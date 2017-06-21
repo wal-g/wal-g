@@ -2,26 +2,34 @@ package main
 
 import (
 	"archive/tar"
+	_ "bytes"
+	"encoding/binary"
 	"fmt"
+	"github.com/rasky/go-lzo"
 	"io"
+	_ "io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"runtime"
 	"time"
-	"github.com/rasky/go-lzo"
-	//"github.com/MediaMath/go-lzop"
-	//"github.com/dgryski/go-lzo"
-	_ "bytes"
-	"encoding/binary"
-	_ "io/ioutil"
 )
 
 const MAX_BLOCK_SIZE = 64 * 1024 * 1024
 
+var HOME string = os.Getenv("HOME")
+
 type Empty struct{}
 
 type TarInterpreter interface {
-	Interpret(tr io.Reader, cur *tar.Header, home, newDir string)
+	Interpret(r io.Reader, hdr *tar.Header)
+}
+
+type NOPTarInterpreter struct{}
+
+type FileTarInterpreter struct {
+	home   string
+	newDir string
 }
 
 func timeTrack(start time.Time, name string) {
@@ -32,39 +40,33 @@ func timeTrack(start time.Time, name string) {
 func makeDir(home, name string) {
 	dest := home + "/" + name
 	if _, err := os.Stat(dest); os.IsNotExist(err) {
-		if err := os.Mkdir(dest, 0777); err != nil {
+		if err := os.Mkdir(dest, 0700); err != nil {
 			panic(err)
 		}
 	}
 }
 
+func decompress(w io.Writer, s io.Reader) {
+	var skip int = 33
 
-func decompress(home, file string) (name string) {
-	path := home + "/" + file
-	skip := 33
-	s, err := os.Open(path)
-
+	sk := make([]byte, skip)
+	_, err := s.Read(sk)
 	if err != nil {
 		panic(err)
 	}
 
-	_, err = s.Seek(int64(skip), 0)
 	var fileNameLen uint8
 
 	binary.Read(s, binary.BigEndian, &fileNameLen)
-
+	
 	fileName := make([]byte, fileNameLen)
-
 	_, err = s.Read(fileName)
-	fmt.Println("fileName", string(fileName))
 	if err != nil {
 		panic(err)
 	}
 
 	fileComment := make([]byte, 4)
 	_, err = s.Read(fileComment)
-
-
 	if err != nil {
 		panic(err)
 	}
@@ -73,32 +75,20 @@ func decompress(home, file string) (name string) {
 	var com uint32
 	var check uint32
 
-	f, err := os.Create(string(fileName))
-	if err != nil {
-		panic(err)
-	}
-
 	for {
 
 		err = binary.Read(s, binary.BigEndian, &uncom)
-
 		if uncom == 0 {
 			break
 		}
-
 		if err != nil {
 			panic(err)
 		}
-
-		log.Printf("uncom: %d\n", uncom)
 
 		err = binary.Read(s, binary.BigEndian, &com)
-
 		if err != nil {
 			panic(err)
 		}
-
-		log.Printf("com: %d\n", com)
 
 		err = binary.Read(s, binary.BigEndian, &check)
 		if err != nil {
@@ -106,8 +96,7 @@ func decompress(home, file string) (name string) {
 		}
 
 		if uncom <= com {
-			//io.CopyN(os.Stdout, s, int64(com))
-			io.CopyN(f, s, int64(com))
+			io.CopyN(w, s, int64(com))
 
 		} else {
 			out, err := lzo.Decompress1X(s, int(com), int(uncom))
@@ -115,38 +104,24 @@ func decompress(home, file string) (name string) {
 				panic(err)
 			}
 
-			_, err = f.Write(out)
+			_, err = w.Write(out)
 			if err != nil {
 				panic(err)
 			}
 		}
 	}
-	return string(fileName)
 }
 
-func decom_ex(ti TarInterpreter, home, newDir, file string) {
-	tar := decompress(home, file)
-	fmt.Println(tar)
-	ExtractOne(ti, home, newDir, tar)
-}
-
-type NOPTarInterpreter struct {
-
-}
-
-func (ti *NOPTarInterpreter) Interpret(tr io.Reader, cur *tar.Header, home, newDir string) {
+func (ti *NOPTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 	fmt.Println(cur.Name)
 }
 
-type FileTarInterpreter struct {
-}
-
-func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header, home, newDir string) {
-	target := home + "/" + newDir + "/" + cur.Name
+func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
+	targetPath := ti.home + "/" + ti.newDir + "/" + cur.Name
 	switch cur.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
 
-		f, err := os.Create(target)
+		f, err := os.Create(targetPath)
 		if err != nil {
 			panic(err)
 		}
@@ -165,32 +140,25 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header, home, new
 			panic(err)
 		}
 	case tar.TypeDir:
-		err := os.Mkdir(target, os.FileMode(cur.Mode))
+		err := os.Mkdir(targetPath, os.FileMode(cur.Mode))
+		fmt.Println(cur.Mode)
 		if err != nil {
 			panic(err)
 		}
 	case tar.TypeLink:
-		if err := os.Link(cur.Name, target); err != nil {
+		if err := os.Link(cur.Name, targetPath); err != nil {
 			panic(err)
 		}
 	case tar.TypeSymlink:
-		if err := os.Symlink(cur.Name, target); err != nil {
+		if err := os.Symlink(cur.Name, targetPath); err != nil {
 			panic(err)
 		}
 	}
 	fmt.Println(cur.Name)
 }
 
-func ExtractOne(ti TarInterpreter, home, newDir, file string) {
-	//s, err := os.Open(home + "/" + file)
-	s, err := os.Open(file)
-	if err != nil {
-		panic(err)
-	}
-
+func ExtractOne(ti TarInterpreter, s io.Reader) {
 	tr := tar.NewReader(s)
-
-	makeDir(home, newDir) //permission 0777
 
 	for {
 		cur, err := tr.Next()
@@ -201,27 +169,46 @@ func ExtractOne(ti TarInterpreter, home, newDir, file string) {
 			panic(err)
 		}
 
-		ti.Interpret(tr, cur, home, newDir)
+		ti.Interpret(tr, cur)
 	}
 
 }
 
-func ExtractAll(ti TarInterpreter, newDir string, files []string) int {
+func ExtractAll(ti TarInterpreter, files []string, flag string) int {
 	defer timeTrack(time.Now(), "Extract With")
-	home := os.Getenv("HOME")
 
 	if len(files) < 1 {
 		log.Fatalln("No files provided.")
 	}
 
-	makeDir(home, newDir)
-
 	sem := make(chan Empty, len(files))
 
 	for i, val := range files {
-		//extract_one(home, newDir, val)
 		go func(i int, val string) {
-			decom_ex(ti, home, newDir, val)
+			pr, pw := io.Pipe()
+			go func() {
+				if flag == "-d" {
+					data, err := http.Get(val)
+					if err != nil {
+						panic(err)
+					}
+
+					r := data.Body
+					defer r.Close()
+					decompress(pw, r)
+				} else if flag == "-f" {
+					r, err := os.Open(HOME + "/" + val)
+					if err != nil {
+						panic(err)
+					}
+					decompress(pw, r)
+				} else {
+					log.Fataln("Flag")
+				}
+				defer pw.Close()
+			}()
+
+			ExtractOne(ti, pr)
 			sem <- Empty{}
 		}(i, val)
 	}
@@ -232,19 +219,21 @@ func ExtractAll(ti TarInterpreter, newDir string, files []string) int {
 	return num
 }
 
-
 func main() {
 	all := os.Args
-	files := all[2:]
-	newDir := all[1]
+	flag := all[1]
+	dir := all[2]
+	f := all[3:]
 
-	// r := compress(os.Getenv("HOME"), os.Args[1])
-	// decompress(r)
-	//decompress(os.Getenv("HOME"), os.Args[1])
-	//decom_ex(os.Getenv("HOME"), os.Args[1], os.Args[2])
+	ft := FileTarInterpreter{
+		home:   HOME,
+		newDir: dir,
+	}
+	makeDir(ft.home, ft.newDir)
 
-	//ExtractAll(newDir, files)
-	fmt.Println("Go Routines: ", ExtractAll(&NOPTarInterpreter{}, newDir, files))
-	//ExtractWithout(os.Args)
+	np := NOPTarInterpreter{}
+
+	fmt.Println("NOP Go Routines: ", ExtractAll(&np, f, flag))
+	fmt.Println("File Go Routines: ", ExtractAll(&ft, f, flag))
 
 }
