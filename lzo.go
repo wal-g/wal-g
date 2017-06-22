@@ -1,10 +1,13 @@
 package extract
 
 import (
-	"io"
 	"encoding/binary"
 	"github.com/rasky/go-lzo"
+	"io"
 )
+
+var Uncompressed uint32
+var Compressed uint32
 
 func decompress(w io.Writer, s io.Reader) {
 	var skip int = 33
@@ -49,6 +52,9 @@ func decompress(w io.Writer, s io.Reader) {
 		if err != nil {
 			panic(err)
 		}
+
+		Uncompressed += uncom
+		Compressed += com
 
 		err = binary.Read(s, binary.BigEndian, &check)
 		if err != nil {

@@ -18,9 +18,9 @@ import (
 
 var counter int32
 
-const lzopPrefix = "\x89\x4c\x5a\x4f\x00\x0d\x0a\x1a\x0a\x10\x30\x20\xa0\x09\x40" + 
-				   "\x01\x05\x03\x00\x00\x01\x00\x00\x81\xa4\x59\x43\x06\xd0\x00" + 
-				   "\x00\x00\x00\x06\x70\x32\x2e\x74\x61\x72\x51\xf8\x06\x08"
+const lzopPrefix = "\x89\x4c\x5a\x4f\x00\x0d\x0a\x1a\x0a\x10\x30\x20\xa0\x09\x40" +
+	"\x01\x05\x03\x00\x00\x01\x00\x00\x81\xa4\x59\x43\x06\xd0\x00" +
+	"\x00\x00\x00\x06\x70\x32\x2e\x74\x61\x72\x51\xf8\x06\x08"
 
 const blockSize = 256 * 1024
 
@@ -86,7 +86,7 @@ func newStrideByteReader(s int) *StrideByteReader {
 	sb := StrideByteReader{
 		stride:    s,
 		randBytes: make([]byte, s),
-	}	
+	}
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	rand.Read(sb.randBytes)
@@ -158,9 +158,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 		go func() {
 			createTar(pw, &lr)
-			// for i := 0; i < 10; i++ {
-			// 	fmt.Fprintf(pw, "0123456789abcdef")
-			// }
 			defer pw.Close()
 		}()
 
@@ -172,4 +169,3 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		panic("bug")
 	}
 }
-

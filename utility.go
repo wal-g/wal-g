@@ -1,9 +1,9 @@
 package extract
 
 import (
-	"time"
-	"os"
 	"log"
+	"os"
+	"time"
 )
 
 func timeTrack(start time.Time, name string) {

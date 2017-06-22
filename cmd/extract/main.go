@@ -25,10 +25,13 @@ func main() {
 		log.Fatalln("Flag Missing")
 	}
 	
-	np := extract.NOPTarInterpreter{}
+	//np := extract.NOPTarInterpreter{}
+	//fmt.Println("NOP Go Routines: ", extract.ExtractAll(&np, data, f))
 
-	fmt.Println("NOP Go Routines: ", extract.ExtractAll(&np, data, f))
 	fmt.Println("File Go Routines: ", extract.ExtractAll(&ft, data, f))
+	log.Printf("Uncompressed: %v", extract.Uncompressed)
+	log.Printf("Compressed: %v", extract.Compressed)
+	log.Printf("Ratio: %.2f%%", (float64(extract.Compressed) / float64(extract.Uncompressed)) * float64(100))
 
 }
 
