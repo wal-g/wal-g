@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 	"flag"
-	_ "github.com/katie31/extract"
+	"github.com/katie31/extract"
 )
 
 func checkArgs() bool {
