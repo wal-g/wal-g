@@ -9,13 +9,6 @@ import (
 )
 
 func main() {
-// 	f := &flag.Parse()
-// 	args := flag.Args()
-// 	dir := args[0]
-// 	data := args[1:]
-
-
-
 	all := os.Args
 	f := all[1]
 	dir := all[2]
