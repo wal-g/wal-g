@@ -87,6 +87,7 @@ func newStrideByteReader(s int) *StrideByteReader {
 		stride:    s,
 		randBytes: make([]byte, s),
 	}
+
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	rand.Read(sb.randBytes)
@@ -94,10 +95,36 @@ func newStrideByteReader(s int) *StrideByteReader {
 }
 
 func (sb *StrideByteReader) Read(p []byte) (n int, err error) {
-	for i := 0; i < len(p); i++ {
-		p[i] = sb.randBytes[sb.counter]
-		sb.counter = (sb.counter + 1) % len(sb.randBytes)
+	l := len(sb.randBytes)
+	//m := len(p)/l
+
+	start := 0
+
+	for {
+		n := copy(p[start:], sb.randBytes[sb.counter:])
+		sb.counter = (sb.counter + n) % l
+		if n == 0 {
+			break
+		} else {
+			start += n 
+		}
 	}
+
+	// for i := l; i < m * l; i += l {
+	// 	copy(p[start:i], sb.randBytes)
+	// 	start += l
+	// }
+
+	// for i := m * l; i < len(p); i++ {
+	// 	p[i] = sb.randBytes[sb.counter]
+	// 	sb.counter = (sb.counter + 1) % l
+	// }
+
+
+	// for i := 0; i < len(p); i++ {
+	// 	p[i] = sb.randBytes[sb.counter]
+	// 	sb.counter = (sb.counter + 1) % len(sb.randBytes)
+	// }
 
 	return len(p), nil
 }
