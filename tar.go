@@ -25,8 +25,8 @@ type TarInterpreter interface {
 type NOPTarInterpreter struct{}
 
 type FileTarInterpreter struct {
-	home   string
-	newDir string
+	Home   string
+	NewDir string
 }
 
 
@@ -101,7 +101,7 @@ func (ti *NOPTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 }
 
 func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
-	targetPath := ti.home + "/" + ti.newDir + "/" + cur.Name
+	targetPath := ti.Home + "/" + ti.NewDir + "/" + cur.Name
 	switch cur.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
 
@@ -194,7 +194,7 @@ func ExtractAll(ti TarInterpreter, files []string, flag string) int {
 					defer r.Close()
 					decompress(pw, r)
 				} else if flag == "-f" {
-					r, err := os.Open(os.Getenv("HOME") + "/" + val)
+					r, err := os.Open(os.Getenv("Home") + "/" + val)
 					if err != nil {
 						panic(err)
 					}

@@ -2,42 +2,40 @@ package main
 
 import (
 	"os"
-	"flag"
+	_ "flag"
 	"github.com/katie31/extract"
+	"fmt"
+	"log"
 )
 
-func checkArgs() bool {
-	
-}
-
 func main() {
-	flag.Parse()
-	args := flag.Args()
-	dir := args[0]
-	f := args[1:]
+// 	f := &flag.Parse()
+// 	args := flag.Args()
+// 	dir := args[0]
+// 	data := args[1:]
 
 
 
-	// all := os.Args
-	// flag := all[1]
-	// dir := all[2]
-	// f := all[3:]
+	all := os.Args
+	f := all[1]
+	dir := all[2]
+	data := all[3:]
 
-	ft := FileTarInterpreter{
-		home:   os.Getenv("HOME"),
-		newDir: dir,
+	ft := extract.FileTarInterpreter{
+		Home:   os.Getenv("HOME"),
+		NewDir: dir,
 	}
 
-	if flag == "-d" || flag == "-f" {
-		extract.MakeDir(ft.home, ft.newDir)
+	if f == "-d" || f == "-f" {
+		extract.MakeDir(ft.Home, ft.NewDir)
 	} else {
 		log.Fatalln("Flag Missing")
 	}
 	
-	np := NOPTarInterpreter{}
+	np := extract.NOPTarInterpreter{}
 
-	fmt.Println("NOP Go Routines: ", extract.ExtractAll(&np, f, flag))
-	fmt.Println("File Go Routines: ", extract.ExtractAll(&ft, f, flag))
+	fmt.Println("NOP Go Routines: ", extract.ExtractAll(&np, data, f))
+	fmt.Println("File Go Routines: ", extract.ExtractAll(&ft, data, f))
 
 }
 
