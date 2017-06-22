@@ -1,4 +1,4 @@
-package main
+package extract
 
 import (
 	"archive/tar"
@@ -13,11 +13,8 @@ import (
 	"os"
 	"runtime"
 	"time"
+	"crypto/tls"
 )
-
-const MAX_BLOCK_SIZE = 64 * 1024 * 1024
-
-var HOME string = os.Getenv("HOME")
 
 type Empty struct{}
 
@@ -32,19 +29,6 @@ type FileTarInterpreter struct {
 	newDir string
 }
 
-func timeTrack(start time.Time, name string) {
-	elapsed := time.Since(start)
-	log.Printf("%s took %s", name, elapsed)
-}
-
-func makeDir(home, name string) {
-	dest := home + "/" + name
-	if _, err := os.Stat(dest); os.IsNotExist(err) {
-		if err := os.Mkdir(dest, 0700); err != nil {
-			panic(err)
-		}
-	}
-}
 
 func decompress(w io.Writer, s io.Reader) {
 	var skip int = 33
@@ -58,7 +42,7 @@ func decompress(w io.Writer, s io.Reader) {
 	var fileNameLen uint8
 
 	binary.Read(s, binary.BigEndian, &fileNameLen)
-	
+
 	fileName := make([]byte, fileNameLen)
 	_, err = s.Read(fileName)
 	if err != nil {
@@ -157,7 +141,7 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 	fmt.Println(cur.Name)
 }
 
-func ExtractOne(ti TarInterpreter, s io.Reader) {
+func extractOne(ti TarInterpreter, s io.Reader) {
 	tr := tar.NewReader(s)
 
 	for {
@@ -188,7 +172,20 @@ func ExtractAll(ti TarInterpreter, files []string, flag string) int {
 			pr, pw := io.Pipe()
 			go func() {
 				if flag == "-d" {
-					data, err := http.Get(val)
+					tls := &http.Transport{
+       					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+    				}
+
+    				client := &http.Client{
+    					Transport: tls,
+    				}
+    				
+					get, err := http.NewRequest("GET", val, nil)
+					if err != nil {
+						panic(err)
+					}
+
+					data, err := client.Do(get)
 					if err != nil {
 						panic(err)
 					}
@@ -197,21 +194,22 @@ func ExtractAll(ti TarInterpreter, files []string, flag string) int {
 					defer r.Close()
 					decompress(pw, r)
 				} else if flag == "-f" {
-					r, err := os.Open(HOME + "/" + val)
+					r, err := os.Open(os.Getenv("HOME") + "/" + val)
 					if err != nil {
 						panic(err)
 					}
 					decompress(pw, r)
 				} else {
-					log.Fataln("Flag")
+					log.Fatalln("Flag")
 				}
 				defer pw.Close()
 			}()
 
-			ExtractOne(ti, pr)
+			extractOne(ti, pr)
 			sem <- Empty{}
 		}(i, val)
 	}
+	
 	num := runtime.NumGoroutine()
 	for i := 0; i < len(files); i++ {
 		<-sem
@@ -219,21 +217,3 @@ func ExtractAll(ti TarInterpreter, files []string, flag string) int {
 	return num
 }
 
-func main() {
-	all := os.Args
-	flag := all[1]
-	dir := all[2]
-	f := all[3:]
-
-	ft := FileTarInterpreter{
-		home:   HOME,
-		newDir: dir,
-	}
-	makeDir(ft.home, ft.newDir)
-
-	np := NOPTarInterpreter{}
-
-	fmt.Println("NOP Go Routines: ", ExtractAll(&np, f, flag))
-	fmt.Println("File Go Routines: ", ExtractAll(&ft, f, flag))
-
-}

@@ -1,4 +1,4 @@
-package main
+package extract
 
 import (
 	"archive/tar"
@@ -8,10 +8,8 @@ import (
 	_ "github.com/dgryski/go-lzo"
 	"github.com/rasky/go-lzo"
 	"io"
-	"log"
 	"math/rand"
 	"net/http"
-	_ "reflect"
 	"regexp"
 	"strconv"
 	"sync/atomic"
@@ -20,7 +18,10 @@ import (
 
 var counter int32
 
-const lzopPrefix = "\x89\x4c\x5a\x4f\x00\x0d\x0a\x1a\x0a\x10\x30\x20\xa0\x09\x40\x01\x05\x03\x00\x00\x01\x00\x00\x81\xa4\x59\x43\x06\xd0\x00\x00\x00\x00\x06\x70\x32\x2e\x74\x61\x72\x51\xf8\x06\x08"
+const lzopPrefix = "\x89\x4c\x5a\x4f\x00\x0d\x0a\x1a\x0a\x10\x30\x20\xa0\x09\x40" + 
+				   "\x01\x05\x03\x00\x00\x01\x00\x00\x81\xa4\x59\x43\x06\xd0\x00" + 
+				   "\x00\x00\x00\x06\x70\x32\x2e\x74\x61\x72\x51\xf8\x06\x08"
+
 const blockSize = 256 * 1024
 
 type StrideByteReader struct {
@@ -29,18 +30,13 @@ type StrideByteReader struct {
 	randBytes []byte
 }
 
-type lzopReader struct {
+type LzopReader struct {
 	uncompressed io.Reader
 	slice        []byte
 	err          error
 }
 
-func timeTrack(start time.Time, name string) {
-	elapsed := time.Since(start)
-	log.Printf("%s took %s", name, elapsed)
-}
-
-func (lz *lzopReader) Read(p []byte) (n int, err error) {
+func (lz *LzopReader) Read(p []byte) (n int, err error) {
 	if len(lz.slice) == 0 {
 		if lz.err == nil {
 			lz.slice = make([]byte, blockSize+12)
@@ -90,8 +86,7 @@ func newStrideByteReader(s int) *StrideByteReader {
 	sb := StrideByteReader{
 		stride:    s,
 		randBytes: make([]byte, s),
-	}
-	//rand.Seed(0)
+	}	
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	rand.Read(sb.randBytes)
@@ -132,7 +127,7 @@ func createTar(w io.Writer, r *io.LimitedReader) {
 
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
+func Handler(w http.ResponseWriter, r *http.Request) {
 	matcher := regexp.MustCompile("/stride-(\\d+).bytes-(\\d+).tar(.lzo)?")
 	str := matcher.FindStringSubmatch(r.URL.Path)
 	stride, err := strconv.Atoi(str[1])
@@ -169,7 +164,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			defer pw.Close()
 		}()
 
-		compressedReader := lzopReader{uncompressed: pr}
+		compressedReader := LzopReader{uncompressed: pr}
 
 		io.Copy(w, &compressedReader)
 		w.Write(make([]byte, 12))
@@ -178,7 +173,3 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func main() {
-	http.HandleFunc("/", handler)
-	http.ListenAndServe("localhost:8080", nil)
-}
