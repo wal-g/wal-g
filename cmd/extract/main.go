@@ -15,18 +15,18 @@ func main() {
 	data := all[3:]
 
 	ft := extract.FileTarInterpreter{
-		Home:   os.Getenv("HOME"),
+		//Home:   os.Getenv("HOME"),
 		NewDir: dir,
 	}
 
 	if f == "-d" || f == "-f" {
-		extract.MakeDir(ft.Home, ft.NewDir)
+		extract.MakeDir(ft.NewDir)
 	} else {
 		log.Fatalln("Flag Missing")
 	}
 	
-	//np := extract.NOPTarInterpreter{}
-	//fmt.Println("NOP Go Routines: ", extract.ExtractAll(&np, data, f))
+	// np := extract.NOPTarInterpreter{}
+	// fmt.Println("NOP Go Routines: ", extract.ExtractAll(&np, data, f))
 
 	fmt.Println("File Go Routines: ", extract.ExtractAll(&ft, data, f))
 	log.Printf("Uncompressed: %v", extract.Uncompressed)
