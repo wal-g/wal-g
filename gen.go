@@ -88,7 +88,8 @@ func newStrideByteReader(s int) *StrideByteReader {
 		randBytes: make([]byte, s),
 	}
 
-	rand.Seed(time.Now().UTC().UnixNano())
+	rand.Seed(0)
+	//rand.Seed(time.Now().UTC().UnixNano())
 
 	rand.Read(sb.randBytes)
 	return &sb
