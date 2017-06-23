@@ -3,6 +3,7 @@ package extract
 import (
 	"crypto/tls"
 	"io"
+	_ "io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -20,19 +21,19 @@ func ExtractAll(ti TarInterpreter, files []string, flag string) int {
 	}
 
 	sem := make(chan Empty, len(files))
+	tls := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	client := &http.Client{
+		Transport: tls,
+	}
 
 	for i, val := range files {
 		go func(i int, val string) {
 			pr, pw := io.Pipe()
 			go func() {
 				if flag == "-d" {
-					tls := &http.Transport{
-						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-					}
-
-					client := &http.Client{
-						Transport: tls,
-					}
 
 					get, err := http.NewRequest("GET", val, nil)
 					if err != nil {
@@ -44,11 +45,13 @@ func ExtractAll(ti TarInterpreter, files []string, flag string) int {
 						panic(err)
 					}
 
+
 					r := data.Body
+
 					defer r.Close()
 					decompress(pw, r)
 				} else if flag == "-f" {
-					r, err := os.Open(os.Getenv("Home") + "/" + val)
+					r, err := os.Open(os.Getenv("HOME") + "/" + val)
 					if err != nil {
 						panic(err)
 					}
