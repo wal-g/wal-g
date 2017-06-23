@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"sync/atomic"
 	"time"
+	"log"
 )
 
 var counter int32
@@ -95,20 +96,14 @@ func newStrideByteReader(s int) *StrideByteReader {
 	return &sb
 }
 
-func (sb *StrideByteReader) Read(p []byte) (n int, err error) {
+func (sb *StrideByteReader) Read(p []byte) (int, error) {
 	l := len(sb.randBytes)
 	//m := len(p)/l
 
-	start := 0
-
-	for {
-		n := copy(p[start:], sb.randBytes[sb.counter:])
+	n := 0
+	for start := 0; start < len(p); n = copy(p[start:], sb.randBytes[sb.counter:]) {
 		sb.counter = (sb.counter + n) % l
-		if n == 0 {
-			break
-		} else {
-			start += n 
-		}
+		start += n 
 	}
 
 	// for i := l; i < m * l; i += l {
@@ -168,6 +163,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
+
+	r.ContentLength = int64(nBytes)
+	log.Println("CONTENTLENGTH:", r.ContentLength)
 
 	lzoFlag := str[3]
 

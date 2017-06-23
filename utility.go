@@ -19,3 +19,7 @@ func MakeDir(home, name string) {
 		}
 	}
 }
+
+// func debug(mes string, val uint32) {
+// 	log.Printf("%s: %d", mes, val)
+// }
