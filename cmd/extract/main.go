@@ -6,13 +6,28 @@ import (
 	"github.com/katie31/extract"
 	"fmt"
 	"log"
+	_ "net/http/pprof"
+	"runtime/pprof"
 )
 
 func main() {
 	all := os.Args
-	f := all[1]
-	dir := all[2]
-	data := all[3:]
+	c := all[1]
+	f := all[2]
+	dir := all[3]
+	data := all[4:]
+
+	if c == "-c" {
+        f, err := os.Create("12.prof")
+        if err != nil {
+            log.Fatal(err)
+        }
+        pprof.StartCPUProfile(f)
+        defer pprof.StopCPUProfile()
+    }
+	// f := all[1]
+	// dir := all[2]
+	// data := all[3:]
 
 	ft := extract.FileTarInterpreter{
 		Home:   os.Getenv("HOME"),
@@ -25,8 +40,8 @@ func main() {
 		log.Fatalln("Flag Missing")
 	}
 	
-	//np := extract.NOPTarInterpreter{}
-	//fmt.Println("NOP Go Routines: ", extract.ExtractAll(&np, data, f))
+	// np := extract.NOPTarInterpreter{}
+	// fmt.Println("NOP Go Routines: ", extract.ExtractAll(&np, data, f))
 
 	fmt.Println("File Go Routines: ", extract.ExtractAll(&ft, data, f))
 	log.Printf("Uncompressed: %v", extract.Uncompressed)

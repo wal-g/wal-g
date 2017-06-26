@@ -20,7 +20,8 @@ func ExtractAll(ti TarInterpreter, files []string, flag string) int {
 		log.Fatalln("No data provided.")
 	}
 
-	sem := make(chan Empty, len(files))
+	concurrency := 40
+	sem := make(chan Empty, concurrency)
 	tls := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
