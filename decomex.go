@@ -13,7 +13,7 @@ import (
 
 type Empty struct{}
 
-func ExtractAll(ti TarInterpreter, files []string, flag string) int {
+func ExtractAll(ti TarInterpreter, files []string, remote bool) int {
 	defer timeTrack(time.Now(), "Extract All")
 
 	if len(files) < 1 {
@@ -34,7 +34,7 @@ func ExtractAll(ti TarInterpreter, files []string, flag string) int {
 		go func(i int, val string) {
 			pr, pw := io.Pipe()
 			go func() {
-				if flag == "-d" {
+				if remote {
 
 					get, err := http.NewRequest("GET", val, nil)
 					if err != nil {
@@ -46,12 +46,11 @@ func ExtractAll(ti TarInterpreter, files []string, flag string) int {
 						panic(err)
 					}
 
-
 					r := data.Body
 
 					defer r.Close()
 					decompress(pw, r)
-				} else if flag == "-f" {
+				} else if !remote {
 					r, err := os.Open(val)
 					if err != nil {
 						panic(err)

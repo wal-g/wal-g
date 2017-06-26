@@ -1,4 +1,3 @@
-//LOCAL
 package extract
 
 import (
@@ -36,10 +35,9 @@ func decompress(w io.Writer, s io.Reader) {
 	if n != len(fileName) {
 		panic("Did not fill filename")
 	}
-	if err != nil{
+	if err != nil {
 		panic(err)
 	}
-
 
 	fileComment := make([]byte, 4)
 	n, err = s.Read(fileComment)
@@ -54,7 +52,6 @@ func decompress(w io.Writer, s io.Reader) {
 	var com uint32
 	var check uint32
 
-
 	for {
 
 		err = binary.Read(s, binary.BigEndian, &uncom)
@@ -65,12 +62,10 @@ func decompress(w io.Writer, s io.Reader) {
 			panic(err)
 		}
 
-
 		err = binary.Read(s, binary.BigEndian, &com)
 		if err != nil {
 			panic(err)
 		}
-
 
 		Uncompressed += uncom
 		Compressed += com

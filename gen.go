@@ -8,13 +8,13 @@ import (
 	_ "github.com/dgryski/go-lzo"
 	"github.com/rasky/go-lzo"
 	"io"
+	_ "log"
 	"math/rand"
 	"net/http"
 	"regexp"
 	"strconv"
 	"sync/atomic"
 	"time"
-	_ "log"
 )
 
 var counter int32
@@ -102,7 +102,7 @@ func (sb *StrideByteReader) Read(p []byte) (int, error) {
 	n := 0
 	for start := 0; start < len(p); n = copy(p[start:], sb.randBytes[sb.counter:]) {
 		sb.counter = (sb.counter + n) % l
-		start += n 
+		start += n
 	}
 
 	// for i := 0; i < len(p); i++ {
