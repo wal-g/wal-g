@@ -14,7 +14,7 @@ type TarInterpreter interface {
 type NOPTarInterpreter struct{}
 
 type FileTarInterpreter struct {
-	Home   string
+	//Home   string
 	NewDir string
 }
 
@@ -23,7 +23,7 @@ func (ti *NOPTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 }
 
 func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
-	targetPath := ti.Home + "/" + ti.NewDir + "/" + cur.Name
+	targetPath := ti.NewDir + "/" + cur.Name
 	switch cur.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
 

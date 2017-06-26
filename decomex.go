@@ -52,7 +52,7 @@ func ExtractAll(ti TarInterpreter, files []string, flag string) int {
 					defer r.Close()
 					decompress(pw, r)
 				} else if flag == "-f" {
-					r, err := os.Open(os.Getenv("HOME") + "/" + val)
+					r, err := os.Open(val)
 					if err != nil {
 						panic(err)
 					}
