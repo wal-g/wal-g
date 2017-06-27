@@ -13,12 +13,6 @@ import (
     "io/ioutil"
 )
 
-type Prefix struct {
-	Creds *credentials.Credentials
-    Bucket *string
-	Path *string
-}
-
 type Backup struct {
 	p    *Prefix
 	name string
