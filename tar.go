@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"time"
+	"path"
 )
 
 type TarInterpreter interface {
@@ -38,7 +39,7 @@ func (ti *NOPTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 }
 
 func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
-	targetPath := ti.NewDir + "/" + cur.Name
+	targetPath := path.Join(ti.NewDir, cur.Name)
 	switch cur.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
 
@@ -61,7 +62,7 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 			panic(err)
 		}
 	case tar.TypeDir:
-		err := os.Mkdir(targetPath, os.FileMode(cur.Mode))
+		err := os.MkdirAll(targetPath, os.FileMode(cur.Mode))
 		fmt.Println(cur.Mode)
 		if err != nil {
 			panic(err)
