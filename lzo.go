@@ -1,4 +1,4 @@
-package extract
+ package extract
 
 import (
 	"encoding/binary"
@@ -17,10 +17,12 @@ func (r *RaskyReader) Read(p []byte) (int, error) {
 var Uncompressed uint32
 var Compressed uint32
 
-func decompress(w io.Writer, s io.Reader) {
+func Decompress(w io.Writer, s io.Reader) {
 	var skip int = 33
 	sk := make([]byte, skip)
+
 	n, err := s.Read(sk)
+
 	if n != len(sk) {
 		panic("Did not fill skip")
 	}

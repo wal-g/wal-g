@@ -4,11 +4,8 @@ import (
 	"archive/tar"
 	"bytes"
 	"encoding/binary"
-	_ "fmt"
-	_ "github.com/dgryski/go-lzo"
 	"github.com/rasky/go-lzo"
 	"io"
-	_ "log"
 	"math/rand"
 	"net/http"
 	"regexp"
@@ -19,11 +16,11 @@ import (
 
 var counter int32
 
-const lzopPrefix = "\x89\x4c\x5a\x4f\x00\x0d\x0a\x1a\x0a\x10\x30\x20\xa0\x09\x40" +
+const LzopPrefix = "\x89\x4c\x5a\x4f\x00\x0d\x0a\x1a\x0a\x10\x30\x20\xa0\x09\x40" +
 	"\x01\x05\x03\x00\x00\x01\x00\x00\x81\xa4\x59\x43\x06\xd0\x00" +
 	"\x00\x00\x00\x06\x70\x32\x2e\x74\x61\x72\x51\xf8\x06\x08"
 
-const blockSize = 256 * 1024
+const LzopBlockSize = 256 * 1024
 
 type StrideByteReader struct {
 	stride    int
@@ -32,7 +29,7 @@ type StrideByteReader struct {
 }
 
 type LzopReader struct {
-	uncompressed io.Reader
+	Uncompressed io.Reader
 	slice        []byte
 	err          error
 }
@@ -40,7 +37,7 @@ type LzopReader struct {
 func (lz *LzopReader) Read(p []byte) (n int, err error) {
 	if len(lz.slice) == 0 {
 		if lz.err == nil {
-			lz.slice = make([]byte, blockSize+12)
+			lz.slice = make([]byte, LzopBlockSize+12)
 			sum := 12
 			i := 0
 			for {
@@ -48,7 +45,7 @@ func (lz *LzopReader) Read(p []byte) (n int, err error) {
 					break
 				}
 
-				i, lz.err = lz.uncompressed.Read(lz.slice[sum:])
+				i, lz.err = lz.Uncompressed.Read(lz.slice[sum:])
 				sum += i
 
 				if lz.err != nil {
@@ -83,7 +80,7 @@ func (lz *LzopReader) Read(p []byte) (n int, err error) {
 	return n, nil
 }
 
-func newStrideByteReader(s int) *StrideByteReader {
+func NewStrideByteReader(s int) *StrideByteReader {
 	sb := StrideByteReader{
 		stride:    s,
 		randBytes: make([]byte, s),
@@ -91,7 +88,6 @@ func newStrideByteReader(s int) *StrideByteReader {
 
 	rand.Seed(0)
 	//rand.Seed(time.Now().UTC().UnixNano())
-
 	rand.Read(sb.randBytes)
 	return &sb
 }
@@ -105,16 +101,11 @@ func (sb *StrideByteReader) Read(p []byte) (int, error) {
 		start += n
 	}
 
-	// for i := 0; i < len(p); i++ {
-	// 	p[i] = sb.randBytes[sb.counter]
-	// 	sb.counter = (sb.counter + 1) % len(sb.randBytes)
-	// }
-
 	return len(p), nil
 }
 
-func createTar(w io.Writer, r *io.LimitedReader) {
-	defer timeTrack(time.Now(), "TAR")
+func CreateTar(w io.Writer, r *io.LimitedReader) {
+	defer TimeTrack(time.Now(), "CREATE TAR")
 	counter = atomic.AddInt32(&counter, 1)
 	tw := tar.NewWriter(w)
 
@@ -154,28 +145,34 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	lzoFlag := str[3]
 
-	sb := newStrideByteReader(stride)
+	sb := NewStrideByteReader(stride)
 	lr := io.LimitedReader{sb, int64(nBytes)}
 
-	defer timeTrack(time.Now(), "HANDLER")
+	defer TimeTrack(time.Now(), "HANDLER")
 
 	switch lzoFlag {
 	case "":
-		createTar(w, &lr)
+		CreateTar(w, &lr)
 	case ".lzo":
-		io.Copy(w, bytes.NewBufferString(lzopPrefix))
+		io.Copy(w, bytes.NewBufferString(LzopPrefix))
 
 		pr, pw := io.Pipe()
 
 		go func() {
-			createTar(pw, &lr)
+			CreateTar(pw, &lr)
 			defer pw.Close()
 		}()
 
-		compressedReader := LzopReader{uncompressed: pr}
+		compressedReader := LzopReader{Uncompressed: pr}
 
 		io.Copy(w, &compressedReader)
-		w.Write(make([]byte, 12))
+		n, err := w.Write(make([]byte, 12))
+		if n != 12 {
+			panic("Did not write empty signal bytes.")
+		}
+		if err != nil {
+			panic(err)
+		}
 	default:
 		panic("bug")
 	}

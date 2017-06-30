@@ -4,7 +4,9 @@ import (
 	"archive/tar"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"time"
 )
 
 type TarInterpreter interface {
@@ -14,8 +16,21 @@ type TarInterpreter interface {
 type NOPTarInterpreter struct{}
 
 type FileTarInterpreter struct {
-	//Home   string
 	NewDir string
+}
+
+type BufferTarInterpreter struct {
+	Out []byte
+}
+
+func (ti *BufferTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
+	defer TimeTrack(time.Now(), "BUFFER INTERPRET")
+	//Assumes only regualr files
+	out, err := ioutil.ReadAll(tr)
+	if err != nil {
+		panic(err)
+	}
+	ti.Out = out
 }
 
 func (ti *NOPTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
