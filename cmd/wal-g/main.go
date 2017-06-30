@@ -111,7 +111,7 @@ func main() {
 	} else if fetch == "wal-fetch" {
 		a := &extract.Archive{
 			Prefix:  pre,
-			Archive: aws.String(*pre.Server + "/wal_005/" + dirArc),
+			Archive: aws.String(*pre.Server + "/wal_005/" + dirArc + ".lzo"),
 		}
 
 		if a.CheckExistence() {
