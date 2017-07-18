@@ -22,6 +22,20 @@ type S3ReaderMaker struct {
 
 func (s *S3ReaderMaker) Format() string { return s.FileFormat }
 
+func (s *S3ReaderMaker) Reader() io.ReadCloser {
+	input := &s3.GetObjectInput{
+		Bucket: s.Backup.Prefix.Bucket,
+		Key:    s.Key,
+	}
+
+	rdr, err := s.Backup.Prefix.Svc.GetObject(input)
+	if err != nil {
+		panic(err)
+	}
+
+	return rdr.Body
+}
+
 type Prefix struct {
 	Creds  *credentials.Credentials
 	Svc    *s3.S3
@@ -94,7 +108,6 @@ func (a *Archive) CheckExistence() bool {
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
-
 			case "NotFound":
 				return false
 			}
@@ -107,20 +120,6 @@ func stripNameBackup(key string) string {
 	all := strings.SplitAfter(key, "/")
 	name := strings.Split(all[2], "_backup")[0]
 	return name
-}
-
-func (s *S3ReaderMaker) Reader() io.ReadCloser {
-	input := &s3.GetObjectInput{
-		Bucket: s.Backup.Prefix.Bucket,
-		Key:    s.Key,
-	}
-
-	rdr, err := s.Backup.Prefix.Svc.GetObject(input)
-	if err != nil {
-		panic(err)
-	}
-
-	return rdr.Body
 }
 
 func GetKeys(b *Backup) []string {

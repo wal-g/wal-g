@@ -55,7 +55,7 @@ func Test1Byte(t *testing.T) { testRoundTrip(t, 7924, 1) }
 
 func Test1MByte(t *testing.T) { testRoundTrip(t, 7924, 1024*1024) }
 
-func Test10BByte(t *testing.T) { testRoundTrip(t, 7924, 1024*1024*10) }
+func Test10BByte(t *testing.T) { testRoundTrip(t, 7924, 10*1024*1024) }
 
 type BufferReaderMaker struct {
 	Buf *bytes.Buffer

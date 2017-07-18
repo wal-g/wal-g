@@ -4,7 +4,6 @@ import (
 	"github.com/pierrec/lz4"
 	"io"
 	"os"
-	//"fmt"
 )
 
 type Lz4CascadeClose struct {

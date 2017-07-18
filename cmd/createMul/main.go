@@ -47,7 +47,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		lab, _ := walg.QueryFile(c, "hello")
+		lab, _ := walg.QueryFile(c, time.Now().String())
 		bkout := filepath.Join(outDir, walg.FormatName(lab))
 
 		bundle.Tbm = &walg.FileTarBallMaker{
@@ -58,18 +58,19 @@ func main() {
 		os.MkdirAll(bkout, 0766)
 
 	} else if s3 {
+		tu, _ := walg.Configure()
 		c, err := walg.Connect()
 		if err != nil {
 			panic(err)
 		}
-		lbl, sc := walg.QueryFile(c, "hello")
+		lbl, sc := walg.QueryFile(c, time.Now().String())
 		n := walg.FormatName(lbl)
 
 		bundle.Tbm = &walg.S3TarBallMaker{
 			BaseDir:  filepath.Base(in),
 			Trim:     in,
 			BkupName: n,
-			Tu:       walg.Configure(),
+			Tu:       tu,
 		}
 
 		bundle.NewTarBall()

@@ -52,7 +52,7 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 		if dne {
 			base := filepath.Base(cur.Name)
 			dir := strings.TrimSuffix(targetPath, base)
-			err := os.MkdirAll(dir, 755)
+			err := os.MkdirAll(dir, 0755)
 			if err != nil {
 				panic(err)
 			}
@@ -80,7 +80,7 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 			panic(err)
 		}
 	case tar.TypeDir:
-		err := os.MkdirAll(targetPath, 755)
+		err := os.MkdirAll(targetPath, 0755)
 		if err != nil {
 			panic(err)
 		}

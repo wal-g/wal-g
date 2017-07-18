@@ -178,7 +178,7 @@ func (s *S3TarBall) Finish() {
 
 	}()
 
-	tupl.wg.Wait()
+	tupl.Finish()
 	fmt.Printf("Uploaded %d compressed tar files.\n", s.number)
 }
 

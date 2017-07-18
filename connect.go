@@ -1,8 +1,8 @@
 package walg
 
 import (
+	"fmt"
 	"github.com/jackc/pgx"
-	// "strconv"
 	"os"
 	"regexp"
 )
@@ -12,8 +12,13 @@ import (
  *  run with `sudo -E -u postgres`.
  */
 func Connect() (*pgx.Conn, error) {
+	host := os.Getenv("PGHOST")
+	if host == "" {
+		fmt.Println("Did not set PGHOST.")
+		os.Exit(1)
+	}
 	config := pgx.ConnConfig{
-		Host: os.Getenv("PGHOST"),
+		Host: host,
 	}
 
 	conn, err := pgx.Connect(config)

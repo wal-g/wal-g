@@ -51,7 +51,7 @@ func checkVar(n map[string]string) error {
  *  Able to configure the upload part size in the S3 uploader.
  *  ISSUES: 64MB will get an out of memory error
  */
-func Configure() *TarUploader {
+func Configure() (*TarUploader, *Prefix) {
 	chk := make(map[string]string)
 
 	chk["WALE_S3_PREFIX"] = os.Getenv("WALE_S3_PREFIX")
@@ -61,7 +61,10 @@ func Configure() *TarUploader {
 	chk["AWS_SECURITY_TOKEN"] = os.Getenv("AWS_SECURITY_TOKEN")
 
 	err := checkVar(chk)
-	if err != nil {
+	if serr, ok := err.(*UnsetEnvVarError); ok {
+		fmt.Println(serr.Error())
+		os.Exit(1)
+	} else if err != nil {
 		panic(err)
 	}
 
@@ -107,7 +110,7 @@ func Configure() *TarUploader {
 		wg:     &sync.WaitGroup{},
 	}
 
-	return upload
+	return upload, pre
 }
 
 /**
@@ -141,8 +144,7 @@ func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 }
 
 /**
- *  Compresses a WAL file using LZ4 and uploads to S3.
- *  ISSUES: UNTESTED
+ *  Compress a WAL file using LZ4 and upload to S3.
  */
 func (tu *TarUploader) UploadWal(path string) {
 	f, err := os.Open(path)
