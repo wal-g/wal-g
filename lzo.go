@@ -1,7 +1,8 @@
- package extract
+package walg
 
 import (
 	"encoding/binary"
+	"github.com/pierrec/lz4"
 	"github.com/rasky/go-lzo"
 	"io"
 )
@@ -17,7 +18,12 @@ func (r *RaskyReader) Read(p []byte) (int, error) {
 var Uncompressed uint32
 var Compressed uint32
 
-func Decompress(w io.Writer, s io.Reader) {
+func CheckType(name string) string {
+	last3 := name[len(name)-3:]
+	return last3
+}
+
+func DecompressLzo(d io.Writer, s io.Reader) {
 	var skip int = 33
 	sk := make([]byte, skip)
 
@@ -78,7 +84,7 @@ func Decompress(w io.Writer, s io.Reader) {
 		}
 
 		if uncom <= com {
-			n, err := io.CopyN(w, s, int64(com))
+			n, err := io.CopyN(d, s, int64(com))
 			if n != int64(com) {
 				panic("uncom <= com")
 			}
@@ -99,7 +105,7 @@ func Decompress(w io.Writer, s io.Reader) {
 				panic(err)
 			}
 
-			n, err = w.Write(out)
+			n, err = d.Write(out)
 			if n != len(out) {
 				panic("Write to pipe failed")
 			}
@@ -107,5 +113,14 @@ func Decompress(w io.Writer, s io.Reader) {
 				panic(err)
 			}
 		}
+	}
+}
+
+func DecompressLz4(d io.Writer, s io.Reader) {
+	lz := lz4.NewReader(s)
+
+	_, err := lz.WriteTo(d)
+	if err != nil {
+		panic(err)
 	}
 }

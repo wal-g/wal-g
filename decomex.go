@@ -1,6 +1,7 @@
-package extract
+package walg
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -9,20 +10,25 @@ import (
 	"time"
 )
 
-type Empty struct{}
-
 type ReaderMaker interface {
 	Reader() io.ReadCloser
+	Format() string
 }
 
 type HttpReaderMaker struct {
-	Client *http.Client
-	Path   string
+	Client     *http.Client
+	Path       string
+	FileFormat string
 }
 
+func (h *HttpReaderMaker) Format() string { return h.FileFormat }
+
 type FileReaderMaker struct {
-	Path string
+	Path       string
+	FileFormat string
 }
+
+func (f *FileReaderMaker) Format() string { return f.FileFormat }
 
 func (h *HttpReaderMaker) Reader() io.ReadCloser {
 	get, err := http.NewRequest("GET", h.Path, nil)
@@ -63,7 +69,15 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) int {
 			go func() {
 				r := val.Reader()
 				defer r.Close()
-				Decompress(pw, r)
+				if val.Format() == "lzo" {
+					DecompressLzo(pw, r)
+				} else if val.Format() == "lz4" {
+					DecompressLz4(pw, r)
+				} else {
+					fmt.Printf("Invalid file type '%s'\n", val.Format())
+					os.Exit(1)
+				}
+
 				defer pw.Close()
 			}()
 

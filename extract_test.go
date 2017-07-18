@@ -1,9 +1,9 @@
-package extract_test
+package walg
 
 import (
 	"bytes"
 	"fmt"
-	"github.com/katie31/extract"
+	"github.com/katie31/wal-g"
 	"io"
 	"io/ioutil"
 	"testing"

@@ -1,4 +1,4 @@
-package extract
+package walg
 
 import (
 	"archive/tar"

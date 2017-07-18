@@ -1,4 +1,4 @@
-package extract
+package walg
 
 import (
 	"archive/tar"
@@ -6,8 +6,10 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"time"
 	"path"
+	"path/filepath"
+	"strings"
+	"time"
 )
 
 type TarInterpreter interface {
@@ -26,7 +28,7 @@ type BufferTarInterpreter struct {
 
 func (ti *BufferTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 	defer TimeTrack(time.Now(), "BUFFER INTERPRET")
-	//Assumes only regualr files
+	//Assumes only regular files
 	out, err := ioutil.ReadAll(tr)
 	if err != nil {
 		panic(err)
@@ -42,9 +44,25 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 	targetPath := path.Join(ti.NewDir, cur.Name)
 	switch cur.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
+		var f *os.File
+		var err error
 
-		f, err := os.Create(targetPath)
-		if err != nil {
+		f, err = os.Create(targetPath)
+		dne := os.IsNotExist(err)
+		if dne {
+			base := filepath.Base(cur.Name)
+			dir := strings.TrimSuffix(targetPath, base)
+			err := os.MkdirAll(dir, 755)
+			if err != nil {
+				panic(err)
+			}
+
+			f, err = os.Create(targetPath)
+			if err != nil {
+				panic(err)
+			}
+		}
+		if err != nil && !dne {
 			panic(err)
 		}
 
@@ -62,9 +80,11 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 			panic(err)
 		}
 	case tar.TypeDir:
-		err := os.MkdirAll(targetPath, os.FileMode(cur.Mode))
-		fmt.Println(cur.Mode)
+		err := os.MkdirAll(targetPath, 755)
 		if err != nil {
+			panic(err)
+		}
+		if err = os.Chmod(targetPath, os.FileMode(cur.Mode)); err != nil {
 			panic(err)
 		}
 	case tar.TypeLink:

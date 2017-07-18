@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"github.com/katie31/extract"
+	"github.com/katie31/wal-g"
 	"log"
 	"net/http"
 	"os"
@@ -20,7 +20,7 @@ var data []string
 func init() {
 	flag.BoolVar(&profile, "p", false, "Profiler (false on default)")
 	flag.BoolVar(&mem, "m", false, "Memory profiler (false on default)")
-	flag.BoolVar(&noOp, "n", false, "Write to file (write on default)")
+	flag.BoolVar(&noOp, "n", false, "NOP extractor (write on default)")
 
 }
 
@@ -30,22 +30,24 @@ func main() {
 	dir := all[0]
 	data := all[1:]
 
-	out := make([]extract.ReaderMaker, len(data))
+	out := make([]walg.ReaderMaker, len(data))
 	for i, val := range data {
 		if strings.HasPrefix(val, "https://") {
 			tls := &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			}
 
-			h := &extract.HttpReaderMaker{
-				Client: &http.Client{Transport: tls},
-				Path:   val,
+			h := &walg.HttpReaderMaker{
+				Client:     &http.Client{Transport: tls},
+				Path:       val,
+				FileFormat: walg.CheckType(val),
 			}
 
 			out[i] = h
 		} else {
-			f := &extract.FileReaderMaker{
-				Path: val,
+			f := &walg.FileReaderMaker{
+				Path:       val,
+				FileFormat: walg.CheckType(val),
 			}
 			out[i] = f
 		}
@@ -61,31 +63,30 @@ func main() {
 	}
 
 	if !noOp {
-		ft := extract.FileTarInterpreter{
+		ft := walg.FileTarInterpreter{
 			NewDir: dir,
 		}
 
-		extract.MakeDir(ft.NewDir)
+		walg.MakeDir(ft.NewDir)
 
-		fmt.Println("File Go Routines: ", extract.ExtractAll(&ft, out))
+		fmt.Println("File Go Routines: ", walg.ExtractAll(&ft, out))
 		if mem {
-		f, err := os.Create("mem.prof")
-		if err != nil {
-			log.Fatal(err)
+			f, err := os.Create("mem.prof")
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			pprof.WriteHeapProfile(f)
+			f.Close()
 		}
-
-		pprof.WriteHeapProfile(f)
-		f.Close()
-	}
 	} else {
-		np := extract.NOPTarInterpreter{}
-		fmt.Println("NOP Go Routines: ", extract.ExtractAll(&np, out))
+		np := walg.NOPTarInterpreter{}
+		fmt.Println("NOP Go Routines: ", walg.ExtractAll(&np, out))
 
 	}
 
-	fmt.Printf("Uncompressed: %v\n", extract.Uncompressed)
-	fmt.Printf("Compressed: %v\n", extract.Compressed)
-	fmt.Printf("Ratio: %.2f%%\n", (float64(extract.Compressed)/float64(extract.Uncompressed))*float64(100))
+	fmt.Printf("Uncompressed: %v\n", walg.Uncompressed)
+	fmt.Printf("Compressed: %v\n", walg.Compressed)
+	fmt.Printf("Ratio: %.2f%%\n", (float64(walg.Compressed)/float64(walg.Uncompressed))*float64(100))
 
-	
 }

@@ -1,4 +1,4 @@
-package extract
+package walg
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
@@ -6,8 +6,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"io"
-	"strings"
 	"sort"
+	"strings"
 )
 
 type WalFiles interface {
@@ -15,9 +15,12 @@ type WalFiles interface {
 }
 
 type S3ReaderMaker struct {
-	Backup *Backup
-	Key    *string
+	Backup     *Backup
+	Key        *string
+	FileFormat string
 }
+
+func (s *S3ReaderMaker) Format() string { return s.FileFormat }
 
 type Prefix struct {
 	Creds  *credentials.Credentials
@@ -34,14 +37,14 @@ type Backup struct {
 }
 
 type Archive struct {
-	Prefix *Prefix
+	Prefix  *Prefix
 	Archive *string
 }
 
-func GetLatest(b *Backup) string{
+func GetLatest(b *Backup) string {
 	objects := &s3.ListObjectsInput{
-		Bucket: b.Prefix.Bucket,
-		Prefix: b.Path,
+		Bucket:    b.Prefix.Bucket,
+		Prefix:    b.Path,
 		Delimiter: aws.String("/"),
 	}
 
@@ -84,7 +87,7 @@ func (b *Backup) CheckExistence() bool {
 func (a *Archive) CheckExistence() bool {
 	arch := &s3.HeadObjectInput{
 		Bucket: a.Prefix.Bucket,
-		Key: a.Archive,
+		Key:    a.Archive,
 	}
 
 	_, err := a.Prefix.Svc.HeadObject(arch)
@@ -98,7 +101,6 @@ func (a *Archive) CheckExistence() bool {
 		}
 	}
 	return true
-
 }
 
 func stripNameBackup(key string) string {
@@ -145,7 +147,7 @@ func GetKeys(b *Backup) []string {
 func GetArchive(a *Archive) io.ReadCloser {
 	input := &s3.GetObjectInput{
 		Bucket: a.Prefix.Bucket,
-		Key: a.Archive,
+		Key:    a.Archive,
 	}
 
 	archive, err := a.Prefix.Svc.GetObject(input)

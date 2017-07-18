@@ -6,10 +6,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/katie31/extract"
+	"github.com/katie31/wal-g"
+	//"github.com/katie31/write"
 	"net/url"
 	"os"
-	//"sort"
 )
 
 func main() {
@@ -19,7 +19,7 @@ func main() {
 		panic(err)
 	}
 
-	pre := &extract.Prefix{
+	pre := &walg.Prefix{
 		Creds:  credentials.NewStaticCredentials(os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY"), os.Getenv("AWS_SECURITY_TOKEN")),
 		Bucket: aws.String(u.Host),
 		Server: aws.String(u.Path[1:]),
@@ -52,10 +52,10 @@ func main() {
 	/*** OPTION: BACKUP-FETCH ***/
 	if fetch == "backup-fetch" {
 		var keys []string
-		var bk *extract.Backup
+		var bk *walg.Backup
 		/*** Check if backup specified in COMMAND LINE exists and if it does extract to NEWDIR. ***/
 		if backupName != "LATEST" {
-			bk = &extract.Backup{
+			bk = &walg.Backup{
 				Prefix: pre,
 				Path:   aws.String(*pre.Server + "/basebackups_005/"),
 				Name:   aws.String(backupName),
@@ -63,14 +63,14 @@ func main() {
 
 			bk.Js = aws.String(*bk.Path + *bk.Name + "_backup_stop_sentinel.json")
 
-			fmt.Println("NEWDIR", dirArc)
+			fmt.Println("NEWDIR:", dirArc)
 			fmt.Println("PATH:", *bk.Path)
 			fmt.Println("NAME:", *bk.Name)
 			fmt.Println("JSON:", *bk.Js)
 			fmt.Println(bk.CheckExistence())
 
 			if bk.CheckExistence() {
-				keys = extract.GetKeys(bk)
+				keys = walg.GetKeys(bk)
 			} else {
 				fmt.Printf("Backup '%s' does not exist.\n", *bk.Name)
 				os.Exit(1)
@@ -78,13 +78,13 @@ func main() {
 
 			/*** Find the LATEST valid backup (checks against JSON file and grabs name from there) and extract to NEWDIR. ***/
 		} else {
-			bk = &extract.Backup{
+			bk = &walg.Backup{
 				Prefix: pre,
 				Path:   aws.String(*pre.Server + "/basebackups_005/"),
 			}
 
-			bk.Name = aws.String(extract.GetLatest(bk))
-			keys = extract.GetKeys(bk)
+			bk.Name = aws.String(walg.GetLatest(bk))
+			keys = walg.GetKeys(bk)
 
 			fmt.Println("NEWDIR", dirArc)
 			fmt.Println("PATH:", *bk.Path)
@@ -92,35 +92,37 @@ func main() {
 
 		}
 
-		out := make([]extract.ReaderMaker, len(keys))
+		out := make([]walg.ReaderMaker, len(keys))
 		for i, key := range keys {
-			s := &extract.S3ReaderMaker{
-				Backup: bk,
-				Key:    aws.String(key),
+			s := &walg.S3ReaderMaker{
+				Backup:     bk,
+				Key:        aws.String(key),
+				FileFormat: walg.CheckType(key),
 			}
 			out[i] = s
 		}
 
-		f := &extract.FileTarInterpreter{
+		f := &walg.FileTarInterpreter{
 			NewDir: dirArc,
 		}
-		extract.ExtractAll(f, out)
+		walg.ExtractAll(f, out)
 
-		//np := &extract.NOPTarInterpreter{}
-		//extract.ExtractAll(np, out)
+		//np := &walg.NOPTarInterpreter{}
+		//walg.ExtractAll(np, out)
 	} else if fetch == "wal-fetch" {
-		a := &extract.Archive{
+		a := &walg.Archive{
 			Prefix:  pre,
 			Archive: aws.String(*pre.Server + "/wal_005/" + dirArc + ".lzo"),
 		}
 
 		if a.CheckExistence() {
-			arch := extract.GetArchive(a)
+			arch := walg.GetArchive(a)
 			f, err := os.Create(backupName)
 			if err != nil {
 				panic(err)
 			}
-			extract.Decompress(f, arch)
+
+			walg.DecompressLzo(f, arch)
 			f.Close()
 		} else {
 			fmt.Printf("Archive '%s' does not exist.\n", dirArc)
@@ -130,6 +132,11 @@ func main() {
 		// fmt.Println(a.CheckExistence())
 		//a.CheckExistence()
 
-	}
+	} //else if fetch == "wal-push" {
+	// 	tupl := write.Configure()
+	// 	tupl.UploadWal("PATH")
+	// 	tupl.Finish()
+
+	// }
 
 }

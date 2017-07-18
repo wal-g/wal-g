@@ -1,4 +1,4 @@
-package extract
+package walg
 
 import (
 	"fmt"
@@ -34,8 +34,26 @@ func TimeTrack(start time.Time, name string) {
 func MakeDir(name string) {
 	dest := name
 	if _, err := os.Stat(dest); os.IsNotExist(err) {
-		if err := os.Mkdir(dest, 0700); err != nil {
+		if err := os.MkdirAll(dest, 0755); err != nil {
 			panic(err)
 		}
+	}
+}
+
+/*** For padding purposes. ***/
+func countDigits(i int) int {
+	count := 0
+	for {
+		if i == 0 {
+			break
+		}
+		i /= 10
+		count += 1
+	}
+
+	if count == 0 {
+		return 1
+	} else {
+		return count
 	}
 }
