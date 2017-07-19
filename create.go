@@ -72,7 +72,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 			panic(err)
 		}
 
-		hdr.Name = filepath.Join(tarBall.BaseDir(), strings.TrimPrefix(path, tarBall.Trim()))
+		hdr.Name = filepath.Join(strings.TrimPrefix(path, tarBall.Trim()))
 		fmt.Println("NAME:", hdr.Name)
 
 		err = tarWriter.WriteHeader(hdr)
@@ -86,18 +86,20 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 				panic(err)
 			}
 
+			lim := &io.LimitedReader{
+				R: f,
+				N: int64(hdr.Size),
+			}
+
 			fmt.Println("Writing tar ...")
 
-			_, err = io.Copy(tarWriter, f)
-
-			// if err == tar.ErrWriteTooLong {
-
-			// }
+			_, err = io.Copy(tarWriter, lim)
 
 			if err != nil {
 				panic(err)
 			}
 			tarBall.SetSize(hdr.Size)
+			f.Close()
 		}
 	}
 

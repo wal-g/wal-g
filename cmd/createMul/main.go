@@ -4,17 +4,23 @@ import (
 	"flag"
 	"fmt"
 	"github.com/katie31/wal-g"
+	"log"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"strconv"
 	"time"
 )
 
+var profile bool
+var mem bool
 var nop bool
 var s3 bool
 var outDir string
 
 func init() {
+	flag.BoolVar(&profile, "p", false, "Profiler (false on default)")
+	flag.BoolVar(&mem, "m", false, "Memory profiler (false on default)")
 	flag.BoolVar(&nop, "n", false, "Use a NOP writer (false on default).")
 	flag.BoolVar(&s3, "s", false, "Upload compressed tar files to s3 (write to disk on default)")
 	flag.StringVar(&outDir, "out", "", "Directory compressed tar files will be written to (unset on default)")
@@ -28,6 +34,15 @@ func main() {
 		panic(err)
 	}
 	in := all[1]
+
+	if profile {
+		f, err := os.Create("cpu.prof")
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
 
 	bundle := &walg.Bundle{
 		MinSize: int64(part),
@@ -43,19 +58,12 @@ func main() {
 		fmt.Printf("Please provide a directory to write to.\n")
 		os.Exit(1)
 	} else if !s3 {
-		c, err := walg.Connect()
-		if err != nil {
-			panic(err)
-		}
-		lab, _ := walg.QueryFile(c, time.Now().String())
-		bkout := filepath.Join(outDir, walg.FormatName(lab))
-
 		bundle.Tbm = &walg.FileTarBallMaker{
 			BaseDir: filepath.Base(in),
 			Trim:    in,
-			Out:     bkout,
+			Out:     outDir,
 		}
-		os.MkdirAll(bkout, 0766)
+		os.MkdirAll(outDir, 0766)
 
 	} else if s3 {
 		tu, _ := walg.Configure()
@@ -87,5 +95,15 @@ func main() {
 	}
 	bundle.Tb.CloseTar()
 	bundle.Tb.Finish()
+
+	if mem {
+		f, err := os.Create("mem.prof")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		pprof.WriteHeapProfile(f)
+		f.Close()
+	}
 
 }

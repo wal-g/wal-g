@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"flag"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/katie31/wal-g"
 	"os"
@@ -9,31 +10,56 @@ import (
 	"time"
 )
 
+var help bool
+var helpMsg = "backup-fetch\tfetch a backup from S3\n" + 
+			"backup-push\tstarts and uploads a backup to S3\n" + 
+			"wal-fetch\tfetch a WAL file from S3\n" +
+			"wal-push\tpush a WAL file to S3\n"
+
+
+func init() {
+	flag.Usage = func() {
+        fmt.Fprintf(os.Stderr, "Usage of WAL-G:\n")
+        fmt.Fprintf(os.Stderr, "%s", helpMsg)
+        flag.PrintDefaults()
+	}
+	
+	//flag.BoolVar(&help, "", false, helpMsg)
+}
+
 func main() {
 	/**
 	 *  Configure and start session with bucket, region, and path names. Checks that environment variables
 	 *  are properly set. Layer: Server
 	 */
+	flag.Parse()
+	all := flag.Args()
+	if len(all) == 0 {
+		fmt.Println("Please choose a command:")
+		fmt.Println(helpMsg)
+		os.Exit(1)
+	}
+	command := all[0]
+	dirArc := all[1]
+
+	var backupName string
+	if len(all) == 3 {
+		backupName = all[2]
+	}
+
 	tu, pre := walg.Configure()
 
 	fmt.Println("BUCKET:", *pre.Bucket)
 	fmt.Println("PATH:", *pre.Server)
 
 	/*** Grab arguments from command line ***/
-	all := os.Args
-	command := all[1]
-	dirArc := all[2]
-
-	var backupName string
-	if len(all) == 4 {
-		backupName = all[3]
-	}
+	
 
 	/*** OPTION: BACKUP-FETCH ***/
 	if command == "backup-fetch" {
 		var keys []string
 		var bk *walg.Backup
-		/*** Check if backup specified in COMMAND LINE exists and if it does extract to NEWDIR. ***/
+		/*** Check if BACKUPNAME exists and if it does extract to DIRARC. ***/
 		if backupName != "LATEST" {
 			bk = &walg.Backup{
 				Prefix: pre,
@@ -56,8 +82,8 @@ func main() {
 				os.Exit(1)
 			}
 
-			/*** Find the LATEST valid backup (checks against JSON file and grabs name from there) and extract to NEWDIR. ***/
-		} else {
+			/*** Find the LATEST valid backup (checks against JSON file and grabs name from there) and extract to DIRARC. ***/
+		} else if backupName == "LATEST" {
 			bk = &walg.Backup{
 				Prefix: pre,
 				Path:   aws.String(*pre.Server + "/basebackups_005/"),
@@ -118,9 +144,6 @@ func main() {
 			fmt.Printf("Archive '%s' does not exist.\n", dirArc)
 			os.Exit(1)
 		}
-		// fmt.Println(*a.Archive)
-		// fmt.Println(a.CheckExistence())
-		//a.CheckExistence()
 
 	} else if command == "wal-push" {
 		tu.UploadWal(dirArc)
@@ -147,9 +170,9 @@ func main() {
 		bundle.NewTarBall()
 		bundle.UploadLabelFiles(lbl, sc)
 
-		/*** WALK the in directory and upload to S3. ***/
+		/*** WALK the DIRARC directory and upload to S3. ***/
 		bundle.NewTarBall()
-		defer walg.TimeTrack(time.Now(), "MAIN")
+		defer walg.TimeTrack(time.Now(), "BACKUP-PUSH")
 		fmt.Println("Walking ...")
 		err = filepath.Walk(dirArc, bundle.TarWalker)
 		if err != nil {

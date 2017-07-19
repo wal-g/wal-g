@@ -186,7 +186,7 @@ func (bundle *Bundle) UploadLabelFiles(lb, sc string) {
 	tarWriter := tarBall.Tw()
 
 	lhdr := &tar.Header{
-		Name:     filepath.Join(tarBall.BaseDir(), "data", "backup_label"),
+		Name:     filepath.Join("backup_label"),
 		Mode:     int64(0600),
 		Size:     int64(len(lb)),
 		Typeflag: tar.TypeReg,
@@ -202,7 +202,7 @@ func (bundle *Bundle) UploadLabelFiles(lb, sc string) {
 	}
 
 	shdr := &tar.Header{
-		Name:     filepath.Join(tarBall.BaseDir(), "data", "tablespace_map"),
+		Name:     filepath.Join("tablespace_map"),
 		Mode:     int64(0600),
 		Size:     int64(len(sc)),
 		Typeflag: tar.TypeReg,
