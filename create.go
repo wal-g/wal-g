@@ -72,7 +72,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 			panic(err)
 		}
 
-		hdr.Name = filepath.Join(strings.TrimPrefix(path, tarBall.Trim()))
+		hdr.Name = strings.TrimPrefix(path, tarBall.Trim())
 		fmt.Println("NAME:", hdr.Name)
 
 		err = tarWriter.WriteHeader(hdr)

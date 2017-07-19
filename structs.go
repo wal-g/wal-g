@@ -22,7 +22,6 @@ func init() {
 	EXCLUDE["pg_log"] = Empty{}
 	EXCLUDE["pg_xlog"] = Empty{}
 	EXCLUDE["pg_wal"] = Empty{}
-	EXCLUDE["pg_control"] = Empty{}
 
 	EXCLUDE["pgsql_tmp"] = Empty{}
 	EXCLUDE["postgresql.auto.conf.tmp"] = Empty{}
