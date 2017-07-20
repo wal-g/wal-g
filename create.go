@@ -19,6 +19,18 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 		panic(err)
 	}
 
+	// _, ok := EXCLUDE[info.Name()]
+
+	// if ok && info.IsDir() {
+	// 	fmt.Println("------------------------------------------EXCLUDED")
+	// 	fmt.Println("------------------------------------------", path)
+	// 	//p := strings.TrimPrefix(path, bundle.Tb.Trim())
+	// 	fmt.Println("------------------------------------------", p)
+	// 	//os.MkdirAll(p, info.Mode())
+	// 	err = HandleTar(bundle, path, info)
+	// 	return filepath.SkipDir
+	// }
+
 	if bundle.Tb.Size() <= bundle.MinSize {
 		fmt.Println("---SIZE:", bundle.MinSize)
 		err = HandleTar(bundle, path, info)
@@ -31,6 +43,7 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 	} else {
 		oldTB := bundle.Tb
 		oldTB.CloseTar()
+
 		fmt.Println("------------------------------------------NEW------------------------------------------")
 		bundle.NewTarBall()
 		err = HandleTar(bundle, path, info)
@@ -64,7 +77,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 	var hdr *tar.Header
 	var err error
 
-	if !ok && info.Mode().IsRegular() {
+	if !ok {
 		fmt.Println("------------------------------------------", fileName)
 		hdr, err = tar.FileInfoHeader(info, fileName)
 		if err != nil {
@@ -78,26 +91,27 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 		if err != nil {
 			panic(err)
 		}
-		f, err := os.Open(path)
-		if err != nil {
-			panic(err)
-		}
-		lim := &io.LimitedReader{
-			R: f,
-			N: int64(hdr.Size),
-		}
+		if info.Mode().IsRegular() {
+			f, err := os.Open(path)
+			if err != nil {
+				panic(err)
+			}
+			lim := &io.LimitedReader{
+				R: f,
+				N: int64(hdr.Size),
+			}
 
-		fmt.Println("Writing tar ...")
+			fmt.Println("Writing tar ...")
 
-		_, err = io.Copy(tarWriter, lim)
-		if err != nil {
-			panic(err)
+			_, err = io.Copy(tarWriter, lim)
+			if err != nil {
+				panic(err)
+			}
+
+			tarBall.SetSize(hdr.Size)
+			f.Close()
 		}
-
-		tarBall.SetSize(hdr.Size)
-		f.Close()
 	} else if ok && info.Mode().IsDir() {
-		fmt.Println("------------------------------------------EXCLUDED")
 		fmt.Println("------------------------------------------", fileName)
 		hdr, err = tar.FileInfoHeader(info, fileName)
 		if err != nil {
