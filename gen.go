@@ -105,7 +105,7 @@ func (sb *StrideByteReader) Read(p []byte) (int, error) {
 }
 
 func CreateTar(w io.Writer, r *io.LimitedReader) {
-	defer TimeTrack(time.Now(), "CREATE TAR")
+	//defer TimeTrack(time.Now(), "CREATE TAR")
 	counter = atomic.AddInt32(&counter, 1)
 	tw := tar.NewWriter(w)
 

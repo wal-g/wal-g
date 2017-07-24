@@ -180,7 +180,58 @@ func (tu *TarUploader) UploadWal(path string) {
 
 }
 
+func (bundle *Bundle) UploadSentinel() {
+	fileName := bundle.Sen.info.Name()
+	info := bundle.Sen.info
+	path := bundle.Sen.path
+
+	bundle.NewTarBall()
+	tarBall := bundle.Tb
+	tarBall.SetUp("pg_control.tar.lz4")
+	tarWriter := tarBall.Tw()
+
+	fmt.Println("------------------------------------------", fileName)
+	hdr, err := tar.FileInfoHeader(info, fileName)
+	if err != nil {
+		panic(err)
+	}
+
+	hdr.Name = strings.TrimPrefix(path, tarBall.Trim())
+	fmt.Println("NAME:", hdr.Name)
+
+	err = tarWriter.WriteHeader(hdr)
+	if err != nil {
+		panic(err)
+	}
+
+	if info.Mode().IsRegular() {
+		f, err := os.Open(path)
+		if err != nil {
+			panic(err)
+		}
+
+		lim := &io.LimitedReader{
+			R: f,
+			N: int64(hdr.Size),
+		}
+
+		_, err = io.Copy(tarWriter, lim)
+		if err != nil {
+			panic(err)
+		}
+
+		tarBall.SetSize(hdr.Size)
+		f.Close()
+	}
+	tarBall.CloseTar()
+}
+
+/**
+ *  Creates the `backup_label` and `tablespace_map` files and uploads
+ *  it to S3.
+ */
 func (bundle *Bundle) UploadLabelFiles(lb, sc string) {
+	bundle.NewTarBall()
 	tarBall := bundle.Tb
 	tarBall.SetUp()
 	tarWriter := tarBall.Tw()

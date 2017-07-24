@@ -8,7 +8,7 @@ import (
 
 type Lz4CascadeClose struct {
 	*lz4.Writer
-	underlying io.WriteCloser
+	Underlying io.WriteCloser
 }
 
 func (lcc *Lz4CascadeClose) Close() (err error) {
@@ -16,7 +16,7 @@ func (lcc *Lz4CascadeClose) Close() (err error) {
 	if err != nil {
 		panic(err)
 	}
-	err = lcc.underlying.Close()
+	err = lcc.Underlying.Close()
 	if err != nil {
 		panic(err)
 	}

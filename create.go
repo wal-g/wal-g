@@ -19,19 +19,9 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 		panic(err)
 	}
 
-	// _, ok := EXCLUDE[info.Name()]
-
-	// if ok && info.IsDir() {
-	// 	fmt.Println("------------------------------------------EXCLUDED")
-	// 	fmt.Println("------------------------------------------", path)
-	// 	//p := strings.TrimPrefix(path, bundle.Tb.Trim())
-	// 	fmt.Println("------------------------------------------", p)
-	// 	//os.MkdirAll(p, info.Mode())
-	// 	err = HandleTar(bundle, path, info)
-	// 	return filepath.SkipDir
-	// }
-
-	if bundle.Tb.Size() <= bundle.MinSize {
+	if info.Name() == "pg_control" {
+		bundle.Sen = &Sentinel{info, path}
+	} else if bundle.Tb.Size() <= bundle.MinSize {
 		fmt.Println("---SIZE:", bundle.MinSize)
 		err = HandleTar(bundle, path, info)
 		if err == filepath.SkipDir {

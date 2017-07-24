@@ -9,7 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"time"
+	//"time"
 )
 
 type TarInterpreter interface {
@@ -27,7 +27,7 @@ type BufferTarInterpreter struct {
 }
 
 func (ti *BufferTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
-	defer TimeTrack(time.Now(), "BUFFER INTERPRET")
+	//defer TimeTrack(time.Now(), "BUFFER INTERPRET")
 	//Assumes only regular files
 	out, err := ioutil.ReadAll(tr)
 	if err != nil {
@@ -76,6 +76,10 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 			panic(err)
 		}
 
+		if err = f.Sync(); err != nil {
+			panic(err)
+		}
+
 		if err = f.Close(); err != nil {
 			panic(err)
 		}
@@ -96,6 +100,7 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 			panic(err)
 		}
 	}
+
 	fmt.Println(cur.Name)
 }
 

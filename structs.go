@@ -49,15 +49,22 @@ type TarBundle interface {
 /*** CONCRETE TAR BUNDLE ***/
 type Bundle struct {
 	MinSize int64
-	Tb      TarBall
-	Tbm     TarBallMaker
+	Sen     *Sentinel
+	//Corrupt bool
+	Tb  TarBall
+	Tbm TarBallMaker
 }
 
 func (b *Bundle) GetTarBall() TarBall { return b.Tb }
 func (b *Bundle) NewTarBall()         { b.Tb = b.Tbm.Make() }
 
+type Sentinel struct {
+	info os.FileInfo
+	path string
+}
+
 type TarBall interface {
-	SetUp()
+	SetUp(args ...string)
 	CloseTar()
 	Finish()
 	BaseDir() string
@@ -80,7 +87,7 @@ type FileTarBall struct {
 	tw      *tar.Writer
 }
 
-func (fb *FileTarBall) SetUp() {
+func (fb *FileTarBall) SetUp(names ...string) {
 	if fb.tw == nil {
 		name := filepath.Join(fb.out, "part_"+fmt.Sprintf("%0.3d", fb.number)+".tar.lz4")
 		f, err := os.Create(name)
@@ -129,9 +136,14 @@ type S3TarBall struct {
 	tu       *TarUploader
 }
 
-func (s *S3TarBall) SetUp() {
+func (s *S3TarBall) SetUp(names ...string) {
 	if s.tw == nil {
-		name := "part_" + fmt.Sprintf("%0.3d", s.number) + ".tar.lz4"
+		var name string
+		if len(names) > 0 {
+			name = names[0]
+		} else {
+			name = "part_" + fmt.Sprintf("%0.3d", s.number) + ".tar.lz4"
+		}
 		w := s.StartUpload(name)
 		s.w = w
 		s.tw = tar.NewWriter(w)
@@ -198,9 +210,9 @@ type NOPTarBall struct {
 	tw      *tar.Writer
 }
 
-func (n *NOPTarBall) SetUp()    { return }
-func (n *NOPTarBall) CloseTar() { return }
-func (n *NOPTarBall) Finish()   { fmt.Printf("NOP: %d files.\n", n.number) }
+func (n *NOPTarBall) SetUp(params ...string) { return }
+func (n *NOPTarBall) CloseTar()              { return }
+func (n *NOPTarBall) Finish()                { fmt.Printf("NOP: %d files.\n", n.number) }
 
 func (n *NOPTarBall) BaseDir() string { return n.baseDir }
 func (n *NOPTarBall) Trim() string    { return n.trim }

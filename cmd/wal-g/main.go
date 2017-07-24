@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"flag"
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/katie31/wal-g"
 	"os"
@@ -11,19 +11,18 @@ import (
 )
 
 var help bool
-var helpMsg = "backup-fetch\tfetch a backup from S3\n" + 
-			"backup-push\tstarts and uploads a backup to S3\n" + 
-			"wal-fetch\tfetch a WAL file from S3\n" +
-			"wal-push\tpush a WAL file to S3\n"
-
+var helpMsg = "backup-fetch\tfetch a backup from S3\n" +
+	"backup-push\tstarts and uploads a backup to S3\n" +
+	"wal-fetch\tfetch a WAL file from S3\n" +
+	"wal-push\tpush a WAL file to S3\n"
 
 func init() {
 	flag.Usage = func() {
-        fmt.Fprintf(os.Stderr, "Usage of WAL-G:\n")
-        fmt.Fprintf(os.Stderr, "%s", helpMsg)
-        flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "Usage of WAL-G:\n")
+		fmt.Fprintf(os.Stderr, "%s", helpMsg)
+		flag.PrintDefaults()
 	}
-	
+
 	//flag.BoolVar(&help, "", false, helpMsg)
 }
 
@@ -53,10 +52,10 @@ func main() {
 	fmt.Println("PATH:", *pre.Server)
 
 	/*** Grab arguments from command line ***/
-	
 
 	/*** OPTION: BACKUP-FETCH ***/
 	if command == "backup-fetch" {
+		var allKeys []string
 		var keys []string
 		var bk *walg.Backup
 		/*** Check if BACKUPNAME exists and if it does extract to DIRARC. ***/
@@ -76,7 +75,9 @@ func main() {
 			fmt.Println(bk.CheckExistence())
 
 			if bk.CheckExistence() {
-				keys = walg.GetKeys(bk)
+				allKeys = walg.GetKeys(bk)
+				keys = allKeys[:len(allKeys)-1]
+
 			} else {
 				fmt.Printf("Backup '%s' does not exist.\n", *bk.Name)
 				os.Exit(1)
@@ -90,12 +91,17 @@ func main() {
 			}
 
 			bk.Name = aws.String(walg.GetLatest(bk))
-			keys = walg.GetKeys(bk)
+			allKeys = walg.GetKeys(bk)
+			keys = allKeys[:len(allKeys)-1]
 
 			fmt.Println("NEWDIR", dirArc)
 			fmt.Println("PATH:", *bk.Path)
 			fmt.Println("NAME:", *bk.Name)
 
+		}
+
+		f := &walg.FileTarInterpreter{
+			NewDir: dirArc,
 		}
 
 		out := make([]walg.ReaderMaker, len(keys))
@@ -108,11 +114,24 @@ func main() {
 			out[i] = s
 		}
 
-		f := &walg.FileTarInterpreter{
-			NewDir: dirArc,
+		/*** Extract all except pg_control. ***/
+		walg.ExtractAll(f, out)
+
+		/*** Extract pg_control last. ***/
+		last := len(allKeys) - 1
+		sentinel := make([]walg.ReaderMaker, 1)
+		sentinel[0] = &walg.S3ReaderMaker{
+			Backup:     bk,
+			Key:        aws.String(allKeys[last]),
+			FileFormat: walg.CheckType(allKeys[last]),
+		}
+		check := filepath.Base(allKeys[last])
+		if check != "pg_control.tar.lz4" {
+			fmt.Println("Corrupted backup.")
+			os.Exit(1)
 		}
 
-		walg.ExtractAll(f, out)
+		walg.ExtractAll(f, sentinel)
 
 		//np := &walg.NOPTarInterpreter{}
 		//walg.ExtractAll(np, out)
@@ -151,6 +170,7 @@ func main() {
 	} else if command == "backup-push" {
 		bundle := &walg.Bundle{
 			MinSize: int64(1000000000), //MINSIZE = 1GB
+			//Corrupt: true,
 		}
 		c, err := walg.Connect()
 		if err != nil {
@@ -166,10 +186,6 @@ func main() {
 			Tu:       tu,
 		}
 
-		/*** UPLOAD label files. ***/
-		bundle.NewTarBall()
-		bundle.UploadLabelFiles(lbl, sc)
-
 		/*** WALK the DIRARC directory and upload to S3. ***/
 		bundle.NewTarBall()
 		defer walg.TimeTrack(time.Now(), "BACKUP-PUSH")
@@ -179,6 +195,12 @@ func main() {
 			panic(err)
 		}
 		bundle.Tb.CloseTar()
+
+		/*** UPLOAD label files. ***/
+		bundle.UploadLabelFiles(lbl, sc)
+
+		/*** UPLOAD `pg_control`. ***/
+		bundle.UploadSentinel()
 		bundle.Tb.Finish()
 	}
 

@@ -32,8 +32,8 @@ func (s *S3ReaderMaker) Reader() io.ReadCloser {
 	if err != nil {
 		panic(err)
 	}
-
 	return rdr.Body
+
 }
 
 type Prefix struct {

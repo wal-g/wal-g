@@ -39,21 +39,3 @@ func MakeDir(name string) {
 		}
 	}
 }
-
-/*** For padding purposes. ***/
-func countDigits(i int) int {
-	count := 0
-	for {
-		if i == 0 {
-			break
-		}
-		i /= 10
-		count += 1
-	}
-
-	if count == 0 {
-		return 1
-	} else {
-		return count
-	}
-}
