@@ -9,14 +9,11 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	//"time"
 )
 
 type TarInterpreter interface {
 	Interpret(r io.Reader, hdr *tar.Header)
 }
-
-type NOPTarInterpreter struct{}
 
 type FileTarInterpreter struct {
 	NewDir string
@@ -34,10 +31,6 @@ func (ti *BufferTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 		panic(err)
 	}
 	ti.Out = out
-}
-
-func (ti *NOPTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
-	fmt.Println(cur.Name)
 }
 
 func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
@@ -102,21 +95,4 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 	}
 
 	fmt.Println(cur.Name)
-}
-
-func extractOne(ti TarInterpreter, s io.Reader) {
-	tr := tar.NewReader(s)
-
-	for {
-		cur, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			panic(err)
-		}
-
-		ti.Interpret(tr, cur)
-	}
-
 }

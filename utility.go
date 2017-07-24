@@ -2,7 +2,6 @@ package walg
 
 import (
 	"fmt"
-	"os"
 	"time"
 )
 
@@ -29,13 +28,4 @@ func (p TimeSlice) Swap(i, j int) {
 func TimeTrack(start time.Time, name string) {
 	elapsed := time.Since(start)
 	fmt.Printf("%s took %s\n", name, elapsed)
-}
-
-func MakeDir(name string) {
-	dest := name
-	if _, err := os.Stat(dest); os.IsNotExist(err) {
-		if err := os.MkdirAll(dest, 0755); err != nil {
-			panic(err)
-		}
-	}
 }

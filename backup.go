@@ -14,6 +14,11 @@ type WalFiles interface {
 	CheckExistence() bool
 }
 
+type ReaderMaker interface {
+	Reader() io.ReadCloser
+	Format() string
+}
+
 type S3ReaderMaker struct {
 	Backup     *Backup
 	Key        *string
@@ -55,6 +60,9 @@ type Archive struct {
 	Archive *string
 }
 
+/**
+ *  Sorts the backups by last modified time and returns the latest backup key.
+ */
 func GetLatest(b *Backup) string {
 	objects := &s3.ListObjectsInput{
 		Bucket:    b.Prefix.Bucket,
@@ -80,6 +88,9 @@ func GetLatest(b *Backup) string {
 	return sortTimes[0].Name
 }
 
+/**
+ *  Checks that the specified backup exists. 
+ */
 func (b *Backup) CheckExistence() bool {
 	js := &s3.HeadObjectInput{
 		Bucket: b.Prefix.Bucket,
@@ -98,6 +109,9 @@ func (b *Backup) CheckExistence() bool {
 	return true
 }
 
+/**
+ *  Checks that the specified WAL file exists.
+ */
 func (a *Archive) CheckExistence() bool {
 	arch := &s3.HeadObjectInput{
 		Bucket: a.Prefix.Bucket,
@@ -116,6 +130,9 @@ func (a *Archive) CheckExistence() bool {
 	return true
 }
 
+/** 
+ *  Strips the backup key and returns it in its base form `base_...`.
+ */
 func stripNameBackup(key string) string {
 	all := strings.SplitAfter(key, "/")
 	name := strings.Split(all[2], "_backup")[0]
@@ -143,6 +160,9 @@ func GetKeys(b *Backup) []string {
 	return arr
 }
 
+/**
+ *  Downloads the specified archive from S3.
+ */
 func GetArchive(a *Archive) io.ReadCloser {
 	input := &s3.GetObjectInput{
 		Bucket: a.Prefix.Bucket,

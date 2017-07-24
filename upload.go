@@ -180,6 +180,10 @@ func (tu *TarUploader) UploadWal(path string) {
 
 }
 
+/**
+ *  Uploads the compressed tar file of `pg_control`. Will only be called
+ *  after the rest of the backup is successfully uploaded to S3.
+ */
 func (bundle *Bundle) UploadSentinel() {
 	fileName := bundle.Sen.info.Name()
 	info := bundle.Sen.info

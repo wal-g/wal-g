@@ -22,14 +22,12 @@ func init() {
 		fmt.Fprintf(os.Stderr, "%s", helpMsg)
 		flag.PrintDefaults()
 	}
-
-	//flag.BoolVar(&help, "", false, helpMsg)
 }
 
 func main() {
 	/**
 	 *  Configure and start session with bucket, region, and path names. Checks that environment variables
-	 *  are properly set. Layer: Server
+	 *  are properly set.
 	 */
 	flag.Parse()
 	all := flag.Args()
@@ -50,8 +48,6 @@ func main() {
 
 	fmt.Println("BUCKET:", *pre.Bucket)
 	fmt.Println("PATH:", *pre.Server)
-
-	/*** Grab arguments from command line ***/
 
 	/*** OPTION: BACKUP-FETCH ***/
 	if command == "backup-fetch" {
@@ -117,25 +113,27 @@ func main() {
 		/*** Extract all except pg_control. ***/
 		walg.ExtractAll(f, out)
 
-		/*** Extract pg_control last. ***/
-		last := len(allKeys) - 1
-		sentinel := make([]walg.ReaderMaker, 1)
-		sentinel[0] = &walg.S3ReaderMaker{
-			Backup:     bk,
-			Key:        aws.String(allKeys[last]),
-			FileFormat: walg.CheckType(allKeys[last]),
+		/*** Extract pg_control last. If pg_control does not exist, program exits with error code 1. ***/
+		name := *bk.Path + *bk.Name + "/tar_partitions/pg_control.tar.lz4"
+		pgControl := &walg.Archive{
+			Prefix:  pre,
+			Archive: aws.String(name),
 		}
-		check := filepath.Base(allKeys[last])
-		if check != "pg_control.tar.lz4" {
-			fmt.Println("Corrupted backup.")
+
+		if pgControl.CheckExistence() {
+			sentinel := make([]walg.ReaderMaker, 1)
+			sentinel[0] = &walg.S3ReaderMaker{
+				Backup:     bk,
+				Key:        aws.String(name),
+				FileFormat: walg.CheckType(name),
+			}
+			walg.ExtractAll(f, sentinel)
+		} else {
+			fmt.Println("Corrupt backup: missing pg_control")
 			os.Exit(1)
 		}
-
-		walg.ExtractAll(f, sentinel)
-
-		//np := &walg.NOPTarInterpreter{}
-		//walg.ExtractAll(np, out)
 	} else if command == "wal-fetch" {
+		/*** Fetch and decompress a WAL file from S3. ***/
 		a := &walg.Archive{
 			Prefix:  pre,
 			Archive: aws.String(*pre.Server + "/wal_005/" + dirArc + ".lzo"),
@@ -170,7 +168,6 @@ func main() {
 	} else if command == "backup-push" {
 		bundle := &walg.Bundle{
 			MinSize: int64(1000000000), //MINSIZE = 1GB
-			//Corrupt: true,
 		}
 		c, err := walg.Connect()
 		if err != nil {

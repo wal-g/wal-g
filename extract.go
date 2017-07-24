@@ -1,56 +1,30 @@
 package walg
 
 import (
+	"archive/tar"
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"runtime"
 	"time"
 )
 
-type ReaderMaker interface {
-	Reader() io.ReadCloser
-	Format() string
-}
+func extractOne(ti TarInterpreter, s io.Reader) {
+	tr := tar.NewReader(s)
 
-type HttpReaderMaker struct {
-	Client     *http.Client
-	Path       string
-	FileFormat string
-}
+	for {
+		cur, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			panic(err)
+		}
 
-func (h *HttpReaderMaker) Format() string { return h.FileFormat }
-
-type FileReaderMaker struct {
-	Path       string
-	FileFormat string
-}
-
-func (f *FileReaderMaker) Format() string { return f.FileFormat }
-
-func (h *HttpReaderMaker) Reader() io.ReadCloser {
-	get, err := http.NewRequest("GET", h.Path, nil)
-	if err != nil {
-		panic(err)
+		ti.Interpret(tr, cur)
 	}
 
-	data, err := h.Client.Do(get)
-	if err != nil {
-		panic(err)
-	}
-
-	return data.Body
-}
-
-func (f *FileReaderMaker) Reader() io.ReadCloser {
-	r, err := os.Open(f.Path)
-	if err != nil {
-		panic(err)
-	}
-
-	return r
 }
 
 func ExtractAll(ti TarInterpreter, files []ReaderMaker) int {
