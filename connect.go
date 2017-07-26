@@ -51,9 +51,13 @@ func QueryFile(conn *pgx.Conn, backup string) (string, string) {
 
 /**
  *  Grabs the name of the WAL file and returns it in the form of `base_...`.
+ *  If no match is found, returns an empty string and a NoMatchAvailableError.
  */
-func FormatName(s string) string {
+func FormatName(s string) (string, error) {
 	re := regexp.MustCompile(`\(([^\)]+)\)`)
 	f := re.FindString(s)
-	return "base_" + f[6:len(f)-1]
+	if f == "" {
+		return "", NoMatchAvailableError{s}
+	}
+	return "base_" + f[6:len(f)-1], nil
 }

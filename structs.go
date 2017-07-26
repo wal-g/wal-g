@@ -56,13 +56,13 @@ func (b *Bundle) GetTarBall() TarBall { return b.Tb }
 func (b *Bundle) NewTarBall()         { b.Tb = b.Tbm.Make() }
 
 type Sentinel struct {
-	info os.FileInfo
+	Info os.FileInfo
 	path string
 }
 
 type TarBall interface {
 	SetUp(args ...string)
-	CloseTar()
+	CloseTar() error
 	Finish()
 	BaseDir() string
 	Trim() string
@@ -99,17 +99,22 @@ func (s *S3TarBall) SetUp(names ...string) {
 	}
 }
 
-func (s *S3TarBall) CloseTar() {
+/**
+ *  Closes tar writer flushing any unwritten data to underlying writer before also
+ *  closing the underlying writer.
+ */
+func (s *S3TarBall) CloseTar() error {
 	err := s.tw.Close()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	err = s.w.Close()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	fmt.Println("Closed")
+	return nil
 }
 
 /**

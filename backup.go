@@ -89,7 +89,7 @@ func GetLatest(b *Backup) string {
 }
 
 /**
- *  Checks that the specified backup exists. 
+ *  Checks that the specified backup exists.
  */
 func (b *Backup) CheckExistence() bool {
 	js := &s3.HeadObjectInput{
@@ -130,7 +130,7 @@ func (a *Archive) CheckExistence() bool {
 	return true
 }
 
-/** 
+/**
  *  Strips the backup key and returns it in its base form `base_...`.
  */
 func stripNameBackup(key string) string {

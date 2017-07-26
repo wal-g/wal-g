@@ -174,7 +174,10 @@ func main() {
 			panic(err)
 		}
 		lbl, sc := walg.QueryFile(c, time.Now().String())
-		n := walg.FormatName(lbl)
+		n, err := walg.FormatName(lbl)
+		if err != nil {
+			panic(err)
+		}
 
 		bundle.Tbm = &walg.S3TarBallMaker{
 			BaseDir:  filepath.Base(dirArc),
@@ -191,7 +194,10 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		bundle.Tb.CloseTar()
+		err = bundle.Tb.CloseTar()
+		if err != nil {
+			panic(err)
+		}
 
 		/*** UPLOAD label files. ***/
 		bundle.UploadLabelFiles(lbl, sc)

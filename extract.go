@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 	"runtime"
-	"time"
+	//"time"
 )
 
 func extractOne(ti TarInterpreter, s io.Reader) {
@@ -28,7 +28,7 @@ func extractOne(ti TarInterpreter, s io.Reader) {
 }
 
 func ExtractAll(ti TarInterpreter, files []ReaderMaker) int {
-	defer TimeTrack(time.Now(), "EXTRACT ALL")
+	//defer TimeTrack(time.Now(), "EXTRACT ALL")
 
 	if len(files) < 1 {
 		log.Fatalln("No data provided.")

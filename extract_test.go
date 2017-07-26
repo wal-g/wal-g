@@ -34,7 +34,7 @@ func testLzopRoundTrip(t *testing.T, stride, nBytes int) {
 	_, err = io.Copy(lzopTarReader, comReader)
 	lzopTarReader.Write(make([]byte, 12))
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 
 	/*** Extract the generated tar and check that its one member is the same as the bytes generated to begin with. ***/
@@ -44,7 +44,7 @@ func testLzopRoundTrip(t *testing.T, stride, nBytes int) {
 	walg.ExtractAll(buf, files)
 
 	if !bytes.Equal(bCopy, buf.Out) {
-		t.Fail()
+		t.Error("decompressed output does not match input.")
 	}
 }
 

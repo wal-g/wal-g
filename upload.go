@@ -153,7 +153,7 @@ func (tu *TarUploader) UploadWal(path string) {
 	}
 
 	lz := &LzPipeWriter{
-		chunk: f,
+		Input: f,
 	}
 
 	lz.Compress()
@@ -161,7 +161,7 @@ func (tu *TarUploader) UploadWal(path string) {
 	input := &s3manager.UploadInput{
 		Bucket: aws.String(tu.bucket),
 		Key:    aws.String(p),
-		Body:   lz.pr,
+		Body:   lz.Output,
 	}
 
 	tu.wg.Add(1)
@@ -185,8 +185,8 @@ func (tu *TarUploader) UploadWal(path string) {
  *  after the rest of the backup is successfully uploaded to S3.
  */
 func (bundle *Bundle) UploadSentinel() {
-	fileName := bundle.Sen.info.Name()
-	info := bundle.Sen.info
+	fileName := bundle.Sen.Info.Name()
+	info := bundle.Sen.Info
 	path := bundle.Sen.path
 
 	bundle.NewTarBall()
@@ -227,7 +227,10 @@ func (bundle *Bundle) UploadSentinel() {
 		tarBall.SetSize(hdr.Size)
 		f.Close()
 	}
-	tarBall.CloseTar()
+	err = tarBall.CloseTar()
+	if err != nil {
+		panic(err)
+	}
 }
 
 /**
@@ -272,5 +275,8 @@ func (bundle *Bundle) UploadLabelFiles(lb, sc string) {
 		panic(err)
 	}
 
-	tarBall.CloseTar()
+	err = tarBall.CloseTar()
+	if err != nil {
+		panic(err)
+	}
 }

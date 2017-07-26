@@ -10,26 +10,26 @@ type Lz4CascadeClose struct {
 	Underlying io.WriteCloser
 }
 
-func (lcc *Lz4CascadeClose) Close() (err error) {
-	err = lcc.Writer.Close()
+func (lcc *Lz4CascadeClose) Close() error {
+	err := lcc.Writer.Close()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	err = lcc.Underlying.Close()
 	if err != nil {
-		panic(err)
+		return err
 	}
-	return
+	return nil
 }
 
 type LzPipeWriter struct {
-	chunk io.Reader
-	pr    *io.PipeReader
+	Input  io.Reader
+	Output *io.PipeReader
 }
 
 func (p *LzPipeWriter) Writer() io.WriteCloser {
 	pr, pw := io.Pipe()
-	p.pr = pr
+	p.Output = pr
 	return pw
 }
 
@@ -38,7 +38,7 @@ func (p *LzPipeWriter) Compress() {
 	lzw := lz4.NewWriter(w)
 
 	go func() {
-		_, err := lzw.ReadFrom(p.chunk)
+		_, err := lzw.ReadFrom(p.Input)
 		if err != nil {
 			panic(err)
 		}

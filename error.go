@@ -14,3 +14,12 @@ func (e UnsetEnvVarError) Error() string {
 
 	return msg
 }
+
+type NoMatchAvailableError struct {
+	str string
+}
+
+func (e NoMatchAvailableError) Error() string {
+	msg := "No match found in '" + e.str + "'\n"
+	return msg
+}

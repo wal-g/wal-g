@@ -32,7 +32,10 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 		}
 	} else {
 		oldTB := bundle.Tb
-		oldTB.CloseTar()
+		err := oldTB.CloseTar()
+		if err != nil {
+			panic(err)
+		}
 
 		fmt.Println("------------------------------------------NEW------------------------------------------")
 		bundle.NewTarBall()
@@ -58,11 +61,6 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 	_, ok := EXCLUDE[info.Name()]
 	tarBall.SetUp()
 	tarWriter := tarBall.Tw()
-
-	if tarBall.Nop() && !ok {
-		fmt.Println("------------------------------------------", fileName)
-		return nil
-	}
 
 	var hdr *tar.Header
 	var err error
