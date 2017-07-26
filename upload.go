@@ -184,7 +184,7 @@ func (tu *TarUploader) UploadWal(path string) {
  *  Uploads the compressed tar file of `pg_control`. Will only be called
  *  after the rest of the backup is successfully uploaded to S3.
  */
-func (bundle *Bundle) UploadSentinel() {
+func (bundle *Bundle) HandleSentinel() {
 	fileName := bundle.Sen.Info.Name()
 	info := bundle.Sen.Info
 	path := bundle.Sen.path
@@ -237,7 +237,7 @@ func (bundle *Bundle) UploadSentinel() {
  *  Creates the `backup_label` and `tablespace_map` files and uploads
  *  it to S3.
  */
-func (bundle *Bundle) UploadLabelFiles(lb, sc string) {
+func (bundle *Bundle) HandleLabelFiles(lb, sc string) {
 	bundle.NewTarBall()
 	tarBall := bundle.Tb
 	tarBall.SetUp()

@@ -200,10 +200,10 @@ func main() {
 		}
 
 		/*** UPLOAD label files. ***/
-		bundle.UploadLabelFiles(lbl, sc)
+		bundle.HandleLabelFiles(lbl, sc)
 
 		/*** UPLOAD `pg_control`. ***/
-		bundle.UploadSentinel()
+		bundle.HandleSentinel()
 		bundle.Tb.Finish()
 	}
 
