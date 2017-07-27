@@ -1,0 +1,106 @@
+package write
+
+import (
+	"archive/tar"
+	"bytes"
+	"fmt"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"io"
+	"os"
+	"sync"
+)
+
+type TarBall interface {
+	SetUp(*TarUploader, string, *sync.WaitGroup)
+	CloseTar()
+	Out() string
+	BaseDir() string
+	Trim() string
+	Number() int
+	Size() int64
+	SetSize(int64)
+	W() io.WriteCloser
+	Tw() *tar.Writer
+}
+
+type FileTarBall struct {
+	number       int
+	size 		 int64
+	out 		 string
+	baseDir      string
+	trim         string
+}
+
+type BufTarBall struct {
+	out          string
+	baseDir      string
+	trim         string
+	number       int
+	size         int64
+	pr           *io.PipeReader
+	w            io.WriteCloser
+	tw           *tar.Writer
+}
+
+func (bb *BufTarBall) SetUp(t *TarUploader, name string, wg *sync.WaitGroup) {
+	if bb.tw == nil {
+		w := bb.StartUpload(t, name, wg)
+		bb.w = w
+		bb.tw = tar.NewWriter(w)
+	}
+}
+
+func (bb *BufTarBall) CloseTar() {
+	err := bb.tw.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	err = bb.w.Close()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Closed")
+}
+
+func (bb *BufTarBall) Out() string       { return bb.out }
+func (bb *BufTarBall) BaseDir() string   { return bb.baseDir }
+func (bb *BufTarBall) Trim() string      { return bb.trim }
+func (bb *BufTarBall) Number() int       { return bb.number }
+func (bb *BufTarBall) Size() int64       { return bb.size }
+func (bb *BufTarBall) SetSize(i int64)   { bb.size += i }
+func (bb *BufTarBall) W() io.WriteCloser { return bb.w }
+func (bb *BufTarBall) Tw() *tar.Writer   { return bb.tw }
+
+type TarBundle interface {
+	//NewTarBall(number int, base, trim string)
+	GetTarBall() TarBall
+	TarUploader() *TarUploader
+	Wg() *sync.WaitGroup
+}
+
+/*** CONCRETE TAR BUNDLE ***/
+type Bundle struct {
+	MinSize      int64
+	ByteInterval int
+	TB           *BufTarBall
+	Tu           *TarUploader
+	wg           *sync.WaitGroup
+	NewTarBall   func(number int, base, trim string) TarBall
+}
+
+func (b *Bundle) TarUploader() *TarUploader { return b.Tu }
+func (b *Bundle) Wg() *sync.WaitGroup       { return b.wg }
+
+func (b *Bundle) NewTarBall(number int, base, trim string) {
+	b.TB = b.NewTarBall(number, base, trim)
+}
+
+func (b *Bundle) GetTarBall() TarBall { return b.TB }
+
+type TarUploader struct {
+	Upl    *s3manager.Uploader
+	Bucket string
+	Server string
+	Region string
+}

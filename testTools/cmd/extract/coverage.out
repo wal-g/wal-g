@@ -1,0 +1,17 @@
+mode: set
+github.com/katie31/extract/cmd/extract/main.go:20.13,25.2 3 1
+github.com/katie31/extract/cmd/extract/main.go:27.13,34.27 6 0
+github.com/katie31/extract/cmd/extract/main.go:54.2,54.13 1 0
+github.com/katie31/extract/cmd/extract/main.go:63.2,63.11 1 0
+github.com/katie31/extract/cmd/extract/main.go:86.2,88.105 3 0
+github.com/katie31/extract/cmd/extract/main.go:34.27,35.41 1 0
+github.com/katie31/extract/cmd/extract/main.go:35.41,46.4 3 0
+github.com/katie31/extract/cmd/extract/main.go:46.4,51.4 2 0
+github.com/katie31/extract/cmd/extract/main.go:54.13,56.17 2 0
+github.com/katie31/extract/cmd/extract/main.go:59.3,60.31 2 0
+github.com/katie31/extract/cmd/extract/main.go:56.17,58.4 1 0
+github.com/katie31/extract/cmd/extract/main.go:63.11,71.10 4 0
+github.com/katie31/extract/cmd/extract/main.go:71.10,73.17 2 0
+github.com/katie31/extract/cmd/extract/main.go:77.3,78.12 2 0
+github.com/katie31/extract/cmd/extract/main.go:73.17,75.4 1 0
+github.com/katie31/extract/cmd/extract/main.go:80.3,84.3 2 0
