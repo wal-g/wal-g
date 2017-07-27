@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"github.com/katie31/wal-g"
-	"github.com/katie31/wal-g/prototype"
+	"github.com/katie31/wal-g/testTools"
 	"io"
 	"io/ioutil"
 	"os"
@@ -69,7 +69,7 @@ func generateData(t *testing.T) string {
 	}
 	fmt.Println(dir)
 
-	sb := prototype.NewStrideByteReader(10)
+	sb := tools.NewStrideByteReader(10)
 	lr := &io.LimitedReader{sb, int64(1024 * 1024)}
 
 	/*** Generates 5 1MB files ***/
@@ -132,7 +132,7 @@ func extract(t *testing.T, dir string) string {
 	out := make([]walg.ReaderMaker, len(files))
 	for i, val := range files {
 		path := filepath.Join(dir, val.Name())
-		f := &prototype.FileReaderMaker{
+		f := &tools.FileReaderMaker{
 			Path:       path,
 			FileFormat: walg.CheckType(val.Name()),
 		}
@@ -297,7 +297,7 @@ func TestWalk(t *testing.T) {
 		MinSize: int64(10),
 	}
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
-	bundle.Tbm = &prototype.FileTarBallMaker{
+	bundle.Tbm = &tools.FileTarBallMaker{
 		BaseDir: filepath.Base(data),
 		Trim:    data,
 		Out:     compressed,

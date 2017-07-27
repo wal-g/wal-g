@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/katie31/wal-g"
-	"github.com/katie31/wal-g/prototype"
+	"github.com/katie31/wal-g/testTools"
 	"io"
 	"io/ioutil"
 	"testing"
@@ -12,7 +12,7 @@ import (
 
 func testLzopRoundTrip(t *testing.T, stride, nBytes int) {
 	/*** Generate and save random bytes compare against compression-decompression cycle. ***/
-	sb := prototype.NewStrideByteReader(stride)
+	sb := tools.NewStrideByteReader(stride)
 	lr := &io.LimitedReader{sb, int64(nBytes)}
 	b, err := ioutil.ReadAll(lr)
 
@@ -26,11 +26,11 @@ func testLzopRoundTrip(t *testing.T, stride, nBytes int) {
 	/*** Compress bytes and make a tar in memory. ***/
 	tarR, memberW := io.Pipe()
 	go func() {
-		prototype.CreateTar(memberW, &io.LimitedReader{bytes.NewBuffer(b), int64(len(b))})
+		tools.CreateTar(memberW, &io.LimitedReader{bytes.NewBuffer(b), int64(len(b))})
 		memberW.Close()
 	}()
-	comReader := &prototype.LzopReader{Uncompressed: tarR}
-	lzopTarReader := bytes.NewBufferString(prototype.LzopPrefix)
+	comReader := &tools.LzopReader{Uncompressed: tarR}
+	lzopTarReader := bytes.NewBufferString(tools.LzopPrefix)
 	_, err = io.Copy(lzopTarReader, comReader)
 	lzopTarReader.Write(make([]byte, 12))
 	if err != nil {
@@ -49,7 +49,7 @@ func testLzopRoundTrip(t *testing.T, stride, nBytes int) {
 }
 
 func TestLzopUncompressableBytes(t *testing.T) {
-	testLzopRoundTrip(t, prototype.LzopBlockSize*2, prototype.LzopBlockSize*2)
+	testLzopRoundTrip(t, tools.LzopBlockSize*2, tools.LzopBlockSize*2)
 }
 
 func TestLzop1Byte(t *testing.T)   { testLzopRoundTrip(t, 7924, 1) }
@@ -70,18 +70,18 @@ func (b *BufferReaderMaker) Format() string {
 }
 
 func setupRand(stride, nBytes int) *BufferReaderMaker {
-	sb := prototype.NewStrideByteReader(stride)
+	sb := tools.NewStrideByteReader(stride)
 	lr := &io.LimitedReader{sb, int64(nBytes)}
-	b := &BufferReaderMaker{bytes.NewBufferString(prototype.LzopPrefix), "lzo"}
+	b := &BufferReaderMaker{bytes.NewBufferString(tools.LzopPrefix), "lzo"}
 
 	pr, pw := io.Pipe()
 
 	go func() {
-		prototype.CreateTar(pw, lr)
+		tools.CreateTar(pw, lr)
 		defer pw.Close()
 	}()
 
-	comReader := prototype.LzopReader{Uncompressed: pr}
+	comReader := tools.LzopReader{Uncompressed: pr}
 	io.Copy(b.Buf, &comReader)
 	n, err := b.Buf.Write(make([]byte, 12))
 
