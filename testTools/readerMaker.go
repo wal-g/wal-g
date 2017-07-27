@@ -8,21 +8,23 @@ import (
 
 type HttpReaderMaker struct {
 	Client     *http.Client
-	Path       string
+	Key        string
 	FileFormat string
 }
 
 func (h *HttpReaderMaker) Format() string { return h.FileFormat }
+func (h *HttpReaderMaker) Path() string   { return h.Key }
 
 type FileReaderMaker struct {
-	Path       string
+	Key        string
 	FileFormat string
 }
 
 func (f *FileReaderMaker) Format() string { return f.FileFormat }
+func (f *FileReaderMaker) Path() string   { return f.Key }
 
 func (h *HttpReaderMaker) Reader() io.ReadCloser {
-	get, err := http.NewRequest("GET", h.Path, nil)
+	get, err := http.NewRequest("GET", h.Key, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -36,7 +38,7 @@ func (h *HttpReaderMaker) Reader() io.ReadCloser {
 }
 
 func (f *FileReaderMaker) Reader() io.ReadCloser {
-	r, err := os.Open(f.Path)
+	r, err := os.Open(f.Key)
 	if err != nil {
 		panic(err)
 	}

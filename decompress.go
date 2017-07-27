@@ -5,8 +5,12 @@ import (
 	"github.com/pierrec/lz4"
 	"github.com/rasky/go-lzo"
 	"io"
+	"regexp"
 )
 
+/**
+ *  Fix bug in rasky package. Crashes if byte size is too small.
+ */
 type RaskyReader struct {
 	R io.Reader
 }
@@ -18,11 +22,18 @@ func (r *RaskyReader) Read(p []byte) (int, error) {
 var Uncompressed uint32
 var Compressed uint32
 
-func CheckType(name string) string {
-	last3 := name[len(name)-3:]
-	return last3
+/**
+ *  Grabs the file extention from PATH
+ */
+func CheckType(path string) string {
+	re := regexp.MustCompile(`\.([^\.]+)$`)
+	f := re.FindString(path)
+	return f[1:]
 }
 
+/**
+ *  Decompress an .lzo file.
+ */
 func DecompressLzo(d io.Writer, s io.Reader) {
 	var skip int = 33
 	sk := make([]byte, skip)
@@ -116,6 +127,9 @@ func DecompressLzo(d io.Writer, s io.Reader) {
 	}
 }
 
+/**
+ *  Decompress a .lz4 file.
+ */
 func DecompressLz4(d io.Writer, s io.Reader) {
 	lz := lz4.NewReader(s)
 

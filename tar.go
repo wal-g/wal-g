@@ -23,6 +23,9 @@ type BufferTarInterpreter struct {
 	Out []byte
 }
 
+/**
+ *  Handles in memory tar formats. Mostly for testing purposes.
+ */
 func (ti *BufferTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 	//defer TimeTrack(time.Now(), "BUFFER INTERPRET")
 	//Assumes only regular files
@@ -33,6 +36,10 @@ func (ti *BufferTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 	ti.Out = out
 }
 
+/**
+ *  Extracts a tar file and creates needed directories.
+ *  TODO: test symlinks
+ */
 func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 	targetPath := path.Join(ti.NewDir, cur.Name)
 	switch cur.Typeflag {

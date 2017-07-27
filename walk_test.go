@@ -54,8 +54,9 @@ func createLabelFiles(t *testing.T, dir string) {
 }
 
 /**
- *  Generate 5 1MB of random data and write to temp 
- *  directory 'data...'.
+ *  Generate 5 1MB of random data and write to temp
+ *  directory 'data...'. Also creates a fake sentinel file and
+ *  tests that excluded directories are handled correctly.
  */
 func generateData(t *testing.T) string {
 	cwd, err := filepath.Abs("./")
@@ -88,6 +89,7 @@ func generateData(t *testing.T) string {
 	if err != nil {
 		t.Log(err)
 	}
+
 	f, err := os.Create(filepath.Join(dir, "global", "pg_control"))
 	if err != nil {
 		t.Log(err)
@@ -97,7 +99,23 @@ func generateData(t *testing.T) string {
 		t.Log(err)
 	}
 
+	/*** Test that concurrency doesn't break extract. ***/
+	s, err := os.Create(filepath.Join(dir, "global", "bytes"))
+	if err != nil {
+		t.Log(err)
+	}
+	err = s.Chmod(0600)
+	if err != nil {
+		t.Log(err)
+	}
+
+	_, err = io.Copy(s, lr)
+	if err != nil {
+		t.Log(err)
+	}
+
 	defer f.Close()
+	defer s.Close()
 
 	/*** Create excluded directory with one file in it. ***/
 	err = os.MkdirAll(filepath.Join(dir, "pg_notify"), 0700)
@@ -112,7 +130,7 @@ func generateData(t *testing.T) string {
 	if err != nil {
 		t.Log(err)
 	}
-	defer n.Close() 
+	defer n.Close()
 
 	/*** Create `backup_label` and `tablespace_map` files ***/
 	createLabelFiles(t, dir)
@@ -133,7 +151,7 @@ func extract(t *testing.T, dir string) string {
 	for i, val := range files {
 		path := filepath.Join(dir, val.Name())
 		f := &tools.FileReaderMaker{
-			Path:       path,
+			Key:        path,
 			FileFormat: walg.CheckType(val.Name()),
 		}
 		out[i] = f
@@ -146,7 +164,11 @@ func extract(t *testing.T, dir string) string {
 	if err != nil {
 		t.Log(err)
 	}
-	walg.ExtractAll(ft, out)
+
+	err = walg.ExtractAll(ft, out)
+	if err != nil {
+		t.Log(err)
+	}
 
 	return outDir
 
@@ -155,8 +177,8 @@ func extract(t *testing.T, dir string) string {
 /**
  *  First compares two directories and returns true if everything in
  *  os.FileInfo is the same except for FileInfo.Sys() (syscall.Stat_t)
- *  and ModTimes. If initial comparison returns true, compares first 
- *  4KB of file contents and will only compute sha256 for both files if the 
+ *  and ModTimes. If initial comparison returns true, compares first
+ *  4KB of file content and will only compute sha256 for both files if the
  *  initial bytes are the same.
  */
 func compare(t *testing.T, dir1, dir2 string) bool {
@@ -188,10 +210,10 @@ func compare(t *testing.T, dir1, dir2 string) bool {
 				size = isEmpty(t, filepath.Join(dir2, f2.Name()))
 			}
 		}
-		
+
 		shallowEqual = name && size && mode && isDir
 
-		/*** If directories are the same compares contents of the files ***/
+		/*** If directories are the same, compares contents of the files ***/
 		if shallowEqual {
 			if !(f1.IsDir() && f2.IsDir()) {
 				f1Path := filepath.Join(dir1, f1.Name())
@@ -217,7 +239,9 @@ func compare(t *testing.T, dir1, dir2 string) bool {
 }
 
 /**
- *  Computes the sha256 of file1 and file2.
+ *  Computes the sha256 of FILE1 and FILE2. Will only
+ *  compute the sum if the first 4KB of the two files
+ *  are the same.
  */
 func computeSha(t *testing.T, file1, file2 string) bool {
 	f1, err := os.Open(file1)

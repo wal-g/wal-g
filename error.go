@@ -1,6 +1,8 @@
 package walg
 
-import ()
+import (
+	"fmt"
+)
 
 type UnsetEnvVarError struct {
 	names []string
@@ -20,6 +22,16 @@ type NoMatchAvailableError struct {
 }
 
 func (e NoMatchAvailableError) Error() string {
-	msg := "No match found in '" + e.str + "'\n"
+	msg := fmt.Sprintf("No match found in '%s'\n", e.str)
+	return msg
+}
+
+type UnsupportedFileTypeError struct {
+	Path       string
+	FileFormat string
+}
+
+func (e UnsupportedFileTypeError) Error() string {
+	msg := fmt.Sprintf("WAL-G does not support the file format %s in %s", e.FileFormat, e.Path)
 	return msg
 }

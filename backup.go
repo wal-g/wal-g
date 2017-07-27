@@ -17,6 +17,7 @@ type WalFiles interface {
 type ReaderMaker interface {
 	Reader() io.ReadCloser
 	Format() string
+	Path() string
 }
 
 type S3ReaderMaker struct {
@@ -26,7 +27,11 @@ type S3ReaderMaker struct {
 }
 
 func (s *S3ReaderMaker) Format() string { return s.FileFormat }
+func (s *S3ReaderMaker) Path() string   { return *s.Key }
 
+/**
+ *  Create a new S3 reader for each object.
+ */
 func (s *S3ReaderMaker) Reader() io.ReadCloser {
 	input := &s3.GetObjectInput{
 		Bucket: s.Backup.Prefix.Bucket,

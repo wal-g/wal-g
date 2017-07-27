@@ -2,14 +2,14 @@ package walg
 
 import (
 	"archive/tar"
-	"fmt"
 	"io"
 	"log"
-	"os"
-	"runtime"
 	//"time"
 )
 
+/**
+ *  Extract exactly one tar bundle.
+ */
 func extractOne(ti TarInterpreter, s io.Reader) {
 	tr := tar.NewReader(s)
 
@@ -21,19 +21,21 @@ func extractOne(ti TarInterpreter, s io.Reader) {
 		if err != nil {
 			panic(err)
 		}
-
 		ti.Interpret(tr, cur)
 	}
 
 }
 
-func ExtractAll(ti TarInterpreter, files []ReaderMaker) int {
+/**
+ *  Handles all files passed in. Supports `.lzo`, `.lz4, and `.tar`.
+ */
+func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 	//defer TimeTrack(time.Now(), "EXTRACT ALL")
-
 	if len(files) < 1 {
 		log.Fatalln("No data provided.")
 	}
 
+	var err error
 	concurrency := 40
 	sem := make(chan Empty, concurrency)
 
@@ -47,22 +49,27 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) int {
 					DecompressLzo(pw, r)
 				} else if val.Format() == "lz4" {
 					DecompressLz4(pw, r)
+				} else if val.Format() == "tar" {
+					io.Copy(pw, r)
 				} else {
-					fmt.Printf("Invalid file type '%s'\n", val.Format())
-					os.Exit(1)
+					err = UnsupportedFileTypeError{val.Path(), val.Format()}
 				}
 
 				defer pw.Close()
 			}()
 
-			extractOne(ti, pr)
+			if err == nil {
+				extractOne(ti, pr)
+			}
 			sem <- Empty{}
+
 		}(i, val)
 	}
 
-	num := runtime.NumGoroutine()
+	//num := runtime.NumGoroutine()
+
 	for i := 0; i < len(files); i++ {
 		<-sem
 	}
-	return num
+	return err
 }

@@ -10,9 +10,10 @@ import (
 )
 
 /**
- *  TarWalker walks files provided by the IN directory and creates compressed tar members
- *  labeled as `part_00i.tar.lzo`. For files and directories that are skipped, please
- *  consult EXCLUDE in structs.go.
+ *  TarWalker walks files provided by the passed in directory and creates compressed tar members
+ *  labeled as `part_00i.tar.lzo`. To see which files and directories that are skipped, please
+ *  consult EXCLUDE in structs.go. Excluded directories will be created but their contents will
+ *  not be included in the tar bundle.
  */
 func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error {
 	if err != nil {

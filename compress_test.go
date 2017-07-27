@@ -24,6 +24,9 @@ var tests = []struct {
 	{"testing123456789", 16, 4},
 }
 
+/**
+ *  Test that Lz4CasecadeClose works.
+ */
 func TestLz4Close(t *testing.T) {
 	for _, tt := range tests {
 		b := &BufCloser{bytes.NewBufferString(tt.testString)}

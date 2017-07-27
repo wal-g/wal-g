@@ -49,7 +49,7 @@ func checkVar(n map[string]string) error {
  *  AWS_SECRET_ACCESS_KEY
  *  AWS_SECURITY_TOKEN
  *  Able to configure the upload part size in the S3 uploader.
- *  ISSUES: 64MB will get an out of memory error
+ *  ISSUES: 64MB will get an out of memory error (depends on specs)
  */
 func Configure() (*TarUploader, *Prefix) {
 	chk := make(map[string]string)
@@ -102,7 +102,6 @@ func Configure() (*TarUploader, *Prefix) {
 	})
 
 	upload := &TarUploader{
-		//Upl: s3manager.NewUploaderWithClient(pre.Svc),
 		upl:    up,
 		bucket: bucket,
 		server: server,
@@ -115,7 +114,7 @@ func Configure() (*TarUploader, *Prefix) {
 
 /**
  *  Creates a lz4 writer and runs upload in the background once
- *  a tar member is finished writing.
+ *  a compressed tar member is finished writing.
  */
 func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 	pr, pw := io.Pipe()

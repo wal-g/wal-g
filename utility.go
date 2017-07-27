@@ -10,6 +10,9 @@ type BackupTime struct {
 	Time time.Time
 }
 
+/**
+ *  Used to grab last modified backups on S3.
+ */
 type TimeSlice []BackupTime
 
 func (p TimeSlice) Len() int {

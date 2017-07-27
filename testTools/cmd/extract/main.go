@@ -39,14 +39,14 @@ func main() {
 
 			h := &tools.HttpReaderMaker{
 				Client:     &http.Client{Transport: tls},
-				Path:       val,
+				Key:       val,
 				FileFormat: walg.CheckType(val),
 			}
 
 			out[i] = h
 		} else {
 			f := &tools.FileReaderMaker{
-				Path:       val,
+				Key:       val,
 				FileFormat: walg.CheckType(val),
 			}
 			out[i] = f
@@ -68,8 +68,14 @@ func main() {
 		}
 
 		walg.MakeDir(ft.NewDir)
+		err := walg.ExtractAll(f, out)
+		if serr, ok := err.(*UnsupportedFileTypeError); ok {
+			fmt.Println(serr.Error())
+			os.Exit(1)
+		} else if err != nil {
+			panic(err)
+		}
 
-		fmt.Println("File Go Routines: ", walg.ExtractAll(&ft, out))
 		if mem {
 			f, err := os.Create("mem.prof")
 			if err != nil {
@@ -81,7 +87,14 @@ func main() {
 		}
 	} else {
 		np := walg.NOPTarInterpreter{}
-		fmt.Println("NOP Go Routines: ", walg.ExtractAll(&np, out))
+		err := walg.ExtractAll(f, out)
+		if serr, ok := err.(*UnsupportedFileTypeError); ok {
+			fmt.Println(serr.Error())
+			os.Exit(1)
+		} else if err != nil {
+			panic(err)
+		}
+
 
 	}
 

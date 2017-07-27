@@ -5,6 +5,9 @@ import (
 	"io"
 )
 
+/**
+ *  Struct that closes lz4 and underlying writer.
+ */
 type Lz4CascadeClose struct {
 	*lz4.Writer
 	Underlying io.WriteCloser

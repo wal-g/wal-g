@@ -12,9 +12,9 @@ import (
 
 var help bool
 var helpMsg = "backup-fetch\tfetch a backup from S3\n" +
-	"backup-push\tstarts and uploads a backup to S3\n" +
+	"backup-push\tstarts and uploads a finished backup to S3\n" +
 	"wal-fetch\tfetch a WAL file from S3\n" +
-	"wal-push\tpush a WAL file to S3\n"
+	"wal-push\tupload a WAL file to S3\n"
 
 func init() {
 	flag.Usage = func() {
@@ -111,7 +111,13 @@ func main() {
 		}
 
 		/*** Extract all except pg_control. ***/
-		walg.ExtractAll(f, out)
+		err := walg.ExtractAll(f, out)
+		if serr, ok := err.(*walg.UnsupportedFileTypeError); ok {
+			fmt.Println(serr.Error())
+			os.Exit(1)
+		} else if err != nil {
+			panic(err)
+		}
 
 		/*** Extract pg_control last. If pg_control does not exist, program exits with error code 1. ***/
 		name := *bk.Path + *bk.Name + "/tar_partitions/pg_control.tar.lz4"
@@ -127,7 +133,13 @@ func main() {
 				Key:        aws.String(name),
 				FileFormat: walg.CheckType(name),
 			}
-			walg.ExtractAll(f, sentinel)
+			err := walg.ExtractAll(f, sentinel)
+			if serr, ok := err.(*walg.UnsupportedFileTypeError); ok {
+				fmt.Println(serr.Error())
+				os.Exit(1)
+			} else if err != nil {
+				panic(err)
+			}
 		} else {
 			fmt.Println("Corrupt backup: missing pg_control")
 			os.Exit(1)
