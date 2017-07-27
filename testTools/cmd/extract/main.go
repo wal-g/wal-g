@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/katie31/wal-g"
+	"github.com/katie31/wal-g/testTools"
 	"log"
 	"net/http"
 	"os"
@@ -30,6 +31,15 @@ func main() {
 	dir := all[0]
 	data := all[1:]
 
+	if mem {
+			f, err := os.Create("mem.prof")
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			pprof.WriteHeapProfile(f)
+			f.Close()
+	}
 	out := make([]walg.ReaderMaker, len(data))
 	for i, val := range data {
 		if strings.HasPrefix(val, "https://") {
@@ -63,32 +73,24 @@ func main() {
 	}
 
 	if !noOp {
-		ft := walg.FileTarInterpreter{
+		ft := &walg.FileTarInterpreter{
 			NewDir: dir,
 		}
 
-		walg.MakeDir(ft.NewDir)
-		err := walg.ExtractAll(f, out)
-		if serr, ok := err.(*UnsupportedFileTypeError); ok {
+		tools.MakeDir(ft.NewDir)
+		err := walg.ExtractAll(ft, out)
+		if serr, ok := err.(*walg.UnsupportedFileTypeError); ok {
 			fmt.Println(serr.Error())
 			os.Exit(1)
 		} else if err != nil {
 			panic(err)
 		}
 
-		if mem {
-			f, err := os.Create("mem.prof")
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			pprof.WriteHeapProfile(f)
-			f.Close()
-		}
+		
 	} else {
-		np := walg.NOPTarInterpreter{}
-		err := walg.ExtractAll(f, out)
-		if serr, ok := err.(*UnsupportedFileTypeError); ok {
+		np := &tools.NOPTarInterpreter{}
+		err := walg.ExtractAll(np, out)
+		if serr, ok := err.(*walg.UnsupportedFileTypeError); ok {
 			fmt.Println(serr.Error())
 			os.Exit(1)
 		} else if err != nil {

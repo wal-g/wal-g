@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/katie31/wal-g"
-	"github.com/katie31/wal-g/tools"
+	"github.com/katie31/wal-g/testTools"
 	"log"
 	"os"
 	"path/filepath"
@@ -36,15 +36,6 @@ func main() {
 	}
 	in := all[1]
 
-	if profile {
-		f, err := os.Create("cpu.prof")
-		if err != nil {
-			log.Fatal(err)
-		}
-		pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
-	}
-
 	bundle := &walg.Bundle{
 		MinSize: int64(part),
 	}
@@ -59,6 +50,25 @@ func main() {
 		fmt.Printf("Please provide a directory to write to.\n")
 		os.Exit(1)
 	} else if !s3 {
+		if profile {
+			f, err := os.Create("cpu.prof")
+			if err != nil {
+				log.Fatal(err)
+			}
+			pprof.StartCPUProfile(f)
+			defer pprof.StopCPUProfile()
+		}
+
+		if mem {
+			f, err := os.Create("mem.prof")
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			pprof.WriteHeapProfile(f)
+			f.Close()
+		}
+
 		bundle.Tbm = &tools.FileTarBallMaker{
 			BaseDir: filepath.Base(in),
 			Trim:    in,
@@ -102,15 +112,5 @@ func main() {
 		panic(err)
 	}
 	bundle.Tb.Finish()
-
-	if mem {
-		f, err := os.Create("mem.prof")
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		pprof.WriteHeapProfile(f)
-		f.Close()
-	}
 
 }
