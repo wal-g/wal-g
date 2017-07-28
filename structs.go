@@ -4,7 +4,9 @@ import (
 	"archive/tar"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"io"
 	"os"
 	"strings"
@@ -156,11 +158,20 @@ func (s *S3TarBall) SetSize(i int64) { s.size += i }
 func (s *S3TarBall) Tw() *tar.Writer { return s.tw }
 
 type TarUploader struct {
-	upl    *s3manager.Uploader
+	upl    s3manageriface.UploaderAPI
 	bucket string
 	server string
 	region string
 	wg     *sync.WaitGroup
+}
+
+func NewTarUploader(svc s3iface.S3API, bucket, server, region string) *TarUploader {
+	return &TarUploader {
+		bucket: bucket,
+		server: server,
+		region: region,
+		wg:     &sync.WaitGroup{},
+	}
 }
 
 func (tu *TarUploader) Finish() {

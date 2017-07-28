@@ -5,6 +5,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"io"
 	"sort"
 	"strings"
@@ -48,7 +49,7 @@ func (s *S3ReaderMaker) Reader() io.ReadCloser {
 
 type Prefix struct {
 	Creds  *credentials.Credentials
-	Svc    *s3.S3
+	Svc    s3iface.S3API
 	Bucket *string
 	Server *string
 }
@@ -69,13 +70,13 @@ type Archive struct {
  *  Sorts the backups by last modified time and returns the latest backup key.
  */
 func GetLatest(b *Backup) string {
-	objects := &s3.ListObjectsInput{
+	objects := &s3.ListObjectsV2Input{
 		Bucket:    b.Prefix.Bucket,
 		Prefix:    b.Path,
 		Delimiter: aws.String("/"),
 	}
 
-	backups, err := b.Prefix.Svc.ListObjects(objects)
+	backups, err := b.Prefix.Svc.ListObjectsV2(objects)
 	if err != nil {
 		panic(err)
 	}
@@ -145,12 +146,12 @@ func stripNameBackup(key string) string {
 }
 
 func GetKeys(b *Backup) []string {
-	objects := &s3.ListObjectsInput{
+	objects := &s3.ListObjectsV2Input{
 		Bucket: b.Prefix.Bucket,
 		Prefix: aws.String(*b.Path + *b.Name + "/tar_partitions"),
 	}
 
-	files, err := b.Prefix.Svc.ListObjects(objects)
+	files, err := b.Prefix.Svc.ListObjectsV2(objects)
 	if err != nil {
 		panic(err)
 	}

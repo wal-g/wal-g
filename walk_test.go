@@ -109,6 +109,7 @@ func generateData(t *testing.T) string {
 		t.Log(err)
 	}
 
+	lr = &io.LimitedReader{sb, int64(100 * 1024 * 1024)}
 	_, err = io.Copy(s, lr)
 	if err != nil {
 		t.Log(err)

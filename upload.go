@@ -7,6 +7,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pierrec/lz4"
 	"io"
@@ -14,7 +16,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 )
 
 /**
@@ -42,7 +43,10 @@ func checkVar(n map[string]string) error {
 }
 
 /**
- *  Configure uploader and connect to S3. Requires these environment variables:
+ *  Configure uploader and connect to S3. Checks that a valid session
+ *  is started; if invalid, returns AWS error and TarUploader and Prefix
+ *  will be nil. 
+ *  Requires these environment variables:
  *  WALE_S3_PREFIX
  *  AWS_REGION
  *  AWS_ACCESS_KEY_ID
@@ -50,8 +54,9 @@ func checkVar(n map[string]string) error {
  *  AWS_SECURITY_TOKEN
  *  Able to configure the upload part size in the S3 uploader.
  *  ISSUES: 64MB will get an out of memory error (depends on specs)
+ *  TODO: still has panic code in for debugging purposes
  */
-func Configure() (*TarUploader, *Prefix) {
+func Configure() (*TarUploader, *Prefix, error) {
 	chk := make(map[string]string)
 
 	chk["WALE_S3_PREFIX"] = os.Getenv("WALE_S3_PREFIX")
@@ -61,17 +66,23 @@ func Configure() (*TarUploader, *Prefix) {
 	chk["AWS_SECURITY_TOKEN"] = os.Getenv("AWS_SECURITY_TOKEN")
 
 	err := checkVar(chk)
-	if serr, ok := err.(*UnsetEnvVarError); ok {
-		fmt.Println(serr.Error())
-		os.Exit(1)
-	} else if err != nil {
-		panic(err)
+	if err != nil {
+		return nil, nil, err
 	}
+	// if serr, ok := err.(*UnsetEnvVarError); ok {
+	// 	fmt.Println(serr.Error())
+	// 	os.Exit(1)
+	// } else if err != nil {
+	// 	panic(err)
+	// }
 
 	u, err := url.Parse(chk["WALE_S3_PREFIX"])
 	if err != nil {
-		panic(err)
+		return nil, nil, err
 	}
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	bucket := u.Host
 	server := u.Path[1:]
@@ -90,26 +101,54 @@ func Configure() (*TarUploader, *Prefix) {
 
 	sess, err := session.NewSession(config)
 	if err != nil {
-		panic(err)
+		return nil, nil, err
 	}
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	pre.Svc = s3.New(sess)
 
-	/*** 	Create an uploader with S3 client and custom options	***/
-	up := s3manager.NewUploaderWithClient(pre.Svc, func(u *s3manager.Uploader) {
-		u.PartSize = 20 * 1024 * 1024 // 20MB per part
-		u.Concurrency = 3
-	})
-
-	upload := &TarUploader{
-		upl:    up,
-		bucket: bucket,
-		server: server,
-		region: region,
-		wg:     &sync.WaitGroup{},
+	/***	Test validity of session	***/
+	valid, err := Valid(pre.Svc, bucket)
+	if !valid {
+		return nil, nil, err
 	}
 
-	return upload, pre
+	upload := NewTarUploader(pre.Svc, bucket, server, region)
+	upload.upl = CreateUploader(pre.Svc, 20*1024*1024, 3)
+
+
+	return upload, pre, err
+}
+
+/**
+ *  Function to test validity of S3 client.
+ */
+ func Valid(svc s3iface.S3API, bucket string) (bool, error) {
+ 	testValidSession := &s3.GetBucketLocationInput{
+		Bucket: aws.String(bucket),
+	} 
+
+ 	_, err := svc.GetBucketLocation(testValidSession)
+	if err == nil {
+		return true, nil
+	}
+	return false, err
+ }
+
+/**
+ *  Creates an uploader with customizable concurrency
+ *  and partsize.
+ */
+func CreateUploader(svc s3iface.S3API, partsize, concurrency int) s3manageriface.UploaderAPI {
+	/*** 	Create an uploader with S3 client and custom options	***/
+	up := s3manager.NewUploaderWithClient(svc, func(u *s3manager.Uploader) {
+		u.PartSize = int64(partsize)
+		u.Concurrency = concurrency
+	})
+
+	return up
 }
 
 /**

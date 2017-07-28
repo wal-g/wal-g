@@ -52,7 +52,7 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 }
 
 /**
- *  Creates underlying Writer and handles one file. Does not follow symlinks. If file/directory
+ *  Creates underlying Writer and handles one given file. Does not follow symlinks. If file/directory
  *  is in EXCLUDE, will not be included in the final file.
  *  ISSUES: follow symlink, write too long error occurs sporadically
  */

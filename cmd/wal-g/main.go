@@ -44,7 +44,15 @@ func main() {
 		backupName = all[2]
 	}
 
-	tu, pre := walg.Configure()
+	tu, pre, err := walg.Configure()
+
+	/***************************************** PANIC or exit? *****************************************/
+	if serr, ok := err.(*walg.UnsetEnvVarError); ok {
+		fmt.Println(serr.Error())
+		os.Exit(1)
+	} else if err != nil {
+		panic(err)
+	}
 
 	fmt.Println("BUCKET:", *pre.Bucket)
 	fmt.Println("PATH:", *pre.Server)
@@ -111,7 +119,7 @@ func main() {
 		}
 
 		/*** Extract all except pg_control. ***/
-		err := walg.ExtractAll(f, out)
+		err = walg.ExtractAll(f, out)
 		if serr, ok := err.(*walg.UnsupportedFileTypeError); ok {
 			fmt.Println(serr.Error())
 			os.Exit(1)

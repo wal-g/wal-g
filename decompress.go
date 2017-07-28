@@ -109,11 +109,11 @@ func DecompressLzo(d io.Writer, s io.Reader) {
 			}
 
 			out, err := lzo.Decompress1X(ras, int(com), int(uncom))
-			if len(out) != int(uncom) {
-				panic("Decompress1X")
-			}
 			if err != nil {
 				panic(err)
+			}
+			if len(out) != int(uncom) {
+				panic("Decompress1X")
 			}
 
 			n, err = d.Write(out)
