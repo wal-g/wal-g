@@ -109,7 +109,7 @@ func generateData(t *testing.T) string {
 		t.Log(err)
 	}
 
-	lr = &io.LimitedReader{sb, int64(100 * 1024 * 1024)}
+	lr = &io.LimitedReader{sb, int64(500 * 1024 * 1024)}
 	_, err = io.Copy(s, lr)
 	if err != nil {
 		t.Log(err)
@@ -336,13 +336,17 @@ func TestWalk(t *testing.T) {
 	fmt.Println("Walking ...")
 	err = filepath.Walk(data, bundle.TarWalker)
 	if err != nil {
-		panic(err)
+		t.Log(err)
 	}
+
 	err = bundle.Tb.CloseTar()
 	if err != nil {
-		panic(err)
+		t.Log(err)
 	}
-	bundle.Tb.Finish()
+	err = bundle.Tb.Finish()
+	if err != nil {
+		t.Log(err)
+	}
 
 	/*** Test that sentinel exists and is handled correctly ***/
 	sen := bundle.Sen.Info.Name()
@@ -358,6 +362,15 @@ func TestWalk(t *testing.T) {
 
 	/*** Compares that original and extracted directories are the same. ***/
 	equal := compare(t, data, extracted)
+
+	/*** Test WAL files can be 'uploaded' ***/
+	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region")
+	tu.Upl = &mockS3Uploader{}
+	wal := tu.UploadWal(filepath.Join(data, "1"))
+
+	if wal == "" {
+		t.Errorf("upload: expected wal path to be set but got ''")
+	}
 
 	/*** Will only remove temporary directories if directories are equal. ***/
 	if equal {

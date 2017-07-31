@@ -65,7 +65,7 @@ type Sentinel struct {
 type TarBall interface {
 	SetUp(args ...string)
 	CloseTar() error
-	Finish()
+	Finish() error
 	BaseDir() string
 	Trim() string
 	Nop() bool
@@ -98,6 +98,7 @@ func (s *S3TarBall) SetUp(names ...string) {
 		w := s.StartUpload(name)
 		s.w = w
 		s.tw = tar.NewWriter(w)
+
 	}
 }
 
@@ -124,7 +125,8 @@ func (s *S3TarBall) CloseTar() error {
  *  and uploaded with the backup name. Waits until all files have been
  *  uploaded.
  */
-func (s *S3TarBall) Finish() {
+func (s *S3TarBall) Finish() error {
+	var err error
 	tupl := s.tu
 	body := "{}"
 	name := s.bkupName + "_backup_stop_sentinel.json"
@@ -138,15 +140,17 @@ func (s *S3TarBall) Finish() {
 	go func() {
 		defer tupl.wg.Done()
 
-		_, err := tupl.upl.Upload(input)
-		if err != nil {
-			panic(err)
+		_, e := tupl.Upl.Upload(input)
+		if e != nil {
+			err = e
 		}
 
 	}()
 
 	tupl.Finish()
 	fmt.Printf("Uploaded %d compressed tar files.\n", s.number)
+	return err
+
 }
 
 func (s *S3TarBall) BaseDir() string { return s.baseDir }
@@ -158,7 +162,7 @@ func (s *S3TarBall) SetSize(i int64) { s.size += i }
 func (s *S3TarBall) Tw() *tar.Writer { return s.tw }
 
 type TarUploader struct {
-	upl    s3manageriface.UploaderAPI
+	Upl    s3manageriface.UploaderAPI
 	bucket string
 	server string
 	region string
@@ -166,7 +170,7 @@ type TarUploader struct {
 }
 
 func NewTarUploader(svc s3iface.S3API, bucket, server, region string) *TarUploader {
-	return &TarUploader {
+	return &TarUploader{
 		bucket: bucket,
 		server: server,
 		region: region,

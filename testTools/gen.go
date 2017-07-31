@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"bytes"
 	"encoding/binary"
-	"github.com/katie31/wal-g"
 	"github.com/rasky/go-lzo"
 	"io"
 	"math/rand"
@@ -12,7 +11,6 @@ import (
 	"regexp"
 	"strconv"
 	"sync/atomic"
-	"time"
 )
 
 var counter int32
@@ -149,7 +147,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	sb := NewStrideByteReader(stride)
 	lr := io.LimitedReader{sb, int64(nBytes)}
 
-	defer walg.TimeTrack(time.Now(), "HANDLER")
+	//defer walg.TimeTrack(time.Now(), "HANDLER")
 
 	switch lzoFlag {
 	case "":

@@ -1,7 +1,6 @@
 package walg
 
 import (
-	"fmt"
 	"time"
 )
 
@@ -25,10 +24,4 @@ func (p TimeSlice) Less(i, j int) bool {
 
 func (p TimeSlice) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
-}
-
-//defer timeTrack(time.Now(), "EXTRACT ALL")
-func TimeTrack(start time.Time, name string) {
-	elapsed := time.Since(start)
-	fmt.Printf("%s took %s\n", name, elapsed)
 }

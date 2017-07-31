@@ -8,8 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pierrec/lz4"
 	"io"
 	"net/url"
@@ -45,7 +45,7 @@ func checkVar(n map[string]string) error {
 /**
  *  Configure uploader and connect to S3. Checks that a valid session
  *  is started; if invalid, returns AWS error and TarUploader and Prefix
- *  will be nil. 
+ *  will be nil.
  *  Requires these environment variables:
  *  WALE_S3_PREFIX
  *  AWS_REGION
@@ -89,14 +89,13 @@ func Configure() (*TarUploader, *Prefix, error) {
 	region := chk["AWS_REGION"]
 
 	pre := &Prefix{
-		Creds:  credentials.NewStaticCredentials(chk["AWS_ACCESS_KEY_ID"], chk["AWS_SECRET_ACCESS_KEY"], chk["AWS_SECURITY_TOKEN"]),
 		Bucket: aws.String(bucket),
 		Server: aws.String(server),
 	}
 
 	config := &aws.Config{
 		Region:      aws.String(region),
-		Credentials: pre.Creds,
+		Credentials: credentials.NewStaticCredentials(chk["AWS_ACCESS_KEY_ID"], chk["AWS_SECRET_ACCESS_KEY"], chk["AWS_SECURITY_TOKEN"]),
 	}
 
 	sess, err := session.NewSession(config)
@@ -116,26 +115,26 @@ func Configure() (*TarUploader, *Prefix, error) {
 	}
 
 	upload := NewTarUploader(pre.Svc, bucket, server, region)
-	upload.upl = CreateUploader(pre.Svc, 20*1024*1024, 3)
-
+	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, 3)
 
 	return upload, pre, err
 }
 
 /**
- *  Function to test validity of S3 client.
+ *  Function to test validity of S3 client by trying to get the location
+ *  of the specificed bucket.
  */
- func Valid(svc s3iface.S3API, bucket string) (bool, error) {
- 	testValidSession := &s3.GetBucketLocationInput{
+func Valid(svc s3iface.S3API, bucket string) (bool, error) {
+	testValidSession := &s3.GetBucketLocationInput{
 		Bucket: aws.String(bucket),
-	} 
+	}
 
- 	_, err := svc.GetBucketLocation(testValidSession)
+	_, err := svc.GetBucketLocation(testValidSession)
 	if err == nil {
 		return true, nil
 	}
 	return false, err
- }
+}
 
 /**
  *  Creates an uploader with customizable concurrency
@@ -172,7 +171,7 @@ func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 	go func() {
 		defer tupl.wg.Done()
 
-		_, err := tupl.upl.Upload(input)
+		_, err := tupl.Upl.Upload(input)
 		if err != nil {
 			panic(err)
 		}
@@ -184,7 +183,7 @@ func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 /**
  *  Compress a WAL file using LZ4 and upload to S3.
  */
-func (tu *TarUploader) UploadWal(path string) {
+func (tu *TarUploader) UploadWal(path string) string {
 	f, err := os.Open(path)
 	if err != nil {
 		panic(err)
@@ -207,7 +206,7 @@ func (tu *TarUploader) UploadWal(path string) {
 	go func() {
 		defer tu.wg.Done()
 
-		_, err := tu.upl.Upload(input)
+		_, err := tu.Upl.Upload(input)
 		if err != nil {
 			panic(err)
 		}
@@ -215,6 +214,7 @@ func (tu *TarUploader) UploadWal(path string) {
 	}()
 
 	fmt.Println("WAL PATH:", p)
+	return p
 
 }
 

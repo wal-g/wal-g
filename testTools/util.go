@@ -1,7 +1,9 @@
 package tools
 
 import (
+	"fmt"
 	"os"
+	"time"
 )
 
 func MakeDir(name string) {
@@ -11,4 +13,10 @@ func MakeDir(name string) {
 			panic(err)
 		}
 	}
+}
+
+//defer timeTrack(time.Now(), "EXTRACT ALL")
+func TimeTrack(start time.Time, name string) {
+	elapsed := time.Since(start)
+	fmt.Printf("%s took %s\n", name, elapsed)
 }

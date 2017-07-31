@@ -47,8 +47,9 @@ func (fb *FileTarBall) CloseTar() error {
 	return nil
 }
 
-func (fb *FileTarBall) Finish() {
+func (fb *FileTarBall) Finish() error {
 	fmt.Printf("Wrote %d compressed tar files to %s.\n", fb.number, fb.out)
+	return nil
 }
 
 func (fb *FileTarBall) BaseDir() string { return fb.baseDir }
@@ -70,7 +71,10 @@ type NOPTarBall struct {
 
 func (n *NOPTarBall) SetUp(params ...string) { return }
 func (n *NOPTarBall) CloseTar() error        { return nil }
-func (n *NOPTarBall) Finish()                { fmt.Printf("NOP: %d files.\n", n.number) }
+func (n *NOPTarBall) Finish() error {
+	fmt.Printf("NOP: %d files.\n", n.number)
+	return nil
+}
 
 func (n *NOPTarBall) BaseDir() string { return n.baseDir }
 func (n *NOPTarBall) Trim() string    { return n.trim }

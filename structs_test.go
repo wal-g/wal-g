@@ -72,3 +72,53 @@ func TestS3TarBall(t *testing.T) {
 	}
 
 }
+
+func TestS3DependentFunctions(t *testing.T) {
+	bundle := &walg.Bundle{
+		MinSize: 100,
+	}
+
+	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region")
+	tu.Upl = &mockS3Uploader{}
+
+	bundle.Tbm = &walg.S3TarBallMaker{
+		BaseDir:  "mockDirectory",
+		Trim:     "",
+		BkupName: "mockBackup",
+		Tu:       tu,
+	}
+
+	bundle.NewTarBall()
+	tarBall := bundle.Tb
+	tarBall.SetUp()
+
+	// one := []byte("a")
+
+	// _, err := tarBall.Tw().Write(one)
+
+	// fmt.Println("written")
+	// if err != nil {
+	// 	t.Errorf("structs: expected to write 1 byte but got %s", err)
+	// }
+
+	//tarBall.CloseTar()
+
+	// _, err = tarBall.Tw().Write(one)
+	// if err == nil {
+	// 	t.Errorf("structs: expected WriteAfterClose error but got '<nil>'")
+	// }
+	err := tarBall.Finish()
+	if err != nil {
+		t.Errorf("structs: tarball did not finish correctly with error %s", err)
+	}
+
+	/***	Test naming property of SetUp	***/
+	bundle.NewTarBall()
+	tarBall = bundle.Tb
+	tarBall.SetUp("mockTarball")
+	err = tarBall.Finish()
+	if err != nil {
+		t.Errorf("structs: tarball did not finish correctly with error %s", err)
+	}
+
+}

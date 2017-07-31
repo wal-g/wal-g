@@ -2,8 +2,8 @@ package walg
 
 import (
 	"archive/tar"
+	"errors"
 	"io"
-	"log"
 	//"time"
 )
 
@@ -32,7 +32,7 @@ func extractOne(ti TarInterpreter, s io.Reader) {
 func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 	//defer TimeTrack(time.Now(), "EXTRACT ALL")
 	if len(files) < 1 {
-		log.Fatalln("No data provided.")
+		return errors.New("Did not provide files to extract")
 	}
 
 	var err error
@@ -51,6 +51,7 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 					DecompressLz4(pw, r)
 				} else if val.Format() == "tar" {
 					io.Copy(pw, r)
+				} else if val.Format() == "nop" {
 				} else {
 					err = UnsupportedFileTypeError{val.Path(), val.Format()}
 				}

@@ -1,17 +1,12 @@
 package walg_test
 
 import (
-	"github.com/katie31/wal-g"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/katie31/wal-g"
 	"os"
 	"testing"
 )
-
-type mockS3Client struct {
-	s3iface.S3API
-}
 
 func (m *mockS3Client) GetBucketLocation(*s3.GetBucketLocationInput) (*s3.GetBucketLocationOutput, error) {
 	mock := &s3.GetBucketLocationOutput{
@@ -46,8 +41,8 @@ func setEmpty(t *testing.T) {
 	}
 }
 
-/** 
- *  Sets needed environment variables. 
+/**
+ *  Sets needed environment variables.
  */
 func setFake(t *testing.T) {
 	err := os.Setenv("WALE_S3_PREFIX", "wale_s3_prefix")
@@ -81,7 +76,7 @@ func TestConfigure(t *testing.T) {
 	err.Error()
 	if _, ok := err.(*walg.UnsetEnvVarError); !ok {
 		t.Errorf("upload: Expected error 'UnsetEnvVarError' but got %s", err)
-	} 
+	}
 
 	if tu != nil || pre != nil {
 		t.Errorf("upload: Expected empty uploader and prefix but got TU:%v and PREFIX:%v", tu, pre)
@@ -93,7 +88,7 @@ func TestConfigure(t *testing.T) {
 	tu, pre, err = walg.Configure()
 	if err == nil {
 		t.Errorf("upload: Expected to error on fake credentials but got '%v'", err)
-	} 
+	}
 
 	/***	Test invalid url	***/
 	err = os.Setenv("WALE_S3_PREFIX", "test_fail:")
@@ -116,26 +111,23 @@ func TestConfigure(t *testing.T) {
 	if err == nil {
 		t.Errorf("upload: AWS_SDK_LOAD_CONFIG path is invalid")
 	}
-	
+
 }
 
 func TestValidUploader(t *testing.T) {
 	mockSvc := &mockS3Client{}
 	_, err := walg.Valid(mockSvc, "bucket")
 	if err != nil {
-		t.Errorf("upload: Mock S3 client should be valid but instead got '%s'", err)
+		t.Errorf("upload: Mock S3 client should be valid but got '%s'", err)
 	}
 
 	tu := walg.NewTarUploader(mockSvc, "bucket", "server", "region")
 	if tu == nil {
-		t.Errorf("upload: Did not create a new tar uploaders")
+		t.Errorf("upload: Did not create a new tar uploader")
 	}
 
 	upl := walg.CreateUploader(mockSvc, 100, 3)
 	if upl == nil {
-		t.Errorf("upload: Did not create a new S3 Upload Manager")
+		t.Errorf("upload: Did not create a new S3 UploadManager")
 	}
 }
-
-
-

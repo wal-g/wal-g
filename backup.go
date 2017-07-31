@@ -3,7 +3,6 @@ package walg
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"io"
@@ -48,7 +47,6 @@ func (s *S3ReaderMaker) Reader() io.ReadCloser {
 }
 
 type Prefix struct {
-	Creds  *credentials.Credentials
 	Svc    s3iface.S3API
 	Bucket *string
 	Server *string
@@ -61,15 +59,10 @@ type Backup struct {
 	Js     *string
 }
 
-type Archive struct {
-	Prefix  *Prefix
-	Archive *string
-}
-
 /**
  *  Sorts the backups by last modified time and returns the latest backup key.
  */
-func GetLatest(b *Backup) string {
+func (b *Backup) GetLatest() string {
 	objects := &s3.ListObjectsV2Input{
 		Bucket:    b.Prefix.Bucket,
 		Prefix:    b.Path,
@@ -95,6 +88,15 @@ func GetLatest(b *Backup) string {
 }
 
 /**
+ *  Strips the backup key and returns it in its base form `base_...`.
+ */
+func stripNameBackup(key string) string {
+	all := strings.SplitAfter(key, "/")
+	name := strings.Split(all[2], "_backup")[0]
+	return name
+}
+
+/**
  *  Checks that the specified backup exists.
  */
 func (b *Backup) CheckExistence() bool {
@@ -113,6 +115,35 @@ func (b *Backup) CheckExistence() bool {
 		}
 	}
 	return true
+}
+
+/**
+ *  Gets the keys of the files in the specified backup.
+ */
+func (b *Backup) GetKeys() []string {
+	objects := &s3.ListObjectsV2Input{
+		Bucket: b.Prefix.Bucket,
+		Prefix: aws.String(*b.Path + *b.Name + "/tar_partitions"),
+	}
+
+	files, err := b.Prefix.Svc.ListObjectsV2(objects)
+	if err != nil {
+		panic(err)
+	}
+
+	arr := make([]string, len(files.Contents))
+
+	for i, ob := range files.Contents {
+		key := *ob.Key
+		arr[i] = key
+	}
+
+	return arr
+}
+
+type Archive struct {
+	Prefix  *Prefix
+	Archive *string
 }
 
 /**
@@ -137,39 +168,9 @@ func (a *Archive) CheckExistence() bool {
 }
 
 /**
- *  Strips the backup key and returns it in its base form `base_...`.
- */
-func stripNameBackup(key string) string {
-	all := strings.SplitAfter(key, "/")
-	name := strings.Split(all[2], "_backup")[0]
-	return name
-}
-
-func GetKeys(b *Backup) []string {
-	objects := &s3.ListObjectsV2Input{
-		Bucket: b.Prefix.Bucket,
-		Prefix: aws.String(*b.Path + *b.Name + "/tar_partitions"),
-	}
-
-	files, err := b.Prefix.Svc.ListObjectsV2(objects)
-	if err != nil {
-		panic(err)
-	}
-
-	arr := make([]string, len(files.Contents))
-
-	for i, ob := range files.Contents {
-		key := *ob.Key
-		arr[i] = key
-	}
-
-	return arr
-}
-
-/**
  *  Downloads the specified archive from S3.
  */
-func GetArchive(a *Archive) io.ReadCloser {
+func (a *Archive) GetArchive() io.ReadCloser {
 	input := &s3.GetObjectInput{
 		Bucket: a.Prefix.Bucket,
 		Key:    a.Archive,

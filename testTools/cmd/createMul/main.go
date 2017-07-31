@@ -101,7 +101,7 @@ func main() {
 	}
 
 	bundle.NewTarBall()
-	defer walg.TimeTrack(time.Now(), "MAIN")
+	defer tools.TimeTrack(time.Now(), "MAIN")
 	fmt.Println("Walking ...")
 	err = filepath.Walk(in, bundle.TarWalker)
 	if err != nil {
@@ -111,6 +111,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	bundle.Tb.Finish()
+	err = bundle.Tb.Finish()
+	if err != nil {
+		panic(err)
+	}
 
 }

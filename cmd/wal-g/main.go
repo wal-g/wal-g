@@ -79,7 +79,7 @@ func main() {
 			fmt.Println(bk.CheckExistence())
 
 			if bk.CheckExistence() {
-				allKeys = walg.GetKeys(bk)
+				allKeys = bk.GetKeys()
 				keys = allKeys[:len(allKeys)-1]
 
 			} else {
@@ -94,8 +94,8 @@ func main() {
 				Path:   aws.String(*pre.Server + "/basebackups_005/"),
 			}
 
-			bk.Name = aws.String(walg.GetLatest(bk))
-			allKeys = walg.GetKeys(bk)
+			bk.Name = aws.String(bk.GetLatest())
+			allKeys = bk.GetKeys()
 			keys = allKeys[:len(allKeys)-1]
 
 			fmt.Println("NEWDIR", dirArc)
@@ -160,7 +160,7 @@ func main() {
 		}
 
 		if a.CheckExistence() {
-			arch := walg.GetArchive(a)
+			arch := a.GetArchive()
 			f, err := os.Create(backupName)
 			if err != nil {
 				panic(err)
@@ -169,7 +169,7 @@ func main() {
 			walg.DecompressLzo(f, arch)
 			f.Close()
 		} else if a.Archive = aws.String(*pre.Server + "/wal_005/" + dirArc + ".lz4"); a.CheckExistence() {
-			arch := walg.GetArchive(a)
+			arch := a.GetArchive()
 			f, err := os.Create(backupName)
 			if err != nil {
 				panic(err)
@@ -183,8 +183,11 @@ func main() {
 		}
 
 	} else if command == "wal-push" {
-		tu.UploadWal(dirArc)
+		_ = tu.UploadWal(dirArc)
 		tu.Finish()
+		if err != nil {
+			panic(err)
+		}
 	} else if command == "backup-push" {
 		bundle := &walg.Bundle{
 			MinSize: int64(1000000000), //MINSIZE = 1GB
@@ -208,7 +211,6 @@ func main() {
 
 		/*** WALK the DIRARC directory and upload to S3. ***/
 		bundle.NewTarBall()
-		defer walg.TimeTrack(time.Now(), "BACKUP-PUSH")
 		fmt.Println("Walking ...")
 		err = filepath.Walk(dirArc, bundle.TarWalker)
 		if err != nil {
@@ -224,7 +226,10 @@ func main() {
 
 		/*** UPLOAD `pg_control`. ***/
 		bundle.HandleSentinel()
-		bundle.Tb.Finish()
+		err = bundle.Tb.Finish()
+		if err != nil {
+			panic(err)
+		}
 	}
 
 }

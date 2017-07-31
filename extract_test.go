@@ -11,6 +11,18 @@ import (
 )
 
 /**
+ *  Tests that WAL-G handles no files provided to extract
+ *  safely.
+ */
+func TestNoFilesProvided(t *testing.T) {
+	buf := &walg.BufferTarInterpreter{}
+	err := walg.ExtractAll(buf, []walg.ReaderMaker{})
+	if err == nil {
+		t.Errorf("extract: Did not catch no files provided error")
+	}
+}
+
+/**
  *  Tests that WAL-G handles unknown file types correctly.
  */
 func TestUnsupportedFileType(t *testing.T) {
