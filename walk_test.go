@@ -109,6 +109,7 @@ func generateData(t *testing.T) string {
 		t.Log(err)
 	}
 
+	//generate large enough file (500MB) so that goroutine doesn't finish before extracting pg_control
 	lr = &io.LimitedReader{sb, int64(500 * 1024 * 1024)}
 	_, err = io.Copy(s, lr)
 	if err != nil {
@@ -372,7 +373,7 @@ func TestWalk(t *testing.T) {
 		t.Errorf("upload: expected wal path to be set but got ''")
 	}
 
-	/*** Will only remove temporary directories if directories are equal. ***/
+	/*** Will only remove temporary directories if `extracted` and `data...`directories are equal. ***/
 	if equal {
 		defer os.RemoveAll(data)
 		defer os.RemoveAll(compressed)

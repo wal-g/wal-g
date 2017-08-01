@@ -28,6 +28,7 @@ func extractOne(ti TarInterpreter, s io.Reader) {
 
 /**
  *  Handles all files passed in. Supports `.lzo`, `.lz4, and `.tar`.
+ *  File type `nop` is used for testing purposes.
  */
 func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 	//defer TimeTrack(time.Now(), "EXTRACT ALL")

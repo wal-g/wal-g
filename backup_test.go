@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/katie31/wal-g"
 	"github.com/katie31/wal-g/testTools"
+	"io"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -66,16 +67,23 @@ type mockS3Uploader struct {
 }
 
 func (u *mockS3Uploader) Upload(input *s3manager.UploadInput, f ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error) {
+	var err error
 	output := &s3manager.UploadOutput{
 		Location:  *input.Bucket,
 		VersionID: input.Key,
 	}
 
-	return output, nil
+	/***	Discard bytes to unblock pipe.	***/
+	_, e := io.Copy(ioutil.Discard, input.Body)
+	if e != nil {
+		err = e
+	}
+
+	return output, err
 }
 
 /**
- *  Creates 5 fake s3 objects populating the Key and LastModified field.
+ *  Creates 5 fake s3 objects with Key and LastModified field.
  */
 func fakeContents() []*s3.Object {
 	c := make([]*s3.Object, 5)
@@ -84,40 +92,41 @@ func fakeContents() []*s3.Object {
 		Key:          aws.String("mockServer/base_backup/second.nop"),
 		LastModified: aws.Time(time.Date(2017, 2, 2, 30, 48, 39, 651387233, time.UTC)),
 	}
-
 	c[0] = ob
 
 	ob = &s3.Object{
 		Key:          aws.String("mockServer/base_backup/fourth.nop"),
 		LastModified: aws.Time(time.Date(2009, 2, 27, 20, 8, 33, 651387235, time.UTC)),
 	}
-
 	c[1] = ob
 
 	ob = &s3.Object{
 		Key:          aws.String("mockServer/base_backup/fifth.nop"),
 		LastModified: aws.Time(time.Date(2008, 11, 20, 16, 34, 58, 651387232, time.UTC)),
 	}
-
 	c[2] = ob
 
 	ob = &s3.Object{
 		Key:          aws.String("mockServer/base_backup/first.nop"),
 		LastModified: aws.Time(time.Date(2020, 11, 31, 20, 3, 58, 651387237, time.UTC)),
 	}
-
 	c[3] = ob
 
 	ob = &s3.Object{
 		Key:          aws.String("mockServer/base_backup/third.nop"),
 		LastModified: aws.Time(time.Date(2009, 3, 13, 4, 2, 42, 651387234, time.UTC)),
 	}
-
 	c[4] = ob
 
 	return c
 }
 
+/**
+ *  Tests that backup fetch methods work. Tests:
+ *  GetLatest()
+ *  CheckExistence()
+ *  GetKeys()
+ */
 func TestBackup(t *testing.T) {
 	pre := &walg.Prefix{
 		Svc:    &mockS3Client{},
@@ -181,6 +190,11 @@ func TestBackup(t *testing.T) {
 
 }
 
+/**
+ *  Tests Archive functions including:
+ *  CheckExistence()
+ *  GetArchive()
+ */
 func TestArchive(t *testing.T) {
 	pre := &walg.Prefix{
 		Svc:    &mockS3Client{},

@@ -37,7 +37,7 @@ func (ti *BufferTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {
 }
 
 /**
- *  Extracts a tar file and creates needed directories.
+ *  Extracts a tar file to local disk and creates needed directories.
  *  TODO: test symlinks
  */
 func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) {

@@ -41,7 +41,7 @@ func TestUnsupportedFileType(t *testing.T) {
 }
 
 /**
- *  Checks that WAL-G can handle uncompressed tar files.
+ *  Tests that WAL-G can handle uncompressed tar files.
  */
 func TestTar(t *testing.T) {
 	/*** Generate and save random bytes compare against compression-decompression cycle. ***/

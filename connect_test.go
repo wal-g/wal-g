@@ -22,6 +22,10 @@ var names = []struct {
 	{"gewageaw", "", walg.NoMatchAvailableError{}},
 }
 
+/**
+ *  Tests that backup name is successfully extracted from
+ *  return values of pg_stop_backup(false)
+ */
 func TestFormatName(t *testing.T) {
 	for _, n := range names {
 		actual, err := walg.FormatName(n.input)

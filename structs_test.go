@@ -1,6 +1,8 @@
 package walg_test
 
 import (
+	"archive/tar"
+	"fmt"
 	"github.com/katie31/wal-g"
 	"testing"
 )
@@ -73,6 +75,10 @@ func TestS3TarBall(t *testing.T) {
 
 }
 
+/**
+ *  Tests S3 dependent functions for S3TarBall such as
+ *  SetUp(), CloseTar() and Finish().
+ */
 func TestS3DependentFunctions(t *testing.T) {
 	bundle := &walg.Bundle{
 		MinSize: 100,
@@ -91,23 +97,36 @@ func TestS3DependentFunctions(t *testing.T) {
 	bundle.NewTarBall()
 	tarBall := bundle.Tb
 	tarBall.SetUp()
+	tarWriter := tarBall.Tw()
 
-	// one := []byte("a")
+	one := []byte("a")
 
-	// _, err := tarBall.Tw().Write(one)
+	/***	Write mock header	***/
+	hdr := &tar.Header{
+		Name: "mock",
+		Size: int64(1),
+	}
+	err := tarWriter.WriteHeader(hdr)
+	if err != nil {
+		t.Log(err)
+	}
 
-	// fmt.Println("written")
-	// if err != nil {
-	// 	t.Errorf("structs: expected to write 1 byte but got %s", err)
-	// }
+	/***	Write body	***/
+	_, err = tarWriter.Write(one)
 
-	//tarBall.CloseTar()
+	fmt.Println("written")
+	if err != nil {
+		t.Errorf("structs: expected to write 1 byte but got %s", err)
+	}
+	tarBall.CloseTar()
 
-	// _, err = tarBall.Tw().Write(one)
-	// if err == nil {
-	// 	t.Errorf("structs: expected WriteAfterClose error but got '<nil>'")
-	// }
-	err := tarBall.Finish()
+	/***	Handle write after close 	***/
+	_, err = tarBall.Tw().Write(one)
+	if err == nil {
+		t.Errorf("structs: expected WriteAfterClose error but got '<nil>'")
+	}
+
+	err = tarBall.Finish()
 	if err != nil {
 		t.Errorf("structs: tarball did not finish correctly with error %s", err)
 	}
@@ -116,6 +135,7 @@ func TestS3DependentFunctions(t *testing.T) {
 	bundle.NewTarBall()
 	tarBall = bundle.Tb
 	tarBall.SetUp("mockTarball")
+	tarBall.CloseTar()
 	err = tarBall.Finish()
 	if err != nil {
 		t.Errorf("structs: tarball did not finish correctly with error %s", err)

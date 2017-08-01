@@ -67,6 +67,10 @@ func setFake(t *testing.T) {
 	}
 }
 
+/**
+ *  Tests that a valid S3 client is created and configured from
+ *  environment variables.
+ */
 func TestConfigure(t *testing.T) {
 	/***	Test empty environment variables	***/
 	setEmpty(t)
@@ -96,7 +100,7 @@ func TestConfigure(t *testing.T) {
 		t.Log(err)
 	}
 
-	tu, pre, err = walg.Configure()
+	_, _, err = walg.Configure()
 	if err == nil {
 		t.Errorf("upload: Expected to fail on fake url")
 	}
@@ -107,13 +111,16 @@ func TestConfigure(t *testing.T) {
 		t.Log(err)
 	}
 
-	tu, pre, err = walg.Configure()
+	_, _, err = walg.Configure()
 	if err == nil {
 		t.Errorf("upload: AWS_SDK_LOAD_CONFIG path is invalid")
 	}
 
 }
 
+/**
+ *  Tests that client is valid and created a new tar uploader.
+ */
 func TestValidUploader(t *testing.T) {
 	mockSvc := &mockS3Client{}
 	_, err := walg.Valid(mockSvc, "bucket")

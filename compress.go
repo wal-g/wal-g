@@ -2,6 +2,7 @@ package walg
 
 import (
 	"github.com/pierrec/lz4"
+	//"github.com/pkg/errors"
 	"io"
 )
 
@@ -25,6 +26,9 @@ func (lcc *Lz4CascadeClose) Close() error {
 	return nil
 }
 
+/**
+ *  Struct that compresses input into pipe
+ */
 type LzPipeWriter struct {
 	Input  io.Reader
 	Output *io.PipeReader

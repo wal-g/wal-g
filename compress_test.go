@@ -53,6 +53,9 @@ func TestLz4Close(t *testing.T) {
 	}
 }
 
+/**
+ *  Tests that LzPipeWriter works.
+ */
 func TestLzPipeWriter(t *testing.T) {
 	for _, tt := range tests {
 		in := &BufCloser{bytes.NewBufferString(tt.testString)}
@@ -66,7 +69,7 @@ func TestLzPipeWriter(t *testing.T) {
 		walg.DecompressLz4(decompressed, lz.Output)
 
 		if decompressed.String() != tt.testString {
-			t.Errorf("compress: Lz4CascadeClose expected %s bytes written but got %s", tt.testString, decompressed)
+			t.Errorf("compress: Lz4CascadeClose expected %s to be written but got %s", tt.testString, decompressed)
 		}
 	}
 }

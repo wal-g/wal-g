@@ -9,7 +9,7 @@ import (
 )
 
 /**
- *  Fix bug in rasky package. Crashes if byte size is too small.
+ *  Fix bug in rasky package. Rasky crashes if byte size is too small.
  */
 type RaskyReader struct {
 	R io.Reader
@@ -23,7 +23,7 @@ var Uncompressed uint32
 var Compressed uint32
 
 /**
- *  Grabs the file extention from PATH
+ *  Grabs the file extension from PATH
  */
 func CheckType(path string) string {
 	re := regexp.MustCompile(`\.([^\.]+)$`)

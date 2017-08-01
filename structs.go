@@ -62,6 +62,9 @@ type Sentinel struct {
 	path string
 }
 
+/**
+ *  Represents one tar file.
+ */
 type TarBall interface {
 	SetUp(args ...string)
 	CloseTar() error
@@ -87,6 +90,10 @@ type S3TarBall struct {
 	tu       *TarUploader
 }
 
+/**
+ *  Creates a new tar writer and starts upload to S3.
+ *  Upload will block until tar is finished writing.
+ */
 func (s *S3TarBall) SetUp(names ...string) {
 	if s.tw == nil {
 		var name string
@@ -103,8 +110,8 @@ func (s *S3TarBall) SetUp(names ...string) {
 }
 
 /**
- *  Closes tar writer flushing any unwritten data to underlying writer before also
- *  closing the underlying writer.
+ *  Closes tar writer flushing any unwritten data to underlying writer before
+ *  closing underlying writer.
  */
 func (s *S3TarBall) CloseTar() error {
 	err := s.tw.Close()
@@ -161,6 +168,10 @@ func (s *S3TarBall) Size() int64     { return s.size }
 func (s *S3TarBall) SetSize(i int64) { s.size += i }
 func (s *S3TarBall) Tw() *tar.Writer { return s.tw }
 
+/**
+ *  Uploader associated with tarballs. Multiple tarballs can share
+ *  one uploader. Must call CreateUploader() in 'upload.go'.
+ */
 type TarUploader struct {
 	Upl    s3manageriface.UploaderAPI
 	bucket string

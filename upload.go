@@ -115,13 +115,13 @@ func Configure() (*TarUploader, *Prefix, error) {
 	}
 
 	upload := NewTarUploader(pre.Svc, bucket, server, region)
-	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, 3)
+	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, 3) //3 concurrency streams at 20MB
 
 	return upload, pre, err
 }
 
 /**
- *  Function to test validity of S3 client by trying to get the location
+ *  Tests validity of S3 client by trying to get the location
  *  of the specificed bucket.
  */
 func Valid(svc s3iface.S3API, bucket string) (bool, error) {
@@ -173,7 +173,11 @@ func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 
 		_, err := tupl.Upl.Upload(input)
 		if err != nil {
-			panic(err)
+			if multierr, ok := err.(s3manager.MultiUploadFailure); ok {
+				fmt.Println("Error:", multierr.Code(), multierr.Message(), multierr.UploadID())
+			} else {
+				fmt.Println("Error:", err.Error())
+			}
 		}
 
 	}()
@@ -208,7 +212,11 @@ func (tu *TarUploader) UploadWal(path string) string {
 
 		_, err := tu.Upl.Upload(input)
 		if err != nil {
-			panic(err)
+			if multierr, ok := err.(s3manager.MultiUploadFailure); ok {
+				fmt.Println("Error:", multierr.Code(), multierr.Message(), multierr.UploadID())
+			} else {
+				fmt.Println("Error:", err.Error())
+			}
 		}
 
 	}()

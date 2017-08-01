@@ -32,13 +32,13 @@ func main() {
 	data := all[1:]
 
 	if mem {
-			f, err := os.Create("mem.prof")
-			if err != nil {
-				log.Fatal(err)
-			}
+		f, err := os.Create("mem.prof")
+		if err != nil {
+			log.Fatal(err)
+		}
 
-			pprof.WriteHeapProfile(f)
-			f.Close()
+		pprof.WriteHeapProfile(f)
+		f.Close()
 	}
 	out := make([]walg.ReaderMaker, len(data))
 	for i, val := range data {
@@ -49,14 +49,14 @@ func main() {
 
 			h := &tools.HttpReaderMaker{
 				Client:     &http.Client{Transport: tls},
-				Key:       val,
+				Key:        val,
 				FileFormat: walg.CheckType(val),
 			}
 
 			out[i] = h
 		} else {
 			f := &tools.FileReaderMaker{
-				Key:       val,
+				Key:        val,
 				FileFormat: walg.CheckType(val),
 			}
 			out[i] = f
@@ -86,7 +86,6 @@ func main() {
 			panic(err)
 		}
 
-		
 	} else {
 		np := &tools.NOPTarInterpreter{}
 		err := walg.ExtractAll(np, out)
@@ -96,7 +95,6 @@ func main() {
 		} else if err != nil {
 			panic(err)
 		}
-
 
 	}
 

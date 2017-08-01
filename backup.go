@@ -1,6 +1,7 @@
 package walg
 
 import (
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -40,7 +41,12 @@ func (s *S3ReaderMaker) Reader() io.ReadCloser {
 
 	rdr, err := s.Backup.Prefix.Svc.GetObject(input)
 	if err != nil {
-		panic(err)
+		if awsErr, ok := err.(awserr.Error); ok {
+			fmt.Printf("Error: \t%s %s\n\t%s", awsErr.Code(), awsErr.Message(), awsErr.Error())
+		} else {
+			fmt.Println(err.Error())
+		}
+		//panic(err)
 	}
 	return rdr.Body
 
@@ -71,7 +77,12 @@ func (b *Backup) GetLatest() string {
 
 	backups, err := b.Prefix.Svc.ListObjectsV2(objects)
 	if err != nil {
-		panic(err)
+		if awsErr, ok := err.(awserr.Error); ok {
+			fmt.Printf("Error: \t%s %s\n\t%s", awsErr.Code(), awsErr.Message(), awsErr.Error())
+		} else {
+			fmt.Println(err.Error())
+		}
+		//panic(err)
 	}
 
 	sortTimes := make([]BackupTime, len(backups.Contents))
@@ -107,11 +118,15 @@ func (b *Backup) CheckExistence() bool {
 
 	_, err := b.Prefix.Svc.HeadObject(js)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
+		if awsErr, ok := err.(awserr.Error); ok {
+			switch awsErr.Code() {
 			case "NotFound":
 				return false
+			default:
+				fmt.Printf("Error: \t%s %s\n\t%s", awsErr.Code(), awsErr.Message(), awsErr.Error())
+				return false
 			}
+
 		}
 	}
 	return true
@@ -128,7 +143,12 @@ func (b *Backup) GetKeys() []string {
 
 	files, err := b.Prefix.Svc.ListObjectsV2(objects)
 	if err != nil {
-		panic(err)
+		if awsErr, ok := err.(awserr.Error); ok {
+			fmt.Printf("Error: \t%s %s\n\t%s", awsErr.Code(), awsErr.Message(), awsErr.Error())
+		} else {
+			fmt.Println(err.Error())
+		}
+		//panic(err)
 	}
 
 	arr := make([]string, len(files.Contents))
@@ -157,12 +177,16 @@ func (a *Archive) CheckExistence() bool {
 
 	_, err := a.Prefix.Svc.HeadObject(arch)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
+		if awsErr, ok := err.(awserr.Error); ok {
+			switch awsErr.Code() {
 			case "NotFound":
+				return false
+			default:
+				fmt.Printf("Error: \t%s %s\n\t%s", awsErr.Code(), awsErr.Message(), awsErr.Error())
 				return false
 			}
 		}
+
 	}
 	return true
 }
@@ -178,7 +202,12 @@ func (a *Archive) GetArchive() io.ReadCloser {
 
 	archive, err := a.Prefix.Svc.GetObject(input)
 	if err != nil {
-		panic(err)
+		if awsErr, ok := err.(awserr.Error); ok {
+			fmt.Printf("Error: \t%s %s\n\t%s", awsErr.Code(), awsErr.Message(), awsErr.Error())
+		} else {
+			fmt.Println(err.Error())
+		}
+		//panic(err)
 	}
 
 	return archive.Body

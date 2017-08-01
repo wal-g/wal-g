@@ -11,10 +11,10 @@ import (
 )
 
 var help bool
-var helpMsg = "backup-fetch\tfetch a backup from S3\n" +
-	"backup-push\tstarts and uploads a finished backup to S3\n" +
-	"wal-fetch\tfetch a WAL file from S3\n" +
-	"wal-push\tupload a WAL file to S3\n"
+var helpMsg = "\tbackup-fetch\tfetch a backup from S3\n" +
+	"\tbackup-push\tstarts and uploads a finished backup to S3\n" +
+	"\twal-fetch\tfetch a WAL file from S3\n" +
+	"\twal-push\tupload a WAL file to S3\n"
 
 func init() {
 	flag.Usage = func() {
@@ -45,13 +45,9 @@ func main() {
 	}
 
 	tu, pre, err := walg.Configure()
-
-	/***************************************** PANIC or exit? *****************************************/
-	if serr, ok := err.(*walg.UnsetEnvVarError); ok {
-		fmt.Println(serr.Error())
+	if err != nil {
+		fmt.Printf("FATAL: \t%+v\n", err)
 		os.Exit(1)
-	} else if err != nil {
-		panic(err)
 	}
 
 	fmt.Println("BUCKET:", *pre.Bucket)
