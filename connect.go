@@ -3,6 +3,7 @@ package walg
 import (
 	"fmt"
 	"github.com/jackc/pgx"
+	"github.com/pkg/errors"
 	"os"
 	"regexp"
 )
@@ -32,21 +33,24 @@ func Connect() (*pgx.Conn, error) {
 /**
  *  Starts a nonexclusive backup immediately. Finishes backup.
  */
-func QueryFile(conn *pgx.Conn, backup string) (string, string) {
-	rows, err := conn.Query("SELECT * FROM pg_start_backup($1, true, false)", backup)
-	if err != nil {
-		panic(err)
+func QueryFile(conn *pgx.Conn, backup string) (string, string, error) {
+	var err error
+	rows, e := conn.Query("SELECT * FROM pg_start_backup($1, true, false)", backup)
+	if e != nil {
+		err = errors.Wrap(e, "select query failed")
+		return "", "", err
 	}
 	rows.Close()
 
 	var labelfile string
 	var spcmapfile string
-	err = conn.QueryRow("SELECT labelfile, spcmapfile FROM pg_stop_backup(false)").Scan(&labelfile, &spcmapfile)
-	if err != nil {
-		panic(err)
+	e = conn.QueryRow("SELECT labelfile, spcmapfile FROM pg_stop_backup(false)").Scan(&labelfile, &spcmapfile)
+	if e != nil {
+		err = errors.Wrap(e, "select query failed")
+		return "", "", err
 	}
 
-	return labelfile, spcmapfile
+	return labelfile, spcmapfile, err
 }
 
 /**

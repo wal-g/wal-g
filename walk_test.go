@@ -355,8 +355,15 @@ func TestWalk(t *testing.T) {
 		t.Errorf("walk: Sentinel expected %s but got %s", "pg_control", sen)
 	}
 
-	bundle.HandleSentinel()
-	bundle.HandleLabelFiles("backup", "table")
+	err = bundle.HandleSentinel()
+	if err != nil {
+		t.Errorf("walk: Sentinel expected to succeed but got %+v\n", err)
+	}
+
+	err = bundle.HandleLabelFiles("backup", "table")
+	if err != nil {
+		t.Errorf("walk: Sentinel expected to succeed but got %+v\n", err)
+	}
 
 	/**** Extracts compressed directory to `extracted` ***/
 	extracted := extract(t, compressed)
@@ -367,10 +374,14 @@ func TestWalk(t *testing.T) {
 	/*** Test WAL files can be 'uploaded' ***/
 	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region")
 	tu.Upl = &mockS3Uploader{}
-	wal := tu.UploadWal(filepath.Join(data, "1"))
+	wal, err := tu.UploadWal(filepath.Join(data, "1"))
 
 	if wal == "" {
 		t.Errorf("upload: expected wal path to be set but got ''")
+	}
+
+	if err != nil {
+		t.Errorf("upload: expected no error to occur but got %+v", err)
 	}
 
 	/*** Will only remove temporary directories if `extracted` and `data...`directories are equal. ***/

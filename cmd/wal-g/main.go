@@ -144,6 +144,7 @@ func main() {
 			} else if err != nil {
 				panic(err)
 			}
+			fmt.Println("Extract complete.")
 		} else {
 			fmt.Println("Corrupt backup: missing pg_control")
 			os.Exit(1)
@@ -162,7 +163,11 @@ func main() {
 				panic(err)
 			}
 
-			walg.DecompressLzo(f, arch)
+			err = walg.DecompressLzo(f, arch)
+			if err != nil {
+				fmt.Printf("FATAL: %+v\n", err)
+				os.Exit(1)
+			}
 			f.Close()
 		} else if a.Archive = aws.String(*pre.Server + "/wal_005/" + dirArc + ".lz4"); a.CheckExistence() {
 			arch := a.GetArchive()
@@ -171,7 +176,11 @@ func main() {
 				panic(err)
 			}
 
-			walg.DecompressLz4(f, arch)
+			err = walg.DecompressLz4(f, arch)
+			if err != nil {
+				fmt.Printf("FATAL: %+v\n", err)
+				os.Exit(1)
+			}
 			f.Close()
 		} else {
 			fmt.Printf("Archive '%s' does not exist.\n", dirArc)
@@ -179,11 +188,14 @@ func main() {
 		}
 
 	} else if command == "wal-push" {
-		_ = tu.UploadWal(dirArc)
-		tu.Finish()
+		_, err := tu.UploadWal(dirArc)
 		if err != nil {
-			panic(err)
+			fmt.Printf("%+v\n", err)
+			os.Exit(1)
 		}
+
+		tu.Finish()
+
 	} else if command == "backup-push" {
 		bundle := &walg.Bundle{
 			MinSize: int64(1000000000), //MINSIZE = 1GB
@@ -192,7 +204,12 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		lbl, sc := walg.QueryFile(c, time.Now().String())
+		lbl, sc, err := walg.QueryFile(c, time.Now().String())
+		if err != nil {
+			fmt.Printf("%+v\n", err)
+			os.Exit(1)
+		}
+
 		n, err := walg.FormatName(lbl)
 		if err != nil {
 			panic(err)
@@ -218,10 +235,18 @@ func main() {
 		}
 
 		/*** UPLOAD label files. ***/
-		bundle.HandleLabelFiles(lbl, sc)
+		err = bundle.HandleLabelFiles(lbl, sc)
+		if err != nil {
+			fmt.Println("%+v\n", err)
+			os.Exit(1)
+		}
 
 		/*** UPLOAD `pg_control`. ***/
-		bundle.HandleSentinel()
+		err = bundle.HandleSentinel()
+		if err != nil {
+			fmt.Println("%+v\n", err)
+			os.Exit(1)
+		}
 		err = bundle.Tb.Finish()
 		if err != nil {
 			panic(err)

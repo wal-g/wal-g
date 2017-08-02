@@ -2,7 +2,7 @@ package walg
 
 import (
 	"archive/tar"
-	"errors"
+	"github.com/pkg/errors"
 	"io"
 	//"time"
 )
@@ -10,7 +10,7 @@ import (
 /**
  *  Extract exactly one tar bundle.
  */
-func extractOne(ti TarInterpreter, s io.Reader) {
+func extractOne(ti TarInterpreter, s io.Reader) error {
 	tr := tar.NewReader(s)
 
 	for {
@@ -19,10 +19,15 @@ func extractOne(ti TarInterpreter, s io.Reader) {
 			break
 		}
 		if err != nil {
-			panic(err)
+			return errors.Wrap(err, "extractOne: tar extract failed")
 		}
-		ti.Interpret(tr, cur)
+
+		err = ti.Interpret(tr, cur)
+		if err != nil {
+			return errors.Wrap(err, "extractOne: Interpret failed")
+		}
 	}
+	return nil
 
 }
 
@@ -33,45 +38,67 @@ func extractOne(ti TarInterpreter, s io.Reader) {
 func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 	//defer TimeTrack(time.Now(), "EXTRACT ALL")
 	if len(files) < 1 {
-		return errors.New("Did not provide files to extract")
+		return errors.New("ExtractAll: did not provide files to extract")
 	}
 
 	var err error
-	concurrency := 40
-	sem := make(chan Empty, concurrency)
+
+	collect := make(chan error, 1)
+	sem := make(chan Empty, len(files))
 
 	for i, val := range files {
 		go func(i int, val ReaderMaker) {
+			var e error
 			pr, pw := io.Pipe()
+
 			go func() {
 				r := val.Reader()
 				defer r.Close()
+				defer pw.Close()
 				if val.Format() == "lzo" {
-					DecompressLzo(pw, r)
+					e = DecompressLzo(pw, r)
+					if e != nil {
+						collect <- errors.Wrap(e, "ExtractAll: lzo decompress failed")
+					}
 				} else if val.Format() == "lz4" {
-					DecompressLz4(pw, r)
+					e = DecompressLz4(pw, r)
+					if e != nil {
+						collect <- errors.Wrap(e, "ExtractAll: lz4 decompress failed")
+					}
 				} else if val.Format() == "tar" {
-					io.Copy(pw, r)
+					_, e = io.Copy(pw, r)
+					if e != nil {
+						collect <- errors.Wrap(e, "ExtractAll: tar extract failed")
+					}
 				} else if val.Format() == "nop" {
 				} else {
-					err = UnsupportedFileTypeError{val.Path(), val.Format()}
+					e = UnsupportedFileTypeError{val.Path(), val.Format()}
+					collect <- e
 				}
 
-				defer pw.Close()
 			}()
 
-			if err == nil {
-				extractOne(ti, pr)
+			if len(collect) == 0 {
+				e = extractOne(ti, pr)
+				if e != nil {
+					collect <- e
+				}
 			}
+
 			sem <- Empty{}
 
 		}(i, val)
 	}
 
-	//num := runtime.NumGoroutine()
-
 	for i := 0; i < len(files); i++ {
 		<-sem
 	}
-	return err
+
+	select {
+	case err := <-collect:
+		return err
+	default:
+		return err
+	}
+
 }

@@ -1,19 +1,10 @@
 package walg_test
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/katie31/wal-g"
 	"os"
 	"testing"
 )
-
-func (m *mockS3Client) GetBucketLocation(*s3.GetBucketLocationInput) (*s3.GetBucketLocationOutput, error) {
-	mock := &s3.GetBucketLocationOutput{
-		LocationConstraint: aws.String("mockBucketRegion"),
-	}
-	return mock, nil
-}
 
 /**
  *  Sets needed environment variables to empty strings.
@@ -86,14 +77,7 @@ func TestConfigure(t *testing.T) {
 		t.Errorf("upload: Expected empty uploader and prefix but got TU:%v and PREFIX:%v", tu, pre)
 	}
 
-	/***	Test fake credentials	***/
 	setFake(t)
-
-	tu, pre, err = walg.Configure()
-	if err == nil {
-		t.Errorf("upload: Expected to error on fake credentials but got '%v'", err)
-	}
-
 	/***	Test invalid url	***/
 	err = os.Setenv("WALE_S3_PREFIX", "test_fail:")
 	if err != nil {
@@ -105,15 +89,24 @@ func TestConfigure(t *testing.T) {
 		t.Errorf("upload: Expected to fail on fake url")
 	}
 
-	/***	Test invalid config file	***/
-	err = os.Setenv("AWS_SDK_LOAD_CONFIG", "true")
+	/***	Test created uploader and prefix 	***/
+	err = os.Setenv("WALE_S3_PREFIX", "s3://bucket/server")
 	if err != nil {
 		t.Log(err)
 	}
+	tu, pre, err = walg.Configure()
 
-	_, _, err = walg.Configure()
-	if err == nil {
-		t.Errorf("upload: AWS_SDK_LOAD_CONFIG path is invalid")
+	if *pre.Bucket != "bucket" {
+		t.Errorf("upload: Prefix field 'Bucket' expected %s but got %s", "bucket", *pre.Bucket)
+	}
+	if *pre.Server != "server" {
+		t.Errorf("upload: Prefix field 'Server' expected %s but got %s", "server", *pre.Server)
+	}
+	if tu == nil {
+		t.Errorf("upload: did not create an uploader")
+	}
+	if err != nil {
+		t.Errorf("upload: expected error to be '<nil>' but got %s", err)
 	}
 
 }
@@ -123,10 +116,6 @@ func TestConfigure(t *testing.T) {
  */
 func TestValidUploader(t *testing.T) {
 	mockSvc := &mockS3Client{}
-	_, err := walg.Valid(mockSvc, "bucket")
-	if err != nil {
-		t.Errorf("upload: Mock S3 client should be valid but got '%s'", err)
-	}
 
 	tu := walg.NewTarUploader(mockSvc, "bucket", "server", "region")
 	if tu == nil {

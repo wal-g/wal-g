@@ -63,13 +63,20 @@ func TestLzPipeWriter(t *testing.T) {
 			Input: in,
 		}
 
-		lz.Compress()
+		err := lz.Compress()
+		if err != nil {
+			t.Logf("%+v\n", err)
+		}
 
 		decompressed := &BufCloser{&bytes.Buffer{}}
-		walg.DecompressLz4(decompressed, lz.Output)
+		err = walg.DecompressLz4(decompressed, lz.Output)
+		if err != nil {
+			t.Logf("%+v\n", err)
+		}
 
 		if decompressed.String() != tt.testString {
 			t.Errorf("compress: Lz4CascadeClose expected %s to be written but got %s", tt.testString, decompressed)
 		}
 	}
+
 }

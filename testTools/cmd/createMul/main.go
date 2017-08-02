@@ -82,7 +82,11 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		lbl, sc := walg.QueryFile(c, time.Now().String())
+		lbl, sc, err := walg.QueryFile(c, time.Now().String())
+		if err != nil {
+			fmt.Printf("%+v\n", err)
+			os.Exit(1)
+		}
 		n, err := walg.FormatName(lbl)
 		if err != nil {
 			panic(err)

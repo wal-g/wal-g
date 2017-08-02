@@ -3,6 +3,7 @@ package walg
 import (
 	"archive/tar"
 	"fmt"
+	"github.com/pkg/errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -17,7 +18,7 @@ import (
  */
 func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error {
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "TarWalker: walk failed")
 	}
 
 	if info.Name() == "pg_control" {
@@ -29,13 +30,13 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 			return err
 		}
 		if err != nil {
-			panic(err)
+			return err
 		}
 	} else {
 		oldTB := bundle.Tb
 		err := oldTB.CloseTar()
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		fmt.Println("------------------------------------------NEW------------------------------------------")
@@ -45,7 +46,7 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 			return err
 		}
 		if err != nil {
-			panic(err)
+			return err
 		}
 	}
 	return nil
@@ -71,7 +72,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 		fmt.Println("------------------------------------------", fileName)
 		hdr, err = tar.FileInfoHeader(info, fileName)
 		if err != nil {
-			panic(err)
+			return errors.Wrap(err, "HandleTar: could not grab header info")
 		}
 
 		hdr.Name = strings.TrimPrefix(path, tarBall.Trim())
@@ -79,12 +80,12 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 
 		err = tarWriter.WriteHeader(hdr)
 		if err != nil {
-			panic(err)
+			return errors.Wrap(err, "HandleTar: failed to write header")
 		}
 		if info.Mode().IsRegular() {
 			f, err := os.Open(path)
 			if err != nil {
-				panic(err)
+				return errors.Wrapf(err, "HandleTar: failed to open file %s\n", path)
 			}
 			lim := &io.LimitedReader{
 				R: f,
@@ -95,7 +96,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 
 			_, err = io.Copy(tarWriter, lim)
 			if err != nil {
-				panic(err)
+				return errors.Wrap(err, "HandleTar: copy failed")
 			}
 
 			tarBall.SetSize(hdr.Size)
@@ -105,7 +106,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 		fmt.Println("------------------------------------------", fileName)
 		hdr, err = tar.FileInfoHeader(info, fileName)
 		if err != nil {
-			panic(err)
+			return errors.Wrap(err, "HandleTar: could not grab header info")
 		}
 
 		hdr.Name = strings.TrimPrefix(path, tarBall.Trim())
@@ -113,7 +114,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 
 		err = tarWriter.WriteHeader(hdr)
 		if err != nil {
-			panic(err)
+			return errors.Wrap(err, "HandleTar: failed to write header")
 		}
 		fmt.Println("RUNNING:", tarBall.Size())
 		return filepath.SkipDir

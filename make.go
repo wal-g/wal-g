@@ -16,7 +16,7 @@ type S3TarBallMaker struct {
 }
 
 func (s *S3TarBallMaker) Make() TarBall {
-	s.number += 1
+	s.number++
 	return &S3TarBall{
 		number:   s.number,
 		size:     s.size,

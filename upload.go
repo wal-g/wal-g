@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pierrec/lz4"
+	"github.com/pkg/errors"
 	"io"
 	"net/url"
 	"os"
@@ -69,20 +70,11 @@ func Configure() (*TarUploader, *Prefix, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	// if serr, ok := err.(*UnsetEnvVarError); ok {
-	// 	fmt.Println(serr.Error())
-	// 	os.Exit(1)
-	// } else if err != nil {
-	// 	panic(err)
-	// }
 
 	u, err := url.Parse(chk["WALE_S3_PREFIX"])
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "Configure: failed to parse url")
 	}
-	// if err != nil {
-	// 	panic(err)
-	// }
 
 	bucket := u.Host
 	server := u.Path[1:]
@@ -100,40 +92,15 @@ func Configure() (*TarUploader, *Prefix, error) {
 
 	sess, err := session.NewSession(config)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "Configure: session failed")
 	}
-	// if err != nil {
-	// 	panic(err)
-	// }
 
 	pre.Svc = s3.New(sess)
-
-	/***	Test validity of session	***/
-	valid, err := Valid(pre.Svc, bucket)
-	if !valid {
-		return nil, nil, err
-	}
 
 	upload := NewTarUploader(pre.Svc, bucket, server, region)
 	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, 3) //3 concurrency streams at 20MB
 
 	return upload, pre, err
-}
-
-/**
- *  Tests validity of S3 client by trying to get the location
- *  of the specificed bucket.
- */
-func Valid(svc s3iface.S3API, bucket string) (bool, error) {
-	testValidSession := &s3.GetBucketLocationInput{
-		Bucket: aws.String(bucket),
-	}
-
-	_, err := svc.GetBucketLocation(testValidSession)
-	if err == nil {
-		return true, nil
-	}
-	return false, err
 }
 
 /**
@@ -187,17 +154,22 @@ func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 /**
  *  Compress a WAL file using LZ4 and upload to S3.
  */
-func (tu *TarUploader) UploadWal(path string) string {
-	f, err := os.Open(path)
-	if err != nil {
-		panic(err)
+func (tu *TarUploader) UploadWal(path string) (string, error) {
+	var err error
+	f, e := os.Open(path)
+	if e != nil {
+		err = errors.Wrapf(e, "UploadWal: failed to open file %s\n", path)
 	}
 
 	lz := &LzPipeWriter{
 		Input: f,
 	}
 
-	lz.Compress()
+	e = lz.Compress()
+	if e != nil {
+		err = e
+	}
+
 	p := tu.server + "/wal_005/" + filepath.Base(path) + ".lz4"
 	input := &s3manager.UploadInput{
 		Bucket: aws.String(tu.bucket),
@@ -222,7 +194,7 @@ func (tu *TarUploader) UploadWal(path string) string {
 	}()
 
 	fmt.Println("WAL PATH:", p)
-	return p
+	return p, err
 
 }
 
@@ -230,7 +202,7 @@ func (tu *TarUploader) UploadWal(path string) string {
  *  Uploads the compressed tar file of `pg_control`. Will only be called
  *  after the rest of the backup is successfully uploaded to S3.
  */
-func (bundle *Bundle) HandleSentinel() {
+func (bundle *Bundle) HandleSentinel() error {
 	fileName := bundle.Sen.Info.Name()
 	info := bundle.Sen.Info
 	path := bundle.Sen.path
@@ -251,13 +223,13 @@ func (bundle *Bundle) HandleSentinel() {
 
 	err = tarWriter.WriteHeader(hdr)
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "HandleSentinel: failed to write header")
 	}
 
 	if info.Mode().IsRegular() {
 		f, err := os.Open(path)
 		if err != nil {
-			panic(err)
+			return errors.Wrapf(err, "HandleSentinel: failed to open file %s\n", path)
 		}
 
 		lim := &io.LimitedReader{
@@ -267,7 +239,7 @@ func (bundle *Bundle) HandleSentinel() {
 
 		_, err = io.Copy(tarWriter, lim)
 		if err != nil {
-			panic(err)
+			return errors.Wrap(err, "HandleSentinel: copy failed")
 		}
 
 		tarBall.SetSize(hdr.Size)
@@ -275,15 +247,17 @@ func (bundle *Bundle) HandleSentinel() {
 	}
 	err = tarBall.CloseTar()
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "HandleSentinel: failed to close tarball")
 	}
+
+	return nil
 }
 
 /**
  *  Creates the `backup_label` and `tablespace_map` files and uploads
  *  it to S3.
  */
-func (bundle *Bundle) HandleLabelFiles(lb, sc string) {
+func (bundle *Bundle) HandleLabelFiles(lb, sc string) error {
 	bundle.NewTarBall()
 	tarBall := bundle.Tb
 	tarBall.SetUp()
@@ -298,11 +272,11 @@ func (bundle *Bundle) HandleLabelFiles(lb, sc string) {
 
 	err := tarWriter.WriteHeader(lhdr)
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "HandleLabelFiles: failed to write header")
 	}
 	_, err = io.Copy(tarWriter, strings.NewReader(lb))
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "HandleLabelFiles: copy failed")
 	}
 
 	shdr := &tar.Header{
@@ -314,15 +288,17 @@ func (bundle *Bundle) HandleLabelFiles(lb, sc string) {
 
 	err = tarWriter.WriteHeader(shdr)
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "HandleLabelFiles: failed to write header")
 	}
 	_, err = io.Copy(tarWriter, strings.NewReader(sc))
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "HandleLabelFiles: copy failed")
 	}
 
 	err = tarBall.CloseTar()
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "HandleLabelFiles: failed to close tarball")
 	}
+
+	return nil
 }
