@@ -3,10 +3,10 @@ package walg
 import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/pkg/errors"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/pkg/errors"
 	"io"
 	"sort"
 	"strings"
@@ -90,7 +90,7 @@ func (b *Backup) GetLatest() (string, error) {
 	backups, err := b.Prefix.Svc.ListObjectsV2(objects)
 	if err != nil {
 		return "", errors.Wrap(err, "GetLatest: s3.ListObjectsV2 failed")
-	
+
 	}
 
 	sortTimes := make([]BackupTime, len(backups.Contents))

@@ -365,13 +365,18 @@ func TestWalk(t *testing.T) {
 		t.Errorf("walk: Sentinel expected to succeed but got %+v\n", err)
 	}
 
-	/**** Extracts compressed directory to `extracted` ***/
+	/**** Extracts compressed directory to `extracted`. ***/
 	extracted := extract(t, compressed)
+	if compare(t, data, extracted) {
+		// Clean up only if the test succeeds.
+		defer os.RemoveAll(data)
+		defer os.RemoveAll(compressed)
+		defer os.RemoveAll(extracted)
+	} else {
+		t.Errorf("walk: Extracted and original directories are not the same.")
+	}
 
-	/*** Compares that original and extracted directories are the same. ***/
-	equal := compare(t, data, extracted)
-
-	/*** Test WAL files can be 'uploaded' ***/
+	// Re-use generated data to test uploading WAL.
 	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region")
 	tu.Upl = &mockS3Uploader{}
 	wal, err := tu.UploadWal(filepath.Join(data, "1"))
@@ -382,16 +387,5 @@ func TestWalk(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("upload: expected no error to occur but got %+v", err)
-	}
-
-	/*** Will only remove temporary directories if `extracted` and `data...`directories are equal. ***/
-	if equal {
-		defer os.RemoveAll(data)
-		defer os.RemoveAll(compressed)
-		defer os.RemoveAll(extracted)
-	}
-
-	if !equal {
-		t.Errorf("walk: Extracted and original directories are not the same.")
 	}
 }

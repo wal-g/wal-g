@@ -31,7 +31,7 @@ var correctKeys = []string{"mockServer/base_backup/second.nop",
 type mockS3Client struct {
 	s3iface.S3API
 	notFound bool
-	err bool
+	err      bool
 }
 
 func (m *mockS3Client) ListObjectsV2(input *s3.ListObjectsV2Input) (*s3.ListObjectsV2Output, error) {
@@ -143,7 +143,7 @@ func fakeContents() []*s3.Object {
 func TestBackupErrors(t *testing.T) {
 	pre := &walg.Prefix{
 		Svc: &mockS3Client{
-			err: true,
+			err:      true,
 			notFound: true,
 		},
 		Bucket: aws.String("mock bucket"),
@@ -163,8 +163,8 @@ func TestBackupErrors(t *testing.T) {
 	}
 
 	pre.Svc = &mockS3Client{
-			err: true,
-		}
+		err: true,
+	}
 	exists = bk.CheckExistence()
 	if exists {
 		t.Errorf("backup: expected mock backup to fail")
@@ -174,14 +174,34 @@ func TestBackupErrors(t *testing.T) {
 	_, err := bk.GetLatest()
 	if err == nil {
 		t.Errorf("backup: expected error but got '<nil>'")
-	} 
+	}
 
 	/***	GetKeys error testing 	***/
 	_, err = bk.GetKeys()
 	if err == nil {
 		t.Errorf("backup: expected error but got '<nil>'")
-	} 
+	}
 
+	/***	Test S3 ReaderMaker with error S3.	***/
+	keys := []string{"1.nop", "2.nop", "3.gzip"}
+	n := &tools.NOPTarInterpreter{}
+
+	out := make([]walg.ReaderMaker, len(keys))
+	for i, key := range keys {
+		s := &walg.S3ReaderMaker{
+			Backup:     bk,
+			Key:        aws.String(key),
+			FileFormat: walg.CheckType(key),
+		}
+		out[i] = s
+	}
+
+	err = walg.ExtractAll(n, out)
+	if err == nil {
+		t.Errorf("backup: expected error but got '<nil>'")
+	} else {
+		t.Logf("%+v\n", err)
+	}
 }
 
 /**
@@ -250,7 +270,7 @@ func TestBackup(t *testing.T) {
 func TestArchiveErrors(t *testing.T) {
 	pre := &walg.Prefix{
 		Svc: &mockS3Client{
-			err: true,
+			err:      true,
 			notFound: true,
 		},
 		Bucket: aws.String("mock bucket"),
@@ -269,8 +289,8 @@ func TestArchiveErrors(t *testing.T) {
 	}
 
 	pre.Svc = &mockS3Client{
-			err: true,
-		}
+		err: true,
+	}
 	exists = arch.CheckExistence()
 	if exists {
 		t.Errorf("archive: expected mock archive to fail")

@@ -36,7 +36,7 @@ func CheckType(path string) string {
 		return f[1:]
 	}
 	return ""
-	
+
 }
 
 /**
@@ -144,6 +144,7 @@ func DecompressLz4(d io.Writer, s io.Reader) error {
 	lz := lz4.NewReader(s)
 
 	_, err := lz.WriteTo(d)
+
 	if err != nil {
 		return errors.Wrap(err, "DecompressLz4: lz4 write failed")
 	}
