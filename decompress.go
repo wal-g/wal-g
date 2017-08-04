@@ -10,12 +10,15 @@ import (
 )
 
 /**
- *  Fix bug in rasky package. Rasky crashes if byte size is too small.
+ *  Fixes bug in rasky package. Rasky crashes if byte size is too small.
  */
 type RaskyReader struct {
 	R io.Reader
 }
 
+/**
+ *  Makes sure all bytes are get read for Rasky package.
+ */
 func (r *RaskyReader) Read(p []byte) (int, error) {
 	return io.ReadFull(r.R, p)
 }
@@ -24,54 +27,52 @@ var Uncompressed uint32
 var Compressed uint32
 
 /**
- *  Grabs the file extension from PATH
+ *  Grabs the file extension from PATH.
  */
 func CheckType(path string) string {
 	re := regexp.MustCompile(`\.([^\.]+)$`)
 	f := re.FindString(path)
-	return f[1:]
+	if f != "" {
+		return f[1:]
+	}
+	return ""
+	
 }
 
 /**
- *  Decompress an .lzo file.
+ *  Decompress an .lzo file. Returns the first error
+ *  encountered.
  */
 func DecompressLzo(d io.Writer, s io.Reader) error {
-	var err error
 	skip := 33
 	sk := make([]byte, skip)
 
-	n, e := s.Read(sk)
+	n, err := s.Read(sk)
 	if n != len(sk) {
-		err = errors.New("DecompressLzo: did not fill skip")
-		return err
+		return errors.New("DecompressLzo: did not fill skip")
 	}
-	if e != nil {
-		err = errors.Wrap(e, "DecompressLzo: read failed")
-		return err
+	if err != nil {
+		return errors.Wrap(err, "DecompressLzo: read failed")
 	}
 
 	var fileNameLen uint8
 	binary.Read(s, binary.BigEndian, &fileNameLen)
 	fileName := make([]byte, fileNameLen)
-	n, e = s.Read(fileName)
+	n, err = s.Read(fileName)
 	if n != len(fileName) {
-		err = errors.New("DecompressLzo: did not fill filename")
-		return err
+		return errors.New("DecompressLzo: did not fill filename")
 	}
-	if e != nil {
-		err = errors.Wrap(e, "DecompressLzo: read failed")
-		return err
+	if err != nil {
+		return errors.Wrap(err, "DecompressLzo: read failed")
 	}
 
 	fileComment := make([]byte, 4)
-	n, e = s.Read(fileComment)
+	n, err = s.Read(fileComment)
 	if n != len(fileComment) {
-		err = errors.New("DecompressLzo: did not fill fileComment")
-		return err
+		return errors.New("DecompressLzo: did not fill fileComment")
 	}
-	if e != nil {
-		err = errors.Wrap(e, "DecompressLzo: read failed")
-		return err
+	if err != nil {
+		return errors.Wrap(err, "DecompressLzo: read failed")
 	}
 
 	var uncom uint32
@@ -80,39 +81,34 @@ func DecompressLzo(d io.Writer, s io.Reader) error {
 
 	for {
 
-		e := binary.Read(s, binary.BigEndian, &uncom)
+		err := binary.Read(s, binary.BigEndian, &uncom)
 		if uncom == 0 {
 			break
 		}
-		if e != nil {
-			err = errors.Wrap(e, "DecompressLzo: read failed")
-			return err
+		if err != nil {
+			return errors.Wrap(err, "DecompressLzo: read failed")
 		}
 
-		e = binary.Read(s, binary.BigEndian, &com)
+		err = binary.Read(s, binary.BigEndian, &com)
 		if err != nil {
-			err = errors.Wrap(e, "DecompressLzo: read failed")
-			return err
+			return errors.Wrap(err, "DecompressLzo: read failed")
 		}
 
 		Uncompressed += uncom
 		Compressed += com
 
-		e = binary.Read(s, binary.BigEndian, &check)
-		if e != nil {
-			err = errors.Wrap(e, "DecompressLzo: read failed")
-			return err
+		err = binary.Read(s, binary.BigEndian, &check)
+		if err != nil {
+			return errors.Wrap(err, "DecompressLzo: read failed")
 		}
 
 		if uncom <= com {
-			n, e := io.CopyN(d, s, int64(com))
+			n, err := io.CopyN(d, s, int64(com))
 			if n != int64(com) {
-				err = errors.New("DecompressLzo: copy failed")
-				return err
+				return errors.New("DecompressLzo: copy failed")
 			}
-			if e != nil {
-				err = errors.Wrap(e, "DecompressLzo: copy failed")
-				return err
+			if err != nil {
+				return errors.Wrap(err, "DecompressLzo: copy failed")
 			}
 
 		} else {
@@ -120,24 +116,21 @@ func DecompressLzo(d io.Writer, s io.Reader) error {
 				R: s,
 			}
 
-			out, e := lzo.Decompress1X(ras, int(com), int(uncom))
-			if e != nil {
-				err = errors.Wrap(e, "DecompressLzo: decompress lzo failed")
-				return err
-			}
-			if len(out) != int(uncom) {
-				err = errors.New("DecompressLzo: out bytes do not equal uncompressed")
-				return err
+			out, err := lzo.Decompress1X(ras, int(com), int(uncom))
+			if err != nil {
+				return errors.Wrap(err, "DecompressLzo: decompress lzo failed")
 			}
 
-			n, e = d.Write(out)
-			if n != len(out) {
-				err = errors.New("DecompressLzo: write to pipe failed")
-				return err
+			if len(out) != int(uncom) {
+				return errors.New("DecompressLzo: out bytes do not equal uncompressed")
 			}
-			if e != nil {
-				err = errors.Wrap(e, "DecompressLzo: write to pipe failed")
-				return err
+
+			n, err = d.Write(out)
+			if n != len(out) {
+				return errors.New("DecompressLzo: write to pipe failed")
+			}
+			if err != nil {
+				return errors.Wrap(err, "DecompressLzo: write to pipe failed")
 			}
 		}
 	}
@@ -145,16 +138,14 @@ func DecompressLzo(d io.Writer, s io.Reader) error {
 }
 
 /**
- *  Decompress a .lz4 file.
+ *  Decompress a .lz4 file. Returns an error upon failure.
  */
 func DecompressLz4(d io.Writer, s io.Reader) error {
-	var err error
 	lz := lz4.NewReader(s)
 
-	_, e := lz.WriteTo(d)
-	if e != nil {
-		err = errors.Wrap(e, "DecompressLz4: lz4 write failed")
-		return err
+	_, err := lz.WriteTo(d)
+	if err != nil {
+		return errors.Wrap(err, "DecompressLz4: lz4 write failed")
 	}
-	return err
+	return nil
 }

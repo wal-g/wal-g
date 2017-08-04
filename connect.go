@@ -1,7 +1,6 @@
 package walg
 
 import (
-	"fmt"
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"os"
@@ -10,47 +9,48 @@ import (
 
 /**
  *  Connects to postgres using a UNIX socket. Must export PGHOST and
- *  run with `sudo -E -u postgres`.
+ *  run with `sudo -E -u postgres`. If PGHOST is not set or if the
+ *  connection fails, an error is returned and the connection is nil.
  */
 func Connect() (*pgx.Conn, error) {
 	host := os.Getenv("PGHOST")
 	if host == "" {
-		fmt.Println("Did not set PGHOST.")
-		os.Exit(1)
+		return nil, errors.New("Connect: did not set PGHOST")
 	}
+
 	config := pgx.ConnConfig{
 		Host: host,
 	}
 
 	conn, err := pgx.Connect(config)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Connect: postgres connection failed")
 	}
 
 	return conn, nil
 }
 
 /**
- *  Starts a nonexclusive backup immediately. Finishes backup.
+ *  Starts a non-exclusive base backup immediately. When finishing the backup,
+ *  `backup_label` and `tablespace_map` contents are not immediately written to
+ *  a file but returned instead. Returns empty strings and an error if backup
+ *  fails.
  */
 func QueryFile(conn *pgx.Conn, backup string) (string, string, error) {
-	var err error
-	rows, e := conn.Query("SELECT * FROM pg_start_backup($1, true, false)", backup)
-	if e != nil {
-		err = errors.Wrap(e, "select query failed")
-		return "", "", err
+	rows, err := conn.Query("SELECT * FROM pg_start_backup($1, true, false)", backup)
+	if err != nil {
+		return "", "", errors.Wrap(err, "QueryFile: start backup failed")
 	}
 	rows.Close()
 
 	var labelfile string
 	var spcmapfile string
-	e = conn.QueryRow("SELECT labelfile, spcmapfile FROM pg_stop_backup(false)").Scan(&labelfile, &spcmapfile)
-	if e != nil {
-		err = errors.Wrap(e, "select query failed")
-		return "", "", err
+	err = conn.QueryRow("SELECT labelfile, spcmapfile FROM pg_stop_backup(false)").Scan(&labelfile, &spcmapfile)
+	if err != nil {
+		return "", "", errors.Wrap(err, "QueryFile: stop backup failed")
 	}
 
-	return labelfile, spcmapfile, err
+	return labelfile, spcmapfile, nil
 }
 
 /**
@@ -61,7 +61,7 @@ func FormatName(s string) (string, error) {
 	re := regexp.MustCompile(`\(([^\)]+)\)`)
 	f := re.FindString(s)
 	if f == "" {
-		return "", NoMatchAvailableError{s}
+		return "", errors.Wrap(NoMatchAvailableError{s}, "FormatName:")
 	}
 	return "base_" + f[6:len(f)-1], nil
 }
