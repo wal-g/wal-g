@@ -12,8 +12,8 @@ import (
 
 /**
  *  TarWalker walks files provided by the passed in directory and creates compressed tar members
- *  labeled as `part_00i.tar.lzo`. To see which files and directories that are skipped, please
- *  consult EXCLUDE in structs.go. Excluded directories will be created but their contents will
+ *  labeled as `part_00i.tar.lzo`. To see which files and directories are skipped, please
+ *  consult EXCLUDE in 'structs.go'. Excluded directories will be created but their contents will
  *  not be included in the tar bundle.
  */
 func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error {
@@ -30,13 +30,13 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 			return err
 		}
 		if err != nil {
-			return err
+			return errors.Wrap(err, "TarWalker: handle tar failed")
 		}
 	} else {
 		oldTB := bundle.Tb
 		err := oldTB.CloseTar()
 		if err != nil {
-			return err
+			return errors.Wrap(err, "TarWalker: failed to close tarball")
 		}
 
 		fmt.Println("------------------------------------------NEW------------------------------------------")
@@ -46,17 +46,16 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 			return err
 		}
 		if err != nil {
-			return err
+			return errors.Wrap(err, "TarWalker: handle tar failed")
 		}
 	}
 	return nil
 }
 
 /**
- *  Creates underlying Writer and handles one given file. Does not follow symlinks. If file
+ *  Creates underlying tar writer and handles one given file. Does not follow symlinks. If file
  *  is in EXCLUDE, will not be included in the final file. EXCLUDED directories are created
  *  but their contents are not written to local disk.
- *  ISSUES: follow symlink, write too long error occurs sporadically
  */
 func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 	tarBall := bundle.GetTarBall()
@@ -65,12 +64,9 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 	tarBall.SetUp()
 	tarWriter := tarBall.Tw()
 
-	var hdr *tar.Header
-	var err error
-
 	if !ok {
 		fmt.Println("------------------------------------------", fileName)
-		hdr, err = tar.FileInfoHeader(info, fileName)
+		hdr, err := tar.FileInfoHeader(info, fileName)
 		if err != nil {
 			return errors.Wrap(err, "HandleTar: could not grab header info")
 		}
@@ -104,9 +100,9 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 		}
 	} else if ok && info.Mode().IsDir() {
 		fmt.Println("------------------------------------------", fileName)
-		hdr, err = tar.FileInfoHeader(info, fileName)
+		hdr, err := tar.FileInfoHeader(info, fileName)
 		if err != nil {
-			return errors.Wrap(err, "HandleTar: could not grab header info")
+			return errors.Wrap(err, "HandleTar: failed to grab header info")
 		}
 
 		hdr.Name = strings.TrimPrefix(path, tarBall.Trim())
