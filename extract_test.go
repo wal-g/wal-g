@@ -134,7 +134,7 @@ type BufferReaderMaker struct {
 	FileFormat string
 }
 
-func (b *BufferReaderMaker) Reader() io.ReadCloser { return ioutil.NopCloser(b.Buf) }
+func (b *BufferReaderMaker) Reader() (io.ReadCloser, error) { return ioutil.NopCloser(b.Buf), nil }
 func (b *BufferReaderMaker) Format() string        { return b.FileFormat }
 func (b *BufferReaderMaker) Path() string          { return b.Key }
 
