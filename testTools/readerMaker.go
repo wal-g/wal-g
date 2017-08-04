@@ -23,25 +23,25 @@ type FileReaderMaker struct {
 func (f *FileReaderMaker) Format() string { return f.FileFormat }
 func (f *FileReaderMaker) Path() string   { return f.Key }
 
-func (h *HttpReaderMaker) Reader() io.ReadCloser {
+func (h *HttpReaderMaker) Reader() (io.ReadCloser, error) {
 	get, err := http.NewRequest("GET", h.Key, nil)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	data, err := h.Client.Do(get)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	return data.Body
+	return data.Body, nil
 }
 
-func (f *FileReaderMaker) Reader() io.ReadCloser {
+func (f *FileReaderMaker) Reader() (io.ReadCloser, error) {
 	r, err := os.Open(f.Key)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	return r
+	return r, nil
 }
