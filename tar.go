@@ -12,20 +12,31 @@ import (
 	"strings"
 )
 
+/**
+ *  Tar interpreter for that behaves differently for
+ *  different file types.
+ */
 type TarInterpreter interface {
 	Interpret(r io.Reader, hdr *tar.Header) error
 }
 
+/**
+ *  Tar interpreter that extracts to a file.
+ */
 type FileTarInterpreter struct {
 	NewDir string
 }
 
+/**
+ *  Tar interpreter that extracts to a byte slice. Used
+ *  for testing purposes.
+ */
 type BufferTarInterpreter struct {
 	Out []byte
 }
 
 /**
- *  Handles in memory tar formats. Mostly for testing purposes.
+ *  Handles in memory tar formats. Used for testing purposes.
  */
 func (ti *BufferTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
 	//defer TimeTrack(time.Now(), "BUFFER INTERPRET")
@@ -40,16 +51,16 @@ func (ti *BufferTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
 
 /**
  *  Extracts a tar file to local disk and creates needed directories.
- *  TODO: test symlinks
+ *  Returns the first error encountered. Calls fsync after each file
+ *  is written successfully.
  */
 func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
 	targetPath := path.Join(ti.NewDir, cur.Name)
 	switch cur.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
 		var f *os.File
-		var err error
 
-		f, err = os.Create(targetPath)
+		f, err := os.Create(targetPath)
 		dne := os.IsNotExist(err)
 		if dne {
 			base := filepath.Base(cur.Name)
@@ -61,11 +72,11 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
 
 			f, err = os.Create(targetPath)
 			if err != nil {
-				return errors.Wrap(err, "Interpret: failed to create new file")
+				return errors.Wrapf(err, "Interpret: failed to create new file %s", targetPath)
 			}
 		}
 		if err != nil && !dne {
-			return errors.Wrap(err, "Interpret: failed to create new file")
+			return errors.Wrapf(err, "Interpret: failed to create new file %s", targetPath)
 		}
 
 		_, err = io.Copy(f, tr)
@@ -83,23 +94,23 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
 		}
 
 		if err = f.Close(); err != nil {
-			return errors.Wrap(err, "Interpret: failed to close file")
+			return errors.Wrapf(err, "Interpret: failed to close file %s", targetPath)
 		}
 	case tar.TypeDir:
 		err := os.MkdirAll(targetPath, 0755)
 		if err != nil {
-			return errors.Wrap(err, "Interpret: failed to create all directories")
+			return errors.Wrapf(err, "Interpret: failed to create all directories in %s", targetPath)
 		}
 		if err = os.Chmod(targetPath, os.FileMode(cur.Mode)); err != nil {
 			return errors.Wrap(err, "Interpret: chmod failed")
 		}
 	case tar.TypeLink:
 		if err := os.Link(cur.Name, targetPath); err != nil {
-			return errors.Wrap(err, "Interpret: failed to create hardlink")
+			return errors.Wrapf(err, "Interpret: failed to create hardlink %s", targetPath)
 		}
 	case tar.TypeSymlink:
 		if err := os.Symlink(cur.Name, targetPath); err != nil {
-			return errors.Wrap(err, "Interpret: failed to create symlink")
+			return errors.Wrapf(err, "Interpret: failed to create symlink", targetPath)
 		}
 	}
 
