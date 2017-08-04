@@ -54,8 +54,6 @@ func checkVar(n map[string]string) error {
  *  AWS_SECRET_ACCESS_KEY
  *  AWS_SECURITY_TOKEN
  *  Able to configure the upload part size in the S3 uploader.
- *  ISSUES: 64MB will get an out of memory error (depends on specs)
- *  TODO: still has panic code in for debugging purposes
  */
 func Configure() (*TarUploader, *Prefix, error) {
 	chk := make(map[string]string)
@@ -73,7 +71,7 @@ func Configure() (*TarUploader, *Prefix, error) {
 
 	u, err := url.Parse(chk["WALE_S3_PREFIX"])
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "Configure: failed to parse url")
+		return nil, nil, errors.Wrapf(err, "Configure: failed to parse url '%s'", chk["WALE_S3_PREFIX"])
 	}
 
 	bucket := u.Host
@@ -92,7 +90,7 @@ func Configure() (*TarUploader, *Prefix, error) {
 
 	sess, err := session.NewSession(config)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "Configure: session failed")
+		return nil, nil, errors.Wrap(err, "Configure: failed to create new session")
 	}
 
 	pre.Svc = s3.New(sess)
@@ -108,12 +106,10 @@ func Configure() (*TarUploader, *Prefix, error) {
  *  and partsize.
  */
 func CreateUploader(svc s3iface.S3API, partsize, concurrency int) s3manageriface.UploaderAPI {
-	/*** 	Create an uploader with S3 client and custom options	***/
 	up := s3manager.NewUploaderWithClient(svc, func(u *s3manager.Uploader) {
 		u.PartSize = int64(partsize)
 		u.Concurrency = concurrency
 	})
-
 	return up
 }
 
@@ -141,9 +137,9 @@ func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 		_, err := tupl.Upl.Upload(input)
 		if err != nil {
 			if multierr, ok := err.(s3manager.MultiUploadFailure); ok {
-				fmt.Println("Error:", multierr.Code(), multierr.Message(), multierr.UploadID())
+				fmt.Println("StartUpload:", multierr.Code(), multierr.Message(), multierr.UploadID())
 			} else {
-				fmt.Println("Error:", err.Error())
+				fmt.Println("StartUpload:", err.Error())
 			}
 		}
 
@@ -152,22 +148,22 @@ func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 }
 
 /**
- *  Compress a WAL file using LZ4 and upload to S3.
+ *  Compress a WAL file using LZ4 and upload to S3. Returns
+ *  the first error encountered and an empty string upon failure.
  */
 func (tu *TarUploader) UploadWal(path string) (string, error) {
-	var err error
-	f, e := os.Open(path)
-	if e != nil {
-		err = errors.Wrapf(e, "UploadWal: failed to open file %s\n", path)
+	f, err := os.Open(path)
+	if err != nil {
+		return "", errors.Wrapf(err, "UploadWal: failed to open file %s\n", path)
 	}
 
 	lz := &LzPipeWriter{
 		Input: f,
 	}
 
-	e = lz.Compress()
-	if e != nil {
-		err = e
+	err = lz.Compress()
+	if err != nil {
+		return "", errors.Wrapf(err, "UploadWal: failed to compress file")
 	}
 
 	p := tu.server + "/wal_005/" + filepath.Base(path) + ".lz4"
@@ -185,22 +181,23 @@ func (tu *TarUploader) UploadWal(path string) (string, error) {
 		_, err := tu.Upl.Upload(input)
 		if err != nil {
 			if multierr, ok := err.(s3manager.MultiUploadFailure); ok {
-				fmt.Println("Error:", multierr.Code(), multierr.Message(), multierr.UploadID())
+				fmt.Println("UploadWal:", multierr.Code(), multierr.Message(), multierr.UploadID())
 			} else {
-				fmt.Println("Error:", err.Error())
+				fmt.Println("UploadWal:", err.Error())
 			}
 		}
 
 	}()
 
 	fmt.Println("WAL PATH:", p)
-	return p, err
+	return p, nil
 
 }
 
 /**
  *  Uploads the compressed tar file of `pg_control`. Will only be called
- *  after the rest of the backup is successfully uploaded to S3.
+ *  after the rest of the backup is successfully uploaded to S3. Returns
+ *  an error upon failure.
  */
 func (bundle *Bundle) HandleSentinel() error {
 	fileName := bundle.Sen.Info.Name()
@@ -215,7 +212,7 @@ func (bundle *Bundle) HandleSentinel() error {
 	fmt.Println("------------------------------------------", fileName)
 	hdr, err := tar.FileInfoHeader(info, fileName)
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "HandleSentinel: failed to grab header info")
 	}
 
 	hdr.Name = strings.TrimPrefix(path, tarBall.Trim())
@@ -245,6 +242,7 @@ func (bundle *Bundle) HandleSentinel() error {
 		tarBall.SetSize(hdr.Size)
 		f.Close()
 	}
+
 	err = tarBall.CloseTar()
 	if err != nil {
 		return errors.Wrap(err, "HandleSentinel: failed to close tarball")
@@ -255,7 +253,7 @@ func (bundle *Bundle) HandleSentinel() error {
 
 /**
  *  Creates the `backup_label` and `tablespace_map` files and uploads
- *  it to S3.
+ *  it to S3. Returns error upon failure.
  */
 func (bundle *Bundle) HandleLabelFiles(lb, sc string) error {
 	bundle.NewTarBall()

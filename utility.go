@@ -4,6 +4,9 @@ import (
 	"time"
 )
 
+/**
+ *  Used to sort backup by time
+ */
 type BackupTime struct {
 	Name string
 	Time time.Time
