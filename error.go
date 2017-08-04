@@ -4,6 +4,9 @@ import (
 	"fmt"
 )
 
+/**
+ *  Used to indicate required environment variables for WAL-G.
+ */
 type UnsetEnvVarError struct {
 	names []string
 }
@@ -17,6 +20,9 @@ func (e UnsetEnvVarError) Error() string {
 	return msg
 }
 
+/**
+ *  Used to signal no match found in string.
+ */
 type NoMatchAvailableError struct {
 	str string
 }
@@ -26,6 +32,9 @@ func (e NoMatchAvailableError) Error() string {
 	return msg
 }
 
+/**
+ *  Used to signal unsupported file types by WAL-G.
+ */
 type UnsupportedFileTypeError struct {
 	Path       string
 	FileFormat string

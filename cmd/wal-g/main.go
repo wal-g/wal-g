@@ -202,7 +202,8 @@ func main() {
 		}
 		c, err := walg.Connect()
 		if err != nil {
-			panic(err)
+			fmt.Printf("%+v\n", err)
+			os.Exit(1)
 		}
 		lbl, sc, err := walg.QueryFile(c, time.Now().String())
 		if err != nil {

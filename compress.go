@@ -27,19 +27,26 @@ func (lcc *Lz4CascadeClose) Close() error {
 }
 
 /**
- *  Struct that compresses input into pipe
+ *  Struct that compresses input into pipe.
  */
 type LzPipeWriter struct {
 	Input  io.Reader
 	Output *io.PipeReader
 }
 
+/**
+ *  Creates a new pipe writer and reader.
+ */
 func (p *LzPipeWriter) Writer() io.WriteCloser {
 	pr, pw := io.Pipe()
 	p.Output = pr
 	return pw
 }
 
+/**
+ *  Compresses input using LZ4 to pipe. Returns
+ *  the first encountered error.
+ */
 func (p *LzPipeWriter) Compress() error {
 	w := p.Writer()
 	lzw := lz4.NewWriter(w)

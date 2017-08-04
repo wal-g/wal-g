@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
+	"github.com/pkg/errors"
 	"io"
 	"os"
 	"strings"
@@ -78,6 +79,10 @@ type TarBall interface {
 	Tw() *tar.Writer
 }
 
+/**
+ *  Represents tar file that is
+ *  going to be uploaded to S3.
+ */
 type S3TarBall struct {
 	baseDir  string
 	trim     string
@@ -92,7 +97,9 @@ type S3TarBall struct {
 
 /**
  *  Creates a new tar writer and starts upload to S3.
- *  Upload will block until tar is finished writing.
+ *  Upload will block until tar is finished writing. If a name
+ *  for the file is not given, default name is of the form
+ *  `part_....tar.lz4`.
  */
 func (s *S3TarBall) SetUp(names ...string) {
 	if s.tw == nil {
@@ -116,12 +123,12 @@ func (s *S3TarBall) SetUp(names ...string) {
 func (s *S3TarBall) CloseTar() error {
 	err := s.tw.Close()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "CloseTar: failed to close tar writer")
 	}
 
 	err = s.w.Close()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "CloseTar: failed to close underlying writer")
 	}
 	fmt.Println("Closed")
 	return nil
@@ -149,13 +156,15 @@ func (s *S3TarBall) Finish() error {
 
 		_, e := tupl.Upl.Upload(input)
 		if e != nil {
-			err = e
+			err = errors.Wrap(e, "Finish: json failed to upload")
 		}
 
 	}()
 
 	tupl.Finish()
-	fmt.Printf("Uploaded %d compressed tar files.\n", s.number)
+	if err == nil {
+		fmt.Printf("Uploaded %d compressed tar files.\n", s.number)
+	}
 	return err
 
 }
@@ -180,6 +189,9 @@ type TarUploader struct {
 	wg     *sync.WaitGroup
 }
 
+/**
+ *  Creates a new tar uploader with own waitgroup.
+ */
 func NewTarUploader(svc s3iface.S3API, bucket, server, region string) *TarUploader {
 	return &TarUploader{
 		bucket: bucket,
