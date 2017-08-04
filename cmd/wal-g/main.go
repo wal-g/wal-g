@@ -75,7 +75,11 @@ func main() {
 			fmt.Println(bk.CheckExistence())
 
 			if bk.CheckExistence() {
-				allKeys = bk.GetKeys()
+				allKeys, err := bk.GetKeys()
+				if err != nil {
+					fmt.Printf("%+v\n", err)
+					os.Exit(1)
+				}
 				keys = allKeys[:len(allKeys)-1]
 
 			} else {
@@ -90,8 +94,17 @@ func main() {
 				Path:   aws.String(*pre.Server + "/basebackups_005/"),
 			}
 
-			bk.Name = aws.String(bk.GetLatest())
-			allKeys = bk.GetKeys()
+			latest, err := bk.GetLatest()
+			if err != nil {
+				fmt.Printf("%+v\n", err)
+				os.Exit(1)
+			}
+			bk.Name = aws.String(latest)
+			allKeys, err = bk.GetKeys()
+			if err != nil {
+				fmt.Printf("%+v\n", err)
+				os.Exit(1)
+			}
 			keys = allKeys[:len(allKeys)-1]
 
 			fmt.Println("NEWDIR", dirArc)
@@ -157,7 +170,11 @@ func main() {
 		}
 
 		if a.CheckExistence() {
-			arch := a.GetArchive()
+			arch, err := a.GetArchive()
+			if err != nil {
+				fmt.Printf("%+v\n", err)
+				os.Exit(1)
+			}
 			f, err := os.Create(backupName)
 			if err != nil {
 				panic(err)
@@ -170,7 +187,11 @@ func main() {
 			}
 			f.Close()
 		} else if a.Archive = aws.String(*pre.Server + "/wal_005/" + dirArc + ".lz4"); a.CheckExistence() {
-			arch := a.GetArchive()
+			arch, err := a.GetArchive()
+			if err != nil {
+				fmt.Printf("%+v\n", err)
+				os.Exit(1)
+			}
 			f, err := os.Create(backupName)
 			if err != nil {
 				panic(err)
