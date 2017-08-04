@@ -52,7 +52,10 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 			pr, pw := io.Pipe()
 
 			go func() {
-				r := val.Reader()
+				r, err := val.Reader()
+				if err != nil {
+					panic(err)
+				}
 				defer r.Close()
 				defer pw.Close()
 				if val.Format() == "lzo" {
