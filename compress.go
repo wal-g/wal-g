@@ -17,11 +17,11 @@ type Lz4CascadeClose struct {
 func (lcc *Lz4CascadeClose) Close() error {
 	err := lcc.Writer.Close()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Lz4 Close: failed to close lz4 writer")
 	}
 	err = lcc.Underlying.Close()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Lz4 Close: failed to close underlying writer")
 	}
 	return nil
 }

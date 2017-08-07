@@ -156,7 +156,7 @@ func (s *S3TarBall) Finish() error {
 
 		_, e := tupl.Upl.Upload(input)
 		if e != nil {
-			err = errors.Wrap(e, "Finish: json failed to upload")
+			err = errors.Wrap(e, "S3TarBall Finish: json failed to upload")
 		}
 
 	}()

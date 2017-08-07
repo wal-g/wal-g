@@ -76,12 +76,20 @@ func (m *mockS3Client) HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjectOutp
  */
 type mockS3Uploader struct {
 	s3manageriface.UploaderAPI
+	multierr bool
 	err bool
 }
 
 func (u *mockS3Uploader) Upload(input *s3manager.UploadInput, f ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error) {
 	if u.err {
 		return nil, awserr.New("UploadFailed", "mock Upload error", nil)
+	}
+
+	if u.multierr {
+		e := mockMultiFailureError{
+			err: awserr.New("UploadFailed", "multiupload failure error", nil),
+		}
+		return nil, e
 	}
 
 	output := &s3manager.UploadOutput{
@@ -96,6 +104,19 @@ func (u *mockS3Uploader) Upload(input *s3manager.UploadInput, f ...func(*s3manag
 	}
 
 	return output, nil
+}
+
+type mockMultiFailureError struct {
+	s3manager.MultiUploadFailure
+	err awserr.Error
+}
+
+func (m mockMultiFailureError) UploadID() string{
+	return "mock ID"
+}
+
+func (m mockMultiFailureError) Error() string{
+	return m.err.Error()
 }
 
 /**
@@ -199,9 +220,7 @@ func TestBackupErrors(t *testing.T) {
 	err = walg.ExtractAll(n, out)
 	if err == nil {
 		t.Errorf("backup: expected error but got '<nil>'")
-	} else {
-		t.Logf("%+v\n", err)
-	}
+	} 
 }
 
 /**
@@ -342,5 +361,10 @@ func TestArchive(t *testing.T) {
 	exists = arch.CheckExistence()
 	if exists {
 		t.Errorf("archive: expected mock backup to not exist")
+	}
+
+	_, err = arch.GetArchive()
+	if err == nil {
+		t.Errorf("archive: expected error but got %v", err)
 	}
 }

@@ -93,6 +93,7 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 	sem := make(chan Empty, len(files))
 	collectAll := make(chan error)
 	defer close(collectAll)
+
 	for i, val := range files {
 		go func(i int, val ReaderMaker) {
 			pr, tempW := io.Pipe()
