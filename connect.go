@@ -29,7 +29,7 @@ func Connect() (*pgx.Conn, error) {
 	return conn, nil
 }
 
-// Starts a non-exclusive base backup immediately. When finishing the backup,
+// QueryFile starts a non-exclusive base backup immediately. When finishing the backup,
 // `backup_label` and `tablespace_map` contents are not immediately written to
 // a file but returned instead. Returns empty strings and an error if backup
 // fails.

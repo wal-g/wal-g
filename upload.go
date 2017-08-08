@@ -20,11 +20,11 @@ import (
 	"strings"
 )
 
-// Maximum number of retries for upload.
-var MAX_RETRIES = 7
+// MAXRETRIES is the maximum number of retries for upload.
+var MAXRETRIES = 7
 
-// Maxmimum backoff time in seconds for upload.
-var MAX_BACKOFF = float64(32)
+// MAXBACKOFF is the maxmimum backoff time in seconds for upload.
+var MAXBACKOFF = float64(32)
 
 // Checks that the following environment variables are set:
 // WALE_S3_PREFIX
@@ -100,7 +100,7 @@ func Configure() (*TarUploader, *Prefix, error) {
 
 	pre.Svc = s3.New(sess)
 
-	upload := NewTarUploader(pre.Svc, bucket, server, region, MAX_RETRIES, MAX_BACKOFF)
+	upload := NewTarUploader(pre.Svc, bucket, server, region, MAXRETRIES, MAXBACKOFF)
 	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, 3) //3 concurrency streams at 20MB
 
 	return upload, pre, err

@@ -15,9 +15,9 @@ import (
 	"sync"
 )
 
+// EXCLUDE is a list of excluded members from the bundled backup.
 var EXCLUDE = make(map[string]Empty)
 
-// Lists excluded members from the bundled backup.
 func init() {
 	EXCLUDE["pg_log"] = Empty{}
 	EXCLUDE["pg_xlog"] = Empty{}

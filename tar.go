@@ -22,7 +22,7 @@ type FileTarInterpreter struct {
 	NewDir string
 }
 
-// Interpet extracts a tar file to disk and creates needed directories.
+// Interpret extracts a tar file to disk and creates needed directories.
 // Returns the first error encountered. Calls fsync after each file
 // is written successfully.
 func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
