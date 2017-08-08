@@ -22,12 +22,10 @@ var correctKeys = []string{"mockServer/base_backup/second.nop",
 	"mockServer/base_backup/first.nop",
 	"mockServer/base_backup/third.nop"}
 
-/**
- *  Mock out S3 client. Includes these methods:
- *  ListObjectsV2(*ListObjectsV2Input)
- *  GetObject(*GetObjectInput)
- *  HeadObject(*HeadObjectInput)
- */
+// Mock out S3 client. Includes these methods:
+// ListObjectsV2(*ListObjectsV2Input)
+// GetObject(*GetObjectInput)
+// HeadObject(*HeadObjectInput)
 type mockS3Client struct {
 	s3iface.S3API
 	notFound bool
@@ -70,10 +68,8 @@ func (m *mockS3Client) HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjectOutp
 	return &s3.HeadObjectOutput{}, nil
 }
 
-/**
- *  Mock out uploader client for S3. Includes these methods:
- *  Upload(*UploadInput, ...func(*s3manager.Uploader))
- */
+// Mock out uploader client for S3. Includes these methods:
+// Upload(*UploadInput, ...func(*s3manager.Uploader))
 type mockS3Uploader struct {
 	s3manageriface.UploaderAPI
 	multierr bool
@@ -97,7 +93,7 @@ func (u *mockS3Uploader) Upload(input *s3manager.UploadInput, f ...func(*s3manag
 		VersionID: input.Key,
 	}
 
-	/***	Discard bytes to unblock pipe.	***/
+	// Discard bytes to unblock pipe.
 	_, err := io.Copy(ioutil.Discard, input.Body)
 	if err != nil {
 		return nil, err
@@ -119,9 +115,7 @@ func (m mockMultiFailureError) Error() string {
 	return m.err.Error()
 }
 
-/**
- *  Creates 5 fake s3 objects with Key and LastModified field.
- */
+// Creates 5 fake S3 objects with Key and LastModified field.
 func fakeContents() []*s3.Object {
 	c := make([]*s3.Object, 5)
 
@@ -158,9 +152,6 @@ func fakeContents() []*s3.Object {
 	return c
 }
 
-/**
- *  Test backup error handling.
- */
 func TestBackupErrors(t *testing.T) {
 	pre := &walg.Prefix{
 		Svc: &mockS3Client{
@@ -177,8 +168,8 @@ func TestBackupErrors(t *testing.T) {
 		Name:   aws.String("base_backupmockBackup"),
 	}
 
-	/***	CheckExistence error testing	***/
-	exists := bk.CheckExistence()
+	//CheckExistence error testing
+	exists, _ := bk.CheckExistence()
 	if exists {
 		t.Errorf("backup: expected mock backup to not exist")
 	}
@@ -186,25 +177,25 @@ func TestBackupErrors(t *testing.T) {
 	pre.Svc = &mockS3Client{
 		err: true,
 	}
-	exists = bk.CheckExistence()
-	if exists {
-		t.Errorf("backup: expected mock backup to fail")
+	_, err := bk.CheckExistence()
+	if err == nil {
+		t.Errorf("backup: CheckExistence expected error but got '<nil>'")
 	}
 
-	/***	GetLatest error testing 	***/
-	_, err := bk.GetLatest()
+	//GetLatest error testing
+	_, err = bk.GetLatest()
 	if err == nil {
 		t.Errorf("backup: expected error but got '<nil>'")
 	}
 
-	/***	GetKeys error testing 	***/
+	//GetKeys error testing
 	_, err = bk.GetKeys()
 	if err == nil {
 		t.Errorf("backup: expected error but got '<nil>'")
 	}
 
-	/***	Test S3 ReaderMaker with error S3.	***/
-	keys := []string{"1.nop", "2.nop", "3.gzip"}
+	//Test S3 ReaderMaker with error S3.
+	keys := []string{"1.nop", "2.nop", "3.gzip", "4.lzo"}
 	n := &tools.NOPTarInterpreter{}
 
 	out := make([]walg.ReaderMaker, len(keys))
@@ -223,12 +214,10 @@ func TestBackupErrors(t *testing.T) {
 	}
 }
 
-/**
- *  Tests that backup fetch methods work. Tests:
- *  GetLatest()
- *  CheckExistence()
- *  GetKeys()
- */
+// Tests backup-fetch methods including:
+// GetLatest()
+// CheckExistence()
+// GetKeys()
 func TestBackup(t *testing.T) {
 	pre := &walg.Prefix{
 		Svc:    &mockS3Client{},
@@ -247,7 +236,7 @@ func TestBackup(t *testing.T) {
 		t.Errorf("backup: expected %s from 'GetLatest' but got %s", "first", latest)
 	}
 
-	exists := bk.CheckExistence()
+	exists, _ := bk.CheckExistence()
 	if !exists {
 		t.Errorf("backup: expected mock backup to exist but 'CheckExistence' returned false")
 	}
@@ -263,7 +252,7 @@ func TestBackup(t *testing.T) {
 		}
 	}
 
-	/***	Test S3 ReaderMaker		***/
+	// Test S3 ReaderMaker
 	n := &tools.NOPTarInterpreter{}
 
 	out := make([]walg.ReaderMaker, len(keys))
@@ -301,8 +290,8 @@ func TestArchiveErrors(t *testing.T) {
 		Archive: aws.String("mockArchive"),
 	}
 
-	/***	CheckExistence error testing	***/
-	exists := arch.CheckExistence()
+	// CheckExistence error testing
+	exists, _ := arch.CheckExistence()
 	if exists {
 		t.Errorf("archive: expected mock archive to not exist")
 	}
@@ -310,18 +299,16 @@ func TestArchiveErrors(t *testing.T) {
 	pre.Svc = &mockS3Client{
 		err: true,
 	}
-	exists = arch.CheckExistence()
-	if exists {
-		t.Errorf("archive: expected mock archive to fail")
+	_, err := arch.CheckExistence()
+	if err == nil {
+		t.Errorf("archive: CheckExistence expected error but got `<nil>`")
 	}
 
 }
 
-/**
- *  Tests Archive functions including:
- *  CheckExistence()
- *  GetArchive()
- */
+// Tests Archive functions including:
+// CheckExistence()
+// GetArchive()
 func TestArchive(t *testing.T) {
 	pre := &walg.Prefix{
 		Svc:    &mockS3Client{},
@@ -334,7 +321,7 @@ func TestArchive(t *testing.T) {
 		Archive: aws.String("mockArchive"),
 	}
 
-	exists := arch.CheckExistence()
+	exists, _ := arch.CheckExistence()
 	if !exists {
 		t.Errorf("archive: expected mock archive to exist but 'CheckExistence' returned false")
 	}
@@ -358,9 +345,9 @@ func TestArchive(t *testing.T) {
 		err: true,
 	}
 
-	exists = arch.CheckExistence()
-	if exists {
-		t.Errorf("archive: expected mock backup to not exist")
+	_, err = arch.CheckExistence()
+	if err == nil {
+		t.Errorf("archive: CheckExistence expected error but got `<nil>`")
 	}
 
 	_, err = arch.GetArchive()

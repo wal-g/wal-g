@@ -6,9 +6,8 @@ import (
 	"io"
 )
 
-/**
- *  Struct to handle 0 byte write in LZ4 package.
- */
+// EmptyWriteIgnorer handles 0 byte write in LZ4 package
+// to stop pipe reader/writer from blocking.
 type EmptyWriteIgnorer struct {
 	io.WriteCloser
 }
@@ -16,15 +15,13 @@ type EmptyWriteIgnorer struct {
 func (e EmptyWriteIgnorer) Write(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil
-	} else {
-		return e.WriteCloser.Write(p)
 	}
+	return e.WriteCloser.Write(p)
 }
 
-/**
- *  Extract exactly one tar bundle. Returns an error
- *  upon failure.
- */
+// Extract exactly one tar bundle. Returns an error
+// upon failure. Able to configure behavior by passing
+// in different TarInterpreters.
 func extractOne(ti TarInterpreter, s io.Reader) error {
 	tr := tar.NewReader(s)
 
@@ -46,10 +43,9 @@ func extractOne(ti TarInterpreter, s io.Reader) error {
 
 }
 
-/**
- *  Decompresses tar file.
- */
-func tarDecompresser(wc io.WriteCloser, rm ReaderMaker) error {
+// Ensures that file extension is valid. Any subsequent behavior
+// depends on file type.
+func tarHandler(wc io.WriteCloser, rm ReaderMaker) error {
 	defer wc.Close()
 	r, err := rm.Reader()
 	if err != nil {
@@ -79,13 +75,11 @@ func tarDecompresser(wc io.WriteCloser, rm ReaderMaker) error {
 	return nil
 }
 
-/**
- *  Handles all files passed in. Supports `.lzo`, `.lz4, and `.tar`.
- *  File type `nop` is used for testing purposes. Returns the
- *  first error encountered.
- */
+// ExtractAll Handles all files passed in. Supports `.lzo`, `.lz4, and `.tar`.
+// File type `.nop` is used for testing purposes. Each file is extracted
+// in its own goroutine and ExtractAll will wait for all goroutines to finish.
+// Returns the first error encountered.
 func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
-	//defer TimeTrack(time.Now(), "EXTRACT ALL")
 	if len(files) < 1 {
 		return errors.New("ExtractAll: did not provide files to extract")
 	}
@@ -99,11 +93,13 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 			pr, tempW := io.Pipe()
 			pw := &EmptyWriteIgnorer{tempW}
 
+			//Collect errors returned by tarHandler.
 			collectLow := make(chan error)
 			go func() {
-				collectLow <- tarDecompresser(pw, val)
+				collectLow <- tarHandler(pw, val)
 			}()
 
+			//Collect errors returned by extractOne.
 			collectTop := make(chan error)
 			go func() {
 				defer pr.Close()

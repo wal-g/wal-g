@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pkg/errors"
 	"io"
+	"log"
 	"os"
 	"strings"
 	"sync"
@@ -16,9 +17,7 @@ import (
 
 var EXCLUDE = make(map[string]Empty)
 
-/**
- *  List of excluded members from the bundled backup.
- */
+// Lists excluded members from the bundled backup.
 func init() {
 	EXCLUDE["pg_log"] = Empty{}
 	EXCLUDE["pg_xlog"] = Empty{}
@@ -30,7 +29,7 @@ func init() {
 	EXCLUDE["postmaster.opts"] = Empty{}
 	EXCLUDE["recovery.conf"] = Empty{}
 
-	/*** DIRECTORIES ***/
+	// DIRECTORIES
 	EXCLUDE["pg_dynshmem"] = Empty{}
 	EXCLUDE["pg_notify"] = Empty{}
 	EXCLUDE["pg_replslot"] = Empty{}
@@ -42,12 +41,19 @@ func init() {
 
 type Empty struct{}
 
+// TarBundle represents one
+// completed directory.
 type TarBundle interface {
 	NewTarBall()
 	GetTarBall() TarBall
 }
 
-/*** CONCRETE TAR BUNDLE ***/
+// Bundle represents the directory to
+// be walked. Contains at least one TarBall
+// if walk has started. Each TarBall will be at least
+// MinSize bytes. The Sentinel is used to ensure complete
+// uploaded backups; in this case, pg_control is used as
+// the sentinel.
 type Bundle struct {
 	MinSize int64
 	Sen     *Sentinel
@@ -58,14 +64,14 @@ type Bundle struct {
 func (b *Bundle) GetTarBall() TarBall { return b.Tb }
 func (b *Bundle) NewTarBall()         { b.Tb = b.Tbm.Make() }
 
+// Sentinel is used to signal completion of a walked
+// directory.
 type Sentinel struct {
 	Info os.FileInfo
 	path string
 }
 
-/**
- *  Represents one tar file.
- */
+// TarBall represents one tar file.
 type TarBall interface {
 	SetUp(args ...string)
 	CloseTar() error
@@ -79,10 +85,8 @@ type TarBall interface {
 	Tw() *tar.Writer
 }
 
-/**
- *  Represents tar file that is
- *  going to be uploaded to S3.
- */
+// S3TarBall represents a tar file that is
+// going to be uploaded to S3.
 type S3TarBall struct {
 	baseDir  string
 	trim     string
@@ -95,12 +99,10 @@ type S3TarBall struct {
 	tu       *TarUploader
 }
 
-/**
- *  Creates a new tar writer and starts upload to S3.
- *  Upload will block until tar is finished writing. If a name
- *  for the file is not given, default name is of the form
- *  `part_....tar.lz4`.
- */
+// SetUp creates a new tar writer and starts upload to S3.
+// Upload will block until the tar file is finished writing.
+// If a name for the file is not given, default name is of
+// the form `part_....tar.lz4`.
 func (s *S3TarBall) SetUp(names ...string) {
 	if s.tw == nil {
 		var name string
@@ -116,10 +118,8 @@ func (s *S3TarBall) SetUp(names ...string) {
 	}
 }
 
-/**
- *  Closes tar writer flushing any unwritten data to underlying writer before
- *  closing underlying writer.
- */
+// CloseTar closes the tar writer, flushing any unwritten data
+// to the underlying writer before also closing the underlying writer.
 func (s *S3TarBall) CloseTar() error {
 	err := s.tw.Close()
 	if err != nil {
@@ -134,11 +134,11 @@ func (s *S3TarBall) CloseTar() error {
 	return nil
 }
 
-/**
- *  Once a backup is finished uploading, an empty .json file is written
- *  and uploaded with the backup name. Waits until all files have been
- *  uploaded.
- */
+// Finish writes an empty .json file and uploads it with the
+// the backup name. Finish will wait until all tar file parts
+// have been uploaded. The json file will only be uploaded
+// if all other parts of the backup are present in S3.
+// an alert is given with the corresponding error.
 func (s *S3TarBall) Finish() error {
 	var err error
 	tupl := s.tu
@@ -150,24 +150,29 @@ func (s *S3TarBall) Finish() error {
 		Key:    aws.String(path),
 		Body:   strings.NewReader(body),
 	}
-	tupl.wg.Add(1)
-	go func() {
-		defer tupl.wg.Done()
-
-		e := tupl.upload(input, path)
-		if e != nil {
-			fmt.Printf("upload: could not upload '%s' after %v retries\n", path, tupl.MaxRetries)
-			err = errors.Wrap(e, "S3TarBall Finish: json failed to upload")
-		}
-
-	}()
-
 	tupl.Finish()
+
+	//If other parts are successful in uploading, upload json file.
+	if tupl.Success {
+		tupl.wg.Add(1)
+		go func() {
+			defer tupl.wg.Done()
+
+			e := tupl.upload(input, path)
+			if e != nil {
+				log.Printf("upload: could not upload '%s' after %v retries\n", path, tupl.MaxRetries)
+				err = errors.Wrap(e, "S3TarBall Finish: json failed to upload")
+			}
+
+		}()
+
+		tupl.Finish()
+	}
+
 	if err == nil && tupl.Success {
 		fmt.Printf("Uploaded %d compressed tar files.\n", s.number)
 	}
 	return err
-
 }
 
 func (s *S3TarBall) BaseDir() string { return s.baseDir }
@@ -178,10 +183,9 @@ func (s *S3TarBall) Size() int64     { return s.size }
 func (s *S3TarBall) SetSize(i int64) { s.size += i }
 func (s *S3TarBall) Tw() *tar.Writer { return s.tw }
 
-/**
- *  Uploader associated with tarballs. Multiple tarballs can share
- *  one uploader. Must call CreateUploader() in 'upload.go'.
- */
+// TarUploader contains fields associated with uploading tarballs.
+// Multiple tarballs can share one uploader. Must call CreateUploader()
+// in 'upload.go'.
 type TarUploader struct {
 	Upl        s3manageriface.UploaderAPI
 	MaxRetries int
@@ -193,9 +197,9 @@ type TarUploader struct {
 	wg         *sync.WaitGroup
 }
 
-/**
- *  Creates a new tar uploader with own waitgroup.
- */
+// NewTarUploader creates a new tar uploader without the actual
+// S3 uploader. CreateUploader() is used to configure byte size and
+// concurrency streams for the uploader.
 func NewTarUploader(svc s3iface.S3API, bucket, server, region string, r int, w float64) *TarUploader {
 	return &TarUploader{
 		MaxRetries: r,
@@ -207,9 +211,11 @@ func NewTarUploader(svc s3iface.S3API, bucket, server, region string, r int, w f
 	}
 }
 
+// Finish waits for all waiting parts to be uploaded. If an error occurs,
+// prints alert to stderr.
 func (tu *TarUploader) Finish() {
 	tu.wg.Wait()
 	if !tu.Success {
-		fmt.Printf("WAL-G could not complete upload\n")
+		log.Printf("WAL-G could not complete upload.\n")
 	}
 }

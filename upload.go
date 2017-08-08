@@ -13,23 +13,25 @@ import (
 	"github.com/pierrec/lz4"
 	"github.com/pkg/errors"
 	"io"
+	"log"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
+// Maximum number of retries for upload.
 var MAX_RETRIES = 7
+
+// Maxmimum backoff time in seconds for upload.
 var MAX_BACKOFF = float64(32)
 
-/**
- *  Checks that the following environment variables are set:
- *  WALE_S3_PREFIX
- *  AWS_REGION
- *  AWS_ACCESS_KEY_ID
- *  AWS_SECRET_ACCESS_KEY
- *  AWS_SECURITY_TOKEN
- */
+// Checks that the following environment variables are set:
+// WALE_S3_PREFIX
+// AWS_REGION
+// AWS_ACCESS_KEY_ID
+// AWS_SECRET_ACCESS_KEY
+// AWS_SECURITY_TOKEN
 func checkVar(n map[string]string) error {
 	u := &UnsetEnvVarError{
 		names: make([]string, 0, 5),
@@ -46,18 +48,18 @@ func checkVar(n map[string]string) error {
 	return nil
 }
 
-/**
- *  Configure uploader and connect to S3. Checks that a valid session
- *  is started; if invalid, returns AWS error and TarUploader and Prefix
- *  will be nil.
- *  Requires these environment variables:
- *  WALE_S3_PREFIX
- *  AWS_REGION
- *  AWS_ACCESS_KEY_ID
- *  AWS_SECRET_ACCESS_KEY
- *  AWS_SECURITY_TOKEN
- *  Able to configure the upload part size in the S3 uploader.
- */
+// Configure connects to S3 and creates an uploader. It makes sure
+// that a valid session has started; if invalid, returns AWS error
+// and `<nil>` values.
+//
+// Requires these environment variables to be set:
+// WALE_S3_PREFIX
+// AWS_REGION
+// AWS_ACCESS_KEY_ID
+// AWS_SECRET_ACCESS_KEY
+// AWS_SECURITY_TOKEN
+//
+// Able to configure the upload part size in the S3 uploader.
 func Configure() (*TarUploader, *Prefix, error) {
 	chk := make(map[string]string)
 
@@ -104,10 +106,8 @@ func Configure() (*TarUploader, *Prefix, error) {
 	return upload, pre, err
 }
 
-/**
- *  Creates an uploader with customizable concurrency
- *  and partsize.
- */
+// CreateUploader returns an uploader with customizable concurrency
+// and partsize.
 func CreateUploader(svc s3iface.S3API, partsize, concurrency int) s3manageriface.UploaderAPI {
 	up := s3manager.NewUploaderWithClient(svc, func(u *s3manager.Uploader) {
 		u.PartSize = int64(partsize)
@@ -116,7 +116,8 @@ func CreateUploader(svc s3iface.S3API, partsize, concurrency int) s3manageriface
 	return up
 }
 
-
+// Helper function to upload to S3. If an error occurs during upload, retries will
+// occur in exponentially incremental seconds.
 func (tu *TarUploader) upload(input *s3manager.UploadInput, path string) (err error) {
 	upl := tu.Upl
 	et := NewExpTicker(tu.MaxRetries, tu.MaxWait)
@@ -129,10 +130,9 @@ func (tu *TarUploader) upload(input *s3manager.UploadInput, path string) (err er
 		}
 
 		if e != nil {
+			// If compression failure, will not retry.
 			if re, ok := e.(Lz4Error); ok {
-				fmt.Println("upload: failed to upload due to compression error")
-				fmt.Println(re)
-				break
+				return re
 			}
 			et.Update()
 
@@ -141,14 +141,11 @@ func (tu *TarUploader) upload(input *s3manager.UploadInput, path string) (err er
 				break
 			}
 
-			var msg string
 			if multierr, ok := e.(s3manager.MultiUploadFailure); ok {
-				msg = fmt.Sprintf("upload: failed to upload '%s' with UploadID '%s'. Restarting in %v seconds", path, multierr.UploadID(), et.wait)
+				log.Printf("upload: failed to upload '%s' with UploadID '%s'. Restarting in %v seconds", path, multierr.UploadID(), et.wait)
 			} else {
-				msg = fmt.Sprintf("upload: failed to upload '%s'. Restarting in %v seconds", path, et.wait)
+				log.Printf("upload: failed to upload '%s'. Restarting in %v seconds", path, et.wait)
 			}
-
-			fmt.Println(msg)
 
 		}
 
@@ -157,10 +154,8 @@ func (tu *TarUploader) upload(input *s3manager.UploadInput, path string) (err er
 	return errors.Wrap(err, "")
 }
 
-/**
- *  Creates a lz4 writer and runs upload in the background once
- *  a compressed tar member is finished writing.
- */
+// StartUpload creates a lz4 writer and runs upload in the background once
+// a compressed tar member is finished writing.
 func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 	pr, pw := io.Pipe()
 	tupl := s.tu
@@ -179,19 +174,19 @@ func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 		defer tupl.wg.Done()
 
 		err := tupl.upload(input, path)
+		if re, ok := err.(Lz4Error); ok {
+			log.Printf("upload: could not upload '%s' due to compression error\n%+v\n", path, re)
+		}
 		if err != nil {
-			fmt.Printf("upload: could not upload '%s' after %v retries\n", path, tupl.MaxRetries)
-			fmt.Printf("FATAL%v\n", err)
+			log.Printf("upload: could not upload '%s' after %v retries\nFATAL%v\n", path, tupl.MaxRetries, err)
 		}
 
 	}()
 	return &Lz4CascadeClose{lz4.NewWriter(pw), pw}
 }
 
-/**
- *  Compress a WAL file using LZ4 and upload to S3. Returns
- *  the first error encountered and an empty string upon failure.
- */
+// UploadWal compresses a WAL file using LZ4 and uploads to S3. Returns
+// the first error encountered and an empty string upon failure.
 func (tu *TarUploader) UploadWal(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -212,28 +207,20 @@ func (tu *TarUploader) UploadWal(path string) (string, error) {
 	}
 
 	tu.wg.Add(1)
-
 	go func() {
 		defer tu.wg.Done()
-
-		err := tu.upload(input, path)
-		if err != nil {
-			fmt.Printf("upload: could not upload '%s' after %v retries\n", p, tu.MaxRetries)
-			fmt.Printf("FATAL%v\n", err)
-		} 
+		err = tu.upload(input, path)
 
 	}()
 
+	tu.Finish()
 	fmt.Println("WAL PATH:", p)
-	return p, nil
-
+	return p, err
 }
 
-/**
- *  Uploads the compressed tar file of `pg_control`. Will only be called
- *  after the rest of the backup is successfully uploaded to S3. Returns
- *  an error upon failure.
- */
+// HandleSentinel uploads the compressed tar file of `pg_control`. Will only be called
+// after the rest of the backup is successfully uploaded to S3. Returns
+// an error upon failure.
 func (bundle *Bundle) HandleSentinel() error {
 	fileName := bundle.Sen.Info.Name()
 	info := bundle.Sen.Info
@@ -286,10 +273,8 @@ func (bundle *Bundle) HandleSentinel() error {
 	return nil
 }
 
-/**
- *  Creates the `backup_label` and `tablespace_map` files and uploads
- *  it to S3. Returns error upon failure.
- */
+// HandleLabelFiles creates the `backup_label` and `tablespace_map` files and uploads
+// it to S3. Returns error upon failure.
 func (bundle *Bundle) HandleLabelFiles(lb, sc string) error {
 	bundle.NewTarBall()
 	tarBall := bundle.Tb

@@ -10,12 +10,12 @@ import (
 	"strings"
 )
 
-/**
- *  TarWalker walks files provided by the passed in directory and creates compressed tar members
- *  labeled as `part_00i.tar.lzo`. To see which files and directories are skipped, please
- *  consult EXCLUDE in 'structs.go'. Excluded directories will be created but their contents will
- *  not be included in the tar bundle.
- */
+// TarWalker walks files provided by the passed in directory
+// and creates compressed tar members labeled as `part_00i.tar.lzo`.
+//
+// To see which files and directories are skipped, please consult
+// 'structs.go'. Excluded directories will be created but their
+// contents will not be included in the tar bundle.
 func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error {
 	if err != nil {
 		return errors.Wrap(err, "TarWalker: walk failed")
@@ -52,11 +52,10 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 	return nil
 }
 
-/**
- *  Creates underlying tar writer and handles one given file. Does not follow symlinks. If file
- *  is in EXCLUDE, will not be included in the final file. EXCLUDED directories are created
- *  but their contents are not written to local disk.
- */
+// HandleTar creates underlying tar writer and handles one given file.
+// Does not follow symlinks. If file is in EXCLUDE, will not be included
+// in the final tarball. EXCLUDED directories are created
+// but their contents are not written to local disk.
 func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 	tarBall := bundle.GetTarBall()
 	fileName := info.Name()

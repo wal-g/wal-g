@@ -11,26 +11,20 @@ import (
 	"strings"
 )
 
-/**
- *  Tar interpreter for that behaves differently for
- *  different file types.
- */
+// TarInterpreter behaves differently
+// for different file types.
 type TarInterpreter interface {
 	Interpret(r io.Reader, hdr *tar.Header) error
 }
 
-/**
- *  Tar interpreter that extracts to a file.
- */
+// FileTarInterpreter extracts input to disk.
 type FileTarInterpreter struct {
 	NewDir string
 }
 
-/**
- *  Extracts a tar file to local disk and creates needed directories.
- *  Returns the first error encountered. Calls fsync after each file
- *  is written successfully.
- */
+// Interpet extracts a tar file to disk and creates needed directories.
+// Returns the first error encountered. Calls fsync after each file
+// is written successfully.
 func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
 	targetPath := path.Join(ti.NewDir, cur.Name)
 	switch cur.Typeflag {

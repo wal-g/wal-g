@@ -15,10 +15,8 @@ var fileNames = []struct {
 	{"mockgzip", ""},
 }
 
-/**
- *  Tests that backup name is successfully extracted from
- *  return values of pg_stop_backup(false)
- */
+// Tests that backup name is successfully extracted from
+// return values of pg_stop_backup(false)
 func TestCheckType(t *testing.T) {
 	for _, f := range fileNames {
 		actual := walg.CheckType(f.input)

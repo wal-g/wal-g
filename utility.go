@@ -4,17 +4,15 @@ import (
 	"time"
 )
 
-/**
- *  Used to sort backup by time
- */
+// BackupTime is used to sort backups by
+// latest modified time.
 type BackupTime struct {
 	Name string
 	Time time.Time
 }
 
-/**
- *  Used to grab last modified backups on S3.
- */
+// TimeSlice represents a backup and its
+// last modified time.
 type TimeSlice []BackupTime
 
 func (p TimeSlice) Len() int {

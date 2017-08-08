@@ -9,16 +9,13 @@ import (
 	"regexp"
 )
 
-/**
- *  Fixes bug in rasky package. Rasky crashes if byte size is too small.
- */
+// RaskyReader handles cases when the Rasky lzo package crashes.
+// Occurs if byte size is too small.
 type RaskyReader struct {
 	R io.Reader
 }
 
-/**
- *  Makes sure all bytes are get read for Rasky package.
- */
+// Read ensures all bytes are get read for Rasky package.
 func (r *RaskyReader) Read(p []byte) (int, error) {
 	return io.ReadFull(r.R, p)
 }
@@ -26,9 +23,7 @@ func (r *RaskyReader) Read(p []byte) (int, error) {
 var Uncompressed uint32
 var Compressed uint32
 
-/**
- *  Grabs the file extension from PATH.
- */
+// CheckType grabs the file extension from PATH.
 func CheckType(path string) string {
 	re := regexp.MustCompile(`\.([^\.]+)$`)
 	f := re.FindString(path)
@@ -39,10 +34,8 @@ func CheckType(path string) string {
 
 }
 
-/**
- *  Decompress an .lzo file. Returns the first error
- *  encountered.
- */
+// DecompressLzo decompresses an .lzo file. Returns the first error
+// encountered.
 func DecompressLzo(d io.Writer, s io.Reader) error {
 	skip := 33
 	sk := make([]byte, skip)
@@ -137,14 +130,10 @@ func DecompressLzo(d io.Writer, s io.Reader) error {
 	return nil
 }
 
-/**
- *  Decompress a .lz4 file. Returns an error upon failure.
- */
+// DecompressLz4 decompresses a .lz4 file. Returns an error upon failure.
 func DecompressLz4(d io.Writer, s io.Reader) error {
 	lz := lz4.NewReader(s)
-
 	_, err := lz.WriteTo(d)
-
 	if err != nil {
 		return errors.Wrap(err, "DecompressLz4: lz4 write failed")
 	}

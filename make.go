@@ -2,16 +2,13 @@ package walg
 
 import ()
 
-/**
- *  Generic TarBall handler.
- */
+// TarBallMaker is used to allow for
+// flexible creation of different TarBalls.
 type TarBallMaker interface {
 	Make() TarBall
 }
 
-/**
- *  Handles all tarballs that are uploaded to S3.
- */
+// S3TarBallMaker creates tarballs that are uploaded to S3.
 type S3TarBallMaker struct {
 	number   int
 	size     int64
@@ -21,10 +18,7 @@ type S3TarBallMaker struct {
 	Tu       *TarUploader
 }
 
-/**
- *  Returns a tarball with fields needed in order to
- *  upload to S3.
- */
+// Make returns a tarball with required S3 fields.
 func (s *S3TarBallMaker) Make() TarBall {
 	s.number++
 	return &S3TarBall{

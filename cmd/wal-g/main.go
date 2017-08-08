@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/katie31/wal-g"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
 )
 
 var help bool
+var l *log.Logger
 var helpMsg = "\tbackup-fetch\tfetch a backup from S3\n" +
 	"\tbackup-push\tstarts and uploads a finished backup to S3\n" +
 	"\twal-fetch\tfetch a WAL file from S3\n" +
@@ -22,19 +24,16 @@ func init() {
 		fmt.Fprintf(os.Stderr, "%s", helpMsg)
 		flag.PrintDefaults()
 	}
+	l = log.New(os.Stderr, "", 0)
 }
 
 func main() {
-	/**
-	 *  Configure and start session with bucket, region, and path names. Checks that environment variables
-	 *  are properly set.
-	 */
+	// Configure and start S3 session with bucket, region, and path names.
+	// Checks that environment variables are properly set.
 	flag.Parse()
 	all := flag.Args()
-	if len(all) == 0 {
-		fmt.Println("Please choose a command:")
-		fmt.Println(helpMsg)
-		os.Exit(1)
+	if len(all) < 2 {
+		l.Fatalf("Please choose a command:\n%s", helpMsg)
 	}
 	command := all[0]
 	dirArc := all[1]
@@ -46,19 +45,17 @@ func main() {
 
 	tu, pre, err := walg.Configure()
 	if err != nil {
-		fmt.Printf("FATAL: \t%+v\n", err)
-		os.Exit(1)
+		log.Fatalf("FATAL: %+v\n", err)
 	}
 
 	fmt.Println("BUCKET:", *pre.Bucket)
 	fmt.Println("PATH:", *pre.Server)
 
-	/*** OPTION: BACKUP-FETCH ***/
 	if command == "backup-fetch" {
 		var allKeys []string
 		var keys []string
 		var bk *walg.Backup
-		/*** Check if BACKUPNAME exists and if it does extract to DIRARC. ***/
+		// Check if BACKUPNAME exists and if it does extract to DIRARC.
 		if backupName != "LATEST" {
 			bk = &walg.Backup{
 				Prefix: pre,
@@ -68,26 +65,27 @@ func main() {
 
 			bk.Js = aws.String(*bk.Path + *bk.Name + "_backup_stop_sentinel.json")
 
-			fmt.Println("NEWDIR:", dirArc)
-			fmt.Println("PATH:", *bk.Path)
-			fmt.Println("NAME:", *bk.Name)
-			fmt.Println("JSON:", *bk.Js)
-			fmt.Println(bk.CheckExistence())
-
-			if bk.CheckExistence() {
+			// fmt.Println("NEWDIR:", dirArc)
+			// fmt.Println("PATH:", *bk.Path)
+			// fmt.Println("NAME:", *bk.Name)
+			// fmt.Println("JSON:", *bk.Js)
+			// fmt.Println(bk.CheckExistence())
+			exists, err := bk.CheckExistence()
+			if err != nil {
+				log.Fatalf("%+v\n", err)
+			}
+			if exists {
 				allKeys, err := bk.GetKeys()
 				if err != nil {
-					fmt.Printf("%+v\n", err)
-					os.Exit(1)
+					log.Fatalf("%+v\n", err)
 				}
 				keys = allKeys[:len(allKeys)-1]
 
 			} else {
-				fmt.Printf("Backup '%s' does not exist.\n", *bk.Name)
-				os.Exit(1)
+				log.Fatalf("Backup '%s' does not exist.\n", *bk.Name)
 			}
 
-			/*** Find the LATEST valid backup (checks against JSON file and grabs name from there) and extract to DIRARC. ***/
+			// Find the LATEST valid backup (checks against JSON file and grabs name from there) and extract to DIRARC.
 		} else if backupName == "LATEST" {
 			bk = &walg.Backup{
 				Prefix: pre,
@@ -96,21 +94,14 @@ func main() {
 
 			latest, err := bk.GetLatest()
 			if err != nil {
-				fmt.Printf("%+v\n", err)
-				os.Exit(1)
+				log.Fatalf("%+v\n", err)
 			}
 			bk.Name = aws.String(latest)
 			allKeys, err = bk.GetKeys()
 			if err != nil {
-				fmt.Printf("%+v\n", err)
-				os.Exit(1)
+				log.Fatalf("%+v\n", err)
 			}
 			keys = allKeys[:len(allKeys)-1]
-
-			fmt.Println("NEWDIR", dirArc)
-			fmt.Println("PATH:", *bk.Path)
-			fmt.Println("NAME:", *bk.Name)
-
 		}
 
 		f := &walg.FileTarInterpreter{
@@ -127,23 +118,26 @@ func main() {
 			out[i] = s
 		}
 
-		/*** Extract all except pg_control. ***/
+		// Extract all except pg_control.
 		err = walg.ExtractAll(f, out)
 		if serr, ok := err.(*walg.UnsupportedFileTypeError); ok {
-			fmt.Println(serr.Error())
-			os.Exit(1)
+			log.Fatalf("%v\n", serr)
 		} else if err != nil {
-			panic(err)
+			log.Fatalf("%+v\n", err)
 		}
 
-		/*** Extract pg_control last. If pg_control does not exist, program exits with error code 1. ***/
+		// Extract pg_control last. If pg_control does not exist, program exits with error code 1.
 		name := *bk.Path + *bk.Name + "/tar_partitions/pg_control.tar.lz4"
 		pgControl := &walg.Archive{
 			Prefix:  pre,
 			Archive: aws.String(name),
 		}
 
-		if pgControl.CheckExistence() {
+		exists, err := pgControl.CheckExistence()
+		if err != nil {
+			log.Fatalf("%+v\n", err)
+		}
+		if exists {
 			sentinel := make([]walg.ReaderMaker, 1)
 			sentinel[0] = &walg.S3ReaderMaker{
 				Backup:     bk,
@@ -152,89 +146,95 @@ func main() {
 			}
 			err := walg.ExtractAll(f, sentinel)
 			if serr, ok := err.(*walg.UnsupportedFileTypeError); ok {
-				fmt.Println(serr.Error())
-				os.Exit(1)
+				log.Fatalf("%v\n", serr)
 			} else if err != nil {
-				panic(err)
+				log.Fatalf("%+v\n", err)
 			}
 			fmt.Println("Extract complete.")
 		} else {
-			fmt.Println("Corrupt backup: missing pg_control")
-			os.Exit(1)
+			log.Fatal("Corrupt backup: missing pg_control")
 		}
 	} else if command == "wal-fetch" {
-		/*** Fetch and decompress a WAL file from S3. ***/
+		// Fetch and decompress a WAL file from S3.
 		a := &walg.Archive{
 			Prefix:  pre,
 			Archive: aws.String(*pre.Server + "/wal_005/" + dirArc + ".lzo"),
 		}
 
-		if a.CheckExistence() {
+		// Check existence of compressed LZO WAL file
+		exists, err := a.CheckExistence()
+		if err != nil {
+			log.Fatalf("%+v\n", err)
+		}
+
+		if exists {
 			arch, err := a.GetArchive()
 			if err != nil {
-				fmt.Printf("%+v\n", err)
-				os.Exit(1)
+				log.Fatalf("%+v\n", err)
 			}
 			f, err := os.Create(backupName)
 			if err != nil {
-				panic(err)
+				log.Fatalf("%v\n", err)
 			}
 
 			err = walg.DecompressLzo(f, arch)
 			if err != nil {
-				fmt.Printf("FATAL: %+v\n", err)
-				os.Exit(1)
+				log.Fatalf("%+v\n", err)
 			}
 			f.Close()
-		} else if a.Archive = aws.String(*pre.Server + "/wal_005/" + dirArc + ".lz4"); a.CheckExistence() {
-			arch, err := a.GetArchive()
+		} else if !exists {
+			// Check existence of compressed LZ4 WAL file
+			a.Archive = aws.String(*pre.Server + "/wal_005/" + dirArc + ".lz4")
+			exists, err = a.CheckExistence()
 			if err != nil {
-				fmt.Printf("%+v\n", err)
-				os.Exit(1)
-			}
-			f, err := os.Create(backupName)
-			if err != nil {
-				panic(err)
+				log.Fatalf("%+v\n", err)
 			}
 
-			err = walg.DecompressLz4(f, arch)
-			if err != nil {
-				fmt.Printf("FATAL: %+v\n", err)
-				os.Exit(1)
+			if exists {
+				arch, err := a.GetArchive()
+				if err != nil {
+					log.Fatalf("%+v\n", err)
+				}
+				f, err := os.Create(backupName)
+				if err != nil {
+					log.Fatalf("%v\n", err)
+				}
+
+				err = walg.DecompressLz4(f, arch)
+				if err != nil {
+					log.Fatalf("%+v\n", err)
+				}
+				f.Close()
+			} else {
+				log.Fatalf("Archive '%s' does not exist.\n", dirArc)
 			}
-			f.Close()
-		} else {
-			fmt.Printf("Archive '%s' does not exist.\n", dirArc)
-			os.Exit(1)
 		}
-
 	} else if command == "wal-push" {
-		_, err := tu.UploadWal(dirArc)
-		if err != nil {
-			fmt.Printf("%+v\n", err)
-			os.Exit(1)
+		// Upload a WAL file to S3.
+		path, err := tu.UploadWal(dirArc)
+		if re, ok := err.(walg.Lz4Error); ok {
+			log.Printf("Could not upload '%s' due to compression error.\n%+v\n", path, re)
+		} else if err != nil {
+			log.Printf("Could not upload '%s' after %v retries\n", path, tu.MaxRetries)
+			log.Fatalf("%+v\n", err)
 		}
-
-		tu.Finish()
-
 	} else if command == "backup-push" {
+		// Connect to postgres and start/finish a nonexclusive backup.
 		bundle := &walg.Bundle{
 			MinSize: int64(1000000000), //MINSIZE = 1GB
 		}
 		c, err := walg.Connect()
 		if err != nil {
-			fmt.Printf("%+v\n", err)
-			os.Exit(1)
+			log.Fatalf("%+v\n", err)
 		}
 		lbl, sc, err := walg.QueryFile(c, time.Now().String())
 		if err != nil {
-			fmt.Printf("%+v\n", err)
-			os.Exit(1)
+			log.Fatalf("%+v\n", err)
 		}
 
 		n, err := walg.FormatName(lbl)
 		if err != nil {
-			panic(err)
+			log.Fatalf("%v\n", err)
 		}
 
 		bundle.Tbm = &walg.S3TarBallMaker{
@@ -244,35 +244,35 @@ func main() {
 			Tu:       tu,
 		}
 
-		/*** WALK the DIRARC directory and upload to S3. ***/
+		// Walk the DIRARC directory and upload to S3.
 		bundle.NewTarBall()
 		fmt.Println("Walking ...")
 		err = filepath.Walk(dirArc, bundle.TarWalker)
 		if err != nil {
-			panic(err)
+			log.Fatalf("%+v\n", err)
 		}
 		err = bundle.Tb.CloseTar()
 		if err != nil {
-			panic(err)
+			log.Fatalf("%+v\n", err)
 		}
 
-		/*** UPLOAD label files. ***/
+		// Write and upload postgres `backup_label` and `tablespace_map` files
 		err = bundle.HandleLabelFiles(lbl, sc)
 		if err != nil {
-			fmt.Println("%+v\n", err)
-			os.Exit(1)
+			log.Fatalf("%+v\n", err)
 		}
 
-		/*** UPLOAD `pg_control`. ***/
+		// Upload `pg_control`.
 		err = bundle.HandleSentinel()
 		if err != nil {
-			fmt.Println("%+v\n", err)
-			os.Exit(1)
+			log.Fatalf("%+v\n", err)
 		}
 		err = bundle.Tb.Finish()
 		if err != nil {
-			panic(err)
+			log.Fatalf("%+v\n", err)
 		}
+	} else {
+		l.Fatalf("Command '%s' is unsupported by WAL-G.", command)
 	}
 
 }

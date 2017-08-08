@@ -6,9 +6,7 @@ import (
 	"testing"
 )
 
-/**
- *  Sets needed environment variables to empty strings.
- */
+// Sets WAL-G needed environment variables to empty strings.
 func setEmpty(t *testing.T) {
 	err := os.Setenv("WALE_S3_PREFIX", "")
 	if err != nil {
@@ -32,9 +30,7 @@ func setEmpty(t *testing.T) {
 	}
 }
 
-/**
- *  Sets needed environment variables.
- */
+// Sets fake environment variables.
 func setFake(t *testing.T) {
 	err := os.Setenv("WALE_S3_PREFIX", "wale_s3_prefix")
 	if err != nil {
@@ -58,12 +54,8 @@ func setFake(t *testing.T) {
 	}
 }
 
-/**
- *  Tests that a valid S3 client is created and configured from
- *  environment variables.
- */
 func TestConfigure(t *testing.T) {
-	/***	Test empty environment variables	***/
+	//Test empty environment variables
 	setEmpty(t)
 
 	tu, pre, err := walg.Configure()
@@ -78,7 +70,7 @@ func TestConfigure(t *testing.T) {
 	}
 
 	setFake(t)
-	/***	Test invalid url	***/
+	//Test invalid url
 	err = os.Setenv("WALE_S3_PREFIX", "test_fail:")
 	if err != nil {
 		t.Log(err)
@@ -89,7 +81,7 @@ func TestConfigure(t *testing.T) {
 		t.Errorf("upload: Expected to fail on fake url")
 	}
 
-	/***	Test created uploader and prefix 	***/
+	//Test created uploader and prefix
 	err = os.Setenv("WALE_S3_PREFIX", "s3://bucket/server")
 	if err != nil {
 		t.Log(err)

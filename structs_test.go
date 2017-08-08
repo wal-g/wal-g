@@ -7,9 +7,7 @@ import (
 	"testing"
 )
 
-/**
- *  Tests the various S3TarBall get and set methods.
- */
+// Tests S3 get and set methods.
 func TestS3TarBall(t *testing.T) {
 	tarBallCounter := 0
 	bundle := &walg.Bundle{
@@ -75,10 +73,8 @@ func TestS3TarBall(t *testing.T) {
 
 }
 
-/**
- *  Tests S3 dependent functions for S3TarBall such as
- *  SetUp(), CloseTar() and Finish().
- */
+// Tests S3 dependent functions for S3TarBall such as
+// SetUp(), CloseTar() and Finish().
 func TestS3DependentFunctions(t *testing.T) {
 	bundle := &walg.Bundle{
 		MinSize: 100,
@@ -101,7 +97,7 @@ func TestS3DependentFunctions(t *testing.T) {
 
 	one := []byte("a")
 
-	/***	Write mock header	***/
+	//Write mock header.
 	hdr := &tar.Header{
 		Name: "mock",
 		Size: int64(1),
@@ -111,7 +107,7 @@ func TestS3DependentFunctions(t *testing.T) {
 		t.Log(err)
 	}
 
-	/***	Write body	***/
+	//Write body.
 	_, err = tarWriter.Write(one)
 
 	fmt.Println("written")
@@ -120,7 +116,7 @@ func TestS3DependentFunctions(t *testing.T) {
 	}
 	tarBall.CloseTar()
 
-	/***	Handle write after close 	***/
+	//Handle write after close.
 	_, err = tarBall.Tw().Write(one)
 	if err == nil {
 		t.Errorf("structs: expected WriteAfterClose error but got '<nil>'")
@@ -131,7 +127,7 @@ func TestS3DependentFunctions(t *testing.T) {
 		t.Errorf("structs: tarball did not finish correctly with error %s", err)
 	}
 
-	/***	Test naming property of SetUp	***/
+	//Test naming property of SetUp().
 	bundle.NewTarBall()
 	tarBall = bundle.Tb
 	tarBall.SetUp("mockTarball")
