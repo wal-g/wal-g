@@ -19,6 +19,9 @@ import (
 	"strings"
 )
 
+var MAX_RETRIES = 6
+var MAX_BACKOFF = float64(32)
+
 /**
  *  Checks that the following environment variables are set:
  *  WALE_S3_PREFIX
@@ -95,7 +98,7 @@ func Configure() (*TarUploader, *Prefix, error) {
 
 	pre.Svc = s3.New(sess)
 
-	upload := NewTarUploader(pre.Svc, bucket, server, region)
+	upload := NewTarUploader(pre.Svc, bucket, server, region, MAX_RETRIES, MAX_BACKOFF)
 	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, 3) //3 concurrency streams at 20MB
 
 	return upload, pre, err
@@ -111,6 +114,40 @@ func CreateUploader(svc s3iface.S3API, partsize, concurrency int) s3manageriface
 		u.Concurrency = concurrency
 	})
 	return up
+}
+
+func (tu *TarUploader) upload(input *s3manager.UploadInput, path string) (err error) {
+	upl := tu.Upl
+	et := NewExpTicker(tu.MaxRetries, tu.MaxWait)
+
+	for {
+		_, e := upl.Upload(input)
+		if e == nil {
+			break
+		}
+
+		if e != nil {
+			et.Update()
+			
+			if et.retries == et.MaxRetries {
+				err = e
+				break
+			}
+
+			var msg string
+			if multierr, ok := e.(s3manager.MultiUploadFailure); ok {
+				msg = fmt.Sprintf("upload: failed to upload '%s' with UploadID '%s'. Restarting in %v seconds", path, multierr.UploadID(), et.wait)
+			} else {
+				msg = fmt.Sprintf("upload: failed to upload '%s'. Restarting in %v seconds", path, et.wait)
+			}
+
+			fmt.Println(msg)
+
+		}
+
+		et.Sleep()
+	}
+	return errors.Wrap(err, "")
 }
 
 /**
@@ -134,13 +171,9 @@ func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 	go func() {
 		defer tupl.wg.Done()
 
-		_, err := tupl.Upl.Upload(input)
+		err := tupl.upload(input, path)
 		if err != nil {
-			if multierr, ok := err.(s3manager.MultiUploadFailure); ok {
-				fmt.Println("StartUpload:", multierr.Code(), multierr.Message(), multierr.UploadID())
-			} else {
-				fmt.Println("StartUpload:", err.Error())
-			}
+			fmt.Printf("upload: could not upload '%s' after %v retries\n", path, tupl.MaxRetries)
 		}
 
 	}()
@@ -178,13 +211,9 @@ func (tu *TarUploader) UploadWal(path string) (string, error) {
 	go func() {
 		defer tu.wg.Done()
 
-		_, err := tu.Upl.Upload(input)
+		err := tu.upload(input, path)
 		if err != nil {
-			if multierr, ok := err.(s3manager.MultiUploadFailure); ok {
-				fmt.Println("UploadWal:", multierr.Code(), multierr.Message(), multierr.UploadID())
-			} else {
-				fmt.Println("UploadWal:", err.Error())
-			}
+			fmt.Printf("upload: could not upload '%s' after %v retries\n", p, MAX_RETRIES)
 		}
 
 	}()

@@ -117,7 +117,7 @@ func TestConfigure(t *testing.T) {
 func TestValidUploader(t *testing.T) {
 	mockSvc := &mockS3Client{}
 
-	tu := walg.NewTarUploader(mockSvc, "bucket", "server", "region")
+	tu := walg.NewTarUploader(mockSvc, "bucket", "server", "region", 1, float64(1))
 	if tu == nil {
 		t.Errorf("upload: Did not create a new tar uploader")
 	}
@@ -126,4 +126,35 @@ func TestValidUploader(t *testing.T) {
 	if upl == nil {
 		t.Errorf("upload: Did not create a new S3 UploadManager")
 	}
+}
+
+func TestUploadError(t *testing.T) {
+	mockClient := &mockS3Client{}
+
+	mockUploader := &mockS3Uploader{
+		err: true,
+	}
+
+	tu := walg.NewTarUploader(mockClient, "bucket", "server", "region", 2, float64(1))
+	tu.Upl = mockUploader
+
+	maker := &walg.S3TarBallMaker{
+		BaseDir:  "tmp",
+		Trim:     "/usr/local",
+		BkupName: "test",
+		Tu:       tu,
+	}
+
+	tarBall := maker.Make()
+	tarBall.SetUp()
+	tarBall.Finish()
+
+	tu.Upl = &mockS3Uploader{
+		multierr: true,
+	}
+
+	tarBall = maker.Make()
+	tarBall.SetUp()
+	tarBall.Finish()
+
 }

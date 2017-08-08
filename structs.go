@@ -154,8 +154,9 @@ func (s *S3TarBall) Finish() error {
 	go func() {
 		defer tupl.wg.Done()
 
-		_, e := tupl.Upl.Upload(input)
+		e := tupl.upload(input, path)
 		if e != nil {
+			fmt.Printf("upload: could not upload '%s' after %v retries\n", path, tupl.MaxRetries)
 			err = errors.Wrap(e, "S3TarBall Finish: json failed to upload")
 		}
 
@@ -183,6 +184,8 @@ func (s *S3TarBall) Tw() *tar.Writer { return s.tw }
  */
 type TarUploader struct {
 	Upl    s3manageriface.UploaderAPI
+	MaxRetries int
+	MaxWait float64
 	bucket string
 	server string
 	region string
@@ -192,8 +195,10 @@ type TarUploader struct {
 /**
  *  Creates a new tar uploader with own waitgroup.
  */
-func NewTarUploader(svc s3iface.S3API, bucket, server, region string) *TarUploader {
+func NewTarUploader(svc s3iface.S3API, bucket, server, region string, r int, w float64) *TarUploader {
 	return &TarUploader{
+		MaxRetries: r,
+		MaxWait: w,
 		bucket: bucket,
 		server: server,
 		region: region,

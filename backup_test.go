@@ -77,7 +77,7 @@ func (m *mockS3Client) HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjectOutp
 type mockS3Uploader struct {
 	s3manageriface.UploaderAPI
 	multierr bool
-	err bool
+	err      bool
 }
 
 func (u *mockS3Uploader) Upload(input *s3manager.UploadInput, f ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error) {
@@ -111,11 +111,11 @@ type mockMultiFailureError struct {
 	err awserr.Error
 }
 
-func (m mockMultiFailureError) UploadID() string{
+func (m mockMultiFailureError) UploadID() string {
 	return "mock ID"
 }
 
-func (m mockMultiFailureError) Error() string{
+func (m mockMultiFailureError) Error() string {
 	return m.err.Error()
 }
 
@@ -220,7 +220,7 @@ func TestBackupErrors(t *testing.T) {
 	err = walg.ExtractAll(n, out)
 	if err == nil {
 		t.Errorf("backup: expected error but got '<nil>'")
-	} 
+	}
 }
 
 /**

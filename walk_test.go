@@ -377,7 +377,7 @@ func TestWalk(t *testing.T) {
 	}
 
 	// Re-use generated data to test uploading WAL.
-	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region")
+	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region", 2, float64(1))
 	tu.Upl = &mockS3Uploader{}
 	wal, err := tu.UploadWal(filepath.Join(data, "1"))
 
