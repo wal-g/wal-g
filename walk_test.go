@@ -380,7 +380,7 @@ func TestWalk(t *testing.T) {
 	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region", 2, float64(1))
 	tu.Upl = &mockS3Uploader{}
 	wal, err := tu.UploadWal(filepath.Join(data, "1"))
-
+	tu.Finish()
 	if wal == "" {
 		t.Errorf("upload: expected wal path to be set but got ''")
 	}

@@ -148,6 +148,9 @@ func TestUploadError(t *testing.T) {
 	tarBall := maker.Make()
 	tarBall.SetUp()
 	tarBall.Finish()
+	if tu.Success == true {
+		t.Errorf("upload: expected to fail to upload successfully")
+	}
 
 	tu.Upl = &mockS3Uploader{
 		multierr: true,
@@ -156,5 +159,13 @@ func TestUploadError(t *testing.T) {
 	tarBall = maker.Make()
 	tarBall.SetUp()
 	tarBall.Finish()
+	if tu.Success == true {
+		t.Errorf("upload: expected to fail to upload successfully")
+	}
+
+	_, err := tu.UploadWal("fake path")
+	if err == nil {
+		t.Errorf("upload: UploadWal expected error but got `<nil>`")
+	}
 
 }

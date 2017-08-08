@@ -163,7 +163,7 @@ func (s *S3TarBall) Finish() error {
 	}()
 
 	tupl.Finish()
-	if err == nil {
+	if err == nil && tupl.Success {
 		fmt.Printf("Uploaded %d compressed tar files.\n", s.number)
 	}
 	return err
@@ -183,13 +183,14 @@ func (s *S3TarBall) Tw() *tar.Writer { return s.tw }
  *  one uploader. Must call CreateUploader() in 'upload.go'.
  */
 type TarUploader struct {
-	Upl    s3manageriface.UploaderAPI
+	Upl        s3manageriface.UploaderAPI
 	MaxRetries int
-	MaxWait float64
-	bucket string
-	server string
-	region string
-	wg     *sync.WaitGroup
+	MaxWait    float64
+	Success    bool
+	bucket     string
+	server     string
+	region     string
+	wg         *sync.WaitGroup
 }
 
 /**
@@ -198,14 +199,17 @@ type TarUploader struct {
 func NewTarUploader(svc s3iface.S3API, bucket, server, region string, r int, w float64) *TarUploader {
 	return &TarUploader{
 		MaxRetries: r,
-		MaxWait: w,
-		bucket: bucket,
-		server: server,
-		region: region,
-		wg:     &sync.WaitGroup{},
+		MaxWait:    w,
+		bucket:     bucket,
+		server:     server,
+		region:     region,
+		wg:         &sync.WaitGroup{},
 	}
 }
 
 func (tu *TarUploader) Finish() {
 	tu.wg.Wait()
+	if !tu.Success {
+		fmt.Printf("WAL-G could not complete upload\n")
+	}
 }

@@ -5,6 +5,18 @@ import (
 )
 
 /**
+ *  Used to catch specific errors from Lz4PipeWriter.
+ */
+type Lz4Error struct {
+	err error
+}
+
+func (e Lz4Error) Error() string {
+	msg := fmt.Sprintf("%+v\n", e.err)
+	return msg
+}
+
+/**
  *  Used to indicate required environment variables for WAL-G.
  */
 type UnsetEnvVarError struct {
@@ -33,7 +45,7 @@ func (e NoMatchAvailableError) Error() string {
 }
 
 /**
- *  Used to signal unsupported file types by WAL-G.
+ *  Used to signal file types that are unsupported by WAL-G.
  */
 type UnsupportedFileTypeError struct {
 	Path       string

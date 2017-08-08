@@ -15,7 +15,7 @@ import (
  *  safely.
  */
 func TestNoFilesProvided(t *testing.T) {
-	buf := &walg.BufferTarInterpreter{}
+	buf := &tools.BufferTarInterpreter{}
 	err := walg.ExtractAll(buf, []walg.ReaderMaker{})
 	if err == nil {
 		t.Errorf("extract: Did not catch no files provided error")
@@ -28,7 +28,7 @@ func TestNoFilesProvided(t *testing.T) {
 func TestUnsupportedFileType(t *testing.T) {
 	test := &bytes.Buffer{}
 	brm := &BufferReaderMaker{test, "/usr/local", "gzip"}
-	buf := &walg.BufferTarInterpreter{}
+	buf := &tools.BufferTarInterpreter{}
 	files := []walg.ReaderMaker{brm}
 	err := walg.ExtractAll(buf, files)
 
@@ -62,7 +62,7 @@ func TestTar(t *testing.T) {
 
 	/*** Extract the generated tar and check that its one member is the same as the bytes generated to begin with. ***/
 	brm := &BufferReaderMaker{member, "/usr/local", "tar"}
-	buf := &walg.BufferTarInterpreter{}
+	buf := &tools.BufferTarInterpreter{}
 	files := []walg.ReaderMaker{brm}
 	err = walg.ExtractAll(buf, files)
 	if err != nil {
@@ -106,7 +106,7 @@ func testLzopRoundTrip(t *testing.T, stride, nBytes int) {
 
 	/*** Extract the generated tar and check that its one member is the same as the bytes generated to begin with. ***/
 	brm := &BufferReaderMaker{lzopTarReader, "/usr/local", "lzo"}
-	buf := &walg.BufferTarInterpreter{}
+	buf := &tools.BufferTarInterpreter{}
 	files := []walg.ReaderMaker{brm}
 	err = walg.ExtractAll(buf, files)
 	if err != nil {
@@ -185,7 +185,7 @@ func BenchmarkExtractAll(b *testing.B) {
 	// np := &extract.NOPTarInterpreter{}
 	// extract.ExtractAll(np, out)
 
-	buf := &walg.BufferTarInterpreter{}
+	buf := &tools.BufferTarInterpreter{}
 	err := walg.ExtractAll(buf, out)
 	if err != nil {
 		b.Log(err)

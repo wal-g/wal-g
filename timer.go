@@ -23,7 +23,7 @@ func (et *ExponentialTicker) Update() {
 	if et.wait < et.MaxWait {
 		et.wait = math.Exp2(float64(et.retries))
 	}
-	et.retries+=1
+	et.retries++
 }
 
 func (et *ExponentialTicker) Sleep() {

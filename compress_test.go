@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/katie31/wal-g"
 	"github.com/pierrec/lz4"
+	"io/ioutil"
 	"math/rand"
 	"testing"
 )
@@ -23,12 +24,18 @@ func (w *BufCloser) Close() error {
 
 type ErrorWriteCloser struct{}
 
-func (e ErrorWriteCloser) Write(p []byte) (int, error) {
+func (ew ErrorWriteCloser) Write(p []byte) (int, error) {
 	return -1, errors.New("mock writer: write error")
 }
 
-func (e ErrorWriteCloser) Close() error {
+func (ew ErrorWriteCloser) Close() error {
 	return errors.New("mock writer: close error")
+}
+
+type ErrorReader struct{}
+
+func (er ErrorReader) Read(p []byte) (int, error) {
+	return -1, errors.New("mock reader: read error")
 }
 
 var tests = []struct {
@@ -39,9 +46,6 @@ var tests = []struct {
 	{"testing123456789", 16, 4},
 }
 
-/**
- *  Test that Lz4CascadeClose works.
- */
 func TestLz4Close(t *testing.T) {
 	for _, tt := range tests {
 		b := &BufCloser{bytes.NewBufferString(tt.testString), false}
@@ -92,9 +96,6 @@ func TestLz4CloseError(t *testing.T) {
 
 }
 
-/**
- *  Tests that LzPipeWriter works.
- */
 func TestLzPipeWriter(t *testing.T) {
 	for _, tt := range tests {
 		in := &BufCloser{bytes.NewBufferString(tt.testString), false}
@@ -102,20 +103,28 @@ func TestLzPipeWriter(t *testing.T) {
 			Input: in,
 		}
 
-		err := lz.Compress()
-		if err != nil {
-			t.Logf("%+v\n", err)
-		}
+		lz.Compress()
 
 		decompressed := &BufCloser{&bytes.Buffer{}, false}
-		err = walg.DecompressLz4(decompressed, lz.Output)
+		err := walg.DecompressLz4(decompressed, lz.Output)
 		if err != nil {
 			t.Logf("%+v\n", err)
 		}
 
 		if decompressed.String() != tt.testString {
-			t.Errorf("compress: Lz4CascadeClose expected %s to be written but got %s", tt.testString, decompressed)
+			t.Errorf("compress: Lz4CascadeClose expected '%s' to be written but got '%s'", tt.testString, decompressed)
 		}
 	}
 
+}
+
+func TestLzPipeWriterError(t *testing.T) {
+	lz := &walg.LzPipeWriter{Input: &ErrorReader{}}
+
+	lz.Compress()
+
+	_, err := ioutil.ReadAll(lz.Output)
+	if err == nil {
+		t.Errorf("compress: LzPipeWriter expected error but got `<nil>`")
+	}
 }

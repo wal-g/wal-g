@@ -31,50 +31,40 @@ func (lcc *Lz4CascadeClose) Close() error {
  */
 type LzPipeWriter struct {
 	Input  io.Reader
-	Output *io.PipeReader
+	Output io.Reader
 }
 
 /**
- *  Creates a new pipe writer and reader.
+ *  Compresses input using LZ4 to pipe.
  */
-func (p *LzPipeWriter) Writer() io.WriteCloser {
+func (p *LzPipeWriter) Compress() {
 	pr, pw := io.Pipe()
 	p.Output = pr
-	return pw
-}
-
-/**
- *  Compresses input using LZ4 to pipe. Returns
- *  the first encountered error.
- */
-func (p *LzPipeWriter) Compress() error {
-	w := p.Writer()
+	w := &EmptyWriteIgnorer{pw}
 	lzw := lz4.NewWriter(w)
 
-	collect := make(chan error)
 	go func() {
 		_, err := lzw.ReadFrom(p.Input)
+
 		if err != nil {
-			collect <- errors.Wrap(err, "Compress: lz4 writer read failed")
+			e := Lz4Error{errors.Wrap(err, "Compress: lz4 compression failed")}
+			pw.CloseWithError(e)
 		}
 
 		defer func() {
-			err := lzw.Close()
-			if err != nil {
-				collect <- errors.Wrap(err, "Compress: lz4 writer close failed")
-			}
-			err = w.Close()
-			if err != nil {
-				collect <- errors.Wrap(err, "Compress: underlying writer close failed")
+			if err == nil {
+				if err := lzw.Close(); err != nil {
+					e := Lz4Error{errors.Wrap(err, "Compress: lz4 writer close failed")}
+					pw.CloseWithError(e)
+				} else {
+					if err = pw.Close(); err != nil {
+						e := Lz4Error{errors.Wrap(err, "Compress: lz4 pipe writer close failed")}
+						pw.CloseWithError(e)
+					}
+				}
 			}
 		}()
 
 	}()
 
-	select {
-	case err := <-collect:
-		return err
-	default:
-		return nil
-	}
 }

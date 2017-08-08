@@ -19,7 +19,7 @@ import (
 	"strings"
 )
 
-var MAX_RETRIES = 6
+var MAX_RETRIES = 7
 var MAX_BACKOFF = float64(32)
 
 /**
@@ -116,6 +116,7 @@ func CreateUploader(svc s3iface.S3API, partsize, concurrency int) s3manageriface
 	return up
 }
 
+
 func (tu *TarUploader) upload(input *s3manager.UploadInput, path string) (err error) {
 	upl := tu.Upl
 	et := NewExpTicker(tu.MaxRetries, tu.MaxWait)
@@ -123,13 +124,19 @@ func (tu *TarUploader) upload(input *s3manager.UploadInput, path string) (err er
 	for {
 		_, e := upl.Upload(input)
 		if e == nil {
+			tu.Success = true
 			break
 		}
 
 		if e != nil {
+			if re, ok := e.(Lz4Error); ok {
+				fmt.Println("upload: failed to upload due to compression error")
+				fmt.Println(re)
+				break
+			}
 			et.Update()
-			
-			if et.retries == et.MaxRetries {
+
+			if et.retries > et.MaxRetries {
 				err = e
 				break
 			}
@@ -174,6 +181,7 @@ func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 		err := tupl.upload(input, path)
 		if err != nil {
 			fmt.Printf("upload: could not upload '%s' after %v retries\n", path, tupl.MaxRetries)
+			fmt.Printf("FATAL%v\n", err)
 		}
 
 	}()
@@ -194,10 +202,7 @@ func (tu *TarUploader) UploadWal(path string) (string, error) {
 		Input: f,
 	}
 
-	err = lz.Compress()
-	if err != nil {
-		return "", errors.Wrapf(err, "UploadWal: failed to compress file")
-	}
+	lz.Compress()
 
 	p := tu.server + "/wal_005/" + filepath.Base(path) + ".lz4"
 	input := &s3manager.UploadInput{
@@ -213,8 +218,9 @@ func (tu *TarUploader) UploadWal(path string) (string, error) {
 
 		err := tu.upload(input, path)
 		if err != nil {
-			fmt.Printf("upload: could not upload '%s' after %v retries\n", p, MAX_RETRIES)
-		}
+			fmt.Printf("upload: could not upload '%s' after %v retries\n", p, tu.MaxRetries)
+			fmt.Printf("FATAL%v\n", err)
+		} 
 
 	}()
 
