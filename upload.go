@@ -233,14 +233,13 @@ func (bundle *Bundle) HandleSentinel() error {
 	tarBall.SetUp("pg_control.tar.lz4")
 	tarWriter := tarBall.Tw()
 
-	fmt.Println("------------------------------------------", fileName)
 	hdr, err := tar.FileInfoHeader(info, fileName)
 	if err != nil {
 		return errors.Wrap(err, "HandleSentinel: failed to grab header info")
 	}
 
 	hdr.Name = strings.TrimPrefix(path, tarBall.Trim())
-	fmt.Println("NAME:", hdr.Name)
+	fmt.Println(hdr.Name)
 
 	err = tarWriter.WriteHeader(hdr)
 	if err != nil {
@@ -298,6 +297,7 @@ func (bundle *Bundle) HandleLabelFiles(lb, sc string) error {
 	if err != nil {
 		return errors.Wrap(err, "HandleLabelFiles: copy failed")
 	}
+	fmt.Println(lhdr.Name)
 
 	shdr := &tar.Header{
 		Name:     "tablespace_map",
@@ -314,6 +314,7 @@ func (bundle *Bundle) HandleLabelFiles(lb, sc string) error {
 	if err != nil {
 		return errors.Wrap(err, "HandleLabelFiles: copy failed")
 	}
+	fmt.Println(shdr.Name)
 
 	err = tarBall.CloseTar()
 	if err != nil {

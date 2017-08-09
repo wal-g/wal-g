@@ -93,14 +93,13 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 			f.Close()
 		}
 	} else if ok && info.Mode().IsDir() {
-		fmt.Println("------------------------------------------", fileName)
 		hdr, err := tar.FileInfoHeader(info, fileName)
 		if err != nil {
 			return errors.Wrap(err, "HandleTar: failed to grab header info")
 		}
 
 		hdr.Name = strings.TrimPrefix(path, tarBall.Trim())
-		fmt.Println("NAME:", hdr.Name)
+		fmt.Println(hdr.Name)
 
 		err = tarWriter.WriteHeader(hdr)
 		if err != nil {
