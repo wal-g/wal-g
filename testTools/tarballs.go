@@ -11,7 +11,7 @@ import (
 )
 
 // FileTarBall represents a tarball that is
-// written to disk. 
+// written to disk.
 type FileTarBall struct {
 	baseDir string
 	trim    string
@@ -37,7 +37,7 @@ func (fb *FileTarBall) SetUp(names ...string) {
 	}
 }
 
-// CloseTar closes the tar writer and file, flushing any 
+// CloseTar closes the tar writer and file, flushing any
 // unwritten data to the file before closing.
 func (fb *FileTarBall) CloseTar() error {
 	err := fb.tw.Close()

@@ -15,7 +15,7 @@ import (
 
 var counter int32
 
-// LzopPrefix consists of arbitrary bytes at a specified length to 
+// LzopPrefix consists of arbitrary bytes at a specified length to
 // satisfy lzop header format.
 const LzopPrefix = "\x89\x4c\x5a\x4f\x00\x0d\x0a\x1a\x0a\x10\x30\x20\xa0\x09\x40" +
 	"\x01\x05\x03\x00\x00\x01\x00\x00\x81\xa4\x59\x43\x06\xd0\x00" +
@@ -119,7 +119,8 @@ func (sb *StrideByteReader) Read(p []byte) (int, error) {
 // and writes to a destination writer.
 func CreateTar(w io.Writer, r *io.LimitedReader) {
 	//defer TimeTrack(time.Now(), "CREATE TAR")
-	counter = atomic.AddInt32(&counter, 1)
+	tmp := atomic.AddInt32(&counter, 1)
+	_ = tmp
 	tw := tar.NewWriter(w)
 
 	hdr := &tar.Header{
@@ -144,8 +145,8 @@ func CreateTar(w io.Writer, r *io.LimitedReader) {
 
 // Handler allows for generation of random bytes by configuring
 // the URL 'https://localhost:8080/stride-N.bytes-N.tar.lzo' where
-// byte size and stride length are customizable. 
-// 
+// byte size and stride length are customizable.
+//
 // Compressed tar files are automatically generated. Grab using curl
 // ie. 'curl -sk ...'
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -165,7 +166,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	lzoFlag := str[3]
 
 	sb := NewStrideByteReader(stride)
-	lr := io.LimitedReader{sb, int64(nBytes)}
+	lr := io.LimitedReader{Uncompressed: sb, slice: int64(nBytes)}
 
 	//defer walg.TimeTrack(time.Now(), "HANDLER")
 
