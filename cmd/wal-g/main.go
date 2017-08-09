@@ -150,7 +150,7 @@ func main() {
 			} else if err != nil {
 				log.Fatalf("%+v\n", err)
 			}
-			fmt.Println("Backup extraction complete.")
+			fmt.Printf("\nBackup extraction complete.\n")
 		} else {
 			log.Fatal("Corrupt backup: missing pg_control")
 		}

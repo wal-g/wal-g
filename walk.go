@@ -38,7 +38,6 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 			return errors.Wrap(err, "TarWalker: failed to close tarball")
 		}
 
-		fmt.Println("------------------------------------------NEW------------------------------------------")
 		bundle.NewTarBall()
 		err = HandleTar(bundle, path, info)
 		if err == filepath.SkipDir {
@@ -63,14 +62,13 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 	tarWriter := tarBall.Tw()
 
 	if !ok {
-		fmt.Println("------------------------------------------", fileName)
 		hdr, err := tar.FileInfoHeader(info, fileName)
 		if err != nil {
 			return errors.Wrap(err, "HandleTar: could not grab header info")
 		}
 
 		hdr.Name = strings.TrimPrefix(path, tarBall.Trim())
-		fmt.Println("NAME:", hdr.Name)
+		fmt.Println(hdr.Name)
 
 		err = tarWriter.WriteHeader(hdr)
 		if err != nil {

@@ -50,7 +50,7 @@ func checkVar(n map[string]string) error {
 
 // Configure connects to S3 and creates an uploader. It makes sure
 // that a valid session has started; if invalid, returns AWS error
-// and `<nil>` values.
+// and `<nil>` values. 
 //
 // Requires these environment variables to be set:
 // WALE_S3_PREFIX
@@ -167,7 +167,7 @@ func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 		Body:   pr,
 	}
 
-	fmt.Println("PATH:", path)
+	fmt.Printf("Starting part %d...\n", s.number)
 
 	tupl.wg.Add(1)
 	go func() {
