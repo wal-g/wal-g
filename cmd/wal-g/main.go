@@ -55,6 +55,7 @@ func main() {
 		var allKeys []string
 		var keys []string
 		var bk *walg.Backup
+
 		// Check if BACKUPNAME exists and if it does extract to DIRARC.
 		if backupName != "LATEST" {
 			bk = &walg.Backup{
@@ -62,7 +63,6 @@ func main() {
 				Path:   aws.String(*pre.Server + "/basebackups_005/"),
 				Name:   aws.String(backupName),
 			}
-
 			bk.Js = aws.String(*bk.Path + *bk.Name + "_backup_stop_sentinel.json")
 
 			// fmt.Println("NEWDIR:", dirArc)
@@ -85,7 +85,7 @@ func main() {
 				log.Fatalf("Backup '%s' does not exist.\n", *bk.Name)
 			}
 
-			// Find the LATEST valid backup (checks against JSON file and grabs name from there) and extract to DIRARC.
+			// Find the LATEST valid backup (checks against JSON file and grabs backup name) and extract to DIRARC.
 		} else if backupName == "LATEST" {
 			bk = &walg.Backup{
 				Prefix: pre,
@@ -118,7 +118,7 @@ func main() {
 			out[i] = s
 		}
 
-		// Extract all except pg_control.
+		// Extract all compressed tar members except `pg_control.tar.lz4`.
 		err = walg.ExtractAll(f, out)
 		if serr, ok := err.(*walg.UnsupportedFileTypeError); ok {
 			log.Fatalf("%v\n", serr)
@@ -150,7 +150,7 @@ func main() {
 			} else if err != nil {
 				log.Fatalf("%+v\n", err)
 			}
-			fmt.Println("Extract complete.")
+			fmt.Println("Backup extraction complete.")
 		} else {
 			log.Fatal("Corrupt backup: missing pg_control")
 		}
@@ -213,10 +213,10 @@ func main() {
 		// Upload a WAL file to S3.
 		path, err := tu.UploadWal(dirArc)
 		if re, ok := err.(walg.Lz4Error); ok {
-			log.Printf("Could not upload '%s' due to compression error.\n%+v\n", path, re)
+			log.Fatalf("FATAL: could not upload '%s' due to compression error.\n%+v\n", path, re)
 		} else if err != nil {
-			log.Printf("Could not upload '%s' after %v retries\n", path, tu.MaxRetries)
-			log.Fatalf("%+v\n", err)
+			log.Printf("upload: could not upload '%s' after %v retries\n", path, tu.MaxRetries)
+			log.Fatalf("FATAL%+v\n", err)
 		}
 	} else if command == "backup-push" {
 		// Connect to postgres and start/finish a nonexclusive backup.
@@ -237,6 +237,7 @@ func main() {
 			log.Fatalf("%v\n", err)
 		}
 
+		// Start a new tar bundle and walk the DIRARC directory and upload to S3.
 		bundle.Tbm = &walg.S3TarBallMaker{
 			BaseDir:  filepath.Base(dirArc),
 			Trim:     dirArc,
@@ -244,7 +245,6 @@ func main() {
 			Tu:       tu,
 		}
 
-		// Walk the DIRARC directory and upload to S3.
 		bundle.NewTarBall()
 		fmt.Println("Walking ...")
 		err = filepath.Walk(dirArc, bundle.TarWalker)
@@ -267,6 +267,8 @@ func main() {
 		if err != nil {
 			log.Fatalf("%+v\n", err)
 		}
+
+		// Wait for all uploads to finish.
 		err = bundle.Tb.Finish()
 		if err != nil {
 			log.Fatalf("%+v\n", err)

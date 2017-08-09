@@ -124,7 +124,12 @@ func TestLzPipeWriterError(t *testing.T) {
 	lz.Compress()
 
 	_, err := ioutil.ReadAll(lz.Output)
+	err.Error()
 	if err == nil {
 		t.Errorf("compress: LzPipeWriter expected error but got `<nil>`")
+	}
+	if re, ok := err.(walg.Lz4Error); !ok {
+
+		t.Errorf("compress: LzPipeWriter expected Lz4Error but got %v", re)
 	}
 }

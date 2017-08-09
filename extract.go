@@ -93,13 +93,13 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 			pr, tempW := io.Pipe()
 			pw := &EmptyWriteIgnorer{tempW}
 
-			//Collect errors returned by tarHandler.
+			// Collect errors returned by tarHandler.
 			collectLow := make(chan error)
 			go func() {
 				collectLow <- tarHandler(pw, val)
 			}()
 
-			//Collect errors returned by extractOne.
+			// Collect errors returned by extractOne.
 			collectTop := make(chan error)
 			go func() {
 				defer pr.Close()

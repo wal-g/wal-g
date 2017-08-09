@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 )
 
+// FileTarBall represents a tarball that is
+// written to disk. 
 type FileTarBall struct {
 	baseDir string
 	trim    string
@@ -21,6 +23,8 @@ type FileTarBall struct {
 	tw      *tar.Writer
 }
 
+// SetUp creates a new LZ4 writer, tar writer and file for
+// writing bundled compressed bytes to.
 func (fb *FileTarBall) SetUp(names ...string) {
 	if fb.tw == nil {
 		name := filepath.Join(fb.out, "part_"+fmt.Sprintf("%0.3d", fb.number)+".tar.lz4")
@@ -33,6 +37,8 @@ func (fb *FileTarBall) SetUp(names ...string) {
 	}
 }
 
+// CloseTar closes the tar writer and file, flushing any 
+// unwritten data to the file before closing.
 func (fb *FileTarBall) CloseTar() error {
 	err := fb.tw.Close()
 	if err != nil {
@@ -47,6 +53,7 @@ func (fb *FileTarBall) CloseTar() error {
 	return nil
 }
 
+// Finish alerts that compression is complete.
 func (fb *FileTarBall) Finish() error {
 	fmt.Printf("Wrote %d compressed tar files to %s.\n", fb.number, fb.out)
 	return nil
@@ -60,6 +67,7 @@ func (fb *FileTarBall) Size() int64     { return fb.size }
 func (fb *FileTarBall) SetSize(i int64) { fb.size += i }
 func (fb *FileTarBall) Tw() *tar.Writer { return fb.tw }
 
+// NOPTarBall mocks a tarball. Used for testing purposes.
 type NOPTarBall struct {
 	baseDir string
 	trim    string

@@ -6,6 +6,8 @@ import (
 	"os"
 )
 
+// HttpReaderMaker decompresses lzop tarballs from
+// the passed in url.
 type HttpReaderMaker struct {
 	Client     *http.Client
 	Key        string
@@ -15,6 +17,8 @@ type HttpReaderMaker struct {
 func (h *HttpReaderMaker) Format() string { return h.FileFormat }
 func (h *HttpReaderMaker) Path() string   { return h.Key }
 
+// FileReaderMaker decompresses lzop tarballs from
+// the passed in file.
 type FileReaderMaker struct {
 	Key        string
 	FileFormat string
@@ -23,6 +27,8 @@ type FileReaderMaker struct {
 func (f *FileReaderMaker) Format() string { return f.FileFormat }
 func (f *FileReaderMaker) Path() string   { return f.Key }
 
+// Reader creates a new request to grab the data generated
+// by the random bytes generator.
 func (h *HttpReaderMaker) Reader() (io.ReadCloser, error) {
 	get, err := http.NewRequest("GET", h.Key, nil)
 	if err != nil {
@@ -37,6 +43,7 @@ func (h *HttpReaderMaker) Reader() (io.ReadCloser, error) {
 	return data.Body, nil
 }
 
+// Reader creates a new reader from the passed in file.
 func (f *FileReaderMaker) Reader() (io.ReadCloser, error) {
 	r, err := os.Open(f.Key)
 	if err != nil {

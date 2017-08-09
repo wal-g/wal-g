@@ -80,7 +80,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 		if info.Mode().IsRegular() {
 			f, err := os.Open(path)
 			if err != nil {
-				return errors.Wrapf(err, "HandleTar: failed to open file %s\n", path)
+				return errors.Wrapf(err, "HandleTar: failed to open file '%s'\n", path)
 			}
 			lim := &io.LimitedReader{
 				R: f,

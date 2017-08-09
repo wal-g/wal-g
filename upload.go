@@ -175,10 +175,12 @@ func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 
 		err := tupl.upload(input, path)
 		if re, ok := err.(Lz4Error); ok {
-			log.Printf("upload: could not upload '%s' due to compression error\n%+v\n", path, re)
+
+			log.Printf("FATAL: could not upload '%s' due to compression error\n%+v\n", path, re)
 		}
 		if err != nil {
-			log.Printf("upload: could not upload '%s' after %v retries\nFATAL%v\n", path, tupl.MaxRetries, err)
+			log.Printf("upload: could not upload '%s' after %v retries\n", path, tupl.MaxRetries)
+			log.Printf("FATAL%v\n", err)
 		}
 
 	}()

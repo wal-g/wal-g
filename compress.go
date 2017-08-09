@@ -45,6 +45,7 @@ func (p *LzPipeWriter) Compress() {
 
 	go func() {
 		_, err := lzw.ReadFrom(p.Input)
+
 		if err != nil {
 			e := Lz4Error{errors.Wrap(err, "Compress: lz4 compression failed")}
 			pw.CloseWithError(e)

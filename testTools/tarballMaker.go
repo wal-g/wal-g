@@ -4,6 +4,9 @@ import (
 	"github.com/katie31/wal-g"
 )
 
+// FileTarMaker creates a new FileTarBall
+// with the directory that files should be
+// extracted to.
 type FileTarBallMaker struct {
 	number  int
 	size    int64
@@ -12,8 +15,9 @@ type FileTarBallMaker struct {
 	Out     string
 }
 
+// Make creates a new FileTarBall.
 func (f *FileTarBallMaker) Make() walg.TarBall {
-	f.number += 1
+	f.number++
 	return &FileTarBall{
 		number:  f.number,
 		size:    f.size,
@@ -23,6 +27,8 @@ func (f *FileTarBallMaker) Make() walg.TarBall {
 	}
 }
 
+// NOPTarBallMaker creates a new NOPTarBall. Used
+// for testing purposes.
 type NOPTarBallMaker struct {
 	number  int
 	size    int64
@@ -31,8 +37,9 @@ type NOPTarBallMaker struct {
 	Nop     bool
 }
 
+// Make creates a new NOPTarBall.
 func (n *NOPTarBallMaker) Make() walg.TarBall {
-	n.number += 1
+	n.number++
 	return &NOPTarBall{
 		number:  n.number,
 		size:    n.size,

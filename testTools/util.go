@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// MakeDir creates a new directory with mode 0755.
 func MakeDir(name string) {
 	dest := name
 	if _, err := os.Stat(dest); os.IsNotExist(err) {
@@ -15,7 +16,10 @@ func MakeDir(name string) {
 	}
 }
 
-//defer timeTrack(time.Now(), "EXTRACT ALL")
+// TimeTrack is used to time how long functions take.
+//
+// Usage Example:
+// defer timeTrack(time.Now(), "EXTRACT ALL")
 func TimeTrack(start time.Time, name string) {
 	elapsed := time.Since(start)
 	fmt.Printf("%s took %s\n", name, elapsed)
