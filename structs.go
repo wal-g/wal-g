@@ -130,7 +130,7 @@ func (s *S3TarBall) CloseTar() error {
 	if err != nil {
 		return errors.Wrap(err, "CloseTar: failed to close underlying writer")
 	}
-	fmt.Println("Closed")
+	fmt.Printf("Finished writing part %d.\n", s.number)
 	return nil
 }
 

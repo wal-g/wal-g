@@ -24,7 +24,6 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 	if info.Name() == "pg_control" {
 		bundle.Sen = &Sentinel{info, path}
 	} else if bundle.Tb.Size() <= bundle.MinSize {
-		fmt.Println("---SIZE:", bundle.MinSize)
 		err = HandleTar(bundle, path, info)
 		if err == filepath.SkipDir {
 			return err
@@ -87,8 +86,6 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 				N: int64(hdr.Size),
 			}
 
-			fmt.Println("Writing tar ...")
-
 			_, err = io.Copy(tarWriter, lim)
 			if err != nil {
 				return errors.Wrap(err, "HandleTar: copy failed")
@@ -111,10 +108,8 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 		if err != nil {
 			return errors.Wrap(err, "HandleTar: failed to write header")
 		}
-		fmt.Println("RUNNING:", tarBall.Size())
 		return filepath.SkipDir
 	}
 
-	fmt.Println("RUNNING:", tarBall.Size())
 	return nil
 }
