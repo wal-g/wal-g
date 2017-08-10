@@ -10,7 +10,7 @@ import (
 )
 
 // RaskyReader handles cases when the Rasky lzo package crashes.
-// Occurs if byte size is too small.
+// Occurs if byte size is too small (1-5).
 type RaskyReader struct {
 	R io.Reader
 }

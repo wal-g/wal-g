@@ -29,25 +29,18 @@ func Connect() (*pgx.Conn, error) {
 	return conn, nil
 }
 
-// QueryFile starts a non-exclusive base backup immediately. When finishing the backup,
+// StartBackup starts a non-exclusive base backup immediately. When finishing the backup,
 // `backup_label` and `tablespace_map` contents are not immediately written to
-// a file but returned instead. Returns empty strings and an error if backup
+// a file but returned instead. Returns empty string and an error if backup
 // fails.
-func QueryFile(conn *pgx.Conn, backup string) (string, string, error) {
-	rows, err := conn.Query("SELECT * FROM pg_start_backup($1, true, false)", backup)
+func StartBackup(conn *pgx.Conn, backup string) (string, error) {
+	var name string
+	err := conn.QueryRow("SELECT * FROM pg_xlogfile_name_offset(pg_start_backup($1, true, false))", backup).Scan(&name)
 	if err != nil {
-		return "", "", errors.Wrap(err, "QueryFile: start backup failed")
-	}
-	rows.Close()
-
-	var labelfile string
-	var spcmapfile string
-	err = conn.QueryRow("SELECT labelfile, spcmapfile FROM pg_stop_backup(false)").Scan(&labelfile, &spcmapfile)
-	if err != nil {
-		return "", "", errors.Wrap(err, "QueryFile: stop backup failed")
+		return "", errors.Wrap(err, "QueryFile: start backup failed")
 	}
 
-	return labelfile, spcmapfile, nil
+	return "", nil
 }
 
 // FormatName grabs the name of the WAL file and returns it in the form of `base_...`.

@@ -223,18 +223,13 @@ func main() {
 		bundle := &walg.Bundle{
 			MinSize: int64(1000000000), //MINSIZE = 1GB
 		}
-		c, err := walg.Connect()
+		conn, err := walg.Connect()
 		if err != nil {
 			log.Fatalf("%+v\n", err)
 		}
-		lbl, sc, err := walg.QueryFile(c, time.Now().String())
+		n, err := walg.StartBackup(conn, time.Now().String())
 		if err != nil {
 			log.Fatalf("%+v\n", err)
-		}
-
-		n, err := walg.FormatName(lbl)
-		if err != nil {
-			log.Fatalf("%v\n", err)
 		}
 
 		// Start a new tar bundle and walk the DIRARC directory and upload to S3.
@@ -256,14 +251,14 @@ func main() {
 			log.Fatalf("%+v\n", err)
 		}
 
-		// Write and upload postgres `backup_label` and `tablespace_map` files
-		err = bundle.HandleLabelFiles(lbl, sc)
+		// Upload `pg_control`.
+		err = bundle.HandleSentinel()
 		if err != nil {
 			log.Fatalf("%+v\n", err)
 		}
 
-		// Upload `pg_control`.
-		err = bundle.HandleSentinel()
+		// Stops backup and write/upload postgres `backup_label` and `tablespace_map` files
+		err = bundle.HandleLabelFiles(conn)
 		if err != nil {
 			log.Fatalf("%+v\n", err)
 		}

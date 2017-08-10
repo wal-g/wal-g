@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
+	"github.com/jackc/pgx"
 	"github.com/pierrec/lz4"
 	"github.com/pkg/errors"
 	"io"
@@ -285,8 +286,15 @@ func (bundle *Bundle) HandleSentinel() error {
 }
 
 // HandleLabelFiles creates the `backup_label` and `tablespace_map` files and uploads
-// it to S3. Returns error upon failure.
-func (bundle *Bundle) HandleLabelFiles(lb, sc string) error {
+// it to S3 by stopping the backup. Returns error upon failure.
+func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) error {
+	var lb string
+	var sc string
+	err := conn.QueryRow("SELECT labelfile, spcmapfile FROM pg_stop_backup(false)").Scan(&lb, &sc)
+	if err != nil {
+		return errors.Wrap(err, "HandleLabelFiles: stop backup failed")
+	}
+
 	bundle.NewTarBall()
 	tarBall := bundle.Tb
 	tarBall.SetUp()
@@ -299,7 +307,7 @@ func (bundle *Bundle) HandleLabelFiles(lb, sc string) error {
 		Typeflag: tar.TypeReg,
 	}
 
-	err := tarWriter.WriteHeader(lhdr)
+	err = tarWriter.WriteHeader(lhdr)
 	if err != nil {
 		return errors.Wrap(err, "HandleLabelFiles: failed to write header")
 	}

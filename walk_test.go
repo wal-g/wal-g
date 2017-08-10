@@ -349,10 +349,10 @@ func TestWalk(t *testing.T) {
 		t.Errorf("walk: Sentinel expected to succeed but got %+v\n", err)
 	}
 
-	err = bundle.HandleLabelFiles("backup", "table")
-	if err != nil {
-		t.Errorf("walk: Sentinel expected to succeed but got %+v\n", err)
-	}
+	// err = bundle.HandleLabelFiles("backup", "table")
+	// if err != nil {
+	// 	t.Errorf("walk: Sentinel expected to succeed but got %+v\n", err)
+	// }
 
 	// Extracts compressed directory to `extracted`.
 	extracted := extract(t, compressed)
