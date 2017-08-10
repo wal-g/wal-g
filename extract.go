@@ -90,6 +90,13 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 	sem := make(chan Empty, len(files))
 	collectAll := make(chan error)
 	defer close(collectAll)
+	go func() {
+		for e := range collectAll {
+			if e != nil {
+				err = e
+			}
+		}
+	}()
 
 	
 
@@ -154,18 +161,11 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 			}
 
 			done <- true
+			concurrent <- Empty{}
 			sem <- Empty{}
 		}(i, val)
 	}
-	
 
-	go func() {
-		for e := range collectAll {
-			if e != nil {
-				err = e
-			}
-		}
-	}()
 
 	for i := 0; i < len(files); i++ {
 		<-sem
