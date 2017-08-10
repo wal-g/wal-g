@@ -7,8 +7,8 @@ import (
 
 // ExponentialTicker is used for exponential backoff
 // for uploading to S3. If the max wait time is reached,
-// retries will occur after max wait time intervals until
-// the maximum number of retries is reached.
+// retries will occur after max wait time intervals up to
+// max retries.
 type ExponentialTicker struct {
 	MaxRetries int
 	retries    int
@@ -17,7 +17,7 @@ type ExponentialTicker struct {
 }
 
 // NewExpTicker creates a new ExponentialTicker with
-// configurable number of retries and max wait time.
+// configurable max number of retries and max wait time.
 func NewExpTicker(retries int, wait float64) *ExponentialTicker {
 	return &ExponentialTicker{
 		MaxRetries: retries,

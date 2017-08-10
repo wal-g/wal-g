@@ -57,7 +57,7 @@ type Prefix struct {
 	Server *string
 }
 
-// Backup contains the information about a valid backup
+// Backup contains information about a valid backup
 // generated and uploaded by WAL-G.
 type Backup struct {
 	Prefix *Prefix

@@ -49,7 +49,7 @@ func main() {
 	}
 
 	fmt.Println("BUCKET:", *pre.Bucket)
-	fmt.Println("PATH:", *pre.Server)
+	fmt.Println("SERVER:", *pre.Server)
 
 	if command == "backup-fetch" {
 		var allKeys []string

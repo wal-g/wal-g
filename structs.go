@@ -41,14 +41,13 @@ func init() {
 
 type Empty struct{}
 
-// TarBundle represents one
-// completed directory.
+// TarBundle represents one completed directory.
 type TarBundle interface {
 	NewTarBall()
 	GetTarBall() TarBall
 }
 
-// Bundle represents the directory to
+// A Bundle represents the directory to
 // be walked. Contains at least one TarBall
 // if walk has started. Each TarBall will be at least
 // MinSize bytes. The Sentinel is used to ensure complete
@@ -71,7 +70,7 @@ type Sentinel struct {
 	path string
 }
 
-// TarBall represents one tar file.
+// A TarBall represents one tar file.
 type TarBall interface {
 	SetUp(args ...string)
 	CloseTar() error

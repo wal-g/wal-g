@@ -20,6 +20,9 @@ import (
 	"strings"
 )
 
+// ConcurrencyStreams is used to configure Upload manager streams
+var ConcurrencyStreams = 3
+
 // MAXRETRIES is the maximum number of retries for upload.
 var MAXRETRIES = 7
 
@@ -101,7 +104,7 @@ func Configure() (*TarUploader, *Prefix, error) {
 	pre.Svc = s3.New(sess)
 
 	upload := NewTarUploader(pre.Svc, bucket, server, region, MAXRETRIES, MAXBACKOFF)
-	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, 3) //3 concurrency streams at 20MB
+	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, ConcurrencyStreams) //3 concurrency streams at 20MB
 
 	return upload, pre, err
 }
@@ -167,7 +170,7 @@ func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 		Body:   pr,
 	}
 
-	fmt.Printf("Starting part %d...\n", s.number)
+	fmt.Printf("Starting part %d ...\n", s.number)
 
 	tupl.wg.Add(1)
 	go func() {
