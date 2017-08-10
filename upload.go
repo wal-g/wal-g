@@ -17,12 +17,9 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
-
-// ConcurrencyStreams is used to configure Upload manager streams
-var ConcurrencyStreams = 3
-
 // MAXRETRIES is the maximum number of retries for upload.
 var MAXRETRIES = 7
 
@@ -104,7 +101,8 @@ func Configure() (*TarUploader, *Prefix, error) {
 	pre.Svc = s3.New(sess)
 
 	upload := NewTarUploader(pre.Svc, bucket, server, region, MAXRETRIES, MAXBACKOFF)
-	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, ConcurrencyStreams) //3 concurrency streams at 20MB
+	con, err := strconv.Atoi(os.Getenv("WALG_CONCURRENCY"))
+	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, con) //3 concurrency streams at 20MB
 
 	return upload, pre, err
 }
