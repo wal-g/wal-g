@@ -109,10 +109,10 @@ func Configure() (*TarUploader, *Prefix, error) {
 	if ok {
 		con, err = strconv.Atoi(conc)
 	} else {
-		con = 3
+		con = 10
 	}
 
-	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, con) //default 3 concurrency streams at 20MB
+	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, con) //default 10 concurrency streams at 20MB
 
 	return upload, pre, err
 }

@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 )
 
@@ -126,34 +127,41 @@ func main() {
 			log.Fatalf("%+v\n", err)
 		}
 
-		// Extract pg_control last. If pg_control does not exist, program exits with error code 1.
-		name := *bk.Path + *bk.Name + "/tar_partitions/pg_control.tar.lz4"
-		pgControl := &walg.Archive{
-			Prefix:  pre,
-			Archive: aws.String(name),
-		}
-
-		exists, err := pgControl.CheckExistence()
-		if err != nil {
-			log.Fatalf("%+v\n", err)
-		}
-		if exists {
-			sentinel := make([]walg.ReaderMaker, 1)
-			sentinel[0] = &walg.S3ReaderMaker{
-				Backup:     bk,
-				Key:        aws.String(name),
-				FileFormat: walg.CheckType(name),
+		// Check name for backwards compatability. Will check for `pg_control` if WALG version of backup
+		re := regexp.MustCompile(`^([^_]+._{1}[^_]+._{1})`)
+		match := re.FindString(*bk.Name)
+		if match != "" {
+			// Extract pg_control last. If pg_control does not exist, program exits with error code 1.
+			name := *bk.Path + *bk.Name + "/tar_partitions/pg_control.tar.lz4"
+			pgControl := &walg.Archive{
+				Prefix:  pre,
+				Archive: aws.String(name),
 			}
-			err := walg.ExtractAll(f, sentinel)
-			if serr, ok := err.(*walg.UnsupportedFileTypeError); ok {
-				log.Fatalf("%v\n", serr)
-			} else if err != nil {
+
+			exists, err := pgControl.CheckExistence()
+			if err != nil {
 				log.Fatalf("%+v\n", err)
 			}
-			fmt.Printf("\nBackup extraction complete.\n")
-		} else {
-			log.Fatal("Corrupt backup: missing pg_control")
+
+			if exists {
+				sentinel := make([]walg.ReaderMaker, 1)
+				sentinel[0] = &walg.S3ReaderMaker{
+					Backup:     bk,
+					Key:        aws.String(name),
+					FileFormat: walg.CheckType(name),
+				}
+				err := walg.ExtractAll(f, sentinel)
+				if serr, ok := err.(*walg.UnsupportedFileTypeError); ok {
+					log.Fatalf("%v\n", serr)
+				} else if err != nil {
+					log.Fatalf("%+v\n", err)
+				}
+				fmt.Printf("\nBackup extraction complete.\n")
+			} else {
+				log.Fatal("Corrupt backup: missing pg_control")
+			}
 		}
+
 	} else if command == "wal-fetch" {
 		// Fetch and decompress a WAL file from S3.
 		a := &walg.Archive{
