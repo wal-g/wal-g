@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 )
+
 // MAXRETRIES is the maximum number of retries for upload.
 var MAXRETRIES = 7
 
@@ -50,7 +51,7 @@ func checkVar(n map[string]string) error {
 
 // Configure connects to S3 and creates an uploader. It makes sure
 // that a valid session has started; if invalid, returns AWS error
-// and `<nil>` values. 
+// and `<nil>` values.
 //
 // Requires these environment variables to be set:
 // WALE_S3_PREFIX
@@ -101,8 +102,16 @@ func Configure() (*TarUploader, *Prefix, error) {
 	pre.Svc = s3.New(sess)
 
 	upload := NewTarUploader(pre.Svc, bucket, server, region, MAXRETRIES, MAXBACKOFF)
-	con, err := strconv.Atoi(os.Getenv("WALG_CONCURRENCY"))
-	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, con) //3 concurrency streams at 20MB
+
+	var con int
+	conc, ok := os.LookupEnv("WALG_CONCURRENCY")
+	if ok {
+		con, err = strconv.Atoi(conc)
+	} else {
+		con = 3
+	}
+
+	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, con) //default 3 concurrency streams at 20MB
 
 	return upload, pre, err
 }
