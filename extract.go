@@ -8,6 +8,13 @@ import (
 	"strconv"
 )
 
+func min(a, b int) int {
+    if a < b {
+        return a
+    }
+    return b
+}
+
 // EmptyWriteIgnorer handles 0 byte write in LZ4 package
 // to stop pipe reader/writer from blocking.
 type EmptyWriteIgnorer struct {
@@ -98,7 +105,6 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 		}
 	}()
 
-	
 
 	// Set maximum number of goroutines spun off by ExtractAll
 	var con int
@@ -107,25 +113,23 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 	if ok {
 		con, _ = strconv.Atoi(conc)
 	} else {
-		con = 10
+		con = min(10, len(files))
 	}
 
 	concurrent := make(chan Empty, con)
 	for i := 0; i < con; i++ {
 		concurrent <- Empty{}
 	}
-	done := make(chan bool)
 
-	go func() {
-		for i := 0; i < len(files); i++ {
-			<- done
-			concurrent <- Empty{}
-		}
-	}()
 
 	for i, val := range files {
 		<- concurrent
 		go func(i int, val ReaderMaker) {
+			defer func () {
+				concurrent <- Empty{}
+				sem <- Empty{}
+			}()
+
 			pr, tempW := io.Pipe()
 			pw := &EmptyWriteIgnorer{tempW}
 
@@ -159,10 +163,7 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 					collectAll <- err
 				}
 			}
-
-			done <- true
-			concurrent <- Empty{}
-			sem <- Empty{}
+			
 		}(i, val)
 	}
 
