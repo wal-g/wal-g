@@ -4,6 +4,8 @@ import (
 	"archive/tar"
 	"github.com/pkg/errors"
 	"io"
+	"os"
+	"strconv"
 )
 
 // EmptyWriteIgnorer handles 0 byte write in LZ4 package
@@ -84,23 +86,53 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 		return errors.New("ExtractAll: did not provide files to extract")
 	}
 
+	var err error
 	sem := make(chan Empty, len(files))
 	collectAll := make(chan error)
 	defer close(collectAll)
 
+	
+
+	// Set maximum number of goroutines spun off by ExtractAll
+	var con int
+	
+	conc, ok := os.LookupEnv("WALG_MAXCONCURRENCY")
+	if ok {
+		con, _ = strconv.Atoi(conc)
+	} else {
+		con = 10
+	}
+
+	concurrent := make(chan Empty, con)
+	for i := 0; i < con; i++ {
+		concurrent <- Empty{}
+	}
+	done := make(chan bool)
+
+	go func() {
+		for i := 0; i < len(files); i++ {
+			<- done
+			concurrent <- Empty{}
+		}
+	}()
+
 	for i, val := range files {
+		<- concurrent
 		go func(i int, val ReaderMaker) {
 			pr, tempW := io.Pipe()
 			pw := &EmptyWriteIgnorer{tempW}
 
-			// Collect errors returned by tarHandler.
+
+			// Collect errors returned by tarHandler or parsing.
 			collectLow := make(chan error)
+
 			go func() {
 				collectLow <- tarHandler(pw, val)
 			}()
-
+			
 			// Collect errors returned by extractOne.
 			collectTop := make(chan error)
+
 			go func() {
 				defer pr.Close()
 				err := extractOne(ti, pr)
@@ -121,11 +153,12 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 				}
 			}
 
+			done <- true
 			sem <- Empty{}
 		}(i, val)
 	}
+	
 
-	var err error
 	go func() {
 		for e := range collectAll {
 			if e != nil {

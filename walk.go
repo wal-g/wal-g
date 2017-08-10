@@ -10,6 +10,14 @@ import (
 	"strings"
 )
 
+type ZeroReader struct {}
+
+func (z *ZeroReader) Read(p []byte) (int, error) {
+	zeroes := make([]byte, len(p))
+	n := copy(p, zeroes)
+	return n, nil
+
+}
 // TarWalker walks files provided by the passed in directory
 // and creates compressed tar members labeled as `part_00i.tar.lzo`.
 //
@@ -80,7 +88,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
 				return errors.Wrapf(err, "HandleTar: failed to open file '%s'\n", path)
 			}
 			lim := &io.LimitedReader{
-				R: f,
+				R: io.MultiReader(f, &ZeroReader{}),
 				N: int64(hdr.Size),
 			}
 
