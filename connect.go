@@ -35,12 +35,10 @@ func Connect() (*pgx.Conn, error) {
 // fails.
 func StartBackup(conn *pgx.Conn, backup string) (string, error) {
 	var name string
-	var offset string
-	err := conn.QueryRow("SELECT * FROM pg_xlogfile_name_offset(pg_start_backup($1, true, false))", backup).Scan(&name, &offset)
+	err := conn.QueryRow("SELECT file_name FROM pg_xlogfile_name_offset(pg_start_backup($1, true, false))", backup).Scan(&name, &offset)
 	if err != nil {
 		return "", errors.Wrap(err, "QueryFile: start backup failed")
 	}
-	_ = offset
 	return "base_" + name, nil
 }
 
