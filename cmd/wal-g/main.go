@@ -66,11 +66,6 @@ func main() {
 			}
 			bk.Js = aws.String(*bk.Path + *bk.Name + "_backup_stop_sentinel.json")
 
-			// fmt.Println("NEWDIR:", dirArc)
-			// fmt.Println("PATH:", *bk.Path)
-			// fmt.Println("NAME:", *bk.Name)
-			// fmt.Println("JSON:", *bk.Js)
-			// fmt.Println(bk.CheckExistence())
 			exists, err := bk.CheckExistence()
 			if err != nil {
 				log.Fatalf("%+v\n", err)
@@ -86,7 +81,7 @@ func main() {
 				log.Fatalf("Backup '%s' does not exist.\n", *bk.Name)
 			}
 
-			// Find the LATEST valid backup (checks against JSON file and grabs backup name) and extract to DIRARC.
+		// Find the LATEST valid backup (checks against JSON file and grabs backup name) and extract to DIRARC.
 		} else if backupName == "LATEST" {
 			bk = &walg.Backup{
 				Prefix: pre,
@@ -119,7 +114,7 @@ func main() {
 			out[i] = s
 		}
 
-		// Extract all compressed tar members except `pg_control.tar.lz4`.
+		// Extract all compressed tar members except `pg_control.tar.lz4` if WALG version backup.
 		err = walg.ExtractAll(f, out)
 		if serr, ok := err.(*walg.UnsupportedFileTypeError); ok {
 			log.Fatalf("%v\n", serr)
@@ -127,10 +122,11 @@ func main() {
 			log.Fatalf("%+v\n", err)
 		}
 
-		// Check name for backwards compatability. Will check for `pg_control` if WALG version of backup
+		// Check name for backwards compatability. Will check for `pg_control` if WALG version of backup.
 		re := regexp.MustCompile(`^([^_]+._{1}[^_]+._{1})`)
 		match := re.FindString(*bk.Name)
-		if match != "" {
+
+		if match == "" {
 			// Extract pg_control last. If pg_control does not exist, program exits with error code 1.
 			name := *bk.Path + *bk.Name + "/tar_partitions/pg_control.tar.lz4"
 			pgControl := &walg.Archive{
