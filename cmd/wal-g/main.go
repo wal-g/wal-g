@@ -9,15 +9,18 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime/pprof"
 	"time"
 )
 
+var profile bool
+var mem bool
 var help bool
 var l *log.Logger
-var helpMsg = "\tbackup-fetch\tfetch a backup from S3\n" +
-	"\tbackup-push\tstarts and uploads a finished backup to S3\n" +
-	"\twal-fetch\tfetch a WAL file from S3\n" +
-	"\twal-push\tupload a WAL file to S3\n"
+var helpMsg = "  backup-fetch\tfetch a backup from S3\n" +
+	"  backup-push\tstarts and uploads a finished backup to S3\n" +
+	"  wal-fetch\tfetch a WAL file from S3\n" +
+	"  wal-push\tupload a WAL file to S3\n"
 
 func init() {
 	flag.Usage = func() {
@@ -25,6 +28,8 @@ func init() {
 		fmt.Fprintf(os.Stderr, "%s", helpMsg)
 		flag.PrintDefaults()
 	}
+	flag.BoolVar(&profile, "p", false, "\tProfiler (false on default)")
+	flag.BoolVar(&mem, "m", false, "\tMemory profiler (false on default)")
 	l = log.New(os.Stderr, "", 0)
 }
 
@@ -42,6 +47,16 @@ func main() {
 	var backupName string
 	if len(all) == 3 {
 		backupName = all[2]
+	}
+
+	// Various profiling options
+	if profile {
+		f, err := os.Create("cpu.prof")
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
 	}
 
 	tu, pre, err := walg.Configure()
@@ -81,7 +96,7 @@ func main() {
 				log.Fatalf("Backup '%s' does not exist.\n", *bk.Name)
 			}
 
-		// Find the LATEST valid backup (checks against JSON file and grabs backup name) and extract to DIRARC.
+			// Find the LATEST valid backup (checks against JSON file and grabs backup name) and extract to DIRARC.
 		} else if backupName == "LATEST" {
 			bk = &walg.Backup{
 				Prefix: pre,
@@ -156,6 +171,16 @@ func main() {
 			} else {
 				log.Fatal("Corrupt backup: missing pg_control")
 			}
+		}
+
+		if mem {
+			f, err := os.Create("mem.prof")
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			pprof.WriteHeapProfile(f)
+			defer f.Close()
 		}
 
 	} else if command == "wal-fetch" {

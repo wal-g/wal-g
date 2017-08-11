@@ -133,7 +133,6 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 			pr, tempW := io.Pipe()
 			pw := &EmptyWriteIgnorer{tempW}
 
-
 			// Collect errors returned by tarHandler or parsing.
 			collectLow := make(chan error)
 
