@@ -28,8 +28,8 @@ func init() {
 		fmt.Fprintf(os.Stderr, "%s", helpMsg)
 		flag.PrintDefaults()
 	}
-	flag.BoolVar(&profile, "p", false, "\tProfiler (false on default)")
-	flag.BoolVar(&mem, "m", false, "\tMemory profiler (false on default)")
+	flag.BoolVar(&profile, "p", false, "\tProfiler (false by default)")
+	flag.BoolVar(&mem, "m", false, "\tMemory profiler (false by default)")
 	l = log.New(os.Stderr, "", 0)
 }
 
