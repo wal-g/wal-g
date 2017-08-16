@@ -90,14 +90,6 @@
 			"notests": true
 		},
 		{
-			"importpath": "github.com/katie31/wal-g",
-			"repository": "https://github.com/katie31/wal-g",
-			"vcs": "git",
-			"revision": "c7632dacd5ad74067416d8375baeb11fc41e2f9c",
-			"branch": "master",
-			"notests": true
-		},
-		{
 			"importpath": "github.com/lib/pq",
 			"repository": "https://github.com/lib/pq",
 			"vcs": "git",
