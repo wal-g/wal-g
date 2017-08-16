@@ -3,7 +3,7 @@ package walg_test
 import (
 	"bytes"
 	"errors"
-	"github.com/katie31/wal-g"
+	"github.com/wal-g/wal-g"
 	"github.com/pierrec/lz4"
 	"io/ioutil"
 	"math/rand"

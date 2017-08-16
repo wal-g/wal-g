@@ -3,7 +3,7 @@ package tools
 import (
 	"archive/tar"
 	"fmt"
-	"github.com/katie31/wal-g"
+	"github.com/wal-g/wal-g"
 	"github.com/pierrec/lz4"
 	"io"
 	"os"

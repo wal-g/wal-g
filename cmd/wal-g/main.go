@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/katie31/wal-g"
+	"github.com/wal-g/wal-g"
 	"log"
 	"os"
 	"path/filepath"
