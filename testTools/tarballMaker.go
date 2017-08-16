@@ -4,7 +4,7 @@ import (
 	"github.com/katie31/wal-g"
 )
 
-// FileTarMaker creates a new FileTarBall
+// FileTarBallMaker creates a new FileTarBall
 // with the directory that files should be
 // extracted to.
 type FileTarBallMaker struct {

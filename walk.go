@@ -10,7 +10,9 @@ import (
 	"strings"
 )
 
-type ZeroReader struct {}
+// ZeroReader generates a slice of zeroes. Used to pad
+// tar in cases where length of file changes.
+type ZeroReader struct{}
 
 func (z *ZeroReader) Read(p []byte) (int, error) {
 	zeroes := make([]byte, len(p))
@@ -18,6 +20,7 @@ func (z *ZeroReader) Read(p []byte) (int, error) {
 	return n, nil
 
 }
+
 // TarWalker walks files provided by the passed in directory
 // and creates compressed tar members labeled as `part_00i.tar.lzo`.
 //

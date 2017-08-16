@@ -9,10 +9,10 @@ import (
 )
 
 func min(a, b int) int {
-    if a < b {
-        return a
-    }
-    return b
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // EmptyWriteIgnorer handles 0 byte write in LZ4 package
@@ -105,10 +105,9 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 		}
 	}()
 
-
 	// Set maximum number of goroutines spun off by ExtractAll
 	var con int
-	
+
 	conc, ok := os.LookupEnv("WALG_MAXCONCURRENCY")
 	if ok {
 		con, _ = strconv.Atoi(conc)
@@ -121,11 +120,10 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 		concurrent <- Empty{}
 	}
 
-
 	for i, val := range files {
-		<- concurrent
+		<-concurrent
 		go func(i int, val ReaderMaker) {
-			defer func () {
+			defer func() {
 				concurrent <- Empty{}
 				sem <- Empty{}
 			}()
@@ -139,7 +137,7 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 			go func() {
 				collectLow <- tarHandler(pw, val)
 			}()
-			
+
 			// Collect errors returned by extractOne.
 			collectTop := make(chan error)
 
@@ -162,10 +160,9 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 					collectAll <- err
 				}
 			}
-			
+
 		}(i, val)
 	}
-
 
 	for i := 0; i < len(files); i++ {
 		<-sem

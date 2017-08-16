@@ -103,9 +103,6 @@ func TestConfigure(t *testing.T) {
 
 }
 
-/**
- *  Tests that client is valid and created a new tar uploader.
- */
 func TestValidUploader(t *testing.T) {
 	mockSvc := &mockS3Client{}
 

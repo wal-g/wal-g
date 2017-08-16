@@ -39,6 +39,7 @@ func init() {
 	EXCLUDE["pg_subtrans"] = Empty{}
 }
 
+// Empty is used for channel signaling.
 type Empty struct{}
 
 // TarBundle represents one completed directory.

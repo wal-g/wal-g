@@ -20,7 +20,10 @@ func (r *RaskyReader) Read(p []byte) (int, error) {
 	return io.ReadFull(r.R, p)
 }
 
+// Uncompressed is used to log compression ratio.
 var Uncompressed uint32
+
+// Compressed is used to log compression ratio.
 var Compressed uint32
 
 // CheckType grabs the file extension from PATH.
