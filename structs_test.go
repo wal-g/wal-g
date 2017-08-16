@@ -3,7 +3,7 @@ package walg_test
 import (
 	"archive/tar"
 	"fmt"
-	"github.com/katie31/wal-g"
+	"github.com/wal-g/wal-g"
 	"testing"
 )
 

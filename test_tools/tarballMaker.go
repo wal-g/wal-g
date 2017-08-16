@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"github.com/katie31/wal-g"
+	"github.com/wal-g/wal-g"
 )
 
 // FileTarBallMaker creates a new FileTarBall

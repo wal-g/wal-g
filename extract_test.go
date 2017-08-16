@@ -3,8 +3,8 @@ package walg_test
 import (
 	"bytes"
 	"fmt"
-	"github.com/katie31/wal-g"
-	"github.com/katie31/wal-g/testTools"
+	"github.com/wal-g/wal-g"
+	"github.com/wal-g/wal-g/testTools"
 	"io"
 	"io/ioutil"
 	"testing"
