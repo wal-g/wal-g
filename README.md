@@ -117,7 +117,7 @@ WAL-G offers three miniture programs to assist with testing and development:
 * extract
 * generate
 
-<div id='compress'/>
+<a name="compress"/>
 **compress**
 
 Text
