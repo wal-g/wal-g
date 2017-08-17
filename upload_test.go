@@ -124,7 +124,7 @@ func TestUploadError(t *testing.T) {
 		err: true,
 	}
 
-	tu := walg.NewTarUploader(mockClient, "bucket", "server", "region", 2, float64(1))
+	tu := walg.NewTarUploader(mockClient, "bucket", "server", "region", 2, float64(2))
 	tu.Upl = mockUploader
 
 	maker := &walg.S3TarBallMaker{

@@ -3,6 +3,7 @@ package walg
 import (
 	"math"
 	"time"
+	"math/rand"
 )
 
 // ExponentialTicker is used for exponential backoff
@@ -30,7 +31,8 @@ func NewExpTicker(retries int, wait float64) *ExponentialTicker {
 // max wait time is reached.
 func (et *ExponentialTicker) Update() {
 	if et.wait < et.MaxWait {
-		et.wait = math.Exp2(float64(et.retries))
+		rand.Seed(time.Now().UTC().UnixNano())
+		et.wait = math.Exp2(float64(et.retries)) + rand.Float64()
 	}
 	et.retries++
 }

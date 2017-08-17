@@ -19,7 +19,7 @@ Installation
 ----------
 A precompiled binary for Linux AMD 64 of the latest version of WAL-G can be obtained under the [Releases tab](https://github.com/wal-g/wal-g/releases).
 
-To decompress the binary use:
+To decompress the binary, use:
 
 ```
 tar -zxvf wal-g.linux-amd64.tar.gz
@@ -49,9 +49,9 @@ Required if using AWS STS:
 
 Concurrency values can be configured using:
 
-* `WALG_MAX_CONCURRENCY`
+* `WALG_DOWNLOAD_CONCURRENCY`
 
-To configure how many goroutines to use during extraction, use `WALG_MAX_CONCURRENCY`. By default, WAL-G uses the minimum of the number of files to extract and 10.
+To configure how many goroutines to use during extraction, use `WALG_DOWNLOAD_CONCURRENCY`. By default, WAL-G uses the minimum of the number of files to extract and 10.
 
 * `WALG_UPLOAD_CONCURRENCY`
 
