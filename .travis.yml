@@ -1,8 +1,8 @@
 language: go
 
 go:
-	-1.8
+  -1.8
 deploy:
-	skip_cleanup: true
-	provider: releases
-	file: wal-g
+  skip_cleanup: true
+  provider: releases
+  file: wal-g
