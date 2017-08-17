@@ -2,26 +2,14 @@
 
 WAL-G 
 
-[compress](#compress)
-
 Installing
 ----------
-A step by step series of examples that tell you have to get a development env running
-
-Say what the step will be
+A precompiled binary for Linux AMD 64 can be obtained like this:
 
 ```
-Give the example
-```
-
-And repeat
 
 ```
-until finished
-```
-
-End with an example of getting some data out of the system or using it for a little demo
-
+For other incompatible systems, please consult the Development section for more information.
 Configuration
 -------------
 **Required**
@@ -32,13 +20,16 @@ To connect to Amazon S3, WAL-G requires that these variables be set:
 * `AWS_REGION`(eg. `us-west-2`)
 * `AWS_ACCESS_KEY_ID`
 * `AWS_SECRET_ACCESS_KEY`
-* `AWS_SECURITY_TOKEN`
 
 Also note that WAL-G uses this environment variable to connect to Postgres:
 
 * `PGHOST`
 
 **Optional**
+
+Required if using AWS STS:
+
+* `AWS_SECURITY_TOKEN`
 
 Concurrency values can be configured using:
 
@@ -100,7 +91,23 @@ wal-g wal-push /path/to/archive
 
 Development
 -----------
-WAL-G relies heavily on unit tests. These tests do not require S3 configuration as the upload/download parts are tested using mocked objects.
+### Installation
+To compile and build the binary:
+
+```
+go get github.com/wal-g/wal-g
+make all
+```
+Users can also install WAL-G by using `make install`. Specifying the GOBIN environment variable before installing allows the user to specify the installation location. On default, `make install` puts the compiled binary in `go/bin`.
+
+```
+export GOBIN=/usr/local/bin
+make install
+```
+
+### Testing
+
+WAL-G relies heavily on unit tests. These tests do not require S3 configuration as the upload/download parts are tested using mocked objects. For more information on testing, please consult [test_tools](test_tools).
 
 WAL-G will preform a round-trip compression/decompression test that generates a directory for data (eg. data7869...), compressed files (eg. compressed), and extracted files (eg. extracted). These directories will only get cleaned up if the files in the original data directory matches the files in the extracted one.
 
@@ -111,34 +118,15 @@ go test -v -coverprofile=coverage.out
 go tool cover -html=coverage.out
 ```
 
-### Testing Tools
-WAL-G offers three miniture programs to assist with testing and development:
 
-* 
-* [extract](#extract)
-* [generate](#generate)
-
-
-##### compress
-
-
-Text
-fewafeawfeawfewa  
-fewafewafewafwe  
-feawfewafewafe  
-fewafewafewafewa  
-
-[extract](#extract)
-
-**generate**
 
 
 
 Authors
 -------
 
-* [Daniel Farina](https://github.com/fdr)
 * [Katie Li](https://github.com/katie31)
+* [Daniel Farina](https://github.com/fdr)
 
 See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project.
 
