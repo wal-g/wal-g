@@ -4,7 +4,7 @@ WAL-G
 
 Installing
 ----------
-A precompiled binary for Linux AMD 64 can be obtained like this:
+A precompiled binary for Linux AMD 64 can be obtained 
 
 ```
 
@@ -119,9 +119,6 @@ go tool cover -html=coverage.out
 ```
 
 
-
-
-
 Authors
 -------
 
@@ -133,8 +130,7 @@ See also the list of [contributors](https://github.com/your/project/contributors
 License
 -------
 
-This project is licensed under the Apache License, Version 2.0. 
-Please refer to the [LICENSE.md](LICENSE.md) file for more details.
+This project is licensed under the Apache License, Version 2.0, but the lzo support is licensed under GPL 3.0+. Please refer to the [LICENSE.md](LICENSE.md) file for more details.
 
 Acknowledgements
 ----------------
