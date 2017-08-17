@@ -108,7 +108,7 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 	// Set maximum number of goroutines spun off by ExtractAll
 	var con int
 
-	conc, ok := os.LookupEnv("WALG_MAXCONCURRENCY")
+	conc, ok := os.LookupEnv("WALG_MAX_CONCURRENCY")
 	if ok {
 		con, _ = strconv.Atoi(conc)
 	} else {

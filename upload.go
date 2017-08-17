@@ -105,7 +105,7 @@ func Configure() (*TarUploader, *Prefix, error) {
 	upload := NewTarUploader(pre.Svc, bucket, server, region, MAXRETRIES, MAXBACKOFF)
 
 	var con int
-	conc, ok := os.LookupEnv("WALG_CONCURRENCY")
+	conc, ok := os.LookupEnv("WALG_UPLOAD_CONCURRENCY")
 	if ok {
 		con, err = strconv.Atoi(conc)
 	} else {

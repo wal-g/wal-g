@@ -6,15 +6,8 @@ WAL-G
 
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system.
 
-### Prerequisites
-
-What things you need to install the software and how to install them
-
-```
-Give examples
-```
-
 ### Installing
+--------------
 
 A step by step series of examples that tell you have to get a development env running
 
@@ -32,26 +25,71 @@ until finished
 
 End with an example of getting some data out of the system or using it for a little demo
 
+### Configuration
+-----------------
+To connect to Amazon S3, WAL-G requires that these variables be set:
+
+* `WALE_S3_PREFIX` (eg. `s3://bucket/path/to/folder`)
+* `AWS_REGION`(eg. `us-west-2`)
+* `AWS_ACCESS_KEY_ID`
+* `AWS_SECRET_ACCESS_KEY`
+* `AWS_SECURITY_TOKEN`
+
+Also note that WAL-G uses this environment variable to connect to Postgres:
+
+* `PGHOST`
+
+**Optional:**
+
+Concurrency values can be configured using:
+
+* `WALG_MAX_CONCURRENCY`
+
+To configure how many goroutines to use during extraction, set this variable. By default, WAL-G uses the minimum of the number of files to extract and 10.
+
+* `WALG_UPLOAD_CONCURRENCY`
+
+To configure how many concurrency streams to use during backup uploading, set this variable. By default, WAL-G uses 10 streams.
+
+
+
 ## Usage
 -----------
 WAL-G currently supports these commands:
 
-* backup-fetch
+<br/>
 
-When fetching base backups, WAL-G should be passed in a path to the directory to extract to. If this directory does not exist, WAL-G will create it and any dependent subdirectories. 
+* ``backup-fetch``
+
+When fetching base backups, the user should pass in the name of the backup and a path to a directory to extract to. If this directory does not exist, WAL-G will create it and any dependent subdirectories. 
 
 ```
 wal-g backup-fetch ~/extract/to/here example-backup
 ```
-* backup-push
 
+WAL-G can also fetch the latest backup using:
 
 ```
-wal-g backup-push ~/extract/to/here example-backup
+wal-g backup-fetch ~/extract/to/here LATEST
 ```
+<br/>
 
-* wal-fetch
-* wal-push
+* ``backup-push``
+
+
+
+Upload a base backup to S3 using:
+
+```
+wal-g backup-push /backup/directory/path
+```
+<br/>
+
+* ``wal-fetch``
+
+<br/>
+
+* ``wal-push``
 
 
 
