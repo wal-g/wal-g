@@ -117,10 +117,17 @@ WAL-G offers three miniture programs to assist with testing and development:
 * extract
 * generate
 
-<a name="compress"/>
+
 **compress**
 
+
+
 Text
+fewafeawfeawfewa  
+fewafewafewafwe  
+feawfewafewafe  
+fewafewafewafewa  
+
 
 
 Authors
