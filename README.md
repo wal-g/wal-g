@@ -2,7 +2,7 @@
 
 WAL-G is an archival restoration tool for Postgres. 
 
-WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4 compression, multiple processors and non-exclusive base backups for Postgres. More information on the design and implementation of WAL-G can be found on the Citus Data blog blog post ["BLOG NAME"](https://www.citusdata.com/blog/).  
+WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4 compression, multiple processors and non-exclusive base backups for Postgres. More information on the design and implementation of WAL-G can be found on the Citus Data blog post ["BLOG NAME"](https://www.citusdata.com/blog/).  
 
 **Table of Contents**  
 - [Installation](#installation)  
@@ -17,14 +17,11 @@ WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4
 
 Installation
 ----------
-A precompiled binary for Linux AMD 64 of the latest version of WAL-G can be obtained under the Releases tab or like so:
+A precompiled binary for Linux AMD 64 of the latest version of WAL-G can be obtained under the [Releases tab](https://github.com/wal-g/wal-g/releases).
+
+To decompress the binary use:
 
 ```
-curl -s https://api.github.com/repos/wal-g/wal-g/releases/latest \
-  | grep browser_download_url                                    \
-  | grep amd64                                                   \
-  | cut -d '"' -f 4                                              \
-  | wget -qi -
 tar -zxvf wal-g.linux-amd64.tar.gz
 ```
 For other incompatible systems, please consult the Development section for more information.
@@ -145,7 +142,7 @@ Authors
 * [Katie Li](https://github.com/katie31)
 * [Daniel Farina](https://github.com/fdr)
 
-See also the list of [contributors](https://github.com/wal-g/wal-g/graphs/contributors) who participated in this project.
+See also the list of [contributors](CONTRIBUTORS) who participated in this project.
 
 License
 -------
