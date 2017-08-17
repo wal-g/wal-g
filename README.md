@@ -1,8 +1,8 @@
 # WAL-G
 
-WAL-G is an archival and restoration tool for Postgres. 
+WAL-G is an archival restoration tool for Postgres. 
 
-WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4 compression, multiple processors and non-exclusive base backups for Postgres. More information on the design and implementation of WAL-G can be found (here)[]
+WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4 compression, multiple processors and non-exclusive base backups for Postgres. More information on the design and implementation of WAL-G can be found on the Citus Data blog titled ["BLOG NAME"](https://www.citusdata.com/blog/...).  
 
 **Table of Contents**  
 - [Installation](#installation)  
@@ -21,9 +21,9 @@ A precompiled binary for Linux AMD 64 of the latest version of WAL-G can be obta
 
 ```
 curl -s https://api.github.com/repos/wal-g/wal-g/releases/latest \
-  | grep browser_download_url \
-  | grep amd64 \
-  | cut -d '"' -f 4 \
+  | grep browser_download_url                                    \
+  | grep amd64                                                   \
+  | cut -d '"' -f 4                                              \
   | wget -qi -
 tar -zxvf wal-g.linux-amd64.tar.gz
 ```
