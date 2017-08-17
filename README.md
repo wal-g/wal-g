@@ -2,6 +2,7 @@
 
 WAL-G 
 
+[compress](#compress)
 
 Installing
 ----------
@@ -113,13 +114,12 @@ go tool cover -html=coverage.out
 ### Testing Tools
 WAL-G offers three miniture programs to assist with testing and development:
 
-* [compress](#compress)
-* extract
-* generate
+* 
+* [extract](#extract)
+* [generate](#generate)
 
 
-**compress**
-
+##### compress
 
 
 Text
@@ -127,6 +127,10 @@ fewafeawfeawfewa
 fewafewafewafwe  
 feawfewafewafe  
 fewafewafewafewa  
+
+[extract](#extract)
+
+**generate**
 
 
 
@@ -143,3 +147,7 @@ License
 
 This project is licensed under the Apache License, Version 2.0. 
 Please refer to the [LICENSE.md](LICENSE.md) file for more details.
+
+Acknowledgements
+----------------
+
