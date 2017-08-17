@@ -37,7 +37,19 @@ End with an example of getting some data out of the system or using it for a lit
 WAL-G currently supports these commands:
 
 * backup-fetch
+
+When fetching base backups, WAL-G should be passed in a path to the directory to extract to. If this directory does not exist, WAL-G will create it and any dependent subdirectories. 
+
+```
+wal-g backup-fetch ~/extract/to/here example-backup
+```
 * backup-push
+
+
+```
+wal-g backup-push ~/extract/to/here example-backup
+```
+
 * wal-fetch
 * wal-push
 
