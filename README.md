@@ -4,12 +4,19 @@ WAL-G
 
 Installing
 ----------
-A precompiled binary for Linux AMD 64 can be obtained 
+A precompiled binary for Linux AMD 64 of the latest version of WAL-G can be obtained like so:
 
 ```
+curl -s https://api.github.com/repos/wal-g/wal-g/releases/latest \
+  | grep browser_download_url \
+  | grep amd64 \
+  | cut -d '"' -f 4 \
+  | wget -qi -
+tar -zxvf wal-g.linux-amd64.tar.gz
 
 ```
 For other incompatible systems, please consult the Development section for more information.
+
 Configuration
 -------------
 **Required**
