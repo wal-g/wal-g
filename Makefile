@@ -3,7 +3,7 @@ PKG_FILES = $(wildcard *.go)
 
 .PHONY : test install all clean
 
-test:
+test: cmd/wal-g/wal-g
 	go test -v
 
 all: cmd/wal-g/wal-g	
