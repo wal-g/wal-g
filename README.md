@@ -111,7 +111,16 @@ go tool cover -html=coverage.out
 ```
 
 ### Testing Tools
+WAL-G offers three miniture programs to assist with testing and development:
 
+* [compress](#compress)
+* extract
+* generate
+
+<div id='compress'/>
+**compress**
+
+Text
 
 
 Authors
