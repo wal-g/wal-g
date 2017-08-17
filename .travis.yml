@@ -1,5 +1,6 @@
 language: go
-go: -1.8
+go:
+  - 1.8.x
 deploy:
   provider: releases
   api_key:
