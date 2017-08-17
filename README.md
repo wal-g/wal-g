@@ -2,7 +2,15 @@
 
 WAL-G 
 
-Installing
+**Table of Contents**  
+- [Installation](#installation)  
+- [Configuration](#configuration)  
+- [Usage](#usage)  
+- [Development](#development)  
+	- [Installing](#installing)  
+	- [Testing](#testing)
+
+Installation
 ----------
 A precompiled binary for Linux AMD 64 of the latest version of WAL-G can be obtained like so:
 
@@ -13,7 +21,6 @@ curl -s https://api.github.com/repos/wal-g/wal-g/releases/latest \
   | cut -d '"' -f 4 \
   | wget -qi -
 tar -zxvf wal-g.linux-amd64.tar.gz
-
 ```
 For other incompatible systems, please consult the Development section for more information.
 
@@ -98,7 +105,8 @@ wal-g wal-push /path/to/archive
 
 Development
 -----------
-### Installation
+### Installing
+
 To compile and build the binary:
 
 ```
@@ -116,7 +124,7 @@ make install
 
 WAL-G relies heavily on unit tests. These tests do not require S3 configuration as the upload/download parts are tested using mocked objects. For more information on testing, please consult [test_tools](test_tools).
 
-WAL-G will preform a round-trip compression/decompression test that generates a directory for data (eg. data7869...), compressed files (eg. compressed), and extracted files (eg. extracted). These directories will only get cleaned up if the files in the original data directory matches the files in the extracted one.
+WAL-G will preform a round-trip compression/decompression test that generates a directory for data (eg. data...), compressed files (eg. compressed), and extracted files (eg. extracted). These directories will only get cleaned up if the files in the original data directory matches the files in the extracted one.
 
 Test coverage can be obtained using:
 
