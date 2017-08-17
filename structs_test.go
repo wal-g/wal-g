@@ -2,7 +2,6 @@ package walg_test
 
 import (
 	"archive/tar"
-	"fmt"
 	"github.com/wal-g/wal-g"
 	"testing"
 )
@@ -110,7 +109,6 @@ func TestS3DependentFunctions(t *testing.T) {
 	// Write body.
 	_, err = tarWriter.Write(one)
 
-	fmt.Println("written")
 	if err != nil {
 		t.Errorf("structs: expected to write 1 byte but got %s", err)
 	}

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/wal-g/wal-g"
-	"github.com/wal-g/wal-g/testTools"
+	"github.com/wal-g/wal-g/test_tools"
 	"io"
 	"io/ioutil"
 	"testing"

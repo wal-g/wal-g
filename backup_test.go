@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/wal-g/wal-g"
-	"github.com/wal-g/wal-g/testTools"
+	"github.com/wal-g/wal-g/test_tools"
 	"io"
 	"io/ioutil"
 	"strings"

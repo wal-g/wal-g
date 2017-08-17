@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"github.com/wal-g/wal-g"
-	"github.com/wal-g/wal-g/testTools"
+	"github.com/wal-g/wal-g/test_tools"
 	"io"
 	"io/ioutil"
 	"os"

@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/wal-g/wal-g"
-	"github.com/wal-g/wal-g/testTools"
+	"github.com/wal-g/wal-g/test_tools"
 	"log"
 	"net/http"
 	"os"
