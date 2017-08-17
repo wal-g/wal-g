@@ -1,6 +1,8 @@
 # WAL-G
 
-WAL-G 
+WAL-G is an archival and restoration tool for Postgres. 
+
+WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4 compression, multiple processors and non-exclusive base backups for Postgres. More information on the design and implementation of WAL-G can be found (here)[]
 
 **Table of Contents**  
 - [Installation](#installation)  
@@ -8,11 +10,14 @@ WAL-G
 - [Usage](#usage)  
 - [Development](#development)  
 	- [Installing](#installing)  
-	- [Testing](#testing)
+	- [Testing](#testing)  
+- [Authors](#authors)  
+- [License](#license)  
+- [Acknowledgements](#acknowledgements)
 
 Installation
 ----------
-A precompiled binary for Linux AMD 64 of the latest version of WAL-G can be obtained like so:
+A precompiled binary for Linux AMD 64 of the latest version of WAL-G can be obtained under the Releases tab or like so:
 
 ```
 curl -s https://api.github.com/repos/wal-g/wal-g/releases/latest \
@@ -140,7 +145,7 @@ Authors
 * [Katie Li](https://github.com/katie31)
 * [Daniel Farina](https://github.com/fdr)
 
-See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project.
+See also the list of [contributors](https://github.com/wal-g/wal-g/graphs/contributors) who participated in this project.
 
 License
 -------
