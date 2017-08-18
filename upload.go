@@ -3,8 +3,16 @@ package walg
 import (
 	"archive/tar"
 	"fmt"
+	"io"
+	"log"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/defaults"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
@@ -13,13 +21,6 @@ import (
 	"github.com/jackc/pgx"
 	"github.com/pierrec/lz4"
 	"github.com/pkg/errors"
-	"io"
-	"log"
-	"net/url"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
 )
 
 // MAXRETRIES is the maximum number of retries for upload.
@@ -57,9 +58,6 @@ func checkVar(n map[string]string) error {
 // Requires these environment variables to be set:
 // WALE_S3_PREFIX
 // AWS_REGION
-// AWS_ACCESS_KEY_ID
-// AWS_SECRET_ACCESS_KEY
-// AWS_SECURITY_TOKEN
 //
 // Able to configure the upload part size in the S3 uploader.
 func Configure() (*TarUploader, *Prefix, error) {
@@ -67,9 +65,6 @@ func Configure() (*TarUploader, *Prefix, error) {
 
 	chk["WALE_S3_PREFIX"] = os.Getenv("WALE_S3_PREFIX")
 	chk["AWS_REGION"] = os.Getenv("AWS_REGION")
-	chk["AWS_ACCESS_KEY_ID"] = os.Getenv("AWS_ACCESS_KEY_ID")
-	chk["AWS_SECRET_ACCESS_KEY"] = os.Getenv("AWS_SECRET_ACCESS_KEY")
-	chk["AWS_SECURITY_TOKEN"] = os.Getenv("AWS_SECURITY_TOKEN")
 
 	err := checkVar(chk)
 	if err != nil {
@@ -79,6 +74,11 @@ func Configure() (*TarUploader, *Prefix, error) {
 	u, err := url.Parse(chk["WALE_S3_PREFIX"])
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "Configure: failed to parse url '%s'", chk["WALE_S3_PREFIX"])
+	}
+
+	defaultConfig := defaults.Get().Config
+	if _, err := defaultConfig.Credentials.Get(); err != nil {
+		return nil, nil, errors.Wrapf(err, "Configure: no AWS credentials; please specify e.g. AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY")
 	}
 
 	bucket := u.Host
@@ -92,7 +92,7 @@ func Configure() (*TarUploader, *Prefix, error) {
 
 	config := &aws.Config{
 		Region:      aws.String(region),
-		Credentials: credentials.NewStaticCredentials(chk["AWS_ACCESS_KEY_ID"], chk["AWS_SECRET_ACCESS_KEY"], chk["AWS_SECURITY_TOKEN"]),
+		Credentials: defaultConfig.Credentials,
 	}
 
 	sess, err := session.NewSession(config)
