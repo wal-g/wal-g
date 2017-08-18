@@ -170,7 +170,7 @@ func (s *S3TarBall) Finish() error {
 	}
 
 	if err == nil && tupl.Success {
-		fmt.Printf("\nUploaded %d compressed tar files.\n", s.number)
+		fmt.Printf("Uploaded %d compressed tar files.\n", s.number)
 	}
 	return err
 }

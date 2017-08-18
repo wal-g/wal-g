@@ -49,7 +49,6 @@ func (fb *FileTarBall) CloseTar() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("Closed")
 	return nil
 }
 
