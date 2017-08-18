@@ -39,9 +39,7 @@ To connect to Amazon S3, WAL-G requires that these variables be set:
 * `AWS_ACCESS_KEY_ID`
 * `AWS_SECRET_ACCESS_KEY`
 
-Also note that WAL-G uses this environment variable to connect to Postgres:
-
-* `PGHOST`
+WAL-G uses [the usual PostgreSQL environment variables](https://www.postgresql.org/docs/current/static/libpq-envars.html) to configure its connection, especially including `PGHOST`, `PGPORT`, `PGUSER`, and `PGPASSWORD`/`PGPASSFILE`/`~/.pgpass`.
 
 **Optional**
 
