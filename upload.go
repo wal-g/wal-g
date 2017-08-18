@@ -4,7 +4,7 @@ import (
 	"archive/tar"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/defaults"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
@@ -31,12 +31,9 @@ var MAXBACKOFF = float64(32)
 // Checks that the following environment variables are set:
 // WALE_S3_PREFIX
 // AWS_REGION
-// AWS_ACCESS_KEY_ID
-// AWS_SECRET_ACCESS_KEY
-// AWS_SECURITY_TOKEN
 func checkVar(n map[string]string) error {
 	u := &UnsetEnvVarError{
-		names: make([]string, 0, 5),
+		names: make([]string, 0, 2),
 	}
 	for i, val := range n {
 		if val == "" {
@@ -59,21 +56,15 @@ func checkVar(n map[string]string) error {
 // AWS_REGION
 // AWS_ACCESS_KEY_ID
 // AWS_SECRET_ACCESS_KEY
-// AWS_SECURITY_TOKEN
 //
 // Able to configure the upload part size in the S3 uploader.
 func Configure() (*TarUploader, *Prefix, error) {
 	chk := make(map[string]string)
-
 	chk["WALE_S3_PREFIX"] = os.Getenv("WALE_S3_PREFIX")
 	chk["AWS_REGION"] = os.Getenv("AWS_REGION")
-	chk["AWS_ACCESS_KEY_ID"] = os.Getenv("AWS_ACCESS_KEY_ID")
-	chk["AWS_SECRET_ACCESS_KEY"] = os.Getenv("AWS_SECRET_ACCESS_KEY")
-	chk["AWS_SECURITY_TOKEN"] = os.Getenv("AWS_SECURITY_TOKEN")
-
-	err := checkVar(chk)
-	if err != nil {
-		return nil, nil, err
+	preErr := checkVar(chk)
+	if preErr != nil {
+		return nil, nil, preErr
 	}
 
 	u, err := url.Parse(chk["WALE_S3_PREFIX"])
@@ -90,9 +81,9 @@ func Configure() (*TarUploader, *Prefix, error) {
 		Server: aws.String(server),
 	}
 
-	config := &aws.Config{
-		Region:      aws.String(region),
-		Credentials: credentials.NewStaticCredentials(chk["AWS_ACCESS_KEY_ID"], chk["AWS_SECRET_ACCESS_KEY"], chk["AWS_SECURITY_TOKEN"]),
+	config := defaults.Get().Config
+	if _, err := config.Credentials.Get(); err != nil {
+		return nil, nil, errors.Wrapf(err, "Configure: failed to get AWS credentials; please specify AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY")
 	}
 
 	sess, err := session.NewSession(config)

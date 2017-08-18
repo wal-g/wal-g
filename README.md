@@ -4,7 +4,7 @@
 
 WAL-G is an archival restoration tool for Postgres. 
 
-WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4 compression, multiple processors and non-exclusive base backups for Postgres. More information on the design and implementation of WAL-G can be found on the Citus Data blog post ["Introducing WAL-G: Faster Disaster Recovery for Postgres"](https://www.citusdata.com/blog/2017/08/18/introducing-wal-g-faster-restores-for-postgres/).  
+WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4 compression, multiple processors and non-exclusive base backups for Postgres. More information on the design and implementation of WAL-G can be found on the Citus Data blog post ["Introducing WAL-G by Citus: Faster Disaster Recovery for Postgres"](https://www.citusdata.com/blog/2017/08/18/introducing-wal-g-faster-restores-for-postgres/).  
 
 **Table of Contents**  
 - [Installation](#installation)  
@@ -45,7 +45,7 @@ WAL-G uses [the usual PostgreSQL environment variables](https://www.postgresql.o
 
 Required if using AWS STS:
 
-* `AWS_SECURITY_TOKEN`
+* `AWS_SESSION_TOKEN`
 
 Concurrency values can be configured using:
 
@@ -151,4 +151,6 @@ This project is licensed under the Apache License, Version 2.0, but the lzo supp
 
 Acknowledgements
 ----------------
-WAL-G could not have been possible without the support of [Citus](https://www.citusdata.com/) [Data](https://github.com/citusdata). We would like to express our sincere gratitude and appreciation for having the opportunity to develop and test this project. Thank you to all who contributed to the creation of WAL-G.
+WAL-G would not have happened without the support of [Citus Data](https://www.citusdata.com/)
+
+WAL-G came into existence as a result of the collaboration between a summer engineering intern at Citus, Katie Li, and Daniel Farina, the original author of WAL-E who currently serves as a principal engineer on the Citus Cloud team. Citus Data also has an [open source extension to Postgres](https://github.com/citusdata) that distributes database queries horizontally to deliver scale and performance. 
