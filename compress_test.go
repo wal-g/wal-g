@@ -3,8 +3,8 @@ package walg_test
 import (
 	"bytes"
 	"errors"
-	"github.com/wal-g/wal-g"
 	"github.com/pierrec/lz4"
+	"github.com/wal-g/wal-g"
 	"io/ioutil"
 	"math/rand"
 	"testing"

@@ -1,4 +1,6 @@
 # WAL-G
+[![Build Status](https://travis-ci.org/wal-g/wal-g.svg?branch=master)](https://travis-ci.org/wal-g/wal-g)
+[![Go Report Card](https://goreportcard.com/badge/github.com/wal-g/wal-g)](https://goreportcard.com/report/github.com/wal-g/wal-g)
 
 WAL-G is an archival restoration tool for Postgres. 
 
@@ -148,7 +150,3 @@ License
 -------
 
 This project is licensed under the Apache License, Version 2.0, but the lzo support is licensed under GPL 3.0+. Please refer to the [LICENSE.md](LICENSE.md) file for more details.
-
-Acknowledgements
-----------------
-

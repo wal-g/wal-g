@@ -88,7 +88,7 @@ func main() {
 			fmt.Printf("%+v\n", err)
 			os.Exit(1)
 		}
-		
+
 		bundle.Tbm = &walg.S3TarBallMaker{
 			BaseDir:  filepath.Base(in),
 			Trim:     in,

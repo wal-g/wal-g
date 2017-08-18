@@ -3,8 +3,8 @@ package tools
 import (
 	"archive/tar"
 	"fmt"
-	"github.com/wal-g/wal-g"
 	"github.com/pierrec/lz4"
+	"github.com/wal-g/wal-g"
 	"io"
 	"os"
 	"path/filepath"

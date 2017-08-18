@@ -2,8 +2,8 @@ package walg
 
 import (
 	"math"
-	"time"
 	"math/rand"
+	"time"
 )
 
 // ExponentialTicker is used for exponential backoff
