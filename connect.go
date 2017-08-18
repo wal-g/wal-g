@@ -1,10 +1,10 @@
 package walg
 
 import (
+	"regexp"
+
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
-	"os"
-	"regexp"
 )
 
 // Connect establishes a connection to postgres using
@@ -12,13 +12,9 @@ import (
 // If PGHOST is not set or if the connection fails, an error is returned
 // and the connection is `<nil>`.
 func Connect() (*pgx.Conn, error) {
-	host := os.Getenv("PGHOST")
-	if host == "" {
-		return nil, errors.New("Connect: did not set PGHOST")
-	}
-
-	config := pgx.ConnConfig{
-		Host: host,
+	config, err := pgx.ParseEnvLibpq()
+	if err != nil {
+		return nil, errors.Wrap(err, "Connect: unable to read environment variables")
 	}
 
 	conn, err := pgx.Connect(config)
