@@ -58,7 +58,7 @@ curl -k https://localhost:8080/stride-1.bytes-1.tar.lzo \
 The URLs can also be fed directly to `extract`. Currently, `generate` only supports LZOP compression.
 
 
-**NOTE:** `compress` and `extract` support profiling options using the flags `-p` and `-m`. The first generates a CPU profile to `cpu.prof` and the second generates a memory profile to `mem.prof`.
+**NOTE:** `compress` and `extract` support profiling options using the flags `-p` and `-m`. The first generates a CPU profile to `cpu.prof` while the latter generates a memory profile to `mem.prof`.
 
 To access the profiles, use:
 
