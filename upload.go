@@ -3,6 +3,14 @@ package walg
 import (
 	"archive/tar"
 	"fmt"
+	"io"
+	"log"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/defaults"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -13,13 +21,6 @@ import (
 	"github.com/jackc/pgx"
 	"github.com/pierrec/lz4"
 	"github.com/pkg/errors"
-	"io"
-	"log"
-	"net/url"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
 )
 
 // MAXRETRIES is the maximum number of retries for upload.
@@ -28,23 +29,29 @@ var MAXRETRIES = 7
 // MAXBACKOFF is the maxmimum backoff time in seconds for upload.
 var MAXBACKOFF = float64(32)
 
-// Checks that the following environment variables are set:
-// WALE_S3_PREFIX
-// AWS_REGION
-func checkVar(n map[string]string) error {
-	u := &UnsetEnvVarError{
-		names: make([]string, 0, 2),
-	}
-	for i, val := range n {
-		if val == "" {
-			u.names = append(u.names, i)
-		}
-	}
-	if len(u.names) != 0 {
-		return u
+// Given an S3 bucket name, attempt to determine its region
+func findS3BucketRegion(bucket string, config *aws.Config) (string, error) {
+	input := s3.GetBucketLocationInput{
+		Bucket: aws.String(bucket),
 	}
 
-	return nil
+	sess, err := session.NewSession(config.WithRegion("us-east-1"))
+	if err != nil {
+		return "", err
+	}
+
+	output, err := s3.New(sess).GetBucketLocation(&input)
+	if err != nil {
+		return "", err
+	}
+
+	if output.LocationConstraint == nil {
+		// buckets in "US Standard", a.k.a. us-east-1, are returned as a nil region
+		return "us-east-1", nil
+	} else {
+		// all other regions are strings
+		return *output.LocationConstraint, nil
+	}
 }
 
 // Configure connects to S3 and creates an uploader. It makes sure
@@ -53,37 +60,40 @@ func checkVar(n map[string]string) error {
 //
 // Requires these environment variables to be set:
 // WALE_S3_PREFIX
-// AWS_REGION
-// AWS_ACCESS_KEY_ID
-// AWS_SECRET_ACCESS_KEY
 //
 // Able to configure the upload part size in the S3 uploader.
 func Configure() (*TarUploader, *Prefix, error) {
-	chk := make(map[string]string)
-	chk["WALE_S3_PREFIX"] = os.Getenv("WALE_S3_PREFIX")
-	chk["AWS_REGION"] = os.Getenv("AWS_REGION")
-	preErr := checkVar(chk)
-	if preErr != nil {
-		return nil, nil, preErr
+	wale_s3_prefix := os.Getenv("WALE_S3_PREFIX")
+	if wale_s3_prefix == "" {
+		return nil, nil, &UnsetEnvVarError{names: []string{"WALE_S3_PREFIX"}}
 	}
 
-	u, err := url.Parse(chk["WALE_S3_PREFIX"])
+	u, err := url.Parse(wale_s3_prefix)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "Configure: failed to parse url '%s'", chk["WALE_S3_PREFIX"])
+		return nil, nil, errors.Wrapf(err, "Configure: failed to parse url '%s'", wale_s3_prefix)
 	}
 
 	bucket := u.Host
 	server := u.Path[1:]
-	region := chk["AWS_REGION"]
+
+	config := defaults.Get().Config
+
+	if _, err := config.Credentials.Get(); err != nil {
+		return nil, nil, errors.Wrapf(err, "Configure: failed to get AWS credentials; please specify AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY")
+	}
+
+	region := os.Getenv("AWS_REGION")
+	if region == "" {
+		region, err = findS3BucketRegion(bucket, config)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "Configure: AWS_REGION is not set and s3:GetBucketLocation failed")
+		}
+	}
+	config = config.WithRegion(region)
 
 	pre := &Prefix{
 		Bucket: aws.String(bucket),
 		Server: aws.String(server),
-	}
-
-	config := defaults.Get().Config
-	if _, err := config.Credentials.Get(); err != nil {
-		return nil, nil, errors.Wrapf(err, "Configure: failed to get AWS credentials; please specify AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY")
 	}
 
 	sess, err := session.NewSession(config)

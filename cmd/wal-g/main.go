@@ -3,14 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/wal-g/wal-g"
 	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime/pprof"
 	"time"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/wal-g/wal-g"
 )
 
 var profile bool
