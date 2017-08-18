@@ -150,3 +150,7 @@ License
 -------
 
 This project is licensed under the Apache License, Version 2.0, but the lzo support is licensed under GPL 3.0+. Please refer to the [LICENSE.md](LICENSE.md) file for more details.
+
+Acknowledgements
+----------------
+WAL-G could not have been possible without the support of [Citus](#https://www.citusdata.com/) [Data](#https://github.com/citusdata). We would like to express our sincere gratitude and appreciation for having the opportunity to develop and test this project. Thank you to all who contributed to the creation of WAL-G.
