@@ -82,6 +82,13 @@ func Configure() (*TarUploader, *Prefix, error) {
 		return nil, nil, errors.Wrapf(err, "Configure: failed to get AWS credentials; please specify AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY")
 	}
 
+	if endpoint := os.Getenv("AWS_ENDPOINT"); endpoint != "" {
+		config.Endpoint = aws.String(endpoint)
+	}
+
+	s3ForcePathStyle, _ := strconv.ParseBool(os.Getenv("AWS_S3_FORCE_PATH_STYLE"))
+	config.S3ForcePathStyle = aws.Bool(s3ForcePathStyle)
+
 	region := os.Getenv("AWS_REGION")
 	if region == "" {
 		region, err = findS3BucketRegion(bucket, config)

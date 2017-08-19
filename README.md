@@ -56,7 +56,24 @@ To configure how many goroutines to use during extraction, use `WALG_DOWNLOAD_CO
 
 To configure how many concurrency streams to use during backup uploading, use `WALG_UPLOAD_CONCURRENCY`. By default, WAL-G uses 10 streams.
 
+* `AWS_ENDPOINT`
 
+Overrides the default hostname to connect to an S3-compatible service. i.e, `http://s3-like-service:9000`
+
+* `AWS_S3_FORCE_PATH_STYLE`
+
+To enable path-style addressing(i.e., `http://s3.amazonaws.com/BUCKET/KEY`) when connecting to an S3-compatible service that lack of support for sub-domain style bucket URLs (i.e., `http://BUCKET.s3.amazonaws.com/KEY`). Defaults to `false`.
+
+*** Example: Using Minio.io S3-compatible storage ***
+
+```
+AWS_ACCESS_KEY_ID: "<minio-key>"
+AWS_SECRET_ACCESS_KEY: "<minio-secret>"
+WALE_S3_PREFIX: "s3://my-minio-bucket/sub-dir"
+AWS_ENDPOINT: "http://minio:9000"
+AWS_S3_FORCE_PATH_STYLE: "true"
+AWS_REGION: us-east-1
+```
 
 Usage
 -----
