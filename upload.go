@@ -113,6 +113,11 @@ func Configure() (*TarUploader, *Prefix, error) {
 		con = 10
 	}
 
+	storageClass, ok := os.LookupEnv("WALG_S3_STORAGE_CLASS")
+	if ok {
+		upload.StorageClass = storageClass
+	}
+
 	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, con) //default 10 concurrency streams at 20MB
 
 	return upload, pre, err
@@ -174,9 +179,10 @@ func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 
 	path := tupl.server + "/basebackups_005/" + s.bkupName + "/tar_partitions/" + name
 	input := &s3manager.UploadInput{
-		Bucket: aws.String(tupl.bucket),
-		Key:    aws.String(path),
-		Body:   pr,
+		Bucket:       aws.String(tupl.bucket),
+		Key:          aws.String(path),
+		Body:         pr,
+		StorageClass: aws.String(tupl.StorageClass),
 	}
 
 	fmt.Printf("Starting part %d ...\n", s.number)
@@ -215,9 +221,10 @@ func (tu *TarUploader) UploadWal(path string) (string, error) {
 
 	p := tu.server + "/wal_005/" + filepath.Base(path) + ".lz4"
 	input := &s3manager.UploadInput{
-		Bucket: aws.String(tu.bucket),
-		Key:    aws.String(p),
-		Body:   lz.Output,
+		Bucket:       aws.String(tu.bucket),
+		Key:          aws.String(p),
+		Body:         lz.Output,
+		StorageClass: aws.String(tu.StorageClass),
 	}
 
 	tu.wg.Add(1)

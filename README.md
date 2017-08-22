@@ -56,7 +56,9 @@ To configure how many goroutines to use during extraction, use `WALG_DOWNLOAD_CO
 
 To configure how many concurrency streams to use during backup uploading, use `WALG_UPLOAD_CONCURRENCY`. By default, WAL-G uses 10 streams.
 
+* `WALG_S3_STORAGE_CLASS`
 
+To configure the S3 storage class used for backup files, use `WALG_S3_STORAGE_CLASS`. By default, WAL-G uses the "STANDARD" storage class. Other supported values include "STANDARD_IA" for Infrequent Access and "REDUCED_REDUNDANCY" for Reduced Redundancy.
 
 Usage
 -----
