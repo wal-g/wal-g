@@ -31,7 +31,20 @@ func Connect() (*pgx.Conn, error) {
 // fails.
 func StartBackup(conn *pgx.Conn, backup string) (string, error) {
 	var name string
-	err := conn.QueryRow("SELECT file_name FROM pg_xlogfile_name_offset(pg_start_backup($1, true, false))", backup).Scan(&name)
+	var version int
+	// We extract here version since it is not used elsewhere. If reused, this should be refactored.
+	// TODO: implement offline backups, incapsulate PostgreSQL version logic and create test specs for this logic.
+	// Currently all version-dependent logic is here
+	err := conn.QueryRow("select (current_setting('server_version_num'))::int").Scan(&version)
+	if err != nil {
+		return "", errors.Wrap(err, "QueryFile: getting Postgres version failed")
+	}
+	walname := "xlog"
+	if version >= 100000 {
+		walname = "wal"
+	}
+
+	err = conn.QueryRow("SELECT file_name FROM pg_"+walname+"file_name_offset(pg_start_backup($1, true, false))", backup).Scan(&name)
 	if err != nil {
 		return "", errors.Wrap(err, "QueryFile: start backup failed")
 	}
