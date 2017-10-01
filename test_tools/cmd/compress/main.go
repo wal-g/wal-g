@@ -83,7 +83,11 @@ func main() {
 			panic(err)
 		}
 
+<<<<<<< HEAD
 		n, err := bundle.StartBackup(c, time.Now().String(), in)
+=======
+		n, _, err := walg.StartBackup(c, time.Now().String())
+>>>>>>> Implement incremental backup
 		if err != nil {
 			fmt.Printf("%+v\n", err)
 			os.Exit(1)
