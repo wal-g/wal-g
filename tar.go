@@ -26,6 +26,9 @@ type FileTarInterpreter struct {
 
 func contains(s *[]string, e string) bool {
 	//AB: Go is sick
+	if s==nil{
+		return false
+	}
 	for _, a := range *s {
 		if a == e {
 			return true
@@ -50,19 +53,9 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
 				return errors.Wrap(err, "Interpret: failed to apply increment for "+targetPath)
 			}
 
-			err = os.Rename(incrementalPath, targetPath)
-			if os.IsNotExist(err) {
-				// this path is invoked if this is a first file in a dir
-				err := PrepareDirs(cur, targetPath)
-				if err != nil {
-					return errors.Wrap(err, "Interpret: failed to create all directories")
-				}
-				err = os.Rename(incrementalPath, targetPath)
-				if err != nil {
-					return errors.Wrap(err, "Interpret: failed to rename incremented file "+targetPath)
-				}
-			} else if err != nil {
-				return errors.Wrap(err, "Interpret: failed to rename incremented file "+targetPath)
+			err = MoveFileAndCreateDirs(incrementalPath, targetPath, cur.Name)
+			if err != nil {
+				return errors.Wrap(err, "Interpret: failed to move increment for "+targetPath)
 			}
 		} else {
 
@@ -71,7 +64,7 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
 			f, err := os.Create(targetPath)
 			dne := os.IsNotExist(err)
 			if dne {
-				err := PrepareDirs(cur, targetPath)
+				err := PrepareDirs(cur.Name, targetPath)
 				if err != nil {
 					return errors.Wrap(err, "Interpret: failed to create all directories")
 				}
@@ -124,8 +117,25 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
 	fmt.Println(cur.Name)
 	return nil
 }
-func PrepareDirs(cur *tar.Header, targetPath string) error {
-	base := filepath.Base(cur.Name)
+func MoveFileAndCreateDirs(incrementalPath string, targetPath string, fileName string) (err error) {
+	err = os.Rename(incrementalPath, targetPath)
+	if os.IsNotExist(err) {
+		// this path is invoked if this is a first file in a dir
+		err := PrepareDirs(fileName, targetPath)
+		if err != nil {
+			return errors.Wrap(err, "MoveFileAndCreateDirs: failed to create all directories")
+		}
+		err = os.Rename(incrementalPath, targetPath)
+		if err != nil {
+			return errors.Wrap(err, "MoveFileAndCreateDirs: failed to rename incremented file "+targetPath)
+		}
+	} else if err != nil {
+		return errors.Wrap(err, "MoveFileAndCreateDirs: failed to rename incremented file "+targetPath)
+	}
+	return nil
+}
+func PrepareDirs(fileName string, targetPath string) error {
+	base := filepath.Base(fileName)
 	dir := strings.TrimSuffix(targetPath, base)
 	err := os.MkdirAll(dir, 0755)
 	return err

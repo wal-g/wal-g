@@ -84,32 +84,40 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 		fmt.Println(hdr.Name)
 
 		if info.Mode().IsRegular() {
-			f, isPaged, size, err := ReadDatabaseFile(path, bundle.GetIncrementBaseLsn())
-			if err != nil {
-				return errors.Wrapf(err, "HandleTar: failed to open file '%s'\n", path)
-			}
+			baseTime := bundle.GetIncrementBaseTime()
+			if baseTime != nil && info.ModTime().UTC().Before(*baseTime) {
+				// File was not changed since previous backup
 
-			hdr.Size = size
-			if isPaged {
-				tarBall.AppendIncrementalFile(hdr.Name)
-			}
+				fmt.Println("Skiped by modification type")
+				tarBall.AppendSkipFile(hdr.Name)
+			} else {
+				f, isPaged, size, err := ReadDatabaseFile(path, bundle.GetIncrementBaseLsn())
+				if err != nil {
+					return errors.Wrapf(err, "HandleTar: failed to open file '%s'\n", path)
+				}
 
-			err = tarWriter.WriteHeader(hdr)
-			if err != nil {
-				return errors.Wrap(err, "HandleTar: failed to write header")
-			}
-			lim := &io.LimitedReader{
-				R: io.MultiReader(f, &ZeroReader{}),
-				N: int64(hdr.Size),
-			}
+				hdr.Size = size
+				if isPaged {
+					tarBall.AppendIncrementalFile(hdr.Name)
+				}
 
-			size, err = io.Copy(tarWriter, lim)
-			if err != nil {
-				return errors.Wrap(err, "HandleTar: copy failed")
-			}
+				err = tarWriter.WriteHeader(hdr)
+				if err != nil {
+					return errors.Wrap(err, "HandleTar: failed to write header")
+				}
+				lim := &io.LimitedReader{
+					R: io.MultiReader(f, &ZeroReader{}),
+					N: int64(hdr.Size),
+				}
 
-			tarBall.SetSize(hdr.Size)
-			f.Close()
+				size, err = io.Copy(tarWriter, lim)
+				if err != nil {
+					return errors.Wrap(err, "HandleTar: copy failed")
+				}
+
+				tarBall.SetSize(hdr.Size)
+				f.Close()
+			}
 		}
 	} else if ok && info.Mode().IsDir() {
 		hdr, err := tar.FileInfoHeader(info, fileName)

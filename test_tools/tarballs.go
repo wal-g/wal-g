@@ -79,8 +79,11 @@ func (fb *FileTarBall) Number() int     { return fb.number }
 func (fb *FileTarBall) Size() int64     { return fb.size }
 func (fb *FileTarBall) SetSize(i int64) { fb.size += i }
 func (fb *FileTarBall) Tw() *tar.Writer { return fb.tw }
+
 func (b *FileTarBall) AppendIncrementalFile(filePath ...string) {}
 func (b *FileTarBall) GetIncrementalFiles() []string            { return nil }
+func (b *FileTarBall) AppendSkipFile(filePath ...string) {}
+func (b *FileTarBall) GetSkipFiles() []string            { return nil }
 
 // NOPTarBall mocks a tarball. Used for testing purposes.
 type NOPTarBall struct {
@@ -109,3 +112,5 @@ func (n *NOPTarBall) Tw() *tar.Writer { return n.tw }
 
 func (b *NOPTarBall) AppendIncrementalFile(filePath ...string) {}
 func (b *NOPTarBall) GetIncrementalFiles() []string            { return nil }
+func (b *NOPTarBall) AppendSkipFile(filePath ...string) {}
+func (b *NOPTarBall) GetSkipFiles() []string            { return nil }

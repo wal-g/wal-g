@@ -1,5 +1,7 @@
 package walg
 
+import "time"
+
 // TarBallMaker is used to allow for
 // flexible creation of different TarBalls.
 type TarBallMaker interface {
@@ -17,6 +19,7 @@ type S3TarBallMaker struct {
 	Lsn              *uint64
 	IncrementFromLsn *uint64
 	IncrementFrom    string
+	StartTime        time.Time
 }
 
 // Make returns a tarball with required S3 fields.
@@ -32,5 +35,6 @@ func (s *S3TarBallMaker) Make() TarBall {
 		Lsn:              s.Lsn,
 		IncrementFromLsn: s.IncrementFromLsn,
 		IncrementFrom:    s.IncrementFrom,
+		StartTime:        s.StartTime,
 	}
 }

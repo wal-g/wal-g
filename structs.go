@@ -14,6 +14,7 @@ import (
 	"sync"
 	"encoding/json"
 	"bytes"
+	"time"
 )
 
 // EXCLUDE is a list of excluded members from the bundled backup.
@@ -48,6 +49,7 @@ type TarBundle interface {
 	NewTarBall()
 	GetTarBall() TarBall
 	GetIncrementBaseLsn() *uint64
+	GetIncrementBaseTime() *time.Time
 }
 
 // A Bundle represents the directory to
@@ -64,7 +66,8 @@ type Bundle struct {
 	Crypter          OpenPGPCrypter
 	Timeline         uint32
 	Replica          bool
-	IncrementFromLsn *uint64
+	IncrementFromLsn  *uint64
+	IncrementFromTime *time.Time
 }
 
 func (b *Bundle) GetTarBall() TarBall { return b.Tb }
@@ -76,10 +79,12 @@ func (b *Bundle) NewTarBall() {
 		// This can be refactored so that list of incremented files would be in Bundle,
 		// but such refactoring will incur significant control flow and class responsibility changes.
 		ntb.AppendIncrementalFile(b.Tb.GetIncrementalFiles()...)
+		ntb.AppendSkipFile(b.Tb.GetSkipFiles()...)
 	}
 	b.Tb = ntb
 }
 func (b *Bundle) GetIncrementBaseLsn() *uint64 { return b.IncrementFromLsn }
+func (b *Bundle) GetIncrementBaseTime() *time.Time { return b.IncrementFromTime }
 
 // Sentinel is used to signal completion of a walked
 // directory.
@@ -101,7 +106,9 @@ type TarBall interface {
 	SetSize(int64)
 	Tw() *tar.Writer
 	AppendIncrementalFile(filePath ...string)
+	AppendSkipFile(filePath ...string)
 	GetIncrementalFiles() []string
+	GetSkipFiles() []string
 }
 
 // S3TarBall represents a tar file that is
@@ -119,7 +126,9 @@ type S3TarBall struct {
 	Lsn              *uint64
 	IncrementFromLsn *uint64
 	IncrementalFiles []string
+	SkipFiles []string
 	IncrementFrom    string
+	StartTime        time.Time
 }
 
 // SetUp creates a new tar writer and starts upload to S3.
@@ -163,15 +172,24 @@ var SentinelNotUploaded = errors.New("Sentinel was not uploaded due to timeline 
 func (b *S3TarBall) AppendIncrementalFile(filePath ...string) {
 	b.IncrementalFiles = append(b.IncrementalFiles, filePath...)
 }
+func (b *S3TarBall) AppendSkipFile(filePath ...string) {
+	b.SkipFiles = append(b.SkipFiles, filePath...)
+}
 func (b *S3TarBall) GetIncrementalFiles() []string {
 	return b.IncrementalFiles
 }
 
+func (b *S3TarBall) GetSkipFiles() []string {
+	return b.SkipFiles
+}
+
 type S3TarBallSentinelDto struct {
 	LSN              *uint64
-	IncrementFromLSN *uint64   `json:"IncrementFromLSN,omitempty"`
-	IncrementFiles   *[]string `json:"IncrementFiles,omitempty"`
-	IncrementFrom    *string   `json:"IncrementFrom,omitempty"`
+	StartTime        *time.Time `json:"StartTime,omitempty"`
+	IncrementFromLSN *uint64    `json:"IncrementFromLSN,omitempty"`
+	IncrementFiles   *[]string  `json:"IncrementFiles,omitempty"`
+	SkippedFiles   *[]string  `json:"SkippedFiles,omitempty"`
+	IncrementFrom    *string    `json:"IncrementFrom,omitempty"`
 }
 
 func (dto *S3TarBallSentinelDto) IsIncremental() bool {
@@ -195,7 +213,9 @@ func (s *S3TarBall) Finish(uploadStopSentinel bool) error {
 	}
 	if s.IncrementFromLsn != nil {
 		dto.IncrementFiles = &s.IncrementalFiles
+		dto.SkippedFiles = &s.SkipFiles
 		dto.IncrementFrom = &s.IncrementFrom
+		dto.StartTime = &s.StartTime
 	}
 	dtoBody, err := json.Marshal(&dto)
 	if err != nil {
