@@ -46,8 +46,11 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
 	incrementalPath := path.Join(ti.IncrementalBaseDir, cur.Name)
 	switch cur.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
+		fd,haveFd := ti.Sentinel.Files[cur.Name]
+
 		// If this file is incremental we use it's base version from incremental path
-		if ti.Sentinel.IsIncremental() && contains(ti.Sentinel.IncrementFiles, cur.Name) {
+		fmt.Println(cur.Name)
+		if haveFd && ti.Sentinel.IsIncremental() && fd.IsIncremented {
 			err := ApplyFileIncrement(incrementalPath, tr)
 			if err != nil {
 				return errors.Wrap(err, "Interpret: failed to apply increment for "+targetPath)

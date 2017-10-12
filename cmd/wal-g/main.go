@@ -458,18 +458,21 @@ func UnwrapBackup(bk *walg.Backup, dirArc string, pre *walg.Prefix, sentinel wal
 				}
 			}
 		}
-		if sentinel.SkippedFiles != nil {
-			for _, f := range *sentinel.SkippedFiles {
-				fmt.Printf("Skipped file %v\n",f)
-				targetPath := path.Join(dirArc, f)
-				// this path is only used for increment restoration
-				incrementalPath := path.Join(incrementBase, f)
-				err = walg.MoveFileAndCreateDirs(incrementalPath, targetPath, f)
-				if err != nil {
-					log.Fatal(err,"Failed to move skipped file for "+targetPath + " "+f)
-				}
+
+		for fileName, fd := range sentinel.Files {
+			if !fd.IsSkipped {
+				continue
+			}
+			fmt.Printf("Skipped file %v\n", fileName)
+			targetPath := path.Join(dirArc, fileName)
+			// this path is only used for increment restoration
+			incrementalPath := path.Join(incrementBase, fileName)
+			err = walg.MoveFileAndCreateDirs(incrementalPath, targetPath, fileName)
+			if err != nil {
+				log.Fatal(err, "Failed to move skipped file for "+targetPath+" "+fileName)
 			}
 		}
+
 	}
 
 	var allKeys []string
@@ -559,9 +562,12 @@ func handleIncrementalBackup(dirArc string, tu *walg.TarUploader, pre *walg.Pref
 
 	// Connect to postgres and start/finish a nonexclusive backup.
 	bundle := &walg.Bundle{
-		MinSize:           int64(1000000000), //MINSIZE = 1GB
-		IncrementFromLsn:  dto.LSN,
-		IncrementFromTime: dto.StartTime,
+		MinSize:            int64(1000000000), //MINSIZE = 1GB
+		IncrementFromLsn:   dto.LSN,
+		IncrementFromFiles: dto.Files,
+	}
+	if dto.Files == nil{
+		bundle.IncrementFromFiles = make(map[string]walg.BackupFileDescription)
 	}
 	conn, err := walg.Connect()
 	if err != nil {
@@ -580,7 +586,6 @@ func handleIncrementalBackup(dirArc string, tu *walg.TarUploader, pre *walg.Pref
 		Lsn:              &lsn,
 		IncrementFromLsn: dto.LSN,
 		IncrementFrom:    latest,
-		StartTime:        time.Now().UTC(),
 	}
 	bundle.NewTarBall()
 	fmt.Println("Walking ...")

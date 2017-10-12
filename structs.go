@@ -3,18 +3,18 @@ package walg
 import (
 	"archive/tar"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pkg/errors"
 	"io"
-	"log"
 	"os"
+	"log"
 	"sync"
-	"encoding/json"
-	"bytes"
 	"time"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"encoding/json"
+	"github.com/aws/aws-sdk-go/aws"
+	"bytes"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 )
 
 // EXCLUDE is a list of excluded members from the bundled backup.
@@ -49,7 +49,7 @@ type TarBundle interface {
 	NewTarBall()
 	GetTarBall() TarBall
 	GetIncrementBaseLsn() *uint64
-	GetIncrementBaseTime() *time.Time
+	GetIncrementBaseFiles() BackupFileList
 }
 
 // A Bundle represents the directory to
@@ -59,32 +59,33 @@ type TarBundle interface {
 // uploaded backups; in this case, pg_control is used as
 // the sentinel.
 type Bundle struct {
-	MinSize          int64
-	Sen              *Sentinel
-	Tb               TarBall
-	Tbm              TarBallMaker
-	Crypter          OpenPGPCrypter
-	Timeline         uint32
-	Replica          bool
-	IncrementFromLsn  *uint64
-	IncrementFromTime *time.Time
+	MinSize            int64
+	Sen                *Sentinel
+	Tb                 TarBall
+	Tbm                TarBallMaker
+	Crypter            OpenPGPCrypter
+	Timeline           uint32
+	Replica            bool
+	IncrementFromLsn   *uint64
+	IncrementFromFiles BackupFileList
 }
 
 func (b *Bundle) GetTarBall() TarBall { return b.Tb }
 func (b *Bundle) NewTarBall() {
 	ntb := b.Tbm.Make()
 	if b.Tb != nil {
-		// List of incremental files are inherited from previous Tar from the same bundle
+		// Map of incremental files are inherited from previous Tar from the same bundle
 		// This design decision is based on Finish() function placement and TarWalker() behavior.
-		// This can be refactored so that list of incremented files would be in Bundle,
+		// This can be refactored so that map of incremented files would be in Bundle,
 		// but such refactoring will incur significant control flow and class responsibility changes.
-		ntb.AppendIncrementalFile(b.Tb.GetIncrementalFiles()...)
-		ntb.AppendSkipFile(b.Tb.GetSkipFiles()...)
+		ntb.SetFiles(b.Tb.GetFiles())
+	} else {
+		ntb.SetFiles(make(map[string]BackupFileDescription))
 	}
 	b.Tb = ntb
 }
-func (b *Bundle) GetIncrementBaseLsn() *uint64 { return b.IncrementFromLsn }
-func (b *Bundle) GetIncrementBaseTime() *time.Time { return b.IncrementFromTime }
+func (b *Bundle) GetIncrementBaseLsn() *uint64          { return b.IncrementFromLsn }
+func (b *Bundle) GetIncrementBaseFiles() BackupFileList { return b.IncrementFromFiles }
 
 // Sentinel is used to signal completion of a walked
 // directory.
@@ -105,11 +106,11 @@ type TarBall interface {
 	Size() int64
 	SetSize(int64)
 	Tw() *tar.Writer
-	AppendIncrementalFile(filePath ...string)
-	AppendSkipFile(filePath ...string)
-	GetIncrementalFiles() []string
-	GetSkipFiles() []string
+	SetFiles(files BackupFileList)
+	GetFiles() BackupFileList
 }
+
+type BackupFileList map[string]BackupFileDescription
 
 // S3TarBall represents a tar file that is
 // going to be uploaded to S3.
@@ -125,10 +126,8 @@ type S3TarBall struct {
 	tu               *TarUploader
 	Lsn              *uint64
 	IncrementFromLsn *uint64
-	IncrementalFiles []string
-	SkipFiles []string
 	IncrementFrom    string
-	StartTime        time.Time
+	Files            BackupFileList
 }
 
 // SetUp creates a new tar writer and starts upload to S3.
@@ -169,27 +168,26 @@ func (s *S3TarBall) CloseTar() error {
 
 var SentinelNotUploaded = errors.New("Sentinel was not uploaded due to timeline change during backup")
 
-func (b *S3TarBall) AppendIncrementalFile(filePath ...string) {
-	b.IncrementalFiles = append(b.IncrementalFiles, filePath...)
-}
-func (b *S3TarBall) AppendSkipFile(filePath ...string) {
-	b.SkipFiles = append(b.SkipFiles, filePath...)
-}
-func (b *S3TarBall) GetIncrementalFiles() []string {
-	return b.IncrementalFiles
+func (b *S3TarBall) SetFiles(files BackupFileList) {
+	b.Files = files
 }
 
-func (b *S3TarBall) GetSkipFiles() []string {
-	return b.SkipFiles
+func (b *S3TarBall) GetFiles() BackupFileList {
+	return b.Files
 }
 
 type S3TarBallSentinelDto struct {
 	LSN              *uint64
-	StartTime        *time.Time `json:"StartTime,omitempty"`
-	IncrementFromLSN *uint64    `json:"IncrementFromLSN,omitempty"`
-	IncrementFiles   *[]string  `json:"IncrementFiles,omitempty"`
-	SkippedFiles   *[]string  `json:"SkippedFiles,omitempty"`
-	IncrementFrom    *string    `json:"IncrementFrom,omitempty"`
+	IncrementFromLSN *uint64 `json:"IncrementFromLSN,omitempty"`
+	IncrementFrom    *string `json:"IncrementFrom,omitempty"`
+
+	Files BackupFileList
+}
+
+type BackupFileDescription struct {
+	IsIncremented bool // should never be both incremented and Skipped
+	IsSkipped     bool
+	MTime         time.Time
 }
 
 func (dto *S3TarBallSentinelDto) IsIncremental() bool {
@@ -212,11 +210,10 @@ func (s *S3TarBall) Finish(uploadStopSentinel bool) error {
 		IncrementFromLSN: s.IncrementFromLsn,
 	}
 	if s.IncrementFromLsn != nil {
-		dto.IncrementFiles = &s.IncrementalFiles
-		dto.SkippedFiles = &s.SkipFiles
 		dto.IncrementFrom = &s.IncrementFrom
-		dto.StartTime = &s.StartTime
 	}
+
+	dto.Files = s.GetFiles()
 	dtoBody, err := json.Marshal(&dto)
 	if err != nil {
 		return err
@@ -241,7 +238,6 @@ func (s *S3TarBall) Finish(uploadStopSentinel bool) error {
 				log.Printf("upload: could not upload '%s' after %v retries\n", path, tupl.MaxRetries)
 				err = errors.Wrap(e, "S3TarBall Finish: json failed to upload")
 			}
-
 		}()
 
 		tupl.Finish()
