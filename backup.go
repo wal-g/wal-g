@@ -66,6 +66,8 @@ type Backup struct {
 	Js     *string
 }
 
+var LatestNotFound = errors.New("LATEST backup not found")
+
 // GetLatest sorts the backups by last modified time
 // and returns the latest backup key.
 func (b *Backup) GetLatest() (string, error) {
@@ -81,7 +83,13 @@ func (b *Backup) GetLatest() (string, error) {
 
 	}
 
-	sortTimes := make([]BackupTime, len(backups.Contents))
+	count := len(backups.Contents)
+
+	if count==0 {
+		return "", LatestNotFound
+	}
+
+	sortTimes := make([]BackupTime, count)
 
 	for i, ob := range backups.Contents {
 		key := *ob.Key
