@@ -105,7 +105,7 @@ func (b *Backup) GetLatest() (string, error) {
 // Strips the backup key and returns it in its base form `base_...`.
 func stripNameBackup(key string) string {
 	all := strings.SplitAfter(key, "/")
-	name := strings.Split(all[2], "_backup")[0]
+	name := strings.Split(all[len(all)-1], "_backup")[0]
 	return name
 }
 
