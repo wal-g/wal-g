@@ -92,14 +92,15 @@ func ParsePageHeader(data []byte) (uint64, bool) {
 	return uint64(res.lsn), false
 }
 
-func IsPagedFile(info os.FileInfo) bool {
+func IsPagedFile(info os.FileInfo, fileName string) bool {
 	StaticStructAllignmentCheck()
-	name := info.Name()
 
 	// For details on which file is paged see
 	// https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
 	if info.IsDir() ||
-		strings.HasSuffix(name, "_fsm") ||
+		strings.HasSuffix(fileName, "_fsm") ||
+		strings.HasSuffix(fileName, "_vm") ||
+		((!strings.Contains(fileName, "base")) && (!strings.Contains(fileName, "global")) && (!strings.Contains(fileName, "pg_tblspc"))) ||
 		info.Size() == 0 ||
 		info.Size()%int64(BlockSize) != 0 {
 		return false
@@ -266,7 +267,7 @@ func ReadDatabaseFile(fileName string, lsn *uint64, isNew bool) (io.ReadCloser, 
 		return nil, false, fileSize, err
 	}
 
-	if lsn == nil || isNew || !IsPagedFile(info) {
+	if lsn == nil || isNew || !IsPagedFile(info, fileName) {
 		return file, false, fileSize, nil
 	}
 

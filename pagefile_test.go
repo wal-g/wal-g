@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	pagedFileName        = "testdata/paged_file.bin"
+	pagedFileName        = "testdata/base_paged_file.bin"
 	sampeLSN      uint64 = 0xc6bd4600
 )
 
