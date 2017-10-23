@@ -75,6 +75,10 @@ AWS_S3_FORCE_PATH_STYLE: "true"
 AWS_REGION: us-east-1
 ```
 
+* `WALG_S3_STORAGE_CLASS`
+
+To configure the S3 storage class used for backup files, use `WALG_S3_STORAGE_CLASS`. By default, WAL-G uses the "STANDARD" storage class. Other supported values include "STANDARD_IA" for Infrequent Access and "REDUCED_REDUNDANCY" for Reduced Redundancy.
+
 Usage
 -----
 

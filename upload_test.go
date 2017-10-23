@@ -97,8 +97,21 @@ func TestConfigure(t *testing.T) {
 	if tu == nil {
 		t.Errorf("upload: did not create an uploader")
 	}
+	if tu.StorageClass != "STANDARD" {
+		t.Errorf("upload: TarUploader field 'StorageClass' expected %s but got %s", "STANDARD", tu.StorageClass)
+	}
 	if err != nil {
 		t.Errorf("upload: expected error to be '<nil>' but got %s", err)
+	}
+
+	//Test STANDARD_IA storage class
+	err = os.Setenv("WALG_S3_STORAGE_CLASS", "STANDARD_IA")
+	if err != nil {
+		t.Log(err)
+	}
+	tu, pre, err = walg.Configure()
+	if tu.StorageClass != "STANDARD_IA" {
+		t.Errorf("upload: TarUploader field 'StorageClass' expected %s but got %s", "STANDARD_IA", tu.StorageClass)
 	}
 
 }

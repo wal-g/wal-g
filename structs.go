@@ -187,14 +187,15 @@ func (s *S3TarBall) Tw() *tar.Writer { return s.tw }
 // Multiple tarballs can share one uploader. Must call CreateUploader()
 // in 'upload.go'.
 type TarUploader struct {
-	Upl        s3manageriface.UploaderAPI
-	MaxRetries int
-	MaxWait    float64
-	Success    bool
-	bucket     string
-	server     string
-	region     string
-	wg         *sync.WaitGroup
+	Upl          s3manageriface.UploaderAPI
+	MaxRetries   int
+	MaxWait      float64
+	StorageClass string
+	Success      bool
+	bucket       string
+	server       string
+	region       string
+	wg           *sync.WaitGroup
 }
 
 // NewTarUploader creates a new tar uploader without the actual
@@ -202,12 +203,13 @@ type TarUploader struct {
 // concurrency streams for the uploader.
 func NewTarUploader(svc s3iface.S3API, bucket, server, region string, r int, w float64) *TarUploader {
 	return &TarUploader{
-		MaxRetries: r,
-		MaxWait:    w,
-		bucket:     bucket,
-		server:     server,
-		region:     region,
-		wg:         &sync.WaitGroup{},
+		MaxRetries:   r,
+		MaxWait:      w,
+		StorageClass: "STANDARD",
+		bucket:       bucket,
+		server:       server,
+		region:       region,
+		wg:           &sync.WaitGroup{},
 	}
 }
 

@@ -120,6 +120,11 @@ func Configure() (*TarUploader, *Prefix, error) {
 		con = 10
 	}
 
+	storageClass, ok := os.LookupEnv("WALG_S3_STORAGE_CLASS")
+	if ok {
+		upload.StorageClass = storageClass
+	}
+
 	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, con) //default 10 concurrency streams at 20MB
 
 	return upload, pre, err
@@ -173,6 +178,17 @@ func (tu *TarUploader) upload(input *s3manager.UploadInput, path string) (err er
 	return errors.Wrap(err, "")
 }
 
+// createUploadInput creates a s3manager.UploadInput for a TarUploader using
+// the specified path and reader.
+func (tu *TarUploader) createUploadInput(path string, reader io.Reader) *s3manager.UploadInput {
+	return &s3manager.UploadInput{
+		Bucket:       aws.String(tu.bucket),
+		Key:          aws.String(path),
+		Body:         reader,
+		StorageClass: aws.String(tu.StorageClass),
+	}
+}
+
 // StartUpload creates a lz4 writer and runs upload in the background once
 // a compressed tar member is finished writing.
 func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
@@ -180,11 +196,7 @@ func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 	tupl := s.tu
 
 	path := tupl.server + "/basebackups_005/" + s.bkupName + "/tar_partitions/" + name
-	input := &s3manager.UploadInput{
-		Bucket: aws.String(tupl.bucket),
-		Key:    aws.String(path),
-		Body:   pr,
-	}
+	input := tupl.createUploadInput(path, pr)
 
 	fmt.Printf("Starting part %d ...\n", s.number)
 
@@ -221,11 +233,7 @@ func (tu *TarUploader) UploadWal(path string) (string, error) {
 	lz.Compress()
 
 	p := tu.server + "/wal_005/" + filepath.Base(path) + ".lz4"
-	input := &s3manager.UploadInput{
-		Bucket: aws.String(tu.bucket),
-		Key:    aws.String(p),
-		Body:   lz.Output,
-	}
+	input := tu.createUploadInput(p, lz.Output)
 
 	tu.wg.Add(1)
 	go func() {
