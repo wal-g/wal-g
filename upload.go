@@ -86,8 +86,14 @@ func Configure() (*TarUploader, *Prefix, error) {
 		config.Endpoint = aws.String(endpoint)
 	}
 
-	s3ForcePathStyle, _ := strconv.ParseBool(os.Getenv("AWS_S3_FORCE_PATH_STYLE"))
-	config.S3ForcePathStyle = aws.Bool(s3ForcePathStyle)
+	s3ForcePathStyleStr := os.Getenv("AWS_S3_FORCE_PATH_STYLE")
+	if len(s3ForcePathStyleStr) > 0 {
+		s3ForcePathStyle, err := strconv.ParseBool(s3ForcePathStyleStr)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "Configure: failed parse AWS_S3_FORCE_PATH_STYLE")
+		}
+		config.S3ForcePathStyle = aws.Bool(s3ForcePathStyle)
+	}
 
 	region := os.Getenv("AWS_REGION")
 	if region == "" {
