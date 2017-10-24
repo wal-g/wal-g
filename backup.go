@@ -85,21 +85,24 @@ func (b *Backup) GetLatest() (string, error) {
 
 	count := len(backups.Contents)
 
-	if count==0 {
+	if count == 0 {
 		return "", LatestNotFound
 	}
 
-	sortTimes := make([]BackupTime, count)
+	sortTimes := GetBackupTimeSlices(backups)
 
+	return sortTimes[0].Name, nil
+}
+func GetBackupTimeSlices(backups *s3.ListObjectsV2Output) []BackupTime {
+	sortTimes := make([]BackupTime, len(backups.Contents))
 	for i, ob := range backups.Contents {
 		key := *ob.Key
 		time := *ob.LastModified
 		sortTimes[i] = BackupTime{stripNameBackup(key), time}
 	}
-
-	sort.Sort(TimeSlice(sortTimes))
-
-	return sortTimes[0].Name, nil
+	slice := TimeSlice(sortTimes)
+	sort.Sort(slice)
+	return slice
 }
 
 // Strips the backup key and returns it in its base form `base_...`.

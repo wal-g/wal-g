@@ -355,3 +355,48 @@ func TestArchive(t *testing.T) {
 		t.Errorf("archive: expected error but got %v", err)
 	}
 }
+
+func TestGetBackupTimeSlices(t *testing.T) {
+	first := "mockServer/backup01.json"
+	second := "mockServer/somedir/backup02.json"
+	third := "mockServer/somedir/somesubdir/backup03.json"
+	firstTime := time.Now().Add(time.Hour)
+	secondTime := time.Now().Add(time.Minute)
+	thirdTime := time.Now()
+
+	c := []*s3.Object{
+		{Key: &first, LastModified: &firstTime,},
+		{Key: &second, LastModified: &secondTime,},
+		{Key: &third, LastModified: &thirdTime,},
+	}
+	objectsFromS3 := &s3.ListObjectsV2Output{Contents: c}
+
+	checkSortingPermutationResult(objectsFromS3, t) //123
+	c[0], c[1] = c[1], c[0]
+	checkSortingPermutationResult(objectsFromS3, t) //213
+	c[2], c[0] = c[0], c[2]
+	checkSortingPermutationResult(objectsFromS3, t) //312
+	c[2], c[1] = c[1], c[2]
+	checkSortingPermutationResult(objectsFromS3, t) //321
+	c[0], c[1] = c[1], c[0]
+	checkSortingPermutationResult(objectsFromS3, t) //231
+	c[2], c[0] = c[0], c[2]
+	checkSortingPermutationResult(objectsFromS3, t) //132
+
+}
+func checkSortingPermutationResult(objectsFromS3 *s3.ListObjectsV2Output, t *testing.T) {
+	//t.Log(objectsFromS3)
+	slice := walg.GetBackupTimeSlices(objectsFromS3)
+	if slice[0].Name != "backup01.json" {
+		t.Log(slice[0].Name)
+		t.Error("Sorting does not work correctly")
+	}
+	if slice[1].Name != "backup02.json" {
+		t.Log(slice[1].Name)
+		t.Error("Sorting does not work correctly")
+	}
+	if slice[2].Name != "backup03.json" {
+		t.Log(slice[2].Name)
+		t.Error("Sorting does not work correctly")
+	}
+}

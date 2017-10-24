@@ -74,7 +74,11 @@ func Configure() (*TarUploader, *Prefix, error) {
 	}
 
 	bucket := u.Host
-	server := u.Path[1:]
+	var server = ""
+	if len(u.Path) > 0 {
+		// TODO: Unchecked assertion: first char is '/'
+		server = u.Path[1:]
+	}
 
 	config := defaults.Get().Config
 

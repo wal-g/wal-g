@@ -55,43 +55,60 @@ func setFake(t *testing.T) {
 }
 
 func TestConfigure(t *testing.T) {
+	bucketPath := "s3://bucket/server"
+
+	doConfigureWithBuсketPath(t, bucketPath, "server")
+}
+
+func TestConfigureBucketRoot(t *testing.T) {
+	bucketPath := "s3://bucket/"
+
+	doConfigureWithBuсketPath(t, bucketPath, "")
+}
+
+func TestConfigureBucketRoot2(t *testing.T) {
+	bucketPath := "s3://bucket"
+
+	doConfigureWithBuсketPath(t, bucketPath, "")
+}
+
+func TestConfigureDeepBucket(t *testing.T) {
+	bucketPath := "s3://bucket/subdir/server"
+
+	doConfigureWithBuсketPath(t, bucketPath, "subdir/server")
+}
+
+func doConfigureWithBuсketPath(t *testing.T, bucketPath string, expectedServer string) {
 	//Test empty environment variables
 	setEmpty(t)
-
 	tu, pre, err := walg.Configure()
-
 	err.Error()
 	if _, ok := err.(*walg.UnsetEnvVarError); !ok {
 		t.Errorf("upload: Expected error 'UnsetEnvVarError' but got %s", err)
 	}
-
 	if tu != nil || pre != nil {
 		t.Errorf("upload: Expected empty uploader and prefix but got TU:%v and PREFIX:%v", tu, pre)
 	}
-
 	setFake(t)
 	//Test invalid url
 	err = os.Setenv("WALE_S3_PREFIX", "test_fail:")
 	if err != nil {
 		t.Log(err)
 	}
-
 	_, _, err = walg.Configure()
 	if err == nil {
 		t.Errorf("upload: Expected to fail on fake url")
 	}
-
 	//Test created uploader and prefix
-	err = os.Setenv("WALE_S3_PREFIX", "s3://bucket/server")
+	err = os.Setenv("WALE_S3_PREFIX", bucketPath)
 	if err != nil {
 		t.Log(err)
 	}
 	tu, pre, err = walg.Configure()
-
 	if *pre.Bucket != "bucket" {
 		t.Errorf("upload: Prefix field 'Bucket' expected %s but got %s", "bucket", *pre.Bucket)
 	}
-	if *pre.Server != "server" {
+	if *pre.Server != expectedServer {
 		t.Errorf("upload: Prefix field 'Server' expected %s but got %s", "server", *pre.Server)
 	}
 	if tu == nil {
@@ -103,9 +120,9 @@ func TestConfigure(t *testing.T) {
 	if err != nil {
 		t.Errorf("upload: expected error to be '<nil>' but got %s", err)
 	}
-
 	//Test STANDARD_IA storage class
 	err = os.Setenv("WALG_S3_STORAGE_CLASS", "STANDARD_IA")
+	defer os.Unsetenv("WALG_S3_STORAGE_CLASS")
 	if err != nil {
 		t.Log(err)
 	}
@@ -113,7 +130,6 @@ func TestConfigure(t *testing.T) {
 	if tu.StorageClass != "STANDARD_IA" {
 		t.Errorf("upload: TarUploader field 'StorageClass' expected %s but got %s", "STANDARD_IA", tu.StorageClass)
 	}
-
 }
 
 func TestValidUploader(t *testing.T) {
