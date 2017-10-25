@@ -158,6 +158,8 @@ func (tu *TarUploader) upload(input *s3manager.UploadInput, path string) (err er
 				break
 			}
 
+			//TODO: Handle "no such bucket error"
+
 			if multierr, ok := e.(s3manager.MultiUploadFailure); ok {
 				log.Printf("upload: failed to upload '%s' with UploadID '%s'. Restarting in %0.2f seconds", path, multierr.UploadID(), et.wait)
 			} else {
@@ -184,7 +186,7 @@ func (tu *TarUploader) createUploadInput(path string, reader io.Reader) *s3manag
 
 // StartUpload creates a lz4 writer and runs upload in the background once
 // a compressed tar member is finished writing.
-func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
+func (s *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteCloser {
 	pr, pw := io.Pipe()
 	tupl := s.tu
 
@@ -208,6 +210,17 @@ func (s *S3TarBall) StartUpload(name string) io.WriteCloser {
 		}
 
 	}()
+
+	if crypter.IsUsed() {
+		wc, err := crypter.Encrypt(pw)
+
+		if err != nil {
+			panic(err)
+		}
+
+		return &Lz4CascadeClose2{lz4.NewWriter(wc), wc, pw}
+	}
+
 	return &Lz4CascadeClose{lz4.NewWriter(pw), pw}
 }
 
@@ -223,7 +236,7 @@ func (tu *TarUploader) UploadWal(path string) (string, error) {
 		Input: f,
 	}
 
-	lz.Compress()
+	lz.Compress(&OpenPGPCrypter{})
 
 	p := tu.server + "/wal_005/" + filepath.Base(path) + ".lz4"
 	input := tu.createUploadInput(p, lz.Output)
@@ -250,7 +263,7 @@ func (bundle *Bundle) HandleSentinel() error {
 
 	bundle.NewTarBall()
 	tarBall := bundle.Tb
-	tarBall.SetUp("pg_control.tar.lz4")
+	tarBall.SetUp(&bundle.Crypter, "pg_control.tar.lz4")
 	tarWriter := tarBall.Tw()
 
 	hdr, err := tar.FileInfoHeader(info, fileName)
@@ -306,7 +319,7 @@ func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) error {
 
 	bundle.NewTarBall()
 	tarBall := bundle.Tb
-	tarBall.SetUp()
+	tarBall.SetUp(&bundle.Crypter)
 	tarWriter := tarBall.Tw()
 
 	lhdr := &tar.Header{

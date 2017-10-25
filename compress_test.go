@@ -103,7 +103,7 @@ func TestLzPipeWriter(t *testing.T) {
 			Input: in,
 		}
 
-		lz.Compress()
+		lz.Compress(walg.MockDisarmedCrypter())
 
 		decompressed := &BufCloser{&bytes.Buffer{}, false}
 		err := walg.DecompressLz4(decompressed, lz.Output)
@@ -121,7 +121,7 @@ func TestLzPipeWriter(t *testing.T) {
 func TestLzPipeWriterError(t *testing.T) {
 	lz := &walg.LzPipeWriter{Input: &ErrorReader{}}
 
-	lz.Compress()
+	lz.Compress(walg.MockDisarmedCrypter())
 
 	_, err := ioutil.ReadAll(lz.Output)
 	err.Error()

@@ -25,14 +25,28 @@ type FileTarBall struct {
 
 // SetUp creates a new LZ4 writer, tar writer and file for
 // writing bundled compressed bytes to.
-func (fb *FileTarBall) SetUp(names ...string) {
+func (fb *FileTarBall) SetUp(crypter walg.Crypter, names ...string) {
 	if fb.tw == nil {
 		name := filepath.Join(fb.out, "part_"+fmt.Sprintf("%0.3d", fb.number)+".tar.lz4")
 		f, err := os.Create(name)
 		if err != nil {
 			panic(err)
 		}
-		fb.w = &walg.Lz4CascadeClose{lz4.NewWriter(f), f}
+		var wc io.WriteCloser
+
+		if crypter.IsUsed() {
+			wc, err = crypter.Encrypt(f)
+
+			if err != nil {
+				panic(err)
+			}
+
+			fb.w = &walg.Lz4CascadeClose2{lz4.NewWriter(f), wc, f}
+		} else {
+			wc = f;
+			fb.w = &walg.Lz4CascadeClose{lz4.NewWriter(f), wc}
+		}
+
 		fb.tw = tar.NewWriter(fb.w)
 	}
 }
@@ -76,8 +90,8 @@ type NOPTarBall struct {
 	tw      *tar.Writer
 }
 
-func (n *NOPTarBall) SetUp(params ...string) { return }
-func (n *NOPTarBall) CloseTar() error        { return nil }
+func (n *NOPTarBall) SetUp(crypter walg.Crypter, params ...string) { return }
+func (n *NOPTarBall) CloseTar() error                               { return nil }
 func (n *NOPTarBall) Finish() error {
 	fmt.Printf("NOP: %d files.\n", n.number)
 	return nil

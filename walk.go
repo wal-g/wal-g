@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	//"golang.org/x/crypto/openpgp"
 )
 
 // ZeroReader generates a slice of zeroes. Used to pad
@@ -35,7 +36,7 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 	if info.Name() == "pg_control" {
 		bundle.Sen = &Sentinel{info, path}
 	} else if bundle.Tb.Size() <= bundle.MinSize {
-		err = HandleTar(bundle, path, info)
+		err = HandleTar(bundle, path, info, &bundle.Crypter)
 		if err == filepath.SkipDir {
 			return err
 		}
@@ -50,7 +51,7 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 		}
 
 		bundle.NewTarBall()
-		err = HandleTar(bundle, path, info)
+		err = HandleTar(bundle, path, info, &bundle.Crypter)
 		if err == filepath.SkipDir {
 			return err
 		}
@@ -65,11 +66,11 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 // Does not follow symlinks. If file is in EXCLUDE, will not be included
 // in the final tarball. EXCLUDED directories are created
 // but their contents are not written to local disk.
-func HandleTar(bundle TarBundle, path string, info os.FileInfo) error {
+func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter) error {
 	tarBall := bundle.GetTarBall()
 	fileName := info.Name()
 	_, ok := EXCLUDE[info.Name()]
-	tarBall.SetUp()
+	tarBall.SetUp(crypter)
 	tarWriter := tarBall.Tw()
 
 	if !ok {

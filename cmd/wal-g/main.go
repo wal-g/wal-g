@@ -12,6 +12,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/wal-g/wal-g"
+	"io"
 )
 
 var profile bool
@@ -217,11 +218,23 @@ func main() {
 			log.Fatalf("%+v\n", err)
 		}
 
+		var crypter walg.Crypter
+
 		if exists {
 			arch, err := a.GetArchive()
 			if err != nil {
 				log.Fatalf("%+v\n", err)
 			}
+
+			if crypter.IsUsed() {
+				var reader io.Reader
+				reader, err = crypter.Decrypt(arch)
+				if err != nil {
+					log.Fatalf("%v\n", err)
+				}
+				arch = walg.ReadCascadeClose{reader, arch}
+			}
+
 			f, err := os.Create(backupName)
 			if err != nil {
 				log.Fatalf("%v\n", err)
@@ -245,6 +258,16 @@ func main() {
 				if err != nil {
 					log.Fatalf("%+v\n", err)
 				}
+
+				if crypter.IsUsed() {
+					var reader io.Reader
+					reader, err = crypter.Decrypt(arch)
+					if err != nil {
+						log.Fatalf("%v\n", err)
+					}
+					arch = walg.ReadCascadeClose{reader, arch}
+				}
+
 				f, err := os.Create(backupName)
 				if err != nil {
 					log.Fatalf("%v\n", err)
