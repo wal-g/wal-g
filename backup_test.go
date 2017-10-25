@@ -357,9 +357,9 @@ func TestArchive(t *testing.T) {
 }
 
 func TestGetBackupTimeSlices(t *testing.T) {
-	first := "mockServer/backup01.json"
-	second := "mockServer/somedir/backup02.json"
-	third := "mockServer/somedir/somesubdir/backup03.json"
+	first := "mockServer/backup01_backup_stop_sentinel.json"
+	second := "mockServer/somedir/backup02_backup_stop_sentinel.json"
+	third := "mockServer/somedir/somesubdir/backup03_backup_stop_sentinel.json"
 	firstTime := time.Now().Add(time.Hour)
 	secondTime := time.Now().Add(time.Minute)
 	thirdTime := time.Now()
@@ -387,15 +387,15 @@ func TestGetBackupTimeSlices(t *testing.T) {
 func checkSortingPermutationResult(objectsFromS3 *s3.ListObjectsV2Output, t *testing.T) {
 	//t.Log(objectsFromS3)
 	slice := walg.GetBackupTimeSlices(objectsFromS3)
-	if slice[0].Name != "backup01.json" {
+	if slice[0].Name != "backup01" {
 		t.Log(slice[0].Name)
 		t.Error("Sorting does not work correctly")
 	}
-	if slice[1].Name != "backup02.json" {
+	if slice[1].Name != "backup02" {
 		t.Log(slice[1].Name)
 		t.Error("Sorting does not work correctly")
 	}
-	if slice[2].Name != "backup03.json" {
+	if slice[2].Name != "backup03" {
 		t.Log(slice[2].Name)
 		t.Error("Sorting does not work correctly")
 	}
