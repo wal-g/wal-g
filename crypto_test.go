@@ -6,6 +6,7 @@ import (
 	"testing"
 	"bytes"
 	"io/ioutil"
+	"io"
 )
 
 const pgpTestPrivateKey string = `
@@ -70,9 +71,9 @@ nWM=
 `
 
 func MockArmedCrypter() (Crypter) {
-	return mockCrypter(pgpTestPrivateKey)
+	return createCrypter(pgpTestPrivateKey)
 }
-func mockCrypter(armedKeyring string) *OpenPGPCrypter {
+func createCrypter(armedKeyring string) *OpenPGPCrypter {
 	ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(armedKeyring))
 	if err != nil {
 		panic(err)
@@ -82,7 +83,22 @@ func mockCrypter(armedKeyring string) *OpenPGPCrypter {
 }
 
 func MockDisarmedCrypter() (Crypter) {
-	return &OpenPGPCrypter{armed: false, configured: true, pubKey: nil, secretKey: nil}
+	return &MockCrypter{}
+}
+
+type MockCrypter struct {
+}
+
+func (crypter *MockCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, error) {
+	return writer, nil
+}
+
+func (crypter *MockCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) {
+	return reader, nil
+}
+
+func (crypter *MockCrypter) IsUsed() bool {
+	return true
 }
 
 func TestMockCrypter(t *testing.T) {
