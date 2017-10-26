@@ -300,7 +300,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("%+v\n", err)
 		}
-		n, err := walg.StartBackup(conn, time.Now().String())
+		n, err := walg.StartBackup(conn, time.Now().String(), dirArc)
 		if err != nil {
 			log.Fatalf("%+v\n", err)
 		}

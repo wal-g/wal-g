@@ -5,6 +5,7 @@ import (
 
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
+	"path"
 )
 
 // Connect establishes a connection to postgres using
@@ -29,8 +30,9 @@ func Connect() (*pgx.Conn, error) {
 // `backup_label` and `tablespace_map` contents are not immediately written to
 // a file but returned instead. Returns empty string and an error if backup
 // fails.
-func StartBackup(conn *pgx.Conn, backup string) (string, error) {
-	var name string
+func StartBackup(conn *pgx.Conn, backup string, backupDir string) (string, error) {
+	var name, lsnStr string
+	var replica bool
 	var version int
 	// We extract here version since it is not used elsewhere. If reused, this should be refactored.
 	// TODO: implement offline backups, incapsulate PostgreSQL version logic and create test specs for this logic.
@@ -44,9 +46,16 @@ func StartBackup(conn *pgx.Conn, backup string) (string, error) {
 		walname = "wal"
 	}
 
-	err = conn.QueryRow("SELECT file_name FROM pg_"+walname+"file_name_offset(pg_start_backup($1, true, false))", backup).Scan(&name)
+	query := "SELECT case when pg_is_in_recovery() then '' else (pg_" + walname + "file_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn"
+	err = conn.QueryRow(query, backup).Scan(&name, &lsnStr, &replica)
 	if err != nil {
 		return "", errors.Wrap(err, "QueryFile: start backup failed")
+	}
+	if replica {
+		name, err = WALFileName(lsnStr, path.Join(backupDir, "global", "pg_control"))
+		if err != nil {
+			return "", err
+		}
 	}
 	return "base_" + name, nil
 }

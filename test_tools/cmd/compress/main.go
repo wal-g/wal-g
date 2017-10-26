@@ -83,7 +83,7 @@ func main() {
 			panic(err)
 		}
 
-		n, err := walg.StartBackup(c, time.Now().String())
+		n, err := walg.StartBackup(c, time.Now().String(), in)
 		if err != nil {
 			fmt.Printf("%+v\n", err)
 			os.Exit(1)
