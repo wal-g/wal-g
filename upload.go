@@ -158,8 +158,6 @@ func (tu *TarUploader) upload(input *s3manager.UploadInput, path string) (err er
 				break
 			}
 
-			//TODO: Handle "no such bucket error"
-
 			if multierr, ok := e.(s3manager.MultiUploadFailure); ok {
 				log.Printf("upload: failed to upload '%s' with UploadID '%s'. Restarting in %0.2f seconds", path, multierr.UploadID(), et.wait)
 			} else {
