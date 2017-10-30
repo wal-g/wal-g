@@ -55,11 +55,13 @@ type TarBundle interface {
 // uploaded backups; in this case, pg_control is used as
 // the sentinel.
 type Bundle struct {
-	MinSize int64
-	Sen     *Sentinel
-	Tb      TarBall
-	Tbm     TarBallMaker
-	Crypter OpenPGPCrypter
+	MinSize  int64
+	Sen      *Sentinel
+	Tb       TarBall
+	Tbm      TarBallMaker
+	Crypter  OpenPGPCrypter
+	Timeline uint32
+	Replica  bool
 }
 
 func (b *Bundle) GetTarBall() TarBall { return b.Tb }
@@ -76,7 +78,7 @@ type Sentinel struct {
 type TarBall interface {
 	SetUp(crypter Crypter, args ...string)
 	CloseTar() error
-	Finish() error
+	Finish(uploadStopSentinel bool) error
 	BaseDir() string
 	Trim() string
 	Nop() bool
@@ -136,12 +138,14 @@ func (s *S3TarBall) CloseTar() error {
 	return nil
 }
 
+var SentinelNotUploaded = errors.New("Sentinel was not uploaded due to timeline change during backup")
+
 // Finish writes an empty .json file and uploads it with the
 // the backup name. Finish will wait until all tar file parts
 // have been uploaded. The json file will only be uploaded
 // if all other parts of the backup are present in S3.
 // an alert is given with the corresponding error.
-func (s *S3TarBall) Finish() error {
+func (s *S3TarBall) Finish(uploadStopSentinel bool) error {
 	var err error
 	tupl := s.tu
 	body := "{}"
@@ -155,7 +159,7 @@ func (s *S3TarBall) Finish() error {
 	tupl.Finish()
 
 	//If other parts are successful in uploading, upload json file.
-	if tupl.Success {
+	if tupl.Success && uploadStopSentinel {
 		tupl.wg.Add(1)
 		go func() {
 			defer tupl.wg.Done()
@@ -169,6 +173,10 @@ func (s *S3TarBall) Finish() error {
 		}()
 
 		tupl.Finish()
+	} else {
+		log.Printf("Uploaded %d compressed tar files.\n", s.number)
+		log.Printf("Sentinel was not uploaded %v", path)
+		return SentinelNotUploaded
 	}
 
 	if err == nil && tupl.Success {

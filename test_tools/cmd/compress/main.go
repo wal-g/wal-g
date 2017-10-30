@@ -83,7 +83,7 @@ func main() {
 			panic(err)
 		}
 
-		n, err := walg.StartBackup(c, time.Now().String(), in)
+		n, err := bundle.StartBackup(c, time.Now().String(), in)
 		if err != nil {
 			fmt.Printf("%+v\n", err)
 			os.Exit(1)
@@ -112,7 +112,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	err = bundle.Tb.Finish()
+	err = bundle.Tb.Finish(true)
 	if err != nil {
 		panic(err)
 	}

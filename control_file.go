@@ -131,9 +131,11 @@ import (
 	"strings"
 	"strconv"
 	"errors"
+	"path"
 )
 
-func readTimelineFromControlFile(fileName string) (uint32, error) {
+func readTimelineFromControlFile(backupDir string) (uint32, error) {
+	fileName := path.Join(backupDir, "global", "pg_control")
 	data, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return 0, err
@@ -165,19 +167,14 @@ const (
 	walFileFormat  = "%08X%08X%08X"           // xlog_internal.h line 155
 )
 
-func WALFileName(lsnStr string, pgcontrol string) (string, error) {
-	lsn, err := ParseLsn(lsnStr)
+func WALFileName(lsn uint64, backupDir string) (string, uint32, error) {
+	timeline, err := readTimelineFromControlFile(backupDir)
 	if err != nil {
-		return "", err
-	}
-
-	timeline, err := readTimelineFromControlFile(pgcontrol)
-	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	XLogSegmentsPerXLogId := 0x100000000 / walSegmentSize // xlog_internal.h line 101
 	logSegNo := (lsn - uint64(1)) / walSegmentSize        // xlog_internal.h line 121
 
-	return fmt.Sprintf(walFileFormat, timeline, logSegNo/XLogSegmentsPerXLogId, logSegNo%XLogSegmentsPerXLogId), nil
+	return fmt.Sprintf(walFileFormat, timeline, logSegNo/XLogSegmentsPerXLogId, logSegNo%XLogSegmentsPerXLogId), timeline, nil
 }

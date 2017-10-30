@@ -3,7 +3,11 @@ package walg
 import "testing"
 
 func TestControlFileRead(t *testing.T) {
-	name, err := WALFileName("2/E5000028", "testdata/pg_control")
+	lsn, err := ParseLsn("2/E5000028")
+	if err != nil {
+		t.Fatal(err)
+	}
+	name, _, err := WALFileName(lsn, "testdata")
 	if err != nil {
 		t.Fatal(err)
 	}

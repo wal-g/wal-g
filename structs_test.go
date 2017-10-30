@@ -120,7 +120,7 @@ func TestS3DependentFunctions(t *testing.T) {
 		t.Errorf("structs: expected WriteAfterClose error but got '<nil>'")
 	}
 
-	err = tarBall.Finish()
+	err = tarBall.Finish(true)
 	if err != nil {
 		t.Errorf("structs: tarball did not finish correctly with error %s", err)
 	}
@@ -130,7 +130,7 @@ func TestS3DependentFunctions(t *testing.T) {
 	tarBall = bundle.Tb
 	tarBall.SetUp(walg.MockArmedCrypter(), "mockTarball")
 	tarBall.CloseTar()
-	err = tarBall.Finish()
+	err = tarBall.Finish(true)
 	if err != nil {
 		t.Errorf("structs: tarball did not finish correctly with error %s", err)
 	}
