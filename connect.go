@@ -61,32 +61,22 @@ func (b *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName string, 
 	// We extract here version since it is not used elsewhere. If reused, this should be refactored.
 	// TODO: implement offline backups, incapsulate PostgreSQL version logic and create test specs for this logic.
 	// Currently all version-dependent logic is here
-	err = conn.QueryRow("select (current_setting('server_version_num'))::int").Scan(&version)
-	if err != nil {
-		return "", 0, version, errors.Wrap(err, "StartBackup: getting Postgres version failed")
-	}
-	walname := "xlog"
-	if version >= 100000 {
-		walname = "wal"
-	}
-
-	query := "SELECT case when pg_is_in_recovery() then '' else (pg_" + walname + "file_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn"
-	if err = conn.QueryRow(query, backup).Scan(&name, &lsnStr, &b.Replica); err != nil {
-		return "", 0, version, errors.Wrap(err, "StartBackup: pg_start_backup() failed")
-	}
+	queryBuilder := PgQueryBuilder{}
+	queryRunner := PgQueryRunner{queryBuilder: queryBuilder, connection: conn}
+	name, lsnStr, b.Replica, err = queryRunner.StartBackup(backup)
 
 	lsn, err = ParseLsn(lsnStr)
 	if err != nil {
-		return "", 0, version, err
+		return "", 0, queryBuilder.Version, err
 	}
 
 	if b.Replica {
 		name, b.Timeline, err = WALFileName(lsn, conn)
 		if err != nil {
-			return "", 0, version, err
+			return "", 0, queryBuilder.Version, err
 		}
 	}
-	return backupNamePrefix + name, lsn, version, nil
+	return backupNamePrefix + name, lsn, queryBuilder.Version, nil
 
 }
 

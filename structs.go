@@ -5,16 +5,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
-	"github.com/pkg/errors"
 	"io"
 	"log"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/jackc/pgx"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
+	"github.com/pkg/errors"
 )
 
 // EXCLUDE is a list of excluded members from the bundled backup.
@@ -323,4 +326,128 @@ func (tu *TarUploader) Clone() *TarUploader {
 		tu.region,
 		&sync.WaitGroup{},
 	}
+}
+
+type QueryBuilder interface {
+	BuildGetVersion() string
+	BuildStartBackup() (string, error)
+	BuildStopBackup() (string, error)
+}
+
+type PgQueryBuilder struct {
+	Version int
+}
+
+func (qb *PgQueryBuilder) BuildGetVersion() string {
+	return "select (current_setting('server_version_num'))::int"
+}
+
+func (qb *PgQueryBuilder) BuildStartBackup() (string, error) {
+	switch {
+	case qb.Version >= 100000:
+		return "SELECT case when pg_is_in_recovery() then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn", nil
+	case qb.Version >= 90600:
+		return "SELECT case when pg_is_in_recovery() then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn", nil
+	case qb.Version >= 90000:
+		return "SELECT case when pg_is_in_recovery() then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true) lsn", nil
+	case qb.Version == 0:
+		return "", errors.New("Postgres version not set, cannot determing start backup query")
+	default:
+		return "", errors.New("Could not determine start backup query for version " + fmt.Sprintf("%d", qb.Version))
+	}
+}
+
+func (qb *PgQueryBuilder) BuildStopBackup() (string, error) {
+	switch {
+	case qb.Version >= 90600:
+		return "SELECT labelfile, spcmapfile, lsn FROM pg_stop_backup(false)", nil
+	case qb.Version >= 90000:
+		return "SELECT (pg_xlogfile_name_offset(lsn)).file_name, lpad((pg_xlogfile_name_offset(lsn)).file_offset::text, 8, '0') AS file_offset, lsn::text FROM pg_stop_backup() lsn", nil
+	case qb.Version == 0:
+		return "", errors.New("Postgres version not set, cannot determing stop backup query")
+	default:
+		return "", errors.New("Could not determine stop backup query for version " + fmt.Sprintf("%d", qb.Version))
+	}
+}
+
+type QueryRunner interface {
+	GetVersion() (int, error)
+	StartBackup(backup string) (string, string, bool, error)
+	StopBackup() (string, string, string, error)
+}
+
+type PgQueryRunner struct {
+	queryBuilder PgQueryBuilder
+	connection   *pgx.Conn
+}
+
+func (queryRunner *PgQueryRunner) GetVersion() (version int, err error) {
+	queryBuilder := queryRunner.queryBuilder
+	conn := queryRunner.connection
+	err = conn.QueryRow(queryBuilder.BuildGetVersion()).Scan(&queryBuilder.Version)
+	if err != nil {
+		return 0, errors.Wrap(err, "GetVersion: getting Postgres version failed")
+	}
+	return queryBuilder.Version, nil
+}
+
+func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string, lsnString string, inRecovery bool, err error) {
+	queryBuilder := queryRunner.queryBuilder
+	conn := queryRunner.connection
+	if queryBuilder.Version == 0 {
+		_, err := queryRunner.GetVersion()
+		if err != nil {
+			return "", "", false, errors.Wrap(err, "QueryRunner Startbackup: getting Postgres version failed")
+		}
+	}
+
+	startBackupQuery, err := queryBuilder.BuildStartBackup()
+	if err != nil {
+		return "", "", false, errors.Wrap(err, "QueryRunner StartBackup: Building start backup query failed")
+	}
+
+	if err = conn.QueryRow(startBackupQuery, backup).Scan(&backupName, &lsnString, &inRecovery); err != nil {
+		return "", "", false, errors.Wrap(err, "QueryRunner StartBackup: pg_start_backup() failed")
+	}
+
+	return backupName, lsnString, inRecovery, nil
+}
+
+func (queryRunner *PgQueryRunner) StopBackup() (label string, offsetMap string, lsnStr string, err error) {
+	queryBuilder := queryRunner.queryBuilder
+	conn := queryRunner.connection
+	if queryBuilder.Version == 0 {
+		_, err := queryRunner.GetVersion()
+		if err != nil {
+			return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: getting Postgres version failed")
+		}
+	}
+
+	tx, err := conn.Begin()
+	if err != nil {
+		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: transaction begin failed")
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec("SET statement_timeout=0;")
+	if err != nil {
+		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: failed setting statement timeout in transaction")
+	}
+
+	stopBackupQuery, err := queryBuilder.BuildStopBackup()
+	if err != nil {
+		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: Building stop backup query failed")
+	}
+
+	err = tx.QueryRow(stopBackupQuery).Scan(&label, &offsetMap, &lsnStr)
+	if err != nil {
+		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: stop backup failed")
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: commit failed")
+	}
+
+	return label, offsetMap, lsnStr, nil
 }
