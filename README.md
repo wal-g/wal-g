@@ -62,7 +62,7 @@ To configure the S3 storage class used for backup files, use `WALG_S3_STORAGE_CL
 
 * `WALE_GPG_KEY_ID`
 
-To configure GPG key for encryption and decryption. By default, no encryption is used.
+To configure GPG key for encryption and decryption. By default, no encryption is used. Public keyring is cached in the file "/.walg_key_cache".
 
 Usage
 -----
