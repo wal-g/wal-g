@@ -54,23 +54,33 @@ func extractOne(ti TarInterpreter, s io.Reader) error {
 
 // Ensures that file extension is valid. Any subsequent behavior
 // depends on file type.
-func tarHandler(wc io.WriteCloser, rm ReaderMaker) error {
+func tarHandler(wc io.WriteCloser, rm ReaderMaker, crypter Crypter) error {
 	defer wc.Close()
 	r, err := rm.Reader()
+
 	if err != nil {
 		return errors.Wrap(err, "ExtractAll: failed to create new reader")
 	}
 	defer r.Close()
 
+	if crypter.IsUsed() {
+		var reader io.Reader
+		reader, err = crypter.Decrypt(r)
+		if err != nil {
+			return errors.Wrap(err, "ExtractAll: decrypt failed")
+		}
+		r = ReadCascadeClose{reader, r}
+	}
+
 	if rm.Format() == "lzo" {
 		err = DecompressLzo(wc, r)
 		if err != nil {
-			return errors.Wrap(err, "ExtractAll: lzo decompress failed")
+			return errors.Wrap(err, "ExtractAll: lzo decompress failed. Is archive encrypted?")
 		}
 	} else if rm.Format() == "lz4" {
 		err = DecompressLz4(wc, r)
 		if err != nil {
-			return errors.Wrap(err, "ExtractAll: lz4 decompress failed")
+			return errors.Wrap(err, "ExtractAll: lz4 decompress failed. Is archive encrypted?")
 		}
 	} else if rm.Format() == "tar" {
 		_, err = io.Copy(wc, r)
@@ -120,6 +130,8 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 		concurrent <- Empty{}
 	}
 
+	var crypter OpenPGPCrypter
+
 	for i, val := range files {
 		<-concurrent
 		go func(i int, val ReaderMaker) {
@@ -135,7 +147,7 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 			collectLow := make(chan error)
 
 			go func() {
-				collectLow <- tarHandler(pw, val)
+				collectLow <- tarHandler(pw, val, &crypter)
 			}()
 
 			// Collect errors returned by extractOne.

@@ -79,6 +79,10 @@ AWS_REGION: us-east-1
 
 To configure the S3 storage class used for backup files, use `WALG_S3_STORAGE_CLASS`. By default, WAL-G uses the "STANDARD" storage class. Other supported values include "STANDARD_IA" for Infrequent Access and "REDUCED_REDUNDANCY" for Reduced Redundancy.
 
+* `WALE_GPG_KEY_ID`
+
+To configure GPG key for encryption and decryption. By default, no encryption is used. Public keyring is cached in the file "/.walg_key_cache".
+
 Usage
 -----
 

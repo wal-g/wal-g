@@ -2,6 +2,14 @@
 	"version": 0,
 	"dependencies": [
 		{
+			"importpath": "golang.org/x/crypto/openpgp",
+			"repository": "https://github.com/golang/crypto",
+			"vcs": "git",
+			"revision": "418008d6189cfc4ba88f220353d087d3ddfd7a31",
+			"branch": "master",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/Sirupsen/logrus",
 			"repository": "https://github.com/Sirupsen/logrus",
 			"vcs": "git",
