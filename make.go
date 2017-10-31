@@ -1,7 +1,5 @@
 package walg
 
-import ()
-
 // TarBallMaker is used to allow for
 // flexible creation of different TarBalls.
 type TarBallMaker interface {

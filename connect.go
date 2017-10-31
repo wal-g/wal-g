@@ -30,7 +30,7 @@ func Connect() (*pgx.Conn, error) {
 // `backup_label` and `tablespace_map` contents are not immediately written to
 // a file but returned instead. Returns empty string and an error if backup
 // fails.
-func (b *Bundle) StartBackup(conn *pgx.Conn, backup string, backupDir string) (string, error) {
+func (b *Bundle) StartBackup(conn *pgx.Conn, backup string) (string, error) {
 	var name, lsnStr string
 	var version int
 	// We extract here version since it is not used elsewhere. If reused, this should be refactored.
@@ -57,7 +57,7 @@ func (b *Bundle) StartBackup(conn *pgx.Conn, backup string, backupDir string) (s
 	}
 
 	if b.Replica {
-		name, b.Timeline, err = WALFileName(lsn, backupDir)
+		name, b.Timeline, err = WALFileName(lsn, conn)
 		if err != nil {
 			return "", err
 		}
@@ -65,9 +65,9 @@ func (b *Bundle) StartBackup(conn *pgx.Conn, backup string, backupDir string) (s
 	return "base_" + name, nil
 }
 
-func (b *Bundle) CheckTimelineChanged(backupDir string) bool {
+func (b *Bundle) CheckTimelineChanged(conn *pgx.Conn) bool {
 	if b.Replica {
-		timeline, err := readTimelineFromControlFile(backupDir)
+		timeline, err := readTimeline(conn)
 		if err != nil {
 			log.Printf("Unbale to check timeline change. Sentinel for the backup will not be uploaded.")
 			return true
@@ -75,7 +75,7 @@ func (b *Bundle) CheckTimelineChanged(backupDir string) bool {
 
 		// Per discussion in
 		// https://www.postgresql.org/message-id/flat/BF2AD4A8-E7F5-486F-92C8-A6959040DEB6%40yandex-team.ru#BF2AD4A8-E7F5-486F-92C8-A6959040DEB6@yandex-team.ru
-		// Following is the very pessimistic approach on replica backup invalidation
+		// Following check is the very pessimistic approach on replica backup invalidation
 		if timeline != b.Timeline {
 			log.Printf("Timeline has changed since backup start. Sentinel for the backup will not be uploaded.")
 			return true
