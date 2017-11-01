@@ -110,6 +110,7 @@ When uploading backups to S3, the user should pass in the path containing the ba
 ```
 wal-g backup-push /backup/directory/path
 ```
+If backup is pushed from replication slave, WAL-G will control timeline of the server. In case of promotion to master or timeline switch, backup will be uploaded but not finalized, WAL-G will exit with an error. In this case logs will contain information necessary to finalize the backup. You can use backuped data if you clearly understand entangled risks.
 
 
 * ``wal-fetch``
