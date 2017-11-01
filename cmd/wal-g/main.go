@@ -300,7 +300,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("%+v\n", err)
 		}
-		n, err := walg.StartBackup(conn, time.Now().String())
+		n, err := bundle.StartBackup(conn, time.Now().String())
 		if err != nil {
 			log.Fatalf("%+v\n", err)
 		}
@@ -336,8 +336,10 @@ func main() {
 			log.Fatalf("%+v\n", err)
 		}
 
+		timelineChanged := bundle.CheckTimelineChanged(conn)
+
 		// Wait for all uploads to finish.
-		err = bundle.Tb.Finish()
+		err = bundle.Tb.Finish(!timelineChanged)
 		if err != nil {
 			log.Fatalf("%+v\n", err)
 		}

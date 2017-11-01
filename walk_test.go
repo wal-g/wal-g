@@ -333,7 +333,7 @@ func TestWalk(t *testing.T) {
 	if err != nil {
 		t.Log(err)
 	}
-	err = bundle.Tb.Finish()
+	err = bundle.Tb.Finish(true)
 	if err != nil {
 		t.Log(err)
 	}

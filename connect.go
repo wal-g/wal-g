@@ -5,6 +5,7 @@ import (
 
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
+	"log"
 )
 
 // Connect establishes a connection to postgres using
@@ -29,8 +30,8 @@ func Connect() (*pgx.Conn, error) {
 // `backup_label` and `tablespace_map` contents are not immediately written to
 // a file but returned instead. Returns empty string and an error if backup
 // fails.
-func StartBackup(conn *pgx.Conn, backup string) (string, error) {
-	var name string
+func (b *Bundle) StartBackup(conn *pgx.Conn, backup string) (string, error) {
+	var name, lsnStr string
 	var version int
 	// We extract here version since it is not used elsewhere. If reused, this should be refactored.
 	// TODO: implement offline backups, incapsulate PostgreSQL version logic and create test specs for this logic.
@@ -44,11 +45,43 @@ func StartBackup(conn *pgx.Conn, backup string) (string, error) {
 		walname = "wal"
 	}
 
-	err = conn.QueryRow("SELECT file_name FROM pg_"+walname+"file_name_offset(pg_start_backup($1, true, false))", backup).Scan(&name)
+	query := "SELECT case when pg_is_in_recovery() then '' else (pg_" + walname + "file_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn"
+	err = conn.QueryRow(query, backup).Scan(&name, &lsnStr, &b.Replica)
 	if err != nil {
 		return "", errors.Wrap(err, "QueryFile: start backup failed")
 	}
+
+	lsn, err := ParseLsn(lsnStr)
+	if err != nil {
+		return "", err
+	}
+
+	if b.Replica {
+		name, b.Timeline, err = WALFileName(lsn, conn)
+		if err != nil {
+			return "", err
+		}
+	}
 	return "base_" + name, nil
+}
+
+func (b *Bundle) CheckTimelineChanged(conn *pgx.Conn) bool {
+	if b.Replica {
+		timeline, err := readTimeline(conn)
+		if err != nil {
+			log.Printf("Unbale to check timeline change. Sentinel for the backup will not be uploaded.")
+			return true
+		}
+
+		// Per discussion in
+		// https://www.postgresql.org/message-id/flat/BF2AD4A8-E7F5-486F-92C8-A6959040DEB6%40yandex-team.ru#BF2AD4A8-E7F5-486F-92C8-A6959040DEB6@yandex-team.ru
+		// Following check is the very pessimistic approach on replica backup invalidation
+		if timeline != b.Timeline {
+			log.Printf("Timeline has changed since backup start. Sentinel for the backup will not be uploaded.")
+			return true
+		}
+	}
+	return false
 }
 
 // FormatName grabs the name of the WAL file and returns it in the form of `base_...`.
