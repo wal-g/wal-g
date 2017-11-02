@@ -166,7 +166,7 @@ func TestUploadError(t *testing.T) {
 	tarBall := maker.Make()
 	tarBall.SetUp(walg.MockArmedCrypter())
 
-	tarBall.Finish(true)
+	tarBall.Finish(&walg.S3TarBallSentinelDto{})
 	if tu.Success == true {
 		t.Errorf("upload: expected to fail to upload successfully")
 	}
@@ -177,7 +177,7 @@ func TestUploadError(t *testing.T) {
 
 	tarBall = maker.Make()
 	tarBall.SetUp(walg.MockArmedCrypter())
-	tarBall.Finish(true)
+	tarBall.Finish(&walg.S3TarBallSentinelDto{})
 	if tu.Success == true {
 		t.Errorf("upload: expected to fail to upload successfully")
 	}

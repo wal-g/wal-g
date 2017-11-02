@@ -333,7 +333,7 @@ func TestWalk(t *testing.T) {
 	if err != nil {
 		t.Log(err)
 	}
-	err = bundle.Tb.Finish(true)
+	err = bundle.Tb.Finish(&walg.S3TarBallSentinelDto{})
 	if err != nil {
 		t.Log(err)
 	}

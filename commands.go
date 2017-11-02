@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"time"
 	"io"
+	"strconv"
 )
 
 func HandleBackupList(pre *Prefix) {
@@ -216,25 +217,68 @@ func UnwrapBackup(bk *Backup, dirArc string, pre *Prefix, sentinel S3TarBallSent
 	}
 }
 
+func GetDeltaConfig() (max_deltas int, from_full bool) {
+	stepsStr, hasSteps := os.LookupEnv("WALG_DELTA_MAX_STEPS")
+	var err error
+	if hasSteps {
+		max_deltas, err = strconv.Atoi(stepsStr)
+		if err != nil {
+			log.Fatal("Unable to parse WALG_DELTA_MAX_STEPS ", err)
+		}
+	}
+	origin, hasOrigin := os.LookupEnv("WALG_DELTA_ORIGIN")
+	if hasOrigin {
+		switch origin {
+		case "LATEST":
+			break;
+		case "LATEST_FULL":
+			from_full = false
+			break;
+		default:
+			log.Fatal("Unknown WALG_DELTA_ORIGIN:", origin)
+		}
+	}
+	return
+}
+
 func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
+	max_deltas, from_full := GetDeltaConfig()
+
 	var bk = &Backup{
 		Prefix: pre,
 		Path:   aws.String(*pre.Server + "/basebackups_005/"),
 	}
 
 	var dto S3TarBallSentinelDto
-	latest, err := bk.GetLatest()
-	if err != LatestNotFound {
-		if err != nil {
-			log.Fatalf("%+v\n", err)
-		}
-		dto = fetchSentinel(latest, bk, pre)
-	}
+	var latest string
+	var err error
+	incrementCount := 1
 
-	if dto.LSN == nil {
-		fmt.Println("LATEST backup was made without increment feature. Fallback to full backup with increment LSN marker.")
-	} else {
-		fmt.Printf("Incremental backup from %v with LSN %x. \n", latest, *dto.LSN)
+	if max_deltas > 0 {
+		latest, err = bk.GetLatest()
+		if err != LatestNotFound {
+			if err != nil {
+				log.Fatalf("%+v\n", err)
+			}
+			dto = fetchSentinel(latest, bk, pre)
+			if dto.IncrementCount != nil {
+				incrementCount = *dto.IncrementCount + 1
+			}
+
+			if incrementCount > max_deltas {
+				fmt.Println("Reached max delta steps. Doing full backup.")
+				dto = S3TarBallSentinelDto{}
+			} else if dto.LSN == nil {
+				fmt.Println("LATEST backup was made without increment feature. Fallback to full backup with increment LSN marker.")
+			} else {
+				if from_full {
+					fmt.Println("Delta will be made from full backup.")
+					latest = *dto.IncrementFullName
+					dto = fetchSentinel(latest, bk, pre)
+				}
+				fmt.Printf("Incremental backup from %v with LSN %x. \n", latest, *dto.LSN)
+			}
+		}
 	}
 
 	bundle := &Bundle{
@@ -251,7 +295,7 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
-	n, lsn, err := bundle.StartBackup(conn, time.Now().String())
+	name, lsn, err := bundle.StartBackup(conn, time.Now().String())
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
@@ -259,7 +303,7 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 	bundle.Tbm = &S3TarBallMaker{
 		BaseDir:          filepath.Base(dirArc),
 		Trim:             dirArc,
-		BkupName:         n,
+		BkupName:         name,
 		Tu:               tu,
 		Lsn:              &lsn,
 		IncrementFromLsn: dto.LSN,
@@ -287,9 +331,27 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 	}
 
 	timelineChanged := bundle.CheckTimelineChanged(conn)
+	var sentinel *S3TarBallSentinelDto
+
+	if !timelineChanged {
+		sentinel = &S3TarBallSentinelDto{
+			LSN:              &lsn,
+			IncrementFromLSN: dto.LSN,
+		}
+		if dto.LSN != nil {
+			sentinel.IncrementFrom = &latest
+			sentinel.IncrementFullName = &latest
+			if dto.IsIncremental() {
+				sentinel.IncrementFullName = dto.IncrementFullName
+			}
+			sentinel.IncrementCount = &incrementCount
+		}
+
+		dto.Files = bundle.Tb.GetFiles()
+	}
 
 	// Wait for all uploads to finish.
-	err = bundle.Tb.Finish(!timelineChanged)
+	err = bundle.Tb.Finish(sentinel)
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}

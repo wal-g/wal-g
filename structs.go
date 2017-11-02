@@ -98,7 +98,7 @@ type Sentinel struct {
 type TarBall interface {
 	SetUp(crypter Crypter, args ...string)
 	CloseTar() error
-	Finish(uploadStopSentinel bool) error
+	Finish(sentinel *S3TarBallSentinelDto) error
 	BaseDir() string
 	Trim() string
 	Nop() bool
@@ -177,9 +177,11 @@ func (b *S3TarBall) GetFiles() BackupFileList {
 }
 
 type S3TarBallSentinelDto struct {
-	LSN              *uint64
-	IncrementFromLSN *uint64 `json:"IncrementFromLSN,omitempty"`
-	IncrementFrom    *string `json:"IncrementFrom,omitempty"`
+	LSN               *uint64
+	IncrementFromLSN  *uint64 `json:"DeltaFromLSN,omitempty"`
+	IncrementFrom     *string `json:"DeltaFrom,omitempty"`
+	IncrementFullName *string `json:"DeltaFullName,omitempty"`
+	IncrementCount    *int    `json:"DeltaCount,omitempty"`
 
 	Files BackupFileList
 }
@@ -191,7 +193,13 @@ type BackupFileDescription struct {
 }
 
 func (dto *S3TarBallSentinelDto) IsIncremental() bool {
-	if (dto.IncrementFrom != nil) != (dto.IncrementFromLSN != nil) {
+	// If we have increment base, we must have all the rest properties.
+	// If we do not have base - anything else is a mistake
+	if dto.IncrementFrom != nil {
+		if dto.IncrementFromLSN == nil || dto.IncrementFullName == nil || dto.IncrementCount == nil {
+			panic("Inconsistent S3TarBallSentinelDto")
+		}
+	} else if dto.IncrementFromLSN != nil && dto.IncrementFullName != nil && dto.IncrementCount != nil {
 		panic("Inconsistent S3TarBallSentinelDto")
 	}
 	return dto.IncrementFrom != nil
@@ -202,33 +210,26 @@ func (dto *S3TarBallSentinelDto) IsIncremental() bool {
 // have been uploaded. The json file will only be uploaded
 // if all other parts of the backup are present in S3.
 // an alert is given with the corresponding error.
-func (s *S3TarBall) Finish(uploadStopSentinel bool) error {
+func (s *S3TarBall) Finish(sentinel *S3TarBallSentinelDto) error {
 	var err error
-	tupl := s.tu
-	dto := S3TarBallSentinelDto{
-		LSN:              s.Lsn,
-		IncrementFromLSN: s.IncrementFromLsn,
-	}
-	if s.IncrementFromLsn != nil {
-		dto.IncrementFrom = &s.IncrementFrom
-	}
-
-	dto.Files = s.GetFiles()
-	dtoBody, err := json.Marshal(&dto)
-	if err != nil {
-		return err
-	}
 	name := s.bkupName + "_backup_stop_sentinel.json"
-	path := tupl.server + "/basebackups_005/" + name
-	input := &s3manager.UploadInput{
-		Bucket: aws.String(tupl.bucket),
-		Key:    aws.String(path),
-		Body:   bytes.NewReader(dtoBody),
-	}
+	tupl := s.tu
+
 	tupl.Finish()
 
 	//If other parts are successful in uploading, upload json file.
-	if tupl.Success && uploadStopSentinel {
+	if tupl.Success && sentinel != nil {
+		dtoBody, err := json.Marshal(&sentinel)
+		if err != nil {
+			return err
+		}
+		path := tupl.server + "/basebackups_005/" + name
+		input := &s3manager.UploadInput{
+			Bucket: aws.String(tupl.bucket),
+			Key:    aws.String(path),
+			Body:   bytes.NewReader(dtoBody),
+		}
+
 		tupl.wg.Add(1)
 		go func() {
 			defer tupl.wg.Done()
@@ -243,7 +244,7 @@ func (s *S3TarBall) Finish(uploadStopSentinel bool) error {
 		tupl.Finish()
 	} else {
 		log.Printf("Uploaded %d compressed tar files.\n", s.number)
-		log.Printf("Sentinel was not uploaded %v", path)
+		log.Printf("Sentinel was not uploaded %v", name)
 		return SentinelNotUploaded
 	}
 
