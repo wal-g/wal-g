@@ -9,6 +9,7 @@ import (
 type BackupTime struct {
 	Name string
 	Time time.Time
+	WalFileName string
 }
 
 // TimeSlice represents a backup and its

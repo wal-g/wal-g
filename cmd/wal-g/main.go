@@ -93,6 +93,8 @@ func main() {
 		walg.HandleBackupPush(dirArc, tu, pre)
 	} else if command == "backup-fetch" {
 		walg.HandleBackupFetch(backupName, pre, dirArc, mem)
+	} else if command == "backup-list" {
+		walg.HandleBackupList(pre)
 	} else {
 		l.Fatalf("Command '%s' is unsupported by WAL-G.", command)
 	}

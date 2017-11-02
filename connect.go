@@ -59,9 +59,11 @@ func (b *Bundle) StartBackup(conn *pgx.Conn, backup string) (string, uint64, err
 			return "", 0, err
 		}
 	}
-	return "base_" + name, lsn, nil
+	return backupNamePrefix + name, lsn, nil
 
 }
+
+const backupNamePrefix = "base_"
 
 func (b *Bundle) CheckTimelineChanged(conn *pgx.Conn) bool {
 	if b.Replica {
@@ -90,5 +92,5 @@ func FormatName(s string) (string, error) {
 	if f == "" {
 		return "", errors.Wrap(NoMatchAvailableError{s}, "FormatName:")
 	}
-	return "base_" + f[6:len(f)-1], nil
+	return backupNamePrefix + f[6:len(f)-1], nil
 }

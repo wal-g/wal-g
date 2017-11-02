@@ -14,6 +14,21 @@ import (
 	"io"
 )
 
+func HandleBackupList(pre *Prefix) {
+	var bk = &Backup{
+		Prefix: pre,
+		Path:   aws.String(*pre.Server + "/basebackups_005/"),
+	}
+	backups, err := bk.GetBackups()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("name\tlast_modified\twal_segment_backup_start")
+	for _, b := range backups {
+		fmt.Printf("%v\t%v\t%v\n", b.Name, b.Time.Format(time.RFC3339), b.WalFileName)
+	}
+}
+
 func HandleBackupFetch(backupName string, pre *Prefix, dirArc string, mem bool) (lsn *uint64) {
 	lsn = DeltaFetchRecursion(backupName, pre, dirArc)
 

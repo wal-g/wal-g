@@ -74,6 +74,18 @@ var LatestNotFound = errors.New("LATEST backup not found")
 // GetLatest sorts the backups by last modified time
 // and returns the latest backup key.
 func (b *Backup) GetLatest() (string, error) {
+	sortTimes, err := b.GetBackups()
+
+	if err != nil {
+		return "", err
+	}
+
+	return sortTimes[0].Name, nil
+}
+
+// Recives backup descriptions and sorts them by time
+func (b *Backup) GetBackups() ([]BackupTime, error) {
+	var sortTimes []BackupTime
 	objects := &s3.ListObjectsV2Input{
 		Bucket:    b.Prefix.Bucket,
 		Prefix:    b.Path,
@@ -82,26 +94,28 @@ func (b *Backup) GetLatest() (string, error) {
 
 	backups, err := b.Prefix.Svc.ListObjectsV2(objects)
 	if err != nil {
-		return "", errors.Wrap(err, "GetLatest: s3.ListObjectsV2 failed")
+		return nil, errors.Wrap(err, "GetLatest: s3.ListObjectsV2 failed")
 
 	}
 
 	count := len(backups.Contents)
 
 	if count == 0 {
-		return "", LatestNotFound
+		return nil, LatestNotFound
 	}
 
-	sortTimes := GetBackupTimeSlices(backups)
+	sortTimes = GetBackupTimeSlices(backups)
 
-	return sortTimes[0].Name, nil
+	return sortTimes, nil
 }
+
+// Converts S3 objects to backup description
 func GetBackupTimeSlices(backups *s3.ListObjectsV2Output) []BackupTime {
 	sortTimes := make([]BackupTime, len(backups.Contents))
 	for i, ob := range backups.Contents {
 		key := *ob.Key
 		time := *ob.LastModified
-		sortTimes[i] = BackupTime{stripNameBackup(key), time}
+		sortTimes[i] = BackupTime{stripNameBackup(key), time, stripWalFileName(key)}
 	}
 	slice := TimeSlice(sortTimes)
 	sort.Sort(slice)
@@ -113,6 +127,16 @@ func stripNameBackup(key string) string {
 	all := strings.SplitAfter(key, "/")
 	name := strings.Split(all[len(all)-1], "_backup")[0]
 	return name
+}
+
+// Strips the backup WAL file name.
+func stripWalFileName(key string) string {
+	name := stripNameBackup(key)
+
+	if strings.HasPrefix(name, backupNamePrefix) {
+		return name[len(backupNamePrefix):]
+	}
+	return ""
 }
 
 // CheckExistence checks that the specified backup exists.
@@ -224,4 +248,3 @@ func fetchSentinel(backupName string, bk *Backup, pre *Prefix) (dto S3TarBallSen
 	}
 	return
 }
-
