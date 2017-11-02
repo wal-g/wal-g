@@ -5,6 +5,7 @@ WAL-G offers three prototyping programs to assist with testing and development:
 * [compress](#compress)
 * [extract](#extract)
 * [generate](#generate)
+* [delta](#delta)
 
 
 #### compress
@@ -65,3 +66,17 @@ To access the profiles, use:
 ```
 go tool pprof wal-g FILENAME
 ```
+
+#### delta
+
+`delta` runs concurrent testing of delta backups:
+- init pg_bench
+- make base backup
+- run bp_bench
+- run pg_bench and delta backup in parallel
+- make delta backup
+- restore delta chain
+- compare restoragtion results and highlight but difference
+- if critical differences found diff will exit with panic
+
+`delta` must be invoked with env variables necessary for wal-g `backup-push`
