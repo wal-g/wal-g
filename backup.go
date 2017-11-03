@@ -182,6 +182,34 @@ func (b *Backup) GetKeys() ([]string, error) {
 
 	return arr, nil
 }
+// Returns all WAL file keys less then key provided
+func (b *Backup) GetWals(before string) ([]*s3.ObjectIdentifier, error) {
+	objects := &s3.ListObjectsV2Input{
+		Bucket: b.Prefix.Bucket,
+		Prefix: aws.String(*b.Path),
+	}
+
+	files, err := b.Prefix.Svc.ListObjectsV2(objects)
+	if err != nil {
+		return nil, errors.Wrap(err, "GetKeys: s3.ListObjectsV2 failed")
+	}
+
+	arr := make([]*s3.ObjectIdentifier, 0)
+
+	for _, ob := range files.Contents {
+		key := *ob.Key
+		if stripWalName(key) < before {
+			arr = append(arr, &s3.ObjectIdentifier{Key:aws.String(key)})
+		}
+	}
+
+	return arr, nil
+}
+func stripWalName(key string) string {
+	all := strings.SplitAfter(key, "/")
+	name := strings.Split(all[len(all)-1], ".")[0]
+	return name
+}
 
 // Archive contains information associated with
 // a WAL archive.
@@ -226,8 +254,10 @@ func (a *Archive) GetArchive() (io.ReadCloser, error) {
 	return archive.Body, nil
 }
 
+const SentinelSuffix = "_backup_stop_sentinel.json"
+
 func fetchSentinel(backupName string, bk *Backup, pre *Prefix) (dto S3TarBallSentinelDto) {
-	latestSentinel := backupName + "_backup_stop_sentinel.json"
+	latestSentinel := backupName + SentinelSuffix
 	previousBackupReader := S3ReaderMaker{
 		Backup:     bk,
 		Key:        aws.String(*pre.Server + "/basebackups_005/" + latestSentinel),

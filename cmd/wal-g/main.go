@@ -15,6 +15,7 @@ var help bool
 var l *log.Logger
 var helpMsg = "  backup-fetch\tfetch a backup from S3\n" +
 	"  backup-push\tstarts and uploads a finished backup to S3\n" +
+	"  backup-list\tprints available backups\n" +
 	"  wal-fetch\tfetch a WAL file from S3\n" +
 	"  wal-push\tupload a WAL file to S3\n"
 
@@ -26,12 +27,14 @@ func init() {
 	}
 	flag.BoolVar(&profile, "p", false, "\tProfiler (false by default)")
 	flag.BoolVar(&mem, "m", false, "\tMemory profiler (false by default)")
+
+	flag.BoolVar(&walg.DeleteConfirmed, "confirm", false, "\tConfirm deletion")
+	flag.BoolVar(&walg.DeleteDryrun, "dry-run", false, "\tDry-run deletion")
 	l = log.New(os.Stderr, "", 0)
 }
 
 func main() {
-	// Configure and start S3 session with bucket, region, and path names.
-	// Checks that environment variables are properly set.
+	fmt.Println(walg.DeleteConfirmed)
 	flag.Parse()
 	all := flag.Args()
 	if len(all) < 2 {
@@ -48,6 +51,9 @@ func main() {
 			os.Exit(0)
 		case "backup-push":
 			fmt.Printf("usage:\twal-g backup-push backup_directory\n\n")
+			os.Exit(0)
+		case "backup-list":
+			fmt.Printf("usage:\twal-g backup-list\n\n")
 			os.Exit(0)
 		case "wal-fetch":
 			fmt.Printf("usage:\twal-g wal-fetch wal_name file_name\n\t   wal_name: name of WAL archive\n\t   file_name: name of file to be written to\n\n")
@@ -75,6 +81,8 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
+	// Configure and start S3 session with bucket, region, and path names.
+	// Checks that environment variables are properly set.
 	tu, pre, err := walg.Configure()
 	if err != nil {
 		log.Fatalf("FATAL: %+v\n", err)
@@ -95,6 +103,8 @@ func main() {
 		walg.HandleBackupFetch(backupName, pre, dirArc, mem)
 	} else if command == "backup-list" {
 		walg.HandleBackupList(pre)
+	} else if command == "delete" {
+		walg.HandleDelete(pre, all)
 	} else {
 		l.Fatalf("Command '%s' is unsupported by WAL-G.", command)
 	}

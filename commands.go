@@ -13,7 +13,174 @@ import (
 	"time"
 	"io"
 	"strconv"
+	"github.com/aws/aws-sdk-go/service/s3"
 )
+
+func HandleDelete(pre *Prefix, args []string) {
+	if len(args) < 3 {
+		PrintDeletaUsageAndFail()
+	}
+	var full, find_full, retain, before bool
+	params := args[1:]
+	if params[0] == "retain" {
+		retain = true
+		params = params[1:]
+	} else if params[0] == "before" {
+		before = true
+		params = params[1:]
+	} else {
+		PrintDeletaUsageAndFail()
+	}
+
+	if params[0] == "FULL" {
+		full = true
+		params = params[1:]
+	} else if params[0] == "FIND_FULL" {
+		find_full = true
+		params = params[1:]
+	}
+
+	if len(params) < 1 {
+		log.Print("Backup name not specified")
+		PrintDeletaUsageAndFail()
+	}
+	target := params[0]
+
+	//if DeleteConfirmed && !DeleteDryrun  // TODO: use flag
+	dryrun := true
+	if len(params) > 1 && (params[1] == "--confirm" || params[1] == "-confirm") {
+		dryrun = false
+	}
+
+	var bk = &Backup{
+		Prefix: pre,
+		Path:   aws.String(*pre.Server + "/basebackups_005/"),
+	}
+
+	if before {
+		DeleteBeforeTarget(target, bk, pre, find_full, nil, dryrun)
+	}
+	if retain {
+		number, err := strconv.Atoi(target)
+		if err != nil {
+			log.Fatal("Unable to parse number of backups: ", err)
+		}
+		backups, err := bk.GetBackups()
+		if err != nil {
+			log.Fatal(err)
+		}
+		if full {
+			if len(backups) <= number {
+				fmt.Printf("Have only %v backups.\n", number)
+			}
+			left := number
+			for _, b := range backups {
+				if left == 1 {
+					DeleteBeforeTarget(b.Name, bk, pre, true, backups, dryrun)
+					return
+				}
+				dto := fetchSentinel(b.Name, bk, pre)
+				if !dto.IsIncremental() {
+					left--
+				}
+			}
+			fmt.Printf("Scanned all backups but didn't have %v full.", number)
+		} else {
+			if len(backups) <= number {
+				fmt.Printf("Have only %v backups.\n", number)
+			}
+			target = backups[number].Name
+			DeleteBeforeTarget(target, bk, pre, find_full, nil, dryrun)
+		}
+	}
+}
+
+var DeleteConfirmed bool
+var DeleteDryrun bool
+
+func DeleteBeforeTarget(target string, bk *Backup, pre *Prefix, find_full bool, backups []BackupTime, dryRun bool) {
+	dto := fetchSentinel(target, bk, pre)
+	if dto.IsIncremental() {
+		if find_full {
+			target = *dto.IncrementFullName
+		} else {
+			log.Fatalf("%v is incemental and it's predecessors cannot be deleted. Consider FIND_FULL option.", target)
+		}
+	}
+	var err error
+	if backups == nil {
+		backups, err = bk.GetBackups()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	skip := true
+	skipLine := len(backups)
+	for i, b := range backups {
+		if skip {
+			log.Printf("%v skipped\n", b.Name)
+		} else {
+			log.Printf("%v will be deleted\n", b.Name)
+		}
+		if b.Name == target {
+			skip = false
+			skipLine = i
+		}
+	}
+
+	if !dryRun {
+		if skipLine < len(backups)-1 {
+			DeleteWALBefore(backups[skipLine], pre)
+			DeleteBackupsBefore(backups, skipLine, pre)
+		}
+	} else {
+		log.Printf("Dry run finished.\n")
+	}
+}
+func DeleteBackupsBefore(backups []BackupTime, skipline int, pre *Prefix) {
+	for i, b := range backups {
+		if (i > skipline) {
+			input := &s3.DeleteObjectsInput{Bucket: pre.Bucket, Delete: &s3.Delete{
+				Objects: []*s3.ObjectIdentifier{
+					{Key: aws.String(*pre.Server + "/basebackups_005/" + b.Name)},
+					{Key: aws.String(*pre.Server + "/basebackups_005/" + b.Name + SentinelSuffix)},
+				},
+			}}
+			_, err := pre.Svc.DeleteObjects(input)
+			if err != nil {
+				log.Fatal("Unable to delete backup ", b.Name, err)
+			}
+		}
+	}
+}
+func DeleteWALBefore(bt BackupTime, pre *Prefix) {
+	var bk = &Backup{
+		Prefix: pre,
+		Path:   aws.String(*pre.Server + "/wal_005/"),
+	}
+
+	objects, err := bk.GetWals(bt.WalFileName)
+	if err != nil {
+		log.Fatal("Unable to obtaind WALS for border ", bt.Name, err)
+	}
+
+	input := &s3.DeleteObjectsInput{Bucket: pre.Bucket, Delete: &s3.Delete{
+		Objects: objects,
+	}}
+	_, err = pre.Svc.DeleteObjects(input)
+	if err != nil {
+		log.Fatal("Unable to delete WALS before ", bt.Name, err)
+	}
+}
+
+func PrintDeletaUsageAndFail() {
+	log.Fatal("delete requires at least 2 paremeters\n" + `retain 5\tkeep 5 backups
+		retain FULL 5\tkeep 5 full backups and all deltas of them
+		retail FIND_FULL 5\tfind necessary full for 5th and keep everyting after it
+		before base_0123\tkeep everyting after base_0123 including itself
+		before FIND_FULL base_0123\tkeep everything after base of base_0123`)
+}
 
 func HandleBackupList(pre *Prefix) {
 	var bk = &Backup{
@@ -269,14 +436,14 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 				fmt.Println("Reached max delta steps. Doing full backup.")
 				dto = S3TarBallSentinelDto{}
 			} else if dto.LSN == nil {
-				fmt.Println("LATEST backup was made without increment feature. Fallback to full backup with increment LSN marker.")
+				fmt.Println("LATEST backup was made without support for delta feature. Fallback to full backup with LSN marker for future deltas.")
 			} else {
 				if from_full {
 					fmt.Println("Delta will be made from full backup.")
 					latest = *dto.IncrementFullName
 					dto = fetchSentinel(latest, bk, pre)
 				}
-				fmt.Printf("Incremental backup from %v with LSN %x. \n", latest, *dto.LSN)
+				fmt.Printf("Delta backup from %v with LSN %x. \n", latest, *dto.LSN)
 			}
 		}
 	}
