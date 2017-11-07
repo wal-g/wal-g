@@ -218,7 +218,7 @@ func main() {
 			log.Fatalf("%+v\n", err)
 		}
 
-		var crypter walg.Crypter
+		crypter := walg.OpenPGPCrypter{}
 
 		if exists {
 			arch, err := a.GetArchive()

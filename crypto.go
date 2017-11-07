@@ -164,7 +164,7 @@ func GetPubRingArmour(keyId string) ([]byte, error) {
 		}
 	}
 
-	out, err := exec.Command(gpgBin, "-a", "--export", "-r", "\""+keyId+"\"").Output()
+	out, err := exec.Command(gpgBin, "-a", "--export", keyId).Output()
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func GetPubRingArmour(keyId string) ([]byte, error) {
 }
 
 func GetSecretRingArmour(keyId string) ([]byte, error) {
-	out, err := exec.Command(gpgBin, "-a", "--export-secret-key", "-r", "\""+keyId+"\"").Output()
+	out, err := exec.Command(gpgBin, "-a", "--export-secret-key", keyId).Output()
 	if err != nil {
 		return nil, err
 	}
