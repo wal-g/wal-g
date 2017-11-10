@@ -17,51 +17,18 @@ import (
 )
 
 func HandleDelete(pre *Prefix, args []string) {
-	if len(args) < 3 {
-		PrintDeletaUsageAndFail()
-	}
-	var full, find_full, retain, before bool
-	params := args[1:]
-	if params[0] == "retain" {
-		retain = true
-		params = params[1:]
-	} else if params[0] == "before" {
-		before = true
-		params = params[1:]
-	} else {
-		PrintDeletaUsageAndFail()
-	}
-
-	if params[0] == "FULL" {
-		full = true
-		params = params[1:]
-	} else if params[0] == "FIND_FULL" {
-		find_full = true
-		params = params[1:]
-	}
-
-	if len(params) < 1 {
-		log.Print("Backup name not specified")
-		PrintDeletaUsageAndFail()
-	}
-	target := params[0]
-
-	//if DeleteConfirmed && !DeleteDryrun  // TODO: use flag
-	dryrun := true
-	if len(params) > 1 && (params[1] == "--confirm" || params[1] == "-confirm") {
-		dryrun = false
-	}
+	cfg := ParseDeleteArguments(args, PrintDeleteUsageAndFail)
 
 	var bk = &Backup{
 		Prefix: pre,
 		Path:   aws.String(*pre.Server + "/basebackups_005/"),
 	}
 
-	if before {
-		DeleteBeforeTarget(target, bk, pre, find_full, nil, dryrun)
+	if cfg.before {
+		DeleteBeforeTarget(cfg.target, bk, pre, cfg.find_full, nil, cfg.dryrun)
 	}
-	if retain {
-		number, err := strconv.Atoi(target)
+	if cfg.retain {
+		number, err := strconv.Atoi(cfg.target)
 		if err != nil {
 			log.Fatal("Unable to parse number of backups: ", err)
 		}
@@ -69,14 +36,14 @@ func HandleDelete(pre *Prefix, args []string) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if full {
+		if cfg.full {
 			if len(backups) <= number {
 				fmt.Printf("Have only %v backups.\n", number)
 			}
 			left := number
 			for _, b := range backups {
 				if left == 1 {
-					DeleteBeforeTarget(b.Name, bk, pre, true, backups, dryrun)
+					DeleteBeforeTarget(b.Name, bk, pre, true, backups, cfg.dryrun)
 					return
 				}
 				dto := fetchSentinel(b.Name, bk, pre)
@@ -89,10 +56,57 @@ func HandleDelete(pre *Prefix, args []string) {
 			if len(backups) <= number {
 				fmt.Printf("Have only %v backups.\n", number)
 			}
-			target = backups[number].Name
-			DeleteBeforeTarget(target, bk, pre, find_full, nil, dryrun)
+			cfg.target = backups[number].Name
+			DeleteBeforeTarget(cfg.target, bk, pre, cfg.find_full, nil, cfg.dryrun)
 		}
 	}
+}
+
+type DeleteCommandArguments struct {
+	full      bool
+	find_full bool
+	retain    bool
+	before    bool
+	target    string
+	dryrun    bool
+}
+
+func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteCommandArguments) {
+	if len(args) < 3 {
+		fallBackFunc()
+		return
+	}
+
+	params := args[1:]
+	if params[0] == "retain" {
+		result.retain = true
+		params = params[1:]
+	} else if params[0] == "before" {
+		result.before = true
+		params = params[1:]
+	} else {
+		fallBackFunc()
+		return
+	}
+	if params[0] == "FULL" {
+		result.full = true
+		params = params[1:]
+	} else if params[0] == "FIND_FULL" {
+		result.find_full = true
+		params = params[1:]
+	}
+	if len(params) < 1 {
+		log.Print("Backup name not specified")
+		fallBackFunc()
+		return
+	}
+	result.target = params[0]
+	//if DeleteConfirmed && !DeleteDryrun  // TODO: use flag
+	result.dryrun = true
+	if len(params) > 1 && (params[1] == "--confirm" || params[1] == "-confirm") {
+		result.dryrun = false
+	}
+	return
 }
 
 var DeleteConfirmed bool
@@ -174,7 +188,7 @@ func DeleteWALBefore(bt BackupTime, pre *Prefix) {
 	}
 }
 
-func PrintDeletaUsageAndFail() {
+func PrintDeleteUsageAndFail() {
 	log.Fatal("delete requires at least 2 paremeters\n" + `retain 5\tkeep 5 backups
 		retain FULL 5\tkeep 5 full backups and all deltas of them
 		retail FIND_FULL 5\tfind necessary full for 5th and keep everyting after it
