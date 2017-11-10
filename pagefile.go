@@ -10,62 +10,7 @@
 
 package walg
 
-/*
-// This block is CGo Postgres page header parsing. This is comment in comment. Cool.
-#include <inttypes.h>
-typedef struct PageHeaderData
-{
-	uint32_t 		pd_lsn_h;
-	uint32_t 		pd_lsn_l;
-
-	uint16_t		pd_checksum;
-	uint16_t		pd_flags;
-	uint16_t		pd_lower;
-	uint16_t 		pd_upper;
-	uint16_t 		pd_special;
-	uint16_t		pd_pagesize_version;
-	uint32_t 		pd_prune_xid;
-} PageHeaderData;
-
-typedef struct PageProbeResult
-{
-	int success;
-	uint64_t lsn;
-} PageProbeResult;
-
-#define valid_flags     (7)
-#define invalid_lsn     (0)
-#define layout_version  (4)
-#define header_size     (24)
-#define block_size		(8192)
-
-PageProbeResult GetLSNIfPageIsValid(void* ptr)
-{
-	PageHeaderData* data = (PageHeaderData*) ptr;
-	PageProbeResult result = {0 , invalid_lsn};
-
-	//LSN layout is neither big endian nor low endiang, here we conver it to comparable form
-	// This form must be coherent with ParseLsn() function which is used by StartBackup()
-	result.lsn = (((uint64_t)data->pd_lsn_h) << 32) + ((uint64_t)data->pd_lsn_l);
-
-	if ((data->pd_flags & valid_flags) != data->pd_flags ||
-		data->pd_lower < header_size ||
-		data->pd_lower > data->pd_upper ||
-		data->pd_upper > data->pd_special ||
-		data->pd_special > block_size ||
-		(result.lsn == invalid_lsn)||
-		data->pd_pagesize_version != block_size + layout_version)
-	{
-		return result;
-	}
-
-	result.success = 1;
-	return result;
-}
-*/
-import "C"
 import (
-	"unsafe"
 	"os"
 	"strings"
 	"io"
@@ -77,23 +22,46 @@ import (
 const (
 	BlockSize            uint16 = 8192
 	sizeofInt32                 = 4
+	sizeofInt16                 = 2
 	sizeofInt64                 = 8
 	sizeofPgPageHeader          = 24
 	signatureMagicNumber byte   = 0x55
+	invalid_lsn          uint64 = 0
+	valid_flags                 = 7
+	layout_version              = 4
+	header_size                 = 24
 )
 
-func ParsePageHeader(data []byte) (uint64, bool) {
-	res := C.GetLSNIfPageIsValid(unsafe.Pointer(&data[0]))
+func ParsePageHeader(data []byte) (lsn uint64, valid bool) {
+	// Any ideas on how to make this code pretty and nice?
+	le := binary.LittleEndian
+	pd_lsn_h := le.Uint32(data[0:sizeofInt32])
+	pd_lsn_l := le.Uint32(data[sizeofInt32:2*sizeofInt32])
 
-	// this mess is caused by STDC _Bool
-	if res.success != 0 {
-		return uint64(res.lsn), true
+	// pd_checksum := binary.LittleEndian.Uint16(data[2*sizeofInt32:2*sizeofInt32+sizeofInt16])
+	pd_flags := le.Uint16(data[2*sizeofInt32+sizeofInt16:2*sizeofInt32+2*sizeofInt16])
+	pd_lower := le.Uint16(data[2*sizeofInt32+2*sizeofInt16:2*sizeofInt32+3*sizeofInt16])
+	pd_upper := le.Uint16(data[2*sizeofInt32+3*sizeofInt16:2*sizeofInt32+4*sizeofInt16])
+	pd_special := le.Uint16(data[2*sizeofInt32+4*sizeofInt16:2*sizeofInt32+5*sizeofInt16])
+	pd_pagesize_version := le.Uint16(data[2*sizeofInt32+5*sizeofInt16:2*sizeofInt32+6*sizeofInt16])
+
+	lsn = ((uint64(pd_lsn_h)) << 32) + uint64(pd_lsn_l);
+	if (pd_flags&valid_flags) != pd_flags ||
+		pd_lower < header_size ||
+		pd_lower > pd_upper ||
+		pd_upper > pd_special ||
+		pd_special > BlockSize ||
+		(lsn == invalid_lsn) ||
+		pd_pagesize_version != BlockSize+layout_version {
+		valid = false
+	} else {
+		valid = true
 	}
-	return uint64(res.lsn), false
+
+	return
 }
 
 func IsPagedFile(info os.FileInfo, fileName string) bool {
-	StaticStructAllignmentCheck()
 
 	// For details on which file is paged see
 	// https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
@@ -106,15 +74,6 @@ func IsPagedFile(info os.FileInfo, fileName string) bool {
 		return false
 	}
 	return true
-}
-
-// This function ensures Postgres page header sitructure has correct size
-func StaticStructAllignmentCheck() {
-	var dummy C.PageHeaderData
-	sizeof := unsafe.Sizeof(dummy)
-	if sizeof != sizeofPgPageHeader {
-		panic("Error in PageHeaderData struct compilation");
-	}
 }
 
 // Reader consturcts difference map during initialization and than re-read file
