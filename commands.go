@@ -480,6 +480,11 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
+
+	if len(latest) > 0 {
+		name = name + "_D_" + stripWalFileName(latest)
+	}
+
 	// Start a new tar bundle and walk the DIRARC directory and upload to S3.
 	bundle.Tbm = &S3TarBallMaker{
 		BaseDir:          filepath.Base(dirArc),
