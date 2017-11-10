@@ -64,7 +64,7 @@ Overrides the default hostname to connect to an S3-compatible service. i.e, `htt
 
 To enable path-style addressing(i.e., `http://s3.amazonaws.com/BUCKET/KEY`) when connecting to an S3-compatible service that lack of support for sub-domain style bucket URLs (i.e., `http://BUCKET.s3.amazonaws.com/KEY`). Defaults to `false`.
 
-*** Example: Using Minio.io S3-compatible storage ***
+***Example: Using Minio.io S3-compatible storage***
 
 ```
 AWS_ACCESS_KEY_ID: "<minio-key>"
@@ -82,6 +82,17 @@ To configure the S3 storage class used for backup files, use `WALG_S3_STORAGE_CL
 * `WALE_GPG_KEY_ID`
 
 To configure GPG key for encryption and decryption. By default, no encryption is used. Public keyring is cached in the file "/.walg_key_cache".
+
+* `WALG_DELTA_MAX_STEPS`
+
+ Delta-backup is difference between previously taken backup and present state. `WALG_DELTA_MAX_STEPS` determines how many delta backups can be between full backups. Defaults to 0.
+ Restoration process will automatically fetch all necessary deltas and base backup and compose valid restored backup (you still need WALs after start of last backup to restore consistent cluster).
+ Delta computation is based on ModTime of file system and LSN number of pages in datafiles.
+
+* `WALG_DELTA_ORIGIN`
+
+ To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not exceeded). `WALG_DELTA_ORIGIN` can be LATEST (chaining increments), LATEST_FULL (for bases where volatile part is compact and chaining has no meaning - deltas overwrite each other). Defaults to LATEST.
+
 
 Usage
 -----
@@ -129,6 +140,35 @@ When uploading WAL archives to S3, the user should pass in the absolute path to 
 ```
 wal-g wal-push /path/to/archive
 ```
+
+* ``backup-list``
+
+Lists names and creation time of available backups.
+
+* ``delete``
+
+Is used to delete backups and WALs before them. By default ``delete`` will perform dry run. If you want to execute deletion you have to add ``--confirm`` flag at the end of the command.
+
+``delete`` can operate in two modes: ``retain`` and ``before``.
+
+``retain`` [FULL|FIND_FULL] %number%
+
+if FULL is specified keep 5 full backups and everything in the middle
+
+``before`` [FIND_FULL] %name%
+
+if FIND_FULL is specified WAL-G will calculate minimum backup needed to keep all deltas alive. If FIND_FULL is not specified and call can produce orphaned deltas - call will fail with the list.
+
+``retain 5`` will fail if 5th is delta
+
+``retain FULL 5`` will keep 5 full backups and all deltas of them
+
+``retail FIND_FULL`` will find necessary full for 5th
+
+``before base_000010000123123123`` will fail if base_000010000123123123 is delta
+
+``before FIND_FULL base_000010000123123123`` will keep everything after base of base_000010000123123123
+
 
 Development
 -----------
