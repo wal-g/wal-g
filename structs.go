@@ -219,7 +219,7 @@ func (s *S3TarBall) Finish(sentinel *S3TarBallSentinelDto) error {
 
 	//If other parts are successful in uploading, upload json file.
 	if tupl.Success && sentinel != nil {
-		dtoBody, err := json.Marshal(&sentinel)
+		dtoBody, err := json.Marshal(*sentinel)
 		if err != nil {
 			return err
 		}

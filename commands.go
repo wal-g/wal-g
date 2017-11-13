@@ -100,11 +100,26 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 		fallBackFunc()
 		return
 	}
+
 	result.target = params[0]
 	//if DeleteConfirmed && !DeleteDryrun  // TODO: use flag
 	result.dryrun = true
 	if len(params) > 1 && (params[1] == "--confirm" || params[1] == "-confirm") {
 		result.dryrun = false
+	}
+
+	if result.retain {
+		number, err := strconv.Atoi(result.target)
+		if err != nil {
+			log.Println("Cannot parse target number ", number)
+			fallBackFunc()
+			return
+		}
+		if number <= 0 {
+			log.Println("Cannot retain 0") // Consider allowing to delete everything
+			fallBackFunc()
+			return
+		}
 	}
 	return
 }
@@ -189,11 +204,12 @@ func DeleteWALBefore(bt BackupTime, pre *Prefix) {
 }
 
 func PrintDeleteUsageAndFail() {
-	log.Fatal("delete requires at least 2 paremeters\n" + `retain 5\tkeep 5 backups
-		retain FULL 5\tkeep 5 full backups and all deltas of them
-		retail FIND_FULL 5\tfind necessary full for 5th and keep everyting after it
-		before base_0123\tkeep everyting after base_0123 including itself
-		before FIND_FULL base_0123\tkeep everything after base of base_0123`)
+	log.Fatal("delete requires at least 2 paremeters" + `
+		retain 5                      keep 5 backups
+		retain FULL 5                 keep 5 full backups and all deltas of them
+		retail FIND_FULL 5            find necessary full for 5th and keep everyting after it
+		before base_0123              keep everyting after base_0123 including itself
+		before FIND_FULL base_0123    keep everything after base of base_0123`)
 }
 
 func HandleBackupList(pre *Prefix) {
@@ -481,7 +497,7 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 		log.Fatalf("%+v\n", err)
 	}
 
-	if len(latest) > 0 {
+	if len(latest) > 0 && dto.LSN != nil {
 		name = name + "_D_" + stripWalFileName(latest)
 	}
 

@@ -69,7 +69,7 @@ type Backup struct {
 	Js     *string
 }
 
-var LatestNotFound = errors.New("LATEST backup not found")
+var LatestNotFound = errors.New("No backups found")
 
 // GetLatest sorts the backups by last modified time
 // and returns the latest backup key.
@@ -132,6 +132,7 @@ func stripNameBackup(key string) string {
 // Strips the backup WAL file name.
 func stripWalFileName(key string) string {
 	name := stripNameBackup(key)
+	name = strings.SplitN(name,"_D_",2)[0]
 
 	if strings.HasPrefix(name, backupNamePrefix) {
 		return name[len(backupNamePrefix):]
