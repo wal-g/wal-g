@@ -30,7 +30,7 @@ func Connect() (*pgx.Conn, error) {
 // `backup_label` and `tablespace_map` contents are not immediately written to
 // a file but returned instead. Returns empty string and an error if backup
 // fails.
-func (b *Bundle) StartBackup(conn *pgx.Conn, backup string) (string, error) {
+func (b *Bundle) StartBackup(conn *pgx.Conn, backup string) (string, uint64, error) {
 	var name, lsnStr string
 	var version int
 	// We extract here version since it is not used elsewhere. If reused, this should be refactored.
@@ -38,7 +38,7 @@ func (b *Bundle) StartBackup(conn *pgx.Conn, backup string) (string, error) {
 	// Currently all version-dependent logic is here
 	err := conn.QueryRow("select (current_setting('server_version_num'))::int").Scan(&version)
 	if err != nil {
-		return "", errors.Wrap(err, "QueryFile: getting Postgres version failed")
+		return "", 0, errors.Wrap(err, "QueryFile: getting Postgres version failed")
 	}
 	walname := "xlog"
 	if version >= 100000 {
@@ -47,23 +47,23 @@ func (b *Bundle) StartBackup(conn *pgx.Conn, backup string) (string, error) {
 
 	query := "SELECT case when pg_is_in_recovery() then '' else (pg_" + walname + "file_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn"
 	err = conn.QueryRow(query, backup).Scan(&name, &lsnStr, &b.Replica)
-	if err != nil {
-		return "", errors.Wrap(err, "QueryFile: start backup failed")
-	}
 
 	lsn, err := ParseLsn(lsnStr)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	if b.Replica {
 		name, b.Timeline, err = WALFileName(lsn, conn)
 		if err != nil {
-			return "", err
+			return "", 0, err
 		}
 	}
-	return "base_" + name, nil
+	return backupNamePrefix + name, lsn, nil
+
 }
+
+const backupNamePrefix = "base_"
 
 func (b *Bundle) CheckTimelineChanged(conn *pgx.Conn) bool {
 	if b.Replica {
@@ -92,5 +92,5 @@ func FormatName(s string) (string, error) {
 	if f == "" {
 		return "", errors.Wrap(NoMatchAvailableError{s}, "FormatName:")
 	}
-	return "base_" + f[6:len(f)-1], nil
+	return backupNamePrefix + f[6:len(f)-1], nil
 }

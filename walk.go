@@ -25,7 +25,7 @@ func (z *ZeroReader) Read(p []byte) (int, error) {
 // TarWalker walks files provided by the passed in directory
 // and creates compressed tar members labeled as `part_00i.tar.lzo`.
 //
-// To see which files and directories are skipped, please consult
+// To see which files and directories are Skipped, please consult
 // 'structs.go'. Excluded directories will be created but their
 // contents will not be included in the tar bundle.
 func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error {
@@ -51,6 +51,7 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 		}
 
 		bundle.NewTarBall()
+
 		err = HandleTar(bundle, path, info, &bundle.Crypter)
 		if err == filepath.SkipDir {
 			return err
@@ -82,27 +83,51 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 		hdr.Name = strings.TrimPrefix(path, tarBall.Trim())
 		fmt.Println(hdr.Name)
 
-		err = tarWriter.WriteHeader(hdr)
-		if err != nil {
-			return errors.Wrap(err, "HandleTar: failed to write header")
-		}
 		if info.Mode().IsRegular() {
-			f, err := os.Open(path)
-			if err != nil {
-				return errors.Wrapf(err, "HandleTar: failed to open file '%s'\n", path)
-			}
-			lim := &io.LimitedReader{
-				R: io.MultiReader(f, &ZeroReader{}),
-				N: int64(hdr.Size),
-			}
+			baseFiles := bundle.GetIncrementBaseFiles()
+			bf, ok := baseFiles[hdr.Name]
 
-			_, err = io.Copy(tarWriter, lim)
-			if err != nil {
-				return errors.Wrap(err, "HandleTar: copy failed")
-			}
+			// It is important to take MTime before ReadDatabaseFile()
+			time := info.ModTime()
 
-			tarBall.SetSize(hdr.Size)
-			f.Close()
+			// We do not rely here on monotonic time, instead we backup file if MTime changed somehow
+			// For details see
+			// https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
+
+			if ok && (time == bf.MTime) {
+				// File was not changed since previous backup
+
+				fmt.Println("Skiped due to unchanged modification time")
+				tarBall.GetFiles()[hdr.Name] = BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time}
+
+			} else {
+				// !ok means file was not observed previously
+				f, isPaged, size, err := ReadDatabaseFile(path, bundle.GetIncrementBaseLsn(), !ok)
+				if err != nil {
+					return errors.Wrapf(err, "HandleTar: failed to open file '%s'\n", path)
+				}
+
+				hdr.Size = size
+
+				tarBall.GetFiles()[hdr.Name] = BackupFileDescription{IsSkipped: false, IsIncremented: isPaged, MTime: time}
+
+				err = tarWriter.WriteHeader(hdr)
+				if err != nil {
+					return errors.Wrap(err, "HandleTar: failed to write header")
+				}
+				lim := &io.LimitedReader{
+					R: io.MultiReader(f, &ZeroReader{}),
+					N: int64(hdr.Size),
+				}
+
+				size, err = io.Copy(tarWriter, lim)
+				if err != nil {
+					return errors.Wrap(err, "HandleTar: copy failed")
+				}
+
+				tarBall.SetSize(hdr.Size)
+				f.Close()
+			}
 		}
 	} else if ok && info.Mode().IsDir() {
 		hdr, err := tar.FileInfoHeader(info, fileName)

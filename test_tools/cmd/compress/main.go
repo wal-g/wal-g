@@ -83,7 +83,7 @@ func main() {
 			panic(err)
 		}
 
-		n, err := bundle.StartBackup(c, time.Now().String(), in)
+		n, _, err := bundle.StartBackup(c, time.Now().String())
 		if err != nil {
 			fmt.Printf("%+v\n", err)
 			os.Exit(1)
@@ -112,7 +112,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	err = bundle.Tb.Finish(true)
+	err = bundle.Tb.Finish(&walg.S3TarBallSentinelDto{})
 	if err != nil {
 		panic(err)
 	}

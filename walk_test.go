@@ -156,7 +156,7 @@ func extract(t *testing.T, dir string) string {
 
 	outDir := filepath.Join(filepath.Dir(dir), "extracted")
 
-	ft := &walg.FileTarInterpreter{outDir}
+	ft := &walg.FileTarInterpreter{NewDir: outDir,}
 	err = os.MkdirAll(outDir, 0766)
 	if err != nil {
 		t.Log(err)
@@ -333,7 +333,7 @@ func TestWalk(t *testing.T) {
 	if err != nil {
 		t.Log(err)
 	}
-	err = bundle.Tb.Finish(true)
+	err = bundle.Tb.Finish(&walg.S3TarBallSentinelDto{})
 	if err != nil {
 		t.Log(err)
 	}

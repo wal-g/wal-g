@@ -67,7 +67,7 @@ func (fb *FileTarBall) CloseTar() error {
 }
 
 // Finish alerts that compression is complete.
-func (fb *FileTarBall) Finish(uploadStopSentinel bool) error {
+func (fb *FileTarBall) Finish(sentinel *walg.S3TarBallSentinelDto) error {
 	fmt.Printf("Wrote %d compressed tar files to %s.\n", fb.number, fb.out)
 	return nil
 }
@@ -79,6 +79,11 @@ func (fb *FileTarBall) Number() int     { return fb.number }
 func (fb *FileTarBall) Size() int64     { return fb.size }
 func (fb *FileTarBall) SetSize(i int64) { fb.size += i }
 func (fb *FileTarBall) Tw() *tar.Writer { return fb.tw }
+
+func (b *FileTarBall) AppendIncrementalFile(filePath ...string) {}
+func (b *FileTarBall) GetIncrementalFiles() []string            { return nil }
+func (b *FileTarBall) SetFiles(files walg.BackupFileList)        {}
+func (b *FileTarBall) GetFiles() walg.BackupFileList            { return make(walg.BackupFileList) }
 
 // NOPTarBall mocks a tarball. Used for testing purposes.
 type NOPTarBall struct {
@@ -92,7 +97,7 @@ type NOPTarBall struct {
 
 func (n *NOPTarBall) SetUp(crypter walg.Crypter, params ...string) { return }
 func (n *NOPTarBall) CloseTar() error                              { return nil }
-func (n *NOPTarBall) Finish(uploadStopSentinel bool) error {
+func (n *NOPTarBall) Finish(sentinel *walg.S3TarBallSentinelDto) error {
 	fmt.Printf("NOP: %d files.\n", n.number)
 	return nil
 }
@@ -104,3 +109,6 @@ func (n *NOPTarBall) Number() int     { return n.number }
 func (n *NOPTarBall) Size() int64     { return n.size }
 func (n *NOPTarBall) SetSize(i int64) { n.size += i }
 func (n *NOPTarBall) Tw() *tar.Writer { return n.tw }
+
+func (b *NOPTarBall) SetFiles(files walg.BackupFileList) {}
+func (b *NOPTarBall) GetFiles() walg.BackupFileList     { return make(walg.BackupFileList) }
