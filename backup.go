@@ -86,15 +86,15 @@ func (b *Backup) GetLatest() (string, error) {
 // Recives backup descriptions and sorts them by time
 func (b *Backup) GetBackups() ([]BackupTime, error) {
 	var sortTimes []BackupTime
-	objects := &s3.ListObjectsV2Input{
+	objects := &s3.ListObjectsInput{
 		Bucket:    b.Prefix.Bucket,
 		Prefix:    b.Path,
 		Delimiter: aws.String("/"),
 	}
 
-	backups, err := b.Prefix.Svc.ListObjectsV2(objects)
+	backups, err := b.Prefix.Svc.ListObjects(objects)
 	if err != nil {
-		return nil, errors.Wrap(err, "GetLatest: s3.ListObjectsV2 failed")
+		return nil, errors.Wrap(err, "GetLatest: s3.ListObjects failed")
 
 	}
 
@@ -110,7 +110,7 @@ func (b *Backup) GetBackups() ([]BackupTime, error) {
 }
 
 // Converts S3 objects to backup description
-func GetBackupTimeSlices(backups *s3.ListObjectsV2Output) []BackupTime {
+func GetBackupTimeSlices(backups *s3.ListObjectsOutput) []BackupTime {
 	sortTimes := make([]BackupTime, len(backups.Contents))
 	for i, ob := range backups.Contents {
 		key := *ob.Key
@@ -132,7 +132,7 @@ func stripNameBackup(key string) string {
 // Strips the backup WAL file name.
 func stripWalFileName(key string) string {
 	name := stripNameBackup(key)
-	name = strings.SplitN(name,"_D_",2)[0]
+	name = strings.SplitN(name, "_D_", 2)[0]
 
 	if strings.HasPrefix(name, backupNamePrefix) {
 		return name[len(backupNamePrefix):]
@@ -164,14 +164,14 @@ func (b *Backup) CheckExistence() (bool, error) {
 
 // GetKeys returns all the keys for the files in the specified backup.
 func (b *Backup) GetKeys() ([]string, error) {
-	objects := &s3.ListObjectsV2Input{
+	objects := &s3.ListObjectsInput{
 		Bucket: b.Prefix.Bucket,
 		Prefix: aws.String(*b.Path + *b.Name + "/tar_partitions"),
 	}
 
-	files, err := b.Prefix.Svc.ListObjectsV2(objects)
+	files, err := b.Prefix.Svc.ListObjects(objects)
 	if err != nil {
-		return nil, errors.Wrap(err, "GetKeys: s3.ListObjectsV2 failed")
+		return nil, errors.Wrap(err, "GetKeys: s3.ListObjects failed")
 	}
 
 	arr := make([]string, len(files.Contents))
@@ -183,16 +183,17 @@ func (b *Backup) GetKeys() ([]string, error) {
 
 	return arr, nil
 }
+
 // Returns all WAL file keys less then key provided
 func (b *Backup) GetWals(before string) ([]*s3.ObjectIdentifier, error) {
-	objects := &s3.ListObjectsV2Input{
+	objects := &s3.ListObjectsInput{
 		Bucket: b.Prefix.Bucket,
 		Prefix: aws.String(*b.Path),
 	}
 
-	files, err := b.Prefix.Svc.ListObjectsV2(objects)
+	files, err := b.Prefix.Svc.ListObjects(objects)
 	if err != nil {
-		return nil, errors.Wrap(err, "GetKeys: s3.ListObjectsV2 failed")
+		return nil, errors.Wrap(err, "GetKeys: s3.ListObjects failed")
 	}
 
 	arr := make([]*s3.ObjectIdentifier, 0)
@@ -200,7 +201,7 @@ func (b *Backup) GetWals(before string) ([]*s3.ObjectIdentifier, error) {
 	for _, ob := range files.Contents {
 		key := *ob.Key
 		if stripWalName(key) < before {
-			arr = append(arr, &s3.ObjectIdentifier{Key:aws.String(key)})
+			arr = append(arr, &s3.ObjectIdentifier{Key: aws.String(key)})
 		}
 	}
 
@@ -227,6 +228,7 @@ func (a *Archive) CheckExistence() (bool, error) {
 	}
 
 	_, err := a.Prefix.Svc.HeadObject(arch)
+
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
 			switch awsErr.Code() {

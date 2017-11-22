@@ -34,17 +34,16 @@ func init() {
 }
 
 func main() {
-	fmt.Println(walg.DeleteConfirmed)
 	flag.Parse()
 	all := flag.Args()
 	if len(all) < 2 {
 		l.Fatalf("Please choose a command:\n%s", helpMsg)
 	}
 	command := all[0]
-	dirArc := all[1]
+	firstArgument := all[1]
 
 	// Usage strings for supported commands
-	if dirArc == "-h" {
+	if firstArgument == "-h" {
 		switch command {
 		case "backup-fetch":
 			fmt.Printf("usage:\twal-g backup-fetch output_directory backup_name\n\twal-g backup-fetch output_directory LATEST\n\n")
@@ -93,14 +92,16 @@ func main() {
 
 	if command == "wal-fetch" {
 		// Fetch and decompress a WAL file from S3.
-		walg.HandleWALFetch(pre, dirArc, backupName)
+		walg.HandleWALFetch(pre, firstArgument, backupName, true)
+	} else if command == "wal-prefetch" {
+		walg.HandleWALPrefetch(pre, firstArgument, backupName)
 	} else if command == "wal-push" {
 		// Upload a WAL file to S3.
-		walg.HandleWALPush(tu, dirArc)
+		walg.HandleWALPush(tu, firstArgument)
 	} else if command == "backup-push" {
-		walg.HandleBackupPush(dirArc, tu, pre)
+		walg.HandleBackupPush(firstArgument, tu, pre)
 	} else if command == "backup-fetch" {
-		walg.HandleBackupFetch(backupName, pre, dirArc, mem)
+		walg.HandleBackupFetch(backupName, pre, firstArgument, mem)
 	} else if command == "backup-list" {
 		walg.HandleBackupList(pre)
 	} else if command == "delete" {

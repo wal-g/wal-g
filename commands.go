@@ -14,6 +14,7 @@ import (
 	"io"
 	"strconv"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"os/exec"
 )
 
 func HandleDelete(pre *Prefix, args []string) {
@@ -559,10 +560,69 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 	}
 }
 
-func HandleWALFetch(pre *Prefix, dirArc string, backupName string) {
+func HandleWALPrefetch(pre *Prefix, walFileName string, location string) {
+	var fileName = walFileName
+	var err error
+	location = path.Dir(location)
+	errors := make(chan (interface{}))
+	for i := 0; i < 8; i++ {
+		fileName, err = NextWALFileName(fileName)
+		if err != nil {
+			log.Println("WAL-prefetch failed: ", err, " file: ", fileName)
+		}
+		go prefetchFile(location, pre, fileName, errors)
+		time.Sleep(time.Millisecond) // wait for first call
+	}
+	for i := 0; i < 8; i++ {
+		<-errors //wait until everyone is done. Erros are reported in recovery
+	}
+}
+
+func prefetchFile(location string, pre *Prefix, walFileName string, error_queue chan (interface{})) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Prefetch unsucessfull ", walFileName, r)
+			error_queue <- r
+		} else {
+			error_queue <- nil
+		}
+	}()
+
+	prefetchLocation := path.Join(location, ".walg", "prefetch")
+	runningLocation := path.Join(prefetchLocation, "running")
+	oldPath := path.Join(runningLocation, walFileName)
+	newPath := path.Join(prefetchLocation, walFileName)
+	_, err_o := os.Stat(oldPath)
+	_, err_n := os.Stat(newPath)
+
+	if (err_o != nil && !os.IsNotExist(err_o)) || (err_n != nil && !os.IsNotExist(err_n)) {
+		// Seems someone is doing something about this file
+		return
+	}
+
+	log.Println("WAL-prefetch file: ", walFileName)
+	os.MkdirAll(runningLocation, 0755)
+
+	DownloadFile(pre, walFileName, oldPath)
+
+	_, err_o = os.Stat(oldPath)
+	_, err_n = os.Stat(newPath)
+	if err_o == nil && os.IsNotExist(err_n) {
+		os.Rename(oldPath, newPath)
+	}
+}
+
+func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPrefetch bool) {
+	if triggerPrefetch {
+		defer forkPrefetch(walFileName, location)
+	}
+
+	DownloadFile(pre, walFileName, location)
+}
+func DownloadFile(pre *Prefix, walFileName string, location string) {
 	a := &Archive{
 		Prefix:  pre,
-		Archive: aws.String(*pre.Server + "/wal_005/" + dirArc + ".lzo"),
+		Archive: aws.String(*pre.Server + "/wal_005/" + walFileName + ".lzo"),
 	}
 	// Check existence of compressed LZO WAL file
 	exists, err := a.CheckExistence()
@@ -585,7 +645,7 @@ func HandleWALFetch(pre *Prefix, dirArc string, backupName string) {
 			arch = ReadCascadeClose{reader, arch}
 		}
 
-		f, err := os.Create(backupName)
+		f, err := os.Create(location)
 		if err != nil {
 			log.Fatalf("%v\n", err)
 		}
@@ -597,7 +657,7 @@ func HandleWALFetch(pre *Prefix, dirArc string, backupName string) {
 		f.Close()
 	} else if !exists {
 		// Check existence of compressed LZ4 WAL file
-		a.Archive = aws.String(*pre.Server + "/wal_005/" + dirArc + ".lz4")
+		a.Archive = aws.String(*pre.Server + "/wal_005/" + walFileName + ".lz4")
 		exists, err = a.CheckExistence()
 		if err != nil {
 			log.Fatalf("%+v\n", err)
@@ -618,7 +678,7 @@ func HandleWALFetch(pre *Prefix, dirArc string, backupName string) {
 				arch = ReadCascadeClose{reader, arch}
 			}
 
-			f, err := os.Create(backupName)
+			f, err := os.Create(location)
 			if err != nil {
 				log.Fatalf("%v\n", err)
 			}
@@ -629,8 +689,22 @@ func HandleWALFetch(pre *Prefix, dirArc string, backupName string) {
 			}
 			f.Close()
 		} else {
-			log.Fatalf("Archive '%s' does not exist.\n", dirArc)
+			log.Printf("Archive '%s' does not exist.\n", walFileName)
 		}
+	}
+}
+
+func forkPrefetch(walFileName string, location string) {
+	cmd := exec.Command(os.Args[0], "wal-prefetch", walFileName, location)
+	cmd.Env = os.Environ()
+
+	//cmd.Stdout = &NilWriter{}
+	cmd.Stdout = os.Stdout
+
+	err := cmd.Start()
+
+	if err != nil {
+		log.Println("WAL-prefetch failed: ", err)
 	}
 }
 
