@@ -228,7 +228,6 @@ func (a *Archive) CheckExistence() (bool, error) {
 	}
 
 	_, err := a.Prefix.Svc.HeadObject(arch)
-
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
 			switch awsErr.Code() {

@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"syscall"
+	"strings"
 )
 
 func HandleDelete(pre *Prefix, args []string) {
@@ -565,16 +566,18 @@ func HandleWALPrefetch(pre *Prefix, walFileName string, location string) {
 	var err error
 	location = path.Dir(location)
 	errors := make(chan (interface{}))
+	awaited := 0
 	for i := 0; i < 8; i++ {
 		fileName, err = NextWALFileName(fileName)
 		if err != nil {
 			log.Println("WAL-prefetch failed: ", err, " file: ", fileName)
 		}
+		awaited++
 		go prefetchFile(location, pre, fileName, errors)
 		time.Sleep(time.Millisecond) // ramp up in order
 	}
-	for i := 0; i < 8; i++ {
-		<-errors //wait until everyone is done. Erros are reported in recovery
+	for i := 0; i < awaited; i++ {
+		<-errors // Wait until everyone is done. Erros are reported in recovery
 	}
 }
 
@@ -606,8 +609,11 @@ func prefetchFile(location string, pre *Prefix, walFileName string, error_queue 
 	_, err_n = os.Stat(newPath)
 	if err_o == nil && os.IsNotExist(err_n) {
 		os.Rename(oldPath, newPath)
+	} else {
+		os.Remove(oldPath) // error is ignored
 	}
 }
+
 func getPrefetchLocations(location string, walFileName string) (runningLocation string, runningFile string, fetchedFile string) {
 	prefetchLocation := path.Join(location, ".wal-g", "prefetch")
 	runningLocation = path.Join(prefetchLocation, "running")
@@ -630,6 +636,8 @@ func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPre
 			return
 		}
 
+		// We have race condition here, if running is renamed here, but it's OK
+
 		if runStat, err := os.Stat(running); err == nil {
 			observedSize := runStat.Size() // If there is no progress in 50 ms - start downloading myself
 			if observedSize <= seenSize {
@@ -641,13 +649,16 @@ func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPre
 			}
 			seenSize = observedSize
 		} else if os.IsNotExist(err) {
-			break
+			break // Normal startup path
+		} else {
+			break // Abnormal path. Permission denied etc. Yes, I know that previous 'else' can be eliminated.
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
 
 	DownloadFile(pre, walFileName, location)
 }
+
 func DownloadFile(pre *Prefix, walFileName string, location string) {
 	a := &Archive{
 		Prefix:  pre,
@@ -724,6 +735,9 @@ func DownloadFile(pre *Prefix, walFileName string, location string) {
 }
 
 func forkPrefetch(walFileName string, location string) {
+	if strings.Contains(walFileName, "history") || strings.Contains(walFileName, "partial") {
+		return // There will be nothing ot prefetch anyway
+	}
 	err := syscall.Exec(os.Args[0], []string{os.Args[0], "wal-prefetch", walFileName, location}, os.Environ())
 
 	if err != nil {
