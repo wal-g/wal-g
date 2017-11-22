@@ -609,7 +609,7 @@ func prefetchFile(location string, pre *Prefix, walFileName string, error_queue 
 	}
 }
 func getPrefetchLocations(location string, walFileName string) (runningLocation string, runningFile string, fetchedFile string) {
-	prefetchLocation := path.Join(location, ".walg", "prefetch")
+	prefetchLocation := path.Join(location, ".wal-g", "prefetch")
 	runningLocation = path.Join(prefetchLocation, "running")
 	oldPath := path.Join(runningLocation, walFileName)
 	newPath := path.Join(prefetchLocation, walFileName)
