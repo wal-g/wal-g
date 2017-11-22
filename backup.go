@@ -86,15 +86,15 @@ func (b *Backup) GetLatest() (string, error) {
 // Recives backup descriptions and sorts them by time
 func (b *Backup) GetBackups() ([]BackupTime, error) {
 	var sortTimes []BackupTime
-	objects := &s3.ListObjectsInput{
+	objects := &s3.ListObjectsV2Input{
 		Bucket:    b.Prefix.Bucket,
 		Prefix:    b.Path,
 		Delimiter: aws.String("/"),
 	}
 
-	backups, err := b.Prefix.Svc.ListObjects(objects)
+	backups, err := b.Prefix.Svc.ListObjectsV2(objects)
 	if err != nil {
-		return nil, errors.Wrap(err, "GetLatest: s3.ListObjects failed")
+		return nil, errors.Wrap(err, "GetLatest: s3.ListObjectsV2 failed")
 
 	}
 
@@ -110,7 +110,7 @@ func (b *Backup) GetBackups() ([]BackupTime, error) {
 }
 
 // Converts S3 objects to backup description
-func GetBackupTimeSlices(backups *s3.ListObjectsOutput) []BackupTime {
+func GetBackupTimeSlices(backups *s3.ListObjectsV2Output) []BackupTime {
 	sortTimes := make([]BackupTime, len(backups.Contents))
 	for i, ob := range backups.Contents {
 		key := *ob.Key
@@ -164,14 +164,14 @@ func (b *Backup) CheckExistence() (bool, error) {
 
 // GetKeys returns all the keys for the files in the specified backup.
 func (b *Backup) GetKeys() ([]string, error) {
-	objects := &s3.ListObjectsInput{
+	objects := &s3.ListObjectsV2Input{
 		Bucket: b.Prefix.Bucket,
 		Prefix: aws.String(*b.Path + *b.Name + "/tar_partitions"),
 	}
 
-	files, err := b.Prefix.Svc.ListObjects(objects)
+	files, err := b.Prefix.Svc.ListObjectsV2(objects)
 	if err != nil {
-		return nil, errors.Wrap(err, "GetKeys: s3.ListObjects failed")
+		return nil, errors.Wrap(err, "GetKeys: s3.ListObjectsV2 failed")
 	}
 
 	arr := make([]string, len(files.Contents))
@@ -186,14 +186,14 @@ func (b *Backup) GetKeys() ([]string, error) {
 
 // Returns all WAL file keys less then key provided
 func (b *Backup) GetWals(before string) ([]*s3.ObjectIdentifier, error) {
-	objects := &s3.ListObjectsInput{
+	objects := &s3.ListObjectsV2Input{
 		Bucket: b.Prefix.Bucket,
 		Prefix: aws.String(*b.Path),
 	}
 
-	files, err := b.Prefix.Svc.ListObjects(objects)
+	files, err := b.Prefix.Svc.ListObjectsV2(objects)
 	if err != nil {
-		return nil, errors.Wrap(err, "GetKeys: s3.ListObjects failed")
+		return nil, errors.Wrap(err, "GetKeys: s3.ListObjectsV2 failed")
 	}
 
 	arr := make([]*s3.ObjectIdentifier, 0)

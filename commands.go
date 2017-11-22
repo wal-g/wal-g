@@ -14,7 +14,7 @@ import (
 	"io"
 	"strconv"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"os/exec"
+	"syscall"
 )
 
 func HandleDelete(pre *Prefix, args []string) {
@@ -571,7 +571,7 @@ func HandleWALPrefetch(pre *Prefix, walFileName string, location string) {
 			log.Println("WAL-prefetch failed: ", err, " file: ", fileName)
 		}
 		go prefetchFile(location, pre, fileName, errors)
-		time.Sleep(time.Millisecond) // wait for first call
+		time.Sleep(time.Millisecond) // ramp up in order
 	}
 	for i := 0; i < 8; i++ {
 		<-errors //wait until everyone is done. Erros are reported in recovery
@@ -588,14 +588,11 @@ func prefetchFile(location string, pre *Prefix, walFileName string, error_queue 
 		}
 	}()
 
-	prefetchLocation := path.Join(location, ".walg", "prefetch")
-	runningLocation := path.Join(prefetchLocation, "running")
-	oldPath := path.Join(runningLocation, walFileName)
-	newPath := path.Join(prefetchLocation, walFileName)
+	runningLocation, oldPath, newPath := getPrefetchLocations(location, walFileName)
 	_, err_o := os.Stat(oldPath)
 	_, err_n := os.Stat(newPath)
 
-	if (err_o != nil && !os.IsNotExist(err_o)) || (err_n != nil && !os.IsNotExist(err_n)) {
+	if (err_o == nil || !os.IsNotExist(err_o)) || (err_n == nil || !os.IsNotExist(err_n)) {
 		// Seems someone is doing something about this file
 		return
 	}
@@ -611,10 +608,42 @@ func prefetchFile(location string, pre *Prefix, walFileName string, error_queue 
 		os.Rename(oldPath, newPath)
 	}
 }
+func getPrefetchLocations(location string, walFileName string) (runningLocation string, runningFile string, fetchedFile string) {
+	prefetchLocation := path.Join(location, ".walg", "prefetch")
+	runningLocation = path.Join(prefetchLocation, "running")
+	oldPath := path.Join(runningLocation, walFileName)
+	newPath := path.Join(prefetchLocation, walFileName)
+	return runningLocation, oldPath, newPath
+}
 
 func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPrefetch bool) {
 	if triggerPrefetch {
 		defer forkPrefetch(walFileName, location)
+	}
+
+	_, running, prefetched := getPrefetchLocations(path.Dir(location), walFileName)
+	seenSize := int64(-1)
+
+	for {
+		if _, err := os.Stat(prefetched); err == nil {
+			os.Rename(prefetched, location)
+			return
+		}
+
+		if runStat, err := os.Stat(running); err == nil {
+			observedSize := runStat.Size() // If there is no progress in 50 ms - start downloading myself
+			if observedSize <= seenSize {
+				defer func() {
+					os.Remove(running) // we try to clean up and ignore here any error
+					os.Remove(prefetched)
+				}()
+				break
+			}
+			seenSize = observedSize
+		} else if os.IsNotExist(err) {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 
 	DownloadFile(pre, walFileName, location)
@@ -695,13 +724,7 @@ func DownloadFile(pre *Prefix, walFileName string, location string) {
 }
 
 func forkPrefetch(walFileName string, location string) {
-	cmd := exec.Command(os.Args[0], "wal-prefetch", walFileName, location)
-	cmd.Env = os.Environ()
-
-	//cmd.Stdout = &NilWriter{}
-	cmd.Stdout = os.Stdout
-
-	err := cmd.Start()
+	err := syscall.Exec(os.Args[0], []string{os.Args[0], "wal-prefetch", walFileName, location}, os.Environ())
 
 	if err != nil {
 		log.Println("WAL-prefetch failed: ", err)
