@@ -44,6 +44,13 @@ func init() {
 // Empty is used for channel signaling.
 type Empty struct{}
 
+// Writer to /dev/null
+type NilWriter struct{}
+
+func (this *NilWriter) Write(p []byte) (n int, err error) {
+	return len(p), nil
+}
+
 // TarBundle represents one completed directory.
 type TarBundle interface {
 	NewTarBall()

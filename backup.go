@@ -132,7 +132,7 @@ func stripNameBackup(key string) string {
 // Strips the backup WAL file name.
 func stripWalFileName(key string) string {
 	name := stripNameBackup(key)
-	name = strings.SplitN(name,"_D_",2)[0]
+	name = strings.SplitN(name, "_D_", 2)[0]
 
 	if strings.HasPrefix(name, backupNamePrefix) {
 		return name[len(backupNamePrefix):]
@@ -183,6 +183,7 @@ func (b *Backup) GetKeys() ([]string, error) {
 
 	return arr, nil
 }
+
 // Returns all WAL file keys less then key provided
 func (b *Backup) GetWals(before string) ([]*s3.ObjectIdentifier, error) {
 	objects := &s3.ListObjectsV2Input{
@@ -200,7 +201,7 @@ func (b *Backup) GetWals(before string) ([]*s3.ObjectIdentifier, error) {
 	for _, ob := range files.Contents {
 		key := *ob.Key
 		if stripWalName(key) < before {
-			arr = append(arr, &s3.ObjectIdentifier{Key:aws.String(key)})
+			arr = append(arr, &s3.ObjectIdentifier{Key: aws.String(key)})
 		}
 	}
 

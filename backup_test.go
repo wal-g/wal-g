@@ -34,7 +34,7 @@ type mockS3Client struct {
 
 func (m *mockS3Client) ListObjectsV2(input *s3.ListObjectsV2Input) (*s3.ListObjectsV2Output, error) {
 	if m.err {
-		return nil, awserr.New("MockListObjects", "mock ListObjectsV2 errors", nil)
+		return nil, awserr.New("MockListObjectsV2", "mock ListObjectsV2 errors", nil)
 	}
 
 	contents := fakeContents()
@@ -384,6 +384,7 @@ func TestGetBackupTimeSlices(t *testing.T) {
 	checkSortingPermutationResult(objectsFromS3, t) //132
 
 }
+
 func checkSortingPermutationResult(objectsFromS3 *s3.ListObjectsV2Output, t *testing.T) {
 	//t.Log(objectsFromS3)
 	slice := walg.GetBackupTimeSlices(objectsFromS3)

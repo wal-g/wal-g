@@ -559,10 +559,47 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 	}
 }
 
-func HandleWALFetch(pre *Prefix, dirArc string, backupName string) {
+func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPrefetch bool) {
+	if triggerPrefetch {
+		defer forkPrefetch(walFileName, location)
+	}
+
+	_, _, running, prefetched := getPrefetchLocations(path.Dir(location), walFileName)
+	seenSize := int64(-1)
+
+	for {
+		if _, err := os.Stat(prefetched); err == nil {
+			os.Rename(prefetched, location)
+			return
+		}
+
+		// We have race condition here, if running is renamed here, but it's OK
+
+		if runStat, err := os.Stat(running); err == nil {
+			observedSize := runStat.Size() // If there is no progress in 50 ms - start downloading myself
+			if observedSize <= seenSize {
+				defer func() {
+					os.Remove(running) // we try to clean up and ignore here any error
+					os.Remove(prefetched)
+				}()
+				break
+			}
+			seenSize = observedSize
+		} else if os.IsNotExist(err) {
+			break // Normal startup path
+		} else {
+			break // Abnormal path. Permission denied etc. Yes, I know that previous 'else' can be eliminated.
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	DownloadFile(pre, walFileName, location)
+}
+
+func DownloadFile(pre *Prefix, walFileName string, location string) {
 	a := &Archive{
 		Prefix:  pre,
-		Archive: aws.String(*pre.Server + "/wal_005/" + dirArc + ".lzo"),
+		Archive: aws.String(*pre.Server + "/wal_005/" + walFileName + ".lzo"),
 	}
 	// Check existence of compressed LZO WAL file
 	exists, err := a.CheckExistence()
@@ -585,7 +622,7 @@ func HandleWALFetch(pre *Prefix, dirArc string, backupName string) {
 			arch = ReadCascadeClose{reader, arch}
 		}
 
-		f, err := os.Create(backupName)
+		f, err := os.Create(location)
 		if err != nil {
 			log.Fatalf("%v\n", err)
 		}
@@ -597,7 +634,7 @@ func HandleWALFetch(pre *Prefix, dirArc string, backupName string) {
 		f.Close()
 	} else if !exists {
 		// Check existence of compressed LZ4 WAL file
-		a.Archive = aws.String(*pre.Server + "/wal_005/" + dirArc + ".lz4")
+		a.Archive = aws.String(*pre.Server + "/wal_005/" + walFileName + ".lz4")
 		exists, err = a.CheckExistence()
 		if err != nil {
 			log.Fatalf("%+v\n", err)
@@ -618,7 +655,7 @@ func HandleWALFetch(pre *Prefix, dirArc string, backupName string) {
 				arch = ReadCascadeClose{reader, arch}
 			}
 
-			f, err := os.Create(backupName)
+			f, err := os.Create(location)
 			if err != nil {
 				log.Fatalf("%v\n", err)
 			}
@@ -629,7 +666,7 @@ func HandleWALFetch(pre *Prefix, dirArc string, backupName string) {
 			}
 			f.Close()
 		} else {
-			log.Fatalf("Archive '%s' does not exist.\n", dirArc)
+			log.Printf("Archive '%s' does not exist.\n", walFileName)
 		}
 	}
 }

@@ -128,6 +128,8 @@ If backup is pushed from replication slave, WAL-G will control timeline of the s
 
 When fetching WAL archives from S3, the user should pass in the archive name and the name of the file to download to. This file should not exist as WAL-G will create it for you.
 
+WAL-G will also prefetch WAL files ahead of asked WAL file. These files will be cached in `./.wal-g/prefetch` directory. Cache files older than recently asked WAL file will be deleted from the cache, to prevent cache bloat. If the file is requested with `wal-fetch` this will also remove it from cache, but trigger fulfilment of cache with new file.
+
 ```
 wal-g wal-fetch example-archive new-file-name
 ```
