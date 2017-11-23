@@ -33,9 +33,14 @@ func TestNextWALFileName(t *testing.T) {
 		t.Fatal("TestNextWALFileName 0000000100000001000001FF did not failed")
 	}
 
-	nextname, err = NextWALFileName("00000001000aa001000001FF")
+	nextname, err = NextWALFileName("00000001000ZZ001000000FF")
 	if err == nil {
-		t.Fatal("TestNextWALFileName 00000001000aa001000001FF did not failed")
+		t.Fatal("TestNextWALFileName 00000001000ZZ001000001FF did not failed")
+	}
+
+	nextname, err = NextWALFileName("00000001000001000000FF")
+	if err == nil {
+		t.Fatal("TestNextWALFileName 00000001000001000001FF did not failed")
 	}
 
 	nextname, err = NextWALFileName("asdfasdf")
@@ -45,8 +50,9 @@ func TestNextWALFileName(t *testing.T) {
 }
 
 func TestPrefetchLocation(t *testing.T) {
-	runningLocation, runningFile, fetchedFile := getPrefetchLocations("/var/pgdata/xlog/", "000000010000000000000051")
-	if runningLocation != "/var/pgdata/xlog/.wal-g/prefetch/running" ||
+	prefetchLocation, runningLocation, runningFile, fetchedFile := getPrefetchLocations("/var/pgdata/xlog/", "000000010000000000000051")
+	if prefetchLocation != "/var/pgdata/xlog/.wal-g/prefetch" ||
+		runningLocation != "/var/pgdata/xlog/.wal-g/prefetch/running" ||
 		runningFile != "/var/pgdata/xlog/.wal-g/prefetch/running/000000010000000000000051" ||
 		fetchedFile != "/var/pgdata/xlog/.wal-g/prefetch/000000010000000000000051" {
 		t.Fatal("TestPrefetchLocation failed")
