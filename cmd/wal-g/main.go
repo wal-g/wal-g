@@ -17,7 +17,8 @@ var helpMsg = "  backup-fetch\tfetch a backup from S3\n" +
 	"  backup-push\tstarts and uploads a finished backup to S3\n" +
 	"  backup-list\tprints available backups\n" +
 	"  wal-fetch\tfetch a WAL file from S3\n" +
-	"  wal-push\tupload a WAL file to S3\n"
+	"  wal-push\tupload a WAL file to S3\n"+
+	"  delete\tclear old backups and WALs\n"
 
 func init() {
 	flag.Usage = func() {
