@@ -80,6 +80,12 @@ func Configure() (*TarUploader, *Prefix, error) {
 		server = u.Path[1:]
 	}
 
+	if len(server) > 0 && server[len(server)-1] == '/' {
+		// Allover the code this parameter is concatenated with '/'.
+		// TODO: Get rid of numerous string literals concatenated with this
+		server = server[:len(server)-1]
+	}
+
 	config := defaults.Get().Config
 
 	if _, err := config.Credentials.Get(); err != nil {

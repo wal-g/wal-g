@@ -17,7 +17,7 @@ var helpMsg = "  backup-fetch\tfetch a backup from S3\n" +
 	"  backup-push\tstarts and uploads a finished backup to S3\n" +
 	"  backup-list\tprints available backups\n" +
 	"  wal-fetch\tfetch a WAL file from S3\n" +
-	"  wal-push\tupload a WAL file to S3\n"+
+	"  wal-push\tupload a WAL file to S3\n" +
 	"  delete\tclear old backups and WALs\n"
 
 func init() {
@@ -37,14 +37,18 @@ func init() {
 func main() {
 	flag.Parse()
 	all := flag.Args()
-	if len(all) < 2 {
+	if len(all) < 1 {
 		l.Fatalf("Please choose a command:\n%s", helpMsg)
 	}
 	command := all[0]
-	firstArgument := all[1]
+	firstArgument := ""
+	if len(all) > 1 {
+		firstArgument = all[1]
+	}
 
 	// Usage strings for supported commands
-	if firstArgument == "-h" {
+	// TODO: refactor arg parsing towards gloang flag usage and more helpful messages
+	if firstArgument == "-h" || firstArgument == "--help" || (firstArgument == "" && command != "backup-list") {
 		switch command {
 		case "backup-fetch":
 			fmt.Printf("usage:\twal-g backup-fetch output_directory backup_name\n\twal-g backup-fetch output_directory LATEST\n\n")
