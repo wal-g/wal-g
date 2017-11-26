@@ -381,7 +381,7 @@ func UnwrapBackup(bk *Backup, dirArc string, pre *Prefix, sentinel S3TarBallSent
 	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of backup.
 	re := regexp.MustCompile(`^([^_]+._{1}[^_]+._{1})`)
 	match := re.FindString(*bk.Name)
-	if match == "" {
+	if match == "" || sentinel.IsIncremental() {
 		// Extract pg_control last. If pg_control does not exist, program exits with error code 1.
 		name := *bk.Path + *bk.Name + "/tar_partitions/pg_control.tar.lz4"
 		pgControl := &Archive{
