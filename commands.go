@@ -222,7 +222,8 @@ func HandleBackupList(pre *Prefix) {
 		log.Fatal(err)
 	}
 	fmt.Println("name\tlast_modified\twal_segment_backup_start")
-	for _, b := range backups {
+	for i := len(backups) - 1; i >= 0; i-- {
+		b := backups[i]
 		fmt.Printf("%v\t%v\t%v\n", b.Name, b.Time.Format(time.RFC3339), b.WalFileName)
 	}
 }
