@@ -1,18 +1,19 @@
 package walg
 
 import (
-	"os"
-	"log"
-	"github.com/aws/aws-sdk-go/aws"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"log"
+	"os"
 	"path"
 	"path/filepath"
-	"runtime/pprof"
-	"io/ioutil"
 	"regexp"
-	"time"
-	"io"
+	"runtime/pprof"
 	"strconv"
+	"time"
+
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
@@ -56,7 +57,7 @@ func HandleDelete(pre *Prefix, args []string) {
 			if len(backups) <= number {
 				fmt.Printf("Have only %v backups.\n", number)
 			}
-			cfg.target = backups[number].Name
+			cfg.target = backups[number-1].Name
 			DeleteBeforeTarget(cfg.target, bk, pre, cfg.find_full, nil, cfg.dryrun)
 		}
 	}
@@ -169,7 +170,7 @@ func DeleteBeforeTarget(target string, bk *Backup, pre *Prefix, find_full bool, 
 }
 func DeleteBackupsBefore(backups []BackupTime, skipline int, pre *Prefix) {
 	for i, b := range backups {
-		if (i > skipline) {
+		if i > skipline {
 			input := &s3.DeleteObjectsInput{Bucket: pre.Bucket, Delete: &s3.Delete{
 				Objects: []*s3.ObjectIdentifier{
 					{Key: aws.String(*pre.Server + "/basebackups_005/" + b.Name)},
@@ -434,10 +435,10 @@ func GetDeltaConfig() (max_deltas int, from_full bool) {
 	if hasOrigin {
 		switch origin {
 		case "LATEST":
-			break;
+			break
 		case "LATEST_FULL":
 			from_full = false
-			break;
+			break
 		default:
 			log.Fatal("Unknown WALG_DELTA_ORIGIN:", origin)
 		}
