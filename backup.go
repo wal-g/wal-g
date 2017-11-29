@@ -92,13 +92,18 @@ func (b *Backup) GetBackups() ([]BackupTime, error) {
 		Delimiter: aws.String("/"),
 	}
 
-	backups, err := b.Prefix.Svc.ListObjectsV2(objects)
+	var backups = make([]*s3.Object, 0)
+
+	err := b.Prefix.Svc.ListObjectsV2Pages(objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
+		backups = append(backups, files.Contents...)
+		return true
+	})
+
 	if err != nil {
 		return nil, errors.Wrap(err, "GetLatest: s3.ListObjectsV2 failed")
-
 	}
 
-	count := len(backups.Contents)
+	count := len(backups)
 
 	if count == 0 {
 		return nil, LatestNotFound
@@ -110,9 +115,9 @@ func (b *Backup) GetBackups() ([]BackupTime, error) {
 }
 
 // Converts S3 objects to backup description
-func GetBackupTimeSlices(backups *s3.ListObjectsV2Output) []BackupTime {
-	sortTimes := make([]BackupTime, len(backups.Contents))
-	for i, ob := range backups.Contents {
+func GetBackupTimeSlices(backups []*s3.Object) []BackupTime {
+	sortTimes := make([]BackupTime, len(backups))
+	for i, ob := range backups {
 		key := *ob.Key
 		time := *ob.LastModified
 		sortTimes[i] = BackupTime{stripNameBackup(key), time, stripWalFileName(key)}
@@ -169,19 +174,25 @@ func (b *Backup) GetKeys() ([]string, error) {
 		Prefix: aws.String(*b.Path + *b.Name + "/tar_partitions"),
 	}
 
-	files, err := b.Prefix.Svc.ListObjectsV2(objects)
+	result := make([]string, 0)
+
+	err := b.Prefix.Svc.ListObjectsV2Pages(objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
+
+		arr := make([]string, len(files.Contents))
+
+		for i, ob := range files.Contents {
+			key := *ob.Key
+			arr[i] = key
+		}
+
+		result = append(result, arr...)
+		return true
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "GetKeys: s3.ListObjectsV2 failed")
 	}
 
-	arr := make([]string, len(files.Contents))
-
-	for i, ob := range files.Contents {
-		key := *ob.Key
-		arr[i] = key
-	}
-
-	return arr, nil
+	return result, nil
 }
 
 // Returns all WAL file keys less then key provided
@@ -191,18 +202,20 @@ func (b *Backup) GetWals(before string) ([]*s3.ObjectIdentifier, error) {
 		Prefix: aws.String(*b.Path),
 	}
 
-	files, err := b.Prefix.Svc.ListObjectsV2(objects)
-	if err != nil {
-		return nil, errors.Wrap(err, "GetKeys: s3.ListObjectsV2 failed")
-	}
-
 	arr := make([]*s3.ObjectIdentifier, 0)
 
-	for _, ob := range files.Contents {
-		key := *ob.Key
-		if stripWalName(key) < before {
-			arr = append(arr, &s3.ObjectIdentifier{Key: aws.String(key)})
+	err := b.Prefix.Svc.ListObjectsV2Pages(objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
+		for _, ob := range files.Contents {
+			key := *ob.Key
+			if stripWalName(key) < before {
+				arr = append(arr, &s3.ObjectIdentifier{Key: aws.String(key)})
+			}
 		}
+		return true
+	})
+
+	if err != nil {
+		return nil, errors.Wrap(err, "GetKeys: s3.ListObjectsV2 failed")
 	}
 
 	return arr, nil

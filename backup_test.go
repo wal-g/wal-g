@@ -32,9 +32,9 @@ type mockS3Client struct {
 	err      bool
 }
 
-func (m *mockS3Client) ListObjectsV2(input *s3.ListObjectsV2Input) (*s3.ListObjectsV2Output, error) {
+func (m *mockS3Client) ListObjectsV2Pages(input *s3.ListObjectsV2Input, callback func(*s3.ListObjectsV2Output, bool) bool) error {
 	if m.err {
-		return nil, awserr.New("MockListObjectsV2", "mock ListObjectsV2 errors", nil)
+		return awserr.New("MockListObjectsV2", "mock ListObjectsV2 errors", nil)
 	}
 
 	contents := fakeContents()
@@ -43,7 +43,8 @@ func (m *mockS3Client) ListObjectsV2(input *s3.ListObjectsV2Input) (*s3.ListObje
 		Name:     input.Bucket,
 	}
 
-	return output, nil
+	callback(output, true)
+	return nil
 }
 
 func (m *mockS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error) {
@@ -387,7 +388,7 @@ func TestGetBackupTimeSlices(t *testing.T) {
 
 func checkSortingPermutationResult(objectsFromS3 *s3.ListObjectsV2Output, t *testing.T) {
 	//t.Log(objectsFromS3)
-	slice := walg.GetBackupTimeSlices(objectsFromS3)
+	slice := walg.GetBackupTimeSlices(objectsFromS3.Contents)
 	if slice[0].Name != "backup01" {
 		t.Log(slice[0].Name)
 		t.Error("Sorting does not work correctly")
