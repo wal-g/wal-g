@@ -7,8 +7,8 @@ import (
 // BackupTime is used to sort backups by
 // latest modified time.
 type BackupTime struct {
-	Name string
-	Time time.Time
+	Name        string
+	Time        time.Time
 	WalFileName string
 }
 
@@ -26,4 +26,16 @@ func (p TimeSlice) Less(i, j int) bool {
 
 func (p TimeSlice) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
+}
+
+func partition(a []string, b int) [][]string {
+	c := make([][]string, 0)
+	for i := 0; i < len(a); i += b {
+		if i+b > len(a) {
+			c = append(c, a[i:])
+		} else {
+			c = append(c, a[i:i+b])
+		}
+	}
+	return c
 }

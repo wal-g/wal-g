@@ -168,22 +168,47 @@ func DeleteBeforeTarget(target string, bk *Backup, pre *Prefix, find_full bool, 
 		log.Printf("Dry run finished.\n")
 	}
 }
+
 func DeleteBackupsBefore(backups []BackupTime, skipline int, pre *Prefix) {
 	for i, b := range backups {
 		if i > skipline {
-			input := &s3.DeleteObjectsInput{Bucket: pre.Bucket, Delete: &s3.Delete{
-				Objects: []*s3.ObjectIdentifier{
-					{Key: aws.String(*pre.Server + "/basebackups_005/" + b.Name)},
-					{Key: aws.String(*pre.Server + "/basebackups_005/" + b.Name + SentinelSuffix)},
-				},
-			}}
-			_, err := pre.Svc.DeleteObjects(input)
-			if err != nil {
-				log.Fatal("Unable to delete backup ", b.Name, err)
-			}
+			dropBackup(pre, b)
 		}
 	}
 }
+func dropBackup(pre *Prefix, b BackupTime) {
+	var bk = &Backup{
+		Prefix: pre,
+		Path:   aws.String(*pre.Server + "/basebackups_005/"),
+		Name:   aws.String(b.Name),
+	}
+	tarFiles, err := bk.GetKeys()
+	if err != nil {
+		log.Fatal("Unable to list backup for deletion ", b.Name, err)
+	}
+	keys := append(tarFiles, *pre.Server+"/basebackups_005/"+b.Name+SentinelSuffix, *pre.Server+"/basebackups_005/"+b.Name)
+	parts := partition(keys, 1000)
+	for _, part := range parts {
+
+		input := &s3.DeleteObjectsInput{Bucket: pre.Bucket, Delete: &s3.Delete{
+			Objects: partitionToObjects(part),
+		}}
+		_, err = pre.Svc.DeleteObjects(input)
+		if err != nil {
+			log.Fatal("Unable to delete backup ", b.Name, err)
+		}
+
+	}
+}
+
+func partitionToObjects(keys []string) []*s3.ObjectIdentifier {
+	objs := make([]*s3.ObjectIdentifier, len(keys))
+	for i, k := range keys {
+		objs[i] = &s3.ObjectIdentifier{Key: aws.String(k)}
+	}
+	return objs
+}
+
 func DeleteWALBefore(bt BackupTime, pre *Prefix) {
 	var bk = &Backup{
 		Prefix: pre,
@@ -364,7 +389,7 @@ func UnwrapBackup(bk *Backup, dirArc string, pre *Prefix, sentinel S3TarBallSent
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
-	keys = allKeys[:len(allKeys)-1]
+	keys = allKeys[:len(allKeys)-1] // TODO: WTF is going on?
 	f := &FileTarInterpreter{
 		NewDir:             dirArc,
 		Sentinel:           sentinel,
