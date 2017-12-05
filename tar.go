@@ -26,7 +26,7 @@ type FileTarInterpreter struct {
 
 func contains(s *[]string, e string) bool {
 	//AB: Go is sick
-	if s==nil{
+	if s == nil {
 		return false
 	}
 	for _, a := range *s {
@@ -41,15 +41,15 @@ func contains(s *[]string, e string) bool {
 // Returns the first error encountered. Calls fsync after each file
 // is written successfully.
 func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
+	fmt.Println(cur.Name)
 	targetPath := path.Join(ti.NewDir, cur.Name)
 	// this path is only used for increment restoration
 	incrementalPath := path.Join(ti.IncrementalBaseDir, cur.Name)
 	switch cur.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
-		fd,haveFd := ti.Sentinel.Files[cur.Name]
+		fd, haveFd := ti.Sentinel.Files[cur.Name]
 
 		// If this file is incremental we use it's base version from incremental path
-		fmt.Println(cur.Name)
 		if haveFd && ti.Sentinel.IsIncremental() && fd.IsIncremented {
 			err := ApplyFileIncrement(incrementalPath, tr)
 			if err != nil {
@@ -116,8 +116,6 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
 			return errors.Wrapf(err, "Interpret: failed to create symlink", targetPath)
 		}
 	}
-
-	fmt.Println(cur.Name)
 	return nil
 }
 func MoveFileAndCreateDirs(incrementalPath string, targetPath string, fileName string) (err error) {

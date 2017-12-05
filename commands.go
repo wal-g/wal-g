@@ -257,12 +257,6 @@ func HandleBackupList(pre *Prefix) {
 func HandleBackupFetch(backupName string, pre *Prefix, dirArc string, mem bool) (lsn *uint64) {
 	lsn = DeltaFetchRecursion(backupName, pre, dirArc)
 
-	// If following directories were not archived, we still must create them.
-	// Without these directories PostgreSQL is unable to start.
-	// Error is ignored intentially.
-	os.Mkdir(path.Join(dirArc, "pg_tblspc"), 0766)
-	os.Mkdir(path.Join(dirArc, "pg_stat"), 0766)
-
 	if mem {
 		f, err := os.Create("mem.prof")
 		if err != nil {

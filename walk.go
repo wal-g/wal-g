@@ -70,11 +70,11 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter) error {
 	tarBall := bundle.GetTarBall()
 	fileName := info.Name()
-	_, ok := EXCLUDE[info.Name()]
+	_, excluded := EXCLUDE[info.Name()]
 	tarBall.SetUp(crypter)
 	tarWriter := tarBall.Tw()
 
-	if !ok {
+	if !excluded {
 		hdr, err := tar.FileInfoHeader(info, fileName)
 		if err != nil {
 			return errors.Wrap(err, "HandleTar: could not grab header info")
@@ -85,7 +85,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 
 		if info.Mode().IsRegular() {
 			baseFiles := bundle.GetIncrementBaseFiles()
-			bf, ok := baseFiles[hdr.Name]
+			bf, wasInBase := baseFiles[hdr.Name]
 
 			// It is important to take MTime before ReadDatabaseFile()
 			time := info.ModTime()
@@ -94,15 +94,15 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 			// For details see
 			// https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
 
-			if ok && (time == bf.MTime) {
+			if wasInBase && (time == bf.MTime) {
 				// File was not changed since previous backup
 
 				fmt.Println("Skiped due to unchanged modification time")
 				tarBall.GetFiles()[hdr.Name] = BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time}
 
 			} else {
-				// !ok means file was not observed previously
-				f, isPaged, size, err := ReadDatabaseFile(path, bundle.GetIncrementBaseLsn(), !ok)
+				// !excluded means file was not observed previously
+				f, isPaged, size, err := ReadDatabaseFile(path, bundle.GetIncrementBaseLsn(), !wasInBase)
 				if err != nil {
 					return errors.Wrapf(err, "HandleTar: failed to open file '%s'\n", path)
 				}
@@ -115,6 +115,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 				if err != nil {
 					return errors.Wrap(err, "HandleTar: failed to write header")
 				}
+
 				lim := &io.LimitedReader{
 					R: io.MultiReader(f, &ZeroReader{}),
 					N: int64(hdr.Size),
@@ -128,8 +129,14 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 				tarBall.SetSize(hdr.Size)
 				f.Close()
 			}
+		} else {
+			// It is not file
+			err = tarWriter.WriteHeader(hdr)
+			if err != nil {
+				return errors.Wrap(err, "HandleTar: failed to write header")
+			}
 		}
-	} else if ok && info.Mode().IsDir() {
+	} else if excluded && info.Mode().IsDir() {
 		hdr, err := tar.FileInfoHeader(info, fileName)
 		if err != nil {
 			return errors.Wrap(err, "HandleTar: failed to grab header info")
