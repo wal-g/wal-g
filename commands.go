@@ -219,13 +219,15 @@ func DeleteWALBefore(bt BackupTime, pre *Prefix) {
 	if err != nil {
 		log.Fatal("Unable to obtaind WALS for border ", bt.Name, err)
 	}
-
-	input := &s3.DeleteObjectsInput{Bucket: pre.Bucket, Delete: &s3.Delete{
-		Objects: objects,
-	}}
-	_, err = pre.Svc.DeleteObjects(input)
-	if err != nil {
-		log.Fatal("Unable to delete WALS before ", bt.Name, err)
+	parts := partitionObjects(objects, 1000)
+	for _, part := range parts {
+		input := &s3.DeleteObjectsInput{Bucket: pre.Bucket, Delete: &s3.Delete{
+			Objects: part,
+		}}
+		_, err = pre.Svc.DeleteObjects(input)
+		if err != nil {
+			log.Fatal("Unable to delete WALS before ", bt.Name, err)
+		}
 	}
 }
 
