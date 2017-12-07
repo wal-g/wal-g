@@ -3,11 +3,12 @@ package walg_test
 import (
 	"bytes"
 	"errors"
-	"github.com/pierrec/lz4"
-	"github.com/wal-g/wal-g"
 	"io/ioutil"
 	"math/rand"
 	"testing"
+
+	"github.com/pierrec/lz4"
+	"github.com/wal-g/wal-g"
 )
 
 type BufCloser struct {

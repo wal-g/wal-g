@@ -3,11 +3,12 @@ package walg
 import (
 	"archive/tar"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
 	//"golang.org/x/crypto/openpgp"
 )
 

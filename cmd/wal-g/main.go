@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"runtime/pprof"
+
 	"github.com/wal-g/wal-g"
 )
 

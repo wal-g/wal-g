@@ -2,8 +2,9 @@ package walg_test
 
 import (
 	"archive/tar"
-	"github.com/wal-g/wal-g"
 	"testing"
+
+	"github.com/wal-g/wal-g"
 )
 
 // Tests S3 get and set methods.

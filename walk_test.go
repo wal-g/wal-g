@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
-	"github.com/wal-g/wal-g"
-	"github.com/wal-g/wal-g/test_tools"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
+
+	"github.com/wal-g/wal-g"
+	"github.com/wal-g/wal-g/test_tools"
 )
 
 const BUFSIZE = 4 * 1024
@@ -156,7 +157,7 @@ func extract(t *testing.T, dir string) string {
 
 	outDir := filepath.Join(filepath.Dir(dir), "extracted")
 
-	ft := &walg.FileTarInterpreter{NewDir: outDir,}
+	ft := &walg.FileTarInterpreter{NewDir: outDir}
 	err = os.MkdirAll(outDir, 0766)
 	if err != nil {
 		t.Log(err)

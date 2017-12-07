@@ -1,10 +1,11 @@
 package walg_test
 
 import (
-	"github.com/wal-g/wal-g"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/wal-g/wal-g"
 )
 
 var times = []struct {

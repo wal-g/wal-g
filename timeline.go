@@ -1,10 +1,11 @@
 package walg
 
 import (
-	"fmt"
-	"strings"
-	"strconv"
 	"errors"
+	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/jackc/pgx"
 )
 

@@ -3,12 +3,13 @@ package walg
 import (
 	"archive/tar"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // TarInterpreter behaves differently

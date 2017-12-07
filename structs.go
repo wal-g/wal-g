@@ -2,19 +2,20 @@ package walg
 
 import (
 	"archive/tar"
+	"bytes"
+	"encoding/json"
 	"fmt"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
-	"github.com/pkg/errors"
 	"io"
-	"os"
 	"log"
+	"os"
 	"sync"
 	"time"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"encoding/json"
+
 	"github.com/aws/aws-sdk-go/aws"
-	"bytes"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
+	"github.com/pkg/errors"
 )
 
 // EXCLUDE is a list of excluded members from the bundled backup.
