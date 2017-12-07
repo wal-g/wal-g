@@ -1,6 +1,12 @@
 package walg_test
 
 import (
+	"io"
+	"io/ioutil"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -9,11 +15,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/wal-g/wal-g"
 	"github.com/wal-g/wal-g/test_tools"
-	"io"
-	"io/ioutil"
-	"strings"
-	"testing"
-	"time"
 )
 
 var correctKeys = []string{"mockServer/base_backup/second.nop",
@@ -366,9 +367,9 @@ func TestGetBackupTimeSlices(t *testing.T) {
 	thirdTime := time.Now()
 
 	c := []*s3.Object{
-		{Key: &first, LastModified: &firstTime,},
-		{Key: &second, LastModified: &secondTime,},
-		{Key: &third, LastModified: &thirdTime,},
+		{Key: &first, LastModified: &firstTime},
+		{Key: &second, LastModified: &secondTime},
+		{Key: &third, LastModified: &thirdTime},
 	}
 	objectsFromS3 := &s3.ListObjectsV2Output{Contents: c}
 

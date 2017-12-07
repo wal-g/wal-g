@@ -3,11 +3,12 @@ package walg_test
 import (
 	"bytes"
 	"fmt"
-	"github.com/wal-g/wal-g"
-	"github.com/wal-g/wal-g/test_tools"
 	"io"
 	"io/ioutil"
 	"testing"
+
+	"github.com/wal-g/wal-g"
+	"github.com/wal-g/wal-g/test_tools"
 )
 
 func TestNoFilesProvided(t *testing.T) {

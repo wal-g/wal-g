@@ -1,12 +1,13 @@
 package walg
 
 import (
-	"golang.org/x/crypto/openpgp"
+	"bytes"
+	"io"
+	"io/ioutil"
 	"strings"
 	"testing"
-	"bytes"
-	"io/ioutil"
-	"io"
+
+	"golang.org/x/crypto/openpgp"
 )
 
 const pgpTestPrivateKey string = `
@@ -70,7 +71,7 @@ nWM=
 -----END PGP PRIVATE KEY BLOCK-----
 `
 
-func MockArmedCrypter() (Crypter) {
+func MockArmedCrypter() Crypter {
 	return createCrypter(pgpTestPrivateKey)
 }
 func createCrypter(armedKeyring string) *OpenPGPCrypter {
@@ -82,7 +83,7 @@ func createCrypter(armedKeyring string) *OpenPGPCrypter {
 	return crypter
 }
 
-func MockDisarmedCrypter() (Crypter) {
+func MockDisarmedCrypter() Crypter {
 	return &MockCrypter{}
 }
 

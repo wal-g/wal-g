@@ -3,12 +3,13 @@ package walg
 import (
 	"archive/tar"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // TarInterpreter behaves differently
@@ -26,7 +27,7 @@ type FileTarInterpreter struct {
 
 func contains(s *[]string, e string) bool {
 	//AB: Go is sick
-	if s==nil{
+	if s == nil {
 		return false
 	}
 	for _, a := range *s {
@@ -46,7 +47,7 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
 	incrementalPath := path.Join(ti.IncrementalBaseDir, cur.Name)
 	switch cur.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
-		fd,haveFd := ti.Sentinel.Files[cur.Name]
+		fd, haveFd := ti.Sentinel.Files[cur.Name]
 
 		// If this file is incremental we use it's base version from incremental path
 		fmt.Println(cur.Name)

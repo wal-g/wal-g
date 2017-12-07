@@ -1,14 +1,14 @@
 package walg
 
 import (
-	"os"
 	"bytes"
-	"io/ioutil"
 	"io"
-	"os/exec"
-	"testing"
-	"strings"
+	"io/ioutil"
 	"math/rand"
+	"os"
+	"os/exec"
+	"strings"
+	"testing"
 )
 
 const waleGpgKey string = `

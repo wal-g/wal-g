@@ -1,8 +1,9 @@
 package walg_test
 
 import (
-	"github.com/wal-g/wal-g"
 	"testing"
+
+	"github.com/wal-g/wal-g"
 )
 
 var names = []struct {

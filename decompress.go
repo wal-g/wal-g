@@ -2,11 +2,12 @@ package walg
 
 import (
 	"encoding/binary"
+	"io"
+	"regexp"
+
 	"github.com/pierrec/lz4"
 	"github.com/pkg/errors"
 	"github.com/rasky/go-lzo"
-	"io"
-	"regexp"
 )
 
 // RaskyReader handles cases when the Rasky lzo package crashes.

@@ -1,9 +1,10 @@
 package walg_test
 
 import (
-	"github.com/wal-g/wal-g"
 	"os"
 	"testing"
+
+	"github.com/wal-g/wal-g"
 )
 
 // Sets WAL-G needed environment variables to empty strings.

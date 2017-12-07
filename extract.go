@@ -2,10 +2,11 @@ package walg
 
 import (
 	"archive/tar"
-	"github.com/pkg/errors"
 	"io"
 	"os"
 	"strconv"
+
+	"github.com/pkg/errors"
 )
 
 func min(a, b int) int {

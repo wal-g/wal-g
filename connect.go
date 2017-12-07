@@ -1,11 +1,11 @@
 package walg
 
 import (
+	"log"
 	"regexp"
 
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
-	"log"
 )
 
 // Connect establishes a connection to postgres using
