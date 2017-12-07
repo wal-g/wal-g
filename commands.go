@@ -56,9 +56,10 @@ func HandleDelete(pre *Prefix, args []string) {
 		} else {
 			if len(backups) <= number {
 				fmt.Printf("Have only %v backups.\n", number)
+			} else {
+				cfg.target = backups[number-1].Name
+				DeleteBeforeTarget(cfg.target, bk, pre, cfg.find_full, nil, cfg.dryrun)
 			}
-			cfg.target = backups[number-1].Name
-			DeleteBeforeTarget(cfg.target, bk, pre, cfg.find_full, nil, cfg.dryrun)
 		}
 	}
 }
