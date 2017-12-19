@@ -56,7 +56,16 @@ func TestDeleteArgsParsingBefore(t *testing.T) {
 	if parseAndTestFail(command, &args) {
 		t.Fatal("Parsing of delete comand failed")
 	}
-	if !args.before || !args.find_full || args.target != "x" {
+	if !args.before || !args.find_full || args.target != "x"  || args.beforeTime != nil {
+		t.Fatal("Parsing was wrong")
+	}
+
+	command = []string{"delete", "before", "FIND_FULL", "2014-11-12T11:45:26.371Z"}
+
+	if parseAndTestFail(command, &args) {
+		t.Fatal("Parsing of delete comand failed")
+	}
+	if !args.before || !args.find_full || args.beforeTime == nil {
 		t.Fatal("Parsing was wrong")
 	}
 

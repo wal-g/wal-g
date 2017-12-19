@@ -26,7 +26,21 @@ func HandleDelete(pre *Prefix, args []string) {
 	}
 
 	if cfg.before {
-		DeleteBeforeTarget(cfg.target, bk, pre, cfg.find_full, nil, cfg.dryrun)
+		if cfg.beforeTime == nil {
+			DeleteBeforeTarget(cfg.target, bk, pre, cfg.find_full, nil, cfg.dryrun)
+		} else {
+			backups, err := bk.GetBackups()
+			if err != nil {
+				log.Fatal(err)
+			}
+			for _, b := range backups {
+				if b.Time.Before(*cfg.beforeTime) {
+					DeleteBeforeTarget(b.Name, bk, pre, cfg.find_full, backups, cfg.dryrun)
+					return
+				}
+			}
+			log.Println("No backups before ", *cfg.beforeTime)
+		}
 	}
 	if cfg.retain {
 		number, err := strconv.Atoi(cfg.target)
@@ -65,12 +79,13 @@ func HandleDelete(pre *Prefix, args []string) {
 }
 
 type DeleteCommandArguments struct {
-	full      bool
-	find_full bool
-	retain    bool
-	before    bool
-	target    string
-	dryrun    bool
+	full       bool
+	find_full  bool
+	retain     bool
+	before     bool
+	target     string
+	beforeTime *time.Time
+	dryrun     bool
 }
 
 func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteCommandArguments) {
@@ -104,6 +119,13 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 	}
 
 	result.target = params[0]
+	if t, err := time.Parse(time.RFC3339, result.target); err == nil {
+		if t.After(time.Now()) {
+			log.Println("Cannot delete before future date")
+			fallBackFunc()
+		}
+		result.beforeTime = &t
+	}
 	//if DeleteConfirmed && !DeleteDryrun  // TODO: use flag
 	result.dryrun = true
 	if len(params) > 1 && (params[1] == "--confirm" || params[1] == "-confirm") {
