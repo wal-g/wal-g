@@ -214,7 +214,7 @@ func (pr *IncrementalPageReader) Initialize() (size int64, err error) {
 	}
 }
 
-func ReadDatabaseFile(fileName string, lsn *uint64, isNew bool) (io.ReadCloser, bool, int64, error) {
+func ReadDatabaseFile(fileName string, lsn *uint64, isNew bool, changeMap []byte) (io.ReadCloser, bool, int64, error) {
 	info, err := os.Stat(fileName)
 	fileSize := info.Size()
 	if err != nil {

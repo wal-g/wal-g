@@ -12,18 +12,39 @@ import (
 // a UNIX socket. Must export PGHOST and run with `sudo -E -u postgres`.
 // If PGHOST is not set or if the connection fails, an error is returned
 // and the connection is `<nil>`.
-func Connect() (*pgx.Conn, error) {
+func (b *Bundle) Connect(delta bool, base_lsn *uint64) (connection *pgx.Conn, err error, ptrack_enabled bool) {
 	config, err := pgx.ParseEnvLibpq()
 	if err != nil {
-		return nil, errors.Wrap(err, "Connect: unable to read environment variables")
+		return nil, errors.Wrap(err, "Connect: unable to read environment variables"), false
 	}
 
-	conn, err := pgx.Connect(config)
+	b.Connection, err = pgx.Connect(config)
 	if err != nil {
-		return nil, errors.Wrap(err, "Connect: postgres connection failed")
+		return nil, errors.Wrap(err, "Connect: postgres connection failed"), false
 	}
 
-	return conn, nil
+	if delta {
+		var lsnStr string
+		err1 := b.Connection.QueryRow("select pg_ptrack_control_lsn()::text").Scan(&lsnStr)
+		lsn, err2 := ParseLsn(lsnStr)
+		return b.Connection, nil, err1 == nil && err2 == nil && lsn <= *base_lsn
+	} else {
+		err1 := b.Connection.QueryRow("select pg_ptrack_clear()").Scan()
+		return b.Connection, nil, err1 == nil
+	}
+}
+
+func (b *Bundle) GetChangeMap(filename string) []byte {
+	if !b.Ptrack {
+		return nil
+	}
+
+	var bytes []byte
+	err := b.Connection.QueryRow("select pg_ptrack_get_and_clear(0,$1)", filename).Scan(&bytes)
+	if err != nil {
+		return nil
+	}
+	return bytes
 }
 
 // StartBackup starts a non-exclusive base backup immediately. When finishing the backup,

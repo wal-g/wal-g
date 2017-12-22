@@ -78,7 +78,7 @@ func main() {
 
 	} else if s3 {
 		tu, _, _ := walg.Configure()
-		c, err := walg.Connect()
+		c, err, _ := bundle.Connect(false, nil)
 		if err != nil {
 			panic(err)
 		}

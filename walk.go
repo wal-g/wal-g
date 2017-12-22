@@ -102,7 +102,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 
 			} else {
 				// !excluded means file was not observed previously
-				f, isPaged, size, err := ReadDatabaseFile(path, bundle.GetIncrementBaseLsn(), !wasInBase)
+				f, isPaged, size, err := ReadDatabaseFile(path, bundle.GetIncrementBaseLsn(), !wasInBase, bundle.GetChangeMap(info.Name()))
 				if err != nil {
 					return errors.Wrapf(err, "HandleTar: failed to open file '%s'\n", path)
 				}

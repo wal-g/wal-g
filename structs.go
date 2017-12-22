@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"bytes"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/jackc/pgx"
 )
 
 // EXCLUDE is a list of excluded members from the bundled backup.
@@ -57,6 +58,7 @@ type TarBundle interface {
 	GetTarBall() TarBall
 	GetIncrementBaseLsn() *uint64
 	GetIncrementBaseFiles() BackupFileList
+	GetChangeMap(filename string) []byte
 }
 
 // A Bundle represents the directory to
@@ -75,9 +77,11 @@ type Bundle struct {
 	Replica            bool
 	IncrementFromLsn   *uint64
 	IncrementFromFiles BackupFileList
+	Ptrack             bool
+	Connection         *pgx.Conn
 }
 
-func (b *Bundle) GetTarBall() TarBall { return b.Tb }
+func (b *Bundle) GetTarBall() TarBall   { return b.Tb }
 func (b *Bundle) NewTarBall() {
 	ntb := b.Tbm.Make()
 	if b.Tb != nil {
@@ -194,6 +198,7 @@ type S3TarBallSentinelDto struct {
 
 	PgVersion int
 	FinishLSN *uint64
+	Ptrack bool
 }
 
 type BackupFileDescription struct {

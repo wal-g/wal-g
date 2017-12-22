@@ -82,7 +82,8 @@ func (fb *FileTarBall) Tw() *tar.Writer { return fb.tw }
 
 func (b *FileTarBall) AppendIncrementalFile(filePath ...string) {}
 func (b *FileTarBall) GetIncrementalFiles() []string            { return nil }
-func (b *FileTarBall) SetFiles(files walg.BackupFileList)        {}
+func (b *FileTarBall) GetChangeMap(filename string) []byte      { return nil }
+func (b *FileTarBall) SetFiles(files walg.BackupFileList)       {}
 func (b *FileTarBall) GetFiles() walg.BackupFileList            { return make(walg.BackupFileList) }
 
 // NOPTarBall mocks a tarball. Used for testing purposes.
@@ -110,5 +111,6 @@ func (n *NOPTarBall) Size() int64     { return n.size }
 func (n *NOPTarBall) SetSize(i int64) { n.size += i }
 func (n *NOPTarBall) Tw() *tar.Writer { return n.tw }
 
-func (b *NOPTarBall) SetFiles(files walg.BackupFileList) {}
-func (b *NOPTarBall) GetFiles() walg.BackupFileList     { return make(walg.BackupFileList) }
+func (b *NOPTarBall) SetFiles(files walg.BackupFileList)  {}
+func (b *NOPTarBall) GetChangeMap(filename string) []byte { return nil }
+func (b *NOPTarBall) GetFiles() walg.BackupFileList       { return make(walg.BackupFileList) }

@@ -540,11 +540,12 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 	}
 
 	// Connect to postgres and start/finish a nonexclusive backup.
-	conn, err := Connect()
+	conn, err, ptrack_enabled := bundle.Connect(dto.LSN != nil, dto.LSN)
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
 	name, lsn, pg_version, err := bundle.StartBackup(conn, time.Now().String())
+	bundle.Ptrack = ptrack_enabled
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
@@ -592,6 +593,7 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 			LSN:              &lsn,
 			IncrementFromLSN: dto.LSN,
 			PgVersion:        pg_version,
+			Ptrack:           ptrack_enabled,
 		}
 		if dto.LSN != nil {
 			sentinel.IncrementFrom = &latest
