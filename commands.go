@@ -544,7 +544,7 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
-	name, lsn, err := bundle.StartBackup(conn, time.Now().String())
+	name, lsn, pg_version, err := bundle.StartBackup(conn, time.Now().String())
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
@@ -591,6 +591,7 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 		sentinel = &S3TarBallSentinelDto{
 			LSN:              &lsn,
 			IncrementFromLSN: dto.LSN,
+			PgVersion:        pg_version,
 		}
 		if dto.LSN != nil {
 			sentinel.IncrementFrom = &latest

@@ -191,6 +191,8 @@ type S3TarBallSentinelDto struct {
 	IncrementCount    *int    `json:"DeltaCount,omitempty"`
 
 	Files BackupFileList
+
+	PgVersion int
 }
 
 type BackupFileDescription struct {

@@ -83,7 +83,7 @@ func main() {
 			panic(err)
 		}
 
-		n, _, err := bundle.StartBackup(c, time.Now().String())
+		n, _, _, err := bundle.StartBackup(c, time.Now().String())
 		if err != nil {
 			fmt.Printf("%+v\n", err)
 			os.Exit(1)
