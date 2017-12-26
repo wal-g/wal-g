@@ -193,6 +193,7 @@ type S3TarBallSentinelDto struct {
 	Files BackupFileList
 
 	PgVersion int
+	FinishLSN *uint64
 }
 
 type BackupFileDescription struct {

@@ -330,12 +330,13 @@ func (bundle *Bundle) HandleSentinel() error {
 
 // HandleLabelFiles creates the `backup_label` and `tablespace_map` files and uploads
 // it to S3 by stopping the backup. Returns error upon failure.
-func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) error {
+func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {
 	var lb string
 	var sc string
-	err := conn.QueryRow("SELECT labelfile, spcmapfile FROM pg_stop_backup(false)").Scan(&lb, &sc)
+	var lsnStr string
+	err := conn.QueryRow("SELECT labelfile, spcmapfile, lsn FROM pg_stop_backup(false)").Scan(&lb, &sc, &lsnStr)
 	if err != nil {
-		return errors.Wrap(err, "HandleLabelFiles: stop backup failed")
+		return 0, errors.Wrap(err, "HandleLabelFiles: stop backup failed")
 	}
 
 	bundle.NewTarBall()
@@ -352,11 +353,11 @@ func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) error {
 
 	err = tarWriter.WriteHeader(lhdr)
 	if err != nil {
-		return errors.Wrap(err, "HandleLabelFiles: failed to write header")
+		return 0, errors.Wrap(err, "HandleLabelFiles: failed to write header")
 	}
 	_, err = io.Copy(tarWriter, strings.NewReader(lb))
 	if err != nil {
-		return errors.Wrap(err, "HandleLabelFiles: copy failed")
+		return 0, errors.Wrap(err, "HandleLabelFiles: copy failed")
 	}
 	fmt.Println(lhdr.Name)
 
@@ -369,18 +370,23 @@ func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) error {
 
 	err = tarWriter.WriteHeader(shdr)
 	if err != nil {
-		return errors.Wrap(err, "HandleLabelFiles: failed to write header")
+		return 0, errors.Wrap(err, "HandleLabelFiles: failed to write header")
 	}
 	_, err = io.Copy(tarWriter, strings.NewReader(sc))
 	if err != nil {
-		return errors.Wrap(err, "HandleLabelFiles: copy failed")
+		return 0, errors.Wrap(err, "HandleLabelFiles: copy failed")
 	}
 	fmt.Println(shdr.Name)
 
 	err = tarBall.CloseTar()
 	if err != nil {
-		return errors.Wrap(err, "HandleLabelFiles: failed to close tarball")
+		return 0, errors.Wrap(err, "HandleLabelFiles: failed to close tarball")
 	}
 
-	return nil
+	lsn, err := ParseLsn(lsnStr)
+	if err != nil {
+		return 0, errors.Wrap(err, "HandleLabelFiles: failed to parse finish LSN")
+	}
+
+	return lsn, nil
 }

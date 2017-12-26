@@ -579,7 +579,7 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 		log.Fatalf("%+v\n", err)
 	}
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` files
-	err = bundle.HandleLabelFiles(conn)
+	finishLsn, err := bundle.HandleLabelFiles(conn)
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
@@ -602,7 +602,8 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 			sentinel.IncrementCount = &incrementCount
 		}
 
-		dto.Files = bundle.Tb.GetFiles()
+		sentinel.Files = bundle.Tb.GetFiles()
+		sentinel.FinishLSN = &finishLsn
 	}
 
 	// Wait for all uploads to finish.
