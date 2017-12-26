@@ -540,7 +540,7 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 	}
 
 	// Connect to postgres and start/finish a nonexclusive backup.
-	conn, err, ptrack_enabled := bundle.Connect(dto.LSN != nil, dto.LSN)
+	conn, err, ptrack_enabled := bundle.Connect(dto.LSN != nil, dto.FinishLSN)
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}

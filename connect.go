@@ -12,7 +12,7 @@ import (
 // a UNIX socket. Must export PGHOST and run with `sudo -E -u postgres`.
 // If PGHOST is not set or if the connection fails, an error is returned
 // and the connection is `<nil>`.
-func (b *Bundle) Connect(delta bool, base_lsn *uint64) (connection *pgx.Conn, err error, ptrack_enabled bool) {
+func (b *Bundle) Connect(delta bool, base_finish_lsn *uint64) (connection *pgx.Conn, err error, ptrack_enabled bool) {
 	config, err := pgx.ParseEnvLibpq()
 	if err != nil {
 		return nil, errors.Wrap(err, "Connect: unable to read environment variables"), false
@@ -23,15 +23,26 @@ func (b *Bundle) Connect(delta bool, base_lsn *uint64) (connection *pgx.Conn, er
 		return nil, errors.Wrap(err, "Connect: postgres connection failed"), false
 	}
 
-	if delta {
-		var lsnStr string
-		err1 := b.Connection.QueryRow("select pg_ptrack_control_lsn()::text").Scan(&lsnStr)
-		lsn, err2 := ParseLsn(lsnStr)
-		return b.Connection, nil, err1 == nil && err2 == nil && lsn <= *base_lsn
-	} else {
-		err1 := b.Connection.QueryRow("select pg_ptrack_clear()").Scan()
-		return b.Connection, nil, err1 == nil
+	var ptrack_enabled_str string
+
+	err = b.Connection.QueryRow("show ptrack_enable").Scan(&ptrack_enabled_str)
+
+	if err == nil && ptrack_enabled_str == "on" {
+		if delta {
+			var lsnStr string
+			err1 := b.Connection.QueryRow("select pg_ptrack_control_lsn()::text").Scan(&lsnStr)
+			lsn, err2 := ParseLsn(lsnStr)
+			ptrack_enabled = err1 == nil && err2 == nil && lsn <= *base_finish_lsn
+			if !ptrack_enabled {
+				panic("Experiment failed")
+			}
+			return b.Connection, nil, ptrack_enabled
+		} else {
+			err1 := b.Connection.QueryRow("select pg_ptrack_clear()").Scan()
+			return b.Connection, nil, err1 == nil
+		}
 	}
+	return b.Connection, nil, false
 }
 
 func (b *Bundle) GetChangeMap(filename string) []byte {
@@ -41,7 +52,7 @@ func (b *Bundle) GetChangeMap(filename string) []byte {
 
 	var bytes []byte
 	err := b.Connection.QueryRow("select pg_ptrack_get_and_clear(0,$1)", filename).Scan(&bytes)
-	if err != nil {
+	if err != nil || len(bytes) == 0 {
 		return nil
 	}
 	return bytes

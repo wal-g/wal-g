@@ -81,7 +81,7 @@ type Bundle struct {
 	Connection         *pgx.Conn
 }
 
-func (b *Bundle) GetTarBall() TarBall   { return b.Tb }
+func (b *Bundle) GetTarBall() TarBall { return b.Tb }
 func (b *Bundle) NewTarBall() {
 	ntb := b.Tbm.Make()
 	if b.Tb != nil {
@@ -193,6 +193,7 @@ type S3TarBallSentinelDto struct {
 	IncrementFrom     *string `json:"DeltaFrom,omitempty"`
 	IncrementFullName *string `json:"DeltaFullName,omitempty"`
 	IncrementCount    *int    `json:"DeltaCount,omitempty"`
+
 
 	Files BackupFileList
 

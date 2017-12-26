@@ -157,21 +157,21 @@ func PagedFileCompare(filename1 string, filename2 string, lsn uint64) {
 
 			if lsn1 != lsn2 {
 				if (lsn1 < lsn) {
-					log.Panic("Increment pages did not restore page with different LSN")
+					fmt.Println("!!!!!!!!!!!!Increment pages did not restore page with different LSN")
 				} else {
 					fmt.Println("LSNs differ, but origin is newer than backup")
 				}
-			}
 
-			//fmt.Println(b1)
-			//fmt.Println(b2)
-			for x := 0; x < int(walg.BlockSize); x++ {
+				fmt.Println(b1)
+				fmt.Println(b2)
+				/*for x := 0; x < int(walg.BlockSize); x++ {
 				//if b1[x]^b2[x] == 1 {
 				//	continue
 				//}
 				if b1[x] != b2[x] && b1[x]^b2[x] != 1 {
 					fmt.Printf("bitdiff %x: Different bytes %x and %x at %x\n", b1[x]^b2[x], b1[x], b2[x], x)
 				}
+			}*/
 			}
 		}
 		chunkNumber++
@@ -180,7 +180,7 @@ func PagedFileCompare(filename1 string, filename2 string, lsn uint64) {
 
 func Bench() {
 	var err error
-	out, err := exec.Command(pgbenchCommand, "postgres", "-T", "20", "-c", "3", "-j", "3").Output()
+	out, err := exec.Command(pgbenchCommand, "postgres", "-T", "5", "-c", "3", "-j", "3").Output()
 	fmt.Println(string(out))
 	if err != nil {
 		log.Fatal(err);

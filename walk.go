@@ -71,6 +71,10 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 	tarBall := bundle.GetTarBall()
 	fileName := info.Name()
 	_, excluded := EXCLUDE[info.Name()]
+	if strings.HasSuffix(info.Name(), "_ptrack") {
+		excluded = true
+	}
+
 	tarBall.SetUp(crypter)
 	tarWriter := tarBall.Tw()
 

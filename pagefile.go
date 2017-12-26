@@ -17,6 +17,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"sort"
 )
 
 const (
@@ -146,7 +147,7 @@ func (pr *IncrementalPageReader) Close() error {
 
 var InvalidBlock = errors.New("Block is not valid")
 
-func (pr *IncrementalPageReader) Initialize() (size int64, err error) {
+func (pr *IncrementalPageReader) Initialize(changeMap []byte) (size int64, err error) {
 	size = 0
 	// "wi" at the head stands for "wal-g increment"
 	// format version "1", signature magic number
@@ -161,57 +162,88 @@ func (pr *IncrementalPageReader) Initialize() (size int64, err error) {
 	pageBytes := make([]byte, BlockSize)
 	pr.blocks = make([]uint32, 0, fileSize/int64(BlockSize))
 
-	for currentBlockNumber := uint32(0); ; currentBlockNumber++ {
-		n, err := io.ReadFull(pr.file, pageBytes)
-		if err == io.ErrUnexpectedEOF || n%int(BlockSize) != 0 {
-			return 0, errors.New("Unexpected EOF during increment scan")
+	if changeMap != nil {
+		fmt.Println("Using PTRACK map")
+		for i, b := range changeMap {
+			for shift := uint32(0); shift < 8; shift++ {
+				if b&(1<<shift) != 0 {
+					pr.blocks = append(pr.blocks, uint32(uint32(i)*uint32(8)+shift))
+				}
+			}
 		}
-
-		if err == io.EOF {
-			diffBlockCount := len(pr.blocks)
-			lenBytes := make([]byte, sizeofInt32)
-			binary.LittleEndian.PutUint32(lenBytes, uint32(diffBlockCount))
-			pr.backlog <- lenBytes
-			size += sizeofInt32
-
-			diffMap := make([]byte, diffBlockCount*sizeofInt32)
-
-			for index, blockNo := range pr.blocks {
-				binary.LittleEndian.PutUint32(diffMap[index*sizeofInt32:(index+1)*sizeofInt32], blockNo)
+	} else {
+		for currentBlockNumber := uint32(0); ; currentBlockNumber++ {
+			n, err := io.ReadFull(pr.file, pageBytes)
+			if err == io.ErrUnexpectedEOF || n%int(BlockSize) != 0 {
+				return 0, errors.New("Unexpected EOF during increment scan")
 			}
 
-			pr.backlog <- diffMap
-			size += int64(diffBlockCount * sizeofInt32)
-			dataSize := int64(len(pr.blocks)) * int64(BlockSize)
-			size += dataSize
-			_, err := pr.seeker.Seek(0, 0)
-			if err != nil {
-				return 0, nil
-			}
-			pr.file.N = dataSize
-			return size, nil
-		}
-
-		if err == nil {
-			lsn, valid := ParsePageHeader(pageBytes)
-
-			var allZeroes = false
-			if !valid && allZero(pageBytes) {
-				allZeroes = true
-				valid = true
+			if err == io.EOF {
+				break;
 			}
 
-			if !valid {
-				return 0, InvalidBlock
-			}
+			if err == nil {
+				lsn, valid := ParsePageHeader(pageBytes)
 
-			if (allZeroes) || (lsn >= pr.lsn) {
-				pr.blocks = append(pr.blocks, currentBlockNumber)
+				var allZeroes = false
+				if !valid && allZero(pageBytes) {
+					allZeroes = true
+					valid = true
+				}
+
+				if !valid {
+					return 0, InvalidBlock
+				}
+
+				if (allZeroes) || (lsn >= pr.lsn) {
+					pr.blocks = append(pr.blocks, currentBlockNumber)
+				}
+			} else {
+				return 0, err
 			}
-		} else {
-			return 0, err
 		}
 	}
+
+	/*
+	Map comparison code
+
+	ptrack_blocks := pr.blocks
+	pr.blocks = make([]uint32, 0, fileSize/int64(BlockSize))
+
+	if len(ptrack_blocks)!=len(pr.blocks){
+		for _,b:=range pr.blocks {
+			if ptrack_blocks[SearchUInts(ptrack_blocks,b)]!=b {
+				fmt.Println("!!!!!!!!!!! Block not found ", b)
+			}
+		}
+	}*/
+
+	diffBlockCount := len(pr.blocks)
+	lenBytes := make([]byte, sizeofInt32)
+	binary.LittleEndian.PutUint32(lenBytes, uint32(diffBlockCount))
+	pr.backlog <- lenBytes
+	size += sizeofInt32
+
+	diffMap := make([]byte, diffBlockCount*sizeofInt32)
+
+	for index, blockNo := range pr.blocks {
+		binary.LittleEndian.PutUint32(diffMap[index*sizeofInt32:(index+1)*sizeofInt32], blockNo)
+	}
+
+	pr.backlog <- diffMap
+	size += int64(diffBlockCount * sizeofInt32)
+	dataSize := int64(len(pr.blocks)) * int64(BlockSize)
+	size += dataSize
+	_, err = pr.seeker.Seek(0, 0)
+	if err != nil {
+		return 0, nil
+	}
+	pr.file.N = dataSize
+	return size, nil
+}
+
+func SearchUInts(a []uint32, x uint32) int {
+	return sort.Search(len(a), func(i int) bool { return a[i] >= x })
 }
 
 func ReadDatabaseFile(fileName string, lsn *uint64, isNew bool, changeMap []byte) (io.ReadCloser, bool, int64, error) {
@@ -236,7 +268,7 @@ func ReadDatabaseFile(fileName string, lsn *uint64, isNew bool, changeMap []byte
 	}
 
 	reader := &IncrementalPageReader{make(chan []byte, 4), lim, file, file, info, *lsn, nil, nil}
-	incrSize, err := reader.Initialize()
+	incrSize, err := reader.Initialize(changeMap)
 	if err != nil {
 		if err == InvalidBlock {
 			file.Close()
