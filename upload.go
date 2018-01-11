@@ -72,6 +72,9 @@ func Configure() (*TarUploader, *Prefix, error) {
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "Configure: failed to parse url '%s'", wale_s3_prefix)
 	}
+	if u.Scheme == "" || u.Host == "" {
+		return nil, nil, fmt.Errorf("Missing url scheme=%q and/or host=%q", u.Scheme, u.Host)
+	}
 
 	bucket := u.Host
 	var server = ""
