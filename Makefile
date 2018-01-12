@@ -4,7 +4,7 @@ PKG_FILES = $(wildcard *.go)
 .PHONY : test install all clean
 
 test: cmd/wal-g/wal-g
-	go vet ./...
+	go list ./... | grep -v 'vendor/' | xargs go vet
 	go test -v
 
 all: cmd/wal-g/wal-g
