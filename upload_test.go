@@ -105,6 +105,9 @@ func doConfigureWithBuсketPath(t *testing.T, bucketPath string, expectedServer 
 		t.Log(err)
 	}
 	tu, pre, err = walg.Configure()
+	if err != nil {
+		t.Errorf("upload: unexpected error %v", err)
+	}
 	if *pre.Bucket != "bucket" {
 		t.Errorf("upload: Prefix field 'Bucket' expected %s but got %s", "bucket", *pre.Bucket)
 	}
