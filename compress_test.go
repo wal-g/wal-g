@@ -130,7 +130,6 @@ func TestLzPipeWriterError(t *testing.T) {
 	lz.Compress(walg.MockDisarmedCrypter())
 
 	_, err := ioutil.ReadAll(lz.Output)
-	err.Error()
 	if err == nil {
 		t.Errorf("compress: LzPipeWriter expected error but got `<nil>`")
 	}

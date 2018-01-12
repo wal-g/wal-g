@@ -25,7 +25,6 @@ func TestUnsupportedFileType(t *testing.T) {
 	files := []walg.ReaderMaker{brm}
 	err := walg.ExtractAll(buf, files)
 
-	err.Error()
 	if serr, ok := err.(*walg.UnsupportedFileTypeError); ok {
 		t.Errorf("extract: Extract should not support filetype %s", brm.FileFormat)
 	} else if serr != nil {
