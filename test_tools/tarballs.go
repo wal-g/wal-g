@@ -42,13 +42,15 @@ func (fb *FileTarBall) SetUp(crypter walg.Crypter, names ...string) {
 			}
 
 			fb.w = &walg.Lz4CascadeClose2{
-				Underlying: lz4.NewWriter(f),
-				Underlying2: wc,
+				Writer: lz4.NewWriter(f),
+				Underlying: wc,
+				Underlying2: f,
 			}
 		} else {
 			wc = f;
 			fb.w = &walg.Lz4CascadeClose{
-				Underlying: lz4.NewWriter(f),
+				Writer: lz4.NewWriter(f),
+				Underlying: wc,
 			}
 		}
 

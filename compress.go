@@ -10,39 +10,28 @@ import (
 // into one function. Calling Close() will close the
 // lz4 and underlying writer.
 type Lz4CascadeClose struct {
-	Lz4Writer *lz4.Writer
+	*lz4.Writer
 	Underlying io.WriteCloser
 }
 
 // Close returns the first encountered error from closing
 // the lz4 writer or the underlying writer.
 func (lcc *Lz4CascadeClose) Close() error {
-	if lcc.Lz4Writer != nil {
-		err := lcc.Lz4Writer.Close()
-		if err != nil {
-			return errors.Wrap(err, "Lz4 Close: failed to close lz4 writer")
-		}
+	err := lcc.Writer.Close()
+	if err != nil {
+		return errors.Wrap(err, "Lz4 Close: failed to close lz4 writer")
 	}
-	if lcc.Underlying != nil {
-		err := lcc.Underlying.Close()
-		if err != nil {
-			return errors.Wrap(err, "Lz4 Close: failed to close underlying writer")
-		}
+	err = lcc.Underlying.Close()
+	if err != nil {
+		return errors.Wrap(err, "Lz4 Close: failed to close underlying writer")
 	}
 	return nil
-}
-
-func (lcc *Lz4CascadeClose) Write(p []byte) (n int, err error) {
-	if lcc.Lz4Writer != nil {
-		return lcc.Lz4Writer.Write(p)
-	}
-	return lcc.Underlying.Write(p)
 }
 
 // Cascade closers with two independent closers.
 // This peculiar behavior is required to handle OpenGPG Writer behavior
 type Lz4CascadeClose2 struct {
-	Lz4Writer *lz4.Writer
+	*lz4.Writer
 	Underlying  io.WriteCloser
 	Underlying2 io.WriteCloser
 }
@@ -50,7 +39,7 @@ type Lz4CascadeClose2 struct {
 // Close returns the first encountered error from closing
 // the lz4 writer or the underlying writer.
 func (lcc *Lz4CascadeClose2) Close() error {
-	err := lcc.Lz4Writer.Close()
+	err := lcc.Writer.Close()
 	if err != nil {
 		return errors.Wrap(err, "Lz4 Close: failed to close lz4 writer")
 	}
@@ -63,13 +52,6 @@ func (lcc *Lz4CascadeClose2) Close() error {
 		return errors.Wrap(err, "Lz4 Close: failed to close underlying writer")
 	}
 	return nil
-}
-
-func (lcc *Lz4CascadeClose2) Write(p []byte) (n int, err error) {
-	if lcc.Lz4Writer != nil {
-		return lcc.Lz4Writer.Write(p)
-	}
-	return lcc.Underlying.Write(p)
 }
 
 // LzPipeWriter allows for flexibility of using compressed output.
