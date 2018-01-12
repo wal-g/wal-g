@@ -166,7 +166,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	lzoFlag := str[3]
 
 	sb := NewStrideByteReader(stride)
-	lr := io.LimitedReader{sb, int64(nBytes)}
+	lr := io.LimitedReader{
+		R: sb,
+		N: int64(nBytes),
+	}
 
 	//defer walg.TimeTrack(time.Now(), "HANDLER")
 

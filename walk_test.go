@@ -68,11 +68,17 @@ func generateData(t *testing.T) string {
 	fmt.Println(dir)
 
 	sb := tools.NewStrideByteReader(10)
-	lr := &io.LimitedReader{sb, int64(1024 * 1024)}
+	lr := &io.LimitedReader{
+		R: sb,
+		N: int64(1024 * 1024),
+	}
 
 	// Generates 5 1MB files
 	for i := 1; i < 6; i++ {
-		lr = &io.LimitedReader{sb, int64(100)}
+		lr = &io.LimitedReader{
+			R: sb,
+			N: int64(100),
+		}
 		f, err := os.Create(filepath.Join(dir, strconv.Itoa(i)))
 		if err != nil {
 			t.Log(err)
@@ -107,7 +113,10 @@ func generateData(t *testing.T) string {
 	}
 
 	// Generate large enough file (500MB) so that goroutine doesn't finish before extracting pg_control
-	lr = &io.LimitedReader{sb, int64(500 * 1024 * 1024)}
+	lr = &io.LimitedReader{
+		R: sb,
+		N: int64(500 * 1024 * 1024),
+	}
 	_, err = io.Copy(s, lr)
 	if err != nil {
 		t.Log(err)
@@ -254,8 +263,14 @@ func computeSha(t *testing.T, file1, file2 string) bool {
 	buf1 := make([]byte, BUFSIZE)
 	buf2 := make([]byte, BUFSIZE)
 
-	l1 := &io.LimitedReader{f1, BUFSIZE}
-	l2 := &io.LimitedReader{f2, BUFSIZE}
+	l1 := &io.LimitedReader{
+		R: f1,
+		N: BUFSIZE,
+	}
+	l2 := &io.LimitedReader{
+		R: f2,
+		N: BUFSIZE,
+	}
 
 	l1.Read(buf1)
 	l2.Read(buf2)

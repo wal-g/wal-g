@@ -49,7 +49,10 @@ var tests = []struct {
 func TestLz4Close(t *testing.T) {
 	for _, tt := range tests {
 		b := &BufCloser{bytes.NewBufferString(tt.testString), false}
-		lz := &walg.Lz4CascadeClose{lz4.NewWriter(b), b}
+		lz := &walg.Lz4CascadeClose{
+			Lz4Writer: lz4.NewWriter(b),
+			Underlying: b,
+		}
 
 		random := make([]byte, tt.written)
 		_, err := rand.Read(random)
@@ -82,7 +85,10 @@ func TestLz4Close(t *testing.T) {
 
 func TestLz4CloseError(t *testing.T) {
 	mock := &ErrorWriteCloser{}
-	lz := &walg.Lz4CascadeClose{lz4.NewWriter(mock), mock}
+	lz := &walg.Lz4CascadeClose{
+		Lz4Writer: lz4.NewWriter(mock),
+		Underlying: mock,
+	}
 
 	_, err := lz.Write([]byte{byte('a')})
 	if err == nil {
