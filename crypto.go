@@ -10,6 +10,8 @@ import (
 	"os/user"
 	"io/ioutil"
 	"encoding/json"
+	"path/filepath"
+	"strings"
 )
 
 type Crypter interface {
@@ -151,22 +153,26 @@ func GetPubRingArmour(keyId string) ([]byte, error) {
 
 	usr, err := user.Current()
 	if err == nil {
-
-		cacheFilename = usr.HomeDir+"/.walg_key_cache"
-
+		cacheFilename = filepath.Join(usr.HomeDir, ".walg_key_cache")
 		file, err := ioutil.ReadFile(cacheFilename)
 		// here we ignore whatever error can occur
 		if err == nil {
 			json.Unmarshal(file, &cache)
-			if cache.KeyId == keyId {
+			if cache.KeyId == keyId && len(cache.Body) > 0 { // don't return an empty cached value
 				return cache.Body, nil
 			}
 		}
 	}
 
-	out, err := exec.Command(gpgBin, "-a", "--export", keyId).Output()
+	cmd := exec.Command(gpgBin, "-a", "--export", keyId)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
 	if err != nil {
 		return nil, err
+	}
+	if stderr.Len() > 0 { // gpg -a --export <key-id> reports error on stderr and exits == 0 if the key isn't found
+		return nil, errors.New(strings.TrimSpace(stderr.String()))
 	}
 
 	cache.KeyId = keyId
