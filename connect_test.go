@@ -2,6 +2,7 @@ package walg_test
 
 import (
 	"github.com/wal-g/wal-g"
+	"strings"
 	"testing"
 )
 
@@ -27,8 +28,9 @@ var names = []struct {
 func TestFormatName(t *testing.T) {
 	for _, n := range names {
 		actual, err := walg.FormatName(n.input)
-		if err != nil {
-			err.Error()
+		if err != nil && !strings.Contains(err.Error(), "No match found in") {
+			t.Error(err) // error other than 'no match', probably bad
+			continue
 		}
 		if actual != n.expected && err != n.err {
 			t.Errorf("connect: FormatName expected `%s` and `%v` but got `%s` and `%v`", n.expected, err, actual, n.err)
