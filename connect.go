@@ -12,6 +12,8 @@ import (
 // a UNIX socket. Must export PGHOST and run with `sudo -E -u postgres`.
 // If PGHOST is not set or if the connection fails, an error is returned
 // and the connection is `<nil>`.
+//
+// Example: PGHOST=/var/run/postgresql or PGHOST=10.0.0.1
 func Connect() (*pgx.Conn, error) {
 	config, err := pgx.ParseEnvLibpq()
 	if err != nil {
