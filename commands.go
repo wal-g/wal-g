@@ -280,6 +280,7 @@ func HandleBackupList(pre *Prefix) {
 }
 
 func HandleBackupFetch(backupName string, pre *Prefix, dirArc string, mem bool) (lsn *uint64) {
+	dirArc = ResolveSymlink(dirArc)
 	lsn = DeltaFetchRecursion(backupName, pre, dirArc)
 
 	if mem {
@@ -491,6 +492,7 @@ func GetDeltaConfig() (max_deltas int, from_full bool) {
 }
 
 func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
+	dirArc = ResolveSymlink(dirArc)
 	max_deltas, from_full := GetDeltaConfig()
 
 	var bk = &Backup{
@@ -614,6 +616,7 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 }
 
 func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPrefetch bool) {
+	location = ResolveSymlink(location)
 	if triggerPrefetch {
 		defer forkPrefetch(walFileName, location)
 	}
