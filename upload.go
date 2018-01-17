@@ -262,7 +262,7 @@ func (tu *TarUploader) UploadWal(path string) (string, error) {
 
 	lz.Compress(&OpenPGPCrypter{})
 
-	p := tu.server + "/wal_005/" + filepath.Base(path) + ".lz4"
+	p := sanitizePath(tu.server + "/wal_005/" + filepath.Base(path) + ".lz4")
 	input := tu.createUploadInput(p, lz.Output)
 
 	tu.wg.Add(1)

@@ -22,7 +22,7 @@ func HandleDelete(pre *Prefix, args []string) {
 
 	var bk = &Backup{
 		Prefix: pre,
-		Path:   aws.String(*pre.Server + "/basebackups_005/"),
+		Path:   GetBackupPath(pre),
 	}
 
 	if cfg.before {
@@ -202,7 +202,7 @@ func DeleteBackupsBefore(backups []BackupTime, skipline int, pre *Prefix) {
 func dropBackup(pre *Prefix, b BackupTime) {
 	var bk = &Backup{
 		Prefix: pre,
-		Path:   aws.String(*pre.Server + "/basebackups_005/"),
+		Path:   GetBackupPath(pre),
 		Name:   aws.String(b.Name),
 	}
 	tarFiles, err := bk.GetKeys()
@@ -235,7 +235,7 @@ func partitionToObjects(keys []string) []*s3.ObjectIdentifier {
 func DeleteWALBefore(bt BackupTime, pre *Prefix) {
 	var bk = &Backup{
 		Prefix: pre,
-		Path:   aws.String(*pre.Server + "/wal_005/"),
+		Path:   aws.String(sanitizePath(*pre.Server + "/wal_005/")),
 	}
 
 	objects, err := bk.GetWals(bt.WalFileName)
@@ -266,7 +266,7 @@ func PrintDeleteUsageAndFail() {
 func HandleBackupList(pre *Prefix) {
 	var bk = &Backup{
 		Prefix: pre,
-		Path:   aws.String(*pre.Server + "/basebackups_005/"),
+		Path:   GetBackupPath(pre),
 	}
 	backups, err := bk.GetBackups()
 	if err != nil {
@@ -302,7 +302,7 @@ func DeltaFetchRecursion(backupName string, pre *Prefix, dirArc string) (lsn *ui
 	if backupName != "LATEST" {
 		bk = &Backup{
 			Prefix: pre,
-			Path:   aws.String(*pre.Server + "/basebackups_005/"),
+			Path:   GetBackupPath(pre),
 			Name:   aws.String(backupName),
 		}
 		bk.Js = aws.String(*bk.Path + *bk.Name + "_backup_stop_sentinel.json")
@@ -319,7 +319,7 @@ func DeltaFetchRecursion(backupName string, pre *Prefix, dirArc string) (lsn *ui
 	} else {
 		bk = &Backup{
 			Prefix: pre,
-			Path:   aws.String(*pre.Server + "/basebackups_005/"),
+			Path:   GetBackupPath(pre),
 		}
 
 		latest, err := bk.GetLatest()
@@ -497,7 +497,7 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 
 	var bk = &Backup{
 		Prefix: pre,
-		Path:   aws.String(*pre.Server + "/basebackups_005/"),
+		Path:   GetBackupPath(pre),
 	}
 
 	var dto S3TarBallSentinelDto
@@ -656,7 +656,7 @@ func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPre
 func DownloadFile(pre *Prefix, walFileName string, location string) {
 	a := &Archive{
 		Prefix:  pre,
-		Archive: aws.String(*pre.Server + "/wal_005/" + walFileName + ".lzo"),
+		Archive: aws.String(sanitizePath(*pre.Server + "/wal_005/" + walFileName + ".lzo")),
 	}
 	// Check existence of compressed LZO WAL file
 	exists, err := a.CheckExistence()
@@ -691,7 +691,7 @@ func DownloadFile(pre *Prefix, walFileName string, location string) {
 		f.Close()
 	} else if !exists {
 		// Check existence of compressed LZ4 WAL file
-		a.Archive = aws.String(*pre.Server + "/wal_005/" + walFileName + ".lz4")
+		a.Archive = aws.String(sanitizePath(*pre.Server + "/wal_005/" + walFileName + ".lz4"))
 		exists, err = a.CheckExistence()
 		if err != nil {
 			log.Fatalf("%+v\n", err)

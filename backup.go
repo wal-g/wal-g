@@ -171,7 +171,7 @@ func (b *Backup) CheckExistence() (bool, error) {
 func (b *Backup) GetKeys() ([]string, error) {
 	objects := &s3.ListObjectsV2Input{
 		Bucket: b.Prefix.Bucket,
-		Prefix: aws.String(*b.Path + *b.Name + "/tar_partitions"),
+		Prefix: aws.String(sanitizePath(*b.Path + *b.Name + "/tar_partitions")),
 	}
 
 	result := make([]string, 0)
@@ -199,7 +199,7 @@ func (b *Backup) GetKeys() ([]string, error) {
 func (b *Backup) GetWals(before string) ([]*s3.ObjectIdentifier, error) {
 	objects := &s3.ListObjectsV2Input{
 		Bucket: b.Prefix.Bucket,
-		Prefix: aws.String(*b.Path),
+		Prefix: aws.String(sanitizePath(*b.Path)),
 	}
 
 	arr := make([]*s3.ObjectIdentifier, 0)
@@ -292,4 +292,14 @@ func fetchSentinel(backupName string, bk *Backup, pre *Prefix) (dto S3TarBallSen
 		log.Fatalf("%+v\n", err)
 	}
 	return
+}
+
+func GetBackupPath(prefix *Prefix) *string {
+	path := *prefix.Server + "/basebackups_005/"
+	server := sanitizePath(path)
+	return aws.String(server)
+}
+
+func sanitizePath(path string) string {
+	return strings.TrimLeft(path, "/")
 }

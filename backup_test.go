@@ -165,7 +165,7 @@ func TestBackupErrors(t *testing.T) {
 
 	bk := &walg.Backup{
 		Prefix: pre,
-		Path:   aws.String(*pre.Server + "/basebackups_005/"),
+		Path:   walg.GetBackupPath(pre),
 		Name:   aws.String("base_backupmockBackup"),
 	}
 
@@ -228,7 +228,7 @@ func TestBackup(t *testing.T) {
 
 	bk := &walg.Backup{
 		Prefix: pre,
-		Path:   aws.String(*pre.Server + "/basebackups_005/"),
+		Path:   walg.GetBackupPath(pre),
 		Name:   aws.String("base_backupmockBackup"),
 	}
 
