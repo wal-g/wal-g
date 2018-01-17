@@ -25,6 +25,30 @@ func Connect() (*pgx.Conn, error) {
 		return nil, errors.Wrap(err, "Connect: postgres connection failed")
 	}
 
+	var archive_mode string
+
+	err = conn.QueryRow("show archive_mode").Scan(&archive_mode)
+
+	if err != nil {
+		return nil, errors.Wrap(err, "Connect: postgres archive_mode test failed")
+	}
+
+	if archive_mode != "on" && archive_mode != "always" {
+		log.Println("WARNING! It seems your archive_mode is not enabled. This will cause inconsistent backup. Please consider configuring WAL archiving.")
+	} else {
+		var archive_command string
+
+		err = conn.QueryRow("show archive_command").Scan(&archive_command)
+
+		if err != nil {
+			return nil, errors.Wrap(err, "Connect: postgres archive_mode test failed")
+		}
+
+		if (len(archive_command) == 0 || archive_command == "(disabled)") {
+			log.Println("WARNING! It seems your archive_command is not configured. This will cause inconsistent backup. Please consider configuring WAL archiving.")
+		}
+	}
+
 	return conn, nil
 }
 
