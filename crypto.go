@@ -139,7 +139,16 @@ func GetKeyRingId() string {
 	return os.Getenv("WALE_GPG_KEY_ID")
 }
 
-const gpgBin = "gpg"
+func GetGpgBinPath() string {
+	gpgBinPath := os.Getenv("GPG_BIN_PATH")
+	if gpgBinPath == "" {
+		return "gpg"
+	}
+
+	return gpgBinPath
+}
+
+var gpgBin = GetGpgBinPath()
 
 type CachedKey struct {
 	KeyId string `json:"keyId"`
