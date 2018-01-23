@@ -95,6 +95,9 @@ To configure GPG key for encryption and decryption. By default, no encryption is
 
  To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not exceeded). `WALG_DELTA_ORIGIN` can be LATEST (chaining increments), LATEST_FULL (for bases where volatile part is compact and chaining has no meaning - deltas overwrite each other). Defaults to LATEST.
 
+* `GPG_BIN_PATH`
+
+To configure the path to the `gpg` command. If not set, it defaults to `gpg` and is assumed to be on the PATH.
 
 Usage
 -----
