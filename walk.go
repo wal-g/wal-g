@@ -30,7 +30,12 @@ func (z *ZeroReader) Read(p []byte) (int, error) {
 // contents will not be included in the tar bundle.
 func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error {
 	if err != nil {
-		return errors.Wrap(err, "TarWalker: walk failed")
+		if os.IsNotExist(err) {
+			fmt.Println(path, " deleted dring filepath walk")
+			return nil
+		} else {
+			return errors.Wrap(err, "TarWalker: walk failed")
+		}
 	}
 
 	if info.Name() == "pg_control" {
