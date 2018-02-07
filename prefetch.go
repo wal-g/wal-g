@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"path"
 	"strings"
-	"syscall"
+	"os/exec"
 )
 
 func HandleWALPrefetch(pre *Prefix, walFileName string, location string) {
@@ -17,7 +17,7 @@ func HandleWALPrefetch(pre *Prefix, walFileName string, location string) {
 	location = path.Dir(location)
 	errors := make(chan (interface{}))
 	awaited := 0
-	for i := 0; i < 8; i++ {
+	for i := 0; i < getMaxConcurrency(8); i++ {
 		fileName, err = NextWALFileName(fileName)
 		if err != nil {
 			log.Println("WAL-prefetch failed: ", err, " file: ", fileName)
@@ -79,7 +79,9 @@ func forkPrefetch(walFileName string, location string) {
 	if strings.Contains(walFileName, "history") || strings.Contains(walFileName, "partial") {
 		return // There will be nothing ot prefetch anyway
 	}
-	err := syscall.Exec(os.Args[0], []string{os.Args[0], "wal-prefetch", walFileName, location}, os.Environ())
+	cmd := exec.Command(os.Args[0], "wal-prefetch", walFileName, location)
+	cmd.Env = os.Environ()
+	err := cmd.Start()
 
 	if err != nil {
 		log.Println("WAL-prefetch failed: ", err)

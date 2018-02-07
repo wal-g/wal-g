@@ -4,6 +4,8 @@ import (
 	"time"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"path/filepath"
+	"os"
+	"strconv"
 )
 
 // BackupTime is used to sort backups by
@@ -63,4 +65,16 @@ func ResolveSymlink(path string) string {
 		return path
 	}
 	return resolve
+}
+
+
+func getMaxConcurrency(reasonableMaximum int) int {
+	var con int
+	conc, ok := os.LookupEnv("WALG_DOWNLOAD_CONCURRENCY")
+	if ok {
+		con, _ = strconv.Atoi(conc)
+	} else {
+		con = min(10, reasonableMaximum)
+	}
+	return con
 }

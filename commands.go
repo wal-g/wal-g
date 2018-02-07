@@ -729,6 +729,16 @@ func DownloadFile(pre *Prefix, walFileName string, location string) {
 }
 
 func HandleWALPush(tu *TarUploader, dirArc string) {
+	bu := BgUploader{}
+	// Look for new WALs while doing main upload
+	bu.Start(dirArc, int32(getMaxConcurrency(16)-1), tu)
+
+	UploadWALFile(tu, dirArc)
+
+	bu.Stop()
+}
+
+func UploadWALFile(tu *TarUploader, dirArc string) {
 	path, err := tu.UploadWal(dirArc)
 	if re, ok := err.(Lz4Error); ok {
 		log.Fatalf("FATAL: could not upload '%s' due to compression error.\n%+v\n", path, re)

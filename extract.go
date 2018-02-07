@@ -4,8 +4,6 @@ import (
 	"archive/tar"
 	"github.com/pkg/errors"
 	"io"
-	"os"
-	"strconv"
 )
 
 func min(a, b int) int {
@@ -116,14 +114,7 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 	}()
 
 	// Set maximum number of goroutines spun off by ExtractAll
-	var con int
-
-	conc, ok := os.LookupEnv("WALG_DOWNLOAD_CONCURRENCY")
-	if ok {
-		con, _ = strconv.Atoi(conc)
-	} else {
-		con = min(10, len(files))
-	}
+	var con = getMaxConcurrency(len(files))
 
 	concurrent := make(chan Empty, con)
 	for i := 0; i < con; i++ {
