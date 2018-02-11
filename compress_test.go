@@ -50,7 +50,7 @@ func TestLz4Close(t *testing.T) {
 	for _, tt := range tests {
 		b := &BufCloser{bytes.NewBufferString(tt.testString), false}
 		lz := &walg.Lz4CascadeClose{
-			Writer: lz4.NewWriter(b),
+			Writer:     lz4.NewWriter(b),
 			Underlying: b,
 		}
 
@@ -86,7 +86,7 @@ func TestLz4Close(t *testing.T) {
 func TestLz4CloseError(t *testing.T) {
 	mock := &ErrorWriteCloser{}
 	lz := &walg.Lz4CascadeClose{
-		Writer: lz4.NewWriter(mock),
+		Writer:     lz4.NewWriter(mock),
 		Underlying: mock,
 	}
 

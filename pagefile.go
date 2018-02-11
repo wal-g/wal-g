@@ -11,12 +11,12 @@
 package walg
 
 import (
-	"os"
-	"strings"
-	"io"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"strings"
 )
 
 const (
@@ -36,16 +36,16 @@ func ParsePageHeader(data []byte) (lsn uint64, valid bool) {
 	// Any ideas on how to make this code pretty and nice?
 	le := binary.LittleEndian
 	pd_lsn_h := le.Uint32(data[0:sizeofInt32])
-	pd_lsn_l := le.Uint32(data[sizeofInt32:2*sizeofInt32])
+	pd_lsn_l := le.Uint32(data[sizeofInt32 : 2*sizeofInt32])
 
 	// pd_checksum := binary.LittleEndian.Uint16(data[2*sizeofInt32:2*sizeofInt32+sizeofInt16])
-	pd_flags := le.Uint16(data[2*sizeofInt32+sizeofInt16:2*sizeofInt32+2*sizeofInt16])
-	pd_lower := le.Uint16(data[2*sizeofInt32+2*sizeofInt16:2*sizeofInt32+3*sizeofInt16])
-	pd_upper := le.Uint16(data[2*sizeofInt32+3*sizeofInt16:2*sizeofInt32+4*sizeofInt16])
-	pd_special := le.Uint16(data[2*sizeofInt32+4*sizeofInt16:2*sizeofInt32+5*sizeofInt16])
-	pd_pagesize_version := le.Uint16(data[2*sizeofInt32+5*sizeofInt16:2*sizeofInt32+6*sizeofInt16])
+	pd_flags := le.Uint16(data[2*sizeofInt32+sizeofInt16 : 2*sizeofInt32+2*sizeofInt16])
+	pd_lower := le.Uint16(data[2*sizeofInt32+2*sizeofInt16 : 2*sizeofInt32+3*sizeofInt16])
+	pd_upper := le.Uint16(data[2*sizeofInt32+3*sizeofInt16 : 2*sizeofInt32+4*sizeofInt16])
+	pd_special := le.Uint16(data[2*sizeofInt32+4*sizeofInt16 : 2*sizeofInt32+5*sizeofInt16])
+	pd_pagesize_version := le.Uint16(data[2*sizeofInt32+5*sizeofInt16 : 2*sizeofInt32+6*sizeofInt16])
 
-	lsn = ((uint64(pd_lsn_h)) << 32) + uint64(pd_lsn_l);
+	lsn = ((uint64(pd_lsn_h)) << 32) + uint64(pd_lsn_l)
 	if (pd_flags&valid_flags) != pd_flags ||
 		pd_lower < header_size ||
 		pd_lower > pd_upper ||
@@ -150,7 +150,7 @@ func (pr *IncrementalPageReader) Initialize() (size int64, err error) {
 	size = 0
 	// "wi" at the head stands for "wal-g increment"
 	// format version "1", signature magic number
-	pr.next = &[]byte{'w', 'i', '1', signatureMagicNumber};
+	pr.next = &[]byte{'w', 'i', '1', signatureMagicNumber}
 	size += sizeofInt32
 	fileSizeBytes := make([]byte, sizeofInt64)
 	fileSize := pr.info.Size()
@@ -253,7 +253,7 @@ func ReadDatabaseFile(fileName string, lsn *uint64, isNew bool) (io.ReadCloser, 
 	return reader, true, incrSize, nil
 }
 
-func ApplyFileIncrement(fileName string, increment io.Reader) (error) {
+func ApplyFileIncrement(fileName string, increment io.Reader) error {
 	fmt.Println("Incrementing " + fileName)
 	header := make([]byte, sizeofInt32)
 	fileSizeBytes := make([]byte, sizeofInt64)
@@ -303,7 +303,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader) (error) {
 
 	page := make([]byte, BlockSize)
 	for i := uint32(0); i < diffBlockCount; i++ {
-		blockNo := binary.LittleEndian.Uint32(diffMap[i*sizeofInt32:(i+1)*sizeofInt32])
+		blockNo := binary.LittleEndian.Uint32(diffMap[i*sizeofInt32 : (i+1)*sizeofInt32])
 		_, err = io.ReadFull(increment, page)
 		if err != nil {
 			return err

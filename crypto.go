@@ -1,15 +1,15 @@
 package walg
 
 import (
-	"os"
-	"golang.org/x/crypto/openpgp"
-	"os/exec"
 	"bytes"
-	"io"
-	"errors"
-	"os/user"
-	"io/ioutil"
 	"encoding/json"
+	"errors"
+	"golang.org/x/crypto/openpgp"
+	"io"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strings"
 )
@@ -58,7 +58,7 @@ func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, e
 	if crypter.pubKey == nil {
 		armour, err := GetPubRingArmour(crypter.keyRingId)
 		if err != nil {
-			return nil, err;
+			return nil, err
 		}
 
 		entitylist, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(armour))
@@ -117,7 +117,7 @@ func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) 
 	if crypter.secretKey == nil {
 		armour, err := GetSecretRingArmour(crypter.keyRingId)
 		if err != nil {
-			return nil, err;
+			return nil, err
 		}
 
 		entitylist, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(armour))
@@ -129,7 +129,7 @@ func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) 
 
 	var md, err0 = openpgp.ReadMessage(reader, crypter.secretKey, nil, nil)
 	if err0 != nil {
-		return nil, err0;
+		return nil, err0
 	}
 
 	return md.UnverifiedBody, nil

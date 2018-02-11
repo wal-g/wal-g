@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/wal-g/wal-g"
 	"log"
 	"os"
 	"runtime/pprof"
-	"github.com/wal-g/wal-g"
 )
 
 var profile bool

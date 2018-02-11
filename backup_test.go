@@ -366,9 +366,9 @@ func TestGetBackupTimeSlices(t *testing.T) {
 	thirdTime := time.Now()
 
 	c := []*s3.Object{
-		{Key: &first, LastModified: &firstTime,},
-		{Key: &second, LastModified: &secondTime,},
-		{Key: &third, LastModified: &thirdTime,},
+		{Key: &first, LastModified: &firstTime},
+		{Key: &second, LastModified: &secondTime},
+		{Key: &third, LastModified: &thirdTime},
 	}
 	objectsFromS3 := &s3.ListObjectsV2Output{Contents: c}
 
