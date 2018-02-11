@@ -290,11 +290,11 @@ func ApplyFileIncrement(fileName string, increment io.Reader) error {
 	}
 
 	file, err := os.OpenFile(fileName, os.O_RDWR, 0666)
-	defer file.Close()
-	defer file.Sync()
 	if err != nil {
 		return err
 	}
+	defer file.Close()
+	defer file.Sync()
 
 	err = file.Truncate(int64(fileSize))
 	if err != nil {
