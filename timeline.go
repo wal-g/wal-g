@@ -1,11 +1,11 @@
 package walg
 
 import (
-	"fmt"
-	"strings"
-	"strconv"
 	"errors"
+	"fmt"
 	"github.com/jackc/pgx"
+	"strconv"
+	"strings"
 )
 
 func readTimeline(conn *pgx.Conn) (timeline uint32, err error) {

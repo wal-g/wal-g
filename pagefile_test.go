@@ -1,13 +1,13 @@
 package walg
 
 import (
-	"testing"
-	"fmt"
-	"io/ioutil"
-	"os"
 	"bytes"
-	"log"
+	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
+	"os"
+	"testing"
 )
 
 const (

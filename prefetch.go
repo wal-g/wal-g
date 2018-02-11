@@ -2,13 +2,13 @@ package walg
 
 import (
 	"fmt"
-	"os"
-	"log"
-	"time"
 	"io/ioutil"
+	"log"
+	"os"
+	"os/exec"
 	"path"
 	"strings"
-	"os/exec"
+	"time"
 )
 
 func HandleWALPrefetch(pre *Prefix, walFileName string, location string) {

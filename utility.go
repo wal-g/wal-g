@@ -1,11 +1,11 @@
 package walg
 
 import (
-	"time"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"path/filepath"
 	"os"
+	"path/filepath"
 	"strconv"
+	"time"
 )
 
 // BackupTime is used to sort backups by
@@ -59,14 +59,13 @@ func partitionObjects(a []*s3.ObjectIdentifier, b int) [][]*s3.ObjectIdentifier 
 
 func ResolveSymlink(path string) string {
 	resolve, err := filepath.EvalSymlinks(path)
-	if err!=nil {
+	if err != nil {
 		// TODO: Consider descriptive panic here and other checks
 		// Directory may be absent et c.
 		return path
 	}
 	return resolve
 }
-
 
 func getMaxConcurrency(reasonableMaximum int) int {
 	var con int

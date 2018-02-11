@@ -1,6 +1,5 @@
 package walg
 
-
 // TarBallMaker is used to allow for
 // flexible creation of different TarBalls.
 type TarBallMaker interface {
@@ -34,6 +33,6 @@ func (s *S3TarBallMaker) Make() TarBall {
 		Lsn:              s.Lsn,
 		IncrementFromLsn: s.IncrementFromLsn,
 		IncrementFrom:    s.IncrementFrom,
-		Files:s.Files,
+		Files:            s.Files,
 	}
 }

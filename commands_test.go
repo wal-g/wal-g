@@ -56,7 +56,7 @@ func TestDeleteArgsParsingBefore(t *testing.T) {
 	if parseAndTestFail(command, &args) {
 		t.Fatal("Parsing of delete comand failed")
 	}
-	if !args.before || !args.find_full || args.target != "x"  || args.beforeTime != nil {
+	if !args.before || !args.find_full || args.target != "x" || args.beforeTime != nil {
 		t.Fatal("Parsing was wrong")
 	}
 

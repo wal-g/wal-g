@@ -1,7 +1,10 @@
 CMD_FILES = $(wildcard cmd/wal-g/*.go)
 PKG_FILES = $(wildcard *.go)
 
-.PHONY : test install all clean
+.PHONY : fmt test install all clean
+
+fmt: $(CMD_FILES) $(PKG_FILES)
+	gofmt -s -w $(CMD_FILES) $(PKG_FILES)
 
 test: cmd/wal-g/wal-g
 	go list ./... | grep -v 'vendor/' | xargs go vet

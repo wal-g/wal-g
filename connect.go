@@ -44,7 +44,7 @@ func Connect() (*pgx.Conn, error) {
 			return nil, errors.Wrap(err, "Connect: postgres archive_mode test failed")
 		}
 
-		if (len(archive_command) == 0 || archive_command == "(disabled)") {
+		if len(archive_command) == 0 || archive_command == "(disabled)" {
 			log.Println("WARNING! It seems your archive_command is not configured. This will cause inconsistent backup. Please consider configuring WAL archiving.")
 		}
 	}

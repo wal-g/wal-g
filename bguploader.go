@@ -1,14 +1,14 @@
 package walg
 
 import (
-	"strings"
-	"sync/atomic"
-	"time"
-	"sync"
-	"path/filepath"
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 )
 
 // The state of concurrent WAL upload
