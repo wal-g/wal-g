@@ -11,7 +11,7 @@ import (
 func readTimeline(conn *pgx.Conn) (timeline uint32, err error) {
 	var bytes_per_wal_segment uint32
 	err = conn.QueryRow("select timeline_id, bytes_per_wal_segment from pg_control_checkpoint(), pg_control_init()").Scan(&timeline, &bytes_per_wal_segment)
-	if err == nil && uint64(bytes_per_wal_segment) != walSegmentSize {
+	if err == nil && uint64(bytes_per_wal_segment) != WalSegmentSize {
 		return 0, errors.New("bytes_per_wal_segment of the server does not match expected value")
 	}
 	return
@@ -36,9 +36,9 @@ func ParseLsn(lsnStr string) (lsn uint64, err error) {
 }
 
 const (
-	walSegmentSize        = uint64(16 * 1024 * 1024)     // xlog.c line 113
+	WalSegmentSize        = uint64(16 * 1024 * 1024)     // xlog.c line 113
 	walFileFormat         = "%08X%08X%08X"               // xlog_internal.h line 155
-	xLogSegmentsPerXLogId = 0x100000000 / walSegmentSize // xlog_internal.h line 101
+	xLogSegmentsPerXLogId = 0x100000000 / WalSegmentSize // xlog_internal.h line 101
 )
 
 func WALFileName(lsn uint64, conn *pgx.Conn) (string, uint32, error) {
@@ -47,7 +47,7 @@ func WALFileName(lsn uint64, conn *pgx.Conn) (string, uint32, error) {
 		return "", 0, err
 	}
 
-	logSegNo := (lsn - uint64(1)) / walSegmentSize // xlog_internal.h line 121
+	logSegNo := (lsn - uint64(1)) / WalSegmentSize // xlog_internal.h line 121
 
 	return formatWALFileName(timeline, logSegNo), timeline, nil
 }

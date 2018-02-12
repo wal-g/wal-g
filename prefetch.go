@@ -76,7 +76,9 @@ func getPrefetchLocations(location string, walFileName string) (prefetchLocation
 }
 
 func forkPrefetch(walFileName string, location string) {
-	if strings.Contains(walFileName, "history") || strings.Contains(walFileName, "partial") {
+	if strings.Contains(walFileName, "history") ||
+		strings.Contains(walFileName, "partial") ||
+		getMaxConcurrency(16) == 1 {
 		return // There will be nothing ot prefetch anyway
 	}
 	cmd := exec.Command(os.Args[0], "wal-prefetch", walFileName, location)

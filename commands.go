@@ -625,9 +625,18 @@ func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPre
 	seenSize := int64(-1)
 
 	for {
-		if _, err := os.Stat(prefetched); err == nil {
-			os.Rename(prefetched, location)
+		if stat, err := os.Stat(prefetched); err == nil {
+			if stat.Size() != int64(WalSegmentSize) {
+				log.Println("WAL-G: Prefetch error: wrong file size of prefetched file")
+				break
+			}
+			err = os.Rename(prefetched, location)
+			if err != nil {
+				log.Fatalf("%+v\n", err)
+			}
 			return
+		} else if !os.IsNotExist(err) {
+			log.Fatalf("%+v\n", err)
 		}
 
 		// We have race condition here, if running is renamed here, but it's OK

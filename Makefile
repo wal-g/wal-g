@@ -3,12 +3,12 @@ PKG_FILES = $(wildcard *.go)
 
 .PHONY : fmt test install all clean
 
-fmt: $(CMD_FILES) $(PKG_FILES)
-	gofmt -s -w $(CMD_FILES) $(PKG_FILES)
-
 test: cmd/wal-g/wal-g
 	go list ./... | grep -v 'vendor/' | xargs go vet
 	go test -v
+
+fmt: $(CMD_FILES) $(PKG_FILES)
+	gofmt -s -w $(CMD_FILES) $(PKG_FILES)
 
 all: cmd/wal-g/wal-g
 

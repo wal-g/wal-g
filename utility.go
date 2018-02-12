@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+	"log"
 )
 
 // BackupTime is used to sort backups by
@@ -69,11 +70,16 @@ func ResolveSymlink(path string) string {
 
 func getMaxConcurrency(reasonableMaximum int) int {
 	var con int
+	var err error
 	conc, ok := os.LookupEnv("WALG_DOWNLOAD_CONCURRENCY")
 	if ok {
-		con, _ = strconv.Atoi(conc)
+		con, err = strconv.Atoi(conc)
+
+		if err != nil {
+			log.Panic("Unknown concurrency number ",err)
+		}
 	} else {
 		con = min(10, reasonableMaximum)
 	}
-	return con
+	return max(con,1)
 }
