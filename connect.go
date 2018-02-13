@@ -1,11 +1,11 @@
 package walg
 
 import (
+	"log"
 	"regexp"
 
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
-	"log"
 )
 
 // Connect establishes a connection to postgres using
@@ -71,7 +71,9 @@ func (b *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName string, 
 	}
 
 	query := "SELECT case when pg_is_in_recovery() then '' else (pg_" + walname + "file_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn"
-	err = conn.QueryRow(query, backup).Scan(&name, &lsnStr, &b.Replica)
+	if err = conn.QueryRow(query, backup).Scan(&name, &lsnStr, &b.Replica); err != nil {
+		return "", 0, version, errors.Wrap(err, "can't query lsn")
+	}
 
 	lsn, err = ParseLsn(lsnStr)
 	if err != nil {
