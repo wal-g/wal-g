@@ -63,7 +63,7 @@ func (b *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName string, 
 	// Currently all version-dependent logic is here
 	err = conn.QueryRow("select (current_setting('server_version_num'))::int").Scan(&version)
 	if err != nil {
-		return "", 0, version, errors.Wrap(err, "QueryFile: getting Postgres version failed")
+		return "", 0, version, errors.Wrap(err, "StartBackup: getting Postgres version failed")
 	}
 	walname := "xlog"
 	if version >= 100000 {
@@ -72,7 +72,7 @@ func (b *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName string, 
 
 	query := "SELECT case when pg_is_in_recovery() then '' else (pg_" + walname + "file_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn"
 	if err = conn.QueryRow(query, backup).Scan(&name, &lsnStr, &b.Replica); err != nil {
-		return "", 0, version, errors.Wrap(err, "can't query lsn")
+		return "", 0, version, errors.Wrap(err, "StartBackup: pg_start_backup() failed")
 	}
 
 	lsn, err = ParseLsn(lsnStr)
