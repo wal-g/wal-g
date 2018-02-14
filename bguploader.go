@@ -50,7 +50,7 @@ func (u *BgUploader) Start(walFilePath string, maxParallelWorkers int32, tu *Tar
 	u.started[filepath.Base(walFilePath)+readySuffix] = walFilePath
 
 	// This goroutine will spawn new if necessary
-	go u.CheckForNewFiles()
+	go scanOnce(u)
 }
 
 func (u *BgUploader) Stop() {
@@ -68,57 +68,34 @@ var readySuffix = ".ready"
 var archive_status = "archive_status"
 var done = ".done"
 
-// This function could be better represented by the state machine of different wait types
-func (u *BgUploader) CheckForNewFiles() {
-	for // loop in case if this is last running goroutine
-	{
-		for haveNoSlots(u) && shouldKeepScanning(u) {
-			time.Sleep(10 * time.Millisecond)
+func scanOnce(u *BgUploader) {
+	u.mutex.Lock()
+	defer u.mutex.Unlock()
+
+	files, err := ioutil.ReadDir(filepath.Join(u.dir, archive_status))
+	if err != nil {
+		log.Print("Error of parallel upload: ", err)
+		return
+	}
+
+	for _, f := range files {
+		if haveNoSlots(u) {
+			break
 		}
-
-		files, err := ioutil.ReadDir(filepath.Join(u.dir, archive_status))
-
-		if err != nil {
-			log.Print("Error of parallel upload: ", err)
-			return
+		name := f.Name()
+		if !strings.HasSuffix(name, readySuffix) {
+			continue
 		}
-
-		for _, f := range files {
-			if haveNoSlots(u) {
-				break
-			}
-			name := f.Name()
-			if !strings.HasSuffix(name, readySuffix) {
-				continue
-			}
-			if _, ok := u.started[name]; ok {
-				continue
-			}
-			u.started[name] = name
-
-			u.mutex.Lock()
-			if shouldKeepScanning(u) {
-				u.running.Add(1)
-				atomic.AddInt32(&u.parallelWorkers, 1)
-				go u.Upload(f)
-			}
-			u.mutex.Unlock()
+		if _, ok := u.started[name]; ok {
+			continue
 		}
+		u.started[name] = name
 
-		if !shouldKeepScanning(u) {
-			return
-		}
 
-		// If we have slots but no files in FS, we wait for 1 seconds, checking whether we should be interrupted
-		// This is done to prevent frequent FS scan
-		if !haveNoSlots(u) {
-			for i := 0; i < 100; i++ {
-				if shouldKeepScanning(u) {
-					time.Sleep(20 * time.Millisecond)
-				} else {
-					return
-				}
-			}
+		if shouldKeepScanning(u) {
+			u.running.Add(1)
+			atomic.AddInt32(&u.parallelWorkers, 1)
+			go u.Upload(f)
 		}
 	}
 }
@@ -132,7 +109,6 @@ func haveNoSlots(u *BgUploader) bool {
 }
 
 func (u *BgUploader) Upload(info os.FileInfo) {
-
 	walfilename := strings.TrimSuffix(info.Name(), readySuffix)
 	UploadWALFile(u.tu, filepath.Join(u.dir, walfilename))
 
@@ -145,6 +121,8 @@ func (u *BgUploader) Upload(info os.FileInfo) {
 
 	atomic.AddInt32(&u.totalUploaded, 1)
 
+	scanOnce(u);
 	atomic.AddInt32(&u.parallelWorkers, -1)
+
 	u.running.Done()
 }
