@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"testing"
+	"io"
 )
 
 type BufCloser struct {
@@ -122,6 +123,42 @@ func TestLzPipeWriter(t *testing.T) {
 		}
 	}
 
+}
+
+type DelayedErrorReader struct {
+	underlying io.Reader
+	n          int
+}
+
+func (er *DelayedErrorReader) Read(p []byte) (int, error) {
+	x, err := er.underlying.Read(p)
+	if err != nil {
+		return -1, err
+	}
+	er.n -= x
+	if er.n < 0 {
+		return -1, errors.New("mock reader: read error")
+	} else {
+		return x, nil
+	}
+}
+
+func TestLzPipeWriterErrorPropogation(t *testing.T) {
+	L := 1024 * 1024 * 4
+	b := make([]byte, L)
+	rand.Read(b)
+	in := &BufCloser{bytes.NewBuffer(b), false}
+	lz := &walg.LzPipeWriter{
+		Input: in,
+	}
+
+	lz.Compress(walg.MockDisarmedCrypter())
+
+	decompressed := &BufCloser{&bytes.Buffer{}, false}
+	err := walg.DecompressLz4(decompressed, &DelayedErrorReader{lz.Output, L})
+	if err == nil {
+		t.Error("lz4 did not propogate error of the buffer")
+	}
 }
 
 func TestLzPipeWriterError(t *testing.T) {
