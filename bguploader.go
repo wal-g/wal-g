@@ -91,7 +91,6 @@ func scanOnce(u *BgUploader) {
 		}
 		u.started[name] = name
 
-
 		if shouldKeepScanning(u) {
 			u.running.Add(1)
 			atomic.AddInt32(&u.parallelWorkers, 1)
@@ -110,7 +109,7 @@ func haveNoSlots(u *BgUploader) bool {
 
 func (u *BgUploader) Upload(info os.FileInfo) {
 	walfilename := strings.TrimSuffix(info.Name(), readySuffix)
-	UploadWALFile(u.tu, filepath.Join(u.dir, walfilename))
+	UploadWALFile(u.tu.Clone(), filepath.Join(u.dir, walfilename))
 
 	ready := filepath.Join(u.dir, archive_status, info.Name())
 	done := filepath.Join(u.dir, archive_status, walfilename+done)

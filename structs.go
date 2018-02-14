@@ -310,3 +310,17 @@ func (tu *TarUploader) Finish() {
 		log.Printf("WAL-G could not complete upload.\n")
 	}
 }
+
+func (tu *TarUploader) Clone() *TarUploader {
+	return &TarUploader{
+		tu.Upl,
+		tu.MaxRetries,
+		tu.MaxWait,
+		tu.StorageClass,
+		tu.Success,
+		tu.bucket,
+		tu.server,
+		tu.region,
+		&sync.WaitGroup{},
+	};
+}
