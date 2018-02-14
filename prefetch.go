@@ -61,7 +61,7 @@ func prefetchFile(location string, pre *Prefix, walFileName string, error_queue 
 	_, err_o = os.Stat(oldPath)
 	_, err_n = os.Stat(newPath)
 	if err_o == nil && os.IsNotExist(err_n) {
-		os.Rename(oldPath, newPath)
+		os.Link(oldPath, newPath)
 	} else {
 		os.Remove(oldPath) // error is ignored
 	}
