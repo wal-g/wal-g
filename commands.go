@@ -659,10 +659,10 @@ func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPre
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	DownloadFile(pre, walFileName, location)
+	DownloadWALFile(pre, walFileName, location)
 }
 
-func DownloadFile(pre *Prefix, walFileName string, location string) {
+func DownloadWALFile(pre *Prefix, walFileName string, location string) {
 	a := &Archive{
 		Prefix:  pre,
 		Archive: aws.String(sanitizePath(*pre.Server + "/wal_005/" + walFileName + ".lzo")),
@@ -726,9 +726,12 @@ func DownloadFile(pre *Prefix, walFileName string, location string) {
 				log.Fatalf("%v\n", err)
 			}
 
-			err = DecompressLz4(f, arch)
+			size, err := DecompressLz4(f, arch)
 			if err != nil {
 				log.Fatalf("%+v\n", err)
+			}
+			if size != int64(WalSegmentSize) {
+				log.Fatal("Download WAL error: wrong size ", size)
 			}
 			err = f.Close()
 			if err != nil {

@@ -52,7 +52,7 @@ func prefetchFile(location string, pre *Prefix, walFileName string, wg *sync.Wai
 	log.Println("WAL-prefetch file: ", walFileName)
 	os.MkdirAll(runningLocation, 0755)
 
-	DownloadFile(pre, walFileName, oldPath)
+	DownloadWALFile(pre, walFileName, oldPath)
 
 	_, err_o = os.Stat(oldPath)
 	_, err_n = os.Stat(newPath)

@@ -83,7 +83,7 @@ func tarHandler(wc io.WriteCloser, rm ReaderMaker, crypter Crypter) error {
 			return errors.Wrap(err, "ExtractAll: lzo decompress failed. Is archive encrypted?")
 		}
 	} else if rm.Format() == "lz4" {
-		err = DecompressLz4(wc, r)
+		_, err = DecompressLz4(wc, r)
 		if err != nil {
 			return errors.Wrap(err, "ExtractAll: lz4 decompress failed. Is archive encrypted?")
 		}

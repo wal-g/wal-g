@@ -113,7 +113,7 @@ func TestLzPipeWriter(t *testing.T) {
 		lz.Compress(walg.MockDisarmedCrypter())
 
 		decompressed := &BufCloser{&bytes.Buffer{}, false}
-		err := walg.DecompressLz4(decompressed, lz.Output)
+		_, err := walg.DecompressLz4(decompressed, lz.Output)
 		if err != nil {
 			t.Logf("%+v\n", err)
 		}
@@ -155,7 +155,7 @@ func TestLzPipeWriterErrorPropogation(t *testing.T) {
 	lz.Compress(walg.MockDisarmedCrypter())
 
 	decompressed := &BufCloser{&bytes.Buffer{}, false}
-	err := walg.DecompressLz4(decompressed, &DelayedErrorReader{lz.Output, L})
+	_, err := walg.DecompressLz4(decompressed, &DelayedErrorReader{lz.Output, L})
 	if err == nil {
 		t.Error("lz4 did not propogate error of the buffer")
 	}
