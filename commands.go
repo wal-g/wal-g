@@ -1,6 +1,7 @@
 package walg
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"encoding/binary"
 )
 
 func HandleDelete(pre *Prefix, args []string) {
@@ -481,10 +481,8 @@ func GetDeltaConfig() (max_deltas int, from_full bool) {
 	if hasOrigin {
 		switch origin {
 		case "LATEST":
-			break
 		case "LATEST_FULL":
 			from_full = false
-			break
 		default:
 			log.Fatal("Unknown WALG_DELTA_ORIGIN:", origin)
 		}
@@ -635,7 +633,7 @@ func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPre
 			if err != nil {
 				log.Fatalf("%+v\n", err)
 			}
-			magic := make([]byte, 4);
+			magic := make([]byte, 4)
 			file.Read(magic)
 			recheck := false
 			if binary.LittleEndian.Uint32(magic) < 0xD061 {
@@ -649,7 +647,7 @@ func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPre
 				if err != nil {
 					log.Fatalf("%+v\n", err)
 				}
-				magic := make([]byte, 4);
+				magic := make([]byte, 4)
 				file.Read(magic)
 				if binary.LittleEndian.Uint32(magic) < 0xD061 {
 					log.Println("WAL-G: WAL file magic is invalid, fsync did not help, download again")
