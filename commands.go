@@ -15,6 +15,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"encoding/binary"
 )
 
 func HandleDelete(pre *Prefix, args []string) {
@@ -630,6 +631,33 @@ func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPre
 				log.Println("WAL-G: Prefetch error: wrong file size of prefetched file")
 				break
 			}
+			file, err := os.Open(prefetched)
+			if err != nil {
+				log.Fatalf("%+v\n", err)
+			}
+			magic := make([]byte, 4);
+			file.Read(magic)
+			recheck := false
+			if binary.LittleEndian.Uint32(magic) < 0xD061 {
+				log.Println("WAL-G: WAL file magic is invalid, calling fsync")
+				file.Sync()
+				recheck = true
+			}
+			file.Close()
+			if recheck {
+				file, err := os.Open(prefetched)
+				if err != nil {
+					log.Fatalf("%+v\n", err)
+				}
+				magic := make([]byte, 4);
+				file.Read(magic)
+				if binary.LittleEndian.Uint32(magic) < 0xD061 {
+					log.Println("WAL-G: WAL file magic is invalid, fsync did not help, download again")
+					break
+				}
+				file.Close()
+			}
+
 			err = os.Rename(prefetched, location)
 			if err != nil {
 				log.Fatalf("%+v\n", err)

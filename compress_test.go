@@ -125,6 +125,29 @@ func TestLzPipeWriter(t *testing.T) {
 
 }
 
+func TestLzPipeWriterBigChunk(t *testing.T) {
+	L := 1024 * 1024 // 1Mb
+	b := make([]byte, L)
+	rand.Read(b)
+	in := &BufCloser{bytes.NewBuffer(b), false}
+	lz := &walg.LzPipeWriter{
+		Input: in,
+	}
+
+	lz.Compress(walg.MockDisarmedCrypter())
+
+	decompressed := &BufCloser{&bytes.Buffer{}, false}
+	_, err := walg.DecompressLz4(decompressed, lz.Output)
+	if err != nil {
+		t.Logf("%+v\n", err)
+	}
+
+	if !bytes.Equal(b, decompressed.Bytes()) {
+		t.Errorf("Incorrect decompression")
+	}
+
+}
+
 type DelayedErrorReader struct {
 	underlying io.Reader
 	n          int
