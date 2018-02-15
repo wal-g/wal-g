@@ -16,7 +16,7 @@ func HandleWALPrefetch(pre *Prefix, walFileName string, location string) {
 	var fileName = walFileName
 	var err error
 	location = path.Dir(location)
-	wg:= &sync.WaitGroup{}
+	wg := &sync.WaitGroup{}
 	for i := 0; i < getMaxConcurrency(8); i++ {
 		fileName, err = NextWALFileName(fileName)
 		if err != nil {
@@ -24,7 +24,7 @@ func HandleWALPrefetch(pre *Prefix, walFileName string, location string) {
 		}
 		wg.Add(1)
 		go prefetchFile(location, pre, fileName, wg)
-		time.Sleep(time.Millisecond) // ramp up in order
+		time.Sleep(10 * time.Millisecond) // ramp up in order
 	}
 
 	go cleanupPrefetchDirectories(walFileName, location, FileSystemCleaner{})
