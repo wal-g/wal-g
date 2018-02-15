@@ -9,39 +9,35 @@ import (
 	"path"
 	"strings"
 	"time"
+	"sync"
 )
 
 func HandleWALPrefetch(pre *Prefix, walFileName string, location string) {
 	var fileName = walFileName
 	var err error
 	location = path.Dir(location)
-	errors := make(chan (interface{}))
-	awaited := 0
+	wg:= &sync.WaitGroup{}
 	for i := 0; i < getMaxConcurrency(8); i++ {
 		fileName, err = NextWALFileName(fileName)
 		if err != nil {
 			log.Println("WAL-prefetch failed: ", err, " file: ", fileName)
 		}
-		awaited++
-		go prefetchFile(location, pre, fileName, errors)
+		wg.Add(1)
+		go prefetchFile(location, pre, fileName, wg)
 		time.Sleep(time.Millisecond) // ramp up in order
 	}
 
 	go cleanupPrefetchDirectories(walFileName, location, FileSystemCleaner{})
 
-	for i := 0; i < awaited; i++ {
-		<-errors // Wait until everyone is done. Errors are reported in recovery
-	}
+	wg.Wait()
 }
 
-func prefetchFile(location string, pre *Prefix, walFileName string, error_queue chan (interface{})) {
+func prefetchFile(location string, pre *Prefix, walFileName string, wg *sync.WaitGroup) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Prefetch unsucessfull ", walFileName, r)
-			error_queue <- r
-		} else {
-			error_queue <- nil
 		}
+		wg.Done()
 	}()
 
 	_, runningLocation, oldPath, newPath := getPrefetchLocations(location, walFileName)

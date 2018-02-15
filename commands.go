@@ -730,7 +730,10 @@ func DownloadFile(pre *Prefix, walFileName string, location string) {
 			if err != nil {
 				log.Fatalf("%+v\n", err)
 			}
-			f.Close()
+			err = f.Close()
+			if err != nil {
+				log.Fatalf("%+v\n", err)
+			}
 		} else {
 			log.Printf("Archive '%s' does not exist.\n", walFileName)
 		}
