@@ -120,7 +120,7 @@ func (u *BgUploader) Upload(info os.FileInfo) {
 
 	atomic.AddInt32(&u.totalUploaded, 1)
 
-	scanOnce(u);
+	scanOnce(u)
 	atomic.AddInt32(&u.parallelWorkers, -1)
 
 	u.running.Done()

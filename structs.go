@@ -322,5 +322,5 @@ func (tu *TarUploader) Clone() *TarUploader {
 		tu.server,
 		tu.region,
 		&sync.WaitGroup{},
-	};
+	}
 }

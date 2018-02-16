@@ -134,13 +134,13 @@ func DecompressLzo(d io.Writer, s io.Reader) error {
 }
 
 // DecompressLz4 decompresses a .lz4 file. Returns an error upon failure.
-func DecompressLz4(d io.Writer, s io.Reader) (int64,error) {
+func DecompressLz4(d io.Writer, s io.Reader) (int64, error) {
 	lz := lz4.NewReader(s)
 	n, err := lz.WriteTo(d)
 	if err != nil {
-		return n,errors.Wrap(err, "DecompressLz4: lz4 write failed")
+		return n, errors.Wrap(err, "DecompressLz4: lz4 write failed")
 	}
-	return n,nil
+	return n, nil
 }
 
 // Compose io.ReadCloser from two parts
