@@ -3,11 +3,12 @@ package tools
 import (
 	"archive/tar"
 	"fmt"
-	"github.com/pierrec/lz4"
-	"github.com/wal-g/wal-g"
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/pierrec/lz4"
+	"github.com/wal-g/wal-g"
 )
 
 // FileTarBall represents a tarball that is
@@ -42,14 +43,14 @@ func (fb *FileTarBall) SetUp(crypter walg.Crypter, names ...string) {
 			}
 
 			fb.w = &walg.Lz4CascadeClose2{
-				Writer: lz4.NewWriter(f),
-				Underlying: wc,
+				Writer:      lz4.NewWriter(f),
+				Underlying:  wc,
 				Underlying2: f,
 			}
 		} else {
-			wc = f;
+			wc = f
 			fb.w = &walg.Lz4CascadeClose{
-				Writer: lz4.NewWriter(f),
+				Writer:     lz4.NewWriter(f),
 				Underlying: wc,
 			}
 		}
@@ -66,11 +67,7 @@ func (fb *FileTarBall) CloseTar() error {
 		return err
 	}
 
-	err = fb.w.Close()
-	if err != nil {
-		return err
-	}
-	return nil
+	return fb.w.Close()
 }
 
 // Finish alerts that compression is complete.
@@ -89,7 +86,7 @@ func (fb *FileTarBall) Tw() *tar.Writer { return fb.tw }
 
 func (b *FileTarBall) AppendIncrementalFile(filePath ...string) {}
 func (b *FileTarBall) GetIncrementalFiles() []string            { return nil }
-func (b *FileTarBall) SetFiles(files walg.BackupFileList)        {}
+func (b *FileTarBall) SetFiles(files walg.BackupFileList)       {}
 func (b *FileTarBall) GetFiles() walg.BackupFileList            { return make(walg.BackupFileList) }
 
 // NOPTarBall mocks a tarball. Used for testing purposes.
@@ -102,7 +99,7 @@ type NOPTarBall struct {
 	tw      *tar.Writer
 }
 
-func (n *NOPTarBall) SetUp(crypter walg.Crypter, params ...string) { return }
+func (n *NOPTarBall) SetUp(crypter walg.Crypter, params ...string) {}
 func (n *NOPTarBall) CloseTar() error                              { return nil }
 func (n *NOPTarBall) Finish(sentinel *walg.S3TarBallSentinelDto) error {
 	fmt.Printf("NOP: %d files.\n", n.number)
@@ -118,4 +115,4 @@ func (n *NOPTarBall) SetSize(i int64) { n.size += i }
 func (n *NOPTarBall) Tw() *tar.Writer { return n.tw }
 
 func (b *NOPTarBall) SetFiles(files walg.BackupFileList) {}
-func (b *NOPTarBall) GetFiles() walg.BackupFileList     { return make(walg.BackupFileList) }
+func (b *NOPTarBall) GetFiles() walg.BackupFileList      { return make(walg.BackupFileList) }

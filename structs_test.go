@@ -2,8 +2,9 @@ package walg_test
 
 import (
 	"archive/tar"
-	"github.com/wal-g/wal-g"
 	"testing"
+
+	"github.com/wal-g/wal-g"
 )
 
 // Tests S3 get and set methods.
@@ -36,7 +37,7 @@ func TestS3TarBall(t *testing.T) {
 		t.Errorf("make: Expected trim to be '%s' but got '%s'", "/usr/local", tarBall.Trim())
 	}
 
-	if tarBall.Nop() != false {
+	if tarBall.Nop() {
 		t.Errorf("make: S3TarBall expected NOP to be false but got %v", tarBall.Nop())
 	}
 

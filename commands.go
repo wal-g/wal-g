@@ -1,6 +1,7 @@
 package walg
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"encoding/binary"
 	"github.com/pkg/errors"
 )
 
@@ -482,10 +482,8 @@ func GetDeltaConfig() (max_deltas int, from_full bool) {
 	if hasOrigin {
 		switch origin {
 		case "LATEST":
-			break
 		case "LATEST_FULL":
 			from_full = false
-			break
 		default:
 			log.Fatal("Unknown WALG_DELTA_ORIGIN:", origin)
 		}

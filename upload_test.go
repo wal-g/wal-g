@@ -1,9 +1,10 @@
 package walg_test
 
 import (
-	"github.com/wal-g/wal-g"
 	"os"
 	"testing"
+
+	"github.com/wal-g/wal-g"
 )
 
 // Sets WAL-G needed environment variables to empty strings.
@@ -169,7 +170,7 @@ func TestUploadError(t *testing.T) {
 	tarBall.SetUp(walg.MockArmedCrypter())
 
 	tarBall.Finish(&walg.S3TarBallSentinelDto{})
-	if tu.Success == true {
+	if tu.Success {
 		t.Errorf("upload: expected to fail to upload successfully")
 	}
 
@@ -180,7 +181,7 @@ func TestUploadError(t *testing.T) {
 	tarBall = maker.Make()
 	tarBall.SetUp(walg.MockArmedCrypter())
 	tarBall.Finish(&walg.S3TarBallSentinelDto{})
-	if tu.Success == true {
+	if tu.Success {
 		t.Errorf("upload: expected to fail to upload successfully")
 	}
 
@@ -188,5 +189,4 @@ func TestUploadError(t *testing.T) {
 	if err == nil {
 		t.Errorf("upload: UploadWal expected error but got `<nil>`")
 	}
-
 }
