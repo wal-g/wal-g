@@ -54,13 +54,6 @@ func prefetchFile(location string, pre *Prefix, walFileName string, wg *sync.Wai
 
 	DownloadWALFile(pre, walFileName, oldPath)
 
-	err := checkWALFileMagic(oldPath)
-
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
 	_, err_o = os.Stat(oldPath)
 	_, err_n = os.Stat(newPath)
 	if err_o == nil && os.IsNotExist(err_n) {

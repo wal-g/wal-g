@@ -632,16 +632,19 @@ func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPre
 				log.Println("WAL-G: Prefetch error: wrong file size of prefetched file")
 				break
 			}
-			//err := checkWALFileMagic(prefetched)
-			//if err != nil {
-			//	log.Println(err)
-			//	break;
-			//}
 
 			err = os.Rename(prefetched, location)
 			if err != nil {
 				log.Fatalf("%+v\n", err)
 			}
+
+			err := checkWALFileMagic(location)
+			if err != nil {
+				log.Println("Prefetched file contain errors", err)
+				os.Remove(location)
+				break;
+			}
+
 			return
 		} else if !os.IsNotExist(err) {
 			log.Fatalf("%+v\n", err)
