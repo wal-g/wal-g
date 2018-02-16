@@ -16,6 +16,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/pkg/errors"
 )
 
 func HandleDelete(pre *Prefix, args []string) {
@@ -626,40 +627,22 @@ func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPre
 	for {
 		if stat, err := os.Stat(prefetched); err == nil {
 			if stat.Size() != int64(WalSegmentSize) {
-				log.Println("WAL-G: Prefetch error: wrong file size of prefetched file")
+				log.Println("WAL-G: Prefetch error: wrong file size of prefetched file ", stat.Size())
 				break
-			}
-			file, err := os.Open(prefetched)
-			if err != nil {
-				log.Fatalf("%+v\n", err)
-			}
-			magic := make([]byte, 4)
-			file.Read(magic)
-			recheck := false
-			if binary.LittleEndian.Uint32(magic) < 0xD061 {
-				log.Println("WAL-G: WAL file magic is invalid, calling fsync")
-				file.Sync()
-				recheck = true
-			}
-			file.Close()
-			if recheck {
-				file, err := os.Open(prefetched)
-				if err != nil {
-					log.Fatalf("%+v\n", err)
-				}
-				magic := make([]byte, 4)
-				file.Read(magic)
-				if binary.LittleEndian.Uint32(magic) < 0xD061 {
-					log.Println("WAL-G: WAL file magic is invalid, fsync did not help, download again")
-					break
-				}
-				file.Close()
 			}
 
 			err = os.Rename(prefetched, location)
 			if err != nil {
 				log.Fatalf("%+v\n", err)
 			}
+
+			err := checkWALFileMagic(location)
+			if err != nil {
+				log.Println("Prefetched file contain errors", err)
+				os.Remove(location)
+				break;
+			}
+
 			return
 		} else if !os.IsNotExist(err) {
 			log.Fatalf("%+v\n", err)
@@ -686,6 +669,21 @@ func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPre
 	}
 
 	DownloadWALFile(pre, walFileName, location)
+}
+
+func checkWALFileMagic(prefetched string) error {
+	file, err := os.Open(prefetched)
+	defer file.Close()
+	if err != nil {
+		return err
+	}
+	magic := make([]byte, 4)
+	file.Read(magic)
+	if binary.LittleEndian.Uint32(magic) < 0xD061 {
+		return errors.New("WAL-G: WAL file magic is invalid ")
+	}
+
+	return nil
 }
 
 func DownloadWALFile(pre *Prefix, walFileName string, location string) {
