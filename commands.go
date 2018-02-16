@@ -629,7 +629,7 @@ func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPre
 	for {
 		if stat, err := os.Stat(prefetched); err == nil {
 			if stat.Size() != int64(WalSegmentSize) {
-				log.Println("WAL-G: Prefetch error: wrong file size of prefetched file")
+				log.Println("WAL-G: Prefetch error: wrong file size of prefetched file ", stat.Size())
 				break
 			}
 
