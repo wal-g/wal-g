@@ -5,10 +5,10 @@ import (
 	"errors"
 	"github.com/pierrec/lz4"
 	"github.com/wal-g/wal-g"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"testing"
-	"io"
 )
 
 type BufCloser struct {

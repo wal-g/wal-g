@@ -640,7 +640,7 @@ func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPre
 			if err != nil {
 				log.Println("Prefetched file contain errors", err)
 				os.Remove(location)
-				break;
+				break
 			}
 
 			return

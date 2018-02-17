@@ -2,11 +2,11 @@ package walg
 
 import (
 	"github.com/aws/aws-sdk-go/service/s3"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
 	"time"
-	"log"
 )
 
 // BackupTime is used to sort backups by
@@ -76,10 +76,10 @@ func getMaxConcurrency(reasonableMaximum int) int {
 		con, err = strconv.Atoi(conc)
 
 		if err != nil {
-			log.Panic("Unknown concurrency number ",err)
+			log.Panic("Unknown concurrency number ", err)
 		}
 	} else {
 		con = min(10, reasonableMaximum)
 	}
-	return max(con,1)
+	return max(con, 1)
 }

@@ -8,8 +8,8 @@ import (
 	"os/exec"
 	"path"
 	"strings"
-	"time"
 	"sync"
+	"time"
 )
 
 func HandleWALPrefetch(pre *Prefix, walFileName string, location string) {
