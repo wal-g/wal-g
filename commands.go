@@ -673,10 +673,10 @@ func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPre
 
 func checkWALFileMagic(prefetched string) error {
 	file, err := os.Open(prefetched)
-	defer file.Close()
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	magic := make([]byte, 4)
 	file.Read(magic)
 	if binary.LittleEndian.Uint32(magic) < 0xD061 {
