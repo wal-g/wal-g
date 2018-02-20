@@ -260,8 +260,8 @@ func PrintDeleteUsageAndFail() {
 	log.Fatal("delete requires at least 2 paremeters" + `
 		retain 5                      keep 5 backups
 		retain FULL 5                 keep 5 full backups and all deltas of them
-		retail FIND_FULL 5            find necessary full for 5th and keep everyting after it
-		before base_0123              keep everyting after base_0123 including itself
+		retail FIND_FULL 5            find necessary full for 5th and keep everything after it
+		before base_0123              keep everything after base_0123 including itself
 		before FIND_FULL base_0123    keep everything after base of base_0123`)
 }
 
