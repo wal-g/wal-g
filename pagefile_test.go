@@ -32,7 +32,7 @@ func TestIncrementingFileBigLSN(t *testing.T) {
 
 }
 
-// This test convers the case when increment is bigger than original file
+// This test converts the case when increment is bigger than original file
 func TestIncrementingFileSmallLSN(t *testing.T) {
 	loclLSN := uint64(0)
 	postgresFileTest(loclLSN, t)

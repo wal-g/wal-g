@@ -35,7 +35,7 @@ func HandleWALPrefetch(pre *Prefix, walFileName string, location string) {
 func prefetchFile(location string, pre *Prefix, walFileName string, wg *sync.WaitGroup) {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("Prefetch unsucessfull ", walFileName, r)
+			fmt.Println("Prefetch unsuccessful ", walFileName, r)
 		}
 		wg.Done()
 	}()

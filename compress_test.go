@@ -180,7 +180,7 @@ func TestLzPipeWriterErrorPropogation(t *testing.T) {
 	decompressed := &BufCloser{&bytes.Buffer{}, false}
 	_, err := walg.DecompressLz4(decompressed, &DelayedErrorReader{lz.Output, L})
 	if err == nil {
-		t.Error("lz4 did not propogate error of the buffer")
+		t.Error("lz4 did not propagate error of the buffer")
 	}
 }
 

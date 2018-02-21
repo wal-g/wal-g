@@ -260,8 +260,8 @@ func PrintDeleteUsageAndFail() {
 	log.Fatal("delete requires at least 2 paremeters" + `
 		retain 5                      keep 5 backups
 		retain FULL 5                 keep 5 full backups and all deltas of them
-		retail FIND_FULL 5            find necessary full for 5th and keep everyting after it
-		before base_0123              keep everyting after base_0123 including itself
+		retail FIND_FULL 5            find necessary full for 5th and keep everything after it
+		before base_0123              keep everything after base_0123 including itself
 		before FIND_FULL base_0123    keep everything after base of base_0123`)
 }
 
@@ -673,10 +673,10 @@ func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPre
 
 func checkWALFileMagic(prefetched string) error {
 	file, err := os.Open(prefetched)
-	defer file.Close()
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	magic := make([]byte, 4)
 	file.Read(magic)
 	if binary.LittleEndian.Uint32(magic) < 0xD061 {
