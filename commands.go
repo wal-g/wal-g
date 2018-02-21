@@ -745,7 +745,7 @@ func DownloadWALFile(pre *Prefix, walFileName string, location string) {
 				arch = ReadCascadeClose{reader, arch}
 			}
 
-			f, err := os.Create(location)
+			f, err := os.OpenFile(location, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
 			if err != nil {
 				log.Fatalf("%v\n", err)
 			}
