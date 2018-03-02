@@ -376,21 +376,21 @@ func (qb *PgQueryRunner) BuildStopBackup() (string, error) {
 
 func NewPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
 	r := &PgQueryRunner{connection: conn}
-	var err error
-	r.Version, err = r.getVersion()
+
+	err := r.getVersion()
 	if err != nil {
 		return nil, err
 	}
 	return r, nil
 }
 
-func (queryRunner *PgQueryRunner) getVersion() (version int, err error) {
+func (queryRunner *PgQueryRunner) getVersion() (err error) {
 	conn := queryRunner.connection
 	err = conn.QueryRow(queryRunner.BuildGetVersion()).Scan(&queryRunner.Version)
 	if err != nil {
-		return 0, errors.Wrap(err, "GetVersion: getting Postgres version failed")
+		return errors.Wrap(err, "GetVersion: getting Postgres version failed")
 	}
-	return queryRunner.Version, nil
+	return nil
 }
 
 func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string, lsnString string, inRecovery bool, err error) {
