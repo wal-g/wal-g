@@ -62,7 +62,7 @@ func (b *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName string, 
 	// TODO: implement offline backups, incapsulate PostgreSQL version logic and create test specs for this logic.
 	// Currently all version-dependent logic is here
 	queryBuilder := PgQueryBuilder{}
-	queryRunner := PgQueryRunner{queryBuilder: queryBuilder, connection: conn}
+	queryRunner := PgQueryRunner{queryBuilder: &queryBuilder, connection: conn}
 	name, lsnStr, b.Replica, err = queryRunner.StartBackup(backup)
 
 	lsn, err = ParseLsn(lsnStr)

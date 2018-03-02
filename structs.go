@@ -377,7 +377,7 @@ type QueryRunner interface {
 }
 
 type PgQueryRunner struct {
-	queryBuilder PgQueryBuilder
+	queryBuilder *PgQueryBuilder
 	connection   *pgx.Conn
 }
 
