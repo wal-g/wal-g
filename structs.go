@@ -328,21 +328,25 @@ func (tu *TarUploader) Clone() *TarUploader {
 	}
 }
 
-type QueryBuilder interface {
+type QueryRunner interface {
+	getVersion() (int, error)
 	BuildGetVersion() string
 	BuildStartBackup() (string, error)
 	BuildStopBackup() (string, error)
+	StartBackup(backup string) (string, string, bool, error)
+	StopBackup() (string, string, string, error)
 }
 
-type PgQueryBuilder struct {
-	Version int
+type PgQueryRunner struct {
+	connection *pgx.Conn
+	Version    int
 }
 
-func (qb *PgQueryBuilder) BuildGetVersion() string {
+func (qb *PgQueryRunner) BuildGetVersion() string {
 	return "select (current_setting('server_version_num'))::int"
 }
 
-func (qb *PgQueryBuilder) BuildStartBackup() (string, error) {
+func (qb *PgQueryRunner) BuildStartBackup() (string, error) {
 	switch {
 	case qb.Version >= 100000:
 		return "SELECT case when pg_is_in_recovery() then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn", nil
@@ -357,7 +361,7 @@ func (qb *PgQueryBuilder) BuildStartBackup() (string, error) {
 	}
 }
 
-func (qb *PgQueryBuilder) BuildStopBackup() (string, error) {
+func (qb *PgQueryRunner) BuildStopBackup() (string, error) {
 	switch {
 	case qb.Version >= 90600:
 		return "SELECT labelfile, spcmapfile, lsn FROM pg_stop_backup(false)", nil
@@ -370,38 +374,28 @@ func (qb *PgQueryBuilder) BuildStopBackup() (string, error) {
 	}
 }
 
-type QueryRunner interface {
-	GetVersion() (int, error)
-	StartBackup(backup string) (string, string, bool, error)
-	StopBackup() (string, string, string, error)
+func NewPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
+	r := &PgQueryRunner{connection: conn}
+	var err error
+	r.Version, err = r.getVersion()
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
 }
 
-type PgQueryRunner struct {
-	queryBuilder *PgQueryBuilder
-	connection   *pgx.Conn
-}
-
-func (queryRunner *PgQueryRunner) GetVersion() (version int, err error) {
-	queryBuilder := queryRunner.queryBuilder
+func (queryRunner *PgQueryRunner) getVersion() (version int, err error) {
 	conn := queryRunner.connection
-	err = conn.QueryRow(queryBuilder.BuildGetVersion()).Scan(&queryBuilder.Version)
+	err = conn.QueryRow(queryRunner.BuildGetVersion()).Scan(&queryRunner.Version)
 	if err != nil {
 		return 0, errors.Wrap(err, "GetVersion: getting Postgres version failed")
 	}
-	return queryBuilder.Version, nil
+	return queryRunner.Version, nil
 }
 
 func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string, lsnString string, inRecovery bool, err error) {
-	queryBuilder := queryRunner.queryBuilder
+	startBackupQuery, err := queryRunner.BuildStartBackup()
 	conn := queryRunner.connection
-	if queryBuilder.Version == 0 {
-		_, err := queryRunner.GetVersion()
-		if err != nil {
-			return "", "", false, errors.Wrap(err, "QueryRunner Startbackup: getting Postgres version failed")
-		}
-	}
-
-	startBackupQuery, err := queryBuilder.BuildStartBackup()
 	if err != nil {
 		return "", "", false, errors.Wrap(err, "QueryRunner StartBackup: Building start backup query failed")
 	}
@@ -414,14 +408,7 @@ func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string,
 }
 
 func (queryRunner *PgQueryRunner) StopBackup() (label string, offsetMap string, lsnStr string, err error) {
-	queryBuilder := queryRunner.queryBuilder
 	conn := queryRunner.connection
-	if queryBuilder.Version == 0 {
-		_, err := queryRunner.GetVersion()
-		if err != nil {
-			return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: getting Postgres version failed")
-		}
-	}
 
 	tx, err := conn.Begin()
 	if err != nil {
@@ -434,7 +421,7 @@ func (queryRunner *PgQueryRunner) StopBackup() (label string, offsetMap string, 
 		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: failed setting statement timeout in transaction")
 	}
 
-	stopBackupQuery, err := queryBuilder.BuildStopBackup()
+	stopBackupQuery, err := queryRunner.BuildStopBackup()
 	if err != nil {
 		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: Building stop backup query failed")
 	}

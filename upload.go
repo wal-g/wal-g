@@ -338,9 +338,11 @@ func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {
 	var sc string
 	var lsnStr string
 
-	queryBuilder := PgQueryBuilder{}
-	queryRunner := PgQueryRunner{queryBuilder: &queryBuilder, connection: conn}
-	lb, sc, lsnStr, err := queryRunner.StopBackup()
+	queryRunner, err := NewPgQueryRunner(conn)
+	if err != nil {
+		return 0, errors.Wrap(err, "HandleLabelFiles: Failed to build query runner.")
+	}
+	lb, sc, lsnStr, err = queryRunner.StopBackup()
 	if err != nil {
 		return 0, errors.Wrap(err, "HandleLabelFiles: failed to stop backup")
 	}

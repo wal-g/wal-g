@@ -61,22 +61,24 @@ func (b *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName string, 
 	// We extract here version since it is not used elsewhere. If reused, this should be refactored.
 	// TODO: implement offline backups, incapsulate PostgreSQL version logic and create test specs for this logic.
 	// Currently all version-dependent logic is here
-	queryBuilder := PgQueryBuilder{}
-	queryRunner := PgQueryRunner{queryBuilder: &queryBuilder, connection: conn}
+	queryRunner, err := NewPgQueryRunner(conn)
+	if err != nil {
+		return "", 0, queryRunner.Version, errors.Wrap(err, "StartBackup: Failed to build query runner.")
+	}
 	name, lsnStr, b.Replica, err = queryRunner.StartBackup(backup)
 
 	lsn, err = ParseLsn(lsnStr)
 	if err != nil {
-		return "", 0, queryBuilder.Version, err
+		return "", 0, queryRunner.Version, err
 	}
 
 	if b.Replica {
 		name, b.Timeline, err = WALFileName(lsn, conn)
 		if err != nil {
-			return "", 0, queryBuilder.Version, err
+			return "", 0, queryRunner.Version, err
 		}
 	}
-	return backupNamePrefix + name, lsn, queryBuilder.Version, nil
+	return backupNamePrefix + name, lsn, queryRunner.Version, nil
 
 }
 

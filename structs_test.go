@@ -140,7 +140,7 @@ func TestS3DependentFunctions(t *testing.T) {
 
 // Tests building start backup query
 func TestBuildStartBackup(t *testing.T) {
-	queryBuilder := &walg.PgQueryBuilder{Version: 0}
+	queryBuilder := &walg.PgQueryRunner{Version: 0}
 	_, err := queryBuilder.BuildStartBackup()
 	if err == nil {
 		t.Error("BuildStartBackup did not error on version 0")
@@ -173,7 +173,7 @@ func TestBuildStartBackup(t *testing.T) {
 
 // Tests building stop backup query
 func TestBuildStopBackup(t *testing.T) {
-	queryBuilder := &walg.PgQueryBuilder{Version: 0}
+	queryBuilder := &walg.PgQueryRunner{Version: 0}
 	_, err := queryBuilder.BuildStopBackup()
 	if err == nil {
 		t.Error("BuildStopBackup did not error on version 0")
