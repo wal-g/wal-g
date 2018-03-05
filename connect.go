@@ -27,6 +27,7 @@ func Connect() (*pgx.Conn, error) {
 
 	var archive_mode string
 
+	// TODO: Move this logic to queryRunner
 	err = conn.QueryRow("show archive_mode").Scan(&archive_mode)
 
 	if err != nil {
@@ -58,9 +59,6 @@ func Connect() (*pgx.Conn, error) {
 // fails.
 func (b *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName string, lsn uint64, version int, err error) {
 	var name, lsnStr string
-	// We extract here version since it is not used elsewhere. If reused, this should be refactored.
-	// TODO: implement offline backups, incapsulate PostgreSQL version logic and create test specs for this logic.
-	// Currently all version-dependent logic is here
 	queryRunner, err := NewPgQueryRunner(conn)
 	if err != nil {
 		return "", 0, queryRunner.Version, errors.Wrap(err, "StartBackup: Failed to build query runner.")
