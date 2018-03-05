@@ -337,9 +337,19 @@ func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {
 	var lb string
 	var sc string
 	var lsnStr string
-	err := conn.QueryRow("SELECT labelfile, spcmapfile, lsn FROM pg_stop_backup(false)").Scan(&lb, &sc, &lsnStr)
+
+	queryRunner, err := NewPgQueryRunner(conn)
 	if err != nil {
-		return 0, errors.Wrap(err, "HandleLabelFiles: stop backup failed")
+		return 0, errors.Wrap(err, "HandleLabelFiles: Failed to build query runner.")
+	}
+	lb, sc, lsnStr, err = queryRunner.StopBackup()
+	if err != nil {
+		return 0, errors.Wrap(err, "HandleLabelFiles: failed to stop backup")
+	}
+
+	lsn, err := ParseLsn(lsnStr)
+	if err != nil {
+		return 0, errors.Wrap(err, "HandleLabelFiles: failed to parse finish LSN")
 	}
 
 	bundle.NewTarBall()
@@ -384,11 +394,6 @@ func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {
 	err = tarBall.CloseTar()
 	if err != nil {
 		return 0, errors.Wrap(err, "HandleLabelFiles: failed to close tarball")
-	}
-
-	lsn, err := ParseLsn(lsnStr)
-	if err != nil {
-		return 0, errors.Wrap(err, "HandleLabelFiles: failed to parse finish LSN")
 	}
 
 	return lsn, nil
