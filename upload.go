@@ -352,6 +352,10 @@ func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {
 		return 0, errors.Wrap(err, "HandleLabelFiles: failed to parse finish LSN")
 	}
 
+	if queryRunner.Version < 90600 {
+		return lsn, nil
+	}
+
 	bundle.NewTarBall()
 	tarBall := bundle.Tb
 	tarBall.SetUp(&bundle.Crypter)
