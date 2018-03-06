@@ -786,3 +786,33 @@ func UploadWALFile(tu *TarUploader, dirArc string) {
 		log.Fatalf("FATAL%+v\n", err)
 	}
 }
+
+func HandleExtract(path string, location string) {
+	var f io.ReadCloser
+	f, err := os.Open(path)
+	if err != nil {
+		log.Fatalf("UploadWal: failed to open file %s\n", path)
+		return
+	}
+
+	var crypter = OpenPGPCrypter{}
+	if crypter.IsUsed() {
+		var reader io.Reader
+		reader, err = crypter.Decrypt(f)
+		if err != nil {
+			log.Fatalf("%v\n", err)
+		}
+		f = ReadCascadeClose{reader, f}
+	}
+
+	f2, err := os.Create(location)
+	if err != nil {
+		log.Fatalf("%v\n", err)
+	}
+
+	_, err = DecompressLz4(f2, f)
+	if err != nil {
+		log.Fatalf("%v\n", err)
+	}
+	f.Close()
+}
