@@ -17,7 +17,7 @@ func HandleWALPrefetch(pre *Prefix, walFileName string, location string) {
 	var err error
 	location = path.Dir(location)
 	wg := &sync.WaitGroup{}
-	for i := 0; i < getMaxConcurrency(8); i++ {
+	for i := 0; i < getMaxDownloadConcurrency(8); i++ {
 		fileName, err = NextWALFileName(fileName)
 		if err != nil {
 			log.Println("WAL-prefetch failed: ", err, " file: ", fileName)
@@ -74,7 +74,7 @@ func getPrefetchLocations(location string, walFileName string) (prefetchLocation
 func forkPrefetch(walFileName string, location string) {
 	if strings.Contains(walFileName, "history") ||
 		strings.Contains(walFileName, "partial") ||
-		getMaxConcurrency(16) == 1 {
+		getMaxDownloadConcurrency(16) == 1 {
 		return // There will be nothing ot prefetch anyway
 	}
 	cmd := exec.Command(os.Args[0], "wal-prefetch", walFileName, location)

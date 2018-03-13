@@ -121,7 +121,7 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 	}()
 
 	// Set maximum number of goroutines spun off by ExtractAll
-	var con = getMaxConcurrency(len(files))
+	var con = getMaxDownloadConcurrency(len(files))
 
 	concurrent := make(chan Empty, con)
 	for i := 0; i < con; i++ {

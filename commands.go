@@ -773,7 +773,7 @@ func DownloadWALFile(pre *Prefix, walFileName string, location string) {
 func HandleWALPush(tu *TarUploader, dirArc string) {
 	bu := BgUploader{}
 	// Look for new WALs while doing main upload
-	bu.Start(dirArc, int32(getMaxConcurrency(16)-1), tu)
+	bu.Start(dirArc, int32(getMaxUploadConcurrency(16)-1), tu)
 
 	UploadWALFile(tu, dirArc)
 

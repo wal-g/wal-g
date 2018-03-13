@@ -68,10 +68,26 @@ func ResolveSymlink(path string) string {
 	return resolve
 }
 
-func getMaxConcurrency(reasonableMaximum int) int {
+func getMaxDownloadConcurrency(reasonableMaximum int) int {
 	var con int
 	var err error
 	conc, ok := os.LookupEnv("WALG_DOWNLOAD_CONCURRENCY")
+	if ok {
+		con, err = strconv.Atoi(conc)
+
+		if err != nil {
+			log.Panic("Unknown concurrency number ", err)
+		}
+	} else {
+		con = min(10, reasonableMaximum)
+	}
+	return max(con, 1)
+}
+
+func getMaxUploadConcurrency(reasonableMaximum int) int {
+	var con int
+	var err error
+	conc, ok := os.LookupEnv("WALG_UPLOAD_CONCURRENCY")
 	if ok {
 		con, err = strconv.Atoi(conc)
 
