@@ -256,13 +256,16 @@ func DeleteWALBefore(bt BackupTime, pre *Prefix) {
 	}
 }
 
-func PrintDeleteUsageAndFail() {
-	log.Fatal("delete requires at least 2 paremeters" + `
+
+var DeleteUsage = "delete requires at least 2 parameters" + `
 		retain 5                      keep 5 backups
 		retain FULL 5                 keep 5 full backups and all deltas of them
 		retail FIND_FULL 5            find necessary full for 5th and keep everything after it
 		before base_0123              keep everything after base_0123 including itself
-		before FIND_FULL base_0123    keep everything after base of base_0123`)
+		before FIND_FULL base_0123    keep everything after the base of base_0123`
+
+func PrintDeleteUsageAndFail() {
+	log.Fatal(DeleteUsage)
 }
 
 func HandleBackupList(pre *Prefix) {

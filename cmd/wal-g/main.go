@@ -65,6 +65,9 @@ func main() {
 		case "wal-push":
 			fmt.Printf("usage:\twal-g wal-push archive_path\n\n")
 			os.Exit(0)
+		case "delete":
+			fmt.Println(walg.DeleteUsage)
+			os.Exit(0)
 		default:
 			l.Fatalf("Command '%s' is unsupported by WAL-G.\n\n", command)
 		}
