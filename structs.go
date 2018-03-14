@@ -239,6 +239,7 @@ func (s *S3TarBall) Finish(sentinel *S3TarBallSentinelDto) error {
 			Bucket: aws.String(tupl.bucket),
 			Key:    aws.String(path),
 			Body:   bytes.NewReader(dtoBody),
+			StorageClass: aws.String(tupl.StorageClass),
 		}
 
 		tupl.wg.Add(1)
