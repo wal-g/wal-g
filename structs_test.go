@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/wal-g/wal-g"
+	"os"
+	"time"
 )
 
 // Tests S3 get and set methods.
@@ -20,7 +22,7 @@ func TestS3TarBall(t *testing.T) {
 		BkupName: "test",
 	}
 
-	bundle.NewTarBall()
+	bundle.NewTarBall(true)
 	tarBallCounter += 1
 
 	if bundle.Tb == nil {
@@ -50,7 +52,7 @@ func TestS3TarBall(t *testing.T) {
 	}
 
 	increase := 1024
-	tarBall.SetSize(int64(increase))
+	tarBall.AddSize(int64(increase))
 
 	if tarBall.Size() != 1024 {
 		t.Errorf("make: Tarball size expected to increase to %d but got %d", increase, tarBall.Size())
@@ -60,7 +62,7 @@ func TestS3TarBall(t *testing.T) {
 		t.Errorf("make: Tarball writer should not be set up without calling SetUp()")
 	}
 
-	bundle.NewTarBall()
+	bundle.NewTarBall(true)
 	tarBallCounter += 1
 
 	if tarBall == bundle.Tb {
@@ -90,7 +92,7 @@ func TestS3DependentFunctions(t *testing.T) {
 		Tu:       tu,
 	}
 
-	bundle.NewTarBall()
+	bundle.NewTarBall(true)
 	tarBall := bundle.Tb
 	tarBall.SetUp(walg.MockArmedCrypter())
 	tarWriter := tarBall.Tw()
@@ -127,7 +129,7 @@ func TestS3DependentFunctions(t *testing.T) {
 	}
 
 	// Test naming property of SetUp().
-	bundle.NewTarBall()
+	bundle.NewTarBall(true)
 	tarBall = bundle.Tb
 	tarBall.SetUp(walg.MockArmedCrypter(), "mockTarball")
 	tarBall.CloseTar()
@@ -136,4 +138,97 @@ func TestS3DependentFunctions(t *testing.T) {
 		t.Errorf("structs: tarball did not finish correctly with error %s", err)
 	}
 
+}
+
+func TestEmptyBundleQueue(t *testing.T) {
+
+	bundle := &walg.Bundle{
+		MinSize: 100,
+	}
+
+	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region", 1, float64(1))
+	tu.Upl = &mockS3Uploader{}
+
+	bundle.Tbm = &walg.S3TarBallMaker{
+		BaseDir:  "mockDirectory",
+		Trim:     "",
+		BkupName: "mockBackup",
+		Tu:       tu,
+	}
+
+	bundle.StartQueue()
+
+	err := bundle.FinishQueue()
+	if err != nil {
+		t.Log(err)
+	}
+}
+
+func TestBundleQueue(t *testing.T) {
+
+	queueTest(t)
+
+}
+
+func TestBundleQueueHC(t *testing.T) {
+
+	os.Setenv("WALG_UPLOAD_CONCURRENCY", "100")
+
+	queueTest(t)
+
+	os.Unsetenv("WALG_UPLOAD_CONCURRENCY")
+}
+
+func TestBundleQueueLC(t *testing.T) {
+
+	os.Setenv("WALG_UPLOAD_CONCURRENCY", "1")
+
+	queueTest(t)
+
+	os.Unsetenv("WALG_UPLOAD_CONCURRENCY")
+}
+
+func queueTest(t *testing.T) {
+	bundle := &walg.Bundle{
+		MinSize: 100,
+	}
+	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region", 1, float64(1))
+	tu.Upl = &mockS3Uploader{}
+	bundle.Tbm = &walg.S3TarBallMaker{
+		BaseDir:  "mockDirectory",
+		Trim:     "",
+		BkupName: "mockBackup",
+		Tu:       tu,
+	}
+
+	f := false
+	tr := true
+	// For tests there must be at leaest 3 workers
+
+	bundle.StartQueue()
+
+	go func() {
+		a := bundle.Deque()
+		time.Sleep(10*time.Millisecond)
+		bundle.EnqueueBack(a, &tr)
+		time.Sleep(10*time.Millisecond)
+		bundle.EnqueueBack(a, &f)
+	}()
+
+	go func() {
+		c := bundle.Deque()
+		time.Sleep(10*time.Millisecond)
+		bundle.CheckSizeAndEnqueueBack(c)
+	}()
+
+	go func() {
+		b := bundle.Deque()
+		time.Sleep(10*time.Millisecond)
+		bundle.EnqueueBack(b, &f)
+	}()
+
+	err := bundle.FinishQueue()
+	if err != nil {
+		t.Log(err)
+	}
 }

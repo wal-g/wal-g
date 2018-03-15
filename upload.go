@@ -131,7 +131,7 @@ func Configure() (*TarUploader, *Prefix, error) {
 
 	upload := NewTarUploader(pre.Svc, bucket, server, region, MAXRETRIES, MAXBACKOFF)
 
-	var con = getMaxUploadConcurrency(10);
+	var con = getMaxUploadConcurrency(10)
 
 	storageClass, ok := os.LookupEnv("WALG_S3_STORAGE_CLASS")
 	if ok {
@@ -279,7 +279,7 @@ func (bundle *Bundle) HandleSentinel() error {
 	info := bundle.Sen.Info
 	path := bundle.Sen.path
 
-	bundle.NewTarBall()
+	bundle.NewTarBall(true)
 	tarBall := bundle.Tb
 	tarBall.SetUp(&bundle.Crypter, "pg_control.tar.lz4")
 	tarWriter := tarBall.Tw()
@@ -313,7 +313,7 @@ func (bundle *Bundle) HandleSentinel() error {
 			return errors.Wrap(err, "HandleSentinel: copy failed")
 		}
 
-		tarBall.SetSize(hdr.Size)
+		tarBall.AddSize(hdr.Size)
 		f.Close()
 	}
 
@@ -350,7 +350,7 @@ func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {
 		return lsn, nil
 	}
 
-	bundle.NewTarBall()
+	bundle.NewTarBall(true)
 	tarBall := bundle.Tb
 	tarBall.SetUp(&bundle.Crypter)
 	tarWriter := tarBall.Tw()

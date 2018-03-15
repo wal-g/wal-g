@@ -81,13 +81,14 @@ func (fb *FileTarBall) Trim() string    { return fb.trim }
 func (fb *FileTarBall) Nop() bool       { return fb.nop }
 func (fb *FileTarBall) Number() int     { return fb.number }
 func (fb *FileTarBall) Size() int64     { return fb.size }
-func (fb *FileTarBall) SetSize(i int64) { fb.size += i }
+func (fb *FileTarBall) AddSize(i int64) { fb.size += i }
 func (fb *FileTarBall) Tw() *tar.Writer { return fb.tw }
 
 func (b *FileTarBall) AppendIncrementalFile(filePath ...string) {}
 func (b *FileTarBall) GetIncrementalFiles() []string            { return nil }
 func (b *FileTarBall) SetFiles(files walg.BackupFileList)       {}
 func (b *FileTarBall) GetFiles() walg.BackupFileList            { return make(walg.BackupFileList) }
+func (b *FileTarBall) AwaitUploads()                            {}
 
 // NOPTarBall mocks a tarball. Used for testing purposes.
 type NOPTarBall struct {
@@ -111,8 +112,9 @@ func (n *NOPTarBall) Trim() string    { return n.trim }
 func (n *NOPTarBall) Nop() bool       { return n.nop }
 func (n *NOPTarBall) Number() int     { return n.number }
 func (n *NOPTarBall) Size() int64     { return n.size }
-func (n *NOPTarBall) SetSize(i int64) { n.size += i }
+func (n *NOPTarBall) AddSize(i int64) { n.size += i }
 func (n *NOPTarBall) Tw() *tar.Writer { return n.tw }
 
 func (b *NOPTarBall) SetFiles(files walg.BackupFileList) {}
 func (b *NOPTarBall) GetFiles() walg.BackupFileList      { return make(walg.BackupFileList) }
+func (b *NOPTarBall) AwaitUploads()                      {}

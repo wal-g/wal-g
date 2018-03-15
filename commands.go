@@ -256,7 +256,6 @@ func DeleteWALBefore(bt BackupTime, pre *Prefix) {
 	}
 }
 
-
 var DeleteUsage = "delete requires at least 2 parameters" + `
 		retain 5                      keep 5 backups
 		retain FULL 5                 keep 5 full backups and all deltas of them
@@ -568,13 +567,14 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 		IncrementFromLsn: dto.LSN,
 		IncrementFrom:    latest,
 	}
-	bundle.NewTarBall()
+
+	bundle.StartQueue()
 	fmt.Println("Walking ...")
 	err = filepath.Walk(dirArc, bundle.TarWalker)
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
-	err = bundle.Tb.CloseTar()
+	err = bundle.FinishQueue()
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}

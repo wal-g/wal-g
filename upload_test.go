@@ -166,7 +166,7 @@ func TestUploadError(t *testing.T) {
 		Tu:       tu,
 	}
 
-	tarBall := maker.Make()
+	tarBall := maker.Make(true)
 	tarBall.SetUp(walg.MockArmedCrypter())
 
 	tarBall.Finish(&walg.S3TarBallSentinelDto{})
@@ -178,7 +178,7 @@ func TestUploadError(t *testing.T) {
 		multierr: true,
 	}
 
-	tarBall = maker.Make()
+	tarBall = maker.Make(true)
 	tarBall.SetUp(walg.MockArmedCrypter())
 	tarBall.Finish(&walg.S3TarBallSentinelDto{})
 	if tu.Success {
