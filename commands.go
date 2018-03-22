@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"runtime/pprof"
 	"strconv"
+	"text/tabwriter"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -277,10 +278,14 @@ func HandleBackupList(pre *Prefix) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("name\tlast_modified\twal_segment_backup_start")
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+	defer w.Flush()
+	fmt.Fprintln(w, "name\tlast_modified\twal_segment_backup_start")
+
 	for i := len(backups) - 1; i >= 0; i-- {
 		b := backups[i]
-		fmt.Printf("%v\t%v\t%v\n", b.Name, b.Time.Format(time.RFC3339), b.WalFileName)
+		fmt.Fprintln(w, fmt.Sprintf("%v\t%v\t%v", b.Name, b.Time.Format(time.RFC3339), b.WalFileName))
 	}
 }
 
