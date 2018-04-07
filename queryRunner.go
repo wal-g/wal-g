@@ -9,14 +9,14 @@ import (
 
 // The interface for controlling database during backup
 type QueryRunner interface {
-	// This call should informa the database that we are going to copy cluster's contents
+	// This call should inform the database that we are going to copy cluster's contents
 	// Should fail if backup is currently impossible
 	StartBackup(backup string) (string, string, bool, error)
 	// Inform database that contents are copied, get information on backup
 	StopBackup() (string, string, string, error)
 }
 
-// Impelemntation for controlling PostgreSQL 9.0+
+// Implementation for controlling PostgreSQL 9.0+
 type PgQueryRunner struct {
 	connection *pgx.Conn
 	Version    int
@@ -27,7 +27,7 @@ func (qb *PgQueryRunner) BuildGetVersion() string {
 	return "select (current_setting('server_version_num'))::int"
 }
 
-// Format a query that starts backup accroding to server features and version
+// Format a query that starts backup according to server features and version
 func (qb *PgQueryRunner) BuildStartBackup() (string, error) {
 	// TODO: rewrite queries for older versions to remove pg_is_in_recovery()
 	// where pg_start_backup() will fail on standby anyway
@@ -39,13 +39,13 @@ func (qb *PgQueryRunner) BuildStartBackup() (string, error) {
 	case qb.Version >= 90000:
 		return "SELECT case when pg_is_in_recovery() then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true) lsn", nil
 	case qb.Version == 0:
-		return "", errors.New("Postgres version not set, cannot determing start backup query")
+		return "", errors.New("Postgres version not set, cannot determine start backup query")
 	default:
 		return "", errors.New("Could not determine start backup query for version " + fmt.Sprintf("%d", qb.Version))
 	}
 }
 
-// Format a query that stops backup accroding to server features and version
+// Format a query that stops backup according to server features and version
 func (qb *PgQueryRunner) BuildStopBackup() (string, error) {
 	switch {
 	case qb.Version >= 90600:
@@ -53,7 +53,7 @@ func (qb *PgQueryRunner) BuildStopBackup() (string, error) {
 	case qb.Version >= 90000:
 		return "SELECT (pg_xlogfile_name_offset(lsn)).file_name, lpad((pg_xlogfile_name_offset(lsn)).file_offset::text, 8, '0') AS file_offset, lsn::text FROM pg_stop_backup() lsn", nil
 	case qb.Version == 0:
-		return "", errors.New("Postgres version not set, cannot determing stop backup query")
+		return "", errors.New("Postgres version not set, cannot determine stop backup query")
 	default:
 		return "", errors.New("Could not determine stop backup query for version " + fmt.Sprintf("%d", qb.Version))
 	}
@@ -70,7 +70,7 @@ func NewPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
 	return r, nil
 }
 
-// Retrive PostgreSQL numeric version
+// Retrieve PostgreSQL numeric version
 func (queryRunner *PgQueryRunner) getVersion() (err error) {
 	conn := queryRunner.connection
 	err = conn.QueryRow(queryRunner.BuildGetVersion()).Scan(&queryRunner.Version)
