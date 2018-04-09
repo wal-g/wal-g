@@ -48,10 +48,9 @@ func findS3BucketRegion(bucket string, config *aws.Config) (string, error) {
 	if output.LocationConstraint == nil {
 		// buckets in "US Standard", a.k.a. us-east-1, are returned as a nil region
 		return "us-east-1", nil
-	} else {
-		// all other regions are strings
-		return *output.LocationConstraint, nil
 	}
+	// all other regions are strings
+	return *output.LocationConstraint, nil
 }
 
 // Configure connects to S3 and creates an uploader. It makes sure
@@ -63,14 +62,14 @@ func findS3BucketRegion(bucket string, config *aws.Config) (string, error) {
 //
 // Able to configure the upload part size in the S3 uploader.
 func Configure() (*TarUploader, *Prefix, error) {
-	wale_s3_prefix := os.Getenv("WALE_S3_PREFIX")
-	if wale_s3_prefix == "" {
+	waleS3Prefix := os.Getenv("WALE_S3_PREFIX")
+	if waleS3Prefix == "" {
 		return nil, nil, &UnsetEnvVarError{names: []string{"WALE_S3_PREFIX"}}
 	}
 
-	u, err := url.Parse(wale_s3_prefix)
+	u, err := url.Parse(waleS3Prefix)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "Configure: failed to parse url '%s'", wale_s3_prefix)
+		return nil, nil, errors.Wrapf(err, "Configure: failed to parse url '%s'", waleS3Prefix)
 	}
 	if u.Scheme == "" || u.Host == "" {
 		return nil, nil, fmt.Errorf("Missing url scheme=%q and/or host=%q", u.Scheme, u.Host)
@@ -131,8 +130,7 @@ func Configure() (*TarUploader, *Prefix, error) {
 
 	upload := NewTarUploader(pre.Svc, bucket, server, region, MAXRETRIES, MAXBACKOFF)
 
-	var con = getMaxUploadConcurrency(10);
-
+	var con = getMaxUploadConcurrency(10)
 	storageClass, ok := os.LookupEnv("WALG_S3_STORAGE_CLASS")
 	if ok {
 		upload.StorageClass = storageClass
@@ -313,7 +311,7 @@ func (bundle *Bundle) HandleSentinel() error {
 			return errors.Wrap(err, "HandleSentinel: copy failed")
 		}
 
-		tarBall.SetSize(hdr.Size)
+		tarBall.AddSize(hdr.Size)
 		f.Close()
 	}
 

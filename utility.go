@@ -58,6 +58,7 @@ func partitionObjects(a []*s3.ObjectIdentifier, b int) [][]*s3.ObjectIdentifier 
 	return c
 }
 
+// ResolveSymlink converts path to physical if it is symlink
 func ResolveSymlink(path string) string {
 	resolve, err := filepath.EvalSymlinks(path)
 	if err != nil {

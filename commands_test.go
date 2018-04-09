@@ -10,7 +10,7 @@ func TestDeleteArgsParsingRetain(t *testing.T) {
 		t.Fatal("Parsing of delete comand failed")
 	}
 
-	if !args.retain || args.find_full || args.target != "5" {
+	if !args.retain || args.findFull || args.target != "5" {
 		t.Fatal("Parsing was wrong")
 	}
 
@@ -28,7 +28,7 @@ func TestDeleteArgsParsingRetain(t *testing.T) {
 	if parseAndTestFail(command, &args) {
 		t.Fatal("Parsing of delete comand failed")
 	}
-	if !args.retain || args.full || args.target != "5" || !args.find_full {
+	if !args.retain || args.full || args.target != "5" || !args.findFull {
 		t.Fatal("Parsing was wrong")
 	}
 
@@ -47,7 +47,7 @@ func TestDeleteArgsParsingBefore(t *testing.T) {
 		t.Fatal("Parsing of delete comand failed")
 	}
 
-	if !args.before || args.find_full || args.target != "x" || args.retain {
+	if !args.before || args.findFull || args.target != "x" || args.retain {
 		t.Fatal("Parsing was wrong")
 	}
 
@@ -56,7 +56,7 @@ func TestDeleteArgsParsingBefore(t *testing.T) {
 	if parseAndTestFail(command, &args) {
 		t.Fatal("Parsing of delete comand failed")
 	}
-	if !args.before || !args.find_full || args.target != "x" || args.beforeTime != nil {
+	if !args.before || !args.findFull || args.target != "x" || args.beforeTime != nil {
 		t.Fatal("Parsing was wrong")
 	}
 
@@ -65,7 +65,7 @@ func TestDeleteArgsParsingBefore(t *testing.T) {
 	if parseAndTestFail(command, &args) {
 		t.Fatal("Parsing of delete comand failed")
 	}
-	if !args.before || !args.find_full || args.beforeTime == nil {
+	if !args.before || !args.findFull || args.beforeTime == nil {
 		t.Fatal("Parsing was wrong")
 	}
 

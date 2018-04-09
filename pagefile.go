@@ -20,39 +20,40 @@ import (
 )
 
 const (
+	// BlockSize is the PostgreSQL page size
 	BlockSize            uint16 = 8192
 	sizeofInt32                 = 4
 	sizeofInt16                 = 2
 	sizeofInt64                 = 8
-	sizeofPgPageHeader          = 24
 	signatureMagicNumber byte   = 0x55
-	invalid_lsn          uint64 = 0
-	valid_flags                 = 7
-	layout_version              = 4
-	header_size                 = 24
+	invalidLsn           uint64 = 0
+	validFlags                  = 7
+	layoutVersion               = 4
+	headerSize                  = 24
 )
 
+// ParsePageHeader reads information from PostgreSQL page header. Exported for test reasons.
 func ParsePageHeader(data []byte) (lsn uint64, valid bool) {
 	// Any ideas on how to make this code pretty and nice?
 	le := binary.LittleEndian
-	pd_lsn_h := le.Uint32(data[0:sizeofInt32])
-	pd_lsn_l := le.Uint32(data[sizeofInt32 : 2*sizeofInt32])
+	pdLsnH := le.Uint32(data[0:sizeofInt32])
+	pdLsnL := le.Uint32(data[sizeofInt32: 2*sizeofInt32])
 
 	// pd_checksum := binary.LittleEndian.Uint16(data[2*sizeofInt32:2*sizeofInt32+sizeofInt16])
-	pd_flags := le.Uint16(data[2*sizeofInt32+sizeofInt16 : 2*sizeofInt32+2*sizeofInt16])
-	pd_lower := le.Uint16(data[2*sizeofInt32+2*sizeofInt16 : 2*sizeofInt32+3*sizeofInt16])
-	pd_upper := le.Uint16(data[2*sizeofInt32+3*sizeofInt16 : 2*sizeofInt32+4*sizeofInt16])
-	pd_special := le.Uint16(data[2*sizeofInt32+4*sizeofInt16 : 2*sizeofInt32+5*sizeofInt16])
-	pd_pagesize_version := le.Uint16(data[2*sizeofInt32+5*sizeofInt16 : 2*sizeofInt32+6*sizeofInt16])
+	pdFlags := le.Uint16(data[2*sizeofInt32+sizeofInt16: 2*sizeofInt32+2*sizeofInt16])
+	pdLower := le.Uint16(data[2*sizeofInt32+2*sizeofInt16: 2*sizeofInt32+3*sizeofInt16])
+	pdUpper := le.Uint16(data[2*sizeofInt32+3*sizeofInt16: 2*sizeofInt32+4*sizeofInt16])
+	pdSpecial := le.Uint16(data[2*sizeofInt32+4*sizeofInt16: 2*sizeofInt32+5*sizeofInt16])
+	pdPagesizeVersion := le.Uint16(data[2*sizeofInt32+5*sizeofInt16: 2*sizeofInt32+6*sizeofInt16])
 
-	lsn = ((uint64(pd_lsn_h)) << 32) + uint64(pd_lsn_l)
-	if (pd_flags&valid_flags) != pd_flags ||
-		pd_lower < header_size ||
-		pd_lower > pd_upper ||
-		pd_upper > pd_special ||
-		pd_special > BlockSize ||
-		(lsn == invalid_lsn) ||
-		pd_pagesize_version != BlockSize+layout_version {
+	lsn = ((uint64(pdLsnH)) << 32) + uint64(pdLsnL)
+	if (pdFlags&validFlags) != pdFlags ||
+		pdLower < headerSize ||
+		pdLower > pdUpper ||
+		pdUpper > pdSpecial ||
+		pdSpecial > BlockSize ||
+		(lsn == invalidLsn) ||
+		pdPagesizeVersion != BlockSize+layoutVersion {
 		valid = false
 	} else {
 		valid = true
@@ -61,6 +62,7 @@ func ParsePageHeader(data []byte) (lsn uint64, valid bool) {
 	return
 }
 
+// IsPagedFile checks basic expectaions for paged file
 func IsPagedFile(info os.FileInfo, fileName string) bool {
 
 	// For details on which file is paged see
@@ -76,7 +78,7 @@ func IsPagedFile(info os.FileInfo, fileName string) bool {
 	return true
 }
 
-// Reader consturcts difference map during initialization and than re-read file
+// IncrementalPageReader constructs difference map during initialization and than re-read file
 // Diff map can be of 1Gb/PostgresBlockSize elements == 512Kb
 type IncrementalPageReader struct {
 	backlog chan []byte
@@ -89,6 +91,7 @@ type IncrementalPageReader struct {
 	blocks  []uint32
 }
 
+// Read from IncrementalPageReader
 func (pr *IncrementalPageReader) Read(p []byte) (n int, err error) {
 	err = nil
 	if pr.next == nil {
@@ -103,14 +106,15 @@ func (pr *IncrementalPageReader) Read(p []byte) (n int, err error) {
 	}
 
 	if pr.next == nil {
-		err = pr.DrainMoreData()
+		err = pr.drainMoreData()
 	}
 
 	return n, err
 }
-func (pr *IncrementalPageReader) DrainMoreData() error {
+
+func (pr *IncrementalPageReader) drainMoreData() error {
 	for len(pr.blocks) > 0 && len(pr.backlog) < 2 {
-		err := pr.AdvanceFileReader()
+		err := pr.advanceFileReader()
 		if err != nil {
 			return err
 		}
@@ -124,7 +128,7 @@ func (pr *IncrementalPageReader) DrainMoreData() error {
 	return nil
 }
 
-func (pr *IncrementalPageReader) AdvanceFileReader() error {
+func (pr *IncrementalPageReader) advanceFileReader() error {
 	pageBytes := make([]byte, BlockSize)
 	blockNo := pr.blocks[0]
 	pr.blocks = pr.blocks[1:]
@@ -140,13 +144,15 @@ func (pr *IncrementalPageReader) AdvanceFileReader() error {
 	return err
 }
 
+// Close IncrementalPageReader
 func (pr *IncrementalPageReader) Close() error {
 	return pr.closer.Close()
 }
 
-var InvalidBlock = errors.New("Block is not valid")
+// ErrInvalidBlock indicates that file contain invalid page and cannot be archived incrementally
+var ErrInvalidBlock = errors.New("Block is not valid")
 
-func (pr *IncrementalPageReader) Initialize() (size int64, err error) {
+func (pr *IncrementalPageReader) initialize() (size int64, err error) {
 	size = 0
 	// "wi" at the head stands for "wal-g increment"
 	// format version "1", signature magic number
@@ -202,7 +208,7 @@ func (pr *IncrementalPageReader) Initialize() (size int64, err error) {
 			}
 
 			if !valid {
-				return 0, InvalidBlock
+				return 0, ErrInvalidBlock
 			}
 
 			if (allZeroes) || (lsn >= pr.lsn) {
@@ -214,6 +220,7 @@ func (pr *IncrementalPageReader) Initialize() (size int64, err error) {
 	}
 }
 
+// ReadDatabaseFile tries to read file as an incremental data file if possible, otherwise just open the file
 func ReadDatabaseFile(fileName string, lsn *uint64, isNew bool) (io.ReadCloser, bool, int64, error) {
 	info, err := os.Stat(fileName)
 	fileSize := info.Size()
@@ -236,9 +243,9 @@ func ReadDatabaseFile(fileName string, lsn *uint64, isNew bool) (io.ReadCloser, 
 	}
 
 	reader := &IncrementalPageReader{make(chan []byte, 4), lim, file, file, info, *lsn, nil, nil}
-	incrSize, err := reader.Initialize()
+	incrSize, err := reader.initialize()
 	if err != nil {
-		if err == InvalidBlock {
+		if err == ErrInvalidBlock {
 			file.Close()
 			fmt.Printf("File %v has invalid pages, fallback to full backup\n", fileName)
 			file, err = os.Open(fileName)
@@ -246,13 +253,14 @@ func ReadDatabaseFile(fileName string, lsn *uint64, isNew bool) (io.ReadCloser, 
 				return nil, false, fileSize, err
 			}
 			return file, false, fileSize, nil
-		} else {
-			return nil, false, fileSize, err
 		}
+
+		return nil, false, fileSize, err
 	}
 	return reader, true, incrSize, nil
 }
 
+// ApplyFileIncrement changes pages according to supplied change map file
 func ApplyFileIncrement(fileName string, increment io.Reader) error {
 	fmt.Println("Incrementing " + fileName)
 	header := make([]byte, sizeofInt32)
@@ -303,7 +311,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader) error {
 
 	page := make([]byte, BlockSize)
 	for i := uint32(0); i < diffBlockCount; i++ {
-		blockNo := binary.LittleEndian.Uint32(diffMap[i*sizeofInt32 : (i+1)*sizeofInt32])
+		blockNo := binary.LittleEndian.Uint32(diffMap[i*sizeofInt32: (i+1)*sizeofInt32])
 		_, err = io.ReadFull(increment, page)
 		if err != nil {
 			return err

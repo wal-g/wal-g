@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+// HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
 func HandleWALPrefetch(pre *Prefix, walFileName string, location string) {
 	var fileName = walFileName
 	var err error
@@ -41,10 +42,10 @@ func prefetchFile(location string, pre *Prefix, walFileName string, wg *sync.Wai
 	}()
 
 	_, runningLocation, oldPath, newPath := getPrefetchLocations(location, walFileName)
-	_, err_o := os.Stat(oldPath)
-	_, err_n := os.Stat(newPath)
+	_, errO := os.Stat(oldPath)
+	_, errN := os.Stat(newPath)
 
-	if (err_o == nil || !os.IsNotExist(err_o)) || (err_n == nil || !os.IsNotExist(err_n)) {
+	if (errO == nil || !os.IsNotExist(errO)) || (errN == nil || !os.IsNotExist(errN)) {
 		// Seems someone is doing something about this file
 		return
 	}
@@ -54,9 +55,9 @@ func prefetchFile(location string, pre *Prefix, walFileName string, wg *sync.Wai
 
 	DownloadWALFile(pre, walFileName, oldPath)
 
-	_, err_o = os.Stat(oldPath)
-	_, err_n = os.Stat(newPath)
-	if err_o == nil && os.IsNotExist(err_n) {
+	_, errO = os.Stat(oldPath)
+	_, errN = os.Stat(newPath)
+	if errO == nil && os.IsNotExist(errN) {
 		os.Rename(oldPath, newPath)
 	} else {
 		os.Remove(oldPath) // error is ignored
@@ -86,14 +87,17 @@ func forkPrefetch(walFileName string, location string) {
 	}
 }
 
+// Cleaner interface serves to separate file system logic from prefetch clean logic to make it testable
 type Cleaner interface {
 	GetFiles(directory string) ([]string, error)
 	Remove(file string)
 }
 
+// FileSystemCleaner actually performs it's functions on file system
 type FileSystemCleaner struct{}
 
-func (this FileSystemCleaner) GetFiles(directory string) (files []string, err error) {
+// GetFiles of a directory
+func (c FileSystemCleaner) GetFiles(directory string) (files []string, err error) {
 	fileInfos, err := ioutil.ReadDir(directory)
 	if err != nil {
 		return
@@ -108,7 +112,8 @@ func (this FileSystemCleaner) GetFiles(directory string) (files []string, err er
 	return
 }
 
-func (this FileSystemCleaner) Remove(file string) {
+// Remove file
+func (c FileSystemCleaner) Remove(file string) {
 	os.Remove(file)
 }
 

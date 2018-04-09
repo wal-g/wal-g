@@ -9,11 +9,11 @@ import (
 )
 
 func readTimeline(conn *pgx.Conn) (timeline uint32, err error) {
-	var bytes_per_wal_segment uint32
+	var bytesPerWalSegment uint32
 
 	// TODO: Check if this logic can be moved to queryRunner or abstracted away somehow
-	err = conn.QueryRow("select timeline_id, bytes_per_wal_segment from pg_control_checkpoint(), pg_control_init()").Scan(&timeline, &bytes_per_wal_segment)
-	if err == nil && uint64(bytes_per_wal_segment) != WalSegmentSize {
+	err = conn.QueryRow("select timeline_id, bytes_per_wal_segment from pg_control_checkpoint(), pg_control_init()").Scan(&timeline, &bytesPerWalSegment)
+	if err == nil && uint64(bytesPerWalSegment) != WalSegmentSize {
 		return 0, errors.New("bytes_per_wal_segment of the server does not match expected value")
 	}
 	return
@@ -23,6 +23,7 @@ const (
 	sizeofInt32bits = sizeofInt32 * 8
 )
 
+// ParseLsn converts PostgreSQL string representation of LSN to uint64
 func ParseLsn(lsnStr string) (lsn uint64, err error) {
 	lsnArray := strings.SplitN(lsnStr, "/", 2)
 
@@ -38,11 +39,14 @@ func ParseLsn(lsnStr string) (lsn uint64, err error) {
 }
 
 const (
-	WalSegmentSize        = uint64(16 * 1024 * 1024)     // xlog.c line 113
+	// WalSegmentSize is the size of one WAL file
+	WalSegmentSize = uint64(16 * 1024 * 1024) // xlog.c line 113ß
+
 	walFileFormat         = "%08X%08X%08X"               // xlog_internal.h line 155
 	xLogSegmentsPerXLogId = 0x100000000 / WalSegmentSize // xlog_internal.h line 101
 )
 
+// WALFileName formats WAL file name using PostgreSQL connection. Essentially reads timeline of the server.
 func WALFileName(lsn uint64, conn *pgx.Conn) (string, uint32, error) {
 	timeline, err := readTimeline(conn)
 	if err != nil {
@@ -53,10 +57,12 @@ func WALFileName(lsn uint64, conn *pgx.Conn) (string, uint32, error) {
 
 	return formatWALFileName(timeline, logSegNo), timeline, nil
 }
+
 func formatWALFileName(timeline uint32, logSegNo uint64) string {
 	return fmt.Sprintf(walFileFormat, timeline, logSegNo/xLogSegmentsPerXLogId, logSegNo%xLogSegmentsPerXLogId)
 }
 
+// ParseWALFileName extracts numeric parts from WAL file name
 func ParseWALFileName(name string) (timelineId uint32, logSegNo uint64, err error) {
 	if len(name) != 24 {
 		err = errors.New("Not a WAL file name: " + name)
@@ -87,6 +93,7 @@ func ParseWALFileName(name string) (timelineId uint32, logSegNo uint64, err erro
 	return
 }
 
+// NextWALFileName computes name of next WAL segment
 func NextWALFileName(name string) (nextname string, err error) {
 	timelineId, logSegNo, err0 := ParseWALFileName(name)
 	if err0 != nil {

@@ -130,6 +130,9 @@ func doConfigureWithBuсketPath(t *testing.T, bucketPath string, expectedServer 
 		t.Log(err)
 	}
 	tu, pre, err = walg.Configure()
+	if err != nil {
+		t.Log(err)
+	}
 	if tu.StorageClass != "STANDARD_IA" {
 		t.Errorf("upload: TarUploader field 'StorageClass' expected %s but got %s", "STANDARD_IA", tu.StorageClass)
 	}

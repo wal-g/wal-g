@@ -29,8 +29,6 @@ func init() {
 	flag.BoolVar(&profile, "p", false, "\tProfiler (false by default)")
 	flag.BoolVar(&mem, "m", false, "\tMemory profiler (false by default)")
 
-	flag.BoolVar(&walg.DeleteConfirmed, "confirm", false, "\tConfirm deletion")
-	flag.BoolVar(&walg.DeleteDryrun, "dry-run", false, "\tDry-run deletion")
 	l = log.New(os.Stderr, "", 0)
 }
 

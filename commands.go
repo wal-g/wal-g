@@ -16,12 +16,12 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
 )
 
+// HandleDelete is invoked to perform wal-g delete
 func HandleDelete(pre *Prefix, args []string) {
-	cfg := ParseDeleteArguments(args, PrintDeleteUsageAndFail)
+	cfg := ParseDeleteArguments(args, printDeleteUsageAndFail)
 
 	var bk = &Backup{
 		Prefix: pre,
@@ -30,7 +30,7 @@ func HandleDelete(pre *Prefix, args []string) {
 
 	if cfg.before {
 		if cfg.beforeTime == nil {
-			DeleteBeforeTarget(cfg.target, bk, pre, cfg.find_full, nil, cfg.dryrun)
+			deleteBeforeTarget(cfg.target, bk, pre, cfg.findFull, nil, cfg.dryrun)
 		} else {
 			backups, err := bk.GetBackups()
 			if err != nil {
@@ -38,7 +38,7 @@ func HandleDelete(pre *Prefix, args []string) {
 			}
 			for _, b := range backups {
 				if b.Time.Before(*cfg.beforeTime) {
-					DeleteBeforeTarget(b.Name, bk, pre, cfg.find_full, backups, cfg.dryrun)
+					deleteBeforeTarget(b.Name, bk, pre, cfg.findFull, backups, cfg.dryrun)
 					return
 				}
 			}
@@ -61,7 +61,7 @@ func HandleDelete(pre *Prefix, args []string) {
 			left := number
 			for _, b := range backups {
 				if left == 1 {
-					DeleteBeforeTarget(b.Name, bk, pre, true, backups, cfg.dryrun)
+					deleteBeforeTarget(b.Name, bk, pre, true, backups, cfg.dryrun)
 					return
 				}
 				dto := fetchSentinel(b.Name, bk, pre)
@@ -75,200 +75,13 @@ func HandleDelete(pre *Prefix, args []string) {
 				fmt.Printf("Have only %v backups.\n", number)
 			} else {
 				cfg.target = backups[number-1].Name
-				DeleteBeforeTarget(cfg.target, bk, pre, cfg.find_full, nil, cfg.dryrun)
+				deleteBeforeTarget(cfg.target, bk, pre, cfg.findFull, nil, cfg.dryrun)
 			}
 		}
 	}
 }
 
-type DeleteCommandArguments struct {
-	full       bool
-	find_full  bool
-	retain     bool
-	before     bool
-	target     string
-	beforeTime *time.Time
-	dryrun     bool
-}
-
-func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteCommandArguments) {
-	if len(args) < 3 {
-		fallBackFunc()
-		return
-	}
-
-	params := args[1:]
-	if params[0] == "retain" {
-		result.retain = true
-		params = params[1:]
-	} else if params[0] == "before" {
-		result.before = true
-		params = params[1:]
-	} else {
-		fallBackFunc()
-		return
-	}
-	if params[0] == "FULL" {
-		result.full = true
-		params = params[1:]
-	} else if params[0] == "FIND_FULL" {
-		result.find_full = true
-		params = params[1:]
-	}
-	if len(params) < 1 {
-		log.Print("Backup name not specified")
-		fallBackFunc()
-		return
-	}
-
-	result.target = params[0]
-	if t, err := time.Parse(time.RFC3339, result.target); err == nil {
-		if t.After(time.Now()) {
-			log.Println("Cannot delete before future date")
-			fallBackFunc()
-		}
-		result.beforeTime = &t
-	}
-	//if DeleteConfirmed && !DeleteDryrun  // TODO: use flag
-	result.dryrun = true
-	if len(params) > 1 && (params[1] == "--confirm" || params[1] == "-confirm") {
-		result.dryrun = false
-	}
-
-	if result.retain {
-		number, err := strconv.Atoi(result.target)
-		if err != nil {
-			log.Println("Cannot parse target number ", number)
-			fallBackFunc()
-			return
-		}
-		if number <= 0 {
-			log.Println("Cannot retain 0") // Consider allowing to delete everything
-			fallBackFunc()
-			return
-		}
-	}
-	return
-}
-
-var DeleteConfirmed bool
-var DeleteDryrun bool
-
-func DeleteBeforeTarget(target string, bk *Backup, pre *Prefix, find_full bool, backups []BackupTime, dryRun bool) {
-	dto := fetchSentinel(target, bk, pre)
-	if dto.IsIncremental() {
-		if find_full {
-			target = *dto.IncrementFullName
-		} else {
-			log.Fatalf("%v is incemental and it's predecessors cannot be deleted. Consider FIND_FULL option.", target)
-		}
-	}
-	var err error
-	if backups == nil {
-		backups, err = bk.GetBackups()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	skip := true
-	skipLine := len(backups)
-	for i, b := range backups {
-		if skip {
-			log.Printf("%v skipped\n", b.Name)
-		} else {
-			log.Printf("%v will be deleted\n", b.Name)
-		}
-		if b.Name == target {
-			skip = false
-			skipLine = i
-		}
-	}
-
-	if !dryRun {
-		if skipLine < len(backups)-1 {
-			DeleteWALBefore(backups[skipLine], pre)
-			DeleteBackupsBefore(backups, skipLine, pre)
-		}
-	} else {
-		log.Printf("Dry run finished.\n")
-	}
-}
-
-func DeleteBackupsBefore(backups []BackupTime, skipline int, pre *Prefix) {
-	for i, b := range backups {
-		if i > skipline {
-			dropBackup(pre, b)
-		}
-	}
-}
-func dropBackup(pre *Prefix, b BackupTime) {
-	var bk = &Backup{
-		Prefix: pre,
-		Path:   GetBackupPath(pre),
-		Name:   aws.String(b.Name),
-	}
-	tarFiles, err := bk.GetKeys()
-	if err != nil {
-		log.Fatal("Unable to list backup for deletion ", b.Name, err)
-	}
-	keys := append(tarFiles, *pre.Server+"/basebackups_005/"+b.Name+SentinelSuffix, *pre.Server+"/basebackups_005/"+b.Name)
-	parts := partition(keys, 1000)
-	for _, part := range parts {
-
-		input := &s3.DeleteObjectsInput{Bucket: pre.Bucket, Delete: &s3.Delete{
-			Objects: partitionToObjects(part),
-		}}
-		_, err = pre.Svc.DeleteObjects(input)
-		if err != nil {
-			log.Fatal("Unable to delete backup ", b.Name, err)
-		}
-
-	}
-}
-
-func partitionToObjects(keys []string) []*s3.ObjectIdentifier {
-	objs := make([]*s3.ObjectIdentifier, len(keys))
-	for i, k := range keys {
-		objs[i] = &s3.ObjectIdentifier{Key: aws.String(k)}
-	}
-	return objs
-}
-
-func DeleteWALBefore(bt BackupTime, pre *Prefix) {
-	var bk = &Backup{
-		Prefix: pre,
-		Path:   aws.String(sanitizePath(*pre.Server + "/wal_005/")),
-	}
-
-	objects, err := bk.GetWals(bt.WalFileName)
-	if err != nil {
-		log.Fatal("Unable to obtaind WALS for border ", bt.Name, err)
-	}
-	parts := partitionObjects(objects, 1000)
-	for _, part := range parts {
-		input := &s3.DeleteObjectsInput{Bucket: pre.Bucket, Delete: &s3.Delete{
-			Objects: part,
-		}}
-		_, err = pre.Svc.DeleteObjects(input)
-		if err != nil {
-			log.Fatal("Unable to delete WALS before ", bt.Name, err)
-		}
-	}
-}
-
-
-var DeleteUsage = "delete requires at least 2 parameters" + `
-		retain 5                      keep 5 backups
-		retain FULL 5                 keep 5 full backups and all deltas of them
-		retail FIND_FULL 5            find necessary full for 5th and keep everything after it
-		before base_0123              keep everything after base_0123 including itself
-		before FIND_FULL base_0123    keep everything after the base of base_0123`
-
-func PrintDeleteUsageAndFail() {
-	log.Fatal(DeleteUsage)
-}
-
+// HandleBackupList is invoked to perform wal-g backup-list
 func HandleBackupList(pre *Prefix) {
 	var bk = &Backup{
 		Prefix: pre,
@@ -289,9 +102,10 @@ func HandleBackupList(pre *Prefix) {
 	}
 }
 
+// HandleBackupFetch is invoked to perform wal-g backup-fetch
 func HandleBackupFetch(backupName string, pre *Prefix, dirArc string, mem bool) (lsn *uint64) {
 	dirArc = ResolveSymlink(dirArc)
-	lsn = DeltaFetchRecursion(backupName, pre, dirArc)
+	lsn = deltaFetchRecursion(backupName, pre, dirArc)
 
 	if mem {
 		f, err := os.Create("mem.prof")
@@ -305,8 +119,8 @@ func HandleBackupFetch(backupName string, pre *Prefix, dirArc string, mem bool) 
 	return
 }
 
-// This function composes Backup object and recursively searches for necessary base backup
-func DeltaFetchRecursion(backupName string, pre *Prefix, dirArc string) (lsn *uint64) {
+// deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
+func deltaFetchRecursion(backupName string, pre *Prefix, dirArc string) (lsn *uint64) {
 	var bk *Backup
 	// Check if BACKUPNAME exists and if it does extract to DIRARC.
 	if backupName != "LATEST" {
@@ -342,18 +156,18 @@ func DeltaFetchRecursion(backupName string, pre *Prefix, dirArc string) (lsn *ui
 
 	if dto.IsIncremental() {
 		fmt.Printf("Delta from %v at LSN %x \n", *dto.IncrementFrom, *dto.IncrementFromLSN)
-		DeltaFetchRecursion(*dto.IncrementFrom, pre, dirArc)
+		deltaFetchRecursion(*dto.IncrementFrom, pre, dirArc)
 		fmt.Printf("%v fetched. Upgrading from LSN %x to LSN %x \n", *dto.IncrementFrom, *dto.IncrementFromLSN, dto.LSN)
 	}
 
-	UnwrapBackup(bk, dirArc, pre, dto)
+	unwrapBackup(bk, dirArc, pre, dto)
 
 	lsn = dto.LSN
 	return
 }
 
 // Do the job of unpacking Backup object
-func UnwrapBackup(bk *Backup, dirArc string, pre *Prefix, sentinel S3TarBallSentinelDto) {
+func unwrapBackup(bk *Backup, dirArc string, pre *Prefix, sentinel S3TarBallSentinelDto) {
 
 	incrementBase := path.Join(dirArc, "increment_base")
 	if !sentinel.IsIncremental() {
@@ -477,11 +291,11 @@ func UnwrapBackup(bk *Backup, dirArc string, pre *Prefix, sentinel S3TarBallSent
 	}
 }
 
-func GetDeltaConfig() (max_deltas int, from_full bool) {
+func getDeltaConfig() (maxDeltas int, fromFull bool) {
 	stepsStr, hasSteps := os.LookupEnv("WALG_DELTA_MAX_STEPS")
 	var err error
 	if hasSteps {
-		max_deltas, err = strconv.Atoi(stepsStr)
+		maxDeltas, err = strconv.Atoi(stepsStr)
 		if err != nil {
 			log.Fatal("Unable to parse WALG_DELTA_MAX_STEPS ", err)
 		}
@@ -491,7 +305,7 @@ func GetDeltaConfig() (max_deltas int, from_full bool) {
 		switch origin {
 		case "LATEST":
 		case "LATEST_FULL":
-			from_full = false
+			fromFull = false
 		default:
 			log.Fatal("Unknown WALG_DELTA_ORIGIN:", origin)
 		}
@@ -499,9 +313,10 @@ func GetDeltaConfig() (max_deltas int, from_full bool) {
 	return
 }
 
+// HandleBackupPush is invoked to performa wal-g backup-push
 func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 	dirArc = ResolveSymlink(dirArc)
-	max_deltas, from_full := GetDeltaConfig()
+	maxDeltas, fromFull := getDeltaConfig()
 
 	var bk = &Backup{
 		Prefix: pre,
@@ -513,9 +328,9 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 	var err error
 	incrementCount := 1
 
-	if max_deltas > 0 {
+	if maxDeltas > 0 {
 		latest, err = bk.GetLatest()
-		if err != LatestNotFound {
+		if err != ErrLatestNotFound {
 			if err != nil {
 				log.Fatalf("%+v\n", err)
 			}
@@ -524,13 +339,13 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 				incrementCount = *dto.IncrementCount + 1
 			}
 
-			if incrementCount > max_deltas {
+			if incrementCount > maxDeltas {
 				fmt.Println("Reached max delta steps. Doing full backup.")
 				dto = S3TarBallSentinelDto{}
 			} else if dto.LSN == nil {
 				fmt.Println("LATEST backup was made without support for delta feature. Fallback to full backup with LSN marker for future deltas.")
 			} else {
-				if from_full {
+				if fromFull {
 					fmt.Println("Delta will be made from full backup.")
 					latest = *dto.IncrementFullName
 					dto = fetchSentinel(latest, bk, pre)
@@ -554,7 +369,7 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
-	name, lsn, pg_version, err := bundle.StartBackup(conn, time.Now().String())
+	name, lsn, pgVersion, err := bundle.StartBackup(conn, time.Now().String())
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
@@ -601,7 +416,7 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 		sentinel = &S3TarBallSentinelDto{
 			LSN:              &lsn,
 			IncrementFromLSN: dto.LSN,
-			PgVersion:        pg_version,
+			PgVersion:        pgVersion,
 		}
 		if dto.LSN != nil {
 			sentinel.IncrementFrom = &latest
@@ -623,6 +438,7 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 	}
 }
 
+// HandleWALFetch is invoked to performa wal-g wal-fetch
 func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPrefetch bool) {
 	location = ResolveSymlink(location)
 	if triggerPrefetch {
@@ -694,6 +510,7 @@ func checkWALFileMagic(prefetched string) error {
 	return nil
 }
 
+// DownloadWALFile downloads a file and writes it to local file
 func DownloadWALFile(pre *Prefix, walFileName string, location string) {
 	a := &Archive{
 		Prefix:  pre,
@@ -775,6 +592,7 @@ func DownloadWALFile(pre *Prefix, walFileName string, location string) {
 	}
 }
 
+// HandleWALPush is invoked to perform wal-g wal-push
 func HandleWALPush(tu *TarUploader, dirArc string) {
 	bu := BgUploader{}
 	// Look for new WALs while doing main upload
@@ -785,6 +603,7 @@ func HandleWALPush(tu *TarUploader, dirArc string) {
 	bu.Stop()
 }
 
+// UploadWALFile from FS to the cloud
 func UploadWALFile(tu *TarUploader, dirArc string) {
 	path, err := tu.UploadWal(dirArc)
 	if re, ok := err.(Lz4Error); ok {

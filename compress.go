@@ -28,7 +28,7 @@ func (lcc *Lz4CascadeClose) Close() error {
 	return nil
 }
 
-// Cascade closers with two independent closers.
+// Lz4CascadeClose2 cascade closers with two independent closers.
 // This peculiar behavior is required to handle OpenGPG Writer behavior
 type Lz4CascadeClose2 struct {
 	*lz4.Writer

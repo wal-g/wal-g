@@ -6,7 +6,7 @@ type MockCleaner struct {
 	deleted []string
 }
 
-func (this *MockCleaner) GetFiles(directory string) (files []string, err error) {
+func (cl *MockCleaner) GetFiles(directory string) (files []string, err error) {
 	files = []string{
 		"000000010000000100000056",
 		"000000010000000100000057",
@@ -17,8 +17,8 @@ func (this *MockCleaner) GetFiles(directory string) (files []string, err error) 
 	return
 }
 
-func (this *MockCleaner) Remove(file string) {
-	this.deleted = append(this.deleted, file)
+func (cl *MockCleaner) Remove(file string) {
+	cl.deleted = append(cl.deleted, file)
 }
 
 func TestCleanup(t *testing.T) {

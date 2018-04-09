@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// The interface for controlling database during backup
+// The QueryRunner interface for controlling database during backup
 type QueryRunner interface {
 	// This call should inform the database that we are going to copy cluster's contents
 	// Should fail if backup is currently impossible
@@ -16,50 +16,50 @@ type QueryRunner interface {
 	StopBackup() (string, string, string, error)
 }
 
-// Implementation for controlling PostgreSQL 9.0+
+// PgQueryRunner is implementation for controlling PostgreSQL 9.0+
 type PgQueryRunner struct {
 	connection *pgx.Conn
 	Version    int
 }
 
-// Formats a query to retrieve PostgreSQL numeric version
-func (qb *PgQueryRunner) BuildGetVersion() string {
+// BuildGetVersion formats a query to retrieve PostgreSQL numeric version
+func (queryRunner *PgQueryRunner) BuildGetVersion() string {
 	return "select (current_setting('server_version_num'))::int"
 }
 
-// Format a query that starts backup according to server features and version
-func (qb *PgQueryRunner) BuildStartBackup() (string, error) {
+// BuildStartBackup formats a query that starts backup according to server features and version
+func (queryRunner *PgQueryRunner) BuildStartBackup() (string, error) {
 	// TODO: rewrite queries for older versions to remove pg_is_in_recovery()
 	// where pg_start_backup() will fail on standby anyway
 	switch {
-	case qb.Version >= 100000:
+	case queryRunner.Version >= 100000:
 		return "SELECT case when pg_is_in_recovery() then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn", nil
-	case qb.Version >= 90600:
+	case queryRunner.Version >= 90600:
 		return "SELECT case when pg_is_in_recovery() then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn", nil
-	case qb.Version >= 90000:
+	case queryRunner.Version >= 90000:
 		return "SELECT case when pg_is_in_recovery() then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true) lsn", nil
-	case qb.Version == 0:
+	case queryRunner.Version == 0:
 		return "", errors.New("Postgres version not set, cannot determine start backup query")
 	default:
-		return "", errors.New("Could not determine start backup query for version " + fmt.Sprintf("%d", qb.Version))
+		return "", errors.New("Could not determine start backup query for version " + fmt.Sprintf("%d", queryRunner.Version))
 	}
 }
 
-// Format a query that stops backup according to server features and version
-func (qb *PgQueryRunner) BuildStopBackup() (string, error) {
+// BuildStopBackup formats a query that stops backup according to server features and version
+func (queryRunner *PgQueryRunner) BuildStopBackup() (string, error) {
 	switch {
-	case qb.Version >= 90600:
+	case queryRunner.Version >= 90600:
 		return "SELECT labelfile, spcmapfile, lsn FROM pg_stop_backup(false)", nil
-	case qb.Version >= 90000:
+	case queryRunner.Version >= 90000:
 		return "SELECT (pg_xlogfile_name_offset(lsn)).file_name, lpad((pg_xlogfile_name_offset(lsn)).file_offset::text, 8, '0') AS file_offset, lsn::text FROM pg_stop_backup() lsn", nil
-	case qb.Version == 0:
+	case queryRunner.Version == 0:
 		return "", errors.New("Postgres version not set, cannot determine stop backup query")
 	default:
-		return "", errors.New("Could not determine stop backup query for version " + fmt.Sprintf("%d", qb.Version))
+		return "", errors.New("Could not determine stop backup query for version " + fmt.Sprintf("%d", queryRunner.Version))
 	}
 }
 
-// Build QueryRunner from available connection
+// NewPgQueryRunner builds QueryRunner from available connection
 func NewPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
 	r := &PgQueryRunner{connection: conn}
 
@@ -80,7 +80,7 @@ func (queryRunner *PgQueryRunner) getVersion() (err error) {
 	return nil
 }
 
-// Inform the database that we are starting copy of cluster contents
+// StartBackup informs the database that we are starting copy of cluster contents
 func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string, lsnString string, inRecovery bool, err error) {
 	startBackupQuery, err := queryRunner.BuildStartBackup()
 	conn := queryRunner.connection
@@ -95,7 +95,7 @@ func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string,
 	return backupName, lsnString, inRecovery, nil
 }
 
-// Inform the database that copy is over
+// StopBackup informs the database that copy is over
 func (queryRunner *PgQueryRunner) StopBackup() (label string, offsetMap string, lsnStr string, err error) {
 	conn := queryRunner.connection
 

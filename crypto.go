@@ -14,13 +14,14 @@ import (
 	"strings"
 )
 
+// Crypter is responsible for makeing cryptographical pipeline parts when needed
 type Crypter interface {
 	IsUsed() bool
 	Encrypt(writer io.WriteCloser) (io.WriteCloser, error)
 	Decrypt(reader io.ReadCloser) (io.Reader, error)
 }
 
-// Crypter incapsulates specific of cypher method
+// OpenPGPCrypter incapsulates specific of cypher method
 // Includes keys, infrastructutre information etc
 // If many encryption methods will be used it worth
 // to extract interface
@@ -32,7 +33,7 @@ type OpenPGPCrypter struct {
 	secretKey openpgp.EntityList
 }
 
-// Function to check necessity of Crypter use
+// IsUsed is to check necessity of Crypter use
 // Must be called prior to any other crypter call
 func (crypter *OpenPGPCrypter) IsUsed() bool {
 	if !crypter.configured {
@@ -41,22 +42,23 @@ func (crypter *OpenPGPCrypter) IsUsed() bool {
 	return crypter.armed
 }
 
-// Internal OpenPGPCrypter initialization
+// ConfigureGPGCrypter is OpenPGPCrypter internal initialization
 func (crypter *OpenPGPCrypter) ConfigureGPGCrypter() {
 	crypter.configured = true
 	crypter.keyRingId = GetKeyRingId()
 	crypter.armed = len(crypter.keyRingId) != 0
 }
 
-var CrypterUseMischief = errors.New("Crypter is not checked before use")
+// ErrCrypterUseMischief happens when crypter is used before initialization
+var ErrCrypterUseMischief = errors.New("Crypter is not checked before use")
 
-// Creates encryption writer from ordinary writer
+// Encrypt creates encryption writer from ordinary writer
 func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, error) {
 	if !crypter.configured {
-		return nil, CrypterUseMischief
+		return nil, ErrCrypterUseMischief
 	}
 	if crypter.pubKey == nil {
-		armour, err := GetPubRingArmour(crypter.keyRingId)
+		armour, err := getPubRingArmour(crypter.keyRingId)
 		if err != nil {
 			return nil, err
 		}
@@ -71,6 +73,7 @@ func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, e
 	return &DelayWriteCloser{writer, crypter.pubKey, nil}, nil
 }
 
+// DelayWriteCloser delays first writes.
 // Encryption starts writing header immediately.
 // But there is a lot of places where writer is instantiated long before pipe
 // is ready. This is why here is used special writer, which delays encryption
@@ -97,6 +100,7 @@ func (d *DelayWriteCloser) Write(p []byte) (n int, err error) {
 	return
 }
 
+// Close DelayWriteCloser
 func (d *DelayWriteCloser) Close() error {
 	if d.outer == nil {
 		wc, err0 := openpgp.Encrypt(d.inner, d.el, nil, nil, nil)
@@ -109,13 +113,13 @@ func (d *DelayWriteCloser) Close() error {
 	return (*d.outer).Close()
 }
 
-// Created decripted reader from ordinary reader
+// Decrypt creates decrypted reader from ordinary reader
 func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) {
 	if !crypter.configured {
-		return nil, CrypterUseMischief
+		return nil, ErrCrypterUseMischief
 	}
 	if crypter.secretKey == nil {
-		armour, err := GetSecretRingArmour(crypter.keyRingId)
+		armour, err := getSecretRingArmour(crypter.keyRingId)
 		if err != nil {
 			return nil, err
 		}
@@ -135,19 +139,21 @@ func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) 
 	return md.UnverifiedBody, nil
 }
 
+// GetKeyRingId extracts name of a key to use from env variable
 func GetKeyRingId() string {
 	return os.Getenv("WALE_GPG_KEY_ID")
 }
 
 const gpgBin = "gpg"
 
+// CachedKey is the data transfer object describing format of key ring cache
 type CachedKey struct {
 	KeyId string `json:"keyId"`
 	Body  []byte `json:"body"`
 }
 
 // Here we read armoured version of Key by calling GPG process
-func GetPubRingArmour(keyId string) ([]byte, error) {
+func getPubRingArmour(keyId string) ([]byte, error) {
 	var cache CachedKey
 	var cacheFilename string
 
@@ -185,7 +191,7 @@ func GetPubRingArmour(keyId string) ([]byte, error) {
 	return out, nil
 }
 
-func GetSecretRingArmour(keyId string) ([]byte, error) {
+func getSecretRingArmour(keyId string) ([]byte, error) {
 	out, err := exec.Command(gpgBin, "-a", "--export-secret-key", keyId).Output()
 	if err != nil {
 		return nil, err

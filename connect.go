@@ -25,27 +25,27 @@ func Connect() (*pgx.Conn, error) {
 		return nil, errors.Wrap(err, "Connect: postgres connection failed")
 	}
 
-	var archive_mode string
+	var archiveMode string
 
 	// TODO: Move this logic to queryRunner
-	err = conn.QueryRow("show archive_mode").Scan(&archive_mode)
+	err = conn.QueryRow("show archive_mode").Scan(&archiveMode)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "Connect: postgres archive_mode test failed")
 	}
 
-	if archive_mode != "on" && archive_mode != "always" {
+	if archiveMode != "on" && archiveMode != "always" {
 		log.Println("WARNING! It seems your archive_mode is not enabled. This will cause inconsistent backup. Please consider configuring WAL archiving.")
 	} else {
-		var archive_command string
+		var archiveCommand string
 
-		err = conn.QueryRow("show archive_command").Scan(&archive_command)
+		err = conn.QueryRow("show archive_command").Scan(&archiveCommand)
 
 		if err != nil {
 			return nil, errors.Wrap(err, "Connect: postgres archive_mode test failed")
 		}
 
-		if len(archive_command) == 0 || archive_command == "(disabled)" {
+		if len(archiveCommand) == 0 || archiveCommand == "(disabled)" {
 			log.Println("WARNING! It seems your archive_command is not configured. This will cause inconsistent backup. Please consider configuring WAL archiving.")
 		}
 	}
@@ -82,6 +82,7 @@ func (b *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName string, 
 
 const backupNamePrefix = "base_"
 
+// CheckTimelineChanged compares timelines of pg_backup_start() and pg_backup_stop()
 func (b *Bundle) CheckTimelineChanged(conn *pgx.Conn) bool {
 	if b.Replica {
 		timeline, err := readTimeline(conn)

@@ -45,10 +45,11 @@ func init() {
 // Empty is used for channel signaling.
 type Empty struct{}
 
-// Writer to /dev/null
+// NilWriter to /dev/null
 type NilWriter struct{}
 
-func (this *NilWriter) Write(p []byte) (n int, err error) {
+// Write to /dev/null
+func (nw *NilWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
@@ -78,7 +79,10 @@ type Bundle struct {
 	IncrementFromFiles BackupFileList
 }
 
+// GetTarBall from a Bundle
 func (b *Bundle) GetTarBall() TarBall { return b.Tb }
+
+// NewTarBall starts writing new tarball
 func (b *Bundle) NewTarBall() {
 	ntb := b.Tbm.Make()
 	if b.Tb != nil {
@@ -92,7 +96,11 @@ func (b *Bundle) NewTarBall() {
 	}
 	b.Tb = ntb
 }
-func (b *Bundle) GetIncrementBaseLsn() *uint64          { return b.IncrementFromLsn }
+
+// GetIncrementBaseLsn returns LSN of previous backup
+func (b *Bundle) GetIncrementBaseLsn() *uint64 { return b.IncrementFromLsn }
+
+// GetIncrementBaseFiles returns list of files from previous backup
 func (b *Bundle) GetIncrementBaseFiles() BackupFileList { return b.IncrementFromFiles }
 
 // Sentinel is used to signal completion of a walked
@@ -112,12 +120,13 @@ type TarBall interface {
 	Nop() bool
 	Number() int
 	Size() int64
-	SetSize(int64)
+	AddSize(int64)
 	Tw() *tar.Writer
 	SetFiles(files BackupFileList)
 	GetFiles() BackupFileList
 }
 
+// BackupFileList is a map of file properties in a backup
 type BackupFileList map[string]BackupFileDescription
 
 // S3TarBall represents a tar file that is
@@ -174,16 +183,20 @@ func (s *S3TarBall) CloseTar() error {
 	return nil
 }
 
-var SentinelNotUploaded = errors.New("Sentinel was not uploaded due to timeline change during backup")
+// ErrSentinelNotUploaded happens when upload of json sentinel failed
+var ErrSentinelNotUploaded = errors.New("Sentinel was not uploaded due to timeline change during backup")
 
-func (b *S3TarBall) SetFiles(files BackupFileList) {
-	b.Files = files
+// SetFiles of this backup
+func (s *S3TarBall) SetFiles(files BackupFileList) {
+	s.Files = files
 }
 
-func (b *S3TarBall) GetFiles() BackupFileList {
-	return b.Files
+// GetFiles of this backup
+func (s *S3TarBall) GetFiles() BackupFileList {
+	return s.Files
 }
 
+// S3TarBallSentinelDto describes file structure of json sentinel
 type S3TarBallSentinelDto struct {
 	LSN               *uint64
 	IncrementFromLSN  *uint64 `json:"DeltaFromLSN,omitempty"`
@@ -197,12 +210,14 @@ type S3TarBallSentinelDto struct {
 	FinishLSN *uint64
 }
 
+// BackupFileDescription contains properties of one backup file
 type BackupFileDescription struct {
 	IsIncremented bool // should never be both incremented and Skipped
 	IsSkipped     bool
 	MTime         time.Time
 }
 
+// IsIncremental checks that sentinel represents delta backup
 func (dto *S3TarBallSentinelDto) IsIncremental() bool {
 	// If we have increment base, we must have all the rest properties.
 	// If we do not have base - anything else is a mistake
@@ -236,9 +251,9 @@ func (s *S3TarBall) Finish(sentinel *S3TarBallSentinelDto) error {
 		}
 		path := tupl.server + "/basebackups_005/" + name
 		input := &s3manager.UploadInput{
-			Bucket: aws.String(tupl.bucket),
-			Key:    aws.String(path),
-			Body:   bytes.NewReader(dtoBody),
+			Bucket:       aws.String(tupl.bucket),
+			Key:          aws.String(path),
+			Body:         bytes.NewReader(dtoBody),
 			StorageClass: aws.String(tupl.StorageClass),
 		}
 
@@ -249,7 +264,7 @@ func (s *S3TarBall) Finish(sentinel *S3TarBallSentinelDto) error {
 			e := tupl.upload(input, path)
 			if e != nil {
 				log.Printf("upload: could not upload '%s' after %v retries\n", path, tupl.MaxRetries)
-				err = errors.Wrap(e, "S3TarBall Finish: json failed to upload")
+				log.Fatalf("S3TarBall Finish: json failed to upload")
 			}
 		}()
 
@@ -257,7 +272,7 @@ func (s *S3TarBall) Finish(sentinel *S3TarBallSentinelDto) error {
 	} else {
 		log.Printf("Uploaded %d compressed tar files.\n", s.number)
 		log.Printf("Sentinel was not uploaded %v", name)
-		return SentinelNotUploaded
+		return ErrSentinelNotUploaded
 	}
 
 	if err == nil && tupl.Success {
@@ -266,12 +281,19 @@ func (s *S3TarBall) Finish(sentinel *S3TarBallSentinelDto) error {
 	return err
 }
 
+// BaseDir of a backup
 func (s *S3TarBall) BaseDir() string { return s.baseDir }
+// Trim suffix
 func (s *S3TarBall) Trim() string    { return s.trim }
+// Nop is a dummy fonction for test purposes
 func (s *S3TarBall) Nop() bool       { return s.nop }
+// Number of parts
 func (s *S3TarBall) Number() int     { return s.number }
+// Size accumulated in this tarball
 func (s *S3TarBall) Size() int64     { return s.size }
-func (s *S3TarBall) SetSize(i int64) { s.size += i }
+// AddSize to total Size
+func (s *S3TarBall) AddSize(i int64) { s.size += i }
+// Tw is tar writer
 func (s *S3TarBall) Tw() *tar.Writer { return s.tw }
 
 // TarUploader contains fields associated with uploading tarballs.
@@ -313,6 +335,7 @@ func (tu *TarUploader) Finish() {
 	}
 }
 
+// Clone creates similar TarUploader with new WaitGroup
 func (tu *TarUploader) Clone() *TarUploader {
 	return &TarUploader{
 		tu.Upl,

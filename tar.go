@@ -67,7 +67,7 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
 			f, err := os.Create(targetPath)
 			dne := os.IsNotExist(err)
 			if dne {
-				err := PrepareDirs(cur.Name, targetPath)
+				err := prepareDirs(cur.Name, targetPath)
 				if err != nil {
 					return errors.Wrap(err, "Interpret: failed to create all directories")
 				}
@@ -118,11 +118,13 @@ func (ti *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
 	}
 	return nil
 }
+
+// MoveFileAndCreateDirs moves file from incremental folder to target folder, creating necessary folders structure
 func MoveFileAndCreateDirs(incrementalPath string, targetPath string, fileName string) (err error) {
 	err = os.Rename(incrementalPath, targetPath)
 	if os.IsNotExist(err) {
 		// this path is invoked if this is a first file in a dir
-		err := PrepareDirs(fileName, targetPath)
+		err := prepareDirs(fileName, targetPath)
 		if err != nil {
 			return errors.Wrap(err, "MoveFileAndCreateDirs: failed to create all directories")
 		}
@@ -135,7 +137,9 @@ func MoveFileAndCreateDirs(incrementalPath string, targetPath string, fileName s
 	}
 	return nil
 }
-func PrepareDirs(fileName string, targetPath string) error {
+
+// Make sure all dirs exist
+func prepareDirs(fileName string, targetPath string) error {
 	base := filepath.Base(fileName)
 	dir := strings.TrimSuffix(targetPath, base)
 	err := os.MkdirAll(dir, 0755)

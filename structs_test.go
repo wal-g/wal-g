@@ -50,7 +50,7 @@ func TestS3TarBall(t *testing.T) {
 	}
 
 	increase := 1024
-	tarBall.SetSize(int64(increase))
+	tarBall.AddSize(int64(increase))
 
 	if tarBall.Size() != 1024 {
 		t.Errorf("make: Tarball size expected to increase to %d but got %d", increase, tarBall.Size())

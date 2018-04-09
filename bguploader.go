@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// The state of concurrent WAL upload
+// BgUploader represents the state of concurrent WAL upload
 type BgUploader struct {
 	// pg_[wals|xlog]
 	dir string
@@ -53,6 +53,7 @@ func (u *BgUploader) Start(walFilePath string, maxParallelWorkers int32, tu *Tar
 	go scanOnce(u)
 }
 
+// Stop pipeline
 func (u *BgUploader) Stop() {
 	for atomic.LoadInt32(&u.parallelWorkers) != 0 {
 		time.Sleep(50 * time.Millisecond)
@@ -65,14 +66,14 @@ func (u *BgUploader) Stop() {
 }
 
 var readySuffix = ".ready"
-var archive_status = "archive_status"
+var archiveStatus = "archive_status"
 var done = ".done"
 
 func scanOnce(u *BgUploader) {
 	u.mutex.Lock()
 	defer u.mutex.Unlock()
 
-	files, err := ioutil.ReadDir(filepath.Join(u.dir, archive_status))
+	files, err := ioutil.ReadDir(filepath.Join(u.dir, archiveStatus))
 	if err != nil {
 		log.Print("Error of parallel upload: ", err)
 		return
@@ -107,12 +108,13 @@ func haveNoSlots(u *BgUploader) bool {
 	return atomic.LoadInt32(&u.parallelWorkers) >= atomic.LoadInt32(&u.maxParallelWorkers)
 }
 
+// Upload one WAL file
 func (u *BgUploader) Upload(info os.FileInfo) {
 	walfilename := strings.TrimSuffix(info.Name(), readySuffix)
 	UploadWALFile(u.tu.Clone(), filepath.Join(u.dir, walfilename))
 
-	ready := filepath.Join(u.dir, archive_status, info.Name())
-	done := filepath.Join(u.dir, archive_status, walfilename+done)
+	ready := filepath.Join(u.dir, archiveStatus, info.Name())
+	done := filepath.Join(u.dir, archiveStatus, walfilename+done)
 	err := os.Rename(ready, done)
 	if err != nil {
 		log.Print("Error renaming .ready to .done: ", err)

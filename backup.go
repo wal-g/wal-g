@@ -35,8 +35,11 @@ type S3ReaderMaker struct {
 	FileFormat string
 }
 
+// Format of a file
 func (s *S3ReaderMaker) Format() string { return s.FileFormat }
-func (s *S3ReaderMaker) Path() string   { return *s.Key }
+
+// Path to file in bucket
+func (s *S3ReaderMaker) Path() string { return *s.Key }
 
 // Reader creates a new S3 reader for each S3 object.
 func (s *S3ReaderMaker) Reader() (io.ReadCloser, error) {
@@ -69,7 +72,8 @@ type Backup struct {
 	Js     *string
 }
 
-var LatestNotFound = errors.New("No backups found")
+// ErrLatestNotFound happens when users asks backup-fetch LATEST, but there is no backups
+var ErrLatestNotFound = errors.New("No backups found")
 
 // GetLatest sorts the backups by last modified time
 // and returns the latest backup key.
@@ -83,7 +87,7 @@ func (b *Backup) GetLatest() (string, error) {
 	return sortTimes[0].Name, nil
 }
 
-// Recives backup descriptions and sorts them by time
+// GetBackups receives backup descriptions and sorts them by time
 func (b *Backup) GetBackups() ([]BackupTime, error) {
 	var sortTimes []BackupTime
 	objects := &s3.ListObjectsV2Input{
@@ -106,7 +110,7 @@ func (b *Backup) GetBackups() ([]BackupTime, error) {
 	count := len(backups)
 
 	if count == 0 {
-		return nil, LatestNotFound
+		return nil, ErrLatestNotFound
 	}
 
 	sortTimes = GetBackupTimeSlices(backups)
@@ -114,7 +118,7 @@ func (b *Backup) GetBackups() ([]BackupTime, error) {
 	return sortTimes, nil
 }
 
-// Converts S3 objects to backup description
+// GetBackupTimeSlices converts S3 objects to backup description
 func GetBackupTimeSlices(backups []*s3.Object) []BackupTime {
 	sortTimes := make([]BackupTime, len(backups))
 	for i, ob := range backups {
@@ -195,7 +199,7 @@ func (b *Backup) GetKeys() ([]string, error) {
 	return result, nil
 }
 
-// Returns all WAL file keys less then key provided
+// GetWals returns all WAL file keys less then key provided
 func (b *Backup) GetWals(before string) ([]*s3.ObjectIdentifier, error) {
 	objects := &s3.ListObjectsV2Input{
 		Bucket: b.Prefix.Bucket,
@@ -220,6 +224,7 @@ func (b *Backup) GetWals(before string) ([]*s3.ObjectIdentifier, error) {
 
 	return arr, nil
 }
+
 func stripWalName(key string) string {
 	all := strings.SplitAfter(key, "/")
 	name := strings.Split(all[len(all)-1], ".")[0]
@@ -269,6 +274,7 @@ func (a *Archive) GetArchive() (io.ReadCloser, error) {
 	return archive.Body, nil
 }
 
+// SentinelSuffix is a suffix of backup finish sentinel file
 const SentinelSuffix = "_backup_stop_sentinel.json"
 
 func fetchSentinel(backupName string, bk *Backup, pre *Prefix) (dto S3TarBallSentinelDto) {
@@ -294,6 +300,7 @@ func fetchSentinel(backupName string, bk *Backup, pre *Prefix) (dto S3TarBallSen
 	return
 }
 
+// GetBackupPath gets path for basebackup in a bucket
 func GetBackupPath(prefix *Prefix) *string {
 	path := *prefix.Server + "/basebackups_005/"
 	server := sanitizePath(path)

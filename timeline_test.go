@@ -28,22 +28,22 @@ func TestNextWALFileName(t *testing.T) {
 		t.Fatal("TestNextWALFileName 0000000100000001000000FF failed")
 	}
 
-	nextname, err = NextWALFileName("0000000100000001000001FF")
+	_, err = NextWALFileName("0000000100000001000001FF")
 	if err == nil {
 		t.Fatal("TestNextWALFileName 0000000100000001000001FF did not failed")
 	}
 
-	nextname, err = NextWALFileName("00000001000ZZ001000000FF")
+	_, err = NextWALFileName("00000001000ZZ001000000FF")
 	if err == nil {
 		t.Fatal("TestNextWALFileName 00000001000ZZ001000001FF did not failed")
 	}
 
-	nextname, err = NextWALFileName("00000001000001000000FF")
+	_, err = NextWALFileName("00000001000001000000FF")
 	if err == nil {
 		t.Fatal("TestNextWALFileName 00000001000001000001FF did not failed")
 	}
 
-	nextname, err = NextWALFileName("asdfasdf")
+	_, err = NextWALFileName("asdfasdf")
 	if err == nil {
 		t.Fatal("TestNextWALFileName asdfasdf did not failed")
 	}

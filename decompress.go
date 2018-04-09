@@ -143,7 +143,7 @@ func DecompressLz4(d io.Writer, s io.Reader) (int64, error) {
 	return n, nil
 }
 
-// Compose io.ReadCloser from two parts
+// ReadCascadeClose composes io.ReadCloser from two parts
 type ReadCascadeClose struct {
 	io.Reader
 	io.Closer

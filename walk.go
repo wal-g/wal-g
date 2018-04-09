@@ -33,9 +33,8 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 		if os.IsNotExist(err) {
 			fmt.Println(path, " deleted dring filepath walk")
 			return nil
-		} else {
-			return errors.Wrap(err, "TarWalker: walk failed")
 		}
+		return errors.Wrap(err, "TarWalker: walk failed")
 	}
 
 	if info.Name() == "pg_control" {
@@ -131,7 +130,11 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 					return errors.Wrap(err, "HandleTar: copy failed")
 				}
 
-				tarBall.SetSize(hdr.Size)
+				if size != hdr.Size {
+					return errors.Errorf("HandleTar: packed wrong numbers of bytes %d instead of %d", size, hdr.Size)
+				}
+
+				tarBall.AddSize(hdr.Size)
 				f.Close()
 			}
 		} else {
