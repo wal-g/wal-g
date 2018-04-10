@@ -160,11 +160,6 @@ func (tu *TarUploader) upload(input *s3manager.UploadInput, path string) (err er
 		return nil
 	}
 
-	// If compression failure, will not retry.
-	if re, ok := e.(Lz4Error); ok {
-		return re
-	}
-
 	if multierr, ok := e.(s3manager.MultiUploadFailure); ok {
 		log.Printf("upload: failed to upload '%s' with UploadID '%s'.", path, multierr.UploadID())
 	} else {
