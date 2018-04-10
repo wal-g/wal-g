@@ -263,7 +263,7 @@ func (s *S3TarBall) Finish(sentinel *S3TarBallSentinelDto) error {
 
 			e := tupl.upload(input, path)
 			if e != nil {
-				log.Printf("upload: could not upload '%s' after %v retries\n", path, tupl.MaxRetries)
+				log.Printf("upload: could not upload '%s'\n", path)
 				log.Fatalf("S3TarBall Finish: json failed to upload")
 			}
 		}()
@@ -283,16 +283,22 @@ func (s *S3TarBall) Finish(sentinel *S3TarBallSentinelDto) error {
 
 // BaseDir of a backup
 func (s *S3TarBall) BaseDir() string { return s.baseDir }
+
 // Trim suffix
-func (s *S3TarBall) Trim() string    { return s.trim }
+func (s *S3TarBall) Trim() string { return s.trim }
+
 // Nop is a dummy fonction for test purposes
-func (s *S3TarBall) Nop() bool       { return s.nop }
+func (s *S3TarBall) Nop() bool { return s.nop }
+
 // Number of parts
-func (s *S3TarBall) Number() int     { return s.number }
+func (s *S3TarBall) Number() int { return s.number }
+
 // Size accumulated in this tarball
-func (s *S3TarBall) Size() int64     { return s.size }
+func (s *S3TarBall) Size() int64 { return s.size }
+
 // AddSize to total Size
 func (s *S3TarBall) AddSize(i int64) { s.size += i }
+
 // Tw is tar writer
 func (s *S3TarBall) Tw() *tar.Writer { return s.tw }
 
@@ -301,8 +307,6 @@ func (s *S3TarBall) Tw() *tar.Writer { return s.tw }
 // in 'upload.go'.
 type TarUploader struct {
 	Upl          s3manageriface.UploaderAPI
-	MaxRetries   int
-	MaxWait      float64
 	StorageClass string
 	Success      bool
 	bucket       string
@@ -314,10 +318,8 @@ type TarUploader struct {
 // NewTarUploader creates a new tar uploader without the actual
 // S3 uploader. CreateUploader() is used to configure byte size and
 // concurrency streams for the uploader.
-func NewTarUploader(svc s3iface.S3API, bucket, server, region string, r int, w float64) *TarUploader {
+func NewTarUploader(svc s3iface.S3API, bucket, server, region string) *TarUploader {
 	return &TarUploader{
-		MaxRetries:   r,
-		MaxWait:      w,
 		StorageClass: "STANDARD",
 		bucket:       bucket,
 		server:       server,
@@ -339,8 +341,6 @@ func (tu *TarUploader) Finish() {
 func (tu *TarUploader) Clone() *TarUploader {
 	return &TarUploader{
 		tu.Upl,
-		tu.MaxRetries,
-		tu.MaxWait,
 		tu.StorageClass,
 		tu.Success,
 		tu.bucket,

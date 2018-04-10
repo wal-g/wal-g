@@ -141,7 +141,7 @@ func doConfigureWithBuсketPath(t *testing.T, bucketPath string, expectedServer 
 func TestValidUploader(t *testing.T) {
 	mockSvc := &mockS3Client{}
 
-	tu := walg.NewTarUploader(mockSvc, "bucket", "server", "region", 1, float64(1))
+	tu := walg.NewTarUploader(mockSvc, "bucket", "server", "region")
 	if tu == nil {
 		t.Errorf("upload: Did not create a new tar uploader")
 	}
@@ -159,7 +159,7 @@ func TestUploadError(t *testing.T) {
 		err: true,
 	}
 
-	tu := walg.NewTarUploader(mockClient, "bucket", "server", "region", 2, float64(2))
+	tu := walg.NewTarUploader(mockClient, "bucket", "server", "region")
 	tu.Upl = mockUploader
 
 	maker := &walg.S3TarBallMaker{

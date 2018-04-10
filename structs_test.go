@@ -80,7 +80,7 @@ func TestS3DependentFunctions(t *testing.T) {
 		MinSize: 100,
 	}
 
-	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region", 1, float64(1))
+	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region")
 	tu.Upl = &mockS3Uploader{}
 
 	bundle.Tbm = &walg.S3TarBallMaker{

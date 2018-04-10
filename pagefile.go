@@ -37,14 +37,14 @@ func ParsePageHeader(data []byte) (lsn uint64, valid bool) {
 	// Any ideas on how to make this code pretty and nice?
 	le := binary.LittleEndian
 	pdLsnH := le.Uint32(data[0:sizeofInt32])
-	pdLsnL := le.Uint32(data[sizeofInt32: 2*sizeofInt32])
+	pdLsnL := le.Uint32(data[sizeofInt32 : 2*sizeofInt32])
 
 	// pd_checksum := binary.LittleEndian.Uint16(data[2*sizeofInt32:2*sizeofInt32+sizeofInt16])
-	pdFlags := le.Uint16(data[2*sizeofInt32+sizeofInt16: 2*sizeofInt32+2*sizeofInt16])
-	pdLower := le.Uint16(data[2*sizeofInt32+2*sizeofInt16: 2*sizeofInt32+3*sizeofInt16])
-	pdUpper := le.Uint16(data[2*sizeofInt32+3*sizeofInt16: 2*sizeofInt32+4*sizeofInt16])
-	pdSpecial := le.Uint16(data[2*sizeofInt32+4*sizeofInt16: 2*sizeofInt32+5*sizeofInt16])
-	pdPagesizeVersion := le.Uint16(data[2*sizeofInt32+5*sizeofInt16: 2*sizeofInt32+6*sizeofInt16])
+	pdFlags := le.Uint16(data[2*sizeofInt32+sizeofInt16 : 2*sizeofInt32+2*sizeofInt16])
+	pdLower := le.Uint16(data[2*sizeofInt32+2*sizeofInt16 : 2*sizeofInt32+3*sizeofInt16])
+	pdUpper := le.Uint16(data[2*sizeofInt32+3*sizeofInt16 : 2*sizeofInt32+4*sizeofInt16])
+	pdSpecial := le.Uint16(data[2*sizeofInt32+4*sizeofInt16 : 2*sizeofInt32+5*sizeofInt16])
+	pdPagesizeVersion := le.Uint16(data[2*sizeofInt32+5*sizeofInt16 : 2*sizeofInt32+6*sizeofInt16])
 
 	lsn = ((uint64(pdLsnH)) << 32) + uint64(pdLsnL)
 	if (pdFlags&validFlags) != pdFlags ||
@@ -311,7 +311,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader) error {
 
 	page := make([]byte, BlockSize)
 	for i := uint32(0); i < diffBlockCount; i++ {
-		blockNo := binary.LittleEndian.Uint32(diffMap[i*sizeofInt32: (i+1)*sizeofInt32])
+		blockNo := binary.LittleEndian.Uint32(diffMap[i*sizeofInt32 : (i+1)*sizeofInt32])
 		_, err = io.ReadFull(increment, page)
 		if err != nil {
 			return err

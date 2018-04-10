@@ -609,7 +609,7 @@ func UploadWALFile(tu *TarUploader, dirArc string) {
 	if re, ok := err.(Lz4Error); ok {
 		log.Fatalf("FATAL: could not upload '%s' due to compression error.\n%+v\n", path, re)
 	} else if err != nil {
-		log.Printf("upload: could not upload '%s' after %v retries\n", path, tu.MaxRetries)
+		log.Printf("upload: could not upload '%s'\n", path)
 		log.Fatalf("FATAL%+v\n", err)
 	}
 }

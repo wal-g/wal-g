@@ -55,7 +55,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 	}
 
 	// Re-use generated data to test uploading WAL.
-	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region", 2, float64(1))
+	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region")
 	tu.Upl = &mockS3Uploader{}
 	bu := walg.BgUploader{}
 	// Look for new WALs while doing main upload

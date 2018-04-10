@@ -26,9 +26,6 @@ import (
 // MAXRETRIES is the maximum number of retries for upload.
 var MAXRETRIES = 7
 
-// MAXBACKOFF is the maxmimum backoff time in seconds for upload.
-var MAXBACKOFF = float64(32)
-
 // Given an S3 bucket name, attempt to determine its region
 func findS3BucketRegion(bucket string, config *aws.Config) (string, error) {
 	input := s3.GetBucketLocationInput{
@@ -90,6 +87,7 @@ func Configure() (*TarUploader, *Prefix, error) {
 
 	config := defaults.Get().Config
 
+	config.MaxRetries = &MAXRETRIES
 	if _, err := config.Credentials.Get(); err != nil {
 		return nil, nil, errors.Wrapf(err, "Configure: failed to get AWS credentials; please specify AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY")
 	}
@@ -128,7 +126,7 @@ func Configure() (*TarUploader, *Prefix, error) {
 
 	pre.Svc = s3.New(sess)
 
-	upload := NewTarUploader(pre.Svc, bucket, server, region, MAXRETRIES, MAXBACKOFF)
+	upload := NewTarUploader(pre.Svc, bucket, server, region)
 
 	var con = getMaxUploadConcurrency(10)
 	storageClass, ok := os.LookupEnv("WALG_S3_STORAGE_CLASS")
@@ -155,38 +153,24 @@ func CreateUploader(svc s3iface.S3API, partsize, concurrency int) s3manageriface
 // occur in exponentially incremental seconds.
 func (tu *TarUploader) upload(input *s3manager.UploadInput, path string) (err error) {
 	upl := tu.Upl
-	et := NewExpTicker(tu.MaxRetries, tu.MaxWait)
 
-	for {
-		_, e := upl.Upload(input)
-		if e == nil {
-			tu.Success = true
-			break
-		}
-
-		if e != nil {
-			// If compression failure, will not retry.
-			if re, ok := e.(Lz4Error); ok {
-				return re
-			}
-			et.Update()
-
-			if et.retries > et.MaxRetries {
-				err = e
-				break
-			}
-
-			if multierr, ok := e.(s3manager.MultiUploadFailure); ok {
-				log.Printf("upload: failed to upload '%s' with UploadID '%s'. Restarting in %0.2f seconds", path, multierr.UploadID(), et.wait)
-			} else {
-				log.Printf("upload: failed to upload '%s': %s. Restarting in %0.2f seconds", path, e.Error(), et.wait)
-			}
-
-		}
-
-		et.Sleep()
+	_, e := upl.Upload(input)
+	if e == nil {
+		tu.Success = true
+		return nil
 	}
-	return errors.Wrap(err, "")
+
+	// If compression failure, will not retry.
+	if re, ok := e.(Lz4Error); ok {
+		return re
+	}
+
+	if multierr, ok := e.(s3manager.MultiUploadFailure); ok {
+		log.Printf("upload: failed to upload '%s' with UploadID '%s'.", path, multierr.UploadID())
+	} else {
+		log.Printf("upload: failed to upload '%s': %s.", path, e.Error())
+	}
+	return e
 }
 
 // createUploadInput creates a s3manager.UploadInput for a TarUploader using
@@ -221,7 +205,7 @@ func (s *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteCloser {
 			log.Printf("FATAL: could not upload '%s' due to compression error\n%+v\n", path, re)
 		}
 		if err != nil {
-			log.Printf("upload: could not upload '%s' after %v retries\n", path, tupl.MaxRetries)
+			log.Printf("upload: could not upload '%s'\n", path)
 			log.Printf("FATAL%v\n", err)
 		}
 
