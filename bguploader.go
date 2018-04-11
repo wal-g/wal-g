@@ -35,10 +35,13 @@ type BgUploader struct {
 	totalUploaded int32
 
 	mutex sync.Mutex
+
+	pre    *Prefix
+	verify bool
 }
 
 // Start up checking what's inside archive_status
-func (u *BgUploader) Start(walFilePath string, maxParallelWorkers int32, tu *TarUploader) {
+func (u *BgUploader) Start(walFilePath string, maxParallelWorkers int32, tu *TarUploader, pre *Prefix, verify bool) {
 	if maxParallelWorkers < 1 {
 		return // Nothing to start
 	}
@@ -48,6 +51,8 @@ func (u *BgUploader) Start(walFilePath string, maxParallelWorkers int32, tu *Tar
 	u.dir = filepath.Dir(walFilePath)
 	u.started = make(map[string]interface{})
 	u.started[filepath.Base(walFilePath)+readySuffix] = walFilePath
+	u.pre = pre
+	u.verify = verify
 
 	// This goroutine will spawn new if necessary
 	go scanOnce(u)
@@ -111,7 +116,7 @@ func haveNoSlots(u *BgUploader) bool {
 // Upload one WAL file
 func (u *BgUploader) Upload(info os.FileInfo) {
 	walfilename := strings.TrimSuffix(info.Name(), readySuffix)
-	UploadWALFile(u.tu.Clone(), filepath.Join(u.dir, walfilename))
+	UploadWALFile(u.tu.Clone(), filepath.Join(u.dir, walfilename), u.pre, u.verify)
 
 	ready := filepath.Join(u.dir, archiveStatus, info.Name())
 	done := filepath.Join(u.dir, archiveStatus, walfilename+done)

@@ -258,6 +258,20 @@ func (a *Archive) CheckExistence() (bool, error) {
 	}
 	return true, nil
 }
+// GetETag aquires ETag of the object from S3
+func (a *Archive) GetETag() (*string, error) {
+	arch := &s3.HeadObjectInput{
+		Bucket: a.Prefix.Bucket,
+		Key:    a.Archive,
+	}
+
+	h, err := a.Prefix.Svc.HeadObject(arch)
+	if err != nil {
+		return nil, err
+	}
+
+	return h.ETag, nil
+}
 
 // GetArchive downloads the specified archive from S3.
 func (a *Archive) GetArchive() (io.ReadCloser, error) {

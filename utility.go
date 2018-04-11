@@ -1,7 +1,11 @@
 package walg
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"hash"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -99,4 +103,27 @@ func getMaxUploadConcurrency(reasonableMaximum int) int {
 		con = min(10, reasonableMaximum)
 	}
 	return max(con, 1)
+}
+
+type md5Reader struct {
+	internal io.Reader
+	md5      hash.Hash
+}
+
+func newMd5Reader(reader io.Reader) *md5Reader {
+	return &md5Reader{internal: reader, md5: md5.New()}
+}
+
+func (r *md5Reader) Read(p []byte) (n int, err error) {
+	n, err = r.internal.Read(p)
+	if err != nil {
+		return
+	}
+	_, err = r.md5.Write(p[:n])
+	return
+}
+
+func (r *md5Reader) Sum() string {
+	bytes := r.md5.Sum(nil)
+	return hex.EncodeToString(bytes)
 }

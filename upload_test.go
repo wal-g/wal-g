@@ -188,7 +188,7 @@ func TestUploadError(t *testing.T) {
 		t.Errorf("upload: expected to fail to upload successfully")
 	}
 
-	_, err := tu.UploadWal("fake path")
+	_, err := tu.UploadWal("fake path", nil, false)
 	if err == nil {
 		t.Errorf("upload: UploadWal expected error but got `<nil>`")
 	}

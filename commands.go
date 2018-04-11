@@ -593,19 +593,19 @@ func DownloadWALFile(pre *Prefix, walFileName string, location string) {
 }
 
 // HandleWALPush is invoked to perform wal-g wal-push
-func HandleWALPush(tu *TarUploader, dirArc string) {
+func HandleWALPush(tu *TarUploader, dirArc string, pre *Prefix, verify bool) {
 	bu := BgUploader{}
 	// Look for new WALs while doing main upload
-	bu.Start(dirArc, int32(getMaxUploadConcurrency(16)-1), tu)
+	bu.Start(dirArc, int32(getMaxUploadConcurrency(16)-1), tu, pre, verify)
 
-	UploadWALFile(tu, dirArc)
+	UploadWALFile(tu, dirArc, pre, verify)
 
 	bu.Stop()
 }
 
 // UploadWALFile from FS to the cloud
-func UploadWALFile(tu *TarUploader, dirArc string) {
-	path, err := tu.UploadWal(dirArc)
+func UploadWALFile(tu *TarUploader, dirArc string, pre *Prefix, verify bool) {
+	path, err := tu.UploadWal(dirArc, pre, verify)
 	if re, ok := err.(Lz4Error); ok {
 		log.Fatalf("FATAL: could not upload '%s' due to compression error.\n%+v\n", path, re)
 	} else if err != nil {

@@ -72,8 +72,11 @@ func main() {
 	}
 
 	var backupName string
+	var verify = false
 	if len(all) == 3 {
 		backupName = all[2]
+		//TODO: use cobra
+		verify = all[2] == "--verify"
 	}
 
 	// Various profiling options
@@ -103,7 +106,7 @@ func main() {
 		walg.HandleWALPrefetch(pre, firstArgument, backupName)
 	} else if command == "wal-push" {
 		// Upload a WAL file to S3.
-		walg.HandleWALPush(tu, firstArgument)
+		walg.HandleWALPush(tu, firstArgument, pre, verify)
 	} else if command == "backup-push" {
 		walg.HandleBackupPush(firstArgument, tu, pre)
 	} else if command == "backup-fetch" {

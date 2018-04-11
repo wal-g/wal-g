@@ -221,7 +221,7 @@ func (s *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteCloser {
 
 // UploadWal compresses a WAL file using LZ4 and uploads to S3. Returns
 // the first error encountered and an empty string upon failure.
-func (tu *TarUploader) UploadWal(path string) (string, error) {
+func (tu *TarUploader) UploadWal(path string, pre *Prefix, verify bool) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", errors.Wrapf(err, "UploadWal: failed to open file %s\n", path)
@@ -234,7 +234,13 @@ func (tu *TarUploader) UploadWal(path string) (string, error) {
 	lz.Compress(&OpenPGPCrypter{})
 
 	p := sanitizePath(tu.server + "/wal_005/" + filepath.Base(path) + ".lz4")
-	input := tu.createUploadInput(p, lz.Output)
+	reader := lz.Output
+
+	if verify {
+		reader = newMd5Reader(reader)
+	}
+
+	input := tu.createUploadInput(p, reader)
 
 	tu.wg.Add(1)
 	go func() {
@@ -245,6 +251,26 @@ func (tu *TarUploader) UploadWal(path string) (string, error) {
 
 	tu.Finish()
 	fmt.Println("WAL PATH:", p)
+	if verify {
+		sum := reader.(*md5Reader).Sum()
+		a := &Archive{
+			Prefix:  pre,
+			Archive: aws.String(p),
+		}
+		eTag, err := a.GetETag()
+		if err != nil {
+			log.Fatalf("Unable to verify WAL %s", err)
+		}
+		if eTag == nil {
+			log.Fatalf("Unable to verify WAL: nil ETag ")
+		}
+
+		trimETag := strings.Trim(*eTag, "\"")
+		if sum != trimETag {
+			log.Fatalf("WAL verification failed: md5 %s ETag %s", sum, trimETag)
+		}
+		fmt.Println("ETag ", trimETag)
+	}
 	return p, err
 }
 

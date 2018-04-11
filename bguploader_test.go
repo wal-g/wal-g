@@ -59,7 +59,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 	tu.Upl = &mockS3Uploader{}
 	bu := walg.BgUploader{}
 	// Look for new WALs while doing main upload
-	bu.Start(a, 16, tu)
+	bu.Start(a, 16, tu, nil, false)
 	time.Sleep(time.Second) //time to spin up new uploaders
 	bu.Stop()
 
