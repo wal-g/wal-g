@@ -258,6 +258,7 @@ func (a *Archive) CheckExistence() (bool, error) {
 	}
 	return true, nil
 }
+
 // GetETag aquires ETag of the object from S3
 func (a *Archive) GetETag() (*string, error) {
 	arch := &s3.HeadObjectInput{

@@ -6,6 +6,7 @@ import (
 	"log"
 	"strconv"
 	"time"
+	"strings"
 )
 
 // DeleteCommandArguments incapsulates arguments for delete command
@@ -139,7 +140,11 @@ func dropBackup(pre *Prefix, b BackupTime) {
 	if err != nil {
 		log.Fatal("Unable to list backup for deletion ", b.Name, err)
 	}
-	keys := append(tarFiles, *pre.Server+"/basebackups_005/"+b.Name+SentinelSuffix, *pre.Server+"/basebackups_005/"+b.Name)
+
+	folderKey := strings.TrimPrefix(*pre.Server+"/basebackups_005/"+b.Name, "/")
+	suffixKey := folderKey + SentinelSuffix
+
+	keys := append(tarFiles, suffixKey, folderKey)
 	parts := partition(keys, 1000)
 	for _, part := range parts {
 
