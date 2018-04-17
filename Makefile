@@ -16,9 +16,9 @@ install:
 	(cd cmd/wal-g && go install)
 
 clean:
-	rm -r extracted compressed $(wildcard data*)
+	rm -rf extracted compressed $(wildcard data*)
 	go clean
 	(cd cmd/wal-g && go clean)
 
 cmd/wal-g/wal-g: $(CMD_FILES) $(PKG_FILES)
-	(cd cmd/wal-g && go build)
+	(cd cmd/wal-g && go build -ldflags "-X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X main.GitRevision=`git rev-parse --short HEAD` -X main.WalgVersion=`git tag -l --points-at HEAD`")

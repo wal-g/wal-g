@@ -29,11 +29,38 @@ func init() {
 	flag.BoolVar(&profile, "p", false, "\tProfiler (false by default)")
 	flag.BoolVar(&mem, "m", false, "\tMemory profiler (false by default)")
 
+	// this is temp solution to pass everything through flag. Will remove it when useing CLI like cobra or cli
+	flag.BoolVar(&showVersion, "version", false, "\tversion")
+	flag.BoolVar(&showVersion, "v", false, "\tversion")
+	flag.BoolVar(&showVersionVerbose, "version-verbose", false, "\tLong version")
+	flag.BoolVar(&showVersionVerbose, "vv", false, "\tLong version")
+
 	l = log.New(os.Stderr, "", 0)
 }
 
+var WalgVersion = "devel"
+var GitRevision = "devel"
+var BuildDate = "devel"
+
+var showVersion bool
+var showVersionVerbose bool
+
 func main() {
 	flag.Parse()
+
+	if WalgVersion == "" {
+		WalgVersion = "devel"
+	}
+
+	if showVersionVerbose {
+		fmt.Println(WalgVersion, "\t", GitRevision, "\t", BuildDate)
+		return
+	}
+	if showVersion {
+		fmt.Println(WalgVersion)
+		return
+	}
+
 	all := flag.Args()
 	if len(all) < 1 {
 		l.Fatalf("Please choose a command:\n%s", helpMsg)
