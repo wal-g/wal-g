@@ -16,7 +16,7 @@ type FileTarBallMaker struct {
 }
 
 // Make creates a new FileTarBall.
-func (f *FileTarBallMaker) Make() walg.TarBall {
+func (f *FileTarBallMaker) Make(inheritState bool) walg.TarBall {
 	f.number++
 	return &FileTarBall{
 		number:  f.number,
@@ -38,7 +38,7 @@ type NOPTarBallMaker struct {
 }
 
 // Make creates a new NOPTarBall.
-func (n *NOPTarBallMaker) Make() walg.TarBall {
+func (n *NOPTarBallMaker) Make(inheritState bool) walg.TarBall {
 	n.number++
 	return &NOPTarBall{
 		number:  n.number,

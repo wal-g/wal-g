@@ -337,17 +337,18 @@ func TestWalk(t *testing.T) {
 		t.Log(err)
 	}
 
-	bundle.NewTarBall()
+	bundle.StartQueue()
 	fmt.Println("Walking ...")
 	err = filepath.Walk(data, bundle.TarWalker)
 	if err != nil {
 		t.Log(err)
 	}
 
-	err = bundle.Tb.CloseTar()
+	err = bundle.FinishQueue()
 	if err != nil {
 		t.Log(err)
 	}
+
 	err = bundle.Tb.Finish(&walg.S3TarBallSentinelDto{})
 	if err != nil {
 		t.Log(err)

@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	//"golang.org/x/crypto/openpgp"
 )
 
 // ZeroReader generates a slice of zeroes. Used to pad
@@ -39,23 +38,7 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 
 	if info.Name() == "pg_control" {
 		bundle.Sen = &Sentinel{info, path}
-	} else if bundle.Tb.Size() <= bundle.MinSize {
-		err = HandleTar(bundle, path, info, &bundle.Crypter)
-		if err == filepath.SkipDir {
-			return err
-		}
-		if err != nil {
-			return errors.Wrap(err, "TarWalker: handle tar failed")
-		}
 	} else {
-		oldTB := bundle.Tb
-		err := oldTB.CloseTar()
-		if err != nil {
-			return errors.Wrap(err, "TarWalker: failed to close tarball")
-		}
-
-		bundle.NewTarBall()
-
 		err = HandleTar(bundle, path, info, &bundle.Crypter)
 		if err == filepath.SkipDir {
 			return err
@@ -72,9 +55,13 @@ func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error 
 // in the final tarball. EXCLUDED directories are created
 // but their contents are not written to local disk.
 func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter) error {
-	tarBall := bundle.GetTarBall()
 	fileName := info.Name()
 	_, excluded := EXCLUDE[info.Name()]
+
+	tarBall := bundle.Deque()
+	var parallelOpInProgress = false
+	defer bundle.EnqueueBack(tarBall, &parallelOpInProgress)
+
 	tarBall.SetUp(crypter)
 	tarWriter := tarBall.Tw()
 
@@ -106,36 +93,55 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 
 			} else {
 				// !excluded means file was not observed previously
-				f, isPaged, size, err := ReadDatabaseFile(path, bundle.GetIncrementBaseLsn(), !wasInBase)
-				if err != nil {
-					return errors.Wrapf(err, "HandleTar: failed to open file '%s'\n", path)
+				worker := func() error {
+					f, isPaged, size, err := ReadDatabaseFile(path, bundle.GetIncrementBaseLsn(), !wasInBase)
+					if err != nil {
+						return errors.Wrapf(err, "HandleTar: failed to open file '%s'\n", path)
+					}
+
+					hdr.Size = size
+
+					tarBall.GetFiles()[hdr.Name] = BackupFileDescription{IsSkipped: false, IsIncremented: isPaged, MTime: time}
+
+					err = tarWriter.WriteHeader(hdr)
+					if err != nil {
+						return errors.Wrap(err, "HandleTar: failed to write header")
+					}
+
+					lim := &io.LimitedReader{
+						R: io.MultiReader(f, &ZeroReader{}),
+						N: int64(hdr.Size),
+					}
+
+					size, err = io.Copy(tarWriter, lim)
+					if err != nil {
+						return errors.Wrap(err, "HandleTar: copy failed")
+					}
+
+					if size != hdr.Size {
+						return errors.Errorf("HandleTar: packed wrong numbers of bytes %d instead of %d", size, hdr.Size)
+					}
+
+					tarBall.AddSize(hdr.Size)
+					f.Close()
+					return nil
 				}
 
-				hdr.Size = size
-
-				tarBall.GetFiles()[hdr.Name] = BackupFileDescription{IsSkipped: false, IsIncremented: isPaged, MTime: time}
-
-				err = tarWriter.WriteHeader(hdr)
-				if err != nil {
-					return errors.Wrap(err, "HandleTar: failed to write header")
+				workerWrapper := func() {
+					// TODO: Refactor this functional mess
+					// And maybe do a better error handling
+					workerError := worker()
+					if workerError != nil {
+						panic(workerError)
+					}
+					bundleError := bundle.CheckSizeAndEnqueueBack(tarBall)
+					if bundleError != nil {
+						panic(bundleError)
+					}
 				}
 
-				lim := &io.LimitedReader{
-					R: io.MultiReader(f, &ZeroReader{}),
-					N: int64(hdr.Size),
-				}
-
-				size, err = io.Copy(tarWriter, lim)
-				if err != nil {
-					return errors.Wrap(err, "HandleTar: copy failed")
-				}
-
-				if size != hdr.Size {
-					return errors.Errorf("HandleTar: packed wrong numbers of bytes %d instead of %d", size, hdr.Size)
-				}
-
-				tarBall.AddSize(hdr.Size)
-				f.Close()
+				parallelOpInProgress = true
+				go workerWrapper()
 			}
 		} else {
 			// It is not file

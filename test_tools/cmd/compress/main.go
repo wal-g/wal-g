@@ -96,19 +96,19 @@ func main() {
 			Tu:       tu,
 		}
 
-		bundle.NewTarBall()
+		bundle.NewTarBall(true)
 		bundle.HandleLabelFiles(c)
 
 	}
 
-	bundle.NewTarBall()
+	bundle.StartQueue()
 	defer tools.TimeTrack(time.Now(), "MAIN")
 	fmt.Println("Walking ...")
 	err = filepath.Walk(in, bundle.TarWalker)
 	if err != nil {
 		panic(err)
 	}
-	err = bundle.Tb.CloseTar()
+	err = bundle.FinishQueue()
 	if err != nil {
 		panic(err)
 	}

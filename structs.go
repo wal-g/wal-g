@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pkg/errors"
+	"runtime"
 )
 
 // EXCLUDE is a list of excluded members from the bundled backup.
@@ -55,10 +56,16 @@ func (nw *NilWriter) Write(p []byte) (n int, err error) {
 
 // TarBundle represents one completed directory.
 type TarBundle interface {
-	NewTarBall()
+	NewTarBall(inheritState bool)
 	GetTarBall() TarBall
 	GetIncrementBaseLsn() *uint64
 	GetIncrementBaseFiles() BackupFileList
+
+	StartQueue()
+	Deque() TarBall
+	EnqueueBack(tb TarBall, parallelOpInProgress *bool)
+	CheckSizeAndEnqueueBack(tb TarBall) error
+	FinishQueue() error
 }
 
 // A Bundle represents the directory to
@@ -77,23 +84,87 @@ type Bundle struct {
 	Replica            bool
 	IncrementFromLsn   *uint64
 	IncrementFromFiles BackupFileList
+
+	tarballQueue     chan (TarBall)
+	parallelTarballs int
+}
+
+func (b *Bundle) StartQueue() {
+	b.parallelTarballs = getMaxUploadConcurrency(runtime.NumCPU())
+	b.tarballQueue = make(chan (TarBall), b.parallelTarballs)
+	for i := 0; i < b.parallelTarballs; i++ {
+		b.NewTarBall(false)
+		b.tarballQueue <- b.Tb
+	}
+}
+
+func (b *Bundle) Deque() TarBall {
+	return <-b.tarballQueue
+}
+
+func (b *Bundle) FinishQueue() error {
+	b.NewTarBall(false)
+	files := b.Tb.GetFiles()
+	for i := 0; i < b.parallelTarballs; i++ {
+		tb := <-b.tarballQueue
+		if tb.Tw() == nil {
+			// This had written nothing
+			continue
+		}
+		err := tb.CloseTar()
+		tb.AwaitUploads()
+
+		if err != nil {
+			return errors.Wrap(err, "TarWalker: failed to close tarball")
+		}
+		for k, v := range tb.GetFiles() {
+			files[k] = v
+		}
+	}
+	b.Tb.SetFiles(files)
+	return nil
+}
+
+func (b *Bundle) EnqueueBack(tb TarBall, parallelOpInProgress *bool) {
+	if !*parallelOpInProgress {
+		b.tarballQueue <- tb
+	}
+}
+
+func (b *Bundle) CheckSizeAndEnqueueBack(tb TarBall) error {
+	if tb.Size() > b.MinSize {
+		err := tb.CloseTar()
+		if err != nil {
+			return errors.Wrap(err, "TarWalker: failed to close tarball")
+		}
+		tb.AwaitUploads()
+
+		b.NewTarBall(true)
+		tb = b.Tb
+	}
+
+	b.tarballQueue <- tb
+	return nil
 }
 
 // GetTarBall from a Bundle
 func (b *Bundle) GetTarBall() TarBall { return b.Tb }
 
 // NewTarBall starts writing new tarball
-func (b *Bundle) NewTarBall() {
-	ntb := b.Tbm.Make()
-	if b.Tb != nil {
-		// Map of incremental files are inherited from previous Tar from the same bundle
-		// This design decision is based on Finish() function placement and TarWalker() behavior.
-		// This can be refactored so that map of incremented files would be in Bundle,
-		// but such refactoring will incur significant control flow and class responsibility changes.
-		ntb.SetFiles(b.Tb.GetFiles())
-	} else {
-		ntb.SetFiles(make(map[string]BackupFileDescription))
+func (b *Bundle) NewTarBall(inheritState bool) {
+	ntb := b.Tbm.Make(inheritState)
+	files := make(map[string]BackupFileDescription)
+
+	if inheritState && b.Tb != nil {
+		// Map of incremental files are inherited from previous Tar
+		// from the same bundle in case of sequential tarball creation
+		for k, v := range b.Tb.GetFiles() {
+			files[k] = v
+		}
 	}
+
+	ntb.SetFiles(files)
+
 	b.Tb = ntb
 }
 
@@ -124,6 +195,7 @@ type TarBall interface {
 	Tw() *tar.Writer
 	SetFiles(files BackupFileList)
 	GetFiles() BackupFileList
+	AwaitUploads()
 }
 
 // BackupFileList is a map of file properties in a backup
@@ -163,7 +235,6 @@ func (s *S3TarBall) SetUp(crypter Crypter, names ...string) {
 
 		s.w = w
 		s.tw = tar.NewWriter(w)
-
 	}
 }
 
@@ -194,6 +265,10 @@ func (s *S3TarBall) SetFiles(files BackupFileList) {
 // GetFiles of this backup
 func (s *S3TarBall) GetFiles() BackupFileList {
 	return s.Files
+}
+
+func (b *S3TarBall) AwaitUploads() {
+	b.tu.wg.Wait()
 }
 
 // S3TarBallSentinelDto describes file structure of json sentinel
