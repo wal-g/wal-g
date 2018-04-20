@@ -34,7 +34,7 @@ Configuration
 
 To connect to Amazon S3, WAL-G requires that these variables be set:
 
-* `WALE_S3_PREFIX` (eg. `s3://bucket/path/to/folder`)
+* `WALG_S3_PREFIX` (eg. `s3://bucket/path/to/folder`)
 
 WAL-G determines AWS credentials [like other AWS tools](http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#config-settings-and-precedence). You can set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (optionally with `AWS_SECURITY_TOKEN`), or `~/.aws/credentials` (optionally with `AWS_PROFILE`), or you can set nothing to automatically fetch credentials from the EC2 metadata service.
 
@@ -71,7 +71,7 @@ To enable path-style addressing(i.e., `http://s3.amazonaws.com/BUCKET/KEY`) when
 ```
 AWS_ACCESS_KEY_ID: "<minio-key>"
 AWS_SECRET_ACCESS_KEY: "<minio-secret>"
-WALE_S3_PREFIX: "s3://my-minio-bucket/sub-dir"
+WALG_S3_PREFIX: "s3://my-minio-bucket/sub-dir"
 AWS_ENDPOINT: "http://minio:9000"
 AWS_S3_FORCE_PATH_STYLE: "true"
 AWS_REGION: us-east-1
@@ -81,7 +81,7 @@ AWS_REGION: us-east-1
 
 To configure the S3 storage class used for backup files, use `WALG_S3_STORAGE_CLASS`. By default, WAL-G uses the "STANDARD" storage class. Other supported values include "STANDARD_IA" for Infrequent Access and "REDUCED_REDUNDANCY" for Reduced Redundancy.
 
-* `WALE_GPG_KEY_ID`
+* `WALG_GPG_KEY_ID`
 
 To configure GPG key for encryption and decryption. By default, no encryption is used. Public keyring is cached in the file "/.walg_key_cache".
 

@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-const waleGpgKey string = `
+const walgGpgKey string = `
 -----BEGIN PGP PRIVATE KEY BLOCK-----
 Version: GnuPG v1
 
@@ -118,17 +118,17 @@ CbuheGeFEgiFsaFR/zWcD9hI9rnMAI6rxda+oj9C6M3oYaGkQ3u0iNwzsDs+34er
 =DlRG
 -----END PGP PRIVATE KEY BLOCK-----`
 
-const waleWALfilename = "testdata/000000010000000000000024.lzo"
+const walgWALfilename = "testdata/000000010000000000000024.lzo"
 
 // This test extracts WAL-E-encrypted WAL, decrypts it by extrnal
 // GPG, compares result with OpenGPG decryption and invokes Lzop
 // decompression to check integrity. Test will leave gpg key
 // "walg-server-test" installed.
-func TestDecryptWALElzo(t *testing.T) {
+func TestDecryptWALGlzo(t *testing.T) {
 	t.Skip("This test has gpg side effects and was skipped. If you want to run it - comment skip line in crypto_compt_test.go")
 
-	crypter := createCrypter(waleGpgKey)
-	f, err := os.Open(waleWALfilename)
+	crypter := createCrypter(walgGpgKey)
+	f, err := os.Open(walgWALfilename)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,12 +143,12 @@ func TestDecryptWALElzo(t *testing.T) {
 
 	installTestKeyToExternalGPG(t)
 
-	os.Setenv("WALE_GPG_KEY_ID", "walg-server-test")
-	defer os.Unsetenv("WALE_GPG_KEY_ID")
+	os.Setenv("WALG_GPG_KEY_ID", "walg-server-test")
+	defer os.Unsetenv("WALG_GPG_KEY_ID")
 
 	ec := &ExternalGPGCrypter{}
 
-	f, err = os.Open(waleWALfilename)
+	f, err = os.Open(walgWALfilename)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func TestDecryptWALElzo(t *testing.T) {
 func installTestKeyToExternalGPG(t *testing.T) *exec.Cmd {
 	command := exec.Command(gpgBin, "--import")
 
-	command.Stdin = strings.NewReader(waleGpgKey)
+	command.Stdin = strings.NewReader(walgGpgKey)
 	err := command.Run()
 	if err != nil {
 		t.Fatal(err)
@@ -201,8 +201,8 @@ func TestOpenGPGandExternalGPGCompatibility(t *testing.T) {
 
 	installTestKeyToExternalGPG(t)
 
-	os.Setenv("WALE_GPG_KEY_ID", "walg-server-test")
-	defer os.Unsetenv("WALE_GPG_KEY_ID")
+	os.Setenv("WALG_GPG_KEY_ID", "walg-server-test")
+	defer os.Unsetenv("WALG_GPG_KEY_ID")
 
 	ec := &ExternalGPGCrypter{}
 	c := &OpenPGPCrypter{}
