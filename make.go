@@ -3,7 +3,7 @@ package walg
 // TarBallMaker is used to allow for
 // flexible creation of different TarBalls.
 type TarBallMaker interface {
-	Make(inheritState bool) TarBall
+	Make(newUploader bool) TarBall
 }
 
 // S3TarBallMaker creates tarballs that are uploaded to S3.
@@ -21,10 +21,10 @@ type S3TarBallMaker struct {
 }
 
 // Make returns a tarball with required S3 fields.
-func (s *S3TarBallMaker) Make(inheritState bool) TarBall {
+func (s *S3TarBallMaker) Make(newUploader bool) TarBall {
 	s.number++
 	uploader := s.Tu
-	if !inheritState {
+	if newUploader {
 		uploader = uploader.Clone()
 	}
 	return &S3TarBall{

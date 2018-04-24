@@ -282,7 +282,7 @@ func (bundle *Bundle) HandleSentinel() error {
 	info := bundle.Sen.Info
 	path := bundle.Sen.path
 
-	bundle.NewTarBall(true)
+	bundle.NewTarBall(bundle.Tb)
 	tarBall := bundle.Tb
 	tarBall.SetUp(&bundle.Crypter, "pg_control.tar.lz4")
 	tarWriter := tarBall.Tw()
@@ -353,7 +353,7 @@ func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {
 		return lsn, nil
 	}
 
-	bundle.NewTarBall(true)
+	bundle.NewTarBall(bundle.Tb)
 	tarBall := bundle.Tb
 	tarBall.SetUp(&bundle.Crypter)
 	tarWriter := tarBall.Tw()

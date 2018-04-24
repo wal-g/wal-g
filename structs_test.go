@@ -20,9 +20,10 @@ func TestS3TarBall(t *testing.T) {
 		BaseDir:  "tmp",
 		Trim:     "/usr/local",
 		BkupName: "test",
+		Tu:       walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region"),
 	}
 
-	bundle.NewTarBall(true)
+	bundle.NewTarBall(bundle.Tb)
 	tarBallCounter += 1
 
 	if bundle.Tb == nil {
@@ -62,7 +63,7 @@ func TestS3TarBall(t *testing.T) {
 		t.Errorf("make: Tarball writer should not be set up without calling SetUp()")
 	}
 
-	bundle.NewTarBall(true)
+	bundle.NewTarBall(bundle.Tb)
 	tarBallCounter += 1
 
 	if tarBall == bundle.Tb {
@@ -92,7 +93,7 @@ func TestS3DependentFunctions(t *testing.T) {
 		Tu:       tu,
 	}
 
-	bundle.NewTarBall(true)
+	bundle.NewTarBall(bundle.Tb)
 	tarBall := bundle.Tb
 	tarBall.SetUp(walg.MockArmedCrypter())
 	tarWriter := tarBall.Tw()
@@ -129,7 +130,7 @@ func TestS3DependentFunctions(t *testing.T) {
 	}
 
 	// Test naming property of SetUp().
-	bundle.NewTarBall(true)
+	bundle.NewTarBall(bundle.Tb)
 	tarBall = bundle.Tb
 	tarBall.SetUp(walg.MockArmedCrypter(), "mockTarball")
 	tarBall.CloseTar()
@@ -207,23 +208,25 @@ func queueTest(t *testing.T) {
 
 	bundle.StartQueue()
 
+	a := bundle.Deque()
 	go func() {
-		a := bundle.Deque()
-		time.Sleep(10*time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 		bundle.EnqueueBack(a, &tr)
-		time.Sleep(10*time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 		bundle.EnqueueBack(a, &f)
 	}()
 
+
+	c := bundle.Deque()
 	go func() {
-		c := bundle.Deque()
-		time.Sleep(10*time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 		bundle.CheckSizeAndEnqueueBack(c)
 	}()
 
+
+	b := bundle.Deque()
 	go func() {
-		b := bundle.Deque()
-		time.Sleep(10*time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 		bundle.EnqueueBack(b, &f)
 	}()
 

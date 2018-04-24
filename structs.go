@@ -16,7 +16,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pkg/errors"
-	"runtime"
 )
 
 // EXCLUDE is a list of excluded members from the bundled backup.
@@ -56,8 +55,7 @@ func (nw *NilWriter) Write(p []byte) (n int, err error) {
 
 // TarBundle represents one completed directory.
 type TarBundle interface {
-	NewTarBall(inheritState bool)
-	GetTarBall() TarBall
+	NewTarBall(inheritState TarBall)
 	GetIncrementBaseLsn() *uint64
 	GetIncrementBaseFiles() BackupFileList
 
@@ -86,37 +84,62 @@ type Bundle struct {
 	IncrementFromFiles BackupFileList
 
 	tarballQueue     chan (TarBall)
+	uploadQueue      chan (TarBall)
 	parallelTarballs int
+	maxUploadQueue   int
+	mutex            sync.Mutex
+	started          bool
 }
 
 func (b *Bundle) StartQueue() {
-	b.parallelTarballs = getMaxUploadConcurrency(runtime.NumCPU())
+	if b.started {
+		panic("Trying to start already started Queue")
+	}
+	b.parallelTarballs = getMaxUploadDiskConcurrency()
+	b.maxUploadQueue = getMaxUploadQueue()
 	b.tarballQueue = make(chan (TarBall), b.parallelTarballs)
+	b.uploadQueue = make(chan (TarBall), b.parallelTarballs + b.maxUploadQueue)
 	for i := 0; i < b.parallelTarballs; i++ {
-		b.NewTarBall(false)
+		b.NewTarBall(nil)
 		b.tarballQueue <- b.Tb
 	}
+	b.started = true
 }
 
 func (b *Bundle) Deque() TarBall {
+	if !b.started {
+		panic("Trying to deque from not started Queue")
+	}
 	return <-b.tarballQueue
 }
 
 func (b *Bundle) FinishQueue() error {
-	b.NewTarBall(false)
+	if !b.started {
+		panic("Trying to stop not started Queue")
+	}
+	b.started = false
+
+
+	// At this point no new tarballs should be put into uploadQueue
+	for len(b.uploadQueue) > 0 {
+		otb := <-b.uploadQueue
+		otb.AwaitUploads()
+	}
+
+	b.NewTarBall(nil)
 	files := b.Tb.GetFiles()
-	for i := 0; i < b.parallelTarballs; i++ {
+	for len(b.tarballQueue) > 0 {
 		tb := <-b.tarballQueue
 		if tb.Tw() == nil {
 			// This had written nothing
 			continue
 		}
 		err := tb.CloseTar()
-		tb.AwaitUploads()
-
 		if err != nil {
 			return errors.Wrap(err, "TarWalker: failed to close tarball")
 		}
+		tb.AwaitUploads()
+
 		for k, v := range tb.GetFiles() {
 			files[k] = v
 		}
@@ -133,32 +156,39 @@ func (b *Bundle) EnqueueBack(tb TarBall, parallelOpInProgress *bool) {
 
 func (b *Bundle) CheckSizeAndEnqueueBack(tb TarBall) error {
 	if tb.Size() > b.MinSize {
+		b.mutex.Lock()
+		defer b.mutex.Unlock()
+
 		err := tb.CloseTar()
 		if err != nil {
 			return errors.Wrap(err, "TarWalker: failed to close tarball")
 		}
-		tb.AwaitUploads()
 
-		b.NewTarBall(true)
+		b.uploadQueue <- tb
+		for len(b.uploadQueue) > b.maxUploadQueue {
+			select {
+				case otb := <-b.uploadQueue:
+					otb.AwaitUploads()
+				default:
+			}
+		}
+
+		b.NewTarBall(tb)
 		tb = b.Tb
 	}
-
 	b.tarballQueue <- tb
 	return nil
 }
 
-// GetTarBall from a Bundle
-func (b *Bundle) GetTarBall() TarBall { return b.Tb }
-
 // NewTarBall starts writing new tarball
-func (b *Bundle) NewTarBall(inheritState bool) {
-	ntb := b.Tbm.Make(inheritState)
+func (b *Bundle) NewTarBall(inheritState TarBall) {
+	ntb := b.Tbm.Make(inheritState != nil)
 	files := make(map[string]BackupFileDescription)
 
-	if inheritState && b.Tb != nil {
+	if inheritState != nil {
 		// Map of incremental files are inherited from previous Tar
 		// from the same bundle in case of sequential tarball creation
-		for k, v := range b.Tb.GetFiles() {
+		for k, v := range inheritState.GetFiles() {
 			files[k] = v
 		}
 	}

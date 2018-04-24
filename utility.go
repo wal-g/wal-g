@@ -73,15 +73,25 @@ func ResolveSymlink(path string) string {
 	return resolve
 }
 
-func getMaxDownloadConcurrency(reasonableMaximum int) int {
-	return getMaxConcurrency("WALG_DOWNLOAD_CONCURRENCY", reasonableMaximum)
+func getMaxDownloadConcurrency(default_value int) int {
+	return getMaxConcurrency("WALG_DOWNLOAD_CONCURRENCY", default_value)
 }
 
-func getMaxUploadConcurrency(reasonableMaximum int) int {
-	return getMaxConcurrency("WALG_UPLOAD_CONCURRENCY", reasonableMaximum)
+func getMaxUploadConcurrency(default_value int) int {
+	return getMaxConcurrency("WALG_UPLOAD_CONCURRENCY", default_value)
 }
 
-func getMaxConcurrency(key string, reasonableMaximum int) int {
+// This setting is intentially undocumented in README. Effectively, this configures how many prepared tar files there
+// may be in uploading state during backup-push.
+func getMaxUploadQueue() int {
+	return getMaxConcurrency("WALG_UPLOAD_QUEUE", 2)
+}
+
+func getMaxUploadDiskConcurrency() int {
+	return getMaxConcurrency("WALG_UPLOAD_DISK_CONCURRENCY", 1)
+}
+
+func getMaxConcurrency(key string, default_value int) int {
 	var con int
 	var err error
 	conc, ok := os.LookupEnv(key)
@@ -92,10 +102,10 @@ func getMaxConcurrency(key string, reasonableMaximum int) int {
 			log.Panic("Unknown concurrency number ", err)
 		}
 	} else {
-		if reasonableMaximum > 0 {
-			con = min(10, reasonableMaximum)
+		if default_value > 0 {
+			con = default_value
 		} else {
-			return 10
+			con = 10
 		}
 	}
 	return max(con, 1)
