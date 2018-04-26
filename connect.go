@@ -65,10 +65,10 @@ func (b *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName string, 
 	}
 	name, lsnStr, b.Replica, err = queryRunner.StartBackup(backup)
 
-	lsn, err = ParseLsn(lsnStr)
 	if err != nil {
 		return "", 0, queryRunner.Version, err
 	}
+	lsn, err = ParseLsn(lsnStr)
 
 	if b.Replica {
 		name, b.Timeline, err = WALFileName(lsn, conn)

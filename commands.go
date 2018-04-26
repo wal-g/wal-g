@@ -388,13 +388,14 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 		IncrementFromLsn: dto.LSN,
 		IncrementFrom:    latest,
 	}
-	bundle.NewTarBall()
+
+	bundle.StartQueue()
 	fmt.Println("Walking ...")
 	err = filepath.Walk(dirArc, bundle.TarWalker)
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
-	err = bundle.Tb.CloseTar()
+	err = bundle.FinishQueue()
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}

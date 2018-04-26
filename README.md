@@ -58,6 +58,10 @@ To configure how many goroutines to use during backup-fetch  and wal-push, use `
 
 To configure how many concurrency streams to use during backup uploading, use `WALG_UPLOAD_CONCURRENCY`. By default, WAL-G uses 10 streams.
 
+* `WALG_UPLOAD_DISK_CONCURRENCY`
+
+To configure how many concurrency streams are reading disk during ```backup-push```. By default, WAL-G uses 1 stream.
+
 * `AWS_ENDPOINT`
 
 Overrides the default hostname to connect to an S3-compatible service. i.e, `http://s3-like-service:9000`
