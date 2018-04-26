@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+	"encoding/json"
 )
 
 // BackupTime is used to sort backups by
@@ -85,6 +86,21 @@ func getMaxUploadConcurrency(default_value int) int {
 // may be in uploading state during backup-push.
 func getMaxUploadQueue() int {
 	return getMaxConcurrency("WALG_UPLOAD_QUEUE", 2)
+}
+
+// GetSentinelUserData tries to parse WALG_SENTINEL_USER_DATA env variable
+func GetSentinelUserData() interface{} {
+	dataStr, ok := os.LookupEnv("WALG_SENTINEL_USER_DATA")
+	if !ok || len(dataStr) == 0 {
+		return nil
+	}
+	var out interface{}
+	err := json.Unmarshal([]byte(dataStr), &out)
+	if err != nil {
+		log.Println("WARNING! Unable to parse WALG_SENTINEL_USER_DATA as JSON")
+		return dataStr
+	}
+	return out
 }
 
 func getMaxUploadDiskConcurrency() int {

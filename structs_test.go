@@ -216,13 +216,11 @@ func queueTest(t *testing.T) {
 		bundle.EnqueueBack(a, &f)
 	}()
 
-
 	c := bundle.Deque()
 	go func() {
 		time.Sleep(10 * time.Millisecond)
 		bundle.CheckSizeAndEnqueueBack(c)
 	}()
-
 
 	b := bundle.Deque()
 	go func() {
@@ -234,4 +232,33 @@ func queueTest(t *testing.T) {
 	if err != nil {
 		t.Log(err)
 	}
+}
+
+func TestUserData(t *testing.T) {
+
+	os.Setenv("WALG_SENTINEL_USER_DATA", "1.0")
+
+	data := walg.GetSentinelUserData()
+	t.Log(data)
+	if 1.0 != data.(float64) {
+		t.Fatal("Unable to parse WALG_SENTINEL_USER_DATA")
+	}
+
+	os.Setenv("WALG_SENTINEL_USER_DATA", "\"1\"")
+
+	data = walg.GetSentinelUserData()
+	t.Log(data)
+	if "1" != data.(string) {
+		t.Fatal("Unable to parse WALG_SENTINEL_USER_DATA")
+	}
+
+	os.Setenv("WALG_SENTINEL_USER_DATA", `{"x":123,"y":["asdasd",123]}`)
+
+	data = walg.GetSentinelUserData()
+	t.Log(data)
+	if nil == data {
+		t.Fatal("Unable to parse WALG_SENTINEL_USER_DATA")
+	}
+
+	os.Unsetenv("WALG_UPLOAD_CONCURRENCY")
 }

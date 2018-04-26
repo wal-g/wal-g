@@ -62,6 +62,10 @@ To configure how many concurrency streams to use during backup uploading, use `W
 
 To configure how many concurrency streams are reading disk during ```backup-push```. By default, WAL-G uses 1 stream.
 
+* `WALG_SENTINEL_USER_DATA`
+
+This setting allows backup automation tools to add extra information to JSON sentinel file during ```backup-push```.
+
 * `AWS_ENDPOINT`
 
 Overrides the default hostname to connect to an S3-compatible service. i.e, `http://s3-like-service:9000`

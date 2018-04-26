@@ -98,7 +98,7 @@ func (b *Bundle) StartQueue() {
 	b.parallelTarballs = getMaxUploadDiskConcurrency()
 	b.maxUploadQueue = getMaxUploadQueue()
 	b.tarballQueue = make(chan (TarBall), b.parallelTarballs)
-	b.uploadQueue = make(chan (TarBall), b.parallelTarballs + b.maxUploadQueue)
+	b.uploadQueue = make(chan (TarBall), b.parallelTarballs+b.maxUploadQueue)
 	for i := 0; i < b.parallelTarballs; i++ {
 		b.NewTarBall(nil)
 		b.tarballQueue <- b.Tb
@@ -118,7 +118,6 @@ func (b *Bundle) FinishQueue() error {
 		panic("Trying to stop not started Queue")
 	}
 	b.started = false
-
 
 	// At this point no new tarballs should be put into uploadQueue
 	for len(b.uploadQueue) > 0 {
@@ -167,9 +166,9 @@ func (b *Bundle) CheckSizeAndEnqueueBack(tb TarBall) error {
 		b.uploadQueue <- tb
 		for len(b.uploadQueue) > b.maxUploadQueue {
 			select {
-				case otb := <-b.uploadQueue:
-					otb.AwaitUploads()
-				default:
+			case otb := <-b.uploadQueue:
+				otb.AwaitUploads()
+			default:
 			}
 		}
 
@@ -313,6 +312,8 @@ type S3TarBallSentinelDto struct {
 
 	PgVersion int
 	FinishLSN *uint64
+
+	UserData interface{} `json:"UserData,omitempty"`
 }
 
 // BackupFileDescription contains properties of one backup file
@@ -350,6 +351,7 @@ func (s *S3TarBall) Finish(sentinel *S3TarBallSentinelDto) error {
 
 	//If other parts are successful in uploading, upload json file.
 	if tupl.Success && sentinel != nil {
+		sentinel.UserData = GetSentinelUserData()
 		dtoBody, err := json.Marshal(*sentinel)
 		if err != nil {
 			return err
