@@ -17,6 +17,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/pkg/errors"
+	"sync"
 )
 
 // HandleDelete is invoked to perform wal-g delete
@@ -359,6 +360,7 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 		MinSize:            int64(1000000000), //MINSIZE = 1GB
 		IncrementFromLsn:   dto.LSN,
 		IncrementFromFiles: dto.Files,
+		Files:              &sync.Map{},
 	}
 	if dto.Files == nil {
 		bundle.IncrementFromFiles = make(map[string]BackupFileDescription)
@@ -404,7 +406,7 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
-	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` files
+	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
 	finishLsn, err := bundle.HandleLabelFiles(conn)
 	if err != nil {
 		log.Fatalf("%+v\n", err)
@@ -428,7 +430,7 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 			sentinel.IncrementCount = &incrementCount
 		}
 
-		sentinel.Files = bundle.Tb.GetFiles()
+		sentinel.SetFiles(bundle.GetFiles())
 		sentinel.FinishLSN = &finishLsn
 	}
 

@@ -23,7 +23,7 @@ func TestS3TarBall(t *testing.T) {
 		Tu:       walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region"),
 	}
 
-	bundle.NewTarBall(bundle.Tb)
+	bundle.NewTarBall(false)
 	tarBallCounter += 1
 
 	if bundle.Tb == nil {
@@ -63,7 +63,7 @@ func TestS3TarBall(t *testing.T) {
 		t.Errorf("make: Tarball writer should not be set up without calling SetUp()")
 	}
 
-	bundle.NewTarBall(bundle.Tb)
+	bundle.NewTarBall(false)
 	tarBallCounter += 1
 
 	if tarBall == bundle.Tb {
@@ -93,7 +93,7 @@ func TestS3DependentFunctions(t *testing.T) {
 		Tu:       tu,
 	}
 
-	bundle.NewTarBall(bundle.Tb)
+	bundle.NewTarBall(false)
 	tarBall := bundle.Tb
 	tarBall.SetUp(walg.MockArmedCrypter())
 	tarWriter := tarBall.Tw()
@@ -130,7 +130,7 @@ func TestS3DependentFunctions(t *testing.T) {
 	}
 
 	// Test naming property of SetUp().
-	bundle.NewTarBall(bundle.Tb)
+	bundle.NewTarBall(false)
 	tarBall = bundle.Tb
 	tarBall.SetUp(walg.MockArmedCrypter(), "mockTarball")
 	tarBall.CloseTar()

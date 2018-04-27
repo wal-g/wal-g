@@ -282,7 +282,7 @@ func (bundle *Bundle) HandleSentinel() error {
 	info := bundle.Sen.Info
 	path := bundle.Sen.path
 
-	bundle.NewTarBall(bundle.Tb)
+	bundle.NewTarBall(false)
 	tarBall := bundle.Tb
 	tarBall.SetUp(&bundle.Crypter, "pg_control.tar.lz4")
 	tarWriter := tarBall.Tw()
@@ -328,7 +328,7 @@ func (bundle *Bundle) HandleSentinel() error {
 	return nil
 }
 
-// HandleLabelFiles creates the `backup_label` and `tablespace_map` files and uploads
+// HandleLabelFiles creates the `backup_label` and `tablespace_map` Files and uploads
 // it to S3 by stopping the backup. Returns error upon failure.
 func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {
 	var lb string
@@ -353,7 +353,7 @@ func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {
 		return lsn, nil
 	}
 
-	bundle.NewTarBall(bundle.Tb)
+	bundle.NewTarBall(false)
 	tarBall := bundle.Tb
 	tarBall.SetUp(&bundle.Crypter)
 	tarWriter := tarBall.Tw()

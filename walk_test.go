@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"testing"
+	"sync"
 )
 
 const BUFSIZE = 4 * 1024
@@ -325,6 +326,7 @@ func TestWalk(t *testing.T) {
 	// Bundle and compress files to `compressed`.
 	bundle := &walg.Bundle{
 		MinSize: int64(10),
+		Files:   &sync.Map{},
 	}
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
 	bundle.Tbm = &tools.FileTarBallMaker{

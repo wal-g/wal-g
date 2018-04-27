@@ -55,7 +55,7 @@ func (nw *NilWriter) Write(p []byte) (n int, err error) {
 
 // TarBundle represents one completed directory.
 type TarBundle interface {
-	NewTarBall(inheritState TarBall)
+	NewTarBall(dedicatedUploader bool)
 	GetIncrementBaseLsn() *uint64
 	GetIncrementBaseFiles() BackupFileList
 
@@ -64,6 +64,7 @@ type TarBundle interface {
 	EnqueueBack(tb TarBall, parallelOpInProgress *bool)
 	CheckSizeAndEnqueueBack(tb TarBall) error
 	FinishQueue() error
+	GetFiles() *sync.Map
 }
 
 // A Bundle represents the directory to
@@ -89,7 +90,11 @@ type Bundle struct {
 	maxUploadQueue   int
 	mutex            sync.Mutex
 	started          bool
+
+	Files *sync.Map
 }
+
+func (b *Bundle) GetFiles() *sync.Map { return b.Files }
 
 func (b *Bundle) StartQueue() {
 	if b.started {
@@ -100,7 +105,7 @@ func (b *Bundle) StartQueue() {
 	b.tarballQueue = make(chan (TarBall), b.parallelTarballs)
 	b.uploadQueue = make(chan (TarBall), b.parallelTarballs+b.maxUploadQueue)
 	for i := 0; i < b.parallelTarballs; i++ {
-		b.NewTarBall(nil)
+		b.NewTarBall(true)
 		b.tarballQueue <- b.Tb
 	}
 	b.started = true
@@ -125,8 +130,8 @@ func (b *Bundle) FinishQueue() error {
 		otb.AwaitUploads()
 	}
 
-	b.NewTarBall(nil)
-	files := b.Tb.GetFiles()
+	b.NewTarBall(false)
+
 	for len(b.tarballQueue) > 0 {
 		tb := <-b.tarballQueue
 		if tb.Tw() == nil {
@@ -138,12 +143,7 @@ func (b *Bundle) FinishQueue() error {
 			return errors.Wrap(err, "TarWalker: failed to close tarball")
 		}
 		tb.AwaitUploads()
-
-		for k, v := range tb.GetFiles() {
-			files[k] = v
-		}
 	}
-	b.Tb.SetFiles(files)
 	return nil
 }
 
@@ -172,7 +172,7 @@ func (b *Bundle) CheckSizeAndEnqueueBack(tb TarBall) error {
 			}
 		}
 
-		b.NewTarBall(tb)
+		b.NewTarBall(true)
 		tb = b.Tb
 	}
 	b.tarballQueue <- tb
@@ -180,19 +180,8 @@ func (b *Bundle) CheckSizeAndEnqueueBack(tb TarBall) error {
 }
 
 // NewTarBall starts writing new tarball
-func (b *Bundle) NewTarBall(inheritState TarBall) {
-	ntb := b.Tbm.Make(inheritState != nil)
-	files := make(map[string]BackupFileDescription)
-
-	if inheritState != nil {
-		// Map of incremental files are inherited from previous Tar
-		// from the same bundle in case of sequential tarball creation
-		for k, v := range inheritState.GetFiles() {
-			files[k] = v
-		}
-	}
-
-	ntb.SetFiles(files)
+func (b *Bundle) NewTarBall(dedicatedUploader bool) {
+	ntb := b.Tbm.Make(dedicatedUploader)
 
 	b.Tb = ntb
 }
@@ -200,7 +189,7 @@ func (b *Bundle) NewTarBall(inheritState TarBall) {
 // GetIncrementBaseLsn returns LSN of previous backup
 func (b *Bundle) GetIncrementBaseLsn() *uint64 { return b.IncrementFromLsn }
 
-// GetIncrementBaseFiles returns list of files from previous backup
+// GetIncrementBaseFiles returns list of Files from previous backup
 func (b *Bundle) GetIncrementBaseFiles() BackupFileList { return b.IncrementFromFiles }
 
 // Sentinel is used to signal completion of a walked
@@ -222,8 +211,6 @@ type TarBall interface {
 	Size() int64
 	AddSize(int64)
 	Tw() *tar.Writer
-	SetFiles(files BackupFileList)
-	GetFiles() BackupFileList
 	AwaitUploads()
 }
 
@@ -286,16 +273,6 @@ func (s *S3TarBall) CloseTar() error {
 // ErrSentinelNotUploaded happens when upload of json sentinel failed
 var ErrSentinelNotUploaded = errors.New("Sentinel was not uploaded due to timeline change during backup")
 
-// SetFiles of this backup
-func (s *S3TarBall) SetFiles(files BackupFileList) {
-	s.Files = files
-}
-
-// GetFiles of this backup
-func (s *S3TarBall) GetFiles() BackupFileList {
-	return s.Files
-}
-
 func (b *S3TarBall) AwaitUploads() {
 	b.tu.wg.Wait()
 }
@@ -314,6 +291,16 @@ type S3TarBallSentinelDto struct {
 	FinishLSN *uint64
 
 	UserData interface{} `json:"UserData,omitempty"`
+}
+
+func (s *S3TarBallSentinelDto) SetFiles(p *sync.Map) {
+	s.Files = make(BackupFileList)
+	p.Range(func(k, v interface{}) bool {
+		key := k.(string)
+		description := v.(BackupFileDescription)
+		s.Files[key] = description
+		return true
+	})
 }
 
 // BackupFileDescription contains properties of one backup file
@@ -377,13 +364,13 @@ func (s *S3TarBall) Finish(sentinel *S3TarBallSentinelDto) error {
 
 		tupl.Finish()
 	} else {
-		log.Printf("Uploaded %d compressed tar files.\n", s.number)
+		log.Printf("Uploaded %d compressed tar Files.\n", s.number)
 		log.Printf("Sentinel was not uploaded %v", name)
 		return ErrSentinelNotUploaded
 	}
 
 	if err == nil && tupl.Success {
-		fmt.Printf("Uploaded %d compressed tar files.\n", s.number)
+		fmt.Printf("Uploaded %d compressed tar Files.\n", s.number)
 	}
 	return err
 }

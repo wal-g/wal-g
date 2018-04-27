@@ -89,7 +89,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 				// File was not changed since previous backup
 
 				fmt.Println("Skiped due to unchanged modification time")
-				tarBall.GetFiles()[hdr.Name] = BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time}
+				bundle.GetFiles().Store(hdr.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time})
 
 			} else {
 				// !excluded means file was not observed previously
@@ -101,7 +101,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 
 					hdr.Size = size
 
-					tarBall.GetFiles()[hdr.Name] = BackupFileDescription{IsSkipped: false, IsIncremented: isPaged, MTime: time}
+					bundle.GetFiles().Store(hdr.Name, BackupFileDescription{IsSkipped: false, IsIncremented: isPaged, MTime: time})
 
 					err = tarWriter.WriteHeader(hdr)
 					if err != nil {

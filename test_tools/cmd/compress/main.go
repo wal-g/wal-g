@@ -96,7 +96,7 @@ func main() {
 			Tu:       tu,
 		}
 
-		bundle.NewTarBall(bundle.Tb)
+		bundle.NewTarBall(false)
 		bundle.HandleLabelFiles(c)
 
 	}

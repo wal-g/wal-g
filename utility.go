@@ -82,7 +82,7 @@ func getMaxUploadConcurrency(default_value int) int {
 	return getMaxConcurrency("WALG_UPLOAD_CONCURRENCY", default_value)
 }
 
-// This setting is intentially undocumented in README. Effectively, this configures how many prepared tar files there
+// This setting is intentially undocumented in README. Effectively, this configures how many prepared tar Files there
 // may be in uploading state during backup-push.
 func getMaxUploadQueue() int {
 	return getMaxConcurrency("WALG_UPLOAD_QUEUE", 2)

@@ -171,7 +171,7 @@ func (b *Backup) CheckExistence() (bool, error) {
 	return true, nil
 }
 
-// GetKeys returns all the keys for the files in the specified backup.
+// GetKeys returns all the keys for the Files in the specified backup.
 func (b *Backup) GetKeys() ([]string, error) {
 	objects := &s3.ListObjectsV2Input{
 		Bucket: b.Prefix.Bucket,

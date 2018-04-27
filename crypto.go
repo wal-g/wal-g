@@ -78,7 +78,7 @@ func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, e
 // But there is a lot of places where writer is instantiated long before pipe
 // is ready. This is why here is used special writer, which delays encryption
 // initialization before actual write. If no write occurs, initialization
-// still is performed, to handle zero-byte files correctly
+// still is performed, to handle zero-byte Files correctly
 type DelayWriteCloser struct {
 	inner io.WriteCloser
 	el    openpgp.EntityList
