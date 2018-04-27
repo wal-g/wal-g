@@ -1,6 +1,6 @@
 language: go
 go:
-  - 1.8.x
+  - 1.10.x
 before_deploy:
   - tar -zcf wal-g.linux-amd64.tar.gz -C cmd/wal-g/ wal-g
 deploy:
