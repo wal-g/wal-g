@@ -126,13 +126,15 @@ func (b *Bundle) FinishQueue() error {
 
 	// At this point no new tarballs should be put into uploadQueue
 	for len(b.uploadQueue) > 0 {
-		otb := <-b.uploadQueue
-		otb.AwaitUploads()
+		select {
+		case otb := <-b.uploadQueue:
+			otb.AwaitUploads()
+		default:
+		}
 	}
 
-	b.NewTarBall(false)
-
-	for len(b.tarballQueue) > 0 {
+	// We have to deque exactly this count of workers
+	for i := 0; i < b.parallelTarballs; i++ {
 		tb := <-b.tarballQueue
 		if tb.Tw() == nil {
 			// This had written nothing
