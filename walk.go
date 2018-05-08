@@ -85,7 +85,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 			// For details see
 			// https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
 
-			if wasInBase && (time == bf.MTime) {
+			if wasInBase && (time.Equal(bf.MTime)) {
 				// File was not changed since previous backup
 
 				fmt.Println("Skiped due to unchanged modification time")
