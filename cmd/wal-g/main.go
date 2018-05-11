@@ -77,22 +77,22 @@ func main() {
 		switch command {
 		case "backup-fetch":
 			fmt.Printf("usage:\twal-g backup-fetch output_directory backup_name\n\twal-g backup-fetch output_directory LATEST\n\n")
-			os.Exit(0)
+			os.Exit(1)
 		case "backup-push":
 			fmt.Printf("usage:\twal-g backup-push backup_directory\n\n")
-			os.Exit(0)
+			os.Exit(1)
 		case "backup-list":
 			fmt.Printf("usage:\twal-g backup-list\n\n")
-			os.Exit(0)
+			os.Exit(1)
 		case "wal-fetch":
 			fmt.Printf("usage:\twal-g wal-fetch wal_name file_name\n\t   wal_name: name of WAL archive\n\t   file_name: name of file to be written to\n\n")
-			os.Exit(0)
+			os.Exit(1)
 		case "wal-push":
 			fmt.Printf("usage:\twal-g wal-push archive_path\n\n")
-			os.Exit(0)
+			os.Exit(1)
 		case "delete":
 			fmt.Println(walg.DeleteUsage)
-			os.Exit(0)
+			os.Exit(1)
 		default:
 			l.Fatalf("Command '%s' is unsupported by WAL-G.\n\n", command)
 		}
