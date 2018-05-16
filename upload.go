@@ -210,7 +210,7 @@ func (s *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteCloser {
 		wc, err := crypter.Encrypt(pw)
 
 		if err != nil {
-			panic(err)
+			log.Fatal("upload: encryption error ",err)
 		}
 
 		return &Lz4CascadeClose2{lz4.NewWriter(wc), wc, pw}
