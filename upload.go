@@ -55,18 +55,18 @@ func findS3BucketRegion(bucket string, config *aws.Config) (string, error) {
 // and `<nil>` values.
 //
 // Requires these environment variables to be set:
-// WALE_S3_PREFIX
+// WALG_S3_PREFIX
 //
 // Able to configure the upload part size in the S3 uploader.
 func Configure() (*TarUploader, *Prefix, error) {
-	waleS3Prefix := os.Getenv("WALE_S3_PREFIX")
-	if waleS3Prefix == "" {
-		return nil, nil, &UnsetEnvVarError{names: []string{"WALE_S3_PREFIX"}}
+	walgS3Prefix := os.Getenv("WALG_S3_PREFIX")
+	if walgS3Prefix == "" {
+		return nil, nil, &UnsetEnvVarError{names: []string{"WALG_S3_PREFIX"}}
 	}
 
-	u, err := url.Parse(waleS3Prefix)
+	u, err := url.Parse(walgS3Prefix)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "Configure: failed to parse url '%s'", waleS3Prefix)
+		return nil, nil, errors.Wrapf(err, "Configure: failed to parse url '%s'", walgS3Prefix)
 	}
 	if u.Scheme == "" || u.Host == "" {
 		return nil, nil, fmt.Errorf("Missing url scheme=%q and/or host=%q", u.Scheme, u.Host)

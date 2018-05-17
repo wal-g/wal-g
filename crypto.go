@@ -141,7 +141,7 @@ func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) 
 
 // GetKeyRingId extracts name of a key to use from env variable
 func GetKeyRingId() string {
-	return os.Getenv("WALE_GPG_KEY_ID")
+	return os.Getenv("WALG_GPG_KEY_ID")
 }
 
 const gpgBin = "gpg"

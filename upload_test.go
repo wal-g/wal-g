@@ -9,7 +9,7 @@ import (
 
 // Sets WAL-G needed environment variables to empty strings.
 func setEmpty(t *testing.T) {
-	err := os.Setenv("WALE_S3_PREFIX", "")
+	err := os.Setenv("WALG_S3_PREFIX", "")
 	if err != nil {
 		t.Log(err)
 	}
@@ -33,7 +33,7 @@ func setEmpty(t *testing.T) {
 
 // Sets fake environment variables.
 func setFake(t *testing.T) {
-	err := os.Setenv("WALE_S3_PREFIX", "wale_s3_prefix")
+	err := os.Setenv("WALG_S3_PREFIX", "walg_s3_prefix")
 	if err != nil {
 		t.Log(err)
 	}
@@ -91,7 +91,7 @@ func doConfigureWithBuсketPath(t *testing.T, bucketPath string, expectedServer 
 	}
 	setFake(t)
 	//Test invalid url
-	err = os.Setenv("WALE_S3_PREFIX", "test_fail:")
+	err = os.Setenv("WALG_S3_PREFIX", "test_fail:")
 	if err != nil {
 		t.Log(err)
 	}
@@ -100,7 +100,7 @@ func doConfigureWithBuсketPath(t *testing.T, bucketPath string, expectedServer 
 		t.Errorf("upload: Expected to fail on fake url")
 	}
 	//Test created uploader and prefix
-	err = os.Setenv("WALE_S3_PREFIX", bucketPath)
+	err = os.Setenv("WALG_S3_PREFIX", bucketPath)
 	if err != nil {
 		t.Log(err)
 	}
