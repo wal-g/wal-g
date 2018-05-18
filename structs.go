@@ -353,6 +353,14 @@ func (s *S3TarBall) Finish(sentinel *S3TarBallSentinelDto) error {
 			StorageClass: aws.String(tupl.StorageClass),
 		}
 
+		if tupl.ServerSideEncryption != "" {
+			input.ServerSideEncryption = aws.String(tupl.ServerSideEncryption)
+
+			if tupl.ServerSideEncryption == "aws:kms" && tupl.SSEKMSKeyId != "" {
+				input.SSEKMSKeyId = aws.String(tupl.SSEKMSKeyId)
+			}
+		}
+
 		tupl.wg.Add(1)
 		go func() {
 			defer tupl.wg.Done()
@@ -402,13 +410,15 @@ func (s *S3TarBall) Tw() *tar.Writer { return s.tw }
 // Multiple tarballs can share one uploader. Must call CreateUploader()
 // in 'upload.go'.
 type TarUploader struct {
-	Upl          s3manageriface.UploaderAPI
-	StorageClass string
-	Success      bool
-	bucket       string
-	server       string
-	region       string
-	wg           *sync.WaitGroup
+	Upl                  s3manageriface.UploaderAPI
+	ServerSideEncryption string
+	SSEKMSKeyId          string
+	StorageClass         string
+	Success              bool
+	bucket               string
+	server               string
+	region               string
+	wg                   *sync.WaitGroup
 }
 
 // NewTarUploader creates a new tar uploader without the actual
@@ -437,6 +447,8 @@ func (tu *TarUploader) Finish() {
 func (tu *TarUploader) Clone() *TarUploader {
 	return &TarUploader{
 		tu.Upl,
+		tu.ServerSideEncryption,
+		tu.SSEKMSKeyId,
 		tu.StorageClass,
 		tu.Success,
 		tu.bucket,
