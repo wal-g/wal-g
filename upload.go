@@ -144,6 +144,10 @@ func Configure() (*TarUploader, *Prefix, error) {
 		upload.SSEKMSKeyId = sseKmsKeyId
 	}
 
+	if serverSideEncryption == "aws:kms" && sseKmsKeyId == "" {
+		return nil, nil, errors.New("Configure: WALG_S3_SSE_KMS_ID must be set if using aws:kms encryption")
+	}
+
 	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, con) //default 10 concurrency streams at 20MB
 
 	return upload, pre, err
