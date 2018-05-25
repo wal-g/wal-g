@@ -144,8 +144,9 @@ func Configure() (*TarUploader, *Prefix, error) {
 		upload.SSEKMSKeyId = sseKmsKeyId
 	}
 
-	if serverSideEncryption == "aws:kms" && sseKmsKeyId == "" {
-		return nil, nil, errors.New("Configure: WALG_S3_SSE_KMS_ID must be set if using aws:kms encryption")
+	// Only aws:kms implies sseKmsKeyId
+	if (serverSideEncryption == "aws:kms") == (sseKmsKeyId == "") {
+		return nil, nil, errors.New("Configure: WALG_S3_SSE_KMS_ID must be set iff using aws:kms encryption")
 	}
 
 	upload.Upl = CreateUploader(pre.Svc, 20*1024*1024, con) //default 10 concurrency streams at 20MB
@@ -195,7 +196,8 @@ func (tu *TarUploader) createUploadInput(path string, reader io.Reader) *s3manag
 	if tu.ServerSideEncryption != "" {
 		uploadInput.ServerSideEncryption = aws.String(tu.ServerSideEncryption)
 
-		if tu.ServerSideEncryption == "aws:kms" && tu.SSEKMSKeyId != "" {
+		if tu.SSEKMSKeyId != "" {
+			// Only aws:kms implies sseKmsKeyId, checked during validation
 			uploadInput.SSEKMSKeyId = aws.String(tu.SSEKMSKeyId)
 		}
 	}

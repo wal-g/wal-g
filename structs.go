@@ -326,7 +326,7 @@ func (dto *S3TarBallSentinelDto) IsIncremental() bool {
 	return dto.IncrementFrom != nil
 }
 
-// Finish writes an empty .json file and uploads it with the
+// Finish writes a .json file description and uploads it with the
 // the backup name. Finish will wait until all tar file parts
 // have been uploaded. The json file will only be uploaded
 // if all other parts of the backup are present in S3.
@@ -356,7 +356,8 @@ func (s *S3TarBall) Finish(sentinel *S3TarBallSentinelDto) error {
 		if tupl.ServerSideEncryption != "" {
 			input.ServerSideEncryption = aws.String(tupl.ServerSideEncryption)
 
-			if tupl.ServerSideEncryption == "aws:kms" && tupl.SSEKMSKeyId != "" {
+			if tupl.SSEKMSKeyId != "" {
+				// Only aws:kms implies sseKmsKeyId, checked during validation
 				input.SSEKMSKeyId = aws.String(tupl.SSEKMSKeyId)
 			}
 		}
