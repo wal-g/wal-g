@@ -326,7 +326,7 @@ func (dto *S3TarBallSentinelDto) IsIncremental() bool {
 	return dto.IncrementFrom != nil
 }
 
-// Finish writes an empty .json file and uploads it with the
+// Finish writes a .json file description and uploads it with the
 // the backup name. Finish will wait until all tar file parts
 // have been uploaded. The json file will only be uploaded
 // if all other parts of the backup are present in S3.
@@ -351,6 +351,15 @@ func (s *S3TarBall) Finish(sentinel *S3TarBallSentinelDto) error {
 			Key:          aws.String(path),
 			Body:         bytes.NewReader(dtoBody),
 			StorageClass: aws.String(tupl.StorageClass),
+		}
+
+		if tupl.ServerSideEncryption != "" {
+			input.ServerSideEncryption = aws.String(tupl.ServerSideEncryption)
+
+			if tupl.SSEKMSKeyId != "" {
+				// Only aws:kms implies sseKmsKeyId, checked during validation
+				input.SSEKMSKeyId = aws.String(tupl.SSEKMSKeyId)
+			}
 		}
 
 		tupl.wg.Add(1)
@@ -402,13 +411,15 @@ func (s *S3TarBall) Tw() *tar.Writer { return s.tw }
 // Multiple tarballs can share one uploader. Must call CreateUploader()
 // in 'upload.go'.
 type TarUploader struct {
-	Upl          s3manageriface.UploaderAPI
-	StorageClass string
-	Success      bool
-	bucket       string
-	server       string
-	region       string
-	wg           *sync.WaitGroup
+	Upl                  s3manageriface.UploaderAPI
+	ServerSideEncryption string
+	SSEKMSKeyId          string
+	StorageClass         string
+	Success              bool
+	bucket               string
+	server               string
+	region               string
+	wg                   *sync.WaitGroup
 }
 
 // NewTarUploader creates a new tar uploader without the actual
@@ -437,6 +448,8 @@ func (tu *TarUploader) Finish() {
 func (tu *TarUploader) Clone() *TarUploader {
 	return &TarUploader{
 		tu.Upl,
+		tu.ServerSideEncryption,
+		tu.SSEKMSKeyId,
 		tu.StorageClass,
 		tu.Success,
 		tu.bucket,
