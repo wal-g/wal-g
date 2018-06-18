@@ -95,7 +95,7 @@ func WipeRestore() {
 	}
 }
 
-func Fetch(pre *walg.Prefix) *uint64 {
+func Fetch(pre *walg.S3Prefix) *uint64 {
 	return walg.HandleBackupFetch("LATEST", pre, restoreDir, false)
 }
 
@@ -224,6 +224,6 @@ func SetupBench() {
 		fmt.Println(err);
 	}
 }
-func Backup(tu *walg.TarUploader, pre *walg.Prefix) {
+func Backup(tu *walg.TarUploader, pre *walg.S3Prefix) {
 	walg.HandleBackupPush(baseDir, tu, pre)
 }

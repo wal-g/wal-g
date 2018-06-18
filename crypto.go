@@ -85,32 +85,32 @@ type DelayWriteCloser struct {
 	outer *io.WriteCloser
 }
 
-func (d *DelayWriteCloser) Write(p []byte) (n int, err error) {
+func (delayWriteCloser *DelayWriteCloser) Write(p []byte) (n int, err error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	if d.outer == nil {
-		wc, err0 := openpgp.Encrypt(d.inner, d.el, nil, nil, nil)
-		if err0 != nil {
+	if delayWriteCloser.outer == nil {
+		wc, err := openpgp.Encrypt(delayWriteCloser.inner, delayWriteCloser.el, nil, nil, nil)
+		if err != nil {
 			return 0, err
 		}
-		d.outer = &wc
+		delayWriteCloser.outer = &wc
 	}
-	n, err = (*d.outer).Write(p)
+	n, err = (*delayWriteCloser.outer).Write(p)
 	return
 }
 
 // Close DelayWriteCloser
-func (d *DelayWriteCloser) Close() error {
-	if d.outer == nil {
-		wc, err0 := openpgp.Encrypt(d.inner, d.el, nil, nil, nil)
-		if err0 != nil {
-			return err0
+func (delayWriteCloser *DelayWriteCloser) Close() error {
+	if delayWriteCloser.outer == nil {
+		writeCloser, err := openpgp.Encrypt(delayWriteCloser.inner, delayWriteCloser.el, nil, nil, nil)
+		if err != nil {
+			return err
 		}
-		d.outer = &wc
+		delayWriteCloser.outer = &writeCloser
 	}
 
-	return (*d.outer).Close()
+	return (*delayWriteCloser.outer).Close()
 }
 
 // Decrypt creates decrypted reader from ordinary reader

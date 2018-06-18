@@ -10,6 +10,23 @@ import (
 	"strings"
 )
 
+
+// ExcludedFilenames is a list of excluded members from the bundled backup.
+var ExcludedFilenames = make(map[string]Empty)
+
+func init() {
+	filesToExclude := []string {
+		"pg_log", "pg_xlog", "pg_wal",
+		"pgsql_tmp", "postgresql.auto.conf.tmp", "postmaster.pid", "postmaster.opts", "recovery.conf",
+		"pg_dynshmem", "pg_notify", "pg_replslot", "pg_serial", "pg_stat_tmp", "pg_snapshots", "pg_subtrans", // Directories
+	}
+
+	for _, filename := range filesToExclude {
+		ExcludedFilenames[filename] = Empty{}
+	}
+}
+
+
 // ZeroReader generates a slice of zeroes. Used to pad
 // tar in cases where length of file changes.
 type ZeroReader struct{}
@@ -21,49 +38,21 @@ func (z *ZeroReader) Read(p []byte) (int, error) {
 
 }
 
-// TarWalker walks files provided by the passed in directory
-// and creates compressed tar members labeled as `part_00i.tar.lzo`.
-//
-// To see which files and directories are Skipped, please consult
-// 'structs.go'. Excluded directories will be created but their
-// contents will not be included in the tar bundle.
-func (bundle *Bundle) TarWalker(path string, info os.FileInfo, err error) error {
-	if err != nil {
-		if os.IsNotExist(err) {
-			fmt.Println(path, " deleted dring filepath walk")
-			return nil
-		}
-		return errors.Wrap(err, "TarWalker: walk failed")
-	}
-
-	if info.Name() == "pg_control" {
-		bundle.Sen = &Sentinel{info, path}
-	} else {
-		err = HandleTar(bundle, path, info, &bundle.Crypter)
-		if err == filepath.SkipDir {
-			return err
-		}
-		if err != nil {
-			return errors.Wrap(err, "TarWalker: handle tar failed")
-		}
-	}
-	return nil
-}
 
 // HandleTar creates underlying tar writer and handles one given file.
-// Does not follow symlinks. If file is in EXCLUDE, will not be included
+// Does not follow symlinks. If file is in ExcludedFilenames, will not be included
 // in the final tarball. EXCLUDED directories are created
 // but their contents are not written to local disk.
 func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter) error {
 	fileName := info.Name()
-	_, excluded := EXCLUDE[info.Name()]
+	_, excluded := ExcludedFilenames[info.Name()]
 
 	tarBall := bundle.Deque()
 	var parallelOpInProgress = false
 	defer bundle.EnqueueBack(tarBall, &parallelOpInProgress)
 
 	tarBall.SetUp(crypter)
-	tarWriter := tarBall.Tw()
+	tarWriter := tarBall.TarWriter()
 
 	if !excluded {
 		hdr, err := tar.FileInfoHeader(info, fileName)

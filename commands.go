@@ -21,7 +21,7 @@ import (
 )
 
 // HandleDelete is invoked to perform wal-g delete
-func HandleDelete(pre *Prefix, args []string) {
+func HandleDelete(pre *S3Prefix, args []string) {
 	cfg := ParseDeleteArguments(args, printDeleteUsageAndFail)
 
 	var bk = &Backup{
@@ -83,7 +83,7 @@ func HandleDelete(pre *Prefix, args []string) {
 }
 
 // HandleBackupList is invoked to perform wal-g backup-list
-func HandleBackupList(pre *Prefix) {
+func HandleBackupList(pre *S3Prefix) {
 	var bk = &Backup{
 		Prefix: pre,
 		Path:   GetBackupPath(pre),
@@ -104,7 +104,7 @@ func HandleBackupList(pre *Prefix) {
 }
 
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
-func HandleBackupFetch(backupName string, pre *Prefix, dirArc string, mem bool) (lsn *uint64) {
+func HandleBackupFetch(backupName string, pre *S3Prefix, dirArc string, mem bool) (lsn *uint64) {
 	dirArc = ResolveSymlink(dirArc)
 	lsn = deltaFetchRecursion(backupName, pre, dirArc)
 
@@ -121,7 +121,7 @@ func HandleBackupFetch(backupName string, pre *Prefix, dirArc string, mem bool) 
 }
 
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
-func deltaFetchRecursion(backupName string, pre *Prefix, dirArc string) (lsn *uint64) {
+func deltaFetchRecursion(backupName string, pre *S3Prefix, dirArc string) (lsn *uint64) {
 	var bk *Backup
 	// Check if BACKUPNAME exists and if it does extract to DIRARC.
 	if backupName != "LATEST" {
@@ -168,10 +168,10 @@ func deltaFetchRecursion(backupName string, pre *Prefix, dirArc string) (lsn *ui
 }
 
 // Do the job of unpacking Backup object
-func unwrapBackup(bk *Backup, dirArc string, pre *Prefix, sentinel S3TarBallSentinelDto) {
+func unwrapBackup(bk *Backup, dirArc string, pre *S3Prefix, sentinelDto S3TarBallSentinelDto) {
 
 	incrementBase := path.Join(dirArc, "increment_base")
-	if !sentinel.IsIncremental() {
+	if !sentinelDto.IsIncremental() {
 		var empty = true
 		searchLambda := func(path string, info os.FileInfo, err error) error {
 			if path != dirArc {
@@ -212,7 +212,7 @@ func unwrapBackup(bk *Backup, dirArc string, pre *Prefix, sentinel S3TarBallSent
 			}
 		}
 
-		for fileName, fd := range sentinel.Files {
+		for fileName, fd := range sentinelDto.Files {
 			if !fd.IsSkipped {
 				continue
 			}
@@ -237,7 +237,7 @@ func unwrapBackup(bk *Backup, dirArc string, pre *Prefix, sentinel S3TarBallSent
 	keys = allKeys[:len(allKeys)-1] // TODO: WTF is going on?
 	f := &FileTarInterpreter{
 		NewDir:             dirArc,
-		Sentinel:           sentinel,
+		Sentinel:           sentinelDto,
 		IncrementalBaseDir: incrementBase,
 	}
 	out := make([]ReaderMaker, len(keys))
@@ -259,7 +259,7 @@ func unwrapBackup(bk *Backup, dirArc string, pre *Prefix, sentinel S3TarBallSent
 	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of backup.
 	re := regexp.MustCompile(`^([^_]+._{1}[^_]+._{1})`)
 	match := re.FindString(*bk.Name)
-	if match == "" || sentinel.IsIncremental() {
+	if match == "" || sentinelDto.IsIncremental() {
 		// Extract pg_control last. If pg_control does not exist, program exits with error code 1.
 		name := *bk.Path + *bk.Name + "/tar_partitions/pg_control.tar.lz4"
 		pgControl := &Archive{
@@ -315,7 +315,7 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 }
 
 // HandleBackupPush is invoked to performa wal-g backup-push
-func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
+func HandleBackupPush(dirArc string, tu *TarUploader, pre *S3Prefix) {
 	dirArc = ResolveSymlink(dirArc)
 	maxDeltas, fromFull := getDeltaConfig()
 
@@ -324,7 +324,7 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 		Path:   GetBackupPath(pre),
 	}
 
-	var dto S3TarBallSentinelDto
+	var sentinelDto S3TarBallSentinelDto
 	var latest string
 	var err error
 	incrementCount := 1
@@ -335,34 +335,34 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 			if err != nil {
 				log.Fatalf("%+v\n", err)
 			}
-			dto = fetchSentinel(latest, bk, pre)
-			if dto.IncrementCount != nil {
-				incrementCount = *dto.IncrementCount + 1
+			sentinelDto = fetchSentinel(latest, bk, pre)
+			if sentinelDto.IncrementCount != nil {
+				incrementCount = *sentinelDto.IncrementCount + 1
 			}
 
 			if incrementCount > maxDeltas {
 				fmt.Println("Reached max delta steps. Doing full backup.")
-				dto = S3TarBallSentinelDto{}
-			} else if dto.LSN == nil {
+				sentinelDto = S3TarBallSentinelDto{}
+			} else if sentinelDto.LSN == nil {
 				fmt.Println("LATEST backup was made without support for delta feature. Fallback to full backup with LSN marker for future deltas.")
 			} else {
 				if fromFull {
 					fmt.Println("Delta will be made from full backup.")
-					latest = *dto.IncrementFullName
-					dto = fetchSentinel(latest, bk, pre)
+					latest = *sentinelDto.IncrementFullName
+					sentinelDto = fetchSentinel(latest, bk, pre)
 				}
-				fmt.Printf("Delta backup from %v with LSN %x. \n", latest, *dto.LSN)
+				fmt.Printf("Delta backup from %v with LSN %x. \n", latest, *sentinelDto.LSN)
 			}
 		}
 	}
 
 	bundle := &Bundle{
 		MinSize:            int64(1000000000), //MINSIZE = 1GB
-		IncrementFromLsn:   dto.LSN,
-		IncrementFromFiles: dto.Files,
+		IncrementFromLsn:   sentinelDto.LSN,
+		IncrementFromFiles: sentinelDto.Files,
 		Files:              &sync.Map{},
 	}
-	if dto.Files == nil {
+	if sentinelDto.Files == nil {
 		bundle.IncrementFromFiles = make(map[string]BackupFileDescription)
 	}
 
@@ -376,24 +376,24 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 		log.Fatalf("%+v\n", err)
 	}
 
-	if len(latest) > 0 && dto.LSN != nil {
+	if len(latest) > 0 && sentinelDto.LSN != nil {
 		name = name + "_D_" + stripWalFileName(latest)
 	}
 
 	// Start a new tar bundle and walk the DIRARC directory and upload to S3.
-	bundle.Tbm = &S3TarBallMaker{
+	bundle.TarBallMaker = &S3TarBallMaker{
 		BaseDir:          filepath.Base(dirArc),
 		Trim:             dirArc,
 		BkupName:         name,
-		Tu:               tu,
+		TarUploader:      tu,
 		Lsn:              &lsn,
-		IncrementFromLsn: dto.LSN,
+		IncrementFromLsn: sentinelDto.LSN,
 		IncrementFrom:    latest,
 	}
 
 	bundle.StartQueue()
 	fmt.Println("Walking ...")
-	err = filepath.Walk(dirArc, bundle.TarWalker)
+	err = filepath.Walk(dirArc, bundle.TarWalk)
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
@@ -418,14 +418,14 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 	if !timelineChanged {
 		sentinel = &S3TarBallSentinelDto{
 			LSN:              &lsn,
-			IncrementFromLSN: dto.LSN,
+			IncrementFromLSN: sentinelDto.LSN,
 			PgVersion:        pgVersion,
 		}
-		if dto.LSN != nil {
+		if sentinelDto.LSN != nil {
 			sentinel.IncrementFrom = &latest
 			sentinel.IncrementFullName = &latest
-			if dto.IsIncremental() {
-				sentinel.IncrementFullName = dto.IncrementFullName
+			if sentinelDto.IsIncremental() {
+				sentinel.IncrementFullName = sentinelDto.IncrementFullName
 			}
 			sentinel.IncrementCount = &incrementCount
 		}
@@ -435,14 +435,14 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *Prefix) {
 	}
 
 	// Wait for all uploads to finish.
-	err = bundle.Tb.Finish(sentinel)
+	err = bundle.TarBall.Finish(sentinel)
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
 }
 
 // HandleWALFetch is invoked to performa wal-g wal-fetch
-func HandleWALFetch(pre *Prefix, walFileName string, location string, triggerPrefetch bool) {
+func HandleWALFetch(pre *S3Prefix, walFileName string, location string, triggerPrefetch bool) {
 	location = ResolveSymlink(location)
 	if triggerPrefetch {
 		defer forkPrefetch(walFileName, location)
@@ -514,7 +514,7 @@ func checkWALFileMagic(prefetched string) error {
 }
 
 // DownloadWALFile downloads a file and writes it to local file
-func DownloadWALFile(pre *Prefix, walFileName string, location string) {
+func DownloadWALFile(pre *S3Prefix, walFileName string, location string) {
 	a := &Archive{
 		Prefix:  pre,
 		Archive: aws.String(sanitizePath(*pre.Server + "/wal_005/" + walFileName + ".lzo")),
@@ -596,7 +596,7 @@ func DownloadWALFile(pre *Prefix, walFileName string, location string) {
 }
 
 // HandleWALPush is invoked to perform wal-g wal-push
-func HandleWALPush(tu *TarUploader, dirArc string, pre *Prefix, verify bool) {
+func HandleWALPush(tu *TarUploader, dirArc string, pre *S3Prefix, verify bool) {
 	bu := BgUploader{}
 	// Look for new WALs while doing main upload
 	bu.Start(dirArc, int32(getMaxUploadConcurrency(16)-1), tu, pre, verify)
@@ -607,7 +607,7 @@ func HandleWALPush(tu *TarUploader, dirArc string, pre *Prefix, verify bool) {
 }
 
 // UploadWALFile from FS to the cloud
-func UploadWALFile(tu *TarUploader, dirArc string, pre *Prefix, verify bool) {
+func UploadWALFile(tu *TarUploader, dirArc string, pre *S3Prefix, verify bool) {
 	path, err := tu.UploadWal(dirArc, pre, verify)
 	if re, ok := err.(Lz4Error); ok {
 		log.Fatalf("FATAL: could not upload '%s' due to compression error.\n%+v\n", path, re)

@@ -81,7 +81,7 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 	return
 }
 
-func deleteBeforeTarget(target string, bk *Backup, pre *Prefix, findFull bool, backups []BackupTime, dryRun bool) {
+func deleteBeforeTarget(target string, bk *Backup, pre *S3Prefix, findFull bool, backups []BackupTime, dryRun bool) {
 	dto := fetchSentinel(target, bk, pre)
 	if dto.IsIncremental() {
 		if findFull {
@@ -122,7 +122,7 @@ func deleteBeforeTarget(target string, bk *Backup, pre *Prefix, findFull bool, b
 	}
 }
 
-func deleteBackupsBefore(backups []BackupTime, skipline int, pre *Prefix) {
+func deleteBackupsBefore(backups []BackupTime, skipline int, pre *S3Prefix) {
 	for i, b := range backups {
 		if i > skipline {
 			dropBackup(pre, b)
@@ -130,7 +130,7 @@ func deleteBackupsBefore(backups []BackupTime, skipline int, pre *Prefix) {
 	}
 }
 
-func dropBackup(pre *Prefix, b BackupTime) {
+func dropBackup(pre *S3Prefix, b BackupTime) {
 	var bk = &Backup{
 		Prefix: pre,
 		Path:   GetBackupPath(pre),
@@ -141,7 +141,7 @@ func dropBackup(pre *Prefix, b BackupTime) {
 		log.Fatal("Unable to list backup for deletion ", b.Name, err)
 	}
 
-	folderKey := strings.TrimPrefix(*pre.Server+"/basebackups_005/"+b.Name, "/")
+	folderKey := strings.TrimPrefix(*pre.Server+BaseBackupsPath+b.Name, "/")
 	suffixKey := folderKey + SentinelSuffix
 
 	keys := append(tarFiles, suffixKey, folderKey)
@@ -167,7 +167,7 @@ func partitionToObjects(keys []string) []*s3.ObjectIdentifier {
 	return objs
 }
 
-func deleteWALBefore(bt BackupTime, pre *Prefix) {
+func deleteWALBefore(bt BackupTime, pre *S3Prefix) {
 	var bk = &Backup{
 		Prefix: pre,
 		Path:   aws.String(sanitizePath(*pre.Server + "/wal_005/")),

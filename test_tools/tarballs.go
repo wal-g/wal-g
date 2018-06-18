@@ -71,7 +71,7 @@ func (fb *FileTarBall) CloseTar() error {
 }
 
 // Finish alerts that compression is complete.
-func (fb *FileTarBall) Finish(sentinel *walg.S3TarBallSentinelDto) error {
+func (fb *FileTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error {
 	fmt.Printf("Wrote %d compressed tar files to %s.\n", fb.number, fb.out)
 	return nil
 }
@@ -97,7 +97,7 @@ type NOPTarBall struct {
 
 func (n *NOPTarBall) SetUp(crypter walg.Crypter, params ...string) {}
 func (n *NOPTarBall) CloseTar() error                              { return nil }
-func (n *NOPTarBall) Finish(sentinel *walg.S3TarBallSentinelDto) error {
+func (n *NOPTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error {
 	fmt.Printf("NOP: %d files.\n", n.number)
 	return nil
 }

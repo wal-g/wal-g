@@ -16,21 +16,21 @@ func TestS3TarBall(t *testing.T) {
 		MinSize: int64(10),
 	}
 
-	bundle.Tbm = &walg.S3TarBallMaker{
-		BaseDir:  "tmp",
-		Trim:     "/usr/local",
-		BkupName: "test",
-		Tu:       walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region"),
+	bundle.TarBallMaker = &walg.S3TarBallMaker{
+		BaseDir:     "tmp",
+		Trim:        "/usr/local",
+		BkupName:    "test",
+		TarUploader: walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region"),
 	}
 
 	bundle.NewTarBall(false)
 	tarBallCounter += 1
 
-	if bundle.Tb == nil {
+	if bundle.TarBall == nil {
 		t.Errorf("make: Did not successfully create a new tarball.")
 	}
 
-	tarBall := bundle.Tb
+	tarBall := bundle.TarBall
 
 	if tarBall.BaseDir() != "tmp" {
 		t.Errorf("make: Expected base directory to be '%s' but got '%s'", "tmp", tarBall.BaseDir())
@@ -44,8 +44,8 @@ func TestS3TarBall(t *testing.T) {
 		t.Errorf("make: S3TarBall expected NOP to be false but got %v", tarBall.Nop())
 	}
 
-	if tarBall.Number() != tarBallCounter {
-		t.Errorf("make: Expected tarball number to be %d but got %d", tarBallCounter, tarBall.Number())
+	if tarBall.PartCount() != tarBallCounter {
+		t.Errorf("make: Expected tarball number to be %d but got %d", tarBallCounter, tarBall.PartCount())
 	}
 
 	if tarBall.Size() != 0 {
@@ -59,19 +59,19 @@ func TestS3TarBall(t *testing.T) {
 		t.Errorf("make: Tarball size expected to increase to %d but got %d", increase, tarBall.Size())
 	}
 
-	if tarBall.Tw() != nil {
+	if tarBall.TarWriter() != nil {
 		t.Errorf("make: Tarball writer should not be set up without calling SetUp()")
 	}
 
 	bundle.NewTarBall(false)
 	tarBallCounter += 1
 
-	if tarBall == bundle.Tb {
+	if tarBall == bundle.TarBall {
 		t.Errorf("make: Did not successfully create a new tarball")
 	}
 
-	if bundle.Tb.Number() != tarBallCounter {
-		t.Errorf("make: Expected tarball number to increase to %d but got %d", tarBallCounter, tarBall.Number())
+	if bundle.TarBall.PartCount() != tarBallCounter {
+		t.Errorf("make: Expected tarball number to increase to %d but got %d", tarBallCounter, tarBall.PartCount())
 	}
 
 }
@@ -84,19 +84,19 @@ func TestS3DependentFunctions(t *testing.T) {
 	}
 
 	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region")
-	tu.Upl = &mockS3Uploader{}
+	tu.UploaderApi = &mockS3Uploader{}
 
-	bundle.Tbm = &walg.S3TarBallMaker{
-		BaseDir:  "mockDirectory",
-		Trim:     "",
-		BkupName: "mockBackup",
-		Tu:       tu,
+	bundle.TarBallMaker = &walg.S3TarBallMaker{
+		BaseDir:     "mockDirectory",
+		Trim:        "",
+		BkupName:    "mockBackup",
+		TarUploader: tu,
 	}
 
 	bundle.NewTarBall(false)
-	tarBall := bundle.Tb
+	tarBall := bundle.TarBall
 	tarBall.SetUp(walg.MockArmedCrypter())
-	tarWriter := tarBall.Tw()
+	tarWriter := tarBall.TarWriter()
 
 	one := []byte("a")
 
@@ -119,7 +119,7 @@ func TestS3DependentFunctions(t *testing.T) {
 	tarBall.CloseTar()
 
 	// Handle write after close.
-	_, err = tarBall.Tw().Write(one)
+	_, err = tarBall.TarWriter().Write(one)
 	if err == nil {
 		t.Errorf("structs: expected WriteAfterClose error but got '<nil>'")
 	}
@@ -131,7 +131,7 @@ func TestS3DependentFunctions(t *testing.T) {
 
 	// Test naming property of SetUp().
 	bundle.NewTarBall(false)
-	tarBall = bundle.Tb
+	tarBall = bundle.TarBall
 	tarBall.SetUp(walg.MockArmedCrypter(), "mockTarball")
 	tarBall.CloseTar()
 	err = tarBall.Finish(&walg.S3TarBallSentinelDto{})
@@ -148,13 +148,13 @@ func TestEmptyBundleQueue(t *testing.T) {
 	}
 
 	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region")
-	tu.Upl = &mockS3Uploader{}
+	tu.UploaderApi = &mockS3Uploader{}
 
-	bundle.Tbm = &walg.S3TarBallMaker{
-		BaseDir:  "mockDirectory",
-		Trim:     "",
-		BkupName: "mockBackup",
-		Tu:       tu,
+	bundle.TarBallMaker = &walg.S3TarBallMaker{
+		BaseDir:     "mockDirectory",
+		Trim:        "",
+		BkupName:    "mockBackup",
+		TarUploader: tu,
 	}
 
 	bundle.StartQueue()
@@ -194,12 +194,12 @@ func queueTest(t *testing.T) {
 		MinSize: 100,
 	}
 	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region")
-	tu.Upl = &mockS3Uploader{}
-	bundle.Tbm = &walg.S3TarBallMaker{
-		BaseDir:  "mockDirectory",
-		Trim:     "",
-		BkupName: "mockBackup",
-		Tu:       tu,
+	tu.UploaderApi = &mockS3Uploader{}
+	bundle.TarBallMaker = &walg.S3TarBallMaker{
+		BaseDir:     "mockDirectory",
+		Trim:        "",
+		BkupName:    "mockBackup",
+		TarUploader: tu,
 	}
 
 	f := false
