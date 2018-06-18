@@ -29,15 +29,15 @@ func NewExpTicker(retries int, wait float64) *ExponentialTicker {
 // Update increases running count of retries by 1 and
 // exponentially increases the wait time until the
 // max wait time is reached.
-func (et *ExponentialTicker) Update() {
-	if et.wait < et.MaxWait {
+func (ticker *ExponentialTicker) Update() {
+	if ticker.wait < ticker.MaxWait {
 		rand.Seed(time.Now().UTC().UnixNano())
-		et.wait = math.Exp2(float64(et.retries)) + rand.Float64()
+		ticker.wait = math.Exp2(float64(ticker.retries)) + rand.Float64()
 	}
-	et.retries++
+	ticker.retries++
 }
 
 // Sleep will wait in seconds.
-func (et *ExponentialTicker) Sleep() {
-	time.Sleep(time.Duration(et.wait) * time.Second)
+func (ticker *ExponentialTicker) Sleep() {
+	time.Sleep(time.Duration(ticker.wait) * time.Second)
 }

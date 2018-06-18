@@ -7,3 +7,5 @@ type BackupFileDescription struct {
 	IsSkipped     bool
 	MTime         time.Time
 }
+
+type BackupFileList map[string]BackupFileDescription

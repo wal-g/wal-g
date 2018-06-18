@@ -53,8 +53,6 @@ func Connect() (*pgx.Conn, error) {
 	return conn, nil
 }
 
-const backupNamePrefix = "base_"
-
 // FormatName grabs the name of the WAL file and returns it in the form of `base_...`.
 // If no match is found, returns an empty string and a `NoMatchAvailableError`.
 func FormatName(s string) (string, error) {

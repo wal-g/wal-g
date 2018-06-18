@@ -19,7 +19,6 @@ type FileTarBall struct {
 	out     string
 	number  int
 	size    int64
-	nop     bool
 	w       io.WriteCloser
 	tw      *tar.Writer
 }
@@ -78,18 +77,16 @@ func (fb *FileTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error {
 
 func (fb *FileTarBall) BaseDir() string { return fb.baseDir }
 func (fb *FileTarBall) Trim() string    { return fb.trim }
-func (fb *FileTarBall) Nop() bool       { return fb.nop }
-func (fb *FileTarBall) Number() int     { return fb.number }
+func (fb *FileTarBall) PartCount() int     { return fb.number }
 func (fb *FileTarBall) Size() int64     { return fb.size }
 func (fb *FileTarBall) AddSize(i int64) { fb.size += i }
-func (fb *FileTarBall) Tw() *tar.Writer { return fb.tw }
+func (fb *FileTarBall) TarWriter() *tar.Writer { return fb.tw }
 func (b *FileTarBall) AwaitUploads()    {}
 
 // NOPTarBall mocks a tarball. Used for testing purposes.
 type NOPTarBall struct {
 	baseDir string
 	trim    string
-	nop     bool
 	number  int
 	size    int64
 	tw      *tar.Writer
@@ -104,9 +101,8 @@ func (n *NOPTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error {
 
 func (n *NOPTarBall) BaseDir() string { return n.baseDir }
 func (n *NOPTarBall) Trim() string    { return n.trim }
-func (n *NOPTarBall) Nop() bool       { return n.nop }
-func (n *NOPTarBall) Number() int     { return n.number }
+func (n *NOPTarBall) PartCount() int     { return n.number }
 func (n *NOPTarBall) Size() int64     { return n.size }
 func (n *NOPTarBall) AddSize(i int64) { n.size += i }
-func (n *NOPTarBall) Tw() *tar.Writer { return n.tw }
+func (n *NOPTarBall) TarWriter() *tar.Writer { return n.tw }
 func (b *NOPTarBall) AwaitUploads()   {}

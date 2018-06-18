@@ -34,7 +34,6 @@ type NOPTarBallMaker struct {
 	size    int64
 	BaseDir string
 	Trim    string
-	Nop     bool
 }
 
 // Make creates a new NOPTarBall.
@@ -44,7 +43,6 @@ func (n *NOPTarBallMaker) Make(inheritState bool) walg.TarBall {
 		number:  n.number,
 		size:    n.size,
 		baseDir: n.BaseDir,
-		nop:     n.Nop,
 		trim:    n.Trim,
 	}
 }

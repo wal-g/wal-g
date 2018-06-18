@@ -44,7 +44,6 @@ func main() {
 		bundle.TarBallMaker = &tools.NOPTarBallMaker{
 			BaseDir: filepath.Base(in),
 			Trim:    in,
-			Nop:     true,
 		}
 	} else if !s3 && outDir == "" {
 		fmt.Printf("Please provide a directory to write to.\n")

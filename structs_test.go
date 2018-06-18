@@ -40,10 +40,6 @@ func TestS3TarBall(t *testing.T) {
 		t.Errorf("make: Expected trim to be '%s' but got '%s'", "/usr/local", tarBall.Trim())
 	}
 
-	if tarBall.Nop() {
-		t.Errorf("make: S3TarBall expected NOP to be false but got %v", tarBall.Nop())
-	}
-
 	if tarBall.PartCount() != tarBallCounter {
 		t.Errorf("make: Expected tarball number to be %d but got %d", tarBallCounter, tarBall.PartCount())
 	}

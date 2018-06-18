@@ -80,7 +80,7 @@ func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify boo
 
 	lz.Compress(&OpenPGPCrypter{})
 
-	p := sanitizePath(tarUploader.server + "/wal_005/" + filepath.Base(path) + ".lz4")
+	p := sanitizePath(tarUploader.server + WalPath + filepath.Base(path) + ".lz4")
 	reader := lz.Output
 
 	if verify {
@@ -99,7 +99,7 @@ func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify boo
 	tarUploader.Finish()
 	fmt.Println("WAL PATH:", p)
 	if verify {
-		sum := reader.(*md5Reader).Sum()
+		sum := reader.(*MD5Reader).Sum()
 		a := &Archive{
 			Prefix:  pre,
 			Archive: aws.String(p),

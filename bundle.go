@@ -182,7 +182,7 @@ func (bundle *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName str
 // and creates compressed tar members labeled as `part_00i.tar.lzo`.
 //
 // To see which files and directories are Skipped, please consult
-// 'structs.go'. Excluded directories will be created but their
+// ExcludedFilenames. Excluded directories will be created but their
 // contents will not be included in the tar bundle.
 func (bundle *Bundle) TarWalk(path string, info os.FileInfo, err error) error {
 	if err != nil {

@@ -19,7 +19,6 @@ type S3TarBall struct {
 	baseDir          string
 	trim             string
 	bkupName         string
-	nop              bool
 	partCount        int
 	size             int64
 	writeCloser      io.WriteCloser
@@ -115,7 +114,6 @@ func (tarBall *S3TarBall) BaseDir() string { return tarBall.baseDir }
 func (tarBall *S3TarBall) Trim() string { return tarBall.trim }
 
 // Nop is a dummy fonction for test purposes
-func (tarBall *S3TarBall) Nop() bool      { return tarBall.nop }
 func (tarBall *S3TarBall) PartCount() int { return tarBall.partCount }
 
 // Size accumulated in this tarball

@@ -9,6 +9,13 @@ import (
 	"strings"
 )
 
+const DeleteUsageText = "delete requires at least 2 parameters" + `
+		retain 5                      keep 5 backups
+		retain FULL 5                 keep 5 full backups and all deltas of them
+		retail FIND_FULL 5            find necessary full for 5th and keep everything after it
+		before base_0123              keep everything after base_0123 including itself
+		before FIND_FULL base_0123    keep everything after the base of base_0123`
+
 // DeleteCommandArguments incapsulates arguments for delete command
 type DeleteCommandArguments struct {
 	full       bool
@@ -170,7 +177,7 @@ func partitionToObjects(keys []string) []*s3.ObjectIdentifier {
 func deleteWALBefore(bt BackupTime, pre *S3Prefix) {
 	var bk = &Backup{
 		Prefix: pre,
-		Path:   aws.String(sanitizePath(*pre.Server + "/wal_005/")),
+		Path:   aws.String(sanitizePath(*pre.Server + WalPath)),
 	}
 
 	objects, err := bk.GetWals(bt.WalFileName)
@@ -189,14 +196,6 @@ func deleteWALBefore(bt BackupTime, pre *S3Prefix) {
 	}
 }
 
-// DeleteUsage is a text message explaining how to use delete
-var DeleteUsage = "delete requires at least 2 parameters" + `
-		retain 5                      keep 5 backups
-		retain FULL 5                 keep 5 full backups and all deltas of them
-		retail FIND_FULL 5            find necessary full for 5th and keep everything after it
-		before base_0123              keep everything after base_0123 including itself
-		before FIND_FULL base_0123    keep everything after the base of base_0123`
-
 func printDeleteUsageAndFail() {
-	log.Fatal(DeleteUsage)
+	log.Fatal(DeleteUsageText)
 }

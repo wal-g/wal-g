@@ -517,7 +517,7 @@ func checkWALFileMagic(prefetched string) error {
 func DownloadWALFile(pre *S3Prefix, walFileName string, location string) {
 	a := &Archive{
 		Prefix:  pre,
-		Archive: aws.String(sanitizePath(*pre.Server + "/wal_005/" + walFileName + ".lzo")),
+		Archive: aws.String(sanitizePath(*pre.Server + WalPath + walFileName + ".lzo")),
 	}
 	// Check existence of compressed LZO WAL file
 	exists, err := a.CheckExistence()
@@ -552,7 +552,7 @@ func DownloadWALFile(pre *S3Prefix, walFileName string, location string) {
 		f.Close()
 	} else if !exists {
 		// Check existence of compressed LZ4 WAL file
-		a.Archive = aws.String(sanitizePath(*pre.Server + "/wal_005/" + walFileName + ".lz4"))
+		a.Archive = aws.String(sanitizePath(*pre.Server + WalPath + walFileName + ".lz4"))
 		exists, err = a.CheckExistence()
 		if err != nil {
 			log.Fatalf("%+v\n", err)
@@ -607,8 +607,8 @@ func HandleWALPush(tu *TarUploader, dirArc string, pre *S3Prefix, verify bool) {
 }
 
 // UploadWALFile from FS to the cloud
-func UploadWALFile(tu *TarUploader, dirArc string, pre *S3Prefix, verify bool) {
-	path, err := tu.UploadWal(dirArc, pre, verify)
+func UploadWALFile(tarUploader *TarUploader, dirArc string, pre *S3Prefix, verify bool) {
+	path, err := tarUploader.UploadWal(dirArc, pre, verify)
 	if re, ok := err.(Lz4Error); ok {
 		log.Fatalf("FATAL: could not upload '%s' due to compression error.\n%+v\n", path, re)
 	} else if err != nil {

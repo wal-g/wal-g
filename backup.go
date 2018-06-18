@@ -13,9 +13,6 @@ import (
 )
 
 
-const BaseBackupsPath = "/basebackups_005/"
-
-
 // ErrLatestNotFound happens when users asks backup-fetch LATEST, but there is no backups
 var ErrLatestNotFound = errors.New("No backups found")
 

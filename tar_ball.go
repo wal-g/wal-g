@@ -10,7 +10,6 @@ type TarBall interface {
 	Finish(sentinelDto *S3TarBallSentinelDto) error
 	BaseDir() string
 	Trim() string
-	Nop() bool
 	PartCount() int
 	Size() int64
 	AddSize(int64)
