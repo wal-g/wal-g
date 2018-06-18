@@ -55,19 +55,19 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 		return nil, nil, &UnsetEnvVarError{names: []string{"WALE_S3_PREFIX"}}
 	}
 
-	u, err := url.Parse(waleS3Prefix)
+	url, err := url.Parse(waleS3Prefix)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "Configure: failed to parse url '%s'", waleS3Prefix)
 	}
-	if u.Scheme == "" || u.Host == "" {
-		return nil, nil, fmt.Errorf("Missing url scheme=%q and/or host=%q", u.Scheme, u.Host)
+	if url.Scheme == "" || url.Host == "" {
+		return nil, nil, fmt.Errorf("Missing url scheme=%q and/or host=%q", url.Scheme, url.Host)
 	}
 
-	bucket := u.Host
+	bucket := url.Host
 	var server = ""
-	if len(u.Path) > 0 {
+	if len(url.Path) > 0 {
 		// TODO: Unchecked assertion: first char is '/'
-		server = u.Path[1:]
+		server = url.Path[1:]
 	}
 
 	if len(server) > 0 && server[len(server)-1] == '/' {
@@ -117,22 +117,22 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 
 	pre.Svc = s3.New(sess)
 
-	upload := NewTarUploader(pre.Svc, bucket, server, region)
+	uploader := NewTarUploader(pre.Svc, bucket, server, region)
 
 	var con = getMaxUploadConcurrency(10)
 	storageClass, ok := os.LookupEnv("WALG_S3_STORAGE_CLASS")
 	if ok {
-		upload.StorageClass = storageClass
+		uploader.StorageClass = storageClass
 	}
 
 	serverSideEncryption, ok := os.LookupEnv("WALG_S3_SSE")
 	if ok {
-		upload.ServerSideEncryption = serverSideEncryption
+		uploader.ServerSideEncryption = serverSideEncryption
 	}
 
 	sseKmsKeyId, ok := os.LookupEnv("WALG_S3_SSE_KMS_ID")
 	if ok {
-		upload.SSEKMSKeyId = sseKmsKeyId
+		uploader.SSEKMSKeyId = sseKmsKeyId
 	}
 
 	// Only aws:kms implies sseKmsKeyId
@@ -140,9 +140,9 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 		return nil, nil, errors.New("Configure: WALG_S3_SSE_KMS_ID must be set iff using aws:kms encryption")
 	}
 
-	upload.UploaderApi = CreateUploader(pre.Svc, 20*1024*1024, con) //default 10 concurrency streams at 20MB
+	uploader.UploaderApi = CreateUploader(pre.Svc, 20*1024*1024, con) //default 10 concurrency streams at 20MB
 
-	return upload, pre, err
+	return uploader, pre, err
 }
 
 // CreateUploader returns an uploader with customizable concurrency

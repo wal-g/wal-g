@@ -5,7 +5,6 @@ import (
 	"golang.org/x/crypto/openpgp"
 )
 
-
 // DelayWriteCloser delays first writes.
 // Encryption starts writing header immediately.
 // But there is a lot of places where writer is instantiated long before pipe

@@ -118,7 +118,7 @@ func main() {
 
 	// Configure and start S3 session with bucket, region, and path names.
 	// Checks that environment variables are properly set.
-	tu, pre, err := walg.Configure()
+	tarUploader, pre, err := walg.Configure()
 	if err != nil {
 		log.Fatalf("FATAL: %+v\n", err)
 	}
@@ -133,9 +133,9 @@ func main() {
 		walg.HandleWALPrefetch(pre, firstArgument, backupName)
 	} else if command == "wal-push" {
 		// Upload a WAL file to S3.
-		walg.HandleWALPush(tu, firstArgument, pre, verify)
+		walg.HandleWALPush(tarUploader, firstArgument, pre, verify)
 	} else if command == "backup-push" {
-		walg.HandleBackupPush(firstArgument, tu, pre)
+		walg.HandleBackupPush(firstArgument, tarUploader, pre)
 	} else if command == "backup-fetch" {
 		walg.HandleBackupFetch(backupName, pre, firstArgument, mem)
 	} else if command == "backup-list" {

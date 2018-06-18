@@ -49,6 +49,7 @@ func (archive *Archive) GetETag() (*string, error) {
 
 	return h.ETag, nil
 }
+
 // GetArchive downloads the specified archive from S3.
 func (archive *Archive) GetArchive() (io.ReadCloser, error) {
 	input := &s3.GetObjectInput{

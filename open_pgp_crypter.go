@@ -35,7 +35,6 @@ func (crypter *OpenPGPCrypter) ConfigureGPGCrypter() {
 	crypter.armed = len(crypter.keyRingId) != 0
 }
 
-
 // ErrCrypterUseMischief happens when crypter is used before initialization
 var ErrCrypterUseMischief = errors.New("Crypter is not checked before use")
 

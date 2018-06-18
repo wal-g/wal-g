@@ -261,7 +261,7 @@ func unwrapBackup(bk *Backup, dirArc string, pre *S3Prefix, sentinelDto S3TarBal
 	match := re.FindString(*bk.Name)
 	if match == "" || sentinelDto.IsIncremental() {
 		// Extract pg_control last. If pg_control does not exist, program exits with error code 1.
-		name := *bk.Path + *bk.Name + "/tar_partitions/pg_control.tar.lz4"
+		name := *bk.Path + *bk.Name + "/tar_partitions/pg_control.tar." + Lz4FileExtension
 		pgControl := &Archive{
 			Prefix:  pre,
 			Archive: aws.String(name),
@@ -552,7 +552,7 @@ func DownloadWALFile(pre *S3Prefix, walFileName string, location string) {
 		f.Close()
 	} else if !exists {
 		// Check existence of compressed LZ4 WAL file
-		a.Archive = aws.String(sanitizePath(*pre.Server + WalPath + walFileName + ".lz4"))
+		a.Archive = aws.String(sanitizePath(*pre.Server + WalPath + walFileName + "." + Lz4FileExtension))
 		exists, err = a.CheckExistence()
 		if err != nil {
 			log.Fatalf("%+v\n", err)
@@ -596,12 +596,12 @@ func DownloadWALFile(pre *S3Prefix, walFileName string, location string) {
 }
 
 // HandleWALPush is invoked to perform wal-g wal-push
-func HandleWALPush(tu *TarUploader, dirArc string, pre *S3Prefix, verify bool) {
+func HandleWALPush(tarUploader *TarUploader, dirArc string, pre *S3Prefix, verify bool) {
 	bu := BgUploader{}
 	// Look for new WALs while doing main upload
-	bu.Start(dirArc, int32(getMaxUploadConcurrency(16)-1), tu, pre, verify)
+	bu.Start(dirArc, int32(getMaxUploadConcurrency(16)-1), tarUploader, pre, verify)
 
-	UploadWALFile(tu, dirArc, pre, verify)
+	UploadWALFile(tarUploader, dirArc, pre, verify)
 
 	bu.Stop()
 }

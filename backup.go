@@ -12,7 +12,6 @@ import (
 	"strings"
 )
 
-
 // ErrLatestNotFound happens when users asks backup-fetch LATEST, but there is no backups
 var ErrLatestNotFound = errors.New("No backups found")
 
@@ -66,37 +65,6 @@ func (backup *Backup) GetBackups() ([]BackupTime, error) {
 	sortTimes = GetBackupTimeSlices(backups)
 
 	return sortTimes, nil
-}
-
-// GetBackupTimeSlices converts S3 objects to backup description
-func GetBackupTimeSlices(backups []*s3.Object) []BackupTime {
-	sortTimes := make([]BackupTime, len(backups))
-	for i, ob := range backups {
-		key := *ob.Key
-		time := *ob.LastModified
-		sortTimes[i] = BackupTime{stripNameBackup(key), time, stripWalFileName(key)}
-	}
-	slice := TimeSlice(sortTimes)
-	sort.Sort(slice)
-	return slice
-}
-
-// Strips the backup key and returns it in its base form `base_...`.
-func stripNameBackup(key string) string {
-	all := strings.SplitAfter(key, "/")
-	name := strings.Split(all[len(all)-1], "_backup")[0]
-	return name
-}
-
-// Strips the backup WAL file name.
-func stripWalFileName(key string) string {
-	name := stripNameBackup(key)
-	name = strings.SplitN(name, "_D_", 2)[0]
-
-	if strings.HasPrefix(name, backupNamePrefix) {
-		return name[len(backupNamePrefix):]
-	}
-	return ""
 }
 
 // CheckExistence checks that the specified backup exists.
@@ -175,14 +143,42 @@ func (backup *Backup) GetWals(before string) ([]*s3.ObjectIdentifier, error) {
 	return arr, nil
 }
 
-func stripWalName(key string) string {
+// GetBackupTimeSlices converts S3 objects to backup description
+func GetBackupTimeSlices(backups []*s3.Object) []BackupTime {
+	sortTimes := make([]BackupTime, len(backups))
+	for i, ob := range backups {
+		key := *ob.Key
+		time := *ob.LastModified
+		sortTimes[i] = BackupTime{stripNameBackup(key), time, stripWalFileName(key)}
+	}
+	slice := TimeSlice(sortTimes)
+	sort.Sort(slice)
+	return slice
+}
+
+// Strips the backup key and returns it in its base form `base_...`.
+func stripNameBackup(key string) string {
 	all := strings.SplitAfter(key, "/")
-	name := strings.Split(all[len(all)-1], ".")[0]
+	name := strings.Split(all[len(all)-1], "_backup")[0]
 	return name
 }
 
-// SentinelSuffix is a suffix of backup finish sentinel file
-const SentinelSuffix = "_backup_stop_sentinel.json"
+// Strips the backup WAL file name.
+func stripWalFileName(key string) string {
+	name := stripNameBackup(key)
+	name = strings.SplitN(name, "_D_", 2)[0]
+
+	if strings.HasPrefix(name, backupNamePrefix) {
+		return name[len(backupNamePrefix):]
+	}
+	return ""
+}
+
+func stripWalName(path string) string {
+	all := strings.SplitAfter(path, "/")
+	name := strings.Split(all[len(all)-1], ".")[0]
+	return name
+}
 
 func fetchSentinel(backupName string, bk *Backup, pre *S3Prefix) (dto S3TarBallSentinelDto) {
 	latestSentinel := backupName + SentinelSuffix
@@ -212,8 +208,4 @@ func GetBackupPath(prefix *S3Prefix) *string {
 	path := *prefix.Server + BaseBackupsPath
 	server := sanitizePath(path)
 	return aws.String(server)
-}
-
-func sanitizePath(path string) string {
-	return strings.TrimLeft(path, "/")
 }

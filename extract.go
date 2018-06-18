@@ -6,7 +6,6 @@ import (
 	"io"
 )
 
-
 // EmptyWriteIgnorer handles 0 byte write in LZ4 package
 // to stop pipe reader/writer from blocking.
 type EmptyWriteIgnorer struct {
@@ -69,7 +68,7 @@ func tarHandler(writeCloser io.WriteCloser, readerMaker ReaderMaker, crypter Cry
 		if err != nil {
 			return errors.Wrap(err, "ExtractAll: lzo decompress failed. Is archive encrypted?")
 		}
-	} else if readerMaker.Format() == "lz4" {
+	} else if readerMaker.Format() == Lz4FileExtension {
 		_, err = DecompressLz4(writeCloser, r)
 		if err != nil {
 			return errors.Wrap(err, "ExtractAll: lz4 decompress failed. Is archive encrypted?")

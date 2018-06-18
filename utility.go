@@ -7,14 +7,29 @@ import (
 	"path/filepath"
 	"strconv"
 	"encoding/json"
+	"strings"
 )
 
 const (
-	VersionStr = "005"
-	BaseBackupsPath = "/basebackups_" + VersionStr + "/"
-	WalPath = "/wal_" + VersionStr + "/"
+	VersionStr       = "005"
+	BaseBackupsPath  = "/basebackups_" + VersionStr + "/"
+	WalPath          = "/wal_" + VersionStr + "/"
 	backupNamePrefix = "base_"
+
+	// SentinelSuffix is a suffix of backup finish sentinel file
+	SentinelSuffix = "_backup_stop_sentinel.json"
 )
+
+// Empty is used for channel signaling.
+type Empty struct{}
+
+// NilWriter to /dev/null
+type NilWriter struct{}
+
+// Write to /dev/null
+func (nw *NilWriter) Write(p []byte) (n int, err error) {
+	return len(p), nil
+}
 
 func min(a, b int) int {
 	if a < b {
@@ -43,6 +58,9 @@ func contains(s *[]string, e string) bool {
 	return false
 }
 
+func sanitizePath(path string) string {
+	return strings.TrimLeft(path, "/")
+}
 
 func partition(a []string, b int) [][]string {
 	c := make([][]string, 0)
@@ -131,16 +149,4 @@ func getMaxConcurrency(key string, default_value int) int {
 		}
 	}
 	return max(con, 1)
-}
-
-
-// Empty is used for channel signaling.
-type Empty struct{}
-
-// NilWriter to /dev/null
-type NilWriter struct{}
-
-// Write to /dev/null
-func (nw *NilWriter) Write(p []byte) (n int, err error) {
-	return len(p), nil
 }

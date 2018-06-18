@@ -2,7 +2,6 @@ package walg
 
 import (
 	"encoding/binary"
-	"github.com/pierrec/lz4"
 	"github.com/pkg/errors"
 	"github.com/rasky/go-lzo"
 	"io"
@@ -131,16 +130,6 @@ func DecompressLzo(d io.Writer, s io.Reader) error {
 		}
 	}
 	return nil
-}
-
-// DecompressLz4 decompresses a .lz4 file. Returns an error upon failure.
-func DecompressLz4(d io.Writer, s io.Reader) (int64, error) {
-	lz := lz4.NewReader(s)
-	n, err := lz.WriteTo(d)
-	if err != nil {
-		return n, errors.Wrap(err, "DecompressLz4: lz4 write failed")
-	}
-	return n, nil
 }
 
 // ReadCascadeClose composes io.ReadCloser from two parts

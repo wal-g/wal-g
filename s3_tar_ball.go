@@ -40,7 +40,7 @@ func (tarBall *S3TarBall) SetUp(crypter Crypter, names ...string) {
 		if len(names) > 0 {
 			name = names[0]
 		} else {
-			name = "part_" + fmt.Sprintf("%0.3d", tarBall.partCount) + ".tar.lz4"
+			name = "part_" + fmt.Sprintf("%0.3d", tarBall.partCount) + ".tar." + Lz4FileExtension
 		}
 		writeCloser := tarBall.StartUpload(name, crypter)
 
@@ -48,6 +48,7 @@ func (tarBall *S3TarBall) SetUp(crypter Crypter, names ...string) {
 		tarBall.tarWriter = tar.NewWriter(writeCloser)
 	}
 }
+
 // CloseTar closes the tar writer, flushing any unwritten data
 // to the underlying writer before also closing the underlying writer.
 func (tarBall *S3TarBall) CloseTar() error {
@@ -70,22 +71,21 @@ func (tarBall *S3TarBall) AwaitUploads() {
 // StartUpload creates a lz4 writer and runs upload in the background once
 // a compressed tar member is finished writing.
 func (tarBall *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteCloser {
-	pr, pw := io.Pipe()
-	tupl := tarBall.tarUploader
+	pipeReader, pipeWriter := io.Pipe()
+	tarUploader := tarBall.tarUploader
 
-	path := tupl.server + BaseBackupsPath + tarBall.bkupName + "/tar_partitions/" + name
-	input := tupl.createUploadInput(path, pr)
+	path := tarUploader.server + BaseBackupsPath + tarBall.bkupName + "/tar_partitions/" + name
+	input := tarUploader.createUploadInput(path, pipeReader)
 
 	fmt.Printf("Starting part %d ...\n", tarBall.partCount)
 
-	tupl.waitGroup.Add(1)
+	tarUploader.waitGroup.Add(1)
 	go func() {
-		defer tupl.waitGroup.Done()
+		defer tarUploader.waitGroup.Done()
 
-		err := tupl.upload(input, path)
-		if re, ok := err.(Lz4Error); ok {
-
-			log.Printf("FATAL: could not upload '%s' due to compression error\n%+v\n", path, re)
+		err := tarUploader.upload(input, path)
+		if lz4Err, ok := err.(Lz4Error); ok {
+			log.Printf("FATAL: could not upload '%s' due to compression error\n%+v\n", path, lz4Err)
 		}
 		if err != nil {
 			log.Printf("upload: could not upload '%s'\n", path)
@@ -95,16 +95,16 @@ func (tarBall *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteClos
 	}()
 
 	if crypter.IsUsed() {
-		wc, err := crypter.Encrypt(pw)
+		writeCloser, err := crypter.Encrypt(pipeWriter)
 
 		if err != nil {
 			log.Fatal("upload: encryption error ", err)
 		}
 
-		return &Lz4CascadeClose2{lz4.NewWriter(wc), wc, pw}
+		return &Lz4CascadeCloser2{lz4.NewWriter(writeCloser), writeCloser, pipeWriter}
 	}
 
-	return &Lz4CascadeClose{lz4.NewWriter(pw), pw}
+	return &Lz4CascadeCloser{lz4.NewWriter(pipeWriter), pipeWriter}
 }
 
 // BaseDir of a backup
@@ -117,7 +117,8 @@ func (tarBall *S3TarBall) Trim() string { return tarBall.trim }
 func (tarBall *S3TarBall) PartCount() int { return tarBall.partCount }
 
 // Size accumulated in this tarball
-func (tarBall *S3TarBall) Size() int64     { return tarBall.size }
+func (tarBall *S3TarBall) Size() int64 { return tarBall.size }
+
 // AddSize to total Size
 func (tarBall *S3TarBall) AddSize(i int64)        { tarBall.size += i }
 func (tarBall *S3TarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }

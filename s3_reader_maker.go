@@ -15,8 +15,9 @@ type S3ReaderMaker struct {
 }
 
 func (readerMaker *S3ReaderMaker) Format() string { return readerMaker.FileFormat }
+
 // Path to file in bucket
-func (readerMaker *S3ReaderMaker) Path() string   { return *readerMaker.Key }
+func (readerMaker *S3ReaderMaker) Path() string { return *readerMaker.Key }
 
 // Reader creates a new S3 reader for each S3 object.
 func (readerMaker *S3ReaderMaker) Reader() (io.ReadCloser, error) {

@@ -41,6 +41,7 @@ type Bundle struct {
 }
 
 func (bundle *Bundle) GetFiles() *sync.Map { return bundle.Files }
+
 func (bundle *Bundle) StartQueue() {
 	if bundle.started {
 		panic("Trying to start already started Queue")
@@ -55,12 +56,14 @@ func (bundle *Bundle) StartQueue() {
 	}
 	bundle.started = true
 }
+
 func (bundle *Bundle) Deque() TarBall {
 	if !bundle.started {
 		panic("Trying to deque from not started Queue")
 	}
 	return <-bundle.tarballQueue
 }
+
 func (bundle *Bundle) FinishQueue() error {
 	if !bundle.started {
 		panic("Trying to stop not started Queue")
@@ -91,11 +94,13 @@ func (bundle *Bundle) FinishQueue() error {
 	}
 	return nil
 }
+
 func (bundle *Bundle) EnqueueBack(tarBall TarBall, parallelOpInProgress *bool) {
 	if !*parallelOpInProgress {
 		bundle.tarballQueue <- tarBall
 	}
 }
+
 func (bundle *Bundle) CheckSizeAndEnqueueBack(tarBall TarBall) error {
 	if tarBall.Size() > bundle.MinSize {
 		bundle.mutex.Lock()
@@ -128,7 +133,8 @@ func (bundle *Bundle) NewTarBall(dedicatedUploader bool) {
 }
 
 // GetIncrementBaseLsn returns LSN of previous backup
-func (bundle *Bundle) GetIncrementBaseLsn() *uint64          { return bundle.IncrementFromLsn }
+func (bundle *Bundle) GetIncrementBaseLsn() *uint64 { return bundle.IncrementFromLsn }
+
 // GetIncrementBaseFiles returns list of Files from previous backup
 func (bundle *Bundle) GetIncrementBaseFiles() BackupFileList { return bundle.IncrementFromFiles }
 
@@ -178,6 +184,7 @@ func (bundle *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName str
 	return "base_" + name, lsn, queryRunner.Version, nil
 
 }
+
 // TarWalk walks files provided by the passed in directory
 // and creates compressed tar members labeled as `part_00i.tar.lzo`.
 //
@@ -206,6 +213,7 @@ func (bundle *Bundle) TarWalk(path string, info os.FileInfo, err error) error {
 	}
 	return nil
 }
+
 // HandleSentinel uploads the compressed tar file of `pg_control`. Will only be called
 // after the rest of the backup is successfully uploaded to S3. Returns
 // an error upon failure.
@@ -216,7 +224,7 @@ func (bundle *Bundle) HandleSentinel() error {
 
 	bundle.NewTarBall(false)
 	tarBall := bundle.TarBall
-	tarBall.SetUp(&bundle.Crypter, "pg_control.tar.lz4")
+	tarBall.SetUp(&bundle.Crypter, "pg_control.tar." + Lz4FileExtension)
 	tarWriter := tarBall.TarWriter()
 
 	hdr, err := tar.FileInfoHeader(info, fileName)
@@ -259,6 +267,7 @@ func (bundle *Bundle) HandleSentinel() error {
 
 	return nil
 }
+
 // HandleLabelFiles creates the `backup_label` and `tablespace_map` Files and uploads
 // it to S3 by stopping the backup. Returns error upon failure.
 func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {

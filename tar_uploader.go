@@ -42,6 +42,7 @@ func NewTarUploader(svc s3iface.S3API, bucket, server, region string) *TarUpload
 		waitGroup:    &sync.WaitGroup{},
 	}
 }
+
 // Finish waits for all waiting parts to be uploaded. If an error occurs,
 // prints alert to stderr.
 func (tarUploader *TarUploader) Finish() {
@@ -74,13 +75,13 @@ func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify boo
 		return "", errors.Wrapf(err, "UploadWal: failed to open file %s\n", path)
 	}
 
-	lz := &LzPipeWriter{
+	lz := &Lz4PipeWriter{
 		Input: f,
 	}
 
 	lz.Compress(&OpenPGPCrypter{})
 
-	p := sanitizePath(tarUploader.server + WalPath + filepath.Base(path) + ".lz4")
+	p := sanitizePath(tarUploader.server + WalPath + filepath.Base(path) + "." + Lz4FileExtension)
 	reader := lz.Output
 
 	if verify {
@@ -120,6 +121,7 @@ func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify boo
 	}
 	return p, err
 }
+
 // createUploadInput creates a s3manager.UploadInput for a TarUploader using
 // the specified path and reader.
 func (tarUploader *TarUploader) createUploadInput(path string, reader io.Reader) *s3manager.UploadInput {
