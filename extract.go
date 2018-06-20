@@ -6,20 +6,6 @@ import (
 	"io"
 )
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 // EmptyWriteIgnorer handles 0 byte write in LZ4 package
 // to stop pipe reader/writer from blocking.
 type EmptyWriteIgnorer struct {
@@ -59,9 +45,9 @@ func extractOne(ti TarInterpreter, s io.Reader) error {
 
 // Ensures that file extension is valid. Any subsequent behavior
 // depends on file type.
-func tarHandler(wc io.WriteCloser, rm ReaderMaker, crypter Crypter) error {
-	defer wc.Close()
-	r, err := rm.Reader()
+func tarHandler(writeCloser io.WriteCloser, readerMaker ReaderMaker, crypter Crypter) error {
+	defer writeCloser.Close()
+	r, err := readerMaker.Reader()
 
 	if err != nil {
 		return errors.Wrap(err, "ExtractAll: failed to create new reader")
@@ -77,24 +63,24 @@ func tarHandler(wc io.WriteCloser, rm ReaderMaker, crypter Crypter) error {
 		r = ReadCascadeClose{reader, r}
 	}
 
-	if rm.Format() == "lzo" {
-		err = DecompressLzo(wc, r)
+	if readerMaker.Format() == "lzo" {
+		err = DecompressLzo(writeCloser, r)
 		if err != nil {
 			return errors.Wrap(err, "ExtractAll: lzo decompress failed. Is archive encrypted?")
 		}
-	} else if rm.Format() == "lz4" {
-		_, err = DecompressLz4(wc, r)
+	} else if readerMaker.Format() == Lz4FileExtension {
+		_, err = DecompressLz4(writeCloser, r)
 		if err != nil {
 			return errors.Wrap(err, "ExtractAll: lz4 decompress failed. Is archive encrypted?")
 		}
-	} else if rm.Format() == "tar" {
-		_, err = io.Copy(wc, r)
+	} else if readerMaker.Format() == "tar" {
+		_, err = io.Copy(writeCloser, r)
 		if err != nil {
 			return errors.Wrap(err, "ExtractAll: tar extract failed")
 		}
-	} else if rm.Format() == "nop" {
+	} else if readerMaker.Format() == "nop" {
 	} else {
-		return errors.Wrap(UnsupportedFileTypeError{rm.Path(), rm.Format()}, "ExtractAll:")
+		return errors.Wrap(UnsupportedFileTypeError{readerMaker.Path(), readerMaker.Format()}, "ExtractAll:")
 	}
 	return nil
 }
@@ -103,7 +89,7 @@ func tarHandler(wc io.WriteCloser, rm ReaderMaker, crypter Crypter) error {
 // File type `.nop` is used for testing purposes. Each file is extracted
 // in its own goroutine and ExtractAll will wait for all goroutines to finish.
 // Returns the first error encountered.
-func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
+func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 	if len(files) < 1 {
 		return errors.New("ExtractAll: did not provide files to extract")
 	}
@@ -153,7 +139,7 @@ func ExtractAll(ti TarInterpreter, files []ReaderMaker) error {
 
 			go func() {
 				defer pr.Close()
-				err := extractOne(ti, pr)
+				err := extractOne(tarInterpreter, pr)
 				collectTop <- err
 			}()
 

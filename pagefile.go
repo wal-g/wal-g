@@ -92,109 +92,109 @@ type IncrementalPageReader struct {
 }
 
 // Read from IncrementalPageReader
-func (pr *IncrementalPageReader) Read(p []byte) (n int, err error) {
+func (pageReader *IncrementalPageReader) Read(p []byte) (n int, err error) {
 	err = nil
-	if pr.next == nil {
+	if pageReader.next == nil {
 		return 0, io.EOF
 	}
-	n = copy(p, *pr.next)
-	if n == len(*pr.next) {
-		pr.next = nil
+	n = copy(p, *pageReader.next)
+	if n == len(*pageReader.next) {
+		pageReader.next = nil
 	} else {
-		bytes := (*(pr.next))[n:]
-		pr.next = &(bytes)
+		bytes := (*(pageReader.next))[n:]
+		pageReader.next = &(bytes)
 	}
 
-	if pr.next == nil {
-		err = pr.drainMoreData()
+	if pageReader.next == nil {
+		err = pageReader.drainMoreData()
 	}
 
 	return n, err
 }
 
-func (pr *IncrementalPageReader) drainMoreData() error {
-	for len(pr.blocks) > 0 && len(pr.backlog) < 2 {
-		err := pr.advanceFileReader()
+func (pageReader *IncrementalPageReader) drainMoreData() error {
+	for len(pageReader.blocks) > 0 && len(pageReader.backlog) < 2 {
+		err := pageReader.advanceFileReader()
 		if err != nil {
 			return err
 		}
 	}
 
-	if len(pr.backlog) > 0 {
-		moreBytes := <-pr.backlog
-		pr.next = &moreBytes
+	if len(pageReader.backlog) > 0 {
+		moreBytes := <-pageReader.backlog
+		pageReader.next = &moreBytes
 	}
 
 	return nil
 }
 
-func (pr *IncrementalPageReader) advanceFileReader() error {
+func (pageReader *IncrementalPageReader) advanceFileReader() error {
 	pageBytes := make([]byte, BlockSize)
-	blockNo := pr.blocks[0]
-	pr.blocks = pr.blocks[1:]
+	blockNo := pageReader.blocks[0]
+	pageReader.blocks = pageReader.blocks[1:]
 	offset := int64(blockNo) * int64(BlockSize)
-	_, err := pr.seeker.Seek(offset, 0)
+	_, err := pageReader.seeker.Seek(offset, 0)
 	if err != nil {
 		return err
 	}
-	_, err = io.ReadFull(pr.file, pageBytes)
+	_, err = io.ReadFull(pageReader.file, pageBytes)
 	if err == nil {
-		pr.backlog <- pageBytes
+		pageReader.backlog <- pageBytes
 	}
 	return err
 }
 
 // Close IncrementalPageReader
-func (pr *IncrementalPageReader) Close() error {
-	return pr.closer.Close()
+func (pageReader *IncrementalPageReader) Close() error {
+	return pageReader.closer.Close()
 }
 
 // ErrInvalidBlock indicates that file contain invalid page and cannot be archived incrementally
 var ErrInvalidBlock = errors.New("Block is not valid")
 
-func (pr *IncrementalPageReader) initialize() (size int64, err error) {
+func (pageReader *IncrementalPageReader) initialize() (size int64, err error) {
 	size = 0
 	// "wi" at the head stands for "wal-g increment"
 	// format version "1", signature magic number
-	pr.next = &[]byte{'w', 'i', '1', signatureMagicNumber}
+	pageReader.next = &[]byte{'w', 'i', '1', signatureMagicNumber}
 	size += sizeofInt32
 	fileSizeBytes := make([]byte, sizeofInt64)
-	fileSize := pr.info.Size()
+	fileSize := pageReader.info.Size()
 	binary.LittleEndian.PutUint64(fileSizeBytes, uint64(fileSize))
-	pr.backlog <- fileSizeBytes
+	pageReader.backlog <- fileSizeBytes
 	size += sizeofInt64
 
 	pageBytes := make([]byte, BlockSize)
-	pr.blocks = make([]uint32, 0, fileSize/int64(BlockSize))
+	pageReader.blocks = make([]uint32, 0, fileSize/int64(BlockSize))
 
 	for currentBlockNumber := uint32(0); ; currentBlockNumber++ {
-		n, err := io.ReadFull(pr.file, pageBytes)
+		n, err := io.ReadFull(pageReader.file, pageBytes)
 		if err == io.ErrUnexpectedEOF || n%int(BlockSize) != 0 {
 			return 0, errors.New("Unexpected EOF during increment scan")
 		}
 
 		if err == io.EOF {
-			diffBlockCount := len(pr.blocks)
+			diffBlockCount := len(pageReader.blocks)
 			lenBytes := make([]byte, sizeofInt32)
 			binary.LittleEndian.PutUint32(lenBytes, uint32(diffBlockCount))
-			pr.backlog <- lenBytes
+			pageReader.backlog <- lenBytes
 			size += sizeofInt32
 
 			diffMap := make([]byte, diffBlockCount*sizeofInt32)
 
-			for index, blockNo := range pr.blocks {
+			for index, blockNo := range pageReader.blocks {
 				binary.LittleEndian.PutUint32(diffMap[index*sizeofInt32:(index+1)*sizeofInt32], blockNo)
 			}
 
-			pr.backlog <- diffMap
+			pageReader.backlog <- diffMap
 			size += int64(diffBlockCount * sizeofInt32)
-			dataSize := int64(len(pr.blocks)) * int64(BlockSize)
+			dataSize := int64(len(pageReader.blocks)) * int64(BlockSize)
 			size += dataSize
-			_, err := pr.seeker.Seek(0, 0)
+			_, err := pageReader.seeker.Seek(0, 0)
 			if err != nil {
 				return 0, nil
 			}
-			pr.file.N = dataSize
+			pageReader.file.N = dataSize
 			return size, nil
 		}
 
@@ -211,8 +211,8 @@ func (pr *IncrementalPageReader) initialize() (size int64, err error) {
 				return 0, ErrInvalidBlock
 			}
 
-			if (allZeroes) || (lsn >= pr.lsn) {
-				pr.blocks = append(pr.blocks, currentBlockNumber)
+			if (allZeroes) || (lsn >= pageReader.lsn) {
+				pageReader.blocks = append(pageReader.blocks, currentBlockNumber)
 			}
 		} else {
 			return 0, err

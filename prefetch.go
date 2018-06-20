@@ -13,7 +13,7 @@ import (
 )
 
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
-func HandleWALPrefetch(pre *Prefix, walFileName string, location string) {
+func HandleWALPrefetch(pre *S3Prefix, walFileName string, location string) {
 	var fileName = walFileName
 	var err error
 	location = path.Dir(location)
@@ -33,7 +33,7 @@ func HandleWALPrefetch(pre *Prefix, walFileName string, location string) {
 	wg.Wait()
 }
 
-func prefetchFile(location string, pre *Prefix, walFileName string, wg *sync.WaitGroup) {
+func prefetchFile(location string, pre *S3Prefix, walFileName string, wg *sync.WaitGroup) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Prefetch unsuccessful ", walFileName, r)

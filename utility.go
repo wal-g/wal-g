@@ -1,41 +1,65 @@
 package walg
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"hash"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"strconv"
-	"time"
 	"encoding/json"
+	"strings"
 )
 
-// BackupTime is used to sort backups by
-// latest modified time.
-type BackupTime struct {
-	Name        string
-	Time        time.Time
-	WalFileName string
+const (
+	VersionStr       = "005"
+	BaseBackupsPath  = "/basebackups_" + VersionStr + "/"
+	WalPath          = "/wal_" + VersionStr + "/"
+	backupNamePrefix = "base_"
+
+	// SentinelSuffix is a suffix of backup finish sentinel file
+	SentinelSuffix = "_backup_stop_sentinel.json"
+)
+
+// Empty is used for channel signaling.
+type Empty struct{}
+
+// NilWriter to /dev/null
+type NilWriter struct{}
+
+// Write to /dev/null
+func (nw *NilWriter) Write(p []byte) (n int, err error) {
+	return len(p), nil
 }
 
-// TimeSlice represents a backup and its
-// last modified time.
-type TimeSlice []BackupTime
-
-func (p TimeSlice) Len() int {
-	return len(p)
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
-func (p TimeSlice) Less(i, j int) bool {
-	return p[i].Time.After(p[j].Time)
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
-func (p TimeSlice) Swap(i, j int) {
-	p[i], p[j] = p[j], p[i]
+func contains(s *[]string, e string) bool {
+	//AB: Go is sick
+	if s == nil {
+		return false
+	}
+	for _, a := range *s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
+func sanitizePath(path string) string {
+	return strings.TrimLeft(path, "/")
 }
 
 func partition(a []string, b int) [][]string {
@@ -125,27 +149,4 @@ func getMaxConcurrency(key string, default_value int) int {
 		}
 	}
 	return max(con, 1)
-}
-
-type md5Reader struct {
-	internal io.Reader
-	md5      hash.Hash
-}
-
-func newMd5Reader(reader io.Reader) *md5Reader {
-	return &md5Reader{internal: reader, md5: md5.New()}
-}
-
-func (r *md5Reader) Read(p []byte) (n int, err error) {
-	n, err = r.internal.Read(p)
-	if err != nil {
-		return
-	}
-	_, err = r.md5.Write(p[:n])
-	return
-}
-
-func (r *md5Reader) Sum() string {
-	bytes := r.md5.Sum(nil)
-	return hex.EncodeToString(bytes)
 }

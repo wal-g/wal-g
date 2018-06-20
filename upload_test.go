@@ -109,10 +109,10 @@ func doConfigureWithBuсketPath(t *testing.T, bucketPath string, expectedServer 
 		t.Errorf("upload: unexpected error %v", err)
 	}
 	if *pre.Bucket != "bucket" {
-		t.Errorf("upload: Prefix field 'Bucket' expected %s but got %s", "bucket", *pre.Bucket)
+		t.Errorf("upload: S3Prefix field 'Bucket' expected %s but got %s", "bucket", *pre.Bucket)
 	}
 	if *pre.Server != expectedServer {
-		t.Errorf("upload: Prefix field 'Server' expected %s but got %s", "server", *pre.Server)
+		t.Errorf("upload: S3Prefix field 'Server' expected %s but got %s", "server", *pre.Server)
 	}
 	if tu == nil {
 		t.Errorf("upload: did not create an uploader")
@@ -160,13 +160,13 @@ func TestUploadError(t *testing.T) {
 	}
 
 	tu := walg.NewTarUploader(mockClient, "bucket", "server", "region")
-	tu.Upl = mockUploader
+	tu.UploaderApi = mockUploader
 
 	maker := &walg.S3TarBallMaker{
-		BaseDir:  "tmp",
-		Trim:     "/usr/local",
-		BkupName: "test",
-		Tu:       tu,
+		BaseDir:     "tmp",
+		Trim:        "/usr/local",
+		BkupName:    "test",
+		TarUploader: tu,
 	}
 
 	tarBall := maker.Make(true)
@@ -177,7 +177,7 @@ func TestUploadError(t *testing.T) {
 		t.Errorf("upload: expected to fail to upload successfully")
 	}
 
-	tu.Upl = &mockS3Uploader{
+	tu.UploaderApi = &mockS3Uploader{
 		multierr: true,
 	}
 

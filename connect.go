@@ -53,55 +53,6 @@ func Connect() (*pgx.Conn, error) {
 	return conn, nil
 }
 
-// StartBackup starts a non-exclusive base backup immediately. When finishing the backup,
-// `backup_label` and `tablespace_map` contents are not immediately written to
-// a file but returned instead. Returns empty string and an error if backup
-// fails.
-func (b *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName string, lsn uint64, version int, err error) {
-	var name, lsnStr string
-	queryRunner, err := NewPgQueryRunner(conn)
-	if err != nil {
-		return "", 0, queryRunner.Version, errors.Wrap(err, "StartBackup: Failed to build query runner.")
-	}
-	name, lsnStr, b.Replica, err = queryRunner.StartBackup(backup)
-
-	if err != nil {
-		return "", 0, queryRunner.Version, err
-	}
-	lsn, err = ParseLsn(lsnStr)
-
-	if b.Replica {
-		name, b.Timeline, err = WALFileName(lsn, conn)
-		if err != nil {
-			return "", 0, queryRunner.Version, err
-		}
-	}
-	return backupNamePrefix + name, lsn, queryRunner.Version, nil
-
-}
-
-const backupNamePrefix = "base_"
-
-// CheckTimelineChanged compares timelines of pg_backup_start() and pg_backup_stop()
-func (b *Bundle) CheckTimelineChanged(conn *pgx.Conn) bool {
-	if b.Replica {
-		timeline, err := readTimeline(conn)
-		if err != nil {
-			log.Printf("Unbale to check timeline change. Sentinel for the backup will not be uploaded.")
-			return true
-		}
-
-		// Per discussion in
-		// https://www.postgresql.org/message-id/flat/BF2AD4A8-E7F5-486F-92C8-A6959040DEB6%40yandex-team.ru#BF2AD4A8-E7F5-486F-92C8-A6959040DEB6@yandex-team.ru
-		// Following check is the very pessimistic approach on replica backup invalidation
-		if timeline != b.Timeline {
-			log.Printf("Timeline has changed since backup start. Sentinel for the backup will not be uploaded.")
-			return true
-		}
-	}
-	return false
-}
-
 // FormatName grabs the name of the WAL file and returns it in the form of `base_...`.
 // If no match is found, returns an empty string and a `NoMatchAvailableError`.
 func FormatName(s string) (string, error) {

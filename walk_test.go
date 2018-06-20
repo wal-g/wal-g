@@ -208,9 +208,9 @@ func compare(t *testing.T, dir1, dir2 string) bool {
 		mode := f1.Mode() == f2.Mode()
 		isDir := f1.IsDir() == f2.IsDir()
 
-		// If directory is on EXCLUDED list, make sure it exists but is empty.
+		// If directory is in ExcludedFilenames list, make sure it exists but is empty.
 		if f2.IsDir() {
-			_, ok := walg.EXCLUDE[f2.Name()]
+			_, ok := walg.ExcludedFilenames[f2.Name()]
 			if ok {
 				size = isEmpty(t, filepath.Join(dir2, f2.Name()))
 			}
@@ -329,7 +329,7 @@ func TestWalk(t *testing.T) {
 		Files:   &sync.Map{},
 	}
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
-	bundle.Tbm = &tools.FileTarBallMaker{
+	bundle.TarBallMaker = &tools.FileTarBallMaker{
 		BaseDir: filepath.Base(data),
 		Trim:    data,
 		Out:     compressed,
@@ -341,7 +341,7 @@ func TestWalk(t *testing.T) {
 
 	bundle.StartQueue()
 	fmt.Println("Walking ...")
-	err = filepath.Walk(data, bundle.TarWalker)
+	err = filepath.Walk(data, bundle.TarWalk)
 	if err != nil {
 		t.Log(err)
 	}
@@ -351,13 +351,13 @@ func TestWalk(t *testing.T) {
 		t.Log(err)
 	}
 
-	err = bundle.Tb.Finish(&walg.S3TarBallSentinelDto{})
+	err = bundle.TarBall.Finish(&walg.S3TarBallSentinelDto{})
 	if err != nil {
 		t.Log(err)
 	}
 
 	// Test that sentinel exists and is handled correctly.
-	sen := bundle.Sen.Info.Name()
+	sen := bundle.Sentinel.Info.Name()
 	if sen != "pg_control" {
 		t.Errorf("walk: Sentinel expected %s but got %s", "pg_control", sen)
 	}
@@ -385,7 +385,7 @@ func TestWalk(t *testing.T) {
 
 	// Re-use generated data to test uploading WAL.
 	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region")
-	tu.Upl = &mockS3Uploader{}
+	tu.UploaderApi = &mockS3Uploader{}
 	wal, err := tu.UploadWal(filepath.Join(data, "1"), nil, false)
 	if wal == "" {
 		t.Errorf("upload: expected wal path to be set but got ''")

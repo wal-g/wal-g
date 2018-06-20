@@ -154,7 +154,7 @@ func fakeContents() []*s3.Object {
 }
 
 func TestBackupErrors(t *testing.T) {
-	pre := &walg.Prefix{
+	pre := &walg.S3Prefix{
 		Svc: &mockS3Client{
 			err:      true,
 			notFound: true,
@@ -220,7 +220,7 @@ func TestBackupErrors(t *testing.T) {
 // CheckExistence()
 // GetKeys()
 func TestBackup(t *testing.T) {
-	pre := &walg.Prefix{
+	pre := &walg.S3Prefix{
 		Svc:    &mockS3Client{},
 		Bucket: aws.String("mock bucket"),
 		Server: aws.String("mock server"),
@@ -277,7 +277,7 @@ func TestBackup(t *testing.T) {
 }
 
 func TestArchiveErrors(t *testing.T) {
-	pre := &walg.Prefix{
+	pre := &walg.S3Prefix{
 		Svc: &mockS3Client{
 			err:      true,
 			notFound: true,
@@ -311,7 +311,7 @@ func TestArchiveErrors(t *testing.T) {
 // CheckExistence()
 // GetArchive()
 func TestArchive(t *testing.T) {
-	pre := &walg.Prefix{
+	pre := &walg.S3Prefix{
 		Svc:    &mockS3Client{},
 		Bucket: aws.String("mock bucket"),
 		Server: aws.String("mock server"),

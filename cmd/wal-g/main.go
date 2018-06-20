@@ -29,7 +29,7 @@ func init() {
 	flag.BoolVar(&profile, "p", false, "\tProfiler (false by default)")
 	flag.BoolVar(&mem, "m", false, "\tMemory profiler (false by default)")
 
-	// this is temp solution to pass everything through flag. Will remove it when useing CLI like cobra or cli
+	// this is temp solution to pass everything through flag. Will remove it when using CLI like cobra or cli
 	flag.BoolVar(&showVersion, "version", false, "\tversion")
 	flag.BoolVar(&showVersion, "v", false, "\tversion")
 	flag.BoolVar(&showVersionVerbose, "version-verbose", false, "\tLong version")
@@ -91,7 +91,7 @@ func main() {
 			fmt.Printf("usage:\twal-g wal-push archive_path\n\n")
 			os.Exit(1)
 		case "delete":
-			fmt.Println(walg.DeleteUsage)
+			fmt.Println(walg.DeleteUsageText)
 			os.Exit(1)
 		default:
 			l.Fatalf("Command '%s' is unsupported by WAL-G.\n\n", command)
@@ -118,7 +118,7 @@ func main() {
 
 	// Configure and start S3 session with bucket, region, and path names.
 	// Checks that environment variables are properly set.
-	tu, pre, err := walg.Configure()
+	tarUploader, pre, err := walg.Configure()
 	if err != nil {
 		log.Fatalf("FATAL: %+v\n", err)
 	}
@@ -133,9 +133,9 @@ func main() {
 		walg.HandleWALPrefetch(pre, firstArgument, backupName)
 	} else if command == "wal-push" {
 		// Upload a WAL file to S3.
-		walg.HandleWALPush(tu, firstArgument, pre, verify)
+		walg.HandleWALPush(tarUploader, firstArgument, pre, verify)
 	} else if command == "backup-push" {
-		walg.HandleBackupPush(firstArgument, tu, pre)
+		walg.HandleBackupPush(firstArgument, tarUploader, pre)
 	} else if command == "backup-fetch" {
 		walg.HandleBackupFetch(backupName, pre, firstArgument, mem)
 	} else if command == "backup-list" {

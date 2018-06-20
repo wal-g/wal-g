@@ -41,10 +41,9 @@ func main() {
 	}
 
 	if nop {
-		bundle.Tbm = &tools.NOPTarBallMaker{
+		bundle.TarBallMaker = &tools.NOPTarBallMaker{
 			BaseDir: filepath.Base(in),
 			Trim:    in,
-			Nop:     true,
 		}
 	} else if !s3 && outDir == "" {
 		fmt.Printf("Please provide a directory to write to.\n")
@@ -69,7 +68,7 @@ func main() {
 			f.Close()
 		}
 
-		bundle.Tbm = &tools.FileTarBallMaker{
+		bundle.TarBallMaker = &tools.FileTarBallMaker{
 			BaseDir: filepath.Base(in),
 			Trim:    in,
 			Out:     outDir,
@@ -89,11 +88,11 @@ func main() {
 			os.Exit(1)
 		}
 
-		bundle.Tbm = &walg.S3TarBallMaker{
-			BaseDir:  filepath.Base(in),
-			Trim:     in,
-			BkupName: n,
-			Tu:       tu,
+		bundle.TarBallMaker = &walg.S3TarBallMaker{
+			BaseDir:     filepath.Base(in),
+			Trim:        in,
+			BkupName:    n,
+			TarUploader: tu,
 		}
 
 		bundle.NewTarBall(false)
@@ -104,7 +103,7 @@ func main() {
 	bundle.StartQueue()
 	defer tools.TimeTrack(time.Now(), "MAIN")
 	fmt.Println("Walking ...")
-	err = filepath.Walk(in, bundle.TarWalker)
+	err = filepath.Walk(in, bundle.TarWalk)
 	if err != nil {
 		panic(err)
 	}
@@ -112,7 +111,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	err = bundle.Tb.Finish(&walg.S3TarBallSentinelDto{})
+	err = bundle.TarBall.Finish(&walg.S3TarBallSentinelDto{})
 	if err != nil {
 		panic(err)
 	}
