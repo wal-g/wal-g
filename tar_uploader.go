@@ -70,25 +70,25 @@ func (tarUploader *TarUploader) Clone() *TarUploader {
 // UploadWal compresses a WAL file using LZ4 and uploads to S3. Returns
 // the first error encountered and an empty string upon failure.
 func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify bool) (string, error) {
-	f, err := os.Open(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return "", errors.Wrapf(err, "UploadWal: failed to open file %s\n", path)
 	}
 
-	lz := &Lz4PipeWriter{
-		Input: f,
+	pipeWriter := &CompressingPipeWriter{
+		Input: file,
 	}
 
-	lz.Compress(&OpenPGPCrypter{})
+	pipeWriter.Compress(&OpenPGPCrypter{})
 
-	p := sanitizePath(tarUploader.server + WalPath + filepath.Base(path) + "." + Lz4FileExtension)
-	reader := lz.Output
+	dstPath := sanitizePath(tarUploader.server + WalPath + filepath.Base(path) + "." + Lz4FileExtension)
+	reader := pipeWriter.Output
 
 	if verify {
 		reader = newMd5Reader(reader)
 	}
 
-	input := tarUploader.createUploadInput(p, reader)
+	input := tarUploader.createUploadInput(dstPath, reader)
 
 	tarUploader.waitGroup.Add(1)
 	go func() {
@@ -98,14 +98,14 @@ func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify boo
 	}()
 
 	tarUploader.Finish()
-	fmt.Println("WAL PATH:", p)
+	fmt.Println("WAL PATH:", dstPath)
 	if verify {
 		sum := reader.(*MD5Reader).Sum()
-		a := &Archive{
+		archive := &Archive{
 			Prefix:  pre,
-			Archive: aws.String(p),
+			Archive: aws.String(dstPath),
 		}
-		eTag, err := a.GetETag()
+		eTag, err := archive.GetETag()
 		if err != nil {
 			log.Fatalf("Unable to verify WAL %s", err)
 		}
@@ -119,7 +119,7 @@ func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify boo
 		}
 		fmt.Println("ETag ", trimETag)
 	}
-	return p, err
+	return dstPath, err
 }
 
 // createUploadInput creates a s3manager.UploadInput for a TarUploader using

@@ -11,12 +11,12 @@ import (
 // RaskyReader handles cases when the Rasky lzo package crashes.
 // Occurs if byte size is too small (1-5).
 type RaskyReader struct {
-	R io.Reader
+	Reader io.Reader
 }
 
 // Read ensures all bytes are get read for Rasky package.
-func (r *RaskyReader) Read(p []byte) (int, error) {
-	return io.ReadFull(r.R, p)
+func (reader *RaskyReader) Read(buffer []byte) (int, error) {
+	return io.ReadFull(reader.Reader, buffer)
 }
 
 // Uncompressed is used to log compression ratio.
@@ -38,12 +38,11 @@ func CheckType(path string) string {
 
 // DecompressLzo decompresses an .lzo file. Returns the first error
 // encountered.
-func DecompressLzo(d io.Writer, s io.Reader) error {
-	skip := 33
-	sk := make([]byte, skip)
+func DecompressLzo(dst io.Writer, src io.Reader) error {
+	skipped := make([]byte, 33)
 
-	n, err := io.ReadFull(s, sk)
-	if n != len(sk) {
+	n, err := io.ReadFull(src, skipped)
+	if n != len(skipped) {
 		return errors.New("DecompressLzo: did not fill skip")
 	}
 	if err != nil {
@@ -51,9 +50,9 @@ func DecompressLzo(d io.Writer, s io.Reader) error {
 	}
 
 	var fileNameLen uint8
-	binary.Read(s, binary.BigEndian, &fileNameLen)
+	binary.Read(src, binary.BigEndian, &fileNameLen)
 	fileName := make([]byte, fileNameLen)
-	n, err = io.ReadFull(s, fileName)
+	n, err = io.ReadFull(src, fileName)
 	if n != len(fileName) {
 		return errors.New("DecompressLzo: did not fill filename")
 	}
@@ -62,7 +61,7 @@ func DecompressLzo(d io.Writer, s io.Reader) error {
 	}
 
 	fileComment := make([]byte, 4)
-	n, err = io.ReadFull(s, fileComment)
+	n, err = io.ReadFull(src, fileComment)
 	if n != len(fileComment) {
 		return errors.New("DecompressLzo: did not fill fileComment")
 	}
@@ -76,7 +75,7 @@ func DecompressLzo(d io.Writer, s io.Reader) error {
 
 	for {
 
-		err := binary.Read(s, binary.BigEndian, &uncom)
+		err := binary.Read(src, binary.BigEndian, &uncom)
 		if uncom == 0 {
 			break
 		}
@@ -84,7 +83,7 @@ func DecompressLzo(d io.Writer, s io.Reader) error {
 			return errors.Wrap(err, "DecompressLzo: read failed")
 		}
 
-		err = binary.Read(s, binary.BigEndian, &com)
+		err = binary.Read(src, binary.BigEndian, &com)
 		if err != nil {
 			return errors.Wrap(err, "DecompressLzo: read failed")
 		}
@@ -92,13 +91,13 @@ func DecompressLzo(d io.Writer, s io.Reader) error {
 		Uncompressed += uncom
 		Compressed += com
 
-		err = binary.Read(s, binary.BigEndian, &check)
+		err = binary.Read(src, binary.BigEndian, &check)
 		if err != nil {
 			return errors.Wrap(err, "DecompressLzo: read failed")
 		}
 
 		if uncom <= com {
-			n, err := io.CopyN(d, s, int64(com))
+			n, err := io.CopyN(dst, src, int64(com))
 			if n != int64(com) {
 				return errors.New("DecompressLzo: copy failed")
 			}
@@ -107,11 +106,11 @@ func DecompressLzo(d io.Writer, s io.Reader) error {
 			}
 
 		} else {
-			ras := &RaskyReader{
-				R: s,
+			raskyReader := &RaskyReader{
+				Reader: src,
 			}
 
-			out, err := lzo.Decompress1X(ras, int(com), int(uncom))
+			out, err := lzo.Decompress1X(raskyReader, int(com), int(uncom))
 			if err != nil {
 				return errors.Wrap(err, "DecompressLzo: decompress lzo failed")
 			}
@@ -120,7 +119,7 @@ func DecompressLzo(d io.Writer, s io.Reader) error {
 				return errors.New("DecompressLzo: out bytes do not equal uncompressed")
 			}
 
-			n, err = d.Write(out)
+			n, err = dst.Write(out)
 			if n != len(out) {
 				return errors.New("DecompressLzo: write to pipe failed")
 			}
@@ -132,8 +131,8 @@ func DecompressLzo(d io.Writer, s io.Reader) error {
 	return nil
 }
 
-// ReadCascadeClose composes io.ReadCloser from two parts
-type ReadCascadeClose struct {
+// ReadCascadeCloser composes io.ReadCloser from two parts
+type ReadCascadeCloser struct {
 	io.Reader
 	io.Closer
 }

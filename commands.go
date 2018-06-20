@@ -515,29 +515,29 @@ func checkWALFileMagic(prefetched string) error {
 
 // DownloadWALFile downloads a file and writes it to local file
 func DownloadWALFile(pre *S3Prefix, walFileName string, location string) {
-	a := &Archive{
+	archive := &Archive{
 		Prefix:  pre,
 		Archive: aws.String(sanitizePath(*pre.Server + WalPath + walFileName + ".lzo")),
 	}
 	// Check existence of compressed LZO WAL file
-	exists, err := a.CheckExistence()
+	exists, err := archive.CheckExistence()
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
 	var crypter = OpenPGPCrypter{}
 	if exists {
-		arch, err := a.GetArchive()
+		archiveReader, err := archive.GetArchive()
 		if err != nil {
 			log.Fatalf("%+v\n", err)
 		}
 
 		if crypter.IsUsed() {
 			var reader io.Reader
-			reader, err = crypter.Decrypt(arch)
+			reader, err = crypter.Decrypt(archiveReader)
 			if err != nil {
 				log.Fatalf("%v\n", err)
 			}
-			arch = ReadCascadeClose{reader, arch}
+			archiveReader = ReadCascadeCloser{reader, archiveReader}
 		}
 
 		f, err := os.Create(location)
@@ -545,47 +545,47 @@ func DownloadWALFile(pre *S3Prefix, walFileName string, location string) {
 			log.Fatalf("%v\n", err)
 		}
 
-		err = DecompressLzo(f, arch)
+		err = DecompressLzo(f, archiveReader)
 		if err != nil {
 			log.Fatalf("%+v\n", err)
 		}
 		f.Close()
 	} else if !exists {
 		// Check existence of compressed LZ4 WAL file
-		a.Archive = aws.String(sanitizePath(*pre.Server + WalPath + walFileName + "." + Lz4FileExtension))
-		exists, err = a.CheckExistence()
+		archive.Archive = aws.String(sanitizePath(*pre.Server + WalPath + walFileName + "." + Lz4FileExtension))
+		exists, err = archive.CheckExistence()
 		if err != nil {
 			log.Fatalf("%+v\n", err)
 		}
 
 		if exists {
-			arch, err := a.GetArchive()
+			archiveReader, err := archive.GetArchive()
 			if err != nil {
 				log.Fatalf("%+v\n", err)
 			}
 
 			if crypter.IsUsed() {
 				var reader io.Reader
-				reader, err = crypter.Decrypt(arch)
+				reader, err = crypter.Decrypt(archiveReader)
 				if err != nil {
 					log.Fatalf("%v\n", err)
 				}
-				arch = ReadCascadeClose{reader, arch}
+				archiveReader = ReadCascadeCloser{reader, archiveReader}
 			}
 
-			f, err := os.OpenFile(location, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
+			file, err := os.OpenFile(location, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
 			if err != nil {
 				log.Fatalf("%v\n", err)
 			}
 
-			size, err := DecompressLz4(f, arch)
+			size, err := DecompressLz4(file, archiveReader)
 			if err != nil {
 				log.Fatalf("%+v\n", err)
 			}
 			if size != int64(WalSegmentSize) {
 				log.Fatal("Download WAL error: wrong size ", size)
 			}
-			err = f.Close()
+			err = file.Close()
 			if err != nil {
 				log.Fatalf("%+v\n", err)
 			}
@@ -609,7 +609,7 @@ func HandleWALPush(tarUploader *TarUploader, dirArc string, pre *S3Prefix, verif
 // UploadWALFile from FS to the cloud
 func UploadWALFile(tarUploader *TarUploader, dirArc string, pre *S3Prefix, verify bool) {
 	path, err := tarUploader.UploadWal(dirArc, pre, verify)
-	if re, ok := err.(Lz4Error); ok {
+	if re, ok := err.(CompressingPipeWriterError); ok {
 		log.Fatalf("FATAL: could not upload '%s' due to compression error.\n%+v\n", path, re)
 	} else if err != nil {
 		log.Printf("upload: could not upload '%s'\n", path)

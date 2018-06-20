@@ -47,34 +47,34 @@ func extractOne(ti TarInterpreter, s io.Reader) error {
 // depends on file type.
 func tarHandler(writeCloser io.WriteCloser, readerMaker ReaderMaker, crypter Crypter) error {
 	defer writeCloser.Close()
-	r, err := readerMaker.Reader()
+	readCloser, err := readerMaker.Reader()
 
 	if err != nil {
 		return errors.Wrap(err, "ExtractAll: failed to create new reader")
 	}
-	defer r.Close()
+	defer readCloser.Close()
 
 	if crypter.IsUsed() {
 		var reader io.Reader
-		reader, err = crypter.Decrypt(r)
+		reader, err = crypter.Decrypt(readCloser)
 		if err != nil {
 			return errors.Wrap(err, "ExtractAll: decrypt failed")
 		}
-		r = ReadCascadeClose{reader, r}
+		readCloser = ReadCascadeCloser{reader, readCloser}
 	}
 
 	if readerMaker.Format() == "lzo" {
-		err = DecompressLzo(writeCloser, r)
+		err = DecompressLzo(writeCloser, readCloser)
 		if err != nil {
 			return errors.Wrap(err, "ExtractAll: lzo decompress failed. Is archive encrypted?")
 		}
 	} else if readerMaker.Format() == Lz4FileExtension {
-		_, err = DecompressLz4(writeCloser, r)
+		_, err = DecompressLz4(writeCloser, readCloser)
 		if err != nil {
 			return errors.Wrap(err, "ExtractAll: lz4 decompress failed. Is archive encrypted?")
 		}
 	} else if readerMaker.Format() == "tar" {
-		_, err = io.Copy(writeCloser, r)
+		_, err = io.Copy(writeCloser, readCloser)
 		if err != nil {
 			return errors.Wrap(err, "ExtractAll: tar extract failed")
 		}

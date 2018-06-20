@@ -4,17 +4,6 @@ import (
 	"fmt"
 )
 
-// Lz4Error is used to catch specific errors from Lz4PipeWriter
-// when uploading to S3. Will not retry upload if this error
-// occurs.
-type Lz4Error struct {
-	err error
-}
-
-func (e Lz4Error) Error() string {
-	msg := fmt.Sprintf("%+v\n", e.err)
-	return msg
-}
 
 // UnsetEnvVarError is used to indicate required environment
 // variables for WAL-G.

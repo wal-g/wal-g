@@ -84,7 +84,7 @@ func (tarBall *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteClos
 		defer tarUploader.waitGroup.Done()
 
 		err := tarUploader.upload(input, path)
-		if lz4Err, ok := err.(Lz4Error); ok {
+		if lz4Err, ok := err.(CompressingPipeWriterError); ok {
 			log.Printf("FATAL: could not upload '%s' due to compression error\n%+v\n", path, lz4Err)
 		}
 		if err != nil {
@@ -101,10 +101,10 @@ func (tarBall *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteClos
 			log.Fatal("upload: encryption error ", err)
 		}
 
-		return &Lz4CascadeCloser2{lz4.NewWriter(writeCloser), writeCloser, pipeWriter}
+		return &CascadeCloser{lz4.NewWriter(writeCloser), &CascadeCloser{writeCloser, pipeWriter}}
 	}
 
-	return &Lz4CascadeCloser{lz4.NewWriter(pipeWriter), pipeWriter}
+	return &CascadeCloser{lz4.NewWriter(pipeWriter), pipeWriter}
 }
 
 // BaseDir of a backup
