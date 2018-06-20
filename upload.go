@@ -55,19 +55,19 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 		return nil, nil, &UnsetEnvVarError{names: []string{"WALE_S3_PREFIX"}}
 	}
 
-	url, err := url.Parse(waleS3Prefix)
+	waleS3Url, err := url.Parse(waleS3Prefix)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "Configure: failed to parse url '%s'", waleS3Prefix)
 	}
-	if url.Scheme == "" || url.Host == "" {
-		return nil, nil, fmt.Errorf("Missing url scheme=%q and/or host=%q", url.Scheme, url.Host)
+	if waleS3Url.Scheme == "" || waleS3Url.Host == "" {
+		return nil, nil, fmt.Errorf("Missing url scheme=%q and/or host=%q", waleS3Url.Scheme, waleS3Url.Host)
 	}
 
-	bucket := url.Host
+	bucket := waleS3Url.Host
 	var server = ""
-	if len(url.Path) > 0 {
+	if len(waleS3Url.Path) > 0 {
 		// TODO: Unchecked assertion: first char is '/'
-		server = url.Path[1:]
+		server = waleS3Url.Path[1:]
 	}
 
 	if len(server) > 0 && server[len(server)-1] == '/' {

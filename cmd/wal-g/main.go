@@ -29,7 +29,7 @@ func init() {
 	flag.BoolVar(&profile, "p", false, "\tProfiler (false by default)")
 	flag.BoolVar(&mem, "m", false, "\tMemory profiler (false by default)")
 
-	// this is temp solution to pass everything through flag. Will remove it when useing CLI like cobra or cli
+	// this is temp solution to pass everything through flag. Will remove it when using CLI like cobra or cli
 	flag.BoolVar(&showVersion, "version", false, "\tversion")
 	flag.BoolVar(&showVersion, "v", false, "\tversion")
 	flag.BoolVar(&showVersionVerbose, "version-verbose", false, "\tLong version")
