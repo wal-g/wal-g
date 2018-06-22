@@ -26,8 +26,9 @@ var Compressed uint32
 
 type LzoDecompressor struct{}
 
-func (decompressor LzoDecompressor) Decompress(dst io.Writer, src io.Reader) error {
-	skipped := make([]byte, 33)
+func readSkipped(src io.Reader) error {
+	const toSkip = 33
+	skipped := make([]byte, toSkip)
 
 	n, err := io.ReadFull(src, skipped)
 	if n != len(skipped) {
@@ -36,25 +37,54 @@ func (decompressor LzoDecompressor) Decompress(dst io.Writer, src io.Reader) err
 	if err != nil {
 		return errors.Wrap(err, "DecompressLzo: read failed")
 	}
+	return nil
+}
 
+func readFileName(src io.Reader) error {
 	var fileNameLen uint8
 	binary.Read(src, binary.BigEndian, &fileNameLen)
 	fileName := make([]byte, fileNameLen)
-	n, err = io.ReadFull(src, fileName)
+	n, err := io.ReadFull(src, fileName)
 	if n != len(fileName) {
 		return errors.New("DecompressLzo: did not fill filename")
 	}
 	if err != nil {
 		return errors.Wrap(err, "DecompressLzo: read failed")
 	}
+	return nil
+}
 
+func readFileComment(src io.Reader) error {
 	fileComment := make([]byte, 4)
-	n, err = io.ReadFull(src, fileComment)
+	n, err := io.ReadFull(src, fileComment)
 	if n != len(fileComment) {
 		return errors.New("DecompressLzo: did not fill fileComment")
 	}
 	if err != nil {
 		return errors.Wrap(err, "DecompressLzo: read failed")
+	}
+	return nil
+}
+
+func readUselessData(src io.Reader) error {
+	uselessDataReaders := []func(reader io.Reader) error {
+		readSkipped,
+		readFileName,
+		readFileComment,
+	}
+	for _, reader := range uselessDataReaders {
+		err := reader(src)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (decompressor LzoDecompressor) Decompress(dst io.Writer, src io.Reader) error {
+	err := readUselessData(src)
+	if err != nil {
+		return err
 	}
 
 	var uncom uint32
@@ -62,7 +92,6 @@ func (decompressor LzoDecompressor) Decompress(dst io.Writer, src io.Reader) err
 	var check uint32
 
 	for {
-
 		err := binary.Read(src, binary.BigEndian, &uncom)
 		if uncom == 0 {
 			break
@@ -107,7 +136,7 @@ func (decompressor LzoDecompressor) Decompress(dst io.Writer, src io.Reader) err
 				return errors.New("DecompressLzo: out bytes do not equal uncompressed")
 			}
 
-			n, err = dst.Write(out)
+			n, err := dst.Write(out)
 			if n != len(out) {
 				return errors.New("DecompressLzo: write to pipe failed")
 			}
