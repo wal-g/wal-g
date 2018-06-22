@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"encoding/json"
 	"strings"
+	"regexp"
 )
 
 const (
@@ -149,4 +150,14 @@ func getMaxConcurrency(key string, default_value int) int {
 		}
 	}
 	return max(con, 1)
+}
+
+// CheckType grabs the file extension from PATH.
+func CheckType(path string) string {
+	re := regexp.MustCompile(`\.([^\.]+)$`)
+	f := re.FindString(path)
+	if f != "" {
+		return f[1:]
+	}
+	return ""
 }

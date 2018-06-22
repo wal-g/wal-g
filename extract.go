@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"github.com/pkg/errors"
 	"io"
+	"fmt"
 )
 
 // EmptyWriteIgnorer handles 0 byte write in LZ4 package
@@ -45,7 +46,7 @@ func extractOne(ti TarInterpreter, s io.Reader) error {
 
 // Ensures that file extension is valid. Any subsequent behavior
 // depends on file type.
-func tarHandler(writeCloser io.WriteCloser, readerMaker ReaderMaker, crypter Crypter) error {
+func handleTar(writeCloser io.WriteCloser, readerMaker ReaderMaker, crypter Crypter) error {
 	defer writeCloser.Close()
 	readCloser, err := readerMaker.Reader()
 
@@ -63,17 +64,17 @@ func tarHandler(writeCloser io.WriteCloser, readerMaker ReaderMaker, crypter Cry
 		readCloser = ReadCascadeCloser{reader, readCloser}
 	}
 
-	if readerMaker.Format() == "lzo" {
-		err = DecompressLzo(writeCloser, readCloser)
-		if err != nil {
-			return errors.Wrap(err, "ExtractAll: lzo decompress failed. Is archive encrypted?")
+	for _, decompressor := range Decompressors {
+		if readerMaker.Format() != decompressor.FileExtension() {
+			continue
 		}
-	} else if readerMaker.Format() == Lz4FileExtension {
-		_, err = DecompressLz4(writeCloser, readCloser)
+		err = decompressor.Decompress(writeCloser, readCloser)
 		if err != nil {
-			return errors.Wrap(err, "ExtractAll: lz4 decompress failed. Is archive encrypted?")
+			return errors.Wrap(err, fmt.Sprintf("ExtractAll: %v decompress failed. Is archive encrypted?", decompressor.FileExtension()))
 		}
-	} else if readerMaker.Format() == "tar" {
+		return nil
+	}
+	if readerMaker.Format() == "tar" {
 		_, err = io.Copy(writeCloser, readCloser)
 		if err != nil {
 			return errors.Wrap(err, "ExtractAll: tar extract failed")
@@ -127,11 +128,11 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 			pr, tempW := io.Pipe()
 			pw := &EmptyWriteIgnorer{tempW}
 
-			// Collect errors returned by tarHandler or parsing.
+			// Collect errors returned by handleTar or parsing.
 			collectLow := make(chan error)
 
 			go func() {
-				collectLow <- tarHandler(pw, val, &crypter)
+				collectLow <- handleTar(pw, val, &crypter)
 			}()
 
 			// Collect errors returned by extractOne.

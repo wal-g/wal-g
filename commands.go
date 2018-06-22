@@ -495,7 +495,7 @@ func HandleWALFetch(pre *S3Prefix, walFileName string, location string, triggerP
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	DownloadWALFile(pre, walFileName, location)
+	DownloadAndDecompressWALFile(pre, walFileName, location)
 }
 
 func checkWALFileMagic(prefetched string) error {
@@ -513,86 +513,59 @@ func checkWALFileMagic(prefetched string) error {
 	return nil
 }
 
-// DownloadWALFile downloads a file and writes it to local file
-func DownloadWALFile(pre *S3Prefix, walFileName string, location string) {
+func tryDownloadWALFile(pre *S3Prefix, walFullPath string) (archiveReader io.ReadCloser, exists bool, err error) {
 	archive := &Archive{
 		Prefix:  pre,
-		Archive: aws.String(sanitizePath(*pre.Server + WalPath + walFileName + ".lzo")),
+		Archive: aws.String(sanitizePath(walFullPath)),
 	}
-	// Check existence of compressed LZO WAL file
-	exists, err := archive.CheckExistence()
+
+	exists, err = archive.CheckExistence()
+	if err != nil || !exists {
+		return
+	}
+
+	archiveReader, err = archive.GetArchive()
+	return
+}
+
+func decompressWALFile(archiveReader io.ReadCloser, dstLocation string, decompressor Decompressor) error {
+	crypter := OpenPGPCrypter{}
+	if crypter.IsUsed() {
+		reader, err := crypter.Decrypt(archiveReader)
+		if err != nil {
+			return err
+		}
+		archiveReader = ReadCascadeCloser{reader, archiveReader}
+	}
+
+	file, err := os.OpenFile(dstLocation, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
 	if err != nil {
-		log.Fatalf("%+v\n", err)
+		return err
 	}
-	var crypter = OpenPGPCrypter{}
-	if exists {
-		archiveReader, err := archive.GetArchive()
+
+	err = decompressor.Decompress(file, archiveReader)
+	if err != nil {
+		return err
+	}
+	return file.Close()
+}
+
+// DownloadAndDecompressWALFile downloads a file and writes it to local file
+func DownloadAndDecompressWALFile(pre *S3Prefix, walFileName string, dstLocation string) {
+	for _, decompressor := range Decompressors {
+		archiveReader, exists, err := tryDownloadWALFile(pre, *pre.Server + WalPath + walFileName + "." + decompressor.FileExtension())
 		if err != nil {
 			log.Fatalf("%+v\n", err)
 		}
-
-		if crypter.IsUsed() {
-			var reader io.Reader
-			reader, err = crypter.Decrypt(archiveReader)
-			if err != nil {
-				log.Fatalf("%v\n", err)
-			}
-			archiveReader = ReadCascadeCloser{reader, archiveReader}
+		if !exists {
+			continue
 		}
-
-		f, err := os.Create(location)
-		if err != nil {
-			log.Fatalf("%v\n", err)
-		}
-
-		err = DecompressLzo(f, archiveReader)
+		err = decompressWALFile(archiveReader, dstLocation, decompressor)
 		if err != nil {
 			log.Fatalf("%+v\n", err)
-		}
-		f.Close()
-	} else if !exists {
-		// Check existence of compressed LZ4 WAL file
-		archive.Archive = aws.String(sanitizePath(*pre.Server + WalPath + walFileName + "." + Lz4FileExtension))
-		exists, err = archive.CheckExistence()
-		if err != nil {
-			log.Fatalf("%+v\n", err)
-		}
-
-		if exists {
-			archiveReader, err := archive.GetArchive()
-			if err != nil {
-				log.Fatalf("%+v\n", err)
-			}
-
-			if crypter.IsUsed() {
-				var reader io.Reader
-				reader, err = crypter.Decrypt(archiveReader)
-				if err != nil {
-					log.Fatalf("%v\n", err)
-				}
-				archiveReader = ReadCascadeCloser{reader, archiveReader}
-			}
-
-			file, err := os.OpenFile(location, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
-			if err != nil {
-				log.Fatalf("%v\n", err)
-			}
-
-			size, err := DecompressLz4(file, archiveReader)
-			if err != nil {
-				log.Fatalf("%+v\n", err)
-			}
-			if size != int64(WalSegmentSize) {
-				log.Fatal("Download WAL error: wrong size ", size)
-			}
-			err = file.Close()
-			if err != nil {
-				log.Fatalf("%+v\n", err)
-			}
-		} else {
-			log.Printf("Archive '%s' does not exist.\n", walFileName)
 		}
 	}
+	log.Printf("Archive '%s' does not exist.\n", walFileName)
 }
 
 // HandleWALPush is invoked to perform wal-g wal-push

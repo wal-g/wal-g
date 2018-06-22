@@ -1,11 +1,10 @@
 package walg
 
 import (
-	"encoding/binary"
-	"github.com/pkg/errors"
-	"github.com/rasky/go-lzo"
 	"io"
-	"regexp"
+	"github.com/pkg/errors"
+	"encoding/binary"
+	"github.com/rasky/go-lzo"
 )
 
 // RaskyReader handles cases when the Rasky lzo package crashes.
@@ -25,20 +24,9 @@ var Uncompressed uint32
 // Compressed is used to log compression ratio.
 var Compressed uint32
 
-// CheckType grabs the file extension from PATH.
-func CheckType(path string) string {
-	re := regexp.MustCompile(`\.([^\.]+)$`)
-	f := re.FindString(path)
-	if f != "" {
-		return f[1:]
-	}
-	return ""
+type LzoDecompressor struct{}
 
-}
-
-// DecompressLzo decompresses an .lzo file. Returns the first error
-// encountered.
-func DecompressLzo(dst io.Writer, src io.Reader) error {
+func (decompressor LzoDecompressor) Decompress(dst io.Writer, src io.Reader) error {
 	skipped := make([]byte, 33)
 
 	n, err := io.ReadFull(src, skipped)
@@ -131,8 +119,6 @@ func DecompressLzo(dst io.Writer, src io.Reader) error {
 	return nil
 }
 
-// ReadCascadeCloser composes io.ReadCloser from two parts
-type ReadCascadeCloser struct {
-	io.Reader
-	io.Closer
+func (decompressor LzoDecompressor) FileExtension() string {
+	return LzoFileExtension
 }

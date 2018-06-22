@@ -164,7 +164,8 @@ func TestDecryptWALElzo(t *testing.T) {
 	}
 
 	buffer := bytes.Buffer{}
-	err = DecompressLzo(&buffer, bytes.NewReader(bytes1))
+	decompressor := LzoDecompressor{}
+	err = decompressor.Decompress(&buffer, bytes.NewReader(bytes1))
 	if err != nil {
 		t.Fatal(err)
 	}

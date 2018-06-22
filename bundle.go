@@ -224,7 +224,7 @@ func (bundle *Bundle) HandleSentinel() error {
 
 	bundle.NewTarBall(false)
 	tarBall := bundle.TarBall
-	tarBall.SetUp(&bundle.Crypter, "pg_control.tar." + Lz4FileExtension)
+	tarBall.SetUp(&bundle.Crypter, "pg_control.tar." + tarBall.FileExtension())
 	tarWriter := tarBall.TarWriter()
 
 	hdr, err := tar.FileInfoHeader(info, fileName)

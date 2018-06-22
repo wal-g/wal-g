@@ -105,6 +105,14 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 	}
 	config = config.WithRegion(region)
 
+	compressionMethod := os.Getenv("WALG_COMPRESSION_METHOD")
+	if compressionMethod == "" {
+		compressionMethod = Lz4AlgorithmName
+	}
+	if _, ok := Compressors[compressionMethod]; !ok {
+		return nil, nil, UnknownCompressionMethodError{}
+	}
+
 	pre := &S3Prefix{
 		Bucket: aws.String(bucket),
 		Server: aws.String(server),
@@ -117,7 +125,7 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 
 	pre.Svc = s3.New(sess)
 
-	uploader := NewTarUploader(pre.Svc, bucket, server, region)
+	uploader := NewTarUploader(bucket, server, region, compressionMethod)
 
 	var con = getMaxUploadConcurrency(10)
 	storageClass, ok := os.LookupEnv("WALG_S3_STORAGE_CLASS")

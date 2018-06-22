@@ -3,7 +3,6 @@ package walg
 import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"sync"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"log"
 	"os"
 	"github.com/pkg/errors"
@@ -27,18 +26,20 @@ type TarUploader struct {
 	bucket               string
 	server               string
 	region               string
+	compressor           Compressor
 	waitGroup            *sync.WaitGroup
 }
 
 // NewTarUploader creates a new tar uploader without the actual
 // S3 uploader. CreateUploader() is used to configure byte size and
 // concurrency streams for the uploader.
-func NewTarUploader(svc s3iface.S3API, bucket, server, region string) *TarUploader {
+func NewTarUploader(bucket, server, region string, compressionMethod string) *TarUploader {
 	return &TarUploader{
 		StorageClass: "STANDARD",
 		bucket:       bucket,
 		server:       server,
 		region:       region,
+		compressor:   Compressors[compressionMethod],
 		waitGroup:    &sync.WaitGroup{},
 	}
 }
@@ -63,11 +64,12 @@ func (tarUploader *TarUploader) Clone() *TarUploader {
 		tarUploader.bucket,
 		tarUploader.server,
 		tarUploader.region,
+		tarUploader.compressor,
 		&sync.WaitGroup{},
 	}
 }
 
-// UploadWal compresses a WAL file using LZ4 and uploads to S3. Returns
+// UploadWal compresses a WAL file and uploads to S3. Returns
 // the first error encountered and an empty string upon failure.
 func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify bool) (string, error) {
 	file, err := os.Open(path)
@@ -77,11 +79,12 @@ func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify boo
 
 	pipeWriter := &CompressingPipeWriter{
 		Input: file,
+		NewCompressingWriter: tarUploader.compressor.NewWriter,
 	}
 
 	pipeWriter.Compress(&OpenPGPCrypter{})
 
-	dstPath := sanitizePath(tarUploader.server + WalPath + filepath.Base(path) + "." + Lz4FileExtension)
+	dstPath := sanitizePath(tarUploader.server + WalPath + filepath.Base(path) + "." + tarUploader.compressor.FileExtension())
 	reader := pipeWriter.Output
 
 	if verify {

@@ -2,7 +2,6 @@ package walg
 
 import (
 	"io"
-	"github.com/pierrec/lz4"
 	"github.com/pkg/errors"
 	"fmt"
 )
@@ -12,6 +11,7 @@ import (
 type CompressingPipeWriter struct {
 	Input  io.Reader
 	Output io.Reader
+	NewCompressingWriter func(io.Writer) ReaderFromWriteCloser
 }
 
 // Compress compresses input to a pipe reader. Output must be used or
@@ -31,7 +31,7 @@ func (pipeWriter *CompressingPipeWriter) Compress(crypter Crypter) {
 	}
 
 	writeIgnorer := &EmptyWriteIgnorer{writeCloser}
-	lzWriter := lz4.NewWriter(writeIgnorer)
+	lzWriter := pipeWriter.NewCompressingWriter(writeIgnorer)
 
 	go func() {
 		_, err := lzWriter.ReadFrom(pipeWriter.Input)
