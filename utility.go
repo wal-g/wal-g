@@ -19,6 +19,8 @@ const (
 
 	// SentinelSuffix is a suffix of backup finish sentinel file
 	SentinelSuffix = "_backup_stop_sentinel.json"
+	DefaultDecompressedBlockMaxSize = 20 << 20
+	NotFoundAWSErrorCode = "NotFound"
 )
 
 // Empty is used for channel signaling.

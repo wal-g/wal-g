@@ -14,7 +14,6 @@ import (
 // FileTarBall represents a tarball that is
 // written to disk.
 type FileTarBall struct {
-	baseDir     string
 	trim        string
 	out         string
 	number      int
@@ -74,9 +73,7 @@ func (fileTarBall *FileTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) e
 	return nil
 }
 
-func (fileTarBall *FileTarBall) BaseDir() string        { return fileTarBall.baseDir }
 func (fileTarBall *FileTarBall) Trim() string           { return fileTarBall.trim }
-func (fileTarBall *FileTarBall) PartCount() int         { return fileTarBall.number }
 func (fileTarBall *FileTarBall) Size() int64            { return fileTarBall.size }
 func (fileTarBall *FileTarBall) AddSize(i int64)        { fileTarBall.size += i }
 func (fileTarBall *FileTarBall) TarWriter() *tar.Writer { return fileTarBall.tarWriter }
@@ -85,7 +82,6 @@ func (fileTarBall *FileTarBall) AwaitUploads()          {}
 
 // NOPTarBall mocks a tarball. Used for testing purposes.
 type NOPTarBall struct {
-	baseDir   string
 	trim      string
 	number    int
 	size      int64
@@ -99,9 +95,7 @@ func (n *NOPTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error {
 	return nil
 }
 
-func (n *NOPTarBall) BaseDir() string { return n.baseDir }
 func (n *NOPTarBall) Trim() string    { return n.trim }
-func (n *NOPTarBall) PartCount() int     { return n.number }
 func (n *NOPTarBall) Size() int64     { return n.size }
 func (n *NOPTarBall) AddSize(i int64) { n.size += i }
 func (n *NOPTarBall) TarWriter() *tar.Writer { return n.tarWriter }

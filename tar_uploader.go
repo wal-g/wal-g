@@ -25,7 +25,6 @@ type TarUploader struct {
 	Success              bool
 	bucket               string
 	server               string
-	region               string
 	compressor           Compressor
 	waitGroup            *sync.WaitGroup
 }
@@ -33,12 +32,11 @@ type TarUploader struct {
 // NewTarUploader creates a new tar uploader without the actual
 // S3 uploader. CreateUploader() is used to configure byte size and
 // concurrency streams for the uploader.
-func NewTarUploader(bucket, server, region string, compressionMethod string) *TarUploader {
+func NewTarUploader(bucket, server, compressionMethod string) *TarUploader {
 	return &TarUploader{
 		StorageClass: "STANDARD",
 		bucket:       bucket,
 		server:       server,
-		region:       region,
 		compressor:   Compressors[compressionMethod],
 		waitGroup:    &sync.WaitGroup{},
 	}
@@ -63,7 +61,6 @@ func (tarUploader *TarUploader) Clone() *TarUploader {
 		tarUploader.Success,
 		tarUploader.bucket,
 		tarUploader.server,
-		tarUploader.region,
 		tarUploader.compressor,
 		&sync.WaitGroup{},
 	}

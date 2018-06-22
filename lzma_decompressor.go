@@ -13,7 +13,7 @@ func (decompressor LzmaDecompressor) Decompress(dst io.Writer, src io.Reader) er
 	if err != nil {
 		return errors.Wrap(err, "DecompressLzma: lzma reader creation failed")
 	}
-	buf := make([]byte, 20<<20)
+	buf := make([]byte, DefaultDecompressedBlockMaxSize)
 	_, err = lzReader.Read(buf)
 	if err != nil {
 		return errors.Wrap(err, "DecompressLzma: lzma decompression failed")

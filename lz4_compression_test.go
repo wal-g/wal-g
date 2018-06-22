@@ -47,7 +47,7 @@ var tests = []struct {
 	{"testing123456789", 16, 4},
 }
 
-func TestLz4Close(t *testing.T) {
+func TestCascadeFileCloser(t *testing.T) {
 	for _, tt := range tests {
 		b := &BufCloser{bytes.NewBufferString(tt.testString), false}
 		lz := &walg.CascadeWriteCloser{
@@ -84,7 +84,7 @@ func TestLz4Close(t *testing.T) {
 	}
 }
 
-func TestLz4CloseError(t *testing.T) {
+func TestCascadeFileCloserError(t *testing.T) {
 	mock := &ErrorWriteCloser{}
 	lz := &walg.CascadeWriteCloser{
 		WriteCloser:     lz4.NewWriter(mock),
@@ -103,7 +103,7 @@ func TestLz4CloseError(t *testing.T) {
 
 }
 
-func TestLzPipeWriter(t *testing.T) {
+func TestCompressingPipeWriter(t *testing.T) {
 	for _, tt := range tests {
 		in := &BufCloser{bytes.NewBufferString(tt.testString), false}
 		lz := walg.NewLz4CompressingPipeWriter(in)
@@ -124,7 +124,7 @@ func TestLzPipeWriter(t *testing.T) {
 
 }
 
-func TestLzPipeWriterBigChunk(t *testing.T) {
+func TestCompressingPipeWriterBigChunk(t *testing.T) {
 	L := 1024 * 1024 // 1Mb
 	b := make([]byte, L)
 	rand.Read(b)
@@ -164,7 +164,7 @@ func (er *DelayedErrorReader) Read(p []byte) (int, error) {
 	}
 }
 
-func TestLzPipeWriterErrorPropogation(t *testing.T) {
+func TestCompressingPipeWriterErrorPropagation(t *testing.T) {
 	L := 1024 * 1024 * 4
 	b := make([]byte, L)
 	rand.Read(b)
@@ -181,7 +181,7 @@ func TestLzPipeWriterErrorPropogation(t *testing.T) {
 	}
 }
 
-func TestLzPipeWriterError(t *testing.T) {
+func TestCompressingPipeWriterError(t *testing.T) {
 	lz := walg.NewLz4CompressingPipeWriter(&ErrorReader{})
 
 	lz.Compress(walg.MockDisarmedCrypter())

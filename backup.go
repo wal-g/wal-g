@@ -78,7 +78,7 @@ func (backup *Backup) CheckExistence() (bool, error) {
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
 			switch awsErr.Code() {
-			case "NotFound":
+			case NotFoundAWSErrorCode:
 				return false, nil
 			default:
 				return false, awsErr

@@ -330,7 +330,6 @@ func TestWalk(t *testing.T) {
 	}
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
 	bundle.TarBallMaker = &tools.FileTarBallMaker{
-		BaseDir: filepath.Base(data),
 		Trim:    data,
 		Out:     compressed,
 	}

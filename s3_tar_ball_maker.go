@@ -3,7 +3,6 @@ package walg
 // S3TarBallMaker creates tarballs that are uploaded to S3.
 type S3TarBallMaker struct {
 	partCount        int
-	BaseDir          string
 	Trim             string
 	BkupName         string
 	TarUploader      *TarUploader
@@ -21,7 +20,6 @@ func (tarBallMaker *S3TarBallMaker) Make(dedicatedUploader bool) TarBall {
 	}
 	return &S3TarBall{
 		partCount:        tarBallMaker.partCount,
-		baseDir:          tarBallMaker.BaseDir,
 		trim:             tarBallMaker.Trim,
 		bkupName:         tarBallMaker.BkupName,
 		tarUploader:      uploader,

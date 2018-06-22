@@ -42,7 +42,6 @@ func main() {
 
 	if nop {
 		bundle.TarBallMaker = &tools.NOPTarBallMaker{
-			BaseDir: filepath.Base(in),
 			Trim:    in,
 		}
 	} else if !s3 && outDir == "" {
@@ -69,7 +68,6 @@ func main() {
 		}
 
 		bundle.TarBallMaker = &tools.FileTarBallMaker{
-			BaseDir: filepath.Base(in),
 			Trim:    in,
 			Out:     outDir,
 		}
@@ -89,7 +87,6 @@ func main() {
 		}
 
 		bundle.TarBallMaker = &walg.S3TarBallMaker{
-			BaseDir:     filepath.Base(in),
 			Trim:        in,
 			BkupName:    n,
 			TarUploader: tu,

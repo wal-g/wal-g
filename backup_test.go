@@ -61,7 +61,7 @@ func (m *mockS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput,
 
 func (m *mockS3Client) HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjectOutput, error) {
 	if m.err && m.notFound {
-		return nil, awserr.New("NotFound", "mock HeadObject error", nil)
+		return nil, awserr.New(walg.NotFoundAWSErrorCode, "mock HeadObject error", nil)
 	} else if m.err {
 		return nil, awserr.New("MockHeadObject", "mock HeadObject error", nil)
 	}

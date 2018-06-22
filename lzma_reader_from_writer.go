@@ -18,7 +18,7 @@ func NewLzmaReaderFromWriter (dst io.Writer) (*LzmaReaderFromWriter, error) {
 	}
 	return &LzmaReaderFromWriter{
 		Writer: *lzmaWriter,
-		BlockMaxSize: 20 << 20,
+		BlockMaxSize: DefaultDecompressedBlockMaxSize,
 	}, nil
 }
 

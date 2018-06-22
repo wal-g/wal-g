@@ -86,7 +86,7 @@ func handleTar(writeCloser io.WriteCloser, readerMaker ReaderMaker, crypter Cryp
 	return nil
 }
 
-// ExtractAll Handles all files passed in. Supports `.lzo`, `.lz4, and `.tar`.
+// ExtractAll Handles all files passed in. Supports `.lzo`, `.lz4`, `.lzma`, and `.tar`.
 // File type `.nop` is used for testing purposes. Each file is extracted
 // in its own goroutine and ExtractAll will wait for all goroutines to finish.
 // Returns the first error encountered.

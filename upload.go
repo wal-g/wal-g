@@ -125,7 +125,7 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 
 	pre.Svc = s3.New(sess)
 
-	uploader := NewTarUploader(bucket, server, region, compressionMethod)
+	uploader := NewTarUploader(bucket, server, compressionMethod)
 
 	var con = getMaxUploadConcurrency(10)
 	storageClass, ok := os.LookupEnv("WALG_S3_STORAGE_CLASS")
