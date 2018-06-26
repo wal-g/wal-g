@@ -578,6 +578,7 @@ func DownloadAndDecompressWALFile(pre *S3Prefix, walFileName string, dstLocation
 		if err != nil {
 			log.Fatalf("%+v\n", err)
 		}
+		return
 	}
 	log.Printf("Archive '%s' does not exist.\n", walFileName)
 }

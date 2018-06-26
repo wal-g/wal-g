@@ -164,20 +164,32 @@ func (er *DelayedErrorReader) Read(p []byte) (int, error) {
 	}
 }
 
-func TestCompressingPipeWriterErrorPropagation(t *testing.T) {
+func testCompressingPipeWriterErrorPropagation(compressor walg.Compressor, t *testing.T) error {
 	L := 1024 * 1024 * 4
 	b := make([]byte, L)
 	rand.Read(b)
 	in := &BufCloser{bytes.NewBuffer(b), false}
-	lz := walg.NewLz4CompressingPipeWriter(in)
+	lz := &walg.CompressingPipeWriter{
+		Input: in,
+		NewCompressingWriter: func(writer io.Writer) walg.ReaderFromWriteCloser {
+			return compressor.NewWriter(writer)
+		},
+	}
 
 	lz.Compress(walg.MockDisarmedCrypter())
 
 	decompressed := &BufCloser{&bytes.Buffer{}, false}
-	decompressor := walg.Lz4Decompressor{}
+	decompressor := walg.FindDecompressor(compressor.FileExtension())
 	err := decompressor.Decompress(decompressed, &DelayedErrorReader{lz.Output, L})
-	if err == nil {
-		t.Error("lz4 did not propagate error of the buffer")
+	return err
+}
+
+func TestCompressingPipeWriterErrorPropagation(t *testing.T) {
+	for _, compressor := range walg.Compressors {
+		err := testCompressingPipeWriterErrorPropagation(compressor, t)
+		if err == nil {
+			t.Errorf("%v did not propagate error of the buffer", compressor.FileExtension())
+		}
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"strings"
 	"regexp"
+	"io"
 )
 
 const (
@@ -18,9 +19,9 @@ const (
 	backupNamePrefix = "base_"
 
 	// SentinelSuffix is a suffix of backup finish sentinel file
-	SentinelSuffix = "_backup_stop_sentinel.json"
-	DefaultDecompressedBlockMaxSize = 20 << 20
-	NotFoundAWSErrorCode = "NotFound"
+	SentinelSuffix         = "_backup_stop_sentinel.json"
+	CompressedBlockMaxSize = 20 << 20
+	NotFoundAWSErrorCode   = "NotFound"
 )
 
 // Empty is used for channel signaling.
@@ -162,4 +163,22 @@ func CheckType(path string) string {
 		return f[1:]
 	}
 	return ""
+}
+
+func readFrom(dst io.Writer, src io.Reader) (n int64, err error) {
+	buf := make([]byte, CompressedBlockMaxSize)
+	for {
+		m, er := io.ReadFull(src, buf)
+		n += int64(m)
+		if er == nil || er == io.ErrUnexpectedEOF || er == io.EOF {
+			if _, err = dst.Write(buf[:m]); err != nil {
+				return
+			}
+			if er == nil {
+				continue
+			}
+			return
+		}
+		return n, er
+	}
 }

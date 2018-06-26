@@ -8,16 +8,19 @@ import (
 const (
 	Lz4AlgorithmName  = "lz4"
 	LzmaAlgorithmName = "lzma"
+	ZstdAlgorithmName = "zstd"
 
 	Lz4FileExtension  = "lz4"
 	LzmaFileExtension = "lzma"
+	ZstdFileExtension = "zst"
 	LzoFileExtension  = "lzo"
 )
+var compressingAlgorithms = []string{Lz4AlgorithmName, LzmaAlgorithmName, ZstdAlgorithmName}
 
 type UnknownCompressionMethodError struct{}
 
 func (err UnknownCompressionMethodError) Error() string {
-	return fmt.Sprintf("Unkown compression method, supported mathods are: %v, %v", Lz4AlgorithmName, LzmaAlgorithmName)
+	return fmt.Sprintf("Unkown compression method, supported methods are: %v", compressingAlgorithms)
 }
 
 type Compressor interface {
@@ -33,6 +36,7 @@ type Decompressor interface {
 var Compressors map[string]Compressor
 var Decompressors = []Decompressor{
 	Lz4Decompressor{},
+	ZstdDecompressor{},
 	LzmaDecompressor{},
 	LzoDecompressor{},
 }
@@ -41,4 +45,5 @@ func init() {
 	Compressors = make(map[string]Compressor)
 	Compressors[Lz4AlgorithmName] = Lz4Compressor{}
 	Compressors[LzmaAlgorithmName] = LzmaCompressor{}
+	Compressors[ZstdAlgorithmName] = ZstdCompressor{}
 }

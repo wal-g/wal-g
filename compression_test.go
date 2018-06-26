@@ -10,7 +10,7 @@ import (
 	"io"
 )
 
-func findDecompressor(compressorFileExtension string) Decompressor {
+func FindDecompressor(compressorFileExtension string) Decompressor {
 	for _, decompressor := range Decompressors {
 		if decompressor.FileExtension() == compressorFileExtension {
 			return decompressor
@@ -86,7 +86,7 @@ func decompressCompressedFile(compressorFileExtension string) error {
 	if err != nil {
 		return err
 	}
-	decompressor := findDecompressor(compressorFileExtension)
+	decompressor := FindDecompressor(compressorFileExtension)
 	err = decompressor.Decompress(decompressedFile, compressedFile)
 	return err
 }
@@ -131,7 +131,6 @@ func testCompressor(compressor Compressor, initialFilePath string, t *testing.T)
 		return
 	}
 }
-var compressingAlgorithms = []string{Lz4AlgorithmName, LzmaAlgorithmName}
 
 func TestSmallFileCompression(t *testing.T) {
 	for _, compressingAlgorithm := range compressingAlgorithms {
