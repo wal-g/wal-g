@@ -69,14 +69,10 @@ func generateData(t *testing.T) string {
 	fmt.Println(dir)
 
 	sb := tools.NewStrideByteReader(10)
-	lr := &io.LimitedReader{
-		R: sb,
-		N: int64(1024 * 1024),
-	}
 
 	// Generates 5 1MB files
 	for i := 1; i < 6; i++ {
-		lr = &io.LimitedReader{
+		lr := &io.LimitedReader{
 			R: sb,
 			N: int64(100),
 		}
@@ -114,7 +110,7 @@ func generateData(t *testing.T) string {
 	}
 
 	// Generate large enough file (500MB) so that goroutine doesn't finish before extracting pg_control
-	lr = &io.LimitedReader{
+	lr := &io.LimitedReader{
 		R: sb,
 		N: int64(500 * 1024 * 1024),
 	}
