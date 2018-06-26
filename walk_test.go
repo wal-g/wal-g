@@ -11,8 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"testing"
 	"sync"
+	"testing"
 )
 
 const BUFSIZE = 4 * 1024
@@ -330,8 +330,8 @@ func TestWalk(t *testing.T) {
 	}
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
 	bundle.TarBallMaker = &tools.FileTarBallMaker{
-		Trim:    data,
-		Out:     compressed,
+		Trim: data,
+		Out:  compressed,
 	}
 	err := os.MkdirAll(compressed, 0766)
 	if err != nil {

@@ -1,10 +1,10 @@
 package walg
 
 import (
-	"io"
-	"github.com/pkg/errors"
 	"encoding/binary"
+	"github.com/pkg/errors"
 	"github.com/rasky/go-lzo"
+	"io"
 )
 
 // RaskyReader handles cases when the Rasky lzo package crashes.
@@ -67,7 +67,7 @@ func readFileComment(src io.Reader) error {
 }
 
 func readUselessData(src io.Reader) error {
-	uselessDataReaders := []func(reader io.Reader) error {
+	uselessDataReaders := []func(reader io.Reader) error{
 		readSkipped,
 		readFileName,
 		readFileComment,

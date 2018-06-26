@@ -10,12 +10,11 @@ import (
 	"strings"
 )
 
-
 // ExcludedFilenames is a list of excluded members from the bundled backup.
 var ExcludedFilenames = make(map[string]Empty)
 
 func init() {
-	filesToExclude := []string {
+	filesToExclude := []string{
 		"pg_log", "pg_xlog", "pg_wal",
 		"pgsql_tmp", "postgresql.auto.conf.tmp", "postmaster.pid", "postmaster.opts", "recovery.conf",
 		"pg_dynshmem", "pg_notify", "pg_replslot", "pg_serial", "pg_stat_tmp", "pg_snapshots", "pg_subtrans", // Directories
@@ -25,7 +24,6 @@ func init() {
 		ExcludedFilenames[filename] = Empty{}
 	}
 }
-
 
 // ZeroReader generates a slice of zeroes. Used to pad
 // tar in cases where length of file changes.
@@ -37,7 +35,6 @@ func (z *ZeroReader) Read(p []byte) (int, error) {
 	return n, nil
 
 }
-
 
 // HandleTar creates underlying tar writer and handles one given file.
 // Does not follow symlinks. If file is in ExcludedFilenames, will not be included

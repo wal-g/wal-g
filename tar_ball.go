@@ -2,7 +2,6 @@ package walg
 
 import "archive/tar"
 
-
 // A TarBall represents one tar file.
 type TarBall interface {
 	SetUp(crypter Crypter, args ...string)

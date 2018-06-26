@@ -1,11 +1,11 @@
 package walg
 
 import (
-	"io"
 	"github.com/DataDog/zstd"
+	"io"
 )
 
-type ZstdDecompressor struct {}
+type ZstdDecompressor struct{}
 
 func (decompressor ZstdDecompressor) Decompress(dst io.Writer, src io.Reader) error {
 	lzReader := zstd.NewReader(src)
@@ -17,4 +17,3 @@ func (decompressor ZstdDecompressor) Decompress(dst io.Writer, src io.Reader) er
 func (decompressor ZstdDecompressor) FileExtension() string {
 	return ZstdFileExtension
 }
-

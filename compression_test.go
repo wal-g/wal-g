@@ -1,13 +1,13 @@
 package walg
 
 import (
-	"testing"
-	"os"
-	"io/ioutil"
 	"bytes"
 	"fmt"
-	"math/rand"
 	"io"
+	"io/ioutil"
+	"math/rand"
+	"os"
+	"testing"
 )
 
 func FindDecompressor(compressorFileExtension string) Decompressor {
@@ -21,14 +21,14 @@ func FindDecompressor(compressorFileExtension string) Decompressor {
 
 const (
 	SmallFilePath        = "./testdata/small_compression_test_data"
-	BigFilePath 		 = "./testdata/big_compression_test_data"
+	BigFilePath          = "./testdata/big_compression_test_data"
 	CompressedFilePath   = "./testdata/compressed_file."
 	DecompressedFilePath = "./testdata/decompressed_file"
 )
 
 type BiasedRandomReader struct {
 	sourceSize int
-	bytesRead int
+	bytesRead  int
 }
 
 func NewBiasedRandomReader(sourceSize int) *BiasedRandomReader {
@@ -36,9 +36,9 @@ func NewBiasedRandomReader(sourceSize int) *BiasedRandomReader {
 }
 
 func (reader *BiasedRandomReader) Read(p []byte) (n int, err error) {
-	toRead := min(len(p), reader.sourceSize -  reader.bytesRead)
+	toRead := min(len(p), reader.sourceSize-reader.bytesRead)
 	for i := 0; i < toRead; i++ {
-		p[i] = byte(min(10, rand.Int() % 256))
+		p[i] = byte(min(10, rand.Int()%256))
 	}
 	reader.bytesRead += toRead
 	if toRead < len(p) {
@@ -48,7 +48,7 @@ func (reader *BiasedRandomReader) Read(p []byte) (n int, err error) {
 }
 
 type DifferentFileError struct {
-	firstFileContent []byte
+	firstFileContent  []byte
 	secondFileContent []byte
 }
 
@@ -102,7 +102,7 @@ func compareDecompressedFileWithInitial(initialFilePath string) error {
 	}
 	if bytes.Compare(decompressedFileContent, initialFileContent) != 0 {
 		return DifferentFileError{
-			firstFileContent: decompressedFileContent,
+			firstFileContent:  decompressedFileContent,
 			secondFileContent: initialFileContent,
 		}
 	}

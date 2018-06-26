@@ -1,10 +1,10 @@
 package walg
 
 import (
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"io"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
+	"io"
 )
 
 // Archive contains information associated with

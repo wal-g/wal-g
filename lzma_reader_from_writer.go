@@ -9,7 +9,7 @@ type LzmaReaderFromWriter struct {
 	lzma.Writer
 }
 
-func NewLzmaReaderFromWriter (dst io.Writer) (*LzmaReaderFromWriter, error) {
+func NewLzmaReaderFromWriter(dst io.Writer) (*LzmaReaderFromWriter, error) {
 	lzmaWriter, err := lzma.NewWriter(dst)
 	if err != nil {
 		return nil, err

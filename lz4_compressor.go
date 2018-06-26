@@ -1,8 +1,8 @@
 package walg
 
 import (
-	"io"
 	"github.com/pierrec/lz4"
+	"io"
 )
 
 type Lz4Compressor struct{}

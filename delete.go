@@ -5,8 +5,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"log"
 	"strconv"
-	"time"
 	"strings"
+	"time"
 )
 
 const DeleteUsageText = "delete requires at least 2 parameters" + `

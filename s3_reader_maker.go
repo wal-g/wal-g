@@ -1,9 +1,9 @@
 package walg
 
 import (
-	"io"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
+	"io"
 )
 
 // S3ReaderMaker handles cases where backups need to be uploaded to

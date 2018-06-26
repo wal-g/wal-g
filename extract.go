@@ -2,9 +2,9 @@ package walg
 
 import (
 	"archive/tar"
+	"fmt"
 	"github.com/pkg/errors"
 	"io"
-	"fmt"
 )
 
 // EmptyWriteIgnorer handles 0 byte write in LZ4 package

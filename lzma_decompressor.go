@@ -1,9 +1,9 @@
 package walg
 
 import (
-	"io"
-	"github.com/ulikunitz/xz/lzma"
 	"github.com/pkg/errors"
+	"github.com/ulikunitz/xz/lzma"
+	"io"
 )
 
 type LzmaDecompressor struct{}

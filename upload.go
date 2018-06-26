@@ -2,9 +2,6 @@ package walg
 
 import (
 	"fmt"
-	"net/url"
-	"os"
-	"strconv"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/defaults"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -13,6 +10,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pkg/errors"
+	"net/url"
+	"os"
+	"strconv"
 )
 
 var MaxUploadRetries = 7
@@ -162,5 +162,3 @@ func CreateUploader(svc s3iface.S3API, partsize, concurrency int) s3manageriface
 	})
 	return up
 }
-
-

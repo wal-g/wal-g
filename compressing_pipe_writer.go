@@ -1,16 +1,16 @@
 package walg
 
 import (
-	"io"
-	"github.com/pkg/errors"
 	"fmt"
+	"github.com/pkg/errors"
+	"io"
 )
 
 // CompressingPipeWriter allows for flexibility of using compressed output.
 // Input is read and compressed to a pipe reader.
 type CompressingPipeWriter struct {
-	Input  io.Reader
-	Output io.Reader
+	Input                io.Reader
+	Output               io.Reader
 	NewCompressingWriter func(io.Writer) ReaderFromWriteCloser
 }
 

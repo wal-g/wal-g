@@ -18,5 +18,3 @@ func (writer *ZstdReaderFromWriter) ReadFrom(reader io.Reader) (n int64, err err
 	n, err = readFrom(writer, reader)
 	return
 }
-
-

@@ -1,15 +1,15 @@
 package walg
 
 import (
-	"io"
 	"archive/tar"
-	"fmt"
-	"github.com/pkg/errors"
-	"log"
-	"encoding/json"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/aws/aws-sdk-go/aws"
 	"bytes"
+	"encoding/json"
+	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/pkg/errors"
+	"io"
+	"log"
 )
 
 // S3TarBall represents a tar file that is
@@ -112,11 +112,13 @@ func (tarBall *S3TarBall) Trim() string { return tarBall.trim }
 func (tarBall *S3TarBall) Size() int64 { return tarBall.size }
 
 // AddSize to total Size
-func (tarBall *S3TarBall) AddSize(i int64)        { tarBall.size += i }
+func (tarBall *S3TarBall) AddSize(i int64) { tarBall.size += i }
 
 func (tarBall *S3TarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
 
-func (tarBall *S3TarBall) FileExtension() string { return tarBall.tarUploader.compressor.FileExtension() }
+func (tarBall *S3TarBall) FileExtension() string {
+	return tarBall.tarUploader.compressor.FileExtension()
+}
 
 // Finish writes a .json file description and uploads it with the
 // the backup name. Finish will wait until all tar file parts

@@ -1,15 +1,15 @@
 package walg
 
 import (
+	"encoding/json"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
-	"strconv"
-	"encoding/json"
-	"strings"
 	"regexp"
-	"io"
+	"strconv"
+	"strings"
 )
 
 const (

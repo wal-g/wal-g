@@ -1,8 +1,8 @@
 package walg
 
 import (
-	"io"
 	"github.com/pierrec/lz4"
+	"io"
 )
 
 func NewLz4MockTarUploader() *TarUploader {

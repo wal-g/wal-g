@@ -1,17 +1,17 @@
 package walg
 
 import (
-	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
-	"sync"
-	"log"
-	"os"
-	"github.com/pkg/errors"
-	"path/filepath"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
-	"strings"
-	"io"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
+	"github.com/pkg/errors"
+	"io"
+	"log"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
 )
 
 // TarUploader contains fields associated with uploading tarballs.
@@ -75,7 +75,7 @@ func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify boo
 	}
 
 	pipeWriter := &CompressingPipeWriter{
-		Input: file,
+		Input:                file,
 		NewCompressingWriter: tarUploader.compressor.NewWriter,
 	}
 

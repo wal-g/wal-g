@@ -1,8 +1,8 @@
 package walg
 
 import (
-	"io"
 	"github.com/pkg/errors"
+	"io"
 )
 
 // CascadeWriteCloser bundles multiple closures

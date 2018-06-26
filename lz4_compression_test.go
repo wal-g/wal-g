@@ -51,8 +51,8 @@ func TestCascadeFileCloser(t *testing.T) {
 	for _, tt := range tests {
 		b := &BufCloser{bytes.NewBufferString(tt.testString), false}
 		lz := &walg.CascadeWriteCloser{
-			WriteCloser:     lz4.NewWriter(b),
-			Underlying: b,
+			WriteCloser: lz4.NewWriter(b),
+			Underlying:  b,
 		}
 
 		random := make([]byte, tt.written)
@@ -87,8 +87,8 @@ func TestCascadeFileCloser(t *testing.T) {
 func TestCascadeFileCloserError(t *testing.T) {
 	mock := &ErrorWriteCloser{}
 	lz := &walg.CascadeWriteCloser{
-		WriteCloser:     lz4.NewWriter(mock),
-		Underlying: mock,
+		WriteCloser: lz4.NewWriter(mock),
+		Underlying:  mock,
 	}
 
 	_, err := lz.Write([]byte{byte('a')})

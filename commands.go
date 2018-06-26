@@ -20,10 +20,10 @@ import (
 	"sync"
 )
 
-type PgControlMissingError struct { }
+type PgControlMissingError struct{}
 
 func (err PgControlMissingError) Error() string {
-	return "Corrupt backup: missing pg_control"
+	return "Corrupted backup: missing pg_control"
 }
 
 // HandleDelete is invoked to perform wal-g delete
@@ -196,7 +196,7 @@ func extractPgControl(backup *Backup, pre *S3Prefix, fileTarInterpreter *FileTar
 			Key:        aws.String(name),
 			FileFormat: CheckType(name),
 		}
-		err = ExtractAll(fileTarInterpreter , sentinel)
+		err = ExtractAll(fileTarInterpreter, sentinel)
 		if serr, ok := err.(*UnsupportedFileTypeError); ok {
 			return serr
 		}
@@ -567,7 +567,7 @@ func decompressWALFile(archiveReader io.ReadCloser, dstLocation string, decompre
 // DownloadAndDecompressWALFile downloads a file and writes it to local file
 func DownloadAndDecompressWALFile(pre *S3Prefix, walFileName string, dstLocation string) {
 	for _, decompressor := range Decompressors {
-		archiveReader, exists, err := tryDownloadWALFile(pre, *pre.Server + WalPath + walFileName + "." + decompressor.FileExtension())
+		archiveReader, exists, err := tryDownloadWALFile(pre, *pre.Server+WalPath+walFileName+"."+decompressor.FileExtension())
 		if err != nil {
 			log.Fatalf("%+v\n", err)
 		}
@@ -580,18 +580,18 @@ func DownloadAndDecompressWALFile(pre *S3Prefix, walFileName string, dstLocation
 		}
 		return
 	}
-	log.Printf("Archive '%s' does not exist.\n", walFileName)
+	log.Fatalf("Archive '%s' does not exist.\n", walFileName)
 }
 
 // HandleWALPush is invoked to perform wal-g wal-push
 func HandleWALPush(tarUploader *TarUploader, dirArc string, pre *S3Prefix, verify bool) {
-	bu := BgUploader{}
+	bgUploader := BgUploader{}
 	// Look for new WALs while doing main upload
-	bu.Start(dirArc, int32(getMaxUploadConcurrency(16)-1), tarUploader, pre, verify)
+	bgUploader.Start(dirArc, int32(getMaxUploadConcurrency(16)-1), tarUploader, pre, verify)
 
 	UploadWALFile(tarUploader, dirArc, pre, verify)
 
-	bu.Stop()
+	bgUploader.Stop()
 }
 
 // UploadWALFile from FS to the cloud

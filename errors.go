@@ -4,7 +4,6 @@ import (
 	"fmt"
 )
 
-
 // UnsetEnvVarError is used to indicate required environment
 // variables for WAL-G.
 type UnsetEnvVarError struct {
