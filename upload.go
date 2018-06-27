@@ -15,7 +15,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-var MaxUploadRetries = 7
+// MaxRetries limit upload and download retries during interaction with S3
+var MaxRetries = 15
 
 // Given an S3 bucket name, attempt to determine its region
 func findS3BucketRegion(bucket string, config *aws.Config) (string, error) {
@@ -78,7 +79,7 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 
 	config := defaults.Get().Config
 
-	config.MaxRetries = &MaxUploadRetries
+	config.MaxRetries = &MaxRetries
 	if _, err := config.Credentials.Get(); err != nil {
 		return nil, nil, errors.Wrapf(err, "Configure: failed to get AWS credentials; please specify AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY")
 	}
