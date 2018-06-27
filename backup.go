@@ -78,7 +78,7 @@ func (backup *Backup) CheckExistence() (bool, error) {
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
 			switch awsErr.Code() {
-			case "NotFound":
+			case NotFoundAWSErrorCode:
 				return false, nil
 			default:
 				return false, awsErr
@@ -185,7 +185,7 @@ func fetchSentinel(backupName string, bk *Backup, pre *S3Prefix) (dto S3TarBallS
 	previousBackupReader := S3ReaderMaker{
 		Backup:     bk,
 		Key:        aws.String(*pre.Server + BaseBackupsPath + latestSentinel),
-		FileFormat: CheckType(latestSentinel),
+		FileFormat: GetFileExtension(latestSentinel),
 	}
 	prevBackup, err := previousBackupReader.Reader()
 	if err != nil {

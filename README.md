@@ -4,7 +4,7 @@
 
 WAL-G is an archival restoration tool for Postgres.
 
-WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4 compression, multiple processors and non-exclusive base backups for Postgres. More information on the design and implementation of WAL-G can be found on the Citus Data blog post ["Introducing WAL-G by Citus: Faster Disaster Recovery for Postgres"](https://www.citusdata.com/blog/2017/08/18/introducing-wal-g-faster-restores-for-postgres/).
+WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4, LZMA or Zstd compression, multiple processors and non-exclusive base backups for Postgres. More information on the design and implementation of WAL-G can be found on the Citus Data blog post ["Introducing WAL-G by Citus: Faster Disaster Recovery for Postgres"](https://www.citusdata.com/blog/2017/08/18/introducing-wal-g-faster-restores-for-postgres/).
 
 **Table of Contents**
 - [Installation](#installation)
@@ -111,6 +111,10 @@ To configure GPG key for encryption and decryption. By default, no encryption is
 
  To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not exceeded). `WALG_DELTA_ORIGIN` can be LATEST (chaining increments), LATEST_FULL (for bases where volatile part is compact and chaining has no meaning - deltas overwrite each other). Defaults to LATEST.
 
+* `WALG_COMPRESSION_METHOD`
+
+ To configure compression method used for backups. Possible options are: `lz4`, 'lzma', `zstd`. Default method is `lz4`. LZ4 is the fastest method, but compression ratio is bad.
+ LZMA is way much slower, however it compresses backups about 6 times better than LZ4. Zstd is a good trade-off between speed and compression ratio which is about 3 times better than LZ4.
 
 Usage
 -----

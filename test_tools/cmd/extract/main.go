@@ -50,14 +50,14 @@ func main() {
 			h := &tools.HTTPReaderMaker{
 				Client:     &http.Client{Transport: tls},
 				Key:        val,
-				FileFormat: walg.CheckType(val),
+				FileFormat: walg.GetFileExtension(val),
 			}
 
 			out[i] = h
 		} else {
 			f := &tools.FileReaderMaker{
 				Key:        val,
-				FileFormat: walg.CheckType(val),
+				FileFormat: walg.GetFileExtension(val),
 			}
 			out[i] = f
 		}

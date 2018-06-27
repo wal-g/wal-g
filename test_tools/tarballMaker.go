@@ -10,7 +10,6 @@ import (
 type FileTarBallMaker struct {
 	number  int
 	size    int64
-	BaseDir string
 	Trim    string
 	Out     string
 }
@@ -21,7 +20,6 @@ func (f *FileTarBallMaker) Make(inheritState bool) walg.TarBall {
 	return &FileTarBall{
 		number:  f.number,
 		size:    f.size,
-		baseDir: f.BaseDir,
 		trim:    f.Trim,
 		out:     f.Out,
 	}
@@ -32,7 +30,6 @@ func (f *FileTarBallMaker) Make(inheritState bool) walg.TarBall {
 type NOPTarBallMaker struct {
 	number  int
 	size    int64
-	BaseDir string
 	Trim    string
 }
 
@@ -42,7 +39,6 @@ func (n *NOPTarBallMaker) Make(inheritState bool) walg.TarBall {
 	return &NOPTarBall{
 		number:  n.number,
 		size:    n.size,
-		baseDir: n.BaseDir,
 		trim:    n.Trim,
 	}
 }

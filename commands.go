@@ -20,6 +20,12 @@ import (
 	"sync"
 )
 
+type PgControlMissingError struct{}
+
+func (err PgControlMissingError) Error() string {
+	return "Corrupted backup: missing pg_control"
+}
+
 // HandleDelete is invoked to perform wal-g delete
 func HandleDelete(pre *S3Prefix, args []string) {
 	cfg := ParseDeleteArguments(args, printDeleteUsageAndFail)
@@ -167,8 +173,40 @@ func deltaFetchRecursion(backupName string, pre *S3Prefix, dirArc string) (lsn *
 	return
 }
 
+func extractPgControl(backup *Backup, pre *S3Prefix, fileTarInterpreter *FileTarInterpreter) error {
+	// Extract pg_control last. If pg_control does not exist, program exits with error code 1.
+	for _, decompressor := range Decompressors {
+		name := *backup.Path + *backup.Name + "/tar_partitions/pg_control.tar." + decompressor.FileExtension()
+		pgControl := &Archive{
+			Prefix:  pre,
+			Archive: aws.String(name),
+		}
+
+		exists, err := pgControl.CheckExistence()
+		if err != nil {
+			return err
+		}
+
+		if !exists {
+			continue
+		}
+		sentinel := make([]ReaderMaker, 1)
+		sentinel[0] = &S3ReaderMaker{
+			Backup:     backup,
+			Key:        aws.String(name),
+			FileFormat: GetFileExtension(name),
+		}
+		err = ExtractAll(fileTarInterpreter, sentinel)
+		if serr, ok := err.(*UnsupportedFileTypeError); ok {
+			return serr
+		}
+		return err
+	}
+	return PgControlMissingError{}
+}
+
 // Do the job of unpacking Backup object
-func unwrapBackup(bk *Backup, dirArc string, pre *S3Prefix, sentinelDto S3TarBallSentinelDto) {
+func unwrapBackup(backup *Backup, dirArc string, pre *S3Prefix, sentinelDto S3TarBallSentinelDto) {
 
 	incrementBase := path.Join(dirArc, "increment_base")
 	if !sentinelDto.IsIncremental() {
@@ -230,12 +268,12 @@ func unwrapBackup(bk *Backup, dirArc string, pre *S3Prefix, sentinelDto S3TarBal
 
 	var allKeys []string
 	var keys []string
-	allKeys, err := bk.GetKeys()
+	allKeys, err := backup.GetKeys()
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
 	keys = allKeys[:len(allKeys)-1] // TODO: WTF is going on?
-	f := &FileTarInterpreter{
+	fileTarInterpreter := &FileTarInterpreter{
 		NewDir:             dirArc,
 		Sentinel:           sentinelDto,
 		IncrementalBaseDir: incrementBase,
@@ -243,14 +281,14 @@ func unwrapBackup(bk *Backup, dirArc string, pre *S3Prefix, sentinelDto S3TarBal
 	out := make([]ReaderMaker, len(keys))
 	for i, key := range keys {
 		s := &S3ReaderMaker{
-			Backup:     bk,
+			Backup:     backup,
 			Key:        aws.String(key),
-			FileFormat: CheckType(key),
+			FileFormat: GetFileExtension(key),
 		}
 		out[i] = s
 	}
 	// Extract all compressed tar members except `pg_control.tar.lz4` if WALG version backup.
-	err = ExtractAll(f, out)
+	err = ExtractAll(fileTarInterpreter, out)
 	if serr, ok := err.(*UnsupportedFileTypeError); ok {
 		log.Fatalf("%v\n", serr)
 	} else if err != nil {
@@ -258,36 +296,13 @@ func unwrapBackup(bk *Backup, dirArc string, pre *S3Prefix, sentinelDto S3TarBal
 	}
 	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of backup.
 	re := regexp.MustCompile(`^([^_]+._{1}[^_]+._{1})`)
-	match := re.FindString(*bk.Name)
-	if match == "" || sentinelDto.IsIncremental() {
-		// Extract pg_control last. If pg_control does not exist, program exits with error code 1.
-		name := *bk.Path + *bk.Name + "/tar_partitions/pg_control.tar." + Lz4FileExtension
-		pgControl := &Archive{
-			Prefix:  pre,
-			Archive: aws.String(name),
-		}
-
-		exists, err := pgControl.CheckExistence()
+	match := re.FindString(*backup.Name)
+	if match == "" || sentinelDto.IsIncremental() { // TODO: extract pg_control
+		err = extractPgControl(backup, pre, fileTarInterpreter)
 		if err != nil {
 			log.Fatalf("%+v\n", err)
-		}
-
-		if exists {
-			sentinel := make([]ReaderMaker, 1)
-			sentinel[0] = &S3ReaderMaker{
-				Backup:     bk,
-				Key:        aws.String(name),
-				FileFormat: CheckType(name),
-			}
-			err := ExtractAll(f, sentinel)
-			if serr, ok := err.(*UnsupportedFileTypeError); ok {
-				log.Fatalf("%v\n", serr)
-			} else if err != nil {
-				log.Fatalf("%+v\n", err)
-			}
-			fmt.Printf("\nBackup extraction complete.\n")
 		} else {
-			log.Fatal("Corrupt backup: missing pg_control")
+			fmt.Print("\nBackup extraction complete.\n")
 		}
 	}
 }
@@ -382,7 +397,6 @@ func HandleBackupPush(dirArc string, tu *TarUploader, pre *S3Prefix) {
 
 	// Start a new tar bundle and walk the DIRARC directory and upload to S3.
 	bundle.TarBallMaker = &S3TarBallMaker{
-		BaseDir:          filepath.Base(dirArc),
 		Trim:             dirArc,
 		BkupName:         name,
 		TarUploader:      tu,
@@ -495,7 +509,7 @@ func HandleWALFetch(pre *S3Prefix, walFileName string, location string, triggerP
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	DownloadWALFile(pre, walFileName, location)
+	DownloadAndDecompressWALFile(pre, walFileName, location)
 }
 
 func checkWALFileMagic(prefetched string) error {
@@ -513,103 +527,77 @@ func checkWALFileMagic(prefetched string) error {
 	return nil
 }
 
-// DownloadWALFile downloads a file and writes it to local file
-func DownloadWALFile(pre *S3Prefix, walFileName string, location string) {
-	a := &Archive{
+func tryDownloadWALFile(pre *S3Prefix, walFullPath string) (archiveReader io.ReadCloser, exists bool, err error) {
+	archive := &Archive{
 		Prefix:  pre,
-		Archive: aws.String(sanitizePath(*pre.Server + WalPath + walFileName + ".lzo")),
+		Archive: aws.String(sanitizePath(walFullPath)),
 	}
-	// Check existence of compressed LZO WAL file
-	exists, err := a.CheckExistence()
+
+	exists, err = archive.CheckExistence()
+	if err != nil || !exists {
+		return
+	}
+
+	archiveReader, err = archive.GetArchive()
+	return
+}
+
+func decompressWALFile(archiveReader io.ReadCloser, dstLocation string, decompressor Decompressor) error {
+	crypter := OpenPGPCrypter{}
+	if crypter.IsUsed() {
+		reader, err := crypter.Decrypt(archiveReader)
+		if err != nil {
+			return err
+		}
+		archiveReader = ReadCascadeCloser{reader, archiveReader}
+	}
+
+	file, err := os.OpenFile(dstLocation, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
 	if err != nil {
-		log.Fatalf("%+v\n", err)
+		return err
 	}
-	var crypter = OpenPGPCrypter{}
-	if exists {
-		arch, err := a.GetArchive()
-		if err != nil {
-			log.Fatalf("%+v\n", err)
-		}
 
-		if crypter.IsUsed() {
-			var reader io.Reader
-			reader, err = crypter.Decrypt(arch)
-			if err != nil {
-				log.Fatalf("%v\n", err)
-			}
-			arch = ReadCascadeClose{reader, arch}
-		}
-
-		f, err := os.Create(location)
-		if err != nil {
-			log.Fatalf("%v\n", err)
-		}
-
-		err = DecompressLzo(f, arch)
-		if err != nil {
-			log.Fatalf("%+v\n", err)
-		}
-		f.Close()
-	} else if !exists {
-		// Check existence of compressed LZ4 WAL file
-		a.Archive = aws.String(sanitizePath(*pre.Server + WalPath + walFileName + "." + Lz4FileExtension))
-		exists, err = a.CheckExistence()
-		if err != nil {
-			log.Fatalf("%+v\n", err)
-		}
-
-		if exists {
-			arch, err := a.GetArchive()
-			if err != nil {
-				log.Fatalf("%+v\n", err)
-			}
-
-			if crypter.IsUsed() {
-				var reader io.Reader
-				reader, err = crypter.Decrypt(arch)
-				if err != nil {
-					log.Fatalf("%v\n", err)
-				}
-				arch = ReadCascadeClose{reader, arch}
-			}
-
-			f, err := os.OpenFile(location, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
-			if err != nil {
-				log.Fatalf("%v\n", err)
-			}
-
-			size, err := DecompressLz4(f, arch)
-			if err != nil {
-				log.Fatalf("%+v\n", err)
-			}
-			if size != int64(WalSegmentSize) {
-				log.Fatal("Download WAL error: wrong size ", size)
-			}
-			err = f.Close()
-			if err != nil {
-				log.Fatalf("%+v\n", err)
-			}
-		} else {
-			log.Printf("Archive '%s' does not exist.\n", walFileName)
-		}
+	err = decompressor.Decompress(file, archiveReader)
+	if err != nil {
+		return err
 	}
+	return file.Close()
+}
+
+// DownloadAndDecompressWALFile downloads a file and writes it to local file
+func DownloadAndDecompressWALFile(pre *S3Prefix, walFileName string, dstLocation string) {
+	for _, decompressor := range Decompressors {
+		archiveReader, exists, err := tryDownloadWALFile(pre, *pre.Server+WalPath+walFileName+"."+decompressor.FileExtension())
+		if err != nil {
+			log.Fatalf("%+v\n", err)
+		}
+		if !exists {
+			continue
+		}
+		err = decompressWALFile(archiveReader, dstLocation, decompressor)
+		if err != nil {
+			log.Fatalf("%+v\n", err)
+		}
+		return
+	}
+	log.Fatalf("Archive '%s' does not exist.\n", walFileName)
 }
 
 // HandleWALPush is invoked to perform wal-g wal-push
 func HandleWALPush(tarUploader *TarUploader, dirArc string, pre *S3Prefix, verify bool) {
-	bu := BgUploader{}
+	bgUploader := BgUploader{}
 	// Look for new WALs while doing main upload
-	bu.Start(dirArc, int32(getMaxUploadConcurrency(16)-1), tarUploader, pre, verify)
+	bgUploader.Start(dirArc, int32(getMaxUploadConcurrency(16)-1), tarUploader, pre, verify)
 
 	UploadWALFile(tarUploader, dirArc, pre, verify)
 
-	bu.Stop()
+	bgUploader.Stop()
 }
 
 // UploadWALFile from FS to the cloud
 func UploadWALFile(tarUploader *TarUploader, dirArc string, pre *S3Prefix, verify bool) {
 	path, err := tarUploader.UploadWal(dirArc, pre, verify)
-	if re, ok := err.(Lz4Error); ok {
+	if re, ok := err.(CompressingPipeWriterError); ok {
 		log.Fatalf("FATAL: could not upload '%s' due to compression error.\n%+v\n", path, re)
 	} else if err != nil {
 		log.Printf("upload: could not upload '%s'\n", path)

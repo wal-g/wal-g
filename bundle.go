@@ -1,16 +1,16 @@
 package walg
 
 import (
-	"sync"
-	"github.com/pkg/errors"
+	"archive/tar"
+	"fmt"
 	"github.com/jackc/pgx"
+	"github.com/pkg/errors"
+	"io"
 	"log"
 	"os"
-	"fmt"
 	"path/filepath"
-	"archive/tar"
 	"strings"
-	"io"
+	"sync"
 )
 
 // A Bundle represents the directory to
@@ -224,7 +224,7 @@ func (bundle *Bundle) HandleSentinel() error {
 
 	bundle.NewTarBall(false)
 	tarBall := bundle.TarBall
-	tarBall.SetUp(&bundle.Crypter, "pg_control.tar." + Lz4FileExtension)
+	tarBall.SetUp(&bundle.Crypter, "pg_control.tar."+tarBall.FileExtension())
 	tarWriter := tarBall.TarWriter()
 
 	hdr, err := tar.FileInfoHeader(info, fileName)

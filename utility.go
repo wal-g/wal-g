@@ -1,12 +1,14 @@
 package walg
 
 import (
+	"encoding/json"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
-	"encoding/json"
 	"strings"
 )
 
@@ -17,7 +19,9 @@ const (
 	backupNamePrefix = "base_"
 
 	// SentinelSuffix is a suffix of backup finish sentinel file
-	SentinelSuffix = "_backup_stop_sentinel.json"
+	SentinelSuffix         = "_backup_stop_sentinel.json"
+	CompressedBlockMaxSize = 20 << 20
+	NotFoundAWSErrorCode   = "NotFound"
 )
 
 // Empty is used for channel signaling.
@@ -98,12 +102,12 @@ func ResolveSymlink(path string) string {
 	return resolve
 }
 
-func getMaxDownloadConcurrency(default_value int) int {
-	return getMaxConcurrency("WALG_DOWNLOAD_CONCURRENCY", default_value)
+func getMaxDownloadConcurrency(defaultValue int) int {
+	return getMaxConcurrency("WALG_DOWNLOAD_CONCURRENCY", defaultValue)
 }
 
-func getMaxUploadConcurrency(default_value int) int {
-	return getMaxConcurrency("WALG_UPLOAD_CONCURRENCY", default_value)
+func getMaxUploadConcurrency(defaultValue int) int {
+	return getMaxConcurrency("WALG_UPLOAD_CONCURRENCY", defaultValue)
 }
 
 // This setting is intentially undocumented in README. Effectively, this configures how many prepared tar Files there
@@ -131,7 +135,7 @@ func getMaxUploadDiskConcurrency() int {
 	return getMaxConcurrency("WALG_UPLOAD_DISK_CONCURRENCY", 1)
 }
 
-func getMaxConcurrency(key string, default_value int) int {
+func getMaxConcurrency(key string, defaultValue int) int {
 	var con int
 	var err error
 	conc, ok := os.LookupEnv(key)
@@ -142,11 +146,38 @@ func getMaxConcurrency(key string, default_value int) int {
 			log.Panic("Unknown concurrency number ", err)
 		}
 	} else {
-		if default_value > 0 {
-			con = default_value
+		if defaultValue > 0 {
+			con = defaultValue
 		} else {
 			con = 10
 		}
 	}
 	return max(con, 1)
+}
+
+func GetFileExtension(path string) string {
+	re := regexp.MustCompile(`\.([^\.]+)$`)
+	f := re.FindString(path)
+	if f != "" {
+		return f[1:]
+	}
+	return ""
+}
+
+func readFrom(dst io.Writer, src io.Reader) (n int64, err error) {
+	buf := make([]byte, CompressedBlockMaxSize)
+	for {
+		m, er := io.ReadFull(src, buf)
+		n += int64(m)
+		if er == nil || er == io.ErrUnexpectedEOF || er == io.EOF {
+			if _, err = dst.Write(buf[:m]); err != nil {
+				return
+			}
+			if er == nil {
+				continue
+			}
+			return
+		}
+		return n, er
+	}
 }

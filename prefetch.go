@@ -53,7 +53,7 @@ func prefetchFile(location string, pre *S3Prefix, walFileName string, wg *sync.W
 	log.Println("WAL-prefetch file: ", walFileName)
 	os.MkdirAll(runningLocation, 0755)
 
-	DownloadWALFile(pre, walFileName, oldPath)
+	DownloadAndDecompressWALFile(pre, walFileName, oldPath)
 
 	_, errO = os.Stat(oldPath)
 	_, errN = os.Stat(newPath)

@@ -47,12 +47,12 @@ var tests = []struct {
 	{"testing123456789", 16, 4},
 }
 
-func TestLz4Close(t *testing.T) {
+func TestCascadeFileCloser(t *testing.T) {
 	for _, tt := range tests {
 		b := &BufCloser{bytes.NewBufferString(tt.testString), false}
-		lz := &walg.Lz4CascadeCloser{
-			Writer:     lz4.NewWriter(b),
-			Underlying: b,
+		lz := &walg.CascadeWriteCloser{
+			WriteCloser: lz4.NewWriter(b),
+			Underlying:  b,
 		}
 
 		random := make([]byte, tt.written)
@@ -63,15 +63,15 @@ func TestLz4Close(t *testing.T) {
 
 		n, err := lz.Write(random)
 		if err != nil {
-			t.Errorf("compress: Lz4CascadeCloser expected `<nil>` but got %v", err)
+			t.Errorf("compress: CascadeWriteCloser expected `<nil>` but got %v", err)
 		}
 		if n != tt.written {
-			t.Errorf("compress: Lz4CascadeCloser expected %d bytes written but got %d", tt.written, n)
+			t.Errorf("compress: CascadeWriteCloser expected %d bytes written but got %d", tt.written, n)
 		}
 
 		err = lz.Close()
 		if err != nil {
-			t.Errorf("compress: Lz4CascadeCloser expected `<nil>` but got %v", err)
+			t.Errorf("compress: CascadeWriteCloser expected `<nil>` but got %v", err)
 		}
 
 		b.err = true
@@ -84,60 +84,58 @@ func TestLz4Close(t *testing.T) {
 	}
 }
 
-func TestLz4CloseError(t *testing.T) {
+func TestCascadeFileCloserError(t *testing.T) {
 	mock := &ErrorWriteCloser{}
-	lz := &walg.Lz4CascadeCloser{
-		Writer:     lz4.NewWriter(mock),
-		Underlying: mock,
+	lz := &walg.CascadeWriteCloser{
+		WriteCloser: lz4.NewWriter(mock),
+		Underlying:  mock,
 	}
 
 	_, err := lz.Write([]byte{byte('a')})
 	if err == nil {
-		t.Errorf("compress: Lz4CascadeCloser expected error on write but got `<nil>`")
+		t.Errorf("compress: CascadeWriteCloser expected error on write but got `<nil>`")
 	}
 
 	err = lz.Close()
 	if err == nil {
-		t.Errorf("compress: Lz4CascadeCloser expected error on close but got `<nil>`")
+		t.Errorf("compress: CascadeWriteCloser expected error on close but got `<nil>`")
 	}
 
 }
 
-func TestLzPipeWriter(t *testing.T) {
+func TestCompressingPipeWriter(t *testing.T) {
 	for _, tt := range tests {
 		in := &BufCloser{bytes.NewBufferString(tt.testString), false}
-		lz := &walg.Lz4PipeWriter{
-			Input: in,
-		}
+		lz := walg.NewLz4CompressingPipeWriter(in)
 
 		lz.Compress(walg.MockDisarmedCrypter())
 
 		decompressed := &BufCloser{&bytes.Buffer{}, false}
-		_, err := walg.DecompressLz4(decompressed, lz.Output)
+		decompressor := walg.Lz4Decompressor{}
+		err := decompressor.Decompress(decompressed, lz.Output)
 		if err != nil {
 			t.Logf("%+v\n", err)
 		}
 
 		if decompressed.String() != tt.testString {
-			t.Errorf("compress: Lz4CascadeCloser expected '%s' to be written but got '%s'", tt.testString, decompressed)
+			t.Errorf("compress: CascadeWriteCloser expected '%s' to be written but got '%s'", tt.testString, decompressed)
 		}
 	}
 
 }
 
-func TestLzPipeWriterBigChunk(t *testing.T) {
+func TestCompressingPipeWriterBigChunk(t *testing.T) {
 	L := 1024 * 1024 // 1Mb
 	b := make([]byte, L)
 	rand.Read(b)
 	in := &BufCloser{bytes.NewBuffer(b), false}
-	lz := &walg.Lz4PipeWriter{
-		Input: in,
-	}
+	lz := walg.NewLz4CompressingPipeWriter(in)
 
 	lz.Compress(walg.MockDisarmedCrypter())
 
 	decompressed := &BufCloser{&bytes.Buffer{}, false}
-	_, err := walg.DecompressLz4(decompressed, lz.Output)
+	decompressor := walg.Lz4Decompressor{}
+	err := decompressor.Decompress(decompressed, lz.Output)
 	if err != nil {
 		t.Logf("%+v\n", err)
 	}
@@ -166,35 +164,46 @@ func (er *DelayedErrorReader) Read(p []byte) (int, error) {
 	}
 }
 
-func TestLzPipeWriterErrorPropogation(t *testing.T) {
+func testCompressingPipeWriterErrorPropagation(compressor walg.Compressor, t *testing.T) error {
 	L := 1024 * 1024 * 4
 	b := make([]byte, L)
 	rand.Read(b)
 	in := &BufCloser{bytes.NewBuffer(b), false}
-	lz := &walg.Lz4PipeWriter{
+	lz := &walg.CompressingPipeWriter{
 		Input: in,
+		NewCompressingWriter: func(writer io.Writer) walg.ReaderFromWriteCloser {
+			return compressor.NewWriter(writer)
+		},
 	}
 
 	lz.Compress(walg.MockDisarmedCrypter())
 
 	decompressed := &BufCloser{&bytes.Buffer{}, false}
-	_, err := walg.DecompressLz4(decompressed, &DelayedErrorReader{lz.Output, L})
-	if err == nil {
-		t.Error("lz4 did not propagate error of the buffer")
+	decompressor := walg.FindDecompressor(compressor.FileExtension())
+	err := decompressor.Decompress(decompressed, &DelayedErrorReader{lz.Output, L})
+	return err
+}
+
+func TestCompressingPipeWriterErrorPropagation(t *testing.T) {
+	for _, compressor := range walg.Compressors {
+		err := testCompressingPipeWriterErrorPropagation(compressor, t)
+		if err == nil {
+			t.Errorf("%v did not propagate error of the buffer", compressor.FileExtension())
+		}
 	}
 }
 
-func TestLzPipeWriterError(t *testing.T) {
-	lz := &walg.Lz4PipeWriter{Input: &ErrorReader{}}
+func TestCompressingPipeWriterError(t *testing.T) {
+	lz := walg.NewLz4CompressingPipeWriter(&ErrorReader{})
 
 	lz.Compress(walg.MockDisarmedCrypter())
 
 	_, err := ioutil.ReadAll(lz.Output)
 	if err == nil {
-		t.Errorf("compress: Lz4PipeWriter expected error but got `<nil>`")
+		t.Errorf("compress: CompressingPipeWriter expected error but got `<nil>`")
 	}
-	if re, ok := err.(walg.Lz4Error); !ok {
+	if re, ok := err.(walg.CompressingPipeWriterError); !ok {
 
-		t.Errorf("compress: Lz4PipeWriter expected Lz4Error but got %v", re)
+		t.Errorf("compress: CompressingPipeWriter expected CompressingPipeWriterError but got %v", re)
 	}
 }

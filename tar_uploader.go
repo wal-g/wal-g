@@ -1,18 +1,17 @@
 package walg
 
 import (
-	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
-	"sync"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	"log"
-	"os"
-	"github.com/pkg/errors"
-	"path/filepath"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
-	"strings"
-	"io"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
+	"github.com/pkg/errors"
+	"io"
+	"log"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
 )
 
 // TarUploader contains fields associated with uploading tarballs.
@@ -26,19 +25,19 @@ type TarUploader struct {
 	Success              bool
 	bucket               string
 	server               string
-	region               string
+	compressor           Compressor
 	waitGroup            *sync.WaitGroup
 }
 
 // NewTarUploader creates a new tar uploader without the actual
 // S3 uploader. CreateUploader() is used to configure byte size and
 // concurrency streams for the uploader.
-func NewTarUploader(svc s3iface.S3API, bucket, server, region string) *TarUploader {
+func NewTarUploader(bucket, server, compressionMethod string) *TarUploader {
 	return &TarUploader{
 		StorageClass: "STANDARD",
 		bucket:       bucket,
 		server:       server,
-		region:       region,
+		compressor:   Compressors[compressionMethod],
 		waitGroup:    &sync.WaitGroup{},
 	}
 }
@@ -62,33 +61,34 @@ func (tarUploader *TarUploader) Clone() *TarUploader {
 		tarUploader.Success,
 		tarUploader.bucket,
 		tarUploader.server,
-		tarUploader.region,
+		tarUploader.compressor,
 		&sync.WaitGroup{},
 	}
 }
 
-// UploadWal compresses a WAL file using LZ4 and uploads to S3. Returns
+// UploadWal compresses a WAL file and uploads to S3. Returns
 // the first error encountered and an empty string upon failure.
 func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify bool) (string, error) {
-	f, err := os.Open(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return "", errors.Wrapf(err, "UploadWal: failed to open file %s\n", path)
 	}
 
-	lz := &Lz4PipeWriter{
-		Input: f,
+	pipeWriter := &CompressingPipeWriter{
+		Input:                file,
+		NewCompressingWriter: tarUploader.compressor.NewWriter,
 	}
 
-	lz.Compress(&OpenPGPCrypter{})
+	pipeWriter.Compress(&OpenPGPCrypter{})
 
-	p := sanitizePath(tarUploader.server + WalPath + filepath.Base(path) + "." + Lz4FileExtension)
-	reader := lz.Output
+	dstPath := sanitizePath(tarUploader.server + WalPath + filepath.Base(path) + "." + tarUploader.compressor.FileExtension())
+	reader := pipeWriter.Output
 
 	if verify {
 		reader = newMd5Reader(reader)
 	}
 
-	input := tarUploader.createUploadInput(p, reader)
+	input := tarUploader.createUploadInput(dstPath, reader)
 
 	tarUploader.waitGroup.Add(1)
 	go func() {
@@ -98,14 +98,14 @@ func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify boo
 	}()
 
 	tarUploader.Finish()
-	fmt.Println("WAL PATH:", p)
+	fmt.Println("WAL PATH:", dstPath)
 	if verify {
 		sum := reader.(*MD5Reader).Sum()
-		a := &Archive{
+		archive := &Archive{
 			Prefix:  pre,
-			Archive: aws.String(p),
+			Archive: aws.String(dstPath),
 		}
-		eTag, err := a.GetETag()
+		eTag, err := archive.GetETag()
 		if err != nil {
 			log.Fatalf("Unable to verify WAL %s", err)
 		}
@@ -119,7 +119,7 @@ func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify boo
 		}
 		fmt.Println("ETag ", trimETag)
 	}
-	return p, err
+	return dstPath, err
 }
 
 // createUploadInput creates a s3manager.UploadInput for a TarUploader using

@@ -61,7 +61,7 @@ func (m *mockS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput,
 
 func (m *mockS3Client) HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjectOutput, error) {
 	if m.err && m.notFound {
-		return nil, awserr.New("NotFound", "mock HeadObject error", nil)
+		return nil, awserr.New(walg.NotFoundAWSErrorCode, "mock HeadObject error", nil)
 	} else if m.err {
 		return nil, awserr.New("MockHeadObject", "mock HeadObject error", nil)
 	}
@@ -204,7 +204,7 @@ func TestBackupErrors(t *testing.T) {
 		s := &walg.S3ReaderMaker{
 			Backup:     bk,
 			Key:        aws.String(key),
-			FileFormat: walg.CheckType(key),
+			FileFormat: walg.GetFileExtension(key),
 		}
 		out[i] = s
 	}
@@ -261,7 +261,7 @@ func TestBackup(t *testing.T) {
 		s := &walg.S3ReaderMaker{
 			Backup:     bk,
 			Key:        aws.String(key),
-			FileFormat: walg.CheckType(key),
+			FileFormat: walg.GetFileExtension(key),
 		}
 		out[i] = s
 		if out[i].Path() != correctKeys[i] {

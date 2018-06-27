@@ -1,10 +1,10 @@
 package walg
 
 import (
-	"io"
-	"hash"
 	"crypto/md5"
 	"encoding/hex"
+	"hash"
+	"io"
 )
 
 type MD5Reader struct {

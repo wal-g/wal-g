@@ -1,0 +1,18 @@
+language: go
+
+go:
+  - 1.8.x
+  - 1.9.x
+  - 1.10.x
+
+os:
+  - linux
+  - osx
+
+install:
+  - "wget http://sun.aei.polsl.pl/~sdeor/corpus/mr.bz2"
+  - "bzip2 -d mr.bz2"
+script:
+  - "go build"
+  - "PAYLOAD=`pwd`/mr go test -v"
+  - "PAYLOAD=`pwd`/mr go test -bench ."

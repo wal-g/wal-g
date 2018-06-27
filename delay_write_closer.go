@@ -1,8 +1,8 @@
 package walg
 
 import (
-	"io"
 	"golang.org/x/crypto/openpgp"
+	"io"
 )
 
 // DelayWriteCloser delays first writes.

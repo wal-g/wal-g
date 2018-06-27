@@ -11,8 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"testing"
 	"sync"
+	"testing"
 )
 
 const BUFSIZE = 4 * 1024
@@ -69,14 +69,10 @@ func generateData(t *testing.T) string {
 	fmt.Println(dir)
 
 	sb := tools.NewStrideByteReader(10)
-	lr := &io.LimitedReader{
-		R: sb,
-		N: int64(1024 * 1024),
-	}
 
 	// Generates 5 1MB files
 	for i := 1; i < 6; i++ {
-		lr = &io.LimitedReader{
+		lr := &io.LimitedReader{
 			R: sb,
 			N: int64(100),
 		}
@@ -114,7 +110,7 @@ func generateData(t *testing.T) string {
 	}
 
 	// Generate large enough file (500MB) so that goroutine doesn't finish before extracting pg_control
-	lr = &io.LimitedReader{
+	lr := &io.LimitedReader{
 		R: sb,
 		N: int64(500 * 1024 * 1024),
 	}
@@ -159,7 +155,7 @@ func extract(t *testing.T, dir string) string {
 		path := filepath.Join(dir, val.Name())
 		f := &tools.FileReaderMaker{
 			Key:        path,
-			FileFormat: walg.CheckType(val.Name()),
+			FileFormat: walg.GetFileExtension(val.Name()),
 		}
 		out[i] = f
 	}
@@ -330,9 +326,8 @@ func TestWalk(t *testing.T) {
 	}
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
 	bundle.TarBallMaker = &tools.FileTarBallMaker{
-		BaseDir: filepath.Base(data),
-		Trim:    data,
-		Out:     compressed,
+		Trim: data,
+		Out:  compressed,
 	}
 	err := os.MkdirAll(compressed, 0766)
 	if err != nil {
@@ -384,7 +379,7 @@ func TestWalk(t *testing.T) {
 	}
 
 	// Re-use generated data to test uploading WAL.
-	tu := walg.NewTarUploader(&mockS3Client{}, "bucket", "server", "region")
+	tu := walg.NewLz4MockTarUploader()
 	tu.UploaderApi = &mockS3Uploader{}
 	wal, err := tu.UploadWal(filepath.Join(data, "1"), nil, false)
 	if wal == "" {

@@ -1,10 +1,10 @@
 package walg
 
 import (
-	"golang.org/x/crypto/openpgp"
-	"errors"
-	"io"
 	"bytes"
+	"errors"
+	"golang.org/x/crypto/openpgp"
+	"io"
 )
 
 // OpenPGPCrypter incapsulates specific of cypher method

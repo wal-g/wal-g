@@ -1,10 +1,10 @@
 package walg
 
 import (
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"io"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
+	"io"
 )
 
 // Archive contains information associated with
@@ -25,7 +25,7 @@ func (archive *Archive) CheckExistence() (bool, error) {
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
 			switch awsErr.Code() {
-			case "NotFound":
+			case NotFoundAWSErrorCode:
 				return false, nil
 			default:
 				return false, awsErr
