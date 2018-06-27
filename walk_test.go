@@ -155,7 +155,7 @@ func extract(t *testing.T, dir string) string {
 		path := filepath.Join(dir, val.Name())
 		f := &tools.FileReaderMaker{
 			Key:        path,
-			FileFormat: walg.CheckType(val.Name()),
+			FileFormat: walg.GetFileExtension(val.Name()),
 		}
 		out[i] = f
 	}

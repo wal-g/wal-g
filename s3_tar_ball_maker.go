@@ -21,7 +21,7 @@ func (tarBallMaker *S3TarBallMaker) Make(dedicatedUploader bool) TarBall {
 	return &S3TarBall{
 		partCount:        tarBallMaker.partCount,
 		trim:             tarBallMaker.Trim,
-		bkupName:         tarBallMaker.BkupName,
+		backupName:       tarBallMaker.BkupName,
 		tarUploader:      uploader,
 		Lsn:              tarBallMaker.Lsn,
 		IncrementFromLsn: tarBallMaker.IncrementFromLsn,

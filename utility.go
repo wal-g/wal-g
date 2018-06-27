@@ -155,8 +155,7 @@ func getMaxConcurrency(key string, defaultValue int) int {
 	return max(con, 1)
 }
 
-// CheckType grabs the file extension from PATH.
-func CheckType(path string) string {
+func GetFileExtension(path string) string {
 	re := regexp.MustCompile(`\.([^\.]+)$`)
 	f := re.FindString(path)
 	if f != "" {

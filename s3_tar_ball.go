@@ -16,7 +16,7 @@ import (
 // going to be uploaded to S3.
 type S3TarBall struct {
 	trim             string
-	bkupName         string
+	backupName       string
 	partCount        int
 	size             int64
 	writeCloser      io.WriteCloser
@@ -38,7 +38,7 @@ func (tarBall *S3TarBall) SetUp(crypter Crypter, names ...string) {
 		if len(names) > 0 {
 			name = names[0]
 		} else {
-			name = "part_" + fmt.Sprintf("%0.3d", tarBall.partCount) + ".tar." + tarBall.tarUploader.compressor.FileExtension()
+			name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partCount, tarBall.FileExtension())
 		}
 		writeCloser := tarBall.StartUpload(name, crypter)
 
@@ -72,7 +72,7 @@ func (tarBall *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteClos
 	pipeReader, pipeWriter := io.Pipe()
 	tarUploader := tarBall.tarUploader
 
-	path := tarUploader.server + BaseBackupsPath + tarBall.bkupName + "/tar_partitions/" + name
+	path := tarUploader.server + BaseBackupsPath + tarBall.backupName + "/tar_partitions/" + name
 	input := tarUploader.createUploadInput(path, pipeReader)
 
 	fmt.Printf("Starting part %d ...\n", tarBall.partCount)
@@ -127,7 +127,7 @@ func (tarBall *S3TarBall) FileExtension() string {
 // an alert is given with the corresponding error.
 func (tarBall *S3TarBall) Finish(sentinelDto *S3TarBallSentinelDto) error {
 	var err error
-	name := tarBall.bkupName + "_backup_stop_sentinel.json"
+	name := tarBall.backupName + "_backup_stop_sentinel.json"
 	tarUploader := tarBall.tarUploader
 
 	tarUploader.Finish()

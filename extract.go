@@ -2,7 +2,6 @@ package walg
 
 import (
 	"archive/tar"
-	"fmt"
 	"github.com/pkg/errors"
 	"io"
 )
@@ -70,7 +69,7 @@ func handleTar(writeCloser io.WriteCloser, readerMaker ReaderMaker, crypter Cryp
 		}
 		err = decompressor.Decompress(writeCloser, readCloser)
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("ExtractAll: %v decompress failed. Is archive encrypted?", decompressor.FileExtension()))
+			return errors.Wrapf(err, "ExtractAll: %v decompress failed. Is archive encrypted?", decompressor.FileExtension())
 		}
 		return nil
 	}

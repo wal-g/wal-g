@@ -185,7 +185,7 @@ func fetchSentinel(backupName string, bk *Backup, pre *S3Prefix) (dto S3TarBallS
 	previousBackupReader := S3ReaderMaker{
 		Backup:     bk,
 		Key:        aws.String(*pre.Server + BaseBackupsPath + latestSentinel),
-		FileFormat: CheckType(latestSentinel),
+		FileFormat: GetFileExtension(latestSentinel),
 	}
 	prevBackup, err := previousBackupReader.Reader()
 	if err != nil {

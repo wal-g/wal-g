@@ -19,9 +19,9 @@ var fileNames = []struct {
 // return values of pg_stop_backup(false)
 func TestCheckType(t *testing.T) {
 	for _, f := range fileNames {
-		actual := walg.CheckType(f.input)
+		actual := walg.GetFileExtension(f.input)
 		if actual != f.expected {
-			t.Errorf("decompress: CheckType expected `%s` but got `%s`", f.expected, actual)
+			t.Errorf("decompress: GetFileExtension expected `%s` but got `%s`", f.expected, actual)
 
 		}
 	}

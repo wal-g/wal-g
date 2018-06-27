@@ -204,7 +204,7 @@ func TestBackupErrors(t *testing.T) {
 		s := &walg.S3ReaderMaker{
 			Backup:     bk,
 			Key:        aws.String(key),
-			FileFormat: walg.CheckType(key),
+			FileFormat: walg.GetFileExtension(key),
 		}
 		out[i] = s
 	}
@@ -261,7 +261,7 @@ func TestBackup(t *testing.T) {
 		s := &walg.S3ReaderMaker{
 			Backup:     bk,
 			Key:        aws.String(key),
-			FileFormat: walg.CheckType(key),
+			FileFormat: walg.GetFileExtension(key),
 		}
 		out[i] = s
 		if out[i].Path() != correctKeys[i] {

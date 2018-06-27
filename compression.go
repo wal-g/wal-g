@@ -34,17 +34,15 @@ type Decompressor interface {
 	FileExtension() string
 }
 
-var Compressors map[string]Compressor
+var Compressors = map[string]Compressor{
+	Lz4AlgorithmName: Lz4Compressor{},
+	LzmaAlgorithmName: LzmaCompressor{},
+	ZstdAlgorithmName: ZstdCompressor{},
+}
+
 var Decompressors = []Decompressor{
 	Lz4Decompressor{},
 	ZstdDecompressor{},
 	LzmaDecompressor{},
 	LzoDecompressor{},
-}
-
-func init() {
-	Compressors = make(map[string]Compressor)
-	Compressors[Lz4AlgorithmName] = Lz4Compressor{}
-	Compressors[LzmaAlgorithmName] = LzmaCompressor{}
-	Compressors[ZstdAlgorithmName] = ZstdCompressor{}
 }

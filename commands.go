@@ -194,7 +194,7 @@ func extractPgControl(backup *Backup, pre *S3Prefix, fileTarInterpreter *FileTar
 		sentinel[0] = &S3ReaderMaker{
 			Backup:     backup,
 			Key:        aws.String(name),
-			FileFormat: CheckType(name),
+			FileFormat: GetFileExtension(name),
 		}
 		err = ExtractAll(fileTarInterpreter, sentinel)
 		if serr, ok := err.(*UnsupportedFileTypeError); ok {
@@ -283,7 +283,7 @@ func unwrapBackup(backup *Backup, dirArc string, pre *S3Prefix, sentinelDto S3Ta
 		s := &S3ReaderMaker{
 			Backup:     backup,
 			Key:        aws.String(key),
-			FileFormat: CheckType(key),
+			FileFormat: GetFileExtension(key),
 		}
 		out[i] = s
 	}
