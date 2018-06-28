@@ -97,10 +97,4 @@ func main() {
 		}
 
 	}
-
-	// Only prints compression data for lzo.
-	fmt.Printf("Uncompressed: %v\n", walg.Uncompressed)
-	fmt.Printf("Compressed: %v\n", walg.Compressed)
-	fmt.Printf("Ratio: %.2f%%\n", (float64(walg.Compressed)/float64(walg.Uncompressed))*float64(100))
-
 }

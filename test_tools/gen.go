@@ -2,28 +2,16 @@ package tools
 
 import (
 	"archive/tar"
-	"bytes"
-	"encoding/binary"
+	"github.com/wal-g/wal-g"
 	"io"
 	"math/rand"
 	"net/http"
 	"regexp"
 	"strconv"
 	"sync/atomic"
-
-	"github.com/rasky/go-lzo"
 )
 
 var counter int32
-
-// LzopPrefix consists of arbitrary bytes at a specified length to
-// satisfy lzop header format.
-const LzopPrefix = "\x89\x4c\x5a\x4f\x00\x0d\x0a\x1a\x0a\x10\x30\x20\xa0\x09\x40" +
-	"\x01\x05\x03\x00\x00\x01\x00\x00\x81\xa4\x59\x43\x06\xd0\x00" +
-	"\x00\x00\x00\x06\x70\x32\x2e\x74\x61\x72\x51\xf8\x06\x08"
-
-// LzopBlockSize for modern architectures.
-const LzopBlockSize = 256 * 1024
 
 // StrideByteReader allows for customizable "strides" of
 // random bytes. Creates an infinite stream.
@@ -31,62 +19,6 @@ type StrideByteReader struct {
 	stride    int
 	counter   int
 	randBytes []byte
-}
-
-// LzopReader takes in uncompressed bytes and
-// compresses using lzo.
-type LzopReader struct {
-	Uncompressed io.Reader
-	slice        []byte
-	err          error
-}
-
-// Read compresses byte slice `p` matching lzop format.
-// Does not compress with a checksum.
-func (lz *LzopReader) Read(p []byte) (n int, err error) {
-	if len(lz.slice) == 0 {
-		if lz.err == nil {
-			lz.slice = make([]byte, LzopBlockSize+12)
-			sum := 12
-			i := 0
-			for {
-				if sum >= len(lz.slice) {
-					break
-				}
-
-				i, lz.err = lz.Uncompressed.Read(lz.slice[sum:])
-				sum += i
-
-				if lz.err != nil {
-					break
-				}
-
-			}
-
-			lz.slice = lz.slice[:sum]
-
-			out := lzo.Compress1X(lz.slice[12:])
-
-			if (len(lz.slice) - 12) <= len(out) {
-				binary.BigEndian.PutUint32(lz.slice[:4], uint32(sum-12))
-				binary.BigEndian.PutUint32(lz.slice[4:8], uint32(sum-12))
-			} else {
-				binary.BigEndian.PutUint32(lz.slice[:4], uint32(len(lz.slice)-12))
-				binary.BigEndian.PutUint32(lz.slice[4:8], uint32(len(out)))
-				copy(lz.slice[12:], out)
-
-				lz.slice = lz.slice[:len(out)+12]
-			}
-
-			binary.BigEndian.PutUint32(lz.slice[8:12], 0xFFFFFFFF)
-		} else {
-			return 0, lz.err
-		}
-	}
-
-	n = copy(p, lz.slice)
-	lz.slice = lz.slice[n:]
-	return n, nil
 }
 
 // NewStrideByteReader creates a new random byte
@@ -178,22 +110,16 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	case "":
 		CreateTar(w, &lr)
 	case ".lzo":
-		io.Copy(w, bytes.NewBufferString(LzopPrefix))
-
 		pr, pw := io.Pipe()
+		lzow := walg.NewLzoWriter(pw)
 
 		go func() {
-			CreateTar(pw, &lr)
+			CreateTar(lzow, &lr)
+			defer lzow.Close()
 			defer pw.Close()
 		}()
 
-		compressedReader := LzopReader{Uncompressed: pr}
-
-		io.Copy(w, &compressedReader)
-		n, err := w.Write(make([]byte, 12))
-		if n != 12 {
-			panic("Did not write empty signal bytes.")
-		}
+		io.Copy(w, pr)
 		if err != nil {
 			panic(err)
 		}

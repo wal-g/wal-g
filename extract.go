@@ -79,6 +79,8 @@ func handleTar(writeCloser io.WriteCloser, readerMaker ReaderMaker, crypter Cryp
 			return errors.Wrap(err, "ExtractAll: tar extract failed")
 		}
 	} else if readerMaker.Format() == "nop" {
+	} else if readerMaker.Format() == "lzo" {
+		return errors.Wrap(UnsupportedFileTypeError{readerMaker.Path(), readerMaker.Format()}, "ExtractAll: lzo linked to this WAL-G binary")
 	} else {
 		return errors.Wrap(UnsupportedFileTypeError{readerMaker.Path(), readerMaker.Format()}, "ExtractAll:")
 	}
