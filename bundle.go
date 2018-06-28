@@ -227,15 +227,15 @@ func (bundle *Bundle) HandleSentinel() error {
 	tarBall.SetUp(&bundle.Crypter, "pg_control.tar."+tarBall.FileExtension())
 	tarWriter := tarBall.TarWriter()
 
-	hdr, err := tar.FileInfoHeader(info, fileName)
+	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
 	if err != nil {
 		return errors.Wrap(err, "HandleSentinel: failed to grab header info")
 	}
 
-	hdr.Name = strings.TrimPrefix(path, tarBall.Trim())
-	fmt.Println(hdr.Name)
+	fileInfoHeader.Name = strings.TrimPrefix(path, tarBall.ArchiveDirectory())
+	fmt.Println(fileInfoHeader.Name)
 
-	err = tarWriter.WriteHeader(hdr)
+	err = tarWriter.WriteHeader(fileInfoHeader)
 	if err != nil {
 		return errors.Wrap(err, "HandleSentinel: failed to write header")
 	}
@@ -248,7 +248,7 @@ func (bundle *Bundle) HandleSentinel() error {
 
 		lim := &io.LimitedReader{
 			R: f,
-			N: int64(hdr.Size),
+			N: int64(fileInfoHeader.Size),
 		}
 
 		_, err = io.Copy(tarWriter, lim)
@@ -256,7 +256,7 @@ func (bundle *Bundle) HandleSentinel() error {
 			return errors.Wrap(err, "HandleSentinel: copy failed")
 		}
 
-		tarBall.AddSize(hdr.Size)
+		tarBall.AddSize(fileInfoHeader.Size)
 		f.Close()
 	}
 

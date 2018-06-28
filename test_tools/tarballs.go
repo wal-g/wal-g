@@ -14,12 +14,12 @@ import (
 // FileTarBall represents a tarball that is
 // written to disk.
 type FileTarBall struct {
-	trim        string
-	out         string
-	number      int
-	size        int64
-	writeCloser io.WriteCloser
-	tarWriter   *tar.Writer
+	archiveDirectory string
+	out              string
+	number           int
+	size             int64
+	writeCloser      io.WriteCloser
+	tarWriter        *tar.Writer
 }
 
 // SetUp creates a new LZ4 writer, tar writer and file for
@@ -73,7 +73,7 @@ func (fileTarBall *FileTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) e
 	return nil
 }
 
-func (fileTarBall *FileTarBall) Trim() string           { return fileTarBall.trim }
+func (fileTarBall *FileTarBall) ArchiveDirectory() string           { return fileTarBall.archiveDirectory }
 func (fileTarBall *FileTarBall) Size() int64            { return fileTarBall.size }
 func (fileTarBall *FileTarBall) AddSize(i int64)        { fileTarBall.size += i }
 func (fileTarBall *FileTarBall) TarWriter() *tar.Writer { return fileTarBall.tarWriter }
@@ -82,10 +82,10 @@ func (fileTarBall *FileTarBall) AwaitUploads()          {}
 
 // NOPTarBall mocks a tarball. Used for testing purposes.
 type NOPTarBall struct {
-	trim      string
-	number    int
-	size      int64
-	tarWriter *tar.Writer
+	archiveDirectory string
+	number           int
+	size             int64
+	tarWriter        *tar.Writer
 }
 
 func (n *NOPTarBall) SetUp(crypter walg.Crypter, params ...string) {}
@@ -95,7 +95,7 @@ func (n *NOPTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error {
 	return nil
 }
 
-func (n *NOPTarBall) Trim() string    { return n.trim }
+func (n *NOPTarBall) ArchiveDirectory() string    { return n.archiveDirectory }
 func (n *NOPTarBall) Size() int64     { return n.size }
 func (n *NOPTarBall) AddSize(i int64) { n.size += i }
 func (n *NOPTarBall) TarWriter() *tar.Writer { return n.tarWriter }

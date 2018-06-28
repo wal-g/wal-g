@@ -68,8 +68,8 @@ func main() {
 		}
 
 		bundle.TarBallMaker = &tools.FileTarBallMaker{
-			Trim:    in,
-			Out:     outDir,
+			ArchiveDirectory: in,
+			Out:              outDir,
 		}
 		os.MkdirAll(outDir, 0766)
 
@@ -87,9 +87,9 @@ func main() {
 		}
 
 		bundle.TarBallMaker = &walg.S3TarBallMaker{
-			Trim:        in,
-			BkupName:    n,
-			TarUploader: tu,
+			ArchiveDirectory: in,
+			BackupName:       n,
+			TarUploader:      tu,
 		}
 
 		bundle.NewTarBall(false)

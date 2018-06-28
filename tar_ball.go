@@ -7,7 +7,7 @@ type TarBall interface {
 	SetUp(crypter Crypter, args ...string)
 	CloseTar() error
 	Finish(sentinelDto *S3TarBallSentinelDto) error
-	Trim() string
+	ArchiveDirectory() string
 	Size() int64
 	AddSize(int64)
 	TarWriter() *tar.Writer

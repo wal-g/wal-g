@@ -17,9 +17,9 @@ func TestS3TarBall(t *testing.T) {
 	}
 
 	bundle.TarBallMaker = &walg.S3TarBallMaker{
-		Trim:        "/usr/local",
-		BkupName:    "test",
-		TarUploader: walg.NewLz4MockTarUploader(),
+		ArchiveDirectory: "/usr/local",
+		BackupName:       "test",
+		TarUploader:      walg.NewLz4MockTarUploader(),
 	}
 
 	bundle.NewTarBall(false)
@@ -31,8 +31,8 @@ func TestS3TarBall(t *testing.T) {
 
 	tarBall := bundle.TarBall
 
-	if tarBall.Trim() != "/usr/local" {
-		t.Errorf("make: Expected trim to be '%s' but got '%s'", "/usr/local", tarBall.Trim())
+	if tarBall.ArchiveDirectory() != "/usr/local" {
+		t.Errorf("make: Expected archiveDirectory to be '%s' but got '%s'", "/usr/local", tarBall.ArchiveDirectory())
 	}
 
 	if tarBall.Size() != 0 {
@@ -69,9 +69,9 @@ func TestS3DependentFunctions(t *testing.T) {
 	tu.UploaderApi = &mockS3Uploader{}
 
 	bundle.TarBallMaker = &walg.S3TarBallMaker{
-		Trim:        "",
-		BkupName:    "mockBackup",
-		TarUploader: tu,
+		ArchiveDirectory: "",
+		BackupName:       "mockBackup",
+		TarUploader:      tu,
 	}
 
 	bundle.NewTarBall(false)
@@ -132,9 +132,9 @@ func TestEmptyBundleQueue(t *testing.T) {
 	tu.UploaderApi = &mockS3Uploader{}
 
 	bundle.TarBallMaker = &walg.S3TarBallMaker{
-		Trim:        "",
-		BkupName:    "mockBackup",
-		TarUploader: tu,
+		ArchiveDirectory: "",
+		BackupName:       "mockBackup",
+		TarUploader:      tu,
 	}
 
 	bundle.StartQueue()
@@ -176,9 +176,9 @@ func queueTest(t *testing.T) {
 	tu := walg.NewLz4MockTarUploader()
 	tu.UploaderApi = &mockS3Uploader{}
 	bundle.TarBallMaker = &walg.S3TarBallMaker{
-		Trim:        "",
-		BkupName:    "mockBackup",
-		TarUploader: tu,
+		ArchiveDirectory: "",
+		BackupName:       "mockBackup",
+		TarUploader:      tu,
 	}
 
 	f := false

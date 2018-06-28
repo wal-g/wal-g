@@ -57,7 +57,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 			return errors.Wrap(err, "HandleTar: could not grab header info")
 		}
 
-		hdr.Name = strings.TrimPrefix(path, tarBall.Trim())
+		hdr.Name = strings.TrimPrefix(path, tarBall.ArchiveDirectory())
 		fmt.Println(hdr.Name)
 
 		if info.Mode().IsRegular() {
@@ -142,7 +142,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 			return errors.Wrap(err, "HandleTar: failed to grab header info")
 		}
 
-		hdr.Name = strings.TrimPrefix(path, tarBall.Trim())
+		hdr.Name = strings.TrimPrefix(path, tarBall.ArchiveDirectory())
 		fmt.Println(hdr.Name)
 
 		err = tarWriter.WriteHeader(hdr)

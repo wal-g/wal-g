@@ -3,8 +3,8 @@ package walg
 // S3TarBallMaker creates tarballs that are uploaded to S3.
 type S3TarBallMaker struct {
 	partCount        int
-	Trim             string
-	BkupName         string
+	ArchiveDirectory string
+	BackupName       string
 	TarUploader      *TarUploader
 	Lsn              *uint64
 	IncrementFromLsn *uint64
@@ -20,8 +20,8 @@ func (tarBallMaker *S3TarBallMaker) Make(dedicatedUploader bool) TarBall {
 	}
 	return &S3TarBall{
 		partCount:        tarBallMaker.partCount,
-		trim:             tarBallMaker.Trim,
-		backupName:       tarBallMaker.BkupName,
+		archiveDirectory: tarBallMaker.ArchiveDirectory,
+		backupName:       tarBallMaker.BackupName,
 		tarUploader:      uploader,
 		Lsn:              tarBallMaker.Lsn,
 		IncrementFromLsn: tarBallMaker.IncrementFromLsn,

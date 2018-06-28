@@ -326,8 +326,8 @@ func TestWalk(t *testing.T) {
 	}
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
 	bundle.TarBallMaker = &tools.FileTarBallMaker{
-		Trim: data,
-		Out:  compressed,
+		ArchiveDirectory: data,
+		Out:              compressed,
 	}
 	err := os.MkdirAll(compressed, 0766)
 	if err != nil {

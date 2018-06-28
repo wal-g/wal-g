@@ -8,20 +8,20 @@ import (
 // with the directory that files should be
 // extracted to.
 type FileTarBallMaker struct {
-	number  int
-	size    int64
-	Trim    string
-	Out     string
+	number           int
+	size             int64
+	ArchiveDirectory string
+	Out              string
 }
 
 // Make creates a new FileTarBall.
 func (f *FileTarBallMaker) Make(inheritState bool) walg.TarBall {
 	f.number++
 	return &FileTarBall{
-		number:  f.number,
-		size:    f.size,
-		trim:    f.Trim,
-		out:     f.Out,
+		number:           f.number,
+		size:             f.size,
+		archiveDirectory: f.ArchiveDirectory,
+		out:              f.Out,
 	}
 }
 
@@ -37,8 +37,8 @@ type NOPTarBallMaker struct {
 func (n *NOPTarBallMaker) Make(inheritState bool) walg.TarBall {
 	n.number++
 	return &NOPTarBall{
-		number:  n.number,
-		size:    n.size,
-		trim:    n.Trim,
+		number:           n.number,
+		size:             n.size,
+		archiveDirectory: n.Trim,
 	}
 }

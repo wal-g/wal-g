@@ -15,7 +15,7 @@ import (
 // S3TarBall represents a tar file that is
 // going to be uploaded to S3.
 type S3TarBall struct {
-	trim             string
+	archiveDirectory string
 	backupName       string
 	partCount        int
 	size             int64
@@ -105,8 +105,7 @@ func (tarBall *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteClos
 	return &CascadeWriteCloser{tarUploader.compressor.NewWriter(pipeWriter), pipeWriter}
 }
 
-// Trim suffix
-func (tarBall *S3TarBall) Trim() string { return tarBall.trim }
+func (tarBall *S3TarBall) ArchiveDirectory() string { return tarBall.archiveDirectory }
 
 // Size accumulated in this tarball
 func (tarBall *S3TarBall) Size() int64 { return tarBall.size }

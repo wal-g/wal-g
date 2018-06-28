@@ -161,9 +161,9 @@ func TestUploadError(t *testing.T) {
 	tu.UploaderApi = mockUploader
 
 	maker := &walg.S3TarBallMaker{
-		Trim:        "/usr/local",
-		BkupName:    "test",
-		TarUploader: tu,
+		ArchiveDirectory: "/usr/local",
+		BackupName:       "test",
+		TarUploader:      tu,
 	}
 
 	tarBall := maker.Make(true)

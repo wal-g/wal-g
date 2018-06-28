@@ -5,7 +5,7 @@
 // 8 bytes uint file size
 // 4 bytes uint changed pages count N
 // (N * 4) bytes for Block Numbers of changed pages
-// (N * BlockSize) bytes for changed page data
+// (N * PostgresPageSize) bytes for changed page data
 //
 
 package walg
@@ -20,8 +20,7 @@ import (
 )
 
 const (
-	// BlockSize is the PostgreSQL page size
-	BlockSize            uint16 = 8192
+	PostgresPageSize     uint16 = 8192
 	sizeofInt32                 = 4
 	sizeofInt16                 = 2
 	sizeofInt64                 = 8
@@ -51,9 +50,9 @@ func ParsePageHeader(data []byte) (lsn uint64, valid bool) {
 		pdLower < headerSize ||
 		pdLower > pdUpper ||
 		pdUpper > pdSpecial ||
-		pdSpecial > BlockSize ||
+		pdSpecial > PostgresPageSize ||
 		(lsn == invalidLsn) ||
-		pdPagesizeVersion != BlockSize+layoutVersion {
+		pdPagesizeVersion != PostgresPageSize+layoutVersion {
 		valid = false
 	} else {
 		valid = true
@@ -62,7 +61,7 @@ func ParsePageHeader(data []byte) (lsn uint64, valid bool) {
 	return
 }
 
-// IsPagedFile checks basic expectaions for paged file
+// IsPagedFile checks basic expectations for paged file
 func IsPagedFile(info os.FileInfo, fileName string) bool {
 
 	// For details on which file is paged see
@@ -72,7 +71,7 @@ func IsPagedFile(info os.FileInfo, fileName string) bool {
 		strings.HasSuffix(fileName, "_vm") ||
 		((!strings.Contains(fileName, "base")) && (!strings.Contains(fileName, "global")) && (!strings.Contains(fileName, "pg_tblspc"))) ||
 		info.Size() == 0 ||
-		info.Size()%int64(BlockSize) != 0 {
+		info.Size()%int64(PostgresPageSize) != 0 {
 		return false
 	}
 	return true
@@ -91,7 +90,6 @@ type IncrementalPageReader struct {
 	blocks  []uint32
 }
 
-// Read from IncrementalPageReader
 func (pageReader *IncrementalPageReader) Read(p []byte) (n int, err error) {
 	err = nil
 	if pageReader.next == nil {
@@ -129,10 +127,10 @@ func (pageReader *IncrementalPageReader) drainMoreData() error {
 }
 
 func (pageReader *IncrementalPageReader) advanceFileReader() error {
-	pageBytes := make([]byte, BlockSize)
+	pageBytes := make([]byte, PostgresPageSize)
 	blockNo := pageReader.blocks[0]
 	pageReader.blocks = pageReader.blocks[1:]
-	offset := int64(blockNo) * int64(BlockSize)
+	offset := int64(blockNo) * int64(PostgresPageSize)
 	_, err := pageReader.seeker.Seek(offset, 0)
 	if err != nil {
 		return err
@@ -164,12 +162,12 @@ func (pageReader *IncrementalPageReader) initialize() (size int64, err error) {
 	pageReader.backlog <- fileSizeBytes
 	size += sizeofInt64
 
-	pageBytes := make([]byte, BlockSize)
-	pageReader.blocks = make([]uint32, 0, fileSize/int64(BlockSize))
+	pageBytes := make([]byte, PostgresPageSize)
+	pageReader.blocks = make([]uint32, 0, fileSize/int64(PostgresPageSize))
 
 	for currentBlockNumber := uint32(0); ; currentBlockNumber++ {
 		n, err := io.ReadFull(pageReader.file, pageBytes)
-		if err == io.ErrUnexpectedEOF || n%int(BlockSize) != 0 {
+		if err == io.ErrUnexpectedEOF || n%int(PostgresPageSize) != 0 {
 			return 0, errors.New("Unexpected EOF during increment scan")
 		}
 
@@ -182,13 +180,13 @@ func (pageReader *IncrementalPageReader) initialize() (size int64, err error) {
 
 			diffMap := make([]byte, diffBlockCount*sizeofInt32)
 
-			for index, blockNo := range pageReader.blocks {
-				binary.LittleEndian.PutUint32(diffMap[index*sizeofInt32:(index+1)*sizeofInt32], blockNo)
+			for i, blockNum := range pageReader.blocks {
+				binary.LittleEndian.PutUint32(diffMap[i*sizeofInt32:(i+1)*sizeofInt32], blockNum)
 			}
 
 			pageReader.backlog <- diffMap
 			size += int64(diffBlockCount * sizeofInt32)
-			dataSize := int64(len(pageReader.blocks)) * int64(BlockSize)
+			dataSize := int64(len(pageReader.blocks)) * int64(PostgresPageSize)
 			size += dataSize
 			_, err := pageReader.seeker.Seek(0, 0)
 			if err != nil {
@@ -198,24 +196,24 @@ func (pageReader *IncrementalPageReader) initialize() (size int64, err error) {
 			return size, nil
 		}
 
-		if err == nil {
-			lsn, valid := ParsePageHeader(pageBytes)
+		if err != nil {
+			return 0, err
+		}
 
-			var allZeroes = false
-			if !valid && allZero(pageBytes) {
+		lsn, valid := ParsePageHeader(pageBytes)
+
+		allZeroes := false
+
+		if !valid {
+			if allZero(pageBytes) {
 				allZeroes = true
-				valid = true
-			}
-
-			if !valid {
+			} else {
 				return 0, ErrInvalidBlock
 			}
+		}
 
-			if (allZeroes) || (lsn >= pageReader.lsn) {
-				pageReader.blocks = append(pageReader.blocks, currentBlockNumber)
-			}
-		} else {
-			return 0, err
+		if (allZeroes) || (lsn >= pageReader.lsn) {
+			pageReader.blocks = append(pageReader.blocks, currentBlockNumber)
 		}
 	}
 }
@@ -309,7 +307,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader) error {
 		return err
 	}
 
-	page := make([]byte, BlockSize)
+	page := make([]byte, PostgresPageSize)
 	for i := uint32(0); i < diffBlockCount; i++ {
 		blockNo := binary.LittleEndian.Uint32(diffMap[i*sizeofInt32 : (i+1)*sizeofInt32])
 		_, err = io.ReadFull(increment, page)
@@ -317,7 +315,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader) error {
 			return err
 		}
 
-		_, err = file.WriteAt(page, int64(blockNo)*int64(BlockSize))
+		_, err = file.WriteAt(page, int64(blockNo)*int64(PostgresPageSize))
 		if err != nil {
 			return err
 		}
