@@ -232,7 +232,7 @@ func (bundle *Bundle) HandleSentinel() error {
 		return errors.Wrap(err, "HandleSentinel: failed to grab header info")
 	}
 
-	fileInfoHeader.Name = strings.TrimPrefix(path, tarBall.ArchiveDirectory())
+	fileInfoHeader.Name = tarBall.GetFileRelPath(path)
 	fmt.Println(fileInfoHeader.Name)
 
 	err = tarWriter.WriteHeader(fileInfoHeader)

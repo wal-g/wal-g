@@ -329,7 +329,7 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 	return
 }
 
-// HandleBackupPush is invoked to performa wal-g backup-push
+// HandleBackupPush is invoked to perform a wal-g backup-push
 func HandleBackupPush(archiveDirectory string, tarUploader *TarUploader, pre *S3Prefix) {
 	archiveDirectory = ResolveSymlink(archiveDirectory)
 	maxDeltas, fromFull := getDeltaConfig()

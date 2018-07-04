@@ -31,10 +31,6 @@ func TestS3TarBall(t *testing.T) {
 
 	tarBall := bundle.TarBall
 
-	if tarBall.ArchiveDirectory() != "/usr/local" {
-		t.Errorf("make: Expected archiveDirectory to be '%s' but got '%s'", "/usr/local", tarBall.ArchiveDirectory())
-	}
-
 	if tarBall.Size() != 0 {
 		t.Errorf("make: Expected tarball initial size to be 0 but got %d", tarBall.Size())
 	}

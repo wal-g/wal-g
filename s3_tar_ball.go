@@ -105,6 +105,10 @@ func (tarBall *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteClos
 	return &CascadeWriteCloser{tarUploader.compressor.NewWriter(pipeWriter), pipeWriter}
 }
 
+func (tarBall *S3TarBall) GetFileRelPath(fileAbsPath string) string {
+	return GetFileRelPath(fileAbsPath, tarBall.archiveDirectory)
+}
+
 func (tarBall *S3TarBall) ArchiveDirectory() string { return tarBall.archiveDirectory }
 
 // Size accumulated in this tarball

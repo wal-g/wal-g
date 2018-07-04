@@ -164,6 +164,10 @@ func GetFileExtension(path string) string {
 	return ""
 }
 
+func GetFileRelPath(fileAbsPath string, directoryPath string) string {
+	return strings.TrimPrefix(fileAbsPath, directoryPath)
+}
+
 func readFrom(dst io.Writer, src io.Reader) (n int64, err error) {
 	buf := make([]byte, CompressedBlockMaxSize)
 	for {

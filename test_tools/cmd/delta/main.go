@@ -127,7 +127,7 @@ func PagedFileCompare(filename1 string, filename2 string, lsn uint64) {
 	f1, _ := os.Open(filename1)
 	f2, _ := os.Open(filename2)
 
-	chunkSize := int(walg.PostgresPageSize)
+	chunkSize := int(walg.WalPageSize)
 
 	var chunkNumber = 0
 	for {
@@ -165,7 +165,7 @@ func PagedFileCompare(filename1 string, filename2 string, lsn uint64) {
 
 			//fmt.Println(b1)
 			//fmt.Println(b2)
-			for x := 0; x < int(walg.PostgresPageSize); x++ {
+			for x := 0; x < int(walg.WalPageSize); x++ {
 				//if b1[x]^b2[x] == 1 {
 				//	continue
 				//}

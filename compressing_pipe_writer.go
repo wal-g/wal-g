@@ -41,29 +41,24 @@ func (pipeWriter *CompressingPipeWriter) Compress(crypter Crypter) {
 			dstWriter.CloseWithError(e)
 		}
 
-		defer func() {
-			if err == nil {
-				if err := lzWriter.Close(); err != nil {
-					e := CompressingPipeWriterError{errors.Wrap(err, "Compress: writer close failed")}
-					dstWriter.CloseWithError(e)
-				} else {
-					if crypter.IsUsed() {
-						err := writeCloser.Close()
+		if err := lzWriter.Close(); err != nil {
+			e := CompressingPipeWriterError{errors.Wrap(err, "Compress: writer close failed")}
+			dstWriter.CloseWithError(e)
+			return
+		}
+		if crypter.IsUsed() {
+			err := writeCloser.Close()
 
-						if err != nil {
-							e := CompressingPipeWriterError{errors.Wrap(err, "Compress: encryption failed")}
-							dstWriter.CloseWithError(e)
-							return
-						}
-					}
-					if err = dstWriter.Close(); err != nil {
-						e := CompressingPipeWriterError{errors.Wrap(err, "Compress: pipe writer close failed")}
-						dstWriter.CloseWithError(e)
-					}
-				}
+			if err != nil {
+				e := CompressingPipeWriterError{errors.Wrap(err, "Compress: encryption failed")}
+				dstWriter.CloseWithError(e)
+				return
 			}
-		}()
-
+		}
+		if err = dstWriter.Close(); err != nil {
+			e := CompressingPipeWriterError{errors.Wrap(err, "Compress: pipe writer close failed")}
+			dstWriter.CloseWithError(e)
+		}
 	}()
 }
 

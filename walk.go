@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // ExcludedFilenames is a list of excluded members from the bundled backup.
@@ -52,17 +51,17 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 	tarWriter := tarBall.TarWriter()
 
 	if !excluded {
-		hdr, err := tar.FileInfoHeader(info, fileName)
+		fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
 		if err != nil {
 			return errors.Wrap(err, "HandleTar: could not grab header info")
 		}
 
-		hdr.Name = strings.TrimPrefix(path, tarBall.ArchiveDirectory())
-		fmt.Println(hdr.Name)
+		fileInfoHeader.Name = tarBall.GetFileRelPath(path)
+		fmt.Println(fileInfoHeader.Name)
 
 		if info.Mode().IsRegular() {
 			baseFiles := bundle.GetIncrementBaseFiles()
-			bf, wasInBase := baseFiles[hdr.Name]
+			bf, wasInBase := baseFiles[fileInfoHeader.Name]
 
 			// It is important to take MTime before ReadDatabaseFile()
 			time := info.ModTime()
@@ -75,7 +74,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 				// File was not changed since previous backup
 
 				fmt.Println("Skiped due to unchanged modification time")
-				bundle.GetFiles().Store(hdr.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time})
+				bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time})
 
 			} else {
 				// !excluded means file was not observed previously
@@ -85,18 +84,18 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 						return errors.Wrapf(err, "HandleTar: failed to open file '%s'\n", path)
 					}
 
-					hdr.Size = size
+					fileInfoHeader.Size = size
 
-					bundle.GetFiles().Store(hdr.Name, BackupFileDescription{IsSkipped: false, IsIncremented: isPaged, MTime: time})
+					bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: false, IsIncremented: isPaged, MTime: time})
 
-					err = tarWriter.WriteHeader(hdr)
+					err = tarWriter.WriteHeader(fileInfoHeader)
 					if err != nil {
 						return errors.Wrap(err, "HandleTar: failed to write header")
 					}
 
 					lim := &io.LimitedReader{
 						R: io.MultiReader(f, &ZeroReader{}),
-						N: int64(hdr.Size),
+						N: int64(fileInfoHeader.Size),
 					}
 
 					size, err = io.Copy(tarWriter, lim)
@@ -104,11 +103,11 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 						return errors.Wrap(err, "HandleTar: copy failed")
 					}
 
-					if size != hdr.Size {
-						return errors.Errorf("HandleTar: packed wrong numbers of bytes %d instead of %d", size, hdr.Size)
+					if size != fileInfoHeader.Size {
+						return errors.Errorf("HandleTar: packed wrong numbers of bytes %d instead of %d", size, fileInfoHeader.Size)
 					}
 
-					tarBall.AddSize(hdr.Size)
+					tarBall.AddSize(fileInfoHeader.Size)
 					f.Close()
 					return nil
 				}
@@ -131,21 +130,21 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 			}
 		} else {
 			// It is not file
-			err = tarWriter.WriteHeader(hdr)
+			err = tarWriter.WriteHeader(fileInfoHeader)
 			if err != nil {
 				return errors.Wrap(err, "HandleTar: failed to write header")
 			}
 		}
 	} else if excluded && info.Mode().IsDir() {
-		hdr, err := tar.FileInfoHeader(info, fileName)
+		fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
 		if err != nil {
 			return errors.Wrap(err, "HandleTar: failed to grab header info")
 		}
 
-		hdr.Name = strings.TrimPrefix(path, tarBall.ArchiveDirectory())
-		fmt.Println(hdr.Name)
+		fileInfoHeader.Name = tarBall.GetFileRelPath(path)
+		fmt.Println(fileInfoHeader.Name)
 
-		err = tarWriter.WriteHeader(hdr)
+		err = tarWriter.WriteHeader(fileInfoHeader)
 		if err != nil {
 			return errors.Wrap(err, "HandleTar: failed to write header")
 		}

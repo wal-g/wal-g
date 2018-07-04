@@ -24,9 +24,9 @@ type FileTarBall struct {
 
 // SetUp creates a new LZ4 writer, tar writer and file for
 // writing bundled compressed bytes to.
-func (fileTarBall *FileTarBall) SetUp(crypter walg.Crypter, names ...string) {
-	if fileTarBall.tarWriter == nil {
-		name := filepath.Join(fileTarBall.out, "part_"+fmt.Sprintf("%0.3d", fileTarBall.number)+".tar.lz4")
+func (tarBall *FileTarBall) SetUp(crypter walg.Crypter, names ...string) {
+	if tarBall.tarWriter == nil {
+		name := filepath.Join(tarBall.out, "part_"+fmt.Sprintf("%0.3d", tarBall.number)+".tar.lz4")
 		file, err := os.Create(name)
 		if err != nil {
 			panic(err)
@@ -40,45 +40,49 @@ func (fileTarBall *FileTarBall) SetUp(crypter walg.Crypter, names ...string) {
 				panic(err)
 			}
 
-			fileTarBall.writeCloser = &walg.CascadeWriteCloser{
+			tarBall.writeCloser = &walg.CascadeWriteCloser{
 				WriteCloser: lz4.NewWriter(file),
 				Underlying: &walg.CascadeWriteCloser{WriteCloser: writeCloser, Underlying: file},
 			}
 		} else {
 			writeCloser = file
-			fileTarBall.writeCloser = &walg.CascadeWriteCloser{
+			tarBall.writeCloser = &walg.CascadeWriteCloser{
 				WriteCloser: lz4.NewWriter(file),
 				Underlying:  writeCloser,
 			}
 		}
 
-		fileTarBall.tarWriter = tar.NewWriter(fileTarBall.writeCloser)
+		tarBall.tarWriter = tar.NewWriter(tarBall.writeCloser)
 	}
 }
 
 // CloseTar closes the tar writer and file, flushing any
 // unwritten data to the file before closing.
-func (fileTarBall *FileTarBall) CloseTar() error {
-	err := fileTarBall.tarWriter.Close()
+func (tarBall *FileTarBall) CloseTar() error {
+	err := tarBall.tarWriter.Close()
 	if err != nil {
 		return err
 	}
 
-	return fileTarBall.writeCloser.Close()
+	return tarBall.writeCloser.Close()
 }
 
 // Finish alerts that compression is complete.
-func (fileTarBall *FileTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error {
-	fmt.Printf("Wrote %d compressed tar files to %s.\n", fileTarBall.number, fileTarBall.out)
+func (tarBall *FileTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error {
+	fmt.Printf("Wrote %d compressed tar files to %s.\n", tarBall.number, tarBall.out)
 	return nil
 }
 
-func (fileTarBall *FileTarBall) ArchiveDirectory() string           { return fileTarBall.archiveDirectory }
-func (fileTarBall *FileTarBall) Size() int64            { return fileTarBall.size }
-func (fileTarBall *FileTarBall) AddSize(i int64)        { fileTarBall.size += i }
-func (fileTarBall *FileTarBall) TarWriter() *tar.Writer { return fileTarBall.tarWriter }
-func (fileTarBall *FileTarBall) FileExtension() string { return "lz4" }
-func (fileTarBall *FileTarBall) AwaitUploads()          {}
+
+func (tarBall *FileTarBall) GetFileRelPath(fileAbsPath string) string {
+	return walg.GetFileRelPath(fileAbsPath, tarBall.archiveDirectory)
+}
+func (tarBall *FileTarBall) ArchiveDirectory() string { return tarBall.archiveDirectory }
+func (tarBall *FileTarBall) Size() int64              { return tarBall.size }
+func (tarBall *FileTarBall) AddSize(i int64)          { tarBall.size += i }
+func (tarBall *FileTarBall) TarWriter() *tar.Writer   { return tarBall.tarWriter }
+func (tarBall *FileTarBall) FileExtension() string    { return "lz4" }
+func (tarBall *FileTarBall) AwaitUploads()            {}
 
 // NOPTarBall mocks a tarball. Used for testing purposes.
 type NOPTarBall struct {
@@ -88,16 +92,19 @@ type NOPTarBall struct {
 	tarWriter        *tar.Writer
 }
 
-func (n *NOPTarBall) SetUp(crypter walg.Crypter, params ...string) {}
-func (n *NOPTarBall) CloseTar() error                              { return nil }
-func (n *NOPTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error {
-	fmt.Printf("NOP: %d files.\n", n.number)
+func (tarBall *NOPTarBall) SetUp(crypter walg.Crypter, params ...string) {}
+func (tarBall *NOPTarBall) CloseTar() error                              { return nil }
+func (tarBall *NOPTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error {
+	fmt.Printf("NOP: %d files.\n", tarBall.number)
 	return nil
 }
 
-func (n *NOPTarBall) ArchiveDirectory() string    { return n.archiveDirectory }
-func (n *NOPTarBall) Size() int64     { return n.size }
-func (n *NOPTarBall) AddSize(i int64) { n.size += i }
-func (n *NOPTarBall) TarWriter() *tar.Writer { return n.tarWriter }
-func (n *NOPTarBall) FileExtension() string { return "lz4" }
-func (b *NOPTarBall) AwaitUploads()   {}
+func (tarBall *NOPTarBall) GetFileRelPath(fileAbsPath string) string {
+	return walg.GetFileRelPath(fileAbsPath,  tarBall.archiveDirectory)
+}
+func (tarBall *NOPTarBall) ArchiveDirectory() string { return tarBall.archiveDirectory }
+func (tarBall *NOPTarBall) Size() int64              { return tarBall.size }
+func (tarBall *NOPTarBall) AddSize(i int64)          { tarBall.size += i }
+func (tarBall *NOPTarBall) TarWriter() *tar.Writer   { return tarBall.tarWriter }
+func (tarBall *NOPTarBall) FileExtension() string    { return "lz4" }
+func (tarBall *NOPTarBall) AwaitUploads()            {}
