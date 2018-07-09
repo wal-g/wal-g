@@ -309,10 +309,10 @@ func unwrapBackup(backup *Backup, dirArc string, pre *S3Prefix, sentinelDto S3Ta
 		err = extractPgControl(backup, pre, fileTarInterpreter, *pgControlKey)
 		if err != nil {
 			log.Fatalf("%+v\n", err)
-		} else {
-			fmt.Print("\nBackup extraction complete.\n")
 		}
 	}
+
+	fmt.Print("\nBackup extraction complete.\n")
 }
 
 func getDeltaConfig() (maxDeltas int, fromFull bool) {
