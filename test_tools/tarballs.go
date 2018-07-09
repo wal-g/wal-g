@@ -42,7 +42,7 @@ func (fileTarBall *FileTarBall) SetUp(crypter walg.Crypter, names ...string) {
 
 			fileTarBall.writeCloser = &walg.CascadeWriteCloser{
 				WriteCloser: lz4.NewWriter(file),
-				Underlying: &walg.CascadeWriteCloser{WriteCloser: writeCloser, Underlying: file},
+				Underlying:  &walg.CascadeWriteCloser{WriteCloser: writeCloser, Underlying: file},
 			}
 		} else {
 			writeCloser = file
@@ -77,7 +77,7 @@ func (fileTarBall *FileTarBall) Trim() string           { return fileTarBall.tri
 func (fileTarBall *FileTarBall) Size() int64            { return fileTarBall.size }
 func (fileTarBall *FileTarBall) AddSize(i int64)        { fileTarBall.size += i }
 func (fileTarBall *FileTarBall) TarWriter() *tar.Writer { return fileTarBall.tarWriter }
-func (fileTarBall *FileTarBall) FileExtension() string { return "lz4" }
+func (fileTarBall *FileTarBall) FileExtension() string  { return "lz4" }
 func (fileTarBall *FileTarBall) AwaitUploads()          {}
 
 // NOPTarBall mocks a tarball. Used for testing purposes.
@@ -95,9 +95,9 @@ func (n *NOPTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error {
 	return nil
 }
 
-func (n *NOPTarBall) Trim() string    { return n.trim }
-func (n *NOPTarBall) Size() int64     { return n.size }
-func (n *NOPTarBall) AddSize(i int64) { n.size += i }
+func (n *NOPTarBall) Trim() string           { return n.trim }
+func (n *NOPTarBall) Size() int64            { return n.size }
+func (n *NOPTarBall) AddSize(i int64)        { n.size += i }
 func (n *NOPTarBall) TarWriter() *tar.Writer { return n.tarWriter }
-func (n *NOPTarBall) FileExtension() string { return "lz4" }
-func (b *NOPTarBall) AwaitUploads()   {}
+func (n *NOPTarBall) FileExtension() string  { return "lz4" }
+func (b *NOPTarBall) AwaitUploads()          {}

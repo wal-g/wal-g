@@ -42,7 +42,7 @@ func main() {
 
 	if nop {
 		bundle.TarBallMaker = &tools.NOPTarBallMaker{
-			Trim:    in,
+			Trim: in,
 		}
 	} else if !s3 && outDir == "" {
 		fmt.Printf("Please provide a directory to write to.\n")
@@ -68,8 +68,8 @@ func main() {
 		}
 
 		bundle.TarBallMaker = &tools.FileTarBallMaker{
-			Trim:    in,
-			Out:     outDir,
+			Trim: in,
+			Out:  outDir,
 		}
 		os.MkdirAll(outDir, 0766)
 

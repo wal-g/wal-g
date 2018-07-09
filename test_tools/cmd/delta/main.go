@@ -1,18 +1,18 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
+	"github.com/jackc/pgx"
 	"github.com/wal-g/wal-g"
+	"io"
 	"log"
 	"os"
 	"os/exec"
-	"time"
-	"fmt"
-	"strconv"
 	"path/filepath"
+	"strconv"
 	"strings"
-	"io"
-	"bytes"
-	"github.com/jackc/pgx"
+	"time"
 )
 
 func RemoveContents(dir string) error {
@@ -47,7 +47,7 @@ func main() {
 	os.Setenv("WALE_S3_PREFIX", os.Getenv("WALE_S3_PREFIX")+"/"+strconv.FormatInt(time.Now().UnixNano(), 10))
 	tu, pre, err := walg.Configure()
 	if err != nil {
-		log.Fatal(err);
+		log.Fatal(err)
 	}
 	BenchInit()
 
@@ -75,11 +75,11 @@ func main() {
 func Checkpoint() {
 	config, err := pgx.ParseEnvLibpq()
 	if err != nil {
-		log.Fatal(err);
+		log.Fatal(err)
 	}
 	conn, err := pgx.Connect(config)
 	if err != nil {
-		log.Fatal(err);
+		log.Fatal(err)
 	}
 	conn.Query("checkpoint;")
 }
@@ -87,11 +87,11 @@ func Checkpoint() {
 func WipeRestore() {
 	err := RemoveContents(restoreDir)
 	if err != nil {
-		log.Fatal(err);
+		log.Fatal(err)
 	}
 	err = os.MkdirAll(restoreDir, 0777)
 	if err != nil {
-		log.Fatal(err);
+		log.Fatal(err)
 	}
 }
 
@@ -156,7 +156,7 @@ func PagedFileCompare(filename1 string, filename2 string, lsn uint64) {
 			fmt.Printf("LSN2 %x valid %v\n", lsn2, valid2)
 
 			if lsn1 != lsn2 {
-				if (lsn1 < lsn) {
+				if lsn1 < lsn {
 					log.Panic("Increment pages did not restore page with different LSN")
 				} else {
 					fmt.Println("LSNs differ, but origin is newer than backup")
@@ -183,7 +183,7 @@ func Bench() {
 	out, err := exec.Command(pgbenchCommand, "postgres", "-T", "20", "-c", "3", "-j", "3").Output()
 	fmt.Println(string(out))
 	if err != nil {
-		log.Fatal(err);
+		log.Fatal(err)
 	}
 }
 
@@ -192,7 +192,7 @@ func BenchInit() {
 	out, err := exec.Command(pgbenchCommand, "postgres", "-i", "-s", "20").Output()
 	fmt.Println(string(out))
 	if err != nil {
-		log.Fatal(err);
+		log.Fatal(err)
 	}
 }
 
@@ -202,7 +202,7 @@ func Ctl(command string) {
 		out, err := exec.Command(pgctlCommand, "-D", baseDir, command).Output()
 		fmt.Println(string(out))
 		if err != nil {
-			log.Fatal(err);
+			log.Fatal(err)
 		}
 	}()
 	time.Sleep(100) // peace of shell
@@ -212,7 +212,7 @@ func InitDb() {
 	out, err := exec.Command(initdbCommand, baseDir).Output()
 	fmt.Println(string(out))
 	if err != nil {
-		log.Fatal(err);
+		log.Fatal(err)
 	}
 }
 
@@ -221,7 +221,7 @@ func SetupBench() {
 	out, err := exec.Command(pgbenchCommand, "postgres", "-i").Output()
 	fmt.Println(string(out))
 	if err != nil {
-		fmt.Println(err);
+		fmt.Println(err)
 	}
 }
 func Backup(tu *walg.TarUploader, pre *walg.S3Prefix) {
