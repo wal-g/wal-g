@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-const pgpTestPrivateKey string = `
+const pgpTestPrivateKey = `
 -----BEGIN PGP PRIVATE KEY BLOCK-----
 
 lQOYBFmyi7EBCADbQqd6Ze1dqHpAZJqmAY0BP0xx2H0ET5EIWfQde1UGYcXgF8zC

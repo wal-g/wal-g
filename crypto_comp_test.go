@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-const waleGpgKey string = `
+const waleGpgKey = `
 -----BEGIN PGP PRIVATE KEY BLOCK-----
 Version: GnuPG v1
 

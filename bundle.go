@@ -30,8 +30,8 @@ type Bundle struct {
 	IncrementFromLsn   *uint64
 	IncrementFromFiles BackupFileList
 
-	tarballQueue     chan (TarBall)
-	uploadQueue      chan (TarBall)
+	tarballQueue     chan TarBall
+	uploadQueue      chan TarBall
 	parallelTarballs int
 	maxUploadQueue   int
 	mutex            sync.Mutex
@@ -48,8 +48,8 @@ func (bundle *Bundle) StartQueue() {
 	}
 	bundle.parallelTarballs = getMaxUploadDiskConcurrency()
 	bundle.maxUploadQueue = getMaxUploadQueue()
-	bundle.tarballQueue = make(chan (TarBall), bundle.parallelTarballs)
-	bundle.uploadQueue = make(chan (TarBall), bundle.parallelTarballs+bundle.maxUploadQueue)
+	bundle.tarballQueue = make(chan TarBall, bundle.parallelTarballs)
+	bundle.uploadQueue = make(chan TarBall, bundle.parallelTarballs+bundle.maxUploadQueue)
 	for i := 0; i < bundle.parallelTarballs; i++ {
 		bundle.NewTarBall(true)
 		bundle.tarballQueue <- bundle.TarBall
