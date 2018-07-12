@@ -19,8 +19,11 @@ func (reader *AlignedReader) Read(p []byte) (n int, err error) {
 }
 
 func (reader *AlignedReader) ReadToAlignment() error {
-	paddingLength := (reader.alreadyRead + reader.alignment - 1) / reader.alignment * reader.alignment
+	paddingLength := reader.alignment - reader.alreadyRead % reader.alignment
+	if paddingLength == reader.alignment {
+		return nil
+	}
 	padding := make([]byte, paddingLength)
-	_, err := reader.innerReader.Read(padding)
+	_, err := reader.Read(padding)
 	return err
 }

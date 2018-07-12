@@ -18,6 +18,10 @@ type FieldToParse struct {
 	name  string
 }
 
+func NewFieldToParse(field interface{}, name string) *FieldToParse {
+	return &FieldToParse{field, name}
+}
+
 func (fieldToParse *FieldToParse) parseFrom(reader io.Reader) error {
 	err := binary.Read(reader, binary.LittleEndian, fieldToParse.field)
 	if err != nil {

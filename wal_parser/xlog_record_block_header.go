@@ -19,8 +19,7 @@ type XLogRecordBlockHeader struct {
 	forkFlags uint8
 	dataLength uint16
 	imageHeader *XLogRecordBlockImageHeader
-	relFileNode *RelFileNode
-	blockNo uint32
+	blockLocation BlockLocation
 }
 
 func NewXLogRecordBlockHeader(blockId uint8) XLogRecordBlockHeader {
@@ -45,4 +44,12 @@ func (blockHeader *XLogRecordBlockHeader) willInit() bool {
 
 func (blockHeader *XLogRecordBlockHeader) hasSameRel() bool {
 	return (blockHeader.forkFlags & BkpBlockSameRel) != 0
+}
+
+func (blockHeader *XLogRecordBlockHeader) checkDataStateConsistency() error {
+	if (blockHeader.hasData() && blockHeader.dataLength == 0) ||
+		(!blockHeader.hasData() && blockHeader.dataLength != 0) {
+		return InconsistentBlockDataStateError{blockHeader.hasData(),  blockHeader.dataLength}
+	}
+	return nil
 }

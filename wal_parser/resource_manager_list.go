@@ -27,4 +27,7 @@ package wal_parser
  	RmReplOriginID
  	RmGenericID
  	RmLogicalMsgID
+
+
+ 	RmNextFreeID
  )

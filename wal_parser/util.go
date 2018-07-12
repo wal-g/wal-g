@@ -1,6 +1,8 @@
 package wal_parser
 
 type Oid = uint32
+type TimeLineID = uint32
+type XLogRecordPtr = uint64
 
 func minUint32(a uint32, b uint32) uint32 {
 	if a < b {
@@ -9,7 +11,7 @@ func minUint32(a uint32, b uint32) uint32 {
 	return b
 }
 
-func concatBytes(a []byte, b []byte) []byte {
+func concatByteSlices(a []byte, b []byte) []byte {
 	result := make([]byte, len(a) + len(b))
 	copy(result, a)
 	copy(result[len(a):], b)

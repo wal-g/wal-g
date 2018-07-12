@@ -20,6 +20,9 @@ type ShrinkableReader struct {
 }
 
 func (reader *ShrinkableReader) Read(p []byte) (n int, err error) {
+	if reader.dataRemained == 0 {
+		return 0, io.EOF
+	}
 	if len(p) <= reader.dataRemained {
 		n, err = reader.innerReader.Read(p)
 		reader.dataRemained -= n
@@ -27,12 +30,9 @@ func (reader *ShrinkableReader) Read(p []byte) (n int, err error) {
 	}
 	remained := make([]byte, reader.dataRemained)
 	n, err = reader.innerReader.Read(remained)
-	reader.dataRemained -= n
-	if err != nil {
-		return
-	}
 	copy(p, remained)
-	return n, io.EOF
+	reader.dataRemained -= n
+	return
 }
 
 func (reader *ShrinkableReader) Shrink(length int) error {

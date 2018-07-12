@@ -20,8 +20,8 @@ const (
 type XLogPageHeader struct {
 	magic uint16
 	info uint16
-	timeLineID uint32
-	pageAddress uint64
+	timeLineID TimeLineID
+	pageAddress XLogRecordPtr
 	remainingDataLen uint32
 }
 
