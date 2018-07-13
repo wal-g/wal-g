@@ -1,6 +1,16 @@
+notifications:
+  email: false
 language: go
+dist: trusty
 go:
   - 1.10.x
+matrix:
+  include:
+    - env: GOTAGS=
+    - env: GOTAGS=lzo
+      addons:
+        apt:
+          packages: liblzo2-dev
 before_deploy:
   - tar -zcf wal-g.linux-amd64.tar.gz -C cmd/wal-g/ wal-g
 deploy:
@@ -12,3 +22,4 @@ deploy:
   on:
     repo: wal-g/wal-g
     tags: true
+    condition: "$GOTAGS = ''"

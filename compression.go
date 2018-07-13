@@ -44,5 +44,4 @@ var Decompressors = []Decompressor{
 	Lz4Decompressor{},
 	ZstdDecompressor{},
 	LzmaDecompressor{},
-	LzoDecompressor{},
 }

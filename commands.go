@@ -173,35 +173,24 @@ func deltaFetchRecursion(backupName string, pre *S3Prefix, dirArc string) (lsn *
 	return
 }
 
-func extractPgControl(backup *Backup, pre *S3Prefix, fileTarInterpreter *FileTarInterpreter) error {
-	// Extract pg_control last. If pg_control does not exist, program exits with error code 1.
-	for _, decompressor := range Decompressors {
-		name := *backup.Path + *backup.Name + "/tar_partitions/pg_control.tar." + decompressor.FileExtension()
-		pgControl := &Archive{
-			Prefix:  pre,
-			Archive: aws.String(name),
-		}
+// Extract pg_control separately, and last.
+func extractPgControl(backup *Backup, pre *S3Prefix, fileTarInterpreter *FileTarInterpreter, name string) error {
+	sentinel := make([]ReaderMaker, 1)
+	sentinel[0] = &S3ReaderMaker{
+		Backup:     backup,
+		Key:        aws.String(name),
+		FileFormat: GetFileExtension(name),
+	}
 
-		exists, err := pgControl.CheckExistence()
-		if err != nil {
-			return err
-		}
-
-		if !exists {
-			continue
-		}
-		sentinel := make([]ReaderMaker, 1)
-		sentinel[0] = &S3ReaderMaker{
-			Backup:     backup,
-			Key:        aws.String(name),
-			FileFormat: GetFileExtension(name),
-		}
-		err = ExtractAll(fileTarInterpreter, sentinel)
-		if serr, ok := err.(*UnsupportedFileTypeError); ok {
-			return serr
-		}
+	err := ExtractAll(fileTarInterpreter, sentinel)
+	if err != nil {
 		return err
 	}
+
+	if serr, ok := err.(*UnsupportedFileTypeError); ok {
+		return serr
+	}
+
 	return PgControlMissingError{}
 }
 
@@ -266,27 +255,42 @@ func unwrapBackup(backup *Backup, dirArc string, pre *S3Prefix, sentinelDto S3Ta
 
 	}
 
-	var allKeys []string
-	var keys []string
-	allKeys, err := backup.GetKeys()
+	keys, err := backup.GetKeys()
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
-	keys = allKeys[:len(allKeys)-1] // TODO: WTF is going on?
+
 	fileTarInterpreter := &FileTarInterpreter{
 		NewDir:             dirArc,
 		Sentinel:           sentinelDto,
 		IncrementalBaseDir: incrementBase,
 	}
-	out := make([]ReaderMaker, len(keys))
-	for i, key := range keys {
+	out := make([]ReaderMaker, 0, len(keys))
+
+	var pgControlKey *string
+	pgControlRe := regexp.MustCompile(`^.*?/tar_partitions/pg_control\.tar(\..+$|$)`)
+	for _, key := range keys {
+		// Separate the pg_control key from the others to
+		// extract it at the end, as to prevent server startup
+		// with incomplete backup restoration.  But only if it
+		// exists: it won't in the case of WAL-E backup
+		// backwards compatibility.
+		if pgControlRe.MatchString(key) {
+			if pgControlKey != nil {
+				panic("expect only one pg_control key match")
+			}
+			pgControlKey = &key
+			continue
+		}
+
 		s := &S3ReaderMaker{
 			Backup:     backup,
 			Key:        aws.String(key),
 			FileFormat: GetFileExtension(key),
 		}
-		out[i] = s
+		out = append(out, s)
 	}
+
 	// Extract all compressed tar members except `pg_control.tar.lz4` if WALG version backup.
 	err = ExtractAll(fileTarInterpreter, out)
 	if serr, ok := err.(*UnsupportedFileTypeError); ok {
@@ -297,14 +301,18 @@ func unwrapBackup(backup *Backup, dirArc string, pre *S3Prefix, sentinelDto S3Ta
 	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of backup.
 	re := regexp.MustCompile(`^([^_]+._{1}[^_]+._{1})`)
 	match := re.FindString(*backup.Name)
-	if match == "" || sentinelDto.IsIncremental() { // TODO: extract pg_control
-		err = extractPgControl(backup, pre, fileTarInterpreter)
+	if match == "" || sentinelDto.IsIncremental() {
+		if pgControlKey == nil {
+			log.Fatal("Expect pg_control archive, but not found")
+		}
+
+		err = extractPgControl(backup, pre, fileTarInterpreter, *pgControlKey)
 		if err != nil {
 			log.Fatalf("%+v\n", err)
-		} else {
-			fmt.Print("\nBackup extraction complete.\n")
 		}
 	}
+
+	fmt.Print("\nBackup extraction complete.\n")
 }
 
 func getDeltaConfig() (maxDeltas int, fromFull bool) {
