@@ -28,9 +28,9 @@ func (f *FileTarBallMaker) Make(inheritState bool) walg.TarBall {
 // NOPTarBallMaker creates a new NOPTarBall. Used
 // for testing purposes.
 type NOPTarBallMaker struct {
-	number  int
-	size    int64
-	Trim    string
+	number int
+	size   int64
+	Trim   string
 }
 
 // Make creates a new NOPTarBall.

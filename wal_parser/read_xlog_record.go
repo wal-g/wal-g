@@ -1,13 +1,13 @@
 package wal_parser
 
 import (
-	"io"
 	"bytes"
+	"io"
 )
 
 func readXLogRecordHeader(reader io.Reader) (*XLogRecordHeader, error) {
 	xLogRecordHeader := XLogRecordHeader{}
-	err := parseMultipleFieldsFromReader([]FieldToParse {
+	err := parseMultipleFieldsFromReader([]FieldToParse{
 		{&xLogRecordHeader.totalRecordLength, "totalRecordLength"},
 		{&xLogRecordHeader.xactID, "xactID"},
 		{&xLogRecordHeader.prevRecordPtr, "prevRecordPtr"},
@@ -29,7 +29,7 @@ func readXLogRecordHeader(reader io.Reader) (*XLogRecordHeader, error) {
 
 func readRelFileNode(reader io.Reader) (*RelFileNode, error) {
 	relFileNode := RelFileNode{}
-	err := parseMultipleFieldsFromReader([]FieldToParse {
+	err := parseMultipleFieldsFromReader([]FieldToParse{
 		{&relFileNode.spcNode, "spcNode"},
 		{&relFileNode.dbNode, "dbNode"},
 		{&relFileNode.relNode, "relNode"},
@@ -72,7 +72,7 @@ func readXLogRecordBlockDataAndImages(record *XLogRecord, reader io.Reader) erro
 
 func readXLogRecordBlockImageHeader(reader io.Reader) (*XLogRecordBlockImageHeader, error) {
 	blockImageHeader := XLogRecordBlockImageHeader{}
-	err := parseMultipleFieldsFromReader([]FieldToParse {
+	err := parseMultipleFieldsFromReader([]FieldToParse{
 		{&blockImageHeader.imageLength, "imageLength"},
 		{&blockImageHeader.holeOffset, "imageHoleOffset"},
 		{&blockImageHeader.info, "imageInfo"},
@@ -97,7 +97,7 @@ func readXLogRecordBlockImageHeader(reader io.Reader) (*XLogRecordBlockImageHead
 	return &blockImageHeader, nil
 }
 
-func readBlockLocation(blockHasSameRel bool, lastRelFileNode *RelFileNode,  reader io.Reader) (location *BlockLocation, err error) {
+func readBlockLocation(blockHasSameRel bool, lastRelFileNode *RelFileNode, reader io.Reader) (location *BlockLocation, err error) {
 	var relFileNode *RelFileNode
 	if blockHasSameRel {
 		if lastRelFileNode == nil {
@@ -131,7 +131,7 @@ func readXLogRecordBlockHeader(lastRelFileNode *RelFileNode,
 	}
 	*maxReadBlockId = int(blockHeader.blockId)
 
-	err := parseMultipleFieldsFromReader([]FieldToParse {
+	err := parseMultipleFieldsFromReader([]FieldToParse{
 		{&blockHeader.forkFlags, "forkFlags"},
 		{&blockHeader.dataLength, "dataLength"},
 	}, reader)
@@ -145,7 +145,8 @@ func readXLogRecordBlockHeader(lastRelFileNode *RelFileNode,
 	reader.Shrink(int(blockHeader.dataLength))
 
 	if blockHeader.hasImage() {
-		blockHeader.imageHeader, err = readXLogRecordBlockImageHeader(reader)
+		imageHeader, err := readXLogRecordBlockImageHeader(reader)
+		blockHeader.imageHeader = *imageHeader
 		if err != nil {
 			return nil, err
 		}
@@ -160,7 +161,7 @@ func readXLogRecordBlockHeader(lastRelFileNode *RelFileNode,
 		return nil, err
 	}
 	blockHeader.blockLocation = *blockLocation
-	return &blockHeader, nil
+	return blockHeader, nil
 }
 
 func readXLogRecordBlockHeaderPart(record *XLogRecord, reader io.Reader) error {
@@ -183,7 +184,7 @@ func readXLogRecordBlockHeaderPart(record *XLogRecord, reader io.Reader) error {
 			record.mainDataLen = uint32(mainDataLen)
 			headerReader.Shrink(int(mainDataLen))
 		case XlrBlockIdDataLong:
-			err := NewFieldToParse(&record.mainDataLen,  "mainDataLen32").parseFrom(headerReader)
+			err := NewFieldToParse(&record.mainDataLen, "mainDataLen32").parseFrom(headerReader)
 			if err != nil {
 				return err
 			}
@@ -211,10 +212,10 @@ func readXLogRecordMainData(mainDataLen uint32, reader io.Reader) ([]byte, error
 }
 
 func readXLogRecordBody(header *XLogRecordHeader, reader io.Reader) (*XLogRecord, error) {
-	record := NewXLogRecord(header)
-	readXLogRecordBlockHeaderPart(&record, reader)
+	record := NewXLogRecord(*header)
+	readXLogRecordBlockHeaderPart(record, reader)
 
-	err := readXLogRecordBlockDataAndImages(&record, reader)
+	err := readXLogRecordBlockDataAndImages(record, reader)
 	if err != nil {
 		return nil, err
 	}
@@ -223,5 +224,5 @@ func readXLogRecordBody(header *XLogRecordHeader, reader io.Reader) (*XLogRecord
 	if err != nil {
 		return nil, err
 	}
-	return &record, nil
+	return record, nil
 }

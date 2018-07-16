@@ -3,16 +3,16 @@ package wal_parser
 import "fmt"
 
 const (
-	BkpImageHasHole uint8 = 0x01
+	BkpImageHasHole      uint8 = 0x01
 	BkpImageIsCompressed uint8 = 0x02
-	BkpImageApply uint8 = 0x04
+	BkpImageApply        uint8 = 0x04
 )
 
 type InconsistentBlockImageHoleStateError struct {
-	holeOffset uint16
-	holeLength uint16
+	holeOffset  uint16
+	holeLength  uint16
 	imageLength uint16
-	hasHole bool
+	hasHole     bool
 }
 
 func (err InconsistentBlockImageHoleStateError) Error() string {
@@ -21,9 +21,9 @@ func (err InconsistentBlockImageHoleStateError) Error() string {
 }
 
 type InconsistentBlockImageLengthError struct {
-	hasHole bool
+	hasHole      bool
 	isCompressed bool
-	length uint16
+	length       uint16
 }
 
 func (err InconsistentBlockImageLengthError) Error() string {
@@ -60,7 +60,7 @@ func (imageHeader *XLogRecordBlockImageHeader) checkHoleStateConsistency() error
 
 func (imageHeader *XLogRecordBlockImageHeader) checkLengthConsistency() error {
 	if (imageHeader.isCompressed() && imageHeader.imageLength == BlockSize) ||
-		(!imageHeader.hasHole() && !imageHeader.isCompressed() && imageHeader.imageLength != BlockSize){
+		(!imageHeader.hasHole() && !imageHeader.isCompressed() && imageHeader.imageLength != BlockSize) {
 		return InconsistentBlockImageLengthError{imageHeader.hasHole(), imageHeader.isCompressed(), imageHeader.imageLength}
 	}
 	return nil

@@ -4,7 +4,7 @@ import "io"
 
 type AlignedReader struct {
 	innerReader io.Reader
-	alignment int
+	alignment   int
 	alreadyRead int
 }
 
@@ -19,7 +19,7 @@ func (reader *AlignedReader) Read(p []byte) (n int, err error) {
 }
 
 func (reader *AlignedReader) ReadToAlignment() error {
-	paddingLength := reader.alignment - reader.alreadyRead % reader.alignment
+	paddingLength := reader.alignment - reader.alreadyRead%reader.alignment
 	if paddingLength == reader.alignment {
 		return nil
 	}

@@ -1,29 +1,29 @@
 package wal_parser
 
 const (
-	XlrMaxBlockId = 32
+	XlrMaxBlockId       = 32
 	XlrBlockIdDataShort = 255
-	XlrBlockIdDataLong = 254
-	XlrBlockIdOrigin = 253
+	XlrBlockIdDataLong  = 254
+	XlrBlockIdOrigin    = 253
 
 	BkpBlockForkMask uint8 = 0x0F
 	BkpBlockFlagMask uint8 = 0xF0
 	BkpBlockHasImage uint8 = 0x10
-	BkpBlockHasData uint8 = 0x20
+	BkpBlockHasData  uint8 = 0x20
 	BkpBlockWillInit uint8 = 0x40
-	BkpBlockSameRel uint8 = 0x80
+	BkpBlockSameRel  uint8 = 0x80
 )
 
 type XLogRecordBlockHeader struct {
-	blockId uint8
-	forkFlags uint8
-	dataLength uint16
-	imageHeader *XLogRecordBlockImageHeader
+	blockId       uint8
+	forkFlags     uint8
+	dataLength    uint16
+	imageHeader   XLogRecordBlockImageHeader
 	blockLocation BlockLocation
 }
 
-func NewXLogRecordBlockHeader(blockId uint8) XLogRecordBlockHeader {
-	return XLogRecordBlockHeader{blockId: blockId}
+func NewXLogRecordBlockHeader(blockId uint8) *XLogRecordBlockHeader {
+	return &XLogRecordBlockHeader{blockId: blockId}
 }
 
 func (blockHeader *XLogRecordBlockHeader) forkNum() uint8 {
@@ -49,7 +49,7 @@ func (blockHeader *XLogRecordBlockHeader) hasSameRel() bool {
 func (blockHeader *XLogRecordBlockHeader) checkDataStateConsistency() error {
 	if (blockHeader.hasData() && blockHeader.dataLength == 0) ||
 		(!blockHeader.hasData() && blockHeader.dataLength != 0) {
-		return InconsistentBlockDataStateError{blockHeader.hasData(),  blockHeader.dataLength}
+		return InconsistentBlockDataStateError{blockHeader.hasData(), blockHeader.dataLength}
 	}
 	return nil
 }

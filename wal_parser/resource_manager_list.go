@@ -4,30 +4,29 @@ package wal_parser
  * src/include/access/rmgrlist.h
  */
 
- const (
- 	RmXlogID = iota
- 	RmXactID
- 	RmSmgrID
- 	RmClogID
- 	RmDBaseID
- 	RmTblSpcID
- 	RmMultiXactID
- 	RmRelMapID
- 	RmStandbyID
- 	RmHeap2ID
- 	RmHeapID
- 	RmBTreeID
- 	RmHashID
- 	RmGinID
- 	RmGistID
- 	RmSeqID
- 	RmSPGistID
- 	RmBrinID
- 	RmCommitTsID
- 	RmReplOriginID
- 	RmGenericID
- 	RmLogicalMsgID
+const (
+	RmXlogID = iota
+	RmXactID
+	RmSmgrID
+	RmClogID
+	RmDBaseID
+	RmTblSpcID
+	RmMultiXactID
+	RmRelMapID
+	RmStandbyID
+	RmHeap2ID
+	RmHeapID
+	RmBTreeID
+	RmHashID
+	RmGinID
+	RmGistID
+	RmSeqID
+	RmSPGistID
+	RmBrinID
+	RmCommitTsID
+	RmReplOriginID
+	RmGenericID
+	RmLogicalMsgID
 
-
- 	RmNextFreeID
- )
+	RmNextFreeID
+)

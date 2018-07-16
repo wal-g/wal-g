@@ -18,10 +18,10 @@ const (
  * src/include/access/xlog_internal.h
  */
 type XLogPageHeader struct {
-	magic uint16
-	info uint16
-	timeLineID TimeLineID
-	pageAddress XLogRecordPtr
+	magic            uint16
+	info             uint16
+	timeLineID       TimeLineID
+	pageAddress      XLogRecordPtr
 	remainingDataLen uint32
 }
 

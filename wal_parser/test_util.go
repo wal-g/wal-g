@@ -1,8 +1,8 @@
 package wal_parser
 
 import (
-	"testing"
 	"io"
+	"testing"
 )
 
 func assertEquals(t *testing.T, a interface{}, b interface{}) {

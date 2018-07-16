@@ -1,13 +1,14 @@
 package wal_parser
 
 import (
-	"testing"
-	"os"
-	"io"
 	"bytes"
+	"io"
+	"os"
+	"testing"
 )
 
-const WalFilePath = "./testdata/00000001000000000000002B"
+//const WalFilePath = "./testdata/00000001000000000000002B"
+const WalFilePath = "./testdata/000000010000000000000078"
 
 func TestWalFileParsing(t *testing.T) {
 	walFile, err := os.Open(WalFilePath)

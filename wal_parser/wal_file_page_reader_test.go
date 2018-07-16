@@ -1,10 +1,10 @@
 package wal_parser
 
 import (
-	"testing"
-	"math/rand"
 	"bytes"
 	"io"
+	"math/rand"
+	"testing"
 )
 
 func TestWalPageReader_ReadPageData(t *testing.T) {

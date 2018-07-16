@@ -35,7 +35,7 @@ type Decompressor interface {
 }
 
 var Compressors = map[string]Compressor{
-	Lz4AlgorithmName: Lz4Compressor{},
+	Lz4AlgorithmName:  Lz4Compressor{},
 	LzmaAlgorithmName: LzmaCompressor{},
 	ZstdAlgorithmName: ZstdCompressor{},
 }

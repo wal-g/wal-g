@@ -42,7 +42,7 @@ func main() {
 
 	if nop {
 		bundle.TarBallMaker = &tools.NOPTarBallMaker{
-			Trim:    in,
+			Trim: in,
 		}
 	} else if !s3 && outDir == "" {
 		fmt.Printf("Please provide a directory to write to.\n")

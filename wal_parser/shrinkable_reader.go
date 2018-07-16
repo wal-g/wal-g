@@ -1,13 +1,13 @@
 package wal_parser
 
 import (
-	"io"
 	"fmt"
+	"io"
 )
 
 type NotEnoughDataToShrinkError struct {
 	dataRemained int
-	toShrink int
+	toShrink     int
 }
 
 func (err NotEnoughDataToShrinkError) Error() string {
@@ -42,4 +42,3 @@ func (reader *ShrinkableReader) Shrink(length int) error {
 	reader.dataRemained -= length
 	return nil
 }
-

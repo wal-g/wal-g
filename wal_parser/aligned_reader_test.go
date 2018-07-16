@@ -1,9 +1,9 @@
 package wal_parser
 
 import (
-	"testing"
 	"bytes"
 	"io"
+	"testing"
 )
 
 func TestAlignedReader_EOF(t *testing.T) {
@@ -13,7 +13,7 @@ func TestAlignedReader_EOF(t *testing.T) {
 }
 
 func TestAlignedReader_Read(t *testing.T) {
-	reader := bytes.NewReader([]byte {1, 2, 3, 4})
+	reader := bytes.NewReader([]byte{1, 2, 3, 4})
 	alignedReader := NewAlignedReader(reader, 2)
 	buf := make([]byte, 3)
 	n, err := io.ReadFull(alignedReader, buf)
@@ -27,7 +27,7 @@ func TestAlignedReader_Read(t *testing.T) {
 }
 
 func TestAlignedReader_ReadAfterAlignment(t *testing.T) {
-	reader := bytes.NewReader([]byte {1, 2, 3, 4, 5, 6, 7, 8, 9})
+	reader := bytes.NewReader([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9})
 	alignedReader := NewAlignedReader(reader, 3)
 	buf := make([]byte, 4)
 	alignedReader.Read(buf)
@@ -43,7 +43,7 @@ func TestAlignedReader_ReadAfterAlignment(t *testing.T) {
 }
 
 func TestAlignedReader_ReadToAlignment(t *testing.T) {
-	reader := bytes.NewReader([]byte {1, 2, 3, 4, 5})
+	reader := bytes.NewReader([]byte{1, 2, 3, 4, 5})
 	alignedReader := NewAlignedReader(reader, 2)
 	buf := make([]byte, 3)
 	alignedReader.Read(buf)

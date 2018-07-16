@@ -5,8 +5,8 @@ import "fmt"
 const (
 	// info flags
 
-	XlrInfoMask = 0x0F
-	XlrRmgrInfoMask	= 0xF0
+	XlrInfoMask     = 0x0F
+	XlrRmgrInfoMask = 0xF0
 
 	XlrSpecialRelUpdate  = 0x01
 	XlrCheckConsistency  = 0x02
@@ -53,7 +53,7 @@ func (header *XLogRecordHeader) checkTotalRecordLengthConsistency() error {
 
 func (header *XLogRecordHeader) checkResourceManagerIDValidity() error {
 	if header.resourceManagerID >= RmNextFreeID {
-		return InvalidXLogRecordResourceManagerIDError{ header.resourceManagerID }
+		return InvalidXLogRecordResourceManagerIDError{header.resourceManagerID}
 	}
 	return nil
 }

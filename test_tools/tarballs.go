@@ -42,7 +42,7 @@ func (tarBall *FileTarBall) SetUp(crypter walg.Crypter, names ...string) {
 
 			tarBall.writeCloser = &walg.CascadeWriteCloser{
 				WriteCloser: lz4.NewWriter(file),
-				Underlying: &walg.CascadeWriteCloser{WriteCloser: writeCloser, Underlying: file},
+				Underlying:  &walg.CascadeWriteCloser{WriteCloser: writeCloser, Underlying: file},
 			}
 		} else {
 			writeCloser = file
@@ -73,7 +73,6 @@ func (tarBall *FileTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error
 	return nil
 }
 
-
 func (tarBall *FileTarBall) GetFileRelPath(fileAbsPath string) string {
 	return walg.GetFileRelPath(fileAbsPath, tarBall.archiveDirectory)
 }
@@ -100,7 +99,7 @@ func (tarBall *NOPTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error 
 }
 
 func (tarBall *NOPTarBall) GetFileRelPath(fileAbsPath string) string {
-	return walg.GetFileRelPath(fileAbsPath,  tarBall.archiveDirectory)
+	return walg.GetFileRelPath(fileAbsPath, tarBall.archiveDirectory)
 }
 func (tarBall *NOPTarBall) ArchiveDirectory() string { return tarBall.archiveDirectory }
 func (tarBall *NOPTarBall) Size() int64              { return tarBall.size }

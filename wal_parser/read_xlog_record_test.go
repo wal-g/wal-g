@@ -1,12 +1,12 @@
 package wal_parser
 
 import (
-	"testing"
 	"bytes"
+	"testing"
 )
 
 func TestReadXLogRecordHeader(t *testing.T) {
-	headerData := []byte {
+	headerData := []byte{
 		0x05, 0x1d, 0x00, 0x00, 0x43, 0x02, 0x00, 0x00, 0xc8, 0xed, 0xff, 0x2a, 0x00, 0x00, 0x00, 0x00,
 		0xb0, 0x00, 0x00, 0x00, 0x3c, 0x20, 0xf5, 0xec,
 	}
@@ -27,7 +27,7 @@ func TestReadXLogRecordHeader(t *testing.T) {
 func TestReadXLogRecordBlockHeader(t *testing.T) {
 	var lastRelFileNode *RelFileNode = nil
 	maxReadBlockId := -1
-	headerData := []byte {
+	headerData := []byte{
 		0x10, 0x00, 0x00, 0xd4, 0x1c, 0xd4, 0x05, 0x05, 0x7f, 0x06, 0x00, 0x00, 0x00, 0x40, 0x00,
 		0x00, 0x15, 0x40, 0x00, 0x00, 0xe4, 0x18, 0x00, 0x00,
 	}
@@ -42,7 +42,7 @@ func TestReadXLogRecordBlockHeader(t *testing.T) {
 	assertEquals(t, header.imageHeader.imageLength, uint16(0x1cd4))
 	assertEquals(t, header.imageHeader.holeOffset, uint16(0x05d4))
 	assertEquals(t, header.imageHeader.info, uint8(0x05))
-	assertEquals(t, header.imageHeader.holeLength, BlockSize - header.imageHeader.imageLength)
+	assertEquals(t, header.imageHeader.holeLength, BlockSize-header.imageHeader.imageLength)
 	assertEquals(t, header.blockLocation.relFileNode.spcNode, Oid(0x0000067f))
 	assertEquals(t, header.blockLocation.relFileNode.dbNode, Oid(0x00004000))
 	assertEquals(t, header.blockLocation.relFileNode.relNode, Oid(0x00004015))
@@ -51,7 +51,7 @@ func TestReadXLogRecordBlockHeader(t *testing.T) {
 }
 
 func TestReadBlockLocation_WithDifferentRel(t *testing.T) {
-	data := []byte {
+	data := []byte{
 		0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
 		0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
 	}
@@ -68,7 +68,7 @@ func TestReadBlockLocation_WithDifferentRel(t *testing.T) {
 }
 
 func TestReadXLogRecordBlockImageHeader_NotCompressed(t *testing.T) {
-	data := []byte {
+	data := []byte{
 		0x42, 0x10, 0x30, 0x00, 0x05,
 	}
 	reader := bytes.NewReader(data)
@@ -84,7 +84,7 @@ func TestReadXLogRecordBlockImageHeader_NotCompressed(t *testing.T) {
 }
 
 func TestReadXLogRecordBlockImageHeader_Compressed(t *testing.T) {
-	data := []byte {
+	data := []byte{
 		0x42, 0x10, 0x30, 0x00, 0x07, 0x92, 0x00,
 	}
 	reader := bytes.NewReader(data)
@@ -101,17 +101,17 @@ func TestReadXLogRecordBlockImageHeader_Compressed(t *testing.T) {
 
 func testReadXLogRecordBlockHeaderPartLogic(t *testing.T, data []byte, blockDataLen uint32) *XLogRecord {
 	reader := bytes.NewReader(data)
-	record := NewXLogRecord(&XLogRecordHeader{totalRecordLength: XLogRecordHeaderSize + uint32(len(data)) + blockDataLen})
-	err := readXLogRecordBlockHeaderPart(&record, reader)
+	record := NewXLogRecord(XLogRecordHeader{totalRecordLength: XLogRecordHeaderSize + uint32(len(data)) + blockDataLen})
+	err := readXLogRecordBlockHeaderPart(record, reader)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 	assertReaderIsEmpty(t, reader)
-	return &record
+	return record
 }
 
 func TestReadXLogRecordBlockHeaderPart_DataShort(t *testing.T) {
-	data := []byte {
+	data := []byte{
 		0xff, 0x12,
 	}
 	expectedMainDataLen := uint32(0x12)
@@ -120,7 +120,7 @@ func TestReadXLogRecordBlockHeaderPart_DataShort(t *testing.T) {
 }
 
 func TestReadXLogRecordBlockHeaderPart_DataLong(t *testing.T) {
-	data := []byte {
+	data := []byte{
 		0xfe, 0x98, 0x76, 0x54, 0x32,
 	}
 	expectedMainDataLen := uint32(0x32547698)
@@ -129,7 +129,7 @@ func TestReadXLogRecordBlockHeaderPart_DataLong(t *testing.T) {
 }
 
 func TestReadXLogRecordBlockHeaderPart_RecordOrigin(t *testing.T) {
-	data := []byte {
+	data := []byte{
 		0xfd, 0x01, 0xfe,
 	}
 	expectedOrigin := uint16(0xfe01)
@@ -138,7 +138,7 @@ func TestReadXLogRecordBlockHeaderPart_RecordOrigin(t *testing.T) {
 }
 
 func TestReadXLogRecordBlockHeaderPart_MultipleBlocks(t *testing.T) {
-	data := []byte {
+	data := []byte{
 		0xfd, 0x01, 0xfe,
 		0x00, 0x10, 0x00, 0x00, 0xd4, 0x1c, 0xd4, 0x05, 0x05, 0x7f, 0x06, 0x00, 0x00, 0x00, 0x40,
 		0x00, 0x00, 0x15, 0x40, 0x00, 0x00, 0xe4, 0x18, 0x00, 0x00,
@@ -147,7 +147,7 @@ func TestReadXLogRecordBlockHeaderPart_MultipleBlocks(t *testing.T) {
 	expectedOrigin := uint16(0xfe01)
 	expectedMainDataLen := uint32(0x12)
 	expectedImageLength := uint16(0x1cd4)
-	record := testReadXLogRecordBlockHeaderPartLogic(t, data, expectedMainDataLen + uint32(expectedImageLength))
+	record := testReadXLogRecordBlockHeaderPartLogic(t, data, expectedMainDataLen+uint32(expectedImageLength))
 	assertEquals(t, record.origin, expectedOrigin)
 	assertEquals(t, record.mainDataLen, expectedMainDataLen)
 	assertEquals(t, len(record.blocks), 1)
@@ -158,7 +158,7 @@ func TestReadXLogRecordBlockHeaderPart_MultipleBlocks(t *testing.T) {
 	assertEquals(t, header.imageHeader.imageLength, expectedImageLength)
 	assertEquals(t, header.imageHeader.holeOffset, uint16(0x05d4))
 	assertEquals(t, header.imageHeader.info, uint8(0x05))
-	assertEquals(t, header.imageHeader.holeLength, BlockSize - header.imageHeader.imageLength)
+	assertEquals(t, header.imageHeader.holeLength, BlockSize-header.imageHeader.imageLength)
 	assertEquals(t, header.blockLocation.relFileNode.spcNode, Oid(0x0000067f))
 	assertEquals(t, header.blockLocation.relFileNode.dbNode, Oid(0x00004000))
 	assertEquals(t, header.blockLocation.relFileNode.relNode, Oid(0x00004015))
@@ -166,13 +166,13 @@ func TestReadXLogRecordBlockHeaderPart_MultipleBlocks(t *testing.T) {
 }
 
 func TestReadXLogRecordBlockDataAndImages_OnlyData(t *testing.T) {
-	data := []byte {
+	data := []byte{
 		0x00, 0x01, 0x02, 0x03, 0x04, 0x05,
 	}
 	reader := bytes.NewReader(data)
 	record := XLogRecord{
-		blocks: []XLogRecordBlock {{header: XLogRecordBlockHeader{
-			forkFlags: BkpBlockHasData,
+		blocks: []XLogRecordBlock{{header: XLogRecordBlockHeader{
+			forkFlags:  BkpBlockHasData,
 			dataLength: uint16(len(data)),
 		}}},
 	}
@@ -185,14 +185,14 @@ func TestReadXLogRecordBlockDataAndImages_OnlyData(t *testing.T) {
 }
 
 func TestReadXLogRecordBlockDataAndImages_OnlyImage(t *testing.T) {
-	image := []byte {
+	image := []byte{
 		0x06, 0x07, 0x08, 0x09, 0x0a,
 	}
 	reader := bytes.NewReader(image)
 	record := XLogRecord{
-		blocks: []XLogRecordBlock {{header: XLogRecordBlockHeader{
-			forkFlags: BkpBlockHasImage,
-			imageHeader: &XLogRecordBlockImageHeader{imageLength:uint16(len(image))},
+		blocks: []XLogRecordBlock{{header: XLogRecordBlockHeader{
+			forkFlags:   BkpBlockHasImage,
+			imageHeader: XLogRecordBlockImageHeader{imageLength: uint16(len(image))},
 		}}},
 	}
 	err := readXLogRecordBlockDataAndImages(&record, reader)
@@ -204,20 +204,20 @@ func TestReadXLogRecordBlockDataAndImages_OnlyImage(t *testing.T) {
 }
 
 func TestReadXLogRecordBlockDataAndImages_DataAndImage(t *testing.T) {
-	imageData := []byte {
+	imageData := []byte{
 		0x10, 0x11, 0x12, 0x13,
 	}
-	blockData := []byte {
+	blockData := []byte{
 		0x14, 0x15, 0x16, 0x17, 0x18,
 	}
 	dataAndImage := concatByteSlices(imageData, blockData)
 	imageLen := 4
 	reader := bytes.NewReader(dataAndImage)
 	record := XLogRecord{
-		blocks: []XLogRecordBlock {{header: XLogRecordBlockHeader{
-			forkFlags: BkpBlockHasImage | BkpBlockHasData,
-			dataLength: 5,
-			imageHeader: &XLogRecordBlockImageHeader{imageLength: uint16(imageLen)},
+		blocks: []XLogRecordBlock{{header: XLogRecordBlockHeader{
+			forkFlags:   BkpBlockHasImage | BkpBlockHasData,
+			dataLength:  5,
+			imageHeader: XLogRecordBlockImageHeader{imageLength: uint16(imageLen)},
 		}}},
 	}
 	err := readXLogRecordBlockDataAndImages(&record, reader)
@@ -229,16 +229,16 @@ func TestReadXLogRecordBlockDataAndImages_DataAndImage(t *testing.T) {
 }
 
 func TestReadXLogRecordBody(t *testing.T) {
-	imageData := []byte {
+	imageData := []byte{
 		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
 	}
-	blockData := []byte {
+	blockData := []byte{
 		0x0a, 0x0b, 0x0c,
 	}
-	mainData := []byte {
+	mainData := []byte{
 		0x0d, 0x0e, 0x0f, 0x10,
 	}
-	data := []byte { // block header data
+	data := []byte{ // block header data
 		0xfd, 0x01, 0xfe,
 		0x00, 0x30, 0x03, 0x00, 0x0a, 0x00, 0xd4, 0x05, 0x05, 0x7f, 0x06, 0x00, 0x00, 0x00, 0x40,
 		0x00, 0x00, 0x15, 0x40, 0x00, 0x00, 0xe4, 0x18, 0x00, 0x00,
@@ -263,7 +263,7 @@ func TestReadXLogRecordBody(t *testing.T) {
 	assertEquals(t, header.imageHeader.imageLength, expectedImageLength)
 	assertEquals(t, header.imageHeader.holeOffset, uint16(0x05d4))
 	assertEquals(t, header.imageHeader.info, uint8(0x05))
-	assertEquals(t, header.imageHeader.holeLength, BlockSize - header.imageHeader.imageLength)
+	assertEquals(t, header.imageHeader.holeLength, BlockSize-header.imageHeader.imageLength)
 	assertEquals(t, header.blockLocation.relFileNode.spcNode, Oid(0x0000067f))
 	assertEquals(t, header.blockLocation.relFileNode.dbNode, Oid(0x00004000))
 	assertEquals(t, header.blockLocation.relFileNode.relNode, Oid(0x00004015))

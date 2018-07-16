@@ -17,4 +17,3 @@ func (reader *WalPageReader) ReadPageData() ([]byte, error) {
 	}
 	return page, nil
 }
-

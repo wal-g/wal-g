@@ -1,8 +1,8 @@
 package wal_parser
 
 type XLogPage struct {
-	header  XLogPageHeader
+	header                 XLogPageHeader
 	prevRecordTrailingData []byte
-	records []XLogRecord
-	nextRecordHeadingData []byte
+	records                []XLogRecord
+	nextRecordHeadingData  []byte
 }

@@ -1,9 +1,9 @@
 package wal_parser
 
 import (
-	"io"
 	"encoding/binary"
 	"github.com/pkg/errors"
+	"io"
 )
 
 var PaddingByte FieldToParse

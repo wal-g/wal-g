@@ -1,8 +1,8 @@
 package wal_parser
 
 import (
-	"fmt"
 	"errors"
+	"fmt"
 )
 
 type InvalidRecordBlockIdError struct {
@@ -23,7 +23,7 @@ func (err OutOfOrderBlockIdError) Error() string {
 }
 
 type InconsistentBlockDataStateError struct {
-	hasData bool
+	hasData    bool
 	dataLength uint16
 }
 

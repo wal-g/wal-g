@@ -6,6 +6,6 @@ package wal_parser
  */
 type RelFileNode struct {
 	spcNode Oid
-	dbNode Oid
+	dbNode  Oid
 	relNode Oid
 }
