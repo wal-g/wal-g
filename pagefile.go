@@ -34,40 +34,9 @@ const (
 // InvalidBlockError indicates that file contain invalid page and cannot be archived incrementally
 var InvalidBlockError = errors.New("block is invalid")
 
-var IncrementScanUnexpectedEOF = errors.New("unexpected EOF during increment scan")
 var InvalidIncrementFileHeaderError = errors.New("Invalid increment file header")
 var UnknownIncrementFileHeaderError = errors.New("Unknown increment file header")
 var UnexpectedTarDataError = errors.New("Expected end of Tar")
-
-// ParsePageHeader reads information from PostgreSQL page header. Exported for test reasons.
-func ParsePageHeader(data []byte) (lsn uint64, valid bool) { // TODO : refactor nahui
-	// Any ideas on how to make this code pretty and nice?
-	le := binary.LittleEndian
-	pdLsnH := le.Uint32(data[0:sizeofInt32])
-	pdLsnL := le.Uint32(data[sizeofInt32 : 2*sizeofInt32])
-
-	// pd_checksum := binary.LittleEndian.Uint16(data[2*sizeofInt32:2*sizeofInt32+sizeofInt16])
-	pdFlags := le.Uint16(data[2*sizeofInt32+sizeofInt16 : 2*sizeofInt32+2*sizeofInt16])
-	pdLower := le.Uint16(data[2*sizeofInt32+2*sizeofInt16 : 2*sizeofInt32+3*sizeofInt16])
-	pdUpper := le.Uint16(data[2*sizeofInt32+3*sizeofInt16 : 2*sizeofInt32+4*sizeofInt16])
-	pdSpecial := le.Uint16(data[2*sizeofInt32+4*sizeofInt16 : 2*sizeofInt32+5*sizeofInt16])
-	pdPagesizeVersion := le.Uint16(data[2*sizeofInt32+5*sizeofInt16 : 2*sizeofInt32+6*sizeofInt16])
-
-	lsn = ((uint64(pdLsnH)) << 32) + uint64(pdLsnL)
-	if (pdFlags&validFlags) != pdFlags ||
-		pdLower < headerSize ||
-		pdLower > pdUpper ||
-		pdUpper > pdSpecial ||
-		pdSpecial > WalPageSize ||
-		(lsn == invalidLsn) ||
-		pdPagesizeVersion != WalPageSize+layoutVersion {
-		valid = false
-	} else {
-		valid = true
-	}
-
-	return
-}
 
 // IsPagedFile checks basic expectations for paged file
 func IsPagedFile(info os.FileInfo, fileName string) bool {
@@ -85,8 +54,9 @@ func IsPagedFile(info os.FileInfo, fileName string) bool {
 	return true
 }
 
+// TODO : maybe it's better to decompose this func
 // TryReadDatabaseFile tries to read file as an incremental data file if possible, otherwise just open the file
-func TryReadDatabaseFile(fileName string, lsn *uint64, isNew bool) (io.ReadCloser, bool, int64, error) { // TODO : improve signature
+func TryReadDatabaseFile(fileName string, lsn *uint64, isNew bool) (fileReader io.ReadCloser, isPaged bool, size int64, err error) {
 	info, err := os.Stat(fileName)
 	fileSize := info.Size()
 	if err != nil {
@@ -107,8 +77,8 @@ func TryReadDatabaseFile(fileName string, lsn *uint64, isNew bool) (io.ReadClose
 		N: int64(fileSize),
 	}
 
-	reader := &IncrementalPageReader{make(chan []byte, 4), lim, file, file, info, *lsn, nil, nil}
-	incrSize, err := reader.initialize()
+	pageReader := &IncrementalPageReader{make(chan []byte, 4), lim, file, info, *lsn, nil, nil}
+	incrSize, err := pageReader.initialize()
 	if err != nil {
 		if err == InvalidBlockError {
 			file.Close()
@@ -122,7 +92,7 @@ func TryReadDatabaseFile(fileName string, lsn *uint64, isNew bool) (io.ReadClose
 
 		return nil, false, fileSize, err
 	}
-	return reader, true, incrSize, nil
+	return pageReader, true, incrSize, nil
 }
 
 // ApplyFileIncrement changes pages according to supplied change map file

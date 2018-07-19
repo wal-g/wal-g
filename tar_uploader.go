@@ -77,7 +77,7 @@ func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify boo
 	var walFileReader io.Reader
 	recordingReader, err := NewWalDeltaRecordingReader(file)
 	if err != nil {
-		if err == DeltaFileExistanceError {
+		if err == DeltaFileExistenceError {
 			// it is normal and it means that next backup should use full scan strategy instead of wal scanning
 			walFileReader = file
 		} else {

@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+// TODO : refactor this pile of shit
+
 // Tests S3 get and set methods.
 func TestS3TarBall(t *testing.T) {
 	tarBallCounter := 0

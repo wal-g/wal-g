@@ -6,6 +6,18 @@ import (
 	"io"
 )
 
+// CompressingPipeWriterError is used to catch specific errors from CompressingPipeWriter
+// when uploading to S3. Will not retry upload if this error
+// occurs.
+type CompressingPipeWriterError struct {
+	err error
+}
+
+func (err CompressingPipeWriterError) Error() string {
+	msg := fmt.Sprintf("%+v\n", err.err)
+	return msg
+}
+
 // CompressingPipeWriter allows for flexibility of using compressed output.
 // Input is read and compressed to a pipe reader.
 type CompressingPipeWriter struct {
@@ -60,16 +72,4 @@ func (pipeWriter *CompressingPipeWriter) Compress(crypter Crypter) {
 			dstWriter.CloseWithError(e)
 		}
 	}()
-}
-
-// CompressingPipeWriterError is used to catch specific errors from CompressingPipeWriter
-// when uploading to S3. Will not retry upload if this error
-// occurs.
-type CompressingPipeWriterError struct {
-	err error
-}
-
-func (err CompressingPipeWriterError) Error() string {
-	msg := fmt.Sprintf("%+v\n", err.err)
-	return msg
 }

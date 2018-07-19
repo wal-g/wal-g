@@ -150,10 +150,12 @@ func PagedFileCompare(filename1 string, filename2 string, lsn uint64) {
 
 		if !bytes.Equal(b1, b2) {
 			fmt.Printf("Bytes at %x differ\n", chunkNumber*chunkSize)
-			lsn1, valid1 := walg.ParsePageHeader(b1)
-			fmt.Printf("LSN1 %x valid %v\n", lsn1, valid1)
-			lsn2, valid2 := walg.ParsePageHeader(b2)
-			fmt.Printf("LSN2 %x valid %v\n", lsn2, valid2)
+			pageHeader1, _ := walg.ParsePostgresPageHeader(bytes.NewReader(b1))
+			lsn1 := pageHeader1.Lsn()
+			fmt.Printf("LSN1 %x valid %v\n", lsn1, pageHeader1.IsValid())
+			pageHeader2, _ := walg.ParsePostgresPageHeader(bytes.NewReader(b2))
+			lsn2 := pageHeader2.Lsn()
+			fmt.Printf("LSN2 %x valid %v\n", lsn2, pageHeader2.IsValid())
 
 			if lsn1 != lsn2 {
 				if lsn1 < lsn {

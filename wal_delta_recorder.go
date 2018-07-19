@@ -2,13 +2,13 @@ package walg
 
 import (
 	"encoding/binary"
-	"github.com/wal-g/wal-g/_vendor-20180626150014/github.com/pkg/errors"
+	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/walparser"
 	"os"
 	"path"
 )
 
-var DeltaFileExistanceError = errors.New("delta file doesn't exist")
+var DeltaFileExistenceError = errors.New("delta file doesn't exist")
 
 type WalDeltaRecorder struct {
 	deltaFile *os.File
@@ -22,7 +22,7 @@ func NewWalDeltaRecorder() (*WalDeltaRecorder, error) {
 	deltaFile, err := os.OpenFile(path.Join(PathToDataFolder, DeltaFilename), os.O_APPEND|os.O_WRONLY, 0600) // TODO : it may not exist and it is not an error
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, DeltaFileExistanceError
+			return nil, DeltaFileExistenceError
 		}
 		return nil, err
 	}

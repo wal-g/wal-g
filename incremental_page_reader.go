@@ -1,23 +1,25 @@
 package walg
 
 import (
+	"bytes"
 	"encoding/binary"
 	"io"
 	"os"
-	"bytes"
+	"github.com/pkg/errors"
 )
+
+var IncrementScanUnexpectedEOF = errors.New("unexpected EOF during increment scan")
 
 // IncrementalPageReader constructs difference map during initialization and than re-read file
 // Diff map can be of 1Gb/PostgresBlockSize elements == 512Kb
 type IncrementalPageReader struct {
-	backlog chan []byte
-	file    *io.LimitedReader
-	seeker  io.Seeker
-	closer  io.Closer
-	info    os.FileInfo
-	lsn     uint64
-	next    *[]byte
-	blocks  []uint32
+	backlog         chan []byte
+	file            *io.LimitedReader
+	pagedFileSeeker SeekerCloser
+	info            os.FileInfo
+	lsn             uint64
+	next            *[]byte
+	blocks          []uint32
 }
 
 func (pageReader *IncrementalPageReader) Read(p []byte) (n int, err error) {
@@ -61,7 +63,7 @@ func (pageReader *IncrementalPageReader) advanceFileReader() error {
 	blockNo := pageReader.blocks[0]
 	pageReader.blocks = pageReader.blocks[1:]
 	offset := int64(blockNo) * int64(WalPageSize)
-	_, err := pageReader.seeker.Seek(offset, 0)
+	_, err := pageReader.pagedFileSeeker.Seek(offset, 0)
 	if err != nil {
 		return err
 	}
@@ -74,10 +76,10 @@ func (pageReader *IncrementalPageReader) advanceFileReader() error {
 
 // Close IncrementalPageReader
 func (pageReader *IncrementalPageReader) Close() error {
-	return pageReader.closer.Close()
+	return pageReader.pagedFileSeeker.Close()
 }
 
-func (pageReader *IncrementalPageReader) initialize() (size int64, err error) { // TODO : "initialize" is rather meaningless naming, maybe this func should be decomposed
+func (pageReader *IncrementalPageReader) initialize() (size int64, err error) { // TODO : "initialize" is rather meaningless name, maybe this func should be decomposed
 	size = 0
 	// "wi" at the head stands for "wal-g increment"
 	// format version "1", signature magic number
@@ -99,7 +101,7 @@ func (pageReader *IncrementalPageReader) initialize() (size int64, err error) { 
 		if err == io.EOF {
 			size += pageReader.sendDiffMapToBacklog()
 
-			_, err := pageReader.seeker.Seek(0, 0)
+			_, err := pageReader.pagedFileSeeker.Seek(0, 0)
 			if err != nil {
 				return 0, nil
 			}
@@ -138,7 +140,9 @@ func (pageReader *IncrementalPageReader) sendDiffMapToBacklog() (size int64) {
 
 // selectNewValidPage checks whether page is valid and if it so, then blockNo is appended to blocks list
 func (pageReader *IncrementalPageReader) selectNewValidPage(pageBytes []byte, blockNo uint32) (valid bool) {
-	lsn, valid := ParsePageHeader(pageBytes)
+	pageHeader, _ := ParsePostgresPageHeader(bytes.NewReader(pageBytes))
+	valid = pageHeader.IsValid()
+	lsn := pageHeader.Lsn()
 
 	allZeroes := false
 
