@@ -40,7 +40,7 @@ func TestIncrementingFileSmallLSN(t *testing.T) {
 }
 
 func postgresFileTest(loclLSN uint64, t *testing.T) {
-	reader, isPaged, size, err := ReadDatabaseFile(pagedFileName, &loclLSN, false)
+	reader, isPaged, size, err := TryReadDatabaseFile(pagedFileName, &loclLSN, false)
 	file, _ := os.Stat(pagedFileName)
 	if err != nil {
 		fmt.Print(err.Error())

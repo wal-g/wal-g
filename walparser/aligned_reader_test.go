@@ -1,7 +1,8 @@
-package wal_parser
+package walparser
 
 import (
 	"bytes"
+	"github.com/wal-g/wal-g/testingutil"
 	"io"
 	"testing"
 )
@@ -9,7 +10,7 @@ import (
 func TestAlignedReader_EOF(t *testing.T) {
 	reader := bytes.NewReader(nil)
 	alignedReader := NewAlignedReader(reader, 2)
-	assertReaderIsEmpty(t, alignedReader)
+	testingutil.AssertReaderIsEmpty(t, alignedReader)
 }
 
 func TestAlignedReader_Read(t *testing.T) {
@@ -20,7 +21,7 @@ func TestAlignedReader_Read(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	assertEquals(t, n, alignedReader.alreadyRead)
+	testingutil.AssertEquals(t, n, alignedReader.alreadyRead)
 	if buf[0] != 1 || buf[1] != 2 || buf[2] != 3 {
 		t.Fatalf("incorrect data was read")
 	}
@@ -36,7 +37,7 @@ func TestAlignedReader_ReadAfterAlignment(t *testing.T) {
 	if err != nil && err != io.EOF {
 		t.Fatalf(err.Error())
 	}
-	assertEquals(t, readCount, 3)
+	testingutil.AssertEquals(t, readCount, 3)
 	if buf[0] != 7 || buf[1] != 8 || buf[2] != 9 {
 		t.Fatalf("incorrect data was read")
 	}
@@ -51,5 +52,5 @@ func TestAlignedReader_ReadToAlignment(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	assertEquals(t, alignedReader.alreadyRead, 4)
+	testingutil.AssertEquals(t, alignedReader.alreadyRead, 4)
 }

@@ -1,21 +1,22 @@
-package wal_parser
+package walparser
 
 import (
 	"bytes"
+	"github.com/wal-g/wal-g/walparser/parsingutil"
 	"io"
 )
 
 func readXLogRecordHeader(reader io.Reader) (*XLogRecordHeader, error) {
 	xLogRecordHeader := XLogRecordHeader{}
-	err := parseMultipleFieldsFromReader([]FieldToParse{
-		{&xLogRecordHeader.totalRecordLength, "totalRecordLength"},
-		{&xLogRecordHeader.xactID, "xactID"},
-		{&xLogRecordHeader.prevRecordPtr, "prevRecordPtr"},
-		{&xLogRecordHeader.info, "info"},
-		{&xLogRecordHeader.resourceManagerID, "resourceManagerID"},
-		PaddingByte,
-		PaddingByte,
-		{&xLogRecordHeader.crc32Hash, "crc32Hash"},
+	err := parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
+		*parsingutil.NewFieldToParse(&xLogRecordHeader.TotalRecordLength, "totalRecordLength"),
+		*parsingutil.NewFieldToParse(&xLogRecordHeader.XactID, "xactID"),
+		*parsingutil.NewFieldToParse(&xLogRecordHeader.PrevRecordPtr, "prevRecordPtr"),
+		*parsingutil.NewFieldToParse(&xLogRecordHeader.Info, "info"),
+		*parsingutil.NewFieldToParse(&xLogRecordHeader.ResourceManagerID, "resourceManagerID"),
+		parsingutil.PaddingByte,
+		parsingutil.PaddingByte,
+		*parsingutil.NewFieldToParse(&xLogRecordHeader.Crc32Hash, "crc32Hash"),
 	}, reader)
 	if err != nil {
 		return nil, err
@@ -29,10 +30,10 @@ func readXLogRecordHeader(reader io.Reader) (*XLogRecordHeader, error) {
 
 func readRelFileNode(reader io.Reader) (*RelFileNode, error) {
 	relFileNode := RelFileNode{}
-	err := parseMultipleFieldsFromReader([]FieldToParse{
-		{&relFileNode.spcNode, "spcNode"},
-		{&relFileNode.dbNode, "dbNode"},
-		{&relFileNode.relNode, "relNode"},
+	err := parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
+		*parsingutil.NewFieldToParse(&relFileNode.SpcNode, "spcNode"),
+		*parsingutil.NewFieldToParse(&relFileNode.DBNode, "dbNode"),
+		*parsingutil.NewFieldToParse(&relFileNode.RelNode, "relNode"),
 	}, reader)
 	if err != nil {
 		return nil, err
@@ -50,18 +51,18 @@ func parseXLogRecordFromBytes(data []byte) (*XLogRecord, error) {
 }
 
 func readXLogRecordBlockDataAndImages(record *XLogRecord, reader io.Reader) error {
-	for i := range record.blocks {
-		block := &record.blocks[i]
-		if (*block).header.hasImage() {
-			(*block).image = make([]byte, (*block).header.imageHeader.imageLength)
-			_, err := io.ReadFull(reader, (*block).image)
+	for i := range record.Blocks {
+		block := &record.Blocks[i]
+		if (*block).Header.HasImage() {
+			(*block).Image = make([]byte, (*block).Header.ImageHeader.ImageLength)
+			_, err := io.ReadFull(reader, (*block).Image)
 			if err != nil {
 				return err
 			}
 		}
-		if (*block).header.hasData() {
-			(*block).data = make([]byte, (*block).header.dataLength)
-			_, err := io.ReadFull(reader, (*block).data)
+		if (*block).Header.HasData() {
+			(*block).Data = make([]byte, (*block).Header.DataLength)
+			_, err := io.ReadFull(reader, (*block).Data)
 			if err != nil {
 				return err
 			}
@@ -72,23 +73,23 @@ func readXLogRecordBlockDataAndImages(record *XLogRecord, reader io.Reader) erro
 
 func readXLogRecordBlockImageHeader(reader io.Reader) (*XLogRecordBlockImageHeader, error) {
 	blockImageHeader := XLogRecordBlockImageHeader{}
-	err := parseMultipleFieldsFromReader([]FieldToParse{
-		{&blockImageHeader.imageLength, "imageLength"},
-		{&blockImageHeader.holeOffset, "imageHoleOffset"},
-		{&blockImageHeader.info, "imageInfo"},
+	err := parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
+		*parsingutil.NewFieldToParse(&blockImageHeader.ImageLength, "imageLength"),
+		*parsingutil.NewFieldToParse(&blockImageHeader.HoleOffset, "imageHoleOffset"),
+		*parsingutil.NewFieldToParse(&blockImageHeader.Info, "imageInfo"),
 	}, reader)
 	if err != nil {
 		return nil, err
 	}
-	if blockImageHeader.isCompressed() {
-		if blockImageHeader.hasHole() {
-			err = NewFieldToParse(&blockImageHeader.holeLength, "imageHoleLength").parseFrom(reader)
+	if blockImageHeader.IsCompressed() {
+		if blockImageHeader.HasHole() {
+			err = parsingutil.NewFieldToParse(&blockImageHeader.HoleLength, "imageHoleLength").ParseFrom(reader)
 			if err != nil {
 				return nil, err
 			}
 		}
 	} else {
-		blockImageHeader.holeLength = BlockSize - blockImageHeader.imageLength
+		blockImageHeader.HoleLength = BlockSize - blockImageHeader.ImageLength
 	}
 	err = blockImageHeader.checkConsistency()
 	if err != nil {
@@ -112,7 +113,7 @@ func readBlockLocation(blockHasSameRel bool, lastRelFileNode *RelFileNode, reade
 		lastRelFileNode = relFileNode
 	}
 	var blockNo uint32
-	err = NewFieldToParse(&blockNo, "blockNo").parseFrom(reader)
+	err = parsingutil.NewFieldToParse(&blockNo, "blockNo").ParseFrom(reader)
 	if err != nil {
 		return
 	}
@@ -126,14 +127,14 @@ func readXLogRecordBlockHeader(lastRelFileNode *RelFileNode,
 		return nil, InvalidRecordBlockIdError{blockId}
 	}
 	blockHeader := NewXLogRecordBlockHeader(blockId)
-	if int(blockHeader.blockId) <= *maxReadBlockId {
-		return nil, OutOfOrderBlockIdError{int(blockHeader.blockId), *maxReadBlockId}
+	if int(blockHeader.BlockId) <= *maxReadBlockId {
+		return nil, OutOfOrderBlockIdError{int(blockHeader.BlockId), *maxReadBlockId}
 	}
-	*maxReadBlockId = int(blockHeader.blockId)
+	*maxReadBlockId = int(blockHeader.BlockId)
 
-	err := parseMultipleFieldsFromReader([]FieldToParse{
-		{&blockHeader.forkFlags, "forkFlags"},
-		{&blockHeader.dataLength, "dataLength"},
+	err := parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
+		*parsingutil.NewFieldToParse(&blockHeader.ForkFlags, "forkFlags"),
+		*parsingutil.NewFieldToParse(&blockHeader.DataLength, "dataLength"),
 	}, reader)
 	if err != nil {
 		return nil, err
@@ -142,55 +143,55 @@ func readXLogRecordBlockHeader(lastRelFileNode *RelFileNode,
 	if err != nil {
 		return nil, err
 	}
-	reader.Shrink(int(blockHeader.dataLength))
+	reader.Shrink(int(blockHeader.DataLength))
 
-	if blockHeader.hasImage() {
+	if blockHeader.HasImage() {
 		imageHeader, err := readXLogRecordBlockImageHeader(reader)
-		blockHeader.imageHeader = *imageHeader
+		blockHeader.ImageHeader = *imageHeader
 		if err != nil {
 			return nil, err
 		}
-		err = reader.Shrink(int(blockHeader.imageHeader.imageLength))
+		err = reader.Shrink(int(blockHeader.ImageHeader.ImageLength))
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	blockLocation, err := readBlockLocation(blockHeader.hasSameRel(), lastRelFileNode, reader)
+	blockLocation, err := readBlockLocation(blockHeader.HasSameRel(), lastRelFileNode, reader)
 	if err != nil {
 		return nil, err
 	}
-	blockHeader.blockLocation = *blockLocation
+	blockHeader.BlockLocation = *blockLocation
 	return blockHeader, nil
 }
 
 func readXLogRecordBlockHeaderPart(record *XLogRecord, reader io.Reader) error {
 	var lastRelFileNode *RelFileNode = nil
 	var maxReadBlockId = -1
-	headerReader := &ShrinkableReader{reader, int(record.header.totalRecordLength - XLogRecordHeaderSize)}
+	headerReader := &ShrinkableReader{reader, int(record.Header.TotalRecordLength - XLogRecordHeaderSize)}
 	for headerReader.dataRemained > 0 {
 		var blockId uint8
-		err := NewFieldToParse(&blockId, "blockId").parseFrom(headerReader)
+		err := parsingutil.NewFieldToParse(&blockId, "blockId").ParseFrom(headerReader)
 		if err != nil {
 			return err
 		}
 		switch blockId {
 		case XlrBlockIdDataShort:
 			var mainDataLen uint8
-			err := NewFieldToParse(&mainDataLen, "mainDataLen8").parseFrom(headerReader)
+			err := parsingutil.NewFieldToParse(&mainDataLen, "mainDataLen8").ParseFrom(headerReader)
 			if err != nil {
 				return err
 			}
-			record.mainDataLen = uint32(mainDataLen)
+			record.MainDataLen = uint32(mainDataLen)
 			headerReader.Shrink(int(mainDataLen))
 		case XlrBlockIdDataLong:
-			err := NewFieldToParse(&record.mainDataLen, "mainDataLen32").parseFrom(headerReader)
+			err := parsingutil.NewFieldToParse(&record.MainDataLen, "mainDataLen32").ParseFrom(headerReader)
 			if err != nil {
 				return err
 			}
-			headerReader.Shrink(int(record.mainDataLen))
+			headerReader.Shrink(int(record.MainDataLen))
 		case XlrBlockIdOrigin:
-			err := NewFieldToParse(&record.origin, "origin").parseFrom(headerReader)
+			err := parsingutil.NewFieldToParse(&record.Origin, "origin").ParseFrom(headerReader)
 			if err != nil {
 				return err
 			}
@@ -199,7 +200,7 @@ func readXLogRecordBlockHeaderPart(record *XLogRecord, reader io.Reader) error {
 			if err != nil {
 				return err
 			}
-			record.blocks = append(record.blocks, XLogRecordBlock{header: *blockHeader})
+			record.Blocks = append(record.Blocks, XLogRecordBlock{Header: *blockHeader})
 		}
 	}
 	return nil
@@ -220,7 +221,7 @@ func readXLogRecordBody(header *XLogRecordHeader, reader io.Reader) (*XLogRecord
 		return nil, err
 	}
 
-	record.mainData, err = readXLogRecordMainData(record.mainDataLen, reader)
+	record.MainData, err = readXLogRecordMainData(record.MainDataLen, reader)
 	if err != nil {
 		return nil, err
 	}

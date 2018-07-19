@@ -1,6 +1,8 @@
 package walg
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"io"
@@ -47,6 +49,21 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func toBytes(x interface{}) []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.LittleEndian, x)
+	return buf.Bytes()
+}
+
+func allZero(s []byte) bool {
+	for _, v := range s {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func contains(s *[]string, e string) bool {

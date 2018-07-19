@@ -1,4 +1,4 @@
-package wal_parser
+package walparser
 
 /* List of postgres resource managers, for clarification you can look at postgres code:
  * src/include/access/rmgrlist.h

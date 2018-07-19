@@ -1,4 +1,4 @@
-package wal_parser
+package walparser
 
 const (
 	// info flags
@@ -18,13 +18,13 @@ const (
  * src/include/access/xlog_internal.h
  */
 type XLogPageHeader struct {
-	magic            uint16
-	info             uint16
-	timeLineID       TimeLineID
-	pageAddress      XLogRecordPtr
-	remainingDataLen uint32
+	Magic            uint16
+	Info             uint16
+	TimeLineID       TimeLineID
+	PageAddress      XLogRecordPtr
+	RemainingDataLen uint32
 }
 
-func (pageHeader *XLogPageHeader) isLong() bool {
-	return (pageHeader.info & XlpLongHeader) != 0
+func (pageHeader *XLogPageHeader) IsLong() bool {
+	return (pageHeader.Info & XlpLongHeader) != 0
 }

@@ -1,4 +1,4 @@
-package wal_parser
+package walparser
 
 import (
 	"bytes"

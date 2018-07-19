@@ -6,6 +6,8 @@ import (
 	"io"
 )
 
+var NoFilesToExtractError = errors.New("ExtractAll: did not provide files to extract")
+
 // EmptyWriteIgnorer handles 0 byte write in LZ4 package
 // to stop pipe reader/writer from blocking.
 type EmptyWriteIgnorer struct {
@@ -91,7 +93,7 @@ func handleTar(writeCloser io.WriteCloser, readerMaker ReaderMaker, crypter Cryp
 // Returns the first error encountered.
 func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 	if len(files) < 1 {
-		return errors.New("ExtractAll: did not provide files to extract")
+		return NoFilesToExtractError
 	}
 
 	var err error

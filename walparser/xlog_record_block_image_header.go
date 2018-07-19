@@ -1,4 +1,4 @@
-package wal_parser
+package walparser
 
 import "fmt"
 
@@ -31,37 +31,37 @@ func (err InconsistentBlockImageLengthError) Error() string {
 }
 
 type XLogRecordBlockImageHeader struct {
-	imageLength uint16
-	holeOffset  uint16
-	holeLength  uint16
-	info        uint8
+	ImageLength uint16
+	HoleOffset  uint16
+	HoleLength  uint16
+	Info        uint8
 }
 
-func (imageHeader *XLogRecordBlockImageHeader) hasHole() bool {
-	return (imageHeader.info & BkpImageHasHole) != 0
+func (imageHeader *XLogRecordBlockImageHeader) HasHole() bool {
+	return (imageHeader.Info & BkpImageHasHole) != 0
 }
 
-func (imageHeader *XLogRecordBlockImageHeader) isCompressed() bool {
-	return (imageHeader.info & BkpImageIsCompressed) != 0
+func (imageHeader *XLogRecordBlockImageHeader) IsCompressed() bool {
+	return (imageHeader.Info & BkpImageIsCompressed) != 0
 }
 
-func (imageHeader *XLogRecordBlockImageHeader) applyImage() bool {
-	return (imageHeader.info & BkpImageApply) != 0
+func (imageHeader *XLogRecordBlockImageHeader) ApplyImage() bool {
+	return (imageHeader.Info & BkpImageApply) != 0
 }
 
 func (imageHeader *XLogRecordBlockImageHeader) checkHoleStateConsistency() error {
-	if (imageHeader.hasHole() && (imageHeader.holeOffset == 0 || imageHeader.holeLength == 0 || imageHeader.imageLength == BlockSize)) ||
-		(!imageHeader.hasHole() && (imageHeader.holeOffset != 0 || imageHeader.holeLength != 0)) {
-		return InconsistentBlockImageHoleStateError{imageHeader.holeOffset, imageHeader.holeLength,
-			imageHeader.imageLength, imageHeader.hasHole()}
+	if (imageHeader.HasHole() && (imageHeader.HoleOffset == 0 || imageHeader.HoleLength == 0 || imageHeader.ImageLength == BlockSize)) ||
+		(!imageHeader.HasHole() && (imageHeader.HoleOffset != 0 || imageHeader.HoleLength != 0)) {
+		return InconsistentBlockImageHoleStateError{imageHeader.HoleOffset, imageHeader.HoleLength,
+			imageHeader.ImageLength, imageHeader.HasHole()}
 	}
 	return nil
 }
 
 func (imageHeader *XLogRecordBlockImageHeader) checkLengthConsistency() error {
-	if (imageHeader.isCompressed() && imageHeader.imageLength == BlockSize) ||
-		(!imageHeader.hasHole() && !imageHeader.isCompressed() && imageHeader.imageLength != BlockSize) {
-		return InconsistentBlockImageLengthError{imageHeader.hasHole(), imageHeader.isCompressed(), imageHeader.imageLength}
+	if (imageHeader.IsCompressed() && imageHeader.ImageLength == BlockSize) ||
+		(!imageHeader.HasHole() && !imageHeader.IsCompressed() && imageHeader.ImageLength != BlockSize) {
+		return InconsistentBlockImageLengthError{imageHeader.HasHole(), imageHeader.IsCompressed(), imageHeader.ImageLength}
 	}
 	return nil
 }

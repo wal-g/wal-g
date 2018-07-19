@@ -63,7 +63,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 			baseFiles := bundle.GetIncrementBaseFiles()
 			bf, wasInBase := baseFiles[fileInfoHeader.Name]
 
-			// It is important to take MTime before ReadDatabaseFile()
+			// It is important to take MTime before TryReadDatabaseFile()
 			time := info.ModTime()
 
 			// We do not rely here on monotonic time, instead we backup file if MTime changed somehow
@@ -79,7 +79,7 @@ func HandleTar(bundle TarBundle, path string, info os.FileInfo, crypter Crypter)
 			} else {
 				// !excluded means file was not observed previously
 				worker := func() error {
-					f, isPaged, size, err := ReadDatabaseFile(path, bundle.GetIncrementBaseLsn(), !wasInBase)
+					f, isPaged, size, err := TryReadDatabaseFile(path, bundle.GetIncrementBaseLsn(), !wasInBase)
 					if err != nil {
 						return errors.Wrapf(err, "HandleTar: failed to open file '%s'\n", path)
 					}

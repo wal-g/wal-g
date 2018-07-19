@@ -1,4 +1,4 @@
-package wal_parser
+package walparser
 
 type Oid uint32
 type TimeLineID uint32

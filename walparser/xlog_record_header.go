@@ -1,4 +1,4 @@
-package wal_parser
+package walparser
 
 import "fmt"
 
@@ -34,26 +34,26 @@ func (err InvalidXLogRecordResourceManagerIDError) Error() string {
  * src/include/access/xlogrecord.h
  */
 type XLogRecordHeader struct {
-	totalRecordLength uint32
-	xactID            uint32
-	prevRecordPtr     XLogRecordPtr
-	info              uint8
-	resourceManagerID uint8
+	TotalRecordLength uint32
+	XactID            uint32
+	PrevRecordPtr     XLogRecordPtr
+	Info              uint8
+	ResourceManagerID uint8
 	/* 2 bytes of padding here, initialize to zero */
-	crc32Hash uint32
+	Crc32Hash uint32
 	/* XLogRecordBlockHeaders and XLogRecordDataHeader follow, no padding */
 }
 
 func (header *XLogRecordHeader) checkTotalRecordLengthConsistency() error {
-	if header.totalRecordLength < XLogRecordHeaderSize {
-		return InconsistentXLogRecordTotalLengthError{header.totalRecordLength}
+	if header.TotalRecordLength < XLogRecordHeaderSize {
+		return InconsistentXLogRecordTotalLengthError{header.TotalRecordLength}
 	}
 	return nil
 }
 
 func (header *XLogRecordHeader) checkResourceManagerIDValidity() error {
-	if header.resourceManagerID >= RmNextFreeID {
-		return InvalidXLogRecordResourceManagerIDError{header.resourceManagerID}
+	if header.ResourceManagerID >= RmNextFreeID {
+		return InvalidXLogRecordResourceManagerIDError{header.ResourceManagerID}
 	}
 	return nil
 }

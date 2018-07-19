@@ -11,6 +11,10 @@ import (
 	"testing"
 )
 
+var MockCloseError = errors.New("mock close error")
+var MockReadError = errors.New("mock reader: read error")
+var MockWriteError = errors.New("mock writer: write error")
+
 type BufCloser struct {
 	*bytes.Buffer
 	err bool
@@ -18,7 +22,7 @@ type BufCloser struct {
 
 func (w *BufCloser) Close() error {
 	if w.err {
-		return errors.New("mock close error")
+		return MockCloseError
 	}
 	return nil
 }
@@ -26,17 +30,17 @@ func (w *BufCloser) Close() error {
 type ErrorWriteCloser struct{}
 
 func (ew ErrorWriteCloser) Write(p []byte) (int, error) {
-	return -1, errors.New("mock writer: write error")
+	return -1, MockWriteError
 }
 
 func (ew ErrorWriteCloser) Close() error {
-	return errors.New("mock writer: close error")
+	return MockCloseError
 }
 
 type ErrorReader struct{}
 
 func (er ErrorReader) Read(p []byte) (int, error) {
-	return -1, errors.New("mock reader: read error")
+	return -1, MockReadError
 }
 
 var tests = []struct {

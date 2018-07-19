@@ -74,8 +74,22 @@ func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify boo
 		return "", errors.Wrapf(err, "UploadWal: failed to open file %s\n", path)
 	}
 
+	var walFileReader io.Reader
+	recordingReader, err := NewWalDeltaRecordingReader(file)
+	if err != nil {
+		if err == DeltaFileExistanceError {
+			// it is normal and it means that next backup should use full scan strategy instead of wal scanning
+			walFileReader = file
+		} else {
+			return "", errors.Wrapf(err, "UploadWal: failed to start delta recording\n")
+		}
+	} else {
+		walFileReader = recordingReader
+		defer recordingReader.Close()
+	}
+
 	pipeWriter := &CompressingPipeWriter{
-		Input:                file,
+		Input:                walFileReader,
 		NewCompressingWriter: tarUploader.compressor.NewWriter,
 	}
 
@@ -94,7 +108,6 @@ func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify boo
 	go func() {
 		defer tarUploader.waitGroup.Done()
 		err = tarUploader.upload(input, path)
-
 	}()
 
 	tarUploader.Finish()

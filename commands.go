@@ -20,11 +20,8 @@ import (
 	"sync"
 )
 
-type PgControlMissingError struct{}
-
-func (err PgControlMissingError) Error() string {
-	return "Corrupted backup: missing pg_control"
-}
+var PgControlMissingError = errors.New("Corrupted backup: missing pg_control")
+var InvalidWalFileMagicError = errors.New("WAL-G: WAL file magic is invalid ")
 
 // HandleDelete is invoked to perform wal-g delete
 func HandleDelete(pre *S3Prefix, args []string) {
@@ -202,7 +199,7 @@ func extractPgControl(backup *Backup, pre *S3Prefix, fileTarInterpreter *FileTar
 		}
 		return err
 	}
-	return PgControlMissingError{}
+	return PgControlMissingError
 }
 
 // Do the job of unpacking Backup object
@@ -521,7 +518,7 @@ func checkWALFileMagic(prefetched string) error {
 	magic := make([]byte, 4)
 	file.Read(magic)
 	if binary.LittleEndian.Uint32(magic) < 0xD061 {
-		return errors.New("WAL-G: WAL file magic is invalid ")
+		return InvalidWalFileMagicError
 	}
 
 	return nil

@@ -12,8 +12,8 @@ package walg
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
+	"github.com/pkg/errors"
 	"io"
 	"os"
 	"strings"
@@ -31,8 +31,16 @@ const (
 	headerSize                  = 24
 )
 
+// InvalidBlockError indicates that file contain invalid page and cannot be archived incrementally
+var InvalidBlockError = errors.New("block is invalid")
+
+var IncrementScanUnexpectedEOF = errors.New("unexpected EOF during increment scan")
+var InvalidIncrementFileHeaderError = errors.New("Invalid increment file header")
+var UnknownIncrementFileHeaderError = errors.New("Unknown increment file header")
+var UnexpectedTarDataError = errors.New("Expected end of Tar")
+
 // ParsePageHeader reads information from PostgreSQL page header. Exported for test reasons.
-func ParsePageHeader(data []byte) (lsn uint64, valid bool) {
+func ParsePageHeader(data []byte) (lsn uint64, valid bool) { // TODO : refactor nahui
 	// Any ideas on how to make this code pretty and nice?
 	le := binary.LittleEndian
 	pdLsnH := le.Uint32(data[0:sizeofInt32])
@@ -77,149 +85,8 @@ func IsPagedFile(info os.FileInfo, fileName string) bool {
 	return true
 }
 
-// IncrementalPageReader constructs difference map during initialization and than re-read file
-// Diff map can be of 1Gb/PostgresBlockSize elements == 512Kb
-type IncrementalPageReader struct {
-	backlog chan []byte
-	file    *io.LimitedReader
-	seeker  io.Seeker
-	closer  io.Closer
-	info    os.FileInfo
-	lsn     uint64
-	next    *[]byte
-	blocks  []uint32
-}
-
-func (pageReader *IncrementalPageReader) Read(p []byte) (n int, err error) {
-	err = nil
-	if pageReader.next == nil {
-		return 0, io.EOF
-	}
-	n = copy(p, *pageReader.next)
-	if n == len(*pageReader.next) {
-		pageReader.next = nil
-	} else {
-		bytes := (*(pageReader.next))[n:]
-		pageReader.next = &(bytes)
-	}
-
-	if pageReader.next == nil {
-		err = pageReader.drainMoreData()
-	}
-
-	return n, err
-}
-
-func (pageReader *IncrementalPageReader) drainMoreData() error {
-	for len(pageReader.blocks) > 0 && len(pageReader.backlog) < 2 {
-		err := pageReader.advanceFileReader()
-		if err != nil {
-			return err
-		}
-	}
-
-	if len(pageReader.backlog) > 0 {
-		moreBytes := <-pageReader.backlog
-		pageReader.next = &moreBytes
-	}
-
-	return nil
-}
-
-func (pageReader *IncrementalPageReader) advanceFileReader() error {
-	pageBytes := make([]byte, WalPageSize)
-	blockNo := pageReader.blocks[0]
-	pageReader.blocks = pageReader.blocks[1:]
-	offset := int64(blockNo) * int64(WalPageSize)
-	_, err := pageReader.seeker.Seek(offset, 0)
-	if err != nil {
-		return err
-	}
-	_, err = io.ReadFull(pageReader.file, pageBytes)
-	if err == nil {
-		pageReader.backlog <- pageBytes
-	}
-	return err
-}
-
-// Close IncrementalPageReader
-func (pageReader *IncrementalPageReader) Close() error {
-	return pageReader.closer.Close()
-}
-
-// ErrInvalidBlock indicates that file contain invalid page and cannot be archived incrementally
-var ErrInvalidBlock = errors.New("Block is not valid")
-
-func (pageReader *IncrementalPageReader) initialize() (size int64, err error) {
-	size = 0
-	// "wi" at the head stands for "wal-g increment"
-	// format version "1", signature magic number
-	pageReader.next = &[]byte{'w', 'i', '1', signatureMagicNumber}
-	size += sizeofInt32
-	fileSizeBytes := make([]byte, sizeofInt64)
-	fileSize := pageReader.info.Size()
-	binary.LittleEndian.PutUint64(fileSizeBytes, uint64(fileSize))
-	pageReader.backlog <- fileSizeBytes
-	size += sizeofInt64
-
-	pageBytes := make([]byte, WalPageSize)
-	pageReader.blocks = make([]uint32, 0, fileSize/int64(WalPageSize))
-
-	for currentBlockNumber := uint32(0); ; currentBlockNumber++ {
-		n, err := io.ReadFull(pageReader.file, pageBytes)
-		if err == io.ErrUnexpectedEOF || n%int(WalPageSize) != 0 {
-			return 0, errors.New("Unexpected EOF during increment scan")
-		}
-
-		if err == io.EOF {
-			diffBlockCount := len(pageReader.blocks)
-			lenBytes := make([]byte, sizeofInt32)
-			binary.LittleEndian.PutUint32(lenBytes, uint32(diffBlockCount))
-			pageReader.backlog <- lenBytes
-			size += sizeofInt32
-
-			diffMap := make([]byte, diffBlockCount*sizeofInt32)
-
-			for i, blockNo := range pageReader.blocks {
-				binary.LittleEndian.PutUint32(diffMap[i*sizeofInt32:(i+1)*sizeofInt32], blockNo)
-			}
-
-			pageReader.backlog <- diffMap
-			size += int64(diffBlockCount * sizeofInt32)
-			dataSize := int64(len(pageReader.blocks)) * int64(WalPageSize)
-			size += dataSize
-			_, err := pageReader.seeker.Seek(0, 0)
-			if err != nil {
-				return 0, nil
-			}
-			pageReader.file.N = dataSize
-			return size, nil
-		}
-
-		if err != nil {
-			return 0, err
-		}
-
-		lsn, valid := ParsePageHeader(pageBytes)
-
-		allZeroes := false
-
-		if !valid {
-			if allZero(pageBytes) {
-				allZeroes = true
-			} else {
-				return 0, ErrInvalidBlock
-			}
-		}
-
-		if (allZeroes) || (lsn >= pageReader.lsn) {
-			pageReader.blocks = append(pageReader.blocks, currentBlockNumber)
-		}
-	}
-}
-
-// ReadDatabaseFile tries to read file as an incremental data file if possible, otherwise just open the file
-func ReadDatabaseFile(fileName string, lsn *uint64, isNew bool) (io.ReadCloser, bool, int64, error) {
+// TryReadDatabaseFile tries to read file as an incremental data file if possible, otherwise just open the file
+func TryReadDatabaseFile(fileName string, lsn *uint64, isNew bool) (io.ReadCloser, bool, int64, error) { // TODO : improve signature
 	info, err := os.Stat(fileName)
 	fileSize := info.Size()
 	if err != nil {
@@ -243,7 +110,7 @@ func ReadDatabaseFile(fileName string, lsn *uint64, isNew bool) (io.ReadCloser, 
 	reader := &IncrementalPageReader{make(chan []byte, 4), lim, file, file, info, *lsn, nil, nil}
 	incrSize, err := reader.initialize()
 	if err != nil {
-		if err == ErrInvalidBlock {
+		if err == InvalidBlockError {
 			file.Close()
 			fmt.Printf("File %v has invalid pages, fallback to full backup\n", fileName)
 			file, err = os.Open(fileName)
@@ -271,10 +138,10 @@ func ApplyFileIncrement(fileName string, increment io.Reader) error {
 	}
 
 	if header[0] != 'w' || header[1] != 'i' || header[3] != signatureMagicNumber {
-		return errors.New("Invalid increment file header")
+		return InvalidIncrementFileHeaderError
 	}
 	if header[2] != '1' {
-		return errors.New("Unknown increment file header")
+		return UnknownIncrementFileHeaderError
 	}
 
 	_, err = io.ReadFull(increment, fileSizeBytes)
@@ -323,17 +190,8 @@ func ApplyFileIncrement(fileName string, increment io.Reader) error {
 
 	all, _ := increment.Read(make([]byte, 1))
 	if all > 0 {
-		return errors.New("Expected end of Tar")
+		return UnexpectedTarDataError
 	}
 
 	return nil
-}
-
-func allZero(s []byte) bool {
-	for _, v := range s {
-		if v != 0 {
-			return false
-		}
-	}
-	return true
 }

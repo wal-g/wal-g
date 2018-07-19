@@ -1,7 +1,8 @@
-package wal_parser
+package walparser
 
 import (
 	"bytes"
+	"github.com/wal-g/wal-g/testingutil"
 	"testing"
 )
 
@@ -16,12 +17,12 @@ func TestReadXLogPageHeader_Long(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	assertEquals(t, header.magic, uint16(0xd098))
-	assertEquals(t, header.info, uint16(0x0007))
-	assertEquals(t, header.timeLineID, TimeLineID(0x00000001))
-	assertEquals(t, header.pageAddress, XLogRecordPtr(0x000000002b000000))
-	assertEquals(t, header.remainingDataLen, uint32(0x00000acd))
-	assertReaderIsEmpty(t, reader)
+	testingutil.AssertEquals(t, header.Magic, uint16(0xd098))
+	testingutil.AssertEquals(t, header.Info, uint16(0x0007))
+	testingutil.AssertEquals(t, header.TimeLineID, TimeLineID(0x00000001))
+	testingutil.AssertEquals(t, header.PageAddress, XLogRecordPtr(0x000000002b000000))
+	testingutil.AssertEquals(t, header.RemainingDataLen, uint32(0x00000acd))
+	testingutil.AssertReaderIsEmpty(t, reader)
 }
 
 func TestReadXLogPageHeader_Short(t *testing.T) {
@@ -34,12 +35,12 @@ func TestReadXLogPageHeader_Short(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	assertEquals(t, header.magic, uint16(0xd098))
-	assertEquals(t, header.info, uint16(0x0005))
-	assertEquals(t, header.timeLineID, TimeLineID(0x00000001))
-	assertEquals(t, header.pageAddress, XLogRecordPtr(0x000000002b000000))
-	assertEquals(t, header.remainingDataLen, uint32(0x00000acd))
-	assertReaderIsEmpty(t, reader)
+	testingutil.AssertEquals(t, header.Magic, uint16(0xd098))
+	testingutil.AssertEquals(t, header.Info, uint16(0x0005))
+	testingutil.AssertEquals(t, header.TimeLineID, TimeLineID(0x00000001))
+	testingutil.AssertEquals(t, header.PageAddress, XLogRecordPtr(0x000000002b000000))
+	testingutil.AssertEquals(t, header.RemainingDataLen, uint32(0x00000acd))
+	testingutil.AssertReaderIsEmpty(t, reader)
 }
 
 func TestTryReadXLogRecordData_PartialHeader(t *testing.T) {
@@ -51,8 +52,8 @@ func TestTryReadXLogRecordData_PartialHeader(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	assertEquals(t, whole, false)
-	assertByteSlicesEqual(t, data, recordPart)
+	testingutil.AssertEquals(t, whole, false)
+	testingutil.AssertByteSlicesEqual(t, data, recordPart)
 }
 
 func TestTryReadXLogRecordData_PartialContent(t *testing.T) {
@@ -66,8 +67,8 @@ func TestTryReadXLogRecordData_PartialContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	assertEquals(t, whole, false)
-	assertByteSlicesEqual(t, data, recordPart)
+	testingutil.AssertEquals(t, whole, false)
+	testingutil.AssertByteSlicesEqual(t, data, recordPart)
 }
 
 func TestTryReadXLogRecordData_FullRecord(t *testing.T) {
@@ -81,6 +82,6 @@ func TestTryReadXLogRecordData_FullRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	assertEquals(t, whole, true)
-	assertByteSlicesEqual(t, data, recordPart)
+	testingutil.AssertEquals(t, whole, true)
+	testingutil.AssertByteSlicesEqual(t, data, recordPart)
 }
