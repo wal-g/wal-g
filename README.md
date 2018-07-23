@@ -116,6 +116,14 @@ To configure GPG key for encryption and decryption. By default, no encryption is
  To configure compression method used for backups. Possible options are: `lz4`, 'lzma', `zstd`. Default method is `lz4`. LZ4 is the fastest method, but compression ratio is bad.
  LZMA is way much slower, however it compresses backups about 6 times better than LZ4. Zstd is a good trade-off between speed and compression ratio which is about 3 times better than LZ4.
 
+ * `WALG_DISK_RATE_LIMIT`
+
+  To configure disk read rate limit during ```backup-push``` in bytes per second.
+
+ * `WALG_NETWORK_RATE_LIMIT`
+
+  To configure network upload rate limit during ```backup-push``` in bytes per second.
+
 Usage
 -----
 

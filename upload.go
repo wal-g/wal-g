@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"golang.org/x/time/rate"
 )
 
 // MaxRetries limit upload and download retries during interaction with S3
@@ -117,6 +118,24 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 	pre := &S3Prefix{
 		Bucket: aws.String(bucket),
 		Server: aws.String(server),
+	}
+
+	diskLimitStr := os.Getenv("WALG_DISK_RATE_LIMIT")
+	if diskLimitStr != "" {
+		diskLimit, err := strconv.ParseInt(diskLimitStr, 10, 64)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "Configure: failed to parse WALG_DISK_RATE_LIMIT")
+		}
+		diskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+64*1024)); // Add 8 pages to possible bursts
+	}
+
+	netLimitStr := os.Getenv("WALG_NETWORK_RATE_LIMIT")
+	if netLimitStr != "" {
+		netLimit, err := strconv.ParseInt(netLimitStr, 10, 64)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "Configure: failed to parse WALG_NETWORK_RATE_LIMIT")
+		}
+		networkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+64*1024)); // Add 8 pages to possible bursts
 	}
 
 	sess, err := session.NewSession(config)

@@ -111,9 +111,21 @@
   revision = "418008d6189cfc4ba88f220353d087d3ddfd7a31"
   source = "https://github.com/golang/crypto"
 
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/net"
+  packages = ["context"]
+  revision = "a680a1efc54dd51c040b3b5ce4939ea3cf2ea0d1"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/time"
+  packages = ["rate"]
+  revision = "fbb02b2291d28baffd63558aa44b4b56f178d650"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "6527682c0e55d3c67828fb5fabb577afabd57ecb4ff9a29b700677df843e1664"
+  inputs-digest = "20f6fc16281214df80b8e9092e7b2fb191d53fdaf89070a989d3b08d54b1e089"
   solver-name = "gps-cdcl"
   solver-version = 1
