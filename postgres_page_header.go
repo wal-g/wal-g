@@ -1,8 +1,8 @@
 package walg
 
 import (
-	"io"
 	"github.com/wal-g/wal-g/walparser/parsingutil"
+	"io"
 )
 
 type PostgresPageHeader struct {
@@ -34,14 +34,14 @@ func (header *PostgresPageHeader) IsValid() bool {
 func ParsePostgresPageHeader(reader io.Reader) (*PostgresPageHeader, error) {
 	pageHeader := PostgresPageHeader{}
 	fields := []parsingutil.FieldToParse{
-		*parsingutil.NewFieldToParse(&pageHeader.pdLsnH, "pdLsnH"),
-		*parsingutil.NewFieldToParse(&pageHeader.pdLsnL, "pdLsnL"),
-		*parsingutil.NewFieldToParse(&pageHeader.pdChecksum, "pdChecksum"),
-		*parsingutil.NewFieldToParse(&pageHeader.pdFlags, "pdFlags"),
-		*parsingutil.NewFieldToParse(&pageHeader.pdLower, "pdLower"),
-		*parsingutil.NewFieldToParse(&pageHeader.pdUpper, "pdUpper"),
-		*parsingutil.NewFieldToParse(&pageHeader.pdSpecial, "pdSpecial"),
-		*parsingutil.NewFieldToParse(&pageHeader.pdPageSizeVersion, "pdPageSizeVersion"),
+		{Field: &pageHeader.pdLsnH, Name: "pdLsnH"},
+		{Field: &pageHeader.pdLsnL, Name: "pdLsnL"},
+		{Field: &pageHeader.pdChecksum, Name: "pdChecksum"},
+		{Field: &pageHeader.pdFlags, Name: "pdFlags"},
+		{Field: &pageHeader.pdLower, Name: "pdLower"},
+		{Field: &pageHeader.pdUpper, Name: "pdUpper"},
+		{Field: &pageHeader.pdSpecial, Name: "pdSpecial"},
+		{Field: &pageHeader.pdPageSizeVersion, Name: "pdPageSizeVersion"},
 	}
 	err := parsingutil.ParseMultipleFieldsFromReader(fields, reader)
 	if err != nil {

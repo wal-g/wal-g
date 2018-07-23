@@ -2,7 +2,7 @@ package parsingutil
 
 import (
 	"bytes"
-	"github.com/wal-g/wal-g/testingutil"
+	"github.com/wal-g/wal-g/walparser/parsingutil/testingutil"
 	"testing"
 )
 

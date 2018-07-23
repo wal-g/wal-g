@@ -1,3 +1,3 @@
 .idea
 cmd/wal-g/wal-g
-_vendor*
+/walparser/testdata/whole_wal_file

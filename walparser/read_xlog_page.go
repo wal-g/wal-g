@@ -2,9 +2,12 @@ package walparser
 
 import (
 	"bytes"
+	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/walparser/parsingutil"
 	"io"
 )
+
+var ZeroPageHeaderError = errors.New("page header contains only zeroes, maybe it is a part .partial file or this page follow WAL-switch record")
 
 func tryReadXLogRecordData(alignedReader *AlignedReader) (data []byte, whole bool, err error) {
 	err = alignedReader.ReadToAlignment()
@@ -20,9 +23,12 @@ func tryReadXLogRecordData(alignedReader *AlignedReader) (data []byte, whole boo
 		return nil, false, err
 	}
 	if readCount < XLogRecordHeaderSize {
+		if readCount > 0 && allZero(headerData[:readCount]) { // end of last non zero page of .partial file
+			return nil, false, ZeroRecordHeaderError
+		}
 		return headerData[:readCount], false, nil // header don't fit into the page
 	}
-	recordHeader, err := readXLogRecordHeader(bytes.NewReader(headerData))
+	recordHeader, err := readXLogRecordHeader(bytes.NewReader(headerData)) // zero header error is ok for partial page here
 	if err != nil {
 		return nil, false, err
 	}
@@ -40,9 +46,9 @@ func readXLogLongPageHeaderData(reader io.Reader) error {
 	var segmentSize uint32
 	var xLogBlockSize uint32
 	return parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
-		*parsingutil.NewFieldToParse(&systemID, "systemID"),
-		*parsingutil.NewFieldToParse(&segmentSize, "segmentSize"),
-		*parsingutil.NewFieldToParse(&xLogBlockSize, "xLogBlockSize"),
+		{Field: &systemID, Name: "systemID"},
+		{Field: &segmentSize, Name: "segmentSize"},
+		{Field: &xLogBlockSize, Name: "xLogBlockSize"},
 	}, reader)
 }
 
@@ -50,14 +56,17 @@ func readXLogLongPageHeaderData(reader io.Reader) error {
 func readXLogPageHeader(reader io.Reader) (*XLogPageHeader, error) {
 	pageHeader := XLogPageHeader{}
 	err := parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
-		*parsingutil.NewFieldToParse(&pageHeader.Magic, "magic"),
-		*parsingutil.NewFieldToParse(&pageHeader.Info, "info"),
-		*parsingutil.NewFieldToParse(&pageHeader.TimeLineID, "timeLineID"),
-		*parsingutil.NewFieldToParse(&pageHeader.PageAddress, "pageAddress"),
-		*parsingutil.NewFieldToParse(&pageHeader.RemainingDataLen, "remainingDataLen"),
+		{Field: &pageHeader.Magic, Name: "magic"},
+		{Field: &pageHeader.Info, Name: "info"},
+		{Field: &pageHeader.TimeLineID, Name: "timeLineID"},
+		{Field: &pageHeader.PageAddress, Name: "pageAddress"},
+		{Field: &pageHeader.RemainingDataLen, Name: "remainingDataLen"},
 	}, reader)
 	if err != nil {
 		return nil, err
+	}
+	if pageHeader.isZero() {
+		return nil, ZeroPageHeaderError
 	}
 
 	// read long header data from reader

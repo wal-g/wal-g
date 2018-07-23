@@ -17,3 +17,12 @@ func concatByteSlices(a []byte, b []byte) []byte {
 	copy(result[len(a):], b)
 	return result
 }
+
+func allZero(data []byte) bool {
+	for _, x := range data {
+		if x != 0 {
+			return false
+		}
+	}
+	return true
+}

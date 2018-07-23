@@ -9,14 +9,14 @@ import (
 func readXLogRecordHeader(reader io.Reader) (*XLogRecordHeader, error) {
 	xLogRecordHeader := XLogRecordHeader{}
 	err := parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
-		*parsingutil.NewFieldToParse(&xLogRecordHeader.TotalRecordLength, "totalRecordLength"),
-		*parsingutil.NewFieldToParse(&xLogRecordHeader.XactID, "xactID"),
-		*parsingutil.NewFieldToParse(&xLogRecordHeader.PrevRecordPtr, "prevRecordPtr"),
-		*parsingutil.NewFieldToParse(&xLogRecordHeader.Info, "info"),
-		*parsingutil.NewFieldToParse(&xLogRecordHeader.ResourceManagerID, "resourceManagerID"),
+		{Field: &xLogRecordHeader.TotalRecordLength, Name: "totalRecordLength"},
+		{Field: &xLogRecordHeader.XactID, Name: "xactID"},
+		{Field: &xLogRecordHeader.PrevRecordPtr, Name: "prevRecordPtr"},
+		{Field: &xLogRecordHeader.Info, Name: "info"},
+		{Field: &xLogRecordHeader.ResourceManagerID, Name: "resourceManagerID"},
 		parsingutil.PaddingByte,
 		parsingutil.PaddingByte,
-		*parsingutil.NewFieldToParse(&xLogRecordHeader.Crc32Hash, "crc32Hash"),
+		{Field: &xLogRecordHeader.Crc32Hash, Name: "crc32Hash"},
 	}, reader)
 	if err != nil {
 		return nil, err
@@ -31,9 +31,9 @@ func readXLogRecordHeader(reader io.Reader) (*XLogRecordHeader, error) {
 func readRelFileNode(reader io.Reader) (*RelFileNode, error) {
 	relFileNode := RelFileNode{}
 	err := parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
-		*parsingutil.NewFieldToParse(&relFileNode.SpcNode, "spcNode"),
-		*parsingutil.NewFieldToParse(&relFileNode.DBNode, "dbNode"),
-		*parsingutil.NewFieldToParse(&relFileNode.RelNode, "relNode"),
+		{Field: &relFileNode.SpcNode, Name: "spcNode"},
+		{Field: &relFileNode.DBNode, Name: "dbNode"},
+		{Field: &relFileNode.RelNode, Name: "relNode"},
 	}, reader)
 	if err != nil {
 		return nil, err
@@ -74,9 +74,9 @@ func readXLogRecordBlockDataAndImages(record *XLogRecord, reader io.Reader) erro
 func readXLogRecordBlockImageHeader(reader io.Reader) (*XLogRecordBlockImageHeader, error) {
 	blockImageHeader := XLogRecordBlockImageHeader{}
 	err := parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
-		*parsingutil.NewFieldToParse(&blockImageHeader.ImageLength, "imageLength"),
-		*parsingutil.NewFieldToParse(&blockImageHeader.HoleOffset, "imageHoleOffset"),
-		*parsingutil.NewFieldToParse(&blockImageHeader.Info, "imageInfo"),
+		{Field: &blockImageHeader.ImageLength, Name: "imageLength"},
+		{Field: &blockImageHeader.HoleOffset, Name: "imageHoleOffset"},
+		{Field: &blockImageHeader.Info, Name: "imageInfo"},
 	}, reader)
 	if err != nil {
 		return nil, err
@@ -133,8 +133,8 @@ func readXLogRecordBlockHeader(lastRelFileNode *RelFileNode,
 	*maxReadBlockId = int(blockHeader.BlockId)
 
 	err := parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
-		*parsingutil.NewFieldToParse(&blockHeader.ForkFlags, "forkFlags"),
-		*parsingutil.NewFieldToParse(&blockHeader.DataLength, "dataLength"),
+		{Field: &blockHeader.ForkFlags, Name: "forkFlags"},
+		{Field: &blockHeader.DataLength, Name: "dataLength"},
 	}, reader)
 	if err != nil {
 		return nil, err

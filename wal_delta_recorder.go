@@ -18,6 +18,7 @@ func (recorder *WalDeltaRecorder) Close() error {
 	return recorder.deltaFile.Close()
 }
 
+// TODO : make multiple file recording
 func NewWalDeltaRecorder() (*WalDeltaRecorder, error) {
 	deltaFile, err := os.OpenFile(path.Join(PathToDataFolder, DeltaFilename), os.O_APPEND|os.O_WRONLY, 0600) // TODO : it may not exist and it is not an error
 	if err != nil {
@@ -34,9 +35,9 @@ func (recorder *WalDeltaRecorder) recordWalDelta(records []walparser.XLogRecord)
 		for _, block := range record.Blocks {
 			location := block.Header.BlockLocation
 			numbersToWrite := []uint32{
+				uint32(location.RelationFileNode.SpcNode),
 				uint32(location.RelationFileNode.DBNode),
 				uint32(location.RelationFileNode.RelNode),
-				uint32(location.RelationFileNode.SpcNode),
 				location.BlockNo,
 			}
 			for _, number := range numbersToWrite {

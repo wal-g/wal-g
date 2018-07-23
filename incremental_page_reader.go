@@ -3,9 +3,9 @@ package walg
 import (
 	"bytes"
 	"encoding/binary"
+	"github.com/pkg/errors"
 	"io"
 	"os"
-	"github.com/pkg/errors"
 )
 
 var IncrementScanUnexpectedEOF = errors.New("unexpected EOF during increment scan")
@@ -93,8 +93,8 @@ func (pageReader *IncrementalPageReader) initialize() (size int64, err error) { 
 	pageReader.blocks = make([]uint32, 0, fileSize/int64(WalPageSize))
 
 	for currentBlockNumber := uint32(0); ; currentBlockNumber++ {
-		n, err := io.ReadFull(pageReader.file, pageBytes)
-		if err == io.ErrUnexpectedEOF || n%int(WalPageSize) != 0 { // TODO : seems that (n%int(WalPageSize) != 0) is useless here
+		_, err := io.ReadFull(pageReader.file, pageBytes)
+		if err == io.ErrUnexpectedEOF {
 			return 0, IncrementScanUnexpectedEOF
 		}
 

@@ -14,8 +14,8 @@ func init() {
 }
 
 type FieldToParse struct {
-	field interface{}
-	name  string
+	Field interface{}
+	Name  string
 }
 
 func NewFieldToParse(field interface{}, name string) *FieldToParse {
@@ -23,9 +23,9 @@ func NewFieldToParse(field interface{}, name string) *FieldToParse {
 }
 
 func (fieldToParse *FieldToParse) ParseFrom(reader io.Reader) error {
-	err := binary.Read(reader, binary.LittleEndian, fieldToParse.field)
+	err := binary.Read(reader, binary.LittleEndian, fieldToParse.Field)
 	if err != nil {
-		return errors.Wrapf(err, "FieldToParse: failed to parse field '%v'", fieldToParse.name)
+		return errors.Wrapf(err, "FieldToParse: failed to parse field '%v'", fieldToParse.Name)
 	}
 	return nil
 }

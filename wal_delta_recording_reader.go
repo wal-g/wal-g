@@ -1,6 +1,7 @@
 package walg
 
 import (
+	"bytes"
 	"github.com/wal-g/wal-g/walparser"
 	"io"
 	"os"
@@ -49,10 +50,25 @@ func (reader *WalDeltaRecordingReader) Read(p []byte) (n int, err error) {
 		copy(p, reader.pageDataLeftover)
 		dataExpected -= len(reader.pageDataLeftover)
 		reader.pageDataLeftover, err = reader.pageReader.ReadPageData()
-		if err != nil && (err != io.EOF || len(reader.pageDataLeftover) == 0) {
+		if err != nil && (err != io.EOF || len(reader.pageDataLeftover) != int(WalPageSize)) {
+			return len(p) - dataExpected, err
+		}
+		err = reader.extractBlockNumbersFromRecords()
+		if err != nil { // TODO : what to do with errors from recorder?
 			return len(p) - dataExpected, err
 		}
 	}
+}
+
+func (reader *WalDeltaRecordingReader) extractBlockNumbersFromRecords() error {
+	records, err := reader.walParser.ParseRecordsFromPage(bytes.NewReader(reader.pageDataLeftover))
+	if err != nil && err != walparser.PartialPageError {
+		if err == walparser.ZeroPageError {
+			return nil
+		}
+		return err
+	}
+	return reader.recorder.recordWalDelta(records)
 }
 
 func NewWalDeltaRecordingReader(walFileReader io.Reader) (*WalDeltaRecordingReader, error) {

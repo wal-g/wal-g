@@ -2,6 +2,7 @@ package walparser
 
 import (
 	"bytes"
+	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 )
@@ -12,18 +13,22 @@ const (
 	XLogRecordAlignment        = 8
 )
 
+var ZeroPageError = errors.New("the whole page consists only of zero bytes")
+var PartialPageError = errors.New("the page is partial, maybe it is the last non zero page of .partial file")
+
 type WalParser struct {
 	currentRecordData []byte
 }
 
 func (parser *WalParser) ParseRecordsFromPage(reader io.Reader) ([]XLogRecord, error) {
-	page, err := parser.parsePage(reader)
-	if err != nil {
-		return nil, err
+	// returning pageParsingErr later is important because of PartialPageError possibility
+	page, pageParsingErr := parser.parsePage(reader)
+	if pageParsingErr != nil && pageParsingErr != PartialPageError {
+		return nil, pageParsingErr
 	}
 	if len(parser.currentRecordData) == 0 {
 		parser.currentRecordData = page.NextRecordHeadingData
-		return page.Records, nil
+		return page.Records, pageParsingErr
 	} else {
 		currentRecordData := concatByteSlices(parser.currentRecordData, page.PrevRecordTrailingData)
 		header, err := readXLogRecordHeader(bytes.NewReader(currentRecordData))
@@ -39,13 +44,13 @@ func (parser *WalParser) ParseRecordsFromPage(reader io.Reader) ([]XLogRecord, e
 			records[0] = *currentRecord
 			copy(records[1:], page.Records)
 			parser.currentRecordData = page.NextRecordHeadingData
-			return records, nil
+			return records, pageParsingErr
 		}
 		if len(page.Records) != 0 || len(page.NextRecordHeadingData) != 0 {
 			return nil, ContinuationNotFoundError
 		}
 		parser.currentRecordData = currentRecordData
-		return make([]XLogRecord, 0), nil
+		return make([]XLogRecord, 0), pageParsingErr
 	}
 }
 
@@ -53,6 +58,15 @@ func (parser *WalParser) parsePage(reader io.Reader) (*XLogPage, error) {
 	alignedReader := NewAlignedReader(reader, XLogRecordAlignment)
 	pageHeader, err := readXLogPageHeader(alignedReader)
 	if err != nil {
+		if err == ZeroPageHeaderError {
+			pageData, err1 := ioutil.ReadAll(reader)
+			if err1 != nil {
+				return nil, err1
+			}
+			if allZero(pageData) {
+				return nil, ZeroPageError
+			}
+		}
 		return nil, err
 	}
 	err = alignedReader.ReadToAlignment()
@@ -77,16 +91,17 @@ func (parser *WalParser) parsePage(reader io.Reader) (*XLogPage, error) {
 			return &XLogPage{Header: *pageHeader, PrevRecordTrailingData: remainingData}, nil
 		}
 	}
-	pageRecords := make([]XLogRecord, 0) // TODO : also can be a tail of WAL switch
+	pageRecords := make([]XLogRecord, 0)
 	for {
 		recordData, wholeRecord, err := tryReadXLogRecordData(alignedReader)
 		if err != nil {
-			return nil, err
+			return checkPartialPage(alignedReader, &XLogPage{Header: *pageHeader, PrevRecordTrailingData: remainingData, Records: pageRecords}, err)
 		}
 		if wholeRecord {
+			// The header was previously validated being zero, so now it doesn't need to. However we do this for code robustness.
 			record, err := parseXLogRecordFromBytes(recordData)
 			if err != nil {
-				return nil, err
+				return checkPartialPage(alignedReader, &XLogPage{Header: *pageHeader, PrevRecordTrailingData: remainingData, Records: pageRecords}, err)
 			}
 			pageRecords = append(pageRecords, *record)
 			if record.isWALSwitch() {
@@ -96,6 +111,19 @@ func (parser *WalParser) parsePage(reader io.Reader) (*XLogPage, error) {
 		}
 		return &XLogPage{*pageHeader, remainingData, pageRecords, recordData}, nil
 	}
+}
+
+func checkPartialPage(pageReader io.Reader, page *XLogPage, recordReadingErr error) (*XLogPage, error) {
+	if recordReadingErr == ZeroRecordHeaderError {
+		pageData, err1 := ioutil.ReadAll(pageReader)
+		if err1 != nil {
+			return nil, err1
+		}
+		if allZero(pageData) {
+			return page, PartialPageError
+		}
+	}
+	return nil, recordReadingErr
 }
 
 func NewWalParser() *WalParser {

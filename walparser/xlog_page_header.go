@@ -28,3 +28,11 @@ type XLogPageHeader struct {
 func (pageHeader *XLogPageHeader) IsLong() bool {
 	return (pageHeader.Info & XlpLongHeader) != 0
 }
+
+func (pageHeader *XLogPageHeader) isZero() bool {
+	return pageHeader.Magic == 0 &&
+		pageHeader.Info == 0 &&
+		pageHeader.TimeLineID == 0 &&
+		pageHeader.PageAddress == 0 &&
+		pageHeader.RemainingDataLen == 0
+}

@@ -1,6 +1,9 @@
 package walparser
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/pkg/errors"
+)
 
 const (
 	// info flags
@@ -28,6 +31,8 @@ type InvalidXLogRecordResourceManagerIDError struct {
 func (err InvalidXLogRecordResourceManagerIDError) Error() string {
 	return fmt.Sprintf("resource manager id is invalid: %v, while it should be less then: %v", err.resourceManagerID, RmNextFreeID)
 }
+
+var ZeroRecordHeaderError = errors.New("whole record header is zero, maybe it's parsed from .partial file or after WAL-Switch operation")
 
 /* This struct corresponds to postgres struct XLogRecord.
  * For clarification you can find it in postgres:
@@ -61,7 +66,19 @@ func (header *XLogRecordHeader) checkResourceManagerIDValidity() error {
 func (header *XLogRecordHeader) checkConsistency() error {
 	err := header.checkTotalRecordLengthConsistency()
 	if err != nil {
+		if header.isZero() {
+			return ZeroRecordHeaderError
+		}
 		return err
 	}
 	return header.checkResourceManagerIDValidity()
+}
+
+func (header *XLogRecordHeader) isZero() bool {
+	return header.TotalRecordLength == 0 &&
+		header.XactID == 0 &&
+		header.PrevRecordPtr == 0 &&
+		header.Info == 0 &&
+		header.ResourceManagerID == 0 &&
+		header.Crc32Hash == 0
 }
