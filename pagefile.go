@@ -234,7 +234,7 @@ func ReadDatabaseFile(fileName string, lsn *uint64, isNew bool) (io.ReadCloser, 
 	}
 
 	if lsn == nil || isNew || !IsPagedFile(info, fileName) {
-		return file, false, fileSize, nil
+		return NewDiskLimitReader(file), false, fileSize, nil
 	}
 
 	lim := &io.LimitedReader{
@@ -252,7 +252,7 @@ func ReadDatabaseFile(fileName string, lsn *uint64, isNew bool) (io.ReadCloser, 
 			if err != nil {
 				return nil, false, fileSize, err
 			}
-			return file, false, fileSize, nil
+			return NewDiskLimitReader(file), false, fileSize, nil
 		}
 
 		return nil, false, fileSize, err
