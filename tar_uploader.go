@@ -58,7 +58,7 @@ func (tarUploader *TarUploader) Clone() *TarUploader {
 		tarUploader.ServerSideEncryption,
 		tarUploader.SSEKMSKeyId,
 		tarUploader.StorageClass,
-		tarUploader.Success,
+		false,
 		tarUploader.bucket,
 		tarUploader.server,
 		tarUploader.compressor,

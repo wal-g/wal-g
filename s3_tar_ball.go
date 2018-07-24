@@ -64,6 +64,9 @@ func (tarBall *S3TarBall) CloseTar() error {
 }
 func (tarBall *S3TarBall) AwaitUploads() {
 	tarBall.tarUploader.waitGroup.Wait()
+	if !tarBall.tarUploader.Success {
+		log.Fatal("Unable to complete uploads")
+	}
 }
 
 // StartUpload creates a compressing writer and runs upload in the background once
@@ -87,9 +90,8 @@ func (tarBall *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteClos
 		}
 		if err != nil {
 			log.Printf("upload: could not upload '%s'\n", path)
-			log.Printf("FATAL%v\n", err)
+			log.Printf("FATAL %v\n", err)
 		}
-
 	}()
 
 	if crypter.IsUsed() {

@@ -607,8 +607,9 @@ func UploadWALFile(tarUploader *TarUploader, dirArc string, pre *S3Prefix, verif
 	path, err := tarUploader.UploadWal(dirArc, pre, verify)
 	if re, ok := err.(CompressingPipeWriterError); ok {
 		log.Fatalf("FATAL: could not upload '%s' due to compression error.\n%+v\n", path, re)
-	} else if err != nil {
+	}
+	if err != nil {
 		log.Printf("upload: could not upload '%s'\n", path)
-		log.Fatalf("FATAL%+v\n", err)
+		log.Fatalf("FATAL %v\n", err)
 	}
 }
