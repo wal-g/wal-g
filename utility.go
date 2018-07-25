@@ -8,8 +8,8 @@ import (
 	"io"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -172,13 +172,12 @@ func getMaxConcurrency(key string, defaultValue int) int {
 	return max(con, 1)
 }
 
-func GetFileExtension(path string) string {
-	re := regexp.MustCompile(`\.([^\.]+)$`)
-	f := re.FindString(path)
-	if f != "" {
-		return f[1:]
+func GetFileExtension(filePath string) string {
+	ext := path.Ext(filePath)
+	if ext != "" {
+		ext = ext[1:]
 	}
-	return ""
+	return ext
 }
 
 func GetFileRelPath(fileAbsPath string, directoryPath string) string {

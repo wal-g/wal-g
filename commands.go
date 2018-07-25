@@ -327,7 +327,7 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 }
 
 // HandleBackupPush is invoked to perform a wal-g backup-push
-func HandleBackupPush(archiveDirectory string, tarUploader *TarUploader, pre *S3Prefix) {
+func HandleBackupPush(archiveDirectory string, tarUploader *Uploader, pre *S3Prefix) {
 	archiveDirectory = ResolveSymlink(archiveDirectory)
 	maxDeltas, fromFull := getDeltaConfig()
 
@@ -581,19 +581,23 @@ func DownloadAndDecompressWALFile(pre *S3Prefix, walFileName string, dstLocation
 }
 
 // HandleWALPush is invoked to perform wal-g wal-push
-func HandleWALPush(tarUploader *TarUploader, archiveDirectory string, pre *S3Prefix, verify bool) {
+func HandleWALPush(tarUploader *Uploader, walFilePath string, pre *S3Prefix, verify bool) {
 	bgUploader := BgUploader{}
 	// Look for new WALs while doing main upload
-	bgUploader.Start(archiveDirectory, int32(getMaxUploadConcurrency(16)-1), tarUploader, pre, verify)
+	bgUploader.Start(walFilePath, int32(getMaxUploadConcurrency(16)-1), tarUploader, pre, verify)
 
-	UploadWALFile(tarUploader, archiveDirectory, pre, verify)
+	UploadWALFile(tarUploader, walFilePath, pre, verify)
 
 	bgUploader.Stop()
 }
 
 // UploadWALFile from FS to the cloud
-func UploadWALFile(tarUploader *TarUploader, archiveDirectory string, pre *S3Prefix, verify bool) {
-	path, err := tarUploader.UploadWal(archiveDirectory, pre, verify)
+func UploadWALFile(tarUploader *Uploader, walFilePath string, pre *S3Prefix, verify bool) {
+	walFile, err := os.Open(walFilePath)
+	if err != nil {
+		log.Fatalf("upload: could not open '%s'\n", walFilePath)
+	}
+	path, err := tarUploader.UploadWal(walFile, pre, verify)
 	if compressionError, ok := err.(CompressingPipeWriterError); ok {
 		log.Fatalf("FATAL: could not upload '%s' due to compression error.\n%+v\n", path, compressionError)
 	} else if err != nil {

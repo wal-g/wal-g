@@ -5,19 +5,18 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
-	"github.com/pkg/errors"
 	"io"
 	"log"
-	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
 )
 
-// TarUploader contains fields associated with uploading tarballs.
+// Uploader contains fields associated with uploading tarballs.
 // Multiple tarballs can share one uploader. Must call CreateUploader()
 // in 'upload.go'.
-type TarUploader struct {
+type Uploader struct {
 	UploaderApi          s3manageriface.UploaderAPI
 	ServerSideEncryption string
 	SSEKMSKeyId          string
@@ -29,11 +28,11 @@ type TarUploader struct {
 	waitGroup            *sync.WaitGroup
 }
 
-// NewTarUploader creates a new tar uploader without the actual
+// NewUploader creates a new tar uploader without the actual
 // S3 uploader. CreateUploader() is used to configure byte size and
 // concurrency streams for the uploader.
-func NewTarUploader(bucket, server, compressionMethod string) *TarUploader {
-	return &TarUploader{
+func NewUploader(bucket, server, compressionMethod string) *Uploader {
+	return &Uploader{
 		StorageClass: "STANDARD",
 		bucket:       bucket,
 		server:       server,
@@ -44,78 +43,75 @@ func NewTarUploader(bucket, server, compressionMethod string) *TarUploader {
 
 // Finish waits for all waiting parts to be uploaded. If an error occurs,
 // prints alert to stderr.
-func (tarUploader *TarUploader) Finish() {
-	tarUploader.waitGroup.Wait()
-	if !tarUploader.Success {
+func (uploader *Uploader) Finish() {
+	uploader.waitGroup.Wait()
+	if !uploader.Success {
 		log.Printf("WAL-G could not complete upload.\n")
 	}
 }
 
-// Clone creates similar TarUploader with new WaitGroup
-func (tarUploader *TarUploader) Clone() *TarUploader {
-	return &TarUploader{
-		tarUploader.UploaderApi,
-		tarUploader.ServerSideEncryption,
-		tarUploader.SSEKMSKeyId,
-		tarUploader.StorageClass,
-		tarUploader.Success,
-		tarUploader.bucket,
-		tarUploader.server,
-		tarUploader.compressor,
+// Clone creates similar Uploader with new WaitGroup
+func (uploader *Uploader) Clone() *Uploader {
+	return &Uploader{
+		uploader.UploaderApi,
+		uploader.ServerSideEncryption,
+		uploader.SSEKMSKeyId,
+		uploader.StorageClass,
+		uploader.Success,
+		uploader.bucket,
+		uploader.server,
+		uploader.compressor,
 		&sync.WaitGroup{},
 	}
 }
 
 // UploadWal compresses a WAL file and uploads to S3. Returns
 // the first error encountered and an empty string upon failure.
-func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify bool) (string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return "", errors.Wrapf(err, "UploadWal: failed to open file %s\n", path)
-	}
-
+func (uploader *Uploader) UploadWal(file NamedReader, s3Prefix *S3Prefix, verify bool) (string, error) {
 	var walFileReader io.Reader
-	recordingReader, err := NewWalDeltaRecordingReader(file)
-	if err != nil {
-		if err == DeltaFileExistenceError {
-			// it is normal and it means that next backup should use full scan strategy instead of wal scanning
+
+	filename := path.Base(file.Name())
+	if isWalFilename(filename) {
+		recordingReader, err := NewWalDeltaRecordingReader(file, filename, s3Prefix, uploader.Clone())
+		if err != nil {
 			walFileReader = file
 		} else {
-			return "", errors.Wrapf(err, "UploadWal: failed to start delta recording\n")
+			walFileReader = recordingReader
+			defer recordingReader.Close()
 		}
 	} else {
-		walFileReader = recordingReader
-		defer recordingReader.Close()
+		walFileReader = file
 	}
 
 	pipeWriter := &CompressingPipeWriter{
 		Input:                walFileReader,
-		NewCompressingWriter: tarUploader.compressor.NewWriter,
+		NewCompressingWriter: uploader.compressor.NewWriter,
 	}
 
 	pipeWriter.Compress(&OpenPGPCrypter{})
 
-	dstPath := sanitizePath(tarUploader.server + WalPath + filepath.Base(path) + "." + tarUploader.compressor.FileExtension())
+	dstPath := sanitizePath(uploader.server + WalPath + filepath.Base(file.Name()) + "." + uploader.compressor.FileExtension())
 	reader := pipeWriter.Output
 
 	if verify {
 		reader = newMd5Reader(reader)
 	}
 
-	input := tarUploader.createUploadInput(dstPath, reader)
+	input := uploader.createUploadInput(dstPath, reader)
 
-	tarUploader.waitGroup.Add(1)
+	var err error
+	uploader.waitGroup.Add(1)
 	go func() {
-		defer tarUploader.waitGroup.Done()
-		err = tarUploader.upload(input, path)
+		defer uploader.waitGroup.Done()
+		err = uploader.upload(input, file.Name())
 	}()
 
-	tarUploader.Finish()
+	uploader.Finish()
 	fmt.Println("WAL PATH:", dstPath)
 	if verify {
 		sum := reader.(*MD5Reader).Sum()
 		archive := &Archive{
-			Prefix:  pre,
+			Prefix:  s3Prefix,
 			Archive: aws.String(dstPath),
 		}
 		eTag, err := archive.GetETag()
@@ -135,22 +131,22 @@ func (tarUploader *TarUploader) UploadWal(path string, pre *S3Prefix, verify boo
 	return dstPath, err
 }
 
-// createUploadInput creates a s3manager.UploadInput for a TarUploader using
+// createUploadInput creates a s3manager.UploadInput for a Uploader using
 // the specified path and reader.
-func (tarUploader *TarUploader) createUploadInput(path string, reader io.Reader) *s3manager.UploadInput {
+func (uploader *Uploader) createUploadInput(path string, reader io.Reader) *s3manager.UploadInput {
 	uploadInput := &s3manager.UploadInput{
-		Bucket:       aws.String(tarUploader.bucket),
+		Bucket:       aws.String(uploader.bucket),
 		Key:          aws.String(path),
 		Body:         reader,
-		StorageClass: aws.String(tarUploader.StorageClass),
+		StorageClass: aws.String(uploader.StorageClass),
 	}
 
-	if tarUploader.ServerSideEncryption != "" {
-		uploadInput.ServerSideEncryption = aws.String(tarUploader.ServerSideEncryption)
+	if uploader.ServerSideEncryption != "" {
+		uploadInput.ServerSideEncryption = aws.String(uploader.ServerSideEncryption)
 
-		if tarUploader.SSEKMSKeyId != "" {
+		if uploader.SSEKMSKeyId != "" {
 			// Only aws:kms implies sseKmsKeyId, checked during validation
-			uploadInput.SSEKMSKeyId = aws.String(tarUploader.SSEKMSKeyId)
+			uploadInput.SSEKMSKeyId = aws.String(uploader.SSEKMSKeyId)
 		}
 	}
 
@@ -159,12 +155,12 @@ func (tarUploader *TarUploader) createUploadInput(path string, reader io.Reader)
 
 // Helper function to upload to S3. If an error occurs during upload, retries will
 // occur in exponentially incremental seconds.
-func (tarUploader *TarUploader) upload(input *s3manager.UploadInput, path string) (err error) {
-	upl := tarUploader.UploaderApi
+func (uploader *Uploader) upload(input *s3manager.UploadInput, path string) (err error) {
+	upl := uploader.UploaderApi
 
 	_, e := upl.Upload(input)
 	if e == nil {
-		tarUploader.Success = true
+		uploader.Success = true
 		return nil
 	}
 

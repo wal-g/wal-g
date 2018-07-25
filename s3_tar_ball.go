@@ -21,7 +21,7 @@ type S3TarBall struct {
 	size             int64
 	writeCloser      io.WriteCloser
 	tarWriter        *tar.Writer
-	tarUploader      *TarUploader
+	tarUploader      *Uploader
 	Lsn              *uint64
 	IncrementFromLsn *uint64
 	IncrementFrom    string

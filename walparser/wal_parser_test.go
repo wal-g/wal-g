@@ -81,7 +81,7 @@ func doWalSwitchParsingTesting(t *testing.T, pageReader WalPageReader, parser Wa
 	}
 }
 
-func parsingTestCase(t * testing.T, filename string, doTesting func(*testing.T, WalPageReader, WalParser)) {
+func parsingTestCase(t *testing.T, filename string, doTesting func(*testing.T, WalPageReader, WalParser)) {
 	walFile, err := os.Open(filename)
 	defer walFile.Close()
 	if err != nil {

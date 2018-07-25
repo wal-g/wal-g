@@ -5,7 +5,7 @@ type S3TarBallMaker struct {
 	partCount        int
 	ArchiveDirectory string
 	BackupName       string
-	TarUploader      *TarUploader
+	TarUploader      *Uploader
 	Lsn              *uint64
 	IncrementFromLsn *uint64
 	IncrementFrom    string

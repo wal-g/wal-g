@@ -20,6 +20,10 @@ type WalParser struct {
 	currentRecordData []byte
 }
 
+func (parser *WalParser) Invalidate() {
+	parser.currentRecordData = nil
+}
+
 func (parser *WalParser) ParseRecordsFromPage(reader io.Reader) ([]XLogRecord, error) {
 	// returning pageParsingErr later is important because of PartialPageError possibility
 	page, pageParsingErr := parser.parsePage(reader)

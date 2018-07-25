@@ -13,7 +13,8 @@ import (
 // This test has known race condition
 // We expect that background worker will upload 100 files.
 // But we have no guaranties for this
-func TestBackgroundWALUpload(t *testing.T) {
+// TODO : we need  replace this test
+func TestBackgroundWALUpload(t *testing.T) { // TODO : this test is really inconvenient for debugging
 	cwd, err := filepath.Abs("./")
 	if err != nil {
 		t.Log(err)

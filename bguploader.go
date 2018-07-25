@@ -29,7 +29,7 @@ type BgUploader struct {
 	started map[string]interface{}
 
 	// uploading structure
-	tarUploader *TarUploader
+	tarUploader *Uploader
 
 	// to control amount of work done in one cycle of archive_comand
 	totalUploaded int32
@@ -41,7 +41,7 @@ type BgUploader struct {
 }
 
 // Start up checking what's inside archive_status
-func (uploader *BgUploader) Start(walFilePath string, maxParallelWorkers int32, tu *TarUploader, pre *S3Prefix, verify bool) {
+func (uploader *BgUploader) Start(walFilePath string, maxParallelWorkers int32, tu *Uploader, pre *S3Prefix, verify bool) {
 	if maxParallelWorkers < 1 {
 		return // Nothing to start
 	}

@@ -19,7 +19,7 @@ func HandleWALPrefetch(pre *S3Prefix, walFileName string, location string) {
 	location = path.Dir(location)
 	wg := &sync.WaitGroup{}
 	for i := 0; i < getMaxDownloadConcurrency(8); i++ {
-		fileName, err = NextWALFileName(fileName)
+		fileName, err = GetNextWALFileName(fileName)
 		if err != nil {
 			log.Println("WAL-prefetch failed: ", err, " file: ", fileName)
 		}

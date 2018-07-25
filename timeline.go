@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/jackc/pgx"
 	"strconv"
-	"strings"
 )
 
 func readTimeline(conn *pgx.Conn) (timeline uint32, err error) {
@@ -22,21 +21,6 @@ func readTimeline(conn *pgx.Conn) (timeline uint32, err error) {
 const (
 	sizeofInt32bits = sizeofInt32 * 8
 )
-
-// ParseLsn converts PostgreSQL string representation of LSN to uint64
-func ParseLsn(lsnStr string) (lsn uint64, err error) {
-	lsnArray := strings.SplitN(lsnStr, "/", 2)
-
-	//Postgres format it's LSNs as two hex numbers separated by "/"
-	highLsn, err := strconv.ParseUint(lsnArray[0], 0x10, sizeofInt32bits)
-	lowLsn, err2 := strconv.ParseUint(lsnArray[1], 0x10, sizeofInt32bits)
-	if err != nil || err2 != nil {
-		err = errors.New("Unable to parse LSN " + lsnStr)
-	}
-
-	lsn = highLsn<<sizeofInt32bits + lowLsn
-	return
-}
 
 const (
 	// WalSegmentSize is the size of one WAL file
@@ -93,12 +77,16 @@ func ParseWALFileName(name string) (timelineId uint32, logSegNo uint64, err erro
 	return
 }
 
-// NextWALFileName computes name of next WAL segment
-func NextWALFileName(name string) (nextname string, err error) {
-	timelineId, logSegNo, err0 := ParseWALFileName(name)
-	if err0 != nil {
-		err = err0
-		return
+func isWalFilename(filename string) bool {
+	_, _, err := ParseWALFileName(filename)
+	return err == nil
+}
+
+// GetNextWALFileName computes name of next WAL segment
+func GetNextWALFileName(name string) (string, error) {
+	timelineId, logSegNo, err := ParseWALFileName(name)
+	if err != nil {
+		return "", err
 	}
 	logSegNo++
 	return formatWALFileName(uint32(timelineId), logSegNo), nil

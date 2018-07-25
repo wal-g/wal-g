@@ -173,7 +173,7 @@ func (bundle *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName str
 	if err != nil {
 		return "", 0, queryRunner.Version, err
 	}
-	lsn, err = ParseLsn(lsnStr)
+	lsn, err = pgx.ParseLSN(lsnStr)
 
 	if bundle.Replica {
 		name, bundle.Timeline, err = WALFileName(lsn, conn)
@@ -284,7 +284,7 @@ func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {
 		return 0, errors.Wrap(err, "HandleLabelFiles: failed to stop backup")
 	}
 
-	lsn, err := ParseLsn(lsnStr)
+	lsn, err := pgx.ParseLSN(lsnStr)
 	if err != nil {
 		return 0, errors.Wrap(err, "HandleLabelFiles: failed to parse finish LSN")
 	}

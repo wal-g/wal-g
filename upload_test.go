@@ -118,7 +118,7 @@ func doConfigureWithBuсketPath(t *testing.T, bucketPath string, expectedServer 
 		t.Errorf("upload: did not create an uploader")
 	}
 	if tu.StorageClass != "STANDARD" {
-		t.Errorf("upload: TarUploader field 'StorageClass' expected %s but got %s", "STANDARD", tu.StorageClass)
+		t.Errorf("upload: Uploader field 'StorageClass' expected %s but got %s", "STANDARD", tu.StorageClass)
 	}
 	if err != nil {
 		t.Errorf("upload: expected error to be '<nil>' but got %s", err)
@@ -134,7 +134,7 @@ func doConfigureWithBuсketPath(t *testing.T, bucketPath string, expectedServer 
 		t.Log(err)
 	}
 	if tu.StorageClass != "STANDARD_IA" {
-		t.Errorf("upload: TarUploader field 'StorageClass' expected %s but got %s", "STANDARD_IA", tu.StorageClass)
+		t.Errorf("upload: Uploader field 'StorageClass' expected %s but got %s", "STANDARD_IA", tu.StorageClass)
 	}
 }
 
@@ -183,10 +183,5 @@ func TestUploadError(t *testing.T) {
 	tarBall.Finish(&walg.S3TarBallSentinelDto{})
 	if tu.Success {
 		t.Errorf("upload: expected to fail to upload successfully")
-	}
-
-	_, err := tu.UploadWal("fake path", nil, false)
-	if err == nil {
-		t.Errorf("upload: UploadWal expected error but got `<nil>`")
 	}
 }

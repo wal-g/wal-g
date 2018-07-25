@@ -50,7 +50,7 @@ func findS3BucketRegion(bucket string, config *aws.Config) (string, error) {
 // WALE_S3_PREFIX
 //
 // Able to configure the upload part size in the S3 uploader.
-func Configure() (*TarUploader, *S3Prefix, error) {
+func Configure() (*Uploader, *S3Prefix, error) {
 	waleS3Prefix := os.Getenv("WALE_S3_PREFIX")
 	if waleS3Prefix == "" {
 		return nil, nil, &UnsetEnvVarError{names: []string{"WALE_S3_PREFIX"}}
@@ -126,7 +126,7 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 
 	pre.Svc = s3.New(sess)
 
-	uploader := NewTarUploader(bucket, server, compressionMethod)
+	uploader := NewUploader(bucket, server, compressionMethod)
 
 	var con = getMaxUploadConcurrency(10)
 	storageClass, ok := os.LookupEnv("WALG_S3_STORAGE_CLASS")
@@ -157,9 +157,9 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 // CreateUploader returns an uploader with customizable concurrency
 // and partsize.
 func CreateUploader(svc s3iface.S3API, partsize, concurrency int) s3manageriface.UploaderAPI {
-	up := s3manager.NewUploaderWithClient(svc, func(u *s3manager.Uploader) {
+	uploader := s3manager.NewUploaderWithClient(svc, func(u *s3manager.Uploader) {
 		u.PartSize = int64(partsize)
 		u.Concurrency = concurrency
 	})
-	return up
+	return uploader
 }

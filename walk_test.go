@@ -151,11 +151,11 @@ func extract(t *testing.T, dir string) string {
 	}
 
 	out := make([]walg.ReaderMaker, len(files))
-	for i, val := range files {
-		path := filepath.Join(dir, val.Name())
+	for i, file := range files {
+		filePath := filepath.Join(dir, file.Name())
 		f := &tools.FileReaderMaker{
-			Key:        path,
-			FileFormat: walg.GetFileExtension(val.Name()),
+			Key:        filePath,
+			FileFormat: walg.GetFileExtension(file.Name()),
 		}
 		out[i] = f
 	}
@@ -381,7 +381,12 @@ func TestWalk(t *testing.T) {
 	// Re-use generated data to test uploading WAL.
 	tu := walg.NewLz4MockTarUploader()
 	tu.UploaderApi = &mockS3Uploader{}
-	wal, err := tu.UploadWal(filepath.Join(data, "1"), nil, false)
+	walFileName := filepath.Join(data, "1")
+	walFile, err := os.Open(walFileName)
+	if err != nil {
+		t.Errorf("can't open file: %s", walFileName)
+	}
+	wal, err := tu.UploadWal(walFile, nil, false)
 	if wal == "" {
 		t.Errorf("upload: expected wal path to be set but got ''")
 	}

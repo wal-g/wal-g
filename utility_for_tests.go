@@ -5,8 +5,8 @@ import (
 	"io"
 )
 
-func NewLz4MockTarUploader() *TarUploader {
-	return NewTarUploader("bucket", "server", Lz4AlgorithmName)
+func NewLz4MockTarUploader() *Uploader {
+	return NewUploader("bucket", "server", Lz4AlgorithmName)
 }
 
 func NewLz4CompressingPipeWriter(input io.Reader) *CompressingPipeWriter {

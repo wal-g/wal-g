@@ -29,10 +29,35 @@ func (pageHeader *XLogPageHeader) IsLong() bool {
 	return (pageHeader.Info & XlpLongHeader) != 0
 }
 
+func (pageHeader *XLogPageHeader) HasContinuationRecord() bool {
+	return (pageHeader.Info & XlpFirstIsContRecord) != 0
+}
+
+func (pageHeader *XLogPageHeader) IsValid() bool {
+	return pageHeader.hasValidFlags() &&
+		pageHeader.hasConsistentRemainingDataLen()
+}
+
 func (pageHeader *XLogPageHeader) isZero() bool {
 	return pageHeader.Magic == 0 &&
 		pageHeader.Info == 0 &&
 		pageHeader.TimeLineID == 0 &&
 		pageHeader.PageAddress == 0 &&
 		pageHeader.RemainingDataLen == 0
+}
+func (pageHeader *XLogPageHeader) hasValidFlags() bool {
+	return (pageHeader.Info &^ XlpAllFlags) == 0
+}
+
+func (pageHeader *XLogPageHeader) hasConsistentRemainingDataLen() bool {
+	if pageHeader.HasContinuationRecord() {
+		if pageHeader.RemainingDataLen == 0 {
+			return false
+		}
+	} else {
+		if pageHeader.RemainingDataLen != 0 {
+			return false
+		}
+	}
+	return true
 }

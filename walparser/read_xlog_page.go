@@ -8,6 +8,7 @@ import (
 )
 
 var ZeroPageHeaderError = errors.New("page header contains only zeroes, maybe it is a part .partial file or this page follow WAL-switch record")
+var InvalidPageHeaderError = errors.New("invalid page header")
 
 func tryReadXLogRecordData(alignedReader *AlignedReader) (data []byte, whole bool, err error) {
 	err = alignedReader.ReadToAlignment()
@@ -67,6 +68,10 @@ func readXLogPageHeader(reader io.Reader) (*XLogPageHeader, error) {
 	}
 	if pageHeader.isZero() {
 		return nil, ZeroPageHeaderError
+	}
+
+	if !pageHeader.IsValid() {
+		return nil, InvalidPageHeaderError
 	}
 
 	// read long header data from reader
