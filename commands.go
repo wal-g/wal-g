@@ -20,12 +20,6 @@ import (
 	"sync"
 )
 
-type PgControlMissingError struct{}
-
-func (err PgControlMissingError) Error() string {
-	return "Corrupted backup: missing pg_control"
-}
-
 // HandleDelete is invoked to perform wal-g delete
 func HandleDelete(pre *S3Prefix, args []string) {
 	cfg := ParseDeleteArguments(args, printDeleteUsageAndFail)
@@ -190,8 +184,8 @@ func extractPgControl(backup *Backup, pre *S3Prefix, fileTarInterpreter *FileTar
 	if serr, ok := err.(*UnsupportedFileTypeError); ok {
 		return serr
 	}
+	return nil
 
-	return PgControlMissingError{}
 }
 
 // Do the job of unpacking Backup object
