@@ -5,7 +5,8 @@ PKG_FILES = $(wildcard *.go)
 
 test: cmd/wal-g/wal-g
 	go list ./... | grep -v 'vendor/' | xargs go vet
-	go test -v
+	go test -v ./walg_test/
+	go test -v ./walparser/
 
 fmt: $(CMD_FILES) $(PKG_FILES)
 	gofmt -s -w $(CMD_FILES) $(PKG_FILES)

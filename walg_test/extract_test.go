@@ -191,5 +191,4 @@ func BenchmarkExtractAll(b *testing.B) {
 	if err != nil {
 		b.Log(err)
 	}
-
 }
