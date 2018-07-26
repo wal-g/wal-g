@@ -26,7 +26,7 @@ func (readerMaker *S3ReaderMaker) Reader() (io.ReadCloser, error) {
 		Key:    readerMaker.Key,
 	}
 
-	rdr, err := readerMaker.Backup.Prefix.Svc.GetObject(input)
+	rdr, err := readerMaker.Backup.Prefix.S3API.GetObject(input)
 	if err != nil {
 		return nil, errors.Wrap(err, "S3 Reader: s3.GetObject failed")
 	}

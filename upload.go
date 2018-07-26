@@ -50,7 +50,7 @@ func findS3BucketRegion(bucket string, config *aws.Config) (string, error) {
 // WALE_S3_PREFIX
 //
 // Able to configure the upload part size in the S3 uploader.
-func Configure() (*Uploader, *S3Prefix, error) {
+func Configure() (*Uploader, *S3Folder, error) {
 	waleS3Prefix := os.Getenv("WALE_S3_PREFIX")
 	if waleS3Prefix == "" {
 		return nil, nil, &UnsetEnvVarError{names: []string{"WALE_S3_PREFIX"}}
@@ -114,19 +114,14 @@ func Configure() (*Uploader, *S3Prefix, error) {
 		return nil, nil, UnknownCompressionMethodError{}
 	}
 
-	pre := &S3Prefix{
-		Bucket: aws.String(bucket),
-		Server: aws.String(server),
-	}
-
 	sess, err := session.NewSession(config)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "Configure: failed to create new session")
 	}
 
-	pre.Svc = s3.New(sess)
+	pre := NewS3Folder(s3.New(sess), bucket, server)
 
-	uploader := NewUploader(bucket, server, compressionMethod)
+	uploader := NewUploader(compressionMethod, pre)
 
 	var con = getMaxUploadConcurrency(10)
 	storageClass, ok := os.LookupEnv("WALG_S3_STORAGE_CLASS")
@@ -149,7 +144,7 @@ func Configure() (*Uploader, *S3Prefix, error) {
 		return nil, nil, errors.New("Configure: WALG_S3_SSE_KMS_ID must be set iff using aws:kms encryption")
 	}
 
-	uploader.UploaderApi = CreateUploader(pre.Svc, 20*1024*1024, con) //default 10 concurrency streams at 20MB
+	uploader.UploaderApi = CreateUploader(pre.S3API, 20*1024*1024, con) //default 10 concurrency streams at 20MB
 
 	return uploader, pre, err
 }
@@ -157,9 +152,9 @@ func Configure() (*Uploader, *S3Prefix, error) {
 // CreateUploader returns an uploader with customizable concurrency
 // and partsize.
 func CreateUploader(svc s3iface.S3API, partsize, concurrency int) s3manageriface.UploaderAPI {
-	uploader := s3manager.NewUploaderWithClient(svc, func(u *s3manager.Uploader) {
-		u.PartSize = int64(partsize)
-		u.Concurrency = concurrency
+	uploaderAPI := s3manager.NewUploaderWithClient(svc, func(uploader *s3manager.Uploader) {
+		uploader.PartSize = int64(partsize)
+		uploader.Concurrency = concurrency
 	})
-	return uploader
+	return uploaderAPI
 }

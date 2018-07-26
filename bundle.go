@@ -13,14 +13,17 @@ import (
 	"sync"
 )
 
+// It is made so to load big database files of size 1GB one by one
+const DefaultTarSizeThreshold = int64((1 << 30) - 1)
+
 // A Bundle represents the directory to
 // be walked. Contains at least one TarBall
 // if walk has started. Each TarBall will be at least
-// MinSize bytes. The Sentinel is used to ensure complete
+// TarSizeThreshold bytes. The Sentinel is used to ensure complete
 // uploaded backups; in this case, pg_control is used as
 // the sentinel.
 type Bundle struct {
-	MinSize            int64
+	TarSizeThreshold   int64
 	Sentinel           *Sentinel
 	TarBall            TarBall
 	TarBallMaker       TarBallMaker
@@ -38,6 +41,15 @@ type Bundle struct {
 	started          bool
 
 	Files *sync.Map
+}
+
+func NewBundle(incrementFromLsn *uint64, incrementFromFiles BackupFileList) *Bundle {
+	return &Bundle{
+		TarSizeThreshold:   DefaultTarSizeThreshold,
+		IncrementFromLsn:   incrementFromLsn,
+		IncrementFromFiles: incrementFromFiles,
+		Files:              &sync.Map{},
+	}
 }
 
 func (bundle *Bundle) GetFiles() *sync.Map { return bundle.Files }
@@ -102,7 +114,7 @@ func (bundle *Bundle) EnqueueBack(tarBall TarBall, parallelOpInProgress *bool) {
 }
 
 func (bundle *Bundle) CheckSizeAndEnqueueBack(tarBall TarBall) error {
-	if tarBall.Size() > bundle.MinSize {
+	if tarBall.Size() > bundle.TarSizeThreshold {
 		bundle.mutex.Lock()
 		defer bundle.mutex.Unlock()
 

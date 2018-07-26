@@ -18,12 +18,11 @@ import (
 // in 'upload.go'.
 type Uploader struct {
 	UploaderApi          s3manageriface.UploaderAPI
+	UploadingLocation    *S3Folder
 	ServerSideEncryption string
 	SSEKMSKeyId          string
 	StorageClass         string
 	Success              bool
-	bucket               string
-	server               string
 	compressor           Compressor
 	waitGroup            *sync.WaitGroup
 }
@@ -31,13 +30,12 @@ type Uploader struct {
 // NewUploader creates a new tar uploader without the actual
 // S3 uploader. CreateUploader() is used to configure byte size and
 // concurrency streams for the uploader.
-func NewUploader(bucket, server, compressionMethod string) *Uploader {
+func NewUploader(compressionMethod string, uploadingLocation *S3Folder) *Uploader {
 	return &Uploader{
-		StorageClass: "STANDARD",
-		bucket:       bucket,
-		server:       server,
-		compressor:   Compressors[compressionMethod],
-		waitGroup:    &sync.WaitGroup{},
+		UploadingLocation: uploadingLocation,
+		StorageClass:      "STANDARD",
+		compressor:        Compressors[compressionMethod],
+		waitGroup:         &sync.WaitGroup{},
 	}
 }
 
@@ -54,12 +52,11 @@ func (uploader *Uploader) Finish() {
 func (uploader *Uploader) Clone() *Uploader {
 	return &Uploader{
 		uploader.UploaderApi,
+		uploader.UploadingLocation,
 		uploader.ServerSideEncryption,
 		uploader.SSEKMSKeyId,
 		uploader.StorageClass,
 		uploader.Success,
-		uploader.bucket,
-		uploader.server,
 		uploader.compressor,
 		&sync.WaitGroup{},
 	}
@@ -67,7 +64,7 @@ func (uploader *Uploader) Clone() *Uploader {
 
 // UploadWal compresses a WAL file and uploads to S3. Returns
 // the first error encountered and an empty string upon failure.
-func (uploader *Uploader) UploadWal(file NamedReader, s3Prefix *S3Prefix, verify bool) (string, error) {
+func (uploader *Uploader) UploadWal(file NamedReader, s3Prefix *S3Folder, verify bool) (string, error) {
 	var walFileReader io.Reader
 
 	filename := path.Base(file.Name())
@@ -90,14 +87,14 @@ func (uploader *Uploader) UploadWal(file NamedReader, s3Prefix *S3Prefix, verify
 
 	pipeWriter.Compress(&OpenPGPCrypter{})
 
-	dstPath := sanitizePath(uploader.server + WalPath + filepath.Base(file.Name()) + "." + uploader.compressor.FileExtension())
+	dstPath := sanitizePath(*uploader.UploadingLocation.Server + WalPath + filepath.Base(file.Name()) + "." + uploader.compressor.FileExtension())
 	reader := pipeWriter.Output
 
 	if verify {
 		reader = newMd5Reader(reader)
 	}
 
-	input := uploader.createUploadInput(dstPath, reader)
+	input := uploader.CreateUploadInput(dstPath, reader)
 
 	var err error
 	uploader.waitGroup.Add(1)
@@ -131,11 +128,11 @@ func (uploader *Uploader) UploadWal(file NamedReader, s3Prefix *S3Prefix, verify
 	return dstPath, err
 }
 
-// createUploadInput creates a s3manager.UploadInput for a Uploader using
+// CreateUploadInput creates a s3manager.UploadInput for a Uploader using
 // the specified path and reader.
-func (uploader *Uploader) createUploadInput(path string, reader io.Reader) *s3manager.UploadInput {
+func (uploader *Uploader) CreateUploadInput(path string, reader io.Reader) *s3manager.UploadInput {
 	uploadInput := &s3manager.UploadInput{
-		Bucket:       aws.String(uploader.bucket),
+		Bucket:       uploader.UploadingLocation.Bucket,
 		Key:          aws.String(path),
 		Body:         reader,
 		StorageClass: aws.String(uploader.StorageClass),

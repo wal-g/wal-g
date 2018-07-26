@@ -13,7 +13,7 @@ import (
 )
 
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
-func HandleWALPrefetch(pre *S3Prefix, walFileName string, location string) {
+func HandleWALPrefetch(pre *S3Folder, walFileName string, location string) {
 	var fileName = walFileName
 	var err error
 	location = path.Dir(location)
@@ -28,12 +28,12 @@ func HandleWALPrefetch(pre *S3Prefix, walFileName string, location string) {
 		time.Sleep(10 * time.Millisecond) // ramp up in order
 	}
 
-	go cleanupPrefetchDirectories(walFileName, location, FileSystemCleaner{})
+	go CleanupPrefetchDirectories(walFileName, location, FileSystemCleaner{})
 
 	wg.Wait()
 }
 
-func prefetchFile(location string, pre *S3Prefix, walFileName string, wg *sync.WaitGroup) {
+func prefetchFile(location string, pre *S3Folder, walFileName string, wg *sync.WaitGroup) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Prefetch unsuccessful ", walFileName, r)
@@ -41,7 +41,7 @@ func prefetchFile(location string, pre *S3Prefix, walFileName string, wg *sync.W
 		wg.Done()
 	}()
 
-	_, runningLocation, oldPath, newPath := getPrefetchLocations(location, walFileName)
+	_, runningLocation, oldPath, newPath := GetPrefetchLocations(location, walFileName)
 	_, errO := os.Stat(oldPath)
 	_, errN := os.Stat(newPath)
 
@@ -64,7 +64,7 @@ func prefetchFile(location string, pre *S3Prefix, walFileName string, wg *sync.W
 	}
 }
 
-func getPrefetchLocations(location string, walFileName string) (prefetchLocation string, runningLocation string, runningFile string, fetchedFile string) {
+func GetPrefetchLocations(location string, walFileName string) (prefetchLocation string, runningLocation string, runningFile string, fetchedFile string) {
 	prefetchLocation = path.Join(location, ".wal-g", "prefetch")
 	runningLocation = path.Join(prefetchLocation, "running")
 	oldPath := path.Join(runningLocation, walFileName)
@@ -117,13 +117,13 @@ func (c FileSystemCleaner) Remove(file string) {
 	os.Remove(file)
 }
 
-func cleanupPrefetchDirectories(walFileName string, location string, cleaner Cleaner) {
+func CleanupPrefetchDirectories(walFileName string, location string, cleaner Cleaner) {
 	timelineId, logSegNo, err := ParseWALFileName(walFileName)
 	if err != nil {
 		log.Println("WAL-prefetch cleanup failed: ", err, " file: ", walFileName)
 		return
 	}
-	prefetchLocation, runningLocation, _, _ := getPrefetchLocations(location, walFileName)
+	prefetchLocation, runningLocation, _, _ := GetPrefetchLocations(location, walFileName)
 	cleanupPrefetchDirectory(prefetchLocation, timelineId, logSegNo, cleaner)
 	cleanupPrefetchDirectory(runningLocation, timelineId, logSegNo, cleaner)
 }

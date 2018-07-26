@@ -66,19 +66,6 @@ func allZero(s []byte) bool {
 	return true
 }
 
-func contains(s *[]string, e string) bool {
-	//AB: Go is sick
-	if s == nil {
-		return false
-	}
-	for _, a := range *s {
-		if a == e {
-			return true
-		}
-	}
-	return false
-}
-
 func sanitizePath(path string) string {
 	return strings.TrimLeft(path, "/")
 }

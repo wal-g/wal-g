@@ -10,7 +10,7 @@ import (
 // Archive contains information associated with
 // a WAL archive.
 type Archive struct {
-	Prefix  *S3Prefix
+	Prefix  *S3Folder
 	Archive *string
 }
 
@@ -21,7 +21,7 @@ func (archive *Archive) CheckExistence() (bool, error) {
 		Key:    archive.Archive,
 	}
 
-	_, err := archive.Prefix.Svc.HeadObject(arch)
+	_, err := archive.Prefix.S3API.HeadObject(arch)
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
 			switch awsErr.Code() {
@@ -42,7 +42,7 @@ func (archive *Archive) GetETag() (*string, error) {
 		Key:    archive.Archive,
 	}
 
-	h, err := archive.Prefix.Svc.HeadObject(arch)
+	h, err := archive.Prefix.S3API.HeadObject(arch)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (archive *Archive) GetArchive() (io.ReadCloser, error) {
 		Key:    archive.Archive,
 	}
 
-	newArchive, err := archive.Prefix.Svc.GetObject(input)
+	newArchive, err := archive.Prefix.S3API.GetObject(input)
 	if err != nil {
 		return nil, errors.Wrap(err, "GetArchive: s3.GetObject failed")
 	}

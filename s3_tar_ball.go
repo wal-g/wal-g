@@ -70,18 +70,18 @@ func (tarBall *S3TarBall) AwaitUploads() {
 // a compressed tar member is finished writing.
 func (tarBall *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteCloser {
 	pipeReader, pipeWriter := io.Pipe()
-	tarUploader := tarBall.tarUploader
+	uploader := tarBall.tarUploader
 
-	path := tarUploader.server + BaseBackupsPath + tarBall.backupName + "/tar_partitions/" + name
-	input := tarUploader.createUploadInput(path, pipeReader)
+	path := *uploader.UploadingLocation.Server + BaseBackupsPath + tarBall.backupName + "/tar_partitions/" + name
+	input := uploader.CreateUploadInput(path, pipeReader)
 
 	fmt.Printf("Starting part %d ...\n", tarBall.partCount)
 
-	tarUploader.waitGroup.Add(1)
+	uploader.waitGroup.Add(1)
 	go func() {
-		defer tarUploader.waitGroup.Done()
+		defer uploader.waitGroup.Done()
 
-		err := tarUploader.upload(input, path)
+		err := uploader.upload(input, path)
 		if compressingError, ok := err.(CompressingPipeWriterError); ok {
 			log.Printf("FATAL: could not upload '%s' due to compression error\n%+v\n", path, compressingError)
 		}
@@ -99,10 +99,10 @@ func (tarBall *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteClos
 			log.Fatal("upload: encryption error ", err)
 		}
 
-		return &CascadeWriteCloser{tarUploader.compressor.NewWriter(encryptedWriter), &CascadeWriteCloser{encryptedWriter, pipeWriter}}
+		return &CascadeWriteCloser{uploader.compressor.NewWriter(encryptedWriter), &CascadeWriteCloser{encryptedWriter, pipeWriter}}
 	}
 
-	return &CascadeWriteCloser{tarUploader.compressor.NewWriter(pipeWriter), pipeWriter}
+	return &CascadeWriteCloser{uploader.compressor.NewWriter(pipeWriter), pipeWriter}
 }
 
 func (tarBall *S3TarBall) GetFileRelPath(fileAbsPath string) string {
@@ -131,53 +131,53 @@ func (tarBall *S3TarBall) FileExtension() string {
 func (tarBall *S3TarBall) Finish(sentinelDto *S3TarBallSentinelDto) error {
 	var err error
 	name := tarBall.backupName + "_backup_stop_sentinel.json"
-	tarUploader := tarBall.tarUploader
+	uploader := tarBall.tarUploader
 
-	tarUploader.Finish()
+	uploader.Finish()
 
 	//If other parts are successful in uploading, upload json file.
-	if tarUploader.Success && sentinelDto != nil {
+	if uploader.Success && sentinelDto != nil {
 		sentinelDto.UserData = GetSentinelUserData()
 		dtoBody, err := json.Marshal(*sentinelDto)
 		if err != nil {
 			return err
 		}
-		path := tarUploader.server + BaseBackupsPath + name
+		path := *uploader.UploadingLocation.Server + BaseBackupsPath + name
 		input := &s3manager.UploadInput{
-			Bucket:       aws.String(tarUploader.bucket),
+			Bucket:       uploader.UploadingLocation.Bucket,
 			Key:          aws.String(path),
 			Body:         bytes.NewReader(dtoBody),
-			StorageClass: aws.String(tarUploader.StorageClass),
+			StorageClass: aws.String(uploader.StorageClass),
 		}
 
-		if tarUploader.ServerSideEncryption != "" {
-			input.ServerSideEncryption = aws.String(tarUploader.ServerSideEncryption)
+		if uploader.ServerSideEncryption != "" {
+			input.ServerSideEncryption = aws.String(uploader.ServerSideEncryption)
 
-			if tarUploader.SSEKMSKeyId != "" {
+			if uploader.SSEKMSKeyId != "" {
 				// Only aws:kms implies sseKmsKeyId, checked during validation
-				input.SSEKMSKeyId = aws.String(tarUploader.SSEKMSKeyId)
+				input.SSEKMSKeyId = aws.String(uploader.SSEKMSKeyId)
 			}
 		}
 
-		tarUploader.waitGroup.Add(1)
+		uploader.waitGroup.Add(1)
 		go func() {
-			defer tarUploader.waitGroup.Done()
+			defer uploader.waitGroup.Done()
 
-			e := tarUploader.upload(input, path)
+			e := uploader.upload(input, path)
 			if e != nil {
 				log.Printf("upload: could not upload '%s'\n", path)
 				log.Fatalf("S3TarBall Finish: json failed to upload")
 			}
 		}()
 
-		tarUploader.Finish()
+		uploader.Finish()
 	} else {
 		log.Printf("Uploaded %d compressed tar Files.\n", tarBall.partCount)
 		log.Printf("Sentinel was not uploaded %v", name)
 		return errors.New("Sentinel was not uploaded due to timeline change during backup")
 	}
 
-	if err == nil && tarUploader.Success {
+	if err == nil && uploader.Success {
 		fmt.Printf("Uploaded %d compressed tar Files.\n", tarBall.partCount)
 	}
 	return err

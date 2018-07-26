@@ -36,12 +36,12 @@ type BgUploader struct {
 
 	mutex sync.Mutex
 
-	pre    *S3Prefix
+	pre    *S3Folder
 	verify bool
 }
 
 // Start up checking what's inside archive_status
-func (uploader *BgUploader) Start(walFilePath string, maxParallelWorkers int32, tu *Uploader, pre *S3Prefix, verify bool) {
+func (uploader *BgUploader) Start(walFilePath string, maxParallelWorkers int32, tu *Uploader, pre *S3Folder, verify bool) {
 	if maxParallelWorkers < 1 {
 		return // Nothing to start
 	}

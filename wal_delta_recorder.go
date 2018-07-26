@@ -13,7 +13,7 @@ const WalFileInDelta uint64 = 16
 type WalDeltaRecorder struct {
 	deltaFile            *os.File
 	recordingWalFilename string
-	s3Prefix             *S3Prefix
+	s3Prefix             *S3Folder
 	uploader             *Uploader
 }
 
@@ -33,7 +33,7 @@ func (recorder *WalDeltaRecorder) Close() error {
 	return nil
 }
 
-func NewWalDeltaRecorder(walFilename string, s3Prefix *S3Prefix, uploader *Uploader) (*WalDeltaRecorder, error) {
+func NewWalDeltaRecorder(walFilename string, s3Prefix *S3Folder, uploader *Uploader) (*WalDeltaRecorder, error) {
 	deltaFile, err := openDeltaFileFor(walFilename)
 	if err != nil {
 		return nil, err

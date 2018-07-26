@@ -17,14 +17,13 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/pkg/errors"
-	"sync"
 )
 
 var PgControlMissingError = errors.New("Corrupted backup: missing pg_control")
 var InvalidWalFileMagicError = errors.New("WAL-G: WAL file magic is invalid ")
 
 // HandleDelete is invoked to perform wal-g delete
-func HandleDelete(pre *S3Prefix, args []string) {
+func HandleDelete(pre *S3Folder, args []string) {
 	arguments := ParseDeleteArguments(args, printDeleteUsageAndFail)
 
 	var backup = &Backup{
@@ -32,25 +31,25 @@ func HandleDelete(pre *S3Prefix, args []string) {
 		Path:   GetBackupPath(pre),
 	}
 
-	if arguments.before {
-		if arguments.beforeTime == nil {
-			deleteBeforeTarget(arguments.target, backup, pre, arguments.findFull, nil, arguments.dryrun)
+	if arguments.Before {
+		if arguments.BeforeTime == nil {
+			deleteBeforeTarget(arguments.Target, backup, pre, arguments.FindFull, nil, arguments.dryrun)
 		} else {
 			backups, err := backup.GetBackups()
 			if err != nil {
 				log.Fatal(err)
 			}
 			for _, b := range backups {
-				if b.Time.Before(*arguments.beforeTime) {
-					deleteBeforeTarget(b.Name, backup, pre, arguments.findFull, backups, arguments.dryrun)
+				if b.Time.Before(*arguments.BeforeTime) {
+					deleteBeforeTarget(b.Name, backup, pre, arguments.FindFull, backups, arguments.dryrun)
 					return
 				}
 			}
-			log.Println("No backups before ", *arguments.beforeTime)
+			log.Println("No backups before ", *arguments.BeforeTime)
 		}
 	}
-	if arguments.retain {
-		backupCount, err := strconv.Atoi(arguments.target)
+	if arguments.Retain {
+		backupCount, err := strconv.Atoi(arguments.Target)
 		if err != nil {
 			log.Fatal("Unable to parse number of backups: ", err)
 		}
@@ -58,7 +57,7 @@ func HandleDelete(pre *S3Prefix, args []string) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if arguments.full {
+		if arguments.Full {
 			if len(backups) <= backupCount {
 				fmt.Printf("Have only %v backups.\n", backupCount)
 			}
@@ -78,15 +77,15 @@ func HandleDelete(pre *S3Prefix, args []string) {
 			if len(backups) <= backupCount {
 				fmt.Printf("Have only %v backups.\n", backupCount)
 			} else {
-				arguments.target = backups[backupCount-1].Name
-				deleteBeforeTarget(arguments.target, backup, pre, arguments.findFull, nil, arguments.dryrun)
+				arguments.Target = backups[backupCount-1].Name
+				deleteBeforeTarget(arguments.Target, backup, pre, arguments.FindFull, nil, arguments.dryrun)
 			}
 		}
 	}
 }
 
 // HandleBackupList is invoked to perform wal-g backup-list
-func HandleBackupList(pre *S3Prefix) {
+func HandleBackupList(pre *S3Folder) {
 	var backup = &Backup{
 		Prefix: pre,
 		Path:   GetBackupPath(pre),
@@ -107,7 +106,7 @@ func HandleBackupList(pre *S3Prefix) {
 }
 
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
-func HandleBackupFetch(backupName string, pre *S3Prefix, archiveDirectory string, mem bool) (lsn *uint64) {
+func HandleBackupFetch(backupName string, pre *S3Folder, archiveDirectory string, mem bool) (lsn *uint64) {
 	archiveDirectory = ResolveSymlink(archiveDirectory)
 	lsn = deltaFetchRecursion(backupName, pre, archiveDirectory)
 
@@ -124,7 +123,7 @@ func HandleBackupFetch(backupName string, pre *S3Prefix, archiveDirectory string
 }
 
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
-func deltaFetchRecursion(backupName string, pre *S3Prefix, archiveDirectory string) (lsn *uint64) {
+func deltaFetchRecursion(backupName string, pre *S3Folder, archiveDirectory string) (lsn *uint64) {
 	var backup *Backup
 	// Check if backup exists and if it does extract to archiveDirectory.
 	if backupName != "LATEST" {
@@ -170,7 +169,7 @@ func deltaFetchRecursion(backupName string, pre *S3Prefix, archiveDirectory stri
 	return
 }
 
-func extractPgControl(backup *Backup, pre *S3Prefix, fileTarInterpreter *FileTarInterpreter) error {
+func extractPgControl(backup *Backup, pre *S3Folder, fileTarInterpreter *FileTarInterpreter) error {
 	// Extract pg_control last. If pg_control does not exist, program exits with error code 1.
 	for _, decompressor := range Decompressors {
 		name := *backup.Path + *backup.Name + "/tar_partitions/pg_control.tar." + decompressor.FileExtension()
@@ -203,7 +202,7 @@ func extractPgControl(backup *Backup, pre *S3Prefix, fileTarInterpreter *FileTar
 }
 
 // Do the job of unpacking Backup object
-func unwrapBackup(backup *Backup, archiveDirectory string, pre *S3Prefix, sentinelDto S3TarBallSentinelDto) {
+func unwrapBackup(backup *Backup, archiveDirectory string, pre *S3Folder, sentinelDto S3TarBallSentinelDto) {
 
 	incrementBase := path.Join(archiveDirectory, "increment_base")
 	if !sentinelDto.IsIncremental() {
@@ -327,7 +326,7 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 }
 
 // HandleBackupPush is invoked to perform a wal-g backup-push
-func HandleBackupPush(archiveDirectory string, tarUploader *Uploader, pre *S3Prefix) {
+func HandleBackupPush(archiveDirectory string, uploader *Uploader, pre *S3Folder) {
 	archiveDirectory = ResolveSymlink(archiveDirectory)
 	maxDeltas, fromFull := getDeltaConfig()
 
@@ -368,15 +367,7 @@ func HandleBackupPush(archiveDirectory string, tarUploader *Uploader, pre *S3Pre
 		}
 	}
 
-	bundle := &Bundle{
-		MinSize:            int64(1000000000), //MINSIZE = 1GB
-		IncrementFromLsn:   sentinelDto.LSN,
-		IncrementFromFiles: sentinelDto.Files,
-		Files:              &sync.Map{},
-	}
-	if sentinelDto.Files == nil {
-		bundle.IncrementFromFiles = make(map[string]BackupFileDescription)
-	}
+	bundle := NewBundle(sentinelDto.LSN, sentinelDto.Files)
 
 	// Connect to postgres and start/finish a nonexclusive backup.
 	conn, err := Connect()
@@ -396,7 +387,7 @@ func HandleBackupPush(archiveDirectory string, tarUploader *Uploader, pre *S3Pre
 	bundle.TarBallMaker = &S3TarBallMaker{
 		ArchiveDirectory: archiveDirectory,
 		BackupName:       backupName,
-		TarUploader:      tarUploader,
+		TarUploader:      uploader,
 		Lsn:              &lsn,
 		IncrementFromLsn: sentinelDto.LSN,
 		IncrementFrom:    latest,
@@ -453,13 +444,13 @@ func HandleBackupPush(archiveDirectory string, tarUploader *Uploader, pre *S3Pre
 }
 
 // HandleWALFetch is invoked to performa wal-g wal-fetch
-func HandleWALFetch(pre *S3Prefix, walFileName string, location string, triggerPrefetch bool) {
+func HandleWALFetch(pre *S3Folder, walFileName string, location string, triggerPrefetch bool) {
 	location = ResolveSymlink(location)
 	if triggerPrefetch {
 		defer forkPrefetch(walFileName, location)
 	}
 
-	_, _, running, prefetched := getPrefetchLocations(path.Dir(location), walFileName)
+	_, _, running, prefetched := GetPrefetchLocations(path.Dir(location), walFileName)
 	seenSize := int64(-1)
 
 	for {
@@ -524,7 +515,7 @@ func checkWALFileMagic(prefetched string) error {
 	return nil
 }
 
-func tryDownloadWALFile(pre *S3Prefix, walFullPath string) (archiveReader io.ReadCloser, exists bool, err error) {
+func tryDownloadWALFile(pre *S3Folder, walFullPath string) (archiveReader io.ReadCloser, exists bool, err error) {
 	archive := &Archive{
 		Prefix:  pre,
 		Archive: aws.String(sanitizePath(walFullPath)),
@@ -562,7 +553,7 @@ func decompressWALFile(archiveReader io.ReadCloser, dstLocation string, decompre
 }
 
 // DownloadAndDecompressWALFile downloads a file and writes it to local file
-func DownloadAndDecompressWALFile(pre *S3Prefix, walFileName string, dstLocation string) {
+func DownloadAndDecompressWALFile(pre *S3Folder, walFileName string, dstLocation string) {
 	for _, decompressor := range Decompressors {
 		archiveReader, exists, err := tryDownloadWALFile(pre, *pre.Server+WalPath+walFileName+"."+decompressor.FileExtension())
 		if err != nil {
@@ -581,7 +572,7 @@ func DownloadAndDecompressWALFile(pre *S3Prefix, walFileName string, dstLocation
 }
 
 // HandleWALPush is invoked to perform wal-g wal-push
-func HandleWALPush(tarUploader *Uploader, walFilePath string, pre *S3Prefix, verify bool) {
+func HandleWALPush(tarUploader *Uploader, walFilePath string, pre *S3Folder, verify bool) {
 	bgUploader := BgUploader{}
 	// Look for new WALs while doing main upload
 	bgUploader.Start(walFilePath, int32(getMaxUploadConcurrency(16)-1), tarUploader, pre, verify)
@@ -592,7 +583,7 @@ func HandleWALPush(tarUploader *Uploader, walFilePath string, pre *S3Prefix, ver
 }
 
 // UploadWALFile from FS to the cloud
-func UploadWALFile(tarUploader *Uploader, walFilePath string, pre *S3Prefix, verify bool) {
+func UploadWALFile(tarUploader *Uploader, walFilePath string, pre *S3Folder, verify bool) {
 	walFile, err := os.Open(walFilePath)
 	if err != nil {
 		log.Fatalf("upload: could not open '%s'\n", walFilePath)
