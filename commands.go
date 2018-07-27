@@ -598,6 +598,19 @@ func HandleWALPush(tarUploader *TarUploader, dirArc string, pre *S3Prefix, verif
 
 // UploadWALFile from FS to the cloud
 func UploadWALFile(tarUploader *TarUploader, dirArc string, pre *S3Prefix, verify bool) {
+	archive := &Archive{
+		Prefix:  pre,
+		Archive: aws.String(sanitizePath(tarUploader.server + WalPath + filepath.Base(dirArc) + "." + tarUploader.compressor.FileExtension())),
+	}
+
+	exists, err := archive.CheckExistence()
+	if err != nil {
+		log.Fatalf("FATAL %+v\n", err)
+	}
+	if exists {
+		log.Fatalf("FATAL WAL file '%s' already archived, not overwriting", dirArc)
+	}
+
 	path, err := tarUploader.UploadWal(dirArc, pre, verify)
 	if re, ok := err.(CompressingPipeWriterError); ok {
 		log.Fatalf("FATAL: could not upload '%s' due to compression error.\n%+v\n", path, re)
