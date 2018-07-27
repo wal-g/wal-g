@@ -15,6 +15,6 @@ func NewZstdReaderFromWriter(dst io.Writer) *ZstdReaderFromWriter {
 }
 
 func (writer *ZstdReaderFromWriter) ReadFrom(reader io.Reader) (n int64, err error) {
-	n, err = readFrom(writer, reader)
+	n, err = fastCopy(writer, reader)
 	return
 }

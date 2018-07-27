@@ -9,11 +9,11 @@ import (
 type LzmaDecompressor struct{}
 
 func (decompressor LzmaDecompressor) Decompress(dst io.Writer, src io.Reader) error {
-	lzReader, err := lzma.NewReader(src)
+	lzReader, err := lzma.NewReader(NewUntilEofReader(src))
 	if err != nil {
 		return errors.Wrap(err, "DecompressLzma: lzma reader creation failed")
 	}
-	_, err = io.Copy(dst, lzReader)
+	_, err = fastCopy(dst, lzReader)
 	return err
 }
 
