@@ -84,6 +84,9 @@ func TestBackgroundNoOverwriteWALUpload(t *testing.T) {
 		t.Error("did not exit from not overwriting")
 	}
 
+	// Here we start this test in separate process to verify panic
+	// We cannot just call it and recovery since panic is handled in async goroutine
+	// One day we sill replace all panics with error handling, until then this is OK
 	cmd := exec.Command(os.Args[0], "-test.run=TestBackgroundNoOverwriteWALUpload")
 	cmd.Env = append(os.Environ(), "NO_OVERWRITE_TEST=1")
 	err := cmd.Run()
