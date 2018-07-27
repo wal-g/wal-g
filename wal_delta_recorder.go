@@ -13,7 +13,6 @@ const WalFileInDelta uint64 = 16
 type WalDeltaRecorder struct {
 	deltaFile            *os.File
 	recordingWalFilename string
-	s3Prefix             *S3Folder
 	uploader             *Uploader
 }
 
@@ -33,12 +32,12 @@ func (recorder *WalDeltaRecorder) Close() error {
 	return nil
 }
 
-func NewWalDeltaRecorder(walFilename string, s3Prefix *S3Folder, uploader *Uploader) (*WalDeltaRecorder, error) {
+func NewWalDeltaRecorder(walFilename string, uploader *Uploader) (*WalDeltaRecorder, error) {
 	deltaFile, err := openDeltaFileFor(walFilename)
 	if err != nil {
 		return nil, err
 	}
-	return &WalDeltaRecorder{deltaFile, walFilename, s3Prefix, uploader}, nil
+	return &WalDeltaRecorder{deltaFile, walFilename, uploader}, nil
 }
 
 func (recorder *WalDeltaRecorder) recordWalDelta(records []walparser.XLogRecord) error {
@@ -59,7 +58,7 @@ func (recorder *WalDeltaRecorder) CloseAfterErr() {
 func (recorder *WalDeltaRecorder) sendDeltaToS3(locations []walparser.BlockLocation) error {
 	var buffer bytes.Buffer
 	WriteLocationsTo(&buffer, locations)
-	_, err := recorder.uploader.UploadWal(&NamedReaderImpl{&buffer, recorder.deltaFile.Name()}, recorder.s3Prefix, false)
+	_, err := recorder.uploader.UploadWal(&NamedReaderImpl{&buffer, recorder.deltaFile.Name()}, false)
 	return err
 }
 

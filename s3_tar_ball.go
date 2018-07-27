@@ -21,7 +21,7 @@ type S3TarBall struct {
 	size             int64
 	writeCloser      io.WriteCloser
 	tarWriter        *tar.Writer
-	tarUploader      *Uploader
+	uploader         *Uploader
 	Lsn              *uint64
 	IncrementFromLsn *uint64
 	IncrementFrom    string
@@ -63,14 +63,14 @@ func (tarBall *S3TarBall) CloseTar() error {
 	return nil
 }
 func (tarBall *S3TarBall) AwaitUploads() {
-	tarBall.tarUploader.waitGroup.Wait()
+	tarBall.uploader.waitGroup.Wait()
 }
 
 // StartUpload creates a compressing writer and runs upload in the background once
 // a compressed tar member is finished writing.
 func (tarBall *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteCloser {
 	pipeReader, pipeWriter := io.Pipe()
-	uploader := tarBall.tarUploader
+	uploader := tarBall.uploader
 
 	path := *uploader.UploadingLocation.Server + BaseBackupsPath + tarBall.backupName + "/tar_partitions/" + name
 	input := uploader.CreateUploadInput(path, pipeReader)
@@ -120,7 +120,7 @@ func (tarBall *S3TarBall) AddSize(i int64) { tarBall.size += i }
 func (tarBall *S3TarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
 
 func (tarBall *S3TarBall) FileExtension() string {
-	return tarBall.tarUploader.compressor.FileExtension()
+	return tarBall.uploader.compressor.FileExtension()
 }
 
 // Finish writes a .json file description and uploads it with the
@@ -131,7 +131,7 @@ func (tarBall *S3TarBall) FileExtension() string {
 func (tarBall *S3TarBall) Finish(sentinelDto *S3TarBallSentinelDto) error {
 	var err error
 	name := tarBall.backupName + "_backup_stop_sentinel.json"
-	uploader := tarBall.tarUploader
+	uploader := tarBall.uploader
 
 	uploader.Finish()
 

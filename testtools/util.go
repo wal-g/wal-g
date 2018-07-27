@@ -41,6 +41,10 @@ func NewLz4CompressingPipeWriter(input io.Reader) *walg.CompressingPipeWriter {
 	}
 }
 
+func NewMockS3Folder(s3ClientErr, s3ClientNotFound bool) *walg.S3Folder {
+	return walg.NewS3Folder(NewMockS3Client(s3ClientErr, s3ClientNotFound), "mock bucket", "mock server")
+}
+
 func Contains(s *[]string, e string) bool {
 	//AB: Go is sick
 	if s == nil {

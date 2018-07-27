@@ -89,7 +89,7 @@ func main() {
 		bundle.TarBallMaker = &walg.S3TarBallMaker{
 			ArchiveDirectory: in,
 			BackupName:       n,
-			TarUploader:      tu,
+			Uploader:         tu,
 		}
 
 		bundle.NewTarBall(false)

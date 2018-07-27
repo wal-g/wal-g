@@ -22,11 +22,11 @@ func (readerMaker *S3ReaderMaker) Path() string { return *readerMaker.Key }
 // Reader creates a new S3 reader for each S3 object.
 func (readerMaker *S3ReaderMaker) Reader() (io.ReadCloser, error) {
 	input := &s3.GetObjectInput{
-		Bucket: readerMaker.Backup.Prefix.Bucket,
+		Bucket: readerMaker.Backup.Folder.Bucket,
 		Key:    readerMaker.Key,
 	}
 
-	rdr, err := readerMaker.Backup.Prefix.S3API.GetObject(input)
+	rdr, err := readerMaker.Backup.Folder.S3API.GetObject(input)
 	if err != nil {
 		return nil, errors.Wrap(err, "S3 Reader: s3.GetObject failed")
 	}

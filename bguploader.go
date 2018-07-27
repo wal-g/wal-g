@@ -29,45 +29,43 @@ type BgUploader struct {
 	started map[string]interface{}
 
 	// uploading structure
-	tarUploader *Uploader
+	uploader *Uploader
 
 	// to control amount of work done in one cycle of archive_comand
 	totalUploaded int32
 
 	mutex sync.Mutex
 
-	pre    *S3Folder
 	verify bool
 }
 
 // Start up checking what's inside archive_status
-func (uploader *BgUploader) Start(walFilePath string, maxParallelWorkers int32, tu *Uploader, pre *S3Folder, verify bool) {
+func (bgUploader *BgUploader) Start(walFilePath string, maxParallelWorkers int32, uploader *Uploader, verify bool) {
 	if maxParallelWorkers < 1 {
 		return // Nothing to start
 	}
 	// prepare state
-	uploader.tarUploader = tu
-	uploader.maxParallelWorkers = maxParallelWorkers
-	uploader.dir = filepath.Dir(walFilePath)
-	uploader.started = make(map[string]interface{})
-	uploader.started[filepath.Base(walFilePath)+readySuffix] = walFilePath
-	uploader.pre = pre
-	uploader.verify = verify
+	bgUploader.uploader = uploader
+	bgUploader.maxParallelWorkers = maxParallelWorkers
+	bgUploader.dir = filepath.Dir(walFilePath)
+	bgUploader.started = make(map[string]interface{})
+	bgUploader.started[filepath.Base(walFilePath)+readySuffix] = walFilePath
+	bgUploader.verify = verify
 
 	// This goroutine will spawn new if necessary
-	go scanOnce(uploader)
+	go scanOnce(bgUploader)
 }
 
 // Stop pipeline
-func (uploader *BgUploader) Stop() {
-	for atomic.LoadInt32(&uploader.parallelWorkers) != 0 {
+func (bgUploader *BgUploader) Stop() {
+	for atomic.LoadInt32(&bgUploader.parallelWorkers) != 0 {
 		time.Sleep(50 * time.Millisecond)
 	} // Wait until noone works
 
-	uploader.mutex.Lock()
-	defer uploader.mutex.Unlock()
-	atomic.StoreInt32(&uploader.maxParallelWorkers, 0) // stop new jobs
-	uploader.running.Wait()                            // wait again for those how jumped to the closing door
+	bgUploader.mutex.Lock()
+	defer bgUploader.mutex.Unlock()
+	atomic.StoreInt32(&bgUploader.maxParallelWorkers, 0) // stop new jobs
+	bgUploader.running.Wait()                            // wait again for those how jumped to the closing door
 }
 
 var readySuffix = ".ready"
@@ -114,21 +112,21 @@ func haveNoSlots(u *BgUploader) bool {
 }
 
 // Upload one WAL file
-func (uploader *BgUploader) Upload(info os.FileInfo) {
+func (bgUploader *BgUploader) Upload(info os.FileInfo) {
 	walFilename := strings.TrimSuffix(info.Name(), readySuffix)
-	UploadWALFile(uploader.tarUploader.Clone(), filepath.Join(uploader.dir, walFilename), uploader.pre, uploader.verify)
+	UploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename), bgUploader.verify)
 
-	ready := filepath.Join(uploader.dir, archiveStatus, info.Name())
-	done := filepath.Join(uploader.dir, archiveStatus, walFilename+done)
+	ready := filepath.Join(bgUploader.dir, archiveStatus, info.Name())
+	done := filepath.Join(bgUploader.dir, archiveStatus, walFilename+done)
 	err := os.Rename(ready, done)
 	if err != nil {
 		log.Print("Error renaming .ready to .done: ", err)
 	}
 
-	atomic.AddInt32(&uploader.totalUploaded, 1)
+	atomic.AddInt32(&bgUploader.totalUploaded, 1)
 
-	scanOnce(uploader)
-	atomic.AddInt32(&uploader.parallelWorkers, -1)
+	scanOnce(bgUploader)
+	atomic.AddInt32(&bgUploader.parallelWorkers, -1)
 
-	uploader.running.Done()
+	bgUploader.running.Done()
 }

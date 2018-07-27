@@ -22,7 +22,7 @@ func TestS3TarBall(t *testing.T) {
 	bundle.TarBallMaker = &walg.S3TarBallMaker{
 		ArchiveDirectory: "/usr/local",
 		BackupName:       "test",
-		TarUploader:      testtools.NewLz4MockTarUploader(),
+		Uploader:         testtools.NewLz4MockTarUploader(),
 	}
 
 	bundle.NewTarBall(false)
@@ -65,12 +65,12 @@ func TestS3DependentFunctions(t *testing.T) {
 	}
 
 	tu := testtools.NewLz4MockTarUploader()
-	tu.UploaderApi = &mockS3Uploader{}
+	tu.UploaderApi = testtools.NewMockS3Uploader(false, false)
 
 	bundle.TarBallMaker = &walg.S3TarBallMaker{
 		ArchiveDirectory: "",
 		BackupName:       "mockBackup",
-		TarUploader:      tu,
+		Uploader:         tu,
 	}
 
 	bundle.NewTarBall(false)
@@ -128,12 +128,12 @@ func TestEmptyBundleQueue(t *testing.T) {
 	}
 
 	tu := testtools.NewLz4MockTarUploader()
-	tu.UploaderApi = &mockS3Uploader{}
+	tu.UploaderApi = testtools.NewMockS3Uploader(false, false)
 
 	bundle.TarBallMaker = &walg.S3TarBallMaker{
 		ArchiveDirectory: "",
 		BackupName:       "mockBackup",
-		TarUploader:      tu,
+		Uploader:         tu,
 	}
 
 	bundle.StartQueue()
@@ -173,11 +173,11 @@ func queueTest(t *testing.T) {
 		TarSizeThreshold: 100,
 	}
 	tu := testtools.NewLz4MockTarUploader()
-	tu.UploaderApi = &mockS3Uploader{}
+	tu.UploaderApi = testtools.NewMockS3Uploader(false, false)
 	bundle.TarBallMaker = &walg.S3TarBallMaker{
 		ArchiveDirectory: "",
 		BackupName:       "mockBackup",
-		TarUploader:      tu,
+		Uploader:         tu,
 	}
 
 	f := false

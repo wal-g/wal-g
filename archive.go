@@ -10,18 +10,18 @@ import (
 // Archive contains information associated with
 // a WAL archive.
 type Archive struct {
-	Prefix  *S3Folder
+	Folder  *S3Folder
 	Archive *string
 }
 
 // CheckExistence checks that the specified WAL file exists.
 func (archive *Archive) CheckExistence() (bool, error) {
 	arch := &s3.HeadObjectInput{
-		Bucket: archive.Prefix.Bucket,
+		Bucket: archive.Folder.Bucket,
 		Key:    archive.Archive,
 	}
 
-	_, err := archive.Prefix.S3API.HeadObject(arch)
+	_, err := archive.Folder.S3API.HeadObject(arch)
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
 			switch awsErr.Code() {
@@ -38,11 +38,11 @@ func (archive *Archive) CheckExistence() (bool, error) {
 // GetETag aquires ETag of the object from S3
 func (archive *Archive) GetETag() (*string, error) {
 	arch := &s3.HeadObjectInput{
-		Bucket: archive.Prefix.Bucket,
+		Bucket: archive.Folder.Bucket,
 		Key:    archive.Archive,
 	}
 
-	h, err := archive.Prefix.S3API.HeadObject(arch)
+	h, err := archive.Folder.S3API.HeadObject(arch)
 	if err != nil {
 		return nil, err
 	}
@@ -53,11 +53,11 @@ func (archive *Archive) GetETag() (*string, error) {
 // GetArchive downloads the specified archive from S3.
 func (archive *Archive) GetArchive() (io.ReadCloser, error) {
 	input := &s3.GetObjectInput{
-		Bucket: archive.Prefix.Bucket,
+		Bucket: archive.Folder.Bucket,
 		Key:    archive.Archive,
 	}
 
-	newArchive, err := archive.Prefix.S3API.GetObject(input)
+	newArchive, err := archive.Folder.S3API.GetObject(input)
 	if err != nil {
 		return nil, errors.Wrap(err, "GetArchive: s3.GetObject failed")
 	}

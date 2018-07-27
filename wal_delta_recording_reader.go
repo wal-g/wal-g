@@ -77,8 +77,8 @@ func (reader *WalDeltaRecordingReader) recordBlockNumbersFromRecords() error {
 	return reader.recorder.recordWalDelta(records)
 }
 
-func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, s3Prefix *S3Folder, uploader *Uploader) (*WalDeltaRecordingReader, error) {
-	walParser, recorder, err := tryOpenParserAndRecorder(walFilename, s3Prefix, uploader)
+func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, uploader *Uploader) (*WalDeltaRecordingReader, error) {
+	walParser, recorder, err := tryOpenParserAndRecorder(walFilename, uploader)
 	if err != nil {
 		deltaFileName, err1 := getDeltaFileNameFor(walFilename)
 		if err1 != nil {
@@ -94,12 +94,12 @@ func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, s3P
 	}, nil
 }
 
-func tryOpenParserAndRecorder(walFilename string, s3Prefix *S3Folder, uploader *Uploader) (*walparser.WalParser, *WalDeltaRecorder, error) {
+func tryOpenParserAndRecorder(walFilename string, uploader *Uploader) (*walparser.WalParser, *WalDeltaRecorder, error) {
 	walParser, err := loadWalParser()
 	if err != nil {
 		return nil, nil, err
 	}
-	recorder, err := NewWalDeltaRecorder(walFilename, s3Prefix, uploader)
+	recorder, err := NewWalDeltaRecorder(walFilename, uploader)
 	if err != nil {
 		return nil, nil, err
 	}

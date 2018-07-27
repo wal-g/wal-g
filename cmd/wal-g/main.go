@@ -133,9 +133,9 @@ func main() {
 		walg.HandleWALPrefetch(pre, firstArgument, backupName)
 	} else if command == "wal-push" {
 		// Upload a WAL file to S3.
-		walg.HandleWALPush(tarUploader, firstArgument, pre, verify)
+		walg.HandleWALPush(tarUploader, firstArgument, verify)
 	} else if command == "backup-push" {
-		walg.HandleBackupPush(firstArgument, tarUploader, pre)
+		walg.HandleBackupPush(firstArgument, tarUploader)
 	} else if command == "backup-fetch" {
 		walg.HandleBackupFetch(backupName, pre, firstArgument, mem)
 	} else if command == "backup-list" {

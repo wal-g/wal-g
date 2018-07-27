@@ -54,19 +54,19 @@ func main() {
 	Checkpoint()
 	WipeRestore()
 
-	Backup(tu, pre)
+	Backup(tu)
 	Bench()
 	sync := make(chan interface{})
 	go func() {
 		Bench()
 		sync <- struct{}{}
 	}()
-	Backup(tu, pre)
+	Backup(tu)
 	<-sync
 
 	Checkpoint()
 
-	Backup(tu, pre)
+	Backup(tu)
 
 	lsn := Fetch(pre)
 
@@ -95,8 +95,8 @@ func WipeRestore() {
 	}
 }
 
-func Fetch(pre *walg.S3Folder) *uint64 {
-	return walg.HandleBackupFetch("LATEST", pre, restoreDir, false)
+func Fetch(folder *walg.S3Folder) *uint64 {
+	return walg.HandleBackupFetch("LATEST", folder, restoreDir, false)
 }
 
 func Diff(lsn uint64) {
@@ -226,6 +226,7 @@ func SetupBench() {
 		fmt.Println(err)
 	}
 }
-func Backup(tu *walg.Uploader, pre *walg.S3Folder) {
-	walg.HandleBackupPush(baseDir, tu, pre)
+
+func Backup(uploader *walg.Uploader) {
+	walg.HandleBackupPush(baseDir, uploader)
 }

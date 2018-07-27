@@ -50,7 +50,7 @@ func findS3BucketRegion(bucket string, config *aws.Config) (string, error) {
 // WALE_S3_PREFIX
 //
 // Able to configure the upload part size in the S3 uploader.
-func Configure() (*Uploader, *S3Folder, error) {
+func Configure() (*Uploader, *S3Folder, error) { // TODO : add parameter naming
 	waleS3Prefix := os.Getenv("WALE_S3_PREFIX")
 	if waleS3Prefix == "" {
 		return nil, nil, &UnsetEnvVarError{names: []string{"WALE_S3_PREFIX"}}
@@ -119,9 +119,9 @@ func Configure() (*Uploader, *S3Folder, error) {
 		return nil, nil, errors.Wrap(err, "Configure: failed to create new session")
 	}
 
-	pre := NewS3Folder(s3.New(sess), bucket, server)
+	folder := NewS3Folder(s3.New(sess), bucket, server)
 
-	uploader := NewUploader(compressionMethod, pre)
+	uploader := NewUploader(compressionMethod, folder)
 
 	var con = getMaxUploadConcurrency(10)
 	storageClass, ok := os.LookupEnv("WALG_S3_STORAGE_CLASS")
@@ -144,9 +144,9 @@ func Configure() (*Uploader, *S3Folder, error) {
 		return nil, nil, errors.New("Configure: WALG_S3_SSE_KMS_ID must be set iff using aws:kms encryption")
 	}
 
-	uploader.UploaderApi = CreateUploader(pre.S3API, 20*1024*1024, con) //default 10 concurrency streams at 20MB
+	uploader.UploaderApi = CreateUploader(folder.S3API, 20*1024*1024, con) //default 10 concurrency streams at 20MB
 
-	return uploader, pre, err
+	return uploader, folder, err
 }
 
 // CreateUploader returns an uploader with customizable concurrency

@@ -64,12 +64,12 @@ func (uploader *Uploader) Clone() *Uploader {
 
 // UploadWal compresses a WAL file and uploads to S3. Returns
 // the first error encountered and an empty string upon failure.
-func (uploader *Uploader) UploadWal(file NamedReader, s3Prefix *S3Folder, verify bool) (string, error) {
+func (uploader *Uploader) UploadWal(file NamedReader, verify bool) (string, error) {
 	var walFileReader io.Reader
 
 	filename := path.Base(file.Name())
 	if isWalFilename(filename) {
-		recordingReader, err := NewWalDeltaRecordingReader(file, filename, s3Prefix, uploader.Clone())
+		recordingReader, err := NewWalDeltaRecordingReader(file, filename, uploader.Clone())
 		if err != nil {
 			walFileReader = file
 		} else {
@@ -108,7 +108,7 @@ func (uploader *Uploader) UploadWal(file NamedReader, s3Prefix *S3Folder, verify
 	if verify {
 		sum := reader.(*MD5Reader).Sum()
 		archive := &Archive{
-			Prefix:  s3Prefix,
+			Folder:  uploader.UploadingLocation,
 			Archive: aws.String(dstPath),
 		}
 		eTag, err := archive.GetETag()

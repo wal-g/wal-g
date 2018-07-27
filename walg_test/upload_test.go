@@ -140,7 +140,7 @@ func doConfigureWithBuсketPath(t *testing.T, bucketPath string, expectedServer 
 }
 
 func TestValidUploader(t *testing.T) {
-	mockSvc := NewMockS3Client(false, false)
+	mockSvc := testtools.NewMockS3Client(false, false)
 
 	tu := testtools.NewLz4MockTarUploader()
 	if tu == nil {
@@ -154,9 +154,7 @@ func TestValidUploader(t *testing.T) {
 }
 
 func TestUploadError(t *testing.T) {
-	mockUploader := &mockS3Uploader{
-		err: true,
-	}
+	mockUploader := testtools.NewMockS3Uploader(false, true)
 
 	tu := testtools.NewLz4MockTarUploader()
 	tu.UploaderApi = mockUploader
@@ -164,7 +162,7 @@ func TestUploadError(t *testing.T) {
 	maker := &walg.S3TarBallMaker{
 		ArchiveDirectory: "/usr/local",
 		BackupName:       "test",
-		TarUploader:      tu,
+		Uploader:         tu,
 	}
 
 	tarBall := maker.Make(true)
@@ -175,9 +173,7 @@ func TestUploadError(t *testing.T) {
 		t.Errorf("upload: expected to fail to upload successfully")
 	}
 
-	tu.UploaderApi = &mockS3Uploader{
-		multierr: true,
-	}
+	tu.UploaderApi = testtools.NewMockS3Uploader(true, false)
 
 	tarBall = maker.Make(true)
 	tarBall.SetUp(MockArmedCrypter())

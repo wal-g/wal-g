@@ -380,13 +380,13 @@ func TestWalk(t *testing.T) {
 
 	// Re-use generated data to test uploading WAL.
 	tu := testtools.NewLz4MockTarUploader()
-	tu.UploaderApi = &mockS3Uploader{}
+	tu.UploaderApi = testtools.NewMockS3Uploader(false, false)
 	walFileName := filepath.Join(data, "1")
 	walFile, err := os.Open(walFileName)
 	if err != nil {
 		t.Errorf("can't open file: %s", walFileName)
 	}
-	wal, err := tu.UploadWal(walFile, nil, false)
+	wal, err := tu.UploadWal(walFile, false)
 	if wal == "" {
 		t.Errorf("upload: expected wal path to be set but got ''")
 	}
