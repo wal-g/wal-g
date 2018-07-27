@@ -8,9 +8,9 @@ import (
 type ZstdDecompressor struct{}
 
 func (decompressor ZstdDecompressor) Decompress(dst io.Writer, src io.Reader) error {
-	lzReader := zstd.NewReader(src)
-	defer lzReader.Close()
-	_, err := io.Copy(dst, lzReader)
+	zstdReader := zstd.NewReader(NewUntilEofReader(src))
+	defer zstdReader.Close()
+	_, err := writeTo(dst, zstdReader)
 	return err
 }
 

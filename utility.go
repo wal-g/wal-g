@@ -164,20 +164,18 @@ func GetFileExtension(path string) string {
 	return ""
 }
 
-func readFrom(dst io.Writer, src io.Reader) (n int64, err error) {
+func writeTo(dst io.Writer, src io.Reader) (int64, error) {
+	n := int64(0)
 	buf := make([]byte, CompressedBlockMaxSize)
 	for {
-		m, er := io.ReadFull(src, buf)
-		n += int64(m)
-		if er == nil || er == io.ErrUnexpectedEOF || er == io.EOF {
-			if _, err = dst.Write(buf[:m]); err != nil {
-				return
-			}
-			if er == nil {
-				continue
-			}
-			return
+		m, readingErr := src.Read(buf)
+		if readingErr != nil && readingErr != io.EOF {
+			return n, readingErr
 		}
-		return n, er
+		m, writingErr := dst.Write(buf[:m])
+		n += int64(m)
+		if writingErr != nil || readingErr == io.EOF {
+			return n, writingErr
+		}
 	}
 }
