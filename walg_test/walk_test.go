@@ -336,7 +336,7 @@ func TestWalk(t *testing.T) {
 
 	bundle.StartQueue()
 	fmt.Println("Walking ...")
-	err = filepath.Walk(data, bundle.TarWalk)
+	err = filepath.Walk(data, bundle.HandleWalkedFSObject)
 	if err != nil {
 		t.Log(err)
 	}

@@ -6,8 +6,7 @@ import (
 	"io"
 )
 
-// S3ReaderMaker handles cases where backups need to be uploaded to
-// S3.
+// S3ReaderMaker creates readers for downloading from S3
 type S3ReaderMaker struct {
 	Backup     *Backup
 	Key        *string

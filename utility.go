@@ -167,7 +167,7 @@ func GetFileExtension(filePath string) string {
 	return ext
 }
 
-func GetFileRelPath(fileAbsPath string, directoryPath string) string {
+func GetFileRelativePath(fileAbsPath string, directoryPath string) string {
 	return strings.TrimPrefix(fileAbsPath, directoryPath)
 }
 

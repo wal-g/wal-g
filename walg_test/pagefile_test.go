@@ -41,20 +41,20 @@ func TestIncrementingFileSmallLSN(t *testing.T) {
 }
 
 func postgresFileTest(loclLSN uint64, t *testing.T) {
-	reader, isPaged, size, err := walg.TryReadDatabaseFile(pagedFileName, &loclLSN, false)
-	file, _ := os.Stat(pagedFileName)
+	fileInfo, err := os.Stat(pagedFileName)
+	if err != nil {
+		fmt.Print(err.Error())
+	}
+	reader, size, err := walg.ReadDatabaseFile(pagedFileName, fileInfo.Size(), loclLSN, nil)
 	if err != nil {
 		fmt.Print(err.Error())
 	}
 	buf, _ := ioutil.ReadAll(reader)
-	if !isPaged {
-		t.Error("Sample file is paged")
-	}
-	if loclLSN != 0 && int64(len(buf)) >= file.Size() {
+	if loclLSN != 0 && int64(len(buf)) >= fileInfo.Size() {
 		t.Error("Increment is too big")
 	}
 
-	if loclLSN == 0 && int64(len(buf)) <= file.Size() {
+	if loclLSN == 0 && int64(len(buf)) <= fileInfo.Size() {
 		t.Error("Increment is expected to be bigger than file")
 	}
 	// We also check that increment correctly predicted it's size

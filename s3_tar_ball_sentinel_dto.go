@@ -4,16 +4,16 @@ import "sync"
 
 // S3TarBallSentinelDto describes file structure of json sentinel
 type S3TarBallSentinelDto struct {
-	LSN               *uint64
+	BackupStartLSN    *uint64 `json:"LSN"`
 	IncrementFromLSN  *uint64 `json:"DeltaFromLSN,omitempty"`
 	IncrementFrom     *string `json:"DeltaFrom,omitempty"`
 	IncrementFullName *string `json:"DeltaFullName,omitempty"`
 	IncrementCount    *int    `json:"DeltaCount,omitempty"`
 
-	Files BackupFileList
+	Files BackupFileList `json:"Files"`
 
-	PgVersion int
-	FinishLSN *uint64
+	PgVersion       int     `json:"PgVersion"`
+	BackupFinishLSN *uint64 `json:"FinishLSN"`
 
 	UserData interface{} `json:"UserData,omitempty"`
 }

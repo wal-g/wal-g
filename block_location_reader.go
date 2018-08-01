@@ -4,11 +4,10 @@ import (
 	"github.com/wal-g/wal-g/walparser"
 	"github.com/wal-g/wal-g/walparser/parsingutil"
 	"io"
-	"os"
 )
 
 type BlockLocationReader struct {
-	deltaFile io.Reader
+	underlying io.Reader
 }
 
 func (reader *BlockLocationReader) readNextLocation() (*walparser.BlockLocation, error) {
@@ -19,7 +18,7 @@ func (reader *BlockLocationReader) readNextLocation() (*walparser.BlockLocation,
 		{Field: &location.RelationFileNode.RelNode, Name: "RelNode"},
 		{Field: &location.BlockNo, Name: "BlockNo"},
 	}
-	err := parsingutil.ParseMultipleFieldsFromReader(fields, reader.deltaFile)
+	err := parsingutil.ParseMultipleFieldsFromReader(fields, reader.underlying)
 	if err != nil {
 		return nil, err
 	}
@@ -38,14 +37,4 @@ func (reader *BlockLocationReader) readAllLocations() ([]walparser.BlockLocation
 		}
 		locations = append(locations, *location)
 	}
-}
-
-func readAllLocationsFromFile(filename string) ([]walparser.BlockLocation, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	reader := BlockLocationReader{file}
-	return reader.readAllLocations()
 }

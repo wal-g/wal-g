@@ -74,7 +74,7 @@ func (tarBall *FileTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error
 }
 
 func (tarBall *FileTarBall) GetFileRelPath(fileAbsPath string) string {
-	return walg.GetFileRelPath(fileAbsPath, tarBall.archiveDirectory)
+	return walg.GetFileRelativePath(fileAbsPath, tarBall.archiveDirectory)
 }
 func (tarBall *FileTarBall) ArchiveDirectory() string { return tarBall.archiveDirectory }
 func (tarBall *FileTarBall) Size() int64              { return tarBall.size }
@@ -99,7 +99,7 @@ func (tarBall *NOPTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error 
 }
 
 func (tarBall *NOPTarBall) GetFileRelPath(fileAbsPath string) string {
-	return walg.GetFileRelPath(fileAbsPath, tarBall.archiveDirectory)
+	return walg.GetFileRelativePath(fileAbsPath, tarBall.archiveDirectory)
 }
 func (tarBall *NOPTarBall) ArchiveDirectory() string { return tarBall.archiveDirectory }
 func (tarBall *NOPTarBall) Size() int64              { return tarBall.size }

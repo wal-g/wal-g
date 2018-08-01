@@ -6,9 +6,6 @@ type S3TarBallMaker struct {
 	ArchiveDirectory string
 	BackupName       string
 	Uploader         *Uploader
-	Lsn              *uint64
-	IncrementFromLsn *uint64
-	IncrementFrom    string
 }
 
 // Make returns a tarball with required S3 fields.
@@ -23,8 +20,5 @@ func (tarBallMaker *S3TarBallMaker) Make(dedicatedUploader bool) TarBall {
 		archiveDirectory: tarBallMaker.ArchiveDirectory,
 		backupName:       tarBallMaker.BackupName,
 		uploader:         uploader,
-		Lsn:              tarBallMaker.Lsn,
-		IncrementFromLsn: tarBallMaker.IncrementFromLsn,
-		IncrementFrom:    tarBallMaker.IncrementFrom,
 	}
 }

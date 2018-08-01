@@ -180,18 +180,15 @@ func queueTest(t *testing.T) {
 		Uploader:         tu,
 	}
 
-	f := false
-	tr := true
-	// For tests there must be at leaest 3 workers
+	// For tests there must be at least 3 workers
 
 	bundle.StartQueue()
 
 	a := bundle.Deque()
 	go func() {
 		time.Sleep(10 * time.Millisecond)
-		bundle.EnqueueBack(a, &tr)
 		time.Sleep(10 * time.Millisecond)
-		bundle.EnqueueBack(a, &f)
+		bundle.EnqueueBack(a)
 	}()
 
 	c := bundle.Deque()
@@ -203,7 +200,7 @@ func queueTest(t *testing.T) {
 	b := bundle.Deque()
 	go func() {
 		time.Sleep(10 * time.Millisecond)
-		bundle.EnqueueBack(b, &f)
+		bundle.EnqueueBack(b)
 	}()
 
 	err := bundle.FinishQueue()

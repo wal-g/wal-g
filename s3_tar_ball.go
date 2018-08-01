@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
 	"io"
 	"log"
@@ -22,10 +20,6 @@ type S3TarBall struct {
 	writeCloser      io.WriteCloser
 	tarWriter        *tar.Writer
 	uploader         *Uploader
-	Lsn              *uint64
-	IncrementFromLsn *uint64
-	IncrementFrom    string
-	Files            BackupFileList
 }
 
 // SetUp creates a new tar writer and starts upload to S3.
@@ -72,7 +66,7 @@ func (tarBall *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteClos
 	pipeReader, pipeWriter := io.Pipe()
 	uploader := tarBall.uploader
 
-	path := *uploader.UploadingLocation.Server + BaseBackupsPath + tarBall.backupName + "/tar_partitions/" + name
+	path := *uploader.UploadingFolder.Server + BaseBackupsPath + tarBall.backupName + "/tar_partitions/" + name
 	input := uploader.CreateUploadInput(path, pipeReader)
 
 	fmt.Printf("Starting part %d ...\n", tarBall.partCount)
@@ -106,7 +100,7 @@ func (tarBall *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteClos
 }
 
 func (tarBall *S3TarBall) GetFileRelPath(fileAbsPath string) string {
-	return GetFileRelPath(fileAbsPath, tarBall.archiveDirectory)
+	return GetFileRelativePath(fileAbsPath, tarBall.archiveDirectory)
 }
 
 func (tarBall *S3TarBall) ArchiveDirectory() string { return tarBall.archiveDirectory }
@@ -129,12 +123,12 @@ func (tarBall *S3TarBall) FileExtension() string {
 // if all other parts of the backup are present in S3.
 // an alert is given with the corresponding error.
 func (tarBall *S3TarBall) Finish(sentinelDto *S3TarBallSentinelDto) error {
-	var err error
 	name := tarBall.backupName + "_backup_stop_sentinel.json"
 	uploader := tarBall.uploader
 
 	uploader.Finish()
 
+	var err error
 	//If other parts are successful in uploading, upload json file.
 	if uploader.Success && sentinelDto != nil {
 		sentinelDto.UserData = GetSentinelUserData()
@@ -142,35 +136,14 @@ func (tarBall *S3TarBall) Finish(sentinelDto *S3TarBallSentinelDto) error {
 		if err != nil {
 			return err
 		}
-		path := *uploader.UploadingLocation.Server + BaseBackupsPath + name
-		input := &s3manager.UploadInput{
-			Bucket:       uploader.UploadingLocation.Bucket,
-			Key:          aws.String(path),
-			Body:         bytes.NewReader(dtoBody),
-			StorageClass: aws.String(uploader.StorageClass),
+		path := *uploader.UploadingFolder.Server + BaseBackupsPath + name
+		input := uploader.CreateUploadInput(path, bytes.NewReader(dtoBody))
+
+		uploadingErr := uploader.upload(input, path)
+		if uploadingErr != nil {
+			log.Printf("upload: could not upload '%s'\n", path)
+			log.Fatalf("S3TarBall Finish: json failed to upload")
 		}
-
-		if uploader.ServerSideEncryption != "" {
-			input.ServerSideEncryption = aws.String(uploader.ServerSideEncryption)
-
-			if uploader.SSEKMSKeyId != "" {
-				// Only aws:kms implies sseKmsKeyId, checked during validation
-				input.SSEKMSKeyId = aws.String(uploader.SSEKMSKeyId)
-			}
-		}
-
-		uploader.waitGroup.Add(1)
-		go func() {
-			defer uploader.waitGroup.Done()
-
-			e := uploader.upload(input, path)
-			if e != nil {
-				log.Printf("upload: could not upload '%s'\n", path)
-				log.Fatalf("S3TarBall Finish: json failed to upload")
-			}
-		}()
-
-		uploader.Finish()
 	} else {
 		log.Printf("Uploaded %d compressed tar Files.\n", tarBall.partCount)
 		log.Printf("Sentinel was not uploaded %v", name)

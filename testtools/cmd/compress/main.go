@@ -100,7 +100,7 @@ func main() {
 	bundle.StartQueue()
 	defer testtools.TimeTrack(time.Now(), "MAIN")
 	fmt.Println("Walking ...")
-	err = filepath.Walk(in, bundle.TarWalk)
+	err = filepath.Walk(in, bundle.HandleWalkedFSObject)
 	if err != nil {
 		panic(err)
 	}

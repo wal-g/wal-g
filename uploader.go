@@ -18,7 +18,7 @@ import (
 // in 'upload.go'.
 type Uploader struct {
 	UploaderApi          s3manageriface.UploaderAPI
-	UploadingLocation    *S3Folder
+	UploadingFolder      *S3Folder
 	ServerSideEncryption string
 	SSEKMSKeyId          string
 	StorageClass         string
@@ -32,10 +32,10 @@ type Uploader struct {
 // concurrency streams for the uploader.
 func NewUploader(compressionMethod string, uploadingLocation *S3Folder) *Uploader {
 	return &Uploader{
-		UploadingLocation: uploadingLocation,
-		StorageClass:      "STANDARD",
-		compressor:        Compressors[compressionMethod],
-		waitGroup:         &sync.WaitGroup{},
+		UploadingFolder: uploadingLocation,
+		StorageClass:    "STANDARD",
+		compressor:      Compressors[compressionMethod],
+		waitGroup:       &sync.WaitGroup{},
 	}
 }
 
@@ -52,7 +52,7 @@ func (uploader *Uploader) Finish() {
 func (uploader *Uploader) Clone() *Uploader {
 	return &Uploader{
 		uploader.UploaderApi,
-		uploader.UploadingLocation,
+		uploader.UploadingFolder,
 		uploader.ServerSideEncryption,
 		uploader.SSEKMSKeyId,
 		uploader.StorageClass,
@@ -87,7 +87,7 @@ func (uploader *Uploader) UploadWal(file NamedReader, verify bool) (string, erro
 
 	pipeWriter.Compress(&OpenPGPCrypter{})
 
-	dstPath := sanitizePath(*uploader.UploadingLocation.Server + WalPath + filepath.Base(file.Name()) + "." + uploader.compressor.FileExtension())
+	dstPath := sanitizePath(*uploader.UploadingFolder.Server + WalPath + filepath.Base(file.Name()) + "." + uploader.compressor.FileExtension())
 	reader := pipeWriter.Output
 
 	if verify {
@@ -96,19 +96,12 @@ func (uploader *Uploader) UploadWal(file NamedReader, verify bool) (string, erro
 
 	input := uploader.CreateUploadInput(dstPath, reader)
 
-	var err error
-	uploader.waitGroup.Add(1)
-	go func() {
-		defer uploader.waitGroup.Done()
-		err = uploader.upload(input, file.Name())
-	}()
-
-	uploader.Finish()
+	err := uploader.upload(input, file.Name())
 	fmt.Println("WAL PATH:", dstPath)
 	if verify {
 		sum := reader.(*MD5Reader).Sum()
 		archive := &Archive{
-			Folder:  uploader.UploadingLocation,
+			Folder:  uploader.UploadingFolder,
 			Archive: aws.String(dstPath),
 		}
 		eTag, err := archive.GetETag()
@@ -132,7 +125,7 @@ func (uploader *Uploader) UploadWal(file NamedReader, verify bool) (string, erro
 // the specified path and reader.
 func (uploader *Uploader) CreateUploadInput(path string, reader io.Reader) *s3manager.UploadInput {
 	uploadInput := &s3manager.UploadInput{
-		Bucket:       uploader.UploadingLocation.Bucket,
+		Bucket:       uploader.UploadingFolder.Bucket,
 		Key:          aws.String(path),
 		Body:         reader,
 		StorageClass: aws.String(uploader.StorageClass),

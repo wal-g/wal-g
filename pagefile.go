@@ -13,9 +13,13 @@ package walg
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/walparser/parsingutil"
 	"io"
 	"os"
+	"path"
+	"regexp"
 	"strings"
 )
 
@@ -29,47 +33,48 @@ const (
 	validFlags                  = 7
 	layoutVersion               = 4
 	headerSize                  = 24
+
+	FsmSuffix            = "_fsm"
+	VmSuffix             = "_vm"
+	DefaultTablespace    = "base"
+	GlobalTablespace     = "global"
+	NonDefaultTablespace = "pg_tblspc"
 )
 
 // InvalidBlockError indicates that file contain invalid page and cannot be archived incrementally
 var InvalidBlockError = errors.New("block is invalid")
-
 var InvalidIncrementFileHeaderError = errors.New("Invalid increment file header")
 var UnknownIncrementFileHeaderError = errors.New("Unknown increment file header")
 var UnexpectedTarDataError = errors.New("Expected end of Tar")
 
+var pagedFilenameRegexp *regexp.Regexp
+
+func init() {
+	pagedFilenameRegexp = regexp.MustCompile("^(\\d+)([.]\\d+)?$")
+}
+
 // IsPagedFile checks basic expectations for paged file
-func IsPagedFile(info os.FileInfo, fileName string) bool {
+func IsPagedFile(info os.FileInfo, filePath string) bool {
 
 	// For details on which file is paged see
 	// https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
 	if info.IsDir() ||
-		strings.HasSuffix(fileName, "_fsm") ||
-		strings.HasSuffix(fileName, "_vm") ||
-		((!strings.Contains(fileName, "base")) && (!strings.Contains(fileName, "global")) && (!strings.Contains(fileName, "pg_tblspc"))) ||
+		strings.HasSuffix(filePath, FsmSuffix) ||
+		strings.HasSuffix(filePath, VmSuffix) ||
+		((!strings.Contains(filePath, DefaultTablespace)) && (!strings.Contains(filePath, GlobalTablespace)) && (!strings.Contains(filePath, NonDefaultTablespace))) ||
 		info.Size() == 0 ||
-		info.Size()%int64(WalPageSize) != 0 {
+		info.Size()%int64(WalPageSize) != 0 ||
+		!pagedFilenameRegexp.MatchString(path.Base(filePath)) {
 		return false
 	}
 	return true
 }
 
-// TODO : maybe it's better to decompose this func
-// TryReadDatabaseFile tries to read file as an incremental data file if possible, otherwise just open the file
-func TryReadDatabaseFile(fileName string, lsn *uint64, isNew bool) (fileReader io.ReadCloser, isPaged bool, size int64, err error) {
-	info, err := os.Stat(fileName)
-	fileSize := info.Size()
+// ReadDatabaseFile reads file as an incremental data file
+func ReadDatabaseFile(filePath string, fileSize int64, lsn uint64, deltaBitmap *roaring.Bitmap) (fileReader io.ReadCloser, size int64, err error) {
+	file, err := os.Open(filePath)
 	if err != nil {
-		return nil, false, fileSize, err
-	}
-
-	file, err := os.Open(fileName)
-	if err != nil {
-		return nil, false, fileSize, err
-	}
-
-	if lsn == nil || isNew || !IsPagedFile(info, fileName) {
-		return file, false, fileSize, nil
+		return nil, 0, err
 	}
 
 	lim := &io.LimitedReader{
@@ -77,54 +82,32 @@ func TryReadDatabaseFile(fileName string, lsn *uint64, isNew bool) (fileReader i
 		N: int64(fileSize),
 	}
 
-	pageReader := &IncrementalPageReader{make(chan []byte, 4), lim, file, info, *lsn, nil, nil}
-	incrSize, err := pageReader.initialize()
+	pageReader := &IncrementalPageReader{make(chan []byte, 4), lim, file, fileSize, lsn, nil, nil}
+	incrementSize, err := pageReader.initialize(deltaBitmap)
 	if err != nil {
-		if err == InvalidBlockError {
-			file.Close()
-			fmt.Printf("File %v has invalid pages, fallback to full backup\n", fileName)
-			file, err = os.Open(fileName)
-			if err != nil {
-				return nil, false, fileSize, err
-			}
-			return file, false, fileSize, nil
-		}
-
-		return nil, false, fileSize, err
+		return nil, 0, err
 	}
-	return pageReader, true, incrSize, nil
+	return pageReader, incrementSize, nil
 }
 
 // ApplyFileIncrement changes pages according to supplied change map file
 func ApplyFileIncrement(fileName string, increment io.Reader) error {
-	fmt.Println("Incrementing " + fileName)
-	header := make([]byte, sizeofInt32)
-	fileSizeBytes := make([]byte, sizeofInt64)
-	diffBlockBytes := make([]byte, sizeofInt32)
-
-	_, err := io.ReadFull(increment, header)
+	fmt.Printf("Incrementing %s\n", fileName)
+	err := readIncrementFileHeader(increment)
 	if err != nil {
 		return err
 	}
 
-	if header[0] != 'w' || header[1] != 'i' || header[3] != signatureMagicNumber {
-		return InvalidIncrementFileHeaderError
-	}
-	if header[2] != '1' {
-		return UnknownIncrementFileHeaderError
-	}
-
-	_, err = io.ReadFull(increment, fileSizeBytes)
-	if err != nil {
-		return err
-	}
-	_, err = io.ReadFull(increment, diffBlockBytes)
+	var fileSize uint64
+	var diffBlockCount uint32
+	err = parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
+		{Field: &fileSize, Name: "fileSize"},
+		{Field: &diffBlockCount, Name: "diffBlockCount"},
+	}, increment)
 	if err != nil {
 		return err
 	}
 
-	fileSize := binary.LittleEndian.Uint64(fileSizeBytes)
-	diffBlockCount := binary.LittleEndian.Uint32(diffBlockBytes)
 	diffMap := make([]byte, diffBlockCount*sizeofInt32)
 
 	_, err = io.ReadFull(increment, diffMap)
@@ -163,5 +146,21 @@ func ApplyFileIncrement(fileName string, increment io.Reader) error {
 		return UnexpectedTarDataError
 	}
 
+	return nil
+}
+
+func readIncrementFileHeader(reader io.Reader) error {
+	header := make([]byte, sizeofInt32)
+	_, err := io.ReadFull(reader, header)
+	if err != nil {
+		return err
+	}
+
+	if header[0] != 'w' || header[1] != 'i' || header[3] != signatureMagicNumber {
+		return InvalidIncrementFileHeaderError
+	}
+	if header[2] != '1' {
+		return UnknownIncrementFileHeaderError
+	}
 	return nil
 }

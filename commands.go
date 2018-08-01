@@ -22,6 +22,14 @@ import (
 var PgControlMissingError = errors.New("Corrupted backup: missing pg_control")
 var InvalidWalFileMagicError = errors.New("WAL-G: WAL file magic is invalid ")
 
+type ArchiveNonExistenceError struct {
+	archiveName string
+}
+
+func (err ArchiveNonExistenceError) Error() string {
+	return fmt.Sprintf("Archive '%s' does not exist.\n", err.archiveName)
+}
+
 // HandleDelete is invoked to perform wal-g delete
 func HandleDelete(folder *S3Folder, args []string) {
 	arguments := ParseDeleteArguments(args, printDeleteUsageAndFail)
@@ -155,17 +163,17 @@ func deltaFetchRecursion(backupName string, folder *S3Folder, archiveDirectory s
 		}
 		backup.Name = aws.String(latest)
 	}
-	var dto = fetchSentinel(*backup.Name, backup, folder)
+	sentinelDto := fetchSentinel(*backup.Name, backup, folder)
 
-	if dto.IsIncremental() {
-		fmt.Printf("Delta from %v at LSN %x \n", *dto.IncrementFrom, *dto.IncrementFromLSN)
-		deltaFetchRecursion(*dto.IncrementFrom, folder, archiveDirectory)
-		fmt.Printf("%v fetched. Upgrading from LSN %x to LSN %x \n", *dto.IncrementFrom, *dto.IncrementFromLSN, dto.LSN)
+	if sentinelDto.IsIncremental() {
+		fmt.Printf("Delta from %v at LSN %x \n", *sentinelDto.IncrementFrom, *sentinelDto.IncrementFromLSN)
+		deltaFetchRecursion(*sentinelDto.IncrementFrom, folder, archiveDirectory)
+		fmt.Printf("%v fetched. Upgrading from LSN %x to LSN %x \n", *sentinelDto.IncrementFrom, *sentinelDto.IncrementFromLSN, sentinelDto.BackupStartLSN)
 	}
 
-	unwrapBackup(backup, archiveDirectory, folder, dto)
+	unwrapBackup(backup, archiveDirectory, folder, sentinelDto)
 
-	lsn = dto.LSN
+	lsn = sentinelDto.BackupStartLSN
 	return
 }
 
@@ -331,11 +339,11 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	maxDeltas, fromFull := getDeltaConfig()
 
 	var backup = &Backup{
-		Folder: uploader.UploadingLocation,
-		Path:   GetBackupPath(uploader.UploadingLocation),
+		Folder: uploader.UploadingFolder,
+		Path:   GetBackupPath(uploader.UploadingFolder),
 	}
 
-	var sentinelDto S3TarBallSentinelDto
+	var previousBackupSentinelDto S3TarBallSentinelDto
 	var latest string
 	var err error
 	incrementCount := 1
@@ -346,40 +354,47 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 			if err != nil {
 				log.Fatalf("%+v\n", err)
 			}
-			sentinelDto = fetchSentinel(latest, backup, uploader.UploadingLocation)
-			if sentinelDto.IncrementCount != nil {
-				incrementCount = *sentinelDto.IncrementCount + 1
+			previousBackupSentinelDto = fetchSentinel(latest, backup, uploader.UploadingFolder)
+			if previousBackupSentinelDto.IncrementCount != nil {
+				incrementCount = *previousBackupSentinelDto.IncrementCount + 1
 			}
 
 			if incrementCount > maxDeltas {
 				fmt.Println("Reached max delta steps. Doing full backup.")
-				sentinelDto = S3TarBallSentinelDto{}
-			} else if sentinelDto.LSN == nil {
+				previousBackupSentinelDto = S3TarBallSentinelDto{}
+			} else if previousBackupSentinelDto.BackupStartLSN == nil {
 				fmt.Println("LATEST backup was made without support for delta feature. Fallback to full backup with LSN marker for future deltas.")
 			} else {
 				if fromFull {
 					fmt.Println("Delta will be made from full backup.")
-					latest = *sentinelDto.IncrementFullName
-					sentinelDto = fetchSentinel(latest, backup, uploader.UploadingLocation)
+					latest = *previousBackupSentinelDto.IncrementFullName
+					previousBackupSentinelDto = fetchSentinel(latest, backup, uploader.UploadingFolder)
 				}
-				fmt.Printf("Delta backup from %v with LSN %x. \n", latest, *sentinelDto.LSN)
+				fmt.Printf("Delta backup from %v with LSN %x. \n", latest, *previousBackupSentinelDto.BackupStartLSN)
 			}
 		}
 	}
 
-	bundle := NewBundle(sentinelDto.LSN, sentinelDto.Files)
+	bundle := NewBundle(previousBackupSentinelDto.BackupStartLSN, previousBackupSentinelDto.Files)
 
 	// Connect to postgres and start/finish a nonexclusive backup.
 	conn, err := Connect()
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
-	backupName, lsn, pgVersion, err := bundle.StartBackup(conn, time.Now().String())
+	backupName, backupStartLSN, pgVersion, err := bundle.StartBackup(conn, time.Now().String())
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
 
-	if len(latest) > 0 && sentinelDto.LSN != nil {
+	if len(latest) > 0 && previousBackupSentinelDto.BackupStartLSN != nil {
+		err = bundle.LoadDeltaMap(uploader.UploadingFolder, backupStartLSN)
+		if err == nil {
+			fmt.Println("Successfully loaded delta map, delta backup will be made with provided delta map")
+		} else {
+			bundle.DeltaMap = nil
+			fmt.Printf("Error during loading delta map: '%v'. Fallback to full scan delta backup\n", err)
+		}
 		backupName = backupName + "_D_" + stripWalFileName(latest)
 	}
 
@@ -388,14 +403,11 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 		ArchiveDirectory: archiveDirectory,
 		BackupName:       backupName,
 		Uploader:         uploader,
-		Lsn:              &lsn,
-		IncrementFromLsn: sentinelDto.LSN,
-		IncrementFrom:    latest,
 	}
 
 	bundle.StartQueue()
 	fmt.Println("Walking ...")
-	err = filepath.Walk(archiveDirectory, bundle.TarWalk)
+	err = filepath.Walk(archiveDirectory, bundle.HandleWalkedFSObject)
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
@@ -415,29 +427,29 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	}
 
 	timelineChanged := bundle.CheckTimelineChanged(conn)
-	var sentinel *S3TarBallSentinelDto
+	var currentBackupSentinelDto *S3TarBallSentinelDto
 
 	if !timelineChanged {
-		sentinel = &S3TarBallSentinelDto{
-			LSN:              &lsn,
-			IncrementFromLSN: sentinelDto.LSN,
+		currentBackupSentinelDto = &S3TarBallSentinelDto{
+			BackupStartLSN:   &backupStartLSN,
+			IncrementFromLSN: previousBackupSentinelDto.BackupStartLSN,
 			PgVersion:        pgVersion,
 		}
-		if sentinelDto.LSN != nil {
-			sentinel.IncrementFrom = &latest
-			sentinel.IncrementFullName = &latest
-			if sentinelDto.IsIncremental() {
-				sentinel.IncrementFullName = sentinelDto.IncrementFullName
+		if previousBackupSentinelDto.BackupStartLSN != nil {
+			currentBackupSentinelDto.IncrementFrom = &latest
+			currentBackupSentinelDto.IncrementFullName = &latest
+			if previousBackupSentinelDto.IsIncremental() {
+				currentBackupSentinelDto.IncrementFullName = previousBackupSentinelDto.IncrementFullName
 			}
-			sentinel.IncrementCount = &incrementCount
+			currentBackupSentinelDto.IncrementCount = &incrementCount
 		}
 
-		sentinel.SetFiles(bundle.GetFiles())
-		sentinel.FinishLSN = &finishLsn
+		currentBackupSentinelDto.SetFiles(bundle.GetFiles())
+		currentBackupSentinelDto.BackupFinishLSN = &finishLsn
 	}
 
 	// Wait for all uploads to finish.
-	err = bundle.TarBall.Finish(sentinel)
+	err = bundle.TarBall.Finish(currentBackupSentinelDto)
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
@@ -497,7 +509,10 @@ func HandleWALFetch(folder *S3Folder, walFileName string, location string, trigg
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	DownloadAndDecompressWALFile(folder, walFileName, location)
+	err := downloadWALFileTo(folder, walFileName, location)
+	if err != nil {
+		log.Fatalf("%v+\n", err)
+	}
 }
 
 func checkWALFileMagic(prefetched string) error {
@@ -530,7 +545,7 @@ func tryDownloadWALFile(folder *S3Folder, walFullPath string) (archiveReader io.
 	return
 }
 
-func decompressWALFile(archiveReader io.ReadCloser, dstLocation string, decompressor Decompressor) error {
+func decompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor Decompressor) error {
 	crypter := OpenPGPCrypter{}
 	if crypter.IsUsed() {
 		reader, err := crypter.Decrypt(archiveReader)
@@ -540,35 +555,38 @@ func decompressWALFile(archiveReader io.ReadCloser, dstLocation string, decompre
 		archiveReader = ReadCascadeCloser{reader, archiveReader}
 	}
 
-	file, err := os.OpenFile(dstLocation, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
-	if err != nil {
-		return err
-	}
-
-	err = decompressor.Decompress(file, archiveReader)
-	if err != nil {
-		return err
-	}
-	return file.Close()
+	err := decompressor.Decompress(dst, archiveReader)
+	return err
 }
 
-// DownloadAndDecompressWALFile downloads a file and writes it to local file
-func DownloadAndDecompressWALFile(folder *S3Folder, walFileName string, dstLocation string) {
+func downloadAndDecompressWALFile(folder *S3Folder, walFileName string) (io.ReadCloser, error) {
 	for _, decompressor := range Decompressors {
 		archiveReader, exists, err := tryDownloadWALFile(folder, *folder.Server+WalPath+walFileName+"."+decompressor.FileExtension())
 		if err != nil {
-			log.Fatalf("%+v\n", err)
+			return nil, err
 		}
 		if !exists {
 			continue
 		}
-		err = decompressWALFile(archiveReader, dstLocation, decompressor)
+		reader, writer := io.Pipe()
+		defer writer.Close()
+		err = decompressWALFile(writer, archiveReader, decompressor)
 		if err != nil {
-			log.Fatalf("%+v\n", err)
+			return nil, err
 		}
-		return
+		return reader, nil
 	}
-	log.Fatalf("Archive '%s' does not exist.\n", walFileName)
+	return nil, ArchiveNonExistenceError{walFileName}
+}
+
+// downloadWALFileTo downloads a file and writes it to local file
+func downloadWALFileTo(folder *S3Folder, walFileName string, dstPath string) error {
+	reader, err := downloadAndDecompressWALFile(folder, walFileName)
+	defer reader.Close()
+	if err != nil {
+		return err
+	}
+	return createFileAndWriteToIt(dstPath, reader)
 }
 
 // HandleWALPush is invoked to perform wal-g wal-push

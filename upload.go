@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // MaxRetries limit upload and download retries during interaction with S3
@@ -65,17 +66,11 @@ func Configure() (*Uploader, *S3Folder, error) { // TODO : add parameter naming
 	}
 
 	bucket := waleS3Url.Host
-	var server = ""
-	if len(waleS3Url.Path) > 0 {
-		// TODO: Unchecked assertion: first char is '/'
-		server = waleS3Url.Path[1:]
-	}
+	server := strings.TrimPrefix(waleS3Url.Path, "/")
 
-	if len(server) > 0 && server[len(server)-1] == '/' {
-		// Allover the code this parameter is concatenated with '/'.
-		// TODO: Get rid of numerous string literals concatenated with this
-		server = server[:len(server)-1]
-	}
+	// Allover the code this parameter is concatenated with '/'.
+	// TODO: Get rid of numerous string literals concatenated with this
+	server = strings.TrimSuffix(server, "/")
 
 	config := defaults.Get().Config
 

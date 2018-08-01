@@ -14,7 +14,7 @@ import (
 // TarInterpreter behaves differently
 // for different file types.
 type TarInterpreter interface {
-	Interpret(r io.Reader, hdr *tar.Header) error
+	Interpret(reader io.Reader, header *tar.Header) error
 }
 
 // FileTarInterpreter extracts input to disk.

@@ -180,23 +180,23 @@ func stripWalName(path string) string {
 	return name
 }
 
-func fetchSentinel(backupName string, bk *Backup, folder *S3Folder) (dto S3TarBallSentinelDto) {
-	latestSentinel := backupName + SentinelSuffix
+func fetchSentinel(backupName string, backup *Backup, folder *S3Folder) (sentinelDto S3TarBallSentinelDto) {
+	latestSentinelName := backupName + SentinelSuffix
 	previousBackupReader := S3ReaderMaker{
-		Backup:     bk,
-		Key:        aws.String(*folder.Server + BaseBackupsPath + latestSentinel),
-		FileFormat: GetFileExtension(latestSentinel),
+		Backup:     backup,
+		Key:        aws.String(*folder.Server + BaseBackupsPath + latestSentinelName),
+		FileFormat: GetFileExtension(latestSentinelName),
 	}
 	prevBackup, err := previousBackupReader.Reader()
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
-	sentinelDto, err := ioutil.ReadAll(prevBackup)
+	sentinelDtoData, err := ioutil.ReadAll(prevBackup)
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
 
-	err = json.Unmarshal(sentinelDto, &dto)
+	err = json.Unmarshal(sentinelDtoData, &sentinelDto)
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
