@@ -27,7 +27,7 @@ type Backup struct {
 // GetLatest sorts the backups by last modified time
 // and returns the latest backup key.
 func (backup *Backup) GetLatest() (string, error) {
-	sortTimes, err := backup.GetBackups()
+	sortTimes, err := backup.getBackups()
 
 	if err != nil {
 		return "", err
@@ -36,8 +36,8 @@ func (backup *Backup) GetLatest() (string, error) {
 	return sortTimes[0].Name, nil
 }
 
-// GetBackups receives backup descriptions and sorts them by time
-func (backup *Backup) GetBackups() ([]BackupTime, error) {
+// getBackups receives backup descriptions and sorts them by time
+func (backup *Backup) getBackups() ([]BackupTime, error) {
 	var sortTimes []BackupTime
 	objects := &s3.ListObjectsV2Input{
 		Bucket:    backup.Folder.Bucket,
@@ -117,8 +117,8 @@ func (backup *Backup) GetKeys() ([]string, error) {
 	return result, nil
 }
 
-// GetWals returns all WAL file keys less then key provided
-func (backup *Backup) GetWals(before string) ([]*s3.ObjectIdentifier, error) {
+// getWals returns all WAL file keys less then key provided
+func (backup *Backup) getWals(before string) ([]*s3.ObjectIdentifier, error) {
 	objects := &s3.ListObjectsV2Input{
 		Bucket: backup.Folder.Bucket,
 		Prefix: aws.String(sanitizePath(*backup.Path)),

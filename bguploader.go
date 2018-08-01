@@ -98,7 +98,7 @@ func scanOnce(u *BgUploader) {
 		if shouldKeepScanning(u) {
 			u.running.Add(1)
 			atomic.AddInt32(&u.parallelWorkers, 1)
-			go u.Upload(f)
+			go u.upload(f)
 		}
 	}
 }
@@ -111,10 +111,10 @@ func haveNoSlots(u *BgUploader) bool {
 	return atomic.LoadInt32(&u.parallelWorkers) >= atomic.LoadInt32(&u.maxParallelWorkers)
 }
 
-// Upload one WAL file
-func (bgUploader *BgUploader) Upload(info os.FileInfo) {
+// upload one WAL file
+func (bgUploader *BgUploader) upload(info os.FileInfo) {
 	walFilename := strings.TrimSuffix(info.Name(), readySuffix)
-	UploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename), bgUploader.verify)
+	uploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename), bgUploader.verify)
 
 	ready := filepath.Join(bgUploader.dir, archiveStatus, info.Name())
 	done := filepath.Join(bgUploader.dir, archiveStatus, walFilename+done)

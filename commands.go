@@ -43,7 +43,7 @@ func HandleDelete(folder *S3Folder, args []string) {
 		if arguments.BeforeTime == nil {
 			deleteBeforeTarget(arguments.Target, backup, folder, arguments.FindFull, nil, arguments.dryrun)
 		} else {
-			backups, err := backup.GetBackups()
+			backups, err := backup.getBackups()
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -61,7 +61,7 @@ func HandleDelete(folder *S3Folder, args []string) {
 		if err != nil {
 			log.Fatal("Unable to parse number of backups: ", err)
 		}
-		backups, err := backup.GetBackups()
+		backups, err := backup.getBackups()
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -76,7 +76,7 @@ func HandleDelete(folder *S3Folder, args []string) {
 					return
 				}
 				dto := fetchSentinel(b.Name, backup, folder)
-				if !dto.IsIncremental() {
+				if !dto.isIncremental() {
 					left--
 				}
 			}
@@ -98,7 +98,7 @@ func HandleBackupList(folder *S3Folder) {
 		Folder: folder,
 		Path:   GetBackupPath(folder),
 	}
-	backups, err := backup.GetBackups()
+	backups, err := backup.getBackups()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -165,7 +165,7 @@ func deltaFetchRecursion(backupName string, folder *S3Folder, archiveDirectory s
 	}
 	sentinelDto := fetchSentinel(*backup.Name, backup, folder)
 
-	if sentinelDto.IsIncremental() {
+	if sentinelDto.isIncremental() {
 		fmt.Printf("Delta from %v at LSN %x \n", *sentinelDto.IncrementFrom, *sentinelDto.IncrementFromLSN)
 		deltaFetchRecursion(*sentinelDto.IncrementFrom, folder, archiveDirectory)
 		fmt.Printf("%v fetched. Upgrading from LSN %x to LSN %x \n", *sentinelDto.IncrementFrom, *sentinelDto.IncrementFromLSN, sentinelDto.BackupStartLSN)
@@ -213,7 +213,7 @@ func extractPgControl(backup *Backup, folder *S3Folder, fileTarInterpreter *File
 func unwrapBackup(backup *Backup, archiveDirectory string, folder *S3Folder, sentinelDto S3TarBallSentinelDto) {
 
 	incrementBase := path.Join(archiveDirectory, "increment_base")
-	if !sentinelDto.IsIncremental() {
+	if !sentinelDto.isIncremental() {
 		var empty = true
 		searchLambda := func(path string, info os.FileInfo, err error) error {
 			if path != archiveDirectory {
@@ -262,7 +262,7 @@ func unwrapBackup(backup *Backup, archiveDirectory string, folder *S3Folder, sen
 			targetPath := path.Join(archiveDirectory, fileName)
 			// this path is only used for increment restoration
 			incrementalPath := path.Join(incrementBase, fileName)
-			err = MoveFileAndCreateDirs(incrementalPath, targetPath, fileName)
+			err = moveFileAndCreateDirs(incrementalPath, targetPath, fileName)
 			if err != nil {
 				log.Fatal(err, "Failed to move skipped file for "+targetPath+" "+fileName)
 			}
@@ -301,7 +301,7 @@ func unwrapBackup(backup *Backup, archiveDirectory string, folder *S3Folder, sen
 	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of backup.
 	re := regexp.MustCompile(`^([^_]+._{1}[^_]+._{1})`)
 	match := re.FindString(*backup.Name)
-	if match == "" || sentinelDto.IsIncremental() { // TODO: extract pg_control
+	if match == "" || sentinelDto.isIncremental() { // TODO: extract pg_control
 		err = extractPgControl(backup, folder, fileTarInterpreter)
 		if err != nil {
 			log.Fatalf("%+v\n", err)
@@ -388,7 +388,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	}
 
 	if len(latest) > 0 && previousBackupSentinelDto.BackupStartLSN != nil {
-		err = bundle.LoadDeltaMap(uploader.UploadingFolder, backupStartLSN)
+		err = bundle.loadDeltaMap(uploader.UploadingFolder, backupStartLSN)
 		if err == nil {
 			fmt.Println("Successfully loaded delta map, delta backup will be made with provided delta map")
 		} else {
@@ -426,7 +426,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 		log.Fatalf("%+v\n", err)
 	}
 
-	timelineChanged := bundle.CheckTimelineChanged(conn)
+	timelineChanged := bundle.checkTimelineChanged(conn)
 	var currentBackupSentinelDto *S3TarBallSentinelDto
 
 	if !timelineChanged {
@@ -438,13 +438,13 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 		if previousBackupSentinelDto.BackupStartLSN != nil {
 			currentBackupSentinelDto.IncrementFrom = &latest
 			currentBackupSentinelDto.IncrementFullName = &latest
-			if previousBackupSentinelDto.IsIncremental() {
+			if previousBackupSentinelDto.isIncremental() {
 				currentBackupSentinelDto.IncrementFullName = previousBackupSentinelDto.IncrementFullName
 			}
 			currentBackupSentinelDto.IncrementCount = &incrementCount
 		}
 
-		currentBackupSentinelDto.SetFiles(bundle.GetFiles())
+		currentBackupSentinelDto.setFiles(bundle.GetFiles())
 		currentBackupSentinelDto.BackupFinishLSN = &finishLsn
 	}
 
@@ -595,13 +595,13 @@ func HandleWALPush(uploader *Uploader, walFilePath string, verify bool) {
 	// Look for new WALs while doing main upload
 	bgUploader.Start(walFilePath, int32(getMaxUploadConcurrency(16)-1), uploader, verify)
 
-	UploadWALFile(uploader, walFilePath, verify)
+	uploadWALFile(uploader, walFilePath, verify)
 
 	bgUploader.Stop()
 }
 
-// UploadWALFile from FS to the cloud
-func UploadWALFile(tarUploader *Uploader, walFilePath string, verify bool) {
+// uploadWALFile from FS to the cloud
+func uploadWALFile(tarUploader *Uploader, walFilePath string, verify bool) {
 	walFile, err := os.Open(walFilePath)
 	if err != nil {
 		log.Fatalf("upload: could not open '%s'\n", walFilePath)

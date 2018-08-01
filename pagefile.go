@@ -53,8 +53,8 @@ func init() {
 	pagedFilenameRegexp = regexp.MustCompile("^(\\d+)([.]\\d+)?$")
 }
 
-// IsPagedFile checks basic expectations for paged file
-func IsPagedFile(info os.FileInfo, filePath string) bool {
+// isPagedFile checks basic expectations for paged file
+func isPagedFile(info os.FileInfo, filePath string) bool {
 
 	// For details on which file is paged see
 	// https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru

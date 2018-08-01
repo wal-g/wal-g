@@ -10,7 +10,7 @@ type BlockLocationWriter struct {
 	underlying io.Writer
 }
 
-func (locationWriter *BlockLocationWriter) WriteLocation(location walparser.BlockLocation) error {
+func (locationWriter *BlockLocationWriter) writeLocation(location walparser.BlockLocation) error {
 	numbersToWrite := []uint32{
 		uint32(location.RelationFileNode.SpcNode),
 		uint32(location.RelationFileNode.DBNode),
@@ -26,10 +26,10 @@ func (locationWriter *BlockLocationWriter) WriteLocation(location walparser.Bloc
 	return nil
 }
 
-func WriteLocationsTo(writer io.Writer, locations []walparser.BlockLocation) error {
+func writeLocationsTo(writer io.Writer, locations []walparser.BlockLocation) error {
 	locationWriter := BlockLocationWriter{writer}
 	for _, location := range locations {
-		err := locationWriter.WriteLocation(location)
+		err := locationWriter.writeLocation(location)
 		if err != nil {
 			return err
 		}

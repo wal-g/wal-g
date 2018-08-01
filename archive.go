@@ -35,8 +35,8 @@ func (archive *Archive) CheckExistence() (bool, error) {
 	return true, nil
 }
 
-// GetETag aquires ETag of the object from S3
-func (archive *Archive) GetETag() (*string, error) {
+// getETag acquires ETag of the object from S3
+func (archive *Archive) getETag() (*string, error) {
 	arch := &s3.HeadObjectInput{
 		Bucket: archive.Folder.Bucket,
 		Key:    archive.Archive,

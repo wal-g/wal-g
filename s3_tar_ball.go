@@ -34,7 +34,7 @@ func (tarBall *S3TarBall) SetUp(crypter Crypter, names ...string) {
 		} else {
 			name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partCount, tarBall.FileExtension())
 		}
-		writeCloser := tarBall.StartUpload(name, crypter)
+		writeCloser := tarBall.startUpload(name, crypter)
 
 		tarBall.writeCloser = writeCloser
 		tarBall.tarWriter = tar.NewWriter(writeCloser)
@@ -60,9 +60,9 @@ func (tarBall *S3TarBall) AwaitUploads() {
 	tarBall.uploader.waitGroup.Wait()
 }
 
-// StartUpload creates a compressing writer and runs upload in the background once
+// startUpload creates a compressing writer and runs upload in the background once
 // a compressed tar member is finished writing.
-func (tarBall *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteCloser {
+func (tarBall *S3TarBall) startUpload(name string, crypter Crypter) io.WriteCloser {
 	pipeReader, pipeWriter := io.Pipe()
 	uploader := tarBall.uploader
 
@@ -103,8 +103,6 @@ func (tarBall *S3TarBall) GetFileRelPath(fileAbsPath string) string {
 	return GetFileRelativePath(fileAbsPath, tarBall.archiveDirectory)
 }
 
-func (tarBall *S3TarBall) ArchiveDirectory() string { return tarBall.archiveDirectory }
-
 // Size accumulated in this tarball
 func (tarBall *S3TarBall) Size() int64 { return tarBall.size }
 
@@ -126,7 +124,7 @@ func (tarBall *S3TarBall) Finish(sentinelDto *S3TarBallSentinelDto) error {
 	name := tarBall.backupName + "_backup_stop_sentinel.json"
 	uploader := tarBall.uploader
 
-	uploader.Finish()
+	uploader.finish()
 
 	var err error
 	//If other parts are successful in uploading, upload json file.
@@ -142,7 +140,7 @@ func (tarBall *S3TarBall) Finish(sentinelDto *S3TarBallSentinelDto) error {
 		uploadingErr := uploader.upload(input, path)
 		if uploadingErr != nil {
 			log.Printf("upload: could not upload '%s'\n", path)
-			log.Fatalf("S3TarBall Finish: json failed to upload")
+			log.Fatalf("S3TarBall finish: json failed to upload")
 		}
 	} else {
 		log.Printf("Uploaded %d compressed tar Files.\n", tarBall.partCount)

@@ -90,7 +90,7 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 
 func deleteBeforeTarget(target string, bk *Backup, folder *S3Folder, findFull bool, backups []BackupTime, dryRun bool) {
 	dto := fetchSentinel(target, bk, folder)
-	if dto.IsIncremental() {
+	if dto.isIncremental() {
 		if findFull {
 			target = *dto.IncrementFullName
 		} else {
@@ -99,7 +99,7 @@ func deleteBeforeTarget(target string, bk *Backup, folder *S3Folder, findFull bo
 	}
 	var err error
 	if backups == nil {
-		backups, err = bk.GetBackups()
+		backups, err = bk.getBackups()
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -180,7 +180,7 @@ func deleteWALBefore(bt BackupTime, folder *S3Folder) {
 		Path:   aws.String(sanitizePath(*folder.Server + WalPath)),
 	}
 
-	objects, err := bk.GetWals(bt.WalFileName)
+	objects, err := bk.getWals(bt.WalFileName)
 	if err != nil {
 		log.Fatal("Unable to obtaind WALS for border ", bt.Name, err)
 	}

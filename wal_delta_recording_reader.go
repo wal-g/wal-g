@@ -56,7 +56,7 @@ func (reader *WalDeltaRecordingReader) Read(p []byte) (n int, err error) {
 		}
 		err = reader.recordBlockNumbersFromRecords()
 		if err != nil {
-			reader.recorder.StopRecording(err)
+			reader.recorder.stopRecording(err)
 			reader.recorder = nil
 		}
 	}

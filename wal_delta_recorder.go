@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	WalFileInDelta uint64 = 16
-	DeltaFilenameSuffix = "_delta"
+	WalFileInDelta      uint64 = 16
+	DeltaFilenameSuffix        = "_delta"
 )
 
 type WalDeltaRecorder struct {
@@ -45,15 +45,15 @@ func NewWalDeltaRecorder(walFilename string, uploader *Uploader) (*WalDeltaRecor
 }
 
 func (recorder *WalDeltaRecorder) recordWalDelta(records []walparser.XLogRecord) error {
-	return WriteLocationsTo(recorder.deltaFile, extractBlockLocations(records))
+	return writeLocationsTo(recorder.deltaFile, extractBlockLocations(records))
 }
 
-func (recorder *WalDeltaRecorder) StopRecording(err error) {
-	recorder.CloseAfterErr()
+func (recorder *WalDeltaRecorder) stopRecording(err error) {
+	recorder.closeAfterErr()
 	log.Printf("Can't write delta file because of error: %v", err)
 }
 
-func (recorder *WalDeltaRecorder) CloseAfterErr() {
+func (recorder *WalDeltaRecorder) closeAfterErr() {
 	recorder.deltaFile.Close()
 	os.Remove(recorder.deltaFile.Name())
 }
@@ -61,13 +61,13 @@ func (recorder *WalDeltaRecorder) CloseAfterErr() {
 // TODO : implementation is bad, don't use UploadWal here
 func (recorder *WalDeltaRecorder) sendDeltaToS3(locations []walparser.BlockLocation) error {
 	var buffer bytes.Buffer
-	WriteLocationsTo(&buffer, locations)
+	writeLocationsTo(&buffer, locations)
 	_, err := recorder.uploader.UploadWal(&NamedReaderImpl{&buffer, recorder.deltaFile.Name()}, false)
 	return err
 }
 
 func getDeltaFileNameFor(walFilename string) (string, error) {
-	timeline, logSegNo, err := ParseWALFileName(walFilename)
+	timeline, logSegNo, err := parseWALFileName(walFilename)
 	if err != nil {
 		return "", err
 	}

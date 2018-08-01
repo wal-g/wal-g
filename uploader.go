@@ -39,9 +39,9 @@ func NewUploader(compressionMethod string, uploadingLocation *S3Folder) *Uploade
 	}
 }
 
-// Finish waits for all waiting parts to be uploaded. If an error occurs,
+// finish waits for all waiting parts to be uploaded. If an error occurs,
 // prints alert to stderr.
-func (uploader *Uploader) Finish() {
+func (uploader *Uploader) finish() {
 	uploader.waitGroup.Wait()
 	if !uploader.Success {
 		log.Printf("WAL-G could not complete upload.\n")
@@ -104,7 +104,7 @@ func (uploader *Uploader) UploadWal(file NamedReader, verify bool) (string, erro
 			Folder:  uploader.UploadingFolder,
 			Archive: aws.String(dstPath),
 		}
-		eTag, err := archive.GetETag()
+		eTag, err := archive.getETag()
 		if err != nil {
 			log.Fatalf("Unable to verify WAL %s", err)
 		}
