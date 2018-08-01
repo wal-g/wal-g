@@ -114,9 +114,18 @@ func Configure() (*Uploader, *S3Folder, error) { // TODO : add parameter naming
 		return nil, nil, errors.Wrap(err, "Configure: failed to create new session")
 	}
 
+	useWalDeltaStr, hasUseWalDelta := os.LookupEnv("WALG_USE_WAL_DELTA")
+	useWalDelta := false
+	if hasUseWalDelta {
+		useWalDelta, err = strconv.ParseBool(useWalDeltaStr)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "Cofigure: failed to parse WALG_USE_WAL_DELTA")
+		}
+	}
+
 	folder := NewS3Folder(s3.New(sess), bucket, server)
 
-	uploader := NewUploader(compressionMethod, folder)
+	uploader := NewUploader(compressionMethod, folder, useWalDelta)
 
 	var con = getMaxUploadConcurrency(10)
 	storageClass, ok := os.LookupEnv("WALG_S3_STORAGE_CLASS")

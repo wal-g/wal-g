@@ -29,7 +29,7 @@ func TimeTrack(start time.Time, name string) {
 }
 
 func NewLz4MockTarUploader() *walg.Uploader {
-	return walg.NewUploader(walg.Lz4AlgorithmName, walg.NewS3Folder(nil, "bucket", "server"))
+	return walg.NewUploader(walg.Lz4AlgorithmName, walg.NewS3Folder(nil, "bucket", "server"), false)
 }
 
 func NewLz4CompressingPipeWriter(input io.Reader) *walg.CompressingPipeWriter {

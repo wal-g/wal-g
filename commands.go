@@ -388,12 +388,14 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	}
 
 	if len(latest) > 0 && previousBackupSentinelDto.BackupStartLSN != nil {
-		err = bundle.loadDeltaMap(uploader.UploadingFolder, backupStartLSN)
-		if err == nil {
-			fmt.Println("Successfully loaded delta map, delta backup will be made with provided delta map")
-		} else {
-			bundle.DeltaMap = nil
-			fmt.Printf("Error during loading delta map: '%v'. Fallback to full scan delta backup\n", err)
+		if uploader.useWalDelta {
+			err = bundle.loadDeltaMap(uploader.UploadingFolder, backupStartLSN)
+			if err == nil {
+				fmt.Println("Successfully loaded delta map, delta backup will be made with provided delta map")
+			} else {
+				bundle.DeltaMap = nil
+				fmt.Printf("Error during loading delta map: '%v'. Fallback to full scan delta backup\n", err)
+			}
 		}
 		backupName = backupName + "_D_" + stripWalFileName(latest)
 	}

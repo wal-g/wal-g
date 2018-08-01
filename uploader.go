@@ -24,17 +24,19 @@ type Uploader struct {
 	StorageClass         string
 	Success              bool
 	compressor           Compressor
+	useWalDelta          bool
 	waitGroup            *sync.WaitGroup
 }
 
 // NewUploader creates a new tar uploader without the actual
 // S3 uploader. CreateUploader() is used to configure byte size and
 // concurrency streams for the uploader.
-func NewUploader(compressionMethod string, uploadingLocation *S3Folder) *Uploader {
+func NewUploader(compressionMethod string, uploadingLocation *S3Folder, useWalDelta bool) *Uploader {
 	return &Uploader{
 		UploadingFolder: uploadingLocation,
 		StorageClass:    "STANDARD",
 		compressor:      Compressors[compressionMethod],
+		useWalDelta:     useWalDelta,
 		waitGroup:       &sync.WaitGroup{},
 	}
 }
@@ -58,6 +60,7 @@ func (uploader *Uploader) Clone() *Uploader {
 		uploader.StorageClass,
 		uploader.Success,
 		uploader.compressor,
+		uploader.useWalDelta,
 		&sync.WaitGroup{},
 	}
 }
@@ -68,7 +71,7 @@ func (uploader *Uploader) UploadWal(file NamedReader, verify bool) (string, erro
 	var walFileReader io.Reader
 
 	filename := path.Base(file.Name())
-	if isWalFilename(filename) {
+	if uploader.useWalDelta && isWalFilename(filename) {
 		recordingReader, err := NewWalDeltaRecordingReader(file, filename, uploader.Clone())
 		if err != nil {
 			walFileReader = file
