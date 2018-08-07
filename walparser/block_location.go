@@ -7,7 +7,7 @@ type BlockLocation struct {
 
 func NewBlockLocation(spcNode, dbNode, relNode Oid, blockNo uint32) *BlockLocation {
 	return &BlockLocation{
-		RelationFileNode: RelFileNode{SpcNode: spcNode, DBNode: dbNode,  RelNode: relNode},
-		BlockNo: blockNo,
+		RelationFileNode: RelFileNode{SpcNode: spcNode, DBNode: dbNode, RelNode: relNode},
+		BlockNo:          blockNo,
 	}
 }

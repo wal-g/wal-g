@@ -11,8 +11,8 @@ import (
 
 const (
 	WalgTestDataFolderPath = "./testdata"
-	WalFilename = "00000001000000000000007C"
-	DeltaFilename = "000000010000000000000070_delta"
+	WalFilename            = "00000001000000000000007C"
+	DeltaFilename          = "000000010000000000000070_delta"
 )
 
 var TestLocation = *walparser.NewBlockLocation(1, 2, 3, 4)

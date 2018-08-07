@@ -6,11 +6,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 	"github.com/wal-g/wal-g/walparser"
+	"io"
+	"io/ioutil"
 	"os"
 	"path"
 	"testing"
-	"io/ioutil"
-	"io"
 )
 
 var ParserFilePath = path.Join(WalgTestDataFolderPath, walg.RecordPartFilename)
@@ -98,9 +98,9 @@ func TestRecordBlockLocationsFromPage(t *testing.T) {
 	assert.NoError(t, err)
 
 	recordingReader := walg.WalDeltaRecordingReader{
-		WalParser: *walParser,
+		WalParser:        *walParser,
 		PageDataLeftover: page2,
-		Recorder: &walg.WalDeltaRecorder{DeltaFile: deltaFile},
+		Recorder:         &walg.WalDeltaRecorder{DeltaFile: deltaFile},
 	}
 	err = recordingReader.RecordBlockLocationsFromPage()
 	assert.NoError(t, err)
@@ -157,7 +157,7 @@ func TestRead_RecordingFail(t *testing.T) {
 	err = deltaFile.Close()
 	assert.NoError(t, err)
 
-	walData := make([]byte, walparser.WalPageSize * 3)
+	walData := make([]byte, walparser.WalPageSize*3)
 	for i := range walData {
 		walData[i] = 1
 	}

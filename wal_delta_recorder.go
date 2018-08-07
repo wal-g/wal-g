@@ -3,10 +3,10 @@ package walg
 import (
 	"bytes"
 	"github.com/wal-g/wal-g/walparser"
+	"io"
 	"log"
 	"os"
 	"path"
-	"io"
 )
 
 const (
@@ -95,6 +95,6 @@ func OpenDeltaFileFor(dataFolderPath, walFilename string) (*os.File, error) {
 		// this is the first wal file in delta, so new delta file should be created
 		return os.Create(deltaFilePath)
 	}
-	deltaFile, err := os.OpenFile(deltaFilePath, os.O_RDWR | os.O_APPEND, 0666)
+	deltaFile, err := os.OpenFile(deltaFilePath, os.O_RDWR|os.O_APPEND, 0666)
 	return deltaFile, err
 }

@@ -432,13 +432,12 @@ func (bundle *Bundle) getDeltaBitmapFor(filePath string) (*roaring.Bitmap, error
 	return bundle.DeltaMap.GetDeltaBitmapFor(filePath)
 }
 
-// TODO : unit tests
 func (bundle *Bundle) DownloadDeltaMap(folder *S3Folder, backupStartLSN uint64) error {
 	deltaMap := NewPagedFileDeltaMap()
 	logSegNo := logSegNoFromLsn(*bundle.IncrementFromLsn + 1)
 	logSegNo -= logSegNo % WalFileInDelta
 	lastLogSegNo := logSegNoFromLsn(backupStartLSN)
-	for ; logSegNo + (WalFileInDelta - 1) <= lastLogSegNo; logSegNo += WalFileInDelta {
+	for ; logSegNo+(WalFileInDelta-1) <= lastLogSegNo; logSegNo += WalFileInDelta {
 		deltaFilename := toDeltaFilename(formatWALFileName(bundle.Timeline, logSegNo))
 		reader, err := downloadAndDecompressWALFile(folder, deltaFilename)
 		if err != nil {

@@ -2,12 +2,12 @@ package walg
 
 import (
 	"bytes"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 	"github.com/wal-g/wal-g/walparser"
 	"io"
 	"testing"
-	"github.com/pkg/errors"
 )
 
 var locations = []walparser.BlockLocation{
@@ -24,7 +24,7 @@ func TestReadWrite(t *testing.T) {
 		assert.NoError(t, err)
 	}
 	actualLocations := make([]walparser.BlockLocation, 0)
-	for  {
+	for {
 		location, err := reader.ReadNextLocation()
 		if errors.Cause(err) == io.EOF {
 			break

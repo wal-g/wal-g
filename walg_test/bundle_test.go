@@ -1,17 +1,17 @@
 package walg_test
 
 import (
+	"bytes"
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 	"github.com/wal-g/wal-g/testtools"
+	"github.com/wal-g/wal-g/walparser"
 	"os"
 	"testing"
 	"time"
-	"github.com/wal-g/wal-g/walparser"
-	"bytes"
-	"github.com/stretchr/testify/assert"
 )
 
-var BundleTestLocations = []walparser.BlockLocation {
+var BundleTestLocations = []walparser.BlockLocation{
 	*walparser.NewBlockLocation(1, 2, 3, 4),
 	*walparser.NewBlockLocation(5, 6, 7, 8),
 	*walparser.NewBlockLocation(1, 2, 3, 9),
@@ -114,7 +114,7 @@ func putDeltaIntoStorage(storage testtools.MockStorage, locations []walparser.Bl
 	if err != nil {
 		return err
 	}
-	storage["mock/mock/wal_005/" + deltaFilename + ".lz4"] = *bytes.NewBuffer(deltaData)
+	storage["mock/mock/wal_005/"+deltaFilename+".lz4"] = *bytes.NewBuffer(deltaData)
 	return nil
 }
 
@@ -126,7 +126,7 @@ func putWalIntoStorage(storage testtools.MockStorage, data []byte, walFilename s
 	if err != nil {
 		return err
 	}
-	storage["mock/mock/wal_005/" + walFilename + ".lz4"] = compressedData
+	storage["mock/mock/wal_005/"+walFilename+".lz4"] = compressedData
 	return nil
 }
 
@@ -144,7 +144,7 @@ func fillStorageWithMockDeltas(storage testtools.MockStorage) error {
 	}
 	err = putDeltaIntoStorage(
 		storage,
-		[]walparser.BlockLocation {
+		[]walparser.BlockLocation{
 			BundleTestLocations[0],
 			BundleTestLocations[2],
 		},
@@ -155,7 +155,7 @@ func fillStorageWithMockDeltas(storage testtools.MockStorage) error {
 	}
 	err = putDeltaIntoStorage(
 		storage,
-		[]walparser.BlockLocation {
+		[]walparser.BlockLocation{
 			BundleTestLocations[2],
 		},
 		"0000000100000000000000A0_delta",
@@ -194,7 +194,7 @@ func TestLoadDeltaMap_AllDeltas(t *testing.T) {
 	backupNextWalFilename := "000000010000000000000090"
 	_, curLogSegNo, err := walg.ParseWALFileName(backupNextWalFilename)
 
-	err = bundle.DownloadDeltaMap(folder, curLogSegNo * walg.WalSegmentSize)
+	err = bundle.DownloadDeltaMap(folder, curLogSegNo*walg.WalSegmentSize)
 	assert.NoError(t, err)
 	assert.NotNil(t, bundle.DeltaMap)
 	assert.Equal(t, []uint32{4, 9}, bundle.DeltaMap[BundleTestLocations[0].RelationFileNode].ToArray())
@@ -208,7 +208,7 @@ func TestLoadDeltaMap_MissingDelta(t *testing.T) {
 	backupNextWalFilename := "0000000100000000000000B0"
 	_, curLogSegNo, err := walg.ParseWALFileName(backupNextWalFilename)
 
-	err = bundle.DownloadDeltaMap(folder, curLogSegNo * walg.WalSegmentSize)
+	err = bundle.DownloadDeltaMap(folder, curLogSegNo*walg.WalSegmentSize)
 	assert.Error(t, err)
 	assert.Nil(t, bundle.DeltaMap)
 }
@@ -220,7 +220,7 @@ func TestLoadDeltaMap_WalTail(t *testing.T) {
 	backupNextWalFilename := "000000010000000000000091"
 	_, curLogSegNo, err := walg.ParseWALFileName(backupNextWalFilename)
 
-	err = bundle.DownloadDeltaMap(folder, curLogSegNo * walg.WalSegmentSize)
+	err = bundle.DownloadDeltaMap(folder, curLogSegNo*walg.WalSegmentSize)
 	assert.NoError(t, err)
 	assert.NotNil(t, bundle.DeltaMap)
 	assert.Equal(t, []uint32{4, 9}, bundle.DeltaMap[BundleTestLocations[0].RelationFileNode].ToArray())
