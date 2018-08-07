@@ -2,7 +2,7 @@ package walparser
 
 import (
 	"bytes"
-	"github.com/wal-g/wal-g/walparser/parsingutil/testingutil"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -13,16 +13,14 @@ func TestReadXLogRecordHeader(t *testing.T) {
 	}
 	reader := bytes.NewReader(headerData)
 	header, err := readXLogRecordHeader(reader)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	testingutil.AssertEquals(t, header.TotalRecordLength, uint32(0x00001d05))
-	testingutil.AssertEquals(t, header.XactID, uint32(0x00000243))
-	testingutil.AssertEquals(t, header.PrevRecordPtr, XLogRecordPtr(0x000000002affedc8))
-	testingutil.AssertEquals(t, header.Info, uint8(0xb0))
-	testingutil.AssertEquals(t, header.ResourceManagerID, uint8(0x00))
-	testingutil.AssertEquals(t, header.Crc32Hash, uint32(0xecf5203c))
-	testingutil.AssertReaderIsEmpty(t, reader)
+	assert.NoError(t, err)
+	assert.Equal(t, header.TotalRecordLength, uint32(0x00001d05))
+	assert.Equal(t, header.XactID, uint32(0x00000243))
+	assert.Equal(t, header.PrevRecordPtr, XLogRecordPtr(0x000000002affedc8))
+	assert.Equal(t, header.Info, uint8(0xb0))
+	assert.Equal(t, header.ResourceManagerID, uint8(0x00))
+	assert.Equal(t, header.Crc32Hash, uint32(0xecf5203c))
+	AssertReaderIsEmpty(t, reader)
 }
 
 func TestReadXLogRecordBlockHeader(t *testing.T) {
@@ -34,21 +32,19 @@ func TestReadXLogRecordBlockHeader(t *testing.T) {
 	}
 	reader := ShrinkableReader{bytes.NewReader(headerData), len(headerData) + 0x1cd4}
 	header, err := readXLogRecordBlockHeader(lastRelFileNode, 0, &maxReadBlockId, &reader)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	testingutil.AssertEquals(t, header.BlockId, uint8(0))
-	testingutil.AssertEquals(t, header.ForkFlags, uint8(0x10))
-	testingutil.AssertEquals(t, header.DataLength, uint16(0x0000))
-	testingutil.AssertEquals(t, header.ImageHeader.ImageLength, uint16(0x1cd4))
-	testingutil.AssertEquals(t, header.ImageHeader.HoleOffset, uint16(0x05d4))
-	testingutil.AssertEquals(t, header.ImageHeader.Info, uint8(0x05))
-	testingutil.AssertEquals(t, header.ImageHeader.HoleLength, BlockSize-header.ImageHeader.ImageLength)
-	testingutil.AssertEquals(t, header.BlockLocation.RelationFileNode.SpcNode, Oid(0x0000067f))
-	testingutil.AssertEquals(t, header.BlockLocation.RelationFileNode.DBNode, Oid(0x00004000))
-	testingutil.AssertEquals(t, header.BlockLocation.RelationFileNode.RelNode, Oid(0x00004015))
-	testingutil.AssertEquals(t, header.BlockLocation.BlockNo, uint32(0x000018e4))
-	testingutil.AssertReaderIsEmpty(t, &reader)
+	assert.NoError(t, err)
+	assert.Equal(t, header.BlockId, uint8(0))
+	assert.Equal(t, header.ForkFlags, uint8(0x10))
+	assert.Equal(t, header.DataLength, uint16(0x0000))
+	assert.Equal(t, header.ImageHeader.ImageLength, uint16(0x1cd4))
+	assert.Equal(t, header.ImageHeader.HoleOffset, uint16(0x05d4))
+	assert.Equal(t, header.ImageHeader.Info, uint8(0x05))
+	assert.Equal(t, header.ImageHeader.HoleLength, BlockSize-header.ImageHeader.ImageLength)
+	assert.Equal(t, header.BlockLocation.RelationFileNode.SpcNode, Oid(0x0000067f))
+	assert.Equal(t, header.BlockLocation.RelationFileNode.DBNode, Oid(0x00004000))
+	assert.Equal(t, header.BlockLocation.RelationFileNode.RelNode, Oid(0x00004015))
+	assert.Equal(t, header.BlockLocation.BlockNo, uint32(0x000018e4))
+	AssertReaderIsEmpty(t, &reader)
 }
 
 func TestReadBlockLocation_WithDifferentRel(t *testing.T) {
@@ -58,14 +54,12 @@ func TestReadBlockLocation_WithDifferentRel(t *testing.T) {
 	}
 	reader := bytes.NewReader(data)
 	location, err := readBlockLocation(false, nil, reader)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	testingutil.AssertEquals(t, location.RelationFileNode.SpcNode, Oid(0x67452301))
-	testingutil.AssertEquals(t, location.RelationFileNode.DBNode, Oid(0xefcdab89))
-	testingutil.AssertEquals(t, location.RelationFileNode.RelNode, Oid(0x78563412))
-	testingutil.AssertEquals(t, location.BlockNo, uint32(0xf0debc9a))
-	testingutil.AssertReaderIsEmpty(t, reader)
+	assert.NoError(t, err)
+	assert.Equal(t, location.RelationFileNode.SpcNode, Oid(0x67452301))
+	assert.Equal(t, location.RelationFileNode.DBNode, Oid(0xefcdab89))
+	assert.Equal(t, location.RelationFileNode.RelNode, Oid(0x78563412))
+	assert.Equal(t, location.BlockNo, uint32(0xf0debc9a))
+	AssertReaderIsEmpty(t, reader)
 }
 
 func TestReadXLogRecordBlockImageHeader_NotCompressed(t *testing.T) {
@@ -74,14 +68,12 @@ func TestReadXLogRecordBlockImageHeader_NotCompressed(t *testing.T) {
 	}
 	reader := bytes.NewReader(data)
 	header, err := readXLogRecordBlockImageHeader(reader)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	testingutil.AssertEquals(t, header.ImageLength, uint16(0x1042))
-	testingutil.AssertEquals(t, header.HoleOffset, uint16(0x0030))
-	testingutil.AssertEquals(t, header.Info, uint8(0x05))
-	testingutil.AssertEquals(t, header.HoleLength, uint16(0x0fbe))
-	testingutil.AssertReaderIsEmpty(t, reader)
+	assert.NoError(t, err)
+	assert.Equal(t, header.ImageLength, uint16(0x1042))
+	assert.Equal(t, header.HoleOffset, uint16(0x0030))
+	assert.Equal(t, header.Info, uint8(0x05))
+	assert.Equal(t, header.HoleLength, uint16(0x0fbe))
+	AssertReaderIsEmpty(t, reader)
 }
 
 func TestReadXLogRecordBlockImageHeader_Compressed(t *testing.T) {
@@ -90,24 +82,20 @@ func TestReadXLogRecordBlockImageHeader_Compressed(t *testing.T) {
 	}
 	reader := bytes.NewReader(data)
 	header, err := readXLogRecordBlockImageHeader(reader)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	testingutil.AssertEquals(t, header.ImageLength, uint16(0x1042))
-	testingutil.AssertEquals(t, header.HoleOffset, uint16(0x0030))
-	testingutil.AssertEquals(t, header.Info, uint8(0x07))
-	testingutil.AssertEquals(t, header.HoleLength, uint16(0x0092))
-	testingutil.AssertReaderIsEmpty(t, reader)
+	assert.NoError(t, err)
+	assert.Equal(t, header.ImageLength, uint16(0x1042))
+	assert.Equal(t, header.HoleOffset, uint16(0x0030))
+	assert.Equal(t, header.Info, uint8(0x07))
+	assert.Equal(t, header.HoleLength, uint16(0x0092))
+	AssertReaderIsEmpty(t, reader)
 }
 
 func testReadXLogRecordBlockHeaderPartLogic(t *testing.T, data []byte, blockDataLen uint32) *XLogRecord {
 	reader := bytes.NewReader(data)
 	record := NewXLogRecord(XLogRecordHeader{TotalRecordLength: XLogRecordHeaderSize + uint32(len(data)) + blockDataLen})
 	err := readXLogRecordBlockHeaderPart(record, reader)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	testingutil.AssertReaderIsEmpty(t, reader)
+	assert.NoError(t, err)
+	AssertReaderIsEmpty(t, reader)
 	return record
 }
 
@@ -117,7 +105,7 @@ func TestReadXLogRecordBlockHeaderPart_DataShort(t *testing.T) {
 	}
 	expectedMainDataLen := uint32(0x12)
 	record := testReadXLogRecordBlockHeaderPartLogic(t, data, expectedMainDataLen)
-	testingutil.AssertEquals(t, record.MainDataLen, expectedMainDataLen)
+	assert.Equal(t, record.MainDataLen, expectedMainDataLen)
 }
 
 func TestReadXLogRecordBlockHeaderPart_DataLong(t *testing.T) {
@@ -126,7 +114,7 @@ func TestReadXLogRecordBlockHeaderPart_DataLong(t *testing.T) {
 	}
 	expectedMainDataLen := uint32(0x32547698)
 	record := testReadXLogRecordBlockHeaderPartLogic(t, data, expectedMainDataLen)
-	testingutil.AssertEquals(t, record.MainDataLen, uint32(expectedMainDataLen))
+	assert.Equal(t, record.MainDataLen, uint32(expectedMainDataLen))
 }
 
 func TestReadXLogRecordBlockHeaderPart_RecordOrigin(t *testing.T) {
@@ -135,7 +123,7 @@ func TestReadXLogRecordBlockHeaderPart_RecordOrigin(t *testing.T) {
 	}
 	expectedOrigin := uint16(0xfe01)
 	record := testReadXLogRecordBlockHeaderPartLogic(t, data, 0)
-	testingutil.AssertEquals(t, record.Origin, expectedOrigin)
+	assert.Equal(t, record.Origin, expectedOrigin)
 }
 
 func TestReadXLogRecordBlockHeaderPart_MultipleBlocks(t *testing.T) {
@@ -149,21 +137,21 @@ func TestReadXLogRecordBlockHeaderPart_MultipleBlocks(t *testing.T) {
 	expectedMainDataLen := uint32(0x12)
 	expectedImageLength := uint16(0x1cd4)
 	record := testReadXLogRecordBlockHeaderPartLogic(t, data, expectedMainDataLen+uint32(expectedImageLength))
-	testingutil.AssertEquals(t, record.Origin, expectedOrigin)
-	testingutil.AssertEquals(t, record.MainDataLen, expectedMainDataLen)
-	testingutil.AssertEquals(t, len(record.Blocks), 1)
+	assert.Equal(t, record.Origin, expectedOrigin)
+	assert.Equal(t, record.MainDataLen, expectedMainDataLen)
+	assert.Equal(t, len(record.Blocks), 1)
 	header := record.Blocks[0].Header
-	testingutil.AssertEquals(t, header.BlockId, uint8(0))
-	testingutil.AssertEquals(t, header.ForkFlags, uint8(0x10))
-	testingutil.AssertEquals(t, header.DataLength, uint16(0x0000))
-	testingutil.AssertEquals(t, header.ImageHeader.ImageLength, expectedImageLength)
-	testingutil.AssertEquals(t, header.ImageHeader.HoleOffset, uint16(0x05d4))
-	testingutil.AssertEquals(t, header.ImageHeader.Info, uint8(0x05))
-	testingutil.AssertEquals(t, header.ImageHeader.HoleLength, BlockSize-header.ImageHeader.ImageLength)
-	testingutil.AssertEquals(t, header.BlockLocation.RelationFileNode.SpcNode, Oid(0x0000067f))
-	testingutil.AssertEquals(t, header.BlockLocation.RelationFileNode.DBNode, Oid(0x00004000))
-	testingutil.AssertEquals(t, header.BlockLocation.RelationFileNode.RelNode, Oid(0x00004015))
-	testingutil.AssertEquals(t, header.BlockLocation.BlockNo, uint32(0x000018e4))
+	assert.Equal(t, header.BlockId, uint8(0))
+	assert.Equal(t, header.ForkFlags, uint8(0x10))
+	assert.Equal(t, header.DataLength, uint16(0x0000))
+	assert.Equal(t, header.ImageHeader.ImageLength, expectedImageLength)
+	assert.Equal(t, header.ImageHeader.HoleOffset, uint16(0x05d4))
+	assert.Equal(t, header.ImageHeader.Info, uint8(0x05))
+	assert.Equal(t, header.ImageHeader.HoleLength, BlockSize-header.ImageHeader.ImageLength)
+	assert.Equal(t, header.BlockLocation.RelationFileNode.SpcNode, Oid(0x0000067f))
+	assert.Equal(t, header.BlockLocation.RelationFileNode.DBNode, Oid(0x00004000))
+	assert.Equal(t, header.BlockLocation.RelationFileNode.RelNode, Oid(0x00004015))
+	assert.Equal(t, header.BlockLocation.BlockNo, uint32(0x000018e4))
 }
 
 func TestReadXLogRecordBlockDataAndImages_OnlyData(t *testing.T) {
@@ -178,11 +166,9 @@ func TestReadXLogRecordBlockDataAndImages_OnlyData(t *testing.T) {
 		}}},
 	}
 	err := readXLogRecordBlockDataAndImages(&record, reader)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	testingutil.AssertByteSlicesEqual(t, record.Blocks[0].Data, data)
-	testingutil.AssertEquals(t, 0, len(record.Blocks[0].Image))
+	assert.NoError(t, err)
+	assert.Equal(t, record.Blocks[0].Data, data)
+	assert.Equal(t, 0, len(record.Blocks[0].Image))
 }
 
 func TestReadXLogRecordBlockDataAndImages_OnlyImage(t *testing.T) {
@@ -197,11 +183,9 @@ func TestReadXLogRecordBlockDataAndImages_OnlyImage(t *testing.T) {
 		}}},
 	}
 	err := readXLogRecordBlockDataAndImages(&record, reader)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	testingutil.AssertByteSlicesEqual(t, record.Blocks[0].Image, image)
-	testingutil.AssertEquals(t, 0, len(record.Blocks[0].Data))
+	assert.NoError(t, err)
+	assert.Equal(t, record.Blocks[0].Image, image)
+	assert.Equal(t, 0, len(record.Blocks[0].Data))
 }
 
 func TestReadXLogRecordBlockDataAndImages_DataAndImage(t *testing.T) {
@@ -222,11 +206,9 @@ func TestReadXLogRecordBlockDataAndImages_DataAndImage(t *testing.T) {
 		}}},
 	}
 	err := readXLogRecordBlockDataAndImages(&record, reader)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	testingutil.AssertByteSlicesEqual(t, record.Blocks[0].Image, imageData)
-	testingutil.AssertByteSlicesEqual(t, record.Blocks[0].Data, blockData)
+	assert.NoError(t, err)
+	assert.Equal(t, record.Blocks[0].Image, imageData)
+	assert.Equal(t, record.Blocks[0].Data, blockData)
 }
 
 func TestReadXLogRecordBody(t *testing.T) {
@@ -251,26 +233,24 @@ func TestReadXLogRecordBody(t *testing.T) {
 	expectedImageLength := uint16(0x000a)
 	reader := bytes.NewReader(data)
 	record, err := readXLogRecordBody(&XLogRecordHeader{TotalRecordLength: uint32(int(XLogRecordHeaderSize) + len(data))}, reader)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	testingutil.AssertEquals(t, record.Origin, expectedOrigin)
-	testingutil.AssertEquals(t, record.MainDataLen, expectedMainDataLen)
-	testingutil.AssertEquals(t, len(record.Blocks), 1)
+	assert.NoError(t, err)
+	assert.Equal(t, record.Origin, expectedOrigin)
+	assert.Equal(t, record.MainDataLen, expectedMainDataLen)
+	assert.Equal(t, len(record.Blocks), 1)
 	header := record.Blocks[0].Header
-	testingutil.AssertEquals(t, header.BlockId, uint8(0))
-	testingutil.AssertEquals(t, header.ForkFlags, uint8(0x30))
-	testingutil.AssertEquals(t, header.DataLength, uint16(0x0003))
-	testingutil.AssertEquals(t, header.ImageHeader.ImageLength, expectedImageLength)
-	testingutil.AssertEquals(t, header.ImageHeader.HoleOffset, uint16(0x05d4))
-	testingutil.AssertEquals(t, header.ImageHeader.Info, uint8(0x05))
-	testingutil.AssertEquals(t, header.ImageHeader.HoleLength, BlockSize-header.ImageHeader.ImageLength)
-	testingutil.AssertEquals(t, header.BlockLocation.RelationFileNode.SpcNode, Oid(0x0000067f))
-	testingutil.AssertEquals(t, header.BlockLocation.RelationFileNode.DBNode, Oid(0x00004000))
-	testingutil.AssertEquals(t, header.BlockLocation.RelationFileNode.RelNode, Oid(0x00004015))
-	testingutil.AssertEquals(t, header.BlockLocation.BlockNo, uint32(0x000018e4))
-	testingutil.AssertByteSlicesEqual(t, record.MainData, mainData)
-	testingutil.AssertByteSlicesEqual(t, record.Blocks[0].Image, imageData)
-	testingutil.AssertByteSlicesEqual(t, record.Blocks[0].Data, blockData)
-	testingutil.AssertReaderIsEmpty(t, reader)
+	assert.Equal(t, header.BlockId, uint8(0))
+	assert.Equal(t, header.ForkFlags, uint8(0x30))
+	assert.Equal(t, header.DataLength, uint16(0x0003))
+	assert.Equal(t, header.ImageHeader.ImageLength, expectedImageLength)
+	assert.Equal(t, header.ImageHeader.HoleOffset, uint16(0x05d4))
+	assert.Equal(t, header.ImageHeader.Info, uint8(0x05))
+	assert.Equal(t, header.ImageHeader.HoleLength, BlockSize-header.ImageHeader.ImageLength)
+	assert.Equal(t, header.BlockLocation.RelationFileNode.SpcNode, Oid(0x0000067f))
+	assert.Equal(t, header.BlockLocation.RelationFileNode.DBNode, Oid(0x00004000))
+	assert.Equal(t, header.BlockLocation.RelationFileNode.RelNode, Oid(0x00004015))
+	assert.Equal(t, header.BlockLocation.BlockNo, uint32(0x000018e4))
+	assert.Equal(t, record.MainData, mainData)
+	assert.Equal(t, record.Blocks[0].Image, imageData)
+	assert.Equal(t, record.Blocks[0].Data, blockData)
+	AssertReaderIsEmpty(t, reader)
 }

@@ -10,7 +10,7 @@ type ZstdDecompressor struct{}
 func (decompressor ZstdDecompressor) Decompress(dst io.Writer, src io.Reader) error {
 	zstdReader := zstd.NewReader(NewUntilEofReader(src))
 	defer zstdReader.Close()
-	_, err := writeTo(dst, zstdReader)
+	_, err := WriteTo(dst, zstdReader)
 	return err
 }
 

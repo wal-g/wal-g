@@ -2,7 +2,7 @@ package walparser
 
 import (
 	"bytes"
-	"github.com/wal-g/wal-g/walparser/parsingutil/testingutil"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -19,13 +19,9 @@ func TestShrinkableReader_Read(t *testing.T) {
 	shrinkableReader := ShrinkableReader{reader, 2}
 	buf := make([]byte, 10)
 	readCount, err := shrinkableReader.Read(buf)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	testingutil.AssertEquals(t, readCount, 2)
-	if buf[0] != 1 || buf[1] != 2 {
-		t.Fatalf("read invalid data")
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, readCount, 2)
+	assert.Equal(t, buf[:2], []byte{1, 2})
 }
 
 func TestShrinkableReader_Shrink(t *testing.T) {
@@ -34,15 +30,13 @@ func TestShrinkableReader_Shrink(t *testing.T) {
 	shrinkableReader.Shrink(1)
 	buf := make([]byte, 4)
 	readCount, err := shrinkableReader.Read(buf)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	testingutil.AssertEquals(t, readCount, 3)
+	assert.NoError(t, err)
+	assert.Equal(t, readCount, 3)
 }
 
 func TestShrinkableReader_EOF(t *testing.T) {
 	reader := bytes.NewReader([]byte{1, 2, 3, 4, 5})
 	shrinkableReader := ShrinkableReader{reader, 5}
 	shrinkableReader.Shrink(5)
-	testingutil.AssertReaderIsEmpty(t, &shrinkableReader)
+	AssertReaderIsEmpty(t, &shrinkableReader)
 }

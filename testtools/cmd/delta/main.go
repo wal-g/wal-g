@@ -34,7 +34,7 @@ func RemoveContents(dir string) error {
 	return nil
 }
 
-const (
+const ( // TODO : do something with it, lol...
 	baseDir        = "/Users/x4mmm/DemoDb"
 	restoreDir     = "/Users/x4mmm/DemoDbRestore"
 	pgbin          = "/Users/x4mmm/project/bin/"

@@ -9,79 +9,85 @@ import (
 )
 
 const (
-	PathToDataFolder   = "~/walg_data"
-	RecordPartFilename = "currentRecort.part"
+	RecordPartFilename = "currentRecord.part"
 )
 
+// In case of recording error WalDeltaRecordingReader stops recording, but continues reading data correctly
 type WalDeltaRecordingReader struct {
-	pageReader       walparser.WalPageReader
-	walParser        walparser.WalParser
-	pageDataLeftover []byte
-	recorder         *WalDeltaRecorder // it can be nil and this indicates recording fail
+	PageReader       walparser.WalPageReader
+	WalParser        walparser.WalParser
+	PageDataLeftover []byte
+	Recorder         *WalDeltaRecorder // it can be nil and this indicates recording fail
+	DataFolderPath   string
 }
 
 func (reader *WalDeltaRecordingReader) Close() error {
-	err := reader.saveParser()
+	err := reader.SaveParser()
 	if err != nil {
 		return err
 	}
-	if reader.recorder == nil {
+	if reader.Recorder == nil {
 		return nil
 	}
-	return reader.recorder.Close()
+	return reader.Recorder.Close()
 }
 
-func (reader *WalDeltaRecordingReader) saveParser() error {
-	file, err := os.Open(path.Join(PathToDataFolder, RecordPartFilename))
+func (reader *WalDeltaRecordingReader) SaveParser() error {
+	parserFilename := path.Join(reader.DataFolderPath, RecordPartFilename)
+	file, err := os.Create(parserFilename)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
-	return reader.walParser.SaveParser(file)
+	return reader.WalParser.SaveParser(file)
 }
 
 func (reader *WalDeltaRecordingReader) Read(p []byte) (n int, err error) {
 	dataExpected := len(p)
 	for {
-		if dataExpected <= len(reader.pageDataLeftover) {
-			copy(p, reader.pageDataLeftover[:dataExpected])
-			reader.pageDataLeftover = reader.pageDataLeftover[dataExpected:]
-			return len(p), nil
+		if len(p) <= len(reader.PageDataLeftover) {
+			copy(p, reader.PageDataLeftover[:len(p)])
+			reader.PageDataLeftover = reader.PageDataLeftover[len(p):]
+			return dataExpected, nil
 		}
-		copy(p, reader.pageDataLeftover)
-		dataExpected -= len(reader.pageDataLeftover)
-		reader.pageDataLeftover, err = reader.pageReader.ReadPageData()
-		if err != nil && (err != io.EOF || len(reader.pageDataLeftover) != int(WalPageSize)) {
-			return len(p) - dataExpected, err
-		}
-		err = reader.recordBlockNumbersFromRecords()
+		copy(p, reader.PageDataLeftover)
+		p = p[len(reader.PageDataLeftover):]
+		reader.PageDataLeftover, err = reader.PageReader.ReadPageData()
 		if err != nil {
-			reader.recorder.stopRecording(err)
-			reader.recorder = nil
+			if err != io.EOF && reader.Recorder != nil {
+				reader.Recorder.stopRecording(err)
+				reader.Recorder = nil
+			}
+			return dataExpected - len(p), err
+		}
+		recordingErr := reader.RecordBlockLocationsFromPage()
+		if recordingErr != nil {
+			reader.Recorder.stopRecording(recordingErr)
+			reader.Recorder = nil
 		}
 	}
 }
 
-func (reader *WalDeltaRecordingReader) recordBlockNumbersFromRecords() error {
-	if reader.recorder == nil {
+func (reader *WalDeltaRecordingReader) RecordBlockLocationsFromPage() error {
+	if reader.Recorder == nil {
 		return nil
 	}
-	records, err := reader.walParser.ParseRecordsFromPage(bytes.NewReader(reader.pageDataLeftover))
+	records, err := reader.WalParser.ParseRecordsFromPage(bytes.NewReader(reader.PageDataLeftover))
 	if err != nil && err != walparser.PartialPageError {
 		if err == walparser.ZeroPageError {
 			return nil
 		}
-		reader.walParser.Invalidate()
+		reader.WalParser.Invalidate()
 		return err
 	}
-	return reader.recorder.recordWalDelta(records)
+	return reader.Recorder.recordWalDelta(records)
 }
 
-func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, uploader *Uploader) (*WalDeltaRecordingReader, error) {
-	walParser, recorder, err := tryOpenParserAndRecorder(walFilename, uploader)
+func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, uploader *Uploader, dataFolderPath string) (*WalDeltaRecordingReader, error) {
+	walParser, recorder, err := tryOpenParserAndRecorder(dataFolderPath, walFilename, uploader)
 	if err != nil {
-		deltaFileName, err1 := getDeltaFileNameFor(walFilename)
-		if err1 != nil {
+		deltaFileName, err1 := GetDeltaFilenameFor(walFilename)
+		if err1 == nil {
 			os.Remove(deltaFileName)
 		}
 		return nil, err
@@ -91,23 +97,24 @@ func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, upl
 		*walParser,
 		nil,
 		recorder,
+		dataFolderPath,
 	}, nil
 }
 
-func tryOpenParserAndRecorder(walFilename string, uploader *Uploader) (*walparser.WalParser, *WalDeltaRecorder, error) {
-	walParser, err := loadWalParser()
+func tryOpenParserAndRecorder(dataFolderPath, walFilename string, uploader *Uploader) (*walparser.WalParser, *WalDeltaRecorder, error) {
+	walParser, err := LoadWalParser(dataFolderPath)
 	if err != nil {
 		return nil, nil, err
 	}
-	recorder, err := NewWalDeltaRecorder(walFilename, uploader)
+	recorder, err := NewWalDeltaRecorder(dataFolderPath, walFilename, uploader)
 	if err != nil {
 		return nil, nil, err
 	}
 	return walParser, recorder, nil
 }
 
-func loadWalParser() (*walparser.WalParser, error) {
-	pathToParser := path.Join(PathToDataFolder, RecordPartFilename)
+func LoadWalParser(dataFolderPath string) (*walparser.WalParser, error) {
+	pathToParser := path.Join(dataFolderPath, RecordPartFilename)
 	parserFile, err := os.Open(pathToParser)
 	if err != nil {
 		if os.IsNotExist(err) {

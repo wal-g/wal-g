@@ -3,6 +3,7 @@ package walg_test
 import (
 	"bytes"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 	"io"
 	"io/ioutil"
@@ -50,40 +51,28 @@ func postgresFileTest(loclLSN uint64, t *testing.T) {
 		fmt.Print(err.Error())
 	}
 	buf, _ := ioutil.ReadAll(reader)
-	if loclLSN != 0 && int64(len(buf)) >= fileInfo.Size() {
-		t.Error("Increment is too big")
-	}
+	assert.Falsef(t, loclLSN != 0 && int64(len(buf)) >= fileInfo.Size(), "Increment is too big")
 
-	if loclLSN == 0 && int64(len(buf)) <= fileInfo.Size() {
-		t.Error("Increment is expected to be bigger than file")
-	}
+	assert.Falsef(t, loclLSN == 0 && int64(len(buf)) <= fileInfo.Size(), "Increment is expected to be bigger than file")
 	// We also check that increment correctly predicted it's size
 	// This is important for Tar archiver, which writes size in the header
-	if int(size) != len(buf) {
-		t.Error("Increment has wrong size")
-	}
+	assert.Equalf(t, len(buf), int(size), "Increment has wrong size")
 	tmpFileName := pagedFileName + "_tmp"
-	CopyFile(pagedFileName, tmpFileName)
+	copyFile(pagedFileName, tmpFileName)
 	defer os.Remove(tmpFileName)
 	tmpFile, _ := os.OpenFile(tmpFileName, os.O_RDWR, 0666)
 	tmpFile.WriteAt(make([]byte, 12345), 477421568-12345)
 	tmpFile.Close()
 	newReader := bytes.NewReader(buf)
 	err = walg.ApplyFileIncrement(tmpFileName, newReader)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 	_, err = newReader.Read(make([]byte, 1))
-	if err != io.EOF {
-		t.Error("Not read to the end")
-	}
+	assert.Equalf(t, io.EOF, err, "Not read to the end")
 	compare := deepCompare(pagedFileName, tmpFileName)
-	if !compare {
-		t.Error("Icrement could not restore file")
-	}
+	assert.Truef(t, compare, "Icrement could not restore file")
 }
 
-func CopyFile(src, dst string) error {
+func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
 		return err
@@ -144,4 +133,28 @@ func deepCompare(file1, file2 string) bool {
 		}
 		chunkNumber++
 	}
+}
+
+func readIncrementFileHeaderTest(t *testing.T, headerData []byte, expectedErr error) {
+	err := walg.ReadIncrementFileHeader(bytes.NewReader(headerData))
+	assert.Equalf(t, expectedErr, err, "Expected '%v', but got : '%v'", expectedErr, err)
+}
+
+func TestReadIncrementFileHeader_Valid(t *testing.T) {
+	readIncrementFileHeaderTest(t, walg.IncrementFileHeader, nil)
+}
+
+func TestReadIncrementFileHeader_InvalidIncrementFileHeaderError(t *testing.T) {
+	dataArray := [][]byte{
+		{'w', 'i', '1', 0x56},
+		{'x', 'i', '1', walg.SignatureMagicNumber},
+		{'w', 'j', '1', walg.SignatureMagicNumber},
+	}
+	for _, data := range dataArray {
+		readIncrementFileHeaderTest(t, data, walg.InvalidIncrementFileHeaderError)
+	}
+}
+
+func TestReadIncrementFileHeader_UnknownIncrementFileHeaderError(t *testing.T) {
+	readIncrementFileHeaderTest(t, []byte{'w', 'i', '2', walg.SignatureMagicNumber}, walg.UnknownIncrementFileHeaderError)
 }

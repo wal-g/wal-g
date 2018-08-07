@@ -1,10 +1,18 @@
 package walg_test
 
 import (
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
+	"io/ioutil"
+	"os"
 	"sort"
+	"strings"
 	"testing"
 	"time"
+)
+
+const (
+	CreateFileWithPath = "./testdata/createFileWith"
 )
 
 var times = []struct {
@@ -48,9 +56,7 @@ func TestSortLatestTime(t *testing.T) {
 	sort.Sort(walg.TimeSlice(sortTimes))
 
 	for i, val := range sortTimes {
-		if val.Name != correct[i] {
-			t.Errorf("utility: Sort times expected %v as %s but got %s instead", val.Time, correct[i], val.Name)
-		}
+		assert.Equal(t, correct[i], val.Name)
 	}
 }
 
@@ -68,9 +74,48 @@ func TestCheckType(t *testing.T) {
 	}
 	for _, f := range fileNames {
 		actual := walg.GetFileExtension(f.input)
-		if actual != f.expected {
-			t.Errorf("decompress: GetFileExtension expected `%s` but got `%s`", f.expected, actual)
-
-		}
+		assert.Equal(t, f.expected, actual)
 	}
+}
+
+func TestGetSentinelUserData(t *testing.T) {
+
+	os.Setenv("WALG_SENTINEL_USER_DATA", "1.0")
+
+	data := walg.GetSentinelUserData()
+	t.Log(data)
+	assert.Equalf(t, 1.0, data.(float64), "Unable to parse WALG_SENTINEL_USER_DATA")
+
+	os.Setenv("WALG_SENTINEL_USER_DATA", "\"1\"")
+
+	data = walg.GetSentinelUserData()
+	t.Log(data)
+	assert.Equalf(t, "1", data.(string), "Unable to parse WALG_SENTINEL_USER_DATA")
+
+	os.Setenv("WALG_SENTINEL_USER_DATA", `{"x":123,"y":["asdasd",123]}`)
+
+	data = walg.GetSentinelUserData()
+	t.Log(data)
+	assert.NotNilf(t, data, "Unable to parse WALG_SENTINEL_USER_DATA")
+
+	os.Unsetenv("WALG_UPLOAD_CONCURRENCY")
+}
+
+func TestCreateFileWith(t *testing.T) {
+	content := "content"
+	err := walg.CreateFileWith(CreateFileWithPath, strings.NewReader(content))
+	assert.NoError(t, err)
+	actualContent, err := ioutil.ReadFile(CreateFileWithPath)
+	assert.NoError(t, err)
+	assert.Equal(t, []byte(content), actualContent)
+	os.Remove(CreateFileWithPath)
+}
+
+func TestCreateFileWith_ExistenceError(t *testing.T) {
+	file, err := os.Create(CreateFileWithPath)
+	assert.NoError(t, err)
+	file.Close()
+	err = walg.CreateFileWith(CreateFileWithPath, strings.NewReader("error"))
+	assert.Equal(t, os.IsExist(err), true)
+	os.Remove(CreateFileWithPath)
 }

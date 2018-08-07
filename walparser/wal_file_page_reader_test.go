@@ -2,6 +2,7 @@ package walparser
 
 import (
 	"bytes"
+	"github.com/stretchr/testify/assert"
 	"io"
 	"math/rand"
 	"testing"
@@ -15,14 +16,8 @@ func TestWalPageReader_ReadPageData(t *testing.T) {
 	reader := bytes.NewReader(initialData)
 	pageReader := WalPageReader{reader}
 	readData, err := pageReader.ReadPageData()
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	for i := 0; i < int(WalPageSize); i++ {
-		if readData[i] != initialData[i] {
-			t.Fatalf("initial and read data differs at position: %v, initial is: %v, read is: %v", i, initialData[i], readData[i])
-		}
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, initialData, readData)
 }
 
 func TestWalPageReader_SmallPageError(t *testing.T) {
@@ -30,16 +25,12 @@ func TestWalPageReader_SmallPageError(t *testing.T) {
 	reader := bytes.NewReader(initialData)
 	pageReader := WalPageReader{reader}
 	_, err := pageReader.ReadPageData()
-	if err != io.ErrUnexpectedEOF {
-		t.Fatalf("should be ErrUnexpectedEOF, but found %v", err)
-	}
+	assert.Equal(t, io.ErrUnexpectedEOF, err)
 }
 
 func TestWalPageReader_EOF(t *testing.T) {
 	reader := bytes.NewReader(nil)
 	pageReader := WalPageReader{reader}
 	_, err := pageReader.ReadPageData()
-	if err != io.EOF {
-		t.Fatalf("expected EOF error, buf found: %v", err)
-	}
+	assert.Equal(t, io.EOF, err)
 }

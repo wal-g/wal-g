@@ -48,6 +48,12 @@
   revision = "2063d937ea693f6f5c8b213906785ff9e36ba0b6"
 
 [[projects]]
+  name = "github.com/davecgh/go-spew"
+  packages = ["spew"]
+  revision = "346938d642f2ec3594ed81d874461961cd0faa76"
+  version = "v1.1.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/glycerine/go-unsnap-stream"
   packages = ["."]
@@ -112,10 +118,22 @@
   revision = "c605e284fe17294bda444b34710735b29d1a9d90"
 
 [[projects]]
+  name = "github.com/pmezard/go-difflib"
+  packages = ["difflib"]
+  revision = "792786c7400a136282c1664665ae0a8db921c6c2"
+  version = "v1.0.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/rasky/go-lzo"
   packages = ["."]
   revision = "affec0788321cffe2c68821be1e07e87127b17f0"
+
+[[projects]]
+  name = "github.com/stretchr/testify"
+  packages = ["assert"]
+  revision = "f35b8ab0b5a2cef36673838d662e249dd9c94686"
+  version = "v1.2.2"
 
 [[projects]]
   name = "github.com/tinylib/msgp"
@@ -156,6 +174,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "53e5fdff769e78d62f5515542dd84b384cc4f0fbd65c0a6fba7b3c1f7ab792ef"
+  inputs-digest = "5d29955d398b5cab76e749e3a80508e86e2e5a558a9d4d7f16608e34df59ac9c"
   solver-name = "gps-cdcl"
   solver-version = 1

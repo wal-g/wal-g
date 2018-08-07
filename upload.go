@@ -16,6 +16,8 @@ import (
 	"strings"
 )
 
+const DefaultStreamingPartSizeFor10Concurrency = 20 << 20
+
 // MaxRetries limit upload and download retries during interaction with S3
 var MaxRetries = 15
 
@@ -125,9 +127,10 @@ func Configure() (*Uploader, *S3Folder, error) { // TODO : add parameter naming
 
 	folder := NewS3Folder(s3.New(sess), bucket, server)
 
-	uploader := NewUploader(compressionMethod, folder, useWalDelta)
+	var concurrency = getMaxUploadConcurrency(10)
+	uploaderApi := createUploader(folder.S3API, DefaultStreamingPartSizeFor10Concurrency, concurrency)
+	uploader := NewUploader(uploaderApi, Compressors[compressionMethod], folder, useWalDelta)
 
-	var con = getMaxUploadConcurrency(10)
 	storageClass, ok := os.LookupEnv("WALG_S3_STORAGE_CLASS")
 	if ok {
 		uploader.StorageClass = storageClass
@@ -135,7 +138,7 @@ func Configure() (*Uploader, *S3Folder, error) { // TODO : add parameter naming
 
 	serverSideEncryption, ok := os.LookupEnv("WALG_S3_SSE")
 	if ok {
-		uploader.ServerSideEncryption = serverSideEncryption
+		uploader.serverSideEncryption = serverSideEncryption
 	}
 
 	sseKmsKeyId, ok := os.LookupEnv("WALG_S3_SSE_KMS_ID")
@@ -148,14 +151,12 @@ func Configure() (*Uploader, *S3Folder, error) { // TODO : add parameter naming
 		return nil, nil, errors.New("Configure: WALG_S3_SSE_KMS_ID must be set iff using aws:kms encryption")
 	}
 
-	uploader.UploaderApi = CreateUploader(folder.S3API, 20*1024*1024, con) //default 10 concurrency streams at 20MB
-
 	return uploader, folder, err
 }
 
-// CreateUploader returns an uploader with customizable concurrency
+// createUploader returns an uploader with customizable concurrency
 // and partsize.
-func CreateUploader(svc s3iface.S3API, partsize, concurrency int) s3manageriface.UploaderAPI {
+func createUploader(svc s3iface.S3API, partsize, concurrency int) s3manageriface.UploaderAPI {
 	uploaderAPI := s3manager.NewUploaderWithClient(svc, func(uploader *s3manager.Uploader) {
 		uploader.PartSize = int64(partsize)
 		uploader.Concurrency = concurrency

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"github.com/pierrec/lz4"
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 	"github.com/wal-g/wal-g/testtools"
 	"io"
@@ -67,24 +68,16 @@ func TestCascadeFileCloser(t *testing.T) {
 		}
 
 		n, err := lz.Write(random)
-		if err != nil {
-			t.Errorf("compress: CascadeWriteCloser expected `<nil>` but got %v", err)
-		}
-		if n != tt.written {
-			t.Errorf("compress: CascadeWriteCloser expected %d bytes written but got %d", tt.written, n)
-		}
+		assert.NoErrorf(t, err, "compress: CascadeWriteCloser expected `<nil>` but got %v", err)
+		assert.Equalf(t, n, tt.written, "compress: CascadeWriteCloser expected %d bytes written but got %d", tt.written, n)
 
 		err = lz.Close()
-		if err != nil {
-			t.Errorf("compress: CascadeWriteCloser expected `<nil>` but got %v", err)
-		}
+		assert.NoErrorf(t, err, "compress: CascadeWriteCloser expected `<nil>` but got %v", err)
 
 		b.err = true
 
 		err = lz.Close()
-		if err == nil {
-			t.Errorf("compress: Underlying writer expected to close with error but got `<nil>`")
-		}
+		assert.Errorf(t, err, "compress: Underlying writer expected to close with error but got `<nil>`")
 
 	}
 }
@@ -97,15 +90,10 @@ func TestCascadeFileCloserError(t *testing.T) {
 	}
 
 	_, err := lz.Write([]byte{byte('a')})
-	if err == nil {
-		t.Errorf("compress: CascadeWriteCloser expected error on write but got `<nil>`")
-	}
+	assert.Errorf(t, err, "compress: CascadeWriteCloser expected error on write but got `<nil>`")
 
 	err = lz.Close()
-	if err == nil {
-		t.Errorf("compress: CascadeWriteCloser expected error on close but got `<nil>`")
-	}
-
+	assert.Errorf(t, err, "compress: CascadeWriteCloser expected error on close but got `<nil>`")
 }
 
 func TestCompressingPipeWriter(t *testing.T) {
@@ -122,9 +110,7 @@ func TestCompressingPipeWriter(t *testing.T) {
 			t.Logf("%+v\n", err)
 		}
 
-		if decompressed.String() != tt.testString {
-			t.Errorf("compress: CascadeWriteCloser expected '%s' to be written but got '%s'", tt.testString, decompressed)
-		}
+		assert.Equalf(t, tt.testString, decompressed.String(), "compress: CascadeWriteCloser expected '%s' to be written but got '%s'", tt.testString, decompressed)
 	}
 
 }
@@ -145,9 +131,7 @@ func TestCompressingPipeWriterBigChunk(t *testing.T) {
 		t.Logf("%+v\n", err)
 	}
 
-	if !bytes.Equal(b, decompressed.Bytes()) {
-		t.Errorf("Incorrect decompression")
-	}
+	assert.Equalf(t, b, decompressed.Bytes(), "Incorrect decompression")
 
 }
 
@@ -192,9 +176,7 @@ func testCompressingPipeWriterErrorPropagation(compressor walg.Compressor, t *te
 func TestCompressingPipeWriterErrorPropagation(t *testing.T) {
 	for _, compressor := range walg.Compressors {
 		err := testCompressingPipeWriterErrorPropagation(compressor, t)
-		if err == nil {
-			t.Errorf("%v did not propagate error of the buffer", compressor.FileExtension())
-		}
+		assert.Errorf(t, err, "%v did not propagate error of the buffer", compressor.FileExtension())
 	}
 }
 
@@ -204,11 +186,8 @@ func TestCompressingPipeWriterError(t *testing.T) {
 	lz.Compress(MockDisarmedCrypter())
 
 	_, err := ioutil.ReadAll(lz.Output)
-	if err == nil {
-		t.Errorf("compress: CompressingPipeWriter expected error but got `<nil>`")
-	}
+	assert.Errorf(t, err, "compress: CompressingPipeWriter expected error but got `<nil>`")
 	if re, ok := err.(walg.CompressingPipeWriterError); !ok {
-
 		t.Errorf("compress: CompressingPipeWriter expected CompressingPipeWriterError but got %v", re)
 	}
 }

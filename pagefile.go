@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/walparser"
 	"github.com/wal-g/wal-g/walparser/parsingutil"
 	"io"
 	"os"
@@ -24,18 +25,16 @@ import (
 )
 
 const (
-	WalPageSize          uint16 = 8192
+	WalPageSize                 = walparser.WalPageSize
 	sizeofInt32                 = 4
 	sizeofInt16                 = 2
 	sizeofInt64                 = 8
-	signatureMagicNumber byte   = 0x55
+	SignatureMagicNumber byte   = 0x55
 	invalidLsn           uint64 = 0
 	validFlags                  = 7
 	layoutVersion               = 4
 	headerSize                  = 24
 
-	FsmSuffix            = "_fsm"
-	VmSuffix             = "_vm"
 	DefaultTablespace    = "base"
 	GlobalTablespace     = "global"
 	NonDefaultTablespace = "pg_tblspc"
@@ -59,8 +58,6 @@ func isPagedFile(info os.FileInfo, filePath string) bool {
 	// For details on which file is paged see
 	// https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
 	if info.IsDir() ||
-		strings.HasSuffix(filePath, FsmSuffix) ||
-		strings.HasSuffix(filePath, VmSuffix) ||
 		((!strings.Contains(filePath, DefaultTablespace)) && (!strings.Contains(filePath, GlobalTablespace)) && (!strings.Contains(filePath, NonDefaultTablespace))) ||
 		info.Size() == 0 ||
 		info.Size()%int64(WalPageSize) != 0 ||
@@ -93,7 +90,7 @@ func ReadDatabaseFile(filePath string, fileSize int64, lsn uint64, deltaBitmap *
 // ApplyFileIncrement changes pages according to supplied change map file
 func ApplyFileIncrement(fileName string, increment io.Reader) error {
 	fmt.Printf("Incrementing %s\n", fileName)
-	err := readIncrementFileHeader(increment)
+	err := ReadIncrementFileHeader(increment)
 	if err != nil {
 		return err
 	}
@@ -149,14 +146,14 @@ func ApplyFileIncrement(fileName string, increment io.Reader) error {
 	return nil
 }
 
-func readIncrementFileHeader(reader io.Reader) error {
+func ReadIncrementFileHeader(reader io.Reader) error {
 	header := make([]byte, sizeofInt32)
 	_, err := io.ReadFull(reader, header)
 	if err != nil {
 		return err
 	}
 
-	if header[0] != 'w' || header[1] != 'i' || header[3] != signatureMagicNumber {
+	if header[0] != 'w' || header[1] != 'i' || header[3] != SignatureMagicNumber {
 		return InvalidIncrementFileHeaderError
 	}
 	if header[2] != '1' {

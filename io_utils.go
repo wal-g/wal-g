@@ -31,11 +31,11 @@ func (z *ZeroReader) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-func createFileAndWriteToIt(filePath string, reader io.Reader) error {
+func CreateFileWith(filePath string, content io.Reader) error {
 	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
 	if err != nil {
 		return err
 	}
-	_, err = writeTo(file, reader)
+	_, err = WriteTo(file, content)
 	return err
 }

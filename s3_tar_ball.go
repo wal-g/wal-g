@@ -66,7 +66,7 @@ func (tarBall *S3TarBall) startUpload(name string, crypter Crypter) io.WriteClos
 	pipeReader, pipeWriter := io.Pipe()
 	uploader := tarBall.uploader
 
-	path := *uploader.UploadingFolder.Server + BaseBackupsPath + tarBall.backupName + "/tar_partitions/" + name
+	path := *uploader.uploadingFolder.Server + BaseBackupsPath + tarBall.backupName + "/tar_partitions/" + name
 	input := uploader.CreateUploadInput(path, pipeReader)
 
 	fmt.Printf("Starting part %d ...\n", tarBall.partCount)
@@ -134,7 +134,7 @@ func (tarBall *S3TarBall) Finish(sentinelDto *S3TarBallSentinelDto) error {
 		if err != nil {
 			return err
 		}
-		path := *uploader.UploadingFolder.Server + BaseBackupsPath + name
+		path := *uploader.uploadingFolder.Server + BaseBackupsPath + name
 		input := uploader.CreateUploadInput(path, bytes.NewReader(dtoBody))
 
 		uploadingErr := uploader.upload(input, path)

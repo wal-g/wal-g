@@ -24,11 +24,11 @@ func (e EmptyWriteIgnorer) Write(p []byte) (int, error) {
 // Extract exactly one tar bundle. Returns an error
 // upon failure. Able to configure behavior by passing
 // in different TarInterpreters.
-func extractOne(ti TarInterpreter, s io.Reader) error {
-	tr := tar.NewReader(s)
+func extractOne(tarInterpreter TarInterpreter, src io.Reader) error {
+	tarReader := tar.NewReader(src)
 
 	for {
-		cur, err := tr.Next()
+		header, err := tarReader.Next()
 		if err == io.EOF {
 			break
 		}
@@ -36,7 +36,7 @@ func extractOne(ti TarInterpreter, s io.Reader) error {
 			return errors.Wrap(err, "extractOne: tar extract failed")
 		}
 
-		err = ti.Interpret(tr, cur)
+		err = tarInterpreter.Interpret(tarReader, header)
 		if err != nil {
 			return errors.Wrap(err, "extractOne: Interpret failed")
 		}

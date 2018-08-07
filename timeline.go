@@ -1,9 +1,9 @@
 package walg
 
 import (
-	"errors"
 	"fmt"
 	"github.com/jackc/pgx"
+	"github.com/pkg/errors"
 	"strconv"
 )
 
@@ -30,6 +30,10 @@ const (
 	xLogSegmentsPerXLogId = 0x100000000 / WalSegmentSize // xlog_internal.h line 101
 )
 
+func logSegNoFromLsn(lsn uint64) uint64 {
+	return (lsn - 1) / WalSegmentSize // xlog_internal.h line 121
+}
+
 // walFileName formats WAL file name using PostgreSQL connection. Essentially reads timeline of the server.
 func walFileName(lsn uint64, conn *pgx.Conn) (string, uint32, error) {
 	timeline, err := readTimeline(conn)
@@ -37,7 +41,7 @@ func walFileName(lsn uint64, conn *pgx.Conn) (string, uint32, error) {
 		return "", 0, err
 	}
 
-	logSegNo := (lsn - uint64(1)) / WalSegmentSize // xlog_internal.h line 121
+	logSegNo := logSegNoFromLsn(lsn)
 
 	return formatWALFileName(timeline, logSegNo), timeline, nil
 }
@@ -46,8 +50,9 @@ func formatWALFileName(timeline uint32, logSegNo uint64) string {
 	return fmt.Sprintf(walFileFormat, timeline, logSegNo/xLogSegmentsPerXLogId, logSegNo%xLogSegmentsPerXLogId)
 }
 
-// parseWALFileName extracts numeric parts from WAL file name
-func parseWALFileName(name string) (timelineId uint32, logSegNo uint64, err error) {
+// TODO : unit tests
+// ParseWALFileName extracts numeric parts from WAL file name
+func ParseWALFileName(name string) (timelineId uint32, logSegNo uint64, err error) {
 	if len(name) != 24 {
 		err = errors.New("Not a WAL file name: " + name)
 		return
@@ -78,13 +83,13 @@ func parseWALFileName(name string) (timelineId uint32, logSegNo uint64, err erro
 }
 
 func isWalFilename(filename string) bool {
-	_, _, err := parseWALFileName(filename)
+	_, _, err := ParseWALFileName(filename)
 	return err == nil
 }
 
 // GetNextWALFileName computes name of next WAL segment
 func GetNextWALFileName(name string) (string, error) {
-	timelineId, logSegNo, err := parseWALFileName(name)
+	timelineId, logSegNo, err := ParseWALFileName(name)
 	if err != nil {
 		return "", err
 	}

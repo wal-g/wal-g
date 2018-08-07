@@ -3,23 +3,20 @@
 package walg_test
 
 import (
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/testtools"
 	"testing"
 )
 
 func TestUploadInput(t *testing.T) {
 	// Test default storage class
-	uploader := testtools.NewLz4MockTarUploader()
+	uploader := testtools.NewMockTarUploader(false, false)
 	input := uploader.CreateUploadInput("path", nil)
-	if *input.StorageClass != "STANDARD" {
-		t.Errorf("upload: UploadInput field 'StorageClass' expected %s but got %s", "STANDARD", *input.StorageClass)
-	}
+	assert.Equal(t, "STANDARD", *input.StorageClass)
 
 	// Test STANDARD_IA storage class
-	uploader = testtools.NewLz4MockTarUploader()
+	uploader = testtools.NewMockTarUploader(false, false)
 	uploader.StorageClass = "STANDARD_IA"
 	input = uploader.CreateUploadInput("path", nil)
-	if *input.StorageClass != "STANDARD_IA" {
-		t.Errorf("upload: UploadInput field 'StorageClass' expected %s but got %s", "STANDARD_IA", *input.StorageClass)
-	}
+	assert.Equal(t, "STANDARD_IA", *input.StorageClass)
 }

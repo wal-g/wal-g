@@ -35,6 +35,15 @@ func (archive *Archive) CheckExistence() (bool, error) {
 	return true, nil
 }
 
+func IsAwsNotExist(err error) bool {
+	if awsErr, ok := err.(awserr.Error); ok {
+		if awsErr.Code() == NotFoundAWSErrorCode {
+			return true
+		}
+	}
+	return false
+}
+
 // getETag acquires ETag of the object from S3
 func (archive *Archive) getETag() (*string, error) {
 	arch := &s3.HeadObjectInput{

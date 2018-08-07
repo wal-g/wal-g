@@ -2,25 +2,21 @@ package parsingutil
 
 import (
 	"bytes"
-	"github.com/wal-g/wal-g/walparser/parsingutil/testingutil"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestFieldToParse_ParseFrom(t *testing.T) {
 	var x uint16
 	err := NewFieldToParse(&x, "x").ParseFrom(bytes.NewReader([]byte{0xAB, 0xCD}))
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	testingutil.AssertEquals(t, x, uint16(0xCDAB))
+	assert.NoError(t, err)
+	assert.Equal(t, x, uint16(0xCDAB))
 }
 
 func TestFieldToParse_ErrorWhileParsing(t *testing.T) {
 	var x uint32
 	err := NewFieldToParse(&x, "x").ParseFrom(bytes.NewReader([]byte{1, 2, 3}))
-	if err == nil {
-		t.Fatalf("err should not be nil")
-	}
+	assert.Error(t, err)
 }
 
 func TestFieldToParse_ParseMultipleFieldsFromReader(t *testing.T) {
@@ -34,7 +30,7 @@ func TestFieldToParse_ParseMultipleFieldsFromReader(t *testing.T) {
 		PaddingByte,
 		{&z, "z"},
 	}, bytes.NewReader(data))
-	testingutil.AssertEquals(t, x, uint16(0x3412))
-	testingutil.AssertEquals(t, y, uint32(0xBC9A7856))
-	testingutil.AssertEquals(t, z, uint16(0xF0DE))
+	assert.Equal(t, x, uint16(0x3412))
+	assert.Equal(t, y, uint32(0xBC9A7856))
+	assert.Equal(t, z, uint16(0xF0DE))
 }

@@ -1,6 +1,7 @@
 package walg_test
 
 import (
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 	"github.com/wal-g/wal-g/testtools"
 	"io/ioutil"
@@ -57,27 +58,22 @@ func TestBackgroundWALUpload(t *testing.T) {
 	}
 
 	// Re-use generated data to test uploading WAL.
-	tu := testtools.NewLz4MockTarUploader()
-	tu.UploaderApi = testtools.NewMockS3Uploader(false, false)
-	bu := walg.BgUploader{}
+	uploader := testtools.NewMockTarUploader(false, false)
+	bgUploader := walg.BgUploader{}
 	// Look for new WALs while doing main upload
-	bu.Start(a, 16, tu, false)
+	bgUploader.Start(a, 16, uploader, false)
 	time.Sleep(time.Second) //time to spin up new uploaders
-	bu.Stop()
+	bgUploader.Stop()
 
 	for i := 0; i < 100; i++ {
 		bname := "B" + strconv.Itoa(i)
 		bd := filepath.Join(dir, "archive_status", bname+".done")
 		_, err = os.Stat(bd)
-		if os.IsNotExist(err) {
-			t.Error(bname + ".done was not created")
-		}
+		assert.Falsef(t, os.IsNotExist(err), bname+".done was not created")
 
 		br := filepath.Join(dir, "archive_status", bname+".ready")
 		_, err = os.Stat(br)
-		if !os.IsNotExist(err) {
-			t.Error(bname + ".ready was not deleted")
-		}
+		assert.Truef(t, os.IsNotExist(err), bname+".ready was not deleted")
 	}
 
 	err = os.RemoveAll(dir)

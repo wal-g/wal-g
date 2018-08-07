@@ -15,14 +15,14 @@ type BufferTarInterpreter struct {
 }
 
 // Interpret handles in memory tar formats. Used for testing purposes.
-func (ti *BufferTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
+func (tarInterpreter *BufferTarInterpreter) Interpret(reader io.Reader, header *tar.Header) error {
 	//defer TimeTrack(time.Now(), "BUFFER INTERPRET")
 	//Assumes only regular files
-	out, err := ioutil.ReadAll(tr)
+	out, err := ioutil.ReadAll(reader)
 	if err != nil {
 		return errors.Wrap(err, "Interpret: ReadAll failed")
 	}
-	ti.Out = out
+	tarInterpreter.Out = out
 	return nil
 }
 
@@ -31,7 +31,7 @@ type NOPTarInterpreter struct{}
 
 // Interpret does not do anything except print the
 // 'tar member' name.
-func (ti *NOPTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
-	fmt.Println(cur.Name)
+func (tarInterpreter *NOPTarInterpreter) Interpret(tr io.Reader, header *tar.Header) error {
+	fmt.Println(header.Name)
 	return nil
 }

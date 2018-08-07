@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 	"github.com/wal-g/wal-g/testtools"
 )
@@ -59,37 +60,36 @@ func setFake(t *testing.T) {
 func TestConfigure(t *testing.T) {
 	bucketPath := "s3://bucket/server"
 
-	doConfigureWithBuсketPath(t, bucketPath, "server")
+	doConfigureWithBucketPath(t, bucketPath, "server")
 }
 
 func TestConfigureBucketRoot(t *testing.T) {
 	bucketPath := "s3://bucket/"
 
-	doConfigureWithBuсketPath(t, bucketPath, "")
+	doConfigureWithBucketPath(t, bucketPath, "")
 }
 
 func TestConfigureBucketRoot2(t *testing.T) {
 	bucketPath := "s3://bucket"
 
-	doConfigureWithBuсketPath(t, bucketPath, "")
+	doConfigureWithBucketPath(t, bucketPath, "")
 }
 
 func TestConfigureDeepBucket(t *testing.T) {
 	bucketPath := "s3://bucket/subdir/server"
 
-	doConfigureWithBuсketPath(t, bucketPath, "subdir/server")
+	doConfigureWithBucketPath(t, bucketPath, "subdir/server")
 }
 
-func doConfigureWithBuсketPath(t *testing.T, bucketPath string, expectedServer string) {
+func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer string) {
 	//Test empty environment variables
 	setEmpty(t)
-	tu, pre, err := walg.Configure()
+	uploader, folder, err := walg.Configure()
 	if _, ok := err.(*walg.UnsetEnvVarError); !ok {
 		t.Errorf("upload: Expected error 'UnsetEnvVarError' but got %s", err)
 	}
-	if tu != nil || pre != nil {
-		t.Errorf("upload: Expected empty uploader and prefix but got TU:%v and PREFIX:%v", tu, pre)
-	}
+	assert.Nil(t, uploader)
+	assert.Nil(t, folder)
 	setFake(t)
 	//Test invalid url
 	err = os.Setenv("WALE_S3_PREFIX", "test_fail:")
@@ -97,88 +97,51 @@ func doConfigureWithBuсketPath(t *testing.T, bucketPath string, expectedServer 
 		t.Log(err)
 	}
 	_, _, err = walg.Configure()
-	if err == nil {
-		t.Errorf("upload: Expected to fail on fake url")
-	}
+	assert.Error(t, err)
 	//Test created uploader and prefix
 	err = os.Setenv("WALE_S3_PREFIX", bucketPath)
 	if err != nil {
 		t.Log(err)
 	}
-	tu, pre, err = walg.Configure()
-	if err != nil {
-		t.Errorf("upload: unexpected error %v", err)
-	}
-	if *pre.Bucket != "bucket" {
-		t.Errorf("upload: S3Folder field 'Bucket' expected %s but got %s", "bucket", *pre.Bucket)
-	}
-	if *pre.Server != expectedServer {
-		t.Errorf("upload: S3Folder field 'Server' expected %s but got %s", "server", *pre.Server)
-	}
-	if tu == nil {
-		t.Errorf("upload: did not create an uploader")
-	}
-	if tu.StorageClass != "STANDARD" {
-		t.Errorf("upload: Uploader field 'StorageClass' expected %s but got %s", "STANDARD", tu.StorageClass)
-	}
-	if err != nil {
-		t.Errorf("upload: expected error to be '<nil>' but got %s", err)
-	}
+	uploader, folder, err = walg.Configure()
+	assert.NoError(t, err)
+	assert.Equal(t, "bucket", *folder.Bucket)
+	assert.Equal(t, expectedServer, *folder.Server)
+	assert.NotNil(t, uploader)
+	assert.Equal(t, "STANDARD", uploader.StorageClass)
+	assert.NoError(t, err)
 	//Test STANDARD_IA storage class
 	err = os.Setenv("WALG_S3_STORAGE_CLASS", "STANDARD_IA")
 	defer os.Unsetenv("WALG_S3_STORAGE_CLASS")
 	if err != nil {
 		t.Log(err)
 	}
-	tu, pre, err = walg.Configure()
+	uploader, folder, err = walg.Configure()
 	if err != nil {
 		t.Log(err)
 	}
-	if tu.StorageClass != "STANDARD_IA" {
-		t.Errorf("upload: Uploader field 'StorageClass' expected %s but got %s", "STANDARD_IA", tu.StorageClass)
-	}
-}
-
-func TestValidUploader(t *testing.T) {
-	mockSvc := testtools.NewMockS3Client(false, false)
-
-	tu := testtools.NewLz4MockTarUploader()
-	if tu == nil {
-		t.Errorf("upload: Did not create a new tar uploader")
-	}
-
-	upl := walg.CreateUploader(mockSvc, 100, 3)
-	if upl == nil {
-		t.Errorf("upload: Did not create a new S3 UploadManager")
-	}
+	assert.Equal(t, "STANDARD_IA", uploader.StorageClass)
 }
 
 func TestUploadError(t *testing.T) {
-	mockUploader := testtools.NewMockS3Uploader(false, true)
-
-	tu := testtools.NewLz4MockTarUploader()
-	tu.UploaderApi = mockUploader
+	uploader := testtools.NewMockTarUploader(false, true)
 
 	maker := &walg.S3TarBallMaker{
 		ArchiveDirectory: "/usr/local",
 		BackupName:       "test",
-		Uploader:         tu,
+		Uploader:         uploader,
 	}
 
 	tarBall := maker.Make(true)
 	tarBall.SetUp(MockArmedCrypter())
 
 	tarBall.Finish(&walg.S3TarBallSentinelDto{})
-	if tu.Success {
-		t.Errorf("upload: expected to fail to upload successfully")
-	}
+	assert.False(t, uploader.Success)
 
-	tu.UploaderApi = testtools.NewMockS3Uploader(true, false)
+	uploader = testtools.NewMockTarUploader(true, false)
 
 	tarBall = maker.Make(true)
 	tarBall.SetUp(MockArmedCrypter())
 	tarBall.Finish(&walg.S3TarBallSentinelDto{})
-	if tu.Success {
-		t.Errorf("upload: expected to fail to upload successfully")
-	}
+	assert.False(t, uploader.Success)
 }

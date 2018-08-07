@@ -2,6 +2,7 @@ package walg_test
 
 import (
 	"bytes"
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 	"io"
 	"io/ioutil"
@@ -130,17 +131,11 @@ func TestDecryptWALElzo(t *testing.T) {
 
 	crypter := createCrypter(waleGpgKey)
 	f, err := os.Open(waleWALfilename)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	decrypt, err := crypter.Decrypt(f)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	bytes1, err := ioutil.ReadAll(decrypt)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	installTestKeyToExternalGPG(t)
 
@@ -150,26 +145,16 @@ func TestDecryptWALElzo(t *testing.T) {
 	ec := &ExternalGPGCrypter{}
 
 	f, err = os.Open(waleWALfilename)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	bytes2, err := ec.Decrypt(f)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
-	if !bytes.Equal(bytes1, bytes2) {
-		t.Log(bytes1)
-		t.Log(bytes2)
-		t.Fatal("Decryption result differ")
-	}
+	assert.Equalf(t, bytes1, bytes2, "Decryption result differ")
 
 	buffer := bytes.Buffer{}
 	decompressor := walg.LzoDecompressor{}
 	err = decompressor.Decompress(&buffer, bytes.NewReader(bytes1))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	/* Unfortunately, we cannot quietly uninstall test keyring. This is why this test is not executed by default.
 	command = exec.Command(gpgBin, "--delete-secret-key", "--yes", "D32100BF1CDA62E5E50008F751EFFF0B6548E47F")
@@ -183,9 +168,7 @@ func installTestKeyToExternalGPG(t *testing.T) *exec.Cmd {
 
 	command.Stdin = strings.NewReader(waleGpgKey)
 	err := command.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	return command
 }
 
@@ -209,9 +192,7 @@ func TestOpenGPGandExternalGPGCompatibility(t *testing.T) {
 	ec := &ExternalGPGCrypter{}
 	c := &walg.OpenPGPCrypter{}
 
-	if !c.IsUsed() {
-		t.Fatal("OpenGPG crypter is unable to initialize")
-	}
+	assert.Truef(t, c.IsUsed(), "OpenGPG crypter is unable to initialize")
 
 	for i := uint(0); i < 16; i++ {
 		tokenSize := 512 << i
@@ -219,26 +200,17 @@ func TestOpenGPGandExternalGPGCompatibility(t *testing.T) {
 		rand.Read(token)
 
 		bytes1, err := ec.Encrypt(bytes.NewReader(token))
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 
 		reader, err := c.Decrypt(&ReadNullCloser{bytes.NewReader(bytes1)})
 
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 
 		decrypted, err := ioutil.ReadAll(reader)
 
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 
-		if !bytes.Equal(token, decrypted) {
-			t.Fatal("OpenGPG could not decrypt GPG produced result for chumk of size ", tokenSize)
-		}
-
+		assert.Equal(t, token, decrypted, "OpenGPG could not decrypt GPG produced result for chumk of size ", tokenSize)
 	}
 }
 

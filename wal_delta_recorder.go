@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"io"
 )
 
 const (
@@ -14,30 +15,35 @@ const (
 )
 
 type WalDeltaRecorder struct {
-	deltaFile            *os.File
-	recordingWalFilename string
-	uploader             *Uploader
+	DeltaFile            *os.File
+	RecordingWalFilename string
+	Uploader             *Uploader
 }
 
 func (recorder *WalDeltaRecorder) Close() error {
-	defer recorder.deltaFile.Close()
-	nextWalFilename, _ := GetNextWALFileName(recorder.recordingWalFilename)
-	nextDeltaFilename, _ := getDeltaFileNameFor(nextWalFilename)
-	if nextWalFilename == nextDeltaFilename {
+	nextWalFilename, _ := GetNextWALFileName(recorder.RecordingWalFilename)
+	nextDeltaFilename, _ := GetDeltaFilenameFor(nextWalFilename)
+	if toDeltaFilename(nextWalFilename) == nextDeltaFilename {
 		// this is the last record in delta file, unique it, and send to S3
-		locationReader := BlockLocationReader{recorder.deltaFile}
-		locations, err := locationReader.readAllLocations()
+		_, err := recorder.DeltaFile.Seek(0, io.SeekStart)
 		if err != nil {
 			return err
 		}
+		locations, err := ReadLocationsFrom(recorder.DeltaFile)
+		if err != nil {
+			return err
+		}
+		recorder.DeltaFile.Close()
+		os.Remove(recorder.DeltaFile.Name())
 		locations = uniqueLocations(locations)
-		return recorder.sendDeltaToS3(locations)
+		return recorder.SendDeltaToS3(locations)
 	}
+	recorder.DeltaFile.Close()
 	return nil
 }
 
-func NewWalDeltaRecorder(walFilename string, uploader *Uploader) (*WalDeltaRecorder, error) {
-	deltaFile, err := openDeltaFileFor(walFilename)
+func NewWalDeltaRecorder(dataFolderPath, walFilename string, uploader *Uploader) (*WalDeltaRecorder, error) {
+	deltaFile, err := OpenDeltaFileFor(dataFolderPath, walFilename)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +51,7 @@ func NewWalDeltaRecorder(walFilename string, uploader *Uploader) (*WalDeltaRecor
 }
 
 func (recorder *WalDeltaRecorder) recordWalDelta(records []walparser.XLogRecord) error {
-	return writeLocationsTo(recorder.deltaFile, extractBlockLocations(records))
+	return WriteLocationsTo(recorder.DeltaFile, extractBlockLocations(records))
 }
 
 func (recorder *WalDeltaRecorder) stopRecording(err error) {
@@ -54,37 +60,41 @@ func (recorder *WalDeltaRecorder) stopRecording(err error) {
 }
 
 func (recorder *WalDeltaRecorder) closeAfterErr() {
-	recorder.deltaFile.Close()
-	os.Remove(recorder.deltaFile.Name())
+	recorder.DeltaFile.Close()
+	os.Remove(recorder.DeltaFile.Name())
 }
 
-// TODO : implementation is bad, don't use UploadWal here
-func (recorder *WalDeltaRecorder) sendDeltaToS3(locations []walparser.BlockLocation) error {
+func (recorder *WalDeltaRecorder) SendDeltaToS3(locations []walparser.BlockLocation) error {
 	var buffer bytes.Buffer
-	writeLocationsTo(&buffer, locations)
-	_, err := recorder.uploader.UploadWal(&NamedReaderImpl{&buffer, recorder.deltaFile.Name()}, false)
+	WriteLocationsTo(&buffer, locations)
+	deltaFilename := path.Base(recorder.DeltaFile.Name())
+	_, err := recorder.Uploader.UploadWalFile(&NamedReaderImpl{&buffer, deltaFilename}, false)
 	return err
 }
 
-func getDeltaFileNameFor(walFilename string) (string, error) {
-	timeline, logSegNo, err := parseWALFileName(walFilename)
+func toDeltaFilename(walFilename string) string {
+	return walFilename + DeltaFilenameSuffix
+}
+
+func GetDeltaFilenameFor(walFilename string) (string, error) {
+	timeline, logSegNo, err := ParseWALFileName(walFilename)
 	if err != nil {
 		return "", err
 	}
 	deltaSegNo := logSegNo - (logSegNo % WalFileInDelta)
-	return formatWALFileName(timeline, deltaSegNo) + DeltaFilenameSuffix, nil
+	return toDeltaFilename(formatWALFileName(timeline, deltaSegNo)), nil
 }
 
-func openDeltaFileFor(walFilename string) (*os.File, error) {
-	deltaFileName, err := getDeltaFileNameFor(walFilename)
+func OpenDeltaFileFor(dataFolderPath, walFilename string) (*os.File, error) {
+	deltaFilename, err := GetDeltaFilenameFor(walFilename)
 	if err != nil {
 		return nil, err
 	}
-	deltaFilePath := path.Join(PathToDataFolder, deltaFileName)
-	if deltaFileName == walFilename {
+	deltaFilePath := path.Join(dataFolderPath, deltaFilename)
+	if deltaFilename == toDeltaFilename(walFilename) {
 		// this is the first wal file in delta, so new delta file should be created
 		return os.Create(deltaFilePath)
 	}
-	deltaFile, err := os.Open(deltaFilePath)
+	deltaFile, err := os.OpenFile(deltaFilePath, os.O_RDWR | os.O_APPEND, 0666)
 	return deltaFile, err
 }

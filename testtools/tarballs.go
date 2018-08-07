@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"bytes"
 	"github.com/pierrec/lz4"
 	"github.com/wal-g/wal-g"
 )
@@ -107,3 +108,47 @@ func (tarBall *NOPTarBall) AddSize(i int64)          { tarBall.size += i }
 func (tarBall *NOPTarBall) TarWriter() *tar.Writer   { return tarBall.tarWriter }
 func (tarBall *NOPTarBall) FileExtension() string    { return "lz4" }
 func (tarBall *NOPTarBall) AwaitUploads()            {}
+
+// BufferTarBall represents a tarball that is
+// written to buffer.
+type BufferTarBall struct {
+	number           int
+	size             int64
+	archiveDirectory string
+	underlying       *bytes.Buffer
+	tarWriter        *tar.Writer
+}
+
+func (tarBall *BufferTarBall) SetUp(crypter walg.Crypter, args ...string) {
+	tarBall.tarWriter = tar.NewWriter(tarBall.underlying)
+}
+
+func (tarBall *BufferTarBall) CloseTar() error {
+	return tarBall.tarWriter.Close()
+}
+
+func (tarBall *BufferTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error {
+	return nil
+}
+
+func (tarBall *BufferTarBall) GetFileRelPath(fileAbsPath string) string {
+	return walg.GetFileRelativePath(fileAbsPath, tarBall.archiveDirectory)
+}
+
+func (tarBall *BufferTarBall) Size() int64 {
+	return tarBall.size
+}
+
+func (tarBall *BufferTarBall) AddSize(add int64) {
+	tarBall.size += add
+}
+
+func (tarBall *BufferTarBall) TarWriter() *tar.Writer {
+	return tarBall.tarWriter
+}
+
+func (tarBall *BufferTarBall) FileExtension() string {
+	return "lz4"
+}
+
+func (tarBall *BufferTarBall) AwaitUploads() {}

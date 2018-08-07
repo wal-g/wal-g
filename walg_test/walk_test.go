@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 	"github.com/wal-g/wal-g/testtools"
 	"io"
@@ -353,14 +354,10 @@ func TestWalk(t *testing.T) {
 
 	// Test that sentinel exists and is handled correctly.
 	sen := bundle.Sentinel.Info.Name()
-	if sen != "pg_control" {
-		t.Errorf("walk: Sentinel expected %s but got %s", "pg_control", sen)
-	}
+	assert.Equal(t, "pg_control", sen)
 
 	err = bundle.HandleSentinel()
-	if err != nil {
-		t.Errorf("walk: Sentinel expected to succeed but got %+v\n", err)
-	}
+	assert.NoError(t, err)
 
 	// err = bundle.HandleLabelFiles("backup", "table")
 	// if err != nil {
@@ -379,17 +376,12 @@ func TestWalk(t *testing.T) {
 	}
 
 	// Re-use generated data to test uploading WAL.
-	tu := testtools.NewLz4MockTarUploader()
-	tu.UploaderApi = testtools.NewMockS3Uploader(false, false)
+	uploader := testtools.NewMockTarUploader(false, false)
 	walFileName := filepath.Join(data, "1")
 	walFile, err := os.Open(walFileName)
-	if err != nil {
-		t.Errorf("can't open file: %s", walFileName)
-	}
-	wal, err := tu.UploadWal(walFile, false)
-	if wal == "" {
-		t.Errorf("upload: expected wal path to be set but got ''")
-	}
+	assert.NoError(t, err)
+	wal, err := uploader.UploadWalFile(walFile, false)
+	assert.NotEqual(t, "", wal)
 
 	if err != nil {
 		//t.Errorf("upload: expected no error to occur but got %+v", err)

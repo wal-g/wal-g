@@ -2,6 +2,7 @@ package walg_test
 
 import (
 	"bytes"
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 	"golang.org/x/crypto/openpgp"
 	"io"
@@ -121,24 +122,16 @@ func TestEncryptionCycle(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	encrypt, err := crypter.Encrypt(&ClosingBuffer{buf})
-	if err != nil {
-		t.Errorf("Encryption error: %v", err)
-	}
+	assert.NoErrorf(t, err, "Encryption error: %v", err)
 
 	encrypt.Write([]byte(somesecret))
 	encrypt.Close()
 
 	decrypt, err := crypter.Decrypt(&ClosingBuffer{buf})
-	if err != nil {
-		t.Errorf("Decryption error: %v", err)
-	}
+	assert.NoErrorf(t, err, "Decryption error: %v", err)
 
 	decryptedBytes, err := ioutil.ReadAll(decrypt)
-	if err != nil {
-		t.Errorf("Decryption read error: %v", err)
-	}
+	assert.NoErrorf(t, err, "Decryption read error: %v", err)
 
-	if string(decryptedBytes) != somesecret {
-		t.Errorf("Decrypted text not equals open text")
-	}
+	assert.Equal(t, somesecret, string(decryptedBytes), "Decrypted text not equals open text")
 }

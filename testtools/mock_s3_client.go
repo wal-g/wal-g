@@ -25,8 +25,8 @@ func NewMockS3Client(err, notFound bool) *mockS3Client {
 	return &mockS3Client{err: err, notFound: notFound}
 }
 
-func (m *mockS3Client) ListObjectsV2Pages(input *s3.ListObjectsV2Input, callback func(*s3.ListObjectsV2Output, bool) bool) error {
-	if m.err {
+func (client *mockS3Client) ListObjectsV2Pages(input *s3.ListObjectsV2Input, callback func(*s3.ListObjectsV2Output, bool) bool) error {
+	if client.err {
 		return awserr.New("MockListObjectsV2", "mock ListObjectsV2 errors", nil)
 	}
 
@@ -40,8 +40,8 @@ func (m *mockS3Client) ListObjectsV2Pages(input *s3.ListObjectsV2Input, callback
 	return nil
 }
 
-func (m *mockS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error) {
-	if m.err {
+func (client *mockS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error) {
+	if client.err {
 		return nil, awserr.New("MockGetObject", "mock GetObject error", nil)
 	}
 
@@ -52,10 +52,10 @@ func (m *mockS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput,
 	return output, nil
 }
 
-func (m *mockS3Client) HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjectOutput, error) {
-	if m.err && m.notFound {
+func (client *mockS3Client) HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjectOutput, error) {
+	if client.err && client.notFound {
 		return nil, awserr.New(walg.NotFoundAWSErrorCode, "mock HeadObject error", nil)
-	} else if m.err {
+	} else if client.err {
 		return nil, awserr.New("MockHeadObject", "mock HeadObject error", nil)
 	}
 

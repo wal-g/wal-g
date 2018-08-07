@@ -3,6 +3,7 @@ package walg_test
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 	"github.com/wal-g/wal-g/testtools"
 	"io/ioutil"
@@ -27,27 +28,19 @@ func TestBackupErrors(t *testing.T) {
 
 	//CheckExistence error testing
 	exists, _ := bk.CheckExistence()
-	if exists {
-		t.Errorf("backup: expected mock backup to not exist")
-	}
+	assert.Falsef(t, exists, "backup: expected mock backup to not exist")
 
 	folder.S3API = testtools.NewMockS3Client(true, false)
 	_, err := bk.CheckExistence()
-	if err == nil {
-		t.Errorf("backup: CheckExistence expected error but got '<nil>'")
-	}
+	assert.Errorf(t, err, "backup: CheckExistence expected error but got '<nil>'")
 
 	//GetLatest error testing
 	_, err = bk.GetLatest()
-	if err == nil {
-		t.Errorf("backup: expected error but got '<nil>'")
-	}
+	assert.Errorf(t, err, "backup: expected error but got '<nil>'")
 
 	//GetKeys error testing
 	_, err = bk.GetKeys()
-	if err == nil {
-		t.Errorf("backup: expected error but got '<nil>'")
-	}
+	assert.Errorf(t, err, "backup: expected error but got '<nil>'")
 
 	//Test S3 ReaderMaker with error S3.
 	keys := []string{"1.nop", "2.nop", "3.gzip", "4.lzo"}
@@ -64,9 +57,7 @@ func TestBackupErrors(t *testing.T) {
 	}
 
 	err = walg.ExtractAll(n, out)
-	if err == nil {
-		t.Errorf("backup: expected error but got '<nil>'")
-	}
+	assert.Errorf(t, err, "backup: expected error but got '<nil>'")
 }
 
 // Tests backup-fetch methods including:
@@ -83,25 +74,15 @@ func TestBackup(t *testing.T) {
 	}
 
 	latest, _ := bk.GetLatest()
-	if latest != "first.nop" {
-		t.Errorf("backup: expected %s from 'GetLatest' but got %s", "first", latest)
-	}
+	assert.Equalf(t, "first.nop", latest, "backup: expected %s from 'GetLatest' but got %s", "first", latest)
 
 	exists, _ := bk.CheckExistence()
-	if !exists {
-		t.Errorf("backup: expected mock backup to exist but 'CheckExistence' returned false")
-	}
+	assert.Truef(t, exists, "backup: expected mock backup to exist but 'CheckExistence' returned false")
 
 	keys, err := bk.GetKeys()
-	if err != nil {
-		t.Errorf("backup: expected no error but got %+v\n", err)
-	}
+	assert.NoErrorf(t, err, "backup: expected no error but got %+v\n", err)
 
-	for i, val := range correctKeys {
-		if keys[i] != val {
-			t.Errorf("backup: expected %s but got %s", val, keys[i])
-		}
-	}
+	assert.Equal(t, correctKeys, keys)
 
 	// Test S3 ReaderMaker
 	n := &testtools.NOPTarInterpreter{}
@@ -114,16 +95,11 @@ func TestBackup(t *testing.T) {
 			FileFormat: walg.GetFileExtension(key),
 		}
 		out[i] = s
-		if out[i].Path() != correctKeys[i] {
-			t.Errorf("backup: expected S3ReaderMaker key to be %s but got %s", correctKeys[i], out[i].Path())
-		}
+		assert.Equalf(t, correctKeys[i], out[i].Path(), "backup: expected S3ReaderMaker key to be %s but got %s", correctKeys[i], out[i].Path())
 	}
 
 	err = walg.ExtractAll(n, out)
-	if err != nil {
-		t.Errorf("backup: could not extract from S3ReaderMaker")
-	}
-
+	assert.NoErrorf(t, err, "backup: could not extract from S3ReaderMaker")
 }
 
 func TestArchiveErrors(t *testing.T) {
@@ -136,15 +112,11 @@ func TestArchiveErrors(t *testing.T) {
 
 	// CheckExistence error testing
 	exists, _ := arch.CheckExistence()
-	if exists {
-		t.Errorf("archive: expected mock archive to not exist")
-	}
+	assert.Falsef(t, exists, "archive: expected mock archive to not exist")
 
 	folder.S3API = testtools.NewMockS3Client(true, false)
 	_, err := arch.CheckExistence()
-	if err == nil {
-		t.Errorf("archive: CheckExistence expected error but got `<nil>`")
-	}
+	assert.Errorf(t, err, "archive: CheckExistence expected error but got `<nil>`")
 
 }
 
@@ -160,14 +132,10 @@ func TestArchive(t *testing.T) {
 	}
 
 	exists, _ := arch.CheckExistence()
-	if !exists {
-		t.Errorf("archive: expected mock archive to exist but 'CheckExistence' returned false")
-	}
+	assert.Truef(t, exists, "archive: expected mock archive to exist but 'CheckExistence' returned false")
 
 	body, err := arch.GetArchive()
-	if err != nil {
-		t.Errorf("archive: expected no error but got %+v\n", err)
-	}
+	assert.NoErrorf(t, err, "archive: expected no error but got %+v\n", err)
 
 	allBody, err := ioutil.ReadAll(body)
 
@@ -175,21 +143,15 @@ func TestArchive(t *testing.T) {
 		t.Log(err)
 	}
 
-	if string(allBody[:]) != "mock content" {
-		t.Errorf("archive: expected archive body to be %s but got %v", "mock content", allBody)
-	}
+	assert.Equal(t, "mock content", string(allBody[:]), "archive: expected archive body to be %s but got %v", "mock content", allBody)
 
 	folder.S3API = testtools.NewMockS3Client(true, false)
 
 	_, err = arch.CheckExistence()
-	if err == nil {
-		t.Errorf("archive: CheckExistence expected error but got `<nil>`")
-	}
+	assert.Errorf(t, err, "archive: CheckExistence expected error but got `<nil>`")
 
 	_, err = arch.GetArchive()
-	if err == nil {
-		t.Errorf("archive: expected error but got %v", err)
-	}
+	assert.Errorf(t, err, "archive: expected error but got %v", err)
 }
 
 func TestGetBackupTimeSlices(t *testing.T) {
@@ -224,16 +186,7 @@ func TestGetBackupTimeSlices(t *testing.T) {
 func checkSortingPermutationResult(objectsFromS3 *s3.ListObjectsV2Output, t *testing.T) {
 	//t.Log(objectsFromS3)
 	slice := walg.GetBackupTimeSlices(objectsFromS3.Contents)
-	if slice[0].Name != "backup01" {
-		t.Log(slice[0].Name)
-		t.Error("Sorting does not work correctly")
-	}
-	if slice[1].Name != "backup02" {
-		t.Log(slice[1].Name)
-		t.Error("Sorting does not work correctly")
-	}
-	if slice[2].Name != "backup03" {
-		t.Log(slice[2].Name)
-		t.Error("Sorting does not work correctly")
-	}
+	assert.Equalf(t, "backup01", slice[0].Name, "Sorting does not work correctly")
+	assert.Equalf(t, "backup02", slice[1].Name, "Sorting does not work correctly")
+	assert.Equalf(t, "backup03", slice[2].Name, "Sorting does not work correctly")
 }

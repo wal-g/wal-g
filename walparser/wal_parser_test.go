@@ -2,6 +2,7 @@ package walparser
 
 import (
 	"bytes"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
 )
@@ -39,54 +40,34 @@ func TestZeroPageParsing(t *testing.T) {
 	zeroPage := make([]byte, WalPageSize)
 	parser := WalParser{}
 	pageData, err := parser.ParseRecordsFromPage(bytes.NewReader(zeroPage))
-	if pageData != nil {
-		t.Fatal("not nil pageData")
-	}
-	if err != ZeroPageError {
-		t.Fatalf("Expected ZeroPageError, buf found: %v", err)
-	}
+	assert.Nilf(t, pageData, "not nil pageData")
+	assert.Equal(t, ZeroPageError, err)
 }
 
 func doPartialFileParsingTesting(t *testing.T, pageReader WalPageReader, parser WalParser) {
 	page, err := pageReader.ReadPageData()
-	if err != nil {
-		t.Fatal(err.Error())
-	}
+	assert.NoError(t, err)
 	_, err = parser.ParseRecordsFromPage(bytes.NewReader(page))
-	if err != PartialPageError {
-		t.Fatalf("got error %v, but expected PartialPageError", err)
-	}
+	assert.Equal(t, PartialPageError, err)
 }
 
 func doWalSwitchParsingTesting(t *testing.T, pageReader WalPageReader, parser WalParser) {
 	firstPage, err := pageReader.ReadPageData() // first page contains first part of WAL-Switch record
-	if err != nil {
-		t.Fatal(err.Error())
-	}
+	assert.NoError(t, err)
 	_, err = parser.ParseRecordsFromPage(bytes.NewReader(firstPage))
-	if err != nil {
-		t.Fatal(err.Error())
-	}
+	assert.NoError(t, err)
 
 	secondPage, err := pageReader.ReadPageData() // second page contains second part of WAL-Switch record
-	if err != nil {
-		t.Fatal(err.Error())
-	}
+	assert.NoError(t, err)
 	records, err := parser.ParseRecordsFromPage(bytes.NewReader(secondPage))
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	if !records[len(records)-1].isWALSwitch() {
-		t.Fatal("expected WAL Switch record")
-	}
+	assert.NoError(t, err)
+	assert.Truef(t, records[len(records)-1].isWALSwitch(), "expected WAL Switch record")
 }
 
 func parsingTestCase(t *testing.T, filename string, doTesting func(*testing.T, WalPageReader, WalParser)) {
 	walFile, err := os.Open(filename)
 	defer walFile.Close()
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
+	assert.NoError(t, err)
 	pageReader := WalPageReader{walFileReader: walFile}
 	parser := WalParser{}
 

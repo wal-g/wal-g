@@ -3,6 +3,7 @@ package walg_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 )
 
@@ -10,64 +11,44 @@ import (
 func TestBuildStartBackup(t *testing.T) {
 	queryBuilder := &walg.PgQueryRunner{Version: 0}
 	_, err := queryBuilder.BuildStartBackup()
-	if err == nil {
-		t.Error("BuildStartBackup did not error on version 0")
-	}
+	assert.Error(t, err)
 
 	queryBuilder.Version = 81000
 	_, err = queryBuilder.BuildStartBackup()
-	if err.Error() != "Could not determine start backup query for version 81000" {
-		t.Errorf("Incorrect error for BuildStartBackup with version 81000, got error %s", err)
-	}
+	assert.Equal(t, "Could not determine start backup query for version 81000", err.Error())
 
 	queryBuilder.Version = 90321
 	queryString, err := queryBuilder.BuildStartBackup()
-	if queryString != "SELECT case when pg_is_in_recovery() then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true) lsn" {
-		t.Errorf("Got wrong query string for BuildStartBackup with version 90321, got %s", queryString)
-	}
+	assert.Equal(t, "SELECT case when pg_is_in_recovery() then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true) lsn", queryString)
 
 	queryBuilder.Version = 90600
 	queryString, err = queryBuilder.BuildStartBackup()
-	if queryString != "SELECT case when pg_is_in_recovery() then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn" {
-		t.Errorf("Got wrong query string for BuildStartBackup with version 90600, got %s", queryString)
-	}
+	assert.Equal(t, "SELECT case when pg_is_in_recovery() then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn", queryString)
 
 	queryBuilder.Version = 100000
 	queryString, err = queryBuilder.BuildStartBackup()
-	if queryString != "SELECT case when pg_is_in_recovery() then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn" {
-		t.Errorf("Got wrong query string for BuildStartBackup with version 100000, got %s", queryString)
-	}
+	assert.Equal(t, "SELECT case when pg_is_in_recovery() then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn", queryString)
 }
 
 // Tests building stop backup query
 func TestBuildStopBackup(t *testing.T) {
 	queryBuilder := &walg.PgQueryRunner{Version: 0}
 	_, err := queryBuilder.BuildStopBackup()
-	if err == nil {
-		t.Error("BuildStopBackup did not error on version 0")
-	}
+	assert.Errorf(t, err, "BuildStopBackup did not error on version 0")
 
 	queryBuilder.Version = 81000
 	_, err = queryBuilder.BuildStopBackup()
-	if err.Error() != "Could not determine stop backup query for version 81000" {
-		t.Errorf("Incorrect error for BuildStopBackup with version 81000, got error %s", err)
-	}
+	assert.Equal(t, "Could not determine stop backup query for version 81000", err.Error())
 
 	queryBuilder.Version = 90321
 	queryString, err := queryBuilder.BuildStopBackup()
-	if queryString != "SELECT (pg_xlogfile_name_offset(lsn)).file_name, lpad((pg_xlogfile_name_offset(lsn)).file_offset::text, 8, '0') AS file_offset, lsn::text FROM pg_stop_backup() lsn" {
-		t.Errorf("Got wrong query string for BuildStopBackup with version 90321, got %s", queryString)
-	}
+	assert.Equal(t, "SELECT (pg_xlogfile_name_offset(lsn)).file_name, lpad((pg_xlogfile_name_offset(lsn)).file_offset::text, 8, '0') AS file_offset, lsn::text FROM pg_stop_backup() lsn", queryString)
 
 	queryBuilder.Version = 90600
 	queryString, err = queryBuilder.BuildStopBackup()
-	if queryString != "SELECT labelfile, spcmapfile, lsn FROM pg_stop_backup(false)" {
-		t.Errorf("Got wrong query string for BuildStopBackup with version 90600, got %s", queryString)
-	}
+	assert.Equal(t, "SELECT labelfile, spcmapfile, lsn FROM pg_stop_backup(false)", queryString)
 
 	queryBuilder.Version = 100000
 	queryString, err = queryBuilder.BuildStopBackup()
-	if queryString != "SELECT labelfile, spcmapfile, lsn FROM pg_stop_backup(false)" {
-		t.Errorf("Got wrong query string for BuildStopBackup with version 100000, got %s", queryString)
-	}
+	assert.Equal(t, "SELECT labelfile, spcmapfile, lsn FROM pg_stop_backup(false)", queryString)
 }

@@ -7,10 +7,14 @@ import (
 )
 
 type BlockLocationWriter struct {
-	underlying io.Writer
+	Underlying io.Writer
 }
 
-func (locationWriter *BlockLocationWriter) writeLocation(location walparser.BlockLocation) error {
+func NewBlockLocationWriter(underlying io.Writer) *BlockLocationWriter {
+	return &BlockLocationWriter{underlying}
+}
+
+func (locationWriter *BlockLocationWriter) WriteLocation(location walparser.BlockLocation) error {
 	numbersToWrite := []uint32{
 		uint32(location.RelationFileNode.SpcNode),
 		uint32(location.RelationFileNode.DBNode),
@@ -18,7 +22,7 @@ func (locationWriter *BlockLocationWriter) writeLocation(location walparser.Bloc
 		location.BlockNo,
 	}
 	for _, number := range numbersToWrite {
-		err := binary.Write(locationWriter.underlying, binary.LittleEndian, number)
+		err := binary.Write(locationWriter.Underlying, binary.LittleEndian, number)
 		if err != nil {
 			return err
 		}
@@ -26,14 +30,13 @@ func (locationWriter *BlockLocationWriter) writeLocation(location walparser.Bloc
 	return nil
 }
 
-func writeLocationsTo(writer io.Writer, locations []walparser.BlockLocation) error {
-	locationWriter := BlockLocationWriter{writer}
+func WriteLocationsTo(writer io.Writer, locations []walparser.BlockLocation) error {
+	locationWriter := NewBlockLocationWriter(writer)
 	for _, location := range locations {
-		err := locationWriter.writeLocation(location)
+		err := locationWriter.WriteLocation(location)
 		if err != nil {
 			return err
 		}
-
 	}
 	return nil
 }

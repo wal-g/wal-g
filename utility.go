@@ -29,14 +29,6 @@ const (
 // Empty is used for channel signaling.
 type Empty struct{}
 
-// NilWriter to /dev/null
-type NilWriter struct{}
-
-// Write to /dev/null
-func (nw *NilWriter) Write(p []byte) (n int, err error) {
-	return len(p), nil
-}
-
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -171,7 +163,7 @@ func GetFileRelativePath(fileAbsPath string, directoryPath string) string {
 	return strings.TrimPrefix(fileAbsPath, directoryPath)
 }
 
-func writeTo(dst io.Writer, src io.Reader) (int64, error) {
+func WriteTo(dst io.Writer, src io.Reader) (int64, error) {
 	n := int64(0)
 	buf := make([]byte, CompressedBlockMaxSize)
 	for {

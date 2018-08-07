@@ -339,8 +339,8 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	maxDeltas, fromFull := getDeltaConfig()
 
 	var backup = &Backup{
-		Folder: uploader.UploadingFolder,
-		Path:   GetBackupPath(uploader.UploadingFolder),
+		Folder: uploader.uploadingFolder,
+		Path:   GetBackupPath(uploader.uploadingFolder),
 	}
 
 	var previousBackupSentinelDto S3TarBallSentinelDto
@@ -354,7 +354,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 			if err != nil {
 				log.Fatalf("%+v\n", err)
 			}
-			previousBackupSentinelDto = fetchSentinel(latest, backup, uploader.UploadingFolder)
+			previousBackupSentinelDto = fetchSentinel(latest, backup, uploader.uploadingFolder)
 			if previousBackupSentinelDto.IncrementCount != nil {
 				incrementCount = *previousBackupSentinelDto.IncrementCount + 1
 			}
@@ -368,7 +368,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 				if fromFull {
 					fmt.Println("Delta will be made from full backup.")
 					latest = *previousBackupSentinelDto.IncrementFullName
-					previousBackupSentinelDto = fetchSentinel(latest, backup, uploader.UploadingFolder)
+					previousBackupSentinelDto = fetchSentinel(latest, backup, uploader.uploadingFolder)
 				}
 				fmt.Printf("Delta backup from %v with LSN %x. \n", latest, *previousBackupSentinelDto.BackupStartLSN)
 			}
@@ -389,11 +389,10 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 
 	if len(latest) > 0 && previousBackupSentinelDto.BackupStartLSN != nil {
 		if uploader.useWalDelta {
-			err = bundle.loadDeltaMap(uploader.UploadingFolder, backupStartLSN)
+			err = bundle.DownloadDeltaMap(uploader.uploadingFolder, backupStartLSN)
 			if err == nil {
 				fmt.Println("Successfully loaded delta map, delta backup will be made with provided delta map")
 			} else {
-				bundle.DeltaMap = nil
 				fmt.Printf("Error during loading delta map: '%v'. Fallback to full scan delta backup\n", err)
 			}
 		}
@@ -532,21 +531,24 @@ func checkWALFileMagic(prefetched string) error {
 	return nil
 }
 
-func tryDownloadWALFile(folder *S3Folder, walFullPath string) (archiveReader io.ReadCloser, exists bool, err error) {
+// TODO : unit tests
+func tryDownloadWALFile(folder *S3Folder, walPath string) (archiveReader io.ReadCloser, exists bool, err error) {
 	archive := &Archive{
 		Folder:  folder,
-		Archive: aws.String(sanitizePath(walFullPath)),
+		Archive: aws.String(sanitizePath(walPath)),
 	}
-
-	exists, err = archive.CheckExistence()
-	if err != nil || !exists {
-		return
-	}
-
 	archiveReader, err = archive.GetArchive()
+	if err != nil {
+		if IsAwsNotExist(err) {
+			err = nil
+		}
+	} else {
+		exists = true
+	}
 	return
 }
 
+// TODO : unit tests
 func decompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor Decompressor) error {
 	crypter := OpenPGPCrypter{}
 	if crypter.IsUsed() {
@@ -561,6 +563,7 @@ func decompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor 
 	return err
 }
 
+// TODO : unit tests
 func downloadAndDecompressWALFile(folder *S3Folder, walFileName string) (io.ReadCloser, error) {
 	for _, decompressor := range Decompressors {
 		archiveReader, exists, err := tryDownloadWALFile(folder, *folder.Server+WalPath+walFileName+"."+decompressor.FileExtension())
@@ -571,11 +574,10 @@ func downloadAndDecompressWALFile(folder *S3Folder, walFileName string) (io.Read
 			continue
 		}
 		reader, writer := io.Pipe()
-		defer writer.Close()
-		err = decompressWALFile(writer, archiveReader, decompressor)
-		if err != nil {
-			return nil, err
-		}
+		go func() {
+			decompressWALFile(&EmptyWriteIgnorer{writer}, archiveReader, decompressor) // TODO : handle errors
+			writer.Close()
+		} ()
 		return reader, nil
 	}
 	return nil, ArchiveNonExistenceError{walFileName}
@@ -588,7 +590,7 @@ func downloadWALFileTo(folder *S3Folder, walFileName string, dstPath string) err
 	if err != nil {
 		return err
 	}
-	return createFileAndWriteToIt(dstPath, reader)
+	return CreateFileWith(dstPath, reader)
 }
 
 // HandleWALPush is invoked to perform wal-g wal-push
@@ -603,12 +605,12 @@ func HandleWALPush(uploader *Uploader, walFilePath string, verify bool) {
 }
 
 // uploadWALFile from FS to the cloud
-func uploadWALFile(tarUploader *Uploader, walFilePath string, verify bool) {
+func uploadWALFile(uploader *Uploader, walFilePath string, verify bool) {
 	walFile, err := os.Open(walFilePath)
 	if err != nil {
 		log.Fatalf("upload: could not open '%s'\n", walFilePath)
 	}
-	path, err := tarUploader.UploadWal(walFile, verify)
+	path, err := uploader.UploadWalFile(walFile, verify)
 	if compressionError, ok := err.(CompressingPipeWriterError); ok {
 		log.Fatalf("FATAL: could not upload '%s' due to compression error.\n%+v\n", path, compressionError)
 	} else if err != nil {

@@ -3,6 +3,7 @@ package walg_test
 import (
 	"bytes"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 	"io"
 	"io/ioutil"
@@ -121,23 +122,14 @@ func testCompressor(compressor walg.Compressor, initialFilePath string, t *testi
 
 	err := compressInitialFile(compressor, initialFilePath, t)
 	defer os.Remove(CompressedFilePath + compressor.FileExtension())
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NoError(t, err)
 
 	err = decompressCompressedFile(compressor.FileExtension())
 	defer os.Remove(DecompressedFilePath)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NoError(t, err)
 
 	err = compareDecompressedFileWithInitial(initialFilePath)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NoError(t, err)
 }
 
 func TestSmallFileCompression(t *testing.T) {
@@ -150,9 +142,7 @@ func TestSmallFileCompression(t *testing.T) {
 func TestBigFileCompression(t *testing.T) {
 	const BigFileSize = 50 << 20
 	err := generateFile(BigFilePath, BigFileSize)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 	defer os.Remove(BigFilePath)
 	for _, compressingAlgorithm := range walg.CompressingAlgorithms {
 		compressor := walg.Compressors[compressingAlgorithm]

@@ -28,8 +28,22 @@ func TimeTrack(start time.Time, name string) {
 	fmt.Printf("%s took %s\n", name, elapsed)
 }
 
-func NewLz4MockTarUploader() *walg.Uploader {
-	return walg.NewUploader(walg.Lz4AlgorithmName, walg.NewS3Folder(nil, "bucket", "server"), false)
+func NewMockTarUploader(apiMultiErr, apiErr bool) *walg.Uploader {
+	return walg.NewUploader(
+		NewMockS3Uploader(apiMultiErr, apiErr, nil),
+		&MockCompressor{},
+		walg.NewS3Folder(nil, "bucket/", "server"),
+		false,
+	)
+}
+
+func NewStoringMockTarUploader(apiMultiErr, apiErr bool, storage MockStorage) *walg.Uploader {
+	return walg.NewUploader(
+		NewMockS3Uploader(apiMultiErr, apiErr, storage),
+		&MockCompressor{},
+		walg.NewS3Folder(nil, "bucket/", "server"),
+		false,
+	)
 }
 
 func NewLz4CompressingPipeWriter(input io.Reader) *walg.CompressingPipeWriter {
@@ -43,6 +57,14 @@ func NewLz4CompressingPipeWriter(input io.Reader) *walg.CompressingPipeWriter {
 
 func NewMockS3Folder(s3ClientErr, s3ClientNotFound bool) *walg.S3Folder {
 	return walg.NewS3Folder(NewMockS3Client(s3ClientErr, s3ClientNotFound), "mock bucket", "mock server")
+}
+
+type ReadWriteNopCloser struct {
+	io.ReadWriter
+}
+
+func (readWriteNopCloser *ReadWriteNopCloser) Close() error {
+	return nil
 }
 
 func Contains(s *[]string, e string) bool {
