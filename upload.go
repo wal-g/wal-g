@@ -10,11 +10,14 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pkg/errors"
+	"golang.org/x/time/rate"
 	"net/url"
 	"os"
 	"strconv"
-	"golang.org/x/time/rate"
+	"strings"
 )
+
+const DefaultStreamingPartSizeFor10Concurrency = 20 << 20
 
 // MaxRetries limit upload and download retries during interaction with S3
 var MaxRetries = 15
@@ -51,7 +54,7 @@ func findS3BucketRegion(bucket string, config *aws.Config) (string, error) {
 // WALE_S3_PREFIX
 //
 // Able to configure the upload part size in the S3 uploader.
-func Configure() (*TarUploader, *S3Prefix, error) {
+func Configure() (*Uploader, *S3Folder, error) { // TODO : add parameter naming
 	waleS3Prefix := os.Getenv("WALE_S3_PREFIX")
 	if waleS3Prefix == "" {
 		return nil, nil, &UnsetEnvVarError{names: []string{"WALE_S3_PREFIX"}}
@@ -66,17 +69,11 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 	}
 
 	bucket := waleS3Url.Host
-	var server = ""
-	if len(waleS3Url.Path) > 0 {
-		// TODO: Unchecked assertion: first char is '/'
-		server = waleS3Url.Path[1:]
-	}
+	server := strings.TrimPrefix(waleS3Url.Path, "/")
 
-	if len(server) > 0 && server[len(server)-1] == '/' {
-		// Allover the code this parameter is concatenated with '/'.
-		// TODO: Get rid of numerous string literals concatenated with this
-		server = server[:len(server)-1]
-	}
+	// Allover the code this parameter is concatenated with '/'.
+	// TODO: Get rid of numerous string literals concatenated with this
+	server = strings.TrimSuffix(server, "/")
 
 	config := defaults.Get().Config
 
@@ -115,18 +112,13 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 		return nil, nil, UnknownCompressionMethodError{}
 	}
 
-	pre := &S3Prefix{
-		Bucket: aws.String(bucket),
-		Server: aws.String(server),
-	}
-
 	diskLimitStr := os.Getenv("WALG_DISK_RATE_LIMIT")
 	if diskLimitStr != "" {
 		diskLimit, err := strconv.ParseInt(diskLimitStr, 10, 64)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "Configure: failed to parse WALG_DISK_RATE_LIMIT")
 		}
-		diskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+64*1024)); // Add 8 pages to possible bursts
+		diskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+64*1024)) // Add 8 pages to possible bursts
 	}
 
 	netLimitStr := os.Getenv("WALG_NETWORK_RATE_LIMIT")
@@ -135,7 +127,7 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "Configure: failed to parse WALG_NETWORK_RATE_LIMIT")
 		}
-		networkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+64*1024)); // Add 8 pages to possible bursts
+		networkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+64*1024)) // Add 8 pages to possible bursts
 	}
 
 	sess, err := session.NewSession(config)
@@ -143,11 +135,21 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 		return nil, nil, errors.Wrap(err, "Configure: failed to create new session")
 	}
 
-	pre.Svc = s3.New(sess)
+	useWalDeltaStr, hasUseWalDelta := os.LookupEnv("WALG_USE_WAL_DELTA")
+	useWalDelta := false
+	if hasUseWalDelta {
+		useWalDelta, err = strconv.ParseBool(useWalDeltaStr)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "Cofigure: failed to parse WALG_USE_WAL_DELTA")
+		}
+	}
 
-	uploader := NewTarUploader(bucket, server, compressionMethod)
+	folder := NewS3Folder(s3.New(sess), bucket, server)
 
-	var con = getMaxUploadConcurrency(10)
+	var concurrency = getMaxUploadConcurrency(10)
+	uploaderApi := createUploader(folder.S3API, DefaultStreamingPartSizeFor10Concurrency, concurrency)
+	uploader := NewUploader(uploaderApi, Compressors[compressionMethod], folder, useWalDelta)
+
 	storageClass, ok := os.LookupEnv("WALG_S3_STORAGE_CLASS")
 	if ok {
 		uploader.StorageClass = storageClass
@@ -155,7 +157,7 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 
 	serverSideEncryption, ok := os.LookupEnv("WALG_S3_SSE")
 	if ok {
-		uploader.ServerSideEncryption = serverSideEncryption
+		uploader.serverSideEncryption = serverSideEncryption
 	}
 
 	sseKmsKeyId, ok := os.LookupEnv("WALG_S3_SSE_KMS_ID")
@@ -168,17 +170,15 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 		return nil, nil, errors.New("Configure: WALG_S3_SSE_KMS_ID must be set iff using aws:kms encryption")
 	}
 
-	uploader.UploaderApi = CreateUploader(pre.Svc, 20*1024*1024, con) //default 10 concurrency streams at 20MB
-
-	return uploader, pre, err
+	return uploader, folder, err
 }
 
-// CreateUploader returns an uploader with customizable concurrency
+// createUploader returns an uploader with customizable concurrency
 // and partsize.
-func CreateUploader(svc s3iface.S3API, partsize, concurrency int) s3manageriface.UploaderAPI {
-	up := s3manager.NewUploaderWithClient(svc, func(u *s3manager.Uploader) {
-		u.PartSize = int64(partsize)
-		u.Concurrency = concurrency
+func createUploader(svc s3iface.S3API, partsize, concurrency int) s3manageriface.UploaderAPI {
+	uploaderAPI := s3manager.NewUploaderWithClient(svc, func(uploader *s3manager.Uploader) {
+		uploader.PartSize = int64(partsize)
+		uploader.Concurrency = concurrency
 	})
-	return up
+	return uploaderAPI
 }

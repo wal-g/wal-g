@@ -14,7 +14,7 @@ import (
 // TarInterpreter behaves differently
 // for different file types.
 type TarInterpreter interface {
-	Interpret(r io.Reader, hdr *tar.Header) error
+	Interpret(reader io.Reader, header *tar.Header) error
 }
 
 // FileTarInterpreter extracts input to disk.
@@ -37,13 +37,13 @@ func (tarInterpreter *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Heade
 		fd, haveFd := tarInterpreter.Sentinel.Files[cur.Name]
 
 		// If this file is incremental we use it's base version from incremental path
-		if haveFd && tarInterpreter.Sentinel.IsIncremental() && fd.IsIncremented {
+		if haveFd && tarInterpreter.Sentinel.isIncremental() && fd.IsIncremented {
 			err := ApplyFileIncrement(incrementalPath, tr)
 			if err != nil {
 				return errors.Wrap(err, "Interpret: failed to apply increment for "+targetPath)
 			}
 
-			err = MoveFileAndCreateDirs(incrementalPath, targetPath, cur.Name)
+			err = moveFileAndCreateDirs(incrementalPath, targetPath, cur.Name)
 			if err != nil {
 				return errors.Wrap(err, "Interpret: failed to move increment for "+targetPath)
 			}
@@ -106,21 +106,21 @@ func (tarInterpreter *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Heade
 	return nil
 }
 
-// MoveFileAndCreateDirs moves file from incremental folder to target folder, creating necessary folders structure
-func MoveFileAndCreateDirs(incrementalPath string, targetPath string, fileName string) (err error) {
+// moveFileAndCreateDirs moves file from incremental folder to target folder, creating necessary folders structure
+func moveFileAndCreateDirs(incrementalPath string, targetPath string, fileName string) (err error) {
 	err = os.Rename(incrementalPath, targetPath)
 	if os.IsNotExist(err) {
 		// this path is invoked if this is a first file in a dir
 		err := prepareDirs(fileName, targetPath)
 		if err != nil {
-			return errors.Wrap(err, "MoveFileAndCreateDirs: failed to create all directories")
+			return errors.Wrap(err, "moveFileAndCreateDirs: failed to create all directories")
 		}
 		err = os.Rename(incrementalPath, targetPath)
 		if err != nil {
-			return errors.Wrap(err, "MoveFileAndCreateDirs: failed to rename incremented file "+targetPath)
+			return errors.Wrap(err, "moveFileAndCreateDirs: failed to rename incremented file "+targetPath)
 		}
 	} else if err != nil {
-		return errors.Wrap(err, "MoveFileAndCreateDirs: failed to rename incremented file "+targetPath)
+		return errors.Wrap(err, "moveFileAndCreateDirs: failed to rename incremented file "+targetPath)
 	}
 	return nil
 }

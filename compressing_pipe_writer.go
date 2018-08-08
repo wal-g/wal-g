@@ -6,6 +6,18 @@ import (
 	"io"
 )
 
+// CompressingPipeWriterError is used to catch specific errors from CompressingPipeWriter
+// when uploading to S3. Will not retry upload if this error
+// occurs.
+type CompressingPipeWriterError struct {
+	err error
+}
+
+func (err CompressingPipeWriterError) Error() string {
+	msg := fmt.Sprintf("%+v\n", err.err)
+	return msg
+}
+
 // CompressingPipeWriter allows for flexibility of using compressed output.
 // Input is read and compressed to a pipe reader.
 type CompressingPipeWriter struct {
@@ -41,40 +53,23 @@ func (pipeWriter *CompressingPipeWriter) Compress(crypter Crypter) {
 			dstWriter.CloseWithError(e)
 		}
 
-		defer func() {
-			if err == nil {
-				if err := lzWriter.Close(); err != nil {
-					e := CompressingPipeWriterError{errors.Wrap(err, "Compress: writer close failed")}
-					dstWriter.CloseWithError(e)
-				} else {
-					if crypter.IsUsed() {
-						err := writeCloser.Close()
+		if err := lzWriter.Close(); err != nil {
+			e := CompressingPipeWriterError{errors.Wrap(err, "Compress: writer close failed")}
+			dstWriter.CloseWithError(e)
+			return
+		}
+		if crypter.IsUsed() {
+			err := writeCloser.Close()
 
-						if err != nil {
-							e := CompressingPipeWriterError{errors.Wrap(err, "Compress: encryption failed")}
-							dstWriter.CloseWithError(e)
-							return
-						}
-					}
-					if err = dstWriter.Close(); err != nil {
-						e := CompressingPipeWriterError{errors.Wrap(err, "Compress: pipe writer close failed")}
-						dstWriter.CloseWithError(e)
-					}
-				}
+			if err != nil {
+				e := CompressingPipeWriterError{errors.Wrap(err, "Compress: encryption failed")}
+				dstWriter.CloseWithError(e)
+				return
 			}
-		}()
-
+		}
+		if err = dstWriter.Close(); err != nil {
+			e := CompressingPipeWriterError{errors.Wrap(err, "Compress: pipe writer close failed")}
+			dstWriter.CloseWithError(e)
+		}
 	}()
-}
-
-// CompressingPipeWriterError is used to catch specific errors from CompressingPipeWriter
-// when uploading to S3. Will not retry upload if this error
-// occurs.
-type CompressingPipeWriterError struct {
-	err error
-}
-
-func (err CompressingPipeWriterError) Error() string {
-	msg := fmt.Sprintf("%+v\n", err.err)
-	return msg
 }

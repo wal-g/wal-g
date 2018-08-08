@@ -1,13 +1,15 @@
 package walg
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"io"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -27,14 +29,6 @@ const (
 // Empty is used for channel signaling.
 type Empty struct{}
 
-// NilWriter to /dev/null
-type NilWriter struct{}
-
-// Write to /dev/null
-func (nw *NilWriter) Write(p []byte) (n int, err error) {
-	return len(p), nil
-}
-
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -49,17 +43,19 @@ func max(a, b int) int {
 	return b
 }
 
-func contains(s *[]string, e string) bool {
-	//AB: Go is sick
-	if s == nil {
-		return false
-	}
-	for _, a := range *s {
-		if a == e {
-			return true
+func toBytes(x interface{}) []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.LittleEndian, x)
+	return buf.Bytes()
+}
+
+func allZero(s []byte) bool {
+	for _, v := range s {
+		if v != 0 {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 func sanitizePath(path string) string {
@@ -155,16 +151,19 @@ func getMaxConcurrency(key string, defaultValue int) int {
 	return max(con, 1)
 }
 
-func GetFileExtension(path string) string {
-	re := regexp.MustCompile(`\.([^\.]+)$`)
-	f := re.FindString(path)
-	if f != "" {
-		return f[1:]
+func GetFileExtension(filePath string) string {
+	ext := path.Ext(filePath)
+	if ext != "" {
+		ext = ext[1:]
 	}
-	return ""
+	return ext
 }
 
-func fastCopy(dst io.Writer, src io.Reader) (int64, error) {
+func GetFileRelativePath(fileAbsPath string, directoryPath string) string {
+	return strings.TrimPrefix(fileAbsPath, directoryPath)
+}
+
+func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
 	n := int64(0)
 	buf := make([]byte, CompressedBlockMaxSize)
 	for {

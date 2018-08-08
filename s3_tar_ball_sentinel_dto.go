@@ -4,21 +4,21 @@ import "sync"
 
 // S3TarBallSentinelDto describes file structure of json sentinel
 type S3TarBallSentinelDto struct {
-	LSN               *uint64
+	BackupStartLSN    *uint64 `json:"LSN"`
 	IncrementFromLSN  *uint64 `json:"DeltaFromLSN,omitempty"`
 	IncrementFrom     *string `json:"DeltaFrom,omitempty"`
 	IncrementFullName *string `json:"DeltaFullName,omitempty"`
 	IncrementCount    *int    `json:"DeltaCount,omitempty"`
 
-	Files BackupFileList
+	Files BackupFileList `json:"Files"`
 
-	PgVersion int
-	FinishLSN *uint64
+	PgVersion       int     `json:"PgVersion"`
+	BackupFinishLSN *uint64 `json:"FinishLSN"`
 
 	UserData interface{} `json:"UserData,omitempty"`
 }
 
-func (dto *S3TarBallSentinelDto) SetFiles(p *sync.Map) {
+func (dto *S3TarBallSentinelDto) setFiles(p *sync.Map) {
 	dto.Files = make(BackupFileList)
 	p.Range(func(k, v interface{}) bool {
 		key := k.(string)
@@ -28,8 +28,9 @@ func (dto *S3TarBallSentinelDto) SetFiles(p *sync.Map) {
 	})
 }
 
-// IsIncremental checks that sentinel represents delta backup
-func (dto *S3TarBallSentinelDto) IsIncremental() bool {
+// TODO : get rid of panic here
+// isIncremental checks that sentinel represents delta backup
+func (dto *S3TarBallSentinelDto) isIncremental() bool {
 	// If we have increment base, we must have all the rest properties.
 	// If we do not have base - anything else is a mistake
 	if dto.IncrementFrom != nil {

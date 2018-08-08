@@ -3,7 +3,7 @@
 pgx provides lower level access to PostgreSQL than the standard database/sql.
 It remains as similar to the database/sql interface as possible while
 providing better speed and access to PostgreSQL specific features. Import
-github.com/jack/pgx/stdlib to use pgx as a database/sql compatible driver.
+github.com/jackc/pgx/stdlib to use pgx as a database/sql compatible driver.
 
 Query Interface
 
@@ -159,6 +159,13 @@ PostgreSQL point type.
 pgx also includes support for custom types implementing the database/sql.Scanner
 and database/sql/driver.Valuer interfaces.
 
+If pgx does cannot natively encode a type and that type is a renamed type (e.g.
+type MyTime time.Time) pgx will attempt to encode the underlying type. While
+this is usually desired behavior it can produce suprising behavior if one the
+underlying type and the renamed type each implement database/sql interfaces and
+the other implements pgx interfaces. It is recommended that this situation be
+avoided by implementing pgx interfaces on the renamed type.
+
 Raw Bytes Mapping
 
 []byte passed as arguments to Query, QueryRow, and Exec are passed unmodified
@@ -233,7 +240,7 @@ Logging
 
 pgx defines a simple logger interface. Connections optionally accept a logger
 that satisfies this interface. Set LogLevel to control logging verbosity.
-Adapters for github.com/inconshreveable/log15, github.com/Sirupsen/logrus, and
+Adapters for github.com/inconshreveable/log15, github.com/sirupsen/logrus, and
 the testing log are provided in the log directory.
 */
 package pgx

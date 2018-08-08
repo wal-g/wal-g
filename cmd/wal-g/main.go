@@ -118,30 +118,30 @@ func main() {
 
 	// Configure and start S3 session with bucket, region, and path names.
 	// Checks that environment variables are properly set.
-	tarUploader, pre, err := walg.Configure()
+	uploader, folder, err := walg.Configure()
 	if err != nil {
 		log.Fatalf("FATAL: %+v\n", err)
 	}
 
-	fmt.Println("BUCKET:", *pre.Bucket)
-	fmt.Println("SERVER:", *pre.Server)
+	fmt.Println("BUCKET:", *folder.Bucket)
+	fmt.Println("SERVER:", *folder.Server)
 
 	if command == "wal-fetch" {
 		// Fetch and decompress a WAL file from S3.
-		walg.HandleWALFetch(pre, firstArgument, backupName, true)
+		walg.HandleWALFetch(folder, firstArgument, backupName, true)
 	} else if command == "wal-prefetch" {
-		walg.HandleWALPrefetch(pre, firstArgument, backupName)
+		walg.HandleWALPrefetch(folder, firstArgument, backupName)
 	} else if command == "wal-push" {
 		// Upload a WAL file to S3.
-		walg.HandleWALPush(tarUploader, firstArgument, pre, verify)
+		walg.HandleWALPush(uploader, firstArgument, verify)
 	} else if command == "backup-push" {
-		walg.HandleBackupPush(firstArgument, tarUploader, pre)
+		walg.HandleBackupPush(firstArgument, uploader)
 	} else if command == "backup-fetch" {
-		walg.HandleBackupFetch(backupName, pre, firstArgument, mem)
+		walg.HandleBackupFetch(backupName, folder, firstArgument, mem)
 	} else if command == "backup-list" {
-		walg.HandleBackupList(pre)
+		walg.HandleBackupList(folder)
 	} else if command == "delete" {
-		walg.HandleDelete(pre, all)
+		walg.HandleDelete(folder, all)
 	} else {
 		l.Fatalf("Command '%s' is unsupported by WAL-G.", command)
 	}

@@ -12,9 +12,9 @@ import (
 // initialization before actual write. If no write occurs, initialization
 // still is performed, to handle zero-byte Files correctly
 type DelayWriteCloser struct {
-	inner io.WriteCloser
-	el    openpgp.EntityList
-	outer *io.WriteCloser
+	inner      io.WriteCloser
+	entityList openpgp.EntityList
+	outer      *io.WriteCloser
 }
 
 func (delayWriteCloser *DelayWriteCloser) Write(p []byte) (n int, err error) {
@@ -22,11 +22,11 @@ func (delayWriteCloser *DelayWriteCloser) Write(p []byte) (n int, err error) {
 		return 0, nil
 	}
 	if delayWriteCloser.outer == nil {
-		wc, err := openpgp.Encrypt(delayWriteCloser.inner, delayWriteCloser.el, nil, nil, nil)
+		writeCloser, err := openpgp.Encrypt(delayWriteCloser.inner, delayWriteCloser.entityList, nil, nil, nil)
 		if err != nil {
 			return 0, err
 		}
-		delayWriteCloser.outer = &wc
+		delayWriteCloser.outer = &writeCloser
 	}
 	n, err = (*delayWriteCloser.outer).Write(p)
 	return
@@ -35,7 +35,7 @@ func (delayWriteCloser *DelayWriteCloser) Write(p []byte) (n int, err error) {
 // Close DelayWriteCloser
 func (delayWriteCloser *DelayWriteCloser) Close() error {
 	if delayWriteCloser.outer == nil {
-		writeCloser, err := openpgp.Encrypt(delayWriteCloser.inner, delayWriteCloser.el, nil, nil, nil)
+		writeCloser, err := openpgp.Encrypt(delayWriteCloser.inner, delayWriteCloser.entityList, nil, nil, nil)
 		if err != nil {
 			return err
 		}

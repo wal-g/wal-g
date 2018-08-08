@@ -17,7 +17,7 @@ func GetKeyRingId() string {
 	return os.Getenv("WALE_GPG_KEY_ID")
 }
 
-const gpgBin = "gpg"
+const GpgBin = "gpg"
 
 // CachedKey is the data transfer object describing format of key ring cache
 type CachedKey struct {
@@ -43,7 +43,7 @@ func getPubRingArmour(keyId string) ([]byte, error) {
 		}
 	}
 
-	cmd := exec.Command(gpgBin, "-a", "--export", keyId)
+	cmd := exec.Command(GpgBin, "-a", "--export", keyId)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -65,7 +65,7 @@ func getPubRingArmour(keyId string) ([]byte, error) {
 }
 
 func getSecretRingArmour(keyId string) ([]byte, error) {
-	out, err := exec.Command(gpgBin, "-a", "--export-secret-key", keyId).Output()
+	out, err := exec.Command(GpgBin, "-a", "--export-secret-key", keyId).Output()
 	if err != nil {
 		return nil, err
 	}

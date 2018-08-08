@@ -6,8 +6,7 @@ import (
 	"io"
 )
 
-// S3ReaderMaker handles cases where backups need to be uploaded to
-// S3.
+// S3ReaderMaker creates readers for downloading from S3
 type S3ReaderMaker struct {
 	Backup     *Backup
 	Key        *string
@@ -22,11 +21,11 @@ func (readerMaker *S3ReaderMaker) Path() string { return *readerMaker.Key }
 // Reader creates a new S3 reader for each S3 object.
 func (readerMaker *S3ReaderMaker) Reader() (io.ReadCloser, error) {
 	input := &s3.GetObjectInput{
-		Bucket: readerMaker.Backup.Prefix.Bucket,
+		Bucket: readerMaker.Backup.Folder.Bucket,
 		Key:    readerMaker.Key,
 	}
 
-	rdr, err := readerMaker.Backup.Prefix.Svc.GetObject(input)
+	rdr, err := readerMaker.Backup.Folder.S3API.GetObject(input)
 	if err != nil {
 		return nil, errors.Wrap(err, "S3 Reader: s3.GetObject failed")
 	}
