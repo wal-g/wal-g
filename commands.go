@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/pkg/errors"
 	"sync"
+	"bytes"
 )
 
 // HandleDelete is invoked to perform wal-g delete
@@ -544,7 +545,7 @@ func tryDownloadWALFile(pre *S3Prefix, walFullPath string) (archiveReader io.Rea
 	return
 }
 
-func decompressWALFile(archiveReader io.ReadCloser, dstLocation string, decompressor Decompressor) error {
+func decompressWALFile(archiveReader io.ReadCloser, file io.WriteCloser, decompressor Decompressor) error {
 	crypter := OpenPGPCrypter{}
 	if crypter.IsUsed() {
 		reader, err := crypter.Decrypt(archiveReader)
@@ -554,12 +555,7 @@ func decompressWALFile(archiveReader io.ReadCloser, dstLocation string, decompre
 		archiveReader = ReadCascadeCloser{reader, archiveReader}
 	}
 
-	file, err := os.OpenFile(dstLocation, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
-	if err != nil {
-		return err
-	}
-
-	err = decompressor.Decompress(file, archiveReader)
+	err := decompressor.Decompress(file, archiveReader)
 	if err != nil {
 		return err
 	}
@@ -576,7 +572,13 @@ func DownloadAndDecompressWALFile(pre *S3Prefix, walFileName string, dstLocation
 		if !exists {
 			continue
 		}
-		err = decompressWALFile(archiveReader, dstLocation, decompressor)
+
+		file, err := os.OpenFile(dstLocation, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
+		if err != nil {
+			log.Fatalf("%+v\n", err)
+		}
+
+		err = decompressWALFile(archiveReader, file, decompressor)
 		if err != nil {
 			log.Fatalf("%+v\n", err)
 		}
@@ -591,24 +593,21 @@ func HandleWALPush(tarUploader *TarUploader, dirArc string, pre *S3Prefix, verif
 	// Look for new WALs while doing main upload
 	bgUploader.Start(dirArc, int32(getMaxUploadConcurrency(16)-1), tarUploader, pre, verify)
 
-	UploadWALFile(tarUploader, dirArc, pre, verify)
+	UploadWALFile(tarUploader, dirArc, pre, verify, false)
 
 	bgUploader.Stop()
 }
 
 // UploadWALFile from FS to the cloud
-func UploadWALFile(tarUploader *TarUploader, dirArc string, pre *S3Prefix, verify bool) {
-	archive := &Archive{
-		Prefix:  pre,
-		Archive: aws.String(sanitizePath(tarUploader.server + WalPath + filepath.Base(dirArc) + "." + tarUploader.compressor.FileExtension())),
-	}
-
-	exists, err := archive.CheckExistence()
-	if err != nil {
-		log.Fatalf("FATAL %+v\n", err)
-	}
-	if exists {
-		log.Fatalf("FATAL WAL file '%s' already archived, not overwriting", dirArc)
+func UploadWALFile(tarUploader *TarUploader, dirArc string, pre *S3Prefix, verify bool, bkgUpload bool) {
+	if pre.PreventWalOverwrite {
+		if checkWALOverwrite(pre, tarUploader, dirArc) {
+			if !bkgUpload {
+				log.Panicf("FATAL: WAL file '%s' already archived, contents differ, unable to overwrite\n", dirArc)
+			}
+			log.Printf("WARNING: WAL file '%s' already archived, contents differ, unable to overwrite\n", dirArc)
+			return
+		}
 	}
 
 	path, err := tarUploader.UploadWal(dirArc, pre, verify)
@@ -617,6 +616,44 @@ func UploadWALFile(tarUploader *TarUploader, dirArc string, pre *S3Prefix, verif
 	}
 	if err != nil {
 		log.Printf("upload: could not upload '%s'\n", path)
-		log.Fatalf("FATAL %v\n", err)
+		log.Fatalf("FATAL: %v\n", err)
 	}
+}
+
+func checkWALOverwrite(pre *S3Prefix, tarUploader *TarUploader, dirArc string) (overwriteAttempt bool) {
+	archiveReader, exists, err := tryDownloadWALFile(pre,
+		sanitizePath(tarUploader.server+WalPath+filepath.Base(dirArc)+"."+tarUploader.compressor.FileExtension()))
+	if err != nil {
+		log.Fatalf("%+v\n", err)
+	}
+	if exists {
+		archived := &bytes.Buffer{}
+
+		err = decompressWALFile(archiveReader, &bufCloser{archived}, getDecompressorByCompressor(tarUploader.compressor))
+
+		local, err := os.Open(dirArc)
+		defer local.Close()
+
+		localBytes, err := ioutil.ReadAll(local)
+
+		if err != nil {
+			log.Fatalf("FATAL: %+v\n", err)
+		}
+
+		if !bytes.Equal(archived.Bytes(), localBytes) {
+			return true
+		} else {
+			log.Printf("WARNING: WAL file '%s' already archived, archived content equals\n", dirArc)
+			return false
+		}
+	}
+	return false
+}
+
+type bufCloser struct {
+	*bytes.Buffer
+}
+
+func (w *bufCloser) Close() error {
+	return nil
 }

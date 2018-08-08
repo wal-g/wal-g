@@ -5,11 +5,11 @@ import (
 	"github.com/wal-g/wal-g"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
+	"math/rand"
 )
 
 // This test has known race condition
@@ -58,50 +58,44 @@ func TestBackgroundWALUpload(t *testing.T) {
 
 func TestBackgroundNoOverwriteWALUpload(t *testing.T) {
 	var overwriteDir = "overwritetestdata"
-	if os.Getenv("NO_OVERWRITE_TEST") == "1" {
-		_, a := setupArchiveStatus(t, overwriteDir)
 
-		addTestDataFile(t, overwriteDir, 0)
+	_, a := setupArchiveStatus(t, overwriteDir)
 
-		// Re-use generated data to test uploading WAL.
-		tu := walg.NewLz4MockTarUploader()
-		tu.UploaderApi = &mockS3Uploader{}
-		pre := &walg.S3Prefix{
-			Svc: &mockS3Client{
-				err:      false,
-				notFound: false,
-			},
-			Bucket: aws.String("mock bucket"),
-			Server: aws.String("mock server"),
+	// Re-use generated data to test uploading WAL.
+	tu := walg.NewLz4MockTarUploader()
+	tu.UploaderApi = &mockS3Uploader{}
+	pre := &walg.S3Prefix{
+		Svc: &mockS3Client{
+			err:      false,
+			notFound: false,
+		},
+		Bucket:              aws.String("mock bucket"),
+		Server:              aws.String("mock server"),
+		PreventWalOverwrite: true,
+	}
+	wasPanic := false
+	defer func() {
+		if r := recover(); r != nil {
+			t.Log("Recovered ", r)
+			wasPanic = true
 		}
-		bu := walg.BgUploader{}
-
-		// Look for new WALs while doing main upload
-		bu.Start(a, 16, tu, pre, false)
-		time.Sleep(time.Second) //time to spin up new uploaders
-		bu.Stop()
-
-		t.Error("did not exit from not overwriting")
+	}()
+	walg.UploadWALFile(tu, a, pre, false, false)
+	if !wasPanic {
+		t.Errorf("WAL was overwritten")
 	}
 
-	// Here we start this test in separate process to verify panic
-	// We cannot just call it and recovery since panic is handled in async goroutine
-	// One day we sill replace all panics with error handling, until then this is OK
-	cmd := exec.Command(os.Args[0], "-test.run=TestBackgroundNoOverwriteWALUpload")
-	cmd.Env = append(os.Environ(), "NO_OVERWRITE_TEST=1")
-	err := cmd.Run()
-	if e, ok := err.(*exec.ExitError); ok && !e.Success() {
-		bname := "B0"
-		bd := filepath.Join(overwriteDir, "archive_status", bname+".ready")
-		_, err := os.Stat(bd)
-		if os.IsNotExist(err) {
-			t.Error(bname + ".ready was deleted")
-		}
-
-		cleanup(t, overwriteDir)
-		return
+	file, err := os.OpenFile(a, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
+	if err != nil {
+		t.Error(err)
 	}
-	t.Fatalf("process ran with err %v, want exit status 1", err)
+	file.WriteString("Hello")
+	file.Close()
+	walg.UploadWALFile(tu, a, pre, false, false)
+	// Should not panic
+	walg.UploadWALFile(tu, a, pre, false, false)
+
+	cleanup(t, overwriteDir)
 }
 
 func setupArchiveStatus(t *testing.T, dir string) (string, string) {
@@ -137,6 +131,8 @@ func setupArchiveStatus(t *testing.T, dir string) (string, string) {
 	if err != nil {
 		t.Log(err)
 	}
+	file.WriteString(strconv.Itoa(rand.Int()))
+	file.WriteString(strconv.Itoa(rand.Int()))
 	file.Close()
 
 	return testDir, a

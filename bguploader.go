@@ -116,7 +116,7 @@ func haveNoSlots(u *BgUploader) bool {
 // Upload one WAL file
 func (uploader *BgUploader) Upload(info os.FileInfo) {
 	walfilename := strings.TrimSuffix(info.Name(), readySuffix)
-	UploadWALFile(uploader.tarUploader.Clone(), filepath.Join(uploader.dir, walfilename), uploader.pre, uploader.verify)
+	UploadWALFile(uploader.tarUploader.Clone(), filepath.Join(uploader.dir, walfilename), uploader.pre, uploader.verify, true)
 
 	ready := filepath.Join(uploader.dir, archiveStatus, info.Name())
 	done := filepath.Join(uploader.dir, archiveStatus, walfilename+done)
