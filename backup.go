@@ -39,7 +39,7 @@ func (backup *Backup) GetLatest() (string, error) {
 // getBackups receives backup descriptions and sorts them by time
 func (backup *Backup) getBackups() ([]BackupTime, error) {
 	var sortTimes []BackupTime
-	objects := &s3.ListObjectsV2Input{
+	objects := &s3.ListObjectsInput{
 		Bucket:    backup.Folder.Bucket,
 		Prefix:    backup.Path,
 		Delimiter: aws.String("/"),
@@ -47,13 +47,13 @@ func (backup *Backup) getBackups() ([]BackupTime, error) {
 
 	var backups = make([]*s3.Object, 0)
 
-	err := backup.Folder.S3API.ListObjectsV2Pages(objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
+	err := backup.Folder.S3API.ListObjectsPages(objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
 		backups = append(backups, files.Contents...)
 		return true
 	})
 
 	if err != nil {
-		return nil, errors.Wrap(err, "GetLatest: s3.ListObjectsV2 failed")
+		return nil, errors.Wrap(err, "GetLatest: s3.ListObjects failed")
 	}
 
 	count := len(backups)
@@ -91,14 +91,14 @@ func (backup *Backup) CheckExistence() (bool, error) {
 
 // GetKeys returns all the keys for the Files in the specified backup.
 func (backup *Backup) GetKeys() ([]string, error) {
-	objects := &s3.ListObjectsV2Input{
+	objects := &s3.ListObjectsInput{
 		Bucket: backup.Folder.Bucket,
 		Prefix: aws.String(sanitizePath(*backup.Path + *backup.Name + "/tar_partitions")),
 	}
 
 	result := make([]string, 0)
 
-	err := backup.Folder.S3API.ListObjectsV2Pages(objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
+	err := backup.Folder.S3API.ListObjectsPages(objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
 
 		arr := make([]string, len(files.Contents))
 
@@ -111,7 +111,7 @@ func (backup *Backup) GetKeys() ([]string, error) {
 		return true
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "GetKeys: s3.ListObjectsV2 failed")
+		return nil, errors.Wrap(err, "GetKeys: s3.ListObjects failed")
 	}
 
 	return result, nil
@@ -119,14 +119,14 @@ func (backup *Backup) GetKeys() ([]string, error) {
 
 // getWals returns all WAL file keys less then key provided
 func (backup *Backup) getWals(before string) ([]*s3.ObjectIdentifier, error) {
-	objects := &s3.ListObjectsV2Input{
+	objects := &s3.ListObjectsInput{
 		Bucket: backup.Folder.Bucket,
 		Prefix: aws.String(sanitizePath(*backup.Path)),
 	}
 
 	arr := make([]*s3.ObjectIdentifier, 0)
 
-	err := backup.Folder.S3API.ListObjectsV2Pages(objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
+	err := backup.Folder.S3API.ListObjectsPages(objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
 		for _, ob := range files.Contents {
 			key := *ob.Key
 			if stripWalName(key) < before {
@@ -137,7 +137,7 @@ func (backup *Backup) getWals(before string) ([]*s3.ObjectIdentifier, error) {
 	})
 
 	if err != nil {
-		return nil, errors.Wrap(err, "GetKeys: s3.ListObjectsV2 failed")
+		return nil, errors.Wrap(err, "GetKeys: s3.ListObjects failed")
 	}
 
 	return arr, nil

@@ -12,7 +12,7 @@ import (
 )
 
 // Mock out S3 client. Includes these methods:
-// ListObjectsV2(*ListObjectsV2Input)
+// ListObjects(*ListObjectsInput)
 // GetObject(*GetObjectInput)
 // HeadObject(*HeadObjectInput)
 type mockS3Client struct {
@@ -25,13 +25,13 @@ func NewMockS3Client(err, notFound bool) *mockS3Client {
 	return &mockS3Client{err: err, notFound: notFound}
 }
 
-func (client *mockS3Client) ListObjectsV2Pages(input *s3.ListObjectsV2Input, callback func(*s3.ListObjectsV2Output, bool) bool) error {
+func (client *mockS3Client) ListObjectsPages(input *s3.ListObjectsInput, callback func(*s3.ListObjectsOutput, bool) bool) error {
 	if client.err {
-		return awserr.New("MockListObjectsV2", "mock ListObjectsV2 errors", nil)
+		return awserr.New("MockListObjects", "mock ListObjects errors", nil)
 	}
 
 	contents := fakeContents()
-	output := &s3.ListObjectsV2Output{
+	output := &s3.ListObjectsOutput{
 		Contents: contents,
 		Name:     input.Bucket,
 	}
