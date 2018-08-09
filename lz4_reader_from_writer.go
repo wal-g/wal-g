@@ -18,4 +18,3 @@ func (writer *Lz4ReaderFromWriter) ReadFrom(reader io.Reader) (n int64, err erro
 	n, err = FastCopy(writer, reader)
 	return
 }
-

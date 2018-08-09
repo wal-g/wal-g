@@ -1,12 +1,12 @@
 package walg_test
 
 import (
+	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
-	"testing"
 	"github.com/wal-g/wal-g/testtools"
-	"bytes"
 	"io/ioutil"
+	"testing"
 )
 
 func TestDeleteArgsParsingRetain(t *testing.T) {
