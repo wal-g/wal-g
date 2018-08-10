@@ -14,6 +14,7 @@ import (
 	"os"
 	"strconv"
 	"golang.org/x/time/rate"
+	"strings"
 )
 
 // MaxRetries limit upload and download retries during interaction with S3
@@ -52,7 +53,7 @@ func findS3BucketRegion(bucket string, config *aws.Config) (string, error) {
 //
 // Able to configure the upload part size in the S3 uploader.
 func Configure() (*TarUploader, *S3Prefix, error) {
-	waleS3Prefix := os.Getenv("WALE_S3_PREFIX")
+	waleS3Prefix := getSettingValue("WALE_S3_PREFIX")
 	if waleS3Prefix == "" {
 		return nil, nil, &UnsetEnvVarError{names: []string{"WALE_S3_PREFIX"}}
 	}
@@ -85,11 +86,11 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 		return nil, nil, errors.Wrapf(err, "Configure: failed to get AWS credentials; please specify AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY")
 	}
 
-	if endpoint := os.Getenv("AWS_ENDPOINT"); endpoint != "" {
+	if endpoint := getSettingValue("AWS_ENDPOINT"); endpoint != "" {
 		config.Endpoint = aws.String(endpoint)
 	}
 
-	s3ForcePathStyleStr := os.Getenv("AWS_S3_FORCE_PATH_STYLE")
+	s3ForcePathStyleStr := getSettingValue("AWS_S3_FORCE_PATH_STYLE")
 	if len(s3ForcePathStyleStr) > 0 {
 		s3ForcePathStyle, err := strconv.ParseBool(s3ForcePathStyleStr)
 		if err != nil {
@@ -98,7 +99,7 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 		config.S3ForcePathStyle = aws.Bool(s3ForcePathStyle)
 	}
 
-	region := os.Getenv("AWS_REGION")
+	region := getSettingValue("AWS_REGION")
 	if region == "" {
 		region, err = findS3BucketRegion(bucket, config)
 		if err != nil {
@@ -107,7 +108,7 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 	}
 	config = config.WithRegion(region)
 
-	compressionMethod := os.Getenv("WALG_COMPRESSION_METHOD")
+	compressionMethod := getSettingValue("WALG_COMPRESSION_METHOD")
 	if compressionMethod == "" {
 		compressionMethod = Lz4AlgorithmName
 	}
@@ -120,7 +121,7 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 		Server: aws.String(server),
 	}
 
-	preventWalOverwriteStr := os.Getenv("WALG_PREVENT_WAL_OVERWRITE")
+	preventWalOverwriteStr := getSettingValue("WALG_PREVENT_WAL_OVERWRITE")
 	if len(preventWalOverwriteStr) > 0 {
 		preventWalOverwrite, err := strconv.ParseBool(preventWalOverwriteStr)
 		if err != nil {
@@ -129,7 +130,7 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 		pre.PreventWalOverwrite = preventWalOverwrite
 	}
 
-	diskLimitStr := os.Getenv("WALG_DISK_RATE_LIMIT")
+	diskLimitStr := getSettingValue("WALG_DISK_RATE_LIMIT")
 	if diskLimitStr != "" {
 		diskLimit, err := strconv.ParseInt(diskLimitStr, 10, 64)
 		if err != nil {
@@ -138,7 +139,7 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 		diskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+64*1024)); // Add 8 pages to possible bursts
 	}
 
-	netLimitStr := os.Getenv("WALG_NETWORK_RATE_LIMIT")
+	netLimitStr := getSettingValue("WALG_NETWORK_RATE_LIMIT")
 	if netLimitStr != "" {
 		netLimit, err := strconv.ParseInt(netLimitStr, 10, 64)
 		if err != nil {
@@ -180,6 +181,17 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 	uploader.UploaderApi = CreateUploader(pre.Svc, 20*1024*1024, con) //default 10 concurrency streams at 20MB
 
 	return uploader, pre, err
+}
+
+func getSettingValue(key string) string {
+	if strings.HasPrefix(key, "WALE") {
+		walgKey := "WALG" + strings.TrimPrefix(key, "WALE")
+		if val, ok := os.LookupEnv(walgKey); ok && len(val) > 0 {
+			return val
+		}
+	}
+
+	return os.Getenv(key)
 }
 
 // CreateUploader returns an uploader with customizable concurrency
