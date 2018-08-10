@@ -14,7 +14,6 @@ import (
 	"os"
 	"strconv"
 	"golang.org/x/time/rate"
-	"strings"
 )
 
 // MaxRetries limit upload and download retries during interaction with S3
@@ -181,17 +180,6 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 	uploader.UploaderApi = CreateUploader(pre.Svc, 20*1024*1024, con) //default 10 concurrency streams at 20MB
 
 	return uploader, pre, err
-}
-
-func getSettingValue(key string) string {
-	if strings.HasPrefix(key, "WALE") {
-		walgKey := "WALG" + strings.TrimPrefix(key, "WALE")
-		if val, ok := os.LookupEnv(walgKey); ok && len(val) > 0 {
-			return val
-		}
-	}
-
-	return os.Getenv(key)
 }
 
 // CreateUploader returns an uploader with customizable concurrency

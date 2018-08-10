@@ -54,6 +54,12 @@
   version = "v1.37.0"
 
 [[projects]]
+  name = "github.com/go-yaml/yaml"
+  packages = ["."]
+  revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
+  version = "v2.2.1"
+
+[[projects]]
   name = "github.com/jackc/pgx"
   packages = [
     ".",
@@ -126,6 +132,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "20f6fc16281214df80b8e9092e7b2fb191d53fdaf89070a989d3b08d54b1e089"
+  inputs-digest = "c85a881fef6d1b08b46b1c323b1629543c9910739535ce0f0ed45720cf40215e"
   solver-name = "gps-cdcl"
   solver-version = 1
