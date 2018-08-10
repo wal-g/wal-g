@@ -64,7 +64,11 @@ To configure how many concurrency streams are reading disk during ```backup-push
 
 * `WALG_SENTINEL_USER_DATA`
 
-This setting allows backup automation tools to add extra information to JSON sentinel file during ```backup-push```.
+This setting allows backup automation tools to add extra information to JSON sentinel file during ```backup-push```. This setting can be used e.g. to give user-defined names to backups.
+
+* `WALG_PREVENT_WAL_OVERWRITE`
+
+If this setting is specified, during ```wal-push``` WAL-G will check the existence of WAL before uploading it. If the different file is already archived under the same name, WAL-G will return the non-zero exit code to prevent PostgreSQL from removing WAL.
 
 * `AWS_ENDPOINT`
 

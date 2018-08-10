@@ -93,7 +93,7 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 	if len(s3ForcePathStyleStr) > 0 {
 		s3ForcePathStyle, err := strconv.ParseBool(s3ForcePathStyleStr)
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "Configure: failed parse AWS_S3_FORCE_PATH_STYLE")
+			return nil, nil, errors.Wrap(err, "Configure: failed to parse AWS_S3_FORCE_PATH_STYLE")
 		}
 		config.S3ForcePathStyle = aws.Bool(s3ForcePathStyle)
 	}
@@ -118,6 +118,15 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 	pre := &S3Prefix{
 		Bucket: aws.String(bucket),
 		Server: aws.String(server),
+	}
+
+	preventWalOverwriteStr := os.Getenv("WALG_PREVENT_WAL_OVERWRITE")
+	if len(preventWalOverwriteStr) > 0 {
+		preventWalOverwrite, err := strconv.ParseBool(preventWalOverwriteStr)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "Configure: failed to parse WALG_PREVENT_WAL_OVERWRITE")
+		}
+		pre.PreventWalOverwrite = preventWalOverwrite
 	}
 
 	diskLimitStr := os.Getenv("WALG_DISK_RATE_LIMIT")
