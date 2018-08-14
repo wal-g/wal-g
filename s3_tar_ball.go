@@ -17,7 +17,7 @@ type S3TarBall struct {
 	backupName       string
 	partCount        int
 	size             int64
-	writeCloser      io.WriteCloser
+	writeCloser      io.Closer
 	tarWriter        *tar.Writer
 	uploader         *Uploader
 }
@@ -56,6 +56,7 @@ func (tarBall *S3TarBall) CloseTar() error {
 	fmt.Printf("Finished writing part %d.\n", tarBall.partCount)
 	return nil
 }
+
 func (tarBall *S3TarBall) AwaitUploads() {
 	tarBall.uploader.waitGroup.Wait()
 	if !tarBall.uploader.Success {
@@ -69,7 +70,7 @@ func (tarBall *S3TarBall) startUpload(name string, crypter Crypter) io.WriteClos
 	pipeReader, pipeWriter := io.Pipe()
 	uploader := tarBall.uploader
 
-	path := *uploader.uploadingFolder.Server + BaseBackupsPath + tarBall.backupName + "/tar_partitions/" + name
+	path := GetBackupPath(uploader.uploadingFolder) + tarBall.backupName + "/tar_partitions/" + name
 	input := uploader.CreateUploadInput(path, NewNetworkLimitReader(pipeReader))
 
 	fmt.Printf("Starting part %d ...\n", tarBall.partCount)
@@ -123,7 +124,7 @@ func (tarBall *S3TarBall) FileExtension() string {
 // if all other parts of the backup are present in S3.
 // an alert is given with the corresponding error.
 func (tarBall *S3TarBall) Finish(sentinelDto *S3TarBallSentinelDto) error {
-	name := tarBall.backupName + "_backup_stop_sentinel.json"
+	name := tarBall.backupName + SentinelSuffix
 	uploader := tarBall.uploader
 
 	uploader.finish()
@@ -136,7 +137,7 @@ func (tarBall *S3TarBall) Finish(sentinelDto *S3TarBallSentinelDto) error {
 		if err != nil {
 			return err
 		}
-		path := *uploader.uploadingFolder.Server + BaseBackupsPath + name
+		path := GetBackupPath(uploader.uploadingFolder) + name
 		input := uploader.CreateUploadInput(path, bytes.NewReader(dtoBody))
 
 		uploadingErr := uploader.upload(input, path)

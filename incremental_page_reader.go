@@ -130,7 +130,6 @@ func (pageReader *IncrementalPageReader) fullScanInitialize() error {
 		if err != nil {
 			if err == io.EOF {
 				_, err = pageReader.pagedFileSeeker.Seek(0, io.SeekStart)
-				return err
 			}
 			return err
 		}

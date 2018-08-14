@@ -2,8 +2,6 @@ package walg
 
 import (
 	"log"
-	"regexp"
-
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 )
@@ -51,15 +49,4 @@ func Connect() (*pgx.Conn, error) {
 	}
 
 	return conn, nil
-}
-
-// FormatName grabs the name of the WAL file and returns it in the form of `base_...`.
-// If no match is found, returns an empty string and a `NoMatchAvailableError`.
-func FormatName(s string) (string, error) {
-	re := regexp.MustCompile(`\(([^\)]+)\)`)
-	f := re.FindString(s)
-	if f == "" {
-		return "", errors.Wrap(NoMatchAvailableError{s}, "FormatName:")
-	}
-	return backupNamePrefix + f[6:len(f)-1], nil
 }

@@ -61,9 +61,7 @@ func TestTar(t *testing.T) {
 		t.Log(err)
 	}
 
-	if !bytes.Equal(bCopy, buf.Out) {
-		t.Error("extract: Unbundled tar output does not match input.")
-	}
+	assert.Equalf(t, bCopy, buf.Out, "extract: Unbundled tar output does not match input.")
 }
 
 // Used to mock files in memory.

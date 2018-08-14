@@ -20,11 +20,7 @@ var correctKeys = []string{"mockServer/base_backup/second.nop",
 func TestBackupErrors(t *testing.T) {
 	folder := testtools.NewMockS3Folder(true, true)
 
-	bk := &walg.Backup{
-		Folder: folder,
-		Path:   walg.GetBackupPath(folder),
-		Name:   aws.String("base_backupmockBackup"),
-	}
+	bk := walg.NewBackup(folder, "base_backupmockBackup")
 
 	//CheckExistence error testing
 	exists, _ := bk.CheckExistence()
@@ -34,8 +30,8 @@ func TestBackupErrors(t *testing.T) {
 	_, err := bk.CheckExistence()
 	assert.Errorf(t, err, "backup: CheckExistence expected error but got '<nil>'")
 
-	//GetLatest error testing
-	_, err = bk.GetLatest()
+	//GetLatestBackupKey error testing
+	_, err = walg.GetLatestBackupKey(bk.Folder)
 	assert.Errorf(t, err, "backup: expected error but got '<nil>'")
 
 	//GetKeys error testing
@@ -48,11 +44,7 @@ func TestBackupErrors(t *testing.T) {
 
 	out := make([]walg.ReaderMaker, len(keys))
 	for i, key := range keys {
-		s := &walg.S3ReaderMaker{
-			Backup:     bk,
-			Key:        aws.String(key),
-			FileFormat: walg.GetFileExtension(key),
-		}
+		s := walg.NewS3ReaderMaker(folder, aws.String(key), walg.GetFileExtension(key))
 		out[i] = s
 	}
 
@@ -61,20 +53,16 @@ func TestBackupErrors(t *testing.T) {
 }
 
 // Tests backup-fetch methods including:
-// GetLatest()
+// GetLatestBackupKey()
 // CheckExistence()
 // GetKeys()
 func TestBackup(t *testing.T) {
 	folder := testtools.NewMockS3Folder(false, false)
 
-	bk := &walg.Backup{
-		Folder: folder,
-		Path:   walg.GetBackupPath(folder),
-		Name:   aws.String("base_backupmockBackup"),
-	}
+	bk := walg.NewBackup(folder, "base_backupmockBackup")
 
-	latest, _ := bk.GetLatest()
-	assert.Equalf(t, "first.nop", latest, "backup: expected %s from 'GetLatest' but got %s", "first", latest)
+	latest, _ := walg.GetLatestBackupKey(bk.Folder)
+	assert.Equalf(t, "first.nop", latest, "backup: expected %s from 'GetLatestBackupKey' but got %s", "first", latest)
 
 	exists, _ := bk.CheckExistence()
 	assert.Truef(t, exists, "backup: expected mock backup to exist but 'CheckExistence' returned false")
@@ -89,11 +77,7 @@ func TestBackup(t *testing.T) {
 
 	out := make([]walg.ReaderMaker, len(keys))
 	for i, key := range keys {
-		s := &walg.S3ReaderMaker{
-			Backup:     bk,
-			Key:        aws.String(key),
-			FileFormat: walg.GetFileExtension(key),
-		}
+		s := walg.NewS3ReaderMaker(folder, aws.String(key), walg.GetFileExtension(key))
 		out[i] = s
 		assert.Equalf(t, correctKeys[i], out[i].Path(), "backup: expected S3ReaderMaker key to be %s but got %s", correctKeys[i], out[i].Path())
 	}
@@ -155,9 +139,9 @@ func TestArchive(t *testing.T) {
 }
 
 func TestGetBackupTimeSlices(t *testing.T) {
-	first := "mockServer/backup01_backup_stop_sentinel.json"
-	second := "mockServer/somedir/backup02_backup_stop_sentinel.json"
-	third := "mockServer/somedir/somesubdir/backup03_backup_stop_sentinel.json"
+	first := "mockServer/backup01" + walg.SentinelSuffix
+	second := "mockServer/somedir/backup02" + walg.SentinelSuffix
+	third := "mockServer/somedir/somesubdir/backup03" + walg.SentinelSuffix
 	firstTime := time.Now().Add(time.Hour)
 	secondTime := time.Now().Add(time.Minute)
 	thirdTime := time.Now()

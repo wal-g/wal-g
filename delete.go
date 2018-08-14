@@ -88,18 +88,19 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 	return
 }
 
-func deleteBeforeTarget(target string, bk *Backup, folder *S3Folder, findFull bool, backups []BackupTime, dryRun bool) {
-	dto := fetchSentinel(target, bk, folder)
+func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dryRun bool) {
+	folder := target.Folder
+	dto := target.fetchSentinel()
 	if dto.isIncremental() {
 		if findFull {
-			target = *dto.IncrementFullName
+			target.Name = *dto.IncrementFullName
 		} else {
-			log.Fatalf("%v is incemental and it's predecessors cannot be deleted. Consider FIND_FULL option.", target)
+			log.Fatalf("%v is incemental and it's predecessors cannot be deleted. Consider FIND_FULL option.", target.Name)
 		}
 	}
 	var err error
 	if backups == nil {
-		backups, err = bk.getBackups()
+		backups, err = getBackups(folder)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -113,7 +114,7 @@ func deleteBeforeTarget(target string, bk *Backup, folder *S3Folder, findFull bo
 		} else {
 			log.Printf("%v will be deleted\n", b.Name)
 		}
-		if b.Name == target {
+		if b.Name == target.Name {
 			skip = false
 			skipLine = i
 		}
@@ -137,21 +138,17 @@ func deleteBackupsBefore(backups []BackupTime, skipline int, folder *S3Folder) {
 	}
 }
 
-func dropBackup(folder *S3Folder, b BackupTime) {
-	var bk = &Backup{
-		Folder: folder,
-		Path:   GetBackupPath(folder),
-		Name:   aws.String(b.Name),
-	}
-	tarFiles, err := bk.GetKeys()
+func dropBackup(folder *S3Folder, backupTime BackupTime) {
+	backup := NewBackup(folder, backupTime.Name)
+	tarFiles, err := backup.GetKeys()
 	if err != nil {
-		log.Fatal("Unable to list backup for deletion ", b.Name, err)
+		log.Fatal("Unable to list backup for deletion ", backupTime.Name, err)
 	}
 
-	folderKey := strings.TrimPrefix(*folder.Server+BaseBackupsPath+b.Name, "/")
-	suffixKey := folderKey + SentinelSuffix
+	folderKey := strings.TrimPrefix(GetBackupPath(folder)+backupTime.Name, "/")
+	sentinelKey := folderKey + SentinelSuffix
 
-	keys := append(tarFiles, suffixKey, folderKey)
+	keys := append(tarFiles, sentinelKey, folderKey)
 	parts := partition(keys, 1000)
 	for _, part := range parts {
 
@@ -160,7 +157,7 @@ func dropBackup(folder *S3Folder, b BackupTime) {
 		}}
 		_, err = folder.S3API.DeleteObjects(input)
 		if err != nil {
-			log.Fatal("Unable to delete backup ", b.Name, err)
+			log.Fatal("Unable to delete backup ", backupTime.Name, err)
 		}
 
 	}
@@ -174,15 +171,10 @@ func partitionToObjects(keys []string) []*s3.ObjectIdentifier {
 	return objs
 }
 
-func deleteWALBefore(bt BackupTime, folder *S3Folder) {
-	var bk = &Backup{
-		Folder: folder,
-		Path:   aws.String(sanitizePath(*folder.Server + WalPath)),
-	}
-
-	objects, err := bk.getWals(bt.WalFileName)
+func deleteWALBefore(backupTime BackupTime, folder *S3Folder) {
+	objects, err := getWals(backupTime.WalFileName, folder)
 	if err != nil {
-		log.Fatal("Unable to obtaind WALS for border ", bt.Name, err)
+		log.Fatal("Unable to obtaind WALS for border ", backupTime.Name, err)
 	}
 	parts := partitionObjects(objects, 1000)
 	for _, part := range parts {
@@ -191,7 +183,7 @@ func deleteWALBefore(bt BackupTime, folder *S3Folder) {
 		}}
 		_, err = folder.S3API.DeleteObjects(input)
 		if err != nil {
-			log.Fatal("Unable to delete WALS before ", bt.Name, err)
+			log.Fatal("Unable to delete WALS before ", backupTime.Name, err)
 		}
 	}
 }

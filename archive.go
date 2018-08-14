@@ -37,7 +37,7 @@ func (archive *Archive) CheckExistence() (bool, error) {
 
 func IsAwsNotExist(err error) bool {
 	if awsErr, ok := err.(awserr.Error); ok {
-		if awsErr.Code() == NotFoundAWSErrorCode {
+		if awsErr.Code() == NotFoundAWSErrorCode || awsErr.Code() == NoSuchKeyAWSErrorCode {
 			return true
 		}
 	}
@@ -68,7 +68,7 @@ func (archive *Archive) GetArchive() (io.ReadCloser, error) {
 
 	newArchive, err := archive.Folder.S3API.GetObject(input)
 	if err != nil {
-		return nil, errors.Wrap(err, "GetArchive: s3.GetObject failed")
+		return nil, errors.Wrapf(err, "GetArchive: s3.GetObject failed getting '%v'", *archive.Archive)
 	}
 
 	return newArchive.Body, nil

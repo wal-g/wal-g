@@ -1,16 +1,16 @@
 // +build lzo
 
-package walg_test
+package walg
 
 import (
 	"bufio"
 	"bytes"
 	"fmt"
 	"github.com/wal-g/wal-g"
-	"github.com/wal-g/wal-g/test_tools"
 	"io"
 	"io/ioutil"
 	"testing"
+	"github.com/stretchr/testify/assert"
 )
 
 // Test extraction of various lzo compressed tar files.
@@ -64,9 +64,7 @@ func testLzopRoundTrip(t *testing.T, stride, nBytes int) {
 		t.Log(err)
 	}
 
-	if !bytes.Equal(bCopy, buf.Out) {
-		t.Error("extract: Decompressed output does not match input.")
-	}
+	assert.Equalf(t, bCopy, buf.Out, "extract: Decompressed output does not match input.")
 }
 
 func TestLzopUncompressableBytes(t *testing.T) {

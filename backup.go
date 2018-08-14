@@ -1,80 +1,44 @@
 package walg
 
 import (
-	"encoding/json"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
-	"io/ioutil"
 	"log"
-	"sort"
-	"strings"
+	"io/ioutil"
+	"encoding/json"
 )
 
-// ErrLatestNotFound happens when users asks backup-fetch LATEST, but there is no backups
-var ErrLatestNotFound = errors.New("No backups found")
+var NoBackupsFoundError = errors.New("No backups found")
 
 // Backup contains information about a valid backup
 // generated and uploaded by WAL-G.
 type Backup struct {
 	Folder *S3Folder
-	Path   *string
-	Name   *string
-	Js     *string
+	Name   string
 }
 
-// GetLatest sorts the backups by last modified time
-// and returns the latest backup key.
-func (backup *Backup) GetLatest() (string, error) {
-	sortTimes, err := backup.getBackups()
-
-	if err != nil {
-		return "", err
-	}
-
-	return sortTimes[0].Name, nil
+func NewBackup(folder *S3Folder, name string) *Backup {
+	return &Backup{folder, name}
 }
 
-// getBackups receives backup descriptions and sorts them by time
-func (backup *Backup) getBackups() ([]BackupTime, error) {
-	var sortTimes []BackupTime
-	objects := &s3.ListObjectsInput{
-		Bucket:    backup.Folder.Bucket,
-		Prefix:    backup.Path,
-		Delimiter: aws.String("/"),
-	}
+func (backup *Backup) getPath() string {
+	return GetBackupPath(backup.Folder) + backup.Name
+}
 
-	var backups = make([]*s3.Object, 0)
-
-	err := backup.Folder.S3API.ListObjectsPages(objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
-		backups = append(backups, files.Contents...)
-		return true
-	})
-
-	if err != nil {
-		return nil, errors.Wrap(err, "GetLatest: s3.ListObjects failed")
-	}
-
-	count := len(backups)
-
-	if count == 0 {
-		return nil, ErrLatestNotFound
-	}
-
-	sortTimes = GetBackupTimeSlices(backups)
-
-	return sortTimes, nil
+func (backup *Backup) getStopSentinelPath() string {
+	return GetBackupPath(backup.Folder) + backup.Name + SentinelSuffix
 }
 
 // CheckExistence checks that the specified backup exists.
 func (backup *Backup) CheckExistence() (bool, error) {
-	js := &s3.HeadObjectInput{
+	stopSentinelObjectInput := &s3.HeadObjectInput{
 		Bucket: backup.Folder.Bucket,
-		Key:    backup.Js,
+		Key:    aws.String(backup.getStopSentinelPath()),
 	}
 
-	_, err := backup.Folder.S3API.HeadObject(js)
+	_, err := backup.Folder.S3API.HeadObject(stopSentinelObjectInput)
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
 			switch awsErr.Code() {
@@ -93,7 +57,7 @@ func (backup *Backup) CheckExistence() (bool, error) {
 func (backup *Backup) GetKeys() ([]string, error) {
 	objects := &s3.ListObjectsInput{
 		Bucket: backup.Folder.Bucket,
-		Prefix: aws.String(sanitizePath(*backup.Path + *backup.Name + "/tar_partitions")),
+		Prefix: aws.String(sanitizePath(backup.getPath() + "/tar_partitions")),
 	}
 
 	result := make([]string, 0)
@@ -117,81 +81,14 @@ func (backup *Backup) GetKeys() ([]string, error) {
 	return result, nil
 }
 
-// getWals returns all WAL file keys less then key provided
-func (backup *Backup) getWals(before string) ([]*s3.ObjectIdentifier, error) {
-	objects := &s3.ListObjectsInput{
-		Bucket: backup.Folder.Bucket,
-		Prefix: aws.String(sanitizePath(*backup.Path)),
-	}
-
-	arr := make([]*s3.ObjectIdentifier, 0)
-
-	err := backup.Folder.S3API.ListObjectsPages(objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
-		for _, ob := range files.Contents {
-			key := *ob.Key
-			if stripWalName(key) < before {
-				arr = append(arr, &s3.ObjectIdentifier{Key: aws.String(key)})
-			}
-		}
-		return true
-	})
-
-	if err != nil {
-		return nil, errors.Wrap(err, "GetKeys: s3.ListObjects failed")
-	}
-
-	return arr, nil
-}
-
-// GetBackupTimeSlices converts S3 objects to backup description
-func GetBackupTimeSlices(backups []*s3.Object) []BackupTime {
-	sortTimes := make([]BackupTime, len(backups))
-	for i, ob := range backups {
-		key := *ob.Key
-		time := *ob.LastModified
-		sortTimes[i] = BackupTime{stripNameBackup(key), time, stripWalFileName(key)}
-	}
-	slice := TimeSlice(sortTimes)
-	sort.Sort(slice)
-	return slice
-}
-
-// Strips the backup key and returns it in its base form `base_...`.
-func stripNameBackup(key string) string {
-	all := strings.SplitAfter(key, "/")
-	name := strings.Split(all[len(all)-1], "_backup")[0]
-	return name
-}
-
-// Strips the backup WAL file name.
-func stripWalFileName(key string) string {
-	name := stripNameBackup(key)
-	name = strings.SplitN(name, "_D_", 2)[0]
-
-	if strings.HasPrefix(name, backupNamePrefix) {
-		return name[len(backupNamePrefix):]
-	}
-	return ""
-}
-
-func stripWalName(path string) string {
-	all := strings.SplitAfter(path, "/")
-	name := strings.Split(all[len(all)-1], ".")[0]
-	return name
-}
-
-func fetchSentinel(backupName string, backup *Backup, folder *S3Folder) (sentinelDto S3TarBallSentinelDto) {
-	latestSentinelName := backupName + SentinelSuffix
-	previousBackupReader := S3ReaderMaker{
-		Backup:     backup,
-		Key:        aws.String(*folder.Server + BaseBackupsPath + latestSentinelName),
-		FileFormat: GetFileExtension(latestSentinelName),
-	}
-	prevBackup, err := previousBackupReader.Reader()
+func (backup *Backup) fetchSentinel() (sentinelDto S3TarBallSentinelDto) {
+	latestSentinelName := backup.getStopSentinelPath()
+	backupReaderMaker := NewS3ReaderMaker(backup.Folder, aws.String(backup.getStopSentinelPath()), GetFileExtension(latestSentinelName))
+	backupReader, err := backupReaderMaker.Reader()
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
-	sentinelDtoData, err := ioutil.ReadAll(prevBackup)
+	sentinelDtoData, err := ioutil.ReadAll(backupReader)
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
@@ -201,11 +98,4 @@ func fetchSentinel(backupName string, backup *Backup, folder *S3Folder) (sentine
 		log.Fatalf("%+v\n", err)
 	}
 	return
-}
-
-// GetBackupPath gets path for basebackup in a bucket
-func GetBackupPath(folder *S3Folder) *string {
-	path := *folder.Server + BaseBackupsPath
-	server := sanitizePath(path)
-	return aws.String(server)
 }

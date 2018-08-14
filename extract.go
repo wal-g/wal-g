@@ -4,6 +4,9 @@ import (
 	"archive/tar"
 	"github.com/pkg/errors"
 	"io"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
+	"context"
 )
 
 var NoFilesToExtractError = errors.New("ExtractAll: did not provide files to extract")
@@ -47,8 +50,7 @@ func extractOne(tarInterpreter TarInterpreter, src io.Reader) error {
 
 // Ensures that file extension is valid. Any subsequent behavior
 // depends on file type.
-func handleTar(writeCloser io.WriteCloser, readerMaker ReaderMaker, crypter Crypter) error {
-	defer writeCloser.Close()
+func decryptAndDecompressTar(writeCloser io.WriteCloser, readerMaker ReaderMaker, crypter Crypter) error {
 	readCloser, err := readerMaker.Reader()
 
 	if err != nil {
@@ -75,15 +77,16 @@ func handleTar(writeCloser io.WriteCloser, readerMaker ReaderMaker, crypter Cryp
 		}
 		return nil
 	}
-	if readerMaker.Format() == "tar" {
+	switch readerMaker.Format() {
+	case "tar":
 		_, err = io.Copy(writeCloser, readCloser)
 		if err != nil {
 			return errors.Wrap(err, "ExtractAll: tar extract failed")
 		}
-	} else if readerMaker.Format() == "nop" {
-	} else if readerMaker.Format() == "lzo" {
+	case "nop":
+	case "lzo":
 		return errors.Wrap(UnsupportedFileTypeError{readerMaker.Path(), readerMaker.Format()}, "ExtractAll: lzo linked to this WAL-G binary")
-	} else {
+	default:
 		return errors.Wrap(UnsupportedFileTypeError{readerMaker.Path(), readerMaker.Format()}, "ExtractAll:")
 	}
 	return nil
@@ -98,74 +101,33 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 		return NoFilesToExtractError
 	}
 
-	var err error
-	sem := make(chan Empty, len(files))
-	collectAll := make(chan error)
-	defer close(collectAll)
-	go func() {
-		for e := range collectAll {
-			if e != nil {
-				err = e
-			}
-		}
-	}()
+	var errorCollector errgroup.Group
 
 	// Set maximum number of goroutines spun off by ExtractAll
-	var con = getMaxDownloadConcurrency(min(len(files), 10))
-
-	concurrent := make(chan Empty, con)
-	for i := 0; i < con; i++ {
-		concurrent <- Empty{}
-	}
-
+	downloadingConcurrency := getMaxDownloadConcurrency(min(len(files), 10))
+	downloadingContext := context.TODO()
+	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
 	var crypter OpenPGPCrypter
 
-	for i, val := range files {
-		<-concurrent
-		go func(i int, val ReaderMaker) {
-			defer func() {
-				concurrent <- Empty{}
-				sem <- Empty{}
-			}()
+	for _, file := range files {
+		downloadingSemaphore.Acquire(downloadingContext, 1)
+		fileClosure := file
 
-			pr, tempW := io.Pipe()
-			pw := &EmptyWriteIgnorer{tempW}
-
-			// Collect errors returned by handleTar or parsing.
-			collectLow := make(chan error)
-
-			go func() {
-				collectLow <- handleTar(pw, val, &crypter)
-			}()
-
-			// Collect errors returned by extractOne.
-			collectTop := make(chan error)
-
-			go func() {
-				defer pr.Close()
-				err := extractOne(tarInterpreter, pr)
-				collectTop <- err
-			}()
-
-			finishedTop := false
-			finishedLow := false
-
-			for !(finishedTop && finishedLow) {
-				select {
-				case err := <-collectTop:
-					finishedTop = true
-					collectAll <- err
-				case err := <-collectLow:
-					finishedLow = true
-					collectAll <- err
-				}
-			}
-
-		}(i, val)
+		extractingReader, pipeWriter := io.Pipe()
+		decompressingWriter := &EmptyWriteIgnorer{pipeWriter}
+		errorCollector.Go(func() error {
+			err := decryptAndDecompressTar(decompressingWriter, fileClosure, &crypter)
+			decompressingWriter.Close()
+			return err
+		})
+		errorCollector.Go(func() error {
+			defer downloadingSemaphore.Release(1)
+			err := extractOne(tarInterpreter, extractingReader)
+			extractingReader.Close()
+			return err
+		})
 	}
 
-	for i := 0; i < len(files); i++ {
-		<-sem
-	}
-	return err
+	downloadingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency))
+	return errorCollector.Wait()
 }

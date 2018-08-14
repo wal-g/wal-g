@@ -241,7 +241,7 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 	return nil
 }
 
-// handleTar creates underlying tar writer and handles one given file.
+// decryptAndDecompressTar creates underlying tar writer and handles one given file.
 // Does not follow symlinks. If file is in ExcludedFilenames, will not be included
 // in the final tarball. EXCLUDED directories are created
 // but their contents are not written to local disk.
@@ -256,7 +256,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 
 	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
 	if err != nil {
-		return errors.Wrap(err, "handleTar: could not grab header info")
+		return errors.Wrap(err, "decryptAndDecompressTar: could not grab header info")
 	}
 
 	tarBall := bundle.Deque() // TODO : simplify logic of it's returning back to the queue
@@ -298,7 +298,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 		defer bundle.EnqueueBack(tarBall)
 		err = tarBall.TarWriter().WriteHeader(fileInfoHeader)
 		if err != nil {
-			return errors.Wrap(err, "handleTar: failed to write header")
+			return errors.Wrap(err, "decryptAndDecompressTar: failed to write header")
 		}
 		if excluded && isDir {
 			return filepath.SkipDir
@@ -308,10 +308,9 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 	return nil
 }
 
-// HandleSentinel uploads the compressed tar file of `pg_control`. Will only be called
-// after the rest of the backup is successfully uploaded to S3. Returns
-// an error upon failure.
-func (bundle *Bundle) HandleSentinel() error {
+// UploadPgControl should only be called
+// after the rest of the backup is successfully uploaded to S3.
+func (bundle *Bundle) UploadPgControl() error {
 	fileName := bundle.Sentinel.Info.Name()
 	info := bundle.Sentinel.Info
 	path := bundle.Sentinel.path
@@ -323,21 +322,21 @@ func (bundle *Bundle) HandleSentinel() error {
 
 	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
 	if err != nil {
-		return errors.Wrap(err, "HandleSentinel: failed to grab header info")
+		return errors.Wrap(err, "UploadPgControl: failed to grab header info")
 	}
 
 	fileInfoHeader.Name = tarBall.GetFileRelPath(path)
 	fmt.Println(fileInfoHeader.Name)
 
-	err = tarWriter.WriteHeader(fileInfoHeader)
+	err = tarWriter.WriteHeader(fileInfoHeader) // TODO : what happens in case of irregular pg_control?
 	if err != nil {
-		return errors.Wrap(err, "HandleSentinel: failed to write header")
+		return errors.Wrap(err, "UploadPgControl: failed to write header")
 	}
 
 	if info.Mode().IsRegular() {
 		file, err := os.Open(path)
 		if err != nil {
-			return errors.Wrapf(err, "HandleSentinel: failed to open file %s\n", path)
+			return errors.Wrapf(err, "UploadPgControl: failed to open file %s\n", path)
 		}
 
 		lim := &io.LimitedReader{
@@ -347,7 +346,7 @@ func (bundle *Bundle) HandleSentinel() error {
 
 		_, err = io.Copy(tarWriter, lim)
 		if err != nil {
-			return errors.Wrap(err, "HandleSentinel: copy failed")
+			return errors.Wrap(err, "UploadPgControl: copy failed")
 		}
 
 		tarBall.AddSize(fileInfoHeader.Size)
@@ -356,24 +355,20 @@ func (bundle *Bundle) HandleSentinel() error {
 
 	err = tarBall.CloseTar()
 	if err != nil {
-		return errors.Wrap(err, "HandleSentinel: failed to close tarball")
+		return errors.Wrap(err, "UploadPgControl: failed to close tarball")
 	}
 
 	return nil
 }
 
-// HandleLabelFiles creates the `backup_label` and `tablespace_map` Files and uploads
-// it to S3 by stopping the backup. Returns error upon failure.
+// HandleLabelFiles creates the `backup_label` and `tablespace_map` files by stopping the backup
+// and uploads them to S3.
 func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {
-	var label string
-	var offsetMap string
-	var lsnStr string
-
 	queryRunner, err := NewPgQueryRunner(conn)
 	if err != nil {
 		return 0, errors.Wrap(err, "HandleLabelFiles: Failed to build query runner.")
 	}
-	label, offsetMap, lsnStr, err = queryRunner.StopBackup()
+	label, offsetMap, lsnStr, err := queryRunner.StopBackup()
 	if err != nil {
 		return 0, errors.Wrap(err, "HandleLabelFiles: failed to stop backup")
 	}

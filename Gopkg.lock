@@ -185,6 +185,15 @@
 
 [[projects]]
   branch = "master"
+  name = "golang.org/x/sync"
+  packages = [
+    "errgroup",
+    "semaphore"
+  ]
+  revision = "1d60e4601c6fd243af51cc01ddf169918a5407ca"
+
+[[projects]]
+  branch = "master"
   name = "golang.org/x/time"
   packages = ["rate"]
   revision = "fbb02b2291d28baffd63558aa44b4b56f178d650"
@@ -192,6 +201,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "6842cf1cfe082e99ebf559625b8fd48ec9b05877b9d98e4f5fbd6361642b15c5"
+  inputs-digest = "2686ba877a8a513c59ca3ed75c92463a711e6453ee1c8fb4adbb411719b9da19"
   solver-name = "gps-cdcl"
   solver-version = 1

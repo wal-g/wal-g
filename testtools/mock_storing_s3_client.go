@@ -20,7 +20,7 @@ func NewMockStoringS3Client(storage MockStorage) *mockStoringS3Client {
 func (client *mockStoringS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error) {
 	buffer, ok := client.storage[*input.Bucket+*input.Key]
 	if !ok {
-		return nil, awserr.New(walg.NotFoundAWSErrorCode, "", nil)
+		return nil, awserr.New(walg.NoSuchKeyAWSErrorCode, "", nil)
 	} else {
 		output := &s3.GetObjectOutput{
 			Body: ioutil.NopCloser(&buffer),

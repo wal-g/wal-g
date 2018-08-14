@@ -86,10 +86,9 @@ func (reader *WalDeltaRecordingReader) RecordBlockLocationsFromPage() error {
 func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, uploader *Uploader, dataFolderPath string) (*WalDeltaRecordingReader, error) {
 	_, err := os.Stat(dataFolderPath)
 	if os.IsNotExist(err) {
-		if err != nil {
-			return nil, err
-		}
-	} else if err != nil {
+		err = os.Mkdir(dataFolderPath, os.ModePerm)
+	}
+	if err != nil {
 		return nil, err
 	}
 	walParser, recorder, err := tryOpenParserAndRecorder(dataFolderPath, walFilename, uploader)

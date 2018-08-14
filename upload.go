@@ -118,7 +118,7 @@ func Configure() (*Uploader, *S3Folder, error) { // TODO : add parameter naming
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "Configure: failed to parse WALG_DISK_RATE_LIMIT")
 		}
-		diskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+64*1024)) // Add 8 pages to possible bursts
+		DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+64*1024)) // Add 8 pages to possible bursts
 	}
 
 	netLimitStr := os.Getenv("WALG_NETWORK_RATE_LIMIT")
@@ -127,7 +127,7 @@ func Configure() (*Uploader, *S3Folder, error) { // TODO : add parameter naming
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "Configure: failed to parse WALG_NETWORK_RATE_LIMIT")
 		}
-		networkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+64*1024)) // Add 8 pages to possible bursts
+		NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+64*1024)) // Add 8 pages to possible bursts
 	}
 
 	sess, err := session.NewSession(config)

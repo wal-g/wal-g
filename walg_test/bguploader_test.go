@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"testing"
 	"time"
+	"github.com/stretchr/testify/assert"
 )
 
 // This test has known race condition
@@ -33,15 +34,11 @@ func TestBackgroundWALUpload(t *testing.T) {
 		bname := "B" + strconv.Itoa(i)
 		bd := filepath.Join(dir, "archive_status", bname+".done")
 		_, err := os.Stat(bd)
-		if os.IsNotExist(err) {
-			t.Error(bname + ".done was not created")
-		}
+		assert.Falsef(t, os.IsNotExist(err), bname + ".done was not created")
 
 		br := filepath.Join(dir, "archive_status", bname+".ready")
 		_, err = os.Stat(br)
-		if !os.IsNotExist(err) {
-			t.Error(bname + ".ready was not deleted")
-		}
+		assert.Truef(t, os.IsNotExist(err), bname + ".ready was not deleted")
 	}
 
 	cleanup(t, dir)
