@@ -81,7 +81,7 @@ func ReadDatabaseFile(filePath string, fileSize int64, lsn uint64, deltaBitmap *
 		N: int64(fileSize),
 	}
 
-	pageReader := &IncrementalPageReader{make(chan []byte, 4), limitedFileReader, file, fileSize, lsn, nil, nil}
+	pageReader := &IncrementalPageReader{limitedFileReader, file, fileSize, lsn, nil, nil}
 	incrementSize, err := pageReader.initialize(deltaBitmap)
 	if err != nil {
 		return nil, 0, err

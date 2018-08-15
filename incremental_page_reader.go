@@ -9,56 +9,51 @@ import (
 )
 
 var IncrementScanUnexpectedEOF = errors.New("unexpected EOF during increment scan")
+// "wi" at the head stands for "wal-g increment"
+// format version "1", signature magic number
 var IncrementFileHeader = []byte{'w', 'i', '1', SignatureMagicNumber}
 
 // IncrementalPageReader constructs difference map during initialization and than re-read file
 // Diff map can be of 1Gb/PostgresBlockSize elements == 512Kb
 type IncrementalPageReader struct {
-	backlog         chan []byte
 	file            *io.LimitedReader
 	pagedFileSeeker SeekerCloser
 	FileSize        int64
 	lsn             uint64
-	next            *[]byte
+	next            []byte
 	Blocks          []uint32
 }
 
 // TODO : unit tests
 func (pageReader *IncrementalPageReader) Read(p []byte) (n int, err error) {
-	err = nil
-	if pageReader.next == nil {
-		return 0, io.EOF
+	for {
+		copied := copy(p, pageReader.next)
+		p = p[copied:]
+		pageReader.next = pageReader.next[copied:]
+		n += copied
+		if len(p) == 0 {
+			return n, nil
+		}
+		moreData, err := pageReader.drainMoreData()
+		if err != nil {
+			return n, err
+		}
+		if !moreData {
+			return n, io.EOF
+		}
 	}
-	n = copy(p, *pageReader.next)
-	if n == len(*pageReader.next) {
-		pageReader.next = nil
-	} else {
-		data := (*(pageReader.next))[n:]
-		pageReader.next = &(data)
-	}
-
-	if pageReader.next == nil {
-		err = pageReader.drainMoreData()
-	}
-
-	return n, err
 }
 
 // TODO : unit tests
-func (pageReader *IncrementalPageReader) drainMoreData() error {
-	for len(pageReader.Blocks) > 0 && len(pageReader.backlog) < 2 {
-		err := pageReader.advanceFileReader()
-		if err != nil {
-			return err
-		}
+func (pageReader *IncrementalPageReader) drainMoreData() (bool, error) {
+	if len(pageReader.Blocks) == 0 {
+		return false, nil
 	}
-
-	if len(pageReader.backlog) > 0 {
-		moreBytes := <-pageReader.backlog
-		pageReader.next = &moreBytes
+	err := pageReader.advanceFileReader()
+	if err != nil {
+		return false, err
 	}
-
-	return nil
+	return true, nil
 }
 
 // TODO : unit tests
@@ -73,7 +68,7 @@ func (pageReader *IncrementalPageReader) advanceFileReader() error {
 	}
 	_, err = io.ReadFull(pageReader.file, pageBytes)
 	if err == nil {
-		pageReader.backlog <- pageBytes
+		pageReader.next = pageBytes
 	}
 	return err
 }
@@ -85,14 +80,10 @@ func (pageReader *IncrementalPageReader) Close() error {
 
 // TODO : unit tests
 func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap) (size int64, err error) { // TODO : "initialize" is rather meaningless name, maybe this func should be decomposed
-	size = 0
-	// "wi" at the head stands for "wal-g increment"
-	// format version "1", signature magic number
-	pageReader.next = &IncrementFileHeader
-	size += sizeofInt32
+	var headerBuffer bytes.Buffer
+	headerBuffer.Write(IncrementFileHeader)
 	fileSize := pageReader.FileSize
-	pageReader.backlog <- toBytes(uint64(fileSize))
-	size += sizeofInt64
+	headerBuffer.Write(toBytes(uint64(fileSize)))
 	pageReader.Blocks = make([]uint32, 0, fileSize/int64(WalPageSize))
 
 	if deltaBitmap == nil {
@@ -104,8 +95,11 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap)
 		pageReader.DeltaBitmapInitialize(deltaBitmap)
 	}
 
-	size += pageReader.sendDiffMapToBacklog()
-	pageReader.file.N = int64(len(pageReader.Blocks)) * int64(WalPageSize)
+	pageReader.writeDiffMapToHeader(&headerBuffer)
+	pageReader.next = headerBuffer.Bytes()
+	pageDataSize := int64(len(pageReader.Blocks)) * int64(WalPageSize)
+	size = int64(headerBuffer.Len()) + pageDataSize
+	pageReader.file.N = pageDataSize
 	return
 }
 
@@ -132,7 +126,7 @@ func (pageReader *IncrementalPageReader) fullScanInitialize() error {
 
 		if err != nil {
 			if err == io.EOF {
-				_, err = pageReader.pagedFileSeeker.Seek(0, io.SeekStart)
+				return nil
 			}
 			return err
 		}
@@ -144,21 +138,13 @@ func (pageReader *IncrementalPageReader) fullScanInitialize() error {
 	}
 }
 
-func (pageReader *IncrementalPageReader) sendDiffMapToBacklog() (size int64) {
+func (pageReader *IncrementalPageReader) writeDiffMapToHeader(headerWriter io.Writer) {
 	diffBlockCount := len(pageReader.Blocks)
-	pageReader.backlog <- toBytes(uint32(diffBlockCount))
-	size = sizeofInt32
-
-	diffMapSize := diffBlockCount * sizeofInt32
-	var diffMap bytes.Buffer
+	headerWriter.Write(toBytes(uint32(diffBlockCount)))
 
 	for _, blockNo := range pageReader.Blocks {
-		binary.Write(&diffMap, binary.LittleEndian, blockNo)
+		binary.Write(headerWriter, binary.LittleEndian, blockNo)
 	}
-
-	pageReader.backlog <- diffMap.Bytes()
-	size += int64(diffMapSize)
-	size += int64(diffBlockCount) * int64(WalPageSize) // add data size
 	return
 }
 
