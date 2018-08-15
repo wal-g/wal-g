@@ -11,20 +11,20 @@ import (
 )
 
 func TestNoFilesProvided(t *testing.T) {
-	buf := &testtools.BufferTarInterpreter{}
+	buf := &testtools.NOPTarInterpreter{}
 	err := walg.ExtractAll(buf, []walg.ReaderMaker{})
 	assert.Equal(t, walg.NoFilesToExtractError, err)
 }
 
 func TestUnsupportedFileType(t *testing.T) {
 	test := &bytes.Buffer{}
-	brm := &BufferReaderMaker{test, "/usr/local", "gzip"}
-	buf := &testtools.BufferTarInterpreter{}
+	brm := &BufferReaderMaker{test, "/usr/local/file.gzip"}
+	buf := &testtools.NOPTarInterpreter{}
 	files := []walg.ReaderMaker{brm}
 	err := walg.ExtractAll(buf, files)
 
 	if serr, ok := err.(*walg.UnsupportedFileTypeError); ok {
-		t.Errorf("extract: Extract should not support filetype %s", brm.FileFormat)
+		t.Errorf("extract: Extract should not support filetype %s", walg.GetFileExtension(brm.Path()))
 	} else if serr != nil {
 		t.Log(serr)
 	}
@@ -53,7 +53,7 @@ func TestTar(t *testing.T) {
 	})
 
 	//Extract the generated tar and check that its one member is the same as the bytes generated to begin with.
-	brm := &BufferReaderMaker{member, "/usr/local", "tar"}
+	brm := &BufferReaderMaker{member, "/usr/local/file.tar"}
 	buf := &testtools.BufferTarInterpreter{}
 	files := []walg.ReaderMaker{brm}
 	err = walg.ExtractAll(buf, files)
@@ -68,9 +68,7 @@ func TestTar(t *testing.T) {
 type BufferReaderMaker struct {
 	Buf        *bytes.Buffer
 	Key        string
-	FileFormat string
 }
 
 func (b *BufferReaderMaker) Reader() (io.ReadCloser, error) { return ioutil.NopCloser(b.Buf), nil }
-func (b *BufferReaderMaker) Format() string                 { return b.FileFormat }
 func (b *BufferReaderMaker) Path() string                   { return b.Key }

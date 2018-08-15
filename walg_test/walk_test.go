@@ -91,7 +91,7 @@ func generateData(t *testing.T) string {
 		t.Log(err)
 	}
 
-	f, err := os.Create(filepath.Join(dir, "global", "pg_control"))
+	f, err := os.Create(filepath.Join(dir, "global", walg.PgControl))
 	if err != nil {
 		t.Log(err)
 	}
@@ -156,7 +156,6 @@ func extract(t *testing.T, dir string) string {
 		filePath := filepath.Join(dir, file.Name())
 		f := &testtools.FileReaderMaker{
 			Key:        filePath,
-			FileFormat: walg.GetFileExtension(file.Name()),
 		}
 		out[i] = f
 	}
@@ -354,7 +353,7 @@ func TestWalk(t *testing.T) {
 
 	// Test that sentinel exists and is handled correctly.
 	sen := bundle.Sentinel.Info.Name()
-	assert.Equal(t, "pg_control", sen)
+	assert.Equal(t, walg.PgControl, sen)
 
 	err = bundle.UploadPgControl()
 	assert.NoError(t, err)

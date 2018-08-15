@@ -64,6 +64,7 @@ func (tarBall *S3TarBall) AwaitUploads() {
 	}
 }
 
+// TODO : unit tests
 // startUpload creates a compressing writer and runs upload in the background once
 // a compressed tar member is finished writing.
 func (tarBall *S3TarBall) startUpload(name string, crypter Crypter) io.WriteCloser {

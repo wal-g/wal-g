@@ -22,6 +22,7 @@ const DefaultStreamingPartSizeFor10Concurrency = 20 << 20
 // MaxRetries limit upload and download retries during interaction with S3
 var MaxRetries = 15
 
+// TODO : unit tests
 // Given an S3 bucket name, attempt to determine its region
 func findS3BucketRegion(bucket string, config *aws.Config) (string, error) {
 	input := s3.GetBucketLocationInput{

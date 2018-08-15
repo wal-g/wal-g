@@ -11,20 +11,16 @@ import (
 type HTTPReaderMaker struct {
 	Client     *http.Client
 	Key        string
-	FileFormat string
 }
 
-func (h *HTTPReaderMaker) Format() string { return h.FileFormat }
 func (h *HTTPReaderMaker) Path() string   { return h.Key }
 
 // FileReaderMaker decompresses lzop tarballs from
 // the passed in file.
 type FileReaderMaker struct {
 	Key        string
-	FileFormat string
 }
 
-func (f *FileReaderMaker) Format() string { return f.FileFormat }
 func (f *FileReaderMaker) Path() string   { return f.Key }
 
 // Reader creates a new request to grab the data generated

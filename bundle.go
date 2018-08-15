@@ -15,7 +15,10 @@ import (
 )
 
 // It is made so to load big database files of size 1GB one by one
-const DefaultTarSizeThreshold = int64((1 << 30) - 1)
+const (
+	DefaultTarSizeThreshold = int64((1 << 30) - 1)
+	PgControl = "pg_control"
+)
 
 // ExcludedFilenames is a list of excluded members from the bundled backup.
 var ExcludedFilenames = make(map[string]Empty)
@@ -165,6 +168,7 @@ func (bundle *Bundle) GetIncrementBaseLsn() *uint64 { return bundle.IncrementFro
 // GetIncrementBaseFiles returns list of Files from previous backup
 func (bundle *Bundle) GetIncrementBaseFiles() BackupFileList { return bundle.IncrementFromFiles }
 
+// TODO : unit tests
 // checkTimelineChanged compares timelines of pg_backup_start() and pg_backup_stop()
 func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
 	if bundle.Replica {
@@ -185,6 +189,7 @@ func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
 	return false
 }
 
+// TODO : unit tests
 // StartBackup starts a non-exclusive base backup immediately. When finishing the backup,
 // `backup_label` and `tablespace_map` contents are not immediately written to
 // a file but returned instead. Returns empty string and an error if backup
@@ -212,6 +217,7 @@ func (bundle *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName str
 
 }
 
+// TODO : unit tests
 // HandleWalkedFSObject walks files provided by the passed in directory
 // and creates compressed tar members labeled as `part_00i.tar.*`, where '*' is compressor file extension.
 //
@@ -227,21 +233,22 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 		return errors.Wrap(err, "HandleWalkedFSObject: walk failed")
 	}
 
-	if info.Name() == "pg_control" {
+	if info.Name() == PgControl {
 		bundle.Sentinel = &Sentinel{info, path}
 	} else {
 		err = bundle.handleTar(path, info)
-		if err == filepath.SkipDir {
-			return err
-		}
 		if err != nil {
+			if err == filepath.SkipDir {
+				return err
+			}
 			return errors.Wrap(err, "HandleWalkedFSObject: handle tar failed")
 		}
 	}
 	return nil
 }
 
-// decryptAndDecompressTar creates underlying tar writer and handles one given file.
+// TODO : unit tests
+// handleTar creates underlying tar writer and handles one given file.
 // Does not follow symlinks. If file is in ExcludedFilenames, will not be included
 // in the final tarball. EXCLUDED directories are created
 // but their contents are not written to local disk.
@@ -256,7 +263,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 
 	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
 	if err != nil {
-		return errors.Wrap(err, "decryptAndDecompressTar: could not grab header info")
+		return errors.Wrap(err, "handleTar: could not grab header info")
 	}
 
 	tarBall := bundle.Deque() // TODO : simplify logic of it's returning back to the queue
@@ -298,7 +305,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 		defer bundle.EnqueueBack(tarBall)
 		err = tarBall.TarWriter().WriteHeader(fileInfoHeader)
 		if err != nil {
-			return errors.Wrap(err, "decryptAndDecompressTar: failed to write header")
+			return errors.Wrap(err, "handleTar: failed to write header")
 		}
 		if excluded && isDir {
 			return filepath.SkipDir
@@ -308,6 +315,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 	return nil
 }
 
+// TODO : unit tests
 // UploadPgControl should only be called
 // after the rest of the backup is successfully uploaded to S3.
 func (bundle *Bundle) UploadPgControl() error {
@@ -361,6 +369,7 @@ func (bundle *Bundle) UploadPgControl() error {
 	return nil
 }
 
+// TODO : unit tests
 // HandleLabelFiles creates the `backup_label` and `tablespace_map` files by stopping the backup
 // and uploads them to S3.
 func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {

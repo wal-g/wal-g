@@ -23,6 +23,7 @@ type IncrementalPageReader struct {
 	Blocks          []uint32
 }
 
+// TODO : unit tests
 func (pageReader *IncrementalPageReader) Read(p []byte) (n int, err error) {
 	err = nil
 	if pageReader.next == nil {
@@ -43,6 +44,7 @@ func (pageReader *IncrementalPageReader) Read(p []byte) (n int, err error) {
 	return n, err
 }
 
+// TODO : unit tests
 func (pageReader *IncrementalPageReader) drainMoreData() error {
 	for len(pageReader.Blocks) > 0 && len(pageReader.backlog) < 2 {
 		err := pageReader.advanceFileReader()
@@ -59,12 +61,13 @@ func (pageReader *IncrementalPageReader) drainMoreData() error {
 	return nil
 }
 
+// TODO : unit tests
 func (pageReader *IncrementalPageReader) advanceFileReader() error {
 	pageBytes := make([]byte, WalPageSize)
 	blockNo := pageReader.Blocks[0]
 	pageReader.Blocks = pageReader.Blocks[1:]
 	offset := int64(blockNo) * int64(WalPageSize)
-	_, err := pageReader.pagedFileSeeker.Seek(offset, 0)
+	_, err := pageReader.pagedFileSeeker.Seek(offset, io.SeekStart)
 	if err != nil {
 		return err
 	}

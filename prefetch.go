@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// TODO : unit tests
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
 func HandleWALPrefetch(folder *S3Folder, walFileName string, location string) {
 	var fileName = walFileName
@@ -32,6 +33,7 @@ func HandleWALPrefetch(folder *S3Folder, walFileName string, location string) {
 	waitGroup.Wait()
 }
 
+// TODO : unit tests
 func prefetchFile(location string, folder *S3Folder, walFileName string, waitGroup *sync.WaitGroup) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -74,6 +76,7 @@ func GetPrefetchLocations(location string, walFileName string) (prefetchLocation
 	return prefetchLocation, runningLocation, oldPath, newPath
 }
 
+// TODO : unit tests
 func forkPrefetch(walFileName string, location string) {
 	if strings.Contains(walFileName, "history") ||
 		strings.Contains(walFileName, "partial") ||

@@ -25,6 +25,7 @@ type CachedKey struct {
 	Body  []byte `json:"body"`
 }
 
+// TODO : unit tests
 // Here we read armoured version of Key by calling GPG process
 func getPubRingArmour(keyId string) ([]byte, error) {
 	var cache CachedKey

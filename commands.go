@@ -30,6 +30,7 @@ func (err ArchiveNonExistenceError) Error() string {
 	return fmt.Sprintf("Archive '%s' does not exist.\n", err.archiveName)
 }
 
+// TODO : unit tests
 // HandleDelete is invoked to perform wal-g delete
 func HandleDelete(folder *S3Folder, args []string) {
 	arguments := ParseDeleteArguments(args, printDeleteUsageAndFail)
@@ -87,6 +88,7 @@ func HandleDelete(folder *S3Folder, args []string) {
 	}
 }
 
+// TODO : unit tests
 // HandleBackupList is invoked to perform wal-g backup-list
 func HandleBackupList(folder *S3Folder) {
 	backups, err := getBackups(folder)
@@ -104,6 +106,7 @@ func HandleBackupList(folder *S3Folder) {
 	}
 }
 
+// TODO : unit tests
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
 func HandleBackupFetch(backupName string, folder *S3Folder, archiveDirectory string, mem bool) (lsn *uint64) {
 	archiveDirectory = ResolveSymlink(archiveDirectory)
@@ -121,6 +124,7 @@ func HandleBackupFetch(backupName string, folder *S3Folder, archiveDirectory str
 	return
 }
 
+// TODO : unit tests
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
 func deltaFetchRecursion(backupName string, folder *S3Folder, archiveDirectory string) (lsn *uint64) {
 	var backup *Backup
@@ -159,9 +163,10 @@ func deltaFetchRecursion(backupName string, folder *S3Folder, archiveDirectory s
 	return
 }
 
+// TODO : unit tests
 func extractPgControl(folder *S3Folder, fileTarInterpreter *FileTarInterpreter, name string) error {
 	sentinel := make([]ReaderMaker, 1)
-	sentinel[0] = NewS3ReaderMaker(folder, aws.String(name), GetFileExtension(name))
+	sentinel[0] = NewS3ReaderMaker(folder, name)
 
 	err := ExtractAll(fileTarInterpreter, sentinel)
 	if err != nil {
@@ -174,6 +179,7 @@ func extractPgControl(folder *S3Folder, fileTarInterpreter *FileTarInterpreter, 
 	return nil
 }
 
+// TODO : unit tests
 // Do the job of unpacking Backup object
 func unwrapBackup(backup *Backup, archiveDirectory string, sentinelDto S3TarBallSentinelDto) {
 
@@ -262,7 +268,7 @@ func unwrapBackup(backup *Backup, archiveDirectory string, sentinelDto S3TarBall
 			pgControlKey = &key
 			continue
 		}
-		s := NewS3ReaderMaker(backup.Folder, aws.String(key), GetFileExtension(key))
+		s := NewS3ReaderMaker(backup.Folder, key)
 		out = append(out, s)
 	}
 
@@ -290,6 +296,7 @@ func unwrapBackup(backup *Backup, archiveDirectory string, sentinelDto S3TarBall
 	fmt.Print("\nBackup extraction complete.\n")
 }
 
+// TODO : unit tests
 func getDeltaConfig() (maxDeltas int, fromFull bool) {
 	stepsStr, hasSteps := os.LookupEnv("WALG_DELTA_MAX_STEPS")
 	var err error
@@ -312,6 +319,7 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 	return
 }
 
+// TODO : unit tests
 // HandleBackupPush is invoked to perform a wal-g backup-push
 func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	archiveDirectory = ResolveSymlink(archiveDirectory)
@@ -431,6 +439,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	}
 }
 
+// TODO : unit tests
 // HandleWALFetch is invoked to performa wal-g wal-fetch
 func HandleWALFetch(folder *S3Folder, walFileName string, location string, triggerPrefetch bool) {
 	location = ResolveSymlink(location)
@@ -491,6 +500,7 @@ func HandleWALFetch(folder *S3Folder, walFileName string, location string, trigg
 	}
 }
 
+// TODO : unit tests
 func checkWALFileMagic(prefetched string) error {
 	file, err := os.Open(prefetched)
 	if err != nil {
@@ -557,6 +567,7 @@ func downloadAndDecompressWALFile(folder *S3Folder, walFileName string) (io.Read
 	return nil, ArchiveNonExistenceError{walFileName}
 }
 
+// TODO : unit tests
 // downloadWALFileTo downloads a file and writes it to local file
 func downloadWALFileTo(folder *S3Folder, walFileName string, dstPath string) error {
 	reader, err := downloadAndDecompressWALFile(folder, walFileName)
@@ -567,6 +578,7 @@ func downloadWALFileTo(folder *S3Folder, walFileName string, dstPath string) err
 	return CreateFileWith(dstPath, reader)
 }
 
+// TODO : unit tests
 // HandleWALPush is invoked to perform wal-g wal-push
 func HandleWALPush(uploader *Uploader, walFilePath string, verify bool) {
 	bgUploader := BgUploader{}
@@ -578,6 +590,7 @@ func HandleWALPush(uploader *Uploader, walFilePath string, verify bool) {
 	bgUploader.Stop()
 }
 
+// TODO : unit tests
 // uploadWALFile from FS to the cloud
 func uploadWALFile(uploader *Uploader, walFilePath string, verify bool) {
 	archive := &Archive{

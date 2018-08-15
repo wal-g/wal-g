@@ -2,13 +2,13 @@ package walg_test
 
 import (
 	"bytes"
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g"
 	"golang.org/x/time/rate"
 	"io"
 	"io/ioutil"
 	"testing"
 	"time"
-	"github.com/wal-g/wal-g"
-	"github.com/stretchr/testify/assert"
 )
 
 type fakeCloser struct {

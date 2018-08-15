@@ -52,6 +52,7 @@ func init() {
 	pagedFilenameRegexp = regexp.MustCompile("^(\\d+)([.]\\d+)?$")
 }
 
+// TODO : unit tests
 // isPagedFile checks basic expectations for paged file
 func isPagedFile(info os.FileInfo, filePath string) bool {
 
@@ -67,6 +68,7 @@ func isPagedFile(info os.FileInfo, filePath string) bool {
 	return true
 }
 
+// TODO : unit tests
 // ReadDatabaseFile reads file as an incremental data file
 func ReadDatabaseFile(filePath string, fileSize int64, lsn uint64, deltaBitmap *roaring.Bitmap) (fileReader io.ReadCloser, size int64, err error) {
 	file, err := os.Open(filePath)
@@ -74,12 +76,12 @@ func ReadDatabaseFile(filePath string, fileSize int64, lsn uint64, deltaBitmap *
 		return nil, 0, err
 	}
 
-	lim := &io.LimitedReader{
+	limitedFileReader := &io.LimitedReader{
 		R: io.MultiReader(NewDiskLimitReader(file), &ZeroReader{}),
 		N: int64(fileSize),
 	}
 
-	pageReader := &IncrementalPageReader{make(chan []byte, 4), lim, file, fileSize, lsn, nil, nil}
+	pageReader := &IncrementalPageReader{make(chan []byte, 4), limitedFileReader, file, fileSize, lsn, nil, nil}
 	incrementSize, err := pageReader.initialize(deltaBitmap)
 	if err != nil {
 		return nil, 0, err
@@ -87,6 +89,7 @@ func ReadDatabaseFile(filePath string, fileSize int64, lsn uint64, deltaBitmap *
 	return pageReader, incrementSize, nil
 }
 
+// TODO : unit tests
 // ApplyFileIncrement changes pages according to supplied change map file
 func ApplyFileIncrement(fileName string, increment io.Reader) error {
 	fmt.Printf("Incrementing %s\n", fileName)

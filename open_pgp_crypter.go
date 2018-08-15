@@ -7,17 +7,23 @@ import (
 	"io"
 )
 
+// ErrCrypterUseMischief happens when crypter is used before initialization
+var ErrCrypterUseMischief = errors.New("Crypter is not checked before use")
+
 // OpenPGPCrypter incapsulates specific of cypher method
 // Includes keys, infrastructutre information etc
 // If many encryption methods will be used it worth
 // to extract interface
 type OpenPGPCrypter struct {
 	Configured bool
-	Armed      bool
 	KeyRingId  string
 
 	PubKey    openpgp.EntityList
 	SecretKey openpgp.EntityList
+}
+
+func (crypter *OpenPGPCrypter) IsArmed() bool {
+	return len(crypter.KeyRingId) != 0
 }
 
 // IsUsed is to check necessity of Crypter use
@@ -26,18 +32,14 @@ func (crypter *OpenPGPCrypter) IsUsed() bool {
 	if !crypter.Configured {
 		crypter.ConfigureGPGCrypter()
 	}
-	return crypter.Armed
+	return crypter.IsArmed()
 }
 
 // ConfigureGPGCrypter is OpenPGPCrypter internal initialization
 func (crypter *OpenPGPCrypter) ConfigureGPGCrypter() {
 	crypter.Configured = true
 	crypter.KeyRingId = GetKeyRingId()
-	crypter.Armed = len(crypter.KeyRingId) != 0
 }
-
-// ErrCrypterUseMischief happens when crypter is used before initialization
-var ErrCrypterUseMischief = errors.New("Crypter is not checked before use")
 
 // Encrypt creates encryption writer from ordinary writer
 func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, error) {

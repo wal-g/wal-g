@@ -1,13 +1,13 @@
 package walg
 
 import (
+	"encoding/json"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
-	"log"
 	"io/ioutil"
-	"encoding/json"
+	"log"
 )
 
 var NoBackupsFoundError = errors.New("No backups found")
@@ -82,8 +82,7 @@ func (backup *Backup) GetKeys() ([]string, error) {
 }
 
 func (backup *Backup) fetchSentinel() (sentinelDto S3TarBallSentinelDto) {
-	latestSentinelName := backup.getStopSentinelPath()
-	backupReaderMaker := NewS3ReaderMaker(backup.Folder, aws.String(backup.getStopSentinelPath()), GetFileExtension(latestSentinelName))
+	backupReaderMaker := NewS3ReaderMaker(backup.Folder, backup.getStopSentinelPath())
 	backupReader, err := backupReaderMaker.Reader()
 	if err != nil {
 		log.Fatalf("%+v\n", err)

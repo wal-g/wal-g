@@ -88,6 +88,7 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 	return
 }
 
+// TODO : unit tests
 func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dryRun bool) {
 	folder := target.Folder
 	dto := target.fetchSentinel()
@@ -130,6 +131,7 @@ func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dry
 	}
 }
 
+// TODO : unit tests
 func deleteBackupsBefore(backups []BackupTime, skipline int, folder *S3Folder) {
 	for i, b := range backups {
 		if i > skipline {
@@ -138,6 +140,7 @@ func deleteBackupsBefore(backups []BackupTime, skipline int, folder *S3Folder) {
 	}
 }
 
+// TODO : unit tests
 func dropBackup(folder *S3Folder, backupTime BackupTime) {
 	backup := NewBackup(folder, backupTime.Name)
 	tarFiles, err := backup.GetKeys()
@@ -163,6 +166,7 @@ func dropBackup(folder *S3Folder, backupTime BackupTime) {
 	}
 }
 
+// TODO : unit tests
 func partitionToObjects(keys []string) []*s3.ObjectIdentifier {
 	objs := make([]*s3.ObjectIdentifier, len(keys))
 	for i, k := range keys {
@@ -171,6 +175,7 @@ func partitionToObjects(keys []string) []*s3.ObjectIdentifier {
 	return objs
 }
 
+// TODO : unit tests
 func deleteWALBefore(backupTime BackupTime, folder *S3Folder) {
 	objects, err := getWals(backupTime.WalFileName, folder)
 	if err != nil {

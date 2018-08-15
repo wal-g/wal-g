@@ -150,6 +150,7 @@ func (uploader *Uploader) CreateUploadInput(path string, reader io.Reader) *s3ma
 	return uploadInput
 }
 
+// TODO : unit tests
 // Helper function to upload to S3. If an error occurs during upload, retries will
 // occur in exponentially incremental seconds.
 func (uploader *Uploader) upload(input *s3manager.UploadInput, path string) error {

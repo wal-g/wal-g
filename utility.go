@@ -24,7 +24,7 @@ const (
 	SentinelSuffix         = "_backup_stop_sentinel.json"
 	CompressedBlockMaxSize = 20 << 20
 	NotFoundAWSErrorCode   = "NotFound"
-	NoSuchKeyAWSErrorCode = "NoSuchKey"
+	NoSuchKeyAWSErrorCode  = "NoSuchKey"
 )
 
 // Empty is used for channel signaling.

@@ -4,28 +4,26 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
 	"io"
+	"github.com/aws/aws-sdk-go/aws"
 )
 
 // S3ReaderMaker creates readers for downloading from S3
 type S3ReaderMaker struct {
-	Folder *S3Folder
-	Key        *string
-	FileFormat string
+	Folder       *S3Folder
+	RelativePath string
 }
 
-func NewS3ReaderMaker(folder *S3Folder,  key *string, fileFormat string) *S3ReaderMaker {
-	return &S3ReaderMaker{folder, key, fileFormat}
+func NewS3ReaderMaker(folder *S3Folder, key string) *S3ReaderMaker {
+	return &S3ReaderMaker{folder, key }
 }
 
-func (readerMaker *S3ReaderMaker) Format() string { return readerMaker.FileFormat }
-
-func (readerMaker *S3ReaderMaker) Path() string { return *readerMaker.Key }
+func (readerMaker *S3ReaderMaker) Path() string { return readerMaker.RelativePath }
 
 // Reader creates a new S3 reader for each S3 object.
 func (readerMaker *S3ReaderMaker) Reader() (io.ReadCloser, error) {
 	input := &s3.GetObjectInput{
 		Bucket: readerMaker.Folder.Bucket,
-		Key:    readerMaker.Key,
+		Key:    aws.String(readerMaker.RelativePath),
 	}
 
 	rdr, err := readerMaker.Folder.S3API.GetObject(input)

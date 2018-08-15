@@ -44,7 +44,7 @@ func TestBackupErrors(t *testing.T) {
 
 	out := make([]walg.ReaderMaker, len(keys))
 	for i, key := range keys {
-		s := walg.NewS3ReaderMaker(folder, aws.String(key), walg.GetFileExtension(key))
+		s := walg.NewS3ReaderMaker(folder, key)
 		out[i] = s
 	}
 
@@ -77,7 +77,7 @@ func TestBackup(t *testing.T) {
 
 	out := make([]walg.ReaderMaker, len(keys))
 	for i, key := range keys {
-		s := walg.NewS3ReaderMaker(folder, aws.String(key), walg.GetFileExtension(key))
+		s := walg.NewS3ReaderMaker(folder, key)
 		out[i] = s
 		assert.Equalf(t, correctKeys[i], out[i].Path(), "backup: expected S3ReaderMaker key to be %s but got %s", correctKeys[i], out[i].Path())
 	}

@@ -1,9 +1,9 @@
 package walg
 
 import (
-	"log"
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
+	"log"
 )
 
 // Connect establishes a connection to postgres using

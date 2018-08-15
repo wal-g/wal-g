@@ -6,6 +6,7 @@ import (
 	"io"
 )
 
+// TODO : unit tests
 func extractBlockLocations(records []walparser.XLogRecord) []walparser.BlockLocation {
 	locations := make([]walparser.BlockLocation, 0)
 	for _, record := range records {
@@ -16,6 +17,7 @@ func extractBlockLocations(records []walparser.XLogRecord) []walparser.BlockLoca
 	return locations
 }
 
+// TODO unit tests
 func uniqueLocations(locations []walparser.BlockLocation) []walparser.BlockLocation {
 	uniqueLocations := make([]walparser.BlockLocation, 0)
 	recordedLocations := make(map[walparser.BlockLocation]bool)
@@ -28,6 +30,7 @@ func uniqueLocations(locations []walparser.BlockLocation) []walparser.BlockLocat
 	return uniqueLocations
 }
 
+// TODO : unit tests
 func extractLocationsFromWalFile(walFile io.ReadCloser) ([]walparser.BlockLocation, error) {
 	pageReader := walparser.NewWalPageReader(walFile)
 	parser := walparser.NewWalParser()

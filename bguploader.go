@@ -72,6 +72,7 @@ var readySuffix = ".ready"
 var archiveStatus = "archive_status"
 var done = ".done"
 
+// TODO : unit tests
 func scanOnce(u *BgUploader) {
 	u.mutex.Lock()
 	defer u.mutex.Unlock()
@@ -111,6 +112,7 @@ func haveNoSlots(u *BgUploader) bool {
 	return atomic.LoadInt32(&u.parallelWorkers) >= atomic.LoadInt32(&u.maxParallelWorkers)
 }
 
+// TODO : unit tests
 // upload one WAL file
 func (bgUploader *BgUploader) upload(info os.FileInfo) {
 	walFilename := strings.TrimSuffix(info.Name(), readySuffix)

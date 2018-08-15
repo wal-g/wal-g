@@ -2,11 +2,11 @@ package walg
 
 import (
 	"archive/tar"
+	"context"
 	"github.com/pkg/errors"
-	"io"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
-	"context"
+	"io"
 )
 
 var NoFilesToExtractError = errors.New("ExtractAll: did not provide files to extract")
@@ -24,9 +24,8 @@ func (e EmptyWriteIgnorer) Write(p []byte) (int, error) {
 	return e.WriteCloser.Write(p)
 }
 
-// Extract exactly one tar bundle. Returns an error
-// upon failure. Able to configure behavior by passing
-// in different TarInterpreters.
+// TODO : unit tests
+// Extract exactly one tar bundle.
 func extractOne(tarInterpreter TarInterpreter, src io.Reader) error {
 	tarReader := tar.NewReader(src)
 
@@ -45,16 +44,16 @@ func extractOne(tarInterpreter TarInterpreter, src io.Reader) error {
 		}
 	}
 	return nil
-
 }
 
+// TODO : unit tests
 // Ensures that file extension is valid. Any subsequent behavior
 // depends on file type.
-func decryptAndDecompressTar(writeCloser io.WriteCloser, readerMaker ReaderMaker, crypter Crypter) error {
+func decryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter Crypter) error {
 	readCloser, err := readerMaker.Reader()
 
 	if err != nil {
-		return errors.Wrap(err, "ExtractAll: failed to create new reader")
+		return errors.Wrap(err, "decryptAndDecompressTar: failed to create new reader")
 	}
 	defer readCloser.Close()
 
@@ -62,36 +61,38 @@ func decryptAndDecompressTar(writeCloser io.WriteCloser, readerMaker ReaderMaker
 		var reader io.Reader
 		reader, err = crypter.Decrypt(readCloser)
 		if err != nil {
-			return errors.Wrap(err, "ExtractAll: decrypt failed")
+			return errors.Wrap(err, "decryptAndDecompressTar: decrypt failed")
 		}
 		readCloser = ReadCascadeCloser{reader, readCloser}
 	}
 
+	fileExtension := GetFileExtension(readerMaker.Path())
 	for _, decompressor := range Decompressors {
-		if readerMaker.Format() != decompressor.FileExtension() {
+		if fileExtension != decompressor.FileExtension() {
 			continue
 		}
-		err = decompressor.Decompress(writeCloser, readCloser)
+		err = decompressor.Decompress(writer, readCloser)
 		if err != nil {
-			return errors.Wrapf(err, "ExtractAll: %v decompress failed. Is archive encrypted?", decompressor.FileExtension())
+			return errors.Wrapf(err, "decryptAndDecompressTar: %v decompress failed. Is archive encrypted?", decompressor.FileExtension())
 		}
 		return nil
 	}
-	switch readerMaker.Format() {
+	switch fileExtension {
 	case "tar":
-		_, err = io.Copy(writeCloser, readCloser)
+		_, err = io.Copy(writer, readCloser)
 		if err != nil {
-			return errors.Wrap(err, "ExtractAll: tar extract failed")
+			return errors.Wrap(err, "decryptAndDecompressTar: tar extract failed")
 		}
 	case "nop":
 	case "lzo":
-		return errors.Wrap(UnsupportedFileTypeError{readerMaker.Path(), readerMaker.Format()}, "ExtractAll: lzo linked to this WAL-G binary")
+		return errors.Wrap(UnsupportedFileTypeError{readerMaker.Path(), fileExtension}, "decryptAndDecompressTar: lzo linked to this WAL-G binary")
 	default:
-		return errors.Wrap(UnsupportedFileTypeError{readerMaker.Path(), readerMaker.Format()}, "ExtractAll:")
+		return errors.Wrap(UnsupportedFileTypeError{readerMaker.Path(), fileExtension}, "decryptAndDecompressTar:")
 	}
 	return nil
 }
 
+// TODO : unit tests
 // ExtractAll Handles all files passed in. Supports `.lzo`, `.lz4`, `.lzma`, and `.tar`.
 // File type `.nop` is used for testing purposes. Each file is extracted
 // in its own goroutine and ExtractAll will wait for all goroutines to finish.
