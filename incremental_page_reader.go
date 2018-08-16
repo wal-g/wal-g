@@ -62,7 +62,7 @@ func (pageReader *IncrementalPageReader) advanceFileReader() error {
 	blockNo := pageReader.Blocks[0]
 	pageReader.Blocks = pageReader.Blocks[1:]
 	offset := int64(blockNo) * int64(WalPageSize)
-	_, err := pageReader.pagedFileSeeker.Seek(offset, io.SeekStart)
+	_, err := pageReader.pagedFileSeeker.Seek(offset, io.SeekStart) // TODO : possible race condition - page was deleted between blocks extraction and seek
 	if err != nil {
 		return err
 	}

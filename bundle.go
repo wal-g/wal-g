@@ -42,6 +42,7 @@ func init() {
 // uploaded backups; in this case, pg_control is used as
 // the sentinel.
 type Bundle struct {
+	ArchiveDirectory   string
 	TarSizeThreshold   int64
 	Sentinel           *Sentinel
 	TarBall            TarBall
@@ -63,13 +64,18 @@ type Bundle struct {
 	Files *sync.Map
 }
 
-func NewBundle(incrementFromLsn *uint64, incrementFromFiles BackupFileList) *Bundle {
+func NewBundle(archiveDirectory string, incrementFromLsn *uint64, incrementFromFiles BackupFileList) *Bundle {
 	return &Bundle{
+		ArchiveDirectory:   archiveDirectory,
 		TarSizeThreshold:   DefaultTarSizeThreshold,
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
 		Files:              &sync.Map{},
 	}
+}
+
+func (bundle *Bundle) GetFileRelPath(fileAbsPath string) string {
+	return GetFileRelativePath(fileAbsPath, bundle.ArchiveDirectory)
 }
 
 func (bundle *Bundle) GetFiles() *sync.Map { return bundle.Files }
@@ -268,13 +274,13 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 
 	tarBall := bundle.Deque() // TODO : simplify logic of it's returning back to the queue
 	tarBall.SetUp(&bundle.Crypter)
-	fileInfoHeader.Name = tarBall.GetFileRelPath(path)
+	fileInfoHeader.Name = bundle.GetFileRelPath(path)
 	fmt.Println(fileInfoHeader.Name)
 
 	if !excluded && info.Mode().IsRegular() {
 		baseFiles := bundle.GetIncrementBaseFiles()
 		bf, wasInBase := baseFiles[fileInfoHeader.Name]
-		// It is important to take MTime before ReadDatabaseFile()
+		// It is important to take MTime before ReadIncrementalFile()
 		time := info.ModTime()
 
 		// We do not rely here on monotonic time, instead we backup file if MTime changed somehow
@@ -318,14 +324,14 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 // TODO : unit tests
 // UploadPgControl should only be called
 // after the rest of the backup is successfully uploaded to S3.
-func (bundle *Bundle) UploadPgControl() error {
+func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 	fileName := bundle.Sentinel.Info.Name()
 	info := bundle.Sentinel.Info
 	path := bundle.Sentinel.path
 
 	bundle.NewTarBall(false)
 	tarBall := bundle.TarBall
-	tarBall.SetUp(&bundle.Crypter, "pg_control.tar."+tarBall.FileExtension())
+	tarBall.SetUp(&bundle.Crypter, "pg_control.tar."+compressorFileExtension)
 	tarWriter := tarBall.TarWriter()
 
 	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
@@ -333,7 +339,7 @@ func (bundle *Bundle) UploadPgControl() error {
 		return errors.Wrap(err, "UploadPgControl: failed to grab header info")
 	}
 
-	fileInfoHeader.Name = tarBall.GetFileRelPath(path)
+	fileInfoHeader.Name = bundle.GetFileRelPath(path)
 	fmt.Println(fileInfoHeader.Name)
 
 	err = tarWriter.WriteHeader(fileInfoHeader) // TODO : what happens in case of irregular pg_control?
@@ -477,43 +483,41 @@ func (bundle *Bundle) DownloadDeltaMap(folder *S3Folder, backupStartLSN uint64) 
 
 // TODO : unit tests
 func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHeader *tar.Header, wasInBase bool, tarBall TarBall) error {
-	var err error
 	incrementBaseLsn := bundle.GetIncrementBaseLsn()
-	isIncremented := incrementBaseLsn != nil && wasInBase && isPagedFile(info, path) && !strings.Contains(path, GlobalTablespace)
+	isIncremented := incrementBaseLsn != nil && wasInBase && isPagedFile(info, path)
 	var fileReader io.ReadCloser
-	var fileSize int64
 	if isIncremented {
 		bitmap, err := bundle.getDeltaBitmapFor(path)
 		if err != nil {
 			return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
 		}
-		fileReader, fileSize, err = ReadDatabaseFile(path, info.Size(), *incrementBaseLsn, bitmap)
+		fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
+		if err != nil {
+			return errors.Wrapf(err, "packFileIntoTar: failed reading incremental file '%s'\n", path)
+		}
 	} else {
-		fileSize = info.Size()
-		fileReader, err = os.Open(path)
-		fileReader = NewDiskLimitReader(fileReader)
-	}
-	if err != nil {
-		return errors.Wrapf(err, "packFileIntoTar: failed to open file '%s'\n", path)
+		fileInfoHeader.Size = info.Size()
+		file, err := os.Open(path)
+		if err != nil {
+			return errors.Wrapf(err, "packFileIntoTar: failed to open file '%s'\n", path)
+		}
+		diskLimitedFileReader := NewDiskLimitReader(file)
+		fileReader = &ReadCascadeCloser{&io.LimitedReader{
+			R: io.MultiReader(diskLimitedFileReader, &ZeroReader{}),
+			N: int64(fileInfoHeader.Size),
+		}, diskLimitedFileReader}
 	}
 	defer fileReader.Close()
 
-	fileInfoHeader.Size = fileSize
-
 	bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: false, IsIncremented: isIncremented, MTime: info.ModTime()})
 
-	lim := &io.LimitedReader{
-		R: io.MultiReader(fileReader, &ZeroReader{}),
-		N: int64(fileInfoHeader.Size),
-	}
-
-	fileSize, err = PackFileTo(tarBall, fileInfoHeader, lim)
+	packedFileSize, err := PackFileTo(tarBall, fileInfoHeader, fileReader)
 	if err != nil {
 		return errors.Wrap(err, "packFileIntoTar: operation failed")
 	}
 
-	if fileSize != fileInfoHeader.Size {
-		return errors.Errorf("packFileIntoTar: packed wrong numbers of bytes %d instead of %d", fileSize, fileInfoHeader.Size)
+	if packedFileSize != fileInfoHeader.Size {
+		return errors.Errorf("packFileIntoTar: packed wrong numbers of bytes %d instead of %d", packedFileSize, fileInfoHeader.Size)
 	}
 
 	return nil

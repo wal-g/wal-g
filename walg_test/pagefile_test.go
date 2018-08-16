@@ -46,7 +46,7 @@ func postgresFileTest(loclLSN uint64, t *testing.T) {
 	if err != nil {
 		fmt.Print(err.Error())
 	}
-	reader, size, err := walg.ReadDatabaseFile(pagedFileName, fileInfo.Size(), loclLSN, nil)
+	reader, size, err := walg.ReadIncrementalFile(pagedFileName, fileInfo.Size(), loclLSN, nil)
 	if err != nil {
 		fmt.Print(err.Error())
 	}
@@ -69,7 +69,7 @@ func postgresFileTest(loclLSN uint64, t *testing.T) {
 	_, err = newReader.Read(make([]byte, 1))
 	assert.Equalf(t, io.EOF, err, "Not read to the end")
 	compare := deepCompare(pagedFileName, tmpFileName)
-	assert.Truef(t, compare, "Icrement could not restore file")
+	assert.Truef(t, compare, "Increment could not restore file")
 }
 
 func copyFile(src, dst string) error {

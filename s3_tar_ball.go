@@ -13,7 +13,6 @@ import (
 // S3TarBall represents a tar file that is
 // going to be uploaded to S3.
 type S3TarBall struct {
-	archiveDirectory string
 	backupName       string
 	partCount        int
 	size             int64
@@ -32,7 +31,7 @@ func (tarBall *S3TarBall) SetUp(crypter Crypter, names ...string) {
 		if len(names) > 0 {
 			name = names[0]
 		} else {
-			name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partCount, tarBall.FileExtension())
+			name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partCount, tarBall.uploader.compressor.FileExtension())
 		}
 		writeCloser := tarBall.startUpload(name, crypter)
 
@@ -103,10 +102,6 @@ func (tarBall *S3TarBall) startUpload(name string, crypter Crypter) io.WriteClos
 	return &CascadeWriteCloser{uploader.compressor.NewWriter(pipeWriter), pipeWriter}
 }
 
-func (tarBall *S3TarBall) GetFileRelPath(fileAbsPath string) string {
-	return GetFileRelativePath(fileAbsPath, tarBall.archiveDirectory)
-}
-
 // Size accumulated in this tarball
 func (tarBall *S3TarBall) Size() int64 { return tarBall.size }
 
@@ -114,10 +109,6 @@ func (tarBall *S3TarBall) Size() int64 { return tarBall.size }
 func (tarBall *S3TarBall) AddSize(i int64) { tarBall.size += i }
 
 func (tarBall *S3TarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
-
-func (tarBall *S3TarBall) FileExtension() string {
-	return tarBall.uploader.compressor.FileExtension()
-}
 
 // Finish writes a .json file description and uploads it with the
 // the backup name. Finish will wait until all tar file parts

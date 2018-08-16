@@ -11,11 +11,9 @@ type TarBall interface {
 	SetUp(crypter Crypter, args ...string)
 	CloseTar() error
 	Finish(sentinelDto *S3TarBallSentinelDto) error
-	GetFileRelPath(fileAbsPath string) string
 	Size() int64
 	AddSize(int64)
 	TarWriter() *tar.Writer
-	FileExtension() string
 	AwaitUploads()
 }
 

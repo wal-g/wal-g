@@ -321,12 +321,12 @@ func TestWalk(t *testing.T) {
 
 	// Bundle and compress files to `compressed`.
 	bundle := &walg.Bundle{
+		ArchiveDirectory: data,
 		TarSizeThreshold: int64(10),
 		Files:            &sync.Map{},
 	}
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
 	bundle.TarBallMaker = &testtools.FileTarBallMaker{
-		ArchiveDirectory: data,
 		Out:              compressed,
 	}
 	err := os.MkdirAll(compressed, 0766)
@@ -355,7 +355,7 @@ func TestWalk(t *testing.T) {
 	sen := bundle.Sentinel.Info.Name()
 	assert.Equal(t, walg.PgControl, sen)
 
-	err = bundle.UploadPgControl()
+	err = bundle.UploadPgControl("lz4")
 	assert.NoError(t, err)
 
 	// err = bundle.HandleLabelFiles("backup", "table")

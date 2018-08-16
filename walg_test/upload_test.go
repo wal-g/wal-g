@@ -127,7 +127,6 @@ func TestUploadError(t *testing.T) {
 	uploader := testtools.NewMockTarUploader(false, true)
 
 	maker := &walg.S3TarBallMaker{
-		ArchiveDirectory: "/usr/local",
 		BackupName:       "test",
 		Uploader:         uploader,
 	}

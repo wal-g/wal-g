@@ -7,6 +7,8 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"io"
+	"log"
+	"bytes"
 )
 
 var NoFilesToExtractError = errors.New("ExtractAll: did not provide files to extract")
@@ -37,6 +39,7 @@ func extractOne(tarInterpreter TarInterpreter, src io.Reader) error {
 		if err != nil {
 			return errors.Wrap(err, "extractOne: tar extract failed")
 		}
+		//log.Printf("header: %v", *header)
 
 		err = tarInterpreter.Interpret(tarReader, header)
 		if err != nil {
@@ -119,11 +122,18 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 		errorCollector.Go(func() error {
 			err := decryptAndDecompressTar(decompressingWriter, fileClosure, &crypter)
 			decompressingWriter.Close()
+			log.Printf("Finished decompression of %s", fileClosure.Path())
 			return err
 		})
 		errorCollector.Go(func() error {
 			defer downloadingSemaphore.Release(1)
-			err := extractOne(tarInterpreter, extractingReader)
+			var buf bytes.Buffer
+			io.Copy(&buf, extractingReader)
+			err := extractOne(tarInterpreter, &buf)
+			if err != nil {
+				err = errors.Wrapf(err, "Extraction error in %s", fileClosure.Path())
+			}
+			log.Printf("Finished extraction of %s", fileClosure.Path())
 			extractingReader.Close()
 			return err
 		})

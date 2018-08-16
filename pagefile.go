@@ -59,7 +59,7 @@ func isPagedFile(info os.FileInfo, filePath string) bool {
 	// For details on which file is paged see
 	// https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
 	if info.IsDir() ||
-		((!strings.Contains(filePath, DefaultTablespace)) && (!strings.Contains(filePath, GlobalTablespace)) && (!strings.Contains(filePath, NonDefaultTablespace))) ||
+		((!strings.Contains(filePath, DefaultTablespace)) && (!strings.Contains(filePath, NonDefaultTablespace))) ||
 		info.Size() == 0 ||
 		info.Size()%int64(WalPageSize) != 0 ||
 		!pagedFilenameRegexp.MatchString(path.Base(filePath)) {
@@ -68,9 +68,7 @@ func isPagedFile(info os.FileInfo, filePath string) bool {
 	return true
 }
 
-// TODO : unit tests
-// ReadDatabaseFile reads file as an incremental data file
-func ReadDatabaseFile(filePath string, fileSize int64, lsn uint64, deltaBitmap *roaring.Bitmap) (fileReader io.ReadCloser, size int64, err error) {
+func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitmap *roaring.Bitmap) (fileReader io.ReadCloser, size int64, err error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, 0, err
@@ -89,7 +87,6 @@ func ReadDatabaseFile(filePath string, fileSize int64, lsn uint64, deltaBitmap *
 	return pageReader, incrementSize, nil
 }
 
-// TODO : unit tests
 // ApplyFileIncrement changes pages according to supplied change map file
 func ApplyFileIncrement(fileName string, increment io.Reader) error {
 	fmt.Printf("Incrementing %s\n", fileName)

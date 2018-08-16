@@ -11,7 +11,6 @@ import (
 type FileTarBallMaker struct {
 	number           int
 	size             int64
-	ArchiveDirectory string
 	Out              string
 }
 
@@ -21,7 +20,6 @@ func (tarBallMaker *FileTarBallMaker) Make(inheritState bool) walg.TarBall {
 	return &FileTarBall{
 		number:           tarBallMaker.number,
 		size:             tarBallMaker.size,
-		archiveDirectory: tarBallMaker.ArchiveDirectory,
 		out:              tarBallMaker.Out,
 	}
 }
@@ -31,7 +29,6 @@ func (tarBallMaker *FileTarBallMaker) Make(inheritState bool) walg.TarBall {
 type NOPTarBallMaker struct {
 	number int
 	size   int64
-	Trim   string
 }
 
 // Make creates a new NOPTarBall.
@@ -40,7 +37,6 @@ func (tarBallMaker *NOPTarBallMaker) Make(inheritState bool) walg.TarBall {
 	return &NOPTarBall{
 		number:           tarBallMaker.number,
 		size:             tarBallMaker.size,
-		archiveDirectory: tarBallMaker.Trim,
 	}
 }
 
@@ -48,7 +44,6 @@ type BufferTarBallMaker struct {
 	number           int
 	size             int64
 	BufferToWrite    *bytes.Buffer
-	ArchiveDirectory string
 }
 
 func (tarBallMaker *BufferTarBallMaker) Make(dedicatedUploader bool) walg.TarBall {
@@ -56,7 +51,6 @@ func (tarBallMaker *BufferTarBallMaker) Make(dedicatedUploader bool) walg.TarBal
 	return &BufferTarBall{
 		number:           tarBallMaker.number,
 		size:             tarBallMaker.size,
-		archiveDirectory: tarBallMaker.ArchiveDirectory,
 		underlying:       tarBallMaker.BufferToWrite,
 	}
 }

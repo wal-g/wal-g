@@ -16,11 +16,11 @@ import (
 func TestS3TarBall(t *testing.T) {
 	tarBallCounter := 0
 	bundle := &walg.Bundle{
+		ArchiveDirectory: "/usr/local",
 		TarSizeThreshold: int64(10),
 	}
 
 	bundle.TarBallMaker = &walg.S3TarBallMaker{
-		ArchiveDirectory: "/usr/local",
 		BackupName:       "test",
 		Uploader:         testtools.NewMockTarUploader(false, false),
 	}
@@ -44,13 +44,13 @@ func TestS3TarBall(t *testing.T) {
 // SetUp(), CloseTar() and Finish().
 func TestS3DependentFunctions(t *testing.T) {
 	bundle := &walg.Bundle{
+		ArchiveDirectory: "",
 		TarSizeThreshold: 100,
 	}
 
 	uploader := testtools.NewMockTarUploader(false, false)
 
 	bundle.TarBallMaker = &walg.S3TarBallMaker{
-		ArchiveDirectory: "",
 		BackupName:       "mockBackup",
 		Uploader:         uploader,
 	}

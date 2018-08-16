@@ -359,7 +359,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 		}
 	}
 
-	bundle := NewBundle(previousBackupSentinelDto.BackupStartLSN, previousBackupSentinelDto.Files)
+	bundle := NewBundle(archiveDirectory, previousBackupSentinelDto.BackupStartLSN, previousBackupSentinelDto.Files)
 
 	// Connect to postgres and start/finish a nonexclusive backup.
 	conn, err := Connect()
@@ -383,13 +383,12 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 		backupName = backupName + "_D_" + stripWalFileName(latest)
 	}
 
-	// Start a new tar bundle and walk the archiveDirectory directory and upload to S3.
 	bundle.TarBallMaker = &S3TarBallMaker{
-		ArchiveDirectory: archiveDirectory,
 		BackupName:       backupName,
 		Uploader:         uploader,
 	}
 
+	// Start a new tar bundle, walk the archiveDirectory and upload everything there.
 	bundle.StartQueue()
 	fmt.Println("Walking ...")
 	err = filepath.Walk(archiveDirectory, bundle.HandleWalkedFSObject)
@@ -400,7 +399,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
-	err = bundle.UploadPgControl()
+	err = bundle.UploadPgControl(uploader.compressor.FileExtension())
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}

@@ -20,13 +20,13 @@ var BundleTestLocations = []walparser.BlockLocation{
 func TestEmptyBundleQueue(t *testing.T) {
 
 	bundle := &walg.Bundle{
+		ArchiveDirectory: "",
 		TarSizeThreshold: 100,
 	}
 
 	uploader := testtools.NewMockTarUploader(false, false)
 
 	bundle.TarBallMaker = &walg.S3TarBallMaker{
-		ArchiveDirectory: "",
 		BackupName:       "mockBackup",
 		Uploader:         uploader,
 	}
@@ -61,11 +61,11 @@ func TestBundleQueueLowConcurrency(t *testing.T) {
 
 func queueTest(t *testing.T) {
 	bundle := &walg.Bundle{
+		ArchiveDirectory: "",
 		TarSizeThreshold: 100,
 	}
 	uploader := testtools.NewMockTarUploader(false, false)
 	bundle.TarBallMaker = &walg.S3TarBallMaker{
-		ArchiveDirectory: "",
 		BackupName:       "mockBackup",
 		Uploader:         uploader,
 	}
