@@ -10,7 +10,14 @@ type ReaderFromWriteCloser interface {
 	io.WriteCloser
 }
 
-type SeekerCloser interface {
+type ReadSeekCloser interface {
+	io.Reader
+	io.Seeker
+	io.Closer
+}
+
+type ReadSeekCloserImpl struct {
+	io.Reader
 	io.Seeker
 	io.Closer
 }

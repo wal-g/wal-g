@@ -81,7 +81,13 @@ func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitma
 		return nil, 0, err
 	}
 
-	pageReader := &IncrementalPageReader{NewDiskLimitReader(file), file, fileSize, lsn, nil, nil}
+	fileReadSeekCloser := &ReadSeekCloserImpl{
+		NewDiskLimitReader(file),
+		file,
+		file,
+	}
+
+	pageReader := &IncrementalPageReader{fileReadSeekCloser, fileSize, lsn, nil, nil}
 	incrementSize, err := pageReader.initialize(deltaBitmap)
 	if err != nil {
 		return nil, 0, err

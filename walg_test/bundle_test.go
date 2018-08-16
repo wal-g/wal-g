@@ -200,10 +200,13 @@ func TestLoadDeltaMap_AllDeltas(t *testing.T) {
 	_, curLogSegNo, err := walg.ParseWALFileName(backupNextWalFilename)
 
 	err = bundle.DownloadDeltaMap(folder, curLogSegNo*walg.WalSegmentSize)
+	deltaMap := bundle.DeltaMap
 	assert.NoError(t, err)
-	assert.NotNil(t, bundle.DeltaMap)
-	assert.Equal(t, []uint32{4, 9}, bundle.DeltaMap[BundleTestLocations[0].RelationFileNode].ToArray())
-	assert.Equal(t, []uint32{8}, bundle.DeltaMap[BundleTestLocations[1].RelationFileNode].ToArray())
+	assert.NotNil(t, deltaMap)
+	assert.Contains(t, deltaMap, BundleTestLocations[0].RelationFileNode)
+	assert.Contains(t, deltaMap, BundleTestLocations[1].RelationFileNode)
+	assert.Equal(t, []uint32{4, 9}, deltaMap[BundleTestLocations[0].RelationFileNode].ToArray())
+	assert.Equal(t, []uint32{8}, deltaMap[BundleTestLocations[1].RelationFileNode].ToArray())
 }
 
 func TestLoadDeltaMap_MissingDelta(t *testing.T) {

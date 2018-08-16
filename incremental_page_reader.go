@@ -17,25 +17,23 @@ var IncrementFileHeader = []byte{'w', 'i', '1', SignatureMagicNumber}
 // IncrementalPageReader constructs difference map during initialization and than re-read file
 // Diff map can be of 1Gb/PostgresBlockSize elements == 512Kb
 type IncrementalPageReader struct {
-	File            io.Reader
-	pagedFileSeeker SeekerCloser
-	FileSize        int64
-	Lsn             uint64
-	next            []byte
-	Blocks          []uint32
+	PagedFile ReadSeekCloser
+	FileSize  int64
+	Lsn       uint64
+	Next      []byte
+	Blocks    []uint32
 }
 
-// TODO : unit tests
 func (pageReader *IncrementalPageReader) Read(p []byte) (n int, err error) {
 	for {
-		copied := copy(p, pageReader.next)
+		copied := copy(p, pageReader.Next)
 		p = p[copied:]
-		pageReader.next = pageReader.next[copied:]
+		pageReader.Next = pageReader.Next[copied:]
 		n += copied
 		if len(p) == 0 {
 			return n, nil
 		}
-		moreData, err := pageReader.drainMoreData()
+		moreData, err := pageReader.DrainMoreData()
 		if err != nil {
 			return n, err
 		}
@@ -45,39 +43,37 @@ func (pageReader *IncrementalPageReader) Read(p []byte) (n int, err error) {
 	}
 }
 
-// TODO : unit tests
-func (pageReader *IncrementalPageReader) drainMoreData() (bool, error) {
+func (pageReader *IncrementalPageReader) DrainMoreData() (succeed bool, err error) {
 	if len(pageReader.Blocks) == 0 {
 		return false, nil
 	}
-	err := pageReader.advanceFileReader()
+	err = pageReader.AdvanceFileReader()
 	if err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
-// TODO : unit tests
-func (pageReader *IncrementalPageReader) advanceFileReader() error {
+func (pageReader *IncrementalPageReader) AdvanceFileReader() error {
 	pageBytes := make([]byte, WalPageSize)
 	blockNo := pageReader.Blocks[0]
 	pageReader.Blocks = pageReader.Blocks[1:]
 	offset := int64(blockNo) * int64(WalPageSize)
 	// TODO : possible race condition - page was deleted between blocks extraction and seek
-	_, err := pageReader.pagedFileSeeker.Seek(offset, io.SeekStart)
+	_, err := pageReader.PagedFile.Seek(offset, io.SeekStart)
 	if err != nil {
 		return err
 	}
-	_, err = io.ReadFull(pageReader.File, pageBytes)
+	_, err = io.ReadFull(pageReader.PagedFile, pageBytes)
 	if err == nil {
-		pageReader.next = pageBytes
+		pageReader.Next = pageBytes
 	}
 	return err
 }
 
 // Close IncrementalPageReader
 func (pageReader *IncrementalPageReader) Close() error {
-	return pageReader.pagedFileSeeker.Close()
+	return pageReader.PagedFile.Close()
 }
 
 // TODO : unit tests
@@ -99,7 +95,7 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap)
 	}
 
 	pageReader.WriteDiffMapToHeader(&headerBuffer)
-	pageReader.next = headerBuffer.Bytes()
+	pageReader.Next = headerBuffer.Bytes()
 	pageDataSize := int64(len(pageReader.Blocks)) * int64(WalPageSize)
 	size = int64(headerBuffer.Len()) + pageDataSize
 	return
@@ -120,7 +116,7 @@ func (pageReader *IncrementalPageReader) DeltaBitmapInitialize(deltaBitmap *roar
 func (pageReader *IncrementalPageReader) FullScanInitialize() error {
 	pageBytes := make([]byte, WalPageSize)
 	for currentBlockNumber := uint32(0); ; currentBlockNumber++ {
-		_, err := io.ReadFull(pageReader.File, pageBytes)
+		_, err := io.ReadFull(pageReader.PagedFile, pageBytes)
 
 		if err != nil {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
