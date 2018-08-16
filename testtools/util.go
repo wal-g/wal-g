@@ -91,16 +91,14 @@ func AssertReaderIsEmpty(t *testing.T, reader io.Reader) {
 	assert.Equal(t, io.EOF, err)
 }
 
-type NopCloser struct {}
+type NopCloser struct{}
 
 func (closer *NopCloser) Close() error {
 	return nil
 }
 
-type NopSeeker struct {}
+type NopSeeker struct{}
 
 func (seeker *NopSeeker) Seek(offset int64, whence int) (int64, error) {
 	return 0, nil
 }
-
-

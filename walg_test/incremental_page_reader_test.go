@@ -103,20 +103,20 @@ func TestFullScanInitialize(t *testing.T) {
 	defer pageFile.Close()
 	assert.NoError(t, err)
 	pageReader := walg.IncrementalPageReader{
-		PagedFile:   pageFile,
-		Blocks: make([]uint32, 0),
-		Lsn:    sampeLSN,
+		PagedFile: pageFile,
+		Blocks:    make([]uint32, 0),
+		Lsn:       sampeLSN,
 	}
 	err = pageReader.FullScanInitialize()
 	assert.NoError(t, err)
-	assert.Equal(t, []uint32 {3, 4, 5, 6, 7}, pageReader.Blocks)
+	assert.Equal(t, []uint32{3, 4, 5, 6, 7}, pageReader.Blocks)
 }
 
 func makePageDataReader() walg.ReadSeekCloser {
 	pageCount := 8
-	pageData := make([]byte, pageCount * int(walg.WalPageSize))
+	pageData := make([]byte, pageCount*int(walg.WalPageSize))
 	for i := 0; i < pageCount; i++ {
-		for j := i * int(walg.WalPageSize); j < (i + 1) * int(walg.WalPageSize); j++ {
+		for j := i * int(walg.WalPageSize); j < (i+1)*int(walg.WalPageSize); j++ {
 			pageData[j] = byte(i)
 		}
 	}
@@ -125,12 +125,12 @@ func makePageDataReader() walg.ReadSeekCloser {
 }
 
 func TestRead(t *testing.T) {
-	blocks := []uint32 {1, 2, 4}
-	header := []byte {12, 13, 14}
-	expectedRead := make([]byte, 3 + 3 * walg.WalPageSize)
+	blocks := []uint32{1, 2, 4}
+	header := []byte{12, 13, 14}
+	expectedRead := make([]byte, 3+3*walg.WalPageSize)
 	copy(expectedRead, header)
 	for id, i := range blocks {
-		for j := 3 + id * int(walg.WalPageSize); j < 3 + (id + 1) * int(walg.WalPageSize); j++ {
+		for j := 3 + id*int(walg.WalPageSize); j < 3+(id+1)*int(walg.WalPageSize); j++ {
 			expectedRead[j] = byte(i)
 		}
 	}
@@ -138,10 +138,10 @@ func TestRead(t *testing.T) {
 	pageReader := walg.IncrementalPageReader{
 		PagedFile: makePageDataReader(),
 		Blocks:    blocks,
-		Next: header,
+		Next:      header,
 	}
 
-	actualRead := make([]byte, 3 + 3 * walg.WalPageSize)
+	actualRead := make([]byte, 3+3*walg.WalPageSize)
 	_, err := io.ReadFull(&pageReader, actualRead)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedRead, actualRead)
@@ -151,7 +151,7 @@ func TestRead(t *testing.T) {
 func TestAdvanceFileReader(t *testing.T) {
 	pageReader := walg.IncrementalPageReader{
 		PagedFile: makePageDataReader(),
-		Blocks: []uint32 {5, 9},
+		Blocks:    []uint32{5, 9},
 	}
 	err := pageReader.AdvanceFileReader()
 	assert.NoError(t, err)
@@ -173,7 +173,7 @@ func TestDrainMoreData_NoBlocks(t *testing.T) {
 func TestDrainMoreData_HasBlocks(t *testing.T) {
 	pageReader := walg.IncrementalPageReader{
 		PagedFile: makePageDataReader(),
-		Blocks: []uint32 {3, 6},
+		Blocks:    []uint32{3, 6},
 	}
 	succeed, err := pageReader.DrainMoreData()
 	assert.NoError(t, err)

@@ -64,7 +64,6 @@ func TestTar(t *testing.T) {
 	assert.Equalf(t, bCopy, buf.Out, "extract: Unbundled tar output does not match input.")
 }
 
-
 //func TestExtractAll(t *testing.T) {
 //	os.Setenv("WALE_GPG_KEY_ID", "3C19717A2B308DF0")
 //	os.Setenv("WALG_DOWNLOAD_CONCURRENCY", "1")
