@@ -14,7 +14,9 @@ import (
 )
 
 const waleWALfilename = "testdata/000000010000000000000024.lzo"
+
 var waleGpgKey string
+
 const waleGpgKeyFilePath = "./testdata/waleGpgKey"
 
 func init() {

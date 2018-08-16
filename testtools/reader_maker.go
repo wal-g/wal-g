@@ -9,19 +9,19 @@ import (
 // HTTPReaderMaker decompresses lzop tarballs from
 // the passed in url.
 type HTTPReaderMaker struct {
-	Client     *http.Client
-	Key        string
+	Client *http.Client
+	Key    string
 }
 
-func (h *HTTPReaderMaker) Path() string   { return h.Key }
+func (h *HTTPReaderMaker) Path() string { return h.Key }
 
 // FileReaderMaker decompresses lzop tarballs from
 // the passed in file.
 type FileReaderMaker struct {
-	Key        string
+	Key string
 }
 
-func (f *FileReaderMaker) Path() string   { return f.Key }
+func (f *FileReaderMaker) Path() string { return f.Key }
 
 // Reader creates a new request to grab the data generated
 // by the random bytes generator.

@@ -1,10 +1,10 @@
 package walg
 
 import (
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
 	"io"
-	"github.com/aws/aws-sdk-go/aws"
 )
 
 // S3ReaderMaker creates readers for downloading from S3
@@ -14,7 +14,7 @@ type S3ReaderMaker struct {
 }
 
 func NewS3ReaderMaker(folder *S3Folder, key string) *S3ReaderMaker {
-	return &S3ReaderMaker{folder, key }
+	return &S3ReaderMaker{folder, key}
 }
 
 func (readerMaker *S3ReaderMaker) Path() string { return readerMaker.RelativePath }

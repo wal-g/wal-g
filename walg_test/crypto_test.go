@@ -1,17 +1,18 @@
 package walg_test
 
 import (
-	"io/ioutil"
-	"github.com/wal-g/wal-g"
-	"golang.org/x/crypto/openpgp"
-	"strings"
-	"io"
-	"testing"
 	"bytes"
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g"
+	"golang.org/x/crypto/openpgp"
+	"io"
+	"io/ioutil"
+	"strings"
+	"testing"
 )
 
 var pgpTestPrivateKey string
+
 const PrivateKeyFilePath = "./testdata/pgpTestPrivateKey"
 
 func init() {

@@ -155,7 +155,7 @@ func extract(t *testing.T, dir string) string {
 	for i, file := range files {
 		filePath := filepath.Join(dir, file.Name())
 		f := &testtools.FileReaderMaker{
-			Key:        filePath,
+			Key: filePath,
 		}
 		out[i] = f
 	}
@@ -327,7 +327,7 @@ func TestWalk(t *testing.T) {
 	}
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
 	bundle.TarBallMaker = &testtools.FileTarBallMaker{
-		Out:              compressed,
+		Out: compressed,
 	}
 	err := os.MkdirAll(compressed, 0766)
 	if err != nil {

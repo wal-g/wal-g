@@ -48,14 +48,14 @@ func main() {
 			}
 
 			h := &testtools.HTTPReaderMaker{
-				Client:     &http.Client{Transport: tls},
-				Key:        val,
+				Client: &http.Client{Transport: tls},
+				Key:    val,
 			}
 
 			out[i] = h
 		} else {
 			f := &testtools.FileReaderMaker{
-				Key:        val,
+				Key: val,
 			}
 			out[i] = f
 		}

@@ -13,12 +13,12 @@ import (
 // S3TarBall represents a tar file that is
 // going to be uploaded to S3.
 type S3TarBall struct {
-	backupName       string
-	partCount        int
-	size             int64
-	writeCloser      io.Closer
-	tarWriter        *tar.Writer
-	uploader         *Uploader
+	backupName  string
+	partCount   int
+	size        int64
+	writeCloser io.Closer
+	tarWriter   *tar.Writer
+	uploader    *Uploader
 }
 
 // SetUp creates a new tar writer and starts upload to S3.

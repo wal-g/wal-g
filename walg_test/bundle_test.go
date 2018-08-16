@@ -27,8 +27,8 @@ func TestEmptyBundleQueue(t *testing.T) {
 	uploader := testtools.NewMockTarUploader(false, false)
 
 	bundle.TarBallMaker = &walg.S3TarBallMaker{
-		BackupName:       "mockBackup",
-		Uploader:         uploader,
+		BackupName: "mockBackup",
+		Uploader:   uploader,
 	}
 
 	bundle.StartQueue()
@@ -66,8 +66,8 @@ func queueTest(t *testing.T) {
 	}
 	uploader := testtools.NewMockTarUploader(false, false)
 	bundle.TarBallMaker = &walg.S3TarBallMaker{
-		BackupName:       "mockBackup",
-		Uploader:         uploader,
+		BackupName: "mockBackup",
+		Uploader:   uploader,
 	}
 
 	// For tests there must be at least 3 workers

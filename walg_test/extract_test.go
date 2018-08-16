@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"testing"
+	"os"
 )
 
 func TestNoFilesProvided(t *testing.T) {
@@ -63,27 +64,22 @@ func TestTar(t *testing.T) {
 
 	assert.Equalf(t, bCopy, buf.Out, "extract: Unbundled tar output does not match input.")
 }
-//
-//func TestExtractAll(t *testing.T) {
-//	os.Setenv("WALE_GPG_KEY_ID", "3C19717A2B308DF0")
-//	os.Setenv("WALG_DOWNLOAD_CONCURRENCY", "1")
-//	defer os.Unsetenv("WALE_GPG_KEY_ID")
-//	defer os.Unsetenv("WALG_DOWNLOAD_CONCURRENCY")
-//	readerMaker1 := &testtools.FileReaderMaker{Key: "testdata/part_001.tar.zst"}
-//	//readerMaker2 := &testtools.FileReaderMaker{Key: "testdata/part_002.tar.zst"}
-//	//readerMaker3 := &testtools.FileReaderMaker{Key: "testdata/part_003.tar.zst"}
-//	//readerMaker4 := &testtools.FileReaderMaker{Key: "testdata/part_004.tar.zst"}
-//	//readerMaker6 := &testtools.FileReaderMaker{Key: "testdata/part_006.tar.zst"}
-//	//readerMaker7 := &testtools.FileReaderMaker{Key: "testdata/pg_control.tar.zst"}
-//	err := walg.ExtractAll(&testtools.NOPTarInterpreter{}, []walg.ReaderMaker { readerMaker1 })
-//		//readerMaker1, readerMaker2, readerMaker3,  readerMaker4, readerMaker6, readerMaker7})
-//	assert.NoError(t, err)
-//}
+
+
+func TestExtractAll(t *testing.T) {
+	os.Setenv("WALE_GPG_KEY_ID", "3C19717A2B308DF0")
+	os.Setenv("WALG_DOWNLOAD_CONCURRENCY", "1")
+	defer os.Unsetenv("WALE_GPG_KEY_ID")
+	defer os.Unsetenv("WALG_DOWNLOAD_CONCURRENCY")
+	readerMaker1 := &testtools.FileReaderMaker{Key: "testdata/part_002.tar.zst"}
+	err := walg.ExtractAll(&testtools.NOPTarInterpreter{}, []walg.ReaderMaker { readerMaker1 })
+	assert.NoError(t, err)
+}
 
 // Used to mock files in memory.
 type BufferReaderMaker struct {
-	Buf        *bytes.Buffer
-	Key        string
+	Buf *bytes.Buffer
+	Key string
 }
 
 func (b *BufferReaderMaker) Reader() (io.ReadCloser, error) { return ioutil.NopCloser(b.Buf), nil }

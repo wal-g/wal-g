@@ -17,7 +17,7 @@ import (
 // It is made so to load big database files of size 1GB one by one
 const (
 	DefaultTarSizeThreshold = int64((1 << 30) - 1)
-	PgControl = "pg_control"
+	PgControl               = "pg_control"
 )
 
 // ExcludedFilenames is a list of excluded members from the bundled backup.

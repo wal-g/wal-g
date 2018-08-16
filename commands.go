@@ -384,8 +384,8 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	}
 
 	bundle.TarBallMaker = &S3TarBallMaker{
-		BackupName:       backupName,
-		Uploader:         uploader,
+		BackupName: backupName,
+		Uploader:   uploader,
 	}
 
 	// Start a new tar bundle, walk the archiveDirectory and upload everything there.

@@ -21,8 +21,8 @@ func TestS3TarBall(t *testing.T) {
 	}
 
 	bundle.TarBallMaker = &walg.S3TarBallMaker{
-		BackupName:       "test",
-		Uploader:         testtools.NewMockTarUploader(false, false),
+		BackupName: "test",
+		Uploader:   testtools.NewMockTarUploader(false, false),
 	}
 
 	bundle.NewTarBall(false)
@@ -51,8 +51,8 @@ func TestS3DependentFunctions(t *testing.T) {
 	uploader := testtools.NewMockTarUploader(false, false)
 
 	bundle.TarBallMaker = &walg.S3TarBallMaker{
-		BackupName:       "mockBackup",
-		Uploader:         uploader,
+		BackupName: "mockBackup",
+		Uploader:   uploader,
 	}
 
 	bundle.NewTarBall(false)

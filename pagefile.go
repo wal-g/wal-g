@@ -41,7 +41,14 @@ const (
 )
 
 // InvalidBlockError indicates that file contain invalid page and cannot be archived incrementally
-var InvalidBlockError = errors.New("block is invalid")
+type InvalidBlockError struct {
+	blockNo uint32
+}
+
+func (err *InvalidBlockError) Error() string {
+	return fmt.Sprintf("block %d is invalid", err.blockNo)
+}
+
 var InvalidIncrementFileHeaderError = errors.New("Invalid increment file header")
 var UnknownIncrementFileHeaderError = errors.New("Unknown increment file header")
 var UnexpectedTarDataError = errors.New("Expected end of Tar")
@@ -74,12 +81,7 @@ func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitma
 		return nil, 0, err
 	}
 
-	limitedFileReader := &io.LimitedReader{
-		R: io.MultiReader(NewDiskLimitReader(file), &ZeroReader{}),
-		N: int64(fileSize),
-	}
-
-	pageReader := &IncrementalPageReader{limitedFileReader, file, fileSize, lsn, nil, nil}
+	pageReader := &IncrementalPageReader{NewDiskLimitReader(file), file, fileSize, lsn, nil, nil}
 	incrementSize, err := pageReader.initialize(deltaBitmap)
 	if err != nil {
 		return nil, 0, err

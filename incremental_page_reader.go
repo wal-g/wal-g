@@ -9,6 +9,7 @@ import (
 )
 
 var IncrementScanUnexpectedEOF = errors.New("unexpected EOF during increment scan")
+
 // "wi" at the head stands for "wal-g increment"
 // format version "1", signature magic number
 var IncrementFileHeader = []byte{'w', 'i', '1', SignatureMagicNumber}
@@ -16,10 +17,10 @@ var IncrementFileHeader = []byte{'w', 'i', '1', SignatureMagicNumber}
 // IncrementalPageReader constructs difference map during initialization and than re-read file
 // Diff map can be of 1Gb/PostgresBlockSize elements == 512Kb
 type IncrementalPageReader struct {
-	file            *io.LimitedReader
+	File            io.Reader
 	pagedFileSeeker SeekerCloser
 	FileSize        int64
-	lsn             uint64
+	Lsn             uint64
 	next            []byte
 	Blocks          []uint32
 }
@@ -62,11 +63,12 @@ func (pageReader *IncrementalPageReader) advanceFileReader() error {
 	blockNo := pageReader.Blocks[0]
 	pageReader.Blocks = pageReader.Blocks[1:]
 	offset := int64(blockNo) * int64(WalPageSize)
-	_, err := pageReader.pagedFileSeeker.Seek(offset, io.SeekStart) // TODO : possible race condition - page was deleted between blocks extraction and seek
+	// TODO : possible race condition - page was deleted between blocks extraction and seek
+	_, err := pageReader.pagedFileSeeker.Seek(offset, io.SeekStart)
 	if err != nil {
 		return err
 	}
-	_, err = io.ReadFull(pageReader.file, pageBytes)
+	_, err = io.ReadFull(pageReader.File, pageBytes)
 	if err == nil {
 		pageReader.next = pageBytes
 	}
@@ -79,7 +81,8 @@ func (pageReader *IncrementalPageReader) Close() error {
 }
 
 // TODO : unit tests
-func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap) (size int64, err error) { // TODO : "initialize" is rather meaningless name, maybe this func should be decomposed
+// TODO : "initialize" is rather meaningless name, maybe this func should be decomposed
+func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap) (size int64, err error) {
 	var headerBuffer bytes.Buffer
 	headerBuffer.Write(IncrementFileHeader)
 	fileSize := pageReader.FileSize
@@ -87,7 +90,7 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap)
 	pageReader.Blocks = make([]uint32, 0, fileSize/int64(WalPageSize))
 
 	if deltaBitmap == nil {
-		err := pageReader.fullScanInitialize()
+		err := pageReader.FullScanInitialize()
 		if err != nil {
 			return 0, err
 		}
@@ -95,17 +98,16 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap)
 		pageReader.DeltaBitmapInitialize(deltaBitmap)
 	}
 
-	pageReader.writeDiffMapToHeader(&headerBuffer)
+	pageReader.WriteDiffMapToHeader(&headerBuffer)
 	pageReader.next = headerBuffer.Bytes()
 	pageDataSize := int64(len(pageReader.Blocks)) * int64(WalPageSize)
 	size = int64(headerBuffer.Len()) + pageDataSize
-	pageReader.file.N = pageDataSize
 	return
 }
 
 func (pageReader *IncrementalPageReader) DeltaBitmapInitialize(deltaBitmap *roaring.Bitmap) {
 	it := deltaBitmap.Iterator()
-	for it.HasNext() {
+	for it.HasNext() { // TODO : do something with file truncation during reading
 		blockNo := it.Next()
 		if pageReader.FileSize >= int64(blockNo+1)*int64(WalPageSize) { // whole block fits into file
 			pageReader.Blocks = append(pageReader.Blocks, blockNo)
@@ -115,30 +117,27 @@ func (pageReader *IncrementalPageReader) DeltaBitmapInitialize(deltaBitmap *roar
 	}
 }
 
-// TODO : unit tests
-func (pageReader *IncrementalPageReader) fullScanInitialize() error {
+func (pageReader *IncrementalPageReader) FullScanInitialize() error {
 	pageBytes := make([]byte, WalPageSize)
 	for currentBlockNumber := uint32(0); ; currentBlockNumber++ {
-		_, err := io.ReadFull(pageReader.file, pageBytes)
-		if err == io.ErrUnexpectedEOF {
-			return IncrementScanUnexpectedEOF
-		}
+		_, err := io.ReadFull(pageReader.File, pageBytes)
 
 		if err != nil {
-			if err == io.EOF {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				return nil
 			}
 			return err
 		}
 
-		valid := pageReader.selectNewValidPage(pageBytes, currentBlockNumber)
+		valid := pageReader.SelectNewValidPage(pageBytes, currentBlockNumber) // TODO : torn page possibility
 		if !valid {
-			return InvalidBlockError
+			return &InvalidBlockError{currentBlockNumber}
 		}
 	}
 }
 
-func (pageReader *IncrementalPageReader) writeDiffMapToHeader(headerWriter io.Writer) {
+// WriteDiffMapToHeader is currently used only with buffers, so we don't handle any writing errors
+func (pageReader *IncrementalPageReader) WriteDiffMapToHeader(headerWriter io.Writer) {
 	diffBlockCount := len(pageReader.Blocks)
 	headerWriter.Write(toBytes(uint32(diffBlockCount)))
 
@@ -148,24 +147,23 @@ func (pageReader *IncrementalPageReader) writeDiffMapToHeader(headerWriter io.Wr
 	return
 }
 
-// TODO : unit tests
-// selectNewValidPage checks whether page is valid and if it so, then blockNo is appended to Blocks list
-func (pageReader *IncrementalPageReader) selectNewValidPage(pageBytes []byte, blockNo uint32) (valid bool) {
+// SelectNewValidPage checks whether page is valid and if it so, then blockNo is appended to Blocks list
+func (pageReader *IncrementalPageReader) SelectNewValidPage(pageBytes []byte, blockNo uint32) (valid bool) {
 	pageHeader, _ := ParsePostgresPageHeader(bytes.NewReader(pageBytes))
 	valid = pageHeader.IsValid()
-	lsn := pageHeader.Lsn()
 
 	allZeroes := false
 
 	if !valid {
 		if allZero(pageBytes) {
 			allZeroes = true
+			valid = true
 		} else {
 			return false
 		}
 	}
 
-	if allZeroes || (lsn >= pageReader.lsn) {
+	if allZeroes || (pageHeader.Lsn() >= pageReader.Lsn) {
 		pageReader.Blocks = append(pageReader.Blocks, blockNo)
 	}
 	return
