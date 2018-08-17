@@ -90,6 +90,23 @@ func doConfigureWithBuсketPath(t *testing.T, bucketPath string, expectedServer 
 		t.Errorf("upload: Expected empty uploader and prefix but got TU:%v and PREFIX:%v", tu, pre)
 	}
 	setFake(t)
+	//Test Minio
+	err = os.Setenv("WALE_S3_PREFIX", "gs://abc.com")
+	if err != nil {
+		t.Log(err)
+	}
+	err = os.Setenv("AWS_ENDPOINT", "http://127.0.0.1:9000")
+	if err != nil {
+		t.Log(err)
+	}
+	err = os.Setenv("AWS_REGION", "")
+	if err != nil {
+		t.Log(err)
+	}
+	_, _, err = walg.Configure()
+	if err != nil {
+		t.Errorf("upload: expected error to be '<nil>' for Minio but got %s", err)
+	}
 	//Test invalid url
 	err = os.Setenv("WALE_S3_PREFIX", "test_fail:")
 	if err != nil {
