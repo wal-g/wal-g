@@ -2,6 +2,11 @@ package walg
 
 import (
 	"fmt"
+	"net/url"
+	"os"
+	"strconv"
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/defaults"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -10,9 +15,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pkg/errors"
-	"net/url"
-	"os"
-	"strconv"
 	"golang.org/x/time/rate"
 )
 
@@ -100,9 +102,17 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 
 	region := os.Getenv("AWS_REGION")
 	if region == "" {
-		region, err = findS3BucketRegion(bucket, config)
-		if err != nil {
-			return nil, nil, errors.Wrapf(err, "Configure: AWS_REGION is not set and s3:GetBucketLocation failed")
+		if config.Endpoint == nil ||
+			*config.Endpoint == "" ||
+			strings.HasSuffix(*config.Endpoint, ".amazonaws.com") {
+			region, err = findS3BucketRegion(bucket, config)
+			if err != nil {
+				return nil, nil, errors.Wrapf(err, "Configure: AWS_REGION is not set and s3:GetBucketLocation failed")
+			}
+		} else {
+			// For S3 compatible services like Minio, Ceph etc. use `us-east-1` as region
+			// ref: https://github.com/minio/cookbook/blob/master/docs/aws-sdk-for-go-with-minio.md
+			region = "us-east-1"
 		}
 	}
 	config = config.WithRegion(region)
@@ -135,7 +145,7 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "Configure: failed to parse WALG_DISK_RATE_LIMIT")
 		}
-		diskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+64*1024)); // Add 8 pages to possible bursts
+		diskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+64*1024)) // Add 8 pages to possible bursts
 	}
 
 	netLimitStr := os.Getenv("WALG_NETWORK_RATE_LIMIT")
@@ -144,7 +154,7 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "Configure: failed to parse WALG_NETWORK_RATE_LIMIT")
 		}
-		networkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+64*1024)); // Add 8 pages to possible bursts
+		networkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+64*1024)) // Add 8 pages to possible bursts
 	}
 
 	sess, err := session.NewSession(config)
