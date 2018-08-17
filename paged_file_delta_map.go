@@ -12,7 +12,7 @@ import (
 
 const (
 	RelFileSizeBound               = 1 << 30
-	BlocksInRelFile                = RelFileSizeBound / int(WalPageSize)
+	BlocksInRelFile                = RelFileSizeBound / int(DatabasePageSize)
 	DefaultSpcNode   walparser.Oid = 1663
 )
 

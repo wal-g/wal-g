@@ -14,7 +14,7 @@ import (
 
 func TestDeltaBitmapInitialize(t *testing.T) {
 	pageReader := walg.IncrementalPageReader{
-		FileSize: int64(walg.WalPageSize * 5),
+		FileSize: int64(walg.DatabasePageSize * 5),
 		Blocks:   make([]uint32, 0),
 	}
 	deltaBitmap := roaring.BitmapOf(0, 2, 3, 12, 14)
@@ -26,7 +26,7 @@ func TestSelectNewValidPage_ZeroPage(t *testing.T) {
 	pageReader := walg.IncrementalPageReader{
 		Blocks: make([]uint32, 0),
 	}
-	pageData := make([]byte, walg.WalPageSize)
+	pageData := make([]byte, walg.DatabasePageSize)
 	var blockNo uint32 = 10
 	valid := pageReader.SelectNewValidPage(pageData, blockNo)
 	assert.True(t, valid)
@@ -37,7 +37,7 @@ func TestSelectNewValidPage_InvalidPage(t *testing.T) {
 	pageReader := walg.IncrementalPageReader{
 		Blocks: make([]uint32, 0),
 	}
-	pageData := make([]byte, walg.WalPageSize)
+	pageData := make([]byte, walg.DatabasePageSize)
 	pageData[2134] = 100
 	var blockNo uint32 = 10
 	valid := pageReader.SelectNewValidPage(pageData, blockNo)
@@ -52,7 +52,7 @@ func TestSelectNewValidPage_ValidPageLowLsn(t *testing.T) {
 	var blockNo uint32 = 10
 	pageFile, err := os.Open(pagedFileName)
 	defer pageFile.Close()
-	pageData := make([]byte, walg.WalPageSize)
+	pageData := make([]byte, walg.DatabasePageSize)
 	_, err = io.ReadFull(pageFile, pageData)
 	assert.NoError(t, err)
 	assert.NoError(t, err)
@@ -69,7 +69,7 @@ func TestSelectNewValidPage_ValidPageHighLsn(t *testing.T) {
 	var blockNo uint32 = 10
 	pageFile, err := os.Open(pagedFileName)
 	defer pageFile.Close()
-	pageData := make([]byte, walg.WalPageSize)
+	pageData := make([]byte, walg.DatabasePageSize)
 	_, err = io.ReadFull(pageFile, pageData)
 	assert.NoError(t, err)
 	assert.NoError(t, err)
@@ -114,9 +114,9 @@ func TestFullScanInitialize(t *testing.T) {
 
 func makePageDataReader() walg.ReadSeekCloser {
 	pageCount := 8
-	pageData := make([]byte, pageCount*int(walg.WalPageSize))
+	pageData := make([]byte, pageCount*int(walg.DatabasePageSize))
 	for i := 0; i < pageCount; i++ {
-		for j := i * int(walg.WalPageSize); j < (i+1)*int(walg.WalPageSize); j++ {
+		for j := i * int(walg.DatabasePageSize); j < (i+1)*int(walg.DatabasePageSize); j++ {
 			pageData[j] = byte(i)
 		}
 	}
@@ -127,10 +127,10 @@ func makePageDataReader() walg.ReadSeekCloser {
 func TestRead(t *testing.T) {
 	blocks := []uint32{1, 2, 4}
 	header := []byte{12, 13, 14}
-	expectedRead := make([]byte, 3+3*walg.WalPageSize)
+	expectedRead := make([]byte, 3+3*walg.DatabasePageSize)
 	copy(expectedRead, header)
 	for id, i := range blocks {
-		for j := 3 + id*int(walg.WalPageSize); j < 3+(id+1)*int(walg.WalPageSize); j++ {
+		for j := 3 + id*int(walg.DatabasePageSize); j < 3+(id+1)*int(walg.DatabasePageSize); j++ {
 			expectedRead[j] = byte(i)
 		}
 	}
@@ -141,7 +141,7 @@ func TestRead(t *testing.T) {
 		Next:      header,
 	}
 
-	actualRead := make([]byte, 3+3*walg.WalPageSize)
+	actualRead := make([]byte, 3+3*walg.DatabasePageSize)
 	_, err := io.ReadFull(&pageReader, actualRead)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedRead, actualRead)
@@ -156,8 +156,8 @@ func TestAdvanceFileReader(t *testing.T) {
 	err := pageReader.AdvanceFileReader()
 	assert.NoError(t, err)
 	assert.Equal(t, []uint32{9}, pageReader.Blocks)
-	expectedNext := make([]byte, walg.WalPageSize)
-	for i := 0; i < int(walg.WalPageSize); i++ {
+	expectedNext := make([]byte, walg.DatabasePageSize)
+	for i := 0; i < int(walg.DatabasePageSize); i++ {
 		expectedNext[i] = 5
 	}
 	assert.Equal(t, expectedNext, pageReader.Next)
@@ -179,8 +179,8 @@ func TestDrainMoreData_HasBlocks(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, succeed)
 	assert.Equal(t, []uint32{6}, pageReader.Blocks)
-	expectedNext := make([]byte, walg.WalPageSize)
-	for i := 0; i < int(walg.WalPageSize); i++ {
+	expectedNext := make([]byte, walg.DatabasePageSize)
+	for i := 0; i < int(walg.DatabasePageSize); i++ {
 		expectedNext[i] = 3
 	}
 	assert.Equal(t, expectedNext, pageReader.Next)

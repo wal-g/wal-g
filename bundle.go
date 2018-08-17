@@ -279,7 +279,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 
 	if !excluded && info.Mode().IsRegular() {
 		baseFiles := bundle.GetIncrementBaseFiles()
-		bf, wasInBase := baseFiles[fileInfoHeader.Name]
+		baseFile, wasInBase := baseFiles[fileInfoHeader.Name]
 		// It is important to take MTime before ReadIncrementalFile()
 		time := info.ModTime()
 
@@ -287,7 +287,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 		// For details see
 		// https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
 
-		if wasInBase && (time.Equal(bf.MTime)) {
+		if wasInBase && (time.Equal(baseFile.MTime)) {
 			// File was not changed since previous backup
 			fmt.Println("Skiped due to unchanged modification time")
 			bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time})

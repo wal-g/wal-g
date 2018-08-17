@@ -5,7 +5,7 @@
 // 8 bytes uint file size
 // 4 bytes uint changed pages count N
 // (N * 4) bytes for Block Numbers of changed pages
-// (N * WalPageSize) bytes for changed page data
+// (N * DatabasePageSize) bytes for changed page data
 //
 
 package walg
@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	WalPageSize                 = walparser.WalPageSize
+	DatabasePageSize            = walparser.BlockSize
 	sizeofInt32                 = 4
 	sizeofInt16                 = 2
 	sizeofInt64                 = 8
@@ -68,7 +68,7 @@ func isPagedFile(info os.FileInfo, filePath string) bool {
 	if info.IsDir() ||
 		((!strings.Contains(filePath, DefaultTablespace)) && (!strings.Contains(filePath, NonDefaultTablespace))) ||
 		info.Size() == 0 ||
-		info.Size()%int64(WalPageSize) != 0 ||
+		info.Size()%int64(DatabasePageSize) != 0 ||
 		!pagedFilenameRegexp.MatchString(path.Base(filePath)) {
 		return false
 	}
@@ -132,7 +132,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader) error {
 		return err
 	}
 
-	page := make([]byte, WalPageSize)
+	page := make([]byte, DatabasePageSize)
 	for i := uint32(0); i < diffBlockCount; i++ {
 		blockNo := binary.LittleEndian.Uint32(diffMap[i*sizeofInt32 : (i+1)*sizeofInt32])
 		_, err = io.ReadFull(increment, page)
@@ -140,7 +140,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader) error {
 			return err
 		}
 
-		_, err = file.WriteAt(page, int64(blockNo)*int64(WalPageSize))
+		_, err = file.WriteAt(page, int64(blockNo)*int64(DatabasePageSize))
 		if err != nil {
 			return err
 		}
