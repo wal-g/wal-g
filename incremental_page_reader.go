@@ -12,7 +12,7 @@ import (
 var IncrementFileHeader = []byte{'w', 'i', '1', SignatureMagicNumber}
 
 // IncrementalPageReader constructs difference map during initialization and than re-read file
-// Diff map can be of 1Gb/PostgresBlockSize elements == 512Kb
+// Diff map may consist of 1Gb/PostgresBlockSize elements == 512Kb
 type IncrementalPageReader struct {
 	PagedFile ReadSeekCloser
 	FileSize  int64

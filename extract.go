@@ -51,11 +51,11 @@ func extractOne(tarInterpreter TarInterpreter, src io.Reader) error {
 // TODO : unit tests
 // Ensures that file extension is valid. Any subsequent behavior
 // depends on file type.
-func decryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter Crypter) error {
+func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter Crypter) error {
 	readCloser, err := readerMaker.Reader()
 
 	if err != nil {
-		return errors.Wrap(err, "decryptAndDecompressTar: failed to create new reader")
+		return errors.Wrap(err, "DecryptAndDecompressTar: failed to create new reader")
 	}
 	defer readCloser.Close()
 
@@ -63,7 +63,7 @@ func decryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 		var reader io.Reader
 		reader, err = crypter.Decrypt(readCloser)
 		if err != nil {
-			return errors.Wrap(err, "decryptAndDecompressTar: decrypt failed")
+			return errors.Wrap(err, "DecryptAndDecompressTar: decrypt failed")
 		}
 		readCloser = ReadCascadeCloser{reader, readCloser}
 	}
@@ -75,7 +75,7 @@ func decryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 		}
 		err = decompressor.Decompress(writer, readCloser)
 		if err != nil {
-			return errors.Wrapf(err, "decryptAndDecompressTar: %v decompress failed. Is archive encrypted?", decompressor.FileExtension())
+			return errors.Wrapf(err, "DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?", decompressor.FileExtension())
 		}
 		return nil
 	}
@@ -83,13 +83,13 @@ func decryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 	case "tar":
 		_, err = io.Copy(writer, readCloser)
 		if err != nil {
-			return errors.Wrap(err, "decryptAndDecompressTar: tar extract failed")
+			return errors.Wrap(err, "DecryptAndDecompressTar: tar extract failed")
 		}
 	case "nop":
 	case "lzo":
-		return errors.Wrap(UnsupportedFileTypeError{readerMaker.Path(), fileExtension}, "decryptAndDecompressTar: lzo linked to this WAL-G binary")
+		return errors.Wrap(UnsupportedFileTypeError{readerMaker.Path(), fileExtension}, "DecryptAndDecompressTar: lzo linked to this WAL-G binary")
 	default:
-		return errors.Wrap(UnsupportedFileTypeError{readerMaker.Path(), fileExtension}, "decryptAndDecompressTar:")
+		return errors.Wrap(UnsupportedFileTypeError{readerMaker.Path(), fileExtension}, "DecryptAndDecompressTar:")
 	}
 	return nil
 }
@@ -119,7 +119,7 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 		extractingReader, pipeWriter := io.Pipe()
 		decompressingWriter := &EmptyWriteIgnorer{pipeWriter}
 		errorCollector.Go(func() error {
-			err := decryptAndDecompressTar(decompressingWriter, fileClosure, &crypter)
+			err := DecryptAndDecompressTar(decompressingWriter, fileClosure, &crypter)
 			decompressingWriter.Close()
 			log.Printf("Finished decompression of %s", fileClosure.Path())
 			return err

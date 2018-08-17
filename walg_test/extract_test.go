@@ -69,8 +69,20 @@ func TestTar(t *testing.T) {
 //	os.Setenv("WALG_DOWNLOAD_CONCURRENCY", "1")
 //	defer os.Unsetenv("WALE_GPG_KEY_ID")
 //	defer os.Unsetenv("WALG_DOWNLOAD_CONCURRENCY")
-//	readerMaker1 := &testtools.FileReaderMaker{Key: "testdata/part_002.tar.zst"}
-//	err := walg.ExtractAll(&testtools.NOPTarInterpreter{}, []walg.ReaderMaker { readerMaker1 })
+//	readerMaker := &testtools.FileReaderMaker{Key: "testdata/part_009.tar.zst"}
+//	err := walg.ExtractAll(&testtools.NOPTarInterpreter{}, []walg.ReaderMaker {readerMaker})
+//	assert.NoError(t, err)
+//}
+
+//func TestDecryptAndDecompressTar(t *testing.T) {
+//	os.Setenv("WALE_GPG_KEY_ID", "3C19717A2B308DF0")
+//	defer os.Unsetenv("WALE_GPG_KEY_ID")
+//	readerMaker := &testtools.FileReaderMaker{Key: "testdata/part_021.tar.zst"}
+//	result, err := os.Create("testdata/part_021.tar")
+//	assert.NoError(t, err)
+//	defer result.Close()
+//	var crypter walg.OpenPGPCrypter
+//	err = walg.DecryptAndDecompressTar(result, readerMaker, &crypter)
 //	assert.NoError(t, err)
 //}
 

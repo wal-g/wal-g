@@ -488,12 +488,21 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 	var fileReader io.ReadCloser
 	if isIncremented {
 		bitmap, err := bundle.getDeltaBitmapFor(path)
-		if err != nil {
-			return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
-		}
-		fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
-		if err != nil {
-			return errors.Wrapf(err, "packFileIntoTar: failed reading incremental file '%s'\n", path)
+		if err != NoBitmapFoundError { // this file has changed after the start ob backup, so just skip it
+			if err != nil {
+				return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
+			}
+			fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
+			if err != nil {
+				return errors.Wrapf(err, "packFileIntoTar: failed reading incremental file '%s'\n", path)
+			}
+			fileReader = &ReadCascadeCloser{ &io.LimitedReader{
+				R: io.MultiReader(fileReader, &ZeroReader{}),
+				N: int64(fileInfoHeader.Size),
+			}, fileReader}
+		} else {
+			bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: info.ModTime()})
+			return nil
 		}
 	} else {
 		fileInfoHeader.Size = info.Size()

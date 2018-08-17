@@ -16,6 +16,7 @@ const (
 	DefaultSpcNode   walparser.Oid = 1663
 )
 
+var NoBitmapFoundError = errors.New("GetDeltaBitmapFor: no bitmap found")
 var UnknownTableSpaceError = errors.New("GetRelFileNodeFrom: unknown tablespace")
 
 type PagedFileDeltaMap map[walparser.RelFileNode]*roaring.Bitmap
@@ -36,10 +37,15 @@ func (deltaMap *PagedFileDeltaMap) AddToDelta(location walparser.BlockLocation) 
 	}
 }
 
+// TODO : unit test no bitmap found
 func (deltaMap *PagedFileDeltaMap) GetDeltaBitmapFor(filePath string) (*roaring.Bitmap, error) {
 	relFileNode, err := GetRelFileNodeFrom(filePath)
 	if err != nil {
 		return nil, err
+	}
+	_, ok := (*deltaMap)[*relFileNode]
+	if !ok {
+		return nil, NoBitmapFoundError
 	}
 	bitmap := (*deltaMap)[*relFileNode].Clone()
 	relFileId, err := GetRelFileIdFrom(filePath)
