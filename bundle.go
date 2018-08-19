@@ -376,21 +376,21 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 }
 
 // TODO : unit tests
-// HandleLabelFiles creates the `backup_label` and `tablespace_map` files by stopping the backup
+// UploadLabelFiles creates the `backup_label` and `tablespace_map` files by stopping the backup
 // and uploads them to S3.
-func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {
+func (bundle *Bundle) UploadLabelFiles(conn *pgx.Conn) (uint64, error) {
 	queryRunner, err := NewPgQueryRunner(conn)
 	if err != nil {
-		return 0, errors.Wrap(err, "HandleLabelFiles: Failed to build query runner.")
+		return 0, errors.Wrap(err, "UploadLabelFiles: Failed to build query runner.")
 	}
 	label, offsetMap, lsnStr, err := queryRunner.StopBackup()
 	if err != nil {
-		return 0, errors.Wrap(err, "HandleLabelFiles: failed to stop backup")
+		return 0, errors.Wrap(err, "UploadLabelFiles: failed to stop backup")
 	}
 
 	lsn, err := pgx.ParseLSN(lsnStr)
 	if err != nil {
-		return 0, errors.Wrap(err, "HandleLabelFiles: failed to parse finish LSN")
+		return 0, errors.Wrap(err, "UploadLabelFiles: failed to parse finish LSN")
 	}
 
 	if queryRunner.Version < 90600 {
@@ -410,7 +410,7 @@ func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {
 
 	_, err = PackFileTo(tarBall, labelHeader, strings.NewReader(label))
 	if err != nil {
-		return 0, errors.Wrapf(err, "HandleLabelFiles: failed to put %s to tar", labelHeader.Name)
+		return 0, errors.Wrapf(err, "UploadLabelFiles: failed to put %s to tar", labelHeader.Name)
 	}
 	fmt.Println(labelHeader.Name)
 
@@ -423,13 +423,13 @@ func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {
 
 	_, err = PackFileTo(tarBall, offsetMapHeader, strings.NewReader(offsetMap))
 	if err != nil {
-		return 0, errors.Wrapf(err, "HandleLabelFiles: failed to put %s to tar", offsetMapHeader.Name)
+		return 0, errors.Wrapf(err, "UploadLabelFiles: failed to put %s to tar", offsetMapHeader.Name)
 	}
 	fmt.Println(offsetMapHeader.Name)
 
 	err = tarBall.CloseTar()
 	if err != nil {
-		return 0, errors.Wrap(err, "HandleLabelFiles: failed to close tarball")
+		return 0, errors.Wrap(err, "UploadLabelFiles: failed to close tarball")
 	}
 
 	return lsn, nil
@@ -488,7 +488,7 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 	var fileReader io.ReadCloser
 	if isIncremented {
 		bitmap, err := bundle.getDeltaBitmapFor(path)
-		if err != NoBitmapFoundError { // this file has changed after the start ob backup, so just skip it
+		if err != NoBitmapFoundError { // this file has changed after the start of backup, so just skip it
 			if err != nil {
 				return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
 			}
@@ -496,7 +496,7 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 			if err != nil {
 				return errors.Wrapf(err, "packFileIntoTar: failed reading incremental file '%s'\n", path)
 			}
-			fileReader = &ReadCascadeCloser{ &io.LimitedReader{
+			fileReader = &ReadCascadeCloser{&io.LimitedReader{
 				R: io.MultiReader(fileReader, &ZeroReader{}),
 				N: int64(fileInfoHeader.Size),
 			}, fileReader}

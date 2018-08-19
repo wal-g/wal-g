@@ -326,17 +326,17 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	maxDeltas, fromFull := getDeltaConfig()
 
 	var previousBackupSentinelDto S3TarBallSentinelDto
-	var latest string
+	var previousBackupName string
 	var err error
 	incrementCount := 1
 
 	if maxDeltas > 0 {
-		latest, err = GetLatestBackupKey(uploader.uploadingFolder)
+		previousBackupName, err = GetLatestBackupKey(uploader.uploadingFolder)
 		if err != NoBackupsFoundError {
 			if err != nil {
 				log.Fatalf("%+v\n", err)
 			}
-			previousBackup := NewBackup(uploader.uploadingFolder, latest)
+			previousBackup := NewBackup(uploader.uploadingFolder, previousBackupName)
 			previousBackupSentinelDto = previousBackup.fetchSentinel()
 			if previousBackupSentinelDto.IncrementCount != nil {
 				incrementCount = *previousBackupSentinelDto.IncrementCount + 1
@@ -350,11 +350,11 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 			} else {
 				if fromFull {
 					fmt.Println("Delta will be made from full backup.")
-					latest = *previousBackupSentinelDto.IncrementFullName
-					previousBackup := NewBackup(uploader.uploadingFolder, latest)
+					previousBackupName = *previousBackupSentinelDto.IncrementFullName
+					previousBackup := NewBackup(uploader.uploadingFolder, previousBackupName)
 					previousBackupSentinelDto = previousBackup.fetchSentinel()
 				}
-				fmt.Printf("Delta backup from %v with LSN %x. \n", latest, *previousBackupSentinelDto.BackupStartLSN)
+				fmt.Printf("Delta backup from %v with LSN %x. \n", previousBackupName, *previousBackupSentinelDto.BackupStartLSN)
 			}
 		}
 	}
@@ -371,7 +371,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 		log.Fatalf("%+v\n", err)
 	}
 
-	if len(latest) > 0 && previousBackupSentinelDto.BackupStartLSN != nil {
+	if len(previousBackupName) > 0 && previousBackupSentinelDto.BackupStartLSN != nil {
 		if uploader.useWalDelta {
 			err = bundle.DownloadDeltaMap(uploader.uploadingFolder, backupStartLSN)
 			if err == nil {
@@ -380,13 +380,10 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 				fmt.Printf("Error during loading delta map: '%v'. Fallback to full scan delta backup\n", err)
 			}
 		}
-		backupName = backupName + "_D_" + stripWalFileName(latest)
+		backupName = backupName + "_D_" + stripWalFileName(previousBackupName)
 	}
 
-	bundle.TarBallMaker = &S3TarBallMaker{
-		BackupName: backupName,
-		Uploader:   uploader,
-	}
+	bundle.TarBallMaker = NewS3TarBallMaker(backupName, uploader)
 
 	// Start a new tar bundle, walk the archiveDirectory and upload everything there.
 	bundle.StartQueue()
@@ -404,7 +401,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 		log.Fatalf("%+v\n", err)
 	}
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
-	finishLsn, err := bundle.HandleLabelFiles(conn)
+	finishLsn, err := bundle.UploadLabelFiles(conn)
 	if err != nil {
 		log.Fatalf("%+v\n", err)
 	}
@@ -419,10 +416,11 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 			PgVersion:        pgVersion,
 		}
 		if previousBackupSentinelDto.BackupStartLSN != nil {
-			currentBackupSentinelDto.IncrementFrom = &latest
-			currentBackupSentinelDto.IncrementFullName = &latest
+			currentBackupSentinelDto.IncrementFrom = &previousBackupName
 			if previousBackupSentinelDto.isIncremental() {
 				currentBackupSentinelDto.IncrementFullName = previousBackupSentinelDto.IncrementFullName
+			} else {
+				currentBackupSentinelDto.IncrementFullName = &previousBackupName
 			}
 			currentBackupSentinelDto.IncrementCount = &incrementCount
 		}

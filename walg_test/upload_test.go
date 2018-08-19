@@ -126,10 +126,7 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 func TestUploadError(t *testing.T) {
 	uploader := testtools.NewMockTarUploader(false, true)
 
-	maker := &walg.S3TarBallMaker{
-		BackupName: "test",
-		Uploader:   uploader,
-	}
+	maker := walg.NewS3TarBallMaker("test", uploader)
 
 	tarBall := maker.Make(true)
 	tarBall.SetUp(MockArmedCrypter())

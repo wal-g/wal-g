@@ -14,7 +14,7 @@ import (
 // going to be uploaded to S3.
 type S3TarBall struct {
 	backupName  string
-	partCount   int
+	partNumber  int
 	size        int64
 	writeCloser io.Closer
 	tarWriter   *tar.Writer
@@ -31,7 +31,7 @@ func (tarBall *S3TarBall) SetUp(crypter Crypter, names ...string) {
 		if len(names) > 0 {
 			name = names[0]
 		} else {
-			name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partCount, tarBall.uploader.compressor.FileExtension())
+			name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partNumber, tarBall.uploader.compressor.FileExtension())
 		}
 		writeCloser := tarBall.startUpload(name, crypter)
 
@@ -52,7 +52,7 @@ func (tarBall *S3TarBall) CloseTar() error {
 	if err != nil {
 		return errors.Wrap(err, "CloseTar: failed to close underlying writer")
 	}
-	fmt.Printf("Finished writing part %d.\n", tarBall.partCount)
+	fmt.Printf("Finished writing part %d.\n", tarBall.partNumber)
 	return nil
 }
 
@@ -73,7 +73,7 @@ func (tarBall *S3TarBall) startUpload(name string, crypter Crypter) io.WriteClos
 	path := GetBackupPath(uploader.uploadingFolder) + tarBall.backupName + "/tar_partitions/" + name
 	input := uploader.CreateUploadInput(path, NewNetworkLimitReader(pipeReader))
 
-	fmt.Printf("Starting part %d ...\n", tarBall.partCount)
+	fmt.Printf("Starting part %d ...\n", tarBall.partNumber)
 
 	uploader.waitGroup.Add(1)
 	go func() {
@@ -138,13 +138,13 @@ func (tarBall *S3TarBall) Finish(sentinelDto *S3TarBallSentinelDto) error {
 			log.Fatalf("S3TarBall finish: json failed to upload")
 		}
 	} else {
-		log.Printf("Uploaded %d compressed tar Files.\n", tarBall.partCount)
+		log.Printf("Uploaded %d compressed tar Files.\n", tarBall.partNumber)
 		log.Printf("Sentinel was not uploaded %v", name)
 		return errors.New("Sentinel was not uploaded due to timeline change during backup")
 	}
 
 	if err == nil && uploader.Success {
-		fmt.Printf("Uploaded %d compressed tar Files.\n", tarBall.partCount)
+		fmt.Printf("Uploaded %d compressed tar Files.\n", tarBall.partNumber)
 	}
 	return err
 }

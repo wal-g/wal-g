@@ -84,13 +84,10 @@ func main() {
 			os.Exit(1)
 		}
 
-		bundle.TarBallMaker = &walg.S3TarBallMaker{
-			BackupName: n,
-			Uploader:   tu,
-		}
+		bundle.TarBallMaker = walg.NewS3TarBallMaker(n, tu)
 
 		bundle.NewTarBall(false)
-		bundle.HandleLabelFiles(c)
+		bundle.UploadLabelFiles(c)
 
 	}
 

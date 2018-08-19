@@ -358,7 +358,7 @@ func TestWalk(t *testing.T) {
 	err = bundle.UploadPgControl("lz4")
 	assert.NoError(t, err)
 
-	// err = bundle.HandleLabelFiles("backup", "table")
+	// err = bundle.UploadLabelFiles("backup", "table")
 	// if err != nil {
 	// 	t.Errorf("walk: Sentinel expected to succeed but got %+v\n", err)
 	// }
