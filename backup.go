@@ -55,14 +55,14 @@ func (backup *Backup) CheckExistence() (bool, error) {
 
 // GetKeys returns all the keys for the Files in the specified backup.
 func (backup *Backup) GetKeys() ([]string, error) {
-	objects := &s3.ListObjectsInput{
+	objects := &s3.ListObjectsV2Input{
 		Bucket: backup.Folder.Bucket,
 		Prefix: aws.String(sanitizePath(backup.getPath() + "/tar_partitions")),
 	}
 
 	result := make([]string, 0)
 
-	err := backup.Folder.S3API.ListObjectsPages(objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
+	err := backup.Folder.S3API.ListObjectsV2Pages(objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
 
 		arr := make([]string, len(files.Contents))
 

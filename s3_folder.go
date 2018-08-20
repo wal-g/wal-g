@@ -41,7 +41,7 @@ func GetLatestBackupKey(folder *S3Folder) (string, error) {
 // getBackups receives backup descriptions and sorts them by time
 func getBackups(folder *S3Folder) ([]BackupTime, error) {
 	var sortTimes []BackupTime
-	objects := &s3.ListObjectsInput{
+	objects := &s3.ListObjectsV2Input{
 		Bucket:    folder.Bucket,
 		Prefix:    aws.String(GetBackupPath(folder)),
 		Delimiter: aws.String("/"),
@@ -49,7 +49,7 @@ func getBackups(folder *S3Folder) ([]BackupTime, error) {
 
 	var backups = make([]*s3.Object, 0)
 
-	err := folder.S3API.ListObjectsPages(objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
+	err := folder.S3API.ListObjectsV2Pages(objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
 		backups = append(backups, files.Contents...)
 		return true
 	})
@@ -71,14 +71,14 @@ func getBackups(folder *S3Folder) ([]BackupTime, error) {
 
 // getWals returns all WAL file keys less then key provided
 func getWals(before string, folder *S3Folder) ([]*s3.ObjectIdentifier, error) {
-	objects := &s3.ListObjectsInput{
+	objects := &s3.ListObjectsV2Input{
 		Bucket: folder.Bucket,
 		Prefix: aws.String(sanitizePath(folder.Server + WalPath)),
 	}
 
 	arr := make([]*s3.ObjectIdentifier, 0)
 
-	err := folder.S3API.ListObjectsPages(objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
+	err := folder.S3API.ListObjectsV2Pages(objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
 		for _, ob := range files.Contents {
 			key := *ob.Key
 			if stripWalName(key) < before {

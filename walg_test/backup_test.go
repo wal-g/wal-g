@@ -151,7 +151,7 @@ func TestGetBackupTimeSlices(t *testing.T) {
 		{Key: &second, LastModified: &secondTime},
 		{Key: &third, LastModified: &thirdTime},
 	}
-	objectsFromS3 := &s3.ListObjectsOutput{Contents: c}
+	objectsFromS3 := &s3.ListObjectsV2Output{Contents: c}
 
 	checkSortingPermutationResult(objectsFromS3, t) //123
 	c[0], c[1] = c[1], c[0]
@@ -167,7 +167,7 @@ func TestGetBackupTimeSlices(t *testing.T) {
 
 }
 
-func checkSortingPermutationResult(objectsFromS3 *s3.ListObjectsOutput, t *testing.T) {
+func checkSortingPermutationResult(objectsFromS3 *s3.ListObjectsV2Output, t *testing.T) {
 	//t.Log(objectsFromS3)
 	slice := walg.GetBackupTimeSlices(objectsFromS3.Contents)
 	assert.Equalf(t, "backup01", slice[0].Name, "Sorting does not work correctly")
