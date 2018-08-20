@@ -2,6 +2,11 @@ package walg
 
 import (
 	"fmt"
+	"net/url"
+	"os"
+	"strconv"
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/defaults"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -11,9 +16,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pkg/errors"
 	"golang.org/x/time/rate"
-	"net/url"
-	"os"
-	"strconv"
 )
 
 // MaxRetries limit upload and download retries during interaction with S3
@@ -93,16 +95,24 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 	if len(s3ForcePathStyleStr) > 0 {
 		s3ForcePathStyle, err := strconv.ParseBool(s3ForcePathStyleStr)
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "Configure: failed parse AWS_S3_FORCE_PATH_STYLE")
+			return nil, nil, errors.Wrap(err, "Configure: failed to parse AWS_S3_FORCE_PATH_STYLE")
 		}
 		config.S3ForcePathStyle = aws.Bool(s3ForcePathStyle)
 	}
 
 	region := os.Getenv("AWS_REGION")
 	if region == "" {
-		region, err = findS3BucketRegion(bucket, config)
-		if err != nil {
-			return nil, nil, errors.Wrapf(err, "Configure: AWS_REGION is not set and s3:GetBucketLocation failed")
+		if config.Endpoint == nil ||
+			*config.Endpoint == "" ||
+			strings.HasSuffix(*config.Endpoint, ".amazonaws.com") {
+			region, err = findS3BucketRegion(bucket, config)
+			if err != nil {
+				return nil, nil, errors.Wrapf(err, "Configure: AWS_REGION is not set and s3:GetBucketLocation failed")
+			}
+		} else {
+			// For S3 compatible services like Minio, Ceph etc. use `us-east-1` as region
+			// ref: https://github.com/minio/cookbook/blob/master/docs/aws-sdk-for-go-with-minio.md
+			region = "us-east-1"
 		}
 	}
 	config = config.WithRegion(region)
@@ -118,6 +128,15 @@ func Configure() (*TarUploader, *S3Prefix, error) {
 	pre := &S3Prefix{
 		Bucket: aws.String(bucket),
 		Server: aws.String(server),
+	}
+
+	preventWalOverwriteStr := os.Getenv("WALG_PREVENT_WAL_OVERWRITE")
+	if len(preventWalOverwriteStr) > 0 {
+		preventWalOverwrite, err := strconv.ParseBool(preventWalOverwriteStr)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "Configure: failed to parse WALG_PREVENT_WAL_OVERWRITE")
+		}
+		pre.PreventWalOverwrite = preventWalOverwrite
 	}
 
 	diskLimitStr := os.Getenv("WALG_DISK_RATE_LIMIT")
