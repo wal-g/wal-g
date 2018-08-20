@@ -26,9 +26,9 @@ func (header *PostgresPageHeader) IsValid() bool {
 		header.pdLower < headerSize ||
 		header.pdLower > header.pdUpper ||
 		header.pdUpper > header.pdSpecial ||
-		header.pdSpecial > WalPageSize ||
+		header.pdSpecial > DatabasePageSize ||
 		(header.Lsn() == invalidLsn) ||
-		header.pdPageSizeVersion != WalPageSize+layoutVersion)
+		header.pdPageSizeVersion != DatabasePageSize+layoutVersion)
 }
 
 // TODO : unit tests

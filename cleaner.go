@@ -23,6 +23,7 @@ func CleanupPrefetchDirectories(walFileName string, location string, cleaner Cle
 	}
 }
 
+// TODO : unit tests
 func cleanupPrefetchDirectory(directory string, timelineId uint32, logSegNo uint64, cleaner Cleaner) {
 	files, err := cleaner.GetFiles(directory)
 	if err != nil {

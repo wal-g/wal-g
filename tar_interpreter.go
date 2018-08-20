@@ -24,6 +24,7 @@ type FileTarInterpreter struct {
 	IncrementalBaseDir string
 }
 
+// TODO : unit tests
 // Interpret extracts a tar file to disk and creates needed directories.
 // Returns the first error encountered. Calls fsync after each file
 // is written successfully.
@@ -106,6 +107,7 @@ func (tarInterpreter *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Heade
 	return nil
 }
 
+// TODO : unit tests
 // moveFileAndCreateDirs moves file from incremental folder to target folder, creating necessary folders structure
 func moveFileAndCreateDirs(incrementalPath string, targetPath string, fileName string) (err error) {
 	err = os.Rename(incrementalPath, targetPath)

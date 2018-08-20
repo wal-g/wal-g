@@ -76,7 +76,7 @@ go tool pprof wal-g FILENAME
 - run pg_bench and delta backup in parallel
 - make delta backup
 - restore delta chain
-- compare restoragtion results and highlight but difference
+- compare restoration results and highlight but difference
 - if critical differences found diff will exit with panic
 
 `delta` must be invoked with env variables necessary for wal-g `backup-push`

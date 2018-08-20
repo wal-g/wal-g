@@ -9,20 +9,18 @@ import (
 // with the directory that files should be
 // extracted to.
 type FileTarBallMaker struct {
-	number           int
-	size             int64
-	ArchiveDirectory string
-	Out              string
+	number int
+	size   int64
+	Out    string
 }
 
 // Make creates a new FileTarBall.
 func (tarBallMaker *FileTarBallMaker) Make(inheritState bool) walg.TarBall {
 	tarBallMaker.number++
 	return &FileTarBall{
-		number:           tarBallMaker.number,
-		size:             tarBallMaker.size,
-		archiveDirectory: tarBallMaker.ArchiveDirectory,
-		out:              tarBallMaker.Out,
+		number: tarBallMaker.number,
+		size:   tarBallMaker.size,
+		out:    tarBallMaker.Out,
 	}
 }
 
@@ -31,32 +29,28 @@ func (tarBallMaker *FileTarBallMaker) Make(inheritState bool) walg.TarBall {
 type NOPTarBallMaker struct {
 	number int
 	size   int64
-	Trim   string
 }
 
 // Make creates a new NOPTarBall.
 func (tarBallMaker *NOPTarBallMaker) Make(inheritState bool) walg.TarBall {
 	tarBallMaker.number++
 	return &NOPTarBall{
-		number:           tarBallMaker.number,
-		size:             tarBallMaker.size,
-		archiveDirectory: tarBallMaker.Trim,
+		number: tarBallMaker.number,
+		size:   tarBallMaker.size,
 	}
 }
 
 type BufferTarBallMaker struct {
-	number           int
-	size             int64
-	BufferToWrite    *bytes.Buffer
-	ArchiveDirectory string
+	number        int
+	size          int64
+	BufferToWrite *bytes.Buffer
 }
 
 func (tarBallMaker *BufferTarBallMaker) Make(dedicatedUploader bool) walg.TarBall {
 	tarBallMaker.number++
 	return &BufferTarBall{
-		number:           tarBallMaker.number,
-		size:             tarBallMaker.size,
-		archiveDirectory: tarBallMaker.ArchiveDirectory,
-		underlying:       tarBallMaker.BufferToWrite,
+		number:     tarBallMaker.number,
+		size:       tarBallMaker.size,
+		underlying: tarBallMaker.BufferToWrite,
 	}
 }

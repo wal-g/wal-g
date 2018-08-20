@@ -20,16 +20,13 @@ var BundleTestLocations = []walparser.BlockLocation{
 func TestEmptyBundleQueue(t *testing.T) {
 
 	bundle := &walg.Bundle{
+		ArchiveDirectory: "",
 		TarSizeThreshold: 100,
 	}
 
 	uploader := testtools.NewMockTarUploader(false, false)
 
-	bundle.TarBallMaker = &walg.S3TarBallMaker{
-		ArchiveDirectory: "",
-		BackupName:       "mockBackup",
-		Uploader:         uploader,
-	}
+	bundle.TarBallMaker = walg.NewS3TarBallMaker("mockBackup", uploader)
 
 	bundle.StartQueue()
 
@@ -61,14 +58,11 @@ func TestBundleQueueLowConcurrency(t *testing.T) {
 
 func queueTest(t *testing.T) {
 	bundle := &walg.Bundle{
+		ArchiveDirectory: "",
 		TarSizeThreshold: 100,
 	}
 	uploader := testtools.NewMockTarUploader(false, false)
-	bundle.TarBallMaker = &walg.S3TarBallMaker{
-		ArchiveDirectory: "",
-		BackupName:       "mockBackup",
-		Uploader:         uploader,
-	}
+	bundle.TarBallMaker = walg.NewS3TarBallMaker("mockBackup", uploader)
 
 	// For tests there must be at least 3 workers
 
@@ -200,10 +194,13 @@ func TestLoadDeltaMap_AllDeltas(t *testing.T) {
 	_, curLogSegNo, err := walg.ParseWALFileName(backupNextWalFilename)
 
 	err = bundle.DownloadDeltaMap(folder, curLogSegNo*walg.WalSegmentSize)
+	deltaMap := bundle.DeltaMap
 	assert.NoError(t, err)
-	assert.NotNil(t, bundle.DeltaMap)
-	assert.Equal(t, []uint32{4, 9}, bundle.DeltaMap[BundleTestLocations[0].RelationFileNode].ToArray())
-	assert.Equal(t, []uint32{8}, bundle.DeltaMap[BundleTestLocations[1].RelationFileNode].ToArray())
+	assert.NotNil(t, deltaMap)
+	assert.Contains(t, deltaMap, BundleTestLocations[0].RelationFileNode)
+	assert.Contains(t, deltaMap, BundleTestLocations[1].RelationFileNode)
+	assert.Equal(t, []uint32{4, 9}, deltaMap[BundleTestLocations[0].RelationFileNode].ToArray())
+	assert.Equal(t, []uint32{8}, deltaMap[BundleTestLocations[1].RelationFileNode].ToArray())
 }
 
 func TestLoadDeltaMap_MissingDelta(t *testing.T) {

@@ -124,7 +124,7 @@ func main() {
 	}
 
 	fmt.Println("BUCKET:", *folder.Bucket)
-	fmt.Println("SERVER:", *folder.Server)
+	fmt.Println("SERVER:", folder.Server)
 
 	if command == "wal-fetch" {
 		// Fetch and decompress a WAL file from S3.

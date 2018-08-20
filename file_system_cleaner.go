@@ -8,6 +8,7 @@ import (
 // FileSystemCleaner actually performs it's functions on file system
 type FileSystemCleaner struct{}
 
+// TODO : unit tests
 // GetFiles of a directory
 func (cleaner FileSystemCleaner) GetFiles(directory string) (files []string, err error) {
 	fileInfos, err := ioutil.ReadDir(directory)

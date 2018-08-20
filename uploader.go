@@ -13,7 +13,7 @@ import (
 	"sync"
 )
 
-const DataFolderPath = "~/walg_data"
+const DataFolderPath = "/tmp/walg_data"
 
 // Uploader contains fields associated with uploading tarballs.
 // Multiple tarballs can share one uploader. Must call createUploader()
@@ -94,7 +94,7 @@ func (uploader *Uploader) UploadWalFile(file NamedReader, verify bool) (string, 
 
 	pipeWriter.Compress(&OpenPGPCrypter{})
 
-	dstPath := sanitizePath(*uploader.uploadingFolder.Server + WalPath + filepath.Base(file.Name()) + "." + uploader.compressor.FileExtension())
+	dstPath := sanitizePath(uploader.uploadingFolder.Server + WalPath + filepath.Base(file.Name()) + "." + uploader.compressor.FileExtension())
 	reader := pipeWriter.Output
 
 	if verify {
@@ -150,6 +150,7 @@ func (uploader *Uploader) CreateUploadInput(path string, reader io.Reader) *s3ma
 	return uploadInput
 }
 
+// TODO : unit tests
 // Helper function to upload to S3. If an error occurs during upload, retries will
 // occur in exponentially incremental seconds.
 func (uploader *Uploader) upload(input *s3manager.UploadInput, path string) error {

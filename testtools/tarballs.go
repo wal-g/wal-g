@@ -15,12 +15,11 @@ import (
 // FileTarBall represents a tarball that is
 // written to disk.
 type FileTarBall struct {
-	archiveDirectory string
-	out              string
-	number           int
-	size             int64
-	writeCloser      io.WriteCloser
-	tarWriter        *tar.Writer
+	out         string
+	number      int
+	size        int64
+	writeCloser io.WriteCloser
+	tarWriter   *tar.Writer
 }
 
 // SetUp creates a new LZ4 writer, tar writer and file for
@@ -74,22 +73,16 @@ func (tarBall *FileTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error
 	return nil
 }
 
-func (tarBall *FileTarBall) GetFileRelPath(fileAbsPath string) string {
-	return walg.GetFileRelativePath(fileAbsPath, tarBall.archiveDirectory)
-}
-func (tarBall *FileTarBall) ArchiveDirectory() string { return tarBall.archiveDirectory }
-func (tarBall *FileTarBall) Size() int64              { return tarBall.size }
-func (tarBall *FileTarBall) AddSize(i int64)          { tarBall.size += i }
-func (tarBall *FileTarBall) TarWriter() *tar.Writer   { return tarBall.tarWriter }
-func (tarBall *FileTarBall) FileExtension() string    { return "lz4" }
-func (tarBall *FileTarBall) AwaitUploads()            {}
+func (tarBall *FileTarBall) Size() int64            { return tarBall.size }
+func (tarBall *FileTarBall) AddSize(i int64)        { tarBall.size += i }
+func (tarBall *FileTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
+func (tarBall *FileTarBall) AwaitUploads()          {}
 
 // NOPTarBall mocks a tarball. Used for testing purposes.
 type NOPTarBall struct {
-	archiveDirectory string
-	number           int
-	size             int64
-	tarWriter        *tar.Writer
+	number    int
+	size      int64
+	tarWriter *tar.Writer
 }
 
 func (tarBall *NOPTarBall) SetUp(crypter walg.Crypter, params ...string) {}
@@ -99,24 +92,18 @@ func (tarBall *NOPTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error 
 	return nil
 }
 
-func (tarBall *NOPTarBall) GetFileRelPath(fileAbsPath string) string {
-	return walg.GetFileRelativePath(fileAbsPath, tarBall.archiveDirectory)
-}
-func (tarBall *NOPTarBall) ArchiveDirectory() string { return tarBall.archiveDirectory }
-func (tarBall *NOPTarBall) Size() int64              { return tarBall.size }
-func (tarBall *NOPTarBall) AddSize(i int64)          { tarBall.size += i }
-func (tarBall *NOPTarBall) TarWriter() *tar.Writer   { return tarBall.tarWriter }
-func (tarBall *NOPTarBall) FileExtension() string    { return "lz4" }
-func (tarBall *NOPTarBall) AwaitUploads()            {}
+func (tarBall *NOPTarBall) Size() int64            { return tarBall.size }
+func (tarBall *NOPTarBall) AddSize(i int64)        { tarBall.size += i }
+func (tarBall *NOPTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
+func (tarBall *NOPTarBall) AwaitUploads()          {}
 
 // BufferTarBall represents a tarball that is
 // written to buffer.
 type BufferTarBall struct {
-	number           int
-	size             int64
-	archiveDirectory string
-	underlying       *bytes.Buffer
-	tarWriter        *tar.Writer
+	number     int
+	size       int64
+	underlying *bytes.Buffer
+	tarWriter  *tar.Writer
 }
 
 func (tarBall *BufferTarBall) SetUp(crypter walg.Crypter, args ...string) {
@@ -131,10 +118,6 @@ func (tarBall *BufferTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) err
 	return nil
 }
 
-func (tarBall *BufferTarBall) GetFileRelPath(fileAbsPath string) string {
-	return walg.GetFileRelativePath(fileAbsPath, tarBall.archiveDirectory)
-}
-
 func (tarBall *BufferTarBall) Size() int64 {
 	return tarBall.size
 }
@@ -145,10 +128,6 @@ func (tarBall *BufferTarBall) AddSize(add int64) {
 
 func (tarBall *BufferTarBall) TarWriter() *tar.Writer {
 	return tarBall.tarWriter
-}
-
-func (tarBall *BufferTarBall) FileExtension() string {
-	return "lz4"
 }
 
 func (tarBall *BufferTarBall) AwaitUploads() {}

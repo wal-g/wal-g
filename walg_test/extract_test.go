@@ -11,20 +11,20 @@ import (
 )
 
 func TestNoFilesProvided(t *testing.T) {
-	buf := &testtools.BufferTarInterpreter{}
+	buf := &testtools.NOPTarInterpreter{}
 	err := walg.ExtractAll(buf, []walg.ReaderMaker{})
 	assert.Equal(t, walg.NoFilesToExtractError, err)
 }
 
 func TestUnsupportedFileType(t *testing.T) {
 	test := &bytes.Buffer{}
-	brm := &BufferReaderMaker{test, "/usr/local", "gzip"}
-	buf := &testtools.BufferTarInterpreter{}
+	brm := &BufferReaderMaker{test, "/usr/local/file.gzip"}
+	buf := &testtools.NOPTarInterpreter{}
 	files := []walg.ReaderMaker{brm}
 	err := walg.ExtractAll(buf, files)
 
 	if serr, ok := err.(*walg.UnsupportedFileTypeError); ok {
-		t.Errorf("extract: Extract should not support filetype %s", brm.FileFormat)
+		t.Errorf("extract: Extract should not support filetype %s", walg.GetFileExtension(brm.Path()))
 	} else if serr != nil {
 		t.Log(serr)
 	}
@@ -53,7 +53,7 @@ func TestTar(t *testing.T) {
 	})
 
 	//Extract the generated tar and check that its one member is the same as the bytes generated to begin with.
-	brm := &BufferReaderMaker{member, "/usr/local", "tar"}
+	brm := &BufferReaderMaker{member, "/usr/local/file.tar"}
 	buf := &testtools.BufferTarInterpreter{}
 	files := []walg.ReaderMaker{brm}
 	err = walg.ExtractAll(buf, files)
@@ -61,18 +61,36 @@ func TestTar(t *testing.T) {
 		t.Log(err)
 	}
 
-	if !bytes.Equal(bCopy, buf.Out) {
-		t.Error("extract: Unbundled tar output does not match input.")
-	}
+	assert.Equalf(t, bCopy, buf.Out, "extract: Unbundled tar output does not match input.")
 }
+
+//func TestExtractAll(t *testing.T) {
+//	os.Setenv("WALE_GPG_KEY_ID", "3C19717A2B308DF0")
+//	os.Setenv("WALG_DOWNLOAD_CONCURRENCY", "1")
+//	defer os.Unsetenv("WALE_GPG_KEY_ID")
+//	defer os.Unsetenv("WALG_DOWNLOAD_CONCURRENCY")
+//	readerMaker := &testtools.FileReaderMaker{Key: "testdata/part_009.tar.zst"}
+//	err := walg.ExtractAll(&testtools.NOPTarInterpreter{}, []walg.ReaderMaker {readerMaker})
+//	assert.NoError(t, err)
+//}
+
+//func TestDecryptAndDecompressTar(t *testing.T) {
+//	os.Setenv("WALE_GPG_KEY_ID", "3C19717A2B308DF0")
+//	defer os.Unsetenv("WALE_GPG_KEY_ID")
+//	readerMaker := &testtools.FileReaderMaker{Key: "testdata/part_021.tar.zst"}
+//	result, err := os.Create("testdata/part_021.tar")
+//	assert.NoError(t, err)
+//	defer result.Close()
+//	var crypter walg.OpenPGPCrypter
+//	err = walg.DecryptAndDecompressTar(result, readerMaker, &crypter)
+//	assert.NoError(t, err)
+//}
 
 // Used to mock files in memory.
 type BufferReaderMaker struct {
-	Buf        *bytes.Buffer
-	Key        string
-	FileFormat string
+	Buf *bytes.Buffer
+	Key string
 }
 
 func (b *BufferReaderMaker) Reader() (io.ReadCloser, error) { return ioutil.NopCloser(b.Buf), nil }
-func (b *BufferReaderMaker) Format() string                 { return b.FileFormat }
 func (b *BufferReaderMaker) Path() string                   { return b.Key }

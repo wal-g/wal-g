@@ -2,9 +2,11 @@ package testtools
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 	"io"
 	"os"
+	"testing"
 	"time"
 )
 
@@ -81,4 +83,22 @@ func Contains(s *[]string, e string) bool {
 		}
 	}
 	return false
+}
+
+func AssertReaderIsEmpty(t *testing.T, reader io.Reader) {
+	buf := make([]byte, 1)
+	_, err := reader.Read(buf)
+	assert.Equal(t, io.EOF, err)
+}
+
+type NopCloser struct{}
+
+func (closer *NopCloser) Close() error {
+	return nil
+}
+
+type NopSeeker struct{}
+
+func (seeker *NopSeeker) Seek(offset int64, whence int) (int64, error) {
+	return 0, nil
 }

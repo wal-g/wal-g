@@ -37,13 +37,12 @@ func main() {
 	in := all[1]
 
 	bundle := &walg.Bundle{
+		ArchiveDirectory: in,
 		TarSizeThreshold: int64(part),
 	}
 
 	if nop {
-		bundle.TarBallMaker = &testtools.NOPTarBallMaker{
-			Trim: in,
-		}
+		bundle.TarBallMaker = &testtools.NOPTarBallMaker{}
 	} else if !s3 && outDir == "" {
 		fmt.Printf("Please provide a directory to write to.\n")
 		os.Exit(1)
@@ -68,8 +67,7 @@ func main() {
 		}
 
 		bundle.TarBallMaker = &testtools.FileTarBallMaker{
-			ArchiveDirectory: in,
-			Out:              outDir,
+			Out: outDir,
 		}
 		os.MkdirAll(outDir, 0766)
 
@@ -86,14 +84,10 @@ func main() {
 			os.Exit(1)
 		}
 
-		bundle.TarBallMaker = &walg.S3TarBallMaker{
-			ArchiveDirectory: in,
-			BackupName:       n,
-			Uploader:         tu,
-		}
+		bundle.TarBallMaker = walg.NewS3TarBallMaker(n, tu)
 
 		bundle.NewTarBall(false)
-		bundle.HandleLabelFiles(c)
+		bundle.UploadLabelFiles(c)
 
 	}
 

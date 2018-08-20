@@ -106,7 +106,7 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	uploader, folder, err = walg.Configure()
 	assert.NoError(t, err)
 	assert.Equal(t, "bucket", *folder.Bucket)
-	assert.Equal(t, expectedServer, *folder.Server)
+	assert.Equal(t, expectedServer, folder.Server)
 	assert.NotNil(t, uploader)
 	assert.Equal(t, "STANDARD", uploader.StorageClass)
 	assert.NoError(t, err)
@@ -126,11 +126,7 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 func TestUploadError(t *testing.T) {
 	uploader := testtools.NewMockTarUploader(false, true)
 
-	maker := &walg.S3TarBallMaker{
-		ArchiveDirectory: "/usr/local",
-		BackupName:       "test",
-		Uploader:         uploader,
-	}
+	maker := walg.NewS3TarBallMaker("test", uploader)
 
 	tarBall := maker.Make(true)
 	tarBall.SetUp(MockArmedCrypter())

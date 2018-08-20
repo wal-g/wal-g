@@ -15,7 +15,10 @@ import (
 )
 
 // It is made so to load big database files of size 1GB one by one
-const DefaultTarSizeThreshold = int64((1 << 30) - 1)
+const (
+	DefaultTarSizeThreshold = int64((1 << 30) - 1)
+	PgControl               = "pg_control"
+)
 
 // ExcludedFilenames is a list of excluded members from the bundled backup.
 var ExcludedFilenames = make(map[string]Empty)
@@ -39,6 +42,7 @@ func init() {
 // uploaded backups; in this case, pg_control is used as
 // the sentinel.
 type Bundle struct {
+	ArchiveDirectory   string
 	TarSizeThreshold   int64
 	Sentinel           *Sentinel
 	TarBall            TarBall
@@ -60,13 +64,18 @@ type Bundle struct {
 	Files *sync.Map
 }
 
-func NewBundle(incrementFromLsn *uint64, incrementFromFiles BackupFileList) *Bundle {
+func NewBundle(archiveDirectory string, incrementFromLsn *uint64, incrementFromFiles BackupFileList) *Bundle {
 	return &Bundle{
+		ArchiveDirectory:   archiveDirectory,
 		TarSizeThreshold:   DefaultTarSizeThreshold,
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
 		Files:              &sync.Map{},
 	}
+}
+
+func (bundle *Bundle) GetFileRelPath(fileAbsPath string) string {
+	return GetFileRelativePath(fileAbsPath, bundle.ArchiveDirectory)
 }
 
 func (bundle *Bundle) GetFiles() *sync.Map { return bundle.Files }
@@ -165,6 +174,7 @@ func (bundle *Bundle) GetIncrementBaseLsn() *uint64 { return bundle.IncrementFro
 // GetIncrementBaseFiles returns list of Files from previous backup
 func (bundle *Bundle) GetIncrementBaseFiles() BackupFileList { return bundle.IncrementFromFiles }
 
+// TODO : unit tests
 // checkTimelineChanged compares timelines of pg_backup_start() and pg_backup_stop()
 func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
 	if bundle.Replica {
@@ -185,6 +195,7 @@ func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
 	return false
 }
 
+// TODO : unit tests
 // StartBackup starts a non-exclusive base backup immediately. When finishing the backup,
 // `backup_label` and `tablespace_map` contents are not immediately written to
 // a file but returned instead. Returns empty string and an error if backup
@@ -212,6 +223,7 @@ func (bundle *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName str
 
 }
 
+// TODO : unit tests
 // HandleWalkedFSObject walks files provided by the passed in directory
 // and creates compressed tar members labeled as `part_00i.tar.*`, where '*' is compressor file extension.
 //
@@ -227,20 +239,21 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 		return errors.Wrap(err, "HandleWalkedFSObject: walk failed")
 	}
 
-	if info.Name() == "pg_control" {
+	if info.Name() == PgControl {
 		bundle.Sentinel = &Sentinel{info, path}
 	} else {
 		err = bundle.handleTar(path, info)
-		if err == filepath.SkipDir {
-			return err
-		}
 		if err != nil {
+			if err == filepath.SkipDir {
+				return err
+			}
 			return errors.Wrap(err, "HandleWalkedFSObject: handle tar failed")
 		}
 	}
 	return nil
 }
 
+// TODO : unit tests
 // handleTar creates underlying tar writer and handles one given file.
 // Does not follow symlinks. If file is in ExcludedFilenames, will not be included
 // in the final tarball. EXCLUDED directories are created
@@ -261,20 +274,20 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 
 	tarBall := bundle.Deque() // TODO : simplify logic of it's returning back to the queue
 	tarBall.SetUp(&bundle.Crypter)
-	fileInfoHeader.Name = tarBall.GetFileRelPath(path)
+	fileInfoHeader.Name = bundle.GetFileRelPath(path)
 	fmt.Println(fileInfoHeader.Name)
 
 	if !excluded && info.Mode().IsRegular() {
 		baseFiles := bundle.GetIncrementBaseFiles()
-		bf, wasInBase := baseFiles[fileInfoHeader.Name]
-		// It is important to take MTime before ReadDatabaseFile()
+		baseFile, wasInBase := baseFiles[fileInfoHeader.Name]
+		// It is important to take MTime before ReadIncrementalFile()
 		time := info.ModTime()
 
 		// We do not rely here on monotonic time, instead we backup file if MTime changed somehow
 		// For details see
 		// https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
 
-		if wasInBase && (time.Equal(bf.MTime)) {
+		if wasInBase && (time.Equal(baseFile.MTime)) {
 			// File was not changed since previous backup
 			fmt.Println("Skiped due to unchanged modification time")
 			bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time})
@@ -308,36 +321,36 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 	return nil
 }
 
-// HandleSentinel uploads the compressed tar file of `pg_control`. Will only be called
-// after the rest of the backup is successfully uploaded to S3. Returns
-// an error upon failure.
-func (bundle *Bundle) HandleSentinel() error {
+// TODO : unit tests
+// UploadPgControl should only be called
+// after the rest of the backup is successfully uploaded to S3.
+func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 	fileName := bundle.Sentinel.Info.Name()
 	info := bundle.Sentinel.Info
 	path := bundle.Sentinel.path
 
 	bundle.NewTarBall(false)
 	tarBall := bundle.TarBall
-	tarBall.SetUp(&bundle.Crypter, "pg_control.tar."+tarBall.FileExtension())
+	tarBall.SetUp(&bundle.Crypter, "pg_control.tar."+compressorFileExtension)
 	tarWriter := tarBall.TarWriter()
 
 	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
 	if err != nil {
-		return errors.Wrap(err, "HandleSentinel: failed to grab header info")
+		return errors.Wrap(err, "UploadPgControl: failed to grab header info")
 	}
 
-	fileInfoHeader.Name = tarBall.GetFileRelPath(path)
+	fileInfoHeader.Name = bundle.GetFileRelPath(path)
 	fmt.Println(fileInfoHeader.Name)
 
-	err = tarWriter.WriteHeader(fileInfoHeader)
+	err = tarWriter.WriteHeader(fileInfoHeader) // TODO : what happens in case of irregular pg_control?
 	if err != nil {
-		return errors.Wrap(err, "HandleSentinel: failed to write header")
+		return errors.Wrap(err, "UploadPgControl: failed to write header")
 	}
 
 	if info.Mode().IsRegular() {
 		file, err := os.Open(path)
 		if err != nil {
-			return errors.Wrapf(err, "HandleSentinel: failed to open file %s\n", path)
+			return errors.Wrapf(err, "UploadPgControl: failed to open file %s\n", path)
 		}
 
 		lim := &io.LimitedReader{
@@ -347,7 +360,7 @@ func (bundle *Bundle) HandleSentinel() error {
 
 		_, err = io.Copy(tarWriter, lim)
 		if err != nil {
-			return errors.Wrap(err, "HandleSentinel: copy failed")
+			return errors.Wrap(err, "UploadPgControl: copy failed")
 		}
 
 		tarBall.AddSize(fileInfoHeader.Size)
@@ -356,31 +369,28 @@ func (bundle *Bundle) HandleSentinel() error {
 
 	err = tarBall.CloseTar()
 	if err != nil {
-		return errors.Wrap(err, "HandleSentinel: failed to close tarball")
+		return errors.Wrap(err, "UploadPgControl: failed to close tarball")
 	}
 
 	return nil
 }
 
-// HandleLabelFiles creates the `backup_label` and `tablespace_map` Files and uploads
-// it to S3 by stopping the backup. Returns error upon failure.
-func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {
-	var label string
-	var offsetMap string
-	var lsnStr string
-
+// TODO : unit tests
+// UploadLabelFiles creates the `backup_label` and `tablespace_map` files by stopping the backup
+// and uploads them to S3.
+func (bundle *Bundle) UploadLabelFiles(conn *pgx.Conn) (uint64, error) {
 	queryRunner, err := NewPgQueryRunner(conn)
 	if err != nil {
-		return 0, errors.Wrap(err, "HandleLabelFiles: Failed to build query runner.")
+		return 0, errors.Wrap(err, "UploadLabelFiles: Failed to build query runner.")
 	}
-	label, offsetMap, lsnStr, err = queryRunner.StopBackup()
+	label, offsetMap, lsnStr, err := queryRunner.StopBackup()
 	if err != nil {
-		return 0, errors.Wrap(err, "HandleLabelFiles: failed to stop backup")
+		return 0, errors.Wrap(err, "UploadLabelFiles: failed to stop backup")
 	}
 
 	lsn, err := pgx.ParseLSN(lsnStr)
 	if err != nil {
-		return 0, errors.Wrap(err, "HandleLabelFiles: failed to parse finish LSN")
+		return 0, errors.Wrap(err, "UploadLabelFiles: failed to parse finish LSN")
 	}
 
 	if queryRunner.Version < 90600 {
@@ -400,7 +410,7 @@ func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {
 
 	_, err = PackFileTo(tarBall, labelHeader, strings.NewReader(label))
 	if err != nil {
-		return 0, errors.Wrapf(err, "HandleLabelFiles: failed to put %s to tar", labelHeader.Name)
+		return 0, errors.Wrapf(err, "UploadLabelFiles: failed to put %s to tar", labelHeader.Name)
 	}
 	fmt.Println(labelHeader.Name)
 
@@ -413,13 +423,13 @@ func (bundle *Bundle) HandleLabelFiles(conn *pgx.Conn) (uint64, error) {
 
 	_, err = PackFileTo(tarBall, offsetMapHeader, strings.NewReader(offsetMap))
 	if err != nil {
-		return 0, errors.Wrapf(err, "HandleLabelFiles: failed to put %s to tar", offsetMapHeader.Name)
+		return 0, errors.Wrapf(err, "UploadLabelFiles: failed to put %s to tar", offsetMapHeader.Name)
 	}
 	fmt.Println(offsetMapHeader.Name)
 
 	err = tarBall.CloseTar()
 	if err != nil {
-		return 0, errors.Wrap(err, "HandleLabelFiles: failed to close tarball")
+		return 0, errors.Wrap(err, "UploadLabelFiles: failed to close tarball")
 	}
 
 	return lsn, nil
@@ -473,43 +483,50 @@ func (bundle *Bundle) DownloadDeltaMap(folder *S3Folder, backupStartLSN uint64) 
 
 // TODO : unit tests
 func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHeader *tar.Header, wasInBase bool, tarBall TarBall) error {
-	var err error
 	incrementBaseLsn := bundle.GetIncrementBaseLsn()
-	isIncremented := incrementBaseLsn != nil && wasInBase && isPagedFile(info, path) && !strings.Contains(path, GlobalTablespace)
+	isIncremented := incrementBaseLsn != nil && wasInBase && isPagedFile(info, path)
 	var fileReader io.ReadCloser
-	var fileSize int64
 	if isIncremented {
 		bitmap, err := bundle.getDeltaBitmapFor(path)
-		if err != nil {
-			return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
+		if err != NoBitmapFoundError { // this file has changed after the start of backup, so just skip it
+			if err != nil {
+				return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
+			}
+			fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
+			if err != nil {
+				return errors.Wrapf(err, "packFileIntoTar: failed reading incremental file '%s'\n", path)
+			}
+			fileReader = &ReadCascadeCloser{&io.LimitedReader{
+				R: io.MultiReader(fileReader, &ZeroReader{}),
+				N: int64(fileInfoHeader.Size),
+			}, fileReader}
+		} else {
+			bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: info.ModTime()})
+			return nil
 		}
-		fileReader, fileSize, err = ReadDatabaseFile(path, info.Size(), *incrementBaseLsn, bitmap)
 	} else {
-		fileSize = info.Size()
-		fileReader, err = os.Open(path)
-		fileReader = NewDiskLimitReader(fileReader)
-	}
-	if err != nil {
-		return errors.Wrapf(err, "packFileIntoTar: failed to open file '%s'\n", path)
+		fileInfoHeader.Size = info.Size()
+		file, err := os.Open(path)
+		if err != nil {
+			return errors.Wrapf(err, "packFileIntoTar: failed to open file '%s'\n", path)
+		}
+		diskLimitedFileReader := NewDiskLimitReader(file)
+		fileReader = &ReadCascadeCloser{&io.LimitedReader{
+			R: io.MultiReader(diskLimitedFileReader, &ZeroReader{}),
+			N: int64(fileInfoHeader.Size),
+		}, diskLimitedFileReader}
 	}
 	defer fileReader.Close()
 
-	fileInfoHeader.Size = fileSize
-
 	bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: false, IsIncremented: isIncremented, MTime: info.ModTime()})
 
-	lim := &io.LimitedReader{
-		R: io.MultiReader(fileReader, &ZeroReader{}),
-		N: int64(fileInfoHeader.Size),
-	}
-
-	fileSize, err = PackFileTo(tarBall, fileInfoHeader, lim)
+	packedFileSize, err := PackFileTo(tarBall, fileInfoHeader, fileReader)
 	if err != nil {
 		return errors.Wrap(err, "packFileIntoTar: operation failed")
 	}
 
-	if fileSize != fileInfoHeader.Size {
-		return errors.Errorf("packFileIntoTar: packed wrong numbers of bytes %d instead of %d", fileSize, fileInfoHeader.Size)
+	if packedFileSize != fileInfoHeader.Size {
+		return errors.Errorf("packFileIntoTar: packed wrong numbers of bytes %d instead of %d", packedFileSize, fileInfoHeader.Size)
 	}
 
 	return nil

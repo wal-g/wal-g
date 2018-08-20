@@ -91,7 +91,7 @@ func generateData(t *testing.T) string {
 		t.Log(err)
 	}
 
-	f, err := os.Create(filepath.Join(dir, "global", "pg_control"))
+	f, err := os.Create(filepath.Join(dir, "global", walg.PgControl))
 	if err != nil {
 		t.Log(err)
 	}
@@ -155,8 +155,7 @@ func extract(t *testing.T, dir string) string {
 	for i, file := range files {
 		filePath := filepath.Join(dir, file.Name())
 		f := &testtools.FileReaderMaker{
-			Key:        filePath,
-			FileFormat: walg.GetFileExtension(file.Name()),
+			Key: filePath,
 		}
 		out[i] = f
 	}
@@ -322,13 +321,13 @@ func TestWalk(t *testing.T) {
 
 	// Bundle and compress files to `compressed`.
 	bundle := &walg.Bundle{
+		ArchiveDirectory: data,
 		TarSizeThreshold: int64(10),
 		Files:            &sync.Map{},
 	}
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
 	bundle.TarBallMaker = &testtools.FileTarBallMaker{
-		ArchiveDirectory: data,
-		Out:              compressed,
+		Out: compressed,
 	}
 	err := os.MkdirAll(compressed, 0766)
 	if err != nil {
@@ -354,12 +353,12 @@ func TestWalk(t *testing.T) {
 
 	// Test that sentinel exists and is handled correctly.
 	sen := bundle.Sentinel.Info.Name()
-	assert.Equal(t, "pg_control", sen)
+	assert.Equal(t, walg.PgControl, sen)
 
-	err = bundle.HandleSentinel()
+	err = bundle.UploadPgControl("lz4")
 	assert.NoError(t, err)
 
-	// err = bundle.HandleLabelFiles("backup", "table")
+	// err = bundle.UploadLabelFiles("backup", "table")
 	// if err != nil {
 	// 	t.Errorf("walk: Sentinel expected to succeed but got %+v\n", err)
 	// }

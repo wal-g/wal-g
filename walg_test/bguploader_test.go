@@ -1,6 +1,7 @@
 package walg_test
 
 import (
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 	"github.com/wal-g/wal-g/testtools"
 	"io/ioutil"
@@ -33,15 +34,11 @@ func TestBackgroundWALUpload(t *testing.T) {
 		bname := "B" + strconv.Itoa(i)
 		bd := filepath.Join(dir, "archive_status", bname+".done")
 		_, err := os.Stat(bd)
-		if os.IsNotExist(err) {
-			t.Error(bname + ".done was not created")
-		}
+		assert.Falsef(t, os.IsNotExist(err), bname+".done was not created")
 
 		br := filepath.Join(dir, "archive_status", bname+".ready")
 		_, err = os.Stat(br)
-		if !os.IsNotExist(err) {
-			t.Error(bname + ".ready was not deleted")
-		}
+		assert.Truef(t, os.IsNotExist(err), bname+".ready was not deleted")
 	}
 
 	cleanup(t, dir)
