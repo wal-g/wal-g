@@ -64,7 +64,11 @@ To configure how many concurrency streams are reading disk during ```backup-push
 
 * `WALG_SENTINEL_USER_DATA`
 
-This setting allows backup automation tools to add extra information to JSON sentinel file during ```backup-push```.
+This setting allows backup automation tools to add extra information to JSON sentinel file during ```backup-push```. This setting can be used e.g. to give user-defined names to backups.
+
+* `WALG_PREVENT_WAL_OVERWRITE`
+
+If this setting is specified, during ```wal-push``` WAL-G will check the existence of WAL before uploading it. If the different file is already archived under the same name, WAL-G will return the non-zero exit code to prevent PostgreSQL from removing WAL.
 
 * `AWS_ENDPOINT`
 
@@ -251,3 +255,7 @@ Acknowledgements
 WAL-G would not have happened without the support of [Citus Data](https://www.citusdata.com/)
 
 WAL-G came into existence as a result of the collaboration between a summer engineering intern at Citus, Katie Li, and Daniel Farina, the original author of WAL-E who currently serves as a principal engineer on the Citus Cloud team. Citus Data also has an [open source extension to Postgres](https://github.com/citusdata) that distributes database queries horizontally to deliver scale and performance.
+
+Chat
+----
+We have a [Slack group](https://postgresteam.slack.com/messages/CA25P48P2) to discuss WAL-G usage and development. To joint PostgreSQL slack use [invite app](https://postgres-slack.herokuapp.com).

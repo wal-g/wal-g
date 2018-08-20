@@ -1,8 +1,11 @@
 package walg
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"log"
@@ -14,9 +17,6 @@ import (
 	"strconv"
 	"text/tabwriter"
 	"time"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/pkg/errors"
 )
 
 var PgControlMissingError = errors.New("Corrupted backup: missing pg_control")
@@ -582,25 +582,22 @@ func HandleWALPush(uploader *Uploader, walFilePath string, verify bool) {
 	// Look for new WALs while doing main upload
 	bgUploader.Start(walFilePath, int32(getMaxUploadConcurrency(16)-1), uploader, verify)
 
-	uploadWALFile(uploader, walFilePath, verify)
+	uploadWALFile(uploader, walFilePath, verify, false)
 
 	bgUploader.Stop()
 }
 
 // TODO : unit tests
 // uploadWALFile from FS to the cloud
-func uploadWALFile(uploader *Uploader, walFilePath string, verify bool) {
-	archive := &Archive{
-		Folder:  uploader.uploadingFolder,
-		Archive: aws.String(sanitizePath(uploader.uploadingFolder.Server + WalPath + filepath.Base(walFilePath) + "." + uploader.compressor.FileExtension())),
-	}
-
-	exists, err := archive.CheckExistence()
-	if err != nil {
-		log.Fatalf("FATAL %+v\n", err)
-	}
-	if exists {
-		log.Fatalf("FATAL WAL file '%s' already archived, not overwriting", walFilePath)
+func uploadWALFile(uploader *Uploader, walFilePath string, verify, isBackgroundUpload bool) {
+	if uploader.uploadingFolder.preventWalOverwrite {
+		if checkWALOverwrite(uploader, walFilePath) {
+			if !isBackgroundUpload {
+				log.Panicf("FATAL: WAL file '%s' already archived, contents differ, unable to overwrite\n", walFilePath)
+			}
+			log.Printf("WARNING: WAL file '%s' already archived, contents differ, unable to overwrite\n", walFilePath)
+			return
+		}
 	}
 	walFile, err := os.Open(walFilePath)
 	if err != nil {
@@ -611,6 +608,41 @@ func uploadWALFile(uploader *Uploader, walFilePath string, verify bool) {
 		log.Fatalf("FATAL: could not upload '%s' due to compression error.\n%+v\n", path, compressionError)
 	} else if err != nil {
 		log.Printf("upload: could not upload '%s'\n", path)
-		log.Fatalf("FATAL %v\n", err)
+		log.Fatalf("FATAL: %v\n", err)
 	}
+}
+
+func checkWALOverwrite(uploader *Uploader, walFilePath string) (overwriteAttempt bool) {
+	archiveReader, exists, err := TryDownloadWALFile(uploader.uploadingFolder, sanitizePath(uploader.uploadingFolder.Server+WalPath+filepath.Base(walFilePath)+"."+uploader.compressor.FileExtension()))
+	if err != nil {
+		log.Fatalf("%+v\n", err)
+	}
+	if exists {
+		archived := &bytes.Buffer{}
+
+		err = decompressWALFile(archived, archiveReader, getDecompressorByCompressor(uploader.compressor))
+		if err != nil {
+			log.Fatalf("FATAL: %+v\n", err)
+		}
+
+		local, err := os.Open(walFilePath)
+		if err != nil {
+			log.Fatalf("FATAL: %+v\n", err)
+		}
+		defer local.Close()
+
+		localBytes, err := ioutil.ReadAll(local)
+
+		if err != nil {
+			log.Fatalf("FATAL: %+v\n", err)
+		}
+
+		if !bytes.Equal(archived.Bytes(), localBytes) {
+			return true
+		} else {
+			log.Printf("WARNING: WAL file '%s' already archived, archived content equals\n", walFilePath)
+			return false
+		}
+	}
+	return false
 }

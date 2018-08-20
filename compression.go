@@ -45,3 +45,13 @@ var Decompressors = []Decompressor{
 	ZstdDecompressor{},
 	LzmaDecompressor{},
 }
+
+func getDecompressorByCompressor(compressor Compressor) Decompressor {
+	extension := compressor.FileExtension()
+	for _, d := range Decompressors {
+		if d.FileExtension() == extension {
+			return d
+		}
+	}
+	return nil
+}

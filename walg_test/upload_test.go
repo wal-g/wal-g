@@ -91,11 +91,18 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	assert.Nil(t, uploader)
 	assert.Nil(t, folder)
 	setFake(t)
+	//Test Minio
+	err = os.Setenv("WALE_S3_PREFIX", "gs://abc.com")
+	assert.NoError(t, err)
+	err = os.Setenv("AWS_ENDPOINT", "http://127.0.0.1:9000")
+	assert.NoError(t, err)
+	err = os.Setenv("AWS_REGION", "")
+	assert.NoError(t, err)
+	_, _, err = walg.Configure()
+	assert.NoError(t, err)
 	//Test invalid url
 	err = os.Setenv("WALE_S3_PREFIX", "test_fail:")
-	if err != nil {
-		t.Log(err)
-	}
+	assert.NoError(t, err)
 	_, _, err = walg.Configure()
 	assert.Error(t, err)
 	//Test created uploader and prefix
@@ -121,6 +128,16 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 		t.Log(err)
 	}
 	assert.Equal(t, "STANDARD_IA", uploader.StorageClass)
+}
+
+func TestValidUploader(t *testing.T) {
+	mockSvc := testtools.NewMockS3Client(false, false)
+
+	tu := testtools.NewMockTarUploader(false, false)
+	assert.NotNil(t, tu)
+
+	upl := walg.CreateUploader(mockSvc, 100, 3)
+	assert.NotNil(t, upl)
 }
 
 func TestUploadError(t *testing.T) {

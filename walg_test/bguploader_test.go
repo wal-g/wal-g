@@ -5,6 +5,7 @@ import (
 	"github.com/wal-g/wal-g"
 	"github.com/wal-g/wal-g/testtools"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -116,6 +117,8 @@ func setupArchiveStatus(t *testing.T, dir string) (string, string) {
 	if err != nil {
 		t.Log(err)
 	}
+	file.WriteString(strconv.Itoa(rand.Int()))
+	file.WriteString(strconv.Itoa(rand.Int()))
 	file.Close()
 
 	return testDir, a

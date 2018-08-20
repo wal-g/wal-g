@@ -172,7 +172,7 @@ func setupFolderAndBundle() (folder *walg.S3Folder, bundle *walg.Bundle, err err
 	if err != nil {
 		return nil, nil, err
 	}
-	folder = walg.NewS3Folder(testtools.NewMockStoringS3Client(storage), "mock/", "mock")
+	folder = walg.NewS3Folder(testtools.NewMockStoringS3Client(storage), "mock/", "mock", false)
 	currentBackupFirstWalFilename := "000000010000000000000073"
 	timeLine, logSegNo, err := walg.ParseWALFileName(currentBackupFirstWalFilename)
 	if err != nil {

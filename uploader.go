@@ -16,7 +16,7 @@ import (
 const DataFolderPath = "/tmp/walg_data"
 
 // Uploader contains fields associated with uploading tarballs.
-// Multiple tarballs can share one uploader. Must call createUploader()
+// Multiple tarballs can share one uploader. Must call CreateUploader()
 // in 'upload.go'.
 type Uploader struct {
 	uploaderApi          s3manageriface.UploaderAPI
@@ -31,7 +31,7 @@ type Uploader struct {
 }
 
 // NewUploader creates a new tar uploader without the actual
-// S3 uploader. createUploader() is used to configure byte size and
+// S3 uploader. CreateUploader() is used to configure byte size and
 // concurrency streams for the uploader.
 func NewUploader(uploaderAPI s3manageriface.UploaderAPI, compressor Compressor, uploadingLocation *S3Folder, useWalDelta bool) *Uploader {
 	return &Uploader{

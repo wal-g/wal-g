@@ -2,6 +2,11 @@ package walg
 
 import (
 	"fmt"
+	"net/url"
+	"os"
+	"strconv"
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/defaults"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -11,10 +16,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pkg/errors"
 	"golang.org/x/time/rate"
-	"net/url"
-	"os"
-	"strconv"
-	"strings"
 )
 
 const DefaultStreamingPartSizeFor10Concurrency = 20 << 20
@@ -91,16 +92,24 @@ func Configure() (*Uploader, *S3Folder, error) { // TODO : add parameter naming
 	if len(s3ForcePathStyleStr) > 0 {
 		s3ForcePathStyle, err := strconv.ParseBool(s3ForcePathStyleStr)
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "Configure: failed parse AWS_S3_FORCE_PATH_STYLE")
+			return nil, nil, errors.Wrap(err, "Configure: failed to parse AWS_S3_FORCE_PATH_STYLE")
 		}
 		config.S3ForcePathStyle = aws.Bool(s3ForcePathStyle)
 	}
 
 	region := os.Getenv("AWS_REGION")
 	if region == "" {
-		region, err = findS3BucketRegion(bucket, config)
-		if err != nil {
-			return nil, nil, errors.Wrapf(err, "Configure: AWS_REGION is not set and s3:GetBucketLocation failed")
+		if config.Endpoint == nil ||
+			*config.Endpoint == "" ||
+			strings.HasSuffix(*config.Endpoint, ".amazonaws.com") {
+			region, err = findS3BucketRegion(bucket, config)
+			if err != nil {
+				return nil, nil, errors.Wrapf(err, "Configure: AWS_REGION is not set and s3:GetBucketLocation failed")
+			}
+		} else {
+			// For S3 compatible services like Minio, Ceph etc. use `us-east-1` as region
+			// ref: https://github.com/minio/cookbook/blob/master/docs/aws-sdk-for-go-with-minio.md
+			region = "us-east-1"
 		}
 	}
 	config = config.WithRegion(region)
@@ -111,6 +120,15 @@ func Configure() (*Uploader, *S3Folder, error) { // TODO : add parameter naming
 	}
 	if _, ok := Compressors[compressionMethod]; !ok {
 		return nil, nil, UnknownCompressionMethodError{}
+	}
+
+	preventWalOverwriteStr := os.Getenv("WALG_PREVENT_WAL_OVERWRITE")
+	var preventWalOverwrite bool
+	if len(preventWalOverwriteStr) > 0 {
+		preventWalOverwrite, err = strconv.ParseBool(preventWalOverwriteStr)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "Configure: failed to parse WALG_PREVENT_WAL_OVERWRITE")
+		}
 	}
 
 	diskLimitStr := os.Getenv("WALG_DISK_RATE_LIMIT")
@@ -145,10 +163,10 @@ func Configure() (*Uploader, *S3Folder, error) { // TODO : add parameter naming
 		}
 	}
 
-	folder := NewS3Folder(s3.New(sess), bucket, server)
+	folder := NewS3Folder(s3.New(sess), bucket, server, preventWalOverwrite)
 
 	var concurrency = getMaxUploadConcurrency(10)
-	uploaderApi := createUploader(folder.S3API, DefaultStreamingPartSizeFor10Concurrency, concurrency)
+	uploaderApi := CreateUploader(folder.S3API, DefaultStreamingPartSizeFor10Concurrency, concurrency)
 	uploader := NewUploader(uploaderApi, Compressors[compressionMethod], folder, useWalDelta)
 
 	storageClass, ok := os.LookupEnv("WALG_S3_STORAGE_CLASS")
@@ -174,9 +192,9 @@ func Configure() (*Uploader, *S3Folder, error) { // TODO : add parameter naming
 	return uploader, folder, err
 }
 
-// createUploader returns an uploader with customizable concurrency
+// CreateUploader returns an uploader with customizable concurrency
 // and partsize.
-func createUploader(svc s3iface.S3API, partsize, concurrency int) s3manageriface.UploaderAPI {
+func CreateUploader(svc s3iface.S3API, partsize, concurrency int) s3manageriface.UploaderAPI {
 	uploaderAPI := s3manager.NewUploaderWithClient(svc, func(uploader *s3manager.Uploader) {
 		uploader.PartSize = int64(partsize)
 		uploader.Concurrency = concurrency

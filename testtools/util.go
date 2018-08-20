@@ -33,7 +33,7 @@ func NewMockTarUploader(apiMultiErr, apiErr bool) *walg.Uploader {
 	return walg.NewUploader(
 		NewMockS3Uploader(apiMultiErr, apiErr, nil),
 		&MockCompressor{},
-		walg.NewS3Folder(NewMockS3Client(true, true), "bucket/", "server"),
+		walg.NewS3Folder(NewMockS3Client(true, true), "bucket/", "server", false),
 		false,
 	)
 }
@@ -42,7 +42,7 @@ func NewStoringMockTarUploader(apiMultiErr, apiErr bool, storage MockStorage) *w
 	return walg.NewUploader(
 		NewMockS3Uploader(apiMultiErr, apiErr, storage),
 		&MockCompressor{},
-		walg.NewS3Folder(nil, "bucket/", "server"),
+		walg.NewS3Folder(nil, "bucket/", "server", false),
 		false,
 	)
 }
@@ -57,11 +57,11 @@ func NewLz4CompressingPipeWriter(input io.Reader) *walg.CompressingPipeWriter {
 }
 
 func NewMockS3Folder(s3ClientErr, s3ClientNotFound bool) *walg.S3Folder {
-	return walg.NewS3Folder(NewMockS3Client(s3ClientErr, s3ClientNotFound), "mock bucket", "mock server")
+	return walg.NewS3Folder(NewMockS3Client(s3ClientErr, s3ClientNotFound), "mock bucket", "mock server", false)
 }
 
 func NewStoringMockS3Folder(storage MockStorage) *walg.S3Folder {
-	return walg.NewS3Folder(NewMockStoringS3Client(storage), "bucket/", "server")
+	return walg.NewS3Folder(NewMockStoringS3Client(storage), "bucket/", "server", false)
 }
 
 type ReadWriteNopCloser struct {

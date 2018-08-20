@@ -10,16 +10,18 @@ import (
 )
 
 type S3Folder struct {
-	S3API  s3iface.S3API
-	Bucket *string
-	Server string
+	S3API               s3iface.S3API
+	Bucket              *string
+	Server              string
+	preventWalOverwrite bool
 }
 
-func NewS3Folder(s3API s3iface.S3API, bucket, server string) *S3Folder {
+func NewS3Folder(s3API s3iface.S3API, bucket, server string, preventWalOverwrite bool) *S3Folder {
 	return &S3Folder{
 		s3API,
 		aws.String(bucket),
 		server,
+		preventWalOverwrite,
 	}
 }
 
