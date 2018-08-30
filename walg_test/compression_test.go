@@ -2,11 +2,11 @@ package walg_test
 
 import (
 	"bytes"
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 	"io"
 	"math/rand"
 	"testing"
-	"github.com/stretchr/testify/assert"
 )
 
 func min(a, b int) int {
@@ -25,7 +25,7 @@ func FindDecompressor(compressorFileExtension string) walg.Decompressor {
 	return nil
 }
 
-type BiasedRandomReader struct {}
+type BiasedRandomReader struct{}
 
 func NewBiasedRandomReader() *BiasedRandomReader {
 	return &BiasedRandomReader{}
