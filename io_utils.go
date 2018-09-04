@@ -26,4 +26,3 @@ func (reader *UntilEOFReader) Read(p []byte) (n int, err error) {
 	}
 	return
 }
-
