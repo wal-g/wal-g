@@ -3,7 +3,7 @@ RUN apt update
 RUN yes | apt install liblzo2-2
 COPY pginstall.sh /tmp
 RUN chmod +x /tmp/pginstall.sh
-RUN /tmp/pginstall.sh | apt install postgresql postgresql-contrib
+RUN /tmp/pginstall.sh | apt install postgresql-10 postgresql-contrib
 ENV PGDATA=/var/lib/postgresql/10/main
 RUN rm -rf $PGDATA
 RUN su postgres -c "/usr/lib/postgresql/10/bin/initdb $PGDATA"
