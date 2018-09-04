@@ -1,5 +1,6 @@
 FROM ubuntu
 RUN apt update
+RUN apt install liblzo2-2
 COPY pginstall.sh /tmp
 RUN chmod +x /tmp/pginstall.sh
 RUN /tmp/pginstall.sh | apt install postgresql postgresql-contrib
