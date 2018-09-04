@@ -2,7 +2,7 @@ notifications:
   email: false
 services:
   - docker
-script: build.sh
+script: ./build.sh
 language: go
 dist: trusty
 go:
