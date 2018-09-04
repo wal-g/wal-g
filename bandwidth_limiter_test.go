@@ -1,27 +1,27 @@
 package walg
 
 import (
-	"testing"
-	"golang.org/x/time/rate"
 	"bytes"
+	"golang.org/x/time/rate"
 	"io"
 	"io/ioutil"
+	"testing"
 	"time"
 )
 
-type fakeCloser struct{
+type fakeCloser struct {
 	r io.Reader
 }
 
 func TestLimiter(t *testing.T) {
-	diskLimiter = rate.NewLimiter(rate.Limit(1000), int(1024));
-	networkLimiter = rate.NewLimiter(rate.Limit(1000), int(1024));
+	diskLimiter = rate.NewLimiter(rate.Limit(1000), int(1024))
+	networkLimiter = rate.NewLimiter(rate.Limit(1000), int(1024))
 	defer func() {
 		diskLimiter = nil
 		networkLimiter = nil
 	}()
 	buffer := bytes.NewReader(make([]byte, 2000))
-	r:= &fakeCloser{buffer}
+	r := &fakeCloser{buffer}
 	start := time.Now()
 
 	reader := NewDiskLimitReader(NewNetworkLimitReader(r))
@@ -32,7 +32,7 @@ func TestLimiter(t *testing.T) {
 	}
 	end := time.Now()
 
-	if end.Sub(start) < time.Millisecond * 800 {
+	if end.Sub(start) < time.Millisecond*800 {
 		t.Errorf("Rate limiter did not work")
 	}
 }
