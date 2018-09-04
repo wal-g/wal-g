@@ -3,3 +3,4 @@ cmd/wal-g/wal-g
 _vendor*
 walg_test/testdata/data*
 walg_test/testdata/part*
+docker/pg/wal-g

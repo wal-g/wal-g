@@ -4,6 +4,8 @@ import (
 	"archive/tar"
 	"github.com/pkg/errors"
 	"io"
+	"log"
+	"math/rand"
 )
 
 // EmptyWriteIgnorer handles 0 byte write in LZ4 package
@@ -97,27 +99,51 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 	}
 
 	var err error
-	sem := make(chan Empty, len(files))
 	collectAll := make(chan error)
 	defer close(collectAll)
 	go func() {
 		for e := range collectAll {
 			if e != nil {
+				if err != nil {
+					log.Println(err)
+				}
 				err = e
 			}
 		}
 	}()
 
-	// Set maximum number of goroutines spun off by ExtractAll
 	var con = getMaxDownloadConcurrency(min(len(files), 10))
 
-	concurrent := make(chan Empty, con)
-	for i := 0; i < con; i++ {
-		concurrent <- Empty{}
+	// here we try to restart idempotent tar reader 3 times
+	currentRun := files
+	failed := tryExtractFiles(currentRun, tarInterpreter, collectAll, false, con)
+
+	// Lowering parallelism for failed tars
+	for len(failed) > 0 && con > 1 {
+		currentRun = failed
+		con /= 2
+		failed = tryExtractFiles(failed, tarInterpreter, collectAll, false, con)
 	}
 
-	var crypter OpenPGPCrypter
+	// If we have failed tars we iterate until we see a progress
+	for len(failed) > 0 && len(failed) < len(currentRun) {
+		currentRun = failed
+		failed = tryExtractFiles(failed, tarInterpreter, collectAll, false, 1)
+	}
+	// Last attempt to obtain err
+	if len(failed) > 0 {
+		tryExtractFiles(failed, tarInterpreter, collectAll, true, 1)
+	}
+	return err
+}
 
+func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, collectAll chan error, reportError bool, connectionCount int) (failed []ReaderMaker) {
+	sem := make(chan Empty, len(files))
+	concurrent := make(chan Empty, connectionCount)
+	for i := 0; i < connectionCount; i++ {
+		concurrent <- Empty{}
+	}
+	var crypter OpenPGPCrypter
 	for i, val := range files {
 		<-concurrent
 		go func(i int, val ReaderMaker) {
@@ -147,23 +173,41 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 
 			finishedTop := false
 			finishedLow := false
-
+			var err1, err2 error
 			for !(finishedTop && finishedLow) {
 				select {
-				case err := <-collectTop:
+				case err1 = <-collectTop:
 					finishedTop = true
-					collectAll <- err
-				case err := <-collectLow:
+				case err2 = <-collectLow:
 					finishedLow = true
-					collectAll <- err
+				}
+			}
+			if reportError {
+				collectAll <- err1
+				collectAll <- err2
+			} else {
+				if err1 != nil {
+					log.Println(err1)
+				}
+				if err2 != nil {
+					log.Println(err2)
+				}
+				if err1 != nil || err2 != nil || rand.Int()%3 == 0 {
+					failed = append(failed, val)
 				}
 			}
 
 		}(i, val)
 	}
-
 	for i := 0; i < len(files); i++ {
 		<-sem
 	}
-	return err
+	if len(failed) > 0 {
+		log.Println("Iteration finished, failed tars: ")
+		for _, f := range failed {
+			log.Print(f.Path(), ",")
+		}
+		log.Print("\n")
+	}
+	return
 }
