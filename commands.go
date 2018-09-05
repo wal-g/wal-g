@@ -556,8 +556,8 @@ func downloadAndDecompressWALFile(folder *S3Folder, walFileName string) (io.Read
 		}
 		reader, writer := io.Pipe()
 		go func() {
-			decompressWALFile(&EmptyWriteIgnorer{writer}, archiveReader, decompressor) // TODO : handle errors
-			writer.Close()
+			err = decompressWALFile(&EmptyWriteIgnorer{writer}, archiveReader, decompressor)
+			writer.CloseWithError(err)
 		}()
 		return reader, nil
 	}
