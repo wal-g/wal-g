@@ -38,7 +38,7 @@ func extractOne(tarInterpreter TarInterpreter, src io.Reader) error {
 		if err != nil {
 			return errors.Wrap(err, "extractOne: tar extract failed")
 		}
-		log.Printf("header: %v", *header)
+		//log.Printf("header: %v", *header)
 
 		err = tarInterpreter.Interpret(tarReader, header)
 		if err != nil {

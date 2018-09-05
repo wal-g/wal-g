@@ -568,10 +568,10 @@ func downloadAndDecompressWALFile(folder *S3Folder, walFileName string) (io.Read
 // downloadWALFileTo downloads a file and writes it to local file
 func downloadWALFileTo(folder *S3Folder, walFileName string, dstPath string) error {
 	reader, err := downloadAndDecompressWALFile(folder, walFileName)
-	defer reader.Close()
 	if err != nil {
 		return err
 	}
+	defer reader.Close()
 	return CreateFileWith(dstPath, reader)
 }
 
