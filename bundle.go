@@ -272,8 +272,6 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 		return errors.Wrap(err, "handleTar: could not grab header info")
 	}
 
-	tarBall := bundle.Deque() // TODO : simplify logic of it's returning back to the queue
-	tarBall.SetUp(&bundle.Crypter)
 	fileInfoHeader.Name = bundle.GetFileRelPath(path)
 	fmt.Println(fileInfoHeader.Name)
 
@@ -291,10 +289,11 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 			// File was not changed since previous backup
 			fmt.Println("Skiped due to unchanged modification time")
 			bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time})
-			bundle.EnqueueBack(tarBall)
 			return nil
 		}
 
+		tarBall := bundle.Deque()
+		tarBall.SetUp(&bundle.Crypter)
 		go func() {
 			// TODO: Refactor this functional mess
 			// And maybe do a better error handling
@@ -308,6 +307,8 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 			}
 		}()
 	} else {
+		tarBall := bundle.Deque()
+		tarBall.SetUp(&bundle.Crypter)
 		defer bundle.EnqueueBack(tarBall)
 		err = tarBall.TarWriter().WriteHeader(fileInfoHeader)
 		if err != nil {

@@ -25,8 +25,8 @@ func (r *fakeCloser) Close() error {
 }
 
 func TestLimiter(t *testing.T) {
-	walg.DiskLimiter = rate.NewLimiter(rate.Limit(1000), int(1024))
-	walg.NetworkLimiter = rate.NewLimiter(rate.Limit(1000), int(1024))
+	walg.DiskLimiter = rate.NewLimiter(rate.Limit(10000), int(1024))
+	walg.NetworkLimiter = rate.NewLimiter(rate.Limit(10000), int(1024))
 	defer func() {
 		walg.DiskLimiter = nil
 		walg.NetworkLimiter = nil
@@ -40,7 +40,7 @@ func TestLimiter(t *testing.T) {
 	assert.NoError(t, err)
 	end := time.Now()
 
-	if end.Sub(start) < time.Millisecond*800 { // TODO : what?
+	if end.Sub(start) < time.Millisecond*80 {
 		t.Errorf("Rate limiter did not work")
 	}
 }

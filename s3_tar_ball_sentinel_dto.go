@@ -33,13 +33,10 @@ func (dto *S3TarBallSentinelDto) setFiles(p *sync.Map) {
 // isIncremental checks that sentinel represents delta backup
 func (dto *S3TarBallSentinelDto) isIncremental() bool {
 	// If we have increment base, we must have all the rest properties.
-	// If we do not have base - anything else is a mistake
 	if dto.IncrementFrom != nil {
 		if dto.IncrementFromLSN == nil || dto.IncrementFullName == nil || dto.IncrementCount == nil {
 			panic("Inconsistent S3TarBallSentinelDto")
 		}
-	} else if dto.IncrementFromLSN != nil && dto.IncrementFullName != nil && dto.IncrementCount != nil {
-		panic("Inconsistent S3TarBallSentinelDto")
 	}
 	return dto.IncrementFrom != nil
 }
