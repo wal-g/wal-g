@@ -3,3 +3,4 @@ cmd/wal-g/wal-g
 walparser/testdata/whole_wal_file
 walg_test/testdata/part*
 walg_test/testdata/data*
+docker/pg/wal-g

@@ -104,13 +104,29 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 		return NoFilesToExtractError
 	}
 
-	var errorCollector errgroup.Group
-
 	// Set maximum number of goroutines spun off by ExtractAll
 	downloadingConcurrency := getMaxDownloadConcurrency(min(len(files), 10))
+	var err error
+	for currentRun := files; len(currentRun) > 0; {
+		var failed []ReaderMaker
+		failed, err = tryExtractFiles(currentRun, tarInterpreter, downloadingConcurrency)
+		if downloadingConcurrency > 1 {
+			downloadingConcurrency /= 2
+		} else if len(failed) == len(currentRun) {
+			break
+		}
+		currentRun = failed
+	}
+	return err
+}
+
+// TODO : unit tests
+func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloadingConcurrency int) (failed []ReaderMaker, err error) {
+	var errorCollector errgroup.Group
 	downloadingContext := context.TODO()
 	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
 	var crypter OpenPGPCrypter
+	inFailed := make(map[ReaderMaker]bool)
 
 	for _, file := range files {
 		downloadingSemaphore.Acquire(downloadingContext, 1)
@@ -122,20 +138,32 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 			err := DecryptAndDecompressTar(decompressingWriter, fileClosure, &crypter)
 			decompressingWriter.Close()
 			log.Printf("Finished decompression of %s", fileClosure.Path())
+			if err != nil {
+				if _, ok := inFailed[fileClosure]; !ok {
+					inFailed[fileClosure] = true
+					failed = append(failed, fileClosure)
+				}
+				log.Println(err)
+			}
 			return err
 		})
 		errorCollector.Go(func() error {
 			defer downloadingSemaphore.Release(1)
 			err := extractOne(tarInterpreter, extractingReader)
-			if err != nil {
-				err = errors.Wrapf(err, "Extraction error in %s", fileClosure.Path())
-			}
-			log.Printf("Finished extraction of %s", fileClosure.Path())
+			err = errors.Wrapf(err, "Extraction error in %s", fileClosure.Path())
 			extractingReader.Close()
+			log.Printf("Finished extraction of %s", fileClosure.Path())
+			if err != nil {
+				if _, ok := inFailed[fileClosure]; !ok {
+					inFailed[fileClosure] = true
+					failed = append(failed, fileClosure)
+				}
+				log.Println(err)
+			}
 			return err
 		})
 	}
 
 	downloadingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency))
-	return errorCollector.Wait()
+	return failed, errorCollector.Wait()
 }
