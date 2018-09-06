@@ -16,6 +16,10 @@ const (
 	Empty     = BoundType('E')
 )
 
+func (bt BoundType) String() string {
+	return string(bt)
+}
+
 type UntypedTextRange struct {
 	Lower     string
 	Upper     string
@@ -26,8 +30,8 @@ type UntypedTextRange struct {
 func ParseUntypedTextRange(src string) (*UntypedTextRange, error) {
 	utr := &UntypedTextRange{}
 	if src == "empty" {
-		utr.LowerType = 'E'
-		utr.UpperType = 'E'
+		utr.LowerType = Empty
+		utr.UpperType = Empty
 		return utr, nil
 	}
 
@@ -75,28 +79,28 @@ func ParseUntypedTextRange(src string) (*UntypedTextRange, error) {
 	if err != nil {
 		return nil, errors.Errorf("invalid upper value: %v", err)
 	}
-	buf.UnreadRune()
 
 	if r == ')' || r == ']' {
 		utr.UpperType = Unbounded
 	} else {
+		buf.UnreadRune()
 		utr.Upper, err = rangeParseValue(buf)
 		if err != nil {
 			return nil, errors.Errorf("invalid upper value: %v", err)
 		}
-	}
 
-	r, _, err = buf.ReadRune()
-	if err != nil {
-		return nil, errors.Errorf("missing upper bound: %v", err)
-	}
-	switch r {
-	case ')':
-		utr.UpperType = Exclusive
-	case ']':
-		utr.UpperType = Inclusive
-	default:
-		return nil, errors.Errorf("missing upper bound, instead got: %v", string(r))
+		r, _, err = buf.ReadRune()
+		if err != nil {
+			return nil, errors.Errorf("missing upper bound: %v", err)
+		}
+		switch r {
+		case ')':
+			utr.UpperType = Exclusive
+		case ']':
+			utr.UpperType = Inclusive
+		default:
+			return nil, errors.Errorf("missing upper bound, instead got: %v", string(r))
+		}
 	}
 
 	skipWhitespace(buf)

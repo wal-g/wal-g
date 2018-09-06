@@ -1,5 +1,5 @@
 [![](https://godoc.org/github.com/jackc/pgx?status.svg)](https://godoc.org/github.com/jackc/pgx)
-[![Build Status](https://travis-ci.org/jackc/pgx.png)](https://travis-ci.org/jackc/pgx)
+[![Build Status](https://travis-ci.org/jackc/pgx.svg)](https://travis-ci.org/jackc/pgx)
 
 # pgx - PostgreSQL Driver and Toolkit
 
@@ -79,8 +79,15 @@ skip tests for connection types that are not configured.
 
 To setup the normal test environment, first install these dependencies:
 
+    go get github.com/cockroachdb/apd
+    go get github.com/hashicorp/go-version
     go get github.com/jackc/fake
+    go get github.com/lib/pq
+    go get github.com/pkg/errors
+    go get github.com/satori/go.uuid
     go get github.com/shopspring/decimal
+    go get github.com/sirupsen/logrus
+    go get go.uber.org/zap
     go get gopkg.in/inconshreveable/log15.v2
 
 Then run the following SQL:
@@ -93,6 +100,7 @@ Then run the following SQL:
 Connect to database pgx_test and run:
 
     create extension hstore;
+    create domain uint64 as numeric(20,0);
 
 Next open conn_config_test.go.example and make a copy without the
 .example. If your PostgreSQL server is accepting connections on 127.0.0.1,

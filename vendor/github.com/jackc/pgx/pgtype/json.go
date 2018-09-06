@@ -33,6 +33,15 @@ func (dst *JSON) Set(src interface{}) error {
 		} else {
 			*dst = JSON{Bytes: value, Status: Present}
 		}
+	// Encode* methods are defined on *JSON. If JSON is passed directly then the
+	// struct itself would be encoded instead of Bytes. This is clearly a footgun
+	// so detect and return an error. See https://github.com/jackc/pgx/issues/350.
+	case JSON:
+		return errors.New("use pointer to pgtype.JSON instead of value")
+	// Same as above but for JSONB (because they share implementation)
+	case JSONB:
+		return errors.New("use pointer to pgtype.JSONB instead of value")
+
 	default:
 		buf, err := json.Marshal(value)
 		if err != nil {
@@ -143,7 +152,7 @@ func (dst *JSON) Scan(src interface{}) error {
 func (src *JSON) Value() (driver.Value, error) {
 	switch src.Status {
 	case Present:
-		return string(src.Bytes), nil
+		return src.Bytes, nil
 	case Null:
 		return nil, nil
 	default:

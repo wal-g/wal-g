@@ -31,8 +31,34 @@ func convertSimpleArgument(ci *pgtype.ConnInfo, arg interface{}) (interface{}, e
 	}
 
 	switch arg := arg.(type) {
+
+	// https://github.com/jackc/pgx/issues/409 Changed JSON and JSONB to surface
+	// []byte to database/sql instead of string. But that caused problems with the
+	// simple protocol because the driver.Valuer case got taken before the
+	// pgtype.TextEncoder case. And driver.Valuer needed to be first in the usual
+	// case because of https://github.com/jackc/pgx/issues/339. So instead we
+	// special case JSON and JSONB.
+	case *pgtype.JSON:
+		buf, err := arg.EncodeText(ci, nil)
+		if err != nil {
+			return nil, err
+		}
+		if buf == nil {
+			return nil, nil
+		}
+		return string(buf), nil
+	case *pgtype.JSONB:
+		buf, err := arg.EncodeText(ci, nil)
+		if err != nil {
+			return nil, err
+		}
+		if buf == nil {
+			return nil, nil
+		}
+		return string(buf), nil
+
 	case driver.Valuer:
-		return arg.Value()
+		return callValuerValue(arg)
 	case pgtype.TextEncoder:
 		buf, err := arg.EncodeText(ci, nil)
 		if err != nil {
@@ -128,12 +154,6 @@ func encodePreparedStatementArgument(ci *pgtype.ConnInfo, buf []byte, oid pgtype
 			pgio.SetInt32(buf[sp:], int32(len(buf[sp:])-4))
 		}
 		return buf, nil
-	case driver.Valuer:
-		v, err := arg.Value()
-		if err != nil {
-			return nil, err
-		}
-		return encodePreparedStatementArgument(ci, buf, oid, v)
 	case string:
 		buf = pgio.AppendInt32(buf, int32(len(arg)))
 		buf = append(buf, arg...)
@@ -154,6 +174,16 @@ func encodePreparedStatementArgument(ci *pgtype.ConnInfo, buf []byte, oid pgtype
 		value := dt.Value
 		err := value.Set(arg)
 		if err != nil {
+			{
+				if arg, ok := arg.(driver.Valuer); ok {
+					v, err := callValuerValue(arg)
+					if err != nil {
+						return nil, err
+					}
+					return encodePreparedStatementArgument(ci, buf, oid, v)
+				}
+			}
+
 			return nil, err
 		}
 
@@ -168,6 +198,14 @@ func encodePreparedStatementArgument(ci *pgtype.ConnInfo, buf []byte, oid pgtype
 			pgio.SetInt32(buf[sp:], int32(len(buf[sp:])-4))
 		}
 		return buf, nil
+	}
+
+	if arg, ok := arg.(driver.Valuer); ok {
+		v, err := callValuerValue(arg)
+		if err != nil {
+			return nil, err
+		}
+		return encodePreparedStatementArgument(ci, buf, oid, v)
 	}
 
 	if strippedArg, ok := stripNamedType(&refVal); ok {
@@ -191,7 +229,7 @@ func chooseParameterFormatCode(ci *pgtype.ConnInfo, oid pgtype.OID, arg interfac
 		if _, ok := dt.Value.(pgtype.BinaryEncoder); ok {
 			if arg, ok := arg.(driver.Valuer); ok {
 				if err := dt.Value.Set(arg); err != nil {
-					if value, err := arg.Value(); err == nil {
+					if value, err := callValuerValue(arg); err == nil {
 						if _, ok := value.(string); ok {
 							return TextFormatCode
 						}

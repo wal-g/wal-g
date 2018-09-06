@@ -1,3 +1,78 @@
+# 3.2.0 (August 7, 2018)
+
+## Features
+
+* Support sslkey, sslcert, and sslrootcert URI params (Sean Chittenden)
+* Allow any scheme in ParseURI (for convenience with cockroachdb) (Sean Chittenden)
+* Add support for domain types
+* Add zerolog logging adaptor (Justin Reagor)
+* Add driver.Connector support / Go 1.10 support (James Lawrence)
+* Allow nested database/sql/driver.Drivers (Jackson Owens)
+* Support int64 and uint64 numeric array (Anthony Regeda)
+* Add nul support to pgtype.Bool (Tarik Demirci)
+* Add types to decode error messages (Damir Vandic)
+
+
+## Fixes
+
+* Fix Rows.Values returning same value for multiple columns of same complex type
+* Fix StartReplication() syntax (steampunkcoder)
+* Fix precision loss for test format geometric types
+* Allows scanning jsonb column into `*json.RawMessage`
+* Allow recovery to savepoint in failed transaction
+* Fix deadlock when CopyFromSource panics
+* Include PreferSimpleProtocol in config Merge (Murat Kabilov)
+
+## Changes
+
+* pgtype.JSON(B).Value now returns []byte instead of string. This allows
+  database/sql to scan json(b) into \*json.RawMessage. This is a tiny behavior
+  change, but database/sql Scan should automatically convert []byte to string, so
+  there shouldn't be any incompatibility.
+
+# 3.1.0 (January 15, 2018)
+
+## Features
+
+* Add QueryEx, QueryRowEx, ExecEx, and RollbackEx to Tx
+* Add more ColumnType support (Timothée Peignier)
+* Add UUIDArray type (Kelsey Francis)
+* Add zap log adapter (Kelsey Francis)
+* Add CreateReplicationSlotEx that consistent_point and snapshot_name (Mark Fletcher)
+* Add BeginBatch to Tx (Gaspard Douady)
+* Support CrateDB (Felix Geisendörfer)
+* Allow use of logrus logger with fields configured (André Bierlein)
+* Add array of enum support
+* Add support for bit type
+* Handle timeout parameters (Timothée Peignier)
+* Allow overriding connection info (James Lawrence)
+* Add support for bpchar type (Iurii Krasnoshchok)
+* Add ConnConfig.PreferSimpleProtocol
+
+## Fixes
+
+* Fix numeric EncodeBinary bug (Wei Congrui)
+* Fix logrus updated package name (Damir Vandic)
+* Fix some invalid one round trip execs failing to return non-nil error. (Kelsey Francis)
+* Return ErrClosedPool when Acquire() with closed pool (Mike Graf)
+* Fix decoding row with same type values
+* Always return non-nil \*Rows from Query to fix QueryRow (Kelsey Francis)
+* Fix pgtype types that can Set database/sql/driver.driver.Valuer
+* Prefix types in namespaces other than pg_catalog or public (Kelsey Francis)
+* Fix incomplete selects during batch (Gaspard Douady and Jack Christensen)
+* Support nil pointers to value implementing driver.Valuer
+* Fix time logging for QueryEx
+* Fix ranges with text format where end is unbounded
+* Detect erroneous JSON(B) encoding
+* Fix missing interval mapping
+* ConnPool begin should not retry if ctx is done (Gaspard Douady)
+* Fix reading interrupted messages could break connection
+* Return error on unknown oid while decoding record instead of panic (Iurii Krasnoshchok)
+
+## Changes
+
+* Align sslmode "require" more closely to libpq (Johan Brandhorst)
+
 # 3.0.1 (August 12, 2017)
 
 ## Fixes
