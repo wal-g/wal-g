@@ -34,7 +34,7 @@ Configuration
 
 To connect to Amazon S3, WAL-G requires that these variables be set:
 
-* `WALE_S3_PREFIX` (eg. `s3://bucket/path/to/folder`)
+* `WALG_S3_PREFIX` (eg. `s3://bucket/path/to/folder`) (alternative form `WALE_S3_PREFIX`)
 
 WAL-G determines AWS credentials [like other AWS tools](http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#config-settings-and-precedence). You can set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (optionally with `AWS_SECURITY_TOKEN`), or `~/.aws/credentials` (optionally with `AWS_PROFILE`), or you can set nothing to automatically fetch credentials from the EC2 metadata service.
 
@@ -101,7 +101,7 @@ To enable S3 server-side encryption, set to the algorithm to use when storing th
 
 If using S3 server-side encryption with `aws:kms`, the KMS Key ID to use for object encryption.
 
-* `WALE_GPG_KEY_ID`
+* `WALG_GPG_KEY_ID`  (alternative form `WALE_GPG_KEY_ID`)
 
 To configure GPG key for encryption and decryption. By default, no encryption is used. Public keyring is cached in the file "/.walg_key_cache".
 

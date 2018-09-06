@@ -8,7 +8,7 @@ services:
             - "MINIO_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE"
             - "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
         entrypoint: sh
-        command: -c 'mkdir -p /export/testbucket && /usr/bin/minio server /export'
+        command: -c 'mkdir -p /export/fullbucket && mkdir -p /export/fullscandeltabucket && mkdir -p /export/waldeltabucket && /usr/bin/minio server /export'
     pg:
         build: ./docker/pg
         env_file:

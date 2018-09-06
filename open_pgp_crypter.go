@@ -7,44 +7,47 @@ import (
 	"io"
 )
 
+// ErrCrypterUseMischief happens when crypter is used before initialization
+var ErrCrypterUseMischief = errors.New("Crypter is not checked before use")
+
 // OpenPGPCrypter incapsulates specific of cypher method
 // Includes keys, infrastructutre information etc
 // If many encryption methods will be used it worth
 // to extract interface
 type OpenPGPCrypter struct {
-	configured, armed bool
-	keyRingId         string
+	Configured bool
+	KeyRingId  string
 
-	pubKey    openpgp.EntityList
-	secretKey openpgp.EntityList
+	PubKey    openpgp.EntityList
+	SecretKey openpgp.EntityList
+}
+
+func (crypter *OpenPGPCrypter) IsArmed() bool {
+	return len(crypter.KeyRingId) != 0
 }
 
 // IsUsed is to check necessity of Crypter use
 // Must be called prior to any other crypter call
 func (crypter *OpenPGPCrypter) IsUsed() bool {
-	if !crypter.configured {
+	if !crypter.Configured {
 		crypter.ConfigureGPGCrypter()
 	}
-	return crypter.armed
+	return crypter.IsArmed()
 }
 
 // ConfigureGPGCrypter is OpenPGPCrypter internal initialization
 func (crypter *OpenPGPCrypter) ConfigureGPGCrypter() {
-	crypter.configured = true
-	crypter.keyRingId = GetKeyRingId()
-	crypter.armed = len(crypter.keyRingId) != 0
+	crypter.Configured = true
+	crypter.KeyRingId = GetKeyRingId()
 }
-
-// ErrCrypterUseMischief happens when crypter is used before initialization
-var ErrCrypterUseMischief = errors.New("Crypter is not checked before use")
 
 // Encrypt creates encryption writer from ordinary writer
 func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, error) {
-	if !crypter.configured {
+	if !crypter.Configured {
 		return nil, ErrCrypterUseMischief
 	}
-	if crypter.pubKey == nil {
-		armour, err := getPubRingArmour(crypter.keyRingId)
+	if crypter.PubKey == nil {
+		armour, err := getPubRingArmour(crypter.KeyRingId)
 		if err != nil {
 			return nil, err
 		}
@@ -53,19 +56,19 @@ func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, e
 		if err != nil {
 			return nil, err
 		}
-		crypter.pubKey = entitylist
+		crypter.PubKey = entitylist
 	}
 
-	return &DelayWriteCloser{writer, crypter.pubKey, nil}, nil
+	return &DelayWriteCloser{writer, crypter.PubKey, nil}, nil
 }
 
 // Decrypt creates decrypted reader from ordinary reader
 func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) {
-	if !crypter.configured {
+	if !crypter.Configured {
 		return nil, ErrCrypterUseMischief
 	}
-	if crypter.secretKey == nil {
-		armour, err := getSecretRingArmour(crypter.keyRingId)
+	if crypter.SecretKey == nil {
+		armour, err := getSecretRingArmour(crypter.KeyRingId)
 		if err != nil {
 			return nil, err
 		}
@@ -74,10 +77,10 @@ func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) 
 		if err != nil {
 			return nil, err
 		}
-		crypter.secretKey = entitylist
+		crypter.SecretKey = entitylist
 	}
 
-	var md, err0 = openpgp.ReadMessage(reader, crypter.secretKey, nil, nil)
+	var md, err0 = openpgp.ReadMessage(reader, crypter.SecretKey, nil, nil)
 	if err0 != nil {
 		return nil, err0
 	}

@@ -4,15 +4,18 @@ import (
 	"context"
 	"crypto/md5"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -41,10 +44,11 @@ var minimalConnInfo *pgtype.ConnInfo
 func init() {
 	minimalConnInfo = pgtype.NewConnInfo()
 	minimalConnInfo.InitializeDataTypes(map[string]pgtype.OID{
-		"int4": pgtype.Int4OID,
-		"name": pgtype.NameOID,
-		"oid":  pgtype.OIDOID,
-		"text": pgtype.TextOID,
+		"int4":    pgtype.Int4OID,
+		"name":    pgtype.NameOID,
+		"oid":     pgtype.OIDOID,
+		"text":    pgtype.TextOID,
+		"varchar": pgtype.VarcharOID,
 	})
 }
 
@@ -71,8 +75,20 @@ type ConnConfig struct {
 	Logger            Logger
 	LogLevel          int
 	Dial              DialFunc
-	RuntimeParams     map[string]string // Run-time parameters to set on connection as session default values (e.g. search_path or application_name)
-	OnNotice          NoticeHandler     // Callback function called when a notice response is received.
+	RuntimeParams     map[string]string                     // Run-time parameters to set on connection as session default values (e.g. search_path or application_name)
+	OnNotice          NoticeHandler                         // Callback function called when a notice response is received.
+	CustomConnInfo    func(*Conn) (*pgtype.ConnInfo, error) // Callback function to implement connection strategies for different backends. crate, pgbouncer, pgpool, etc.
+
+	// PreferSimpleProtocol disables implicit prepared statement usage. By default
+	// pgx automatically uses the unnamed prepared statement for Query and
+	// QueryRow. It also uses a prepared statement when Exec has arguments. This
+	// can improve performance due to being able to use the binary format. It also
+	// does not rely on client side parameter sanitization. However, it does incur
+	// two round-trips per query and may be incompatible proxies such as
+	// PGBouncer. Setting PreferSimpleProtocol causes the simple protocol to be
+	// used by default. The same functionality can be controlled on a per query
+	// basis by setting QueryExOptions.SimpleProtocol.
+	PreferSimpleProtocol bool
 }
 
 func (cc *ConnConfig) networkAddress() (network, address string) {
@@ -190,7 +206,7 @@ var ErrDeadConn = errors.New("conn is dead")
 var ErrTLSRefused = errors.New("server refused TLS connection")
 
 // ErrConnBusy occurs when the connection is busy (for example, in the middle of
-// reading query results) and another action is attempts.
+// reading query results) and another action is attempted.
 var ErrConnBusy = errors.New("conn is busy")
 
 // ErrInvalidLogLevel occurs on attempt to set an invalid log level.
@@ -208,6 +224,10 @@ func (e ProtocolError) Error() string {
 // Other config fields are optional.
 func Connect(config ConnConfig) (c *Conn, err error) {
 	return connect(config, minimalConnInfo)
+}
+
+func defaultDialer() *net.Dialer {
+	return &net.Dialer{KeepAlive: 5 * time.Minute}
 }
 
 func connect(config ConnConfig, connInfo *pgtype.ConnInfo) (c *Conn, err error) {
@@ -246,7 +266,8 @@ func connect(config ConnConfig, connInfo *pgtype.ConnInfo) (c *Conn, err error) 
 
 	network, address := c.config.networkAddress()
 	if c.config.Dial == nil {
-		c.config.Dial = (&net.Dialer{KeepAlive: 5 * time.Minute}).Dial
+		d := defaultDialer()
+		c.config.Dial = d.Dial
 	}
 
 	if c.shouldLog(LogLevelInfo) {
@@ -381,16 +402,74 @@ func (c *Conn) connect(config ConnConfig, network, address string, tlsConfig *tl
 	}
 }
 
-func (c *Conn) initConnInfo() error {
-	nameOIDs := make(map[string]pgtype.OID, 256)
-
-	rows, err := c.Query(`select t.oid, t.typname
+func initPostgresql(c *Conn) (*pgtype.ConnInfo, error) {
+	const (
+		namedOIDQuery = `select t.oid,
+	case when nsp.nspname in ('pg_catalog', 'public') then t.typname
+		else nsp.nspname||'.'||t.typname
+	end
 from pg_type t
 left join pg_type base_type on t.typelem=base_type.oid
+left join pg_namespace nsp on t.typnamespace=nsp.oid
 where (
 	  t.typtype in('b', 'p', 'r', 'e')
 	  and (base_type.oid is null or base_type.typtype in('b', 'p', 'r'))
-	)`)
+	)`
+	)
+
+	nameOIDs, err := connInfoFromRows(c.Query(namedOIDQuery))
+	if err != nil {
+		return nil, err
+	}
+
+	cinfo := pgtype.NewConnInfo()
+	cinfo.InitializeDataTypes(nameOIDs)
+
+	if err = c.initConnInfoEnumArray(cinfo); err != nil {
+		return nil, err
+	}
+
+	if err = c.initConnInfoDomains(cinfo); err != nil {
+		return nil, err
+	}
+
+	return cinfo, nil
+}
+
+func (c *Conn) initConnInfo() (err error) {
+	var (
+		connInfo *pgtype.ConnInfo
+	)
+
+	if c.config.CustomConnInfo != nil {
+		if c.ConnInfo, err = c.config.CustomConnInfo(c); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if connInfo, err = initPostgresql(c); err == nil {
+		c.ConnInfo = connInfo
+		return err
+	}
+
+	// Check if CrateDB specific approach might still allow us to connect.
+	if connInfo, err = c.crateDBTypesQuery(err); err == nil {
+		c.ConnInfo = connInfo
+	}
+
+	return err
+}
+
+// initConnInfoEnumArray introspects for arrays of enums and registers a data type for them.
+func (c *Conn) initConnInfoEnumArray(cinfo *pgtype.ConnInfo) error {
+	nameOIDs := make(map[string]pgtype.OID, 16)
+	rows, err := c.Query(`select t.oid, t.typname
+from pg_type t
+  join pg_type base_type on t.typelem=base_type.oid
+where t.typtype = 'b'
+  and base_type.typtype = 'e'`)
 	if err != nil {
 		return err
 	}
@@ -409,9 +488,131 @@ where (
 		return rows.Err()
 	}
 
-	c.ConnInfo = pgtype.NewConnInfo()
-	c.ConnInfo.InitializeDataTypes(nameOIDs)
+	for name, oid := range nameOIDs {
+		cinfo.RegisterDataType(pgtype.DataType{
+			Value: &pgtype.EnumArray{},
+			Name:  name,
+			OID:   oid,
+		})
+	}
+
 	return nil
+}
+
+// initConnInfoDomains introspects for domains and registers a data type for them.
+func (c *Conn) initConnInfoDomains(cinfo *pgtype.ConnInfo) error {
+	type domain struct {
+		oid     pgtype.OID
+		name    pgtype.Text
+		baseOID pgtype.OID
+	}
+
+	domains := make([]*domain, 0, 16)
+
+	rows, err := c.Query(`select t.oid, t.typname, t.typbasetype
+from pg_type t
+  join pg_type base_type on t.typbasetype=base_type.oid
+where t.typtype = 'd'
+  and base_type.typtype = 'b'`)
+	if err != nil {
+		return err
+	}
+
+	for rows.Next() {
+		var d domain
+		if err := rows.Scan(&d.oid, &d.name, &d.baseOID); err != nil {
+			return err
+		}
+
+		domains = append(domains, &d)
+	}
+
+	if rows.Err() != nil {
+		return rows.Err()
+	}
+
+	for _, d := range domains {
+		baseDataType, ok := cinfo.DataTypeForOID(d.baseOID)
+		if ok {
+			cinfo.RegisterDataType(pgtype.DataType{
+				Value: reflect.New(reflect.ValueOf(baseDataType.Value).Elem().Type()).Interface().(pgtype.Value),
+				Name:  d.name.String,
+				OID:   d.oid,
+			})
+		}
+	}
+
+	return nil
+}
+
+// crateDBTypesQuery checks if the given err is likely to be the result of
+// CrateDB not implementing the pg_types table correctly. If yes, a CrateDB
+// specific query against pg_types is executed and its results are returned. If
+// not, the original error is returned.
+func (c *Conn) crateDBTypesQuery(err error) (*pgtype.ConnInfo, error) {
+	// CrateDB 2.1.6 is a database that implements the PostgreSQL wire protocol,
+	// but not perfectly. In particular, the pg_catalog schema containing the
+	// pg_type table is not visible by default and the pg_type.typtype column is
+	// not implemented. Therefor the query above currently returns the following
+	// error:
+	//
+	//   pgx.PgError{Severity:"ERROR", Code:"XX000",
+	//   Message:"TableUnknownException: Table 'test.pg_type' unknown",
+	//   Detail:"", Hint:"", Position:0, InternalPosition:0, InternalQuery:"",
+	//   Where:"", SchemaName:"", TableName:"", ColumnName:"", DataTypeName:"",
+	//   ConstraintName:"", File:"Schemas.java", Line:99, Routine:"getTableInfo"}
+	//
+	// If CrateDB was to fix the pg_type table visbility in the future, we'd
+	// still get this error until typtype column is implemented:
+	//
+	//   pgx.PgError{Severity:"ERROR", Code:"XX000",
+	//   Message:"ColumnUnknownException: Column typtype unknown", Detail:"",
+	//   Hint:"", Position:0, InternalPosition:0, InternalQuery:"", Where:"",
+	//   SchemaName:"", TableName:"", ColumnName:"", DataTypeName:"",
+	//   ConstraintName:"", File:"FullQualifiedNameFieldProvider.java", Line:132,
+	//
+	// Additionally CrateDB doesn't implement Postgres error codes [2], and
+	// instead always returns "XX000" (internal_error). The code below uses all
+	// of this knowledge as a heuristic to detect CrateDB. If CrateDB is
+	// detected, a CrateDB specific pg_type query is executed instead.
+	//
+	// The heuristic is designed to still work even if CrateDB fixes [2] or
+	// renames its internal exception names. If both are changed but pg_types
+	// isn't fixed, this code will need to be changed.
+	//
+	// There is also a small chance the heuristic will yield a false positive for
+	// non-CrateDB databases (e.g. if a real Postgres instance returns a XX000
+	// error), but hopefully there will be no harm in attempting the alternative
+	// query in this case.
+	//
+	// CrateDB also uses the type varchar for the typname column which required
+	// adding varchar to the minimalConnInfo init code.
+	//
+	// Also see the discussion here [3].
+	//
+	// [1] https://crate.io/
+	// [2] https://github.com/crate/crate/issues/5027
+	// [3] https://github.com/jackc/pgx/issues/320
+
+	if pgErr, ok := err.(PgError); ok &&
+		(pgErr.Code == "XX000" ||
+			strings.Contains(pgErr.Message, "TableUnknownException") ||
+			strings.Contains(pgErr.Message, "ColumnUnknownException")) {
+		var (
+			nameOIDs map[string]pgtype.OID
+		)
+
+		if nameOIDs, err = connInfoFromRows(c.Query(`select oid, typname from pg_catalog.pg_type`)); err != nil {
+			return nil, err
+		}
+
+		cinfo := pgtype.NewConnInfo()
+		cinfo.InitializeDataTypes(nameOIDs)
+
+		return cinfo, err
+	}
+
+	return nil, err
 }
 
 // PID returns the backend PID for this connection.
@@ -505,6 +706,8 @@ func (old ConnConfig) Merge(other ConnConfig) ConnConfig {
 		cc.Dial = other.Dial
 	}
 
+	cc.PreferSimpleProtocol = other.PreferSimpleProtocol
+
 	cc.RuntimeParams = make(map[string]string)
 	for k, v := range old.RuntimeParams {
 		cc.RuntimeParams[k] = v
@@ -543,13 +746,33 @@ func ParseURI(uri string) (ConnConfig, error) {
 	}
 	cp.Database = strings.TrimLeft(url.Path, "/")
 
-	err = configSSL(url.Query().Get("sslmode"), &cp)
+	if pgtimeout := url.Query().Get("connect_timeout"); pgtimeout != "" {
+		timeout, err := strconv.ParseInt(pgtimeout, 10, 64)
+		if err != nil {
+			return cp, err
+		}
+		d := defaultDialer()
+		d.Timeout = time.Duration(timeout) * time.Second
+		cp.Dial = d.Dial
+	}
+
+	tlsArgs := configTLSArgs{
+		sslCert:     url.Query().Get("sslcert"),
+		sslKey:      url.Query().Get("sslkey"),
+		sslMode:     url.Query().Get("sslmode"),
+		sslRootCert: url.Query().Get("sslrootcert"),
+	}
+	err = configTLS(tlsArgs, &cp)
 	if err != nil {
 		return cp, err
 	}
 
 	ignoreKeys := map[string]struct{}{
-		"sslmode": {},
+		"connect_timeout": {},
+		"sslcert":         {},
+		"sslkey":          {},
+		"sslmode":         {},
+		"sslrootcert":     {},
 	}
 
 	cp.RuntimeParams = make(map[string]string)
@@ -585,7 +808,7 @@ func ParseDSN(s string) (ConnConfig, error) {
 
 	m := dsnRegexp.FindAllStringSubmatch(s, -1)
 
-	var sslmode string
+	tlsArgs := configTLSArgs{}
 
 	cp.RuntimeParams = make(map[string]string)
 
@@ -606,13 +829,27 @@ func ParseDSN(s string) (ConnConfig, error) {
 		case "dbname":
 			cp.Database = b[2]
 		case "sslmode":
-			sslmode = b[2]
+			tlsArgs.sslMode = b[2]
+		case "sslrootcert":
+			tlsArgs.sslRootCert = b[2]
+		case "sslcert":
+			tlsArgs.sslCert = b[2]
+		case "sslkey":
+			tlsArgs.sslKey = b[2]
+		case "connect_timeout":
+			timeout, err := strconv.ParseInt(b[2], 10, 64)
+			if err != nil {
+				return cp, err
+			}
+			d := defaultDialer()
+			d.Timeout = time.Duration(timeout) * time.Second
+			cp.Dial = d.Dial
 		default:
 			cp.RuntimeParams[b[1]] = b[2]
 		}
 	}
 
-	err := configSSL(sslmode, &cp)
+	err := configTLS(tlsArgs, &cp)
 	if err != nil {
 		return cp, err
 	}
@@ -625,7 +862,7 @@ func ParseDSN(s string) (ConnConfig, error) {
 // ParseConnectionString parses either a URI or a DSN connection string.
 // see ParseURI and ParseDSN for details.
 func ParseConnectionString(s string) (ConnConfig, error) {
-	if strings.HasPrefix(s, "postgres://") || strings.HasPrefix(s, "postgresql://") {
+	if u, err := url.Parse(s); err == nil && u.Scheme != "" {
 		return ParseURI(s)
 	}
 	return ParseDSN(s)
@@ -643,7 +880,11 @@ func ParseConnectionString(s string) (ConnConfig, error) {
 // PGUSER
 // PGPASSWORD
 // PGSSLMODE
+// PGSSLCERT
+// PGSSLKEY
+// PGSSLROOTCERT
 // PGAPPNAME
+// PGCONNECT_TIMEOUT
 //
 // Important TLS Security Notes:
 // ParseEnvLibpq tries to match libpq behavior with regard to PGSSLMODE. This
@@ -652,10 +893,10 @@ func ParseConnectionString(s string) (ConnConfig, error) {
 // See http://www.postgresql.org/docs/9.4/static/libpq-ssl.html#LIBPQ-SSL-PROTECTION
 // for details on what level of security each sslmode provides.
 //
-// "require" and "verify-ca" modes currently are treated as "verify-full". e.g.
-// They have stronger security guarantees than they would with libpq. Do not
-// rely on this behavior as it may be possible to match libpq in the future. If
-// you need full security use "verify-full".
+// "verify-ca" mode currently is treated as "verify-full". e.g. It has stronger
+// security guarantees than it would with libpq. Do not rely on this behavior as it
+// may be possible to match libpq in the future. If you need full security use
+// "verify-full".
 //
 // Several of the PGSSLMODE options (including the default behavior of "prefer")
 // will set UseFallbackTLS to true and FallbackTLSConfig to a disabled or
@@ -679,9 +920,24 @@ func ParseEnvLibpq() (ConnConfig, error) {
 	cc.User = os.Getenv("PGUSER")
 	cc.Password = os.Getenv("PGPASSWORD")
 
-	sslmode := os.Getenv("PGSSLMODE")
+	if pgtimeout := os.Getenv("PGCONNECT_TIMEOUT"); pgtimeout != "" {
+		if timeout, err := strconv.ParseInt(pgtimeout, 10, 64); err == nil {
+			d := defaultDialer()
+			d.Timeout = time.Duration(timeout) * time.Second
+			cc.Dial = d.Dial
+		} else {
+			return cc, err
+		}
+	}
 
-	err := configSSL(sslmode, &cc)
+	tlsArgs := configTLSArgs{
+		sslMode:     os.Getenv("PGSSLMODE"),
+		sslKey:      os.Getenv("PGSSLKEY"),
+		sslCert:     os.Getenv("PGSSLCERT"),
+		sslRootCert: os.Getenv("PGSSLROOTCERT"),
+	}
+
+	err := configTLS(tlsArgs, &cc)
 	if err != nil {
 		return cc, err
 	}
@@ -696,14 +952,27 @@ func ParseEnvLibpq() (ConnConfig, error) {
 	return cc, nil
 }
 
-func configSSL(sslmode string, cc *ConnConfig) error {
+type configTLSArgs struct {
+	sslMode     string
+	sslRootCert string
+	sslCert     string
+	sslKey      string
+}
+
+// configTLS uses lib/pq's TLS parameters to reconstruct a coherent tls.Config.
+// Inputs are parsed out and provided by ParseDSN() or ParseURI().
+func configTLS(args configTLSArgs, cc *ConnConfig) error {
 	// Match libpq default behavior
-	if sslmode == "" {
-		sslmode = "prefer"
+	if args.sslMode == "" {
+		args.sslMode = "prefer"
 	}
 
-	switch sslmode {
+	switch args.sslMode {
 	case "disable":
+		cc.UseFallbackTLS = false
+		cc.TLSConfig = nil
+		cc.FallbackTLSConfig = nil
+		return nil
 	case "allow":
 		cc.UseFallbackTLS = true
 		cc.FallbackTLSConfig = &tls.Config{InsecureSkipVerify: true}
@@ -711,12 +980,47 @@ func configSSL(sslmode string, cc *ConnConfig) error {
 		cc.TLSConfig = &tls.Config{InsecureSkipVerify: true}
 		cc.UseFallbackTLS = true
 		cc.FallbackTLSConfig = nil
-	case "require", "verify-ca", "verify-full":
+	case "require":
+		cc.TLSConfig = &tls.Config{InsecureSkipVerify: true}
+	case "verify-ca", "verify-full":
 		cc.TLSConfig = &tls.Config{
 			ServerName: cc.Host,
 		}
 	default:
 		return errors.New("sslmode is invalid")
+	}
+
+	if args.sslRootCert != "" {
+		caCertPool := x509.NewCertPool()
+
+		caPath := args.sslRootCert
+		caCert, err := ioutil.ReadFile(caPath)
+		if err != nil {
+			return errors.Wrapf(err, "unable to read CA file %q", caPath)
+		}
+
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			return errors.Wrap(err, "unable to add CA to cert pool")
+		}
+
+		cc.TLSConfig.RootCAs = caCertPool
+		cc.TLSConfig.ClientCAs = caCertPool
+	}
+
+	sslcert := args.sslCert
+	sslkey := args.sslKey
+
+	if (sslcert != "" && sslkey == "") || (sslcert == "" && sslkey != "") {
+		return fmt.Errorf(`both "sslcert" and "sslkey" are required`)
+	}
+
+	if sslcert != "" && sslkey != "" {
+		cert, err := tls.LoadX509KeyPair(sslcert, sslkey)
+		if err != nil {
+			return errors.Wrap(err, "unable to read cert")
+		}
+
+		cc.TLSConfig.Certificates = []tls.Certificate{cert}
 	}
 
 	return nil
@@ -1452,12 +1756,16 @@ func (c *Conn) execEx(ctx context.Context, sql string, options *QueryExOptions, 
 		err = c.termContext(err)
 	}()
 
-	if options != nil && options.SimpleProtocol {
+	if (options == nil && c.config.PreferSimpleProtocol) || (options != nil && options.SimpleProtocol) {
 		err = c.sanitizeAndSendSimpleQuery(sql, arguments...)
 		if err != nil {
 			return "", err
 		}
 	} else if options != nil && len(options.ParameterOIDs) > 0 {
+		if err := c.ensureConnectionReadyForQuery(); err != nil {
+			return "", err
+		}
+
 		buf, err := c.buildOneRoundTripExec(c.wbuf, sql, options, arguments)
 		if err != nil {
 			return "", err
@@ -1625,4 +1933,28 @@ func (c *Conn) ensureConnectionReadyForQuery() error {
 	}
 
 	return nil
+}
+
+func connInfoFromRows(rows *Rows, err error) (map[string]pgtype.OID, error) {
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	nameOIDs := make(map[string]pgtype.OID, 256)
+	for rows.Next() {
+		var oid pgtype.OID
+		var name pgtype.Text
+		if err = rows.Scan(&oid, &name); err != nil {
+			return nil, err
+		}
+
+		nameOIDs[name.String] = oid
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return nameOIDs, err
 }

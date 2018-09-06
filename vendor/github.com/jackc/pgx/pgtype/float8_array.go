@@ -15,6 +15,12 @@ type Float8Array struct {
 }
 
 func (dst *Float8Array) Set(src interface{}) error {
+	// untyped nil and typed nil interfaces are different
+	if src == nil {
+		*dst = Float8Array{Status: Null}
+		return nil
+	}
+
 	switch value := src.(type) {
 
 	case []float64:
@@ -40,7 +46,7 @@ func (dst *Float8Array) Set(src interface{}) error {
 		if originalSrc, ok := underlyingSliceType(src); ok {
 			return dst.Set(originalSrc)
 		}
-		return errors.Errorf("cannot convert %v to Float8", value)
+		return errors.Errorf("cannot convert %v to Float8Array", value)
 	}
 
 	return nil
@@ -80,7 +86,7 @@ func (src *Float8Array) AssignTo(dst interface{}) error {
 		return NullAssignTo(dst)
 	}
 
-	return errors.Errorf("cannot decode %v into %T", src, dst)
+	return errors.Errorf("cannot decode %#v into %T", src, dst)
 }
 
 func (dst *Float8Array) DecodeText(ci *ConnInfo, src []byte) error {

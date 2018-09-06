@@ -15,6 +15,12 @@ type NumericArray struct {
 }
 
 func (dst *NumericArray) Set(src interface{}) error {
+	// untyped nil and typed nil interfaces are different
+	if src == nil {
+		*dst = NumericArray{Status: Null}
+		return nil
+	}
+
 	switch value := src.(type) {
 
 	case []float32:
@@ -55,11 +61,49 @@ func (dst *NumericArray) Set(src interface{}) error {
 			}
 		}
 
+	case []int64:
+		if value == nil {
+			*dst = NumericArray{Status: Null}
+		} else if len(value) == 0 {
+			*dst = NumericArray{Status: Present}
+		} else {
+			elements := make([]Numeric, len(value))
+			for i := range value {
+				if err := elements[i].Set(value[i]); err != nil {
+					return err
+				}
+			}
+			*dst = NumericArray{
+				Elements:   elements,
+				Dimensions: []ArrayDimension{{Length: int32(len(elements)), LowerBound: 1}},
+				Status:     Present,
+			}
+		}
+
+	case []uint64:
+		if value == nil {
+			*dst = NumericArray{Status: Null}
+		} else if len(value) == 0 {
+			*dst = NumericArray{Status: Present}
+		} else {
+			elements := make([]Numeric, len(value))
+			for i := range value {
+				if err := elements[i].Set(value[i]); err != nil {
+					return err
+				}
+			}
+			*dst = NumericArray{
+				Elements:   elements,
+				Dimensions: []ArrayDimension{{Length: int32(len(elements)), LowerBound: 1}},
+				Status:     Present,
+			}
+		}
+
 	default:
 		if originalSrc, ok := underlyingSliceType(src); ok {
 			return dst.Set(originalSrc)
 		}
-		return errors.Errorf("cannot convert %v to Numeric", value)
+		return errors.Errorf("cannot convert %v to NumericArray", value)
 	}
 
 	return nil
@@ -99,6 +143,24 @@ func (src *NumericArray) AssignTo(dst interface{}) error {
 			}
 			return nil
 
+		case *[]int64:
+			*v = make([]int64, len(src.Elements))
+			for i := range src.Elements {
+				if err := src.Elements[i].AssignTo(&((*v)[i])); err != nil {
+					return err
+				}
+			}
+			return nil
+
+		case *[]uint64:
+			*v = make([]uint64, len(src.Elements))
+			for i := range src.Elements {
+				if err := src.Elements[i].AssignTo(&((*v)[i])); err != nil {
+					return err
+				}
+			}
+			return nil
+
 		default:
 			if nextDst, retry := GetAssignToDstType(dst); retry {
 				return src.AssignTo(nextDst)
@@ -108,7 +170,7 @@ func (src *NumericArray) AssignTo(dst interface{}) error {
 		return NullAssignTo(dst)
 	}
 
-	return errors.Errorf("cannot decode %v into %T", src, dst)
+	return errors.Errorf("cannot decode %#v into %T", src, dst)
 }
 
 func (dst *NumericArray) DecodeText(ci *ConnInfo, src []byte) error {

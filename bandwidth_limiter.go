@@ -12,28 +12,28 @@ type LimitedReader struct {
 	limiter *rate.Limiter
 }
 
-var diskLimiter *rate.Limiter
-var networkLimiter *rate.Limiter
+var DiskLimiter *rate.Limiter
+var NetworkLimiter *rate.Limiter
 
 // NewNetworkLimitReader returns a reader that is rate limited by network limiter
 func NewNetworkLimitReader(r io.ReadCloser) io.ReadCloser {
-	if networkLimiter == nil {
+	if NetworkLimiter == nil {
 		return r
 	}
 	return &LimitedReader{
 		r:       r,
-		limiter: networkLimiter,
+		limiter: NetworkLimiter,
 	}
 }
 
 // NewDiskLimitReader returns a reader that is rate limited by disk limiter
 func NewDiskLimitReader(r io.ReadCloser) io.ReadCloser {
-	if diskLimiter == nil {
+	if DiskLimiter == nil {
 		return r
 	}
 	return &LimitedReader{
 		r:       r,
-		limiter: diskLimiter,
+		limiter: DiskLimiter,
 	}
 }
 

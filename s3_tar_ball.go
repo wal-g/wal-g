@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
 	"io"
 	"log"
@@ -15,17 +13,12 @@ import (
 // S3TarBall represents a tar file that is
 // going to be uploaded to S3.
 type S3TarBall struct {
-	trim             string
-	backupName       string
-	partCount        int
-	size             int64
-	writeCloser      io.WriteCloser
-	tarWriter        *tar.Writer
-	tarUploader      *TarUploader
-	Lsn              *uint64
-	IncrementFromLsn *uint64
-	IncrementFrom    string
-	Files            BackupFileList
+	backupName  string
+	partNumber  int
+	size        int64
+	writeCloser io.Closer
+	tarWriter   *tar.Writer
+	uploader    *Uploader
 }
 
 // SetUp creates a new tar writer and starts upload to S3.
@@ -38,9 +31,9 @@ func (tarBall *S3TarBall) SetUp(crypter Crypter, names ...string) {
 		if len(names) > 0 {
 			name = names[0]
 		} else {
-			name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partCount, tarBall.FileExtension())
+			name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partNumber, tarBall.uploader.compressor.FileExtension())
 		}
-		writeCloser := tarBall.StartUpload(name, crypter)
+		writeCloser := tarBall.startUpload(name, crypter)
 
 		tarBall.writeCloser = writeCloser
 		tarBall.tarWriter = tar.NewWriter(writeCloser)
@@ -59,32 +52,34 @@ func (tarBall *S3TarBall) CloseTar() error {
 	if err != nil {
 		return errors.Wrap(err, "CloseTar: failed to close underlying writer")
 	}
-	fmt.Printf("Finished writing part %d.\n", tarBall.partCount)
+	fmt.Printf("Finished writing part %d.\n", tarBall.partNumber)
 	return nil
 }
+
 func (tarBall *S3TarBall) AwaitUploads() {
-	tarBall.tarUploader.waitGroup.Wait()
-	if !tarBall.tarUploader.Success {
+	tarBall.uploader.waitGroup.Wait()
+	if !tarBall.uploader.Success {
 		log.Fatal("Unable to complete uploads")
 	}
 }
 
-// StartUpload creates a compressing writer and runs upload in the background once
+// TODO : unit tests
+// startUpload creates a compressing writer and runs upload in the background once
 // a compressed tar member is finished writing.
-func (tarBall *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteCloser {
+func (tarBall *S3TarBall) startUpload(name string, crypter Crypter) io.WriteCloser {
 	pipeReader, pipeWriter := io.Pipe()
-	tarUploader := tarBall.tarUploader
+	uploader := tarBall.uploader
 
-	path := tarUploader.server + BaseBackupsPath + tarBall.backupName + "/tar_partitions/" + name
-	input := tarUploader.createUploadInput(path, NewNetworkLimitReader(pipeReader))
+	path := GetBackupPath(uploader.uploadingFolder) + tarBall.backupName + "/tar_partitions/" + name
+	input := uploader.CreateUploadInput(path, NewNetworkLimitReader(pipeReader))
 
-	fmt.Printf("Starting part %d ...\n", tarBall.partCount)
+	fmt.Printf("Starting part %d ...\n", tarBall.partNumber)
 
-	tarUploader.waitGroup.Add(1)
+	uploader.waitGroup.Add(1)
 	go func() {
-		defer tarUploader.waitGroup.Done()
+		defer uploader.waitGroup.Done()
 
-		err := tarUploader.upload(input, path)
+		err := uploader.upload(input, path)
 		if compressingError, ok := err.(CompressingPipeWriterError); ok {
 			log.Printf("FATAL: could not upload '%s' due to compression error\n%+v\n", path, compressingError)
 		}
@@ -101,14 +96,11 @@ func (tarBall *S3TarBall) StartUpload(name string, crypter Crypter) io.WriteClos
 			log.Fatal("upload: encryption error ", err)
 		}
 
-		return &CascadeWriteCloser{tarUploader.compressor.NewWriter(encryptedWriter), &CascadeWriteCloser{encryptedWriter, pipeWriter}}
+		return &CascadeWriteCloser{uploader.compressor.NewWriter(encryptedWriter), &CascadeWriteCloser{encryptedWriter, pipeWriter}}
 	}
 
-	return &CascadeWriteCloser{tarUploader.compressor.NewWriter(pipeWriter), pipeWriter}
+	return &CascadeWriteCloser{uploader.compressor.NewWriter(pipeWriter), pipeWriter}
 }
-
-// Trim suffix
-func (tarBall *S3TarBall) Trim() string { return tarBall.trim }
 
 // Size accumulated in this tarball
 func (tarBall *S3TarBall) Size() int64 { return tarBall.size }
@@ -118,66 +110,41 @@ func (tarBall *S3TarBall) AddSize(i int64) { tarBall.size += i }
 
 func (tarBall *S3TarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
 
-func (tarBall *S3TarBall) FileExtension() string {
-	return tarBall.tarUploader.compressor.FileExtension()
-}
-
 // Finish writes a .json file description and uploads it with the
 // the backup name. Finish will wait until all tar file parts
 // have been uploaded. The json file will only be uploaded
 // if all other parts of the backup are present in S3.
 // an alert is given with the corresponding error.
 func (tarBall *S3TarBall) Finish(sentinelDto *S3TarBallSentinelDto) error {
+	name := tarBall.backupName + SentinelSuffix
+	uploader := tarBall.uploader
+
+	uploader.finish()
+
 	var err error
-	name := tarBall.backupName + "_backup_stop_sentinel.json"
-	tarUploader := tarBall.tarUploader
-
-	tarUploader.Finish()
-
 	//If other parts are successful in uploading, upload json file.
-	if tarUploader.Success && sentinelDto != nil {
+	if uploader.Success && sentinelDto != nil {
 		sentinelDto.UserData = GetSentinelUserData()
 		dtoBody, err := json.Marshal(*sentinelDto)
 		if err != nil {
 			return err
 		}
-		path := tarUploader.server + BaseBackupsPath + name
-		input := &s3manager.UploadInput{
-			Bucket:       aws.String(tarUploader.bucket),
-			Key:          aws.String(path),
-			Body:         bytes.NewReader(dtoBody),
-			StorageClass: aws.String(tarUploader.StorageClass),
+		path := GetBackupPath(uploader.uploadingFolder) + name
+		input := uploader.CreateUploadInput(path, bytes.NewReader(dtoBody))
+
+		uploadingErr := uploader.upload(input, path)
+		if uploadingErr != nil {
+			log.Printf("upload: could not upload '%s'\n", path)
+			log.Fatalf("S3TarBall finish: json failed to upload")
 		}
-
-		if tarUploader.ServerSideEncryption != "" {
-			input.ServerSideEncryption = aws.String(tarUploader.ServerSideEncryption)
-
-			if tarUploader.SSEKMSKeyId != "" {
-				// Only aws:kms implies sseKmsKeyId, checked during validation
-				input.SSEKMSKeyId = aws.String(tarUploader.SSEKMSKeyId)
-			}
-		}
-
-		tarUploader.waitGroup.Add(1)
-		go func() {
-			defer tarUploader.waitGroup.Done()
-
-			e := tarUploader.upload(input, path)
-			if e != nil {
-				log.Printf("upload: could not upload '%s'\n", path)
-				log.Fatalf("S3TarBall Finish: json failed to upload")
-			}
-		}()
-
-		tarUploader.Finish()
 	} else {
-		log.Printf("Uploaded %d compressed tar Files.\n", tarBall.partCount)
+		log.Printf("Uploaded %d compressed tar Files.\n", tarBall.partNumber)
 		log.Printf("Sentinel was not uploaded %v", name)
 		return errors.New("Sentinel was not uploaded due to timeline change during backup")
 	}
 
-	if err == nil && tarUploader.Success {
-		fmt.Printf("Uploaded %d compressed tar Files.\n", tarBall.partCount)
+	if err == nil && uploader.Success {
+		fmt.Printf("Uploaded %d compressed tar Files.\n", tarBall.partNumber)
 	}
 	return err
 }
