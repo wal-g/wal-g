@@ -512,7 +512,10 @@ func HandleWALFetch(pre *S3Prefix, walFileName string, location string, triggerP
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	DownloadAndDecompressWALFile(pre, walFileName, location)
+	err := DownloadAndDecompressWALFile(pre, walFileName, location)
+	if err != nil {
+		log.Fatalf("%+v\n", err)
+	}
 }
 
 func checkWALFileMagic(prefetched string) error {
@@ -563,11 +566,11 @@ func decompressWALFile(archiveReader io.ReadCloser, file io.WriteCloser, decompr
 }
 
 // DownloadAndDecompressWALFile downloads a file and writes it to local file
-func DownloadAndDecompressWALFile(pre *S3Prefix, walFileName string, dstLocation string) {
+func DownloadAndDecompressWALFile(pre *S3Prefix, walFileName string, dstLocation string) error {
 	for _, decompressor := range Decompressors {
 		archiveReader, exists, err := tryDownloadWALFile(pre, *pre.Server+WalPath+walFileName+"."+decompressor.FileExtension())
 		if err != nil {
-			log.Fatalf("%+v\n", err)
+			return err
 		}
 		if !exists {
 			continue
@@ -575,16 +578,16 @@ func DownloadAndDecompressWALFile(pre *S3Prefix, walFileName string, dstLocation
 
 		file, err := os.OpenFile(dstLocation, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
 		if err != nil {
-			log.Fatalf("%+v\n", err)
+			return err
 		}
 
 		err = decompressWALFile(archiveReader, file, decompressor)
 		if err != nil {
-			log.Fatalf("%+v\n", err)
+			return err
 		}
-		return
+		return nil
 	}
-	log.Fatalf("Archive '%s' does not exist.\n", walFileName)
+	return errors.New("Archive '%s' does not exist " + walFileName)
 }
 
 // HandleWALPush is invoked to perform wal-g wal-push
