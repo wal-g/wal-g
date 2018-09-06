@@ -18,12 +18,12 @@ const DeleteUsageText = "delete requires at least 2 parameters" + `
 
 // DeleteCommandArguments incapsulates arguments for delete command
 type DeleteCommandArguments struct {
-	full       bool
-	findFull   bool
-	retain     bool
-	before     bool
-	target     string
-	beforeTime *time.Time
+	Full       bool
+	FindFull   bool
+	Retain     bool
+	Before     bool
+	Target     string
+	BeforeTime *time.Time
 	dryrun     bool
 }
 
@@ -36,20 +36,20 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 
 	params := args[1:]
 	if params[0] == "retain" {
-		result.retain = true
+		result.Retain = true
 		params = params[1:]
 	} else if params[0] == "before" {
-		result.before = true
+		result.Before = true
 		params = params[1:]
 	} else {
 		fallBackFunc()
 		return
 	}
 	if params[0] == "FULL" {
-		result.full = true
+		result.Full = true
 		params = params[1:]
 	} else if params[0] == "FIND_FULL" {
-		result.findFull = true
+		result.FindFull = true
 		params = params[1:]
 	}
 	if len(params) < 1 {
@@ -58,13 +58,13 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 		return
 	}
 
-	result.target = params[0]
-	if t, err := time.Parse(time.RFC3339, result.target); err == nil {
+	result.Target = params[0]
+	if t, err := time.Parse(time.RFC3339, result.Target); err == nil {
 		if t.After(time.Now()) {
 			log.Println("Cannot delete before future date")
 			fallBackFunc()
 		}
-		result.beforeTime = &t
+		result.BeforeTime = &t
 	}
 	//if DeleteConfirmed && !DeleteDryrun  // TODO: use flag
 	result.dryrun = true
@@ -72,8 +72,8 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 		result.dryrun = false
 	}
 
-	if result.retain {
-		number, err := strconv.Atoi(result.target)
+	if result.Retain {
+		number, err := strconv.Atoi(result.Target)
 		if err != nil {
 			log.Println("Cannot parse target number ", number)
 			fallBackFunc()
@@ -88,18 +88,20 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 	return
 }
 
-func deleteBeforeTarget(target string, bk *Backup, pre *S3Prefix, findFull bool, backups []BackupTime, dryRun bool) {
-	dto := fetchSentinel(target, bk, pre)
-	if dto.IsIncremental() {
+// TODO : unit tests
+func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dryRun bool) {
+	folder := target.Folder
+	dto := target.fetchSentinel()
+	if dto.isIncremental() {
 		if findFull {
-			target = *dto.IncrementFullName
+			target.Name = *dto.IncrementFullName
 		} else {
-			log.Fatalf("%v is incemental and it's predecessors cannot be deleted. Consider FIND_FULL option.", target)
+			log.Fatalf("%v is incemental and it's predecessors cannot be deleted. Consider FIND_FULL option.", target.Name)
 		}
 	}
 	var err error
 	if backups == nil {
-		backups, err = bk.GetBackups()
+		backups, err = getBackups(folder)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -113,7 +115,7 @@ func deleteBeforeTarget(target string, bk *Backup, pre *S3Prefix, findFull bool,
 		} else {
 			log.Printf("%v will be deleted\n", b.Name)
 		}
-		if b.Name == target {
+		if b.Name == target.Name {
 			skip = false
 			skipLine = i
 		}
@@ -121,51 +123,50 @@ func deleteBeforeTarget(target string, bk *Backup, pre *S3Prefix, findFull bool,
 
 	if !dryRun {
 		if skipLine < len(backups)-1 {
-			deleteWALBefore(backups[skipLine], pre)
-			deleteBackupsBefore(backups, skipLine, pre)
+			deleteWALBefore(backups[skipLine], folder)
+			deleteBackupsBefore(backups, skipLine, folder)
 		}
 	} else {
 		log.Printf("Dry run finished.\n")
 	}
 }
 
-func deleteBackupsBefore(backups []BackupTime, skipline int, pre *S3Prefix) {
+// TODO : unit tests
+func deleteBackupsBefore(backups []BackupTime, skipline int, folder *S3Folder) {
 	for i, b := range backups {
 		if i > skipline {
-			dropBackup(pre, b)
+			dropBackup(folder, b)
 		}
 	}
 }
 
-func dropBackup(pre *S3Prefix, b BackupTime) {
-	var bk = &Backup{
-		Prefix: pre,
-		Path:   GetBackupPath(pre),
-		Name:   aws.String(b.Name),
-	}
-	tarFiles, err := bk.GetKeys()
+// TODO : unit tests
+func dropBackup(folder *S3Folder, backupTime BackupTime) {
+	backup := NewBackup(folder, backupTime.Name)
+	tarFiles, err := backup.GetKeys()
 	if err != nil {
-		log.Fatal("Unable to list backup for deletion ", b.Name, err)
+		log.Fatal("Unable to list backup for deletion ", backupTime.Name, err)
 	}
 
-	folderKey := strings.TrimPrefix(*pre.Server+BaseBackupsPath+b.Name, "/")
-	suffixKey := folderKey + SentinelSuffix
+	folderKey := strings.TrimPrefix(GetBackupPath(folder)+backupTime.Name, "/")
+	sentinelKey := folderKey + SentinelSuffix
 
-	keys := append(tarFiles, suffixKey, folderKey)
+	keys := append(tarFiles, sentinelKey, folderKey)
 	parts := partition(keys, 1000)
 	for _, part := range parts {
 
-		input := &s3.DeleteObjectsInput{Bucket: pre.Bucket, Delete: &s3.Delete{
+		input := &s3.DeleteObjectsInput{Bucket: folder.Bucket, Delete: &s3.Delete{
 			Objects: partitionToObjects(part),
 		}}
-		_, err = pre.Svc.DeleteObjects(input)
+		_, err = folder.S3API.DeleteObjects(input)
 		if err != nil {
-			log.Fatal("Unable to delete backup ", b.Name, err)
+			log.Fatal("Unable to delete backup ", backupTime.Name, err)
 		}
 
 	}
 }
 
+// TODO : unit tests
 func partitionToObjects(keys []string) []*s3.ObjectIdentifier {
 	objs := make([]*s3.ObjectIdentifier, len(keys))
 	for i, k := range keys {
@@ -174,24 +175,20 @@ func partitionToObjects(keys []string) []*s3.ObjectIdentifier {
 	return objs
 }
 
-func deleteWALBefore(bt BackupTime, pre *S3Prefix) {
-	var bk = &Backup{
-		Prefix: pre,
-		Path:   aws.String(sanitizePath(*pre.Server + WalPath)),
-	}
-
-	objects, err := bk.GetWals(bt.WalFileName)
+// TODO : unit tests
+func deleteWALBefore(backupTime BackupTime, folder *S3Folder) {
+	objects, err := getWals(backupTime.WalFileName, folder)
 	if err != nil {
-		log.Fatal("Unable to obtaind WALS for border ", bt.Name, err)
+		log.Fatal("Unable to obtaind WALS for border ", backupTime.Name, err)
 	}
 	parts := partitionObjects(objects, 1000)
 	for _, part := range parts {
-		input := &s3.DeleteObjectsInput{Bucket: pre.Bucket, Delete: &s3.Delete{
+		input := &s3.DeleteObjectsInput{Bucket: folder.Bucket, Delete: &s3.Delete{
 			Objects: part,
 		}}
-		_, err = pre.Svc.DeleteObjects(input)
+		_, err = folder.S3API.DeleteObjects(input)
 		if err != nil {
-			log.Fatal("Unable to delete WALS before ", bt.Name, err)
+			log.Fatal("Unable to delete WALS before ", backupTime.Name, err)
 		}
 	}
 }

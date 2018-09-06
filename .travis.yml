@@ -1,5 +1,8 @@
 notifications:
   email: false
+services:
+  - docker
+script: ./build.sh
 language: go
 dist: trusty
 go:

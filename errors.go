@@ -19,16 +19,6 @@ func (e UnsetEnvVarError) Error() string {
 	return msg
 }
 
-// NoMatchAvailableError is used to signal no match found in string.
-type NoMatchAvailableError struct {
-	str string
-}
-
-func (e NoMatchAvailableError) Error() string {
-	msg := fmt.Sprintf("No match found in '%s'\n", e.str)
-	return msg
-}
-
 // UnsupportedFileTypeError is used to signal file types
 // that are unsupported by WAL-G.
 type UnsupportedFileTypeError struct {

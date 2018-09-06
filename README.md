@@ -255,3 +255,7 @@ Acknowledgements
 WAL-G would not have happened without the support of [Citus Data](https://www.citusdata.com/)
 
 WAL-G came into existence as a result of the collaboration between a summer engineering intern at Citus, Katie Li, and Daniel Farina, the original author of WAL-E who currently serves as a principal engineer on the Citus Cloud team. Citus Data also has an [open source extension to Postgres](https://github.com/citusdata) that distributes database queries horizontally to deliver scale and performance.
+
+Chat
+----
+We have a [Slack group](https://postgresteam.slack.com/messages/CA25P48P2) to discuss WAL-G usage and development. To joint PostgreSQL slack use [invite app](https://postgres-slack.herokuapp.com).

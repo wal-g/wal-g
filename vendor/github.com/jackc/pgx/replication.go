@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -401,15 +402,14 @@ func (rc *ReplicationConn) TimelineHistory(timeline int) (r *Rows, err error) {
 // This function assumes that slotName has already been created. In order to omit the timeline argument
 // pass a -1 for the timeline to get the server default behavior.
 func (rc *ReplicationConn) StartReplication(slotName string, startLsn uint64, timeline int64, pluginArguments ...string) (err error) {
-	var queryString string
+	queryString := fmt.Sprintf("START_REPLICATION SLOT %s LOGICAL %s", slotName, FormatLSN(startLsn))
 	if timeline >= 0 {
-		queryString = fmt.Sprintf("START_REPLICATION SLOT %s LOGICAL %s TIMELINE %d", slotName, FormatLSN(startLsn), timeline)
-	} else {
-		queryString = fmt.Sprintf("START_REPLICATION SLOT %s LOGICAL %s", slotName, FormatLSN(startLsn))
+		timelineOption := fmt.Sprintf("TIMELINE %d", timeline)
+		pluginArguments = append(pluginArguments, timelineOption)
 	}
 
-	for _, arg := range pluginArguments {
-		queryString += fmt.Sprintf(" %s", arg)
+	if len(pluginArguments) > 0 {
+		queryString += fmt.Sprintf(" ( %s )", strings.Join(pluginArguments, ", "))
 	}
 
 	if err = rc.c.sendQuery(queryString); err != nil {
@@ -437,6 +437,18 @@ func (rc *ReplicationConn) StartReplication(slotName string, startLsn uint64, ti
 // Create the replication slot, using the given name and output plugin.
 func (rc *ReplicationConn) CreateReplicationSlot(slotName, outputPlugin string) (err error) {
 	_, err = rc.c.Exec(fmt.Sprintf("CREATE_REPLICATION_SLOT %s LOGICAL %s", slotName, outputPlugin))
+	return
+}
+
+// Create the replication slot, using the given name and output plugin, and return the consistent_point and snapshot_name values.
+func (rc *ReplicationConn) CreateReplicationSlotEx(slotName, outputPlugin string) (consistentPoint string, snapshotName string, err error) {
+	var dummy string
+	var rows *Rows
+	rows, err = rc.sendReplicationModeQuery(fmt.Sprintf("CREATE_REPLICATION_SLOT %s LOGICAL %s", slotName, outputPlugin))
+	defer rows.Close()
+	for rows.Next() {
+		rows.Scan(&dummy, &consistentPoint, &snapshotName, &dummy)
+	}
 	return
 }
 

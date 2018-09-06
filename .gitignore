@@ -1,3 +1,6 @@
 .idea
 cmd/wal-g/wal-g
-_vendor*
+walparser/testdata/whole_wal_file
+walg_test/testdata/part*
+walg_test/testdata/data*
+docker/pg/wal-g

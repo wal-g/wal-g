@@ -16,6 +16,12 @@ type DateArray struct {
 }
 
 func (dst *DateArray) Set(src interface{}) error {
+	// untyped nil and typed nil interfaces are different
+	if src == nil {
+		*dst = DateArray{Status: Null}
+		return nil
+	}
+
 	switch value := src.(type) {
 
 	case []time.Time:
@@ -41,7 +47,7 @@ func (dst *DateArray) Set(src interface{}) error {
 		if originalSrc, ok := underlyingSliceType(src); ok {
 			return dst.Set(originalSrc)
 		}
-		return errors.Errorf("cannot convert %v to Date", value)
+		return errors.Errorf("cannot convert %v to DateArray", value)
 	}
 
 	return nil
@@ -81,7 +87,7 @@ func (src *DateArray) AssignTo(dst interface{}) error {
 		return NullAssignTo(dst)
 	}
 
-	return errors.Errorf("cannot decode %v into %T", src, dst)
+	return errors.Errorf("cannot decode %#v into %T", src, dst)
 }
 
 func (dst *DateArray) DecodeText(ci *ConnInfo, src []byte) error {

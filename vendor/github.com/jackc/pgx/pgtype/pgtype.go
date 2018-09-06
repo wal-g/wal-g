@@ -32,6 +32,7 @@ const (
 	Int4ArrayOID        = 1007
 	TextArrayOID        = 1009
 	ByteaArrayOID       = 1001
+	BPCharArrayOID      = 1014
 	VarcharArrayOID     = 1015
 	Int8ArrayOID        = 1016
 	Float4ArrayOID      = 1021
@@ -39,6 +40,7 @@ const (
 	ACLItemOID          = 1033
 	ACLItemArrayOID     = 1034
 	InetArrayOID        = 1041
+	BPCharOID           = 1042
 	VarcharOID          = 1043
 	DateOID             = 1082
 	TimestampOID        = 1114
@@ -46,8 +48,10 @@ const (
 	DateArrayOID        = 1182
 	TimestamptzOID      = 1184
 	TimestamptzArrayOID = 1185
+	NumericOID          = 1700
 	RecordOID           = 2249
 	UUIDOID             = 2950
+	UUIDArrayOID        = 2951
 	JSONBOID            = 3802
 )
 
@@ -209,6 +213,7 @@ func init() {
 	nameValues = map[string]Value{
 		"_aclitem":     &ACLItemArray{},
 		"_bool":        &BoolArray{},
+		"_bpchar":      &BPCharArray{},
 		"_bytea":       &ByteaArray{},
 		"_cidr":        &CIDRArray{},
 		"_date":        &DateArray{},
@@ -222,10 +227,13 @@ func init() {
 		"_text":        &TextArray{},
 		"_timestamp":   &TimestampArray{},
 		"_timestamptz": &TimestamptzArray{},
+		"_uuid":        &UUIDArray{},
 		"_varchar":     &VarcharArray{},
 		"aclitem":      &ACLItem{},
+		"bit":          &Bit{},
 		"bool":         &Bool{},
 		"box":          &Box{},
+		"bpchar":       &BPChar{},
 		"bytea":        &Bytea{},
 		"char":         &QChar{},
 		"cid":          &CID{},
@@ -243,6 +251,7 @@ func init() {
 		"int4range":    &Int4range{},
 		"int8":         &Int8{},
 		"int8range":    &Int8range{},
+		"interval":     &Interval{},
 		"json":         &JSON{},
 		"jsonb":        &JSONB{},
 		"line":         &Line{},
