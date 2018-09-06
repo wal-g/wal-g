@@ -34,6 +34,7 @@ var (
 		"WALG_COMPRESSION_METHOD":      nil,
 		"WALG_DISK_RATE_LIMIT":         nil,
 		"WALG_NETWORK_RATE_LIMIT":      nil,
+		"WALG_USE_WAL_DELTA":      nil,
 	}
 )
 

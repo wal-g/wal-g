@@ -3,7 +3,6 @@ package walg
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 
@@ -154,7 +153,7 @@ func Configure() (uploader *Uploader, destinationFolder *S3Folder, err error) {
 		return nil, nil, errors.Wrap(err, "Configure: failed to create new session")
 	}
 
-	useWalDeltaStr, hasUseWalDelta := getSettingValue("WALG_USE_WAL_DELTA")
+	useWalDeltaStr, hasUseWalDelta := LookupConfigValue("WALG_USE_WAL_DELTA")
 	useWalDelta := false
 	if hasUseWalDelta {
 		useWalDelta, err = strconv.ParseBool(useWalDeltaStr)
@@ -169,17 +168,17 @@ func Configure() (uploader *Uploader, destinationFolder *S3Folder, err error) {
 	uploaderApi := CreateUploader(folder.S3API, DefaultStreamingPartSizeFor10Concurrency, concurrency)
 	uploader = NewUploader(uploaderApi, Compressors[compressionMethod], folder, useWalDelta)
 
-	storageClass, ok := getSettingValue("WALG_S3_STORAGE_CLASS")
+	storageClass, ok := LookupConfigValue("WALG_S3_STORAGE_CLASS")
 	if ok {
 		uploader.StorageClass = storageClass
 	}
 
-	serverSideEncryption, ok := getSettingValue("WALG_S3_SSE")
+	serverSideEncryption, ok := LookupConfigValue("WALG_S3_SSE")
 	if ok {
 		uploader.serverSideEncryption = serverSideEncryption
 	}
 
-	sseKmsKeyId, ok := getSettingValue("WALG_S3_SSE_KMS_ID")
+	sseKmsKeyId, ok := LookupConfigValue("WALG_S3_SSE_KMS_ID")
 	if ok {
 		uploader.SSEKMSKeyId = sseKmsKeyId
 	}
