@@ -79,23 +79,12 @@ func TestBackgroundNoOverwriteWALUpload(t *testing.T) {
 			t.Log("Recovered ", r)
 			wasPanic = true
 		}
+		cleanup(t, overwriteDir)
 	}()
 	walg.UploadWALFile(tu, a, pre, false, false)
 	if !wasPanic {
 		t.Errorf("WAL was overwritten")
 	}
-
-	file, err := os.OpenFile(a, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
-	if err != nil {
-		t.Error(err)
-	}
-	file.WriteString("Hello")
-	file.Close()
-	walg.UploadWALFile(tu, a, pre, false, false)
-	// Should not panic
-	walg.UploadWALFile(tu, a, pre, false, false)
-
-	cleanup(t, overwriteDir)
 }
 
 func setupArchiveStatus(t *testing.T, dir string) (string, string) {
