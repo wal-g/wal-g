@@ -9,10 +9,12 @@ const (
 	Lz4AlgorithmName  = "lz4"
 	LzmaAlgorithmName = "lzma"
 	ZstdAlgorithmName = "zstd"
+	BrotliAlgorithmName = "brotli"
 
 	Lz4FileExtension  = "lz4"
 	LzmaFileExtension = "lzma"
 	ZstdFileExtension = "zst"
+	BrotliFileExtension = "br"
 	LzoFileExtension  = "lzo"
 )
 
@@ -37,13 +39,15 @@ type Decompressor interface {
 var Compressors = map[string]Compressor{
 	Lz4AlgorithmName:  Lz4Compressor{},
 	LzmaAlgorithmName: LzmaCompressor{},
+	BrotliAlgorithmName: BrotliCompressor{},
 	ZstdAlgorithmName: ZstdCompressor{},
 }
 
 var Decompressors = []Decompressor{
 	Lz4Decompressor{},
-	ZstdDecompressor{},
+	BrotliDecompressor{},
 	LzmaDecompressor{},
+	ZstdDecompressor{},
 }
 
 func getDecompressorByCompressor(compressor Compressor) Decompressor {
