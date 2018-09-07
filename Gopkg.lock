@@ -91,6 +91,12 @@
   revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
 
 [[projects]]
+  name = "github.com/google/brotli"
+  packages = ["go/cbrotli"]
+  revision = "b601fe817bd3217cb144bbb380a43cae8e847388"
+  version = "v1.0.5"
+
+[[projects]]
   name = "github.com/jackc/pgx"
   packages = [
     ".",
@@ -205,19 +211,9 @@
   packages = ["rate"]
   revision = "fbb02b2291d28baffd63558aa44b4b56f178d650"
 
-[[projects]]
-  branch = "master"
-  name = "gopkg.in/kothar/brotli-go.v0"
-  packages = [
-    "dec",
-    "enc",
-    "shared"
-  ]
-  revision = "771231d473d6c4896e97c2b6e3855f1afc0cdada"
-
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "78624afe79cd9a07f054dc3d738ac11841b524a239acb2b5eb4a38de0bf41670"
+  inputs-digest = "77fd4604457ce4cf627662587c8f6928d951ab38c549ed0f07fd3f53d9ce7b71"
   solver-name = "gps-cdcl"
   solver-version = 1

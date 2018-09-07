@@ -2,17 +2,16 @@ package walg
 
 import (
 	"io"
-	"gopkg.in/kothar/brotli-go.v0/enc"
+	"github.com/google/brotli/go/cbrotli"
 )
 
 type BrotliReaderFromWriter struct {
-	enc.BrotliWriter
+	cbrotli.Writer
 }
 
 func NewBrotliReaderFromWriter(dst io.Writer) *BrotliReaderFromWriter {
-	params := enc.NewBrotliParams()
-	params.SetQuality(1)
-	return &BrotliReaderFromWriter{BrotliWriter: *enc.NewBrotliWriter(params, dst)}
+	options := cbrotli.WriterOptions{Quality: 1}
+	return &BrotliReaderFromWriter{Writer: *cbrotli.NewWriter(dst, options)}
 }
 
 func (writer *BrotliReaderFromWriter) ReadFrom(reader io.Reader) (n int64, err error) {

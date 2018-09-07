@@ -2,13 +2,13 @@ package walg
 
 import (
 	"io"
-	"gopkg.in/kothar/brotli-go.v0/dec"
+	"github.com/google/brotli/go/cbrotli"
 )
 
 type BrotliDecompressor struct{}
 
 func (decompressor BrotliDecompressor) Decompress(dst io.Writer, src io.Reader) error {
-	brotliReader := dec.NewBrotliReader(NewUntilEofReader(src))
+	brotliReader := cbrotli.NewReader(NewUntilEofReader(src))
 	defer brotliReader.Close()
 	_, err := FastCopy(dst, brotliReader)
 	return err
