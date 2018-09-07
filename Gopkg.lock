@@ -79,16 +79,16 @@
   version = "v1.38.1"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/golang/snappy"
-  packages = ["."]
-  revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
-
-[[projects]]
   name = "github.com/go-yaml/yaml"
   packages = ["."]
   revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
   version = "v2.2.1"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/golang/snappy"
+  packages = ["."]
+  revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
 
 [[projects]]
   name = "github.com/jackc/pgx"
@@ -182,6 +182,7 @@
     "openpgp/s2k"
   ]
   revision = "f027049dab0ad238e394a753dba2d14753473a04"
+  source = "https://github.com/golang/crypto"
 
 [[projects]]
   branch = "master"
@@ -204,9 +205,19 @@
   packages = ["rate"]
   revision = "fbb02b2291d28baffd63558aa44b4b56f178d650"
 
+[[projects]]
+  branch = "master"
+  name = "gopkg.in/kothar/brotli-go.v0"
+  packages = [
+    "dec",
+    "enc",
+    "shared"
+  ]
+  revision = "771231d473d6c4896e97c2b6e3855f1afc0cdada"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c85a881fef6d1b08b46b1c323b1629543c9910739535ce0f0ed45720cf40215e"
+  inputs-digest = "78624afe79cd9a07f054dc3d738ac11841b524a239acb2b5eb4a38de0bf41670"
   solver-name = "gps-cdcl"
   solver-version = 1
