@@ -20,6 +20,6 @@ func NewLzmaReaderFromWriter(dst io.Writer) (*LzmaReaderFromWriter, error) {
 }
 
 func (writer *LzmaReaderFromWriter) ReadFrom(reader io.Reader) (n int64, err error) {
-	n, err = fastCopy(writer, reader)
+	n, err = FastCopy(writer, reader)
 	return
 }

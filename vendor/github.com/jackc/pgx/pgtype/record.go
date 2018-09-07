@@ -2,6 +2,7 @@ package pgtype
 
 import (
 	"encoding/binary"
+	"reflect"
 
 	"github.com/pkg/errors"
 )
@@ -66,7 +67,7 @@ func (src *Record) AssignTo(dst interface{}) error {
 		return NullAssignTo(dst)
 	}
 
-	return errors.Errorf("cannot decode %v into %T", src, dst)
+	return errors.Errorf("cannot decode %#v into %T", src, dst)
 }
 
 func (dst *Record) DecodeBinary(ci *ConnInfo, src []byte) error {
@@ -97,9 +98,10 @@ func (dst *Record) DecodeBinary(ci *ConnInfo, src []byte) error {
 
 		var binaryDecoder BinaryDecoder
 		if dt, ok := ci.DataTypeForOID(fieldOID); ok {
-			if binaryDecoder, ok = dt.Value.(BinaryDecoder); !ok {
-				return errors.Errorf("unknown oid while decoding record: %v", fieldOID)
-			}
+			binaryDecoder, _ = dt.Value.(BinaryDecoder)
+		}
+		if binaryDecoder == nil {
+			return errors.Errorf("unknown oid while decoding record: %v", fieldOID)
 		}
 
 		var fieldBytes []byte
@@ -110,6 +112,9 @@ func (dst *Record) DecodeBinary(ci *ConnInfo, src []byte) error {
 			fieldBytes = src[rp : rp+fieldLen]
 			rp += fieldLen
 		}
+
+		// Duplicate struct to scan into
+		binaryDecoder = reflect.New(reflect.ValueOf(binaryDecoder).Elem().Type()).Interface().(BinaryDecoder)
 
 		if err := binaryDecoder.DecodeBinary(ci, fieldBytes); err != nil {
 			return err

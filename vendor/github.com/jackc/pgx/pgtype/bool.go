@@ -13,6 +13,11 @@ type Bool struct {
 }
 
 func (dst *Bool) Set(src interface{}) error {
+	if src == nil {
+		*dst = Bool{Status: Null}
+		return nil
+	}
+
 	switch value := src.(type) {
 	case bool:
 		*dst = Bool{Bool: value, Status: Present}
@@ -59,7 +64,7 @@ func (src *Bool) AssignTo(dst interface{}) error {
 		return NullAssignTo(dst)
 	}
 
-	return errors.Errorf("cannot decode %v into %T", src, dst)
+	return errors.Errorf("cannot decode %#v into %T", src, dst)
 }
 
 func (dst *Bool) DecodeText(ci *ConnInfo, src []byte) error {

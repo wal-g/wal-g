@@ -18,12 +18,12 @@ const (
 	LzoFileExtension  = "lzo"
 )
 
-var compressingAlgorithms = []string{Lz4AlgorithmName, LzmaAlgorithmName, ZstdAlgorithmName}
+var CompressingAlgorithms = []string{Lz4AlgorithmName, LzmaAlgorithmName, ZstdAlgorithmName}
 
 type UnknownCompressionMethodError struct{}
 
 func (err UnknownCompressionMethodError) Error() string {
-	return fmt.Sprintf("Unkown compression method, supported methods are: %v", compressingAlgorithms)
+	return fmt.Sprintf("Unkown compression method, supported methods are: %v", CompressingAlgorithms)
 }
 
 type Compressor interface {
@@ -52,7 +52,7 @@ var Decompressors = []Decompressor{
 
 func getDecompressorByCompressor(compressor Compressor) Decompressor {
 	extension := compressor.FileExtension()
-	for _,d:=range Decompressors{
+	for _, d := range Decompressors {
 		if d.FileExtension() == extension {
 			return d
 		}
