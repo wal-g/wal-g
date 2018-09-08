@@ -10,7 +10,7 @@ type BrotliReaderFromWriter struct {
 }
 
 func NewBrotliReaderFromWriter(dst io.Writer) *BrotliReaderFromWriter {
-	options := cbrotli.WriterOptions{Quality: 1}
+	options := cbrotli.WriterOptions{Quality: 2}
 	return &BrotliReaderFromWriter{Writer: *cbrotli.NewWriter(dst, options)}
 }
 
