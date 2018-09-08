@@ -143,11 +143,11 @@ type DelayedErrorReader struct {
 func (er *DelayedErrorReader) Read(p []byte) (int, error) {
 	x, err := er.underlying.Read(p)
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 	er.n -= x
 	if er.n < 0 {
-		return -1, errors.New("mock reader: read error")
+		return 0, errors.New("mock reader: read error")
 	} else {
 		return x, nil
 	}
