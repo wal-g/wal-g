@@ -127,7 +127,7 @@ func putWalIntoStorage(storage testtools.MockStorage, data []byte, walFilename s
 	}
 	err = compressingWriter.Close()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	storage["mock/mock/wal_005/"+walFilename+".lz4"] = compressedData
 	return nil
