@@ -33,7 +33,6 @@ func TestS3TarBall(t *testing.T) {
 	assert.Nil(t, tarBall.TarWriter())
 
 	bundle.NewTarBall(false)
-	tarBallCounter += 1
 	//assert.Equal(t, bundle.TarBall, tarBall)
 }
 

@@ -195,7 +195,7 @@ func TestLoadDeltaMap_AllDeltas(t *testing.T) {
 	assert.NoError(t, err)
 
 	backupNextWalFilename := "000000010000000000000090"
-	_, curLogSegNo, err := walg.ParseWALFileName(backupNextWalFilename)
+	_, curLogSegNo, _ := walg.ParseWALFileName(backupNextWalFilename)
 
 	err = bundle.DownloadDeltaMap(folder, curLogSegNo*walg.WalSegmentSize)
 	deltaMap := bundle.DeltaMap
@@ -212,7 +212,7 @@ func TestLoadDeltaMap_MissingDelta(t *testing.T) {
 	assert.NoError(t, err)
 
 	backupNextWalFilename := "0000000100000000000000B0"
-	_, curLogSegNo, err := walg.ParseWALFileName(backupNextWalFilename)
+	_, curLogSegNo, _ := walg.ParseWALFileName(backupNextWalFilename)
 
 	err = bundle.DownloadDeltaMap(folder, curLogSegNo*walg.WalSegmentSize)
 	assert.Error(t, err)
@@ -224,7 +224,7 @@ func TestLoadDeltaMap_WalTail(t *testing.T) {
 	assert.NoError(t, err)
 
 	backupNextWalFilename := "000000010000000000000091"
-	_, curLogSegNo, err := walg.ParseWALFileName(backupNextWalFilename)
+	_, curLogSegNo, _ := walg.ParseWALFileName(backupNextWalFilename)
 
 	err = bundle.DownloadDeltaMap(folder, curLogSegNo*walg.WalSegmentSize)
 	assert.NoError(t, err)
