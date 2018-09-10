@@ -1,8 +1,8 @@
 package walg
 
 import (
-	"io"
 	"github.com/google/brotli/go/cbrotli"
+	"io"
 )
 
 type BrotliDecompressor struct{}

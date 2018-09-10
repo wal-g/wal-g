@@ -6,16 +6,16 @@ import (
 )
 
 const (
-	Lz4AlgorithmName  = "lz4"
-	LzmaAlgorithmName = "lzma"
-	ZstdAlgorithmName = "zstd"
+	Lz4AlgorithmName    = "lz4"
+	LzmaAlgorithmName   = "lzma"
+	ZstdAlgorithmName   = "zstd"
 	BrotliAlgorithmName = "brotli"
 
-	Lz4FileExtension  = "lz4"
-	LzmaFileExtension = "lzma"
-	ZstdFileExtension = "zst"
+	Lz4FileExtension    = "lz4"
+	LzmaFileExtension   = "lzma"
+	ZstdFileExtension   = "zst"
 	BrotliFileExtension = "br"
-	LzoFileExtension  = "lzo"
+	LzoFileExtension    = "lzo"
 )
 
 var CompressingAlgorithms = []string{Lz4AlgorithmName, LzmaAlgorithmName, ZstdAlgorithmName}
@@ -37,10 +37,10 @@ type Decompressor interface {
 }
 
 var Compressors = map[string]Compressor{
-	Lz4AlgorithmName:  Lz4Compressor{},
-	LzmaAlgorithmName: LzmaCompressor{},
+	Lz4AlgorithmName:    Lz4Compressor{},
+	LzmaAlgorithmName:   LzmaCompressor{},
 	BrotliAlgorithmName: BrotliCompressor{},
-	ZstdAlgorithmName: ZstdCompressor{},
+	ZstdAlgorithmName:   ZstdCompressor{},
 }
 
 var Decompressors = []Decompressor{
