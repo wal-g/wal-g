@@ -116,11 +116,14 @@ func haveNoSlots(u *BgUploader) bool {
 // upload one WAL file
 func (bgUploader *BgUploader) upload(info os.FileInfo) {
 	walFilename := strings.TrimSuffix(info.Name(), readySuffix)
-	uploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename), bgUploader.verify, true)
+	err := uploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename), bgUploader.verify)
+	if err != nil {
+		log.Print("Error of background uploader: ", err)
+	}
 
 	ready := filepath.Join(bgUploader.dir, archiveStatus, info.Name())
 	done := filepath.Join(bgUploader.dir, archiveStatus, walFilename+done)
-	err := os.Rename(ready, done)
+	err = os.Rename(ready, done)
 	if err != nil {
 		log.Print("Error renaming .ready to .done: ", err)
 	}
