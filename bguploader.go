@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const TotalBgUploadedLimit = 1024
+
 // BgUploader represents the state of concurrent WAL upload
 type BgUploader struct {
 	// pg_[wals|xlog]
@@ -84,7 +86,7 @@ func (bgUploader *BgUploader) scanOnce() {
 	}
 
 	for _, f := range files {
-		if haveNoSlots(bgUploader) {
+		if bgUploader.haveNoSlots() {
 			break
 		}
 		name := f.Name()
@@ -96,7 +98,7 @@ func (bgUploader *BgUploader) scanOnce() {
 		}
 		bgUploader.started[name] = name
 
-		if shouldKeepScanning(bgUploader) {
+		if bgUploader.shouldKeepScanning() {
 			bgUploader.running.Add(1)
 			atomic.AddInt32(&bgUploader.parallelWorkers, 1)
 			go bgUploader.upload(f)
@@ -104,12 +106,12 @@ func (bgUploader *BgUploader) scanOnce() {
 	}
 }
 
-func shouldKeepScanning(u *BgUploader) bool {
-	return atomic.LoadInt32(&u.maxParallelWorkers) > 0 && atomic.LoadInt32(&u.totalUploaded) < 1024
+func (bgUploader *BgUploader) shouldKeepScanning() bool {
+	return atomic.LoadInt32(&bgUploader.maxParallelWorkers) > 0 && atomic.LoadInt32(&bgUploader.totalUploaded) < TotalBgUploadedLimit
 }
 
-func haveNoSlots(u *BgUploader) bool {
-	return atomic.LoadInt32(&u.parallelWorkers) >= atomic.LoadInt32(&u.maxParallelWorkers)
+func (bgUploader *BgUploader) haveNoSlots() bool {
+	return atomic.LoadInt32(&bgUploader.parallelWorkers) >= atomic.LoadInt32(&bgUploader.maxParallelWorkers)
 }
 
 // TODO : unit tests

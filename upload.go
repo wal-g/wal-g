@@ -17,7 +17,10 @@ import (
 	"golang.org/x/time/rate"
 )
 
-const DefaultStreamingPartSizeFor10Concurrency = 20 << 20
+const (
+	DefaultStreamingPartSizeFor10Concurrency = 20 << 20
+ 	DefaultDataBurstRateLimit = 8*int64(DatabasePageSize)
+)
 
 // MaxRetries limit upload and download retries during interaction with S3
 var MaxRetries = 15
@@ -136,7 +139,7 @@ func Configure() (uploader *Uploader, destinationFolder *S3Folder, err error) {
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "Configure: failed to parse WALG_DISK_RATE_LIMIT")
 		}
-		DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+64*1024)) // Add 8 pages to possible bursts
+		DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 
 	netLimitStr := getSettingValue("WALG_NETWORK_RATE_LIMIT")
@@ -145,7 +148,7 @@ func Configure() (uploader *Uploader, destinationFolder *S3Folder, err error) {
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "Configure: failed to parse WALG_NETWORK_RATE_LIMIT")
 		}
-		NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+64*1024)) // Add 8 pages to possible bursts
+		NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 
 	sess, err := session.NewSession(config)

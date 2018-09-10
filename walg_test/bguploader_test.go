@@ -16,7 +16,6 @@ import (
 // This test has known race condition
 // We expect that background worker will upload 100 files.
 // But we have no guaranties for this
-// TODO : this test is really inconvenient for debugging, maybe its better to do its single-threaded version.
 func TestBackgroundWALUpload(t *testing.T) {
 	dir, a := setupArchiveStatus(t, "")
 	for i := 0; i < 100; i++ {
@@ -44,45 +43,6 @@ func TestBackgroundWALUpload(t *testing.T) {
 
 	cleanup(t, dir)
 }
-
-//func TestBackgroundNoOverwriteWALUpload(t *testing.T) {
-//	var overwriteDir = "overwritetestdata"
-//	if os.Getenv("NO_OVERWRITE_TEST") == "1" {
-//		_, a := setupArchiveStatus(t, overwriteDir)
-//
-//		addTestDataFile(t, overwriteDir, 0)
-//
-//		// Re-use generated data to test uploading WAL.
-//		tu := testtools.NewMockTarUploader(false, false)
-//		bu := walg.BgUploader{}
-//
-//		// Look for new WALs while doing main upload
-//		bu.Start(a, 16, tu, false)
-//		time.Sleep(time.Second) //time to spin up new uploaders
-//		bu.Stop()
-//
-//		t.Error("did not exit from not overwriting")
-//	}
-//
-//	// Here we start this test in separate process to verify panic
-//	// We cannot just call it and recovery since panic is handled in async goroutine
-//	// One day we will replace all panics with error handling, until then this is OK
-//	cmd := exec.Command(os.Args[0], "-test.run=TestBackgroundNoOverwriteWALUpload")
-//	cmd.Env = append(os.Environ(), "NO_OVERWRITE_TEST=1")
-//	err := cmd.Run()
-//	if e, ok := err.(*exec.ExitError); ok && !e.Success() {
-//		bname := "B0"
-//		bd := filepath.Join(overwriteDir, "archive_status", bname+".ready")
-//		_, err := os.Stat(bd)
-//		if os.IsNotExist(err) {
-//			t.Error(bname + ".ready was deleted")
-//		}
-//
-//		cleanup(t, overwriteDir)
-//		return
-//	}
-//	t.Fatalf("process ran with err %v, want exit status 1", err)
-//}
 
 func setupArchiveStatus(t *testing.T, dir string) (string, string) {
 	cwd, err := filepath.Abs("./")
