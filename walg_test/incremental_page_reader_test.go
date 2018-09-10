@@ -51,6 +51,7 @@ func TestSelectNewValidPage_ValidPageLowLsn(t *testing.T) {
 	}
 	var blockNo uint32 = 10
 	pageFile, err := os.Open(pagedFileName)
+	assert.NoError(t, err)
 	defer pageFile.Close()
 	pageData := make([]byte, walg.DatabasePageSize)
 	_, err = io.ReadFull(pageFile, pageData)
@@ -68,6 +69,7 @@ func TestSelectNewValidPage_ValidPageHighLsn(t *testing.T) {
 	}
 	var blockNo uint32 = 10
 	pageFile, err := os.Open(pagedFileName)
+	assert.NoError(t, err)
 	defer pageFile.Close()
 	pageData := make([]byte, walg.DatabasePageSize)
 	_, err = io.ReadFull(pageFile, pageData)

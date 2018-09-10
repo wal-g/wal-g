@@ -2,8 +2,8 @@ package walg
 
 import (
 	"github.com/DataDog/zstd"
-	"io"
 	"github.com/pkg/errors"
+	"io"
 )
 
 type ZstdDecompressor struct{}
@@ -12,10 +12,10 @@ func (decompressor ZstdDecompressor) Decompress(dst io.Writer, src io.Reader) er
 	zstdReader := zstd.NewReader(NewUntilEofReader(src))
 	_, err := FastCopy(dst, zstdReader)
 	if err != nil {
-		return errors.Wrap(err,  "DecompressZstd: zstd write failed")
+		return errors.Wrap(err, "DecompressZstd: zstd write failed")
 	}
 	err = zstdReader.Close()
-	return errors.Wrap(err,  "DecompressZstd: zstd reader close failed")
+	return errors.Wrap(err, "DecompressZstd: zstd reader close failed")
 }
 
 func (decompressor ZstdDecompressor) FileExtension() string {
