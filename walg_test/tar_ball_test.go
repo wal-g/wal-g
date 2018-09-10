@@ -14,7 +14,6 @@ import (
 // TODO : this test is broken now
 // Tests S3 get and set methods.
 func TestS3TarBall(t *testing.T) {
-	tarBallCounter := 0
 	bundle := &walg.Bundle{
 		ArchiveDirectory: "/usr/local",
 		TarSizeThreshold: int64(10),
@@ -23,7 +22,6 @@ func TestS3TarBall(t *testing.T) {
 	bundle.TarBallMaker = walg.NewS3TarBallMaker("test", testtools.NewMockTarUploader(false, false))
 
 	bundle.NewTarBall(false)
-	tarBallCounter += 1
 
 	assert.NotNil(t, bundle.TarBall)
 
