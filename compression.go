@@ -23,7 +23,7 @@ var CompressingAlgorithms = []string{Lz4AlgorithmName, LzmaAlgorithmName, ZstdAl
 type UnknownCompressionMethodError struct{}
 
 func (err UnknownCompressionMethodError) Error() string {
-	return fmt.Sprintf("Unkown compression method, supported methods are: %v", CompressingAlgorithms)
+	return fmt.Sprintf("Unknown compression method, supported methods are: %v", CompressingAlgorithms)
 }
 
 type Compressor interface {

@@ -163,7 +163,6 @@ func Configure() (uploader *Uploader, destinationFolder *S3Folder, err error) {
 	}
 
 	folder := NewS3Folder(s3.New(sess), bucket, server, preventWalOverwrite)
-
 	var concurrency = getMaxUploadConcurrency(10)
 	uploaderApi := CreateUploader(folder.S3API, DefaultStreamingPartSizeFor10Concurrency, concurrency)
 	uploader = NewUploader(uploaderApi, Compressors[compressionMethod], folder, useWalDelta)

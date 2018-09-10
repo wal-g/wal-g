@@ -24,10 +24,7 @@ func NewFieldToParse(field interface{}, name string) *FieldToParse {
 
 func (fieldToParse *FieldToParse) ParseFrom(reader io.Reader) error {
 	err := binary.Read(reader, binary.LittleEndian, fieldToParse.Field)
-	if err != nil {
-		return errors.Wrapf(err, "FieldToParse: failed to parse field '%v'", fieldToParse.Name)
-	}
-	return nil
+	return errors.Wrapf(err, "FieldToParse: failed to parse field '%v'", fieldToParse.Name)
 }
 
 func ParseMultipleFieldsFromReader(fields []FieldToParse, reader io.Reader) error {

@@ -74,17 +74,12 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 			continue
 		}
 		err = decompressor.Decompress(writer, readCloser)
-		if err != nil {
-			return errors.Wrapf(err, "DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?", decompressor.FileExtension())
-		}
-		return nil
+		return errors.Wrapf(err, "DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?", decompressor.FileExtension())
 	}
 	switch fileExtension {
 	case "tar":
 		_, err = io.Copy(writer, readCloser)
-		if err != nil {
-			return errors.Wrap(err, "DecryptAndDecompressTar: tar extract failed")
-		}
+		return errors.Wrap(err, "DecryptAndDecompressTar: tar extract failed")
 	case "nop":
 	case "lzo":
 		return errors.Wrap(UnsupportedFileTypeError{readerMaker.Path(), fileExtension}, "DecryptAndDecompressTar: lzo linked to this WAL-G binary")

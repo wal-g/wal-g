@@ -369,11 +369,7 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 	}
 
 	err = tarBall.CloseTar()
-	if err != nil {
-		return errors.Wrap(err, "UploadPgControl: failed to close tarball")
-	}
-
-	return nil
+	return errors.Wrap(err, "UploadPgControl: failed to close tarball")
 }
 
 // TODO : unit tests

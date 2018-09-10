@@ -63,7 +63,7 @@ func (parser *WalParser) parsePage(reader io.Reader) (*XLogPage, error) {
 	pageHeader, err := readXLogPageHeader(alignedReader)
 	if err != nil {
 		if err == ZeroPageHeaderError {
-			pageData, err1 := ioutil.ReadAll(reader)
+			pageData, err1 := ioutil.ReadAll(alignedReader)
 			if err1 != nil {
 				return nil, err1
 			}
