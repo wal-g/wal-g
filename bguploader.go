@@ -119,6 +119,7 @@ func (bgUploader *BgUploader) upload(info os.FileInfo) {
 	err := uploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename), bgUploader.verify)
 	if err != nil {
 		log.Print("Error of background uploader: ", err)
+		return
 	}
 
 	ready := filepath.Join(bgUploader.dir, archiveStatus, info.Name())
