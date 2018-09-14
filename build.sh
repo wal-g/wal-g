@@ -1,5 +1,6 @@
 #!/bin/sh
 set -e
+cp vendor/github.com/google/brotli/go/cbrotli/cgo.go vendor/github.com/google/brotli/go/cbrotli/cgo.go.tmp
 
 readonly CWD=$PWD
 cd vendor/github.com/google/brotli/go/cbrotli
@@ -19,4 +20,4 @@ make
 cp ./cmd/wal-g/wal-g ./docker/pg
 docker-compose build
 docker-compose up --exit-code-from pg
-docker rm wal-g_pg_1 wal-g_s3_1
+mv vendor/github.com/google/brotli/go/cbrotli/cgo.go.tmp vendor/github.com/google/brotli/go/cbrotli/cgo.go
