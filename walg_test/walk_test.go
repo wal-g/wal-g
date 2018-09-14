@@ -379,7 +379,7 @@ func TestWalk(t *testing.T) {
 	walFileName := filepath.Join(data, "1")
 	walFile, err := os.Open(walFileName)
 	assert.NoError(t, err)
-	wal, err := uploader.UploadWalFile(walFile, false)
+	wal, err := uploader.UploadFile(walFile, false)
 	assert.NotEqual(t, "", wal)
 
 	if err != nil {

@@ -13,11 +13,9 @@ import (
 	"sync"
 )
 
-const DataFolderPath = "/tmp/walg_data"
-
 // Uploader contains fields associated with uploading tarballs.
 // Multiple tarballs can share one uploader. Must call CreateUploader()
-// in 'upload.go'.
+// in 'configure.go'.
 type Uploader struct {
 	uploaderApi          s3manageriface.UploaderAPI
 	uploadingFolder      *S3Folder
@@ -28,12 +26,19 @@ type Uploader struct {
 	compressor           Compressor
 	useWalDelta          bool
 	waitGroup            *sync.WaitGroup
+	deltaFileManager *DeltaFileManager
 }
 
 // NewUploader creates a new tar uploader without the actual
 // S3 uploader. CreateUploader() is used to configure byte size and
 // concurrency streams for the uploader.
 func NewUploader(uploaderAPI s3manageriface.UploaderAPI, compressor Compressor, uploadingLocation *S3Folder, useWalDelta bool) *Uploader {
+	temporaryDataFolder, err := NewTemporaryDataFolder(DataFolderPath)
+
+	if err != nil {
+		useWalDelta = false
+		_ = fmt.Sprintf("failed to open WAL-G data folder because of: '%v'", err)
+	}
 	return &Uploader{
 		uploaderApi:     uploaderAPI,
 		uploadingFolder: uploadingLocation,
@@ -41,6 +46,7 @@ func NewUploader(uploaderAPI s3manageriface.UploaderAPI, compressor Compressor, 
 		compressor:      compressor,
 		useWalDelta:     useWalDelta,
 		waitGroup:       &sync.WaitGroup{},
+		deltaFileManager: NewDeltaFileManager(temporaryDataFolder),
 	}
 }
 
@@ -65,18 +71,16 @@ func (uploader *Uploader) Clone() *Uploader {
 		uploader.compressor,
 		uploader.useWalDelta,
 		&sync.WaitGroup{},
+		uploader.deltaFileManager,
 	}
 }
 
-// TODO : unit tests
-// UploadWalFile compresses a WAL file and uploads to S3. Returns
-// the first error encountered and an empty string upon failure.
-func (uploader *Uploader) UploadWalFile(file NamedReader, verify bool) (string, error) {
+func (uploader *Uploader) UploadWalFile(file NamedReader, verify bool) (dstPath string, err error) {
 	var walFileReader io.Reader
 
 	filename := path.Base(file.Name())
-	if uploader.useWalDelta && isWalFilename(filename) {
-		recordingReader, err := NewWalDeltaRecordingReader(file, filename, uploader.Clone(), DataFolderPath)
+	if uploader.useWalDelta && isWalFilename(file.Name()) {
+		recordingReader, err := NewWalDeltaRecordingReader(file, filename, uploader.deltaFileManager)
 		if err != nil {
 			walFileReader = file
 		} else {
@@ -87,14 +91,20 @@ func (uploader *Uploader) UploadWalFile(file NamedReader, verify bool) (string, 
 		walFileReader = file
 	}
 
+	return uploader.UploadFile(&NamedReaderImpl{walFileReader, file.Name()}, verify)
+}
+
+// TODO : unit tests
+// UploadFile compresses a file and uploads it. Returns path to the file in storage.
+func (uploader *Uploader) UploadFile(file NamedReader, verify bool) (dstPath string, err error) {
 	pipeWriter := &CompressingPipeWriter{
-		Input:                walFileReader,
+		Input:                file,
 		NewCompressingWriter: uploader.compressor.NewWriter,
 	}
 
 	pipeWriter.Compress(&OpenPGPCrypter{})
 
-	dstPath := sanitizePath(uploader.uploadingFolder.Server + WalPath + filepath.Base(file.Name()) + "." + uploader.compressor.FileExtension())
+	dstPath = sanitizePath(uploader.uploadingFolder.Server + WalPath + filepath.Base(file.Name()) + "." + uploader.compressor.FileExtension())
 	reader := pipeWriter.Output
 
 	if verify {
@@ -103,8 +113,8 @@ func (uploader *Uploader) UploadWalFile(file NamedReader, verify bool) (string, 
 
 	input := uploader.CreateUploadInput(dstPath, reader)
 
-	err := uploader.upload(input, file.Name())
-	fmt.Println("WAL PATH:", dstPath)
+	err = uploader.upload(input, file.Name())
+	fmt.Println("FILE PATH:", dstPath)
 	if verify {
 		sum := reader.(*MD5Reader).Sum()
 		archive := &Archive{
@@ -113,19 +123,19 @@ func (uploader *Uploader) UploadWalFile(file NamedReader, verify bool) (string, 
 		}
 		eTag, err := archive.getETag()
 		if err != nil {
-			log.Fatalf("Unable to verify WAL %s", err)
+			log.Panicf("Unable to verify file %s", err)
 		}
 		if eTag == nil {
-			log.Fatalf("Unable to verify WAL: nil ETag ")
+			log.Panicf("Unable to verify file: nil ETag ")
 		}
 
 		trimETag := strings.Trim(*eTag, "\"")
 		if sum != trimETag {
-			log.Fatalf("WAL verification failed: md5 %s ETag %s", sum, trimETag)
+			log.Panicf("file verification failed: md5 %s ETag %s", sum, trimETag)
 		}
 		fmt.Println("ETag ", trimETag)
 	}
-	return dstPath, err
+	return
 }
 
 // CreateUploadInput creates a s3manager.UploadInput for a Uploader using

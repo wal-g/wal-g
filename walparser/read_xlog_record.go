@@ -41,7 +41,7 @@ func readRelFileNode(reader io.Reader) (*RelFileNode, error) {
 	return &relFileNode, nil
 }
 
-func parseXLogRecordFromBytes(data []byte) (*XLogRecord, error) {
+func ParseXLogRecordFromBytes(data []byte) (*XLogRecord, error) {
 	reader := bytes.NewReader(data)
 	header, err := readXLogRecordHeader(reader)
 	if err != nil {

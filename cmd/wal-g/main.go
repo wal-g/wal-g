@@ -72,7 +72,7 @@ func main() {
 	}
 
 	// Usage strings for supported commands
-	// TODO: refactor arg parsing towards gloang flag usage and more helpful messages
+	// TODO: refactor arg parsing towards golang flag usage and more helpful messages
 	if firstArgument == "-h" || firstArgument == "--help" || (firstArgument == "" && command != "backup-list") {
 		switch command {
 		case "backup-fetch":

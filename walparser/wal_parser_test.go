@@ -39,7 +39,7 @@ const SmallPartialTestPath = "./testdata/small_partial_test"
 func TestZeroPageParsing(t *testing.T) {
 	zeroPage := make([]byte, WalPageSize)
 	parser := WalParser{}
-	pageData, err := parser.ParseRecordsFromPage(bytes.NewReader(zeroPage))
+	_, pageData, err := parser.ParseRecordsFromPage(bytes.NewReader(zeroPage))
 	assert.Nilf(t, pageData, "not nil pageData")
 	assert.Equal(t, ZeroPageError, err)
 }
@@ -47,19 +47,19 @@ func TestZeroPageParsing(t *testing.T) {
 func doPartialFileParsingTesting(t *testing.T, pageReader WalPageReader, parser WalParser) {
 	page, err := pageReader.ReadPageData()
 	assert.NoError(t, err)
-	_, err = parser.ParseRecordsFromPage(bytes.NewReader(page))
+	_, _, err = parser.ParseRecordsFromPage(bytes.NewReader(page))
 	assert.Equal(t, PartialPageError, err)
 }
 
 func doWalSwitchParsingTesting(t *testing.T, pageReader WalPageReader, parser WalParser) {
 	firstPage, err := pageReader.ReadPageData() // first page contains first part of WAL-Switch record
 	assert.NoError(t, err)
-	_, err = parser.ParseRecordsFromPage(bytes.NewReader(firstPage))
+	_, _, err = parser.ParseRecordsFromPage(bytes.NewReader(firstPage))
 	assert.NoError(t, err)
 
 	secondPage, err := pageReader.ReadPageData() // second page contains second part of WAL-Switch record
 	assert.NoError(t, err)
-	records, err := parser.ParseRecordsFromPage(bytes.NewReader(secondPage))
+	_, records, err := parser.ParseRecordsFromPage(bytes.NewReader(secondPage))
 	assert.NoError(t, err)
 	assert.Truef(t, records[len(records)-1].isWALSwitch(), "expected WAL Switch record")
 }

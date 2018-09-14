@@ -41,19 +41,27 @@ type BgUploader struct {
 	verify bool
 }
 
+func NewBgUploader(walFilePath string, maxParallelWorkers int32, uploader *Uploader, verify bool) *BgUploader {
+	started := make(map[string]interface{})
+	started[filepath.Base(walFilePath)+readySuffix] = walFilePath
+	return &BgUploader{
+		filepath.Dir(walFilePath),
+		0,
+		maxParallelWorkers,
+		sync.WaitGroup{},
+		started,
+		uploader,
+		0,
+		sync.Mutex{},
+		verify,
+	}
+}
+
 // Start up checking what's inside archive_status
-func (bgUploader *BgUploader) Start(walFilePath string, maxParallelWorkers int32, uploader *Uploader, verify bool) {
-	if maxParallelWorkers < 1 {
+func (bgUploader *BgUploader) Start() {
+	if bgUploader.maxParallelWorkers < 1 {
 		return // Nothing to start
 	}
-	// prepare state
-	bgUploader.uploader = uploader
-	bgUploader.maxParallelWorkers = maxParallelWorkers
-	bgUploader.dir = filepath.Dir(walFilePath)
-	bgUploader.started = make(map[string]interface{})
-	bgUploader.started[filepath.Base(walFilePath)+readySuffix] = walFilePath
-	bgUploader.verify = verify
-
 	// This goroutine will spawn new if necessary
 	go bgUploader.scanOnce()
 }

@@ -31,9 +31,8 @@ func uniqueLocations(locations []walparser.BlockLocation) []walparser.BlockLocat
 }
 
 // TODO : unit tests
-func extractLocationsFromWalFile(walFile io.ReadCloser) ([]walparser.BlockLocation, error) {
+func extractLocationsFromWalFile(parser *walparser.WalParser, walFile io.ReadCloser) ([]walparser.BlockLocation, error) {
 	pageReader := walparser.NewWalPageReader(walFile)
-	parser := walparser.NewWalParser()
 	locations := make([]walparser.BlockLocation, 0)
 	for {
 		data, err := pageReader.ReadPageData()
@@ -43,7 +42,7 @@ func extractLocationsFromWalFile(walFile io.ReadCloser) ([]walparser.BlockLocati
 			}
 			return nil, err
 		}
-		records, err := parser.ParseRecordsFromPage(bytes.NewReader(data))
+		_, records, err := parser.ParseRecordsFromPage(bytes.NewReader(data))
 		if err != nil && err != walparser.PartialPageError && err != walparser.ZeroPageError {
 			return nil, err
 		}

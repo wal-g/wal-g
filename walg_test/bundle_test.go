@@ -94,10 +94,15 @@ func queueTest(t *testing.T) {
 }
 
 func makeDeltaFile(locations []walparser.BlockLocation) ([]byte, error) {
+	locations = append(locations, walg.TerminalLocation)
 	var data bytes.Buffer
 	compressor := walg.Compressors[walg.Lz4AlgorithmName]
 	compressingWriter := compressor.NewWriter(&data)
 	err := walg.WriteLocationsTo(compressingWriter, locations)
+	if err != nil {
+		return nil, err
+	}
+	_, err = compressingWriter.Write([]byte{0, 0, 0, 0})
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +183,7 @@ func setupFolderAndBundle() (folder *walg.S3Folder, bundle *walg.Bundle, err err
 	}
 	folder = walg.NewS3Folder(testtools.NewMockStoringS3Client(storage), "mock/", "mock", false)
 	currentBackupFirstWalFilename := "000000010000000000000073"
-	timeLine, logSegNo, err := walg.ParseWALFileName(currentBackupFirstWalFilename)
+	timeLine, logSegNo, err := walg.ParseWALFilename(currentBackupFirstWalFilename)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -195,7 +200,7 @@ func TestLoadDeltaMap_AllDeltas(t *testing.T) {
 	assert.NoError(t, err)
 
 	backupNextWalFilename := "000000010000000000000090"
-	_, curLogSegNo, _ := walg.ParseWALFileName(backupNextWalFilename)
+	_, curLogSegNo, _ := walg.ParseWALFilename(backupNextWalFilename)
 
 	err = bundle.DownloadDeltaMap(folder, curLogSegNo*walg.WalSegmentSize)
 	deltaMap := bundle.DeltaMap
@@ -212,7 +217,7 @@ func TestLoadDeltaMap_MissingDelta(t *testing.T) {
 	assert.NoError(t, err)
 
 	backupNextWalFilename := "0000000100000000000000B0"
-	_, curLogSegNo, _ := walg.ParseWALFileName(backupNextWalFilename)
+	_, curLogSegNo, _ := walg.ParseWALFilename(backupNextWalFilename)
 
 	err = bundle.DownloadDeltaMap(folder, curLogSegNo*walg.WalSegmentSize)
 	assert.Error(t, err)
@@ -224,7 +229,7 @@ func TestLoadDeltaMap_WalTail(t *testing.T) {
 	assert.NoError(t, err)
 
 	backupNextWalFilename := "000000010000000000000091"
-	_, curLogSegNo, _ := walg.ParseWALFileName(backupNextWalFilename)
+	_, curLogSegNo, _ := walg.ParseWALFilename(backupNextWalFilename)
 
 	err = bundle.DownloadDeltaMap(folder, curLogSegNo*walg.WalSegmentSize)
 	assert.NoError(t, err)

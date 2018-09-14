@@ -22,6 +22,8 @@ import (
 var PgControlMissingError = errors.New("Corrupted backup: missing pg_control")
 var InvalidWalFileMagicError = errors.New("WAL-G: WAL file magic is invalid ")
 
+const DataFolderPath = "/tmp/walg_data"
+
 type ArchiveNonExistenceError struct {
 	archiveName string
 }
@@ -578,16 +580,19 @@ func downloadWALFileTo(folder *S3Folder, walFileName string, dstPath string) err
 // TODO : unit tests
 // HandleWALPush is invoked to perform wal-g wal-push
 func HandleWALPush(uploader *Uploader, walFilePath string, verify bool) {
-	bgUploader := BgUploader{}
+	bgUploader := NewBgUploader(walFilePath, int32(getMaxUploadConcurrency(16)-1), uploader, verify)
 	// Look for new WALs while doing main upload
-	bgUploader.Start(walFilePath, int32(getMaxUploadConcurrency(16)-1), uploader, verify)
-
+	bgUploader.Start()
 	err := uploadWALFile(uploader, walFilePath, verify)
 	if err != nil {
 		panic(err)
 	}
 
 	bgUploader.Stop()
+	if uploader.deltaFileManager == nil {
+		return
+	}
+	uploader.deltaFileManager.FlushFiles()
 }
 
 // TODO : unit tests

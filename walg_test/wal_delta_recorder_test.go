@@ -65,15 +65,15 @@ func TestSendDeltaToS3(t *testing.T) {
 	assertContainsTestLocation(t, storage)
 }
 
-func TestClose_NoSending(t *testing.T) {
+func TestEndRecording_NoSending(t *testing.T) {
 	recorder, err := walg.NewWalDeltaRecorder(WalgTestDataFolderPath, "000000010000000000000070", nil)
 	defer os.Remove(DeltaFilePath)
 	assert.NoError(t, err)
-	err = recorder.Close()
+	err = recorder.EndRecording()
 	assert.NoError(t, err)
 }
 
-func TestClose_Sending(t *testing.T) {
+func TestEndRecording_Sending(t *testing.T) {
 	storage := testtools.NewMockStorage()
 	deltaFile, err := os.Create(DeltaFilePath)
 	assert.NoError(t, err)
@@ -86,7 +86,7 @@ func TestClose_Sending(t *testing.T) {
 		testtools.NewStoringMockTarUploader(false, false, storage),
 	)
 	assert.NoError(t, err)
-	err = recorder.Close()
+	err = recorder.EndRecording()
 	assert.NoError(t, err)
 	assertContainsTestLocation(t, storage)
 }

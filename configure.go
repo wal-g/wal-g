@@ -19,7 +19,7 @@ import (
 
 const (
 	DefaultStreamingPartSizeFor10Concurrency = 20 << 20
- 	DefaultDataBurstRateLimit = 8*int64(DatabasePageSize)
+	DefaultDataBurstRateLimit                = 8 * int64(DatabasePageSize)
 )
 
 // MaxRetries limit upload and download retries during interaction with S3

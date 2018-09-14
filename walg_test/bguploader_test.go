@@ -24,9 +24,9 @@ func TestBackgroundWALUpload(t *testing.T) {
 
 	// Re-use generated data to test uploading WAL.
 	tu := testtools.NewMockTarUploader(false, false)
-	bu := walg.BgUploader{}
+	bu := walg.NewBgUploader(a, 16, tu, false)
 	// Look for new WALs while doing main upload
-	bu.Start(a, 16, tu, false)
+	bu.Start()
 	time.Sleep(time.Second) //time to spin up new uploaders
 	bu.Stop()
 
