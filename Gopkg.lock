@@ -79,16 +79,22 @@
   version = "v1.38.1"
 
 [[projects]]
+  name = "github.com/go-yaml/yaml"
+  packages = ["."]
+  revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
+  version = "v2.2.1"
+
+[[projects]]
   branch = "master"
   name = "github.com/golang/snappy"
   packages = ["."]
   revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
 
 [[projects]]
-  name = "github.com/go-yaml/yaml"
-  packages = ["."]
-  revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
-  version = "v2.2.1"
+  name = "github.com/google/brotli"
+  packages = ["go/cbrotli"]
+  revision = "b601fe817bd3217cb144bbb380a43cae8e847388"
+  version = "v1.0.5"
 
 [[projects]]
   name = "github.com/jackc/pgx"
@@ -207,6 +213,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c85a881fef6d1b08b46b1c323b1629543c9910739535ce0f0ed45720cf40215e"
+  inputs-digest = "82d8125d0694ff22dff08b44816bb57baf9cc11e0ae703acee1560b005c88449"
   solver-name = "gps-cdcl"
   solver-version = 1

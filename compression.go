@@ -6,17 +6,19 @@ import (
 )
 
 const (
-	Lz4AlgorithmName  = "lz4"
-	LzmaAlgorithmName = "lzma"
-	ZstdAlgorithmName = "zstd"
+	Lz4AlgorithmName    = "lz4"
+	LzmaAlgorithmName   = "lzma"
+	ZstdAlgorithmName   = "zstd"
+	BrotliAlgorithmName = "brotli"
 
-	Lz4FileExtension  = "lz4"
-	LzmaFileExtension = "lzma"
-	ZstdFileExtension = "zst"
-	LzoFileExtension  = "lzo"
+	Lz4FileExtension    = "lz4"
+	LzmaFileExtension   = "lzma"
+	ZstdFileExtension   = "zst"
+	LzoFileExtension    = "lzo"
+	BrotliFileExtension = "br"
 )
 
-var CompressingAlgorithms = []string{Lz4AlgorithmName, LzmaAlgorithmName, ZstdAlgorithmName}
+var CompressingAlgorithms = []string{Lz4AlgorithmName, LzmaAlgorithmName, ZstdAlgorithmName, BrotliAlgorithmName}
 
 type UnknownCompressionMethodError struct{}
 
@@ -35,15 +37,17 @@ type Decompressor interface {
 }
 
 var Compressors = map[string]Compressor{
-	Lz4AlgorithmName:  Lz4Compressor{},
-	LzmaAlgorithmName: LzmaCompressor{},
-	ZstdAlgorithmName: ZstdCompressor{},
+	Lz4AlgorithmName:    Lz4Compressor{},
+	LzmaAlgorithmName:   LzmaCompressor{},
+	ZstdAlgorithmName:   ZstdCompressor{},
+	BrotliAlgorithmName: BrotliCompressor{},
 }
 
 var Decompressors = []Decompressor{
 	Lz4Decompressor{},
 	ZstdDecompressor{},
 	LzmaDecompressor{},
+	BrotliDecompressor{},
 }
 
 func getDecompressorByCompressor(compressor Compressor) Decompressor {
