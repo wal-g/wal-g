@@ -1,5 +1,8 @@
 #!/bin/sh
 set -e
+mkdir .brotli.tmp
+cp -rf vendor/github.com/google/brotli/* .brotli.tmp
+cp -rf .brotli/* vendor/github.com/google/brotli/
 cp vendor/github.com/google/brotli/go/cbrotli/cgo.go vendor/github.com/google/brotli/go/cbrotli/cgo.go.tmp
 
 readonly CWD=$PWD
@@ -20,4 +23,6 @@ make
 cp ./cmd/wal-g/wal-g ./docker/pg
 docker-compose build
 docker-compose up --exit-code-from pg
-mv vendor/github.com/google/brotli/go/cbrotli/cgo.go.tmp vendor/github.com/google/brotli/go/cbrotli/cgo.go
+rm -rf vendor/github.com/google/brotli/*
+mv .brotli.tmp/* vendor/github.com/google/brotli/
+rm -rf .brotli.tmp
