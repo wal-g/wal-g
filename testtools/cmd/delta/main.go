@@ -45,7 +45,7 @@ const ( // TODO : do something with it, lol...
 
 func main() {
 	os.Setenv("WALE_S3_PREFIX", os.Getenv("WALE_S3_PREFIX")+"/"+strconv.FormatInt(time.Now().UnixNano(), 10))
-	tu, pre, err := walg.Configure()
+	tu, pre, err := walg.Configure(false)
 	if err != nil {
 		log.Fatal(err)
 	}

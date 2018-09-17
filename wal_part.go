@@ -1,16 +1,16 @@
 package walg
 
 import (
-	"io"
 	"github.com/wal-g/wal-g/walparser/parsingutil"
+	"io"
 )
 
 type WalPartDataType uint8
 
 const (
 	PreviousWalHeadType WalPartDataType = 0
-	WalTailType WalPartDataType = 1
-	WalHeadType WalPartDataType = 2
+	WalTailType         WalPartDataType = 1
+	WalHeadType         WalPartDataType = 2
 )
 
 type WalPart struct {
@@ -25,7 +25,7 @@ func NewWalPart(dataType WalPartDataType, id uint8, data []byte) *WalPart {
 
 // TODO : unit tests
 func (part *WalPart) saveWalPart(writer io.Writer) error {
-	_, err := writer.Write([]byte {byte(part.dataType), part.id})
+	_, err := writer.Write([]byte{byte(part.dataType), part.id})
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func readWalPart(reader io.Reader) (*WalPart, error) {
 	var dataType WalPartDataType
 	var partId uint8
 	var dataLen uint32
-	err := parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse {
+	err := parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
 		{Field: &dataType, Name: "part data type"},
 		{Field: &partId, Name: "part number"},
 		{Field: &dataLen, Name: "part data len"},

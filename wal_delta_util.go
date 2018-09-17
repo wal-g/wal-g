@@ -1,16 +1,16 @@
 package walg
 
 import (
+	"github.com/wal-g/wal-g/walparser"
 	"os"
 	"path"
-	"github.com/wal-g/wal-g/walparser"
 	"strings"
 )
 
 const (
 	WalFileInDelta      uint64 = 16
 	DeltaFilenameSuffix        = "_delta"
-	PartFilenameSuffix = "_part"
+	PartFilenameSuffix         = "_part"
 )
 
 func toPartFilename(deltaFilename string) string {
@@ -32,20 +32,6 @@ func GetDeltaFilenameFor(walFilename string) (string, error) {
 	}
 	deltaSegNo := logSegNo - (logSegNo % WalFileInDelta)
 	return toDeltaFilename(formatWALFileName(timeline, deltaSegNo)), nil
-}
-
-func OpenDeltaFileFor(dataFolderPath, walFilename string) (*os.File, error) {
-	deltaFilename, err := GetDeltaFilenameFor(walFilename)
-	if err != nil {
-		return nil, err
-	}
-	deltaFilePath := path.Join(dataFolderPath, deltaFilename)
-	if deltaFilename == toDeltaFilename(walFilename) {
-		// this is the first wal file in delta, so new delta file should be created
-		return os.Create(deltaFilePath)
-	}
-	deltaFile, err := os.OpenFile(deltaFilePath, os.O_RDWR|os.O_APPEND, 0666)
-	return deltaFile, err
 }
 
 // TODO : unit tests

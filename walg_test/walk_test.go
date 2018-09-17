@@ -379,8 +379,7 @@ func TestWalk(t *testing.T) {
 	walFileName := filepath.Join(data, "1")
 	walFile, err := os.Open(walFileName)
 	assert.NoError(t, err)
-	wal, err := uploader.UploadFile(walFile, false)
-	assert.NotEqual(t, "", wal)
+	err = uploader.UploadFile(walFile)
 
 	if err != nil {
 		//t.Errorf("upload: expected no error to occur but got %+v", err)

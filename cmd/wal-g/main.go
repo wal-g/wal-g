@@ -99,11 +99,11 @@ func main() {
 	}
 
 	var backupName string
-	var verify = false
+	var verifyUploads = false
 	if len(all) == 3 {
 		backupName = all[2]
 		//TODO: use cobra
-		verify = all[2] == "--verify"
+		verifyUploads = all[2] == "--verify"
 	}
 
 	// Various profiling options
@@ -118,7 +118,7 @@ func main() {
 
 	// Configure and start S3 session with bucket, region, and path names.
 	// Checks that environment variables are properly set.
-	uploader, folder, err := walg.Configure()
+	uploader, folder, err := walg.Configure(verifyUploads)
 	if err != nil {
 		log.Fatalf("FATAL: %+v\n", err)
 	}
@@ -133,7 +133,7 @@ func main() {
 		walg.HandleWALPrefetch(folder, firstArgument, backupName)
 	} else if command == "wal-push" {
 		// Upload a WAL file to S3.
-		walg.HandleWALPush(uploader, firstArgument, verify)
+		walg.HandleWALPush(uploader, firstArgument)
 	} else if command == "backup-push" {
 		walg.HandleBackupPush(firstArgument, uploader)
 	} else if command == "backup-fetch" {

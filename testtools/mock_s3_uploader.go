@@ -28,6 +28,10 @@ func NewMockStorage() MockStorage {
 	return make(map[string]bytes.Buffer)
 }
 
+func (storage MockStorage) IsEmpty() bool {
+	return len(storage) == 0
+}
+
 // Mock out uploader client for S3. Includes these methods:
 // Upload(*UploadInput, ...func(*s3manager.Uploader))
 type mockS3Uploader struct {

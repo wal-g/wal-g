@@ -22,7 +22,7 @@ import (
 var PgControlMissingError = errors.New("Corrupted backup: missing pg_control")
 var InvalidWalFileMagicError = errors.New("WAL-G: WAL file magic is invalid ")
 
-const DataFolderPath = "/tmp/walg_data"
+const DataFolderPath = "/tmp/walg_data" // TODO : make data folder path tied to $PGDATA
 
 type ArchiveNonExistenceError struct {
 	archiveName string
@@ -579,11 +579,11 @@ func downloadWALFileTo(folder *S3Folder, walFileName string, dstPath string) err
 
 // TODO : unit tests
 // HandleWALPush is invoked to perform wal-g wal-push
-func HandleWALPush(uploader *Uploader, walFilePath string, verify bool) {
-	bgUploader := NewBgUploader(walFilePath, int32(getMaxUploadConcurrency(16)-1), uploader, verify)
+func HandleWALPush(uploader *Uploader, walFilePath string) {
+	bgUploader := NewBgUploader(walFilePath, int32(getMaxUploadConcurrency(16)-1), uploader)
 	// Look for new WALs while doing main upload
 	bgUploader.Start()
-	err := uploadWALFile(uploader, walFilePath, verify)
+	err := uploadWALFile(uploader, walFilePath)
 	if err != nil {
 		panic(err)
 	}
@@ -592,12 +592,12 @@ func HandleWALPush(uploader *Uploader, walFilePath string, verify bool) {
 	if uploader.deltaFileManager == nil {
 		return
 	}
-	uploader.deltaFileManager.FlushFiles()
+	uploader.deltaFileManager.FlushFiles(uploader.Clone())
 }
 
 // TODO : unit tests
 // uploadWALFile from FS to the cloud
-func uploadWALFile(uploader *Uploader, walFilePath string, verify bool) error {
+func uploadWALFile(uploader *Uploader, walFilePath string) error {
 	if uploader.uploadingFolder.preventWalOverwrite {
 		overwriteAttempt, err := checkWALOverwrite(uploader, walFilePath)
 		if err != nil {
@@ -610,8 +610,8 @@ func uploadWALFile(uploader *Uploader, walFilePath string, verify bool) error {
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not open '%s'\n", walFilePath)
 	}
-	path, err := uploader.UploadWalFile(walFile, verify)
-	return errors.Wrapf(err, "upload: could not upload '%s'\n", path)
+	err = uploader.UploadWalFile(walFile)
+	return errors.Wrapf(err, "upload: could not upload '%s'\n", walFilePath)
 }
 
 func checkWALOverwrite(uploader *Uploader, walFilePath string) (overwriteAttempt bool, err error) {

@@ -1,9 +1,9 @@
 package walg
 
 import (
-	"github.com/wal-g/wal-g/walparser"
 	"bytes"
 	"fmt"
+	"github.com/wal-g/wal-g/walparser"
 	"log"
 )
 
@@ -16,7 +16,7 @@ func (err NotWalFilenameError) Error() string {
 }
 
 type WalPartRecorder struct {
-	manager *DeltaFileManager
+	manager     *DeltaFileManager
 	walFilename string
 }
 
@@ -55,7 +55,7 @@ func (recorder *WalPartRecorder) saveNextWalHead(parser *walparser.WalParser) er
 	}
 	positionInDelta := getPositionInDelta(recorder.walFilename)
 	partFile.walHeads[positionInDelta] = parserData.Bytes()
-	if positionInDelta == int(WalFileInDelta) - 1 {
+	if positionInDelta == int(WalFileInDelta)-1 {
 		nextWalFilename, _ := GetNextWalFilename(recorder.walFilename)
 		nextDeltaFilename, _ := GetDeltaFilenameFor(nextWalFilename)
 		nextPartFile, err := recorder.manager.getPartFile(nextDeltaFilename)

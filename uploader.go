@@ -26,27 +26,34 @@ type Uploader struct {
 	compressor           Compressor
 	useWalDelta          bool
 	waitGroup            *sync.WaitGroup
-	deltaFileManager *DeltaFileManager
+	deltaFileManager     *DeltaFileManager
+	verify               bool
 }
 
 // NewUploader creates a new tar uploader without the actual
 // S3 uploader. CreateUploader() is used to configure byte size and
 // concurrency streams for the uploader.
-func NewUploader(uploaderAPI s3manageriface.UploaderAPI, compressor Compressor, uploadingLocation *S3Folder, useWalDelta bool) *Uploader {
-	temporaryDataFolder, err := NewTemporaryDataFolder(DataFolderPath)
+func NewUploader(
+	uploaderAPI s3manageriface.UploaderAPI,
+	compressor Compressor,
+	uploadingLocation *S3Folder,
+	useWalDelta, verify bool,
+) *Uploader {
+	temporaryDataFolder, err := NewDiskDataFolder(DataFolderPath)
 
 	if err != nil {
 		useWalDelta = false
 		_ = fmt.Sprintf("failed to open WAL-G data folder because of: '%v'", err)
 	}
 	return &Uploader{
-		uploaderApi:     uploaderAPI,
-		uploadingFolder: uploadingLocation,
-		StorageClass:    "STANDARD",
-		compressor:      compressor,
-		useWalDelta:     useWalDelta,
-		waitGroup:       &sync.WaitGroup{},
+		uploaderApi:      uploaderAPI,
+		uploadingFolder:  uploadingLocation,
+		StorageClass:     "STANDARD",
+		compressor:       compressor,
+		useWalDelta:      useWalDelta,
+		waitGroup:        &sync.WaitGroup{},
 		deltaFileManager: NewDeltaFileManager(temporaryDataFolder),
+		verify:           verify,
 	}
 }
 
@@ -72,10 +79,11 @@ func (uploader *Uploader) Clone() *Uploader {
 		uploader.useWalDelta,
 		&sync.WaitGroup{},
 		uploader.deltaFileManager,
+		uploader.verify,
 	}
 }
 
-func (uploader *Uploader) UploadWalFile(file NamedReader, verify bool) (dstPath string, err error) {
+func (uploader *Uploader) UploadWalFile(file NamedReader) error {
 	var walFileReader io.Reader
 
 	filename := path.Base(file.Name())
@@ -91,12 +99,12 @@ func (uploader *Uploader) UploadWalFile(file NamedReader, verify bool) (dstPath 
 		walFileReader = file
 	}
 
-	return uploader.UploadFile(&NamedReaderImpl{walFileReader, file.Name()}, verify)
+	return uploader.UploadFile(&NamedReaderImpl{walFileReader, file.Name()})
 }
 
 // TODO : unit tests
-// UploadFile compresses a file and uploads it. Returns path to the file in storage.
-func (uploader *Uploader) UploadFile(file NamedReader, verify bool) (dstPath string, err error) {
+// UploadFile compresses a file and uploads it.
+func (uploader *Uploader) UploadFile(file NamedReader) error {
 	pipeWriter := &CompressingPipeWriter{
 		Input:                file,
 		NewCompressingWriter: uploader.compressor.NewWriter,
@@ -104,18 +112,18 @@ func (uploader *Uploader) UploadFile(file NamedReader, verify bool) (dstPath str
 
 	pipeWriter.Compress(&OpenPGPCrypter{})
 
-	dstPath = sanitizePath(uploader.uploadingFolder.Server + WalPath + filepath.Base(file.Name()) + "." + uploader.compressor.FileExtension())
+	dstPath := sanitizePath(uploader.uploadingFolder.Server + WalPath + filepath.Base(file.Name()) + "." + uploader.compressor.FileExtension())
 	reader := pipeWriter.Output
 
-	if verify {
+	if uploader.verify {
 		reader = newMd5Reader(reader)
 	}
 
 	input := uploader.CreateUploadInput(dstPath, reader)
 
-	err = uploader.upload(input, file.Name())
+	err := uploader.upload(input, file.Name())
 	fmt.Println("FILE PATH:", dstPath)
-	if verify {
+	if uploader.verify {
 		sum := reader.(*MD5Reader).Sum()
 		archive := &Archive{
 			Folder:  uploader.uploadingFolder,
@@ -135,7 +143,7 @@ func (uploader *Uploader) UploadFile(file NamedReader, verify bool) (dstPath str
 		}
 		fmt.Println("ETag ", trimETag)
 	}
-	return
+	return err
 }
 
 // CreateUploadInput creates a s3manager.UploadInput for a Uploader using

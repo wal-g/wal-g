@@ -1,9 +1,9 @@
 package walg
 
 import (
-	"io"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/walparser"
+	"io"
 )
 
 type WalPartFile struct {
@@ -22,7 +22,7 @@ func NewWalPartFile() *WalPartFile {
 
 // TODO : unit tests
 func (partFile *WalPartFile) isComplete() bool {
-	for _,  walTail := range partFile.walTails {
+	for _, walTail := range partFile.walTails {
 		if walTail == nil {
 			return false
 		}
@@ -59,7 +59,7 @@ func (partFile *WalPartFile) getCurrentDeltaFileRecordHeads() [][]byte {
 	recordHeads := make([][]byte, WalFileInDelta)
 	recordHeads[0] = partFile.previousWalHead
 	for id := 1; id < int(WalFileInDelta); id++ {
-		recordHeads[id] = partFile.walHeads[id - 1]
+		recordHeads[id] = partFile.walHeads[id-1]
 	}
 	return recordHeads
 }

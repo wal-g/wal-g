@@ -1,27 +1,36 @@
 package walg
 
 import (
-	"os"
+	"bytes"
 	"github.com/wal-g/wal-g/walparser"
 	"log"
-	"bytes"
+	"sync"
 )
 
 // TODO : clean up directory from outdated delta files
 type DeltaFileManager struct {
-	dataFolder *TemporaryDataFolder
-	partFiles map[string] *WalPartFile
-	deltaFileWriters map[string] *DeltaFileChanWriter
+	dataFolder            DataFolder
+	partFiles             map[string]*WalPartFile
+	deltaFileWriters      map[string]*DeltaFileChanWriter
+	deltaFileWriterWaiter sync.WaitGroup
 	canceledWalRecordings chan string
+	canceledDeltaFiles    map[string]bool
+	canceledWaiter        sync.WaitGroup
 }
 
-func NewDeltaFileManager(dataFolder *TemporaryDataFolder) *DeltaFileManager {
-	return &DeltaFileManager{
+func NewDeltaFileManager(dataFolder DataFolder) *DeltaFileManager {
+	manager := &DeltaFileManager{
 		dataFolder,
-		make(map[string] *WalPartFile),
-		make(map[string] *DeltaFileChanWriter),
+		make(map[string]*WalPartFile),
+		make(map[string]*DeltaFileChanWriter),
+		sync.WaitGroup{},
 		make(chan string),
+		make(map[string]bool),
+		sync.WaitGroup{},
 	}
+	manager.canceledWaiter.Add(1)
+	go manager.getCanceledDeltaFiles()
+	return manager
 }
 
 // TODO : unit tests
@@ -29,10 +38,10 @@ func (manager *DeltaFileManager) getBlockLocationConsumer(deltaFilename string) 
 	if deltaFileWriter, ok := manager.deltaFileWriters[deltaFilename]; ok {
 		return deltaFileWriter.blockLocationConsumer, nil
 	}
-	physicalDeltaFile, err := manager.dataFolder.openReadonlyFile(deltaFilename)
+	physicalDeltaFile, err := manager.dataFolder.OpenReadonlyFile(deltaFilename)
 	var deltaFile *DeltaFile
 	if err != nil {
-		if !os.IsNotExist(err) {
+		if _, ok := err.(*NoSuchFileError); !ok {
 			return nil, err
 		}
 		deltaFile = NewDeltaFile(walparser.NewWalParser())
@@ -44,7 +53,8 @@ func (manager *DeltaFileManager) getBlockLocationConsumer(deltaFilename string) 
 		}
 	}
 	deltaFileWriter := NewDeltaFileChanWriter(deltaFile)
-	go deltaFileWriter.consume()
+	manager.deltaFileWriterWaiter.Add(1)
+	go deltaFileWriter.consume(&manager.deltaFileWriterWaiter)
 	manager.deltaFileWriters[deltaFilename] = deltaFileWriter
 	return deltaFileWriter.blockLocationConsumer, nil
 }
@@ -55,10 +65,10 @@ func (manager *DeltaFileManager) getPartFile(deltaFilename string) (*WalPartFile
 	if partFile, ok := manager.partFiles[partFilename]; ok {
 		return partFile, nil
 	}
-	physicalPartFile, err := manager.dataFolder.openReadonlyFile(partFilename)
+	physicalPartFile, err := manager.dataFolder.OpenReadonlyFile(partFilename)
 	var partFile *WalPartFile
 	if err != nil {
-		if !os.IsNotExist(err) {
+		if _, ok := err.(*NoSuchFileError); !ok {
 			return nil, err
 		}
 		partFile = NewWalPartFile()
@@ -74,37 +84,55 @@ func (manager *DeltaFileManager) getPartFile(deltaFilename string) (*WalPartFile
 }
 
 // TODO : unit tests
-func (manager *DeltaFileManager) FlushFiles() {
-	canceledDeltaFiles := manager.getCanceledDeltaFiles()
-	completedPartFiles := make(map[string]bool)
+func (manager *DeltaFileManager) flushPartFiles() (completedPartFiles map[string]bool) {
+	close(manager.canceledWalRecordings)
+	manager.canceledWaiter.Wait()
+	completedPartFiles = make(map[string]bool)
 	for partFilename, partFile := range manager.partFiles {
 		deltaFilename := partFilenameToDelta(partFilename)
-		if _, ok := canceledDeltaFiles[deltaFilename]; ok {
+		if _, ok := manager.canceledDeltaFiles[deltaFilename]; ok {
 			continue
 		}
 		if partFile.isComplete() {
 			completedPartFiles[partFilename] = true
 			err := manager.combinePartFile(deltaFilename, partFile)
 			if err != nil {
-				canceledDeltaFiles[deltaFilename] = true
+				manager.canceledDeltaFiles[deltaFilename] = true
 				log.Printf("canceled delta file writing because of error: %v", err)
 			}
 		} else {
 			err := saveToDataFolder(partFile, partFilename, manager.dataFolder)
 			if err != nil {
-				canceledDeltaFiles[deltaFilename] = true
+				manager.canceledDeltaFiles[deltaFilename] = true
 				log.Printf("failed to save part file: '%s' because of error: '%v'", partFilename, err)
 			}
 		}
 	}
-	for deltaFilename, deltaFileWriter := range manager.deltaFileWriters {
+	return
+}
+
+// TODO : unit tests
+func (manager *DeltaFileManager) flushDeltaFiles(uploader *Uploader, completedPartFiles map[string]bool) {
+	for _, deltaFileWriter := range manager.deltaFileWriters {
 		deltaFileWriter.close()
-		if _, ok := canceledDeltaFiles[deltaFilename]; ok {
+	}
+	manager.deltaFileWriterWaiter.Wait()
+	for deltaFilename, deltaFileWriter := range manager.deltaFileWriters {
+		if _, ok := manager.canceledDeltaFiles[deltaFilename]; ok {
 			continue
 		}
 		partFilename := toPartFilename(deltaFilename)
 		if _, ok := completedPartFiles[partFilename]; ok {
-			// TODO : upload file to S3
+			var deltaFileData bytes.Buffer
+			err := deltaFileWriter.deltaFile.save(&deltaFileData)
+			if err != nil {
+				log.Printf("failed to upload delta file: '%s' because of saving error: '%v'", deltaFilename, err)
+			} else {
+				err = uploader.UploadFile(&NamedReaderImpl{&deltaFileData, deltaFilename})
+				if err != nil {
+					log.Printf("failed to upload delta file: '%s' because of uploading error: '%v'", deltaFilename, err)
+				}
+			}
 		} else {
 			err := saveToDataFolder(deltaFileWriter.deltaFile, deltaFilename, manager.dataFolder)
 			if err != nil {
@@ -114,31 +142,36 @@ func (manager *DeltaFileManager) FlushFiles() {
 	}
 }
 
+// TODO : unit tests
+func (manager *DeltaFileManager) FlushFiles(uploader *Uploader) {
+	completedPartFiles := manager.flushPartFiles()
+	manager.flushDeltaFiles(uploader, completedPartFiles)
+}
+
 func (manager *DeltaFileManager) cancelRecording(walFilename string) {
 	manager.canceledWalRecordings <- walFilename
 }
 
 // TODO : unit tests
-func (manager *DeltaFileManager) getCanceledDeltaFiles() map[string]bool {
-	canceledDeltaFiles := make(map[string]bool)
-	close(manager.canceledWalRecordings)
+func (manager *DeltaFileManager) getCanceledDeltaFiles() {
 	for walFilename := range manager.canceledWalRecordings {
-		canceledDeltaFiles[toDeltaFilename(walFilename)] = true
-		nextWalFilename, err := GetNextWalFilename(walFilename)
+		deltaFilename, err := GetDeltaFilenameFor(walFilename)
 		if err != nil {
-			canceledDeltaFiles[toDeltaFilename(nextWalFilename)] = true
-		} else {
-			log.Printf("error: %v", err)
+			continue
 		}
+		manager.canceledDeltaFiles[deltaFilename] = true
+		nextWalFilename, _ := GetNextWalFilename(walFilename)
+		deltaFilename, _ = GetDeltaFilenameFor(nextWalFilename)
+		manager.canceledDeltaFiles[deltaFilename] = true
 	}
-	return canceledDeltaFiles
+	manager.canceledWaiter.Done()
 }
 
 // TODO : unit tests
 func (manager *DeltaFileManager) combinePartFile(deltaFilename string, partFile *WalPartFile) error {
 	deltaFileWriter := manager.deltaFileWriters[deltaFilename]
 	var err error
-	deltaFileWriter.deltaFile.walParser, err = walparser.LoadParser(bytes.NewReader(partFile.walHeads[WalFileInDelta - 1]))
+	deltaFileWriter.deltaFile.walParser, err = walparser.LoadParser(bytes.NewReader(partFile.walHeads[WalFileInDelta-1]))
 	if err != nil {
 		return err
 	}

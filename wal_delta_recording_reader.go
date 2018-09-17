@@ -59,7 +59,9 @@ func (reader *WalDeltaRecordingReader) Read(p []byte) (n int, err error) {
 		p = p[len(reader.PageDataLeftover):]
 		reader.PageDataLeftover, err = reader.PageReader.ReadPageData()
 		if err != nil {
-			reader.partRecorder.cancelRecordingWithErr(err)
+			if err != io.EOF {
+				reader.partRecorder.cancelRecordingWithErr(err)
+			}
 			return dataExpected - len(p), err
 		}
 		recordingErr := reader.RecordBlockLocationsFromPage()

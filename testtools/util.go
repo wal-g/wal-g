@@ -35,6 +35,7 @@ func NewMockTarUploader(apiMultiErr, apiErr bool) *walg.Uploader {
 		&MockCompressor{},
 		walg.NewS3Folder(NewMockS3Client(true, true), "bucket/", "server", false),
 		false,
+		false,
 	)
 }
 
@@ -43,6 +44,7 @@ func NewStoringMockTarUploader(apiMultiErr, apiErr bool, storage MockStorage) *w
 		NewMockS3Uploader(apiMultiErr, apiErr, storage),
 		&MockCompressor{},
 		walg.NewS3Folder(nil, "bucket/", "server", false),
+		false,
 		false,
 	)
 }
