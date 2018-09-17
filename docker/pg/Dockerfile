@@ -11,5 +11,4 @@ COPY run_integration_tests.sh /tmp
 COPY full_backup_test.sh /tmp
 COPY delta_backup_fullscan_test.sh /tmp
 COPY delta_backup_wal_delta_test.sh /tmp
-COPY wal-g-dep/* /usr/local/lib/
 CMD su postgres -c "/tmp/run_integration_tests.sh"

@@ -18,7 +18,7 @@ const (
 	LzoFileExtension    = "lzo"
 )
 
-var CompressingAlgorithms = []string{Lz4AlgorithmName, LzmaAlgorithmName, ZstdAlgorithmName}
+var CompressingAlgorithms = []string{Lz4AlgorithmName, LzmaAlgorithmName, ZstdAlgorithmName, BrotliAlgorithmName}
 
 type UnknownCompressionMethodError struct{}
 

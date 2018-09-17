@@ -10,8 +10,8 @@ type BrotliReaderFromWriter struct {
 }
 
 func NewBrotliReaderFromWriter(dst io.Writer) *BrotliReaderFromWriter {
-	options := cbrotli.WriterOptions{Quality: 2}
-	return &BrotliReaderFromWriter{Writer: *cbrotli.NewWriter(dst, options)}
+	brotliWriter := cbrotli.NewWriter(dst, cbrotli.WriterOptions{Quality: 3})
+	return &BrotliReaderFromWriter{Writer: *brotliWriter}
 }
 
 func (writer *BrotliReaderFromWriter) ReadFrom(reader io.Reader) (n int64, err error) {
