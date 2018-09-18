@@ -46,20 +46,6 @@ func createWalParser() (*walparser.WalParser, error) {
 	return walParser, nil
 }
 
-func TestLoadWalParser(t *testing.T) {
-	walParser, err := createWalParser()
-	assert.NoError(t, err)
-	parserFile, err := os.Create(ParserFilePath)
-	assert.NoError(t, err)
-	walParser.SaveParser(parserFile)
-	parserFile.Close()
-
-	actualParser, err := walg.LoadWalParser(WalgTestDataFolderPath)
-	assert.NoError(t, err)
-	assert.Equal(t, walParser, actualParser)
-	os.Remove(ParserFilePath)
-}
-
 func TestRecordBlockLocationsFromPage(t *testing.T) {
 	walParser := walparser.NewWalParser()
 	walFile, err := os.Open(WalFilePath)
@@ -111,7 +97,7 @@ func TestRead_CorrectRecording(t *testing.T) {
 	assert.NoError(t, err)
 	defer walFile.Close()
 
-	dataFolder := testtools.NewMockDataFolder(make(map[string]*bytes.Buffer))
+	dataFolder := testtools.NewMockDataFolder()
 	manager := walg.NewDeltaFileManager(dataFolder)
 	recordingReader, err := walg.NewWalDeltaRecordingReader(walFile, WalFilename, manager)
 	assert.NoError(t, err)
@@ -132,7 +118,7 @@ func TestRead_RecordingFail(t *testing.T) {
 		walData[i] = 1
 	}
 
-	dataFolder := testtools.NewMockDataFolder(make(map[string]*bytes.Buffer))
+	dataFolder := testtools.NewMockDataFolder()
 	manager := walg.NewDeltaFileManager(dataFolder)
 	recordingReader, err := walg.NewWalDeltaRecordingReader(bytes.NewReader(walData), WalFilename, manager)
 	assert.NoError(t, err)

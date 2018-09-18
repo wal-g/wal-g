@@ -452,13 +452,13 @@ func (bundle *Bundle) DownloadDeltaMap(folder *S3Folder, backupStartLSN uint64) 
 		if err != nil {
 			return errors.Wrapf(err, "Error during delta file '%s' downloading.", deltaFilename)
 		}
-		deltaFile, err := loadDeltaFile(reader)
-		walParser = deltaFile.walParser
+		deltaFile, err := LoadDeltaFile(reader)
+		walParser = deltaFile.WalParser
 		if err != nil {
 			return errors.Wrapf(err, "Error during reading delta file '%s'", deltaFilename)
 		}
 		reader.Close()
-		for _, location := range deltaFile.locations {
+		for _, location := range deltaFile.Locations {
 			deltaMap.AddToDelta(location)
 		}
 	}

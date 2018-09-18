@@ -1,35 +1,39 @@
 package walg
 
 import (
+	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/walparser"
 	"io"
 )
 
+var NilWalParserError = errors.New("expected to get non nil wal parser, but got nil one")
+
 type DeltaFile struct {
-	locations []walparser.BlockLocation
-	walParser *walparser.WalParser
+	Locations []walparser.BlockLocation
+	WalParser *walparser.WalParser
 }
 
-func NewDeltaFile(walParser *walparser.WalParser) *DeltaFile {
-	return &DeltaFile{nil, walParser}
+func NewDeltaFile(walParser *walparser.WalParser) (*DeltaFile, error) {
+	if walParser == nil {
+		return nil, NilWalParserError
+	}
+	return &DeltaFile{nil, walParser}, nil
 }
 
-// TODO : unit tests
-func (deltaFile *DeltaFile) save(writer io.Writer) error {
-	err := WriteLocationsTo(writer, append(deltaFile.locations, TerminalLocation))
+func (deltaFile *DeltaFile) Save(writer io.Writer) error {
+	err := WriteLocationsTo(writer, append(deltaFile.Locations, TerminalLocation))
 	if err != nil {
 		return err
 	}
-	return deltaFile.walParser.SaveParser(writer)
+	return deltaFile.WalParser.Save(writer)
 }
 
-// TODO : unit tests
-func loadDeltaFile(reader io.Reader) (*DeltaFile, error) {
+func LoadDeltaFile(reader io.Reader) (*DeltaFile, error) {
 	locations, err := ReadLocationsFrom(reader)
 	if err != nil {
 		return nil, err
 	}
-	walParser, err := walparser.LoadParser(reader)
+	walParser, err := walparser.LoadWalParser(reader)
 	if err != nil {
 		return nil, err
 	}

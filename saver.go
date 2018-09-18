@@ -3,7 +3,7 @@ package walg
 import "io"
 
 type Saver interface {
-	save(writer io.Writer) error
+	Save(writer io.Writer) error
 }
 
 func saveToDataFolder(saver Saver, filename string, dataFolder DataFolder) error {
@@ -11,7 +11,7 @@ func saveToDataFolder(saver Saver, filename string, dataFolder DataFolder) error
 	if err != nil {
 		return err
 	}
-	err = saver.save(file)
+	err = saver.Save(file)
 	if err != nil {
 		return err
 	}

@@ -9,8 +9,8 @@ import (
 
 type MockDataFolder map[string]*bytes.Buffer
 
-func NewMockDataFolder(files map[string]*bytes.Buffer) *MockDataFolder {
-	dataFolder := MockDataFolder(files)
+func NewMockDataFolder() *MockDataFolder {
+	dataFolder := MockDataFolder(make(map[string]*bytes.Buffer))
 	return &dataFolder
 }
 
@@ -20,7 +20,7 @@ func (folder *MockDataFolder) IsEmpty() bool {
 
 func (folder *MockDataFolder) OpenReadonlyFile(filename string) (io.ReadCloser, error) {
 	if _, ok := (*folder)[filename]; ok {
-		return ioutil.NopCloser((*folder)[filename]), nil
+		return ioutil.NopCloser(bytes.NewReader((*folder)[filename].Bytes())), nil
 	} else {
 		return nil, walg.NewNoSuchFileError(filename)
 	}

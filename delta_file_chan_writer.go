@@ -6,8 +6,8 @@ import (
 )
 
 type DeltaFileChanWriter struct {
-	deltaFile             *DeltaFile
-	blockLocationConsumer chan walparser.BlockLocation
+	DeltaFile             *DeltaFile
+	BlockLocationConsumer chan walparser.BlockLocation
 }
 
 func NewDeltaFileChanWriter(deltaFile *DeltaFile) *DeltaFileChanWriter {
@@ -16,12 +16,12 @@ func NewDeltaFileChanWriter(deltaFile *DeltaFile) *DeltaFileChanWriter {
 }
 
 func (writer *DeltaFileChanWriter) consume(waitGroup *sync.WaitGroup) {
-	for blockLocation := range writer.blockLocationConsumer {
-		writer.deltaFile.locations = append(writer.deltaFile.locations, blockLocation)
+	for blockLocation := range writer.BlockLocationConsumer {
+		writer.DeltaFile.Locations = append(writer.DeltaFile.Locations, blockLocation)
 	}
 	waitGroup.Done()
 }
 
 func (writer *DeltaFileChanWriter) close() {
-	close(writer.blockLocationConsumer)
+	close(writer.BlockLocationConsumer)
 }

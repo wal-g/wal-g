@@ -1,9 +1,7 @@
 package walg
 
 import (
-	"bytes"
 	"fmt"
-	"github.com/wal-g/wal-g/walparser"
 	"log"
 )
 
@@ -27,47 +25,40 @@ func NewWalPartRecorder(walFilename string, manager *DeltaFileManager) (*WalPart
 	return &WalPartRecorder{manager, walFilename}, nil
 }
 
-// TODO : unit tests
-func (recorder *WalPartRecorder) savePreviousWalTail(tailData []byte) error {
+func (recorder *WalPartRecorder) SavePreviousWalTail(tailData []byte) error {
 	deltaFilename, err := GetDeltaFilenameFor(recorder.walFilename)
 	if err != nil {
 		return err
 	}
-	partFile, err := recorder.manager.getPartFile(deltaFilename)
+	partFile, err := recorder.manager.GetPartFile(deltaFilename)
 	if err != nil {
 		return err
 	}
-	partFile.walTails[getPositionInDelta(recorder.walFilename)] = tailData
+	partFile.WalTails[GetPositionInDelta(recorder.walFilename)] = tailData
 	return nil
 }
 
-// TODO : unit tests
-func (recorder *WalPartRecorder) saveNextWalHead(parser *walparser.WalParser) error {
-	var parserData bytes.Buffer
-	err := parser.SaveParser(&parserData)
-	if err != nil {
-		return err
-	}
+func (recorder *WalPartRecorder) SaveNextWalHead(head []byte) error {
 	deltaFilename, _ := GetDeltaFilenameFor(recorder.walFilename)
-	partFile, err := recorder.manager.getPartFile(deltaFilename)
+	partFile, err := recorder.manager.GetPartFile(deltaFilename)
 	if err != nil {
 		return err
 	}
-	positionInDelta := getPositionInDelta(recorder.walFilename)
-	partFile.walHeads[positionInDelta] = parserData.Bytes()
+	positionInDelta := GetPositionInDelta(recorder.walFilename)
+	partFile.WalHeads[positionInDelta] = head
 	if positionInDelta == int(WalFileInDelta)-1 {
 		nextWalFilename, _ := GetNextWalFilename(recorder.walFilename)
 		nextDeltaFilename, _ := GetDeltaFilenameFor(nextWalFilename)
-		nextPartFile, err := recorder.manager.getPartFile(nextDeltaFilename)
+		nextPartFile, err := recorder.manager.GetPartFile(nextDeltaFilename)
 		if err != nil {
 			return err
 		}
-		nextPartFile.previousWalHead = parserData.Bytes()
+		nextPartFile.PreviousWalHead = head
 	}
 	return nil
 }
 
 func (recorder *WalPartRecorder) cancelRecordingWithErr(err error) {
 	log.Printf("stopped wal file: '%s' recording because of error: '%v'", recorder.walFilename, err)
-	recorder.manager.cancelRecording(recorder.walFilename)
+	recorder.manager.CancelRecording(recorder.walFilename)
 }

@@ -7,34 +7,10 @@ import (
 	"testing"
 )
 
-//const WalFilePath = "./testdata/whole_wal_file"
 const WalSwitchTestPath = "./testdata/wal_switch_test"
 const PartialTestPath = "./testdata/partial_test"
 const CutWALSwitchTestPath = "./testdata/cut_wal_switch_test"
 const SmallPartialTestPath = "./testdata/small_partial_test"
-
-//func TestWalFileParsing(t *testing.T) {
-//	walFile, err := os.Open(WalFilePath)
-//	defer walFile.Close()
-//	if err != nil {
-//		t.Fatalf(err.Error())
-//	}
-//	pageReader := WalPageReader{walFileReader: walFile}
-//	parser := WalParser{}
-//	for i := 0; ; i++ {
-//		pageData, err := pageReader.ReadPageData()
-//		if err != nil {
-//			if err == io.EOF {
-//				break
-//			}
-//			t.Fatalf("error: \"%s\" at page: %v", err.Error(), i)
-//		}
-//		_, err = parser.ParseRecordsFromPage(bytes.NewReader(pageData))
-//		if err != nil {
-//			t.Fatalf("error: \"%s\" at page: %v", err.Error(), i)
-//		}
-//	}
-//}
 
 func TestZeroPageParsing(t *testing.T) {
 	zeroPage := make([]byte, WalPageSize)
@@ -79,4 +55,17 @@ func TestParsing(t *testing.T) {
 	parsingTestCase(t, PartialTestPath, doPartialFileParsingTesting)
 	parsingTestCase(t, CutWALSwitchTestPath, doWalSwitchParsingTesting)
 	parsingTestCase(t, WalSwitchTestPath, doWalSwitchParsingTesting)
+}
+
+func TestSaveLoadWalParser(t *testing.T) {
+	walParser := &WalParser{[]byte{1, 2, 3, 4, 5, 6}}
+
+	var walParserData bytes.Buffer
+	err := walParser.Save(&walParserData)
+	assert.NoError(t, err)
+
+	loadedWalParser, err := LoadWalParser(&walParserData)
+	assert.NoError(t, err)
+
+	assert.Equal(t, walParser, loadedWalParser)
 }

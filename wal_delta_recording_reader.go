@@ -2,9 +2,9 @@ package walg
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/wal-g/wal-g/walparser"
 	"io"
-	"log"
 	"os"
 )
 
@@ -40,9 +40,9 @@ func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, man
 }
 
 func (reader *WalDeltaRecordingReader) Close() error {
-	err := reader.partRecorder.saveNextWalHead(&reader.WalParser)
+	err := reader.partRecorder.SaveNextWalHead(reader.WalParser.GetCurrentRecordData())
 	if err != nil {
-		log.Printf("Failed to save next wal file prefix after end of recording because of: %v", err)
+		fmt.Printf("Failed to save next wal file prefix after end of recording because of: %v", err)
 	}
 	return err
 }
@@ -77,7 +77,7 @@ func (reader *WalDeltaRecordingReader) RecordBlockLocationsFromPage() error {
 	}
 	discardedRecordTail, records, err := reader.WalParser.ParseRecordsFromPage(bytes.NewReader(reader.PageDataLeftover))
 	if len(discardedRecordTail) > 0 {
-		err = reader.partRecorder.savePreviousWalTail(discardedRecordTail)
+		err = reader.partRecorder.SavePreviousWalTail(discardedRecordTail)
 		if err != nil {
 			return err
 		}
@@ -99,7 +99,7 @@ func tryOpenParserAndRecorders(walFilename string, manager *DeltaFileManager) (*
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	blockLocationConsumer, err := manager.getBlockLocationConsumer(deltaFilename)
+	blockLocationConsumer, err := manager.GetBlockLocationConsumer(deltaFilename)
 	if err != nil {
 		return nil, nil, nil, err
 	}

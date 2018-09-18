@@ -22,6 +22,10 @@ type WalParser struct {
 	currentRecordData []byte
 }
 
+func NewWalParser() *WalParser {
+	return &WalParser{make([]byte, 0)}
+}
+
 func (parser *WalParser) Invalidate() {
 	parser.currentRecordData = nil
 }
@@ -135,11 +139,7 @@ func checkPartialPage(pageReader io.Reader, page *XLogPage, recordReadingErr err
 	return nil, recordReadingErr
 }
 
-func NewWalParser() *WalParser {
-	return &WalParser{nil}
-}
-
-func (parser *WalParser) SaveParser(writer io.Writer) error {
+func (parser *WalParser) Save(writer io.Writer) error {
 	currentRecordDataLen := make([]byte, 4)
 	binary.LittleEndian.PutUint32(currentRecordDataLen, uint32(len(parser.currentRecordData)))
 	_, err := writer.Write(currentRecordDataLen)
@@ -150,7 +150,11 @@ func (parser *WalParser) SaveParser(writer io.Writer) error {
 	return err
 }
 
-func LoadParser(reader io.Reader) (*WalParser, error) {
+func (parser *WalParser) GetCurrentRecordData() []byte {
+	return parser.currentRecordData
+}
+
+func LoadWalParser(reader io.Reader) (*WalParser, error) {
 	var dataLen uint32
 	err := parsingutil.NewFieldToParse(&dataLen, "record data prefix len").ParseFrom(reader)
 	if err != nil {
@@ -162,4 +166,8 @@ func LoadParser(reader io.Reader) (*WalParser, error) {
 		return nil, err
 	}
 	return &WalParser{data}, nil
+}
+
+func LoadWalParserFromCurrentRecordData(currentRecordData []byte) *WalParser {
+	return &WalParser{currentRecordData}
 }

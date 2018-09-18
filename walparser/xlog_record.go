@@ -13,12 +13,17 @@ type XLogRecord struct {
 	MainData    []byte
 }
 
-func (record *XLogRecord) isWALSwitch() bool {
-	return record.Header.ResourceManagerID == RmXlogID &&
-		(record.Header.Info&^XlrInfoMask) == XLogSwitch
-}
-
 func NewXLogRecord(header XLogRecordHeader) *XLogRecord {
 	blocks := make([]XLogRecordBlock, 0)
 	return &XLogRecord{Header: header, Blocks: blocks}
+}
+
+func (record *XLogRecord) IsZero() bool {
+	return record.Header.isZero() && record.MainDataLen == 0 && record.Origin == 0 &&
+		record.Blocks == nil && record.MainData == nil
+}
+
+func (record *XLogRecord) isWALSwitch() bool {
+	return record.Header.ResourceManagerID == RmXlogID &&
+		(record.Header.Info&^XlrInfoMask) == XLogSwitch
 }

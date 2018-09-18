@@ -23,9 +23,13 @@ func NewWalPart(dataType WalPartDataType, id uint8, data []byte) *WalPart {
 	return &WalPart{dataType, id, data}
 }
 
-// TODO : unit tests
-func (part *WalPart) saveWalPart(writer io.Writer) error {
+func (part *WalPart) Save(writer io.Writer) error {
 	_, err := writer.Write([]byte{byte(part.dataType), part.id})
+	if err != nil {
+		return err
+	}
+	dataLen := uint32(len(part.data))
+	_, err = writer.Write(toBytes(&dataLen))
 	if err != nil {
 		return err
 	}
@@ -35,7 +39,7 @@ func (part *WalPart) saveWalPart(writer io.Writer) error {
 
 func saveWalParts(parts []WalPart, writer io.Writer) error {
 	for _, part := range parts {
-		err := part.saveWalPart(writer)
+		err := part.Save(writer)
 		if err != nil {
 			return err
 		}
@@ -43,8 +47,7 @@ func saveWalParts(parts []WalPart, writer io.Writer) error {
 	return nil
 }
 
-// TODO : unit tests
-func readWalPart(reader io.Reader) (*WalPart, error) {
+func LoadWalPart(reader io.Reader) (*WalPart, error) {
 	var dataType WalPartDataType
 	var partId uint8
 	var dataLen uint32
