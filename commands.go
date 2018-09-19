@@ -593,7 +593,7 @@ func HandleWALPush(uploader *Uploader, walFilePath string) {
 
 	//fmt.Println("--------------* Stop bgUploader '%s' *--------------", walFilePath)
 	bgUploader.Stop()
-	fmt.Printf("--------------* Flush Files '%s' *--------------\n", walFilePath)
+	fmt.Printf("--------------* Flush Files '%s' *--------------\n\n", walFilePath)
 	if uploader.deltaFileManager != nil {
 		uploader.deltaFileManager.FlushFiles(uploader.Clone())
 	}
