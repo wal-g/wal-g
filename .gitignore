@@ -5,5 +5,5 @@ walg_test/testdata/part*
 walg_test/testdata/data*
 walg_test/testdata/00000*
 walg_test/to_delete*
-walg_test/testdata/archive_status*
+walg_test/testdata/wal_test/
 docker/pg/wal-g
