@@ -1,2 +1,0 @@
-/usr/bin/ar qc libbrotlidec-static.a  CMakeFiles/brotlidec-static.dir/c/dec/bit_reader.c.o CMakeFiles/brotlidec-static.dir/c/dec/decode.c.o CMakeFiles/brotlidec-static.dir/c/dec/huffman.c.o CMakeFiles/brotlidec-static.dir/c/dec/state.c.o
-/usr/bin/ranlib libbrotlidec-static.a
