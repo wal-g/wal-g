@@ -168,7 +168,15 @@ func Configure(verifyUploads bool) (uploader *Uploader, destinationFolder *S3Fol
 	folder := NewS3Folder(s3.New(sess), bucket, server, preventWalOverwrite)
 	var concurrency = getMaxUploadConcurrency(10)
 	uploaderApi := CreateUploader(folder.S3API, DefaultStreamingPartSizeFor10Concurrency, concurrency)
-	uploader = NewUploader(uploaderApi, Compressors[compressionMethod], folder, useWalDelta, verifyUploads)
+	var deltaDataFolder DataFolder = nil
+	if useWalDelta {
+		deltaDataFolder, err = NewDiskDataFolder(DataFolderPath)
+		if err != nil {
+			useWalDelta = false
+			_ = fmt.Sprintf("can't use wal delta feature because can't open delta data folder '%s' due to error: '%v'", DataFolderPath, err)
+		}
+	}
+	uploader = NewUploader(uploaderApi, Compressors[compressionMethod], folder, deltaDataFolder, useWalDelta, verifyUploads)
 
 	storageClass, ok := LookupConfigValue("WALG_S3_STORAGE_CLASS")
 	if ok {

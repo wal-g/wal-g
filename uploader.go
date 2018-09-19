@@ -37,14 +37,9 @@ func NewUploader(
 	uploaderAPI s3manageriface.UploaderAPI,
 	compressor Compressor,
 	uploadingLocation *S3Folder,
+	deltaDataFolder DataFolder,
 	useWalDelta, verify bool,
 ) *Uploader {
-	temporaryDataFolder, err := NewDiskDataFolder(DataFolderPath)
-
-	if err != nil {
-		useWalDelta = false
-		_ = fmt.Sprintf("failed to open WAL-G data folder because of: '%v'", err)
-	}
 	return &Uploader{
 		uploaderApi:      uploaderAPI,
 		uploadingFolder:  uploadingLocation,
@@ -52,7 +47,7 @@ func NewUploader(
 		compressor:       compressor,
 		useWalDelta:      useWalDelta,
 		waitGroup:        &sync.WaitGroup{},
-		deltaFileManager: NewDeltaFileManager(temporaryDataFolder),
+		deltaFileManager: NewDeltaFileManager(deltaDataFolder),
 		verify:           verify,
 	}
 }
@@ -83,11 +78,12 @@ func (uploader *Uploader) Clone() *Uploader {
 	}
 }
 
+// TODO : unit tests
 func (uploader *Uploader) UploadWalFile(file NamedReader) error {
 	var walFileReader io.Reader
 
 	filename := path.Base(file.Name())
-	if uploader.useWalDelta && isWalFilename(file.Name()) {
+	if uploader.useWalDelta && isWalFilename(filename) {
 		recordingReader, err := NewWalDeltaRecordingReader(file, filename, uploader.deltaFileManager)
 		if err != nil {
 			walFileReader = file

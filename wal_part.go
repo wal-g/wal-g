@@ -29,7 +29,7 @@ func (part *WalPart) Save(writer io.Writer) error {
 		return err
 	}
 	dataLen := uint32(len(part.data))
-	_, err = writer.Write(toBytes(&dataLen))
+	_, err = writer.Write(ToBytes(&dataLen))
 	if err != nil {
 		return err
 	}

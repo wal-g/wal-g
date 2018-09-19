@@ -34,3 +34,15 @@ func (folder *DiskDataFolder) OpenWriteOnlyFile(filename string) (io.WriteCloser
 	filePath := filepath.Join(folder.path, filename)
 	return os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 }
+
+func (folder *DiskDataFolder) CleanFolder() error {
+	cleaner := FileSystemCleaner{}
+	files, err := cleaner.GetFiles(folder.path)
+	if err != nil {
+		return err
+	}
+	for _, file := range files {
+		cleaner.Remove(file)
+	}
+	return nil
+}

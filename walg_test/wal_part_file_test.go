@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
+	"github.com/wal-g/wal-g/walparser"
 	"testing"
 )
 
@@ -56,4 +57,15 @@ func TestSaveLoadWalPartFile(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, *partFile, *loadedPartFile)
+}
+
+func TestCombineRecords(t *testing.T) {
+	partFile := walg.NewWalPartFile()
+	xLogRecord, recordData := GetXLogRecordData()
+	partFile.WalHeads[1] = recordData[:16]
+	partFile.WalTails[2] = recordData[16:]
+
+	actualRecords, err := partFile.CombineRecords()
+	assert.NoError(t, err)
+	assert.Equal(t, []walparser.XLogRecord{xLogRecord}, actualRecords)
 }

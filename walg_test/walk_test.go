@@ -375,7 +375,7 @@ func TestWalk(t *testing.T) {
 	}
 
 	// Re-use generated data to test uploading WAL.
-	uploader := testtools.NewMockTarUploader(false, false)
+	uploader := testtools.NewMockUploader(false, false)
 	walFileName := filepath.Join(data, "1")
 	walFile, err := os.Open(walFileName)
 	assert.NoError(t, err)

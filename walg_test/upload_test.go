@@ -133,7 +133,7 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 func TestValidUploader(t *testing.T) {
 	mockSvc := testtools.NewMockS3Client(false, false)
 
-	tu := testtools.NewMockTarUploader(false, false)
+	tu := testtools.NewMockUploader(false, false)
 	assert.NotNil(t, tu)
 
 	upl := walg.CreateUploader(mockSvc, 100, 3)
@@ -141,7 +141,7 @@ func TestValidUploader(t *testing.T) {
 }
 
 func TestUploadError(t *testing.T) {
-	uploader := testtools.NewMockTarUploader(false, true)
+	uploader := testtools.NewMockUploader(false, true)
 
 	maker := walg.NewS3TarBallMaker("test", uploader)
 
@@ -151,7 +151,7 @@ func TestUploadError(t *testing.T) {
 	tarBall.Finish(&walg.S3TarBallSentinelDto{})
 	assert.False(t, uploader.Success)
 
-	uploader = testtools.NewMockTarUploader(true, false)
+	uploader = testtools.NewMockUploader(true, false)
 
 	tarBall = maker.Make(true)
 	tarBall.SetUp(MockArmedCrypter())

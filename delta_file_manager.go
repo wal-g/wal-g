@@ -15,8 +15,6 @@ func (err DeltaFileWriterNotFoundError) Error() string {
 	return fmt.Sprintf("can't file delta file writer for file: '%s'", err.filename)
 }
 
-// TODO : clean up directory from outdated delta files
-// we can do it using wal filename from wal-push command
 type DeltaFileManager struct {
 	dataFolder            DataFolder
 	PartFiles             sync.Map
@@ -65,7 +63,7 @@ func (manager *DeltaFileManager) GetBlockLocationConsumer(deltaFilename string) 
 	}
 	deltaFileWriter := NewDeltaFileChanWriter(deltaFile)
 	manager.deltaFileWriterWaiter.Add(1)
-	go deltaFileWriter.consume(&manager.deltaFileWriterWaiter)
+	go deltaFileWriter.Consume(&manager.deltaFileWriterWaiter)
 	manager.DeltaFileWriters.Store(deltaFilename, deltaFileWriter)
 	return deltaFileWriter.BlockLocationConsumer, nil
 }
@@ -106,7 +104,7 @@ func (manager *DeltaFileManager) FlushPartFiles() (completedPartFiles map[string
 		}
 		if partFile.IsComplete() {
 			completedPartFiles[partFilename] = true
-			err := manager.combinePartFile(deltaFilename, partFile)
+			err := manager.CombinePartFile(deltaFilename, partFile)
 			if err != nil {
 				manager.CanceledDeltaFiles[deltaFilename] = true
 				fmt.Printf("canceled delta file writing because of error: %v", err)
@@ -159,6 +157,7 @@ func (manager *DeltaFileManager) FlushDeltaFiles(uploader *Uploader, completedPa
 }
 
 func (manager *DeltaFileManager) FlushFiles(uploader *Uploader) {
+	manager.dataFolder.CleanFolder()
 	completedPartFiles := manager.FlushPartFiles()
 	manager.FlushDeltaFiles(uploader, completedPartFiles)
 }
@@ -181,8 +180,7 @@ func (manager *DeltaFileManager) GetCanceledDeltaFiles() {
 	manager.canceledWaiter.Done()
 }
 
-// TODO : unit tests
-func (manager *DeltaFileManager) combinePartFile(deltaFilename string, partFile *WalPartFile) error {
+func (manager *DeltaFileManager) CombinePartFile(deltaFilename string, partFile *WalPartFile) error {
 	deltaFileWriterInterface, ok := manager.DeltaFileWriters.Load(deltaFilename)
 	if !ok {
 		return DeltaFileWriterNotFoundError{deltaFilename}
@@ -190,11 +188,11 @@ func (manager *DeltaFileManager) combinePartFile(deltaFilename string, partFile 
 	deltaFileWriter := deltaFileWriterInterface.(*DeltaFileChanWriter)
 	deltaFileWriter.DeltaFile.WalParser = walparser.LoadWalParserFromCurrentRecordData(partFile.WalHeads[WalFileInDelta-1])
 	var err error
-	records, err := partFile.combineRecords()
+	records, err := partFile.CombineRecords()
 	if err != nil {
 		return err
 	}
-	locations := extractBlockLocations(records)
+	locations := ExtractBlockLocations(records)
 	for _, location := range locations {
 		deltaFileWriter.BlockLocationConsumer <- location
 	}

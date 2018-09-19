@@ -9,6 +9,10 @@ import (
 
 type MockDataFolder map[string]*bytes.Buffer
 
+func (folder *MockDataFolder) CleanFolder() error {
+	return nil
+}
+
 func NewMockDataFolder() *MockDataFolder {
 	dataFolder := MockDataFolder(make(map[string]*bytes.Buffer))
 	return &dataFolder

@@ -6,8 +6,7 @@ import (
 	"io"
 )
 
-// TODO : unit tests
-func extractBlockLocations(records []walparser.XLogRecord) []walparser.BlockLocation {
+func ExtractBlockLocations(records []walparser.XLogRecord) []walparser.BlockLocation {
 	locations := make([]walparser.BlockLocation, 0)
 	for _, record := range records {
 		if record.IsZero() {
@@ -36,6 +35,6 @@ func extractLocationsFromWalFile(parser *walparser.WalParser, walFile io.ReadClo
 		if err != nil && err != walparser.PartialPageError && err != walparser.ZeroPageError {
 			return nil, err
 		}
-		locations = append(locations, extractBlockLocations(records)...)
+		locations = append(locations, ExtractBlockLocations(records)...)
 	}
 }

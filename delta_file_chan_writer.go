@@ -15,7 +15,7 @@ func NewDeltaFileChanWriter(deltaFile *DeltaFile) *DeltaFileChanWriter {
 	return &DeltaFileChanWriter{deltaFile, blockLocationConsumer}
 }
 
-func (writer *DeltaFileChanWriter) consume(waitGroup *sync.WaitGroup) {
+func (writer *DeltaFileChanWriter) Consume(waitGroup *sync.WaitGroup) {
 	for blockLocation := range writer.BlockLocationConsumer {
 		writer.DeltaFile.Locations = append(writer.DeltaFile.Locations, blockLocation)
 	}

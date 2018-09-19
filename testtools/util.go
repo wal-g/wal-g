@@ -29,22 +29,24 @@ func TimeTrack(start time.Time, name string) {
 	fmt.Printf("%s took %s\n", name, elapsed)
 }
 
-func NewMockTarUploader(apiMultiErr, apiErr bool) *walg.Uploader {
+func NewMockUploader(apiMultiErr, apiErr bool) *walg.Uploader {
 	return walg.NewUploader(
 		NewMockS3Uploader(apiMultiErr, apiErr, nil),
 		&MockCompressor{},
 		walg.NewS3Folder(NewMockS3Client(true, true), "bucket/", "server", false),
+		nil,
 		false,
 		false,
 	)
 }
 
-func NewStoringMockTarUploader(apiMultiErr, apiErr bool, storage MockStorage) *walg.Uploader {
+func NewStoringMockUploader(storage MockStorage, deltaDataFolder walg.DataFolder) *walg.Uploader {
 	return walg.NewUploader(
-		NewMockS3Uploader(apiMultiErr, apiErr, storage),
+		NewMockS3Uploader(false, false, storage),
 		&MockCompressor{},
 		walg.NewS3Folder(nil, "bucket/", "server", false),
-		false,
+		deltaDataFolder,
+		true,
 		false,
 	)
 }

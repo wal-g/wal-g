@@ -64,11 +64,10 @@ func (partFile *WalPartFile) getCurrentDeltaFileRecordHeads() [][]byte {
 	return recordHeads
 }
 
-// TODO : unit tests
-func (partFile *WalPartFile) combineRecords() ([]walparser.XLogRecord, error) {
+func (partFile *WalPartFile) CombineRecords() ([]walparser.XLogRecord, error) {
 	recordHeads := partFile.getCurrentDeltaFileRecordHeads()
-	records := make([]walparser.XLogRecord, WalFileInDelta)
-	for id := range records {
+	records := make([]walparser.XLogRecord, 0)
+	for id := 0; id < int(WalFileInDelta); id++ {
 		recordData := make([]byte, 0)
 		recordData = append(recordData, recordHeads[id]...)
 		recordData = append(recordData, partFile.WalTails[id]...)
@@ -79,7 +78,7 @@ func (partFile *WalPartFile) combineRecords() ([]walparser.XLogRecord, error) {
 		if err != nil {
 			return nil, err
 		}
-		records[id] = *record
+		records = append(records, *record)
 	}
 	return records, nil
 }
