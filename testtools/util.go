@@ -40,11 +40,22 @@ func NewMockUploader(apiMultiErr, apiErr bool) *walg.Uploader {
 	)
 }
 
-func NewStoringMockUploader(storage MockStorage, deltaDataFolder walg.DataFolder) *walg.Uploader {
+func NewStoringMockUploader(storage *MockStorage, deltaDataFolder walg.DataFolder) *walg.Uploader {
 	return walg.NewUploader(
 		NewMockS3Uploader(false, false, storage),
 		&MockCompressor{},
 		walg.NewS3Folder(nil, "bucket/", "server", false),
+		deltaDataFolder,
+		true,
+		false,
+	)
+}
+
+func NewStoringCompressingMockUploader(storage *MockStorage, deltaDataFolder walg.DataFolder) *walg.Uploader {
+	return walg.NewUploader(
+		NewMockS3Uploader(false, false, storage),
+		&walg.BrotliCompressor{},
+		walg.NewS3Folder(NewMockStoringS3Client(storage), "bucket/", "server", true),
 		deltaDataFolder,
 		true,
 		false,
@@ -64,7 +75,7 @@ func NewMockS3Folder(s3ClientErr, s3ClientNotFound bool) *walg.S3Folder {
 	return walg.NewS3Folder(NewMockS3Client(s3ClientErr, s3ClientNotFound), "mock bucket", "mock server", false)
 }
 
-func NewStoringMockS3Folder(storage MockStorage) *walg.S3Folder {
+func NewStoringMockS3Folder(storage *MockStorage) *walg.S3Folder {
 	return walg.NewS3Folder(NewMockStoringS3Client(storage), "bucket/", "server", false)
 }
 

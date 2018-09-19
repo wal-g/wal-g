@@ -40,6 +40,10 @@ func NewUploader(
 	deltaDataFolder DataFolder,
 	useWalDelta, verify bool,
 ) *Uploader {
+	var deltaFileManager *DeltaFileManager = nil
+	if useWalDelta {
+		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
+	}
 	return &Uploader{
 		uploaderApi:      uploaderAPI,
 		uploadingFolder:  uploadingLocation,
@@ -47,7 +51,7 @@ func NewUploader(
 		compressor:       compressor,
 		useWalDelta:      useWalDelta,
 		waitGroup:        &sync.WaitGroup{},
-		deltaFileManager: NewDeltaFileManager(deltaDataFolder),
+		deltaFileManager: deltaFileManager,
 		verify:           verify,
 	}
 }

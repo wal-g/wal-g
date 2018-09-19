@@ -580,19 +580,23 @@ func downloadWALFileTo(folder *S3Folder, walFileName string, dstPath string) err
 // TODO : unit tests
 // HandleWALPush is invoked to perform wal-g wal-push
 func HandleWALPush(uploader *Uploader, walFilePath string) {
+	fmt.Println("--------------* Create bgUploader '%s' *--------------", walFilePath)
 	bgUploader := NewBgUploader(walFilePath, int32(getMaxUploadConcurrency(16)-1), uploader)
+	fmt.Println("--------------* Start bgUploader '%s' *--------------", walFilePath)
 	// Look for new WALs while doing main upload
 	bgUploader.Start()
+	fmt.Println("--------------* uploadWALFile '%s' *--------------", walFilePath)
 	err := uploadWALFile(uploader, walFilePath)
 	if err != nil {
 		panic(err)
 	}
 
+	fmt.Println("--------------* Stop bgUploader '%s' *--------------", walFilePath)
 	bgUploader.Stop()
-	if uploader.deltaFileManager == nil {
-		return
+	fmt.Println("--------------* Flush Files '%s' *--------------", walFilePath)
+	if uploader.deltaFileManager != nil {
+		uploader.deltaFileManager.FlushFiles(uploader.Clone())
 	}
-	uploader.deltaFileManager.FlushFiles(uploader.Clone())
 }
 
 // TODO : unit tests

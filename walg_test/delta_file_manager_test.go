@@ -252,7 +252,7 @@ func TestFlushDeltaFiles_CompleteFile(t *testing.T) {
 		walg.ToPartFilename(DeltaFilename): true,
 	})
 
-	actualDeltaFileData, ok := storage["bucket/server/wal_005/"+DeltaFilename+".mock"]
+	actualDeltaFileData, ok := storage.Load("bucket/server/wal_005/" + DeltaFilename + ".mock")
 	assert.True(t, ok)
 	actualDeltaFile, err := walg.LoadDeltaFile(&actualDeltaFileData)
 	assert.NoError(t, err)

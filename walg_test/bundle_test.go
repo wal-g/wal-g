@@ -113,16 +113,16 @@ func makeDeltaFile(locations []walparser.BlockLocation) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
-func putDeltaIntoStorage(storage testtools.MockStorage, locations []walparser.BlockLocation, deltaFilename string) error {
+func putDeltaIntoStorage(storage *testtools.MockStorage, locations []walparser.BlockLocation, deltaFilename string) error {
 	deltaData, err := makeDeltaFile(locations)
 	if err != nil {
 		return err
 	}
-	storage["mock/mock/wal_005/"+deltaFilename+".lz4"] = *bytes.NewBuffer(deltaData)
+	storage.Store("mock/mock/wal_005/"+deltaFilename+".lz4", *bytes.NewBuffer(deltaData))
 	return nil
 }
 
-func putWalIntoStorage(storage testtools.MockStorage, data []byte, walFilename string) error {
+func putWalIntoStorage(storage *testtools.MockStorage, data []byte, walFilename string) error {
 	compressor := walg.Compressors[walg.Lz4AlgorithmName]
 	var compressedData bytes.Buffer
 	compressingWriter := compressor.NewWriter(&compressedData)
@@ -134,11 +134,11 @@ func putWalIntoStorage(storage testtools.MockStorage, data []byte, walFilename s
 	if err != nil {
 		return err
 	}
-	storage["mock/mock/wal_005/"+walFilename+".lz4"] = compressedData
+	storage.Store("mock/mock/wal_005/"+walFilename+".lz4", compressedData)
 	return nil
 }
 
-func fillStorageWithMockDeltas(storage testtools.MockStorage) error {
+func fillStorageWithMockDeltas(storage *testtools.MockStorage) error {
 	err := putDeltaIntoStorage(
 		storage,
 		[]walparser.BlockLocation{
