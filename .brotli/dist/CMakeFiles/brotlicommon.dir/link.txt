@@ -1,0 +1,1 @@
+/usr/bin/cc -fPIC -O3 -DNDEBUG  -shared -Wl,-soname,libbrotlicommon.so.1 -o libbrotlicommon.so.1.0.5 CMakeFiles/brotlicommon.dir/c/common/dictionary.c.o CMakeFiles/brotlicommon.dir/c/common/transform.c.o -lm 
