@@ -17,8 +17,8 @@ func (err DeltaFileWriterNotFoundError) Error() string {
 
 type DeltaFileManager struct {
 	dataFolder            DataFolder
-	PartFiles             sync.Map
-	DeltaFileWriters      sync.Map
+	PartFiles             *LazyCache
+	DeltaFileWriters      *LazyCache
 	deltaFileWriterWaiter sync.WaitGroup
 	canceledWalRecordings chan string
 	CanceledDeltaFiles    map[string]bool
@@ -28,22 +28,42 @@ type DeltaFileManager struct {
 func NewDeltaFileManager(dataFolder DataFolder) *DeltaFileManager {
 	manager := &DeltaFileManager{
 		dataFolder,
-		sync.Map{},
-		sync.Map{},
+		nil,
+		nil,
 		sync.WaitGroup{},
 		make(chan string),
 		make(map[string]bool),
 		sync.WaitGroup{},
 	}
+	manager.PartFiles = NewLazyCache(func(partFilenameInterface interface{}) (partFile interface{}, err error) {
+		partFilename, ok := partFilenameInterface.(string)
+		if !ok {
+			return nil, WrongTypeError{"string"}
+		}
+		return manager.LoadPartFile(partFilename)
+	})
+	manager.DeltaFileWriters = NewLazyCache(func(deltaFilenameInterface interface{}) (deltaFileWriter interface{}, err error) {
+		deltaFilename, ok := deltaFilenameInterface.(string)
+		if !ok {
+			return nil, WrongTypeError{"string"}
+		}
+		return manager.LoadDeltaFileWriter(deltaFilename)
+	})
 	manager.canceledWaiter.Add(1)
-	go manager.GetCanceledDeltaFiles()
+	go manager.collectCanceledDeltaFiles()
 	return manager
 }
 
 func (manager *DeltaFileManager) GetBlockLocationConsumer(deltaFilename string) (chan walparser.BlockLocation, error) {
-	if deltaFileWriter, ok := manager.DeltaFileWriters.Load(deltaFilename); ok {
-		return deltaFileWriter.(*DeltaFileChanWriter).BlockLocationConsumer, nil
+	deltaFileWriter, _, err := manager.DeltaFileWriters.Load(deltaFilename)
+	if err != nil {
+		return nil, err
 	}
+	return deltaFileWriter.(*DeltaFileChanWriter).BlockLocationConsumer, nil
+}
+
+// TODO : unit tests
+func (manager *DeltaFileManager) LoadDeltaFileWriter(deltaFilename string) (deltaFileWriter *DeltaFileChanWriter, err error) {
 	physicalDeltaFile, err := manager.dataFolder.OpenReadonlyFile(deltaFilename)
 	var deltaFile *DeltaFile
 	if err != nil {
@@ -61,18 +81,23 @@ func (manager *DeltaFileManager) GetBlockLocationConsumer(deltaFilename string) 
 			return nil, err
 		}
 	}
-	deltaFileWriter := NewDeltaFileChanWriter(deltaFile)
+	deltaFileWriter = NewDeltaFileChanWriter(deltaFile)
 	manager.deltaFileWriterWaiter.Add(1)
 	go deltaFileWriter.Consume(&manager.deltaFileWriterWaiter)
-	manager.DeltaFileWriters.Store(deltaFilename, deltaFileWriter)
-	return deltaFileWriter.BlockLocationConsumer, nil
+	return deltaFileWriter, nil
 }
 
 func (manager *DeltaFileManager) GetPartFile(deltaFilename string) (*WalPartFile, error) {
 	partFilename := ToPartFilename(deltaFilename)
-	if partFile, ok := manager.PartFiles.Load(partFilename); ok {
-		return partFile.(*WalPartFile), nil
+	partFile, _, err := manager.PartFiles.Load(partFilename)
+	if err != nil {
+		return nil, err
 	}
+	return partFile.(*WalPartFile), nil
+}
+
+// TODO : unit tests
+func (manager *DeltaFileManager) LoadPartFile(partFilename string) (*WalPartFile, error) {
 	physicalPartFile, err := manager.dataFolder.OpenReadonlyFile(partFilename)
 	var partFile *WalPartFile
 	if err != nil {
@@ -87,7 +112,6 @@ func (manager *DeltaFileManager) GetPartFile(deltaFilename string) (*WalPartFile
 			return nil, err
 		}
 	}
-	manager.PartFiles.Store(partFilename, partFile)
 	return partFile, nil
 }
 
@@ -107,13 +131,13 @@ func (manager *DeltaFileManager) FlushPartFiles() (completedPartFiles map[string
 			err := manager.CombinePartFile(deltaFilename, partFile)
 			if err != nil {
 				manager.CanceledDeltaFiles[deltaFilename] = true
-				fmt.Printf("canceled delta file writing because of error: %v", err)
+				fmt.Printf("Canceled delta file writing because of error: %v\n", err)
 			}
 		} else {
 			err := saveToDataFolder(partFile, partFilename, manager.dataFolder)
 			if err != nil {
 				manager.CanceledDeltaFiles[deltaFilename] = true
-				fmt.Printf("failed to save part file: '%s' because of error: '%v'", partFilename, err)
+				fmt.Printf("Failed to save part file: '%s' because of error: '%v'\n", partFilename, err)
 			}
 		}
 		return true
@@ -166,7 +190,8 @@ func (manager *DeltaFileManager) CancelRecording(walFilename string) {
 	manager.canceledWalRecordings <- walFilename
 }
 
-func (manager *DeltaFileManager) GetCanceledDeltaFiles() {
+// TODO : unit tests
+func (manager *DeltaFileManager) collectCanceledDeltaFiles() {
 	for walFilename := range manager.canceledWalRecordings {
 		deltaFilename, err := GetDeltaFilenameFor(walFilename)
 		if err != nil {
@@ -181,13 +206,12 @@ func (manager *DeltaFileManager) GetCanceledDeltaFiles() {
 }
 
 func (manager *DeltaFileManager) CombinePartFile(deltaFilename string, partFile *WalPartFile) error {
-	deltaFileWriterInterface, ok := manager.DeltaFileWriters.Load(deltaFilename)
-	if !ok {
+	deltaFileWriterInterface, exists := manager.DeltaFileWriters.LoadExisting(deltaFilename)
+	if !exists {
 		return DeltaFileWriterNotFoundError{deltaFilename}
 	}
 	deltaFileWriter := deltaFileWriterInterface.(*DeltaFileChanWriter)
 	deltaFileWriter.DeltaFile.WalParser = walparser.LoadWalParserFromCurrentRecordData(partFile.WalHeads[WalFileInDelta-1])
-	var err error
 	records, err := partFile.CombineRecords()
 	if err != nil {
 		return err

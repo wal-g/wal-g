@@ -99,8 +99,8 @@ func TestGetBlockLocationConsumer_CreateNew(t *testing.T) {
 
 	consumer, err := manager.GetBlockLocationConsumer(DeltaFilename)
 	assert.NoError(t, err)
-	expectedConsumer, ok := manager.DeltaFileWriters.Load(DeltaFilename)
-	assert.True(t, ok)
+	expectedConsumer, exists := manager.DeltaFileWriters.LoadExisting(DeltaFilename)
+	assert.True(t, exists)
 	assert.Equal(t, expectedConsumer.(*walg.DeltaFileChanWriter).BlockLocationConsumer, consumer)
 }
 
@@ -122,8 +122,8 @@ func TestGetBlockLocationConsumer_Load(t *testing.T) {
 
 	consumer, err := manager.GetBlockLocationConsumer(DeltaFilename)
 	assert.NoError(t, err)
-	expectedConsumer, ok := manager.DeltaFileWriters.Load(DeltaFilename)
-	assert.True(t, ok)
+	expectedConsumer, exists := manager.DeltaFileWriters.LoadExisting(DeltaFilename)
+	assert.True(t, exists)
 	assert.Equal(t, deltaFile, expectedConsumer.(*walg.DeltaFileChanWriter).DeltaFile)
 	assert.Equal(t, expectedConsumer.(*walg.DeltaFileChanWriter).BlockLocationConsumer, consumer)
 }
@@ -148,8 +148,8 @@ func TestGetPartFile_CreateNew(t *testing.T) {
 
 	actualPartFile, err := manager.GetPartFile(DeltaFilename)
 	assert.NoError(t, err)
-	expectedPartFile, ok := manager.PartFiles.Load(walg.ToPartFilename(DeltaFilename))
-	assert.True(t, ok)
+	expectedPartFile, exists := manager.PartFiles.LoadExisting(walg.ToPartFilename(DeltaFilename))
+	assert.True(t, exists)
 	assert.Equal(t, expectedPartFile.(*walg.WalPartFile), actualPartFile)
 }
 
