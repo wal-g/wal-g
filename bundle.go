@@ -219,6 +219,11 @@ func (bundle *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName str
 		if err != nil {
 			return "", 0, queryRunner.Version, err
 		}
+	} else {
+		bundle.Timeline, err = readTimeline(conn)
+		if err != nil {
+			fmt.Printf("Couldn't get current timeline because of error: '%v'\n", err)
+		}
 	}
 	return "base_" + name, lsn, queryRunner.Version, nil
 
@@ -444,7 +449,7 @@ func (bundle *Bundle) DownloadDeltaMap(folder *S3Folder, backupStartLSN uint64) 
 	deltaMap := NewPagedFileDeltaMap()
 	logSegNo := logSegNoFromLsn(*bundle.IncrementFromLsn + 1)
 	logSegNo -= logSegNo % WalFileInDelta
-	lastLogSegNo := logSegNoFromLsn(backupStartLSN)
+	lastLogSegNo := logSegNoFromLsn(backupStartLSN) - 1
 	walParser := walparser.NewWalParser()
 	for ; logSegNo+(WalFileInDelta-1) <= lastLogSegNo; logSegNo += WalFileInDelta {
 		deltaFilename := toDeltaFilename(formatWALFileName(bundle.Timeline, logSegNo))

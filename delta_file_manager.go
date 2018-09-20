@@ -163,17 +163,17 @@ func (manager *DeltaFileManager) FlushDeltaFiles(uploader *Uploader, completedPa
 			var deltaFileData bytes.Buffer
 			err := deltaFileWriter.DeltaFile.Save(&deltaFileData)
 			if err != nil {
-				fmt.Printf("failed to upload delta file: '%s' because of saving error: '%v'", deltaFilename, err)
+				fmt.Printf("Failed to upload delta file: '%s' because of saving error: '%v'\n", deltaFilename, err)
 			} else {
 				err = uploader.UploadFile(&NamedReaderImpl{&deltaFileData, deltaFilename})
 				if err != nil {
-					fmt.Printf("failed to upload delta file: '%s' because of uploading error: '%v'", deltaFilename, err)
+					fmt.Printf("Failed to upload delta file: '%s' because of uploading error: '%v'\n", deltaFilename, err)
 				}
 			}
 		} else {
 			err := saveToDataFolder(deltaFileWriter.DeltaFile, deltaFilename, manager.dataFolder)
 			if err != nil {
-				fmt.Printf("failed to save delta file: '%s' because of error: '%v'", deltaFilename, err)
+				fmt.Printf("Failed to save delta file: '%s' because of error: '%v'\n", deltaFilename, err)
 			}
 		}
 		return true

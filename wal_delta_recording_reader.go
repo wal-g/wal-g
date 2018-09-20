@@ -18,6 +18,7 @@ type WalDeltaRecordingReader struct {
 	PageDataLeftover []byte
 	Recorder         *WalDeltaRecorder
 	partRecorder     *WalPartRecorder
+	firstRead bool
 }
 
 func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, manager *DeltaFileManager) (*WalDeltaRecordingReader, error) {
@@ -25,19 +26,18 @@ func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, man
 	if err != nil {
 		return nil, err
 	}
-	//fmt.Printf("-------------------------* Started recording for: %s *-------------------------\n", walFilename)
 	return &WalDeltaRecordingReader{
 		*walparser.NewWalPageReader(walFileReader),
 		*walParser,
 		nil,
 		recorder,
 		partRecorder,
+		true,
 	}, nil
 }
 
 func (reader *WalDeltaRecordingReader) Close() error {
 	err := reader.partRecorder.SaveNextWalHead(reader.WalParser.GetCurrentRecordData())
-	//fmt.Printf("-------------------------* Finished recording for: %s *-------------------------\n", reader.partRecorder.walFilename)
 	if err != nil {
 		fmt.Printf("Failed to save next wal file prefix after end of recording because of: %v", err)
 	}
@@ -69,11 +69,12 @@ func (reader *WalDeltaRecordingReader) Read(p []byte) (n int, err error) {
 }
 
 func (reader *WalDeltaRecordingReader) RecordBlockLocationsFromPage() error {
+	defer func() { reader.firstRead = false }()
 	if reader.Recorder == nil {
 		return nil
 	}
 	discardedRecordTail, records, err := reader.WalParser.ParseRecordsFromPage(bytes.NewReader(reader.PageDataLeftover))
-	if len(discardedRecordTail) > 0 {
+	if reader.firstRead {
 		err = reader.partRecorder.SavePreviousWalTail(discardedRecordTail)
 		if err != nil {
 			return err

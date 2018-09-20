@@ -25,6 +25,9 @@ func NewWalPartRecorder(walFilename string, manager *DeltaFileManager) (*WalPart
 }
 
 func (recorder *WalPartRecorder) SavePreviousWalTail(tailData []byte) error {
+	if tailData == nil {
+		tailData = make([]byte, 0)
+	}
 	deltaFilename, err := GetDeltaFilenameFor(recorder.walFilename)
 	if err != nil {
 		return err
@@ -38,6 +41,9 @@ func (recorder *WalPartRecorder) SavePreviousWalTail(tailData []byte) error {
 }
 
 func (recorder *WalPartRecorder) SaveNextWalHead(head []byte) error {
+	if head == nil {
+		head = make([]byte, 0)
+	}
 	deltaFilename, _ := GetDeltaFilenameFor(recorder.walFilename)
 	partFile, err := recorder.manager.GetPartFile(deltaFilename)
 	if err != nil {
