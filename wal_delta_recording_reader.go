@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/wal-g/wal-g/walparser"
 	"io"
-	"os"
 )
 
 const (
@@ -17,19 +16,16 @@ type WalDeltaRecordingReader struct {
 	PageReader       walparser.WalPageReader
 	WalParser        walparser.WalParser
 	PageDataLeftover []byte
-	Recorder         *WalDeltaRecorder // it can be nil and this indicates recording fail
+	Recorder         *WalDeltaRecorder
 	partRecorder     *WalPartRecorder
 }
 
 func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, manager *DeltaFileManager) (*WalDeltaRecordingReader, error) {
 	walParser, recorder, partRecorder, err := tryOpenParserAndRecorders(walFilename, manager)
 	if err != nil {
-		deltaFilename, err1 := GetDeltaFilenameFor(walFilename)
-		if err1 == nil {
-			os.Remove(deltaFilename)
-		}
 		return nil, err
 	}
+	//fmt.Printf("-------------------------* Started recording for: %s *-------------------------\n", walFilename)
 	return &WalDeltaRecordingReader{
 		*walparser.NewWalPageReader(walFileReader),
 		*walParser,
@@ -41,6 +37,7 @@ func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, man
 
 func (reader *WalDeltaRecordingReader) Close() error {
 	err := reader.partRecorder.SaveNextWalHead(reader.WalParser.GetCurrentRecordData())
+	//fmt.Printf("-------------------------* Finished recording for: %s *-------------------------\n", reader.partRecorder.walFilename)
 	if err != nil {
 		fmt.Printf("Failed to save next wal file prefix after end of recording because of: %v", err)
 	}
