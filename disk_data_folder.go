@@ -42,7 +42,7 @@ func (folder *DiskDataFolder) CleanFolder() error {
 		return err
 	}
 	for _, file := range files {
-		cleaner.Remove(file)
+		cleaner.Remove(filepath.Join(folder.path, file))
 	}
 	return nil
 }

@@ -181,7 +181,10 @@ func (manager *DeltaFileManager) FlushDeltaFiles(uploader *Uploader, completedPa
 }
 
 func (manager *DeltaFileManager) FlushFiles(uploader *Uploader) {
-	manager.dataFolder.CleanFolder()
+	err := manager.dataFolder.CleanFolder()
+	if err != nil {
+		fmt.Printf("Failed to clean delta folder because of error: '%v'\n", err)
+	}
 	completedPartFiles := manager.FlushPartFiles()
 	manager.FlushDeltaFiles(uploader, completedPartFiles)
 }
