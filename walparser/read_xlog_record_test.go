@@ -53,7 +53,8 @@ func TestReadBlockLocation_WithDifferentRel(t *testing.T) {
 		0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
 	}
 	reader := bytes.NewReader(data)
-	location, err := readBlockLocation(false, nil, reader)
+	var lastRelFileNode *RelFileNode
+	location, err := readBlockLocation(false, &lastRelFileNode, reader)
 	assert.NoError(t, err)
 	assert.Equal(t, location.RelationFileNode.SpcNode, Oid(0x67452301))
 	assert.Equal(t, location.RelationFileNode.DBNode, Oid(0xefcdab89))

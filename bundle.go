@@ -6,6 +6,7 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/walparser"
 	"io"
 	"log"
 	"os"
@@ -214,9 +215,14 @@ func (bundle *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName str
 	lsn, err = pgx.ParseLSN(lsnStr)
 
 	if bundle.Replica {
-		name, bundle.Timeline, err = walFileName(lsn, conn)
+		name, bundle.Timeline, err = getWalFilename(lsn, conn)
 		if err != nil {
 			return "", 0, queryRunner.Version, err
+		}
+	} else {
+		bundle.Timeline, err = readTimeline(conn)
+		if err != nil {
+			fmt.Printf("Couldn't get current timeline because of error: '%v'\n", err)
 		}
 	}
 	return "base_" + name, lsn, queryRunner.Version, nil
@@ -369,11 +375,7 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 	}
 
 	err = tarBall.CloseTar()
-	if err != nil {
-		return errors.Wrap(err, "UploadPgControl: failed to close tarball")
-	}
-
-	return nil
+	return errors.Wrap(err, "UploadPgControl: failed to close tarball")
 }
 
 // TODO : unit tests
@@ -447,33 +449,37 @@ func (bundle *Bundle) DownloadDeltaMap(folder *S3Folder, backupStartLSN uint64) 
 	deltaMap := NewPagedFileDeltaMap()
 	logSegNo := logSegNoFromLsn(*bundle.IncrementFromLsn + 1)
 	logSegNo -= logSegNo % WalFileInDelta
-	lastLogSegNo := logSegNoFromLsn(backupStartLSN)
+	lastLogSegNo := logSegNoFromLsn(backupStartLSN) - 1
+	walParser := walparser.NewWalParser()
 	for ; logSegNo+(WalFileInDelta-1) <= lastLogSegNo; logSegNo += WalFileInDelta {
 		deltaFilename := toDeltaFilename(formatWALFileName(bundle.Timeline, logSegNo))
 		reader, err := downloadAndDecompressWALFile(folder, deltaFilename)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "Error during delta file '%s' downloading.", deltaFilename)
 		}
-		locations, err := ReadLocationsFrom(reader)
-		reader.Close()
+		deltaFile, err := LoadDeltaFile(reader)
+		walParser = deltaFile.WalParser
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "Error during reading delta file '%s'", deltaFilename)
 		}
-		for _, location := range locations {
+		reader.Close()
+		for _, location := range deltaFile.Locations {
 			deltaMap.AddToDelta(location)
 		}
 	}
+	// We don't consider the case when there is no delta files from previous backup,
+	// because in such a case postgres do a WAL-Switch and first WAL file appears to be whole.
 	for ; logSegNo <= lastLogSegNo; logSegNo++ {
 		walFilename := formatWALFileName(bundle.Timeline, logSegNo)
 		reader, err := downloadAndDecompressWALFile(folder, walFilename)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "Error during wal file '%s' downloading", walFilename)
 		}
-		locations, err := extractLocationsFromWalFile(reader)
-		reader.Close()
+		locations, err := extractLocationsFromWalFile(walParser, reader)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "Error during extracting locations from wal file: '%s'", walFilename)
 		}
+		reader.Close()
 		for _, location := range locations {
 			deltaMap.AddToDelta(location)
 		}

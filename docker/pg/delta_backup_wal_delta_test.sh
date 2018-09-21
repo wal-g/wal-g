@@ -4,12 +4,12 @@ export WALE_S3_PREFIX=s3://waldeltabucket
 export WALG_USE_WAL_DELTA=true
 /usr/lib/postgresql/10/bin/initdb $PGDATA
 echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
-echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
+echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g wal-push %p && mkdir -p /tmp/deltas/$(basename %p)'" >> /var/lib/postgresql/10/main/postgresql.conf
 echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 /usr/lib/postgresql/10/bin/pg_ctl -D $PGDATA -w start
-pgbench -i -s 10 postgres
+pgbench -i -s 30 postgres
 wal-g backup-push $PGDATA
-pgbench -i -s 20 postgres
+pgbench -i -s 40 postgres
 pg_dumpall -f /tmp/dump1
 pgbench -c 2 -j -T 100000000&
 wal-g backup-push $PGDATA

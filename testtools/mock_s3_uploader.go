@@ -22,22 +22,16 @@ func (err mockMultiFailureError) Error() string {
 	return err.err.Error()
 }
 
-type MockStorage map[string]bytes.Buffer
-
-func NewMockStorage() MockStorage {
-	return make(map[string]bytes.Buffer)
-}
-
 // Mock out uploader client for S3. Includes these methods:
 // Upload(*UploadInput, ...func(*s3manager.Uploader))
 type mockS3Uploader struct {
 	s3manageriface.UploaderAPI
 	multiErr bool
 	err      bool
-	storage  MockStorage
+	storage  *MockStorage
 }
 
-func NewMockS3Uploader(multiErr, err bool, storage MockStorage) *mockS3Uploader {
+func NewMockS3Uploader(multiErr, err bool, storage *MockStorage) *mockS3Uploader {
 	return &mockS3Uploader{multiErr: multiErr, err: err, storage: storage}
 }
 
@@ -65,7 +59,7 @@ func (uploader *mockS3Uploader) Upload(input *s3manager.UploadInput, f ...func(*
 	} else {
 		var buf bytes.Buffer
 		_, err = io.Copy(&buf, input.Body)
-		uploader.storage[*input.Bucket+*input.Key] = buf
+		uploader.storage.underlying.Store(*input.Bucket+*input.Key, buf)
 	}
 	if err != nil {
 		return nil, err

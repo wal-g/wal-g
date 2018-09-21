@@ -36,9 +36,9 @@ func ReadLocationsFrom(reader io.Reader) ([]walparser.BlockLocation, error) {
 	locations := make([]walparser.BlockLocation, 0)
 	for {
 		location, err := locationReader.ReadNextLocation()
-		if err != nil {
+		if err != nil || *location == TerminalLocation {
 			if errors.Cause(err) == io.EOF {
-				return locations, nil
+				err = nil
 			}
 			return locations, err
 		}

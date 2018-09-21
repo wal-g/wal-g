@@ -5,8 +5,8 @@ import (
 	"encoding/binary"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
+	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/walparser"
-	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -39,52 +39,14 @@ func createWalParser() (*walparser.WalParser, error) {
 	data := createWalPageWithContinuation()
 
 	walParser := walparser.NewWalParser()
-	_, err := walParser.ParseRecordsFromPage(bytes.NewReader(data)) // initializing parsing
+	_, _, err := walParser.ParseRecordsFromPage(bytes.NewReader(data)) // initializing parsing
 	if err != nil {
 		return nil, err
 	}
 	return walParser, nil
 }
 
-func TestSaveParser(t *testing.T) {
-	walParser, err := createWalParser()
-	assert.NoError(t, err)
-	recordingReader := walg.WalDeltaRecordingReader{
-		WalParser:      *walParser,
-		DataFolderPath: WalgTestDataFolderPath,
-	}
-	err = recordingReader.SaveParser()
-	assert.NoError(t, err)
-
-	parserFile, err := os.Open(ParserFilePath)
-	assert.NoError(t, err)
-	actualParser, err := walparser.LoadParser(parserFile)
-	assert.NoError(t, err)
-	parserFile.Close()
-	assert.Equal(t, walParser, actualParser)
-	os.Remove(ParserFilePath)
-}
-
-func TestLoadWalParser(t *testing.T) {
-	walParser, err := createWalParser()
-	assert.NoError(t, err)
-	parserFile, err := os.Create(ParserFilePath)
-	assert.NoError(t, err)
-	walParser.SaveParser(parserFile)
-	parserFile.Close()
-
-	actualParser, err := walg.LoadWalParser(WalgTestDataFolderPath)
-	assert.NoError(t, err)
-	assert.Equal(t, walParser, actualParser)
-	os.Remove(ParserFilePath)
-}
-
 func TestRecordBlockLocationsFromPage(t *testing.T) {
-	deltaFile, err := os.Create(DeltaFilePath)
-	assert.NoError(t, err)
-	defer os.Remove(DeltaFilePath)
-	defer deltaFile.Close()
-
 	walParser := walparser.NewWalParser()
 	walFile, err := os.Open(WalFilePath)
 	assert.NoError(t, err)
@@ -94,21 +56,25 @@ func TestRecordBlockLocationsFromPage(t *testing.T) {
 	page2, err := pageReader.ReadPageData()
 	assert.NoError(t, err)
 
-	_, err = walParser.ParseRecordsFromPage(bytes.NewReader(page1)) // initializing
+	_, _, err = walParser.ParseRecordsFromPage(bytes.NewReader(page1)) // initializing
 	assert.NoError(t, err)
 
+	blockLocationConsumer := make(chan walparser.BlockLocation)
 	recordingReader := walg.WalDeltaRecordingReader{
 		WalParser:        *walParser,
 		PageDataLeftover: page2,
-		Recorder:         &walg.WalDeltaRecorder{DeltaFile: deltaFile},
+		Recorder:         walg.NewWalDeltaRecorder(blockLocationConsumer),
 	}
-	err = recordingReader.RecordBlockLocationsFromPage()
-	assert.NoError(t, err)
+	go func() {
+		err = recordingReader.RecordBlockLocationsFromPage()
+		assert.NoError(t, err)
 
-	_, err = deltaFile.Seek(0, io.SeekStart)
-	assert.NoError(t, err)
-	locations, err := walg.ReadLocationsFrom(deltaFile)
-	assert.NoError(t, err)
+		close(blockLocationConsumer)
+	}()
+	locations := make([]walparser.BlockLocation, 0)
+	for location := range blockLocationConsumer {
+		locations = append(locations, location)
+	}
 	assert.Len(t, locations, 1)
 	assert.Equal(t, RealLocation, locations[0])
 }
@@ -131,43 +97,36 @@ func TestRead_CorrectRecording(t *testing.T) {
 	assert.NoError(t, err)
 	defer walFile.Close()
 
-	file, err := os.Create(DeltaFilePath)
+	dataFolder := testtools.NewMockDataFolder()
+	manager := walg.NewDeltaFileManager(dataFolder)
+	recordingReader, err := walg.NewWalDeltaRecordingReader(walFile, WalFilename, manager)
 	assert.NoError(t, err)
-	file.Close()
-	defer os.Remove(DeltaFilePath)
-
-	recordingReader, err := walg.NewWalDeltaRecordingReader(walFile, WalFilename, nil, WalgTestDataFolderPath)
-	assert.NoError(t, err)
-	defer recordingReader.Recorder.DeltaFile.Close()
 
 	_, err = ioutil.ReadAll(recordingReader)
 	assert.NoError(t, err)
+	manager.FlushFiles(nil)
 
-	_, err = recordingReader.Recorder.DeltaFile.Seek(0, io.SeekStart)
-	assert.NoError(t, err)
-	locations, err := walg.ReadLocationsFrom(recordingReader.Recorder.DeltaFile)
+	locations, err := walg.ReadLocationsFrom((*dataFolder)[DeltaFilename])
 	assert.NoError(t, err)
 	assert.Len(t, locations, 1)
 	assert.Equal(t, RealLocation, locations[0])
 }
 
 func TestRead_RecordingFail(t *testing.T) {
-	deltaFile, err := os.Create(DeltaFilePath)
-	assert.NoError(t, err)
-	err = deltaFile.Close()
-	assert.NoError(t, err)
-
 	walData := make([]byte, walparser.WalPageSize*3)
 	for i := range walData {
 		walData[i] = 1
 	}
 
-	recordingReader, err := walg.NewWalDeltaRecordingReader(bytes.NewReader(walData), WalFilename, nil, WalgTestDataFolderPath)
+	dataFolder := testtools.NewMockDataFolder()
+	manager := walg.NewDeltaFileManager(dataFolder)
+	recordingReader, err := walg.NewWalDeltaRecordingReader(bytes.NewReader(walData), WalFilename, manager)
 	assert.NoError(t, err)
 
 	actualData, err := ioutil.ReadAll(recordingReader)
 	assert.NoError(t, err)
+	manager.FlushFiles(nil)
+
 	assert.Equal(t, walData, actualData)
-	_, err = os.Stat(DeltaFilePath)
-	assert.True(t, os.IsNotExist(err))
+	assert.True(t, dataFolder.IsEmpty())
 }

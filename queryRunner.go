@@ -74,10 +74,7 @@ func NewPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
 func (queryRunner *PgQueryRunner) getVersion() (err error) {
 	conn := queryRunner.connection
 	err = conn.QueryRow(queryRunner.BuildGetVersion()).Scan(&queryRunner.Version)
-	if err != nil {
-		return errors.Wrap(err, "GetVersion: getting Postgres version failed")
-	}
-	return nil
+	return errors.Wrap(err, "GetVersion: getting Postgres version failed")
 }
 
 // StartBackup informs the database that we are starting copy of cluster contents

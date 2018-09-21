@@ -34,9 +34,9 @@ func logSegNoFromLsn(lsn uint64) uint64 {
 	return (lsn - 1) / WalSegmentSize // xlog_internal.h line 121
 }
 
-// walFileName formats WAL file name using PostgreSQL connection. Essentially reads timeline of the server.
-func walFileName(lsn uint64, conn *pgx.Conn) (string, uint32, error) {
-	timeline, err := readTimeline(conn)
+// getWalFilename formats WAL file name using PostgreSQL connection. Essentially reads timeline of the server.
+func getWalFilename(lsn uint64, conn *pgx.Conn) (walFilename string, timeline uint32, err error) {
+	timeline, err = readTimeline(conn)
 	if err != nil {
 		return "", 0, err
 	}
@@ -51,8 +51,8 @@ func formatWALFileName(timeline uint32, logSegNo uint64) string {
 }
 
 // TODO : unit tests
-// ParseWALFileName extracts numeric parts from WAL file name
-func ParseWALFileName(name string) (timelineId uint32, logSegNo uint64, err error) {
+// ParseWALFilename extracts numeric parts from WAL file name
+func ParseWALFilename(name string) (timelineId uint32, logSegNo uint64, err error) {
 	if len(name) != 24 {
 		err = errors.New("Not a WAL file name: " + name)
 		return
@@ -83,13 +83,13 @@ func ParseWALFileName(name string) (timelineId uint32, logSegNo uint64, err erro
 }
 
 func isWalFilename(filename string) bool {
-	_, _, err := ParseWALFileName(filename)
+	_, _, err := ParseWALFilename(filename)
 	return err == nil
 }
 
-// GetNextWALFileName computes name of next WAL segment
-func GetNextWALFileName(name string) (string, error) {
-	timelineId, logSegNo, err := ParseWALFileName(name)
+// GetNextWalFilename computes name of next WAL segment
+func GetNextWalFilename(name string) (string, error) {
+	timelineId, logSegNo, err := ParseWALFilename(name)
 	if err != nil {
 		return "", err
 	}

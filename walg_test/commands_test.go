@@ -78,7 +78,7 @@ func parseAndTestFail(command []string, arguments *walg.DeleteCommandArguments) 
 func TestTryDownloadWALFile_Exist(t *testing.T) {
 	storage := testtools.NewMockStorage()
 	expectedData := []byte("mock")
-	storage["bucket/server/wal_005/00000001000000000000007C"] = *bytes.NewBuffer(expectedData)
+	storage.Store("bucket/server/wal_005/00000001000000000000007C", *bytes.NewBuffer(expectedData))
 	folder := testtools.NewStoringMockS3Folder(storage)
 	archiveReader, exist, err := walg.TryDownloadWALFile(folder, "server/wal_005/00000001000000000000007C")
 	assert.NoError(t, err)

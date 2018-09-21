@@ -7,28 +7,28 @@ import (
 )
 
 func TestNextWALFileName(t *testing.T) {
-	nextName, err := walg.GetNextWALFileName("000000010000000000000051")
+	nextName, err := walg.GetNextWalFilename("000000010000000000000051")
 	assert.NoError(t, err)
 	assert.Equal(t, "000000010000000000000052", nextName)
 
-	nextName, err = walg.GetNextWALFileName("00000001000000000000005F")
+	nextName, err = walg.GetNextWalFilename("00000001000000000000005F")
 	assert.NoError(t, err)
 	assert.Equal(t, "000000010000000000000060", nextName)
 
-	nextName, err = walg.GetNextWALFileName("0000000100000001000000FF")
+	nextName, err = walg.GetNextWalFilename("0000000100000001000000FF")
 	assert.NoError(t, err)
 	assert.Equal(t, "000000010000000200000000", nextName)
 
-	_, err = walg.GetNextWALFileName("0000000100000001000001FF")
+	_, err = walg.GetNextWalFilename("0000000100000001000001FF")
 	assert.Errorf(t, err, "TestNextWALFileName 0000000100000001000001FF did not failed")
 
-	_, err = walg.GetNextWALFileName("00000001000ZZ001000000FF")
+	_, err = walg.GetNextWalFilename("00000001000ZZ001000000FF")
 	assert.Errorf(t, err, "TestNextWALFileName 00000001000ZZ001000001FF did not failed")
 
-	_, err = walg.GetNextWALFileName("00000001000001000000FF")
+	_, err = walg.GetNextWalFilename("00000001000001000000FF")
 	assert.Errorf(t, err, "TestNextWALFileName 00000001000001000001FF did not failed")
 
-	_, err = walg.GetNextWALFileName("asdfasdf")
+	_, err = walg.GetNextWalFilename("asdfasdf")
 	assert.Errorf(t, err, "TestNextWALFileName asdfasdf did not failed")
 }
 

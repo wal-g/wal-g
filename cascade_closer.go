@@ -21,8 +21,5 @@ func (cascadeCloser *CascadeWriteCloser) Close() error {
 		return errors.Wrap(err, "Close: failed to close main writer")
 	}
 	err = cascadeCloser.Underlying.Close()
-	if err != nil {
-		return errors.Wrap(err, "Close: failed to close underlying writer")
-	}
-	return nil
+	return errors.Wrap(err, "Close: failed to close underlying writer")
 }

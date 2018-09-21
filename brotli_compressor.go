@@ -1,8 +1,6 @@
 package walg
 
-import (
-	"io"
-)
+import "io"
 
 type BrotliCompressor struct{}
 

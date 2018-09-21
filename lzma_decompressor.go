@@ -14,7 +14,7 @@ func (decompressor LzmaDecompressor) Decompress(dst io.Writer, src io.Reader) er
 		return errors.Wrap(err, "DecompressLzma: lzma reader creation failed")
 	}
 	_, err = FastCopy(dst, lzReader)
-	return err
+	return errors.Wrap(err, "DecompressLzma: lzma write failed")
 }
 
 func (decompressor LzmaDecompressor) FileExtension() string {

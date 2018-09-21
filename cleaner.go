@@ -12,7 +12,7 @@ type Cleaner interface {
 }
 
 func CleanupPrefetchDirectories(walFileName string, location string, cleaner Cleaner) {
-	timelineId, logSegNo, err := ParseWALFileName(walFileName)
+	timelineId, logSegNo, err := ParseWALFilename(walFileName)
 	if err != nil {
 		log.Println("WAL-prefetch cleanup failed: ", err, " file: ", walFileName)
 		return
@@ -31,7 +31,7 @@ func cleanupPrefetchDirectory(directory string, timelineId uint32, logSegNo uint
 	}
 
 	for _, f := range files {
-		fileTimelineId, fileLogSegNo, err := ParseWALFileName(f)
+		fileTimelineId, fileLogSegNo, err := ParseWALFilename(f)
 		if err != nil {
 			continue
 		}

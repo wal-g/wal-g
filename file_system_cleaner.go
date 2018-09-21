@@ -3,6 +3,7 @@ package walg
 import (
 	"io/ioutil"
 	"os"
+	"fmt"
 )
 
 // FileSystemCleaner actually performs it's functions on file system
@@ -27,5 +28,8 @@ func (cleaner FileSystemCleaner) GetFiles(directory string) (files []string, err
 
 // Remove file
 func (cleaner FileSystemCleaner) Remove(file string) {
-	os.Remove(file)
+	err := os.Remove(file)
+	if err != nil {
+		fmt.Printf("Tried to remove file: '%s', but got error: '%v'\n", file, err)
+	}
 }

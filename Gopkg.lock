@@ -188,6 +188,7 @@
     "openpgp/s2k"
   ]
   revision = "f027049dab0ad238e394a753dba2d14753473a04"
+  source = "https://github.com/golang/crypto"
 
 [[projects]]
   branch = "master"

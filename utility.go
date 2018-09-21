@@ -44,7 +44,7 @@ func max(a, b int) int {
 	return b
 }
 
-func toBytes(x interface{}) []byte {
+func ToBytes(x interface{}) []byte {
 	var buf bytes.Buffer
 	binary.Write(&buf, binary.LittleEndian, x)
 	return buf.Bytes()

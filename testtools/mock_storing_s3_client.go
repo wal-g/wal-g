@@ -10,15 +10,15 @@ import (
 
 type mockStoringS3Client struct {
 	s3iface.S3API
-	storage MockStorage
+	storage *MockStorage
 }
 
-func NewMockStoringS3Client(storage MockStorage) *mockStoringS3Client {
+func NewMockStoringS3Client(storage *MockStorage) *mockStoringS3Client {
 	return &mockStoringS3Client{storage: storage}
 }
 
 func (client *mockStoringS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error) {
-	buffer, ok := client.storage[*input.Bucket+*input.Key]
+	buffer, ok := client.storage.Load(*input.Bucket + *input.Key)
 	if !ok {
 		return nil, awserr.New(walg.NoSuchKeyAWSErrorCode, "", nil)
 	} else {

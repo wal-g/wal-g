@@ -79,7 +79,7 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap)
 	var headerBuffer bytes.Buffer
 	headerBuffer.Write(IncrementFileHeader)
 	fileSize := pageReader.FileSize
-	headerBuffer.Write(toBytes(uint64(fileSize)))
+	headerBuffer.Write(ToBytes(uint64(fileSize)))
 	pageReader.Blocks = make([]uint32, 0, fileSize/int64(DatabasePageSize))
 
 	if deltaBitmap == nil {
@@ -132,7 +132,7 @@ func (pageReader *IncrementalPageReader) FullScanInitialize() error {
 // WriteDiffMapToHeader is currently used only with buffers, so we don't handle any writing errors
 func (pageReader *IncrementalPageReader) WriteDiffMapToHeader(headerWriter io.Writer) {
 	diffBlockCount := len(pageReader.Blocks)
-	headerWriter.Write(toBytes(uint32(diffBlockCount)))
+	headerWriter.Write(ToBytes(uint32(diffBlockCount)))
 
 	for _, blockNo := range pageReader.Blocks {
 		binary.Write(headerWriter, binary.LittleEndian, blockNo)

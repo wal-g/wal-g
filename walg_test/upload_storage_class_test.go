@@ -10,12 +10,12 @@ import (
 
 func TestUploadInput(t *testing.T) {
 	// Test default storage class
-	uploader := testtools.NewMockTarUploader(false, false)
+	uploader := testtools.NewMockUploader(false, false)
 	input := uploader.CreateUploadInput("path", nil)
 	assert.Equal(t, "STANDARD", *input.StorageClass)
 
 	// Test STANDARD_IA storage class
-	uploader = testtools.NewMockTarUploader(false, false)
+	uploader = testtools.NewMockUploader(false, false)
 	uploader.StorageClass = "STANDARD_IA"
 	input = uploader.CreateUploadInput("path", nil)
 	assert.Equal(t, "STANDARD_IA", *input.StorageClass)

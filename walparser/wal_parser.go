@@ -2,7 +2,9 @@ package walparser
 
 import (
 	"bytes"
+	"encoding/binary"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/walparser/parsingutil"
 	"io"
 	"io/ioutil"
 )
@@ -20,41 +22,48 @@ type WalParser struct {
 	currentRecordData []byte
 }
 
+func NewWalParser() *WalParser {
+	return &WalParser{make([]byte, 0)}
+}
+
 func (parser *WalParser) Invalidate() {
 	parser.currentRecordData = nil
 }
 
-func (parser *WalParser) ParseRecordsFromPage(reader io.Reader) ([]XLogRecord, error) {
+// For now we suppose that no wal record crosses whole wal page.
+// If there is no currentRecordData (e. g. we look at the first record in the file), then we return
+// prevRecordTail and discard it in parser.
+func (parser *WalParser) ParseRecordsFromPage(reader io.Reader) (prevRecordTail []byte, pageRecords []XLogRecord, err error) {
 	// returning pageParsingErr later is important because of PartialPageError possibility
 	page, pageParsingErr := parser.parsePage(reader)
 	if pageParsingErr != nil && pageParsingErr != PartialPageError {
-		return nil, pageParsingErr
+		return nil, nil, pageParsingErr
 	}
 	if len(parser.currentRecordData) == 0 {
 		parser.currentRecordData = page.NextRecordHeadingData
-		return page.Records, pageParsingErr
+		return page.PrevRecordTrailingData, page.Records, pageParsingErr
 	} else {
 		currentRecordData := concatByteSlices(parser.currentRecordData, page.PrevRecordTrailingData)
 		header, err := readXLogRecordHeader(bytes.NewReader(currentRecordData))
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if header.TotalRecordLength == uint32(len(currentRecordData)) {
-			currentRecord, err := parseXLogRecordFromBytes(currentRecordData)
+			currentRecord, err := ParseXLogRecordFromBytes(currentRecordData)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			records := make([]XLogRecord, len(page.Records)+1)
 			records[0] = *currentRecord
 			copy(records[1:], page.Records)
 			parser.currentRecordData = page.NextRecordHeadingData
-			return records, pageParsingErr
+			return nil, records, pageParsingErr
 		}
 		if len(page.Records) != 0 || len(page.NextRecordHeadingData) != 0 {
-			return nil, ContinuationNotFoundError
+			return nil, nil, ContinuationNotFoundError
 		}
 		parser.currentRecordData = currentRecordData
-		return make([]XLogRecord, 0), pageParsingErr
+		return nil, make([]XLogRecord, 0), pageParsingErr
 	}
 }
 
@@ -63,7 +72,7 @@ func (parser *WalParser) parsePage(reader io.Reader) (*XLogPage, error) {
 	pageHeader, err := readXLogPageHeader(alignedReader)
 	if err != nil {
 		if err == ZeroPageHeaderError {
-			pageData, err1 := ioutil.ReadAll(reader)
+			pageData, err1 := ioutil.ReadAll(alignedReader)
 			if err1 != nil {
 				return nil, err1
 			}
@@ -87,7 +96,7 @@ func (parser *WalParser) parsePage(reader io.Reader) (*XLogPage, error) {
 	}
 	// if remainingData can be a part of WAL-switch record and we can check it
 	if len(parser.currentRecordData) > 0 {
-		record, err := parseXLogRecordFromBytes(concatByteSlices(parser.currentRecordData, remainingData))
+		record, err := ParseXLogRecordFromBytes(concatByteSlices(parser.currentRecordData, remainingData))
 		if err != nil {
 			return nil, err
 		}
@@ -103,7 +112,7 @@ func (parser *WalParser) parsePage(reader io.Reader) (*XLogPage, error) {
 		}
 		if wholeRecord {
 			// The header was previously validated being zero, so now it doesn't need to. However we do this for code robustness.
-			record, err := parseXLogRecordFromBytes(recordData)
+			record, err := ParseXLogRecordFromBytes(recordData)
 			if err != nil {
 				return checkPartialPage(alignedReader, &XLogPage{Header: *pageHeader, PrevRecordTrailingData: remainingData, Records: pageRecords}, err)
 			}
@@ -130,19 +139,35 @@ func checkPartialPage(pageReader io.Reader, page *XLogPage, recordReadingErr err
 	return nil, recordReadingErr
 }
 
-func NewWalParser() *WalParser {
-	return &WalParser{nil}
-}
-
-func (parser *WalParser) SaveParser(writer io.Writer) error {
-	_, err := writer.Write(parser.currentRecordData)
+func (parser *WalParser) Save(writer io.Writer) error {
+	currentRecordDataLen := make([]byte, 4)
+	binary.LittleEndian.PutUint32(currentRecordDataLen, uint32(len(parser.currentRecordData)))
+	_, err := writer.Write(currentRecordDataLen)
+	if err != nil {
+		return err
+	}
+	_, err = writer.Write(parser.currentRecordData)
 	return err
 }
 
-func LoadParser(reader io.Reader) (*WalParser, error) {
-	data, err := ioutil.ReadAll(reader)
+func (parser *WalParser) GetCurrentRecordData() []byte {
+	return parser.currentRecordData
+}
+
+func LoadWalParser(reader io.Reader) (*WalParser, error) {
+	var dataLen uint32
+	err := parsingutil.NewFieldToParse(&dataLen, "record data prefix len").ParseFrom(reader)
+	if err != nil {
+		return nil, err
+	}
+	data := make([]byte, dataLen)
+	_, err = io.ReadFull(reader, data)
 	if err != nil {
 		return nil, err
 	}
 	return &WalParser{data}, nil
+}
+
+func LoadWalParserFromCurrentRecordData(currentRecordData []byte) *WalParser {
+	return &WalParser{currentRecordData}
 }
