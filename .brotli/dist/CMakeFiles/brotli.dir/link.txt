@@ -1,0 +1,1 @@
+/usr/bin/cc -O3 -DNDEBUG  -rdynamic CMakeFiles/brotli.dir/c/tools/brotli.c.o  -o brotli libbrotlienc-static.a libbrotlidec-static.a libbrotlicommon-static.a -lm 
