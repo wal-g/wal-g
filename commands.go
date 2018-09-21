@@ -592,7 +592,7 @@ func HandleWALPush(uploader *Uploader, walFilePath string) {
 	if uploader.deltaFileManager != nil {
 		uploader.deltaFileManager.FlushFiles(uploader.Clone())
 	}
-}//
+} //
 
 // TODO : unit tests
 // uploadWALFile from FS to the cloud

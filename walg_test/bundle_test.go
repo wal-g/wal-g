@@ -202,7 +202,7 @@ func TestLoadDeltaMap_AllDeltas(t *testing.T) {
 	backupNextWalFilename := "000000010000000000000090"
 	_, curLogSegNo, _ := walg.ParseWALFilename(backupNextWalFilename)
 
-	err = bundle.DownloadDeltaMap(folder, curLogSegNo*walg.WalSegmentSize + 1)
+	err = bundle.DownloadDeltaMap(folder, curLogSegNo*walg.WalSegmentSize+1)
 	deltaMap := bundle.DeltaMap
 	assert.NoError(t, err)
 	assert.NotNil(t, deltaMap)

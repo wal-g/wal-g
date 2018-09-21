@@ -18,7 +18,7 @@ type WalDeltaRecordingReader struct {
 	PageDataLeftover []byte
 	Recorder         *WalDeltaRecorder
 	partRecorder     *WalPartRecorder
-	firstRead bool
+	firstRead        bool
 }
 
 func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, manager *DeltaFileManager) (*WalDeltaRecordingReader, error) {

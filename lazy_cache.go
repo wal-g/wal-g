@@ -1,8 +1,8 @@
 package walg
 
 import (
-	"sync"
 	"fmt"
+	"sync"
 )
 
 type WrongTypeError struct {
@@ -35,7 +35,7 @@ func (lazyCache *LazyCache) Load(key interface{}) (value interface{}, exists boo
 	}
 	value, err = lazyCache.load(key)
 	lazyCache.cache[key] = value
-	return value, false,  err
+	return value, false, err
 }
 
 func (lazyCache *LazyCache) LoadExisting(key interface{}) (value interface{}, exists bool) {
