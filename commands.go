@@ -22,7 +22,7 @@ import (
 var PgControlMissingError = errors.New("Corrupted backup: missing pg_control")
 var InvalidWalFileMagicError = errors.New("WAL-G: WAL file magic is invalid ")
 
-const DataFolderPath = "/tmp/walg_data" // TODO : make data folder path tied to $PGDATA
+const DefaultDataFolderPath = "/tmp"
 
 type ArchiveNonExistenceError struct {
 	archiveName string

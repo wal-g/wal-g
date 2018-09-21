@@ -15,6 +15,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pkg/errors"
 	"golang.org/x/time/rate"
+	"path/filepath"
+	"os"
 )
 
 const (
@@ -170,10 +172,24 @@ func Configure(verifyUploads bool) (uploader *Uploader, destinationFolder *S3Fol
 	uploaderApi := CreateUploader(folder.S3API, DefaultStreamingPartSizeFor10Concurrency, concurrency)
 	var deltaDataFolder DataFolder = nil
 	if useWalDelta {
-		deltaDataFolder, err = NewDiskDataFolder(DataFolderPath)
+		pgdata, ok := LookupConfigValue("PGDATA")
+		var dataFolderPath string
+		if !ok {
+			dataFolderPath = DefaultDataFolderPath
+		} else {
+			dataFolderPath = filepath.Join(pgdata, "pg_wal")
+			if _, err = os.Stat(dataFolderPath); err != nil {
+				dataFolderPath = filepath.Join(pgdata, "pg_xlog")
+				if _, err = os.Stat(dataFolderPath); err != nil {
+					dataFolderPath = DefaultDataFolderPath
+				}
+			}
+		}
+		dataFolderPath = filepath.Join(dataFolderPath, "walg_data")
+		deltaDataFolder, err = NewDiskDataFolder(dataFolderPath)
 		if err != nil {
 			useWalDelta = false
-			_ = fmt.Sprintf("can't use wal delta feature because can't open delta data folder '%s' due to error: '%v'", DataFolderPath, err)
+			_ = fmt.Sprintf("can't use wal delta feature because can't open delta data folder '%s' due to error: '%v'", dataFolderPath, err)
 		}
 	}
 	uploader = NewUploader(uploaderApi, Compressors[compressionMethod], folder, deltaDataFolder, useWalDelta, verifyUploads)
