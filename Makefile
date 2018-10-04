@@ -21,7 +21,7 @@ install:
 	(cd cmd/wal-g && go install)
 
 clean:
-	rm -rf extracted compressed $(wildcard data*)
+	rm -rf extracted compressed $(filter-out $(wildcard *.go), $(wildcard data*))
 	go clean
 	(cd cmd/wal-g && go clean)
 
