@@ -458,10 +458,10 @@ func (bundle *Bundle) DownloadDeltaMap(folder *S3Folder, backupStartLSN uint64) 
 			return errors.Wrapf(err, "Error during delta file '%s' downloading.", deltaFilename)
 		}
 		deltaFile, err := LoadDeltaFile(reader)
-		walParser = deltaFile.WalParser
 		if err != nil {
 			return errors.Wrapf(err, "Error during reading delta file '%s'", deltaFilename)
 		}
+		walParser = deltaFile.WalParser
 		reader.Close()
 		for _, location := range deltaFile.Locations {
 			deltaMap.AddToDelta(location)
