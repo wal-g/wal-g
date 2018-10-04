@@ -8,6 +8,7 @@ import (
 	"golang.org/x/sync/semaphore"
 	"io"
 	"log"
+	"sync"
 )
 
 var NoFilesToExtractError = errors.New("ExtractAll: did not provide files to extract")
@@ -120,7 +121,7 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 	downloadingContext := context.TODO()
 	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
 	var crypter OpenPGPCrypter
-	inFailed := make(map[ReaderMaker]bool)
+	inFailed := sync.Map{}
 
 	for _, file := range files {
 		downloadingSemaphore.Acquire(downloadingContext, 1)
@@ -133,8 +134,7 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 			decompressingWriter.Close()
 			log.Printf("Finished decompression of %s", fileClosure.Path())
 			if err != nil {
-				if _, ok := inFailed[fileClosure]; !ok {
-					inFailed[fileClosure] = true
+				if _, ok := inFailed.LoadOrStore(fileClosure, true); !ok {
 					failed = append(failed, fileClosure)
 				}
 				log.Println(err)
@@ -148,8 +148,7 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 			extractingReader.Close()
 			log.Printf("Finished extraction of %s", fileClosure.Path())
 			if err != nil {
-				if _, ok := inFailed[fileClosure]; !ok {
-					inFailed[fileClosure] = true
+				if _, ok := inFailed.LoadOrStore(fileClosure, true); !ok {
 					failed = append(failed, fileClosure)
 				}
 				log.Println(err)
