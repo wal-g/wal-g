@@ -109,9 +109,13 @@ func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dry
 
 	skip := true
 	skipLine := len(backups)
+	var walSkipFileName = ""
 	for i, b := range backups {
 		if skip {
 			log.Printf("%v skipped\n", b.Name)
+			if walSkipFileName == "" || walSkipFileName < b.WalFileName {
+				walSkipFileName = b.WalFileName
+			}
 		} else {
 			log.Printf("%v will be deleted\n", b.Name)
 		}
@@ -123,7 +127,7 @@ func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dry
 
 	if !dryRun {
 		if skipLine < len(backups)-1 {
-			deleteWALBefore(backups[skipLine], folder)
+			deleteWALBefore(walSkipFileName, folder)
 			deleteBackupsBefore(backups, skipLine, folder)
 		}
 	} else {
@@ -176,10 +180,10 @@ func partitionToObjects(keys []string) []*s3.ObjectIdentifier {
 }
 
 // TODO : unit tests
-func deleteWALBefore(backupTime BackupTime, folder *S3Folder) {
-	objects, err := getWals(backupTime.WalFileName, folder)
+func deleteWALBefore(walSkipFileName string, folder *S3Folder) {
+	objects, err := getWals(walSkipFileName, folder)
 	if err != nil {
-		log.Fatal("Unable to obtaind WALS for border ", backupTime.Name, err)
+		log.Fatal("Unable to obtaind WALS for border ", walSkipFileName, err)
 	}
 	parts := partitionObjects(objects, 1000)
 	for _, part := range parts {
@@ -188,7 +192,7 @@ func deleteWALBefore(backupTime BackupTime, folder *S3Folder) {
 		}}
 		_, err = folder.S3API.DeleteObjects(input)
 		if err != nil {
-			log.Fatal("Unable to delete WALS before ", backupTime.Name, err)
+			log.Fatal("Unable to delete WALS before ", walSkipFileName, err)
 		}
 	}
 }
