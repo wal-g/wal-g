@@ -199,7 +199,7 @@ if FIND_FULL is specified WAL-G will calculate minimum backup needed to keep all
 
 ``retain FULL 5`` will keep 5 full backups and all deltas of them
 
-``retail FIND_FULL`` will find necessary full for 5th
+``retain FIND_FULL`` will find necessary full for 5th
 
 ``before base_000010000123123123`` will fail if base_000010000123123123 is delta
 
