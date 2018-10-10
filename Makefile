@@ -26,4 +26,4 @@ clean:
 	(cd cmd/wal-g && go clean)
 
 cmd/wal-g/wal-g: $(CMD_FILES) $(PKG_FILES)
-	(cd cmd/wal-g && go build $(GOTAGS) -ldflags "-X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X main.GitRevision=`git rev-parse --short HEAD` -X main.WalgVersion=`git tag -l --points-at HEAD`")
+	(cd cmd/wal-g && go build $(GOTAGS) -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X main.GitRevision=`git rev-parse --short HEAD` -X main.WalgVersion=`git tag -l --points-at HEAD`")
