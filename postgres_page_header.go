@@ -20,7 +20,6 @@ func (header *PostgresPageHeader) Lsn() uint64 {
 	return ((uint64(header.pdLsnH)) << 32) + uint64(header.pdLsnL)
 }
 
-// TODO : unit tests
 func (header *PostgresPageHeader) IsValid() bool {
 	return !((header.pdFlags&validFlags) != header.pdFlags ||
 		header.pdLower < headerSize ||
@@ -31,7 +30,10 @@ func (header *PostgresPageHeader) IsValid() bool {
 		header.pdPageSizeVersion != DatabasePageSize+layoutVersion)
 }
 
-// TODO : unit tests
+func (header *PostgresPageHeader) IsNew() bool {
+	return header.pdUpper == 0 // #define PageIsNew(page) (((PageHeader) (page))->pd_upper == 0) in bufpage.h
+}
+
 // ParsePostgresPageHeader reads information from PostgreSQL page header. Exported for test reasons.
 func ParsePostgresPageHeader(reader io.Reader) (*PostgresPageHeader, error) {
 	pageHeader := PostgresPageHeader{}

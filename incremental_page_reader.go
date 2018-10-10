@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"github.com/RoaringBitmap/roaring"
 	"io"
+	"log"
 )
 
 // "wi" at the head stands for "wal-g increment"
@@ -145,18 +146,19 @@ func (pageReader *IncrementalPageReader) SelectNewValidPage(pageBytes []byte, bl
 	pageHeader, _ := ParsePostgresPageHeader(bytes.NewReader(pageBytes))
 	valid = pageHeader.IsValid()
 
-	allZeroes := false
+	isNew := false
 
 	if !valid {
-		if allZero(pageBytes) {
-			allZeroes = true
+		if pageHeader.IsNew() { // vacuumed page
+			isNew = true
 			valid = true
 		} else {
+			log.Println("Invalid page ", blockNo, " page header ", pageHeader)
 			return false
 		}
 	}
 
-	if allZeroes || (pageHeader.Lsn() >= pageReader.Lsn) {
+	if isNew || (pageHeader.Lsn() >= pageReader.Lsn) {
 		pageReader.Blocks = append(pageReader.Blocks, blockNo)
 	}
 	return

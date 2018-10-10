@@ -38,6 +38,9 @@ func TestSelectNewValidPage_InvalidPage(t *testing.T) {
 		Blocks: make([]uint32, 0),
 	}
 	pageData := make([]byte, walg.DatabasePageSize)
+	for i := byte(0); i < 24; i++ {
+		pageData[i] = i
+	}
 	pageData[2134] = 100
 	var blockNo uint32 = 10
 	valid := pageReader.SelectNewValidPage(pageData, blockNo)
