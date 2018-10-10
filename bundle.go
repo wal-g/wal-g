@@ -26,8 +26,8 @@ var ExcludedFilenames = make(map[string]Empty)
 
 func init() {
 	filesToExclude := []string{
-		"pg_log", "pg_xlog", "pg_wal", // Directories
-		"pgsql_tmp", "postgresql.auto.conf.tmp", "postmaster.pid", "postmaster.opts", "recovery.conf", // Files
+		"pg_log", "pg_xlog", "pg_wal",                                                                        // Directories
+		"pgsql_tmp", "postgresql.auto.conf.tmp", "postmaster.pid", "postmaster.opts", "recovery.conf",        // Files
 		"pg_dynshmem", "pg_notify", "pg_replslot", "pg_serial", "pg_stat_tmp", "pg_snapshots", "pg_subtrans", // Directories
 	}
 
@@ -500,7 +500,12 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 				return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
 			}
 			fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
-			if err != nil {
+			if _, ok := err.(*InvalidBlockError); ok {
+				fileReader, err = startReadingFile(fileInfoHeader, info, path, fileReader)
+				if err != nil {
+					return err
+				}
+			} else if err != nil {
 				return errors.Wrapf(err, "packFileIntoTar: failed reading incremental file '%s'\n", path)
 			}
 			fileReader = &ReadCascadeCloser{&io.LimitedReader{
@@ -512,16 +517,11 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 			return nil
 		}
 	} else {
-		fileInfoHeader.Size = info.Size()
-		file, err := os.Open(path)
+		var err error
+		fileReader, err = startReadingFile(fileInfoHeader, info, path, fileReader)
 		if err != nil {
-			return errors.Wrapf(err, "packFileIntoTar: failed to open file '%s'\n", path)
+			return err
 		}
-		diskLimitedFileReader := NewDiskLimitReader(file)
-		fileReader = &ReadCascadeCloser{&io.LimitedReader{
-			R: io.MultiReader(diskLimitedFileReader, &ZeroReader{}),
-			N: int64(fileInfoHeader.Size),
-		}, diskLimitedFileReader}
 	}
 	defer fileReader.Close()
 
@@ -537,4 +537,17 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 	}
 
 	return nil
+}
+func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string, fileReader io.ReadCloser) (io.ReadCloser, error) {
+	fileInfoHeader.Size = info.Size()
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "packFileIntoTar: failed to open file '%s'\n", path)
+	}
+	diskLimitedFileReader := NewDiskLimitReader(file)
+	fileReader = &ReadCascadeCloser{&io.LimitedReader{
+		R: io.MultiReader(diskLimitedFileReader, &ZeroReader{}),
+		N: int64(fileInfoHeader.Size),
+	}, diskLimitedFileReader}
+	return fileReader, nil
 }
