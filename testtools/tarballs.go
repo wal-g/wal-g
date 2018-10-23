@@ -78,25 +78,6 @@ func (tarBall *FileTarBall) AddSize(i int64)        { tarBall.size += i }
 func (tarBall *FileTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
 func (tarBall *FileTarBall) AwaitUploads()          {}
 
-// NOPTarBall mocks a tarball. Used for testing purposes.
-type NOPTarBall struct {
-	number    int
-	size      int64
-	tarWriter *tar.Writer
-}
-
-func (tarBall *NOPTarBall) SetUp(crypter walg.Crypter, params ...string) {}
-func (tarBall *NOPTarBall) CloseTar() error                              { return nil }
-func (tarBall *NOPTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error {
-	fmt.Printf("NOP: %d files.\n", tarBall.number)
-	return nil
-}
-
-func (tarBall *NOPTarBall) Size() int64            { return tarBall.size }
-func (tarBall *NOPTarBall) AddSize(i int64)        { tarBall.size += i }
-func (tarBall *NOPTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
-func (tarBall *NOPTarBall) AwaitUploads()          {}
-
 // BufferTarBall represents a tarball that is
 // written to buffer.
 type BufferTarBall struct {

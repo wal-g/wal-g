@@ -96,3 +96,16 @@ func GetNextWalFilename(name string) (string, error) {
 	logSegNo++
 	return formatWALFileName(uint32(timelineId), logSegNo), nil
 }
+
+func ShouldPrefault(name string) (lsn uint64, shouldPrefault bool, timelineId uint32, err error) {
+	timelineId, logSegNo, err := ParseWALFilename(name)
+	if err != nil {
+		return 0, false, 0, err
+	}
+	if logSegNo%WalFileInDelta != 0 {
+		return 0, false, 0, nil
+	}
+	logSegNo += WalFileInDelta
+
+	return logSegNo * WalSegmentSize, true, timelineId, nil
+}

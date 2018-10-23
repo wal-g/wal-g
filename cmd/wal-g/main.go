@@ -130,7 +130,7 @@ func main() {
 		// Fetch and decompress a WAL file from S3.
 		walg.HandleWALFetch(folder, firstArgument, backupName, true)
 	} else if command == "wal-prefetch" {
-		walg.HandleWALPrefetch(folder, firstArgument, backupName)
+		walg.HandleWALPrefetch(folder, firstArgument, backupName, uploader)
 	} else if command == "wal-push" {
 		// Upload a WAL file to S3.
 		walg.HandleWALPush(uploader, firstArgument)

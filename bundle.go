@@ -65,6 +65,7 @@ type Bundle struct {
 	Files *sync.Map
 }
 
+// TODO: use DiskDataFolder
 func NewBundle(archiveDirectory string, incrementFromLsn *uint64, incrementFromFiles BackupFileList) *Bundle {
 	return &Bundle{
 		ArchiveDirectory:   archiveDirectory,
@@ -538,6 +539,7 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 
 	return nil
 }
+
 func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string, fileReader io.ReadCloser) (io.ReadCloser, error) {
 	fileInfoHeader.Size = info.Size()
 	file, err := os.Open(path)

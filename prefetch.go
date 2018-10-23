@@ -9,11 +9,16 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"path/filepath"
+	"archive/tar"
+	"github.com/pkg/errors"
+	"io"
+	"io/ioutil"
 )
 
 // TODO : unit tests
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
-func HandleWALPrefetch(folder *S3Folder, walFileName string, location string) {
+func HandleWALPrefetch(folder *S3Folder, walFileName string, location string, uploader *Uploader) {
 	var fileName = walFileName
 	var err error
 	location = path.Dir(location)
@@ -25,12 +30,146 @@ func HandleWALPrefetch(folder *S3Folder, walFileName string, location string) {
 		}
 		waitGroup.Add(1)
 		go prefetchFile(location, folder, fileName, waitGroup)
+
+		prefaultStartLsn, shouldPrefault, timelineId, err := ShouldPrefault(fileName)
+		if err != nil {
+			log.Println("ShouldPrefault failed: ", err, " file: ", fileName)
+		}
+		if shouldPrefault {
+			waitGroup.Add(1)
+			go prefaultData(prefaultStartLsn, timelineId, folder, waitGroup, uploader)
+		}
+
 		time.Sleep(10 * time.Millisecond) // ramp up in order
 	}
 
 	go CleanupPrefetchDirectories(walFileName, location, FileSystemCleaner{})
 
 	waitGroup.Wait()
+}
+
+// TODO : unit tests
+func prefaultData(prefaultStartLsn uint64, timelineId uint32, folder *S3Folder, waitGroup *sync.WaitGroup, uploader *Uploader) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Prefault unsuccessful ", prefaultStartLsn)
+		}
+		waitGroup.Done()
+	}()
+
+	if !uploader.useWalDelta {
+		return
+	}
+
+	archiveDirectory := uploader.deltaFileManager.dataFolder.(*DiskDataFolder).path
+	archiveDirectory = filepath.Dir(archiveDirectory)
+	archiveDirectory = filepath.Dir(archiveDirectory)
+	bundle := NewBundle(archiveDirectory, &prefaultStartLsn, nil)
+	bundle.Timeline = timelineId
+	err := bundle.DownloadDeltaMap(uploader.uploadingFolder, prefaultStartLsn+WalSegmentSize*WalFileInDelta)
+	if err != nil {
+		fmt.Printf("Error during loading delta map: '%v'.", err)
+		return
+	}
+	bundle.TarBallMaker = NewNopTarBallMaker()
+
+	// Start a new tar bundle, walk the archiveDirectory and upload everything there.
+	bundle.StartQueue()
+	fmt.Println("Walking for prefault...")
+	err = filepath.Walk(archiveDirectory, bundle.PrefaultWalkedFSObject)
+	if err != nil {
+		log.Fatalf("%+v\n", err)
+	}
+	err = bundle.FinishQueue()
+}
+
+func (bundle *Bundle) PrefaultWalkedFSObject(path string, info os.FileInfo, err error) error {
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println(path, " deleted during filepath walk")
+			return nil
+		}
+		return err
+	}
+
+	if info.Name() != PgControl {
+		err = bundle.prefaultHandleTar(path, info)
+		if err != nil {
+			if err == filepath.SkipDir {
+				return err
+			}
+			return errors.Wrap(err, "HandleWalkedFSObject: handle tar failed")
+		}
+	}
+	return nil
+}
+
+func (bundle *Bundle) prefaultHandleTar(path string, info os.FileInfo) error {
+	fileName := info.Name()
+	_, excluded := ExcludedFilenames[fileName]
+	isDir := info.IsDir()
+
+	if excluded && !isDir {
+		return nil
+	}
+
+	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
+	if err != nil {
+		return errors.Wrap(err, "handleTar: could not grab header info")
+	}
+
+	fileInfoHeader.Name = bundle.GetFileRelPath(path)
+
+	if !excluded && info.Mode().IsRegular() {
+		tarBall := bundle.Deque()
+		tarBall.SetUp(nil)
+		go func() {
+			err := bundle.prefaultFile(path, info, fileInfoHeader)
+			if err != nil {
+				panic(err)
+			}
+			err = bundle.CheckSizeAndEnqueueBack(tarBall)
+			if err != nil {
+				panic(err)
+			}
+		}()
+	} else {
+		if excluded && isDir {
+			return filepath.SkipDir
+		}
+	}
+
+	return nil
+}
+
+func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader *tar.Header) error {
+	incrementBaseLsn := bundle.GetIncrementBaseLsn()
+	isIncremented := isPagedFile(info, path)
+	var fileReader io.ReadCloser
+	if isIncremented {
+		bitmap, err := bundle.getDeltaBitmapFor(path)
+		if err != NoBitmapFoundError { // this file has changed after the start of backup, so just skip it
+			if err != nil {
+				return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
+			}
+			fmt.Println("Prefaulting ", path)
+			fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
+			if _, ok := err.(*InvalidBlockError); ok {
+				return nil
+			} else if err != nil {
+				return errors.Wrapf(err, "packFileIntoTar: failed reading incremental file '%s'\n", path)
+			}
+
+			_, err := io.Copy(ioutil.Discard, fileReader)
+
+			if err != nil {
+				return errors.Wrap(err, "packFileIntoTar: operation failed")
+			}
+			fileReader.Close()
+		}
+	}
+
+	return nil
 }
 
 // TODO : unit tests

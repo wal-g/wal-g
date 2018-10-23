@@ -42,7 +42,7 @@ func main() {
 	}
 
 	if nop {
-		bundle.TarBallMaker = &testtools.NOPTarBallMaker{}
+		bundle.TarBallMaker = &walg.NOPTarBallMaker{}
 	} else if !s3 && outDir == "" {
 		fmt.Printf("Please provide a directory to write to.\n")
 		os.Exit(1)

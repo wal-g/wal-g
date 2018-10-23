@@ -24,22 +24,6 @@ func (tarBallMaker *FileTarBallMaker) Make(inheritState bool) walg.TarBall {
 	}
 }
 
-// NOPTarBallMaker creates a new NOPTarBall. Used
-// for testing purposes.
-type NOPTarBallMaker struct {
-	number int
-	size   int64
-}
-
-// Make creates a new NOPTarBall.
-func (tarBallMaker *NOPTarBallMaker) Make(inheritState bool) walg.TarBall {
-	tarBallMaker.number++
-	return &NOPTarBall{
-		number: tarBallMaker.number,
-		size:   tarBallMaker.size,
-	}
-}
-
 type BufferTarBallMaker struct {
 	number        int
 	size          int64
