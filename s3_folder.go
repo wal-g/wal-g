@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"sort"
 	"strings"
+	"time"
 )
 
 type S3Folder struct {
@@ -41,7 +42,17 @@ func GetLatestBackupKey(folder *S3Folder) (string, error) {
 }
 
 // getBackups receives backup descriptions and sorts them by time
-func getBackups(folder *S3Folder) ([]BackupTime, error) {
+func getBackups(folder *S3Folder) (backus []BackupTime, err error) {
+	backus, _, err = getBackupsAndGarbage(folder)
+
+	count := len(backus)
+	if count == 0 {
+		return nil, NoBackupsFoundError
+	}
+	return
+}
+
+func getBackupsAndGarbage(folder *S3Folder) (backups []BackupTime, garbage []BackupTime, err error) {
 	var sortTimes []BackupTime
 	objects := &s3.ListObjectsV2Input{
 		Bucket:    folder.Bucket,
@@ -49,26 +60,23 @@ func getBackups(folder *S3Folder) ([]BackupTime, error) {
 		Delimiter: aws.String("/"),
 	}
 
-	var backups = make([]*s3.Object, 0)
+	var backupObjects = make([]*s3.Object, 0)
+	var prefixObjects = make([]*s3.CommonPrefix, 0)
 
-	err := folder.S3API.ListObjectsV2Pages(objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
-		backups = append(backups, files.Contents...)
+	err = folder.S3API.ListObjectsV2Pages(objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
+		prefixObjects = append(prefixObjects, files.CommonPrefixes...)
+		backupObjects = append(backupObjects, files.Contents...)
 		return true
 	})
 
 	if err != nil {
-		return nil, errors.Wrap(err, "GetLatestBackupKey: s3.ListObjects failed")
+		return nil, nil, errors.Wrap(err, "GetLatestBackupKey: s3.ListObjects failed")
 	}
 
-	count := len(backups)
+	sortTimes = GetBackupTimeSlices(backupObjects)
+	garbage = GetGarbageBackupTimeSlicesFromPrefix(prefixObjects, sortTimes)
 
-	if count == 0 {
-		return nil, NoBackupsFoundError
-	}
-
-	sortTimes = GetBackupTimeSlices(backups)
-
-	return sortTimes, nil
+	return sortTimes, garbage, nil
 }
 
 // getWals returns all WAL file keys less then key provided
@@ -81,8 +89,8 @@ func getWals(before string, folder *S3Folder) ([]*s3.ObjectIdentifier, error) {
 	arr := make([]*s3.ObjectIdentifier, 0)
 
 	err := folder.S3API.ListObjectsV2Pages(objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
-		for _, ob := range files.Contents {
-			key := *ob.Key
+		for _, object := range files.Contents {
+			key := *object.Key
 			if stripWalName(key) < before {
 				arr = append(arr, &s3.ObjectIdentifier{Key: aws.String(key)})
 			}
@@ -100,9 +108,9 @@ func getWals(before string, folder *S3Folder) ([]*s3.ObjectIdentifier, error) {
 // GetBackupTimeSlices converts S3 objects to backup description
 func GetBackupTimeSlices(backups []*s3.Object) []BackupTime {
 	sortTimes := make([]BackupTime, len(backups))
-	for i, ob := range backups {
-		key := *ob.Key
-		time := *ob.LastModified
+	for i, object := range backups {
+		key := *object.Key
+		time := *object.LastModified
 		sortTimes[i] = BackupTime{stripBackupName(key), time, stripWalFileName(key)}
 	}
 	slice := TimeSlice(sortTimes)
@@ -110,10 +118,34 @@ func GetBackupTimeSlices(backups []*s3.Object) []BackupTime {
 	return slice
 }
 
+// GetBackupTimeSlices converts S3 objects to backup description
+func GetGarbageBackupTimeSlicesFromPrefix(backups []*s3.CommonPrefix, nongarbage []BackupTime) []BackupTime {
+	sortTimes := make([]BackupTime, 0)
+	var keyfilter = make(map[string]string)
+	for _, k := range nongarbage {
+		keyfilter[k.Name] = k.Name
+	}
+	for _, object := range backups {
+		key := stripPrefixName(*object.Prefix)
+		if _, ok := keyfilter[key]; ok {
+			continue
+		}
+		sortTimes = append(sortTimes, BackupTime{key, time.Time{}, stripWalFileName(key)})
+	}
+	return sortTimes
+}
+
 // Strips the backup key and returns it in its base form `base_...`.
 func stripBackupName(key string) string {
 	all := strings.SplitAfter(key, "/")
 	name := strings.Split(all[len(all)-1], "_backup")[0]
+	return name
+}
+
+func stripPrefixName(key string) string {
+	key = strings.Trim(key, "/")
+	all := strings.SplitAfter(key, "/")
+	name := all[len(all)-1]
 	return name
 }
 

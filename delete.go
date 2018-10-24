@@ -99,9 +99,10 @@ func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dry
 			log.Fatalf("%v is incemental and it's predecessors cannot be deleted. Consider FIND_FULL option.", target.Name)
 		}
 	}
+	var garbage []BackupTime
 	var err error
 	if backups == nil {
-		backups, err = getBackups(folder)
+		backups, garbage, err = getBackupsAndGarbage(folder)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -110,18 +111,29 @@ func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dry
 	skip := true
 	skipLine := len(backups)
 	var walSkipFileName = ""
-	for i, b := range backups {
+	for i, backupTime := range backups {
 		if skip {
-			log.Printf("%v skipped\n", b.Name)
-			if walSkipFileName == "" || walSkipFileName < b.WalFileName {
-				walSkipFileName = b.WalFileName
+			log.Printf("%v skipped\n", backupTime.Name)
+			if walSkipFileName == "" || walSkipFileName < backupTime.WalFileName {
+				walSkipFileName = backupTime.WalFileName
 			}
 		} else {
-			log.Printf("%v will be deleted\n", b.Name)
+			log.Printf("%v will be deleted\n", backupTime.Name)
 		}
-		if b.Name == target.Name {
+		if backupTime.Name == target.Name {
 			skip = false
 			skipLine = i
+		}
+	}
+
+	for _, backupTime := range garbage {
+		if strings.HasPrefix(backupTime.Name, backupNamePrefix) && backupTime.Name < target.Name {
+			log.Printf("%v will be deleted (garbage)\n", backupTime.Name)
+			if !dryRun {
+				dropBackup(folder, backupTime)
+			}
+		} else {
+			log.Printf("%v skipped (garbage)\n", backupTime.Name)
 		}
 	}
 
