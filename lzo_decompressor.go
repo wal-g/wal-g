@@ -15,10 +15,43 @@ func (decompressor LzoDecompressor) Decompress(dst io.Writer, src io.Reader) err
 	}
 	defer lzor.Close()
 
-	_, err = io.Copy(dst, lzor)
+	_, err = fastCopyHandleErrClosedPipe(dst, lzor)
 	return err
 }
 
 func (decompressor LzoDecompressor) FileExtension() string {
 	return LzoFileExtension
+}
+
+func fastCopyHandleErrClosedPipe(dst io.Writer, src io.Reader) (int64, error) {
+	n := int64(0)
+	buf := make([]byte, CompressedBlockMaxSize)
+	for {
+		read, readingErr := src.Read(buf)
+		if readingErr != nil && readingErr != io.EOF {
+			return n, readingErr
+		}
+		written, writingErr := dst.Write(buf[:read])
+		n += int64(written)
+		if writingErr == io.ErrClosedPipe {
+			// Here we handle LZO padded with zeroes:
+			// writer cannot consume anymore data, but all we have is zeroes
+			for {
+				if !allZero(buf[written:read]) {
+					return n, writingErr
+				}
+				if readingErr == io.EOF {
+					return n, nil
+				}
+				read, readingErr = src.Read(buf)
+				if readingErr != nil && readingErr != io.EOF {
+					return n, readingErr
+				}
+				written = 0
+			}
+		}
+		if writingErr != nil || readingErr == io.EOF {
+			return n, writingErr
+		}
+	}
 }
