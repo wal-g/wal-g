@@ -114,7 +114,7 @@ func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dry
 	for i, backupTime := range backups {
 		if skip {
 			log.Printf("%v skipped\n", backupTime.Name)
-			if walSkipFileName == "" || walSkipFileName < backupTime.WalFileName {
+			if walSkipFileName == "" || walSkipFileName > backupTime.WalFileName {
 				walSkipFileName = backupTime.WalFileName
 			}
 		} else {
