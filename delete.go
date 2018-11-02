@@ -111,7 +111,7 @@ func deleteBeforeTarget(target string, bk *Backup, pre *S3Prefix, findFull bool,
 	for i, b := range backups {
 		if skip {
 			log.Printf("%v skipped\n", b.Name)
-			if walSkipFileName == "" || walSkipFileName < b.WalFileName {
+			if walSkipFileName == "" || walSkipFileName > b.WalFileName {
 				walSkipFileName = b.WalFileName
 			}
 		} else {
