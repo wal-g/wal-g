@@ -100,7 +100,7 @@ func (tarInterpreter *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Heade
 		}
 	case tar.TypeSymlink:
 		if err := os.Symlink(cur.Name, targetPath); err != nil {
-			return errors.Wrapf(err, "Interpret: failed to create symlink", targetPath)
+			return errors.Wrapf(err, "Interpret: failed to create symlink %s", targetPath)
 		}
 	}
 	return nil
