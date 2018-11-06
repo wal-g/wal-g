@@ -108,23 +108,7 @@ func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dry
 		}
 	}
 
-	skip := true
-	skipLine := len(backups)
-	var walSkipFileName = ""
-	for i, backupTime := range backups {
-		if skip {
-			log.Printf("%v skipped\n", backupTime.Name)
-			if walSkipFileName == "" || walSkipFileName > backupTime.WalFileName {
-				walSkipFileName = backupTime.WalFileName
-			}
-		} else {
-			log.Printf("%v will be deleted\n", backupTime.Name)
-		}
-		if backupTime.Name == target.Name {
-			skip = false
-			skipLine = i
-		}
-	}
+	skipLine, walSkipFileName := ComputeDeletionSkipline(backups, target)
 
 	for _, backupTime := range garbage {
 		if strings.HasPrefix(backupTime.Name, backupNamePrefix) && backupTime.Name < target.Name {
@@ -145,6 +129,28 @@ func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dry
 	} else {
 		log.Printf("Dry run finished.\n")
 	}
+}
+
+// ComputeDeletionSkipline selects last backup and name of last necessary WAL
+func ComputeDeletionSkipline(backups []BackupTime, target *Backup) (skipLine int, walSkipFileName string) {
+	skip := true
+	skipLine = len(backups)
+	walSkipFileName = ""
+	for i, backupTime := range backups {
+		if skip {
+			log.Printf("%v skipped\n", backupTime.Name)
+			if walSkipFileName == "" || walSkipFileName > backupTime.WalFileName {
+				walSkipFileName = backupTime.WalFileName
+			}
+		} else {
+			log.Printf("%v will be deleted\n", backupTime.Name)
+		}
+		if backupTime.Name == target.Name {
+			skip = false
+			skipLine = i
+		}
+	}
+	return skipLine, walSkipFileName
 }
 
 // TODO : unit tests
