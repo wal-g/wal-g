@@ -514,7 +514,7 @@ func HandleWALFetch(pre *S3Prefix, walFileName string, location string, triggerP
 
 	err := DownloadAndDecompressWALFile(pre, walFileName, location)
 	if err != nil {
-		log.Fatalf("%+v\n", err)
+		log.Fatalf("%v\n", err)
 	}
 }
 
@@ -587,7 +587,7 @@ func DownloadAndDecompressWALFile(pre *S3Prefix, walFileName string, dstLocation
 		}
 		return nil
 	}
-	return errors.New("Archive '%s' does not exist " + walFileName)
+	return errors.Errorf("Archive '%s' does not exist ", walFileName)
 }
 
 // HandleWALPush is invoked to perform wal-g wal-push
