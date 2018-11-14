@@ -7,6 +7,7 @@ import (
 	"github.com/wal-g/wal-g/walparser/parsingutil"
 	"io"
 	"io/ioutil"
+	"fmt"
 )
 
 const (
@@ -23,12 +24,20 @@ func NewZeroPageError() ZeroPageError {
 	return ZeroPageError{errors.New("the whole page consists only of zero bytes")}
 }
 
+func (err ZeroPageError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
+}
+
 type PartialPageError struct {
 	error
 }
 
 func NewPartialPageError() PartialPageError {
 	return PartialPageError{errors.New("the page is partial, maybe it is the last non zero page of .partial file")}
+}
+
+func (err PartialPageError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 type WalParser struct {

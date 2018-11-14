@@ -27,12 +27,20 @@ func NewInvalidWalFileMagicError() InvalidWalFileMagicError {
 	return InvalidWalFileMagicError{errors.New("WAL-G: WAL file magic is invalid ")}
 }
 
+func (err InvalidWalFileMagicError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
+}
+
 type CantOverwriteWalFileError struct {
 	error
 }
 
 func NewCantOverwriteWalFileError(walFilePath string) CantOverwriteWalFileError {
 	return CantOverwriteWalFileError{errors.Errorf("WAL file '%s' already archived, contents differ, unable to overwrite\n", walFilePath)}
+}
+
+func (err CantOverwriteWalFileError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 const DefaultDataFolderPath = "/tmp"
@@ -43,6 +51,10 @@ type ArchiveNonExistenceError struct {
 
 func NewArchiveNonExistenceError(archiveName string) ArchiveNonExistenceError {
 	return ArchiveNonExistenceError{errors.Errorf("Archive '%s' does not exist.\n", archiveName)}
+}
+
+func (err ArchiveNonExistenceError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 // TODO : unit tests

@@ -49,12 +49,20 @@ func NewInvalidBlockError(blockNo uint32) InvalidBlockError {
 	return InvalidBlockError{errors.Errorf("block %d is invalid", blockNo)}
 }
 
+func (err InvalidBlockError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
+}
+
 type InvalidIncrementFileHeaderError struct {
 	error
 }
 
 func NewInvalidIncrementFileHeaderError() InvalidIncrementFileHeaderError {
 	return InvalidIncrementFileHeaderError{errors.New("Invalid increment file header")}
+}
+
+func (err InvalidIncrementFileHeaderError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 type UnknownIncrementFileHeaderError struct {
@@ -65,12 +73,20 @@ func NewUnknownIncrementFileHeaderError() UnknownIncrementFileHeaderError {
 	return UnknownIncrementFileHeaderError{errors.New("Unknown increment file header")}
 }
 
+func (err UnknownIncrementFileHeaderError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
+}
+
 type UnexpectedTarDataError struct {
 	error
 }
 
 func NewUnexpectedTarDataError() UnexpectedTarDataError {
 	return UnexpectedTarDataError{errors.New("Expected end of Tar")}
+}
+
+func (err UnexpectedTarDataError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 var pagedFilenameRegexp *regexp.Regexp

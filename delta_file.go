@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/walparser"
 	"io"
+	"fmt"
 )
 
 type NilWalParserError struct {
@@ -12,6 +13,10 @@ type NilWalParserError struct {
 
 func NewNilWalParserError() NilWalParserError {
 	return NilWalParserError{errors.New("expected to get non nil wal parser, but got nil one")}
+}
+
+func (err NilWalParserError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 type DeltaFile struct {

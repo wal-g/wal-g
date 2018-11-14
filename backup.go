@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"io/ioutil"
 	"log"
+	"fmt"
 )
 
 type NoBackupsFoundError struct {
@@ -16,6 +17,10 @@ type NoBackupsFoundError struct {
 
 func NewNoBackupsFoundError() NoBackupsFoundError {
 	return NoBackupsFoundError{errors.New("No backups found")}
+}
+
+func (err NoBackupsFoundError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 // Backup contains information about a valid backup

@@ -2,6 +2,7 @@ package walparser
 
 import (
 	"github.com/pkg/errors"
+	"fmt"
 )
 
 const (
@@ -23,6 +24,10 @@ func NewInconsistentXLogRecordTotalLengthError(totalRecordLength uint32) Inconsi
 	return InconsistentXLogRecordTotalLengthError{errors.Errorf("total record length is too small: %v, expected at least: %v", totalRecordLength, XLogRecordHeaderSize)}
 }
 
+func (err InconsistentXLogRecordTotalLengthError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
+}
+
 type InvalidXLogRecordResourceManagerIDError struct {
 	error
 }
@@ -31,12 +36,20 @@ func NewInvalidXLogRecordResourceManagerIDError(resourceManagerID uint8) Invalid
 	return InvalidXLogRecordResourceManagerIDError{errors.Errorf("resource manager id is invalid: %v, while it should be less then: %v", resourceManagerID, RmNextFreeID)}
 }
 
+func (err InvalidXLogRecordResourceManagerIDError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
+}
+
 type ZeroRecordHeaderError struct {
 	error
 }
 
 func NewZeroRecordHeaderError() ZeroRecordHeaderError {
 	return ZeroRecordHeaderError{errors.New("whole record header is zero, maybe it's parsed from .partial file or after WAL-Switch operation")}
+}
+
+func (err ZeroRecordHeaderError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 /* This struct corresponds to postgres struct XLogRecord.

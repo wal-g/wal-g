@@ -9,6 +9,7 @@ import (
 	"log"
 	"sync"
 	"strings"
+	"fmt"
 )
 
 type NoFilesToExtractError struct {
@@ -17,6 +18,10 @@ type NoFilesToExtractError struct {
 
 func NewNoFilesToExtractError() NoFilesToExtractError {
 	return NoFilesToExtractError{errors.New("ExtractAll: did not provide files to extract")}
+}
+
+func (err NoFilesToExtractError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 // EmptyWriteIgnorer handles 0 byte write in LZ4 package

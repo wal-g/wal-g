@@ -8,6 +8,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"fmt"
 )
 
 const (
@@ -24,12 +25,20 @@ func NewNoBitmapFoundError() NoBitmapFoundError {
 	return NoBitmapFoundError{errors.New("GetDeltaBitmapFor: no bitmap found")}
 }
 
+func (err NoBitmapFoundError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
+}
+
 type UnknownTableSpaceError struct {
 	error
 }
 
 func NewUnknownTableSpaceError() UnknownTableSpaceError {
 	return UnknownTableSpaceError{errors.New("GetRelFileNodeFrom: unknown tablespace")}
+}
+
+func (err UnknownTableSpaceError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 type PagedFileDeltaMap map[walparser.RelFileNode]*roaring.Bitmap

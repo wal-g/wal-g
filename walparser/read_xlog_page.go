@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/walparser/parsingutil"
 	"io"
+	"fmt"
 )
 
 type ZeroPageHeaderError struct {
@@ -15,12 +16,20 @@ func NewZeroPageHeaderError() error {
 	return ZeroPageHeaderError{errors.New("page header contains only zeroes, maybe it is a part .partial file or this page follow WAL-switch record")}
 }
 
+func (err ZeroPageHeaderError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
+}
+
 type InvalidPageHeaderError struct {
 	error
 }
 
 func NewInvalidPageHeaderError() error {
 	return InvalidPageHeaderError{errors.New("invalid page header")}
+}
+
+func (err InvalidPageHeaderError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 func tryReadXLogRecordData(alignedReader *AlignedReader) (data []byte, whole bool, err error) {

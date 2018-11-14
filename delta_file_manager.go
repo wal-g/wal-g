@@ -3,9 +3,9 @@ package walg
 import (
 	"bytes"
 	"fmt"
+	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/walparser"
 	"sync"
-	"github.com/pkg/errors"
 )
 
 type DeltaFileWriterNotFoundError struct {
@@ -14,6 +14,10 @@ type DeltaFileWriterNotFoundError struct {
 
 func NewDeltaFileWriterNotFoundError(filename string) DeltaFileWriterNotFoundError {
 	return DeltaFileWriterNotFoundError{errors.Errorf("can't file delta file writer for file: '%s'", filename)}
+}
+
+func (err DeltaFileWriterNotFoundError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 type DeltaFileManager struct {

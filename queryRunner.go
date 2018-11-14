@@ -3,6 +3,7 @@ package walg
 import (
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
+	"fmt"
 )
 
 type NoPostgresVersionError struct {
@@ -13,12 +14,20 @@ func NewNoPostgresVersionError() NoPostgresVersionError {
 	return NoPostgresVersionError{errors.New("Postgres version not set, cannot determine backup query")}
 }
 
+func (err NoPostgresVersionError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
+}
+
 type UnsupportedPostgresVersionError struct {
 	error
 }
 
 func NewUnsupportedPostgresVersionError(version int) UnsupportedPostgresVersionError {
 	return UnsupportedPostgresVersionError{errors.Errorf("Could not determine backup query for version %d", version)}
+}
+
+func (err UnsupportedPostgresVersionError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 // The QueryRunner interface for controlling database during backup

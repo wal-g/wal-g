@@ -1,9 +1,9 @@
 package walg
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
-	"fmt"
 )
 
 // FileSystemCleaner actually performs it's functions on file system

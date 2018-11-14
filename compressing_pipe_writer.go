@@ -1,6 +1,7 @@
 package walg
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"io"
 )
@@ -14,6 +15,10 @@ type CompressingPipeWriterError struct {
 
 func NewCompressingPipeWriterError(reason string) CompressingPipeWriterError {
 	return CompressingPipeWriterError{errors.New(reason)}
+}
+
+func (err CompressingPipeWriterError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 // CompressingPipeWriter allows for flexibility of using compressed output.
