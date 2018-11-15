@@ -2,18 +2,23 @@
 
 
 [[projects]]
+  digest = "1:c99bd4548f502371b98c77534239a514c9a1e715d468af3c108db06186aa692a"
   name = "github.com/DataDog/zstd"
   packages = ["."]
+  pruneopts = "UT"
   revision = "aebefd9fcb99f22cd691ef778a12ed68f0e6a1ab"
   version = "v1.3.4"
 
 [[projects]]
+  digest = "1:72fff13e105db55c6d4b1acb69216b88d9d3009433f43d7df3488f842b0b6929"
   name = "github.com/RoaringBitmap/roaring"
   packages = ["."]
+  pruneopts = "UT"
   revision = "3d677d3262197ee558b85029301eb69b8239f91a"
   version = "v0.4.16"
 
 [[projects]]
+  digest = "1:a8fec68900b1beb5f62f5122d5db179b24fb771b30533623fbe41319fd2ae3a3"
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -49,54 +54,70 @@
     "service/s3/s3iface",
     "service/s3/s3manager",
     "service/s3/s3manager/s3manageriface",
-    "service/sts"
+    "service/sts",
   ]
+  pruneopts = "UT"
   revision = "f9728bfcd31e85d264b4ab20299bbbba241c00ca"
   version = "v1.15.7"
 
 [[projects]]
+  digest = "1:ad8b4e90264438ea13214e2cac5d26fde580dee47c11d5ba66537b6a97e1baee"
   name = "github.com/cyberdelia/lzo"
   packages = ["."]
+  pruneopts = "UT"
   revision = "feb520148d8940294afb1e242dc1d2a7c9c34432"
   version = "1.0"
 
 [[projects]]
+  digest = "1:a2c1d0e43bd3baaa071d1b9ed72c27d78169b2b269f71c105ac4ba34b1be4a39"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
+  pruneopts = "UT"
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
   version = "v1.1.0"
 
 [[projects]]
   branch = "master"
+  digest = "1:981722e5ee549ef844285c2b370c19e58b7dc30bc19ba3537f3df284b551b54a"
   name = "github.com/glycerine/go-unsnap-stream"
   packages = ["."]
+  pruneopts = "UT"
   revision = "9f0cb55181dd3a0a4c168d3dbc72d4aca4853126"
 
 [[projects]]
+  digest = "1:fe8a03a8222d5b913f256972933d26d24ad7c8286692a42943bc01633cc8fce3"
   name = "github.com/go-ini/ini"
   packages = ["."]
+  pruneopts = "UT"
   revision = "358ee7663966325963d4e8b2e1fbd570c5195153"
   version = "v1.38.1"
 
 [[projects]]
+  digest = "1:342378ac4dcb378a5448dd723f0784ae519383532f5e70ade24132c4c8693202"
   name = "github.com/go-yaml/yaml"
   packages = ["."]
+  pruneopts = "UT"
   revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
   version = "v2.2.1"
 
 [[projects]]
   branch = "master"
+  digest = "1:4a0c6bb4805508a6287675fac876be2ac1182539ca8a32468d8128882e9d5009"
   name = "github.com/golang/snappy"
   packages = ["."]
+  pruneopts = "UT"
   revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
 
 [[projects]]
+  digest = "1:acc27c8f27da9682e170d84713e12951fca77331ff7bf217b05f914d975b5a95"
   name = "github.com/google/brotli"
   packages = ["go/cbrotli"]
+  pruneopts = "UT"
   revision = "b601fe817bd3217cb144bbb380a43cae8e847388"
   version = "v1.0.5"
 
 [[projects]]
+  digest = "1:8dfbec76b4834d96c37ba4c4969fc47c9a15e67c5a7eecfa031fbe67dab50429"
   name = "github.com/jackc/pgx"
   packages = [
     ".",
@@ -104,79 +125,105 @@
     "internal/sanitize",
     "pgio",
     "pgproto3",
-    "pgtype"
+    "pgtype",
   ]
+  pruneopts = "UT"
   revision = "89f1e6ac7276b61d885db5e5aed6fcbedd1c7e31"
   version = "v3.2.0"
 
 [[projects]]
+  digest = "1:e22af8c7518e1eab6f2eab2b7d7558927f816262586cd6ed9f349c97a6c285c4"
   name = "github.com/jmespath/go-jmespath"
   packages = ["."]
+  pruneopts = "UT"
   revision = "0b12d6b5"
 
 [[projects]]
   branch = "master"
+  digest = "1:c22fdadfe2de0e1df75987cac34f1c721157dc24f180c76b4ef66a3c9637a799"
   name = "github.com/mschoch/smat"
   packages = ["."]
+  pruneopts = "UT"
   revision = "90eadee771aeab36e8bf796039b8c261bebebe4f"
 
 [[projects]]
+  digest = "1:5e73b34a27d827212102605789de00bd411b2e434812133c83935fe9897c75e1"
   name = "github.com/philhofer/fwd"
   packages = ["."]
+  pruneopts = "UT"
   revision = "bb6d471dc95d4fe11e432687f8b70ff496cf3136"
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:34cd01be69526d7e73fff2eff67d8589b390d5f7dd6e1bf218c15f6f46ddc33a"
   name = "github.com/pierrec/lz4"
-  packages = [
-    ".",
-    "internal/xxh32"
-  ]
-  revision = "1958fd8fff7f115e79725b1288e0b878b3e06b00"
-  version = "v2.0.3"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "5a3d2245f97fc249850e7802e3c01fad02a1c316"
 
 [[projects]]
+  digest = "1:186e021e0c2fa61e181151d8b2fef4d2b6b217a55794bd591de73773b934a32a"
+  name = "github.com/pierrec/xxHash"
+  packages = ["xxHash32"]
+  pruneopts = "UT"
+  revision = "f051bb7f1d1aaf1b5a665d74fb6b0217712c69f7"
+  version = "v0.1.1"
+
+[[projects]]
+  digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
   name = "github.com/pkg/errors"
   packages = ["."]
+  pruneopts = "UT"
   revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
   version = "v0.8.0"
 
 [[projects]]
+  digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
+  pruneopts = "UT"
   revision = "792786c7400a136282c1664665ae0a8db921c6c2"
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:18752d0b95816a1b777505a97f71c7467a8445b8ffb55631a7bf779f6ba4fa83"
   name = "github.com/stretchr/testify"
   packages = ["assert"]
+  pruneopts = "UT"
   revision = "f35b8ab0b5a2cef36673838d662e249dd9c94686"
   version = "v1.2.2"
 
 [[projects]]
+  digest = "1:eaa6698f44de8f2977e93c9b946e60a8af75f565058658aad2df8032b55c84e5"
   name = "github.com/tinylib/msgp"
   packages = ["msgp"]
+  pruneopts = "UT"
   revision = "b2b6a672cf1e5b90748f79b8b81fc8c5cf0571a1"
   version = "1.0.2"
 
 [[projects]]
+  digest = "1:ba8028944baec941af3e7e7d9a51b3161a7168a042188b058da662bfc33fd1aa"
   name = "github.com/ulikunitz/xz"
   packages = [
     "internal/hash",
     "internal/xlog",
-    "lzma"
+    "lzma",
   ]
+  pruneopts = "UT"
   revision = "0c6b41e72360850ca4f98dc341fd999726ea007f"
   version = "v0.5.4"
 
 [[projects]]
+  digest = "1:981fe66c332248711bafe3b5033e939cfd175e897e20a14905d4fcdc0fd68f59"
   name = "github.com/willf/bitset"
   packages = ["."]
+  pruneopts = "UT"
   revision = "d860f346b89450988a379d7d705e83c58d1ea227"
   version = "v1.1.3"
 
 [[projects]]
   branch = "master"
+  digest = "1:12287a0e0a82eb9315597f0699b6a9dcaa1b6734ee61f5be05b5eb11ba0fdba1"
   name = "golang.org/x/crypto"
   packages = [
     "cast5",
@@ -185,35 +232,65 @@
     "openpgp/elgamal",
     "openpgp/errors",
     "openpgp/packet",
-    "openpgp/s2k"
+    "openpgp/s2k",
   ]
+  pruneopts = "UT"
   revision = "f027049dab0ad238e394a753dba2d14753473a04"
   source = "https://github.com/golang/crypto"
 
 [[projects]]
   branch = "master"
+  digest = "1:76ee51c3f468493aff39dbacc401e8831fbb765104cbf613b89bef01cf4bad70"
   name = "golang.org/x/net"
   packages = ["context"]
+  pruneopts = "UT"
   revision = "f9ce57c11b242f0f1599cf25c89d8cb02c45295a"
 
 [[projects]]
   branch = "master"
+  digest = "1:c313aef534e493304f3666fbd24dca5932ebf776a82b7a40f961c9355794a1b1"
   name = "golang.org/x/sync"
   packages = [
     "errgroup",
-    "semaphore"
+    "semaphore",
   ]
+  pruneopts = "UT"
   revision = "1d60e4601c6fd243af51cc01ddf169918a5407ca"
 
 [[projects]]
   branch = "master"
+  digest = "1:c9e7a4b4d47c0ed205d257648b0e5b0440880cb728506e318f8ac7cd36270bc4"
   name = "golang.org/x/time"
   packages = ["rate"]
+  pruneopts = "UT"
   revision = "fbb02b2291d28baffd63558aa44b4b56f178d650"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "82d8125d0694ff22dff08b44816bb57baf9cc11e0ae703acee1560b005c88449"
+  input-imports = [
+    "github.com/DataDog/zstd",
+    "github.com/RoaringBitmap/roaring",
+    "github.com/aws/aws-sdk-go/aws",
+    "github.com/aws/aws-sdk-go/aws/awserr",
+    "github.com/aws/aws-sdk-go/aws/defaults",
+    "github.com/aws/aws-sdk-go/aws/session",
+    "github.com/aws/aws-sdk-go/service/s3",
+    "github.com/aws/aws-sdk-go/service/s3/s3iface",
+    "github.com/aws/aws-sdk-go/service/s3/s3manager",
+    "github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface",
+    "github.com/cyberdelia/lzo",
+    "github.com/go-yaml/yaml",
+    "github.com/google/brotli/go/cbrotli",
+    "github.com/jackc/pgx",
+    "github.com/pierrec/lz4",
+    "github.com/pkg/errors",
+    "github.com/stretchr/testify/assert",
+    "github.com/ulikunitz/xz/lzma",
+    "golang.org/x/crypto/openpgp",
+    "golang.org/x/sync/errgroup",
+    "golang.org/x/sync/semaphore",
+    "golang.org/x/time/rate",
+  ]
   solver-name = "gps-cdcl"
   solver-version = 1
