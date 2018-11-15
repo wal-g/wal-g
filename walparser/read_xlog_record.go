@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/wal-g/wal-g/walparser/parsingutil"
 	"io"
+	"github.com/pkg/errors"
 )
 
 func readXLogRecordHeader(reader io.Reader) (*XLogRecordHeader, error) {
@@ -57,14 +58,14 @@ func readXLogRecordBlockDataAndImages(record *XLogRecord, reader io.Reader) erro
 			(*block).Image = make([]byte, (*block).Header.ImageHeader.ImageLength)
 			_, err := io.ReadFull(reader, (*block).Image)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 		}
 		if (*block).Header.HasData() {
 			(*block).Data = make([]byte, (*block).Header.DataLength)
 			_, err := io.ReadFull(reader, (*block).Data)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 		}
 	}
@@ -102,7 +103,7 @@ func readBlockLocation(blockHasSameRel bool, lastRelFileNode **RelFileNode, read
 	var relFileNode *RelFileNode
 	if blockHasSameRel {
 		if *lastRelFileNode == nil {
-			return nil, NoPrevRelFileNodeError
+			return nil, NewNoPrevRelFileNodeError()
 		}
 		relFileNode = *lastRelFileNode
 	} else {
@@ -124,11 +125,11 @@ func readBlockLocation(blockHasSameRel bool, lastRelFileNode **RelFileNode, read
 func readXLogRecordBlockHeader(lastRelFileNode *RelFileNode,
 	blockId uint8, maxReadBlockId *int, reader *ShrinkableReader) (*XLogRecordBlockHeader, error) {
 	if blockId > XlrMaxBlockId {
-		return nil, InvalidRecordBlockIdError{blockId}
+		return nil, NewInvalidRecordBlockIdError(blockId)
 	}
 	blockHeader := NewXLogRecordBlockHeader(blockId)
 	if int(blockHeader.BlockId) <= *maxReadBlockId {
-		return nil, OutOfOrderBlockIdError{int(blockHeader.BlockId), *maxReadBlockId}
+		return nil, NewOutOfOrderBlockIdError(int(blockHeader.BlockId), *maxReadBlockId)
 	}
 	*maxReadBlockId = int(blockHeader.BlockId)
 
@@ -147,10 +148,10 @@ func readXLogRecordBlockHeader(lastRelFileNode *RelFileNode,
 
 	if blockHeader.HasImage() {
 		imageHeader, err := readXLogRecordBlockImageHeader(reader)
-		blockHeader.ImageHeader = *imageHeader
 		if err != nil {
 			return nil, err
 		}
+		blockHeader.ImageHeader = *imageHeader
 		err = reader.Shrink(int(blockHeader.ImageHeader.ImageLength))
 		if err != nil {
 			return nil, err
@@ -209,7 +210,7 @@ func readXLogRecordBlockHeaderPart(record *XLogRecord, reader io.Reader) error {
 func readXLogRecordMainData(mainDataLen uint32, reader io.Reader) ([]byte, error) {
 	mainData := make([]byte, mainDataLen)
 	_, err := io.ReadFull(reader, mainData)
-	return mainData, err
+	return mainData, errors.WithStack(err)
 }
 
 func readXLogRecordBody(header *XLogRecordHeader, reader io.Reader) (*XLogRecord, error) {

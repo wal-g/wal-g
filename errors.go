@@ -1,32 +1,29 @@
 package walg
 
 import (
-	"fmt"
+	"github.com/pkg/errors"
 )
 
 // UnsetEnvVarError is used to indicate required environment
 // variables for WAL-G.
 type UnsetEnvVarError struct {
-	names []string
+	error
 }
 
-func (e UnsetEnvVarError) Error() string {
+func NewUnsetEnvVarError(names []string) UnsetEnvVarError {
 	msg := "Did not set the following environment variables:\n"
-	for _, v := range e.names {
+	for _, v := range names {
 		msg = msg + v + "\n"
 	}
-
-	return msg
+	return UnsetEnvVarError{errors.New(msg)}
 }
 
 // UnsupportedFileTypeError is used to signal file types
 // that are unsupported by WAL-G.
 type UnsupportedFileTypeError struct {
-	Path       string
-	FileFormat string
+	error
 }
 
-func (e UnsupportedFileTypeError) Error() string {
-	msg := fmt.Sprintf("WAL-G does not support the file format '%s' in '%s'", e.FileFormat, e.Path)
-	return msg
+func NewUnsupportedFileTypeError(path string, fileFormat string) UnsupportedFileTypeError {
+	return UnsupportedFileTypeError{errors.Errorf("WAL-G does not support the file format '%s' in '%s'", fileFormat, path)}
 }

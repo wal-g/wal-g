@@ -11,7 +11,13 @@ import (
 	"strings"
 )
 
-var NoFilesToExtractError = errors.New("ExtractAll: did not provide files to extract")
+type NoFilesToExtractError struct {
+	error
+}
+
+func NewNoFilesToExtractError() NoFilesToExtractError {
+	return NoFilesToExtractError{errors.New("ExtractAll: did not provide files to extract")}
+}
 
 // EmptyWriteIgnorer handles 0 byte write in LZ4 package
 // to stop pipe reader/writer from blocking.
@@ -82,9 +88,9 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 		return errors.Wrap(err, "DecryptAndDecompressTar: tar extract failed")
 	case "nop":
 	case "lzo":
-		return errors.Wrap(UnsupportedFileTypeError{readerMaker.Path(), fileExtension}, "DecryptAndDecompressTar: lzo linked to this WAL-G binary")
+		return NewUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
 	default:
-		return errors.Wrap(UnsupportedFileTypeError{readerMaker.Path(), fileExtension}, "DecryptAndDecompressTar:")
+		return NewUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
 	}
 	return nil
 }
@@ -96,7 +102,7 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 // Returns the first error encountered.
 func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 	if len(files) < 1 {
-		return NoFilesToExtractError
+		return NewNoFilesToExtractError()
 	}
 
 	// Set maximum number of goroutines spun off by ExtractAll

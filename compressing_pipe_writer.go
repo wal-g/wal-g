@@ -1,7 +1,6 @@
 package walg
 
 import (
-	"fmt"
 	"github.com/pkg/errors"
 	"io"
 )
@@ -10,12 +9,11 @@ import (
 // when uploading to S3. Will not retry upload if this error
 // occurs.
 type CompressingPipeWriterError struct {
-	err error
+	error
 }
 
-func (err CompressingPipeWriterError) Error() string {
-	msg := fmt.Sprintf("%+v\n", err.err)
-	return msg
+func NewCompressingPipeWriterError(reason string) CompressingPipeWriterError {
+	return CompressingPipeWriterError{errors.New(reason)}
 }
 
 // CompressingPipeWriter allows for flexibility of using compressed output.
@@ -49,12 +47,12 @@ func (pipeWriter *CompressingPipeWriter) Compress(crypter Crypter) {
 		_, err := lzWriter.ReadFrom(pipeWriter.Input)
 
 		if err != nil {
-			e := CompressingPipeWriterError{errors.Wrap(err, "Compress: compression failed")}
+			e := NewCompressingPipeWriterError("Compress: compression failed")
 			dstWriter.CloseWithError(e)
 		}
 
 		if err := lzWriter.Close(); err != nil {
-			e := CompressingPipeWriterError{errors.Wrap(err, "Compress: writer close failed")}
+			e := NewCompressingPipeWriterError("Compress: writer close failed")
 			dstWriter.CloseWithError(e)
 			return
 		}
@@ -62,13 +60,13 @@ func (pipeWriter *CompressingPipeWriter) Compress(crypter Crypter) {
 			err := writeCloser.Close()
 
 			if err != nil {
-				e := CompressingPipeWriterError{errors.Wrap(err, "Compress: encryption failed")}
+				e := NewCompressingPipeWriterError("Compress: encryption failed")
 				dstWriter.CloseWithError(e)
 				return
 			}
 		}
 		if err = dstWriter.Close(); err != nil {
-			e := CompressingPipeWriterError{errors.Wrap(err, "Compress: pipe writer close failed")}
+			e := NewCompressingPipeWriterError("Compress: pipe writer close failed")
 			dstWriter.CloseWithError(e)
 		}
 	}()

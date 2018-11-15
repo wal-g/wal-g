@@ -7,8 +7,14 @@ import (
 	"io"
 )
 
-// ErrCrypterUseMischief happens when crypter is used before initialization
-var ErrCrypterUseMischief = errors.New("Crypter is not checked before use")
+// CrypterUseMischiefError happens when crypter is used before initialization
+type CrypterUseMischiefError struct {
+	error
+}
+
+func NewCrypterUseMischiefError() CrypterUseMischiefError {
+	return CrypterUseMischiefError{errors.New("Crypter is not checked before use")}
+}
 
 // OpenPGPCrypter incapsulates specific of cypher method
 // Includes keys, infrastructutre information etc
@@ -44,7 +50,7 @@ func (crypter *OpenPGPCrypter) ConfigureGPGCrypter() {
 // Encrypt creates encryption writer from ordinary writer
 func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, error) {
 	if !crypter.Configured {
-		return nil, ErrCrypterUseMischief
+		return nil, NewCrypterUseMischiefError()
 	}
 	if crypter.PubKey == nil {
 		armour, err := getPubRingArmour(crypter.KeyRingId)
@@ -65,7 +71,7 @@ func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, e
 // Decrypt creates decrypted reader from ordinary reader
 func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) {
 	if !crypter.Configured {
-		return nil, ErrCrypterUseMischief
+		return nil, NewCrypterUseMischiefError()
 	}
 	if crypter.SecretKey == nil {
 		armour, err := getSecretRingArmour(crypter.KeyRingId)

@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"github.com/wal-g/wal-g/walparser"
 	"sync"
+	"github.com/pkg/errors"
 )
 
 type DeltaFileWriterNotFoundError struct {
-	filename string
+	error
 }
 
-func (err DeltaFileWriterNotFoundError) Error() string {
-	return fmt.Sprintf("can't file delta file writer for file: '%s'", err.filename)
+func NewDeltaFileWriterNotFoundError(filename string) DeltaFileWriterNotFoundError {
+	return DeltaFileWriterNotFoundError{errors.Errorf("can't file delta file writer for file: '%s'", filename)}
 }
 
 type DeltaFileManager struct {
@@ -38,14 +39,14 @@ func NewDeltaFileManager(dataFolder DataFolder) *DeltaFileManager {
 	manager.PartFiles = NewLazyCache(func(partFilenameInterface interface{}) (partFile interface{}, err error) {
 		partFilename, ok := partFilenameInterface.(string)
 		if !ok {
-			return nil, WrongTypeError{"string"}
+			return nil, NewWrongTypeError("string")
 		}
 		return manager.LoadPartFile(partFilename)
 	})
 	manager.DeltaFileWriters = NewLazyCache(func(deltaFilenameInterface interface{}) (deltaFileWriter interface{}, err error) {
 		deltaFilename, ok := deltaFilenameInterface.(string)
 		if !ok {
-			return nil, WrongTypeError{"string"}
+			return nil, NewWrongTypeError("string")
 		}
 		return manager.LoadDeltaFileWriter(deltaFilename)
 	})
@@ -67,7 +68,7 @@ func (manager *DeltaFileManager) LoadDeltaFileWriter(deltaFilename string) (delt
 	physicalDeltaFile, err := manager.dataFolder.OpenReadonlyFile(deltaFilename)
 	var deltaFile *DeltaFile
 	if err != nil {
-		if _, ok := err.(*NoSuchFileError); !ok {
+		if _, ok := err.(NoSuchFileError); !ok {
 			return nil, err
 		}
 		deltaFile, err = NewDeltaFile(walparser.NewWalParser())
@@ -101,7 +102,7 @@ func (manager *DeltaFileManager) LoadPartFile(partFilename string) (*WalPartFile
 	physicalPartFile, err := manager.dataFolder.OpenReadonlyFile(partFilename)
 	var partFile *WalPartFile
 	if err != nil {
-		if _, ok := err.(*NoSuchFileError); !ok {
+		if _, ok := err.(NoSuchFileError); !ok {
 			return nil, err
 		}
 		partFile = NewWalPartFile()
@@ -211,7 +212,7 @@ func (manager *DeltaFileManager) collectCanceledDeltaFiles() {
 func (manager *DeltaFileManager) CombinePartFile(deltaFilename string, partFile *WalPartFile) error {
 	deltaFileWriterInterface, exists := manager.DeltaFileWriters.LoadExisting(deltaFilename)
 	if !exists {
-		return DeltaFileWriterNotFoundError{deltaFilename}
+		return NewDeltaFileWriterNotFoundError(deltaFilename)
 	}
 	deltaFileWriter := deltaFileWriterInterface.(*DeltaFileChanWriter)
 	deltaFileWriter.DeltaFile.WalParser = walparser.LoadWalParserFromCurrentRecordData(partFile.WalHeads[WalFileInDelta-1])

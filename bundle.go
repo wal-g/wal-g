@@ -21,6 +21,14 @@ const (
 	PgControl               = "pg_control"
 )
 
+type TarSizeError struct {
+	error
+}
+
+func NewTarSizeError(packedFileSize, expectedSize int64) TarSizeError {
+	return TarSizeError{errors.Errorf("packed wrong numbers of bytes %d instead of %d", packedFileSize, expectedSize)}
+}
+
 // ExcludedFilenames is a list of excluded members from the bundled backup.
 var ExcludedFilenames = make(map[string]Empty)
 
@@ -496,7 +504,7 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 	var fileReader io.ReadCloser
 	if isIncremented {
 		bitmap, err := bundle.getDeltaBitmapFor(path)
-		if err == NoBitmapFoundError { // this file has changed after the start of backup, so just skip it
+		if _, ok := err.(NoBitmapFoundError); ok { // this file has changed after the start of backup, so just skip it
 			bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: info.ModTime()})
 			return nil
 		} else if err != nil {
@@ -509,7 +517,7 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 				R: io.MultiReader(fileReader, &ZeroReader{}),
 				N: int64(fileInfoHeader.Size),
 			}, fileReader}
-		case *InvalidBlockError: // fallback to full file backup
+		case InvalidBlockError: // fallback to full file backup
 			log.Printf("failed to read file '%s' as incremented\n", fileInfoHeader.Name)
 			isIncremented = false
 			fileReader, err = startReadingFile(fileInfoHeader, info, path, fileReader)
@@ -536,7 +544,7 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 	}
 
 	if packedFileSize != fileInfoHeader.Size {
-		return errors.Errorf("packFileIntoTar: packed wrong numbers of bytes %d instead of %d", packedFileSize, fileInfoHeader.Size)
+		return NewTarSizeError(packedFileSize, fileInfoHeader.Size)
 	}
 
 	return nil

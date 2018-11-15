@@ -1,16 +1,16 @@
 package walg
 
 import (
-	"fmt"
 	"sync"
+	"github.com/pkg/errors"
 )
 
 type WrongTypeError struct {
-	desiredType string
+	error
 }
 
-func (err WrongTypeError) Error() string {
-	return fmt.Sprintf("expected to get '%s', but not found one", err.desiredType)
+func NewWrongTypeError(desiredType string) WrongTypeError {
+	return WrongTypeError{errors.Errorf("expected to get '%s', but not found one", desiredType)}
 }
 
 type LazyCache struct {

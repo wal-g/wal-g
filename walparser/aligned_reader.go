@@ -1,6 +1,9 @@
 package walparser
 
-import "io"
+import (
+	"io"
+	"github.com/pkg/errors"
+)
 
 type AlignedReader struct {
 	innerReader io.Reader
@@ -15,7 +18,7 @@ func NewAlignedReader(source io.Reader, alignment int) *AlignedReader {
 func (reader *AlignedReader) Read(p []byte) (n int, err error) {
 	n, err = reader.innerReader.Read(p)
 	reader.alreadyRead += n
-	return
+	return n, err
 }
 
 func (reader *AlignedReader) ReadToAlignment() error {
@@ -25,5 +28,5 @@ func (reader *AlignedReader) ReadToAlignment() error {
 	}
 	padding := make([]byte, paddingLength)
 	_, err := reader.Read(padding)
-	return err
+	return errors.WithStack(err)
 }

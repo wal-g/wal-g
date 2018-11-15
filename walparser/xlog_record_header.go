@@ -1,7 +1,6 @@
 package walparser
 
 import (
-	"fmt"
 	"github.com/pkg/errors"
 )
 
@@ -17,22 +16,28 @@ const (
 )
 
 type InconsistentXLogRecordTotalLengthError struct {
-	totalRecordLength uint32
+	error
 }
 
-func (err InconsistentXLogRecordTotalLengthError) Error() string {
-	return fmt.Sprintf("total record length is too small: %v, expected at least: %v", err.totalRecordLength, XLogRecordHeaderSize)
+func NewInconsistentXLogRecordTotalLengthError(totalRecordLength uint32) InconsistentXLogRecordTotalLengthError {
+	return InconsistentXLogRecordTotalLengthError{errors.Errorf("total record length is too small: %v, expected at least: %v", totalRecordLength, XLogRecordHeaderSize)}
 }
 
 type InvalidXLogRecordResourceManagerIDError struct {
-	resourceManagerID uint8
+	error
 }
 
-func (err InvalidXLogRecordResourceManagerIDError) Error() string {
-	return fmt.Sprintf("resource manager id is invalid: %v, while it should be less then: %v", err.resourceManagerID, RmNextFreeID)
+func NewInvalidXLogRecordResourceManagerIDError(resourceManagerID uint8) InvalidXLogRecordResourceManagerIDError {
+	return InvalidXLogRecordResourceManagerIDError{errors.Errorf("resource manager id is invalid: %v, while it should be less then: %v", resourceManagerID, RmNextFreeID)}
 }
 
-var ZeroRecordHeaderError = errors.New("whole record header is zero, maybe it's parsed from .partial file or after WAL-Switch operation")
+type ZeroRecordHeaderError struct {
+	error
+}
+
+func NewZeroRecordHeaderError() ZeroRecordHeaderError {
+	return ZeroRecordHeaderError{errors.New("whole record header is zero, maybe it's parsed from .partial file or after WAL-Switch operation")}
+}
 
 /* This struct corresponds to postgres struct XLogRecord.
  * For clarification you can find it in postgres:
@@ -51,14 +56,14 @@ type XLogRecordHeader struct {
 
 func (header *XLogRecordHeader) checkTotalRecordLengthConsistency() error {
 	if header.TotalRecordLength < XLogRecordHeaderSize {
-		return InconsistentXLogRecordTotalLengthError{header.TotalRecordLength}
+		return NewInconsistentXLogRecordTotalLengthError(header.TotalRecordLength)
 	}
 	return nil
 }
 
 func (header *XLogRecordHeader) checkResourceManagerIDValidity() error {
 	if header.ResourceManagerID >= RmNextFreeID {
-		return InvalidXLogRecordResourceManagerIDError{header.ResourceManagerID}
+		return NewInvalidXLogRecordResourceManagerIDError(header.ResourceManagerID)
 	}
 	return nil
 }
@@ -67,7 +72,7 @@ func (header *XLogRecordHeader) checkConsistency() error {
 	err := header.checkTotalRecordLengthConsistency()
 	if err != nil {
 		if header.isZero() {
-			return ZeroRecordHeaderError
+			return NewZeroRecordHeaderError()
 		}
 		return err
 	}

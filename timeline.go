@@ -7,13 +7,29 @@ import (
 	"strconv"
 )
 
+type BytesPerWalSegmentError struct {
+	error
+}
+
+func NewBytesPerWalSegmentError() BytesPerWalSegmentError {
+	return BytesPerWalSegmentError{errors.New("bytes_per_wal_segment of the server does not match expected value")}
+}
+
+type IncorrectLogSegNoError struct {
+	error
+}
+
+func NewIncorrectLogSegNoError(name string) IncorrectLogSegNoError {
+	return IncorrectLogSegNoError{errors.Errorf("Incorrect logSegNoLo in WAL file name: %s", name)}
+}
+
 func readTimeline(conn *pgx.Conn) (timeline uint32, err error) {
 	var bytesPerWalSegment uint32
 
 	// TODO: Check if this logic can be moved to queryRunner or abstracted away somehow
 	err = conn.QueryRow("select timeline_id, bytes_per_wal_segment from pg_control_checkpoint(), pg_control_init()").Scan(&timeline, &bytesPerWalSegment)
 	if err == nil && uint64(bytesPerWalSegment) != WalSegmentSize {
-		return 0, errors.New("bytes_per_wal_segment of the server does not match expected value")
+		return 0, NewBytesPerWalSegmentError()
 	}
 	return
 }
@@ -54,7 +70,7 @@ func formatWALFileName(timeline uint32, logSegNo uint64) string {
 // ParseWALFilename extracts numeric parts from WAL file name
 func ParseWALFilename(name string) (timelineId uint32, logSegNo uint64, err error) {
 	if len(name) != 24 {
-		err = errors.New("Not a WAL file name: " + name)
+		err = NewNotWalFilenameError(name)
 		return
 	}
 	timelineId64, err0 := strconv.ParseUint(name[0:8], 0x10, sizeofInt32bits)
@@ -74,7 +90,7 @@ func ParseWALFilename(name string) (timelineId uint32, logSegNo uint64, err erro
 		return
 	}
 	if logSegNoLo >= xLogSegmentsPerXLogId {
-		err = errors.New("Incorrect logSegNoLo in WAL file name: " + name)
+		err = NewIncorrectLogSegNoError(name)
 		return
 	}
 

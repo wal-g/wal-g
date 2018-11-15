@@ -137,7 +137,7 @@ func deepCompare(file1, file2 string) bool {
 
 func readIncrementFileHeaderTest(t *testing.T, headerData []byte, expectedErr error) {
 	err := walg.ReadIncrementFileHeader(bytes.NewReader(headerData))
-	assert.Equalf(t, expectedErr, err, "Expected '%v', but got : '%v'", expectedErr, err)
+	assert.IsType(t, err, expectedErr)
 }
 
 func TestReadIncrementFileHeader_Valid(t *testing.T) {
@@ -151,10 +151,10 @@ func TestReadIncrementFileHeader_InvalidIncrementFileHeaderError(t *testing.T) {
 		{'w', 'j', '1', walg.SignatureMagicNumber},
 	}
 	for _, data := range dataArray {
-		readIncrementFileHeaderTest(t, data, walg.InvalidIncrementFileHeaderError)
+		readIncrementFileHeaderTest(t, data, walg.InvalidIncrementFileHeaderError{})
 	}
 }
 
 func TestReadIncrementFileHeader_UnknownIncrementFileHeaderError(t *testing.T) {
-	readIncrementFileHeaderTest(t, []byte{'w', 'i', '2', walg.SignatureMagicNumber}, walg.UnknownIncrementFileHeaderError)
+	readIncrementFileHeaderTest(t, []byte{'w', 'i', '2', walg.SignatureMagicNumber}, walg.UnknownIncrementFileHeaderError{})
 }

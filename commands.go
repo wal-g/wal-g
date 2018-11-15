@@ -19,17 +19,30 @@ import (
 	"time"
 )
 
-var PgControlMissingError = errors.New("Corrupted backup: missing pg_control")
-var InvalidWalFileMagicError = errors.New("WAL-G: WAL file magic is invalid ")
+type InvalidWalFileMagicError struct {
+	error
+}
+
+func NewInvalidWalFileMagicError() InvalidWalFileMagicError {
+	return InvalidWalFileMagicError{errors.New("WAL-G: WAL file magic is invalid ")}
+}
+
+type CantOverwriteWalFileError struct {
+	error
+}
+
+func NewCantOverwriteWalFileError(walFilePath string) CantOverwriteWalFileError {
+	return CantOverwriteWalFileError{errors.Errorf("WAL file '%s' already archived, contents differ, unable to overwrite\n", walFilePath)}
+}
 
 const DefaultDataFolderPath = "/tmp"
 
 type ArchiveNonExistenceError struct {
-	archiveName string
+	error
 }
 
-func (err ArchiveNonExistenceError) Error() string {
-	return fmt.Sprintf("Archive '%s' does not exist.\n", err.archiveName)
+func NewArchiveNonExistenceError(archiveName string) ArchiveNonExistenceError {
+	return ArchiveNonExistenceError{errors.Errorf("Archive '%s' does not exist.\n", archiveName)}
 }
 
 // TODO : unit tests
@@ -175,7 +188,7 @@ func extractPgControl(folder *S3Folder, fileTarInterpreter *FileTarInterpreter, 
 		return err
 	}
 
-	if serr, ok := err.(*UnsupportedFileTypeError); ok {
+	if serr, ok := err.(UnsupportedFileTypeError); ok {
 		return serr
 	}
 	return nil
@@ -276,7 +289,7 @@ func unwrapBackup(backup *Backup, archiveDirectory string, sentinelDto S3TarBall
 
 	// Extract all compressed tar members except `pg_control.tar.lz4` if WALG version backup.
 	err = ExtractAll(fileTarInterpreter, out)
-	if serr, ok := err.(*UnsupportedFileTypeError); ok {
+	if serr, ok := err.(UnsupportedFileTypeError); ok {
 		log.Fatalf("%v\n", serr)
 	} else if err != nil {
 		log.Fatalf("%+v\n", err)
@@ -334,7 +347,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 
 	if maxDeltas > 0 {
 		previousBackupName, err = GetLatestBackupKey(uploader.uploadingFolder)
-		if err != NoBackupsFoundError {
+		if _, ok := err.(NoBackupsFoundError); !ok {
 			if err != nil {
 				log.Fatalf("%+v\n", err)
 			}
@@ -509,7 +522,7 @@ func checkWALFileMagic(prefetched string) error {
 	magic := make([]byte, 4)
 	file.Read(magic)
 	if binary.LittleEndian.Uint32(magic) < 0xD061 {
-		return InvalidWalFileMagicError
+		return NewInvalidWalFileMagicError()
 	}
 
 	return nil
@@ -563,7 +576,7 @@ func downloadAndDecompressWALFile(folder *S3Folder, walFileName string) (io.Read
 		}()
 		return reader, nil
 	}
-	return nil, ArchiveNonExistenceError{walFileName}
+	return nil, NewArchiveNonExistenceError(walFileName)
 }
 
 // TODO : unit tests
@@ -602,7 +615,7 @@ func uploadWALFile(uploader *Uploader, walFilePath string) error {
 		if err != nil {
 			return errors.Wrap(err, "Couldn't check whether there is an overwrite attempt due to inner error")
 		} else if overwriteAttempt {
-			return errors.Errorf("WAL file '%s' already archived, contents differ, unable to overwrite\n", walFilePath)
+			return NewCantOverwriteWalFileError(walFilePath)
 		}
 	}
 	walFile, err := os.Open(walFilePath)

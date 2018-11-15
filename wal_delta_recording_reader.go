@@ -80,8 +80,8 @@ func (reader *WalDeltaRecordingReader) RecordBlockLocationsFromPage() error {
 			return err
 		}
 	}
-	if err != nil && err != walparser.PartialPageError {
-		if err == walparser.ZeroPageError {
+	if _, ok := err.(walparser.PartialPageError); !ok && err != nil {
+		if _, ok := err.(walparser.ZeroPageError); ok {
 			return nil
 		}
 		reader.WalParser.Invalidate()

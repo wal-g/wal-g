@@ -15,7 +15,7 @@ func TestBuildStartBackup(t *testing.T) {
 
 	queryBuilder.Version = 81000
 	_, err = queryBuilder.BuildStartBackup()
-	assert.Equal(t, "Could not determine start backup query for version 81000", err.Error())
+	assert.IsType(t, err, walg.UnsupportedPostgresVersionError{})
 
 	queryBuilder.Version = 90321
 	queryString, err := queryBuilder.BuildStartBackup()
@@ -38,7 +38,7 @@ func TestBuildStopBackup(t *testing.T) {
 
 	queryBuilder.Version = 81000
 	_, err = queryBuilder.BuildStopBackup()
-	assert.Equal(t, "Could not determine stop backup query for version 81000", err.Error())
+	assert.IsType(t, err, walg.UnsupportedPostgresVersionError{})
 
 	queryBuilder.Version = 90321
 	queryString, err := queryBuilder.BuildStopBackup()

@@ -24,6 +24,14 @@ const (
 	DefaultDataBurstRateLimit                = 8 * int64(DatabasePageSize)
 )
 
+type SseKmsIdNotSetError struct {
+	error
+}
+
+func NewSseKmsIdNotSetError() SseKmsIdNotSetError {
+	return SseKmsIdNotSetError{errors.New("Configure: WALG_S3_SSE_KMS_ID must be set if using aws:kms encryption")}
+}
+
 // MaxRetries limit upload and download retries during interaction with S3
 var MaxRetries = 15
 
@@ -63,7 +71,7 @@ func findS3BucketRegion(bucket string, config *aws.Config) (string, error) {
 func Configure(verifyUploads bool) (uploader *Uploader, destinationFolder *S3Folder, err error) {
 	waleS3Prefix := getSettingValue("WALE_S3_PREFIX")
 	if waleS3Prefix == "" {
-		return nil, nil, &UnsetEnvVarError{names: []string{"WALE_S3_PREFIX"}}
+		return nil, nil, NewUnsetEnvVarError([]string{"WALE_S3_PREFIX"})
 	}
 
 	waleS3Url, err := url.Parse(waleS3Prefix)
@@ -123,7 +131,7 @@ func Configure(verifyUploads bool) (uploader *Uploader, destinationFolder *S3Fol
 		compressionMethod = Lz4AlgorithmName
 	}
 	if _, ok := Compressors[compressionMethod]; !ok {
-		return nil, nil, UnknownCompressionMethodError{}
+		return nil, nil, NewUnknownCompressionMethodError()
 	}
 
 	preventWalOverwriteStr := getSettingValue("WALG_PREVENT_WAL_OVERWRITE")
@@ -211,7 +219,7 @@ func Configure(verifyUploads bool) (uploader *Uploader, destinationFolder *S3Fol
 
 	// Only aws:kms implies sseKmsKeyId
 	if (serverSideEncryption == "aws:kms") == (sseKmsKeyId == "") {
-		return nil, nil, errors.New("Configure: WALG_S3_SSE_KMS_ID must be set iff using aws:kms encryption")
+		return nil, nil, NewSseKmsIdNotSetError()
 	}
 
 	return uploader, folder, err

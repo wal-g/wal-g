@@ -125,7 +125,7 @@ func (pageReader *IncrementalPageReader) FullScanInitialize() error {
 
 		valid := pageReader.SelectNewValidPage(pageBytes, currentBlockNumber) // TODO : torn page possibility
 		if !valid {
-			return &InvalidBlockError{currentBlockNumber}
+			return NewInvalidBlockError(currentBlockNumber)
 		}
 	}
 }

@@ -1,35 +1,45 @@
 package walparser
 
 import (
-	"errors"
-	"fmt"
+	"github.com/pkg/errors"
 )
 
 type InvalidRecordBlockIdError struct {
-	blockId uint8
+	error
 }
 
-func (err InvalidRecordBlockIdError) Error() string {
-	return fmt.Sprintf("invalid record blockId: %v", err.blockId)
+func NewInvalidRecordBlockIdError(blockId uint8) InvalidRecordBlockIdError {
+	return InvalidRecordBlockIdError{errors.Errorf("invalid record blockId: %v", blockId)}
 }
 
 type OutOfOrderBlockIdError struct {
-	actualBlockId   int
-	expectedBlockId int
+	error
 }
 
-func (err OutOfOrderBlockIdError) Error() string {
-	return fmt.Sprintf("out of order block id: %v, expected: %v", err.actualBlockId, err.expectedBlockId)
+func NewOutOfOrderBlockIdError(actualBlockId int, expectedBlockId int) OutOfOrderBlockIdError {
+	return OutOfOrderBlockIdError{errors.Errorf("out of order block id: %v, expected: %v", actualBlockId, expectedBlockId)}
 }
 
 type InconsistentBlockDataStateError struct {
-	hasData    bool
-	dataLength uint16
+	error
 }
 
-func (err InconsistentBlockDataStateError) Error() string {
-	return fmt.Sprintf("block state is inconsistent: hasData is: %v, while dataLength is: %v", err.hasData, err.dataLength)
+func NewInconsistentBlockDataStateError(hasData    bool, dataLength uint16) InconsistentBlockDataStateError {
+	return InconsistentBlockDataStateError{errors.Errorf("block state is inconsistent: hasData is: %v, while dataLength is: %v", hasData, dataLength)}
 }
 
-var NoPrevRelFileNodeError = errors.New("expected to copy previous rel file node, but not found one")
-var ContinuationNotFoundError = errors.New("expected to find continuation of current xlog record, but found new records instead")
+type NoPrevRelFileNodeError struct {
+	error
+}
+
+func NewNoPrevRelFileNodeError() NoPrevRelFileNodeError {
+	return NoPrevRelFileNodeError{errors.New("expected to copy previous rel file node, but not found one")}
+}
+
+type ContinuationNotFoundError struct {
+	error
+}
+
+func NewContinuationNotFoundError() ContinuationNotFoundError {
+	return ContinuationNotFoundError{errors.New("expected to find continuation of current xlog record, but found new records instead")}
+}

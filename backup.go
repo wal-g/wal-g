@@ -10,7 +10,13 @@ import (
 	"log"
 )
 
-var NoBackupsFoundError = errors.New("No backups found")
+type NoBackupsFoundError struct {
+	error
+}
+
+func NewNoBackupsFoundError() NoBackupsFoundError {
+	return NoBackupsFoundError{errors.New("No backups found")}
+}
 
 // Backup contains information about a valid backup
 // generated and uploaded by WAL-G.

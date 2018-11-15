@@ -10,6 +10,14 @@ import (
 	"log"
 )
 
+type NoSentinelUploadError struct {
+	error
+}
+
+func NewNoSentinelUploadError() NoSentinelUploadError {
+	return NoSentinelUploadError{errors.New("Sentinel was not uploaded due to timeline change during backup")}
+}
+
 // S3TarBall represents a tar file that is
 // going to be uploaded to S3.
 type S3TarBall struct {
@@ -140,7 +148,7 @@ func (tarBall *S3TarBall) Finish(sentinelDto *S3TarBallSentinelDto) error {
 	} else {
 		log.Printf("Uploaded %d compressed tar Files.\n", tarBall.partNumber)
 		log.Printf("Sentinel was not uploaded %v", name)
-		return errors.New("Sentinel was not uploaded due to timeline change during backup")
+		return NewNoSentinelUploadError()
 	}
 
 	if err == nil && uploader.Success {

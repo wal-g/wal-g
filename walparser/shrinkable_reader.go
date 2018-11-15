@@ -1,17 +1,16 @@
 package walparser
 
 import (
-	"fmt"
 	"io"
+	"github.com/pkg/errors"
 )
 
 type NotEnoughDataToShrinkError struct {
-	dataRemained int
-	toShrink     int
+	error
 }
 
-func (err NotEnoughDataToShrinkError) Error() string {
-	return fmt.Sprintf("not enough data to shrink: dataRemained: %v, toShrink: %v", err.dataRemained, err.toShrink)
+func NewNotEnoughDataToShrinkError(dataRemained int, toShrink     int) error {
+	return NotEnoughDataToShrinkError{errors.Errorf("not enough data to shrink: dataRemained: %v, toShrink: %v", dataRemained, toShrink)}
 }
 
 type ShrinkableReader struct {
@@ -26,18 +25,18 @@ func (reader *ShrinkableReader) Read(p []byte) (n int, err error) {
 	if len(p) <= reader.dataRemained {
 		n, err = reader.innerReader.Read(p)
 		reader.dataRemained -= n
-		return
+		return n, err
 	}
 	remained := make([]byte, reader.dataRemained)
 	n, err = reader.innerReader.Read(remained)
 	copy(p, remained)
 	reader.dataRemained -= n
-	return
+	return n, err
 }
 
 func (reader *ShrinkableReader) Shrink(length int) error {
 	if reader.dataRemained < length {
-		return NotEnoughDataToShrinkError{reader.dataRemained, length}
+		return NewNotEnoughDataToShrinkError(reader.dataRemained, length)
 	}
 	reader.dataRemained -= length
 	return nil

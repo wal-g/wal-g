@@ -6,6 +6,7 @@ import (
 	"io"
 	"math/rand"
 	"testing"
+	"github.com/pkg/errors"
 )
 
 func TestWalPageReader_ReadPageData(t *testing.T) {
@@ -25,7 +26,7 @@ func TestWalPageReader_SmallPageError(t *testing.T) {
 	reader := bytes.NewReader(initialData)
 	pageReader := WalPageReader{reader}
 	_, err := pageReader.ReadPageData()
-	assert.Equal(t, io.ErrUnexpectedEOF, err)
+	assert.Equal(t, io.ErrUnexpectedEOF, errors.Cause(err))
 }
 
 func TestWalPageReader_EOF(t *testing.T) {
