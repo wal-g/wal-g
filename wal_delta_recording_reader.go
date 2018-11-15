@@ -2,7 +2,6 @@ package walg
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/wal-g/wal-g/walparser"
 	"io"
 )
@@ -39,7 +38,7 @@ func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, man
 func (reader *WalDeltaRecordingReader) Close() error {
 	err := reader.partRecorder.SaveNextWalHead(reader.WalParser.GetCurrentRecordData())
 	if err != nil {
-		fmt.Printf("Failed to save next wal file prefix after end of recording because of: %v", err)
+		warningLogger.Printf("Failed to save next wal file prefix after end of recording because of: %v", err)
 	}
 	return err
 }

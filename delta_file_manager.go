@@ -136,13 +136,13 @@ func (manager *DeltaFileManager) FlushPartFiles() (completedPartFiles map[string
 			err := manager.CombinePartFile(deltaFilename, partFile)
 			if err != nil {
 				manager.CanceledDeltaFiles[deltaFilename] = true
-				fmt.Printf("Canceled delta file writing because of error: %v\n", err)
+				warningLogger.Printf("Canceled delta file writing because of error: %v\n", err)
 			}
 		} else {
 			err := saveToDataFolder(partFile, partFilename, manager.dataFolder)
 			if err != nil {
 				manager.CanceledDeltaFiles[deltaFilename] = true
-				fmt.Printf("Failed to save part file: '%s' because of error: '%v'\n", partFilename, err)
+				warningLogger.Printf("Failed to save part file: '%s' because of error: '%v'\n", partFilename, err)
 			}
 		}
 		return true
@@ -168,17 +168,17 @@ func (manager *DeltaFileManager) FlushDeltaFiles(uploader *Uploader, completedPa
 			var deltaFileData bytes.Buffer
 			err := deltaFileWriter.DeltaFile.Save(&deltaFileData)
 			if err != nil {
-				fmt.Printf("Failed to upload delta file: '%s' because of saving error: '%v'\n", deltaFilename, err)
+				warningLogger.Printf("Failed to upload delta file: '%s' because of saving error: '%v'\n", deltaFilename, err)
 			} else {
 				err = uploader.UploadFile(&NamedReaderImpl{&deltaFileData, deltaFilename})
 				if err != nil {
-					fmt.Printf("Failed to upload delta file: '%s' because of uploading error: '%v'\n", deltaFilename, err)
+					warningLogger.Printf("Failed to upload delta file: '%s' because of uploading error: '%v'\n", deltaFilename, err)
 				}
 			}
 		} else {
 			err := saveToDataFolder(deltaFileWriter.DeltaFile, deltaFilename, manager.dataFolder)
 			if err != nil {
-				fmt.Printf("Failed to save delta file: '%s' because of error: '%v'\n", deltaFilename, err)
+				warningLogger.Printf("Failed to save delta file: '%s' because of error: '%v'\n", deltaFilename, err)
 			}
 		}
 		return true
@@ -188,7 +188,7 @@ func (manager *DeltaFileManager) FlushDeltaFiles(uploader *Uploader, completedPa
 func (manager *DeltaFileManager) FlushFiles(uploader *Uploader) {
 	err := manager.dataFolder.CleanFolder()
 	if err != nil {
-		fmt.Printf("Failed to clean delta folder because of error: '%v'\n", err)
+		warningLogger.Printf("Failed to clean delta folder because of error: '%v'\n", err)
 	}
 	completedPartFiles := manager.FlushPartFiles()
 	manager.FlushDeltaFiles(uploader, completedPartFiles)

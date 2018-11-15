@@ -3,7 +3,6 @@ package walg
 import (
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
-	"log"
 )
 
 // Connect establishes a connection to postgres using
@@ -33,7 +32,7 @@ func Connect() (*pgx.Conn, error) {
 	}
 
 	if archiveMode != "on" && archiveMode != "always" {
-		log.Println("WARNING! It seems your archive_mode is not enabled. This will cause inconsistent backup. Please consider configuring WAL archiving.")
+		warningLogger.Println("It seems your archive_mode is not enabled. This will cause inconsistent backup. Please consider configuring WAL archiving.")
 	} else {
 		var archiveCommand string
 
@@ -44,7 +43,7 @@ func Connect() (*pgx.Conn, error) {
 		}
 
 		if len(archiveCommand) == 0 || archiveCommand == "(disabled)" {
-			log.Println("WARNING! It seems your archive_command is not configured. This will cause inconsistent backup. Please consider configuring WAL archiving.")
+			warningLogger.Println("It seems your archive_command is not configured. This will cause inconsistent backup. Please consider configuring WAL archiving.")
 		}
 	}
 

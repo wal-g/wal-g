@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"io"
-	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -122,7 +121,7 @@ func GetSentinelUserData() interface{} {
 	var out interface{}
 	err := json.Unmarshal([]byte(dataStr), &out)
 	if err != nil {
-		log.Println("WARNING! Unable to parse WALG_SENTINEL_USER_DATA as JSON")
+		warningLogger.Println("Unable to parse WALG_SENTINEL_USER_DATA as JSON")
 		return dataStr
 	}
 	return out
@@ -140,7 +139,7 @@ func getMaxConcurrency(key string, defaultValue int) int {
 		con, err = strconv.Atoi(conc)
 
 		if err != nil {
-			log.Panic("Unknown concurrency number ", err)
+			errorLogger.Panic("Unknown concurrency number ", err)
 		}
 	} else {
 		if defaultValue > 0 {
