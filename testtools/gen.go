@@ -2,11 +2,8 @@ package testtools
 
 import (
 	"archive/tar"
-	"github.com/wal-g/wal-g"
 	"io"
 	"math/rand"
-	"net/http"
-	"regexp"
 	"strconv"
 	"sync/atomic"
 )
@@ -72,58 +69,5 @@ func CreateTar(w io.Writer, r *io.LimitedReader) {
 
 	if err := tw.Close(); err != nil {
 		panic(err)
-	}
-
-}
-
-// Handler allows for generation of random bytes by configuring
-// the URL 'https://localhost:8080/stride-N.bytes-N.tar.lzo' where
-// byte size and stride length are customizable.
-//
-// Compressed tar files are automatically generated. Grab using curl
-// ie. 'curl -sk ...'
-func Handler(w http.ResponseWriter, r *http.Request) {
-	matcher := regexp.MustCompile(`/stride-(\d+).bytes-(\d+).tar(.lzo)?`)
-	str := matcher.FindStringSubmatch(r.URL.Path)
-	stride, err := strconv.Atoi(str[1])
-
-	if err != nil {
-		panic(err)
-	}
-
-	nBytes, err := strconv.Atoi(str[2])
-	if err != nil {
-		panic(err)
-	}
-
-	lzoFlag := str[3]
-
-	sb := NewStrideByteReader(stride)
-	lr := io.LimitedReader{
-		R: sb,
-		N: int64(nBytes),
-	}
-
-	//defer TimeTrack(time.Now(), "HANDLER")
-
-	switch lzoFlag {
-	case "":
-		CreateTar(w, &lr)
-	case ".lzo":
-		pr, pw := io.Pipe()
-		lzow := walg.NewLzoWriter(pw)
-
-		go func() {
-			CreateTar(lzow, &lr)
-			defer lzow.Close()
-			defer pw.Close()
-		}()
-
-		io.Copy(w, pr)
-		if err != nil {
-			panic(err)
-		}
-	default:
-		panic("bug")
 	}
 }
