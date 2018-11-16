@@ -10,6 +10,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"fmt"
 )
 
 type GpgKeyExportError struct {
@@ -18,6 +19,10 @@ type GpgKeyExportError struct {
 
 func NewGpgKeyExportError(text string) GpgKeyExportError {
 	return GpgKeyExportError{errors.Errorf("Got error while exporting gpg key: '%s'", text)}
+}
+
+func (err GpgKeyExportError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 // GetKeyRingId extracts name of a key to use from env variable

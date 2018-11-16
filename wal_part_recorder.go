@@ -13,6 +13,10 @@ func NewNotWalFilenameError(filename string) NotWalFilenameError {
 	return NotWalFilenameError{errors.Errorf("expected to get wal filename, but found: '%s'", filename)}
 }
 
+func (err NotWalFilenameError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
+}
+
 type WalPartRecorder struct {
 	manager     *DeltaFileManager
 	walFilename string

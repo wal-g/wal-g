@@ -2,9 +2,9 @@ package walparser
 
 import (
 	"bytes"
+	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/walparser/parsingutil"
 	"io"
-	"github.com/pkg/errors"
 )
 
 func readXLogRecordHeader(reader io.Reader) (*XLogRecordHeader, error) {

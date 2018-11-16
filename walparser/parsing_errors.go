@@ -1,6 +1,7 @@
 package walparser
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 )
 
@@ -12,6 +13,10 @@ func NewInvalidRecordBlockIdError(blockId uint8) InvalidRecordBlockIdError {
 	return InvalidRecordBlockIdError{errors.Errorf("invalid record blockId: %v", blockId)}
 }
 
+func (err InvalidRecordBlockIdError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
+}
+
 type OutOfOrderBlockIdError struct {
 	error
 }
@@ -20,12 +25,20 @@ func NewOutOfOrderBlockIdError(actualBlockId int, expectedBlockId int) OutOfOrde
 	return OutOfOrderBlockIdError{errors.Errorf("out of order block id: %v, expected: %v", actualBlockId, expectedBlockId)}
 }
 
+func (err OutOfOrderBlockIdError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
+}
+
 type InconsistentBlockDataStateError struct {
 	error
 }
 
-func NewInconsistentBlockDataStateError(hasData    bool, dataLength uint16) InconsistentBlockDataStateError {
+func NewInconsistentBlockDataStateError(hasData bool, dataLength uint16) InconsistentBlockDataStateError {
 	return InconsistentBlockDataStateError{errors.Errorf("block state is inconsistent: hasData is: %v, while dataLength is: %v", hasData, dataLength)}
+}
+
+func (err InconsistentBlockDataStateError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 type NoPrevRelFileNodeError struct {
@@ -34,6 +47,10 @@ type NoPrevRelFileNodeError struct {
 
 func NewNoPrevRelFileNodeError() NoPrevRelFileNodeError {
 	return NoPrevRelFileNodeError{errors.New("expected to copy previous rel file node, but not found one")}
+}
+
+func (err NoPrevRelFileNodeError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 type ContinuationNotFoundError struct {

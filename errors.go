@@ -2,6 +2,7 @@ package walg
 
 import (
 	"github.com/pkg/errors"
+	"fmt"
 )
 
 // UnsetEnvVarError is used to indicate required environment
@@ -16,6 +17,10 @@ func NewUnsetEnvVarError(names []string) UnsetEnvVarError {
 		msg = msg + v + "\n"
 	}
 	return UnsetEnvVarError{errors.New(msg)}
+}
+
+func (err UnsetEnvVarError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 // UnsupportedFileTypeError is used to signal file types

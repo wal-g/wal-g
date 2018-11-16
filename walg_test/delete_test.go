@@ -9,7 +9,6 @@ import (
 	"time"
 )
 
-
 //NB: order will reverse after sorting
 var backup_times1 = []walg.BackupTime{
 	{

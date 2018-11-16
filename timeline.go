@@ -15,12 +15,20 @@ func NewBytesPerWalSegmentError() BytesPerWalSegmentError {
 	return BytesPerWalSegmentError{errors.New("bytes_per_wal_segment of the server does not match expected value")}
 }
 
+func (err BytesPerWalSegmentError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
+}
+
 type IncorrectLogSegNoError struct {
 	error
 }
 
 func NewIncorrectLogSegNoError(name string) IncorrectLogSegNoError {
 	return IncorrectLogSegNoError{errors.Errorf("Incorrect logSegNoLo in WAL file name: %s", name)}
+}
+
+func (err IncorrectLogSegNoError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 func readTimeline(conn *pgx.Conn) (timeline uint32, err error) {

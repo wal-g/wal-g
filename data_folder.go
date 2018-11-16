@@ -1,8 +1,9 @@
 package walg
 
 import (
-	"io"
 	"github.com/pkg/errors"
+	"io"
+	"fmt"
 )
 
 type NoSuchFileError struct {
@@ -11,6 +12,10 @@ type NoSuchFileError struct {
 
 func NewNoSuchFileError(filename string) NoSuchFileError {
 	return NoSuchFileError{errors.Errorf("No file found: %s", filename)}
+}
+
+func (err NoSuchFileError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 type DataFolder interface {

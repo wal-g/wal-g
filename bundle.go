@@ -29,13 +29,17 @@ func NewTarSizeError(packedFileSize, expectedSize int64) TarSizeError {
 	return TarSizeError{errors.Errorf("packed wrong numbers of bytes %d instead of %d", packedFileSize, expectedSize)}
 }
 
+func (err TarSizeError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
+}
+
 // ExcludedFilenames is a list of excluded members from the bundled backup.
 var ExcludedFilenames = make(map[string]Empty)
 
 func init() {
 	filesToExclude := []string{
-		"pg_log", "pg_xlog", "pg_wal",                                                                        // Directories
-		"pgsql_tmp", "postgresql.auto.conf.tmp", "postmaster.pid", "postmaster.opts", "recovery.conf",        // Files
+		"pg_log", "pg_xlog", "pg_wal", // Directories
+		"pgsql_tmp", "postgresql.auto.conf.tmp", "postmaster.pid", "postmaster.opts", "recovery.conf", // Files
 		"pg_dynshmem", "pg_notify", "pg_replslot", "pg_serial", "pg_stat_tmp", "pg_snapshots", "pg_subtrans", // Directories
 	}
 

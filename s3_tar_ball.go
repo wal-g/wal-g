@@ -18,6 +18,10 @@ func NewNoSentinelUploadError() NoSentinelUploadError {
 	return NoSentinelUploadError{errors.New("Sentinel was not uploaded due to timeline change during backup")}
 }
 
+func (err NoSentinelUploadError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
+}
+
 // S3TarBall represents a tar file that is
 // going to be uploaded to S3.
 type S3TarBall struct {

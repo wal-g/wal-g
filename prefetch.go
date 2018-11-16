@@ -1,19 +1,19 @@
 package walg
 
 import (
+	"archive/tar"
 	"fmt"
+	"github.com/pkg/errors"
+	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
-	"path/filepath"
-	"archive/tar"
-	"github.com/pkg/errors"
-	"io"
-	"io/ioutil"
 )
 
 // TODO : unit tests

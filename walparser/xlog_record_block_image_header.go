@@ -2,6 +2,7 @@ package walparser
 
 import (
 	"github.com/pkg/errors"
+	"fmt"
 )
 
 const (
@@ -20,12 +21,20 @@ func NewInconsistentBlockImageHoleStateError(holeOffset uint16, holeLength uint1
 		holeOffset, holeLength, imageLength, hasHole)}
 }
 
+func (err InconsistentBlockImageHoleStateError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
+}
+
 type InconsistentBlockImageLengthError struct {
 	error
 }
 
 func NewInconsistentBlockImageLengthError(hasHole bool, isCompressed bool, length uint16) InconsistentBlockImageLengthError {
 	return InconsistentBlockImageLengthError{errors.Errorf("block image has invalid state: hasHole: %v, isCompressed: %v, imageLength: %v", hasHole, isCompressed, length)}
+}
+
+func (err InconsistentBlockImageLengthError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 type XLogRecordBlockImageHeader struct {

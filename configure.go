@@ -15,8 +15,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pkg/errors"
 	"golang.org/x/time/rate"
-	"path/filepath"
 	"os"
+	"path/filepath"
 )
 
 const (
@@ -30,6 +30,10 @@ type SseKmsIdNotSetError struct {
 
 func NewSseKmsIdNotSetError() SseKmsIdNotSetError {
 	return SseKmsIdNotSetError{errors.New("Configure: WALG_S3_SSE_KMS_ID must be set if using aws:kms encryption")}
+}
+
+func (err SseKmsIdNotSetError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 // MaxRetries limit upload and download retries during interaction with S3
@@ -79,7 +83,7 @@ func Configure(verifyUploads bool) (uploader *Uploader, destinationFolder *S3Fol
 		return nil, nil, errors.Wrapf(err, "Configure: failed to parse url '%s'", waleS3Prefix)
 	}
 	if waleS3Url.Scheme == "" || waleS3Url.Host == "" {
-		return nil, nil, fmt.Errorf("Missing url scheme=%q and/or host=%q", waleS3Url.Scheme, waleS3Url.Host)
+		return nil, nil, fmt.Errorf("missing url scheme=%q and/or host=%q", waleS3Url.Scheme, waleS3Url.Host)
 	}
 
 	bucket := waleS3Url.Host

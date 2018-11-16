@@ -1,8 +1,9 @@
 package walg
 
 import (
-	"io"
 	"github.com/pkg/errors"
+	"io"
+	"fmt"
 )
 
 const (
@@ -20,12 +21,16 @@ const (
 
 var CompressingAlgorithms = []string{Lz4AlgorithmName, LzmaAlgorithmName, BrotliAlgorithmName}
 
-type UnknownCompressionMethodError struct{
+type UnknownCompressionMethodError struct {
 	error
 }
 
 func NewUnknownCompressionMethodError() UnknownCompressionMethodError {
 	return UnknownCompressionMethodError{errors.Errorf("Unknown compression method, supported methods are: %v", CompressingAlgorithms)}
+}
+
+func (err UnknownCompressionMethodError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 type Compressor interface {

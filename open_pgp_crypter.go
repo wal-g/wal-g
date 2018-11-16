@@ -5,6 +5,7 @@ import (
 	"errors"
 	"golang.org/x/crypto/openpgp"
 	"io"
+	"fmt"
 )
 
 // CrypterUseMischiefError happens when crypter is used before initialization
@@ -13,7 +14,11 @@ type CrypterUseMischiefError struct {
 }
 
 func NewCrypterUseMischiefError() CrypterUseMischiefError {
-	return CrypterUseMischiefError{errors.New("Crypter is not checked before use")}
+	return CrypterUseMischiefError{errors.New("crypter is not checked before use")}
+}
+
+func (err CrypterUseMischiefError) Error() string {
+	return fmt.Sprintf("%+v", err.error)
 }
 
 // OpenPGPCrypter incapsulates specific of cypher method
