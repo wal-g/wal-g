@@ -1,11 +1,25 @@
 package walg
 
 import (
-	"fmt"
-
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 )
+
+type NoPostgresVersionError struct {
+	error
+}
+
+func NewNoPostgresVersionError() NoPostgresVersionError {
+	return NoPostgresVersionError{errors.New("Postgres version not set, cannot determine backup query")}
+}
+
+type UnsupportedPostgresVersionError struct {
+	error
+}
+
+func NewUnsupportedPostgresVersionError(version int) UnsupportedPostgresVersionError {
+	return UnsupportedPostgresVersionError{errors.Errorf("Could not determine backup query for version %d", version)}
+}
 
 // The QueryRunner interface for controlling database during backup
 type QueryRunner interface {
@@ -39,9 +53,9 @@ func (queryRunner *PgQueryRunner) BuildStartBackup() (string, error) {
 	case queryRunner.Version >= 90000:
 		return "SELECT case when pg_is_in_recovery() then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true) lsn", nil
 	case queryRunner.Version == 0:
-		return "", errors.New("Postgres version not set, cannot determine start backup query")
+		return "", NewNoPostgresVersionError()
 	default:
-		return "", errors.New("Could not determine start backup query for version " + fmt.Sprintf("%d", queryRunner.Version))
+		return "", NewUnsupportedPostgresVersionError(queryRunner.Version)
 	}
 }
 
@@ -53,9 +67,9 @@ func (queryRunner *PgQueryRunner) BuildStopBackup() (string, error) {
 	case queryRunner.Version >= 90000:
 		return "SELECT (pg_xlogfile_name_offset(lsn)).file_name, lpad((pg_xlogfile_name_offset(lsn)).file_offset::text, 8, '0') AS file_offset, lsn::text FROM pg_stop_backup() lsn", nil
 	case queryRunner.Version == 0:
-		return "", errors.New("Postgres version not set, cannot determine stop backup query")
+		return "", NewNoPostgresVersionError()
 	default:
-		return "", errors.New("Could not determine stop backup query for version " + fmt.Sprintf("%d", queryRunner.Version))
+		return "", NewUnsupportedPostgresVersionError(queryRunner.Version)
 	}
 }
 

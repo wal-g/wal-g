@@ -16,8 +16,21 @@ const (
 	DefaultSpcNode   walparser.Oid = 1663
 )
 
-var NoBitmapFoundError = errors.New("GetDeltaBitmapFor: no bitmap found")
-var UnknownTableSpaceError = errors.New("GetRelFileNodeFrom: unknown tablespace")
+type NoBitmapFoundError struct {
+	error
+}
+
+func NewNoBitmapFoundError() NoBitmapFoundError {
+	return NoBitmapFoundError{errors.New("GetDeltaBitmapFor: no bitmap found")}
+}
+
+type UnknownTableSpaceError struct {
+	error
+}
+
+func NewUnknownTableSpaceError() UnknownTableSpaceError {
+	return UnknownTableSpaceError{errors.New("GetRelFileNodeFrom: unknown tablespace")}
+}
 
 type PagedFileDeltaMap map[walparser.RelFileNode]*roaring.Bitmap
 
@@ -45,7 +58,7 @@ func (deltaMap *PagedFileDeltaMap) GetDeltaBitmapFor(filePath string) (*roaring.
 	}
 	_, ok := (*deltaMap)[*relFileNode]
 	if !ok {
-		return nil, NoBitmapFoundError
+		return nil, NewNoBitmapFoundError()
 	}
 	bitmap := (*deltaMap)[*relFileNode].Clone()
 	relFileId, err := GetRelFileIdFrom(filePath)
@@ -97,6 +110,6 @@ func GetRelFileNodeFrom(filePath string) (*walparser.RelFileNode, error) {
 		}
 		return &walparser.RelFileNode{SpcNode: walparser.Oid(spcNode), DBNode: walparser.Oid(dbNode), RelNode: walparser.Oid(relNode)}, nil
 	} else {
-		return nil, UnknownTableSpaceError
+		return nil, NewUnknownTableSpaceError()
 	}
 }

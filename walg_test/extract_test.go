@@ -13,21 +13,7 @@ import (
 func TestNoFilesProvided(t *testing.T) {
 	buf := &testtools.NOPTarInterpreter{}
 	err := walg.ExtractAll(buf, []walg.ReaderMaker{})
-	assert.Equal(t, walg.NoFilesToExtractError, err)
-}
-
-func TestUnsupportedFileType(t *testing.T) {
-	test := &bytes.Buffer{}
-	brm := &BufferReaderMaker{test, "/usr/local/file.gzip"}
-	buf := &testtools.NOPTarInterpreter{}
-	files := []walg.ReaderMaker{brm}
-	err := walg.ExtractAll(buf, files)
-
-	if serr, ok := err.(*walg.UnsupportedFileTypeError); ok {
-		t.Errorf("extract: Extract should not support filetype %s", walg.GetFileExtension(brm.Path()))
-	} else if serr != nil {
-		t.Log(serr)
-	}
+	assert.IsType(t, err, walg.NoFilesToExtractError{})
 }
 
 // Tests roundtrip for a tar file.

@@ -148,13 +148,13 @@ func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader
 	var fileReader io.ReadCloser
 	if isIncremented {
 		bitmap, err := bundle.getDeltaBitmapFor(path)
-		if err != NoBitmapFoundError { // this file has changed after the start of backup, so just skip it
+		if _, ok := err.(NoBitmapFoundError); !ok { // this file has changed after the start of backup, so just skip it
 			if err != nil {
 				return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
 			}
 			fmt.Println("Prefaulting ", path)
 			fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
-			if _, ok := err.(*InvalidBlockError); ok {
+			if _, ok := err.(InvalidBlockError); ok {
 				return nil
 			} else if err != nil {
 				return errors.Wrapf(err, "packFileIntoTar: failed reading incremental file '%s'\n", path)

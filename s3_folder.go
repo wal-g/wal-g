@@ -47,7 +47,7 @@ func getBackups(folder *S3Folder) (backus []BackupTime, err error) {
 
 	count := len(backus)
 	if count == 0 {
-		return nil, NoBackupsFoundError
+		return nil, NewNoBackupsFoundError()
 	}
 	return
 }

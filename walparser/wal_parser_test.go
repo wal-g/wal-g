@@ -17,14 +17,14 @@ func TestZeroPageParsing(t *testing.T) {
 	parser := WalParser{}
 	_, pageData, err := parser.ParseRecordsFromPage(bytes.NewReader(zeroPage))
 	assert.Nilf(t, pageData, "not nil pageData")
-	assert.Equal(t, ZeroPageError, err)
+	assert.IsType(t, err, ZeroPageError{})
 }
 
 func doPartialFileParsingTesting(t *testing.T, pageReader WalPageReader, parser WalParser) {
 	page, err := pageReader.ReadPageData()
 	assert.NoError(t, err)
 	_, _, err = parser.ParseRecordsFromPage(bytes.NewReader(page))
-	assert.Equal(t, PartialPageError, err)
+	assert.IsType(t, err, PartialPageError{})
 }
 
 func doWalSwitchParsingTesting(t *testing.T, pageReader WalPageReader, parser WalParser) {

@@ -42,16 +42,36 @@ const (
 
 // InvalidBlockError indicates that file contain invalid page and cannot be archived incrementally
 type InvalidBlockError struct {
-	blockNo uint32
+	error
 }
 
-func (err *InvalidBlockError) Error() string {
-	return fmt.Sprintf("block %d is invalid", err.blockNo)
+func NewInvalidBlockError(blockNo uint32) InvalidBlockError {
+	return InvalidBlockError{errors.Errorf("block %d is invalid", blockNo)}
 }
 
-var InvalidIncrementFileHeaderError = errors.New("Invalid increment file header")
-var UnknownIncrementFileHeaderError = errors.New("Unknown increment file header")
-var UnexpectedTarDataError = errors.New("Expected end of Tar")
+type InvalidIncrementFileHeaderError struct {
+	error
+}
+
+func NewInvalidIncrementFileHeaderError() InvalidIncrementFileHeaderError {
+	return InvalidIncrementFileHeaderError{errors.New("Invalid increment file header")}
+}
+
+type UnknownIncrementFileHeaderError struct {
+	error
+}
+
+func NewUnknownIncrementFileHeaderError() UnknownIncrementFileHeaderError {
+	return UnknownIncrementFileHeaderError{errors.New("Unknown increment file header")}
+}
+
+type UnexpectedTarDataError struct {
+	error
+}
+
+func NewUnexpectedTarDataError() UnexpectedTarDataError {
+	return UnexpectedTarDataError{errors.New("Expected end of Tar")}
+}
 
 var pagedFilenameRegexp *regexp.Regexp
 
@@ -148,7 +168,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader) error {
 
 	all, _ := increment.Read(make([]byte, 1))
 	if all > 0 {
-		return UnexpectedTarDataError
+		return NewUnexpectedTarDataError()
 	}
 
 	return nil
@@ -162,10 +182,10 @@ func ReadIncrementFileHeader(reader io.Reader) error {
 	}
 
 	if header[0] != 'w' || header[1] != 'i' || header[3] != SignatureMagicNumber {
-		return InvalidIncrementFileHeaderError
+		return NewInvalidIncrementFileHeaderError()
 	}
 	if header[2] != '1' {
-		return UnknownIncrementFileHeaderError
+		return NewUnknownIncrementFileHeaderError()
 	}
 	return nil
 }

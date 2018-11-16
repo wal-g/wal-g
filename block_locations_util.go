@@ -32,7 +32,11 @@ func extractLocationsFromWalFile(parser *walparser.WalParser, walFile io.ReadClo
 			return nil, err
 		}
 		_, records, err := parser.ParseRecordsFromPage(bytes.NewReader(data))
-		if err != nil && err != walparser.PartialPageError && err != walparser.ZeroPageError {
+		switch err.(type) {
+		case nil:
+		case walparser.PartialPageError:
+		case walparser.ZeroPageError:
+		default:
 			return nil, err
 		}
 		locations = append(locations, ExtractBlockLocations(records)...)

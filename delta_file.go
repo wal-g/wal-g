@@ -6,7 +6,13 @@ import (
 	"io"
 )
 
-var NilWalParserError = errors.New("expected to get non nil wal parser, but got nil one")
+type NilWalParserError struct {
+	error
+}
+
+func NewNilWalParserError() NilWalParserError {
+	return NilWalParserError{errors.New("expected to get non nil wal parser, but got nil one")}
+}
 
 type DeltaFile struct {
 	Locations []walparser.BlockLocation
@@ -15,7 +21,7 @@ type DeltaFile struct {
 
 func NewDeltaFile(walParser *walparser.WalParser) (*DeltaFile, error) {
 	if walParser == nil {
-		return nil, NilWalParserError
+		return nil, NewNilWalParserError()
 	}
 	return &DeltaFile{nil, walParser}, nil
 }

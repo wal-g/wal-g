@@ -85,7 +85,7 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	//Test empty environment variables
 	setEmpty(t)
 	uploader, folder, err := walg.Configure(false)
-	if _, ok := err.(*walg.UnsetEnvVarError); !ok {
+	if _, ok := err.(walg.UnsetEnvVarError); !ok {
 		t.Errorf("upload: Expected error 'UnsetEnvVarError' but got %s", err)
 	}
 	assert.Nil(t, uploader)

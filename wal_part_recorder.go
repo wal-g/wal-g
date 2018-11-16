@@ -2,14 +2,15 @@ package walg
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 )
 
 type NotWalFilenameError struct {
-	filename string
+	error
 }
 
-func (err NotWalFilenameError) Error() string {
-	return fmt.Sprintf("expected to get wal filename, but found: '%s'", err.filename)
+func NewNotWalFilenameError(filename string) NotWalFilenameError {
+	return NotWalFilenameError{errors.Errorf("expected to get wal filename, but found: '%s'", filename)}
 }
 
 type WalPartRecorder struct {
@@ -19,7 +20,7 @@ type WalPartRecorder struct {
 
 func NewWalPartRecorder(walFilename string, manager *DeltaFileManager) (*WalPartRecorder, error) {
 	if !isWalFilename(walFilename) {
-		return nil, NotWalFilenameError{walFilename}
+		return nil, NewNotWalFilenameError(walFilename)
 	}
 	return &WalPartRecorder{manager, walFilename}, nil
 }

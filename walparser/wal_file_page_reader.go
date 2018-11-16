@@ -2,6 +2,7 @@ package walparser
 
 import (
 	"io"
+	"github.com/pkg/errors"
 )
 
 type WalPageReader struct {
@@ -17,7 +18,7 @@ func (reader *WalPageReader) ReadPageData() ([]byte, error) {
 	page := make([]byte, WalPageSize)
 	_, err := io.ReadFull(reader.walFileReader, page)
 	if err != nil && err != io.EOF {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return page, err
 }

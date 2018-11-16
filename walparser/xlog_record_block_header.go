@@ -49,7 +49,7 @@ func (blockHeader *XLogRecordBlockHeader) HasSameRel() bool {
 func (blockHeader *XLogRecordBlockHeader) checkDataStateConsistency() error {
 	if (blockHeader.HasData() && blockHeader.DataLength == 0) ||
 		(!blockHeader.HasData() && blockHeader.DataLength != 0) {
-		return InconsistentBlockDataStateError{blockHeader.HasData(), blockHeader.DataLength}
+		return NewInconsistentBlockDataStateError(blockHeader.HasData(), blockHeader.DataLength)
 	}
 	return nil
 }

@@ -3,7 +3,7 @@ package walg
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -11,6 +11,14 @@ import (
 	"path/filepath"
 	"strings"
 )
+
+type GpgKeyExportError struct {
+	error
+}
+
+func NewGpgKeyExportError(text string) GpgKeyExportError {
+	return GpgKeyExportError{errors.Errorf("Got error while exporting gpg key: '%s'", text)}
+}
 
 // GetKeyRingId extracts name of a key to use from env variable
 func GetKeyRingId() string {
@@ -52,7 +60,7 @@ func getPubRingArmour(keyId string) ([]byte, error) {
 		return nil, err
 	}
 	if stderr.Len() > 0 { // gpg -a --export <key-id> reports error on stderr and exits == 0 if the key isn't found
-		return nil, errors.New(strings.TrimSpace(stderr.String()))
+		return nil, NewGpgKeyExportError(strings.TrimSpace(stderr.String()))
 	}
 
 	cache.KeyId = keyId
