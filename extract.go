@@ -4,11 +4,11 @@ import (
 	"archive/tar"
 	"context"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"io"
 	"log"
 	"sync"
+	"strings"
 )
 
 var NoFilesToExtractError = errors.New("ExtractAll: did not provide files to extract")
@@ -101,23 +101,22 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 
 	// Set maximum number of goroutines spun off by ExtractAll
 	downloadingConcurrency := getMaxDownloadConcurrency(min(len(files), 10))
-	var err error
 	for currentRun := files; len(currentRun) > 0; {
 		var failed []ReaderMaker
-		failed, err = tryExtractFiles(currentRun, tarInterpreter, downloadingConcurrency)
+		failed = tryExtractFiles(currentRun, tarInterpreter, downloadingConcurrency)
 		if downloadingConcurrency > 1 {
 			downloadingConcurrency /= 2
 		} else if len(failed) == len(currentRun) {
-			break
+			return errors.Errorf("failed to extract files:\n%s\n",
+				strings.Join(ReaderMakersToFilePaths(failed), "\n"))
 		}
 		currentRun = failed
 	}
-	return err
+	return nil
 }
 
 // TODO : unit tests
-func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloadingConcurrency int) (failed []ReaderMaker, err error) {
-	var errorCollector errgroup.Group
+func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloadingConcurrency int) (failed []ReaderMaker) {
 	downloadingContext := context.TODO()
 	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
 	var crypter OpenPGPCrypter
@@ -129,34 +128,32 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 
 		extractingReader, pipeWriter := io.Pipe()
 		decompressingWriter := &EmptyWriteIgnorer{pipeWriter}
-		errorCollector.Go(func() error {
+		go func() {
 			err := DecryptAndDecompressTar(decompressingWriter, fileClosure, &crypter)
 			decompressingWriter.Close()
 			log.Printf("Finished decompression of %s", fileClosure.Path())
 			if err != nil {
-				if _, ok := inFailed.LoadOrStore(fileClosure, true); !ok {
-					failed = append(failed, fileClosure)
-				}
+				inFailed.Store(fileClosure, true)
 				log.Println(err)
 			}
-			return err
-		})
-		errorCollector.Go(func() error {
+		}()
+		go func() {
 			defer downloadingSemaphore.Release(1)
 			err := extractOne(tarInterpreter, extractingReader)
 			err = errors.Wrapf(err, "Extraction error in %s", fileClosure.Path())
 			extractingReader.Close()
 			log.Printf("Finished extraction of %s", fileClosure.Path())
 			if err != nil {
-				if _, ok := inFailed.LoadOrStore(fileClosure, true); !ok {
-					failed = append(failed, fileClosure)
-				}
+				inFailed.Store(fileClosure, true)
 				log.Println(err)
 			}
-			return err
-		})
+		}()
 	}
 
 	downloadingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency))
-	return failed, errorCollector.Wait()
+	inFailed.Range(func(failedFile, _ interface{}) bool {
+		failed = append(failed, failedFile.(ReaderMaker))
+		return true
+	})
+	return failed
 }

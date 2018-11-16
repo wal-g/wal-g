@@ -496,26 +496,28 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 	var fileReader io.ReadCloser
 	if isIncremented {
 		bitmap, err := bundle.getDeltaBitmapFor(path)
-		if err != NoBitmapFoundError { // this file has changed after the start of backup, so just skip it
-			if err != nil {
+		if err == NoBitmapFoundError { // this file has changed after the start of backup, so just skip it
+			bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: info.ModTime()})
+			return nil
+		} else if err != nil {
 				return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
-			}
-			fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
-			if _, ok := err.(*InvalidBlockError); ok {
-				fileReader, err = startReadingFile(fileInfoHeader, info, path, fileReader)
-				if err != nil {
-					return err
-				}
-			} else if err != nil {
-				return errors.Wrapf(err, "packFileIntoTar: failed reading incremental file '%s'\n", path)
-			}
+		}
+		fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
+		switch err.(type) {
+		case nil:
 			fileReader = &ReadCascadeCloser{&io.LimitedReader{
 				R: io.MultiReader(fileReader, &ZeroReader{}),
 				N: int64(fileInfoHeader.Size),
 			}, fileReader}
-		} else {
-			bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: info.ModTime()})
-			return nil
+		case *InvalidBlockError: // fallback to full file backup
+			log.Printf("failed to read file '%s' as incremented\n", fileInfoHeader.Name)
+			isIncremented = false
+			fileReader, err = startReadingFile(fileInfoHeader, info, path, fileReader)
+			if err != nil {
+				return err
+			}
+		default:
+			return errors.Wrapf(err, "packFileIntoTar: failed reading incremental file '%s'\n", path)
 		}
 	} else {
 		var err error
