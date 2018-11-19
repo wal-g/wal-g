@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 	"github.com/wal-g/wal-g/testtools"
@@ -85,7 +86,7 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	//Test empty environment variables
 	setEmpty(t)
 	uploader, folder, err := walg.Configure(false)
-	if _, ok := err.(walg.UnsetEnvVarError); !ok {
+	if _, ok := (errors.Cause(err)).(walg.UnsetEnvVarError); !ok {
 		t.Errorf("upload: Expected error 'UnsetEnvVarError' but got %s", err)
 	}
 	assert.Nil(t, uploader)
@@ -136,7 +137,7 @@ func TestValidUploader(t *testing.T) {
 	tu := testtools.NewMockUploader(false, false)
 	assert.NotNil(t, tu)
 
-	upl := walg.CreateUploader(mockSvc, 100, 3)
+	upl := walg.CreateUploaderAPI(mockSvc, 100, 3)
 	assert.NotNil(t, upl)
 }
 

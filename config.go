@@ -55,25 +55,15 @@ func verifyConfig() {
 
 func readConfig() {
 	usr, err := user.Current()
-	if err == nil {
+	if err != nil {
+		return
+	}
+	for _, unmarshal := range []func([]byte, interface{}) error{json.Unmarshal, yaml.Unmarshal} {
 		cacheFilename := filepath.Join(usr.HomeDir, ".walg.json")
 		file, err := ioutil.ReadFile(cacheFilename)
 		// here we ignore whatever error can occur
 		if err == nil {
-			err = json.Unmarshal(file, &WalgConfig)
-			if err != nil {
-				errorLogger.Panic(err)
-			}
-			return
-		} else if !os.IsNotExist(err) {
-			errorLogger.Panic(err)
-		}
-
-		cacheFilename = filepath.Join(usr.HomeDir, ".walg.json")
-		file, err = ioutil.ReadFile(cacheFilename)
-		// here we ignore whatever error can occur
-		if err == nil {
-			err := yaml.Unmarshal(file, &WalgConfig)
+			err = unmarshal(file, &WalgConfig)
 			if err != nil {
 				errorLogger.Panic(err)
 			}

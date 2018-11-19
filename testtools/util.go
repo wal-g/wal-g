@@ -1,42 +1,51 @@
 package testtools
 
 import (
+	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g"
 	"io"
 	"testing"
 )
 
+func MakeDefaultUploader(
+	uploaderAPI s3manageriface.UploaderAPI,
+	compressor walg.Compressor,
+	uploadingLocation *walg.S3Folder,
+	deltaDataFolder walg.DataFolder,
+	useWalDelta bool,
+) *walg.Uploader {
+	return walg.NewUploader(uploaderAPI, "", "", "STANDARD", compressor,
+		uploadingLocation, deltaDataFolder, useWalDelta, false)
+}
+
 func NewMockUploader(apiMultiErr, apiErr bool) *walg.Uploader {
-	return walg.NewUploader(
+	return MakeDefaultUploader(
 		NewMockS3Uploader(apiMultiErr, apiErr, nil),
 		&MockCompressor{},
 		walg.NewS3Folder(NewMockS3Client(true, true), "bucket/", "server", false),
 		nil,
 		false,
-		false,
 	)
 }
 
 func NewStoringMockUploader(storage *MockStorage, deltaDataFolder walg.DataFolder) *walg.Uploader {
-	return walg.NewUploader(
+	return MakeDefaultUploader(
 		NewMockS3Uploader(false, false, storage),
 		&MockCompressor{},
 		walg.NewS3Folder(nil, "bucket/", "server", false),
 		deltaDataFolder,
 		true,
-		false,
 	)
 }
 
 func NewStoringCompressingMockUploader(storage *MockStorage, deltaDataFolder walg.DataFolder) *walg.Uploader {
-	return walg.NewUploader(
+	return MakeDefaultUploader(
 		NewMockS3Uploader(false, false, storage),
 		&walg.BrotliCompressor{},
 		walg.NewS3Folder(NewMockStoringS3Client(storage), "bucket/", "server", true),
 		deltaDataFolder,
 		true,
-		false,
 	)
 }
 

@@ -12,7 +12,7 @@ import (
 )
 
 // Uploader contains fields associated with uploading tarballs.
-// Multiple tarballs can share one uploader. Must call CreateUploader()
+// Multiple tarballs can share one uploader. Must call CreateUploaderAPI()
 // in 'configure.go'.
 type Uploader struct {
 	uploaderApi          s3manageriface.UploaderAPI
@@ -28,11 +28,9 @@ type Uploader struct {
 	verify               bool
 }
 
-// NewUploader creates a new tar uploader without the actual
-// S3 uploader. CreateUploader() is used to configure byte size and
-// concurrency streams for the uploader.
 func NewUploader(
 	uploaderAPI s3manageriface.UploaderAPI,
+	serverSideEncryption, sseKMSKeyId, storageClass string,
 	compressor Compressor,
 	uploadingLocation *S3Folder,
 	deltaDataFolder DataFolder,
@@ -43,14 +41,16 @@ func NewUploader(
 		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
 	}
 	return &Uploader{
-		uploaderApi:      uploaderAPI,
-		uploadingFolder:  uploadingLocation,
-		StorageClass:     "STANDARD",
-		compressor:       compressor,
-		useWalDelta:      useWalDelta,
-		waitGroup:        &sync.WaitGroup{},
-		deltaFileManager: deltaFileManager,
-		verify:           verify,
+		uploaderApi:          uploaderAPI,
+		uploadingFolder:      uploadingLocation,
+		serverSideEncryption: serverSideEncryption,
+		SSEKMSKeyId:          sseKMSKeyId,
+		StorageClass:         storageClass,
+		compressor:           compressor,
+		useWalDelta:          useWalDelta,
+		waitGroup:            &sync.WaitGroup{},
+		deltaFileManager:     deltaFileManager,
+		verify:               verify,
 	}
 }
 

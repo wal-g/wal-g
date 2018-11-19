@@ -35,7 +35,7 @@ func HandleWALPrefetch(folder *S3Folder, walFileName string, location string, up
 		}
 		if shouldPrefault {
 			waitGroup.Add(1)
-			go prefaultData(prefaultStartLsn, timelineId, folder, waitGroup, uploader)
+			go prefaultData(prefaultStartLsn, timelineId, waitGroup, uploader)
 		}
 
 		time.Sleep(10 * time.Millisecond) // ramp up in order
@@ -47,7 +47,7 @@ func HandleWALPrefetch(folder *S3Folder, walFileName string, location string, up
 }
 
 // TODO : unit tests
-func prefaultData(prefaultStartLsn uint64, timelineId uint32, folder *S3Folder, waitGroup *sync.WaitGroup, uploader *Uploader) {
+func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.WaitGroup, uploader *Uploader) {
 	defer func() {
 		if r := recover(); r != nil {
 			errorLogger.Println("Prefault unsuccessful ", prefaultStartLsn)
