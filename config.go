@@ -3,6 +3,7 @@ package walg
 import (
 	"encoding/json"
 	"github.com/go-yaml/yaml"
+	"github.com/wal-g/wal-g/tracelog"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -34,6 +35,7 @@ var (
 		"WALG_DISK_RATE_LIMIT":         nil,
 		"WALG_NETWORK_RATE_LIMIT":      nil,
 		"WALG_USE_WAL_DELTA":           nil,
+		"WALG_LOG_LEVEL":               nil,
 	}
 )
 
@@ -46,9 +48,9 @@ func verifyConfig() {
 	if WalgConfig == nil {
 		return
 	}
-	for k, _ := range *WalgConfig {
+	for k := range *WalgConfig {
 		if _, ok := allowedConfigKeys[k]; !ok {
-			errorLogger.Panic("Settings " + k + " is unknown")
+			tracelog.ErrorLogger.Panic("Settings " + k + " is unknown")
 		}
 	}
 }
@@ -65,11 +67,11 @@ func readConfig() {
 		if err == nil {
 			err = unmarshal(file, &WalgConfig)
 			if err != nil {
-				errorLogger.Panic(err)
+				tracelog.ErrorLogger.Panic(err)
 			}
 			return
 		} else if !os.IsNotExist(err) {
-			errorLogger.Panic(err)
+			tracelog.ErrorLogger.Panic(err)
 		}
 	}
 }

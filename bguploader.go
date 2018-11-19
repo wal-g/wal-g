@@ -1,6 +1,7 @@
 package walg
 
 import (
+	"github.com/wal-g/wal-g/tracelog"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -85,7 +86,7 @@ func (bgUploader *BgUploader) scanOnce() {
 
 	files, err := ioutil.ReadDir(filepath.Join(bgUploader.dir, archiveStatus))
 	if err != nil {
-		errorLogger.Print("Error of parallel upload: ", err)
+		tracelog.ErrorLogger.Print("Error of parallel upload: ", err)
 		return
 	}
 
@@ -124,7 +125,7 @@ func (bgUploader *BgUploader) upload(info os.FileInfo) {
 	walFilename := strings.TrimSuffix(info.Name(), readySuffix)
 	err := uploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename))
 	if err != nil {
-		errorLogger.Print("Error of background uploader: ", err)
+		tracelog.ErrorLogger.Print("Error of background uploader: ", err)
 		return
 	}
 
@@ -132,7 +133,7 @@ func (bgUploader *BgUploader) upload(info os.FileInfo) {
 	done := filepath.Join(bgUploader.dir, archiveStatus, walFilename+done)
 	err = os.Rename(ready, done)
 	if err != nil {
-		errorLogger.Print("Error renaming .ready to .done: ", err)
+		tracelog.ErrorLogger.Print("Error renaming .ready to .done: ", err)
 	}
 
 	atomic.AddInt32(&bgUploader.totalUploaded, 1)

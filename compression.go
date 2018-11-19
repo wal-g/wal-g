@@ -1,9 +1,10 @@
 package walg
 
 import (
-	"github.com/pkg/errors"
-	"io"
 	"fmt"
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/tracelog"
+	"io"
 )
 
 const (
@@ -30,7 +31,7 @@ func NewUnknownCompressionMethodError() UnknownCompressionMethodError {
 }
 
 func (err UnknownCompressionMethodError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type Compressor interface {

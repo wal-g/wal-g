@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 	"io"
 	"fmt"
+	"github.com/wal-g/wal-g/tracelog"
 )
 
 type NotEnoughDataToShrinkError struct {
@@ -15,7 +16,7 @@ func NewNotEnoughDataToShrinkError(dataRemained int, toShrink int) error {
 }
 
 func (err NotEnoughDataToShrinkError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type ShrinkableReader struct {

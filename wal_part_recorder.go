@@ -3,6 +3,7 @@ package walg
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/tracelog"
 )
 
 type NotWalFilenameError struct {
@@ -14,7 +15,7 @@ func NewNotWalFilenameError(filename string) NotWalFilenameError {
 }
 
 func (err NotWalFilenameError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type WalPartRecorder struct {
@@ -69,6 +70,6 @@ func (recorder *WalPartRecorder) SaveNextWalHead(head []byte) error {
 }
 
 func (recorder *WalPartRecorder) cancelRecordingWithErr(err error) {
-	warningLogger.Printf("Stopped wal file: '%s' recording because of error: '%v'\n", recorder.walFilename, err)
+	tracelog.WarningLogger.Printf("Stopped wal file: '%s' recording because of error: '%v'\n", recorder.walFilename, err)
 	recorder.manager.CancelRecording(recorder.walFilename)
 }

@@ -1,9 +1,10 @@
 package walg
 
 import (
-	"github.com/pkg/errors"
-	"sync"
 	"fmt"
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/tracelog"
+	"sync"
 )
 
 type WrongTypeError struct {
@@ -15,7 +16,7 @@ func NewWrongTypeError(desiredType string) WrongTypeError {
 }
 
 func (err WrongTypeError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type LazyCache struct {

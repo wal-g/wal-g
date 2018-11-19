@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/tracelog"
 	"strconv"
 )
 
@@ -16,7 +17,7 @@ func NewBytesPerWalSegmentError() BytesPerWalSegmentError {
 }
 
 func (err BytesPerWalSegmentError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type IncorrectLogSegNoError struct {
@@ -28,7 +29,7 @@ func NewIncorrectLogSegNoError(name string) IncorrectLogSegNoError {
 }
 
 func (err IncorrectLogSegNoError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 func readTimeline(conn *pgx.Conn) (timeline uint32, err error) {

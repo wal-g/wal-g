@@ -1,6 +1,7 @@
 package walg
 
 import (
+	"github.com/wal-g/wal-g/tracelog"
 	"path"
 )
 
@@ -13,7 +14,7 @@ type Cleaner interface {
 func CleanupPrefetchDirectories(walFileName string, location string, cleaner Cleaner) {
 	timelineId, logSegNo, err := ParseWALFilename(walFileName)
 	if err != nil {
-		warningLogger.Println("WAL-prefetch cleanup failed: ", err, " file: ", walFileName)
+		tracelog.WarningLogger.Println("WAL-prefetch cleanup failed: ", err, " file: ", walFileName)
 		return
 	}
 	prefetchLocation, runningLocation, _, _ := GetPrefetchLocations(location, walFileName)
@@ -26,7 +27,7 @@ func CleanupPrefetchDirectories(walFileName string, location string, cleaner Cle
 func cleanupPrefetchDirectory(directory string, timelineId uint32, logSegNo uint64, cleaner Cleaner) {
 	files, err := cleaner.GetFiles(directory)
 	if err != nil {
-		warningLogger.Println("WAL-prefetch cleanup failed, : ", err, " cannot enumerate files in dir: ", directory)
+		tracelog.WarningLogger.Println("WAL-prefetch cleanup failed, : ", err, " cannot enumerate files in dir: ", directory)
 	}
 
 	for _, f := range files {

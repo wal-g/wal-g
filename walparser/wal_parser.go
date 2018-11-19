@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"fmt"
+	"github.com/wal-g/wal-g/tracelog"
 )
 
 const (
@@ -25,7 +26,7 @@ func NewZeroPageError() ZeroPageError {
 }
 
 func (err ZeroPageError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type PartialPageError struct {
@@ -37,7 +38,7 @@ func NewPartialPageError() PartialPageError {
 }
 
 func (err PartialPageError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type WalParser struct {

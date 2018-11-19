@@ -1,10 +1,11 @@
 package walg
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/tracelog"
 	"github.com/wal-g/wal-g/walparser"
 	"io"
-	"fmt"
 )
 
 type NilWalParserError struct {
@@ -16,7 +17,7 @@ func NewNilWalParserError() NilWalParserError {
 }
 
 func (err NilWalParserError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type DeltaFile struct {

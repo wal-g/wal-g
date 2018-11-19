@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/wal-g/wal-g/tracelog"
 	"io"
 	"os"
 	"path"
@@ -121,7 +122,7 @@ func GetSentinelUserData() interface{} {
 	var out interface{}
 	err := json.Unmarshal([]byte(dataStr), &out)
 	if err != nil {
-		warningLogger.Println("Unable to parse WALG_SENTINEL_USER_DATA as JSON")
+		tracelog.WarningLogger.Println("Unable to parse WALG_SENTINEL_USER_DATA as JSON")
 		return dataStr
 	}
 	return out
@@ -139,7 +140,7 @@ func getMaxConcurrency(key string, defaultValue int) int {
 		con, err = strconv.Atoi(conc)
 
 		if err != nil {
-			errorLogger.Panic("Unknown concurrency number ", err)
+			tracelog.ErrorLogger.Panic("Unknown concurrency number ", err)
 		}
 	} else {
 		if defaultValue > 0 {

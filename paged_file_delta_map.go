@@ -1,14 +1,15 @@
 package walg
 
 import (
+	"fmt"
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/tracelog"
 	"github.com/wal-g/wal-g/walparser"
 	"os"
 	"path"
 	"strconv"
 	"strings"
-	"fmt"
 )
 
 const (
@@ -26,7 +27,7 @@ func NewNoBitmapFoundError() NoBitmapFoundError {
 }
 
 func (err NoBitmapFoundError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type UnknownTableSpaceError struct {
@@ -38,7 +39,7 @@ func NewUnknownTableSpaceError() UnknownTableSpaceError {
 }
 
 func (err UnknownTableSpaceError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type PagedFileDeltaMap map[walparser.RelFileNode]*roaring.Bitmap

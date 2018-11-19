@@ -3,6 +3,7 @@ package walparser
 import (
 	"github.com/pkg/errors"
 	"fmt"
+	"github.com/wal-g/wal-g/tracelog"
 )
 
 const (
@@ -25,7 +26,7 @@ func NewInconsistentXLogRecordTotalLengthError(totalRecordLength uint32) Inconsi
 }
 
 func (err InconsistentXLogRecordTotalLengthError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type InvalidXLogRecordResourceManagerIDError struct {
@@ -37,7 +38,7 @@ func NewInvalidXLogRecordResourceManagerIDError(resourceManagerID uint8) Invalid
 }
 
 func (err InvalidXLogRecordResourceManagerIDError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type ZeroRecordHeaderError struct {
@@ -49,7 +50,7 @@ func NewZeroRecordHeaderError() ZeroRecordHeaderError {
 }
 
 func (err ZeroRecordHeaderError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 /* This struct corresponds to postgres struct XLogRecord.

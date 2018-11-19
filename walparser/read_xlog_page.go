@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/wal-g/walparser/parsingutil"
 	"io"
 	"fmt"
+	"github.com/wal-g/wal-g/tracelog"
 )
 
 type ZeroPageHeaderError struct {
@@ -17,7 +18,7 @@ func NewZeroPageHeaderError() error {
 }
 
 func (err ZeroPageHeaderError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type InvalidPageHeaderError struct {
@@ -29,7 +30,7 @@ func NewInvalidPageHeaderError() error {
 }
 
 func (err InvalidPageHeaderError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 func tryReadXLogRecordData(alignedReader *AlignedReader) (data []byte, whole bool, err error) {

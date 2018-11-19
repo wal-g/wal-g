@@ -1,6 +1,7 @@
 package walg
 
 import (
+	"github.com/wal-g/wal-g/tracelog"
 	"io/ioutil"
 	"os"
 )
@@ -29,6 +30,6 @@ func (cleaner FileSystemCleaner) GetFiles(directory string) (files []string, err
 func (cleaner FileSystemCleaner) Remove(file string) {
 	err := os.Remove(file)
 	if err != nil {
-		warningLogger.Printf("Tried to remove file: '%s', but got error: '%v'\n", file, err)
+		tracelog.WarningLogger.Printf("Tried to remove file: '%s', but got error: '%v'\n", file, err)
 	}
 }

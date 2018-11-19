@@ -1,9 +1,10 @@
 package walg
 
 import (
-	"github.com/pkg/errors"
-	"io"
 	"fmt"
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/tracelog"
+	"io"
 )
 
 type NoSuchFileError struct {
@@ -15,7 +16,7 @@ func NewNoSuchFileError(filename string) NoSuchFileError {
 }
 
 func (err NoSuchFileError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type DataFolder interface {

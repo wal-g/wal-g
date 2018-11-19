@@ -1,8 +1,9 @@
 package walg
 
 import (
-	"github.com/pkg/errors"
 	"fmt"
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/tracelog"
 )
 
 // UnsetEnvVarError is used to indicate required environment
@@ -20,7 +21,7 @@ func NewUnsetEnvVarError(names []string) UnsetEnvVarError {
 }
 
 func (err UnsetEnvVarError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 // UnsupportedFileTypeError is used to signal file types

@@ -6,6 +6,7 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/tracelog"
 	"github.com/wal-g/wal-g/walparser"
 	"io"
 	"os"
@@ -29,7 +30,7 @@ func NewTarSizeError(packedFileSize, expectedSize int64) TarSizeError {
 }
 
 func (err TarSizeError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 // ExcludedFilenames is a list of excluded members from the bundled backup.
@@ -193,7 +194,7 @@ func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
 	if bundle.Replica {
 		timeline, err := readTimeline(conn)
 		if err != nil {
-			errorLogger.Printf("Unable to check timeline change. Sentinel for the backup will not be uploaded.")
+			tracelog.ErrorLogger.Printf("Unable to check timeline change. Sentinel for the backup will not be uploaded.")
 			return true
 		}
 
@@ -201,7 +202,7 @@ func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
 		// https://www.postgresql.org/message-id/flat/BF2AD4A8-E7F5-486F-92C8-A6959040DEB6%40yandex-team.ru#BF2AD4A8-E7F5-486F-92C8-A6959040DEB6@yandex-team.ru
 		// Following check is the very pessimistic approach on replica backup invalidation
 		if timeline != bundle.Timeline {
-			errorLogger.Printf("Timeline has changed since backup start. Sentinel for the backup will not be uploaded.")
+			tracelog.ErrorLogger.Printf("Timeline has changed since backup start. Sentinel for the backup will not be uploaded.")
 			return true
 		}
 	}
@@ -234,7 +235,7 @@ func (bundle *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName str
 	} else {
 		bundle.Timeline, err = readTimeline(conn)
 		if err != nil {
-			warningLogger.Printf("Couldn't get current timeline because of error: '%v'\n", err)
+			tracelog.WarningLogger.Printf("Couldn't get current timeline because of error: '%v'\n", err)
 		}
 	}
 	return "base_" + name, lsn, queryRunner.Version, nil
@@ -251,7 +252,7 @@ func (bundle *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName str
 func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err error) error {
 	if err != nil {
 		if os.IsNotExist(err) {
-			warningLogger.Println(path, " deleted during filepath walk")
+			tracelog.WarningLogger.Println(path, " deleted during filepath walk")
 			return nil
 		}
 		return errors.Wrap(err, "HandleWalkedFSObject: walk failed")
@@ -291,7 +292,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 	}
 
 	fileInfoHeader.Name = bundle.GetFileRelPath(path)
-	infoLogger.Println(fileInfoHeader.Name)
+	tracelog.InfoLogger.Println(fileInfoHeader.Name)
 
 	if !excluded && info.Mode().IsRegular() {
 		baseFiles := bundle.GetIncrementBaseFiles()
@@ -305,7 +306,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 
 		if wasInBase && (time.Equal(baseFile.MTime)) {
 			// File was not changed since previous backup
-			infoLogger.Println("Skiped due to unchanged modification time")
+			tracelog.InfoLogger.Println("Skiped due to unchanged modification time")
 			bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time})
 			return nil
 		}
@@ -359,7 +360,7 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 	}
 
 	fileInfoHeader.Name = bundle.GetFileRelPath(path)
-	infoLogger.Println(fileInfoHeader.Name)
+	tracelog.InfoLogger.Println(fileInfoHeader.Name)
 
 	err = tarWriter.WriteHeader(fileInfoHeader) // TODO : what happens in case of irregular pg_control?
 	if err != nil {
@@ -427,7 +428,7 @@ func (bundle *Bundle) UploadLabelFiles(conn *pgx.Conn) (uint64, error) {
 	if err != nil {
 		return 0, errors.Wrapf(err, "UploadLabelFiles: failed to put %s to tar", labelHeader.Name)
 	}
-	infoLogger.Println(labelHeader.Name)
+	tracelog.InfoLogger.Println(labelHeader.Name)
 
 	offsetMapHeader := &tar.Header{
 		Name:     "tablespace_map",
@@ -440,7 +441,7 @@ func (bundle *Bundle) UploadLabelFiles(conn *pgx.Conn) (uint64, error) {
 	if err != nil {
 		return 0, errors.Wrapf(err, "UploadLabelFiles: failed to put %s to tar", offsetMapHeader.Name)
 	}
-	infoLogger.Println(offsetMapHeader.Name)
+	tracelog.InfoLogger.Println(offsetMapHeader.Name)
 
 	err = tarBall.CloseTar()
 	if err != nil {
@@ -511,7 +512,7 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 			bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: info.ModTime()})
 			return nil
 		} else if err != nil {
-				return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
+			return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
 		}
 		fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
 		switch err.(type) {
@@ -521,7 +522,7 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 				N: int64(fileInfoHeader.Size),
 			}, fileReader}
 		case InvalidBlockError: // fallback to full file backup
-			warningLogger.Printf("failed to read file '%s' as incremented\n", fileInfoHeader.Name)
+			tracelog.WarningLogger.Printf("failed to read file '%s' as incremented\n", fileInfoHeader.Name)
 			isIncremented = false
 			fileReader, err = startReadingFile(fileInfoHeader, info, path, fileReader)
 			if err != nil {

@@ -3,6 +3,7 @@ package walg
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/wal-g/wal-g/tracelog"
 	"log"
 	"strconv"
 	"strings"
@@ -53,7 +54,7 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 		params = params[1:]
 	}
 	if len(params) < 1 {
-		errorLogger.Print("Backup name not specified")
+		tracelog.ErrorLogger.Print("Backup name not specified")
 		fallBackFunc()
 		return
 	}
@@ -61,7 +62,7 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 	result.Target = params[0]
 	if t, err := time.Parse(time.RFC3339, result.Target); err == nil {
 		if t.After(time.Now()) {
-			warningLogger.Println("Cannot delete before future date")
+			tracelog.WarningLogger.Println("Cannot delete before future date")
 			fallBackFunc()
 		}
 		result.BeforeTime = &t
@@ -75,12 +76,12 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 	if result.Retain {
 		number, err := strconv.Atoi(result.Target)
 		if err != nil {
-			errorLogger.Println("Cannot parse target number ", number)
+			tracelog.ErrorLogger.Println("Cannot parse target number ", number)
 			fallBackFunc()
 			return
 		}
 		if number <= 0 {
-			errorLogger.Println("Cannot retain 0") // Consider allowing to delete everything
+			tracelog.ErrorLogger.Println("Cannot retain 0") // Consider allowing to delete everything
 			fallBackFunc()
 			return
 		}
@@ -96,7 +97,7 @@ func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dry
 		if findFull {
 			target.Name = *dto.IncrementFullName
 		} else {
-			errorLogger.Fatalf("%v is incemental and it's predecessors cannot be deleted. Consider FIND_FULL option.", target.Name)
+			tracelog.ErrorLogger.Fatalf("%v is incemental and it's predecessors cannot be deleted. Consider FIND_FULL option.", target.Name)
 		}
 	}
 	var garbage []BackupTime
@@ -104,7 +105,7 @@ func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dry
 	if backups == nil {
 		backups, garbage, err = getBackupsAndGarbage(folder)
 		if err != nil {
-			errorLogger.Fatal(err)
+			tracelog.ErrorLogger.Fatal(err)
 		}
 	}
 
@@ -112,12 +113,12 @@ func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dry
 
 	for _, backupTime := range garbage {
 		if strings.HasPrefix(backupTime.Name, backupNamePrefix) && backupTime.Name < target.Name {
-			infoLogger.Printf("%v will be deleted (garbage)\n", backupTime.Name)
+			tracelog.InfoLogger.Printf("%v will be deleted (garbage)\n", backupTime.Name)
 			if !dryRun {
 				dropBackup(folder, backupTime)
 			}
 		} else {
-			infoLogger.Printf("%v skipped (garbage)\n", backupTime.Name)
+			tracelog.InfoLogger.Printf("%v skipped (garbage)\n", backupTime.Name)
 		}
 	}
 
@@ -127,7 +128,7 @@ func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dry
 			deleteBackupsBefore(backups, skipLine, folder)
 		}
 	} else {
-		infoLogger.Printf("Dry run finished.\n")
+		tracelog.InfoLogger.Printf("Dry run finished.\n")
 	}
 }
 
@@ -138,12 +139,12 @@ func ComputeDeletionSkipline(backups []BackupTime, target *Backup) (skipLine int
 	walSkipFileName = ""
 	for i, backupTime := range backups {
 		if skip {
-			infoLogger.Printf("%v skipped\n", backupTime.Name)
+			tracelog.InfoLogger.Printf("%v skipped\n", backupTime.Name)
 			if walSkipFileName == "" || walSkipFileName > backupTime.WalFileName {
 				walSkipFileName = backupTime.WalFileName
 			}
 		} else {
-			infoLogger.Printf("%v will be deleted\n", backupTime.Name)
+			tracelog.InfoLogger.Printf("%v will be deleted\n", backupTime.Name)
 		}
 		if backupTime.Name == target.Name {
 			skip = false
@@ -167,7 +168,7 @@ func dropBackup(folder *S3Folder, backupTime BackupTime) {
 	backup := NewBackup(folder, backupTime.Name)
 	tarFiles, err := backup.GetKeys()
 	if err != nil {
-		errorLogger.Fatal("Unable to list backup for deletion ", backupTime.Name, err)
+		tracelog.ErrorLogger.Fatal("Unable to list backup for deletion ", backupTime.Name, err)
 	}
 
 	folderKey := strings.TrimPrefix(GetBackupPath(folder)+backupTime.Name, "/")
@@ -182,7 +183,7 @@ func dropBackup(folder *S3Folder, backupTime BackupTime) {
 		}}
 		_, err = folder.S3API.DeleteObjects(input)
 		if err != nil {
-			errorLogger.Fatal("Unable to delete backup ", backupTime.Name, err)
+			tracelog.ErrorLogger.Fatal("Unable to delete backup ", backupTime.Name, err)
 		}
 
 	}
@@ -201,7 +202,7 @@ func partitionToObjects(keys []string) []*s3.ObjectIdentifier {
 func deleteWALBefore(walSkipFileName string, folder *S3Folder) {
 	objects, err := getWals(walSkipFileName, folder)
 	if err != nil {
-		errorLogger.Fatal("Unable to obtaind WALS for border ", walSkipFileName, err)
+		tracelog.ErrorLogger.Fatal("Unable to obtaind WALS for border ", walSkipFileName, err)
 	}
 	parts := partitionObjects(objects, 1000)
 	for _, part := range parts {
@@ -210,7 +211,7 @@ func deleteWALBefore(walSkipFileName string, folder *S3Folder) {
 		}}
 		_, err = folder.S3API.DeleteObjects(input)
 		if err != nil {
-			errorLogger.Fatal("Unable to delete WALS before ", walSkipFileName, err)
+			tracelog.ErrorLogger.Fatal("Unable to delete WALS before ", walSkipFileName, err)
 		}
 	}
 }

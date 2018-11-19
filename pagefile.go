@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/tracelog"
 	"github.com/wal-g/wal-g/walparser"
 	"github.com/wal-g/wal-g/walparser/parsingutil"
 	"io"
@@ -50,7 +51,7 @@ func NewInvalidBlockError(blockNo uint32) InvalidBlockError {
 }
 
 func (err InvalidBlockError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type InvalidIncrementFileHeaderError struct {
@@ -62,7 +63,7 @@ func NewInvalidIncrementFileHeaderError() InvalidIncrementFileHeaderError {
 }
 
 func (err InvalidIncrementFileHeaderError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type UnknownIncrementFileHeaderError struct {
@@ -74,7 +75,7 @@ func NewUnknownIncrementFileHeaderError() UnknownIncrementFileHeaderError {
 }
 
 func (err UnknownIncrementFileHeaderError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type UnexpectedTarDataError struct {
@@ -86,7 +87,7 @@ func NewUnexpectedTarDataError() UnexpectedTarDataError {
 }
 
 func (err UnexpectedTarDataError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 var pagedFilenameRegexp *regexp.Regexp
@@ -133,7 +134,7 @@ func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitma
 
 // ApplyFileIncrement changes pages according to supplied change map file
 func ApplyFileIncrement(fileName string, increment io.Reader) error {
-	infoLogger.Printf("Incrementing %s\n", fileName)
+	tracelog.InfoLogger.Printf("Incrementing %s\n", fileName)
 	err := ReadIncrementFileHeader(increment)
 	if err != nil {
 		return err

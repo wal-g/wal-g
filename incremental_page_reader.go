@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"github.com/RoaringBitmap/roaring"
+	"github.com/wal-g/wal-g/tracelog"
 	"io"
 )
 
@@ -152,7 +153,7 @@ func (pageReader *IncrementalPageReader) SelectNewValidPage(pageBytes []byte, bl
 			isNew = true
 			valid = true
 		} else {
-			warningLogger.Println("Invalid page ", blockNo, " page header ", pageHeader)
+			tracelog.WarningLogger.Println("Invalid page ", blockNo, " page header ", pageHeader)
 			return false
 		}
 	}

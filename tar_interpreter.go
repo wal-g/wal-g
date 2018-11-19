@@ -3,6 +3,7 @@ package walg
 import (
 	"archive/tar"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/tracelog"
 	"io"
 	"os"
 	"path"
@@ -28,7 +29,7 @@ type FileTarInterpreter struct {
 // Returns the first error encountered. Calls fsync after each file
 // is written successfully.
 func (tarInterpreter *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
-	infoLogger.Println(cur.Name)
+	tracelog.InfoLogger.Println(cur.Name)
 	targetPath := path.Join(tarInterpreter.NewDir, cur.Name)
 	// this path is only used for increment restoration
 	incrementalPath := path.Join(tarInterpreter.IncrementalBaseDir, cur.Name)

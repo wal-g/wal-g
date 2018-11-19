@@ -4,6 +4,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
+	"github.com/wal-g/wal-g/tracelog"
 	"io"
 	"path"
 	"path/filepath"
@@ -59,7 +60,7 @@ func NewUploader(
 func (uploader *Uploader) finish() {
 	uploader.waitGroup.Wait()
 	if !uploader.Success {
-		errorLogger.Printf("WAL-G could not complete upload.\n")
+		tracelog.ErrorLogger.Printf("WAL-G could not complete upload.\n")
 	}
 }
 
@@ -120,7 +121,7 @@ func (uploader *Uploader) UploadFile(file NamedReader) error {
 	input := uploader.CreateUploadInput(dstPath, reader)
 
 	err := uploader.upload(input, file.Name())
-	infoLogger.Println("FILE PATH:", dstPath)
+	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
 	if uploader.verify {
 		sum := reader.(*MD5Reader).Sum()
 		archive := &Archive{
@@ -129,17 +130,17 @@ func (uploader *Uploader) UploadFile(file NamedReader) error {
 		}
 		eTag, err := archive.getETag()
 		if err != nil {
-			errorLogger.Panicf("Unable to verify file %s", err)
+			tracelog.ErrorLogger.Panicf("Unable to verify file %s", err)
 		}
 		if eTag == nil {
-			errorLogger.Panicf("Unable to verify file: nil ETag ")
+			tracelog.ErrorLogger.Panicf("Unable to verify file: nil ETag ")
 		}
 
 		trimETag := strings.Trim(*eTag, "\"")
 		if sum != trimETag {
-			errorLogger.Panicf("file verification failed: md5 %s ETag %s", sum, trimETag)
+			tracelog.ErrorLogger.Panicf("file verification failed: md5 %s ETag %s", sum, trimETag)
 		}
-		infoLogger.Println("ETag ", trimETag)
+		tracelog.InfoLogger.Println("ETag ", trimETag)
 	}
 	return err
 }
@@ -179,9 +180,9 @@ func (uploader *Uploader) upload(input *s3manager.UploadInput, path string) erro
 	}
 
 	if multierr, ok := err.(s3manager.MultiUploadFailure); ok {
-		errorLogger.Printf("upload: failed to upload '%s' with UploadID '%s'.", path, multierr.UploadID())
+		tracelog.ErrorLogger.Printf("upload: failed to upload '%s' with UploadID '%s'.", path, multierr.UploadID())
 	} else {
-		errorLogger.Printf("upload: failed to upload '%s': %s.", path, err.Error())
+		tracelog.ErrorLogger.Printf("upload: failed to upload '%s': %s.", path, err.Error())
 	}
 	return err
 }

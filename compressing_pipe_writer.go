@@ -3,6 +3,7 @@ package walg
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/tracelog"
 	"io"
 )
 
@@ -18,7 +19,7 @@ func NewCompressingPipeWriterError(reason string) CompressingPipeWriterError {
 }
 
 func (err CompressingPipeWriterError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 // CompressingPipeWriter allows for flexibility of using compressed output.

@@ -3,6 +3,7 @@ package walg
 import (
 	"archive/tar"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/tracelog"
 	"io"
 	"io/ioutil"
 	"os"
@@ -24,14 +25,14 @@ func HandleWALPrefetch(folder *S3Folder, walFileName string, location string, up
 	for i := 0; i < getMaxDownloadConcurrency(8); i++ {
 		fileName, err = GetNextWalFilename(fileName)
 		if err != nil {
-			errorLogger.Println("WAL-prefetch failed: ", err, " file: ", fileName)
+			tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err, " file: ", fileName)
 		}
 		waitGroup.Add(1)
 		go prefetchFile(location, folder, fileName, waitGroup)
 
 		prefaultStartLsn, shouldPrefault, timelineId, err := ShouldPrefault(fileName)
 		if err != nil {
-			errorLogger.Println("ShouldPrefault failed: ", err, " file: ", fileName)
+			tracelog.ErrorLogger.Println("ShouldPrefault failed: ", err, " file: ", fileName)
 		}
 		if shouldPrefault {
 			waitGroup.Add(1)
@@ -50,7 +51,7 @@ func HandleWALPrefetch(folder *S3Folder, walFileName string, location string, up
 func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.WaitGroup, uploader *Uploader) {
 	defer func() {
 		if r := recover(); r != nil {
-			errorLogger.Println("Prefault unsuccessful ", prefaultStartLsn)
+			tracelog.ErrorLogger.Println("Prefault unsuccessful ", prefaultStartLsn)
 		}
 		waitGroup.Done()
 	}()
@@ -66,17 +67,17 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 	bundle.Timeline = timelineId
 	err := bundle.DownloadDeltaMap(uploader.uploadingFolder, prefaultStartLsn+WalSegmentSize*WalFileInDelta)
 	if err != nil {
-		errorLogger.Printf("Error during loading delta map: '%+v'.", err)
+		tracelog.ErrorLogger.Printf("Error during loading delta map: '%+v'.", err)
 		return
 	}
 	bundle.TarBallMaker = NewNopTarBallMaker()
 
 	// Start a new tar bundle, walk the archiveDirectory and upload everything there.
 	bundle.StartQueue()
-	infoLogger.Println("Walking for prefault...")
+	tracelog.InfoLogger.Println("Walking for prefault...")
 	err = filepath.Walk(archiveDirectory, bundle.PrefaultWalkedFSObject)
 	if err != nil {
-		errorLogger.Fatalf("%+v\n", err)
+		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
 	err = bundle.FinishQueue()
 }
@@ -84,7 +85,7 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 func (bundle *Bundle) PrefaultWalkedFSObject(path string, info os.FileInfo, err error) error {
 	if err != nil {
 		if os.IsNotExist(err) {
-			warningLogger.Println(path, " deleted during filepath walk")
+			tracelog.WarningLogger.Println(path, " deleted during filepath walk")
 			return nil
 		}
 		return err
@@ -150,7 +151,7 @@ func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader
 			if err != nil {
 				return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
 			}
-			infoLogger.Println("Prefaulting ", path)
+			tracelog.InfoLogger.Println("Prefaulting ", path)
 			fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
 			if _, ok := err.(InvalidBlockError); ok {
 				return nil
@@ -174,7 +175,7 @@ func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader
 func prefetchFile(location string, folder *S3Folder, walFileName string, waitGroup *sync.WaitGroup) {
 	defer func() {
 		if r := recover(); r != nil {
-			errorLogger.Println("Prefetch unsuccessful ", walFileName, r)
+			tracelog.ErrorLogger.Println("Prefetch unsuccessful ", walFileName, r)
 		}
 		waitGroup.Done()
 	}()
@@ -188,12 +189,12 @@ func prefetchFile(location string, folder *S3Folder, walFileName string, waitGro
 		return
 	}
 
-	infoLogger.Println("WAL-prefetch file: ", walFileName)
+	tracelog.InfoLogger.Println("WAL-prefetch file: ", walFileName)
 	os.MkdirAll(runningLocation, 0755)
 
 	err := downloadWALFileTo(folder, walFileName, oldPath)
 	if err != nil {
-		errorLogger.Fatalf("%v+\n", err)
+		tracelog.ErrorLogger.Fatalf("%v+\n", err)
 	}
 
 	_, errO = os.Stat(oldPath)
@@ -225,6 +226,6 @@ func forkPrefetch(walFileName string, location string) {
 	err := cmd.Start()
 
 	if err != nil {
-		errorLogger.Println("WAL-prefetch failed: ", err)
+		tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err)
 	}
 }

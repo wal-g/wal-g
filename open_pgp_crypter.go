@@ -3,9 +3,10 @@ package walg
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"github.com/wal-g/wal-g/tracelog"
 	"golang.org/x/crypto/openpgp"
 	"io"
-	"fmt"
 )
 
 // CrypterUseMischiefError happens when crypter is used before initialization
@@ -18,7 +19,7 @@ func NewCrypterUseMischiefError() CrypterUseMischiefError {
 }
 
 func (err CrypterUseMischiefError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 // OpenPGPCrypter incapsulates specific of cypher method

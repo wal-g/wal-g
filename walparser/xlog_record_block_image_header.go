@@ -3,6 +3,7 @@ package walparser
 import (
 	"github.com/pkg/errors"
 	"fmt"
+	"github.com/wal-g/wal-g/tracelog"
 )
 
 const (
@@ -22,7 +23,7 @@ func NewInconsistentBlockImageHoleStateError(holeOffset uint16, holeLength uint1
 }
 
 func (err InconsistentBlockImageHoleStateError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type InconsistentBlockImageLengthError struct {
@@ -34,7 +35,7 @@ func NewInconsistentBlockImageLengthError(hasHole bool, isCompressed bool, lengt
 }
 
 func (err InconsistentBlockImageLengthError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type XLogRecordBlockImageHeader struct {

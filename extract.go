@@ -3,12 +3,13 @@ package walg
 import (
 	"archive/tar"
 	"context"
+	"fmt"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/tracelog"
 	"golang.org/x/sync/semaphore"
 	"io"
-	"sync"
 	"strings"
-	"fmt"
+	"sync"
 )
 
 type NoFilesToExtractError struct {
@@ -20,7 +21,7 @@ func NewNoFilesToExtractError() NoFilesToExtractError {
 }
 
 func (err NoFilesToExtractError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 // EmptyWriteIgnorer handles 0 byte write in LZ4 package
@@ -141,10 +142,10 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 		go func() {
 			err := DecryptAndDecompressTar(decompressingWriter, fileClosure, &crypter)
 			decompressingWriter.Close()
-			infoLogger.Printf("Finished decompression of %s", fileClosure.Path())
+			tracelog.InfoLogger.Printf("Finished decompression of %s", fileClosure.Path())
 			if err != nil {
 				inFailed.Store(fileClosure, true)
-				errorLogger.Println(err)
+				tracelog.ErrorLogger.Println(err)
 			}
 		}()
 		go func() {
@@ -152,10 +153,10 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 			err := extractOne(tarInterpreter, extractingReader)
 			err = errors.Wrapf(err, "Extraction error in %s", fileClosure.Path())
 			extractingReader.Close()
-			infoLogger.Printf("Finished extraction of %s", fileClosure.Path())
+			tracelog.InfoLogger.Printf("Finished extraction of %s", fileClosure.Path())
 			if err != nil {
 				inFailed.Store(fileClosure, true)
-				errorLogger.Println(err)
+				tracelog.ErrorLogger.Println(err)
 			}
 		}()
 	}

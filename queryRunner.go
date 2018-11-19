@@ -1,9 +1,10 @@
 package walg
 
 import (
+	"fmt"
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
-	"fmt"
+	"github.com/wal-g/wal-g/tracelog"
 )
 
 type NoPostgresVersionError struct {
@@ -15,7 +16,7 @@ func NewNoPostgresVersionError() NoPostgresVersionError {
 }
 
 func (err NoPostgresVersionError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 type UnsupportedPostgresVersionError struct {
@@ -27,7 +28,7 @@ func NewUnsupportedPostgresVersionError(version int) UnsupportedPostgresVersionE
 }
 
 func (err UnsupportedPostgresVersionError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 // The QueryRunner interface for controlling database during backup

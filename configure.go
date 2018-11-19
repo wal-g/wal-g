@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/tracelog"
 	"golang.org/x/time/rate"
 	"os"
 	"path/filepath"
@@ -33,7 +34,7 @@ func NewSseKmsIdNotSetError() SseKmsIdNotSetError {
 }
 
 func (err SseKmsIdNotSetError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 // MaxRetries limit upload and download retries during interaction with S3
@@ -214,7 +215,7 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err
 	deltaDataFolder, err = NewDiskDataFolder(dataFolderPath)
 	if err != nil {
 		useWalDelta = false
-		warningLogger.Printf("can't use wal delta feature because can't open delta data folder '%s'"+
+		tracelog.WarningLogger.Printf("can't use wal delta feature because can't open delta data folder '%s'"+
 			" due to error: '%v'\n", dataFolderPath, err)
 	}
 	return
@@ -244,6 +245,15 @@ func configureServerSideEncryption() (serverSideEncryption string, sseKmsKeyId s
 	return
 }
 
+// TODO : unit tests
+func configureLogging() error {
+	logLevel, ok := LookupConfigValue("WALG_LOG_LEVEL")
+	if ok {
+		return tracelog.UpdateLogLevel(logLevel)
+	}
+	return nil
+}
+
 // Configure connects to S3 and creates an uploader. It makes sure
 // that a valid session has started; if invalid, returns AWS error
 // and `<nil>` values.
@@ -253,6 +263,11 @@ func configureServerSideEncryption() (serverSideEncryption string, sseKmsKeyId s
 //
 // Able to configure the upload part size in the S3 uploader.
 func Configure(verifyUploads bool) (uploader *Uploader, destinationFolder *S3Folder, err error) {
+	err = configureLogging()
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to configure logging")
+	}
+
 	err = configureLimiters()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to configure limiters")

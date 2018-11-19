@@ -3,14 +3,15 @@ package walg
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/tracelog"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strings"
-	"fmt"
 )
 
 type GpgKeyExportError struct {
@@ -22,7 +23,7 @@ func NewGpgKeyExportError(text string) GpgKeyExportError {
 }
 
 func (err GpgKeyExportError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 // GetKeyRingId extracts name of a key to use from env variable

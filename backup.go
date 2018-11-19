@@ -2,12 +2,13 @@ package walg
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/tracelog"
 	"io/ioutil"
-	"fmt"
 )
 
 type NoBackupsFoundError struct {
@@ -19,7 +20,7 @@ func NewNoBackupsFoundError() NoBackupsFoundError {
 }
 
 func (err NoBackupsFoundError) Error() string {
-	return fmt.Sprintf("%+v", err.error)
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
 // Backup contains information about a valid backup
@@ -95,16 +96,16 @@ func (backup *Backup) fetchSentinel() (sentinelDto S3TarBallSentinelDto) {
 	backupReaderMaker := NewS3ReaderMaker(backup.Folder, backup.getStopSentinelPath())
 	backupReader, err := backupReaderMaker.Reader()
 	if err != nil {
-		errorLogger.Fatalf("%+v\n", err)
+		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
 	sentinelDtoData, err := ioutil.ReadAll(backupReader)
 	if err != nil {
-		errorLogger.Fatalf("%+v\n", err)
+		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
 
 	err = json.Unmarshal(sentinelDtoData, &sentinelDto)
 	if err != nil {
-		errorLogger.Fatalf("%+v\n", err)
+		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
 	return
 }
