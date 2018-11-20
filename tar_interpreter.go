@@ -39,7 +39,7 @@ func (tarInterpreter *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Heade
 
 		// If this file is incremental we use it's base version from incremental path
 		if haveFd && tarInterpreter.Sentinel.isIncremental() && fd.IsIncremented {
-			err := ApplyFileIncrement(incrementalPath, tr)
+			err := ApplyFileIncrement(incrementalPath, targetPath, tr)
 			if err != nil {
 				return errors.Wrap(err, "Interpret: failed to apply increment for "+targetPath)
 			}

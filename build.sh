@@ -22,4 +22,6 @@ make
 cp ./cmd/wal-g/wal-g ./docker/pg
 docker-compose build
 docker-compose up --exit-code-from pg
-./cleanup.sh
+rm -rf vendor/github.com/google/brotli/*
+mv .brotli.tmp/* vendor/github.com/google/brotli/
+rm -rf .brotli.tmp

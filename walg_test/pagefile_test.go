@@ -64,7 +64,7 @@ func postgresFileTest(loclLSN uint64, t *testing.T) {
 	tmpFile.WriteAt(make([]byte, 12345), 477421568-12345)
 	tmpFile.Close()
 	newReader := bytes.NewReader(buf)
-	err = walg.ApplyFileIncrement(tmpFileName, newReader)
+	err = walg.ApplyFileIncrement(tmpFileName, "", newReader)
 	assert.NoError(t, err)
 	_, err = newReader.Read(make([]byte, 1))
 	assert.Equalf(t, io.EOF, err, "Not read to the end")
