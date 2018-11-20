@@ -241,6 +241,14 @@ func unwrapBackup(backup *Backup, archiveDirectory string, sentinelDto S3TarBall
 		if err != nil {
 			tracelog.ErrorLogger.Fatal(err)
 		}
+		tracelog.DebugLogger.Println("Archive directory before increment:")
+		filepath.Walk(archiveDirectory,
+			func(path string, info os.FileInfo, err error) error {
+				if !info.IsDir() {
+					tracelog.DebugLogger.Println(path)
+				}
+			return nil
+		})
 
 		for _, f := range files {
 			objName := f.Name()
@@ -320,6 +328,14 @@ func unwrapBackup(backup *Backup, archiveDirectory string, sentinelDto S3TarBall
 		}
 	}
 
+	tracelog.DebugLogger.Println("Archive directory after unwrap:")
+	filepath.Walk(archiveDirectory,
+		func(path string, info os.FileInfo, err error) error {
+			if !info.IsDir() {
+				tracelog.DebugLogger.Println(path)
+			}
+			return nil
+		})
 	tracelog.InfoLogger.Print("\nBackup extraction complete.\n")
 }
 
