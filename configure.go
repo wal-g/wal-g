@@ -83,7 +83,7 @@ func Configure(verifyUploads bool) (uploader *Uploader, destinationFolder *S3Fol
 		return nil, nil, errors.Wrapf(err, "Configure: failed to parse url '%s'", waleS3Prefix)
 	}
 	if waleS3Url.Scheme == "" || waleS3Url.Host == "" {
-		return nil, nil, fmt.Errorf("missing url scheme=%q and/or host=%q", waleS3Url.Scheme, waleS3Url.Host)
+		return nil, nil, errors.Errorf("missing url scheme=%q and/or host=%q", waleS3Url.Scheme, waleS3Url.Host)
 	}
 
 	bucket := waleS3Url.Host

@@ -1,7 +1,6 @@
 package walg
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 )
@@ -30,6 +29,6 @@ func (cleaner FileSystemCleaner) GetFiles(directory string) (files []string, err
 func (cleaner FileSystemCleaner) Remove(file string) {
 	err := os.Remove(file)
 	if err != nil {
-		fmt.Printf("Tried to remove file: '%s', but got error: '%v'\n", file, err)
+		warningLogger.Printf("Tried to remove file: '%s', but got error: '%v'\n", file, err)
 	}
 }

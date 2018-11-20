@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"github.com/go-yaml/yaml"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -49,7 +48,7 @@ func verifyConfig() {
 	}
 	for k, _ := range *WalgConfig {
 		if _, ok := allowedConfigKeys[k]; !ok {
-			log.Panic("Settings " + k + " is unknown")
+			errorLogger.Panic("Settings " + k + " is unknown")
 		}
 	}
 }
@@ -63,11 +62,11 @@ func readConfig() {
 		if err == nil {
 			err = json.Unmarshal(file, &WalgConfig)
 			if err != nil {
-				log.Panic(err)
+				errorLogger.Panic(err)
 			}
 			return
 		} else if !os.IsNotExist(err) {
-			log.Panic(err)
+			errorLogger.Panic(err)
 		}
 
 		cacheFilename = filepath.Join(usr.HomeDir, ".walg.json")
@@ -76,11 +75,11 @@ func readConfig() {
 		if err == nil {
 			err := yaml.Unmarshal(file, &WalgConfig)
 			if err != nil {
-				log.Panic(err)
+				errorLogger.Panic(err)
 			}
 			return
 		} else if !os.IsNotExist(err) {
-			log.Panic(err)
+			errorLogger.Panic(err)
 		}
 	}
 }

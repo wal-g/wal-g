@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/walparser"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -194,7 +193,7 @@ func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
 	if bundle.Replica {
 		timeline, err := readTimeline(conn)
 		if err != nil {
-			log.Printf("Unbale to check timeline change. Sentinel for the backup will not be uploaded.")
+			errorLogger.Printf("Unable to check timeline change. Sentinel for the backup will not be uploaded.")
 			return true
 		}
 
@@ -202,7 +201,7 @@ func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
 		// https://www.postgresql.org/message-id/flat/BF2AD4A8-E7F5-486F-92C8-A6959040DEB6%40yandex-team.ru#BF2AD4A8-E7F5-486F-92C8-A6959040DEB6@yandex-team.ru
 		// Following check is the very pessimistic approach on replica backup invalidation
 		if timeline != bundle.Timeline {
-			log.Printf("Timeline has changed since backup start. Sentinel for the backup will not be uploaded.")
+			errorLogger.Printf("Timeline has changed since backup start. Sentinel for the backup will not be uploaded.")
 			return true
 		}
 	}
@@ -235,7 +234,7 @@ func (bundle *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName str
 	} else {
 		bundle.Timeline, err = readTimeline(conn)
 		if err != nil {
-			fmt.Printf("Couldn't get current timeline because of error: '%v'\n", err)
+			warningLogger.Printf("Couldn't get current timeline because of error: '%v'\n", err)
 		}
 	}
 	return "base_" + name, lsn, queryRunner.Version, nil
@@ -252,7 +251,7 @@ func (bundle *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName str
 func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err error) error {
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Println(path, " deleted during filepath walk")
+			warningLogger.Println(path, " deleted during filepath walk")
 			return nil
 		}
 		return errors.Wrap(err, "HandleWalkedFSObject: walk failed")
@@ -292,7 +291,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 	}
 
 	fileInfoHeader.Name = bundle.GetFileRelPath(path)
-	fmt.Println(fileInfoHeader.Name)
+	infoLogger.Println(fileInfoHeader.Name)
 
 	if !excluded && info.Mode().IsRegular() {
 		baseFiles := bundle.GetIncrementBaseFiles()
@@ -306,7 +305,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 
 		if wasInBase && (time.Equal(baseFile.MTime)) {
 			// File was not changed since previous backup
-			fmt.Println("Skiped due to unchanged modification time")
+			infoLogger.Println("Skiped due to unchanged modification time")
 			bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time})
 			return nil
 		}
@@ -360,7 +359,7 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 	}
 
 	fileInfoHeader.Name = bundle.GetFileRelPath(path)
-	fmt.Println(fileInfoHeader.Name)
+	infoLogger.Println(fileInfoHeader.Name)
 
 	err = tarWriter.WriteHeader(fileInfoHeader) // TODO : what happens in case of irregular pg_control?
 	if err != nil {
@@ -428,7 +427,7 @@ func (bundle *Bundle) UploadLabelFiles(conn *pgx.Conn) (uint64, error) {
 	if err != nil {
 		return 0, errors.Wrapf(err, "UploadLabelFiles: failed to put %s to tar", labelHeader.Name)
 	}
-	fmt.Println(labelHeader.Name)
+	infoLogger.Println(labelHeader.Name)
 
 	offsetMapHeader := &tar.Header{
 		Name:     "tablespace_map",
@@ -441,7 +440,7 @@ func (bundle *Bundle) UploadLabelFiles(conn *pgx.Conn) (uint64, error) {
 	if err != nil {
 		return 0, errors.Wrapf(err, "UploadLabelFiles: failed to put %s to tar", offsetMapHeader.Name)
 	}
-	fmt.Println(offsetMapHeader.Name)
+	infoLogger.Println(offsetMapHeader.Name)
 
 	err = tarBall.CloseTar()
 	if err != nil {
@@ -522,7 +521,7 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 				N: int64(fileInfoHeader.Size),
 			}, fileReader}
 		case InvalidBlockError: // fallback to full file backup
-			log.Printf("failed to read file '%s' as incremented\n", fileInfoHeader.Name)
+			warningLogger.Printf("failed to read file '%s' as incremented\n", fileInfoHeader.Name)
 			isIncremented = false
 			fileReader, err = startReadingFile(fileInfoHeader, info, path, fileReader)
 			if err != nil {

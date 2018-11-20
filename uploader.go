@@ -1,12 +1,10 @@
 package walg
 
 import (
-	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"io"
-	"log"
 	"path"
 	"path/filepath"
 	"strings"
@@ -61,7 +59,7 @@ func NewUploader(
 func (uploader *Uploader) finish() {
 	uploader.waitGroup.Wait()
 	if !uploader.Success {
-		log.Printf("WAL-G could not complete upload.\n")
+		errorLogger.Printf("WAL-G could not complete upload.\n")
 	}
 }
 
@@ -122,7 +120,7 @@ func (uploader *Uploader) UploadFile(file NamedReader) error {
 	input := uploader.CreateUploadInput(dstPath, reader)
 
 	err := uploader.upload(input, file.Name())
-	fmt.Println("FILE PATH:", dstPath)
+	infoLogger.Println("FILE PATH:", dstPath)
 	if uploader.verify {
 		sum := reader.(*MD5Reader).Sum()
 		archive := &Archive{
@@ -131,17 +129,17 @@ func (uploader *Uploader) UploadFile(file NamedReader) error {
 		}
 		eTag, err := archive.getETag()
 		if err != nil {
-			log.Panicf("Unable to verify file %s", err)
+			errorLogger.Panicf("Unable to verify file %s", err)
 		}
 		if eTag == nil {
-			log.Panicf("Unable to verify file: nil ETag ")
+			errorLogger.Panicf("Unable to verify file: nil ETag ")
 		}
 
 		trimETag := strings.Trim(*eTag, "\"")
 		if sum != trimETag {
-			log.Panicf("file verification failed: md5 %s ETag %s", sum, trimETag)
+			errorLogger.Panicf("file verification failed: md5 %s ETag %s", sum, trimETag)
 		}
-		fmt.Println("ETag ", trimETag)
+		infoLogger.Println("ETag ", trimETag)
 	}
 	return err
 }
@@ -181,9 +179,9 @@ func (uploader *Uploader) upload(input *s3manager.UploadInput, path string) erro
 	}
 
 	if multierr, ok := err.(s3manager.MultiUploadFailure); ok {
-		log.Printf("upload: failed to upload '%s' with UploadID '%s'.", path, multierr.UploadID())
+		errorLogger.Printf("upload: failed to upload '%s' with UploadID '%s'.", path, multierr.UploadID())
 	} else {
-		log.Printf("upload: failed to upload '%s': %s.", path, err.Error())
+		errorLogger.Printf("upload: failed to upload '%s': %s.", path, err.Error())
 	}
 	return err
 }

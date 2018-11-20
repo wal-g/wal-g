@@ -7,7 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
 	"io/ioutil"
-	"log"
 	"fmt"
 )
 
@@ -96,16 +95,16 @@ func (backup *Backup) fetchSentinel() (sentinelDto S3TarBallSentinelDto) {
 	backupReaderMaker := NewS3ReaderMaker(backup.Folder, backup.getStopSentinelPath())
 	backupReader, err := backupReaderMaker.Reader()
 	if err != nil {
-		log.Fatalf("%+v\n", err)
+		errorLogger.Fatalf("%+v\n", err)
 	}
 	sentinelDtoData, err := ioutil.ReadAll(backupReader)
 	if err != nil {
-		log.Fatalf("%+v\n", err)
+		errorLogger.Fatalf("%+v\n", err)
 	}
 
 	err = json.Unmarshal(sentinelDtoData, &sentinelDto)
 	if err != nil {
-		log.Fatalf("%+v\n", err)
+		errorLogger.Fatalf("%+v\n", err)
 	}
 	return
 }

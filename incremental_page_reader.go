@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"github.com/RoaringBitmap/roaring"
 	"io"
-	"log"
 )
 
 // "wi" at the head stands for "wal-g increment"
@@ -153,7 +152,7 @@ func (pageReader *IncrementalPageReader) SelectNewValidPage(pageBytes []byte, bl
 			isNew = true
 			valid = true
 		} else {
-			log.Println("Invalid page ", blockNo, " page header ", pageHeader)
+			warningLogger.Println("Invalid page ", blockNo, " page header ", pageHeader)
 			return false
 		}
 	}

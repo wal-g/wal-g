@@ -6,7 +6,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
 	"io"
-	"log"
 	"sync"
 	"strings"
 	"fmt"
@@ -142,10 +141,10 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 		go func() {
 			err := DecryptAndDecompressTar(decompressingWriter, fileClosure, &crypter)
 			decompressingWriter.Close()
-			log.Printf("Finished decompression of %s", fileClosure.Path())
+			infoLogger.Printf("Finished decompression of %s", fileClosure.Path())
 			if err != nil {
 				inFailed.Store(fileClosure, true)
-				log.Println(err)
+				errorLogger.Println(err)
 			}
 		}()
 		go func() {
@@ -153,10 +152,10 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 			err := extractOne(tarInterpreter, extractingReader)
 			err = errors.Wrapf(err, "Extraction error in %s", fileClosure.Path())
 			extractingReader.Close()
-			log.Printf("Finished extraction of %s", fileClosure.Path())
+			infoLogger.Printf("Finished extraction of %s", fileClosure.Path())
 			if err != nil {
 				inFailed.Store(fileClosure, true)
-				log.Println(err)
+				errorLogger.Println(err)
 			}
 		}()
 	}

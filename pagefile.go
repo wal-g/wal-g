@@ -133,7 +133,7 @@ func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitma
 
 // ApplyFileIncrement changes pages according to supplied change map file
 func ApplyFileIncrement(fileName string, increment io.Reader) error {
-	fmt.Printf("Incrementing %s\n", fileName)
+	infoLogger.Printf("Incrementing %s\n", fileName)
 	err := ReadIncrementFileHeader(increment)
 	if err != nil {
 		return err

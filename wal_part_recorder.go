@@ -69,6 +69,6 @@ func (recorder *WalPartRecorder) SaveNextWalHead(head []byte) error {
 }
 
 func (recorder *WalPartRecorder) cancelRecordingWithErr(err error) {
-	fmt.Printf("Stopped wal file: '%s' recording because of error: '%v'\n", recorder.walFilename, err)
+	warningLogger.Printf("Stopped wal file: '%s' recording because of error: '%v'\n", recorder.walFilename, err)
 	recorder.manager.CancelRecording(recorder.walFilename)
 }
