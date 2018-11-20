@@ -10,6 +10,12 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"time"
+)
+
+const (
+	MinExtractRetryWait = time.Minute
+	MaxExtractRetryWait = 5 * time.Minute
 )
 
 type NoFilesToExtractError struct {
@@ -110,6 +116,7 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 		return NewNoFilesToExtractError()
 	}
 
+	retrier := NewExponentialRetrier(MinExtractRetryWait, MaxExtractRetryWait)
 	// Set maximum number of goroutines spun off by ExtractAll
 	downloadingConcurrency := getMaxDownloadConcurrency(min(len(files), 10))
 	for currentRun := files; len(currentRun) > 0; {
@@ -122,6 +129,9 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 				strings.Join(ReaderMakersToFilePaths(failed), "\n"))
 		}
 		currentRun = failed
+		if len(failed) > 0 {
+			retrier.retry()
+		}
 	}
 	return nil
 }
