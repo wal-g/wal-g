@@ -48,6 +48,8 @@ func TestBackupErrors(t *testing.T) {
 		out[i] = s
 	}
 
+	walg.MinExtractRetryWait = time.Microsecond
+	walg.MaxExtractRetryWait = time.Microsecond
 	err = walg.ExtractAll(n, out)
 	assert.Errorf(t, err, "backup: expected error but got '<nil>'")
 }
