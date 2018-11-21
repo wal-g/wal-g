@@ -77,7 +77,7 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 	tracelog.InfoLogger.Println("Walking for prefault...")
 	err = filepath.Walk(archiveDirectory, bundle.PrefaultWalkedFSObject)
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
+		tracelog.ErrorLogger.FatalError(err)
 	}
 	err = bundle.FinishQueue()
 }
@@ -194,7 +194,7 @@ func prefetchFile(location string, folder *S3Folder, walFileName string, waitGro
 
 	err := downloadWALFileTo(folder, walFileName, oldPath)
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%v+\n", err)
+		tracelog.ErrorLogger.FatalError(err)
 	}
 
 	_, errO = os.Stat(oldPath)
