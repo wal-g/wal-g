@@ -28,6 +28,64 @@ type DeleteCommandArguments struct {
 	dryrun     bool
 }
 
+// TODO : unit tests
+// HandleDelete is invoked to perform wal-g delete
+func HandleDelete(folder *S3Folder, args []string) {
+	arguments := ParseDeleteArguments(args, printDeleteUsageAndFail)
+
+	if arguments.Before {
+		if arguments.BeforeTime == nil {
+			deleteBeforeTarget(NewBackup(folder, arguments.Target), arguments.FindFull, nil, arguments.dryrun)
+		} else {
+			backups, err := getBackups(folder)
+			if err != nil {
+				tracelog.ErrorLogger.FatalError(err)
+			}
+			for _, b := range backups {
+				if b.Time.Before(*arguments.BeforeTime) {
+					deleteBeforeTarget(NewBackup(folder, b.Name), arguments.FindFull, backups, arguments.dryrun)
+					return
+				}
+			}
+			tracelog.WarningLogger.Println("No backups before ", *arguments.BeforeTime)
+		}
+	}
+	if arguments.Retain {
+		backupCount, err := strconv.Atoi(arguments.Target)
+		if err != nil {
+			tracelog.ErrorLogger.Fatal("Unable to parse number of backups: ", err)
+		}
+		backups, err := getBackups(folder)
+		if err != nil {
+			tracelog.ErrorLogger.FatalError(err)
+		}
+		if arguments.Full {
+			if len(backups) <= backupCount {
+				tracelog.WarningLogger.Printf("Have only %v backups.\n", backupCount)
+			}
+			left := backupCount
+			for _, b := range backups {
+				if left == 1 {
+					deleteBeforeTarget(NewBackup(folder, b.Name), true, backups, arguments.dryrun)
+					return
+				}
+				backup := NewBackup(folder, b.Name)
+				dto := backup.fetchSentinel()
+				if !dto.isIncremental() {
+					left--
+				}
+			}
+			tracelog.WarningLogger.Printf("Scanned all backups but didn't have %v full.", backupCount)
+		} else {
+			if len(backups) <= backupCount {
+				tracelog.WarningLogger.Printf("Have only %v backups.\n", backupCount)
+			} else {
+				deleteBeforeTarget(NewBackup(folder, backups[backupCount-1].Name), arguments.FindFull, nil, arguments.dryrun)
+			}
+		}
+	}
+}
+
 // ParseDeleteArguments interprets arguments for delete command. TODO: use flags or cobra
 func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteCommandArguments) {
 	if len(args) < 3 {

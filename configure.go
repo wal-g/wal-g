@@ -23,6 +23,7 @@ import (
 const (
 	DefaultStreamingPartSizeFor10Concurrency = 20 << 20
 	DefaultDataBurstRateLimit                = 8 * int64(DatabasePageSize)
+	DefaultDataFolderPath                    = "/tmp"
 )
 
 type SseKmsIdNotSetError struct {
