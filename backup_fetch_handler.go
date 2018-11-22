@@ -53,7 +53,10 @@ func deltaFetchRecursion(backupName string, folder *S3Folder, archiveDirectory s
 
 		backup = NewBackup(folder, latest)
 	}
-	sentinelDto := backup.fetchSentinel()
+	sentinelDto, err := backup.fetchSentinel()
+	if err != nil {
+		tracelog.ErrorLogger.FatalError(err)
+	}
 
 	if sentinelDto.isIncremental() {
 		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n", *sentinelDto.IncrementFrom, *sentinelDto.IncrementFromLSN)

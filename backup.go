@@ -92,20 +92,17 @@ func (backup *Backup) GetKeys() ([]string, error) {
 	return result, nil
 }
 
-func (backup *Backup) fetchSentinel() (sentinelDto S3TarBallSentinelDto) {
+func (backup *Backup) fetchSentinel() (sentinelDto S3TarBallSentinelDto, err error) {
 	backupReaderMaker := NewS3ReaderMaker(backup.Folder, backup.getStopSentinelPath())
 	backupReader, err := backupReaderMaker.Reader()
 	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
+		return S3TarBallSentinelDto{}, err
 	}
 	sentinelDtoData, err := ioutil.ReadAll(backupReader)
 	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
+		return S3TarBallSentinelDto{}, err
 	}
 
 	err = json.Unmarshal(sentinelDtoData, &sentinelDto)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
 	return
 }
