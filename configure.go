@@ -217,6 +217,7 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err
 		useWalDelta = false
 		tracelog.WarningLogger.Printf("can't use wal delta feature because can't open delta data folder '%s'"+
 			" due to error: '%v'\n", dataFolderPath, err)
+		err = nil
 	}
 	return
 }
