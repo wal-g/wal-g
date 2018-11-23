@@ -1,20 +1,77 @@
 package walg
 
 import (
+	"fmt"
+	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/tracelog"
-	"io/ioutil"
 	"os"
-	"path"
-	"path/filepath"
-	"regexp"
 	"runtime/pprof"
 )
 
+const PgControlPath = "/global/pg_control"
+
+var UtilityFilePaths = map[string]bool {
+	PgControlPath: true,
+	BackupLabelFilename: true,
+	TablespaceMapFilename: true,
+}
+
+type BackupNonExistenceError struct {
+	error
+}
+
+func NewBackupNonExistenceError(backupName string) BackupNonExistenceError {
+	return BackupNonExistenceError{errors.Errorf("Backup '%s' does not exist.", backupName)}
+}
+
+func (err BackupNonExistenceError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
+type NoDescriptionError struct {
+	error
+}
+
+func NewNoDescriptionError(fileName string) NoDescriptionError {
+	return NoDescriptionError{errors.Errorf("Wanted to fetch increment for file: '%s', but didn't found one in base", fileName)}
+}
+
+func (err NoDescriptionError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
+type NonEmptyDbDataDirectoryError struct {
+	error
+}
+
+func NewNonEmptyDbDataDirectoryError(dbDataDirectory string) NonEmptyDbDataDirectoryError {
+	return NonEmptyDbDataDirectoryError{errors.Errorf("Directory %v for delta base must be empty", dbDataDirectory)}
+}
+
+func (err NonEmptyDbDataDirectoryError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
+type PgControlNotFoundError struct {
+	error
+}
+
+func NewPgControlNotFoundError() PgControlNotFoundError {
+	return PgControlNotFoundError{errors.Errorf("Expect pg_control archive, but not found")}
+}
+
+func (err PgControlNotFoundError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
 // TODO : unit tests
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
-func HandleBackupFetch(backupName string, folder *S3Folder, archiveDirectory string, mem bool) (lsn *uint64) {
-	archiveDirectory = ResolveSymlink(archiveDirectory)
-	lsn = deltaFetchRecursion(backupName, folder, archiveDirectory)
+func HandleBackupFetch(backupName string, folder *S3Folder, dbDataDirectory string, mem bool) {
+	dbDataDirectory = ResolveSymlink(dbDataDirectory)
+	err := deltaFetchRecursion(backupName, folder, dbDataDirectory, nil)
+	if err != nil {
+		tracelog.ErrorLogger.Fatalf("Failed to fetch backup: %v\n", err)
+	}
 
 	if mem {
 		memProfileLog, err := os.Create("mem.prof")
@@ -29,192 +86,87 @@ func HandleBackupFetch(backupName string, folder *S3Folder, archiveDirectory str
 }
 
 // TODO : unit tests
-// deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
-func deltaFetchRecursion(backupName string, folder *S3Folder, archiveDirectory string) (lsn *uint64) {
+func getBackupByName(backupName string, folder *S3Folder) (*Backup, error) {
 	var backup *Backup
-	// Check if backup exists and if it does extract to archiveDirectory.
-	if backupName != "LATEST" {
+	if backupName == "LATEST" {
+		latest, err := GetLatestBackupKey(folder)
+		if err != nil {
+			return nil, err
+		}
+
+		backup = NewBackup(folder, latest)
+
+	} else {
 		backup = NewBackup(folder, backupName)
 
 		exists, err := backup.CheckExistence()
 		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
+			return nil, err
 		}
 		if !exists {
-			tracelog.ErrorLogger.Fatalf("Backup '%s' does not exist.\n", backup.Name)
+			return nil, NewBackupNonExistenceError(backupName)
 		}
-
-		// Find the LATEST valid backup (checks against JSON file and grabs backup name) and extract to archiveDirectory.
-	} else {
-		latest, err := GetLatestBackupKey(folder)
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
-		}
-
-		backup = NewBackup(folder, latest)
 	}
-	sentinelDto, err := backup.fetchSentinel()
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
-
-	if sentinelDto.isIncremental() {
-		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n", *sentinelDto.IncrementFrom, *sentinelDto.IncrementFromLSN)
-		deltaFetchRecursion(*sentinelDto.IncrementFrom, folder, archiveDirectory)
-		tracelog.InfoLogger.Printf("%v fetched. Upgrading from LSN %x to LSN %x \n", *sentinelDto.IncrementFrom, *sentinelDto.IncrementFromLSN, sentinelDto.BackupStartLSN)
-	}
-
-	unwrapBackup(backup, archiveDirectory, sentinelDto)
-
-	lsn = sentinelDto.BackupStartLSN
-	return
+	return backup, nil
 }
 
 // TODO : unit tests
-func extractPgControl(folder *S3Folder, fileTarInterpreter *FileTarInterpreter, name string) error {
-	sentinel := make([]ReaderMaker, 1)
-	sentinel[0] = NewS3ReaderMaker(folder, name)
-
-	err := ExtractAll(fileTarInterpreter, sentinel)
+// deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
+func deltaFetchRecursion(backupName string, folder *S3Folder, dbDataDirectory string, filesToUnwrap map[string]bool) error {
+	backup, err := getBackupByName(backupName, folder)
+	if err != nil {
+		return err
+	}
+	sentinelDto, err := backup.fetchSentinel()
 	if err != nil {
 		return err
 	}
 
-	if serr, ok := err.(UnsupportedFileTypeError); ok {
-		return serr
+	if filesToUnwrap == nil { // it is the exact backup we want to fetch, so we want to include all files here
+		filesToUnwrap = getRestoredBackupFilesToUnwrap(sentinelDto)
 	}
-	return nil
+
+	if sentinelDto.isIncremental() {
+		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n", *(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN))
+		baseFilesToUnwrap, err := getBaseFilesToUnwrap(sentinelDto.Files, filesToUnwrap)
+		if err != nil {
+			return err
+		}
+		err = deltaFetchRecursion(*sentinelDto.IncrementFrom, folder, dbDataDirectory, baseFilesToUnwrap)
+		if err != nil {
+			return err
+		}
+		tracelog.InfoLogger.Printf("%v fetched. Upgrading from LSN %x to LSN %x \n", *(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN), *(sentinelDto.BackupStartLSN))
+	}
+
+	return backup.unwrap(dbDataDirectory, sentinelDto, filesToUnwrap)
 }
 
 // TODO : unit tests
-// Do the job of unpacking Backup object
-func unwrapBackup(backup *Backup, archiveDirectory string, sentinelDto S3TarBallSentinelDto) {
-
-	incrementBase := path.Join(archiveDirectory, "increment_base")
-	if !sentinelDto.isIncremental() {
-		var empty = true
-		searchLambda := func(path string, info os.FileInfo, err error) error {
-			if path != archiveDirectory {
-				empty = false
-			}
-			return nil
-		}
-		filepath.Walk(archiveDirectory, searchLambda)
-
-		if !empty {
-			tracelog.ErrorLogger.Fatalf("Directory %v for delta base must be empty", archiveDirectory)
-		}
-	} else {
-		defer func() {
-			err := os.RemoveAll(incrementBase)
-			if err != nil {
-				tracelog.ErrorLogger.FatalError(err)
-			}
-		}()
-
-		err := os.MkdirAll(incrementBase, os.FileMode(os.ModePerm))
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
-		}
-
-		files, err := ioutil.ReadDir(archiveDirectory)
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
-		}
-		tracelog.DebugLogger.Println("Archive directory before increment:")
-		filepath.Walk(archiveDirectory,
-			func(path string, info os.FileInfo, err error) error {
-				if !info.IsDir() {
-					tracelog.DebugLogger.Println(path)
-				}
-				return nil
-			})
-
-		for _, f := range files {
-			objName := f.Name()
-			if objName != "increment_base" {
-				err := os.Rename(path.Join(archiveDirectory, objName), path.Join(incrementBase, objName))
-				if err != nil {
-					tracelog.ErrorLogger.FatalError(err)
-				}
-			}
-		}
-
-		for fileName, fd := range sentinelDto.Files {
-			if !fd.IsSkipped {
-				continue
-			}
-			tracelog.InfoLogger.Printf("Skipped file %v\n", fileName)
-			targetPath := path.Join(archiveDirectory, fileName)
-			// this path is only used for increment restoration
-			incrementalPath := path.Join(incrementBase, fileName)
-			err = moveFileAndCreateDirs(incrementalPath, targetPath, fileName)
-			if err != nil {
-				tracelog.ErrorLogger.Fatal(err, "Failed to move skipped file for "+targetPath+" "+fileName)
-			}
-		}
-
+func getRestoredBackupFilesToUnwrap(sentinelDto S3TarBallSentinelDto) map[string]bool {
+	filesToUnwrap := make(map[string]bool)
+	for file := range sentinelDto.Files {
+		filesToUnwrap[file] = true
 	}
-
-	keys, err := backup.GetKeys()
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
+	for utilityFilePath := range UtilityFilePaths {
+		filesToUnwrap[utilityFilePath] = true
 	}
+	return filesToUnwrap
+}
 
-	fileTarInterpreter := &FileTarInterpreter{
-		NewDir:             archiveDirectory,
-		Sentinel:           sentinelDto,
-		IncrementalBaseDir: incrementBase,
-	}
-	out := make([]ReaderMaker, 0, len(keys))
-
-	var pgControlKey *string
-	pgControlRe := regexp.MustCompile(`^.*?/tar_partitions/pg_control\.tar(\..+$|$)`)
-	for _, key := range keys {
-		// Separate the pg_control key from the others to
-		// extract it at the end, as to prevent server startup
-		// with incomplete backup restoration.  But only if it
-		// exists: it won't in the case of WAL-E backup
-		// backwards compatibility.
-		if pgControlRe.MatchString(key) {
-			if pgControlKey != nil {
-				panic("expect only one pg_control key match")
+// TODO : unit tests
+func getBaseFilesToUnwrap(backupFileStates BackupFileList, currentFilesToUnwrap map[string]bool) (map[string]bool, error) {
+	baseFilesToUnwrap := make(map[string]bool)
+	for file := range currentFilesToUnwrap {
+		fileDescription, hasDescription := backupFileStates[file]
+		if !hasDescription {
+			if _, ok := UtilityFilePaths[file]; !ok {
+				return nil, NewNoDescriptionError(file)
 			}
-			pgControlKey = &key
-			continue
 		}
-		s := NewS3ReaderMaker(backup.Folder, key)
-		out = append(out, s)
-	}
-
-	// Extract all compressed tar members except `pg_control.tar.lz4` if WALG version backup.
-	err = ExtractAll(fileTarInterpreter, out)
-	if serr, ok := err.(UnsupportedFileTypeError); ok {
-		tracelog.ErrorLogger.FatalError(serr)
-	} else if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
-	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of backup.
-	re := regexp.MustCompile(`^([^_]+._{1}[^_]+._{1})`)
-	match := re.FindString(backup.Name)
-	if match == "" || sentinelDto.isIncremental() {
-		if pgControlKey == nil {
-			tracelog.ErrorLogger.Fatal("Expect pg_control archive, but not found")
-		}
-
-		err = extractPgControl(backup.Folder, fileTarInterpreter, *pgControlKey)
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
+		if fileDescription.IsSkipped || fileDescription.IsIncremented {
+			baseFilesToUnwrap[file] = true
 		}
 	}
-
-	tracelog.DebugLogger.Println("Archive directory after unwrap:")
-	filepath.Walk(archiveDirectory,
-		func(path string, info os.FileInfo, err error) error {
-			if !info.IsDir() {
-				tracelog.DebugLogger.Println(path)
-			}
-			return nil
-		})
-	tracelog.InfoLogger.Print("\nBackup extraction complete.\n")
+	return baseFilesToUnwrap, nil
 }

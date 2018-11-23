@@ -19,110 +19,84 @@ type TarInterpreter interface {
 
 // FileTarInterpreter extracts input to disk.
 type FileTarInterpreter struct {
-	NewDir             string
-	Sentinel           S3TarBallSentinelDto
-	IncrementalBaseDir string
+	DBDataDirectory string
+	Sentinel        S3TarBallSentinelDto
+	FilesToUnwrap   map[string]bool
+}
+
+func NewFileTarInterpreter(dbDataDirectory string, sentinel S3TarBallSentinelDto, filesToUnwrap map[string]bool) *FileTarInterpreter {
+	return &FileTarInterpreter{dbDataDirectory, sentinel, filesToUnwrap}
+}
+
+// TODO : unit tests
+func (tarInterpreter *FileTarInterpreter) unwrapRegularFile(fileReader io.Reader, fileInfo *tar.Header, targetPath string) error {
+	fileDescription, haveFileDescription := tarInterpreter.Sentinel.Files[fileInfo.Name]
+
+	// If this file is incremental we use it's base version from incremental path
+	if haveFileDescription && tarInterpreter.Sentinel.isIncremental() && fileDescription.IsIncremented {
+		err := ApplyFileIncrement(targetPath, fileReader)
+		return errors.Wrapf(err, "Interpret: failed to apply increment for '%s'", targetPath)
+	}
+	if _, ok := tarInterpreter.FilesToUnwrap[fileInfo.Name]; !ok {
+		// don't have to unwrap it this time
+		tracelog.DebugLogger.Printf("Don't have to unwrap '%s' this time\n", fileInfo.Name)
+		return nil
+	}
+	err := prepareDirs(fileInfo.Name, targetPath)
+	if err != nil {
+		return errors.Wrap(err, "Interpret: failed to create all directories")
+	}
+	file, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+	if os.IsExist(err) {
+		return errors.Wrap(err, "file have to not exist till this moment")
+	}
+	if err != nil {
+		return errors.Wrapf(err, "failed to create new file: '%s'", fileInfo.Name)
+	}
+
+	_, err = io.Copy(file, fileReader)
+	if err != nil {
+		return errors.Wrap(err, "Interpret: copy failed")
+	}
+
+	mode := os.FileMode(fileInfo.Mode)
+	if err = os.Chmod(file.Name(), mode); err != nil {
+		return errors.Wrap(err, "Interpret: chmod failed")
+	}
+
+	if err = file.Sync(); err != nil {
+		return errors.Wrap(err, "Interpret: fsync failed")
+	}
+	err = file.Close()
+	return errors.Wrapf(err, "Interpret: failed to close file %s", targetPath)
 }
 
 // TODO : unit tests
 // Interpret extracts a tar file to disk and creates needed directories.
 // Returns the first error encountered. Calls fsync after each file
 // is written successfully.
-func (tarInterpreter *FileTarInterpreter) Interpret(tr io.Reader, cur *tar.Header) error {
-	tracelog.InfoLogger.Println(cur.Name)
-	targetPath := path.Join(tarInterpreter.NewDir, cur.Name)
-	// this path is only used for increment restoration
-	incrementalPath := path.Join(tarInterpreter.IncrementalBaseDir, cur.Name)
-	switch cur.Typeflag {
+func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileInfo *tar.Header) error {
+	tracelog.DebugLogger.Println("Interpreting: ", fileInfo.Name)
+	targetPath := path.Join(tarInterpreter.DBDataDirectory, fileInfo.Name)
+	switch fileInfo.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
-		fd, haveFd := tarInterpreter.Sentinel.Files[cur.Name]
-
-		// If this file is incremental we use it's base version from incremental path
-		if haveFd && tarInterpreter.Sentinel.isIncremental() && fd.IsIncremented {
-			err := ApplyFileIncrement(incrementalPath, targetPath, tr)
-			if err != nil {
-				return errors.Wrap(err, "Interpret: failed to apply increment for "+targetPath)
-			}
-
-			err = moveFileAndCreateDirs(incrementalPath, targetPath, cur.Name)
-			if err != nil {
-				return errors.Wrap(err, "Interpret: failed to move increment for "+targetPath)
-			}
-		} else {
-
-			var f *os.File
-
-			f, err := os.Create(targetPath)
-			dne := os.IsNotExist(err)
-			if dne {
-				err := prepareDirs(cur.Name, targetPath)
-				if err != nil {
-					return errors.Wrap(err, "Interpret: failed to create all directories")
-				}
-
-				f, err = os.Create(targetPath)
-				if err != nil {
-					return errors.Wrapf(err, "Interpret: failed to create new file %s", targetPath)
-				}
-			}
-			if err != nil && !dne {
-				return errors.Wrapf(err, "Interpret: failed to create new file %s", targetPath)
-			}
-
-			_, err = io.Copy(f, tr)
-			if err != nil {
-				return errors.Wrap(err, "Interpret: copy failed")
-			}
-
-			mode := os.FileMode(cur.Mode)
-			if err = os.Chmod(f.Name(), mode); err != nil {
-				return errors.Wrap(err, "Interpret: chmod failed")
-			}
-
-			if err = f.Sync(); err != nil {
-				return errors.Wrap(err, "Interpret: fsync failed")
-			}
-
-			if err = f.Close(); err != nil {
-				return errors.Wrapf(err, "Interpret: failed to close file %s", targetPath)
-			}
-		}
+		return tarInterpreter.unwrapRegularFile(fileReader, fileInfo, targetPath)
 	case tar.TypeDir:
 		err := os.MkdirAll(targetPath, 0755)
 		if err != nil {
 			return errors.Wrapf(err, "Interpret: failed to create all directories in %s", targetPath)
 		}
-		if err = os.Chmod(targetPath, os.FileMode(cur.Mode)); err != nil {
+		if err = os.Chmod(targetPath, os.FileMode(fileInfo.Mode)); err != nil {
 			return errors.Wrap(err, "Interpret: chmod failed")
 		}
 	case tar.TypeLink:
-		if err := os.Link(cur.Name, targetPath); err != nil {
+		if err := os.Link(fileInfo.Name, targetPath); err != nil {
 			return errors.Wrapf(err, "Interpret: failed to create hardlink %s", targetPath)
 		}
 	case tar.TypeSymlink:
-		if err := os.Symlink(cur.Name, targetPath); err != nil {
+		if err := os.Symlink(fileInfo.Name, targetPath); err != nil {
 			return errors.Wrapf(err, "Interpret: failed to create symlink %s", targetPath)
 		}
-	}
-	return nil
-}
-
-// TODO : unit tests
-// moveFileAndCreateDirs moves file from incremental folder to target folder, creating necessary folders structure
-func moveFileAndCreateDirs(incrementalPath string, targetPath string, fileName string) (err error) {
-	err = os.Rename(incrementalPath, targetPath)
-	if os.IsNotExist(err) {
-		// this path is invoked if this is a first file in a dir
-		err := prepareDirs(fileName, targetPath)
-		if err != nil {
-			return errors.Wrap(err, "moveFileAndCreateDirs: failed to create all directories")
-		}
-		err = os.Rename(incrementalPath, targetPath)
-		if err != nil {
-			return errors.Wrap(err, "moveFileAndCreateDirs: failed to rename incremented file "+targetPath)
-		}
-	} else if err != nil {
-		return errors.Wrap(err, "moveFileAndCreateDirs: failed to rename incremented file "+targetPath)
 	}
 	return nil
 }

@@ -43,8 +43,8 @@ func (e EmptyWriteIgnorer) Write(p []byte) (int, error) {
 
 // TODO : unit tests
 // Extract exactly one tar bundle.
-func extractOne(tarInterpreter TarInterpreter, src io.Reader) error {
-	tarReader := tar.NewReader(src)
+func extractOne(tarInterpreter TarInterpreter, source io.Reader) error {
+	tarReader := tar.NewReader(source)
 
 	for {
 		header, err := tarReader.Next()
@@ -110,7 +110,7 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 // in its own goroutine and ExtractAll will wait for all goroutines to finish.
 // Returns the first error encountered.
 func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
-	if len(files) < 1 {
+	if len(files) == 0 {
 		return NewNoFilesToExtractError()
 	}
 
@@ -139,7 +139,7 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 	downloadingContext := context.TODO()
 	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
 	var crypter OpenPGPCrypter
-	inFailed := sync.Map{}
+	isFailed := sync.Map{}
 
 	for _, file := range files {
 		downloadingSemaphore.Acquire(downloadingContext, 1)
@@ -152,7 +152,7 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 			decompressingWriter.Close()
 			tracelog.InfoLogger.Printf("Finished decompression of %s", fileClosure.Path())
 			if err != nil {
-				inFailed.Store(fileClosure, true)
+				isFailed.Store(fileClosure, true)
 				tracelog.ErrorLogger.Println(err)
 			}
 		}()
@@ -163,14 +163,14 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 			extractingReader.Close()
 			tracelog.InfoLogger.Printf("Finished extraction of %s", fileClosure.Path())
 			if err != nil {
-				inFailed.Store(fileClosure, true)
+				isFailed.Store(fileClosure, true)
 				tracelog.ErrorLogger.Println(err)
 			}
 		}()
 	}
 
 	downloadingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency))
-	inFailed.Range(func(failedFile, _ interface{}) bool {
+	isFailed.Range(func(failedFile, _ interface{}) bool {
 		failed = append(failed, failedFile.(ReaderMaker))
 		return true
 	})

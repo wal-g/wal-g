@@ -162,7 +162,18 @@ func extract(t *testing.T, dir string) string {
 
 	outDir := filepath.Join(filepath.Dir(dir), "extracted")
 
-	ft := &walg.FileTarInterpreter{NewDir: outDir}
+	ft := walg.NewFileTarInterpreter(outDir, walg.S3TarBallSentinelDto{}, map[string]bool {
+		"/1": true,
+		"/2": true,
+		"/3": true,
+		"/4": true,
+		"/5": true,
+		"/backup_label": true,
+		"/global/bytes": true,
+		"/global/pg_control": true,
+		"/pg_notify/0000": true,
+		"/tablespace_map": true,
+	})
 	err = os.MkdirAll(outDir, 0766)
 	if err != nil {
 		t.Log(err)

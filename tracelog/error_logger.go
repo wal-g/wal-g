@@ -14,5 +14,5 @@ func NewErrorLogger(out io.Writer, prefix string) *errorLogger {
 }
 
 func (logger *errorLogger) FatalError(err error) {
-	logger.Fatal(GetErrorFormatter(), err)
+	logger.Fatalf(GetErrorFormatter(), err)
 }
