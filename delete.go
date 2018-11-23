@@ -97,7 +97,7 @@ func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dry
 		if findFull {
 			target.Name = *dto.IncrementFullName
 		} else {
-			tracelog.ErrorLogger.Fatalf("%v is incemental and it's predecessors cannot be deleted. Consider FIND_FULL option.", target.Name)
+			tracelog.ErrorLogger.Fatalf("%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option.", target.Name)
 		}
 	}
 	var garbage []BackupTime
@@ -105,7 +105,7 @@ func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dry
 	if backups == nil {
 		backups, garbage, err = getBackupsAndGarbage(folder)
 		if err != nil {
-			tracelog.ErrorLogger.Fatal(err)
+			tracelog.ErrorLogger.FatalError(err)
 		}
 	}
 

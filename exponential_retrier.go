@@ -3,7 +3,7 @@ package walg
 import "time"
 
 type ExponentialRetrier struct {
-	sleepDuration time.Duration
+	sleepDuration      time.Duration
 	sleepDurationBound time.Duration
 }
 

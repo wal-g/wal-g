@@ -8,15 +8,16 @@ import (
 	"io/ioutil"
 )
 
-var InfoLogger = log.New(os.Stderr, "INFO: ", log.LstdFlags|log.Lmicroseconds)
-var WarningLogger = log.New(os.Stderr, "WARNING: ", log.LstdFlags|log.Lmicroseconds)
-var ErrorLogger = log.New(os.Stderr, "ERROR: ", log.LstdFlags|log.Lmicroseconds)
-var DebugLogger = log.New(ioutil.Discard, "DEBUG: ", log.LstdFlags|log.Lmicroseconds)
-
 const (
 	NormalLogLevel = "NORMAL"
 	DevelLogLevel  = "DEVEL"
+	timeFlags = log.LstdFlags|log.Lmicroseconds 
 )
+
+var InfoLogger = NewErrorLogger(os.Stderr, "INFO: ")
+var WarningLogger = NewErrorLogger(os.Stderr, "WARNING: ")
+var ErrorLogger = NewErrorLogger(os.Stderr, "ERROR: ")
+var DebugLogger = NewErrorLogger(ioutil.Discard, "DEBUG: ")
 
 var LogLevels = []string{NormalLogLevel, DevelLogLevel}
 var logLevel = NormalLogLevel
@@ -27,9 +28,9 @@ var logLevelFormatters = map[string]string {
 
 func setupLoggers() {
 	if logLevel == NormalLogLevel {
-		DebugLogger = log.New(ioutil.Discard, "DEBUG: ", log.LstdFlags|log.Lmicroseconds)
+		DebugLogger = NewErrorLogger(ioutil.Discard, "DEBUG: ")
 	} else {
-		DebugLogger = log.New(os.Stderr, "DEBUG: ", log.LstdFlags|log.Lmicroseconds)
+		DebugLogger = NewErrorLogger(os.Stderr, "DEBUG: ")
 	}
 }
 

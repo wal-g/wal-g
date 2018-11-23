@@ -96,16 +96,16 @@ func (backup *Backup) fetchSentinel() (sentinelDto S3TarBallSentinelDto) {
 	backupReaderMaker := NewS3ReaderMaker(backup.Folder, backup.getStopSentinelPath())
 	backupReader, err := backupReaderMaker.Reader()
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
+		tracelog.ErrorLogger.FatalError(err)
 	}
 	sentinelDtoData, err := ioutil.ReadAll(backupReader)
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
+		tracelog.ErrorLogger.FatalError(err)
 	}
 
 	err = json.Unmarshal(sentinelDtoData, &sentinelDto)
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
+		tracelog.ErrorLogger.FatalError(err)
 	}
 	return
 }
