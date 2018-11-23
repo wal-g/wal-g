@@ -111,7 +111,7 @@ func BenchmarkExtractAll(b *testing.B) {
 	b.ResetTimer()
 
 	// f := &extract.FileTarInterpreter{
-	// 		NewDir: "",
+	// 		DBDataDirectory: "",
 	// 	}
 	// out[0] = f
 

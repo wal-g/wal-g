@@ -19,6 +19,8 @@ import (
 const (
 	DefaultTarSizeThreshold = int64((1 << 30) - 1)
 	PgControl               = "pg_control"
+	BackupLabelFilename     = "backup_label"
+	TablespaceMapFilename   = "tablespace_map"
 )
 
 type TarSizeError struct {
@@ -292,7 +294,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 	}
 
 	fileInfoHeader.Name = bundle.GetFileRelPath(path)
-	tracelog.InfoLogger.Println(fileInfoHeader.Name)
+	tracelog.DebugLogger.Println(fileInfoHeader.Name)
 
 	if !excluded && info.Mode().IsRegular() {
 		baseFiles := bundle.GetIncrementBaseFiles()
@@ -306,7 +308,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 
 		if wasInBase && (time.Equal(baseFile.MTime)) {
 			// File was not changed since previous backup
-			tracelog.InfoLogger.Println("Skiped due to unchanged modification time")
+			tracelog.DebugLogger.Println("Skiped due to unchanged modification time")
 			bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time})
 			return nil
 		}
@@ -418,7 +420,7 @@ func (bundle *Bundle) UploadLabelFiles(conn *pgx.Conn) (uint64, error) {
 	tarBall.SetUp(&bundle.Crypter)
 
 	labelHeader := &tar.Header{
-		Name:     "backup_label",
+		Name:     BackupLabelFilename,
 		Mode:     int64(0600),
 		Size:     int64(len(label)),
 		Typeflag: tar.TypeReg,
@@ -431,7 +433,7 @@ func (bundle *Bundle) UploadLabelFiles(conn *pgx.Conn) (uint64, error) {
 	tracelog.InfoLogger.Println(labelHeader.Name)
 
 	offsetMapHeader := &tar.Header{
-		Name:     "tablespace_map",
+		Name:     TablespaceMapFilename,
 		Mode:     int64(0600),
 		Size:     int64(len(offsetMap)),
 		Typeflag: tar.TypeReg,

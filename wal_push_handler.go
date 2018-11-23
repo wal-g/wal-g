@@ -15,7 +15,7 @@ type CantOverwriteWalFileError struct {
 }
 
 func NewCantOverwriteWalFileError(walFilePath string) CantOverwriteWalFileError {
-	return CantOverwriteWalFileError{errors.Errorf("WAL file '%s' already archived, contents differ, unable to overwrite\n", walFilePath)}
+	return CantOverwriteWalFileError{errors.Errorf("WAL file '%s' already archived, contents differ, unable to overwrite", walFilePath)}
 }
 
 func (err CantOverwriteWalFileError) Error() string {
