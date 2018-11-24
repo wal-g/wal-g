@@ -44,8 +44,8 @@ func IsAwsNotExist(err error) bool {
 	return false
 }
 
-// getETag acquires ETag of the object from S3
-func (archive *Archive) getETag() (*string, error) {
+// getETagAndReplicationStatue acquires ETag of the object from S3
+func (archive *Archive) getETagAndReplicationStatue() (eTag *string ,replicationStatus *string, err error) {
 	arch := &s3.HeadObjectInput{
 		Bucket: archive.Folder.Bucket,
 		Key:    archive.Archive,
@@ -53,10 +53,10 @@ func (archive *Archive) getETag() (*string, error) {
 
 	h, err := archive.Folder.S3API.HeadObject(arch)
 	if err != nil {
-		return nil, err
+		return nil, nil,  err
 	}
 
-	return h.ETag, nil
+	return h.ETag, h.ReplicationStatus, nil
 }
 
 // GetArchive downloads the specified archive from S3.

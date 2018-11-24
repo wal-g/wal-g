@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
+	"github.com/pkg/errors"
 )
 
 // Uploader contains fields associated with uploading tarballs.
@@ -123,12 +125,13 @@ func (uploader *Uploader) UploadFile(file NamedReader) error {
 	err := uploader.upload(input, file.Name())
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
 	if uploader.verify {
+		verifyStart := time.Now()
 		sum := reader.(*MD5Reader).Sum()
 		archive := &Archive{
 			Folder:  uploader.uploadingFolder,
 			Archive: aws.String(dstPath),
 		}
-		eTag, err := archive.getETag()
+		eTag, repStatus, err := archive.getETagAndReplicationStatue()
 		if err != nil {
 			tracelog.ErrorLogger.Panicf("Unable to verify file %s", err)
 		}
@@ -141,6 +144,22 @@ func (uploader *Uploader) UploadFile(file NamedReader) error {
 			tracelog.ErrorLogger.Panicf("file verification failed: md5 %s ETag %s", sum, trimETag)
 		}
 		tracelog.InfoLogger.Println("ETag ", trimETag)
+
+		for {
+			if repStatus!=nil && *repStatus == "COMPLETED" {
+				return nil
+			}
+
+			time.Sleep(time.Second * 3)
+			if time.Now().Sub(verifyStart) >= time.Minute {
+				tracelog.ErrorLogger.FatalError(errors.New("Awaiting replication status failed"))
+			}
+
+			_, repStatus, err = archive.getETagAndReplicationStatue()
+			if err != nil {
+				tracelog.ErrorLogger.Panicf("Unable to verify file %s", err)
+			}
+		}
 	}
 	return err
 }
