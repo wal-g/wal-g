@@ -37,13 +37,13 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	archiveDirectory = ResolveSymlink(archiveDirectory)
 	maxDeltas, fromFull := getDeltaConfig()
 
-	var previousBackupSentinelDto S3TarBallSentinelDto
+	var previousBackupSentinelDto BackupSentinelDto
 	var previousBackupName string
 	var err error
 	incrementCount := 1
 
 	if maxDeltas > 0 {
-		previousBackupName, err = GetLatestBackupKey(uploader.uploadingFolder)
+		previousBackupName, err = getLatestBackupKey(uploader.uploadingFolder)
 		if err != nil {
 			if _, ok := err.(NoBackupsFoundError); ok {
 				tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
@@ -62,7 +62,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 
 			if incrementCount > maxDeltas {
 				tracelog.InfoLogger.Println("Reached max delta steps. Doing full backup.")
-				previousBackupSentinelDto = S3TarBallSentinelDto{}
+				previousBackupSentinelDto = BackupSentinelDto{}
 			} else if previousBackupSentinelDto.BackupStartLSN == nil {
 				tracelog.InfoLogger.Println("LATEST backup was made without support for delta feature. Fallback to full backup with LSN marker for future deltas.")
 			} else {
@@ -96,7 +96,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 
 	if len(previousBackupName) > 0 && previousBackupSentinelDto.BackupStartLSN != nil {
 		if uploader.useWalDelta {
-			err = bundle.DownloadDeltaMap(uploader.uploadingFolder, backupStartLSN)
+			err = bundle.DownloadDeltaMap(uploader.uploadingFolder.GetSubFolder(WalPath), backupStartLSN)
 			if err == nil {
 				tracelog.InfoLogger.Println("Successfully loaded delta map, delta backup will be made with provided delta map")
 			} else {
@@ -106,7 +106,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 		backupName = backupName + "_D_" + stripWalFileName(previousBackupName)
 	}
 
-	bundle.TarBallMaker = NewS3TarBallMaker(backupName, uploader)
+	bundle.TarBallMaker = NewStorageTarBallMaker(backupName, uploader)
 
 	// Start a new tar bundle, walk the archiveDirectory and upload everything there.
 	bundle.StartQueue()
@@ -130,10 +130,10 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	}
 
 	timelineChanged := bundle.checkTimelineChanged(conn)
-	var currentBackupSentinelDto *S3TarBallSentinelDto
+	var currentBackupSentinelDto *BackupSentinelDto
 
 	if !timelineChanged {
-		currentBackupSentinelDto = &S3TarBallSentinelDto{
+		currentBackupSentinelDto = &BackupSentinelDto{
 			BackupStartLSN:   &backupStartLSN,
 			IncrementFromLSN: previousBackupSentinelDto.BackupStartLSN,
 			PgVersion:        pgVersion,

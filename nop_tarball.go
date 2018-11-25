@@ -14,7 +14,7 @@ type NOPTarBall struct {
 
 func (tarBall *NOPTarBall) SetUp(crypter Crypter, params ...string) {}
 func (tarBall *NOPTarBall) CloseTar() error                         { return nil }
-func (tarBall *NOPTarBall) Finish(sentinelDto *S3TarBallSentinelDto) error {
+func (tarBall *NOPTarBall) Finish(sentinelDto *BackupSentinelDto) error {
 	fmt.Printf("NOP: %d files.\n", tarBall.number)
 	return nil
 }

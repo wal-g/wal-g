@@ -460,7 +460,7 @@ func (bundle *Bundle) getDeltaBitmapFor(filePath string) (*roaring.Bitmap, error
 	return bundle.DeltaMap.GetDeltaBitmapFor(filePath)
 }
 
-func (bundle *Bundle) DownloadDeltaMap(folder *S3Folder, backupStartLSN uint64) error {
+func (bundle *Bundle) DownloadDeltaMap(folder StorageFolder, backupStartLSN uint64) error {
 	deltaMap := NewPagedFileDeltaMap()
 	logSegNo := logSegNoFromLsn(*bundle.IncrementFromLsn + 1)
 	logSegNo -= logSegNo % WalFileInDelta
@@ -556,6 +556,7 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 	return nil
 }
 
+// TODO : unit tests
 func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string, fileReader io.ReadCloser) (io.ReadCloser, error) {
 	fileInfoHeader.Size = info.Size()
 	file, err := os.Open(path)

@@ -26,7 +26,7 @@ func TestEmptyBundleQueue(t *testing.T) {
 
 	uploader := testtools.NewMockUploader(false, false)
 
-	bundle.TarBallMaker = walg.NewS3TarBallMaker("mockBackup", uploader)
+	bundle.TarBallMaker = walg.NewStorageTarBallMaker("mockBackup", uploader)
 
 	bundle.StartQueue()
 
@@ -62,7 +62,7 @@ func queueTest(t *testing.T) {
 		TarSizeThreshold: 100,
 	}
 	uploader := testtools.NewMockUploader(false, false)
-	bundle.TarBallMaker = walg.NewS3TarBallMaker("mockBackup", uploader)
+	bundle.TarBallMaker = walg.NewStorageTarBallMaker("mockBackup", uploader)
 
 	// For tests there must be at least 3 workers
 
@@ -113,16 +113,16 @@ func makeDeltaFile(locations []walparser.BlockLocation) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
-func putDeltaIntoStorage(storage *testtools.MockStorage, locations []walparser.BlockLocation, deltaFilename string) error {
+func putDeltaIntoStorage(storage *testtools.InMemoryStorage, locations []walparser.BlockLocation, deltaFilename string) error {
 	deltaData, err := makeDeltaFile(locations)
 	if err != nil {
 		return err
 	}
-	storage.Store("mock/mock/wal_005/"+deltaFilename+".lz4", *bytes.NewBuffer(deltaData))
+	storage.Store("in_memory/wal_005/"+deltaFilename+".lz4", *bytes.NewBuffer(deltaData))
 	return nil
 }
 
-func putWalIntoStorage(storage *testtools.MockStorage, data []byte, walFilename string) error {
+func putWalIntoStorage(storage *testtools.InMemoryStorage, data []byte, walFilename string) error {
 	compressor := walg.Compressors[walg.Lz4AlgorithmName]
 	var compressedData bytes.Buffer
 	compressingWriter := compressor.NewWriter(&compressedData)
@@ -134,11 +134,11 @@ func putWalIntoStorage(storage *testtools.MockStorage, data []byte, walFilename 
 	if err != nil {
 		return err
 	}
-	storage.Store("mock/mock/wal_005/"+walFilename+".lz4", compressedData)
+	storage.Store("in_memory/wal_005/"+walFilename+".lz4", compressedData)
 	return nil
 }
 
-func fillStorageWithMockDeltas(storage *testtools.MockStorage) error {
+func fillStorageWithMockDeltas(storage *testtools.InMemoryStorage) error {
 	err := putDeltaIntoStorage(
 		storage,
 		[]walparser.BlockLocation{
@@ -175,13 +175,13 @@ func fillStorageWithMockDeltas(storage *testtools.MockStorage) error {
 	return err
 }
 
-func setupFolderAndBundle() (folder *walg.S3Folder, bundle *walg.Bundle, err error) {
-	storage := testtools.NewMockStorage()
+func setupFolderAndBundle() (folder walg.StorageFolder, bundle *walg.Bundle, err error) {
+	storage := testtools.NewInMemoryStorage()
 	err = fillStorageWithMockDeltas(storage)
 	if err != nil {
 		return nil, nil, err
 	}
-	folder = walg.NewS3Folder(testtools.NewMockStoringS3Client(storage), "mock/", "mock", false)
+	folder = testtools.NewInMemoryStorageFolder("in_memory/", storage).GetSubFolder(walg.WalPath)
 	currentBackupFirstWalFilename := "000000010000000000000073"
 	timeLine, logSegNo, err := walg.ParseWALFilename(currentBackupFirstWalFilename)
 	if err != nil {

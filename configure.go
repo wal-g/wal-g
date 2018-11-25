@@ -162,8 +162,25 @@ func createS3Session(s3Bucket string) (*session.Session, error) {
 }
 
 // TODO : unit tests
+func configureS3Uploader(s3Client *s3.S3) (*S3Uploader, error) {
+	var concurrency = getMaxUploadConcurrency(10)
+	uploaderApi := CreateUploaderAPI(s3Client, DefaultStreamingPartSizeFor10Concurrency, concurrency)
+
+	serverSideEncryption, sseKmsKeyId, err := configureServerSideEncryption()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure server side encryption")
+	}
+
+	storageClass, ok := LookupConfigValue("WALG_S3_STORAGE_CLASS")
+	if !ok {
+		storageClass = "STANDARD"
+	}
+	return NewS3Uploader(uploaderApi, serverSideEncryption, sseKmsKeyId, storageClass), nil
+}
+
+// TODO : unit tests
 func configureS3Folder() (*S3Folder, error) {
-	s3Bucket, s3Server, err := getS3Path()
+	s3Bucket, s3Path, err := getS3Path()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure S3 path")
 	}
@@ -171,14 +188,12 @@ func configureS3Folder() (*S3Folder, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create new session")
 	}
-	preventWalOverwrite := false
-	if preventWalOverwriteStr := getSettingValue("WALG_PREVENT_WAL_OVERWRITE"); preventWalOverwriteStr != "" {
-		preventWalOverwrite, err = strconv.ParseBool(preventWalOverwriteStr)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to parse WALG_PREVENT_WAL_OVERWRITE")
-		}
+	s3Client := s3.New(sess)
+	s3Uploader, err := configureS3Uploader(s3Client)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure S3 uploader")
 	}
-	folder := NewS3Folder(s3.New(sess), s3Bucket, s3Server, preventWalOverwrite)
+	folder := NewS3Folder(*s3Uploader, s3Client, s3Bucket, s3Path)
 	return folder, nil
 }
 
@@ -264,7 +279,7 @@ func configureLogging() error {
 // WALE_S3_PREFIX
 //
 // Able to configure the upload part size in the S3 uploader.
-func Configure(verifyUploads bool) (uploader *Uploader, destinationFolder *S3Folder, err error) {
+func Configure() (uploader *Uploader, destinationFolder StorageFolder, err error) {
 	err = configureLogging()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to configure logging")
@@ -280,19 +295,6 @@ func Configure(verifyUploads bool) (uploader *Uploader, destinationFolder *S3Fol
 		return nil, nil, errors.Wrap(err, "failed to configure S3 folder")
 	}
 
-	var concurrency = getMaxUploadConcurrency(10)
-	uploaderApi := CreateUploaderAPI(folder.S3API, DefaultStreamingPartSizeFor10Concurrency, concurrency)
-
-	serverSideEncryption, sseKmsKeyId, err := configureServerSideEncryption()
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to configure server side encryption")
-	}
-
-	storageClass, ok := LookupConfigValue("WALG_S3_STORAGE_CLASS")
-	if !ok {
-		storageClass = "STANDARD"
-	}
-
 	compressor, err := configureCompressor()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to configure compression")
@@ -303,8 +305,15 @@ func Configure(verifyUploads bool) (uploader *Uploader, destinationFolder *S3Fol
 		return nil, nil, errors.Wrap(err, "failed to configure WAL Delta usage")
 	}
 
-	uploader = NewUploader(uploaderApi, serverSideEncryption, sseKmsKeyId, storageClass, compressor,
-		folder, deltaDataFolder, useWalDelta, verifyUploads)
+	preventWalOverwrite := false
+	if preventWalOverwriteStr := getSettingValue("WALG_PREVENT_WAL_OVERWRITE"); preventWalOverwriteStr != "" {
+		preventWalOverwrite, err = strconv.ParseBool(preventWalOverwriteStr)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "failed to parse WALG_PREVENT_WAL_OVERWRITE")
+		}
+	}
+
+	uploader = NewUploader(compressor, folder, deltaDataFolder, useWalDelta, preventWalOverwrite)
 
 	return uploader, folder, err
 }

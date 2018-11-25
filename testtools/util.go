@@ -8,43 +8,27 @@ import (
 	"testing"
 )
 
-func MakeDefaultUploader(
-	uploaderAPI s3manageriface.UploaderAPI,
-	compressor walg.Compressor,
-	uploadingLocation *walg.S3Folder,
-	deltaDataFolder walg.DataFolder,
-	useWalDelta bool,
-) *walg.Uploader {
-	return walg.NewUploader(uploaderAPI, "", "", "STANDARD", compressor,
-		uploadingLocation, deltaDataFolder, useWalDelta, false)
+func MakeDefaultUploader(uploaderAPI s3manageriface.UploaderAPI) *walg.S3Uploader {
+	return walg.NewS3Uploader(uploaderAPI, "", "", "STANDARD")
 }
 
 func NewMockUploader(apiMultiErr, apiErr bool) *walg.Uploader {
-	return MakeDefaultUploader(
-		NewMockS3Uploader(apiMultiErr, apiErr, nil),
+	s3Uploader := MakeDefaultUploader(NewMockS3Uploader(apiMultiErr, apiErr, nil))
+	return walg.NewUploader(
 		&MockCompressor{},
-		walg.NewS3Folder(NewMockS3Client(true, true), "bucket/", "server", false),
+		walg.NewS3Folder(*s3Uploader, NewMockS3Client(false, true), "bucket/", "server/"),
 		nil,
+		false,
 		false,
 	)
 }
 
-func NewStoringMockUploader(storage *MockStorage, deltaDataFolder walg.DataFolder) *walg.Uploader {
-	return MakeDefaultUploader(
-		NewMockS3Uploader(false, false, storage),
+func NewStoringMockUploader(storage *InMemoryStorage, deltaDataFolder walg.DataFolder) *walg.Uploader {
+	return walg.NewUploader(
 		&MockCompressor{},
-		walg.NewS3Folder(nil, "bucket/", "server", false),
+		NewInMemoryStorageFolder("in_memory/", storage),
 		deltaDataFolder,
 		true,
-	)
-}
-
-func NewStoringCompressingMockUploader(storage *MockStorage, deltaDataFolder walg.DataFolder) *walg.Uploader {
-	return MakeDefaultUploader(
-		NewMockS3Uploader(false, false, storage),
-		&walg.BrotliCompressor{},
-		walg.NewS3Folder(NewMockStoringS3Client(storage), "bucket/", "server", true),
-		deltaDataFolder,
 		true,
 	)
 }
@@ -56,14 +40,6 @@ func NewLz4CompressingPipeWriter(input io.Reader) *walg.CompressingPipeWriter {
 			return walg.NewLz4ReaderFromWriter(writer)
 		},
 	}
-}
-
-func NewMockS3Folder(s3ClientErr, s3ClientNotFound bool) *walg.S3Folder {
-	return walg.NewS3Folder(NewMockS3Client(s3ClientErr, s3ClientNotFound), "mock bucket", "mock server", false)
-}
-
-func NewStoringMockS3Folder(storage *MockStorage) *walg.S3Folder {
-	return walg.NewS3Folder(NewMockStoringS3Client(storage), "bucket/", "server", false)
 }
 
 type ReadWriteNopCloser struct {

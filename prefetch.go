@@ -17,7 +17,8 @@ import (
 
 // TODO : unit tests
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
-func HandleWALPrefetch(folder *S3Folder, walFileName string, location string, uploader *Uploader) {
+func HandleWALPrefetch(folder StorageFolder, walFileName string, location string, uploader *Uploader) {
+	folder = folder.GetSubFolder(WalPath)
 	var fileName = walFileName
 	var err error
 	location = path.Dir(location)
@@ -82,6 +83,7 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 	err = bundle.FinishQueue()
 }
 
+// TODO : unit tests
 func (bundle *Bundle) PrefaultWalkedFSObject(path string, info os.FileInfo, err error) error {
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -103,6 +105,7 @@ func (bundle *Bundle) PrefaultWalkedFSObject(path string, info os.FileInfo, err 
 	return nil
 }
 
+// TODO : unit tests
 func (bundle *Bundle) prefaultHandleTar(path string, info os.FileInfo) error {
 	fileName := info.Name()
 	_, excluded := ExcludedFilenames[fileName]
@@ -141,6 +144,7 @@ func (bundle *Bundle) prefaultHandleTar(path string, info os.FileInfo) error {
 	return nil
 }
 
+// TODO : unit tests
 func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader *tar.Header) error {
 	incrementBaseLsn := bundle.GetIncrementBaseLsn()
 	isIncremented := isPagedFile(info, path)
@@ -172,7 +176,7 @@ func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader
 }
 
 // TODO : unit tests
-func prefetchFile(location string, folder *S3Folder, walFileName string, waitGroup *sync.WaitGroup) {
+func prefetchFile(location string, folder StorageFolder, walFileName string, waitGroup *sync.WaitGroup) {
 	defer func() {
 		if r := recover(); r != nil {
 			tracelog.ErrorLogger.Println("Prefetch unsuccessful ", walFileName, r)

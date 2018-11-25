@@ -20,11 +20,11 @@ type TarInterpreter interface {
 // FileTarInterpreter extracts input to disk.
 type FileTarInterpreter struct {
 	DBDataDirectory string
-	Sentinel        S3TarBallSentinelDto
+	Sentinel        BackupSentinelDto
 	FilesToUnwrap   map[string]bool
 }
 
-func NewFileTarInterpreter(dbDataDirectory string, sentinel S3TarBallSentinelDto, filesToUnwrap map[string]bool) *FileTarInterpreter {
+func NewFileTarInterpreter(dbDataDirectory string, sentinel BackupSentinelDto, filesToUnwrap map[string]bool) *FileTarInterpreter {
 	return &FileTarInterpreter{dbDataDirectory, sentinel, filesToUnwrap}
 }
 

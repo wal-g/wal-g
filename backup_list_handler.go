@@ -10,7 +10,7 @@ import (
 
 // TODO : unit tests
 // HandleBackupList is invoked to perform wal-g backup-list
-func HandleBackupList(folder *S3Folder) {
+func HandleBackupList(folder StorageFolder) {
 	backups, err := getBackups(folder)
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
@@ -22,6 +22,6 @@ func HandleBackupList(folder *S3Folder) {
 
 	for i := len(backups) - 1; i >= 0; i-- {
 		b := backups[i]
-		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v", b.Name, b.Time.Format(time.RFC3339), b.WalFileName))
+		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v", b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName))
 	}
 }

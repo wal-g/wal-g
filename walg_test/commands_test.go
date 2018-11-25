@@ -76,11 +76,11 @@ func parseAndTestFail(command []string, arguments *walg.DeleteCommandArguments) 
 }
 
 func TestTryDownloadWALFile_Exist(t *testing.T) {
-	storage := testtools.NewMockStorage()
+	storage := testtools.NewInMemoryStorage()
 	expectedData := []byte("mock")
-	storage.Store("bucket/server/wal_005/00000001000000000000007C", *bytes.NewBuffer(expectedData))
-	folder := testtools.NewStoringMockS3Folder(storage)
-	archiveReader, exist, err := walg.TryDownloadWALFile(folder, "server/wal_005/00000001000000000000007C")
+	folder := testtools.NewInMemoryStorageFolder("in_memory/" + walg.WalPath, storage)
+	folder.PutObject("00000001000000000000007C", bytes.NewBuffer(expectedData))
+	archiveReader, exist, err := walg.TryDownloadWALFile(folder, "00000001000000000000007C")
 	assert.NoError(t, err)
 	assert.True(t, exist)
 	actualData, err := ioutil.ReadAll(archiveReader)
@@ -89,9 +89,9 @@ func TestTryDownloadWALFile_Exist(t *testing.T) {
 }
 
 func TestTryDownloadWALFile_NotExist(t *testing.T) {
-	storage := testtools.NewMockStorage()
-	folder := testtools.NewStoringMockS3Folder(storage)
-	reader, exist, err := walg.TryDownloadWALFile(folder, "server/wal_005/00000001000000000000007C")
+	storage := testtools.NewInMemoryStorage()
+	folder := testtools.NewInMemoryStorageFolder("", storage)
+	reader, exist, err := walg.TryDownloadWALFile(folder, "00000001000000000000007C")
 	assert.Nil(t, reader)
 	assert.False(t, exist)
 	assert.NoError(t, err)
