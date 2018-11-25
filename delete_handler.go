@@ -1,10 +1,9 @@
 package walg
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/wal-g/wal-g/tracelog"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -30,12 +29,14 @@ type DeleteCommandArguments struct {
 
 // TODO : unit tests
 // HandleDelete is invoked to perform wal-g delete
-func HandleDelete(folder *S3Folder, args []string) {
+func HandleDelete(folder StorageFolder, args []string) {
+	backupFolder := folder.GetSubFolder(BaseBackupPath)
+	walFolder := folder.GetSubFolder(WalPath)
 	arguments := ParseDeleteArguments(args, printDeleteUsageAndFail)
 
 	if arguments.Before {
 		if arguments.BeforeTime == nil {
-			deleteBeforeTarget(NewBackup(folder, arguments.Target), arguments.FindFull, nil, arguments.dryrun)
+			deleteBeforeTarget(walFolder, NewBackup(backupFolder, arguments.Target), arguments.FindFull, nil, arguments.dryrun)
 		} else {
 			backups, err := getBackups(folder)
 			if err != nil {
@@ -43,7 +44,7 @@ func HandleDelete(folder *S3Folder, args []string) {
 			}
 			for _, b := range backups {
 				if b.Time.Before(*arguments.BeforeTime) {
-					deleteBeforeTarget(NewBackup(folder, b.Name), arguments.FindFull, backups, arguments.dryrun)
+					deleteBeforeTarget(walFolder, NewBackup(backupFolder, b.BackupName), arguments.FindFull, backups, arguments.dryrun)
 					return
 				}
 			}
@@ -66,10 +67,10 @@ func HandleDelete(folder *S3Folder, args []string) {
 			left := backupCount
 			for _, b := range backups {
 				if left == 1 {
-					deleteBeforeTarget(NewBackup(folder, b.Name), true, backups, arguments.dryrun)
+					deleteBeforeTarget(walFolder, NewBackup(backupFolder, b.BackupName), true, backups, arguments.dryrun)
 					return
 				}
-				backup := NewBackup(folder, b.Name)
+				backup := NewBackup(folder, b.BackupName)
 				dto, err := backup.fetchSentinel()
 				if err != nil {
 					tracelog.ErrorLogger.FatalError(err)
@@ -83,7 +84,7 @@ func HandleDelete(folder *S3Folder, args []string) {
 			if len(backups) <= backupCount {
 				tracelog.WarningLogger.Printf("Have only %v backups.\n", backupCount)
 			} else {
-				deleteBeforeTarget(NewBackup(folder, backups[backupCount-1].Name), arguments.FindFull, nil, arguments.dryrun)
+				deleteBeforeTarget(walFolder, NewBackup(backupFolder, backups[backupCount-1].BackupName), arguments.FindFull, nil, arguments.dryrun)
 			}
 		}
 	}
@@ -151,8 +152,8 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 }
 
 // TODO : unit tests
-func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dryRun bool) {
-	folder := target.Folder
+func deleteBeforeTarget(walFolder StorageFolder, target *Backup, findFull bool, backups []BackupTime, dryRun bool) {
+	backupFolder := target.BaseBackupFolder
 	dto, err := target.fetchSentinel()
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
@@ -164,9 +165,9 @@ func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dry
 			tracelog.ErrorLogger.Fatalf("%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option.", target.Name)
 		}
 	}
-	var garbage []BackupTime
+	var garbage []string
 	if backups == nil {
-		backups, garbage, err = getBackupsAndGarbage(folder)
+		backups, garbage, err = getBackupsAndGarbage(backupFolder)
 		if err != nil {
 			tracelog.ErrorLogger.FatalError(err)
 		}
@@ -174,21 +175,21 @@ func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dry
 
 	skipLine, walSkipFileName := ComputeDeletionSkipline(backups, target)
 
-	for _, backupTime := range garbage {
-		if strings.HasPrefix(backupTime.Name, backupNamePrefix) && backupTime.Name < target.Name {
-			tracelog.InfoLogger.Printf("%v will be deleted (garbage)\n", backupTime.Name)
+	for _, garbageName := range garbage {
+		if strings.HasPrefix(garbageName, backupNamePrefix) && garbageName < target.Name {
+			tracelog.InfoLogger.Printf("%v will be deleted (garbage)\n", garbageName)
 			if !dryRun {
-				dropBackup(folder, backupTime)
+				dropBackup(backupFolder, garbageName)
 			}
 		} else {
-			tracelog.InfoLogger.Printf("%v skipped (garbage)\n", backupTime.Name)
+			tracelog.InfoLogger.Printf("%v skipped (garbage)\n", garbageName)
 		}
 	}
 
 	if !dryRun {
 		if skipLine < len(backups)-1 {
-			deleteWALBefore(walSkipFileName, folder)
-			deleteBackupsBefore(backups, skipLine, folder)
+			deleteWALBefore(walSkipFileName, walFolder)
+			deleteBackupsBefore(backups, skipLine, backupFolder)
 		}
 	} else {
 		tracelog.InfoLogger.Printf("Dry run finished.\n")
@@ -202,14 +203,14 @@ func ComputeDeletionSkipline(backups []BackupTime, target *Backup) (skipLine int
 	walSkipFileName = ""
 	for i, backupTime := range backups {
 		if skip {
-			tracelog.InfoLogger.Printf("%v skipped\n", backupTime.Name)
+			tracelog.InfoLogger.Printf("%v skipped\n", backupTime.BackupName)
 			if walSkipFileName == "" || walSkipFileName > backupTime.WalFileName {
 				walSkipFileName = backupTime.WalFileName
 			}
 		} else {
-			tracelog.InfoLogger.Printf("%v will be deleted\n", backupTime.Name)
+			tracelog.InfoLogger.Printf("%v will be deleted\n", backupTime.BackupName)
 		}
-		if backupTime.Name == target.Name {
+		if backupTime.BackupName == target.Name {
 			skip = false
 			skipLine = i
 		}
@@ -218,67 +219,126 @@ func ComputeDeletionSkipline(backups []BackupTime, target *Backup) (skipLine int
 }
 
 // TODO : unit tests
-func deleteBackupsBefore(backups []BackupTime, skipline int, folder *S3Folder) {
+func deleteBackupsBefore(backups []BackupTime, skipline int, folder StorageFolder) {
 	for i, b := range backups {
 		if i > skipline {
-			dropBackup(folder, b)
+			dropBackup(folder, b.BackupName)
 		}
 	}
 }
 
 // TODO : unit tests
-func dropBackup(folder *S3Folder, backupTime BackupTime) {
-	backup := NewBackup(folder, backupTime.Name)
-	tarFiles, err := backup.GetKeys()
+func dropBackup(folder StorageFolder, backupName string) {
+	backup := NewBackup(folder, backupName)
+	tarNames, err := backup.getTarNames()
 	if err != nil {
-		tracelog.ErrorLogger.Fatal("Unable to list backup for deletion ", backupTime.Name, err)
+		tracelog.ErrorLogger.FatalError(err)
 	}
+	sentinelName := backupName + SentinelSuffix
 
-	folderKey := strings.TrimPrefix(GetBackupPath(folder)+backupTime.Name, "/")
-	sentinelKey := folderKey + SentinelSuffix
-
-	keys := append(tarFiles, sentinelKey, folderKey)
-	parts := partition(keys, 1000)
-	for _, part := range parts {
-
-		input := &s3.DeleteObjectsInput{Bucket: folder.Bucket, Delete: &s3.Delete{
-			Objects: partitionToObjects(part),
-		}}
-		_, err = folder.S3API.DeleteObjects(input)
-		if err != nil {
-			tracelog.ErrorLogger.Fatal("Unable to delete backup ", backupTime.Name, err)
-		}
-
-	}
-}
-
-// TODO : unit tests
-func partitionToObjects(keys []string) []*s3.ObjectIdentifier {
-	objs := make([]*s3.ObjectIdentifier, len(keys))
-	for i, k := range keys {
-		objs[i] = &s3.ObjectIdentifier{Key: aws.String(k)}
-	}
-	return objs
-}
-
-// TODO : unit tests
-func deleteWALBefore(walSkipFileName string, folder *S3Folder) {
-	objects, err := getWals(walSkipFileName, folder)
+	toDelete := append(tarNames, sentinelName, backupName)
+	err = folder.DeleteObjects(toDelete)
 	if err != nil {
-		tracelog.ErrorLogger.Fatal("Unable to obtaind WALS for border ", walSkipFileName, err)
+		tracelog.ErrorLogger.Fatal("Unable to delete backup ", backupName, err)
 	}
-	parts := partitionObjects(objects, 1000)
-	for _, part := range parts {
-		input := &s3.DeleteObjectsInput{Bucket: folder.Bucket, Delete: &s3.Delete{
-			Objects: part,
-		}}
-		_, err = folder.S3API.DeleteObjects(input)
-		if err != nil {
-			tracelog.ErrorLogger.Fatal("Unable to delete WALS before ", walSkipFileName, err)
-		}
+}
+
+// TODO : unit tests
+func deleteWALBefore(walSkipFileName string, folder StorageFolder) {
+	wals, err := getWals(walSkipFileName, folder)
+	if err != nil {
+		tracelog.ErrorLogger.Fatal("Unable to obtain WALs for border ", walSkipFileName, err)
+	}
+	err = folder.DeleteObjects(wals)
+	if err != nil {
+		tracelog.ErrorLogger.Fatalf("Unable to delete WALs before '%s', because of: "+tracelog.GetErrorFormatter(), walSkipFileName, err)
 	}
 }
 
 func printDeleteUsageAndFail() {
 	log.Fatal(DeleteUsageText)
+}
+
+// TODO : unit tests
+// getWals returns all WAL file keys less then key provided
+func getWals(before string, folder StorageFolder) ([]string, error) {
+	walObjects, _, err := folder.ListFolder()
+	if err != nil {
+		return nil, err
+	}
+	walsBefore := make([]string, 0)
+	for _, walObject := range walObjects {
+		if walObject.GetAbsPath() < before {
+			walsBefore = append(walsBefore, walObject.GetAbsPath())
+		}
+	}
+
+	return walsBefore, nil
+}
+
+// TODO : unit tests
+func getLatestBackupKey(folder StorageFolder) (string, error) {
+	sortTimes, err := getBackups(folder)
+
+	if err != nil {
+		return "", err
+	}
+
+	return sortTimes[0].BackupName, nil
+}
+
+// TODO : unit tests
+// getBackups receives backup descriptions and sorts them by time
+func getBackups(folder StorageFolder) (backups []BackupTime, err error) {
+	backups, _, err = getBackupsAndGarbage(folder)
+
+	count := len(backups)
+	if count == 0 {
+		return nil, NewNoBackupsFoundError()
+	}
+	return
+}
+
+// TODO : unit tests
+func getBackupsAndGarbage(folder StorageFolder) (backups []BackupTime, garbage []string, err error) {
+	backupObjects, subFolders, err := folder.ListFolder()
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	sortTimes := getBackupTimeSlices(backupObjects)
+	garbage = getGarbageFromPrefix(subFolders, sortTimes)
+
+	return sortTimes, garbage, nil
+}
+
+// TODO : unit tests
+func getBackupTimeSlices(backups []StorageObject) []BackupTime {
+	sortTimes := make([]BackupTime, len(backups))
+	for i, object := range backups {
+		key := object.GetAbsPath()
+		time := object.GetLastModified()
+		sortTimes[i] = BackupTime{stripBackupName(key), time, stripWalFileName(key)}
+	}
+	slice := TimeSlice(sortTimes)
+	sort.Sort(slice)
+	return slice
+}
+
+// TODO : unit tests
+func getGarbageFromPrefix(folders []StorageFolder, nonGarbage []BackupTime) []string {
+	garbage := make([]string, 0)
+	var keyFilter = make(map[string]string)
+	for _, k := range nonGarbage {
+		keyFilter[k.BackupName] = k.BackupName
+	}
+	for _, folder := range folders {
+		backupName := stripPrefixName(folder.GetPath())
+		if _, ok := keyFilter[backupName]; ok {
+			continue
+		}
+		garbage = append(garbage, backupName)
+	}
+	return garbage
 }

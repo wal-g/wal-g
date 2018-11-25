@@ -85,7 +85,7 @@ func TestConfigureDeepBucket(t *testing.T) {
 func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer string) {
 	//Test empty environment variables
 	setEmpty(t)
-	uploader, folder, err := walg.Configure(false)
+	uploader, folder, err := walg.Configure()
 	if _, ok := (errors.Cause(err)).(walg.UnsetEnvVarError); !ok {
 		t.Errorf("upload: Expected error 'UnsetEnvVarError' but got %s", err)
 	}
@@ -99,24 +99,22 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	assert.NoError(t, err)
 	err = os.Setenv("AWS_REGION", "")
 	assert.NoError(t, err)
-	_, _, err = walg.Configure(false)
+	_, _, err = walg.Configure()
 	assert.NoError(t, err)
 	//Test invalid url
 	err = os.Setenv("WALE_S3_PREFIX", "test_fail:")
 	assert.NoError(t, err)
-	_, _, err = walg.Configure(false)
+	_, _, err = walg.Configure()
 	assert.Error(t, err)
 	//Test created uploader and prefix
 	err = os.Setenv("WALE_S3_PREFIX", bucketPath)
 	if err != nil {
 		t.Log(err)
 	}
-	uploader, folder, err = walg.Configure(false)
+	uploader, folder, err = walg.Configure()
 	assert.NoError(t, err)
-	assert.Equal(t, "bucket", *folder.Bucket)
-	assert.Equal(t, expectedServer, folder.Server)
+	assert.Equal(t, expectedServer, folder.GetPath())
 	assert.NotNil(t, uploader)
-	assert.Equal(t, "STANDARD", uploader.StorageClass)
 	assert.NoError(t, err)
 	//Test STANDARD_IA storage class
 	err = os.Setenv("WALG_S3_STORAGE_CLASS", "STANDARD_IA")
@@ -124,11 +122,10 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	if err != nil {
 		t.Log(err)
 	}
-	uploader, folder, err = walg.Configure(false)
+	_, _, err = walg.Configure()
 	if err != nil {
 		t.Log(err)
 	}
-	assert.Equal(t, "STANDARD_IA", uploader.StorageClass)
 }
 
 func TestValidUploader(t *testing.T) {
@@ -144,18 +141,18 @@ func TestValidUploader(t *testing.T) {
 func TestUploadError(t *testing.T) {
 	uploader := testtools.NewMockUploader(false, true)
 
-	maker := walg.NewS3TarBallMaker("test", uploader)
+	maker := walg.NewStorageTarBallMaker("test", uploader)
 
 	tarBall := maker.Make(true)
 	tarBall.SetUp(MockArmedCrypter())
 
-	tarBall.Finish(&walg.S3TarBallSentinelDto{})
+	tarBall.Finish(&walg.BackupSentinelDto{})
 	assert.False(t, uploader.Success)
 
 	uploader = testtools.NewMockUploader(true, false)
 
 	tarBall = maker.Make(true)
 	tarBall.SetUp(MockArmedCrypter())
-	tarBall.Finish(&walg.S3TarBallSentinelDto{})
+	tarBall.Finish(&walg.BackupSentinelDto{})
 	assert.False(t, uploader.Success)
 }

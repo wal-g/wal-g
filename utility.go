@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/wal-g/wal-g/tracelog"
 	"io"
 	"os"
@@ -16,8 +15,8 @@ import (
 
 const (
 	VersionStr       = "005"
-	BaseBackupsPath  = "/basebackups_" + VersionStr + "/"
-	WalPath          = "/wal_" + VersionStr + "/"
+	BaseBackupPath   = "basebackups_" + VersionStr + "/"
+	WalPath          = "wal_" + VersionStr + "/"
 	backupNamePrefix = "base_"
 
 	// SentinelSuffix is a suffix of backup finish sentinel file
@@ -63,29 +62,18 @@ func sanitizePath(path string) string {
 	return strings.TrimLeft(path, "/")
 }
 
-func partition(a []string, b int) [][]string {
-	c := make([][]string, 0)
-	for i := 0; i < len(a); i += b {
-		if i+b > len(a) {
-			c = append(c, a[i:])
-		} else {
-			c = append(c, a[i:i+b])
-		}
-	}
-	return c
-}
-
-func partitionObjects(a []*s3.ObjectIdentifier, b int) [][]*s3.ObjectIdentifier {
+// TODO : unit tests
+func partitionStrings(strings []string, blockSize int) [][]string {
 	// I've unsuccessfully tried this with interface{} but there was too much of casting
-	c := make([][]*s3.ObjectIdentifier, 0)
-	for i := 0; i < len(a); i += b {
-		if i+b > len(a) {
-			c = append(c, a[i:])
+	partition := make([][]string, 0)
+	for i := 0; i < len(strings); i += blockSize {
+		if i+blockSize > len(strings) {
+			partition = append(partition, strings[i:])
 		} else {
-			c = append(c, a[i:i+b])
+			partition = append(partition, strings[i:i+blockSize])
 		}
 	}
-	return c
+	return partition
 }
 
 // ResolveSymlink converts path to physical if it is symlink
@@ -132,6 +120,7 @@ func getMaxUploadDiskConcurrency() int {
 	return getMaxConcurrency("WALG_UPLOAD_DISK_CONCURRENCY", 1)
 }
 
+// TODO : unit tests
 func getMaxConcurrency(key string, defaultValue int) int {
 	var con int
 	var err error
@@ -152,6 +141,7 @@ func getMaxConcurrency(key string, defaultValue int) int {
 	return max(con, 1)
 }
 
+// TODO : unit tests
 func GetFileExtension(filePath string) string {
 	ext := path.Ext(filePath)
 	if ext != "" {
@@ -164,6 +154,7 @@ func GetFileRelativePath(fileAbsPath string, directoryPath string) string {
 	return strings.TrimPrefix(fileAbsPath, directoryPath)
 }
 
+// TODO : unit tests
 func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
 	n := int64(0)
 	buf := make([]byte, CompressedBlockMaxSize)
@@ -178,4 +169,31 @@ func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
 			return n, writingErr
 		}
 	}
+}
+
+// TODO : unit tests
+func stripBackupName(path string) string {
+	all := strings.SplitAfter(path, "/")
+	name := strings.Split(all[len(all)-1], "_backup")[0]
+	return name
+}
+
+// TODO : unit tests
+func stripPrefixName(path string) string {
+	path = strings.Trim(path, "/")
+	all := strings.SplitAfter(path, "/")
+	name := all[len(all)-1]
+	return name
+}
+
+// TODO : unit tests
+// Strips the backup WAL file name.
+func stripWalFileName(path string) string {
+	name := stripBackupName(path)
+	name = strings.SplitN(name, "_D_", 2)[0]
+
+	if strings.HasPrefix(name, backupNamePrefix) {
+		return name[len(backupNamePrefix):]
+	}
+	return ""
 }

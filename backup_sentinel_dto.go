@@ -2,8 +2,8 @@ package walg
 
 import "sync"
 
-// S3TarBallSentinelDto describes file structure of json sentinel
-type S3TarBallSentinelDto struct {
+// BackupSentinelDto describes file structure of json sentinel
+type BackupSentinelDto struct {
 	BackupStartLSN    *uint64 `json:"LSN"`
 	IncrementFromLSN  *uint64 `json:"DeltaFromLSN,omitempty"`
 	IncrementFrom     *string `json:"DeltaFrom,omitempty"`
@@ -18,7 +18,7 @@ type S3TarBallSentinelDto struct {
 	UserData interface{} `json:"UserData,omitempty"`
 }
 
-func (dto *S3TarBallSentinelDto) setFiles(p *sync.Map) {
+func (dto *BackupSentinelDto) setFiles(p *sync.Map) {
 	dto.Files = make(BackupFileList)
 	p.Range(func(k, v interface{}) bool {
 		key := k.(string)
@@ -31,11 +31,11 @@ func (dto *S3TarBallSentinelDto) setFiles(p *sync.Map) {
 // TODO : unit tests
 // TODO : get rid of panic here
 // isIncremental checks that sentinel represents delta backup
-func (dto *S3TarBallSentinelDto) isIncremental() bool {
+func (dto *BackupSentinelDto) isIncremental() bool {
 	// If we have increment base, we must have all the rest properties.
 	if dto.IncrementFrom != nil {
 		if dto.IncrementFromLSN == nil || dto.IncrementFullName == nil || dto.IncrementCount == nil {
-			panic("Inconsistent S3TarBallSentinelDto")
+			panic("Inconsistent BackupSentinelDto")
 		}
 	}
 	return dto.IncrementFrom != nil

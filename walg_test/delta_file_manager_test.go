@@ -247,12 +247,12 @@ func TestFlushDeltaFiles_CompleteFile(t *testing.T) {
 	deltaFile.Locations = append(deltaFile.Locations, TestLocation)
 	assert.NoError(t, err)
 	manager.DeltaFileWriters.Store(DeltaFilename, walg.NewDeltaFileChanWriter(deltaFile))
-	storage := testtools.NewMockStorage()
+	storage := testtools.NewInMemoryStorage()
 	manager.FlushDeltaFiles(testtools.NewStoringMockUploader(storage, nil), map[string]bool{
 		walg.ToPartFilename(DeltaFilename): true,
 	})
 
-	actualDeltaFileData, ok := storage.Load("bucket/server/wal_005/" + DeltaFilename + ".mock")
+	actualDeltaFileData, ok := storage.Load("in_memory/" + DeltaFilename + ".mock")
 	assert.True(t, ok)
 	actualDeltaFile, err := walg.LoadDeltaFile(&actualDeltaFileData)
 	assert.NoError(t, err)

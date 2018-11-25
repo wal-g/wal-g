@@ -162,7 +162,7 @@ func extract(t *testing.T, dir string) string {
 
 	outDir := filepath.Join(filepath.Dir(dir), "extracted")
 
-	ft := walg.NewFileTarInterpreter(outDir, walg.S3TarBallSentinelDto{}, map[string]bool {
+	ft := walg.NewFileTarInterpreter(outDir, walg.BackupSentinelDto{}, map[string]bool {
 		"/1": true,
 		"/2": true,
 		"/3": true,
@@ -357,7 +357,7 @@ func TestWalk(t *testing.T) {
 		t.Log(err)
 	}
 
-	err = bundle.TarBall.Finish(&walg.S3TarBallSentinelDto{})
+	err = bundle.TarBall.Finish(&walg.BackupSentinelDto{})
 	if err != nil {
 		t.Log(err)
 	}

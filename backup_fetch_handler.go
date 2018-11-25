@@ -10,9 +10,9 @@ import (
 
 const PgControlPath = "/global/pg_control"
 
-var UtilityFilePaths = map[string]bool {
-	PgControlPath: true,
-	BackupLabelFilename: true,
+var UtilityFilePaths = map[string]bool{
+	PgControlPath:         true,
+	BackupLabelFilename:   true,
 	TablespaceMapFilename: true,
 }
 
@@ -66,7 +66,8 @@ func (err PgControlNotFoundError) Error() string {
 
 // TODO : unit tests
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
-func HandleBackupFetch(backupName string, folder *S3Folder, dbDataDirectory string, mem bool) {
+func HandleBackupFetch(backupName string, folder StorageFolder, dbDataDirectory string, mem bool) {
+	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder, %s, %v)\n", backupName, dbDataDirectory, mem)
 	dbDataDirectory = ResolveSymlink(dbDataDirectory)
 	err := deltaFetchRecursion(backupName, folder, dbDataDirectory, nil)
 	if err != nil {
@@ -86,13 +87,14 @@ func HandleBackupFetch(backupName string, folder *S3Folder, dbDataDirectory stri
 }
 
 // TODO : unit tests
-func getBackupByName(backupName string, folder *S3Folder) (*Backup, error) {
+func getBackupByName(backupName string, folder StorageFolder) (*Backup, error) {
 	var backup *Backup
 	if backupName == "LATEST" {
-		latest, err := GetLatestBackupKey(folder)
+		latest, err := getLatestBackupKey(folder)
 		if err != nil {
 			return nil, err
 		}
+		tracelog.InfoLogger.Printf("LATEST backup is: '%s'\n", latest)
 
 		backup = NewBackup(folder, latest)
 
@@ -112,7 +114,7 @@ func getBackupByName(backupName string, folder *S3Folder) (*Backup, error) {
 
 // TODO : unit tests
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
-func deltaFetchRecursion(backupName string, folder *S3Folder, dbDataDirectory string, filesToUnwrap map[string]bool) error {
+func deltaFetchRecursion(backupName string, folder StorageFolder, dbDataDirectory string, filesToUnwrap map[string]bool) error {
 	backup, err := getBackupByName(backupName, folder)
 	if err != nil {
 		return err
@@ -143,7 +145,7 @@ func deltaFetchRecursion(backupName string, folder *S3Folder, dbDataDirectory st
 }
 
 // TODO : unit tests
-func getRestoredBackupFilesToUnwrap(sentinelDto S3TarBallSentinelDto) map[string]bool {
+func getRestoredBackupFilesToUnwrap(sentinelDto BackupSentinelDto) map[string]bool {
 	filesToUnwrap := make(map[string]bool)
 	for file := range sentinelDto.Files {
 		filesToUnwrap[file] = true

@@ -19,7 +19,7 @@ func TestS3TarBall(t *testing.T) {
 		TarSizeThreshold: int64(10),
 	}
 
-	bundle.TarBallMaker = walg.NewS3TarBallMaker("test", testtools.NewMockUploader(false, false))
+	bundle.TarBallMaker = walg.NewStorageTarBallMaker("test", testtools.NewMockUploader(false, false))
 
 	bundle.NewTarBall(false)
 
@@ -34,7 +34,7 @@ func TestS3TarBall(t *testing.T) {
 	//assert.Equal(t, bundle.TarBall, tarBall)
 }
 
-// Tests S3 dependent functions for S3TarBall such as
+// Tests S3 dependent functions for StorageTarBall such as
 // SetUp(), CloseTar() and Finish().
 func TestS3DependentFunctions(t *testing.T) {
 	bundle := &walg.Bundle{
@@ -44,7 +44,7 @@ func TestS3DependentFunctions(t *testing.T) {
 
 	uploader := testtools.NewMockUploader(false, false)
 
-	bundle.TarBallMaker = walg.NewS3TarBallMaker("mockBackup", uploader)
+	bundle.TarBallMaker = walg.NewStorageTarBallMaker("mockBackup", uploader)
 
 	bundle.NewTarBall(false)
 	tarBall := bundle.TarBall
@@ -73,7 +73,7 @@ func TestS3DependentFunctions(t *testing.T) {
 	_, err = tarBall.TarWriter().Write(mockData)
 	assert.Error(t, err)
 
-	err = tarBall.Finish(&walg.S3TarBallSentinelDto{})
+	err = tarBall.Finish(&walg.BackupSentinelDto{})
 	assert.NoError(t, err)
 
 	// Test naming property of SetUp().
@@ -81,7 +81,7 @@ func TestS3DependentFunctions(t *testing.T) {
 	tarBall = bundle.TarBall
 	tarBall.SetUp(MockArmedCrypter(), "mockTarball")
 	tarBall.CloseTar()
-	err = tarBall.Finish(&walg.S3TarBallSentinelDto{})
+	err = tarBall.Finish(&walg.BackupSentinelDto{})
 	assert.NoError(t, err)
 }
 

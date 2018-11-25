@@ -3,7 +3,6 @@ package walg
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/tracelog"
 	"io"
@@ -38,7 +37,9 @@ func (err ArchiveNonExistenceError) Error() string {
 
 // TODO : unit tests
 // HandleWALFetch is invoked to performa wal-g wal-fetch
-func HandleWALFetch(folder *S3Folder, walFileName string, location string, triggerPrefetch bool) {
+func HandleWALFetch(folder StorageFolder, walFileName string, location string, triggerPrefetch bool) {
+	tracelog.DebugLogger.Printf("HandleWALFetch(folder, %s, %s, %v)\n", walFileName, location, triggerPrefetch)
+	folder = folder.GetSubFolder(WalPath)
 	location = ResolveSymlink(location)
 	if triggerPrefetch {
 		defer forkPrefetch(walFileName, location)
@@ -113,18 +114,14 @@ func checkWALFileMagic(prefetched string) error {
 	return nil
 }
 
-func TryDownloadWALFile(folder *S3Folder, walPath string) (archiveReader io.ReadCloser, exists bool, err error) {
-	archive := &Archive{
-		Folder:  folder,
-		Archive: aws.String(sanitizePath(walPath)),
-	}
-	archiveReader, err = archive.GetArchive()
-	if err != nil {
-		if IsAwsNotExist(errors.Cause(err)) {
-			err = nil
-		}
-	} else {
+func TryDownloadWALFile(folder StorageFolder, walPath string) (walFileReader io.ReadCloser, exists bool, err error) {
+	walFileReader, err = folder.ReadObject(walPath)
+	if err == nil {
 		exists = true
+		return
+	}
+	if _, ok := errors.Cause(err).(ObjectNotFoundError); ok {
+		err = nil
 	}
 	return
 }
@@ -145,9 +142,9 @@ func decompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor 
 }
 
 // TODO : unit tests
-func downloadAndDecompressWALFile(folder *S3Folder, walFileName string) (io.ReadCloser, error) {
+func downloadAndDecompressWALFile(folder StorageFolder, walFileName string) (io.ReadCloser, error) {
 	for _, decompressor := range Decompressors {
-		archiveReader, exists, err := TryDownloadWALFile(folder, folder.Server+WalPath+walFileName+"."+decompressor.FileExtension())
+		archiveReader, exists, err := TryDownloadWALFile(folder, walFileName+"."+decompressor.FileExtension())
 		if err != nil {
 			return nil, err
 		}
@@ -166,7 +163,7 @@ func downloadAndDecompressWALFile(folder *S3Folder, walFileName string) (io.Read
 
 // TODO : unit tests
 // downloadWALFileTo downloads a file and writes it to local file
-func downloadWALFileTo(folder *S3Folder, walFileName string, dstPath string) error {
+func downloadWALFileTo(folder StorageFolder, walFileName string, dstPath string) error {
 	reader, err := downloadAndDecompressWALFile(folder, walFileName)
 	if err != nil {
 		return err

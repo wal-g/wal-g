@@ -5,7 +5,7 @@ import "time"
 // BackupTime is used to sort backups by
 // latest modified time.
 type BackupTime struct {
-	Name        string
+	BackupName  string
 	Time        time.Time
 	WalFileName string
 }

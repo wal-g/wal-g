@@ -68,7 +68,7 @@ func (tarBall *FileTarBall) CloseTar() error {
 }
 
 // Finish alerts that compression is complete.
-func (tarBall *FileTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error {
+func (tarBall *FileTarBall) Finish(sentinelDto *walg.BackupSentinelDto) error {
 	fmt.Printf("Wrote %d compressed tar files to %s.\n", tarBall.number, tarBall.out)
 	return nil
 }
@@ -95,7 +95,7 @@ func (tarBall *BufferTarBall) CloseTar() error {
 	return tarBall.tarWriter.Close()
 }
 
-func (tarBall *BufferTarBall) Finish(sentinelDto *walg.S3TarBallSentinelDto) error {
+func (tarBall *BufferTarBall) Finish(sentinelDto *walg.BackupSentinelDto) error {
 	return nil
 }
 

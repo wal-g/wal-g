@@ -25,6 +25,7 @@ func (err CantOverwriteWalFileError) Error() string {
 // TODO : unit tests
 // HandleWALPush is invoked to perform wal-g wal-push
 func HandleWALPush(uploader *Uploader, walFilePath string) {
+	uploader.uploadingFolder = uploader.uploadingFolder.GetSubFolder(WalPath)
 	bgUploader := NewBgUploader(walFilePath, int32(getMaxUploadConcurrency(16)-1), uploader)
 	// Look for new WALs while doing main upload
 	bgUploader.Start()
@@ -42,7 +43,7 @@ func HandleWALPush(uploader *Uploader, walFilePath string) {
 // TODO : unit tests
 // uploadWALFile from FS to the cloud
 func uploadWALFile(uploader *Uploader, walFilePath string) error {
-	if uploader.uploadingFolder.preventWalOverwrite {
+	if uploader.preventWalOverwrite {
 		overwriteAttempt, err := checkWALOverwrite(uploader, walFilePath)
 		if err != nil {
 			return errors.Wrap(err, "Couldn't check whether there is an overwrite attempt due to inner error")
@@ -58,8 +59,9 @@ func uploadWALFile(uploader *Uploader, walFilePath string) error {
 	return errors.Wrapf(err, "upload: could not upload '%s'\n", walFilePath)
 }
 
+// TODO : unit tests
 func checkWALOverwrite(uploader *Uploader, walFilePath string) (overwriteAttempt bool, err error) {
-	walFileReader, err := downloadAndDecompressWALFile(uploader.uploadingFolder, uploader.uploadingFolder.Server+WalPath+filepath.Base(walFilePath)+"."+uploader.compressor.FileExtension())
+	walFileReader, err := downloadAndDecompressWALFile(uploader.uploadingFolder, filepath.Base(walFilePath)+"."+uploader.compressor.FileExtension())
 	if err != nil {
 		if _, ok := err.(ArchiveNonExistenceError); ok {
 			err = nil
