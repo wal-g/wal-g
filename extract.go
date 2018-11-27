@@ -13,10 +13,8 @@ import (
 	"time"
 )
 
-const (
-	MinExtractRetryWait = time.Minute
-	MaxExtractRetryWait = 5 * time.Minute
-)
+var MinExtractRetryWait = time.Minute
+var MaxExtractRetryWait = 5 * time.Minute
 
 type NoFilesToExtractError struct {
 	error
