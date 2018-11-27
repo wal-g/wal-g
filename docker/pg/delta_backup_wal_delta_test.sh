@@ -11,7 +11,8 @@ pgbench -i -s 30 postgres
 wal-g backup-push $PGDATA
 pgbench -i -s 40 postgres
 pg_dumpall -f /tmp/dump1
-pgbench -c 2 -j -T 100000000&
+pgbench -c 2 -T 100000000 -S &
+sleep 1
 wal-g backup-push $PGDATA
 pkill -9 postgres
 rm -rf $PGDATA
