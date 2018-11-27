@@ -70,7 +70,10 @@ func HandleDelete(folder *S3Folder, args []string) {
 					return
 				}
 				backup := NewBackup(folder, b.Name)
-				dto := backup.fetchSentinel()
+				dto, err := backup.fetchSentinel()
+				if err != nil {
+					tracelog.ErrorLogger.FatalError(err)
+				}
 				if !dto.isIncremental() {
 					left--
 				}
@@ -150,7 +153,10 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 // TODO : unit tests
 func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dryRun bool) {
 	folder := target.Folder
-	dto := target.fetchSentinel()
+	dto, err := target.fetchSentinel()
+	if err != nil {
+		tracelog.ErrorLogger.FatalError(err)
+	}
 	if dto.isIncremental() {
 		if findFull {
 			target.Name = *dto.IncrementFullName
@@ -159,7 +165,6 @@ func deleteBeforeTarget(target *Backup, findFull bool, backups []BackupTime, dry
 		}
 	}
 	var garbage []BackupTime
-	var err error
 	if backups == nil {
 		backups, garbage, err = getBackupsAndGarbage(folder)
 		if err != nil {

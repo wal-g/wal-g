@@ -52,7 +52,10 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 			}
 		} else {
 			previousBackup := NewBackup(uploader.uploadingFolder, previousBackupName)
-			previousBackupSentinelDto = previousBackup.fetchSentinel()
+			previousBackupSentinelDto, err = previousBackup.fetchSentinel()
+			if err != nil {
+				tracelog.ErrorLogger.FatalError(err)
+			}
 			if previousBackupSentinelDto.IncrementCount != nil {
 				incrementCount = *previousBackupSentinelDto.IncrementCount + 1
 			}
@@ -67,7 +70,10 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 					tracelog.InfoLogger.Println("Delta will be made from full backup.")
 					previousBackupName = *previousBackupSentinelDto.IncrementFullName
 					previousBackup := NewBackup(uploader.uploadingFolder, previousBackupName)
-					previousBackupSentinelDto = previousBackup.fetchSentinel()
+					previousBackupSentinelDto, err = previousBackup.fetchSentinel()
+					if err != nil {
+						tracelog.ErrorLogger.FatalError(err)
+					}
 				}
 				tracelog.InfoLogger.Printf("Delta backup from %v with LSN %x. \n", previousBackupName, *previousBackupSentinelDto.BackupStartLSN)
 			}
