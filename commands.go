@@ -375,10 +375,13 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 
 	if maxDeltas > 0 {
 		previousBackupName, err = GetLatestBackupKey(uploader.uploadingFolder)
-		if _, ok := err.(NoBackupsFoundError); !ok {
-			if err != nil {
+		if err != nil {
+			if _, ok := err.(NoBackupsFoundError); ok {
+				tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
+			} else {
 				tracelog.ErrorLogger.FatalError(err)
 			}
+		} else {
 			previousBackup := NewBackup(uploader.uploadingFolder, previousBackupName)
 			previousBackupSentinelDto = previousBackup.fetchSentinel()
 			if previousBackupSentinelDto.IncrementCount != nil {
@@ -400,6 +403,8 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 				tracelog.InfoLogger.Printf("Delta backup from %v with LSN %x. \n", previousBackupName, *previousBackupSentinelDto.BackupStartLSN)
 			}
 		}
+	} else {
+		tracelog.InfoLogger.Println("Doing full backup.")
 	}
 
 	bundle := NewBundle(archiveDirectory, previousBackupSentinelDto.BackupStartLSN, previousBackupSentinelDto.Files)
