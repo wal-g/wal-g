@@ -2,29 +2,33 @@ CMD_FILES = $(wildcard cmd/wal-g/*.go)
 PKG_FILES = $(wildcard *.go)
 TEST_FILES = $(wildcard walg_test/*.go testtools/*.go)
 
-.PHONY : fmt test install all clean
+.PHONY: test fmt all install clean
 
 ifdef GOTAGS
 override GOTAGS := -tags $(GOTAGS)
 endif
 
-test: cmd/wal-g/wal-g
-	go list ./... | grep -v 'vendor/' | xargs go vet
-	go test -v ./walg_test/
-	go test -v ./walparser/
+test: build
+	go list ./... | grep -v 'submodules/' | xargs go vet
+	go test -v ./test/
+	go test -v ./internal/walparser/
 
 fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 	gofmt -s -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 
-all: cmd/wal-g/wal-g
+all: build
+
+deps:
+	git submodule update --init --recursive
+	dep ensure
 
 install:
+	@make deps
 	(cd cmd/wal-g && go install)
 
 clean:
-	rm -rf extracted compressed $(filter-out $(wildcard *.go), $(wildcard data*))
-	go clean
 	(cd cmd/wal-g && go clean)
 
-cmd/wal-g/wal-g: $(CMD_FILES) $(PKG_FILES)
+build: $(CMD_FILES) $(PKG_FILES)
+	@make deps
 	(cd cmd/wal-g && go build $(GOTAGS) -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X main.GitRevision=`git rev-parse --short HEAD` -X main.WalgVersion=`git tag -l --points-at HEAD`")

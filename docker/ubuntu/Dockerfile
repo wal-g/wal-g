@@ -11,8 +11,8 @@ RUN apt-get update && \
     nano \
     postgresql-10 \
     postgresql-contrib \
-    libbrotli1 \
-    liblzo2-2 && \
+    liblzo2-2 \
+    libbrotli1 && \
     rm -rf /var/lib/apt/lists/*
 
 RUN rm -rf $PGDATA
