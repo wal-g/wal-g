@@ -157,7 +157,6 @@ wal-g backup-push /backup/directory/path
 ```
 If backup is pushed from replication slave, WAL-G will control timeline of the server. In case of promotion to master or timeline switch, backup will be uploaded but not finalized, WAL-G will exit with an error. In this case logs will contain information necessary to finalize the backup. You can use backuped data if you clearly understand entangled risks.
 
-
 * ``wal-fetch``
 
 When fetching WAL archives from S3, the user should pass in the archive name and the name of the file to download to. This file should not exist as WAL-G will create it for you.
@@ -167,7 +166,6 @@ WAL-G will also prefetch WAL files ahead of asked WAL file. These files will be 
 ```
 wal-g wal-fetch example-archive new-file-name
 ```
-
 
 * ``wal-push``
 
