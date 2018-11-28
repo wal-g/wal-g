@@ -1,17 +1,40 @@
 version: '3'
+
 services:
-    s3:
-        image: minio/minio
-        ports:
-            - "9000:9000"
-        environment:
-            - "MINIO_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE"
-            - "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-        entrypoint: sh
-        command: -c 'mkdir -p /export/fullbucket && mkdir -p /export/fullscandeltabucket && mkdir -p /export/waldeltabucket && /usr/bin/minio server /export'
-    pg:
-        build: ./docker/pg
-        env_file:
-            - ./docker/pg/walg_env.env
-        depends_on:
-            - s3
+  golang:
+    build:
+      dockerfile: ./docker/golang/Dockerfile
+      context: .
+    image: wal-g/golang
+    container_name: wal-g_golang
+
+  ubuntu:
+    build:
+      dockerfile: ./docker/ubuntu/Dockerfile
+      context: .
+    image: wal-g/ubuntu
+    container_name: wal-g_ubuntu
+
+  s3:
+    image: minio/minio
+    container_name: wal-g_s3
+    ports:
+      - "9000:9000"
+    environment:
+      - "MINIO_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE"
+      - "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+    entrypoint: sh
+    command: -c 'mkdir -p /export/fullbucket && mkdir -p /export/fullscandeltabucket && mkdir -p /export/waldeltabucket && /usr/bin/minio server /export'
+
+  pg:
+    build:
+      dockerfile: ./docker/pg/Dockerfile
+      context: .
+    image: wal-g/pg
+    container_name: wal-g_pg
+    env_file:
+      - docker/pg/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
