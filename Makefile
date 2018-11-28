@@ -19,7 +19,7 @@ fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 all: build
 
 deps:
-	git submodule update --init --recursive
+	git submodule update --init
 	dep ensure
 
 install:

@@ -131,7 +131,7 @@ func getAWSRegion(s3Bucket string, config *aws.Config) (string, error) {
 	return region, nil
 }
 
-//TODO : unit tests
+// TODO : unit tests
 func createS3Session(s3Bucket string) (*session.Session, error) {
 	config := defaults.Get().Config
 

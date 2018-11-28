@@ -1,6 +1,8 @@
+# external libs
 vendor/
 
+# bin
 cmd/wal-g/wal-g
-test/testdata/00000*
 
-docker/pg/wal-g
+# tests
+test/testdata/00000*
