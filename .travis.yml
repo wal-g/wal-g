@@ -1,21 +1,29 @@
-notifications:
-  email: false
+language: go
+dist: xenial
+go:
+  - 1.11.x
+
 services:
   - docker
-script: ./build.sh
-language: go
-dist: trusty
-go:
-  - 1.10.x
+
+before_script:
+  - sudo apt-get update
+  - sudo apt-get install --yes liblzo2-dev libbrotli-dev
+
 matrix:
   include:
     - env: GOTAGS= BINSUFFIX=
     - env: GOTAGS=lzo BINSUFFIX=.lzo
-      addons:
-        apt:
-          packages: liblzo2-dev
+    - env: GOTAGS=brotli BINSUFFIX=.brotli
+
+script: ./build.sh
+
+notifications:
+  email: false
+
 before_deploy:
   - tar -zcf wal-g.linux-amd64$BINSUFFIX.tar.gz -C cmd/wal-g/ wal-g
+
 deploy:
   provider: releases
   api_key:
