@@ -11,7 +11,6 @@ import (
 
 var profile bool
 var mem bool
-var help bool
 var l *log.Logger
 var helpMsg = "  backup-fetch\tfetch a backup from S3\n" +
 	"  backup-push\tstarts and uploads a finished backup to S3\n" +
