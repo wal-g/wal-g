@@ -3,28 +3,28 @@ package testtools
 import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g"
+	"github.com/wal-g/wal-g/internal"
 	"io"
 	"testing"
 )
 
-func MakeDefaultUploader(uploaderAPI s3manageriface.UploaderAPI) *walg.S3Uploader {
-	return walg.NewS3Uploader(uploaderAPI, "", "", "STANDARD")
+func MakeDefaultUploader(uploaderAPI s3manageriface.UploaderAPI) *internal.S3Uploader {
+	return internal.NewS3Uploader(uploaderAPI, "", "", "STANDARD")
 }
 
-func NewMockUploader(apiMultiErr, apiErr bool) *walg.Uploader {
+func NewMockUploader(apiMultiErr, apiErr bool) *internal.Uploader {
 	s3Uploader := MakeDefaultUploader(NewMockS3Uploader(apiMultiErr, apiErr, nil))
-	return walg.NewUploader(
+	return internal.NewUploader(
 		&MockCompressor{},
-		walg.NewS3Folder(*s3Uploader, NewMockS3Client(false, true), "bucket/", "server/"),
+		internal.NewS3Folder(*s3Uploader, NewMockS3Client(false, true), "bucket/", "server/"),
 		nil,
 		false,
 		false,
 	)
 }
 
-func NewStoringMockUploader(storage *InMemoryStorage, deltaDataFolder walg.DataFolder) *walg.Uploader {
-	return walg.NewUploader(
+func NewStoringMockUploader(storage *InMemoryStorage, deltaDataFolder internal.DataFolder) *internal.Uploader {
+	return internal.NewUploader(
 		&MockCompressor{},
 		NewInMemoryStorageFolder("in_memory/", storage),
 		deltaDataFolder,
@@ -33,11 +33,11 @@ func NewStoringMockUploader(storage *InMemoryStorage, deltaDataFolder walg.DataF
 	)
 }
 
-func NewLz4CompressingPipeWriter(input io.Reader) *walg.CompressingPipeWriter {
-	return &walg.CompressingPipeWriter{
+func NewLz4CompressingPipeWriter(input io.Reader) *internal.CompressingPipeWriter {
+	return &internal.CompressingPipeWriter{
 		Input: input,
-		NewCompressingWriter: func(writer io.Writer) walg.ReaderFromWriteCloser {
-			return walg.NewLz4ReaderFromWriter(writer)
+		NewCompressingWriter: func(writer io.Writer) internal.ReaderFromWriteCloser {
+			return internal.NewLz4ReaderFromWriter(writer)
 		},
 	}
 }
@@ -51,7 +51,7 @@ func (readWriteNopCloser *ReadWriteNopCloser) Close() error {
 }
 
 func Contains(s *[]string, e string) bool {
-	//AB: Go is sick
+	// AB: Go is sick
 	if s == nil {
 		return false
 	}
