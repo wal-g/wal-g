@@ -27,7 +27,7 @@ func NewStrideByteReader(s int) *StrideByteReader {
 	}
 
 	rand.Seed(0)
-	//rand.Seed(time.Now().UTC().UnixNano())
+	// rand.Seed(time.Now().UTC().UnixNano())
 	rand.Read(sb.randBytes)
 	return &sb
 }
@@ -48,7 +48,7 @@ func (sb *StrideByteReader) Read(p []byte) (int, error) {
 // CreateTar creates a new tarball from the passed in reader
 // and writes to a destination writer.
 func CreateTar(w io.Writer, r *io.LimitedReader) {
-	//defer TimeTrack(time.Now(), "CREATE TAR")
+	// defer TimeTrack(time.Now(), "CREATE TAR")
 	tmp := atomic.AddInt32(&counter, 1)
 	_ = tmp
 	tw := tar.NewWriter(w)

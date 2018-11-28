@@ -133,7 +133,7 @@ func (tarBall *StorageTarBall) Finish(sentinelDto *BackupSentinelDto) error {
 	uploader.finish()
 
 	var err error
-	//If other parts are successful in uploading, upload json file.
+	// If other parts are successful in uploading, upload json file.
 	if uploader.Success && sentinelDto != nil {
 		sentinelDto.UserData = GetSentinelUserData()
 		dtoBody, err := json.Marshal(*sentinelDto)

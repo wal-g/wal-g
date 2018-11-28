@@ -16,7 +16,7 @@ type BufferTarInterpreter struct {
 
 // Interpret handles in memory tar formats. Used for testing purposes.
 func (tarInterpreter *BufferTarInterpreter) Interpret(reader io.Reader, header *tar.Header) error {
-	//defer TimeTrack(time.Now(), "BUFFER INTERPRET")
+	// defer TimeTrack(time.Now(), "BUFFER INTERPRET")
 	// Assumes only regular files
 	out, err := ioutil.ReadAll(reader)
 	if err != nil {

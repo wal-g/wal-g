@@ -145,7 +145,7 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 		}
 		result.BeforeTime = &t
 	}
-	//if DeleteConfirmed && !DeleteDryrun  // TODO: use flag
+	// if DeleteConfirmed && !DeleteDryrun  // TODO: use flag
 	result.dryrun = true
 	if len(params) > 1 && (params[1] == "--confirm" || params[1] == "-confirm") {
 		result.dryrun = false
