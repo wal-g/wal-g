@@ -3,7 +3,7 @@ package testtools
 import (
 	"bytes"
 	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g"
+	"github.com/wal-g/wal-g/internal"
 	"io"
 	"io/ioutil"
 	"path/filepath"
@@ -51,7 +51,7 @@ func (folder *InMemoryStorageFolder) GetPath() string {
 	return folder.path
 }
 
-func (folder *InMemoryStorageFolder) ListFolder() (objects []walg.StorageObject, subFolders []walg.StorageFolder, err error) {
+func (folder *InMemoryStorageFolder) ListFolder() (objects []internal.StorageObject, subFolders []internal.StorageFolder, err error) {
 	subFolderNames := sync.Map{}
 	folder.Storage.Range(func(key string, value TimeStampedData) bool {
 		if !strings.HasPrefix(key, folder.path) {
@@ -77,7 +77,7 @@ func (folder *InMemoryStorageFolder) DeleteObjects(objectRelativePaths []string)
 	panic("implement me")
 }
 
-func (folder *InMemoryStorageFolder) GetSubFolder(subFolderRelativePath string) walg.StorageFolder {
+func (folder *InMemoryStorageFolder) GetSubFolder(subFolderRelativePath string) internal.StorageFolder {
 	return NewInMemoryStorageFolder(folder.path+subFolderRelativePath, folder.Storage)
 }
 
@@ -85,7 +85,7 @@ func (folder *InMemoryStorageFolder) ReadObject(objectRelativePath string) (io.R
 	objectAbsPath := folder.path + objectRelativePath
 	object, exists := folder.Storage.Load(objectAbsPath)
 	if !exists {
-		return nil, walg.NewObjectNotFoundError(objectAbsPath)
+		return nil, internal.NewObjectNotFoundError(objectAbsPath)
 	}
 	return ioutil.NopCloser(&object.Data), nil
 }

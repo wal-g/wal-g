@@ -2,7 +2,7 @@ package testtools
 
 import (
 	"bytes"
-	"github.com/wal-g/wal-g"
+	"github.com/wal-g/wal-g/internal"
 )
 
 // FileTarBallMaker creates a new FileTarBall
@@ -15,7 +15,7 @@ type FileTarBallMaker struct {
 }
 
 // Make creates a new FileTarBall.
-func (tarBallMaker *FileTarBallMaker) Make(inheritState bool) walg.TarBall {
+func (tarBallMaker *FileTarBallMaker) Make(inheritState bool) internal.TarBall {
 	tarBallMaker.number++
 	return &FileTarBall{
 		number: tarBallMaker.number,
@@ -30,7 +30,7 @@ type BufferTarBallMaker struct {
 	BufferToWrite *bytes.Buffer
 }
 
-func (tarBallMaker *BufferTarBallMaker) Make(dedicatedUploader bool) walg.TarBall {
+func (tarBallMaker *BufferTarBallMaker) Make(dedicatedUploader bool) internal.TarBall {
 	tarBallMaker.number++
 	return &BufferTarBall{
 		number:     tarBallMaker.number,

@@ -2,7 +2,7 @@ package testtools
 
 import (
 	"bytes"
-	"github.com/wal-g/wal-g"
+	"github.com/wal-g/wal-g/internal"
 	"io"
 	"io/ioutil"
 )
@@ -26,7 +26,7 @@ func (folder *MockDataFolder) OpenReadonlyFile(filename string) (io.ReadCloser, 
 	if _, ok := (*folder)[filename]; ok {
 		return ioutil.NopCloser(bytes.NewReader((*folder)[filename].Bytes())), nil
 	} else {
-		return nil, walg.NewNoSuchFileError(filename)
+		return nil, internal.NewNoSuchFileError(filename)
 	}
 }
 

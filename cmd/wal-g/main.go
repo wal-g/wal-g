@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/wal-g/wal-g"
+	"github.com/wal-g/wal-g/internal"
 	"log"
 	"os"
 	"runtime/pprof"
@@ -91,7 +91,7 @@ func main() {
 			fmt.Printf("usage:\twal-g wal-push archive_path\n\n")
 			os.Exit(1)
 		case "delete":
-			fmt.Println(walg.DeleteUsageText)
+			fmt.Println(internal.DeleteUsageText)
 			os.Exit(1)
 		default:
 			l.Fatalf("Command '%s' is unsupported by WAL-G.\n\n", command)
@@ -115,7 +115,7 @@ func main() {
 
 	// Configure and start S3 session with bucket, region, and path names.
 	// Checks that environment variables are properly set.
-	uploader, folder, err := walg.Configure()
+	uploader, folder, err := internal.Configure()
 	if err != nil {
 		log.Fatalf("FATAL: %+v\n", err)
 	}
@@ -124,20 +124,20 @@ func main() {
 
 	if command == "wal-fetch" {
 		// Fetch and decompress a WAL file from S3.
-		walg.HandleWALFetch(folder, firstArgument, backupName, true)
+		internal.HandleWALFetch(folder, firstArgument, backupName, true)
 	} else if command == "wal-prefetch" {
-		walg.HandleWALPrefetch(folder, firstArgument, backupName, uploader)
+		internal.HandleWALPrefetch(folder, firstArgument, backupName, uploader)
 	} else if command == "wal-push" {
 		// Upload a WAL file to S3.
-		walg.HandleWALPush(uploader, firstArgument)
+		internal.HandleWALPush(uploader, firstArgument)
 	} else if command == "backup-push" {
-		walg.HandleBackupPush(firstArgument, uploader)
+		internal.HandleBackupPush(firstArgument, uploader)
 	} else if command == "backup-fetch" {
-		walg.HandleBackupFetch(backupName, folder, firstArgument, mem)
+		internal.HandleBackupFetch(backupName, folder, firstArgument, mem)
 	} else if command == "backup-list" {
-		walg.HandleBackupList(folder)
+		internal.HandleBackupList(folder)
 	} else if command == "delete" {
-		walg.HandleDelete(folder, all)
+		internal.HandleDelete(folder, all)
 	} else {
 		l.Fatalf("Command '%s' is unsupported by WAL-G.", command)
 	}

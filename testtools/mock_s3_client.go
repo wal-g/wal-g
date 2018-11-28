@@ -5,7 +5,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	"github.com/wal-g/wal-g"
+	"github.com/wal-g/wal-g/internal"
 	"io/ioutil"
 	"strings"
 	"time"
@@ -56,7 +56,7 @@ func (client *mockS3Client) HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjec
 	if client.err {
 		return nil, awserr.New("MockHeadObject", "mock HeadObject error", nil)
 	} else if client.notFound {
-		return nil, awserr.New(walg.NotFoundAWSErrorCode, "mock HeadObject error", nil)
+		return nil, awserr.New(internal.NotFoundAWSErrorCode, "mock HeadObject error", nil)
 	}
 
 	return &s3.HeadObjectOutput{}, nil
