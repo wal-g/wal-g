@@ -22,11 +22,18 @@ func (err ObjectNotFoundError) Error() string {
 type StorageFolder interface {
 	// Path should always ends with '/'
 	GetPath() string
+
+	// Should return objects with relative paths
 	ListFolder() (objects []StorageObject, subFolders []StorageFolder, err error)
+
 	DeleteObjects(objectRelativePaths []string) error
+
 	Exists(objectRelativePath string) (bool, error)
+
 	GetSubFolder(subFolderRelativePath string) StorageFolder
+
 	// Should return ObjectNotFoundError in case, there is no such object
 	ReadObject(objectRelativePath string) (io.ReadCloser, error)
+
 	PutObject(name string, content io.Reader) error
 }

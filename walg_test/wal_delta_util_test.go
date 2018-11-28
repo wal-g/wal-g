@@ -31,7 +31,7 @@ func TestGetPositionInDelta(t *testing.T) {
 func assertContainsTestLocation(t *testing.T, storage testtools.InMemoryStorage) {
 	storageDeltaFilePath := "bucket/server/wal_005/000000010000000000000070_delta.mock"
 	locationBuffer, _ := storage.Load(storageDeltaFilePath)
-	reader := walg.NewBlockLocationReader(&locationBuffer)
+	reader := walg.NewBlockLocationReader(&locationBuffer.Data)
 	location, err := reader.ReadNextLocation()
 	assert.NoError(t, err)
 	assert.NotNil(t, location)

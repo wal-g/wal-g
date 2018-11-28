@@ -76,9 +76,8 @@ func parseAndTestFail(command []string, arguments *walg.DeleteCommandArguments) 
 }
 
 func TestTryDownloadWALFile_Exist(t *testing.T) {
-	storage := testtools.NewInMemoryStorage()
 	expectedData := []byte("mock")
-	folder := testtools.NewInMemoryStorageFolder("in_memory/" + walg.WalPath, storage)
+	folder := testtools.MakeDefaultInMemoryStorageFolder().GetSubFolder(walg.WalPath)
 	folder.PutObject("00000001000000000000007C", bytes.NewBuffer(expectedData))
 	archiveReader, exist, err := walg.TryDownloadWALFile(folder, "00000001000000000000007C")
 	assert.NoError(t, err)
@@ -89,8 +88,7 @@ func TestTryDownloadWALFile_Exist(t *testing.T) {
 }
 
 func TestTryDownloadWALFile_NotExist(t *testing.T) {
-	storage := testtools.NewInMemoryStorage()
-	folder := testtools.NewInMemoryStorageFolder("", storage)
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
 	reader, exist, err := walg.TryDownloadWALFile(folder, "00000001000000000000007C")
 	assert.Nil(t, reader)
 	assert.False(t, exist)

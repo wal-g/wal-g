@@ -50,15 +50,15 @@ func (backup *Backup) CheckExistence() (bool, error) {
 	return backup.BaseBackupFolder.Exists(backup.getStopSentinelPath())
 }
 
-// TODO : unit tests
-func (backup *Backup) getTarNames() ([]string, error) {
-	objects, _, err := backup.getTarPartitionFolder().ListFolder()
+func (backup *Backup) GetTarNames() ([]string, error) {
+	tarPartitionFolder := backup.getTarPartitionFolder()
+	objects, _, err := tarPartitionFolder.ListFolder()
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to list backup '%s' for deletion", backup.Name)
 	}
 	result := make([]string, len(objects))
 	for id, object := range objects {
-		result[id] = strings.TrimPrefix(object.GetAbsPath(), backup.getTarPartitionFolder().GetPath())
+		result[id] = strings.TrimPrefix(object.GetAbsPath(), tarPartitionFolder.GetPath())
 	}
 	return result, nil
 }
@@ -155,28 +155,28 @@ func IsDirectoryEmpty(directoryPath string) (bool, error) {
 
 // TODO : init tests
 func (backup *Backup) getTarsToExtract() (tarsToExtract []ReaderMaker, pgControlKey string, err error) {
-	keys, err := backup.getTarNames()
+	tarNames, err := backup.GetTarNames()
 	if err != nil {
 		return nil, "", err
 	}
-	tracelog.DebugLogger.Printf("Tars to extract: '%+v'\n", keys)
-	tarsToExtract = make([]ReaderMaker, 0, len(keys))
+	tracelog.DebugLogger.Printf("Tars to extract: '%+v'\n", tarNames)
+	tarsToExtract = make([]ReaderMaker, 0, len(tarNames))
 
 	pgControlRe := regexp.MustCompile(`^.*?pg_control\.tar(\..+$|$)`)
-	for _, key := range keys {
-		// Separate the pg_control key from the others to
+	for _, tarName := range tarNames {
+		// Separate the pg_control tarName from the others to
 		// extract it at the end, as to prevent server startup
 		// with incomplete backup restoration.  But only if it
 		// exists: it won't in the case of WAL-E backup
 		// backwards compatibility.
-		if pgControlRe.MatchString(key) {
+		if pgControlRe.MatchString(tarName) {
 			if pgControlKey != "" {
-				panic("expect only one pg_control key match")
+				panic("expect only one pg_control tar name match")
 			}
-			pgControlKey = key
+			pgControlKey = tarName
 			continue
 		}
-		tarToExtract := NewStorageReaderMaker(backup.getTarPartitionFolder(), key)
+		tarToExtract := NewStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
 		tarsToExtract = append(tarsToExtract, tarToExtract)
 	}
 	if pgControlKey == "" {

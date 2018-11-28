@@ -21,7 +21,7 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 	origin, hasOrigin := os.LookupEnv("WALG_DELTA_ORIGIN")
 	if hasOrigin {
 		switch origin {
-		case "LATEST":
+		case LatestString:
 		case "LATEST_FULL":
 			fromFull = true
 		default:
@@ -43,7 +43,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	incrementCount := 1
 
 	if maxDeltas > 0 {
-		previousBackupName, err = getLatestBackupKey(uploader.uploadingFolder)
+		previousBackupName, err = getLatestBackupName(uploader.uploadingFolder)
 		if err != nil {
 			if _, ok := err.(NoBackupsFoundError); ok {
 				tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
