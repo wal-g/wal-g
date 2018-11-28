@@ -28,6 +28,22 @@ type DeleteCommandArguments struct {
 }
 
 // TODO : unit tests
+func modifyDeleteTarget(target *Backup, findFull bool) *Backup {
+	sentinelDto, err := target.fetchSentinel()
+	if err != nil {
+		tracelog.ErrorLogger.FatalError(err)
+	}
+	if sentinelDto.isIncremental() {
+		if findFull {
+			target.Name = *sentinelDto.IncrementFullName
+		} else {
+			tracelog.ErrorLogger.Fatalf("%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option.", target.Name)
+		}
+	}
+	return target
+}
+
+// TODO : unit tests
 // HandleDelete is invoked to perform wal-g delete
 func HandleDelete(folder StorageFolder, args []string) {
 	backupFolder := folder.GetSubFolder(BaseBackupPath)
@@ -36,7 +52,7 @@ func HandleDelete(folder StorageFolder, args []string) {
 
 	if arguments.Before {
 		if arguments.BeforeTime == nil {
-			deleteBeforeTarget(walFolder, NewBackup(backupFolder, arguments.Target), arguments.FindFull, nil, arguments.dryrun)
+			deleteBeforeTarget(walFolder, modifyDeleteTarget(NewBackup(backupFolder, arguments.Target), arguments.FindFull), nil, arguments.dryrun)
 		} else {
 			backups, err := getBackups(folder)
 			if err != nil {
@@ -44,7 +60,7 @@ func HandleDelete(folder StorageFolder, args []string) {
 			}
 			for _, b := range backups {
 				if b.Time.Before(*arguments.BeforeTime) {
-					deleteBeforeTarget(walFolder, NewBackup(backupFolder, b.BackupName), arguments.FindFull, backups, arguments.dryrun)
+					deleteBeforeTarget(walFolder, modifyDeleteTarget(NewBackup(backupFolder, b.BackupName), arguments.FindFull), backups, arguments.dryrun)
 					return
 				}
 			}
@@ -67,7 +83,7 @@ func HandleDelete(folder StorageFolder, args []string) {
 			left := backupCount
 			for _, b := range backups {
 				if left == 1 {
-					deleteBeforeTarget(walFolder, NewBackup(backupFolder, b.BackupName), true, backups, arguments.dryrun)
+					deleteBeforeTarget(walFolder, modifyDeleteTarget(NewBackup(backupFolder, b.BackupName), true), backups, arguments.dryrun)
 					return
 				}
 				backup := NewBackup(folder, b.BackupName)
@@ -84,7 +100,7 @@ func HandleDelete(folder StorageFolder, args []string) {
 			if len(backups) <= backupCount {
 				tracelog.WarningLogger.Printf("Have only %v backups.\n", backupCount)
 			} else {
-				deleteBeforeTarget(walFolder, NewBackup(backupFolder, backups[backupCount-1].BackupName), arguments.FindFull, nil, arguments.dryrun)
+				deleteBeforeTarget(walFolder, modifyDeleteTarget(NewBackup(backupFolder, backups[backupCount-1].BackupName), arguments.FindFull), nil, arguments.dryrun)
 			}
 		}
 	}
@@ -152,48 +168,44 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 }
 
 // TODO : unit tests
-func deleteBeforeTarget(walFolder StorageFolder, target *Backup, findFull bool, backups []BackupTime, dryRun bool) {
+func deleteBeforeTarget(walFolder StorageFolder, target *Backup, backupToScan []BackupTime, dryRun bool) {
 	backupFolder := target.BaseBackupFolder
-	dto, err := target.fetchSentinel()
+	allBackups, garbage, err := getBackupsAndGarbage(backupFolder)
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	if dto.isIncremental() {
-		if findFull {
-			target.Name = *dto.IncrementFullName
-		} else {
-			tracelog.ErrorLogger.Fatalf("%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option.", target.Name)
-		}
+	if backupToScan == nil { // TODO : anti-pattern, needs refactoring
+		backupToScan = allBackups
 	}
-	var garbage []string
-	if backups == nil {
-		backups, garbage, err = getBackupsAndGarbage(backupFolder)
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
-		}
+	garbageToDelete := findGarbageToDelete(garbage, target)
+
+	if dryRun { // TODO : split this function by two: 'find objects to delete' and 'delete these objects'
+		tracelog.InfoLogger.Printf("Dry run finished.\n")
+		return
 	}
 
-	skipLine, walSkipFileName := ComputeDeletionSkipline(backups, target)
+	for _, garbageName := range garbageToDelete {
+		dropBackup(backupFolder, garbageName)
+	}
+	skipLine, walSkipFileName := ComputeDeletionSkipline(backupToScan, target)
+	if skipLine < len(backupToScan)-1 {
+		deleteWALBefore(walSkipFileName, walFolder)
+		deleteBackupsBefore(backupToScan, skipLine, backupFolder)
+	}
+}
 
+// TODO : unit tests
+func findGarbageToDelete(garbage []string, target *Backup) []string {
+	garbageToDelete := make([]string, 0)
 	for _, garbageName := range garbage {
 		if strings.HasPrefix(garbageName, backupNamePrefix) && garbageName < target.Name {
 			tracelog.InfoLogger.Printf("%v will be deleted (garbage)\n", garbageName)
-			if !dryRun {
-				dropBackup(backupFolder, garbageName)
-			}
+			garbageToDelete = append(garbageToDelete, garbageName)
 		} else {
 			tracelog.InfoLogger.Printf("%v skipped (garbage)\n", garbageName)
 		}
 	}
-
-	if !dryRun {
-		if skipLine < len(backups)-1 {
-			deleteWALBefore(walSkipFileName, walFolder)
-			deleteBackupsBefore(backups, skipLine, backupFolder)
-		}
-	} else {
-		tracelog.InfoLogger.Printf("Dry run finished.\n")
-	}
+	return garbageToDelete
 }
 
 // ComputeDeletionSkipline selects last backup and name of last necessary WAL
