@@ -26,7 +26,6 @@ func NewS3Folder(uploader S3Uploader, s3API s3iface.S3API, bucket, path string) 
 	}
 }
 
-// TODO : unit tests
 func (folder *S3Folder) Exists(objectRelativePath string) (bool, error) {
 	objectPath := folder.Path + objectRelativePath
 	stopSentinelObjectInput := &s3.HeadObjectInput{
@@ -44,12 +43,10 @@ func (folder *S3Folder) Exists(objectRelativePath string) (bool, error) {
 	return true, nil
 }
 
-// TODO : unit tests
 func (folder *S3Folder) PutObject(name string, content io.Reader) error {
 	return folder.uploader.upload(*folder.Bucket, folder.Path+name, content)
 }
 
-// TODO : unit tests
 func (folder *S3Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	objectPath := folder.Path + objectRelativePath
 	input := &s3.GetObjectInput{
@@ -67,7 +64,6 @@ func (folder *S3Folder) ReadObject(objectRelativePath string) (io.ReadCloser, er
 	return object.Body, nil
 }
 
-// TODO : unit tests
 func (folder *S3Folder) GetSubFolder(subFolderRelativePath string) StorageFolder {
 	if !strings.HasSuffix(subFolderRelativePath, "/") {
 		subFolderRelativePath = subFolderRelativePath + "/"
@@ -79,7 +75,6 @@ func (folder *S3Folder) GetPath() string {
 	return folder.Path
 }
 
-// TODO : unit tests
 func (folder *S3Folder) ListFolder() (objects []StorageObject, subFolders []StorageFolder, err error) {
 	s3Objects := &s3.ListObjectsV2Input{
 		Bucket:    folder.Bucket,
@@ -103,7 +98,6 @@ func (folder *S3Folder) ListFolder() (objects []StorageObject, subFolders []Stor
 	return objects, subFolders, nil
 }
 
-// TODO : unit tests
 func (folder *S3Folder) DeleteObjects(objectRelativePaths []string) error {
 	parts := partitionStrings(objectRelativePaths, 1000)
 	for _, part := range parts {
@@ -118,7 +112,6 @@ func (folder *S3Folder) DeleteObjects(objectRelativePaths []string) error {
 	return nil
 }
 
-// TODO : unit tests
 func (folder *S3Folder) partitionToObjects(keys []string) []*s3.ObjectIdentifier {
 	objects := make([]*s3.ObjectIdentifier, len(keys))
 	for id, key := range keys {
@@ -127,7 +120,6 @@ func (folder *S3Folder) partitionToObjects(keys []string) []*s3.ObjectIdentifier
 	return objects
 }
 
-// TODO : unit tests
 func isAwsNotExist(err error) bool {
 	if awsErr, ok := err.(awserr.Error); ok {
 		if awsErr.Code() == NotFoundAWSErrorCode || awsErr.Code() == NoSuchKeyAWSErrorCode {
