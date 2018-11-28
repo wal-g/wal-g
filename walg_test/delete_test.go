@@ -39,7 +39,7 @@ var backup_times1 = []walg.BackupTime{
 }
 
 func TestSkiplineComputation(t *testing.T) {
-	folder := testtools.NewInMemoryStorageFolder("", nil)
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
 
 	sort.Sort(walg.TimeSlice(backup_times1))
 
@@ -79,7 +79,7 @@ var backup_times2 = []walg.BackupTime{
 }
 
 func TestSkiplineComputationAfterUpgrade(t *testing.T) {
-	folder := testtools.NewInMemoryStorageFolder("", nil)
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
 
 	sort.Sort(walg.TimeSlice(backup_times2))
 

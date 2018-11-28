@@ -8,7 +8,10 @@ import (
 	"runtime/pprof"
 )
 
-const PgControlPath = "/global/pg_control"
+const (
+	PgControlPath = "/global/pg_control"
+	LatestString  = "LATEST"
+)
 
 var UtilityFilePaths = map[string]bool{
 	PgControlPath:         true,
@@ -25,18 +28,6 @@ func NewBackupNonExistenceError(backupName string) BackupNonExistenceError {
 }
 
 func (err BackupNonExistenceError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
-type NoDescriptionError struct {
-	error
-}
-
-func NewNoDescriptionError(fileName string) NoDescriptionError {
-	return NoDescriptionError{errors.Errorf("Wanted to fetch increment for file: '%s', but didn't found one in base", fileName)}
-}
-
-func (err NoDescriptionError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
@@ -86,11 +77,10 @@ func HandleBackupFetch(backupName string, folder StorageFolder, dbDataDirectory 
 	return
 }
 
-// TODO : unit tests
-func getBackupByName(backupName string, folder StorageFolder) (*Backup, error) {
+func GetBackupByName(backupName string, folder StorageFolder) (*Backup, error) {
 	var backup *Backup
-	if backupName == "LATEST" {
-		latest, err := getLatestBackupKey(folder)
+	if backupName == LatestString {
+		latest, err := getLatestBackupName(folder)
 		if err != nil {
 			return nil, err
 		}
@@ -115,7 +105,7 @@ func getBackupByName(backupName string, folder StorageFolder) (*Backup, error) {
 // TODO : unit tests
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
 func deltaFetchRecursion(backupName string, folder StorageFolder, dbDataDirectory string, filesToUnwrap map[string]bool) error {
-	backup, err := getBackupByName(backupName, folder)
+	backup, err := GetBackupByName(backupName, folder)
 	if err != nil {
 		return err
 	}
@@ -125,12 +115,12 @@ func deltaFetchRecursion(backupName string, folder StorageFolder, dbDataDirector
 	}
 
 	if filesToUnwrap == nil { // it is the exact backup we want to fetch, so we want to include all files here
-		filesToUnwrap = getRestoredBackupFilesToUnwrap(sentinelDto)
+		filesToUnwrap = GetRestoredBackupFilesToUnwrap(sentinelDto)
 	}
 
 	if sentinelDto.isIncremental() {
 		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n", *(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN))
-		baseFilesToUnwrap, err := getBaseFilesToUnwrap(sentinelDto.Files, filesToUnwrap)
+		baseFilesToUnwrap, err := GetBaseFilesToUnwrap(sentinelDto.Files, filesToUnwrap)
 		if err != nil {
 			return err
 		}
@@ -144,8 +134,7 @@ func deltaFetchRecursion(backupName string, folder StorageFolder, dbDataDirector
 	return backup.unwrap(dbDataDirectory, sentinelDto, filesToUnwrap)
 }
 
-// TODO : unit tests
-func getRestoredBackupFilesToUnwrap(sentinelDto BackupSentinelDto) map[string]bool {
+func GetRestoredBackupFilesToUnwrap(sentinelDto BackupSentinelDto) map[string]bool {
 	filesToUnwrap := make(map[string]bool)
 	for file := range sentinelDto.Files {
 		filesToUnwrap[file] = true
@@ -156,14 +145,13 @@ func getRestoredBackupFilesToUnwrap(sentinelDto BackupSentinelDto) map[string]bo
 	return filesToUnwrap
 }
 
-// TODO : unit tests
-func getBaseFilesToUnwrap(backupFileStates BackupFileList, currentFilesToUnwrap map[string]bool) (map[string]bool, error) {
+func GetBaseFilesToUnwrap(backupFileStates BackupFileList, currentFilesToUnwrap map[string]bool) (map[string]bool, error) {
 	baseFilesToUnwrap := make(map[string]bool)
 	for file := range currentFilesToUnwrap {
 		fileDescription, hasDescription := backupFileStates[file]
 		if !hasDescription {
 			if _, ok := UtilityFilePaths[file]; !ok {
-				return nil, NewNoDescriptionError(file)
+				tracelog.ErrorLogger.Panicf("Wanted to fetch increment for file: '%s', but didn't found one in base", file)
 			}
 		}
 		if fileDescription.IsSkipped || fileDescription.IsIncremented {

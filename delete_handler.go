@@ -230,7 +230,7 @@ func deleteBackupsBefore(backups []BackupTime, skipline int, folder StorageFolde
 // TODO : unit tests
 func dropBackup(folder StorageFolder, backupName string) {
 	backup := NewBackup(folder, backupName)
-	tarNames, err := backup.getTarNames()
+	tarNames, err := backup.GetTarNames()
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
@@ -277,7 +277,7 @@ func getWals(before string, folder StorageFolder) ([]string, error) {
 }
 
 // TODO : unit tests
-func getLatestBackupKey(folder StorageFolder) (string, error) {
+func getLatestBackupName(folder StorageFolder) (string, error) {
 	sortTimes, err := getBackups(folder)
 
 	if err != nil {
@@ -318,6 +318,9 @@ func getBackupTimeSlices(backups []StorageObject) []BackupTime {
 	sortTimes := make([]BackupTime, len(backups))
 	for i, object := range backups {
 		key := object.GetAbsPath()
+		if !strings.HasSuffix(key, SentinelSuffix) {
+			continue
+		}
 		time := object.GetLastModified()
 		sortTimes[i] = BackupTime{stripBackupName(key), time, stripWalFileName(key)}
 	}

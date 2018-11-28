@@ -254,7 +254,7 @@ func TestFlushDeltaFiles_CompleteFile(t *testing.T) {
 
 	actualDeltaFileData, ok := storage.Load("in_memory/" + DeltaFilename + ".mock")
 	assert.True(t, ok)
-	actualDeltaFile, err := walg.LoadDeltaFile(&actualDeltaFileData)
+	actualDeltaFile, err := walg.LoadDeltaFile(&actualDeltaFileData.Data)
 	assert.NoError(t, err)
 
 	assert.Equal(t, deltaFile, actualDeltaFile)
