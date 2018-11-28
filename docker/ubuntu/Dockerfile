@@ -6,7 +6,7 @@ ENV TERM xterm-256color
 ENV PGDATA /var/lib/postgresql/10/main
 
 RUN apt-get update && \
-    apt-get install --yes \
+    apt-get install --yes --no-install-recommends --no-install-suggests \
     htop \
     nano \
     postgresql-10 \
