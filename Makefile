@@ -1,5 +1,6 @@
 CMD_FILES = $(wildcard cmd/wal-g/*.go)
 PKG_FILES = $(wildcard *.go)
+TEST_FILES = $(wildcard walg_test/*.go testtools/*.go)
 
 .PHONY : fmt test install all clean
 
@@ -12,8 +13,8 @@ test: cmd/wal-g/wal-g
 	go test -v ./walg_test/
 	go test -v ./walparser/
 
-fmt: $(CMD_FILES) $(PKG_FILES)
-	gofmt -s -w $(CMD_FILES) $(PKG_FILES)
+fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
+	gofmt -s -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 
 all: cmd/wal-g/wal-g
 
