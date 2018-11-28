@@ -10,12 +10,6 @@ before_script:
   - sudo apt-get update
   - sudo apt-get install --yes liblzo2-dev libbrotli-dev
 
-matrix:
-  include:
-    - env: GOTAGS= BINSUFFIX=
-    - env: GOTAGS=lzo BINSUFFIX=.lzo
-    - env: GOTAGS=brotli BINSUFFIX=.brotli
-
 script: ./build.sh
 
 notifications:
