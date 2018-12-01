@@ -6,3 +6,5 @@ cmd/wal-g/wal-g
 
 # tests
 test/testdata/00000*
+
+tmp/

@@ -6,9 +6,13 @@ go:
 services:
   - docker
 
-before_script:
-  - sudo apt-get update
-  - sudo apt-get install --yes --no-install-recommends --no-install-suggests liblzo2-dev libbrotli-dev
+matrix:
+  include:
+    - env: GOTAGS= BINSUFFIX=
+    - env: GOTAGS=lzo BINSUFFIX=.lzo
+      addons:
+        apt:
+          packages: [liblzo2-dev]
 
 script: ./build.sh
 
@@ -16,7 +20,7 @@ notifications:
   email: false
 
 before_deploy:
-  - tar -zcf wal-g.linux-amd64$BINSUFFIX.tar.gz -C cmd/wal-g/ wal-g
+  - tar -zcf wal-g.linux-amd64$BINSUFFIX.tar.gz -C cmd/wal-g wal-g
 
 deploy:
   provider: releases
