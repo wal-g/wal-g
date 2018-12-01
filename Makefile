@@ -9,7 +9,7 @@ override GOTAGS := -tags $(GOTAGS)
 endif
 
 test: build
-	go list ./... | grep -v 'submodules/' | xargs go vet
+	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet
 	go test -v ./test/
 	go test -v ./internal/walparser/
 
@@ -23,12 +23,10 @@ deps:
 	dep ensure
 
 install:
-	@make deps
 	(cd cmd/wal-g && go install)
 
 clean:
 	(cd cmd/wal-g && go clean)
 
 build: $(CMD_FILES) $(PKG_FILES)
-	@make deps
 	(cd cmd/wal-g && go build $(GOTAGS) -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X main.GitRevision=`git rev-parse --short HEAD` -X main.WalgVersion=`git tag -l --points-at HEAD`")
