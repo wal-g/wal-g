@@ -1,8 +1,8 @@
 CMD_FILES = $(wildcard cmd/wal-g/*.go)
-PKG_FILES = $(wildcard *.go)
-TEST_FILES = $(wildcard walg_test/*.go testtools/*.go)
+PKG_FILES = $(wildcard internal/**/*.go internal/**/**/*.go internal/*.go)
+TEST_FILES = $(wildcard test/*.go testtools/*.go)
 
-.PHONY: test fmt all install clean
+.PHONY: test fmt lint all install clean
 
 ifdef GOTAGS
 override GOTAGS := -tags $(GOTAGS)
@@ -15,6 +15,9 @@ test: build
 
 fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 	gofmt -s -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
+
+lint: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
+	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs golint
 
 all: build
 
