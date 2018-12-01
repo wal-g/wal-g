@@ -1,10 +1,10 @@
 package walparser
 
 import (
-	"github.com/pkg/errors"
-	"io"
 	"fmt"
+	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"io"
 )
 
 type NotEnoughDataToShrinkError struct {

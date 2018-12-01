@@ -11,7 +11,7 @@ import (
 const (
 	NormalLogLevel = "NORMAL"
 	DevelLogLevel  = "DEVEL"
-	timeFlags = log.LstdFlags|log.Lmicroseconds 
+	timeFlags      = log.LstdFlags | log.Lmicroseconds
 )
 
 var InfoLogger = NewErrorLogger(os.Stderr, "INFO: ")
@@ -21,9 +21,9 @@ var DebugLogger = NewErrorLogger(ioutil.Discard, "DEBUG: ")
 
 var LogLevels = []string{NormalLogLevel, DevelLogLevel}
 var logLevel = NormalLogLevel
-var logLevelFormatters = map[string]string {
+var logLevelFormatters = map[string]string{
 	NormalLogLevel: "%v",
-	DevelLogLevel: "%+v",
+	DevelLogLevel:  "%+v",
 }
 
 func setupLoggers() {
