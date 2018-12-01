@@ -212,12 +212,14 @@ To compile and build the binary:
 
 ```
 go get github.com/wal-g/wal-g
+make deps
 make all
 ```
 Users can also install WAL-G by using `make install`. Specifying the GOBIN environment variable before installing allows the user to specify the installation location. On default, `make install` puts the compiled binary in `go/bin`.
 
 ```
 export GOBIN=/usr/local/bin
+make deps
 make install
 ```
 
