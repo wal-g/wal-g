@@ -7,7 +7,7 @@ fi
 
 make deps  # install dependencies
 
-[[ -d tmp ]] || mkdir tmp
+test -d tmp  || mkdir tmp
 
 cp -rf vendor/github.com/google/brotli/* tmp/
 cp -rf submodules/brotli/* vendor/github.com/google/brotli/
