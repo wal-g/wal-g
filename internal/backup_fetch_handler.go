@@ -78,6 +78,8 @@ func HandleBackupFetch(backupName string, folder StorageFolder, dbDataDirectory 
 }
 
 func GetBackupByName(backupName string, folder StorageFolder) (*Backup, error) {
+	baseBackupFolder := folder.GetSubFolder(BaseBackupPath)
+
 	var backup *Backup
 	if backupName == LatestString {
 		latest, err := getLatestBackupName(folder)
@@ -86,10 +88,10 @@ func GetBackupByName(backupName string, folder StorageFolder) (*Backup, error) {
 		}
 		tracelog.InfoLogger.Printf("LATEST backup is: '%s'\n", latest)
 
-		backup = NewBackup(folder, latest)
+		backup = NewBackup(baseBackupFolder, latest)
 
 	} else {
-		backup = NewBackup(folder, backupName)
+		backup = NewBackup(baseBackupFolder, backupName)
 
 		exists, err := backup.CheckExistence()
 		if err != nil {

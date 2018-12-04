@@ -65,10 +65,17 @@ func (folder *S3Folder) ReadObject(objectRelativePath string) (io.ReadCloser, er
 }
 
 func (folder *S3Folder) GetSubFolder(subFolderRelativePath string) StorageFolder {
-	if !strings.HasSuffix(subFolderRelativePath, "/") {
-		subFolderRelativePath = subFolderRelativePath + "/"
+	return NewS3Folder(folder.uploader, folder.S3API, *folder.Bucket, JoinS3Path(folder.Path, subFolderRelativePath) + "/")
+}
+
+func JoinS3Path(elem ...string) string {
+	var res []string
+	for _, e := range elem {
+		if e != "" {
+			res = append(res, strings.Trim(e,"/"))
+		}
 	}
-	return NewS3Folder(folder.uploader, folder.S3API, *folder.Bucket, folder.Path+subFolderRelativePath)
+	return strings.Join(res, "/")
 }
 
 func (folder *S3Folder) GetPath() string {
