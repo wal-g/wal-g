@@ -34,7 +34,7 @@ type Backup struct {
 }
 
 func NewBackup(folder StorageFolder, name string) *Backup {
-	return &Backup{folder, name}
+	return &Backup{folder.GetSubFolder(BaseBackupPath), name}
 }
 
 func (backup *Backup) getStopSentinelPath() string {

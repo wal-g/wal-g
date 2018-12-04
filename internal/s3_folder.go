@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"io"
 	"strings"
+	"path"
 )
 
 type S3Folder struct {
@@ -65,10 +66,7 @@ func (folder *S3Folder) ReadObject(objectRelativePath string) (io.ReadCloser, er
 }
 
 func (folder *S3Folder) GetSubFolder(subFolderRelativePath string) StorageFolder {
-	if !strings.HasSuffix(subFolderRelativePath, "/") {
-		subFolderRelativePath = subFolderRelativePath + "/"
-	}
-	return NewS3Folder(folder.uploader, folder.S3API, *folder.Bucket, folder.Path+subFolderRelativePath)
+	return NewS3Folder(folder.uploader, folder.S3API, *folder.Bucket, path.Join(folder.Path, subFolderRelativePath) + "/")
 }
 
 func (folder *S3Folder) GetPath() string {

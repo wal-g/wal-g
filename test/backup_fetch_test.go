@@ -9,16 +9,17 @@ import (
 )
 
 func createMockStorageFolder() internal.StorageFolder {
-	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	folder.PutObject("base_123_backup_stop_sentinel.json", &bytes.Buffer{})
-	folder.PutObject("base_456_backup_stop_sentinel.json", &bytes.Buffer{})
-	folder.PutObject("base_000_backup_stop_sentinel.json", &bytes.Buffer{}) // last put
-	folder.PutObject("base_123312", &bytes.Buffer{})                        // not a sentinel
-	folder.PutObject("base_321/nop", &bytes.Buffer{})
-	folder.PutObject("folder123/nop", &bytes.Buffer{})
-	folder.PutObject("base_456/tar_partitions/1", &bytes.Buffer{})
-	folder.PutObject("base_456/tar_partitions/2", &bytes.Buffer{})
-	folder.PutObject("base_456/tar_partitions/3", &bytes.Buffer{})
+	var folder = testtools.MakeDefaultInMemoryStorageFolder()
+	subFolder := folder.GetSubFolder(internal.BaseBackupPath)
+	subFolder.PutObject("base_123_backup_stop_sentinel.json", &bytes.Buffer{})
+	subFolder.PutObject("base_456_backup_stop_sentinel.json", &bytes.Buffer{})
+	subFolder.PutObject("base_000_backup_stop_sentinel.json", &bytes.Buffer{}) // last put
+	subFolder.PutObject("base_123312", &bytes.Buffer{})                        // not a sentinel
+	subFolder.PutObject("base_321/nop", &bytes.Buffer{})
+	subFolder.PutObject("folder123/nop", &bytes.Buffer{})
+	subFolder.PutObject("base_456/tar_partitions/1", &bytes.Buffer{})
+	subFolder.PutObject("base_456/tar_partitions/2", &bytes.Buffer{})
+	subFolder.PutObject("base_456/tar_partitions/3", &bytes.Buffer{})
 	return folder
 }
 
@@ -26,7 +27,7 @@ func TestGetBackupByName_Latest(t *testing.T) {
 	folder := createMockStorageFolder()
 	backup, err := internal.GetBackupByName(internal.LatestString, folder)
 	assert.NoError(t, err)
-	assert.Equal(t, folder, backup.BaseBackupFolder)
+	assert.Equal(t, folder.GetSubFolder(internal.BaseBackupPath), backup.BaseBackupFolder)
 	assert.Equal(t, "base_000", backup.Name)
 }
 
@@ -42,7 +43,7 @@ func TestGetBackupByName_Exists(t *testing.T) {
 	folder := createMockStorageFolder()
 	backup, err := internal.GetBackupByName("base_123", folder)
 	assert.NoError(t, err)
-	assert.Equal(t, folder, backup.BaseBackupFolder)
+	assert.Equal(t, folder.GetSubFolder(internal.BaseBackupPath), backup.BaseBackupFolder)
 	assert.Equal(t, "base_123", backup.Name)
 }
 

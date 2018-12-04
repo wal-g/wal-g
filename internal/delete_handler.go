@@ -313,7 +313,7 @@ func getBackups(folder StorageFolder) (backups []BackupTime, err error) {
 
 // TODO : unit tests
 func getBackupsAndGarbage(folder StorageFolder) (backups []BackupTime, garbage []string, err error) {
-	backupObjects, subFolders, err := folder.ListFolder()
+	backupObjects, subFolders, err := folder.GetSubFolder(BaseBackupPath).ListFolder()
 
 	if err != nil {
 		return nil, nil, err
