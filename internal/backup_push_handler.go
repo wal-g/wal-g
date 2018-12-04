@@ -45,7 +45,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	folder := uploader.uploadingFolder
 	basebackupFolder := folder.GetSubFolder(BaseBackupPath)
 	if maxDeltas > 0 {
-		previousBackupName, err = getLatestBackupName(basebackupFolder)
+		previousBackupName, err = getLatestBackupName(folder)
 		if err != nil {
 			if _, ok := err.(NoBackupsFoundError); ok {
 				tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
@@ -83,6 +83,8 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	} else {
 		tracelog.InfoLogger.Println("Doing full backup.")
 	}
+
+	uploader.uploadingFolder = basebackupFolder // TODO: AB: this subfolder switch look ugly. I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
 
 	bundle := NewBundle(archiveDirectory, previousBackupSentinelDto.BackupStartLSN, previousBackupSentinelDto.Files)
 
