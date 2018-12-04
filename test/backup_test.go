@@ -8,7 +8,7 @@ import (
 
 func TestCheckExistence_Exists(t *testing.T) {
 	folder := createMockStorageFolder()
-	backup := internal.NewBackup(folder, "base_000")
+	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_000")
 	exists, err := backup.CheckExistence()
 	assert.NoError(t, err)
 	assert.True(t, exists)
@@ -16,7 +16,7 @@ func TestCheckExistence_Exists(t *testing.T) {
 
 func TestCheckExistence_NotExists(t *testing.T) {
 	folder := createMockStorageFolder()
-	backup := internal.NewBackup(folder, "base_321")
+	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_321")
 	exists, err := backup.CheckExistence()
 	assert.NoError(t, err)
 	assert.False(t, exists)
@@ -24,7 +24,7 @@ func TestCheckExistence_NotExists(t *testing.T) {
 
 func TestGetTarNames(t *testing.T) {
 	folder := createMockStorageFolder()
-	backup := internal.NewBackup(folder, "base_456")
+	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_456")
 	tarNames, err := backup.GetTarNames()
 	assert.NoError(t, err)
 	assert.ElementsMatch(t, []string{"1", "2", "3"}, tarNames)

@@ -42,8 +42,10 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	var err error
 	incrementCount := 1
 
+	folder := uploader.uploadingFolder
+	basebackupFolder := folder.GetSubFolder(BaseBackupPath)
 	if maxDeltas > 0 {
-		previousBackupName, err = getLatestBackupName(uploader.uploadingFolder)
+		previousBackupName, err = getLatestBackupName(basebackupFolder)
 		if err != nil {
 			if _, ok := err.(NoBackupsFoundError); ok {
 				tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
@@ -51,7 +53,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 				tracelog.ErrorLogger.FatalError(err)
 			}
 		} else {
-			previousBackup := NewBackup(uploader.uploadingFolder, previousBackupName)
+			previousBackup := NewBackup(basebackupFolder, previousBackupName)
 			previousBackupSentinelDto, err = previousBackup.fetchSentinel()
 			if err != nil {
 				tracelog.ErrorLogger.FatalError(err)
@@ -69,7 +71,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 				if fromFull {
 					tracelog.InfoLogger.Println("Delta will be made from full backup.")
 					previousBackupName = *previousBackupSentinelDto.IncrementFullName
-					previousBackup := NewBackup(uploader.uploadingFolder, previousBackupName)
+					previousBackup := NewBackup(basebackupFolder, previousBackupName)
 					previousBackupSentinelDto, err = previousBackup.fetchSentinel()
 					if err != nil {
 						tracelog.ErrorLogger.FatalError(err)
@@ -96,7 +98,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 
 	if len(previousBackupName) > 0 && previousBackupSentinelDto.BackupStartLSN != nil {
 		if uploader.useWalDelta {
-			err = bundle.DownloadDeltaMap(uploader.uploadingFolder.GetSubFolder(WalPath), backupStartLSN)
+			err = bundle.DownloadDeltaMap(folder.GetSubFolder(WalPath), backupStartLSN)
 			if err == nil {
 				tracelog.InfoLogger.Println("Successfully loaded delta map, delta backup will be made with provided delta map")
 			} else {
