@@ -21,8 +21,9 @@ func NewInMemoryStorageObject(absPath string, lastModified time.Time) *InMemoryS
 	return &InMemoryStorageObject{absPath, lastModified}
 }
 
-func (object *InMemoryStorageObject) GetAbsPath() string {
-	return object.absPath
+func (object *InMemoryStorageObject) GetName() string {
+	all := strings.SplitAfter(object.absPath, "/")
+	return all[len(all)-1]
 }
 
 func (object *InMemoryStorageObject) GetLastModified() time.Time {

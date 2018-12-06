@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 )
 
 const TarPartitionFolderName = "/tar_partitions/"
@@ -58,7 +57,7 @@ func (backup *Backup) GetTarNames() ([]string, error) {
 	}
 	result := make([]string, len(objects))
 	for id, object := range objects {
-		result[id] = strings.TrimPrefix(object.GetAbsPath(), tarPartitionFolder.GetPath())
+		result[id] = object.GetName()
 	}
 	return result, nil
 }
