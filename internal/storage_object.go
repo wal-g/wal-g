@@ -3,6 +3,6 @@ package internal
 import "time"
 
 type StorageObject interface {
-	GetAbsPath() string
+	GetName() string
 	GetLastModified() time.Time
 }

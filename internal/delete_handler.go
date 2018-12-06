@@ -280,8 +280,8 @@ func getWals(before string, folder StorageFolder) ([]string, error) {
 	}
 	walsBefore := make([]string, 0)
 	for _, walObject := range walObjects {
-		if walObject.GetAbsPath() < before {
-			walsBefore = append(walsBefore, walObject.GetAbsPath())
+		if walObject.GetName() < before {
+			walsBefore = append(walsBefore, walObject.GetName())
 		}
 	}
 
@@ -329,7 +329,7 @@ func getBackupsAndGarbage(folder StorageFolder) (backups []BackupTime, garbage [
 func getBackupTimeSlices(backups []StorageObject) []BackupTime {
 	sortTimes := make([]BackupTime, len(backups))
 	for i, object := range backups {
-		key := object.GetAbsPath()
+		key := object.GetName()
 		if !strings.HasSuffix(key, SentinelSuffix) {
 			continue
 		}

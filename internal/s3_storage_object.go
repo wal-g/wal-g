@@ -13,7 +13,7 @@ func NewS3StorageObject(object *s3.Object) *S3StorageObject {
 	return &S3StorageObject{object}
 }
 
-func (object *S3StorageObject) GetAbsPath() string {
+func (object *S3StorageObject) GetName() string {
 	return *object.Key
 }
 
