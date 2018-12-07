@@ -2,6 +2,8 @@ package internal
 
 import (
 	"bytes"
+	"fmt"
+	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"io"
@@ -11,14 +13,26 @@ const (
 	RecordPartFilename = "currentRecord.part"
 )
 
+type CantDiscardWalDataError struct {
+	error
+}
+
+func NewCantDiscardWalDataError() CantDiscardWalDataError {
+	return CantDiscardWalDataError{errors.New("wanted to discard data from WAL while was restricted to do it")}
+}
+
+func (err CantDiscardWalDataError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
 // In case of recording error WalDeltaRecordingReader stops recording, but continues reading data correctly
 type WalDeltaRecordingReader struct {
-	PageReader       walparser.WalPageReader
-	WalParser        walparser.WalParser
-	PageDataLeftover []byte
-	Recorder         *WalDeltaRecorder
-	partRecorder     *WalPartRecorder
-	firstRead        bool
+	PageReader                 walparser.WalPageReader
+	WalParser                  walparser.WalParser
+	PageDataLeftover           []byte
+	Recorder                   *WalDeltaRecorder
+	partRecorder               *WalPartRecorder
+	canParsePreviousRecordTail bool
 }
 
 func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, manager *DeltaFileManager) (*WalDeltaRecordingReader, error) {
@@ -69,23 +83,27 @@ func (reader *WalDeltaRecordingReader) Read(p []byte) (n int, err error) {
 }
 
 func (reader *WalDeltaRecordingReader) RecordBlockLocationsFromPage() error {
-	defer func() { reader.firstRead = false }()
 	if reader.Recorder == nil {
 		return nil
 	}
 	discardedRecordTail, records, err := reader.WalParser.ParseRecordsFromPage(bytes.NewReader(reader.PageDataLeftover))
-	if reader.firstRead {
-		err = reader.partRecorder.SavePreviousWalTail(discardedRecordTail)
-		if err != nil {
-			return err
-		}
-	}
 	if _, ok := err.(walparser.PartialPageError); !ok && err != nil {
 		if _, ok := err.(walparser.ZeroPageError); ok {
 			return nil
 		}
 		reader.WalParser.Invalidate()
 		return err
+	}
+	if len(discardedRecordTail) > 0 || len(records) > 0 {
+		if reader.canParsePreviousRecordTail {
+			reader.canParsePreviousRecordTail = false
+			err = reader.partRecorder.SavePreviousWalTail(discardedRecordTail)
+			if err != nil {
+				return err
+			}
+		} else if len(discardedRecordTail) > 0 {
+			return NewCantDiscardWalDataError()
+		}
 	}
 	reader.Recorder.recordWalDelta(records)
 	return nil

@@ -29,6 +29,18 @@ func (err ZeroPageError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
+type CantSavePartialParserError struct {
+	error
+}
+
+func NewCantSavePartialParserError() CantSavePartialParserError {
+	return CantSavePartialParserError{errors.New("wal parser doesn't contain beginning of saved record, so it's invalid")}
+}
+
+func (err CantSavePartialParserError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
 type PartialPageError struct {
 	error
 }
@@ -42,15 +54,21 @@ func (err PartialPageError) Error() string {
 }
 
 type WalParser struct {
-	currentRecordData []byte
+	currentRecordData         []byte
+	hasCurrentRecordBeginning bool
 }
 
 func NewWalParser() *WalParser {
-	return &WalParser{make([]byte, 0)}
+	return &WalParser{make([]byte, 0), false}
+}
+
+func (parser *WalParser) setCurrentRecordData(data []byte) {
+	parser.currentRecordData = data
+	parser.hasCurrentRecordBeginning = len(data) > 0
 }
 
 func (parser *WalParser) Invalidate() {
-	parser.currentRecordData = nil
+	parser.setCurrentRecordData(nil)
 }
 
 // For now we suppose that no wal record crosses whole wal page.
@@ -62,32 +80,32 @@ func (parser *WalParser) ParseRecordsFromPage(reader io.Reader) (prevRecordTail 
 	if _, ok := pageParsingErr.(PartialPageError); !ok && pageParsingErr != nil {
 		return nil, nil, pageParsingErr
 	}
-	if len(parser.currentRecordData) == 0 {
-		parser.currentRecordData = page.NextRecordHeadingData
-		return page.PrevRecordTrailingData, page.Records, pageParsingErr
-	} else {
-		currentRecordData := concatByteSlices(parser.currentRecordData, page.PrevRecordTrailingData)
-		header, err := readXLogRecordHeader(bytes.NewReader(currentRecordData))
-		if err != nil {
-			return nil, nil, err
-		}
-		if header.TotalRecordLength == uint32(len(currentRecordData)) {
-			currentRecord, err := ParseXLogRecordFromBytes(currentRecordData)
-			if err != nil {
-				return nil, nil, err
-			}
-			records := make([]XLogRecord, len(page.Records)+1)
-			records[0] = *currentRecord
-			copy(records[1:], page.Records)
-			parser.currentRecordData = page.NextRecordHeadingData
-			return nil, records, pageParsingErr
-		}
-		if len(page.Records) != 0 || len(page.NextRecordHeadingData) != 0 {
-			return nil, nil, NewContinuationNotFoundError()
-		}
-		parser.currentRecordData = currentRecordData
-		return nil, make([]XLogRecord, 0), pageParsingErr
+	if uint32(len(page.PrevRecordTrailingData)) < page.Header.RemainingDataLen {
+		// ok, it's not all
+		parser.currentRecordData = concatByteSlices(parser.currentRecordData, page.PrevRecordTrailingData)
+		return nil, nil, pageParsingErr
 	}
+	currentRecordData := concatByteSlices(parser.currentRecordData, page.PrevRecordTrailingData)
+	if !parser.hasCurrentRecordBeginning {
+		parser.setCurrentRecordData(page.NextRecordHeadingData)
+		return currentRecordData, page.Records, pageParsingErr
+	}
+	header, err := readXLogRecordHeader(bytes.NewReader(currentRecordData))
+	if err != nil {
+		return nil, nil, err
+	}
+	if header.TotalRecordLength != uint32(len(currentRecordData)) {
+		return nil, nil, NewContinuationNotFoundError()
+	}
+	currentRecord, err := ParseXLogRecordFromBytes(currentRecordData)
+	if err != nil {
+		return nil, nil, err
+	}
+	records := make([]XLogRecord, len(page.Records)+1)
+	records[0] = *currentRecord
+	copy(records[1:], page.Records)
+	parser.setCurrentRecordData(page.NextRecordHeadingData)
+	return nil, records, pageParsingErr
 }
 
 func (parser *WalParser) parsePage(reader io.Reader) (*XLogPage, error) {
@@ -118,7 +136,7 @@ func (parser *WalParser) parsePage(reader io.Reader) (*XLogPage, error) {
 		return &XLogPage{Header: *pageHeader, PrevRecordTrailingData: remainingData[:readCount]}, nil
 	}
 	// if remainingData can be a part of WAL-switch record and we can check it
-	if len(parser.currentRecordData) > 0 {
+	if parser.hasCurrentRecordBeginning {
 		record, err := ParseXLogRecordFromBytes(concatByteSlices(parser.currentRecordData, remainingData))
 		if err != nil {
 			return nil, err
@@ -163,6 +181,9 @@ func checkPartialPage(pageReader io.Reader, page *XLogPage, recordReadingErr err
 }
 
 func (parser *WalParser) Save(writer io.Writer) error {
+	if len(parser.currentRecordData) > 0 && !parser.hasCurrentRecordBeginning {
+		return NewCantSavePartialParserError()
+	}
 	currentRecordDataLen := make([]byte, 4)
 	binary.LittleEndian.PutUint32(currentRecordDataLen, uint32(len(parser.currentRecordData)))
 	_, err := writer.Write(currentRecordDataLen)
@@ -188,9 +209,9 @@ func LoadWalParser(reader io.Reader) (*WalParser, error) {
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	return &WalParser{data}, nil
+	return &WalParser{data, len(data) > 0}, nil
 }
 
-func LoadWalParserFromCurrentRecordData(currentRecordData []byte) *WalParser {
-	return &WalParser{currentRecordData}
+func LoadWalParserFromCurrentRecordHead(currentRecordHead []byte) *WalParser {
+	return &WalParser{currentRecordHead, true}
 }

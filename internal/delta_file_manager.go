@@ -137,7 +137,7 @@ func (manager *DeltaFileManager) FlushPartFiles() (completedPartFiles map[string
 			err := manager.CombinePartFile(deltaFilename, partFile)
 			if err != nil {
 				manager.CanceledDeltaFiles[deltaFilename] = true
-				tracelog.WarningLogger.Printf("Canceled delta file writing because of error: %v\n", err)
+				tracelog.WarningLogger.Printf("Canceled delta file writing because of error: "+tracelog.GetErrorFormatter()+"\n", err)
 			}
 		} else {
 			err := saveToDataFolder(partFile, partFilename, manager.dataFolder)
@@ -220,7 +220,7 @@ func (manager *DeltaFileManager) CombinePartFile(deltaFilename string, partFile 
 		return NewDeltaFileWriterNotFoundError(deltaFilename)
 	}
 	deltaFileWriter := deltaFileWriterInterface.(*DeltaFileChanWriter)
-	deltaFileWriter.DeltaFile.WalParser = walparser.LoadWalParserFromCurrentRecordData(partFile.WalHeads[WalFileInDelta-1])
+	deltaFileWriter.DeltaFile.WalParser = walparser.LoadWalParserFromCurrentRecordHead(partFile.WalHeads[WalFileInDelta-1])
 	records, err := partFile.CombineRecords()
 	if err != nil {
 		return err

@@ -14,7 +14,7 @@ const SmallPartialTestPath = "./testdata/small_partial_test"
 
 func TestZeroPageParsing(t *testing.T) {
 	zeroPage := make([]byte, WalPageSize)
-	parser := WalParser{}
+	parser := NewWalParser()
 	_, pageData, err := parser.ParseRecordsFromPage(bytes.NewReader(zeroPage))
 	assert.Nilf(t, pageData, "not nil pageData")
 	assert.IsType(t, err, ZeroPageError{})
@@ -45,9 +45,9 @@ func parsingTestCase(t *testing.T, filename string, doTesting func(*testing.T, W
 	defer walFile.Close()
 	assert.NoError(t, err)
 	pageReader := WalPageReader{walFileReader: walFile}
-	parser := WalParser{}
+	parser := NewWalParser()
 
-	doTesting(t, pageReader, parser)
+	doTesting(t, pageReader, *parser)
 }
 
 func TestParsing(t *testing.T) {
@@ -58,7 +58,7 @@ func TestParsing(t *testing.T) {
 }
 
 func TestSaveLoadWalParser(t *testing.T) {
-	walParser := &WalParser{[]byte{1, 2, 3, 4, 5, 6}}
+	walParser := LoadWalParserFromCurrentRecordHead([]byte{1, 2, 3, 4, 5, 6})
 
 	var walParserData bytes.Buffer
 	err := walParser.Save(&walParserData)
