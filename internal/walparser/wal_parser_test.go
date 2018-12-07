@@ -8,11 +8,11 @@ import (
 )
 
 const (
-WalSwitchTestPath = "./testdata/wal_switch_test"
-PartialTestPath = "./testdata/partial_test"
-CutWALSwitchTestPath = "./testdata/cut_wal_switch_test"
-SmallPartialTestPath = "./testdata/small_partial_test"
-LongRecordTestPath = "./testdata/long_record"
+	WalSwitchTestPath    = "./testdata/wal_switch_test"
+	PartialTestPath      = "./testdata/partial_test"
+	CutWALSwitchTestPath = "./testdata/cut_wal_switch_test"
+	SmallPartialTestPath = "./testdata/small_partial_test"
+	LongRecordTestPath   = "./testdata/long_record"
 )
 
 func TestZeroPageParsing(t *testing.T) {
