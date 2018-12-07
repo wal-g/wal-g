@@ -43,7 +43,7 @@ func TestSkiplineComputation(t *testing.T) {
 
 	sort.Sort(internal.TimeSlice(backup_times1))
 
-	skipLine, walSkipFileName := internal.ComputeDeletionSkipline(backup_times1, internal.NewBackup(baseBackupFolder, "base_00000001000000000000008C"))
+	skipLine, walSkipFileName := internal.ComputeDeletionSkiplineAndPrintIntentions(backup_times1, internal.NewBackup(baseBackupFolder, "base_00000001000000000000008C"))
 
 	assert.Equal(t, "00000001000000000000008C", walSkipFileName)
 	assert.Equal(t, 3, skipLine) // we will skip 3 backups
@@ -83,7 +83,7 @@ func TestSkiplineComputationAfterUpgrade(t *testing.T) {
 
 	sort.Sort(internal.TimeSlice(backup_times2))
 
-	skipLine, walSkipFileName := internal.ComputeDeletionSkipline(backup_times2, internal.NewBackup(baseBackupFolder, "base_00000004000000000000008C"))
+	skipLine, walSkipFileName := internal.ComputeDeletionSkiplineAndPrintIntentions(backup_times2, internal.NewBackup(baseBackupFolder, "base_00000004000000000000008C"))
 
 	assert.Equal(t, "00000001000000000000009C", walSkipFileName)
 	assert.Equal(t, 3, skipLine)
