@@ -28,7 +28,7 @@ type DeleteCommandArguments struct {
 }
 
 // TODO : unit tests
-func modifyDeleteTarget(target *Backup, findFull bool) *Backup {
+func adjustDeleteTarget(target *Backup, findFull bool) *Backup {
 	sentinelDto, err := target.fetchSentinel()
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
@@ -52,7 +52,7 @@ func HandleDelete(folder StorageFolder, args []string) {
 
 	if arguments.Before {
 		if arguments.BeforeTime == nil {
-			deleteBeforeTarget(walFolder, modifyDeleteTarget(NewBackup(baseBackupFolder, arguments.Target), arguments.FindFull), nil, arguments.dryrun)
+			deleteBeforeTarget(walFolder, adjustDeleteTarget(NewBackup(baseBackupFolder, arguments.Target), arguments.FindFull), arguments.dryrun)
 		} else {
 			backups, err := getBackups(folder)
 			if err != nil {
@@ -60,7 +60,7 @@ func HandleDelete(folder StorageFolder, args []string) {
 			}
 			for _, b := range backups {
 				if b.Time.Before(*arguments.BeforeTime) {
-					deleteBeforeTarget(walFolder, modifyDeleteTarget(NewBackup(baseBackupFolder, b.BackupName), arguments.FindFull), backups, arguments.dryrun)
+					deleteBeforeTarget(walFolder, adjustDeleteTarget(NewBackup(baseBackupFolder, b.BackupName), arguments.FindFull), arguments.dryrun)
 					return
 				}
 			}
@@ -83,7 +83,7 @@ func HandleDelete(folder StorageFolder, args []string) {
 			left := backupCount
 			for _, b := range backups {
 				if left == 1 {
-					deleteBeforeTarget(walFolder, modifyDeleteTarget(NewBackup(baseBackupFolder, b.BackupName), true), backups, arguments.dryrun)
+					deleteBeforeTarget(walFolder, adjustDeleteTarget(NewBackup(baseBackupFolder, b.BackupName), true), arguments.dryrun)
 					return
 				}
 				backup := NewBackup(baseBackupFolder, b.BackupName)
@@ -100,7 +100,7 @@ func HandleDelete(folder StorageFolder, args []string) {
 			if len(backups) <= backupCount {
 				tracelog.WarningLogger.Printf("Have only %v backups.\n", backupCount)
 			} else {
-				deleteBeforeTarget(walFolder, modifyDeleteTarget(NewBackup(baseBackupFolder, backups[backupCount-1].BackupName), arguments.FindFull), nil, arguments.dryrun)
+				deleteBeforeTarget(walFolder, adjustDeleteTarget(NewBackup(baseBackupFolder, backups[backupCount-1].BackupName), arguments.FindFull), arguments.dryrun)
 			}
 		}
 	}
@@ -168,16 +168,15 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 }
 
 // TODO : unit tests
-func deleteBeforeTarget(walFolder StorageFolder, target *Backup, backupToScan []BackupTime, dryRun bool) {
+func deleteBeforeTarget(walFolder StorageFolder, target *Backup, dryRun bool) {
 	backupFolder := target.BaseBackupFolder
-	allBackups, garbage, err := getBackupsAndGarbage(backupFolder)
+	backupToScan, garbage, err := getBackupsAndGarbage(backupFolder)
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	if backupToScan == nil { // TODO : anti-pattern, needs refactoring
-		backupToScan = allBackups
-	}
 	garbageToDelete := findGarbageToDelete(garbage, target)
+
+	skipLine, walSkipFileName := ComputeDeletionSkiplineAndPrintIntentions(backupToScan, target)
 
 	if dryRun { // TODO : split this function by two: 'find objects to delete' and 'delete these objects'
 		tracelog.InfoLogger.Printf("Dry run finished.\n")
@@ -187,7 +186,6 @@ func deleteBeforeTarget(walFolder StorageFolder, target *Backup, backupToScan []
 	for _, garbageName := range garbageToDelete {
 		dropBackup(backupFolder, garbageName)
 	}
-	skipLine, walSkipFileName := ComputeDeletionSkipline(backupToScan, target)
 	if skipLine < len(backupToScan)-1 {
 		deleteWALBefore(walSkipFileName, walFolder)
 		deleteBackupsBefore(backupToScan, skipLine, backupFolder)
@@ -208,8 +206,8 @@ func findGarbageToDelete(garbage []string, target *Backup) []string {
 	return garbageToDelete
 }
 
-// ComputeDeletionSkipline selects last backup and name of last necessary WAL
-func ComputeDeletionSkipline(backups []BackupTime, target *Backup) (skipLine int, walSkipFileName string) {
+// ComputeDeletionSkiplineAndPrintIntentions selects last backup and name of last necessary WAL
+func ComputeDeletionSkiplineAndPrintIntentions(backups []BackupTime, target *Backup) (skipLine int, walSkipFileName string) {
 	skip := true
 	skipLine = len(backups)
 	walSkipFileName = ""
