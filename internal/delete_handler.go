@@ -47,12 +47,12 @@ func adjustDeleteTarget(target *Backup, findFull bool) *Backup {
 // HandleDelete is invoked to perform wal-g delete
 func HandleDelete(folder StorageFolder, args []string) {
 	baseBackupFolder := folder.GetSubFolder(BaseBackupPath)
-	walFolder := folder.GetSubFolder(WalPath)
+
 	arguments := ParseDeleteArguments(args, printDeleteUsageAndFail)
 
 	if arguments.Before {
 		if arguments.BeforeTime == nil {
-			deleteBeforeTarget(walFolder, adjustDeleteTarget(NewBackup(baseBackupFolder, arguments.Target), arguments.FindFull), arguments.dryrun)
+			deleteBeforeTarget(folder, adjustDeleteTarget(NewBackup(baseBackupFolder, arguments.Target), arguments.FindFull), arguments.dryrun)
 		} else {
 			backups, err := getBackups(folder)
 			if err != nil {
@@ -60,7 +60,7 @@ func HandleDelete(folder StorageFolder, args []string) {
 			}
 			for _, b := range backups {
 				if b.Time.Before(*arguments.BeforeTime) {
-					deleteBeforeTarget(walFolder, adjustDeleteTarget(NewBackup(baseBackupFolder, b.BackupName), arguments.FindFull), arguments.dryrun)
+					deleteBeforeTarget(folder, adjustDeleteTarget(NewBackup(baseBackupFolder, b.BackupName), arguments.FindFull), arguments.dryrun)
 					return
 				}
 			}
@@ -83,7 +83,7 @@ func HandleDelete(folder StorageFolder, args []string) {
 			left := backupCount
 			for _, b := range backups {
 				if left == 1 {
-					deleteBeforeTarget(walFolder, adjustDeleteTarget(NewBackup(baseBackupFolder, b.BackupName), true), arguments.dryrun)
+					deleteBeforeTarget(folder, adjustDeleteTarget(NewBackup(baseBackupFolder, b.BackupName), true), arguments.dryrun)
 					return
 				}
 				backup := NewBackup(baseBackupFolder, b.BackupName)
@@ -100,7 +100,7 @@ func HandleDelete(folder StorageFolder, args []string) {
 			if len(backups) <= backupCount {
 				tracelog.WarningLogger.Printf("Have only %v backups.\n", backupCount)
 			} else {
-				deleteBeforeTarget(walFolder, adjustDeleteTarget(NewBackup(baseBackupFolder, backups[backupCount-1].BackupName), arguments.FindFull), arguments.dryrun)
+				deleteBeforeTarget(folder, adjustDeleteTarget(NewBackup(baseBackupFolder, backups[backupCount-1].BackupName), arguments.FindFull), arguments.dryrun)
 			}
 		}
 	}
@@ -168,9 +168,9 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 }
 
 // TODO : unit tests
-func deleteBeforeTarget(walFolder StorageFolder, target *Backup, dryRun bool) {
-	backupFolder := target.BaseBackupFolder
-	backupToScan, garbage, err := getBackupsAndGarbage(backupFolder)
+func deleteBeforeTarget(folder StorageFolder, target *Backup, dryRun bool) {
+	walFolder := folder.GetSubFolder(WalPath)
+	backupToScan, garbage, err := getBackupsAndGarbage(folder)
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
@@ -184,11 +184,11 @@ func deleteBeforeTarget(walFolder StorageFolder, target *Backup, dryRun bool) {
 	}
 
 	for _, garbageName := range garbageToDelete {
-		dropBackup(backupFolder, garbageName)
+		dropBackup(folder, garbageName)
 	}
 	if skipLine < len(backupToScan)-1 {
 		deleteWALBefore(walSkipFileName, walFolder)
-		deleteBackupsBefore(backupToScan, skipLine, backupFolder)
+		deleteBackupsBefore(backupToScan, skipLine, folder)
 	}
 }
 
@@ -239,27 +239,36 @@ func deleteBackupsBefore(backups []BackupTime, skipline int, folder StorageFolde
 
 // TODO : unit tests
 func dropBackup(folder StorageFolder, backupName string) {
-	backup := NewBackup(folder.GetSubFolder(BaseBackupPath), backupName)
+	basebackupFolder := folder.GetSubFolder(BaseBackupPath)
+	backup := NewBackup(basebackupFolder, backupName)
 	tarNames, err := backup.GetTarNames()
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
 	sentinelName := backupName + SentinelSuffix
+	err = basebackupFolder.DeleteObjects([]string{sentinelName})
+	if err != nil {
+		tracelog.ErrorLogger.Fatal("Unable to delete backup sentinel ", sentinelName, err)
+	}
 
-	toDelete := append(tarNames, sentinelName, backupName)
-	err = folder.DeleteObjects(toDelete)
+	err = basebackupFolder.GetSubFolder(backupName).GetSubFolder(TarPartitionFolderName).DeleteObjects(tarNames)
 	if err != nil {
 		tracelog.ErrorLogger.Fatal("Unable to delete backup ", backupName, err)
+	}
+
+	err = basebackupFolder.DeleteObjects([]string{backupName})
+	if err != nil {
+		tracelog.ErrorLogger.Fatal("Unable to delete backup folder", backupName, err)
 	}
 }
 
 // TODO : unit tests
-func deleteWALBefore(walSkipFileName string, folder StorageFolder) {
-	wals, err := getWals(walSkipFileName, folder)
+func deleteWALBefore(walSkipFileName string, walFolder StorageFolder) {
+	wals, err := getWals(walSkipFileName, walFolder)
 	if err != nil {
 		tracelog.ErrorLogger.Fatal("Unable to obtain WALs for border ", walSkipFileName, err)
 	}
-	err = folder.DeleteObjects(wals)
+	err = walFolder.DeleteObjects(wals)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Unable to delete WALs before '%s', because of: "+tracelog.GetErrorFormatter(), walSkipFileName, err)
 	}
@@ -278,7 +287,9 @@ func getWals(before string, folder StorageFolder) ([]string, error) {
 	}
 	walsBefore := make([]string, 0)
 	for _, walObject := range walObjects {
+		tracelog.InfoLogger.Println(walObject.GetName())
 		if walObject.GetName() < before {
+			tracelog.InfoLogger.Println("delete",walObject.GetName())
 			walsBefore = append(walsBefore, walObject.GetName())
 		}
 	}
