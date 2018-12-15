@@ -29,7 +29,7 @@ type FSFolder struct {
 	subpath  string
 }
 
-func configureFSFoler(path string) (StorageFolder, error) {
+func NewFSFolder(path string) (StorageFolder, error) {
 	if _, err := os.Stat(path); err != nil {
 		return nil, err // Not exists or is inaccessible
 	}
@@ -48,7 +48,7 @@ func (f *FSFolder) ListFolder() (objects []StorageObject, subFolders []StorageFo
 	for _, fileInfo := range files {
 		if fileInfo.IsDir() {
 			// I do not use GetSubfolder() intentially
-			subPath := path.Join(f.rootPath, fileInfo.Name())
+			subPath := path.Join(f.subpath, fileInfo.Name())
 			subFolders = append(subFolders, &FSFolder{f.rootPath, subPath})
 		} else {
 			objects = append(objects, &FileStorageObject{fileInfo})
@@ -59,7 +59,7 @@ func (f *FSFolder) ListFolder() (objects []StorageObject, subFolders []StorageFo
 
 func (f *FSFolder) DeleteObjects(objectRelativePaths []string) error {
 	for _, fileName := range objectRelativePaths {
-		err := os.Remove(f.GetFilePath(fileName))
+		err := os.RemoveAll(f.GetFilePath(fileName))
 		if os.IsNotExist(err) {
 			continue
 		}
