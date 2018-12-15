@@ -40,9 +40,16 @@ WAL-G determines AWS credentials [like other AWS tools](http://docs.aws.amazon.c
 
 WAL-G uses [the usual PostgreSQL environment variables](https://www.postgresql.org/docs/current/static/libpq-envars.html) to configure its connection, especially including `PGHOST`, `PGPORT`, `PGUSER`, and `PGPASSWORD`/`PGPASSFILE`/`~/.pgpass`.
 
-`PGHOST` can connect over a UNIX socket. This mode is preferred for localhost connections, set `PGHOST=/var/run/postgresql` to use it. WAL-G will connect over TCP if `PGHOST` is an IP address.
+To store buckups on files system, WAL-G requires that these variables be set:
+
+* `WALG_FILE_PREFIX` (eg. `/tmp/wal-g-test-data`)
+
+Please, keep in mind that by default storing backups on disk along with database is not safe. Do not use it as a disaster recovery plan.
+
 
 **Optional**
+
+`PGHOST` can connect over a UNIX socket. This mode is preferred for localhost connections, set `PGHOST=/var/run/postgresql` to use it. WAL-G will connect over TCP if `PGHOST` is an IP address.
 
 WAL-G can automatically determine the S3 bucket's region using `s3:GetBucketLocation`, but if you wish to avoid this API call or forbid it from the applicable IAM policy, specify:
 
