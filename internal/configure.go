@@ -70,7 +70,7 @@ func findS3BucketRegion(bucket string, config *aws.Config) (string, error) {
 func getS3Path() (bucket, server string, err error) {
 	waleS3Prefix := getSettingValue("WALE_S3_PREFIX")
 	if waleS3Prefix == "" {
-		return "", "", NewUnsetEnvVarError([]string{"WALE_S3_PREFIX"})
+		return "", "", NewUnsetEnvVarError([]string{"WALG_S3_PREFIX"})
 	}
 
 	waleS3Url, err := url.Parse(waleS3Prefix)
@@ -176,6 +176,18 @@ func configureS3Uploader(s3Client *s3.S3) (*S3Uploader, error) {
 		storageClass = "STANDARD"
 	}
 	return NewS3Uploader(uploaderApi, serverSideEncryption, sseKmsKeyId, storageClass), nil
+}
+
+// TODO : unit tests
+func configureFolder() (StorageFolder, error) {
+	waleS3Prefix := getSettingValue("WALE_S3_PREFIX")
+	waleFilePrefix := getSettingValue("WALE_FILE_PREFIX")
+	if waleS3Prefix != "" {
+		return configureS3Folder()
+	} else if waleFilePrefix != "" {
+		return configureFSFoler(waleFilePrefix)
+	}
+	return nil, NewUnsetEnvVarError([]string{"WALG_S3_PREFIX", "WALG_FILE_PREFIX"})
 }
 
 // TODO : unit tests
@@ -290,9 +302,9 @@ func Configure() (uploader *Uploader, destinationFolder StorageFolder, err error
 		return nil, nil, errors.Wrap(err, "failed to configure limiters")
 	}
 
-	folder, err := configureS3Folder()
+	folder, err := configureFolder()
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to configure S3 folder")
+		return nil, nil, errors.Wrap(err, "failed to configure folder")
 	}
 
 	compressor, err := configureCompressor()
