@@ -16,6 +16,8 @@ var (
 	allowedConfigKeys = map[string]*string{
 		"WALG_S3_PREFIX":               nil,
 		"WALE_S3_PREFIX":               nil,
+		"WALG_FILE_PREFIX":             nil,
+		"WALE_FILE_PREFIX":             nil,
 		"AWS_REGION":                   nil,
 		"WALG_DOWNLOAD_CONCURRENCY":    nil,
 		"WALG_UPLOAD_CONCURRENCY":      nil,

@@ -256,6 +256,11 @@ func dropBackup(folder StorageFolder, backupName string) {
 		tracelog.ErrorLogger.Fatal("Unable to delete backup ", backupName, err)
 	}
 
+	err = basebackupFolder.GetSubFolder(backupName).DeleteObjects([]string{TarPartitionFolderName})
+	if err != nil {
+		tracelog.ErrorLogger.Fatal("Unable to delete backup tar partition folder", backupName, err)
+	}
+
 	err = basebackupFolder.DeleteObjects([]string{backupName})
 	if err != nil {
 		tracelog.ErrorLogger.Fatal("Unable to delete backup folder", backupName, err)
