@@ -32,15 +32,24 @@ Configuration
 -------------
 **Required**
 
-To connect to Amazon S3, WAL-G requires that these variables be set:
+WAL-G uses [the usual PostgreSQL environment variables](https://www.postgresql.org/docs/current/static/libpq-envars.html) to configure its connection, especially including `PGHOST`, `PGPORT`, `PGUSER`, and `PGPASSWORD`/`PGPASSFILE`/`~/.pgpass`.
+
+
+To connect to Amazon S3, WAL-G requires that this variable be set:
 
 * `WALG_S3_PREFIX` (eg. `s3://bucket/path/to/folder`) (alternative form `WALE_S3_PREFIX`)
 
 WAL-G determines AWS credentials [like other AWS tools](http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#config-settings-and-precedence). You can set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (optionally with `AWS_SECURITY_TOKEN`), or `~/.aws/credentials` (optionally with `AWS_PROFILE`), or you can set nothing to automatically fetch credentials from the EC2 metadata service.
 
-WAL-G uses [the usual PostgreSQL environment variables](https://www.postgresql.org/docs/current/static/libpq-envars.html) to configure its connection, especially including `PGHOST`, `PGPORT`, `PGUSER`, and `PGPASSWORD`/`PGPASSFILE`/`~/.pgpass`.
 
-To store buckups on files system, WAL-G requires that these variables be set:
+To store backups in Google Cloud Storage, WAL-G requires that these variables be set:
+
+* `WALG_GS_PREFIX` to specify where to store backups (eg. `gs://x4m-test-bucket/walg-folder`) 
+
+* `GOOGLE_APPLICATION_CREDENTIALS` must point to authentication json file given by GCP
+
+
+To store backups on files system, WAL-G requires that these variables be set:
 
 * `WALG_FILE_PREFIX` (eg. `/tmp/wal-g-test-data`)
 
