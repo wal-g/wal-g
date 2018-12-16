@@ -48,7 +48,7 @@ func (f *FSFolder) ListFolder() (objects []StorageObject, subFolders []StorageFo
 	for _, fileInfo := range files {
 		if fileInfo.IsDir() {
 			// I do not use GetSubfolder() intentially
-			subPath := path.Join(f.subpath, fileInfo.Name())
+			subPath := path.Join(f.subpath, fileInfo.Name()) + "/"
 			subFolders = append(subFolders, &FSFolder{f.rootPath, subPath})
 		} else {
 			objects = append(objects, &FileStorageObject{fileInfo})
@@ -72,7 +72,10 @@ func (f *FSFolder) DeleteObjects(objectRelativePaths []string) error {
 
 func (f *FSFolder) Exists(objectRelativePath string) (bool, error) {
 	_, err := os.Stat(f.GetFilePath(objectRelativePath));
-	return !os.IsNotExist(err), err
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return true, err
 }
 
 func (f *FSFolder) GetSubFolder(subFolderRelativePath string) StorageFolder {
@@ -86,7 +89,7 @@ func (f *FSFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) 
 }
 
 func (f *FSFolder) PutObject(name string, content io.Reader) error {
-	tracelog.DebugLogger.Printf("Put %v on into \n", name, f.subpath)
+	tracelog.DebugLogger.Printf("Put %v into %v\n", name, f.subpath)
 	filePath := f.GetFilePath(name)
 	file, err := OpenFileWithDir(filePath)
 	if err != nil {
