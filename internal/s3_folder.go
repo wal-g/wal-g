@@ -22,7 +22,7 @@ func NewS3Folder(uploader S3Uploader, s3API s3iface.S3API, bucket, path string) 
 		uploader,
 		s3API,
 		aws.String(bucket),
-		path,
+		addDelimiterToPath(path),
 	}
 }
 

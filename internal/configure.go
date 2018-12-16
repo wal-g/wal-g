@@ -179,7 +179,7 @@ func configureFolder() (StorageFolder, error) {
 	waleFilePrefix := getSettingValue("WALE_FILE_PREFIX")
 	waleGSPrefix := getSettingValue("WALE_GS_PREFIX")
 	if waleS3Prefix != "" {
-		return configureS3Folder()
+		return ConfigureS3Folder()
 	} else if waleFilePrefix != "" {
 		return NewFSFolder(waleFilePrefix)
 	} else if waleGSPrefix != "" {
@@ -189,7 +189,7 @@ func configureFolder() (StorageFolder, error) {
 }
 
 // TODO : unit tests
-func configureS3Folder() (*S3Folder, error) {
+func ConfigureS3Folder() (*S3Folder, error) {
 	waleS3Prefix := getSettingValue("WALE_S3_PREFIX")
 	if waleS3Prefix == "" {
 		return nil, NewUnsetEnvVarError([]string{"WALG_S3_PREFIX"})

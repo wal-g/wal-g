@@ -46,7 +46,7 @@ func testStorageFolder(storageFolder internal.StorageFolder, t *testing.T) {
 	err := storageFolder.PutObject("file0", strings.NewReader("data0"))
 	assert.NoError(t, err)
 
-	err = storageFolder.PutObject("Sub1/file1", strings.NewReader("data1"))
+	err = sub1.PutObject("file1", strings.NewReader("data1"))
 	assert.NoError(t, err)
 
 	b, err := storageFolder.Exists("file0")
@@ -58,8 +58,14 @@ func testStorageFolder(storageFolder internal.StorageFolder, t *testing.T) {
 
 	objects, subFolders, err := storageFolder.ListFolder()
 	assert.NoError(t, err)
+	t.Log(subFolders[0].GetPath())
 	assert.Equal(t, objects[0].GetName(), "file0")
 	assert.True(t, strings.HasSuffix(subFolders[0].GetPath(), "Sub1/"))
+
+	sublist, subFolders, err := sub1.ListFolder()
+	assert.NoError(t, err)
+	assert.Equal(t,len(subFolders),0)
+	assert.Equal(t,len(sublist),1)
 
 	data, err := sub1.ReadObject("file1")
 	assert.NoError(t, err)
