@@ -67,15 +67,10 @@ func findS3BucketRegion(bucket string, config *aws.Config) (string, error) {
 }
 
 // TODO : unit tests
-func getS3Path() (bucket, server string, err error) {
-	waleS3Prefix := getSettingValue("WALE_S3_PREFIX")
-	if waleS3Prefix == "" {
-		return "", "", NewUnsetEnvVarError([]string{"WALG_S3_PREFIX"})
-	}
-
-	waleS3Url, err := url.Parse(waleS3Prefix)
+func getPathFromPrefix(prefix string) (bucket, server string, err error) {
+	waleS3Url, err := url.Parse(prefix)
 	if err != nil {
-		return "", "", errors.Wrapf(err, "failed to parse url '%s'", waleS3Prefix)
+		return "", "", errors.Wrapf(err, "failed to parse url '%s'", prefix)
 	}
 	if waleS3Url.Scheme == "" || waleS3Url.Host == "" {
 		return "", "", errors.Errorf("missing url scheme=%q and/or host=%q", waleS3Url.Scheme, waleS3Url.Host)
@@ -182,17 +177,24 @@ func configureS3Uploader(s3Client *s3.S3) (*S3Uploader, error) {
 func configureFolder() (StorageFolder, error) {
 	waleS3Prefix := getSettingValue("WALE_S3_PREFIX")
 	waleFilePrefix := getSettingValue("WALE_FILE_PREFIX")
+	waleGSPrefix := getSettingValue("WALE_GS_PREFIX")
 	if waleS3Prefix != "" {
 		return configureS3Folder()
 	} else if waleFilePrefix != "" {
 		return NewFSFolder(waleFilePrefix)
+	} else if waleGSPrefix != "" {
+		return NewGSFolder(waleGSPrefix)
 	}
-	return nil, NewUnsetEnvVarError([]string{"WALG_S3_PREFIX", "WALG_FILE_PREFIX"})
+	return nil, NewUnsetEnvVarError([]string{"WALG_S3_PREFIX", "WALG_FILE_PREFIX", "WALG_GS_PREFIX"})
 }
 
 // TODO : unit tests
 func configureS3Folder() (*S3Folder, error) {
-	s3Bucket, s3Path, err := getS3Path()
+	waleS3Prefix := getSettingValue("WALE_S3_PREFIX")
+	if waleS3Prefix == "" {
+		return nil, NewUnsetEnvVarError([]string{"WALG_S3_PREFIX"})
+	}
+	s3Bucket, s3Path, err := getPathFromPrefix(waleS3Prefix)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure S3 path")
 	}
