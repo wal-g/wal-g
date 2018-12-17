@@ -8,10 +8,13 @@ import (
 	"google.golang.org/api/option"
 	"io"
 	"strings"
-	"time"
 )
 
-func NewGSFolder(prefix string) (StorageFolder, error) {
+func NewGSFolder(bucket *storage.BucketHandle, path string) *GSFolder {
+	return &GSFolder{bucket, path}
+}
+
+func ConfigureGSFolder(prefix string) (StorageFolder, error) {
 	credentials := getSettingValue("GOOGLE_APPLICATION_CREDENTIALS")
 	if credentials == "" {
 		return nil, NewUnsetEnvVarError([]string{"GOOGLE_APPLICATION_CREDENTIALS"})
@@ -31,7 +34,8 @@ func NewGSFolder(prefix string) (StorageFolder, error) {
 
 	bucket := client.Bucket(bucketName)
 
-	return &GSFolder{bucket, addDelimiterToPath(path)}, nil
+	path = addDelimiterToPath(path)
+	return NewGSFolder(bucket, path), nil
 }
 
 func addDelimiterToPath(path string) string {
@@ -41,31 +45,18 @@ func addDelimiterToPath(path string) string {
 	return path + "/"
 }
 
-type GSStorageObject struct {
-	updated time.Time
-	name    string
-}
-
-func (o *GSStorageObject) GetName() string {
-	return o.name
-}
-
-func (o *GSStorageObject) GetLastModified() time.Time {
-	return o.updated
-}
-
 // GSFolder represents folder in GCP
 type GSFolder struct {
 	bucket *storage.BucketHandle
 	path   string
 }
 
-func (f *GSFolder) GetPath() string {
-	return f.path
+func (folder *GSFolder) GetPath() string {
+	return folder.path
 }
 
-func (f *GSFolder) ListFolder() (objects []StorageObject, subFolders []StorageFolder, err error) {
-	it := f.bucket.Objects(context.Background(), &storage.Query{Delimiter: "/", Prefix: addDelimiterToPath(f.path)})
+func (folder *GSFolder) ListFolder() (objects []StorageObject, subFolders []StorageFolder, err error) {
+	it := folder.bucket.Objects(context.Background(), &storage.Query{Delimiter: "/", Prefix: addDelimiterToPath(folder.path)})
 	for {
 		objAttrs, err := it.Next()
 		if err == iterator.Done {
@@ -75,20 +66,20 @@ func (f *GSFolder) ListFolder() (objects []StorageObject, subFolders []StorageFo
 			return nil, nil, err
 		}
 		if objAttrs.Prefix != "" {
-			subFolders = append(subFolders, &GSFolder{f.bucket, objAttrs.Prefix})
+			subFolders = append(subFolders, NewGSFolder(folder.bucket, objAttrs.Prefix))
 		} else {
-			objName := strings.TrimPrefix(objAttrs.Name, f.path)
+			objName := strings.TrimPrefix(objAttrs.Name, folder.path)
 			objects = append(objects, &GSStorageObject{objAttrs.Updated, objName})
 		}
 	}
 	return
 }
 
-func (f *GSFolder) DeleteObjects(objectRelativePaths []string) error {
+func (folder *GSFolder) DeleteObjects(objectRelativePaths []string) error {
 	for _, o := range objectRelativePaths {
-		path := JoinS3Path(f.path, o)
-		object := f.bucket.Object(path)
-		tracelog.DebugLogger.Printf("Delete %v\n",path)
+		path := JoinS3Path(folder.path, o)
+		object := folder.bucket.Object(path)
+		tracelog.DebugLogger.Printf("Delete %v\n", path)
 		err := object.Delete(context.Background())
 		if err != nil && err != storage.ErrObjectNotExist {
 			return err
@@ -97,8 +88,8 @@ func (f *GSFolder) DeleteObjects(objectRelativePaths []string) error {
 	return nil
 }
 
-func (f *GSFolder) Exists(objectRelativePath string) (bool, error) {
-	object := f.bucket.Object(JoinS3Path(f.path, objectRelativePath))
+func (folder *GSFolder) Exists(objectRelativePath string) (bool, error) {
+	object := folder.bucket.Object(JoinS3Path(folder.path, objectRelativePath))
 	_, err := object.Attrs(context.Background())
 	if err == storage.ErrObjectNotExist {
 		return false, nil
@@ -106,27 +97,19 @@ func (f *GSFolder) Exists(objectRelativePath string) (bool, error) {
 	return true, err
 }
 
-func (f *GSFolder) GetSubFolder(subFolderRelativePath string) StorageFolder {
-	return &GSFolder{f.bucket, JoinS3Path(f.path, subFolderRelativePath)}
+func (folder *GSFolder) GetSubFolder(subFolderRelativePath string) StorageFolder {
+	return NewGSFolder(folder.bucket, JoinS3Path(folder.path, subFolderRelativePath))
 }
 
-type gSObjectReader struct {
-	io.Reader
-}
-
-func (gSObjectReader) Close() error {
-	return nil
-}
-
-func (f *GSFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
-	object := f.bucket.Object(JoinS3Path(f.path, objectRelativePath))
+func (folder *GSFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
+	object := folder.bucket.Object(JoinS3Path(folder.path, objectRelativePath))
 	reader, err := object.NewReader(context.Background())
-	return &gSObjectReader{reader}, err
+	return &ReaderNopCloser{reader}, err
 }
 
-func (f *GSFolder) PutObject(name string, content io.Reader) error {
-	tracelog.DebugLogger.Printf("Put %v into %v\n", name, f.path)
-	object := f.bucket.Object(JoinS3Path(f.path, name))
+func (folder *GSFolder) PutObject(name string, content io.Reader) error {
+	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
+	object := folder.bucket.Object(JoinS3Path(folder.path, name))
 	w := object.NewWriter(context.Background())
 	_, err := io.Copy(w, content)
 	if err != nil {

@@ -6,22 +6,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"time"
 )
 
 const dirDefaultMode = 0755
-
-type FileStorageObject struct {
-	os.FileInfo
-}
-
-func (fso FileStorageObject) GetName() string {
-	return fso.Name()
-}
-
-func (fso FileStorageObject) GetLastModified() time.Time {
-	return fso.ModTime()
-}
 
 // FSFolder represents folder of file system
 type FSFolder struct {
@@ -29,27 +16,31 @@ type FSFolder struct {
 	subpath  string
 }
 
-func NewFSFolder(path string) (StorageFolder, error) {
+func NewFSFolder(rootPath string, subPath string) *FSFolder {
+	return &FSFolder{rootPath, subPath}
+}
+
+func ConfigureFSFolder(path string) (StorageFolder, error) {
 	if _, err := os.Stat(path); err != nil {
 		return nil, err // Not exists or is inaccessible
 	}
-	return &FSFolder{path, ""}, nil
+	return NewFSFolder(path, ""), nil
 }
 
-func (f *FSFolder) GetPath() string {
-	return f.subpath
+func (folder *FSFolder) GetPath() string {
+	return folder.subpath
 }
 
-func (f *FSFolder) ListFolder() (objects []StorageObject, subFolders []StorageFolder, err error) {
-	files, err := ioutil.ReadDir(path.Join(f.rootPath, f.subpath))
+func (folder *FSFolder) ListFolder() (objects []StorageObject, subFolders []StorageFolder, err error) {
+	files, err := ioutil.ReadDir(path.Join(folder.rootPath, folder.subpath))
 	if err != nil {
 		return nil, nil, err
 	}
 	for _, fileInfo := range files {
 		if fileInfo.IsDir() {
 			// I do not use GetSubfolder() intentially
-			subPath := path.Join(f.subpath, fileInfo.Name()) + "/"
-			subFolders = append(subFolders, &FSFolder{f.rootPath, subPath})
+			subPath := path.Join(folder.subpath, fileInfo.Name()) + "/"
+			subFolders = append(subFolders, NewFSFolder(folder.rootPath, subPath))
 		} else {
 			objects = append(objects, &FileStorageObject{fileInfo})
 		}
@@ -57,9 +48,9 @@ func (f *FSFolder) ListFolder() (objects []StorageObject, subFolders []StorageFo
 	return
 }
 
-func (f *FSFolder) DeleteObjects(objectRelativePaths []string) error {
+func (folder *FSFolder) DeleteObjects(objectRelativePaths []string) error {
 	for _, fileName := range objectRelativePaths {
-		err := os.RemoveAll(f.GetFilePath(fileName))
+		err := os.RemoveAll(folder.GetFilePath(fileName))
 		if os.IsNotExist(err) {
 			continue
 		}
@@ -70,27 +61,32 @@ func (f *FSFolder) DeleteObjects(objectRelativePaths []string) error {
 	return nil
 }
 
-func (f *FSFolder) Exists(objectRelativePath string) (bool, error) {
-	_, err := os.Stat(f.GetFilePath(objectRelativePath));
+func (folder *FSFolder) Exists(objectRelativePath string) (bool, error) {
+	_, err := os.Stat(folder.GetFilePath(objectRelativePath));
 	if os.IsNotExist(err) {
 		return false, nil
 	}
 	return true, err
 }
 
-func (f *FSFolder) GetSubFolder(subFolderRelativePath string) StorageFolder {
-	sf := FSFolder{f.rootPath, path.Join(f.subpath, subFolderRelativePath)}
-	sf.EnsureExists()
+func (folder *FSFolder) GetSubFolder(subFolderRelativePath string) StorageFolder {
+	sf := FSFolder{folder.rootPath, path.Join(folder.subpath, subFolderRelativePath)}
+	err := sf.EnsureExists()
+	if err != nil {
+		// This is something unusual when we cannot be sure that our subfolder exists in FS
+		// The program should not proceed
+		tracelog.ErrorLogger.FatalError(err)
+	}
 	return &sf
 }
 
-func (f *FSFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
-	return os.Open(f.GetFilePath(objectRelativePath))
+func (folder *FSFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
+	return os.Open(folder.GetFilePath(objectRelativePath))
 }
 
-func (f *FSFolder) PutObject(name string, content io.Reader) error {
-	tracelog.DebugLogger.Printf("Put %v into %v\n", name, f.subpath)
-	filePath := f.GetFilePath(name)
+func (folder *FSFolder) PutObject(name string, content io.Reader) error {
+	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.subpath)
+	filePath := folder.GetFilePath(name)
 	file, err := OpenFileWithDir(filePath)
 	if err != nil {
 		return err
@@ -114,16 +110,16 @@ func OpenFileWithDir(filePath string) (*os.File, error) {
 	return file, err
 }
 
-func (f *FSFolder) GetFilePath(objectRelativePath string) string {
-	return path.Join(f.rootPath, f.subpath, objectRelativePath)
+func (folder *FSFolder) GetFilePath(objectRelativePath string) string {
+	return path.Join(folder.rootPath, folder.subpath, objectRelativePath)
 }
 
-func (f *FSFolder) EnsureExists() {
-	dirname := path.Join(f.rootPath, f.subpath)
-	if _, err := os.Stat(dirname); os.IsNotExist(err) {
-		err := os.MkdirAll(dirname, dirDefaultMode)
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
-		}
+func (folder *FSFolder) EnsureExists() error {
+	dirname := path.Join(folder.rootPath, folder.subpath)
+	_, err := os.Stat(dirname)
+	if os.IsNotExist(err) {
+		return os.MkdirAll(dirname, dirDefaultMode)
+
 	}
+	return err
 }

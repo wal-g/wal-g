@@ -16,7 +16,7 @@ func TestFSFolder(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	var storageFolder internal.StorageFolder
 
-	storageFolder, err := internal.NewFSFolder(tmpDir)
+	storageFolder, err := internal.ConfigureFSFolder(tmpDir)
 
 	assert.NoError(t, err)
 
