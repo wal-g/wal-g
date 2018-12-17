@@ -26,10 +26,12 @@ type StorageFolder interface {
 	// Should return objects with relative paths
 	ListFolder() (objects []StorageObject, subFolders []StorageFolder, err error)
 
+	// Delete object, if exists
 	DeleteObjects(objectRelativePaths []string) error
 
 	Exists(objectRelativePath string) (bool, error)
 
+	// Returns handle to subfolder. Does not have to instantiate subfolder in any material form
 	GetSubFolder(subFolderRelativePath string) StorageFolder
 
 	// Should return ObjectNotFoundError in case, there is no such object

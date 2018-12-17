@@ -181,9 +181,9 @@ func configureFolder() (StorageFolder, error) {
 	if waleS3Prefix != "" {
 		return ConfigureS3Folder()
 	} else if waleFilePrefix != "" {
-		return NewFSFolder(waleFilePrefix)
+		return ConfigureFSFolder(waleFilePrefix)
 	} else if waleGSPrefix != "" {
-		return NewGSFolder(waleGSPrefix)
+		return ConfigureGSFolder(waleGSPrefix)
 	}
 	return nil, NewUnsetEnvVarError([]string{"WALG_S3_PREFIX", "WALG_FILE_PREFIX", "WALG_GS_PREFIX"})
 }
