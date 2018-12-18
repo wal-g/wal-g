@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"fmt"
+	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 	"io/ioutil"
@@ -20,9 +22,21 @@ func NewFSFolder(rootPath string, subPath string) *FSFolder {
 	return &FSFolder{rootPath, subPath}
 }
 
+type FSFolderError struct {
+	error
+}
+
+func NewFSFolderError(err error, format string, args ...interface{}) FSFolderError {
+	return FSFolderError{errors.Wrapf(err, format, args...)}
+}
+
+func (err FSFolderError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
 func ConfigureFSFolder(path string) (StorageFolder, error) {
 	if _, err := os.Stat(path); err != nil {
-		return nil, err // Not exists or is inaccessible
+		return nil, NewFSFolderError(err, "Folder not exists or is inaccessible")
 	}
 	return NewFSFolder(path, ""), nil
 }
@@ -34,7 +48,7 @@ func (folder *FSFolder) GetPath() string {
 func (folder *FSFolder) ListFolder() (objects []StorageObject, subFolders []StorageFolder, err error) {
 	files, err := ioutil.ReadDir(path.Join(folder.rootPath, folder.subpath))
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, NewFSFolderError(err, "Unable to read folder")
 	}
 	for _, fileInfo := range files {
 		if fileInfo.IsDir() {
@@ -55,7 +69,7 @@ func (folder *FSFolder) DeleteObjects(objectRelativePaths []string) error {
 			continue
 		}
 		if err != nil {
-			return err
+			return NewFSFolderError(err, "Unable to delete object %v", fileName)
 		}
 	}
 	return nil
@@ -66,17 +80,19 @@ func (folder *FSFolder) Exists(objectRelativePath string) (bool, error) {
 	if os.IsNotExist(err) {
 		return false, nil
 	}
-	return true, err
-}
+	if err != nil {
+		return false, NewFSFolderError(err, "Unable to stat obejct %v", objectRelativePath)
+	}
+	return true, nil
 
+}
 func (folder *FSFolder) GetSubFolder(subFolderRelativePath string) StorageFolder {
 	sf := FSFolder{folder.rootPath, path.Join(folder.subpath, subFolderRelativePath)}
-	err := sf.EnsureExists()
-	if err != nil {
-		// This is something unusual when we cannot be sure that our subfolder exists in FS
-		// The program should not proceed
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	_ = sf.EnsureExists()
+
+	// This is something unusual when we cannot be sure that our subfolder exists in FS
+	// But we do not have to guarantee folder persistence, but any subsequent calls will fail
+	// Just like in all other Storage Folders
 	return &sf
 }
 
@@ -86,7 +102,10 @@ func (folder *FSFolder) ReadObject(objectRelativePath string) (io.ReadCloser, er
 	if os.IsNotExist(err) {
 		return nil, NewObjectNotFoundError(filePath)
 	}
-	return file, err
+	if err != nil {
+		return nil, NewFSFolderError(err, "Unable to read object %v", filePath)
+	}
+	return file, nil
 }
 
 func (folder *FSFolder) PutObject(name string, content io.Reader) error {
@@ -94,13 +113,17 @@ func (folder *FSFolder) PutObject(name string, content io.Reader) error {
 	filePath := folder.GetFilePath(name)
 	file, err := OpenFileWithDir(filePath)
 	if err != nil {
-		return err
+		return NewFSFolderError(err, "Unable to open file %v", filePath)
 	}
 	_, err = io.Copy(file, content)
 	if err != nil {
-		return err
+		return NewFSFolderError(err, "Unable to copy data to %v", filePath)
 	}
-	return file.Close()
+	err = file.Close()
+	if err != nil {
+		return NewFSFolderError(err, "Unable to close %v", filePath)
+	}
+	return nil
 }
 
 func OpenFileWithDir(filePath string) (*os.File, error) {

@@ -197,11 +197,3 @@ func stripWalFileName(path string) string {
 	}
 	return ""
 }
-
-type ReaderNopCloser struct {
-	io.Reader
-}
-
-func (ReaderNopCloser) Close() error {
-	return nil
-}

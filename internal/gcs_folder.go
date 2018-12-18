@@ -3,12 +3,27 @@ package internal
 import (
 	"cloud.google.com/go/storage"
 	"context"
+	"fmt"
+	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"io"
+	"io/ioutil"
 	"strings"
 )
+
+type GSFolderError struct {
+	error
+}
+
+func NewGSFolderError(err error, format string, args ...interface{}) GSFolderError {
+	return GSFolderError{errors.Wrapf(err, format, args...)}
+}
+
+func (err GSFolderError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
 
 func NewGSFolder(bucket *storage.BucketHandle, path string) *GSFolder {
 	return &GSFolder{bucket, path}
@@ -24,12 +39,12 @@ func ConfigureGSFolder(prefix string) (StorageFolder, error) {
 
 	client, err := storage.NewClient(ctx, option.WithCredentialsFile(credentials))
 	if err != nil {
-		return nil, err
+		return nil, NewFSFolderError(err, "Unable to create GS Client")
 	}
 
 	bucketName, path, err := getPathFromPrefix(prefix)
 	if err != nil {
-		return nil, err
+		return nil, NewFSFolderError(err, "Unable to parse prefix %v", prefix)
 	}
 
 	bucket := client.Bucket(bucketName)
@@ -63,7 +78,7 @@ func (folder *GSFolder) ListFolder() (objects []StorageObject, subFolders []Stor
 			break
 		}
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, NewFSFolderError(err, "Unable to iterate %v", folder.path)
 		}
 		if objAttrs.Prefix != "" {
 			subFolders = append(subFolders, NewGSFolder(folder.bucket, objAttrs.Prefix))
@@ -82,19 +97,23 @@ func (folder *GSFolder) DeleteObjects(objectRelativePaths []string) error {
 		tracelog.DebugLogger.Printf("Delete %v\n", path)
 		err := object.Delete(context.Background())
 		if err != nil && err != storage.ErrObjectNotExist {
-			return err
+			return NewFSFolderError(err, "Unable to delete object %v", path)
 		}
 	}
 	return nil
 }
 
 func (folder *GSFolder) Exists(objectRelativePath string) (bool, error) {
-	object := folder.bucket.Object(JoinS3Path(folder.path, objectRelativePath))
+	path := JoinS3Path(folder.path, objectRelativePath)
+	object := folder.bucket.Object(path)
 	_, err := object.Attrs(context.Background())
 	if err == storage.ErrObjectNotExist {
 		return false, nil
 	}
-	return true, err
+	if err != nil {
+		return false, NewFSFolderError(err, "Unable to stat object %v", path)
+	}
+	return true, nil
 }
 
 func (folder *GSFolder) GetSubFolder(subFolderRelativePath string) StorageFolder {
@@ -108,7 +127,7 @@ func (folder *GSFolder) ReadObject(objectRelativePath string) (io.ReadCloser, er
 	if err == storage.ErrObjectNotExist {
 		return nil, NewObjectNotFoundError(path)
 	}
-	return &ReaderNopCloser{reader}, err
+	return ioutil.NopCloser(reader), err
 }
 
 func (folder *GSFolder) PutObject(name string, content io.Reader) error {
@@ -117,8 +136,12 @@ func (folder *GSFolder) PutObject(name string, content io.Reader) error {
 	w := object.NewWriter(context.Background())
 	_, err := io.Copy(w, content)
 	if err != nil {
-		return err
+		return NewFSFolderError(err, "Unable to copy to object")
 	}
 	tracelog.DebugLogger.Printf("Put %v done\n", name)
-	return w.Close()
+	err = w.Close()
+	if err != nil {
+		return NewFSFolderError(err, "Unable to Close object")
+	}
+	return nil
 }
