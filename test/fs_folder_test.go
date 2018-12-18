@@ -89,4 +89,7 @@ func testStorageFolder(storageFolder internal.StorageFolder, t *testing.T) {
 	b, err = sub1.Exists("file1")
 	assert.NoError(t, err)
 	assert.False(t, b)
+
+	_, err = sub1.ReadObject("Tumba Yumba")
+	assert.Error(t,err.(internal.ObjectNotFoundError))
 }
