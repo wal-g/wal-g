@@ -102,8 +102,12 @@ func (folder *GSFolder) GetSubFolder(subFolderRelativePath string) StorageFolder
 }
 
 func (folder *GSFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
-	object := folder.bucket.Object(JoinS3Path(folder.path, objectRelativePath))
+	path := JoinS3Path(folder.path, objectRelativePath)
+	object := folder.bucket.Object(path)
 	reader, err := object.NewReader(context.Background())
+	if err == storage.ErrObjectNotExist {
+		return nil, NewObjectNotFoundError(path)
+	}
 	return &ReaderNopCloser{reader}, err
 }
 

@@ -81,7 +81,12 @@ func (folder *FSFolder) GetSubFolder(subFolderRelativePath string) StorageFolder
 }
 
 func (folder *FSFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
-	return os.Open(folder.GetFilePath(objectRelativePath))
+	filePath := folder.GetFilePath(objectRelativePath)
+	file, err := os.Open(filePath)
+	if os.IsNotExist(err) {
+		return nil, NewObjectNotFoundError(filePath)
+	}
+	return file, err
 }
 
 func (folder *FSFolder) PutObject(name string, content io.Reader) error {
