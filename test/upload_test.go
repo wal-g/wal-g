@@ -113,7 +113,7 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	}
 	uploader, folder, err = internal.Configure()
 	assert.NoError(t, err)
-	assert.Equal(t, expectedServer, strings.TrimSuffix(folder.GetPath(),"/"))
+	assert.Equal(t, expectedServer, strings.TrimSuffix(folder.GetPath(), "/"))
 	assert.NotNil(t, uploader)
 	assert.NoError(t, err)
 	// Test STANDARD_IA storage class

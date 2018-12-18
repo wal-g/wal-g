@@ -76,12 +76,12 @@ func (folder *FSFolder) DeleteObjects(objectRelativePaths []string) error {
 }
 
 func (folder *FSFolder) Exists(objectRelativePath string) (bool, error) {
-	_, err := os.Stat(folder.GetFilePath(objectRelativePath));
+	_, err := os.Stat(folder.GetFilePath(objectRelativePath))
 	if os.IsNotExist(err) {
 		return false, nil
 	}
 	if err != nil {
-		return false, NewFSFolderError(err, "Unable to stat obejct %v", objectRelativePath)
+		return false, NewFSFolderError(err, "Unable to stat object %v", objectRelativePath)
 	}
 	return true, nil
 

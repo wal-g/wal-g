@@ -294,7 +294,7 @@ func getWals(before string, folder StorageFolder) ([]string, error) {
 	for _, walObject := range walObjects {
 		tracelog.InfoLogger.Println(walObject.GetName())
 		if walObject.GetName() < before {
-			tracelog.InfoLogger.Println("delete",walObject.GetName())
+			tracelog.InfoLogger.Println("delete", walObject.GetName())
 			walsBefore = append(walsBefore, walObject.GetName())
 		}
 	}

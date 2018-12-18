@@ -10,10 +10,10 @@ import (
 func TestS3Folder(t *testing.T) {
 	t.Skip("Credentials needed to run S3 tests")
 
-	os.Setenv("AWS_ENDPOINT","http://s3.mdst.yandex.net/")
-	os.Setenv("AWS_ACCESS_KEY_ID","")
-	os.Setenv("AWS_SECRET_ACCESS_KEY","")
-	os.Setenv("WALE_S3_PREFIX","s3://test-bucket/wal-g-test-folder/Sub0")
+	os.Setenv("AWS_ENDPOINT", "http://s3.mdst.yandex.net/")
+	os.Setenv("AWS_ACCESS_KEY_ID", "")
+	os.Setenv("AWS_SECRET_ACCESS_KEY", "")
+	os.Setenv("WALE_S3_PREFIX", "s3://test-bucket/wal-g-test-folder/Sub0")
 
 	storageFolder, err := internal.ConfigureS3Folder()
 
