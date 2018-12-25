@@ -51,24 +51,30 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFile(fileReader io.Reader
 		return errors.Wrap(err, "file have to not exist till this moment")
 	}
 	if err != nil {
-		return errors.Wrapf(err, "failed to create new file: '%s'", fileInfo.Name)
+		return errors.Wrapf(err, "failed to create new file: '%s'", targetPath)
 	}
 
 	_, err = io.Copy(file, fileReader)
 	if err != nil {
+		err1 := file.Close()
+		if err1 != nil {
+			tracelog.ErrorLogger.Printf("Interpret: failed to close file '%s' because of error: %v", targetPath, err1)
+		}
+		err1 = os.Remove(targetPath)
+		if err1 != nil {
+			tracelog.ErrorLogger.Fatalf("Interpret: failed to remove file '%s' because of error: %v", targetPath, err1)
+		}
 		return errors.Wrap(err, "Interpret: copy failed")
 	}
+	defer file.Close()
 
 	mode := os.FileMode(fileInfo.Mode)
 	if err = os.Chmod(file.Name(), mode); err != nil {
 		return errors.Wrap(err, "Interpret: chmod failed")
 	}
 
-	if err = file.Sync(); err != nil {
-		return errors.Wrap(err, "Interpret: fsync failed")
-	}
-	err = file.Close()
-	return errors.Wrapf(err, "Interpret: failed to close file %s", targetPath)
+	err = file.Sync()
+	return errors.Wrap(err, "Interpret: fsync failed")
 }
 
 // TODO : unit tests
