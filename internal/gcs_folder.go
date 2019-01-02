@@ -1,16 +1,16 @@
 package internal
 
 import (
-	"cloud.google.com/go/storage"
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
 	"io"
 	"io/ioutil"
 	"strings"
+
+	"cloud.google.com/go/storage"
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"google.golang.org/api/iterator"
 )
 
 type GSFolderError struct {
@@ -30,14 +30,9 @@ func NewGSFolder(bucket *storage.BucketHandle, path string) *GSFolder {
 }
 
 func ConfigureGSFolder(prefix string) (StorageFolder, error) {
-	credentials := getSettingValue("GOOGLE_APPLICATION_CREDENTIALS")
-	if credentials == "" {
-		return nil, NewUnsetEnvVarError([]string{"GOOGLE_APPLICATION_CREDENTIALS"})
-	}
-
 	ctx := context.Background()
 
-	client, err := storage.NewClient(ctx, option.WithCredentialsFile(credentials))
+	client, err := storage.NewClient(ctx)
 	if err != nil {
 		return nil, NewGSFolderError(err, "Unable to create GS Client")
 	}

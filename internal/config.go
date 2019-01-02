@@ -2,45 +2,45 @@ package internal
 
 import (
 	"encoding/json"
-	"github.com/go-yaml/yaml"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
+
+	"github.com/go-yaml/yaml"
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 var (
 	WalgConfig        *map[string]string
 	allowedConfigKeys = map[string]*string{
-		"WALG_S3_PREFIX":                 nil,
-		"WALE_S3_PREFIX":                 nil,
-		"WALG_FILE_PREFIX":               nil,
-		"WALE_FILE_PREFIX":               nil,
-		"WALG_GS_PREFIX":                 nil,
-		"WALE_GS_PREFIX":                 nil,
-		"GOOGLE_APPLICATION_CREDENTIALS": nil,
-		"AWS_REGION":                     nil,
-		"WALG_DOWNLOAD_CONCURRENCY":      nil,
-		"WALG_UPLOAD_CONCURRENCY":        nil,
-		"WALG_UPLOAD_DISK_CONCURRENCY":   nil,
-		"WALG_SENTINEL_USER_DATA":        nil,
-		"WALG_PREVENT_WAL_OVERWRITE":     nil,
-		"AWS_ENDPOINT":                   nil,
-		"AWS_S3_FORCE_PATH_STYLE":        nil,
-		"WALG_S3_STORAGE_CLASS":          nil,
-		"WALG_S3_SSE":                    nil,
-		"WALG_S3_SSE_KMS_ID":             nil,
-		"WALG_GPG_KEY_ID":                nil,
-		"WALE_GPG_KEY_ID":                nil,
-		"WALG_DELTA_MAX_STEPS":           nil,
-		"WALG_DELTA_ORIGIN":              nil,
-		"WALG_COMPRESSION_METHOD":        nil,
-		"WALG_DISK_RATE_LIMIT":           nil,
-		"WALG_NETWORK_RATE_LIMIT":        nil,
-		"WALG_USE_WAL_DELTA":             nil,
-		"WALG_LOG_LEVEL":                 nil,
+		"WALG_S3_PREFIX":               nil,
+		"WALE_S3_PREFIX":               nil,
+		"WALG_FILE_PREFIX":             nil,
+		"WALE_FILE_PREFIX":             nil,
+		"WALG_GS_PREFIX":               nil,
+		"WALE_GS_PREFIX":               nil,
+		"AWS_REGION":                   nil,
+		"WALG_DOWNLOAD_CONCURRENCY":    nil,
+		"WALG_UPLOAD_CONCURRENCY":      nil,
+		"WALG_UPLOAD_DISK_CONCURRENCY": nil,
+		"WALG_SENTINEL_USER_DATA":      nil,
+		"WALG_PREVENT_WAL_OVERWRITE":   nil,
+		"AWS_ENDPOINT":                 nil,
+		"AWS_S3_FORCE_PATH_STYLE":      nil,
+		"WALG_S3_STORAGE_CLASS":        nil,
+		"WALG_S3_SSE":                  nil,
+		"WALG_S3_SSE_KMS_ID":           nil,
+		"WALG_GPG_KEY_ID":              nil,
+		"WALE_GPG_KEY_ID":              nil,
+		"WALG_DELTA_MAX_STEPS":         nil,
+		"WALG_DELTA_ORIGIN":            nil,
+		"WALG_COMPRESSION_METHOD":      nil,
+		"WALG_DISK_RATE_LIMIT":         nil,
+		"WALG_NETWORK_RATE_LIMIT":      nil,
+		"WALG_USE_WAL_DELTA":           nil,
+		"WALG_LOG_LEVEL":               nil,
 	}
 )
 

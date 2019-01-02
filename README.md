@@ -42,11 +42,11 @@ To connect to Amazon S3, WAL-G requires that this variable be set:
 WAL-G determines AWS credentials [like other AWS tools](http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#config-settings-and-precedence). You can set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (optionally with `AWS_SECURITY_TOKEN`), or `~/.aws/credentials` (optionally with `AWS_PROFILE`), or you can set nothing to automatically fetch credentials from the EC2 metadata service.
 
 
-To store backups in Google Cloud Storage, WAL-G requires that these variables be set:
+To store backups in Google Cloud Storage, WAL-G requires that this variable be set:
 
 * `WALG_GS_PREFIX` to specify where to store backups (eg. `gs://x4m-test-bucket/walg-folder`) 
 
-* `GOOGLE_APPLICATION_CREDENTIALS` must point to authentication json file given by GCP
+WAL-G determines Google Cloud credentials using [application-default credentials](https://cloud.google.com/docs/authentication/production) like other GCP tools. You can set `GOOGLE_APPLICATION_CREDENTIALS` to point to a service account json key from GCP. If you set nothing, WAL-G will attempt to fetch credentials from the GCE/GKE metadata service.
 
 
 To store backups on files system, WAL-G requires that these variables be set:
