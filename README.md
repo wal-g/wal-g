@@ -49,6 +49,22 @@ To store backups in Google Cloud Storage, WAL-G requires that this variable be s
 WAL-G determines Google Cloud credentials using [application-default credentials](https://cloud.google.com/docs/authentication/production) like other GCP tools. You can set `GOOGLE_APPLICATION_CREDENTIALS` to point to a service account json key from GCP. If you set nothing, WAL-G will attempt to fetch credentials from the GCE/GKE metadata service.
 
 
+To store backups in Azure Storage, WAL-G requires that this variable be set:
+
+* `WALG_AZ_PREFIX` to specify where to store backups in Azure storage (eg. `azure://x4m-test-bucket/walg-folder`)
+
+WAL-G determines Azure Storage credentials using [azure default credentials](https://docs.microsoft.com/en-us/azure/storage/common/storage-azure-cli#azure-cli-sample-script). You can set `AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_ACCESS_KEY` to provide azure storage credentials.
+
+Use `WALG_AZURE_BUFFER_SIZE` to set the upload buffer size, and `WALG_AZURE_MAX_BUFFERS` to set the number of buffers to use at most. The default buffer size is  64 * 1024 * 1024 bytes, and the default number of buffers is 3.
+
+
+To store backups in Swift object storage, WAL-G requires that this variable be set:
+
+* `WALG_SWIFT_PREFIX` to specify where to store backups in Swift object storage (eg. `azure://x4m-test-bucket/walg-folder`)
+
+WAL-G determines Swift object storage credentials using [openStack default credentials](https://www.swiftstack.com/docs/cookbooks/swift_usage/auth.html). You can use any of V1, V2, V3 of the SwiftStack Auth middleware to provide Swift object storage credentials.
+
+
 To store backups on files system, WAL-G requires that these variables be set:
 
 * `WALG_FILE_PREFIX` (eg. `/tmp/wal-g-test-data`)
