@@ -46,10 +46,7 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFile(fileReader io.Reader
 	if err != nil {
 		return errors.Wrap(err, "Interpret: failed to create all directories")
 	}
-	file, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
-	if os.IsExist(err) {
-		return errors.Wrap(err, "file have to not exist till this moment")
-	}
+	file, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create new file: '%s'", targetPath)
 	}
