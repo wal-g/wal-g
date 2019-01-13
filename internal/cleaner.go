@@ -2,7 +2,7 @@ package internal
 
 import (
 	"github.com/wal-g/wal-g/internal/tracelog"
-	"path"
+	"path/filepath"
 )
 
 // Cleaner interface serves to separate file system logic from prefetch clean logic to make it testable
@@ -36,7 +36,7 @@ func cleanupPrefetchDirectory(directory string, timelineId uint32, logSegNo uint
 			continue
 		}
 		if fileTimelineId < timelineId || (fileTimelineId == timelineId && fileLogSegNo < logSegNo) {
-			cleaner.Remove(path.Join(directory, f))
+			cleaner.Remove(filepath.Join(directory, f))
 		}
 	}
 }

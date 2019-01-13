@@ -6,7 +6,6 @@ import (
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 )
@@ -80,7 +79,7 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFile(fileReader io.Reader
 // is written successfully.
 func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileInfo *tar.Header) error {
 	tracelog.DebugLogger.Println("Interpreting: ", fileInfo.Name)
-	targetPath := path.Join(tarInterpreter.DBDataDirectory, fileInfo.Name)
+	targetPath := filepath.Join(tarInterpreter.DBDataDirectory, fileInfo.Name)
 	switch fileInfo.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
 		return tarInterpreter.unwrapRegularFile(fileReader, fileInfo, targetPath)

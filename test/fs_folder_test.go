@@ -24,7 +24,7 @@ func TestFSFolder(t *testing.T) {
 }
 
 func setupTmpDir(t *testing.T) string {
-	cwd, err := filepath.Abs("./")
+	cwd, err := filepath.Abs("."+string(os.PathSeparator))
 	if err != nil {
 		t.Log(err)
 	}
@@ -60,7 +60,7 @@ func testStorageFolder(storageFolder internal.StorageFolder, t *testing.T) {
 	assert.NoError(t, err)
 	t.Log(subFolders[0].GetPath())
 	assert.Equal(t, objects[0].GetName(), "file0")
-	assert.True(t, strings.HasSuffix(subFolders[0].GetPath(), "Sub1/"))
+	assert.True(t, strings.HasSuffix(subFolders[0].GetPath(), "Sub1"))
 
 	sublist, subFolders, err := sub1.ListFolder()
 	assert.NoError(t, err)

@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/walparser"
+	"path/filepath"
 	"testing"
 )
 
@@ -21,13 +22,13 @@ func TestGetRelFileIdFrom_NonZeroId(t *testing.T) {
 }
 
 func TestGetRelFileNodeFrom_DefaultTableSpace(t *testing.T) {
-	relFileNode, err := internal.GetRelFileNodeFrom("~/DemoDb/base/123/100500")
+	relFileNode, err := internal.GetRelFileNodeFrom(filepath.Join("~","DemoDb","base","123","100500"))
 	assert.NoError(t, err)
 	assert.Equal(t, walparser.RelFileNode{SpcNode: internal.DefaultSpcNode, DBNode: 123, RelNode: 100500}, *relFileNode)
 }
 
 func TestGetRelFileNodeFrom_NonDefaultTableSpace(t *testing.T) {
-	relFileNode, err := internal.GetRelFileNodeFrom("~/DemoDb/pg_tblspc/16709/PG_9.3_201306121/16499/19401")
+	relFileNode, err := internal.GetRelFileNodeFrom(filepath.Join("~","DemoDb","pg_tblspc","16709","PG_9.3_201306121","16499","19401"))
 	assert.NoError(t, err)
 	assert.Equal(t, walparser.RelFileNode{SpcNode: 16709, DBNode: 16499, RelNode: 19401}, *relFileNode)
 }
@@ -77,7 +78,7 @@ func TestGetDeltaBitmapFor(t *testing.T) {
 		deltaMap.AddToDelta(location)
 	}
 
-	bitmap, err := deltaMap.GetDeltaBitmapFor("~/DemoDb/base/1/2.1")
+	bitmap, err := deltaMap.GetDeltaBitmapFor(filepath.Join("~","DemoDb","base","1","2.1"))
 	assert.NoError(t, err)
 	assert.Equal(t, []uint32{23, 134}, bitmap.ToArray())
 }

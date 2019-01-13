@@ -7,6 +7,7 @@ import (
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/testtools"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -118,7 +119,7 @@ func putDeltaIntoStorage(storage *testtools.InMemoryStorage, locations []walpars
 	if err != nil {
 		return err
 	}
-	storage.Store("in_memory/wal_005/"+deltaFilename+".lz4", *bytes.NewBuffer(deltaData))
+	storage.Store(filepath.Join("in_memory","wal_005",deltaFilename+".lz4"), *bytes.NewBuffer(deltaData))
 	return nil
 }
 
@@ -134,7 +135,7 @@ func putWalIntoStorage(storage *testtools.InMemoryStorage, data []byte, walFilen
 	if err != nil {
 		return err
 	}
-	storage.Store("in_memory/wal_005/"+walFilename+".lz4", compressedData)
+	storage.Store(filepath.Join("in_memory","wal_005",walFilename+".lz4"), compressedData)
 	return nil
 }
 
@@ -181,7 +182,7 @@ func setupFolderAndBundle() (folder internal.StorageFolder, bundle *internal.Bun
 	if err != nil {
 		return nil, nil, err
 	}
-	folder = testtools.NewInMemoryStorageFolder("in_memory/", storage).GetSubFolder(internal.WalPath)
+	folder = testtools.NewInMemoryStorageFolder("in_memory"+string(os.PathSeparator), storage).GetSubFolder(internal.WalPath)
 	currentBackupFirstWalFilename := "000000010000000000000073"
 	timeLine, logSegNo, err := internal.ParseWALFilename(currentBackupFirstWalFilename)
 	if err != nil {

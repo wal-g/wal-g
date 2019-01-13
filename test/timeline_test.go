@@ -3,6 +3,8 @@ package test
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -33,9 +35,9 @@ func TestNextWALFileName(t *testing.T) {
 }
 
 func TestPrefetchLocation(t *testing.T) {
-	prefetchLocation, runningLocation, runningFile, fetchedFile := internal.GetPrefetchLocations("/var/pgdata/xlog/", "000000010000000000000051")
-	assert.Equal(t, "/var/pgdata/xlog/.wal-g/prefetch", prefetchLocation)
-	assert.Equal(t, "/var/pgdata/xlog/.wal-g/prefetch/running", runningLocation)
-	assert.Equal(t, "/var/pgdata/xlog/.wal-g/prefetch/running/000000010000000000000051", runningFile)
-	assert.Equal(t, "/var/pgdata/xlog/.wal-g/prefetch/000000010000000000000051", fetchedFile)
+	prefetchLocation, runningLocation, runningFile, fetchedFile := internal.GetPrefetchLocations(filepath.Join(string(os.PathSeparator),"var","pgdata","xlog"), "000000010000000000000051")
+	assert.Equal(t, filepath.Join(string(os.PathSeparator),"var","pgdata","xlog",".wal-g","prefetch"), prefetchLocation)
+	assert.Equal(t, filepath.Join(string(os.PathSeparator),"var","pgdata","xlog",".wal-g","prefetch","running"), runningLocation)
+	assert.Equal(t, filepath.Join(string(os.PathSeparator),"var","pgdata","xlog",".wal-g","prefetch","running","000000010000000000000051"), runningFile)
+	assert.Equal(t, filepath.Join(string(os.PathSeparator),"var","pgdata","xlog",".wal-g","prefetch","000000010000000000000051"), fetchedFile)
 }

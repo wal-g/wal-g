@@ -11,8 +11,11 @@ type TimeStampedData struct {
 	Timestamp time.Time
 }
 
+
+var timeShiftSeconds time.Duration = 1;
 func TimeStampData(data bytes.Buffer) TimeStampedData {
-	return TimeStampedData{data, time.Now()}
+	timeShiftSeconds++;
+	return TimeStampedData{data, time.Now().Add(timeShiftSeconds * time.Second)}
 }
 
 type InMemoryStorage struct {

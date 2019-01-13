@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 )
 
 const dirDefaultMode = 0755
@@ -46,14 +47,14 @@ func (folder *FSFolder) GetPath() string {
 }
 
 func (folder *FSFolder) ListFolder() (objects []StorageObject, subFolders []StorageFolder, err error) {
-	files, err := ioutil.ReadDir(path.Join(folder.rootPath, folder.subpath))
+	files, err := ioutil.ReadDir(filepath.Join(folder.rootPath, folder.subpath))
 	if err != nil {
 		return nil, nil, NewFSFolderError(err, "Unable to read folder")
 	}
 	for _, fileInfo := range files {
 		if fileInfo.IsDir() {
 			// I do not use GetSubfolder() intentially
-			subPath := path.Join(folder.subpath, fileInfo.Name()) + "/"
+			subPath := filepath.Join(folder.subpath, fileInfo.Name()) + string(os.PathSeparator)
 			subFolders = append(subFolders, NewFSFolder(folder.rootPath, subPath))
 		} else {
 			objects = append(objects, &FileStorageObject{fileInfo})
@@ -87,7 +88,7 @@ func (folder *FSFolder) Exists(objectRelativePath string) (bool, error) {
 
 }
 func (folder *FSFolder) GetSubFolder(subFolderRelativePath string) StorageFolder {
-	sf := FSFolder{folder.rootPath, path.Join(folder.subpath, subFolderRelativePath)}
+	sf := FSFolder{folder.rootPath, filepath.Join(folder.subpath, subFolderRelativePath)}
 	_ = sf.EnsureExists()
 
 	// This is something unusual when we cannot be sure that our subfolder exists in FS
@@ -139,11 +140,11 @@ func OpenFileWithDir(filePath string) (*os.File, error) {
 }
 
 func (folder *FSFolder) GetFilePath(objectRelativePath string) string {
-	return path.Join(folder.rootPath, folder.subpath, objectRelativePath)
+	return filepath.Join(folder.rootPath, folder.subpath, objectRelativePath)
 }
 
 func (folder *FSFolder) EnsureExists() error {
-	dirname := path.Join(folder.rootPath, folder.subpath)
+	dirname := filepath.Join(folder.rootPath, folder.subpath)
 	_, err := os.Stat(dirname)
 	if os.IsNotExist(err) {
 		return os.MkdirAll(dirname, dirDefaultMode)

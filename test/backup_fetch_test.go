@@ -5,6 +5,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/testtools"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -15,11 +17,11 @@ func createMockStorageFolder() internal.StorageFolder {
 	subFolder.PutObject("base_456_backup_stop_sentinel.json", &bytes.Buffer{})
 	subFolder.PutObject("base_000_backup_stop_sentinel.json", &bytes.Buffer{}) // last put
 	subFolder.PutObject("base_123312", &bytes.Buffer{})                        // not a sentinel
-	subFolder.PutObject("base_321/nop", &bytes.Buffer{})
-	subFolder.PutObject("folder123/nop", &bytes.Buffer{})
-	subFolder.PutObject("base_456/tar_partitions/1", &bytes.Buffer{})
-	subFolder.PutObject("base_456/tar_partitions/2", &bytes.Buffer{})
-	subFolder.PutObject("base_456/tar_partitions/3", &bytes.Buffer{})
+	subFolder.PutObject(filepath.Join("base_321","nop"), &bytes.Buffer{})
+	subFolder.PutObject(filepath.Join("folder123","nop"), &bytes.Buffer{})
+	subFolder.PutObject(filepath.Join("base_456","tar_partitions","1"), &bytes.Buffer{})
+	subFolder.PutObject(filepath.Join("base_456","tar_partitions","2"), &bytes.Buffer{})
+	subFolder.PutObject(filepath.Join("base_456","tar_partitions","3"), &bytes.Buffer{})
 	return folder
 }
 
@@ -33,7 +35,7 @@ func TestGetBackupByName_Latest(t *testing.T) {
 
 func TestGetBackupByName_LatestNoBackups(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	folder.PutObject("folder123/nop", &bytes.Buffer{})
+	folder.PutObject("folder123"+string(os.PathSeparator)+"nop", &bytes.Buffer{})
 	_, err := internal.GetBackupByName(internal.LatestString, folder)
 	assert.Error(t, err)
 	assert.IsType(t, internal.NewNoBackupsFoundError(), err)

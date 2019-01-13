@@ -15,8 +15,8 @@ import (
 
 const (
 	VersionStr       = "005"
-	BaseBackupPath   = "basebackups_" + VersionStr + "/"
-	WalPath          = "wal_" + VersionStr + "/"
+	BaseBackupPath   = "basebackups_" + VersionStr
+	WalPath          = "wal_" + VersionStr
 	backupNamePrefix = "base_"
 
 	// SentinelSuffix is a suffix of backup finish sentinel file
@@ -174,14 +174,16 @@ func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
 // TODO : unit tests
 func stripBackupName(path string) string {
 	all := strings.SplitAfter(path, "/")
+	all = strings.SplitAfter(all[len(all)-1], string(os.PathSeparator))
 	name := strings.Split(all[len(all)-1], "_backup")[0]
 	return name
 }
 
 // TODO : unit tests
 func stripPrefixName(path string) string {
-	path = strings.Trim(path, "/")
+	path = strings.Trim(path, "/\\")
 	all := strings.SplitAfter(path, "/")
+	all = strings.SplitAfter(all[len(all)-1], string(os.PathSeparator))
 	name := all[len(all)-1]
 	return name
 }

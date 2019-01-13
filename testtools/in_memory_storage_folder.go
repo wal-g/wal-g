@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -22,7 +23,7 @@ func NewInMemoryStorageObject(absPath string, lastModified time.Time) *InMemoryS
 }
 
 func (object *InMemoryStorageObject) GetName() string {
-	all := strings.SplitAfter(object.absPath, "/")
+	all := strings.SplitAfter(object.absPath, string(os.PathSeparator))
 	return all[len(all)-1]
 }
 
@@ -40,11 +41,11 @@ func NewInMemoryStorageFolder(path string, storage *InMemoryStorage) *InMemorySt
 }
 
 func MakeDefaultInMemoryStorageFolder() *InMemoryStorageFolder {
-	return &InMemoryStorageFolder{"in_memory/", NewInMemoryStorage()}
+	return &InMemoryStorageFolder{"in_memory"+string(os.PathSeparator), NewInMemoryStorage()}
 }
 
 func (folder *InMemoryStorageFolder) Exists(objectRelativePath string) (bool, error) {
-	_, exists := folder.Storage.Load(folder.path + objectRelativePath)
+	_, exists := folder.Storage.Load(filepath.Join(folder.path, objectRelativePath))
 	return exists, nil
 }
 
@@ -61,14 +62,14 @@ func (folder *InMemoryStorageFolder) ListFolder() (objects []internal.StorageObj
 		if filepath.Base(key) == strings.TrimPrefix(key, folder.path) {
 			objects = append(objects, NewInMemoryStorageObject(key, value.Timestamp))
 		} else {
-			subFolderName := strings.Split(strings.TrimPrefix(key, folder.path), "/")[0]
+			subFolderName := strings.Split(strings.TrimPrefix(key, folder.path), string(os.PathSeparator))[0]
 			subFolderNames.Store(subFolderName, true)
 		}
 		return true
 	})
 	subFolderNames.Range(func(iName, _ interface{}) bool {
 		name := iName.(string)
-		subFolders = append(subFolders, NewInMemoryStorageFolder(folder.path+name+"/", folder.Storage))
+		subFolders = append(subFolders, NewInMemoryStorageFolder(filepath.Join(folder.path,name)+string(os.PathSeparator), folder.Storage))
 		return true
 	})
 	return
@@ -79,11 +80,11 @@ func (folder *InMemoryStorageFolder) DeleteObjects(objectRelativePaths []string)
 }
 
 func (folder *InMemoryStorageFolder) GetSubFolder(subFolderRelativePath string) internal.StorageFolder {
-	return NewInMemoryStorageFolder(folder.path+subFolderRelativePath, folder.Storage)
+	return NewInMemoryStorageFolder(filepath.Join(folder.path,subFolderRelativePath)+string(os.PathSeparator), folder.Storage)
 }
 
 func (folder *InMemoryStorageFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
-	objectAbsPath := folder.path + objectRelativePath
+	objectAbsPath := filepath.Join(folder.path, objectRelativePath)
 	object, exists := folder.Storage.Load(objectAbsPath)
 	if !exists {
 		return nil, internal.NewObjectNotFoundError(objectAbsPath)
@@ -93,7 +94,7 @@ func (folder *InMemoryStorageFolder) ReadObject(objectRelativePath string) (io.R
 
 func (folder *InMemoryStorageFolder) PutObject(name string, content io.Reader) error {
 	data, err := ioutil.ReadAll(content)
-	objectPath := folder.path + name
+	objectPath := filepath.Join(folder.path, name)
 	if err != nil {
 		return errors.Wrapf(err, "failed to put '%s' in memory storage", objectPath)
 	}

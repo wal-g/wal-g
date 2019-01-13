@@ -7,7 +7,7 @@ import (
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -91,7 +91,7 @@ func SelectRelFileBlocks(bitmap *roaring.Bitmap, relFileId int) *roaring.Bitmap 
 }
 
 func GetRelFileIdFrom(filePath string) (int, error) {
-	filename := path.Base(filePath)
+	filename := filepath.Base(filePath)
 	match := pagedFilenameRegexp.FindStringSubmatch(filename)
 	if match[2] == "" {
 		return 0, nil
@@ -100,8 +100,8 @@ func GetRelFileIdFrom(filePath string) (int, error) {
 }
 
 func GetRelFileNodeFrom(filePath string) (*walparser.RelFileNode, error) {
-	folderPath, name := path.Split(filePath)
-	folderPathParts := strings.Split(strings.TrimSuffix(folderPath, "/"), string(os.PathSeparator))
+	folderPath, name := filepath.Split(filePath)
+	folderPathParts := strings.Split(strings.TrimSuffix(folderPath, string(os.PathSeparator)), string(os.PathSeparator))
 	match := pagedFilenameRegexp.FindStringSubmatch(name)
 	relNode, err := strconv.Atoi(match[1])
 	if err != nil {

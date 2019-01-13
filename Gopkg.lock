@@ -485,7 +485,6 @@
     "golang.org/x/sync/semaphore",
     "golang.org/x/time/rate",
     "google.golang.org/api/iterator",
-    "google.golang.org/api/option",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1
