@@ -36,7 +36,10 @@ func TestIsPgControlRequired(t *testing.T) {
 	dto, err := backup.FetchSentinel()
 	assert.NoError(t, err)
 	assert.True(t, internal.IsPgControlRequired(backup, dto))
+}
 
-	backup = internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_000000010000DD170000000C_00743784")
-	assert.False(t, internal.IsPgControlRequired(backup, dto))
+func TestIsPgControlNotRequiredForWALEBackups(t *testing.T) {
+	folder := createMockStorageFolder()
+	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_000000010000DD170000000C_00743784")
+	assert.False(t, internal.IsPgControlRequired(backup, internal.BackupSentinelDto{}))
 }
