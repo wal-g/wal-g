@@ -62,8 +62,7 @@ func (backup *Backup) GetTarNames() ([]string, error) {
 	return result, nil
 }
 
-// TODO : unit tests
-func (backup *Backup) fetchSentinel() (BackupSentinelDto, error) {
+func (backup *Backup) FetchSentinel() (BackupSentinelDto, error) {
 	sentinelDto := BackupSentinelDto{}
 	backupReaderMaker := NewStorageReaderMaker(backup.BaseBackupFolder, backup.getStopSentinelPath())
 	backupReader, err := backupReaderMaker.Reader()
@@ -122,9 +121,9 @@ func (backup *Backup) unwrap(dbDataDirectory string, sentinelDto BackupSentinelD
 	}
 
 	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of backup.
-	need_pg_control := isPgControlRequired(backup, sentinelDto)
+	needPgControl := IsPgControlRequired(backup, sentinelDto)
 
-	if pgControlKey == "" && need_pg_control {
+	if pgControlKey == "" && needPgControl {
 		return NewPgControlNotFoundError()
 	}
 
@@ -133,7 +132,7 @@ func (backup *Backup) unwrap(dbDataDirectory string, sentinelDto BackupSentinelD
 		return err
 	}
 
-	if need_pg_control {
+	if needPgControl {
 		err = ExtractAll(tarInterpreter, []ReaderMaker{NewStorageReaderMaker(backup.getTarPartitionFolder(), pgControlKey)})
 		if err != nil {
 			return errors.Wrap(err, "failed to extract pg_control")
@@ -144,11 +143,11 @@ func (backup *Backup) unwrap(dbDataDirectory string, sentinelDto BackupSentinelD
 	return nil
 }
 
-func isPgControlRequired(backup *Backup, sentinelDto BackupSentinelDto) bool {
+func IsPgControlRequired(backup *Backup, sentinelDto BackupSentinelDto) bool {
 	re := regexp.MustCompile(`^([^_]+._{1}[^_]+._{1})`)
-	balg_basebackup_name := re.FindString(backup.Name) == ""
-	need_pg_control := balg_basebackup_name || sentinelDto.isIncremental()
-	return need_pg_control
+	walgBasebackupName := re.FindString(backup.Name) == ""
+	needPgControl := walgBasebackupName || sentinelDto.isIncremental()
+	return needPgControl
 }
 
 // TODO : unit tests

@@ -111,7 +111,7 @@ func deltaFetchRecursion(backupName string, folder StorageFolder, dbDataDirector
 	if err != nil {
 		return err
 	}
-	sentinelDto, err := backup.fetchSentinel()
+	sentinelDto, err := backup.FetchSentinel()
 	if err != nil {
 		return err
 	}

@@ -29,3 +29,14 @@ func TestGetTarNames(t *testing.T) {
 	assert.NoError(t, err)
 	assert.ElementsMatch(t, []string{"1", "2", "3"}, tarNames)
 }
+
+func TestIsPgControlRequired(t *testing.T) {
+	folder := createMockStorageFolder()
+	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_456")
+	dto, err := backup.FetchSentinel()
+	assert.NoError(t, err)
+	assert.True(t, internal.IsPgControlRequired(backup, dto))
+
+	backup = internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_000000010000DD170000000C_00743784")
+	assert.False(t, internal.IsPgControlRequired(backup, dto))
+}

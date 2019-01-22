@@ -29,7 +29,7 @@ type DeleteCommandArguments struct {
 
 // TODO : unit tests
 func adjustDeleteTarget(target *Backup, findFull bool) *Backup {
-	sentinelDto, err := target.fetchSentinel()
+	sentinelDto, err := target.FetchSentinel()
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
@@ -87,7 +87,7 @@ func HandleDelete(folder StorageFolder, args []string) {
 					return
 				}
 				backup := NewBackup(baseBackupFolder, b.BackupName)
-				dto, err := backup.fetchSentinel()
+				dto, err := backup.FetchSentinel()
 				if err != nil {
 					tracelog.ErrorLogger.FatalError(err)
 				}
