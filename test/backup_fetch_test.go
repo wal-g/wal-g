@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/testtools"
+	"strings"
 	"testing"
 )
 
@@ -12,7 +13,7 @@ func createMockStorageFolder() internal.StorageFolder {
 	var folder = testtools.MakeDefaultInMemoryStorageFolder()
 	subFolder := folder.GetSubFolder(internal.BaseBackupPath)
 	subFolder.PutObject("base_123_backup_stop_sentinel.json", &bytes.Buffer{})
-	subFolder.PutObject("base_456_backup_stop_sentinel.json", &bytes.Buffer{})
+	subFolder.PutObject("base_456_backup_stop_sentinel.json", strings.NewReader("{}"))
 	subFolder.PutObject("base_000_backup_stop_sentinel.json", &bytes.Buffer{}) // last put
 	subFolder.PutObject("base_123312", &bytes.Buffer{})                        // not a sentinel
 	subFolder.PutObject("base_321/nop", &bytes.Buffer{})

@@ -63,7 +63,7 @@ func (backup *Backup) GetTarNames() ([]string, error) {
 }
 
 // TODO : unit tests
-func (backup *Backup) fetchSentinel() (BackupSentinelDto, error) {
+func (backup *Backup) FetchSentinel() (BackupSentinelDto, error) {
 	sentinelDto := BackupSentinelDto{}
 	backupReaderMaker := NewStorageReaderMaker(backup.BaseBackupFolder, backup.getStopSentinelPath())
 	backupReader, err := backupReaderMaker.Reader()
@@ -120,14 +120,20 @@ func (backup *Backup) unwrap(dbDataDirectory string, sentinelDto BackupSentinelD
 	if err != nil {
 		return err
 	}
+
+	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of backup.
+	needPgControl := IsPgControlRequired(backup, sentinelDto)
+
+	if pgControlKey == "" && needPgControl {
+		return NewPgControlNotFoundError()
+	}
+
 	err = ExtractAll(tarInterpreter, tarsToExtract)
 	if err != nil {
 		return err
 	}
-	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of backup.
-	re := regexp.MustCompile(`^([^_]+._{1}[^_]+._{1})`)
-	match := re.FindString(backup.Name)
-	if match == "" || sentinelDto.isIncremental() {
+
+	if needPgControl {
 		err = ExtractAll(tarInterpreter, []ReaderMaker{NewStorageReaderMaker(backup.getTarPartitionFolder(), pgControlKey)})
 		if err != nil {
 			return errors.Wrap(err, "failed to extract pg_control")
@@ -136,6 +142,13 @@ func (backup *Backup) unwrap(dbDataDirectory string, sentinelDto BackupSentinelD
 
 	tracelog.InfoLogger.Print("\nBackup extraction complete.\n")
 	return nil
+}
+
+func IsPgControlRequired(backup *Backup, sentinelDto BackupSentinelDto) bool {
+	re := regexp.MustCompile(`^([^_]+._{1}[^_]+._{1})`)
+	walgBasebackupName := re.FindString(backup.Name) == ""
+	needPgControl := walgBasebackupName || sentinelDto.isIncremental()
+	return needPgControl
 }
 
 // TODO : unit tests
@@ -177,9 +190,6 @@ func (backup *Backup) getTarsToExtract() (tarsToExtract []ReaderMaker, pgControl
 		}
 		tarToExtract := NewStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
 		tarsToExtract = append(tarsToExtract, tarToExtract)
-	}
-	if pgControlKey == "" {
-		return nil, "", NewPgControlNotFoundError()
 	}
 	return
 }
