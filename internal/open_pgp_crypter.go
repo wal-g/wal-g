@@ -58,17 +58,36 @@ func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, e
 	if !crypter.Configured {
 		return nil, NewCrypterUseMischiefError()
 	}
-	if crypter.PubKey == nil {
-		armour, err := getPubRingArmour(crypter.KeyRingId)
-		if err != nil {
-			return nil, err
-		}
 
-		entitylist, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(armour))
-		if err != nil {
-			return nil, err
+	if crypter.PubKey == nil {
+		if pubKeyPath, isExist := LookupConfigValue("WALG_PGP_PUBLIC_KEY_PATH"); isExist {
+			entityList, err := GetPGPKey(pubKeyPath)
+
+			if err != nil {
+				return nil, err
+			}
+
+			crypter.PubKey = entityList
+		} else {
+			// TODO: legacy gpg external use, need to remove in next major version
+			tracelog.WarningLogger.Println(`
+You are using deprecated functionality that uses an external gpg library.
+It will be removed in next major version.
+Please set gpg keys using environment variables WALG_PGP_PUBLIC_KEY_PATH.
+			`)
+
+			armour, err := getPubRingArmour(crypter.KeyRingId)
+			if err != nil {
+				return nil, err
+			}
+
+			entityList, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(armour))
+			if err != nil {
+				return nil, err
+			}
+
+			crypter.PubKey = entityList
 		}
-		crypter.PubKey = entitylist
 	}
 
 	return &DelayWriteCloser{writer, crypter.PubKey, nil}, nil
@@ -79,22 +98,41 @@ func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) 
 	if !crypter.Configured {
 		return nil, NewCrypterUseMischiefError()
 	}
-	if crypter.SecretKey == nil {
-		armour, err := getSecretRingArmour(crypter.KeyRingId)
-		if err != nil {
-			return nil, err
-		}
 
-		entitylist, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(armour))
-		if err != nil {
-			return nil, err
+	if crypter.SecretKey == nil {
+		if secKeyPath, isExist := LookupConfigValue("WALG_PGP_SECRET_KEY_PATH"); isExist {
+			entityList, err := GetPGPKey(secKeyPath)
+
+			if err != nil {
+				return nil, err
+			}
+
+			crypter.SecretKey = entityList
+		} else {
+			// TODO: legacy gpg external use, need to remove in next major version
+			tracelog.WarningLogger.Println(`
+You are using deprecated functionality that uses an external gpg library.
+It will be removed in next major version.
+Please set gpg keys using environment variables WALG_PGP_SECRET_KEY_PATH.
+			`)
+
+			armour, err := getSecretRingArmour(crypter.KeyRingId)
+			if err != nil {
+				return nil, err
+			}
+
+			entityList, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(armour))
+			if err != nil {
+				return nil, err
+			}
+
+			crypter.SecretKey = entityList
 		}
-		crypter.SecretKey = entitylist
 	}
 
-	var md, err0 = openpgp.ReadMessage(reader, crypter.SecretKey, nil, nil)
-	if err0 != nil {
-		return nil, err0
+	md, err := openpgp.ReadMessage(reader, crypter.SecretKey, nil, nil)
+	if err != nil {
+		return nil, err
 	}
 
 	return md.UnverifiedBody, nil
