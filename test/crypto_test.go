@@ -70,13 +70,13 @@ func (cb *ClosingBuffer) Close() (err error) {
 
 func TestEncryptionCycle(t *testing.T) {
 	crypter := MockArmedCrypter()
-	const somesecret = "so very secret thingy"
+	const someSecret = "so very secret thingy"
 
 	buf := new(bytes.Buffer)
 	encrypt, err := crypter.Encrypt(&ClosingBuffer{buf})
 	assert.NoErrorf(t, err, "Encryption error: %v", err)
 
-	encrypt.Write([]byte(somesecret))
+	encrypt.Write([]byte(someSecret))
 	encrypt.Close()
 
 	decrypt, err := crypter.Decrypt(&ClosingBuffer{buf})
@@ -85,5 +85,5 @@ func TestEncryptionCycle(t *testing.T) {
 	decryptedBytes, err := ioutil.ReadAll(decrypt)
 	assert.NoErrorf(t, err, "Decryption read error: %v", err)
 
-	assert.Equal(t, somesecret, string(decryptedBytes), "Decrypted text not equals open text")
+	assert.Equal(t, someSecret, string(decryptedBytes), "Decrypted text not equals open text")
 }
