@@ -28,29 +28,56 @@ func (err CrypterUseMischiefError) Error() string {
 // to extract interface
 type OpenPGPCrypter struct {
 	Configured bool
-	KeyRingId  string
+
+	KeyRingId      string
+	IsUseKeyRingId bool
+
+	PubKeyPath    string
+	SecretKeyPath string
+	isUseFiles    bool
 
 	PubKey    openpgp.EntityList
 	SecretKey openpgp.EntityList
 }
 
 func (crypter *OpenPGPCrypter) IsArmed() bool {
-	return len(crypter.KeyRingId) != 0
+	if crypter.IsUseKeyRingId {
+		tracelog.WarningLogger.Println(`
+You are using deprecated functionality that uses an external gpg library.
+It will be removed in next major version.
+Please set gpg keys using environment variables WALG_PGP_PUBLIC_KEY_PATH and WALG_PGP_SECRET_KEY_PATH.
+		`)
+	}
+
+	return crypter.isUseFiles || crypter.IsUseKeyRingId
 }
 
 // IsUsed is to check necessity of Crypter use
 // Must be called prior to any other crypter call
 func (crypter *OpenPGPCrypter) IsUsed() bool {
 	if !crypter.Configured {
-		crypter.ConfigureGPGCrypter()
+		crypter.ConfigurePGPCrypter()
 	}
+
 	return crypter.IsArmed()
 }
 
-// ConfigureGPGCrypter is OpenPGPCrypter internal initialization
-func (crypter *OpenPGPCrypter) ConfigureGPGCrypter() {
+// OpenPGPCrypter internal initialization
+func (crypter *OpenPGPCrypter) ConfigurePGPCrypter() {
 	crypter.Configured = true
-	crypter.KeyRingId = GetKeyRingId()
+
+	pubKeyPath, isPubPathExist := LookupConfigValue("WALG_PGP_PUBLIC_KEY_PATH")
+	secKeyPath, isSecPathExist := LookupConfigValue("WALG_PGP_SECRET_KEY_PATH")
+
+	if isPubPathExist && isSecPathExist {
+		crypter.PubKeyPath = pubKeyPath
+		crypter.SecretKeyPath = secKeyPath
+		crypter.isUseFiles = true
+	} else {
+		if crypter.KeyRingId = GetKeyRingId(); crypter.KeyRingId != "" {
+			crypter.IsUseKeyRingId = true
+		}
+	}
 }
 
 // Encrypt creates encryption writer from ordinary writer
@@ -60,8 +87,8 @@ func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, e
 	}
 
 	if crypter.PubKey == nil {
-		if pubKeyPath, isExist := LookupConfigValue("WALG_PGP_PUBLIC_KEY_PATH"); isExist {
-			entityList, err := GetPGPKey(pubKeyPath)
+		if crypter.isUseFiles {
+			entityList, err := GetPGPKey(crypter.PubKeyPath)
 
 			if err != nil {
 				return nil, err
@@ -70,12 +97,6 @@ func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, e
 			crypter.PubKey = entityList
 		} else {
 			// TODO: legacy gpg external use, need to remove in next major version
-			tracelog.WarningLogger.Println(`
-You are using deprecated functionality that uses an external gpg library.
-It will be removed in next major version.
-Please set gpg keys using environment variables WALG_PGP_PUBLIC_KEY_PATH.
-			`)
-
 			armour, err := getPubRingArmour(crypter.KeyRingId)
 			if err != nil {
 				return nil, err
@@ -100,8 +121,8 @@ func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) 
 	}
 
 	if crypter.SecretKey == nil {
-		if secKeyPath, isExist := LookupConfigValue("WALG_PGP_SECRET_KEY_PATH"); isExist {
-			entityList, err := GetPGPKey(secKeyPath)
+		if crypter.isUseFiles {
+			entityList, err := GetPGPKey(crypter.SecretKeyPath)
 
 			if err != nil {
 				return nil, err
@@ -110,12 +131,6 @@ func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) 
 			crypter.SecretKey = entityList
 		} else {
 			// TODO: legacy gpg external use, need to remove in next major version
-			tracelog.WarningLogger.Println(`
-You are using deprecated functionality that uses an external gpg library.
-It will be removed in next major version.
-Please set gpg keys using environment variables WALG_PGP_SECRET_KEY_PATH.
-			`)
-
 			armour, err := getSecretRingArmour(crypter.KeyRingId)
 			if err != nil {
 				return nil, err

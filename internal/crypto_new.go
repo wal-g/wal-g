@@ -7,18 +7,22 @@ import (
 	"io/ioutil"
 )
 
-func GetKey(path string) io.Reader {
+func ReadKey(path string) (io.Reader, error) {
 	byteData, err := ioutil.ReadFile(path)
 
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	return bytes.NewReader(byteData)
+	return bytes.NewReader(byteData), nil
 }
 
 func GetPGPKey(path string) (openpgp.EntityList, error) {
-	gpgKeyReader := GetKey(path)
+	gpgKeyReader, err := ReadKey(path)
+
+	if err != nil {
+		return nil, err
+	}
 
 	entityList, err := openpgp.ReadArmoredKeyRing(gpgKeyReader)
 
