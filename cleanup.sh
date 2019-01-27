@@ -2,8 +2,14 @@
 
 rm -rf tmp/
 
-if docker ps --all --format '{{.Names}}' | grep wal-g_* > /dev/null; then
-    docker rm -f $(docker ps --all --format '{{.Names}}' | grep wal-g_*)
+walg_images=$(docker ps --all --format '{{.Names}}' | grep wal-g_*)
+
+if [[ ${walg_images} ]]; then
+    docker rm -f ${walg_images}
 fi
 
-docker rmi $(docker images --filter "dangling=true" --quiet --no-trunc)
+bad_images=$(docker images --filter "dangling=true" --quiet --no-trunc)
+
+if [[ ${bad_images} ]]; then
+    docker rmi ${bad_images}
+fi
