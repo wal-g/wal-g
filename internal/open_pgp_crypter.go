@@ -7,6 +7,7 @@ import (
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"golang.org/x/crypto/openpgp"
 	"io"
+	"strings"
 )
 
 // CrypterUseMischiefError happens when crypter is used before initialization
@@ -32,9 +33,11 @@ type OpenPGPCrypter struct {
 	KeyRingId      string
 	IsUseKeyRingId bool
 
-	PubKeyPath    string
-	SecretKeyPath string
-	isUseFiles    bool
+	ArmoredKey      string
+	IsUseArmoredKey bool
+
+	ArmoredKeyPath   string
+	IsUseArmoredKeyPath bool
 
 	PubKey    openpgp.EntityList
 	SecretKey openpgp.EntityList
@@ -45,11 +48,11 @@ func (crypter *OpenPGPCrypter) IsArmed() bool {
 		tracelog.WarningLogger.Println(`
 You are using deprecated functionality that uses an external gpg library.
 It will be removed in next major version.
-Please set gpg keys using environment variables WALG_PGP_PUBLIC_KEY_PATH and WALG_PGP_SECRET_KEY_PATH.
+Please set GPG key using environment variables WALG_PGP_KEY or WALG_PGP_KEY_PATH.
 		`)
 	}
 
-	return crypter.isUseFiles || crypter.IsUseKeyRingId
+	return crypter.IsUseArmoredKey || crypter.IsUseArmoredKeyPath || crypter.IsUseKeyRingId
 }
 
 // IsUsed is to check necessity of Crypter use
@@ -66,17 +69,28 @@ func (crypter *OpenPGPCrypter) IsUsed() bool {
 func (crypter *OpenPGPCrypter) ConfigurePGPCrypter() {
 	crypter.Configured = true
 
-	pubKeyPath, isPubPathExist := LookupConfigValue("WALG_PGP_PUBLIC_KEY_PATH")
-	secKeyPath, isSecPathExist := LookupConfigValue("WALG_PGP_SECRET_KEY_PATH")
+	// key can be either private (for download) or public (for upload)
+	armoredKey, isKeyExist := LookupConfigValue("WALG_PGP_KEY")
 
-	if isPubPathExist && isSecPathExist {
-		crypter.PubKeyPath = pubKeyPath
-		crypter.SecretKeyPath = secKeyPath
-		crypter.isUseFiles = true
-	} else {
-		if crypter.KeyRingId = GetKeyRingId(); crypter.KeyRingId != "" {
-			crypter.IsUseKeyRingId = true
-		}
+	if isKeyExist {
+		crypter.ArmoredKey = armoredKey
+		crypter.IsUseArmoredKey = true
+
+		return
+	}
+
+	// key can be either private (for download) or public (for upload)
+	armoredKeyPath, isPathExist := LookupConfigValue("WALG_PGP_KEY_PATH")
+
+	if isPathExist {
+		crypter.ArmoredKeyPath = armoredKeyPath
+		crypter.IsUseArmoredKeyPath = true
+
+		return
+	}
+
+	if crypter.KeyRingId = GetKeyRingId(); crypter.KeyRingId != "" {
+		crypter.IsUseKeyRingId = true
 	}
 }
 
@@ -87,8 +101,16 @@ func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, e
 	}
 
 	if crypter.PubKey == nil {
-		if crypter.isUseFiles {
-			entityList, err := GetPGPKey(crypter.PubKeyPath)
+		if crypter.IsUseArmoredKey {
+			entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(crypter.ArmoredKey))
+
+			if err != nil {
+				return nil, err
+			}
+
+			crypter.PubKey = entityList
+		} else if crypter.IsUseArmoredKeyPath {
+			entityList, err := ReadPGPKey(crypter.ArmoredKeyPath)
 
 			if err != nil {
 				return nil, err
@@ -97,12 +119,14 @@ func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, e
 			crypter.PubKey = entityList
 		} else {
 			// TODO: legacy gpg external use, need to remove in next major version
-			armour, err := getPubRingArmour(crypter.KeyRingId)
+			armor, err := getPubRingArmor(crypter.KeyRingId)
+
 			if err != nil {
 				return nil, err
 			}
 
-			entityList, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(armour))
+			entityList, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(armor))
+
 			if err != nil {
 				return nil, err
 			}
@@ -121,8 +145,16 @@ func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) 
 	}
 
 	if crypter.SecretKey == nil {
-		if crypter.isUseFiles {
-			entityList, err := GetPGPKey(crypter.SecretKeyPath)
+		if crypter.IsUseArmoredKey {
+			entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(crypter.ArmoredKey))
+
+			if err != nil {
+				return nil, err
+			}
+
+			crypter.SecretKey = entityList
+		} else if crypter.IsUseArmoredKeyPath {
+			entityList, err := ReadPGPKey(crypter.ArmoredKeyPath)
 
 			if err != nil {
 				return nil, err
@@ -131,21 +163,33 @@ func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) 
 			crypter.SecretKey = entityList
 		} else {
 			// TODO: legacy gpg external use, need to remove in next major version
-			armour, err := getSecretRingArmour(crypter.KeyRingId)
+			armor, err := getSecretRingArmor(crypter.KeyRingId)
+
 			if err != nil {
 				return nil, err
 			}
 
-			entityList, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(armour))
+			entityList, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(armor))
+
 			if err != nil {
 				return nil, err
 			}
 
 			crypter.SecretKey = entityList
 		}
+
+		if passphrase, isExist := LookupConfigValue("WALG_PGP_KEY_PASSPHRASE"); isExist {
+			err := DecryptSecretKey(crypter.SecretKey, passphrase)
+
+			if err != nil {
+				fmt.Println(err)
+				return nil, err
+			}
+		}
 	}
 
 	md, err := openpgp.ReadMessage(reader, crypter.SecretKey, nil, nil)
+
 	if err != nil {
 		return nil, err
 	}

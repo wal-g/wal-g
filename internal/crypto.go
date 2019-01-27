@@ -39,8 +39,8 @@ type CachedKey struct {
 }
 
 // TODO : unit tests
-// Here we read armoured version of Key by calling GPG process
-func getPubRingArmour(keyId string) ([]byte, error) {
+// Here we read armored version of Key by calling GPG process
+func getPubRingArmor(keyId string) ([]byte, error) {
 	var cache CachedKey
 	var cacheFilename string
 
@@ -78,7 +78,7 @@ func getPubRingArmour(keyId string) ([]byte, error) {
 	return out, nil
 }
 
-func getSecretRingArmour(keyId string) ([]byte, error) {
+func getSecretRingArmor(keyId string) ([]byte, error) {
 	out, err := exec.Command(GpgBin, "-a", "--export-secret-key", keyId).Output()
 	if err != nil {
 		return nil, err

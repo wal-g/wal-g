@@ -17,7 +17,7 @@ func ReadKey(path string) (io.Reader, error) {
 	return bytes.NewReader(byteData), nil
 }
 
-func GetPGPKey(path string) (openpgp.EntityList, error) {
+func ReadPGPKey(path string) (openpgp.EntityList, error) {
 	gpgKeyReader, err := ReadKey(path)
 
 	if err != nil {
@@ -31,4 +31,26 @@ func GetPGPKey(path string) (openpgp.EntityList, error) {
 	}
 
 	return entityList, nil
+}
+
+func DecryptSecretKey(entityList openpgp.EntityList, passphrase string) error {
+	passphraseBytes := []byte(passphrase)
+
+	for _, entity := range entityList {
+		err := entity.PrivateKey.Decrypt(passphraseBytes)
+
+		if err != nil {
+			return err
+		}
+
+		for _, subKey := range entity.Subkeys {
+			err := subKey.PrivateKey.Decrypt(passphraseBytes)
+
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
