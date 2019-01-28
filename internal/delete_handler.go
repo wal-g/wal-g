@@ -318,6 +318,10 @@ func getLatestBackupName(folder StorageFolder) (string, error) {
 func getBackups(folder StorageFolder) (backups []BackupTime, err error) {
 	backups, _, err = getBackupsAndGarbage(folder)
 
+	if err != nil {
+		return nil, err
+	}
+
 	count := len(backups)
 	if count == 0 {
 		return nil, NewNoBackupsFoundError()
