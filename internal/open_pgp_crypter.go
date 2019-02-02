@@ -182,7 +182,6 @@ func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) 
 			err := DecryptSecretKey(crypter.SecretKey, passphrase)
 
 			if err != nil {
-				fmt.Println(err)
 				return nil, err
 			}
 		}
