@@ -13,8 +13,12 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 pgbench -i -s 10 postgres
 wal-g backup-push ${PGDATA}
+pgbench -T 3 postgres
+wal-g backup-push ${PGDATA}
+pgbench -T 3 postgres
+wal-g backup-push ${PGDATA}
 
-pgbench -i -s 20 postgres
+pgbench -T 3 postgres
 pg_dumpall -f /tmp/dump1
 pgbench -c 2 -T 100000000 -S &
 sleep 1
