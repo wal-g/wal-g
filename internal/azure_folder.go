@@ -1,4 +1,4 @@
-package walg
+package internal
 
 import (
 	"bytes"
