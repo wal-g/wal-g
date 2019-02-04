@@ -15,6 +15,8 @@ import (
 var (
 	WalgConfig        *map[string]string
 	allowedConfigKeys = map[string]*string{
+		"WALG_AZ_PREFIX":               nil,
+		"WALE_AZ_PREFIX":               nil,
 		"WALG_S3_PREFIX":               nil,
 		"WALE_S3_PREFIX":               nil,
 		"WALG_FILE_PREFIX":             nil,
