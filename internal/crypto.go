@@ -28,7 +28,11 @@ func (err GpgKeyExportError) Error() string {
 
 // GetKeyRingId extracts name of a key to use from env variable
 func GetKeyRingId() string {
-	return os.Getenv("WALE_GPG_KEY_ID")
+	gpgKeyRingId := os.Getenv("WALG_GPG_KEY_ID")
+	if gpgKeyRingId == "" {
+		gpgKeyRingId = os.Getenv("WALE_GPG_KEY_ID")
+	}
+	return gpgKeyRingId
 }
 
 const GpgBin = "gpg"
