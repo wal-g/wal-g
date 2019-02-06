@@ -145,7 +145,7 @@ func (folder *SwiftFolder) ListFolder() (objects []StorageObject, subFolders []S
 }
 
 func (folder *SwiftFolder) GetSubFolder(subFolderRelativePath string) StorageFolder {
-	return NewSwiftFolder(folder.connection,folder.container, addDelimiterToAzPath(JoinS3Path(folder.path, subFolderRelativePath)))
+	return NewSwiftFolder(folder.connection,folder.container, addDelimiterToSwiftPath(JoinS3Path(folder.path, subFolderRelativePath)))
 }
 
 func (folder *SwiftFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
