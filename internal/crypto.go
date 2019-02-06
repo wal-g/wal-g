@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"io/ioutil"
-	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
@@ -28,11 +27,7 @@ func (err GpgKeyExportError) Error() string {
 
 // GetKeyRingId extracts name of a key to use from env variable
 func GetKeyRingId() string {
-	gpgKeyRingId := os.Getenv("WALG_GPG_KEY_ID")
-	if gpgKeyRingId == "" {
-		gpgKeyRingId = os.Getenv("WALE_GPG_KEY_ID")
-	}
-	return gpgKeyRingId
+	return getSettingValue("WALG_GPG_KEY_ID")
 }
 
 const GpgBin = "gpg"
