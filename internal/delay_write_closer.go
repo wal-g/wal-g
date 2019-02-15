@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"golang.org/x/crypto/openpgp"
 	"io"
 )
 
@@ -12,9 +11,9 @@ import (
 // initialization before actual write. If no write occurs, initialization
 // still is performed, to handle zero-byte Files correctly
 type DelayWriteCloser struct {
-	inner      io.WriteCloser
-	entityList openpgp.EntityList
-	outer      *io.WriteCloser
+	inner   io.WriteCloser
+	crypter Crypter
+	outer   *io.WriteCloser
 }
 
 func (delayWriteCloser *DelayWriteCloser) Write(p []byte) (n int, err error) {
@@ -22,7 +21,7 @@ func (delayWriteCloser *DelayWriteCloser) Write(p []byte) (n int, err error) {
 		return 0, nil
 	}
 	if delayWriteCloser.outer == nil {
-		writeCloser, err := openpgp.Encrypt(delayWriteCloser.inner, delayWriteCloser.entityList, nil, nil, nil)
+		writeCloser, err := delayWriteCloser.crypter.ForceEncrypt(delayWriteCloser.inner)
 		if err != nil {
 			return 0, err
 		}
@@ -35,7 +34,7 @@ func (delayWriteCloser *DelayWriteCloser) Write(p []byte) (n int, err error) {
 // Close DelayWriteCloser
 func (delayWriteCloser *DelayWriteCloser) Close() error {
 	if delayWriteCloser.outer == nil {
-		writeCloser, err := openpgp.Encrypt(delayWriteCloser.inner, delayWriteCloser.entityList, nil, nil, nil)
+		writeCloser, err := delayWriteCloser.crypter.ForceEncrypt(delayWriteCloser.inner)
 		if err != nil {
 			return err
 		}

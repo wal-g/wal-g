@@ -71,7 +71,7 @@ func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, e
 		crypter.PubKey = entitylist
 	}
 
-	return &DelayWriteCloser{writer, crypter.PubKey, nil}, nil
+	return &DelayWriteCloser{writer, crypter, nil}, nil
 }
 
 // Decrypt creates decrypted reader from ordinary reader
@@ -98,4 +98,8 @@ func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) 
 	}
 
 	return md.UnverifiedBody, nil
+}
+
+func (crypter *OpenPGPCrypter) ForceEncrypt(writer io.WriteCloser) (io.WriteCloser, error) {
+	return openpgp.Encrypt(writer, crypter.PubKey, nil, nil, nil)
 }
