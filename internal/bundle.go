@@ -62,7 +62,7 @@ type Bundle struct {
 	Sentinel           *Sentinel
 	TarBall            TarBall
 	TarBallMaker       TarBallMaker
-	Crypter            OpenPGPCrypter
+	Crypter            Crypter
 	Timeline           uint32
 	Replica            bool
 	IncrementFromLsn   *uint64
@@ -87,6 +87,7 @@ func NewBundle(archiveDirectory string, incrementFromLsn *uint64, incrementFromF
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
 		Files:              &sync.Map{},
+		Crypter:            NewCrypter(),
 	}
 }
 
@@ -314,7 +315,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 		}
 
 		tarBall := bundle.Deque()
-		tarBall.SetUp(&bundle.Crypter)
+		tarBall.SetUp(bundle.Crypter)
 		go func() {
 			// TODO: Refactor this functional mess
 			// And maybe do a better error handling
@@ -329,7 +330,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 		}()
 	} else {
 		tarBall := bundle.Deque()
-		tarBall.SetUp(&bundle.Crypter)
+		tarBall.SetUp(bundle.Crypter)
 		defer bundle.EnqueueBack(tarBall)
 		err = tarBall.TarWriter().WriteHeader(fileInfoHeader)
 		if err != nil {
@@ -353,7 +354,7 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 
 	bundle.NewTarBall(false)
 	tarBall := bundle.TarBall
-	tarBall.SetUp(&bundle.Crypter, "pg_control.tar."+compressorFileExtension)
+	tarBall.SetUp(bundle.Crypter, "pg_control.tar."+compressorFileExtension)
 	tarWriter := tarBall.TarWriter()
 
 	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
@@ -417,7 +418,7 @@ func (bundle *Bundle) UploadLabelFiles(conn *pgx.Conn) (uint64, error) {
 
 	bundle.NewTarBall(false)
 	tarBall := bundle.TarBall
-	tarBall.SetUp(&bundle.Crypter)
+	tarBall.SetUp(bundle.Crypter)
 
 	labelHeader := &tar.Header{
 		Name:     BackupLabelFilename,

@@ -85,3 +85,26 @@ func getSecretRingArmour(keyId string) ([]byte, error) {
 	}
 	return out, nil
 }
+
+// var crypters := []interface{}{ &OpenPGPCrypter{}, &AWSKMSCrypter{} }
+
+func NewCrypter() Crypter {
+
+	crypters := []interface{}{&OpenPGPCrypter{}}
+
+	for _, crypter := range crypters {
+		tempCrypter, ok := crypter.(Crypter)
+		if !ok {
+			tracelog.ErrorLogger.Printf("Can't initialize crypter: %v", tempCrypter)
+		}
+		if tempCrypter.IsUsed() {
+			return tempCrypter
+		}
+	}
+
+	tempCrypter, ok := crypters[0].(Crypter)
+	if !ok {
+		tracelog.ErrorLogger.Printf("Can't initialize crypter: %v", tempCrypter)
+	}
+	return tempCrypter
+}

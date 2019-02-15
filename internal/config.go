@@ -32,6 +32,7 @@ var (
 		"WALG_S3_STORAGE_CLASS":        nil,
 		"WALG_S3_SSE":                  nil,
 		"WALG_S3_SSE_KMS_ID":           nil,
+		"WALG_CSE_KMS_ID":              nil,
 		"WALG_GPG_KEY_ID":              nil,
 		"WALE_GPG_KEY_ID":              nil,
 		"WALG_DELTA_MAX_STEPS":         nil,

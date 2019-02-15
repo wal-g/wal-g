@@ -90,7 +90,9 @@ func (uploader *Uploader) UploadFile(file NamedReader) error {
 		NewCompressingWriter: uploader.compressor.NewWriter,
 	}
 
-	pipeWriter.Compress(&OpenPGPCrypter{})
+	crypter := NewCrypter()
+
+	pipeWriter.Compress(crypter)
 
 	dstPath := sanitizePath(filepath.Base(file.Name()) + "." + uploader.compressor.FileExtension())
 	reader := pipeWriter.Output
