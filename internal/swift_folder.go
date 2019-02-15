@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"github.com/ncw/swift"
 	"github.com/pkg/errors"
-	"github.com/tamalsaha/wal-g-demo/tracelog"
+	//"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 	"io/ioutil"
-	"os"
 	"strings"
 )
 
@@ -29,53 +29,16 @@ func NewSwiftFolder(connection *swift.Connection, container swift.Container, pat
 }
 
 func ConfigureSwiftFolder(prefix string) (StorageFolder, error) {
-	swiftCredentials := getSwiftCredentials()
-	username := swiftCredentials["user"]
-	key := swiftCredentials["key"]
-	authURL := swiftCredentials["authURL"]
-	authType := swiftCredentials["authType"]
-	if swiftCredentials["exists"] != "yes" {
-		return nil, NewSwiftFolderError(errors.New("Credential error"),
-			"Either the OS_USERNAME, OS_PASSWORD or OS_AUTH_URL environment variable is not set")
+	connection := new(swift.Connection)
+	//users must set conventional openStack environment variables: username, key, auth-url, tenantName, region etc
+	err := connection.ApplyEnvironment()
+	if err != nil {
+		return nil, NewSwiftFolderError(err, "Unable to apply env variables")
 	}
-	var region,tenantID,tenantName string
-	// v2 and v3 authentication require tenant ID or name as well
-	if authType != "v1"{
-		tenantID = swiftCredentials["tenantID"]
-		tenantName = swiftCredentials["tenantName"]
-		region = swiftCredentials["region"]
-	}
-	//v3 authentication requires tenant id, domain name, domain
-	if authType!= "v2" && authType != "v1"{
-		//domain name, id, and such
-	}
-	var connection *swift.Connection
-
-	if swiftCredentials["authType"] == "v1"{
-		// Create a v1 auth connection
-		connection = &swift.Connection{
-			UserName: username,
-			ApiKey: key,
-			AuthUrl: authURL,
-			Region:region,
-		}
-	}else if swiftCredentials["authType"] == "v2"{
-		// Create a v2 auth connection
-		connection = &swift.Connection{
-			UserName: username,
-			ApiKey: key,
-			AuthUrl: authURL,
-			Tenant: tenantName,
-			TenantId:tenantID,
-			Region:region,
-		}
-	}
-	// Authenticate
-	err := connection.Authenticate()
+	err = connection.Authenticate()
 	if err != nil {
 		return nil, NewSwiftFolderError(err, "Unable to authenticate Swift connection")
 	}
-
 	containerName, path, err := getPathFromPrefix(prefix)
 	if err != nil {
 		return nil, NewSwiftFolderError(err, "Unable to get container name and path from prefix %v",prefix)
@@ -124,18 +87,27 @@ func (folder *SwiftFolder) ListFolder() (objects []StorageObject, subFolders []S
 	err = folder.connection.ObjectsWalk(folder.container.Name, &swift.ObjectsOpts{Delimiter:int32('/'),Prefix:folder.path}, func(opts *swift.ObjectsOpts) (interface{}, error) {
 
 		objectNames, err := folder.connection.ObjectNames(folder.container.Name, opts)
+		if err != nil{
+			return nil,err
+		}else{
+			// Retrieved object names successfully.
+		}
 		for _,objectName := range objectNames {
 			if strings.HasSuffix(objectName,"/"){
+				//It is a subFolder name
 				subFolders = append(subFolders, NewSwiftFolder(folder.connection,folder.container, objectName))
 			}else{
+				//It is a storage object name
 				obj,_,err := folder.connection.Object(folder.container.Name,objectName)
 				if err != nil{
 					return nil,err
 				}
-				objects = append(objects,&SwiftStorageObject{name:obj.Name,updated:obj.LastModified})
+				//trim prefix to get object's standalone name
+				objName := strings.TrimPrefix(obj.Name, folder.path)
+				objects = append(objects,&SwiftStorageObject{name:objName,updated:obj.LastModified})
 			}
 		}
-
+		//return objectNames if a further iteration is required.
 		return objectNames, err
 	})
 	if err != nil{
@@ -150,20 +122,26 @@ func (folder *SwiftFolder) GetSubFolder(subFolderRelativePath string) StorageFol
 
 func (folder *SwiftFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	path := JoinS3Path(folder.path, objectRelativePath)
-	contentBytes, err := folder.connection.ObjectGetBytes(folder.container.Name,path)
+	//get the object from the cloud using full path
+	cBytes,err := folder.connection.ObjectGetBytes(folder.container.Name, path)
 	if err != nil{
-		return nil, NewSwiftFolderError(err, "Unable to fetch content %v",path)
+		return nil, NewSwiftFolderError(err, "Unable to OPEN Object %v",path)
+	}else{
+		//retrieved object from  the cloud
 	}
-	readContents := bytes.NewReader(contentBytes)
-	return ioutil.NopCloser(readContents), nil
+	readContents := bytes.NewReader(cBytes)
+	return ioutil.NopCloser(readContents) , nil
 }
 
 func (folder *SwiftFolder) PutObject(name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
 	path := JoinS3Path(folder.path, name)
+	//put the object in the cloud using full path
 	_,err := folder.connection.ObjectPut(folder.container.Name,path,content,false,"","",nil)
 	if err != nil {
 		return NewSwiftFolderError(err, "Unable to write content.")
+	} else{
+		//Object stored successfully
 	}
 	return nil
 }
@@ -181,35 +159,4 @@ func (folder *SwiftFolder) DeleteObjects(objectRelativePaths []string) error {
 		}
 	}
 	return nil
-}
-
-func getSwiftCredentials() map[string]string {
-	credentials := make(map[string]string)
-	userName := os.Getenv("OS_USERNAME")
-	password := os.Getenv("OS_PASSWORD")
-	authURL := os.Getenv("OS_AUTH_URL")
-
-	//swiftKey := os.Getenv("SWIFT_API_KEY")
-	//swiftUser := os.Getenv("SWIFT_API_USER")
-	//swiftAuthURL := os.Getenv("SWIFT_AUTH_URL")
-
-	region := os.Getenv("OS_REGION_NAME")
-	tenantName := os.Getenv("OS_TENANT_NAME")
-	tenantID := os.Getenv("OS_TENANT_ID")
-	if userName != "" && password != "" && authURL != ""{
-		credentials["authType"] = "v1"
-		credentials["exists"] = "yes"
-	}
-
-	if tenantID != "" || tenantName != ""{
-		credentials["authType"] = "v2"
-	}
-	credentials["user"] = userName
-	credentials["key"] = password
-	credentials["authURL"]= authURL
-	credentials["region"] = region
-	credentials["tenantID"] = tenantID
-	credentials["tenantName"] = tenantName
-
-	return credentials
 }

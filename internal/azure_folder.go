@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/pkg/errors"
-	"github.com/tamalsaha/wal-g-demo/tracelog"
+	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 	"net/url"
 	"os"
@@ -72,7 +72,6 @@ func (folder *AzureFolder) GetPath() string {
 
 func (folder *AzureFolder) Exists(objectRelativePath string) (bool, error) {
 	path := JoinS3Path(folder.path, objectRelativePath)
-	fmt.Println("folder path = ",folder.path)
 	ctx := context.Background()
 	blobURL := folder.containerURL.NewBlockBlobURL(path)
 	_,err := blobURL.GetProperties(ctx, azblob.BlobAccessConditions{})
@@ -86,23 +85,28 @@ func (folder *AzureFolder) Exists(objectRelativePath string) (bool, error) {
 }
 
 func (folder *AzureFolder) ListFolder() (objects []StorageObject, subFolders []StorageFolder, err error) {
-	//Marker is used for segmentation purposes.
+	//Marker is used for segmented iteration.
 	for marker := (azblob.Marker{}); marker.NotDone(); {
+
 		blobs, err := folder.containerURL.ListBlobsHierarchySegment(context.Background(), marker,"/", azblob.ListBlobsSegmentOptions{Prefix:folder.path})
 		if err != nil {
 			return nil,nil, NewAzureFolderError(err, "Unable to iterate %v",folder.path)
 		}
+		//add blobs to the list of storage objects
 		for _, blob := range blobs.Segment.BlobItems{
 			objName := strings.TrimPrefix(blob.Name, folder.path)
 			updated := time.Time(blob.Properties.LastModified)
+
 			objects = append(objects, &AzureStorageObject{updated, objName})
 		}
 
 		marker = blobs.NextMarker
-		fmt.Println()
+		//Get subFolder names
 		blobPrefixes := blobs.Segment.BlobPrefixes
+		//add subFolders to the list of storage folders
 		for _,blobPrefix := range blobPrefixes{
 			subFolderPath := blobPrefix.Name
+
 			subFolders = append(subFolders, NewAzureFolder(folder.containerURL, subFolderPath))
 		}
 
@@ -115,36 +119,42 @@ func (folder *AzureFolder) GetSubFolder(subFolderRelativePath string) StorageFol
 }
 
 func (folder *AzureFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
+	//Download blob using blobURL obtained from full path to blob
 	path := JoinS3Path(folder.path, objectRelativePath)
 	blobURL := folder.containerURL.NewBlockBlobURL(path)
 	downloadResponse, err := blobURL.Download(context.Background(),0,0,azblob.BlobAccessConditions{},false)
 	if err != nil {
 		return nil,NewAzureFolderError(err, "Unable to download blob %s.", path)
 	}
+	//retrieve and return the downloaded content
 	content := downloadResponse.Body(azblob.RetryReaderOptions{})
 	return content, nil
 }
 
 func (folder *AzureFolder) PutObject(name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
-	path := JoinS3Path(folder.path, name)
-	blobURL := folder.containerURL.NewBlockBlobURL(path)
+	//process the input content
 	buf := new(bytes.Buffer)
 	_, err := buf.ReadFrom(content)
 	if err != nil {
 		return NewAzureFolderError(err, "Unable to copy to object")
 	}
+	//Upload content to a blob using full path
+	path := JoinS3Path(folder.path, name)
+	blobURL := folder.containerURL.NewBlockBlobURL(path)
 	uploadContent := bytes.NewReader(buf.Bytes())
 	_ , err = blobURL.Upload(context.Background(), uploadContent ,azblob.BlobHTTPHeaders{ContentType: "text/plain"}, azblob.Metadata{}, azblob.BlobAccessConditions{})
 	if err != nil{
 		return NewAzureFolderError(err, "unable to upload blob %v", name)
 	}
+
 	tracelog.DebugLogger.Printf("Put %v done\n", name)
 	return nil
 }
 
 func (folder *AzureFolder) DeleteObjects(objectRelativePaths []string) error {
 	for _, objectRelativePath := range objectRelativePaths {
+		//Delete blob using blobURL obtained from full path to blob
 		path := JoinS3Path(folder.path, objectRelativePath)
 		blobURL := folder.containerURL.NewBlockBlobURL(path)
 		tracelog.DebugLogger.Printf("Delete %v\n", path)
@@ -154,6 +164,8 @@ func (folder *AzureFolder) DeleteObjects(objectRelativePaths []string) error {
 		}
 		if err != nil{
 			return NewAzureFolderError(err,"Unable to delete object %v", path)
+		}else {
+			//blob is deleted
 		}
 	}
 	return nil
