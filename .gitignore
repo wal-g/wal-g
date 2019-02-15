@@ -1,7 +1,6 @@
 # external libs
 vendor/
 .idea/
-
 # bin
 cmd/wal-g/wal-g
 
