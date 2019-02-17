@@ -131,15 +131,11 @@ type ExternalGPGCrypter struct {
 }
 
 func (c *ExternalGPGCrypter) IsUsed() bool {
-	_, isExist := internal.LookupKeyRingId()
-
-	return isExist
+	return internal.GetKeyRingId() != ""
 }
 
 func (c *ExternalGPGCrypter) Encrypt(reader io.Reader) ([]byte, error) {
-	keyRingId, _ := internal.LookupKeyRingId()
-
-	cmd := exec.Command("gpg", "-e", "-z", "0", "-r", keyRingId)
+	cmd := exec.Command("gpg", "-e", "-z", "0", "-r", internal.GetKeyRingId())
 
 	cmd.Stdin = reader
 
