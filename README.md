@@ -117,9 +117,22 @@ To enable S3 server-side encryption, set to the algorithm to use when storing th
 
 If using S3 server-side encryption with `aws:kms`, the KMS Key ID to use for object encryption.
 
-* `WALG_GPG_KEY_ID`  (alternative form `WALE_GPG_KEY_ID`)
+* `WALG_GPG_KEY_ID`  (alternative form `WALE_GPG_KEY_ID`) *DEPRECATED*
 
 To configure GPG key for encryption and decryption. By default, no encryption is used. Public keyring is cached in the file "/.walg_key_cache".
+
+* `WALG_PGP_KEY`
+
+To configure encryption and decryption with OpenPGP standard.<br/>
+Set *private key* value, when you need to execute ```wal-fetch``` or ```backup-fetch``` command.<br/>
+Set *public key* value, when you need to execute ```wal-push``` or ```backup-push``` command.<br/>
+Keep in mind that the *private key* also contains the *public key*.
+
+* `WALG_PGP_KEY_PATH`
+Similar to `WALG_PGP_KEY`, but value is the path to the key on file system.
+
+* `WALG_PGP_KEY_PASSPHRASE`
+If your *private key* is encrypted with a *passphrase*, you should set *passpharse* for decrypt.
 
 * `WALG_DELTA_MAX_STEPS`
 
@@ -136,11 +149,11 @@ To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not e
 To configure compression method used for backups. Possible options are: `lz4`, 'lzma', 'brotli'. Default method is `lz4`. LZ4 is the fastest method, but compression ratio is bad.
 LZMA is way much slower, however it compresses backups about 6 times better than LZ4. Brotli is a good trade-off between speed and compression ratio which is about 3 times better than LZ4.
 
- * `WALG_DISK_RATE_LIMIT`
+* `WALG_DISK_RATE_LIMIT`
 
 To configure disk read rate limit during ```backup-push``` in bytes per second.
 
- * `WALG_NETWORK_RATE_LIMIT`
+* `WALG_NETWORK_RATE_LIMIT`
 
 To configure network upload rate limit during ```backup-push``` in bytes per second.
 
