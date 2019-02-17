@@ -117,21 +117,23 @@ To enable S3 server-side encryption, set to the algorithm to use when storing th
 
 If using S3 server-side encryption with `aws:kms`, the KMS Key ID to use for object encryption.
 
-* `WALG_GPG_KEY_ID`  (alternative form `WALE_GPG_KEY_ID`) *DEPRECATED*
+* `WALG_GPG_KEY_ID`  (alternative form `WALE_GPG_KEY_ID`) ⚠️ **DEPRECATED**
 
 To configure GPG key for encryption and decryption. By default, no encryption is used. Public keyring is cached in the file "/.walg_key_cache".
 
 * `WALG_PGP_KEY`
 
-To configure encryption and decryption with OpenPGP standard.<br/>
-Set *private key* value, when you need to execute ```wal-fetch``` or ```backup-fetch``` command.<br/>
-Set *public key* value, when you need to execute ```wal-push``` or ```backup-push``` command.<br/>
+To configure encryption and decryption with OpenPGP standard.
+Set *private key* value, when you need to execute ```wal-fetch``` or ```backup-fetch``` command.
+Set *public key* value, when you need to execute ```wal-push``` or ```backup-push``` command.
 Keep in mind that the *private key* also contains the *public key*.
 
 * `WALG_PGP_KEY_PATH`
+
 Similar to `WALG_PGP_KEY`, but value is the path to the key on file system.
 
 * `WALG_PGP_KEY_PASSPHRASE`
+
 If your *private key* is encrypted with a *passphrase*, you should set *passpharse* for decrypt.
 
 * `WALG_DELTA_MAX_STEPS`
