@@ -123,6 +123,10 @@ func (folder *AzureFolder) ReadObject(objectRelativePath string) (io.ReadCloser,
 	path := JoinS3Path(folder.path, objectRelativePath)
 	blobURL := folder.containerURL.NewBlockBlobURL(path)
 	downloadResponse, err := blobURL.Download(context.Background(),0,0,azblob.BlobAccessConditions{},false)
+	if stgErr, ok := err.(azblob.StorageError); ok && stgErr.ServiceCode() == azblob.ServiceCodeBlobNotFound{
+		return nil, NewObjectNotFoundError(path)
+	}
+
 	if err != nil {
 		return nil,NewAzureFolderError(err, "Unable to download blob %s.", path)
 	}

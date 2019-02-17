@@ -124,6 +124,9 @@ func (folder *SwiftFolder) ReadObject(objectRelativePath string) (io.ReadCloser,
 	path := JoinS3Path(folder.path, objectRelativePath)
 	//get the object from the cloud using full path
 	cBytes,err := folder.connection.ObjectGetBytes(folder.container.Name, path)
+	if err == swift.ObjectNotFound{
+		return nil, NewObjectNotFoundError(path)
+	}
 	if err != nil{
 		return nil, NewSwiftFolderError(err, "Unable to OPEN Object %v",path)
 	}else{
