@@ -93,7 +93,7 @@ func getSecretRingArmour(keyId string) ([]byte, error) {
 
 func NewCrypter() Crypter {
 
-	crypters := []interface{}{ &OpenPGPCrypter{}, &AWSKMSCrypter{} }
+	crypters := []interface{}{&OpenPGPCrypter{}, &AWSKMSCrypter{}}
 
 	for _, crypter := range crypters {
 		tempCrypter, ok := crypter.(Crypter)

@@ -1,22 +1,22 @@
 package internal
 
 import (
-	"io"
 	"crypto/rand"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/minio/sio"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"io"
 )
 
 type AWSKMSCrypter struct {
 	Configured bool
-	KMSKeyId  string
+	KMSKeyId   string
 
-	SymmetricKey []byte
-	SymmetricKeyLen int
-	EncryptedSymmetricKey []byte
+	SymmetricKey             []byte
+	SymmetricKeyLen          int
+	EncryptedSymmetricKey    []byte
 	EncryptedSymmetricKeyLen int
 }
 
