@@ -121,6 +121,10 @@ If using S3 server-side encryption with `aws:kms`, the KMS Key ID to use for obj
 
 To configure GPG key for encryption and decryption. By default, no encryption is used. Public keyring is cached in the file "/.walg_key_cache".
 
+* `WALG_CSE_KMS_ID`
+
+To configure AWS KMS key for client side encryption and decryption. By default, no encryption is used. (AWS_REGION required to be set when using AWS KMS key client side encryption)
+
 * `WALG_DELTA_MAX_STEPS`
 
  Delta-backup is difference between previously taken backup and present state. `WALG_DELTA_MAX_STEPS` determines how many delta backups can be between full backups. Defaults to 0.
