@@ -34,7 +34,7 @@
   version = "v0.4.16"
 
 [[projects]]
-  digest = "1:e3bb374225bfecd4f8d8bd099216802dccbc3ceeb0d185b891eba4eb095857cf"
+  digest = "1:d6ea693db6c6588b4831fd333454721144f4a2533824ef3d22243cd519c4b2fa"
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -63,11 +63,14 @@
     "private/protocol",
     "private/protocol/eventstream",
     "private/protocol/eventstream/eventstreamapi",
+    "private/protocol/json/jsonutil",
+    "private/protocol/jsonrpc",
     "private/protocol/query",
     "private/protocol/query/queryutil",
     "private/protocol/rest",
     "private/protocol/restxml",
     "private/protocol/xml/xmlutil",
+    "service/kms",
     "service/s3",
     "service/s3/s3iface",
     "service/s3/s3manager",
@@ -173,6 +176,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:594b731b385e9dd739b0e73313de41bf32d1041fcdbfac42f62c0d1ff151a09e"
+  name = "github.com/minio/sio"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "035b4ef8c449ba2ba21ec143c91964e76a1fb68c"
+
+[[projects]]
+  branch = "master"
   digest = "1:c22fdadfe2de0e1df75987cac34f1c721157dc24f180c76b4ef66a3c9637a799"
   name = "github.com/mschoch/smat"
   packages = ["."]
@@ -275,16 +286,20 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:bfd957255a80a23af53f514cbaa5f16061df295e37234b5e0935cf49d2cca650"
+  digest = "1:ffc7715fff70ae51f8d9dd673dfc0ae89d2c624779e852e7f19ab1330439b1de"
   name = "golang.org/x/crypto"
   packages = [
     "cast5",
+    "chacha20poly1305",
+    "internal/chacha20",
+    "internal/subtle",
     "openpgp",
     "openpgp/armor",
     "openpgp/elgamal",
     "openpgp/errors",
     "openpgp/packet",
     "openpgp/s2k",
+    "poly1305",
   ]
   pruneopts = "UT"
   revision = "e657309f52e71501f9934566ac06dc5c2f7f11a1"
@@ -330,9 +345,12 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:48a949ee15f5f03524b792547822221b07f828dd26522b5e08688f25a10d14c1"
+  digest = "1:9bd2a1332ddcee55c2dad82b983716d41a32635dafab848a12de0e73f29d4c2c"
   name = "golang.org/x/sys"
-  packages = ["unix"]
+  packages = [
+    "cpu",
+    "unix",
+  ]
   pruneopts = "UT"
   revision = "4d1cda033e0619309c606fc686de3adcf599539e"
 
@@ -469,6 +487,7 @@
     "github.com/aws/aws-sdk-go/aws/awserr",
     "github.com/aws/aws-sdk-go/aws/defaults",
     "github.com/aws/aws-sdk-go/aws/session",
+    "github.com/aws/aws-sdk-go/service/kms",
     "github.com/aws/aws-sdk-go/service/s3",
     "github.com/aws/aws-sdk-go/service/s3/s3iface",
     "github.com/aws/aws-sdk-go/service/s3/s3manager",
@@ -477,6 +496,7 @@
     "github.com/go-yaml/yaml",
     "github.com/google/brotli/go/cbrotli",
     "github.com/jackc/pgx",
+    "github.com/minio/sio",
     "github.com/pierrec/lz4",
     "github.com/pkg/errors",
     "github.com/stretchr/testify/assert",

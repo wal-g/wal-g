@@ -100,6 +100,6 @@ func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) 
 	return md.UnverifiedBody, nil
 }
 
-func (crypter *OpenPGPCrypter) ForceEncrypt(writer io.WriteCloser) (io.WriteCloser, error) {
+func (crypter *OpenPGPCrypter) WrapWriter(writer io.WriteCloser) (io.WriteCloser, error) {
 	return openpgp.Encrypt(writer, crypter.PubKey, nil, nil, nil)
 }

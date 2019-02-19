@@ -21,7 +21,7 @@ func (delayWriteCloser *DelayWriteCloser) Write(p []byte) (n int, err error) {
 		return 0, nil
 	}
 	if delayWriteCloser.outer == nil {
-		writeCloser, err := delayWriteCloser.crypter.ForceEncrypt(delayWriteCloser.inner)
+		writeCloser, err := delayWriteCloser.crypter.WrapWriter(delayWriteCloser.inner)
 		if err != nil {
 			return 0, err
 		}
@@ -34,7 +34,7 @@ func (delayWriteCloser *DelayWriteCloser) Write(p []byte) (n int, err error) {
 // Close DelayWriteCloser
 func (delayWriteCloser *DelayWriteCloser) Close() error {
 	if delayWriteCloser.outer == nil {
-		writeCloser, err := delayWriteCloser.crypter.ForceEncrypt(delayWriteCloser.inner)
+		writeCloser, err := delayWriteCloser.crypter.WrapWriter(delayWriteCloser.inner)
 		if err != nil {
 			return err
 		}

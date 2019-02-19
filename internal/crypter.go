@@ -7,5 +7,5 @@ type Crypter interface {
 	IsUsed() bool
 	Encrypt(writer io.WriteCloser) (io.WriteCloser, error)
 	Decrypt(reader io.ReadCloser) (io.Reader, error)
-	ForceEncrypt(writer io.WriteCloser) (io.WriteCloser, error)
+	WrapWriter(writer io.WriteCloser) (io.WriteCloser, error)
 }

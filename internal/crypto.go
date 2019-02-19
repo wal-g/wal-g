@@ -30,6 +30,11 @@ func GetKeyRingId() string {
 	return getSettingValue("WALE_GPG_KEY_ID")
 }
 
+// GetKMSKeyId extracts id of a key to use from env variable
+func GetKMSKeyId() string {
+	return getSettingValue("WALG_CSE_KMS_ID")
+}
+
 const GpgBin = "gpg"
 
 // CachedKey is the data transfer object describing format of key ring cache
@@ -86,11 +91,9 @@ func getSecretRingArmour(keyId string) ([]byte, error) {
 	return out, nil
 }
 
-// var crypters := []interface{}{ &OpenPGPCrypter{}, &AWSKMSCrypter{} }
-
 func NewCrypter() Crypter {
 
-	crypters := []interface{}{&OpenPGPCrypter{}}
+	crypters := []interface{}{ &OpenPGPCrypter{}, &AWSKMSCrypter{} }
 
 	for _, crypter := range crypters {
 		tempCrypter, ok := crypter.(Crypter)
