@@ -7,12 +7,20 @@ ENV PGDATA /var/lib/postgresql/10/main
 
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests \
+    python3.6 \
+    python3-setuptools \
+    python3-pip \
+    git \
+    pv \
     htop \
     nano \
     postgresql-10 \
     postgresql-contrib \
     liblzo2-2 \
+    lzop \
     libbrotli1 && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    pip3 install git+https://github.com/wal-e/wal-e.git && \
+    pip3 install boto
 
 RUN rm -rf $PGDATA

@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 )
 
 const dirDefaultMode = 0755
@@ -35,6 +36,7 @@ func (err FSFolderError) Error() string {
 }
 
 func ConfigureFSFolder(path string) (StorageFolder, error) {
+	path = strings.TrimPrefix(path, "file://localhost") // WAL-E backward compatibility
 	if _, err := os.Stat(path); err != nil {
 		return nil, NewFSFolderError(err, "Folder not exists or is inaccessible")
 	}
