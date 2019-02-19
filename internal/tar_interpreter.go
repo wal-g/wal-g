@@ -37,10 +37,12 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFile(fileReader io.Reader
 		err := ApplyFileIncrement(targetPath, fileReader)
 		return errors.Wrapf(err, "Interpret: failed to apply increment for '%s'", targetPath)
 	}
-	if _, ok := tarInterpreter.FilesToUnwrap[fileInfo.Name]; !ok {
-		// don't have to unwrap it this time
-		tracelog.DebugLogger.Printf("Don't have to unwrap '%s' this time\n", fileInfo.Name)
-		return nil
+	if tarInterpreter.FilesToUnwrap != nil {
+		if _, ok := tarInterpreter.FilesToUnwrap[fileInfo.Name]; !ok {
+			// don't have to unwrap it this time
+			tracelog.DebugLogger.Printf("Don't have to unwrap '%s' this time\n", fileInfo.Name)
+			return nil
+		}
 	}
 	err := prepareDirs(fileInfo.Name, targetPath)
 	if err != nil {

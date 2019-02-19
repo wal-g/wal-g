@@ -13,6 +13,8 @@ const (
 	LatestString  = "LATEST"
 )
 
+var UnwrapAll map[string]bool = nil
+
 var UtilityFilePaths = map[string]bool{
 	PgControlPath:         true,
 	BackupLabelFilename:   true,
@@ -137,6 +139,9 @@ func deltaFetchRecursion(backupName string, folder StorageFolder, dbDataDirector
 }
 
 func GetRestoredBackupFilesToUnwrap(sentinelDto BackupSentinelDto) map[string]bool {
+	if sentinelDto.Files == nil { // in case of WAL-E of old WAL-G backup
+		return UnwrapAll
+	}
 	filesToUnwrap := make(map[string]bool)
 	for file := range sentinelDto.Files {
 		filesToUnwrap[file] = true
@@ -153,8 +158,9 @@ func GetBaseFilesToUnwrap(backupFileStates BackupFileList, currentFilesToUnwrap 
 		fileDescription, hasDescription := backupFileStates[file]
 		if !hasDescription {
 			if _, ok := UtilityFilePaths[file]; !ok {
-				tracelog.ErrorLogger.Panicf("Wanted to fetch increment for file: '%s', but didn't found one in base", file)
+				tracelog.ErrorLogger.Panicf("Wanted to fetch increment for file: '%s', but didn't find one in base", file)
 			}
+			continue
 		}
 		if fileDescription.IsSkipped || fileDescription.IsIncremented {
 			baseFilesToUnwrap[file] = true
