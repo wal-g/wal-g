@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-var MockCloseError = errors.New("mock close error")
+var MockCloseError = errors.New("mock close: close error")
 var MockReadError = errors.New("mock reader: read error")
 var MockWriteError = errors.New("mock writer: write error")
 

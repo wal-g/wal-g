@@ -2,14 +2,13 @@ package internal
 
 import (
 	"encoding/json"
+	"github.com/go-yaml/yaml"
+	"github.com/wal-g/wal-g/internal/tracelog"
 	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
-
-	"github.com/go-yaml/yaml"
-	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 var (
@@ -34,6 +33,9 @@ var (
 		"WALG_S3_SSE_KMS_ID":           nil,
 		"WALG_GPG_KEY_ID":              nil,
 		"WALE_GPG_KEY_ID":              nil,
+		"WALG_PGP_KEY":                 nil,
+		"WALG_PGP_KEY_PATH":            nil,
+		"WALG_PGP_KEY_PASSPHRASE":      nil,
 		"WALG_DELTA_MAX_STEPS":         nil,
 		"WALG_DELTA_ORIGIN":            nil,
 		"WALG_COMPRESSION_METHOD":      nil,
