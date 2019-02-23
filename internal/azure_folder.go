@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/Azure/azure-storage-blob-go/azblob"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 	"net/url"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 type AzureFolderError struct {

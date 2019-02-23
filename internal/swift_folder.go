@@ -3,13 +3,13 @@ package internal
 import (
 	"bytes"
 	"fmt"
-	"github.com/ncw/swift"
-	"github.com/pkg/errors"
-	//"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 	"io/ioutil"
 	"strings"
+
+	"github.com/ncw/swift"
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 type SwiftFolderError struct {
