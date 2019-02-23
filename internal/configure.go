@@ -186,12 +186,12 @@ func configureFolder() (StorageFolder, error) {
 		return ConfigureFSFolder(waleFilePrefix)
 	} else if waleGSPrefix != "" {
 		return ConfigureGSFolder(waleGSPrefix)
-	}else if waleAZPrefix != "" {
+	} else if waleAZPrefix != "" {
 		return ConfigureAzureFolder(waleAZPrefix)
-	}else if waleSwiftPrefix != "" {
+	} else if waleSwiftPrefix != "" {
 		return ConfigureSwiftFolder(waleSwiftPrefix)
 	}
-	return nil, NewUnsetEnvVarError([]string{"WALG_S3_PREFIX", "WALG_FILE_PREFIX", "WALG_GS_PREFIX","WALG_AZ_PREFIX","WALG_SWIFT_PREFIX",})
+	return nil, NewUnsetEnvVarError([]string{"WALG_S3_PREFIX", "WALG_FILE_PREFIX", "WALG_GS_PREFIX", "WALG_AZ_PREFIX", "WALG_SWIFT_PREFIX"})
 }
 
 // TODO : unit tests

@@ -45,7 +45,7 @@ func ConfigureAzureFolder(prefix string) (StorageFolder, error) {
 	if err != nil {
 		return nil, NewAzureFolderError(err, "Unable to create Azure container")
 	}
-	serviceURL, err := url.Parse(fmt.Sprintf("https://%s.blob.core.windows.net/%s", accountName,containerName))
+	serviceURL, err := url.Parse(fmt.Sprintf("https://%s.blob.core.windows.net/%s", accountName, containerName))
 	if err != nil {
 		return nil, NewAzureFolderError(err, "Unable to parse Azure service URL")
 	}
@@ -74,8 +74,8 @@ func (folder *AzureFolder) Exists(objectRelativePath string) (bool, error) {
 	path := JoinS3Path(folder.path, objectRelativePath)
 	ctx := context.Background()
 	blobURL := folder.containerURL.NewBlockBlobURL(path)
-	_,err := blobURL.GetProperties(ctx, azblob.BlobAccessConditions{})
-	if stgErr, ok := err.(azblob.StorageError); ok && stgErr.ServiceCode() == azblob.ServiceCodeBlobNotFound{
+	_, err := blobURL.GetProperties(ctx, azblob.BlobAccessConditions{})
+	if stgErr, ok := err.(azblob.StorageError); ok && stgErr.ServiceCode() == azblob.ServiceCodeBlobNotFound {
 		return false, nil
 	}
 	if err != nil {
@@ -88,12 +88,12 @@ func (folder *AzureFolder) ListFolder() (objects []StorageObject, subFolders []S
 	//Marker is used for segmented iteration.
 	for marker := (azblob.Marker{}); marker.NotDone(); {
 
-		blobs, err := folder.containerURL.ListBlobsHierarchySegment(context.Background(), marker,"/", azblob.ListBlobsSegmentOptions{Prefix:folder.path})
+		blobs, err := folder.containerURL.ListBlobsHierarchySegment(context.Background(), marker, "/", azblob.ListBlobsSegmentOptions{Prefix: folder.path})
 		if err != nil {
-			return nil,nil, NewAzureFolderError(err, "Unable to iterate %v",folder.path)
+			return nil, nil, NewAzureFolderError(err, "Unable to iterate %v", folder.path)
 		}
 		//add blobs to the list of storage objects
-		for _, blob := range blobs.Segment.BlobItems{
+		for _, blob := range blobs.Segment.BlobItems {
 			objName := strings.TrimPrefix(blob.Name, folder.path)
 			updated := time.Time(blob.Properties.LastModified)
 
@@ -104,7 +104,7 @@ func (folder *AzureFolder) ListFolder() (objects []StorageObject, subFolders []S
 		//Get subFolder names
 		blobPrefixes := blobs.Segment.BlobPrefixes
 		//add subFolders to the list of storage folders
-		for _,blobPrefix := range blobPrefixes{
+		for _, blobPrefix := range blobPrefixes {
 			subFolderPath := blobPrefix.Name
 
 			subFolders = append(subFolders, NewAzureFolder(folder.containerURL, subFolderPath))
@@ -122,13 +122,13 @@ func (folder *AzureFolder) ReadObject(objectRelativePath string) (io.ReadCloser,
 	//Download blob using blobURL obtained from full path to blob
 	path := JoinS3Path(folder.path, objectRelativePath)
 	blobURL := folder.containerURL.NewBlockBlobURL(path)
-	downloadResponse, err := blobURL.Download(context.Background(),0,0,azblob.BlobAccessConditions{},false)
-	if stgErr, ok := err.(azblob.StorageError); ok && stgErr.ServiceCode() == azblob.ServiceCodeBlobNotFound{
+	downloadResponse, err := blobURL.Download(context.Background(), 0, 0, azblob.BlobAccessConditions{}, false)
+	if stgErr, ok := err.(azblob.StorageError); ok && stgErr.ServiceCode() == azblob.ServiceCodeBlobNotFound {
 		return nil, NewObjectNotFoundError(path)
 	}
 
 	if err != nil {
-		return nil,NewAzureFolderError(err, "Unable to download blob %s.", path)
+		return nil, NewAzureFolderError(err, "Unable to download blob %s.", path)
 	}
 	//retrieve and return the downloaded content
 	content := downloadResponse.Body(azblob.RetryReaderOptions{})
@@ -147,8 +147,8 @@ func (folder *AzureFolder) PutObject(name string, content io.Reader) error {
 	path := JoinS3Path(folder.path, name)
 	blobURL := folder.containerURL.NewBlockBlobURL(path)
 	uploadContent := bytes.NewReader(buf.Bytes())
-	_ , err = blobURL.Upload(context.Background(), uploadContent ,azblob.BlobHTTPHeaders{ContentType: "text/plain"}, azblob.Metadata{}, azblob.BlobAccessConditions{})
-	if err != nil{
+	_, err = blobURL.Upload(context.Background(), uploadContent, azblob.BlobHTTPHeaders{ContentType: "text/plain"}, azblob.Metadata{}, azblob.BlobAccessConditions{})
+	if err != nil {
 		return NewAzureFolderError(err, "unable to upload blob %v", name)
 	}
 
@@ -162,13 +162,13 @@ func (folder *AzureFolder) DeleteObjects(objectRelativePaths []string) error {
 		path := JoinS3Path(folder.path, objectRelativePath)
 		blobURL := folder.containerURL.NewBlockBlobURL(path)
 		tracelog.DebugLogger.Printf("Delete %v\n", path)
-		_, err := blobURL.Delete(context.Background(),azblob.DeleteSnapshotsOptionInclude,azblob.BlobAccessConditions{})
-		if stgErr, ok := err.(azblob.StorageError); ok && stgErr.ServiceCode() == azblob.ServiceCodeBlobNotFound{
+		_, err := blobURL.Delete(context.Background(), azblob.DeleteSnapshotsOptionInclude, azblob.BlobAccessConditions{})
+		if stgErr, ok := err.(azblob.StorageError); ok && stgErr.ServiceCode() == azblob.ServiceCodeBlobNotFound {
 			continue
 		}
-		if err != nil{
-			return NewAzureFolderError(err,"Unable to delete object %v", path)
-		}else {
+		if err != nil {
+			return NewAzureFolderError(err, "Unable to delete object %v", path)
+		} else {
 			//blob is deleted
 		}
 	}
