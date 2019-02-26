@@ -56,7 +56,11 @@ func verifyConfig() {
 		return
 	}
 	for k := range *WalgConfig {
-		if _, ok := allowedConfigKeys[k]; !ok {
+		allowedInExtension := false
+		for _, extension := range Extensions {
+			allowedInExtension = allowedInExtension || extension.HasAllowedConfigKey(k)
+		}
+		if _, ok := allowedConfigKeys[k]; !ok && !allowedInExtension {
 			tracelog.ErrorLogger.Panic("Settings " + k + " is unknown")
 		}
 	}
@@ -92,7 +96,7 @@ func LookupConfigValue(key string) (value string, ok bool) {
 	return os.LookupEnv(key)
 }
 
-func getSettingValue(key string) string {
+func GetSettingValue(key string) string {
 	if strings.HasPrefix(key, "WALE") {
 		walgKey := "WALG" + strings.TrimPrefix(key, "WALE")
 		if val, ok := LookupConfigValue(walgKey); ok && len(val) > 0 {

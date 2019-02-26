@@ -66,7 +66,7 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	bundle := NewBundle(archiveDirectory, &prefaultStartLsn, nil)
 	bundle.Timeline = timelineId
-	err := bundle.DownloadDeltaMap(uploader.uploadingFolder.GetSubFolder(WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
+	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Error during loading delta map: '%+v'.", err)
 		return
@@ -196,7 +196,7 @@ func prefetchFile(location string, folder StorageFolder, walFileName string, wai
 	tracelog.InfoLogger.Println("WAL-prefetch file: ", walFileName)
 	os.MkdirAll(runningLocation, 0755)
 
-	err := downloadWALFileTo(folder, walFileName, oldPath)
+	err := DownloadWALFileTo(folder, walFileName, oldPath)
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}

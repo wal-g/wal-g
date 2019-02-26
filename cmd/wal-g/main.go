@@ -35,6 +35,8 @@ func init() {
 	flag.BoolVar(&showVersionVerbose, "vv", false, "\tLong version")
 
 	l = log.New(os.Stderr, "", 0)
+	flag.Parse()
+	internal.LoadExtensions()
 }
 
 var WalgVersion = "devel"
@@ -45,8 +47,6 @@ var showVersion bool
 var showVersionVerbose bool
 
 func main() {
-	flag.Parse()
-
 	if WalgVersion == "" {
 		WalgVersion = "devel"
 	}
@@ -93,7 +93,16 @@ func main() {
 			fmt.Println(internal.DeleteUsageText)
 			os.Exit(1)
 		default:
-			l.Fatalf("Command '%s' is unsupported by WAL-G.\n\n", command)
+			var shouldExit bool
+			fmt.Println(command)
+			if extension, ok := internal.GetExtensionByCommandName(command); ok {
+				shouldExit = extension.TryPrintHelp(command, firstArgument)
+			} else {
+				l.Fatalf("Command '%s' is unsupported by WAL-G.\n\n", command)
+			}
+			if shouldExit {
+				os.Exit(1)
+			}
 		}
 	}
 
@@ -137,6 +146,8 @@ func main() {
 		internal.HandleBackupList(folder)
 	} else if command == "delete" {
 		internal.HandleDelete(folder, all)
+	} else if extension, ok := internal.GetExtensionByCommandName(command); ok {
+		extension.Execute(command, uploader, folder, all)
 	} else {
 		l.Fatalf("Command '%s' is unsupported by WAL-G.", command)
 	}

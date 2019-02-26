@@ -92,7 +92,7 @@ func HandleWALFetch(folder StorageFolder, walFileName string, location string, t
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	err := downloadWALFileTo(folder, walFileName, location)
+	err := DownloadWALFileTo(folder, walFileName, location)
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
@@ -127,7 +127,7 @@ func TryDownloadWALFile(folder StorageFolder, walPath string) (walFileReader io.
 }
 
 // TODO : unit tests
-func decompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor Decompressor) error {
+func DecompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor Decompressor) error {
 	crypter := OpenPGPCrypter{}
 	if crypter.IsUsed() {
 		reader, err := crypter.Decrypt(archiveReader)
@@ -153,7 +153,7 @@ func downloadAndDecompressWALFile(folder StorageFolder, walFileName string) (io.
 		}
 		reader, writer := io.Pipe()
 		go func() {
-			err = decompressWALFile(&EmptyWriteIgnorer{writer}, archiveReader, decompressor)
+			err = DecompressWALFile(&EmptyWriteIgnorer{writer}, archiveReader, decompressor)
 			writer.CloseWithError(err)
 		}()
 		return reader, nil
@@ -163,7 +163,7 @@ func downloadAndDecompressWALFile(folder StorageFolder, walFileName string) (io.
 
 // TODO : unit tests
 // downloadWALFileTo downloads a file and writes it to local file
-func downloadWALFileTo(folder StorageFolder, walFileName string, dstPath string) error {
+func DownloadWALFileTo(folder StorageFolder, walFileName string, dstPath string) error {
 	reader, err := downloadAndDecompressWALFile(folder, walFileName)
 	if err != nil {
 		return err

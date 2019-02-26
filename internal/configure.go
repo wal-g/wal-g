@@ -87,7 +87,7 @@ func getPathFromPrefix(prefix string) (bucket, server string, err error) {
 
 // TODO : unit tests
 func configureLimiters() error {
-	if diskLimitStr := getSettingValue("WALG_DISK_RATE_LIMIT"); diskLimitStr != "" {
+	if diskLimitStr := GetSettingValue("WALG_DISK_RATE_LIMIT"); diskLimitStr != "" {
 		diskLimit, err := strconv.ParseInt(diskLimitStr, 10, 64)
 		if err != nil {
 			return errors.Wrap(err, "failed to parse WALG_DISK_RATE_LIMIT")
@@ -95,7 +95,7 @@ func configureLimiters() error {
 		DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 
-	if netLimitStr := getSettingValue("WALG_NETWORK_RATE_LIMIT"); netLimitStr != "" {
+	if netLimitStr := GetSettingValue("WALG_NETWORK_RATE_LIMIT"); netLimitStr != "" {
 		netLimit, err := strconv.ParseInt(netLimitStr, 10, 64)
 		if err != nil {
 			return errors.Wrap(err, "failed to parse WALG_NETWORK_RATE_LIMIT")
@@ -107,7 +107,7 @@ func configureLimiters() error {
 
 // TODO : unit tests
 func getAWSRegion(s3Bucket string, config *aws.Config) (string, error) {
-	region := getSettingValue("AWS_REGION")
+	region := GetSettingValue("AWS_REGION")
 	if region == "" {
 		if config.Endpoint == nil ||
 			*config.Endpoint == "" ||
@@ -135,11 +135,11 @@ func createS3Session(s3Bucket string) (*session.Session, error) {
 		return nil, errors.Wrapf(err, "failed to get AWS credentials; please specify AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY")
 	}
 
-	if endpoint := getSettingValue("AWS_ENDPOINT"); endpoint != "" {
+	if endpoint := GetSettingValue("AWS_ENDPOINT"); endpoint != "" {
 		config.Endpoint = aws.String(endpoint)
 	}
 
-	if s3ForcePathStyleStr := getSettingValue("AWS_S3_FORCE_PATH_STYLE"); s3ForcePathStyleStr != "" {
+	if s3ForcePathStyleStr := GetSettingValue("AWS_S3_FORCE_PATH_STYLE"); s3ForcePathStyleStr != "" {
 		s3ForcePathStyle, err := strconv.ParseBool(s3ForcePathStyleStr)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to parse AWS_S3_FORCE_PATH_STYLE")
@@ -175,9 +175,9 @@ func configureS3Uploader(s3Client *s3.S3) (*S3Uploader, error) {
 
 // TODO : unit tests
 func configureFolder() (StorageFolder, error) {
-	waleS3Prefix := getSettingValue("WALE_S3_PREFIX")
-	waleFilePrefix := getSettingValue("WALE_FILE_PREFIX")
-	waleGSPrefix := getSettingValue("WALE_GS_PREFIX")
+	waleS3Prefix := GetSettingValue("WALE_S3_PREFIX")
+	waleFilePrefix := GetSettingValue("WALE_FILE_PREFIX")
+	waleGSPrefix := GetSettingValue("WALE_GS_PREFIX")
 	if waleS3Prefix != "" {
 		return ConfigureS3Folder()
 	} else if waleFilePrefix != "" {
@@ -190,7 +190,7 @@ func configureFolder() (StorageFolder, error) {
 
 // TODO : unit tests
 func ConfigureS3Folder() (*S3Folder, error) {
-	waleS3Prefix := getSettingValue("WALE_S3_PREFIX")
+	waleS3Prefix := GetSettingValue("WALE_S3_PREFIX")
 	if waleS3Prefix == "" {
 		return nil, NewUnsetEnvVarError([]string{"WALG_S3_PREFIX"})
 	}
@@ -254,7 +254,7 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err
 
 // TODO : unit tests
 func configureCompressor() (Compressor, error) {
-	compressionMethod := getSettingValue("WALG_COMPRESSION_METHOD")
+	compressionMethod := GetSettingValue("WALG_COMPRESSION_METHOD")
 	if compressionMethod == "" {
 		compressionMethod = Lz4AlgorithmName
 	}
@@ -320,7 +320,7 @@ func Configure() (uploader *Uploader, destinationFolder StorageFolder, err error
 	}
 
 	preventWalOverwrite := false
-	if preventWalOverwriteStr := getSettingValue("WALG_PREVENT_WAL_OVERWRITE"); preventWalOverwriteStr != "" {
+	if preventWalOverwriteStr := GetSettingValue("WALG_PREVENT_WAL_OVERWRITE"); preventWalOverwriteStr != "" {
 		preventWalOverwrite, err = strconv.ParseBool(preventWalOverwriteStr)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to parse WALG_PREVENT_WAL_OVERWRITE")

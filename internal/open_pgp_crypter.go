@@ -36,7 +36,7 @@ type OpenPGPCrypter struct {
 	ArmoredKey      string
 	IsUseArmoredKey bool
 
-	ArmoredKeyPath   string
+	ArmoredKeyPath      string
 	IsUseArmoredKeyPath bool
 
 	PubKey    openpgp.EntityList

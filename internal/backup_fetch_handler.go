@@ -84,7 +84,7 @@ func GetBackupByName(backupName string, folder StorageFolder) (*Backup, error) {
 
 	var backup *Backup
 	if backupName == LatestString {
-		latest, err := getLatestBackupName(folder)
+		latest, err := GetLatestBackupName(folder)
 		if err != nil {
 			return nil, err
 		}
