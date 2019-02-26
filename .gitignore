@@ -8,3 +8,6 @@ cmd/wal-g/wal-g
 test/testdata/00000*
 
 tmp/
+*.xml
+*.iml
+*.so

@@ -57,7 +57,7 @@ func allZero(s []byte) bool {
 	return true
 }
 
-func sanitizePath(path string) string {
+func SanitizePath(path string) string {
 	return strings.TrimLeft(path, "/")
 }
 

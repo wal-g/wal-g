@@ -43,7 +43,7 @@ func (tarBall *StorageTarBall) SetUp(crypter Crypter, names ...string) {
 		if len(names) > 0 {
 			name = names[0]
 		} else {
-			name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partNumber, tarBall.uploader.compressor.FileExtension())
+			name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partNumber, tarBall.uploader.Compressor.FileExtension())
 		}
 		writeCloser := tarBall.startUpload(name, crypter)
 
@@ -90,7 +90,7 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter Crypter) io.Writ
 	go func() {
 		defer uploader.waitGroup.Done()
 
-		err := uploader.upload(path, NewNetworkLimitReader(pipeReader))
+		err := uploader.Upload(path, NewNetworkLimitReader(pipeReader))
 		if compressingError, ok := err.(CompressingPipeWriterError); ok {
 			tracelog.ErrorLogger.Printf("could not upload '%s' due to compression error\n%+v\n", path, compressingError)
 		}
@@ -107,10 +107,10 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter Crypter) io.Writ
 			tracelog.ErrorLogger.Fatal("upload: encryption error ", err)
 		}
 
-		return &CascadeWriteCloser{uploader.compressor.NewWriter(encryptedWriter), &CascadeWriteCloser{encryptedWriter, pipeWriter}}
+		return &CascadeWriteCloser{uploader.Compressor.NewWriter(encryptedWriter), &CascadeWriteCloser{encryptedWriter, pipeWriter}}
 	}
 
-	return &CascadeWriteCloser{uploader.compressor.NewWriter(pipeWriter), pipeWriter}
+	return &CascadeWriteCloser{uploader.Compressor.NewWriter(pipeWriter), pipeWriter}
 }
 
 // Size accumulated in this tarball
@@ -141,7 +141,7 @@ func (tarBall *StorageTarBall) Finish(sentinelDto *BackupSentinelDto) error {
 			return err
 		}
 
-		uploadingErr := uploader.upload(name, bytes.NewReader(dtoBody))
+		uploadingErr := uploader.Upload(name, bytes.NewReader(dtoBody))
 		if uploadingErr != nil {
 			tracelog.ErrorLogger.Printf("upload: could not upload '%s'\n", name)
 			tracelog.ErrorLogger.Fatalf("StorageTarBall finish: json failed to upload")

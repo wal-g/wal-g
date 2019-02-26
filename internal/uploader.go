@@ -12,8 +12,8 @@ import (
 // Uploader contains fields associated with uploading tarballs.
 // Multiple tarballs can share one uploader.
 type Uploader struct {
-	uploadingFolder     storage.Folder
-	compressor          Compressor
+	UploadingFolder     storage.Folder
+	Compressor          Compressor
 	waitGroup           *sync.WaitGroup
 	deltaFileManager    *DeltaFileManager
 	Success             bool
@@ -32,8 +32,8 @@ func NewUploader(
 		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
 	}
 	return &Uploader{
-		uploadingFolder:     uploadingLocation,
-		compressor:          compressor,
+		UploadingFolder:     uploadingLocation,
+		Compressor:          compressor,
 		useWalDelta:         useWalDelta,
 		waitGroup:           &sync.WaitGroup{},
 		deltaFileManager:    deltaFileManager,
@@ -53,8 +53,8 @@ func (uploader *Uploader) finish() {
 // Clone creates similar Uploader with new WaitGroup
 func (uploader *Uploader) Clone() *Uploader {
 	return &Uploader{
-		uploader.uploadingFolder,
-		uploader.compressor,
+		uploader.UploadingFolder,
+		uploader.Compressor,
 		&sync.WaitGroup{},
 		uploader.deltaFileManager,
 		uploader.Success,
@@ -88,22 +88,22 @@ func (uploader *Uploader) UploadWalFile(file NamedReader) error {
 func (uploader *Uploader) UploadFile(file NamedReader) error {
 	pipeWriter := &CompressingPipeWriter{
 		Input:                file,
-		NewCompressingWriter: uploader.compressor.NewWriter,
+		NewCompressingWriter: uploader.Compressor.NewWriter,
 	}
 
 	pipeWriter.Compress(&OpenPGPCrypter{})
 
-	dstPath := sanitizePath(filepath.Base(file.Name()) + "." + uploader.compressor.FileExtension())
+	dstPath := SanitizePath(filepath.Base(file.Name()) + "." + uploader.Compressor.FileExtension())
 	reader := pipeWriter.Output
 
-	err := uploader.upload(dstPath, reader)
+	err := uploader.Upload(dstPath, reader)
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
 	return err
 }
 
 // TODO : unit tests
-func (uploader *Uploader) upload(path string, content io.Reader) error {
-	err := uploader.uploadingFolder.PutObject(path, content)
+func (uploader *Uploader) Upload(path string, content io.Reader) error {
+	err := uploader.UploadingFolder.PutObject(path, content)
 	if err == nil {
 		uploader.Success = true
 		return nil
