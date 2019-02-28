@@ -51,15 +51,8 @@ func ConfigureAzureFolder(prefix string) (StorageFolder, error) {
 		return nil, NewAzureFolderError(err, "Unable to parse Azure service URL")
 	}
 	containerURL := azblob.NewContainerURL(*serviceURL, pipeLine)
-	path = addDelimiterToAzPath(path)
+	path = addDelimiterToPath(path)
 	return NewAzureFolder(containerURL, path), nil
-}
-
-func addDelimiterToAzPath(path string) string {
-	if strings.HasSuffix(path, "/") || path == "" {
-		return path
-	}
-	return path + "/"
 }
 
 type AzureFolder struct {
@@ -72,7 +65,7 @@ func (folder *AzureFolder) GetPath() string {
 }
 
 func (folder *AzureFolder) Exists(objectRelativePath string) (bool, error) {
-	path := JoinS3Path(folder.path, objectRelativePath)
+	path := JoinStoragePath(folder.path, objectRelativePath)
 	ctx := context.Background()
 	blobURL := folder.containerURL.NewBlockBlobURL(path)
 	_, err := blobURL.GetProperties(ctx, azblob.BlobAccessConditions{})
@@ -116,12 +109,12 @@ func (folder *AzureFolder) ListFolder() (objects []StorageObject, subFolders []S
 }
 
 func (folder *AzureFolder) GetSubFolder(subFolderRelativePath string) StorageFolder {
-	return NewAzureFolder(folder.containerURL, addDelimiterToAzPath(JoinS3Path(folder.path, subFolderRelativePath)))
+	return NewAzureFolder(folder.containerURL, addDelimiterToPath(JoinStoragePath(folder.path, subFolderRelativePath)))
 }
 
 func (folder *AzureFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	//Download blob using blobURL obtained from full path to blob
-	path := JoinS3Path(folder.path, objectRelativePath)
+	path := JoinStoragePath(folder.path, objectRelativePath)
 	blobURL := folder.containerURL.NewBlockBlobURL(path)
 	downloadResponse, err := blobURL.Download(context.Background(), 0, 0, azblob.BlobAccessConditions{}, false)
 	if stgErr, ok := err.(azblob.StorageError); ok && stgErr.ServiceCode() == azblob.ServiceCodeBlobNotFound {
@@ -145,7 +138,7 @@ func (folder *AzureFolder) PutObject(name string, content io.Reader) error {
 		return NewAzureFolderError(err, "Unable to copy to object")
 	}
 	//Upload content to a blob using full path
-	path := JoinS3Path(folder.path, name)
+	path := JoinStoragePath(folder.path, name)
 	blobURL := folder.containerURL.NewBlockBlobURL(path)
 	uploadContent := bytes.NewReader(buf.Bytes())
 	_, err = blobURL.Upload(context.Background(), uploadContent, azblob.BlobHTTPHeaders{ContentType: "text/plain"}, azblob.Metadata{}, azblob.BlobAccessConditions{})
@@ -160,7 +153,7 @@ func (folder *AzureFolder) PutObject(name string, content io.Reader) error {
 func (folder *AzureFolder) DeleteObjects(objectRelativePaths []string) error {
 	for _, objectRelativePath := range objectRelativePaths {
 		//Delete blob using blobURL obtained from full path to blob
-		path := JoinS3Path(folder.path, objectRelativePath)
+		path := JoinStoragePath(folder.path, objectRelativePath)
 		blobURL := folder.containerURL.NewBlockBlobURL(path)
 		tracelog.DebugLogger.Printf("Delete %v\n", path)
 		_, err := blobURL.Delete(context.Background(), azblob.DeleteSnapshotsOptionInclude, azblob.BlobAccessConditions{})

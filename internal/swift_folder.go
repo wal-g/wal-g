@@ -43,7 +43,7 @@ func ConfigureSwiftFolder(prefix string) (StorageFolder, error) {
 	if err != nil {
 		return nil, NewSwiftFolderError(err, "Unable to get container name and path from prefix %v", prefix)
 	}
-	path = addDelimiterToSwiftPath(path)
+	path = addDelimiterToPath(path)
 
 	container, _, err := connection.Container(containerName)
 	if err != nil {
@@ -51,13 +51,6 @@ func ConfigureSwiftFolder(prefix string) (StorageFolder, error) {
 	}
 
 	return NewSwiftFolder(connection, container, path), nil
-}
-
-func addDelimiterToSwiftPath(path string) string {
-	if strings.HasSuffix(path, "/") || path == "" {
-		return path
-	}
-	return path + "/"
 }
 
 type SwiftFolder struct {
@@ -71,7 +64,7 @@ func (folder *SwiftFolder) GetPath() string {
 }
 
 func (folder *SwiftFolder) Exists(objectRelativePath string) (bool, error) {
-	path := JoinS3Path(folder.path, objectRelativePath)
+	path := JoinStoragePath(folder.path, objectRelativePath)
 	_, _, err := folder.connection.Object(folder.container.Name, path)
 	if err == swift.ObjectNotFound {
 		return false, nil
@@ -117,11 +110,11 @@ func (folder *SwiftFolder) ListFolder() (objects []StorageObject, subFolders []S
 }
 
 func (folder *SwiftFolder) GetSubFolder(subFolderRelativePath string) StorageFolder {
-	return NewSwiftFolder(folder.connection, folder.container, addDelimiterToSwiftPath(JoinS3Path(folder.path, subFolderRelativePath)))
+	return NewSwiftFolder(folder.connection, folder.container, addDelimiterToPath(JoinStoragePath(folder.path, subFolderRelativePath)))
 }
 
 func (folder *SwiftFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
-	path := JoinS3Path(folder.path, objectRelativePath)
+	path := JoinStoragePath(folder.path, objectRelativePath)
 	//get the object from the cloud using full path
 	cBytes, err := folder.connection.ObjectGetBytes(folder.container.Name, path)
 	if err == swift.ObjectNotFound {
@@ -138,7 +131,7 @@ func (folder *SwiftFolder) ReadObject(objectRelativePath string) (io.ReadCloser,
 
 func (folder *SwiftFolder) PutObject(name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
-	path := JoinS3Path(folder.path, name)
+	path := JoinStoragePath(folder.path, name)
 	//put the object in the cloud using full path
 	_, err := folder.connection.ObjectPut(folder.container.Name, path, content, false, "", "", nil)
 	if err != nil {
@@ -151,7 +144,7 @@ func (folder *SwiftFolder) PutObject(name string, content io.Reader) error {
 
 func (folder *SwiftFolder) DeleteObjects(objectRelativePaths []string) error {
 	for _, objectRelativePath := range objectRelativePaths {
-		path := JoinS3Path(folder.path, objectRelativePath)
+		path := JoinStoragePath(folder.path, objectRelativePath)
 		tracelog.DebugLogger.Printf("Delete object %v\n", path)
 		err := folder.connection.ObjectDelete(folder.container.Name, path)
 		if err == swift.ObjectNotFound {
