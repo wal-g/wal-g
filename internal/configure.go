@@ -178,14 +178,20 @@ func configureFolder() (StorageFolder, error) {
 	waleS3Prefix := getSettingValue("WALE_S3_PREFIX")
 	waleFilePrefix := getSettingValue("WALE_FILE_PREFIX")
 	waleGSPrefix := getSettingValue("WALE_GS_PREFIX")
+	waleAZPrefix := getSettingValue("WALE_AZ_PREFIX")
+	waleSwiftPrefix := getSettingValue("WALE_SWIFT_PREFIX")
 	if waleS3Prefix != "" {
 		return ConfigureS3Folder()
 	} else if waleFilePrefix != "" {
 		return ConfigureFSFolder(waleFilePrefix)
 	} else if waleGSPrefix != "" {
 		return ConfigureGSFolder(waleGSPrefix)
+	} else if waleAZPrefix != "" {
+		return ConfigureAzureFolder(waleAZPrefix)
+	} else if waleSwiftPrefix != "" {
+		return ConfigureSwiftFolder(waleSwiftPrefix)
 	}
-	return nil, NewUnsetEnvVarError([]string{"WALG_S3_PREFIX", "WALG_FILE_PREFIX", "WALG_GS_PREFIX"})
+	return nil, NewUnsetEnvVarError([]string{"WALG_S3_PREFIX", "WALG_FILE_PREFIX", "WALG_GS_PREFIX", "WALG_AZ_PREFIX", "WALG_SWIFT_PREFIX"})
 }
 
 // TODO : unit tests

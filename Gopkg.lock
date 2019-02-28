@@ -18,6 +18,22 @@
   version = "v0.34.0"
 
 [[projects]]
+  digest = "1:d2ccb697dc13c8fbffafa37baae97594d5592ae8f7e113471084137315536e2b"
+  name = "github.com/Azure/azure-pipeline-go"
+  packages = ["pipeline"]
+  pruneopts = "UT"
+  revision = "b8e3409182fd52e74f7d7bdfbff5833591b3b655"
+  version = "v0.1.8"
+
+[[projects]]
+  digest = "1:435043934aa0a8221e2c660e88dffe588783e9497facf6b517a465a37c58c97b"
+  name = "github.com/Azure/azure-storage-blob-go"
+  packages = ["azblob"]
+  pruneopts = "UT"
+  revision = "457680cc0804810f6d02958481e0ffdda51d5c60"
+  version = "0.5.0"
+
+[[projects]]
   digest = "1:c99bd4548f502371b98c77534239a514c9a1e715d468af3c108db06186aa692a"
   name = "github.com/DataDog/zstd"
   packages = ["."]
@@ -178,6 +194,14 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "90eadee771aeab36e8bf796039b8c261bebebe4f"
+
+[[projects]]
+  digest = "1:079f066487b2ea83d1e9ac178686489bda450ae9b7e4aab6a6f4b21b93a61185"
+  name = "github.com/ncw/swift"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "ba19fe35e796969e50f19bd748a770ec5d191ece"
+  version = "v1.0.44"
 
 [[projects]]
   digest = "1:5e73b34a27d827212102605789de00bd411b2e434812133c83935fe9897c75e1"
@@ -463,6 +487,7 @@
   analyzer-version = 1
   input-imports = [
     "cloud.google.com/go/storage",
+    "github.com/Azure/azure-storage-blob-go/azblob",
     "github.com/DataDog/zstd",
     "github.com/RoaringBitmap/roaring",
     "github.com/aws/aws-sdk-go/aws",
@@ -477,6 +502,7 @@
     "github.com/go-yaml/yaml",
     "github.com/google/brotli/go/cbrotli",
     "github.com/jackc/pgx",
+    "github.com/ncw/swift",
     "github.com/pierrec/lz4",
     "github.com/pkg/errors",
     "github.com/stretchr/testify/assert",
