@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"io/ioutil"
 	"os"
@@ -28,11 +29,11 @@ func (err NoBackupsFoundError) Error() string {
 // Backup contains information about a valid backup
 // generated and uploaded by WAL-G.
 type Backup struct {
-	BaseBackupFolder StorageFolder
+	BaseBackupFolder storage.Folder
 	Name             string
 }
 
-func NewBackup(baseBackupFolder StorageFolder, name string) *Backup {
+func NewBackup(baseBackupFolder storage.Folder, name string) *Backup {
 	return &Backup{baseBackupFolder, name}
 }
 
@@ -40,7 +41,7 @@ func (backup *Backup) getStopSentinelPath() string {
 	return backup.Name + SentinelSuffix
 }
 
-func (backup *Backup) getTarPartitionFolder() StorageFolder {
+func (backup *Backup) getTarPartitionFolder() storage.Folder {
 	return backup.BaseBackupFolder.GetSubFolder(backup.Name + TarPartitionFolderName)
 }
 

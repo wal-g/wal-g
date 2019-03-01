@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/testtools"
 	"io"
 	"io/ioutil"
 	"testing"
@@ -16,7 +18,7 @@ import (
 func testLzopRoundTrip(t *testing.T, stride, nBytes int) {
 	// Generate and save random bytes compare against
 	// compression-decompression cycle.
-	sb := tools.NewStrideByteReader(stride)
+	sb := testtools.NewStrideByteReader(stride)
 	lr := &io.LimitedReader{
 		R: sb,
 		N: int64(nBytes),
@@ -44,7 +46,7 @@ func testLzopRoundTrip(t *testing.T, stride, nBytes int) {
 			}
 		}()
 
-		tools.CreateTar(bw, &io.LimitedReader{
+		testtools.CreateTar(bw, &io.LimitedReader{
 			R: bytes.NewBuffer(b),
 			N: int64(len(b)),
 		})
@@ -55,8 +57,8 @@ func testLzopRoundTrip(t *testing.T, stride, nBytes int) {
 
 	// Extract the generated tar and check that its one member is
 	// the same as the bytes generated to begin with.
-	brm := &BufferReaderMaker{tarContents, "/usr/local", "lzo"}
-	buf := &tools.BufferTarInterpreter{}
+	brm := &BufferReaderMaker{tarContents, "/usr/local.lzo"}
+	buf := &testtools.BufferTarInterpreter{}
 	files := []internal.ReaderMaker{brm}
 	err = internal.ExtractAll(buf, files)
 	if err != nil {
@@ -74,18 +76,18 @@ func TestLzop1MByte(t *testing.T)  { testLzopRoundTrip(t, 7924, 1024*1024) }
 func TestLzop10MByte(t *testing.T) { testLzopRoundTrip(t, 7924, 10*1024*1024) }
 
 func setupRand(stride, nBytes int) *BufferReaderMaker {
-	sb := tools.NewStrideByteReader(stride)
+	sb := testtools.NewStrideByteReader(stride)
 	lr := &io.LimitedReader{
 		R: sb,
 		N: int64(nBytes),
 	}
-	b := &BufferReaderMaker{&bytes.Buffer{}, "/usr/local", "lzo"}
+	b := &BufferReaderMaker{&bytes.Buffer{}, "/usr/local.lzo"}
 
 	pr, pw := io.Pipe()
 	lzow := internal.NewLzoWriter(pw)
 
 	go func() {
-		tools.CreateTar(lzow, lr)
+		testtools.CreateTar(lzow, lr)
 		defer lzow.Close()
 		defer pw.Close()
 	}()
@@ -119,7 +121,7 @@ func BenchmarkExtractAll(b *testing.B) {
 	// np := &extract.NOPTarInterpreter{}
 	// extract.ExtractAll(np, out)
 
-	buf := &tools.BufferTarInterpreter{}
+	buf := &testtools.BufferTarInterpreter{}
 	err := internal.ExtractAll(buf, out)
 	if err != nil {
 		b.Log(err)

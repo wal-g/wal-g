@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 	"os"
@@ -37,7 +38,7 @@ func (err ArchiveNonExistenceError) Error() string {
 
 // TODO : unit tests
 // HandleWALFetch is invoked to performa wal-g wal-fetch
-func HandleWALFetch(folder StorageFolder, walFileName string, location string, triggerPrefetch bool) {
+func HandleWALFetch(folder storage.Folder, walFileName string, location string, triggerPrefetch bool) {
 	tracelog.DebugLogger.Printf("HandleWALFetch(folder, %s, %s, %v)\n", walFileName, location, triggerPrefetch)
 	folder = folder.GetSubFolder(WalPath)
 	location = ResolveSymlink(location)
@@ -114,13 +115,13 @@ func checkWALFileMagic(prefetched string) error {
 	return nil
 }
 
-func TryDownloadWALFile(folder StorageFolder, walPath string) (walFileReader io.ReadCloser, exists bool, err error) {
+func TryDownloadWALFile(folder storage.Folder, walPath string) (walFileReader io.ReadCloser, exists bool, err error) {
 	walFileReader, err = folder.ReadObject(walPath)
 	if err == nil {
 		exists = true
 		return
 	}
-	if _, ok := errors.Cause(err).(ObjectNotFoundError); ok {
+	if _, ok := errors.Cause(err).(storage.ObjectNotFoundError); ok {
 		err = nil
 	}
 	return
@@ -142,7 +143,7 @@ func decompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor 
 }
 
 // TODO : unit tests
-func downloadAndDecompressWALFile(folder StorageFolder, walFileName string) (io.ReadCloser, error) {
+func downloadAndDecompressWALFile(folder storage.Folder, walFileName string) (io.ReadCloser, error) {
 	for _, decompressor := range Decompressors {
 		archiveReader, exists, err := TryDownloadWALFile(folder, walFileName+"."+decompressor.FileExtension())
 		if err != nil {
@@ -163,7 +164,7 @@ func downloadAndDecompressWALFile(folder StorageFolder, walFileName string) (io.
 
 // TODO : unit tests
 // downloadWALFileTo downloads a file and writes it to local file
-func downloadWALFileTo(folder StorageFolder, walFileName string, dstPath string) error {
+func downloadWALFileTo(folder storage.Folder, walFileName string, dstPath string) error {
 	reader, err := downloadAndDecompressWALFile(folder, walFileName)
 	if err != nil {
 		return err

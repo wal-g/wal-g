@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"os"
 	"runtime/pprof"
@@ -59,7 +60,7 @@ func (err PgControlNotFoundError) Error() string {
 
 // TODO : unit tests
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
-func HandleBackupFetch(backupName string, folder StorageFolder, dbDataDirectory string, mem bool) {
+func HandleBackupFetch(backupName string, folder storage.Folder, dbDataDirectory string, mem bool) {
 	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder, %s, %v)\n", backupName, dbDataDirectory, mem)
 	dbDataDirectory = ResolveSymlink(dbDataDirectory)
 	err := deltaFetchRecursion(backupName, folder, dbDataDirectory, nil)
@@ -79,7 +80,7 @@ func HandleBackupFetch(backupName string, folder StorageFolder, dbDataDirectory 
 	return
 }
 
-func GetBackupByName(backupName string, folder StorageFolder) (*Backup, error) {
+func GetBackupByName(backupName string, folder storage.Folder) (*Backup, error) {
 	baseBackupFolder := folder.GetSubFolder(BaseBackupPath)
 
 	var backup *Backup
@@ -108,7 +109,7 @@ func GetBackupByName(backupName string, folder StorageFolder) (*Backup, error) {
 
 // TODO : unit tests
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
-func deltaFetchRecursion(backupName string, folder StorageFolder, dbDataDirectory string, filesToUnwrap map[string]bool) error {
+func deltaFetchRecursion(backupName string, folder storage.Folder, dbDataDirectory string, filesToUnwrap map[string]bool) error {
 	backup, err := GetBackupByName(backupName, folder)
 	if err != nil {
 		return err

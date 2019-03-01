@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"log"
 	"sort"
@@ -45,7 +46,7 @@ func adjustDeleteTarget(target *Backup, findFull bool) *Backup {
 
 // TODO : unit tests
 // HandleDelete is invoked to perform wal-g delete
-func HandleDelete(folder StorageFolder, args []string) {
+func HandleDelete(folder storage.Folder, args []string) {
 	baseBackupFolder := folder.GetSubFolder(BaseBackupPath)
 
 	arguments := ParseDeleteArguments(args, printDeleteUsageAndFail)
@@ -168,7 +169,7 @@ func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteComm
 }
 
 // TODO : unit tests
-func deleteBeforeTarget(folder StorageFolder, target *Backup, dryRun bool) {
+func deleteBeforeTarget(folder storage.Folder, target *Backup, dryRun bool) {
 	walFolder := folder.GetSubFolder(WalPath)
 	backupToScan, garbage, err := getBackupsAndGarbage(folder)
 	if err != nil {
@@ -229,7 +230,7 @@ func ComputeDeletionSkiplineAndPrintIntentions(backups []BackupTime, target *Bac
 }
 
 // TODO : unit tests
-func deleteBackupsBefore(backups []BackupTime, skipline int, folder StorageFolder) {
+func deleteBackupsBefore(backups []BackupTime, skipline int, folder storage.Folder) {
 	for i, b := range backups {
 		if i > skipline {
 			dropBackup(folder, b.BackupName)
@@ -238,7 +239,7 @@ func deleteBackupsBefore(backups []BackupTime, skipline int, folder StorageFolde
 }
 
 // TODO : unit tests
-func dropBackup(folder StorageFolder, backupName string) {
+func dropBackup(folder storage.Folder, backupName string) {
 	basebackupFolder := folder.GetSubFolder(BaseBackupPath)
 	backup := NewBackup(basebackupFolder, backupName)
 	tarNames, err := backup.GetTarNames()
@@ -268,7 +269,7 @@ func dropBackup(folder StorageFolder, backupName string) {
 }
 
 // TODO : unit tests
-func deleteWALBefore(walSkipFileName string, walFolder StorageFolder) {
+func deleteWALBefore(walSkipFileName string, walFolder storage.Folder) {
 	wals, err := getWals(walSkipFileName, walFolder)
 	if err != nil {
 		tracelog.ErrorLogger.Fatal("Unable to obtain WALs for border ", walSkipFileName, err)
@@ -285,7 +286,7 @@ func printDeleteUsageAndFail() {
 
 // TODO : unit tests
 // getWals returns all WAL file keys less then key provided
-func getWals(before string, folder StorageFolder) ([]string, error) {
+func getWals(before string, folder storage.Folder) ([]string, error) {
 	walObjects, _, err := folder.ListFolder()
 	if err != nil {
 		return nil, err
@@ -303,7 +304,7 @@ func getWals(before string, folder StorageFolder) ([]string, error) {
 }
 
 // TODO : unit tests
-func getLatestBackupName(folder StorageFolder) (string, error) {
+func getLatestBackupName(folder storage.Folder) (string, error) {
 	sortTimes, err := getBackups(folder)
 
 	if err != nil {
@@ -315,7 +316,7 @@ func getLatestBackupName(folder StorageFolder) (string, error) {
 
 // TODO : unit tests
 // getBackups receives backup descriptions and sorts them by time
-func getBackups(folder StorageFolder) (backups []BackupTime, err error) {
+func getBackups(folder storage.Folder) (backups []BackupTime, err error) {
 	backups, _, err = getBackupsAndGarbage(folder)
 
 	if err != nil {
@@ -330,7 +331,7 @@ func getBackups(folder StorageFolder) (backups []BackupTime, err error) {
 }
 
 // TODO : unit tests
-func getBackupsAndGarbage(folder StorageFolder) (backups []BackupTime, garbage []string, err error) {
+func getBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage []string, err error) {
 	backupObjects, subFolders, err := folder.GetSubFolder(BaseBackupPath).ListFolder()
 
 	if err != nil {
@@ -344,7 +345,7 @@ func getBackupsAndGarbage(folder StorageFolder) (backups []BackupTime, garbage [
 }
 
 // TODO : unit tests
-func getBackupTimeSlices(backups []StorageObject) []BackupTime {
+func getBackupTimeSlices(backups []storage.Object) []BackupTime {
 	sortTimes := make([]BackupTime, len(backups))
 	for i, object := range backups {
 		key := object.GetName()
@@ -360,7 +361,7 @@ func getBackupTimeSlices(backups []StorageObject) []BackupTime {
 }
 
 // TODO : unit tests
-func getGarbageFromPrefix(folders []StorageFolder, nonGarbage []BackupTime) []string {
+func getGarbageFromPrefix(folders []storage.Folder, nonGarbage []BackupTime) []string {
 	garbage := make([]string, 0)
 	var keyFilter = make(map[string]string)
 	for _, k := range nonGarbage {
