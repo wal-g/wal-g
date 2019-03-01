@@ -1,6 +1,7 @@
 CMD_FILES = $(wildcard cmd/wal-g/*.go)
 PKG_FILES = $(wildcard internal/**/*.go internal/**/**/*.go internal/*.go)
 TEST_FILES = $(wildcard test/*.go testtools/*.go)
+PKG := github.com/wal-g/wal-g
 
 .PHONY: test fmt lint all install clean
 

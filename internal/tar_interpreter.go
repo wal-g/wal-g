@@ -30,19 +30,19 @@ func NewFileTarInterpreter(dbDataDirectory string, sentinel BackupSentinelDto, f
 
 // TODO : unit tests
 func (tarInterpreter *FileTarInterpreter) unwrapRegularFile(fileReader io.Reader, fileInfo *tar.Header, targetPath string) error {
-	fileDescription, haveFileDescription := tarInterpreter.Sentinel.Files[fileInfo.Name]
-
-	// If this file is incremental we use it's base version from incremental path
-	if haveFileDescription && tarInterpreter.Sentinel.isIncremental() && fileDescription.IsIncremented {
-		err := ApplyFileIncrement(targetPath, fileReader)
-		return errors.Wrapf(err, "Interpret: failed to apply increment for '%s'", targetPath)
-	}
 	if tarInterpreter.FilesToUnwrap != nil {
 		if _, ok := tarInterpreter.FilesToUnwrap[fileInfo.Name]; !ok {
 			// don't have to unwrap it this time
 			tracelog.DebugLogger.Printf("Don't have to unwrap '%s' this time\n", fileInfo.Name)
 			return nil
 		}
+	}
+	fileDescription, haveFileDescription := tarInterpreter.Sentinel.Files[fileInfo.Name]
+
+	// If this file is incremental we use it's base version from incremental path
+	if haveFileDescription && tarInterpreter.Sentinel.isIncremental() && fileDescription.IsIncremented {
+		err := ApplyFileIncrement(targetPath, fileReader)
+		return errors.Wrapf(err, "Interpret: failed to apply increment for '%s'", targetPath)
 	}
 	err := prepareDirs(fileInfo.Name, targetPath)
 	if err != nil {

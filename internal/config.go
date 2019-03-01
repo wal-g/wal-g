@@ -2,19 +2,22 @@ package internal
 
 import (
 	"encoding/json"
+	"github.com/go-yaml/yaml"
+	"github.com/wal-g/wal-g/internal/tracelog"
 	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
-
-	"github.com/go-yaml/yaml"
-	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 var (
 	WalgConfig        *map[string]string
 	allowedConfigKeys = map[string]*string{
+		"WALG_SWIFT_PREFIX":            nil,
+		"WALE_SWIFT_PREFIX":            nil,
+		"WALG_AZ_PREFIX":               nil,
+		"WALE_AZ_PREFIX":               nil,
 		"WALG_S3_PREFIX":               nil,
 		"WALE_S3_PREFIX":               nil,
 		"WALG_FILE_PREFIX":             nil,
@@ -35,6 +38,9 @@ var (
 		"WALG_CSE_KMS_ID":              nil,
 		"WALG_GPG_KEY_ID":              nil,
 		"WALE_GPG_KEY_ID":              nil,
+		"WALG_PGP_KEY":                 nil,
+		"WALG_PGP_KEY_PATH":            nil,
+		"WALG_PGP_KEY_PASSPHRASE":      nil,
 		"WALG_DELTA_MAX_STEPS":         nil,
 		"WALG_DELTA_ORIGIN":            nil,
 		"WALG_COMPRESSION_METHOD":      nil,

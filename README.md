@@ -117,7 +117,7 @@ To enable S3 server-side encryption, set to the algorithm to use when storing th
 
 If using S3 server-side encryption with `aws:kms`, the KMS Key ID to use for object encryption.
 
-* `WALG_GPG_KEY_ID`  (alternative form `WALE_GPG_KEY_ID`)
+* `WALG_GPG_KEY_ID`  (alternative form `WALE_GPG_KEY_ID`) ⚠️ **DEPRECATED**
 
 To configure GPG key for encryption and decryption. By default, no encryption is used. Public keyring is cached in the file "/.walg_key_cache".
 
@@ -125,28 +125,43 @@ To configure GPG key for encryption and decryption. By default, no encryption is
 
 To configure AWS KMS key for client side encryption and decryption. By default, no encryption is used. (AWS_REGION required to be set when using AWS KMS key client side encryption)
 
+* `WALG_PGP_KEY`
+
+To configure encryption and decryption with OpenPGP standard.
+Set *private key* value, when you need to execute ```wal-fetch``` or ```backup-fetch``` command.
+Set *public key* value, when you need to execute ```wal-push``` or ```backup-push``` command.
+Keep in mind that the *private key* also contains the *public key*.
+
+* `WALG_PGP_KEY_PATH`
+
+Similar to `WALG_PGP_KEY`, but value is the path to the key on file system.
+
+* `WALG_PGP_KEY_PASSPHRASE`
+
+If your *private key* is encrypted with a *passphrase*, you should set *passpharse* for decrypt.
+
 * `WALG_DELTA_MAX_STEPS`
 
- Delta-backup is difference between previously taken backup and present state. `WALG_DELTA_MAX_STEPS` determines how many delta backups can be between full backups. Defaults to 0.
- Restoration process will automatically fetch all necessary deltas and base backup and compose valid restored backup (you still need WALs after start of last backup to restore consistent cluster).
- Delta computation is based on ModTime of file system and LSN number of pages in datafiles.
+Delta-backup is difference between previously taken backup and present state. `WALG_DELTA_MAX_STEPS` determines how many delta backups can be between full backups. Defaults to 0.
+Restoration process will automatically fetch all necessary deltas and base backup and compose valid restored backup (you still need WALs after start of last backup to restore consistent cluster).
+Delta computation is based on ModTime of file system and LSN number of pages in datafiles.
 
 * `WALG_DELTA_ORIGIN`
 
- To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not exceeded). `WALG_DELTA_ORIGIN` can be LATEST (chaining increments), LATEST_FULL (for bases where volatile part is compact and chaining has no meaning - deltas overwrite each other). Defaults to LATEST.
+To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not exceeded). `WALG_DELTA_ORIGIN` can be LATEST (chaining increments), LATEST_FULL (for bases where volatile part is compact and chaining has no meaning - deltas overwrite each other). Defaults to LATEST.
 
 * `WALG_COMPRESSION_METHOD`
 
- To configure compression method used for backups. Possible options are: `lz4`, 'lzma', 'brotli'. Default method is `lz4`. LZ4 is the fastest method, but compression ratio is bad.
- LZMA is way much slower, however it compresses backups about 6 times better than LZ4. Brotli is a good trade-off between speed and compression ratio which is about 3 times better than LZ4.
+To configure compression method used for backups. Possible options are: `lz4`, 'lzma', 'brotli'. Default method is `lz4`. LZ4 is the fastest method, but compression ratio is bad.
+LZMA is way much slower, however it compresses backups about 6 times better than LZ4. Brotli is a good trade-off between speed and compression ratio which is about 3 times better than LZ4.
 
- * `WALG_DISK_RATE_LIMIT`
+* `WALG_DISK_RATE_LIMIT`
 
-  To configure disk read rate limit during ```backup-push``` in bytes per second.
+To configure disk read rate limit during ```backup-push``` in bytes per second.
 
- * `WALG_NETWORK_RATE_LIMIT`
+* `WALG_NETWORK_RATE_LIMIT`
 
-  To configure network upload rate limit during ```backup-push``` in bytes per second.
+To configure network upload rate limit during ```backup-push``` in bytes per second.
 
 Usage
 -----

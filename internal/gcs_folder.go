@@ -48,13 +48,6 @@ func ConfigureGSFolder(prefix string) (StorageFolder, error) {
 	return NewGSFolder(bucket, path), nil
 }
 
-func addDelimiterToPath(path string) string {
-	if strings.HasSuffix(path, "/") || path == "" {
-		return path
-	}
-	return path + "/"
-}
-
 // GSFolder represents folder in GCP
 type GSFolder struct {
 	bucket *storage.BucketHandle
@@ -87,7 +80,7 @@ func (folder *GSFolder) ListFolder() (objects []StorageObject, subFolders []Stor
 
 func (folder *GSFolder) DeleteObjects(objectRelativePaths []string) error {
 	for _, objectRelativePath := range objectRelativePaths {
-		path := JoinS3Path(folder.path, objectRelativePath)
+		path := JoinStoragePath(folder.path, objectRelativePath)
 		object := folder.bucket.Object(path)
 		tracelog.DebugLogger.Printf("Delete %v\n", path)
 		err := object.Delete(context.Background())
@@ -99,7 +92,7 @@ func (folder *GSFolder) DeleteObjects(objectRelativePaths []string) error {
 }
 
 func (folder *GSFolder) Exists(objectRelativePath string) (bool, error) {
-	path := JoinS3Path(folder.path, objectRelativePath)
+	path := JoinStoragePath(folder.path, objectRelativePath)
 	object := folder.bucket.Object(path)
 	_, err := object.Attrs(context.Background())
 	if err == storage.ErrObjectNotExist {
@@ -112,11 +105,11 @@ func (folder *GSFolder) Exists(objectRelativePath string) (bool, error) {
 }
 
 func (folder *GSFolder) GetSubFolder(subFolderRelativePath string) StorageFolder {
-	return NewGSFolder(folder.bucket, JoinS3Path(folder.path, subFolderRelativePath))
+	return NewGSFolder(folder.bucket, JoinStoragePath(folder.path, subFolderRelativePath))
 }
 
 func (folder *GSFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
-	path := JoinS3Path(folder.path, objectRelativePath)
+	path := JoinStoragePath(folder.path, objectRelativePath)
 	object := folder.bucket.Object(path)
 	reader, err := object.NewReader(context.Background())
 	if err == storage.ErrObjectNotExist {
@@ -127,7 +120,7 @@ func (folder *GSFolder) ReadObject(objectRelativePath string) (io.ReadCloser, er
 
 func (folder *GSFolder) PutObject(name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
-	object := folder.bucket.Object(JoinS3Path(folder.path, name))
+	object := folder.bucket.Object(JoinStoragePath(folder.path, name))
 	writer := object.NewWriter(context.Background())
 	_, err := io.Copy(writer, content)
 	if err != nil {

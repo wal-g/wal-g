@@ -197,3 +197,20 @@ func stripWalFileName(path string) string {
 	}
 	return ""
 }
+
+func addDelimiterToPath(path string) string {
+	if strings.HasSuffix(path, "/") || path == "" {
+		return path
+	}
+	return path + "/"
+}
+
+func JoinStoragePath(elem ...string) string {
+	var res []string
+	for _, e := range elem {
+		if e != "" {
+			res = append(res, strings.Trim(e, "/"))
+		}
+	}
+	return strings.Join(res, "/")
+}

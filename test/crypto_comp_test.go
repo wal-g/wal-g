@@ -131,7 +131,7 @@ type ExternalGPGCrypter struct {
 }
 
 func (c *ExternalGPGCrypter) IsUsed() bool {
-	return len(internal.GetKeyRingId()) > 0
+	return internal.GetKeyRingId() != ""
 }
 
 func (c *ExternalGPGCrypter) Encrypt(reader io.Reader) ([]byte, error) {
