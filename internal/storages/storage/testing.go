@@ -1,46 +1,13 @@
-package test
+package storage
 
 import (
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
 	"io/ioutil"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func TestFSFolder(t *testing.T) {
-	tmpDir := setupTmpDir(t)
-
-	defer os.RemoveAll(tmpDir)
-	var storageFolder internal.StorageFolder
-
-	storageFolder, err := internal.ConfigureFSFolder(tmpDir)
-
-	assert.NoError(t, err)
-
-	testStorageFolder(storageFolder, t)
-}
-
-func setupTmpDir(t *testing.T) string {
-	cwd, err := filepath.Abs("./")
-	if err != nil {
-		t.Log(err)
-	}
-	// Create temp directory.
-	tmpDir, err := ioutil.TempDir(cwd, "data")
-	if err != nil {
-		t.Log(err)
-	}
-	err = os.MkdirAll(tmpDir, 0755)
-	if err != nil {
-		t.Log(err)
-	}
-	return tmpDir
-}
-
-func testStorageFolder(storageFolder internal.StorageFolder, t *testing.T) {
+func RunFolderTest(storageFolder Folder, t *testing.T) {
 	sub1 := storageFolder.GetSubFolder("Sub1")
 
 	err := storageFolder.PutObject("file0", strings.NewReader("data0"))
@@ -90,5 +57,5 @@ func testStorageFolder(storageFolder internal.StorageFolder, t *testing.T) {
 	assert.False(t, b)
 
 	_, err = sub1.ReadObject("Tumba Yumba")
-	assert.Error(t, err.(internal.ObjectNotFoundError))
+	assert.Error(t, err.(ObjectNotFoundError))
 }

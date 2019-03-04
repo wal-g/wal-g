@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/storages/s3"
 	"github.com/wal-g/wal-g/testtools"
 	"os"
 	"strings"
@@ -134,7 +135,7 @@ func TestValidUploader(t *testing.T) {
 	tu := testtools.NewMockUploader(false, false)
 	assert.NotNil(t, tu)
 
-	upl := internal.CreateUploaderAPI(mockSvc, 100, 3)
+	upl := s3.CreateUploaderAPI(mockSvc, 100, 3)
 	assert.NotNil(t, upl)
 }
 

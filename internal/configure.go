@@ -1,41 +1,20 @@
 package internal
 
 import (
-	"net/url"
-	"strconv"
-	"strings"
-
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"golang.org/x/time/rate"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 const (
-	DefaultStreamingPartSizeFor10Concurrency = 20 << 20
-	DefaultDataBurstRateLimit                = 8 * int64(DatabasePageSize)
-	DefaultDataFolderPath                    = "/tmp"
+	DefaultDataBurstRateLimit = 8 * int64(DatabasePageSize)
+	DefaultDataFolderPath     = "/tmp"
+	WaleFileHost              = "file://localhost"
 )
-
-// TODO : unit tests
-func getPathFromPrefix(prefix string) (bucket, server string, err error) {
-	storageUrl, err := url.Parse(prefix)
-	if err != nil {
-		return "", "", errors.Wrapf(err, "failed to parse url '%s'", prefix)
-	}
-	if storageUrl.Scheme == "" || storageUrl.Host == "" {
-		return "", "", errors.Errorf("missing url scheme=%q and/or host=%q", storageUrl.Scheme, storageUrl.Host)
-	}
-
-	bucket = storageUrl.Host
-	server = strings.TrimPrefix(storageUrl.Path, "/")
-
-	// Allover the code this parameter is concatenated with '/'.
-	// TODO: Get rid of numerous string literals concatenated with this
-	server = strings.TrimSuffix(server, "/")
-	return bucket, server, nil
-}
 
 // TODO : unit tests
 func configureLimiters() error {
@@ -58,24 +37,20 @@ func configureLimiters() error {
 }
 
 // TODO : unit tests
-func configureFolder() (StorageFolder, error) {
-	waleS3Prefix := getSettingValue("WALE_S3_PREFIX")
-	waleFilePrefix := getSettingValue("WALE_FILE_PREFIX")
-	waleGSPrefix := getSettingValue("WALE_GS_PREFIX")
-	waleAZPrefix := getSettingValue("WALE_AZ_PREFIX")
-	waleSwiftPrefix := getSettingValue("WALE_SWIFT_PREFIX")
-	if waleS3Prefix != "" {
-		return ConfigureS3Folder(waleS3Prefix)
-	} else if waleFilePrefix != "" {
-		return ConfigureFSFolder(waleFilePrefix)
-	} else if waleGSPrefix != "" {
-		return ConfigureGSFolder(waleGSPrefix)
-	} else if waleAZPrefix != "" {
-		return ConfigureAzureFolder(waleAZPrefix)
-	} else if waleSwiftPrefix != "" {
-		return ConfigureSwiftFolder(waleSwiftPrefix)
+func configureFolder() (storage.Folder, error) {
+	skippedPrefixes := make([]string, 0)
+	for _, adapter := range StorageAdapters {
+		prefix := getSettingValue(adapter.prefixName)
+		if prefix == "" {
+			skippedPrefixes = append(skippedPrefixes, adapter.prefixName)
+			continue
+		}
+		if adapter.prefixPreprocessor != nil {
+			prefix = adapter.prefixPreprocessor(prefix)
+		}
+		return adapter.configureFolder(prefix, adapter.loadSettings())
 	}
-	return nil, NewUnsetEnvVarError([]string{"WALG_S3_PREFIX", "WALG_FILE_PREFIX", "WALG_GS_PREFIX", "WALG_AZ_PREFIX", "WALG_SWIFT_PREFIX"})
+	return nil, NewUnsetEnvVarError(skippedPrefixes)
 }
 
 // TODO : unit tests
@@ -143,7 +118,7 @@ func configureLogging() error {
 // Configure connects to storage and creates an uploader. It makes sure
 // that a valid session has started; if invalid, returns AWS error
 // and `<nil>` values.
-func Configure() (uploader *Uploader, destinationFolder StorageFolder, err error) {
+func Configure() (uploader *Uploader, destinationFolder storage.Folder, err error) {
 	err = configureLogging()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to configure logging")

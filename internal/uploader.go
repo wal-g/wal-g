@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 	"path"
@@ -11,7 +12,7 @@ import (
 // Uploader contains fields associated with uploading tarballs.
 // Multiple tarballs can share one uploader.
 type Uploader struct {
-	uploadingFolder     StorageFolder
+	uploadingFolder     storage.Folder
 	compressor          Compressor
 	waitGroup           *sync.WaitGroup
 	deltaFileManager    *DeltaFileManager
@@ -22,7 +23,7 @@ type Uploader struct {
 
 func NewUploader(
 	compressor Compressor,
-	uploadingLocation StorageFolder,
+	uploadingLocation storage.Folder,
 	deltaDataFolder DataFolder,
 	useWalDelta, preventWalOverwrite bool,
 ) *Uploader {

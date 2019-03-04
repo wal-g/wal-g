@@ -6,6 +6,7 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"io"
@@ -460,7 +461,7 @@ func (bundle *Bundle) getDeltaBitmapFor(filePath string) (*roaring.Bitmap, error
 	return bundle.DeltaMap.GetDeltaBitmapFor(filePath)
 }
 
-func (bundle *Bundle) DownloadDeltaMap(folder StorageFolder, backupStartLSN uint64) error {
+func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uint64) error {
 	deltaMap := NewPagedFileDeltaMap()
 	logSegNo := logSegNoFromLsn(*bundle.IncrementFromLsn + 1)
 	logSegNo -= logSegNo % WalFileInDelta

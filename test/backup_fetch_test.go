@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
 	"strings"
 	"testing"
 )
 
-func createMockStorageFolder() internal.StorageFolder {
+func createMockStorageFolder() storage.Folder {
 	var folder = testtools.MakeDefaultInMemoryStorageFolder()
 	subFolder := folder.GetSubFolder(internal.BaseBackupPath)
 	subFolder.PutObject("base_123_backup_stop_sentinel.json", &bytes.Buffer{})

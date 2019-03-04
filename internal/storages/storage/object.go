@@ -1,8 +1,8 @@
-package internal
+package storage
 
 import "time"
 
-type StorageObject interface {
+type Object interface {
 	GetName() string
 	GetLastModified() time.Time
 }

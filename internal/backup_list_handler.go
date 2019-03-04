@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"os"
 	"text/tabwriter"
@@ -10,7 +11,7 @@ import (
 
 // TODO : unit tests
 // HandleBackupList is invoked to perform wal-g backup-list
-func HandleBackupList(folder StorageFolder) {
+func HandleBackupList(folder storage.Folder) {
 	backups, err := getBackups(folder)
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)

@@ -1,16 +1,17 @@
 package internal
 
 import (
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"io"
 )
 
 // StorageReaderMaker creates readers for downloading from storage
 type StorageReaderMaker struct {
-	Folder       StorageFolder
+	Folder       storage.Folder
 	RelativePath string
 }
 
-func NewStorageReaderMaker(folder StorageFolder, relativePath string) *StorageReaderMaker {
+func NewStorageReaderMaker(folder storage.Folder, relativePath string) *StorageReaderMaker {
 	return &StorageReaderMaker{folder, relativePath}
 }
 
@@ -18,5 +19,4 @@ func (readerMaker *StorageReaderMaker) Path() string { return readerMaker.Relati
 
 func (readerMaker *StorageReaderMaker) Reader() (io.ReadCloser, error) {
 	return readerMaker.Folder.ReadObject(readerMaker.RelativePath)
-
 }

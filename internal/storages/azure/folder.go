@@ -1,12 +1,12 @@
-package internal
+package azure
 
 import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"io"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -15,57 +15,67 @@ import (
 	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
-type AzureFolderError struct {
-	error
+const (
+	AccountSetting   = "AZURE_STORAGE_ACCOUNT"
+	AccessKeySetting = "AZURE_STORAGE_ACCESS_KEY"
+)
+
+var SettingList = []string{
+	AccountSetting,
+	AccessKeySetting,
 }
 
-func NewAzureFolderError(err error, format string, args ...interface{}) AzureFolderError {
-	return AzureFolderError{errors.Wrapf(err, format, args...)}
+func NewFolderError(err error, format string, args ...interface{}) storage.Error {
+	return storage.NewError(err, "Azure", format, args...)
 }
 
-func (err AzureFolderError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+func NewCredentialError(settingName string) storage.Error {
+	return NewFolderError(errors.New("Credential error"),
+		"%s setting is not set", settingName)
 }
 
-func NewAzureFolder(containerURL azblob.ContainerURL, path string) *AzureFolder {
-	return &AzureFolder{containerURL, path}
+func NewFolder(containerURL azblob.ContainerURL, path string) *Folder {
+	return &Folder{containerURL, path}
 }
 
-func ConfigureAzureFolder(prefix string) (StorageFolder, error) {
-	accountName, accountKey := accountInfo()
-	if len(accountName) == 0 || len(accountKey) == 0 {
-		return nil, NewAzureFolderError(errors.New("Credential error"),
-			"Either the AZURE_STORAGE_ACCOUNT or AZURE_STORAGE_ACCESS_KEY environment variable is not set")
+func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
+	var accountName, accountKey string
+	var ok bool
+	if accountName, ok = settings[AccountSetting]; !ok {
+		return nil, NewCredentialError(AccountSetting)
+	}
+	if accountKey, ok = settings[AccessKeySetting]; !ok {
+		return nil, NewCredentialError(AccessKeySetting)
 	}
 	credential, err := azblob.NewSharedKeyCredential(accountName, accountKey)
 	if err != nil {
-		return nil, NewAzureFolderError(err, "Unable to create Azure credentials")
+		return nil, NewFolderError(err, "Unable to create credentials")
 	}
 	pipeLine := azblob.NewPipeline(credential, azblob.PipelineOptions{})
-	containerName, path, err := getPathFromPrefix(prefix)
+	containerName, path, err := storage.GetPathFromPrefix(prefix)
 	if err != nil {
-		return nil, NewAzureFolderError(err, "Unable to create Azure container")
+		return nil, NewFolderError(err, "Unable to create container")
 	}
 	serviceURL, err := url.Parse(fmt.Sprintf("https://%s.blob.core.windows.net/%s", accountName, containerName))
 	if err != nil {
-		return nil, NewAzureFolderError(err, "Unable to parse Azure service URL")
+		return nil, NewFolderError(err, "Unable to parse service URL")
 	}
 	containerURL := azblob.NewContainerURL(*serviceURL, pipeLine)
-	path = addDelimiterToPath(path)
-	return NewAzureFolder(containerURL, path), nil
+	path = storage.AddDelimiterToPath(path)
+	return NewFolder(containerURL, path), nil
 }
 
-type AzureFolder struct {
+type Folder struct {
 	containerURL azblob.ContainerURL
 	path         string
 }
 
-func (folder *AzureFolder) GetPath() string {
+func (folder *Folder) GetPath() string {
 	return folder.path
 }
 
-func (folder *AzureFolder) Exists(objectRelativePath string) (bool, error) {
-	path := JoinStoragePath(folder.path, objectRelativePath)
+func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
+	path := storage.JoinPath(folder.path, objectRelativePath)
 	ctx := context.Background()
 	blobURL := folder.containerURL.NewBlockBlobURL(path)
 	_, err := blobURL.GetProperties(ctx, azblob.BlobAccessConditions{})
@@ -73,25 +83,25 @@ func (folder *AzureFolder) Exists(objectRelativePath string) (bool, error) {
 		return false, nil
 	}
 	if err != nil {
-		return false, NewAzureFolderError(err, "Unable to stat object %v", path)
+		return false, NewFolderError(err, "Unable to stat object %v", path)
 	}
 	return true, nil
 }
 
-func (folder *AzureFolder) ListFolder() (objects []StorageObject, subFolders []StorageFolder, err error) {
+func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
 	//Marker is used for segmented iteration.
 	for marker := (azblob.Marker{}); marker.NotDone(); {
 
 		blobs, err := folder.containerURL.ListBlobsHierarchySegment(context.Background(), marker, "/", azblob.ListBlobsSegmentOptions{Prefix: folder.path})
 		if err != nil {
-			return nil, nil, NewAzureFolderError(err, "Unable to iterate %v", folder.path)
+			return nil, nil, NewFolderError(err, "Unable to iterate %v", folder.path)
 		}
 		//add blobs to the list of storage objects
 		for _, blob := range blobs.Segment.BlobItems {
 			objName := strings.TrimPrefix(blob.Name, folder.path)
 			updated := time.Time(blob.Properties.LastModified)
 
-			objects = append(objects, &AzureStorageObject{updated, objName})
+			objects = append(objects, storage.NewLocalObject(objName, updated))
 		}
 
 		marker = blobs.NextMarker
@@ -101,59 +111,59 @@ func (folder *AzureFolder) ListFolder() (objects []StorageObject, subFolders []S
 		for _, blobPrefix := range blobPrefixes {
 			subFolderPath := blobPrefix.Name
 
-			subFolders = append(subFolders, NewAzureFolder(folder.containerURL, subFolderPath))
+			subFolders = append(subFolders, NewFolder(folder.containerURL, subFolderPath))
 		}
 
 	}
 	return
 }
 
-func (folder *AzureFolder) GetSubFolder(subFolderRelativePath string) StorageFolder {
-	return NewAzureFolder(folder.containerURL, addDelimiterToPath(JoinStoragePath(folder.path, subFolderRelativePath)))
+func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
+	return NewFolder(folder.containerURL, storage.AddDelimiterToPath(storage.JoinPath(folder.path, subFolderRelativePath)))
 }
 
-func (folder *AzureFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
+func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	//Download blob using blobURL obtained from full path to blob
-	path := JoinStoragePath(folder.path, objectRelativePath)
+	path := storage.JoinPath(folder.path, objectRelativePath)
 	blobURL := folder.containerURL.NewBlockBlobURL(path)
 	downloadResponse, err := blobURL.Download(context.Background(), 0, 0, azblob.BlobAccessConditions{}, false)
 	if stgErr, ok := err.(azblob.StorageError); ok && stgErr.ServiceCode() == azblob.ServiceCodeBlobNotFound {
-		return nil, NewObjectNotFoundError(path)
+		return nil, storage.NewObjectNotFoundError(path)
 	}
 
 	if err != nil {
-		return nil, NewAzureFolderError(err, "Unable to download blob %s.", path)
+		return nil, NewFolderError(err, "Unable to download blob %s.", path)
 	}
 	//retrieve and return the downloaded content
 	content := downloadResponse.Body(azblob.RetryReaderOptions{})
 	return content, nil
 }
 
-func (folder *AzureFolder) PutObject(name string, content io.Reader) error {
+func (folder *Folder) PutObject(name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
 	//process the input content
 	buf := new(bytes.Buffer)
 	_, err := buf.ReadFrom(content)
 	if err != nil {
-		return NewAzureFolderError(err, "Unable to copy to object")
+		return NewFolderError(err, "Unable to copy to object")
 	}
 	//Upload content to a blob using full path
-	path := JoinStoragePath(folder.path, name)
+	path := storage.JoinPath(folder.path, name)
 	blobURL := folder.containerURL.NewBlockBlobURL(path)
 	uploadContent := bytes.NewReader(buf.Bytes())
 	_, err = blobURL.Upload(context.Background(), uploadContent, azblob.BlobHTTPHeaders{ContentType: "text/plain"}, azblob.Metadata{}, azblob.BlobAccessConditions{})
 	if err != nil {
-		return NewAzureFolderError(err, "unable to upload blob %v", name)
+		return NewFolderError(err, "unable to upload blob %v", name)
 	}
 
 	tracelog.DebugLogger.Printf("Put %v done\n", name)
 	return nil
 }
 
-func (folder *AzureFolder) DeleteObjects(objectRelativePaths []string) error {
+func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	for _, objectRelativePath := range objectRelativePaths {
 		//Delete blob using blobURL obtained from full path to blob
-		path := JoinStoragePath(folder.path, objectRelativePath)
+		path := storage.JoinPath(folder.path, objectRelativePath)
 		blobURL := folder.containerURL.NewBlockBlobURL(path)
 		tracelog.DebugLogger.Printf("Delete %v\n", path)
 		_, err := blobURL.Delete(context.Background(), azblob.DeleteSnapshotsOptionInclude, azblob.BlobAccessConditions{})
@@ -161,16 +171,10 @@ func (folder *AzureFolder) DeleteObjects(objectRelativePaths []string) error {
 			continue
 		}
 		if err != nil {
-			return NewAzureFolderError(err, "Unable to delete object %v", path)
+			return NewFolderError(err, "Unable to delete object %v", path)
 		} else {
 			//blob is deleted
 		}
 	}
 	return nil
-}
-
-func accountInfo() (string, string) {
-	accountName := os.Getenv("AZURE_STORAGE_ACCOUNT")
-	accountKey := os.Getenv("AZURE_STORAGE_ACCESS_KEY")
-	return accountName, accountKey
 }
