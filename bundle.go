@@ -70,15 +70,6 @@ func (bundle *Bundle) FinishQueue() error {
 	}
 	bundle.started = false
 
-	// At this point no new tarballs should be put into uploadQueue
-	for len(bundle.uploadQueue) > 0 {
-		select {
-		case otb := <-bundle.uploadQueue:
-			otb.AwaitUploads()
-		default:
-		}
-	}
-
 	// We have to deque exactly this count of workers
 	for i := 0; i < bundle.parallelTarballs; i++ {
 		tb := <-bundle.tarballQueue
@@ -91,6 +82,15 @@ func (bundle *Bundle) FinishQueue() error {
 			return errors.Wrap(err, "TarWalk: failed to close tarball")
 		}
 		tb.AwaitUploads()
+	}
+
+	// At this point no new tarballs should be put into uploadQueue
+	for len(bundle.uploadQueue) > 0 {
+		select {
+		case otb := <-bundle.uploadQueue:
+			otb.AwaitUploads()
+		default:
+		}
 	}
 	return nil
 }
