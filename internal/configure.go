@@ -18,7 +18,7 @@ const (
 
 // TODO : unit tests
 func configureLimiters() error {
-	if diskLimitStr := getSettingValue("WALG_DISK_RATE_LIMIT"); diskLimitStr != "" {
+	if diskLimitStr := GetSettingValue("WALG_DISK_RATE_LIMIT"); diskLimitStr != "" {
 		diskLimit, err := strconv.ParseInt(diskLimitStr, 10, 64)
 		if err != nil {
 			return errors.Wrap(err, "failed to parse WALG_DISK_RATE_LIMIT")
@@ -26,7 +26,7 @@ func configureLimiters() error {
 		DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 
-	if netLimitStr := getSettingValue("WALG_NETWORK_RATE_LIMIT"); netLimitStr != "" {
+	if netLimitStr := GetSettingValue("WALG_NETWORK_RATE_LIMIT"); netLimitStr != "" {
 		netLimit, err := strconv.ParseInt(netLimitStr, 10, 64)
 		if err != nil {
 			return errors.Wrap(err, "failed to parse WALG_NETWORK_RATE_LIMIT")
@@ -40,7 +40,7 @@ func configureLimiters() error {
 func configureFolder() (storage.Folder, error) {
 	skippedPrefixes := make([]string, 0)
 	for _, adapter := range StorageAdapters {
-		prefix := getSettingValue(adapter.prefixName)
+		prefix := GetSettingValue(adapter.prefixName)
 		if prefix == "" {
 			skippedPrefixes = append(skippedPrefixes, adapter.prefixName)
 			continue
@@ -96,7 +96,7 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err
 
 // TODO : unit tests
 func configureCompressor() (Compressor, error) {
-	compressionMethod := getSettingValue("WALG_COMPRESSION_METHOD")
+	compressionMethod := GetSettingValue("WALG_COMPRESSION_METHOD")
 	if compressionMethod == "" {
 		compressionMethod = Lz4AlgorithmName
 	}
@@ -145,7 +145,7 @@ func Configure() (uploader *Uploader, destinationFolder storage.Folder, err erro
 	}
 
 	preventWalOverwrite := false
-	if preventWalOverwriteStr := getSettingValue("WALG_PREVENT_WAL_OVERWRITE"); preventWalOverwriteStr != "" {
+	if preventWalOverwriteStr := GetSettingValue("WALG_PREVENT_WAL_OVERWRITE"); preventWalOverwriteStr != "" {
 		preventWalOverwrite, err = strconv.ParseBool(preventWalOverwriteStr)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to parse WALG_PREVENT_WAL_OVERWRITE")

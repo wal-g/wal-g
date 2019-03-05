@@ -25,9 +25,9 @@ func (adapter *StorageAdapter) loadSettings() map[string]string {
 			settings[settingName] = strconv.Itoa(getMaxUploadConcurrency(10))
 			continue
 		}
-		settingValue := getSettingValue("WALE_" + settingName)
+		settingValue := GetSettingValue("WALE_" + settingName)
 		if settingValue == "" {
-			settingValue = getSettingValue(settingName)
+			settingValue = GetSettingValue(settingName)
 		}
 		if settingValue != "" {
 			settings[settingName] = settingValue

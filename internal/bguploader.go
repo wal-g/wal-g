@@ -123,7 +123,7 @@ func (bgUploader *BgUploader) haveNoSlots() bool {
 // upload one WAL file
 func (bgUploader *BgUploader) upload(info os.FileInfo) {
 	walFilename := strings.TrimSuffix(info.Name(), readySuffix)
-	err := uploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename))
+	err := UploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename))
 	if err != nil {
 		tracelog.ErrorLogger.Print("Error of background uploader: ", err)
 		return

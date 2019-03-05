@@ -188,8 +188,11 @@ func deleteBeforeTarget(folder storage.Folder, target *Backup, dryRun bool) {
 		dropBackup(folder, garbageName)
 	}
 	if skipLine < len(backupToScan)-1 {
-		deleteWALBefore(walSkipFileName, walFolder)
+		DeleteWALBefore(walSkipFileName, walFolder)
 		deleteBackupsBefore(backupToScan, skipLine, folder)
+		for _, extension := range Extensions {
+			extension.Flush(backupToScan[skipLine], folder)
+		}
 	}
 }
 
@@ -269,7 +272,7 @@ func dropBackup(folder storage.Folder, backupName string) {
 }
 
 // TODO : unit tests
-func deleteWALBefore(walSkipFileName string, walFolder storage.Folder) {
+func DeleteWALBefore(walSkipFileName string, walFolder storage.Folder) {
 	wals, err := getWals(walSkipFileName, walFolder)
 	if err != nil {
 		tracelog.ErrorLogger.Fatal("Unable to obtain WALs for border ", walSkipFileName, err)
@@ -304,9 +307,8 @@ func getWals(before string, folder storage.Folder) ([]string, error) {
 }
 
 // TODO : unit tests
-func getLatestBackupName(folder storage.Folder) (string, error) {
+func GetLatestBackupName(folder storage.Folder) (string, error) {
 	sortTimes, err := getBackups(folder)
-
 	if err != nil {
 		return "", err
 	}
@@ -318,7 +320,6 @@ func getLatestBackupName(folder storage.Folder) (string, error) {
 // getBackups receives backup descriptions and sorts them by time
 func getBackups(folder storage.Folder) (backups []BackupTime, err error) {
 	backups, _, err = getBackupsAndGarbage(folder)
-
 	if err != nil {
 		return nil, err
 	}
@@ -333,7 +334,6 @@ func getBackups(folder storage.Folder) (backups []BackupTime, err error) {
 // TODO : unit tests
 func getBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage []string, err error) {
 	backupObjects, subFolders, err := folder.GetSubFolder(BaseBackupPath).ListFolder()
-
 	if err != nil {
 		return nil, nil, err
 	}
