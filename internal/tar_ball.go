@@ -10,7 +10,6 @@ import (
 type TarBall interface {
 	SetUp(crypter Crypter, args ...string)
 	CloseTar() error
-	Finish(sentinelDto *BackupSentinelDto) error
 	Size() int64
 	AddSize(int64)
 	TarWriter() *tar.Writer

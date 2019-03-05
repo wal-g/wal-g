@@ -3,6 +3,7 @@ package internal
 import (
 	"archive/tar"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 	"io/ioutil"
@@ -17,7 +18,7 @@ import (
 
 // TODO : unit tests
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
-func HandleWALPrefetch(folder StorageFolder, walFileName string, location string, uploader *Uploader) {
+func HandleWALPrefetch(folder storage.Folder, walFileName string, location string, uploader *Uploader) {
 	folder = folder.GetSubFolder(WalPath)
 	var fileName = walFileName
 	var err error
@@ -66,7 +67,7 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	bundle := NewBundle(archiveDirectory, &prefaultStartLsn, nil)
 	bundle.Timeline = timelineId
-	err := bundle.DownloadDeltaMap(uploader.uploadingFolder.GetSubFolder(WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
+	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Error during loading delta map: '%+v'.", err)
 		return
@@ -176,7 +177,7 @@ func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader
 }
 
 // TODO : unit tests
-func prefetchFile(location string, folder StorageFolder, walFileName string, waitGroup *sync.WaitGroup) {
+func prefetchFile(location string, folder storage.Folder, walFileName string, waitGroup *sync.WaitGroup) {
 	defer func() {
 		if r := recover(); r != nil {
 			tracelog.ErrorLogger.Println("Prefetch unsuccessful ", walFileName, r)
@@ -196,7 +197,7 @@ func prefetchFile(location string, folder StorageFolder, walFileName string, wai
 	tracelog.InfoLogger.Println("WAL-prefetch file: ", walFileName)
 	os.MkdirAll(runningLocation, 0755)
 
-	err := downloadWALFileTo(folder, walFileName, oldPath)
+	err := DownloadWALFileTo(folder, walFileName, oldPath)
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}

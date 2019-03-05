@@ -1,12 +1,28 @@
 package internal
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"os"
 	"path/filepath"
 	"strconv"
 	"time"
 )
+
+type SentinelMarshallingError struct {
+	error
+}
+
+func NewSentinelMarshallingError(sentinelName string, err error) SentinelMarshallingError {
+	return SentinelMarshallingError{errors.Wrapf(err, "Failed to marshall sentinel file: '%s'", sentinelName)}
+}
+
+func (err SentinelMarshallingError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
 
 // TODO : unit tests
 func getDeltaConfig() (maxDeltas int, fromFull bool) {
@@ -42,10 +58,10 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	var err error
 	incrementCount := 1
 
-	folder := uploader.uploadingFolder
+	folder := uploader.UploadingFolder
 	basebackupFolder := folder.GetSubFolder(BaseBackupPath)
 	if maxDeltas > 0 {
-		previousBackupName, err = getLatestBackupName(folder)
+		previousBackupName, err = GetLatestBackupName(folder)
 		if err != nil {
 			if _, ok := err.(NoBackupsFoundError); ok {
 				tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
@@ -84,7 +100,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 		tracelog.InfoLogger.Println("Doing full backup.")
 	}
 
-	uploader.uploadingFolder = basebackupFolder // TODO: AB: this subfolder switch look ugly. I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
+	uploader.UploadingFolder = basebackupFolder // TODO: AB: this subfolder switch look ugly. I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
 
 	bundle := NewBundle(archiveDirectory, previousBackupSentinelDto.BackupStartLSN, previousBackupSentinelDto.Files)
 
@@ -123,7 +139,7 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	err = bundle.UploadPgControl(uploader.compressor.FileExtension())
+	err = bundle.UploadPgControl(uploader.Compressor.FileExtension())
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
@@ -134,31 +150,51 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	}
 
 	timelineChanged := bundle.checkTimelineChanged(conn)
-	var currentBackupSentinelDto *BackupSentinelDto
-
-	if !timelineChanged {
-		currentBackupSentinelDto = &BackupSentinelDto{
-			BackupStartLSN:   &backupStartLSN,
-			IncrementFromLSN: previousBackupSentinelDto.BackupStartLSN,
-			PgVersion:        pgVersion,
-		}
-		if previousBackupSentinelDto.BackupStartLSN != nil {
-			currentBackupSentinelDto.IncrementFrom = &previousBackupName
-			if previousBackupSentinelDto.isIncremental() {
-				currentBackupSentinelDto.IncrementFullName = previousBackupSentinelDto.IncrementFullName
-			} else {
-				currentBackupSentinelDto.IncrementFullName = &previousBackupName
-			}
-			currentBackupSentinelDto.IncrementCount = &incrementCount
-		}
-
-		currentBackupSentinelDto.setFiles(bundle.GetFiles())
-		currentBackupSentinelDto.BackupFinishLSN = &finishLsn
-	}
 
 	// Wait for all uploads to finish.
-	err = bundle.TarBall.Finish(currentBackupSentinelDto)
+	uploader.finish()
+	if !uploader.Success {
+		tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", backupName)
+	}
+	if timelineChanged {
+		tracelog.ErrorLogger.Fatalf("Cannot finish backup because of changed timeline.")
+	}
+
+	currentBackupSentinelDto := &BackupSentinelDto{
+		BackupStartLSN:   &backupStartLSN,
+		IncrementFromLSN: previousBackupSentinelDto.BackupStartLSN,
+		PgVersion:        pgVersion,
+	}
+	if previousBackupSentinelDto.BackupStartLSN != nil {
+		currentBackupSentinelDto.IncrementFrom = &previousBackupName
+		if previousBackupSentinelDto.isIncremental() {
+			currentBackupSentinelDto.IncrementFullName = previousBackupSentinelDto.IncrementFullName
+		} else {
+			currentBackupSentinelDto.IncrementFullName = &previousBackupName
+		}
+		currentBackupSentinelDto.IncrementCount = &incrementCount
+	}
+
+	currentBackupSentinelDto.setFiles(bundle.GetFiles())
+	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
+	currentBackupSentinelDto.UserData = GetSentinelUserData()
+
+	// If other parts are successful in uploading, upload json file.
+	err = UploadSentinel(uploader, currentBackupSentinelDto, backupName)
 	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", backupName)
 		tracelog.ErrorLogger.FatalError(err)
 	}
+}
+
+// TODO : unit tests
+func UploadSentinel(uploader *Uploader, sentinelDto *BackupSentinelDto, backupName string) error {
+	sentinelName := backupName + SentinelSuffix
+
+	dtoBody, err := json.Marshal(*sentinelDto)
+	if err != nil {
+		return NewSentinelMarshallingError(sentinelName, err)
+	}
+
+	return uploader.Upload(sentinelName, bytes.NewReader(dtoBody))
 }

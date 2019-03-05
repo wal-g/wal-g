@@ -23,7 +23,6 @@ const (
 	SentinelSuffix         = "_backup_stop_sentinel.json"
 	CompressedBlockMaxSize = 20 << 20
 	NotFoundAWSErrorCode   = "NotFound"
-	NoSuchKeyAWSErrorCode  = "NoSuchKey"
 )
 
 // Empty is used for channel signaling.
@@ -58,22 +57,8 @@ func allZero(s []byte) bool {
 	return true
 }
 
-func sanitizePath(path string) string {
+func SanitizePath(path string) string {
 	return strings.TrimLeft(path, "/")
-}
-
-// TODO : unit tests
-func partitionStrings(strings []string, blockSize int) [][]string {
-	// I've unsuccessfully tried this with interface{} but there was too much of casting
-	partition := make([][]string, 0)
-	for i := 0; i < len(strings); i += blockSize {
-		if i+blockSize > len(strings) {
-			partition = append(partition, strings[i:])
-		} else {
-			partition = append(partition, strings[i:i+blockSize])
-		}
-	}
-	return partition
 }
 
 // ResolveSymlink converts path to physical if it is symlink
@@ -196,21 +181,4 @@ func stripWalFileName(path string) string {
 		return name[len(backupNamePrefix):]
 	}
 	return ""
-}
-
-func addDelimiterToPath(path string) string {
-	if strings.HasSuffix(path, "/") || path == "" {
-		return path
-	}
-	return path + "/"
-}
-
-func JoinStoragePath(elem ...string) string {
-	var res []string
-	for _, e := range elem {
-		if e != "" {
-			res = append(res, strings.Trim(e, "/"))
-		}
-	}
-	return strings.Join(res, "/")
 }

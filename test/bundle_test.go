@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/testtools"
 	"os"
@@ -175,7 +176,7 @@ func fillStorageWithMockDeltas(storage *testtools.InMemoryStorage) error {
 	return err
 }
 
-func setupFolderAndBundle() (folder internal.StorageFolder, bundle *internal.Bundle, err error) {
+func setupFolderAndBundle() (folder storage.Folder, bundle *internal.Bundle, err error) {
 	storage := testtools.NewInMemoryStorage()
 	err = fillStorageWithMockDeltas(storage)
 	if err != nil {

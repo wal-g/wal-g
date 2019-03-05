@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/tracelog"
 	"log"
 	"os"
 	"runtime/pprof"
@@ -11,6 +12,7 @@ import (
 
 var profile bool
 var mem bool
+var pathToExtensions string
 var l *log.Logger
 var helpMsg = "  backup-fetch\tfetch a backup from S3\n" +
 	"  backup-push\tstarts and uploads a finished backup to S3\n" +
@@ -27,6 +29,7 @@ func init() {
 	}
 	flag.BoolVar(&profile, "p", false, "\tProfiler (false by default)")
 	flag.BoolVar(&mem, "m", false, "\tMemory profiler (false by default)")
+	flag.StringVar(&pathToExtensions, "ext_path", "./extensions/build", "\tPath to extensions libraries")
 
 	// this is temp solution to pass everything through flag. Will remove it when using CLI like cobra or cli
 	flag.BoolVar(&showVersion, "version", false, "\tversion")
@@ -35,6 +38,11 @@ func init() {
 	flag.BoolVar(&showVersionVerbose, "vv", false, "\tLong version")
 
 	l = log.New(os.Stderr, "", 0)
+	flag.Parse()
+	err := internal.LoadExtensions(pathToExtensions)
+	if err != nil {
+		tracelog.ErrorLogger.FatalError(err)
+	}
 }
 
 var WalgVersion = "devel"
@@ -45,8 +53,6 @@ var showVersion bool
 var showVersionVerbose bool
 
 func main() {
-	flag.Parse()
-
 	if WalgVersion == "" {
 		WalgVersion = "devel"
 	}
@@ -93,7 +99,16 @@ func main() {
 			fmt.Println(internal.DeleteUsageText)
 			os.Exit(1)
 		default:
-			l.Fatalf("Command '%s' is unsupported by WAL-G.\n\n", command)
+			var shouldExit bool
+			fmt.Println(command)
+			if extension, ok := internal.GetExtensionByCommandName(command); ok {
+				shouldExit = extension.TryPrintHelp(command, all)
+			} else {
+				l.Fatalf("Command '%s' is unsupported by WAL-G.\n\n", command)
+			}
+			if shouldExit {
+				os.Exit(1)
+			}
 		}
 	}
 
@@ -137,6 +152,8 @@ func main() {
 		internal.HandleBackupList(folder)
 	} else if command == "delete" {
 		internal.HandleDelete(folder, all)
+	} else if extension, ok := internal.GetExtensionByCommandName(command); ok {
+		extension.Execute(command, uploader, folder, all)
 	} else {
 		l.Fatalf("Command '%s' is unsupported by WAL-G.", command)
 	}

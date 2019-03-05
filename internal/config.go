@@ -14,27 +14,11 @@ import (
 var (
 	WalgConfig        *map[string]string
 	allowedConfigKeys = map[string]*string{
-		"WALG_SWIFT_PREFIX":            nil,
-		"WALE_SWIFT_PREFIX":            nil,
-		"WALG_AZ_PREFIX":               nil,
-		"WALE_AZ_PREFIX":               nil,
-		"WALG_S3_PREFIX":               nil,
-		"WALE_S3_PREFIX":               nil,
-		"WALG_FILE_PREFIX":             nil,
-		"WALE_FILE_PREFIX":             nil,
-		"WALG_GS_PREFIX":               nil,
-		"WALE_GS_PREFIX":               nil,
-		"AWS_REGION":                   nil,
 		"WALG_DOWNLOAD_CONCURRENCY":    nil,
 		"WALG_UPLOAD_CONCURRENCY":      nil,
 		"WALG_UPLOAD_DISK_CONCURRENCY": nil,
 		"WALG_SENTINEL_USER_DATA":      nil,
 		"WALG_PREVENT_WAL_OVERWRITE":   nil,
-		"AWS_ENDPOINT":                 nil,
-		"AWS_S3_FORCE_PATH_STYLE":      nil,
-		"WALG_S3_STORAGE_CLASS":        nil,
-		"WALG_S3_SSE":                  nil,
-		"WALG_S3_SSE_KMS_ID":           nil,
 		"WALG_CSE_KMS_ID":              nil,
 		"WALG_GPG_KEY_ID":              nil,
 		"WALE_GPG_KEY_ID":              nil,
@@ -52,6 +36,15 @@ var (
 )
 
 func init() {
+	for _, adapter := range StorageAdapters {
+		allowedConfigKeys[adapter.prefixName] = nil
+		allowedConfigKeys[toWalgSettingName(adapter.prefixName)] = nil
+		for _, settingName := range adapter.settingNames {
+			allowedConfigKeys["WALG_"+settingName] = nil
+			allowedConfigKeys["WALE_"+settingName] = nil
+			allowedConfigKeys[settingName] = nil
+		}
+	}
 	readConfig()
 	verifyConfig()
 }
@@ -59,6 +52,11 @@ func init() {
 func verifyConfig() {
 	if WalgConfig == nil {
 		return
+	}
+	for _, extension := range Extensions {
+		for key, value := range extension.GetAllowedConfigKeys() {
+			allowedConfigKeys[key] = value
+		}
 	}
 	for k := range *WalgConfig {
 		if _, ok := allowedConfigKeys[k]; !ok {
@@ -97,9 +95,13 @@ func LookupConfigValue(key string) (value string, ok bool) {
 	return os.LookupEnv(key)
 }
 
-func getSettingValue(key string) string {
+func toWalgSettingName(waleSettingName string) string {
+	return "WALG" + strings.TrimPrefix(waleSettingName, "WALE")
+}
+
+func GetSettingValue(key string) string {
 	if strings.HasPrefix(key, "WALE") {
-		walgKey := "WALG" + strings.TrimPrefix(key, "WALE")
+		walgKey := toWalgSettingName(key)
 		if val, ok := LookupConfigValue(walgKey); ok && len(val) > 0 {
 			return val
 		}

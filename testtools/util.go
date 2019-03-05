@@ -4,19 +4,20 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/storages/s3"
 	"io"
 	"testing"
 )
 
-func MakeDefaultUploader(uploaderAPI s3manageriface.UploaderAPI) *internal.S3Uploader {
-	return internal.NewS3Uploader(uploaderAPI, "", "", "STANDARD")
+func MakeDefaultUploader(uploaderAPI s3manageriface.UploaderAPI) *s3.Uploader {
+	return s3.NewUploader(uploaderAPI, "", "", "STANDARD")
 }
 
 func NewMockUploader(apiMultiErr, apiErr bool) *internal.Uploader {
 	s3Uploader := MakeDefaultUploader(NewMockS3Uploader(apiMultiErr, apiErr, nil))
 	return internal.NewUploader(
 		&MockCompressor{},
-		internal.NewS3Folder(*s3Uploader, NewMockS3Client(false, true), "bucket/", "server/"),
+		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), "bucket/", "server/"),
 		nil,
 		false,
 		false,

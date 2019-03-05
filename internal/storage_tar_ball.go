@@ -2,25 +2,11 @@ package internal
 
 import (
 	"archive/tar"
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 )
-
-type NoSentinelUploadError struct {
-	error
-}
-
-func NewNoSentinelUploadError() NoSentinelUploadError {
-	return NoSentinelUploadError{errors.New("Sentinel was not uploaded due to timeline change during backup")}
-}
-
-func (err NoSentinelUploadError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
 
 // StorageTarBall represents a tar file that is
 // going to be uploaded to storage.
@@ -43,7 +29,7 @@ func (tarBall *StorageTarBall) SetUp(crypter Crypter, names ...string) {
 		if len(names) > 0 {
 			name = names[0]
 		} else {
-			name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partNumber, tarBall.uploader.compressor.FileExtension())
+			name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partNumber, tarBall.uploader.Compressor.FileExtension())
 		}
 		writeCloser := tarBall.startUpload(name, crypter)
 
@@ -90,7 +76,7 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter Crypter) io.Writ
 	go func() {
 		defer uploader.waitGroup.Done()
 
-		err := uploader.upload(path, NewNetworkLimitReader(pipeReader))
+		err := uploader.Upload(path, NewNetworkLimitReader(pipeReader))
 		if compressingError, ok := err.(CompressingPipeWriterError); ok {
 			tracelog.ErrorLogger.Printf("could not upload '%s' due to compression error\n%+v\n", path, compressingError)
 		}
@@ -107,10 +93,10 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter Crypter) io.Writ
 			tracelog.ErrorLogger.Fatal("upload: encryption error ", err)
 		}
 
-		return &CascadeWriteCloser{uploader.compressor.NewWriter(encryptedWriter), &CascadeWriteCloser{encryptedWriter, pipeWriter}}
+		return &CascadeWriteCloser{uploader.Compressor.NewWriter(encryptedWriter), &CascadeWriteCloser{encryptedWriter, pipeWriter}}
 	}
 
-	return &CascadeWriteCloser{uploader.compressor.NewWriter(pipeWriter), pipeWriter}
+	return &CascadeWriteCloser{uploader.Compressor.NewWriter(pipeWriter), pipeWriter}
 }
 
 // Size accumulated in this tarball
@@ -120,40 +106,3 @@ func (tarBall *StorageTarBall) Size() int64 { return tarBall.size }
 func (tarBall *StorageTarBall) AddSize(i int64) { tarBall.size += i }
 
 func (tarBall *StorageTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
-
-// Finish writes a .json file description and uploads it with the
-// the backup name. Finish will wait until all tar file parts
-// have been uploaded. The json file will only be uploaded
-// if all other parts of the backup are present in storage.
-// an alert is given with the corresponding error.
-func (tarBall *StorageTarBall) Finish(sentinelDto *BackupSentinelDto) error {
-	name := tarBall.backupName + SentinelSuffix
-	uploader := tarBall.uploader
-
-	uploader.finish()
-
-	var err error
-	// If other parts are successful in uploading, upload json file.
-	if uploader.Success && sentinelDto != nil {
-		sentinelDto.UserData = GetSentinelUserData()
-		dtoBody, err := json.Marshal(*sentinelDto)
-		if err != nil {
-			return err
-		}
-
-		uploadingErr := uploader.upload(name, bytes.NewReader(dtoBody))
-		if uploadingErr != nil {
-			tracelog.ErrorLogger.Printf("upload: could not upload '%s'\n", name)
-			tracelog.ErrorLogger.Fatalf("StorageTarBall finish: json failed to upload")
-		}
-	} else {
-		tracelog.InfoLogger.Printf("Uploaded %d compressed tar Files.\n", tarBall.partNumber)
-		tracelog.ErrorLogger.Printf("Sentinel was not uploaded %v", name)
-		return NewNoSentinelUploadError()
-	}
-
-	if err == nil && uploader.Success {
-		tracelog.InfoLogger.Printf("Uploaded %d compressed tar Files.\n", tarBall.partNumber)
-	}
-	return err
-}

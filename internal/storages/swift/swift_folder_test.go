@@ -1,8 +1,8 @@
-package test
+package swift
 
 import (
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"os"
 	"testing"
 )
@@ -16,9 +16,9 @@ func TestSwiftFolder(t *testing.T) {
 	os.Setenv("OS_TENANT_NAME", "")
 	os.Setenv("OS_REGION_NAME", "")
 
-	storageFolder, err := internal.ConfigureSwiftFolder("swift://test-container/wal-g-test-folder/sub0")
+	storageFolder, err := ConfigureFolder("swift://test-container/wal-g-test-folder/sub0", nil)
 
 	assert.NoError(t, err)
 
-	testStorageFolder(storageFolder, t)
+	storage.RunFolderTest(storageFolder, t)
 }
