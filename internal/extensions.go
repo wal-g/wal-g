@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"io/ioutil"
 	"os"
@@ -33,20 +34,18 @@ func LoadExtensions(path string) error {
 		}
 		plug, err := plugin.Open(filepath.Join(path, file.Name()))
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return errors.Wrap(err, "can't open plugin")
 		}
 
 		symExtension, err := plug.Lookup("Extension")
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return errors.Wrap(err, "can't find symbol Extension in plugin")
 		}
 		var extension Extension
 		extension, ok := symExtension.(Extension)
 		if !ok {
 			fmt.Println("unexpected type from module symbol")
-			os.Exit(1)
+			return nil
 		}
 		Extensions = append(Extensions, extension)
 	}

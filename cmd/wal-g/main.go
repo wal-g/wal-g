@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/tracelog"
 	"log"
 	"os"
 	"runtime/pprof"
@@ -40,7 +41,7 @@ func init() {
 	flag.Parse()
 	err := internal.LoadExtensions(pathToExtensions)
 	if err != nil {
-		log.Fatalf("FATAL: %+v\n", err)
+		tracelog.ErrorLogger.FatalError(err)
 	}
 }
 
