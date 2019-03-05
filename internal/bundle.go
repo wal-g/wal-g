@@ -125,15 +125,6 @@ func (bundle *Bundle) FinishQueue() error {
 	}
 	bundle.started = false
 
-	// At this point no new tarballs should be put into uploadQueue
-	for len(bundle.uploadQueue) > 0 {
-		select {
-		case otb := <-bundle.uploadQueue:
-			otb.AwaitUploads()
-		default:
-		}
-	}
-
 	// We have to deque exactly this count of workers
 	for i := 0; i < bundle.parallelTarballs; i++ {
 		tarBall := <-bundle.tarballQueue
@@ -147,6 +138,16 @@ func (bundle *Bundle) FinishQueue() error {
 		}
 		tarBall.AwaitUploads()
 	}
+
+	// At this point no new tarballs should be put into uploadQueue
+	for len(bundle.uploadQueue) > 0 {
+		select {
+		case otb := <-bundle.uploadQueue:
+			otb.AwaitUploads()
+		default:
+		}
+	}
+
 	return nil
 }
 
