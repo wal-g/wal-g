@@ -3,12 +3,26 @@ package internal
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"os"
 	"path/filepath"
 	"strconv"
 	"time"
 )
+
+type SentinelMarshallingError struct {
+	error
+}
+
+func NewSentinelMarshallingError(sentinelName string, err error) SentinelMarshallingError {
+	return SentinelMarshallingError{errors.Wrapf(err, "Failed to marshall sentinel file: '%s'", sentinelName)}
+}
+
+func (err SentinelMarshallingError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
 
 // TODO : unit tests
 func getDeltaConfig() (maxDeltas int, fromFull bool) {
@@ -137,8 +151,12 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 
 	timelineChanged := bundle.checkTimelineChanged(conn)
 
+	// Wait for all uploads to finish.
+	uploader.finish()
+	if !uploader.Success {
+		tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", backupName)
+	}
 	if timelineChanged {
-		uploader.finish() // TODO : is it needed here?
 		tracelog.ErrorLogger.Fatalf("Cannot finish backup because of changed timeline.")
 	}
 
@@ -159,41 +177,24 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 
 	currentBackupSentinelDto.setFiles(bundle.GetFiles())
 	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
+	currentBackupSentinelDto.UserData = GetSentinelUserData()
 
-	// Wait for all uploads to finish.
-	err = FinishBackup(uploader, currentBackupSentinelDto, backupName)
+	// If other parts are successful in uploading, upload json file.
+	err = UploadSentinel(uploader, currentBackupSentinelDto, backupName)
 	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", backupName)
 		tracelog.ErrorLogger.FatalError(err)
 	}
 }
 
-// FinishBackup writes a .json file description and uploads it with the
-// the backup name. FinishBackup will wait until all tar file parts
-// have been uploaded. The json file will only be uploaded
-// if all other parts of the backup are present in storage.
-// an alert is given with the corresponding error.
-func FinishBackup(uploader *Uploader, sentinelDto *BackupSentinelDto, backupName string) error {
+// TODO : unit tests
+func UploadSentinel(uploader *Uploader, sentinelDto *BackupSentinelDto, backupName string) error {
 	sentinelName := backupName + SentinelSuffix
 
-	uploader.finish()
-
-	if !uploader.Success {
-		tracelog.ErrorLogger.Printf("Uploader failed during backup of %s\n", backupName)
-		return NewNoSentinelUploadError()
-	}
-
-	// If other parts are successful in uploading, upload json file.
-	sentinelDto.UserData = GetSentinelUserData()
 	dtoBody, err := json.Marshal(*sentinelDto)
 	if err != nil {
-		return err
+		return NewSentinelMarshallingError(sentinelName, err)
 	}
 
-	uploadingErr := uploader.Upload(sentinelName, bytes.NewReader(dtoBody))
-	if uploadingErr != nil {
-		tracelog.ErrorLogger.Printf("upload: could not upload '%s'\n", sentinelName)
-		tracelog.ErrorLogger.Fatalf("StorageTarBall finish: json failed to upload")
-	}
-
-	return nil
+	return uploader.Upload(sentinelName, bytes.NewReader(dtoBody))
 }

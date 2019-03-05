@@ -8,18 +8,6 @@ import (
 	"io"
 )
 
-type NoSentinelUploadError struct {
-	error
-}
-
-func NewNoSentinelUploadError() NoSentinelUploadError {
-	return NoSentinelUploadError{errors.New("Sentinel was not uploaded due to timeline change during backup")}
-}
-
-func (err NoSentinelUploadError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
 // StorageTarBall represents a tar file that is
 // going to be uploaded to storage.
 type StorageTarBall struct {
