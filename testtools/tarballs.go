@@ -66,12 +66,6 @@ func (tarBall *FileTarBall) CloseTar() error {
 	return tarBall.writeCloser.Close()
 }
 
-// Finish alerts that compression is complete.
-func (tarBall *FileTarBall) Finish(sentinelDto *internal.BackupSentinelDto) error {
-	fmt.Printf("Wrote %d compressed tar files to %s.\n", tarBall.number, tarBall.out)
-	return nil
-}
-
 func (tarBall *FileTarBall) Size() int64            { return tarBall.size }
 func (tarBall *FileTarBall) AddSize(i int64)        { tarBall.size += i }
 func (tarBall *FileTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
@@ -92,10 +86,6 @@ func (tarBall *BufferTarBall) SetUp(crypter internal.Crypter, args ...string) {
 
 func (tarBall *BufferTarBall) CloseTar() error {
 	return tarBall.tarWriter.Close()
-}
-
-func (tarBall *BufferTarBall) Finish(sentinelDto *internal.BackupSentinelDto) error {
-	return nil
 }
 
 func (tarBall *BufferTarBall) Size() int64 {

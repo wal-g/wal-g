@@ -357,11 +357,6 @@ func TestWalk(t *testing.T) {
 		t.Log(err)
 	}
 
-	err = bundle.TarBall.Finish(&internal.BackupSentinelDto{})
-	if err != nil {
-		t.Log(err)
-	}
-
 	// Test that sentinel exists and is handled correctly.
 	sen := bundle.Sentinel.Info.Name()
 	assert.Equal(t, internal.PgControl, sen)

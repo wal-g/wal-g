@@ -2,25 +2,11 @@ package internal
 
 import (
 	"archive/tar"
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 )
-
-type NoSentinelUploadError struct {
-	error
-}
-
-func NewNoSentinelUploadError() NoSentinelUploadError {
-	return NoSentinelUploadError{errors.New("Sentinel was not uploaded due to timeline change during backup")}
-}
-
-func (err NoSentinelUploadError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
 
 // StorageTarBall represents a tar file that is
 // going to be uploaded to storage.
@@ -120,40 +106,3 @@ func (tarBall *StorageTarBall) Size() int64 { return tarBall.size }
 func (tarBall *StorageTarBall) AddSize(i int64) { tarBall.size += i }
 
 func (tarBall *StorageTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
-
-// Finish writes a .json file description and uploads it with the
-// the backup name. Finish will wait until all tar file parts
-// have been uploaded. The json file will only be uploaded
-// if all other parts of the backup are present in storage.
-// an alert is given with the corresponding error.
-func (tarBall *StorageTarBall) Finish(sentinelDto *BackupSentinelDto) error {
-	name := tarBall.backupName + SentinelSuffix
-	uploader := tarBall.uploader
-
-	uploader.finish()
-
-	var err error
-	// If other parts are successful in uploading, upload json file.
-	if uploader.Success && sentinelDto != nil {
-		sentinelDto.UserData = GetSentinelUserData()
-		dtoBody, err := json.Marshal(*sentinelDto)
-		if err != nil {
-			return err
-		}
-
-		uploadingErr := uploader.Upload(name, bytes.NewReader(dtoBody))
-		if uploadingErr != nil {
-			tracelog.ErrorLogger.Printf("upload: could not upload '%s'\n", name)
-			tracelog.ErrorLogger.Fatalf("StorageTarBall finish: json failed to upload")
-		}
-	} else {
-		tracelog.InfoLogger.Printf("Uploaded %d compressed tar Files.\n", tarBall.partNumber)
-		tracelog.ErrorLogger.Printf("Sentinel was not uploaded %v", name)
-		return NewNoSentinelUploadError()
-	}
-
-	if err == nil && uploader.Success {
-		tracelog.InfoLogger.Printf("Uploaded %d compressed tar Files.\n", tarBall.partNumber)
-	}
-	return err
-}

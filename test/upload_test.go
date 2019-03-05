@@ -147,13 +147,11 @@ func TestUploadError(t *testing.T) {
 	tarBall := maker.Make(true)
 	tarBall.SetUp(MockArmedCrypter())
 
-	tarBall.Finish(&internal.BackupSentinelDto{})
 	assert.False(t, uploader.Success)
 
 	uploader = testtools.NewMockUploader(true, false)
 
 	tarBall = maker.Make(true)
 	tarBall.SetUp(MockArmedCrypter())
-	tarBall.Finish(&internal.BackupSentinelDto{})
 	assert.False(t, uploader.Success)
 }
