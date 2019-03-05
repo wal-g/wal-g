@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"fmt"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"io/ioutil"
@@ -44,8 +43,7 @@ func LoadExtensions(path string) error {
 		var extension Extension
 		extension, ok := symExtension.(Extension)
 		if !ok {
-			fmt.Println("unexpected type from module symbol")
-			return nil
+			return errors.New("unexpected type from module symbol")
 		}
 		Extensions = append(Extensions, extension)
 	}
