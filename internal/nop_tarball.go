@@ -2,7 +2,6 @@ package internal
 
 import (
 	"archive/tar"
-	"fmt"
 )
 
 // NOPTarBall mocks a tarball. Used for testing purposes.
@@ -14,10 +13,6 @@ type NOPTarBall struct {
 
 func (tarBall *NOPTarBall) SetUp(crypter Crypter, params ...string) {}
 func (tarBall *NOPTarBall) CloseTar() error                         { return nil }
-func (tarBall *NOPTarBall) Finish(sentinelDto *BackupSentinelDto) error {
-	fmt.Printf("NOP: %d files.\n", tarBall.number)
-	return nil
-}
 
 func (tarBall *NOPTarBall) Size() int64            { return tarBall.size }
 func (tarBall *NOPTarBall) AddSize(i int64)        { tarBall.size += i }

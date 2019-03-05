@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"bytes"
+	"encoding/json"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"os"
 	"path/filepath"
@@ -134,31 +136,64 @@ func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
 	}
 
 	timelineChanged := bundle.checkTimelineChanged(conn)
-	var currentBackupSentinelDto *BackupSentinelDto
 
-	if !timelineChanged {
-		currentBackupSentinelDto = &BackupSentinelDto{
-			BackupStartLSN:   &backupStartLSN,
-			IncrementFromLSN: previousBackupSentinelDto.BackupStartLSN,
-			PgVersion:        pgVersion,
-		}
-		if previousBackupSentinelDto.BackupStartLSN != nil {
-			currentBackupSentinelDto.IncrementFrom = &previousBackupName
-			if previousBackupSentinelDto.isIncremental() {
-				currentBackupSentinelDto.IncrementFullName = previousBackupSentinelDto.IncrementFullName
-			} else {
-				currentBackupSentinelDto.IncrementFullName = &previousBackupName
-			}
-			currentBackupSentinelDto.IncrementCount = &incrementCount
-		}
-
-		currentBackupSentinelDto.setFiles(bundle.GetFiles())
-		currentBackupSentinelDto.BackupFinishLSN = &finishLsn
+	if timelineChanged {
+		uploader.finish() // TODO : is it needed here?
+		tracelog.ErrorLogger.Fatalf("Cannot finish backup because of changed timeline.")
 	}
 
+	currentBackupSentinelDto := &BackupSentinelDto{
+		BackupStartLSN:   &backupStartLSN,
+		IncrementFromLSN: previousBackupSentinelDto.BackupStartLSN,
+		PgVersion:        pgVersion,
+	}
+	if previousBackupSentinelDto.BackupStartLSN != nil {
+		currentBackupSentinelDto.IncrementFrom = &previousBackupName
+		if previousBackupSentinelDto.isIncremental() {
+			currentBackupSentinelDto.IncrementFullName = previousBackupSentinelDto.IncrementFullName
+		} else {
+			currentBackupSentinelDto.IncrementFullName = &previousBackupName
+		}
+		currentBackupSentinelDto.IncrementCount = &incrementCount
+	}
+
+	currentBackupSentinelDto.setFiles(bundle.GetFiles())
+	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
+
 	// Wait for all uploads to finish.
-	err = bundle.TarBall.Finish(currentBackupSentinelDto)
+	err = FinishBackup(uploader, currentBackupSentinelDto, backupName)
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
+}
+
+// FinishBackup writes a .json file description and uploads it with the
+// the backup name. FinishBackup will wait until all tar file parts
+// have been uploaded. The json file will only be uploaded
+// if all other parts of the backup are present in storage.
+// an alert is given with the corresponding error.
+func FinishBackup(uploader *Uploader, sentinelDto *BackupSentinelDto, backupName string) error {
+	sentinelName := backupName + SentinelSuffix
+
+	uploader.finish()
+
+	if !uploader.Success {
+		tracelog.ErrorLogger.Printf("Uploader failed during backup of %s\n", backupName)
+		return NewNoSentinelUploadError()
+	}
+
+	// If other parts are successful in uploading, upload json file.
+	sentinelDto.UserData = GetSentinelUserData()
+	dtoBody, err := json.Marshal(*sentinelDto)
+	if err != nil {
+		return err
+	}
+
+	uploadingErr := uploader.Upload(sentinelName, bytes.NewReader(dtoBody))
+	if uploadingErr != nil {
+		tracelog.ErrorLogger.Printf("upload: could not upload '%s'\n", sentinelName)
+		tracelog.ErrorLogger.Fatalf("StorageTarBall finish: json failed to upload")
+	}
+
+	return nil
 }
