@@ -51,6 +51,10 @@ func (crypter *MockCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) {
 	return reader, nil
 }
 
+func (crypter *MockCrypter) WrapWriter(writer io.WriteCloser) (io.WriteCloser, error) {
+	return writer, nil
+}
+
 func (crypter *MockCrypter) IsUsed() bool {
 	return true
 }
