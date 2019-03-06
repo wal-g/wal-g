@@ -28,6 +28,20 @@ func (err NoFilesToExtractError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
+// UnsupportedFileTypeError is used to signal file types
+// that are unsupported by WAL-G.
+type UnsupportedFileTypeError struct {
+	error
+}
+
+func NewUnsupportedFileTypeError(path string, fileFormat string) UnsupportedFileTypeError {
+	return UnsupportedFileTypeError{errors.Errorf("WAL-G does not support the file format '%s' in '%s'", fileFormat, path)}
+}
+
+func (err UnsupportedFileTypeError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
 // EmptyWriteIgnorer handles 0 byte write in LZ4 package
 // to stop pipe reader/writer from blocking.
 type EmptyWriteIgnorer struct {

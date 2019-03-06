@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
@@ -15,6 +16,18 @@ const (
 	DefaultDataFolderPath     = "/tmp"
 	WaleFileHost              = "file://localhost"
 )
+
+type UnconfiguredStorageError struct {
+	error
+}
+
+func NewUnconfiguredStorageError(storagePrefixVariants []string) UnconfiguredStorageError {
+	return UnconfiguredStorageError{errors.Errorf("No storage is configured now, please set one of following settings: %v", storagePrefixVariants)}
+}
+
+func (err UnconfiguredStorageError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
 
 // TODO : unit tests
 func configureLimiters() error {
@@ -50,7 +63,7 @@ func configureFolder() (storage.Folder, error) {
 		}
 		return adapter.configureFolder(prefix, adapter.loadSettings())
 	}
-	return nil, NewUnsetEnvVarError(skippedPrefixes)
+	return nil, NewUnconfiguredStorageError(skippedPrefixes)
 }
 
 // TODO : unit tests
