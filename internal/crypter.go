@@ -8,4 +8,5 @@ type Crypter interface {
 	Encrypt(writer io.WriteCloser) (io.WriteCloser, error)
 	Decrypt(reader io.ReadCloser) (io.Reader, error)
 	WrapWriter(writer io.WriteCloser) (io.WriteCloser, error)
+	GetType() string
 }

@@ -138,3 +138,7 @@ func (crypter *AWSKMSCrypter) WrapWriter(writer io.WriteCloser) (io.WriteCloser,
 
 	return sio.EncryptWriter(writer, sio.Config{Key: crypter.SymmetricKey})
 }
+
+func (crypter *AWSKMSCrypter) GetType() string {
+	return "aws-kms"
+}

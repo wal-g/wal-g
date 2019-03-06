@@ -199,3 +199,7 @@ func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) 
 func (crypter *OpenPGPCrypter) WrapWriter(writer io.WriteCloser) (io.WriteCloser, error) {
 	return openpgp.Encrypt(writer, crypter.PubKey, nil, nil, nil)
 }
+
+func (crypter *OpenPGPCrypter) GetType() string {
+	return "openpgp"
+}

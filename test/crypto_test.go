@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/openpgp"
 	"io"
 	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 )
@@ -55,6 +56,10 @@ func (crypter *MockCrypter) WrapWriter(writer io.WriteCloser) (io.WriteCloser, e
 	return writer, nil
 }
 
+func (crypter *MockCrypter) GetType() string {
+	return "mock"
+}
+
 func (crypter *MockCrypter) IsUsed() bool {
 	return true
 }
@@ -90,4 +95,78 @@ func TestEncryptionCycle(t *testing.T) {
 	assert.NoErrorf(t, err, "Decryption read error: %v", err)
 
 	assert.Equal(t, someSecret, string(decryptedBytes), "Decrypted text not equals open text")
+}
+
+func TestNewCrypter(t *testing.T) {
+	// test OpenPGPCrypter choice
+	// clean envs
+	err := os.Unsetenv("WALG_GPG_KEY_ID")
+	if err != nil {
+		t.Log(err)
+	}
+	err = os.Unsetenv("WALG_PGP_KEY")
+	if err != nil {
+		t.Log(err)
+	}
+	err = os.Unsetenv("WALG_PGP_KEY_PATH")
+	if err != nil {
+		t.Log(err)
+	}
+	// prepare openpgp crypter env vars
+	err = os.Setenv("WALG_GPG_KEY_ID", "WALG_GPG_KEY_ID")
+	if err != nil {
+		t.Log(err)
+	}
+	err = os.Setenv("WALG_PGP_KEY", "WALG_PGP_KEY")
+	if err != nil {
+		t.Log(err)
+	}
+	err = os.Setenv("WALG_PGP_KEY_PATH", "WALG_PGP_KEY_PATH")
+	if err != nil {
+		t.Log(err)
+	}
+	// create pgp crypter
+	crypter := internal.NewCrypter()
+	// check pgp crypter type
+	assert.Equal(t, "openpgp", crypter.GetType(), "Choosing pgp encryption not working")
+	// clean envs
+	err = os.Unsetenv("WALG_GPG_KEY_ID")
+	if err != nil {
+		t.Log(err)
+	}
+	err = os.Unsetenv("WALG_PGP_KEY")
+	if err != nil {
+		t.Log(err)
+	}
+	err = os.Unsetenv("WALG_PGP_KEY_PATH")
+	if err != nil {
+		t.Log(err)
+	}
+
+	// test AWSKMSCrypter choice
+	// clean envs
+	err = os.Unsetenv("WALG_CSE_KMS_ID")
+	if err != nil {
+		t.Log(err)
+	}
+	// prepare aws kms crypter env vars
+	err = os.Setenv("WALG_CSE_KMS_ID", "WALG_CSE_KMS_ID")
+	if err != nil {
+		t.Log(err)
+	}
+	// create aws kms crypter
+	crypter = internal.NewCrypter()
+	// check aws kms crypter type
+	assert.Equal(t, "aws-kms", crypter.GetType(), "Choosing aws kms encryption not working")
+	// clean envs
+	err = os.Unsetenv("WALG_CSE_KMS_ID")
+	if err != nil {
+		t.Log(err)
+	}
+
+	// test default crypter choice
+	// create crypter
+	crypter = internal.NewCrypter()
+	// check default crypter type
+	assert.Equal(t, "openpgp", crypter.GetType(), "Choosing default encryption not working")
 }
