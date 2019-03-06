@@ -99,45 +99,65 @@ func TestEncryptionCycle(t *testing.T) {
 
 func TestNewCrypter(t *testing.T) {
 	// test OpenPGPCrypter choice
+
+	// check by key id
 	// clean envs
 	err := os.Unsetenv("WALG_GPG_KEY_ID")
 	if err != nil {
 		t.Log(err)
 	}
-	err = os.Unsetenv("WALG_PGP_KEY")
-	if err != nil {
-		t.Log(err)
-	}
-	err = os.Unsetenv("WALG_PGP_KEY_PATH")
-	if err != nil {
-		t.Log(err)
-	}
-	// prepare openpgp crypter env vars
+	// prepare openpgp crypter WALG_GPG_KEY_ID env var
 	err = os.Setenv("WALG_GPG_KEY_ID", "WALG_GPG_KEY_ID")
-	if err != nil {
-		t.Log(err)
-	}
-	err = os.Setenv("WALG_PGP_KEY", "WALG_PGP_KEY")
-	if err != nil {
-		t.Log(err)
-	}
-	err = os.Setenv("WALG_PGP_KEY_PATH", "WALG_PGP_KEY_PATH")
 	if err != nil {
 		t.Log(err)
 	}
 	// create pgp crypter
 	crypter := internal.NewCrypter()
 	// check pgp crypter type
-	assert.Equal(t, "openpgp", crypter.GetType(), "Choosing pgp encryption not working")
+	assert.Equal(t, "openpgp", crypter.GetType(), "Choosing pgp encryption with WALG_GPG_KEY_ID not working")
 	// clean envs
 	err = os.Unsetenv("WALG_GPG_KEY_ID")
 	if err != nil {
 		t.Log(err)
 	}
+
+	// check by key
+	// clean envs
 	err = os.Unsetenv("WALG_PGP_KEY")
 	if err != nil {
 		t.Log(err)
 	}
+	// prepare openpgp crypter with WALG_PGP_KEY env var
+	err = os.Setenv("WALG_PGP_KEY", "WALG_PGP_KEY")
+	if err != nil {
+		t.Log(err)
+	}
+	// create pgp crypter
+	crypter = internal.NewCrypter()
+	// check pgp crypter type
+	assert.Equal(t, "openpgp", crypter.GetType(), "Choosing pgp encryption with WALG_PGP_KEY not working")
+	// clean envs
+	err = os.Unsetenv("WALG_PGP_KEY")
+	if err != nil {
+		t.Log(err)
+	}
+
+	// check by key path
+	// clean envs
+	err = os.Unsetenv("WALG_PGP_KEY_PATH")
+	if err != nil {
+		t.Log(err)
+	}
+	// prepare openpgp crypter with WALG_PGP_KEY_PATH env var
+	err = os.Setenv("WALG_PGP_KEY_PATH", "WALG_PGP_KEY_PATH")
+	if err != nil {
+		t.Log(err)
+	}
+	// create pgp crypter
+	crypter = internal.NewCrypter()
+	// check pgp crypter type
+	assert.Equal(t, "openpgp", crypter.GetType(), "Choosing pgp encryption with WALG_PGP_KEY_PATH not working")
+	// clean envs
 	err = os.Unsetenv("WALG_PGP_KEY_PATH")
 	if err != nil {
 		t.Log(err)
@@ -149,7 +169,7 @@ func TestNewCrypter(t *testing.T) {
 	if err != nil {
 		t.Log(err)
 	}
-	// prepare aws kms crypter env vars
+	// prepare aws kms crypter with WALG_CSE_KMS_ID env var
 	err = os.Setenv("WALG_CSE_KMS_ID", "WALG_CSE_KMS_ID")
 	if err != nil {
 		t.Log(err)
@@ -157,7 +177,7 @@ func TestNewCrypter(t *testing.T) {
 	// create aws kms crypter
 	crypter = internal.NewCrypter()
 	// check aws kms crypter type
-	assert.Equal(t, "aws-kms", crypter.GetType(), "Choosing aws kms encryption not working")
+	assert.Equal(t, "aws-kms", crypter.GetType(), "Choosing aws kms encryption with WALG_CSE_KMS_ID not working")
 	// clean envs
 	err = os.Unsetenv("WALG_CSE_KMS_ID")
 	if err != nil {
