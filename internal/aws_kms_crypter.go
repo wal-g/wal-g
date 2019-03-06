@@ -125,9 +125,6 @@ func (crypter *AWSKMSCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) {
 
 	}
 
-	// Because of strange struct caching issue need to pass field throught var
-	symmetricKey := crypter.SymmetricKey
-
 	return sio.DecryptReader(reader, sio.Config{Key: symmetricKey})
 }
 
