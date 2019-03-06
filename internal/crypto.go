@@ -32,7 +32,7 @@ func GetKeyRingId() string {
 
 // GetKMSKeyId extracts id of a key to use from env variable
 func GetKMSKeyId() string {
-	return getSettingValue("WALG_CSE_KMS_ID")
+	return GetSettingValue("WALG_CSE_KMS_ID")
 }
 
 const GpgBin = "gpg"

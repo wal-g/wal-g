@@ -125,7 +125,7 @@ func (crypter *AWSKMSCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) {
 
 	}
 
-	return sio.DecryptReader(reader, sio.Config{Key: crypter.symmetricKey})
+	return sio.DecryptReader(reader, sio.Config{Key: crypter.SymmetricKey})
 }
 
 // Wrap writer with symmetric encryption
