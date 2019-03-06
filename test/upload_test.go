@@ -87,8 +87,8 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	// Test empty environment variables
 	setEmpty(t)
 	uploader, folder, err := internal.Configure()
-	if _, ok := (errors.Cause(err)).(internal.UnsetEnvVarError); !ok {
-		t.Errorf("upload: Expected error 'UnsetEnvVarError' but got %s", err)
+	if _, ok := (errors.Cause(err)).(internal.UnconfiguredStorageError); !ok {
+		t.Errorf("upload: Expected error 'UnconfiguredStorageError' but got %s", err)
 	}
 	assert.Nil(t, uploader)
 	assert.Nil(t, folder)
