@@ -18,7 +18,7 @@ func (crypter *MockAWSKMSCrypter) IsArmed() bool {
 
 func (crypter *MockAWSKMSCrypter) EncryptSymmetricKey() error {
 	salt := "152 random bytes to imitate aws kms encryption method, random words here: witch collapse practice feed shame open despair creek road again ice least it!"
-	crypter.EncryptedSymmetricKey = append(crypter.SymmetricKey, salt ...)
+	crypter.EncryptedSymmetricKey = append(crypter.SymmetricKey, salt...)
 	return nil
 }
 
