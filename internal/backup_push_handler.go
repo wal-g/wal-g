@@ -49,7 +49,7 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 
 // TODO : unit tests
 // HandleBackupPush is invoked to perform a wal-g backup-push
-func HandleBackupPush(archiveDirectory string, uploader *Uploader) {
+func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 	archiveDirectory = ResolveSymlink(archiveDirectory)
 	maxDeltas, fromFull := getDeltaConfig()
 

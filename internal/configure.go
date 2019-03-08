@@ -30,7 +30,7 @@ func (err UnconfiguredStorageError) Error() string {
 }
 
 // TODO : unit tests
-func configureLimiters() error {
+func ConfigureLimiters() error {
 	if diskLimitStr := GetSettingValue("WALG_DISK_RATE_LIMIT"); diskLimitStr != "" {
 		diskLimit, err := strconv.ParseInt(diskLimitStr, 10, 64)
 		if err != nil {
@@ -50,7 +50,7 @@ func configureLimiters() error {
 }
 
 // TODO : unit tests
-func configureFolder() (storage.Folder, error) {
+func ConfigureFolder() (storage.Folder, error) {
 	skippedPrefixes := make([]string, 0)
 	for _, adapter := range StorageAdapters {
 		prefix := GetSettingValue(adapter.prefixName)
@@ -120,7 +120,7 @@ func configureCompressor() (Compressor, error) {
 }
 
 // TODO : unit tests
-func configureLogging() error {
+func ConfigureLogging() error {
 	logLevel, ok := LookupConfigValue("WALG_LOG_LEVEL")
 	if ok {
 		return tracelog.UpdateLogLevel(logLevel)
@@ -128,44 +128,34 @@ func configureLogging() error {
 	return nil
 }
 
-// Configure connects to storage and creates an uploader. It makes sure
+// ConfigureUploader connects to storage and creates an uploader. It makes sure
 // that a valid session has started; if invalid, returns AWS error
 // and `<nil>` values.
-func Configure() (uploader *Uploader, destinationFolder storage.Folder, err error) {
-	err = configureLogging()
+func ConfigureUploader() (uploader *Uploader, err error) {
+	folder, err := ConfigureFolder()
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to configure logging")
-	}
-
-	err = configureLimiters()
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to configure limiters")
-	}
-
-	folder, err := configureFolder()
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to configure folder")
+		return nil, errors.Wrap(err, "failed to configure folder")
 	}
 
 	compressor, err := configureCompressor()
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to configure compression")
+		return nil, errors.Wrap(err, "failed to configure compression")
 	}
 
 	useWalDelta, deltaDataFolder, err := configureWalDeltaUsage()
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to configure WAL Delta usage")
+		return nil, errors.Wrap(err, "failed to configure WAL Delta usage")
 	}
 
 	preventWalOverwrite := false
 	if preventWalOverwriteStr := GetSettingValue("WALG_PREVENT_WAL_OVERWRITE"); preventWalOverwriteStr != "" {
 		preventWalOverwrite, err = strconv.ParseBool(preventWalOverwriteStr)
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "failed to parse WALG_PREVENT_WAL_OVERWRITE")
+			return nil, errors.Wrap(err, "failed to parse WALG_PREVENT_WAL_OVERWRITE")
 		}
 	}
 
 	uploader = NewUploader(compressor, folder, deltaDataFolder, useWalDelta, preventWalOverwrite)
 
-	return uploader, folder, err
+	return uploader, err
 }

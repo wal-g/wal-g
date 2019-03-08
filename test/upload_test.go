@@ -86,12 +86,11 @@ func TestConfigureDeepBucket(t *testing.T) {
 func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer string) {
 	// Test empty environment variables
 	setEmpty(t)
-	uploader, folder, err := internal.Configure()
+	uploader, err := internal.ConfigureUploader()
 	if _, ok := (errors.Cause(err)).(internal.UnconfiguredStorageError); !ok {
 		t.Errorf("upload: Expected error 'UnconfiguredStorageError' but got %s", err)
 	}
 	assert.Nil(t, uploader)
-	assert.Nil(t, folder)
 	setFake(t)
 	// Test Minio
 	err = os.Setenv("WALE_S3_PREFIX", "gs://abc.com")
@@ -100,21 +99,21 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	assert.NoError(t, err)
 	err = os.Setenv("AWS_REGION", "")
 	assert.NoError(t, err)
-	_, _, err = internal.Configure()
+	_, err = internal.ConfigureUploader()
 	assert.NoError(t, err)
 	// Test invalid url
 	err = os.Setenv("WALE_S3_PREFIX", "test_fail:")
 	assert.NoError(t, err)
-	_, _, err = internal.Configure()
+	_, err = internal.ConfigureUploader()
 	assert.Error(t, err)
 	// Test created uploader and prefix
 	err = os.Setenv("WALE_S3_PREFIX", bucketPath)
 	if err != nil {
 		t.Log(err)
 	}
-	uploader, folder, err = internal.Configure()
+	uploader, err = internal.ConfigureUploader()
 	assert.NoError(t, err)
-	assert.Equal(t, expectedServer, strings.TrimSuffix(folder.GetPath(), "/"))
+	assert.Equal(t, expectedServer, strings.TrimSuffix(uploader.UploadingFolder.GetPath(), "/"))
 	assert.NotNil(t, uploader)
 	assert.NoError(t, err)
 	// Test STANDARD_IA storage class
@@ -123,7 +122,7 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	if err != nil {
 		t.Log(err)
 	}
-	_, _, err = internal.Configure()
+	_, err = internal.ConfigureUploader()
 	if err != nil {
 		t.Log(err)
 	}
