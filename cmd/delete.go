@@ -12,6 +12,7 @@ import (
 
 const (
 	ConfirmFlag = "confirm"
+	DeleteShortDescription = "delete clears old backups and WALs"
 
 	DeleteRetainExamples = `  retain 5                      keep 5 backups
   retain FULL 5                 keep 5 full backups and all deltas of them
@@ -38,7 +39,7 @@ func extractDeleteModifierFromArgs(args []string) (int, string) {
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
 	Use:   "delete",
-	Short: "Clear old backups and WALs", // TODO
+	Short: DeleteShortDescription, // TODO : improve description
 }
 
 func deleteArgsValidator(cmd *cobra.Command, args []string) error {
@@ -81,7 +82,7 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 }
 
 var deleteRetainCmd = &cobra.Command{
-	Use:       "retain", // TODO : description
+	Use:       "retain [FULL|FIND_FULL] backup_count", // TODO : improve description
 	Example:   DeleteRetainExamples,
 	ValidArgs: StringModifiers,
 	Args:      deleteRetainArgsValidator,
@@ -120,7 +121,7 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 }
 
 var deleteBeforeCmd = &cobra.Command{
-	Use:     "before", // TODO : description
+	Use:     "before [FIND_FULL] backup_name|timestamp", // TODO : improve description
 	Example: DeleteBeforeExamples,
 	Args:    deleteBeforeArgsValidator,
 	Run:     runDeleteBefore,
