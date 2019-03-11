@@ -3,30 +3,16 @@ package internal
 import (
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
-	"log"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 )
 
-const DeleteUsageText = "delete requires at least 2 parameters" + `
-		retain 5                      keep 5 backups
-		retain FULL 5                 keep 5 full backups and all deltas of them
-		retain FIND_FULL 5            find necessary full for 5th and keep everything after it
-		before base_0123              keep everything after base_0123 including itself
-		before FIND_FULL base_0123    keep everything after the base of base_0123`
-
-// DeleteCommandArguments incapsulates arguments for delete command
-type DeleteCommandArguments struct {
-	Full       bool
-	FindFull   bool
-	Retain     bool
-	Before     bool
-	Target     string
-	BeforeTime *time.Time
-	dryrun     bool
-}
+const (
+	NoDeleteModifier = iota
+	FullDeleteModifier
+	FindFullDeleteModifier
+)
 
 // TODO : unit tests
 func adjustDeleteTarget(target *Backup, findFull bool) *Backup {
@@ -45,131 +31,67 @@ func adjustDeleteTarget(target *Backup, findFull bool) *Backup {
 }
 
 // TODO : unit tests
-// HandleDelete is invoked to perform wal-g delete
-func HandleDelete(folder storage.Folder, args []string) {
+func HandleDeleteRetain(folder storage.Folder, retantionCount int, modifier int, dryRun bool) {
 	baseBackupFolder := folder.GetSubFolder(BaseBackupPath)
 
-	arguments := ParseDeleteArguments(args, printDeleteUsageAndFail)
-
-	if arguments.Before {
-		if arguments.BeforeTime == nil {
-			deleteBeforeTarget(folder, adjustDeleteTarget(NewBackup(baseBackupFolder, arguments.Target), arguments.FindFull), arguments.dryrun)
-		} else {
-			backups, err := getBackups(folder)
+	backups, err := getBackups(folder)
+	if err != nil {
+		tracelog.ErrorLogger.FatalError(err)
+	}
+	if modifier == FullDeleteModifier {
+		if len(backups) <= retantionCount {
+			tracelog.WarningLogger.Printf("Have only %v backups.\n", retantionCount)
+		}
+		left := retantionCount
+		for _, b := range backups {
+			if left == 1 {
+				deleteBeforeTarget(folder, NewBackup(baseBackupFolder, b.BackupName), true, dryRun)
+				return
+			}
+			backup := NewBackup(baseBackupFolder, b.BackupName)
+			dto, err := backup.FetchSentinel()
 			if err != nil {
 				tracelog.ErrorLogger.FatalError(err)
 			}
-			for _, b := range backups {
-				if b.Time.Before(*arguments.BeforeTime) {
-					deleteBeforeTarget(folder, adjustDeleteTarget(NewBackup(baseBackupFolder, b.BackupName), arguments.FindFull), arguments.dryrun)
-					return
-				}
+			if !dto.isIncremental() {
+				left--
 			}
-			tracelog.WarningLogger.Println("No backups before ", *arguments.BeforeTime)
 		}
-	}
-	if arguments.Retain {
-		backupCount, err := strconv.Atoi(arguments.Target)
-		if err != nil {
-			tracelog.ErrorLogger.Fatal("Unable to parse number of backups: ", err)
-		}
-		backups, err := getBackups(folder)
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
-		}
-		if arguments.Full {
-			if len(backups) <= backupCount {
-				tracelog.WarningLogger.Printf("Have only %v backups.\n", backupCount)
-			}
-			left := backupCount
-			for _, b := range backups {
-				if left == 1 {
-					deleteBeforeTarget(folder, adjustDeleteTarget(NewBackup(baseBackupFolder, b.BackupName), true), arguments.dryrun)
-					return
-				}
-				backup := NewBackup(baseBackupFolder, b.BackupName)
-				dto, err := backup.FetchSentinel()
-				if err != nil {
-					tracelog.ErrorLogger.FatalError(err)
-				}
-				if !dto.isIncremental() {
-					left--
-				}
-			}
-			tracelog.WarningLogger.Printf("Scanned all backups but didn't have %v full.", backupCount)
+		tracelog.WarningLogger.Printf("Scanned all backups but didn't have %v full.", retantionCount)
+	} else {
+		if len(backups) <= retantionCount {
+			tracelog.WarningLogger.Printf("Have only %v backups.\n", retantionCount)
 		} else {
-			if len(backups) <= backupCount {
-				tracelog.WarningLogger.Printf("Have only %v backups.\n", backupCount)
-			} else {
-				deleteBeforeTarget(folder, adjustDeleteTarget(NewBackup(baseBackupFolder, backups[backupCount-1].BackupName), arguments.FindFull), arguments.dryrun)
-			}
+			deleteBeforeTarget(folder, NewBackup(baseBackupFolder, backups[retantionCount-1].BackupName), modifier == FindFullDeleteModifier, dryRun)
 		}
 	}
 }
 
-// ParseDeleteArguments interprets arguments for delete command. TODO: use flags or cobra
-func ParseDeleteArguments(args []string, fallBackFunc func()) (result DeleteCommandArguments) {
-	if len(args) < 3 {
-		fallBackFunc()
-		return
-	}
-
-	params := args[1:]
-	if params[0] == "retain" {
-		result.Retain = true
-		params = params[1:]
-	} else if params[0] == "before" {
-		result.Before = true
-		params = params[1:]
-	} else {
-		fallBackFunc()
-		return
-	}
-	if params[0] == "FULL" {
-		result.Full = true
-		params = params[1:]
-	} else if params[0] == "FIND_FULL" {
-		result.FindFull = true
-		params = params[1:]
-	}
-	if len(params) < 1 {
-		tracelog.ErrorLogger.Print("Backup name not specified")
-		fallBackFunc()
-		return
-	}
-
-	result.Target = params[0]
-	if t, err := time.Parse(time.RFC3339, result.Target); err == nil {
-		if t.After(time.Now()) {
-			tracelog.WarningLogger.Println("Cannot delete before future date")
-			fallBackFunc()
-		}
-		result.BeforeTime = &t
-	}
-	// if DeleteConfirmed && !DeleteDryrun  // TODO: use flag
-	result.dryrun = true
-	if len(params) > 1 && (params[1] == "--confirm" || params[1] == "-confirm") {
-		result.dryrun = false
-	}
-
-	if result.Retain {
-		number, err := strconv.Atoi(result.Target)
-		if err != nil {
-			tracelog.ErrorLogger.Println("Cannot parse target number ", number)
-			fallBackFunc()
-			return
-		}
-		if number <= 0 {
-			tracelog.ErrorLogger.Println("Cannot retain 0") // Consider allowing to delete everything
-			fallBackFunc()
-			return
-		}
-	}
-	return
+func HandleDeleteBeforeBackup(folder storage.Folder, backupName string, modifier int, dryRun bool) {
+	baseBackupFolder := folder.GetSubFolder(BaseBackupPath)
+	deleteBeforeTarget(folder, NewBackup(baseBackupFolder, backupName), modifier == FindFullDeleteModifier, dryRun)
 }
 
 // TODO : unit tests
-func deleteBeforeTarget(folder storage.Folder, target *Backup, dryRun bool) {
+func HandleDeleteBeforeTime(folder storage.Folder, before time.Time, modifier int, dryRun bool) {
+	baseBackupFolder := folder.GetSubFolder(BaseBackupPath)
+
+	backups, err := getBackups(folder)
+	if err != nil {
+		tracelog.ErrorLogger.FatalError(err)
+	}
+	for _, b := range backups {
+		if b.Time.Before(before) {
+			deleteBeforeTarget(folder, NewBackup(baseBackupFolder, b.BackupName), modifier == FindFullDeleteModifier, dryRun)
+			return
+		}
+	}
+	tracelog.WarningLogger.Println("No backups before ", before)
+}
+
+// TODO : unit tests
+func deleteBeforeTarget(folder storage.Folder, target *Backup, findFull, dryRun bool) {
+	target = adjustDeleteTarget(target, findFull)
 	walFolder := folder.GetSubFolder(WalPath)
 	backupToScan, garbage, err := getBackupsAndGarbage(folder)
 	if err != nil {
@@ -281,10 +203,6 @@ func DeleteWALBefore(walSkipFileName string, walFolder storage.Folder) {
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Unable to delete WALs before '%s', because of: "+tracelog.GetErrorFormatter(), walSkipFileName, err)
 	}
-}
-
-func printDeleteUsageAndFail() {
-	log.Fatal(DeleteUsageText)
 }
 
 // TODO : unit tests
