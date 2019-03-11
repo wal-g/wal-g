@@ -1,4 +1,5 @@
-CMD_FILES = $(wildcard cmd/wal-g/*.go)
+MAIN_PATH := main/wal-g
+CMD_FILES = $(wildcard wal-g/*.go)
 PKG_FILES = $(wildcard internal/**/*.go internal/**/**/*.go internal/*.go)
 TEST_FILES = $(wildcard test/*.go testtools/*.go)
 PKG := github.com/wal-g/wal-g
@@ -32,10 +33,10 @@ deps:
 	dep ensure
 
 install:
-	(cd cmd/wal-g && go install)
+	(cd $(MAIN_PATH) && go install)
 
 clean:
-	(cd cmd/wal-g && go clean)
+	(cd $(MAIN_PATH) && go clean)
 
 build: $(CMD_FILES) $(PKG_FILES)
-	(cd cmd/wal-g && go build $(GOTAGS) -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X main.GitRevision=`git rev-parse --short HEAD` -X main.WalgVersion=`git tag -l --points-at HEAD`")
+	(cd $(MAIN_PATH) && go build $(GOTAGS) -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X main.GitRevision=`git rev-parse --short HEAD` -X main.WalgVersion=`git tag -l --points-at HEAD`")

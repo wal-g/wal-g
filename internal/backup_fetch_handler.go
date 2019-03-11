@@ -5,8 +5,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
-	"os"
-	"runtime/pprof"
 )
 
 const (
@@ -60,24 +58,13 @@ func (err PgControlNotFoundError) Error() string {
 
 // TODO : unit tests
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
-func HandleBackupFetch(backupName string, folder storage.Folder, dbDataDirectory string, mem bool) {
-	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder, %s, %v)\n", backupName, dbDataDirectory, mem)
+func HandleBackupFetch(folder storage.Folder, dbDataDirectory string, backupName string) {
+	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder, %s)\n", backupName, dbDataDirectory)
 	dbDataDirectory = ResolveSymlink(dbDataDirectory)
 	err := deltaFetchRecursion(backupName, folder, dbDataDirectory, nil)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to fetch backup: %v\n", err)
 	}
-
-	if mem {
-		memProfileLog, err := os.Create("mem.prof")
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
-		}
-
-		pprof.WriteHeapProfile(memProfileLog)
-		defer memProfileLog.Close()
-	}
-	return
 }
 
 func GetBackupByName(backupName string, folder storage.Folder) (*Backup, error) {

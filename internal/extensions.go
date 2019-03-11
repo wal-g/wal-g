@@ -2,6 +2,7 @@ package internal
 
 import (
 	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"io/ioutil"
 	"os"
@@ -50,11 +51,6 @@ func LoadExtensions(path string) error {
 	return nil
 }
 
-func GetExtensionByCommandName(commandName string) (Extension, bool) {
-	for _, extension := range Extensions {
-		if extension.HasCommand(commandName) {
-			return extension, true
-		}
-	}
-	return nil, false
+func RegisterExtensionCommands(rootCmd *cobra.Command) {
+	// TODO : fix extension interface to be able to register commands here
 }

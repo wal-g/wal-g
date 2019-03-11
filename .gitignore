@@ -2,7 +2,7 @@
 vendor/
 .idea/
 # bin
-cmd/wal-g/wal-g
+main/wal-g/wal-g
 
 # tests
 test/testdata/00000*

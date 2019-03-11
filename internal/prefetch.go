@@ -18,8 +18,8 @@ import (
 
 // TODO : unit tests
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
-func HandleWALPrefetch(folder storage.Folder, walFileName string, location string, uploader *Uploader) {
-	folder = folder.GetSubFolder(WalPath)
+func HandleWALPrefetch(uploader *Uploader, walFileName string, location string) {
+	folder := uploader.UploadingFolder.GetSubFolder(WalPath)
 	var fileName = walFileName
 	var err error
 	location = path.Dir(location)
