@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"os"
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 type SentinelMarshallingError struct {

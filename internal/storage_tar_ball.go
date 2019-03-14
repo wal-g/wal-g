@@ -3,9 +3,10 @@ package internal
 import (
 	"archive/tar"
 	"fmt"
+	"io"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
-	"io"
 )
 
 // StorageTarBall represents a tar file that is

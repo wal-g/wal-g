@@ -2,13 +2,14 @@ package internal
 
 import (
 	"archive/tar"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 // TarInterpreter behaves differently

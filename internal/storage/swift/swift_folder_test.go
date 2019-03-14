@@ -1,10 +1,11 @@
 package swift
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal/storages/storage"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/storage/storage"
 )
 
 func TestSwiftFolder(t *testing.T) {

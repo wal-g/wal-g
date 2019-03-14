@@ -2,14 +2,15 @@ package testtools
 
 import (
 	"bytes"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/storages/storage"
 	"io"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/storage/storage"
 )
 
 type InMemoryStorageObject struct {

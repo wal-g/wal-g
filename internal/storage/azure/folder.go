@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/wal-g/wal-g/internal/storages/storage"
 	"io"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/wal-g/wal-g/internal/storage/storage"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/pkg/errors"

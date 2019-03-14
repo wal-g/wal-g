@@ -2,11 +2,12 @@ package internal
 
 import (
 	"fmt"
-	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"os"
 	"text/tabwriter"
 	"time"
+
+	"github.com/wal-g/wal-g/internal/storage/storage"
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 // TODO : unit tests

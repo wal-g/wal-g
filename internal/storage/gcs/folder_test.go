@@ -1,8 +1,9 @@
 package gcs
 
 import (
-	"github.com/wal-g/wal-g/internal/storages/storage"
 	"testing"
+
+	"github.com/wal-g/wal-g/internal/storage/storage"
 
 	"github.com/stretchr/testify/assert"
 )

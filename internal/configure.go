@@ -2,13 +2,14 @@ package internal
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"golang.org/x/time/rate"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/storage/storage"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"golang.org/x/time/rate"
 )
 
 const (

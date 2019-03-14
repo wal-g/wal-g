@@ -2,14 +2,15 @@ package internal
 
 import (
 	"fmt"
-	"github.com/RoaringBitmap/roaring"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/internal/walparser"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/RoaringBitmap/roaring"
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/internal/walparser"
 )
 
 const (

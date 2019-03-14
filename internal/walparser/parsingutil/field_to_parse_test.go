@@ -2,8 +2,9 @@ package parsingutil
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFieldToParse_ParseFrom(t *testing.T) {

@@ -1,14 +1,15 @@
 package s3
 
 import (
+	"io"
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/storages/storage"
-	"io"
-	"strings"
+	"github.com/wal-g/wal-g/internal/storage/storage"
 )
 
 const (

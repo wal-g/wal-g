@@ -2,9 +2,10 @@ package walparser
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAlignedReader_EOF(t *testing.T) {

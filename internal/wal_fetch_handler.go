@@ -3,13 +3,14 @@ package internal
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 	"os"
 	"path"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/storage/storage"
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 type InvalidWalFileMagicError struct {

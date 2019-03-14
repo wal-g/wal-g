@@ -2,12 +2,13 @@ package test
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/testtools"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/storage/storage"
+	"github.com/wal-g/wal-g/testtools"
 )
 
 func createMockStorageFolder() storage.Folder {

@@ -1,9 +1,10 @@
 package s3
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal/storages/storage"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/storage/storage"
 )
 
 func TestS3Folder(t *testing.T) {

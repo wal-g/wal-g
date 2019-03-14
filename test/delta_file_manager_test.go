@@ -2,12 +2,13 @@ package test
 
 import (
 	"bytes"
+	"sync"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/testtools"
-	"sync"
-	"testing"
 )
 
 func concatByteSlices(a []byte, b []byte) []byte {

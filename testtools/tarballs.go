@@ -4,11 +4,12 @@ import (
 	"archive/tar"
 	"bytes"
 	"fmt"
-	"github.com/pierrec/lz4"
-	"github.com/wal-g/wal-g/internal"
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/pierrec/lz4"
+	"github.com/wal-g/wal-g/internal"
 )
 
 // FileTarBall represents a tarball that is

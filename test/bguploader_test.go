@@ -1,9 +1,6 @@
 package test
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/testtools"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -11,6 +8,10 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/testtools"
 )
 
 // This test has known race condition

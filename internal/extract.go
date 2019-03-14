@@ -4,13 +4,14 @@ import (
 	"archive/tar"
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"golang.org/x/sync/semaphore"
 	"io"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"golang.org/x/sync/semaphore"
 )
 
 var MinExtractRetryWait = time.Minute

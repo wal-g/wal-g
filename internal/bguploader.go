@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -9,6 +8,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 const TotalBgUploadedLimit = 1024

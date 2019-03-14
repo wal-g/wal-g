@@ -2,10 +2,11 @@ package internal
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
-	"io"
 )
 
 type NilWalParserError struct {

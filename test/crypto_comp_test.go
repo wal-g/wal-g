@@ -2,8 +2,6 @@ package test
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -11,6 +9,9 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
 )
 
 const waleWALfilename = "testdata/000000010000000000000024.lzo"

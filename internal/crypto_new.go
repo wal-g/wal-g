@@ -2,9 +2,10 @@ package internal
 
 import (
 	"bytes"
-	"golang.org/x/crypto/openpgp"
 	"io"
 	"io/ioutil"
+
+	"golang.org/x/crypto/openpgp"
 )
 
 func ReadKey(path string) (io.Reader, error) {

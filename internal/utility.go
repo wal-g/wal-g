@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 const (

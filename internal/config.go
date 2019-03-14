@@ -2,13 +2,14 @@ package internal
 
 import (
 	"encoding/json"
-	"github.com/go-yaml/yaml"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
+
+	"github.com/go-yaml/yaml"
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 var (

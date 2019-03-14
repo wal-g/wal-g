@@ -2,14 +2,15 @@ package test
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/internal/walparser"
-	"github.com/wal-g/wal-g/testtools"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/storage/storage"
+	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/testtools"
 )
 
 var BundleTestLocations = []walparser.BlockLocation{

@@ -1,12 +1,13 @@
 package internal
 
 import (
-	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 	"path"
 	"path/filepath"
 	"sync"
+
+	"github.com/wal-g/wal-g/internal/storage/storage"
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 // Uploader contains fields associated with uploading tarballs.

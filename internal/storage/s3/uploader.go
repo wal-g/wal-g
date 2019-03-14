@@ -2,6 +2,9 @@ package s3
 
 import (
 	"fmt"
+	"io"
+	"strconv"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
@@ -9,8 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
-	"io"
-	"strconv"
 )
 
 const (

@@ -1,9 +1,10 @@
 package internal
 
 import (
+	"io"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/walparser"
-	"io"
 )
 
 type WalPartFile struct {

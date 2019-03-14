@@ -3,8 +3,9 @@
 package internal
 
 import (
-	"github.com/cyberdelia/lzo"
 	"io"
+
+	"github.com/cyberdelia/lzo"
 )
 
 func NewLzoReader(r io.Reader) (io.ReadCloser, error) {

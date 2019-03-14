@@ -3,11 +3,12 @@ package internal
 import (
 	"bytes"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 type CantOverwriteWalFileError struct {

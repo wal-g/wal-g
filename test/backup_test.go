@@ -1,9 +1,10 @@
 package test
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
-	"testing"
 )
 
 func TestCheckExistence_Exists(t *testing.T) {

@@ -3,9 +3,10 @@ package internal
 import (
 	"bytes"
 	"encoding/binary"
+	"io"
+
 	"github.com/RoaringBitmap/roaring"
 	"github.com/wal-g/wal-g/internal/tracelog"
-	"io"
 )
 
 // "wi" at the head stands for "wal-g increment"

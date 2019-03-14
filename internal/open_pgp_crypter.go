@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"golang.org/x/crypto/openpgp"
 	"io"
 	"strings"
+
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"golang.org/x/crypto/openpgp"
 )
 
 // CrypterUseMischiefError happens when crypter is used before initialization

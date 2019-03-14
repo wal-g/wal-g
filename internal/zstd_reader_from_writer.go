@@ -1,8 +1,9 @@
 package internal
 
 import (
-	"github.com/DataDog/zstd"
 	"io"
+
+	"github.com/DataDog/zstd"
 )
 
 type ZstdReaderFromWriter struct {

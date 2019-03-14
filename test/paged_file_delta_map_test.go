@@ -1,11 +1,12 @@
 package test
 
 import (
+	"testing"
+
 	"github.com/RoaringBitmap/roaring"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/walparser"
-	"testing"
 )
 
 func TestGetRelFileIdFrom_ZeroId(t *testing.T) {

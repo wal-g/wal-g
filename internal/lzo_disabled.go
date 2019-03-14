@@ -3,8 +3,9 @@
 package internal
 
 import (
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
+
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 func NewLzoReader(r io.Reader) (io.ReadCloser, error) {

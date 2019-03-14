@@ -1,8 +1,9 @@
 package internal
 
 import (
-	"github.com/ulikunitz/xz/lzma"
 	"io"
+
+	"github.com/ulikunitz/xz/lzma"
 )
 
 type LzmaReaderFromWriter struct {

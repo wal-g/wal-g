@@ -1,8 +1,9 @@
 package internal
 
 import (
-	"github.com/pierrec/lz4"
 	"io"
+
+	"github.com/pierrec/lz4"
 )
 
 type Lz4ReaderFromWriter struct {

@@ -3,14 +3,15 @@ package test
 import (
 	"bytes"
 	"errors"
-	"github.com/pierrec/lz4"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/testtools"
 	"io"
 	"io/ioutil"
 	"math/rand"
 	"testing"
+
+	"github.com/pierrec/lz4"
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/testtools"
 )
 
 var MockCloseError = errors.New("mock close: close error")

@@ -1,8 +1,9 @@
 package internal
 
 import (
-	"github.com/wal-g/wal-g/internal/storages/storage"
 	"io"
+
+	"github.com/wal-g/wal-g/internal/storage/storage"
 )
 
 // StorageReaderMaker creates readers for downloading from storage

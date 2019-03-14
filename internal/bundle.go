@@ -3,17 +3,18 @@ package internal
 import (
 	"archive/tar"
 	"fmt"
-	"github.com/RoaringBitmap/roaring"
-	"github.com/jackc/pgx"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/internal/walparser"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/RoaringBitmap/roaring"
+	"github.com/jackc/pgx"
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/storage/storage"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/internal/walparser"
 )
 
 // It is made so to load big database files of size 1GB one by one

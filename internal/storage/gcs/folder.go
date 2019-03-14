@@ -2,10 +2,11 @@ package gcs
 
 import (
 	"context"
-	"github.com/wal-g/wal-g/internal/storages/storage"
 	"io"
 	"io/ioutil"
 	"strings"
+
+	"github.com/wal-g/wal-g/internal/storage/storage"
 
 	gcs "cloud.google.com/go/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"

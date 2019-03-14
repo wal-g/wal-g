@@ -2,8 +2,9 @@ package parsingutil
 
 import (
 	"encoding/binary"
-	"github.com/pkg/errors"
 	"io"
+
+	"github.com/pkg/errors"
 )
 
 var PaddingByte FieldToParse

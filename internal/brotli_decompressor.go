@@ -1,8 +1,9 @@
 package internal
 
 import (
-	"github.com/google/brotli/go/cbrotli"
 	"io"
+
+	"github.com/google/brotli/go/cbrotli"
 )
 
 type BrotliDecompressor struct{}

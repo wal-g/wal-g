@@ -2,16 +2,17 @@ package cmd
 
 import (
 	"fmt"
+	"strconv"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/tracelog"
-	"strconv"
-	"time"
 )
 
 const (
-	ConfirmFlag = "confirm"
+	ConfirmFlag            = "confirm"
 	DeleteShortDescription = "delete clears old backups and WALs"
 
 	DeleteRetainExamples = `  retain 5                      keep 5 backups

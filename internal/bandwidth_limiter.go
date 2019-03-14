@@ -1,9 +1,10 @@
 package internal
 
 import (
-	"golang.org/x/time/rate"
 	"io"
 	"time"
+
+	"golang.org/x/time/rate"
 )
 
 type LimitedReader struct {

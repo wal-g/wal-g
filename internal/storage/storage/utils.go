@@ -1,9 +1,10 @@
 package storage
 
 import (
-	"github.com/pkg/errors"
 	"net/url"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 func JoinPath(elem ...string) string {

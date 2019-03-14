@@ -2,13 +2,14 @@ package test
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"golang.org/x/crypto/openpgp"
 	"io"
 	"io/ioutil"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
+	"golang.org/x/crypto/openpgp"
 )
 
 var pgpTestPrivateKey string

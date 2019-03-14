@@ -1,9 +1,10 @@
 package internal
 
 import (
+	"io"
+
 	"github.com/pierrec/lz4"
 	"github.com/pkg/errors"
-	"io"
 )
 
 type Lz4Decompressor struct{}

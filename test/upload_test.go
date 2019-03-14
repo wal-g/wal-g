@@ -1,14 +1,15 @@
 package test
 
 import (
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/storages/s3"
-	"github.com/wal-g/wal-g/testtools"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/storage/s3"
+	"github.com/wal-g/wal-g/testtools"
 )
 
 // Sets WAL-G needed environment variables to empty strings.

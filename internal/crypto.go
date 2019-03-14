@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"io/ioutil"
 	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 type GpgKeyExportError struct {

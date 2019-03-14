@@ -2,10 +2,11 @@ package swift
 
 import (
 	"bytes"
-	"github.com/wal-g/wal-g/internal/storages/storage"
 	"io"
 	"io/ioutil"
 	"strings"
+
+	"github.com/wal-g/wal-g/internal/storage/storage"
 
 	"github.com/ncw/swift"
 	"github.com/wal-g/wal-g/internal/tracelog"

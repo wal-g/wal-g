@@ -2,9 +2,10 @@ package test
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
-	"testing"
 )
 
 func TestSaveLoadWalPart(t *testing.T) {

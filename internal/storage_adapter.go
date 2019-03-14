@@ -1,14 +1,15 @@
 package internal
 
 import (
-	"github.com/wal-g/wal-g/internal/storages/azure"
-	"github.com/wal-g/wal-g/internal/storages/fs"
-	"github.com/wal-g/wal-g/internal/storages/gcs"
-	"github.com/wal-g/wal-g/internal/storages/s3"
-	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/internal/storages/swift"
 	"strconv"
 	"strings"
+
+	"github.com/wal-g/wal-g/internal/storage/azure"
+	"github.com/wal-g/wal-g/internal/storage/fs"
+	"github.com/wal-g/wal-g/internal/storage/gcs"
+	"github.com/wal-g/wal-g/internal/storage/s3"
+	"github.com/wal-g/wal-g/internal/storage/storage"
+	"github.com/wal-g/wal-g/internal/storage/swift"
 )
 
 type StorageAdapter struct {

@@ -13,16 +13,17 @@ package internal
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/RoaringBitmap/roaring"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/internal/walparser"
-	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 	"io"
 	"os"
 	"path"
 	"regexp"
 	"strings"
+
+	"github.com/RoaringBitmap/roaring"
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 )
 
 const (

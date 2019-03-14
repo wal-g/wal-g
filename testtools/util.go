@@ -1,12 +1,13 @@
 package testtools
 
 import (
+	"io"
+	"testing"
+
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/storages/s3"
-	"io"
-	"testing"
+	"github.com/wal-g/wal-g/internal/storage/s3"
 )
 
 func MakeDefaultUploader(uploaderAPI s3manageriface.UploaderAPI) *s3.Uploader {

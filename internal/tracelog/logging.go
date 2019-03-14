@@ -2,10 +2,11 @@ package tracelog
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"log"
 	"os"
+
+	"github.com/pkg/errors"
 )
 
 const (

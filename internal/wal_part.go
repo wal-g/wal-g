@@ -1,8 +1,9 @@
 package internal
 
 import (
-	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 	"io"
+
+	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 )
 
 type WalPartDataType uint8

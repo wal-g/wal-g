@@ -1,9 +1,10 @@
 package azure
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal/storages/storage"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/storage/storage"
 )
 
 func TestAzureFolder(t *testing.T) {

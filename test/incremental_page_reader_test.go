@@ -3,13 +3,14 @@ package test
 import (
 	"bytes"
 	"encoding/binary"
+	"io"
+	"os"
+	"testing"
+
 	"github.com/RoaringBitmap/roaring"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/testtools"
-	"io"
-	"os"
-	"testing"
 )
 
 func TestDeltaBitmapInitialize(t *testing.T) {

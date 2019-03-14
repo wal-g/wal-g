@@ -2,10 +2,11 @@ package test
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/walparser"
-	"testing"
 )
 
 func TestIsComplete_Complete(t *testing.T) {

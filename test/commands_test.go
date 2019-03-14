@@ -2,11 +2,12 @@ package test
 
 import (
 	"bytes"
+	"io/ioutil"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/testtools"
-	"io/ioutil"
-	"testing"
 )
 
 func TestTryDownloadWALFile_Exist(t *testing.T) {

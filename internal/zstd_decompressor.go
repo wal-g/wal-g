@@ -1,9 +1,10 @@
 package internal
 
 import (
+	"io"
+
 	"github.com/DataDog/zstd"
 	"github.com/pkg/errors"
-	"io"
 )
 
 type ZstdDecompressor struct{}

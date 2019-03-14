@@ -1,9 +1,10 @@
 package internal
 
 import (
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"io/ioutil"
 	"os"
+
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 // FileSystemCleaner actually performs it's functions on file system

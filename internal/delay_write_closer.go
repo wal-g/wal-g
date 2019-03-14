@@ -1,8 +1,9 @@
 package internal
 
 import (
-	"golang.org/x/crypto/openpgp"
 	"io"
+
+	"golang.org/x/crypto/openpgp"
 )
 
 // DelayWriteCloser delays first writes.

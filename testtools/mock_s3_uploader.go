@@ -2,11 +2,12 @@ package testtools
 
 import (
 	"bytes"
+	"io"
+	"io/ioutil"
+
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
-	"io"
-	"io/ioutil"
 )
 
 type mockMultiFailureError struct {

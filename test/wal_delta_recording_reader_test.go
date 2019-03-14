@@ -3,14 +3,15 @@ package test
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/walparser"
-	"github.com/wal-g/wal-g/testtools"
 	"io/ioutil"
 	"os"
 	"path"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/testtools"
 )
 
 var ParserFilePath = path.Join(WalgTestDataFolderPath, internal.RecordPartFilename)

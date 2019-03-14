@@ -2,8 +2,9 @@ package internal
 
 import (
 	"archive/tar"
-	"github.com/pkg/errors"
 	"io"
+
+	"github.com/pkg/errors"
 )
 
 // A TarBall represents one tar file.
