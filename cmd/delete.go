@@ -29,7 +29,7 @@ var confirmed = false
 func extractDeleteModifierFromArgs(args []string) (int, string) {
 	if len(args) == 1 {
 		return internal.NoDeleteModifier, args[0]
-	} else if args[0] == StringModifiers[internal.FullDeleteModifier+1] {
+	} else if args[0] == StringModifiers[internal.FullDeleteModifier-1] {
 		return internal.FullDeleteModifier, args[1]
 	} else {
 		return internal.FindFullDeleteModifier, args[1]
