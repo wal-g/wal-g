@@ -12,7 +12,7 @@ import (
 
 const (
 	ConfirmFlag = "confirm"
-	DeleteShortDescription = "delete clears old backups and WALs"
+	DeleteShortDescription = "Clears old backups and WALs"
 
 	DeleteRetainExamples = `  retain 5                      keep 5 backups
   retain FULL 5                 keep 5 full backups and all deltas of them

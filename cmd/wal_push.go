@@ -6,7 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
-const WalPushShortDescription = "wal-push uploads a WAL file to storage"
+const WalPushShortDescription = "Uploads a WAL file to storage"
 
 // walPushCmd represents the walPush command
 var walPushCmd = &cobra.Command{
