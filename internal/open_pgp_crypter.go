@@ -172,6 +172,8 @@ func (crypter *OpenPGPCrypter) loadSecret() error {
 		crypter.mutex.RUnlock()
 		return nil
 	}
+	// unlock needs to be there twice due to different code paths
+	crypter.mutex.RUnlock()
 
 	// we need to load, so lock for writing
 	crypter.mutex.Lock()
