@@ -2,12 +2,15 @@ package internal
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"golang.org/x/crypto/openpgp"
 	"io"
 	"strings"
+	"sync"
+
+	"github.com/pkg/errors"
+
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"golang.org/x/crypto/openpgp"
 )
 
 // CrypterUseMischiefError happens when crypter is used before initialization
@@ -41,6 +44,8 @@ type OpenPGPCrypter struct {
 
 	PubKey    openpgp.EntityList
 	SecretKey openpgp.EntityList
+
+	mutex sync.RWMutex
 }
 
 func (crypter *OpenPGPCrypter) IsArmed() bool {
@@ -144,54 +149,78 @@ func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) 
 		return nil, NewCrypterUseMischiefError()
 	}
 
-	if crypter.SecretKey == nil {
-		if crypter.IsUseArmoredKey {
-			entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(crypter.ArmoredKey))
-
-			if err != nil {
-				return nil, err
-			}
-
-			crypter.SecretKey = entityList
-		} else if crypter.IsUseArmoredKeyPath {
-			entityList, err := ReadPGPKey(crypter.ArmoredKeyPath)
-
-			if err != nil {
-				return nil, err
-			}
-
-			crypter.SecretKey = entityList
-		} else {
-			// TODO: legacy gpg external use, need to remove in next major version
-			armor, err := getSecretRingArmor(crypter.KeyRingId)
-
-			if err != nil {
-				return nil, err
-			}
-
-			entityList, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(armor))
-
-			if err != nil {
-				return nil, err
-			}
-
-			crypter.SecretKey = entityList
-		}
-
-		if passphrase, isExist := LookupConfigValue("WALG_PGP_KEY_PASSPHRASE"); isExist {
-			err := DecryptSecretKey(crypter.SecretKey, passphrase)
-
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	md, err := openpgp.ReadMessage(reader, crypter.SecretKey, nil, nil)
+	err := crypter.loadSecret()
 
 	if err != nil {
 		return nil, err
 	}
 
+	md, err := openpgp.ReadMessage(reader, crypter.SecretKey, nil, nil)
+
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
 	return md.UnverifiedBody, nil
+}
+
+// load the secret key based on the settings
+func (crypter *OpenPGPCrypter) loadSecret() error {
+	// check if we actually need to load it
+	crypter.mutex.RLock()
+	if crypter.SecretKey != nil {
+		crypter.mutex.RUnlock()
+		return nil
+	}
+
+	// we need to load, so lock for writing
+	crypter.mutex.Lock()
+	defer crypter.mutex.Unlock()
+
+	// double check as the key might have been loaded between the RUnlock and Lock
+	if crypter.SecretKey != nil {
+		return nil
+	}
+
+	if crypter.IsUseArmoredKey {
+		entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(crypter.ArmoredKey))
+
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		crypter.SecretKey = entityList
+	} else if crypter.IsUseArmoredKeyPath {
+		entityList, err := ReadPGPKey(crypter.ArmoredKeyPath)
+
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		crypter.SecretKey = entityList
+	} else {
+		// TODO: legacy gpg external use, need to remove in next major version
+		armor, err := getSecretRingArmor(crypter.KeyRingId)
+
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		entityList, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(armor))
+
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		crypter.SecretKey = entityList
+	}
+
+	if passphrase, isExist := LookupConfigValue("WALG_PGP_KEY_PASSPHRASE"); isExist {
+		err := DecryptSecretKey(crypter.SecretKey, passphrase)
+
+		if err != nil {
+			return errors.WithStack(err)
+		}
+	}
+	return nil
 }
