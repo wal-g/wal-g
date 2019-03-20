@@ -114,9 +114,9 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 	}
 	before, err := time.Parse(time.RFC3339, beforeStr)
 	if err != nil {
-		internal.HandleDeleteBeforeTime(folder, before, modifier, !confirmed)
-	} else {
 		internal.HandleDeleteBeforeBackup(folder, beforeStr, modifier, !confirmed)
+	} else {
+		internal.HandleDeleteBeforeTime(folder, before, modifier, !confirmed)
 	}
 }
 
