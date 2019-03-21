@@ -8,23 +8,35 @@ import (
 	"testing"
 )
 
+type MockAWSKMSSymmetricKey struct {
+	internal.AWSKMSSymmetricKey
+}
+
+func (symmetricKey *MockAWSKMSSymmetricKey) Encrypt() error {
+	salt := "152 random bytes to imitate aws kms encryption method, random words here: witch collapse practice feed shame open despair creek road again ice least it!"
+	symmetricKey.EncryptedSymmetricKey = append(symmetricKey.SymmetricKey, salt...)
+	return nil
+}
+
+func (symmetricKey *MockAWSKMSSymmetricKey) Decrypt() error {
+	symmetricKey.SymmetricKey = symmetricKey.EncryptedSymmetricKey[:symmetricKey.SymmetricKeyLen]
+	return nil
+}
+
+func NewMockSymmetricKey(kmsKeyId string, keyLen int, encryptedKeyLen int) internal.SymmetricKey {
+	return &MockAWSKMSSymmetricKey{internal.AWSKMSSymmetricKey{SymmetricKeyLen: keyLen, EncryptedSymmetricKeyLen: encryptedKeyLen, KeyId: kmsKeyId}}
+}
+
 type MockAWSKMSCrypter struct {
 	internal.AWSKMSCrypter
 }
 
-func (crypter *MockAWSKMSCrypter) IsArmed() bool {
+func (crypter *MockAWSKMSCrypter) IsUsed() bool {
+	crypter.Configured = true
+
+	crypter.SymmetricKey = NewMockSymmetricKey("AWSKMSKEYID", 32, 184)
+
 	return true
-}
-
-func (crypter *MockAWSKMSCrypter) EncryptSymmetricKey() error {
-	salt := "152 random bytes to imitate aws kms encryption method, random words here: witch collapse practice feed shame open despair creek road again ice least it!"
-	crypter.EncryptedSymmetricKey = append(crypter.SymmetricKey, salt...)
-	return nil
-}
-
-func (crypter *MockAWSKMSCrypter) DecryptSymmetricKey() error {
-	crypter.SymmetricKey = crypter.EncryptedSymmetricKey[:crypter.SymmetricKeyLen]
-	return nil
 }
 
 func TestAWSKMSCrypterEncryption(t *testing.T) {
