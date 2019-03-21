@@ -13,9 +13,15 @@ const WalgShortDescription = "PostgreSQL backup tool"
 
 var cfgFile string
 
+// These variables are here only to show current version. They are set in makefile during build process
+var WalgVersion = "devel"
+var GitRevision = "devel"
+var BuildDate = "devel"
+
 var RootCmd = &cobra.Command{
-	Use:   "wal-g",
-	Short: WalgShortDescription, // TODO : improve short and long descriptions
+	Use:     "wal-g",
+	Short:   WalgShortDescription, // TODO : improve short and long descriptions
+	Version: WalgVersion + "\t" + GitRevision + "\t" + BuildDate,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -30,10 +36,8 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
+	RootCmd.InitDefaultVersionFlag()
 }
 
 // initConfig reads in config file and ENV variables if set.

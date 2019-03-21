@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const BackupPushShortDescription = "makes backup and uploads it to storage"
+const BackupPushShortDescription = "Makes backup and uploads it to storage"
 
 // backupPushCmd represents the backupPush command
 var backupPushCmd = &cobra.Command{

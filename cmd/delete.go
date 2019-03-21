@@ -12,7 +12,7 @@ import (
 
 const (
 	ConfirmFlag = "confirm"
-	DeleteShortDescription = "delete clears old backups and WALs"
+	DeleteShortDescription = "Clears old backups and WALs"
 
 	DeleteRetainExamples = `  retain 5                      keep 5 backups
   retain FULL 5                 keep 5 full backups and all deltas of them
@@ -29,7 +29,7 @@ var confirmed = false
 func extractDeleteModifierFromArgs(args []string) (int, string) {
 	if len(args) == 1 {
 		return internal.NoDeleteModifier, args[0]
-	} else if args[0] == StringModifiers[internal.FullDeleteModifier+1] {
+	} else if args[0] == StringModifiers[internal.FullDeleteModifier-1] {
 		return internal.FullDeleteModifier, args[1]
 	} else {
 		return internal.FindFullDeleteModifier, args[1]
@@ -114,9 +114,9 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 	}
 	before, err := time.Parse(time.RFC3339, beforeStr)
 	if err != nil {
-		internal.HandleDeleteBeforeTime(folder, before, modifier, !confirmed)
-	} else {
 		internal.HandleDeleteBeforeBackup(folder, beforeStr, modifier, !confirmed)
+	} else {
+		internal.HandleDeleteBeforeTime(folder, before, modifier, !confirmed)
 	}
 }
 

@@ -167,7 +167,7 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 			tracelog.InfoLogger.Printf("Finished decompression of %s", fileClosure.Path())
 			if err != nil {
 				isFailed.Store(fileClosure, true)
-				tracelog.ErrorLogger.Println(err)
+				tracelog.ErrorLogger.Println(fileClosure.Path(), err)
 			}
 		}()
 		go func() {

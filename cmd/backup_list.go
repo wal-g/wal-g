@@ -6,7 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
-const BackupListShortDescription = "backup-list prints available backups"
+const BackupListShortDescription = "Prints available backups"
 
 // backupListCmd represents the backupList command
 var backupListCmd = &cobra.Command{

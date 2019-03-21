@@ -6,7 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
-const WalPrefetchShortDescription = `wal-prefetch command is used for prefetching process forking
+const WalPrefetchShortDescription = `Used for prefetching process forking
 and should not be called by user.`
 
 // walPrefetchCmd represents the walPrefetch command

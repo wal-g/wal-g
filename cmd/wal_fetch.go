@@ -6,7 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
-const WalFetchShortDescription = "wal-fetch fetches a WAL file from storage"
+const WalFetchShortDescription = "Fetches a WAL file from storage"
 
 // walFetchCmd represents the walFetch command
 var walFetchCmd = &cobra.Command{
