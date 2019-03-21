@@ -491,7 +491,6 @@
     "unix",
     "cpu"
   ]
-  packages = ["unix"]
   pruneopts = "UT"
   revision = "4d1cda033e0619309c606fc686de3adcf599539e"
 
