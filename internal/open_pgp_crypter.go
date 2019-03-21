@@ -70,7 +70,7 @@ func (crypter *OpenPGPCrypter) IsUsed() bool {
 	return crypter.IsArmed()
 }
 
-// OpenPGPCrypter internal initialization
+// ConfigurePGPCrypter internal initialization
 func (crypter *OpenPGPCrypter) ConfigurePGPCrypter() {
 	crypter.Configured = true
 

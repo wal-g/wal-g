@@ -13,7 +13,7 @@ func NewWalPageReader(walFileReader io.Reader) *WalPageReader {
 	return &WalPageReader{walFileReader}
 }
 
-// reads data corresponding to one page
+// ReadPageData reads data corresponding to one page
 func (reader *WalPageReader) ReadPageData() ([]byte, error) {
 	page := make([]byte, WalPageSize)
 	_, err := io.ReadFull(reader.walFileReader, page)
