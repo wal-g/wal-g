@@ -6,7 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
-const BackupFetchShortDescription = "backup-fetch fetches a backup from storage"
+const BackupFetchShortDescription = "Fetches a backup from storage"
 
 // backupFetchCmd represents the backupFetch command
 var backupFetchCmd = &cobra.Command{
