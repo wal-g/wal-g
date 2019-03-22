@@ -40,7 +40,7 @@ func HandleDeleteRetain(folder storage.Folder, retantionCount int, modifier int,
 	}
 	if modifier == FullDeleteModifier {
 		if len(backups) <= retantionCount {
-			tracelog.WarningLogger.Printf("Have only %v backups.\n", retantionCount)
+			tracelog.WarningLogger.Printf("Have only %v backups.\n", len(backups))
 		}
 		left := retantionCount
 		for _, b := range backups {
@@ -60,7 +60,7 @@ func HandleDeleteRetain(folder storage.Folder, retantionCount int, modifier int,
 		tracelog.WarningLogger.Printf("Scanned all backups but didn't have %v full.", retantionCount)
 	} else {
 		if len(backups) <= retantionCount {
-			tracelog.WarningLogger.Printf("Have only %v backups.\n", retantionCount)
+			tracelog.WarningLogger.Printf("Have only %v backups.\n", len(backups))
 		} else {
 			deleteBeforeTarget(folder, NewBackup(baseBackupFolder, backups[retantionCount-1].BackupName), modifier == FindFullDeleteModifier, dryRun)
 		}
