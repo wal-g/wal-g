@@ -5,13 +5,15 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"regexp"
 	"strconv"
 	"time"
 )
 
 const (
-	ConfirmFlag = "confirm"
+	ConfirmFlag            = "confirm"
 	DeleteShortDescription = "Clears old backups and WALs"
 
 	DeleteRetainExamples = `  retain 5                      keep 5 backups
@@ -25,6 +27,8 @@ const (
 var StringModifiers = []string{"FULL", "FIND_FULL"}
 
 var confirmed = false
+var regexpLSN = regexp.MustCompile("[0-9A-F]{24}")
+var maxCountOfLSN = 2
 
 func extractDeleteModifierFromArgs(args []string) (int, string) {
 	if len(args) == 1 {
@@ -114,7 +118,14 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 	}
 	before, err := time.Parse(time.RFC3339, beforeStr)
 	if err != nil {
-		internal.HandleDeleteBeforeBackup(folder, beforeStr, modifier, !confirmed)
+		target, err := internal.FindTargetBeforeName(folder, beforeStr, modifier)
+		// after updating delete before time it will be made common
+		if err != nil {
+			tracelog.ErrorLogger.FatalError(err)
+		}
+		if confirmed {
+			err = internal.DeleteBeforeTarget(folder, target, earlierCreated)
+		}
 	} else {
 		internal.HandleDeleteBeforeTime(folder, before, modifier, !confirmed)
 	}
@@ -133,4 +144,13 @@ func init() {
 	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd)
 
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, ConfirmFlag, false, "Confirms backup deletion")
+}
+
+// it's here because it's part of postgres logic and in future it will be placed in postgres part of wal-g
+func earlierCreated(object1 storage.Object, object2 storage.Object) bool {
+	return fetchLSN(object1) < fetchLSN(object2)
+}
+
+func fetchLSN(object storage.Object) string {
+	return regexpLSN.FindAllString(object.GetName(), maxCountOfLSN)[0]
 }

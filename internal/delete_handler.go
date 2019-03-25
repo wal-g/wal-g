@@ -294,3 +294,40 @@ func getGarbageFromPrefix(folders []storage.Folder, nonGarbage []BackupTime) []s
 	}
 	return garbage
 }
+
+func DeleteBeforeTarget(
+	folder storage.Folder,
+	target storage.Object,
+	before func(object1 storage.Object, object2 storage.Object) bool) error {
+	relativePathObjects, err := storage.ListFolderRecursively(folder)
+	if err != nil {
+		return err
+	}
+	filteredRelativePaths := make([]string, 0)
+	for _, object := range relativePathObjects {
+		if before(object, target) {
+			filteredRelativePaths = append(filteredRelativePaths, object.GetName())
+		}
+	}
+	err = folder.DeleteObjects(filteredRelativePaths)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func FindTargetBeforeName(folder storage.Folder, name string, modifier int) (storage.Object, error) {
+	backup := NewBackup(folder.GetSubFolder(BaseBackupPath), name)
+	backup = adjustDeleteTarget(backup, modifier == FindFullDeleteModifier)
+	objects, _, err := folder.GetSubFolder(BaseBackupPath).ListFolder()
+	if err != nil {
+		return nil, err
+	}
+	for _, object := range objects {
+		if strings.HasPrefix(object.GetName(), backup.Name) {
+			tracelog.InfoLogger.Println(object.GetName())
+			return object, nil
+		}
+	}
+	return nil, BackupNonExistenceError{}
+}
