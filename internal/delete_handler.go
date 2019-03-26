@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"sort"
@@ -15,19 +16,20 @@ const (
 )
 
 // TODO : unit tests
-func adjustDeleteTarget(target *Backup, findFull bool) *Backup {
+func adjustDeleteTarget(target *Backup, findFull bool) (*Backup, error) {
 	sentinelDto, err := target.FetchSentinel()
 	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
+		return nil, err
 	}
 	if sentinelDto.isIncremental() {
 		if findFull {
 			target.Name = *sentinelDto.IncrementFullName
 		} else {
-			tracelog.ErrorLogger.Fatalf("%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option.", target.Name)
+			errorMessage := "%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
+			return nil, NewWrongTypeError(fmt.Sprintf(errorMessage, target.Name))
 		}
 	}
-	return target
+	return target, nil
 }
 
 // TODO : unit tests
@@ -67,11 +69,6 @@ func HandleDeleteRetain(folder storage.Folder, retantionCount int, modifier int,
 	}
 }
 
-func HandleDeleteBeforeBackup(folder storage.Folder, backupName string, modifier int, dryRun bool) {
-	baseBackupFolder := folder.GetSubFolder(BaseBackupPath)
-	deleteBeforeTarget(folder, NewBackup(baseBackupFolder, backupName), modifier == FindFullDeleteModifier, dryRun)
-}
-
 // TODO : unit tests
 func HandleDeleteBeforeTime(folder storage.Folder, before time.Time, modifier int, dryRun bool) {
 	baseBackupFolder := folder.GetSubFolder(BaseBackupPath)
@@ -91,7 +88,7 @@ func HandleDeleteBeforeTime(folder storage.Folder, before time.Time, modifier in
 
 // TODO : unit tests
 func deleteBeforeTarget(folder storage.Folder, target *Backup, findFull, dryRun bool) {
-	target = adjustDeleteTarget(target, findFull)
+	target, _ = adjustDeleteTarget(target, findFull)
 	walFolder := folder.GetSubFolder(WalPath)
 	backupToScan, garbage, err := getBackupsAndGarbage(folder)
 	if err != nil {
@@ -295,19 +292,19 @@ func getGarbageFromPrefix(folders []storage.Folder, nonGarbage []BackupTime) []s
 	return garbage
 }
 
-func DeleteBeforeTarget(
-	folder storage.Folder,
-	target storage.Object,
-	before func(object1 storage.Object, object2 storage.Object) bool) error {
-	relativePathObjects, err := storage.ListFolderRecursively(folder)
+func DeleteOldObjects(folder storage.Folder, isElderEnough func(object1 storage.Object) bool) error {
+	fullPathObjects, err := storage.ListFolderRecursively(folder)
 	if err != nil {
 		return err
 	}
 	filteredRelativePaths := make([]string, 0)
-	for _, object := range relativePathObjects {
-		if before(object, target) {
+	for _, object := range fullPathObjects {
+		if isElderEnough(object) {
 			filteredRelativePaths = append(filteredRelativePaths, object.GetName())
 		}
+	}
+	if len(filteredRelativePaths) == 0 {
+		return nil
 	}
 	err = folder.DeleteObjects(filteredRelativePaths)
 	if err != nil {
@@ -318,14 +315,16 @@ func DeleteBeforeTarget(
 
 func FindTargetBeforeName(folder storage.Folder, name string, modifier int) (storage.Object, error) {
 	backup := NewBackup(folder.GetSubFolder(BaseBackupPath), name)
-	backup = adjustDeleteTarget(backup, modifier == FindFullDeleteModifier)
+	backup, err := adjustDeleteTarget(backup, modifier == FindFullDeleteModifier)
+	if err != nil {
+		return nil, err
+	}
 	objects, _, err := folder.GetSubFolder(BaseBackupPath).ListFolder()
 	if err != nil {
 		return nil, err
 	}
 	for _, object := range objects {
 		if strings.HasPrefix(object.GetName(), backup.Name) {
-			tracelog.InfoLogger.Println(object.GetName())
 			return object, nil
 		}
 	}

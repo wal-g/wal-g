@@ -1,10 +1,13 @@
 package test
 
 import (
+	"encoding/json"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 )
@@ -87,4 +90,68 @@ func TestSkiplineComputationAfterUpgrade(t *testing.T) {
 
 	assert.Equal(t, "00000001000000000000009C", walSkipFileName)
 	assert.Equal(t, 3, skipLine)
+}
+
+func TestDeleteOldObjects(t *testing.T) {
+	folder := createMockStorageFolder()
+	expectedOnlyOneSavedObjectName := "basebackups_005/base_123312"
+	filter := func(object storage.Object) bool {
+		return object.GetName() != expectedOnlyOneSavedObjectName
+	}
+	err := internal.DeleteOldObjects(folder, filter)
+	assert.NoError(t, err)
+	savedObjects, err := storage.ListFolderRecursively(folder)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(savedObjects))
+	assert.Equal(t, expectedOnlyOneSavedObjectName, savedObjects[0].GetName())
+}
+
+func TestFindTargetBeforeName_ReturnsErrorForDeltaBackup_Without_Modifier(t *testing.T) {
+	targetDelta := "base_000000010000000000000009_D_000000010000000000000007"
+	folder := createMockStorageFolderWithDeltaBackups(t)
+	expectedErrorMessage := " is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
+	_, err := internal.FindTargetBeforeName(folder, targetDelta, internal.NoDeleteModifier)
+	assert.Error(t, err, targetDelta + expectedErrorMessage)
+}
+
+func TestFindTargetBeforeName_ReturnsFullBackup_Without_Modifier(t *testing.T) {
+	targetDelta := "base_000000010000000000000007"
+	folder := createMockStorageFolderWithDeltaBackups(t)
+	object, err := internal.FindTargetBeforeName(folder, targetDelta, internal.NoDeleteModifier)
+	assert.NoError(t, err)
+	assert.Equal(t, targetDelta + internal.SentinelSuffix, object.GetName())
+}
+
+func TestFindTargetBeforeName_ReturnsErrorForDeltaBackup_With_FIND_FULL(t *testing.T) {
+	targetDelta := "base_000000010000000000000009_D_000000010000000000000007"
+	expected := "base_000000010000000000000007"
+	folder := createMockStorageFolderWithDeltaBackups(t)
+	object, err := internal.FindTargetBeforeName(folder, targetDelta, internal.FindFullDeleteModifier)
+	assert.NoError(t, err)
+	assert.Equal(t, expected + internal.SentinelSuffix, object.GetName())
+}
+
+func createMockStorageFolderWithDeltaBackups(t *testing.T) storage.Folder {
+	var folder = testtools.MakeDefaultInMemoryStorageFolder()
+	subFolder := folder.GetSubFolder(internal.BaseBackupPath)
+	sentinelData := map[string]interface{}{
+		"DeltaFrom": "",
+		"DeltaFullName": "base_000000010000000000000007",
+		"DeltaFromLSN": 0,
+		"DeltaCount": 0,
+	}
+	emptySentinelData := map[string]interface{}{}
+	backupNames := map[string]interface{}{
+		"base_000000010000000000000003": emptySentinelData,
+		"base_000000010000000000000005_D_000000010000000000000003": sentinelData,
+		"base_000000010000000000000007": emptySentinelData,
+		"base_000000010000000000000009_D_000000010000000000000007": sentinelData}
+	for backupName, sentinelD := range backupNames {
+		bytesSentinel, err := json.Marshal(&sentinelD)
+		assert.NoError(t, err)
+		sentinelString := string(bytesSentinel)
+		err = subFolder.PutObject(backupName + internal.SentinelSuffix, strings.NewReader(sentinelString))
+		assert.NoError(t, err)
+	}
+	return folder
 }

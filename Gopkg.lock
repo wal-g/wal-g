@@ -279,15 +279,19 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:e39a5ee8fcbec487f8fc68863ef95f2b025e0739b0e4aa55558a2b4cf8f0ecf0"
+  digest = "1:34cd01be69526d7e73fff2eff67d8589b390d5f7dd6e1bf218c15f6f46ddc33a"
   name = "github.com/pierrec/lz4"
-  packages = [
-    ".",
-    "internal/xxh32",
-  ]
+  packages = ["."]
   pruneopts = "UT"
-  revision = "635575b42742856941dbc767b44905bb9ba083f6"
-  version = "v2.0.7"
+  revision = "5a3d2245f97fc249850e7802e3c01fad02a1c316"
+
+[[projects]]
+  digest = "1:5272d5bcf91d1db46fc9528f706019533f1b390b94b122cff427162bc5009e40"
+  name = "github.com/pierrec/xxHash"
+  packages = ["xxHash32"]
+  pruneopts = "UT"
+  revision = "d17cb990ad2d219d5901415ceaeb50d17df59527"
+  version = "v0.1.5"
 
 [[projects]]
   digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
