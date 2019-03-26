@@ -1,4 +1,4 @@
-package testtools
+package memory
 
 import (
 	"bytes"
@@ -15,15 +15,16 @@ func TimeStampData(data bytes.Buffer) TimeStampedData {
 	return TimeStampedData{data, time.Now()}
 }
 
-type InMemoryStorage struct {
+// Storage is supposed to be used for tests. It doesn't guarantee data safety!
+type Storage struct {
 	underlying *sync.Map
 }
 
-func NewInMemoryStorage() *InMemoryStorage {
-	return &InMemoryStorage{&sync.Map{}}
+func NewStorage() *Storage {
+	return &Storage{&sync.Map{}}
 }
 
-func (storage *InMemoryStorage) Load(key string) (value TimeStampedData, exists bool) {
+func (storage *Storage) Load(key string) (value TimeStampedData, exists bool) {
 	valueInterface, ok := storage.underlying.Load(key)
 	if !ok {
 		return TimeStampedData{}, ok
@@ -31,11 +32,15 @@ func (storage *InMemoryStorage) Load(key string) (value TimeStampedData, exists 
 	return valueInterface.(TimeStampedData), ok
 }
 
-func (storage *InMemoryStorage) Store(key string, value bytes.Buffer) {
+func (storage *Storage) Store(key string, value bytes.Buffer) {
 	storage.underlying.Store(key, TimeStampData(value))
 }
 
-func (storage *InMemoryStorage) Range(callback func(key string, value TimeStampedData) bool) {
+func (storage *Storage) Delete(key string) {
+	storage.underlying.Delete(key)
+}
+
+func (storage *Storage) Range(callback func(key string, value TimeStampedData) bool) {
 	storage.underlying.Range(func(iKey, iValue interface{}) bool {
 		return callback(iKey.(string), iValue.(TimeStampedData))
 	})
