@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/storages/memory"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/testtools"
 	"sync"
@@ -247,7 +248,7 @@ func TestFlushDeltaFiles_CompleteFile(t *testing.T) {
 	deltaFile.Locations = append(deltaFile.Locations, TestLocation)
 	assert.NoError(t, err)
 	manager.DeltaFileWriters.Store(DeltaFilename, internal.NewDeltaFileChanWriter(deltaFile))
-	storage := testtools.NewInMemoryStorage()
+	storage := memory.NewStorage()
 	manager.FlushDeltaFiles(testtools.NewStoringMockUploader(storage, nil), map[string]bool{
 		internal.ToPartFilename(DeltaFilename): true,
 	})

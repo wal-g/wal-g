@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/storages/memory"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/testtools"
@@ -114,7 +115,7 @@ func makeDeltaFile(locations []walparser.BlockLocation) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
-func putDeltaIntoStorage(storage *testtools.InMemoryStorage, locations []walparser.BlockLocation, deltaFilename string) error {
+func putDeltaIntoStorage(storage *memory.Storage, locations []walparser.BlockLocation, deltaFilename string) error {
 	deltaData, err := makeDeltaFile(locations)
 	if err != nil {
 		return err
@@ -123,7 +124,7 @@ func putDeltaIntoStorage(storage *testtools.InMemoryStorage, locations []walpars
 	return nil
 }
 
-func putWalIntoStorage(storage *testtools.InMemoryStorage, data []byte, walFilename string) error {
+func putWalIntoStorage(storage *memory.Storage, data []byte, walFilename string) error {
 	compressor := internal.Compressors[internal.Lz4AlgorithmName]
 	var compressedData bytes.Buffer
 	compressingWriter := compressor.NewWriter(&compressedData)
@@ -139,7 +140,7 @@ func putWalIntoStorage(storage *testtools.InMemoryStorage, data []byte, walFilen
 	return nil
 }
 
-func fillStorageWithMockDeltas(storage *testtools.InMemoryStorage) error {
+func fillStorageWithMockDeltas(storage *memory.Storage) error {
 	err := putDeltaIntoStorage(
 		storage,
 		[]walparser.BlockLocation{
@@ -177,12 +178,12 @@ func fillStorageWithMockDeltas(storage *testtools.InMemoryStorage) error {
 }
 
 func setupFolderAndBundle() (folder storage.Folder, bundle *internal.Bundle, err error) {
-	storage := testtools.NewInMemoryStorage()
+	storage := memory.NewStorage()
 	err = fillStorageWithMockDeltas(storage)
 	if err != nil {
 		return nil, nil, err
 	}
-	folder = testtools.NewInMemoryStorageFolder("in_memory/", storage).GetSubFolder(internal.WalPath)
+	folder = memory.NewFolder("in_memory/", storage).GetSubFolder(internal.WalPath)
 	currentBackupFirstWalFilename := "000000010000000000000073"
 	timeLine, logSegNo, err := internal.ParseWALFilename(currentBackupFirstWalFilename)
 	if err != nil {

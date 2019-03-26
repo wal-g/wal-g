@@ -4,10 +4,15 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/storages/memory"
 	"github.com/wal-g/wal-g/internal/storages/s3"
 	"io"
 	"testing"
 )
+
+func MakeDefaultInMemoryStorageFolder() *memory.Folder {
+	return memory.NewFolder("in_memory/", memory.NewStorage())
+}
 
 func MakeDefaultUploader(uploaderAPI s3manageriface.UploaderAPI) *s3.Uploader {
 	return s3.NewUploader(uploaderAPI, "", "", "STANDARD")
@@ -24,10 +29,10 @@ func NewMockUploader(apiMultiErr, apiErr bool) *internal.Uploader {
 	)
 }
 
-func NewStoringMockUploader(storage *InMemoryStorage, deltaDataFolder internal.DataFolder) *internal.Uploader {
+func NewStoringMockUploader(storage *memory.Storage, deltaDataFolder internal.DataFolder) *internal.Uploader {
 	return internal.NewUploader(
 		&MockCompressor{},
-		NewInMemoryStorageFolder("in_memory/", storage),
+		memory.NewFolder("in_memory/", storage),
 		deltaDataFolder,
 		true,
 		true,

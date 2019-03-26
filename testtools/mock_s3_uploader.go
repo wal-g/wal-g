@@ -5,6 +5,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
+	"github.com/wal-g/wal-g/internal/storages/memory"
 	"io"
 	"io/ioutil"
 )
@@ -28,10 +29,10 @@ type mockS3Uploader struct {
 	s3manageriface.UploaderAPI
 	multiErr bool
 	err      bool
-	storage  *InMemoryStorage
+	storage  *memory.Storage
 }
 
-func NewMockS3Uploader(multiErr, err bool, storage *InMemoryStorage) *mockS3Uploader {
+func NewMockS3Uploader(multiErr, err bool, storage *memory.Storage) *mockS3Uploader {
 	return &mockS3Uploader{multiErr: multiErr, err: err, storage: storage}
 }
 
@@ -59,7 +60,7 @@ func (uploader *mockS3Uploader) Upload(input *s3manager.UploadInput, f ...func(*
 	} else {
 		var buf bytes.Buffer
 		_, err = io.Copy(&buf, input.Body)
-		uploader.storage.underlying.Store(*input.Bucket+*input.Key, buf)
+		uploader.storage.Store(*input.Bucket+*input.Key, buf)
 	}
 	if err != nil {
 		return nil, err
