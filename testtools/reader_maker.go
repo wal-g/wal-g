@@ -2,18 +2,8 @@ package testtools
 
 import (
 	"io"
-	"net/http"
 	"os"
 )
-
-// HTTPReaderMaker decompresses lzop tarballs from
-// the passed in url.
-type HTTPReaderMaker struct {
-	Client *http.Client
-	Key    string
-}
-
-func (h *HTTPReaderMaker) Path() string { return h.Key }
 
 // FileReaderMaker decompresses lzop tarballs from
 // the passed in file.
@@ -22,22 +12,6 @@ type FileReaderMaker struct {
 }
 
 func (f *FileReaderMaker) Path() string { return f.Key }
-
-// Reader creates a new request to grab the data generated
-// by the random bytes generator.
-func (h *HTTPReaderMaker) Reader() (io.ReadCloser, error) {
-	get, err := http.NewRequest("GET", h.Key, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := h.Client.Do(get)
-	if err != nil {
-		return nil, err
-	}
-
-	return data.Body, nil
-}
 
 // Reader creates a new reader from the passed in file.
 func (f *FileReaderMaker) Reader() (io.ReadCloser, error) {
