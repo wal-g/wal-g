@@ -293,12 +293,12 @@ func getGarbageFromPrefix(folders []storage.Folder, nonGarbage []BackupTime) []s
 }
 
 func DeleteOldObjects(folder storage.Folder, isElderEnough func(object1 storage.Object) bool) error {
-	fullPathObjects, err := storage.ListFolderRecursively(folder)
+	relativePathObjects, err := storage.ListFolderRecursively(folder)
 	if err != nil {
 		return err
 	}
 	filteredRelativePaths := make([]string, 0)
-	for _, object := range fullPathObjects {
+	for _, object := range relativePathObjects {
 		if isElderEnough(object) {
 			filteredRelativePaths = append(filteredRelativePaths, object.GetName())
 		}
