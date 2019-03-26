@@ -4,7 +4,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/storages/s3"
 	"github.com/wal-g/wal-g/testtools"
 	"os"
 	"strings"
@@ -126,16 +125,6 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	if err != nil {
 		t.Log(err)
 	}
-}
-
-func TestValidUploader(t *testing.T) {
-	mockSvc := testtools.NewMockS3Client(false, false)
-
-	tu := testtools.NewMockUploader(false, false)
-	assert.NotNil(t, tu)
-
-	upl := s3.CreateUploaderAPI(mockSvc, 100, 3)
-	assert.NotNil(t, upl)
 }
 
 func TestUploadError(t *testing.T) {
