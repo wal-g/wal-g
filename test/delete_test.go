@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -95,10 +96,10 @@ func TestSkiplineComputationAfterUpgrade(t *testing.T) {
 func TestFindTargetBeforeName_ReturnsErrorForDeltaBackup_Without_Modifier(t *testing.T) {
 	targetDelta := "base_000000010000000000000009_D_000000010000000000000007"
 	folder := createMockStorageFolderWithDeltaBackups(t)
-	expectedErrorMessage := " is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
 	_, err := internal.FindTargetBeforeName(folder, targetDelta, internal.NoDeleteModifier)
 	assert.Error(t, err)
-	assert.EqualError(t, err, targetDelta+expectedErrorMessage)
+	expectedTypeOfError := reflect.TypeOf(internal.NewForbiddenActionError(""))
+	assert.Equal(t, reflect.TypeOf(err), expectedTypeOfError)
 }
 
 func TestFindTargetBeforeName_ReturnsFullBackup_Without_Modifier(t *testing.T) {
