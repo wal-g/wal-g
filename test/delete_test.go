@@ -6,7 +6,6 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
-	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -98,8 +97,7 @@ func TestFindTargetBeforeName_ReturnsErrorForDeltaBackup_Without_Modifier(t *tes
 	folder := createMockStorageFolderWithDeltaBackups(t)
 	_, err := internal.FindTargetBeforeName(folder, targetDelta, internal.NoDeleteModifier)
 	assert.Error(t, err)
-	expectedTypeOfError := reflect.TypeOf(internal.NewForbiddenActionError(""))
-	assert.Equal(t, reflect.TypeOf(err), expectedTypeOfError)
+	assert.IsType(t, internal.ForbiddenActionError{}, err)
 }
 
 func TestFindTargetBeforeName_ReturnsFullBackup_Without_Modifier(t *testing.T) {
