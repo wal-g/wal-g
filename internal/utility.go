@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 	"os"
@@ -181,4 +182,12 @@ func stripWalFileName(path string) string {
 		return name[len(backupNamePrefix):]
 	}
 	return ""
+}
+
+type ForbiddenActionError interface {
+	error
+}
+
+func NewForbiddenActionError(message string) ForbiddenActionError {
+	return errors.Errorf(message)
 }

@@ -124,10 +124,9 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 			tracelog.ErrorLogger.FatalError(err)
 		}
 		if confirmed {
-			isYoungerEnough := func(object storage.Object) bool {
+			err = storage.DeleteObjectsWhere(folder, func(object storage.Object) bool {
 				return earlierCreated(object, target)
-			}
-			err = internal.DeleteOldObjects(folder, isYoungerEnough)
+			})
 		}
 	} else {
 		internal.HandleDeleteBeforeTime(folder, before, modifier, !confirmed)

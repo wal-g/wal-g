@@ -22,9 +22,8 @@ func TestListFolderRecursively(t *testing.T) {
 	}
 	fullPathObjects, err := storage.ListFolderRecursively(folder)
 	assert.NoError(t, err)
-	found := false
 	for _, relativePath := range paths {
-		found = false
+		found := false
 		for _, object := range fullPathObjects {
 			if object.GetName() == relativePath {
 				found = true
@@ -33,4 +32,18 @@ func TestListFolderRecursively(t *testing.T) {
 		}
 		assert.True(t, found)
 	}
+}
+
+func TestDeleteOldObjects(t *testing.T) {
+	folder := createMockStorageFolder()
+	expectedOnlyOneSavedObjectName := "basebackups_005/base_123312"
+	filter := func(object storage.Object) bool {
+		return object.GetName() != expectedOnlyOneSavedObjectName
+	}
+	err := storage.DeleteObjectsWhere(folder, filter)
+	assert.NoError(t, err)
+	savedObjects, err := storage.ListFolderRecursively(folder)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(savedObjects))
+	assert.Equal(t, expectedOnlyOneSavedObjectName, savedObjects[0].GetName())
 }

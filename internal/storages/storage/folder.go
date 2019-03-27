@@ -27,6 +27,27 @@ type Folder interface {
 	PutObject(name string, content io.Reader) error
 }
 
+func DeleteObjectsWhere(folder Folder, filter func(object1 Object) bool) error {
+	relativePathObjects, err := ListFolderRecursively(folder)
+	if err != nil {
+		return err
+	}
+	filteredRelativePaths := make([]string, 0)
+	for _, object := range relativePathObjects {
+		if filter(object) {
+			filteredRelativePaths = append(filteredRelativePaths, object.GetName())
+		}
+	}
+	if len(filteredRelativePaths) == 0 {
+		return nil
+	}
+	err = folder.DeleteObjects(filteredRelativePaths)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func ListFolderRecursively(folder Folder) (relativePathObjects []Object, err error) {
 	queue := make([]Folder, 0)
 	queue = append(queue, folder)
