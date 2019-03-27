@@ -65,8 +65,9 @@ func (uploader *BgUploader) Stop() {
 	} // Wait until noone works
 
 	uploader.mutex.Lock()
-	defer uploader.mutex.Unlock()
+	// We have to do this under mutex to exclude interference with shouldKeepScanning() branch
 	atomic.StoreInt32(&uploader.maxParallelWorkers, 0) // stop new jobs
+	uploader.mutex.Unlock()
 	uploader.running.Wait()                            // wait again for those how jumped to the closing door
 }
 
