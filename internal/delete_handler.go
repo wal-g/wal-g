@@ -322,3 +322,17 @@ func FindTargetBeforeName(folder storage.Folder, name string, modifier int) (sto
 	}
 	return nil, BackupNonExistenceError{}
 }
+
+func FindFirstLaterOrEqualTime(folder storage.Folder, timeLine time.Time) (storage.Object, error) {
+	sentinelObjects, _, err := folder.GetSubFolder(BaseBackupPath).ListFolder()
+	if err != nil {
+		return nil, err
+	}
+	sort.Sort(storage.SortableObjectsSlice(sentinelObjects))
+	for _, object := range sentinelObjects {
+		if timeLine.Before(object.GetLastModified()) || timeLine.Equal(object.GetLastModified()) {
+			return object, nil
+		}
+	}
+	return nil, NoBackupsFoundError{}
+}

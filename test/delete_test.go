@@ -2,11 +2,14 @@ package test
 
 import (
 	"encoding/json"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/wal-g/wal-g/test/mocks"
 	"github.com/wal-g/wal-g/testtools"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -140,4 +143,40 @@ func createMockStorageFolderWithDeltaBackups(t *testing.T) storage.Folder {
 		assert.NoError(t, err)
 	}
 	return folder
+}
+
+func TestFirstLaterThanTime(t *testing.T) {
+	baseTime := time.Now()
+	baseNamePrefix := "base_00000001000000000000000"
+	objects := make([]storage.Object, 5)
+	for i := 0; i < 5; i++ {
+		iDuration := time.Duration(i * int(time.Minute))
+		objects[i] = storage.NewLocalObject(baseNamePrefix+strconv.Itoa(i), baseTime.Add(iDuration))
+	}
+
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+
+	mockBaseBackupFolder := mocks.NewMockFolder(controller)
+
+	mockBaseBackupFolder.
+		EXPECT().
+		ListFolder().
+		Return(objects, nil, nil).
+		AnyTimes()
+
+	mockFolder := mocks.NewMockFolder(controller)
+
+	mockFolder.
+		EXPECT().
+		GetSubFolder(internal.BaseBackupPath).
+		Return(mockBaseBackupFolder).
+		AnyTimes()
+
+	storage.SetLessFunction(func(object1 storage.Object, object2 storage.Object) bool {
+		return object1.GetLastModified().Before(object2.GetLastModified())
+	})
+	object, err := internal.FindFirstLaterOrEqualTime(mockFolder, baseTime.Add(2*time.Minute))
+	assert.NoError(t, err)
+	assert.Equal(t, baseNamePrefix+strconv.Itoa(2), object.GetName())
 }

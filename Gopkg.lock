@@ -135,6 +135,14 @@
   version = "v2.2.1"
 
 [[projects]]
+  digest = "1:b60efdeb75d3c0ceed88783ac2495256aba3491a537d0f31401202579fd62a94"
+  name = "github.com/golang/mock"
+  packages = ["gomock"]
+  pruneopts = "UT"
+  revision = "51421b967af1f557f93a59e0057aaf15ca02e29c"
+  version = "v1.2.0"
+
+[[projects]]
   digest = "1:5d1b5a25486fc7d4e133646d834f6fca7ba1cef9903d40e7aa786c41b89e9e91"
   name = "github.com/golang/protobuf"
   packages = [
@@ -630,6 +638,7 @@
     "github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface",
     "github.com/cyberdelia/lzo",
     "github.com/go-yaml/yaml",
+    "github.com/golang/mock/gomock",
     "github.com/google/brotli/go/cbrotli",
     "github.com/jackc/pgx",
     "github.com/mitchellh/go-homedir",
