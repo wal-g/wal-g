@@ -121,8 +121,7 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 	}
 	before, err := time.Parse(time.RFC3339, beforeStr)
 	if err == nil {
-		storage.SetLessFunction(earlierCreated) // it needs for sort []storage.Object
-		potentialTarget, err := internal.FindFirstLaterOrEqualTime(folder, before)
+		potentialTarget, err := internal.FindFirstLaterOrEqualTime(folder, before, postgresLess)
 		if err != nil {
 			tracelog.ErrorLogger.FatalError(err)
 		}
@@ -134,7 +133,7 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 	}
 	if confirmed {
 		err = storage.DeleteObjectsWhere(folder, func(object storage.Object) bool {
-			return earlierCreated(object, target)
+			return postgresLess(object, target)
 		})
 	}
 }
@@ -155,7 +154,7 @@ func init() {
 }
 
 // it's here because it's part of postgres logic and in future it will be placed in postgres part of wal-g
-func earlierCreated(object1 storage.Object, object2 storage.Object) bool {
+func postgresLess(object1 storage.Object, object2 storage.Object) bool {
 	return fetchLSN(object1) < fetchLSN(object2)
 }
 

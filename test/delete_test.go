@@ -173,10 +173,10 @@ func TestFirstLaterThanTime(t *testing.T) {
 		Return(mockBaseBackupFolder).
 		AnyTimes()
 
-	storage.SetLessFunction(func(object1 storage.Object, object2 storage.Object) bool {
-		return object1.GetLastModified().Before(object2.GetLastModified())
-	})
-	object, err := internal.FindFirstLaterOrEqualTime(mockFolder, baseTime.Add(2*time.Minute))
+	object, err := internal.FindFirstLaterOrEqualTime(mockFolder, baseTime.Add(2*time.Minute),
+		func(object1 storage.Object, object2 storage.Object) bool {
+			return object1.GetLastModified().Before(object2.GetLastModified())
+		})
 	assert.NoError(t, err)
 	assert.Equal(t, baseNamePrefix+strconv.Itoa(2), object.GetName())
 }
