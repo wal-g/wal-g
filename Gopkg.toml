@@ -55,7 +55,7 @@
 
 [[constraint]]
   name = "github.com/pierrec/lz4"
-  version = "2.0.7"
+  revision = "5a3d2245f97fc249850e7802e3c01fad02a1c316"
 
 [[constraint]]
   name = "github.com/pkg/errors"

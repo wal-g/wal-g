@@ -2,9 +2,10 @@ package internal
 
 import (
 	"archive/tar"
+	"io/ioutil"
 )
 
-// NOPTarBall mocks a tarball. Used for testing purposes.
+// NOPTarBall mocks a tarball. Used for prefault logic.
 type NOPTarBall struct {
 	number    int
 	size      int64
@@ -32,21 +33,10 @@ func (tarBallMaker *NOPTarBallMaker) Make(inheritState bool) TarBall {
 	return &NOPTarBall{
 		number:    tarBallMaker.number,
 		size:      tarBallMaker.size,
-		tarWriter: tar.NewWriter(&nopWriteCloser{}),
+		tarWriter: tar.NewWriter(ioutil.Discard),
 	}
 }
 
 func NewNopTarBallMaker() TarBallMaker {
 	return &NOPTarBallMaker{0, 0}
-}
-
-type nopWriteCloser struct {
-}
-
-func (*nopWriteCloser) Write(p []byte) (n int, err error) {
-	return len(p), nil
-}
-
-func (*nopWriteCloser) Close() error {
-	return nil
 }
