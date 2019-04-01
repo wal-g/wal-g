@@ -76,26 +76,6 @@ func HandleDeleteRetain(folder storage.Folder, retantionCount int, modifier int,
 }
 
 // TODO : unit tests
-func HandleDeleteBeforeTime(folder storage.Folder, before time.Time, modifier int, dryRun bool) {
-	baseBackupFolder := folder.GetSubFolder(BaseBackupPath)
-
-	backups, err := getBackups(folder)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
-	for _, b := range backups {
-		if b.Time.Before(before) {
-			err = deleteBeforeTarget(folder, NewBackup(baseBackupFolder, b.BackupName), modifier == FindFullDeleteModifier, dryRun)
-			if err != nil {
-				tracelog.ErrorLogger.FatalError(err)
-			}
-			return
-		}
-	}
-	tracelog.WarningLogger.Println("No backups before ", before)
-}
-
-// TODO : unit tests
 func deleteBeforeTarget(folder storage.Folder, target *Backup, findFull, dryRun bool) error {
 	target, err := adjustDeleteTarget(target, findFull)
 	if err != nil {
@@ -321,4 +301,22 @@ func FindTargetBeforeName(folder storage.Folder, name string, modifier int) (sto
 		}
 	}
 	return nil, BackupNonExistenceError{}
+}
+
+func FindFirstLaterOrEqualTime(folder storage.Folder,
+	timeLine time.Time,
+	less func(object1, object2 storage.Object) bool) (storage.Object, error) {
+	sentinelObjects, _, err := folder.GetSubFolder(BaseBackupPath).ListFolder()
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(sentinelObjects, func(i, j int) bool {
+		return less(sentinelObjects[i], sentinelObjects[j])
+	})
+	for _, object := range sentinelObjects {
+		if timeLine.Before(object.GetLastModified()) || timeLine.Equal(object.GetLastModified()) {
+			return object, nil
+		}
+	}
+	return nil, NoBackupsFoundError{}
 }
