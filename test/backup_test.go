@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestCheckExistence_Exists(t *testing.T) {
+func TestCheckExistenceWhenBackupExists(t *testing.T) {
 	folder := createMockStorageFolder()
 	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_000")
 	exists, err := backup.CheckExistence()
@@ -16,7 +16,7 @@ func TestCheckExistence_Exists(t *testing.T) {
 	assert.True(t, exists)
 }
 
-func TestCheckExistence_NotExists(t *testing.T) {
+func TestCheckExistenceWhenBackupNotExists(t *testing.T) {
 	folder := createMockStorageFolder()
 	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_321")
 	exists, err := backup.CheckExistence()
@@ -59,7 +59,7 @@ func TestFetchSentinel(t *testing.T) {
 	assert.Equal(t, expectedSentinel, actualSentinel)
 }
 
-func TestFetchSentinel_ReturnError_WhenSentinelNotExist(t *testing.T) {
+func TestFetchSentinelReturnErrorWhenSentinelNotExist(t *testing.T) {
 	folder := createMockStorageFolder()
 	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_78934085033849")
 
@@ -68,7 +68,7 @@ func TestFetchSentinel_ReturnError_WhenSentinelNotExist(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestFetchSentinel_ReturnError_WhenSentinelUnmarshallable(t *testing.T) {
+func TestFetchSentinelReturnErrorWhenSentinelUnmarshallable(t *testing.T) {
 	folder := createMockStorageFolder()
 	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_000")
 	errorMessage := "failed to unmarshal sentinel"
