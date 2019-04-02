@@ -3,7 +3,6 @@ package internal
 import (
 	"fmt"
 	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"sort"
 	"strings"
 	"time"
@@ -14,205 +13,6 @@ const (
 	FullDeleteModifier
 	FindFullDeleteModifier
 )
-
-// TODO : unit tests
-func adjustDeleteTarget(target *Backup, findFull bool) (*Backup, error) {
-	sentinelDto, err := target.FetchSentinel()
-	if err != nil {
-		return nil, err
-	}
-	if sentinelDto.isIncremental() {
-		if findFull {
-			target.Name = *sentinelDto.IncrementFullName
-		} else {
-			errorMessage := "%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
-			return nil, NewForbiddenActionError(fmt.Sprintf(errorMessage, target.Name))
-		}
-	}
-	return target, nil
-}
-
-// TODO : unit tests
-func HandleDeleteRetain(folder storage.Folder, retantionCount int, modifier int, dryRun bool) {
-	baseBackupFolder := folder.GetSubFolder(BaseBackupPath)
-
-	backups, err := getBackups(folder)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
-	if modifier == FullDeleteModifier {
-		if len(backups) <= retantionCount {
-			tracelog.WarningLogger.Printf("Have only %v backups.\n", len(backups))
-		}
-		left := retantionCount
-		for _, b := range backups {
-			if left == 1 {
-				err = deleteBeforeTarget(folder, NewBackup(baseBackupFolder, b.BackupName), true, dryRun)
-				if err != nil {
-					tracelog.ErrorLogger.FatalError(err)
-				}
-				return
-			}
-			backup := NewBackup(baseBackupFolder, b.BackupName)
-			dto, err := backup.FetchSentinel()
-			if err != nil {
-				tracelog.ErrorLogger.FatalError(err)
-			}
-			if !dto.isIncremental() {
-				left--
-			}
-		}
-		tracelog.WarningLogger.Printf("Scanned all backups but didn't have %v full.", retantionCount)
-	} else {
-		if len(backups) <= retantionCount {
-			tracelog.WarningLogger.Printf("Have only %v backups.\n", len(backups))
-		} else {
-			err = deleteBeforeTarget(folder, NewBackup(baseBackupFolder, backups[retantionCount-1].BackupName), modifier == FindFullDeleteModifier, dryRun)
-			if err != nil {
-				tracelog.ErrorLogger.FatalError(err)
-			}
-		}
-	}
-}
-
-// TODO : unit tests
-func deleteBeforeTarget(folder storage.Folder, target *Backup, findFull, dryRun bool) error {
-	target, err := adjustDeleteTarget(target, findFull)
-	if err != nil {
-		return err
-	}
-	walFolder := folder.GetSubFolder(WalPath)
-	backupToScan, garbage, err := getBackupsAndGarbage(folder)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
-	garbageToDelete := findGarbageToDelete(garbage, target)
-
-	skipLine, walSkipFileName := ComputeDeletionSkiplineAndPrintIntentions(backupToScan, target)
-
-	if dryRun { // TODO : split this function by two: 'find objects to delete' and 'delete these objects'
-		tracelog.InfoLogger.Printf("Dry run finished.\n")
-		return nil
-	}
-
-	for _, garbageName := range garbageToDelete {
-		dropBackup(folder, garbageName)
-	}
-	if skipLine < len(backupToScan)-1 {
-		DeleteWALBefore(walSkipFileName, walFolder)
-		deleteBackupsBefore(backupToScan, skipLine, folder)
-		for _, extension := range Extensions {
-			extension.Flush(backupToScan[skipLine], folder)
-		}
-	}
-	return nil
-}
-
-// TODO : unit tests
-func findGarbageToDelete(garbage []string, target *Backup) []string {
-	garbageToDelete := make([]string, 0)
-	for _, garbageName := range garbage {
-		if strings.HasPrefix(garbageName, backupNamePrefix) && garbageName < target.Name {
-			tracelog.InfoLogger.Printf("%v will be deleted (garbage)\n", garbageName)
-			garbageToDelete = append(garbageToDelete, garbageName)
-		} else {
-			tracelog.InfoLogger.Printf("%v skipped (garbage)\n", garbageName)
-		}
-	}
-	return garbageToDelete
-}
-
-// ComputeDeletionSkiplineAndPrintIntentions selects last backup and name of last necessary WAL
-func ComputeDeletionSkiplineAndPrintIntentions(backups []BackupTime, target *Backup) (skipLine int, walSkipFileName string) {
-	skip := true
-	skipLine = len(backups)
-	walSkipFileName = ""
-	for i, backupTime := range backups {
-		if skip {
-			tracelog.InfoLogger.Printf("%v skipped\n", backupTime.BackupName)
-			if walSkipFileName == "" || walSkipFileName > backupTime.WalFileName {
-				walSkipFileName = backupTime.WalFileName
-			}
-		} else {
-			tracelog.InfoLogger.Printf("%v will be deleted\n", backupTime.BackupName)
-		}
-		if backupTime.BackupName == target.Name {
-			skip = false
-			skipLine = i
-		}
-	}
-	return skipLine, walSkipFileName
-}
-
-// TODO : unit tests
-func deleteBackupsBefore(backups []BackupTime, skipline int, folder storage.Folder) {
-	for i, b := range backups {
-		if i > skipline {
-			dropBackup(folder, b.BackupName)
-		}
-	}
-}
-
-// TODO : unit tests
-func dropBackup(folder storage.Folder, backupName string) {
-	basebackupFolder := folder.GetSubFolder(BaseBackupPath)
-	backup := NewBackup(basebackupFolder, backupName)
-	tarNames, err := backup.GetTarNames()
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
-	sentinelName := backupName + SentinelSuffix
-	err = basebackupFolder.DeleteObjects([]string{sentinelName})
-	if err != nil {
-		tracelog.ErrorLogger.Fatal("Unable to delete backup sentinel ", sentinelName, err)
-	}
-
-	err = basebackupFolder.GetSubFolder(backupName).GetSubFolder(TarPartitionFolderName).DeleteObjects(tarNames)
-	if err != nil {
-		tracelog.ErrorLogger.Fatal("Unable to delete backup ", backupName, err)
-	}
-
-	err = basebackupFolder.GetSubFolder(backupName).DeleteObjects([]string{TarPartitionFolderName})
-	if err != nil {
-		tracelog.ErrorLogger.Fatal("Unable to delete backup tar partition folder", backupName, err)
-	}
-
-	err = basebackupFolder.DeleteObjects([]string{backupName})
-	if err != nil {
-		tracelog.ErrorLogger.Fatal("Unable to delete backup folder", backupName, err)
-	}
-}
-
-// TODO : unit tests
-func DeleteWALBefore(walSkipFileName string, walFolder storage.Folder) {
-	wals, err := getWals(walSkipFileName, walFolder)
-	if err != nil {
-		tracelog.ErrorLogger.Fatal("Unable to obtain WALs for border ", walSkipFileName, err)
-	}
-	err = walFolder.DeleteObjects(wals)
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Unable to delete WALs before '%s', because of: "+tracelog.GetErrorFormatter(), walSkipFileName, err)
-	}
-}
-
-// TODO : unit tests
-// getWals returns all WAL file keys less then key provided
-func getWals(before string, folder storage.Folder) ([]string, error) {
-	walObjects, _, err := folder.ListFolder()
-	if err != nil {
-		return nil, err
-	}
-	walsBefore := make([]string, 0)
-	for _, walObject := range walObjects {
-		tracelog.InfoLogger.Println(walObject.GetName())
-		if walObject.GetName() < before {
-			tracelog.InfoLogger.Println("delete", walObject.GetName())
-			walsBefore = append(walsBefore, walObject.GetName())
-		}
-	}
-
-	return walsBefore, nil
-}
 
 // TODO : unit tests
 func GetLatestBackupName(folder storage.Folder) (string, error) {
@@ -285,38 +85,132 @@ func getGarbageFromPrefix(folders []storage.Folder, nonGarbage []BackupTime) []s
 	return garbage
 }
 
-func FindTargetBeforeName(folder storage.Folder, name string, modifier int) (storage.Object, error) {
-	backup := NewBackup(folder.GetSubFolder(BaseBackupPath), name)
-	backup, err := adjustDeleteTarget(backup, modifier == FindFullDeleteModifier)
+func FindTargetBeforeName(folder storage.Folder,
+	name string, modifier int,
+	isFullBackup func(object storage.Object) bool,
+	greater func(object1, object2 storage.Object) bool) (storage.Object, error) {
+
+	choiceFunc := GetBeforeChoiceFunc(name, modifier, isFullBackup)
+	if choiceFunc == nil {
+		return nil, NewForbiddenActionError("Not allowed modifier for 'delete before'")
+	}
+	return FindTarget(folder, greater, choiceFunc)
+}
+
+func FindTargetBeforeTime(folder storage.Folder,
+	timeLine time.Time, modifier int,
+	isFullBackup func(object storage.Object) bool,
+	less func(object1, object2 storage.Object) bool) (storage.Object, error) {
+
+	potentialTarget, err := FindTarget(folder, less, func(object storage.Object) bool {
+		return timeLine.Before(object.GetLastModified()) || timeLine.Equal(object.GetLastModified())
+	})
 	if err != nil {
 		return nil, err
 	}
+	greater := func(object1, object2 storage.Object) bool {
+		return less(object2, object1)
+	}
+	return FindTargetBeforeName(folder, potentialTarget.GetName(), modifier, isFullBackup, greater)
+}
+
+func FindTargetRetain(folder storage.Folder,
+	retentionCount, modifier int,
+	isFullBackup func(object storage.Object) bool,
+	greater func(object1, object2 storage.Object) bool) (storage.Object, error) {
+
+	choiceFunc := GetRetainChoiceFunc(retentionCount, modifier, isFullBackup)
+	if choiceFunc == nil {
+		return nil, NewForbiddenActionError("Not allowed modifier for 'delete retain'")
+	}
+	return FindTarget(folder, greater, choiceFunc)
+}
+
+func FindTarget(folder storage.Folder,
+	compare func(object1, object2 storage.Object) bool,
+	isTarget func(object storage.Object) bool) (storage.Object, error) {
+
 	objects, _, err := folder.GetSubFolder(BaseBackupPath).ListFolder()
 	if err != nil {
 		return nil, err
 	}
+	sort.Slice(objects, func(i, j int) bool {
+		return compare(objects[i], objects[j])
+	})
 	for _, object := range objects {
-		if strings.HasPrefix(object.GetName(), backup.Name) {
+		if isTarget(object) {
 			return object, nil
 		}
 	}
 	return nil, BackupNonExistenceError{}
 }
 
-func FindFirstLaterOrEqualTime(folder storage.Folder,
-	timeLine time.Time,
-	less func(object1, object2 storage.Object) bool) (storage.Object, error) {
-	sentinelObjects, _, err := folder.GetSubFolder(BaseBackupPath).ListFolder()
-	if err != nil {
-		return nil, err
-	}
-	sort.Slice(sentinelObjects, func(i, j int) bool {
-		return less(sentinelObjects[i], sentinelObjects[j])
-	})
-	for _, object := range sentinelObjects {
-		if timeLine.Before(object.GetLastModified()) || timeLine.Equal(object.GetLastModified()) {
-			return object, nil
+func GetBeforeChoiceFunc(name string, modifier int,
+	isFullBackup func(object storage.Object) bool) func(object storage.Object) bool {
+
+	meetName := false
+	switch modifier {
+	case NoDeleteModifier:
+		return func(object storage.Object) bool {
+			return strings.HasPrefix(object.GetName(), name)
+		}
+	case FindFullDeleteModifier:
+		return func(object storage.Object) bool {
+			meetName = meetName || strings.HasPrefix(object.GetName(), name)
+			return meetName && isFullBackup(object)
 		}
 	}
-	return nil, NoBackupsFoundError{}
+	return nil
+}
+
+func GetRetainChoiceFunc(retentionCount, modifier int,
+	isFullBackup func(object storage.Object) bool) func(object storage.Object) bool {
+
+	count := 0
+	switch modifier {
+	case NoDeleteModifier:
+		return func(object storage.Object) bool {
+			count++
+			if count == retentionCount {
+				return true
+			}
+			return false
+		}
+	case FullDeleteModifier:
+		return func(object storage.Object) bool {
+			if isFullBackup(object) {
+				count++
+			}
+			if count == retentionCount {
+				return true
+			}
+			return false
+		}
+	case FindFullDeleteModifier:
+		return func(object storage.Object) bool {
+			count++
+			if count >= retentionCount && isFullBackup(object) {
+				return true
+			}
+			return false
+		}
+	}
+	return nil
+}
+
+func DeleteBeforeTarget(folder storage.Folder, target storage.Object,
+	confirmed bool,
+	isFullBackup func(object storage.Object) bool,
+	less func(object1, object2 storage.Object) bool) error {
+
+	if !isFullBackup(target) {
+		errorMessage := "%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
+		return NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
+	}
+	if confirmed {
+		return storage.DeleteObjectsWhere(folder, func(object storage.Object) bool {
+			return less(object, target)
+		})
+	}
+	return nil
 }

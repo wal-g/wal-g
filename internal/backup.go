@@ -80,7 +80,7 @@ func (backup *Backup) FetchSentinel() (BackupSentinelDto, error) {
 }
 
 func checkDbDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentinelDto) error {
-	if !sentinelDto.isIncremental() {
+	if !sentinelDto.IsIncremental() {
 		isEmpty, err := IsDirectoryEmpty(dbDataDirectory)
 		if err != nil {
 			return err
@@ -147,7 +147,7 @@ func (backup *Backup) unwrap(dbDataDirectory string, sentinelDto BackupSentinelD
 func IsPgControlRequired(backup *Backup, sentinelDto BackupSentinelDto) bool {
 	re := regexp.MustCompile(`^([^_]+._{1}[^_]+._{1})`)
 	walgBasebackupName := re.FindString(backup.Name) == ""
-	needPgControl := walgBasebackupName || sentinelDto.isIncremental()
+	needPgControl := walgBasebackupName || sentinelDto.IsIncremental()
 	return needPgControl
 }
 

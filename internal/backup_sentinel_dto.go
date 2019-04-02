@@ -30,8 +30,8 @@ func (dto *BackupSentinelDto) setFiles(p *sync.Map) {
 
 // TODO : unit tests
 // TODO : get rid of panic here
-// isIncremental checks that sentinel represents delta backup
-func (dto *BackupSentinelDto) isIncremental() bool {
+// IsIncremental checks that sentinel represents delta backup
+func (dto *BackupSentinelDto) IsIncremental() bool {
 	// If we have increment base, we must have all the rest properties.
 	if dto.IncrementFrom != nil {
 		if dto.IncrementFromLSN == nil || dto.IncrementFullName == nil || dto.IncrementCount == nil {

@@ -1,9 +1,9 @@
 #!/bin/sh
 set -e -x
 
-./tmp/delete_retain_full_test.sh
 ./tmp/delete_without_confirm_test.sh
 ./tmp/delete_retain_find_full_test.sh
+./tmp/delete_retain_full_test.sh
 ./tmp/delete_before_name_find_full_test.sh
 ./tmp/delete_before_time_find_full_test.sh
 ./tmp/full_backup_test.sh
