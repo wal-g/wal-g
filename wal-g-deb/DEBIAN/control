@@ -1,0 +1,5 @@
+Package: wal-g
+Version: 0.1.17
+Architecture: amd64
+Description: WAL-G is an archival restoration tool for Postgres
+Maintainer: mainteiner <example@gmain.com>
