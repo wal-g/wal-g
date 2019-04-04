@@ -40,7 +40,7 @@ func TestDeleteOldObjects(t *testing.T) {
 	filter := func(object storage.Object) bool {
 		return object.GetName() != expectedOnlyOneSavedObjectName
 	}
-	err := storage.DeleteObjectsWhere(folder, filter)
+	err := storage.DeleteObjectsWhere(folder, true, filter)
 	assert.NoError(t, err)
 	savedObjects, err := storage.ListFolderRecursively(folder)
 	assert.NoError(t, err)
