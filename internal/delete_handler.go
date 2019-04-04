@@ -207,10 +207,7 @@ func DeleteBeforeTarget(folder storage.Folder, target storage.Object,
 		errorMessage := "%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
 		return NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
 	}
-	if confirmed {
-		return storage.DeleteObjectsWhere(folder, func(object storage.Object) bool {
-			return less(object, target)
-		})
-	}
-	return nil
+	return storage.DeleteObjectsWhere(folder, confirmed, func(object storage.Object) bool {
+		return less(object, target)
+	})
 }

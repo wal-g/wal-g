@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 	"path"
 	"strings"
@@ -27,23 +28,28 @@ type Folder interface {
 	PutObject(name string, content io.Reader) error
 }
 
-func DeleteObjectsWhere(folder Folder, filter func(object1 Object) bool) error {
+func DeleteObjectsWhere(folder Folder, confirm bool, filter func(object1 Object) bool) error {
 	relativePathObjects, err := ListFolderRecursively(folder)
 	if err != nil {
 		return err
 	}
 	filteredRelativePaths := make([]string, 0)
+	tracelog.InfoLogger.Println("Objects in folder:")
 	for _, object := range relativePathObjects {
 		if filter(object) {
+			tracelog.InfoLogger.Println("\twill be deleted: " + object.GetName())
 			filteredRelativePaths = append(filteredRelativePaths, object.GetName())
+		} else {
+			tracelog.InfoLogger.Println("\tskipped: " + object.GetName())
 		}
 	}
 	if len(filteredRelativePaths) == 0 {
 		return nil
 	}
-	err = folder.DeleteObjects(filteredRelativePaths)
-	if err != nil {
-		return err
+	if confirm {
+		return folder.DeleteObjects(filteredRelativePaths)
+	} else {
+		tracelog.InfoLogger.Println("Dry run, nothing were deleted")
 	}
 	return nil
 }

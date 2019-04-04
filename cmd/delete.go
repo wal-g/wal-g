@@ -168,15 +168,27 @@ func init() {
 
 // TODO: create postgres part and move it there, if it will be needed
 func PostgresLess(object1 storage.Object, object2 storage.Object) bool {
-	return fetchLSN(object1) < fetchLSN(object2)
+	lsn1, ok := tryFetchLSN(object1)
+	if !ok {
+		return false
+	}
+	lsn2, ok := tryFetchLSN(object2)
+	if !ok {
+		return false
+	}
+	return lsn1 < lsn2
 }
 
 func PostgresGreater(object1 storage.Object, object2 storage.Object) bool {
-	return fetchLSN(object1) > fetchLSN(object2)
+	return PostgresLess(object2, object1)
 }
 
-func fetchLSN(object storage.Object) string {
-	return regexpLSN.FindAllString(object.GetName(), maxCountOfLSN)[0]
+func tryFetchLSN(object storage.Object) (string, bool) {
+	found_lsn := regexpLSN.FindAllString(object.GetName(), maxCountOfLSN)
+	if len(found_lsn) > 0 {
+		return regexpLSN.FindAllString(object.GetName(), maxCountOfLSN)[0], true
+	}
+	return "", false
 }
 
 func fetchBackupName(object storage.Object) string {
