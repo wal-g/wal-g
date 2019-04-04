@@ -180,11 +180,11 @@ var regexpLSN = regexp.MustCompile(patternLSN)
 
 // Strips the backup WAL file name.
 func stripWalFileName(path string) string {
-	founded_lsn := regexpLSN.FindAllString(path, 2)
-	if len(founded_lsn) > 0 {
-		return founded_lsn[0]
+	found_lsn := regexpLSN.FindAllString(path, 2)
+	if len(found_lsn) > 0 {
+		return found_lsn[0]
 	}
-	return ""
+	return strings.Repeat("Z", 24)
 }
 
 type ForbiddenActionError struct {
