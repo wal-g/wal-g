@@ -27,7 +27,10 @@ const (
 var StringModifiers = []string{"FULL", "FIND_FULL"}
 
 var confirmed = false
-var regexpLSN = regexp.MustCompile("[0-9A-F]{24}")
+var patternLSN = "[0-9A-F]{24}"
+var patternBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?", patternLSN)
+var regexpLSN = regexp.MustCompile(patternLSN)
+var regexpBackupName = regexp.MustCompile(patternBackupName)
 var maxCountOfLSN = 2
 
 func extractDeleteModifierFromArgs(args []string) (int, string) {
@@ -117,19 +120,21 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 		tracelog.ErrorLogger.FatalError(err)
 	}
 	before, err := time.Parse(time.RFC3339, beforeStr)
-	if err != nil {
-		target, err := internal.FindTargetBeforeName(folder, beforeStr, modifier)
-		// after updating delete before time it will be made common
+	if err == nil {
+		potentialTarget, err := internal.FindFirstLaterOrEqualTime(folder, before, postgresLess)
 		if err != nil {
 			tracelog.ErrorLogger.FatalError(err)
 		}
-		if confirmed {
-			err = storage.DeleteObjectsWhere(folder, func(object storage.Object) bool {
-				return earlierCreated(object, target)
-			})
-		}
-	} else {
-		internal.HandleDeleteBeforeTime(folder, before, modifier, !confirmed)
+		beforeStr = fetchBackupName(potentialTarget)
+	}
+	target, err := internal.FindTargetBeforeName(folder, beforeStr, modifier)
+	if err != nil {
+		tracelog.ErrorLogger.FatalError(err)
+	}
+	if confirmed {
+		err = storage.DeleteObjectsWhere(folder, func(object storage.Object) bool {
+			return postgresLess(object, target)
+		})
 	}
 }
 
@@ -149,10 +154,14 @@ func init() {
 }
 
 // it's here because it's part of postgres logic and in future it will be placed in postgres part of wal-g
-func earlierCreated(object1 storage.Object, object2 storage.Object) bool {
+func postgresLess(object1 storage.Object, object2 storage.Object) bool {
 	return fetchLSN(object1) < fetchLSN(object2)
 }
 
 func fetchLSN(object storage.Object) string {
 	return regexpLSN.FindAllString(object.GetName(), maxCountOfLSN)[0]
+}
+
+func fetchBackupName(object storage.Object) string {
+	return regexpBackupName.FindString(object.GetName())
 }
