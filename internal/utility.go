@@ -128,7 +128,6 @@ func getMaxConcurrency(key string, defaultValue int) int {
 	return max(con, 1)
 }
 
-// TODO : unit tests
 func GetFileExtension(filePath string) string {
 	ext := path.Ext(filePath)
 	if ext != "" {
