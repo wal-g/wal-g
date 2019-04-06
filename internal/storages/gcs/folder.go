@@ -50,7 +50,8 @@ func (folder *Folder) GetPath() string {
 }
 
 func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
-	it := folder.bucket.Objects(context.Background(), &gcs.Query{Delimiter: "/", Prefix: storage.AddDelimiterToPath(folder.path)})
+	prefix := storage.AddDelimiterToPath(folder.path)
+	it := folder.bucket.Objects(context.Background(), &gcs.Query{Delimiter: "/", Prefix: prefix})
 	for {
 		objAttrs, err := it.Next()
 		if err == iterator.Done {
@@ -62,7 +63,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 		if objAttrs.Prefix != "" {
 			subFolders = append(subFolders, NewFolder(folder.bucket, objAttrs.Prefix))
 		} else {
-			objName := strings.TrimPrefix(objAttrs.Name, folder.path)
+			objName := strings.TrimPrefix(objAttrs.Name, prefix)
 			objects = append(objects, storage.NewLocalObject(objName, objAttrs.Updated))
 		}
 	}

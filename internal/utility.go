@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -172,15 +173,16 @@ func stripPrefixName(path string) string {
 }
 
 // TODO : unit tests
+var patternLSN = "[0-9A-F]{24}"
+var regexpLSN = regexp.MustCompile(patternLSN)
+
 // Strips the backup WAL file name.
 func stripWalFileName(path string) string {
-	name := StripBackupName(path)
-	name = strings.SplitN(name, "_D_", 2)[0]
-
-	if strings.HasPrefix(name, backupNamePrefix) {
-		return name[len(backupNamePrefix):]
+	found_lsn := regexpLSN.FindAllString(path, 2)
+	if len(found_lsn) > 0 {
+		return found_lsn[0]
 	}
-	return ""
+	return strings.Repeat("Z", 24)
 }
 
 type ForbiddenActionError struct {

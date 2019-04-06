@@ -63,7 +63,6 @@ func (backup *Backup) GetTarNames() ([]string, error) {
 	return result, nil
 }
 
-// TODO : unit tests
 func (backup *Backup) FetchSentinel() (BackupSentinelDto, error) {
 	sentinelDto := BackupSentinelDto{}
 	backupReaderMaker := NewStorageReaderMaker(backup.BaseBackupFolder, backup.GetStopSentinelPath())
