@@ -119,3 +119,22 @@ func TestCreateFileWith_ExistenceError(t *testing.T) {
 	assert.Equal(t, os.IsExist(err), true)
 	os.Remove(CreateFileWithPath)
 }
+
+func TestStripBackupName(t *testing.T) {
+	var names = []struct {
+		input    string
+		expected string
+	}{
+		{"file_backup", "file"},
+		{"backup", "backup"},
+		{"/other_backup", "other"},
+		{"path/to/tables_backup", "tables"},
+		{"anotherPath/to/document_backup_backup", "document"},
+		{"anotherPath/to/fileBackup", "fileBackup"},
+	}
+
+	for _, n := range names {
+		actual := internal.StripBackupName(n.input)
+		assert.Equal(t, n.expected, actual)
+	}
+}

@@ -157,7 +157,6 @@ func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
 	}
 }
 
-// TODO : unit tests
 func StripBackupName(path string) string {
 	all := strings.SplitAfter(path, "/")
 	name := strings.Split(all[len(all)-1], "_backup")[0]
