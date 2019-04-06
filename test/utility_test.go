@@ -121,7 +121,7 @@ func TestCreateFileWith_ExistenceError(t *testing.T) {
 }
 
 func TestStripBackupName(t *testing.T) {
-	var names = []struct {
+	var testCases = []struct {
 		input    string
 		expected string
 	}{
@@ -133,8 +133,8 @@ func TestStripBackupName(t *testing.T) {
 		{"anotherPath/to/fileBackup", "fileBackup"},
 	}
 
-	for _, n := range names {
-		actual := internal.StripBackupName(n.input)
-		assert.Equal(t, n.expected, actual)
+	for _, testCase := range testCases {
+		actual := internal.StripBackupName(testCase.input)
+		assert.Equal(t, testCase.expected, actual)
 	}
 }
