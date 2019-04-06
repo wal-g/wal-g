@@ -158,7 +158,7 @@ func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
 }
 
 // TODO : unit tests
-func stripBackupName(path string) string {
+func StripBackupName(path string) string {
 	all := strings.SplitAfter(path, "/")
 	name := strings.Split(all[len(all)-1], "_backup")[0]
 	return name
@@ -175,7 +175,7 @@ func stripPrefixName(path string) string {
 // TODO : unit tests
 // Strips the backup WAL file name.
 func stripWalFileName(path string) string {
-	name := stripBackupName(path)
+	name := StripBackupName(path)
 	name = strings.SplitN(name, "_D_", 2)[0]
 
 	if strings.HasPrefix(name, backupNamePrefix) {
