@@ -1,0 +1,14 @@
+Source: wal-g
+Section: net
+Priority: optional
+Maintainer: Andrey Borodin <x4mmm@yandex-team.ru>
+Build-Depends: debhelper (>= 9.0.0)
+Standards-Version: 3.9.5
+Vcs-Git: git://github.com/x4m/wal-g.git
+Vcs-Browser: https://github.com/x4m/wal-g
+
+Package: wal-g
+Architecture: any
+Depends: adduser, ${shlibs:Depends}, ${misc:Depends}
+Description: Continuous archiving for Postgres with S3 support
+ Full documentation: https://github.com/x4m/wal-g

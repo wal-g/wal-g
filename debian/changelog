@@ -1,0 +1,5 @@
+wal-g (0.2.8-1) unstable; urgency=medium
+
+  * Initial release (Closes: #nnnn)  <nnnn is the bug number of your ITP>
+
+ -- user <user@localhost.localdomain>  Sun, 07 Apr 2019 11:26:26 +0500
