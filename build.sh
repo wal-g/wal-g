@@ -40,9 +40,9 @@ if [ X"$1" != X"--deb" ]; then
 	make
 fi
 
-# rm -rf vendor/github.com/google/brotli/*
-# mv tmp/* vendor/github.com/google/brotli/
-# rm -rf tmp/
+rm -rf vendor/github.com/google/brotli/*
+mv tmp/* vendor/github.com/google/brotli/
+rm -rf tmp/
 
 docker-compose build
 docker-compose up --exit-code-from pg pg
