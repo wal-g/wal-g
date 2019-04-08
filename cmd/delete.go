@@ -84,8 +84,21 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	retantionCount, _ := strconv.Atoi(retantionStr)
-	internal.HandleDeleteRetain(folder, retantionCount, modifier, !confirmed)
+	retentionCount, err := strconv.Atoi(retantionStr)
+	if err != nil {
+		tracelog.ErrorLogger.FatalError(err)
+	}
+	isFullBackup := func(object storage.Object) bool {
+		return IsFullBackup(folder, object)
+	}
+	target, err := internal.FindTargetRetain(folder, retentionCount, modifier, isFullBackup, PostgresGreater)
+	if err != nil {
+		tracelog.ErrorLogger.FatalError(err)
+	}
+	err = internal.DeleteBeforeTarget(folder, target, confirmed, isFullBackup, PostgresLess)
+	if err != nil {
+		tracelog.ErrorLogger.FatalError(err)
+	}
 }
 
 var deleteRetainCmd = &cobra.Command{
@@ -119,22 +132,22 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	before, err := time.Parse(time.RFC3339, beforeStr)
-	if err == nil {
-		potentialTarget, err := internal.FindFirstLaterOrEqualTime(folder, before, postgresLess)
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
-		}
-		beforeStr = fetchBackupName(potentialTarget)
+	isFullBackup := func(object storage.Object) bool {
+		return IsFullBackup(folder, object)
 	}
-	target, err := internal.FindTargetBeforeName(folder, beforeStr, modifier)
+	timeLine, err := time.Parse(time.RFC3339, beforeStr)
+	var target storage.Object
+	if err == nil {
+		target, err = internal.FindTargetBeforeTime(folder, timeLine, modifier, isFullBackup, PostgresLess)
+	} else {
+		target, err = internal.FindTargetBeforeName(folder, beforeStr, modifier, isFullBackup, PostgresGreater)
+	}
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	if confirmed {
-		err = storage.DeleteObjectsWhere(folder, func(object storage.Object) bool {
-			return postgresLess(object, target)
-		})
+	err = internal.DeleteBeforeTarget(folder, target, confirmed, isFullBackup, PostgresLess)
+	if err != nil {
+		tracelog.ErrorLogger.FatalError(err)
 	}
 }
 
@@ -153,15 +166,37 @@ func init() {
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, ConfirmFlag, false, "Confirms backup deletion")
 }
 
-// it's here because it's part of postgres logic and in future it will be placed in postgres part of wal-g
-func postgresLess(object1 storage.Object, object2 storage.Object) bool {
-	return fetchLSN(object1) < fetchLSN(object2)
+// TODO: create postgres part and move it there, if it will be needed
+func PostgresLess(object1 storage.Object, object2 storage.Object) bool {
+	lsn1, ok := tryFetchLSN(object1)
+	if !ok {
+		return false
+	}
+	lsn2, ok := tryFetchLSN(object2)
+	if !ok {
+		return false
+	}
+	return lsn1 < lsn2
 }
 
-func fetchLSN(object storage.Object) string {
-	return regexpLSN.FindAllString(object.GetName(), maxCountOfLSN)[0]
+func PostgresGreater(object1 storage.Object, object2 storage.Object) bool {
+	return PostgresLess(object2, object1)
+}
+
+func tryFetchLSN(object storage.Object) (string, bool) {
+	found_lsn := regexpLSN.FindAllString(object.GetName(), maxCountOfLSN)
+	if len(found_lsn) > 0 {
+		return regexpLSN.FindAllString(object.GetName(), maxCountOfLSN)[0], true
+	}
+	return "", false
 }
 
 func fetchBackupName(object storage.Object) string {
 	return regexpBackupName.FindString(object.GetName())
+}
+
+func IsFullBackup(folder storage.Folder, object storage.Object) bool {
+	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), fetchBackupName(object))
+	sentinel, _ := backup.FetchSentinel()
+	return !sentinel.IsIncremental()
 }

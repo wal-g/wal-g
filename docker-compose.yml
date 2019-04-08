@@ -33,6 +33,7 @@ services:
       &&  mkdir -p /export/deletebeforenamefindfullbucket
       &&  mkdir -p /export/deletebeforetimefindfullbucket
       &&  mkdir -p /export/deletewithoutconfirm
+      &&  mkdir -p /export/deleteendtoendbucket
       &&  /usr/bin/minio server /export'
 
   pg:

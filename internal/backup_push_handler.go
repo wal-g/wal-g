@@ -167,7 +167,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 	}
 	if previousBackupSentinelDto.BackupStartLSN != nil {
 		currentBackupSentinelDto.IncrementFrom = &previousBackupName
-		if previousBackupSentinelDto.isIncremental() {
+		if previousBackupSentinelDto.IsIncremental() {
 			currentBackupSentinelDto.IncrementFullName = previousBackupSentinelDto.IncrementFullName
 		} else {
 			currentBackupSentinelDto.IncrementFullName = &previousBackupName

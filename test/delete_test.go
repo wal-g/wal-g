@@ -8,116 +8,143 @@ import (
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/test/mocks"
 	"github.com/wal-g/wal-g/testtools"
-	"sort"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
 
-// NB: order will reverse after sorting
-var backup_times1 = []internal.BackupTime{
-	{
-		BackupName:  "base_00000001000000000000007C",
-		Time:        time.Date(2007, 2, 2, 30, 48, 39, 651387233, time.UTC),
-		WalFileName: "00000001000000000000007C",
-	},
-	{
-		BackupName:  "base_00000001000000000000008C",
-		Time:        time.Date(2008, 2, 27, 20, 8, 33, 651387235, time.UTC),
-		WalFileName: "00000001000000000000008C",
-	},
-	{
-		BackupName:  "base_00000001000000000000009C",
-		Time:        time.Date(2009, 11, 20, 16, 34, 58, 651387232, time.UTC),
-		WalFileName: "00000001000000000000009C",
-	},
-	{
-		BackupName:  "base_0000000100000000000000AC",
-		Time:        time.Date(2010, 11, 31, 20, 3, 58, 651387237, time.UTC),
-		WalFileName: "0000000100000000000000AC",
-	},
-	{
-		BackupName:  "base_0000000100000000000000BC",
-		Time:        time.Date(2011, 3, 13, 4, 2, 42, 651387234, time.UTC),
-		WalFileName: "0000000100000000000000BC",
-	},
+func TestFindTargetBeforeName_ReturnsBackup_Without_Modifier(t *testing.T) {
+	targetDelta := "base_000000010000000000000005_D_000000010000000000000003"
+	expected := targetDelta + internal.SentinelSuffix
+	testFindTargetBeforeName(t, expected, targetDelta, internal.NoDeleteModifier)
 }
 
-func TestSkiplineComputation(t *testing.T) {
-	baseBackupFolder := testtools.MakeDefaultInMemoryStorageFolder().GetSubFolder(internal.BaseBackupPath)
-
-	sort.Sort(internal.TimeSlice(backup_times1))
-
-	skipLine, walSkipFileName := internal.ComputeDeletionSkiplineAndPrintIntentions(backup_times1, internal.NewBackup(baseBackupFolder, "base_00000001000000000000008C"))
-
-	assert.Equal(t, "00000001000000000000008C", walSkipFileName)
-	assert.Equal(t, 3, skipLine) // we will skip 3 backups
-}
-
-// NB: order will reverse after sorting
-var backup_times2 = []internal.BackupTime{
-	{
-		BackupName:  "base_00000004000000000000007C",
-		Time:        time.Date(2007, 2, 2, 30, 48, 39, 651387233, time.UTC),
-		WalFileName: "00000004000000000000007C",
-	},
-	{
-		BackupName:  "base_00000004000000000000008C",
-		Time:        time.Date(2008, 2, 27, 20, 8, 33, 651387235, time.UTC),
-		WalFileName: "00000004000000000000008C",
-	},
-	{
-		BackupName:  "base_00000001000000000000009C",
-		Time:        time.Date(2009, 11, 20, 16, 34, 58, 651387232, time.UTC),
-		WalFileName: "00000001000000000000009C",
-	},
-	{
-		BackupName:  "base_0000000100000000000000AC",
-		Time:        time.Date(2010, 11, 31, 20, 3, 58, 651387237, time.UTC),
-		WalFileName: "0000000100000000000000AC",
-	},
-	{
-		BackupName:  "base_0000000100000000000000BC",
-		Time:        time.Date(2011, 3, 13, 4, 2, 42, 651387234, time.UTC),
-		WalFileName: "0000000100000000000000BC",
-	},
-}
-
-func TestSkiplineComputationAfterUpgrade(t *testing.T) {
-	baseBackupFolder := testtools.MakeDefaultInMemoryStorageFolder().GetSubFolder(internal.BaseBackupPath)
-
-	sort.Sort(internal.TimeSlice(backup_times2))
-
-	skipLine, walSkipFileName := internal.ComputeDeletionSkiplineAndPrintIntentions(backup_times2, internal.NewBackup(baseBackupFolder, "base_00000004000000000000008C"))
-
-	assert.Equal(t, "00000001000000000000009C", walSkipFileName)
-	assert.Equal(t, 3, skipLine)
-}
-
-func TestFindTargetBeforeName_ReturnsErrorForDeltaBackup_Without_Modifier(t *testing.T) {
-	targetDelta := "base_000000010000000000000009_D_000000010000000000000007"
-	folder := createMockStorageFolderWithDeltaBackups(t)
-	_, err := internal.FindTargetBeforeName(folder, targetDelta, internal.NoDeleteModifier)
+func TestFindTargetBeforeName_ReturnsForbiddenActionError_With_FULL_Modifier(t *testing.T) {
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+	_, err := internal.FindTargetBeforeName(mocks.NewMockFolder(controller), "",
+		internal.FullDeleteModifier, isFullBackup, greaterByName)
 	assert.Error(t, err)
 	assert.IsType(t, internal.ForbiddenActionError{}, err)
 }
 
-func TestFindTargetBeforeName_ReturnsFullBackup_Without_Modifier(t *testing.T) {
-	targetDelta := "base_000000010000000000000007"
-	folder := createMockStorageFolderWithDeltaBackups(t)
-	object, err := internal.FindTargetBeforeName(folder, targetDelta, internal.NoDeleteModifier)
-	assert.NoError(t, err)
-	assert.Equal(t, targetDelta+internal.SentinelSuffix, object.GetName())
-}
-
 func TestFindTargetBeforeName_ReturnsFullBackup_With_FIND_FULL(t *testing.T) {
 	targetDelta := "base_000000010000000000000009_D_000000010000000000000007"
-	expected := "base_000000010000000000000007"
+	expected := "base_000000010000000000000007" + internal.SentinelSuffix
+	testFindTargetBeforeName(t, expected, targetDelta, internal.FindFullDeleteModifier)
+}
+
+func testFindTargetBeforeName(t *testing.T, expected, targetName string, modifier int) {
 	folder := createMockStorageFolderWithDeltaBackups(t)
-	object, err := internal.FindTargetBeforeName(folder, targetDelta, internal.FindFullDeleteModifier)
+	target, err := internal.FindTargetBeforeName(folder, targetName, modifier, isFullBackup, greaterByName)
 	assert.NoError(t, err)
-	assert.Equal(t, expected+internal.SentinelSuffix, object.GetName())
+	assert.Equal(t, expected, target.GetName())
+}
+
+func TestFindTargetRetain_Without_Modifier(t *testing.T) {
+	expectedName := "base_000000010000000000000003_D_000000010000000000000002"
+	testTargetRetain(t, expectedName, 2, internal.NoDeleteModifier)
+}
+
+func TestFindTargetRetain_With_FULL_Modifier(t *testing.T) {
+	expectedName := "base_000000010000000000000002"
+	testTargetRetain(t, expectedName, 2, internal.FullDeleteModifier)
+}
+
+func TestFindTargetRetain_With_FIND_FULL_Modifier(t *testing.T) {
+	expectedName := "base_000000010000000000000000"
+	testTargetRetain(t, expectedName, 4, internal.FindFullDeleteModifier)
+}
+
+func testTargetRetain(t *testing.T, expectedName string, retentionCount, modifier int) {
+	mockFolder := createMockFolderWithTime(t, time.Now())
+
+	target, err := internal.FindTargetRetain(mockFolder, retentionCount, modifier, isFullBackup, greaterByTime)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedName, target.GetName())
+}
+
+func TestFindTargetBeforeTime_ReturnBackup_Without_Modifier(t *testing.T) {
+	expected := "base_000000010000000000000001_D_000000010000000000000000"
+	target, err := testFindTargetBeforeTime(t, 1, internal.NoDeleteModifier)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, target.GetName())
+}
+
+func TestFindTargetBeforeTime_ReturnsForbiddenActionError_With_FULL_Modifier(t *testing.T) {
+	_, err := testFindTargetBeforeTime(t, 2, internal.FullDeleteModifier)
+	assert.Error(t, err)
+	assert.IsType(t, internal.ForbiddenActionError{}, err)
+}
+
+func TestFindTargetBeforeTime_With_FIND_FULL_Modifier(t *testing.T) {
+	expected := "base_000000010000000000000002"
+	target, err := testFindTargetBeforeTime(t, 3, internal.FindFullDeleteModifier)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, target.GetName())
+}
+
+func testFindTargetBeforeTime(t *testing.T, minute int, modifier int) (storage.Object, error) {
+	baseTime := time.Now()
+	mockFolder := createMockFolderWithTime(t, baseTime)
+
+	timeLine := baseTime.Add(time.Duration(minute * int(time.Minute)))
+	return internal.FindTargetBeforeTime(mockFolder, timeLine, modifier, isFullBackup, lessByTime)
+}
+
+func createMockFolderWithTime(t *testing.T, baseTime time.Time) *mocks.MockFolder {
+	baseNamePrefix := "base_"
+	deltaMark := "_D_"
+	lsnPrefix := "00000001000000000000000"
+	objects := make([]storage.Object, 5)
+	var lastLSN, name string
+	for i := 0; i < 5; i++ {
+		iDuration := time.Duration(i * int(time.Minute))
+		if i%2 == 0 {
+			lastLSN = lsnPrefix + strconv.Itoa(i)
+			name = baseNamePrefix + lastLSN
+		} else {
+			name = baseNamePrefix + lsnPrefix + strconv.Itoa(i) + deltaMark + lastLSN
+		}
+		objects[i] = storage.NewLocalObject(name, baseTime.Add(iDuration))
+	}
+
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+
+	mockBaseBackupFolder := mocks.NewMockFolder(controller)
+
+	mockBaseBackupFolder.
+		EXPECT().
+		ListFolder().
+		Return(objects, nil, nil).
+		AnyTimes()
+
+	mockFolder := mocks.NewMockFolder(controller)
+
+	mockFolder.
+		EXPECT().
+		GetSubFolder(internal.BaseBackupPath).
+		Return(mockBaseBackupFolder).
+		AnyTimes()
+	return mockFolder
+}
+
+func isFullBackup(object storage.Object) bool {
+	return !strings.Contains(object.GetName(), "D")
+}
+
+func greaterByName(object1, object2 storage.Object) bool {
+	return object1.GetName() > object2.GetName()
+}
+
+func lessByTime(object1, object2 storage.Object) bool {
+	return object1.GetLastModified().Before(object2.GetLastModified())
+}
+
+func greaterByTime(object1, object2 storage.Object) bool {
+	return object1.GetLastModified().After(object2.GetLastModified())
 }
 
 func createMockStorageFolderWithDeltaBackups(t *testing.T) storage.Folder {
@@ -143,40 +170,4 @@ func createMockStorageFolderWithDeltaBackups(t *testing.T) storage.Folder {
 		assert.NoError(t, err)
 	}
 	return folder
-}
-
-func TestFirstLaterThanTime(t *testing.T) {
-	baseTime := time.Now()
-	baseNamePrefix := "base_00000001000000000000000"
-	objects := make([]storage.Object, 5)
-	for i := 0; i < 5; i++ {
-		iDuration := time.Duration(i * int(time.Minute))
-		objects[i] = storage.NewLocalObject(baseNamePrefix+strconv.Itoa(i), baseTime.Add(iDuration))
-	}
-
-	controller := gomock.NewController(t)
-	defer controller.Finish()
-
-	mockBaseBackupFolder := mocks.NewMockFolder(controller)
-
-	mockBaseBackupFolder.
-		EXPECT().
-		ListFolder().
-		Return(objects, nil, nil).
-		AnyTimes()
-
-	mockFolder := mocks.NewMockFolder(controller)
-
-	mockFolder.
-		EXPECT().
-		GetSubFolder(internal.BaseBackupPath).
-		Return(mockBaseBackupFolder).
-		AnyTimes()
-
-	object, err := internal.FindFirstLaterOrEqualTime(mockFolder, baseTime.Add(2*time.Minute),
-		func(object1 storage.Object, object2 storage.Object) bool {
-			return object1.GetLastModified().Before(object2.GetLastModified())
-		})
-	assert.NoError(t, err)
-	assert.Equal(t, baseNamePrefix+strconv.Itoa(2), object.GetName())
 }
