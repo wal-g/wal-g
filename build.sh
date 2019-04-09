@@ -30,7 +30,15 @@ cd ${LIB_DIR}
 make
 
 cd ${CWD}
-make
+
+if [ X"$1" = X"--deb" ]; then
+	read key
+	dpkg-buildpackage --sign-key=$key -b
+fi
+
+if [ X"$1" != X"--deb" ]; then
+	make
+fi
 
 rm -rf vendor/github.com/google/brotli/*
 mv tmp/* vendor/github.com/google/brotli/
