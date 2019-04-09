@@ -11,3 +11,8 @@ tmp/
 *.xml
 *.iml
 *.so
+
+#deb package
+debian/.debhelper/
+debian/wal-g.debhelper.log
+debian/wal-g/
