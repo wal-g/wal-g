@@ -138,3 +138,39 @@ func TestStripBackupName(t *testing.T) {
 		assert.Equal(t, testCase.expected, actual)
 	}
 }
+
+func TestGetMaxConcurrency_InvalidKeyAndValidDefaultValue(t *testing.T) {
+	actual := internal.GetMaxConcurrency("INVALID_KEY", 3)
+
+	assert.Equal(t, 3, actual)
+}
+
+func TestGetMaxConcurrency_InvalidKeyAndInvalidDefaultValue(t *testing.T) {
+	actual := internal.GetMaxConcurrency("INVALID_KEY", -1)
+
+	assert.Equal(t, 10, actual)
+}
+
+func TestGetMaxConcurrency_ValidKey(t *testing.T) {
+	os.Setenv("WALG_UPLOAD_CONCURRENCY", "100")
+	actual := internal.GetMaxConcurrency("WALG_UPLOAD_CONCURRENCY", 1)
+
+	assert.Equal(t, 100, actual)
+	os.Unsetenv("WALG_UPLOAD_CONCURRENCY")
+}
+
+func TestGetMaxConcurrency_ValidKeyAndInvalidDefaultValue(t *testing.T) {
+	os.Setenv("WALG_UPLOAD_CONCURRENCY", "100")
+	actual := internal.GetMaxConcurrency("WALG_UPLOAD_CONCURRENCY", -1)
+
+	assert.Equal(t, 100, actual)
+	os.Unsetenv("WALG_UPLOAD_CONCURRENCY")
+}
+
+func TestGetMaxConcurrency_ValidKeyAndNegativeValue(t *testing.T) {
+	os.Setenv("WALG_UPLOAD_CONCURRENCY", "-5")
+	actual := internal.GetMaxConcurrency("WALG_UPLOAD_CONCURRENCY", 0)
+
+	assert.Equal(t, 1, actual)
+	os.Unsetenv("WALG_UPLOAD_CONCURRENCY")
+}

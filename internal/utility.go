@@ -108,7 +108,6 @@ func getMaxUploadDiskConcurrency() int {
 	return GetMaxConcurrency("WALG_UPLOAD_DISK_CONCURRENCY", 1)
 }
 
-// TODO : unit tests
 func GetMaxConcurrency(key string, defaultValue int) int {
 	var con int
 	var err error
