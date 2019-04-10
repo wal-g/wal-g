@@ -110,7 +110,7 @@ func deltaFetchRecursion(backupName string, folder storage.Folder, dbDataDirecto
 		filesToUnwrap = GetRestoredBackupFilesToUnwrap(sentinelDto)
 	}
 
-	if sentinelDto.isIncremental() {
+	if sentinelDto.IsIncremental() {
 		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n", *(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN))
 		baseFilesToUnwrap, err := GetBaseFilesToUnwrap(sentinelDto.Files, filesToUnwrap)
 		if err != nil {

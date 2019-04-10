@@ -3,7 +3,6 @@ package internal
 import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/wal-g/wal-g/internal/storages/storage"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -13,11 +12,8 @@ import (
 var Extensions []Extension
 
 type Extension interface {
-	TryPrintHelp(command string, args []string) bool
-	HasCommand(command string) bool
-	Execute(command string, uploader *Uploader, folder storage.Folder, args []string)
+	RegisterCommands(cmd *cobra.Command)
 	GetAllowedConfigKeys() map[string]*string
-	Flush(time BackupTime, folder storage.Folder)
 }
 
 func LoadExtensions(path string) error {
@@ -52,5 +48,7 @@ func LoadExtensions(path string) error {
 }
 
 func RegisterExtensionCommands(rootCmd *cobra.Command) {
-	// TODO : fix extension interface to be able to register commands here
+	for _, extension := range Extensions {
+		extension.RegisterCommands(rootCmd)
+	}
 }
