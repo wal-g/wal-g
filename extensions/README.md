@@ -6,11 +6,8 @@ How to create an extension
 4. And variable of this type should be available for lookup
 ```
 type Extension interface {
-	TryPrintHelp(command string, args []string) bool
-	HasCommand(command string) bool
-	Execute(command string, uploader *Uploader, folder storage.Folder, args []string)
+	RegisterCommands(cmd *cobra.Command)
 	GetAllowedConfigKeys() map[string]*string
-	Flush(time BackupTime, folder storage.Folder)
 }
   ```
 
