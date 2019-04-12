@@ -142,6 +142,12 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 			subFolders = append(subFolders, NewFolder(folder.uploader, folder.S3API, *folder.Bucket, *prefix.Prefix))
 		}
 		for _, object := range files.Contents {
+			// Some storages return root tar_partitions folder as a Key.
+			// We do not want to fail restoration due to this fact.
+			// Keep in mind that skipping files is very dangerous and any decision here must be weighted.
+			if *object.Key == folder.Path {
+				continue
+			}
 			objectRelativePath := strings.TrimPrefix(*object.Key, folder.Path)
 			objects = append(objects, storage.NewLocalObject(objectRelativePath, *object.LastModified))
 		}
