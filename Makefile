@@ -43,6 +43,7 @@ lint: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs golint
 
 deps:
+	go get -u github.com/golang/dep/cmd/dep
 	git submodule update --init
 	dep ensure
 	./link_brotli.sh
