@@ -14,7 +14,7 @@ matrix:
         apt:
           packages: [liblzo2-dev]
 
-script: ./build.sh
+script: make
 
 notifications:
   email: false

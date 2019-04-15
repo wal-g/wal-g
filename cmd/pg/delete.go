@@ -1,4 +1,4 @@
-package cmd
+package pg
 
 import (
 	"fmt"
@@ -159,7 +159,7 @@ var deleteBeforeCmd = &cobra.Command{
 }
 
 func init() {
-	RootCmd.AddCommand(deleteCmd)
+	PgCmd.AddCommand(deleteCmd)
 
 	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd)
 
