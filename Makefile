@@ -4,7 +4,7 @@ PKG_FILES = $(wildcard internal/**/*.go internal/**/**/*.go internal/*.go)
 TEST_FILES = $(wildcard test/*.go testtools/*.go)
 PKG := github.com/wal-g/wal-g
 
-.PHONY: fmt lint clean
+.PHONY: unittest fmt lint install clean
 
 ifdef GOTAGS
 override GOTAGS := -tags $(GOTAGS)
@@ -47,3 +47,6 @@ deps:
 	git submodule update --init
 	dep ensure
 	./link_brotli.sh
+
+install:
+	(cd $(MAIN_PG_PATH) && go install)
