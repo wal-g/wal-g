@@ -11,12 +11,12 @@ COPY internal/ internal/
 COPY cmd/ cmd/
 COPY main/ main/
 
-RUN cd main/wal-g && \
-    go build -tags lzo -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
+RUN cd main/pg && \
+    go build -o wal-g -tags lzo -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 
 FROM wal-g/ubuntu:latest
 
-COPY --from=build /go/src/github.com/wal-g/wal-g/main/wal-g/wal-g /usr/bin
+COPY --from=build /go/src/github.com/wal-g/wal-g/main/pg/wal-g /usr/bin
 
 COPY docker/pg/scripts/ /tmp
 

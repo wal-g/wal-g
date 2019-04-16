@@ -1,4 +1,4 @@
-package cmd
+package pg
 
 import (
 	"github.com/wal-g/wal-g/internal"
@@ -24,5 +24,5 @@ var backupPushCmd = &cobra.Command{
 }
 
 func init() {
-	RootCmd.AddCommand(backupPushCmd)
+	PgCmd.AddCommand(backupPushCmd)
 }
