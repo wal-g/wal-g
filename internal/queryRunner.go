@@ -102,18 +102,22 @@ func (queryRunner *PgQueryRunner) getVersion() (err error) {
 }
 
 // StartBackup informs the database that we are starting copy of cluster contents
-func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string, lsnString string, inRecovery bool, err error) {
+func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string, lsnString string, inRecovery bool, dataDir string, err error) {
 	startBackupQuery, err := queryRunner.BuildStartBackup()
 	conn := queryRunner.connection
 	if err != nil {
-		return "", "", false, errors.Wrap(err, "QueryRunner StartBackup: Building start backup query failed")
+		return "", "", false, "", errors.Wrap(err, "QueryRunner StartBackup: Building start backup query failed")
 	}
 
 	if err = conn.QueryRow(startBackupQuery, backup).Scan(&backupName, &lsnString, &inRecovery); err != nil {
-		return "", "", false, errors.Wrap(err, "QueryRunner StartBackup: pg_start_backup() failed")
+		return "", "", false, "", errors.Wrap(err, "QueryRunner StartBackup: pg_start_backup() failed")
 	}
 
-	return backupName, lsnString, inRecovery, nil
+	if err = conn.QueryRow("show data_directory").Scan(&dataDir); err != nil {
+		return "", "", false, "", errors.Wrap(err, "QueryRunner StartBackup: show data_directory failed")
+	}
+
+	return backupName, lsnString, inRecovery, dataDir,nil
 }
 
 // StopBackup informs the database that copy is over
