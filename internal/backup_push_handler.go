@@ -185,8 +185,12 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
 	currentBackupSentinelDto.UserData = GetSentinelUserData()
 
+	err = UploadMetadata(uploader, currentBackupSentinelDto, backupName, meta)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to upload metadata file for backup: %s %v", backupName, err)
+	}
 	// If other parts are successful in uploading, upload json file.
-	err = UploadSentinel(uploader, currentBackupSentinelDto, backupName, meta)
+	err = UploadSentinel(uploader, currentBackupSentinelDto, backupName)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", backupName)
 		tracelog.ErrorLogger.FatalError(err)
@@ -194,7 +198,9 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 }
 
 // TODO : unit tests
-func UploadSentinel(uploader *Uploader, sentinelDto *BackupSentinelDto, backupName string, meta ExtendedMetadataDto) error {
+func UploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupName string, meta ExtendedMetadataDto) error {
+	// BackupSentinelDto struct allows nil field for backward compatiobility
+	// We do not expect here nil dto since it is new dto to upload
 	meta.FinishTime = time.Now()
 	meta.StartLsn = *sentinelDto.BackupStartLSN
 	meta.FinishLsn = *sentinelDto.BackupFinishLSN
@@ -206,14 +212,14 @@ func UploadSentinel(uploader *Uploader, sentinelDto *BackupSentinelDto, backupNa
 		return NewSentinelMarshallingError(metaFile, err)
 	}
 
-	err = uploader.Upload(metaFile, bytes.NewReader(dtoBody))
-	if err != nil {
-		return err
-	}
+	return uploader.Upload(metaFile, bytes.NewReader(dtoBody))
+}
 
+// TODO : unit tests
+func UploadSentinel(uploader *Uploader, sentinelDto *BackupSentinelDto, backupName string) error {
 	sentinelName := backupName + SentinelSuffix
 
-	dtoBody, err = json.Marshal(*sentinelDto)
+	dtoBody, err := json.Marshal(*sentinelDto)
 	if err != nil {
 		return NewSentinelMarshallingError(sentinelName, err)
 	}
