@@ -17,8 +17,12 @@ import (
 )
 
 const (
-	AccountSetting   = "AZURE_STORAGE_ACCOUNT"
-	AccessKeySetting = "AZURE_STORAGE_ACCESS_KEY"
+	AccountSetting    = "AZURE_STORAGE_ACCOUNT"
+	AccessKeySetting  = "AZURE_STORAGE_ACCESS_KEY"
+	minBufferSize     = 1024
+	defaultBufferSize = 64 * 1024 * 1024
+	minBuffers        = 1
+	defaultBuffers    = 3
 )
 
 var SettingList = []string{
@@ -177,15 +181,14 @@ func getUploadStreamToBlockBlobOptions() azblob.UploadStreamToBlockBlobOptions {
 	// Configure the size of the rotating buffers
 	bufSizeS := os.Getenv("WALG_AZURE_BUFFER_SIZE")
 	bufferSize, err := strconv.Atoi(bufSizeS)
-	if err != nil || bufferSize < 1024 {
-		bufferSize = 64 * 1024 * 1024
+	if err != nil || bufferSize < minBufferSize {
+		bufferSize = defaultBufferSize
 	}
 	// Configure the size of the rotating buffers and number of buffers
 	maxBufS := os.Getenv("WALG_AZURE_MAX_BUFFERS")
 	maxBuffers, err := strconv.Atoi(maxBufS)
-	if err != nil || maxBuffers < 1 {
-		maxBuffers = 3
+	if err != nil || maxBuffers < minBuffers {
+		maxBuffers = defaultBuffers
 	}
-	uploadOptions := azblob.UploadStreamToBlockBlobOptions{MaxBuffers: maxBuffers, BufferSize: bufferSize}
-	return uploadOptions
+	return azblob.UploadStreamToBlockBlobOptions{MaxBuffers: maxBuffers, BufferSize: bufferSize}
 }

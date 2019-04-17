@@ -51,16 +51,16 @@ WAL-G determines Google Cloud credentials using [application-default credentials
 
 To store backups in Azure Storage, WAL-G requires that this variable be set:
 
-* `WALG_AZ_PREFIX` to specify where to store backups in Azure storage (eg. `azure://x4m-test-bucket/walg-folder`)
+* `WALG_AZ_PREFIX` to specify where to store backups in Azure storage (eg. `azure://test-container/walg-folder`)
 
 WAL-G determines Azure Storage credentials using [azure default credentials](https://docs.microsoft.com/en-us/azure/storage/common/storage-azure-cli#azure-cli-sample-script). You can set `AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_ACCESS_KEY` to provide azure storage credentials.
 
-Use `WALG_AZURE_BUFFER_SIZE` to set the upload buffer size, and `WALG_AZURE_MAX_BUFFERS` to set the number of buffers to use at most. The default buffer size is  64 * 1024 * 1024 bytes, and the default number of buffers is 3.
+WAL-G sets default upload buffer size to 64 Megabytes, and uses 3 buffers by default. However, users can choose to override these values by setting optional environment variables.
 
 
 To store backups in Swift object storage, WAL-G requires that this variable be set:
 
-* `WALG_SWIFT_PREFIX` to specify where to store backups in Swift object storage (eg. `azure://x4m-test-bucket/walg-folder`)
+* `WALG_SWIFT_PREFIX` to specify where to store backups in Swift object storage (eg. `swift://test-container/walg-folder`)
 
 WAL-G determines Swift object storage credentials using [openStack default credentials](https://www.swiftstack.com/docs/cookbooks/swift_usage/auth.html). You can use any of V1, V2, V3 of the SwiftStack Auth middleware to provide Swift object storage credentials.
 
@@ -109,6 +109,14 @@ Overrides the default hostname to connect to an S3-compatible service. i.e, `htt
 * `AWS_S3_FORCE_PATH_STYLE`
 
 To enable path-style addressing(i.e., `http://s3.amazonaws.com/BUCKET/KEY`) when connecting to an S3-compatible service that lack of support for sub-domain style bucket URLs (i.e., `http://BUCKET.s3.amazonaws.com/KEY`). Defaults to `false`.
+
+* `WALG_AZURE_BUFFER_SIZE` (eg. `33554432`)
+
+Overrides the default `upload buffer size` of 67108864 bytes (64 MB). Note that the size of the buffer must be specified in bytes. Therefore, to use 32 MB sized buffers, this variable should be set to 33554432 bytes.
+
+* `WALG_AZURE_MAX_BUFFERS` (eg. `5`)
+
+Overrides the default `maximum number of upload buffers`. By default, at most 3 buffers are used concurrently.
 
 ***Example: Using Minio.io S3-compatible storage***
 
