@@ -34,16 +34,46 @@ services:
       &&  mkdir -p /export/deletebeforetimefindfullbucket
       &&  mkdir -p /export/deletewithoutconfirm
       &&  mkdir -p /export/deleteendtoendbucket
+      &&  mkdir -p /export/mysqlfullbucket
+      &&  mkdir -p /export/mysqlbinlogpushbucket
+      &&  mkdir -p /export/mysqldeleteendtoendbucket
       &&  /usr/bin/minio server /export'
 
   pg:
     build:
-      dockerfile: ./docker/pg/Dockerfile
+      dockerfile: docker/pg/Dockerfile
       context: .
     image: wal-g/pg
     container_name: wal-g_pg
+
+  pg_tests:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile
+      context: .
+    image: wal-g/pg_tests
+    container_name: wal-g_pg_tests
     env_file:
-      - docker/pg/walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  mysql:
+    build:
+      dockerfile: docker/mysql/Dockerfile
+      context: .
+    image: wal-g/mysql
+    container_name: wal-g_mysql
+
+  mysql_tests:
+    build:
+      dockerfile: docker/mysql_tests/Dockerfile
+      context: .
+    image: wal-g/mysql_tests
+    container_name: wal-g_mysql_tests
+    env_file:
+      - docker/mysql_tests/walg.env
     depends_on:
       - s3
     links:

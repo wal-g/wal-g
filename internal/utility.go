@@ -186,6 +186,12 @@ func stripWalFileName(path string) string {
 	return strings.Repeat("Z", 24)
 }
 
+func LoggedClose(obj io.Closer) {
+	if err := obj.Close(); err != nil {
+		tracelog.ErrorLogger.Printf("Problem with closing object: %v", err)
+	}
+}
+
 type ForbiddenActionError struct {
 	error
 }
