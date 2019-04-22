@@ -2,7 +2,8 @@
 vendor/
 .idea/
 # bin
-main/wal-g/wal-g
+main/pg/wal-g
+main/mysql/wal-g
 
 # tests
 test/testdata/00000*
