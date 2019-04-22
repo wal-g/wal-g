@@ -20,7 +20,10 @@ var walPrefetchCmd = &cobra.Command{
 		if err != nil {
 			tracelog.ErrorLogger.FatalError(err)
 		}
-		internal.HandleWALPrefetch(uploader, args[0], args[1])
+		err = internal.HandleWALPrefetch(uploader, args[0], args[1])
+		if err != nil {
+			tracelog.ErrorLogger.FatalError(err)
+		}
 	},
 }
 

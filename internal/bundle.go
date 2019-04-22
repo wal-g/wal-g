@@ -97,12 +97,20 @@ func (bundle *Bundle) GetFileRelPath(fileAbsPath string) string {
 
 func (bundle *Bundle) GetFiles() *sync.Map { return bundle.Files }
 
-func (bundle *Bundle) StartQueue() {
+func (bundle *Bundle) StartQueue() error {
 	if bundle.started {
 		panic("Trying to start already started Queue")
 	}
-	bundle.parallelTarballs = getMaxUploadDiskConcurrency()
-	bundle.maxUploadQueue = getMaxUploadQueue()
+	var err error
+	bundle.parallelTarballs, err = getMaxUploadDiskConcurrency()
+	if err != nil {
+		return err
+	}
+	bundle.maxUploadQueue, err = getMaxUploadQueue()
+	if err != nil {
+		return err
+	}
+
 	bundle.tarballQueue = make(chan TarBall, bundle.parallelTarballs)
 	bundle.uploadQueue = make(chan TarBall, bundle.parallelTarballs+bundle.maxUploadQueue)
 	for i := 0; i < bundle.parallelTarballs; i++ {
@@ -110,6 +118,7 @@ func (bundle *Bundle) StartQueue() {
 		bundle.tarballQueue <- bundle.TarBall
 	}
 	bundle.started = true
+	return nil
 }
 
 func (bundle *Bundle) Deque() TarBall {

@@ -26,10 +26,14 @@ func (err CantOverwriteWalFileError) Error() string {
 // HandleWALPush is invoked to perform wal-g wal-push
 func HandleWALPush(uploader *Uploader, walFilePath string) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(WalPath)
-	bgUploader := NewBgUploader(walFilePath, int32(getMaxUploadConcurrency(16)-1), uploader)
+	concurrency, err := getMaxUploadConcurrency(16)
+	if err != nil {
+		panic(err)
+	}
+	bgUploader := NewBgUploader(walFilePath, int32(concurrency-1), uploader)
 	// Look for new WALs while doing main upload
 	bgUploader.Start()
-	err := UploadWALFile(uploader, walFilePath)
+	err = UploadWALFile(uploader, walFilePath)
 	if err != nil {
 		panic(err)
 	}

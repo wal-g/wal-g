@@ -75,17 +75,17 @@ func ResolveSymlink(path string) string {
 	return resolve
 }
 
-func getMaxDownloadConcurrency(defaultValue int) int {
+func getMaxDownloadConcurrency(defaultValue int) (int, error) {
 	return GetMaxConcurrency("WALG_DOWNLOAD_CONCURRENCY", defaultValue)
 }
 
-func getMaxUploadConcurrency(defaultValue int) int {
+func getMaxUploadConcurrency(defaultValue int) (int, error) {
 	return GetMaxConcurrency("WALG_UPLOAD_CONCURRENCY", defaultValue)
 }
 
 // This setting is intentially undocumented in README. Effectively, this configures how many prepared tar Files there
 // may be in uploading state during backup-push.
-func getMaxUploadQueue() int {
+func getMaxUploadQueue() (int, error) {
 	return GetMaxConcurrency("WALG_UPLOAD_QUEUE", 2)
 }
 
@@ -104,11 +104,11 @@ func GetSentinelUserData() interface{} {
 	return out
 }
 
-func getMaxUploadDiskConcurrency() int {
+func getMaxUploadDiskConcurrency() (int, error) {
 	return GetMaxConcurrency("WALG_UPLOAD_DISK_CONCURRENCY", 1)
 }
 
-func GetMaxConcurrency(key string, defaultValue int) int {
+func GetMaxConcurrency(key string, defaultValue int) (int, error) {
 	var con int
 	var err error
 	conc, ok := os.LookupEnv(key)
@@ -116,7 +116,7 @@ func GetMaxConcurrency(key string, defaultValue int) int {
 		con, err = strconv.Atoi(conc)
 
 		if err != nil {
-			tracelog.ErrorLogger.Panic("Unknown concurrency number ", err)
+			return 1, err
 		}
 	} else {
 		if defaultValue > 0 {
@@ -125,7 +125,7 @@ func GetMaxConcurrency(key string, defaultValue int) int {
 			con = 10
 		}
 	}
-	return max(con, 1)
+	return max(con, 1), nil
 }
 
 func GetFileExtension(filePath string) string {

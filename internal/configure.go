@@ -61,7 +61,12 @@ func ConfigureFolder() (storage.Folder, error) {
 		if adapter.prefixPreprocessor != nil {
 			prefix = adapter.prefixPreprocessor(prefix)
 		}
-		return adapter.configureFolder(prefix, adapter.loadSettings())
+
+		settings, err := adapter.loadSettings()
+		if err != nil {
+			return nil, err
+		}
+		return adapter.configureFolder(prefix, settings)
 	}
 	return nil, NewUnconfiguredStorageError(skippedPrefixes)
 }

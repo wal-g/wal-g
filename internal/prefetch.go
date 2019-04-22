@@ -18,13 +18,17 @@ import (
 
 // TODO : unit tests
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
-func HandleWALPrefetch(uploader *Uploader, walFileName string, location string) {
+func HandleWALPrefetch(uploader *Uploader, walFileName string, location string) error {
 	folder := uploader.UploadingFolder.GetSubFolder(WalPath)
 	var fileName = walFileName
-	var err error
 	location = path.Dir(location)
 	waitGroup := &sync.WaitGroup{}
-	for i := 0; i < getMaxDownloadConcurrency(8); i++ {
+	concurrency, err := getMaxDownloadConcurrency(8)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < concurrency; i++ {
 		fileName, err = GetNextWalFilename(fileName)
 		if err != nil {
 			tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err, " file: ", fileName)
@@ -47,6 +51,7 @@ func HandleWALPrefetch(uploader *Uploader, walFileName string, location string) 
 	go CleanupPrefetchDirectories(walFileName, location, FileSystemCleaner{})
 
 	waitGroup.Wait()
+	return nil
 }
 
 // TODO : unit tests
@@ -221,14 +226,18 @@ func GetPrefetchLocations(location string, walFileName string) (prefetchLocation
 
 // TODO : unit tests
 func forkPrefetch(walFileName string, location string) {
+	concurrency, err := getMaxDownloadConcurrency(16)
+	if err != nil {
+		tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err)
+	}
 	if strings.Contains(walFileName, "history") ||
 		strings.Contains(walFileName, "partial") ||
-		getMaxDownloadConcurrency(16) == 1 {
+		concurrency == 1 {
 		return // There will be nothing ot prefetch anyway
 	}
 	cmd := exec.Command(os.Args[0], "wal-prefetch", walFileName, location)
 	cmd.Env = os.Environ()
-	err := cmd.Start()
+	err = cmd.Start()
 
 	if err != nil {
 		tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err)
