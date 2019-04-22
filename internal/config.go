@@ -112,3 +112,9 @@ func GetSettingValue(key string) string {
 	}
 	return ""
 }
+
+func UpdateAllowedConfig(fields []string) {
+	for _, field := range fields {
+		allowedConfigKeys[field] = nil
+	}
+}

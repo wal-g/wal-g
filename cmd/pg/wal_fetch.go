@@ -1,4 +1,4 @@
-package cmd
+package pg
 
 import (
 	"github.com/spf13/cobra"
@@ -23,5 +23,5 @@ var walFetchCmd = &cobra.Command{
 }
 
 func init() {
-	RootCmd.AddCommand(walFetchCmd)
+	PgCmd.AddCommand(walFetchCmd)
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"os"
 	"path/filepath"
@@ -104,12 +105,17 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 
 	bundle := NewBundle(archiveDirectory, previousBackupSentinelDto.BackupStartLSN, previousBackupSentinelDto.Files)
 
+	var meta ExtendedMetadataDto
+	meta.StartTime = time.Now()
+	meta.Hostname, _ = os.Hostname()
+
 	// Connect to postgres and start/finish a nonexclusive backup.
 	conn, err := Connect()
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	backupName, backupStartLSN, pgVersion, err := bundle.StartBackup(conn, time.Now().String())
+	backupName, backupStartLSN, pgVersion, dataDir, err := bundle.StartBackup(conn, time.Now().String())
+	meta.DataDir = dataDir
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
@@ -179,12 +185,34 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
 	currentBackupSentinelDto.UserData = GetSentinelUserData()
 
+	err = UploadMetadata(uploader, currentBackupSentinelDto, backupName, meta)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to upload metadata file for backup: %s %v", backupName, err)
+	}
 	// If other parts are successful in uploading, upload json file.
 	err = UploadSentinel(uploader, currentBackupSentinelDto, backupName)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", backupName)
 		tracelog.ErrorLogger.FatalError(err)
 	}
+}
+
+// TODO : unit tests
+func UploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupName string, meta ExtendedMetadataDto) error {
+	// BackupSentinelDto struct allows nil field for backward compatiobility
+	// We do not expect here nil dto since it is new dto to upload
+	meta.FinishTime = time.Now()
+	meta.StartLsn = *sentinelDto.BackupStartLSN
+	meta.FinishLsn = *sentinelDto.BackupFinishLSN
+	meta.PgVersion = sentinelDto.PgVersion
+
+	metaFile := storage.JoinPath(backupName, MetadataFileName)
+	dtoBody, err := json.Marshal(meta)
+	if err != nil {
+		return NewSentinelMarshallingError(metaFile, err)
+	}
+
+	return uploader.Upload(metaFile, bytes.NewReader(dtoBody))
 }
 
 // TODO : unit tests

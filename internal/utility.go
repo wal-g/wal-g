@@ -26,6 +26,7 @@ const (
 	SentinelSuffix         = "_backup_stop_sentinel.json"
 	CompressedBlockMaxSize = 20 << 20
 	NotFoundAWSErrorCode   = "NotFound"
+	MetadataFileName       = "metadata.json"
 )
 
 // Empty is used for channel signaling.
@@ -182,6 +183,12 @@ func stripWalFileName(path string) string {
 		return found_lsn[0]
 	}
 	return strings.Repeat("Z", 24)
+}
+
+func LoggedClose(obj io.Closer) {
+	if err := obj.Close(); err != nil {
+		tracelog.ErrorLogger.Printf("Problem with closing object: %v", err)
+	}
 }
 
 type ForbiddenActionError struct {

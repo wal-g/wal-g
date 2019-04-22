@@ -1,12 +1,13 @@
 package azure
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"io"
 	"net/url"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,8 +17,12 @@ import (
 )
 
 const (
-	AccountSetting   = "AZURE_STORAGE_ACCOUNT"
-	AccessKeySetting = "AZURE_STORAGE_ACCESS_KEY"
+	AccountSetting    = "AZURE_STORAGE_ACCOUNT"
+	AccessKeySetting  = "AZURE_STORAGE_ACCESS_KEY"
+	minBufferSize     = 1024
+	defaultBufferSize = 64 * 1024 * 1024
+	minBuffers        = 1
+	defaultBuffers    = 3
 )
 
 var SettingList = []string{
@@ -141,19 +146,12 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 
 func (folder *Folder) PutObject(name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
-	//process the input content
-	buf := new(bytes.Buffer)
-	_, err := buf.ReadFrom(content)
-	if err != nil {
-		return NewFolderError(err, "Unable to copy to object")
-	}
-	//Upload content to a blob using full path
+	//Upload content to a block blob using full path
 	path := storage.JoinPath(folder.path, name)
 	blobURL := folder.containerURL.NewBlockBlobURL(path)
-	uploadContent := bytes.NewReader(buf.Bytes())
-	_, err = blobURL.Upload(context.Background(), uploadContent, azblob.BlobHTTPHeaders{ContentType: "text/plain"}, azblob.Metadata{}, azblob.BlobAccessConditions{})
+	_, err := azblob.UploadStreamToBlockBlob(context.Background(), content, blobURL, getUploadStreamToBlockBlobOptions())
 	if err != nil {
-		return NewFolderError(err, "unable to upload blob %v", name)
+		return NewFolderError(err, "Unable to upload blob %v", name)
 	}
 
 	tracelog.DebugLogger.Printf("Put %v done\n", name)
@@ -177,4 +175,20 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 		}
 	}
 	return nil
+}
+
+func getUploadStreamToBlockBlobOptions() azblob.UploadStreamToBlockBlobOptions {
+	// Configure the size of the rotating buffers
+	bufSizeS := os.Getenv("WALG_AZURE_BUFFER_SIZE")
+	bufferSize, err := strconv.Atoi(bufSizeS)
+	if err != nil || bufferSize < minBufferSize {
+		bufferSize = defaultBufferSize
+	}
+	// Configure the size of the rotating buffers and number of buffers
+	maxBufS := os.Getenv("WALG_AZURE_MAX_BUFFERS")
+	maxBuffers, err := strconv.Atoi(maxBufS)
+	if err != nil || maxBuffers < minBuffers {
+		maxBuffers = defaultBuffers
+	}
+	return azblob.UploadStreamToBlockBlobOptions{MaxBuffers: maxBuffers, BufferSize: bufferSize}
 }

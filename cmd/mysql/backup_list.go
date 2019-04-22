@@ -1,4 +1,4 @@
-package cmd
+package mysql
 
 import (
 	"github.com/spf13/cobra"
@@ -23,5 +23,5 @@ var backupListCmd = &cobra.Command{
 }
 
 func init() {
-	RootCmd.AddCommand(backupListCmd)
+	MySQLCmd.AddCommand(backupListCmd)
 }
