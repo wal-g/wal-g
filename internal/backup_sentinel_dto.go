@@ -1,6 +1,9 @@
 package internal
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 // BackupSentinelDto describes file structure of json sentinel
 type BackupSentinelDto struct {
@@ -16,6 +19,17 @@ type BackupSentinelDto struct {
 	BackupFinishLSN *uint64 `json:"FinishLSN"`
 
 	UserData interface{} `json:"UserData,omitempty"`
+}
+
+// Extended metadata should describe backup in more details, but be small enough to be downloaded often
+type ExtendedMetadataDto struct {
+	StartTime  time.Time `json:"start_time"`
+	FinishTime time.Time `json:"finish_time"`
+	Hostname   string    `json:"hostname"`
+	DataDir    string    `json:"data_dir"`
+	PgVersion  int       `json:"pg_version"`
+	StartLsn   uint64    `json:"start_lsn"`
+	FinishLsn  uint64    `json:"finish_lsn"`
 }
 
 func (dto *BackupSentinelDto) setFiles(p *sync.Map) {

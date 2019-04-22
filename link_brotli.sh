@@ -1,11 +1,4 @@
 #!/bin/sh
-set -e -x
-
-if ! which dep > /dev/null; then
-    go get -u github.com/golang/dep/cmd/dep  # install dependencies management system
-fi
-
-make deps  # install dependencies
 
 test -d tmp  || mkdir tmp
 
@@ -30,11 +23,3 @@ cd ${LIB_DIR}
 make
 
 cd ${CWD}
-make
-
-rm -rf vendor/github.com/google/brotli/*
-mv tmp/* vendor/github.com/google/brotli/
-rm -rf tmp/
-
-docker-compose build
-docker-compose up --exit-code-from pg pg
