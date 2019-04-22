@@ -9,7 +9,7 @@ services:
 matrix:
   include:
     - env: GOTAGS= BINSUFFIX=
-    - env: GOTAGS=lzo BINSUFFIX=.lzo
+    - env: GOTAGS=lzo BINSUFFIX=-lzo
       addons:
         apt:
           packages: [liblzo2-dev]
