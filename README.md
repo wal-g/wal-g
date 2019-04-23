@@ -2,7 +2,7 @@
 [![Build Status](https://travis-ci.org/wal-g/wal-g.svg?branch=master)](https://travis-ci.org/wal-g/wal-g)
 [![Go Report Card](https://goreportcard.com/badge/github.com/wal-g/wal-g)](https://goreportcard.com/report/github.com/wal-g/wal-g)
 
-WAL-G is an archival restoration tool for Postgres.
+WAL-G is an archival restoration tool for Postgres and MySQL.
 
 WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4, LZMA or Brotli compression, multiple processors and non-exclusive base backups for Postgres. More information on the design and implementation of WAL-G can be found on the Citus Data blog post ["Introducing WAL-G by Citus: Faster Disaster Recovery for Postgres"](https://www.citusdata.com/blog/2017/08/18/introducing-wal-g-faster-restores-for-postgres/).
 
@@ -30,10 +30,10 @@ For other incompatible systems, please consult the Development section for more 
 
 Configuration
 -------------
-**Required**
 
-WAL-G uses [the usual PostgreSQL environment variables](https://www.postgresql.org/docs/current/static/libpq-envars.html) to configure its connection, especially including `PGHOST`, `PGPORT`, `PGUSER`, and `PGPASSWORD`/`PGPASSFILE`/`~/.pgpass`.
+### Common
 
+**One of these variables is required**
 
 To connect to Amazon S3, WAL-G requires that this variable be set:
 
@@ -71,36 +71,11 @@ To store backups on files system, WAL-G requires that these variables be set:
 
 Please, keep in mind that by default storing backups on disk along with database is not safe. Do not use it as a disaster recovery plan.
 
-
 **Optional**
-
-`PGHOST` can connect over a UNIX socket. This mode is preferred for localhost connections, set `PGHOST=/var/run/postgresql` to use it. WAL-G will connect over TCP if `PGHOST` is an IP address.
-
-WAL-G can automatically determine the S3 bucket's region using `s3:GetBucketLocation`, but if you wish to avoid this API call or forbid it from the applicable IAM policy, specify:
 
 * `AWS_REGION`(eg. `us-west-2`)
 
-Concurrency values can be configured using:
-
-* `WALG_DOWNLOAD_CONCURRENCY`
-
-To configure how many goroutines to use during backup-fetch  and wal-push, use `WALG_DOWNLOAD_CONCURRENCY`. By default, WAL-G uses the minimum of the number of files to extract and 10.
-
-* `WALG_UPLOAD_CONCURRENCY`
-
-To configure how many concurrency streams to use during backup uploading, use `WALG_UPLOAD_CONCURRENCY`. By default, WAL-G uses 10 streams.
-
-* `WALG_UPLOAD_DISK_CONCURRENCY`
-
-To configure how many concurrency streams are reading disk during ```backup-push```. By default, WAL-G uses 1 stream.
-
-* `WALG_SENTINEL_USER_DATA`
-
-This setting allows backup automation tools to add extra information to JSON sentinel file during ```backup-push```. This setting can be used e.g. to give user-defined names to backups.
-
-* `WALG_PREVENT_WAL_OVERWRITE`
-
-If this setting is specified, during ```wal-push``` WAL-G will check the existence of WAL before uploading it. If the different file is already archived under the same name, WAL-G will return the non-zero exit code to prevent PostgreSQL from removing WAL.
+WAL-G can automatically determine the S3 bucket's region using `s3:GetBucketLocation`, but if you wish to avoid this API call or forbid it from the applicable IAM policy, specify this variable.
 
 * `AWS_ENDPOINT`
 
@@ -141,6 +116,48 @@ To enable S3 server-side encryption, set to the algorithm to use when storing th
 
 If using S3 server-side encryption with `aws:kms`, the KMS Key ID to use for object encryption.
 
+
+* `WALG_COMPRESSION_METHOD`
+
+To configure compression method used for backups. Possible options are: `lz4`, 'lzma', 'brotli'. Default method is `lz4`. LZ4 is the fastest method, but compression ratio is bad.
+LZMA is way much slower, however it compresses backups about 6 times better than LZ4. Brotli is a good trade-off between speed and compression ratio which is about 3 times better than LZ4.
+
+### Postgres
+WAL-G uses [the usual PostgreSQL environment variables](https://www.postgresql.org/docs/current/static/libpq-envars.html) to configure its connection, especially including `PGHOST`, `PGPORT`, `PGUSER`, and `PGPASSWORD`/`PGPASSFILE`/`~/.pgpass`.
+
+`PGHOST` can connect over a UNIX socket. This mode is preferred for localhost connections, set `PGHOST=/var/run/postgresql` to use it. WAL-G will connect over TCP if `PGHOST` is an IP address.
+
+* `WALG_DISK_RATE_LIMIT`
+
+To configure disk read rate limit during ```backup-push``` in bytes per second.
+
+* `WALG_NETWORK_RATE_LIMIT`
+
+To configure network upload rate limit during ```backup-push``` in bytes per second.
+
+
+Concurrency values can be configured using:
+
+* `WALG_DOWNLOAD_CONCURRENCY`
+
+To configure how many goroutines to use during backup-fetch  and wal-push, use `WALG_DOWNLOAD_CONCURRENCY`. By default, WAL-G uses the minimum of the number of files to extract and 10.
+
+* `WALG_UPLOAD_CONCURRENCY`
+
+To configure how many concurrency streams to use during backup uploading, use `WALG_UPLOAD_CONCURRENCY`. By default, WAL-G uses 10 streams.
+
+* `WALG_UPLOAD_DISK_CONCURRENCY`
+
+To configure how many concurrency streams are reading disk during ```backup-push```. By default, WAL-G uses 1 stream.
+
+* `WALG_SENTINEL_USER_DATA`
+
+This setting allows backup automation tools to add extra information to JSON sentinel file during ```backup-push```. This setting can be used e.g. to give user-defined names to backups.
+
+* `WALG_PREVENT_WAL_OVERWRITE`
+
+If this setting is specified, during ```wal-push``` WAL-G will check the existence of WAL before uploading it. If the different file is already archived under the same name, WAL-G will return the non-zero exit code to prevent PostgreSQL from removing WAL.
+
 * `WALG_GPG_KEY_ID`  (alternative form `WALE_GPG_KEY_ID`) ⚠️ **DEPRECATED**
 
 To configure GPG key for encryption and decryption. By default, no encryption is used. Public keyring is cached in the file "/.walg_key_cache".
@@ -170,24 +187,64 @@ Delta computation is based on ModTime of file system and LSN number of pages in 
 
 To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not exceeded). `WALG_DELTA_ORIGIN` can be LATEST (chaining increments), LATEST_FULL (for bases where volatile part is compact and chaining has no meaning - deltas overwrite each other). Defaults to LATEST.
 
-* `WALG_COMPRESSION_METHOD`
+### MySQL
 
-To configure compression method used for backups. Possible options are: `lz4`, 'lzma', 'brotli'. Default method is `lz4`. LZ4 is the fastest method, but compression ratio is bad.
-LZMA is way much slower, however it compresses backups about 6 times better than LZ4. Brotli is a good trade-off between speed and compression ratio which is about 3 times better than LZ4.
+* `WALG_MYSQL_DATASOURCE_NAME`
 
-* `WALG_DISK_RATE_LIMIT`
+To configure connection string for MySQL. Format ```user:password@host/dbname```
 
-To configure disk read rate limit during ```backup-push``` in bytes per second.
+* `WALG_MYSQL_BINLOG_DST`
 
-* `WALG_NETWORK_RATE_LIMIT`
+To place binlogs in the specified directory during stream-fetch.
 
-To configure network upload rate limit during ```backup-push``` in bytes per second.
+* `WALG_MYSQL_BINLOG_SRC`
+
+To configure directory with binlogs for ```binlog-push```.
+
+* `WALG_MYSQL_BINLOG_END_TS`
+
+To set time [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) for recovery point.
+
+* `WALG_MYSQL_SSL_CA`
+
+To use SSL, a path to file with certificates should be set to this variable.
 
 Usage
 -----
 
 WAL-G currently supports these commands:
 
+### Common
+
+* ``backup-list``
+
+Lists names and creation time of available backups.
+
+* ``delete``
+
+Is used to delete backups and WALs before them. By default ``delete`` will perform dry run. If you want to execute deletion you have to add ``--confirm`` flag at the end of the command.
+
+``delete`` can operate in two modes: ``retain`` and ``before``.
+
+``retain`` [FULL|FIND_FULL] %number%
+
+if FULL is specified keep 5 full backups and everything in the middle
+
+``before`` [FIND_FULL] %name%
+
+if FIND_FULL is specified WAL-G will calculate minimum backup needed to keep all deltas alive. If FIND_FULL is not specified and call can produce orphaned deltas - call will fail with the list.
+
+``retain 5`` will fail if 5th is delta
+
+``retain FULL 5`` will keep 5 full backups and all deltas of them
+
+``retain FIND_FULL`` will find necessary full for 5th
+
+``before base_000010000123123123`` will fail if base_000010000123123123 is delta
+
+``before FIND_FULL base_000010000123123123`` will keep everything after base of base_000010000123123123
+
+### Postgres
 
 * ``backup-fetch``
 
@@ -230,52 +287,69 @@ When uploading WAL archives to S3, the user should pass in the absolute path to 
 wal-g wal-push /path/to/archive
 ```
 
-* ``backup-list``
+### MySQL
 
-Lists names and creation time of available backups.
+* ``stream-fetch``
 
-* ``delete``
+When fetching backup's stream, the user should pass in the name of the backup. It returns an encrypted data stream to stdout, you should pass it to a backup tool that you used to create this backup.
+```
+wal-g stream-fetch example-backup | some_backup_tool use_backup
+```
+WAL-G can also fetch the latest backup using:
 
-Is used to delete backups and WALs before them. By default ``delete`` will perform dry run. If you want to execute deletion you have to add ``--confirm`` flag at the end of the command.
+```
+wal-g stream-fetch LATEST | some_backup_tool use_backup
+```
 
-``delete`` can operate in two modes: ``retain`` and ``before``.
+* ``stream-push``
 
-``retain`` [FULL|FIND_FULL] %number%
+Command for compressing, encrypting and sending backup from stream to storage.
 
-if FULL is specified keep 5 full backups and everything in the middle
+```
+some_backup_tool make_backup | wal-g stream-push
+```
 
-``before`` [FIND_FULL] %name%
+* ``binlog-push``
 
-if FIND_FULL is specified WAL-G will calculate minimum backup needed to keep all deltas alive. If FIND_FULL is not specified and call can produce orphaned deltas - call will fail with the list.
+Command for sending binlogs to storage by CRON.
 
-``retain 5`` will fail if 5th is delta
+```
+wal-g binlog-push
+```
 
-``retain FULL 5`` will keep 5 full backups and all deltas of them
-
-``retain FIND_FULL`` will find necessary full for 5th
-
-``before base_000010000123123123`` will fail if base_000010000123123123 is delta
-
-``before FIND_FULL base_000010000123123123`` will keep everything after base of base_000010000123123123
 
 
 Development
 -----------
 ### Installing
 
-To compile and build the binary:
+To compile and build the binary for Postgres:
 
 ```
 go get github.com/wal-g/wal-g
 make deps
-make all
+make pg_build
+```
+
+To compile and build the binary for MySQL:
+
+```
+go get github.com/wal-g/wal-g
+make deps
+make mysql_build
 ```
 Users can also install WAL-G by using `make install`. Specifying the GOBIN environment variable before installing allows the user to specify the installation location. On default, `make install` puts the compiled binary in `go/bin`.
 
 ```
 export GOBIN=/usr/local/bin
 make deps
-make install
+make pg_install
+```
+or
+```
+export GOBIN=/usr/local/bin
+make deps
+make mysql_install
 ```
 
 ### Testing
