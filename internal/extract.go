@@ -130,7 +130,10 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 
 	retrier := NewExponentialRetrier(MinExtractRetryWait, MaxExtractRetryWait)
 	// Set maximum number of goroutines spun off by ExtractAll
-	downloadingConcurrency := getMaxDownloadConcurrency(min(len(files), 10))
+	downloadingConcurrency, err := getMaxDownloadConcurrency(min(len(files), 10))
+	if err != nil {
+		return err
+	}
 	for currentRun := files; len(currentRun) > 0; {
 		var failed []ReaderMaker
 		failed = tryExtractFiles(currentRun, tarInterpreter, downloadingConcurrency)

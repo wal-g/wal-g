@@ -18,11 +18,15 @@ type StorageAdapter struct {
 	prefixPreprocessor func(string) string
 }
 
-func (adapter *StorageAdapter) loadSettings() map[string]string {
+func (adapter *StorageAdapter) loadSettings() (map[string]string, error) {
 	settings := make(map[string]string)
 	for _, settingName := range adapter.settingNames {
 		if settingName == "UPLOAD_CONCURRENCY" {
-			settings[settingName] = strconv.Itoa(getMaxUploadConcurrency(10))
+			concurrency, err := getMaxUploadConcurrency(10)
+			if err != nil {
+				return nil, err
+			}
+			settings[settingName] = strconv.Itoa(concurrency)
 			continue
 		}
 		settingValue := GetSettingValue("WALE_" + settingName)
@@ -33,7 +37,7 @@ func (adapter *StorageAdapter) loadSettings() map[string]string {
 			settings[settingName] = settingValue
 		}
 	}
-	return settings
+	return settings, nil
 }
 
 func preprocessFilePrefix(prefix string) string {

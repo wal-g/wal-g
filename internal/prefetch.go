@@ -21,10 +21,14 @@ import (
 func HandleWALPrefetch(uploader *Uploader, walFileName string, location string) {
 	folder := uploader.UploadingFolder.GetSubFolder(WalPath)
 	var fileName = walFileName
-	var err error
 	location = path.Dir(location)
 	waitGroup := &sync.WaitGroup{}
-	for i := 0; i < getMaxDownloadConcurrency(8); i++ {
+	concurrency, err := getMaxDownloadConcurrency(8)
+	if err != nil {
+		tracelog.ErrorLogger.FatalError(err)
+	}
+
+	for i := 0; i < concurrency; i++ {
 		fileName, err = GetNextWalFilename(fileName)
 		if err != nil {
 			tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err, " file: ", fileName)
@@ -221,14 +225,18 @@ func GetPrefetchLocations(location string, walFileName string) (prefetchLocation
 
 // TODO : unit tests
 func forkPrefetch(walFileName string, location string) {
+	concurrency, err := getMaxDownloadConcurrency(16)
+	if err != nil {
+		tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err)
+	}
 	if strings.Contains(walFileName, "history") ||
 		strings.Contains(walFileName, "partial") ||
-		getMaxDownloadConcurrency(16) == 1 {
+		concurrency == 1 {
 		return // There will be nothing ot prefetch anyway
 	}
 	cmd := exec.Command(os.Args[0], "wal-prefetch", walFileName, location)
 	cmd.Env = os.Environ()
-	err := cmd.Start()
+	err = cmd.Start()
 
 	if err != nil {
 		tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err)
