@@ -6,8 +6,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
+	"os"
 	"strconv"
 	"strings"
+)
+
+const (
+	S3_CA_CERT_FILE = "WALG_S3_CA_CERT_FILE"
 )
 
 // TODO : unit tests
@@ -78,6 +83,16 @@ func createSession(bucket string, settings map[string]string) (*session.Session,
 		return nil, err
 	}
 	config = config.WithRegion(region)
+
+	caFilePath := os.Getenv(S3_CA_CERT_FILE)
+	if caFilePath != "" {
+		if file, err := os.Open(caFilePath); err == nil {
+			defer file.Close()
+			return session.NewSessionWithOptions(session.Options{Config: *config, CustomCABundle: file})
+		} else {
+			return nil, err
+		}
+	}
 
 	return session.NewSession(config)
 }
