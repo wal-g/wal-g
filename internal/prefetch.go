@@ -18,14 +18,14 @@ import (
 
 // TODO : unit tests
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
-func HandleWALPrefetch(uploader *Uploader, walFileName string, location string) error {
+func HandleWALPrefetch(uploader *Uploader, walFileName string, location string) {
 	folder := uploader.UploadingFolder.GetSubFolder(WalPath)
 	var fileName = walFileName
 	location = path.Dir(location)
 	waitGroup := &sync.WaitGroup{}
 	concurrency, err := getMaxDownloadConcurrency(8)
 	if err != nil {
-		return err
+		tracelog.ErrorLogger.FatalError(err)
 	}
 
 	for i := 0; i < concurrency; i++ {
@@ -51,7 +51,6 @@ func HandleWALPrefetch(uploader *Uploader, walFileName string, location string) 
 	go CleanupPrefetchDirectories(walFileName, location, FileSystemCleaner{})
 
 	waitGroup.Wait()
-	return nil
 }
 
 // TODO : unit tests

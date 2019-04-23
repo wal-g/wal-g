@@ -28,14 +28,14 @@ func HandleWALPush(uploader *Uploader, walFilePath string) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(WalPath)
 	concurrency, err := getMaxUploadConcurrency(16)
 	if err != nil {
-		panic(err)
+		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
 	bgUploader := NewBgUploader(walFilePath, int32(concurrency-1), uploader)
 	// Look for new WALs while doing main upload
 	bgUploader.Start()
 	err = UploadWALFile(uploader, walFilePath)
 	if err != nil {
-		panic(err)
+		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
 
 	bgUploader.Stop()
