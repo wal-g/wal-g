@@ -293,12 +293,12 @@ wal-g wal-push /path/to/archive
 
 When fetching backup's stream, the user should pass in the name of the backup. It returns an encrypted data stream to stdout, you should pass it to a backup tool that you used to create this backup.
 ```
-wal-g stream-fetch example-backup | some_backup_tool use_backup
+wal-g stream-fetch example_backup | xbstream -x -C mysql_datadir
 ```
 WAL-G can also fetch the latest backup using:
 
 ```
-wal-g stream-fetch LATEST | some_backup_tool use_backup
+wal-g stream-fetch LATEST | xbstream -x -C mysql_datadir
 ```
 
 * ``stream-push``
@@ -306,7 +306,7 @@ wal-g stream-fetch LATEST | some_backup_tool use_backup
 Command for compressing, encrypting and sending backup from stream to storage.
 
 ```
-some_backup_tool make_backup | wal-g stream-push
+xtrabackup --backup --stream=xbstream --datadir=mysql_datadir | wal-g stream-push
 ```
 
 * ``binlog-push``
