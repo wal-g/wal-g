@@ -1,5 +1,7 @@
 ## WAL-G for MySQL
 
+**Interface of MySQL now is unstable**
+
 You can use wal-g as a tool for encrypting, compressing MySQL backups and push/fetch them to/from storage without saving it on your filesystem.
 
 Development
