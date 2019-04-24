@@ -23,7 +23,11 @@ var (
 			if err != nil {
 				tracelog.ErrorLogger.FatalError(err)
 			}
-			internal.HandleBackupList(folder, pretty, json)
+			if pretty || json {
+				internal.HandleBackupListWithFlags(folder, pretty, json)
+			} else {
+				internal.HandleBackupList(folder)
+			}
 		},
 	}
 	pretty = false

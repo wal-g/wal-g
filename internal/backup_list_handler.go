@@ -13,7 +13,17 @@ import (
 
 // TODO : unit tests
 // HandleBackupList is invoked to perform wal-g backup-list
-func HandleBackupList(folder storage.Folder, pretty bool, json bool) {
+func HandleBackupList(folder storage.Folder) {
+	backups, err := getBackups(folder)
+	if err != nil {
+		tracelog.ErrorLogger.FatalError(err)
+	}
+
+	WriteBackupList(backups, os.Stdout)
+}
+
+// TODO : unit tests
+func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool) {
 	backups, err := getBackups(folder)
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
