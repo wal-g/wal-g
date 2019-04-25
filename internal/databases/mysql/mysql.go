@@ -25,6 +25,14 @@ const (
 	SslCa        = "WALG_MYSQL_SSL_CA"
 )
 
+var AllowedConfigKeys = []string{
+	"WALG_MYSQL_DATASOURCE_NAME",
+	"WALG_MYSQL_BINLOG_DST",
+	"WALG_MYSQL_BINLOG_SRC",
+	"WALG_MYSQL_BINLOG_END_TS",
+	"WALG_MYSQL_SSL_CA",
+}
+
 type Uploader struct {
 	*internal.Uploader
 }

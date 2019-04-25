@@ -1,3 +1,4 @@
+MAIN_ALL_PATH := main/all
 MAIN_PG_PATH := main/pg
 MAIN_MYSQL_PATH := main/mysql
 DOCKER_COMMON := golang ubuntu s3
@@ -13,6 +14,13 @@ override GOTAGS := -tags $(GOTAGS)
 endif
 
 test: install deps lint unittest pg_build mysql_build unlink_brotli pg_integration_test mysql_integration_test
+
+build_all: $(CMD_FILES) $(PKG_FILES)
+	(cd $(MAIN_ALL_PATH) && go build -o wal-g $(GOTAGS) -ldflags "-s -w -X github.com/wal-g/wal-g/cmd.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd.WalgVersion=`git tag -l --points-at HEAD`")
+
+clean_all:
+	(cd $(MAIN_ALL_PATH) && go clean)
+	./cleanup.sh
 
 pg_test: install deps pg_build lint unittest unlink_brotli pg_integration_test
 

@@ -8,8 +8,8 @@ import (
 
 const WalPushShortDescription = "Uploads a WAL file to storage"
 
-// walPushCmd represents the walPush command
-var walPushCmd = &cobra.Command{
+// WalPushCmd represents the walPush command
+var WalPushCmd = &cobra.Command{
 	Use:   "wal-push wal_filepath",
 	Short: WalPushShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(1),
@@ -23,5 +23,5 @@ var walPushCmd = &cobra.Command{
 }
 
 func init() {
-	PgCmd.AddCommand(walPushCmd)
+	PgCmd.AddCommand(WalPushCmd)
 }

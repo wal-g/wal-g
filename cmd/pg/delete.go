@@ -16,8 +16,8 @@ var regexpLSN = regexp.MustCompile(patternLSN)
 var regexpBackupName = regexp.MustCompile(patternBackupName)
 var maxCountOfLSN = 2
 
-// deleteCmd represents the delete command
-var deleteCmd = &cobra.Command{
+// DeleteCmd represents the delete command
+var DeleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: internal.DeleteShortDescription, // TODO : improve description
 }
@@ -60,10 +60,10 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	PgCmd.AddCommand(deleteCmd)
+	PgCmd.AddCommand(DeleteCmd)
 
-	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd)
-	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
+	DeleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd)
+	DeleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 
 // TODO: create postgres part and move it there, if it will be needed

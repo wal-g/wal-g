@@ -10,8 +10,8 @@ import (
 
 const binlogPushShortDescription = ""
 
-// binlogPushCmd represents the cron command
-var binlogPushCmd = &cobra.Command{
+// BinlogPushCmd represents the cron command
+var BinlogPushCmd = &cobra.Command{
 	Use:   "binlog-push",
 	Short: binlogPushShortDescription,
 	Args:  cobra.ExactArgs(1),
@@ -25,5 +25,5 @@ var binlogPushCmd = &cobra.Command{
 }
 
 func init()  {
-	MySQLCmd.AddCommand(binlogPushCmd)
+	MySQLCmd.AddCommand(BinlogPushCmd)
 }

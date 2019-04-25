@@ -8,8 +8,8 @@ import (
 
 const WalFetchShortDescription = "Fetches a WAL file from storage"
 
-// walFetchCmd represents the walFetch command
-var walFetchCmd = &cobra.Command{
+// WalFetchCmd represents the walFetch command
+var WalFetchCmd = &cobra.Command{
 	Use:   "wal-fetch wal_name destination_filename",
 	Short: WalFetchShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(2),
@@ -23,5 +23,5 @@ var walFetchCmd = &cobra.Command{
 }
 
 func init() {
-	PgCmd.AddCommand(walFetchCmd)
+	PgCmd.AddCommand(WalFetchCmd)
 }

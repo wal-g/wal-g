@@ -10,8 +10,8 @@ import (
 
 const StreamPushShortDescription = ""
 
-// streamPushCmd represents the streamPush command
-var streamPushCmd = &cobra.Command{
+// StreamPushCmd represents the streamPush command
+var StreamPushCmd = &cobra.Command{
 	Use:   "stream-push",
 	Short: StreamPushShortDescription,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -24,5 +24,5 @@ var streamPushCmd = &cobra.Command{
 }
 
 func init()  {
-	MySQLCmd.AddCommand(streamPushCmd)
+	MySQLCmd.AddCommand(StreamPushCmd)
 }

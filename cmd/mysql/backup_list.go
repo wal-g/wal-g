@@ -8,8 +8,8 @@ import (
 
 const BackupListShortDescription = "Prints available backups"
 
-// backupListCmd represents the backupList command
-var backupListCmd = &cobra.Command{
+// BackupListCmd represents the backupList command
+var BackupListCmd = &cobra.Command{
 	Use:   "backup-list",
 	Short: BackupListShortDescription, // TODO : improve description
 	Args:  cobra.NoArgs,
@@ -23,5 +23,5 @@ var backupListCmd = &cobra.Command{
 }
 
 func init() {
-	MySQLCmd.AddCommand(backupListCmd)
+	MySQLCmd.AddCommand(BackupListCmd)
 }

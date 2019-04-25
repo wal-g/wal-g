@@ -8,8 +8,8 @@ import (
 
 const BackupFetchShortDescription = "Fetches a backup from storage"
 
-// backupFetchCmd represents the backupFetch command
-var backupFetchCmd = &cobra.Command{
+// BackupFetchCmd represents the backupFetch command
+var BackupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch destination_directory backup_name",
 	Short: BackupFetchShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(2),
@@ -23,5 +23,5 @@ var backupFetchCmd = &cobra.Command{
 }
 
 func init() {
-	PgCmd.AddCommand(backupFetchCmd)
+	PgCmd.AddCommand(BackupFetchCmd)
 }

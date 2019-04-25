@@ -16,8 +16,8 @@ var regexpTimeRFC3339 = regexp.MustCompile(patternTimeRFC3339)
 var maxCountOfRFC3339 = 1
 var confirmed = false
 
-// deleteCmd represents the delete command
-var deleteCmd = &cobra.Command{
+// DeleteCmd represents the delete command
+var DeleteCmd = &cobra.Command{
 	Use:   "delete", //for example "delete mysql before time"
 	Short: "Clears old backups and binlogs",
 }
@@ -60,9 +60,9 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	MySQLCmd.AddCommand(deleteCmd)
-	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd)
-	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
+	MySQLCmd.AddCommand(DeleteCmd)
+	DeleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd)
+	DeleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 
 func IsFullBackup(folder storage.Folder, object storage.Object) bool {

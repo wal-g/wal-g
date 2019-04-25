@@ -9,8 +9,8 @@ import (
 
 const BackupPushShortDescription = "Makes backup and uploads it to storage"
 
-// backupPushCmd represents the backupPush command
-var backupPushCmd = &cobra.Command{
+// BackupPushCmd represents the backupPush command
+var BackupPushCmd = &cobra.Command{
 	Use:   "backup-push db_directory",
 	Short: BackupPushShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(1),
@@ -24,5 +24,5 @@ var backupPushCmd = &cobra.Command{
 }
 
 func init() {
-	PgCmd.AddCommand(backupPushCmd)
+	PgCmd.AddCommand(BackupPushCmd)
 }

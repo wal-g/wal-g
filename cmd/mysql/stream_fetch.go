@@ -10,8 +10,8 @@ import (
 
 const StreamFetchShortDescription = ""
 
-// streamFetchCmd represents the streamFetch command
-var streamFetchCmd = &cobra.Command{
+// StreamFetchCmd represents the streamFetch command
+var StreamFetchCmd = &cobra.Command{
 	Use:   "stream-fetch backup-name",
 	Short: StreamFetchShortDescription,
 	Args: cobra.ExactArgs(1),
@@ -25,5 +25,5 @@ var streamFetchCmd = &cobra.Command{
 }
 
 func init() {
-	MySQLCmd.AddCommand(streamFetchCmd)
+	MySQLCmd.AddCommand(StreamFetchCmd)
 }
