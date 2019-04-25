@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/wal-g/wal-g/internal/storages/storage"
@@ -62,24 +63,12 @@ func WritePrettyBackupList(backups []BackupTime, output io.Writer) {
 
 // TODO : unit tests
 func WriteBackupListAsJson(backups []BackupTime, output io.Writer, pretty bool) {
-	fmt.Print("[")
-	for i, b := range backups {
-		if i != 0 {
-			fmt.Print(", ")
-		}
-		if pretty {
-			fmt.Println()
-			fmt.Print("\t")
-		}
-		_, _ = fmt.Fprintf(
-			output,
-			"{\"name\":\"%s\", \"last_modified\":\"%s\", \"wal_segment_backup_start\":\"%s\"}",
-			b.BackupName,
-			b.Time.Format(time.RFC3339),
-			b.WalFileName)
-	}
+	var bytes []byte
+	var _ error
 	if pretty {
-		fmt.Println()
+		bytes, _ = json.MarshalIndent(backups, "", "    ")
+	} else {
+		bytes, _ = json.Marshal(backups)
 	}
-	fmt.Print("]")
+	output.Write(bytes)
 }
