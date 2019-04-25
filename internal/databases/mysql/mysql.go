@@ -21,6 +21,7 @@ const (
 	BinlogPath   = "binlog_" + internal.VersionStr + "/"
 	BinlogEndTs  = "WALG_MYSQL_BINLOG_END_TS"
 	BinlogDst    = "WALG_MYSQL_BINLOG_DST"
+	BinlogSrc    = "WALG_MYSQL_BINLOG_SRC"
 	SslCa        = "WALG_MYSQL_SSL_CA"
 )
 

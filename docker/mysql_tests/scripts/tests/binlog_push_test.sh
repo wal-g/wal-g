@@ -3,6 +3,7 @@ set -e -x
 
 export WALE_S3_PREFIX=s3://mysqlbinlogpushbucket
 export WALG_MYSQL_DATASOURCE_NAME=sbtest:@/sbtest
+export WALG_MYSQL_BINLOG_SRC=${MYSQLDATA}
 export WALG_MYSQL_BINLOG_DST=${MYSQLDATA}
 
 mysqld --initialize --init-file=/etc/mysql/init.sql
