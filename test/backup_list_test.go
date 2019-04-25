@@ -71,14 +71,14 @@ func TestBackupListCorrectJsonOutput(t *testing.T) {
 func TestBackupListCorrectPrettyJsonOutput(t *testing.T) {
 	const expectedString = "[\n" +
 		"    {\n" +
-		"        \"BackupName\": \"base_123\",\n" +
-		"        \"Time\": \"2019-04-25T14:48:00Z\",\n" +
-		"        \"WalFileName\": \"ZZZZZZZZZZZZZZZZZZZZZZZZ\"\n" +
+		"        \"backup_name\": \"base_123\",\n" +
+		"        \"time\": \"2019-04-25T14:48:00Z\",\n" +
+		"        \"wal_file_name\": \"ZZZZZZZZZZZZZZZZZZZZZZZZ\"\n" +
 		"    },\n" +
 		"    {\n" +
-		"        \"BackupName\": \"base_456\",\n" +
-		"        \"Time\": \"2018-07-05T01:01:50Z\",\n" +
-		"        \"WalFileName\": \"ZZZZZZZZZZZZZZZZZZZZZZZZ\"\n" +
+		"        \"backup_name\": \"base_456\",\n" +
+		"        \"time\": \"2018-07-05T01:01:50Z\",\n" +
+		"        \"wal_file_name\": \"ZZZZZZZZZZZZZZZZZZZZZZZZ\"\n" +
 		"    }\n" +
 		"]"
 	var unmarshaledBackups []internal.BackupTime
