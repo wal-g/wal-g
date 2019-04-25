@@ -8,6 +8,8 @@ import (
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"os"
 	"path"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -81,6 +83,7 @@ func fetchBinlogs(folder storage.Folder, sentinel StreamSentinelDto, binlogsAreD
 		binlogsAreDone <- nil
 		return
 	}
+	var fetchedLogs []storage.Object
 
 	for _, object := range objects {
 		tracelog.InfoLogger.Println("Consider binlog ", object.GetName(), object.GetLastModified().Format(time.RFC3339))
@@ -95,7 +98,31 @@ func fetchBinlogs(folder storage.Folder, sentinel StreamSentinelDto, binlogsAreD
 				binlogsAreDone <- err
 				return
 			}
+			fetchedLogs = append(fetchedLogs, object)
 		}
+	}
+
+	sort.Slice(fetchedLogs, func(i, j int) bool {
+		return fetchedLogs[i].GetLastModified().After(fetchedLogs[j].GetLastModified())
+	})
+
+	index_file, err := os.Create(filepath.Join(dstFolder, "binlogs_order"))
+	if err != nil {
+		binlogsAreDone <- err
+		return
+	}
+
+	for _, object := range fetchedLogs {
+		_, err := index_file.WriteString(ExtractBinlogName(object, folder) + "\n")
+		if err != nil {
+			binlogsAreDone <- err
+			return
+		}
+	}
+	err = index_file.Close()
+	if err != nil {
+		binlogsAreDone <- err
+		return
 	}
 
 	binlogsAreDone <- nil
