@@ -31,6 +31,7 @@ var (
 		"WALG_NETWORK_RATE_LIMIT":      nil,
 		"WALG_USE_WAL_DELTA":           nil,
 		"WALG_LOG_LEVEL":               nil,
+		"WALG_S3_CA_CERT_FILE":         nil,
 	}
 )
 

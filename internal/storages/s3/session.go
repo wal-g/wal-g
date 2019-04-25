@@ -6,6 +6,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -87,7 +89,7 @@ func createSession(bucket string, settings map[string]string) (*session.Session,
 	caFilePath := os.Getenv(S3_CA_CERT_FILE)
 	if caFilePath != "" {
 		if file, err := os.Open(caFilePath); err == nil {
-			defer file.Close()
+			defer loggedClose(file)
 			return session.NewSessionWithOptions(session.Options{Config: *config, CustomCABundle: file})
 		} else {
 			return nil, err
@@ -95,4 +97,11 @@ func createSession(bucket string, settings map[string]string) (*session.Session,
 	}
 
 	return session.NewSession(config)
+}
+
+func loggedClose(c io.Closer) {
+	err := c.Close()
+	if err != nil {
+		tracelog.ErrorLogger.Println("Closing CA cert file failed: ", err)
+	}
 }
