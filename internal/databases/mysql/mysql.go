@@ -64,17 +64,6 @@ func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
 		}
 		return logFileName
 	}
-	rows, err = db.Query("SHOW SLAVE STATUS")
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
-	}
-	for rows.Next() {
-		err = rows.Scan(&logFileName, &garbage, &garbage, &garbage, &garbage)
-		if err != nil {
-			tracelog.ErrorLogger.Fatalf("%+v\n", err)
-		}
-		return logFileName
-	}
 	tracelog.ErrorLogger.Fatalf("Failed to obtain current binlog file")
 	return ""
 }
