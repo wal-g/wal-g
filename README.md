@@ -132,6 +132,10 @@ WAL-G currently supports these commands for all type of databases:
 
 Lists names and creation time of available backups.
 
+``--pretty``  flag prints list in a table
+
+``--json`` flag prints list in json format, pretty-printed if combined with ``--pretty`` 
+
 * ``delete``
 
 Is used to delete backups and WALs before them. By default ``delete`` will perform dry run. If you want to execute deletion you have to add ``--confirm`` flag at the end of the command.

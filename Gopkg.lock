@@ -232,6 +232,17 @@
   version = "v3.2.0"
 
 [[projects]]
+  digest = "1:4ef2c452afd1700966b7263f2e6bb8999ea636be18ce4d3960c02cd74b5da4b8"
+  name = "github.com/jedib0t/go-pretty"
+  packages = [
+    "table",
+    "text",
+  ]
+  pruneopts = "UT"
+  revision = "a37e1e030434d93557ca8a6a77b4cf9d31cc21ff"
+  version = "v4.0.2"
+
+[[projects]]
   digest = "1:e22af8c7518e1eab6f2eab2b7d7558927f816262586cd6ed9f349c97a6c285c4"
   name = "github.com/jmespath/go-jmespath"
   packages = ["."]
@@ -651,6 +662,7 @@
     "github.com/golang/mock/gomock",
     "github.com/google/brotli/go/cbrotli",
     "github.com/jackc/pgx",
+    "github.com/jedib0t/go-pretty/table",
     "github.com/mitchellh/go-homedir",
     "github.com/ncw/swift",
     "github.com/pierrec/lz4",
