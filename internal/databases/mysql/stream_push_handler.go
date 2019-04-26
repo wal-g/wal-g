@@ -18,7 +18,7 @@ func HandleStreamPush(uploader *Uploader) {
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
-
+	defer internal.LoggedClose(db)
 	backupName := StreamPrefix + time.Now().UTC().Format("20060102T150405Z")
 	stat, _ := os.Stdin.Stat()
 	var stream io.Reader = os.Stdin
