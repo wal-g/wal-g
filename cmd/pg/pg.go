@@ -20,7 +20,7 @@ var BuildDate = "devel"
 var PgCmd = &cobra.Command{
 	Use:     "wal-g",
 	Short:   WalgShortDescription, // TODO : improve short and long descriptions
-	Version: WalgVersion + "\t" + GitRevision + "\t" + BuildDate,
+	Version: WalgVersion + "\t" + GitRevision + "\t" + BuildDate + "\t" + "PostgreSQL",
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
