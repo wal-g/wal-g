@@ -11,9 +11,15 @@ var MySQLShortDescription = "MySQL backup tool"
 
 var cfgFile string
 
+// These variables are here only to show current version. They are set in makefile during build process
+var WalgVersion = "devel"
+var GitRevision = "devel"
+var BuildDate = "devel"
+
 var MySQLCmd = &cobra.Command{
 	Use:   "mysql",
 	Short: MySQLShortDescription, // TODO : improve description
+	Version: WalgVersion + "\t" + GitRevision + "\t" + BuildDate + "\t" + "MySQL",
 }
 
 func Execute() {
