@@ -24,6 +24,7 @@ const (
 	SseKmsIdSetting          = "S3_SSE_KMS_ID"
 	StorageClassSetting      = "S3_STORAGE_CLASS"
 	UploadConcurrencySetting = "UPLOAD_CONCURRENCY"
+	s3CertFile               = "WALG_S3_CA_CERT_FILE"
 )
 
 // MaxRetries limit upload and download retries during interaction with S3
@@ -39,6 +40,7 @@ var SettingList = []string{
 	SseKmsIdSetting,
 	StorageClassSetting,
 	UploadConcurrencySetting,
+	s3CertFile,
 }
 
 func NewFolderError(err error, format string, args ...interface{}) storage.Error {
