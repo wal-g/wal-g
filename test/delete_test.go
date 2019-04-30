@@ -16,7 +16,7 @@ import (
 
 func TestFindTargetBeforeName_ReturnsBackup_Without_Modifier(t *testing.T) {
 	targetDelta := "base_000000010000000000000005_D_000000010000000000000003"
-	expected := targetDelta + internal.SentinelSuffix
+	expected := targetDelta + utility.SentinelSuffix
 	testFindTargetBeforeName(t, expected, targetDelta, internal.NoDeleteModifier)
 }
 
@@ -26,12 +26,12 @@ func TestFindTargetBeforeName_ReturnsForbiddenActionError_With_FULL_Modifier(t *
 	_, err := internal.FindTargetBeforeName(mocks.NewMockFolder(controller), "",
 		internal.FullDeleteModifier, isFullBackup, greaterByName)
 	assert.Error(t, err)
-	assert.IsType(t, internal.ForbiddenActionError{}, err)
+	assert.IsType(t, utility.ForbiddenActionError{}, err)
 }
 
 func TestFindTargetBeforeName_ReturnsFullBackup_With_FIND_FULL(t *testing.T) {
 	targetDelta := "base_000000010000000000000009_D_000000010000000000000007"
-	expected := "base_000000010000000000000007" + internal.SentinelSuffix
+	expected := "base_000000010000000000000007" + utility.SentinelSuffix
 	testFindTargetBeforeName(t, expected, targetDelta, internal.FindFullDeleteModifier)
 }
 
@@ -75,7 +75,7 @@ func TestFindTargetBeforeTime_ReturnBackup_Without_Modifier(t *testing.T) {
 func TestFindTargetBeforeTime_ReturnsForbiddenActionError_With_FULL_Modifier(t *testing.T) {
 	_, err := testFindTargetBeforeTime(t, 2, internal.FullDeleteModifier)
 	assert.Error(t, err)
-	assert.IsType(t, internal.ForbiddenActionError{}, err)
+	assert.IsType(t, utility.ForbiddenActionError{}, err)
 }
 
 func TestFindTargetBeforeTime_With_FIND_FULL_Modifier(t *testing.T) {
@@ -125,7 +125,7 @@ func createMockFolderWithTime(t *testing.T, baseTime time.Time) *mocks.MockFolde
 
 	mockFolder.
 		EXPECT().
-		GetSubFolder(internal.BaseBackupPath).
+		GetSubFolder(utility.BaseBackupPath).
 		Return(mockBaseBackupFolder).
 		AnyTimes()
 	return mockFolder
@@ -149,7 +149,7 @@ func greaterByTime(object1, object2 storage.Object) bool {
 
 func createMockStorageFolderWithDeltaBackups(t *testing.T) storage.Folder {
 	var folder = testtools.MakeDefaultInMemoryStorageFolder()
-	subFolder := folder.GetSubFolder(internal.BaseBackupPath)
+	subFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	sentinelData := map[string]interface{}{
 		"DeltaFrom":     "",
 		"DeltaFullName": "base_000000010000000000000007",
@@ -166,7 +166,7 @@ func createMockStorageFolderWithDeltaBackups(t *testing.T) storage.Folder {
 		bytesSentinel, err := json.Marshal(&sentinelD)
 		assert.NoError(t, err)
 		sentinelString := string(bytesSentinel)
-		err = subFolder.PutObject(backupName+internal.SentinelSuffix, strings.NewReader(sentinelString))
+		err = subFolder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader(sentinelString))
 		assert.NoError(t, err)
 	}
 	return folder

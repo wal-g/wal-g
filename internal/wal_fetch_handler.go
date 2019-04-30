@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path"
@@ -40,8 +41,8 @@ func (err ArchiveNonExistenceError) Error() string {
 // HandleWALFetch is invoked to performa wal-g wal-fetch
 func HandleWALFetch(folder storage.Folder, walFileName string, location string, triggerPrefetch bool) {
 	tracelog.DebugLogger.Printf("HandleWALFetch(folder, %s, %s, %v)\n", walFileName, location, triggerPrefetch)
-	folder = folder.GetSubFolder(WalPath)
-	location = ResolveSymlink(location)
+	folder = folder.GetSubFolder(utility.WalPath)
+	location = utility.ResolveSymlink(location)
 	if triggerPrefetch {
 		defer forkPrefetch(walFileName, location)
 	}

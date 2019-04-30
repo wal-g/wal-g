@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -24,7 +25,7 @@ func HandleBinlogPush(uploader *Uploader) {
 	binlogsFolder := internal.GetSettingValue(BinlogSrc)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(BinlogPath)
 	db, err := getMySQLConnection()
-	defer internal.LoggedClose(db)
+	defer utility.LoggedClose(db,"")
 
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
@@ -75,7 +76,7 @@ func tryArchiveBinLog(uploader *Uploader, filename string, binLog string) error 
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not open '%s'\n", filename)
 	}
-	defer internal.LoggedClose(walFile)
+	defer utility.LoggedClose(walFile, "")
 	err = uploader.UploadWalFile(walFile)
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not upload '%s'\n", filename)

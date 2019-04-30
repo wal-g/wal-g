@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/ioutil"
 	"os"
@@ -19,11 +20,11 @@ import (
 // TODO : unit tests
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
 func HandleWALPrefetch(uploader *Uploader, walFileName string, location string) {
-	folder := uploader.UploadingFolder.GetSubFolder(WalPath)
+	folder := uploader.UploadingFolder.GetSubFolder(utility.WalPath)
 	var fileName = walFileName
 	location = path.Dir(location)
 	waitGroup := &sync.WaitGroup{}
-	concurrency, err := getMaxDownloadConcurrency(8)
+	concurrency, err := utility.GetMaxDownloadConcurrency(8)
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
@@ -71,7 +72,7 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	bundle := NewBundle(archiveDirectory, &prefaultStartLsn, nil)
 	bundle.Timeline = timelineId
-	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
+	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(utility.WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Error during loading delta map: '%+v'.", err)
 		return
@@ -225,7 +226,7 @@ func GetPrefetchLocations(location string, walFileName string) (prefetchLocation
 
 // TODO : unit tests
 func forkPrefetch(walFileName string, location string) {
-	concurrency, err := getMaxDownloadConcurrency(16)
+	concurrency, err := utility.GetMaxDownloadConcurrency(16)
 	if err != nil {
 		tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err)
 	}

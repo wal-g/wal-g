@@ -2,6 +2,7 @@ package internal
 
 import (
 	"github.com/google/brotli/go/cbrotli"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 )
 
@@ -15,6 +16,6 @@ func NewBrotliReaderFromWriter(dst io.Writer) *BrotliReaderFromWriter {
 }
 
 func (writer *BrotliReaderFromWriter) ReadFrom(reader io.Reader) (n int64, err error) {
-	n, err = FastCopy(writer, reader)
+	n, err = utility.FastCopy(writer, reader)
 	return
 }

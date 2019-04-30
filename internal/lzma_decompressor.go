@@ -3,6 +3,7 @@ package internal
 import (
 	"github.com/pkg/errors"
 	"github.com/ulikunitz/xz/lzma"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 )
 
@@ -13,7 +14,7 @@ func (decompressor LzmaDecompressor) Decompress(dst io.Writer, src io.Reader) er
 	if err != nil {
 		return errors.Wrap(err, "DecompressLzma: lzma reader creation failed")
 	}
-	_, err = FastCopy(dst, lzReader)
+	_, err = utility.FastCopy(dst, lzReader)
 	return errors.Wrap(err, "DecompressLzma: lzma write failed")
 }
 

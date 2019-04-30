@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"strings"
 )
@@ -185,7 +186,7 @@ func (folder *Folder) partitionToObjects(keys []string) []*s3.ObjectIdentifier {
 
 func isAwsNotExist(err error) bool {
 	if awsErr, ok := err.(awserr.Error); ok {
-		if awsErr.Code() == NotFoundAWSErrorCode || awsErr.Code() == NoSuchKeyAWSErrorCode {
+		if awsErr.Code() == utility.NotFoundAWSErrorCode || awsErr.Code() == NoSuchKeyAWSErrorCode {
 			return true
 		}
 	}

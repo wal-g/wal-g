@@ -7,6 +7,7 @@ import (
 	"github.com/wal-g/wal-g/internal/storages/s3"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/storages/swift"
+	"github.com/wal-g/wal-g/utility"
 	"strconv"
 	"strings"
 )
@@ -22,7 +23,7 @@ func (adapter *StorageAdapter) loadSettings() (map[string]string, error) {
 	settings := make(map[string]string)
 	for _, settingName := range adapter.settingNames {
 		if settingName == "UPLOAD_CONCURRENCY" {
-			concurrency, err := getMaxUploadConcurrency(10)
+			concurrency, err := utility.GetMaxUploadConcurrency(10)
 			if err != nil {
 				return nil, err
 			}

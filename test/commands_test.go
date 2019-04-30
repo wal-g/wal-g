@@ -11,7 +11,7 @@ import (
 
 func TestTryDownloadWALFile_Exist(t *testing.T) {
 	expectedData := []byte("mock")
-	folder := testtools.MakeDefaultInMemoryStorageFolder().GetSubFolder(internal.WalPath)
+	folder := testtools.MakeDefaultInMemoryStorageFolder().GetSubFolder(utility.WalPath)
 	folder.PutObject("00000001000000000000007C", bytes.NewBuffer(expectedData))
 	archiveReader, exist, err := internal.TryDownloadWALFile(folder, "00000001000000000000007C")
 	assert.NoError(t, err)

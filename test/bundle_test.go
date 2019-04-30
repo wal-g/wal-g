@@ -183,7 +183,7 @@ func setupFolderAndBundle() (folder storage.Folder, bundle *internal.Bundle, err
 	if err != nil {
 		return nil, nil, err
 	}
-	folder = memory.NewFolder("in_memory/", storage).GetSubFolder(internal.WalPath)
+	folder = memory.NewFolder("in_memory/", storage).GetSubFolder(utility.WalPath)
 	currentBackupFirstWalFilename := "000000010000000000000073"
 	timeLine, logSegNo, err := internal.ParseWALFilename(currentBackupFirstWalFilename)
 	if err != nil {

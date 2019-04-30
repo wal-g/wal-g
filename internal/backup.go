@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -38,7 +39,7 @@ func NewBackup(baseBackupFolder storage.Folder, name string) *Backup {
 }
 
 func (backup *Backup) GetStopSentinelPath() string {
-	return backup.Name + SentinelSuffix
+	return backup.Name + utility.SentinelSuffix
 }
 
 func (backup *Backup) getTarPartitionFolder() storage.Folder {
