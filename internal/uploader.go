@@ -3,6 +3,7 @@ package internal
 import (
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"path"
 	"path/filepath"
@@ -93,7 +94,7 @@ func (uploader *Uploader) UploadFile(file NamedReader) error {
 
 	pipeWriter.Compress(&OpenPGPCrypter{})
 
-	dstPath := SanitizePath(filepath.Base(file.Name()) + "." + uploader.Compressor.FileExtension())
+	dstPath := utility.SanitizePath(filepath.Base(file.Name()) + "." + uploader.Compressor.FileExtension())
 	reader := pipeWriter.Output
 
 	err := uploader.Upload(dstPath, reader)

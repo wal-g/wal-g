@@ -7,6 +7,7 @@ import (
 	"github.com/wal-g/wal-g/internal/storages/memory"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/testtools"
+	"github.com/wal-g/wal-g/utility"
 	"sync"
 	"testing"
 )
@@ -44,13 +45,13 @@ func GetXLogRecordData() (walparser.XLogRecord, []byte) {
 		Crc32Hash:         0xecf5203c,
 	}
 	var recordHeaderData bytes.Buffer
-	recordHeaderData.Write(internal.ToBytes(&recordHeader.TotalRecordLength))
-	recordHeaderData.Write(internal.ToBytes(&recordHeader.XactID))
-	recordHeaderData.Write(internal.ToBytes(&recordHeader.PrevRecordPtr))
-	recordHeaderData.Write(internal.ToBytes(&recordHeader.Info))
-	recordHeaderData.Write(internal.ToBytes(&recordHeader.ResourceManagerID))
+	recordHeaderData.Write(utility.ToBytes(&recordHeader.TotalRecordLength))
+	recordHeaderData.Write(utility.ToBytes(&recordHeader.XactID))
+	recordHeaderData.Write(utility.ToBytes(&recordHeader.PrevRecordPtr))
+	recordHeaderData.Write(utility.ToBytes(&recordHeader.Info))
+	recordHeaderData.Write(utility.ToBytes(&recordHeader.ResourceManagerID))
 	recordHeaderData.Write([]byte{0, 0})
-	recordHeaderData.Write(internal.ToBytes(&recordHeader.Crc32Hash))
+	recordHeaderData.Write(utility.ToBytes(&recordHeader.Crc32Hash))
 	recordData := concatByteSlices(recordHeaderData.Bytes(), data)
 	record, _ := walparser.ParseXLogRecordFromBytes(recordData)
 	return *record, recordData

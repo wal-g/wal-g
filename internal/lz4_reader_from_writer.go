@@ -2,6 +2,7 @@ package internal
 
 import (
 	"github.com/pierrec/lz4"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 )
 
@@ -15,6 +16,6 @@ func NewLz4ReaderFromWriter(dst io.Writer) *Lz4ReaderFromWriter {
 }
 
 func (writer *Lz4ReaderFromWriter) ReadFrom(reader io.Reader) (n int64, err error) {
-	n, err = FastCopy(writer, reader)
+	n, err = utility.FastCopy(writer, reader)
 	return
 }

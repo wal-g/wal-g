@@ -9,6 +9,7 @@ import (
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path/filepath"
@@ -37,7 +38,7 @@ func (err TarSizeError) Error() string {
 }
 
 // ExcludedFilenames is a list of excluded members from the bundled backup.
-var ExcludedFilenames = make(map[string]Empty)
+var ExcludedFilenames = make(map[string]utility.Empty)
 
 func init() {
 	filesToExclude := []string{
@@ -47,7 +48,7 @@ func init() {
 	}
 
 	for _, filename := range filesToExclude {
-		ExcludedFilenames[filename] = Empty{}
+		ExcludedFilenames[filename] = utility.Empty{}
 	}
 }
 
@@ -92,7 +93,7 @@ func NewBundle(archiveDirectory string, incrementFromLsn *uint64, incrementFromF
 }
 
 func (bundle *Bundle) GetFileRelPath(fileAbsPath string) string {
-	return GetFileRelativePath(fileAbsPath, bundle.ArchiveDirectory)
+	return utility.GetFileRelativePath(fileAbsPath, bundle.ArchiveDirectory)
 }
 
 func (bundle *Bundle) GetFiles() *sync.Map { return bundle.Files }
@@ -102,11 +103,11 @@ func (bundle *Bundle) StartQueue() error {
 		panic("Trying to start already started Queue")
 	}
 	var err error
-	bundle.parallelTarballs, err = getMaxUploadDiskConcurrency()
+	bundle.parallelTarballs, err = utility.GetMaxUploadDiskConcurrency()
 	if err != nil {
 		return err
 	}
-	bundle.maxUploadQueue, err = getMaxUploadQueue()
+	bundle.maxUploadQueue, err = utility.GetMaxUploadQueue()
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/wal-g/wal-g/utility"
 	"io"
 )
 
@@ -25,7 +26,7 @@ func (decompressor LzoDecompressor) FileExtension() string {
 
 func fastCopyHandleErrClosedPipe(dst io.Writer, src io.Reader) (int64, error) {
 	n := int64(0)
-	buf := make([]byte, CompressedBlockMaxSize)
+	buf := make([]byte, utility.CompressedBlockMaxSize)
 	for {
 		read, readingErr := src.Read(buf)
 		if readingErr != nil && readingErr != io.EOF {
@@ -37,7 +38,7 @@ func fastCopyHandleErrClosedPipe(dst io.Writer, src io.Reader) (int64, error) {
 			// Here we handle LZO padded with zeroes:
 			// writer cannot consume anymore data, but all we have is zeroes
 			for {
-				if !allZero(buf[written:read]) {
+				if !utility.AllZero(buf[written:read]) {
 					return n, writingErr
 				}
 				if readingErr == io.EOF {

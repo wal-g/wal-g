@@ -10,6 +10,7 @@ COPY vendor/ vendor/
 COPY internal/ internal/
 COPY cmd/ cmd/
 COPY main/ main/
+COPY utility/ utility/
 
 RUN cd main/mysql && \
     go build -o wal-g -tags lzo -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S`"

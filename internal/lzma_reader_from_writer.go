@@ -2,6 +2,7 @@ package internal
 
 import (
 	"github.com/ulikunitz/xz/lzma"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 )
 
@@ -20,6 +21,6 @@ func NewLzmaReaderFromWriter(dst io.Writer) (*LzmaReaderFromWriter, error) {
 }
 
 func (writer *LzmaReaderFromWriter) ReadFrom(reader io.Reader) (n int64, err error) {
-	n, err = FastCopy(writer, reader)
+	n, err = utility.FastCopy(writer, reader)
 	return
 }

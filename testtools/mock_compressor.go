@@ -2,6 +2,7 @@ package testtools
 
 import (
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 )
 
@@ -20,7 +21,7 @@ type MockCompressingWriter struct {
 }
 
 func (writer *MockCompressingWriter) ReadFrom(reader io.Reader) (n int64, err error) {
-	return internal.FastCopy(writer.Writer, reader)
+	return utility.FastCopy(writer.Writer, reader)
 }
 
 func (writer *MockCompressingWriter) Close() error { return nil }

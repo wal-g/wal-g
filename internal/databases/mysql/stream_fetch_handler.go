@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"os"
 	"path"
 	"path/filepath"
@@ -35,7 +36,7 @@ func HandleStreamFetch(backupName string, folder storage.Folder) {
 
 // TODO : unit tests
 func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
-	baseBackupFolder := folder.GetSubFolder(internal.BaseBackupPath)
+	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	backup := Backup{internal.NewBackup(baseBackupFolder, fileName)}
 
 	tracelog.InfoLogger.Println("stream-fetch")
@@ -61,7 +62,7 @@ func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
 		if err != nil {
 			return err
 		}
-		internal.LoggedClose(os.Stdout)
+		utility.LoggedClose(os.Stdout, "")
 
 		tracelog.DebugLogger.Println("Waiting for binlogs")
 		err = <-binlogsAreDone
@@ -146,5 +147,5 @@ func GetBinlogConfigs() (*time.Time, string) {
 
 func ExtractBinlogName(object storage.Object, folder storage.Folder) string {
 	binlogName := object.GetName()
-	return strings.TrimSuffix(binlogName, "."+internal.GetFileExtension(binlogName))
+	return strings.TrimSuffix(binlogName, "."+utility.GetFileExtension(binlogName))
 }

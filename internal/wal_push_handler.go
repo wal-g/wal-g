@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -25,8 +26,8 @@ func (err CantOverwriteWalFileError) Error() string {
 // TODO : unit tests
 // HandleWALPush is invoked to perform wal-g wal-push
 func HandleWALPush(uploader *Uploader, walFilePath string) {
-	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(WalPath)
-	concurrency, err := getMaxUploadConcurrency(16)
+	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
+	concurrency, err := utility.GetMaxUploadConcurrency(16)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}

@@ -6,6 +6,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/utility"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -78,6 +80,16 @@ func createSession(bucket string, settings map[string]string) (*session.Session,
 		return nil, err
 	}
 	config = config.WithRegion(region)
+
+	filePath := settings[s3CertFile]
+	if filePath != "" {
+		if file, err := os.Open(filePath); err == nil {
+			defer utility.LoggedClose(file, "Closing CA cert file failed")
+			return session.NewSessionWithOptions(session.Options{Config: *config, CustomCABundle: file})
+		} else {
+			return nil, err
+		}
+	}
 
 	return session.NewSession(config)
 }

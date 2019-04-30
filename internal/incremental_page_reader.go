@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"github.com/RoaringBitmap/roaring"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 )
 
@@ -80,7 +81,7 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap)
 	var headerBuffer bytes.Buffer
 	headerBuffer.Write(IncrementFileHeader)
 	fileSize := pageReader.FileSize
-	headerBuffer.Write(ToBytes(uint64(fileSize)))
+	headerBuffer.Write(utility.ToBytes(uint64(fileSize)))
 	pageReader.Blocks = make([]uint32, 0, fileSize/int64(DatabasePageSize))
 
 	if deltaBitmap == nil {
@@ -133,7 +134,7 @@ func (pageReader *IncrementalPageReader) FullScanInitialize() error {
 // WriteDiffMapToHeader is currently used only with buffers, so we don't handle any writing errors
 func (pageReader *IncrementalPageReader) WriteDiffMapToHeader(headerWriter io.Writer) {
 	diffBlockCount := len(pageReader.Blocks)
-	headerWriter.Write(ToBytes(uint32(diffBlockCount)))
+	headerWriter.Write(utility.ToBytes(uint32(diffBlockCount)))
 
 	for _, blockNo := range pageReader.Blocks {
 		binary.Write(headerWriter, binary.LittleEndian, blockNo)
