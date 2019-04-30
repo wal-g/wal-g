@@ -41,7 +41,7 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFile(fileReader io.Reader
 	fileDescription, haveFileDescription := tarInterpreter.Sentinel.Files[fileInfo.Name]
 
 	// If this file is incremental we use it's base version from incremental path
-	if haveFileDescription && tarInterpreter.Sentinel.isIncremental() && fileDescription.IsIncremented {
+	if haveFileDescription && tarInterpreter.Sentinel.IsIncremental() && fileDescription.IsIncremented {
 		err := ApplyFileIncrement(targetPath, fileReader)
 		return errors.Wrapf(err, "Interpret: failed to apply increment for '%s'", targetPath)
 	}
