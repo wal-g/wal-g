@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
@@ -14,7 +15,7 @@ import (
 // Multiple tarballs can share one uploader.
 type Uploader struct {
 	UploadingFolder     storage.Folder
-	Compressor          Compressor
+	Compressor          compression.Compressor
 	waitGroup           *sync.WaitGroup
 	deltaFileManager    *DeltaFileManager
 	Success             bool
@@ -23,7 +24,7 @@ type Uploader struct {
 }
 
 func NewUploader(
-	compressor Compressor,
+	compressor compression.Compressor,
 	uploadingLocation storage.Folder,
 	deltaDataFolder DataFolder,
 	useWalDelta, preventWalOverwrite bool,

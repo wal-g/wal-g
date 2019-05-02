@@ -1,14 +1,14 @@
 package testtools
 
 import (
-	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression/computils"
 	"github.com/wal-g/wal-g/utility"
 	"io"
 )
 
 type MockCompressor struct{}
 
-func (compressor *MockCompressor) NewWriter(writer io.Writer) internal.ReaderFromWriteCloser {
+func (compressor *MockCompressor) NewWriter(writer io.Writer) computils.ReaderFromWriteCloser {
 	return &MockCompressingWriter{writer}
 }
 

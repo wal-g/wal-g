@@ -1,16 +1,17 @@
-package internal
+package zstd
 
 import (
 	"github.com/DataDog/zstd"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/compression/computils"
 	"github.com/wal-g/wal-g/utility"
 	"io"
 )
 
-type ZstdDecompressor struct{}
+type Decompressor struct{}
 
-func (decompressor ZstdDecompressor) Decompress(dst io.Writer, src io.Reader) error {
-	zstdReader := zstd.NewReader(NewUntilEofReader(src))
+func (decompressor Decompressor) Decompress(dst io.Writer, src io.Reader) error {
+	zstdReader := zstd.NewReader(computils.NewUntilEofReader(src))
 	_, err := utility.FastCopy(dst, zstdReader)
 	if err != nil {
 		return errors.Wrap(err, "DecompressZstd: zstd write failed")
@@ -19,6 +20,6 @@ func (decompressor ZstdDecompressor) Decompress(dst io.Writer, src io.Reader) er
 	return errors.Wrap(err, "DecompressZstd: zstd reader close failed")
 }
 
-func (decompressor ZstdDecompressor) FileExtension() string {
-	return ZstdFileExtension
+func (decompressor Decompressor) FileExtension() string {
+	return FileExtension
 }

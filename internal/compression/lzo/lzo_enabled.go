@@ -1,6 +1,6 @@
 // +build lzo
 
-package internal
+package lzo
 
 import (
 	"github.com/cyberdelia/lzo"
@@ -16,5 +16,5 @@ func NewLzoWriter(w io.Writer) io.WriteCloser {
 }
 
 func init() {
-	Decompressors = append(Decompressors, LzoDecompressor{})
+	compression.Decompressors = append(compression.Decompressors, Decompressor{})
 }

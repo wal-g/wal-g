@@ -3,6 +3,8 @@ package internal
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/compression/lz4"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"golang.org/x/time/rate"
@@ -26,6 +28,18 @@ func NewUnconfiguredStorageError(storagePrefixVariants []string) UnconfiguredSto
 }
 
 func (err UnconfiguredStorageError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
+type UnknownCompressionMethodError struct {
+	error
+}
+
+func NewUnknownCompressionMethodError() UnknownCompressionMethodError {
+	return UnknownCompressionMethodError{errors.Errorf("Unknown compression method, supported methods are: %v", compression.CompressingAlgorithms)}
+}
+
+func (err UnknownCompressionMethodError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
@@ -113,15 +127,15 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err
 }
 
 // TODO : unit tests
-func configureCompressor() (Compressor, error) {
+func configureCompressor() (compression.Compressor, error) {
 	compressionMethod := GetSettingValue("WALG_COMPRESSION_METHOD")
 	if compressionMethod == "" {
-		compressionMethod = Lz4AlgorithmName
+		compressionMethod = lz4.AlgorithmName
 	}
-	if _, ok := Compressors[compressionMethod]; !ok {
+	if _, ok := compression.Compressors[compressionMethod]; !ok {
 		return nil, NewUnknownCompressionMethodError()
 	}
-	return Compressors[compressionMethod], nil
+	return compression.Compressors[compressionMethod], nil
 }
 
 // TODO : unit tests

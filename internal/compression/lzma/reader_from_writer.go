@@ -1,4 +1,4 @@
-package internal
+package lzma
 
 import (
 	"github.com/ulikunitz/xz/lzma"
@@ -6,21 +6,21 @@ import (
 	"io"
 )
 
-type LzmaReaderFromWriter struct {
+type ReaderFromWriter struct {
 	lzma.Writer
 }
 
-func NewLzmaReaderFromWriter(dst io.Writer) (*LzmaReaderFromWriter, error) {
+func NewReaderFromWriter(dst io.Writer) (*ReaderFromWriter, error) {
 	lzmaWriter, err := lzma.NewWriter(dst)
 	if err != nil {
 		return nil, err
 	}
-	return &LzmaReaderFromWriter{
+	return &ReaderFromWriter{
 		Writer: *lzmaWriter,
 	}, nil
 }
 
-func (writer *LzmaReaderFromWriter) ReadFrom(reader io.Reader) (n int64, err error) {
+func (writer *ReaderFromWriter) ReadFrom(reader io.Reader) (n int64, err error) {
 	n, err = utility.FastCopy(writer, reader)
 	return
 }

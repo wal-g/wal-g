@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/compression/computils"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 )
@@ -27,7 +28,7 @@ func (err CompressingPipeWriterError) Error() string {
 type CompressingPipeWriter struct {
 	Input                io.Reader
 	Output               io.Reader
-	NewCompressingWriter func(io.Writer) ReaderFromWriteCloser
+	NewCompressingWriter func(io.Writer) computils.ReaderFromWriteCloser
 }
 
 // Compress compresses input to a pipe reader. Output must be used or

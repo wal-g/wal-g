@@ -6,6 +6,8 @@ import (
 	"github.com/pierrec/lz4"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/compression/computils"
 	"github.com/wal-g/wal-g/testtools"
 	"io"
 	"io/ioutil"
@@ -104,7 +106,7 @@ func TestCompressingPipeWriter(t *testing.T) {
 		lz.Compress(MockDisarmedCrypter())
 
 		decompressed := &BufCloser{&bytes.Buffer{}, false}
-		decompressor := internal.Lz4Decompressor{}
+		decompressor := compression.FindDecompressor("lz4")
 		err := decompressor.Decompress(decompressed, lz.Output)
 		if err != nil {
 			t.Logf("%+v\n", err)
@@ -125,7 +127,7 @@ func TestCompressingPipeWriterBigChunk(t *testing.T) {
 	lz.Compress(MockDisarmedCrypter())
 
 	decompressed := &BufCloser{&bytes.Buffer{}, false}
-	decompressor := internal.Lz4Decompressor{}
+	decompressor := compression.FindDecompressor("lz4")
 	err := decompressor.Decompress(decompressed, lz.Output)
 	if err != nil {
 		t.Logf("%+v\n", err)
@@ -153,14 +155,14 @@ func (er *DelayedErrorReader) Read(p []byte) (int, error) {
 	}
 }
 
-func testCompressingPipeWriterErrorPropagation(compressor internal.Compressor, t *testing.T) {
+func testCompressingPipeWriterErrorPropagation(compressor compression.Compressor, t *testing.T) {
 	L := 1 << 20
 	b := make([]byte, L)
 	rand.Read(b)
 	in := &BufCloser{bytes.NewBuffer(b), false}
 	lz := &internal.CompressingPipeWriter{
 		Input: in,
-		NewCompressingWriter: func(writer io.Writer) internal.ReaderFromWriteCloser {
+		NewCompressingWriter: func(writer io.Writer) computils.ReaderFromWriteCloser {
 			return compressor.NewWriter(writer)
 		},
 	}
@@ -168,13 +170,13 @@ func testCompressingPipeWriterErrorPropagation(compressor internal.Compressor, t
 	lz.Compress(MockDisarmedCrypter())
 
 	decompressed := &BufCloser{&bytes.Buffer{}, false}
-	decompressor := FindDecompressor(compressor.FileExtension())
+	decompressor := compression.FindDecompressor(compressor.FileExtension())
 	err := decompressor.Decompress(decompressed, &DelayedErrorReader{lz.Output, L})
 	assert.Errorf(t, err, "%v did not propagate error of the buffer", compressor.FileExtension())
 }
 
 func TestCompressingPipeWriterErrorPropagation(t *testing.T) {
-	for _, compressor := range internal.Compressors {
+	for _, compressor := range compression.Compressors {
 		go testCompressingPipeWriterErrorPropagation(compressor, t)
 	}
 }

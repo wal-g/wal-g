@@ -6,11 +6,6 @@ import (
 	"os"
 )
 
-type ReaderFromWriteCloser interface {
-	io.ReaderFrom
-	io.WriteCloser
-}
-
 type ReadSeekCloser interface {
 	io.Reader
 	io.Seeker

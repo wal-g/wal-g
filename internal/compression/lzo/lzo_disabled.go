@@ -1,6 +1,6 @@
 // +build !lzo
 
-package internal
+package lzo
 
 import (
 	"github.com/wal-g/wal-g/internal/tracelog"
