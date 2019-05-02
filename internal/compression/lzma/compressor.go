@@ -1,6 +1,7 @@
 package lzma
 
 import (
+	"github.com/ulikunitz/xz/lzma"
 	"github.com/wal-g/wal-g/internal/compression/computils"
 	"io"
 )
@@ -13,11 +14,11 @@ const (
 type Compressor struct{}
 
 func (compressor Compressor) NewWriter(writer io.Writer) computils.ReaderFromWriteCloser {
-	lzmaWriter, err := NewReaderFromWriter(writer)
+	lzmaWriter, err := lzma.NewWriter(writer)
 	if err != nil {
-		panic(err.Error())
+		panic(err)
 	}
-	return lzmaWriter
+	return computils.NewReaderFromWriteCloserImpl(lzmaWriter)
 }
 
 func (compressor Compressor) FileExtension() string {

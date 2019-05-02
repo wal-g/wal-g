@@ -22,7 +22,7 @@ type Decompressor interface {
 }
 
 var Compressors = map[string]Compressor{
-	lz4.FileExtension:    lz4.Compressor{},
+	lz4.AlgorithmName:    lz4.Compressor{},
 	lzma.AlgorithmName:   lzma.Compressor{},
 	brotli.AlgorithmName: brotli.Compressor{},
 }
