@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
-	"github.com/wal-g/wal-g/internal/compression/computils"
 	"github.com/wal-g/wal-g/testtools"
 	"io"
 	"io/ioutil"
@@ -161,10 +160,8 @@ func testCompressingPipeWriterErrorPropagation(compressor compression.Compressor
 	rand.Read(b)
 	in := &BufCloser{bytes.NewBuffer(b), false}
 	lz := &internal.CompressingPipeWriter{
-		Input: in,
-		NewCompressingWriter: func(writer io.Writer) computils.ReaderFromWriteCloser {
-			return compressor.NewWriter(writer)
-		},
+		Input:                in,
+		NewCompressingWriter: compressor.NewWriter,
 	}
 
 	lz.Compress(MockDisarmedCrypter())

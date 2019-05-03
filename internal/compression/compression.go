@@ -2,7 +2,6 @@ package compression
 
 import (
 	"github.com/wal-g/wal-g/internal/compression/brotli"
-	"github.com/wal-g/wal-g/internal/compression/computils"
 	"github.com/wal-g/wal-g/internal/compression/lz4"
 	"github.com/wal-g/wal-g/internal/compression/lzma"
 	"github.com/wal-g/wal-g/internal/compression/zstd"
@@ -12,7 +11,7 @@ import (
 var CompressingAlgorithms = []string{lz4.AlgorithmName, lzma.AlgorithmName, brotli.AlgorithmName}
 
 type Compressor interface {
-	NewWriter(writer io.Writer) computils.ReaderFromWriteCloser
+	NewWriter(writer io.Writer) io.WriteCloser
 	FileExtension() string
 }
 

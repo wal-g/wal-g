@@ -74,6 +74,14 @@ func AssertReaderIsEmpty(t *testing.T, reader io.Reader) {
 	assert.Equal(t, io.EOF, err)
 }
 
+type NopCloserWriter struct {
+	io.Writer
+}
+
+func (NopCloserWriter) Close() error {
+	return nil
+}
+
 type NopCloser struct{}
 
 func (closer *NopCloser) Close() error {

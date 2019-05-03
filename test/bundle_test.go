@@ -131,7 +131,7 @@ func putWalIntoStorage(storage *memory.Storage, data []byte, walFilename string)
 	compressor := compression.Compressors[lz4.AlgorithmName]
 	var compressedData bytes.Buffer
 	compressingWriter := compressor.NewWriter(&compressedData)
-	_, err := compressingWriter.ReadFrom(bytes.NewReader(data))
+	_, err := utility.FastCopy(compressingWriter, bytes.NewReader(data))
 	if err != nil {
 		return err
 	}

@@ -3,8 +3,8 @@ package internal
 import (
 	"fmt"
 	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/compression/computils"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 )
 
@@ -28,7 +28,7 @@ func (err CompressingPipeWriterError) Error() string {
 type CompressingPipeWriter struct {
 	Input                io.Reader
 	Output               io.Reader
-	NewCompressingWriter func(io.Writer) computils.ReaderFromWriteCloser
+	NewCompressingWriter func(io.Writer) io.WriteCloser
 }
 
 // Compress compresses input to a pipe reader. Output must be used or
@@ -51,7 +51,7 @@ func (pipeWriter *CompressingPipeWriter) Compress(crypter Crypter) {
 	lzWriter := pipeWriter.NewCompressingWriter(writeIgnorer)
 
 	go func() {
-		_, err := lzWriter.ReadFrom(pipeWriter.Input)
+		_, err := utility.FastCopy(lzWriter, pipeWriter.Input)
 
 		if err != nil {
 			e := NewCompressingPipeWriterError("Compress: compression failed")

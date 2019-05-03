@@ -3,6 +3,7 @@ package compression
 import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"math/rand"
 	"testing"
@@ -32,7 +33,7 @@ func testCompressor(compressor Compressor, testData bytes.Buffer, t *testing.T) 
 	initialData := testData
 	var compressed bytes.Buffer
 	compressingWriter := compressor.NewWriter(&compressed)
-	_, err := compressingWriter.ReadFrom(&testData)
+	_, err := utility.FastCopy(compressingWriter, &testData)
 	assert.NoError(t, err)
 	err = compressingWriter.Close()
 	assert.NoError(t, err)
