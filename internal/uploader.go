@@ -88,17 +88,10 @@ func (uploader *Uploader) UploadWalFile(file NamedReader) error {
 // TODO : unit tests
 // UploadFile compresses a file and uploads it.
 func (uploader *Uploader) UploadFile(file NamedReader) error {
-	pipeWriter := &CompressingPipeWriter{
-		Input:                file,
-		NewCompressingWriter: uploader.Compressor.NewWriter,
-	}
-
-	pipeWriter.Compress(&OpenPGPCrypter{})
-
+	compressedFile := CompressAndEncrypt(file, uploader.Compressor, &OpenPGPCrypter{})
 	dstPath := utility.SanitizePath(filepath.Base(file.Name()) + "." + uploader.Compressor.FileExtension())
-	reader := pipeWriter.Output
 
-	err := uploader.Upload(dstPath, reader)
+	err := uploader.Upload(dstPath, compressedFile)
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
 	return err
 }

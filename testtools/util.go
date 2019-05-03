@@ -4,7 +4,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/storages/memory"
 	"github.com/wal-g/wal-g/internal/storages/s3"
 	"io"
@@ -38,13 +37,6 @@ func NewStoringMockUploader(storage *memory.Storage, deltaDataFolder internal.Da
 		true,
 		true,
 	)
-}
-
-func NewLz4CompressingPipeWriter(input io.Reader) *internal.CompressingPipeWriter {
-	return &internal.CompressingPipeWriter{
-		Input: input,
-		NewCompressingWriter: compression.Compressors["lz4"].NewWriter,
-	}
 }
 
 type ReadWriteNopCloser struct {

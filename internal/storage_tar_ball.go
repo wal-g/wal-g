@@ -77,7 +77,7 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter Crypter) io.Writ
 		defer uploader.waitGroup.Done()
 
 		err := uploader.Upload(path, NewNetworkLimitReader(pipeReader))
-		if compressingError, ok := err.(CompressingPipeWriterError); ok {
+		if compressingError, ok := err.(CompressAndEncryptError); ok {
 			tracelog.ErrorLogger.Printf("could not upload '%s' due to compression error\n%+v\n", path, compressingError)
 		}
 		if err != nil {

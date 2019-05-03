@@ -38,7 +38,7 @@ func testCompressor(compressor Compressor, testData bytes.Buffer, t *testing.T) 
 	err = compressingWriter.Close()
 	assert.NoError(t, err)
 	var decompressed bytes.Buffer
-	decompressor := FindDecompressor(compressor.FileExtension())
+	decompressor := GetDecompressorByCompressor(compressor)
 	err = decompressor.Decompress(&decompressed, &compressed)
 	assert.NoError(t, err)
 	assert.Equal(t, initialData.Bytes(), decompressed.Bytes())

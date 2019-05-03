@@ -34,13 +34,7 @@ var Decompressors = []Decompressor{
 }
 
 func GetDecompressorByCompressor(compressor Compressor) Decompressor {
-	extension := compressor.FileExtension()
-	for _, d := range Decompressors {
-		if d.FileExtension() == extension {
-			return d
-		}
-	}
-	return nil
+	return FindDecompressor(compressor.FileExtension())
 }
 
 func FindDecompressor(fileExtension string) Decompressor {

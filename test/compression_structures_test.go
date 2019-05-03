@@ -3,11 +3,10 @@ package test
 import (
 	"bytes"
 	"errors"
-	"github.com/pierrec/lz4"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
-	"github.com/wal-g/wal-g/testtools"
+	"github.com/wal-g/wal-g/internal/compression/lz4"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -46,6 +45,10 @@ func (er ErrorReader) Read(p []byte) (int, error) {
 	return -1, MockReadError
 }
 
+func GetLz4Compressor() compression.Compressor {
+	return compression.Compressors[lz4.AlgorithmName]
+}
+
 var tests = []struct {
 	testString string
 	testLength int
@@ -58,7 +61,7 @@ func TestCascadeFileCloser(t *testing.T) {
 	for _, tt := range tests {
 		b := &BufCloser{bytes.NewBufferString(tt.testString), false}
 		lz := &internal.CascadeWriteCloser{
-			WriteCloser: lz4.NewWriter(b),
+			WriteCloser: GetLz4Compressor().NewWriter(b),
 			Underlying:  b,
 		}
 
@@ -86,7 +89,7 @@ func TestCascadeFileCloser(t *testing.T) {
 func TestCascadeFileCloserError(t *testing.T) {
 	mock := &ErrorWriteCloser{}
 	lz := &internal.CascadeWriteCloser{
-		WriteCloser: lz4.NewWriter(mock),
+		WriteCloser: GetLz4Compressor().NewWriter(mock),
 		Underlying:  mock,
 	}
 
@@ -97,16 +100,15 @@ func TestCascadeFileCloserError(t *testing.T) {
 	assert.Errorf(t, err, "compress: CascadeWriteCloser expected error on close but got `<nil>`")
 }
 
-func TestCompressingPipeWriter(t *testing.T) {
+func TestCompressAndEncrypt(t *testing.T) {
 	for _, tt := range tests {
 		in := &BufCloser{bytes.NewBufferString(tt.testString), false}
-		lz := testtools.NewLz4CompressingPipeWriter(in)
-
-		lz.Compress(MockDisarmedCrypter())
+		compressor := GetLz4Compressor()
+		compressed := internal.CompressAndEncrypt(in, compressor, MockDisarmedCrypter())
 
 		decompressed := &BufCloser{&bytes.Buffer{}, false}
-		decompressor := compression.FindDecompressor("lz4")
-		err := decompressor.Decompress(decompressed, lz.Output)
+		decompressor := compression.GetDecompressorByCompressor(compressor)
+		err := decompressor.Decompress(decompressed, compressed)
 		if err != nil {
 			t.Logf("%+v\n", err)
 		}
@@ -116,18 +118,18 @@ func TestCompressingPipeWriter(t *testing.T) {
 
 }
 
-func TestCompressingPipeWriterBigChunk(t *testing.T) {
+func TestCompressAndEncryptBigChunk(t *testing.T) {
 	L := 1024 * 1024 // 1Mb
 	b := make([]byte, L)
 	rand.Read(b)
 	in := &BufCloser{bytes.NewBuffer(b), false}
-	lz := testtools.NewLz4CompressingPipeWriter(in)
 
-	lz.Compress(MockDisarmedCrypter())
+	compressor := GetLz4Compressor()
+	compressed := internal.CompressAndEncrypt(in, compressor, MockDisarmedCrypter())
 
 	decompressed := &BufCloser{&bytes.Buffer{}, false}
-	decompressor := compression.FindDecompressor("lz4")
-	err := decompressor.Decompress(decompressed, lz.Output)
+	decompressor := compression.GetDecompressorByCompressor(compressor)
+	err := decompressor.Decompress(decompressed, compressed)
 	if err != nil {
 		t.Logf("%+v\n", err)
 	}
@@ -154,38 +156,33 @@ func (er *DelayedErrorReader) Read(p []byte) (int, error) {
 	}
 }
 
-func testCompressingPipeWriterErrorPropagation(compressor compression.Compressor, t *testing.T) {
+func testCompressAndEncryptErrorPropagation(compressor compression.Compressor, t *testing.T) {
 	L := 1 << 20
 	b := make([]byte, L)
 	rand.Read(b)
 	in := &BufCloser{bytes.NewBuffer(b), false}
-	lz := &internal.CompressingPipeWriter{
-		Input:                in,
-		NewCompressingWriter: compressor.NewWriter,
-	}
 
-	lz.Compress(MockDisarmedCrypter())
+	compressed := internal.CompressAndEncrypt(in, compressor, MockDisarmedCrypter())
 
 	decompressed := &BufCloser{&bytes.Buffer{}, false}
-	decompressor := compression.FindDecompressor(compressor.FileExtension())
-	err := decompressor.Decompress(decompressed, &DelayedErrorReader{lz.Output, L})
+	decompressor := compression.GetDecompressorByCompressor(compressor)
+	err := decompressor.Decompress(decompressed, &DelayedErrorReader{compressed, L})
 	assert.Errorf(t, err, "%v did not propagate error of the buffer", compressor.FileExtension())
 }
 
-func TestCompressingPipeWriterErrorPropagation(t *testing.T) {
+func TestCompressAndEncryptErrorPropagation(t *testing.T) {
 	for _, compressor := range compression.Compressors {
-		go testCompressingPipeWriterErrorPropagation(compressor, t)
+		go testCompressAndEncryptErrorPropagation(compressor, t)
 	}
 }
 
-func TestCompressingPipeWriterError(t *testing.T) {
-	lz := testtools.NewLz4CompressingPipeWriter(&ErrorReader{})
+func TestCompressAndEncryptError(t *testing.T) {
+	compressor := GetLz4Compressor()
+	compressed := internal.CompressAndEncrypt(&ErrorReader{}, compressor, MockDisarmedCrypter())
 
-	lz.Compress(MockDisarmedCrypter())
-
-	_, err := ioutil.ReadAll(lz.Output)
+	_, err := ioutil.ReadAll(compressed)
 	assert.Errorf(t, err, "compress: CompressingPipeWriter expected error but got `<nil>`")
-	if re, ok := err.(internal.CompressingPipeWriterError); !ok {
-		t.Errorf("compress: CompressingPipeWriter expected CompressingPipeWriterError but got %v", re)
+	if re, ok := err.(internal.CompressAndEncryptError); !ok {
+		t.Errorf("compress: CompressingPipeWriter expected CompressAndEncryptError but got %v", re)
 	}
 }
