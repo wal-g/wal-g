@@ -1,6 +1,9 @@
+// +build lzo
+
 package lzo
 
 import (
+	"github.com/cyberdelia/lzo"
 	"github.com/wal-g/wal-g/utility"
 	"io"
 )
@@ -14,7 +17,7 @@ const (
 type Decompressor struct{}
 
 func (decompressor Decompressor) Decompress(dst io.Writer, src io.Reader) error {
-	lzor, err := NewLzoReader(src)
+	lzor, err := lzo.NewReader(src)
 	if err != nil {
 		return err
 	}

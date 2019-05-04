@@ -1,4 +1,4 @@
-//+build lzo
+// +build lzo
 
 package lzo
 
@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/cyberdelia/lzo"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/testtools"
@@ -35,7 +36,7 @@ func testLzopRoundTrip(t *testing.T, stride, nBytes int) {
 
 	// Compress bytes and make a tar in memory.
 	r, w := io.Pipe()
-	lzow := NewLzoWriter(w)
+	lzow := lzo.NewWriter(w)
 	go func() {
 		defer lzow.Close()
 		defer w.Close()
@@ -84,7 +85,7 @@ func setupRand(stride, nBytes int) *BufferReaderMaker {
 	b := &BufferReaderMaker{&bytes.Buffer{}, "/usr/local.lzo"}
 
 	pr, pw := io.Pipe()
-	lzow := NewLzoWriter(pw)
+	lzow := lzo.NewWriter(pw)
 
 	go func() {
 		testtools.CreateTar(lzow, lr)

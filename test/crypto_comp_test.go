@@ -1,3 +1,5 @@
+// +build lzo
+
 package test
 
 import (
