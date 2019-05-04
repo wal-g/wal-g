@@ -54,7 +54,9 @@ func TestSortLatestTime(t *testing.T) {
 		sortTimes[i] = val.input
 	}
 
-	sort.Sort(internal.TimeSlice(sortTimes))
+	sort.Slice(sortTimes, func(i, j int) bool {
+		return sortTimes[i].Time.After(sortTimes[j].Time)
+	})
 
 	for i, val := range sortTimes {
 		assert.Equal(t, correct[i], val.BackupName)
