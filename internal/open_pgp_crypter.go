@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -100,7 +101,7 @@ func (crypter *OpenPGPCrypter) ConfigurePGPCrypter() {
 }
 
 // Encrypt creates encryption writer from ordinary writer
-func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, error) {
+func (crypter *OpenPGPCrypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	if !crypter.Configured {
 		return nil, NewCrypterUseMischiefError()
 	}
@@ -140,11 +141,22 @@ func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, e
 		}
 	}
 
-	return &DelayWriteCloser{writer, crypter.PubKey, nil}, nil
+	// We use buffered writer because encryption starts writing header immediately,
+	// which can be inappropriate for further usage with blocking writers.
+	// E. g. if underlying writer is a pipe, then this thread will be blocked before
+	// creation of new thread, reading from this pipe.Writer.
+	bufferedWriter := bufio.NewWriter(writer)
+	encryptedWriter, err := openpgp.Encrypt(bufferedWriter, crypter.PubKey, nil, nil, nil)
+
+	if err != nil {
+		return nil, errors.Wrapf(err, "opengpg encryption error")
+	}
+
+	return NewOnCloseFlusher(encryptedWriter, bufferedWriter), nil
 }
 
 // Decrypt creates decrypted reader from ordinary reader
-func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) {
+func (crypter *OpenPGPCrypter) Decrypt(reader io.Reader) (io.Reader, error) {
 	if !crypter.Configured {
 		return nil, NewCrypterUseMischiefError()
 	}
