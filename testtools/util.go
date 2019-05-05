@@ -39,15 +39,6 @@ func NewStoringMockUploader(storage *memory.Storage, deltaDataFolder internal.Da
 	)
 }
 
-func NewLz4CompressingPipeWriter(input io.Reader) *internal.CompressingPipeWriter {
-	return &internal.CompressingPipeWriter{
-		Input: input,
-		NewCompressingWriter: func(writer io.Writer) internal.ReaderFromWriteCloser {
-			return internal.NewLz4ReaderFromWriter(writer)
-		},
-	}
-}
-
 type ReadWriteNopCloser struct {
 	io.ReadWriter
 }
@@ -73,6 +64,14 @@ func AssertReaderIsEmpty(t *testing.T, reader io.Reader) {
 	buf := make([]byte, 1)
 	_, err := reader.Read(buf)
 	assert.Equal(t, io.EOF, err)
+}
+
+type NopCloserWriter struct {
+	io.Writer
+}
+
+func (NopCloserWriter) Close() error {
+	return nil
 }
 
 type NopCloser struct{}

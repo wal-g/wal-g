@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
@@ -48,7 +49,7 @@ func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
 
 	go fetchBinlogs(folder, streamSentinel, binlogsAreDone)
 
-	for _, decompressor := range internal.Decompressors {
+	for _, decompressor := range compression.Decompressors {
 		d := decompressor
 		archiveReader, exists, err := internal.TryDownloadWALFile(baseBackupFolder, getStreamName(&backup, d.FileExtension()))
 		if err != nil {

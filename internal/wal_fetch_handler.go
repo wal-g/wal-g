@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
@@ -129,7 +130,7 @@ func TryDownloadWALFile(folder storage.Folder, walPath string) (walFileReader io
 }
 
 // TODO : unit tests
-func DecompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor Decompressor) error {
+func DecompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor compression.Decompressor) error {
 	crypter := OpenPGPCrypter{}
 	if crypter.IsUsed() {
 		reader, err := crypter.Decrypt(archiveReader)
@@ -145,7 +146,7 @@ func DecompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor 
 
 // TODO : unit tests
 func downloadAndDecompressWALFile(folder storage.Folder, walFileName string) (io.ReadCloser, error) {
-	for _, decompressor := range Decompressors {
+	for _, decompressor := range compression.Decompressors {
 		archiveReader, exists, err := TryDownloadWALFile(folder, walFileName+"."+decompressor.FileExtension())
 		if err != nil {
 			return nil, err

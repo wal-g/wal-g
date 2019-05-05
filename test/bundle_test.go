@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/compression/lz4"
 	"github.com/wal-g/wal-g/internal/storages/memory"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/walparser"
@@ -99,7 +101,7 @@ func queueTest(t *testing.T) {
 func makeDeltaFile(locations []walparser.BlockLocation) ([]byte, error) {
 	locations = append(locations, internal.TerminalLocation)
 	var data bytes.Buffer
-	compressor := internal.Compressors[internal.Lz4AlgorithmName]
+	compressor := compression.Compressors[lz4.AlgorithmName]
 	compressingWriter := compressor.NewWriter(&data)
 	err := internal.WriteLocationsTo(compressingWriter, locations)
 	if err != nil {
@@ -126,10 +128,10 @@ func putDeltaIntoStorage(storage *memory.Storage, locations []walparser.BlockLoc
 }
 
 func putWalIntoStorage(storage *memory.Storage, data []byte, walFilename string) error {
-	compressor := internal.Compressors[internal.Lz4AlgorithmName]
+	compressor := compression.Compressors[lz4.AlgorithmName]
 	var compressedData bytes.Buffer
 	compressingWriter := compressor.NewWriter(&compressedData)
-	_, err := compressingWriter.ReadFrom(bytes.NewReader(data))
+	_, err := utility.FastCopy(compressingWriter, bytes.NewReader(data))
 	if err != nil {
 		return err
 	}

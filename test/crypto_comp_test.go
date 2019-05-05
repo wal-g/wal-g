@@ -1,9 +1,12 @@
+// +build lzo
+
 package test
 
 import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression/lzo"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -57,7 +60,7 @@ func TestDecryptWALElzo(t *testing.T) {
 	assert.Equalf(t, bytes1, bytes2, "Decryption result differ")
 
 	buffer := bytes.Buffer{}
-	decompressor := internal.LzoDecompressor{}
+	decompressor := lzo.Decompressor{}
 	err = decompressor.Decompress(&buffer, bytes.NewReader(bytes1))
 	assert.NoError(t, err)
 

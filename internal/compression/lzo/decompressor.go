@@ -1,16 +1,23 @@
-package internal
+// +build lzo
+
+package lzo
 
 import (
+	"github.com/cyberdelia/lzo"
 	"github.com/wal-g/wal-g/utility"
 	"io"
 )
 
-const LzopBlockSize = 256 * 1024
+const (
+	FileExtension = "lzo"
 
-type LzoDecompressor struct{}
+	LzopBlockSize = 256 * 1024
+)
 
-func (decompressor LzoDecompressor) Decompress(dst io.Writer, src io.Reader) error {
-	lzor, err := NewLzoReader(src)
+type Decompressor struct{}
+
+func (decompressor Decompressor) Decompress(dst io.Writer, src io.Reader) error {
+	lzor, err := lzo.NewReader(src)
 	if err != nil {
 		return err
 	}
@@ -20,8 +27,8 @@ func (decompressor LzoDecompressor) Decompress(dst io.Writer, src io.Reader) err
 	return err
 }
 
-func (decompressor LzoDecompressor) FileExtension() string {
-	return LzoFileExtension
+func (decompressor Decompressor) FileExtension() string {
+	return FileExtension
 }
 
 func fastCopyHandleErrClosedPipe(dst io.Writer, src io.Reader) (int64, error) {

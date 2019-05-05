@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/semaphore"
@@ -99,7 +100,7 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 	}
 
 	fileExtension := utility.GetFileExtension(readerMaker.Path())
-	for _, decompressor := range Decompressors {
+	for _, decompressor := range compression.Decompressors {
 		if fileExtension != decompressor.FileExtension() {
 			continue
 		}
