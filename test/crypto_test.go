@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/testtools"
 	"golang.org/x/crypto/openpgp"
-	"io"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -33,32 +31,12 @@ func createCrypter(armedKeyring string) *internal.OpenPGPCrypter {
 	if err != nil {
 		panic(err)
 	}
-	crypter := &internal.OpenPGPCrypter{Configured: true, PubKey: ring, SecretKey: ring}
+	crypter := &internal.OpenPGPCrypter{PubKey: ring, SecretKey: ring}
 	return crypter
-}
-
-func MockDisarmedCrypter() internal.Crypter {
-	return &MockCrypter{}
-}
-
-type MockCrypter struct {
-}
-
-func (crypter *MockCrypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
-	return &testtools.NopCloserWriter{Writer: writer}, nil
-}
-
-func (crypter *MockCrypter) Decrypt(reader io.Reader) (io.Reader, error) {
-	return reader, nil
-}
-
-func (crypter *MockCrypter) IsUsed() bool {
-	return true
 }
 
 func TestMockCrypter(t *testing.T) {
 	MockArmedCrypter()
-	MockDisarmedCrypter()
 }
 
 func TestEncryptionCycle(t *testing.T) {

@@ -93,7 +93,7 @@ func TestPackFileTo(t *testing.T) {
 		BufferToWrite: buffer,
 	}
 	tarBall := tarBallMaker.Make(false)
-	tarBall.SetUp(MockDisarmedCrypter())
+	tarBall.SetUp(nil)
 	size, err := internal.PackFileTo(tarBall, mockHeader, strings.NewReader(mockData))
 	assert.Equal(t, int64(len(mockData)), size)
 	assert.NoError(t, err)
