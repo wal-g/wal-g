@@ -3,6 +3,7 @@ package test
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/utility"
 	"io/ioutil"
 	"os"
 	"sort"
@@ -73,7 +74,7 @@ func TestCheckType(t *testing.T) {
 		{"mockgzip", ""},
 	}
 	for _, f := range fileNames {
-		actual := internal.GetFileExtension(f.input)
+		actual := utility.GetFileExtension(f.input)
 		assert.Equal(t, f.expected, actual)
 	}
 }
@@ -82,19 +83,19 @@ func TestGetSentinelUserData(t *testing.T) {
 
 	os.Setenv("WALG_SENTINEL_USER_DATA", "1.0")
 
-	data := internal.GetSentinelUserData()
+	data := utility.GetSentinelUserData()
 	t.Log(data)
 	assert.Equalf(t, 1.0, data.(float64), "Unable to parse WALG_SENTINEL_USER_DATA")
 
 	os.Setenv("WALG_SENTINEL_USER_DATA", "\"1\"")
 
-	data = internal.GetSentinelUserData()
+	data = utility.GetSentinelUserData()
 	t.Log(data)
 	assert.Equalf(t, "1", data.(string), "Unable to parse WALG_SENTINEL_USER_DATA")
 
 	os.Setenv("WALG_SENTINEL_USER_DATA", `{"x":123,"y":["asdasd",123]}`)
 
-	data = internal.GetSentinelUserData()
+	data = utility.GetSentinelUserData()
 	t.Log(data)
 	assert.NotNilf(t, data, "Unable to parse WALG_SENTINEL_USER_DATA")
 
@@ -134,20 +135,20 @@ func TestStripBackupName(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		actual := internal.StripBackupName(testCase.input)
+		actual := utility.StripBackupName(testCase.input)
 		assert.Equal(t, testCase.expected, actual)
 	}
 }
 
 func TestGetMaxConcurrency_InvalidKeyAndValidDefaultValue(t *testing.T) {
-	actual, err := internal.GetMaxConcurrency("INVALID_KEY", 3)
+	actual, err := utility.GetMaxConcurrency("INVALID_KEY", 3)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 3, actual)
 }
 
 func TestGetMaxConcurrency_InvalidKeyAndInvalidDefaultValue(t *testing.T) {
-	actual, err := internal.GetMaxConcurrency("INVALID_KEY", -1)
+	actual, err := utility.GetMaxConcurrency("INVALID_KEY", -1)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 10, actual)
@@ -155,7 +156,7 @@ func TestGetMaxConcurrency_InvalidKeyAndInvalidDefaultValue(t *testing.T) {
 
 func TestGetMaxConcurrency_ValidKey(t *testing.T) {
 	os.Setenv("WALG_UPLOAD_CONCURRENCY", "100")
-	actual, err := internal.GetMaxConcurrency("WALG_UPLOAD_CONCURRENCY", 1)
+	actual, err := utility.GetMaxConcurrency("WALG_UPLOAD_CONCURRENCY", 1)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 100, actual)
@@ -164,7 +165,7 @@ func TestGetMaxConcurrency_ValidKey(t *testing.T) {
 
 func TestGetMaxConcurrency_ValidKeyAndInvalidDefaultValue(t *testing.T) {
 	os.Setenv("WALG_UPLOAD_CONCURRENCY", "100")
-	actual, err := internal.GetMaxConcurrency("WALG_UPLOAD_CONCURRENCY", -1)
+	actual, err := utility.GetMaxConcurrency("WALG_UPLOAD_CONCURRENCY", -1)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 100, actual)
@@ -173,7 +174,7 @@ func TestGetMaxConcurrency_ValidKeyAndInvalidDefaultValue(t *testing.T) {
 
 func TestGetMaxConcurrency_ValidKeyAndNegativeValue(t *testing.T) {
 	os.Setenv("WALG_UPLOAD_CONCURRENCY", "-5")
-	actual, err := internal.GetMaxConcurrency("WALG_UPLOAD_CONCURRENCY", 0)
+	actual, err := utility.GetMaxConcurrency("WALG_UPLOAD_CONCURRENCY", 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, actual)
@@ -182,7 +183,7 @@ func TestGetMaxConcurrency_ValidKeyAndNegativeValue(t *testing.T) {
 
 func TestGetMaxConcurrency_ValidKeyAndInvalidValue(t *testing.T) {
 	os.Setenv("WALG_UPLOAD_CONCURRENCY", "invalid")
-	_, err := internal.GetMaxConcurrency("WALG_UPLOAD_CONCURRENCY", 1)
+	_, err := utility.GetMaxConcurrency("WALG_UPLOAD_CONCURRENCY", 1)
 
 	assert.Error(t, err)
 	os.Unsetenv("WALG_UPLOAD_CONCURRENCY")

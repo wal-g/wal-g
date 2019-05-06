@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/semaphore"
 	"io"
 	"strings"
@@ -97,8 +99,8 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 		readCloser = ReadCascadeCloser{reader, readCloser}
 	}
 
-	fileExtension := GetFileExtension(readerMaker.Path())
-	for _, decompressor := range Decompressors {
+	fileExtension := utility.GetFileExtension(readerMaker.Path())
+	for _, decompressor := range compression.Decompressors {
 		if fileExtension != decompressor.FileExtension() {
 			continue
 		}
@@ -130,7 +132,7 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 
 	retrier := NewExponentialRetrier(MinExtractRetryWait, MaxExtractRetryWait)
 	// Set maximum number of goroutines spun off by ExtractAll
-	downloadingConcurrency, err := getMaxDownloadConcurrency(min(len(files), 10))
+	downloadingConcurrency, err := utility.GetMaxDownloadConcurrency(utility.Min(len(files), 10))
 	if err != nil {
 		return err
 	}

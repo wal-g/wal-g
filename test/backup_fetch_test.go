@@ -6,13 +6,14 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
+	"github.com/wal-g/wal-g/utility"
 	"strings"
 	"testing"
 )
 
 func createMockStorageFolder() storage.Folder {
 	var folder = testtools.MakeDefaultInMemoryStorageFolder()
-	subFolder := folder.GetSubFolder(internal.BaseBackupPath)
+	subFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	subFolder.PutObject("base_123_backup_stop_sentinel.json", &bytes.Buffer{})
 	subFolder.PutObject("base_456_backup_stop_sentinel.json", strings.NewReader("{}"))
 	subFolder.PutObject("base_000_backup_stop_sentinel.json", &bytes.Buffer{}) // last put
@@ -29,7 +30,7 @@ func TestGetBackupByName_Latest(t *testing.T) {
 	folder := createMockStorageFolder()
 	backup, err := internal.GetBackupByName(internal.LatestString, folder)
 	assert.NoError(t, err)
-	assert.Equal(t, folder.GetSubFolder(internal.BaseBackupPath), backup.BaseBackupFolder)
+	assert.Equal(t, folder.GetSubFolder(utility.BaseBackupPath), backup.BaseBackupFolder)
 	assert.Equal(t, "base_000", backup.Name)
 }
 
@@ -45,7 +46,7 @@ func TestGetBackupByName_Exists(t *testing.T) {
 	folder := createMockStorageFolder()
 	backup, err := internal.GetBackupByName("base_123", folder)
 	assert.NoError(t, err)
-	assert.Equal(t, folder.GetSubFolder(internal.BaseBackupPath), backup.BaseBackupFolder)
+	assert.Equal(t, folder.GetSubFolder(utility.BaseBackupPath), backup.BaseBackupFolder)
 	assert.Equal(t, "base_123", backup.Name)
 }
 

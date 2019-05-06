@@ -1,4 +1,4 @@
-package internal
+package utility
 
 import (
 	"bytes"
@@ -16,13 +16,23 @@ import (
 	"strings"
 )
 
+func LoggedClose(c io.Closer, errmsg string) {
+	err := c.Close()
+	if errmsg == "" {
+		errmsg = "Problem with closing object: %v"
+	}
+	if err != nil {
+		tracelog.ErrorLogger.Printf(errmsg + ": %v", err)
+	}
+}
+
 const (
 	VersionStr       = "005"
 	BaseBackupPath   = "basebackups_" + VersionStr + "/"
 	WalPath          = "wal_" + VersionStr + "/"
 	backupNamePrefix = "base_"
 
-	// SentinelSuffix is a suffix of backup finish sentinel file
+	// utility.SentinelSuffix is a suffix of backup finish sentinel file
 	SentinelSuffix         = "_backup_stop_sentinel.json"
 	CompressedBlockMaxSize = 20 << 20
 	NotFoundAWSErrorCode   = "NotFound"
@@ -32,14 +42,14 @@ const (
 // Empty is used for channel signaling.
 type Empty struct{}
 
-func min(a, b int) int {
+func Min(a, b int) int {
 	if a < b {
 		return a
 	}
 	return b
 }
 
-func max(a, b int) int {
+func Max(a, b int) int {
 	if a > b {
 		return a
 	}
@@ -52,7 +62,7 @@ func ToBytes(x interface{}) []byte {
 	return buf.Bytes()
 }
 
-func allZero(s []byte) bool {
+func AllZero(s []byte) bool {
 	for _, v := range s {
 		if v != 0 {
 			return false
@@ -65,7 +75,7 @@ func SanitizePath(path string) string {
 	return strings.TrimLeft(path, "/")
 }
 
-// ResolveSymlink converts path to physical if it is symlink
+// utility.ResolveSymlink converts path to physical if it is symlink
 func ResolveSymlink(path string) string {
 	resolve, err := filepath.EvalSymlinks(path)
 	if err != nil {
@@ -76,17 +86,17 @@ func ResolveSymlink(path string) string {
 	return resolve
 }
 
-func getMaxDownloadConcurrency(defaultValue int) (int, error) {
+func GetMaxDownloadConcurrency(defaultValue int) (int, error) {
 	return GetMaxConcurrency("WALG_DOWNLOAD_CONCURRENCY", defaultValue)
 }
 
-func getMaxUploadConcurrency(defaultValue int) (int, error) {
+func GetMaxUploadConcurrency(defaultValue int) (int, error) {
 	return GetMaxConcurrency("WALG_UPLOAD_CONCURRENCY", defaultValue)
 }
 
 // This setting is intentially undocumented in README. Effectively, this configures how many prepared tar Files there
 // may be in uploading state during backup-push.
-func getMaxUploadQueue() (int, error) {
+func GetMaxUploadQueue() (int, error) {
 	return GetMaxConcurrency("WALG_UPLOAD_QUEUE", 2)
 }
 
@@ -105,7 +115,7 @@ func GetSentinelUserData() interface{} {
 	return out
 }
 
-func getMaxUploadDiskConcurrency() (int, error) {
+func GetMaxUploadDiskConcurrency() (int, error) {
 	return GetMaxConcurrency("WALG_UPLOAD_DISK_CONCURRENCY", 1)
 }
 
@@ -126,7 +136,7 @@ func GetMaxConcurrency(key string, defaultValue int) (int, error) {
 			con = 10
 		}
 	}
-	return max(con, 1), nil
+	return Max(con, 1), nil
 }
 
 func GetFileExtension(filePath string) string {
@@ -165,7 +175,7 @@ func StripBackupName(path string) string {
 }
 
 // TODO : unit tests
-func stripPrefixName(path string) string {
+func StripPrefixName(path string) string {
 	path = strings.Trim(path, "/")
 	all := strings.SplitAfter(path, "/")
 	name := all[len(all)-1]
@@ -177,18 +187,12 @@ var patternLSN = "[0-9A-F]{24}"
 var regexpLSN = regexp.MustCompile(patternLSN)
 
 // Strips the backup WAL file name.
-func stripWalFileName(path string) string {
+func StripWalFileName(path string) string {
 	found_lsn := regexpLSN.FindAllString(path, 2)
 	if len(found_lsn) > 0 {
 		return found_lsn[0]
 	}
 	return strings.Repeat("Z", 24)
-}
-
-func LoggedClose(obj io.Closer) {
-	if err := obj.Close(); err != nil {
-		tracelog.ErrorLogger.Printf("Problem with closing object: %v", err)
-	}
 }
 
 type ForbiddenActionError struct {

@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/utility"
 	"testing"
 )
 
 func TestCheckExistenceWhenBackupExists(t *testing.T) {
 	folder := createMockStorageFolder()
-	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_000")
+	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_000")
 	exists, err := backup.CheckExistence()
 	assert.NoError(t, err)
 	assert.True(t, exists)
@@ -18,7 +19,7 @@ func TestCheckExistenceWhenBackupExists(t *testing.T) {
 
 func TestCheckExistenceWhenBackupNotExists(t *testing.T) {
 	folder := createMockStorageFolder()
-	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_321")
+	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_321")
 	exists, err := backup.CheckExistence()
 	assert.NoError(t, err)
 	assert.False(t, exists)
@@ -26,7 +27,7 @@ func TestCheckExistenceWhenBackupNotExists(t *testing.T) {
 
 func TestGetTarNames(t *testing.T) {
 	folder := createMockStorageFolder()
-	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_456")
+	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_456")
 	tarNames, err := backup.GetTarNames()
 	assert.NoError(t, err)
 	assert.ElementsMatch(t, []string{"1", "2", "3"}, tarNames)
@@ -34,7 +35,7 @@ func TestGetTarNames(t *testing.T) {
 
 func TestIsPgControlRequired(t *testing.T) {
 	folder := createMockStorageFolder()
-	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_456")
+	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_456")
 	dto, err := backup.FetchSentinel()
 	assert.NoError(t, err)
 	assert.True(t, internal.IsPgControlRequired(backup, dto))
@@ -42,7 +43,7 @@ func TestIsPgControlRequired(t *testing.T) {
 
 func TestIsPgControlNotRequiredForWALEBackups(t *testing.T) {
 	folder := createMockStorageFolder()
-	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_000000010000DD170000000C_00743784")
+	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_000000010000DD170000000C_00743784")
 	assert.False(t, internal.IsPgControlRequired(backup, internal.BackupSentinelDto{}))
 }
 
@@ -61,7 +62,7 @@ func TestFetchSentinel(t *testing.T) {
 
 func TestFetchSentinelReturnErrorWhenSentinelNotExist(t *testing.T) {
 	folder := createMockStorageFolder()
-	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_78934085033849")
+	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_78934085033849")
 
 	_, err := backup.FetchSentinel()
 
@@ -70,7 +71,7 @@ func TestFetchSentinelReturnErrorWhenSentinelNotExist(t *testing.T) {
 
 func TestFetchSentinelReturnErrorWhenSentinelUnmarshallable(t *testing.T) {
 	folder := createMockStorageFolder()
-	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), "base_000")
+	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_000")
 	errorMessage := "failed to unmarshal sentinel"
 
 	_, err := backup.FetchSentinel()

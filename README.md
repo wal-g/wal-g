@@ -101,6 +101,7 @@ WALE_S3_PREFIX: "s3://my-minio-bucket/sub-dir"
 AWS_ENDPOINT: "http://minio:9000"
 AWS_S3_FORCE_PATH_STYLE: "true"
 AWS_REGION: us-east-1
+WALG_S3_CA_CERT_FILE: "/path/to/custom/ca/file"
 ```
 
 * `WALG_S3_STORAGE_CLASS`

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"strings"
@@ -13,7 +14,7 @@ import (
 )
 
 func HandleStreamPush(uploader *Uploader) {
-	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(internal.BaseBackupPath)
+	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	db, err := getMySQLConnection()
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
@@ -41,23 +42,19 @@ func (uploader *Uploader) UploadStream(fileName string, db *sql.DB, stream io.Re
 	tracelog.DebugLogger.Println("Binlog start file", binlogStart)
 	timeStart := time.Now()
 	compressor := uploader.Compressor
-	pipeWriter := &internal.CompressingPipeWriter{
-		Input:                stream,
-		NewCompressingWriter: compressor.NewWriter,
-	}
 
-	pipeWriter.Compress(&internal.OpenPGPCrypter{})
+	compressed := internal.CompressAndEncrypt(stream, compressor, &internal.OpenPGPCrypter{})
 	backup := Backup{internal.NewBackup(uploader.UploadingFolder, fileName)}
 
 	dstPath := getStreamName(&backup, compressor.FileExtension())
 	tracelog.DebugLogger.Println("Upload path", dstPath)
 
-	err := uploader.Upload(dstPath, pipeWriter.Output)
+	err := uploader.Upload(dstPath, compressed)
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
 	binlogEnd := getMySQLCurrentBinlogFile(db)
 	tracelog.DebugLogger.Println("Binlog end file", binlogEnd)
 
-	uploadStreamSentinel(&StreamSentinelDto{BinLogStart: binlogStart, BinLogEnd: binlogEnd, StartLocalTime: timeStart}, uploader, fileName+internal.SentinelSuffix)
+	uploadStreamSentinel(&StreamSentinelDto{BinLogStart: binlogStart, BinLogEnd: binlogEnd, StartLocalTime: timeStart}, uploader, fileName+utility.SentinelSuffix)
 
 	return err
 }

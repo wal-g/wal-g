@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"io/ioutil"
 	"path"
 	"strings"
@@ -18,7 +19,7 @@ import (
 
 const (
 	StreamPrefix = "stream_"
-	BinlogPath   = "binlog_" + internal.VersionStr + "/"
+	BinlogPath   = "binlog_" + utility.VersionStr + "/"
 	BinlogEndTs  = "WALG_MYSQL_BINLOG_END_TS"
 	BinlogDst    = "WALG_MYSQL_BINLOG_DST"
 	BinlogSrc    = "WALG_MYSQL_BINLOG_SRC"
@@ -106,6 +107,6 @@ type StreamSentinelDto struct {
 }
 
 func getStreamName(backup *Backup, extension string) string {
-	dstPath := internal.SanitizePath(path.Join(backup.Name, "stream.")) + extension
+	dstPath := utility.SanitizePath(path.Join(backup.Name, "stream.")) + extension
 	return dstPath
 }

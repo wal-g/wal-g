@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const (
@@ -60,7 +61,7 @@ func (err PgControlNotFoundError) Error() string {
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
 func HandleBackupFetch(folder storage.Folder, dbDataDirectory string, backupName string) {
 	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder, %s)\n", backupName, dbDataDirectory)
-	dbDataDirectory = ResolveSymlink(dbDataDirectory)
+	dbDataDirectory = utility.ResolveSymlink(dbDataDirectory)
 	err := deltaFetchRecursion(backupName, folder, dbDataDirectory, nil)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to fetch backup: %v\n", err)
@@ -68,7 +69,7 @@ func HandleBackupFetch(folder storage.Folder, dbDataDirectory string, backupName
 }
 
 func GetBackupByName(backupName string, folder storage.Folder) (*Backup, error) {
-	baseBackupFolder := folder.GetSubFolder(BaseBackupPath)
+	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 
 	var backup *Backup
 	if backupName == LatestString {

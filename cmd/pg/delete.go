@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"regexp"
 )
 
@@ -80,7 +81,7 @@ func postgresLess(object1 storage.Object, object2 storage.Object) bool {
 }
 
 func postgresIsFullBackup(folder storage.Folder, object storage.Object) bool {
-	backup := internal.NewBackup(folder.GetSubFolder(internal.BaseBackupPath), fetchBackupName(object))
+	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), fetchBackupName(object))
 	sentinel, _ := backup.FetchSentinel()
 	return !sentinel.IsIncremental()
 }

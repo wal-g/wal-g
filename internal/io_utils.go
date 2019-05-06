@@ -1,14 +1,10 @@
 package internal
 
 import (
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 )
-
-type ReaderFromWriteCloser interface {
-	io.ReaderFrom
-	io.WriteCloser
-}
 
 type ReadSeekCloser interface {
 	io.Reader
@@ -43,6 +39,6 @@ func CreateFileWith(filePath string, content io.Reader) error {
 	if err != nil {
 		return err
 	}
-	_, err = FastCopy(file, content)
+	_, err = utility.FastCopy(file, content)
 	return err
 }

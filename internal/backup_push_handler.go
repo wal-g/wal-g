@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -51,7 +52,7 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 // TODO : unit tests
 // HandleBackupPush is invoked to perform a wal-g backup-push
 func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
-	archiveDirectory = ResolveSymlink(archiveDirectory)
+	archiveDirectory = utility.ResolveSymlink(archiveDirectory)
 	maxDeltas, fromFull := getDeltaConfig()
 
 	var previousBackupSentinelDto BackupSentinelDto
@@ -60,7 +61,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 	incrementCount := 1
 
 	folder := uploader.UploadingFolder
-	basebackupFolder := folder.GetSubFolder(BaseBackupPath)
+	basebackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	if maxDeltas > 0 {
 		previousBackupName, err = GetLatestBackupName(folder)
 		if err != nil {
@@ -122,14 +123,14 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 
 	if len(previousBackupName) > 0 && previousBackupSentinelDto.BackupStartLSN != nil {
 		if uploader.useWalDelta {
-			err = bundle.DownloadDeltaMap(folder.GetSubFolder(WalPath), backupStartLSN)
+			err = bundle.DownloadDeltaMap(folder.GetSubFolder(utility.WalPath), backupStartLSN)
 			if err == nil {
 				tracelog.InfoLogger.Println("Successfully loaded delta map, delta backup will be made with provided delta map")
 			} else {
 				tracelog.WarningLogger.Printf("Error during loading delta map: '%v'. Fallback to full scan delta backup\n", err)
 			}
 		}
-		backupName = backupName + "_D_" + stripWalFileName(previousBackupName)
+		backupName = backupName + "_D_" + utility.StripWalFileName(previousBackupName)
 	}
 
 	bundle.TarBallMaker = NewStorageTarBallMaker(backupName, uploader)
@@ -183,7 +184,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 
 	currentBackupSentinelDto.setFiles(bundle.GetFiles())
 	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
-	currentBackupSentinelDto.UserData = GetSentinelUserData()
+	currentBackupSentinelDto.UserData = utility.GetSentinelUserData()
 
 	err = UploadMetadata(uploader, currentBackupSentinelDto, backupName, meta)
 	if err != nil {
@@ -206,7 +207,7 @@ func UploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupNa
 	meta.FinishLsn = *sentinelDto.BackupFinishLSN
 	meta.PgVersion = sentinelDto.PgVersion
 
-	metaFile := storage.JoinPath(backupName, MetadataFileName)
+	metaFile := storage.JoinPath(backupName, utility.MetadataFileName)
 	dtoBody, err := json.Marshal(meta)
 	if err != nil {
 		return NewSentinelMarshallingError(metaFile, err)
@@ -217,7 +218,7 @@ func UploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupNa
 
 // TODO : unit tests
 func UploadSentinel(uploader *Uploader, sentinelDto *BackupSentinelDto, backupName string) error {
-	sentinelName := backupName + SentinelSuffix
+	sentinelName := backupName + utility.SentinelSuffix
 
 	dtoBody, err := json.Marshal(*sentinelDto)
 	if err != nil {
