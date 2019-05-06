@@ -55,7 +55,7 @@ func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
-	defer internal.LoggedClose(rows, "")
+	defer utility.LoggedClose(rows, "")
 	var logFileName string
 	var garbage interface{}
 	for rows.Next() {
