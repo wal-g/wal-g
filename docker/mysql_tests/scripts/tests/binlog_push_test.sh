@@ -19,7 +19,7 @@ xtrabackup --backup \
 mysql -u sbtest -h localhost -e "FLUSH LOGS";
 find /var/lib/mysql -printf "%f\n" | grep "mysql-bin" | sort | tail -n +2 > /tmp/mysql-bin1.index
 
-wal-g binlog-push ${MYSQLDATA}
+wal-g binlog-push
 sleep 1
 export WALG_MYSQL_BINLOG_END_TS=`date --rfc-3339=ns | sed 's/ /T/'`
 
