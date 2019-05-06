@@ -55,19 +55,9 @@ func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
+	defer utility.LoggedClose(rows, "")
 	var logFileName string
 	var garbage interface{}
-	for rows.Next() {
-		err = rows.Scan(&logFileName, &garbage, &garbage, &garbage, &garbage)
-		if err != nil {
-			tracelog.ErrorLogger.Fatalf("%+v\n", err)
-		}
-		return logFileName
-	}
-	rows, err = db.Query("SHOW SLAVE STATUS")
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
-	}
 	for rows.Next() {
 		err = rows.Scan(&logFileName, &garbage, &garbage, &garbage, &garbage)
 		if err != nil {
