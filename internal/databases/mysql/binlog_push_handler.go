@@ -25,11 +25,10 @@ func HandleBinlogPush(uploader *Uploader) {
 	binlogsFolder := internal.GetSettingValue(BinlogSrc)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(BinlogPath)
 	db, err := getMySQLConnection()
-	defer utility.LoggedClose(db,"")
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
-	defer internal.LoggedClose(db)
+	defer internal.LoggedClose(db,"")
 
 	binlogs := getMySQLSortedBinlogs(db)
 
