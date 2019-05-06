@@ -28,7 +28,7 @@ func HandleBinlogPush(uploader *Uploader) {
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
-	defer internal.LoggedClose(db,"")
+	defer utility.LoggedClose(db,"")
 
 	binlogs := getMySQLSortedBinlogs(db)
 
@@ -49,7 +49,7 @@ func getMySQLSortedBinlogs(db *sql.DB) []string {
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
-	defer internal.LoggedClose(rows, "")
+	defer utility.LoggedClose(rows, "")
 	for rows.Next() {
 		var logFinName string
 		var size uint32
