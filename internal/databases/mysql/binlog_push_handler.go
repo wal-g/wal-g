@@ -49,7 +49,7 @@ func getMySQLSortedBinlogs(db *sql.DB) []string {
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
-	defer rows.Close()
+	defer internal.LoggedClose(rows, "")
 	for rows.Next() {
 		var logFinName string
 		var size uint32
