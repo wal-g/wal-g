@@ -135,11 +135,11 @@ func TestUploadError(t *testing.T) {
 	tarBall := maker.Make(true)
 	tarBall.SetUp(MockArmedCrypter())
 
-	assert.False(t, uploader.Success)
+	assert.False(t, uploader.Failed.Load().(bool))
 
 	uploader = testtools.NewMockUploader(true, false)
 
 	tarBall = maker.Make(true)
 	tarBall.SetUp(MockArmedCrypter())
-	assert.False(t, uploader.Success)
+	assert.False(t, uploader.Failed.Load().(bool))
 }

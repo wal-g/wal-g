@@ -164,7 +164,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 
 	// Wait for all uploads to finish.
 	uploader.finish()
-	if !uploader.Success {
+	if uploader.Failed.Load().(bool) {
 		tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", backupName)
 	}
 	if timelineChanged {

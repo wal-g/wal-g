@@ -56,7 +56,7 @@ func (tarBall *StorageTarBall) CloseTar() error {
 
 func (tarBall *StorageTarBall) AwaitUploads() {
 	tarBall.uploader.waitGroup.Wait()
-	if !tarBall.uploader.Success {
+	if tarBall.uploader.Failed.Load().(bool) {
 		tracelog.ErrorLogger.Fatal("Unable to complete uploads")
 	}
 }
