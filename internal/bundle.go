@@ -580,6 +580,6 @@ func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string,
 	fileReader = &ReadCascadeCloser{&io.LimitedReader{
 		R: io.MultiReader(diskLimitedFileReader, &ZeroReader{}),
 		N: int64(fileInfoHeader.Size),
-	}, diskLimitedFileReader}
+	}, file}
 	return fileReader, nil
 }
