@@ -13,7 +13,7 @@ COPY main/ main/
 COPY utility/ utility/
 
 RUN cd main/pg && \
-    go build -o wal-g -tags lzo -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
+    go build -race -o wal-g -tags lzo -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 
 FROM wal-g/pg:latest
 

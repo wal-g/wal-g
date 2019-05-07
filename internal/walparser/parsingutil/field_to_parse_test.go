@@ -24,10 +24,12 @@ func TestFieldToParse_ParseMultipleFieldsFromReader(t *testing.T) {
 	var y uint32
 	var z uint16
 	data := []byte{0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0x00, 0xDE, 0xF0}
+	var paddingByte uint8
+	PaddingByte := NewFieldToParse(&paddingByte, "padding byte")
 	ParseMultipleFieldsFromReader([]FieldToParse{
 		{&x, "x"},
 		{&y, "y"},
-		PaddingByte,
+		*PaddingByte,
 		{&z, "z"},
 	}, bytes.NewReader(data))
 	assert.Equal(t, x, uint16(0x3412))

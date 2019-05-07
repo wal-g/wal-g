@@ -48,14 +48,14 @@ mysql_install: mysql_build
 
 unittest:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet
-	go test -v ./test/
-	go test -v ./internal/walparser/
-	go test -v ./internal/compression/
-	go test -v ./internal/storages/s3/
-	go test -v ./internal/storages/gcs/
-	go test -v ./internal/storages/fs/
-	go test -v ./internal/storages/azure/
-	go test -v ./internal/storages/swift/
+	go test -v $(TEST_MODIFIER) ./test/
+	go test -v $(TEST_MODIFIER) ./internal/walparser/
+	go test -v $(TEST_MODIFIER) ./internal/compression/
+	go test -v $(TEST_MODIFIER) ./internal/storages/s3/
+	go test -v $(TEST_MODIFIER) ./internal/storages/gcs/
+	go test -v $(TEST_MODIFIER) ./internal/storages/fs/
+	go test -v $(TEST_MODIFIER) ./internal/storages/azure/
+	go test -v $(TEST_MODIFIER) ./internal/storages/swift/
 
 fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 	gofmt -s -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
