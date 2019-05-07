@@ -174,7 +174,6 @@ func StripBackupName(path string) string {
 	return name
 }
 
-// TODO : unit tests
 func StripPrefixName(path string) string {
 	path = strings.Trim(path, "/")
 	all := strings.SplitAfter(path, "/")

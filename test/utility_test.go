@@ -188,3 +188,23 @@ func TestGetMaxConcurrency_ValidKeyAndInvalidValue(t *testing.T) {
 	assert.Error(t, err)
 	os.Unsetenv("WALG_UPLOAD_CONCURRENCY")
 }
+
+func TestStripPrefixName(t *testing.T) {
+	var testCases = []struct {
+		input    string
+		expected string
+	}{
+		{"//path/path1//", "path1"},
+		{"//path//path1/", "path1"},
+		{"path/path1", "path1"},
+		{"path/path1/path2", "path2"},
+		{"path/path1//	/path2", "path2"},
+		{"", ""},
+		{"/", ""},
+	}
+
+	for _, testCase := range testCases {
+		actual := utility.StripPrefixName(testCase.input)
+		assert.Equal(t, testCase.expected, actual)
+	}
+}
