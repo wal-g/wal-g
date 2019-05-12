@@ -1,10 +1,11 @@
 package internal
 
 import (
-	"github.com/spf13/viper"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"os"
 	"strings"
+
+	"github.com/spf13/viper"
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 var (
@@ -32,6 +33,7 @@ var (
 		"PGPORT":                       nil,
 		"PGUSER":                       nil,
 		"PGHOST":                       nil,
+		"WALG_TAR_SIZE_THRESHOLD":      nil,
 	}
 )
 
