@@ -239,6 +239,8 @@ func HandleDeleteBefore(folder storage.Folder, args []string, confirmed bool,
 	timeLine, err := time.Parse(time.RFC3339, beforeStr)
 	var target storage.Object
 	if err == nil {
+		// backup-list shows users time + 1 second, because storages doesn't keep milliseconds
+		timeLine = timeLine.Add(-time.Second)
 		target, err = FindTargetBeforeTime(folder, timeLine, modifier, isFullBackup, less)
 	} else {
 		greater := func(object1, object2 storage.Object) bool { return less(object2, object1) }
@@ -293,7 +295,7 @@ func DeleteBeforeArgsValidator(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unsupported moodifier for delete before command")
 	}
 	if before, err := time.Parse(time.RFC3339, beforeStr); err == nil {
-		if before.After(time.Now()) {
+		if before.Add(-time.Second).After(time.Now()) {
 			return fmt.Errorf("cannot delete before future date")
 		}
 	}

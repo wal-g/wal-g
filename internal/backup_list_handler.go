@@ -46,7 +46,8 @@ func WriteBackupList(backups []BackupTime, output io.Writer) {
 	fmt.Fprintln(writer, "name\tlast_modified\twal_segment_backup_start")
 	for i := len(backups) - 1; i >= 0; i-- {
 		b := backups[i]
-		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v", b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName))
+		// backup-list shows users time + 1 second, because storages doesn't keep milliseconds
+		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v", b.BackupName, b.Time.Add(time.Second).Format(time.RFC3339), b.WalFileName))
 	}
 }
 
