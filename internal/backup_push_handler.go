@@ -202,7 +202,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 		tracelog.ErrorLogger.FatalError(err)
 	}
 	// logging backup set name
-	tracelog.InfoLogger.Println("Wrote backup set with name " + backupName)
+	tracelog.InfoLogger.Println("Wrote backup with name " + backupName)
 }
 
 // TODO : unit tests
