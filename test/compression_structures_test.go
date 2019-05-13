@@ -104,7 +104,7 @@ func TestCompressAndEncrypt(t *testing.T) {
 	for _, tt := range tests {
 		in := &BufCloser{bytes.NewBufferString(tt.testString), false}
 		compressor := GetLz4Compressor()
-		compressed := internal.CompressAndEncrypt(in, compressor, nil)
+		compressed := internal.CompressAndEncrypt(in, compressor, MockDisarmedCrypter())
 
 		decompressed := &BufCloser{&bytes.Buffer{}, false}
 		decompressor := compression.GetDecompressorByCompressor(compressor)
@@ -125,7 +125,7 @@ func TestCompressAndEncryptBigChunk(t *testing.T) {
 	in := &BufCloser{bytes.NewBuffer(b), false}
 
 	compressor := GetLz4Compressor()
-	compressed := internal.CompressAndEncrypt(in, compressor, nil)
+	compressed := internal.CompressAndEncrypt(in, compressor, MockDisarmedCrypter())
 
 	decompressed := &BufCloser{&bytes.Buffer{}, false}
 	decompressor := compression.GetDecompressorByCompressor(compressor)
@@ -162,7 +162,7 @@ func testCompressAndEncryptErrorPropagation(compressor compression.Compressor, t
 	rand.Read(b)
 	in := &BufCloser{bytes.NewBuffer(b), false}
 
-	compressed := internal.CompressAndEncrypt(in, compressor, nil)
+	compressed := internal.CompressAndEncrypt(in, compressor, MockDisarmedCrypter())
 
 	decompressed := &BufCloser{&bytes.Buffer{}, false}
 	decompressor := compression.GetDecompressorByCompressor(compressor)
@@ -178,7 +178,7 @@ func TestCompressAndEncryptErrorPropagation(t *testing.T) {
 
 func TestCompressAndEncryptError(t *testing.T) {
 	compressor := GetLz4Compressor()
-	compressed := internal.CompressAndEncrypt(&ErrorReader{}, compressor, nil)
+	compressed := internal.CompressAndEncrypt(&ErrorReader{}, compressor, MockDisarmedCrypter())
 
 	_, err := ioutil.ReadAll(compressed)
 	assert.Errorf(t, err, "compress: CompressingPipeWriter expected error but got `<nil>`")

@@ -64,7 +64,7 @@ type Bundle struct {
 	Sentinel           *Sentinel
 	TarBall            TarBall
 	TarBallMaker       TarBallMaker
-	Crypter            Crypter
+	Crypter            OpenPGPCrypter
 	Timeline           uint32
 	Replica            bool
 	IncrementFromLsn   *uint64
@@ -82,11 +82,10 @@ type Bundle struct {
 }
 
 // TODO: use DiskDataFolder
-func NewBundle(archiveDirectory string, crypter Crypter, incrementFromLsn *uint64, incrementFromFiles BackupFileList) *Bundle {
+func NewBundle(archiveDirectory string, incrementFromLsn *uint64, incrementFromFiles BackupFileList) *Bundle {
 	return &Bundle{
 		ArchiveDirectory:   archiveDirectory,
 		TarSizeThreshold:   DefaultTarSizeThreshold,
-		Crypter:            crypter,
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
 		Files:              &sync.Map{},
@@ -327,7 +326,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 		}
 
 		tarBall := bundle.Deque()
-		tarBall.SetUp(bundle.Crypter)
+		tarBall.SetUp(&bundle.Crypter)
 		go func() {
 			// TODO: Refactor this functional mess
 			// And maybe do a better error handling
@@ -342,7 +341,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 		}()
 	} else {
 		tarBall := bundle.Deque()
-		tarBall.SetUp(bundle.Crypter)
+		tarBall.SetUp(&bundle.Crypter)
 		defer bundle.EnqueueBack(tarBall)
 		err = tarBall.TarWriter().WriteHeader(fileInfoHeader)
 		if err != nil {
@@ -366,7 +365,7 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 
 	bundle.NewTarBall(false)
 	tarBall := bundle.TarBall
-	tarBall.SetUp(bundle.Crypter, "pg_control.tar."+compressorFileExtension)
+	tarBall.SetUp(&bundle.Crypter, "pg_control.tar."+compressorFileExtension)
 	tarWriter := tarBall.TarWriter()
 
 	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
@@ -430,7 +429,7 @@ func (bundle *Bundle) UploadLabelFiles(conn *pgx.Conn) (uint64, error) {
 
 	bundle.NewTarBall(false)
 	tarBall := bundle.TarBall
-	tarBall.SetUp(bundle.Crypter)
+	tarBall.SetUp(&bundle.Crypter)
 
 	labelHeader := &tar.Header{
 		Name:     BackupLabelFilename,
@@ -580,6 +579,6 @@ func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string,
 	fileReader = &ReadCascadeCloser{&io.LimitedReader{
 		R: io.MultiReader(diskLimitedFileReader, &ZeroReader{}),
 		N: int64(fileInfoHeader.Size),
-	}, file}
+	}, diskLimitedFileReader}
 	return fileReader, nil
 }

@@ -56,7 +56,7 @@ func (tarBall *StorageTarBall) CloseTar() error {
 
 func (tarBall *StorageTarBall) AwaitUploads() {
 	tarBall.uploader.waitGroup.Wait()
-	if tarBall.uploader.Failed.Load().(bool) {
+	if !tarBall.uploader.Success {
 		tracelog.ErrorLogger.Fatal("Unable to complete uploads")
 	}
 }
@@ -86,19 +86,17 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter Crypter) io.Writ
 		}
 	}()
 
-	var writerToCompress io.WriteCloser = pipeWriter
-
-	if crypter != nil {
+	if crypter.IsUsed() {
 		encryptedWriter, err := crypter.Encrypt(pipeWriter)
 
 		if err != nil {
 			tracelog.ErrorLogger.Fatal("upload: encryption error ", err)
 		}
 
-		writerToCompress = &CascadeWriteCloser{encryptedWriter, pipeWriter}
+		return &CascadeWriteCloser{uploader.Compressor.NewWriter(encryptedWriter), &CascadeWriteCloser{encryptedWriter, pipeWriter}}
 	}
 
-	return &CascadeWriteCloser{uploader.Compressor.NewWriter(writerToCompress), writerToCompress}
+	return &CascadeWriteCloser{uploader.Compressor.NewWriter(pipeWriter), pipeWriter}
 }
 
 // Size accumulated in this tarball

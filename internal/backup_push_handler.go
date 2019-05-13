@@ -104,11 +104,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 
 	uploader.UploadingFolder = basebackupFolder // TODO: AB: this subfolder switch look ugly. I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
 
-	crypter := NewOpenPGPCrypter()
-	if crypter != nil {
-		crypter = nil
-	}
-	bundle := NewBundle(archiveDirectory, crypter, previousBackupSentinelDto.BackupStartLSN, previousBackupSentinelDto.Files)
+	bundle := NewBundle(archiveDirectory, previousBackupSentinelDto.BackupStartLSN, previousBackupSentinelDto.Files)
 
 	var meta ExtendedMetadataDto
 	meta.StartTime = time.Now()
@@ -164,7 +160,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 
 	// Wait for all uploads to finish.
 	uploader.finish()
-	if uploader.Failed.Load().(bool) {
+	if !uploader.Success {
 		tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", backupName)
 	}
 	if timelineChanged {

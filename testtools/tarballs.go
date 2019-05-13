@@ -32,7 +32,7 @@ func (tarBall *FileTarBall) SetUp(crypter internal.Crypter, names ...string) {
 		}
 		var writeCloser io.WriteCloser
 
-		if crypter != nil {
+		if crypter.IsUsed() {
 			writeCloser, err = crypter.Encrypt(file)
 
 			if err != nil {

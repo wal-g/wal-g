@@ -29,7 +29,7 @@ func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, cry
 	compressedReader, dstWriter := io.Pipe()
 
 	var writeCloser io.WriteCloser = dstWriter
-	if crypter != nil {
+	if crypter.IsUsed() {
 		var err error
 		writeCloser, err = crypter.Encrypt(dstWriter)
 
@@ -54,7 +54,7 @@ func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, cry
 			dstWriter.CloseWithError(e)
 			return
 		}
-		if crypter != nil {
+		if crypter.IsUsed() {
 			err := writeCloser.Close()
 
 			if err != nil {
@@ -63,7 +63,10 @@ func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, cry
 				return
 			}
 		}
-		dstWriter.Close()
+		if err = dstWriter.Close(); err != nil {
+			e := NewCompressingPipeWriterError("CompressAndEncrypt: pipe writer close failed")
+			dstWriter.CloseWithError(e)
+		}
 	}()
 	return compressedReader
 }
