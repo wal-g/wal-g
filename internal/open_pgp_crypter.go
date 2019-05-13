@@ -1,8 +1,8 @@
 package internal
 
 import (
+	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -13,26 +13,11 @@ import (
 	"golang.org/x/crypto/openpgp"
 )
 
-// CrypterUseMischiefError happens when crypter is used before initialization
-type CrypterUseMischiefError struct {
-	error
-}
-
-func NewCrypterUseMischiefError() CrypterUseMischiefError {
-	return CrypterUseMischiefError{errors.New("crypter is not checked before use")}
-}
-
-func (err CrypterUseMischiefError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
 // OpenPGPCrypter incapsulates specific of cypher method
-// Includes keys, infrastructutre information etc
+// Includes keys, infrastructure information etc
 // If many encryption methods will be used it worth
 // to extract interface
 type OpenPGPCrypter struct {
-	Configured bool
-
 	KeyRingId      string
 	IsUseKeyRingId bool
 
@@ -48,7 +33,18 @@ type OpenPGPCrypter struct {
 	mutex sync.RWMutex
 }
 
-func (crypter *OpenPGPCrypter) IsArmed() bool {
+// NewOpenPGPCrypter created OpenPGPCrypter and configures it.
+// In case that OpenPGPCrypter is not armed, it returns nil.
+func NewOpenPGPCrypter() Crypter {
+	crypter := &OpenPGPCrypter{}
+	crypter.configure()
+	if !crypter.isArmed() {
+		return nil
+	}
+	return crypter
+}
+
+func (crypter *OpenPGPCrypter) isArmed() bool {
 	if crypter.IsUseKeyRingId {
 		tracelog.WarningLogger.Println(`
 You are using deprecated functionality that uses an external gpg library.
@@ -60,20 +56,8 @@ Please set GPG key using environment variables WALG_PGP_KEY or WALG_PGP_KEY_PATH
 	return crypter.IsUseArmoredKey || crypter.IsUseArmoredKeyPath || crypter.IsUseKeyRingId
 }
 
-// IsUsed is to check necessity of Crypter use
-// Must be called prior to any other crypter call
-func (crypter *OpenPGPCrypter) IsUsed() bool {
-	if !crypter.Configured {
-		crypter.ConfigurePGPCrypter()
-	}
-
-	return crypter.IsArmed()
-}
-
-// ConfigurePGPCrypter internal initialization
-func (crypter *OpenPGPCrypter) ConfigurePGPCrypter() {
-	crypter.Configured = true
-
+// configure internal initialization
+func (crypter *OpenPGPCrypter) configure() {
 	// key can be either private (for download) or public (for upload)
 	armoredKey, isKeyExist := LookupConfigValue("WALG_PGP_KEY")
 
@@ -99,56 +83,78 @@ func (crypter *OpenPGPCrypter) ConfigurePGPCrypter() {
 	}
 }
 
-// Encrypt creates encryption writer from ordinary writer
-func (crypter *OpenPGPCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, error) {
-	if !crypter.Configured {
-		return nil, NewCrypterUseMischiefError()
+func (crypter *OpenPGPCrypter) setupPubKey() error {
+	crypter.mutex.RLock()
+	if crypter.PubKey != nil {
+		crypter.mutex.RUnlock()
+		return nil
+	}
+	crypter.mutex.RUnlock()
+
+	crypter.mutex.Lock()
+	defer crypter.mutex.Unlock()
+	if crypter.PubKey != nil { // already set up
+		return nil
 	}
 
-	if crypter.PubKey == nil {
-		if crypter.IsUseArmoredKey {
-			entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(crypter.ArmoredKey))
+	if crypter.IsUseArmoredKey {
+		entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(crypter.ArmoredKey))
 
-			if err != nil {
-				return nil, err
-			}
-
-			crypter.PubKey = entityList
-		} else if crypter.IsUseArmoredKeyPath {
-			entityList, err := ReadPGPKey(crypter.ArmoredKeyPath)
-
-			if err != nil {
-				return nil, err
-			}
-
-			crypter.PubKey = entityList
-		} else {
-			// TODO: legacy gpg external use, need to remove in next major version
-			armor, err := getPubRingArmor(crypter.KeyRingId)
-
-			if err != nil {
-				return nil, err
-			}
-
-			entityList, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(armor))
-
-			if err != nil {
-				return nil, err
-			}
-
-			crypter.PubKey = entityList
+		if err != nil {
+			return err
 		}
+
+		crypter.PubKey = entityList
+	} else if crypter.IsUseArmoredKeyPath {
+		entityList, err := ReadPGPKey(crypter.ArmoredKeyPath)
+
+		if err != nil {
+			return err
+		}
+
+		crypter.PubKey = entityList
+	} else {
+		// TODO: legacy gpg external use, need to remove in next major version
+		armor, err := getPubRingArmor(crypter.KeyRingId)
+
+		if err != nil {
+			return err
+		}
+
+		entityList, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(armor))
+
+		if err != nil {
+			return err
+		}
+
+		crypter.PubKey = entityList
+	}
+	return nil
+}
+
+// Encrypt creates encryption writer from ordinary writer
+func (crypter *OpenPGPCrypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
+	err := crypter.setupPubKey()
+	if err != nil {
+		return nil, err
 	}
 
-	return &DelayWriteCloser{writer, crypter.PubKey, nil}, nil
+	// We use buffered writer because encryption starts writing header immediately,
+	// which can be inappropriate for further usage with blocking writers.
+	// E. g. if underlying writer is a pipe, then this thread will be blocked before
+	// creation of new thread, reading from this pipe.Writer.
+	bufferedWriter := bufio.NewWriter(writer)
+	encryptedWriter, err := openpgp.Encrypt(bufferedWriter, crypter.PubKey, nil, nil, nil)
+
+	if err != nil {
+		return nil, errors.Wrapf(err, "opengpg encryption error")
+	}
+
+	return NewOnCloseFlusher(encryptedWriter, bufferedWriter), nil
 }
 
 // Decrypt creates decrypted reader from ordinary reader
-func (crypter *OpenPGPCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) {
-	if !crypter.Configured {
-		return nil, NewCrypterUseMischiefError()
-	}
-
+func (crypter *OpenPGPCrypter) Decrypt(reader io.Reader) (io.Reader, error) {
 	err := crypter.loadSecret()
 
 	if err != nil {

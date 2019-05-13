@@ -80,9 +80,10 @@ func getBackupTimeSlices(backups []storage.Object) []BackupTime {
 		time := object.GetLastModified()
 		sortTimes[i] = BackupTime{utility.StripBackupName(key), time, utility.StripWalFileName(key)}
 	}
-	slice := TimeSlice(sortTimes)
-	sort.Sort(slice)
-	return slice
+	sort.Slice(sortTimes, func(i, j int) bool {
+		return sortTimes[i].Time.After(sortTimes[j].Time)
+	})
+	return sortTimes
 }
 
 // TODO : unit tests

@@ -131,8 +131,8 @@ func TryDownloadWALFile(folder storage.Folder, walPath string) (walFileReader io
 
 // TODO : unit tests
 func DecompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor compression.Decompressor) error {
-	crypter := OpenPGPCrypter{}
-	if crypter.IsUsed() {
+	crypter := NewOpenPGPCrypter()
+	if crypter != nil {
 		reader, err := crypter.Decrypt(archiveReader)
 		if err != nil {
 			return err
