@@ -166,10 +166,10 @@ if FIND_FULL is specified WAL-G will calculate minimum backup needed to keep all
 Databases
 -----------
 ### PostgreSQL
-[Information about installing, configuration and usage](https://github.com/g0djan/readme/blob/master/PostgreSQL.md)
+[Information about installing, configuration and usage](https://github.com/wal-g/wal-g/blob/master/PostgreSQL.md)
 
 ### MySQL
-[Information about installing, configuration and usage](https://github.com/g0djan/readme/blob/master/MySQL.md)
+[Information about installing, configuration and usage](https://github.com/wal-g/wal-g/blob/master/MySQL.md)
 
 Development
 -----------
