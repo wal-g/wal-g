@@ -40,7 +40,9 @@ func (lazyCache *LazyCache) Load(key interface{}) (value interface{}, exists boo
 		return value, true, nil
 	}
 	value, err = lazyCache.load(key)
-	lazyCache.cache[key] = value
+	if err == nil {
+		lazyCache.cache[key] = value
+	}
 	return value, false, err
 }
 
@@ -60,6 +62,8 @@ func (lazyCache *LazyCache) Store(key, value interface{}) {
 // Range calls reduce sequentially for each key and value present in the cache.
 // If reduce returns false, range stops the iteration.
 func (lazyCache *LazyCache) Range(reduce func(key, value interface{}) bool) {
+	lazyCache.cacheMutex.Lock()
+	defer lazyCache.cacheMutex.Unlock()
 	for key, value := range lazyCache.cache {
 		if !reduce(key, value) {
 			break

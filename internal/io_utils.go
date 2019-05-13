@@ -24,6 +24,27 @@ type ReadCascadeCloser struct {
 	io.Closer
 }
 
+type Flusher interface {
+	Flush() error
+}
+
+type OnCloseFlusher struct {
+	io.WriteCloser
+	Flusher
+}
+
+func NewOnCloseFlusher(writeCloser io.WriteCloser, flusher Flusher) *OnCloseFlusher {
+	return &OnCloseFlusher{writeCloser, flusher}
+}
+
+func (cf OnCloseFlusher) Close() error {
+	err := cf.WriteCloser.Close()
+	if err != nil {
+		return err
+	}
+	return cf.Flush()
+}
+
 // ZeroReader generates a slice of zeroes. Used to pad
 // tar in cases where length of file changes.
 type ZeroReader struct{}

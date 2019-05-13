@@ -70,7 +70,7 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 	archiveDirectory := uploader.deltaFileManager.dataFolder.(*DiskDataFolder).path
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	archiveDirectory = filepath.Dir(archiveDirectory)
-	bundle := NewBundle(archiveDirectory, &prefaultStartLsn, nil)
+	bundle := NewBundle(archiveDirectory, nil, &prefaultStartLsn, nil)
 	bundle.Timeline = timelineId
 	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(utility.WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
 	if err != nil {
