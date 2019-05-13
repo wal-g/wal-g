@@ -37,9 +37,11 @@ type BgUploader struct {
 	totalUploaded int32
 
 	mutex sync.Mutex
+
+	preventWalOverwrite bool
 }
 
-func NewBgUploader(walFilePath string, maxParallelWorkers int32, uploader *Uploader) *BgUploader {
+func NewBgUploader(walFilePath string, maxParallelWorkers int32, uploader *Uploader, preventWalOverwrite bool) *BgUploader {
 	started := make(map[string]interface{})
 	started[filepath.Base(walFilePath)+readySuffix] = walFilePath
 	return &BgUploader{
@@ -51,6 +53,7 @@ func NewBgUploader(walFilePath string, maxParallelWorkers int32, uploader *Uploa
 		uploader,
 		0,
 		sync.Mutex{},
+		preventWalOverwrite,
 	}
 }
 
@@ -125,7 +128,7 @@ func (bgUploader *BgUploader) haveNoSlots() bool {
 // upload one WAL file
 func (bgUploader *BgUploader) upload(info os.FileInfo) {
 	walFilename := strings.TrimSuffix(info.Name(), readySuffix)
-	err := UploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename))
+	err := UploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename), bgUploader.preventWalOverwrite)
 	if err != nil {
 		tracelog.ErrorLogger.Print("Error of background uploader: ", err)
 		return

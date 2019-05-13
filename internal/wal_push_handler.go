@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 type CantOverwriteWalFileError struct {
@@ -27,14 +28,21 @@ func (err CantOverwriteWalFileError) Error() string {
 // HandleWALPush is invoked to perform wal-g wal-push
 func HandleWALPush(uploader *Uploader, walFilePath string) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
+
 	concurrency, err := utility.GetMaxUploadConcurrency(16)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
-	bgUploader := NewBgUploader(walFilePath, int32(concurrency-1), uploader)
+
+	preventWalOverwrite, err := utility.GetWalOverwriteSetting()
+	if err != nil {
+		tracelog.ErrorLogger.Fatalf("%+v\n", err)
+	}
+
+	bgUploader := NewBgUploader(walFilePath, int32(concurrency-1), uploader, preventWalOverwrite)
 	// Look for new WALs while doing main upload
 	bgUploader.Start()
-	err = UploadWALFile(uploader, walFilePath)
+	err = UploadWALFile(uploader, walFilePath, bgUploader.preventWalOverwrite)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
@@ -47,8 +55,8 @@ func HandleWALPush(uploader *Uploader, walFilePath string) {
 
 // TODO : unit tests
 // uploadWALFile from FS to the cloud
-func UploadWALFile(uploader *Uploader, walFilePath string) error {
-	if uploader.preventWalOverwrite {
+func UploadWALFile(uploader *Uploader, walFilePath string, preventWalOverwrite bool) error {
+	if preventWalOverwrite {
 		overwriteAttempt, err := checkWALOverwrite(uploader, walFilePath)
 		if err != nil {
 			return errors.Wrap(err, "Couldn't check whether there is an overwrite attempt due to inner error")

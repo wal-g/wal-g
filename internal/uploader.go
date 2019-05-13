@@ -20,14 +20,13 @@ type Uploader struct {
 	deltaFileManager    *DeltaFileManager
 	Success             bool
 	useWalDelta         bool
-	preventWalOverwrite bool
 }
 
 func NewUploader(
 	compressor compression.Compressor,
 	uploadingLocation storage.Folder,
 	deltaDataFolder DataFolder,
-	useWalDelta, preventWalOverwrite bool,
+	useWalDelta bool,
 ) *Uploader {
 	var deltaFileManager *DeltaFileManager = nil
 	if useWalDelta {
@@ -39,7 +38,6 @@ func NewUploader(
 		useWalDelta:         useWalDelta,
 		waitGroup:           &sync.WaitGroup{},
 		deltaFileManager:    deltaFileManager,
-		preventWalOverwrite: preventWalOverwrite,
 	}
 }
 
@@ -61,7 +59,6 @@ func (uploader *Uploader) Clone() *Uploader {
 		uploader.deltaFileManager,
 		uploader.Success,
 		uploader.useWalDelta,
-		uploader.preventWalOverwrite,
 	}
 }
 
