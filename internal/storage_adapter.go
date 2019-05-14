@@ -50,5 +50,5 @@ var StorageAdapters = []StorageAdapter{
 	{"WALE_FILE_PREFIX", nil, fs.ConfigureFolder, preprocessFilePrefix},
 	{"WALE_GS_PREFIX", nil, gcs.ConfigureFolder, nil},
 	{"WALE_AZ_PREFIX", azure.SettingList, azure.ConfigureFolder, nil},
-	{"WALE_SWIFT_PREFIX", nil, swift.ConfigureFolder, nil},
+	{"WALE_SWIFT_PREFIX", swift.SettingList, swift.ConfigureFolder, nil},
 }

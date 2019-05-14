@@ -1,13 +1,9 @@
 package internal
 
 import (
-	"encoding/json"
-	"github.com/go-yaml/yaml"
+	"github.com/spf13/viper"
 	"github.com/wal-g/wal-g/internal/tracelog"
-	"io/ioutil"
 	"os"
-	"os/user"
-	"path/filepath"
 	"strings"
 )
 
@@ -32,6 +28,10 @@ var (
 		"WALG_USE_WAL_DELTA":           nil,
 		"WALG_LOG_LEVEL":               nil,
 		"WALG_S3_CA_CERT_FILE":         nil,
+		"USER":                         nil,
+		"PGPORT":                       nil,
+		"PGUSER":                       nil,
+		"PGHOST":                       nil,
 	}
 )
 
@@ -66,23 +66,10 @@ func verifyConfig() {
 }
 
 func readConfig() {
-	usr, err := user.Current()
-	if err != nil {
-		return
-	}
-	for _, unmarshal := range []func([]byte, interface{}) error{json.Unmarshal, yaml.Unmarshal} {
-		cacheFilename := filepath.Join(usr.HomeDir, ".walg.json")
-		file, err := ioutil.ReadFile(cacheFilename)
-		// here we ignore whatever error can occur
-		if err == nil {
-			err = unmarshal(file, &WalgConfig)
-			if err != nil {
-				tracelog.ErrorLogger.Panic(err)
-			}
-			return
-		} else if !os.IsNotExist(err) {
-			tracelog.ErrorLogger.Panic(err)
-		}
+	cfg := make(map[string]string)
+	WalgConfig = &cfg
+	for _, key := range viper.AllKeys() {
+		cfg[key] = viper.GetString(key)
 	}
 }
 
