@@ -35,6 +35,6 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(config.InitConfig)
 
-	PgCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
+	PgCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 	PgCmd.InitDefaultVersionFlag()
 }
