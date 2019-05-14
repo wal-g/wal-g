@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 	"os"
@@ -93,21 +92,6 @@ func GetMaxDownloadConcurrency(defaultValue int) (int, error) {
 
 func GetMaxUploadConcurrency(defaultValue int) (int, error) {
 	return GetMaxConcurrency("WALG_UPLOAD_CONCURRENCY", defaultValue)
-}
-
-func  GetWalOverwriteSetting() (preventWalOverwrite bool, err error) {
-	err = nil
-	preventWalOverwrite = false
-	preventWalOverwriteStr := internal.GetSettingValue("WALG_PREVENT_WAL_OVERWRITE")
-
-	if preventWalOverwriteStr != "" {
-		preventWalOverwrite, err = strconv.ParseBool(preventWalOverwriteStr)
-		if err != nil {
-			return false, errors.Wrap(err, "failed to parse WALG_PREVENT_WAL_OVERWRITE")
-		}
-	}
-
-	return preventWalOverwrite, nil;
 }
 
 // This setting is intentially undocumented in README. Effectively, this configures how many prepared tar Files there
