@@ -40,7 +40,7 @@ func InitConfig() {
 
 		// Search config in home directory with name ".wal-g" (without extension).
 		viper.AddConfigPath(usr.HomeDir)
-		viper.SetConfigName(".walg.json")
+		viper.SetConfigName(".walg")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
