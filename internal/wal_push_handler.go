@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
 )
 
 type CantOverwriteWalFileError struct {
@@ -24,21 +23,6 @@ func (err CantOverwriteWalFileError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-func  GetWalOverwriteSetting() (preventWalOverwrite bool, err error) {
-	err = nil
-	preventWalOverwrite = false
-	preventWalOverwriteStr := GetSettingValue("WALG_PREVENT_WAL_OVERWRITE")
-
-	if preventWalOverwriteStr != "" {
-		preventWalOverwrite, err = strconv.ParseBool(preventWalOverwriteStr)
-		if err != nil {
-			return false, errors.Wrap(err, "failed to parse WALG_PREVENT_WAL_OVERWRITE")
-		}
-	}
-
-	return preventWalOverwrite, nil;
-}
-
 // TODO : unit tests
 // HandleWALPush is invoked to perform wal-g wal-push
 func HandleWALPush(uploader *Uploader, walFilePath string) {
@@ -49,7 +33,7 @@ func HandleWALPush(uploader *Uploader, walFilePath string) {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
 
-	preventWalOverwrite, err := GetWalOverwriteSetting()
+	preventWalOverwrite, err := ConfigureWalOverwrite()
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
