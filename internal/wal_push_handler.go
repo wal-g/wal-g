@@ -33,7 +33,7 @@ func HandleWALPush(uploader *Uploader, walFilePath string) {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
 
-	preventWalOverwrite, err := ConfigureWalOverwrite()
+	preventWalOverwrite, err := ConfigurePreventWalOverwrite()
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}

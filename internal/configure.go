@@ -104,7 +104,7 @@ func getDataFolderPath() string {
 	return dataFolderPath
 }
 
-func  ConfigureWalOverwrite() (preventWalOverwrite bool, err error) {
+func  ConfigurePreventWalOverwrite() (preventWalOverwrite bool, err error) {
 	err = nil
 	preventWalOverwrite = false
 	preventWalOverwriteStr := GetSettingValue("WALG_PREVENT_WAL_OVERWRITE")
