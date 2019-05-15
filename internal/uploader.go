@@ -18,28 +18,26 @@ type Uploader struct {
 	UploadingFolder     storage.Folder
 	Compressor          compression.Compressor
 	waitGroup           *sync.WaitGroup
-	deltaFileManager    *DeltaFileManager
+	DeltaFileManager    *DeltaFileManager
 	Failed              atomic.Value
-	useWalDelta         bool
 	preventWalOverwrite bool
+}
+
+func (uploader *Uploader) getUseWalDelta() (useWalDelta bool) {
+	return uploader.DeltaFileManager != nil;
 }
 
 func NewUploader(
 	compressor compression.Compressor,
 	uploadingLocation storage.Folder,
-	deltaDataFolder DataFolder,
-	useWalDelta, preventWalOverwrite bool,
+	preventWalOverwrite bool,
+	deltaFileManager *DeltaFileManager,
 ) *Uploader {
-	var deltaFileManager *DeltaFileManager = nil
-	if useWalDelta {
-		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
-	}
 	uploader := &Uploader{
 		UploadingFolder:     uploadingLocation,
 		Compressor:          compressor,
-		useWalDelta:         useWalDelta,
 		waitGroup:           &sync.WaitGroup{},
-		deltaFileManager:    deltaFileManager,
+		DeltaFileManager:    deltaFileManager,
 		preventWalOverwrite: preventWalOverwrite,
 	}
 	uploader.Failed.Store(false)
@@ -61,9 +59,8 @@ func (uploader *Uploader) Clone() *Uploader {
 		uploader.UploadingFolder,
 		uploader.Compressor,
 		&sync.WaitGroup{},
-		uploader.deltaFileManager,
+		uploader.DeltaFileManager,
 		uploader.Failed,
-		uploader.useWalDelta,
 		uploader.preventWalOverwrite,
 	}
 }
@@ -73,8 +70,8 @@ func (uploader *Uploader) UploadWalFile(file NamedReader) error {
 	var walFileReader io.Reader
 
 	filename := path.Base(file.Name())
-	if uploader.useWalDelta && isWalFilename(filename) {
-		recordingReader, err := NewWalDeltaRecordingReader(file, filename, uploader.deltaFileManager)
+	if uploader.getUseWalDelta() && isWalFilename(filename) {
+		recordingReader, err := NewWalDeltaRecordingReader(file, filename, uploader.DeltaFileManager)
 		if err != nil {
 			walFileReader = file
 		} else {

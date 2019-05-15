@@ -126,7 +126,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 	}
 
 	if len(previousBackupName) > 0 && previousBackupSentinelDto.BackupStartLSN != nil {
-		if uploader.useWalDelta {
+		if uploader.getUseWalDelta() {
 			err = bundle.DownloadDeltaMap(folder.GetSubFolder(utility.WalPath), backupStartLSN)
 			if err == nil {
 				tracelog.InfoLogger.Println("Successfully loaded delta map, delta backup will be made with provided delta map")
