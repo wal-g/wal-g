@@ -105,7 +105,7 @@ func getDataFolderPath() string {
 }
 
 // TODO : unit tests
-func ConfigureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err error) {
+func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err error) {
 	if useWalDeltaStr, ok := LookupConfigValue("WALG_USE_WAL_DELTA"); ok {
 		useWalDelta, err = strconv.ParseBool(useWalDeltaStr)
 		if err != nil {
@@ -161,7 +161,7 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 		return nil, errors.Wrap(err, "failed to configure compression")
 	}
 
-	useWalDelta, deltaDataFolder, err := ConfigureWalDeltaUsage()
+	useWalDelta, deltaDataFolder, err := configureWalDeltaUsage()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure WAL Delta usage")
 	}
