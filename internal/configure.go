@@ -104,6 +104,21 @@ func getDataFolderPath() string {
 	return dataFolderPath
 }
 
+func  ConfigurePreventWalOverwrite() (preventWalOverwrite bool, err error) {
+	err = nil
+	preventWalOverwrite = false
+	preventWalOverwriteStr := GetSettingValue("WALG_PREVENT_WAL_OVERWRITE")
+
+	if preventWalOverwriteStr != "" {
+		preventWalOverwrite, err = strconv.ParseBool(preventWalOverwriteStr)
+		if err != nil {
+			return false, errors.Wrap(err, "failed to parse WALG_PREVENT_WAL_OVERWRITE")
+		}
+	}
+
+	return preventWalOverwrite, nil;
+}
+
 // TODO : unit tests
 func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err error) {
 	if useWalDeltaStr, ok := LookupConfigValue("WALG_USE_WAL_DELTA"); ok {
@@ -166,15 +181,7 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 		return nil, errors.Wrap(err, "failed to configure WAL Delta usage")
 	}
 
-	preventWalOverwrite := false
-	if preventWalOverwriteStr := GetSettingValue("WALG_PREVENT_WAL_OVERWRITE"); preventWalOverwriteStr != "" {
-		preventWalOverwrite, err = strconv.ParseBool(preventWalOverwriteStr)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to parse WALG_PREVENT_WAL_OVERWRITE")
-		}
-	}
-
-	uploader = NewUploader(compressor, folder, deltaDataFolder, useWalDelta, preventWalOverwrite)
+	uploader = NewUploader(compressor, folder, deltaDataFolder, useWalDelta)
 
 	return uploader, err
 }
