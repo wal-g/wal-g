@@ -2,13 +2,15 @@ package internal
 
 import (
 	"archive/tar"
-	"github.com/pkg/errors"
 	"io"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/crypto"
 )
 
 // A TarBall represents one tar file.
 type TarBall interface {
-	SetUp(crypter Crypter, args ...string)
+	SetUp(crypter crypto.Crypter, args ...string)
 	CloseTar() error
 	Size() int64
 	AddSize(int64)

@@ -2,19 +2,22 @@ package internal
 
 import (
 	"archive/tar"
+	"crypto"
 	"fmt"
-	"github.com/RoaringBitmap/roaring"
-	"github.com/jackc/pgx"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/internal/walparser"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/RoaringBitmap/roaring"
+	"github.com/jackc/pgx"
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/utility"
 )
 
 // It is made so to load big database files of size 1GB one by one
@@ -42,8 +45,8 @@ var ExcludedFilenames = make(map[string]utility.Empty)
 
 func init() {
 	filesToExclude := []string{
-		"pg_log", "pg_xlog", "pg_wal",                                                                        // Directories
-		"pgsql_tmp", "postgresql.auto.conf.tmp", "postmaster.pid", "postmaster.opts", "recovery.conf",        // Files
+		"pg_log", "pg_xlog", "pg_wal", // Directories
+		"pgsql_tmp", "postgresql.auto.conf.tmp", "postmaster.pid", "postmaster.opts", "recovery.conf", // Files
 		"pg_dynshmem", "pg_notify", "pg_replslot", "pg_serial", "pg_stat_tmp", "pg_snapshots", "pg_subtrans", // Directories
 	}
 
@@ -64,7 +67,7 @@ type Bundle struct {
 	Sentinel           *Sentinel
 	TarBall            TarBall
 	TarBallMaker       TarBallMaker
-	Crypter            Crypter
+	Crypter            crypto.Crypter
 	Timeline           uint32
 	Replica            bool
 	IncrementFromLsn   *uint64
@@ -82,7 +85,7 @@ type Bundle struct {
 }
 
 // TODO: use DiskDataFolder
-func NewBundle(archiveDirectory string, crypter Crypter, incrementFromLsn *uint64, incrementFromFiles BackupFileList) *Bundle {
+func NewBundle(archiveDirectory string, crypter crypto.Crypter, incrementFromLsn *uint64, incrementFromFiles BackupFileList) *Bundle {
 	return &Bundle{
 		ArchiveDirectory:   archiveDirectory,
 		TarSizeThreshold:   DefaultTarSizeThreshold,

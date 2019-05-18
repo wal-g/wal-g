@@ -2,11 +2,13 @@ package internal
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
-	"io"
 )
 
 // CompressAndEncryptError is used to catch specific errors from CompressAndEncrypt
@@ -25,7 +27,7 @@ func (err CompressAndEncryptError) Error() string {
 
 // CompressAndEncrypt compresses input to a pipe reader. Output must be used or
 // pipe will block.
-func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, crypter Crypter) io.Reader {
+func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, crypter crypto.Crypter) io.Reader {
 	compressedReader, dstWriter := io.Pipe()
 
 	var writeCloser io.WriteCloser = dstWriter
