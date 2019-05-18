@@ -1,4 +1,4 @@
-package test
+package openpgp
 
 import (
 	"bytes"
@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal/crypto"
-	walg_openpgp "github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"golang.org/x/crypto/openpgp"
 )
 
@@ -28,12 +27,12 @@ func MockArmedCrypter() crypto.Crypter {
 	return createCrypter(pgpTestPrivateKey)
 }
 
-func createCrypter(armedKeyring string) *walg_openpgp.Crypter {
+func CreateCrypter(armedKeyring string) *Crypter {
 	ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(armedKeyring))
 	if err != nil {
 		panic(err)
 	}
-	crypter := &walg_openpgp.Crypter{PubKey: ring, SecretKey: ring}
+	crypter := &Crypter{PubKey: ring, SecretKey: ring}
 	return crypter
 }
 

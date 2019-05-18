@@ -3,9 +3,11 @@ package internal
 import (
 	"archive/tar"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 // StorageTarBall represents a tar file that is
@@ -23,7 +25,7 @@ type StorageTarBall struct {
 // Upload will block until the tar file is finished writing.
 // If a name for the file is not given, default name is of
 // the form `part_....tar.[Compressor file extension]`.
-func (tarBall *StorageTarBall) SetUp(crypter Crypter, names ...string) {
+func (tarBall *StorageTarBall) SetUp(crypter crypto.Crypter, names ...string) {
 	if tarBall.tarWriter == nil {
 		var name string
 		if len(names) > 0 {
@@ -64,7 +66,7 @@ func (tarBall *StorageTarBall) AwaitUploads() {
 // TODO : unit tests
 // startUpload creates a compressing writer and runs upload in the background once
 // a compressed tar member is finished writing.
-func (tarBall *StorageTarBall) startUpload(name string, crypter Crypter) io.WriteCloser {
+func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) io.WriteCloser {
 	pipeReader, pipeWriter := io.Pipe()
 	uploader := tarBall.uploader
 

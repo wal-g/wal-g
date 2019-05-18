@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/crypto/openpgp"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func HandleStreamPush(uploader *Uploader) {
@@ -43,7 +45,7 @@ func (uploader *Uploader) UploadStream(fileName string, db *sql.DB, stream io.Re
 	timeStart := time.Now()
 	compressor := uploader.Compressor
 
-	compressed := internal.CompressAndEncrypt(stream, compressor, internal.NewOpenPGPCrypter())
+	compressed := internal.CompressAndEncrypt(stream, compressor, openpgp.NewCrypter())
 	backup := Backup{internal.NewBackup(uploader.UploadingFolder, fileName)}
 
 	dstPath := getStreamName(&backup, compressor.FileExtension())

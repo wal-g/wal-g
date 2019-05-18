@@ -51,6 +51,7 @@ unittest:
 	go test -v ./test/
 	go test -v ./internal/walparser/
 	go test -v ./internal/compression/
+	go test -v ./internal/crypto/
 	go test -v ./internal/storages/s3/
 	go test -v ./internal/storages/gcs/
 	go test -v ./internal/storages/fs/
