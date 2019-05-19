@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
@@ -28,7 +29,7 @@ func (err GpgKeyExportError) Error() string {
 
 // GetKeyRingId extracts name of a key to use from env variable
 func GetKeyRingId() string {
-	return GetSettingValue("WALE_GPG_KEY_ID")
+	return config.GetSettingValue("WALE_GPG_KEY_ID")
 }
 
 const GpgBin = "gpg"
@@ -41,7 +42,7 @@ type CachedKey struct {
 
 // TODO : unit tests
 // Here we read armored version of Key by calling GPG process
-func getPubRingArmor(keyId string) ([]byte, error) {
+func GetPubRingArmor(keyID string) ([]byte, error) {
 	var cache CachedKey
 	var cacheFilename string
 
@@ -52,13 +53,13 @@ func getPubRingArmor(keyId string) ([]byte, error) {
 		// here we ignore whatever error can occur
 		if err == nil {
 			json.Unmarshal(file, &cache)
-			if cache.KeyId == keyId && len(cache.Body) > 0 { // don't return an empty cached value
+			if cache.KeyId == keyID && len(cache.Body) > 0 { // don't return an empty cached value
 				return cache.Body, nil
 			}
 		}
 	}
 
-	cmd := exec.Command(GpgBin, "-a", "--export", keyId)
+	cmd := exec.Command(GpgBin, "-a", "--export", keyID)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -69,7 +70,7 @@ func getPubRingArmor(keyId string) ([]byte, error) {
 		return nil, NewGpgKeyExportError(strings.TrimSpace(stderr.String()))
 	}
 
-	cache.KeyId = keyId
+	cache.KeyId = keyID
 	cache.Body = out
 	marshal, err := json.Marshal(&cache)
 	if err == nil && len(cacheFilename) > 0 {
@@ -79,8 +80,8 @@ func getPubRingArmor(keyId string) ([]byte, error) {
 	return out, nil
 }
 
-func getSecretRingArmor(keyId string) ([]byte, error) {
-	out, err := exec.Command(GpgBin, "-a", "--export-secret-key", keyId).Output()
+func GetSecretRingArmor(keyID string) ([]byte, error) {
+	out, err := exec.Command(GpgBin, "-a", "--export-secret-key", keyID).Output()
 	if err != nil {
 		return nil, err
 	}

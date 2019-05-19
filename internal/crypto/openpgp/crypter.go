@@ -9,9 +9,10 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/internal/utils"
 	"golang.org/x/crypto/openpgp"
 )
 
@@ -61,7 +62,7 @@ Please set GPG key using environment variables WALG_PGP_KEY or WALG_PGP_KEY_PATH
 // configure internal initialization
 func (crypter *Crypter) configure() {
 	// key can be either private (for download) or public (for upload)
-	armoredKey, isKeyExist := internal.LookupConfigValue("WALG_PGP_KEY")
+	armoredKey, isKeyExist := config.LookupConfigValue("WALG_PGP_KEY")
 
 	if isKeyExist {
 		crypter.ArmoredKey = armoredKey
@@ -71,7 +72,7 @@ func (crypter *Crypter) configure() {
 	}
 
 	// key can be either private (for download) or public (for upload)
-	armoredKeyPath, isPathExist := internal.LookupConfigValue("WALG_PGP_KEY_PATH")
+	armoredKeyPath, isPathExist := config.LookupConfigValue("WALG_PGP_KEY_PATH")
 
 	if isPathExist {
 		crypter.ArmoredKeyPath = armoredKeyPath
@@ -117,7 +118,7 @@ func (crypter *Crypter) setupPubKey() error {
 		crypter.PubKey = entityList
 	} else {
 		// TODO: legacy gpg external use, need to remove in next major version
-		armor, err := crypto.getPubRingArmor(crypter.KeyRingId)
+		armor, err := crypto.GetPubRingArmor(crypter.KeyRingId)
 
 		if err != nil {
 			return err
@@ -141,7 +142,7 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 		return nil, err
 	}
 
-	// We use buffered writer because encryption starts writing header immediately,
+	// We use buffered writer because encryption starts wrdepiting header immediately,
 	// which can be inappropriate for further usage with blocking writers.
 	// E. g. if underlying writer is a pipe, then this thread will be blocked before
 	// creation of new thread, reading from this pipe.Writer.
@@ -152,7 +153,7 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 		return nil, errors.Wrapf(err, "opengpg encryption error")
 	}
 
-	return internal.NewOnCloseFlusher(encryptedWriter, bufferedWriter), nil
+	return utils.NewOnCloseFlusher(encryptedWriter, bufferedWriter), nil
 }
 
 // Decrypt creates decrypted reader from ordinary reader
@@ -210,7 +211,7 @@ func (crypter *Crypter) loadSecret() error {
 		crypter.SecretKey = entityList
 	} else {
 		// TODO: legacy gpg external use, need to remove in next major version
-		armor, err := crypto.getSecretRingArmor(crypter.KeyRingId)
+		armor, err := crypto.GetSecretRingArmor(crypter.KeyRingId)
 
 		if err != nil {
 			return errors.WithStack(err)
@@ -225,7 +226,7 @@ func (crypter *Crypter) loadSecret() error {
 		crypter.SecretKey = entityList
 	}
 
-	if passphrase, isExist := internal.LookupConfigValue("WALG_PGP_KEY_PASSPHRASE"); isExist {
+	if passphrase, isExist := config.LookupConfigValue("WALG_PGP_KEY_PASSPHRASE"); isExist {
 		err := decryptSecretKey(crypter.SecretKey, passphrase)
 
 		if err != nil {

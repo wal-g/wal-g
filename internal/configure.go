@@ -2,15 +2,17 @@ package internal
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/compression"
-	"github.com/wal-g/wal-g/internal/compression/lz4"
-	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"golang.org/x/time/rate"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/compression/lz4"
+	"github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"golang.org/x/time/rate"
 )
 
 const (
@@ -45,7 +47,7 @@ func (err UnknownCompressionMethodError) Error() string {
 
 // TODO : unit tests
 func ConfigureLimiters() error {
-	if diskLimitStr := GetSettingValue("WALG_DISK_RATE_LIMIT"); diskLimitStr != "" {
+	if diskLimitStr := config.GetSettingValue("WALG_DISK_RATE_LIMIT"); diskLimitStr != "" {
 		diskLimit, err := strconv.ParseInt(diskLimitStr, 10, 64)
 		if err != nil {
 			return errors.Wrap(err, "failed to parse WALG_DISK_RATE_LIMIT")
@@ -53,7 +55,7 @@ func ConfigureLimiters() error {
 		DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 
-	if netLimitStr := GetSettingValue("WALG_NETWORK_RATE_LIMIT"); netLimitStr != "" {
+	if netLimitStr := config.GetSettingValue("WALG_NETWORK_RATE_LIMIT"); netLimitStr != "" {
 		netLimit, err := strconv.ParseInt(netLimitStr, 10, 64)
 		if err != nil {
 			return errors.Wrap(err, "failed to parse WALG_NETWORK_RATE_LIMIT")
@@ -67,7 +69,7 @@ func ConfigureLimiters() error {
 func ConfigureFolder() (storage.Folder, error) {
 	skippedPrefixes := make([]string, 0)
 	for _, adapter := range StorageAdapters {
-		prefix := GetSettingValue(adapter.prefixName)
+		prefix := config.GetSettingValue(adapter.prefixName)
 		if prefix == "" {
 			skippedPrefixes = append(skippedPrefixes, adapter.prefixName)
 			continue
@@ -87,7 +89,7 @@ func ConfigureFolder() (storage.Folder, error) {
 
 // TODO : unit tests
 func getDataFolderPath() string {
-	pgdata, ok := LookupConfigValue("PGDATA")
+	pgdata, ok := config.LookupConfigValue("PGDATA")
 	var dataFolderPath string
 	if !ok {
 		dataFolderPath = DefaultDataFolderPath
@@ -106,7 +108,7 @@ func getDataFolderPath() string {
 
 // TODO : unit tests
 func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err error) {
-	if useWalDeltaStr, ok := LookupConfigValue("WALG_USE_WAL_DELTA"); ok {
+	if useWalDeltaStr, ok := config.LookupConfigValue("WALG_USE_WAL_DELTA"); ok {
 		useWalDelta, err = strconv.ParseBool(useWalDeltaStr)
 		if err != nil {
 			return false, nil, errors.Wrapf(err, "failed to parse WALG_USE_WAL_DELTA")
@@ -128,7 +130,7 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err
 
 // TODO : unit tests
 func configureCompressor() (compression.Compressor, error) {
-	compressionMethod := GetSettingValue("WALG_COMPRESSION_METHOD")
+	compressionMethod := config.GetSettingValue("WALG_COMPRESSION_METHOD")
 	if compressionMethod == "" {
 		compressionMethod = lz4.AlgorithmName
 	}
@@ -140,7 +142,7 @@ func configureCompressor() (compression.Compressor, error) {
 
 // TODO : unit tests
 func ConfigureLogging() error {
-	logLevel, ok := LookupConfigValue("WALG_LOG_LEVEL")
+	logLevel, ok := config.LookupConfigValue("WALG_LOG_LEVEL")
 	if ok {
 		return tracelog.UpdateLogLevel(logLevel)
 	}
@@ -167,7 +169,7 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 	}
 
 	preventWalOverwrite := false
-	if preventWalOverwriteStr := GetSettingValue("WALG_PREVENT_WAL_OVERWRITE"); preventWalOverwriteStr != "" {
+	if preventWalOverwriteStr := config.GetSettingValue("WALG_PREVENT_WAL_OVERWRITE"); preventWalOverwriteStr != "" {
 		preventWalOverwrite, err = strconv.ParseBool(preventWalOverwriteStr)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to parse WALG_PREVENT_WAL_OVERWRITE")
