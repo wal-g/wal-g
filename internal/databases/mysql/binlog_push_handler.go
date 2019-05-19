@@ -3,16 +3,17 @@ package mysql
 import (
 	"database/sql"
 	"encoding/json"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/utility"
 	"io/ioutil"
 	"os"
 	"os/user"
 	"path"
 	"path/filepath"
 	"sort"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const MysqlBinlogCacheFileName = "walg_mysql_logs_cache"
@@ -22,13 +23,13 @@ type MySQLLogsCache struct {
 }
 
 func HandleBinlogPush(uploader *Uploader) {
-	binlogsFolder := internal.GetSettingValue(BinlogSrc)
+	binlogsFolder := config.GetSettingValue(BinlogSrc)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(BinlogPath)
 	db, err := getMySQLConnection()
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
-	defer utility.LoggedClose(db,"")
+	defer utility.LoggedClose(db, "")
 
 	binlogs := getMySQLSortedBinlogs(db)
 

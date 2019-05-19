@@ -6,15 +6,17 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/go-sql-driver/mysql"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/utility"
 	"io/ioutil"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/go-sql-driver/mysql"
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const (
@@ -70,11 +72,11 @@ func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
 }
 
 func getMySQLConnection() (*sql.DB, error) {
-	datasourceName := internal.GetSettingValue("WALG_MYSQL_DATASOURCE_NAME")
+	datasourceName := config.GetSettingValue("WALG_MYSQL_DATASOURCE_NAME")
 	if datasourceName == "" {
 		datasourceName = "root:password@/mysql"
 	}
-	caFile := internal.GetSettingValue(SslCa)
+	caFile := config.GetSettingValue(SslCa)
 	if caFile != "" {
 		rootCertPool := x509.NewCertPool()
 		pem, err := ioutil.ReadFile(caFile)

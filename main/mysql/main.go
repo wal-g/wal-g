@@ -2,8 +2,8 @@ package main
 
 import (
 	"github.com/wal-g/wal-g/cmd/mysql"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/main"
+	interconfig "github.com/wal-g/wal-g/internal/config"
+	config "github.com/wal-g/wal-g/main"
 )
 
 var mysqlConfigKeys = []string{
@@ -15,7 +15,7 @@ var mysqlConfigKeys = []string{
 }
 
 func main() {
-	internal.UpdateAllowedConfig(mysqlConfigKeys)
+	interconfig.UpdateAllowed(mysqlConfigKeys)
 	config.Configure()
 	mysql.Execute()
 }

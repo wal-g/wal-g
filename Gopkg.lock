@@ -135,6 +135,14 @@
   version = "v1.4.1"
 
 [[projects]]
+  digest = "1:342378ac4dcb378a5448dd723f0784ae519383532f5e70ade24132c4c8693202"
+  name = "github.com/go-yaml/yaml"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
+  version = "v2.2.1"
+
+[[projects]]
   digest = "1:b60efdeb75d3c0ceed88783ac2495256aba3491a537d0f31401202579fd62a94"
   name = "github.com/golang/mock"
   packages = ["gomock"]
@@ -248,6 +256,14 @@
   pruneopts = "UT"
   revision = "c2353362d570a7bfa228149c62842019201cfb71"
   version = "v1.8.0"
+
+[[projects]]
+  digest = "1:5d231480e1c64a726869bc4142d270184c419749d34f167646baa21008eb0a79"
+  name = "github.com/mitchellh/go-homedir"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "af06845cf3004701891bf4fdb884bfe4920b3727"
+  version = "v1.1.0"
 
 [[projects]]
   digest = "1:53bc4cd4914cd7cd52139990d5170d6dc99067ae31c56530621b18b35fc30318"
@@ -645,10 +661,12 @@
     "github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface",
     "github.com/cyberdelia/lzo",
     "github.com/go-sql-driver/mysql",
+    "github.com/go-yaml/yaml",
     "github.com/golang/mock/gomock",
     "github.com/google/brotli/go/cbrotli",
     "github.com/jackc/pgx",
     "github.com/jedib0t/go-pretty/table",
+    "github.com/mitchellh/go-homedir",
     "github.com/ncw/swift",
     "github.com/pierrec/lz4",
     "github.com/pkg/errors",

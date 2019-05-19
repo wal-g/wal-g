@@ -1,8 +1,6 @@
-package internal
+package config
 
 import (
-	"github.com/spf13/viper"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"os"
 	"strings"
 )
@@ -36,45 +34,7 @@ var (
 	}
 )
 
-func init() {
-	for _, adapter := range StorageAdapters {
-		allowedConfigKeys[adapter.prefixName] = nil
-		allowedConfigKeys[toWalgSettingName(adapter.prefixName)] = nil
-		for _, settingName := range adapter.settingNames {
-			allowedConfigKeys["WALG_"+settingName] = nil
-			allowedConfigKeys["WALE_"+settingName] = nil
-			allowedConfigKeys[settingName] = nil
-		}
-	}
-	readConfig()
-	verifyConfig()
-}
-
-func verifyConfig() {
-	if WalgConfig == nil {
-		return
-	}
-	for _, extension := range Extensions {
-		for key, value := range extension.GetAllowedConfigKeys() {
-			allowedConfigKeys[key] = value
-		}
-	}
-	for k := range *WalgConfig {
-		if _, ok := allowedConfigKeys[k]; !ok {
-			tracelog.ErrorLogger.Panic("Settings " + k + " is unknown")
-		}
-	}
-}
-
-func readConfig() {
-	cfg := make(map[string]string)
-	WalgConfig = &cfg
-	for _, key := range viper.AllKeys() {
-		cfg[key] = viper.GetString(key)
-	}
-}
-
-func LookupConfigValue(key string) (value string, ok bool) {
+func LookupValue(key string) (value string, ok bool) {
 	if WalgConfig != nil {
 		if val, ok := (*WalgConfig)[key]; ok {
 			return val, true
@@ -83,27 +43,32 @@ func LookupConfigValue(key string) (value string, ok bool) {
 	return os.LookupEnv(key)
 }
 
-func toWalgSettingName(waleSettingName string) string {
+func ToWalgSettingName(waleSettingName string) string {
 	return "WALG" + strings.TrimPrefix(waleSettingName, "WALE")
 }
 
 func GetSettingValue(key string) string {
 	if strings.HasPrefix(key, "WALE") {
-		walgKey := toWalgSettingName(key)
-		if val, ok := LookupConfigValue(walgKey); ok && len(val) > 0 {
+		walgKey := ToWalgSettingName(key)
+		if val, ok := LookupValue(walgKey); ok && len(val) > 0 {
 			return val
 		}
 	}
 
-	value, ok := LookupConfigValue(key)
+	value, ok := LookupValue(key)
 	if ok {
 		return value
 	}
 	return ""
 }
 
-func UpdateAllowedConfig(fields []string) {
+func UpdateAllowed(fields []string) {
 	for _, field := range fields {
 		allowedConfigKeys[field] = nil
 	}
+}
+
+func CheckAllowed(field string) bool {
+	_, ok := allowedConfigKeys[field]
+	return ok
 }
