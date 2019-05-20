@@ -83,13 +83,18 @@ type Bundle struct {
 }
 
 func getTarSizeThreshold() int64 {
+	const (
+		ThresholdBase    = 10
+		ThresholdBitSize = 64
+	)
+
 	tarSizeThresholdString, ok := LookupConfigValue("WALG_TAR_SIZE_THRESHOLD")
 
 	if !ok {
 		return DefaultTarSizeThreshold
 	}
 
-	tarSizeThreshold, err := strconv.ParseInt(tarSizeThresholdString, 10, 64)
+	tarSizeThreshold, err := strconv.ParseInt(tarSizeThresholdString, ThresholdBase, ThresholdBitSize)
 
 	if err != nil {
 		return DefaultTarSizeThreshold
