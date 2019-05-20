@@ -10,6 +10,8 @@ To compile and build the binary for Postgres:
 
 ```
 go get github.com/wal-g/wal-g
+cd $GOPATH/src/github.com/wal-g/wal-g
+make install
 make deps
 make pg_build
 ```
@@ -18,6 +20,8 @@ Users can also install WAL-G by using `make install`. Specifying the GOBIN envir
 
 ```
 export GOBIN=/usr/local/bin
+cd $GOPATH/src/github.com/wal-g/wal-g
+make install
 make deps
 make pg_install
 ```
