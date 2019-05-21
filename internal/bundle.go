@@ -2,7 +2,6 @@ package internal
 
 import (
 	"archive/tar"
-	"crypto"
 	"fmt"
 	"io"
 	"os"
