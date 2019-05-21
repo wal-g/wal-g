@@ -28,7 +28,7 @@ func init() {
 }
 
 func verifyConfig() {
-	if WalgConfig == nil {
+	if config.WalgConfig == nil {
 		return
 	}
 	for _, extension := range internal.Extensions {
@@ -36,8 +36,8 @@ func verifyConfig() {
 			config.UpdateAllowed([]string{key})
 		}
 	}
-	for k := range *WalgConfig {
-		if _, ok := config.CheckAllowed(k); !ok {
+	for k := range *config.WalgConfig {
+		if ok := config.CheckAllowed(k); !ok {
 			tracelog.ErrorLogger.Panic("Settings " + k + " is unknown")
 		}
 	}
@@ -45,7 +45,7 @@ func verifyConfig() {
 
 func readConfig() {
 	cfg := make(map[string]string)
-	WalgConfig = &cfg
+	config.WalgConfig = &cfg
 	for _, key := range viper.AllKeys() {
 		cfg[key] = viper.GetString(key)
 	}
