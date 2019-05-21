@@ -1,15 +1,17 @@
 package test
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/utility"
 	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/utils"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const (
@@ -106,7 +108,7 @@ func TestGetSentinelUserData(t *testing.T) {
 
 func TestCreateFileWith(t *testing.T) {
 	content := "content"
-	err := internal.CreateFileWith(CreateFileWithPath, strings.NewReader(content))
+	err := utils.CreateFileWith(CreateFileWithPath, strings.NewReader(content))
 	assert.NoError(t, err)
 	actualContent, err := ioutil.ReadFile(CreateFileWithPath)
 	assert.NoError(t, err)
@@ -118,7 +120,7 @@ func TestCreateFileWith_ExistenceError(t *testing.T) {
 	file, err := os.Create(CreateFileWithPath)
 	assert.NoError(t, err)
 	file.Close()
-	err = internal.CreateFileWith(CreateFileWithPath, strings.NewReader("error"))
+	err = utils.CreateFileWith(CreateFileWithPath, strings.NewReader("error"))
 	assert.Equal(t, os.IsExist(err), true)
 	os.Remove(CreateFileWithPath)
 }

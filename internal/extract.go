@@ -14,6 +14,7 @@ import (
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/internal/utils"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/semaphore"
 )
@@ -99,7 +100,7 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 		if err != nil {
 			return errors.Wrap(err, "DecryptAndDecompressTar: decrypt failed")
 		}
-		readCloser = ReadCascadeCloser{reader, readCloser}
+		readCloser = utils.ReadCascadeCloser{reader, readCloser}
 	}
 
 	fileExtension := utility.GetFileExtension(readerMaker.Path())

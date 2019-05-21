@@ -16,6 +16,7 @@ import (
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/internal/utils"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -556,8 +557,8 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 		fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
 		switch err.(type) {
 		case nil:
-			fileReader = &ReadCascadeCloser{&io.LimitedReader{
-				R: io.MultiReader(fileReader, &ZeroReader{}),
+			fileReader = &utils.ReadCascadeCloser{&io.LimitedReader{
+				R: io.MultiReader(fileReader, &utils.ZeroReader{}),
 				N: int64(fileInfoHeader.Size),
 			}, fileReader}
 		case InvalidBlockError: // fallback to full file backup
@@ -601,8 +602,8 @@ func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string,
 		return nil, errors.Wrapf(err, "packFileIntoTar: failed to open file '%s'\n", path)
 	}
 	diskLimitedFileReader := NewDiskLimitReader(file)
-	fileReader = &ReadCascadeCloser{&io.LimitedReader{
-		R: io.MultiReader(diskLimitedFileReader, &ZeroReader{}),
+	fileReader = &utils.ReadCascadeCloser{&io.LimitedReader{
+		R: io.MultiReader(diskLimitedFileReader, &utils.ZeroReader{}),
 		N: int64(fileInfoHeader.Size),
 	}, file}
 	return fileReader, nil

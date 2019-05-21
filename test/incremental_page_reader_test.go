@@ -3,13 +3,15 @@ package test
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/RoaringBitmap/roaring"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/testtools"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/RoaringBitmap/roaring"
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/utils"
+	"github.com/wal-g/wal-g/testtools"
 )
 
 func TestDeltaBitmapInitialize(t *testing.T) {
@@ -117,7 +119,7 @@ func TestFullScanInitialize(t *testing.T) {
 	assert.Equal(t, []uint32{3, 4, 5, 6, 7}, pageReader.Blocks)
 }
 
-func makePageDataReader() internal.ReadSeekCloser {
+func makePageDataReader() utils.ReadSeekCloser {
 	pageCount := 8
 	pageData := make([]byte, pageCount*int(internal.DatabasePageSize))
 	for i := 0; i < pageCount; i++ {
@@ -126,7 +128,7 @@ func makePageDataReader() internal.ReadSeekCloser {
 		}
 	}
 	pageDataReader := bytes.NewReader(pageData)
-	return &internal.ReadSeekCloserImpl{Reader: pageDataReader, Seeker: pageDataReader, Closer: &testtools.NopCloser{}}
+	return &utils.ReadSeekCloserImpl{Reader: pageDataReader, Seeker: pageDataReader, Closer: &testtools.NopCloser{}}
 }
 
 func TestRead(t *testing.T) {

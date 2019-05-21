@@ -13,16 +13,18 @@ package internal
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/RoaringBitmap/roaring"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/internal/walparser"
-	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 	"io"
 	"os"
 	"path"
 	"regexp"
 	"strings"
+
+	"github.com/RoaringBitmap/roaring"
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/internal/utils"
+	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 )
 
 const (
@@ -118,7 +120,7 @@ func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitma
 		return nil, 0, err
 	}
 
-	fileReadSeekCloser := &ReadSeekCloserImpl{
+	fileReadSeekCloser := &utils.ReadSeekCloserImpl{
 		NewDiskLimitReader(file),
 		file,
 		file,

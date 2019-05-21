@@ -13,6 +13,7 @@ import (
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/internal/utils"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -139,7 +140,7 @@ func DecompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor 
 		if err != nil {
 			return err
 		}
-		archiveReader = ReadCascadeCloser{reader, archiveReader}
+		archiveReader = utils.ReadCascadeCloser{reader, archiveReader}
 	}
 
 	err := decompressor.Decompress(dst, archiveReader)
@@ -174,5 +175,5 @@ func DownloadWALFileTo(folder storage.Folder, walFileName string, dstPath string
 		return err
 	}
 	defer reader.Close()
-	return CreateFileWith(dstPath, reader)
+	return utils.CreateFileWith(dstPath, reader)
 }
