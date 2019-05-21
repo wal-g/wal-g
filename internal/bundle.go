@@ -92,7 +92,7 @@ func getTarSizeThreshold() int64 {
 		ThresholdBitSize = 64
 	)
 
-	tarSizeThresholdString, ok := config.LookupConfigValue("WALG_TAR_SIZE_THRESHOLD")
+	tarSizeThresholdString, ok := config.LookupValue("WALG_TAR_SIZE_THRESHOLD")
 
 	if !ok {
 		return DefaultTarSizeThreshold
