@@ -13,6 +13,7 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
@@ -91,7 +92,7 @@ func getTarSizeThreshold() int64 {
 		ThresholdBitSize = 64
 	)
 
-	tarSizeThresholdString, ok := LookupConfigValue("WALG_TAR_SIZE_THRESHOLD")
+	tarSizeThresholdString, ok := config.LookupConfigValue("WALG_TAR_SIZE_THRESHOLD")
 
 	if !ok {
 		return DefaultTarSizeThreshold
