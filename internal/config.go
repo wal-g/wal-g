@@ -32,6 +32,7 @@ var (
 		"PGPORT":                       nil,
 		"PGUSER":                       nil,
 		"PGHOST":                       nil,
+		"WALG_TAR_SIZE_THRESHOLD":      nil,
 	}
 )
 
