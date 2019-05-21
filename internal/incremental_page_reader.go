@@ -3,10 +3,12 @@ package internal
 import (
 	"bytes"
 	"encoding/binary"
+	"io"
+
 	"github.com/RoaringBitmap/roaring"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/internal/utils"
 	"github.com/wal-g/wal-g/utility"
-	"io"
 )
 
 // "wi" at the head stands for "wal-g increment"
@@ -16,7 +18,7 @@ var IncrementFileHeader = []byte{'w', 'i', '1', SignatureMagicNumber}
 // IncrementalPageReader constructs difference map during initialization and than re-read file
 // Diff map may consist of 1Gb/PostgresBlockSize elements == 512Kb
 type IncrementalPageReader struct {
-	PagedFile ReadSeekCloser
+	PagedFile utils.ReadSeekCloser
 	FileSize  int64
 	Lsn       uint64
 	Next      []byte
