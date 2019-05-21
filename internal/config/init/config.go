@@ -10,11 +10,11 @@ import (
 func init() {
 	for _, adapter := range internal.StorageAdapters {
 		allowedConfigKeys := []string{
-			adapter.prefixName,
-			config.ToWalgSettingName(adapter.prefixName),
+			adapter.PrefixName(),
+			config.ToWalgSettingName(adapter.PrefixName()),
 		}
 		config.UpdateAllowed(allowedConfigKeys)
-		for _, settingName := range adapter.settingNames {
+		for _, settingName := range adapter.SettingNames() {
 			allowedConfigKeys = []string{
 				"WALG_" + settingName,
 				"WALE_" + settingName,

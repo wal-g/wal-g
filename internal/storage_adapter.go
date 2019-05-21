@@ -43,6 +43,14 @@ func (adapter *StorageAdapter) loadSettings() (map[string]string, error) {
 	return settings, nil
 }
 
+func (adapter *StorageAdapter) PrefixName() string {
+	return adapter.prefixName
+}
+
+func (adapter *StorageAdapter) SettingNames() []string {
+	return adapter.settingNames
+}
+
 func preprocessFilePrefix(prefix string) string {
 	return strings.TrimPrefix(prefix, WaleFileHost) // WAL-E backward compatibility
 }
