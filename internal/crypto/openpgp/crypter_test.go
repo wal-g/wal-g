@@ -23,10 +23,6 @@ func init() {
 	pgpTestPrivateKey = string(pgpTestPrivateKeyBytes)
 }
 
-func MockArmedCrypter() crypto.Crypter {
-	return createCrypter(pgpTestPrivateKey)
-}
-
 func CreateCrypter(armedKeyring string) *Crypter {
 	ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(armedKeyring))
 	if err != nil {
@@ -34,6 +30,10 @@ func CreateCrypter(armedKeyring string) *Crypter {
 	}
 	crypter := &Crypter{PubKey: ring, SecretKey: ring}
 	return crypter
+}
+
+func MockArmedCrypter() crypto.Crypter {
+	return CreateCrypter(pgpTestPrivateKey)
 }
 
 func TestMockCrypter(t *testing.T) {
