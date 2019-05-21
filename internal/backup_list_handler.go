@@ -42,8 +42,7 @@ func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, de
 				if err != nil {
 					tracelog.ErrorLogger.FatalError(err)
 				}
-				backupDetails[i].writeBackupTime(backups[i])
-				backupDetails[i].writeExtendedMetadataDto(metaData)
+				backupDetails[i] = BackupDetail{backups[i], metaData}
 			}
 		}
 		if json {
