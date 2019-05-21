@@ -4,8 +4,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path"
@@ -40,8 +42,8 @@ func (err ArchiveNonExistenceError) Error() string {
 // HandleWALFetch is invoked to performa wal-g wal-fetch
 func HandleWALFetch(folder storage.Folder, walFileName string, location string, triggerPrefetch bool) {
 	tracelog.DebugLogger.Printf("HandleWALFetch(folder, %s, %s, %v)\n", walFileName, location, triggerPrefetch)
-	folder = folder.GetSubFolder(WalPath)
-	location = ResolveSymlink(location)
+	folder = folder.GetSubFolder(utility.WalPath)
+	location = utility.ResolveSymlink(location)
 	if triggerPrefetch {
 		defer forkPrefetch(walFileName, location)
 	}
@@ -128,9 +130,9 @@ func TryDownloadWALFile(folder storage.Folder, walPath string) (walFileReader io
 }
 
 // TODO : unit tests
-func DecompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor Decompressor) error {
-	crypter := OpenPGPCrypter{}
-	if crypter.IsUsed() {
+func DecompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor compression.Decompressor) error {
+	crypter := NewOpenPGPCrypter()
+	if crypter != nil {
 		reader, err := crypter.Decrypt(archiveReader)
 		if err != nil {
 			return err
@@ -144,7 +146,7 @@ func DecompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor 
 
 // TODO : unit tests
 func downloadAndDecompressWALFile(folder storage.Folder, walFileName string) (io.ReadCloser, error) {
-	for _, decompressor := range Decompressors {
+	for _, decompressor := range compression.Decompressors {
 		archiveReader, exists, err := TryDownloadWALFile(folder, walFileName+"."+decompressor.FileExtension())
 		if err != nil {
 			return nil, err

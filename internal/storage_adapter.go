@@ -7,6 +7,7 @@ import (
 	"github.com/wal-g/wal-g/internal/storages/s3"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/storages/swift"
+	"github.com/wal-g/wal-g/utility"
 	"strconv"
 	"strings"
 )
@@ -18,11 +19,15 @@ type StorageAdapter struct {
 	prefixPreprocessor func(string) string
 }
 
-func (adapter *StorageAdapter) loadSettings() map[string]string {
+func (adapter *StorageAdapter) loadSettings() (map[string]string, error) {
 	settings := make(map[string]string)
 	for _, settingName := range adapter.settingNames {
 		if settingName == "UPLOAD_CONCURRENCY" {
-			settings[settingName] = strconv.Itoa(getMaxUploadConcurrency(10))
+			concurrency, err := utility.GetMaxUploadConcurrency(10)
+			if err != nil {
+				return nil, err
+			}
+			settings[settingName] = strconv.Itoa(concurrency)
 			continue
 		}
 		settingValue := GetSettingValue("WALE_" + settingName)
@@ -33,7 +38,7 @@ func (adapter *StorageAdapter) loadSettings() map[string]string {
 			settings[settingName] = settingValue
 		}
 	}
-	return settings
+	return settings, nil
 }
 
 func preprocessFilePrefix(prefix string) string {
@@ -45,5 +50,5 @@ var StorageAdapters = []StorageAdapter{
 	{"WALE_FILE_PREFIX", nil, fs.ConfigureFolder, preprocessFilePrefix},
 	{"WALE_GS_PREFIX", nil, gcs.ConfigureFolder, nil},
 	{"WALE_AZ_PREFIX", azure.SettingList, azure.ConfigureFolder, nil},
-	{"WALE_SWIFT_PREFIX", nil, swift.ConfigureFolder, nil},
+	{"WALE_SWIFT_PREFIX", swift.SettingList, swift.ConfigureFolder, nil},
 }

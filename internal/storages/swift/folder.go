@@ -11,6 +11,14 @@ import (
 	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
+var SettingList = []string{
+	"OS_USERNAME",
+	"OS_PASSWORD",
+	"OS_AUTH_URL",
+	"OS_TENANT_NAME",
+	"OS_REGION_NAME",
+}
+
 func NewError(err error, format string, args ...interface{}) storage.Error {
 	return storage.NewError(err, "Swift", format, args...)
 }

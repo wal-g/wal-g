@@ -27,6 +27,9 @@ pg_clean:
 	(cd $(MAIN_PG_PATH) && go clean)
 	./cleanup.sh
 
+pg_install: pg_build
+	mv $(MAIN_PG_PATH)/wal-g $(GOBIN)/wal-g
+
 mysql_test: install deps mysql_build lint unittest unlink_brotli mysql_integration_test
 
 mysql_build: $(CMD_FILES) $(PKG_FILES)
@@ -40,10 +43,14 @@ mysql_clean:
 	(cd $(MAIN_MYSQL_PATH) && go clean)
 	./cleanup.sh
 
+mysql_install: mysql_build
+	mv $(MAIN_MYSQL_PATH)/wal-g $(GOBIN)/wal-g
+
 unittest:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet
 	go test -v ./test/
 	go test -v ./internal/walparser/
+	go test -v ./internal/compression/
 	go test -v ./internal/storages/s3/
 	go test -v ./internal/storages/gcs/
 	go test -v ./internal/storages/fs/

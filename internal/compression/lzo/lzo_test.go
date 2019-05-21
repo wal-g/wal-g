@@ -1,11 +1,12 @@
 // +build lzo
 
-package test
+package lzo
 
 import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/cyberdelia/lzo"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/testtools"
@@ -35,11 +36,11 @@ func testLzopRoundTrip(t *testing.T, stride, nBytes int) {
 
 	// Compress bytes and make a tar in memory.
 	r, w := io.Pipe()
-	lzow := internal.NewLzoWriter(w)
+	lzow := lzo.NewWriter(w)
 	go func() {
 		defer lzow.Close()
 		defer w.Close()
-		bw := bufio.NewWriterSize(lzow, internal.LzopBlockSize)
+		bw := bufio.NewWriterSize(lzow, LzopBlockSize)
 		defer func() {
 			if err := bw.Flush(); err != nil {
 				panic(err)
@@ -69,7 +70,7 @@ func testLzopRoundTrip(t *testing.T, stride, nBytes int) {
 }
 
 func TestLzopUncompressableBytes(t *testing.T) {
-	testLzopRoundTrip(t, internal.LzopBlockSize*2, internal.LzopBlockSize*2)
+	testLzopRoundTrip(t, LzopBlockSize*2, LzopBlockSize*2)
 }
 func TestLzop1Byte(t *testing.T)   { testLzopRoundTrip(t, 7924, 1) }
 func TestLzop1MByte(t *testing.T)  { testLzopRoundTrip(t, 7924, 1024*1024) }
@@ -84,7 +85,7 @@ func setupRand(stride, nBytes int) *BufferReaderMaker {
 	b := &BufferReaderMaker{&bytes.Buffer{}, "/usr/local.lzo"}
 
 	pr, pw := io.Pipe()
-	lzow := internal.NewLzoWriter(pw)
+	lzow := lzo.NewWriter(pw)
 
 	go func() {
 		testtools.CreateTar(lzow, lr)
@@ -128,3 +129,12 @@ func BenchmarkExtractAll(b *testing.B) {
 	}
 
 }
+
+// Used to mock files in memory.
+type BufferReaderMaker struct {
+	Buf *bytes.Buffer
+	Key string
+}
+
+func (b *BufferReaderMaker) Reader() (io.ReadCloser, error) { return ioutil.NopCloser(b.Buf), nil }
+func (b *BufferReaderMaker) Path() string                   { return b.Key }

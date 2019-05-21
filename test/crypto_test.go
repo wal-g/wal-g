@@ -5,7 +5,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"golang.org/x/crypto/openpgp"
-	"io"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -32,40 +31,12 @@ func createCrypter(armedKeyring string) *internal.OpenPGPCrypter {
 	if err != nil {
 		panic(err)
 	}
-	crypter := &internal.OpenPGPCrypter{Configured: true, PubKey: ring, SecretKey: ring}
+	crypter := &internal.OpenPGPCrypter{PubKey: ring, SecretKey: ring}
 	return crypter
-}
-
-func MockDisarmedCrypter() internal.Crypter {
-	return &MockCrypter{}
-}
-
-type MockCrypter struct {
-}
-
-func (crypter *MockCrypter) Encrypt(writer io.WriteCloser) (io.WriteCloser, error) {
-	return writer, nil
-}
-
-func (crypter *MockCrypter) Decrypt(reader io.ReadCloser) (io.Reader, error) {
-	return reader, nil
-}
-
-func (crypter *MockCrypter) IsUsed() bool {
-	return true
 }
 
 func TestMockCrypter(t *testing.T) {
 	MockArmedCrypter()
-	MockDisarmedCrypter()
-}
-
-type ClosingBuffer struct {
-	*bytes.Buffer
-}
-
-func (cb *ClosingBuffer) Close() (err error) {
-	return nil
 }
 
 func TestEncryptionCycle(t *testing.T) {
@@ -73,13 +44,13 @@ func TestEncryptionCycle(t *testing.T) {
 	const someSecret = "so very secret thingy"
 
 	buf := new(bytes.Buffer)
-	encrypt, err := crypter.Encrypt(&ClosingBuffer{buf})
+	encrypt, err := crypter.Encrypt(buf)
 	assert.NoErrorf(t, err, "Encryption error: %v", err)
 
 	encrypt.Write([]byte(someSecret))
 	encrypt.Close()
 
-	decrypt, err := crypter.Decrypt(&ClosingBuffer{buf})
+	decrypt, err := crypter.Decrypt(buf)
 	assert.NoErrorf(t, err, "Decryption error: %v", err)
 
 	decryptedBytes, err := ioutil.ReadAll(decrypt)

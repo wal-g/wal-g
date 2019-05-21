@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"path"
 	"regexp"
 	"strings"
@@ -109,8 +110,8 @@ func tryFetchBinlogName(folder storage.Folder, object storage.Object) (string, b
 		_, name = path.Split(name)
 		return name, true
 	}
-	name = strings.Replace(name, internal.SentinelSuffix, "", 1)
-	baseBackupFolder := folder.GetSubFolder(internal.BaseBackupPath)
+	name = strings.Replace(name, utility.SentinelSuffix, "", 1)
+	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	backup := mysql.Backup{Backup: internal.NewBackup(baseBackupFolder, name)}
 	sentinel, err := backup.FetchStreamSentinel()
 	if err != nil {

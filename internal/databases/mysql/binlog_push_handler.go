@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -21,14 +22,13 @@ type MySQLLogsCache struct {
 }
 
 func HandleBinlogPush(uploader *Uploader) {
-	_, binlogsFolder := GetBinlogConfigs()
+	binlogsFolder := internal.GetSettingValue(BinlogSrc)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(BinlogPath)
 	db, err := getMySQLConnection()
-	defer internal.LoggedClose(db)
-
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
+	defer utility.LoggedClose(db,"")
 
 	binlogs := getMySQLSortedBinlogs(db)
 
@@ -49,6 +49,7 @@ func getMySQLSortedBinlogs(db *sql.DB) []string {
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
+	defer utility.LoggedClose(rows, "")
 	for rows.Next() {
 		var logFinName string
 		var size uint32
@@ -75,7 +76,7 @@ func tryArchiveBinLog(uploader *Uploader, filename string, binLog string) error 
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not open '%s'\n", filename)
 	}
-	defer internal.LoggedClose(walFile)
+	defer utility.LoggedClose(walFile, "")
 	err = uploader.UploadWalFile(walFile)
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not upload '%s'\n", filename)

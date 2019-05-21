@@ -9,11 +9,13 @@ import (
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"strconv"
 )
 
 // It is made so to load big database files of size 1GB one by one
@@ -37,7 +39,7 @@ func (err TarSizeError) Error() string {
 }
 
 // ExcludedFilenames is a list of excluded members from the bundled backup.
-var ExcludedFilenames = make(map[string]Empty)
+var ExcludedFilenames = make(map[string]utility.Empty)
 
 func init() {
 	filesToExclude := []string{
@@ -47,7 +49,7 @@ func init() {
 	}
 
 	for _, filename := range filesToExclude {
-		ExcludedFilenames[filename] = Empty{}
+		ExcludedFilenames[filename] = utility.Empty{}
 	}
 }
 
@@ -63,7 +65,7 @@ type Bundle struct {
 	Sentinel           *Sentinel
 	TarBall            TarBall
 	TarBallMaker       TarBallMaker
-	Crypter            OpenPGPCrypter
+	Crypter            Crypter
 	Timeline           uint32
 	Replica            bool
 	IncrementFromLsn   *uint64
@@ -80,11 +82,33 @@ type Bundle struct {
 	Files *sync.Map
 }
 
+func getTarSizeThreshold() int64 {
+	const (
+		ThresholdBase    = 10
+		ThresholdBitSize = 64
+	)
+
+	tarSizeThresholdString, ok := LookupConfigValue("WALG_TAR_SIZE_THRESHOLD")
+
+	if !ok {
+		return DefaultTarSizeThreshold
+	}
+
+	tarSizeThreshold, err := strconv.ParseInt(tarSizeThresholdString, ThresholdBase, ThresholdBitSize)
+
+	if err != nil {
+		return DefaultTarSizeThreshold
+	}
+
+	return tarSizeThreshold
+}
+
 // TODO: use DiskDataFolder
-func NewBundle(archiveDirectory string, incrementFromLsn *uint64, incrementFromFiles BackupFileList) *Bundle {
+func NewBundle(archiveDirectory string, crypter Crypter, incrementFromLsn *uint64, incrementFromFiles BackupFileList) *Bundle {
 	return &Bundle{
 		ArchiveDirectory:   archiveDirectory,
-		TarSizeThreshold:   DefaultTarSizeThreshold,
+		TarSizeThreshold:   getTarSizeThreshold(),
+		Crypter:            crypter,
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
 		Files:              &sync.Map{},
@@ -92,17 +116,25 @@ func NewBundle(archiveDirectory string, incrementFromLsn *uint64, incrementFromF
 }
 
 func (bundle *Bundle) GetFileRelPath(fileAbsPath string) string {
-	return GetFileRelativePath(fileAbsPath, bundle.ArchiveDirectory)
+	return utility.GetFileRelativePath(fileAbsPath, bundle.ArchiveDirectory)
 }
 
 func (bundle *Bundle) GetFiles() *sync.Map { return bundle.Files }
 
-func (bundle *Bundle) StartQueue() {
+func (bundle *Bundle) StartQueue() error {
 	if bundle.started {
 		panic("Trying to start already started Queue")
 	}
-	bundle.parallelTarballs = getMaxUploadDiskConcurrency()
-	bundle.maxUploadQueue = getMaxUploadQueue()
+	var err error
+	bundle.parallelTarballs, err = utility.GetMaxUploadDiskConcurrency()
+	if err != nil {
+		return err
+	}
+	bundle.maxUploadQueue, err = utility.GetMaxUploadQueue()
+	if err != nil {
+		return err
+	}
+
 	bundle.tarballQueue = make(chan TarBall, bundle.parallelTarballs)
 	bundle.uploadQueue = make(chan TarBall, bundle.parallelTarballs+bundle.maxUploadQueue)
 	for i := 0; i < bundle.parallelTarballs; i++ {
@@ -110,6 +142,7 @@ func (bundle *Bundle) StartQueue() {
 		bundle.tarballQueue <- bundle.TarBall
 	}
 	bundle.started = true
+	return nil
 }
 
 func (bundle *Bundle) Deque() TarBall {
@@ -316,7 +349,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 		}
 
 		tarBall := bundle.Deque()
-		tarBall.SetUp(&bundle.Crypter)
+		tarBall.SetUp(bundle.Crypter)
 		go func() {
 			// TODO: Refactor this functional mess
 			// And maybe do a better error handling
@@ -331,7 +364,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 		}()
 	} else {
 		tarBall := bundle.Deque()
-		tarBall.SetUp(&bundle.Crypter)
+		tarBall.SetUp(bundle.Crypter)
 		defer bundle.EnqueueBack(tarBall)
 		err = tarBall.TarWriter().WriteHeader(fileInfoHeader)
 		if err != nil {
@@ -355,7 +388,7 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 
 	bundle.NewTarBall(false)
 	tarBall := bundle.TarBall
-	tarBall.SetUp(&bundle.Crypter, "pg_control.tar."+compressorFileExtension)
+	tarBall.SetUp(bundle.Crypter, "pg_control.tar."+compressorFileExtension)
 	tarWriter := tarBall.TarWriter()
 
 	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
@@ -419,7 +452,7 @@ func (bundle *Bundle) UploadLabelFiles(conn *pgx.Conn) (uint64, error) {
 
 	bundle.NewTarBall(false)
 	tarBall := bundle.TarBall
-	tarBall.SetUp(&bundle.Crypter)
+	tarBall.SetUp(bundle.Crypter)
 
 	labelHeader := &tar.Header{
 		Name:     BackupLabelFilename,
@@ -569,6 +602,6 @@ func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string,
 	fileReader = &ReadCascadeCloser{&io.LimitedReader{
 		R: io.MultiReader(diskLimitedFileReader, &ZeroReader{}),
 		N: int64(fileInfoHeader.Size),
-	}, diskLimitedFileReader}
+	}, file}
 	return fileReader, nil
 }

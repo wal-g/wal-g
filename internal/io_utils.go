@@ -1,14 +1,10 @@
 package internal
 
 import (
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 )
-
-type ReaderFromWriteCloser interface {
-	io.ReaderFrom
-	io.WriteCloser
-}
 
 type ReadSeekCloser interface {
 	io.Reader
@@ -28,6 +24,27 @@ type ReadCascadeCloser struct {
 	io.Closer
 }
 
+type Flusher interface {
+	Flush() error
+}
+
+type OnCloseFlusher struct {
+	io.WriteCloser
+	Flusher
+}
+
+func NewOnCloseFlusher(writeCloser io.WriteCloser, flusher Flusher) *OnCloseFlusher {
+	return &OnCloseFlusher{writeCloser, flusher}
+}
+
+func (cf OnCloseFlusher) Close() error {
+	err := cf.WriteCloser.Close()
+	if err != nil {
+		return err
+	}
+	return cf.Flush()
+}
+
 // ZeroReader generates a slice of zeroes. Used to pad
 // tar in cases where length of file changes.
 type ZeroReader struct{}
@@ -43,6 +60,6 @@ func CreateFileWith(filePath string, content io.Reader) error {
 	if err != nil {
 		return err
 	}
-	_, err = FastCopy(file, content)
+	_, err = utility.FastCopy(file, content)
 	return err
 }

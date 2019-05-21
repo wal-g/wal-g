@@ -1,51 +1,54 @@
 package internal
 
 import (
+	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"path"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 )
 
 // Uploader contains fields associated with uploading tarballs.
 // Multiple tarballs can share one uploader.
 type Uploader struct {
 	UploadingFolder     storage.Folder
-	Compressor          Compressor
+	Compressor          compression.Compressor
 	waitGroup           *sync.WaitGroup
 	deltaFileManager    *DeltaFileManager
-	Success             bool
+	Failed              atomic.Value
 	useWalDelta         bool
-	preventWalOverwrite bool
 }
 
 func NewUploader(
-	compressor Compressor,
+	compressor compression.Compressor,
 	uploadingLocation storage.Folder,
 	deltaDataFolder DataFolder,
-	useWalDelta, preventWalOverwrite bool,
+	useWalDelta bool,
 ) *Uploader {
 	var deltaFileManager *DeltaFileManager = nil
 	if useWalDelta {
 		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
 	}
-	return &Uploader{
+	uploader := &Uploader{
 		UploadingFolder:     uploadingLocation,
 		Compressor:          compressor,
 		useWalDelta:         useWalDelta,
 		waitGroup:           &sync.WaitGroup{},
 		deltaFileManager:    deltaFileManager,
-		preventWalOverwrite: preventWalOverwrite,
 	}
+	uploader.Failed.Store(false)
+	return uploader
 }
 
 // finish waits for all waiting parts to be uploaded. If an error occurs,
 // prints alert to stderr.
 func (uploader *Uploader) finish() {
 	uploader.waitGroup.Wait()
-	if !uploader.Success {
+	if uploader.Failed.Load().(bool) {
 		tracelog.ErrorLogger.Printf("WAL-G could not complete upload.\n")
 	}
 }
@@ -57,9 +60,8 @@ func (uploader *Uploader) Clone() *Uploader {
 		uploader.Compressor,
 		&sync.WaitGroup{},
 		uploader.deltaFileManager,
-		uploader.Success,
+		uploader.Failed,
 		uploader.useWalDelta,
-		uploader.preventWalOverwrite,
 	}
 }
 
@@ -86,17 +88,10 @@ func (uploader *Uploader) UploadWalFile(file NamedReader) error {
 // TODO : unit tests
 // UploadFile compresses a file and uploads it.
 func (uploader *Uploader) UploadFile(file NamedReader) error {
-	pipeWriter := &CompressingPipeWriter{
-		Input:                file,
-		NewCompressingWriter: uploader.Compressor.NewWriter,
-	}
+	compressedFile := CompressAndEncrypt(file, uploader.Compressor, NewOpenPGPCrypter())
+	dstPath := utility.SanitizePath(filepath.Base(file.Name()) + "." + uploader.Compressor.FileExtension())
 
-	pipeWriter.Compress(&OpenPGPCrypter{})
-
-	dstPath := SanitizePath(filepath.Base(file.Name()) + "." + uploader.Compressor.FileExtension())
-	reader := pipeWriter.Output
-
-	err := uploader.Upload(dstPath, reader)
+	err := uploader.Upload(dstPath, compressedFile)
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
 	return err
 }
@@ -105,9 +100,9 @@ func (uploader *Uploader) UploadFile(file NamedReader) error {
 func (uploader *Uploader) Upload(path string, content io.Reader) error {
 	err := uploader.UploadingFolder.PutObject(path, content)
 	if err == nil {
-		uploader.Success = true
 		return nil
 	}
+	uploader.Failed.Store(true)
 	tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"\n", err)
 	return err
 }

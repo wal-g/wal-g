@@ -4,10 +4,14 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"os"
 	"path"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -33,7 +37,7 @@ func HandleStreamFetch(backupName string, folder storage.Folder) {
 
 // TODO : unit tests
 func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
-	baseBackupFolder := folder.GetSubFolder(internal.BaseBackupPath)
+	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	backup := Backup{internal.NewBackup(baseBackupFolder, fileName)}
 
 	tracelog.InfoLogger.Println("stream-fetch")
@@ -45,7 +49,7 @@ func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
 
 	go fetchBinlogs(folder, streamSentinel, binlogsAreDone)
 
-	for _, decompressor := range internal.Decompressors {
+	for _, decompressor := range compression.Decompressors {
 		d := decompressor
 		archiveReader, exists, err := internal.TryDownloadWALFile(baseBackupFolder, getStreamName(&backup, d.FileExtension()))
 		if err != nil {
@@ -59,7 +63,7 @@ func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
 		if err != nil {
 			return err
 		}
-		internal.LoggedClose(os.Stdout)
+		utility.LoggedClose(os.Stdout, "")
 
 		tracelog.DebugLogger.Println("Waiting for binlogs")
 		err = <-binlogsAreDone
@@ -81,6 +85,7 @@ func fetchBinlogs(folder storage.Folder, sentinel StreamSentinelDto, binlogsAreD
 		binlogsAreDone <- nil
 		return
 	}
+	var fetchedLogs []storage.Object
 
 	for _, object := range objects {
 		tracelog.InfoLogger.Println("Consider binlog ", object.GetName(), object.GetLastModified().Format(time.RFC3339))
@@ -95,7 +100,31 @@ func fetchBinlogs(folder storage.Folder, sentinel StreamSentinelDto, binlogsAreD
 				binlogsAreDone <- err
 				return
 			}
+			fetchedLogs = append(fetchedLogs, object)
 		}
+	}
+
+	sort.Slice(fetchedLogs, func(i, j int) bool {
+		return fetchedLogs[i].GetLastModified().After(fetchedLogs[j].GetLastModified())
+	})
+
+	index_file, err := os.Create(filepath.Join(dstFolder, "binlogs_order"))
+	if err != nil {
+		binlogsAreDone <- err
+		return
+	}
+
+	for _, object := range fetchedLogs {
+		_, err := index_file.WriteString(ExtractBinlogName(object, folder) + "\n")
+		if err != nil {
+			binlogsAreDone <- err
+			return
+		}
+	}
+	err = index_file.Close()
+	if err != nil {
+		binlogsAreDone <- err
+		return
 	}
 
 	binlogsAreDone <- nil
@@ -119,5 +148,5 @@ func GetBinlogConfigs() (*time.Time, string) {
 
 func ExtractBinlogName(object storage.Object, folder storage.Folder) string {
 	binlogName := object.GetName()
-	return strings.TrimSuffix(binlogName, "."+internal.GetFileExtension(binlogName))
+	return strings.TrimSuffix(binlogName, "."+utility.GetFileExtension(binlogName))
 }

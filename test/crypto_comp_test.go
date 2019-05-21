@@ -1,9 +1,12 @@
+// +build lzo
+
 package test
 
 import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression/lzo"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -57,7 +60,7 @@ func TestDecryptWALElzo(t *testing.T) {
 	assert.Equalf(t, bytes1, bytes2, "Decryption result differ")
 
 	buffer := bytes.Buffer{}
-	decompressor := internal.LzoDecompressor{}
+	decompressor := lzo.Decompressor{}
 	err = decompressor.Decompress(&buffer, bytes.NewReader(bytes1))
 	assert.NoError(t, err)
 
@@ -95,9 +98,9 @@ func TestOpenGPGandExternalGPGCompatibility(t *testing.T) {
 	defer os.Unsetenv("WALE_GPG_KEY_ID")
 
 	ec := &ExternalGPGCrypter{}
-	c := &internal.OpenPGPCrypter{}
+	c := internal.NewOpenPGPCrypter()
 
-	assert.Truef(t, c.IsUsed(), "OpenGPG crypter is unable to initialize")
+	assert.NotNilf(t, c, "OpenGPG crypter is unable to initialize")
 
 	for i := uint(0); i < 16; i++ {
 		tokenSize := 512 << i
@@ -107,7 +110,7 @@ func TestOpenGPGandExternalGPGCompatibility(t *testing.T) {
 		bytes1, err := ec.Encrypt(bytes.NewReader(token))
 		assert.NoError(t, err)
 
-		reader, err := c.Decrypt(&ReadNullCloser{bytes.NewReader(bytes1)})
+		reader, err := c.Decrypt(bytes.NewReader(bytes1))
 
 		assert.NoError(t, err)
 
@@ -119,19 +122,7 @@ func TestOpenGPGandExternalGPGCompatibility(t *testing.T) {
 	}
 }
 
-type ReadNullCloser struct {
-	io.Reader
-}
-
-func (c *ReadNullCloser) Close() error {
-	return nil // what can go wrong?
-}
-
 type ExternalGPGCrypter struct {
-}
-
-func (c *ExternalGPGCrypter) IsUsed() bool {
-	return internal.GetKeyRingId() != ""
 }
 
 func (c *ExternalGPGCrypter) Encrypt(reader io.Reader) ([]byte, error) {
@@ -142,7 +133,7 @@ func (c *ExternalGPGCrypter) Encrypt(reader io.Reader) ([]byte, error) {
 	return cmd.Output()
 }
 
-func (c *ExternalGPGCrypter) Decrypt(reader io.ReadCloser) ([]byte, error) {
+func (c *ExternalGPGCrypter) Decrypt(reader io.Reader) ([]byte, error) {
 	cmd := exec.Command("gpg", "-d", "-q", "--batch")
 
 	cmd.Stdin = reader

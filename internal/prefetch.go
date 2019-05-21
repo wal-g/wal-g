@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/ioutil"
 	"os"
@@ -19,12 +20,16 @@ import (
 // TODO : unit tests
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
 func HandleWALPrefetch(uploader *Uploader, walFileName string, location string) {
-	folder := uploader.UploadingFolder.GetSubFolder(WalPath)
+	folder := uploader.UploadingFolder.GetSubFolder(utility.WalPath)
 	var fileName = walFileName
-	var err error
 	location = path.Dir(location)
 	waitGroup := &sync.WaitGroup{}
-	for i := 0; i < getMaxDownloadConcurrency(8); i++ {
+	concurrency, err := utility.GetMaxDownloadConcurrency(8)
+	if err != nil {
+		tracelog.ErrorLogger.FatalError(err)
+	}
+
+	for i := 0; i < concurrency; i++ {
 		fileName, err = GetNextWalFilename(fileName)
 		if err != nil {
 			tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err, " file: ", fileName)
@@ -65,9 +70,9 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 	archiveDirectory := uploader.deltaFileManager.dataFolder.(*DiskDataFolder).path
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	archiveDirectory = filepath.Dir(archiveDirectory)
-	bundle := NewBundle(archiveDirectory, &prefaultStartLsn, nil)
+	bundle := NewBundle(archiveDirectory, nil, &prefaultStartLsn, nil)
 	bundle.Timeline = timelineId
-	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
+	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(utility.WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Error during loading delta map: '%+v'.", err)
 		return
@@ -221,14 +226,18 @@ func GetPrefetchLocations(location string, walFileName string) (prefetchLocation
 
 // TODO : unit tests
 func forkPrefetch(walFileName string, location string) {
+	concurrency, err := utility.GetMaxDownloadConcurrency(16)
+	if err != nil {
+		tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err)
+	}
 	if strings.Contains(walFileName, "history") ||
 		strings.Contains(walFileName, "partial") ||
-		getMaxDownloadConcurrency(16) == 1 {
+		concurrency == 1 {
 		return // There will be nothing ot prefetch anyway
 	}
 	cmd := exec.Command(os.Args[0], "wal-prefetch", walFileName, location)
 	cmd.Env = os.Environ()
-	err := cmd.Start()
+	err = cmd.Start()
 
 	if err != nil {
 		tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err)

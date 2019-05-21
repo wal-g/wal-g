@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/semaphore"
 	"io"
 	"strings"
@@ -88,7 +90,7 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 	}
 	defer readCloser.Close()
 
-	if crypter.IsUsed() {
+	if crypter != nil {
 		var reader io.Reader
 		reader, err = crypter.Decrypt(readCloser)
 		if err != nil {
@@ -97,8 +99,8 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 		readCloser = ReadCascadeCloser{reader, readCloser}
 	}
 
-	fileExtension := GetFileExtension(readerMaker.Path())
-	for _, decompressor := range Decompressors {
+	fileExtension := utility.GetFileExtension(readerMaker.Path())
+	for _, decompressor := range compression.Decompressors {
 		if fileExtension != decompressor.FileExtension() {
 			continue
 		}
@@ -130,7 +132,10 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 
 	retrier := NewExponentialRetrier(MinExtractRetryWait, MaxExtractRetryWait)
 	// Set maximum number of goroutines spun off by ExtractAll
-	downloadingConcurrency := getMaxDownloadConcurrency(min(len(files), 10))
+	downloadingConcurrency, err := utility.GetMaxDownloadConcurrency(utility.Min(len(files), 10))
+	if err != nil {
+		return err
+	}
 	for currentRun := files; len(currentRun) > 0; {
 		var failed []ReaderMaker
 		failed = tryExtractFiles(currentRun, tarInterpreter, downloadingConcurrency)
@@ -152,7 +157,7 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloadingConcurrency int) (failed []ReaderMaker) {
 	downloadingContext := context.TODO()
 	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
-	var crypter OpenPGPCrypter
+	crypter := NewOpenPGPCrypter()
 	isFailed := sync.Map{}
 
 	for _, file := range files {
@@ -162,7 +167,7 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 		extractingReader, pipeWriter := io.Pipe()
 		decompressingWriter := &EmptyWriteIgnorer{pipeWriter}
 		go func() {
-			err := DecryptAndDecompressTar(decompressingWriter, fileClosure, &crypter)
+			err := DecryptAndDecompressTar(decompressingWriter, fileClosure, crypter)
 			decompressingWriter.Close()
 			tracelog.InfoLogger.Printf("Finished decompression of %s", fileClosure.Path())
 			if err != nil {

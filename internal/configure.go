@@ -3,6 +3,8 @@ package internal
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/compression/lz4"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"golang.org/x/time/rate"
@@ -26,6 +28,18 @@ func NewUnconfiguredStorageError(storagePrefixVariants []string) UnconfiguredSto
 }
 
 func (err UnconfiguredStorageError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
+type UnknownCompressionMethodError struct {
+	error
+}
+
+func NewUnknownCompressionMethodError() UnknownCompressionMethodError {
+	return UnknownCompressionMethodError{errors.Errorf("Unknown compression method, supported methods are: %v", compression.CompressingAlgorithms)}
+}
+
+func (err UnknownCompressionMethodError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
@@ -61,7 +75,12 @@ func ConfigureFolder() (storage.Folder, error) {
 		if adapter.prefixPreprocessor != nil {
 			prefix = adapter.prefixPreprocessor(prefix)
 		}
-		return adapter.configureFolder(prefix, adapter.loadSettings())
+
+		settings, err := adapter.loadSettings()
+		if err != nil {
+			return nil, err
+		}
+		return adapter.configureFolder(prefix, settings)
 	}
 	return nil, NewUnconfiguredStorageError(skippedPrefixes)
 }
@@ -83,6 +102,21 @@ func getDataFolderPath() string {
 	}
 	dataFolderPath = filepath.Join(dataFolderPath, "walg_data")
 	return dataFolderPath
+}
+
+func  ConfigurePreventWalOverwrite() (preventWalOverwrite bool, err error) {
+	err = nil
+	preventWalOverwrite = false
+	preventWalOverwriteStr := GetSettingValue("WALG_PREVENT_WAL_OVERWRITE")
+
+	if preventWalOverwriteStr != "" {
+		preventWalOverwrite, err = strconv.ParseBool(preventWalOverwriteStr)
+		if err != nil {
+			return false, errors.Wrap(err, "failed to parse WALG_PREVENT_WAL_OVERWRITE")
+		}
+	}
+
+	return preventWalOverwrite, nil;
 }
 
 // TODO : unit tests
@@ -108,15 +142,15 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err
 }
 
 // TODO : unit tests
-func configureCompressor() (Compressor, error) {
+func configureCompressor() (compression.Compressor, error) {
 	compressionMethod := GetSettingValue("WALG_COMPRESSION_METHOD")
 	if compressionMethod == "" {
-		compressionMethod = Lz4AlgorithmName
+		compressionMethod = lz4.AlgorithmName
 	}
-	if _, ok := Compressors[compressionMethod]; !ok {
+	if _, ok := compression.Compressors[compressionMethod]; !ok {
 		return nil, NewUnknownCompressionMethodError()
 	}
-	return Compressors[compressionMethod], nil
+	return compression.Compressors[compressionMethod], nil
 }
 
 // TODO : unit tests
@@ -147,15 +181,7 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 		return nil, errors.Wrap(err, "failed to configure WAL Delta usage")
 	}
 
-	preventWalOverwrite := false
-	if preventWalOverwriteStr := GetSettingValue("WALG_PREVENT_WAL_OVERWRITE"); preventWalOverwriteStr != "" {
-		preventWalOverwrite, err = strconv.ParseBool(preventWalOverwriteStr)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to parse WALG_PREVENT_WAL_OVERWRITE")
-		}
-	}
-
-	uploader = NewUploader(compressor, folder, deltaDataFolder, useWalDelta, preventWalOverwrite)
+	uploader = NewUploader(compressor, folder, deltaDataFolder, useWalDelta)
 
 	return uploader, err
 }

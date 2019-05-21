@@ -12,9 +12,9 @@ const binlogPushShortDescription = ""
 
 // binlogPushCmd represents the cron command
 var binlogPushCmd = &cobra.Command{
-	Use:   "binlog-push /path/to/backup",
+	Use:   "binlog-push",
 	Short: binlogPushShortDescription,
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
 		if err != nil {

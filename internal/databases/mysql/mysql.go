@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"io/ioutil"
 	"path"
 	"strings"
@@ -18,9 +19,10 @@ import (
 
 const (
 	StreamPrefix = "stream_"
-	BinlogPath   = "binlog_" + internal.VersionStr + "/"
+	BinlogPath   = "binlog_" + utility.VersionStr + "/"
 	BinlogEndTs  = "WALG_MYSQL_BINLOG_END_TS"
 	BinlogDst    = "WALG_MYSQL_BINLOG_DST"
+	BinlogSrc    = "WALG_MYSQL_BINLOG_SRC"
 	SslCa        = "WALG_MYSQL_SSL_CA"
 )
 
@@ -53,19 +55,9 @@ func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
+	defer utility.LoggedClose(rows, "")
 	var logFileName string
 	var garbage interface{}
-	for rows.Next() {
-		err = rows.Scan(&logFileName, &garbage, &garbage, &garbage, &garbage)
-		if err != nil {
-			tracelog.ErrorLogger.Fatalf("%+v\n", err)
-		}
-		return logFileName
-	}
-	rows, err = db.Query("SHOW SLAVE STATUS")
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
-	}
 	for rows.Next() {
 		err = rows.Scan(&logFileName, &garbage, &garbage, &garbage, &garbage)
 		if err != nil {
@@ -115,6 +107,6 @@ type StreamSentinelDto struct {
 }
 
 func getStreamName(backup *Backup, extension string) string {
-	dstPath := internal.SanitizePath(path.Join(backup.Name, "stream.")) + extension
+	dstPath := utility.SanitizePath(path.Join(backup.Name, "stream.")) + extension
 	return dstPath
 }

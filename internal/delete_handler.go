@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"sort"
 	"strconv"
 	"strings"
@@ -57,7 +58,7 @@ func getBackups(folder storage.Folder) (backups []BackupTime, err error) {
 
 // TODO : unit tests
 func getBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage []string, err error) {
-	backupObjects, subFolders, err := folder.GetSubFolder(BaseBackupPath).ListFolder()
+	backupObjects, subFolders, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -73,15 +74,16 @@ func getBackupTimeSlices(backups []storage.Object) []BackupTime {
 	sortTimes := make([]BackupTime, len(backups))
 	for i, object := range backups {
 		key := object.GetName()
-		if !strings.HasSuffix(key, SentinelSuffix) {
+		if !strings.HasSuffix(key, utility.SentinelSuffix) {
 			continue
 		}
 		time := object.GetLastModified()
-		sortTimes[i] = BackupTime{StripBackupName(key), time, stripWalFileName(key)}
+		sortTimes[i] = BackupTime{utility.StripBackupName(key), time, utility.StripWalFileName(key)}
 	}
-	slice := TimeSlice(sortTimes)
-	sort.Sort(slice)
-	return slice
+	sort.Slice(sortTimes, func(i, j int) bool {
+		return sortTimes[i].Time.After(sortTimes[j].Time)
+	})
+	return sortTimes
 }
 
 // TODO : unit tests
@@ -92,7 +94,7 @@ func getGarbageFromPrefix(folders []storage.Folder, nonGarbage []BackupTime) []s
 		keyFilter[k.BackupName] = k.BackupName
 	}
 	for _, folder := range folders {
-		backupName := stripPrefixName(folder.GetPath())
+		backupName := utility.StripPrefixName(folder.GetPath())
 		if _, ok := keyFilter[backupName]; ok {
 			continue
 		}
@@ -108,7 +110,7 @@ func FindTargetBeforeName(folder storage.Folder,
 
 	choiceFunc := GetBeforeChoiceFunc(name, modifier, isFullBackup)
 	if choiceFunc == nil {
-		return nil, NewForbiddenActionError("Not allowed modifier for 'delete before'")
+		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete before'")
 	}
 	return FindTarget(folder, greater, choiceFunc)
 }
@@ -137,7 +139,7 @@ func FindTargetRetain(folder storage.Folder,
 
 	choiceFunc := GetRetainChoiceFunc(retentionCount, modifier, isFullBackup)
 	if choiceFunc == nil {
-		return nil, NewForbiddenActionError("Not allowed modifier for 'delete retain'")
+		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete retain'")
 	}
 	return FindTarget(folder, greater, choiceFunc)
 }
@@ -146,7 +148,7 @@ func FindTarget(folder storage.Folder,
 	compare func(object1, object2 storage.Object) bool,
 	isTarget func(object storage.Object) bool) (storage.Object, error) {
 
-	objects, _, err := folder.GetSubFolder(BaseBackupPath).ListFolder()
+	objects, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +223,7 @@ func DeleteBeforeTarget(folder storage.Folder, target storage.Object,
 
 	if !isFullBackup(target) {
 		errorMessage := "%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
-		return NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
+		return utility.NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
 	}
 	tracelog.InfoLogger.Println("Start delete")
 	return storage.DeleteObjectsWhere(folder, confirmed, func(object storage.Object) bool {

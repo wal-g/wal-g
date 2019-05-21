@@ -20,7 +20,7 @@ var BuildDate = "devel"
 var PgCmd = &cobra.Command{
 	Use:     "wal-g",
 	Short:   WalgShortDescription, // TODO : improve short and long descriptions
-	Version: WalgVersion + "\t" + GitRevision + "\t" + BuildDate,
+	Version: WalgVersion + "\t" + GitRevision + "\t" + BuildDate + "\t" + "PostgreSQL",
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -35,6 +35,6 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(config.InitConfig)
 
-	PgCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
+	PgCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 	PgCmd.InitDefaultVersionFlag()
 }

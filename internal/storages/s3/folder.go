@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"strings"
 )
@@ -24,6 +25,7 @@ const (
 	SseKmsIdSetting          = "S3_SSE_KMS_ID"
 	StorageClassSetting      = "S3_STORAGE_CLASS"
 	UploadConcurrencySetting = "UPLOAD_CONCURRENCY"
+	s3CertFile               = "WALG_S3_CA_CERT_FILE"
 )
 
 // MaxRetries limit upload and download retries during interaction with S3
@@ -39,6 +41,7 @@ var SettingList = []string{
 	SseKmsIdSetting,
 	StorageClassSetting,
 	UploadConcurrencySetting,
+	s3CertFile,
 }
 
 func NewFolderError(err error, format string, args ...interface{}) storage.Error {
@@ -183,7 +186,7 @@ func (folder *Folder) partitionToObjects(keys []string) []*s3.ObjectIdentifier {
 
 func isAwsNotExist(err error) bool {
 	if awsErr, ok := err.(awserr.Error); ok {
-		if awsErr.Code() == NotFoundAWSErrorCode || awsErr.Code() == NoSuchKeyAWSErrorCode {
+		if awsErr.Code() == utility.NotFoundAWSErrorCode || awsErr.Code() == NoSuchKeyAWSErrorCode {
 			return true
 		}
 	}
