@@ -95,7 +95,7 @@ func HandleWALFetch(folder storage.Folder, walFileName string, location string, 
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	err := DownloadWALFileTo(folder, walFileName, location)
+	_, err := DownloadWALFileTo(folder, walFileName, location)
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
@@ -145,11 +145,19 @@ func DecompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor 
 }
 
 // TODO : unit tests
-func downloadAndDecompressWALFile(folder storage.Folder, walFileName string) (io.ReadCloser, error) {
-	for _, decompressor := range compression.Decompressors {
+func downloadAndDecompressWALFile(
+	folder storage.Folder,
+	walFileName string,
+	possibleDecompressors ...compression.Decompressor,
+) (compression.Decompressor, io.ReadCloser, error) {
+	if len(possibleDecompressors) == 0 {
+		possibleDecompressors = compression.Decompressors
+	}
+
+	for _, decompressor := range possibleDecompressors {
 		archiveReader, exists, err := TryDownloadWALFile(folder, walFileName+"."+decompressor.FileExtension())
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if !exists {
 			continue
@@ -159,18 +167,37 @@ func downloadAndDecompressWALFile(folder storage.Folder, walFileName string) (io
 			err = DecompressWALFile(&EmptyWriteIgnorer{writer}, archiveReader, decompressor)
 			writer.CloseWithError(err)
 		}()
-		return reader, nil
+		return decompressor, reader, nil
 	}
-	return nil, NewArchiveNonExistenceError(walFileName)
+	return nil, nil, NewArchiveNonExistenceError(walFileName)
 }
 
 // TODO : unit tests
 // downloadWALFileTo downloads a file and writes it to local file
-func DownloadWALFileTo(folder storage.Folder, walFileName string, dstPath string) error {
-	reader, err := downloadAndDecompressWALFile(folder, walFileName)
+func DownloadWALFileTo(
+	folder storage.Folder,
+	walFileName string,
+	dstPath string,
+	possibleDecompressors ...compression.Decompressor,
+) ([]compression.Decompressor, error) {
+	decompressor, reader, err := downloadAndDecompressWALFile(folder, walFileName, possibleDecompressors...)
+
+	if err == nil && len(possibleDecompressors) == 0 {
+		possibleDecompressors = append(possibleDecompressors, decompressor)
+	}
+
+	// If archive doesn't exist with possible decompressors try to check all decompressors
+	if _, ok := err.(ArchiveNonExistenceError); ok {
+		decompressor, reader, err = downloadAndDecompressWALFile(folder, walFileName)
+
+		if err == nil {
+			possibleDecompressors = append(possibleDecompressors, decompressor)
+		}
+	}
+
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer reader.Close()
-	return CreateFileWith(dstPath, reader)
+	return possibleDecompressors, CreateFileWith(dstPath, reader)
 }

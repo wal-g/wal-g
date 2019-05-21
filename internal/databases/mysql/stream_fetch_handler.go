@@ -86,6 +86,7 @@ func fetchBinlogs(folder storage.Folder, sentinel StreamSentinelDto, binlogsAreD
 		return
 	}
 	var fetchedLogs []storage.Object
+	var possibleDecompressors []compression.Decompressor
 
 	for _, object := range objects {
 		tracelog.InfoLogger.Println("Consider binlog ", object.GetName(), object.GetLastModified().Format(time.RFC3339))
@@ -95,7 +96,7 @@ func fetchBinlogs(folder storage.Folder, sentinel StreamSentinelDto, binlogsAreD
 		if BinlogShouldBeFetched(sentinel, binlogName, endTS, object) {
 			fileName := path.Join(dstFolder, binlogName)
 			tracelog.InfoLogger.Println("Download", binlogName, "to", fileName)
-			err := internal.DownloadWALFileTo(binlogFolder, binlogName, fileName)
+			possibleDecompressors, err = internal.DownloadWALFileTo(binlogFolder, binlogName, fileName, possibleDecompressors...)
 			if err != nil {
 				binlogsAreDone <- err
 				return
