@@ -562,7 +562,7 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 					R: io.MultiReader(fileReader, &utils.ZeroReader{}),
 					N: int64(fileInfoHeader.Size),
 				},
-				Closer: fileReader
+				Closer: fileReader,
 			}
 		case InvalidBlockError: // fallback to full file backup
 			tracelog.WarningLogger.Printf("failed to read file '%s' as incremented\n", fileInfoHeader.Name)
@@ -610,7 +610,7 @@ func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string,
 			R: io.MultiReader(diskLimitedFileReader, &utils.ZeroReader{}),
 			N: int64(fileInfoHeader.Size),
 		},
-		Closer: file
+		Closer: file,
 	}
 	return fileReader, nil
 }

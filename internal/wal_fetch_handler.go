@@ -142,7 +142,7 @@ func DecompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor 
 		}
 		archiveReader = utils.ReadCascadeCloser{
 			Reader: reader,
-			Closer: archiveReader
+			Closer: archiveReader,
 		}
 	}
 

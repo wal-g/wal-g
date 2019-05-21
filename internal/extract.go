@@ -102,7 +102,7 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 		}
 		readCloser = utils.ReadCascadeCloser{
 			Reader: reader,
-			Closer: readCloser
+			Closer: readCloser,
 		}
 	}
 
