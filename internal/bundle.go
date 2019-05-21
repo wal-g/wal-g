@@ -557,10 +557,13 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 		fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
 		switch err.(type) {
 		case nil:
-			fileReader = &utils.ReadCascadeCloser{&io.LimitedReader{
-				R: io.MultiReader(fileReader, &utils.ZeroReader{}),
-				N: int64(fileInfoHeader.Size),
-			}, fileReader}
+			fileReader = &utils.ReadCascadeCloser{
+				Reader: &io.LimitedReader{
+					R: io.MultiReader(fileReader, &utils.ZeroReader{}),
+					N: int64(fileInfoHeader.Size),
+				},
+				Closer: fileReader
+			}
 		case InvalidBlockError: // fallback to full file backup
 			tracelog.WarningLogger.Printf("failed to read file '%s' as incremented\n", fileInfoHeader.Name)
 			isIncremented = false
@@ -602,9 +605,12 @@ func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string,
 		return nil, errors.Wrapf(err, "packFileIntoTar: failed to open file '%s'\n", path)
 	}
 	diskLimitedFileReader := NewDiskLimitReader(file)
-	fileReader = &utils.ReadCascadeCloser{&io.LimitedReader{
-		R: io.MultiReader(diskLimitedFileReader, &utils.ZeroReader{}),
-		N: int64(fileInfoHeader.Size),
-	}, file}
+	fileReader = &utils.ReadCascadeCloser{
+		Reader: &io.LimitedReader{
+			R: io.MultiReader(diskLimitedFileReader, &utils.ZeroReader{}),
+			N: int64(fileInfoHeader.Size),
+		},
+		Closer: file
+	}
 	return fileReader, nil
 }

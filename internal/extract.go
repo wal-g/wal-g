@@ -100,7 +100,10 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 		if err != nil {
 			return errors.Wrap(err, "DecryptAndDecompressTar: decrypt failed")
 		}
-		readCloser = utils.ReadCascadeCloser{reader, readCloser}
+		readCloser = utils.ReadCascadeCloser{
+			Reader: reader,
+			Closer: readCloser
+		}
 	}
 
 	fileExtension := utility.GetFileExtension(readerMaker.Path())

@@ -121,9 +121,9 @@ func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitma
 	}
 
 	fileReadSeekCloser := &utils.ReadSeekCloserImpl{
-		NewDiskLimitReader(file),
-		file,
-		file,
+		Reader: NewDiskLimitReader(file),
+		Seeker: file,
+		Closer: file,
 	}
 
 	pageReader := &IncrementalPageReader{fileReadSeekCloser, fileSize, lsn, nil, nil}
