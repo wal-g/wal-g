@@ -10,6 +10,7 @@ const (
 	BackupListShortDescription = "Prints available backups"
 	PrettyFlag                 = "pretty"
 	JsonFlag                   = "json"
+	DetailFlag                 = "detail"
 )
 
 var (
@@ -23,8 +24,8 @@ var (
 			if err != nil {
 				tracelog.ErrorLogger.FatalError(err)
 			}
-			if pretty || json {
-				internal.HandleBackupListWithFlags(folder, pretty, json)
+			if pretty || json || detail {
+				internal.HandleBackupListWithFlags(folder, pretty, json, detail)
 			} else {
 				internal.HandleBackupList(folder)
 			}
@@ -32,6 +33,7 @@ var (
 	}
 	pretty = false
 	json   = false
+	detail = false
 )
 
 func init() {
@@ -39,4 +41,5 @@ func init() {
 
 	backupListCmd.Flags().BoolVar(&pretty, PrettyFlag, false, "Prints more readable output")
 	backupListCmd.Flags().BoolVar(&json, JsonFlag, false, "Prints output in json format")
+	backupListCmd.Flags().BoolVar(&detail, DetailFlag, false, "Prints extra backup details")
 }
