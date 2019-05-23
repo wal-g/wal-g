@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/wal-g/wal-g/cmd/mysql"
 	interconfig "github.com/wal-g/wal-g/internal/config"
-	config "github.com/wal-g/wal-g/main"
+	"github.com/wal-g/wal-g/main"
 )
 
 var mysqlConfigKeys = []string{

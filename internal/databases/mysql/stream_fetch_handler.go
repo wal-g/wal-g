@@ -12,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
-	"github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
@@ -137,14 +136,14 @@ func BinlogShouldBeFetched(sentinel StreamSentinelDto, binlogName string, endTS 
 }
 
 func GetBinlogConfigs() (*time.Time, string) {
-	endTSStr := config.GetSettingValue(BinlogEndTs)
+	endTSStr := GetSettingValue(BinlogEndTs)
 	var endTS *time.Time
 	if endTSStr != "" {
 		if t, err := time.Parse(time.RFC3339, endTSStr); err == nil {
 			endTS = &t
 		}
 	}
-	dstFolder := config.GetSettingValue(BinlogDst)
+	dstFolder := GetSettingValue(BinlogDst)
 	return endTS, dstFolder
 }
 

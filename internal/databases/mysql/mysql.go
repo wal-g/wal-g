@@ -14,7 +14,6 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -72,11 +71,11 @@ func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
 }
 
 func getMySQLConnection() (*sql.DB, error) {
-	datasourceName := config.GetSettingValue("WALG_MYSQL_DATASOURCE_NAME")
+	datasourceName := GetSettingValue("WALG_MYSQL_DATASOURCE_NAME")
 	if datasourceName == "" {
 		datasourceName = "root:password@/mysql"
 	}
-	caFile := config.GetSettingValue(SslCa)
+	caFile := GetSettingValue(SslCa)
 	if caFile != "" {
 		rootCertPool := x509.NewCertPool()
 		pem, err := ioutil.ReadFile(caFile)

@@ -11,7 +11,6 @@ import (
 	"sort"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -23,7 +22,7 @@ type MySQLLogsCache struct {
 }
 
 func HandleBinlogPush(uploader *Uploader) {
-	binlogsFolder := config.GetSettingValue(BinlogSrc)
+	binlogsFolder := GetSettingValue(BinlogSrc)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(BinlogPath)
 	db, err := getMySQLConnection()
 	if err != nil {

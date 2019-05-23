@@ -22,7 +22,7 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/internal/utils"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 )
@@ -120,7 +120,7 @@ func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitma
 		return nil, 0, err
 	}
 
-	fileReadSeekCloser := &utils.ReadSeekCloserImpl{
+	fileReadSeekCloser := &ioextensions.ReadSeekCloserImpl{
 		Reader: NewDiskLimitReader(file),
 		Seeker: file,
 		Closer: file,

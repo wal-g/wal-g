@@ -7,7 +7,7 @@ import (
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/internal/utils"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -18,7 +18,7 @@ var IncrementFileHeader = []byte{'w', 'i', '1', SignatureMagicNumber}
 // IncrementalPageReader constructs difference map during initialization and than re-read file
 // Diff map may consist of 1Gb/PostgresBlockSize elements == 512Kb
 type IncrementalPageReader struct {
-	PagedFile utils.ReadSeekCloser
+	PagedFile ioextensions.ReadSeekCloser
 	FileSize  int64
 	Lsn       uint64
 	Next      []byte

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -45,7 +44,7 @@ func (uploader *Uploader) UploadStream(fileName string, db *sql.DB, stream io.Re
 	timeStart := time.Now()
 	compressor := uploader.Compressor
 
-	compressed := internal.CompressAndEncrypt(stream, compressor, openpgp.NewCrypter())
+	compressed := internal.CompressAndEncrypt(stream, compressor, ConfigureCrypter())
 	backup := Backup{internal.NewBackup(uploader.UploadingFolder, fileName)}
 
 	dstPath := getStreamName(&backup, compressor.FileExtension())

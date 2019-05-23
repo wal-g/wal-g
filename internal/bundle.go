@@ -13,11 +13,10 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/internal/utils"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -47,8 +46,8 @@ var ExcludedFilenames = make(map[string]utility.Empty)
 
 func init() {
 	filesToExclude := []string{
-		"pg_log", "pg_xlog", "pg_wal", // Directories
-		"pgsql_tmp", "postgresql.auto.conf.tmp", "postmaster.pid", "postmaster.opts", "recovery.conf", // Files
+		"pg_log", "pg_xlog", "pg_wal",                                                                        // Directories
+		"pgsql_tmp", "postgresql.auto.conf.tmp", "postmaster.pid", "postmaster.opts", "recovery.conf",        // Files
 		"pg_dynshmem", "pg_notify", "pg_replslot", "pg_serial", "pg_stat_tmp", "pg_snapshots", "pg_subtrans", // Directories
 	}
 
@@ -92,7 +91,7 @@ func getTarSizeThreshold() int64 {
 		ThresholdBitSize = 64
 	)
 
-	tarSizeThresholdString, ok := config.LookupValue("WALG_TAR_SIZE_THRESHOLD")
+	tarSizeThresholdString, ok := LookupValue("WALG_TAR_SIZE_THRESHOLD")
 
 	if !ok {
 		return DefaultTarSizeThreshold
@@ -558,9 +557,9 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 		fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
 		switch err.(type) {
 		case nil:
-			fileReader = &utils.ReadCascadeCloser{
+			fileReader = &ioextensions.ReadCascadeCloser{
 				Reader: &io.LimitedReader{
-					R: io.MultiReader(fileReader, &utils.ZeroReader{}),
+					R: io.MultiReader(fileReader, &ioextensions.ZeroReader{}),
 					N: int64(fileInfoHeader.Size),
 				},
 				Closer: fileReader,
@@ -606,9 +605,9 @@ func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string,
 		return nil, errors.Wrapf(err, "packFileIntoTar: failed to open file '%s'\n", path)
 	}
 	diskLimitedFileReader := NewDiskLimitReader(file)
-	fileReader = &utils.ReadCascadeCloser{
+	fileReader = &ioextensions.ReadCascadeCloser{
 		Reader: &io.LimitedReader{
-			R: io.MultiReader(diskLimitedFileReader, &utils.ZeroReader{}),
+			R: io.MultiReader(diskLimitedFileReader, &ioextensions.ZeroReader{}),
 			N: int64(fileInfoHeader.Size),
 		},
 		Closer: file,

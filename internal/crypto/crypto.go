@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
@@ -25,11 +24,6 @@ func NewGpgKeyExportError(text string) GpgKeyExportError {
 
 func (err GpgKeyExportError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
-// GetKeyRingId extracts name of a key to use from env variable
-func GetKeyRingId() string {
-	return config.GetSettingValue("WALE_GPG_KEY_ID")
 }
 
 const GpgBin = "gpg"

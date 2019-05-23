@@ -1,10 +1,9 @@
-package utils
+package ioextensions
 
 import (
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
-
-	"github.com/wal-g/wal-g/utility"
 )
 
 type ReadSeekCloser interface {

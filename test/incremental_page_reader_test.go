@@ -10,7 +10,7 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/utils"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/testtools"
 )
 
@@ -119,7 +119,7 @@ func TestFullScanInitialize(t *testing.T) {
 	assert.Equal(t, []uint32{3, 4, 5, 6, 7}, pageReader.Blocks)
 }
 
-func makePageDataReader() utils.ReadSeekCloser {
+func makePageDataReader() ioextensions.ReadSeekCloser {
 	pageCount := 8
 	pageData := make([]byte, pageCount*int(internal.DatabasePageSize))
 	for i := 0; i < pageCount; i++ {
@@ -128,7 +128,7 @@ func makePageDataReader() utils.ReadSeekCloser {
 		}
 	}
 	pageDataReader := bytes.NewReader(pageData)
-	return &utils.ReadSeekCloserImpl{Reader: pageDataReader, Seeker: pageDataReader, Closer: &testtools.NopCloser{}}
+	return &ioextensions.ReadSeekCloserImpl{Reader: pageDataReader, Seeker: pageDataReader, Closer: &testtools.NopCloser{}}
 }
 
 func TestRead(t *testing.T) {

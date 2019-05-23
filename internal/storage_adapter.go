@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/storages/azure"
 	"github.com/wal-g/wal-g/internal/storages/fs"
 	"github.com/wal-g/wal-g/internal/storages/gcs"
@@ -32,9 +31,9 @@ func (adapter *StorageAdapter) loadSettings() (map[string]string, error) {
 			settings[settingName] = strconv.Itoa(concurrency)
 			continue
 		}
-		settingValue := config.GetSettingValue("WALE_" + settingName)
+		settingValue := GetSettingValue("WALE_" + settingName)
 		if settingValue == "" {
-			settingValue = config.GetSettingValue(settingName)
+			settingValue = GetSettingValue(settingName)
 		}
 		if settingValue != "" {
 			settings[settingName] = settingValue

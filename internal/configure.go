@@ -8,8 +8,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/internal/compression/lz4"
-	"github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"golang.org/x/time/rate"
@@ -47,7 +48,7 @@ func (err UnknownCompressionMethodError) Error() string {
 
 // TODO : unit tests
 func ConfigureLimiters() error {
-	if diskLimitStr := config.GetSettingValue("WALG_DISK_RATE_LIMIT"); diskLimitStr != "" {
+	if diskLimitStr := GetSettingValue("WALG_DISK_RATE_LIMIT"); diskLimitStr != "" {
 		diskLimit, err := strconv.ParseInt(diskLimitStr, 10, 64)
 		if err != nil {
 			return errors.Wrap(err, "failed to parse WALG_DISK_RATE_LIMIT")
@@ -55,7 +56,7 @@ func ConfigureLimiters() error {
 		DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 
-	if netLimitStr := config.GetSettingValue("WALG_NETWORK_RATE_LIMIT"); netLimitStr != "" {
+	if netLimitStr := GetSettingValue("WALG_NETWORK_RATE_LIMIT"); netLimitStr != "" {
 		netLimit, err := strconv.ParseInt(netLimitStr, 10, 64)
 		if err != nil {
 			return errors.Wrap(err, "failed to parse WALG_NETWORK_RATE_LIMIT")
@@ -69,7 +70,7 @@ func ConfigureLimiters() error {
 func ConfigureFolder() (storage.Folder, error) {
 	skippedPrefixes := make([]string, 0)
 	for _, adapter := range StorageAdapters {
-		prefix := config.GetSettingValue(adapter.prefixName)
+		prefix := GetSettingValue(adapter.prefixName)
 		if prefix == "" {
 			skippedPrefixes = append(skippedPrefixes, adapter.prefixName)
 			continue
@@ -89,7 +90,7 @@ func ConfigureFolder() (storage.Folder, error) {
 
 // TODO : unit tests
 func getDataFolderPath() string {
-	pgdata, ok := config.LookupValue("PGDATA")
+	pgdata, ok := LookupValue("PGDATA")
 	var dataFolderPath string
 	if !ok {
 		dataFolderPath = DefaultDataFolderPath
@@ -109,7 +110,7 @@ func getDataFolderPath() string {
 func ConfigurePreventWalOverwrite() (preventWalOverwrite bool, err error) {
 	err = nil
 	preventWalOverwrite = false
-	preventWalOverwriteStr := config.GetSettingValue("WALG_PREVENT_WAL_OVERWRITE")
+	preventWalOverwriteStr := GetSettingValue("WALG_PREVENT_WAL_OVERWRITE")
 
 	if preventWalOverwriteStr != "" {
 		preventWalOverwrite, err = strconv.ParseBool(preventWalOverwriteStr)
@@ -123,7 +124,7 @@ func ConfigurePreventWalOverwrite() (preventWalOverwrite bool, err error) {
 
 // TODO : unit tests
 func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err error) {
-	if useWalDeltaStr, ok := config.LookupValue("WALG_USE_WAL_DELTA"); ok {
+	if useWalDeltaStr, ok := LookupValue("WALG_USE_WAL_DELTA"); ok {
 		useWalDelta, err = strconv.ParseBool(useWalDeltaStr)
 		if err != nil {
 			return false, nil, errors.Wrapf(err, "failed to parse WALG_USE_WAL_DELTA")
@@ -145,7 +146,7 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err
 
 // TODO : unit tests
 func configureCompressor() (compression.Compressor, error) {
-	compressionMethod := config.GetSettingValue("WALG_COMPRESSION_METHOD")
+	compressionMethod := GetSettingValue("WALG_COMPRESSION_METHOD")
 	if compressionMethod == "" {
 		compressionMethod = lz4.AlgorithmName
 	}
@@ -157,7 +158,7 @@ func configureCompressor() (compression.Compressor, error) {
 
 // TODO : unit tests
 func ConfigureLogging() error {
-	logLevel, ok := config.LookupValue("WALG_LOG_LEVEL")
+	logLevel, ok := LookupValue("WALG_LOG_LEVEL")
 	if ok {
 		return tracelog.UpdateLogLevel(logLevel)
 	}
@@ -186,4 +187,36 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 	uploader = NewUploader(compressor, folder, deltaDataFolder, useWalDelta)
 
 	return uploader, err
+}
+
+// ConfigureCrypter uses environment variables to create and configure a crypter.
+// In case no configuration in environment variables found, return `<nil>` value.
+func ConfigureCrypter() crypto.Crypter {
+	passphrase, isExist := config.LookupValue("WALG_PGP_KEY_PASSPHRASE")
+
+	if !isExist {
+		return nil
+	}
+
+	// key can be either private (for download) or public (for upload)
+	armoredKey, isKeyExist := LookupValue("WALG_PGP_KEY")
+
+	if isKeyExist {
+		return openpgp.CrypterFromArmoredKey(armoredKey, passphrase)
+	}
+
+	// key can be either private (for download) or public (for upload)
+	armoredKeyPath, isPathExist := LookupValue("WALG_PGP_KEY_PATH")
+
+	if isPathExist {
+		return openpgp.CrypterFromArmoredKeyPath(armoredKeyPath, passphrase)
+	}
+
+	keyRingID := GetSettingValue("WALE_GPG_KEY_ID")
+
+	if keyRingID != "" {
+		return openpgp.CrypterFromKeyRingID(keyRingID, passphrase)
+	}
+
+	return nil
 }

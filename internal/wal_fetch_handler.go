@@ -10,10 +10,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/compression"
-	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/internal/utils"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -134,13 +133,13 @@ func TryDownloadWALFile(folder storage.Folder, walPath string) (walFileReader io
 
 // TODO : unit tests
 func DecompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor compression.Decompressor) error {
-	crypter := openpgp.NewCrypter()
+	crypter := ConfigureCrypter()
 	if crypter != nil {
 		reader, err := crypter.Decrypt(archiveReader)
 		if err != nil {
 			return err
 		}
-		archiveReader = utils.ReadCascadeCloser{
+		archiveReader = ioextensions.ReadCascadeCloser{
 			Reader: reader,
 			Closer: archiveReader,
 		}
@@ -178,5 +177,5 @@ func DownloadWALFileTo(folder storage.Folder, walFileName string, dstPath string
 		return err
 	}
 	defer reader.Close()
-	return utils.CreateFileWith(dstPath, reader)
+	return ioextensions.CreateFileWith(dstPath, reader)
 }

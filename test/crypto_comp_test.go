@@ -128,7 +128,7 @@ type ExternalGPGCrypter struct {
 }
 
 func (c *ExternalGPGCrypter) Encrypt(reader io.Reader) ([]byte, error) {
-	cmd := exec.Command("gpg", "-e", "-z", "0", "-r", internal.GetKeyRingId())
+	cmd := exec.Command("gpg", "-e", "-z", "0", "-r", internal.GetSettingValue("WALE_GPG_KEY_ID"))
 
 	cmd.Stdin = reader
 

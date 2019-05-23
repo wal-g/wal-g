@@ -12,9 +12,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
-	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/internal/utils"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/semaphore"
 )
@@ -100,7 +99,7 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 		if err != nil {
 			return errors.Wrap(err, "DecryptAndDecompressTar: decrypt failed")
 		}
-		readCloser = utils.ReadCascadeCloser{
+		readCloser = ioextensions.ReadCascadeCloser{
 			Reader: reader,
 			Closer: readCloser,
 		}
@@ -164,7 +163,7 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloadingConcurrency int) (failed []ReaderMaker) {
 	downloadingContext := context.TODO()
 	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
-	crypter := openpgp.NewCrypter()
+	crypter := ConfigureCrypter()
 	isFailed := sync.Map{}
 
 	for _, file := range files {
