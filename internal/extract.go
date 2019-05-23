@@ -163,8 +163,12 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloadingConcurrency int) (failed []ReaderMaker) {
 	downloadingContext := context.TODO()
 	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
-	crypter := ConfigureCrypter()
 	isFailed := sync.Map{}
+	crypter, err := ConfigureCrypter()
+	if err != nil {
+		tracelog.ErrorLogger.Println(err)
+		return failed
+	}
 
 	for _, file := range files {
 		downloadingSemaphore.Acquire(downloadingContext, 1)

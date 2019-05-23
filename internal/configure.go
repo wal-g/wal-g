@@ -90,7 +90,7 @@ func ConfigureFolder() (storage.Folder, error) {
 
 // TODO : unit tests
 func getDataFolderPath() string {
-	pgdata, ok := LookupValue("PGDATA")
+	pgdata, ok := LookupConfigValue("PGDATA")
 	var dataFolderPath string
 	if !ok {
 		dataFolderPath = DefaultDataFolderPath
@@ -124,7 +124,7 @@ func ConfigurePreventWalOverwrite() (preventWalOverwrite bool, err error) {
 
 // TODO : unit tests
 func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err error) {
-	if useWalDeltaStr, ok := LookupValue("WALG_USE_WAL_DELTA"); ok {
+	if useWalDeltaStr, ok := LookupConfigValue("WALG_USE_WAL_DELTA"); ok {
 		useWalDelta, err = strconv.ParseBool(useWalDeltaStr)
 		if err != nil {
 			return false, nil, errors.Wrapf(err, "failed to parse WALG_USE_WAL_DELTA")
@@ -158,7 +158,7 @@ func configureCompressor() (compression.Compressor, error) {
 
 // TODO : unit tests
 func ConfigureLogging() error {
-	logLevel, ok := LookupValue("WALG_LOG_LEVEL")
+	logLevel, ok := LookupConfigValue("WALG_LOG_LEVEL")
 	if ok {
 		return tracelog.UpdateLogLevel(logLevel)
 	}
@@ -191,25 +191,25 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 
 // ConfigureCrypter uses environment variables to create and configure a crypter.
 // In case no configuration in environment variables found, return `<nil>` value.
-func ConfigureCrypter() crypto.Crypter {
-	passphrase, isExist := config.LookupValue("WALG_PGP_KEY_PASSPHRASE")
+func ConfigureCrypter() (crypto.Crypter, error) {
+	passphrase, isExist := LookupConfigValue("WALG_PGP_KEY_PASSPHRASE")
 
 	if !isExist {
-		return nil
+		return nil, openpgp.CrypterInitializationError{errors.New("PGP key passphrase not defined")}
 	}
 
-	// key can be either private (for download) or public (for upload)
-	armoredKey, isKeyExist := LookupValue("WALG_PGP_KEY")
+	// key can be either private (for download) or public (for upload)	
+	armoredKey, isKeyExist := LookupConfigValue("WALG_PGP_KEY")
 
 	if isKeyExist {
-		return openpgp.CrypterFromArmoredKey(armoredKey, passphrase)
+		return openpgp.CrypterFromKey(armoredKey, passphrase)
 	}
 
 	// key can be either private (for download) or public (for upload)
-	armoredKeyPath, isPathExist := LookupValue("WALG_PGP_KEY_PATH")
+	armoredKeyPath, isPathExist := LookupConfigValue("WALG_PGP_KEY_PATH")
 
 	if isPathExist {
-		return openpgp.CrypterFromArmoredKeyPath(armoredKeyPath, passphrase)
+		return openpgp.CrypterFromKeyPath(armoredKeyPath, passphrase)
 	}
 
 	keyRingID := GetSettingValue("WALE_GPG_KEY_ID")
@@ -218,5 +218,5 @@ func ConfigureCrypter() crypto.Crypter {
 		return openpgp.CrypterFromKeyRingID(keyRingID, passphrase)
 	}
 
-	return nil
+	return nil, openpgp.CrypterInitializationError{errors.New("no config for crypter found")}
 }

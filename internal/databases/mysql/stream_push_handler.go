@@ -44,6 +44,10 @@ func (uploader *Uploader) UploadStream(fileName string, db *sql.DB, stream io.Re
 	timeStart := time.Now()
 	compressor := uploader.Compressor
 
+	crypter, err := internal.ConfigureCrypter()
+	if err != nil {
+		return err
+	}
 	compressed := internal.CompressAndEncrypt(stream, compressor, internal.ConfigureCrypter())
 	backup := Backup{internal.NewBackup(uploader.UploadingFolder, fileName)}
 
