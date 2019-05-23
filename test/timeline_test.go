@@ -47,7 +47,7 @@ func testParseWALFilenameError(t *testing.T, WALFilename string) {
 
 func testParseWALFilenameCorrect(t *testing.T, WALFilename string, expectedTimelineID uint32, expectedLogSegNo uint64) {
 	actualTimelineID, actualLogSegNo, err := internal.ParseWALFilename(WALFilename)
-	assert.Errorf(t, err, "TestParseWALFilename %s failed", WALFilename)
+	assert.NoErrorf(t, err, "TestParseWALFilename %s failed", WALFilename)
 	assert.Equal(t, expectedLogSegNo, actualLogSegNo)
 	assert.Equal(t, expectedTimelineID, actualTimelineID)
 }
