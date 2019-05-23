@@ -32,43 +32,36 @@ type Crypter struct {
 	PubKey    openpgp.EntityList
 	SecretKey openpgp.EntityList
 
-	loadPassphrase func() (string, error)
+	loadPassphrase func() (string, bool)
 
 	mutex sync.RWMutex
 }
 
-type CrypterInitializationError struct {
-	error
-}
-
-// NewCrypterInitializationError creates new instance of CrypterInitializationError
-func NewCrypterInitializationError(message string) CrypterInitializationError {
-	return CrypterInitializationError{errors.New(message)}
-}
-
-func initCrypter(crypter *Crypter) (*Crypter, error) {
-	if !crypter.isArmed() {
-		return nil, NewCrypterInitializationError("crypter is not armed")
-	}
-	return crypter, nil
-}
-
 // CrypterFromKey creates Crypter from armored key.
-func CrypterFromKey(armoredKey string, loadPassphrase func() (string, error)) (crypto.Crypter, error) {
+func CrypterFromKey(armoredKey string, loadPassphrase func() (string, bool)) crypto.Crypter {
 	crypter := &Crypter{ArmoredKey: armoredKey, IsUseArmoredKey: true, loadPassphrase: loadPassphrase}
-	return initCrypter(crypter)
+	if !crypter.isArmed() {
+		return nil
+	}
+	return crypter
 }
 
 // CrypterFromKeyPath creates Crypter from armored key path.
-func CrypterFromKeyPath(armoredKeyPath string, loadPassphrase func() (string, error)) (crypto.Crypter, error) {
+func CrypterFromKeyPath(armoredKeyPath string, loadPassphrase func() (string, bool)) crypto.Crypter {
 	crypter := &Crypter{ArmoredKeyPath: armoredKeyPath, IsUseArmoredKeyPath: true, loadPassphrase: loadPassphrase}
-	return initCrypter(crypter)
+	if !crypter.isArmed() {
+		return nil
+	}
+	return crypter
 }
 
 // CrypterFromKeyRingID create Crypter from key ring ID.
-func CrypterFromKeyRingID(keyRingID string, loadPassphrase func() (string, error)) (crypto.Crypter, error) {
+func CrypterFromKeyRingID(keyRingID string, loadPassphrase func() (string, bool)) crypto.Crypter {
 	crypter := &Crypter{KeyRingID: keyRingID, IsUseKeyRingID: true, loadPassphrase: loadPassphrase}
-	return initCrypter(crypter)
+	if !crypter.isArmed() {
+		return nil
+	}
+	return crypter
 }
 
 // CrypterFromKeyRing creates Crypter from armored keyring.
@@ -234,17 +227,12 @@ func (crypter *Crypter) loadSecret() error {
 		crypter.SecretKey = entityList
 	}
 
-	passphrase, err := crypter.loadPassphrase()
+	if passphrase, ok := crypter.loadPassphrase(); ok {
+		err := decryptSecretKey(crypter.SecretKey, passphrase)
 
-	if err != nil {
-		return errors.WithStack(err)
+		if err != nil {
+			return errors.WithStack(err)
+		}
 	}
-
-	err = decryptSecretKey(crypter.SecretKey, passphrase)
-
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	
 	return nil
 }

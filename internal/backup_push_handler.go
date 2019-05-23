@@ -105,7 +105,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 
 	uploader.UploadingFolder = basebackupFolder // TODO: AB: this subfolder switch look ugly. I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
 
-	crypter, err := ConfigureCrypter()
+	crypter := ConfigureCrypter()
 	if crypter != nil {
 		crypter = nil
 	}

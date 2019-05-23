@@ -191,14 +191,9 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 
 // ConfigureCrypter uses environment variables to create and configure a crypter.
 // In case no configuration in environment variables found, return `<nil>` value.
-func ConfigureCrypter() (crypto.Crypter, error) {
-	loadPassphrase := func() (string, error) {
-		if passphrase, ok := LookupConfigValue("WALG_PGP_KEY_PASSPHRASE"); ok {
-			return passphrase, nil
-		} else {
-			return "", errors.New("WALG_PGP_KEY_PASSPHRASE not found in config")
-		}
-
+func ConfigureCrypter() crypto.Crypter {
+	loadPassphrase := func() (string, bool) {
+		return LookupConfigValue("WALG_PGP_KEY_PASSPHRASE")
 	}
 
 	// key can be either private (for download) or public (for upload)	
@@ -221,5 +216,5 @@ func ConfigureCrypter() (crypto.Crypter, error) {
 		return openpgp.CrypterFromKeyRingID(keyRingID, loadPassphrase)
 	}
 
-	return nil, openpgp.NewCrypterInitializationError("no config for crypter found")
+	return nil
 }

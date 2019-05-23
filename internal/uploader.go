@@ -89,14 +89,10 @@ func (uploader *Uploader) UploadWalFile(file NamedReader) error {
 // TODO : unit tests
 // UploadFile compresses a file and uploads it.
 func (uploader *Uploader) UploadFile(file NamedReader) error {
-	crypter, err := ConfigureCrypter()
-	if err != nil {
-		return err
-	}
-	compressedFile := CompressAndEncrypt(file, uploader.Compressor, crypter)
+	compressedFile := CompressAndEncrypt(file, uploader.Compressor, ConfigureCrypter())
 	dstPath := utility.SanitizePath(filepath.Base(file.Name()) + "." + uploader.Compressor.FileExtension())
 
-	err = uploader.Upload(dstPath, compressedFile)
+	err := uploader.Upload(dstPath, compressedFile)
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
 	return err
 }
