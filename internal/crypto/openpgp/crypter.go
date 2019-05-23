@@ -39,13 +39,18 @@ type CrypterInitializationError struct {
 	error
 }
 
+// NewCrypterInitializationError creates new instance of CrypterInitializationError
+func NewCrypterInitializationError(message string) CrypterInitializationError {
+	return CrypterInitializationError{errors.New(message)}
+}
+
 func initCrypter(crypter *Crypter, passphrase string) (*Crypter, error) {
 	if !crypter.isArmed() {
-		return nil, CrypterInitializationError{errors.New("crypter is not armed")}
+		return nil, NewCrypterInitializationError("crypter is not armed")
 	}
 	err := crypter.loadSecret(passphrase)
 	if err != nil {
-		return nil, CrypterInitializationError{errors.New("failed to load secret")}
+		return nil, NewCrypterInitializationError("failed to load secret")
 	}
 	return crypter, nil
 }
@@ -70,7 +75,7 @@ func CrypterFromKeyRingID(keyRingID, passphrase string) (crypto.Crypter, error) 
 
 // CrypterFromKeyRing creates Crypter from armored keyring.
 // It is used mainly for mock purpouses, so it panics on error.
-func CrypterFromKeyRing(armedKeyring, passphrase string) crypto.Crypter {
+func CrypterFromKeyRing(armedKeyring string) crypto.Crypter {
 	ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(armedKeyring))
 	if err != nil {
 		panic(err)

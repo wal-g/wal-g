@@ -145,7 +145,7 @@ func DecompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor 
 		}
 	}
 
-	err := decompressor.Decompress(dst, archiveReader)
+	err = decompressor.Decompress(dst, archiveReader)
 	return err
 }
 

@@ -195,7 +195,7 @@ func ConfigureCrypter() (crypto.Crypter, error) {
 	passphrase, isExist := LookupConfigValue("WALG_PGP_KEY_PASSPHRASE")
 
 	if !isExist {
-		return nil, openpgp.CrypterInitializationError{errors.New("PGP key passphrase not defined")}
+		return nil, openpgp.NewCrypterInitializationError("PGP key passphrase not defined")
 	}
 
 	// key can be either private (for download) or public (for upload)	
@@ -218,5 +218,5 @@ func ConfigureCrypter() (crypto.Crypter, error) {
 		return openpgp.CrypterFromKeyRingID(keyRingID, passphrase)
 	}
 
-	return nil, openpgp.CrypterInitializationError{errors.New("no config for crypter found")}
+	return nil, openpgp.NewCrypterInitializationError("no config for crypter found")
 }

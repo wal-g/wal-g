@@ -96,7 +96,7 @@ func (uploader *Uploader) UploadFile(file NamedReader) error {
 	compressedFile := CompressAndEncrypt(file, uploader.Compressor, crypter)
 	dstPath := utility.SanitizePath(filepath.Base(file.Name()) + "." + uploader.Compressor.FileExtension())
 
-	err := uploader.Upload(dstPath, compressedFile)
+	err = uploader.Upload(dstPath, compressedFile)
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
 	return err
 }
