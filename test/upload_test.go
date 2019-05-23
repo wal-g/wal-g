@@ -4,7 +4,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/testtools"
 	"os"
 	"strings"
@@ -134,13 +133,13 @@ func TestUploadError(t *testing.T) {
 	maker := internal.NewStorageTarBallMaker("test", uploader)
 
 	tarBall := maker.Make(true)
-	tarBall.SetUp(openpgp.MockArmedCrypter())
+	tarBall.SetUp(MockArmedCrypter())
 
 	assert.False(t, uploader.Failed.Load().(bool))
 
 	uploader = testtools.NewMockUploader(true, false)
 
 	tarBall = maker.Make(true)
-	tarBall.SetUp(openpgp.MockArmedCrypter())
+	tarBall.SetUp(MockArmedCrypter())
 	assert.False(t, uploader.Failed.Load().(bool))
 }
