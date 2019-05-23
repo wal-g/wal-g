@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/crypter/openpgp"
 	"github.com/wal-g/wal-g/testtools"
 	"io"
 	"strings"
@@ -48,7 +49,7 @@ func TestS3DependentFunctions(t *testing.T) {
 
 	bundle.NewTarBall(false)
 	tarBall := bundle.TarBall
-	tarBall.SetUp(MockArmedCrypter())
+	tarBall.SetUp(openpgp.MockArmedCrypter())
 	tarWriter := tarBall.TarWriter()
 
 	mockData := []byte("a")
@@ -76,7 +77,7 @@ func TestS3DependentFunctions(t *testing.T) {
 	// Test naming property of SetUp().
 	bundle.NewTarBall(false)
 	tarBall = bundle.TarBall
-	tarBall.SetUp(MockArmedCrypter(), "mockTarball")
+	tarBall.SetUp(openpgp.MockArmedCrypter(), "mockTarball")
 	tarBall.CloseTar()
 }
 
