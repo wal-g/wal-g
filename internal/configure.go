@@ -186,15 +186,7 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
 	}
 
-	preventWalOverwrite := false
-	if preventWalOverwriteStr := GetSettingValue("WALG_PREVENT_WAL_OVERWRITE"); preventWalOverwriteStr != "" {
-		preventWalOverwrite, err = strconv.ParseBool(preventWalOverwriteStr)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to parse WALG_PREVENT_WAL_OVERWRITE")
-		}
-	}
-
-	uploader = NewUploader(compressor, folder, preventWalOverwrite, deltaFileManager)
+	uploader = NewUploader(compressor, folder, deltaFileManager)
 
 	return uploader, err
 }
