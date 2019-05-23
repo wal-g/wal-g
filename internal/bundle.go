@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"strconv"
 )
 
 // It is made so to load big database files of size 1GB one by one
@@ -81,11 +82,32 @@ type Bundle struct {
 	Files *sync.Map
 }
 
+func getTarSizeThreshold() int64 {
+	const (
+		ThresholdBase    = 10
+		ThresholdBitSize = 64
+	)
+
+	tarSizeThresholdString, ok := LookupConfigValue("WALG_TAR_SIZE_THRESHOLD")
+
+	if !ok {
+		return DefaultTarSizeThreshold
+	}
+
+	tarSizeThreshold, err := strconv.ParseInt(tarSizeThresholdString, ThresholdBase, ThresholdBitSize)
+
+	if err != nil {
+		return DefaultTarSizeThreshold
+	}
+
+	return tarSizeThreshold
+}
+
 // TODO: use DiskDataFolder
 func NewBundle(archiveDirectory string, crypter Crypter, incrementFromLsn *uint64, incrementFromFiles BackupFileList) *Bundle {
 	return &Bundle{
 		ArchiveDirectory:   archiveDirectory,
-		TarSizeThreshold:   DefaultTarSizeThreshold,
+		TarSizeThreshold:   getTarSizeThreshold(),
 		Crypter:            crypter,
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,

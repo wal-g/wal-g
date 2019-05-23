@@ -23,7 +23,6 @@ func NewMockUploader(apiMultiErr, apiErr bool) *internal.Uploader {
 	return internal.NewUploader(
 		&MockCompressor{},
 		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), "bucket/", "server/"),
-		false,
 		nil,
 	)
 }
@@ -32,7 +31,6 @@ func NewStoringMockUploader(storage *memory.Storage, deltaDataFolder internal.Da
 	return internal.NewUploader(
 		&MockCompressor{},
 		memory.NewFolder("in_memory/", storage),
-		true,
 		nil,
 	)
 }

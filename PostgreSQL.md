@@ -10,6 +10,8 @@ To compile and build the binary for Postgres:
 
 ```
 go get github.com/wal-g/wal-g
+cd $GOPATH/src/github.com/wal-g/wal-g
+make install
 make deps
 make pg_build
 ```
@@ -18,6 +20,8 @@ Users can also install WAL-G by using `make install`. Specifying the GOBIN envir
 
 ```
 export GOBIN=/usr/local/bin
+cd $GOPATH/src/github.com/wal-g/wal-g
+make install
 make deps
 make pg_install
 ```
@@ -87,6 +91,10 @@ Delta computation is based on ModTime of file system and LSN number of pages in 
 * `WALG_DELTA_ORIGIN`
 
 To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not exceeded). `WALG_DELTA_ORIGIN` can be LATEST (chaining increments), LATEST_FULL (for bases where volatile part is compact and chaining has no meaning - deltas overwrite each other). Defaults to LATEST.
+
+* `WALG_TAR_SIZE_THRESHOLD`
+
+To configure the size of one backup bundle (in bytes). Smaller size causes granularity and more optimal, faster recovering. It also increases the number of storage requests, so it can costs you much money. Default size is 1 GB (`1 << 30 - 1` bytes).
 
 Usage
 -----

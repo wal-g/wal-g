@@ -20,7 +20,6 @@ type Uploader struct {
 	waitGroup           *sync.WaitGroup
 	deltaFileManager    *DeltaFileManager
 	Failed              atomic.Value
-	preventWalOverwrite bool
 }
 
 func (uploader *Uploader) getUseWalDelta() (useWalDelta bool) {
@@ -30,7 +29,6 @@ func (uploader *Uploader) getUseWalDelta() (useWalDelta bool) {
 func NewUploader(
 	compressor compression.Compressor,
 	uploadingLocation storage.Folder,
-	preventWalOverwrite bool,
 	deltaFileManager *DeltaFileManager,
 ) *Uploader {
 	uploader := &Uploader{
@@ -38,7 +36,6 @@ func NewUploader(
 		Compressor:          compressor,
 		waitGroup:           &sync.WaitGroup{},
 		deltaFileManager:    deltaFileManager,
-		preventWalOverwrite: preventWalOverwrite,
 	}
 	uploader.Failed.Store(false)
 	return uploader
@@ -61,7 +58,6 @@ func (uploader *Uploader) Clone() *Uploader {
 		&sync.WaitGroup{},
 		uploader.deltaFileManager,
 		uploader.Failed,
-		uploader.preventWalOverwrite,
 	}
 }
 

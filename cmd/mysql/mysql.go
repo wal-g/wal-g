@@ -32,6 +32,6 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(config.InitConfig)
 
-	MySQLCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
+	MySQLCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 	MySQLCmd.InitDefaultVersionFlag()
 }

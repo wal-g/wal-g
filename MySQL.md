@@ -11,12 +11,16 @@ To compile and build the binary for MySQL:
 
 ```
 go get github.com/wal-g/wal-g
+cd $GOPATH/src/github.com/wal-g/wal-g
+make install
 make deps
 make mysql_build
 ```
 Users can also install WAL-G by using `make install`. Specifying the GOBIN environment variable before installing allows the user to specify the installation location. On default, `make install` puts the compiled binary in `go/bin`.
 ```
 export GOBIN=/usr/local/bin
+cd $GOPATH/src/github.com/wal-g/wal-g
+make install
 make deps
 make mysql_install
 ```

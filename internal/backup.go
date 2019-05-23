@@ -3,14 +3,15 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/utility"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const TarPartitionFolderName = "/tar_partitions/"
@@ -40,6 +41,10 @@ func NewBackup(baseBackupFolder storage.Folder, name string) *Backup {
 
 func (backup *Backup) GetStopSentinelPath() string {
 	return backup.Name + utility.SentinelSuffix
+}
+
+func (backup *Backup) GetMetadataPath() string {
+	return backup.Name + "/" + utility.MetadataFileName
 }
 
 func (backup *Backup) getTarPartitionFolder() storage.Folder {
@@ -78,6 +83,22 @@ func (backup *Backup) FetchSentinel() (BackupSentinelDto, error) {
 
 	err = json.Unmarshal(sentinelDtoData, &sentinelDto)
 	return sentinelDto, errors.Wrap(err, "failed to unmarshal sentinel")
+}
+
+func (backup *Backup) FetchMeta() (ExtendedMetadataDto, error) {
+	extendedMetadataDto := ExtendedMetadataDto{}
+	backupReaderMaker := NewStorageReaderMaker(backup.BaseBackupFolder, backup.GetMetadataPath())
+	backupReader, err := backupReaderMaker.Reader()
+	if err != nil {
+		return extendedMetadataDto, err
+	}
+	extendedMetadataDtoData, err := ioutil.ReadAll(backupReader)
+	if err != nil {
+		return extendedMetadataDto, errors.Wrap(err, "failed to fetch metadata")
+	}
+
+	err = json.Unmarshal(extendedMetadataDtoData, &extendedMetadataDto)
+	return extendedMetadataDto, errors.Wrap(err, "failed to unmarshal metadata")
 }
 
 func checkDbDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentinelDto) error {

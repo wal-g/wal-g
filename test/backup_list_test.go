@@ -3,10 +3,11 @@ package test
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
 )
 
 func TestBackupListFindsBackups(t *testing.T) {
@@ -16,7 +17,7 @@ func TestBackupListFindsBackups(t *testing.T) {
 
 func TestBackupListFlagsFindsBackups(t *testing.T) {
 	folder := createMockStorageFolder()
-	internal.HandleBackupListWithFlags(folder, true, false)
+	internal.HandleBackupListWithFlags(folder, true, false, false)
 }
 
 var backups = []internal.BackupTime{
