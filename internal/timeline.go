@@ -82,7 +82,7 @@ func ParseWALFilename(name string) (timelineID uint32, logSegNo uint64, err erro
 		return
 	}
 	timelineID64, err0 := strconv.ParseUint(name[0:8], 0x10, sizeofInt32bits)
-	timelineID = uint32(timelineId64)
+	timelineID = uint32(timelineID64)
 	if err0 != nil {
 		err = err0
 		return
