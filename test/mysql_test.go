@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 	"github.com/wal-g/wal-g/internal/storages/memory"
 	"os"
@@ -11,22 +12,25 @@ import (
 )
 
 func TestGetBinlogConfig(t *testing.T) {
-	os.Setenv("WALG_MYSQL_BINLOG_END_TS", "2018-12-06T11:50:58Z")
+	os.Setenv(mysql.BinlogEndTsSetting, "2018-12-06T11:50:58Z")
 	samplePath := "/xxx/"
-	os.Setenv("WALG_MYSQL_BINLOG_DST", samplePath)
-	time, path := mysql.GetBinlogConfigs()
+	os.Setenv(mysql.BinlogDstSetting, samplePath)
+	time, path, err := mysql.GetBinlogConfigs()
+	assert.NoError(t, err)
 	assert.Equal(t, (*time).Year(), 2018)
 	assert.Equal(t, int((*time).Month()), 12)
 	assert.Equal(t, (*time).Day(), 6)
 	assert.Equal(t, path, samplePath)
-	os.Unsetenv("WALG_MYSQL_BINLOG_END_TS")
-	os.Unsetenv("WALG_MYSQL_BINLOG_DST")
+	os.Unsetenv(mysql.BinlogEndTsSetting)
+	os.Unsetenv(mysql.BinlogDstSetting)
 }
 
 func TestGetBinlogConfigNoError(t *testing.T) {
-	os.Unsetenv("WALG_MYSQL_BINLOG_END_TS")
-	os.Unsetenv("WALG_MYSQL_BINLOG_DST")
-	_, _ = mysql.GetBinlogConfigs()
+	os.Unsetenv(mysql.BinlogEndTsSetting)
+	os.Unsetenv(mysql.BinlogDstSetting)
+	_, _, err := mysql.GetBinlogConfigs()
+	assert.Error(t, err)
+	assert.IsType(t, internal.UnsetRequiredSettingError{}, err)
 }
 
 func TestBinlogShouldBeFetched(t *testing.T) {

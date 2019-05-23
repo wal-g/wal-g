@@ -9,7 +9,7 @@ import (
 	"os/user"
 )
 
-var cfgFile string
+var CfgFile string
 
 func Configure() {
 	err := internal.ConfigureLogging()
@@ -27,9 +27,9 @@ func Configure() {
 
 // initConfig reads in config file and ENV variables if set.
 func InitConfig() {
-	if cfgFile != "" {
+	if CfgFile != "" {
 		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
+		viper.SetConfigFile(CfgFile)
 	} else {
 		// Find home directory.
 		usr, err := user.Current()
@@ -46,7 +46,11 @@ func InitConfig() {
 	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
+	err := viper.ReadInConfig()
+	//if err != nil {
+	//	tracelog.WarningLogger.Printf("Failed to use config file because of error: %v\n", err)
+	//}
+	if err == nil {
 		tracelog.InfoLogger.Println("Using config file:", viper.ConfigFileUsed())
 	}
 }

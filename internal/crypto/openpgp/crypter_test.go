@@ -1,4 +1,4 @@
-package test
+package openpgp
 
 import (
 	"bytes"
@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal/crypto"
-	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 )
 
 var pgpTestPrivateKey string
@@ -23,7 +22,7 @@ func init() {
 }
 
 func MockArmedCrypter() crypto.Crypter {
-	return openpgp.CrypterFromKeyRing(pgpTestPrivateKey)
+	return CrypterFromKeyRing(pgpTestPrivateKey)
 }
 
 func TestMockCrypter(t *testing.T) {

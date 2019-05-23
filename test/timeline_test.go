@@ -42,7 +42,7 @@ func TestPrefetchLocation(t *testing.T) {
 
 func testParseWALFilenameError(t *testing.T, WALFilename string) {
 	_, _, err := internal.ParseWALFilename(WALFilename)
-	assert.Errorf(t, err, "TestParseWALFilename %s did not fail", WALFilename)	
+	assert.Errorf(t, err, "TestParseWALFilename %s did not fail", WALFilename)
 }
 
 func testParseWALFilenameCorrect(t *testing.T, WALFilename string, expectedTimelineID uint32, expectedLogSegNo uint64) {
@@ -60,8 +60,8 @@ func TestParseWALFilename(t *testing.T) {
 	testParseWALFilenameError(t, "0000000100xYz00100000001")
 	testParseWALFilenameError(t, "000000010000000100xYz001")
 
-	testParseWALFilenameCorrect(t, "000000010000000100000001", 1, 1<<8 + 1)
-	testParseWALFilenameCorrect(t, "000000100000020000000030", 1<<4, 2<<16 + 3<<4)
-	testParseWALFilenameCorrect(t, "10000000f0000000000000a0", 1<<28, 15<<36 + 10<<4)
-	testParseWALFilenameCorrect(t, "ffffffffffffffff000000ff", 1<<32 - 1, 1<<40 - 1)
+	testParseWALFilenameCorrect(t, "000000010000000100000001", 1, 1<<8+1)
+	testParseWALFilenameCorrect(t, "000000100000020000000030", 1<<4, 2<<16+3<<4)
+	testParseWALFilenameCorrect(t, "10000000f0000000000000a0", 1<<28, 15<<36+10<<4)
+	testParseWALFilenameCorrect(t, "ffffffffffffffff000000ff", 1<<32-1, 1<<40-1)
 }

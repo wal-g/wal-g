@@ -77,7 +77,7 @@ func (bgUploader *BgUploader) Stop() {
 	atomic.StoreInt32(&bgUploader.maxParallelWorkers, 0) // stop new jobs
 	bgUploader.mutex.Unlock()
 
-	bgUploader.running.Wait()                            // wait again for those who jumped to the closing door
+	bgUploader.running.Wait() // wait again for those who jumped to the closing door
 }
 
 var readySuffix = ".ready"

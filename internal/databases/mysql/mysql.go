@@ -19,12 +19,13 @@ import (
 )
 
 const (
-	StreamPrefix = "stream_"
-	BinlogPath   = "binlog_" + utility.VersionStr + "/"
-	BinlogEndTs  = "WALG_MYSQL_BINLOG_END_TS"
-	BinlogDst    = "WALG_MYSQL_BINLOG_DST"
-	BinlogSrc    = "WALG_MYSQL_BINLOG_SRC"
-	SslCa        = "WALG_MYSQL_SSL_CA"
+	StreamPrefix          = "stream_"
+	BinlogPath            = "binlog_" + utility.VersionStr + "/"
+	DatasourceNameSetting = "WALG_MYSQL_DATASOURCE_NAME"
+	BinlogEndTsSetting    = "WALG_MYSQL_BINLOG_END_TS"
+	BinlogDstSetting      = "WALG_MYSQL_BINLOG_DST"
+	BinlogSrcSetting      = "WALG_MYSQL_BINLOG_SRC"
+	SslCaSetting          = "WALG_MYSQL_SSL_CA"
 )
 
 type Uploader struct {
@@ -71,12 +72,12 @@ func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
 }
 
 func getMySQLConnection() (*sql.DB, error) {
-	datasourceName := internal.GetSettingValue("WALG_MYSQL_DATASOURCE_NAME")
-	if datasourceName == "" {
-		datasourceName = "root:password@/mysql"
+	datasourceName, ok := internal.GetSetting(DatasourceNameSetting)
+	if !ok {
+		return nil, internal.NewUnsetRequiredSettingError(DatasourceNameSetting)
 	}
-	caFile := internal.GetSettingValue(SslCa)
-	if caFile != "" {
+	caFile, ok := internal.GetSetting(SslCaSetting)
+	if ok {
 		rootCertPool := x509.NewCertPool()
 		pem, err := ioutil.ReadFile(caFile)
 		if err != nil {
@@ -89,7 +90,7 @@ func getMySQLConnection() (*sql.DB, error) {
 			RootCAs: rootCertPool,
 		})
 		if strings.Contains(datasourceName, "?tls=") || strings.Contains(datasourceName, "&tls=") {
-			return nil, fmt.Errorf("MySQL datasource string contains tls option. It can't be used with WALG_MYSQL_SSL_CA option")
+			return nil, fmt.Errorf("MySQL datasource string contains tls option. It can't be used with %v option", SslCaSetting)
 		}
 		if strings.Contains(datasourceName, "?") {
 			datasourceName += "&tls=custom"

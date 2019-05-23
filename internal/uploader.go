@@ -16,15 +16,15 @@ import (
 // Uploader contains fields associated with uploading tarballs.
 // Multiple tarballs can share one uploader.
 type Uploader struct {
-	UploadingFolder     storage.Folder
-	Compressor          compression.Compressor
-	waitGroup           *sync.WaitGroup
-	deltaFileManager    *DeltaFileManager
-	Failed              atomic.Value
+	UploadingFolder  storage.Folder
+	Compressor       compression.Compressor
+	waitGroup        *sync.WaitGroup
+	deltaFileManager *DeltaFileManager
+	Failed           atomic.Value
 }
 
 func (uploader *Uploader) getUseWalDelta() (useWalDelta bool) {
-	return uploader.deltaFileManager != nil;
+	return uploader.deltaFileManager != nil
 }
 
 func NewUploader(
@@ -33,10 +33,10 @@ func NewUploader(
 	deltaFileManager *DeltaFileManager,
 ) *Uploader {
 	uploader := &Uploader{
-		UploadingFolder:     uploadingLocation,
-		Compressor:          compressor,
-		waitGroup:           &sync.WaitGroup{},
-		deltaFileManager:    deltaFileManager,
+		UploadingFolder:  uploadingLocation,
+		Compressor:       compressor,
+		waitGroup:        &sync.WaitGroup{},
+		deltaFileManager: deltaFileManager,
 	}
 	uploader.Failed.Store(false)
 	return uploader

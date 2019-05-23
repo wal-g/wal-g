@@ -12,8 +12,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/semaphore"
 )
@@ -138,7 +138,7 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 
 	retrier := NewExponentialRetrier(MinExtractRetryWait, MaxExtractRetryWait)
 	// Set maximum number of goroutines spun off by ExtractAll
-	downloadingConcurrency, err := utility.GetMaxDownloadConcurrency(utility.Min(len(files), 10))
+	downloadingConcurrency, err := GetMaxDownloadConcurrency()
 	if err != nil {
 		return err
 	}

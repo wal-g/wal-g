@@ -117,7 +117,7 @@ func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string,
 		return "", "", false, "", errors.Wrap(err, "QueryRunner StartBackup: show data_directory failed")
 	}
 
-	return backupName, lsnString, inRecovery, dataDir,nil
+	return backupName, lsnString, inRecovery, dataDir, nil
 }
 
 // StopBackup informs the database that copy is over

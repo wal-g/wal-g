@@ -14,9 +14,9 @@ import (
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -46,8 +46,8 @@ var ExcludedFilenames = make(map[string]utility.Empty)
 
 func init() {
 	filesToExclude := []string{
-		"pg_log", "pg_xlog", "pg_wal",                                                                        // Directories
-		"pgsql_tmp", "postgresql.auto.conf.tmp", "postmaster.pid", "postmaster.opts", "recovery.conf",        // Files
+		"pg_log", "pg_xlog", "pg_wal", // Directories
+		"pgsql_tmp", "postgresql.auto.conf.tmp", "postmaster.pid", "postmaster.opts", "recovery.conf", // Files
 		"pg_dynshmem", "pg_notify", "pg_replslot", "pg_serial", "pg_stat_tmp", "pg_snapshots", "pg_subtrans", // Directories
 	}
 
@@ -91,11 +91,7 @@ func getTarSizeThreshold() int64 {
 		ThresholdBitSize = 64
 	)
 
-	tarSizeThresholdString, ok := LookupConfigValue("WALG_TAR_SIZE_THRESHOLD")
-
-	if !ok {
-		return DefaultTarSizeThreshold
-	}
+	tarSizeThresholdString := GetSettingWithDefault(TarSizeThresholdSetting)
 
 	tarSizeThreshold, err := strconv.ParseInt(tarSizeThresholdString, ThresholdBase, ThresholdBitSize)
 
@@ -129,11 +125,11 @@ func (bundle *Bundle) StartQueue() error {
 		panic("Trying to start already started Queue")
 	}
 	var err error
-	bundle.parallelTarballs, err = utility.GetMaxUploadDiskConcurrency()
+	bundle.parallelTarballs, err = GetMaxUploadDiskConcurrency()
 	if err != nil {
 		return err
 	}
-	bundle.maxUploadQueue, err = utility.GetMaxUploadQueue()
+	bundle.maxUploadQueue, err = GetMaxUploadQueue()
 	if err != nil {
 		return err
 	}

@@ -29,22 +29,20 @@ func (err SentinelMarshallingError) Error() string {
 
 // TODO : unit tests
 func getDeltaConfig() (maxDeltas int, fromFull bool) {
-	stepsStr, hasSteps := os.LookupEnv("WALG_DELTA_MAX_STEPS")
+	stepsStr := GetSettingWithDefault(DeltaMaxStepsSetting)
 	var err error
-	if hasSteps {
-		maxDeltas, err = strconv.Atoi(stepsStr)
-		if err != nil {
-			tracelog.ErrorLogger.Fatal("Unable to parse WALG_DELTA_MAX_STEPS ", err)
-		}
+	maxDeltas, err = strconv.Atoi(stepsStr)
+	if err != nil {
+		tracelog.ErrorLogger.FatalError(NewParsingError(DeltaMaxStepsSetting, err))
 	}
-	origin, hasOrigin := os.LookupEnv("WALG_DELTA_ORIGIN")
+	origin, hasOrigin := GetSetting(DeltaOriginSetting)
 	if hasOrigin {
 		switch origin {
 		case LatestString:
 		case "LATEST_FULL":
 			fromFull = true
 		default:
-			tracelog.ErrorLogger.Fatal("Unknown WALG_DELTA_ORIGIN:", origin)
+			tracelog.ErrorLogger.Fatalf("Unknown %s: %s\n", DeltaOriginSetting, origin)
 		}
 	}
 	return
@@ -189,7 +187,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 
 	currentBackupSentinelDto.setFiles(bundle.GetFiles())
 	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
-	currentBackupSentinelDto.UserData = utility.GetSentinelUserData()
+	currentBackupSentinelDto.UserData = GetSentinelUserData()
 
 	err = UploadMetadata(uploader, currentBackupSentinelDto, backupName, meta)
 	if err != nil {

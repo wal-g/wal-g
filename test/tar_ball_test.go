@@ -48,7 +48,7 @@ func TestS3DependentFunctions(t *testing.T) {
 
 	bundle.NewTarBall(false)
 	tarBall := bundle.TarBall
-	tarBall.SetUp(MockArmedCrypter())
+	tarBall.SetUp(nil)
 	tarWriter := tarBall.TarWriter()
 
 	mockData := []byte("a")
@@ -67,17 +67,12 @@ func TestS3DependentFunctions(t *testing.T) {
 	_, err = tarWriter.Write(mockData)
 
 	assert.NoError(t, err)
-	tarBall.CloseTar()
+	err = tarBall.CloseTar()
+	assert.NoError(t, err)
 
 	// Handle write after close.
 	_, err = tarBall.TarWriter().Write(mockData)
 	assert.Error(t, err)
-
-	// Test naming property of SetUp().
-	bundle.NewTarBall(false)
-	tarBall = bundle.TarBall
-	tarBall.SetUp(MockArmedCrypter(), "mockTarball")
-	tarBall.CloseTar()
 }
 
 func TestPackFileTo(t *testing.T) {

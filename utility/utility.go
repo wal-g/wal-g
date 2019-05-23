@@ -3,26 +3,24 @@ package utility
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
-	"os"
 	"path"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 )
 
+// TODO : unit tests
 func LoggedClose(c io.Closer, errmsg string) {
 	err := c.Close()
 	if errmsg == "" {
 		errmsg = "Problem with closing object: %v"
 	}
 	if err != nil {
-		tracelog.ErrorLogger.Printf(errmsg + ": %v", err)
+		tracelog.ErrorLogger.Printf(errmsg+": %v", err)
 	}
 }
 
@@ -84,59 +82,6 @@ func ResolveSymlink(path string) string {
 		return path
 	}
 	return resolve
-}
-
-func GetMaxDownloadConcurrency(defaultValue int) (int, error) {
-	return GetMaxConcurrency("WALG_DOWNLOAD_CONCURRENCY", defaultValue)
-}
-
-func GetMaxUploadConcurrency(defaultValue int) (int, error) {
-	return GetMaxConcurrency("WALG_UPLOAD_CONCURRENCY", defaultValue)
-}
-
-// This setting is intentially undocumented in README. Effectively, this configures how many prepared tar Files there
-// may be in uploading state during backup-push.
-func GetMaxUploadQueue() (int, error) {
-	return GetMaxConcurrency("WALG_UPLOAD_QUEUE", 2)
-}
-
-// GetSentinelUserData tries to parse WALG_SENTINEL_USER_DATA env variable
-func GetSentinelUserData() interface{} {
-	dataStr, ok := os.LookupEnv("WALG_SENTINEL_USER_DATA")
-	if !ok || len(dataStr) == 0 {
-		return nil
-	}
-	var out interface{}
-	err := json.Unmarshal([]byte(dataStr), &out)
-	if err != nil {
-		tracelog.WarningLogger.Println("Unable to parse WALG_SENTINEL_USER_DATA as JSON")
-		return dataStr
-	}
-	return out
-}
-
-func GetMaxUploadDiskConcurrency() (int, error) {
-	return GetMaxConcurrency("WALG_UPLOAD_DISK_CONCURRENCY", 1)
-}
-
-func GetMaxConcurrency(key string, defaultValue int) (int, error) {
-	var con int
-	var err error
-	conc, ok := os.LookupEnv(key)
-	if ok {
-		con, err = strconv.Atoi(conc)
-
-		if err != nil {
-			return 1, err
-		}
-	} else {
-		if defaultValue > 0 {
-			con = defaultValue
-		} else {
-			con = 10
-		}
-	}
-	return Max(con, 1), nil
 }
 
 func GetFileExtension(filePath string) string {

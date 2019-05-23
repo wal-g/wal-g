@@ -25,7 +25,7 @@ const (
 	SseKmsIdSetting          = "S3_SSE_KMS_ID"
 	StorageClassSetting      = "S3_STORAGE_CLASS"
 	UploadConcurrencySetting = "UPLOAD_CONCURRENCY"
-	s3CertFile               = "WALG_S3_CA_CERT_FILE"
+	s3CertFile               = "S3_CA_CERT_FILE"
 )
 
 // MaxRetries limit upload and download retries during interaction with S3
