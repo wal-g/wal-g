@@ -75,15 +75,14 @@ func formatWALFileName(timeline uint32, logSegNo uint64) string {
 	return fmt.Sprintf(walFileFormat, timeline, logSegNo/xLogSegmentsPerXLogId, logSegNo%xLogSegmentsPerXLogId)
 }
 
-// TODO : unit tests
 // ParseWALFilename extracts numeric parts from WAL file name
-func ParseWALFilename(name string) (timelineId uint32, logSegNo uint64, err error) {
+func ParseWALFilename(name string) (timelineID uint32, logSegNo uint64, err error) {
 	if len(name) != 24 {
 		err = NewNotWalFilenameError(name)
 		return
 	}
-	timelineId64, err0 := strconv.ParseUint(name[0:8], 0x10, sizeofInt32bits)
-	timelineId = uint32(timelineId64)
+	timelineID64, err0 := strconv.ParseUint(name[0:8], 0x10, sizeofInt32bits)
+	timelineID = uint32(timelineId64)
 	if err0 != nil {
 		err = err0
 		return
