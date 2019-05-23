@@ -136,14 +136,14 @@ func BinlogShouldBeFetched(sentinel StreamSentinelDto, binlogName string, endTS 
 }
 
 func GetBinlogConfigs() (*time.Time, string) {
-	endTSStr := GetSettingValue(BinlogEndTs)
+	endTSStr := internal.GetSettingValue(BinlogEndTs)
 	var endTS *time.Time
 	if endTSStr != "" {
 		if t, err := time.Parse(time.RFC3339, endTSStr); err == nil {
 			endTS = &t
 		}
 	}
-	dstFolder := GetSettingValue(BinlogDst)
+	dstFolder := internal.GetSettingValue(BinlogDst)
 	return endTS, dstFolder
 }
 

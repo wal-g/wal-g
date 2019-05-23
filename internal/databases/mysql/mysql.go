@@ -71,11 +71,11 @@ func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
 }
 
 func getMySQLConnection() (*sql.DB, error) {
-	datasourceName := GetSettingValue("WALG_MYSQL_DATASOURCE_NAME")
+	datasourceName := internal.GetSettingValue("WALG_MYSQL_DATASOURCE_NAME")
 	if datasourceName == "" {
 		datasourceName = "root:password@/mysql"
 	}
-	caFile := GetSettingValue(SslCa)
+	caFile := internal.GetSettingValue(SslCa)
 	if caFile != "" {
 		rootCertPool := x509.NewCertPool()
 		pem, err := ioutil.ReadFile(caFile)

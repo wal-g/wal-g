@@ -22,7 +22,7 @@ type MySQLLogsCache struct {
 }
 
 func HandleBinlogPush(uploader *Uploader) {
-	binlogsFolder := GetSettingValue(BinlogSrc)
+	binlogsFolder := internal.GetSettingValue(BinlogSrc)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(BinlogPath)
 	db, err := getMySQLConnection()
 	if err != nil {
