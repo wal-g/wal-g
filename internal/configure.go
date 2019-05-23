@@ -192,30 +192,33 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 // ConfigureCrypter uses environment variables to create and configure a crypter.
 // In case no configuration in environment variables found, return `<nil>` value.
 func ConfigureCrypter() (crypto.Crypter, error) {
-	passphrase, isExist := LookupConfigValue("WALG_PGP_KEY_PASSPHRASE")
+	loadPassphrase := func() (string, error) {
+		if passphrase, ok := LookupConfigValue("WALG_PGP_KEY_PASSPHRASE"); ok {
+			return passphrase, nil
+		} else {
+			return "", errors.New("WALG_PGP_KEY_PASSPHRASE not found in config")
+		}
 
-	if !isExist {
-		return nil, openpgp.NewCrypterInitializationError("PGP key passphrase not defined")
 	}
 
 	// key can be either private (for download) or public (for upload)	
 	armoredKey, isKeyExist := LookupConfigValue("WALG_PGP_KEY")
 
 	if isKeyExist {
-		return openpgp.CrypterFromKey(armoredKey, passphrase)
+		return openpgp.CrypterFromKey(armoredKey, loadPassphrase)
 	}
 
 	// key can be either private (for download) or public (for upload)
 	armoredKeyPath, isPathExist := LookupConfigValue("WALG_PGP_KEY_PATH")
 
 	if isPathExist {
-		return openpgp.CrypterFromKeyPath(armoredKeyPath, passphrase)
+		return openpgp.CrypterFromKeyPath(armoredKeyPath, loadPassphrase)
 	}
 
 	keyRingID := GetSettingValue("WALE_GPG_KEY_ID")
 
 	if keyRingID != "" {
-		return openpgp.CrypterFromKeyRingID(keyRingID, passphrase)
+		return openpgp.CrypterFromKeyRingID(keyRingID, loadPassphrase)
 	}
 
 	return nil, openpgp.NewCrypterInitializationError("no config for crypter found")

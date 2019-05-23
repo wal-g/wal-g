@@ -32,6 +32,8 @@ type Crypter struct {
 	PubKey    openpgp.EntityList
 	SecretKey openpgp.EntityList
 
+	loadPassphrase func() (string, error)
+
 	mutex sync.RWMutex
 }
 
@@ -44,33 +46,29 @@ func NewCrypterInitializationError(message string) CrypterInitializationError {
 	return CrypterInitializationError{errors.New(message)}
 }
 
-func initCrypter(crypter *Crypter, passphrase string) (*Crypter, error) {
+func initCrypter(crypter *Crypter) (*Crypter, error) {
 	if !crypter.isArmed() {
 		return nil, NewCrypterInitializationError("crypter is not armed")
-	}
-	err := crypter.loadSecret(passphrase)
-	if err != nil {
-		return nil, NewCrypterInitializationError("failed to load secret")
 	}
 	return crypter, nil
 }
 
 // CrypterFromKey creates Crypter from armored key.
-func CrypterFromKey(armoredKey, passphrase string) (crypto.Crypter, error) {
-	crypter := &Crypter{ArmoredKey: armoredKey, IsUseArmoredKey: true}
-	return initCrypter(crypter, passphrase)
+func CrypterFromKey(armoredKey string, loadPassphrase func() (string, error)) (crypto.Crypter, error) {
+	crypter := &Crypter{ArmoredKey: armoredKey, IsUseArmoredKey: true, loadPassphrase: loadPassphrase}
+	return initCrypter(crypter)
 }
 
 // CrypterFromKeyPath creates Crypter from armored key path.
-func CrypterFromKeyPath(armoredKeyPath, passphrase string) (crypto.Crypter, error) {
-	crypter := &Crypter{ArmoredKeyPath: armoredKeyPath, IsUseArmoredKeyPath: true}
-	return initCrypter(crypter, passphrase)
+func CrypterFromKeyPath(armoredKeyPath string, loadPassphrase func() (string, error)) (crypto.Crypter, error) {
+	crypter := &Crypter{ArmoredKeyPath: armoredKeyPath, IsUseArmoredKeyPath: true, loadPassphrase: loadPassphrase}
+	return initCrypter(crypter)
 }
 
 // CrypterFromKeyRingID create Crypter from key ring ID.
-func CrypterFromKeyRingID(keyRingID, passphrase string) (crypto.Crypter, error) {
-	crypter := &Crypter{KeyRingID: keyRingID, IsUseKeyRingID: true}
-	return initCrypter(crypter, passphrase)
+func CrypterFromKeyRingID(keyRingID string, loadPassphrase func() (string, error)) (crypto.Crypter, error) {
+	crypter := &Crypter{KeyRingID: keyRingID, IsUseKeyRingID: true, loadPassphrase: loadPassphrase}
+	return initCrypter(crypter)
 }
 
 // CrypterFromKeyRing creates Crypter from armored keyring.
@@ -168,6 +166,12 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 
 // Decrypt creates decrypted reader from ordinary reader
 func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
+	err := crypter.loadSecret()
+
+	if err != nil {
+		return nil, err
+	}
+
 	md, err := openpgp.ReadMessage(reader, crypter.SecretKey, nil, nil)
 
 	if err != nil {
@@ -178,7 +182,7 @@ func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
 }
 
 // load the secret key based on the settings
-func (crypter *Crypter) loadSecret(passphrase string) error {
+func (crypter *Crypter) loadSecret() error {
 	// check if we actually need to load it
 	crypter.mutex.RLock()
 	if crypter.SecretKey != nil {
@@ -230,10 +234,17 @@ func (crypter *Crypter) loadSecret(passphrase string) error {
 		crypter.SecretKey = entityList
 	}
 
-	err := decryptSecretKey(crypter.SecretKey, passphrase)
+	passphrase, err := crypter.loadPassphrase()
 
 	if err != nil {
 		return errors.WithStack(err)
 	}
+
+	err = decryptSecretKey(crypter.SecretKey, passphrase)
+
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	
 	return nil
 }
