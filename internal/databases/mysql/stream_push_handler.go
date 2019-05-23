@@ -48,13 +48,13 @@ func (uploader *Uploader) UploadStream(fileName string, db *sql.DB, stream io.Re
 	if err != nil {
 		return err
 	}
-	compressed := internal.CompressAndEncrypt(stream, compressor, internal.ConfigureCrypter())
+	compressed := internal.CompressAndEncrypt(stream, compressor, crypter)
 	backup := Backup{internal.NewBackup(uploader.UploadingFolder, fileName)}
 
 	dstPath := getStreamName(&backup, compressor.FileExtension())
 	tracelog.DebugLogger.Println("Upload path", dstPath)
 
-	err := uploader.Upload(dstPath, compressed)
+	err = uploader.Upload(dstPath, compressed)
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
 	binlogEnd := getMySQLCurrentBinlogFile(db)
 	tracelog.DebugLogger.Println("Binlog end file", binlogEnd)
