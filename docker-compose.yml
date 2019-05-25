@@ -78,3 +78,23 @@ services:
       - s3
     links:
       - s3
+
+  redis:
+    build:
+      dockerfile: docker/redis/Dockerfile
+      context: .
+    image: wal-g/redis
+    container_name: wal-g_redis
+
+  redis_tests:
+    build:
+      dockerfile: docker/redis_tests/Dockerfile
+      context: .
+    image: wal-g/redis_tests
+    container_name: wal-g_redis_tests
+    env_file:
+      - docker/redis_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
