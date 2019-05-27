@@ -2,15 +2,18 @@ package internal
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/internal/compression/lz4"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"golang.org/x/time/rate"
-	"os"
-	"path/filepath"
-	"strconv"
 )
 
 const (
@@ -104,7 +107,7 @@ func getDataFolderPath() string {
 	return dataFolderPath
 }
 
-func  ConfigurePreventWalOverwrite() (preventWalOverwrite bool, err error) {
+func ConfigurePreventWalOverwrite() (preventWalOverwrite bool, err error) {
 	err = nil
 	preventWalOverwrite = false
 	preventWalOverwriteStr := GetSettingValue("WALG_PREVENT_WAL_OVERWRITE")
@@ -116,7 +119,7 @@ func  ConfigurePreventWalOverwrite() (preventWalOverwrite bool, err error) {
 		}
 	}
 
-	return preventWalOverwrite, nil;
+	return preventWalOverwrite, nil
 }
 
 // TODO : unit tests
@@ -189,4 +192,34 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 	uploader = NewUploader(compressor, folder, deltaFileManager)
 
 	return uploader, err
+}
+
+// ConfigureCrypter uses environment variables to create and configure a crypter.
+// In case no configuration in environment variables found, return `<nil>` value.
+func ConfigureCrypter() crypto.Crypter {
+	loadPassphrase := func() (string, bool) {
+		return LookupConfigValue("WALG_PGP_KEY_PASSPHRASE")
+	}
+
+	// key can be either private (for download) or public (for upload)	
+	armoredKey, isKeyExist := LookupConfigValue("WALG_PGP_KEY")
+
+	if isKeyExist {
+		return openpgp.CrypterFromKey(armoredKey, loadPassphrase)
+	}
+
+	// key can be either private (for download) or public (for upload)
+	armoredKeyPath, isPathExist := LookupConfigValue("WALG_PGP_KEY_PATH")
+
+	if isPathExist {
+		return openpgp.CrypterFromKeyPath(armoredKeyPath, loadPassphrase)
+	}
+
+	keyRingID := GetSettingValue("WALE_GPG_KEY_ID")
+
+	if keyRingID != "" {
+		return openpgp.CrypterFromKeyRingID(keyRingID, loadPassphrase)
+	}
+
+	return nil
 }

@@ -6,15 +6,16 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"path"
+	"strings"
+	"time"
+
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
-	"io/ioutil"
-	"path"
-	"strings"
-	"time"
 )
 
 const (

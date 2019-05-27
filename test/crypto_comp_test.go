@@ -4,9 +4,6 @@ package test
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/compression/lzo"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -14,6 +11,11 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression/lzo"
+	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 )
 
 const waleWALfilename = "testdata/000000010000000000000024.lzo"
@@ -37,7 +39,7 @@ func init() {
 func TestDecryptWALElzo(t *testing.T) {
 	t.Skip("This test has gpg side effects and was skipped. If you want to run it - comment skip line in crypto_compt_test.go")
 
-	crypter := createCrypter(waleGpgKey)
+	crypter := openpgp.CreateCrypter(waleGpgKey)
 	f, err := os.Open(waleWALfilename)
 	assert.NoError(t, err)
 	decrypt, err := crypter.Decrypt(f)
@@ -126,7 +128,7 @@ type ExternalGPGCrypter struct {
 }
 
 func (c *ExternalGPGCrypter) Encrypt(reader io.Reader) ([]byte, error) {
-	cmd := exec.Command("gpg", "-e", "-z", "0", "-r", internal.GetKeyRingId())
+	cmd := exec.Command("gpg", "-e", "-z", "0", "-r", internal.GetSettingValue("WALE_GPG_KEY_ID"))
 
 	cmd.Stdin = reader
 

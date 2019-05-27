@@ -1,13 +1,14 @@
-package internal
+package openpgp
 
 import (
 	"bytes"
-	"golang.org/x/crypto/openpgp"
 	"io"
 	"io/ioutil"
+
+	"golang.org/x/crypto/openpgp"
 )
 
-func ReadKey(path string) (io.Reader, error) {
+func readKey(path string) (io.Reader, error) {
 	byteData, err := ioutil.ReadFile(path)
 
 	if err != nil {
@@ -17,8 +18,8 @@ func ReadKey(path string) (io.Reader, error) {
 	return bytes.NewReader(byteData), nil
 }
 
-func ReadPGPKey(path string) (openpgp.EntityList, error) {
-	gpgKeyReader, err := ReadKey(path)
+func readPGPKey(path string) (openpgp.EntityList, error) {
+	gpgKeyReader, err := readKey(path)
 
 	if err != nil {
 		return nil, err
@@ -33,7 +34,7 @@ func ReadPGPKey(path string) (openpgp.EntityList, error) {
 	return entityList, nil
 }
 
-func DecryptSecretKey(entityList openpgp.EntityList, passphrase string) error {
+func decryptSecretKey(entityList openpgp.EntityList, passphrase string) error {
 	passphraseBytes := []byte(passphrase)
 
 	for _, entity := range entityList {

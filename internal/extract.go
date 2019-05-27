@@ -4,15 +4,18 @@ import (
 	"archive/tar"
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/compression"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/utility"
-	"golang.org/x/sync/semaphore"
 	"io"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/utility"
+	"golang.org/x/sync/semaphore"
 )
 
 var MinExtractRetryWait = time.Minute
@@ -82,7 +85,7 @@ func extractOne(tarInterpreter TarInterpreter, source io.Reader) error {
 // TODO : unit tests
 // Ensures that file extension is valid. Any subsequent behavior
 // depends on file type.
-func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter Crypter) error {
+func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter crypto.Crypter) error {
 	readCloser, err := readerMaker.Reader()
 
 	if err != nil {
@@ -96,7 +99,10 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 		if err != nil {
 			return errors.Wrap(err, "DecryptAndDecompressTar: decrypt failed")
 		}
-		readCloser = ReadCascadeCloser{reader, readCloser}
+		readCloser = ioextensions.ReadCascadeCloser{
+			Reader: reader,
+			Closer: readCloser,
+		}
 	}
 
 	fileExtension := utility.GetFileExtension(readerMaker.Path())
@@ -157,7 +163,7 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloadingConcurrency int) (failed []ReaderMaker) {
 	downloadingContext := context.TODO()
 	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
-	crypter := NewOpenPGPCrypter()
+	crypter := ConfigureCrypter()
 	isFailed := sync.Map{}
 
 	for _, file := range files {
