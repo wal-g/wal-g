@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
@@ -103,6 +104,7 @@ func (queryRunner *PgQueryRunner) getVersion() (err error) {
 
 // StartBackup informs the database that we are starting copy of cluster contents
 func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string, lsnString string, inRecovery bool, dataDir string, err error) {
+	tracelog.InfoLogger.Println("Calling pg_start_backup()")
 	startBackupQuery, err := queryRunner.BuildStartBackup()
 	conn := queryRunner.connection
 	if err != nil {
@@ -117,11 +119,12 @@ func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string,
 		return "", "", false, "", errors.Wrap(err, "QueryRunner StartBackup: show data_directory failed")
 	}
 
-	return backupName, lsnString, inRecovery, dataDir,nil
+	return backupName, lsnString, inRecovery, dataDir, nil
 }
 
 // StopBackup informs the database that copy is over
 func (queryRunner *PgQueryRunner) StopBackup() (label string, offsetMap string, lsnStr string, err error) {
+	tracelog.InfoLogger.Println("Calling pg_stop_backup()")
 	conn := queryRunner.connection
 
 	tx, err := conn.Begin()
