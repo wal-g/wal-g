@@ -15,7 +15,7 @@ import (
 	"sort"
 )
 
-const MysqlBinlogCacheFileName = "walg_mysql_logs_cache"
+const MysqlBinlogCacheFileName = ".walg_mysql_binlogs_cache"
 
 type MySQLLogsCache struct {
 	LastArchivedBinlog string `json:"LastArchivedBinlog"`
@@ -28,7 +28,7 @@ func HandleBinlogPush(uploader *Uploader) {
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
-	defer utility.LoggedClose(db,"")
+	defer utility.LoggedClose(db, "")
 
 	binlogs := getMySQLSortedBinlogs(db)
 
@@ -92,8 +92,7 @@ func getLastArchivedBinlog() string {
 
 	usr, err := user.Current()
 	if err == nil {
-		cacheFilename = filepath.Join("tmp", usr.Name, MysqlBinlogCacheFileName)
-
+		cacheFilename = filepath.Join(usr.HomeDir, MysqlBinlogCacheFileName)
 		var file []byte
 		file, err = ioutil.ReadFile(cacheFilename)
 		if err == nil {
@@ -117,7 +116,7 @@ func setLastArchivedBinlog(binlogFileName string) {
 
 	usr, err := user.Current()
 	if err == nil {
-		cacheFilename = filepath.Join("tmp", usr.Name, MysqlBinlogCacheFileName)
+		cacheFilename = filepath.Join(usr.HomeDir, MysqlBinlogCacheFileName)
 		var file []byte
 		file, err = ioutil.ReadFile(cacheFilename)
 		// here we ignore whatever error can occur
@@ -133,6 +132,9 @@ func setLastArchivedBinlog(binlogFileName string) {
 
 	marshal, err := json.Marshal(&cache)
 	if err == nil && len(cacheFilename) > 0 {
-		_ = ioutil.WriteFile(cacheFilename, marshal, 0644)
+		err = ioutil.WriteFile(cacheFilename, marshal, 0644)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("%+v\n", err)
+		}
 	}
 }
