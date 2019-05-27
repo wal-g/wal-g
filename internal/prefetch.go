@@ -63,7 +63,7 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 		waitGroup.Done()
 	}()
 
-	if !uploader.useWalDelta {
+	if !uploader.getUseWalDelta() {
 		return
 	}
 

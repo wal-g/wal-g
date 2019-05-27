@@ -20,23 +20,20 @@ type Uploader struct {
 	waitGroup           *sync.WaitGroup
 	deltaFileManager    *DeltaFileManager
 	Failed              atomic.Value
-	useWalDelta         bool
+}
+
+func (uploader *Uploader) getUseWalDelta() (useWalDelta bool) {
+	return uploader.deltaFileManager != nil;
 }
 
 func NewUploader(
 	compressor compression.Compressor,
 	uploadingLocation storage.Folder,
-	deltaDataFolder DataFolder,
-	useWalDelta bool,
+	deltaFileManager *DeltaFileManager,
 ) *Uploader {
-	var deltaFileManager *DeltaFileManager = nil
-	if useWalDelta {
-		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
-	}
 	uploader := &Uploader{
 		UploadingFolder:     uploadingLocation,
 		Compressor:          compressor,
-		useWalDelta:         useWalDelta,
 		waitGroup:           &sync.WaitGroup{},
 		deltaFileManager:    deltaFileManager,
 	}
@@ -61,7 +58,6 @@ func (uploader *Uploader) Clone() *Uploader {
 		&sync.WaitGroup{},
 		uploader.deltaFileManager,
 		uploader.Failed,
-		uploader.useWalDelta,
 	}
 }
 
@@ -70,7 +66,7 @@ func (uploader *Uploader) UploadWalFile(file NamedReader) error {
 	var walFileReader io.Reader
 
 	filename := path.Base(file.Name())
-	if uploader.useWalDelta && isWalFilename(filename) {
+	if uploader.getUseWalDelta() && isWalFilename(filename) {
 		recordingReader, err := NewWalDeltaRecordingReader(file, filename, uploader.deltaFileManager)
 		if err != nil {
 			walFileReader = file

@@ -47,7 +47,7 @@ func HandleWALPush(uploader *Uploader, walFilePath string) {
 	}
 
 	bgUploader.Stop()
-	if uploader.deltaFileManager != nil {
+	if uploader.getUseWalDelta() {
 		uploader.deltaFileManager.FlushFiles(uploader.Clone())
 	}
 } //

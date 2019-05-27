@@ -181,7 +181,12 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 		return nil, errors.Wrap(err, "failed to configure WAL Delta usage")
 	}
 
-	uploader = NewUploader(compressor, folder, deltaDataFolder, useWalDelta)
+	var deltaFileManager *DeltaFileManager = nil
+	if useWalDelta {
+		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
+	}
+
+	uploader = NewUploader(compressor, folder, deltaFileManager)
 
 	return uploader, err
 }
