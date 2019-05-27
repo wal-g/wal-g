@@ -2,24 +2,25 @@ package internal
 
 import (
 	"fmt"
+	"os"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const (
 	NoDeleteModifier = iota
 	FullDeleteModifier
 	FindFullDeleteModifier
-	ConfirmFlag = "confirm"
+	ConfirmFlag            = "confirm"
 	DeleteShortDescription = "Clears old backups and WALs"
-
 
 	DeleteRetainExamples = `  retain 5                      keep 5 backups
   retain FULL 5                 keep 5 full backups and all deltas of them
@@ -160,7 +161,7 @@ func FindTarget(folder storage.Folder,
 			return object, nil
 		}
 	}
-	return nil, BackupNonExistenceError{}
+	return nil, nil
 }
 
 func GetBeforeChoiceFunc(name string, modifier int,
@@ -247,6 +248,10 @@ func HandleDeleteBefore(folder storage.Folder, args []string, confirmed bool,
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
+	if target == nil {
+		tracelog.InfoLogger.Printf("No backup found for deletion")
+		os.Exit(0)
+	}
 	err = DeleteBeforeTarget(folder, target, confirmed, isFullBackup, less)
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
@@ -266,6 +271,10 @@ func HandleDeleteRetain(folder storage.Folder, args []string, confirmed bool,
 	target, err := FindTargetRetain(folder, retentionCount, modifier, isFullBackup, greater)
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
+	}
+	if target == nil {
+		tracelog.InfoLogger.Printf("No backup found for deletion")
+		os.Exit(0)
 	}
 	err = DeleteBeforeTarget(folder, target, confirmed, isFullBackup, less)
 	if err != nil {
