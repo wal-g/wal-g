@@ -18,8 +18,10 @@ do
     if [ $i -eq 3 ];
     then
         sleep 3
+        mv ${MYSQLDATA}/mysql /tmp/mysql
         mysqldump -u sbtest --all-databases --lock-tables=false | head -n -1  > /tmp/dump_backup
         sleep 3
+        mv /tmp/mysql ${MYSQLDATA}/mysql
     fi
 
     xtrabackup --backup \
@@ -51,8 +53,10 @@ sleep 10
 service mysql start || cat /var/log/mysql/error.log
 
 sleep 10
+mv ${MYSQLDATA}/mysql /tmp/mysql
 mysqldump -u sbtest --all-databases --lock-tables=false | head -n -1 > /tmp/dump_restored
 sleep 10
+mv /tmp/mysql ${MYSQLDATA}/mysql
 
 diff /tmp/dump_backup /tmp/dump_restored
 
