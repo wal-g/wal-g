@@ -18,6 +18,10 @@ do
     if [ $i -eq 3 ];
     then
         sleep 3
+        # mv ${MYSQLDATA}/mysql /tmp/mysql
+        # mv /tmp/mysql ${MYSQLDATA}/mysql
+        # allows to avoid flap in test, because stats in mysql db can be different after dump
+
         mv ${MYSQLDATA}/mysql /tmp/mysql
         mysqldump -u sbtest --all-databases --lock-tables=false | head -n -1  > /tmp/dump_backup
         sleep 3
