@@ -33,7 +33,7 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, len(subFolders), 0)
 	assert.Equal(t, len(sublist), 1)
-	assert.Equal(t, sublist[0].GetName(),"file1")
+	assert.Equal(t, sublist[0].GetName(), "file1")
 
 	data, err := sub1.ReadObject("file1")
 	assert.NoError(t, err)

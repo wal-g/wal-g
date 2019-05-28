@@ -6,8 +6,8 @@ import (
 	"io"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 

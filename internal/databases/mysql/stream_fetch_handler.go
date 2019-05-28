@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/storages/storage"
@@ -76,9 +75,9 @@ func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
 
 func fetchBinlogs(folder storage.Folder, sentinel StreamSentinelDto, binlogsAreDone chan error) {
 	binlogFolder := folder.GetSubFolder(BinlogPath)
-	endTS, dstFolder := GetBinlogConfigs()
-	if dstFolder == "" {
-		binlogsAreDone <- errors.New("WALG_MYSQL_BINLOG_DST is not configured")
+	endTS, dstFolder, err := GetBinlogConfigs()
+	if err != nil {
+		binlogsAreDone <- err
 		return
 	}
 	objects, _, err := binlogFolder.ListFolder()
@@ -135,16 +134,21 @@ func BinlogShouldBeFetched(sentinel StreamSentinelDto, binlogName string, endTS 
 	return sentinel.BinLogStart <= binlogName && (endTS == nil || (*endTS).After(object.GetLastModified()))
 }
 
-func GetBinlogConfigs() (*time.Time, string) {
-	endTSStr := internal.GetSettingValue(BinlogEndTs)
-	var endTS *time.Time
-	if endTSStr != "" {
-		if t, err := time.Parse(time.RFC3339, endTSStr); err == nil {
-			endTS = &t
+func GetBinlogConfigs() (endTS *time.Time, dstFolder string, err error) {
+	var ok bool
+	endTSStr, ok := internal.GetSetting(BinlogEndTsSetting)
+	if ok {
+		t, err := time.Parse(time.RFC3339, endTSStr)
+		if err != nil {
+			return nil, "", err
 		}
+		endTS = &t
 	}
-	dstFolder := internal.GetSettingValue(BinlogDst)
-	return endTS, dstFolder
+	dstFolder, ok = internal.GetSetting(BinlogDstSetting)
+	if !ok {
+		return endTS, dstFolder, internal.NewUnsetRequiredSettingError(BinlogDstSetting)
+	}
+	return endTS, dstFolder, nil
 }
 
 func ExtractBinlogName(object storage.Object, folder storage.Folder) string {

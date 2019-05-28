@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/wal-g/wal-g/internal/crypto"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"golang.org/x/crypto/openpgp"
 )
@@ -39,29 +38,17 @@ type Crypter struct {
 
 // CrypterFromKey creates Crypter from armored key.
 func CrypterFromKey(armoredKey string, loadPassphrase func() (string, bool)) crypto.Crypter {
-	crypter := &Crypter{ArmoredKey: armoredKey, IsUseArmoredKey: true, loadPassphrase: loadPassphrase}
-	if !crypter.isArmed() {
-		return nil
-	}
-	return crypter
+	return &Crypter{ArmoredKey: armoredKey, IsUseArmoredKey: true, loadPassphrase: loadPassphrase}
 }
 
 // CrypterFromKeyPath creates Crypter from armored key path.
 func CrypterFromKeyPath(armoredKeyPath string, loadPassphrase func() (string, bool)) crypto.Crypter {
-	crypter := &Crypter{ArmoredKeyPath: armoredKeyPath, IsUseArmoredKeyPath: true, loadPassphrase: loadPassphrase}
-	if !crypter.isArmed() {
-		return nil
-	}
-	return crypter
+	return &Crypter{ArmoredKeyPath: armoredKeyPath, IsUseArmoredKeyPath: true, loadPassphrase: loadPassphrase}
 }
 
 // CrypterFromKeyRingID create Crypter from key ring ID.
 func CrypterFromKeyRingID(keyRingID string, loadPassphrase func() (string, bool)) crypto.Crypter {
-	crypter := &Crypter{KeyRingID: keyRingID, IsUseKeyRingID: true, loadPassphrase: loadPassphrase}
-	if !crypter.isArmed() {
-		return nil
-	}
-	return crypter
+	return &Crypter{KeyRingID: keyRingID, IsUseKeyRingID: true, loadPassphrase: loadPassphrase}
 }
 
 // CrypterFromKeyRing creates Crypter from armored keyring.
@@ -73,18 +60,6 @@ func CrypterFromKeyRing(armedKeyring string) crypto.Crypter {
 	}
 	crypter := &Crypter{PubKey: ring, SecretKey: ring}
 	return crypter
-}
-
-func (crypter *Crypter) isArmed() bool {
-	if crypter.IsUseKeyRingID {
-		tracelog.WarningLogger.Println(`
-You are using deprecated functionality that uses an external gpg library.
-It will be removed in next major version.
-Please set GPG key using environment variables WALG_PGP_KEY or WALG_PGP_KEY_PATH.
-		`)
-	}
-
-	return crypter.IsUseArmoredKey || crypter.IsUseArmoredKeyPath || crypter.IsUseKeyRingID
 }
 
 func (crypter *Crypter) setupPubKey() error {

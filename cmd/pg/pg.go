@@ -10,8 +10,6 @@ import (
 
 const WalgShortDescription = "PostgreSQL backup tool"
 
-var cfgFile string
-
 // These variables are here only to show current version. They are set in makefile during build process
 var WalgVersion = "devel"
 var GitRevision = "devel"
@@ -35,6 +33,6 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(config.InitConfig)
 
-	PgCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.walg.json)")
+	PgCmd.PersistentFlags().StringVar(&config.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 	PgCmd.InitDefaultVersionFlag()
 }

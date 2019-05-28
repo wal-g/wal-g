@@ -17,9 +17,8 @@ const (
 	NoDeleteModifier = iota
 	FullDeleteModifier
 	FindFullDeleteModifier
-	ConfirmFlag = "confirm"
+	ConfirmFlag            = "confirm"
 	DeleteShortDescription = "Clears old backups and WALs"
-
 
 	DeleteRetainExamples = `  retain 5                      keep 5 backups
   retain FULL 5                 keep 5 full backups and all deltas of them

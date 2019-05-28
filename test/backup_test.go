@@ -79,4 +79,3 @@ func TestFetchSentinelReturnErrorWhenSentinelUnmarshallable(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, errorMessage, err.Error()[:len(errorMessage)])
 }
-
