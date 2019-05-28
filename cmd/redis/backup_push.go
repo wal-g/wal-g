@@ -2,15 +2,15 @@ package redis
 
 import (
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/redis" // TODO: replace with my repo
+	"github.com/wal-g/wal-g/internal/databases/redis"
 	"github.com/wal-g/wal-g/internal/tracelog"
 
 	"github.com/spf13/cobra"
 )
 
-const backupPushShortDescription = ""
+const backupPushShortDescription = "Makes backup and uploads it to storage"
 
-// backupPushCmd represents the cron command
+// backupPushCmd represents the backupPush command
 var backupPushCmd = &cobra.Command{
 	Use:   "backup-push",
 	Short: backupPushShortDescription,

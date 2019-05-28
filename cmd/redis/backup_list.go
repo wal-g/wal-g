@@ -11,7 +11,7 @@ const BackupListShortDescription = "Print available backups"
 // backupListCmd represents the backupList command
 var backupListCmd = &cobra.Command{
 	Use:   "backup-list",
-	Short: BackupListShortDescription, // TODO : improve description
+	Short: BackupListShortDescription,
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
