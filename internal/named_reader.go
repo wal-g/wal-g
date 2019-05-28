@@ -15,3 +15,7 @@ type NamedReaderImpl struct {
 func (reader *NamedReaderImpl) Name() string {
 	return reader.name
 }
+
+func NewNamedReaderImpl(reader io.Reader, name string) *NamedReaderImpl {
+	return &NamedReaderImpl{reader, name}
+}
