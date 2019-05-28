@@ -13,7 +13,7 @@ ifdef GOTAGS
 override GOTAGS := -tags $(GOTAGS)
 endif
 
-test: install deps lint unittest pg_build mysql_build unlink_brotli pg_integration_test mysql_integration_test
+test: install deps lint unittest pg_build mysql_build redis_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test
 
 pg_test: install deps pg_build lint unittest unlink_brotli pg_integration_test
 
