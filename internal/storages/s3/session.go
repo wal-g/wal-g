@@ -2,6 +2,7 @@ package s3
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/defaults"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -54,10 +55,28 @@ func getAWSRegion(s3Bucket string, config *aws.Config, settings map[string]strin
 	}
 }
 
+func getDefaultConfig(settings map[string]string) *aws.Config {
+	config := defaults.Get().Config.
+		WithRegion(settings[RegionSetting])
+
+	provider := &credentials.StaticProvider{Value: credentials.Value{
+		AccessKeyID:     getFirstSettingOf(settings, []string{AccessKeyIdSetting, AccessKeySetting}),
+		SecretAccessKey: getFirstSettingOf(settings, []string{SecretAccessKeySetting, SecretKeySetting}),
+		SessionToken:    settings[SessionTokenSetting],
+	}}
+	providers := make([]credentials.Provider, 0)
+	providers = append(providers, provider)
+	providers = append(providers, defaults.CredProviders(config, defaults.Handlers())...)
+	newCredentials := credentials.NewCredentials(&credentials.ChainProvider{
+		VerboseErrors: aws.BoolValue(config.CredentialsChainVerboseErrors),
+		Providers:     providers,
+	})
+	return config.WithCredentials(newCredentials)
+}
+
 // TODO : unit tests
 func createSession(bucket string, settings map[string]string) (*session.Session, error) {
-	config := defaults.Get().Config
-
+	config := getDefaultConfig(settings)
 	config.MaxRetries = &MaxRetries
 	if _, err := config.Credentials.Get(); err != nil {
 		return nil, errors.Wrapf(err, "failed to get AWS credentials; please specify %s and %s", AccessKeyIdSetting, SecretAccessKeySetting)

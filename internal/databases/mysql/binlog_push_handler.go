@@ -3,6 +3,7 @@ package mysql
 import (
 	"database/sql"
 	"encoding/json"
+	"github.com/spf13/viper"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -23,10 +24,10 @@ type MySQLLogsCache struct {
 }
 
 func HandleBinlogPush(uploader *Uploader) {
-	binlogsFolder, ok := internal.GetSetting(BinlogSrcSetting)
-	if !ok {
+	if !viper.IsSet(BinlogSrcSetting) {
 		tracelog.ErrorLogger.FatalError(internal.NewUnsetRequiredSettingError(BinlogSrcSetting))
 	}
+	binlogsFolder := viper.GetString(BinlogSrcSetting)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(BinlogPath)
 	db, err := getMySQLConnection()
 	if err != nil {

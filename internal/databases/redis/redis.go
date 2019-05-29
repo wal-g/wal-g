@@ -14,10 +14,20 @@ type Backup struct {
 	*internal.Backup
 }
 
+// DISCUSS: In some cases, we have default values, but we don't want to store it at global default settings.
+// Naming is far from best, if Go allowed overloads, name GetSettingWithDefault would be more appropriate
+func GetSettingWithLocalDefault(key string, defaultValue string) string {
+	value, ok := internal.GetSetting(key)
+	if ok {
+		return value
+	}
+	return defaultValue
+}
+
 func getRedisConnection() *redis.Client {
-	redisAddr := internal.GetSettingWithLocalDefault("WALG_REDIS_HOST", "localhost")
-	redisPort := internal.GetSettingWithLocalDefault("WALG_REDIS_PORT", "6379")
-	redisPassword := internal.GetSettingWithLocalDefault("WALG_REDIS_PASSWORD", "") // no password set
+	redisAddr := GetSettingWithLocalDefault("WALG_REDIS_HOST", "localhost")
+	redisPort := GetSettingWithLocalDefault("WALG_REDIS_PORT", "6379")
+	redisPassword := GetSettingWithLocalDefault("WALG_REDIS_PASSWORD", "") // no password set
 	redisDbStr, ok := internal.GetSetting("WALG_REDIS_DB")
 	redisDb := 0 // use default DB
 	if ok {
