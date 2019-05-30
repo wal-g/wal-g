@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/time/rate"
 	"io"
 	"io/ioutil"
@@ -33,12 +34,12 @@ func TestLimiter(t *testing.T) {
 	}()
 	buffer := bytes.NewReader(make([]byte, 2000))
 	r := &fakeCloser{buffer}
-	start := time.Now()
+	start := utility.TimeNowCrossPlatformLocal()
 
 	reader := internal.NewDiskLimitReader(internal.NewNetworkLimitReader(r))
 	_, err := ioutil.ReadAll(reader)
 	assert.NoError(t, err)
-	end := time.Now()
+	end := utility.TimeNowCrossPlatformLocal()
 
 	if end.Sub(start) < time.Millisecond*80 {
 		t.Errorf("Rate limiter did not work")

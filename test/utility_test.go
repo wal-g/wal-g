@@ -140,3 +140,14 @@ func TestStripPrefixName(t *testing.T) {
 		assert.Equal(t, testCase.expected, actual)
 	}
 }
+
+func TestCeilTimeUpToMicroseconds_Works_When_Nanoseconds_Greater_Than_Zero(t *testing.T) {
+	timeToCeil := time.Date(2000, 1, 1, 1, 1, 1, 1, time.UTC)
+	expectedTime := time.Date(2000, 1, 1, 1, 1, 1, 1000, time.UTC)
+	assert.Equal(t, expectedTime, utility.CeilTimeUpToMicroseconds(timeToCeil))
+}
+
+func TestCeilTimeUpToMicroseconds_Works_When_Nanoseconds_Equal_Zero(t *testing.T) {
+	timeToCeil := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
+	assert.Equal(t, timeToCeil, utility.CeilTimeUpToMicroseconds(timeToCeil))
+}
