@@ -9,8 +9,6 @@ import (
 
 var RedisShortDescription = "Redis backup tool"
 
-var cfgFile string
-
 // These variables are here only to show current version. They are set in makefile during build process
 var WalgVersion = "devel"
 var GitRevision = "devel"
@@ -32,6 +30,6 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(config.InitConfig)
 
-	RedisCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.walg.json)")
+	RedisCmd.PersistentFlags().StringVar(&config.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 	RedisCmd.InitDefaultVersionFlag()
 }

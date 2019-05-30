@@ -12,8 +12,8 @@ import (
 
 func HandleBackupPush(uploader *Uploader) {
 	// Configure folders
-	redisDataFoler := internal.GetSettingValue("WALG_REDIS_DATA_FOLDER")
-	if redisDataFoler == "" {
+	redisDataFoler, ok := internal.GetSetting("WALG_REDIS_DATA_FOLDER")
+	if !ok {
 		redisDataFoler = "/var/lib/redis"
 	}
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
@@ -25,19 +25,12 @@ func HandleBackupPush(uploader *Uploader) {
 	currentTime := time.Now()
 	initializeBackupSaving(client)
 
-	// Wait for new backup on disk. Maybe add Timer?
+	// Wait for new backup on disk.
+	// DISCUSS: Maybe add Timer to stop trying after some time?
 	waitForNewBackup(currentTime, redisDataFoler)
 
 	// Upload backup
 	uploadBackup(uploader, redisDataFoler)
-}
-
-func getRedisConnection() *redis.Client {
-	return redis.NewClient(&redis.Options{ // TODO: read from env
-		Addr:     "localhost:6379",
-		Password: "", // no password set
-		DB:       0,  // use default DB
-	})
 }
 
 func initializeBackupSaving(client *redis.Client) {
@@ -72,7 +65,7 @@ func uploadBackup(uploader *Uploader, redisDataFoler string) {
 	}
 	defer utility.LoggedClose(f, "")
 	reader := bufio.NewReader(f)
-	namedReader := internal.NewNamedReaderImpl(reader, "backup") // Add date
+	namedReader := internal.NewNamedReaderImpl(reader, "base_"+time.Now().Format(time.RFC3339)) // DISCUSS: Is it correct backup name?
 	err = uploader.UploadFile(namedReader)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
