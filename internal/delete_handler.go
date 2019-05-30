@@ -292,7 +292,7 @@ func DeleteBeforeArgsValidator(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unsupported moodifier for delete before command")
 	}
 	if before, err := time.Parse(time.RFC3339, beforeStr); err == nil {
-		if before.After(utility.CeilTimeUpToMicroseconds(time.Now())) {
+		if before.After(utility.TimeNowCrossPlatformUTC()) {
 			return fmt.Errorf("cannot delete before future date")
 		}
 	}

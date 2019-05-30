@@ -160,3 +160,11 @@ func CeilTimeUpToMicroseconds(timeToCeil time.Time) time.Time {
 	}
 	return timeToCeil
 }
+
+func TimeNowCrossPlatformUTC() time.Time {
+	return CeilTimeUpToMicroseconds(time.Now().In(time.UTC))
+}
+
+func TimeNowCrossPlatformLocal() time.Time {
+	return CeilTimeUpToMicroseconds(time.Now())
+}

@@ -34,12 +34,12 @@ func TestLimiter(t *testing.T) {
 	}()
 	buffer := bytes.NewReader(make([]byte, 2000))
 	r := &fakeCloser{buffer}
-	start := utility.CeilTimeUpToMicroseconds(time.Now())
+	start := utility.TimeNowCrossPlatformLocal()
 
 	reader := internal.NewDiskLimitReader(internal.NewNetworkLimitReader(r))
 	_, err := ioutil.ReadAll(reader)
 	assert.NoError(t, err)
-	end := utility.CeilTimeUpToMicroseconds(time.Now())
+	end := utility.TimeNowCrossPlatformLocal()
 
 	if end.Sub(start) < time.Millisecond*80 {
 		t.Errorf("Rate limiter did not work")

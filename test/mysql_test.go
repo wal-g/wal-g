@@ -40,7 +40,7 @@ func TestBinlogShouldBeFetched(t *testing.T) {
 	storage.Store("mysql-bin-log.000018.lz4", *bytes.NewBufferString(""))
 	storage.Store("mysql-bin-log.000019.lz4", *bytes.NewBufferString(""))
 	time.Sleep(time.Millisecond * 20)
-	cutpoint := utility.CeilTimeUpToMicroseconds(time.Now())
+	cutpoint := utility.TimeNowCrossPlatformLocal()
 	time.Sleep(time.Millisecond * 20)
 	storage.Store("mysql-bin-log.000020.lz4", *bytes.NewBufferString(""))
 

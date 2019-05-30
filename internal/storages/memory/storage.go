@@ -13,7 +13,7 @@ type TimeStampedData struct {
 }
 
 func TimeStampData(data bytes.Buffer) TimeStampedData {
-	return TimeStampedData{data, utility.CeilTimeUpToMicroseconds(time.Now())}
+	return TimeStampedData{data, utility.TimeNowCrossPlatformLocal()}
 }
 
 // Storage is supposed to be used for tests. It doesn't guarantee data safety!

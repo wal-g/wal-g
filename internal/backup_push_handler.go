@@ -110,7 +110,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 	bundle := NewBundle(archiveDirectory, crypter, previousBackupSentinelDto.BackupStartLSN, previousBackupSentinelDto.Files)
 
 	var meta ExtendedMetadataDto
-	meta.StartTime = utility.CeilTimeUpToMicroseconds(time.Now())
+	meta.StartTime = utility.TimeNowCrossPlatformUTC()
 	meta.Hostname, _ = os.Hostname()
 
 	// Connect to postgres and start/finish a nonexclusive backup.
@@ -209,7 +209,7 @@ func UploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupNa
 	// BackupSentinelDto struct allows nil field for backward compatiobility
 	// We do not expect here nil dto since it is new dto to upload
 	meta.DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%f%z"
-	meta.FinishTime = utility.CeilTimeUpToMicroseconds(time.Now())
+	meta.FinishTime = utility.TimeNowCrossPlatformUTC()
 	meta.StartLsn = *sentinelDto.BackupStartLSN
 	meta.FinishLsn = *sentinelDto.BackupFinishLSN
 	meta.PgVersion = sentinelDto.PgVersion
