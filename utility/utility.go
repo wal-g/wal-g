@@ -154,7 +154,9 @@ func (err ForbiddenActionError) Error() string {
 
 // This function is needed for being cross-platform
 func CeilTimeUpToMicroseconds(timeToCeil time.Time) time.Time {
-	timeToCeil = timeToCeil.Add(time.Microsecond)
-	timeToCeil = timeToCeil.Add(-time.Duration(timeToCeil.Nanosecond() % 1000))
+	if timeToCeil.Nanosecond()%1000 != 0 {
+		timeToCeil = timeToCeil.Add(time.Microsecond)
+		timeToCeil = timeToCeil.Add(-time.Duration(timeToCeil.Nanosecond() % 1000))
+	}
 	return timeToCeil
 }
