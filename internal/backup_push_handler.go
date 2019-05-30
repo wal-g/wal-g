@@ -208,7 +208,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 func UploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupName string, meta ExtendedMetadataDto) error {
 	// BackupSentinelDto struct allows nil field for backward compatiobility
 	// We do not expect here nil dto since it is new dto to upload
-	meta.DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%f%z"
+	meta.DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
 	meta.FinishTime = utility.TimeNowCrossPlatformUTC()
 	meta.StartLsn = *sentinelDto.BackupStartLSN
 	meta.FinishLsn = *sentinelDto.BackupFinishLSN
