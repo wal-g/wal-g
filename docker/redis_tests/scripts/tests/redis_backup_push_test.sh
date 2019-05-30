@@ -5,7 +5,7 @@ export WALE_S3_PREFIX=s3://redisbucket
 
 service redis-server start &
 
-sleep 1
+sleep 10 # Wait for full redis-server start
 
 wal-g backup-push
 
