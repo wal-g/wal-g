@@ -59,7 +59,7 @@ func TestFindTargetRetain_With_FIND_FULL_Modifier(t *testing.T) {
 }
 
 func testTargetRetain(t *testing.T, expectedName string, retentionCount, modifier int) {
-	mockFolder := createMockFolderWithTime(t, time.Now())
+	mockFolder := createMockFolderWithTime(t, utility.CeilTimeUpToMicroseconds(time.Now()))
 
 	target, err := internal.FindTargetRetain(mockFolder, retentionCount, modifier, isFullBackup, greaterByTime)
 	assert.NoError(t, err)
@@ -87,7 +87,7 @@ func TestFindTargetBeforeTime_With_FIND_FULL_Modifier(t *testing.T) {
 }
 
 func testFindTargetBeforeTime(t *testing.T, minute int, modifier int) (storage.Object, error) {
-	baseTime := time.Now()
+	baseTime := utility.CeilTimeUpToMicroseconds(time.Now())
 	mockFolder := createMockFolderWithTime(t, baseTime)
 
 	timeLine := baseTime.Add(time.Duration(minute * int(time.Minute)))

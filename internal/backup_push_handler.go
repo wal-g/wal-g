@@ -110,7 +110,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 	bundle := NewBundle(archiveDirectory, crypter, previousBackupSentinelDto.BackupStartLSN, previousBackupSentinelDto.Files)
 
 	var meta ExtendedMetadataDto
-	meta.StartTime = ceilTimeUpToMicroseconds(time.Now())
+	meta.StartTime = utility.CeilTimeUpToMicroseconds(time.Now())
 	meta.Hostname, _ = os.Hostname()
 
 	// Connect to postgres and start/finish a nonexclusive backup.
@@ -118,7 +118,8 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	backupName, backupStartLSN, pgVersion, dataDir, err := bundle.StartBackup(conn, time.Now().String())
+	backupName, backupStartLSN, pgVersion, dataDir, err := bundle.StartBackup(conn,
+		utility.CeilTimeUpToMicroseconds(time.Now()).String())
 	meta.DataDir = dataDir
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
@@ -208,7 +209,7 @@ func UploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupNa
 	// BackupSentinelDto struct allows nil field for backward compatiobility
 	// We do not expect here nil dto since it is new dto to upload
 	meta.DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%f%z"
-	meta.FinishTime = ceilTimeUpToMicroseconds(time.Now())
+	meta.FinishTime = utility.CeilTimeUpToMicroseconds(time.Now())
 	meta.StartLsn = *sentinelDto.BackupStartLSN
 	meta.FinishLsn = *sentinelDto.BackupFinishLSN
 	meta.PgVersion = sentinelDto.PgVersion
@@ -232,11 +233,4 @@ func UploadSentinel(uploader *Uploader, sentinelDto *BackupSentinelDto, backupNa
 	}
 
 	return uploader.Upload(sentinelName, bytes.NewReader(dtoBody))
-}
-
-// This function is needed for being cross-platform
-func ceilTimeUpToMicroseconds(timeToCeil time.Time) time.Time {
-	timeToCeil = timeToCeil.Add(time.Microsecond)
-	timeToCeil = timeToCeil.Add(-time.Duration(timeToCeil.Nanosecond() % 1000))
-	return timeToCeil
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 	"github.com/wal-g/wal-g/internal/storages/memory"
+	"github.com/wal-g/wal-g/utility"
 	"os"
 	"testing"
 	"time"
@@ -39,7 +40,7 @@ func TestBinlogShouldBeFetched(t *testing.T) {
 	storage.Store("mysql-bin-log.000018.lz4", *bytes.NewBufferString(""))
 	storage.Store("mysql-bin-log.000019.lz4", *bytes.NewBufferString(""))
 	time.Sleep(time.Millisecond * 20)
-	cutpoint := time.Now()
+	cutpoint := utility.CeilTimeUpToMicroseconds(time.Now())
 	time.Sleep(time.Millisecond * 20)
 	storage.Store("mysql-bin-log.000020.lz4", *bytes.NewBufferString(""))
 

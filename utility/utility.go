@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // TODO : unit tests
@@ -149,4 +150,11 @@ func NewForbiddenActionError(message string) ForbiddenActionError {
 
 func (err ForbiddenActionError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
+// This function is needed for being cross-platform
+func CeilTimeUpToMicroseconds(timeToCeil time.Time) time.Time {
+	timeToCeil = timeToCeil.Add(time.Microsecond)
+	timeToCeil = timeToCeil.Add(-time.Duration(timeToCeil.Nanosecond() % 1000))
+	return timeToCeil
 }

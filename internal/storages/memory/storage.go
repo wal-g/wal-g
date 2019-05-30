@@ -2,6 +2,7 @@ package memory
 
 import (
 	"bytes"
+	"github.com/wal-g/wal-g/utility"
 	"sync"
 	"time"
 )
@@ -12,7 +13,7 @@ type TimeStampedData struct {
 }
 
 func TimeStampData(data bytes.Buffer) TimeStampedData {
-	return TimeStampedData{data, time.Now()}
+	return TimeStampedData{data, utility.CeilTimeUpToMicroseconds(time.Now())}
 }
 
 // Storage is supposed to be used for tests. It doesn't guarantee data safety!

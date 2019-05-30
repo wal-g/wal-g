@@ -21,7 +21,7 @@ func HandleStreamPush(uploader *Uploader) {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
 	defer utility.LoggedClose(db, "")
-	backupName := StreamPrefix + time.Now().UTC().Format("20060102T150405Z")
+	backupName := StreamPrefix + utility.CeilTimeUpToMicroseconds(time.Now()).UTC().Format("20060102T150405Z")
 	stat, _ := os.Stdin.Stat()
 	var stream io.Reader = os.Stdin
 	if (stat.Mode() & os.ModeCharDevice) == 0 {
@@ -41,7 +41,7 @@ func HandleStreamPush(uploader *Uploader) {
 func (uploader *Uploader) UploadStream(fileName string, db *sql.DB, stream io.Reader) error {
 	binlogStart := getMySQLCurrentBinlogFile(db)
 	tracelog.DebugLogger.Println("Binlog start file", binlogStart)
-	timeStart := time.Now()
+	timeStart := utility.CeilTimeUpToMicroseconds(time.Now())
 	compressor := uploader.Compressor
 
 	compressed := internal.CompressAndEncrypt(stream, compressor, internal.ConfigureCrypter())
