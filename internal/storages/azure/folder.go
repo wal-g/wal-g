@@ -6,7 +6,6 @@ import (
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"io"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +18,8 @@ import (
 const (
 	AccountSetting    = "AZURE_STORAGE_ACCOUNT"
 	AccessKeySetting  = "AZURE_STORAGE_ACCESS_KEY"
+	BufferSizeSetting = "AZURE_BUFFER_SIZE"
+	MaxBuffersSetting = "AZURE_MAX_BUFFERS"
 	minBufferSize     = 1024
 	defaultBufferSize = 64 * 1024 * 1024
 	minBuffers        = 1
@@ -28,6 +29,8 @@ const (
 var SettingList = []string{
 	AccountSetting,
 	AccessKeySetting,
+	BufferSizeSetting,
+	MaxBuffersSetting,
 }
 
 func NewFolderError(err error, format string, args ...interface{}) storage.Error {
@@ -39,8 +42,11 @@ func NewCredentialError(settingName string) storage.Error {
 		"%s setting is not set", settingName)
 }
 
-func NewFolder(containerURL azblob.ContainerURL, path string) *Folder {
-	return &Folder{containerURL, path}
+func NewFolder(
+	uploadStreamToBlockBlobOptions azblob.UploadStreamToBlockBlobOptions,
+	containerURL azblob.ContainerURL,
+	path string) *Folder {
+	return &Folder{uploadStreamToBlockBlobOptions, containerURL, path}
 }
 
 func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
@@ -67,12 +73,13 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 	}
 	containerURL := azblob.NewContainerURL(*serviceURL, pipeLine)
 	path = storage.AddDelimiterToPath(path)
-	return NewFolder(containerURL, path), nil
+	return NewFolder(getUploadStreamToBlockBlobOptions(settings), containerURL, path), nil
 }
 
 type Folder struct {
-	containerURL azblob.ContainerURL
-	path         string
+	uploadStreamToBlockBlobOptions azblob.UploadStreamToBlockBlobOptions
+	containerURL                   azblob.ContainerURL
+	path                           string
 }
 
 func (folder *Folder) GetPath() string {
@@ -116,7 +123,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 		for _, blobPrefix := range blobPrefixes {
 			subFolderPath := blobPrefix.Name
 
-			subFolders = append(subFolders, NewFolder(folder.containerURL, subFolderPath))
+			subFolders = append(subFolders, NewFolder(folder.uploadStreamToBlockBlobOptions, folder.containerURL, subFolderPath))
 		}
 
 	}
@@ -124,7 +131,10 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 }
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
-	return NewFolder(folder.containerURL, storage.AddDelimiterToPath(storage.JoinPath(folder.path, subFolderRelativePath)))
+	return NewFolder(
+		folder.uploadStreamToBlockBlobOptions,
+		folder.containerURL,
+		storage.AddDelimiterToPath(storage.JoinPath(folder.path, subFolderRelativePath)))
 }
 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
@@ -149,7 +159,7 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	//Upload content to a block blob using full path
 	path := storage.JoinPath(folder.path, name)
 	blobURL := folder.containerURL.NewBlockBlobURL(path)
-	_, err := azblob.UploadStreamToBlockBlob(context.Background(), content, blobURL, getUploadStreamToBlockBlobOptions())
+	_, err := azblob.UploadStreamToBlockBlob(context.Background(), content, blobURL, folder.uploadStreamToBlockBlobOptions)
 	if err != nil {
 		return NewFolderError(err, "Unable to upload blob %v", name)
 	}
@@ -177,15 +187,15 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	return nil
 }
 
-func getUploadStreamToBlockBlobOptions() azblob.UploadStreamToBlockBlobOptions {
+func getUploadStreamToBlockBlobOptions(settings map[string]string) azblob.UploadStreamToBlockBlobOptions {
 	// Configure the size of the rotating buffers
-	bufSizeS := os.Getenv("WALG_AZURE_BUFFER_SIZE")
+	bufSizeS := settings[BufferSizeSetting]
 	bufferSize, err := strconv.Atoi(bufSizeS)
 	if err != nil || bufferSize < minBufferSize {
 		bufferSize = defaultBufferSize
 	}
 	// Configure the size of the rotating buffers and number of buffers
-	maxBufS := os.Getenv("WALG_AZURE_MAX_BUFFERS")
+	maxBufS := settings[MaxBuffersSetting]
 	maxBuffers, err := strconv.Atoi(maxBufS)
 	if err != nil || maxBuffers < minBuffers {
 		maxBuffers = defaultBuffers

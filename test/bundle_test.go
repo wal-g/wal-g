@@ -46,19 +46,19 @@ func TestBundleQueue(t *testing.T) {
 }
 
 func TestBundleQueueHighConcurrency(t *testing.T) {
-	os.Setenv("WALG_UPLOAD_CONCURRENCY", "100")
+	os.Setenv(internal.UploadConcurrencySetting, "100")
 
 	queueTest(t)
 
-	os.Unsetenv("WALG_UPLOAD_CONCURRENCY")
+	os.Unsetenv(internal.UploadConcurrencySetting)
 }
 
 func TestBundleQueueLowConcurrency(t *testing.T) {
-	os.Setenv("WALG_UPLOAD_CONCURRENCY", "1")
+	os.Setenv(internal.UploadConcurrencySetting, "1")
 
 	queueTest(t)
 
-	os.Unsetenv("WALG_UPLOAD_CONCURRENCY")
+	os.Unsetenv(internal.UploadConcurrencySetting)
 }
 
 func queueTest(t *testing.T) {

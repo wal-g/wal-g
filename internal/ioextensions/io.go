@@ -1,4 +1,4 @@
-package internal
+package ioextensions
 
 import (
 	"github.com/wal-g/wal-g/utility"

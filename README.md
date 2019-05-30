@@ -137,6 +137,8 @@ Lists names and creation time of available backups.
 
 ``--json`` flag prints list in json format, pretty-printed if combined with ``--pretty`` 
 
+``--detail`` flag prints extra backup details, pretty-printed if combined with ``--pretty`` , json-encoded if combined with ``--json`` 
+
 * ``delete``
 
 Is used to delete backups and WALs before them. By default ``delete`` will perform dry run. If you want to execute deletion you have to add ``--confirm`` flag at the end of the command.

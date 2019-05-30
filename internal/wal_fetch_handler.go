@@ -3,15 +3,17 @@ package internal
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/compression"
-	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 type InvalidWalFileMagicError struct {
@@ -131,13 +133,16 @@ func TryDownloadWALFile(folder storage.Folder, walPath string) (walFileReader io
 
 // TODO : unit tests
 func DecompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor compression.Decompressor) error {
-	crypter := NewOpenPGPCrypter()
+	crypter := ConfigureCrypter()
 	if crypter != nil {
 		reader, err := crypter.Decrypt(archiveReader)
 		if err != nil {
 			return err
 		}
-		archiveReader = ReadCascadeCloser{reader, archiveReader}
+		archiveReader = ioextensions.ReadCascadeCloser{
+			Reader: reader,
+			Closer: archiveReader,
+		}
 	}
 
 	err := decompressor.Decompress(dst, archiveReader)
@@ -172,5 +177,5 @@ func DownloadWALFileTo(folder storage.Folder, walFileName string, dstPath string
 		return err
 	}
 	defer reader.Close()
-	return CreateFileWith(dstPath, reader)
+	return ioextensions.CreateFileWith(dstPath, reader)
 }

@@ -28,7 +28,7 @@ func (err CantOverwriteWalFileError) Error() string {
 func HandleWALPush(uploader *Uploader, walFilePath string) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
 
-	concurrency, err := utility.GetMaxUploadConcurrency(16)
+	concurrency, err := GetMaxUploadConcurrency()
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
@@ -47,7 +47,7 @@ func HandleWALPush(uploader *Uploader, walFilePath string) {
 	}
 
 	bgUploader.Stop()
-	if uploader.deltaFileManager != nil {
+	if uploader.getUseWalDelta() {
 		uploader.deltaFileManager.FlushFiles(uploader.Clone())
 	}
 } //

@@ -1,44 +1,42 @@
 package internal
 
 import (
-	"github.com/wal-g/wal-g/internal/compression"
-	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"path"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+
+	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 // Uploader contains fields associated with uploading tarballs.
 // Multiple tarballs can share one uploader.
 type Uploader struct {
-	UploadingFolder     storage.Folder
-	Compressor          compression.Compressor
-	waitGroup           *sync.WaitGroup
-	deltaFileManager    *DeltaFileManager
-	Failed              atomic.Value
-	useWalDelta         bool
+	UploadingFolder  storage.Folder
+	Compressor       compression.Compressor
+	waitGroup        *sync.WaitGroup
+	deltaFileManager *DeltaFileManager
+	Failed           atomic.Value
+}
+
+func (uploader *Uploader) getUseWalDelta() (useWalDelta bool) {
+	return uploader.deltaFileManager != nil
 }
 
 func NewUploader(
 	compressor compression.Compressor,
 	uploadingLocation storage.Folder,
-	deltaDataFolder DataFolder,
-	useWalDelta bool,
+	deltaFileManager *DeltaFileManager,
 ) *Uploader {
-	var deltaFileManager *DeltaFileManager = nil
-	if useWalDelta {
-		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
-	}
 	uploader := &Uploader{
-		UploadingFolder:     uploadingLocation,
-		Compressor:          compressor,
-		useWalDelta:         useWalDelta,
-		waitGroup:           &sync.WaitGroup{},
-		deltaFileManager:    deltaFileManager,
+		UploadingFolder:  uploadingLocation,
+		Compressor:       compressor,
+		waitGroup:        &sync.WaitGroup{},
+		deltaFileManager: deltaFileManager,
 	}
 	uploader.Failed.Store(false)
 	return uploader
@@ -61,7 +59,6 @@ func (uploader *Uploader) Clone() *Uploader {
 		&sync.WaitGroup{},
 		uploader.deltaFileManager,
 		uploader.Failed,
-		uploader.useWalDelta,
 	}
 }
 
@@ -70,7 +67,7 @@ func (uploader *Uploader) UploadWalFile(file NamedReader) error {
 	var walFileReader io.Reader
 
 	filename := path.Base(file.Name())
-	if uploader.useWalDelta && isWalFilename(filename) {
+	if uploader.getUseWalDelta() && isWalFilename(filename) {
 		recordingReader, err := NewWalDeltaRecordingReader(file, filename, uploader.deltaFileManager)
 		if err != nil {
 			walFileReader = file
@@ -88,7 +85,7 @@ func (uploader *Uploader) UploadWalFile(file NamedReader) error {
 // TODO : unit tests
 // UploadFile compresses a file and uploads it.
 func (uploader *Uploader) UploadFile(file NamedReader) error {
-	compressedFile := CompressAndEncrypt(file, uploader.Compressor, NewOpenPGPCrypter())
+	compressedFile := CompressAndEncrypt(file, uploader.Compressor, ConfigureCrypter())
 	dstPath := utility.SanitizePath(filepath.Base(file.Name()) + "." + uploader.Compressor.FileExtension())
 
 	err := uploader.Upload(dstPath, compressedFile)

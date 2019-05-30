@@ -8,6 +8,7 @@ main/redis/wal-g
 
 # tests
 test/testdata/00000*
+test/testdata/broken_wals/
 
 tmp/
 *.xml

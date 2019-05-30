@@ -1,4 +1,4 @@
-package internal
+package openpgp
 
 import (
 	"bufio"
@@ -9,17 +9,18 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"golang.org/x/crypto/openpgp"
 )
 
-// OpenPGPCrypter incapsulates specific of cypher method
+// Crypter incapsulates specific of cypher method
 // Includes keys, infrastructure information etc
 // If many encryption methods will be used it worth
 // to extract interface
-type OpenPGPCrypter struct {
-	KeyRingId      string
-	IsUseKeyRingId bool
+type Crypter struct {
+	KeyRingID      string
+	IsUseKeyRingID bool
 
 	ArmoredKey      string
 	IsUseArmoredKey bool
@@ -30,60 +31,38 @@ type OpenPGPCrypter struct {
 	PubKey    openpgp.EntityList
 	SecretKey openpgp.EntityList
 
+	loadPassphrase func() (string, bool)
+
 	mutex sync.RWMutex
 }
 
-// NewOpenPGPCrypter created OpenPGPCrypter and configures it.
-// In case that OpenPGPCrypter is not armed, it returns nil.
-func NewOpenPGPCrypter() Crypter {
-	crypter := &OpenPGPCrypter{}
-	crypter.configure()
-	if !crypter.isArmed() {
-		return nil
+// CrypterFromKey creates Crypter from armored key.
+func CrypterFromKey(armoredKey string, loadPassphrase func() (string, bool)) crypto.Crypter {
+	return &Crypter{ArmoredKey: armoredKey, IsUseArmoredKey: true, loadPassphrase: loadPassphrase}
+}
+
+// CrypterFromKeyPath creates Crypter from armored key path.
+func CrypterFromKeyPath(armoredKeyPath string, loadPassphrase func() (string, bool)) crypto.Crypter {
+	return &Crypter{ArmoredKeyPath: armoredKeyPath, IsUseArmoredKeyPath: true, loadPassphrase: loadPassphrase}
+}
+
+// CrypterFromKeyRingID create Crypter from key ring ID.
+func CrypterFromKeyRingID(keyRingID string, loadPassphrase func() (string, bool)) crypto.Crypter {
+	return &Crypter{KeyRingID: keyRingID, IsUseKeyRingID: true, loadPassphrase: loadPassphrase}
+}
+
+// CrypterFromKeyRing creates Crypter from armored keyring.
+// It is used mainly for mock purpouses, so it panics on error.
+func CrypterFromKeyRing(armedKeyring string) crypto.Crypter {
+	ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(armedKeyring))
+	if err != nil {
+		panic(err)
 	}
+	crypter := &Crypter{PubKey: ring, SecretKey: ring}
 	return crypter
 }
 
-func (crypter *OpenPGPCrypter) isArmed() bool {
-	if crypter.IsUseKeyRingId {
-		tracelog.WarningLogger.Println(`
-You are using deprecated functionality that uses an external gpg library.
-It will be removed in next major version.
-Please set GPG key using environment variables WALG_PGP_KEY or WALG_PGP_KEY_PATH.
-		`)
-	}
-
-	return crypter.IsUseArmoredKey || crypter.IsUseArmoredKeyPath || crypter.IsUseKeyRingId
-}
-
-// configure internal initialization
-func (crypter *OpenPGPCrypter) configure() {
-	// key can be either private (for download) or public (for upload)
-	armoredKey, isKeyExist := LookupConfigValue("WALG_PGP_KEY")
-
-	if isKeyExist {
-		crypter.ArmoredKey = armoredKey
-		crypter.IsUseArmoredKey = true
-
-		return
-	}
-
-	// key can be either private (for download) or public (for upload)
-	armoredKeyPath, isPathExist := LookupConfigValue("WALG_PGP_KEY_PATH")
-
-	if isPathExist {
-		crypter.ArmoredKeyPath = armoredKeyPath
-		crypter.IsUseArmoredKeyPath = true
-
-		return
-	}
-
-	if crypter.KeyRingId = GetKeyRingId(); crypter.KeyRingId != "" {
-		crypter.IsUseKeyRingId = true
-	}
-}
-
-func (crypter *OpenPGPCrypter) setupPubKey() error {
+func (crypter *Crypter) setupPubKey() error {
 	crypter.mutex.RLock()
 	if crypter.PubKey != nil {
 		crypter.mutex.RUnlock()
@@ -106,7 +85,7 @@ func (crypter *OpenPGPCrypter) setupPubKey() error {
 
 		crypter.PubKey = entityList
 	} else if crypter.IsUseArmoredKeyPath {
-		entityList, err := ReadPGPKey(crypter.ArmoredKeyPath)
+		entityList, err := readPGPKey(crypter.ArmoredKeyPath)
 
 		if err != nil {
 			return err
@@ -115,7 +94,7 @@ func (crypter *OpenPGPCrypter) setupPubKey() error {
 		crypter.PubKey = entityList
 	} else {
 		// TODO: legacy gpg external use, need to remove in next major version
-		armor, err := getPubRingArmor(crypter.KeyRingId)
+		armor, err := crypto.GetPubRingArmor(crypter.KeyRingID)
 
 		if err != nil {
 			return err
@@ -133,7 +112,7 @@ func (crypter *OpenPGPCrypter) setupPubKey() error {
 }
 
 // Encrypt creates encryption writer from ordinary writer
-func (crypter *OpenPGPCrypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
+func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	err := crypter.setupPubKey()
 	if err != nil {
 		return nil, err
@@ -150,11 +129,11 @@ func (crypter *OpenPGPCrypter) Encrypt(writer io.Writer) (io.WriteCloser, error)
 		return nil, errors.Wrapf(err, "opengpg encryption error")
 	}
 
-	return NewOnCloseFlusher(encryptedWriter, bufferedWriter), nil
+	return ioextensions.NewOnCloseFlusher(encryptedWriter, bufferedWriter), nil
 }
 
 // Decrypt creates decrypted reader from ordinary reader
-func (crypter *OpenPGPCrypter) Decrypt(reader io.Reader) (io.Reader, error) {
+func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
 	err := crypter.loadSecret()
 
 	if err != nil {
@@ -171,7 +150,7 @@ func (crypter *OpenPGPCrypter) Decrypt(reader io.Reader) (io.Reader, error) {
 }
 
 // load the secret key based on the settings
-func (crypter *OpenPGPCrypter) loadSecret() error {
+func (crypter *Crypter) loadSecret() error {
 	// check if we actually need to load it
 	crypter.mutex.RLock()
 	if crypter.SecretKey != nil {
@@ -199,7 +178,7 @@ func (crypter *OpenPGPCrypter) loadSecret() error {
 
 		crypter.SecretKey = entityList
 	} else if crypter.IsUseArmoredKeyPath {
-		entityList, err := ReadPGPKey(crypter.ArmoredKeyPath)
+		entityList, err := readPGPKey(crypter.ArmoredKeyPath)
 
 		if err != nil {
 			return errors.WithStack(err)
@@ -208,7 +187,7 @@ func (crypter *OpenPGPCrypter) loadSecret() error {
 		crypter.SecretKey = entityList
 	} else {
 		// TODO: legacy gpg external use, need to remove in next major version
-		armor, err := getSecretRingArmor(crypter.KeyRingId)
+		armor, err := crypto.GetSecretRingArmor(crypter.KeyRingID)
 
 		if err != nil {
 			return errors.WithStack(err)
@@ -223,8 +202,8 @@ func (crypter *OpenPGPCrypter) loadSecret() error {
 		crypter.SecretKey = entityList
 	}
 
-	if passphrase, isExist := LookupConfigValue("WALG_PGP_KEY_PASSPHRASE"); isExist {
-		err := DecryptSecretKey(crypter.SecretKey, passphrase)
+	if passphrase, ok := crypter.loadPassphrase(); ok {
+		err := decryptSecretKey(crypter.SecretKey, passphrase)
 
 		if err != nil {
 			return errors.WithStack(err)

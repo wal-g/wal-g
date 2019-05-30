@@ -4,9 +4,7 @@ package test
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/compression/lzo"
+	"github.com/wal-g/wal-g/internal/crypto"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -14,13 +12,19 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/compression/lzo"
+	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 )
 
-const waleWALfilename = "testdata/000000010000000000000024.lzo"
+const (
+	waleWALfilename    = "testdata/000000010000000000000024.lzo"
+	waleGpgKeyFilePath = "./testdata/waleGpgKey"
+	gpgKeyID           = "walg-server-test"
+)
 
 var waleGpgKey string
-
-const waleGpgKeyFilePath = "./testdata/waleGpgKey"
 
 func init() {
 	waleGpgKeyBytes, err := ioutil.ReadFile(waleGpgKeyFilePath)
@@ -30,6 +34,10 @@ func init() {
 	waleGpgKey = string(waleGpgKeyBytes)
 }
 
+func noPassphrase() (string, bool) {
+	return "", false
+}
+
 // This test extracts WAL-E-encrypted WAL, decrypts it by external
 // GPG, compares result with OpenGPG decryption and invokes Lzop
 // decompression to check integrity. Test will leave gpg key
@@ -37,7 +45,7 @@ func init() {
 func TestDecryptWALElzo(t *testing.T) {
 	t.Skip("This test has gpg side effects and was skipped. If you want to run it - comment skip line in crypto_compt_test.go")
 
-	crypter := createCrypter(waleGpgKey)
+	crypter := openpgp.CrypterFromKey(waleGpgKey, noPassphrase)
 	f, err := os.Open(waleWALfilename)
 	assert.NoError(t, err)
 	decrypt, err := crypter.Decrypt(f)
@@ -46,9 +54,6 @@ func TestDecryptWALElzo(t *testing.T) {
 	assert.NoError(t, err)
 
 	installTestKeyToExternalGPG(t)
-
-	os.Setenv("WALE_GPG_KEY_ID", "walg-server-test")
-	defer os.Unsetenv("WALE_GPG_KEY_ID")
 
 	ec := &ExternalGPGCrypter{}
 
@@ -72,7 +77,7 @@ func TestDecryptWALElzo(t *testing.T) {
 	}*/
 }
 func installTestKeyToExternalGPG(t *testing.T) *exec.Cmd {
-	command := exec.Command(internal.GpgBin, "--import")
+	command := exec.Command(crypto.GpgBin, "--import")
 
 	command.Stdin = strings.NewReader(waleGpgKey)
 	err := command.Run()
@@ -94,11 +99,8 @@ func TestOpenGPGandExternalGPGCompatibility(t *testing.T) {
 
 	installTestKeyToExternalGPG(t)
 
-	os.Setenv("WALE_GPG_KEY_ID", "walg-server-test")
-	defer os.Unsetenv("WALE_GPG_KEY_ID")
-
 	ec := &ExternalGPGCrypter{}
-	c := internal.NewOpenPGPCrypter()
+	c := openpgp.CrypterFromKeyRingID(gpgKeyID, noPassphrase)
 
 	assert.NotNilf(t, c, "OpenGPG crypter is unable to initialize")
 
@@ -126,7 +128,7 @@ type ExternalGPGCrypter struct {
 }
 
 func (c *ExternalGPGCrypter) Encrypt(reader io.Reader) ([]byte, error) {
-	cmd := exec.Command("gpg", "-e", "-z", "0", "-r", internal.GetKeyRingId())
+	cmd := exec.Command("gpg", "-e", "-z", "0", "-r", gpgKeyID)
 
 	cmd.Stdin = reader
 

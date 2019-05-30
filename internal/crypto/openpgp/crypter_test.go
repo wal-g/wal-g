@@ -1,13 +1,12 @@
-package test
+package openpgp
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"golang.org/x/crypto/openpgp"
 	"io/ioutil"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/crypto"
 )
 
 var pgpTestPrivateKey string
@@ -22,17 +21,8 @@ func init() {
 	pgpTestPrivateKey = string(pgpTestPrivateKeyBytes)
 }
 
-func MockArmedCrypter() internal.Crypter {
-	return createCrypter(pgpTestPrivateKey)
-}
-
-func createCrypter(armedKeyring string) *internal.OpenPGPCrypter {
-	ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(armedKeyring))
-	if err != nil {
-		panic(err)
-	}
-	crypter := &internal.OpenPGPCrypter{PubKey: ring, SecretKey: ring}
-	return crypter
+func MockArmedCrypter() crypto.Crypter {
+	return CrypterFromKeyRing(pgpTestPrivateKey)
 }
 
 func TestMockCrypter(t *testing.T) {
