@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
+	"math"
 	"os"
 	"time"
 )
@@ -52,6 +53,12 @@ func waitForNewBackup(currentTime time.Time, redisDataFoler string) {
 		if err != nil {
 			tracelog.ErrorLogger.Fatalf("%+v\n", err)
 		}
+
+		if math.Abs(currentTime.Sub(stat.ModTime()).Seconds()) < 10 {
+			tracelog.InfoLogger.Println("Backup has been made not so long ago, not going to wait for BGSAVE")
+			break
+		}
+
 		if stat.ModTime().After(currentTime) {
 			break
 		}
