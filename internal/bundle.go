@@ -46,7 +46,7 @@ var ExcludedFilenames = make(map[string]utility.Empty)
 
 func init() {
 	filesToExclude := []string{
-		"pg_log", "pg_xlog", "pg_wal", // Directories
+		"log", "pg_log", "pg_xlog", "pg_wal", // Directories
 		"pgsql_tmp", "postgresql.auto.conf.tmp", "postmaster.pid", "postmaster.opts", "recovery.conf", // Files
 		"pg_dynshmem", "pg_notify", "pg_replslot", "pg_serial", "pg_stat_tmp", "pg_snapshots", "pg_subtrans", // Directories
 	}
