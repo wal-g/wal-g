@@ -14,6 +14,7 @@ type BackupSentinelDto struct {
 	IncrementCount    *int    `json:"DeltaCount,omitempty"`
 
 	Files BackupFileList `json:"Files"`
+	TarFileSets map[string][]string `json:"TarFiles"`
 
 	PgVersion       int     `json:"PgVersion"`
 	BackupFinishLSN *uint64 `json:"FinishLSN"`
