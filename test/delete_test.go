@@ -94,6 +94,29 @@ func testFindTargetBeforeTime(t *testing.T, minute int, modifier int) (storage.O
 	return internal.FindTargetBeforeTime(mockFolder, timeLine, modifier, isFullBackup, lessByTime)
 }
 
+func TestDeleteBeforeTarget_WithPermanentBackups(t *testing.T) {
+	folder := createMockStorageFolderWithPermanentBackups(t)
+	subFolder := folder.GetSubFolder(utility.BaseBackupPath)
+	expectExistAfterDelete := map[string]bool{
+		"base_000000010000000000000003": false,
+		"base_000000010000000000000005": true,
+		"base_000000010000000000000007": false,
+	}
+	for backupName, _ := range expectExistAfterDelete {
+		exists, err := subFolder.Exists(backupName + "/" + utility.MetadataFileName)
+		assert.NoError(t, err)
+		assert.True(t, exists, "expected backup "+backupName+" to exist")
+	}
+	target := storage.NewLocalObject("", utility.TimeNowCrossPlatformLocal().Add(time.Duration(1*int(time.Minute))))
+	err := internal.DeleteBeforeTarget(folder, target, true, isFullBackup, lessByTime)
+	assert.NoError(t, err)
+	for backupName, expect := range expectExistAfterDelete {
+		exists, err := subFolder.Exists(backupName + "/" + utility.MetadataFileName)
+		assert.NoError(t, err)
+		assert.Equal(t, expect, exists, "expected backup "+backupName+" to exist")
+	}
+}
+
 func createMockFolderWithTime(t *testing.T, baseTime time.Time) *mocks.MockFolder {
 	baseNamePrefix := "base_"
 	deltaMark := "_D_"
@@ -168,6 +191,40 @@ func createMockStorageFolderWithDeltaBackups(t *testing.T) storage.Folder {
 		assert.NoError(t, err)
 		sentinelString := string(bytesSentinel)
 		err = subFolder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader(sentinelString))
+		assert.NoError(t, err)
+	}
+	return folder
+}
+
+func createMockStorageFolderWithPermanentBackups(t *testing.T) storage.Folder {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	subFolder := folder.GetSubFolder(utility.BaseBackupPath)
+	emptyData := map[string]interface{}{}
+	permanentMetadata := map[string]interface{}{
+		"start_time":   utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
+		"finish_time":  utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
+		"hostname":     "",
+		"data_dir":     "",
+		"pg_version":   0,
+		"start_lsn":    0,
+		"finish_lsn":   1,
+		"is_permanent": true,
+	}
+	backupNames := map[string]interface{}{
+		"base_000000010000000000000003": emptyData,
+		"base_000000010000000000000005": permanentMetadata,
+		"base_000000010000000000000007": emptyData,
+	}
+	for backupName, metadata := range backupNames {
+		bytesSentinel, err := json.Marshal(&emptyData)
+		assert.NoError(t, err)
+		sentinelString := string(bytesSentinel)
+		err = subFolder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader(sentinelString))
+		assert.NoError(t, err)
+		bytesMetadata, err := json.Marshal(&metadata)
+		assert.NoError(t, err)
+		metadataString := string(bytesMetadata)
+		err = subFolder.PutObject(backupName+"/"+utility.MetadataFileName, strings.NewReader(metadataString))
 		assert.NoError(t, err)
 	}
 	return folder

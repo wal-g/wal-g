@@ -244,10 +244,12 @@ func getPermanentBackupNames(folder storage.Folder) (backupNames []string) {
 	for _, backupTime := range backupTimes {
 		backup, err := GetBackupByName(backupTime.BackupName, folder)
 		if err != nil {
+			tracelog.ErrorLogger.Printf("failed to get backup by name with error %s, ignoring...", err.Error())
 			continue
 		}
 		meta, err := backup.FetchMeta()
 		if err != nil {
+			tracelog.ErrorLogger.Printf("failed to fetch backup meta for backup %s with error %s, ignoring...", backupTime.BackupName, err.Error())
 			continue
 		}
 		if meta.IsPermanent {
