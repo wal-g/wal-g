@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 	config "github.com/wal-g/wal-g/main"
 	"os"
+	"strings"
 )
 
 var RedisShortDescription = "Redis backup tool"
@@ -17,7 +18,7 @@ var BuildDate = "devel"
 var RedisCmd = &cobra.Command{
 	Use:     "redis",
 	Short:   RedisShortDescription, // TODO : improve description
-	Version: WalgVersion + "\t" + GitRevision + "\t" + BuildDate + "\t" + "Redis",
+	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "Redis"}, "\t"),
 }
 
 func Execute() {
