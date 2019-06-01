@@ -8,22 +8,22 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const backupPushShortDescription = "Makes backup and uploads it to storage"
+const streamPushShortDescription = "Makes backup and uploads it to storage"
 
-// backupPushCmd represents the backupPush command
-var backupPushCmd = &cobra.Command{
-	Use:   "backup-push",
-	Short: backupPushShortDescription,
+// streamPushCmd represents the streamPush command
+var streamPushCmd = &cobra.Command{
+	Use:   "stream-push",
+	Short: streamPushShortDescription,
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
 		if err != nil {
 			tracelog.ErrorLogger.FatalError(err)
 		}
-		redis.HandleBackupPush(&redis.Uploader{Uploader: uploader})
+		redis.HandleStreamPush(&redis.Uploader{Uploader: uploader})
 	},
 }
 
 func init() {
-	RedisCmd.AddCommand(backupPushCmd)
+	RedisCmd.AddCommand(streamPushCmd)
 }

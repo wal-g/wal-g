@@ -9,7 +9,7 @@ service redis-server start &
 
 sleep 10 # Wait for full redis-server start
 
-wal-g backup-push
+redis-cli -a {password} --rdb /dev/stdout | wal-g backup-push # Send stream of dump to wal-g
 
 wal-g backup-list
 
