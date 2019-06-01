@@ -54,6 +54,7 @@ services:
     image: wal-g/pg_tests
     container_name: wal-g_pg_tests
     env_file:
+      - docker/common/common_walg.env
       - docker/pg_tests/walg.env
     depends_on:
       - s3
@@ -74,6 +75,7 @@ services:
     image: wal-g/mysql_tests
     container_name: wal-g_mysql_tests
     env_file:
+      - docker/common/common_walg.env
       - docker/mysql_tests/walg.env
     depends_on:
       - s3
@@ -94,7 +96,7 @@ services:
     image: wal-g/redis_tests
     container_name: wal-g_redis_tests
     env_file:
-      - docker/redis_tests/walg.env
+      - docker/common/common_walg.env
     depends_on:
       - s3
     links:
