@@ -2,7 +2,7 @@ package pg
 
 import (
 	"fmt"
-	"github.com/wal-g/wal-g/main"
+	"github.com/wal-g/wal-g/internal"
 	"os"
 	"strings"
 
@@ -32,8 +32,8 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(config.InitConfig)
+	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
-	PgCmd.PersistentFlags().StringVar(&config.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
+	PgCmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 	PgCmd.InitDefaultVersionFlag()
 }

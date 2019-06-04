@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/spf13/viper"
 	"io/ioutil"
 	"path"
 	"strings"
@@ -72,12 +73,12 @@ func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
 }
 
 func getMySQLConnection() (*sql.DB, error) {
-	datasourceName, ok := internal.GetSetting(DatasourceNameSetting)
-	if !ok {
+	if !viper.IsSet(DatasourceNameSetting) {
 		return nil, internal.NewUnsetRequiredSettingError(DatasourceNameSetting)
 	}
-	caFile, ok := internal.GetSetting(SslCaSetting)
-	if ok {
+	datasourceName := viper.GetString(DatasourceNameSetting)
+	if viper.IsSet(SslCaSetting) {
+		caFile := viper.GetString(SslCaSetting)
 		rootCertPool := x509.NewCertPool()
 		pem, err := ioutil.ReadFile(caFile)
 		if err != nil {

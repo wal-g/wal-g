@@ -2,60 +2,12 @@ package test
 
 import (
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
-	"os"
 	"strings"
 	"testing"
 )
-
-// Sets WAL-G needed environment variables to empty strings.
-func setEmpty(t *testing.T) {
-	err := os.Setenv("WALE_S3_PREFIX", "")
-	if err != nil {
-		t.Log(err)
-	}
-	err = os.Setenv("AWS_REGION", "")
-	if err != nil {
-		t.Log(err)
-	}
-	err = os.Setenv("AWS_ACCESS_KEY_ID", "")
-	if err != nil {
-		t.Log(err)
-	}
-	err = os.Setenv("AWS_SECRET_ACCESS_KEY", "")
-	if err != nil {
-		t.Log(err)
-	}
-	err = os.Setenv("AWS_SECURITY_TOKEN", "")
-	if err != nil {
-		t.Log(err)
-	}
-}
-
-// Sets fake environment variables.
-func setFake(t *testing.T) {
-	err := os.Setenv("WALE_S3_PREFIX", "wale_s3_prefix")
-	if err != nil {
-		t.Log(err)
-	}
-	err = os.Setenv("AWS_REGION", "aws_region")
-	if err != nil {
-		t.Log(err)
-	}
-	err = os.Setenv("AWS_ACCESS_KEY_ID", "aws_access_key_id")
-	if err != nil {
-		t.Log(err)
-	}
-	err = os.Setenv("AWS_SECRET_ACCESS_KEY", "aws_secret_access_key")
-	if err != nil {
-		t.Log(err)
-	}
-	err = os.Setenv("AWS_SECURITY_TOKEN", "aws_security_token")
-	if err != nil {
-		t.Log(err)
-	}
-}
 
 func TestConfigure(t *testing.T) {
 	bucketPath := "s3://bucket/server"
@@ -83,45 +35,33 @@ func TestConfigureDeepBucket(t *testing.T) {
 
 func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer string) {
 	// Test empty environment variables
-	setEmpty(t)
+	viper.Reset()
 	uploader, err := internal.ConfigureUploader()
 	if _, ok := (errors.Cause(err)).(internal.UnconfiguredStorageError); !ok {
 		t.Errorf("upload: Expected error 'UnconfiguredStorageError' but got %s", err)
 	}
 	assert.Nil(t, uploader)
-	setFake(t)
-	// Test Minio
-	err = os.Setenv("WALE_S3_PREFIX", "gs://abc.com")
-	assert.NoError(t, err)
-	err = os.Setenv("AWS_ENDPOINT", "http://127.0.0.1:9000")
-	assert.NoError(t, err)
-	err = os.Setenv("AWS_REGION", "")
-	assert.NoError(t, err)
+	internal.InitConfig()
+	internal.Configure()
+	viper.Set("AWS_ACCESS_KEY_ID", "aws_access_key_id")
+	viper.Set("AWS_SECRET_ACCESS_KEY", "aws_secret_access_key")
+	viper.Set("AWS_SECURITY_TOKEN", "aws_security_token")
+	viper.Set("WALE_S3_PREFIX", "gs://abc.com")
+	viper.Set("AWS_ENDPOINT", "http://127.0.0.1:9000")
+	viper.Set("AWS_REGION", "")
 	_, err = internal.ConfigureUploader()
 	assert.NoError(t, err)
-	// Test invalid url
-	err = os.Setenv("WALE_S3_PREFIX", "test_fail:")
-	assert.NoError(t, err)
+	viper.Set("WALE_S3_PREFIX", "test_fail:")
 	_, err = internal.ConfigureUploader()
 	assert.Error(t, err)
-	// Test created uploader and prefix
-	err = os.Setenv("WALE_S3_PREFIX", bucketPath)
-	if err != nil {
-		t.Log(err)
-	}
+	viper.Set("WALE_S3_PREFIX", bucketPath)
 	uploader, err = internal.ConfigureUploader()
 	assert.NoError(t, err)
 	assert.Equal(t, expectedServer, strings.TrimSuffix(uploader.UploadingFolder.GetPath(), "/"))
 	assert.NotNil(t, uploader)
 	assert.NoError(t, err)
 	// Test STANDARD_IA storage class
-	err = os.Setenv("WALG_S3_STORAGE_CLASS", "STANDARD_IA")
-	defer os.Unsetenv("WALG_S3_STORAGE_CLASS")
-	if err != nil {
-		t.Log(err)
-	}
+	viper.Set("WALG_S3_STORAGE_CLASS", "STANDARD_IA")
 	_, err = internal.ConfigureUploader()
-	if err != nil {
-		t.Log(err)
-	}
+	assert.NoError(t, err)
 }
