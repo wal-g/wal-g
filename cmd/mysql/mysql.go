@@ -3,7 +3,7 @@ package mysql
 import (
 	"fmt"
 	"github.com/spf13/cobra"
-	config "github.com/wal-g/wal-g/main"
+	"github.com/wal-g/wal-g/internal"
 	"os"
 	"strings"
 )
@@ -29,8 +29,8 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(config.InitConfig)
+	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
-	MySQLCmd.PersistentFlags().StringVar(&config.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
+	MySQLCmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 	MySQLCmd.InitDefaultVersionFlag()
 }

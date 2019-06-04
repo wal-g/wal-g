@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
 	"io/ioutil"
@@ -33,10 +34,7 @@ func HandleWALPush(uploader *Uploader, walFilePath string) {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
 
-	preventWalOverwrite, err := ConfigurePreventWalOverwrite()
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
-	}
+	preventWalOverwrite := viper.GetBool(PreventWalOverwriteSetting)
 
 	bgUploader := NewBgUploader(walFilePath, int32(concurrency-1), uploader, preventWalOverwrite)
 	// Look for new WALs while doing main upload

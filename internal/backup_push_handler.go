@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -29,14 +29,8 @@ func (err SentinelMarshallingError) Error() string {
 
 // TODO : unit tests
 func getDeltaConfig() (maxDeltas int, fromFull bool) {
-	stepsStr := GetSettingWithDefault(DeltaMaxStepsSetting)
-	var err error
-	maxDeltas, err = strconv.Atoi(stepsStr)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(NewParsingError(DeltaMaxStepsSetting, err))
-	}
-	origin, hasOrigin := GetSetting(DeltaOriginSetting)
-	if hasOrigin {
+	maxDeltas = viper.GetInt(DeltaMaxStepsSetting)
+	if origin, hasOrigin := GetSetting(DeltaOriginSetting); hasOrigin {
 		switch origin {
 		case LatestString:
 		case "LATEST_FULL":
@@ -112,6 +106,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 	var meta ExtendedMetadataDto
 	meta.StartTime = utility.TimeNowCrossPlatformUTC()
 	meta.Hostname, _ = os.Hostname()
+	meta.IsPermanent = false // TODO: add permanent command flag
 
 	// Connect to postgres and start/finish a nonexclusive backup.
 	conn, err := Connect()

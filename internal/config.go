@@ -3,7 +3,7 @@ package internal
 import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/wal-g/internal/tracelog"
-	"os"
+	"os/user"
 )
 
 const (
@@ -25,35 +25,15 @@ const (
 	PgpKeySetting                = "WALG_PGP_KEY"
 	PgpKeyPathSetting            = "WALG_PGP_KEY_PATH"
 	PgpKeyPassphraseSetting      = "WALG_PGP_KEY_PASSPHRASE"
+	PgDataSetting                = "PGDATA" // TODO : do something with it
+	UserSetting                  = "USER"   // TODO : do something with it
+	PgPortSetting                = "PGPORT" // TODO : do something with it
+	PgUserSetting                = "PGUSER" // TODO : do something with it
+	PgHostSetting                = "PGHOST" // TODO : do something with it
 )
 
 var (
-	WalgConfig        *map[string]string
-	allowedConfigKeys = map[string]*string{
-		DownloadConcurrencySetting:   nil,
-		UploadConcurrencySetting:     nil,
-		UploadDiskConcurrencySetting: nil,
-		UploadQueueSetting:           nil,
-		SentinelUserDataSetting:      nil,
-		PreventWalOverwriteSetting:   nil,
-		"WALG_" + GpgKeyIDSetting:    nil,
-		"WALE_" + GpgKeyIDSetting:    nil,
-		PgpKeySetting:                nil,
-		PgpKeyPathSetting:            nil,
-		PgpKeyPassphraseSetting:      nil,
-		DeltaMaxStepsSetting:         nil,
-		DeltaOriginSetting:           nil,
-		CompressionMethodSetting:     nil,
-		DiskRateLimitSetting:         nil,
-		NetworkRateLimitSetting:      nil,
-		UseWalDeltaSetting:           nil,
-		LogLevelSetting:              nil,
-		TarSizeThresholdSetting:      nil,
-		"USER":                       nil, // TODO : do something with it
-		"PGPORT":                     nil, // TODO : do something with it
-		"PGUSER":                     nil, // TODO : do something with it
-		"PGHOST":                     nil, // TODO : do something with it
-	}
+	CfgFile             string
 	defaultConfigValues = map[string]string{
 		DownloadConcurrencySetting:   "10",
 		UploadConcurrencySetting:     "16",
@@ -68,30 +48,10 @@ var (
 )
 
 func GetSetting(key string) (value string, ok bool) {
-	if WalgConfig != nil {
-		if val, ok := (*WalgConfig)[key]; ok {
-			return val, true
-		}
+	if viper.IsSet(key) {
+		return viper.GetString(key), true
 	}
-	return os.LookupEnv(key)
-}
-
-// DISCUSS: In some cases, we have default values, but we don't want to store it at global default settings.
-// Naming is far from best, if Go allowed overloads, name GetSettingWithDefault would be more appropriate
-func GetSettingWithLocalDefault(key string, defaultValue string) string {
-	value, ok := GetSetting(key)
-	if ok {
-		return value
-	}
-	return defaultValue
-}
-
-func GetSettingWithDefault(key string) string {
-	value, ok := GetSetting(key)
-	if ok {
-		return value
-	}
-	return defaultConfigValues[key]
+	return "", false
 }
 
 func GetWaleCompatibleSetting(key string) (value string, exists bool) {
@@ -101,8 +61,8 @@ func GetWaleCompatibleSetting(key string) (value string, exists bool) {
 	}
 	// At first we try to check whether it is configured at all
 	for _, settingKey := range settingKeys {
-		if val, ok := GetSetting(settingKey); ok && len(val) > 0 {
-			return val, true
+		if viper.IsSet(settingKey) {
+			return viper.GetString(settingKey), true
 		}
 	}
 	// Then we try to get default value
@@ -114,46 +74,42 @@ func GetWaleCompatibleSetting(key string) (value string, exists bool) {
 	return "", false
 }
 
-func UpdateAllowedConfig(fields []string) {
-	for _, field := range fields {
-		allowedConfigKeys[field] = nil
+func Configure() {
+	err := ConfigureLogging()
+	if err != nil {
+		tracelog.ErrorLogger.Println("Failed to configure logging.")
+		tracelog.ErrorLogger.FatalError(err)
 	}
+
+	ConfigureLimiters()
 }
 
-func init() {
-	for _, adapter := range StorageAdapters {
-		allowedConfigKeys["WALG_"+adapter.prefixName] = nil
-		allowedConfigKeys["WALE_"+adapter.prefixName] = nil
-		for _, settingName := range adapter.settingNames {
-			allowedConfigKeys["WALG_"+settingName] = nil
-			allowedConfigKeys["WALE_"+settingName] = nil
-			allowedConfigKeys[settingName] = nil
+// initConfig reads in config file and ENV variables if set.
+func InitConfig() {
+	if CfgFile != "" {
+		// Use config file from the flag.
+		viper.SetConfigFile(CfgFile)
+	} else {
+		// Find home directory.
+		usr, err := user.Current()
+		if err != nil {
+			tracelog.ErrorLogger.FatalError(err)
 		}
-	}
-	readConfig()
-	verifyConfig()
-}
 
-func verifyConfig() {
-	if WalgConfig == nil {
-		return
+		// Search config in home directory with name ".wal-g" (without extension).
+		viper.AddConfigPath(usr.HomeDir)
+		viper.SetConfigName(".walg")
 	}
-	for _, extension := range Extensions {
-		for key, value := range extension.GetAllowedConfigKeys() {
-			allowedConfigKeys[key] = value
-		}
-	}
-	for k := range *WalgConfig {
-		if _, ok := allowedConfigKeys[k]; !ok {
-			tracelog.ErrorLogger.Panic("Settings " + k + " is unknown")
-		}
-	}
-}
 
-func readConfig() {
-	cfg := make(map[string]string)
-	WalgConfig = &cfg
-	for _, key := range viper.AllKeys() {
-		cfg[key] = viper.GetString(key)
+	viper.AutomaticEnv() // read in environment variables that match
+
+	for setting, value := range defaultConfigValues {
+		viper.SetDefault(setting, value)
+	}
+
+	// If a config file is found, read it in.
+	err := viper.ReadInConfig()
+	if err == nil {
+		tracelog.InfoLogger.Println("Using config file:", viper.ConfigFileUsed())
 	}
 }

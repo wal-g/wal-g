@@ -3,17 +3,16 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strconv"
-
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"golang.org/x/time/rate"
+	"os"
+	"path/filepath"
 )
 
 const (
@@ -70,8 +69,8 @@ type InvalidConcurrencyValueError struct {
 	error
 }
 
-func NewInvalidConcurrencyValueError(value int) InvalidConcurrencyValueError {
-	return InvalidConcurrencyValueError{errors.Errorf("Concurrency value is expected to be positive but is: %v", value)}
+func NewInvalidConcurrencyValueError(concurrencyType string, value int) InvalidConcurrencyValueError {
+	return InvalidConcurrencyValueError{errors.Errorf("%v value is expected to be positive but is: %v", concurrencyType, value)}
 }
 
 func (err InvalidConcurrencyValueError) Error() string {
@@ -90,38 +89,17 @@ func (err UnmarshallingError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-type ParsingError struct {
-	error
-}
-
-func NewParsingError(subject string, err error) ParsingError {
-	return ParsingError{errors.Errorf("Failed to parse %s: %v", subject, err)}
-}
-
-func (err ParsingError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
 // TODO : unit tests
-func ConfigureLimiters() error {
-	diskLimitStr, ok := GetSetting(DiskRateLimitSetting)
-	if ok {
-		diskLimit, err := strconv.ParseInt(diskLimitStr, 10, 64)
-		if err != nil {
-			return NewParsingError(DiskRateLimitSetting, err)
-		}
+func ConfigureLimiters() {
+	if viper.IsSet(DiskRateLimitSetting) {
+		diskLimit := viper.GetInt64(DiskRateLimitSetting)
 		DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 
-	netLimitStr, ok := GetSetting(NetworkRateLimitSetting)
-	if ok {
-		netLimit, err := strconv.ParseInt(netLimitStr, 10, 64)
-		if err != nil {
-			return NewParsingError(NetworkRateLimitSetting, err)
-		}
+	if viper.IsSet(NetworkRateLimitSetting) {
+		netLimit := viper.GetInt64(NetworkRateLimitSetting)
 		NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
-	return nil
 }
 
 // TODO : unit tests
@@ -148,11 +126,11 @@ func ConfigureFolder() (storage.Folder, error) {
 
 // TODO : unit tests
 func getDataFolderPath() string {
-	pgdata, ok := GetSetting("PGDATA")
 	var dataFolderPath string
-	if !ok {
+	if !viper.IsSet(PgDataSetting) {
 		dataFolderPath = DefaultDataFolderPath
 	} else {
+		pgdata := viper.GetString(PgDataSetting)
 		dataFolderPath = filepath.Join(pgdata, "pg_wal")
 		if _, err := os.Stat(dataFolderPath); err != nil {
 			dataFolderPath = filepath.Join(pgdata, "pg_xlog")
@@ -165,24 +143,9 @@ func getDataFolderPath() string {
 	return dataFolderPath
 }
 
-func ConfigurePreventWalOverwrite() (preventWalOverwrite bool, err error) {
-	preventWalOverwriteStr := GetSettingWithDefault(PreventWalOverwriteSetting)
-
-	preventWalOverwrite, err = strconv.ParseBool(preventWalOverwriteStr)
-	if err != nil {
-		return false, NewParsingError(PreventWalOverwriteSetting, err)
-	}
-
-	return preventWalOverwrite, nil
-}
-
 // TODO : unit tests
 func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err error) {
-	useWalDeltaStr := GetSettingWithDefault(UseWalDeltaSetting)
-	useWalDelta, err = strconv.ParseBool(useWalDeltaStr)
-	if err != nil {
-		return false, nil, NewParsingError(UseWalDeltaSetting, err)
-	}
+	useWalDelta = viper.GetBool(UseWalDeltaSetting)
 	if !useWalDelta {
 		return
 	}
@@ -199,7 +162,7 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err
 
 // TODO : unit tests
 func configureCompressor() (compression.Compressor, error) {
-	compressionMethod := GetSettingWithDefault(CompressionMethodSetting)
+	compressionMethod := viper.GetString(CompressionMethodSetting)
 	if _, ok := compression.Compressors[compressionMethod]; !ok {
 		return nil, NewUnknownCompressionMethodError()
 	}
@@ -208,9 +171,8 @@ func configureCompressor() (compression.Compressor, error) {
 
 // TODO : unit tests
 func ConfigureLogging() error {
-	logLevel, ok := GetSetting(LogLevelSetting)
-	if ok {
-		return tracelog.UpdateLogLevel(logLevel)
+	if viper.IsSet(LogLevelSetting) {
+		return tracelog.UpdateLogLevel(viper.GetString(LogLevelSetting))
 	}
 	return nil
 }
@@ -252,18 +214,18 @@ func ConfigureCrypter() crypto.Crypter {
 	}
 
 	// key can be either private (for download) or public (for upload)
-	if armoredKey, isKeyExist := GetSetting(PgpKeySetting); isKeyExist {
-		return openpgp.CrypterFromKey(armoredKey, loadPassphrase)
+	if viper.IsSet(PgpKeySetting) {
+		return openpgp.CrypterFromKey(viper.GetString(PgpKeySetting), loadPassphrase)
 	}
 
 	// key can be either private (for download) or public (for upload)
-	if armoredKeyPath, isPathExist := GetSetting(PgpKeyPathSetting); isPathExist {
-		return openpgp.CrypterFromKeyPath(armoredKeyPath, loadPassphrase)
+	if viper.IsSet(PgpKeyPathSetting) {
+		return openpgp.CrypterFromKeyPath(viper.GetString(PgpKeyPathSetting), loadPassphrase)
 	}
 
-	if keyRingID, ok := GetWaleCompatibleSetting(GpgKeyIDSetting); ok {
+	if viper.IsSet(GpgKeyIDSetting) {
 		tracelog.WarningLogger.Printf(DeprecatedExternalGpgMessage)
-		return openpgp.CrypterFromKeyRingID(keyRingID, loadPassphrase)
+		return openpgp.CrypterFromKeyRingID(viper.GetString(GpgKeyIDSetting), loadPassphrase)
 	}
 
 	return nil
@@ -287,15 +249,11 @@ func GetMaxUploadDiskConcurrency() (int, error) {
 	return GetMaxConcurrency(UploadDiskConcurrencySetting)
 }
 
-func GetMaxConcurrency(key string) (int, error) {
-	concurrencyStr := GetSettingWithDefault(key)
-	concurrency, err := strconv.Atoi(concurrencyStr)
+func GetMaxConcurrency(concurrencyType string) (int, error) {
+	concurrency := viper.GetInt(concurrencyType)
 
-	if err != nil {
-		return MinAllowedConcurrency, err
-	}
 	if concurrency < MinAllowedConcurrency {
-		return MinAllowedConcurrency, NewInvalidConcurrencyValueError(concurrency)
+		return MinAllowedConcurrency, NewInvalidConcurrencyValueError(concurrencyType, concurrency)
 	}
 	return concurrency, nil
 }
