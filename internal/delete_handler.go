@@ -227,9 +227,45 @@ func DeleteBeforeTarget(folder storage.Folder, target storage.Object,
 		return utility.NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
 	}
 	tracelog.InfoLogger.Println("Start delete")
+	permanentBackupNames := getPermanentBackupNames(folder)
+	if len(permanentBackupNames) > 0 {
+		tracelog.InfoLogger.Println("Found permanent backups: " + strings.Join(permanentBackupNames, ","))
+	}
 	return storage.DeleteObjectsWhere(folder, confirmed, func(object storage.Object) bool {
-		return less(object, target)
+		return less(object, target) && !anyContains(object.GetName(), permanentBackupNames)
 	})
+}
+
+func getPermanentBackupNames(folder storage.Folder) (backupNames []string) {
+	backupTimes, err := getBackups(folder)
+	if err != nil {
+		return nil
+	}
+	for _, backupTime := range backupTimes {
+		backup, err := GetBackupByName(backupTime.BackupName, folder)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("failed to get backup by name with error %s, ignoring...", err.Error())
+			continue
+		}
+		meta, err := backup.FetchMeta()
+		if err != nil {
+			tracelog.ErrorLogger.Printf("failed to fetch backup meta for backup %s with error %s, ignoring...", backupTime.BackupName, err.Error())
+			continue
+		}
+		if meta.IsPermanent {
+			backupNames = append(backupNames, backupTime.BackupName)
+		}
+	}
+	return
+}
+
+func anyContains(str string, substrs []string) bool {
+	for _, substr := range substrs {
+		if strings.Contains(str, substr) {
+			return true
+		}
+	}
+	return false
 }
 
 func HandleDeleteBefore(folder storage.Folder, args []string, confirmed bool,

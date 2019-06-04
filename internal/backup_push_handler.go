@@ -112,6 +112,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 	var meta ExtendedMetadataDto
 	meta.StartTime = utility.TimeNowCrossPlatformUTC()
 	meta.Hostname, _ = os.Hostname()
+	meta.IsPermanent = false // TODO: add permanent command flag
 
 	// Connect to postgres and start/finish a nonexclusive backup.
 	conn, err := Connect()
