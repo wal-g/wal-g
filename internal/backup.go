@@ -222,6 +222,10 @@ func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnw
 }
 
 func shouldUnwrapTar(tarName string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool) bool {
+	if len(sentinelDto.TarFileSets) == 0 {
+		return true
+	}
+
 	tarFiles := sentinelDto.TarFileSets[tarName]
 
 	for _, file := range tarFiles {
