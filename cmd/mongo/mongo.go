@@ -6,12 +6,10 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	config "github.com/wal-g/wal-g/main"
+	"github.com/wal-g/wal-g/internal"
 )
 
 var MongoDBShortDescription = "MongoDB backup tool"
-
-var cfgFile string
 
 // These variables are here only to show current version. They are set in makefile during build process
 var WalgVersion = "devel"
@@ -32,8 +30,8 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(config.InitConfig)
+	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
-	MongoCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
+	MongoCmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
 	MongoCmd.InitDefaultVersionFlag()
 }

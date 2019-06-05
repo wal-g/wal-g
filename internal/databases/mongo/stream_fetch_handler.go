@@ -116,6 +116,6 @@ func getOplogConfigs() (*time.Time, string) {
 			endTS = &t
 		}
 	}
-	dstFolder := internal.GetSettingWithLocalDefault(OplogDst, "")
+	dstFolder, ok := internal.GetSetting(OplogDst)
 	return endTS, dstFolder
 }
