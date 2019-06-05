@@ -37,6 +37,8 @@ services:
       &&  mkdir -p /export/mysqlfullbucket
       &&  mkdir -p /export/mysqlbinlogpushbucket
       &&  mkdir -p /export/mysqldeleteendtoendbucket
+      &&  mkdir -p /export/mongostreampushbucket
+      &&  mkdir -p /export/mongooplogpushbucket
       &&  mkdir -p /export/redisbucket
       &&  /usr/bin/minio server /export'
 

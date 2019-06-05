@@ -1,11 +1,9 @@
 #!/bin/sh
 set -e -x
 
-# export WALE_S3_PREFIX=s3://mongobucket
-export WALE_FILE_PREFIX=/tmp/wal-g-mongo-test-data
+export WALE_S3_PREFIX=s3://mongooplogpushbucket
 export WALG_MONGO_OPLOG_DST=./tmp/fetched_oplogs
 
-mkdir $WALE_FILE_PREFIX
 mkdir $WALG_MONGO_OPLOG_DST
 
 add_test_data() {
@@ -45,6 +43,5 @@ pkill -9 mongod
 
 diff /tmp/export1.json /tmp/export2.json
 
-rm -rf $WALE_FILE_PREFIX
 rm -rf $WALG_MONGO_OPLOG_DST
 rm /tmp/export?.json
