@@ -24,14 +24,14 @@ var deleteCmd = &cobra.Command{
 }
 
 var deleteBeforeCmd = &cobra.Command{
-	Use:     "before [FIND_FULL] backup_name|timestamp", // TODO : improve description
+	Use:     "before backup_name|timestamp", // TODO : improve description
 	Example: internal.DeleteBeforeExamples,
 	Args:    internal.DeleteBeforeArgsValidator,
 	Run:     runDeleteBefore,
 }
 
 var deleteRetainCmd = &cobra.Command{
-	Use:       "retain [FULL|FIND_FULL] backup_count", // TODO : improve description
+	Use:       "retain backup_count", // TODO : improve description
 	Example:   internal.DeleteRetainExamples,
 	ValidArgs: internal.StringModifiers,
 	Args:      internal.DeleteRetainArgsValidator,
