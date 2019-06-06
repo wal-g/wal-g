@@ -2,9 +2,9 @@
 set -e -x
 
 export WALE_S3_PREFIX=s3://mongostreampushbucket
-export WALG_MONGO_OPLOG_DST=./tmp/fetched_oplogs
+export WALG_MONGO_OPLOG_DST=/tmp/fetched_oplogs
 
-mkdir $WALG_MONGO_OPLOG_DST
+mkdir -p $WALG_MONGO_OPLOG_DST
 
 add_test_data() {
     mongo --eval "for (var i = 0; i < 10; i++) { db.getSiblingDB('test').testData.save({x: i}) }"

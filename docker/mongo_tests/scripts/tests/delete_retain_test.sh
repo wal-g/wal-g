@@ -2,9 +2,11 @@
 set -e -x
 
 export WALE_S3_PREFIX=s3://mongodeleteretainbucket
-export WALG_MONGO_OPLOG_DST=./tmp/fetched_oplogs
+export WALG_MONGO_OPLOG_DST=/tmp/fetched_oplogs
+OPLOG_DUMP_DIR=/tmp/oplog_dump
 
-mkdir $WALG_MONGO_OPLOG_DST
+mkdir -p $WALG_MONGO_OPLOG_DST
+mkdir -p $OPLOG_DUMP_DIR
 
 add_test_data() {
     mongo --eval "for (var i = 0; i < 10; i++) { db.getSiblingDB('test').testData.save({x: i}) }"
@@ -22,6 +24,9 @@ do
     then
         mongoexport -d test -c testData | sort  > /tmp/export1.json
     fi
+    sleep 1
+    mongodump -d local -c oplog.\$main --out $OPLOG_DUMP_DIR
+    cat $OPLOG_DUMP_DIR/local/oplog.\$main.bson | wal-g oplog-push
 done
 
 wal-g backup-list
@@ -45,5 +50,13 @@ pkill -9 mongod
 
 diff /tmp/export1.json /tmp/export2.json
 
+oplogCount=`ls $WALG_MONGO_OPLOG_DST | wc -l`
+if [ $oplogCount -ne 3 ]
+then
+    echo "Expected oplog count is 3. Actual: $oplogCount"
+    exit 1
+fi
+
+rm -rf $OPLOG_DUMP_DIR
 rm -rf $WALG_MONGO_OPLOG_DST
 rm /tmp/export?.json
