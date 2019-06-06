@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"time"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/tracelog"
@@ -30,12 +29,12 @@ func HandleStreamPush(uploader *Uploader) {
 // TODO : unit tests
 // UploadStream compresses a stream and uploads it.
 func (uploader *Uploader) UploadStream(stream io.Reader) error {
-	timeStart := time.Now()
+	timeStart := utility.TimeNowCrossPlatformLocal()
 	compressor := uploader.Compressor
 
 	compressed := internal.CompressAndEncrypt(stream, compressor, internal.ConfigureCrypter())
 
-	backupName := StreamPrefix + time.Now().UTC().Format(time.RFC3339)
+	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format("20060102T150405Z")
 	dstPath := getStreamName(backupName, compressor.FileExtension())
 	tracelog.DebugLogger.Println("Upload path", dstPath)
 

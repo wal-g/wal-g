@@ -3,15 +3,15 @@ package mongo
 import (
 	"io"
 	"os"
-	"time"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func HandleOplogPush(uploader *Uploader) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(OplogPath)
-	backupName := OplogPrefix + time.Now().UTC().Format(time.RFC3339)
+	backupName := OplogPrefix + utility.TimeNowCrossPlatformUTC().Format("20060102T150405Z")
 	stat, _ := os.Stdin.Stat()
 	var stream io.Reader = os.Stdin
 	if (stat.Mode() & os.ModeCharDevice) == 0 {
