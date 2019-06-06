@@ -34,8 +34,7 @@ service mongodb start
 wal-g stream-fetch LATEST | mongorestore --archive --oplogReplay
 
 ls $WALG_MONGO_OPLOG_DST
-mv $WALG_MONGO_OPLOG_DST/`ls $WALG_MONGO_OPLOG_DST | head -n 1` $WALG_MONGO_OPLOG_DST/oplog.bson
-mongorestore --oplogReplay $WALG_MONGO_OPLOG_DST
+mongorestore --oplogReplay $WALG_MONGO_OPLOG_DST/`ls $WALG_MONGO_OPLOG_DST | head -n 1`
 
 mongoexport -d test -c testData | sort  > /tmp/export2.json
 

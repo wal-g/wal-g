@@ -86,14 +86,19 @@ func fetchOplogs(folder storage.Folder, startTime time.Time) error {
 
 	for _, oplogFile := range oplogFiles {
 		if oplogFile.GetLastModified().After(startTime) {
-
 			oplogName := extractOplogName(oplogFile.GetName())
+			oplogFileSubFolder := path.Join(oplogDstFolder, oplogName)
+			_, err := internal.NewDiskDataFolder(oplogFileSubFolder)
+			if err != nil {
+				return err
+			}
+			oplogFilePath := path.Join(oplogFileSubFolder, "oplog.bson")
 
-			fileName := path.Join(oplogDstFolder, oplogName) + ".bson"
-
-			err = internal.DownloadWALFileTo(oplogFolder, oplogName, fileName)
-
-			tracelog.InfoLogger.Println("oplog file " + oplogFile.GetName() + " fetched to " + fileName)
+			err = internal.DownloadWALFileTo(oplogFolder, oplogName, oplogFilePath)
+			if err != nil {
+				return err
+			}
+			tracelog.InfoLogger.Println("oplog file " + oplogFile.GetName() + " fetched to " + oplogFilePath)
 
 			if endTS != nil && oplogFile.GetLastModified().After(*endTS) {
 				break
