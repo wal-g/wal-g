@@ -1,13 +1,15 @@
 package mongo
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
@@ -33,6 +35,17 @@ func HandleStreamFetch(backupName string, folder storage.Folder) {
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
+}
+
+// TODO : unit tests
+func (backup *Backup) FetchStreamSentinel() (StreamSentinelDto, error) {
+	sentinelDto := StreamSentinelDto{}
+	sentinelDtoData, err := backup.Backup.FetchSentinelData()
+	if err != nil {
+		return sentinelDto, errors.Wrap(err, "failed to fetch sentinel")
+	}
+	err = json.Unmarshal(sentinelDtoData, &sentinelDto)
+	return sentinelDto, errors.Wrap(err, "failed to unmarshal sentinel")
 }
 
 // TODO : unit tests

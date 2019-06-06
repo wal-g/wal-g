@@ -71,18 +71,26 @@ func (backup *Backup) GetTarNames() ([]string, error) {
 
 func (backup *Backup) FetchSentinel() (BackupSentinelDto, error) {
 	sentinelDto := BackupSentinelDto{}
-	backupReaderMaker := NewStorageReaderMaker(backup.BaseBackupFolder, backup.GetStopSentinelPath())
-	backupReader, err := backupReaderMaker.Reader()
+	sentinelDtoData, err := backup.FetchSentinelData()
 	if err != nil {
 		return sentinelDto, err
-	}
-	sentinelDtoData, err := ioutil.ReadAll(backupReader)
-	if err != nil {
-		return sentinelDto, errors.Wrap(err, "failed to fetch sentinel")
 	}
 
 	err = json.Unmarshal(sentinelDtoData, &sentinelDto)
 	return sentinelDto, errors.Wrap(err, "failed to unmarshal sentinel")
+}
+
+func (backup *Backup) FetchSentinelData() ([]byte, error) {
+	backupReaderMaker := NewStorageReaderMaker(backup.BaseBackupFolder, backup.GetStopSentinelPath())
+	backupReader, err := backupReaderMaker.Reader()
+	if err != nil {
+		return make([]byte, 0), err
+	}
+	sentinelDtoData, err := ioutil.ReadAll(backupReader)
+	if err != nil {
+		return sentinelDtoData, errors.Wrap(err, "failed to fetch sentinel")
+	}
+	return sentinelDtoData, nil
 }
 
 func (backup *Backup) FetchMeta() (ExtendedMetadataDto, error) {

@@ -6,11 +6,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/spf13/viper"
 	"io/ioutil"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/spf13/viper"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
@@ -39,13 +40,7 @@ type Backup struct {
 // TODO : unit tests
 func (backup *Backup) FetchStreamSentinel() (StreamSentinelDto, error) {
 	sentinelDto := StreamSentinelDto{}
-	backupReaderMaker := internal.NewStorageReaderMaker(backup.BaseBackupFolder,
-		backup.GetStopSentinelPath())
-	backupReader, err := backupReaderMaker.Reader()
-	if err != nil {
-		return sentinelDto, err
-	}
-	sentinelDtoData, err := ioutil.ReadAll(backupReader)
+	sentinelDtoData, err := backup.Backup.FetchSentinelData()
 	if err != nil {
 		return sentinelDto, errors.Wrap(err, "failed to fetch sentinel")
 	}
