@@ -7,4 +7,6 @@ RUN apt-get update && \
     postgresql-10 \
     postgresql-contrib
 
+COPY docker/pg/walg.json /tmp/walg.json
+
 RUN rm -rf $PGDATA
