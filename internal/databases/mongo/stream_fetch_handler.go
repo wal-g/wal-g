@@ -57,10 +57,8 @@ func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
 	if err != nil {
 		return err
 	}
-	err = fetchOplogs(folder, streamSentinel.StartLocalTime)
-	if err != nil {
-		return err
-	}
+	oplogsAreDone := make(chan error)
+	go fetchOplogs(folder, streamSentinel.StartLocalTime, oplogsAreDone)
 
 	for _, decompressor := range compression.Decompressors {
 		archiveReader, exists, err := internal.TryDownloadWALFile(baseBackupFolder, getStreamName(backup.Name, decompressor.FileExtension()))
@@ -76,21 +74,24 @@ func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
 			return err
 		}
 		utility.LoggedClose(os.Stdout, "")
-
+		tracelog.DebugLogger.Println("Waiting for oplogs")
+		err = <-oplogsAreDone
 		return err
 	}
 	return internal.NewArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", fileName))
 }
 
-func fetchOplogs(folder storage.Folder, startTime time.Time) error {
+func fetchOplogs(folder storage.Folder, startTime time.Time, oplogAreDone chan error) {
 	oplogFolder := folder.GetSubFolder(OplogPath)
 	endTS, oplogDstFolder := getOplogConfigs()
 	if oplogDstFolder == "" {
-		return errors.New("WALG_MONGO_OPLOG_DST is not configured")
+		oplogAreDone <- errors.New("WALG_MONGO_OPLOG_DST is not configured")
+		return
 	}
 	oplogFiles, _, err := oplogFolder.ListFolder()
 	if err != nil {
-		return err
+		oplogAreDone <- err
+		return
 	}
 
 	sort.Slice(oplogFiles, func(i, j int) bool {
@@ -103,13 +104,15 @@ func fetchOplogs(folder storage.Folder, startTime time.Time) error {
 			oplogFileSubFolder := path.Join(oplogDstFolder, oplogName)
 			_, err := internal.NewDiskDataFolder(oplogFileSubFolder)
 			if err != nil {
-				return err
+				oplogAreDone <- err
+				return
 			}
 			oplogFilePath := path.Join(oplogFileSubFolder, "oplog.bson")
 
 			err = internal.DownloadWALFileTo(oplogFolder, oplogName, oplogFilePath)
 			if err != nil {
-				return err
+				oplogAreDone <- err
+				return
 			}
 			tracelog.InfoLogger.Println("oplog file " + oplogFile.GetName() + " fetched to " + oplogFilePath)
 
@@ -119,7 +122,7 @@ func fetchOplogs(folder storage.Folder, startTime time.Time) error {
 		}
 	}
 
-	return err
+	oplogAreDone <- nil
 }
 
 func extractOplogName(filename string) string {
