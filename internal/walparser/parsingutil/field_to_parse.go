@@ -6,13 +6,6 @@ import (
 	"io"
 )
 
-var PaddingByte FieldToParse
-
-func init() {
-	var paddingByte uint8
-	PaddingByte = FieldToParse{&paddingByte, "padding byte"}
-}
-
 type FieldToParse struct {
 	Field interface{}
 	Name  string

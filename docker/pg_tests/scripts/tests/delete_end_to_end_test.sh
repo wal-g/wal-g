@@ -13,6 +13,8 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 
+pgbench -c 2 -T 100000000 -S || true &
+
 for i in $(seq 1 9);
 do
     pgbench -i -s 2 postgres
@@ -20,7 +22,6 @@ do
     then
         pg_dumpall -f /tmp/dump$i
     fi
-    pgbench -c 2 -T 100000000 -S &
     sleep 1
     wal-g backup-push ${PGDATA}
 done
@@ -37,8 +38,9 @@ FIRST=`wal-g backup-list | head -n 2 | tail -n 1 | cut -f 1 -d " "`
 
 for i in ${FIRST} LATEST
 do
-    pkill -9 postgres
-    rm -rf ${PGDATA}
+    pkill -9 postgres || true
+    pkill -9 wal-g || true
+    rm -rf ${PGDATA} || true
     wal-g backup-fetch ${PGDATA} ${i}
     echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
     /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
@@ -50,7 +52,8 @@ done
 diff /tmp/dump4 /tmp/dump${FIRST}
 diff /tmp/dump9 /tmp/dumpLATEST
 
-pkill -9 postgres
+pkill -9 postgres || true
+pkill -9 wal-g || true
 rm -rf ${PGDATA}
 
 echo $target_backup_name
