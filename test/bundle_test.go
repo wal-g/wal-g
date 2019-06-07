@@ -2,6 +2,7 @@ package test
 
 import (
 	"bytes"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
@@ -11,7 +12,6 @@ import (
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
-	"os"
 	"testing"
 	"time"
 )
@@ -23,6 +23,8 @@ var BundleTestLocations = []walparser.BlockLocation{
 }
 
 func TestEmptyBundleQueue(t *testing.T) {
+	internal.InitConfig()
+	internal.Configure()
 
 	bundle := &internal.Bundle{
 		ArchiveDirectory: "",
@@ -33,12 +35,11 @@ func TestEmptyBundleQueue(t *testing.T) {
 
 	bundle.TarBallMaker = internal.NewStorageTarBallMaker("mockBackup", uploader)
 
-	bundle.StartQueue()
+	err := bundle.StartQueue()
+	assert.NoError(t, err)
 
-	err := bundle.FinishQueue()
-	if err != nil {
-		t.Log(err)
-	}
+	err = bundle.FinishQueue()
+	assert.NoError(t, err)
 }
 
 func TestBundleQueue(t *testing.T) {
@@ -46,19 +47,13 @@ func TestBundleQueue(t *testing.T) {
 }
 
 func TestBundleQueueHighConcurrency(t *testing.T) {
-	os.Setenv(internal.UploadConcurrencySetting, "100")
-
+	viper.Set(internal.UploadConcurrencySetting, "100")
 	queueTest(t)
-
-	os.Unsetenv(internal.UploadConcurrencySetting)
 }
 
 func TestBundleQueueLowConcurrency(t *testing.T) {
-	os.Setenv(internal.UploadConcurrencySetting, "1")
-
+	viper.Set(internal.UploadConcurrencySetting, "1")
 	queueTest(t)
-
-	os.Unsetenv(internal.UploadConcurrencySetting)
 }
 
 func queueTest(t *testing.T) {

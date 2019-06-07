@@ -4,6 +4,7 @@ vendor/
 # bin
 main/pg/wal-g
 main/mysql/wal-g
+main/redis/wal-g
 
 # tests
 test/testdata/00000*

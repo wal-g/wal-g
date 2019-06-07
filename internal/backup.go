@@ -138,7 +138,7 @@ func (backup *Backup) unwrap(dbDataDirectory string, sentinelDto BackupSentinelD
 	}
 
 	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesToUnwrap)
-	tarsToExtract, pgControlKey, err := backup.getTarsToExtract()
+	tarsToExtract, pgControlKey, err := backup.getTarsToExtract(sentinelDto, filesToUnwrap)
 	if err != nil {
 		return err
 	}
@@ -188,7 +188,7 @@ func IsDirectoryEmpty(directoryPath string) (bool, error) {
 }
 
 // TODO : init tests
-func (backup *Backup) getTarsToExtract() (tarsToExtract []ReaderMaker, pgControlKey string, err error) {
+func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool) (tarsToExtract []ReaderMaker, pgControlKey string, err error) {
 	tarNames, err := backup.GetTarNames()
 	if err != nil {
 		return nil, "", err
@@ -210,8 +210,29 @@ func (backup *Backup) getTarsToExtract() (tarsToExtract []ReaderMaker, pgControl
 			pgControlKey = tarName
 			continue
 		}
+
+		if !shouldUnwrapTar(tarName, sentinelDto, filesToUnwrap) {
+			continue
+		}
+
 		tarToExtract := NewStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
 		tarsToExtract = append(tarsToExtract, tarToExtract)
 	}
 	return
+}
+
+func shouldUnwrapTar(tarName string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool) bool {
+	if len(sentinelDto.TarFileSets) == 0 {
+		return true
+	}
+
+	tarFiles := sentinelDto.TarFileSets[tarName]
+
+	for _, file := range tarFiles {
+		if filesToUnwrap[file] {
+			return true
+		}
+	}
+
+	return false
 }

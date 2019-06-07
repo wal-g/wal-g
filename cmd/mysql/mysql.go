@@ -3,8 +3,9 @@ package mysql
 import (
 	"fmt"
 	"github.com/spf13/cobra"
-	config "github.com/wal-g/wal-g/main"
+	"github.com/wal-g/wal-g/internal"
 	"os"
+	"strings"
 )
 
 var MySQLShortDescription = "MySQL backup tool"
@@ -15,9 +16,9 @@ var GitRevision = "devel"
 var BuildDate = "devel"
 
 var MySQLCmd = &cobra.Command{
-	Use:   "mysql",
-	Short: MySQLShortDescription, // TODO : improve description
-	Version: WalgVersion + "\t" + GitRevision + "\t" + BuildDate + "\t" + "MySQL",
+	Use:     "mysql",
+	Short:   MySQLShortDescription, // TODO : improve description
+	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "MySQL"}, "\t"),
 }
 
 func Execute() {
@@ -28,8 +29,8 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(config.InitConfig)
+	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
-	MySQLCmd.PersistentFlags().StringVar(&config.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
+	MySQLCmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 	MySQLCmd.InitDefaultVersionFlag()
 }

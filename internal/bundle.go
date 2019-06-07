@@ -3,10 +3,10 @@ package internal
 import (
 	"archive/tar"
 	"fmt"
+	"github.com/spf13/viper"
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -85,28 +85,11 @@ type Bundle struct {
 	Files *sync.Map
 }
 
-func getTarSizeThreshold() int64 {
-	const (
-		ThresholdBase    = 10
-		ThresholdBitSize = 64
-	)
-
-	tarSizeThresholdString := GetSettingWithDefault(TarSizeThresholdSetting)
-
-	tarSizeThreshold, err := strconv.ParseInt(tarSizeThresholdString, ThresholdBase, ThresholdBitSize)
-
-	if err != nil {
-		return DefaultTarSizeThreshold
-	}
-
-	return tarSizeThreshold
-}
-
 // TODO: use DiskDataFolder
 func NewBundle(archiveDirectory string, crypter crypto.Crypter, incrementFromLsn *uint64, incrementFromFiles BackupFileList) *Bundle {
 	return &Bundle{
 		ArchiveDirectory:   archiveDirectory,
-		TarSizeThreshold:   getTarSizeThreshold(),
+		TarSizeThreshold:   viper.GetInt64(TarSizeThresholdSetting),
 		Crypter:            crypter,
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,

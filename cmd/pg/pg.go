@@ -2,8 +2,9 @@ package pg
 
 import (
 	"fmt"
-	"github.com/wal-g/wal-g/main"
+	"github.com/wal-g/wal-g/internal"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -18,7 +19,7 @@ var BuildDate = "devel"
 var PgCmd = &cobra.Command{
 	Use:     "wal-g",
 	Short:   WalgShortDescription, // TODO : improve short and long descriptions
-	Version: WalgVersion + "\t" + GitRevision + "\t" + BuildDate + "\t" + "PostgreSQL",
+	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "PostgreSQL"}, "\t"),
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -31,8 +32,8 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(config.InitConfig)
+	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
-	PgCmd.PersistentFlags().StringVar(&config.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
+	PgCmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 	PgCmd.InitDefaultVersionFlag()
 }

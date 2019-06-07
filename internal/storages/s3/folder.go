@@ -20,7 +20,10 @@ const (
 	RegionSetting            = "AWS_REGION"
 	ForcePathStyleSetting    = "AWS_S3_FORCE_PATH_STYLE"
 	AccessKeyIdSetting       = "AWS_ACCESS_KEY_ID"
+	AccessKeySetting         = "AWS_ACCESS_KEY"
 	SecretAccessKeySetting   = "AWS_SECRET_ACCESS_KEY"
+	SecretKeySetting         = "AWS_SECRET_KEY"
+	SessionTokenSetting      = "AWS_SESSION_TOKEN"
 	SseSetting               = "S3_SSE"
 	SseKmsIdSetting          = "S3_SSE_KMS_ID"
 	StorageClassSetting      = "S3_STORAGE_CLASS"
@@ -28,20 +31,33 @@ const (
 	s3CertFile               = "S3_CA_CERT_FILE"
 )
 
-// MaxRetries limit upload and download retries during interaction with S3
-var MaxRetries = 15
+var (
+	// MaxRetries limit upload and download retries during interaction with S3
+	MaxRetries  = 15
+	SettingList = []string{
+		EndpointSetting,
+		RegionSetting,
+		ForcePathStyleSetting,
+		AccessKeyIdSetting,
+		AccessKeySetting,
+		SecretAccessKeySetting,
+		SecretKeySetting,
+		SessionTokenSetting,
+		SseSetting,
+		SseKmsIdSetting,
+		StorageClassSetting,
+		UploadConcurrencySetting,
+		s3CertFile,
+	}
+)
 
-var SettingList = []string{
-	EndpointSetting,
-	RegionSetting,
-	ForcePathStyleSetting,
-	AccessKeyIdSetting,
-	SecretAccessKeySetting,
-	SseSetting,
-	SseKmsIdSetting,
-	StorageClassSetting,
-	UploadConcurrencySetting,
-	s3CertFile,
+func getFirstSettingOf(settings map[string]string, keys []string) string {
+	for _, key := range keys {
+		if value, ok := settings[key]; ok {
+			return value
+		}
+	}
+	return ""
 }
 
 func NewFolderError(err error, format string, args ...interface{}) storage.Error {
