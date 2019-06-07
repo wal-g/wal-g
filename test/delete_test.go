@@ -96,24 +96,34 @@ func testFindTargetBeforeTime(t *testing.T, minute int, modifier int) (storage.O
 
 func TestDeleteBeforeTarget_WithPermanentBackups(t *testing.T) {
 	folder := createMockStorageFolderWithPermanentBackups(t)
-	subFolder := folder.GetSubFolder(utility.BaseBackupPath)
+	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
+	walBackupFolder := folder.GetSubFolder(utility.WalPath)
 	expectExistAfterDelete := map[string]bool{
-		"base_000000010000000000000003": false,
-		"base_000000010000000000000005": true,
-		"base_000000010000000000000007": false,
+		"base_000000010000000000000003":                            false,
+		"base_000000010000000000000005_D_000000010000000000000003": true,
+		"base_000000010000000000000007_D_000000010000000000000005": false,
+		"base_000000010000000000000009":                            false,
 	}
 	for backupName, _ := range expectExistAfterDelete {
-		exists, err := subFolder.Exists(backupName + "/" + utility.MetadataFileName)
+		exists, err := baseBackupFolder.Exists(backupName + "/" + utility.MetadataFileName)
 		assert.NoError(t, err)
 		assert.True(t, exists, "expected backup "+backupName+" to exist")
+
+		exists, err = walBackupFolder.Exists(strings.Split(backupName, "_")[1] + ".lz4")
+		assert.NoError(t, err)
+		assert.True(t, exists, "expected wal for "+backupName+" to exist")
 	}
 	target := storage.NewLocalObject("", utility.TimeNowCrossPlatformLocal().Add(time.Duration(1*int(time.Minute))))
 	err := internal.DeleteBeforeTarget(folder, target, true, isFullBackup, lessByTime)
 	assert.NoError(t, err)
 	for backupName, expect := range expectExistAfterDelete {
-		exists, err := subFolder.Exists(backupName + "/" + utility.MetadataFileName)
+		exists, err := baseBackupFolder.Exists(backupName + "/" + utility.MetadataFileName)
 		assert.NoError(t, err)
-		assert.Equal(t, expect, exists, "expected backup "+backupName+" to exist")
+		assert.Equal(t, expect, exists, "errored on "+backupName+"/"+utility.MetadataFileName)
+
+		exists, err = walBackupFolder.Exists(strings.Split(backupName, "_")[1] + ".lz4")
+		assert.NoError(t, err)
+		assert.Equal(t, expect, exists, "errored on "+backupName+".lz4")
 	}
 }
 
@@ -198,7 +208,8 @@ func createMockStorageFolderWithDeltaBackups(t *testing.T) storage.Folder {
 
 func createMockStorageFolderWithPermanentBackups(t *testing.T) storage.Folder {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	subFolder := folder.GetSubFolder(utility.BaseBackupPath)
+	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
+	walBackupFolder := folder.GetSubFolder(utility.WalPath)
 	emptyData := map[string]interface{}{}
 	permanentMetadata := map[string]interface{}{
 		"start_time":   utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
@@ -211,20 +222,24 @@ func createMockStorageFolderWithPermanentBackups(t *testing.T) storage.Folder {
 		"is_permanent": true,
 	}
 	backupNames := map[string]interface{}{
-		"base_000000010000000000000003": emptyData,
-		"base_000000010000000000000005": permanentMetadata,
-		"base_000000010000000000000007": emptyData,
+		"base_000000010000000000000003":                            emptyData,
+		"base_000000010000000000000005_D_000000010000000000000003": permanentMetadata,
+		"base_000000010000000000000007_D_000000010000000000000005": emptyData,
+		"base_000000010000000000000009":                            emptyData,
 	}
 	for backupName, metadata := range backupNames {
-		bytesSentinel, err := json.Marshal(&emptyData)
+		empty, err := json.Marshal(&emptyData)
 		assert.NoError(t, err)
-		sentinelString := string(bytesSentinel)
-		err = subFolder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader(sentinelString))
+		sentinelString := string(empty)
+		err = baseBackupFolder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader(sentinelString))
 		assert.NoError(t, err)
 		bytesMetadata, err := json.Marshal(&metadata)
 		assert.NoError(t, err)
 		metadataString := string(bytesMetadata)
-		err = subFolder.PutObject(backupName+"/"+utility.MetadataFileName, strings.NewReader(metadataString))
+		err = baseBackupFolder.PutObject(backupName+"/"+utility.MetadataFileName, strings.NewReader(metadataString))
+		assert.NoError(t, err)
+		walString := string(empty)
+		err = walBackupFolder.PutObject(strings.Split(backupName, "_")[1]+".lz4", strings.NewReader(walString))
 		assert.NoError(t, err)
 	}
 	return folder

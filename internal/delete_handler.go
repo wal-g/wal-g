@@ -232,7 +232,7 @@ func DeleteBeforeTarget(folder storage.Folder, target storage.Object,
 		tracelog.InfoLogger.Println("Found permanent backups: " + strings.Join(permanentBackupNames, ","))
 	}
 	return storage.DeleteObjectsWhere(folder, confirmed, func(object storage.Object) bool {
-		return less(object, target) && !anyContains(object.GetName(), permanentBackupNames)
+		return less(object, target) && !isPermanent(object.GetName(), permanentBackupNames)
 	})
 }
 
@@ -259,12 +259,32 @@ func getPermanentBackupNames(folder storage.Folder) (backupNames []string) {
 	return
 }
 
-func anyContains(str string, substrs []string) bool {
-	for _, substr := range substrs {
-		if strings.Contains(str, substr) {
-			return true
+func isPermanent(objectName string, permanentBackupNames []string) bool {
+	// avoid deleting relevant wal if backup is marked as permanent
+	// eg if backup base_2_D_1 is permanent, wal 2 should also be permanent
+	if strings.Contains(objectName, utility.WalPath) {
+		for _, permanentBackupName := range permanentBackupNames {
+			baseName := strings.Split(permanentBackupName, "_")[1]
+			if strings.Contains(objectName, baseName) {
+				return true
+			}
 		}
+		return false
 	}
+
+	// avoid deleting backup if backup is marked as permanent
+	// we use the full name to avoid marking the next backup as permanent in delta backups
+	// eg backup base_2_D_1 should not affect permanence of backup base_3_D_2
+	if strings.Contains(objectName, utility.BaseBackupPath) {
+		for _, permanentBackupName := range permanentBackupNames {
+			if strings.Contains(objectName, permanentBackupName) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// object is neither base nor wal backup, should not happen
 	return false
 }
 
