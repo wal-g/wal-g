@@ -99,7 +99,6 @@ func GetFileRelativePath(fileAbsPath string, directoryPath string) string {
 	return strings.TrimPrefix(fileAbsPath, directoryPath)
 }
 
-// TODO : unit tests
 //FastCopy copies data from src to dst in blocks of CopiedBlockMaxSize bytes
 func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
 	n := int64(0)

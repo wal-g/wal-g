@@ -1,7 +1,9 @@
 package test
 
 import (
+	"bytes"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"sort"
 	"strings"
@@ -11,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -150,4 +153,49 @@ func TestCeilTimeUpToMicroseconds_Works_When_Nanoseconds_Greater_Than_Zero(t *te
 func TestCeilTimeUpToMicroseconds_Works_When_Nanoseconds_Equal_Zero(t *testing.T) {
 	timeToCeil := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
 	assert.Equal(t, timeToCeil, utility.CeilTimeUpToMicroseconds(timeToCeil))
+}
+
+func TestFastCopy_NormalCases(t *testing.T) {
+	var testDataLengths = []int64{
+		utility.CopiedBlockMaxSize / 2,
+		utility.CopiedBlockMaxSize,
+		utility.CopiedBlockMaxSize * 2,
+		utility.CopiedBlockMaxSize * 2.5,
+	}
+
+	for _, dataLength := range testDataLengths {
+		currentData := make([]byte, dataLength)
+		rand.Read(currentData)
+		currentReader := bytes.NewReader(currentData)
+		currentBuffer := new(bytes.Buffer)
+		readLength, err := utility.FastCopy(currentBuffer, currentReader)
+		assert.Equal(t, dataLength, readLength)
+		assert.NoError(t, err)
+		assert.Equal(t, currentData, currentBuffer.Bytes())
+	}
+}
+
+func TestFastCopy_NotFails_OnEmptyData(t *testing.T) {
+	emptyData := make([]byte, 0)
+	reader := bytes.NewReader(emptyData)
+	buffer := new(bytes.Buffer)
+	readLength, err := utility.FastCopy(buffer, reader)
+	result := buffer.Bytes()
+	assert.Equal(t, int64(0), readLength)
+	assert.NoError(t, err)
+	assert.Empty(t, result)
+}
+
+func TestFastCopy_ReturnsError_WhenReaderFails(t *testing.T) {
+	reader := new(testtools.ErrorReader)
+	buffer := new(bytes.Buffer)
+	_, err := utility.FastCopy(buffer, reader)
+	assert.Error(t, err)
+}
+
+func TestFastCopy_ReturnsError_WhenWriterFails(t *testing.T) {
+	reader := strings.NewReader("data")
+	writer := new(testtools.WriterError)
+	_, err := utility.FastCopy(writer, reader)
+	assert.Error(t, err)
 }
