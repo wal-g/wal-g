@@ -44,7 +44,7 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 
 // TODO : unit tests
 // HandleBackupPush is invoked to perform a wal-g backup-push
-func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
+func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent bool) {
 	archiveDirectory = utility.ResolveSymlink(archiveDirectory)
 	maxDeltas, fromFull := getDeltaConfig()
 
@@ -103,7 +103,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 	var meta ExtendedMetadataDto
 	meta.StartTime = utility.TimeNowCrossPlatformUTC()
 	meta.Hostname, _ = os.Hostname()
-	meta.IsPermanent = false // TODO: add permanent command flag
+	meta.IsPermanent = isPermanent
 
 	// Connect to postgres and start/finish a nonexclusive backup.
 	conn, err := Connect()
