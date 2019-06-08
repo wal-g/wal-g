@@ -195,7 +195,7 @@ func TestFastCopy_ReturnsError_WhenReaderFails(t *testing.T) {
 
 func TestFastCopy_ReturnsError_WhenWriterFails(t *testing.T) {
 	reader := strings.NewReader("data")
-	writer := new(testtools.WriterError)
+	writer := new(testtools.ErrorWriter)
 	_, err := utility.FastCopy(writer, reader)
 	assert.Error(t, err)
 }
