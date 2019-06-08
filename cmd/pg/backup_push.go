@@ -12,8 +12,8 @@ const (
 	PermanentFlag              = "permanent"
 )
 
-// backupPushCmd represents the backupPush command
 var (
+	// backupPushCmd represents the backupPush command
 	backupPushCmd = &cobra.Command{
 		Use:   "backup-push db_directory",
 		Short: BackupPushShortDescription, // TODO : improve description
