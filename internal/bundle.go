@@ -82,7 +82,8 @@ type Bundle struct {
 	mutex            sync.Mutex
 	started          bool
 
-	Files *sync.Map
+	Files       *sync.Map
+	TarFileSets map[string][]string
 }
 
 // TODO: use DiskDataFolder
@@ -102,6 +103,8 @@ func (bundle *Bundle) GetFileRelPath(fileAbsPath string) string {
 }
 
 func (bundle *Bundle) GetFiles() *sync.Map { return bundle.Files }
+
+func (bundle *Bundle) GetTarFileSets() map[string][]string { return bundle.TarFileSets }
 
 func (bundle *Bundle) StartQueue() error {
 	if bundle.started {
