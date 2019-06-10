@@ -2,6 +2,7 @@ package internal
 
 import (
 	"archive/tar"
+	"fmt"
 	"io/ioutil"
 
 	"github.com/wal-g/wal-g/internal/crypto"
@@ -9,11 +10,13 @@ import (
 
 // NOPTarBall mocks a tarball. Used for prefault logic.
 type NOPTarBall struct {
+	name      string
 	number    int
 	size      int64
 	tarWriter *tar.Writer
 }
 
+func (tarBall *NOPTarBall) Name() string                                   { return tarBall.name }
 func (tarBall *NOPTarBall) SetUp(crypter crypto.Crypter, params ...string) {}
 func (tarBall *NOPTarBall) CloseTar() error                                { return nil }
 
@@ -33,6 +36,7 @@ type NOPTarBallMaker struct {
 func (tarBallMaker *NOPTarBallMaker) Make(inheritState bool) TarBall {
 	tarBallMaker.number++
 	return &NOPTarBall{
+		name:      fmt.Sprintf("nop_%d", tarBallMaker.number),
 		number:    tarBallMaker.number,
 		size:      tarBallMaker.size,
 		tarWriter: tar.NewWriter(ioutil.Discard),
