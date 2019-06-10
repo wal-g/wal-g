@@ -95,6 +95,7 @@ func NewBundle(archiveDirectory string, crypter crypto.Crypter, incrementFromLsn
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
 		Files:              &sync.Map{},
+		TarFileSets:        make(map[string][]string),
 	}
 }
 
@@ -342,6 +343,9 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 			if err != nil {
 				panic(err)
 			}
+
+			bundle.TarFileSets[tarBall.GetName()] = append(bundle.TarFileSets[tarBall.GetName()], info.Name())
+
 			err = bundle.CheckSizeAndEnqueueBack(tarBall)
 			if err != nil {
 				panic(err)
