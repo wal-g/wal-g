@@ -16,12 +16,15 @@ import (
 // FileTarBall represents a tarball that is
 // written to disk.
 type FileTarBall struct {
+	name        string
 	out         string
 	number      int
 	size        int64
 	writeCloser io.WriteCloser
 	tarWriter   *tar.Writer
 }
+
+func (tarBall *FileTarBall) Name() string { return tarBall.name }
 
 // SetUp creates a new LZ4 writer, tar writer and file for
 // writing bundled compressed bytes to.

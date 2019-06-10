@@ -18,6 +18,7 @@ type FileTarBallMaker struct {
 func (tarBallMaker *FileTarBallMaker) Make(inheritState bool) internal.TarBall {
 	tarBallMaker.number++
 	return &FileTarBall{
+		name:   fmt.Sprintf("file_%d", tarBallMaker.number),
 		number: tarBallMaker.number,
 		size:   tarBallMaker.size,
 		out:    tarBallMaker.Out,
