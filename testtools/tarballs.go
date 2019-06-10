@@ -79,11 +79,14 @@ func (tarBall *FileTarBall) AwaitUploads()          {}
 // BufferTarBall represents a tarball that is
 // written to buffer.
 type BufferTarBall struct {
+	name       string
 	number     int
 	size       int64
 	underlying *bytes.Buffer
 	tarWriter  *tar.Writer
 }
+
+func (tarBall *BufferTarBall) Name() string { return tarBall.name }
 
 func (tarBall *BufferTarBall) SetUp(crypter crypto.Crypter, args ...string) {
 	tarBall.tarWriter = tar.NewWriter(tarBall.underlying)

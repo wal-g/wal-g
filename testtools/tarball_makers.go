@@ -34,6 +34,7 @@ type BufferTarBallMaker struct {
 func (tarBallMaker *BufferTarBallMaker) Make(dedicatedUploader bool) internal.TarBall {
 	tarBallMaker.number++
 	return &BufferTarBall{
+		name:       fmt.Sprintf("buffer_%d", tarBallMaker.number),
 		number:     tarBallMaker.number,
 		size:       tarBallMaker.size,
 		underlying: tarBallMaker.BufferToWrite,
