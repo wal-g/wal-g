@@ -13,6 +13,7 @@ import (
 // StorageTarBall represents a tar file that is
 // going to be uploaded to storage.
 type StorageTarBall struct {
+	name        string
 	backupName  string
 	partNumber  int
 	size        int64
@@ -22,7 +23,7 @@ type StorageTarBall struct {
 }
 
 // Name of this tarball
-func (tarBall *StorageTarBall) Name() string { return tarBall.backupName }
+func (tarBall *StorageTarBall) Name() string { return tarBall.name }
 
 // SetUp creates a new tar writer and starts upload to storage.
 // Upload will block until the tar file is finished writing.
@@ -36,6 +37,8 @@ func (tarBall *StorageTarBall) SetUp(crypter crypto.Crypter, names ...string) {
 		} else {
 			name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partNumber, tarBall.uploader.Compressor.FileExtension())
 		}
+		tarBall.name = name
+
 		writeCloser := tarBall.startUpload(name, crypter)
 
 		tarBall.writeCloser = writeCloser
