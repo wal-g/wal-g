@@ -2,6 +2,7 @@ package testtools
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/wal-g/wal-g/internal"
 )
 
