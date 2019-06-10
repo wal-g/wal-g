@@ -38,7 +38,6 @@ fi
 
 diff /tmp/list_before_delete /tmp/list_after_delete
 
-pkill -9 postgres
-rm -rf ${PGDATA}
+scripts/drop_pg.sh
 
 echo "Delete retain FULL success!!!!!!"

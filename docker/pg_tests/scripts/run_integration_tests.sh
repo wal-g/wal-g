@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 set -e -x
 
-for i in /tmp/tests/*; do ./$i; done
+pushd /tmp
+for i in tests/*; do ./$i; done
+popd
