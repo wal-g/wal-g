@@ -21,6 +21,8 @@ type StorageTarBall struct {
 	uploader    *Uploader
 }
 
+func (tarBall *StorageTarBall) Name() string { return tarBall.backupName }
+
 // SetUp creates a new tar writer and starts upload to storage.
 // Upload will block until the tar file is finished writing.
 // If a name for the file is not given, default name is of
