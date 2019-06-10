@@ -179,6 +179,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 	}
 
 	currentBackupSentinelDto.setFiles(bundle.GetFiles())
+	currentBackupSentinelDto.TarFileSets = bundle.GetTarFileSets()
 	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
 	currentBackupSentinelDto.UserData = GetSentinelUserData()
 
