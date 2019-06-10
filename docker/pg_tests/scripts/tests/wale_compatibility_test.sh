@@ -41,7 +41,6 @@ pg_dumpall -f /tmp/dump2
 
 diff /tmp/dump1 /tmp/dump2
 
-pkill -9 postgres
-rm -rf ${PGDATA}
+scripts/drop_pg.sh
 
 echo "WAL-E compatible backup-fetch success!!!!!!"

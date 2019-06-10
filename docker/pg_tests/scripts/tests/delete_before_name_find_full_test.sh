@@ -43,7 +43,6 @@ fi
 
 diff /tmp/list_tail_before_delete /tmp/list_tail_after_delete
 
-pkill -9 postgres
-rm -rf ${PGDATA}
+scripts/drop_pg.sh
 
 echo "Delete before FIND_FULL name success!!!!!!"
