@@ -10,7 +10,7 @@ import (
 
 // A TarBall represents one tar file.
 type TarBall interface {
-	Name()
+	Name() string
 	SetUp(crypter crypto.Crypter, args ...string)
 	CloseTar() error
 	Size() int64
