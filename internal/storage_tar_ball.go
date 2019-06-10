@@ -21,6 +21,7 @@ type StorageTarBall struct {
 	uploader    *Uploader
 }
 
+// Name of this tarball
 func (tarBall *StorageTarBall) Name() string { return tarBall.backupName }
 
 // SetUp creates a new tar writer and starts upload to storage.
