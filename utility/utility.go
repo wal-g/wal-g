@@ -29,7 +29,8 @@ const (
 	VersionStr       = "005"
 	BaseBackupPath   = "basebackups_" + VersionStr + "/"
 	WalPath          = "wal_" + VersionStr + "/"
-	backupNamePrefix = "base_"
+	BackupNamePrefix = "base_"
+	WalNamePrefix    = "wal_"
 
 	// utility.SentinelSuffix is a suffix of backup finish sentinel file
 	SentinelSuffix         = "_backup_stop_sentinel.json"
