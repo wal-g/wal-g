@@ -1,8 +1,12 @@
 #!/bin/sh
 set -e -x
 
-export WALE_S3_PREFIX=s3://fullbucket
+gpg --import /tmp/PGP_KEY
+gpg_key_id=`gpg --list-keys | tail -n +4 | head -n 1 | cut -d ' ' -f 7`
+
+export WALE_S3_PREFIX=s3://cryptobucket
 export WALG_PGP_KEY_PATH=/tmp/PGP_KEY
+export WALE_GPG_KEY_ID=${gpg_key_id}
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
@@ -12,11 +16,13 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 
-pgbench -i -s 10 postgres
+pgbench -i -s 1 postgres
 pg_dumpall -f /tmp/dump1
-pgbench -c 2 -T 100000000 -S &
+pgbench -c 2 -T 10 -S &
 sleep 1
 wal-g backup-push ${PGDATA}
+# wal-g will use WALE_GPG_KEY_ID instead of WALG_PGP_KEY_PATH for backup-fetch
+unset WALG_PGP_KEY_PATH
 
 scripts/drop_pg.sh
 
@@ -32,4 +38,4 @@ diff /tmp/dump1 /tmp/dump2
 
 scripts/drop_pg.sh
 
-echo "Full backup success!!!!!!"
+echo "Crypto test success!!!!!!"
