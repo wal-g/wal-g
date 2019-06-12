@@ -255,7 +255,9 @@ func getPermanentBackupEndLSNs(folder storage.Folder) map[string]bool {
 			continue
 		}
 		if meta.IsPermanent {
-			endLSNs[strings.Split(backupTime.BackupName, "_")[1]] = true
+			endLSNStartIndex := len(utility.BackupNamePrefix)
+			endLSNEndIndex := endLSNStartIndex + 24
+			endLSNs[backupTime.BackupName[endLSNStartIndex:endLSNEndIndex]] = true
 		}
 	}
 	return endLSNs
