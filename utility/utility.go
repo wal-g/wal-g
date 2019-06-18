@@ -36,7 +36,6 @@ const (
 	SentinelSuffix         = "_backup_stop_sentinel.json"
 	CompressedBlockMaxSize = 20 << 20
 	CopiedBlockMaxSize     = CompressedBlockMaxSize
-	NotFoundAWSErrorCode   = "NotFound"
 	MetadataFileName       = "metadata.json"
 )
 
