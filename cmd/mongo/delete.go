@@ -1,16 +1,13 @@
 package mongo
 
 import (
-	"regexp"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
-var patternTimeRFC3339 = "[0-9]{8}T[0-9]{6}Z"
-var regexpTimeRFC3339 = regexp.MustCompile(patternTimeRFC3339)
 var confirmed = false
 
 // deleteCmd represents the delete command
@@ -64,19 +61,11 @@ func init() {
 
 func GetLessFunc(folder storage.Folder) func(object1, object2 storage.Object) bool {
 	return func(object1, object2 storage.Object) bool {
-		time1, ok1 := tryFetchTimeRFC3999(object1)
-		time2, ok2 := tryFetchTimeRFC3999(object2)
+		time1, ok1 := utility.TryFetchTimeRFC3999(object1.GetName())
+		time2, ok2 := utility.TryFetchTimeRFC3999(object2.GetName())
 		if !ok1 || !ok2 {
 			return object2.GetLastModified().After(object1.GetLastModified())
 		}
 		return time1 < time2
 	}
-}
-
-func tryFetchTimeRFC3999(object storage.Object) (string, bool) {
-	times := regexpTimeRFC3339.FindAllString(object.GetName(), 1)
-	if len(times) > 0 {
-		return times[0], true
-	}
-	return "", false
 }
