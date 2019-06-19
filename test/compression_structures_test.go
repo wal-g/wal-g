@@ -28,7 +28,7 @@ var tests = []struct {
 
 func TestCascadeFileCloser(t *testing.T) {
 	for _, tt := range tests {
-		b := &testtools.BufCloser{bytes.NewBufferString(tt.testString), false}
+		b := &testtools.BufCloser{Buffer: bytes.NewBufferString(tt.testString), Err: false}
 		lz := &internal.CascadeWriteCloser{
 			WriteCloser: GetLz4Compressor().NewWriter(b),
 			Underlying:  b,
@@ -71,11 +71,11 @@ func TestCascadeFileCloserError(t *testing.T) {
 
 func TestCompressAndEncrypt(t *testing.T) {
 	for _, tt := range tests {
-		in := &testtools.BufCloser{bytes.NewBufferString(tt.testString), false}
+		in := &testtools.BufCloser{Buffer: bytes.NewBufferString(tt.testString), Err: false}
 		compressor := GetLz4Compressor()
 		compressed := internal.CompressAndEncrypt(in, compressor, nil)
 
-		decompressed := &testtools.BufCloser{&bytes.Buffer{}, false}
+		decompressed := &testtools.BufCloser{Buffer: &bytes.Buffer{}, Err: false}
 		decompressor := compression.GetDecompressorByCompressor(compressor)
 		err := decompressor.Decompress(decompressed, compressed)
 		if err != nil {
@@ -91,12 +91,12 @@ func TestCompressAndEncryptBigChunk(t *testing.T) {
 	L := 1024 * 1024 // 1Mb
 	b := make([]byte, L)
 	rand.Read(b)
-	in := &testtools.BufCloser{bytes.NewBuffer(b), false}
+	in := &testtools.BufCloser{Buffer: bytes.NewBuffer(b), Err: false}
 
 	compressor := GetLz4Compressor()
 	compressed := internal.CompressAndEncrypt(in, compressor, nil)
 
-	decompressed := &testtools.BufCloser{&bytes.Buffer{}, false}
+	decompressed := &testtools.BufCloser{Buffer: &bytes.Buffer{}, Err: false}
 	decompressor := compression.GetDecompressorByCompressor(compressor)
 	err := decompressor.Decompress(decompressed, compressed)
 	if err != nil {
@@ -129,11 +129,11 @@ func testCompressAndEncryptErrorPropagation(compressor compression.Compressor, t
 	L := 1 << 20
 	b := make([]byte, L)
 	rand.Read(b)
-	in := &testtools.BufCloser{bytes.NewBuffer(b), false}
+	in := &testtools.BufCloser{Buffer: bytes.NewBuffer(b), Err: false}
 
 	compressed := internal.CompressAndEncrypt(in, compressor, nil)
 
-	decompressed := &testtools.BufCloser{&bytes.Buffer{}, false}
+	decompressed := &testtools.BufCloser{Buffer: &bytes.Buffer{}, Err: false}
 	decompressor := compression.GetDecompressorByCompressor(compressor)
 	err := decompressor.Decompress(decompressed, &DelayedErrorReader{compressed, L})
 	assert.Errorf(t, err, "%v did not propagate error of the buffer", compressor.FileExtension())
