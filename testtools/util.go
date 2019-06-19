@@ -2,6 +2,7 @@ package testtools
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/walparser"
@@ -55,6 +56,24 @@ func CreateMockStorageFolder() storage.Folder {
 	subFolder.PutObject("base_456/tar_partitions/2", &bytes.Buffer{})
 	subFolder.PutObject("base_456/tar_partitions/3", &bytes.Buffer{})
 	return folder
+}
+
+
+func CreateWalPageWithContinuation() []byte {
+	pageHeader := walparser.XLogPageHeader{
+		Info:             walparser.XlpFirstIsContRecord,
+		RemainingDataLen: 12312,
+	}
+	data := make([]byte, 20)
+	binary.LittleEndian.PutUint16(data, pageHeader.Magic)
+	binary.LittleEndian.PutUint16(data, pageHeader.Info)
+	binary.LittleEndian.PutUint32(data, uint32(pageHeader.TimeLineID))
+	binary.LittleEndian.PutUint64(data, uint64(pageHeader.PageAddress))
+	binary.LittleEndian.PutUint32(data, pageHeader.RemainingDataLen)
+	for len(data) < int(walparser.WalPageSize) {
+		data = append(data, 2)
+	}
+	return data
 }
 
 func GetXLogRecordData() (walparser.XLogRecord, []byte) {
