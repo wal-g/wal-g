@@ -98,32 +98,45 @@ func TestDeleteBeforeTarget_WithPermanentBackups(t *testing.T) {
 	folder := createMockStorageFolderWithPermanentBackups(t)
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	walBackupFolder := folder.GetSubFolder(utility.WalPath)
-	expectExistAfterDelete := map[string]bool{
-		"base_000000010000000000000003":                            false,
-		"base_000000010000000000000005_D_000000010000000000000003": true,
-		"base_000000010000000000000007_D_000000010000000000000005": false,
-		"base_000000010000000000000009":                            false,
+	expectBackupExistAfterDelete := map[string]bool{
+		"base_000000010000000000000002":                            false,
+		"base_000000010000000000000004_D_000000010000000000000002": true,
+		"base_000000010000000000000006_D_000000010000000000000004": false,
 	}
-	for backupName, _ := range expectExistAfterDelete {
+	expectWalExistAfterDelete := map[string]bool{
+		"000000010000000000000001": true,
+		"000000010000000000000002": true,
+		"000000010000000000000003": false,
+	}
+
+	// verify that they exist initially
+	for backupName, _ := range expectBackupExistAfterDelete {
 		exists, err := baseBackupFolder.Exists(backupName + "/" + utility.MetadataFileName)
 		assert.NoError(t, err)
 		assert.True(t, exists, "expected backup "+backupName+" to exist")
 
-		exists, err = walBackupFolder.Exists(strings.Split(backupName, "_")[1] + ".lz4")
-		assert.NoError(t, err)
-		assert.True(t, exists, "expected wal for "+backupName+" to exist")
 	}
+	for walName, _ := range expectWalExistAfterDelete {
+		exists, err := walBackupFolder.Exists(walName + ".lz4")
+		assert.NoError(t, err)
+		assert.True(t, exists, "expected wal "+walName+" to exist")
+	}
+
+	// attempt delete
 	target := storage.NewLocalObject("", utility.TimeNowCrossPlatformLocal().Add(time.Duration(1*int(time.Minute))))
 	err := internal.DeleteBeforeTarget(folder, target, true, isFullBackup, lessByTime)
 	assert.NoError(t, err)
-	for backupName, expect := range expectExistAfterDelete {
+
+	// verify expected permanent still exists
+	for backupName, expect := range expectBackupExistAfterDelete {
 		exists, err := baseBackupFolder.Exists(backupName + "/" + utility.MetadataFileName)
 		assert.NoError(t, err)
 		assert.Equal(t, expect, exists, "errored on "+backupName+"/"+utility.MetadataFileName)
-
-		exists, err = walBackupFolder.Exists(strings.Split(backupName, "_")[1] + ".lz4")
+	}
+	for walName, expect := range expectWalExistAfterDelete {
+		exists, err := walBackupFolder.Exists(walName + ".lz4")
 		assert.NoError(t, err)
-		assert.Equal(t, expect, exists, "errored on "+backupName+".lz4")
+		assert.Equal(t, expect, exists, "errored on "+walName+".lz4")
 	}
 }
 
@@ -211,35 +224,45 @@ func createMockStorageFolderWithPermanentBackups(t *testing.T) storage.Folder {
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	walBackupFolder := folder.GetSubFolder(utility.WalPath)
 	emptyData := map[string]interface{}{}
-	permanentMetadata := map[string]interface{}{
-		"start_time":   utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
-		"finish_time":  utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
-		"hostname":     "",
-		"data_dir":     "",
-		"pg_version":   0,
-		"start_lsn":    0,
-		"finish_lsn":   1,
-		"is_permanent": true,
-	}
 	backupNames := map[string]interface{}{
-		"base_000000010000000000000003":                            emptyData,
-		"base_000000010000000000000005_D_000000010000000000000003": permanentMetadata,
-		"base_000000010000000000000007_D_000000010000000000000005": emptyData,
-		"base_000000010000000000000009":                            emptyData,
+		"base_000000010000000000000002": emptyData,
+		"base_000000010000000000000004_D_000000010000000000000002": map[string]interface{}{
+			"start_time":   utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
+			"finish_time":  utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
+			"hostname":     "",
+			"data_dir":     "",
+			"pg_version":   0,
+			"start_lsn":    16777217, // logSegNo = 1
+			"finish_lsn":   33554433, // logSegNo = 2
+			"is_permanent": true,
+		},
+		"base_000000010000000000000006_D_000000010000000000000004": emptyData,
+	}
+	walNames := map[string]interface{}{
+		"000000010000000000000001": emptyData,
+		"000000010000000000000002": emptyData,
+		"000000010000000000000003": emptyData,
 	}
 	for backupName, metadata := range backupNames {
+		// empty sentinel
 		empty, err := json.Marshal(&emptyData)
 		assert.NoError(t, err)
 		sentinelString := string(empty)
 		err = baseBackupFolder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader(sentinelString))
+
+		// metadata
 		assert.NoError(t, err)
 		bytesMetadata, err := json.Marshal(&metadata)
 		assert.NoError(t, err)
 		metadataString := string(bytesMetadata)
 		err = baseBackupFolder.PutObject(backupName+"/"+utility.MetadataFileName, strings.NewReader(metadataString))
 		assert.NoError(t, err)
-		walString := string(empty)
-		err = walBackupFolder.PutObject(strings.Split(backupName, "_")[1]+".lz4", strings.NewReader(walString))
+	}
+	for walName, data := range walNames {
+		bytes, err := json.Marshal(&data)
+		assert.NoError(t, err)
+		walString := string(bytes)
+		err = walBackupFolder.PutObject(walName+".lz4", strings.NewReader(walString))
 		assert.NoError(t, err)
 	}
 	return folder
