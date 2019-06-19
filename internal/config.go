@@ -21,6 +21,7 @@ const (
 	UseWalDeltaSetting           = "WALG_USE_WAL_DELTA"
 	LogLevelSetting              = "WALG_LOG_LEVEL"
 	TarSizeThresholdSetting      = "WALG_TAR_SIZE_THRESHOLD"
+	CseKmsIDSetting              = "WALG_CSE_KMS_ID"
 	GpgKeyIDSetting              = "GPG_KEY_ID"
 	PgpKeySetting                = "WALG_PGP_KEY"
 	PgpKeyPathSetting            = "WALG_PGP_KEY_PATH"

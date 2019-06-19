@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/crypto/awskms"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
@@ -226,6 +227,10 @@ func ConfigureCrypter() crypto.Crypter {
 	if keyRingID, ok := GetWaleCompatibleSetting(GpgKeyIDSetting); ok {
 		tracelog.WarningLogger.Printf(DeprecatedExternalGpgMessage)
 		return openpgp.CrypterFromKeyRingID(keyRingID, loadPassphrase)
+	}
+
+	if viper.IsSet(CseKmsIDSetting) {
+		return awskms.CrypterFromKeyID(viper.GetString(CseKmsIDSetting))
 	}
 
 	return nil

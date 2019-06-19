@@ -74,6 +74,7 @@ unittest:
 	go test -v $(TEST_MODIFIER) ./internal/compression/
 	go test -v $(TEST_MODIFIER) ./internal/crypto/
 	go test -v $(TEST_MODIFIER) ./internal/crypto/openpgp/
+	go test -v $(TEST_MODIFIER) ./internal/crypto/awskms/
 	go test -v $(TEST_MODIFIER) ./internal/storages/s3/
 	go test -v $(TEST_MODIFIER) ./internal/storages/gcs/
 	go test -v $(TEST_MODIFIER) ./internal/storages/fs/
