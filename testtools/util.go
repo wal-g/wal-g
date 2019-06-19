@@ -103,12 +103,16 @@ func (seeker *NopSeeker) Seek(offset int64, whence int) (int64, error) {
 	return 0, nil
 }
 
+var MockCloseError = errors.New("mock close: close error")
+var MockReadError = errors.New("mock reader: read error")
+var MockWriteError = errors.New("mock writer: write error")
+
 //ErrorWriter struct implements io.Writer interface.
 //Its Write method returns zero and non-nil error on every call
 type ErrorWriter struct{}
 
 func (w ErrorWriter) Write(b []byte) (int, error) {
-	return 0, errors.New("expected writing error")
+	return 0, MockWriteError
 }
 
 //ErrorReader struct implements io.Reader interface.
@@ -116,5 +120,27 @@ func (w ErrorWriter) Write(b []byte) (int, error) {
 type ErrorReader struct{}
 
 func (r ErrorReader) Read(b []byte) (int, error) {
-	return 0, errors.New("expected reading error")
+	return 0, MockReadError
+}
+
+type BufCloser struct {
+	*bytes.Buffer
+	Err bool
+}
+
+func (w *BufCloser) Close() error {
+	if w.Err {
+		return MockCloseError
+	}
+	return nil
+}
+
+type ErrorWriteCloser struct{}
+
+func (ew ErrorWriteCloser) Write(p []byte) (int, error) {
+	return -1, MockWriteError
+}
+
+func (ew ErrorWriteCloser) Close() error {
+	return MockCloseError
 }
