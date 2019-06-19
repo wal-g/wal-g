@@ -35,7 +35,7 @@ func TestListFolderRecursively(t *testing.T) {
 }
 
 func TestDeleteOldObjects(t *testing.T) {
-	folder := createMockStorageFolder()
+	folder := testtools.CreateMockStorageFolder()
 	expectedOnlyOneSavedObjectName := "basebackups_005/base_123312"
 	filter := func(object storage.Object) bool {
 		return object.GetName() != expectedOnlyOneSavedObjectName
