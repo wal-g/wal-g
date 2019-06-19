@@ -223,9 +223,9 @@ func ConfigureCrypter() crypto.Crypter {
 		return openpgp.CrypterFromKeyPath(viper.GetString(PgpKeyPathSetting), loadPassphrase)
 	}
 
-	if viper.IsSet(GpgKeyIDSetting) {
+	if keyRingID, ok := GetWaleCompatibleSetting(GpgKeyIDSetting); ok {
 		tracelog.WarningLogger.Printf(DeprecatedExternalGpgMessage)
-		return openpgp.CrypterFromKeyRingID(viper.GetString(GpgKeyIDSetting), loadPassphrase)
+		return openpgp.CrypterFromKeyRingID(keyRingID, loadPassphrase)
 	}
 
 	return nil

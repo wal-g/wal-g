@@ -485,7 +485,7 @@ func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uin
 	walParser := walparser.NewWalParser()
 	for ; logSegNo+(WalFileInDelta-1) <= lastLogSegNo; logSegNo += WalFileInDelta {
 		deltaFilename := toDeltaFilename(formatWALFileName(bundle.Timeline, logSegNo))
-		reader, err := downloadAndDecompressWALFile(folder, deltaFilename)
+		reader, err := DownloadAndDecompressWALFile(folder, deltaFilename)
 		if err != nil {
 			return errors.Wrapf(err, "Error during delta file '%s' downloading.", deltaFilename)
 		}
@@ -503,7 +503,7 @@ func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uin
 	// because in such a case postgres do a WAL-Switch and first WAL file appears to be whole.
 	for ; logSegNo <= lastLogSegNo; logSegNo++ {
 		walFilename := formatWALFileName(bundle.Timeline, logSegNo)
-		reader, err := downloadAndDecompressWALFile(folder, walFilename)
+		reader, err := DownloadAndDecompressWALFile(folder, walFilename)
 		if err != nil {
 			return errors.Wrapf(err, "Error during wal file '%s' downloading", walFilename)
 		}
