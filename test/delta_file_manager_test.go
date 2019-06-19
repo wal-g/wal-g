@@ -12,13 +12,6 @@ import (
 	"testing"
 )
 
-func concatByteSlices(a []byte, b []byte) []byte {
-	result := make([]byte, len(a)+len(b))
-	copy(result, a)
-	copy(result[len(a):], b)
-	return result
-}
-
 func GetXLogRecordData() (walparser.XLogRecord, []byte) {
 	imageData := []byte{
 		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
@@ -35,7 +28,7 @@ func GetXLogRecordData() (walparser.XLogRecord, []byte) {
 		0x00, 0x00, 0x15, 0x40, 0x00, 0x00, 0xe4, 0x18, 0x00, 0x00,
 		0xff, 0x04,
 	}
-	data = concatByteSlices(concatByteSlices(concatByteSlices(data, imageData), blockData), mainData)
+	data = utility.ConcatByteSlices(utility.ConcatByteSlices(utility.ConcatByteSlices(data, imageData), blockData), mainData)
 	recordHeader := walparser.XLogRecordHeader{
 		TotalRecordLength: uint32(walparser.XLogRecordHeaderSize + len(data)),
 		XactID:            0x00000243,
@@ -52,7 +45,7 @@ func GetXLogRecordData() (walparser.XLogRecord, []byte) {
 	recordHeaderData.Write(utility.ToBytes(&recordHeader.ResourceManagerID))
 	recordHeaderData.Write([]byte{0, 0})
 	recordHeaderData.Write(utility.ToBytes(&recordHeader.Crc32Hash))
-	recordData := concatByteSlices(recordHeaderData.Bytes(), data)
+	recordData := utility.ConcatByteSlices(recordHeaderData.Bytes(), data)
 	record, _ := walparser.ParseXLogRecordFromBytes(recordData)
 	return *record, recordData
 }
