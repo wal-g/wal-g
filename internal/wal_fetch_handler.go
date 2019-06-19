@@ -2,10 +2,14 @@ package internal
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"os/user"
 	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/pkg/errors"
@@ -149,9 +153,77 @@ func DecompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor 
 	return err
 }
 
+// CachedDecompressor is the file extension describing decompressor
+type CachedDecompressor struct {
+	FileExtension string
+}
+
+func GetLastDecompressor() (compression.Decompressor, error) {
+	var cache CachedDecompressor
+	var cacheFilename string
+
+	usr, err := user.Current()
+	if err == nil {
+		cacheFilename = filepath.Join(usr.HomeDir, ".walg_decompressor_cache")
+		file, err := ioutil.ReadFile(cacheFilename)
+		if err == nil {
+			err = json.Unmarshal(file, &cache)
+			if err != nil {
+				return nil, err
+			}
+			return compression.FindDecompressor(cache.FileExtension), nil
+		}
+		return nil, err
+	}
+
+	return nil, nil
+}
+
+func SetLastDecompressor(decompressor compression.Decompressor) error {
+	var cache CachedDecompressor
+	usr, err := user.Current()
+
+	if err != nil {
+		return err
+	}
+
+	cacheFilename := filepath.Join(usr.HomeDir, ".walg_decompressor_cache")
+	cache.FileExtension = decompressor.FileExtension()
+
+	marshal, err := json.Marshal(&cache)
+	if err == nil {
+		return ioutil.WriteFile(cacheFilename, marshal, 0644)
+	}
+
+	return err
+}
+
+func convertDecompressorList(decompressors []compression.Decompressor,
+	lastDecompressor compression.Decompressor) []compression.Decompressor {
+	ret := append(make([]compression.Decompressor, 0, len(decompressors)), lastDecompressor)
+
+	for _, elem := range decompressors {
+		if elem != lastDecompressor {
+			ret = append(ret, elem)
+		}
+	}
+
+	return ret
+}
+
+func putCachedDecompressorInFirstPlace(decompressors []compression.Decompressor) []compression.Decompressor {
+	lastDecompressor, _ := GetLastDecompressor()
+
+	if lastDecompressor != nil && lastDecompressor != decompressors[0] {
+		return convertDecompressorList(decompressors, lastDecompressor)
+	}
+
+	return decompressors
+}
+
 // TODO : unit tests
-func downloadAndDecompressWALFile(folder storage.Folder, walFileName string) (io.ReadCloser, error) {
-	for _, decompressor := range compression.Decompressors {
+func DownloadAndDecompressWALFile(folder storage.Folder, walFileName string) (io.ReadCloser, error) {
+	for _, decompressor := range putCachedDecompressorInFirstPlace(compression.Decompressors) {
 		archiveReader, exists, err := TryDownloadWALFile(folder, walFileName+"."+decompressor.FileExtension())
 		if err != nil {
 			return nil, err
@@ -159,6 +231,7 @@ func downloadAndDecompressWALFile(folder storage.Folder, walFileName string) (io
 		if !exists {
 			continue
 		}
+		_ = SetLastDecompressor(decompressor)
 		reader, writer := io.Pipe()
 		go func() {
 			err = DecompressWALFile(&EmptyWriteIgnorer{writer}, archiveReader, decompressor)
@@ -172,7 +245,7 @@ func downloadAndDecompressWALFile(folder storage.Folder, walFileName string) (io
 // TODO : unit tests
 // downloadWALFileTo downloads a file and writes it to local file
 func DownloadWALFileTo(folder storage.Folder, walFileName string, dstPath string) error {
-	reader, err := downloadAndDecompressWALFile(folder, walFileName)
+	reader, err := DownloadAndDecompressWALFile(folder, walFileName)
 	if err != nil {
 		return err
 	}

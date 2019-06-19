@@ -1,13 +1,15 @@
 package testtools
 
 import (
+	"errors"
+	"io"
+	"testing"
+
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/storages/memory"
 	"github.com/wal-g/wal-g/internal/storages/s3"
-	"io"
-	"testing"
 )
 
 func MakeDefaultInMemoryStorageFolder() *memory.Folder {
@@ -80,4 +82,20 @@ type NopSeeker struct{}
 
 func (seeker *NopSeeker) Seek(offset int64, whence int) (int64, error) {
 	return 0, nil
+}
+
+//ErrorWriter struct implements io.Writer interface.
+//Its Write method returns zero and non-nil error on every call
+type ErrorWriter struct{}
+
+func (w ErrorWriter) Write(b []byte) (int, error) {
+	return 0, errors.New("expected writing error")
+}
+
+//ErrorReader struct implements io.Reader interface.
+//Its Read method returns zero and non-nil error on every call
+type ErrorReader struct{}
+
+func (r ErrorReader) Read(b []byte) (int, error) {
+	return 0, errors.New("expected reading error")
 }
