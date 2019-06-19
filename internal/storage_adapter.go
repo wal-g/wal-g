@@ -39,7 +39,7 @@ func preprocessFilePrefix(prefix string) string {
 var StorageAdapters = []StorageAdapter{
 	{"S3_PREFIX", s3.SettingList, s3.ConfigureFolder, nil},
 	{"FILE_PREFIX", nil, fs.ConfigureFolder, preprocessFilePrefix},
-	{"GS_PREFIX", nil, gcs.ConfigureFolder, nil},
+	{"GS_PREFIX", gcs.SettingList, gcs.ConfigureFolder, nil},
 	{"AZ_PREFIX", azure.SettingList, azure.ConfigureFolder, nil},
 	{"SWIFT_PREFIX", swift.SettingList, swift.ConfigureFolder, nil},
 }
