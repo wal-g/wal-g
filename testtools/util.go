@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/utility"
 	"io"
 	"strings"
@@ -55,6 +56,45 @@ func CreateMockStorageFolder() storage.Folder {
 	subFolder.PutObject("base_456/tar_partitions/3", &bytes.Buffer{})
 	return folder
 }
+
+func GetXLogRecordData() (walparser.XLogRecord, []byte) {
+	imageData := []byte{
+		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
+	}
+	blockData := []byte{
+		0x0a, 0x0b, 0x0c,
+	}
+	mainData := []byte{
+		0x0d, 0x0e, 0x0f, 0x10,
+	}
+	data := []byte{ // block header data
+		0xfd, 0x01, 0xfe,
+		0x00, 0x30, 0x03, 0x00, 0x0a, 0x00, 0xd4, 0x05, 0x05, 0x7f, 0x06, 0x00, 0x00, 0x00, 0x40,
+		0x00, 0x00, 0x15, 0x40, 0x00, 0x00, 0xe4, 0x18, 0x00, 0x00,
+		0xff, 0x04,
+	}
+	data = utility.ConcatByteSlices(utility.ConcatByteSlices(utility.ConcatByteSlices(data, imageData), blockData), mainData)
+	recordHeader := walparser.XLogRecordHeader{
+		TotalRecordLength: uint32(walparser.XLogRecordHeaderSize + len(data)),
+		XactID:            0x00000243,
+		PrevRecordPtr:     0x000000002affedc8,
+		Info:              0xb0,
+		ResourceManagerID: 0x00,
+		Crc32Hash:         0xecf5203c,
+	}
+	var recordHeaderData bytes.Buffer
+	recordHeaderData.Write(utility.ToBytes(&recordHeader.TotalRecordLength))
+	recordHeaderData.Write(utility.ToBytes(&recordHeader.XactID))
+	recordHeaderData.Write(utility.ToBytes(&recordHeader.PrevRecordPtr))
+	recordHeaderData.Write(utility.ToBytes(&recordHeader.Info))
+	recordHeaderData.Write(utility.ToBytes(&recordHeader.ResourceManagerID))
+	recordHeaderData.Write([]byte{0, 0})
+	recordHeaderData.Write(utility.ToBytes(&recordHeader.Crc32Hash))
+	recordData := utility.ConcatByteSlices(recordHeaderData.Bytes(), data)
+	record, _ := walparser.ParseXLogRecordFromBytes(recordData)
+	return *record, recordData
+}
+
 
 type ReadWriteNopCloser struct {
 	io.ReadWriter

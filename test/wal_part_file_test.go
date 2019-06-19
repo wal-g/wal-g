@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/testtools"
 	"testing"
 )
 
@@ -61,7 +62,7 @@ func TestSaveLoadWalPartFile(t *testing.T) {
 
 func TestCombineRecords(t *testing.T) {
 	partFile := internal.NewWalPartFile()
-	xLogRecord, recordData := GetXLogRecordData()
+	xLogRecord, recordData := testtools.GetXLogRecordData()
 	partFile.WalHeads[1] = recordData[:16]
 	partFile.WalTails[2] = recordData[16:]
 
