@@ -17,7 +17,8 @@ type SymmetricKey struct {
 	EncryptedSymmetricKey    []byte
 	EncryptedSymmetricKeyLen int
 
-	KeyID string
+	KeyID  string
+	Region string
 
 	mutex sync.RWMutex
 }
@@ -39,7 +40,13 @@ func (symmetricKey *SymmetricKey) Generate() error {
 
 // Encrypt symmetric key with AWS KMS
 func (symmetricKey *SymmetricKey) Encrypt() error {
-	svc := kms.New(session.New())
+	kmsConfig := aws.NewConfig()
+
+	if symmetricKey.Region != "" {
+		kmsConfig = kmsConfig.WithRegion(symmetricKey.Region)
+	}
+
+	svc := kms.New(session.New(), kmsConfig)
 
 	symmetricKey.mutex.RLock()
 	input := &kms.EncryptInput{
@@ -61,7 +68,13 @@ func (symmetricKey *SymmetricKey) Encrypt() error {
 
 // Decrypt symmetric key with AWS KMS
 func (symmetricKey *SymmetricKey) Decrypt() error {
-	svc := kms.New(session.New())
+	kmsConfig := aws.NewConfig()
+
+	if symmetricKey.Region != "" {
+		kmsConfig = kmsConfig.WithRegion(symmetricKey.Region)
+	}
+
+	svc := kms.New(session.New(), kmsConfig)
 
 	symmetricKey.mutex.RLock()
 	input := &kms.DecryptInput{
@@ -132,6 +145,6 @@ func (symmetricKey *SymmetricKey) GetKeyLen() int {
 }
 
 // NewSymmetricKey creates new symmetric AWS KMS key object
-func NewSymmetricKey(kmsKeyID string, keyLen int, encryptedKeyLen int) *SymmetricKey {
-	return &SymmetricKey{SymmetricKeyLen: keyLen, EncryptedSymmetricKeyLen: encryptedKeyLen, KeyID: kmsKeyID}
+func NewSymmetricKey(kmsKeyID string, keyLen int, encryptedKeyLen int, kmsRegion string) *SymmetricKey {
+	return &SymmetricKey{SymmetricKeyLen: keyLen, EncryptedSymmetricKeyLen: encryptedKeyLen, KeyID: kmsKeyID, Region: kmsRegion}
 }

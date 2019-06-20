@@ -230,7 +230,7 @@ func ConfigureCrypter() crypto.Crypter {
 	}
 
 	if viper.IsSet(CseKmsIDSetting) {
-		return awskms.CrypterFromKeyID(viper.GetString(CseKmsIDSetting))
+		return awskms.CrypterFromKeyID(viper.GetString(CseKmsIDSetting), viper.GetString(CseKmsRegionSetting))
 	}
 
 	return nil

@@ -66,6 +66,6 @@ func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
 }
 
 // CrypterFromKeyID creates AWS KMS Crypter with given KMS Key ID
-func CrypterFromKeyID(CseKmsID string) crypto.Crypter {
-	return &Crypter{SymmetricKey: NewSymmetricKey(CseKmsID, 32, 184)}
+func CrypterFromKeyID(CseKmsID string, CseKmsRegion string) crypto.Crypter {
+	return &Crypter{SymmetricKey: NewSymmetricKey(CseKmsID, 32, 184, CseKmsRegion)}
 }

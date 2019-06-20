@@ -22,6 +22,7 @@ const (
 	LogLevelSetting              = "WALG_LOG_LEVEL"
 	TarSizeThresholdSetting      = "WALG_TAR_SIZE_THRESHOLD"
 	CseKmsIDSetting              = "WALG_CSE_KMS_ID"
+	CseKmsRegionSetting          = "WALG_CSE_KMS_REGION"
 	GpgKeyIDSetting              = "GPG_KEY_ID"
 	PgpKeySetting                = "WALG_PGP_KEY"
 	PgpKeyPathSetting            = "WALG_PGP_KEY_PATH"
