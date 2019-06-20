@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/spf13/viper"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"io/ioutil"
 	"os"
@@ -10,8 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 )
-
-const TotalBgUploadedLimit = 1024
 
 // BgUploader represents the state of concurrent WAL upload
 type BgUploader struct {
@@ -117,7 +116,7 @@ func (bgUploader *BgUploader) scanOnce() {
 }
 
 func (bgUploader *BgUploader) shouldKeepScanning() bool {
-	return atomic.LoadInt32(&bgUploader.maxParallelWorkers) > 0 && atomic.LoadInt32(&bgUploader.totalUploaded) < TotalBgUploadedLimit
+	return atomic.LoadInt32(&bgUploader.maxParallelWorkers) > 0 && atomic.LoadInt32(&bgUploader.totalUploaded) < int32(viper.GetInt(TotalBgUploadedLimit))
 }
 
 func (bgUploader *BgUploader) haveNoSlots() bool {
