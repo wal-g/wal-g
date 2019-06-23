@@ -171,7 +171,7 @@ func fillStorageWithMockDeltas(storage *memory.Storage) error {
 	if err != nil {
 		return err
 	}
-	err = putWalIntoStorage(storage, createWalPageWithContinuation(), "000000010000000000000090")
+	err = putWalIntoStorage(storage, testtools.CreateWalPageWithContinuation(), "000000010000000000000090")
 	return err
 }
 
