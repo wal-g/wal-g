@@ -116,7 +116,7 @@ func (bgUploader *BgUploader) scanOnce() {
 }
 
 func (bgUploader *BgUploader) shouldKeepScanning() bool {
-	return atomic.LoadInt32(&bgUploader.maxParallelWorkers) > 0 && atomic.LoadInt32(&bgUploader.totalUploaded) < int32(viper.GetInt(TotalBgUploadedLimit))
+	return atomic.LoadInt32(&bgUploader.maxParallelWorkers) > 0 && atomic.LoadInt32(&bgUploader.totalUploaded) < viper.GetInt32(TotalBgUploadedLimit)
 }
 
 func (bgUploader *BgUploader) haveNoSlots() bool {
