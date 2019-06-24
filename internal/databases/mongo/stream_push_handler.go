@@ -1,8 +1,6 @@
 package mongo
 
 import (
-	"bytes"
-	"encoding/json"
 	"io"
 	"os"
 
@@ -28,21 +26,7 @@ func HandleStreamPush(uploader *Uploader) {
 func (uploader *Uploader) UploadStream(stream io.Reader) error {
 	timeStart := utility.TimeNowCrossPlatformLocal()
 	backupName, err := uploader.PushStream(stream)
-	uploadStreamSentinel(&StreamSentinelDto{StartLocalTime: timeStart}, uploader, backupName+utility.SentinelSuffix)
+	internal.UploadSentinel(uploader.Uploader, &StreamSentinelDto{StartLocalTime: timeStart}, backupName)
+
 	return err
-}
-
-func uploadStreamSentinel(sentinelDto *StreamSentinelDto, uploader *Uploader, name string) error {
-	dtoBody, err := json.Marshal(*sentinelDto)
-	if err != nil {
-		return err
-	}
-
-	uploadingErr := uploader.Upload(name, bytes.NewReader(dtoBody))
-	if uploadingErr != nil {
-		tracelog.ErrorLogger.Printf("upload: could not upload '%s'\n", name)
-		tracelog.ErrorLogger.Fatalf("StorageTarBall finish: json failed to upload")
-		return uploadingErr
-	}
-	return nil
 }
