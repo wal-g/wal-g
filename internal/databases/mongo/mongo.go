@@ -9,11 +9,10 @@ import (
 )
 
 const (
-	StreamPrefix = "stream_"
-	OplogPrefix  = "oplog_"
-	OplogPath    = "oplog_" + utility.VersionStr + "/"
-	OplogEndTs   = "WALG_MONGO_OPLOG_END_TS"
-	OplogDst     = "WALG_MONGO_OPLOG_DST"
+	OplogPrefix = "oplog_"
+	OplogPath   = "oplog_" + utility.VersionStr + "/"
+	OplogEndTs  = "WALG_MONGO_OPLOG_END_TS"
+	OplogDst    = "WALG_MONGO_OPLOG_DST"
 )
 
 func getStreamName(backupName string, extension string) string {
