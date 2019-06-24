@@ -7,20 +7,17 @@ import (
 	"os"
 
 	"github.com/wal-g/wal-g/internal"
+
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
 func HandleStreamPush(uploader *Uploader) {
-	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
-	stat, _ := os.Stdin.Stat()
-	var stream io.Reader = os.Stdin
-	if (stat.Mode() & os.ModeCharDevice) == 0 {
-		tracelog.InfoLogger.Println("Data is piped from stdin")
-	} else {
+	if !internal.FileIsPiped(os.Stdin) {
 		tracelog.ErrorLogger.Fatal("Use stdin\n")
 	}
-	err := uploader.UploadStream(stream)
+	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
+	err := uploader.UploadStream(os.Stdin)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
@@ -30,19 +27,8 @@ func HandleStreamPush(uploader *Uploader) {
 // UploadStream compresses a stream and uploads it.
 func (uploader *Uploader) UploadStream(stream io.Reader) error {
 	timeStart := utility.TimeNowCrossPlatformLocal()
-	compressor := uploader.Compressor
-
-	compressed := internal.CompressAndEncrypt(stream, compressor, internal.ConfigureCrypter())
-
-	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format("20060102T150405Z")
-	dstPath := getStreamName(backupName, compressor.FileExtension())
-	tracelog.DebugLogger.Println("Upload path", dstPath)
-
-	err := uploader.Upload(dstPath, compressed)
-	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
-
+	backupName, err := uploader.PushStream(stream)
 	uploadStreamSentinel(&StreamSentinelDto{StartLocalTime: timeStart}, uploader, backupName+utility.SentinelSuffix)
-
 	return err
 }
 
