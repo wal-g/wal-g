@@ -36,7 +36,6 @@ const (
 	SentinelSuffix         = "_backup_stop_sentinel.json"
 	CompressedBlockMaxSize = 20 << 20
 	CopiedBlockMaxSize     = CompressedBlockMaxSize
-	NotFoundAWSErrorCode   = "NotFound"
 	MetadataFileName       = "metadata.json"
 )
 
@@ -169,4 +168,11 @@ func TimeNowCrossPlatformUTC() time.Time {
 
 func TimeNowCrossPlatformLocal() time.Time {
 	return CeilTimeUpToMicroseconds(time.Now())
+}
+
+func ConcatByteSlices(a []byte, b []byte) []byte {
+	result := make([]byte, len(a)+len(b))
+	copy(result, a)
+	copy(result[len(a):], b)
+	return result
 }

@@ -1,4 +1,4 @@
-package test
+package testtools
 
 import (
 	"github.com/wal-g/wal-g/internal"

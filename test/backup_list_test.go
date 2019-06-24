@@ -8,15 +8,16 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/testtools"
 )
 
 func TestBackupListFindsBackups(t *testing.T) {
-	folder := createMockStorageFolder()
+	folder := testtools.CreateMockStorageFolder()
 	internal.HandleBackupList(folder)
 }
 
 func TestBackupListFlagsFindsBackups(t *testing.T) {
-	folder := createMockStorageFolder()
+	folder := testtools.CreateMockStorageFolder()
 	internal.HandleBackupListWithFlags(folder, true, false, false)
 }
 

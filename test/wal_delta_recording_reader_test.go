@@ -2,7 +2,6 @@ package test
 
 import (
 	"bytes"
-	"encoding/binary"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/walparser"
@@ -18,25 +17,8 @@ var WalFilePath = path.Join(WalgTestDataFolderPath, WalFilename)
 var DeltaFilePath = path.Join(WalgTestDataFolderPath, DeltaFilename)
 var RealLocation = *walparser.NewBlockLocation(internal.DefaultSpcNode, 16384, 16397, 2062)
 
-func createWalPageWithContinuation() []byte {
-	pageHeader := walparser.XLogPageHeader{
-		Info:             walparser.XlpFirstIsContRecord,
-		RemainingDataLen: 12312,
-	}
-	data := make([]byte, 20)
-	binary.LittleEndian.PutUint16(data, pageHeader.Magic)
-	binary.LittleEndian.PutUint16(data, pageHeader.Info)
-	binary.LittleEndian.PutUint32(data, uint32(pageHeader.TimeLineID))
-	binary.LittleEndian.PutUint64(data, uint64(pageHeader.PageAddress))
-	binary.LittleEndian.PutUint32(data, pageHeader.RemainingDataLen)
-	for len(data) < int(walparser.WalPageSize) {
-		data = append(data, 2)
-	}
-	return data
-}
-
 func createWalParser() (*walparser.WalParser, error) {
-	data := createWalPageWithContinuation()
+	data := testtools.CreateWalPageWithContinuation()
 
 	walParser := walparser.NewWalParser()
 	_, _, err := walParser.ParseRecordsFromPage(bytes.NewReader(data)) // initializing parsing
