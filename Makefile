@@ -70,7 +70,18 @@ redis_install: redis_build
 
 unittest:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet
-	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go test -v $(TEST_MODIFIER) | grep -v 'no test files'
+	go test -v $(TEST_MODIFIER) ./internal/
+	go test -v $(TEST_MODIFIER) ./internal/compression/
+	go test -v $(TEST_MODIFIER) ./internal/crypto/openpgp/
+	go test -v $(TEST_MODIFIER) ./internal/databases/mysql
+	go test -v $(TEST_MODIFIER) ./internal/storages/azure/
+	go test -v $(TEST_MODIFIER) ./internal/storages/fs/
+	go test -v $(TEST_MODIFIER) ./internal/storages/gcs/
+	go test -v $(TEST_MODIFIER) ./internal/storages/s3/
+	go test -v $(TEST_MODIFIER) ./internal/storages/storage
+	go test -v $(TEST_MODIFIER) ./internal/storages/swift/
+	go test -v $(TEST_MODIFIER) ./internal/walparser/
+	go test -v $(TEST_MODIFIER) ./utility
 
 coverage:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go test -v $(TEST_MODIFIER) -coverprofile=$(COVERAGE_FILE) | grep -v 'no test files'
