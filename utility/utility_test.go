@@ -1,4 +1,4 @@
-package test
+package utility_test
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	CreateFileWithPath = "./testdata/createFileWith"
+	CreateFileWithPath = "../test/testdata/createFileWith"
 )
 
 var times = []struct {
