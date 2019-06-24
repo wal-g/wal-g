@@ -72,7 +72,7 @@ func (folder *Folder) GetPath() string {
 
 func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
 	prefix := storage.AddDelimiterToPath(folder.path)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(folder.contextTimeout))
+	ctx, cancel := folder.createTimeoutContext()
 	defer cancel()
 	it := folder.bucket.Objects(ctx, &gcs.Query{Delimiter: "/", Prefix: prefix})
 	for {
@@ -93,12 +93,16 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	return
 }
 
+func (folder *Folder) createTimeoutContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), time.Second*time.Duration(folder.contextTimeout))
+}
+
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	for _, objectRelativePath := range objectRelativePaths {
 		path := storage.JoinPath(folder.path, objectRelativePath)
 		object := folder.bucket.Object(path)
 		tracelog.DebugLogger.Printf("Delete %v\n", path)
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(folder.contextTimeout))
+		ctx, cancel := folder.createTimeoutContext()
 		defer cancel()
 		err := object.Delete(ctx)
 		if err != nil && err != gcs.ErrObjectNotExist {
@@ -111,7 +115,7 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 	path := storage.JoinPath(folder.path, objectRelativePath)
 	object := folder.bucket.Object(path)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(folder.contextTimeout))
+	ctx, cancel := folder.createTimeoutContext()
 	defer cancel()
 	_, err := object.Attrs(ctx)
 	if err == gcs.ErrObjectNotExist {
@@ -130,7 +134,7 @@ func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	path := storage.JoinPath(folder.path, objectRelativePath)
 	object := folder.bucket.Object(path)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(folder.contextTimeout))
+	ctx, cancel := folder.createTimeoutContext()
 	defer cancel()
 	reader, err := object.NewReader(ctx)
 	if err == gcs.ErrObjectNotExist {
@@ -142,7 +146,7 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 func (folder *Folder) PutObject(name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
 	object := folder.bucket.Object(storage.JoinPath(folder.path, name))
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(folder.contextTimeout))
+	ctx, cancel := folder.createTimeoutContext()
 	defer cancel()
 	writer := object.NewWriter(ctx)
 	_, err := io.Copy(writer, content)
