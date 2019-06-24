@@ -1,7 +1,8 @@
-package test
+package mysql_test
 
 import (
 	"bytes"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
@@ -13,6 +14,7 @@ import (
 )
 
 func TestGetBinlogConfig(t *testing.T) {
+	viper.AutomaticEnv()
 	os.Setenv(mysql.BinlogEndTsSetting, "2018-12-06T11:50:58Z")
 	samplePath := "/xxx/"
 	os.Setenv(mysql.BinlogDstSetting, samplePath)
