@@ -26,12 +26,12 @@ func MakeDefaultUploader(uploaderAPI s3manageriface.UploaderAPI) *s3.Uploader {
 	return s3.NewUploader(uploaderAPI, "", "", "STANDARD")
 }
 
-func NewMockUploader(apiMultiErr, apiErr bool) *internal.Uploader {
+func NewMockUploader(apiMultiErr, apiErr bool, archiveStatus *internal.ArchiveStatusManager) *internal.Uploader {
 	s3Uploader := MakeDefaultUploader(NewMockS3Uploader(apiMultiErr, apiErr, nil))
 	return internal.NewUploader(
 		&MockCompressor{},
 		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), "bucket/", "server/"),
-		nil,
+		nil, archiveStatus,
 	)
 }
 
@@ -39,7 +39,7 @@ func NewStoringMockUploader(storage *memory.Storage, deltaDataFolder internal.Da
 	return internal.NewUploader(
 		&MockCompressor{},
 		memory.NewFolder("in_memory/", storage),
-		nil,
+		nil, nil,
 	)
 }
 
@@ -57,7 +57,6 @@ func CreateMockStorageFolder() storage.Folder {
 	subFolder.PutObject("base_456/tar_partitions/3", &bytes.Buffer{})
 	return folder
 }
-
 
 func CreateWalPageWithContinuation() []byte {
 	pageHeader := walparser.XLogPageHeader{
@@ -113,7 +112,6 @@ func GetXLogRecordData() (walparser.XLogRecord, []byte) {
 	record, _ := walparser.ParseXLogRecordFromBytes(recordData)
 	return *record, recordData
 }
-
 
 type ReadWriteNopCloser struct {
 	io.ReadWriter

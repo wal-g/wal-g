@@ -82,7 +82,14 @@ func (bgUploader *BgUploader) Stop() {
 
 var readySuffix = ".ready"
 var archiveStatus = "archive_status"
-var done = ".done"
+
+func (bgUploader *BgUploader) isAlreadyUploaded(walname string) bool {
+	return bgUploader.uploader.archiveStatusManager.FileExist(walname)
+}
+
+func (bgUploader *BgUploader) startUploadWAL(walname string) {
+	_ = bgUploader.uploader.archiveStatusManager.createStatusFile(walname)
+}
 
 // TODO : unit tests
 func (bgUploader *BgUploader) scanOnce() {
@@ -100,9 +107,13 @@ func (bgUploader *BgUploader) scanOnce() {
 			break
 		}
 		name := f.Name()
-		if !strings.HasSuffix(name, readySuffix) {
+		pureName := strings.TrimSuffix(name, readySuffix)
+		if bgUploader.isAlreadyUploaded(pureName) {
 			continue
 		}
+
+		bgUploader.startUploadWAL(pureName)
+
 		if _, ok := bgUploader.started[name]; ok {
 			continue
 		}
@@ -134,12 +145,7 @@ func (bgUploader *BgUploader) upload(info os.FileInfo) {
 		return
 	}
 
-	ready := filepath.Join(bgUploader.dir, archiveStatus, info.Name())
-	done := filepath.Join(bgUploader.dir, archiveStatus, walFilename+done)
-	err = os.Rename(ready, done)
-	if err != nil {
-		tracelog.ErrorLogger.Print("Error renaming .ready to .done: ", err)
-	}
+	tracelog.InfoLogger.Println("wal file to upload" + info.Name())
 
 	atomic.AddInt32(&bgUploader.totalUploaded, 1)
 

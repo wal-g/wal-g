@@ -19,7 +19,7 @@ func TestS3TarBall(t *testing.T) {
 		TarSizeThreshold: int64(10),
 	}
 
-	bundle.TarBallMaker = internal.NewStorageTarBallMaker("test", testtools.NewMockUploader(false, false))
+	bundle.TarBallMaker = internal.NewStorageTarBallMaker("test", testtools.NewMockUploader(false, false, nil))
 
 	bundle.NewTarBall(false)
 
@@ -42,7 +42,7 @@ func TestS3DependentFunctions(t *testing.T) {
 		TarSizeThreshold: 100,
 	}
 
-	uploader := testtools.NewMockUploader(false, false)
+	uploader := testtools.NewMockUploader(false, false, nil)
 
 	bundle.TarBallMaker = internal.NewStorageTarBallMaker("mockBackup", uploader)
 

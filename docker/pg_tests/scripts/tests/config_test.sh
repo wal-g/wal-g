@@ -16,7 +16,7 @@ pg_dumpall -f /tmp/dump1
 pgbench -c 2 -T 100000000 -S &
 sleep 1
 wal-g --config=/tmp/walg.json backup-push ${PGDATA}
-
+    
 pkill -9 postgres
 
 rm -rf ${PGDATA}

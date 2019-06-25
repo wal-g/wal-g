@@ -23,7 +23,9 @@ func TestBackgroundWALUpload(t *testing.T) {
 	}
 
 	// Re-use generated data to test uploading WAL.
-	tu := testtools.NewMockUploader(false, false)
+	archInfoFolder, _ := internal.NewDiskDataFolder(filepath.Join(dir, ".walg_archive_status"))
+	archStatFolder, _ := internal.NewDiskDataFolder(filepath.Join(dir, "archive_status"))
+	tu := testtools.NewMockUploader(false, false, internal.NewArchiveStatusManager(archInfoFolder, archStatFolder))
 	bu := internal.NewBgUploader(a, 16, tu, false)
 	// Look for new WALs while doing main upload
 	bu.Start()
@@ -32,14 +34,18 @@ func TestBackgroundWALUpload(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		bname := "B" + strconv.Itoa(i)
-		bd := filepath.Join(dir, "archive_status", bname+".done")
+		bd := filepath.Join(dir, ".walg_archive_status", bname)
 		_, err := os.Stat(bd)
-		assert.Falsef(t, os.IsNotExist(err), bname+".done was not created")
-
-		br := filepath.Join(dir, "archive_status", bname+".ready")
-		_, err = os.Stat(br)
-		assert.Truef(t, os.IsNotExist(err), bname+".ready was not deleted")
+		assert.Falsef(t, os.IsNotExist(err), bname+"stat file was not created")
 	}
+
+	err := os.Remove(filepath.Join(dir, "archive_status", "B0.ready"))
+
+	time.Sleep(time.Second)
+
+	_, err = os.Stat(filepath.Join(dir, ".walg_archive_status", "B0"))
+
+	assert.Truef(t, os.IsNotExist(err), "stat file was not deleted")
 
 	cleanup(t, dir)
 }
@@ -77,8 +83,8 @@ func setupArchiveStatus(t *testing.T, dir string) (string, string) {
 	if err != nil {
 		t.Log(err)
 	}
-	file.WriteString(strconv.Itoa(rand.Int()))
-	file.WriteString(strconv.Itoa(rand.Int()))
+	_, _ = file.WriteString(strconv.Itoa(rand.Int()))
+	_, _ = file.WriteString(strconv.Itoa(rand.Int()))
 	file.Close()
 
 	return testDir, a

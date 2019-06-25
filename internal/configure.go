@@ -16,9 +16,10 @@ import (
 )
 
 const (
-	DefaultDataBurstRateLimit = 8 * int64(DatabasePageSize)
-	DefaultDataFolderPath     = "/tmp"
-	WaleFileHost              = "file://localhost"
+	DefaultDataBurstRateLimit     = 8 * int64(DatabasePageSize)
+	DefaultDataFolderPath         = "/tmp"
+	DefaultAcriveStatusFolderPath = "/tmp"
+	WaleFileHost                  = "file://localhost"
 )
 
 const MinAllowedConcurrency = 1
@@ -124,9 +125,7 @@ func ConfigureFolder() (storage.Folder, error) {
 	return nil, NewUnconfiguredStorageError(skippedPrefixes)
 }
 
-// TODO : unit tests
-func getDataFolderPath() string {
-	var dataFolderPath string
+func getWALFolderDataPath() (dataFolderPath string) {
 	if !viper.IsSet(PgDataSetting) {
 		dataFolderPath = DefaultDataFolderPath
 	} else {
@@ -139,8 +138,12 @@ func getDataFolderPath() string {
 			}
 		}
 	}
-	dataFolderPath = filepath.Join(dataFolderPath, "walg_data")
-	return dataFolderPath
+	return
+}
+
+// TODO : unit tests
+func getDataFolderPath() string {
+	return filepath.Join(getWALFolderDataPath(), "walg_data")
 }
 
 // TODO : unit tests
@@ -158,6 +161,14 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err
 		err = nil
 	}
 	return
+}
+
+// TODO : unit tests
+func getArchiveStatusFolderPath() string {
+	if !viper.IsSet(PgDataSetting) {
+		return filepath.Join(DefaultAcriveStatusFolderPath, ".walg_archive_status_data")
+	}
+	return filepath.Join(viper.GetString(PgDataSetting), ".walg_archive_status_data")
 }
 
 // TODO : unit tests
@@ -201,7 +212,19 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
 	}
 
-	uploader = NewUploader(compressor, folder, deltaFileManager)
+	WALFolder, err := NewDiskDataFolder(getWALFolderDataPath())
+
+	if err != nil {
+		return nil, err
+	}
+
+	archiveStatusFolder, err := NewDiskDataFolder(getArchiveStatusFolderPath())
+
+	if err != nil {
+		return nil, err
+	}
+
+	uploader = NewUploader(compressor, folder, deltaFileManager, NewArchiveStatusManager(archiveStatusFolder, WALFolder))
 
 	return uploader, err
 }
