@@ -32,7 +32,7 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	_, err := bufferedWriter.Write(crypter.SymmetricKey.GetEncryptedKey())
 
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Can't write encryption key to s3: %v", err)
+		tracelog.ErrorLogger.Printf("Can't write encryption key to buffer: %v", err)
 		return nil, err
 	}
 
@@ -51,7 +51,7 @@ func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
 	encryptedSymmetricKey := make([]byte, crypter.SymmetricKey.GetEncryptedKeyLen())
 	_, err := reader.Read(encryptedSymmetricKey)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Can't read encryption key from s3: %v", err)
+		tracelog.ErrorLogger.Printf("Can't read encryption key from archive file header: %v", err)
 		return reader, err
 	}
 
