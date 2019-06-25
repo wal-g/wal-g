@@ -1,4 +1,3 @@
-cat << EOF > amcheck_test.sql
 CREATE EXTENSION IF NOT EXISTS amcheck;
 SELECT bt_index_check(c.oid), c.relname, c.relpages
 FROM pg_index i
@@ -9,6 +8,3 @@ JOIN pg_namespace n ON c.relnamespace = n.oid
 WHERE am.amname = 'btree'
 AND c.relpersistence != 't'
 AND i.indisready AND i.indisvalid;
-EOF
-
-./psql -f amcheck_test.sql postgres
