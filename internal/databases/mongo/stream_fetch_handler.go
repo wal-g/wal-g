@@ -2,8 +2,6 @@ package mongo
 
 import (
 	"encoding/json"
-	"fmt"
-	"os"
 	"path"
 	"sort"
 	"time"
@@ -11,24 +9,25 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleStreamFetch(backupName string, folder storage.Folder) {
-	backup, err := internal.GetBackupByName(backupName, folder)
+func FetchBackupStreamAndOplog(folder storage.Folder, backup *internal.Backup) error {
+	streamSentinel, err := FetchStreamSentinel(backup)
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Unable to get backup %+v\n", err)
+		return err
 	}
-	if !internal.FileIsPiped(os.Stdout) {
-		tracelog.ErrorLogger.Fatalf("stdout is a terminal")
-	}
-	err = downloadAndDecompressStream(folder, backup)
+	oplogsAreDone := make(chan error)
+	go fetchOplogs(folder, streamSentinel.StartLocalTime, oplogsAreDone)
+	err = internal.DownloadAndDecompressStream(folder, backup)
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
+		return err
 	}
+	tracelog.DebugLogger.Println("Waiting for oplogs")
+	err = <-oplogsAreDone
+	return err
 }
 
 // TODO : unit tests
@@ -40,36 +39,6 @@ func FetchStreamSentinel(backup *internal.Backup) (StreamSentinelDto, error) {
 	}
 	err = json.Unmarshal(sentinelDtoData, &sentinelDto)
 	return sentinelDto, errors.Wrap(err, "failed to unmarshal sentinel")
-}
-
-// TODO : unit tests
-func downloadAndDecompressStream(folder storage.Folder, backup *internal.Backup) error {
-	streamSentinel, err := FetchStreamSentinel(backup)
-	if err != nil {
-		return err
-	}
-	oplogsAreDone := make(chan error)
-	go fetchOplogs(folder, streamSentinel.StartLocalTime, oplogsAreDone)
-
-	for _, decompressor := range compression.Decompressors {
-		archiveReader, exists, err := internal.TryDownloadWALFile(backup.BaseBackupFolder, getStreamName(backup.Name, decompressor.FileExtension()))
-		if err != nil {
-			return err
-		}
-		if !exists {
-			continue
-		}
-
-		err = internal.DecompressWALFile(&internal.EmptyWriteIgnorer{WriteCloser: os.Stdout}, archiveReader, decompressor)
-		if err != nil {
-			return err
-		}
-		utility.LoggedClose(os.Stdout, "")
-		tracelog.DebugLogger.Println("Waiting for oplogs")
-		err = <-oplogsAreDone
-		return err
-	}
-	return internal.NewArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))
 }
 
 func fetchOplogs(folder storage.Folder, startTime time.Time, oplogAreDone chan error) {
