@@ -92,6 +92,9 @@ Overrides the default `upload buffer size` of 67108864 bytes (64 MB). Note that 
 
 Overrides the default `maximum number of upload buffers`. By default, at most 3 buffers are used concurrently.
 
+* `TOTAL_BG_UPLOADED_LIMIT` (eg. `1024`)
+Overrides the default `number of WAL files to upload during one scan`. By default, at most 32 wal files will be uploaded.
+
 ***Example: Using Minio.io S3-compatible storage***
 
 ```

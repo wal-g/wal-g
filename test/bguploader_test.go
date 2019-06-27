@@ -17,8 +17,12 @@ import (
 // We expect that background worker will upload 100 files.
 // But we have no guaranties for this
 func TestBackgroundWALUpload(t *testing.T) {
+
+	internal.InitConfig()
+	iterNum, _ := strconv.ParseInt(internal.TotalBgUploadedLimit, 10, 32)
+
 	dir, a := setupArchiveStatus(t, "")
-	for i := 0; i < 100; i++ {
+	for i := 0; i < int(iterNum); i++ {
 		addTestDataFile(t, dir, i)
 	}
 
@@ -30,7 +34,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 	time.Sleep(time.Second) // time to spin up new uploaders
 	bu.Stop()
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < int(iterNum); i++ {
 		bname := "B" + strconv.Itoa(i)
 		bd := filepath.Join(dir, "archive_status", bname+".done")
 		_, err := os.Stat(bd)
