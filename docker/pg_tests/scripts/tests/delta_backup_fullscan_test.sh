@@ -32,6 +32,7 @@ pg_dumpall -f /tmp/dump2
 
 diff /tmp/dump1 /tmp/dump2
 
+psql -f scripts/amcheck.sql postgres
 scripts/drop_pg.sh
 
 echo "Fullscan delta backup success!!!!!!"

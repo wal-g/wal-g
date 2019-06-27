@@ -227,20 +227,24 @@ func DeleteBeforeTarget(folder storage.Folder, target storage.Object,
 		return utility.NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
 	}
 	tracelog.InfoLogger.Println("Start delete")
-	permanentBackupNames := getPermanentBackupNames(folder)
-	if len(permanentBackupNames) > 0 {
-		tracelog.InfoLogger.Println("Found permanent backups: " + strings.Join(permanentBackupNames, ","))
+	permanentBackups, permanentWals := getPermanentObjects(folder)
+	if len(permanentBackups) > 0 {
+		tracelog.InfoLogger.Printf("Found permanent objects: backups=%v, wals=%v\n", permanentBackups, permanentWals)
 	}
 	return storage.DeleteObjectsWhere(folder, confirmed, func(object storage.Object) bool {
-		return less(object, target) && !anyContains(object.GetName(), permanentBackupNames)
+		return less(object, target) && !isPermanent(object.GetName(), permanentBackups, permanentWals)
 	})
 }
 
-func getPermanentBackupNames(folder storage.Folder) (backupNames []string) {
+func getPermanentObjects(folder storage.Folder) (map[string]bool, map[string]bool) {
+	tracelog.InfoLogger.Println("retrieving permanent objects")
 	backupTimes, err := getBackups(folder)
 	if err != nil {
-		return nil
+		return map[string]bool{}, map[string]bool{}
 	}
+
+	permanentBackups := map[string]bool{}
+	permanentWals := map[string]bool{}
 	for _, backupTime := range backupTimes {
 		backup, err := GetBackupByName(backupTime.BackupName, folder)
 		if err != nil {
@@ -253,18 +257,35 @@ func getPermanentBackupNames(folder storage.Folder) (backupNames []string) {
 			continue
 		}
 		if meta.IsPermanent {
-			backupNames = append(backupNames, backupTime.BackupName)
+			timelineID64, err := strconv.ParseUint(backupTime.BackupName[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+8], 0x10, sizeofInt32bits)
+			if err != nil {
+				tracelog.ErrorLogger.Printf("failed to parse backup timeline for backup %s with error %s, ignoring...", backupTime.BackupName, err.Error())
+				continue
+			}
+			timelineID := uint32(timelineID64)
+
+			startLogSegNo := logSegNoFromLsn(meta.StartLsn)
+			endLogSegNo := logSegNoFromLsn(meta.FinishLsn)
+			for startLogSegNo <= endLogSegNo {
+				permanentWals[formatWALFileName(timelineID, startLogSegNo)] = true
+				startLogSegNo++
+			}
+			permanentBackups[backupTime.BackupName[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+24]] = true
 		}
 	}
-	return
+	return permanentBackups, permanentWals
 }
 
-func anyContains(str string, substrs []string) bool {
-	for _, substr := range substrs {
-		if strings.Contains(str, substr) {
-			return true
-		}
+func isPermanent(objectName string, permanentBackups map[string]bool, permanentWals map[string]bool) bool {
+	if objectName[:len(utility.WalPath)] == utility.WalPath {
+		wal := objectName[len(utility.WalPath) : len(utility.WalPath)+24]
+		return permanentWals[wal]
 	}
+	if objectName[:len(utility.BaseBackupPath)] == utility.BaseBackupPath {
+		backup := objectName[len(utility.BaseBackupPath)+len(utility.BackupNamePrefix) : len(utility.BaseBackupPath)+len(utility.BackupNamePrefix)+24]
+		return permanentBackups[backup]
+	}
+	// should not reach here, default to false
 	return false
 }
 
