@@ -18,28 +18,23 @@ import (
 )
 
 func HandleStreamFetch(backupName string, folder storage.Folder) {
-	if backupName == "" || backupName == "LATEST" {
-		latest, err := internal.GetLatestBackupName(folder)
-		if err != nil {
-			tracelog.ErrorLogger.Fatalf("Unable to get latest backup %+v\n", err)
-		}
-		backupName = latest
+	backup, err := internal.GetBackupByName(backupName, folder)
+	if err != nil {
+		tracelog.ErrorLogger.Fatalf("Unable to get backup %+v\n", err)
 	}
-	stat, _ := os.Stdout.Stat()
-	if (stat.Mode() & os.ModeCharDevice) == 0 {
-	} else {
+	if !internal.FileIsPiped(os.Stdout) {
 		tracelog.ErrorLogger.Fatalf("stdout is a terminal")
 	}
-	err := downloadAndDecompressStream(folder, backupName)
+	err = downloadAndDecompressStream(folder, backup)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
 }
 
 // TODO : unit tests
-func (backup *Backup) FetchStreamSentinel() (StreamSentinelDto, error) {
+func FetchStreamSentinel(backup *internal.Backup) (StreamSentinelDto, error) {
 	sentinelDto := StreamSentinelDto{}
-	sentinelDtoData, err := backup.Backup.FetchSentinelData()
+	sentinelDtoData, err := backup.FetchSentinelData()
 	if err != nil {
 		return sentinelDto, errors.Wrap(err, "failed to fetch sentinel")
 	}
@@ -48,11 +43,8 @@ func (backup *Backup) FetchStreamSentinel() (StreamSentinelDto, error) {
 }
 
 // TODO : unit tests
-func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
-	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	backup := Backup{internal.NewBackup(baseBackupFolder, fileName)}
-
-	streamSentinel, err := backup.FetchStreamSentinel()
+func downloadAndDecompressStream(folder storage.Folder, backup *internal.Backup) error {
+	streamSentinel, err := FetchStreamSentinel(backup)
 	if err != nil {
 		return err
 	}
@@ -60,7 +52,7 @@ func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
 	go fetchOplogs(folder, streamSentinel.StartLocalTime, oplogsAreDone)
 
 	for _, decompressor := range compression.Decompressors {
-		archiveReader, exists, err := internal.TryDownloadWALFile(baseBackupFolder, getStreamName(backup.Name, decompressor.FileExtension()))
+		archiveReader, exists, err := internal.TryDownloadWALFile(backup.BaseBackupFolder, getStreamName(backup.Name, decompressor.FileExtension()))
 		if err != nil {
 			return err
 		}
@@ -77,7 +69,7 @@ func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
 		err = <-oplogsAreDone
 		return err
 	}
-	return internal.NewArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", fileName))
+	return internal.NewArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))
 }
 
 func fetchOplogs(folder storage.Folder, startTime time.Time, oplogAreDone chan error) {

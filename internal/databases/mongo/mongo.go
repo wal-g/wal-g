@@ -22,9 +22,6 @@ func getStreamName(backupName string, extension string) string {
 type Uploader struct {
 	*internal.Uploader
 }
-type Backup struct {
-	*internal.Backup
-}
 
 type StreamSentinelDto struct {
 	StartLocalTime time.Time
