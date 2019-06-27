@@ -1,6 +1,7 @@
 # external libs
 vendor/
 .idea/
+
 # bin
 main/pg/wal-g
 main/mysql/wal-g
@@ -9,6 +10,7 @@ main/redis/wal-g
 # tests
 test/testdata/00000*
 test/testdata/broken_wals/
+coverage.out
 
 tmp/
 *.xml
