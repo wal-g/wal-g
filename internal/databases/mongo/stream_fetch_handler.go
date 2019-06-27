@@ -83,9 +83,9 @@ func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
 
 func fetchOplogs(folder storage.Folder, startTime time.Time, oplogAreDone chan error) {
 	oplogFolder := folder.GetSubFolder(OplogPath)
-	endTS, oplogDstFolder := getOplogConfigs()
-	if oplogDstFolder == "" {
-		oplogAreDone <- errors.New("WALG_MONGO_OPLOG_DST is not configured")
+	endTS, oplogDstFolder, err := getOplogConfigs()
+	if err != nil {
+		oplogAreDone <- nil
 		return
 	}
 	oplogFiles, _, err := oplogFolder.ListFolder()
@@ -129,14 +129,6 @@ func extractOplogName(filename string) string {
 	return strings.TrimSuffix(filename, "."+utility.GetFileExtension(filename))
 }
 
-func getOplogConfigs() (*time.Time, string) {
-	endTSStr, ok := internal.GetSetting(OplogEndTs)
-	var endTS *time.Time
-	if ok {
-		if t, err := time.Parse(time.RFC3339, endTSStr); err == nil {
-			endTS = &t
-		}
-	}
-	dstFolder, ok := internal.GetSetting(OplogDst)
-	return endTS, dstFolder
+func getOplogConfigs() (*time.Time, string, error) {
+	return internal.GetOperationLogsSettings(OplogEndTs, OplogDst)
 }
