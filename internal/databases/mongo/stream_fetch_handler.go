@@ -6,7 +6,6 @@ import (
 	"os"
 	"path"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -100,14 +99,12 @@ func fetchOplogs(folder storage.Folder, startTime time.Time, oplogAreDone chan e
 
 	for _, oplogFile := range oplogFiles {
 		if oplogFile.GetLastModified().After(startTime) {
-			oplogName := extractOplogName(oplogFile.GetName())
-			oplogFileSubFolder := path.Join(oplogDstFolder, oplogName)
-			_, err := internal.NewDiskDataFolder(oplogFileSubFolder)
+			oplogName := utility.TrimFileExtension(oplogFile.GetName())
+			oplogFilePath, err := getOplogDstFilePath(oplogName, oplogDstFolder)
 			if err != nil {
 				oplogAreDone <- err
 				return
 			}
-			oplogFilePath := path.Join(oplogFileSubFolder, "oplog.bson")
 
 			err = internal.DownloadWALFileTo(oplogFolder, oplogName, oplogFilePath)
 			if err != nil {
@@ -125,8 +122,13 @@ func fetchOplogs(folder storage.Folder, startTime time.Time, oplogAreDone chan e
 	oplogAreDone <- nil
 }
 
-func extractOplogName(filename string) string {
-	return strings.TrimSuffix(filename, "."+utility.GetFileExtension(filename))
+func getOplogDstFilePath(oplogName string, oplogDstFolder string) (string, error) {
+	oplogFileSubFolder := path.Join(oplogDstFolder, oplogName)
+	_, err := internal.NewDiskDataFolder(oplogFileSubFolder)
+	if err != nil {
+		return "", err
+	}
+	return path.Join(oplogFileSubFolder, "oplog.bson"), nil
 }
 
 func getOplogConfigs() (*time.Time, string, error) {
