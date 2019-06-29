@@ -6,6 +6,7 @@ CMD_FILES = $(wildcard wal-g/*.go)
 PKG_FILES = $(wildcard internal/**/*.go internal/**/**/*.go internal/*.go)
 TEST_FILES = $(wildcard test/*.go testtools/*.go)
 PKG := github.com/wal-g/wal-g
+COVERAGE_FILE := coverage.out
 
 .PHONY: unittest fmt lint install clean
 
@@ -19,6 +20,10 @@ pg_test: install deps pg_build lint unittest unlink_brotli pg_integration_test
 
 pg_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_PG_PATH) && go build -o wal-g $(GOTAGS) -ldflags "-s -w -X github.com/wal-g/wal-g/cmd.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd.WalgVersion=`git tag -l --points-at HEAD`")
+
+pg_int_tests_only:
+	docker-compose build pg_tests
+	docker-compose up --exit-code-from pg_tests pg_tests
 
 pg_integration_test:
 	docker-compose build $(DOCKER_COMMON) pg pg_tests
@@ -65,16 +70,22 @@ redis_install: redis_build
 
 unittest:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet
-	go test -v ./test/
-	go test -v ./internal/walparser/
-	go test -v ./internal/compression/
-	go test -v ./internal/crypto/
-	go test -v ./internal/crypto/openpgp/
-	go test -v ./internal/storages/s3/
-	go test -v ./internal/storages/gcs/
-	go test -v ./internal/storages/fs/
-	go test -v ./internal/storages/azure/
-	go test -v ./internal/storages/swift/
+	go test -v $(TEST_MODIFIER) ./internal/
+	go test -v $(TEST_MODIFIER) ./internal/compression/
+	go test -v $(TEST_MODIFIER) ./internal/crypto/openpgp/
+	go test -v $(TEST_MODIFIER) ./internal/databases/mysql
+	go test -v $(TEST_MODIFIER) ./internal/storages/azure/
+	go test -v $(TEST_MODIFIER) ./internal/storages/fs/
+	go test -v $(TEST_MODIFIER) ./internal/storages/gcs/
+	go test -v $(TEST_MODIFIER) ./internal/storages/s3/
+	go test -v $(TEST_MODIFIER) ./internal/storages/storage
+	go test -v $(TEST_MODIFIER) ./internal/storages/swift/
+	go test -v $(TEST_MODIFIER) ./internal/walparser/
+	go test -v $(TEST_MODIFIER) ./utility
+
+coverage:
+	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go test -v $(TEST_MODIFIER) -coverprofile=$(COVERAGE_FILE) | grep -v 'no test files'
+	go tool cover -html=$(COVERAGE_FILE)
 
 fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 	gofmt -s -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)

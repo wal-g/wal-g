@@ -2,6 +2,7 @@
 set -e -x
 
 export WALE_S3_PREFIX=s3://fullbucket
+export WALG_PGP_KEY_PATH=/tmp/PGP_KEY
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
@@ -17,9 +18,7 @@ pgbench -c 2 -T 100000000 -S &
 sleep 1
 wal-g backup-push ${PGDATA}
 
-pkill -9 postgres
-
-rm -rf ${PGDATA}
+scripts/drop_pg.sh
 
 wal-g backup-fetch ${PGDATA} LATEST
 
@@ -31,7 +30,7 @@ pg_dumpall -f /tmp/dump2
 
 diff /tmp/dump1 /tmp/dump2
 
-pkill -9 postgres
-rm -rf ${PGDATA}
+psql -f scripts/amcheck.sql postgres
+scripts/drop_pg.sh
 
 echo "Full backup success!!!!!!"

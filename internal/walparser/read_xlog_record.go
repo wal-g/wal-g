@@ -9,14 +9,16 @@ import (
 
 func readXLogRecordHeader(reader io.Reader) (*XLogRecordHeader, error) {
 	xLogRecordHeader := XLogRecordHeader{}
+	var paddingByte uint8
+	PaddingByte := parsingutil.NewFieldToParse(&paddingByte, "padding byte")
 	err := parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
 		{Field: &xLogRecordHeader.TotalRecordLength, Name: "totalRecordLength"},
 		{Field: &xLogRecordHeader.XactID, Name: "xactID"},
 		{Field: &xLogRecordHeader.PrevRecordPtr, Name: "prevRecordPtr"},
 		{Field: &xLogRecordHeader.Info, Name: "info"},
 		{Field: &xLogRecordHeader.ResourceManagerID, Name: "resourceManagerID"},
-		parsingutil.PaddingByte,
-		parsingutil.PaddingByte,
+		*PaddingByte,
+		*PaddingByte,
 		{Field: &xLogRecordHeader.Crc32Hash, Name: "crc32Hash"},
 	}, reader)
 	if err != nil {

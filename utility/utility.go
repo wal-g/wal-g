@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"io"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 // TODO : unit tests
@@ -29,12 +30,13 @@ const (
 	VersionStr       = "005"
 	BaseBackupPath   = "basebackups_" + VersionStr + "/"
 	WalPath          = "wal_" + VersionStr + "/"
-	backupNamePrefix = "base_"
+	BackupNamePrefix = "base_"
+	WalNamePrefix    = "wal_"
 
 	// utility.SentinelSuffix is a suffix of backup finish sentinel file
 	SentinelSuffix         = "_backup_stop_sentinel.json"
 	CompressedBlockMaxSize = 20 << 20
-	NotFoundAWSErrorCode   = "NotFound"
+	CopiedBlockMaxSize     = CompressedBlockMaxSize
 	MetadataFileName       = "metadata.json"
 )
 
@@ -97,10 +99,10 @@ func GetFileRelativePath(fileAbsPath string, directoryPath string) string {
 	return strings.TrimPrefix(fileAbsPath, directoryPath)
 }
 
-// TODO : unit tests
+//FastCopy copies data from src to dst in blocks of CopiedBlockMaxSize bytes
 func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
 	n := int64(0)
-	buf := make([]byte, CompressedBlockMaxSize)
+	buf := make([]byte, CopiedBlockMaxSize)
 	for {
 		m, readingErr := src.Read(buf)
 		if readingErr != nil && readingErr != io.EOF {
@@ -167,4 +169,11 @@ func TimeNowCrossPlatformUTC() time.Time {
 
 func TimeNowCrossPlatformLocal() time.Time {
 	return CeilTimeUpToMicroseconds(time.Now())
+}
+
+func ConcatByteSlices(a []byte, b []byte) []byte {
+	result := make([]byte, len(a)+len(b))
+	copy(result, a)
+	copy(result[len(a):], b)
+	return result
 }

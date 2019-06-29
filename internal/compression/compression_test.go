@@ -9,13 +9,6 @@ import (
 	"testing"
 )
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 type BiasedRandomReader struct{}
 
 func NewBiasedRandomReader() *BiasedRandomReader {
@@ -24,7 +17,7 @@ func NewBiasedRandomReader() *BiasedRandomReader {
 
 func (reader *BiasedRandomReader) Read(p []byte) (n int, err error) {
 	for i := 0; i < len(p); i++ {
-		p[i] = byte(min(10, rand.Int()%256))
+		p[i] = byte(utility.Min(10, rand.Int()%256))
 	}
 	return len(p), nil
 }

@@ -27,7 +27,7 @@ To decompress the binary, use:
 ```
 tar -zxvf wal-g.linux-amd64.tar.gz
 ```
-For other incompatible systems, please consult the Development section for more information.
+For other incompatible systems, please consult the [Development](#development) section for more information.
 
 Configuration
 -------------
@@ -91,6 +91,9 @@ Overrides the default `upload buffer size` of 67108864 bytes (64 MB). Note that 
 * `WALG_AZURE_MAX_BUFFERS` (eg. `5`)
 
 Overrides the default `maximum number of upload buffers`. By default, at most 3 buffers are used concurrently.
+
+* `TOTAL_BG_UPLOADED_LIMIT` (eg. `1024`)
+Overrides the default `number of WAL files to upload during one scan`. By default, at most 32 wal files will be uploaded.
 
 ***Example: Using Minio.io S3-compatible storage***
 
@@ -180,16 +183,19 @@ It is specified for your type of [database](#databases).
 
 ### Testing
 
-WAL-G relies heavily on unit tests. These tests do not require S3 configuration as the upload/download parts are tested using mocked objects. For more information on testing, please consult [test](test) and [testtools](testtools).
+WAL-G relies heavily on unit tests. These tests do not require S3 configuration as the upload/download parts are tested using mocked objects. Unit tests can be run using
+```
+make unittest
+```
+For more information on testing, please consult [test](test), [testtools](testtools) and `unittest` section in [Makefile](Makefile).
 
 WAL-G will perform a round-trip compression/decompression test that generates a directory for data (eg. data...), compressed files (eg. compressed), and extracted files (eg. extracted). These directories will only get cleaned up if the files in the original data directory match the files in the extracted one.
 
 Test coverage can be obtained using:
-
 ```
-go test -v -coverprofile=coverage.out
-go tool cover -html=coverage.out
+make coverage
 ```
+This command generates `coverage.out` file and opens HTML representation of the coverage.
 
 
 Authors

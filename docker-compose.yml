@@ -27,6 +27,7 @@ services:
     command: >
       -c 'mkdir -p /export/fullbucket
       &&  mkdir -p /export/fullscandeltabucket
+      &&  mkdir -p /export/cryptobucket
       &&  mkdir -p /export/waldeltabucket
       &&  mkdir -p /export/deleteretainfullbucket
       &&  mkdir -p /export/deleteretainfindfullbucket
