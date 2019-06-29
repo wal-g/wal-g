@@ -144,7 +144,7 @@ Lists names and creation time of available backups.
 
 * ``delete``
 
-Is used to delete backups and WALs before them. By default ``delete`` will perform dry run. If you want to execute deletion you have to add ``--confirm`` flag at the end of the command.
+Is used to delete backups and WALs before them. By default ``delete`` will perform dry run. If you want to execute deletion you have to add ``--confirm`` flag at the end of the command. Backups marked as permanent will not be deleted.
 
 ``delete`` can operate in two modes: ``retain`` and ``before``.
 
