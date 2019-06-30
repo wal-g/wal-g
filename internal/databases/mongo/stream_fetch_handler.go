@@ -3,7 +3,6 @@ package mongo
 import (
 	"encoding/json"
 	"path"
-	"sort"
 	"time"
 
 	"github.com/pkg/errors"
@@ -42,45 +41,38 @@ func FetchStreamSentinel(backup *internal.Backup) (StreamSentinelDto, error) {
 }
 
 func fetchOplogs(folder storage.Folder, startTime time.Time, oplogAreDone chan error) {
-	oplogFolder := folder.GetSubFolder(OplogPath)
 	endTS, oplogDstFolder, err := getOplogConfigs()
 	if err != nil {
 		oplogAreDone <- nil
 		return
 	}
-	oplogFiles, _, err := oplogFolder.ListFolder()
+	oplogFolder := folder.GetSubFolder(OplogPath)
+
+	logsToFetch, err := internal.GetOperationLogsCoveringInterval(oplogFolder, startTime, endTS)
 	if err != nil {
-		oplogAreDone <- err
+		oplogAreDone <- nil
 		return
 	}
 
-	sort.Slice(oplogFiles, func(i, j int) bool {
-		return oplogFiles[i].GetLastModified().After(oplogFiles[j].GetLastModified())
-	})
+	oplogAreDone <- downloadOplogFiles(logsToFetch, oplogFolder, oplogDstFolder)
+}
 
+func downloadOplogFiles(oplogFiles []storage.Object, oplogFolder storage.Folder, oplogDstFolder string) error {
 	for _, oplogFile := range oplogFiles {
-		if oplogFile.GetLastModified().After(startTime) {
-			oplogName := utility.TrimFileExtension(oplogFile.GetName())
-			oplogFilePath, err := getOplogDstFilePath(oplogName, oplogDstFolder)
-			if err != nil {
-				oplogAreDone <- err
-				return
-			}
-
-			err = internal.DownloadWALFileTo(oplogFolder, oplogName, oplogFilePath)
-			if err != nil {
-				oplogAreDone <- err
-				return
-			}
-			tracelog.InfoLogger.Println("oplog file " + oplogFile.GetName() + " fetched to " + oplogFilePath)
-
-			if endTS != nil && oplogFile.GetLastModified().After(*endTS) {
-				break
-			}
+		oplogName := utility.TrimFileExtension(oplogFile.GetName())
+		oplogFilePath, err := getOplogDstFilePath(oplogName, oplogDstFolder)
+		if err != nil {
+			return err
 		}
+
+		err = internal.DownloadWALFileTo(oplogFolder, oplogName, oplogFilePath)
+		if err != nil {
+			return err
+		}
+		tracelog.InfoLogger.Println("oplog file " + oplogFile.GetName() + " fetched to " + oplogFilePath)
 	}
 
-	oplogAreDone <- nil
+	return nil
 }
 
 func getOplogDstFilePath(oplogName string, oplogDstFolder string) (string, error) {

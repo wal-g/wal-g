@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"os"
+	"sort"
 	"time"
 
 	"github.com/wal-g/wal-g/internal/compression"
@@ -63,4 +64,27 @@ func DownloadAndDecompressStream(folder storage.Folder, backup *Backup) error {
 		return nil
 	}
 	return NewArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))
+}
+
+func GetOperationLogsCoveringInterval(folder storage.Folder, start time.Time, end *time.Time) ([]storage.Object, error) {
+	oplogFiles, _, err := folder.ListFolder()
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Slice(oplogFiles, func(i, j int) bool {
+		return oplogFiles[i].GetLastModified().After(oplogFiles[j].GetLastModified())
+	})
+
+	var logsToFetch []storage.Object
+
+	for _, oplogFile := range oplogFiles {
+		if oplogFile.GetLastModified().After(start) {
+			logsToFetch = append(logsToFetch, oplogFile)
+			if end != nil && oplogFile.GetLastModified().After(*end) {
+				break
+			}
+		}
+	}
+	return logsToFetch, err
 }
