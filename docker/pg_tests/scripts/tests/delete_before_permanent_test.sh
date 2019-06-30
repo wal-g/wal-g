@@ -36,7 +36,7 @@ wal-g backup-list
 
 # check that permanent backup still exists
 first_backup_name=`wal-g backup-list | sed '2q;d' | cut -f 1 -d " "`
-if [ $first_backup_name -ne $permanent_backup_name ];
+if [ $first_backup_name != $permanent_backup_name ];
 then
     echo "permanent backup does not exist after deletion"
 fi
