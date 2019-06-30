@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e -x
 
-export WALE_S3_PREFIX=s3://deletebeforenamefindfullbucket
+export WALE_S3_PREFIX=s3://deletebeforepermanentbucket
 export WALG_USE_WAL_DELTA=true
 export WALG_DELTA_MAX_STEPS=0
 
@@ -34,7 +34,7 @@ last_backup_name=`wal-g backup-list | tail -n 1 | cut -f 1 -d " "`
 wal-g delete before $last_backup_name --confirm
 wal-g backup-list
 
-# check that permannet backup still exists
+# check that permanent backup still exists
 first_backup_name=`wal-g backup-list | sed '2q;d' | cut -f 1 -d " "`
 if [ $first_backup_name -ne $permanent_backup_name ];
 then
