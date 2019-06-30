@@ -33,6 +33,7 @@ services:
       &&  mkdir -p /export/deleteretainfindfullbucket
       &&  mkdir -p /export/deletebeforenamefindfullbucket
       &&  mkdir -p /export/deletebeforetimefindfullbucket
+      &&  mkdir -p /export/deletebeforepermanentbucket
       &&  mkdir -p /export/deletewithoutconfirm
       &&  mkdir -p /export/deleteendtoendbucket
       &&  mkdir -p /export/mysqlfullbucket
