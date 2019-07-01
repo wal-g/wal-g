@@ -80,6 +80,7 @@ func (backup *Backup) FetchSentinel() (BackupSentinelDto, error) {
 	return sentinelDto, errors.Wrap(err, "failed to unmarshal sentinel")
 }
 
+// TODO : unit tests
 func (backup *Backup) FetchSentinelData() ([]byte, error) {
 	backupReaderMaker := NewStorageReaderMaker(backup.BaseBackupFolder, backup.GetStopSentinelPath())
 	backupReader, err := backupReaderMaker.Reader()
