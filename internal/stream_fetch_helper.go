@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"os"
+	"path"
 	"sort"
 	"time"
 
@@ -87,4 +88,23 @@ func GetOperationLogsCoveringInterval(folder storage.Folder, start time.Time, en
 		}
 	}
 	return logsToFetch, err
+}
+
+func DownloadOplogFiles(oplogFiles []storage.Object, oplogFolder storage.Folder, oplogDstFolder string, logFileName string) error {
+	for _, oplogFile := range oplogFiles {
+		oplogName := utility.TrimFileExtension(oplogFile.GetName())
+		oplogFileSubFolder := path.Join(oplogDstFolder, oplogName)
+		_, err := NewDiskDataFolder(oplogFileSubFolder)
+		if err != nil {
+			return err
+		}
+		oplogFilePath := path.Join(oplogFileSubFolder, logFileName)
+		err = DownloadWALFileTo(oplogFolder, oplogName, oplogFilePath)
+		if err != nil {
+			return err
+		}
+		tracelog.InfoLogger.Println("Operation log file " + oplogFile.GetName() + " fetched to " + oplogFilePath)
+	}
+
+	return nil
 }
