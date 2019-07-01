@@ -30,6 +30,7 @@ const (
 	PgPortSetting                = "PGPORT" // TODO : do something with it
 	PgUserSetting                = "PGUSER" // TODO : do something with it
 	PgHostSetting                = "PGHOST" // TODO : do something with it
+	TotalBgUploadedLimit         = "TOTAL_BG_UPLOADED_LIMIT"
 )
 
 var (
@@ -44,6 +45,7 @@ var (
 		CompressionMethodSetting:     "lz4",
 		UseWalDeltaSetting:           "true",
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
+		TotalBgUploadedLimit:         "32",
 	}
 )
 

@@ -30,13 +30,13 @@ const (
 	VersionStr       = "005"
 	BaseBackupPath   = "basebackups_" + VersionStr + "/"
 	WalPath          = "wal_" + VersionStr + "/"
-	backupNamePrefix = "base_"
+	BackupNamePrefix = "base_"
+	WalNamePrefix    = "wal_"
 
 	// utility.SentinelSuffix is a suffix of backup finish sentinel file
 	SentinelSuffix         = "_backup_stop_sentinel.json"
 	CompressedBlockMaxSize = 20 << 20
 	CopiedBlockMaxSize     = CompressedBlockMaxSize
-	NotFoundAWSErrorCode   = "NotFound"
 	MetadataFileName       = "metadata.json"
 )
 
@@ -186,4 +186,11 @@ func TryFetchTimeRFC3999(name string) (string, bool) {
 		return regexpTimeRFC3339.FindAllString(name, 1)[0], true
 	}
 	return "", false
+}
+
+func ConcatByteSlices(a []byte, b []byte) []byte {
+	result := make([]byte, len(a)+len(b))
+	copy(result, a)
+	copy(result[len(a):], b)
+	return result
 }
