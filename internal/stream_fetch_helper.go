@@ -13,7 +13,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-// GetOperationLogsSettings ... TODO
+// GetOperationLogsSettings reads from the environment variables fetch settings
 func GetOperationLogsSettings(OperationLogEndTsSetting string, operationLogsDstSetting string) (endTS *time.Time, dstFolder string, err error) {
 	endTSStr, ok := GetSetting(OperationLogEndTsSetting)
 	if ok {
@@ -30,7 +30,7 @@ func GetOperationLogsSettings(OperationLogEndTsSetting string, operationLogsDstS
 	return endTS, dstFolder, nil
 }
 
-// HandleStreamFetch ... TODO
+// HandleStreamFetch is invoked to perform wal-g stream-fetch
 func HandleStreamFetch(backupName string, folder storage.Folder,
 	fetchBackup func(storage.Folder, *Backup) error) {
 	backup, err := GetBackupByName(backupName, folder)
@@ -46,7 +46,7 @@ func HandleStreamFetch(backupName string, folder storage.Folder,
 	}
 }
 
-// TODO : unit tests
+// DownloadAndDecompressStream downloads, decompresses and writes stream to stdout
 func DownloadAndDecompressStream(backup *Backup) error {
 	for _, decompressor := range compression.Decompressors {
 		archiveReader, exists, err := TryDownloadWALFile(backup.BaseBackupFolder, getStreamName(backup.Name, decompressor.FileExtension()))
@@ -67,6 +67,7 @@ func DownloadAndDecompressStream(backup *Backup) error {
 	return NewArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))
 }
 
+// GetOperationLogsCoveringInterval lists the operation logs that cover the interval
 func GetOperationLogsCoveringInterval(folder storage.Folder, start time.Time, end *time.Time) ([]storage.Object, error) {
 	oplogFiles, _, err := folder.ListFolder()
 	if err != nil {
@@ -90,6 +91,7 @@ func GetOperationLogsCoveringInterval(folder storage.Folder, start time.Time, en
 	return logsToFetch, err
 }
 
+// DownloadOplogFiles downloads files to specified folder
 func DownloadOplogFiles(oplogFiles []storage.Object, oplogFolder storage.Folder, oplogDstFolder string, logFileName string) error {
 	for _, oplogFile := range oplogFiles {
 		oplogName := utility.TrimFileExtension(oplogFile.GetName())
