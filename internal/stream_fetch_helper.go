@@ -47,7 +47,7 @@ func HandleStreamFetch(backupName string, folder storage.Folder,
 }
 
 // TODO : unit tests
-func DownloadAndDecompressStream(folder storage.Folder, backup *Backup) error {
+func DownloadAndDecompressStream(backup *Backup) error {
 	for _, decompressor := range compression.Decompressors {
 		archiveReader, exists, err := TryDownloadWALFile(backup.BaseBackupFolder, getStreamName(backup.Name, decompressor.FileExtension()))
 		if err != nil {

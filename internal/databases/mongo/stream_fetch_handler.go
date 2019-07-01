@@ -18,7 +18,7 @@ func FetchBackupStreamAndOplog(folder storage.Folder, backup *internal.Backup) e
 	}
 	oplogsAreDone := make(chan error)
 	go fetchOplogs(folder, streamSentinel.StartLocalTime, oplogsAreDone)
-	err = internal.DownloadAndDecompressStream(folder, backup)
+	err = internal.DownloadAndDecompressStream(backup)
 	if err != nil {
 		return err
 	}
