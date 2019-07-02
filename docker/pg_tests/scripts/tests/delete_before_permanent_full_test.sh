@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e -x
 
-export WALE_S3_PREFIX=s3://deletebeforepermanentbucket
+export WALE_S3_PREFIX=s3://deletebeforepermanentfullbucket
 export WALG_USE_WAL_DELTA=true
 export WALG_DELTA_MAX_STEPS=0
 
@@ -43,4 +43,4 @@ fi
 
 scripts/drop_pg.sh
 
-echo "Delete before permanent success!!!!!!"
+echo "Delete before permanent full success!!!!!!"
