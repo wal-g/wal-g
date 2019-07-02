@@ -12,7 +12,7 @@ COPY main/ main/
 COPY utility/ utility/
 
 RUN cd main/mongo && \
-    go build -o wal-g -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
+    go build -race -o wal-g -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 
 FROM wal-g/mongo:latest
 
