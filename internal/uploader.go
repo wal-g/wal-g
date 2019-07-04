@@ -23,6 +23,12 @@ type Uploader struct {
 	Failed           atomic.Value
 }
 
+// UploadObject
+type UploadObject struct {
+	Path    string
+	Content io.Reader
+}
+
 func (uploader *Uploader) getUseWalDelta() (useWalDelta bool) {
 	return uploader.deltaFileManager != nil
 }
@@ -102,4 +108,18 @@ func (uploader *Uploader) Upload(path string, content io.Reader) error {
 	uploader.Failed.Store(true)
 	tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"\n", err)
 	return err
+}
+
+// UploadMultiple uploads multiple objects, returning the first error if any.
+// Note that this is not atomic thus potentially dangerous
+// TODO : unit tests
+func (uploader *Uploader) UploadMultiple(objects []UploadObject) error {
+	for _, object := range objects {
+		err := uploader.Upload(object.Path, object.Content)
+		if err != nil {
+			// possibly do a retry here
+			return err
+		}
+	}
+	return nil
 }

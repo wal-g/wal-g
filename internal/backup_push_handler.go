@@ -192,6 +192,13 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", backupName)
 		tracelog.ErrorLogger.FatalError(err)
 	}
+
+	if isPermanent {
+		err := MarkSelfAndPreviousBackupsPermanent(uploader, basebackupFolder, previousBackupName)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("Failed to mark permanent previous backups: %v", err)
+		}
+	}
 	// logging backup set name
 	tracelog.InfoLogger.Println("Wrote backup with name " + backupName)
 }
