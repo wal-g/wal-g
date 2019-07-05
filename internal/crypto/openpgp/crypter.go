@@ -170,7 +170,8 @@ func (crypter *Crypter) loadSecret() error {
 	}
 
 	if crypter.IsUseArmoredKey {
-		entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(crypter.ArmoredKey))
+		evaluatedKey := strings.Replace(crypter.ArmoredKey, `\n`, "\n", -1)
+		entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(evaluatedKey))
 
 		if err != nil {
 			return errors.WithStack(err)
