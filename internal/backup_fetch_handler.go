@@ -2,7 +2,6 @@ package internal
 
 import (
 	"fmt"
-
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
@@ -60,10 +59,10 @@ func (err PgControlNotFoundError) Error() string {
 
 // TODO : unit tests
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
-func HandleBackupFetch(folder storage.Folder, dbDataDirectory string, backupName string) {
+func HandleBackupFetch(folder storage.Folder, dbDataDirectory string, backupName string, fileMask string) {
 	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder, %s)\n", backupName, dbDataDirectory)
 	dbDataDirectory = utility.ResolveSymlink(dbDataDirectory)
-	err := deltaFetchRecursion(backupName, folder, dbDataDirectory, nil)
+	err := deltaFetchRecursion(backupName, folder, dbDataDirectory, nil, fileMask)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to fetch backup: %v\n", err)
 	}
@@ -98,7 +97,8 @@ func GetBackupByName(backupName string, folder storage.Folder) (*Backup, error) 
 
 // TODO : unit tests
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
-func deltaFetchRecursion(backupName string, folder storage.Folder, dbDataDirectory string, filesToUnwrap map[string]bool) error {
+func deltaFetchRecursion(backupName string, folder storage.Folder, dbDataDirectory string,
+	filesToUnwrap map[string]bool, fileMask string) error {
 	backup, err := GetBackupByName(backupName, folder)
 	if err != nil {
 		return err
@@ -109,7 +109,10 @@ func deltaFetchRecursion(backupName string, folder storage.Folder, dbDataDirecto
 	}
 
 	if filesToUnwrap == nil { // it is the exact backup we want to fetch, so we want to include all files here
-		filesToUnwrap = GetRestoredBackupFilesToUnwrap(sentinelDto)
+		filesToUnwrap, err = GetRestoredBackupFilesToUnwrap(sentinelDto, fileMask)
+		if err != nil {
+			return err
+		}
 	}
 
 	if sentinelDto.IsIncremental() {
@@ -118,7 +121,7 @@ func deltaFetchRecursion(backupName string, folder storage.Folder, dbDataDirecto
 		if err != nil {
 			return err
 		}
-		err = deltaFetchRecursion(*sentinelDto.IncrementFrom, folder, dbDataDirectory, baseFilesToUnwrap)
+		err = deltaFetchRecursion(*sentinelDto.IncrementFrom, folder, dbDataDirectory, baseFilesToUnwrap, fileMask)
 		if err != nil {
 			return err
 		}
@@ -128,9 +131,9 @@ func deltaFetchRecursion(backupName string, folder storage.Folder, dbDataDirecto
 	return backup.unwrap(dbDataDirectory, sentinelDto, filesToUnwrap)
 }
 
-func GetRestoredBackupFilesToUnwrap(sentinelDto BackupSentinelDto) map[string]bool {
+func GetRestoredBackupFilesToUnwrap(sentinelDto BackupSentinelDto, fileMask string) (map[string]bool, error) {
 	if sentinelDto.Files == nil { // in case of WAL-E of old WAL-G backup
-		return UnwrapAll
+		return UnwrapAll, nil
 	}
 	filesToUnwrap := make(map[string]bool)
 	for file := range sentinelDto.Files {
@@ -139,7 +142,7 @@ func GetRestoredBackupFilesToUnwrap(sentinelDto BackupSentinelDto) map[string]bo
 	for utilityFilePath := range UtilityFilePaths {
 		filesToUnwrap[utilityFilePath] = true
 	}
-	return filesToUnwrap
+	return utility.SelectMatchingFiles(fileMask, filesToUnwrap)
 }
 
 func GetBaseFilesToUnwrap(backupFileStates BackupFileList, currentFilesToUnwrap map[string]bool) (map[string]bool, error) {

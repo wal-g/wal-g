@@ -6,7 +6,13 @@ import (
 	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
-const BackupFetchShortDescription = "Fetches a backup from storage"
+const (
+	BackupFetchShortDescription = "Fetches a backup from storage"
+	MaskFlagDescription         = "Fetches only files which path relative to destination_directory" +
+		"matches given shell file pattern"
+)
+
+var fileMask string
 
 // backupFetchCmd represents the backupFetch command
 var backupFetchCmd = &cobra.Command{
@@ -18,10 +24,12 @@ var backupFetchCmd = &cobra.Command{
 		if err != nil {
 			tracelog.ErrorLogger.FatalError(err)
 		}
-		internal.HandleBackupFetch(folder, args[0], args[1])
+		internal.HandleBackupFetch(folder, args[0], args[1], fileMask)
 	},
 }
 
 func init() {
+	backupFetchCmd.Flags().StringVar(&fileMask, "mask", "", MaskFlagDescription)
+
 	PgCmd.AddCommand(backupFetchCmd)
 }

@@ -110,13 +110,13 @@ func TestDeleteBeforeTarget_WithPermanentBackups(t *testing.T) {
 	}
 
 	// verify that they exist initially
-	for backupName, _ := range expectBackupExistAfterDelete {
+	for backupName := range expectBackupExistAfterDelete {
 		exists, err := baseBackupFolder.Exists(backupName + "/" + utility.MetadataFileName)
 		assert.NoError(t, err)
 		assert.True(t, exists, "expected backup "+backupName+" to exist")
 
 	}
-	for walName, _ := range expectWalExistAfterDelete {
+	for walName := range expectWalExistAfterDelete {
 		exists, err := walBackupFolder.Exists(walName + ".lz4")
 		assert.NoError(t, err)
 		assert.True(t, exists, "expected wal "+walName+" to exist")
