@@ -26,7 +26,7 @@ wal-g backup-push ${PGDATA}
 
 export WALG_COMPRESSION_METHOD=brotli
 pgbench -i -s 40 postgres
-pkill pgbench
+pkill -9 pgbench
 pg_dumpall -f /tmp/dump1
 sleep 1
 wal-g backup-push ${PGDATA}
