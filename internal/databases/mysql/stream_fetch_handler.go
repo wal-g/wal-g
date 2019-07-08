@@ -106,7 +106,7 @@ func fetchBinlogs(folder storage.Folder, sentinel StreamSentinelDto, binlogsAreD
 	}
 
 	sort.Slice(fetchedLogs, func(i, j int) bool {
-		return fetchedLogs[i].GetLastModified().After(fetchedLogs[j].GetLastModified())
+		return fetchedLogs[i].GetLastModified().Before(fetchedLogs[j].GetLastModified())
 	})
 
 	index_file, err := os.Create(filepath.Join(dstFolder, "binlogs_order"))
