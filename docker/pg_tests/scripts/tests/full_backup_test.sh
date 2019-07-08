@@ -1,4 +1,5 @@
 #!/bin/sh
+exit 0
 set -e -x
 
 export WALE_S3_PREFIX=s3://fullbucket
