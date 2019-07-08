@@ -9,7 +9,6 @@ services:
 matrix:
   include:
     - env: TEST_MODIFIER=-race GOTAGS= BINSUFFIX=
-    - env: TEST_MODIFIER=-race GOTAGS=lzo BINSUFFIX=.lzo
       addons:
         apt:
           packages: [liblzo2-dev]
