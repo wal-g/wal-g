@@ -45,7 +45,7 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	internal.Configure()
 	viper.Set("AWS_ACCESS_KEY_ID", "aws_access_key_id")
 	viper.Set("AWS_SECRET_ACCESS_KEY", "aws_secret_access_key")
-	viper.Set("AWS_SECURITY_TOKEN", "aws_security_token")
+	viper.Set("AWS_SESSION_TOKEN", "aws_session_token")
 	viper.Set("WALE_S3_PREFIX", "gs://abc.com")
 	viper.Set("AWS_ENDPOINT", "http://127.0.0.1:9000")
 	viper.Set("AWS_REGION", "")
