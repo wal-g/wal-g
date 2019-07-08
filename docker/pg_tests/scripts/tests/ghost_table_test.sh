@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e -x
 
-export WALE_S3_PREFIX=s3://waldeltabucket
+export WALE_S3_PREFIX=s3://ghostbucket
 export WALG_USE_WAL_DELTA=true
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
