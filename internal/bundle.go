@@ -344,7 +344,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 				panic(err)
 			}
 
-			bundle.TarFileSets[tarBall.Name()] = append(bundle.TarFileSets[tarBall.Name()], info.Name())
+			bundle.TarFileSets[tarBall.Name()] = append(bundle.TarFileSets[tarBall.Name()], fileInfoHeader.Name)
 
 			err = bundle.CheckSizeAndEnqueueBack(tarBall)
 			if err != nil {
