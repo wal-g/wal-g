@@ -193,7 +193,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 		tracelog.ErrorLogger.FatalError(err)
 	}
 
-	if isPermanent {
+	if isPermanent && previousBackupSentinelDto.BackupStartLSN != nil {
 		err := MarkSelfAndPreviousBackupsPermanent(uploader, basebackupFolder, previousBackupName)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Failed to mark permanent previous backups: %v", err)
