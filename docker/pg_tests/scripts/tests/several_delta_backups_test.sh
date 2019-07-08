@@ -13,6 +13,7 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 
 pgbench -i -s 10 postgres
+pgbench -c 2 -T 100000000 &
 wal-g backup-push ${PGDATA}
 
 export WALG_COMPRESSION_METHOD=lz4
@@ -25,6 +26,7 @@ wal-g backup-push ${PGDATA}
 
 export WALG_COMPRESSION_METHOD=brotli
 pgbench -i -s 40 postgres
+pkill pgbench
 pg_dumpall -f /tmp/dump1
 sleep 1
 wal-g backup-push ${PGDATA}
