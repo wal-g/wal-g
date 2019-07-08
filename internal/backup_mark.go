@@ -72,10 +72,10 @@ func MarkSelfAndPreviousBackupsPermanent(uploader *Uploader, baseBackupFolder st
 }
 
 func getMetadataUploadObject(backupName string, meta ExtendedMetadataDto) (UploadObject, error) {
-	metaFile := storage.JoinPath(backupName, utility.MetadataFileName)
+	metaFilePath := storage.JoinPath(backupName, utility.MetadataFileName)
 	dtoBody, err := json.Marshal(meta)
 	if err != nil {
 		return UploadObject{}, err
 	}
-	return UploadObject{metaFile, bytes.NewReader(dtoBody)}, nil
+	return UploadObject{metaFilePath, bytes.NewReader(dtoBody)}, nil
 }
