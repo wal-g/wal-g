@@ -40,13 +40,13 @@ func fetchStreamSentinel(backup *internal.Backup) (StreamSentinelDto, error) {
 func fetchOplogs(folder storage.Folder, startTime time.Time, oplogAreDone chan error) {
 	endTS, oplogDstFolder, err := getOplogConfigs()
 	if err != nil {
-		oplogAreDone <- nil
+		oplogAreDone <- err
 		return
 	}
 	oplogFolder := folder.GetSubFolder(OplogPath)
 	logsToFetch, err := internal.GetOperationLogsCoveringInterval(oplogFolder, startTime, endTS)
 	if err != nil {
-		oplogAreDone <- nil
+		oplogAreDone <- err
 		return
 	}
 
