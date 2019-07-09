@@ -29,8 +29,8 @@ wal-g backup-push ${PGDATA}
 
 pkill pgbench
 
-pg_ctl -D ${PGDATA} -m smart -w stop
-pg_ctl -D ${PGDATA} -w start
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -m smart -w stop
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 
 pg_dumpall -f /tmp/dump1
 sleep 1
