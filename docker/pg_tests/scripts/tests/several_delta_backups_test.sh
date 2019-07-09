@@ -28,7 +28,10 @@ export WALG_COMPRESSION_METHOD=lzma
 wal-g backup-push ${PGDATA}
 
 pkill pgbench
-sleep 1
+
+pg_ctl -D ${PGDATA} -m smart -w stop
+pg_ctl -D ${PGDATA} -w start
+
 pg_dumpall -f /tmp/dump1
 sleep 1
 
@@ -38,7 +41,9 @@ wal-g backup-fetch ${PGDATA} LATEST
 
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+pg_ctl -D ${PGDATA} -w start
+sleep 10
+
 
 pg_dumpall -f /tmp/dump2
 
