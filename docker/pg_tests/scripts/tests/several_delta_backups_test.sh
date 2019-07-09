@@ -28,6 +28,7 @@ export WALG_COMPRESSION_METHOD=lzma
 wal-g backup-push ${PGDATA}
 
 pkill pgbench
+sleep 1
 pg_dumpall -f /tmp/dump1
 sleep 1
 
