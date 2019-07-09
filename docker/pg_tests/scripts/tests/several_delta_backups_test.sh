@@ -41,7 +41,7 @@ wal-g backup-fetch ${PGDATA} LATEST
 
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
 
-pg_ctl -D ${PGDATA} -w start
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 sleep 10
 
 
