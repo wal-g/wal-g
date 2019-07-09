@@ -66,7 +66,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 			}
 		} else {
 			previousBackup := NewBackup(basebackupFolder, previousBackupName)
-			previousBackupSentinelDto, err = previousBackup.FetchSentinel()
+			previousBackupSentinelDto, err = previousBackup.GetSentinel()
 			if err != nil {
 				tracelog.ErrorLogger.FatalError(err)
 			}
@@ -84,7 +84,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 					tracelog.InfoLogger.Println("Delta will be made from full backup.")
 					previousBackupName = *previousBackupSentinelDto.IncrementFullName
 					previousBackup := NewBackup(basebackupFolder, previousBackupName)
-					previousBackupSentinelDto, err = previousBackup.FetchSentinel()
+					previousBackupSentinelDto, err = previousBackup.GetSentinel()
 					if err != nil {
 						tracelog.ErrorLogger.FatalError(err)
 					}

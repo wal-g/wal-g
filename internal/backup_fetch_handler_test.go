@@ -7,59 +7,6 @@ import (
 	"testing"
 )
 
-func TestGetRestoredBackupFilesToUnwrap_SimpleFile(t *testing.T) {
-	sentinelDto := internal.BackupSentinelDto{
-		Files: testtools.NewBackupFileListBuilder().WithSimple().Build(),
-	}
-
-	files, _ := internal.GetRestoredBackupFilesToUnwrap(sentinelDto, "")
-	assert.Contains(t, files, testtools.SimplePath)
-}
-
-func TestGetRestoredBackupFilesToUnwrap_IncrementedFile(t *testing.T) {
-	sentinelDto := internal.BackupSentinelDto{
-		Files: testtools.NewBackupFileListBuilder().WithIncremented().Build(),
-	}
-
-	files, _ := internal.GetRestoredBackupFilesToUnwrap(sentinelDto, "")
-	assert.Contains(t, files, testtools.IncrementedPath)
-}
-
-func TestGetRestoredBackupFilesToUnwrap_SkippedFile(t *testing.T) {
-	sentinelDto := internal.BackupSentinelDto{
-		Files: testtools.NewBackupFileListBuilder().WithSkipped().Build(),
-	}
-
-	files, _ := internal.GetRestoredBackupFilesToUnwrap(sentinelDto, "")
-	assert.Contains(t, files, testtools.SkippedPath)
-}
-
-func TestGetRestoredBackupFilesToUnwrap_UtilityFiles(t *testing.T) {
-	sentinelDto := internal.BackupSentinelDto{
-		Files: testtools.NewBackupFileListBuilder().Build(),
-	}
-
-	files, _ := internal.GetRestoredBackupFilesToUnwrap(sentinelDto, "")
-	assert.Equal(t, internal.UtilityFilePaths, files)
-}
-
-func TestGetRestoredBackupFilesToUnwrap_NoMoreFiles(t *testing.T) {
-	sentinelDto := internal.BackupSentinelDto{
-		Files: testtools.NewBackupFileListBuilder().WithSimple().WithIncremented().WithSkipped().Build(),
-	}
-
-	files, _ := internal.GetRestoredBackupFilesToUnwrap(sentinelDto, "")
-	expected := map[string]bool{
-		testtools.SimplePath:      true,
-		testtools.IncrementedPath: true,
-		testtools.SkippedPath:     true,
-	}
-	for utilityPath := range internal.UtilityFilePaths {
-		expected[utilityPath] = true
-	}
-	assert.Equal(t, expected, files)
-}
-
 func TestGetBaseFilesToUnwrap_SimpleFile(t *testing.T) {
 	fileStates := testtools.NewBackupFileListBuilder().WithSimple().Build()
 	currentToUnwrap := map[string]bool{
