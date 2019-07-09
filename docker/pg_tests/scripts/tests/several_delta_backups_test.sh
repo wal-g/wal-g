@@ -22,7 +22,9 @@ wal-g backup-push ${PGDATA}
 export WALG_COMPRESSION_METHOD=brotli
 wal-g backup-push ${PGDATA}
 
-export WALG_COMPRESSION_METHOD=brotli
+export WALG_COMPRESSION_METHOD=lzma
+wal-g backup-push ${PGDATA}
+
 pkill pgbench
 pg_dumpall -f /tmp/dump1
 sleep 1
@@ -37,9 +39,9 @@ echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g 
 
 pg_dumpall -f /tmp/dump2
 
-diff /tmp/dump1 /tmp/dump2
-
 psql -f scripts/amcheck.sql postgres
+
+diff /tmp/dump1 /tmp/dump2
 
 scripts/drop_pg.sh
 
