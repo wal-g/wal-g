@@ -1,0 +1,4 @@
+FROM wal-g/docker_prefix:latest
+RUN apt-get install --yes --no-install-recommends --no-install-suggests jq
+
+CMD su postgres -c "/tmp/tests/wale_tablespace_compatibility_test.sh"

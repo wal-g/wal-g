@@ -149,10 +149,15 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 		tracelog.ErrorLogger.Fatalf("Cannot finish backup because of changed timeline.")
 	}
 
+	var tablespaceSpec *TablespaceSpec
+	if !bundle.TablespaceSpec.Empty() {
+		tablespaceSpec = &bundle.TablespaceSpec
+	}
 	currentBackupSentinelDto := &BackupSentinelDto{
 		BackupStartLSN:   &backupStartLSN,
 		IncrementFromLSN: previousBackupSentinelDto.BackupStartLSN,
 		PgVersion:        pgVersion,
+		TablespaceSpec:   tablespaceSpec,
 	}
 	if previousBackupSentinelDto.BackupStartLSN != nil {
 		currentBackupSentinelDto.IncrementFrom = &previousBackupName

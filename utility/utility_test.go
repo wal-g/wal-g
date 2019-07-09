@@ -235,3 +235,72 @@ func TestSelectMatchingFiles_ValidMask(t *testing.T) {
 		"/b/e": true,
 	}, selected)
 }
+
+func TestSanitizePath_Sanitize(t *testing.T) {
+	assert.Equal(t, "home", utility.SanitizePath("/home"))
+}
+
+func TestSanitizePath_LeaveSame(t *testing.T) {
+	assert.Equal(t, "home", utility.SanitizePath("home"))
+}
+
+func TestNormalizePath_Normalize(t *testing.T) {
+	assert.Equal(t, "home", utility.NormalizePath("home/"))
+}
+
+func TestNormalizePath_LeaveSame(t *testing.T) {
+	assert.Equal(t, "home", utility.NormalizePath("home"))
+}
+
+func TestPathsEqual_SamePaths(t *testing.T) {
+	assert.True(t, utility.PathsEqual("/home/ismirn0ff", "/home/ismirn0ff"))
+}
+
+func TestPathsEqual_NeedNormalization(t *testing.T) {
+	assert.True(t, utility.PathsEqual("/home/ismirn0ff", "/home/ismirn0ff/"))
+}
+
+func TestPathsEqual_SubdirectoryDoesNotEquate(t *testing.T) {
+	assert.False(t, utility.PathsEqual("/home/ismirn0ff", "/home/"))
+	assert.False(t, utility.PathsEqual("/home/", "/home/ismirn0ff"))
+}
+
+func TestPathsEqual_RelativeDoesNotEqualAbsolute(t *testing.T) {
+	assert.False(t, utility.PathsEqual("home/ismirn0ff", "/home/ismirn0ff"))
+}
+
+func TestIsInDirectory_SamePaths(t *testing.T) {
+	assert.True(t, utility.IsInDirectory("/home/", "/home/"))
+}
+
+func TestIsInDirectory_NeedPathNormalization(t *testing.T) {
+	assert.True(t, utility.IsInDirectory("/home", "/home/"))
+}
+
+func TestIsInDirectory_NeedDirectoryNormalization(t *testing.T) {
+	assert.True(t, utility.IsInDirectory("/home", "/home/"))
+}
+
+func TestIsInDirectory_NeedBothNormalization(t *testing.T) {
+	assert.True(t, utility.IsInDirectory("/home/", "/home/"))
+}
+
+func TestIsInDirectory_IsSubdirectory(t *testing.T) {
+	assert.True(t, utility.IsInDirectory("/home/ismirn0ff", "/home/"))
+}
+
+func TestIsInDirectory_IsDirectoryAbove(t *testing.T) {
+	assert.False(t, utility.IsInDirectory("/home", "/home/ismirn0ff"))
+}
+
+func TestIsInDirectory_DifferentDirectories(t *testing.T) {
+	assert.False(t, utility.IsInDirectory("/tmp", "/home/ismirn0ff"))
+}
+
+func TestGetSubdirectoryRelativePath_NormalizedDirectory(t *testing.T) {
+	assert.Equal(t, "ismirn0ff/documents", utility.GetSubdirectoryRelativePath("/home/ismirn0ff/documents", "/home"))
+}
+
+func TestGetSubdirectoryRelativePath_NotNormalizedDirectory(t *testing.T) {
+	assert.Equal(t, "ismirn0ff/documents", utility.GetSubdirectoryRelativePath("/home/ismirn0ff/documents/", "/home/"))
+}

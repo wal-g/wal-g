@@ -313,6 +313,34 @@ services:
     links:
       - s3
 
+  pg_wale_tablespace_compatibility_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_wale_tablespace_compatibility_test
+      context: .
+    image: wal-g/wale_tablespace_compatibility_test
+    container_name: wal-g_pg_wale_tablespace_compatibility_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_tablespace_support_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_tablespace_support_test
+      context: .
+    image: wal-g/tablespace_support_test
+    container_name: wal-g_pg_tablespace_support_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
   mysql:
     build:
       dockerfile: docker/mysql/Dockerfile

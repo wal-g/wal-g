@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -37,6 +38,7 @@ const (
 	CompressedBlockMaxSize = 20 << 20
 	CopiedBlockMaxSize     = CompressedBlockMaxSize
 	MetadataFileName       = "metadata.json"
+	PathSeparator          = string(os.PathSeparator)
 )
 
 // Empty is used for channel signaling.
@@ -72,7 +74,23 @@ func AllZero(s []byte) bool {
 }
 
 func SanitizePath(path string) string {
-	return strings.TrimLeft(path, "/")
+	return strings.TrimLeft(path, PathSeparator)
+}
+
+func NormalizePath(path string) string {
+	return strings.TrimRight(path, PathSeparator)
+}
+
+func IsInDirectory(path, directoryPath string) bool {
+	relativePath, err := filepath.Rel(directoryPath, path)
+	if err != nil {
+		return false
+	}
+	return relativePath == "." || NormalizePath(NormalizePath(directoryPath)+PathSeparator+relativePath) == NormalizePath(path)
+}
+
+func PathsEqual(path1, path2 string) bool {
+	return NormalizePath(path1) == NormalizePath(path2)
 }
 
 // utility.ResolveSymlink converts path to physical if it is symlink
@@ -99,8 +117,8 @@ func TrimFileExtension(filePath string) string {
 	return strings.TrimSuffix(filePath, "."+GetFileExtension(filePath))
 }
 
-func GetFileRelativePath(fileAbsPath string, directoryPath string) string {
-	return strings.TrimPrefix(fileAbsPath, directoryPath)
+func GetSubdirectoryRelativePath(subdirectoryPath string, directoryPath string) string {
+	return NormalizePath(SanitizePath(strings.TrimPrefix(subdirectoryPath, directoryPath)))
 }
 
 //FastCopy copies data from src to dst in blocks of CopiedBlockMaxSize bytes

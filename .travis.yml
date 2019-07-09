@@ -103,6 +103,12 @@ jobs:
     - script: make TEST="pg_backup_perftest" pg_integration_test
       workspaces:
         use: image_cache
+    - script: make TEST="pg_wale_tablespace_compatibility_test" pg_integration_test
+      workspaces:
+        use: image_cache
+    - script: make TEST="pg_tablespace_support_test" pg_integration_test
+      workspaces:
+        use: image_cache
 
 notifications:
   email: false

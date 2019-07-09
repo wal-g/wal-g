@@ -19,6 +19,8 @@ type BackupSentinelDto struct {
 	PgVersion       int     `json:"PgVersion"`
 	BackupFinishLSN *uint64 `json:"FinishLSN"`
 
+	TablespaceSpec *TablespaceSpec `json:"spec"`
+
 	UserData interface{} `json:"UserData,omitempty"`
 }
 
