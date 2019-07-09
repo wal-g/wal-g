@@ -19,6 +19,8 @@ wal-g backup-push ${PGDATA}
 export WALG_COMPRESSION_METHOD=lz4
 wal-g backup-push ${PGDATA}
 
+psql -f scripts/amcheck.sql postgres
+
 export WALG_COMPRESSION_METHOD=brotli
 wal-g backup-push ${PGDATA}
 
