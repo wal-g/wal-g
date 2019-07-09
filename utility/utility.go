@@ -95,6 +95,11 @@ func GetFileExtension(filePath string) string {
 	return ext
 }
 
+// TODO : unit tests
+func TrimFileExtension(filePath string) string {
+	return strings.TrimSuffix(filePath, "."+GetFileExtension(filePath))
+}
+
 func GetFileRelativePath(fileAbsPath string, directoryPath string) string {
 	return strings.TrimPrefix(fileAbsPath, directoryPath)
 }
@@ -169,6 +174,18 @@ func TimeNowCrossPlatformUTC() time.Time {
 
 func TimeNowCrossPlatformLocal() time.Time {
 	return CeilTimeUpToMicroseconds(time.Now())
+}
+
+var patternTimeRFC3339 = "[0-9]{8}T[0-9]{6}Z"
+var regexpTimeRFC3339 = regexp.MustCompile(patternTimeRFC3339)
+
+// TODO : unit tests
+func TryFetchTimeRFC3999(name string) (string, bool) {
+	times := regexpTimeRFC3339.FindAllString(name, 1)
+	if len(times) > 0 {
+		return regexpTimeRFC3339.FindAllString(name, 1)[0], true
+	}
+	return "", false
 }
 
 func ConcatByteSlices(a []byte, b []byte) []byte {

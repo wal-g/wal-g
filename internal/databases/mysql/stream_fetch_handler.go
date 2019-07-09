@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"os"
 	"path"
 	"path/filepath"
@@ -136,18 +135,7 @@ func BinlogShouldBeFetched(sentinel StreamSentinelDto, binlogName string, endTS 
 }
 
 func GetBinlogConfigs() (endTS *time.Time, dstFolder string, err error) {
-	if viper.IsSet(BinlogEndTsSetting) {
-		endTSStr := viper.GetString(BinlogEndTsSetting)
-		t, err := time.Parse(time.RFC3339, endTSStr)
-		if err != nil {
-			return nil, "", err
-		}
-		endTS = &t
-	}
-	if !viper.IsSet(BinlogDstSetting) {
-		return endTS, dstFolder, internal.NewUnsetRequiredSettingError(BinlogDstSetting)
-	}
-	return endTS, viper.GetString(BinlogDstSetting), nil
+	return internal.GetOperationLogsSettings(BinlogEndTsSetting, BinlogDstSetting)
 }
 
 func ExtractBinlogName(object storage.Object, folder storage.Folder) string {

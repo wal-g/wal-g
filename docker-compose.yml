@@ -38,6 +38,10 @@ services:
       &&  mkdir -p /export/mysqlfullbucket
       &&  mkdir -p /export/mysqlbinlogpushbucket
       &&  mkdir -p /export/mysqldeleteendtoendbucket
+      &&  mkdir -p /export/mongostreampushbucket
+      &&  mkdir -p /export/mongooplogpushbucket
+      &&  mkdir -p /export/mongodeletebeforebucket
+      &&  mkdir -p /export/mongodeleteretainbucket
       &&  mkdir -p /export/redisbucket
       &&  /usr/bin/minio server /export'
 
@@ -96,6 +100,26 @@ services:
       context: .
     image: wal-g/redis_tests
     container_name: wal-g_redis_tests
+    env_file:
+      - docker/common/common_walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  mongo:
+    build:
+      dockerfile: docker/mongo/Dockerfile
+      context: .
+    image: wal-g/mongo
+    container_name: wal-g_mongo
+
+  mongo_tests:
+    build:
+      dockerfile: docker/mongo_tests/Dockerfile
+      context: .
+    image: wal-g/mongo_tests
+    container_name: wal-g_mongo_tests
     env_file:
       - docker/common/common_walg.env
     depends_on:
