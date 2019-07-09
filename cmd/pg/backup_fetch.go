@@ -8,8 +8,9 @@ import (
 
 const (
 	BackupFetchShortDescription = "Fetches a backup from storage"
-	MaskFlagDescription         = "Fetches only files which path relative to destination_directory" +
-		"matches given shell file pattern"
+	MaskFlagDescription         = `Fetches only files which path relative to destination_directory
+matches given shell file pattern.
+For information about pattern syntax view: https://golang.org/pkg/path/filepath/#Match`
 )
 
 var fileMask string

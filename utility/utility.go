@@ -195,19 +195,19 @@ func ConcatByteSlices(a []byte, b []byte) []byte {
 	return result
 }
 
-func SelectMatchingFiles(fileMask string, filePaths map[string]bool) (map[string]bool, error) {
+func SelectMatchingFiles(fileMask string, filePathsToFilter map[string]bool) (map[string]bool, error) {
 	if fileMask == "" {
-		return filePaths, nil
+		return filePathsToFilter, nil
 	}
 	fileMask = "/" + fileMask
 	result := make(map[string]bool)
-	for filePath := range filePaths {
-		matches, err := filepath.Match(fileMask, filePath)
+	for filePathToFilter := range filePathsToFilter {
+		matches, err := filepath.Match(fileMask, filePathToFilter)
 		if err != nil {
 			return nil, err
 		}
 		if matches {
-			result[filePath] = true
+			result[filePathToFilter] = true
 		}
 	}
 	return result, nil
