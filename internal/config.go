@@ -43,7 +43,7 @@ var (
 		PreventWalOverwriteSetting:   "false",
 		DeltaMaxStepsSetting:         "0",
 		CompressionMethodSetting:     "lz4",
-		UseWalDeltaSetting:           "true",
+		UseWalDeltaSetting:           "false",
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
 		TotalBgUploadedLimit:         "32",
 	}
