@@ -194,3 +194,21 @@ func ConcatByteSlices(a []byte, b []byte) []byte {
 	copy(result[len(a):], b)
 	return result
 }
+
+func SelectMatchingFiles(fileMask string, filePathsToFilter map[string]bool) (map[string]bool, error) {
+	if fileMask == "" {
+		return filePathsToFilter, nil
+	}
+	fileMask = "/" + fileMask
+	result := make(map[string]bool)
+	for filePathToFilter := range filePathsToFilter {
+		matches, err := filepath.Match(fileMask, filePathToFilter)
+		if err != nil {
+			return nil, err
+		}
+		if matches {
+			result[filePathToFilter] = true
+		}
+	}
+	return result, nil
+}

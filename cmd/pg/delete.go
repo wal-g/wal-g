@@ -82,7 +82,7 @@ func postgresLess(object1 storage.Object, object2 storage.Object) bool {
 
 func postgresIsFullBackup(folder storage.Folder, object storage.Object) bool {
 	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), fetchBackupName(object))
-	sentinel, _ := backup.FetchSentinel()
+	sentinel, _ := backup.GetSentinel()
 	return !sentinel.IsIncremental()
 }
 
