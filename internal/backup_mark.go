@@ -5,70 +5,39 @@ import (
 	"encoding/json"
 
 	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
-// MarkSelfAndPreviousBackupsPermanent marks all previous related backups
-// permanent, including itself, any previous delta backups and initial full
-// backup
+// GetImpermanentBackupsBefore marks all previous related backups permanent,
+// including itself, any previous delta backups and initial full backup
 // TODO: unit tests
-func MarkSelfAndPreviousBackupsPermanent(uploader *Uploader, baseBackupFolder storage.Folder, backupName string) error {
-	toUpload := []UploadObject{}
-
-	// mark self if impermanent
+func GetImpermanentBackupsBefore(baseBackupFolder storage.Folder, backupName string, toUpload *[]UploadObject) error {
 	backup := NewBackup(baseBackupFolder, backupName)
-	currentSentinel, err := backup.GetSentinel()
+	sentinel, err := backup.GetSentinel()
 	if err != nil {
 		return err
 	}
-	currentMeta, err := backup.FetchMeta()
+	meta, err := backup.FetchMeta()
 	if err != nil {
 		return err
 	}
-	if !currentMeta.IsPermanent {
-		currentMeta.IsPermanent = true
-		uploadObject, err := getMetadataUploadObject(backup.Name, currentMeta)
+
+	// only upload currently impermanent backups
+	if !meta.IsPermanent {
+		meta.IsPermanent = true
+		uploadObject, err := getMetadataUploadObject(backup.Name, meta)
 		if err != nil {
 			return err
 		}
-		toUpload = append(toUpload, uploadObject)
+		*toUpload = append(*toUpload, uploadObject)
 	}
 
-	// mark previous backups if impermanent
-	if currentSentinel.IsIncremental() {
-		backupName = *currentSentinel.IncrementFrom
-		for i := 0; i < *currentSentinel.IncrementCount; i++ {
-			previousBackup := NewBackup(baseBackupFolder, backupName)
-
-			// fetch sentinel to get previous backup name
-			previousSentinel, err := previousBackup.GetSentinel()
-			if err != nil {
-				return err
-			}
-			if previousSentinel.IncrementFrom != nil {
-				backupName = *previousSentinel.IncrementFrom
-			}
-
-			// skip backups that are already permanent
-			previousMeta, err := previousBackup.FetchMeta()
-			if err != nil {
-				return err
-			}
-			if previousMeta.IsPermanent {
-				continue
-			}
-			previousMeta.IsPermanent = true
-			uploadObject, err := getMetadataUploadObject(previousBackup.Name, previousMeta)
-			if err != nil {
-				return err
-			}
-			toUpload = append(toUpload, uploadObject)
-		}
+	// return when no longer incremental
+	if !sentinel.IsIncremental() {
+		return nil
 	}
 
-	tracelog.InfoLogger.Printf("Marking permanent backups: %v\n", toUpload)
-	return uploader.UploadMultiple(toUpload)
+	return GetImpermanentBackupsBefore(baseBackupFolder, *sentinel.IncrementFrom, toUpload)
 }
 
 func getMetadataUploadObject(backupName string, meta ExtendedMetadataDto) (UploadObject, error) {

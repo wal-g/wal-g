@@ -193,11 +193,19 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", backupName)
 		tracelog.ErrorLogger.FatalError(err)
 	}
-
-	if isPermanent && previousBackupSentinelDto.BackupStartLSN != nil {
-		err := MarkSelfAndPreviousBackupsPermanent(uploader, basebackupFolder, previousBackupName)
+	// If pushing permanent delta backup, mark all previous backups permanent as well
+	if isPermanent && currentBackupSentinelDto.IsIncremental() {
+		tracelog.InfoLogger.Printf("Retrieving previous related backups to be marked as permanent")
+		toUpload := []UploadObject{}
+		err := GetImpermanentBackupsBefore(basebackupFolder, previousBackupName, &toUpload)
 		if err != nil {
-			tracelog.ErrorLogger.Printf("Failed to mark permanent previous backups: %v", err)
+			tracelog.ErrorLogger.Printf("Failed to get previous backups: %v", err)
+		} else {
+			tracelog.InfoLogger.Printf("Retrieved backups to mark as permanent, marking: %v", toUpload)
+			err = uploader.UploadMultiple(toUpload)
+			if err != nil {
+				tracelog.ErrorLogger.Printf("Failed to mark previous backups as permanent: %v", err)
+			}
 		}
 	}
 	// logging backup set name
