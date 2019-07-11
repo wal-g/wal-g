@@ -146,7 +146,10 @@ func readXLogRecordBlockHeader(lastRelFileNode *RelFileNode,
 	if err != nil {
 		return nil, err
 	}
-	reader.Shrink(int(blockHeader.DataLength))
+	err = reader.Shrink(int(blockHeader.DataLength))
+	if err != nil {
+		return nil, err
+	}
 
 	if blockHeader.HasImage() {
 		imageHeader, err := readXLogRecordBlockImageHeader(reader)
@@ -186,13 +189,19 @@ func readXLogRecordBlockHeaderPart(record *XLogRecord, reader io.Reader) error {
 				return err
 			}
 			record.MainDataLen = uint32(mainDataLen)
-			headerReader.Shrink(int(mainDataLen))
+			err = headerReader.Shrink(int(mainDataLen))
+			if err != nil {
+				return err
+			}
 		case XlrBlockIdDataLong:
 			err := parsingutil.NewFieldToParse(&record.MainDataLen, "mainDataLen32").ParseFrom(headerReader)
 			if err != nil {
 				return err
 			}
-			headerReader.Shrink(int(record.MainDataLen))
+			err = headerReader.Shrink(int(record.MainDataLen))
+			if err != nil {
+				return err
+			}
 		case XlrBlockIdOrigin:
 			err := parsingutil.NewFieldToParse(&record.Origin, "origin").ParseFrom(headerReader)
 			if err != nil {
@@ -217,9 +226,12 @@ func readXLogRecordMainData(mainDataLen uint32, reader io.Reader) ([]byte, error
 
 func readXLogRecordBody(header *XLogRecordHeader, reader io.Reader) (*XLogRecord, error) {
 	record := NewXLogRecord(*header)
-	readXLogRecordBlockHeaderPart(record, reader)
+	err := readXLogRecordBlockHeaderPart(record, reader)
+	if err != nil {
+		return nil, err
+	}
 
-	err := readXLogRecordBlockDataAndImages(record, reader)
+	err = readXLogRecordBlockDataAndImages(record, reader)
 	if err != nil {
 		return nil, err
 	}
