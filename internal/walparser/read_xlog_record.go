@@ -101,19 +101,18 @@ func readXLogRecordBlockImageHeader(reader io.Reader) (*XLogRecordBlockImageHead
 	return &blockImageHeader, nil
 }
 
-func readBlockLocation(blockHasSameRel bool, lastRelFileNode **RelFileNode, reader io.Reader) (location *BlockLocation, err error) {
+func readBlockLocation(blockHasSameRel bool, lastRelFileNode *RelFileNode, reader io.Reader) (location *BlockLocation, err error) {
 	var relFileNode *RelFileNode
 	if blockHasSameRel {
-		if *lastRelFileNode == nil {
+		if lastRelFileNode == nil {
 			return nil, NewNoPrevRelFileNodeError()
 		}
-		relFileNode = *lastRelFileNode
+		relFileNode = lastRelFileNode
 	} else {
 		relFileNode, err = readRelFileNode(reader)
 		if err != nil {
 			return
 		}
-		*lastRelFileNode = relFileNode
 	}
 	var blockNo uint32
 	err = parsingutil.NewFieldToParse(&blockNo, "blockNo").ParseFrom(reader)
@@ -125,13 +124,13 @@ func readBlockLocation(blockHasSameRel bool, lastRelFileNode **RelFileNode, read
 }
 
 func readXLogRecordBlockHeader(lastRelFileNode *RelFileNode,
-	blockId uint8, maxReadBlockId *int, reader *ShrinkableReader) (*XLogRecordBlockHeader, error) {
+	blockId uint8, maxReadBlockId *int, reader *ShrinkableReader) (*XLogRecordBlockHeader, *RelFileNode, error) {
 	if blockId > XlrMaxBlockId {
-		return nil, NewInvalidRecordBlockIdError(blockId)
+		return nil, nil, NewInvalidRecordBlockIdError(blockId)
 	}
 	blockHeader := NewXLogRecordBlockHeader(blockId)
 	if int(blockHeader.BlockId) <= *maxReadBlockId {
-		return nil, NewOutOfOrderBlockIdError(int(blockHeader.BlockId), *maxReadBlockId)
+		return nil, nil, NewOutOfOrderBlockIdError(int(blockHeader.BlockId), *maxReadBlockId)
 	}
 	*maxReadBlockId = int(blockHeader.BlockId)
 
@@ -140,35 +139,36 @@ func readXLogRecordBlockHeader(lastRelFileNode *RelFileNode,
 		{Field: &blockHeader.DataLength, Name: "dataLength"},
 	}, reader)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	err = blockHeader.checkDataStateConsistency()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	err = reader.Shrink(int(blockHeader.DataLength))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if blockHeader.HasImage() {
 		imageHeader, err := readXLogRecordBlockImageHeader(reader)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		blockHeader.ImageHeader = *imageHeader
 		err = reader.Shrink(int(blockHeader.ImageHeader.ImageLength))
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
-	blockLocation, err := readBlockLocation(blockHeader.HasSameRel(), &lastRelFileNode, reader)
+	blockLocation, err := readBlockLocation(blockHeader.HasSameRel(), lastRelFileNode, reader)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	lastRelFileNode = &blockLocation.RelationFileNode
 	blockHeader.BlockLocation = *blockLocation
-	return blockHeader, nil
+	return blockHeader, lastRelFileNode, nil
 }
 
 func readXLogRecordBlockHeaderPart(record *XLogRecord, reader io.Reader) error {
@@ -208,7 +208,9 @@ func readXLogRecordBlockHeaderPart(record *XLogRecord, reader io.Reader) error {
 				return err
 			}
 		default:
-			blockHeader, err := readXLogRecordBlockHeader(lastRelFileNode, blockId, &maxReadBlockId, headerReader)
+			var blockHeader *XLogRecordBlockHeader
+			blockHeader, lastRelFileNode, err = readXLogRecordBlockHeader(
+				lastRelFileNode, blockId, &maxReadBlockId, headerReader)
 			if err != nil {
 				return err
 			}
