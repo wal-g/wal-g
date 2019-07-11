@@ -18,7 +18,7 @@ func MarkSelfAndPreviousBackupsPermanent(uploader *Uploader, baseBackupFolder st
 
 	// mark self if impermanent
 	backup := NewBackup(baseBackupFolder, backupName)
-	currentSentinel, err := backup.FetchSentinel()
+	currentSentinel, err := backup.GetSentinel()
 	if err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ func MarkSelfAndPreviousBackupsPermanent(uploader *Uploader, baseBackupFolder st
 			previousBackup := NewBackup(baseBackupFolder, backupName)
 
 			// fetch sentinel to get previous backup name
-			previousSentinel, err := previousBackup.FetchSentinel()
+			previousSentinel, err := previousBackup.GetSentinel()
 			if err != nil {
 				return err
 			}
