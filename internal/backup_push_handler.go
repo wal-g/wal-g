@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/spf13/viper"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/storages/storage"
@@ -65,7 +66,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 			}
 		} else {
 			previousBackup := NewBackup(basebackupFolder, previousBackupName)
-			previousBackupSentinelDto, err = previousBackup.FetchSentinel()
+			previousBackupSentinelDto, err = previousBackup.GetSentinel()
 			if err != nil {
 				tracelog.ErrorLogger.FatalError(err)
 			}
@@ -83,7 +84,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 					tracelog.InfoLogger.Println("Delta will be made from full backup.")
 					previousBackupName = *previousBackupSentinelDto.IncrementFullName
 					previousBackup := NewBackup(basebackupFolder, previousBackupName)
-					previousBackupSentinelDto, err = previousBackup.FetchSentinel()
+					previousBackupSentinelDto, err = previousBackup.GetSentinel()
 					if err != nil {
 						tracelog.ErrorLogger.FatalError(err)
 					}
@@ -223,10 +224,10 @@ func UploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupNa
 }
 
 // TODO : unit tests
-func UploadSentinel(uploader *Uploader, sentinelDto *BackupSentinelDto, backupName string) error {
+func UploadSentinel(uploader *Uploader, sentinelDto interface{}, backupName string) error {
 	sentinelName := backupName + utility.SentinelSuffix
 
-	dtoBody, err := json.Marshal(*sentinelDto)
+	dtoBody, err := json.Marshal(sentinelDto)
 	if err != nil {
 		return NewSentinelMarshallingError(sentinelName, err)
 	}

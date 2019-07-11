@@ -58,7 +58,6 @@ func CreateMockStorageFolder() storage.Folder {
 	return folder
 }
 
-
 func CreateWalPageWithContinuation() []byte {
 	pageHeader := walparser.XLogPageHeader{
 		Info:             walparser.XlpFirstIsContRecord,
@@ -113,7 +112,6 @@ func GetXLogRecordData() (walparser.XLogRecord, []byte) {
 	record, _ := walparser.ParseXLogRecordFromBytes(recordData)
 	return *record, recordData
 }
-
 
 type ReadWriteNopCloser struct {
 	io.ReadWriter

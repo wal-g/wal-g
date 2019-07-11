@@ -14,7 +14,18 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-const TarPartitionFolderName = "/tar_partitions/"
+const (
+	TarPartitionFolderName = "/tar_partitions/"
+	PgControlPath          = "/global/pg_control"
+)
+
+var UnwrapAll map[string]bool = nil
+
+var UtilityFilePaths = map[string]bool{
+	PgControlPath:         true,
+	BackupLabelFilename:   true,
+	TablespaceMapFilename: true,
+}
 
 type NoBackupsFoundError struct {
 	error
@@ -33,10 +44,11 @@ func (err NoBackupsFoundError) Error() string {
 type Backup struct {
 	BaseBackupFolder storage.Folder
 	Name             string
+	SentinelDto      *BackupSentinelDto // used for storage query caching
 }
 
 func NewBackup(baseBackupFolder storage.Folder, name string) *Backup {
-	return &Backup{baseBackupFolder, name}
+	return &Backup{baseBackupFolder, name, nil}
 }
 
 func (backup *Backup) GetStopSentinelPath() string {
@@ -69,20 +81,36 @@ func (backup *Backup) GetTarNames() ([]string, error) {
 	return result, nil
 }
 
-func (backup *Backup) FetchSentinel() (BackupSentinelDto, error) {
+func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
+	if backup.SentinelDto != nil {
+		return *backup.SentinelDto, nil
+	}
 	sentinelDto := BackupSentinelDto{}
-	backupReaderMaker := NewStorageReaderMaker(backup.BaseBackupFolder, backup.GetStopSentinelPath())
-	backupReader, err := backupReaderMaker.Reader()
+	sentinelDtoData, err := backup.FetchSentinelData()
 	if err != nil {
 		return sentinelDto, err
 	}
-	sentinelDtoData, err := ioutil.ReadAll(backupReader)
-	if err != nil {
-		return sentinelDto, errors.Wrap(err, "failed to fetch sentinel")
-	}
 
 	err = json.Unmarshal(sentinelDtoData, &sentinelDto)
-	return sentinelDto, errors.Wrap(err, "failed to unmarshal sentinel")
+	if err != nil {
+		return sentinelDto, errors.Wrap(err, "failed to unmarshal sentinel")
+	}
+	backup.SentinelDto = &sentinelDto
+	return sentinelDto, nil
+}
+
+// TODO : unit tests
+func (backup *Backup) FetchSentinelData() ([]byte, error) {
+	backupReaderMaker := NewStorageReaderMaker(backup.BaseBackupFolder, backup.GetStopSentinelPath())
+	backupReader, err := backupReaderMaker.Reader()
+	if err != nil {
+		return make([]byte, 0), err
+	}
+	sentinelDtoData, err := ioutil.ReadAll(backupReader)
+	if err != nil {
+		return sentinelDtoData, errors.Wrap(err, "failed to fetch sentinel")
+	}
+	return sentinelDtoData, nil
 }
 
 func (backup *Backup) FetchMeta() (ExtendedMetadataDto, error) {
@@ -219,6 +247,24 @@ func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnw
 		tarsToExtract = append(tarsToExtract, tarToExtract)
 	}
 	return
+}
+
+func (backup *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error) {
+	sentinelDto, err := backup.GetSentinel()
+	if err != nil {
+		return nil, err
+	}
+	if sentinelDto.Files == nil { // in case of WAL-E of old WAL-G backup
+		return UnwrapAll, nil
+	}
+	filesToUnwrap := make(map[string]bool)
+	for file := range sentinelDto.Files {
+		filesToUnwrap[file] = true
+	}
+	for utilityFilePath := range UtilityFilePaths {
+		filesToUnwrap[utilityFilePath] = true
+	}
+	return utility.SelectMatchingFiles(fileMask, filesToUnwrap)
 }
 
 func shouldUnwrapTar(tarName string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool) bool {
