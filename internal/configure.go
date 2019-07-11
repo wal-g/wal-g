@@ -177,6 +177,33 @@ func ConfigureLogging() error {
 	return nil
 }
 
+func getArchiveDataFolderPath() (path string) {
+	if !viper.IsSet(PgDataSetting) {
+		path = DefaultDataFolderPath
+	} else {
+		pgdata := viper.GetString(PgDataSetting)
+		path = filepath.Join(pgdata, "pg_wal")
+		if _, err := os.Stat(path); err != nil {
+			path = filepath.Join(pgdata, "pg_xlog")
+			if _, err := os.Stat(path); err != nil {
+				path = DefaultDataFolderPath
+			}
+		}
+	}
+	path = filepath.Join(path, "walg_archive_status")
+
+	return
+}
+
+// TODO : unit tests
+func configureArchiveStatusManager() (archiveDataFolder DataFolder, err error) {
+	archiveFolderPath := getArchiveDataFolderPath()
+
+	archiveDataFolder, err = NewDiskDataFolder(archiveFolderPath)
+
+	return
+}
+
 // ConfigureUploader connects to storage and creates an uploader. It makes sure
 // that a valid session has started; if invalid, returns AWS error
 // and `<nil>` values.
@@ -201,7 +228,13 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
 	}
 
-	uploader = NewUploader(compressor, folder, deltaFileManager)
+	archiveStatusManager, err := configureArchiveStatusManager()
+
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure Archive Status Manager")
+	}
+
+	uploader = NewUploader(compressor, folder, deltaFileManager, archiveStatusManager)
 
 	return uploader, err
 }

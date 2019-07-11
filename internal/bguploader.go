@@ -81,7 +81,6 @@ func (bgUploader *BgUploader) Stop() {
 
 var readySuffix = ".ready"
 var archiveStatus = "archive_status"
-var done = ".done"
 
 // TODO : unit tests
 func (bgUploader *BgUploader) scanOnce() {
@@ -99,7 +98,7 @@ func (bgUploader *BgUploader) scanOnce() {
 			break
 		}
 		name := f.Name()
-		if !strings.HasSuffix(name, readySuffix) {
+		if isWalAlreadyUploaded(bgUploader.uploader, name) {
 			continue
 		}
 		if _, ok := bgUploader.started[name]; ok {
@@ -126,18 +125,16 @@ func (bgUploader *BgUploader) haveNoSlots() bool {
 // TODO : unit tests
 // upload one WAL file
 func (bgUploader *BgUploader) upload(info os.FileInfo) {
-	walFilename := strings.TrimSuffix(info.Name(), readySuffix)
+	actualName := info.Name()
+	walFilename := strings.TrimSuffix(actualName, filepath.Ext(actualName))
 	err := UploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename), bgUploader.preventWalOverwrite)
 	if err != nil {
 		tracelog.ErrorLogger.Print("Error of background uploader: ", err)
 		return
 	}
 
-	ready := filepath.Join(bgUploader.dir, archiveStatus, info.Name())
-	done := filepath.Join(bgUploader.dir, archiveStatus, walFilename+done)
-	err = os.Rename(ready, done)
-	if err != nil {
-		tracelog.ErrorLogger.Print("Error renaming .ready to .done: ", err)
+	if err := markWalUploaded(bgUploader.uploader, walFilename); err != nil {
+		tracelog.ErrorLogger.Printf("Error mark wal file %s uploader due %v", walFilename, err)
 	}
 
 	atomic.AddInt32(&bgUploader.totalUploaded, 1)
