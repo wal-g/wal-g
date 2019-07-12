@@ -81,6 +81,7 @@ func (bgUploader *BgUploader) Stop() {
 
 var readySuffix = ".ready"
 var archiveStatus = "archive_status"
+var doneSuffix = ".done"
 
 // TODO : unit tests
 func (bgUploader *BgUploader) scanOnce() {
@@ -126,7 +127,7 @@ func (bgUploader *BgUploader) haveNoSlots() bool {
 // upload one WAL file
 func (bgUploader *BgUploader) upload(info os.FileInfo) {
 	actualName := info.Name()
-	walFilename := strings.TrimSuffix(actualName, filepath.Ext(actualName))
+	walFilename := strings.TrimSuffix(strings.TrimSuffix(actualName, readySuffix), doneSuffix)
 	err := UploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename), bgUploader.preventWalOverwrite)
 	if err != nil {
 		tracelog.ErrorLogger.Print("Error of background uploader: ", err)
