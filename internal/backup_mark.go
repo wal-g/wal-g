@@ -8,36 +8,46 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-// GetImpermanentBackupsBefore marks all previous related backups permanent,
-// including itself, any previous delta backups and initial full backup
+// GetImpermanentBackupMetadataBefore gets all previous impermanent backup
+// metas, including itself, any previous delta backups and initial full backup,
+// in increasing order beginning from full backup
 // TODO: unit tests
-func GetImpermanentBackupsBefore(baseBackupFolder storage.Folder, backupName string, toUpload *[]UploadObject) error {
+func GetImpermanentBackupMetadataBefore(baseBackupFolder storage.Folder, backupName string) ([]UploadObject, error) {
+	backupMetadata := []UploadObject{}
+
+	// retrieve current backup sentinel and meta
 	backup := NewBackup(baseBackupFolder, backupName)
 	sentinel, err := backup.GetSentinel()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	meta, err := backup.FetchMeta()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// only upload currently impermanent backups
+	// only return currently impermanent backups
 	if !meta.IsPermanent {
 		meta.IsPermanent = true
-		uploadObject, err := getMetadataUploadObject(backup.Name, meta)
+		metadataUploadObject, err := getMetadataUploadObject(backup.Name, meta)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		*toUpload = append(*toUpload, uploadObject)
+		backupMetadata = append(backupMetadata, metadataUploadObject)
 	}
 
 	// return when no longer incremental
 	if !sentinel.IsIncremental() {
-		return nil
+		return backupMetadata, nil
 	}
 
-	return GetImpermanentBackupsBefore(baseBackupFolder, *sentinel.IncrementFrom, toUpload)
+	previousImpermanentBackupMetadata, err := GetImpermanentBackupMetadataBefore(baseBackupFolder, *sentinel.IncrementFrom)
+	if err != nil {
+		return nil, err
+	}
+
+	previousImpermanentBackupMetadata = append(previousImpermanentBackupMetadata, backupMetadata...)
+	return previousImpermanentBackupMetadata, nil
 }
 
 func getMetadataUploadObject(backupName string, meta ExtendedMetadataDto) (UploadObject, error) {

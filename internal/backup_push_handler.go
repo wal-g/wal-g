@@ -196,13 +196,12 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	// If pushing permanent delta backup, mark all previous backups permanent as well
 	if isPermanent && currentBackupSentinelDto.IsIncremental() {
 		tracelog.InfoLogger.Printf("Retrieving previous related backups to be marked as permanent")
-		toUpload := []UploadObject{}
-		err := GetImpermanentBackupsBefore(basebackupFolder, previousBackupName, &toUpload)
+		impermanentBackupMetadata, err := GetImpermanentBackupMetadataBefore(basebackupFolder, previousBackupName)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Failed to get previous backups: %v", err)
 		} else {
-			tracelog.InfoLogger.Printf("Retrieved backups to mark as permanent, marking: %v", toUpload)
-			err = uploader.UploadMultiple(toUpload)
+			tracelog.InfoLogger.Printf("Retrieved backups to mark as permanent, marking: %v", impermanentBackupMetadata)
+			err = uploader.UploadMultiple(impermanentBackupMetadata)
 			if err != nil {
 				tracelog.ErrorLogger.Printf("Failed to mark previous backups as permanent: %v", err)
 			}
