@@ -124,23 +124,28 @@ func ConfigureFolder() (storage.Folder, error) {
 	return nil, NewUnconfiguredStorageError(skippedPrefixes)
 }
 
+func getWalFolderPath() string {
+	if !viper.IsSet(PgDataSetting) {
+		return DefaultDataFolderPath
+	}
+	pgdata := viper.GetString(PgDataSetting)
+	dataFolderPath := filepath.Join(pgdata, "pg_wal")
+	if _, err := os.Stat(dataFolderPath); err == nil {
+		return dataFolderPath
+
+	}
+
+	dataFolderPath = filepath.Join(pgdata, "pg_xlog")
+	if _, err := os.Stat(dataFolderPath); err == nil {
+		return dataFolderPath
+	}
+
+	return DefaultDataFolderPath
+}
+
 // TODO : unit tests
 func getDataFolderPath() string {
-	var dataFolderPath string
-	if !viper.IsSet(PgDataSetting) {
-		dataFolderPath = DefaultDataFolderPath
-	} else {
-		pgdata := viper.GetString(PgDataSetting)
-		dataFolderPath = filepath.Join(pgdata, "pg_wal")
-		if _, err := os.Stat(dataFolderPath); err != nil {
-			dataFolderPath = filepath.Join(pgdata, "pg_xlog")
-			if _, err := os.Stat(dataFolderPath); err != nil {
-				dataFolderPath = DefaultDataFolderPath
-			}
-		}
-	}
-	dataFolderPath = filepath.Join(dataFolderPath, "walg_data")
-	return dataFolderPath
+	return filepath.Join(getWalFolderPath(), "walg_data")
 }
 
 // TODO : unit tests
@@ -177,22 +182,8 @@ func ConfigureLogging() error {
 	return nil
 }
 
-func getArchiveDataFolderPath() (path string) {
-	if !viper.IsSet(PgDataSetting) {
-		path = DefaultDataFolderPath
-	} else {
-		pgdata := viper.GetString(PgDataSetting)
-		path = filepath.Join(pgdata, "pg_wal")
-		if _, err := os.Stat(path); err != nil {
-			path = filepath.Join(pgdata, "pg_xlog")
-			if _, err := os.Stat(path); err != nil {
-				path = DefaultDataFolderPath
-			}
-		}
-	}
-	path = filepath.Join(path, "walg_archive_status")
-
-	return
+func getArchiveDataFolderPath() string {
+	return filepath.Join(getWalFolderPath(), "walg_archive_status")
 }
 
 // TODO : unit tests

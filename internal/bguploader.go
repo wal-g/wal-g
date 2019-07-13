@@ -128,7 +128,7 @@ func (bgUploader *BgUploader) upload(actualName string) {
 	walFilename := strings.TrimSuffix(actualName, readySuffix)
 	err := UploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename), bgUploader.preventWalOverwrite)
 	if err != nil {
-		tracelog.ErrorLogger.Print("Error of background uploader: %v\nFailed to upload wal file %s(%s)", err, walFilename, actualName)
+		tracelog.ErrorLogger.Print("Error of background uploader: ", err)
 		return
 	}
 
