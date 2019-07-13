@@ -24,15 +24,15 @@ func TestReadXLogRecordHeader(t *testing.T) {
 }
 
 func TestReadXLogRecordBlockHeader(t *testing.T) {
-	var lastRelFileNode *RelFileNode = nil
 	maxReadBlockId := -1
 	headerData := []byte{
 		0x10, 0x00, 0x00, 0xd4, 0x1c, 0xd4, 0x05, 0x05, 0x7f, 0x06, 0x00, 0x00, 0x00, 0x40, 0x00,
 		0x00, 0x15, 0x40, 0x00, 0x00, 0xe4, 0x18, 0x00, 0x00,
 	}
 	reader := ShrinkableReader{bytes.NewReader(headerData), len(headerData) + 0x1cd4}
-	header, err := readXLogRecordBlockHeader(lastRelFileNode, 0, &maxReadBlockId, &reader)
+	header, lastRelFileNode, err := readXLogRecordBlockHeader(nil, 0, &maxReadBlockId, &reader)
 	assert.NoError(t, err)
+	assert.Equal(t, *lastRelFileNode, header.BlockLocation.RelationFileNode)
 	assert.Equal(t, header.BlockId, uint8(0))
 	assert.Equal(t, header.ForkFlags, uint8(0x10))
 	assert.Equal(t, header.DataLength, uint16(0x0000))
@@ -53,8 +53,7 @@ func TestReadBlockLocation_WithDifferentRel(t *testing.T) {
 		0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
 	}
 	reader := bytes.NewReader(data)
-	var lastRelFileNode *RelFileNode
-	location, err := readBlockLocation(false, &lastRelFileNode, reader)
+	location, err := readBlockLocation(false, new(RelFileNode), reader)
 	assert.NoError(t, err)
 	assert.Equal(t, location.RelationFileNode.SpcNode, Oid(0x67452301))
 	assert.Equal(t, location.RelationFileNode.DBNode, Oid(0xefcdab89))

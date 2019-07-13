@@ -77,11 +77,23 @@ func parsingTestCase(t *testing.T, filename string, doTesting func(*testing.T, W
 	doTesting(t, pageReader, *parser)
 }
 
-func TestParsing(t *testing.T) {
+func TestParsing_SmallPartial(t *testing.T) {
 	parsingTestCase(t, SmallPartialTestPath, doPartialFileParsingTesting)
+}
+
+func TestParsing_Partial(t *testing.T) {
 	parsingTestCase(t, PartialTestPath, doPartialFileParsingTesting)
-	parsingTestCase(t, CutWALSwitchTestPath, doWalSwitchParsingTesting)
+}
+
+func TestParsing_WalSwitch(t *testing.T) {
 	parsingTestCase(t, WalSwitchTestPath, doWalSwitchParsingTesting)
+}
+
+func TestParsing_CutWALSwitch(t *testing.T) {
+	parsingTestCase(t, CutWALSwitchTestPath, doWalSwitchParsingTesting)
+}
+
+func TestParsing_LongRecord(t *testing.T) {
 	parsingTestCase(t, LongRecordTestPath, doLongRecordParsingTesting)
 }
 
