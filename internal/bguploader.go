@@ -4,7 +4,6 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -99,7 +98,7 @@ func (bgUploader *BgUploader) scanOnce() {
 			break
 		}
 		name := f.Name()
-		if isWalAlreadyUploaded(bgUploader.uploader, name) {
+		if !strings.HasSuffix(name, readySuffix) || isWalAlreadyUploaded(bgUploader.uploader, name) {
 			continue
 		}
 		if _, ok := bgUploader.started[name]; ok {
@@ -110,7 +109,7 @@ func (bgUploader *BgUploader) scanOnce() {
 		if bgUploader.shouldKeepScanning() {
 			bgUploader.running.Add(1)
 			atomic.AddInt32(&bgUploader.parallelWorkers, 1)
-			go bgUploader.upload(f)
+			go bgUploader.upload(name)
 		}
 	}
 }
@@ -125,12 +124,11 @@ func (bgUploader *BgUploader) haveNoSlots() bool {
 
 // TODO : unit tests
 // upload one WAL file
-func (bgUploader *BgUploader) upload(info os.FileInfo) {
-	actualName := info.Name()
-	walFilename := strings.TrimSuffix(strings.TrimSuffix(actualName, readySuffix), doneSuffix)
+func (bgUploader *BgUploader) upload(actualName string) {
+	walFilename := strings.TrimSuffix(actualName, readySuffix)
 	err := UploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename), bgUploader.preventWalOverwrite)
 	if err != nil {
-		tracelog.ErrorLogger.Print("Error of background uploader: ", err)
+		tracelog.ErrorLogger.Print("Error of background uploader: %v\nFailed to upload wal file %s(%s)", err, walFilename, actualName)
 		return
 	}
 
