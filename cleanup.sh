@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 rm -rf tmp/
 rm -rf vendor/github.com/google/brotli/*
