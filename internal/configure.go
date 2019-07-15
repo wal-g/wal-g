@@ -132,7 +132,6 @@ func getWalFolderPath() string {
 	dataFolderPath := filepath.Join(pgdata, "pg_wal")
 	if _, err := os.Stat(dataFolderPath); err == nil {
 		return dataFolderPath
-
 	}
 
 	dataFolderPath = filepath.Join(pgdata, "pg_xlog")
@@ -144,7 +143,7 @@ func getWalFolderPath() string {
 }
 
 // TODO : unit tests
-func getDataFolderPath() string {
+func GetDataFolderPath() string {
 	return filepath.Join(getWalFolderPath(), "walg_data")
 }
 
@@ -154,7 +153,7 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err
 	if !useWalDelta {
 		return
 	}
-	dataFolderPath := getDataFolderPath()
+	dataFolderPath := GetDataFolderPath()
 	deltaDataFolder, err = NewDiskDataFolder(dataFolderPath)
 	if err != nil {
 		useWalDelta = false
@@ -183,16 +182,12 @@ func ConfigureLogging() error {
 }
 
 func getArchiveDataFolderPath() string {
-	return filepath.Join(getWalFolderPath(), "walg_archive_status")
+	return filepath.Join(GetDataFolderPath(), "walg_archive_status")
 }
 
 // TODO : unit tests
-func configureArchiveStatusManager() (archiveDataFolder DataFolder, err error) {
-	archiveFolderPath := getArchiveDataFolderPath()
-
-	archiveDataFolder, err = NewDiskDataFolder(archiveFolderPath)
-
-	return
+func configureArchiveStatusManager() (DataFolder, error) {
+	return NewDiskDataFolder(getArchiveDataFolderPath())
 }
 
 // ConfigureUploader connects to storage and creates an uploader. It makes sure

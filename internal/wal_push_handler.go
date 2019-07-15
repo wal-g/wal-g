@@ -71,14 +71,11 @@ func UploadWALFile(uploader *Uploader, walFilePath string, preventWalOverwrite b
 		}
 	}
 	walFile, err := os.Open(walFilePath)
-	path, _ := filepath.Abs(walFilePath)
 	if err != nil {
-		return errors.Wrapf(err, "upload: could not open '%s'\n", path)
+		return errors.Wrapf(err, "upload: could not open '%s'\n", walFilePath)
 	}
-	if err = uploader.UploadWalFile(walFile); err != nil {
-		return errors.Wrapf(err, "upload: could not Upload '%s'\n", path)
-	}
-	return nil
+	err = uploader.UploadWalFile(walFile)
+	return errors.Wrapf(err, "upload: could not Upload '%s'\n", walFilePath)
 }
 
 // TODO : unit tests

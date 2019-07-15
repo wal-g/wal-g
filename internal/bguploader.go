@@ -124,8 +124,8 @@ func (bgUploader *BgUploader) haveNoSlots() bool {
 
 // TODO : unit tests
 // upload one WAL file
-func (bgUploader *BgUploader) upload(actualName string) {
-	walFilename := strings.TrimSuffix(actualName, readySuffix)
+func (bgUploader *BgUploader) upload(walStatusFilename string) {
+	walFilename := strings.TrimSuffix(walStatusFilename, readySuffix)
 	err := UploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename), bgUploader.preventWalOverwrite)
 	if err != nil {
 		tracelog.ErrorLogger.Print("Error of background uploader: ", err)
