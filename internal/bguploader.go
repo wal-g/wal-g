@@ -4,7 +4,6 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -81,7 +80,7 @@ func (bgUploader *BgUploader) Stop() {
 
 var readySuffix = ".ready"
 var archiveStatus = "archive_status"
-var done = ".done"
+var doneSuffix = ".done"
 
 // TODO : unit tests
 func (bgUploader *BgUploader) scanOnce() {
@@ -99,7 +98,7 @@ func (bgUploader *BgUploader) scanOnce() {
 			break
 		}
 		name := f.Name()
-		if !strings.HasSuffix(name, readySuffix) {
+		if !strings.HasSuffix(name, readySuffix) || isWalAlreadyUploaded(bgUploader.uploader, name) {
 			continue
 		}
 		if _, ok := bgUploader.started[name]; ok {
@@ -110,7 +109,7 @@ func (bgUploader *BgUploader) scanOnce() {
 		if bgUploader.shouldKeepScanning() {
 			bgUploader.running.Add(1)
 			atomic.AddInt32(&bgUploader.parallelWorkers, 1)
-			go bgUploader.upload(f)
+			go bgUploader.upload(name)
 		}
 	}
 }
@@ -125,19 +124,16 @@ func (bgUploader *BgUploader) haveNoSlots() bool {
 
 // TODO : unit tests
 // upload one WAL file
-func (bgUploader *BgUploader) upload(info os.FileInfo) {
-	walFilename := strings.TrimSuffix(info.Name(), readySuffix)
+func (bgUploader *BgUploader) upload(walStatusFilename string) {
+	walFilename := strings.TrimSuffix(walStatusFilename, readySuffix)
 	err := UploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename), bgUploader.preventWalOverwrite)
 	if err != nil {
 		tracelog.ErrorLogger.Print("Error of background uploader: ", err)
 		return
 	}
 
-	ready := filepath.Join(bgUploader.dir, archiveStatus, info.Name())
-	done := filepath.Join(bgUploader.dir, archiveStatus, walFilename+done)
-	err = os.Rename(ready, done)
-	if err != nil {
-		tracelog.ErrorLogger.Print("Error renaming .ready to .done: ", err)
+	if err := markWalUploaded(bgUploader.uploader, walFilename); err != nil {
+		tracelog.ErrorLogger.Printf("Error mark wal file %s uploader due %v", walFilename, err)
 	}
 
 	atomic.AddInt32(&bgUploader.totalUploaded, 1)
