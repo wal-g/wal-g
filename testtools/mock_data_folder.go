@@ -9,6 +9,21 @@ import (
 
 type MockDataFolder map[string]*bytes.Buffer
 
+func (folder *MockDataFolder) FileExists(filename string) bool {
+	_, ok := (*folder)[filename]
+	return ok
+}
+
+func (folder *MockDataFolder) DeleteFile(filename string) error {
+	delete(*folder, filename)
+	return nil
+}
+
+func (folder *MockDataFolder) CreateFile(filename string) error {
+	(*folder)[filename] = bytes.NewBuffer(nil)
+	return nil
+}
+
 func (folder *MockDataFolder) CleanFolder() error {
 	return nil
 }

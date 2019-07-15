@@ -24,4 +24,7 @@ type DataFolder interface {
 	OpenReadonlyFile(filename string) (io.ReadCloser, error)
 	OpenWriteOnlyFile(filename string) (io.WriteCloser, error)
 	CleanFolder() error
+	FileExists(filename string) bool
+	DeleteFile(filename string) error
+	CreateFile(filename string) error
 }

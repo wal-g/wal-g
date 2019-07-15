@@ -46,3 +46,21 @@ func (folder *DiskDataFolder) CleanFolder() error {
 	}
 	return nil
 }
+
+func (folder *DiskDataFolder) FileExists(filename string) bool {
+	filePath := filepath.Join(folder.path, filename)
+	_, err := os.Stat(filePath)
+	return !os.IsNotExist(err)
+}
+
+func (folder *DiskDataFolder) CreateFile(filename string) error {
+	filePath := filepath.Join(folder.path, filename)
+	_, err := os.Create(filePath)
+
+	return err
+}
+
+func (folder *DiskDataFolder) DeleteFile(filename string) error {
+	filePath := filepath.Join(folder.path, filename)
+	return os.Remove(filePath)
+}
