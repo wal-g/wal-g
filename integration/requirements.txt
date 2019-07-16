@@ -1,0 +1,4 @@
+PyYAML>=4.2.0
+pymongo>=3.6.1
+s3cmd>=2.0.1
+humanfriendly==4.4.1

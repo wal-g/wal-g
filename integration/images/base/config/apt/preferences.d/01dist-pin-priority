@@ -1,0 +1,3 @@
+Package: *
+Pin: origin "dist.yandex.ru"
+Pin-Priority: 2

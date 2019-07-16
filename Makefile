@@ -65,6 +65,16 @@ mongo_integration_test:
 	docker-compose build $(DOCKER_COMMON) mongo mongo_tests
 	docker-compose up --exit-code-from mongo_tests mongo_tests
 
+mongo_features: mongo_build
+	mv $(MAIN_MONGO_PATH)/wal-g ./integration/wal-g
+	$(MAKE) -C ./integration integration_test
+
+mongo_clean:
+	(cd $(MAIN_MONGO_PATH) && go clean)
+	./cleanup.sh
+	$(MAKE) -C ./integration clean
+
+
 redis_test: install deps redis_build lint unittest unlink_brotli redis_integration_test
 
 redis_build: $(CMD_FILES) $(PKG_FILES)

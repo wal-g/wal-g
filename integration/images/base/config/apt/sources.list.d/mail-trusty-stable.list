@@ -1,0 +1,2 @@
+deb http://dist.yandex.ru/mail-trusty stable/all/
+deb http://dist.yandex.ru/mail-trusty stable/$(ARCH)/
