@@ -199,3 +199,39 @@ func TestFastCopy_ReturnsError_WhenWriterFails(t *testing.T) {
 	_, err := utility.FastCopy(writer, reader)
 	assert.Error(t, err)
 }
+
+func TestSelectMatchingFiles_EmptyMask(t *testing.T) {
+	files := map[string]bool{
+		"/a":   true,
+		"/b/c": true,
+		"d":    true,
+	}
+	selected, err := utility.SelectMatchingFiles("", files)
+	assert.NoError(t, err)
+	assert.Equal(t, files, selected)
+}
+
+func TestSelectMatchingFiles_InvalidMask(t *testing.T) {
+	files := map[string]bool{
+		"/a":   true,
+		"/b/c": true,
+		"d":    true,
+	}
+	_, err := utility.SelectMatchingFiles("[a-c", files)
+	assert.Error(t, err)
+}
+
+func TestSelectMatchingFiles_ValidMask(t *testing.T) {
+	files := map[string]bool{
+		"/a":   true,
+		"/b/c": true,
+		"/b/e": true,
+		"d":    true,
+	}
+	selected, err := utility.SelectMatchingFiles("b/*", files)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]bool{
+		"/b/c": true,
+		"/b/e": true,
+	}, selected)
+}

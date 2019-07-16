@@ -125,23 +125,27 @@ func ConfigureFolder() (storage.Folder, error) {
 	return nil, NewUnconfiguredStorageError(skippedPrefixes)
 }
 
-// TODO : unit tests
-func getDataFolderPath() string {
-	var dataFolderPath string
+func getWalFolderPath() string {
 	if !viper.IsSet(PgDataSetting) {
-		dataFolderPath = DefaultDataFolderPath
-	} else {
-		pgdata := viper.GetString(PgDataSetting)
-		dataFolderPath = filepath.Join(pgdata, "pg_wal")
-		if _, err := os.Stat(dataFolderPath); err != nil {
-			dataFolderPath = filepath.Join(pgdata, "pg_xlog")
-			if _, err := os.Stat(dataFolderPath); err != nil {
-				dataFolderPath = DefaultDataFolderPath
-			}
-		}
+		return DefaultDataFolderPath
 	}
-	dataFolderPath = filepath.Join(dataFolderPath, "walg_data")
-	return dataFolderPath
+	pgdata := viper.GetString(PgDataSetting)
+	dataFolderPath := filepath.Join(pgdata, "pg_wal")
+	if _, err := os.Stat(dataFolderPath); err == nil {
+		return dataFolderPath
+	}
+
+	dataFolderPath = filepath.Join(pgdata, "pg_xlog")
+	if _, err := os.Stat(dataFolderPath); err == nil {
+		return dataFolderPath
+	}
+
+	return DefaultDataFolderPath
+}
+
+// TODO : unit tests
+func GetDataFolderPath() string {
+	return filepath.Join(getWalFolderPath(), "walg_data")
 }
 
 // TODO : unit tests
@@ -150,7 +154,7 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err
 	if !useWalDelta {
 		return
 	}
-	dataFolderPath := getDataFolderPath()
+	dataFolderPath := GetDataFolderPath()
 	deltaDataFolder, err = NewDiskDataFolder(dataFolderPath)
 	if err != nil {
 		useWalDelta = false
@@ -178,6 +182,15 @@ func ConfigureLogging() error {
 	return nil
 }
 
+func getArchiveDataFolderPath() string {
+	return filepath.Join(GetDataFolderPath(), "walg_archive_status")
+}
+
+// TODO : unit tests
+func configureArchiveStatusManager() (DataFolder, error) {
+	return NewDiskDataFolder(getArchiveDataFolderPath())
+}
+
 // ConfigureUploader connects to storage and creates an uploader. It makes sure
 // that a valid session has started; if invalid, returns AWS error
 // and `<nil>` values.
@@ -202,7 +215,13 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
 	}
 
-	uploader = NewUploader(compressor, folder, deltaFileManager)
+	archiveStatusManager, err := configureArchiveStatusManager()
+
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure Archive Status Manager")
+	}
+
+	uploader = NewUploader(compressor, folder, deltaFileManager, archiveStatusManager)
 
 	return uploader, err
 }

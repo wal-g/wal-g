@@ -34,18 +34,17 @@ func TestBackgroundWALUpload(t *testing.T) {
 	time.Sleep(time.Second) // time to spin up new uploaders
 	bu.Stop()
 
+	walgDataDir := internal.GetDataFolderPath()
+
 	for i := 0; i < int(iterNum); i++ {
 		bname := "B" + strconv.Itoa(i)
-		bd := filepath.Join(dir, "archive_status", bname+".done")
+		bd := filepath.Join(walgDataDir, "walg_archive_status", bname)
 		_, err := os.Stat(bd)
-		assert.Falsef(t, os.IsNotExist(err), bname+".done was not created")
-
-		br := filepath.Join(dir, "archive_status", bname+".ready")
-		_, err = os.Stat(br)
-		assert.Truef(t, os.IsNotExist(err), bname+".ready was not deleted")
+		assert.Falsef(t, os.IsNotExist(err), bname+" status file was not created")
 	}
 
 	cleanup(t, dir)
+	cleanup(t, walgDataDir)
 }
 
 func setupArchiveStatus(t *testing.T, dir string) (string, string) {

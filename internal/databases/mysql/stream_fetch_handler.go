@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"os"
 	"path"
 	"path/filepath"
@@ -106,7 +105,7 @@ func fetchBinlogs(folder storage.Folder, sentinel StreamSentinelDto, binlogsAreD
 	}
 
 	sort.Slice(fetchedLogs, func(i, j int) bool {
-		return fetchedLogs[i].GetLastModified().After(fetchedLogs[j].GetLastModified())
+		return fetchedLogs[i].GetLastModified().Before(fetchedLogs[j].GetLastModified())
 	})
 
 	index_file, err := os.Create(filepath.Join(dstFolder, "binlogs_order"))
@@ -136,18 +135,7 @@ func BinlogShouldBeFetched(sentinel StreamSentinelDto, binlogName string, endTS 
 }
 
 func GetBinlogConfigs() (endTS *time.Time, dstFolder string, err error) {
-	if viper.IsSet(BinlogEndTsSetting) {
-		endTSStr := viper.GetString(BinlogEndTsSetting)
-		t, err := time.Parse(time.RFC3339, endTSStr)
-		if err != nil {
-			return nil, "", err
-		}
-		endTS = &t
-	}
-	if !viper.IsSet(BinlogDstSetting) {
-		return endTS, dstFolder, internal.NewUnsetRequiredSettingError(BinlogDstSetting)
-	}
-	return endTS, viper.GetString(BinlogDstSetting), nil
+	return internal.GetOperationLogsSettings(BinlogEndTsSetting, BinlogDstSetting)
 }
 
 func ExtractBinlogName(object storage.Object, folder storage.Folder) string {
