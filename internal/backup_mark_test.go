@@ -13,7 +13,6 @@ import (
 func TestGetImpermanentBackupMetadataBefore(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	_ = baseBackupFolder
 	backups := map[string]struct {
 		meta     internal.ExtendedMetadataDto
 		sentinel internal.BackupSentinelDto
