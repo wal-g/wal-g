@@ -11,7 +11,6 @@ import (
 // GetImpermanentBackupMetadataBefore gets all previous impermanent backup
 // metas, including itself, any previous delta backups and initial full backup,
 // in increasing order beginning from full backup
-// TODO: unit tests
 func GetImpermanentBackupMetadataBefore(baseBackupFolder storage.Folder, backupName string) ([]UploadObject, error) {
 	backupMetadata := []UploadObject{}
 
