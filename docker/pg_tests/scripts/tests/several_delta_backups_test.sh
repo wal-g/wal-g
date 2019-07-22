@@ -19,7 +19,7 @@ wal-g backup-push ${PGDATA}
 export WALG_COMPRESSION_METHOD=lz4
 wal-g backup-push ${PGDATA}
 
-psql -f scripts/amcheck.sql postgres
+psql -f scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
 
 export WALG_COMPRESSION_METHOD=brotli
 wal-g backup-push ${PGDATA}
@@ -47,7 +47,7 @@ sleep 10
 
 pg_dumpall -f /tmp/dump2
 
-psql -f scripts/amcheck.sql postgres
+psql -f scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
 
 diff /tmp/dump1 /tmp/dump2
 
