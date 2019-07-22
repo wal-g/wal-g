@@ -19,7 +19,9 @@ jobs:
       script: make pg_test
     - script: make mysql_test
     - script: make mongo_test
-    - script: make redis_tests
+    - script: make redis_test
+    - script: make pg_crypto_test
+    - script: make pg_config_test
 
 notifications:
   email: false

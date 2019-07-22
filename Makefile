@@ -17,7 +17,13 @@ endif
 
 test: install deps lint unittest pg_build mysql_build redis_build mongo_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test mongo_integration_test
 
-pg_test: install deps pg_build lint unittest unlink_brotli pg_integration_test
+pg_before_integration_test: install deps pg_build lint unittest unlink_brotli
+
+pg_test: pg_before_integration_test pg_integration_test
+
+pg_crypto_test: pg_before_integration_test pg_integration_crypto_test
+
+pg_config_test: pg_before_integration_test pg_integration_config_test
 
 pg_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_PG_PATH) && go build -o wal-g $(GOTAGS) -ldflags "-s -w -X github.com/wal-g/wal-g/cmd.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd.WalgVersion=`git tag -l --points-at HEAD`")
@@ -29,6 +35,14 @@ pg_int_tests_only:
 pg_integration_test:
 	docker-compose build $(DOCKER_COMMON) pg pg_tests
 	docker-compose up --exit-code-from pg_tests pg_tests
+
+pg_integration_crypto_test:
+	docker-compose build $(DOCKER_COMMON) pg pg_crypto_test
+	docker-compose up --exit-code-from pg_crypto_test pg_crypto_test
+
+pg_integration_config_test:
+	docker-compose build $(DOCKER_COMMON) pg pg_config_test
+	docker-compose up --exit-code-from pg_config_test pg_config_test
 
 pg_clean:
 	(cd $(MAIN_PG_PATH) && go clean)

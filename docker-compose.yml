@@ -68,6 +68,34 @@ services:
     links:
       - s3
 
+  pg_crypto_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_crypto_test
+      context: .
+    image: wal-g/pg_crypto_test
+    container_name: wal-g_pg_crypto_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_config_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_config_test
+      context: .
+    image: wal-g/pg_config_test
+    container_name: wal-g_pg_config_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
   mysql:
     build:
       dockerfile: docker/mysql/Dockerfile
