@@ -21,4 +21,4 @@ COPY --from=build /go/src/github.com/wal-g/wal-g/main/pg/wal-g /usr/bin
 
 COPY docker/pg_tests/scripts/ /tmp
 
-CMD su postgres -c "/tmp/tests/crypto_test.sh"
+CMD su postgres -c "/tmp/crypto_test.sh"
