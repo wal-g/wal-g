@@ -27,7 +27,8 @@ func TestShrinkableReader_Read(t *testing.T) {
 func TestShrinkableReader_Shrink(t *testing.T) {
 	reader := bytes.NewReader([]byte{1, 2, 3, 4, 5})
 	shrinkableReader := ShrinkableReader{reader, 4}
-	shrinkableReader.Shrink(1)
+	err := shrinkableReader.Shrink(1)
+	assert.NoError(t, err)
 	buf := make([]byte, 4)
 	readCount, err := shrinkableReader.Read(buf)
 	assert.NoError(t, err)
@@ -37,6 +38,7 @@ func TestShrinkableReader_Shrink(t *testing.T) {
 func TestShrinkableReader_EOF(t *testing.T) {
 	reader := bytes.NewReader([]byte{1, 2, 3, 4, 5})
 	shrinkableReader := ShrinkableReader{reader, 5}
-	shrinkableReader.Shrink(5)
+	err := shrinkableReader.Shrink(5)
+	assert.NoError(t, err)
 	AssertReaderIsEmpty(t, &shrinkableReader)
 }
