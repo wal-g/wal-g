@@ -29,7 +29,7 @@ pg_dumpall -f /tmp/dump1
 sleep 1
 wal-g backup-push ${PGDATA}
 
-tmp/scripts/drop_pg.sh
+scripts/drop_pg.sh
 
 wal-g backup-fetch ${PGDATA} LATEST
 
@@ -41,6 +41,6 @@ pg_dumpall -f /tmp/dump2
 
 diff /tmp/dump1 /tmp/dump2
 
-tmp/scripts/drop_pg.sh
+scripts/drop_pg.sh
 
 echo "Several delta backup success!!!!!!"

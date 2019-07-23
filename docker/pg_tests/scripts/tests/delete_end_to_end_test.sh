@@ -38,7 +38,7 @@ FIRST=`wal-g backup-list | head -n 2 | tail -n 1 | cut -f 1 -d " "`
 
 for i in ${FIRST} LATEST
 do
-    scripts/drop_pg.sh
+    tmp/scripts/drop_pg.sh
     wal-g backup-fetch ${PGDATA} ${i}
     echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
     /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
@@ -50,7 +50,7 @@ done
 diff /tmp/dump4 /tmp/dump${FIRST}
 diff /tmp/dump9 /tmp/dumpLATEST
 
-scripts/drop_pg.sh
+tmp/scripts/drop_pg.sh
 
 echo $target_backup_name
 echo $FIRST
