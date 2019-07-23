@@ -45,10 +45,12 @@ diff /tmp/list_tail_before_delete /tmp/list_tail_after_delete
 
 echo "____ls____"
 ls
-echo "____ls scripts____"
-ls scripts
+echo "____ls tmp____"
+ls tmp
+echo "____ls tmp/scripts____"
+ls tmp/scripts
 
 
-scripts/drop_pg.sh
+tmp/scripts/drop_pg.sh
 
 echo "Delete before FIND_FULL name success!!!!!!"
