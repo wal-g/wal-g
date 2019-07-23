@@ -26,6 +26,64 @@ pg_integration_test:
 	docker-compose build $(DOCKER_COMMON) pg pg_tests
 	docker-compose up --exit-code-from pg_tests pg_tests
 
+pg_unittests: install deps lint unittest
+
+pg_integration_delete_before_name_find_full_test: install deps pg_build unlink_brotli
+	docker-compose build $(DOCKER_COMMON) pg pg_delete_before_name_find_full_test
+	docker-compose up --exit-code-from pg_delete_before_name_find_full_test pg_delete_before_name_find_full_test
+
+pg_integration_delete_retain_full_test: install deps pg_build unlink_brotli
+	docker-compose build $(DOCKER_COMMON) pg pg_delete_retain_full_test
+	docker-compose up --exit-code-from pg_delete_retain_full_test pg_delete_retain_full_test
+
+pg_integration_full_backup_test: install deps pg_build unlink_brotli
+	docker-compose build $(DOCKER_COMMON) pg pg_full_backup_test
+	docker-compose up --exit-code-from pg_full_backup_test pg_full_backup_test
+
+pg_integration_delete_before_time_find_full_test: install deps pg_build unlink_brotli
+	docker-compose build $(DOCKER_COMMON) pg pg_delete_before_time_find_full_test
+	docker-compose up --exit-code-from pg_delete_before_time_find_full_test pg_delete_before_time_find_full_test
+
+pg_integration_delete_without_confirm_test: install deps pg_build unlink_brotli
+	docker-compose build $(DOCKER_COMMON) pg pg_delete_without_confirm_test
+	docker-compose up --exit-code-from pg_delete_without_confirm_test pg_delete_without_confirm_test
+
+pg_integration_ghost_table_test: install deps pg_build unlink_brotli
+	docker-compose build $(DOCKER_COMMON) pg pg_ghost_table_test
+	docker-compose up --exit-code-from pg_ghost_table_test pg_ghost_table_test
+
+pg_integration_config_test: install deps pg_build unlink_brotli
+	docker-compose build $(DOCKER_COMMON) pg pg_config_test
+	docker-compose up --exit-code-from pg_config_test pg_config_test
+
+pg_integration_delete_end_to_end_test: install deps pg_build unlink_brotli
+	docker-compose build $(DOCKER_COMMON) pg pg_delete_end_to_end_test
+	docker-compose up --exit-code-from pg_delete_end_to_end_test pg_delete_end_to_end_test
+
+pg_integration_delta_backup_fullscan_test: install deps pg_build unlink_brotli
+	docker-compose build $(DOCKER_COMMON) pg pg_delta_backup_fullscan_test
+	docker-compose up --exit-code-from pg_delta_backup_fullscan_test pg_delta_backup_fullscan_test
+
+pg_integration_several_delta_backups_test: install deps pg_build unlink_brotli
+	docker-compose build $(DOCKER_COMMON) pg pg_several_delta_backups_test
+	docker-compose up --exit-code-from pg_several_delta_backups_test pg_several_delta_backups_test
+
+pg_integration_crypto_test: install deps pg_build unlink_brotli
+	docker-compose build $(DOCKER_COMMON) pg pg_crypto_test
+	docker-compose up --exit-code-from pg_crypto_test pg_crypto_test
+
+pg_integration_delete_retain_find_full_test: install deps pg_build unlink_brotli
+	docker-compose build $(DOCKER_COMMON) pg pg_delete_retain_find_full_test
+	docker-compose up --exit-code-from pg_delete_retain_find_full_test pg_delete_retain_find_full_test
+
+pg_integration_delta_backup_wal_delta_test: install deps pg_build unlink_brotli
+	docker-compose build $(DOCKER_COMMON) pg pg_delta_backup_wal_delta_test
+	docker-compose up --exit-code-from pg_delta_backup_wal_delta_test pg_delta_backup_wal_delta_test
+
+pg_integration_wale_compatibility_test: install deps pg_build unlink_brotli
+	docker-compose build $(DOCKER_COMMON) pg pg_wale_compatibility_test
+	docker-compose up --exit-code-from pg_wale_compatibility_test pg_wale_compatibility_test
+
 pg_int_tests_only:
 	docker-compose build pg_tests
 	docker-compose up --exit-code-from pg_tests pg_tests
