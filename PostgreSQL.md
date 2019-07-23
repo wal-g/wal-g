@@ -69,7 +69,7 @@ To configure GPG key for encryption and decryption. By default, no encryption is
 
 * `WALG_PGP_KEY`
 
-To configure encryption and decryption with OpenPGP standard.
+To configure encryption and decryption with OpenPGP standard. You can join multiline key using `\n` symbols into one line (mostly used in case of daemontools and envdir).
 Set *private key* value, when you need to execute ```wal-fetch``` or ```backup-fetch``` command.
 Set *public key* value, when you need to execute ```wal-push``` or ```backup-push``` command.
 Keep in mind that the *private key* also contains the *public key*.
