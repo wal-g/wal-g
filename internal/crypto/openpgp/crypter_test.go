@@ -11,26 +11,38 @@ import (
 
 var pgpTestPrivateKey string
 
-const PrivateKeyFilePath = "./testdata/pgpTestPrivateKey"
+const (
+	PrivateKeyFilePath    = "./testdata/pgpTestPrivateKey"
+	PrivateKeyEnvFilePath = "./testdata/pgpTestPrivateKeyEnv"
+)
 
-func init() {
-	pgpTestPrivateKeyBytes, err := ioutil.ReadFile(PrivateKeyFilePath)
+func noPassphrase() (string, bool) {
+	return "", false
+}
+
+func MockArmedCrypterFromEnv() crypto.Crypter {
+	pgpTestPrivateKeyBytes, err := ioutil.ReadFile(PrivateKeyEnvFilePath)
 	if err != nil {
 		panic(err)
 	}
 	pgpTestPrivateKey = string(pgpTestPrivateKeyBytes)
+
+	return CrypterFromKey(pgpTestPrivateKey, noPassphrase)
 }
 
-func MockArmedCrypter() crypto.Crypter {
-	return CrypterFromKeyRing(pgpTestPrivateKey)
+func MockArmedCrypterFromKeyPath() crypto.Crypter {
+	return CrypterFromKeyPath(PrivateKeyFilePath, noPassphrase)
 }
 
-func TestMockCrypter(t *testing.T) {
-	MockArmedCrypter()
+func TestMockCrypterFromEnv(t *testing.T) {
+	MockArmedCrypterFromEnv()
 }
 
-func TestEncryptionCycle(t *testing.T) {
-	crypter := MockArmedCrypter()
+func TestMockCrypterFromKeyPath(t *testing.T) {
+	MockArmedCrypterFromKeyPath()
+}
+
+func EncryptionCycle(t *testing.T, crypter crypto.Crypter) {
 	const someSecret = "so very secret thingy"
 
 	buf := new(bytes.Buffer)
@@ -47,4 +59,12 @@ func TestEncryptionCycle(t *testing.T) {
 	assert.NoErrorf(t, err, "Decryption read error: %v", err)
 
 	assert.Equal(t, someSecret, string(decryptedBytes), "Decrypted text not equals open text")
+}
+
+func TestEncryptionCycleFromEnv(t *testing.T) {
+	EncryptionCycle(t, MockArmedCrypterFromEnv())
+}
+
+func TestEncryptionCycleFromKeyPath(t *testing.T) {
+	EncryptionCycle(t, MockArmedCrypterFromKeyPath())
 }
