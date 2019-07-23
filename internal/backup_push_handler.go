@@ -183,17 +183,8 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
 	currentBackupSentinelDto.UserData = GetSentinelUserData()
 
-	err = UploadMetadata(uploader, currentBackupSentinelDto, backupName, meta)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("Failed to upload metadata file for backup: %s %v", backupName, err)
-	}
-	// If other parts are successful in uploading, upload json file.
-	err = UploadSentinel(uploader, currentBackupSentinelDto, backupName)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", backupName)
-		tracelog.ErrorLogger.FatalError(err)
-	}
-	// If pushing permanent delta backup, mark all previous backups permanent.
+	// If pushing permanent delta backup, mark all previous backups permanent
+	// Do this before uploading current meta to ensure that backups are marked in increasing order
 	if isPermanent && currentBackupSentinelDto.IsIncremental() {
 		tracelog.InfoLogger.Printf("Retrieving previous related backups to be marked as permanent")
 		impermanentBackupMetadata, err := GetImpermanentBackupMetadataBefore(basebackupFolder, previousBackupName)
@@ -206,6 +197,17 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 				tracelog.ErrorLogger.Fatalf("Failed to mark previous backups as permanent: %v", err)
 			}
 		}
+	}
+
+	err = UploadMetadata(uploader, currentBackupSentinelDto, backupName, meta)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to upload metadata file for backup: %s %v", backupName, err)
+		tracelog.ErrorLogger.FatalError(err)
+	}
+	err = UploadSentinel(uploader, currentBackupSentinelDto, backupName)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", backupName)
+		tracelog.ErrorLogger.FatalError(err)
 	}
 	// logging backup set name
 	tracelog.InfoLogger.Println("Wrote backup with name " + backupName)
