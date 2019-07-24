@@ -19,6 +19,3 @@ FROM wal-g/pg:latest
 
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/pg/wal-g /usr/bin
 
-COPY docker/pg_tests/scripts/ /tmp
-
-CMD su postgres -c "/tmp/run_integration_tests.sh"
