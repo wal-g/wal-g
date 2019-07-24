@@ -45,11 +45,11 @@ Concurrency values can be configured using:
 
 * `WALG_DOWNLOAD_CONCURRENCY`
 
-To configure how many goroutines to use during backup-fetch  and wal-push, use `WALG_DOWNLOAD_CONCURRENCY`. By default, WAL-G uses the minimum of the number of files to extract and 10.
+To configure how many goroutines to use during backup-fetch and wal-fetch, use `WALG_DOWNLOAD_CONCURRENCY`. By default, WAL-G uses the minimum of the number of files to extract and 10.
 
 * `WALG_UPLOAD_CONCURRENCY`
 
-To configure how many concurrency streams to use during backup uploading, use `WALG_UPLOAD_CONCURRENCY`. By default, WAL-G uses 10 streams.
+To configure how many concurrency streams to use during backup uploading, use `WALG_UPLOAD_CONCURRENCY`. By default, WAL-G uses 16 streams.
 
 * `WALG_UPLOAD_DISK_CONCURRENCY`
 
