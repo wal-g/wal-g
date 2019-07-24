@@ -1,4 +1,4 @@
-FROM /go/src/github.com/wal-g/wal-g/docker/pg_tests:latest as build
+FROM wal-g/pg_tests:latest
 
 COPY docker/pg_tests/scripts/ /tmp
 
