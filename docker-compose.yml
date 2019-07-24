@@ -70,6 +70,215 @@ services:
     links:
       - s3
 
+  pg_delete_before_name_find_full_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_before_name_find_full_test
+      context: .
+    image: wal-g/delete_before_name_find_full_test
+    container_name: wal-g_pg_delete_before_name_find_full_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+
+  pg_delete_retain_full_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_retain_full_test
+      context: .
+    image: wal-g/delete_retain_full_test
+    container_name: wal-g_pg_delete_retain_full_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+
+  pg_full_backup_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_test
+      context: .
+    image: wal-g/full_backup_test
+    container_name: wal-g_pg_full_backup_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+
+  pg_delete_before_time_find_full_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_before_time_find_full_test
+      context: .
+    image: wal-g/delete_before_time_find_full_test
+    container_name: wal-g_pg_delete_before_time_find_full_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+
+  pg_delete_without_confirm_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_without_confirm_test
+      context: .
+    image: wal-g/delete_without_confirm_test
+    container_name: wal-g_pg_delete_without_confirm_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+
+  pg_ghost_table_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_ghost_table_test
+      context: .
+    image: wal-g/ghost_table_test
+    container_name: wal-g_pg_ghost_table_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+
+  pg_config_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_config_test
+      context: .
+    image: wal-g/config_test
+    container_name: wal-g_pg_config_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+
+  pg_delete_end_to_end_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_end_to_end_test
+      context: .
+    image: wal-g/delete_end_to_end_test
+    container_name: wal-g_pg_delete_end_to_end_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+
+  pg_delta_backup_fullscan_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delta_backup_fullscan_test
+      context: .
+    image: wal-g/delta_backup_fullscan_test
+    container_name: wal-g_pg_delta_backup_fullscan_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+
+  pg_several_delta_backups_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_several_delta_backups_test
+      context: .
+    image: wal-g/several_delta_backups_test
+    container_name: wal-g_pg_several_delta_backups_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+
+  pg_crypto_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_crypto_test
+      context: .
+    image: wal-g/crypto_test
+    container_name: wal-g_pg_crypto_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+
+  pg_delete_retain_find_full_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_retain_find_full_test
+      context: .
+    image: wal-g/delete_retain_find_full_test
+    container_name: wal-g_pg_delete_retain_find_full_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+
+  pg_delta_backup_wal_delta_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delta_backup_wal_delta_test
+      context: .
+    image: wal-g/delta_backup_wal_delta_test
+    container_name: wal-g_pg_delta_backup_wal_delta_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+
+  pg_wale_compatibility_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_wale_compatibility_test
+      context: .
+    image: wal-g/wale_compatibility_test
+    container_name: wal-g_pg_wale_compatibility_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
   mysql:
     build:
       dockerfile: docker/mysql/Dockerfile

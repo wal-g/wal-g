@@ -38,6 +38,6 @@ fi
 
 diff /tmp/list_before_delete /tmp/list_after_delete
 
-scripts/drop_pg.sh
+tmp/scripts/drop_pg.sh
 
 echo "Delete retain FULL success!!!!!!"

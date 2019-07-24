@@ -24,7 +24,7 @@ wal-g backup-push ${PGDATA}
 # wal-g will use WALE_GPG_KEY_ID instead of WALG_PGP_KEY_PATH for backup-fetch
 unset WALG_PGP_KEY_PATH
 
-scripts/drop_pg.sh
+tmp/scripts/drop_pg.sh
 
 wal-g backup-fetch ${PGDATA} LATEST
 
@@ -36,6 +36,6 @@ pg_dumpall -f /tmp/dump2
 
 diff /tmp/dump1 /tmp/dump2
 
-scripts/drop_pg.sh
+tmp/scripts/drop_pg.sh
 
 echo "Crypto test success!!!!!!"

@@ -22,7 +22,7 @@ pgbench -c 2 -T 100000000 -S &
 sleep 1
 wal-g backup-push ${PGDATA}
 
-scripts/drop_pg.sh
+tmp/scripts/drop_pg.sh
 
 wal-g backup-fetch ${PGDATA} LATEST
 
@@ -34,7 +34,7 @@ pg_dumpall -f /tmp/dump2
 
 diff /tmp/dump1 /tmp/dump2
 
-psql -f scripts/amcheck.sql postgres
-scripts/drop_pg.sh
+psql -f tmp/scripts/amcheck.sql postgres
+tmp/scripts/drop_pg.sh
 
 echo "Wal delta backup success!!!!!!"
