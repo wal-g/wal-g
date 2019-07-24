@@ -28,6 +28,10 @@ pg_integration_test:
 
 pg_unittests: install deps lint unittest
 
+pg_integration_tests_with_args: install deps pg_build unlink_brotli
+	docker-compose build $(DOCKER_COMMON) pg $(ARGS)
+	docker-compose up --exit-code-from $(ARGS) $(ARGS)
+
 pg_integration_delete_before_name_find_full_test: install deps pg_build unlink_brotli
 	docker-compose build $(DOCKER_COMMON) pg pg_delete_before_name_find_full_test
 	docker-compose up --exit-code-from pg_delete_before_name_find_full_test pg_delete_before_name_find_full_test
