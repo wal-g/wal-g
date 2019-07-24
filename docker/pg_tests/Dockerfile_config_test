@@ -1,4 +1,4 @@
-FROM wal-g/pg_tests:latest
+FROM wal-g/pg_tests/docker_prefix
 
 COPY docker/pg_tests/scripts/ /tmp
 
