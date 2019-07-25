@@ -50,7 +50,7 @@
   version = "v0.4.16"
 
 [[projects]]
-  digest = "1:e3bb374225bfecd4f8d8bd099216802dccbc3ceeb0d185b891eba4eb095857cf"
+  digest = "1:d6ea693db6c6588b4831fd333454721144f4a2533824ef3d22243cd519c4b2fa"
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -79,11 +79,14 @@
     "private/protocol",
     "private/protocol/eventstream",
     "private/protocol/eventstream/eventstreamapi",
+    "private/protocol/json/jsonutil",
+    "private/protocol/jsonrpc",
     "private/protocol/query",
     "private/protocol/query/queryutil",
     "private/protocol/rest",
     "private/protocol/restxml",
     "private/protocol/xml/xmlutil",
+    "service/kms",
     "service/s3",
     "service/s3/s3iface",
     "service/s3/s3manager",
@@ -264,6 +267,14 @@
   pruneopts = "UT"
   revision = "c2353362d570a7bfa228149c62842019201cfb71"
   version = "v1.8.0"
+
+[[projects]]
+  digest = "1:594b731b385e9dd739b0e73313de41bf32d1041fcdbfac42f62c0d1ff151a09e"
+  name = "github.com/minio/sio"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "035b4ef8c449ba2ba21ec143c91964e76a1fb68c"
+  version = "v0.2.0"
 
 [[projects]]
   digest = "1:53bc4cd4914cd7cd52139990d5170d6dc99067ae31c56530621b18b35fc30318"
@@ -448,16 +459,20 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:bfd957255a80a23af53f514cbaa5f16061df295e37234b5e0935cf49d2cca650"
+  digest = "1:ffc7715fff70ae51f8d9dd673dfc0ae89d2c624779e852e7f19ab1330439b1de"
   name = "golang.org/x/crypto"
   packages = [
     "cast5",
+    "chacha20poly1305",
+    "internal/chacha20",
+    "internal/subtle",
     "openpgp",
     "openpgp/armor",
     "openpgp/elgamal",
     "openpgp/errors",
     "openpgp/packet",
     "openpgp/s2k",
+    "poly1305",
   ]
   pruneopts = "UT"
   revision = "e657309f52e71501f9934566ac06dc5c2f7f11a1"
@@ -503,9 +518,10 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:ba8cbf57cfd92d5f8592b4aca1a35d92c162363d32aeabd5b12555f8896635e7"
+  digest = "1:c640964729379798b492e5ddd4a78eb496b78b5f03ad3d719e7d4bbb326da22f"
   name = "golang.org/x/sys"
   packages = [
+    "cpu",
     "unix",
     "windows",
   ]
@@ -656,6 +672,7 @@
     "github.com/aws/aws-sdk-go/aws/credentials",
     "github.com/aws/aws-sdk-go/aws/defaults",
     "github.com/aws/aws-sdk-go/aws/session",
+    "github.com/aws/aws-sdk-go/service/kms",
     "github.com/aws/aws-sdk-go/service/s3",
     "github.com/aws/aws-sdk-go/service/s3/s3iface",
     "github.com/aws/aws-sdk-go/service/s3/s3manager",
@@ -667,6 +684,7 @@
     "github.com/google/brotli/go/cbrotli",
     "github.com/jackc/pgx",
     "github.com/jedib0t/go-pretty/table",
+    "github.com/minio/sio",
     "github.com/ncw/swift",
     "github.com/pierrec/lz4",
     "github.com/pkg/errors",

@@ -51,17 +51,6 @@ func CrypterFromKeyRingID(keyRingID string, loadPassphrase func() (string, bool)
 	return &Crypter{KeyRingID: keyRingID, IsUseKeyRingID: true, loadPassphrase: loadPassphrase}
 }
 
-// CrypterFromKeyRing creates Crypter from armored keyring.
-// It is used mainly for mock purpouses, so it panics on error.
-func CrypterFromKeyRing(armedKeyring string) crypto.Crypter {
-	ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(armedKeyring))
-	if err != nil {
-		panic(err)
-	}
-	crypter := &Crypter{PubKey: ring, SecretKey: ring}
-	return crypter
-}
-
 func (crypter *Crypter) setupPubKey() error {
 	crypter.mutex.RLock()
 	if crypter.PubKey != nil {
@@ -77,7 +66,8 @@ func (crypter *Crypter) setupPubKey() error {
 	}
 
 	if crypter.IsUseArmoredKey {
-		entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(crypter.ArmoredKey))
+		evaluatedKey := strings.Replace(crypter.ArmoredKey, `\n`, "\n", -1)
+		entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(evaluatedKey))
 
 		if err != nil {
 			return err
@@ -170,7 +160,8 @@ func (crypter *Crypter) loadSecret() error {
 	}
 
 	if crypter.IsUseArmoredKey {
-		entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(crypter.ArmoredKey))
+		evaluatedKey := strings.Replace(crypter.ArmoredKey, `\n`, "\n", -1)
+		entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(evaluatedKey))
 
 		if err != nil {
 			return errors.WithStack(err)

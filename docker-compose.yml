@@ -35,6 +35,8 @@ services:
       &&  mkdir -p /export/deleteretainfindfullbucket
       &&  mkdir -p /export/deletebeforenamefindfullbucket
       &&  mkdir -p /export/deletebeforetimefindfullbucket
+      &&  mkdir -p /export/deletebeforepermanentfullbucket
+      &&  mkdir -p /export/deletebeforepermanentdeltabucket
       &&  mkdir -p /export/deletewithoutconfirm
       &&  mkdir -p /export/deleteendtoendbucket
       &&  mkdir -p /export/mysqlfullbucket
@@ -81,7 +83,6 @@ services:
       - s3
     links:
       - s3
-
 
   pg_delete_before_name_find_full_test:
     build:

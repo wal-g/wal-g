@@ -92,6 +92,7 @@ unittest:
 	go test -v $(TEST_MODIFIER) ./internal/
 	go test -v $(TEST_MODIFIER) ./internal/compression/
 	go test -v $(TEST_MODIFIER) ./internal/crypto/openpgp/
+	go test -v $(TEST_MODIFIER) ./internal/crypto/awskms/
 	go test -v $(TEST_MODIFIER) ./internal/databases/mysql
 	go test -v $(TEST_MODIFIER) ./internal/storages/azure/
 	go test -v $(TEST_MODIFIER) ./internal/storages/fs/

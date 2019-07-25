@@ -45,11 +45,11 @@ Concurrency values can be configured using:
 
 * `WALG_DOWNLOAD_CONCURRENCY`
 
-To configure how many goroutines to use during backup-fetch  and wal-push, use `WALG_DOWNLOAD_CONCURRENCY`. By default, WAL-G uses the minimum of the number of files to extract and 10.
+To configure how many goroutines to use during backup-fetch and wal-fetch, use `WALG_DOWNLOAD_CONCURRENCY`. By default, WAL-G uses the minimum of the number of files to extract and 10.
 
 * `WALG_UPLOAD_CONCURRENCY`
 
-To configure how many concurrency streams to use during backup uploading, use `WALG_UPLOAD_CONCURRENCY`. By default, WAL-G uses 10 streams.
+To configure how many concurrency streams to use during backup uploading, use `WALG_UPLOAD_CONCURRENCY`. By default, WAL-G uses 16 streams.
 
 * `WALG_UPLOAD_DISK_CONCURRENCY`
 
@@ -69,7 +69,7 @@ To configure GPG key for encryption and decryption. By default, no encryption is
 
 * `WALG_PGP_KEY`
 
-To configure encryption and decryption with OpenPGP standard.
+To configure encryption and decryption with OpenPGP standard. You can join multiline key using `\n` symbols into one line (mostly used in case of daemontools and envdir).
 Set *private key* value, when you need to execute ```wal-fetch``` or ```backup-fetch``` command.
 Set *public key* value, when you need to execute ```wal-push``` or ```backup-push``` command.
 Keep in mind that the *private key* also contains the *public key*.
@@ -121,6 +121,8 @@ When uploading backups to S3, the user should pass in the path containing the ba
 wal-g backup-push /backup/directory/path
 ```
 If backup is pushed from replication slave, WAL-G will control timeline of the server. In case of promotion to master or timeline switch, backup will be uploaded but not finalized, WAL-G will exit with an error. In this case logs will contain information necessary to finalize the backup. You can use backuped data if you clearly understand entangled risks.
+
+``backup-push`` can also be run with the ``--permanent`` flag, which will mark the backup as permanent and prevent it from being removed when running ``delete``.
 
 * ``wal-fetch``
 
