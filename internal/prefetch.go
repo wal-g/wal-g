@@ -158,7 +158,7 @@ func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader
 				return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
 			}
 			tracelog.InfoLogger.Println("Prefaulting ", path)
-			fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
+			fileReader, fileInfoHeader.Size, err, _ = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
 			if _, ok := err.(InvalidBlockError); ok {
 				return nil
 			} else if err != nil {
