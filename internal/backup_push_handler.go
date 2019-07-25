@@ -105,7 +105,10 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	// Connect to postgres and start/finish a nonexclusive backup.
 	conn, err := Connect()
 	tracelog.ErrorLogger.FatalOnError(err)
-	backupName, backupStartLSN, pgVersion, dataDir, err := bundle.StartBackup(conn,
+	if err != nil {
+		tracelog.ErrorLogger.FatalError(err)
+	}
+	backupName, backupStartLSN, _, dataDir, err := bundle.StartBackup(conn,
 		utility.CeilTimeUpToMicroseconds(time.Now()).String())
 	meta.DataDir = dataDir
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -131,62 +134,6 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	err = filepath.Walk(archiveDirectory, bundle.HandleWalkedFSObject)
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = bundle.FinishQueue()
-	tracelog.ErrorLogger.FatalOnError(err)
-	err = bundle.UploadPgControl(uploader.Compressor.FileExtension())
-	tracelog.ErrorLogger.FatalOnError(err)
-	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
-	finishLsn, err := bundle.UploadLabelFiles(conn)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	timelineChanged := bundle.checkTimelineChanged(conn)
-
-	// Wait for all uploads to finish.
-	uploader.finish()
-	if uploader.Failed.Load().(bool) {
-		tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", backupName)
-	}
-	if timelineChanged {
-		tracelog.ErrorLogger.Fatalf("Cannot finish backup because of changed timeline.")
-	}
-
-	currentBackupSentinelDto := &BackupSentinelDto{
-		BackupStartLSN:   &backupStartLSN,
-		IncrementFromLSN: previousBackupSentinelDto.BackupStartLSN,
-		PgVersion:        pgVersion,
-	}
-	if previousBackupSentinelDto.BackupStartLSN != nil {
-		currentBackupSentinelDto.IncrementFrom = &previousBackupName
-		if previousBackupSentinelDto.IsIncremental() {
-			currentBackupSentinelDto.IncrementFullName = previousBackupSentinelDto.IncrementFullName
-		} else {
-			currentBackupSentinelDto.IncrementFullName = &previousBackupName
-		}
-		currentBackupSentinelDto.IncrementCount = &incrementCount
-	}
-
-	currentBackupSentinelDto.setFiles(bundle.GetFiles())
-	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
-	currentBackupSentinelDto.UserData = GetSentinelUserData()
-
-	// If pushing permanent delta backup, mark all previous backups permanent
-	// Do this before uploading current meta to ensure that backups are marked in increasing order
-	if isPermanent && currentBackupSentinelDto.IsIncremental() {
-		MarkBackup(uploader, folder, previousBackupName, true)
-	}
-
-	err = UploadMetadata(uploader, currentBackupSentinelDto, backupName, meta)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("Failed to upload metadata file for backup: %s %v", backupName, err)
-		tracelog.ErrorLogger.FatalError(err)
-	}
-	// If other parts are successful in uploading, upload json file.
-	//err = UploadSentinel(uploader, currentBackupSentinelDto, backupName)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", backupName)
-		tracelog.ErrorLogger.FatalError(err)
-	}
-	// logging backup set name
-	tracelog.InfoLogger.Println("Wrote backup with name " + backupName)
 }
 
 // TODO : unit tests

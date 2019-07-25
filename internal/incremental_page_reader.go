@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
-	"math"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/tinsane/tracelog"
@@ -224,6 +223,7 @@ func (pageReader *IncrementalPageReader) PrintDiff(diff []uint32) error {
 			return NewInvalidBlockError(currentBlockNumber)
 		}
 	}
+	return nil
 }
 
 func (pageReader *IncrementalPageReader) FullScanInitialize2() error {
