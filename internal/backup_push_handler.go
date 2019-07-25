@@ -111,7 +111,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	backupName, backupStartLSN, pgVersion, dataDir, err := bundle.StartBackup(conn,
+	backupName, backupStartLSN, _, dataDir, err := bundle.StartBackup(conn,
 		utility.CeilTimeUpToMicroseconds(time.Now()).String())
 	meta.DataDir = dataDir
 	if err != nil {

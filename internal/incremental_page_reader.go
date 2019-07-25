@@ -80,7 +80,7 @@ func (pageReader *IncrementalPageReader) Close() error {
 
 // TODO : unit tests
 // TODO : "initialize" is rather meaningless name, maybe this func should be decomposed
-func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap) (size int64, err error, blocks []uint32) {
+func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap) (size int64, err error) {
 	var headerBuffer bytes.Buffer
 	headerBuffer.Write(IncrementFileHeader)
 	fileSize := pageReader.FileSize
@@ -90,7 +90,7 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap)
 	if deltaBitmap == nil {
 		err := pageReader.FullScanInitialize()
 		if err != nil {
-			return 0, err, blocks
+			return 0, err
 		}
 	} else {
 
@@ -102,7 +102,7 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap)
 		pageReader2.Blocks = make([]uint32, 0, fileSize/int64(DatabasePageSize))
 		pageReader1.DeltaBitmapInitialize2(deltaBitmap)
 		pageReader2.FullScanInitialize2()
-		blocks = diff(pageReader2.Blocks, pageReader1.Blocks)
+		blocks := diff(pageReader2.Blocks, pageReader1.Blocks)
 		pageReader1.PrintDiff(blocks)
 
 
