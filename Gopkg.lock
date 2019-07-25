@@ -251,6 +251,14 @@
   version = "v4.0.2"
 
 [[projects]]
+  branch = "master"
+  digest = "1:ae940e9156d0d778ce1991bcc99e58fa5ca2790ddf7c5f0bc05385854416f7a6"
+  name = "github.com/jinzhu/copier"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "976e0346caa839d22a17f8031a96bcd0870c0128"
+
+[[projects]]
   digest = "1:e22af8c7518e1eab6f2eab2b7d7558927f816262586cd6ed9f349c97a6c285c4"
   name = "github.com/jmespath/go-jmespath"
   packages = ["."]
@@ -667,6 +675,7 @@
     "github.com/google/brotli/go/cbrotli",
     "github.com/jackc/pgx",
     "github.com/jedib0t/go-pretty/table",
+    "github.com/jinzhu/copier",
     "github.com/ncw/swift",
     "github.com/pierrec/lz4",
     "github.com/pkg/errors",

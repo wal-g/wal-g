@@ -188,7 +188,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 		tracelog.ErrorLogger.Printf("Failed to upload metadata file for backup: %s %v", backupName, err)
 	}
 	// If other parts are successful in uploading, upload json file.
-	err = UploadSentinel(uploader, currentBackupSentinelDto, backupName)
+	//err = UploadSentinel(uploader, currentBackupSentinelDto, backupName)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", backupName)
 		tracelog.ErrorLogger.FatalError(err)

@@ -533,7 +533,7 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 		} else if err != nil {
 			return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
 		}
-		fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
+		fileReader, fileInfoHeader.Size, err, blocks = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
 		switch err.(type) {
 		case nil:
 			fileReader = &ioextensions.ReadCascadeCloser{

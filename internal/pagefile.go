@@ -114,10 +114,10 @@ func isPagedFile(info os.FileInfo, filePath string) bool {
 	return true
 }
 
-func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitmap *roaring.Bitmap) (fileReader io.ReadCloser, size int64, err error) {
+func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitmap *roaring.Bitmap) (fileReader io.ReadCloser, size int64, err error, blocks []uint32) {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, err, blocks
 	}
 
 	fileReadSeekCloser := &ioextensions.ReadSeekCloserImpl{
@@ -127,11 +127,11 @@ func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitma
 	}
 
 	pageReader := &IncrementalPageReader{fileReadSeekCloser, fileSize, lsn, nil, nil}
-	incrementSize, err := pageReader.initialize(deltaBitmap)
+	incrementSize, err, blocks := pageReader.initialize(deltaBitmap)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, err, blocks
 	}
-	return pageReader, incrementSize, nil
+	return pageReader, incrementSize, nil, blocks
 }
 
 // ApplyFileIncrement changes pages according to supplied change map file
