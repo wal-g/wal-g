@@ -65,10 +65,6 @@ services:
     env_file:
       - docker/common/common_walg.env
       - docker/pg_tests/walg.env
-    depends_on:
-      - s3
-    links:
-      - s3
 
   pg_build_docker_prefix:
     build:
