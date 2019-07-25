@@ -143,58 +143,58 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	err = bundle.UploadPgControl(uploader.Compressor.FileExtension())
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
-	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
-	finishLsn, err := bundle.UploadLabelFiles(conn)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
-
-	timelineChanged := bundle.checkTimelineChanged(conn)
-
-	// Wait for all uploads to finish.
-	uploader.finish()
-	if uploader.Failed.Load().(bool) {
-		tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", backupName)
-	}
-	if timelineChanged {
-		tracelog.ErrorLogger.Fatalf("Cannot finish backup because of changed timeline.")
-	}
-
-	currentBackupSentinelDto := &BackupSentinelDto{
-		BackupStartLSN:   &backupStartLSN,
-		IncrementFromLSN: previousBackupSentinelDto.BackupStartLSN,
-		PgVersion:        pgVersion,
-	}
-	if previousBackupSentinelDto.BackupStartLSN != nil {
-		currentBackupSentinelDto.IncrementFrom = &previousBackupName
-		if previousBackupSentinelDto.IsIncremental() {
-			currentBackupSentinelDto.IncrementFullName = previousBackupSentinelDto.IncrementFullName
-		} else {
-			currentBackupSentinelDto.IncrementFullName = &previousBackupName
-		}
-		currentBackupSentinelDto.IncrementCount = &incrementCount
-	}
-
-	currentBackupSentinelDto.setFiles(bundle.GetFiles())
-	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
-	currentBackupSentinelDto.UserData = GetSentinelUserData()
-
-	err = UploadMetadata(uploader, currentBackupSentinelDto, backupName, meta)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("Failed to upload metadata file for backup: %s %v", backupName, err)
-	}
-	// If other parts are successful in uploading, upload json file.
-	//err = UploadSentinel(uploader, currentBackupSentinelDto, backupName)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", backupName)
-		tracelog.ErrorLogger.FatalError(err)
-	}
-	// logging backup set name
-	tracelog.InfoLogger.Println("Wrote backup with name " + backupName)
+	//err = bundle.UploadPgControl(uploader.Compressor.FileExtension())
+	//if err != nil {
+	//	tracelog.ErrorLogger.FatalError(err)
+	//}
+	//// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
+	//finishLsn, err := bundle.UploadLabelFiles(conn)
+	//if err != nil {
+	//	tracelog.ErrorLogger.FatalError(err)
+	//}
+	//
+	//timelineChanged := bundle.checkTimelineChanged(conn)
+	//
+	//// Wait for all uploads to finish.
+	//uploader.finish()
+	//if uploader.Failed.Load().(bool) {
+	//	tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", backupName)
+	//}
+	//if timelineChanged {
+	//	tracelog.ErrorLogger.Fatalf("Cannot finish backup because of changed timeline.")
+	//}
+	//
+	//currentBackupSentinelDto := &BackupSentinelDto{
+	//	BackupStartLSN:   &backupStartLSN,
+	//	IncrementFromLSN: previousBackupSentinelDto.BackupStartLSN,
+	//	PgVersion:        pgVersion,
+	//}
+	//if previousBackupSentinelDto.BackupStartLSN != nil {
+	//	currentBackupSentinelDto.IncrementFrom = &previousBackupName
+	//	if previousBackupSentinelDto.IsIncremental() {
+	//		currentBackupSentinelDto.IncrementFullName = previousBackupSentinelDto.IncrementFullName
+	//	} else {
+	//		currentBackupSentinelDto.IncrementFullName = &previousBackupName
+	//	}
+	//	currentBackupSentinelDto.IncrementCount = &incrementCount
+	//}
+	//
+	//currentBackupSentinelDto.setFiles(bundle.GetFiles())
+	//currentBackupSentinelDto.BackupFinishLSN = &finishLsn
+	//currentBackupSentinelDto.UserData = GetSentinelUserData()
+	//
+	//err = UploadMetadata(uploader, currentBackupSentinelDto, backupName, meta)
+	//if err != nil {
+	//	tracelog.ErrorLogger.Printf("Failed to upload metadata file for backup: %s %v", backupName, err)
+	//}
+	//// If other parts are successful in uploading, upload json file.
+	////err = UploadSentinel(uploader, currentBackupSentinelDto, backupName)
+	//if err != nil {
+	//	tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", backupName)
+	//	tracelog.ErrorLogger.FatalError(err)
+	//}
+	//// logging backup set name
+	//tracelog.InfoLogger.Println("Wrote backup with name " + backupName)
 }
 
 // TODO : unit tests
