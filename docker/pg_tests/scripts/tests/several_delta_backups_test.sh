@@ -13,21 +13,27 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 
 pgbench -i -s 10 postgres
+pgbench -T 100000000 postgres &
 wal-g backup-push ${PGDATA}
 
 export WALG_COMPRESSION_METHOD=lz4
-pgbench -i -s 20 postgres
+wal-g backup-push ${PGDATA}
+
+psql -f scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
+
+export WALG_COMPRESSION_METHOD=brotli
 wal-g backup-push ${PGDATA}
 
 export WALG_COMPRESSION_METHOD=lzma
-pgbench -i -s 30 postgres
 wal-g backup-push ${PGDATA}
 
-export WALG_COMPRESSION_METHOD=brotli
-pgbench -i -s 40 postgres
+pkill pgbench
+
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -m smart -w stop
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+
 pg_dumpall -f /tmp/dump1
 sleep 1
-wal-g backup-push ${PGDATA}
 
 scripts/drop_pg.sh
 
@@ -36,8 +42,12 @@ wal-g backup-fetch ${PGDATA} LATEST
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+sleep 10
+
 
 pg_dumpall -f /tmp/dump2
+
+psql -f scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
 
 diff /tmp/dump1 /tmp/dump2
 
