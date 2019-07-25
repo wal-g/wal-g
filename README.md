@@ -119,6 +119,13 @@ To enable S3 server-side encryption, set to the algorithm to use when storing th
 
 If using S3 server-side encryption with `aws:kms`, the KMS Key ID to use for object encryption.
 
+* `WALG_CSE_KMS_ID`
+
+To configure AWS KMS key for client side encryption and decryption. By default, no encryption is used. (AWS_REGION or WALG_CSE_KMS_REGION required to be set when using AWS KMS key client side encryption)
+
+* `WALG_CSE_KMS_REGION`
+
+To configure AWS KMS key region for client side encryption and decryption (i.e., `eu-west-1`).
 
 * `WALG_COMPRESSION_METHOD`
 
