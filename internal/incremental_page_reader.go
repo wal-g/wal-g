@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"os"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/wal-g/wal-g/internal/ioextensions"
@@ -299,6 +300,7 @@ func (pageReader *IncrementalPageReader) SelectNewValidPage2(pageBytes []byte, b
 	pageHeader, _ := ParsePostgresPageHeader(bytes.NewReader(pageBytes))
 	tracelog.InfoLogger.Printf("Full scan, lsn: %d", pageReader.Lsn)
 	tracelog.InfoLogger.Printf("Full scan, size: %d", pageReader.FileSize)
+	io.Copy(os.Stderr, pageReader.PagedFile)
 	valid = pageHeader.IsValid()
 
 	isNew := false
