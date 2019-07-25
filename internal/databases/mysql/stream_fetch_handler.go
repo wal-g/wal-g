@@ -45,9 +45,20 @@ func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
 	if err != nil {
 		return err
 	}
+	binlogs, _, err := folder.GetSubFolder(BinlogPath).ListFolder()
+	if err != nil {
+		return err
+	}
+	var backupStartUploadTime time.Time
+	for i := 0; i < len(binlogs); i++ {
+		if strings.HasPrefix(binlogs[i].GetName(), streamSentinel.BinLogStart) {
+			backupStartUploadTime = binlogs[i].GetLastModified()
+		}
+	}
+
 	binlogsAreDone := make(chan error)
 
-	go fetchBinlogs(folder, streamSentinel, binlogsAreDone)
+	go fetchBinlogs(folder, backupStartUploadTime, binlogsAreDone)
 
 	for _, decompressor := range compression.Decompressors {
 		d := decompressor
@@ -73,7 +84,7 @@ func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
 	return internal.NewArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", fileName))
 }
 
-func fetchBinlogs(folder storage.Folder, sentinel StreamSentinelDto, binlogsAreDone chan error) {
+func fetchBinlogs(folder storage.Folder, backupStartUploadTime time.Time, binlogsAreDone chan error) {
 	binlogFolder := folder.GetSubFolder(BinlogPath)
 	endTS, dstFolder, err := GetBinlogConfigs()
 	if err != nil {
@@ -92,7 +103,7 @@ func fetchBinlogs(folder storage.Folder, sentinel StreamSentinelDto, binlogsAreD
 
 		binlogName := ExtractBinlogName(object, folder)
 
-		if BinlogShouldBeFetched(sentinel, binlogName, endTS, object) {
+		if BinlogShouldBeFetched(backupStartUploadTime, endTS, object) {
 			fileName := path.Join(dstFolder, binlogName)
 			tracelog.InfoLogger.Println("Download", binlogName, "to", fileName)
 			err := internal.DownloadWALFileTo(binlogFolder, binlogName, fileName)
@@ -130,8 +141,8 @@ func fetchBinlogs(folder storage.Folder, sentinel StreamSentinelDto, binlogsAreD
 	binlogsAreDone <- nil
 }
 
-func BinlogShouldBeFetched(sentinel StreamSentinelDto, binlogName string, endTS *time.Time, object storage.Object) bool {
-	return sentinel.BinLogStart <= binlogName && (endTS == nil || (*endTS).After(object.GetLastModified()))
+func BinlogShouldBeFetched(backupStartUploadTime time.Time, endTS *time.Time, object storage.Object) bool {
+	return backupStartUploadTime.Before(object.GetLastModified()) && (endTS == nil || (*endTS).After(object.GetLastModified()))
 }
 
 func GetBinlogConfigs() (endTS *time.Time, dstFolder string, err error) {
