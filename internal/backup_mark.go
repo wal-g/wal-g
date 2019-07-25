@@ -5,13 +5,34 @@ import (
 	"encoding/json"
 
 	"github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
-// GetImpermanentBackupMetadataBefore gets all previous impermanent backup
-// metas, including itself, any previous delta backups and initial full backup,
-// in increasing order beginning from full backup
-func GetImpermanentBackupMetadataBefore(baseBackupFolder storage.Folder, backupName string) ([]UploadObject, error) {
+// MarkBackup marks a backup as permanent or impermanent
+func MarkBackup(uploader *Uploader, baseBackupFolder storage.Folder, backupName string, toPermanent bool) {
+	tracelog.InfoLogger.Printf("Retrieving previous related backups to be marked: toPermanent=%t", toPermanent)
+	metadataToUpload, err := GetMarkedBackupMetadataToUpload(baseBackupFolder, backupName, toPermanent)
+	if err != nil {
+		tracelog.ErrorLogger.Fatalf("Failed to get previous backups: %v", err)
+	} else {
+		tracelog.InfoLogger.Printf("Retrieved backups to be marked, marking: %v", metadataToUpload)
+		err = uploader.UploadMultiple(metadataToUpload)
+		if err != nil {
+			tracelog.ErrorLogger.Fatalf("Failed to mark previous backups: %v", err)
+		}
+	}
+}
+
+// GetMarkedBackupMetadataToUpload retrieves all previous permanent or
+// impermanent backup metas, including itself, any previous delta backups and
+// initial full backup, in increasing order beginning from full backup,
+// returning modified metadata ready to be uploaded
+//
+// For example, when marking backups from impermanent to permanent, we retrieve
+// all currently impermanent backup metadata, set them to permanent, and return
+// the modified metadata as a slice of uploadable objects
+func GetMarkedBackupMetadataToUpload(baseBackupFolder storage.Folder, backupName string, toPermanent bool) ([]UploadObject, error) {
 	backupMetadata := []UploadObject{}
 
 	// retrieve current backup sentinel and meta
@@ -25,9 +46,9 @@ func GetImpermanentBackupMetadataBefore(baseBackupFolder storage.Folder, backupN
 		return nil, err
 	}
 
-	// only return currently impermanent backups
-	if !meta.IsPermanent {
-		meta.IsPermanent = true
+	// only return backups that we want to update
+	if meta.IsPermanent != toPermanent {
+		meta.IsPermanent = toPermanent
 		metadataUploadObject, err := getMetadataUploadObject(backup.Name, meta)
 		if err != nil {
 			return nil, err
@@ -40,7 +61,7 @@ func GetImpermanentBackupMetadataBefore(baseBackupFolder storage.Folder, backupN
 		return backupMetadata, nil
 	}
 
-	previousImpermanentBackupMetadata, err := GetImpermanentBackupMetadataBefore(baseBackupFolder, *sentinel.IncrementFrom)
+	previousImpermanentBackupMetadata, err := GetMarkedBackupMetadataToUpload(baseBackupFolder, *sentinel.IncrementFrom, toPermanent)
 	if err != nil {
 		return nil, err
 	}
