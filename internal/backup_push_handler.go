@@ -45,7 +45,7 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 
 // TODO : unit tests
 // HandleBackupPush is invoked to perform a wal-g backup-push
-func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
+func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent bool) {
 	archiveDirectory = utility.ResolveSymlink(archiveDirectory)
 	maxDeltas, fromFull := getDeltaConfig()
 
@@ -104,7 +104,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 	var meta ExtendedMetadataDto
 	meta.StartTime = utility.TimeNowCrossPlatformUTC()
 	meta.Hostname, _ = os.Hostname()
-	meta.IsPermanent = false // TODO: add permanent command flag
+	meta.IsPermanent = isPermanent
 
 	// Connect to postgres and start/finish a nonexclusive backup.
 	conn, err := Connect()
@@ -183,11 +183,27 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string) {
 	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
 	currentBackupSentinelDto.UserData = GetSentinelUserData()
 
+	// If pushing permanent delta backup, mark all previous backups permanent
+	// Do this before uploading current meta to ensure that backups are marked in increasing order
+	if isPermanent && currentBackupSentinelDto.IsIncremental() {
+		tracelog.InfoLogger.Printf("Retrieving previous related backups to be marked as permanent")
+		impermanentBackupMetadata, err := GetImpermanentBackupMetadataBefore(basebackupFolder, previousBackupName)
+		if err != nil {
+			tracelog.ErrorLogger.Fatalf("Failed to get previous backups: %v", err)
+		} else {
+			tracelog.InfoLogger.Printf("Retrieved backups to mark as permanent, marking: %v", impermanentBackupMetadata)
+			err = uploader.UploadMultiple(impermanentBackupMetadata)
+			if err != nil {
+				tracelog.ErrorLogger.Fatalf("Failed to mark previous backups as permanent: %v", err)
+			}
+		}
+	}
+
 	err = UploadMetadata(uploader, currentBackupSentinelDto, backupName, meta)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload metadata file for backup: %s %v", backupName, err)
+		tracelog.ErrorLogger.FatalError(err)
 	}
-	// If other parts are successful in uploading, upload json file.
 	err = UploadSentinel(uploader, currentBackupSentinelDto, backupName)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", backupName)
