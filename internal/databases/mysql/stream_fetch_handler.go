@@ -50,9 +50,9 @@ func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
 		return err
 	}
 	var backupStartUploadTime time.Time
-	for i := 0; i < len(binlogs); i++ {
-		if strings.HasPrefix(binlogs[i].GetName(), streamSentinel.BinLogStart) {
-			backupStartUploadTime = binlogs[i].GetLastModified()
+	for _, binlog := range binlogs {
+		if strings.HasPrefix(binlog.GetName(), streamSentinel.BinLogStart) {
+			backupStartUploadTime = binlog.GetLastModified()
 		}
 	}
 
@@ -142,7 +142,8 @@ func fetchBinlogs(folder storage.Folder, backupStartUploadTime time.Time, binlog
 }
 
 func BinlogShouldBeFetched(backupStartUploadTime time.Time, endTS *time.Time, object storage.Object) bool {
-	return backupStartUploadTime.Before(object.GetLastModified()) && (endTS == nil || (*endTS).After(object.GetLastModified()))
+	return (backupStartUploadTime.Before(object.GetLastModified()) || backupStartUploadTime.Equal(object.GetLastModified())) &&
+		(endTS == nil || (*endTS).After(object.GetLastModified()))
 }
 
 func GetBinlogConfigs() (endTS *time.Time, dstFolder string, err error) {

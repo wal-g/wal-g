@@ -7,8 +7,10 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 	"github.com/wal-g/wal-g/internal/storages/memory"
+	storage2 "github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -49,13 +51,18 @@ func TestBinlogShouldBeFetched(t *testing.T) {
 	folder := memory.NewFolder("", storage)
 	objects, _, err := folder.ListFolder()
 
-	dto := mysql.StreamSentinelDto{BinLogStart: "mysql-bin-log.000018", BinLogEnd: "mysql-bin-log.000019.lz4"}
+	var startBinlog storage2.Object
+	for _, object := range objects {
+		if strings.HasPrefix(object.GetName(), "mysql-bin-log.000018.lz4") {
+			startBinlog = object
+		}
+	}
 
 	assert.NoError(t, err)
 	assert.Equal(t, len(objects), 4)
 	for _, o := range objects {
 		binlogName := mysql.ExtractBinlogName(o, folder)
-		fetched := mysql.BinlogShouldBeFetched(dto, binlogName, &cutpoint, o)
+		fetched := mysql.BinlogShouldBeFetched(startBinlog.GetLastModified(), &cutpoint, o)
 		if fetched {
 			allowed := []string{"mysql-bin-log.000018", "mysql-bin-log.000019"}
 			assert.Contains(t, allowed, binlogName)
