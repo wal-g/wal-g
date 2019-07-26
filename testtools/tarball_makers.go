@@ -2,6 +2,7 @@ package testtools
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/wal-g/wal-g/internal"
 )
 
@@ -18,6 +19,7 @@ type FileTarBallMaker struct {
 func (tarBallMaker *FileTarBallMaker) Make(inheritState bool) internal.TarBall {
 	tarBallMaker.number++
 	return &FileTarBall{
+		name:   fmt.Sprintf("file_%d", tarBallMaker.number),
 		number: tarBallMaker.number,
 		size:   tarBallMaker.size,
 		out:    tarBallMaker.Out,
@@ -33,6 +35,7 @@ type BufferTarBallMaker struct {
 func (tarBallMaker *BufferTarBallMaker) Make(dedicatedUploader bool) internal.TarBall {
 	tarBallMaker.number++
 	return &BufferTarBall{
+		name:       fmt.Sprintf("buffer_%d", tarBallMaker.number),
 		number:     tarBallMaker.number,
 		size:       tarBallMaker.size,
 		underlying: tarBallMaker.BufferToWrite,

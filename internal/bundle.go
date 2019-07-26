@@ -82,7 +82,8 @@ type Bundle struct {
 	mutex            sync.Mutex
 	started          bool
 
-	Files *sync.Map
+	Files       *sync.Map
+	TarFileSets map[string][]string
 }
 
 // TODO: use DiskDataFolder
@@ -94,6 +95,7 @@ func NewBundle(archiveDirectory string, crypter crypto.Crypter, incrementFromLsn
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
 		Files:              &sync.Map{},
+		TarFileSets:        make(map[string][]string),
 	}
 }
 
@@ -102,6 +104,8 @@ func (bundle *Bundle) GetFileRelPath(fileAbsPath string) string {
 }
 
 func (bundle *Bundle) GetFiles() *sync.Map { return bundle.Files }
+
+func (bundle *Bundle) GetTarFileSets() map[string][]string { return bundle.TarFileSets }
 
 func (bundle *Bundle) StartQueue() error {
 	if bundle.started {
@@ -339,6 +343,9 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 			if err != nil {
 				panic(err)
 			}
+
+			bundle.TarFileSets[tarBall.Name()] = append(bundle.TarFileSets[tarBall.Name()], fileInfoHeader.Name)
+
 			err = bundle.CheckSizeAndEnqueueBack(tarBall)
 			if err != nil {
 				panic(err)

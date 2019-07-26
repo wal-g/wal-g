@@ -16,12 +16,15 @@ import (
 // FileTarBall represents a tarball that is
 // written to disk.
 type FileTarBall struct {
+	name        string
 	out         string
 	number      int
 	size        int64
 	writeCloser io.WriteCloser
 	tarWriter   *tar.Writer
 }
+
+func (tarBall *FileTarBall) Name() string { return tarBall.name }
 
 // SetUp creates a new LZ4 writer, tar writer and file for
 // writing bundled compressed bytes to.
@@ -76,11 +79,14 @@ func (tarBall *FileTarBall) AwaitUploads()          {}
 // BufferTarBall represents a tarball that is
 // written to buffer.
 type BufferTarBall struct {
+	name       string
 	number     int
 	size       int64
 	underlying *bytes.Buffer
 	tarWriter  *tar.Writer
 }
+
+func (tarBall *BufferTarBall) Name() string { return tarBall.name }
 
 func (tarBall *BufferTarBall) SetUp(crypter crypto.Crypter, args ...string) {
 	tarBall.tarWriter = tar.NewWriter(tarBall.underlying)
