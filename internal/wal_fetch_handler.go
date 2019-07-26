@@ -72,7 +72,7 @@ func HandleWALFetch(folder storage.Folder, walFileName string, location string, 
 			err := checkWALFileMagic(location)
 			if err != nil {
 				tracelog.ErrorLogger.Println("Prefetched file contain errors", err)
-				os.Remove(location)
+				_ = os.Remove(location)
 				break
 			}
 
@@ -87,8 +87,8 @@ func HandleWALFetch(folder storage.Folder, walFileName string, location string, 
 			observedSize := runStat.Size() // If there is no progress in 50 ms - start downloading myself
 			if observedSize <= seenSize {
 				defer func() {
-					os.Remove(running) // we try to clean up and ignore here any error
-					os.Remove(prefetched)
+					_ = os.Remove(running) // we try to clean up and ignore here any error
+					_ = os.Remove(prefetched)
 				}()
 				break
 			}
@@ -115,7 +115,10 @@ func checkWALFileMagic(prefetched string) error {
 	}
 	defer file.Close()
 	magic := make([]byte, 4)
-	file.Read(magic)
+	_, err = file.Read(magic)
+	if err != nil {
+		return err
+	}
 	if binary.LittleEndian.Uint32(magic) < 0xD061 {
 		return NewInvalidWalFileMagicError()
 	}
