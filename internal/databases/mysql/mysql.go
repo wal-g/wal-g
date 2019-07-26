@@ -37,6 +37,23 @@ type Backup struct {
 	*internal.Backup
 }
 
+func scanToMap(rows *sql.Rows, dst map[string]interface{}) error {
+	columns, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+	args := make([]interface{}, len(columns))
+	var garbage interface{}
+	for i, field := range columns {
+		if v, ok := dst[field]; ok {
+			args[i] = v
+		} else {
+			args[i] = &garbage
+		}
+	}
+	return rows.Scan(args...)
+}
+
 // TODO : unit tests
 func (backup *Backup) FetchStreamSentinel() (StreamSentinelDto, error) {
 	sentinelDto := StreamSentinelDto{}
@@ -55,9 +72,8 @@ func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
 	}
 	defer utility.LoggedClose(rows, "")
 	var logFileName string
-	var garbage interface{}
 	for rows.Next() {
-		err = rows.Scan(&logFileName, &garbage, &garbage, &garbage, &garbage)
+		err = scanToMap(rows, map[string]interface{}{"File": &logFileName})
 		if err != nil {
 			tracelog.ErrorLogger.Fatalf("%+v\n", err)
 		}

@@ -50,7 +50,7 @@ func getMySQLSortedBinlogs(db *sql.DB) []string {
 
 	currentBinlog := getMySQLCurrentBinlogFile(db)
 
-	rows, err := db.Query("show binary logs")
+	rows, err := db.Query("SHOW BINARY LOGS")
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("%+v\n", err)
 	}
@@ -58,7 +58,7 @@ func getMySQLSortedBinlogs(db *sql.DB) []string {
 	for rows.Next() {
 		var logFinName string
 		var size uint32
-		err = rows.Scan(&logFinName, &size)
+		err = scanToMap(rows, map[string]interface{}{"Log_name": &logFinName, "File_size": &size})
 		if err != nil {
 			tracelog.ErrorLogger.Fatalf("%+v\n", err)
 		}
