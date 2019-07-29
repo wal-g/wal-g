@@ -94,18 +94,23 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap)
 			return 0, err
 		}
 	} else {
-
+		tracelog.InfoLogger.Println("right branch")
 		var pageReader1 *IncrementalPageReader
 		var pageReader2 *IncrementalPageReader
 		copier.Copy(pageReader1, pageReader)
 		copier.Copy(pageReader2, pageReader)
+		tracelog.InfoLogger.Println("copied")
 		pageReader1.Blocks = make([]uint32, 0, fileSize/int64(DatabasePageSize))
 		pageReader2.Blocks = make([]uint32, 0, fileSize/int64(DatabasePageSize))
+		tracelog.InfoLogger.Println("init blocks")
 		pageReader1.DeltaBitmapInitialize2(deltaBitmap)
+		tracelog.InfoLogger.Println("delta init")
 		pageReader2.FullScanInitialize2()
+		tracelog.InfoLogger.Println("full init")
 		blocks := diff(pageReader2.Blocks, pageReader1.Blocks)
+		tracelog.InfoLogger.Println("diff success")
 		pageReader1.PrintDiff(blocks)
-
+		tracelog.InfoLogger.Println("print diff success")
 
 
 
