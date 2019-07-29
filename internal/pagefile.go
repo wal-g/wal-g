@@ -116,6 +116,14 @@ func isPagedFile(info os.FileInfo, filePath string) bool {
 }
 
 func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitmap *roaring.Bitmap) (fileReader io.ReadCloser, size int64, err error) {
+	fullLog, err := os.Open("/tmp/full_log")
+	deltaLog, err := os.Open("/tmp/delta_log")
+	fullLog.WriteString(filePath)
+	deltaLog.WriteString(filePath)
+	fullLog.Close()
+	deltaLog.Close()
+
+
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, 0, err
