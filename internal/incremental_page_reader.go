@@ -248,7 +248,6 @@ func (pageReader *IncrementalPageReader) FullScanInitialize2() error {
 		if !valid {
 			return NewInvalidBlockError(currentBlockNumber)
 		}
-		tracelog.InfoLogger.Printf("Full scan, block no: %d\n", currentBlockNumber)
 	}
 }
 
