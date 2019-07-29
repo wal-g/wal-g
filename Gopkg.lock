@@ -119,6 +119,14 @@
   version = "v1.4.7"
 
 [[projects]]
+  digest = "1:eceec69de4581189a65244bf958b2c4b3a121ed80700f92ae25c03ab2c8f61a2"
+  name = "github.com/getlantern/deepcopy"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "b923171e8640f94369e21e324b1b0465cb82ec9f"
+  version = "v1"
+
+[[projects]]
   branch = "master"
   digest = "1:981722e5ee549ef844285c2b370c19e58b7dc30bc19ba3537f3df284b551b54a"
   name = "github.com/glycerine/go-unsnap-stream"
@@ -669,6 +677,7 @@
     "github.com/aws/aws-sdk-go/service/s3/s3manager",
     "github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface",
     "github.com/cyberdelia/lzo",
+    "github.com/getlantern/deepcopy",
     "github.com/go-redis/redis",
     "github.com/go-sql-driver/mysql",
     "github.com/golang/mock/gomock",
