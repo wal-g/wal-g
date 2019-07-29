@@ -3,8 +3,10 @@ package internal
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"os"
+	"sync"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/wal-g/wal-g/internal/ioextensions"
@@ -78,6 +80,8 @@ func (pageReader *IncrementalPageReader) Close() error {
 	return pageReader.PagedFile.Close()
 }
 
+
+var Mutex sync.Mutex
 // TODO : unit tests
 // TODO : "initialize" is rather meaningless name, maybe this func should be decomposed
 func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap, pageReader1 *IncrementalPageReader, pageReader2 *IncrementalPageReader) (size int64, err error) {
@@ -104,6 +108,16 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap,
 			tracelog.ErrorLogger.Fatalf("Keka3: %v", err)
 		}
 		tracelog.InfoLogger.Println("full init")
+
+		Mutex.Lock()
+		fullLog, _ := os.Open("/tmp/full_log")
+		deltaLog, _ := os.Open("/tmp/full_log")
+		fullLog.WriteString(fmt.Sprint(pageReader2.Blocks) + "\n")
+		deltaLog.WriteString(fmt.Sprint(pageReader1.Blocks) + "\n")
+		fullLog.Close()
+		deltaLog.Close()
+		Mutex.Unlock()
+
 		blocks := diff(pageReader2.Blocks, pageReader1.Blocks)
 		tracelog.InfoLogger.Println("diff success")
 		err = pageReader1.PrintDiff(blocks)
@@ -203,6 +217,7 @@ func (pageReader *IncrementalPageReader) PrintDiff(diff []uint32) error {
 		tracelog.InfoLogger.Println("Diff is empty")
 		return nil
 	}
+	tracelog.InfoLogger.Println("Diff is not empty")
 	for currentBlockNumber := uint32(0); ; currentBlockNumber++ {
 		found := false
 		for i := 0; i < len(diff); i++ {
