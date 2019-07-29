@@ -81,7 +81,7 @@ func (pageReader *IncrementalPageReader) Close() error {
 
 // TODO : unit tests
 // TODO : "initialize" is rather meaningless name, maybe this func should be decomposed
-func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap) (size int64, err error) {
+func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap, pageReader1 *IncrementalPageReader, pageReader2 *IncrementalPageReader) (size int64, err error) {
 	var headerBuffer bytes.Buffer
 	headerBuffer.Write(IncrementFileHeader)
 	fileSize := pageReader.FileSize
@@ -95,17 +95,6 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap)
 		}
 	} else {
 		tracelog.InfoLogger.Println("right branch")
-		var pageReader1 IncrementalPageReader
-		var pageReader2 IncrementalPageReader
-		err := deepcopy.Copy(&pageReader1, pageReader)
-		if err != nil {
-			tracelog.ErrorLogger.Fatalf("Keka1: %v", err)
-		}
-		err = deepcopy.Copy(&pageReader2, pageReader)
-		if err != nil {
-			tracelog.ErrorLogger.Fatalf("Keka2: %v", err)
-		}
-		tracelog.InfoLogger.Println("copied")
 		pageReader1.Blocks = make([]uint32, 0, fileSize/int64(DatabasePageSize))
 		pageReader2.Blocks = make([]uint32, 0, fileSize/int64(DatabasePageSize))
 		tracelog.InfoLogger.Println("init blocks")
