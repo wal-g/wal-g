@@ -3,7 +3,6 @@ package internal
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/jinzhu/copier"
 	"io"
 	"os"
 
