@@ -10,7 +10,6 @@ import (
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
-	"github.com/getlantern/deepcopy"
 )
 
 // "wi" at the head stands for "wal-g increment"
