@@ -128,7 +128,34 @@ func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitma
 	}
 
 	pageReader := &IncrementalPageReader{fileReadSeekCloser, fileSize, lsn, nil, nil}
-	incrementSize, err := pageReader.initialize(deltaBitmap)
+
+	file1, err := os.Open(filePath)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	fileReadSeekCloser1 := &ioextensions.ReadSeekCloserImpl{
+		Reader: NewDiskLimitReader(file1),
+		Seeker: file1,
+		Closer: file1,
+	}
+
+	pageReader1 := &IncrementalPageReader{fileReadSeekCloser1, fileSize, lsn, nil, nil}
+
+	file2, err := os.Open(filePath)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	fileReadSeekCloser2 := &ioextensions.ReadSeekCloserImpl{
+		Reader: NewDiskLimitReader(file2),
+		Seeker: file2,
+		Closer: file2,
+	}
+
+	pageReader2 := &IncrementalPageReader{fileReadSeekCloser2, fileSize, lsn, nil, nil}
+
+	incrementSize, err := pageReader.initialize(deltaBitmap, pageReader1, pageReader2)
 	if err != nil {
 		return nil, 0, err
 	}
