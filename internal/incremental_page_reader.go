@@ -3,6 +3,7 @@ package internal
 import (
 	"bytes"
 	"encoding/binary"
+	"github.com/jinzhu/copier"
 	"io"
 	"os"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
-	"github.com/jinzhu/copier"
+	"github.com/getlantern/deepcopy"
 )
 
 // "wi" at the head stands for "wal-g increment"
@@ -95,21 +96,33 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap)
 		}
 	} else {
 		tracelog.InfoLogger.Println("right branch")
-		var pageReader1 *IncrementalPageReader
-		var pageReader2 *IncrementalPageReader
-		copier.Copy(pageReader1, pageReader)
-		copier.Copy(pageReader2, pageReader)
+		var pageReader1 IncrementalPageReader
+		var pageReader2 IncrementalPageReader
+		err := deepcopy.Copy(&pageReader1, pageReader)
+		if err != nil {
+			tracelog.ErrorLogger.Fatalf("Keka1: %v", err)
+		}
+		err = deepcopy.Copy(&pageReader2, pageReader)
+		if err != nil {
+			tracelog.ErrorLogger.Fatalf("Keka2: %v", err)
+		}
 		tracelog.InfoLogger.Println("copied")
 		pageReader1.Blocks = make([]uint32, 0, fileSize/int64(DatabasePageSize))
 		pageReader2.Blocks = make([]uint32, 0, fileSize/int64(DatabasePageSize))
 		tracelog.InfoLogger.Println("init blocks")
 		pageReader1.DeltaBitmapInitialize2(deltaBitmap)
 		tracelog.InfoLogger.Println("delta init")
-		pageReader2.FullScanInitialize2()
+		err = pageReader2.FullScanInitialize2()
+		if err != nil {
+			tracelog.ErrorLogger.Fatalf("Keka3: %v", err)
+		}
 		tracelog.InfoLogger.Println("full init")
 		blocks := diff(pageReader2.Blocks, pageReader1.Blocks)
 		tracelog.InfoLogger.Println("diff success")
-		pageReader1.PrintDiff(blocks)
+		err = pageReader1.PrintDiff(blocks)
+		if err != nil {
+			tracelog.ErrorLogger.Fatalf("Keka4: %v", err)
+		}
 		tracelog.InfoLogger.Println("print diff success")
 
 
