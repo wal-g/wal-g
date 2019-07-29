@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/RoaringBitmap/roaring"
@@ -120,7 +121,7 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap,
 
 		blocks := diff(pageReader2.Blocks, pageReader1.Blocks)
 		tracelog.InfoLogger.Println("diff success")
-		err = pageReader1.PrintDiff(blocks)
+		err = pageReader2.PrintDiff(blocks)
 		if err != nil {
 			tracelog.ErrorLogger.Fatalf("Keka4: %v", err)
 		}
@@ -129,26 +130,26 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap,
 
 
 
-		for i := 0; i < len(pageReader.Blocks) && i < len(pageReader2.Blocks); i++ {
-			tracelog.InfoLogger.Println(pageReader1.Blocks[i])
-			tracelog.InfoLogger.Println(pageReader2.Blocks[i])
-			if pageReader1.Blocks[i] != pageReader2.Blocks[i] {
-				tracelog.WarningLogger.Printf("Met different blocks: delta %d and full %d \n", pageReader1.Blocks[i], pageReader2.Blocks[i])
-				blocks = append(blocks, pageReader2.Blocks[i])
-			}
-		}
-
-		if len(pageReader1.Blocks) > len(pageReader2.Blocks) {
-			blocks = append(blocks, pageReader1.Blocks[len(pageReader2.Blocks):]...)
-		} else if len(pageReader1.Blocks) < len(pageReader2.Blocks) {
-			blocks = append(blocks, pageReader2.Blocks[len(pageReader1.Blocks):]...)
-		}
-		if len(pageReader1.Blocks) != len(pageReader2.Blocks) {
-			tracelog.WarningLogger.Printf("Blocks have different len: delta %d and full %d \n", len(pageReader1.Blocks), len(pageReader2.Blocks))
-			for block := range blocks {
-				tracelog.WarningLogger.Printf("Different block: %d \n", block)
-			}
-		}
+		//for i := 0; i < len(pageReader.Blocks) && i < len(pageReader2.Blocks); i++ {
+		//	tracelog.InfoLogger.Println(pageReader1.Blocks[i])
+		//	tracelog.InfoLogger.Println(pageReader2.Blocks[i])
+		//	if pageReader1.Blocks[i] != pageReader2.Blocks[i] {
+		//		tracelog.WarningLogger.Printf("Met different blocks: delta %d and full %d \n", pageReader1.Blocks[i], pageReader2.Blocks[i])
+		//		blocks = append(blocks, pageReader2.Blocks[i])
+		//	}
+		//}
+		//
+		//if len(pageReader1.Blocks) > len(pageReader2.Blocks) {
+		//	blocks = append(blocks, pageReader1.Blocks[len(pageReader2.Blocks):]...)
+		//} else if len(pageReader1.Blocks) < len(pageReader2.Blocks) {
+		//	blocks = append(blocks, pageReader2.Blocks[len(pageReader1.Blocks):]...)
+		//}
+		//if len(pageReader1.Blocks) != len(pageReader2.Blocks) {
+		//	tracelog.WarningLogger.Printf("Blocks have different len: delta %d and full %d \n", len(pageReader1.Blocks), len(pageReader2.Blocks))
+		//	for block := range blocks {
+		//		tracelog.WarningLogger.Printf("Different block: %d \n", block)
+		//	}
+		//}
 
 
 		pageReader.DeltaBitmapInitialize(deltaBitmap)
@@ -218,6 +219,7 @@ func (pageReader *IncrementalPageReader) PrintDiff(diff []uint32) error {
 		return nil
 	}
 	tracelog.InfoLogger.Println("Diff is not empty")
+	tracelog.InfoLogger.Println("lsn: " + strconv.FormatUint(pageReader.Lsn, 10))
 	for currentBlockNumber := uint32(0); ; currentBlockNumber++ {
 		found := false
 		for i := 0; i < len(diff); i++ {
@@ -238,6 +240,7 @@ func (pageReader *IncrementalPageReader) PrintDiff(diff []uint32) error {
 		if !found {
 			break
 		}
+		tracelog.InfoLogger.Printf("Block found %d\n", currentBlockNumber)
 
 		valid := pageReader.SelectNewValidPage2(pageBytes, currentBlockNumber) // TODO : torn page possibility
 		if !valid {
@@ -272,7 +275,6 @@ func (pageReader *IncrementalPageReader) DeltaBitmapInitialize2(deltaBitmap *roa
 		blockNo := it.Next()
 		if pageReader.FileSize >= int64(blockNo+1)*int64(DatabasePageSize) { // whole block fits into file
 			pageReader.Blocks = append(pageReader.Blocks, blockNo)
-			tracelog.InfoLogger.Printf("Delta scan, block no: %d\n", blockNo)
 		} else {
 			break
 		}
@@ -315,10 +317,10 @@ func (pageReader *IncrementalPageReader) SelectNewValidPage(pageBytes []byte, bl
 
 
 func (pageReader *IncrementalPageReader) SelectNewValidPage2(pageBytes []byte, blockNo uint32) (valid bool) {
-	tracelog.InfoLogger.Printf("Full scan, block no: %d", blockNo)
+	tracelog.InfoLogger.Printf("Full scan, block no: %d\n", blockNo)
 	pageHeader, _ := ParsePostgresPageHeader(bytes.NewReader(pageBytes))
-	tracelog.InfoLogger.Printf("Full scan, lsn: %d", pageReader.Lsn)
-	tracelog.InfoLogger.Printf("Full scan, size: %d", pageReader.FileSize)
+	tracelog.InfoLogger.Printf("Full scan, lsn: %d\n", pageReader.Lsn)
+	tracelog.InfoLogger.Printf("Full scan, size: %d\n", pageReader.FileSize)
 	io.Copy(os.Stderr, pageReader.PagedFile)
 	valid = pageHeader.IsValid()
 
