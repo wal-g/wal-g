@@ -111,7 +111,7 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap,
 
 		Mutex.Lock()
 		fullLog, _ := os.Open("/tmp/full_log")
-		deltaLog, _ := os.Open("/tmp/full_log")
+		deltaLog, _ := os.Open("/tmp/delta_log")
 		fullLog.WriteString(fmt.Sprint(pageReader2.Blocks) + "\n")
 		deltaLog.WriteString(fmt.Sprint(pageReader1.Blocks) + "\n")
 		fullLog.Close()
