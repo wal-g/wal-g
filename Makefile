@@ -141,5 +141,5 @@ install:
 
 unlink_brotli:
 	rm -rf vendor/github.com/google/brotli/*
-	mv tmp/* vendor/github.com/google/brotli/
+	mv tmp/* vendor/github.com/google/brotli/ч
 	rm -rf tmp/

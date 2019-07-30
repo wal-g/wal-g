@@ -121,7 +121,7 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap,
 
 		blocks := diff(pageReader2.Blocks, pageReader1.Blocks)
 		tracelog.InfoLogger.Println("diff success")
-		err = pageReader2.PrintDiff(blocks)
+		err = pageReader2.PrintDiff(blocks, pageReader1)
 		if err != nil {
 			tracelog.ErrorLogger.Fatalf("Keka4: %v", err)
 		}
@@ -212,14 +212,14 @@ func (pageReader *IncrementalPageReader) FullScanInitialize() error {
 	}
 }
 
-func (pageReader *IncrementalPageReader) PrintDiff(diff []uint32) error {
+func (pageReader2 *IncrementalPageReader) PrintDiff(diff []uint32, pageReader1 *IncrementalPageReader) error {
 	pageBytes := make([]byte, DatabasePageSize)
 	if diff == nil || len(diff) == 0 {
 		tracelog.InfoLogger.Println("Diff is empty")
 		return nil
 	}
 	tracelog.InfoLogger.Println("Diff is not empty")
-	tracelog.InfoLogger.Println("lsn: " + strconv.FormatUint(pageReader.Lsn, 10))
+	tracelog.InfoLogger.Println("lsn: " + strconv.FormatUint(pageReader2.Lsn, 10))
 	for currentBlockNumber := uint32(0); ; currentBlockNumber++ {
 		found := false
 		for i := 0; i < len(diff); i++ {
@@ -229,20 +229,23 @@ func (pageReader *IncrementalPageReader) PrintDiff(diff []uint32) error {
 			}
 		}
 
-		_, err := io.ReadFull(pageReader.PagedFile, pageBytes)
+		_, err := io.ReadFull(pageReader1.PagedFile, pageBytes)
 
 		if err != nil {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				tracelog.InfoLogger.Println("print diff eof")
 				return nil
 			}
+			tracelog.InfoLogger.Printf("print diff err %v", err)
 			return err
 		}
 		if !found {
+			tracelog.InfoLogger.Printf("Block not found %d\n", currentBlockNumber)
 			break
 		}
 		tracelog.InfoLogger.Printf("Block found %d\n", currentBlockNumber)
 
-		valid := pageReader.SelectNewValidPage2(pageBytes, currentBlockNumber) // TODO : torn page possibility
+		valid := pageReader1.SelectNewValidPage2(pageBytes, currentBlockNumber) // TODO : torn page possibility
 		if !valid {
 			return NewInvalidBlockError(currentBlockNumber)
 		}
