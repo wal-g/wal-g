@@ -1,14 +1,11 @@
 #!/bin/sh
 set -e -x
 
-export WALE_S3_PREFIX=s3://deletebeforepermanentdeltabucket
-export WALG_USE_WAL_DELTA=true
-export WALG_DELTA_MAX_STEPS=3
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
 echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
-echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
+echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=/tmp/configs/delete_before_permanent_delta_test_config.json wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
 echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
@@ -20,28 +17,27 @@ do
     sleep 1
     if [$i -e 3]
     then
-        wal-g backup-push --permanent ${PGDATA}
+        wal-g --config=/tmp/configs/delete_before_permanent_delta_test_config.json backup-push --permanent ${PGDATA}
         pg_dumpall -f /tmp/dump1
     else
-        wal-g backup-push ${PGDATA}
+        wal-g --config=/tmp/configs/delete_before_permanent_delta_test_config.json backup-push ${PGDATA}
     fi
 done
-wal-g backup-list
+wal-g --config=/tmp/configs/delete_before_permanent_delta_test_config.json backup-list
 
 # delete backups by pushing a full backup and running `delete retain 1`
 # this should only delete the last impermanent delta backup
-export WALG_DELTA_MAX_STEPS=0
 pgbench -i -s 1 postgres &
 sleep 1
-wal-g backup-push ${PGDATA}
-wal-g delete retain 1
-wal-g backup-list
+wal-g --config=/tmp/configs/delete_before_permanent_delta_test_config.json backup-push ${PGDATA}
+wal-g --config=/tmp/configs/delete_before_permanent_delta_test_config.json delete retain 1
+wal-g --config=/tmp/configs/delete_before_permanent_delta_test_config.json backup-list
 
 # restore the backup and compare with previous state
 scripts/drop_pg.sh
-first_backup_name=`wal-g backup-list | sed '2q;d' | cut -f 1 -d " "`
-wal-g backup-fetch ${PGDATA} $first_backup_name
-echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
+first_backup_name=`wal-g --config=/tmp/configs/delete_before_permanent_delta_test_config.json backup-list | sed '2q;d' | cut -f 1 -d " "`
+wal-g --config=/tmp/configs/delete_before_permanent_delta_test_config.json backup-fetch ${PGDATA} $first_backup_name
+echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g --config=/tmp/configs/delete_before_permanent_delta_test_config.json wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 pg_dumpall -f /tmp/dump2
 diff /tmp/dump1 /tmp/dump2

@@ -1,31 +1,26 @@
 #!/bin/sh
 set -e -x
 
-export WALE_S3_PREFIX=s3://compressionbucket
-export WALG_USE_WAL_DELTA=true
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
 echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
-echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g wal-push %p && mkdir -p /tmp/deltas/$(basename %p)'" >> /var/lib/postgresql/10/main/postgresql.conf
+echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=/tmp/configs/several_delta_backups_test_config.json wal-push %p && mkdir -p /tmp/deltas/$(basename %p)'" >> /var/lib/postgresql/10/main/postgresql.conf
 echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 
 pgbench -i -s 10 postgres
 pgbench -T 100000000 postgres &
-wal-g backup-push ${PGDATA}
+wal-g --config=/tmp/configs/several_delta_backups_test_config.json backup-push ${PGDATA}
 
-export WALG_COMPRESSION_METHOD=lz4
-wal-g backup-push ${PGDATA}
+wal-g --config=/tmp/configs/several_delta_backups_test_config.json backup-push ${PGDATA}
 
 psql -f scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
 
-export WALG_COMPRESSION_METHOD=brotli
-wal-g backup-push ${PGDATA}
+wal-g --config=/tmp/configs/several_delta_backups_test_config.json backup-push ${PGDATA}
 
-export WALG_COMPRESSION_METHOD=lzma
-wal-g backup-push ${PGDATA}
+wal-g --config=/tmp/configs/several_delta_backups_test_config.json backup-push ${PGDATA}
 
 pkill pgbench
 
@@ -37,9 +32,9 @@ sleep 1
 
 scripts/drop_pg.sh
 
-wal-g backup-fetch ${PGDATA} LATEST
+wal-g --config=/tmp/configs/several_delta_backups_test_config.json backup-fetch ${PGDATA} LATEST
 
-echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
+echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g --config=/tmp/configs/several_delta_backups_test_config.json wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 sleep 10

@@ -1,0 +1,3 @@
+{"WALE_S3_PREFIX": "s3://compressionbucket",
+"WALG_USE_WAL_DELTA": "true",
+"WALG_COMPRESSION_METHOD": "lzma"}

@@ -1,0 +1,3 @@
+{"WALE_S3_PREFIX": "s3://cryptobucket",
+"WALG_PGP_KEY_PATH": "/tmp/PGP_KEY",
+"WALE_GPG_KEY_ID": "${gpg_key_id}"}

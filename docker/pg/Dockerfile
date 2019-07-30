@@ -15,6 +15,7 @@ COPY docker/pg/gpg.conf /var/lib/postgresql/.gnupg/gpg.conf
 COPY docker/pg/gpg-agent.conf /var/lib/postgresql/.gnupg/gpg-agent.conf
 
 COPY docker/pg/walg.json /tmp/walg.json
+COPY docker/pg_tests/scripts/configs /tmp
 
 RUN rm -rf $PGDATA
 
