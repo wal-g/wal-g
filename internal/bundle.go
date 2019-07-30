@@ -479,7 +479,7 @@ func (bundle *Bundle) getDeltaBitmapFor(filePath string) (*roaring.Bitmap, error
 
 func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uint64) error {
 	deltaMap := NewPagedFileDeltaMap()
-	logSegNo := logSegNoFromLsn(*bundle.IncrementFromLsn + 1)
+	logSegNo := logSegNoFromLsn(*bundle.IncrementFromLsn)
 	logSegNo -= logSegNo % WalFileInDelta
 	lastLogSegNo := logSegNoFromLsn(backupStartLSN) - 1
 	walParser := walparser.NewWalParser()
