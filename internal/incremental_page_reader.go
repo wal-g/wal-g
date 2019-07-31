@@ -216,6 +216,7 @@ func (pageReader2 *IncrementalPageReader) PrintDiff(diff []uint32, pageReader1 *
 	pageBytes := make([]byte, DatabasePageSize)
 	if diff == nil || len(diff) == 0 {
 		tracelog.InfoLogger.Println("Diff is empty")
+		tracelog.InfoLogger.Println("lsn without diff: " + strconv.FormatUint(pageReader2.Lsn, 10))
 		return nil
 	}
 	tracelog.InfoLogger.Println("Diff is not empty")
