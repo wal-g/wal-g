@@ -4,15 +4,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
-	"os"
-	"strconv"
-	"sync"
-
 	"github.com/RoaringBitmap/roaring"
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
+	"io"
+	"strconv"
 )
 
 // "wi" at the head stands for "wal-g increment"
@@ -82,7 +79,6 @@ func (pageReader *IncrementalPageReader) Close() error {
 }
 
 
-var Mutex sync.Mutex
 // TODO : unit tests
 // TODO : "initialize" is rather meaningless name, maybe this func should be decomposed
 func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap, pageReader1 *IncrementalPageReader, pageReader2 *IncrementalPageReader) (size int64, err error) {
@@ -109,50 +105,12 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap,
 			tracelog.ErrorLogger.Fatalf("Keka3: %v", err)
 		}
 		tracelog.InfoLogger.Println("full init")
-
-		Mutex.Lock()
-		fullLog, _ := os.Open("/tmp/full_log")
-		deltaLog, _ := os.Open("/tmp/delta_log")
-		fullLog.WriteString(fmt.Sprint(pageReader2.Blocks) + "\n")
-		deltaLog.WriteString(fmt.Sprint(pageReader1.Blocks) + "\n")
-		fullLog.Close()
-		deltaLog.Close()
-		Mutex.Unlock()
-
 		blocks := diff(pageReader2.Blocks, pageReader1.Blocks)
 		tracelog.InfoLogger.Println("diff success")
-		err = pageReader2.PrintDiff(blocks, pageReader1)
+		err = pageReader.FullScanInitialize3(blocks)
 		if err != nil {
 			tracelog.ErrorLogger.Fatalf("Keka4: %v", err)
 		}
-		tracelog.InfoLogger.Println("print diff success")
-
-
-
-
-		//for i := 0; i < len(pageReader.Blocks) && i < len(pageReader2.Blocks); i++ {
-		//	tracelog.InfoLogger.Println(pageReader1.Blocks[i])
-		//	tracelog.InfoLogger.Println(pageReader2.Blocks[i])
-		//	if pageReader1.Blocks[i] != pageReader2.Blocks[i] {
-		//		tracelog.WarningLogger.Printf("Met different blocks: delta %d and full %d \n", pageReader1.Blocks[i], pageReader2.Blocks[i])
-		//		blocks = append(blocks, pageReader2.Blocks[i])
-		//	}
-		//}
-		//
-		//if len(pageReader1.Blocks) > len(pageReader2.Blocks) {
-		//	blocks = append(blocks, pageReader1.Blocks[len(pageReader2.Blocks):]...)
-		//} else if len(pageReader1.Blocks) < len(pageReader2.Blocks) {
-		//	blocks = append(blocks, pageReader2.Blocks[len(pageReader1.Blocks):]...)
-		//}
-		//if len(pageReader1.Blocks) != len(pageReader2.Blocks) {
-		//	tracelog.WarningLogger.Printf("Blocks have different len: delta %d and full %d \n", len(pageReader1.Blocks), len(pageReader2.Blocks))
-		//	for block := range blocks {
-		//		tracelog.WarningLogger.Printf("Different block: %d \n", block)
-		//	}
-		//}
-
-
-		pageReader.DeltaBitmapInitialize(deltaBitmap)
 
 	}
 
@@ -246,17 +204,16 @@ func (pageReader2 *IncrementalPageReader) PrintDiff(diff []uint32, pageReader1 *
 		}
 		tracelog.InfoLogger.Printf("Block found %d\n", currentBlockNumber)
 
-		valid := pageReader1.SelectNewValidPage2(pageBytes, currentBlockNumber) // TODO : torn page possibility
-		if !valid {
-			return NewInvalidBlockError(currentBlockNumber)
-		}
+		//valid := pageReader1.SelectNewValidPage2(pageBytes, currentBlockNumber) // TODO : torn page possibility
+		//if !valid {
+		//	return NewInvalidBlockError(currentBlockNumber)
+		//}
 	}
 	return nil
 }
 
 func (pageReader *IncrementalPageReader) FullScanInitialize2() error {
 	pageBytes := make([]byte, DatabasePageSize)
-	tracelog.InfoLogger.Printf("currentLSN %d\n", pageReader.Lsn)
 	for currentBlockNumber := uint32(0); ; currentBlockNumber++ {
 		_, err := io.ReadFull(pageReader.PagedFile, pageBytes)
 
@@ -266,7 +223,6 @@ func (pageReader *IncrementalPageReader) FullScanInitialize2() error {
 			}
 			return err
 		}
-		tracelog.InfoLogger.Printf("currentBlockNumber %d\n", currentBlockNumber)
 
 		valid := pageReader.SelectNewValidPage(pageBytes, currentBlockNumber) // TODO : torn page possibility
 		if !valid {
@@ -321,12 +277,8 @@ func (pageReader *IncrementalPageReader) SelectNewValidPage(pageBytes []byte, bl
 }
 
 
-func (pageReader *IncrementalPageReader) SelectNewValidPage2(pageBytes []byte, blockNo uint32) (valid bool) {
-	tracelog.InfoLogger.Printf("Full scan, block no: %d\n", blockNo)
+func (pageReader *IncrementalPageReader) SelectNewValidPage2(pageBytes []byte, blockNo uint32, diff []uint32) (valid bool) {
 	pageHeader, _ := ParsePostgresPageHeader(bytes.NewReader(pageBytes))
-	tracelog.InfoLogger.Printf("Full scan, lsn: %d\n", pageReader.Lsn)
-	tracelog.InfoLogger.Printf("Full scan, size: %d\n", pageReader.FileSize)
-	io.Copy(os.Stderr, pageReader.PagedFile)
 	valid = pageHeader.IsValid()
 
 	isNew := false
@@ -343,6 +295,46 @@ func (pageReader *IncrementalPageReader) SelectNewValidPage2(pageBytes []byte, b
 
 	if isNew || (pageHeader.Lsn() >= pageReader.Lsn) {
 		pageReader.Blocks = append(pageReader.Blocks, blockNo)
+		found := false
+		for _, diffBlockNo := range diff {
+			if diffBlockNo == blockNo {
+				found = true
+				tracelog.InfoLogger.Printf("Full scan, block no: %d\n", blockNo)
+				tracelog.InfoLogger.Printf("Full scan, lsn: %d\n", pageReader.Lsn)
+				tracelog.InfoLogger.Printf("Full scan, size: %d\n", pageReader.FileSize)
+				tracelog.InfoLogger.Printf("diff block pdLsnH %d\n", pageHeader.pdLsnH)
+				tracelog.InfoLogger.Printf("diff block pdLsnL           %d\n", pageHeader.pdLsnL     )
+				tracelog.InfoLogger.Printf("diff block pdChecksum       %d\n", pageHeader.pdChecksum  )
+				tracelog.InfoLogger.Printf("diff block pdFlags          %d\n", pageHeader.pdFlags       )
+				tracelog.InfoLogger.Printf("diff block pdLower          %d\n", pageHeader.pdLower      )
+				tracelog.InfoLogger.Printf("diff block pdUpper          %d\n", pageHeader.pdUpper)
+				tracelog.InfoLogger.Printf("diff block pdSpecial        %d\n", pageHeader.pdSpecial)
+				tracelog.InfoLogger.Printf("diff block pdPageSizeVersion%d\n", pageHeader.pdPageSizeVersion)
+				break
+			}
+		}
+		if !found {
+			fmt.Println("Diff block mismatch")
+		}
 	}
 	return
+}
+
+func (pageReader *IncrementalPageReader) FullScanInitialize3(diff []uint32) error {
+	pageBytes := make([]byte, DatabasePageSize)
+	for currentBlockNumber := uint32(0); ; currentBlockNumber++ {
+		_, err := io.ReadFull(pageReader.PagedFile, pageBytes)
+
+		if err != nil {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				return nil
+			}
+			return err
+		}
+
+		valid := pageReader.SelectNewValidPage2(pageBytes, currentBlockNumber, diff) // TODO : torn page possibility
+		if !valid {
+			return NewInvalidBlockError(currentBlockNumber)
+		}
+	}
 }
