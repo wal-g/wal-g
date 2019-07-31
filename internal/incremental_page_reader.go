@@ -302,7 +302,6 @@ func (pageReader *IncrementalPageReader) WriteDiffMapToHeader(headerWriter io.Wr
 func (pageReader *IncrementalPageReader) SelectNewValidPage(pageBytes []byte, blockNo uint32) (valid bool) {
 	pageHeader, _ := ParsePostgresPageHeader(bytes.NewReader(pageBytes))
 	valid = pageHeader.IsValid()
-	io.Copy(os.Stderr, pageReader.PagedFile)
 	isNew := false
 
 	if !valid {
