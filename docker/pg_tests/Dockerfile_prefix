@@ -24,3 +24,4 @@ COPY docker/pg_tests/scripts/ /tmp
 RUN chmod -R 777 /tmp/configs
 RUN chmod 777 /tmp/configs/
 RUN chmod -R 777 /tmp/scripts
+RUN chmod -R 777 /tmp/tests
