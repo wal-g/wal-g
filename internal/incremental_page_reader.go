@@ -264,6 +264,7 @@ func (pageReader *IncrementalPageReader) FullScanInitialize2() error {
 			}
 			return err
 		}
+		tracelog.InfoLogger.Printf("currentBlockNumber %d\n", currentBlockNumber)
 
 		valid := pageReader.SelectNewValidPage(pageBytes, currentBlockNumber) // TODO : torn page possibility
 		if !valid {
@@ -299,7 +300,7 @@ func (pageReader *IncrementalPageReader) WriteDiffMapToHeader(headerWriter io.Wr
 func (pageReader *IncrementalPageReader) SelectNewValidPage(pageBytes []byte, blockNo uint32) (valid bool) {
 	pageHeader, _ := ParsePostgresPageHeader(bytes.NewReader(pageBytes))
 	valid = pageHeader.IsValid()
-
+	io.Copy(os.Stderr, pageReader.PagedFile)
 	isNew := false
 
 	if !valid {
