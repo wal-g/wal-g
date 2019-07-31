@@ -255,6 +255,7 @@ func (pageReader2 *IncrementalPageReader) PrintDiff(diff []uint32, pageReader1 *
 
 func (pageReader *IncrementalPageReader) FullScanInitialize2() error {
 	pageBytes := make([]byte, DatabasePageSize)
+	tracelog.InfoLogger.Printf("currentLSN %d\n", pageReader.Lsn)
 	for currentBlockNumber := uint32(0); ; currentBlockNumber++ {
 		_, err := io.ReadFull(pageReader.PagedFile, pageBytes)
 
