@@ -528,6 +528,7 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 	if isIncremented {
 		bitmap, err := bundle.getDeltaBitmapFor(path)
 		if _, ok := err.(NoBitmapFoundError); ok { // this file has changed after the start of backup, so just skip it
+			tracelog.InfoLogger.Printf("NoBitmapFoundError for: %s\n", path)
 			bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: info.ModTime()})
 			return nil
 		} else if err != nil {
