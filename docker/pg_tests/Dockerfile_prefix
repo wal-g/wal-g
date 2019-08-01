@@ -20,8 +20,3 @@ FROM wal-g/pg:latest
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/pg/wal-g /usr/bin
 
 COPY docker/pg_tests/scripts/ /tmp
-
-RUN chmod -R 777 /tmp/configs
-RUN chmod 777 /tmp/configs/
-RUN chmod -R 777 /tmp/scripts
-RUN chmod -R 777 /tmp/tests

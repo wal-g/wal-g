@@ -3,7 +3,6 @@ set -e -x
 
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
-
 echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
 echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=/tmp/configs/delete_before_name_find_full_test_config.json wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
 echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
