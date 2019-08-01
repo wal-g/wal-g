@@ -74,10 +74,6 @@ coverage.xml
 *,cover
 .hypothesis/
 
-# Translations
-*.mo
-*.pot
-
 # Django stuff:
 *.log
 local_settings.py
@@ -110,9 +106,6 @@ celerybeat-schedule
 # virtualenv
 venv/
 ENV/
-
-# mypy
-.mypy_cache
 
 # Spyder project settings
 .spyderproject

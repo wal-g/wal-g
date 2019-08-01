@@ -1,3 +1,7 @@
+PyYAML>=4.2.0
+pymongo>=3.6.1
+s3cmd>=2.0.1
+humanfriendly==4.4.1
 behave==1.2.6
 docker==3.7.0
 docker-compose==1.23.2

@@ -99,9 +99,6 @@ def prep_network(state, conf):
     for arg in (state, conf):
         assert arg is not None, '%s must not be None' % arg
 
-    # Unfortunately docker is retarded and not able to create
-    # ipv6-only network (see https://github.com/docker/libnetwork/issues/1192)
-    # Do not create new network if there is an another net with the same name.
     if DOCKER_API.networks.list(names='^%s$' % conf.get('network_name')):
         return
     ip_subnet_pool = docker.types.IPAMConfig(pool_configs=[

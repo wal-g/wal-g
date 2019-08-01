@@ -15,7 +15,7 @@ TABLE_COUNT = 1
 ROWS_COUNT = 1
 
 WALG_CLI_PATH = '/usr/bin/wal-g'
-WALG_CONF_PATH = '/config/.wal-g.yaml'
+WALG_CONF_PATH = '/home/.walg.json'
 WALG_DEFAULT_ARGS = ''
 
 
@@ -125,9 +125,8 @@ def make_backup(instance, cli_path=None, conf_path=None, cmd_args=None):
         conf_path = WALG_CONF_PATH
     if cmd_args is None:
         cmd_args = WALG_DEFAULT_ARGS
-    # TODO : Add  conf path!!!
-    backup_command =  '{cli_path} stream-push {args}'.format(
-            cli_path=cli_path, args=cmd_args)
+    backup_command =  '{cli_path} --config {conf_path} stream-push {args}'.format(
+            cli_path=cli_path, args=cmd_args, conf_path=conf_path)
     print(backup_command)
     _, output = docker.exec_run(
         instance, backup_command)
@@ -158,18 +157,18 @@ def get_backup_meta_num(instance, backup_num):
     return get_backup_meta_entry(instance, backup_entries[backup_num])
 
 
-def get_backup_meta_entry(instance, backup_entry, cli_path=None, conf_path=None):
-    """
-    Call backup cli to run delete backup entry
-    """
-    if cli_path is None:
-        cli_path = WALG_CLI_PATH
-    if conf_path is None:
-        conf_path = WALG_CONF_PATH
-    _, output = docker.exec_run(
-        instance, '{cli_path} -c {conf_path} -p {backup_entry} show'.format(
-            cli_path=cli_path, conf_path=conf_path, backup_entry=backup_entry))
-    return json.loads(output)
+#    def get_backup_meta_entry(instance, backup_entry, cli_path=None, conf_path=None):
+#        """
+#        Call backup cli to run delete backup entry
+#        """
+#        if cli_path is None:
+#            cli_path = WALG_CLI_PATH
+#        if conf_path is None:
+#            conf_path = WALG_CONF_PATH
+#        _, output = docker.exec_run(
+#            instance, '{cli_path} -c {conf_path} -p {backup_entry} show'.format(
+#                cli_path=cli_path, conf_path=conf_path, backup_entry=backup_entry))
+#        return json.loads(output)
 
 
 def delete_backup_entry(instance, backup_entry, cli_path=None, conf_path=None):
@@ -181,8 +180,8 @@ def delete_backup_entry(instance, backup_entry, cli_path=None, conf_path=None):
     if conf_path is None:
         conf_path = WALG_CONF_PATH
     _, output = docker.exec_run(
-        instance, '{cli_path} delete retain 1 --confirm'.format(
-            cli_path=cli_path))
+        instance, '{cli_path} --config {conf_path} delete retain 1 --confirm'.format(
+            cli_path=cli_pathi, conf_path=conf_path))
     return output
 
 
@@ -194,8 +193,8 @@ def purge_backups(instance, number, cli_path=None, conf_path=None):
         cli_path = WALG_CLI_PATH
     if conf_path is None:
         conf_path = WALG_CONF_PATH
-    _, output = docker.exec_run(instance, '{cli_path} delete retain {number} --confirm'.format(
-        cli_path=cli_path, number=number))
+    _, output = docker.exec_run(instance, '{cli_path} --config {conf_path} delete retain {number} --confirm'.format(
+        cli_path=cli_path, number=number, conf_path=conf_path))
     print(output)
     return output
 
@@ -209,9 +208,8 @@ def get_backup_entries(instance, cli_path=None, conf_path=None):
         cli_path = WALG_CLI_PATH
     if conf_path is None:
         conf_path = WALG_CONF_PATH
-    # TODO : conf path
-    command = '{cli_path} backup-list'.format(
-        cli_path=cli_path, )
+    command = '{cli_path} --config {conf_path} backup-list'.format(
+        cli_path=cli_path, conf_path=conf_path)
     _, output = docker.exec_run(instance, command)
     raw_entries = output.split('\n')
     return list(filter(None, raw_entries))
@@ -228,8 +226,8 @@ def restore_backup_entry(instance, backup_entry, cli_path=None, conf_path=None):
         conf_path = WALG_CONF_PATH
     print(backup_entry)    
     _, output = docker.exec_run(
-        instance, '{cli_path} stream-fetch {backup_entry}'.format(
-            cli_path=cli_path, backup_entry=backup_entry))
+        instance, '{cli_path} --config {conf_path} stream-fetch {backup_entry}'.format(
+            cli_path=cli_path, backup_entry=backup_entry, conf_path=conf_path))
     return output
 
 

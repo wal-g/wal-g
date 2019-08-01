@@ -276,9 +276,6 @@ def _generate_service_dict(name, instance_name, instance_conf, network, basedir)
         'external_links': instance_conf.get('external_links', []),
     }
 
-    # print('%s' % instance_conf)
-    # print('%s' % instance_conf['external_links'])
-    # raise Exception('')
     return service
 
 

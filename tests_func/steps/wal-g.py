@@ -16,9 +16,10 @@ def step_create_backup(context, node_name):
     options = yaml.load(context.text or '') or {}
     backup_id_regexp = '[0-9]{8}T[0-9]{6}'
     cmd_args = []
-    labels = options.get('labels', {})
-    for key, value in labels.items():
-        cmd_args.append('--label {0}={1}'.format(key, value))
+#   labels are not supported by wal-g for now
+#    labels = options.get('labels', {}) 
+#    for key, value in labels.items():
+#        cmd_args.append('--label {0}={1}'.format(key, value))
 
     backup_id = options.get('name')
     if backup_id:
@@ -119,9 +120,6 @@ def step_check_nometa_purged(context, node_name):
     backup_root_dir = context.conf['dynamic']['wal-g']['path']
 
     for backup_name in context.safe_storage['nometa_backup_names'].pop():
-        # backup_dir = '/export/{bucket_name}/{backup_dir}/{backup_name}'.format(bucket_name=bucket_name,
-        #                                                                        backup_dir=backup_root_dir,
-        #                                                                        backup_name=backup_name)
         backup_dir = os.path.join('/export', bucket_name, backup_root_dir, backup_name)
         _, output = docker.exec_run(instance, 'ls {path}'.format(path=backup_dir), check=False)
         assert_that(output, contains_string('No such file or directory'))
