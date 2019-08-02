@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e -x
 
+export WALE_FILE_PREFIX=file://localhost/tmp
+export WALE_LOG_DESTINATION=stderr
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
@@ -25,9 +27,9 @@ cp ${PGDATA}/pg_ident.conf /tmp/conf_files
 
 rm -rf ${PGDATA}
 
-wal-g --config=/tmp/configs/wale_compatibility_test_config.json backup-fetch ${PGDATA} LATEST
+wal-g backup-fetch ${PGDATA} LATEST
 
-echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g --config=/tmp/configs/wale_compatibility_test_config.json wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
+echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
 
 cp /tmp/conf_files/postgresql.conf ${PGDATA}
 cp /tmp/conf_files/pg_hba.conf ${PGDATA}

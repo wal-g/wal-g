@@ -237,6 +237,9 @@ services:
       context: .
     image: wal-g/wale_compatibility_test
     container_name: wal-g_pg_wale_compatibility_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
