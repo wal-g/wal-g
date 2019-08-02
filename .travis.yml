@@ -16,15 +16,13 @@ matrix:
 env:
   global:
     - CACHE_FOLDER=$HOME/docker-images
-    - IMAGE=walg_prefix
+    - IMAGE=wal-g/docker_prefix
     - CACHE_FILE=${CACHE_FOLDER}/${IMAGE}-${TRAVIS_COMMIT}.tgz
 
 jobs:
   include:
     - stage: build
       script: make pg_prefix_image
-        - mkdir -p ${CACHE_FOLDER}
-        - docker save ${IMAGE} | gzip -c > ${CACHE_FILE}
     - stage: test
       script: make make_unittests
     - script: make ARGS="pg_config_test" pg_integration_tests_with_args
