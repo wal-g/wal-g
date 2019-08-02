@@ -32,7 +32,7 @@ pg_prefix_image: install deps pg_build unlink_brotli
 
 make_unittests: install deps lint unittest
 
-pg_integration_tests_with_args: install deps pg_build unlink_brotli
+pg_integration_tests_with_args:
 	ls -la ${CACHE_FOLDER}
 	if [[ -f ${CACHE_FILE} ]]; then docker load -i ${CACHE_FILE}; fi
 	docker images
