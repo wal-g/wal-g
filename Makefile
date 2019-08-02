@@ -18,18 +18,15 @@ endif
 pg_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_PG_PATH) && go build -o wal-g $(GOTAGS) -ldflags "-s -w -X github.com/wal-g/wal-g/cmd.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd.WalgVersion=`git tag -l --points-at HEAD`")
 
-pg_prefix_image: install deps pg_build unlink_brotli
+pg_build_image: install deps pg_build unlink_brotli
 	docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix
-	docker images
 	mkdir -p ${CACHE_FOLDER}
 	docker save ${IMAGE} | gzip -c > ${CACHE_FILE}
 
-pg_integration_tests_with_args:
-	docker images
+pg_integration_test:
 	docker load -i ${CACHE_FILE}
-	docker images
-	docker-compose build $(ARGS)
-	docker-compose up --exit-code-from $(ARGS) $(ARGS)
+	docker-compose build $(TEST)
+	docker-compose up --exit-code-from $(TEST) $(TEST)
 
 mysql_test: install deps mysql_build lint unlink_brotli mysql_integration_test
 
