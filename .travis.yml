@@ -16,8 +16,8 @@ matrix:
 env:
   global:
     - CACHE_FOLDER=$HOME/docker-images
-    - IMAGE=wal-g_docker_prefix
-    - CACHE_FILE=${CACHE_FOLDER}/${IMAGE}-${TRAVIS_COMMIT}.tgz
+    - IMAGE=wal-g/docker_prefix
+    - CACHE_FILE=${CACHE_FOLDER}/docker_prefix-${TRAVIS_COMMIT}.tgz
 
 jobs:
   include:

@@ -24,18 +24,12 @@ pg_prefix_image: install deps pg_build unlink_brotli
 	mkdir -p ${CACHE_FOLDER}
 	docker save ${IMAGE} | gzip -c > ${CACHE_FILE}
 
-make_unittests: install deps lint unittest
-
 pg_integration_tests_with_args:
 	docker images
 	docker load -i ${CACHE_FILE}
 	docker images
 	docker-compose build $(ARGS)
 	docker-compose up --exit-code-from $(ARGS) $(ARGS)
-
-pg_int_tests_only:
-	docker-compose build pg_tests
-	docker-compose up --exit-code-from pg_tests pg_tests
 
 mysql_test: install deps mysql_build lint unlink_brotli mysql_integration_test
 
@@ -80,6 +74,8 @@ redis_clean:
 
 redis_install: redis_build
 	mv $(MAIN_REDIS_PATH)/wal-g $(GOBIN)/wal-g
+
+make_unittests: install deps lint unittest
 
 unittest:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet
