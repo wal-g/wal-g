@@ -12,6 +12,9 @@ import (
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"golang.org/x/crypto/openpgp"
+
+	//  Support alternative hash function RIPEMD160
+	_ "golang.org/x/crypto/ripemd160"
 )
 
 // Crypter incapsulates specific of cypher method
