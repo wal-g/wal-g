@@ -13,8 +13,18 @@ matrix:
         apt:
           packages: [liblzo2-dev]
 
+env:
+  global:
+    - CACHE_FOLDER=$HOME/docker-images
+    - IMAGE=walg_prefix
+    - CACHE_FILE=${CACHE_FOLDER}/${IMAGE}-${TRAVIS_COMMIT}.tgz
+
 jobs:
   include:
+    - stage: build
+      script: make pg_make_docker_prefix
+        - mkdir -p ${CACHE_FOLDER}
+        - docker save ${IMAGE} | gzip -c > ${CACHE_FILE}
     - stage: test
       script: make make_unittests
     - script: make ARGS="pg_config_test" pg_integration_tests_with_args
@@ -50,3 +60,8 @@ deploy:
   on:
     repo: wal-g/wal-g
     tags: true
+
+cache:
+  bundler: true
+  directories:
+    - ${CACHE_FOLDER}

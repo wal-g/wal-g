@@ -15,33 +15,20 @@ ifdef GOTAGS
 override GOTAGS := -tags $(GOTAGS)
 endif
 
-test: install deps lint unittest pg_build mysql_build redis_build mongo_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test mongo_integration_test
-
-pg_test: install deps pg_build lint unlink_brotli pg_integration_test
-
 pg_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_PG_PATH) && go build -o wal-g $(GOTAGS) -ldflags "-s -w -X github.com/wal-g/wal-g/cmd.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd.WalgVersion=`git tag -l --points-at HEAD`")
 
-pg_integration_test:
-	docker-compose build $(DOCKER_COMMON) pg pg_tests
-	docker-compose up --exit-code-from pg_tests pg_tests
-
 make_unittests: install deps lint unittest
 
-pg_integration_tests_with_args:
-	docker-compose build $(ARGS)
+pg_make_docker_prefix: install deps pg_build unlink_brotli
+    docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix
+
+pg_integration_tests_with_args: install deps pg_build unlink_brotli
+    ls -la ${CACHE_FOLDER}
+    if [[ -f ${CACHE_FILE} ]]; then docker load -i ${CACHE_FILE}; fi
+    docker images
+	docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix $(ARGS)
 	docker-compose up --exit-code-from $(ARGS) $(ARGS)
-
-pg_int_tests_only:
-	docker-compose build pg_tests
-	docker-compose up --exit-code-from pg_tests pg_tests
-	
-pg_clean:
-	(cd $(MAIN_PG_PATH) && go clean)
-	./cleanup.sh
-
-pg_install: pg_build
-	mv $(MAIN_PG_PATH)/wal-g $(GOBIN)/wal-g
 
 mysql_test: install deps mysql_build lint unlink_brotli mysql_integration_test
 
