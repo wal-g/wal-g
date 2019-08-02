@@ -16,13 +16,13 @@ matrix:
 env:
   global:
     - CACHE_FOLDER=$HOME/docker-images
-    - IMAGE=wal-g/docker_prefix
+    - IMAGE=munakoiso/wal-g
     - CACHE_FILE=${CACHE_FOLDER}/docker_prefix-${TRAVIS_COMMIT}.tgz
 
 jobs:
   include:
-    - stage: build
-      script: make pg_build_image
+    - stage: build image
+      script: make pg_load_image
     - stage: test
       script: make make_unittests
     - script: make TEST="pg_config_test" pg_integration_test

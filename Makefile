@@ -18,6 +18,11 @@ endif
 pg_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_PG_PATH) && go build -o wal-g $(GOTAGS) -ldflags "-s -w -X github.com/wal-g/wal-g/cmd.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd.WalgVersion=`git tag -l --points-at HEAD`")
 
+pg_load_image:
+	docker pull ${IMAGE}
+	mkdir -p ${CACHE_FOLDER}
+	docker save ${IMAGE} | gzip -c > ${CACHE_FILE}
+
 pg_build_image: install deps pg_build unlink_brotli
 	docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix
 	mkdir -p ${CACHE_FOLDER}
