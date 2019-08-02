@@ -1,3 +1,3 @@
-FROM wal-g/docker_prefix:latest
+FROM munakoiso/wal-g:latest
 
 CMD su postgres -c "/tmp/tests/full_backup_test.sh"

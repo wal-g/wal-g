@@ -29,7 +29,7 @@ pg_integration_test:
 make_unittests: install deps lint unittest
 
 pg_integration_tests_with_args: install deps pg_build unlink_brotli
-	docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix $(ARGS)
+	docker-compose build $(ARGS)
 	docker-compose up --exit-code-from $(ARGS) $(ARGS)
 
 pg_int_tests_only:

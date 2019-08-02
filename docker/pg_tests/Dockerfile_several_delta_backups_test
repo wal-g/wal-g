@@ -1,4 +1,4 @@
-FROM wal-g/docker_prefix:latest
+FROM munakoiso/wal-g:latest
 
 COPY docker/pg_tests/scripts/ /
 
