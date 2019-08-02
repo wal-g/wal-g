@@ -22,7 +22,7 @@ env:
 jobs:
   include:
     - stage: build
-      script: make pg_make_docker_prefix
+      script: make pg_prefix_image
         - mkdir -p ${CACHE_FOLDER}
         - docker save ${IMAGE} | gzip -c > ${CACHE_FILE}
     - stage: test
