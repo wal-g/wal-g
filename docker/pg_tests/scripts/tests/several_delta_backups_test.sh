@@ -14,12 +14,15 @@ pgbench -i -s 10 postgres
 pgbench -T 100000000 postgres &
 wal-g --config=/tmp/configs/several_delta_backups_test_config.json backup-push ${PGDATA}
 
+export WALG_COMPRESSION_METHOD=lz4
 wal-g --config=/tmp/configs/several_delta_backups_test_config.json backup-push ${PGDATA}
 
 psql -f scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
 
+export WALG_COMPRESSION_METHOD=brotli
 wal-g --config=/tmp/configs/several_delta_backups_test_config.json backup-push ${PGDATA}
 
+export WALG_COMPRESSION_METHOD=lzma
 wal-g --config=/tmp/configs/several_delta_backups_test_config.json backup-push ${PGDATA}
 
 pkill pgbench
