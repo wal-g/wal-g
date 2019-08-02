@@ -20,6 +20,7 @@ pg_build: $(CMD_FILES) $(PKG_FILES)
 
 pg_prefix_image: install deps pg_build unlink_brotli
 	docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix
+	docker images
 	mkdir -p ${CACHE_FOLDER}
 	docker save ${IMAGE} | gzip -c > ${CACHE_FILE}
 
