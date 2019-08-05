@@ -85,6 +85,31 @@ services:
     links:
       - s3
 
+  pg_delete_before_permanent_full_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_before_permanent_full_test
+      context: .
+    image: wal-g/delete_before_permanent_full_test
+    container_name: wal-g_pg_delete_before_permanent_full_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_delete_before_permanent_delta_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_before_permanent_delta_test
+      context: .
+    image: wal-g/delete_before_permanent_delta_test
+    container_name: wal-g_pg_delete_before_permanent_delta_test
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
   pg_delete_retain_full_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_delete_retain_full_test

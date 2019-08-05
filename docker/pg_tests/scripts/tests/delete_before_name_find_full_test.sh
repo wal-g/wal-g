@@ -1,10 +1,12 @@
 #!/bin/sh
 set -e -x
+CONFIG_FILE="/tmp/configs/delete_before_name_find_full_test_config.json"
 
+tmp/scripts/wrap_config_file.sh ${CONFIG_FILE}
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
-echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=/tmp/configs/delete_before_name_find_full_test_config.json wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
+echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${CONFIG_FILE} wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
 echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
@@ -13,21 +15,21 @@ for i in 1 2 3 4
 do
     pgbench -i -s 1 postgres &
     sleep 1
-    wal-g --config=/tmp/configs/delete_before_name_find_full_test_config.json backup-push ${PGDATA}
+    wal-g --config=${CONFIG_FILE} backup-push ${PGDATA}
 done
 
 # take name of last backup(it's delta)
-backup_name=`wal-g --config=/tmp/configs/delete_before_name_find_full_test_config.json backup-list | tail -n 1 | cut -f 1 -d " "`
+backup_name=`wal-g --config=${CONFIG_FILE} backup-list | tail -n 1 | cut -f 1 -d " "`
 
-wal-g --config=/tmp/configs/delete_before_name_find_full_test_config.json backup-list
-lines_before_delete=`wal-g --config=/tmp/configs/delete_before_name_find_full_test_config.json backup-list | wc -l`
-wal-g --config=/tmp/configs/delete_before_name_find_full_test_config.json backup-list | tail -n 2 > /tmp/list_tail_before_delete
+wal-g --config=${CONFIG_FILE} backup-list
+lines_before_delete=`wal-g --config=${CONFIG_FILE} backup-list | wc -l`
+wal-g --config=${CONFIG_FILE} backup-list | tail -n 2 > /tmp/list_tail_before_delete
 
-wal-g --config=/tmp/configs/delete_before_name_find_full_test_config.json delete before FIND_FULL $backup_name --confirm
+wal-g --config=${CONFIG_FILE} delete before FIND_FULL $backup_name --confirm
 
-wal-g --config=/tmp/configs/delete_before_name_find_full_test_config.json backup-list
-lines_after_delete=`wal-g --config=/tmp/configs/delete_before_name_find_full_test_config.json backup-list | wc -l`
-wal-g --config=/tmp/configs/delete_before_name_find_full_test_config.json backup-list | tail -n 2 > /tmp/list_tail_after_delete
+wal-g --config=${CONFIG_FILE} backup-list
+lines_after_delete=`wal-g --config=${CONFIG_FILE} backup-list | wc -l`
+wal-g --config=${CONFIG_FILE} backup-list | tail -n 2 > /tmp/list_tail_after_delete
 
 if [ $(($lines_before_delete-2)) -ne $lines_after_delete ];
 then

@@ -1,4 +1,4 @@
-{"PGSSLMODE": "allow",
+"PGSSLMODE": "allow",
 "PGDATABASE": "postgres",
 "PGHOST": "/var/run/postgresql",
 "AWS_ACCESS_KEY_ID": "AKIAIOSFODNN7EXAMPLE",
@@ -10,4 +10,4 @@
 "WALG_UPLOAD_CONCURRENCY": "10",
 "WALG_DISK_RATE_LIMIT": "41943040",
 "WALG_NETWORK_RATE_LIMIT": "10485760",
-"WALE_S3_PREFIX": "s3://fullscandeltabucket"}
+"WALE_S3_PREFIX": "s3://fullscandeltabucket"

@@ -1,9 +1,6 @@
 #!/bin/sh
 set -e -x
 
-export WALE_FILE_PREFIX=file://localhost/tmp
-export WALE_LOG_DESTINATION=stderr
-
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
 echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf

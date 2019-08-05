@@ -1,9 +1,9 @@
 #!/bin/bash
+TMP_CONFIG="/tmp/configs/new_config"
 
-touch /tmp/configs/new_config
-echo "{" > /tmp/configs/new_config
-cat $1 >> /tmp/configs/new_config
-echo "" >> /tmp/configs/new_config
-echo "}" >> /tmp/configs/new_config
-cat /tmp/configs/new_config > $1
-rm /tmp/configs/new_config
+touch ${TMP_CONFIG}
+echo "{" > ${TMP_CONFIG}
+cat $1 >> ${TMP_CONFIG}
+echo "}" >> ${TMP_CONFIG}
+cat ${TMP_CONFIG} > $1
+rm ${TMP_CONFIG}
