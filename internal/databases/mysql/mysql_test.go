@@ -7,8 +7,10 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 	"github.com/wal-g/wal-g/internal/storages/memory"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -37,25 +39,30 @@ func TestGetBinlogConfigNoError(t *testing.T) {
 }
 
 func TestBinlogShouldBeFetched(t *testing.T) {
-	storage := memory.NewStorage()
-	storage.Store("mysql-bin-log.000017.lz4", *bytes.NewBufferString(""))
-	storage.Store("mysql-bin-log.000018.lz4", *bytes.NewBufferString(""))
-	storage.Store("mysql-bin-log.000019.lz4", *bytes.NewBufferString(""))
+	storage_ := memory.NewStorage()
+	storage_.Store("mysql-bin-log.000017.lz4", *bytes.NewBufferString(""))
+	storage_.Store("mysql-bin-log.000018.lz4", *bytes.NewBufferString(""))
+	storage_.Store("mysql-bin-log.000019.lz4", *bytes.NewBufferString(""))
 	time.Sleep(time.Millisecond * 20)
 	cutpoint := utility.TimeNowCrossPlatformLocal()
 	time.Sleep(time.Millisecond * 20)
-	storage.Store("mysql-bin-log.000020.lz4", *bytes.NewBufferString(""))
+	storage_.Store("mysql-bin-log.000020.lz4", *bytes.NewBufferString(""))
 
-	folder := memory.NewFolder("", storage)
+	folder := memory.NewFolder("", storage_)
 	objects, _, err := folder.ListFolder()
 
-	dto := mysql.StreamSentinelDto{BinLogStart: "mysql-bin-log.000018", BinLogEnd: "mysql-bin-log.000019.lz4"}
+	var startBinlog storage.Object
+	for _, object := range objects {
+		if strings.HasPrefix(object.GetName(), "mysql-bin-log.000018.lz4") {
+			startBinlog = object
+		}
+	}
 
 	assert.NoError(t, err)
 	assert.Equal(t, len(objects), 4)
 	for _, o := range objects {
 		binlogName := mysql.ExtractBinlogName(o, folder)
-		fetched := mysql.BinlogShouldBeFetched(dto, binlogName, &cutpoint, o)
+		fetched := mysql.BinlogShouldBeFetched(startBinlog.GetLastModified(), &cutpoint, o)
 		if fetched {
 			allowed := []string{"mysql-bin-log.000018", "mysql-bin-log.000019"}
 			assert.Contains(t, allowed, binlogName)
