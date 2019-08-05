@@ -21,4 +21,7 @@ COPY --from=build /go/src/github.com/wal-g/wal-g/main/pg/wal-g /usr/bin
 
 COPY docker/pg_tests/scripts/ /tmp
 
+RUN chmod 777 -R /tmp/configs/
 RUN chmod 777 /tmp/configs/
+RUN chmod 777 -R /tmp/scripts/
+RUN chmod 777 -R /tmp/tests/
