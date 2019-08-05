@@ -49,16 +49,16 @@ func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
 	if err != nil {
 		return err
 	}
-	var backupStartUploadTime time.Time
+	var backupUploadTime time.Time
 	for _, binlog := range binlogs {
 		if strings.HasPrefix(binlog.GetName(), streamSentinel.BinLogStart) {
-			backupStartUploadTime = binlog.GetLastModified()
+			backupUploadTime = binlog.GetLastModified()
 		}
 	}
 
 	binlogsAreDone := make(chan error)
 
-	go fetchBinlogs(folder, backupStartUploadTime, binlogsAreDone)
+	go fetchBinlogs(folder, backupUploadTime, binlogsAreDone)
 
 	for _, decompressor := range compression.Decompressors {
 		d := decompressor

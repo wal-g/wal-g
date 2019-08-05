@@ -7,7 +7,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 	"github.com/wal-g/wal-g/internal/storages/memory"
-	storage2 "github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 	"os"
 	"strings"
@@ -39,19 +39,19 @@ func TestGetBinlogConfigNoError(t *testing.T) {
 }
 
 func TestBinlogShouldBeFetched(t *testing.T) {
-	storage := memory.NewStorage()
-	storage.Store("mysql-bin-log.000017.lz4", *bytes.NewBufferString(""))
-	storage.Store("mysql-bin-log.000018.lz4", *bytes.NewBufferString(""))
-	storage.Store("mysql-bin-log.000019.lz4", *bytes.NewBufferString(""))
+	storage_ := memory.NewStorage()
+	storage_.Store("mysql-bin-log.000017.lz4", *bytes.NewBufferString(""))
+	storage_.Store("mysql-bin-log.000018.lz4", *bytes.NewBufferString(""))
+	storage_.Store("mysql-bin-log.000019.lz4", *bytes.NewBufferString(""))
 	time.Sleep(time.Millisecond * 20)
 	cutpoint := utility.TimeNowCrossPlatformLocal()
 	time.Sleep(time.Millisecond * 20)
-	storage.Store("mysql-bin-log.000020.lz4", *bytes.NewBufferString(""))
+	storage_.Store("mysql-bin-log.000020.lz4", *bytes.NewBufferString(""))
 
-	folder := memory.NewFolder("", storage)
+	folder := memory.NewFolder("", storage_)
 	objects, _, err := folder.ListFolder()
 
-	var startBinlog storage2.Object
+	var startBinlog storage.Object
 	for _, object := range objects {
 		if strings.HasPrefix(object.GetName(), "mysql-bin-log.000018.lz4") {
 			startBinlog = object
