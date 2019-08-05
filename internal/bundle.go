@@ -495,6 +495,7 @@ func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uin
 		}
 		walParser = deltaFile.WalParser
 		reader.Close()
+		tracelog.InfoLogger.Printf("successfully loaded %s delta file\n", deltaFilename)
 		for _, location := range deltaFile.Locations {
 			deltaMap.AddToDelta(location)
 		}
