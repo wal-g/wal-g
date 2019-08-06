@@ -38,7 +38,7 @@ wal-g delete retain 1
 wal-g backup-list
 
 # restore the backup and compare with previous state
-scripts/drop_pg.sh
+tmp/scripts/drop_pg.sh
 first_backup_name=`wal-g backup-list | sed '2q;d' | cut -f 1 -d " "`
 wal-g backup-fetch ${PGDATA} $first_backup_name
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
@@ -46,6 +46,6 @@ echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g 
 pg_dumpall -f /tmp/dump2
 diff /tmp/dump1 /tmp/dump2
 
-scripts/drop_pg.sh
+tmp/scripts/drop_pg.sh
 
 echo "Delete before permanent delta success!!!!!!"
