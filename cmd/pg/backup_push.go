@@ -10,6 +10,7 @@ import (
 const (
 	BackupPushShortDescription = "Makes backup and uploads it to storage"
 	PermanentFlag              = "permanent"
+	FullBackupFlag			   = "full"
 )
 
 var (
@@ -23,14 +24,16 @@ var (
 			if err != nil {
 				tracelog.ErrorLogger.FatalError(err)
 			}
-			internal.HandleBackupPush(uploader, args[0], permanent)
+			internal.HandleBackupPush(uploader, args[0], permanent, full_backup)
 		},
 	}
 	permanent = false
+	full_backup = false
 )
 
 func init() {
 	PgCmd.AddCommand(backupPushCmd)
 
 	backupPushCmd.Flags().BoolVar(&permanent, PermanentFlag, false, "Pushes permanent backup")
+	backupPushCmd.Flags().BoolVar(&full_backup, FullBackupFlag, false, "Make full backup-push")
 }
