@@ -18,7 +18,7 @@ for i in 1 2 3 4
 do
     pgbench -i -s 1 postgres &
     sleep 1
-    if [ $i -e 3 ]
+    if [$i -e 3]
     then
         wal-g backup-push --permanent ${PGDATA}
         pg_dumpall -f /tmp/dump1
@@ -38,7 +38,7 @@ wal-g delete retain 1
 wal-g backup-list
 
 # restore the backup and compare with previous state
-tmp/scripts/drop_pg.sh
+scripts/drop_pg.sh
 first_backup_name=`wal-g backup-list | sed '2q;d' | cut -f 1 -d " "`
 wal-g backup-fetch ${PGDATA} $first_backup_name
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
@@ -46,6 +46,6 @@ echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g 
 pg_dumpall -f /tmp/dump2
 diff /tmp/dump1 /tmp/dump2
 
-tmp/scripts/drop_pg.sh
+scripts/drop_pg.sh
 
 echo "Delete before permanent delta success!!!!!!"
