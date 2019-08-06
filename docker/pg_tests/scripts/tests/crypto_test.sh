@@ -5,15 +5,14 @@ gpg --import /tmp/PGP_KEY
 gpg_key_id=`gpg --list-keys | tail -n +4 | head -n 1 | cut -d ' ' -f 7`
 
 COMMON_CONFIG="/tmp/configs/common_config.json"
+
 echo "," >> ${CONFIG_FILE}
 cat ${COMMON_CONFIG} >> ${CONFIG_FILE}
 
 
-echo -e ",\n\"WALE_GPG_KEY_ID\":\"${gpg_key_id}\"" >> ${CONFIG_FILE}
+printf ",\n\"WALE_GPG_KEY_ID\":\"${gpg_key_id}\"" >> ${CONFIG_FILE}
 tmp/scripts/wrap_config_file.sh ${CONFIG_FILE}
 cat ${CONFIG_FILE}
-
-ls -l /tmp/configs/
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 

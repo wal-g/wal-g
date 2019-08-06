@@ -6,6 +6,9 @@ COMMON_CONFIG="/tmp/configs/common_config.json"
 echo "," >> ${CONFIG_FILE}
 cat ${COMMON_CONFIG} >> ${CONFIG_FILE}
 
+tmp/scripts/wrap_config_file.sh ${CONFIG_FILE}
+cat ${CONFIG_FILE}
+
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
 echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf

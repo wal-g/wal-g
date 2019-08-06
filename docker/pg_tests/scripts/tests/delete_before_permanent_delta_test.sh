@@ -1,6 +1,10 @@
 #!/bin/sh
 set -e -x
 
+export WALE_S3_PREFIX=s3://deletebeforepermanentdeltabucket
+export WALG_USE_WAL_DELTA=true
+export WALG_DELTA_MAX_STEPS=3
+
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
 echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
@@ -14,7 +18,7 @@ for i in 1 2 3 4
 do
     pgbench -i -s 1 postgres &
     sleep 1
-    if [ $i -e 3 ]
+    if [$i -e 3]
     then
         wal-g backup-push --permanent ${PGDATA}
         pg_dumpall -f /tmp/dump1
@@ -26,6 +30,7 @@ wal-g backup-list
 
 # delete backups by pushing a full backup and running `delete retain 1`
 # this should only delete the last impermanent delta backup
+export WALG_DELTA_MAX_STEPS=0
 pgbench -i -s 1 postgres &
 sleep 1
 wal-g backup-push ${PGDATA}
