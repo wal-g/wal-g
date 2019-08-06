@@ -13,6 +13,8 @@ echo -e ",\n\"WALE_GPG_KEY_ID\":\"${gpg_key_id}\"" >> ${CONFIG_FILE}
 tmp/scripts/wrap_config_file.sh ${CONFIG_FILE}
 cat ${CONFIG_FILE}
 
+ls -l /tmp/configs/
+
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
 echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
