@@ -18,7 +18,7 @@ for i in 1 2 3 4
 do
     pgbench -i -s 1 postgres &
     sleep 1
-    if [ $i -e 3 ]
+    if [ $i -eq 3 ]
     then
         wal-g backup-push --permanent ${PGDATA}
         pg_dumpall -f /tmp/dump1
