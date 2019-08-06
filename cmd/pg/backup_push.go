@@ -11,6 +11,8 @@ const (
 	BackupPushShortDescription = "Makes backup and uploads it to storage"
 	PermanentFlag              = "permanent"
 	FullBackupFlag			   = "full"
+	PermanentShorthand		   = "p"
+	FullBackupShorthand		   = "f"
 )
 
 var (
@@ -34,6 +36,6 @@ var (
 func init() {
 	PgCmd.AddCommand(backupPushCmd)
 
-	backupPushCmd.Flags().BoolVar(&permanent, PermanentFlag, false, "Pushes permanent backup")
-	backupPushCmd.Flags().BoolVar(&full_backup, FullBackupFlag, false, "Make full backup-push")
+	backupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes permanent backup")
+	backupPushCmd.Flags().BoolVarP(&full_backup, FullBackupFlag, FullBackupShorthand, false, "Make full backup-push")
 }
