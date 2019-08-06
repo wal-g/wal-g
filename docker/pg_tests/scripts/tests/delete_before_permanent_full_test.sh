@@ -1,6 +1,11 @@
 #!/bin/sh
 set -e -x
 CONFIG_FILE="/tmp/configs/delete_before_permanent_full_test_config.json"
+
+COMMON_CONFIG="/tmp/configs/common_config.json"
+echo "," >> ${CONFIG_FILE}
+cat ${COMMON_CONFIG} >> ${CONFIG_FILE}
+
 tmp/scripts/wrap_config_file.sh ${CONFIG_FILE}
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}

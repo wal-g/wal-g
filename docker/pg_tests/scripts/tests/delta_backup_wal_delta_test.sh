@@ -1,6 +1,10 @@
 #!/bin/sh
 exit 0
 CONFIG_FILE="/tmp/configs/delta_backup_wal_delta_test_config.json"set -e -x
+COMMON_CONFIG="/tmp/configs/common_config.json"
+echo "," >> ${CONFIG_FILE}
+cat ${COMMON_CONFIG} >> ${CONFIG_FILE}
+
 tmp/scripts/wrap_config_file.sh ${CONFIG_FILE}
 
 

@@ -2,6 +2,10 @@
 set -e -x
 CONFIG_FILE="/tmp/configs/delete_retain_find_full_test_config.json"
 
+COMMON_CONFIG="/tmp/configs/common_config.json"
+echo "," >> ${CONFIG_FILE}
+cat ${COMMON_CONFIG} >> ${CONFIG_FILE}
+
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
 echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf

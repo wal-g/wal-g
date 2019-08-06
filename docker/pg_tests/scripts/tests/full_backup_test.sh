@@ -1,6 +1,10 @@
 #!/bin/sh
 exit 0
 CONFIG_FILE="/tmp/configs/full_backup_test_config.json"set -e -x
+COMMON_CONFIG="/tmp/configs/common_config.json"
+echo "," >> ${CONFIG_FILE}
+cat ${COMMON_CONFIG} >> ${CONFIG_FILE}
+
 tmp/scripts/wrap_config_file.sh ${CONFIG_FILE}
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}

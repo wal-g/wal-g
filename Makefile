@@ -17,8 +17,6 @@ endif
 
 test: install deps lint unittest pg_build mysql_build redis_build mongo_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test mongo_integration_test
 
-pg_test: install deps pg_build lint unlink_brotli pg_integration_test
-
 pg_int_tests_only:
 	docker-compose build pg_tests
 	docker-compose up --exit-code-from pg_tests pg_tests
