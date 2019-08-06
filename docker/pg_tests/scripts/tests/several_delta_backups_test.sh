@@ -35,7 +35,7 @@ pkill pgbench
 pg_dumpall -f /tmp/dump1
 sleep 1
 
-scripts/drop_pg.sh
+tmp/scripts/drop_pg.sh
 
 wal-g --config=${CONFIG_FILE} backup-fetch ${PGDATA} LATEST
 
@@ -51,6 +51,6 @@ psql -f scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
 
 diff /tmp/dump1 /tmp/dump2
 
-scripts/drop_pg.sh
+tmp/scripts/drop_pg.sh
 
 echo "Several delta backup success!!!!!!"

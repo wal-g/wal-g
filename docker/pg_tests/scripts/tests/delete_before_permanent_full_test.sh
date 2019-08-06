@@ -44,6 +44,6 @@ then
     echo "permanent backup does not exist after deletion"
 fi
 
-scripts/drop_pg.sh
+tmp/scripts/drop_pg.sh
 
 echo "Delete before permanent full success!!!!!!"
