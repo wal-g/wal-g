@@ -45,7 +45,7 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 
 // TODO : unit tests
 // HandleBackupPush is invoked to perform a wal-g backup-push
-func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent bool) {
+func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent bool, isFullBackup bool) {
 	archiveDirectory = utility.ResolveSymlink(archiveDirectory)
 	maxDeltas, fromFull := getDeltaConfig()
 
@@ -56,7 +56,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 
 	folder := uploader.UploadingFolder
 	basebackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	if maxDeltas > 0 {
+	if maxDeltas > 0 && !isFullBackup {
 		previousBackupName, err = GetLatestBackupName(folder)
 		if err != nil {
 			if _, ok := err.(NoBackupsFoundError); ok {
