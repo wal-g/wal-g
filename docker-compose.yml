@@ -76,9 +76,6 @@ services:
       context: .
     image: wal-g/delete_before_name_find_full_test
     container_name: wal-g_pg_delete_before_name_find_full_test
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -91,9 +88,6 @@ services:
       context: .
     image: wal-g/delete_retain_full_test
     container_name: wal-g_pg_delete_retain_full_test
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -106,9 +100,31 @@ services:
       context: .
     image: wal-g/full_backup_test
     container_name: wal-g_pg_full_backup_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_delete_before_permanent_delta_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_before_permanent_delta_test
+      context: .
+    image: wal-g/delete_before_permanent_delta_test
+    container_name: wal-g_pg_delete_before_permanent_delta_test
     env_file:
       - docker/common/common_walg.env
       - docker/pg_tests/walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+      -
+  pg_delete_before_permanent_full_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_before_permanent_full_test
+      context: .
+    image: wal-g/delete_before_permanent_full_test
+    container_name: wal-g_pg_delete_before_permanent_full_test
     depends_on:
       - s3
     links:
@@ -121,9 +137,6 @@ services:
       context: .
     image: wal-g/delete_before_time_find_full_test
     container_name: wal-g_pg_delete_before_time_find_full_test
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -136,9 +149,6 @@ services:
       context: .
     image: wal-g/delete_without_confirm_test
     container_name: wal-g_pg_delete_without_confirm_test
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -151,9 +161,6 @@ services:
       context: .
     image: wal-g/ghost_table_test
     container_name: wal-g_pg_ghost_table_test
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -166,9 +173,6 @@ services:
       context: .
     image: wal-g/config_test
     container_name: wal-g_pg_config_test
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -181,9 +185,6 @@ services:
       context: .
     image: wal-g/delete_end_to_end_test
     container_name: wal-g_pg_delete_end_to_end_test
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -196,9 +197,6 @@ services:
       context: .
     image: wal-g/delta_backup_fullscan_test
     container_name: wal-g_pg_delta_backup_fullscan_test
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -211,9 +209,6 @@ services:
       context: .
     image: wal-g/several_delta_backups_test
     container_name: wal-g_pg_several_delta_backups_test
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -226,9 +221,6 @@ services:
       context: .
     image: wal-g/crypto_test
     container_name: wal-g_pg_crypto_test
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -241,9 +233,6 @@ services:
       context: .
     image: wal-g/delete_retain_find_full_test
     container_name: wal-g_pg_delete_retain_find_full_test
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -256,9 +245,6 @@ services:
       context: .
     image: wal-g/delta_backup_wal_delta_test
     container_name: wal-g_pg_delta_backup_wal_delta_test
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
