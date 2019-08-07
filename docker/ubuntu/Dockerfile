@@ -4,7 +4,7 @@ ENV DEBIAN_FRONTEND noninteractive
 ENV TERM xterm-256color
 
 RUN apt-get update && \
-    apt-get install --yes --no-install-recommends --no-install-suggests \
+    yes | apt-get install --yes --no-install-recommends --no-install-suggests \
     python3.6 \
     python3-setuptools \
     python3-pip \
