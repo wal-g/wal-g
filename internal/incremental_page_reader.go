@@ -3,7 +3,6 @@ package internal
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"github.com/RoaringBitmap/roaring"
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
@@ -295,12 +294,10 @@ func (pageReader *IncrementalPageReader) SelectNewValidPage2(pageBytes []byte, b
 
 	if isNew || (pageHeader.Lsn() >= pageReader.Lsn) {
 		pageReader.Blocks = append(pageReader.Blocks, blockNo)
-		found := false
 		for _, diffBlockNo := range diff {
-			if diffBlockNo == blockNo {
-				found = true
+			if diffBlockNo == blockNo && pageHeader.Lsn() < START_LSN {
 				tracelog.InfoLogger.Printf("Full scan, block no: %d\n", blockNo)
-				tracelog.InfoLogger.Printf("Full scan, lsn: %d\n", pageReader.Lsn)
+				tracelog.InfoLogger.Printf("Full scan, lsn: %d\n", pageHeader.Lsn())
 				tracelog.InfoLogger.Printf("Full scan, size: %d\n", pageReader.FileSize)
 				tracelog.InfoLogger.Printf("diff block pdLsnH %d\n", pageHeader.pdLsnH)
 				tracelog.InfoLogger.Printf("diff block pdLsnL           %d\n", pageHeader.pdLsnL     )
@@ -312,9 +309,6 @@ func (pageReader *IncrementalPageReader) SelectNewValidPage2(pageBytes []byte, b
 				tracelog.InfoLogger.Printf("diff block pdPageSizeVersion%d\n", pageHeader.pdPageSizeVersion)
 				break
 			}
-		}
-		if !found {
-			fmt.Println("Diff block mismatch")
 		}
 	}
 	return

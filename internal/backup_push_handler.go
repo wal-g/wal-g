@@ -43,6 +43,8 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 	return
 }
 
+
+var START_LSN uint64
 // TODO : unit tests
 // HandleBackupPush is invoked to perform a wal-g backup-push
 func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent bool, isFullBackup bool) {
@@ -117,6 +119,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 		if uploader.getUseWalDelta() {
 			tracelog.InfoLogger.Printf("IncrementFromLSN: %d\n", *bundle.IncrementFromLsn)
 			tracelog.InfoLogger.Printf("BackupStartLSN: %d\n", backupStartLSN)
+			START_LSN = backupStartLSN
 			err = bundle.DownloadDeltaMap(folder.GetSubFolder(utility.WalPath), backupStartLSN)
 			if err == nil {
 				tracelog.InfoLogger.Println("Successfully loaded delta map, delta backup will be made with provided delta map")
