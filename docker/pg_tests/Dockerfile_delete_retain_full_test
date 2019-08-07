@@ -18,6 +18,5 @@ FROM wal-g/pg:latest
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/pg/wal-g /usr/bin
 
 COPY docker/pg_tests/scripts/ /tmp
-RUN chmod 777 -R /tmp/tests/configs/
 
 CMD su postgres -c "/tmp/tests/delete_retain_full_test.sh"
