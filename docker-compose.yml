@@ -81,7 +81,6 @@ services:
     links:
       - s3
 
-
   pg_delete_retain_full_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_delete_retain_full_test
@@ -92,7 +91,6 @@ services:
       - s3
     links:
       - s3
-
 
   pg_full_backup_test:
     build:
@@ -118,7 +116,7 @@ services:
       - s3
     links:
       - s3
-      -
+
   pg_delete_before_permanent_full_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_delete_before_permanent_full_test
@@ -129,7 +127,6 @@ services:
       - s3
     links:
       - s3
-
 
   pg_delete_before_time_find_full_test:
     build:
@@ -142,7 +139,6 @@ services:
     links:
       - s3
 
-
   pg_delete_without_confirm_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_delete_without_confirm_test
@@ -153,7 +149,6 @@ services:
       - s3
     links:
       - s3
-
 
   pg_ghost_table_test:
     build:
@@ -166,7 +161,6 @@ services:
     links:
       - s3
 
-
   pg_config_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_config_test
@@ -177,7 +171,6 @@ services:
       - s3
     links:
       - s3
-
 
   pg_delete_end_to_end_test:
     build:
@@ -190,7 +183,6 @@ services:
     links:
       - s3
 
-
   pg_delta_backup_fullscan_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_delta_backup_fullscan_test
@@ -201,7 +193,6 @@ services:
       - s3
     links:
       - s3
-
 
   pg_several_delta_backups_test:
     build:
@@ -214,7 +205,6 @@ services:
     links:
       - s3
 
-
   pg_crypto_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_crypto_test
@@ -225,7 +215,6 @@ services:
       - s3
     links:
       - s3
-
 
   pg_delete_retain_find_full_test:
     build:
@@ -238,7 +227,6 @@ services:
     links:
       - s3
 
-
   pg_delta_backup_wal_delta_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_delta_backup_wal_delta_test
@@ -249,7 +237,6 @@ services:
       - s3
     links:
       - s3
-
 
   pg_wale_compatibility_test:
     build:
