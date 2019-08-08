@@ -32,7 +32,7 @@ wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 pkill pgbench
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -m smart -w stop
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w -t 100500 start
 
 pg_dumpall -f /tmp/dump1
 sleep 1
@@ -43,7 +43,7 @@ wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST
 
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w -t 100500 start
 sleep 10
 
 

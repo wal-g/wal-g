@@ -14,7 +14,6 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 
 printf ",\n\"WALE_GPG_KEY_ID\":\"${gpg_key_id}\"" >> ${TMP_CONFIG}
 tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
-cat ${TMP_CONFIG}
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
