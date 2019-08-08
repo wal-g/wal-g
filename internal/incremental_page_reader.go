@@ -234,11 +234,7 @@ func (pageReader *IncrementalPageReader) DeltaBitmapInitialize2(deltaBitmap *roa
 	it := deltaBitmap.Iterator()
 	for it.HasNext() { // TODO : do something with file truncation during reading
 		blockNo := it.Next()
-		if pageReader.FileSize >= int64(blockNo+1)*int64(DatabasePageSize) { // whole block fits into file
-			pageReader.Blocks = append(pageReader.Blocks, blockNo)
-		} else {
-			break
-		}
+		pageReader.Blocks = append(pageReader.Blocks, blockNo)
 	}
 }
 
