@@ -6,7 +6,7 @@ gpg_key_id=`gpg --list-keys | tail -n +4 | head -n 1 | cut -d ' ' -f 7`
 
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
-cat CONFIG_FILE > TMP_CONFIG
+cat ${CONFIG_FILE} > ${TMP_CONFIG}
 TMP_CONFIG="/tmp/configs/tmp_config.json"
 
 cat ${COMMON_CONFIG} >> ${TMP_CONFIG}

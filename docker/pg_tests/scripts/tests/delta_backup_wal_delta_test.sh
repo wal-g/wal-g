@@ -3,7 +3,7 @@ exit 0
 CONFIG_FILE="/tmp/configs/delta_backup_wal_delta_test_config.json"set -e -x
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
-cat CONFIG_FILE > TMP_CONFIG
+cat ${CONFIG_FILE} > ${TMP_CONFIG}
 echo "," >> ${TMP_CONFIG}
 cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 

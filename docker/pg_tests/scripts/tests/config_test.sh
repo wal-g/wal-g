@@ -4,9 +4,11 @@ CONFIG_FILE="/tmp/configs/config_test_config.json"
 mkdir /tmp/storage
 
 COMMON_CONFIG="/tmp/configs/common_config.json"
+ls -l /tmp
+ls -l /tmp/configs
 
 TMP_CONFIG="/tmp/configs/tmp_config.json"
-cat CONFIG_FILE > TMP_CONFIG
+cat ${CONFIG_FILE} > ${TMP_CONFIG}
 
 echo "," >> ${TMP_CONFIG}
 cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
