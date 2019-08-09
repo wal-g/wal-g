@@ -37,7 +37,15 @@ func GetMarkedBackupMetadataToUpload(
 	baseBackupFolder storage.Folder,
 	backupName string,
 	toPermanent bool) ([]UploadObject, error) {
+	if toPermanent {
+		return getMarkedPermanentBackupMetadata(baseBackupFolder, backupName)
+	} else {
+		//
+		return nil, nil
+	}
+}
 
+func getMarkedPermanentBackupMetadata(baseBackupFolder storage.Folder, backupName string) ([]UploadObject, error){
 	backupMetadata := []UploadObject{}
 
 	// retrieve current backup sentinel and meta
@@ -51,34 +59,24 @@ func GetMarkedBackupMetadataToUpload(
 		return nil, err
 	}
 
+	// only return backups that we want to update
+	if !sentinel.IsIncremental() || meta.IsPermanent {
+		return backupMetadata, nil
+	}
 
-
-	if meta.IsPermanent != toPermanent {
-		meta.IsPermanent = toPermanent
+	if !meta.IsPermanent {
+		meta.IsPermanent = true
 		metadataUploadObject, err := getMetadataUploadObject(backup.Name, meta)
 		if err != nil {
 			return nil, err
 		}
 		backupMetadata = append(backupMetadata, metadataUploadObject)
 	}
-
-	// only return backups that we want to update
-
-	/*
-	маркнуть маркнутый, анмаркнуть анмаркнутый -  ошибка
-	маркнуть анмаркнутый - пройти рекурсивно и маркнуть, причем последующие пометить наличием маркнутых в будущем
-	анмаркнуть маркнутый, если есть марки в будущем - ошибка
-	анмаркнуть маркнутый, если нет марков в будущем - анмаркнуть, обновить флаг будущего марка у следующего
-	*/
-
 	// return when no longer incremental
-	if !sentinel.IsIncremental() || (toPermanent && meta.IsPermanent) {
-		return backupMetadata, nil
-	}
-	previousImpermanentBackupMetadata, err := GetMarkedBackupMetadataToUpload(
+
+	previousImpermanentBackupMetadata, err := getMarkedPermanentBackupMetadata(
 		baseBackupFolder,
-		*sentinel.IncrementFrom,
-		toPermanent)
+		*sentinel.IncrementFrom)
 	if err != nil {
 		return nil, err
 	}
@@ -87,6 +85,41 @@ func GetMarkedBackupMetadataToUpload(
 	return previousImpermanentBackupMetadata, nil
 }
 
+func getMarkedImpermanentBackupMetadata(baseBackupFolder storage.Folder, backupName string) ([]UploadObject, error){
+	backupMetadata := []UploadObject{}
+
+	// retrieve current backup sentinel and meta
+	backup := NewBackup(baseBackupFolder, backupName)
+	sentinel, err := backup.GetSentinel()
+	if err != nil {
+		return nil, err
+	}
+	meta, err := backup.FetchMeta()
+	if err != nil {
+		return nil, err
+	}
+
+	backups, err := getBackups(baseBackupFolder)
+	if err != nil {
+		return nil, err
+	}
+	backupDetails, _ := getBackupDetails(baseBackupFolder, backups)
+	reversLinks := make(map[string]string)
+	for i := len(backupDetails) - 1; i >= 0; i-- {
+		b := backupDetails[i]
+
+	}
+
+}
+
+func getIncrementFromAndIsIncrement(baseBackupFolder storage.Folder, backupName string) (incrementFrom string, isIncrement bool, error){
+	backup := NewBackup(baseBackupFolder, backupName)
+	sentinel, err := backup.GetSentinel()
+	if err != nil {
+		err = err
+	}
+
+}
 
 func getMetadataUploadObject(backupName string, meta ExtendedMetadataDto) (UploadObject, error) {
 	metaFilePath := storage.JoinPath(backupName, utility.MetadataFileName)

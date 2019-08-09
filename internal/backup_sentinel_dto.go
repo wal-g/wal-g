@@ -33,7 +33,6 @@ type ExtendedMetadataDto struct {
 	StartLsn       				uint64    	`json:"start_lsn"`
 	FinishLsn      				uint64    	`json:"finish_lsn"`
 	IsPermanent    				bool      	`json:"is_permanent"`
-	HasPermanentInFuture		bool		`json:"has_permanent_in_future"`
 }
 
 func (dto *BackupSentinelDto) setFiles(p *sync.Map) {

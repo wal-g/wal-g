@@ -31,19 +31,10 @@ func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, de
 		tracelog.ErrorLogger.FatalError(err)
 	}
 	// if details are requested we append content of metadata.json to each line
-	backupDetails := make([]BackupDetail, len(backups))
 	if detail {
-		for i := len(backups) - 1; i >= 0; i-- {
-			backup, err := GetBackupByName(backups[i].BackupName, folder)
-			if err != nil {
-				tracelog.ErrorLogger.FatalError(err)
-			} else {
-				metaData, err := backup.FetchMeta()
-				if err != nil {
-					tracelog.ErrorLogger.FatalError(err)
-				}
-				backupDetails[i] = BackupDetail{backups[i], metaData}
-			}
+		backupDetails, err := getBackupDetails(folder, backups)
+		if err != nil {
+			tracelog.ErrorLogger.FatalError(err)
 		}
 		if json {
 			WriteBackupListDetailsAsJson(backupDetails, os.Stdout, pretty)
@@ -61,6 +52,23 @@ func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, de
 			WriteBackupList(backups, os.Stdout)
 		}
 	}
+}
+
+func getBackupDetails(folder storage.Folder, backups []BackupTime) ([]BackupDetail, error){
+	backupDetails := make([]BackupDetail, len(backups))
+	for i := len(backups) - 1; i >= 0; i-- {
+		backup, err := GetBackupByName(backups[i].BackupName, folder)
+		if err != nil {
+			return nil, err
+		} else {
+			metaData, err := backup.FetchMeta()
+			if err != nil {
+				return nil, err
+			}
+			backupDetails[i] = BackupDetail{backups[i], metaData}
+		}
+	}
+	return backupDetails, nil
 }
 
 // TODO : unit tests
