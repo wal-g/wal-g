@@ -81,7 +81,7 @@ mysql_clean:
 mysql_install: mysql_build
 	mv $(MAIN_MYSQL_PATH)/wal-g $(GOBIN)/wal-g
 
-mongo_test: install deps mongo_build lint unlink_brotli mongo_integration_test
+mongo_test: install deps mongo_build lint unlink_brotli mongo_integration_test mongo_features
 
 mongo_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_MONGO_PATH) && go build -tags brotli -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mongo.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mongo.WalgVersion=`git tag -l --points-at HEAD`")
@@ -89,9 +89,19 @@ mongo_build: $(CMD_FILES) $(PKG_FILES)
 mongo_install: mongo_build
 	mv $(MAIN_MONGO_PATH)/wal-g $(GOBIN)/wal-g
 
-mongo_integration_test: load_docker_common
+mongo_integration_test: mongo_features load_docker_common
 	docker-compose build mongo mongo_tests
 	docker-compose up --exit-code-from mongo_tests mongo_tests
+
+mongo_features: mongo_build
+	mv $(MAIN_MONGO_PATH)/wal-g ./tests_func/wal-g
+	$(MAKE) -C ./tests_func func_test
+	rm -rf ./tests_func/wal-g
+
+mongo_clean:
+	(cd $(MAIN_MONGO_PATH) && go clean)
+	./cleanup.sh
+	$(MAKE) -C ./tests_func clean
 
 redis_test: install deps redis_build lint unlink_brotli redis_integration_test
 

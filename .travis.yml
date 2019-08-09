@@ -8,7 +8,19 @@ services:
 
 addons:
   apt:
-    packages: [liblzo2-dev]
+    packages:
+      - "python3-venv"
+      - "liblzo2-dev"
+
+matrix:
+  include:
+    - env: TEST_MODIFIER=-race GOTAGS= BINSUFFIX=
+      addons:
+        apt:
+          packages:
+            - "liblzo2-dev"
+            - "python3-venv"
+    - python: "3.7"
 
 env:
   global:
