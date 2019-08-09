@@ -11,9 +11,9 @@ import (
 )
 
 func HandleStreamPush(uploader *Uploader) {
-	if !internal.FileIsPiped(os.Stdin) {
-		tracelog.ErrorLogger.Fatal("Use stdin\n")
-	}
+	//if !internal.FileIsPiped(os.Stdin) {
+	//	tracelog.ErrorLogger.Fatal("Use stdin\n")
+	//}
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	err := uploader.UploadStream(os.Stdin)
 	if err != nil {

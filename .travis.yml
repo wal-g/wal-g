@@ -6,12 +6,18 @@ go:
 services:
   - docker
 
+addons:
+  apt:
+    packages:
+      - "python3-venv"
+
 matrix:
   include:
     - env: TEST_MODIFIER=-race GOTAGS= BINSUFFIX=
       addons:
         apt:
           packages: [liblzo2-dev]
+    - python: "3.7"
 
 jobs:
   include:
