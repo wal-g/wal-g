@@ -104,21 +104,64 @@ func getMarkedImpermanentBackupMetadata(baseBackupFolder storage.Folder, backupN
 		return nil, err
 	}
 	backupDetails, _ := getBackupDetails(baseBackupFolder, backups)
-	reversLinks := make(map[string]string)
+	reverseLinks := make(map[string][]string)
+	permanentBackups := make(map[string]bool)
 	for i := len(backupDetails) - 1; i >= 0; i-- {
 		b := backupDetails[i]
-
+		incrementFrom, isIncrement, err := getMetadataFromBackup(baseBackupFolder, b.BackupName)
+		if err != nil {
+			return nil, err
+		}
+		permanentBackups[b] = is
+		if isIncrement{
+			if _, ok := reverseLinks[incrementFrom]; !ok{
+				reverseLinks[incrementFrom] = make([]string, len(backups))
+			}
+			reverseLinks[incrementFrom] = append(reverseLinks[incrementFrom], b.BackupName)
+		}
 	}
+	if backupHasPermanentInFuture(reverseLinks, backupName){
+		return nil, NewHasPermanentBackupInFutureError(backupName)
+	}
+	meta.IsPermanent = false
+	metadataUploadObject, err := getMetadataUploadObject(backup.Name, meta)
+	if err != nil {
+		return nil, err
+	}
+	backupMetadata = append(backupMetadata, metadataUploadObject)
+
+	return backupMetadata, nil
 
 }
 
-func getIncrementFromAndIsIncrement(baseBackupFolder storage.Folder, backupName string) (incrementFrom string, isIncrement bool, error){
+func backupHasPermanentInFuture(reverseLinks map[string][]string, backupName string, permanentBackups []string) (bool) {
+	if _, ok := reverseLinks[backupName]; !ok {
+		return false
+	}
+
+	for _, b := range reverseLinks[backupName]{
+		if backupHasPermanentInFuture(reverseLinks, b) {
+			return true
+		}
+	}
+
+
+	return false
+}
+
+func getMetadataFromBackup(baseBackupFolder storage.Folder, backupName string) (incrementFrom string, isIncrement bool, isPermanent bool, err error){
 	backup := NewBackup(baseBackupFolder, backupName)
 	sentinel, err := backup.GetSentinel()
 	if err != nil {
-		err = err
+		return "", false, false, err
 	}
 
+	meta, err := backup.FetchMeta()
+	if err != nil {
+		return "", false, false, err
+	}
+
+	return *sentinel.IncrementFrom, sentinel.IsIncremental(), meta.IsPermanent, nil
 }
 
 func getMetadataUploadObject(backupName string, meta ExtendedMetadataDto) (UploadObject, error) {
@@ -130,10 +173,11 @@ func getMetadataUploadObject(backupName string, meta ExtendedMetadataDto) (Uploa
 	return UploadObject{metaFilePath, bytes.NewReader(dtoBody)}, nil
 }
 
-type CantMarkPermanentError struct {
+type HasPermanentBackupInFutureError struct {
 	error
 }
 
-func NewCantMarkPermanentError(backupName string, permanentType string) CantMarkPermanentError {
-	return CantMarkPermanentError{errors.Errorf("Can't mark backup '%s' as '%s'", backupName, permanentType)}
+func NewHasPermanentBackupInFutureError(backupName string) HasPermanentBackupInFutureError {
+	return HasPermanentBackupInFutureError{errors.Errorf("Can't mark backup '%s' as impermanent. There is permanent increment backup.", backupName)}
 }
+
