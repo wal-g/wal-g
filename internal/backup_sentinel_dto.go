@@ -24,15 +24,16 @@ type BackupSentinelDto struct {
 
 // Extended metadata should describe backup in more details, but be small enough to be downloaded often
 type ExtendedMetadataDto struct {
-	StartTime      time.Time `json:"start_time"`
-	FinishTime     time.Time `json:"finish_time"`
-	DatetimeFormat string    `json:"date_fmt"`
-	Hostname       string    `json:"hostname"`
-	DataDir        string    `json:"data_dir"`
-	PgVersion      int       `json:"pg_version"`
-	StartLsn       uint64    `json:"start_lsn"`
-	FinishLsn      uint64    `json:"finish_lsn"`
-	IsPermanent    bool      `json:"is_permanent"`
+	StartTime      				time.Time 	`json:"start_time"`
+	FinishTime     				time.Time 	`json:"finish_time"`
+	DatetimeFormat 				string    	`json:"date_fmt"`
+	Hostname       				string    	`json:"hostname"`
+	DataDir        				string    	`json:"data_dir"`
+	PgVersion      				int       	`json:"pg_version"`
+	StartLsn       				uint64    	`json:"start_lsn"`
+	FinishLsn      				uint64    	`json:"finish_lsn"`
+	IsPermanent    				bool      	`json:"is_permanent"`
+	HasPermanentInFuture		bool		`json:"has_permanent_in_future"`
 }
 
 func (dto *BackupSentinelDto) setFiles(p *sync.Map) {
