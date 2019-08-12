@@ -11,7 +11,9 @@ COPY cmd/ cmd/
 COPY main/ main/
 COPY utility/ utility/
 
-RUN cd main/mysql && \
+RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
+        vendor/github.com/google/brotli/go/cbrotli/cgo.go && \
+    cd main/mysql && \
     go build -race -o wal-g -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 
 FROM wal-g/mysql:latest
