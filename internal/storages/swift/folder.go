@@ -5,6 +5,7 @@ import (
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"io"
 	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/ncw/swift"
@@ -29,6 +30,10 @@ func NewFolder(connection *swift.Connection, container swift.Container, path str
 
 func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
 	connection := new(swift.Connection)
+	//Set settings as env variables
+	for prop,value := range settings {
+		os.Setenv(prop,value)
+	}	
 	//users must set conventional openStack environment variables: username, key, auth-url, tenantName, region etc
 	err := connection.ApplyEnvironment()
 	if err != nil {
