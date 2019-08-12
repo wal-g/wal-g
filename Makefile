@@ -22,11 +22,17 @@ pg_test: install deps pg_build lint unlink_brotli pg_integration_test
 pg_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_PG_PATH) && go build -o wal-g $(GOTAGS) -ldflags "-s -w -X github.com/wal-g/wal-g/cmd.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd.WalgVersion=`git tag -l --points-at HEAD`")
 
-pg_integration_test:
-	docker-compose build $(DOCKER_COMMON) pg pg_tests
-	docker-compose up --exit-code-from pg_tests pg_tests
+pg_build_image: install deps pg_build unlink_brotli
+	docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix
+	mkdir -p ${CACHE_FOLDER}
+	docker save ${IMAGE} | gzip -c > ${CACHE_FILE}
 
-make_unittests: install deps lint unittest
+pg_integration_test:
+	docker load -i ${CACHE_FILE}
+	docker-compose build $(TEST)
+	docker-compose up --exit-code-from $(TEST) $(TEST)
+
+all_unittests: install deps lint unittest
 
 pg_integration_tests_with_args: install deps pg_build unlink_brotli
 	docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix $(ARGS)

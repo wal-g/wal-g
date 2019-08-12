@@ -13,24 +13,32 @@ matrix:
         apt:
           packages: [liblzo2-dev]
 
+env:
+  global:
+    - CACHE_FOLDER=$HOME/docker-images
+    - IMAGE=wal-g/docker_prefix
+    - CACHE_FILE=${CACHE_FOLDER}/docker_prefix-${TRAVIS_COMMIT}.tgz
+
 jobs:
   include:
+    - stage: build image
+      script: make pg_build_image
     - stage: test
-      script: make make_unittests
-    - script: make ARGS="pg_config_test" pg_integration_tests_with_args
-    - script: make ARGS="pg_delete_before_name_find_full_test" pg_integration_tests_with_args
-    - script: make ARGS="pg_delete_retain_full_test" pg_integration_tests_with_args
-    - script: make ARGS="pg_delete_before_permanent_full_test" pg_integration_tests_with_args
-    - script: make ARGS="pg_delete_before_permanent_delta_test" pg_integration_tests_with_args
-    - script: make ARGS="pg_delete_before_time_find_full_test" pg_integration_tests_with_args
-    - script: make ARGS="pg_delete_without_confirm_test" pg_integration_tests_with_args
-    - script: make ARGS="pg_ghost_table_test" pg_integration_tests_with_args
-    - script: make ARGS="pg_delete_end_to_end_test" pg_integration_tests_with_args
-    - script: make ARGS="pg_delta_backup_fullscan_test" pg_integration_tests_with_args
-    - script: make ARGS="pg_several_delta_backups_test" pg_integration_tests_with_args
-    - script: make ARGS="pg_crypto_test" pg_integration_tests_with_args
-    - script: make ARGS="pg_delete_retain_find_full_test" pg_integration_tests_with_args
-    - script: make ARGS="pg_wale_compatibility_test" pg_integration_tests_with_args
+      script: make all_unittests
+    - script: make TEST="pg_config_test" pg_integration_test
+    - script: make TEST="pg_crypto_test" pg_integration_test
+    - script: make TEST="pg_delete_before_name_find_full_test" pg_integration_test
+    - script: make TEST="pg_delete_retain_full_test" pg_integration_test
+    - script: make TEST="pg_delete_before_time_find_full_test" pg_integration_test
+    - script: make TEST="pg_delete_without_confirm_test" pg_integration_test
+    - script: make TEST="pg_ghost_table_test" pg_integration_test
+    - script: make TEST="pg_delete_end_to_end_test" pg_integration_test
+    - script: make TEST="pg_delta_backup_fullscan_test" pg_integration_test
+    - script: make TEST="pg_several_delta_backups_test" pg_integration_test
+    - script: make TEST="pg_delete_retain_find_full_test" pg_integration_test
+    - script: make TEST="pg_wale_compatibility_test" pg_integration_test
+    - script: make TEST="pg_delete_before_permanent_full_test" pg_integration_test
+    - script: make TEST="pg_delete_before_permanent_delta_test" pg_integration_test
     - script: make mysql_test
     - script: make mongo_test
     - script: make redis_test
@@ -50,3 +58,8 @@ deploy:
   on:
     repo: wal-g/wal-g
     tags: true
+
+cache:
+  bundler: true
+  directories:
+    - ${CACHE_FOLDER}
