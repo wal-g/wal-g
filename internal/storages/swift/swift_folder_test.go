@@ -7,18 +7,30 @@ import (
 	"testing"
 )
 
-func TestSwiftFolder(t *testing.T) {
+var settings = map[string]string{
+	"OS_USERNAME":    "",
+	"OS_PASSWORD":    "",
+	"OS_AUTH_URL":    "",
+	"OS_TENANT_NAME": "",
+	"OS_REGION_NAME": "",
+}
+
+func TestSwiftFolderUsingConfigFile(t *testing.T) {
 	t.Skip("Credentials needed to run Swift Storage tests")
 
-	os.Setenv("OS_USERNAME", "")
-	os.Setenv("OS_PASSWORD", "")
-	os.Setenv("OS_AUTH_URL", "")
-	os.Setenv("OS_TENANT_NAME", "")
-	os.Setenv("OS_REGION_NAME", "")
-
-	storageFolder, err := ConfigureFolder("swift://test-container/wal-g-test-folder/sub0", nil)
-
+	storageFolderUsingConfigFile, err := ConfigureFolder("swift://test-container/wal-g-test-folder/sub0", settings)
 	assert.NoError(t, err)
+	storage.RunFolderTest(storageFolderUsingConfigFile, t)
+}
 
-	storage.RunFolderTest(storageFolder, t)
+func TestSwiftFolderUsingEnvVariables(t *testing.T) {
+	t.Skip("Credentials needed to run Swift Storage tests")
+
+	for prop, value := range settings {
+		os.Setenv(prop, value)
+	}
+
+	storageFolderUsingEnvVars, err := ConfigureFolder("swift://test-container/wal-g-test-folder/sub0", nil)
+	assert.NoError(t, err)
+	storage.RunFolderTest(storageFolderUsingEnvVars, t)
 }

@@ -6,12 +6,13 @@ go:
 services:
   - docker
 
-matrix:
-  include:
-    - env: TEST_MODIFIER=-race GOTAGS= BINSUFFIX=
-      addons:
-        apt:
-          packages: [liblzo2-dev]
+env:
+  global:
+  - TEST_MODIFIER=-race
+
+addons:
+  apt:
+    packages: [liblzo2-dev]
 
 env:
   global:
@@ -29,7 +30,6 @@ jobs:
     - script: make TEST="pg_crypto_test" pg_integration_test
     - script: make TEST="pg_delete_before_name_find_full_test" pg_integration_test
     - script: make TEST="pg_delete_retain_full_test" pg_integration_test
-    - script: make TEST="pg_full_backup_test" pg_integration_test
     - script: make TEST="pg_delete_before_time_find_full_test" pg_integration_test
     - script: make TEST="pg_delete_without_confirm_test" pg_integration_test
     - script: make TEST="pg_ghost_table_test" pg_integration_test
@@ -37,8 +37,9 @@ jobs:
     - script: make TEST="pg_delta_backup_fullscan_test" pg_integration_test
     - script: make TEST="pg_several_delta_backups_test" pg_integration_test
     - script: make TEST="pg_delete_retain_find_full_test" pg_integration_test
-    - script: make TEST="pg_delta_backup_wal_delta_test" pg_integration_test
     - script: make TEST="pg_wale_compatibility_test" pg_integration_test
+    - script: make TEST="pg_delete_before_permanent_full_test" pg_integration_test
+    - script: make TEST="pg_delete_before_permanent_delta_test" pg_integration_test
     - script: make mysql_test
     - script: make mongo_test
     - script: make redis_test
@@ -47,14 +48,14 @@ notifications:
   email: false
 
 before_deploy:
-  - tar -zcf wal-g.linux-amd64$BINSUFFIX.tar.gz -C main/pg wal-g
+  - tar -zcf wal-g.linux-amd64.tar.gz -C main/pg wal-g
 
 deploy:
   provider: releases
   api_key:
     secure: nRVV5uKaBdCi/J/sLP7+c/shuDEaSeMiapEsro5gp4gr8n/QMgGm5AHNZhkfQVBmhmaKNB7dDzg34RVD2qacVpeZQTTUWetorBiwWvSjf+mlVcmBPKOIivamqetIdMEPgGQ0vudDADMpYiiqWBV893vAg1w0x02Cz7yvduzKEDyVttH+P4A7MPZ9tPtwLyMoOKjxe7Z0IOp82DK0rj+2KXQYe+El9Ipya+2WB88NBuRn2dJSfsAx9VI+5VmUz0waB1lP3ityjgQpaL13QEV6qsCXl+ntb4vGACbPYoPt0pgesq/zkL2ScFKTbzSSo6yByf3zHhV+elZ2sXnK/UYrqe4erC3qkG5qiTuy+uzPKg0pOVdqI1kDtMNoIanCjSVblXXsR+vz0UVHbzOmTMm7ckpnMB1nxsSyaQfs1C2e42SCgIB57RJsWUSsRx/Uq9iJS32ab/8pSnzJ2dZLNo4BxNHJDgKpmfj6ZKhBne+JUcfBsx2DOXs1ad9s0+ahpnlLiijhQQ5ZxGTfzYcXjijtAOyN2Y42wU6YI3L7ezsZTw+AoJeBMdc2MM8yy1CI/PM0x5IL+e9cZ+LoL87f0WZFxMd0KYblEeQzL+yRv0M5cRf4GPgqgEFsYUU4WXAH6Fnah2dailOvkfV1ygbaTxjvrSiIDnk0DKls3y8QLwSJPLw=
   skip_cleanup: true
-  file: wal-g.linux-amd64$BINSUFFIX.tar.gz
+  file: wal-g.linux-amd64.tar.gz
   on:
     repo: wal-g/wal-g
     tags: true
