@@ -5,7 +5,8 @@ import (
 )
 
 func HandleBackupMark(uploader *Uploader, backupName string, toPermanent bool) {
+	folder := uploader.UploadingFolder
 	baseBackupFolder := uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	uploader.UploadingFolder = baseBackupFolder
-	MarkBackup(uploader, baseBackupFolder, backupName, toPermanent)
+	MarkBackup(uploader, folder, backupName, toPermanent)
 }

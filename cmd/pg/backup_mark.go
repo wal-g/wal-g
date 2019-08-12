@@ -26,6 +26,7 @@ var (
 			if err != nil {
 				tracelog.ErrorLogger.FatalError(err)
 			}
+
 			internal.HandleBackupMark(uploader, args[0], !toImpermanent)
 		},
 	}
