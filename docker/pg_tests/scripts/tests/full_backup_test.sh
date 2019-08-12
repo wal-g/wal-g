@@ -45,6 +45,6 @@ echo test > /tmp/test_file
 wal-g wal-push /tmp/test_file test_file
 wal-g wal-push /tmp/test_file test_file
 echo test1 > /tmp/test_file
-!wal-g wal-push /tmp/test_file test_file
+! wal-g wal-push /tmp/test_file test_file
 
 echo "Prevent WAL overwrite success!!!!!!"
