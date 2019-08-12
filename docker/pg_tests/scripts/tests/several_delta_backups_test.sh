@@ -1,31 +1,33 @@
 #!/bin/sh
 set -e -x
+CONFIG_FILE="/tmp/configs/several_delta_backups_test_config.json"
+COMMON_CONFIG="/tmp/configs/common_config.json"
+TMP_CONFIG="/tmp/configs/tmp_config.json"
+cat ${CONFIG_FILE} > ${TMP_CONFIG}
+echo "," >> ${TMP_CONFIG}
+cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 
-export WALE_S3_PREFIX=s3://compressionbucket
-export WALG_USE_WAL_DELTA=true
+tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
 echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
-echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g wal-push %p && mkdir -p /tmp/deltas/$(basename %p)'" >> /var/lib/postgresql/10/main/postgresql.conf
+echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${TMP_CONFIG} wal-push %p && mkdir -p /tmp/deltas/$(basename %p)'" >> /var/lib/postgresql/10/main/postgresql.conf
 echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 
 pgbench -i -s 10 postgres
 pgbench -T 100000000 postgres &
-wal-g backup-push ${PGDATA}
+wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
-export WALG_COMPRESSION_METHOD=lz4
-wal-g backup-push ${PGDATA}
+wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
 psql -f scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
 
-export WALG_COMPRESSION_METHOD=brotli
-wal-g backup-push ${PGDATA}
+wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
-export WALG_COMPRESSION_METHOD=lzma
-wal-g backup-push ${PGDATA}
+wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
 pkill pgbench
 
@@ -35,11 +37,11 @@ pkill pgbench
 pg_dumpall -f /tmp/dump1
 sleep 1
 
-scripts/drop_pg.sh
+tmp/scripts/drop_pg.sh
 
-wal-g backup-fetch ${PGDATA} LATEST
+wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST
 
-echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
+echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w -t 100500 start
 sleep 10
@@ -51,6 +53,6 @@ psql -f scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
 
 diff /tmp/dump1 /tmp/dump2
 
-scripts/drop_pg.sh
-
+tmp/scripts/drop_pg.sh
+rm ${TMP_CONFIG}
 echo "Several delta backup success!!!!!!"

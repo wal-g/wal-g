@@ -1,0 +1,3 @@
+"WALG_DELTA_MAX_STEPS": "0",
+"WALE_S3_PREFIX": "s3://deletewithoutconfirm",
+"WALG_USE_WAL_DELTA": "true"
