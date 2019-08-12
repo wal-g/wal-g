@@ -325,7 +325,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 
 		if wasInBase && (time.Equal(baseFile.MTime)) {
 			// File was not changed since previous backup
-			tracelog.DebugLogger.Println("Skiped due to unchanged modification time")
+			tracelog.DebugLogger.Println("Skipped due to unchanged modification time")
 			bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time})
 			return nil
 		}
