@@ -20,7 +20,7 @@ var streamFetchCmd = &cobra.Command{
 		if err != nil {
 			tracelog.ErrorLogger.FatalError(err)
 		}
-		internal.HandleStreamFetch(args[0], folder, mongo.FetchBackupStreamAndOplog)
+		internal.HandleStreamFetch(args[0], folder, mongo.FetchLogs)
 	},
 }
 

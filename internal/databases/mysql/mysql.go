@@ -4,17 +4,14 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"path"
 	"strings"
 	"time"
 
 	"github.com/spf13/viper"
 
 	"github.com/go-sql-driver/mysql"
-	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
@@ -33,9 +30,6 @@ const (
 type Uploader struct {
 	*internal.Uploader
 }
-type Backup struct {
-	*internal.Backup
-}
 
 func scanToMap(rows *sql.Rows, dst map[string]interface{}) error {
 	columns, err := rows.Columns()
@@ -52,17 +46,6 @@ func scanToMap(rows *sql.Rows, dst map[string]interface{}) error {
 		}
 	}
 	return rows.Scan(args...)
-}
-
-// TODO : unit tests
-func (backup *Backup) FetchStreamSentinel() (StreamSentinelDto, error) {
-	sentinelDto := StreamSentinelDto{}
-	sentinelDtoData, err := backup.Backup.FetchSentinelData()
-	if err != nil {
-		return sentinelDto, errors.Wrap(err, "failed to fetch sentinel")
-	}
-	err = json.Unmarshal(sentinelDtoData, &sentinelDto)
-	return sentinelDto, errors.Wrap(err, "failed to unmarshal sentinel")
 }
 
 func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
@@ -118,9 +101,4 @@ type StreamSentinelDto struct {
 	BinLogStart    string `json:"BinLogStart,omitempty"`
 	BinLogEnd      string `json:"BinLogEnd,omitempty"`
 	StartLocalTime time.Time
-}
-
-func getStreamName(backup *Backup, extension string) string {
-	dstPath := utility.SanitizePath(path.Join(backup.Name, "stream.")) + extension
-	return dstPath
 }

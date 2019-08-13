@@ -20,7 +20,7 @@ var streamFetchCmd = &cobra.Command{
 		if err != nil {
 			tracelog.ErrorLogger.FatalError(err)
 		}
-		mysql.HandleStreamFetch(args[0], folder)
+		internal.HandleStreamFetch(args[0], folder, mysql.FetchLogs)
 	},
 }
 

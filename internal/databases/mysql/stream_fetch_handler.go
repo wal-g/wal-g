@@ -1,47 +1,37 @@
 package mysql
 
 import (
-	"fmt"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
-
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/compression"
-	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleStreamFetch(backupName string, folder storage.Folder) {
-	if backupName == "" || backupName == "LATEST" {
-		latest, err := internal.GetLatestBackupName(folder)
-		if err != nil {
-			tracelog.ErrorLogger.Fatalf("Unable to get latest backup %+v\n", err)
-		}
-		backupName = latest
-	}
-	stat, _ := os.Stdout.Stat()
-	if (stat.Mode() & os.ModeCharDevice) == 0 {
-	} else {
-		tracelog.ErrorLogger.Fatalf("stdout is a terminal")
-	}
-	err := downloadAndDecompressStream(folder, backupName)
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
-	}
+type BinlogFetchSettings struct{}
+
+func (settings BinlogFetchSettings) GetEndTsEnv() string {
+	return BinlogEndTsSetting
 }
 
-// TODO : unit tests
-func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
-	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	backup := Backup{internal.NewBackup(baseBackupFolder, fileName)}
+func (settings BinlogFetchSettings) GetDstEnv() string {
+	return BinlogDstSetting
+}
 
-	tracelog.InfoLogger.Println("stream-fetch")
-	streamSentinel, err := backup.FetchStreamSentinel()
+func (settings BinlogFetchSettings) GetLogFolderPath() string {
+	return BinlogPath
+}
+
+func (settings BinlogFetchSettings) GetFilePath(dstFolder string, logName string) (string, error) {
+	return path.Join(dstFolder, logName), nil
+}
+
+func FetchLogs(folder storage.Folder, backup *internal.Backup) error {
+	var streamSentinel StreamSentinelDto
+	err := internal.FetchStreamSentinel(backup, &streamSentinel)
 	if err != nil {
 		return err
 	}
@@ -55,102 +45,24 @@ func downloadAndDecompressStream(folder storage.Folder, fileName string) error {
 			backupUploadTime = binlog.GetLastModified()
 		}
 	}
-
-	binlogsAreDone := make(chan error)
-
-	go fetchBinlogs(folder, backupUploadTime, binlogsAreDone)
-
-	for _, decompressor := range compression.Decompressors {
-		d := decompressor
-		archiveReader, exists, err := internal.TryDownloadWALFile(baseBackupFolder, getStreamName(&backup, d.FileExtension()))
-		if err != nil {
-			return err
-		}
-		if !exists {
-			continue
-		}
-
-		err = internal.DecompressWALFile(&internal.EmptyWriteIgnorer{WriteCloser: os.Stdout}, archiveReader, d)
-		if err != nil {
-			return err
-		}
-		utility.LoggedClose(os.Stdout, "")
-
-		tracelog.DebugLogger.Println("Waiting for binlogs")
-		err = <-binlogsAreDone
-
+	dstFolder, fetchedBinlogs, err := internal.FetchLogs(folder, backupUploadTime, BinlogFetchSettings{})
+	if err != nil {
 		return err
 	}
-	return internal.NewArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", fileName))
+	return createIndexFile(dstFolder, fetchedBinlogs)
 }
 
-func fetchBinlogs(folder storage.Folder, backupStartUploadTime time.Time, binlogsAreDone chan error) {
-	binlogFolder := folder.GetSubFolder(BinlogPath)
-	endTS, dstFolder, err := GetBinlogConfigs()
+func createIndexFile(dstFolder string, fetchedBinlogs []storage.Object) error {
+	indexFile, err := os.Create(filepath.Join(dstFolder, "binlogs_order"))
 	if err != nil {
-		binlogsAreDone <- err
-		return
-	}
-	objects, _, err := binlogFolder.ListFolder()
-	if err != nil {
-		binlogsAreDone <- nil
-		return
-	}
-	var fetchedLogs []storage.Object
-
-	for _, object := range objects {
-		tracelog.InfoLogger.Println("Consider binlog ", object.GetName(), object.GetLastModified().Format(time.RFC3339))
-
-		binlogName := ExtractBinlogName(object, folder)
-
-		if BinlogShouldBeFetched(backupStartUploadTime, endTS, object) {
-			fileName := path.Join(dstFolder, binlogName)
-			tracelog.InfoLogger.Println("Download", binlogName, "to", fileName)
-			err := internal.DownloadWALFileTo(binlogFolder, binlogName, fileName)
-			if err != nil {
-				binlogsAreDone <- err
-				return
-			}
-			fetchedLogs = append(fetchedLogs, object)
-		}
+		return err
 	}
 
-	sort.Slice(fetchedLogs, func(i, j int) bool {
-		return fetchedLogs[i].GetLastModified().Before(fetchedLogs[j].GetLastModified())
-	})
-
-	index_file, err := os.Create(filepath.Join(dstFolder, "binlogs_order"))
-	if err != nil {
-		binlogsAreDone <- err
-		return
-	}
-
-	for _, object := range fetchedLogs {
-		_, err := index_file.WriteString(ExtractBinlogName(object, folder) + "\n")
+	for _, object := range fetchedBinlogs {
+		_, err = indexFile.WriteString(utility.TrimFileExtension(object.GetName()) + "\n")
 		if err != nil {
-			binlogsAreDone <- err
-			return
+			return err
 		}
 	}
-	err = index_file.Close()
-	if err != nil {
-		binlogsAreDone <- err
-		return
-	}
-
-	binlogsAreDone <- nil
-}
-
-func BinlogShouldBeFetched(backupStartUploadTime time.Time, endTS *time.Time, object storage.Object) bool {
-	return (backupStartUploadTime.Before(object.GetLastModified()) || backupStartUploadTime.Equal(object.GetLastModified())) &&
-		(endTS == nil || (*endTS).After(object.GetLastModified()))
-}
-
-func GetBinlogConfigs() (endTS *time.Time, dstFolder string, err error) {
-	return internal.GetOperationLogsSettings(BinlogEndTsSetting, BinlogDstSetting)
-}
-
-func ExtractBinlogName(object storage.Object, folder storage.Folder) string {
-	binlogName := object.GetName()
-	return strings.TrimSuffix(binlogName, "."+utility.GetFileExtension(binlogName))
+	return indexFile.Close()
 }
