@@ -54,14 +54,10 @@ func HandleStreamFetch(backupName string, folder storage.Folder,
 		logsAreDone <- fetchLogs(folder, backup)
 	}()
 	err = DownloadAndDecompressStream(backup)
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.DebugLogger.Println("Waiting for logs")
 	err = <-logsAreDone
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 // DownloadAndDecompressStream downloads, decompresses and writes stream to stdout
@@ -126,7 +122,7 @@ func DownloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, logDs
 	return nil
 }
 
-func FetchLogs(folder storage.Folder, startTime time.Time, settings LogFetchSettings) (dstFolder string, fetched []storage.Object, err error) {
+func FetchLogs(folder storage.Folder, startTime time.Time, settings LogFetchSettings) (logDstFolder string, fetched []storage.Object, err error) {
 	endTS, logDstFolder, err := GetOperationLogsSettings(settings.GetEndTsEnv(), settings.GetDstEnv())
 	if err != nil {
 		return "", nil, err
@@ -141,7 +137,7 @@ func FetchLogs(folder storage.Folder, startTime time.Time, settings LogFetchSett
 	if err != nil {
 		return "", nil, err
 	}
-	return dstFolder, logsToFetch, nil
+	return logDstFolder, logsToFetch, nil
 }
 
 func LogFileShouldBeFetched(backupStartUploadTime time.Time, endTS *time.Time, object storage.Object) bool {

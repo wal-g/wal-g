@@ -17,6 +17,12 @@ func (logger *errorLogger) FatalError(err error) {
 	logger.Fatalf(GetErrorFormatter(), err)
 }
 
+func (logger *errorLogger) FatalOnError(err error) {
+	if err != nil {
+		logger.FatalError(err)
+	}
+}
+
 func (logger *errorLogger) PrintError(err error) {
 	logger.Printf(GetErrorFormatter()+"\n", err)
 }
