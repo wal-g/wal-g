@@ -18,6 +18,7 @@ env:
     - CACHE_FOLDER=$HOME/docker-images
     - IMAGE=wal-g/docker_prefix
     - CACHE_FILE=${CACHE_FOLDER}/docker_prefix-${TRAVIS_COMMIT}.tgz
+    - PERF_TEST_FOLDER=$HOME/perftest
 
 jobs:
   include:
@@ -27,6 +28,8 @@ jobs:
       script: make all_unittests
     - script: make TEST="pg_config_test" pg_integration_test
     - script: make TEST="pg_crypto_test" pg_integration_test
+    - script: make TEST="pg_delta_backup_wal_delta_test" pg_integration_test
+    - script: make TEST="pg_full_backup_test" pg_integration_test
     - script: make TEST="pg_delete_before_name_find_full_test" pg_integration_test
     - script: make TEST="pg_delete_retain_full_test" pg_integration_test
     - script: make TEST="pg_delete_before_time_find_full_test" pg_integration_test
@@ -42,6 +45,8 @@ jobs:
     - script: make mysql_test
     - script: make mongo_test
     - script: make redis_test
+    - stage: perftest result
+      script: make show_perftest_result
 
 notifications:
   email: false
@@ -63,3 +68,4 @@ cache:
   bundler: true
   directories:
     - ${CACHE_FOLDER}
+    - ${PERF_TEST_FOLDER}

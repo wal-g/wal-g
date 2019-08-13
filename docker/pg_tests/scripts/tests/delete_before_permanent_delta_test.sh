@@ -5,10 +5,15 @@ export WALE_S3_PREFIX=s3://deletebeforepermanentdeltabucket
 export WALG_USE_WAL_DELTA=true
 export WALG_DELTA_MAX_STEPS=3
 
+WAL_PUSH_LOGS="/tmp/logs/wal_push_logs/pg_delete_before_permanent_delta_test_logs"
+WAL_FETCH_LOGS="/tmp/logs/wal_fetch_logs/pg_delete_before_permanent_delta_test_logs"
+BACKUP_PUSH_LOGS="/tmp/logs/backup_push_logs/pg_delete_before_permanent_delta_test_logs"
+BACKUP_FETCH_LOGS="/tmp/logs/backup_fetch_logs/pg_delete_before_permanent_delta_test_logs"
+
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
 echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
-echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
+echo "archive_command = '/usr/bin/timeout 600 /usr/bin/time -v -a --output ${WAL_PUSH_LOGS} /usr/bin/wal-g wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
 echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
@@ -20,10 +25,10 @@ do
     sleep 1
     if [ $i -eq 3 ]
     then
-        wal-g backup-push --permanent ${PGDATA}
+        /usr/bin/time -v -a --output ${BACKUP_PUSH_LOGS} wal-g backup-push --permanent ${PGDATA}
         pg_dumpall -f /tmp/dump1
     else
-        wal-g backup-push ${PGDATA}
+        /usr/bin/time -v -a --output ${BACKUP_PUSH_LOGS} wal-g backup-push ${PGDATA}
     fi
 done
 wal-g backup-list
@@ -33,15 +38,15 @@ wal-g backup-list
 export WALG_DELTA_MAX_STEPS=0
 pgbench -i -s 1 postgres &
 sleep 1
-wal-g backup-push ${PGDATA}
+/usr/bin/time -v -a --output ${BACKUP_PUSH_LOGS} wal-g backup-push ${PGDATA}
 wal-g delete retain 1
 wal-g backup-list
 
 # restore the backup and compare with previous state
 tmp/scripts/drop_pg.sh
 first_backup_name=`wal-g backup-list | sed '2q;d' | cut -f 1 -d " "`
-wal-g backup-fetch ${PGDATA} $first_backup_name
-echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
+/usr/bin/time -v -a --output ${BACKUP_FETCH_LOGS} wal-g backup-fetch ${PGDATA} $first_backup_name
+echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/time -v -a --output ${WAL_FETCH_LOGS} /usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 pg_dumpall -f /tmp/dump2
 diff /tmp/dump1 /tmp/dump2

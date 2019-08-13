@@ -9,10 +9,15 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 
 tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
 
+WAL_PUSH_LOGS="/tmp/logs/wal_push_logs/pg_delete_without_confirm_test_logs"
+WAL_FETCH_LOGS="/tmp/logs/wal_fetch_logs/pg_delete_without_confirm_test_logs"
+BACKUP_PUSH_LOGS="/tmp/logs/backup_push_logs/pg_delete_without_confirm_test_logs"
+BACKUP_FETCH_LOGS="/tmp/logs/backup_fetch_logs/pg_delete_without_confirm_test_logs"
+
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
 echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
-echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${TMP_CONFIG} wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
+echo "archive_command = '/usr/bin/timeout 600 /usr/bin/time -v -a --output ${WAL_PUSH_LOGS} /usr/bin/wal-g --config=${TMP_CONFIG} wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
 echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
@@ -21,7 +26,7 @@ for i in 1 2
 do
     pgbench -i -s 1 postgres &
     sleep 1
-    wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
+    /usr/bin/time -v -a --output ${BACKUP_PUSH_LOGS} wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 done
 
 lines_before_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
