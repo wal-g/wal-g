@@ -42,7 +42,7 @@ func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, cry
 
 	writeIgnorer := &EmptyWriteIgnorer{writeCloser}
 	lzWriter := compressor.NewWriter(writeIgnorer)
-
+	tracelog.InfoLogger.Printf("in compress and encrypt")
 	go func() {
 		_, err := utility.FastCopy(lzWriter, source)
 

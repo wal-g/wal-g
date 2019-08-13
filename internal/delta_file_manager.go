@@ -60,12 +60,14 @@ func NewDeltaFileManager(dataFolder DataFolder) *DeltaFileManager {
 	return manager
 }
 
-func (manager *DeltaFileManager) GetBlockLocationConsumer(deltaFilename string) (chan walparser.BlockLocation, error) {
+func (manager *DeltaFileManager) GetBlockLocationConsumer(deltaFilename string) (*chan walparser.BlockLocation, error) {
 	deltaFileWriter, _, err := manager.DeltaFileWriters.Load(deltaFilename)
+	tracelog.InfoLogger.Printf("deltaFileWriter: %v", deltaFileWriter)
+	tracelog.InfoLogger.Printf("deltaFileWriter&: %v", &deltaFileWriter)
 	if err != nil {
 		return nil, err
 	}
-	return deltaFileWriter.(*DeltaFileChanWriter).BlockLocationConsumer, nil
+	return &deltaFileWriter.(*DeltaFileChanWriter).BlockLocationConsumer, nil
 }
 
 // TODO : unit tests

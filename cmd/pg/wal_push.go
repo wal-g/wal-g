@@ -19,6 +19,7 @@ var walPushCmd = &cobra.Command{
 			tracelog.ErrorLogger.FatalError(err)
 		}
 		internal.HandleWALPush(uploader, args[0])
+		//internal.ParseDelta(args[0])
 	},
 }
 

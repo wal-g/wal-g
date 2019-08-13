@@ -1,7 +1,9 @@
 package internal
 
 import (
+	"github.com/wal-g/wal-g/utility"
 	"io"
+	"io/ioutil"
 	"path"
 	"path/filepath"
 	"sync"
@@ -10,7 +12,6 @@ import (
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/utility"
 )
 
 // Uploader contains fields associated with uploading tarballs.
@@ -72,6 +73,7 @@ func (uploader *Uploader) UploadWalFile(file NamedReader) error {
 
 	filename := path.Base(file.Name())
 	if uploader.getUseWalDelta() && isWalFilename(filename) {
+		tracelog.InfoLogger.Println("use wal delta")
 		recordingReader, err := NewWalDeltaRecordingReader(file, filename, uploader.deltaFileManager)
 		if err != nil {
 			walFileReader = file
@@ -99,7 +101,8 @@ func (uploader *Uploader) UploadFile(file NamedReader) error {
 
 // TODO : unit tests
 func (uploader *Uploader) Upload(path string, content io.Reader) error {
-	err := uploader.UploadingFolder.PutObject(path, content)
+	//err := uploader.UploadingFolder.PutObject(path, content)
+	_, err := io.Copy(ioutil.Discard, content)
 	if err == nil {
 		return nil
 	}
