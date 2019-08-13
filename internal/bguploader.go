@@ -58,6 +58,7 @@ func NewBgUploader(walFilePath string, maxParallelWorkers int32, uploader *Uploa
 // Start up checking what's inside archive_status
 func (bgUploader *BgUploader) Start() {
 	if bgUploader.maxParallelWorkers < 1 {
+		tracelog.InfoLogger.Println("Not enough parallel workers")
 		return // Nothing to start
 	}
 	// This goroutine will spawn new if necessary
@@ -94,18 +95,23 @@ func (bgUploader *BgUploader) scanOnce() {
 
 	for _, f := range files {
 		if bgUploader.haveNoSlots() {
+			tracelog.InfoLogger.Println("Have no slots")
 			break
 		}
 		name := f.Name()
-		if !strings.HasSuffix(name, readySuffix) || isWalAlreadyUploaded(bgUploader.uploader, name) {
+		tracelog.InfoLogger.Printf("scanOnce %s\n", name)
+		if !strings.HasSuffix(name, readySuffix){ // || isWalAlreadyUploaded(bgUploader.uploader, name) {
+			tracelog.InfoLogger.Printf("bad suffix: %v", strings.HasSuffix(name, readySuffix))
 			continue
 		}
 		if _, ok := bgUploader.started[name]; ok {
+			tracelog.InfoLogger.Printf("already started: %s\n", name)
 			continue
 		}
 		bgUploader.started[name] = name
-
+		tracelog.InfoLogger.Printf("new: %s\n", name)
 		if bgUploader.shouldKeepScanning() {
+			tracelog.InfoLogger.Println("should keep scanning")
 			bgUploader.running.Add(1)
 			atomic.AddInt32(&bgUploader.parallelWorkers, 1)
 			go bgUploader.upload(name)
@@ -124,6 +130,7 @@ func (bgUploader *BgUploader) haveNoSlots() bool {
 // TODO : unit tests
 // upload one WAL file
 func (bgUploader *BgUploader) upload(walStatusFilename string) {
+	tracelog.InfoLogger.Printf("parallel upload %s\n17", walStatusFilename)
 	walFilename := strings.TrimSuffix(walStatusFilename, readySuffix)
 	err := UploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename), bgUploader.preventWalOverwrite)
 	if err != nil {
@@ -140,5 +147,6 @@ func (bgUploader *BgUploader) upload(walStatusFilename string) {
 	bgUploader.scanOnce()
 	atomic.AddInt32(&bgUploader.parallelWorkers, -1)
 
+	tracelog.InfoLogger.Printf("Done parallel upload %s\n", walStatusFilename)
 	bgUploader.running.Done()
 }

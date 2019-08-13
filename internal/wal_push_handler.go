@@ -50,9 +50,9 @@ func HandleWALPush(uploader *Uploader, walFilePath string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	bgUploader.Stop()
-	if uploader.getUseWalDelta() {
-		uploader.deltaFileManager.FlushFiles(uploader.Clone())
-	}
+	//if uploader.getUseWalDelta() {
+	//	uploader.deltaFileManager.FlushFiles(uploader.Clone())
+	//}
 } //
 
 // TODO : unit tests
@@ -66,6 +66,7 @@ func UploadWALFile(uploader *Uploader, walFilePath string, preventWalOverwrite b
 			return NewCantOverwriteWalFileError(walFilePath)
 		}
 	}
+	tracelog.InfoLogger.Printf("opened %s", walFilePath)
 	walFile, err := os.Open(walFilePath)
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not open '%s'\n", walFilePath)

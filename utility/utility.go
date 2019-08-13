@@ -105,11 +105,15 @@ func GetFileRelativePath(fileAbsPath string, directoryPath string) string {
 
 //FastCopy copies data from src to dst in blocks of CopiedBlockMaxSize bytes
 func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
+	tracelog.InfoLogger.Println("Fast copy")
 	n := int64(0)
 	buf := make([]byte, CopiedBlockMaxSize)
-	for {
+	tracelog.InfoLogger.Println("before cycle")
+	for i:= 0;; i++{
+		//tracelog.InfoLogger.Printf("iteration no: %d\n", i)
 		m, readingErr := src.Read(buf)
 		if readingErr != nil && readingErr != io.EOF {
+			tracelog.InfoLogger.Println("EOF")
 			return n, readingErr
 		}
 		m, writingErr := dst.Write(buf[:m])

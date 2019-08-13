@@ -1,7 +1,9 @@
 package internal
 
 import (
+	"github.com/wal-g/wal-g/utility"
 	"io"
+	"io/ioutil"
 	"path"
 	"path/filepath"
 	"sync"
@@ -10,7 +12,6 @@ import (
 	"github.com/tinsane/storages/storage"
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
-	"github.com/wal-g/wal-g/utility"
 )
 
 // Uploader contains fields associated with uploading tarballs.
@@ -83,13 +84,13 @@ func (uploader *Uploader) UploadWalFile(file NamedReader) error {
 			walFileReader = file
 		} else {
 			walFileReader = recordingReader
-			defer utility.LoggedClose(recordingReader, "")
+			defer recordingReader.Close()
 		}
 	} else {
 		walFileReader = file
 	}
 
-	return uploader.UploadFile(NewNamedReaderImpl(walFileReader, file.Name()))
+	return uploader.UploadFile(&NamedReaderImpl{walFileReader, file.Name()})
 }
 
 // TODO : unit tests
@@ -105,7 +106,8 @@ func (uploader *Uploader) UploadFile(file NamedReader) error {
 
 // TODO : unit tests
 func (uploader *Uploader) Upload(path string, content io.Reader) error {
-	err := uploader.UploadingFolder.PutObject(path, content)
+	//err := uploader.UploadingFolder.PutObject(path, content)
+	_, err := io.Copy(ioutil.Discard, content)
 	if err == nil {
 		return nil
 	}

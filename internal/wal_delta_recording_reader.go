@@ -60,6 +60,7 @@ func (reader *WalDeltaRecordingReader) Close() error {
 
 func (reader *WalDeltaRecordingReader) Read(p []byte) (n int, err error) {
 	dataExpected := len(p)
+	tracelog.InfoLogger.Printf("Read: WalDeltaRecordingReader")
 	for {
 		if len(p) <= len(reader.PageDataLeftover) {
 			copy(p, reader.PageDataLeftover[:len(p)])
@@ -115,6 +116,7 @@ func tryOpenParserAndRecorders(walFilename string, manager *DeltaFileManager) (*
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	tracelog.InfoLogger.Printf("0xc %s\n", deltaFilename)
 	blockLocationConsumer, err := manager.GetBlockLocationConsumer(deltaFilename)
 	if err != nil {
 		return nil, nil, nil, err
