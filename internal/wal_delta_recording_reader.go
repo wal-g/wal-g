@@ -40,6 +40,7 @@ func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, man
 	if err != nil {
 		return nil, err
 	}
+	tracelog.InfoLogger.Printf("recorder: %v\n", recorder)
 	return &WalDeltaRecordingReader{
 		*walparser.NewWalPageReader(walFileReader),
 		*walParser,

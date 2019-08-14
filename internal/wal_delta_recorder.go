@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
 )
 
@@ -10,8 +11,9 @@ type WalDeltaRecorder struct {
 	blockLocationConsumer chan walparser.BlockLocation
 }
 
-func NewWalDeltaRecorder(blockLocationConsumer chan walparser.BlockLocation) *WalDeltaRecorder {
-	return &WalDeltaRecorder{blockLocationConsumer}
+func NewWalDeltaRecorder(blockLocationConsumer *chan walparser.BlockLocation) *WalDeltaRecorder {
+	tracelog.InfoLogger.Println(blockLocationConsumer)
+	return &WalDeltaRecorder{*blockLocationConsumer}
 }
 
 func (recorder *WalDeltaRecorder) recordWalDelta(records []walparser.XLogRecord) {

@@ -481,7 +481,7 @@ func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uin
 	deltaMap := NewPagedFileDeltaMap()
 	logSegNo := logSegNoFromLsn(*bundle.IncrementFromLsn + 1)
 	logSegNo -= logSegNo % WalFileInDelta
-	lastLogSegNo := logSegNoFromLsn(backupStartLSN) - 1
+	lastLogSegNo := logSegNoFromLsn(backupStartLSN)
 	walParser := walparser.NewWalParser()
 	for ; logSegNo+(WalFileInDelta-1) <= lastLogSegNo; logSegNo += WalFileInDelta {
 		deltaFilename := toDeltaFilename(formatWALFileName(bundle.Timeline, logSegNo))
