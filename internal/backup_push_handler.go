@@ -186,10 +186,6 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	// If pushing permanent delta backup, mark all previous backups permanent
 	// Do this before uploading current meta to ensure that backups are marked in increasing order
 	if isPermanent && currentBackupSentinelDto.IsIncremental() {
-		folder, err := ConfigureFolder()
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
-		}
 		MarkBackup(uploader, folder, previousBackupName, true)
 	}
 

@@ -104,7 +104,6 @@ func getMarkedPermanentBackupMetadata(baseBackupFolder storage.Folder, backupNam
 }
 
 func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string) ([]UploadObject, error){
-	backupMetadata := []UploadObject{}
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 
 	// retrieve current backup meta
@@ -117,7 +116,7 @@ func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string
 
 	permanentBackups, _ := getPermanentObjects(folder)
 	//  del current backup from
-	delete(permanentBackups, backupName[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+24])
+	delete(permanentBackups, getBackupNumber(backupName))
 
 	reverseLinks, err := getGraphFromBaseToIncrement(folder)
 	if err != nil {
@@ -133,23 +132,26 @@ func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string
 	if err != nil {
 		return nil, err
 	}
-	backupMetadata = append(backupMetadata, metadataUploadObject)
+	backupMetadata := []UploadObject {metadataUploadObject}
 
 	return backupMetadata, nil
 
 }
 
-func backupHasPermanentInFuture(reverseLinks *map[string][]string, backupName string, permanentBackups *map[string]bool) (bool) {
-	if _, ok := (*permanentBackups)[backupName[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+24]]; ok {
-		return true
-	}
+func getBackupNumber(backupName string) string {
+	return backupName[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+24]
+}
 
+//backup has permanent in future only when one of the next backups is permanent
+func backupHasPermanentInFuture(reverseLinks *map[string][]string, backupName string, permanentBackups *map[string]bool) (bool) {
+	//if there is no next backups
 	if _, ok := (*reverseLinks)[backupName]; !ok {
 		return false
 	}
 
+	//if one of the next backups is permanent
 	for _, b := range (*reverseLinks)[backupName]{
-		if backupHasPermanentInFuture(reverseLinks, b, permanentBackups) {
+		if _, ok := (*permanentBackups)[getBackupNumber(b)]; ok {
 			return true
 		}
 	}
@@ -167,18 +169,13 @@ func getGraphFromBaseToIncrement(folder storage.Folder) (map[string][]string, er
 	}
 
 	reverseLinks := make(map[string][]string)
-	for i := len(backups) - 1; i >= 0; i-- {
-		b := backups[i]
+	for _, b := range backups {
 		incrementFrom, isIncrement, err := getMetadataFromBackup(baseBackupFolder, b.BackupName)
 		if err != nil {
 			return nil, err
 		}
 
 		if isIncrement{
-			if _, ok := reverseLinks[incrementFrom]; !ok{
-				var list []string
-				reverseLinks[incrementFrom] = list
-			}
 			reverseLinks[incrementFrom] = append(reverseLinks[incrementFrom], b.BackupName)
 		}
 	}
@@ -193,9 +190,9 @@ func getMetadataFromBackup(baseBackupFolder storage.Folder, backupName string) (
 		return "", false, err
 	}
 	if !sentinel.IsIncremental() {
-		return "", sentinel.IsIncremental(),nil
+		return "", false,nil
 	}
-	return *sentinel.IncrementFrom, sentinel.IsIncremental(),nil
+	return *sentinel.IncrementFrom, true,nil
 }
 
 func getMetadataUploadObject(backupName string, meta ExtendedMetadataDto) (UploadObject, error) {
