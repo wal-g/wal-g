@@ -1,7 +1,7 @@
 package mongo
 
 import (
-	"github.com/wal-g/wal-g/utility"
+	"os"
 	"path"
 
 	"github.com/wal-g/wal-g/internal"
@@ -24,7 +24,7 @@ func (settings OpLogFetchSettings) GetLogFolderPath() string {
 
 func (settings OpLogFetchSettings) GetFilePath(dstFolder string, logName string) (string, error) {
 	oplogFileSubFolder := path.Join(dstFolder, logName)
-	err := utility.EnsureFolderExists(oplogFileSubFolder)
+	err := os.MkdirAll(oplogFileSubFolder, os.ModePerm)
 	if err != nil {
 		return "", err
 	}

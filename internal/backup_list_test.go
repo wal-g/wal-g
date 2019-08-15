@@ -63,8 +63,9 @@ func TestBackupListCorrectJsonOutput(t *testing.T) {
 	var actual []internal.BackupTime
 	buf := new(bytes.Buffer)
 
-	internal.WriteAsJson(backups, buf, false)
-	err := json.Unmarshal(buf.Bytes(), &actual)
+	err := internal.WriteAsJson(backups, buf, false)
+	assert.NoError(t, err)
+	err = json.Unmarshal(buf.Bytes(), &actual)
 
 	assert.NoError(t, err)
 	assert.Equal(t, actual, backups)
@@ -86,8 +87,9 @@ func TestBackupListCorrectPrettyJsonOutput(t *testing.T) {
 	var unmarshaledBackups []internal.BackupTime
 	buf := new(bytes.Buffer)
 
-	internal.WriteAsJson(backups, buf, true)
-	err := json.Unmarshal(buf.Bytes(), &unmarshaledBackups)
+	err := internal.WriteAsJson(backups, buf, true)
+	assert.NoError(t, err)
+	err = json.Unmarshal(buf.Bytes(), &unmarshaledBackups)
 
 	assert.NoError(t, err)
 	assert.Equal(t, unmarshaledBackups, backups)

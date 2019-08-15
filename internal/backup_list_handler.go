@@ -46,7 +46,8 @@ func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, de
 			}
 		}
 		if json {
-			WriteAsJson(backupDetails, os.Stdout, pretty)
+			err = WriteAsJson(backupDetails, os.Stdout, pretty)
+			tracelog.ErrorLogger.FatalOnError(err)
 		} else if pretty {
 			WritePrettyBackupListDetails(backupDetails, os.Stdout)
 		} else {
@@ -54,7 +55,8 @@ func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, de
 		}
 	} else {
 		if json {
-			WriteAsJson(backups, os.Stdout, pretty)
+			err = WriteAsJson(backups, os.Stdout, pretty)
+			tracelog.ErrorLogger.FatalOnError(err)
 		} else if pretty {
 			WritePrettyBackupList(backups, os.Stdout)
 		} else {
@@ -107,12 +109,17 @@ func WritePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer
 	}
 }
 
-func WriteAsJson(data interface{}, output io.Writer, pretty bool) {
+func WriteAsJson(data interface{}, output io.Writer, pretty bool) error {
 	var bytes []byte
+	var err error
 	if pretty {
-		bytes, _ = json.MarshalIndent(data, "", "    ")
+		bytes, err = json.MarshalIndent(data, "", "    ")
 	} else {
-		bytes, _ = json.Marshal(data)
+		bytes, err = json.Marshal(data)
 	}
-	_, _ = output.Write(bytes)
+	if err != nil {
+		return err
+	}
+	_, err = output.Write(bytes)
+	return err
 }

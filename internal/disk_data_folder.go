@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,7 +11,7 @@ type DiskDataFolder struct {
 }
 
 func NewDiskDataFolder(folderPath string) (*DiskDataFolder, error) {
-	err := utility.EnsureFolderExists(folderPath)
+	err := os.MkdirAll(folderPath, os.ModePerm)
 	if err != nil {
 		return nil, err
 	}

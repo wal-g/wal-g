@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -212,12 +211,4 @@ func SelectMatchingFiles(fileMask string, filePathsToFilter map[string]bool) (ma
 		}
 	}
 	return result, nil
-}
-
-func EnsureFolderExists(path string) error {
-	_, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		err = os.MkdirAll(path, os.ModePerm)
-	}
-	return err
 }
