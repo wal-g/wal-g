@@ -16,9 +16,7 @@ var streamPushCmd = &cobra.Command{
 	Short: StreamPushShortDescription,
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
-		}
+		tracelog.ErrorLogger.FatalOnError(err)
 		mysql.HandleStreamPush(&mysql.Uploader{Uploader: uploader})
 	},
 }
