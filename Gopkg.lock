@@ -269,12 +269,12 @@
   version = "v1.8.0"
 
 [[projects]]
+  branch = "master"
   digest = "1:594b731b385e9dd739b0e73313de41bf32d1041fcdbfac42f62c0d1ff151a09e"
   name = "github.com/minio/sio"
   packages = ["."]
   pruneopts = "UT"
   revision = "035b4ef8c449ba2ba21ec143c91964e76a1fb68c"
-  version = "v0.2.0"
 
 [[projects]]
   digest = "1:53bc4cd4914cd7cd52139990d5170d6dc99067ae31c56530621b18b35fc30318"
