@@ -3,8 +3,8 @@ package internal
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/tracelog"
 
 	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -61,7 +61,7 @@ func GetMarkedBackupMetadataToUpload(
 	}
 }
 
-func getMarkedPermanentBackupMetadata(baseBackupFolder storage.Folder, backupName string) ([]UploadObject, error){
+func getMarkedPermanentBackupMetadata(baseBackupFolder storage.Folder, backupName string) ([]UploadObject, error) {
 	backupMetadata := []UploadObject{}
 
 	// retrieve current backup sentinel and meta
@@ -103,7 +103,7 @@ func getMarkedPermanentBackupMetadata(baseBackupFolder storage.Folder, backupNam
 	return previousImpermanentBackupMetadata, nil
 }
 
-func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string) ([]UploadObject, error){
+func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string) ([]UploadObject, error) {
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 
 	// retrieve current backup meta
@@ -123,7 +123,7 @@ func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string
 		return nil, err
 	}
 
-	if backupHasPermanentInFuture(&reverseLinks, backupName, &permanentBackups){
+	if backupHasPermanentInFuture(&reverseLinks, backupName, &permanentBackups) {
 		return nil, NewBackupHasPermanentBackupInFutureError(backupName)
 	}
 
@@ -132,25 +132,25 @@ func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string
 	if err != nil {
 		return nil, err
 	}
-	backupMetadata := []UploadObject {metadataUploadObject}
+	backupMetadata := []UploadObject{metadataUploadObject}
 
 	return backupMetadata, nil
 
 }
 
 func getBackupNumber(backupName string) string {
-	return backupName[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+24]
+	return backupName[len(utility.BackupNamePrefix) : len(utility.BackupNamePrefix)+24]
 }
 
 //backup has permanent in future only when one of the next backups is permanent
-func backupHasPermanentInFuture(reverseLinks *map[string][]string, backupName string, permanentBackups *map[string]bool) (bool) {
+func backupHasPermanentInFuture(reverseLinks *map[string][]string, backupName string, permanentBackups *map[string]bool) bool {
 	//if there is no next backups
 	if _, ok := (*reverseLinks)[backupName]; !ok {
 		return false
 	}
 
 	//if one of the next backups is permanent
-	for _, b := range (*reverseLinks)[backupName]{
+	for _, b := range (*reverseLinks)[backupName] {
 		if _, ok := (*permanentBackups)[getBackupNumber(b)]; ok {
 			return true
 		}
@@ -160,7 +160,7 @@ func backupHasPermanentInFuture(reverseLinks *map[string][]string, backupName st
 }
 
 //return graph where nodes - backup names, edges - links from base backups to increment backups
-func getGraphFromBaseToIncrement(folder storage.Folder) (map[string][]string, error){
+func getGraphFromBaseToIncrement(folder storage.Folder) (map[string][]string, error) {
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 
 	backups, err := getBackups(folder)
@@ -175,7 +175,7 @@ func getGraphFromBaseToIncrement(folder storage.Folder) (map[string][]string, er
 			return nil, err
 		}
 
-		if isIncrement{
+		if isIncrement {
 			reverseLinks[incrementFrom] = append(reverseLinks[incrementFrom], b.BackupName)
 		}
 	}
@@ -183,16 +183,16 @@ func getGraphFromBaseToIncrement(folder storage.Folder) (map[string][]string, er
 	return reverseLinks, nil
 }
 
-func getMetadataFromBackup(baseBackupFolder storage.Folder, backupName string) (incrementFrom string, isIncrement bool, err error){
+func getMetadataFromBackup(baseBackupFolder storage.Folder, backupName string) (incrementFrom string, isIncrement bool, err error) {
 	backup := NewBackup(baseBackupFolder, backupName)
 	sentinel, err := backup.GetSentinel()
 	if err != nil {
 		return "", false, err
 	}
 	if !sentinel.IsIncremental() {
-		return "", false,nil
+		return "", false, nil
 	}
-	return *sentinel.IncrementFrom, true,nil
+	return *sentinel.IncrementFrom, true, nil
 }
 
 func getMetadataUploadObject(backupName string, meta ExtendedMetadataDto) (UploadObject, error) {
@@ -213,7 +213,6 @@ func NewBackupAlreadyThisTypePermanentError(backupName string, permanentType str
 	return BackupAlreadyThisTypePermanentError{errors.Errorf("Backup '%s' is already %s.", backupName, permanentType)}
 }
 
-
 type BackupHasPermanentBackupInFutureError struct {
 	error
 }
@@ -221,4 +220,3 @@ type BackupHasPermanentBackupInFutureError struct {
 func NewBackupHasPermanentBackupInFutureError(backupName string) BackupHasPermanentBackupInFutureError {
 	return BackupHasPermanentBackupInFutureError{errors.Errorf("Can't mark backup '%s' as impermanent. There is permanent increment backup.", backupName)}
 }
-

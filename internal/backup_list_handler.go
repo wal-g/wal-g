@@ -54,7 +54,7 @@ func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, de
 	}
 }
 
-func getBackupDetails(folder storage.Folder, backups []BackupTime) ([]BackupDetail, error){
+func getBackupDetails(folder storage.Folder, backups []BackupTime) ([]BackupDetail, error) {
 	backupDetails := make([]BackupDetail, len(backups))
 	for i := len(backups) - 1; i >= 0; i-- {
 		backup, err := GetBackupByName(backups[i].BackupName, folder)
