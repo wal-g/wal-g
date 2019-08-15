@@ -26,6 +26,8 @@ jobs:
       script: make pg_build_image
     - stage: test
       script: make all_unittests
+    - script: make TEST="pg_backup_mark_impermanent_test" pg_integration_test
+    - script: make TEST="pg_backup_mark_permanent_test" pg_integration_test
     - script: make TEST="pg_config_test" pg_integration_test
     - script: make TEST="pg_crypto_test" pg_integration_test
     - script: make TEST="pg_delete_before_name_find_full_test" pg_integration_test

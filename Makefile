@@ -24,7 +24,7 @@ pg_build_image: install deps pg_build unlink_brotli
 	docker save ${IMAGE} | gzip -c > ${CACHE_FILE}
 
 pg_integration_test:
-	docker load -i ${CACHE_FILE}
+	docker load -i ${CACHE_FILE} || true
 	docker-compose build $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
 
