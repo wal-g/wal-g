@@ -15,9 +15,7 @@ var walFetchCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
-		}
+		tracelog.ErrorLogger.FatalOnError(err)
 		internal.HandleWALFetch(folder, args[0], args[1], true)
 	},
 }

@@ -302,17 +302,13 @@ func HandleDeleteBefore(folder storage.Folder, args []string, confirmed bool,
 		greater := func(object1, object2 storage.Object) bool { return less(object2, object1) }
 		target, err = FindTargetBeforeName(folder, beforeStr, modifier, isFullBackup, greater)
 	}
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	if target == nil {
 		tracelog.InfoLogger.Printf("No backup found for deletion")
 		os.Exit(0)
 	}
 	err = DeleteBeforeTarget(folder, target, confirmed, isFullBackup, less)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 func HandleDeleteRetain(folder storage.Folder, args []string, confirmed bool,
@@ -321,22 +317,16 @@ func HandleDeleteRetain(folder storage.Folder, args []string, confirmed bool,
 
 	modifier, retantionStr := extractDeleteModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retantionStr)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	greater := func(object1, object2 storage.Object) bool { return less(object2, object1) }
 	target, err := FindTargetRetain(folder, retentionCount, modifier, isFullBackup, greater)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	if target == nil {
 		tracelog.InfoLogger.Printf("No backup found for deletion")
 		os.Exit(0)
 	}
 	err = DeleteBeforeTarget(folder, target, confirmed, isFullBackup, less)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 func extractDeleteModifierFromArgs(args []string) (int, string) {

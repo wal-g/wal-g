@@ -32,9 +32,7 @@ func getRedisConnection() *redis.Client {
 	redisDb := 0 // use default DB
 	if ok {
 		redisDbValue, err := strconv.Atoi(redisDbStr) // DISCUSS: could redisDb changed on success without additional variable redisDbValue?
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
-		}
+		tracelog.ErrorLogger.FatalOnError(err)
 		redisDb = redisDbValue
 	}
 	return redis.NewClient(&redis.Options{

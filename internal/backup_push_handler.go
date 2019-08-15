@@ -67,9 +67,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 		} else {
 			previousBackup := NewBackup(basebackupFolder, previousBackupName)
 			previousBackupSentinelDto, err = previousBackup.GetSentinel()
-			if err != nil {
-				tracelog.ErrorLogger.FatalError(err)
-			}
+			tracelog.ErrorLogger.FatalOnError(err)
 			if previousBackupSentinelDto.IncrementCount != nil {
 				incrementCount = *previousBackupSentinelDto.IncrementCount + 1
 			}
@@ -85,9 +83,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 					previousBackupName = *previousBackupSentinelDto.IncrementFullName
 					previousBackup := NewBackup(basebackupFolder, previousBackupName)
 					previousBackupSentinelDto, err = previousBackup.GetSentinel()
-					if err != nil {
-						tracelog.ErrorLogger.FatalError(err)
-					}
+					tracelog.ErrorLogger.FatalOnError(err)
 				}
 				tracelog.InfoLogger.Printf("Delta backup from %v with LSN %x. \n", previousBackupName, *previousBackupSentinelDto.BackupStartLSN)
 			}
@@ -108,15 +104,11 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 
 	// Connect to postgres and start/finish a nonexclusive backup.
 	conn, err := Connect()
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	backupName, backupStartLSN, pgVersion, dataDir, err := bundle.StartBackup(conn,
 		utility.CeilTimeUpToMicroseconds(time.Now()).String())
 	meta.DataDir = dataDir
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	if len(previousBackupName) > 0 && previousBackupSentinelDto.BackupStartLSN != nil {
 		if uploader.getUseWalDelta() {
@@ -136,22 +128,14 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	bundle.StartQueue()
 	tracelog.InfoLogger.Println("Walking ...")
 	err = filepath.Walk(archiveDirectory, bundle.HandleWalkedFSObject)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	err = bundle.FinishQueue()
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	err = bundle.UploadPgControl(uploader.Compressor.FileExtension())
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
 	finishLsn, err := bundle.UploadLabelFiles(conn)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	timelineChanged := bundle.checkTimelineChanged(conn)
 

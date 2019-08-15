@@ -37,9 +37,7 @@ var deleteRetainCmd = &cobra.Command{
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	isFullBackup := func(object storage.Object) bool {
 		return IsFullBackup(folder, object)
 	}
@@ -48,9 +46,7 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	isFullBackup := func(object storage.Object) bool {
 		return IsFullBackup(folder, object)
 	}

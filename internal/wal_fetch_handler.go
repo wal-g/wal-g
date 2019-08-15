@@ -65,9 +65,7 @@ func HandleWALFetch(folder storage.Folder, walFileName string, location string, 
 			}
 
 			err = os.Rename(prefetched, location)
-			if err != nil {
-				tracelog.ErrorLogger.FatalError(err)
-			}
+			tracelog.ErrorLogger.FatalOnError(err)
 
 			err := checkWALFileMagic(location)
 			if err != nil {
@@ -102,9 +100,7 @@ func HandleWALFetch(folder storage.Folder, walFileName string, location string, 
 	}
 
 	err := DownloadWALFileTo(folder, walFileName, location)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 // TODO : unit tests

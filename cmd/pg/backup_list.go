@@ -21,9 +21,7 @@ var (
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			folder, err := internal.ConfigureFolder()
-			if err != nil {
-				tracelog.ErrorLogger.FatalError(err)
-			}
+			tracelog.ErrorLogger.FatalOnError(err)
 			if pretty || json || detail {
 				internal.HandleBackupListWithFlags(folder, pretty, json, detail)
 			} else {

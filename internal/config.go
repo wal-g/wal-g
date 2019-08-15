@@ -96,9 +96,7 @@ func InitConfig() {
 	} else {
 		// Find home directory.
 		usr, err := user.Current()
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
-		}
+		tracelog.ErrorLogger.FatalOnError(err)
 
 		// Search config in home directory with name ".wal-g" (without extension).
 		viper.AddConfigPath(usr.HomeDir)
