@@ -501,6 +501,7 @@ func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uin
 	}
 	// We don't consider the case when there is no delta files from previous backup,
 	// because in such a case postgres do a WAL-Switch and first WAL file appears to be whole.
+	lastLogSegNo += 1
 	for ; logSegNo <= lastLogSegNo; logSegNo++ {
 		walFilename := formatWALFileName(bundle.Timeline, logSegNo)
 		reader, err := DownloadAndDecompressWALFile(folder, walFilename)
