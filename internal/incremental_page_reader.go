@@ -106,9 +106,9 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap,
 		tracelog.InfoLogger.Println("full init")
 		blocks := diff(pageReader2.Blocks, pageReader1.Blocks)
 		for i, header := range headers {
-			found := false
+			//found := false
 			for _, block := range blocks {
-				if block == pageReader2.Blocks[i] {
+				if block == pageReader2.Blocks[i] && header.Lsn() < START_LSN && header.Lsn() >= pageReader2.Lsn {
 					tracelog.InfoLogger.Printf("Full scan, block no: %d\n", block)
 					tracelog.InfoLogger.Printf("Full scan, lsn: %d\n", header.Lsn())
 					tracelog.InfoLogger.Printf("Full scan, size: %d\n", pageReader.FileSize)
@@ -120,13 +120,13 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap,
 					tracelog.InfoLogger.Printf("diff block pdUpper          %d\n", header.pdUpper)
 					tracelog.InfoLogger.Printf("diff block pdSpecial        %d\n", header.pdSpecial)
 					tracelog.InfoLogger.Printf("diff block pdPageSizeVersion%d\n", header.pdPageSizeVersion)
-					found = true
+					//found = true
 					break
 				}
 			}
-			if !found {
-				tracelog.InfoLogger.Printf("Not found %d\n pageHeader", i)
-			}
+			//if !found {
+			//	tracelog.InfoLogger.Printf("Not found %d\n pageHeader", i)
+			//}
 		}
 		tracelog.InfoLogger.Println("diff success")
 		err = pageReader.FullScanInitialize()
