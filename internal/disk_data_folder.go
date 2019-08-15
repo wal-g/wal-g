@@ -11,10 +11,7 @@ type DiskDataFolder struct {
 }
 
 func NewDiskDataFolder(folderPath string) (*DiskDataFolder, error) {
-	_, err := os.Stat(folderPath)
-	if os.IsNotExist(err) {
-		err = os.MkdirAll(folderPath, os.ModePerm)
-	}
+	err := os.MkdirAll(folderPath, os.ModePerm)
 	if err != nil {
 		return nil, err
 	}
