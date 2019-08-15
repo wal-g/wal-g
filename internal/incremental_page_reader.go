@@ -77,7 +77,6 @@ func (pageReader *IncrementalPageReader) Close() error {
 	return pageReader.PagedFile.Close()
 }
 
-
 // TODO : unit tests
 // TODO : "initialize" is rather meaningless name, maybe this func should be decomposed
 func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap, pageReader1 *IncrementalPageReader, pageReader2 *IncrementalPageReader) (size int64, err error) {
@@ -105,6 +104,7 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap,
 		}
 		tracelog.InfoLogger.Println("full init")
 		blocks := diff(pageReader2.Blocks, pageReader1.Blocks)
+		tracelog.InfoLogger.Printf("Length headers %d , blocks %d\n", len(headers), len(pageReader2.Blocks))
 		for i, header := range headers {
 			//found := false
 			for _, block := range blocks {
@@ -113,10 +113,10 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap,
 					tracelog.InfoLogger.Printf("Full scan, lsn: %d\n", header.Lsn())
 					tracelog.InfoLogger.Printf("Full scan, size: %d\n", pageReader.FileSize)
 					tracelog.InfoLogger.Printf("diff block pdLsnH %d\n", header.pdLsnH)
-					tracelog.InfoLogger.Printf("diff block pdLsnL           %d\n", header.pdLsnL     )
-					tracelog.InfoLogger.Printf("diff block pdChecksum       %d\n", header.pdChecksum  )
-					tracelog.InfoLogger.Printf("diff block pdFlags          %d\n", header.pdFlags       )
-					tracelog.InfoLogger.Printf("diff block pdLower          %d\n", header.pdLower      )
+					tracelog.InfoLogger.Printf("diff block pdLsnL           %d\n", header.pdLsnL)
+					tracelog.InfoLogger.Printf("diff block pdChecksum       %d\n", header.pdChecksum)
+					tracelog.InfoLogger.Printf("diff block pdFlags          %d\n", header.pdFlags)
+					tracelog.InfoLogger.Printf("diff block pdLower          %d\n", header.pdLower)
 					tracelog.InfoLogger.Printf("diff block pdUpper          %d\n", header.pdUpper)
 					tracelog.InfoLogger.Printf("diff block pdSpecial        %d\n", header.pdSpecial)
 					tracelog.InfoLogger.Printf("diff block pdPageSizeVersion%d\n", header.pdPageSizeVersion)
@@ -244,13 +244,13 @@ func (pageReader *IncrementalPageReader) FullScanInitialize2() (error, []*Postgr
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				return nil, headers
 			}
-			return err, nil
+			return err, headers
 		}
 
 		valid, pageHeader := pageReader.SelectNewValidPage(pageBytes, currentBlockNumber) // TODO : torn page possibility
 		if !valid {
-			return NewInvalidBlockError(currentBlockNumber), nil
-		} else {
+			return NewInvalidBlockError(currentBlockNumber), headers
+		} else if pageHeader != nil {
 			headers = append(headers, pageHeader)
 		}
 	}
@@ -297,10 +297,11 @@ func (pageReader *IncrementalPageReader) SelectNewValidPage(pageBytes []byte, bl
 
 	if isNew || (pageHeader.Lsn() >= pageReader.Lsn) {
 		pageReader.Blocks = append(pageReader.Blocks, blockNo)
+		return valid, pageHeader
+	} else {
+		return valid, nil
 	}
-	return
 }
-
 
 func (pageReader *IncrementalPageReader) SelectNewValidPage2(pageBytes []byte, blockNo uint32, diff []uint32) (valid bool) {
 	pageHeader, _ := ParsePostgresPageHeader(bytes.NewReader(pageBytes))
@@ -326,10 +327,10 @@ func (pageReader *IncrementalPageReader) SelectNewValidPage2(pageBytes []byte, b
 				tracelog.InfoLogger.Printf("Full scan, lsn: %d\n", pageHeader.Lsn())
 				tracelog.InfoLogger.Printf("Full scan, size: %d\n", pageReader.FileSize)
 				tracelog.InfoLogger.Printf("diff block pdLsnH %d\n", pageHeader.pdLsnH)
-				tracelog.InfoLogger.Printf("diff block pdLsnL           %d\n", pageHeader.pdLsnL     )
-				tracelog.InfoLogger.Printf("diff block pdChecksum       %d\n", pageHeader.pdChecksum  )
-				tracelog.InfoLogger.Printf("diff block pdFlags          %d\n", pageHeader.pdFlags       )
-				tracelog.InfoLogger.Printf("diff block pdLower          %d\n", pageHeader.pdLower      )
+				tracelog.InfoLogger.Printf("diff block pdLsnL           %d\n", pageHeader.pdLsnL)
+				tracelog.InfoLogger.Printf("diff block pdChecksum       %d\n", pageHeader.pdChecksum)
+				tracelog.InfoLogger.Printf("diff block pdFlags          %d\n", pageHeader.pdFlags)
+				tracelog.InfoLogger.Printf("diff block pdLower          %d\n", pageHeader.pdLower)
 				tracelog.InfoLogger.Printf("diff block pdUpper          %d\n", pageHeader.pdUpper)
 				tracelog.InfoLogger.Printf("diff block pdSpecial        %d\n", pageHeader.pdSpecial)
 				tracelog.InfoLogger.Printf("diff block pdPageSizeVersion%d\n", pageHeader.pdPageSizeVersion)
