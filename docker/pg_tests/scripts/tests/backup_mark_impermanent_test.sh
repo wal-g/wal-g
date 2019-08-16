@@ -50,7 +50,6 @@ last_backup_name=`wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 
 wal-g --config=${TMP_CONFIG} delete before $last_backup_name --confirm
 wal-g --config=${TMP_CONFIG} backup-list
 
-# check that permanent backup still exists
 first_backup_name=`wal-g --config=${TMP_CONFIG} backup-list | sed '2q;d' | cut -f 1 -d " "`
 if [ $first_backup_name = $backup_name ];
 then
