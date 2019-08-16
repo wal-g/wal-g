@@ -46,9 +46,7 @@ func HandleStreamFetch(backupName string, folder storage.Folder,
 	}
 
 	backup, err := GetBackupByName(backupName, folder)
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Unable to get backup %+v\n", err)
-	}
+	tracelog.ErrorLogger.FatalfOnError("Unable to get backup %+v\n", err)
 	logsAreDone := make(chan error)
 	go func() {
 		logsAreDone <- fetchLogs(folder, backup)

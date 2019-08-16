@@ -50,7 +50,7 @@ func isFullBackup(object storage.Object) bool {
 }
 
 func init() {
-	MongoCmd.AddCommand(deleteCmd)
+	Cmd.AddCommand(deleteCmd)
 	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }

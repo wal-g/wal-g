@@ -140,7 +140,7 @@ func checkDbDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentine
 		}
 	} else {
 		tracelog.DebugLogger.Println("DB data directory before increment:")
-		filepath.Walk(dbDataDirectory,
+		_ = filepath.Walk(dbDataDirectory,
 			func(path string, info os.FileInfo, err error) error {
 				if !info.IsDir() {
 					tracelog.DebugLogger.Println(path)

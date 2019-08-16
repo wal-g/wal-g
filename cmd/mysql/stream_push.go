@@ -1,8 +1,8 @@
 package mysql
 
 import (
-	"github.com/wal-g/wal-g/internal/databases/mysql"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/mysql"
 	"github.com/wal-g/wal-g/internal/tracelog"
 
 	"github.com/spf13/cobra"
@@ -21,6 +21,6 @@ var streamPushCmd = &cobra.Command{
 	},
 }
 
-func init()  {
-	MySQLCmd.AddCommand(streamPushCmd)
+func init() {
+	Cmd.AddCommand(streamPushCmd)
 }

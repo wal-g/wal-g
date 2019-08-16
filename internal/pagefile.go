@@ -13,6 +13,7 @@ package internal
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path"
@@ -166,7 +167,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader) error {
 		}
 		return errors.Wrap(err, "can't open file to increment")
 	}
-	defer file.Close()
+	defer utility.LoggedClose(file, "")
 	defer file.Sync()
 
 	err = file.Truncate(int64(fileSize))

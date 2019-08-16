@@ -14,9 +14,7 @@ import (
 func HandleStreamPush(uploader *Uploader) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	db, err := getMySQLConnection()
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(db, "")
 	var stream io.Reader = os.Stdin
 	if internal.FileIsPiped(os.Stdin) {
@@ -26,9 +24,7 @@ func HandleStreamPush(uploader *Uploader) {
 		stream = strings.NewReader("testtesttest")
 	}
 	err = uploader.UploadStream(db, stream)
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 // TODO : unit tests
@@ -39,11 +35,13 @@ func (uploader *Uploader) UploadStream(db *sql.DB, stream io.Reader) error {
 	timeStart := utility.TimeNowCrossPlatformLocal()
 
 	fileName, err := uploader.PushStream(stream)
+	if err != nil {
+		return err
+	}
 
 	binlogEnd := getMySQLCurrentBinlogFile(db)
 	tracelog.DebugLogger.Println("Binlog end file", binlogEnd)
 
-	internal.UploadSentinel(uploader.Uploader, &StreamSentinelDto{BinLogStart: binlogStart, BinLogEnd: binlogEnd, StartLocalTime: timeStart}, fileName)
-
-	return err
+	sentinel := StreamSentinelDto{BinLogStart: binlogStart, BinLogEnd: binlogEnd, StartLocalTime: timeStart}
+	return internal.UploadSentinel(uploader.Uploader, &sentinel, fileName)
 }

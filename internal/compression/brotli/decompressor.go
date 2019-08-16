@@ -11,7 +11,7 @@ type Decompressor struct{}
 
 func (decompressor Decompressor) Decompress(dst io.Writer, src io.Reader) error {
 	brotliReader := cbrotli.NewReader(computils.NewUntilEofReader(src))
-	defer brotliReader.Close()
+	defer utility.LoggedClose(brotliReader, "")
 	_, err := utility.FastCopy(dst, brotliReader)
 	return err
 }

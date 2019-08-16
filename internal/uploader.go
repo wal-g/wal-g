@@ -83,13 +83,13 @@ func (uploader *Uploader) UploadWalFile(file NamedReader) error {
 			walFileReader = file
 		} else {
 			walFileReader = recordingReader
-			defer recordingReader.Close()
+			defer utility.LoggedClose(recordingReader, "")
 		}
 	} else {
 		walFileReader = file
 	}
 
-	return uploader.UploadFile(&NamedReaderImpl{walFileReader, file.Name()})
+	return uploader.UploadFile(NewNamedReaderImpl(walFileReader, file.Name()))
 }
 
 // TODO : unit tests

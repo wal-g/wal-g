@@ -51,17 +51,11 @@ func (err PgControlNotFoundError) Error() string {
 func HandleBackupFetch(folder storage.Folder, dbDataDirectory string, backupName string, fileMask string) {
 	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder, %s)\n", backupName, dbDataDirectory)
 	backup, err := GetBackupByName(backupName, folder)
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Failed to fetch backup: %v\n", err)
-	}
+	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 	filesToUnwrap, err := backup.GetFilesToUnwrap(fileMask)
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Failed to fetch backup: %v\n", err)
-	}
+	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 	err = deltaFetchRecursion(backupName, folder, utility.ResolveSymlink(dbDataDirectory), filesToUnwrap)
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Failed to fetch backup: %v\n", err)
-	}
+	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 }
 
 func GetBackupByName(backupName string, folder storage.Folder) (*Backup, error) {

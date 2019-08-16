@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/ioutil"
 	"log"
@@ -77,13 +78,13 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+	defer utility.LoggedClose(in, "")
 
 	out, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer utility.LoggedClose(out, "")
 
 	_, err = io.Copy(out, in)
 	if err != nil {

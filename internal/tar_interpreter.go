@@ -2,6 +2,7 @@ package internal
 
 import (
 	"archive/tar"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path"
@@ -66,7 +67,7 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFile(fileReader io.Reader
 		}
 		return errors.Wrap(err, "Interpret: copy failed")
 	}
-	defer file.Close()
+	defer utility.LoggedClose(file, "")
 
 	mode := os.FileMode(fileInfo.Mode)
 	if err = os.Chmod(file.Name(), mode); err != nil {

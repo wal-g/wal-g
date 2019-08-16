@@ -16,9 +16,7 @@ func HandleOplogPush(uploader *Uploader) {
 	oplogName := OplogPrefix + utility.TimeNowCrossPlatformUTC().Format("20060102T150405Z")
 	dstPath := oplogName + "." + uploader.Compressor.FileExtension()
 	err := uploader.PushStreamToDestination(os.Stdin, dstPath)
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Oplog file " + dstPath + " was uploaded")
 }

@@ -66,7 +66,7 @@ func TestTar(t *testing.T) {
 //	readerMaker := &testtools.FileReaderMaker{Key: "testdata/part_021.tar.zst"}
 //	result, err := os.Create("testdata/part_021.tar")
 //	assert.NoError(t, err)
-//	defer result.Close()
+//	defer utility.LoggedClose(result, "")
 //	var crypter internal.OpenPGPCrypter
 //	err = internal.DecryptAndDecompressTar(result, readerMaker, &crypter)
 //	assert.NoError(t, err)

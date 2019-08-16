@@ -57,7 +57,7 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	PgCmd.AddCommand(deleteCmd)
+	Cmd.AddCommand(deleteCmd)
 
 	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
@@ -83,8 +83,8 @@ func postgresIsFullBackup(folder storage.Folder, object storage.Object) bool {
 }
 
 func tryFetchLSN(object storage.Object) (string, bool) {
-	found_lsn := regexpLSN.FindAllString(object.GetName(), maxCountOfLSN)
-	if len(found_lsn) > 0 {
+	foundLsn := regexpLSN.FindAllString(object.GetName(), maxCountOfLSN)
+	if len(foundLsn) > 0 {
 		return regexpLSN.FindAllString(object.GetName(), maxCountOfLSN)[0], true
 	}
 	return "", false

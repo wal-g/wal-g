@@ -30,5 +30,5 @@ var backupFetchCmd = &cobra.Command{
 func init() {
 	backupFetchCmd.Flags().StringVar(&fileMask, "mask", "", MaskFlagDescription)
 
-	PgCmd.AddCommand(backupFetchCmd)
+	Cmd.AddCommand(backupFetchCmd)
 }

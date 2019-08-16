@@ -91,7 +91,7 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 	if err != nil {
 		return errors.Wrap(err, "DecryptAndDecompressTar: failed to create new reader")
 	}
-	defer readCloser.Close()
+	defer utility.LoggedClose(readCloser, "")
 
 	if crypter != nil {
 		var reader io.Reader
@@ -167,14 +167,14 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 	isFailed := sync.Map{}
 
 	for _, file := range files {
-		downloadingSemaphore.Acquire(downloadingContext, 1)
+		_ = downloadingSemaphore.Acquire(downloadingContext, 1)
 		fileClosure := file
 
 		extractingReader, pipeWriter := io.Pipe()
 		decompressingWriter := &EmptyWriteIgnorer{pipeWriter}
 		go func() {
 			err := DecryptAndDecompressTar(decompressingWriter, fileClosure, crypter)
-			decompressingWriter.Close()
+			utility.LoggedClose(decompressingWriter, "")
 			tracelog.InfoLogger.Printf("Finished decompression of %s", fileClosure.Path())
 			if err != nil {
 				isFailed.Store(fileClosure, true)
@@ -185,7 +185,7 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 			defer downloadingSemaphore.Release(1)
 			err := extractOne(tarInterpreter, extractingReader)
 			err = errors.Wrapf(err, "Extraction error in %s", fileClosure.Path())
-			extractingReader.Close()
+			utility.LoggedClose(extractingReader, "")
 			tracelog.InfoLogger.Printf("Finished extraction of %s", fileClosure.Path())
 			if err != nil {
 				isFailed.Store(fileClosure, true)
@@ -194,7 +194,7 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 		}()
 	}
 
-	downloadingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency))
+	_ = downloadingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency))
 	isFailed.Range(func(failedFile, _ interface{}) bool {
 		failed = append(failed, failedFile.(ReaderMaker))
 		return true

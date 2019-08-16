@@ -18,14 +18,10 @@ type Crypter struct {
 func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	if len(crypter.SymmetricKey.GetKey()) == 0 {
 		err := crypter.SymmetricKey.Generate()
-		if err != nil {
-			tracelog.ErrorLogger.Fatalf("Can't generate symmetric key: %v", err)
-		}
+		tracelog.ErrorLogger.FatalfOnError("Can't generate symmetric key: %v", err)
 
 		err = crypter.SymmetricKey.Encrypt()
-		if err != nil {
-			tracelog.ErrorLogger.Fatalf("Can't encrypt symmetric key: %v", err)
-		}
+		tracelog.ErrorLogger.FatalfOnError("Can't encrypt symmetric key: %v", err)
 	}
 
 	bufferedWriter := bufio.NewWriter(writer)
@@ -50,16 +46,12 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
 	encryptedSymmetricKey := make([]byte, crypter.SymmetricKey.GetEncryptedKeyLen())
 	_, err := reader.Read(encryptedSymmetricKey)
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Can't read encryption key from archive file header: %v", err)
-	}
+	tracelog.ErrorLogger.FatalfOnError("Can't read encryption key from archive file header: %v", err)
 
 	crypter.SymmetricKey.SetEncryptedKey(encryptedSymmetricKey)
 
 	err = crypter.SymmetricKey.Decrypt()
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Can't decrypt symmetric key: %v", err)
-	}
+	tracelog.ErrorLogger.FatalfOnError("Can't decrypt symmetric key: %v", err)
 
 	return sio.DecryptReader(reader, sio.Config{Key: crypter.SymmetricKey.GetKey()})
 }
