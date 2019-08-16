@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func parseFirstTimestampFromHeader(fileReadSeekCloser ioextensions.ReadSeekCloser) (int32, error) {
+func ParseFirstTimestampFromHeader(fileReadSeekCloser ioextensions.ReadSeekCloser) (int32, error) {
 	defer fileReadSeekCloser.Close()
 
 	if _, err := fileReadSeekCloser.Seek(4, io.SeekStart); err != nil {
@@ -39,7 +39,7 @@ func parseFromBinlog(filePath string) (time.Time, error) {
 		return time.Time{}, err
 	}
 
-	timestamp, err := parseFirstTimestampFromHeader(file)
+	timestamp, err := ParseFirstTimestampFromHeader(file)
 
 	if err != nil {
 		return time.Time{}, err

@@ -3,12 +3,10 @@ package mysql
 import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 )
@@ -47,91 +45,69 @@ func FetchLogs(folder storage.Folder, backup *internal.Backup) error {
 			backupUploadTime = binlog.GetLastModified()
 		}
 	}
-	dstFolder, fetchedBinlogs, err := getNecessaryBinlog(folder, backupUploadTime)
+
+	logsToFetch, err := internal.GetLogsCoveringInterval(folder, backupUploadTime, nil)
 	if err != nil {
 		return err
 	}
-	return createIndexFile(dstFolder, fetchedBinlogs)
+	endTS, logDstFolder, err := internal.GetOperationLogsSettings(BinlogFetchSettings{}.GetEndTsEnv(), BinlogFetchSettings{}.GetDstEnv())
+
+	if err != nil {
+		return err
+	}
+
+	fetchedBinlogs, err := filterBinlogByHeaderTimestamp(folder, logsToFetch, logDstFolder, endTS)
+
+	if err != nil {
+		return err
+	}
+
+	return createIndexFile(logDstFolder, fetchedBinlogs)
 }
 
-func createIndexFile(dstFolder string, fetchedBinlogs []storage.Object) error {
-	indexFile, err := os.Create(filepath.Join(dstFolder, "binlogs_order"))
-	if err != nil {
-		return err
-	}
+func filterBinlogByHeaderTimestamp(folder storage.Folder, logsToFetch []storage.Object, logDstFolder string, endTS *time.Time) ([]string, error) {
+	var actuallyFetched []string
 
-	for _, object := range fetchedBinlogs {
-		_, err = indexFile.WriteString(utility.TrimFileExtension(object.GetName()) + "\n")
+	for _, binlog := range logsToFetch {
+		binlogName := utility.TrimFileExtension(binlog.GetName())
+		logFilePath := path.Join(logDstFolder, binlogName)
+
+		err := internal.DownloadWALFileTo(folder, binlogName, logFilePath)
 		if err != nil {
-			return err
+			return actuallyFetched, err
 		}
-	}
-	return indexFile.Close()
-}
 
-func getNecessaryBinlog(folder storage.Folder, backupStartUploadTime time.Time) (string, []storage.Object, error) {
-	binlogFolder := folder.GetSubFolder(BinlogPath)
-
-	endTS, dstFolder, err := GetBinlogConfigs()
-	if err != nil {
-		return "", nil, err
-	}
-
-	objects, _, err := binlogFolder.ListFolder()
-	if err != nil {
-		return "", nil, err
-	}
-
-	var fetchedLogs []storage.Object
-
-	sort.Slice(objects, func(i, j int) bool {
-		return objects[i].GetLastModified().Before(objects[j].GetLastModified())
-	})
-
-	for _, object := range objects {
-		tracelog.InfoLogger.Println("Consider binlog ", object.GetName(), object.GetLastModified().Format(time.RFC3339))
-		binlogName := ExtractBinlogName(object, folder)
-
-		if BinlogShouldBeFetched(backupStartUploadTime, object) {
-			fileName := path.Join(dstFolder, binlogName)
-			tracelog.InfoLogger.Println("Download", binlogName, "to", fileName)
-
-			if err := internal.DownloadWALFileTo(binlogFolder, binlogName, fileName); err != nil {
-				return "", nil, err
-			}
-
-			binlogFirstEventTimestamp, err := parseFromBinlog(fileName)
-
-			if err != nil {
-				return "", nil, err
-			}
-
-			if BinlogIsTooOld(binlogFirstEventTimestamp, endTS) {
-				if err = os.Remove(fileName); err != nil {
-					return "", nil, err
-				}
-				return dstFolder, fetchedLogs, nil
-			}
-
-			fetchedLogs = append(fetchedLogs, object)
+		timestamp, err := parseFromBinlog(logFilePath)
+		if err != nil {
+			return nil, err
 		}
+
+		if BinlogIsTooOld(timestamp, endTS) {
+			if err := os.Remove(logFilePath); err != nil {
+				return nil, err
+			}
+			return actuallyFetched, err
+		}
+		actuallyFetched = append(actuallyFetched, binlogName)
 	}
-
-	return dstFolder, fetchedLogs, nil
-}
-
-func BinlogShouldBeFetched(backupStartUploadTime time.Time, object storage.Object) bool {
-	return backupStartUploadTime.Before(object.GetLastModified()) || backupStartUploadTime.Equal(object.GetLastModified())
+	return actuallyFetched, nil
 }
 
 func BinlogIsTooOld(binlogTimestamp time.Time, endTS *time.Time) bool {
 	return endTS != nil && binlogTimestamp.After(*endTS)
 }
 
-func GetBinlogConfigs() (endTS *time.Time, dstFolder string, err error) {
-	return internal.GetOperationLogsSettings(BinlogEndTsSetting, BinlogDstSetting)
-}
-func ExtractBinlogName(object storage.Object, folder storage.Folder) string {
-	binlogName := object.GetName()
-	return strings.TrimSuffix(binlogName, "."+utility.GetFileExtension(binlogName))
+func createIndexFile(dstFolder string, fetchedBinlogs []string) error {
+	indexFile, err := os.Create(filepath.Join(dstFolder, "binlogs_order"))
+	if err != nil {
+		return err
+	}
+
+	for _, binlogName := range fetchedBinlogs {
+		_, err = indexFile.WriteString(utility.TrimFileExtension(binlogName) + "\n")
+		if err != nil {
+			return err
+		}
+	}
+	return indexFile.Close()
 }
