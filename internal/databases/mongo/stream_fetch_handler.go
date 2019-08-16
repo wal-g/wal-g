@@ -38,6 +38,8 @@ func FetchLogs(folder storage.Folder, backup *internal.Backup) error {
 	if err != nil {
 		return err
 	}
-	_, _, err = internal.FetchLogs(folder, streamSentinel.StartLocalTime, OpLogFetchSettings{})
+	_, err = internal.FetchLogs(folder, streamSentinel.StartLocalTime, OpLogFetchSettings{}, func(s string) bool {
+		return false
+	})
 	return err
 }

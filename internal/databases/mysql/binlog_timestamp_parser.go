@@ -9,37 +9,39 @@ import (
 	"time"
 )
 
-func ParseFirstTimestampFromHeader(fileReadSeekCloser ioextensions.ReadSeekCloser) (int32, error) {
+const (
+	BinlogMagicOffset     = 4
+	TimestampHeaderLength = 4
+)
+
+func parseFirstTimestampFromHeader(fileReadSeekCloser ioextensions.ReadSeekCloser) (int32, error) {
 	defer fileReadSeekCloser.Close()
 
-	if _, err := fileReadSeekCloser.Seek(4, io.SeekStart); err != nil {
+	if _, err := fileReadSeekCloser.Seek(BinlogMagicOffset, io.SeekStart); err != nil {
+		return 0, err
+	}
+	headerEventBytes := make([]byte, TimestampHeaderLength)
+	if _, err := fileReadSeekCloser.Read(headerEventBytes); err != nil {
 		return 0, err
 	}
 
-	timestamp := make([]byte, 4)
-
-	if _, err := fileReadSeekCloser.Read(timestamp); err != nil {
-		return 0, err
-	}
-
-	var num int32
-	err := binary.Read(bytes.NewReader(timestamp), binary.LittleEndian, &num)
+	var timestamp int32
+	err := binary.Read(bytes.NewReader(headerEventBytes), binary.LittleEndian, &timestamp)
 
 	if err != nil {
 		return 0, err
 	}
 
-	return num, nil
+	return timestamp, nil
 }
 
 func parseFromBinlog(filePath string) (time.Time, error) {
 	file, err := os.Open(filePath)
-
 	if err != nil {
 		return time.Time{}, err
 	}
 
-	timestamp, err := ParseFirstTimestampFromHeader(file)
+	timestamp, err := parseFirstTimestampFromHeader(file)
 
 	if err != nil {
 		return time.Time{}, err

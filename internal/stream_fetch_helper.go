@@ -103,11 +103,11 @@ func GetLogsCoveringInterval(folder storage.Folder, start time.Time, end *time.T
 }
 
 // DownloadLogFiles downloads files to specified folder
-func DownloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, logDstFolder string, getLogFilePath func(string, string) (string, error)) error {
+func DownloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, getLogFilePath func(string) (string, error), shouldAbortFetch func(filePath string) bool) error {
 	for _, logFile := range logFiles {
 		logName := utility.TrimFileExtension(logFile.GetName())
 
-		logFilePath, err := getLogFilePath(logDstFolder, logName)
+		logFilePath, err := getLogFilePath(logName)
 		if err != nil {
 			return err
 		}
@@ -117,27 +117,29 @@ func DownloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, logDs
 		if err != nil {
 			return err
 		}
+
+		if shouldAbortFetch(logFilePath) {
+			return os.Remove(logFilePath)
+		}
 	}
 
 	return nil
 }
 
-func FetchLogs(folder storage.Folder, startTime time.Time, settings LogFetchSettings) (logDstFolder string, fetched []storage.Object, err error) {
+func FetchLogs(folder storage.Folder, startTime time.Time, settings LogFetchSettings, shouldAbortFetch func(filePath string) bool) (fetched []storage.Object, err error) {
 	endTS, logDstFolder, err := GetOperationLogsSettings(settings.GetEndTsEnv(), settings.GetDstEnv())
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	logFolder := folder.GetSubFolder(settings.GetLogFolderPath())
 	logsToFetch, err := GetLogsCoveringInterval(logFolder, startTime, endTS)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
-	err = DownloadLogFiles(logsToFetch, logFolder, logDstFolder, settings.GetFilePath)
-	if err != nil {
-		return "", nil, err
-	}
-	return logDstFolder, logsToFetch, nil
+	return logsToFetch, DownloadLogFiles(logsToFetch, logFolder, func(filename string) (string, error) {
+		return settings.GetFilePath(logDstFolder, filename)
+	}, shouldAbortFetch)
 }
 
 func LogFileShouldBeFetched(backupStartUploadTime time.Time, endTS *time.Time, object storage.Object) bool {
