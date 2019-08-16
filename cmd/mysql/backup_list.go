@@ -21,5 +21,5 @@ var backupListCmd = &cobra.Command{
 }
 
 func init() {
-	MySQLCmd.AddCommand(backupListCmd)
+	Cmd.AddCommand(backupListCmd)
 }

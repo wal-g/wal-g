@@ -23,5 +23,5 @@ var streamFetchCmd = &cobra.Command{
 }
 
 func init() {
-	MongoCmd.AddCommand(streamFetchCmd)
+	Cmd.AddCommand(streamFetchCmd)
 }

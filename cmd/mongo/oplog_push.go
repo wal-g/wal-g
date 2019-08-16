@@ -23,5 +23,5 @@ var oplogPushCmd = &cobra.Command{
 }
 
 func init() {
-	MongoCmd.AddCommand(oplogPushCmd)
+	Cmd.AddCommand(oplogPushCmd)
 }

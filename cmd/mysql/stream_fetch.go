@@ -1,8 +1,8 @@
 package mysql
 
 import (
-	"github.com/wal-g/wal-g/internal/databases/mysql"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/mysql"
 	"github.com/wal-g/wal-g/internal/tracelog"
 
 	"github.com/spf13/cobra"
@@ -14,7 +14,7 @@ const StreamFetchShortDescription = ""
 var streamFetchCmd = &cobra.Command{
 	Use:   "stream-fetch backup-name",
 	Short: StreamFetchShortDescription,
-	Args: cobra.ExactArgs(1),
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -23,5 +23,5 @@ var streamFetchCmd = &cobra.Command{
 }
 
 func init() {
-	MySQLCmd.AddCommand(streamFetchCmd)
+	Cmd.AddCommand(streamFetchCmd)
 }

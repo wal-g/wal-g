@@ -25,9 +25,7 @@ func HandleStreamPush(uploader *Uploader) {
 	}
 	backupName := "dump_" + time.Now().Format(time.RFC3339)
 	err := uploader.UploadStream(backupName, stream)
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 func (uploader *Uploader) UploadStream(backupName string, stream io.Reader) error {

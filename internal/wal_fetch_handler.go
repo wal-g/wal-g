@@ -109,7 +109,7 @@ func checkWALFileMagic(prefetched string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer utility.LoggedClose(file, "")
 	magic := make([]byte, 4)
 	_, err = file.Read(magic)
 	if err != nil {
@@ -234,7 +234,7 @@ func DownloadAndDecompressWALFile(folder storage.Folder, walFileName string) (io
 		reader, writer := io.Pipe()
 		go func() {
 			err = DecompressWALFile(&EmptyWriteIgnorer{writer}, archiveReader, decompressor)
-			writer.CloseWithError(err)
+			_ = writer.CloseWithError(err)
 		}()
 		return reader, nil
 	}
@@ -248,6 +248,6 @@ func DownloadWALFileTo(folder storage.Folder, walFileName string, dstPath string
 	if err != nil {
 		return err
 	}
-	defer reader.Close()
+	defer utility.LoggedClose(reader, "")
 	return ioextensions.CreateFileWith(dstPath, reader)
 }

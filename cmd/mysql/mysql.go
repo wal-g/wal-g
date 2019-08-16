@@ -8,21 +8,21 @@ import (
 	"strings"
 )
 
-var MySQLShortDescription = "MySQL backup tool"
+var ShortDescription = "MySQL backup tool"
 
 // These variables are here only to show current version. They are set in makefile during build process
 var WalgVersion = "devel"
 var GitRevision = "devel"
 var BuildDate = "devel"
 
-var MySQLCmd = &cobra.Command{
+var Cmd = &cobra.Command{
 	Use:     "mysql",
-	Short:   MySQLShortDescription, // TODO : improve description
+	Short:   ShortDescription, // TODO : improve description
 	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "MySQL"}, "\t"),
 }
 
 func Execute() {
-	if err := MySQLCmd.Execute(); err != nil {
+	if err := Cmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -31,6 +31,6 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
-	MySQLCmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
-	MySQLCmd.InitDefaultVersionFlag()
+	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
+	Cmd.InitDefaultVersionFlag()
 }

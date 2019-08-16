@@ -3,6 +3,7 @@ package walparser
 import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/utility"
 	"os"
 	"testing"
 )
@@ -69,7 +70,7 @@ func doLongRecordParsingTesting(t *testing.T, pageReader WalPageReader, parser W
 
 func parsingTestCase(t *testing.T, filename string, doTesting func(*testing.T, WalPageReader, WalParser)) {
 	walFile, err := os.Open(filename)
-	defer walFile.Close()
+	defer utility.LoggedClose(walFile, "")
 	assert.NoError(t, err)
 	pageReader := WalPageReader{walFileReader: walFile}
 	parser := NewWalParser()

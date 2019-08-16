@@ -3,7 +3,6 @@ package internal_test
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/storages/memory"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"testing"
 )
@@ -26,14 +25,4 @@ func TestGetDeltaFileNameFor(t *testing.T) {
 
 func TestGetPositionInDelta(t *testing.T) {
 	assert.Equal(t, 12, internal.GetPositionInDelta(WalFilename))
-}
-
-func assertContainsTestLocation(t *testing.T, storage memory.Storage) {
-	storageDeltaFilePath := "bucket/server/wal_005/000000010000000000000070_delta.mock"
-	locationBuffer, _ := storage.Load(storageDeltaFilePath)
-	reader := internal.NewBlockLocationReader(&locationBuffer.Data)
-	location, err := reader.ReadNextLocation()
-	assert.NoError(t, err)
-	assert.NotNil(t, location)
-	assert.Equal(t, TestLocation, *location)
 }

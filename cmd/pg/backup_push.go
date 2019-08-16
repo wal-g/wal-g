@@ -24,16 +24,16 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			uploader, err := internal.ConfigureUploader()
 			tracelog.ErrorLogger.FatalOnError(err)
-			internal.HandleBackupPush(uploader, args[0], permanent, full_backup)
+			internal.HandleBackupPush(uploader, args[0], permanent, fullBackup)
 		},
 	}
-	permanent = false
-	full_backup = false
+	permanent  = false
+	fullBackup = false
 )
 
 func init() {
-	PgCmd.AddCommand(backupPushCmd)
+	Cmd.AddCommand(backupPushCmd)
 
 	backupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes permanent backup")
-	backupPushCmd.Flags().BoolVarP(&full_backup, FullBackupFlag, FullBackupShorthand, false, "Make full backup-push")
+	backupPushCmd.Flags().BoolVarP(&fullBackup, FullBackupFlag, FullBackupShorthand, false, "Make full backup-push")
 }

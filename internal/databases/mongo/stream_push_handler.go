@@ -16,9 +16,7 @@ func HandleStreamPush(uploader *Uploader) {
 	}
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	err := uploader.UploadStream(os.Stdin)
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 // TODO : unit tests
@@ -26,7 +24,8 @@ func HandleStreamPush(uploader *Uploader) {
 func (uploader *Uploader) UploadStream(stream io.Reader) error {
 	timeStart := utility.TimeNowCrossPlatformLocal()
 	backupName, err := uploader.PushStream(stream)
-	internal.UploadSentinel(uploader.Uploader, &StreamSentinelDto{StartLocalTime: timeStart}, backupName)
-
-	return err
+	if err != nil {
+		return err
+	}
+	return internal.UploadSentinel(uploader.Uploader, &StreamSentinelDto{StartLocalTime: timeStart}, backupName)
 }

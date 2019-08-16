@@ -14,15 +14,10 @@ import (
 func MarkBackup(uploader *Uploader, folder storage.Folder, backupName string, toPermanent bool) {
 	tracelog.InfoLogger.Printf("Retrieving previous related backups to be marked: toPermanent=%t", toPermanent)
 	metadataToUpload, err := GetMarkedBackupMetadataToUpload(folder, backupName, toPermanent)
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Failed to get previous backups: %v", err)
-	} else {
-		tracelog.InfoLogger.Printf("Retrieved backups to be marked, marking: %v", metadataToUpload)
-		err = uploader.UploadMultiple(metadataToUpload)
-		if err != nil {
-			tracelog.ErrorLogger.Fatalf("Failed to mark previous backups: %v", err)
-		}
-	}
+	tracelog.ErrorLogger.FatalfOnError("Failed to get previous backups: %v", err)
+	tracelog.InfoLogger.Printf("Retrieved backups to be marked, marking: %v", metadataToUpload)
+	err = uploader.UploadMultiple(metadataToUpload)
+	tracelog.ErrorLogger.FatalfOnError("Failed to mark previous backups: %v", err)
 }
 
 // GetMarkedBackupMetadataToUpload retrieves all previous permanent or
@@ -62,7 +57,7 @@ func GetMarkedBackupMetadataToUpload(
 }
 
 func getMarkedPermanentBackupMetadata(baseBackupFolder storage.Folder, backupName string) ([]UploadObject, error) {
-	backupMetadata := []UploadObject{}
+	var backupMetadata []UploadObject
 
 	// retrieve current backup sentinel and meta
 	backup := NewBackup(baseBackupFolder, backupName)

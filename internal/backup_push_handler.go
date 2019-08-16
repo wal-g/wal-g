@@ -125,7 +125,8 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	bundle.TarBallMaker = NewStorageTarBallMaker(backupName, uploader)
 
 	// Start a new tar bundle, walk the archiveDirectory and upload everything there.
-	bundle.StartQueue()
+	err = bundle.StartQueue()
+	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Println("Walking ...")
 	err = filepath.Walk(archiveDirectory, bundle.HandleWalkedFSObject)
 	tracelog.ErrorLogger.FatalOnError(err)

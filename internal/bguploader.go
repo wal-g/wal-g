@@ -80,7 +80,6 @@ func (bgUploader *BgUploader) Stop() {
 
 var readySuffix = ".ready"
 var archiveStatus = "archive_status"
-var doneSuffix = ".done"
 
 // TODO : unit tests
 func (bgUploader *BgUploader) scanOnce() {

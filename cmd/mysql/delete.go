@@ -54,7 +54,7 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	MySQLCmd.AddCommand(deleteCmd)
+	Cmd.AddCommand(deleteCmd)
 	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }

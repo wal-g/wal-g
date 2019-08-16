@@ -35,7 +35,7 @@ var (
 )
 
 func init() {
-	PgCmd.AddCommand(backupListCmd)
+	Cmd.AddCommand(backupListCmd)
 
 	backupListCmd.Flags().BoolVar(&pretty, PrettyFlag, false, "Prints more readable output")
 	backupListCmd.Flags().BoolVar(&json, JsonFlag, false, "Prints output in json format")

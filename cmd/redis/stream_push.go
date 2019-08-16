@@ -23,5 +23,5 @@ var streamPushCmd = &cobra.Command{
 }
 
 func init() {
-	RedisCmd.AddCommand(streamPushCmd)
+	Cmd.AddCommand(streamPushCmd)
 }

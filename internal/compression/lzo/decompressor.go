@@ -21,7 +21,7 @@ func (decompressor Decompressor) Decompress(dst io.Writer, src io.Reader) error 
 	if err != nil {
 		return err
 	}
-	defer lzor.Close()
+	defer utility.LoggedClose(lzor, "")
 
 	_, err = fastCopyHandleErrClosedPipe(dst, lzor)
 	return err

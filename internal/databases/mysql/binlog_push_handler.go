@@ -17,9 +17,9 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-const MysqlBinlogCacheFileName = ".walg_mysql_binlogs_cache"
+const BinlogCacheFileName = ".walg_mysql_binlogs_cache"
 
-type MySQLLogsCache struct {
+type LogsCache struct {
 	LastArchivedBinlog string `json:"LastArchivedBinlog"`
 }
 
@@ -30,18 +30,14 @@ func HandleBinlogPush(uploader *Uploader) {
 	binlogsFolder := viper.GetString(BinlogSrcSetting)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(BinlogPath)
 	db, err := getMySQLConnection()
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(db, "")
 
 	binlogs := getMySQLSortedBinlogs(db)
 
 	for _, binLog := range binlogs {
 		err = tryArchiveBinLog(uploader, path.Join(binlogsFolder, binLog), binLog)
-		if err != nil {
-			tracelog.ErrorLogger.Fatalf("%+v\n", err)
-		}
+		tracelog.ErrorLogger.FatalOnError(err)
 	}
 }
 
@@ -51,17 +47,13 @@ func getMySQLSortedBinlogs(db *sql.DB) []string {
 	currentBinlog := getMySQLCurrentBinlogFile(db)
 
 	rows, err := db.Query("SHOW BINARY LOGS")
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(rows, "")
 	for rows.Next() {
 		var logFinName string
 		var size uint32
 		err = scanToMap(rows, map[string]interface{}{"Log_name": &logFinName, "File_size": &size})
-		if err != nil {
-			tracelog.ErrorLogger.Fatalf("%+v\n", err)
-		}
+		tracelog.ErrorLogger.FatalOnError(err)
 		if logFinName < currentBinlog {
 			result = append(result, logFinName)
 		}
@@ -92,12 +84,12 @@ func tryArchiveBinLog(uploader *Uploader, filename string, binLog string) error 
 }
 
 func getLastArchivedBinlog() string {
-	var cache MySQLLogsCache
+	var cache LogsCache
 	var cacheFilename string
 
 	usr, err := user.Current()
 	if err == nil {
-		cacheFilename = filepath.Join(usr.HomeDir, MysqlBinlogCacheFileName)
+		cacheFilename = filepath.Join(usr.HomeDir, BinlogCacheFileName)
 		var file []byte
 		file, err = ioutil.ReadFile(cacheFilename)
 		if err == nil {
@@ -116,12 +108,12 @@ func getLastArchivedBinlog() string {
 }
 
 func setLastArchivedBinlog(binlogFileName string) {
-	var cache MySQLLogsCache
+	var cache LogsCache
 	var cacheFilename string
 
 	usr, err := user.Current()
 	if err == nil {
-		cacheFilename = filepath.Join(usr.HomeDir, MysqlBinlogCacheFileName)
+		cacheFilename = filepath.Join(usr.HomeDir, BinlogCacheFileName)
 		var file []byte
 		file, err = ioutil.ReadFile(cacheFilename)
 		// here we ignore whatever error can occur

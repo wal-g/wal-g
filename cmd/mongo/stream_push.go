@@ -22,5 +22,5 @@ var streamPushCmd = &cobra.Command{
 }
 
 func init() {
-	MongoCmd.AddCommand(streamPushCmd)
+	Cmd.AddCommand(streamPushCmd)
 }

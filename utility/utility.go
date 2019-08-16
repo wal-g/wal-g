@@ -31,7 +31,6 @@ const (
 	BaseBackupPath   = "basebackups_" + VersionStr + "/"
 	WalPath          = "wal_" + VersionStr + "/"
 	BackupNamePrefix = "base_"
-	WalNamePrefix    = "wal_"
 
 	// utility.SentinelSuffix is a suffix of backup finish sentinel file
 	SentinelSuffix         = "_backup_stop_sentinel.json"
@@ -59,7 +58,7 @@ func Max(a, b int) int {
 
 func ToBytes(x interface{}) []byte {
 	var buf bytes.Buffer
-	binary.Write(&buf, binary.LittleEndian, x)
+	_ = binary.Write(&buf, binary.LittleEndian, x)
 	return buf.Bytes()
 }
 
@@ -140,9 +139,9 @@ var regexpLSN = regexp.MustCompile(patternLSN)
 
 // Strips the backup WAL file name.
 func StripWalFileName(path string) string {
-	found_lsn := regexpLSN.FindAllString(path, 2)
-	if len(found_lsn) > 0 {
-		return found_lsn[0]
+	foundLsn := regexpLSN.FindAllString(path, 2)
+	if len(foundLsn) > 0 {
+		return foundLsn[0]
 	}
 	return strings.Repeat("Z", 24)
 }

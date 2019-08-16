@@ -18,7 +18,6 @@ import (
 )
 
 const (
-	StreamPrefix          = "stream_"
 	BinlogPath            = "binlog_" + utility.VersionStr + "/"
 	DatasourceNameSetting = "WALG_MYSQL_DATASOURCE_NAME"
 	BinlogEndTsSetting    = "WALG_MYSQL_BINLOG_END_TS"
@@ -50,16 +49,12 @@ func scanToMap(rows *sql.Rows, dst map[string]interface{}) error {
 
 func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
 	rows, err := db.Query("SHOW MASTER STATUS")
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("%+v\n", err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(rows, "")
 	var logFileName string
 	for rows.Next() {
 		err = scanToMap(rows, map[string]interface{}{"File": &logFileName})
-		if err != nil {
-			tracelog.ErrorLogger.Fatalf("%+v\n", err)
-		}
+		tracelog.ErrorLogger.FatalOnError(err)
 		return logFileName
 	}
 	tracelog.ErrorLogger.Fatalf("Failed to obtain current binlog file")
@@ -81,9 +76,12 @@ func getMySQLConnection() (*sql.DB, error) {
 		if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
 			return nil, fmt.Errorf("Failed to load certificate from %s", caFile)
 		}
-		mysql.RegisterTLSConfig("custom", &tls.Config{
+		err = mysql.RegisterTLSConfig("custom", &tls.Config{
 			RootCAs: rootCertPool,
 		})
+		if err != nil {
+			return nil, err
+		}
 		if strings.Contains(datasourceName, "?tls=") || strings.Contains(datasourceName, "&tls=") {
 			return nil, fmt.Errorf("MySQL datasource string contains tls option. It can't be used with %v option", SslCaSetting)
 		}
