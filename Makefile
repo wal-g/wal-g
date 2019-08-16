@@ -22,11 +22,24 @@ pg_build_image: install deps pg_build unlink_brotli
 	docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix
 	mkdir -p ${CACHE_FOLDER}
 	docker save ${IMAGE} | gzip -c > ${CACHE_FILE}
+	mkdir -p ${PERF_TEST_FOLDER}/wal_push_logs
+	mkdir -p ${PERF_TEST_FOLDER}/wal_fetch_logs
+	mkdir -p ${PERF_TEST_FOLDER}/backup_push_logs
+	mkdir -p ${PERF_TEST_FOLDER}/backup_fetch_logs
 
 pg_integration_test:
-	docker load -i ${CACHE_FILE}
+	docker load -i ${CACHE_FILE} || true
 	docker-compose build $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
+
+pg_perftest:
+	docker load -i ${CACHE_FILE} || true
+	docker-compose build $(TEST)
+	docker-compose up --exit-code-from $(TEST) $(TEST)
+	docker cp wal-g_${TEST}:tmp/logs/wal_push_logs/$(TEST)_logs ${PERF_TEST_FOLDER}/wal_push_logs || true
+	docker cp wal-g_${TEST}:tmp/logs/wal_fetch_logs/$(TEST)_logs ${PERF_TEST_FOLDER}/wal_fetch_logs || true
+	docker cp wal-g_${TEST}:tmp/logs/backup_push_logs/$(TEST)_logs ${PERF_TEST_FOLDER}/backup_push_logs || true
+	docker cp wal-g_${TEST}:tmp/logs/backup_fetch_logs/$(TEST)_logs ${PERF_TEST_FOLDER}/backup_fetch_logs || true
 
 all_unittests: install deps lint unittest
 
@@ -129,3 +142,15 @@ unlink_brotli:
 	rm -rf vendor/github.com/google/brotli/*
 	mv tmp/* vendor/github.com/google/brotli/
 	rm -rf tmp/
+
+show_perftest_result:
+	ls ${PERF_TEST_FOLDER}
+	ls ${PERF_TEST_FOLDER}/wal_push_logs
+	ls ${PERF_TEST_FOLDER}/wal_fetch_logs
+	ls ${PERF_TEST_FOLDER}/backup_push_logs
+	ls ${PERF_TEST_FOLDER}/backup_fetch_logs
+	cat ${PERF_TEST_FOLDER}/wal_push_logs/*
+	cat ${PERF_TEST_FOLDER}/wal_fetch_logs/*
+	cat ${PERF_TEST_FOLDER}/backup_push_logs/*
+	cat ${PERF_TEST_FOLDER}/backup_fetch_logs/*
+
