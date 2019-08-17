@@ -25,8 +25,30 @@ func (settings BinlogFetchSettings) GetLogFolderPath() string {
 	return BinlogPath
 }
 
-func (settings BinlogFetchSettings) GetFilePath(dstFolder string, logName string) (string, error) {
-	return path.Join(dstFolder, logName), nil
+type BinlogFetchParams struct {
+	folder  storage.Folder
+	StartTs time.Time
+}
+
+func (params BinlogFetchParams) GetStorageFolder() storage.Folder {
+	return params.folder
+}
+
+func (params BinlogFetchParams) GetStartTs() time.Time {
+	return params.StartTs
+}
+
+type BinlogFetchHandlers struct {
+	dstFolder string
+	endTs     *time.Time
+}
+
+func (handlers BinlogFetchHandlers) GetLogFilePath(pathToLog string) (string, error) {
+	return path.Join(handlers.dstFolder, pathToLog), nil
+}
+
+func (handlers BinlogFetchHandlers) CheckUploadedLog(pathToLog string) (bool, error) {
+	return filterBinlogByHeaderTimestamp(pathToLog, handlers.endTs)
 }
 
 func FetchLogs(folder storage.Folder, backup *internal.Backup) error {
@@ -47,17 +69,17 @@ func FetchLogs(folder storage.Folder, backup *internal.Backup) error {
 			backupUploadTime = binlog.GetLastModified()
 		}
 	}
-	endTS, dstFolder, err := internal.GetOperationLogsSettings(settings.GetEndTsEnv(), settings.GetDstEnv())
+
+	endTS, dstFolder, err := internal.GetOperationLogsSettings(settings)
 
 	if err != nil {
 		return err
 	}
 
-	fetchedBinlogs, err := internal.FetchLogs(folder, backupUploadTime, settings, func(filePath string) bool {
-		needStop, err := filterBinlogByHeaderTimestamp(filePath, endTS)
+	params := BinlogFetchParams{folder: folder, StartTs: backupUploadTime}
+	handlers := BinlogFetchHandlers{dstFolder: dstFolder, endTs: endTS}
 
-		return needStop || err != nil
-	})
+	fetchedBinlogs, err := internal.FetchLogs(params, settings, handlers)
 
 	return createIndexFile(dstFolder, fetchedBinlogs)
 }
@@ -67,7 +89,6 @@ func filterBinlogByHeaderTimestamp(logFilePath string, endTS *time.Time) (bool, 
 	if err != nil {
 		return false, err
 	}
-
 	return binlogIsTooOld(timestamp, endTS), nil
 }
 

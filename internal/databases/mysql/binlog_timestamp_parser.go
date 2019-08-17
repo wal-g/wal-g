@@ -3,6 +3,7 @@ package mysql
 import (
 	"bytes"
 	"encoding/binary"
+	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"io"
 	"os"
@@ -18,18 +19,16 @@ func parseFirstTimestampFromHeader(fileReadSeekCloser ioextensions.ReadSeekClose
 	defer fileReadSeekCloser.Close()
 
 	if _, err := fileReadSeekCloser.Seek(BinlogMagicOffset, io.SeekStart); err != nil {
-		return 0, err
+		return 0, errors.Wrapf(err, "Unable to parse header timestamp from file due %v", err)
 	}
 	headerEventBytes := make([]byte, TimestampHeaderLength)
 	if _, err := fileReadSeekCloser.Read(headerEventBytes); err != nil {
-		return 0, err
+		return 0, errors.Wrapf(err, "Unable to parse header timestamp from file due %v", err)
 	}
 
 	var timestamp int32
-	err := binary.Read(bytes.NewReader(headerEventBytes), binary.LittleEndian, &timestamp)
-
-	if err != nil {
-		return 0, err
+	if err := binary.Read(bytes.NewReader(headerEventBytes), binary.LittleEndian, &timestamp); err != nil {
+		return 0, errors.Wrapf(err, "Unable to parse header timestamp from file due %v", err)
 	}
 
 	return timestamp, nil
@@ -42,7 +41,6 @@ func parseFromBinlog(filePath string) (time.Time, error) {
 	}
 
 	timestamp, err := parseFirstTimestampFromHeader(file)
-
 	if err != nil {
 		return time.Time{}, err
 	}

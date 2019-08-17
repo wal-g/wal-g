@@ -18,12 +18,21 @@ type LogFetchSettings interface {
 	GetEndTsEnv() string
 	GetDstEnv() string
 	GetLogFolderPath() string
-	GetFilePath(string, string) (string, error)
+}
+
+type LogFetchParams interface {
+	GetStorageFolder() storage.Folder
+	GetStartTs() time.Time
+}
+
+type LogFetchHandlers interface {
+	GetLogFilePath(pathToLog string) (string, error)
+	CheckUploadedLog(pathToLog string) (bool, error)
 }
 
 // GetOperationLogsSettings reads from the environment variables fetch settings
-func GetOperationLogsSettings(OperationLogEndTsSetting string, operationLogsDstSetting string) (endTS *time.Time, dstFolder string, err error) {
-	endTSStr, ok := GetSetting(OperationLogEndTsSetting)
+func GetOperationLogsSettings(settings LogFetchSettings) (endTS *time.Time, dstFolder string, err error) {
+	endTSStr, ok := GetSetting(settings.GetEndTsEnv())
 	if ok {
 		t, err := time.Parse(time.RFC3339, endTSStr)
 		if err != nil {
@@ -31,6 +40,7 @@ func GetOperationLogsSettings(OperationLogEndTsSetting string, operationLogsDstS
 		}
 		endTS = &t
 	}
+	operationLogsDstSetting := settings.GetDstEnv()
 	dstFolder, ok = GetSetting(operationLogsDstSetting)
 	if !ok {
 		return endTS, dstFolder, NewUnsetRequiredSettingError(operationLogsDstSetting)
@@ -103,11 +113,11 @@ func GetLogsCoveringInterval(folder storage.Folder, start time.Time, end *time.T
 }
 
 // DownloadLogFiles downloads files to specified folder
-func DownloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, getLogFilePath func(string) (string, error), shouldAbortFetch func(filePath string) bool) error {
+func DownloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, handlers LogFetchHandlers) error {
 	for _, logFile := range logFiles {
 		logName := utility.TrimFileExtension(logFile.GetName())
 
-		logFilePath, err := getLogFilePath(logName)
+		logFilePath, err := handlers.GetLogFilePath(logName)
 		if err != nil {
 			return err
 		}
@@ -117,8 +127,13 @@ func DownloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, getLo
 		if err != nil {
 			return err
 		}
+		needAbortFetch, err := handlers.CheckUploadedLog(logFilePath)
 
-		if shouldAbortFetch(logFilePath) {
+		if err != nil {
+			return err
+		}
+
+		if needAbortFetch {
 			return os.Remove(logFilePath)
 		}
 	}
@@ -126,20 +141,23 @@ func DownloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, getLo
 	return nil
 }
 
-func FetchLogs(folder storage.Folder, startTime time.Time, settings LogFetchSettings, shouldAbortFetch func(filePath string) bool) (fetched []storage.Object, err error) {
-	endTS, logDstFolder, err := GetOperationLogsSettings(settings.GetEndTsEnv(), settings.GetDstEnv())
+func FetchLogs(params LogFetchParams, settings LogFetchSettings, handlers LogFetchHandlers) (fetched []storage.Object, err error) {
+	endTS, _, err := GetOperationLogsSettings(settings)
 	if err != nil {
 		return nil, err
 	}
-	logFolder := folder.GetSubFolder(settings.GetLogFolderPath())
-	logsToFetch, err := GetLogsCoveringInterval(logFolder, startTime, endTS)
+	logFolder := params.GetStorageFolder().GetSubFolder(settings.GetLogFolderPath())
+	logsToFetch, err := GetLogsCoveringInterval(logFolder, params.GetStartTs(), endTS)
 	if err != nil {
 		return nil, err
 	}
 
-	return logsToFetch, DownloadLogFiles(logsToFetch, logFolder, func(filename string) (string, error) {
-		return settings.GetFilePath(logDstFolder, filename)
-	}, shouldAbortFetch)
+	err = DownloadLogFiles(logsToFetch, logFolder, handlers)
+	if err != nil {
+		return nil, err
+	}
+
+	return logsToFetch, nil
 }
 
 func LogFileShouldBeFetched(backupStartUploadTime time.Time, endTS *time.Time, object storage.Object) bool {
