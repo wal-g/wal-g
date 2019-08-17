@@ -52,17 +52,41 @@ func (handlers BinlogFetchHandlers) CheckUploadedLog(pathToLog string) (bool, er
 }
 
 func FetchLogs(folder storage.Folder, backup *internal.Backup) error {
-	var streamSentinel StreamSentinelDto
 	settings := BinlogFetchSettings{}
 
+	endTS, dstFolder, err := internal.GetOperationLogsSettings(settings)
+	if err != nil {
+		return err
+	}
+
+	backupUploadTime, err := getBackupUploadTime(folder, backup)
+	if err != nil {
+		return err
+	}
+
+	params := BinlogFetchParams{folder: folder, StartTs: backupUploadTime}
+	handlers := BinlogFetchHandlers{dstFolder: dstFolder, endTs: endTS}
+	fetchedBinlogs, err := internal.FetchLogs(params, settings, handlers)
+
+	if err != nil {
+		return err
+	}
+
+	return createIndexFile(dstFolder, fetchedBinlogs)
+}
+
+func getBackupUploadTime(folder storage.Folder, backup *internal.Backup) (time.Time, error) {
+	var streamSentinel StreamSentinelDto
 	err := internal.FetchStreamSentinel(backup, &streamSentinel)
 	if err != nil {
-		return err
+		return time.Time{}, err
 	}
+
 	binlogs, _, err := folder.GetSubFolder(BinlogPath).ListFolder()
 	if err != nil {
-		return err
+		return time.Time{}, err
 	}
+
 	var backupUploadTime time.Time
 	for _, binlog := range binlogs {
 		if strings.HasPrefix(binlog.GetName(), streamSentinel.BinLogStart) {
@@ -70,18 +94,7 @@ func FetchLogs(folder storage.Folder, backup *internal.Backup) error {
 		}
 	}
 
-	endTS, dstFolder, err := internal.GetOperationLogsSettings(settings)
-
-	if err != nil {
-		return err
-	}
-
-	params := BinlogFetchParams{folder: folder, StartTs: backupUploadTime}
-	handlers := BinlogFetchHandlers{dstFolder: dstFolder, endTs: endTS}
-
-	fetchedBinlogs, err := internal.FetchLogs(params, settings, handlers)
-
-	return createIndexFile(dstFolder, fetchedBinlogs)
+	return backupUploadTime, nil
 }
 
 func filterBinlogByHeaderTimestamp(logFilePath string, endTS *time.Time) (bool, error) {

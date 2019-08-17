@@ -1,19 +1,34 @@
 package mysql
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
 
-const testFilename string = "./testdata/binlog_test"
+const testFilenameLittle string = "./testdata/binlog_small_test"
+const testFilenameBig string = "./testdata/binlog_big_test"
 
-func TestParseBinlogTimestampFromHeader(t *testing.T) {
-	timestamp := time.Unix(int64(1565528401), 0)
+func TestParseFirstTimestampFromHeader_ParseDataCorrect(t *testing.T) {
+	var tests = []struct {
+		name        string
+		testLogPath string
+		exp         time.Time
+	}{
+		{"small instance", testFilenameLittle, time.Unix(int64(1566047760), 0)},
+		{"Big real instance", testFilenameBig, time.Unix(int64(1565528401), 0)},
+	}
 
-	parsed, err := parseFromBinlog(testFilename)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseFromBinlog(tt.testLogPath)
 
-	assert.NoError(t, err)
-	assert.NotNil(t, parsed)
-	assert.Equal(t, timestamp, parsed)
+			if err != nil {
+				t.Errorf("ParseFirstTimestampFromHeader(%s) error %v", tt.testLogPath, err)
+			}
+
+			if got != tt.exp {
+				t.Errorf("ParseFirstTimestampFromHeader(%s) got %v, want %v", tt.testLogPath, got, tt.exp)
+			}
+		})
+	}
 }

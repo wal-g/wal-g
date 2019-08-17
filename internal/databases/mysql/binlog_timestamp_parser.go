@@ -19,16 +19,16 @@ func parseFirstTimestampFromHeader(fileReadSeekCloser ioextensions.ReadSeekClose
 	defer fileReadSeekCloser.Close()
 
 	if _, err := fileReadSeekCloser.Seek(BinlogMagicOffset, io.SeekStart); err != nil {
-		return 0, errors.Wrapf(err, "Unable to parse header timestamp from file due %v", err)
+		return 0, errors.Wrapf(err, "Unable to parse header testLogPath from file due %v", err)
 	}
 	headerEventBytes := make([]byte, TimestampHeaderLength)
 	if _, err := fileReadSeekCloser.Read(headerEventBytes); err != nil {
-		return 0, errors.Wrapf(err, "Unable to parse header timestamp from file due %v", err)
+		return 0, errors.Wrapf(err, "Unable to parse header testLogPath from file due %v", err)
 	}
 
 	var timestamp int32
 	if err := binary.Read(bytes.NewReader(headerEventBytes), binary.LittleEndian, &timestamp); err != nil {
-		return 0, errors.Wrapf(err, "Unable to parse header timestamp from file due %v", err)
+		return 0, errors.Wrapf(err, "Unable to parse header testLogPath from file due %v", err)
 	}
 
 	return timestamp, nil

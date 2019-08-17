@@ -32,8 +32,6 @@ func TestFetchBinlogs(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, len(objects), 4)
 
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	allowed := []string{"mysql-bin-log.000018", "mysql-bin-log.000019"}
 
 	for _, object := range objects {
@@ -41,8 +39,10 @@ func TestFetchBinlogs(t *testing.T) {
 		data, exist := storage_.Load(object.GetName())
 
 		assert.True(t, exist)
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
 
-		timestamp, err := parseFirstTimestampFromHeader(getTestReadSeekCloser(mockCtrl, data.Data))
+		timestamp, err := parseFirstTimestampFromHeader(getTestReadSeekCloserWithExpectedData(mockCtrl, data.Data))
 
 		assert.NoError(t, err)
 		if internal.LogFileShouldBeFetched(startBinlog.GetLastModified(), nil, object) && !binlogIsTooOld(time.Unix(int64(timestamp), 0), &cutPoint) {
@@ -68,7 +68,7 @@ func fillTestStorage() (*memory.Storage, time.Time) {
 	return storage_, cutPoint
 }
 
-func getTestReadSeekCloser(mockCtrl *gomock.Controller, data bytes.Buffer) ioextensions.ReadSeekCloser {
+func getTestReadSeekCloserWithExpectedData(mockCtrl *gomock.Controller, data bytes.Buffer) ioextensions.ReadSeekCloser {
 	testFileReadSeekCloser := testtools.NewMockReadSeekCloser(mockCtrl)
 
 	testFileReadSeekCloser.EXPECT().Read(gomock.Any()).Do(func(p []byte) {
