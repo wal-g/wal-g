@@ -22,11 +22,17 @@ pg_build_image: install deps pg_build unlink_brotli
 	docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix
 	mkdir -p ${CACHE_FOLDER}
 	docker save ${IMAGE} | gzip -c > ${CACHE_FILE}
+	ls ${CACHE_FOLDER}
+	md5sum ${CACHE_FILE}
 
 pg_integration_test:
+	ls ${CACHE_FOLDER}
+	md5sum ${CACHE_FILE}
 	docker load -i ${CACHE_FILE} || true
 	docker-compose build $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
+	ls ${CACHE_FOLDER}
+	md5sum ${CACHE_FILE}
 
 all_unittests: install deps lint unittest
 
