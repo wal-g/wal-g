@@ -1,3 +1,5 @@
+// +build brotli
+
 package brotli
 
 import (
