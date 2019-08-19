@@ -27,14 +27,22 @@ pg_build_image: install deps pg_build unlink_brotli
 	mkdir -p ${PERF_TEST_FOLDER}/logs
 
 pg_integration_test:
-	ls ${CACHE_FOLDER}
-	md5sum ${CACHE_FILE}
-	docker load -i ${CACHE_FILE} || true
+	@if [ ! -f ${CACHE_FILE} ]; then\
+		echo "Rebuild";\
+		docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix\
+	else\
+		docker load -i ${CACHE_FILE}\
+	fi
 	docker-compose build $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
 
 pg_perftest:
-	docker load -i ${CACHE_FILE} || true
+	@if [ ! -f ${CACHE_FILE} ]; then\
+		echo "Rebuild";\
+		docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix\
+	else\
+		docker load -i ${CACHE_FILE}\
+	fi
 	docker-compose build $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
 	docker cp wal-g_${TEST}:tmp/logs/$(TEST)_push ${PERF_TEST_FOLDER}/logs || true
