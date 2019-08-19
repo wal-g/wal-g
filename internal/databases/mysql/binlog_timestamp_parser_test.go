@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-const testFilenameLittle string = "./testdata/binlog_small_test"
+const testFilenameSmall string = "./testdata/binlog_small_test"
 const testFilenameBig string = "./testdata/binlog_big_test"
 
 func TestParseFirstTimestampFromHeader_ParseDataCorrect(t *testing.T) {
@@ -14,7 +14,7 @@ func TestParseFirstTimestampFromHeader_ParseDataCorrect(t *testing.T) {
 		testLogPath string
 		exp         time.Time
 	}{
-		{"small instance", testFilenameLittle, time.Unix(int64(1566047760), 0)},
+		{"Small instance", testFilenameSmall, time.Unix(int64(1566047760), 0)},
 		{"Big real instance", testFilenameBig, time.Unix(int64(1565528401), 0)},
 	}
 

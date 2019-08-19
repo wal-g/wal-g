@@ -33,10 +33,10 @@ func TestGetBinlogConfig(t *testing.T) {
 }
 
 func TestGetBinlogConfigNoError(t *testing.T) {
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
+	mockController := gomock.NewController(t)
+	defer mockController.Finish()
 
-	mock := testtools.NewMockLogFetchSettings(mockCtrl)
+	mock := testtools.NewMockLogFetchSettings(mockController)
 	mock.EXPECT().GetDstEnv().Return(BinlogDstSetting).AnyTimes()
 	mock.EXPECT().GetEndTsEnv().Return(BinlogEndTsSetting).AnyTimes()
 

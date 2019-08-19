@@ -1,12 +1,10 @@
 package mongo
 
 import (
-	"os"
-	"path"
-	"time"
-
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/storages/storage"
+	"os"
+	"path"
 )
 
 type OpLogFetchSettings struct{}
@@ -23,25 +21,16 @@ func (settings OpLogFetchSettings) GetLogFolderPath() string {
 	return OplogPath
 }
 
-type OpLogFetchParams struct {
-	folder  storage.Folder
-	startTS time.Time
-}
-
-func (params OpLogFetchParams) GetStorageFolder() storage.Folder {
-	return params.folder
-}
-
-func (params OpLogFetchParams) GetStartTs() time.Time {
-	return params.startTS
-}
-
 type OpLogFetchHandlers struct {
-	dstFolder string
+	dstPathFolder string
+}
+
+func (handlers OpLogFetchHandlers) HandleAbortFetch(logFilePath string) error {
+	return os.Remove(logFilePath)
 }
 
 func (handlers OpLogFetchHandlers) GetLogFilePath(pathToLog string) (string, error) {
-	oplogFileSubFolder := path.Join(handlers.dstFolder, pathToLog)
+	oplogFileSubFolder := path.Join(handlers.dstPathFolder, pathToLog)
 	err := os.MkdirAll(oplogFileSubFolder, os.ModePerm)
 	if err != nil {
 		return "", err
@@ -50,22 +39,27 @@ func (handlers OpLogFetchHandlers) GetLogFilePath(pathToLog string) (string, err
 	return oplogFilePath, nil
 }
 
-func (handlers OpLogFetchHandlers) CheckUploadedLog(pathToLog string) (bool, error) {
+func (handlers OpLogFetchHandlers) DownloadLogTo(logFolder storage.Folder, logName string, dstLogFilePath string) error {
+	return internal.DownloadWALFileTo(logFolder, logName, dstLogFilePath)
+}
+
+func (handlers OpLogFetchHandlers) ShouldBeAborted(pathToLog string) (bool, error) {
 	return false, nil
 }
 
 func FetchLogs(folder storage.Folder, backup *internal.Backup) error {
 	var streamSentinel StreamSentinelDto
+	var opLogFetchSettings OpLogFetchSettings
+
 	err := internal.FetchStreamSentinel(backup, &streamSentinel)
 	if err != nil {
 		return err
 	}
 
-	_, dstFolder, err := internal.GetOperationLogsSettings(OpLogFetchSettings{})
+	endTS, dstFolder, err := internal.GetOperationLogsSettings(opLogFetchSettings)
 
-	params := OpLogFetchParams{folder: folder, startTS: streamSentinel.StartLocalTime}
-	handlers := OpLogFetchHandlers{dstFolder: dstFolder}
+	handlers := OpLogFetchHandlers{dstPathFolder: dstFolder}
 
-	_, err = internal.FetchLogs(params, OpLogFetchSettings{}, handlers)
+	_, err = internal.FetchLogs(folder, streamSentinel.StartLocalTime, endTS, opLogFetchSettings, handlers)
 	return err
 }
