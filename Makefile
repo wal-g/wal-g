@@ -24,10 +24,7 @@ pg_build_image: install deps pg_build unlink_brotli
 	docker save ${IMAGE} | gzip -c > ${CACHE_FILE}
 	ls ${CACHE_FOLDER}
 	md5sum ${CACHE_FILE}
-	mkdir -p ${PERF_TEST_FOLDER}/wal_push_logs
-	mkdir -p ${PERF_TEST_FOLDER}/wal_fetch_logs
-	mkdir -p ${PERF_TEST_FOLDER}/backup_push_logs
-	mkdir -p ${PERF_TEST_FOLDER}/backup_fetch_logs
+	mkdir -p ${PERF_TEST_FOLDER}/logs
 
 pg_integration_test:
 	ls ${CACHE_FOLDER}
@@ -40,10 +37,9 @@ pg_perftest:
 	docker load -i ${CACHE_FILE} || true
 	docker-compose build $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
-	docker cp wal-g_${TEST}:tmp/logs/wal_push_logs/$(TEST)_logs ${PERF_TEST_FOLDER}/wal_push_logs || true
-	docker cp wal-g_${TEST}:tmp/logs/wal_fetch_logs/$(TEST)_logs ${PERF_TEST_FOLDER}/wal_fetch_logs || true
-	docker cp wal-g_${TEST}:tmp/logs/backup_push_logs/$(TEST)_logs ${PERF_TEST_FOLDER}/backup_push_logs || true
-	docker cp wal-g_${TEST}:tmp/logs/backup_fetch_logs/$(TEST)_logs ${PERF_TEST_FOLDER}/backup_fetch_logs || true
+	docker cp wal-g_${TEST}:tmp/logs/$(TEST)_push ${PERF_TEST_FOLDER}/logs || true
+	docker cp wal-g_${TEST}:tmp/logs/$(TEST)_fetch ${PERF_TEST_FOLDER}/logs || true
+
 
 all_unittests: install deps lint unittest
 
@@ -148,8 +144,9 @@ unlink_brotli:
 	rm -rf tmp/
 
 show_perftest_result:
-	bash ./docker/pg_tests/scripts/scripts/parselogs.sh ${PERF_TEST_FOLDER}/wal_push_logs
-	bash ./docker/pg_tests/scripts/scripts/parselogs.sh ${PERF_TEST_FOLDER}/wal_fetch_logs
-	bash ./docker/pg_tests/scripts/scripts/parselogs.sh ${PERF_TEST_FOLDER}/backup_push_logs
-	bash ./docker/pg_tests/scripts/scripts/parselogs.sh ${PERF_TEST_FOLDER}/backup_fetch_logs
+	bash ./docker/pg_tests/scripts/scripts/parselogs.sh ${PERF_TEST_FOLDER}/logs/pg_wal_perftest_push
+	bash ./docker/pg_tests/scripts/scripts/parselogs.sh ${PERF_TEST_FOLDER}/logs/pg_wal_perftest_fetch
+	bash ./docker/pg_tests/scripts/scripts/parselogs.sh ${PERF_TEST_FOLDER}/logs/pg_backup_perftest_push
+	bash ./docker/pg_tests/scripts/scripts/parselogs.sh ${PERF_TEST_FOLDER}/logs/pg_backup_perftest_fetch
+
 

@@ -12,8 +12,8 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 
 tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
 
-BACKUP_PUSH_LOGS="/tmp/logs/backup_push_logs/pg_backup_perftest_logs"
-BACKUP_FETCH_LOGS="/tmp/logs/backup_fetch_logs/pg_backup_perftest_logs"
+BACKUP_PUSH_LOGS="/tmp/logs/pg_backup_perftest_push"
+BACKUP_FETCH_LOGS="/tmp/logs/pg_backup_perftest_fetch"
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 

@@ -6,16 +6,13 @@ go:
 services:
   - docker
 
-env:
-  global:
-  - TEST_MODIFIER=-race
-
 addons:
   apt:
     packages: [liblzo2-dev]
 
 env:
   global:
+    - TEST_MODIFIER=-race
     - CACHE_FOLDER=$HOME/docker-images
     - IMAGE=wal-g/docker_prefix
     - CACHE_FILE=${CACHE_FOLDER}/docker_prefix-${TRAVIS_COMMIT}.tgz
@@ -68,7 +65,6 @@ deploy:
     tags: true
 
 cache:
-  bundler: true
   directories:
     - ${CACHE_FOLDER}
     - ${PERF_TEST_FOLDER}

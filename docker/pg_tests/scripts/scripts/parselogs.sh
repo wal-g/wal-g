@@ -1,5 +1,5 @@
 #!/bin/bash
-LOGS="${1}/*"
+LOGS=${1}
 echo -e "\n\n"
 cat ${LOGS} | head -n1 | egrep -o -e "wal-push" -e "wal-fetch" -e "backup-push" -e "backup-fetch"
 

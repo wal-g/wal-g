@@ -12,8 +12,8 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 
 tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
 
-WAL_PUSH_LOGS="/tmp/logs/wal_push_logs/pg_wal_perftest_logs"
-WAL_FETCH_LOGS="/tmp/logs/wal_fetch_logs/pg_wal_perftest_logs"
+WAL_PUSH_LOGS="/tmp/logs/pg_wal_perftest_push"
+WAL_FETCH_LOGS="/tmp/logs/pg_wal_perftest_fetch"
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
