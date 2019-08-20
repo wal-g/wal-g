@@ -17,13 +17,11 @@ var streamFetchCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
-		}
-		internal.HandleStreamFetch(args[0], folder, mongo.FetchBackupStreamAndOplog)
+		tracelog.ErrorLogger.FatalOnError(err)
+		internal.HandleStreamFetch(args[0], folder, mongo.FetchLogs)
 	},
 }
 
 func init() {
-	MongoCmd.AddCommand(streamFetchCmd)
+	Cmd.AddCommand(streamFetchCmd)
 }

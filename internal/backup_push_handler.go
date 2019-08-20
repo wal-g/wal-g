@@ -67,9 +67,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 		} else {
 			previousBackup := NewBackup(basebackupFolder, previousBackupName)
 			previousBackupSentinelDto, err = previousBackup.GetSentinel()
-			if err != nil {
-				tracelog.ErrorLogger.FatalError(err)
-			}
+			tracelog.ErrorLogger.FatalOnError(err)
 			if previousBackupSentinelDto.IncrementCount != nil {
 				incrementCount = *previousBackupSentinelDto.IncrementCount + 1
 			}
@@ -85,9 +83,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 					previousBackupName = *previousBackupSentinelDto.IncrementFullName
 					previousBackup := NewBackup(basebackupFolder, previousBackupName)
 					previousBackupSentinelDto, err = previousBackup.GetSentinel()
-					if err != nil {
-						tracelog.ErrorLogger.FatalError(err)
-					}
+					tracelog.ErrorLogger.FatalOnError(err)
 				}
 				tracelog.InfoLogger.Printf("Delta backup from %v with LSN %x. \n", previousBackupName, *previousBackupSentinelDto.BackupStartLSN)
 			}
@@ -108,15 +104,11 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 
 	// Connect to postgres and start/finish a nonexclusive backup.
 	conn, err := Connect()
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	backupName, backupStartLSN, pgVersion, dataDir, err := bundle.StartBackup(conn,
 		utility.CeilTimeUpToMicroseconds(time.Now()).String())
 	meta.DataDir = dataDir
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	if len(previousBackupName) > 0 && previousBackupSentinelDto.BackupStartLSN != nil {
 		if uploader.getUseWalDelta() {
@@ -133,25 +125,18 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	bundle.TarBallMaker = NewStorageTarBallMaker(backupName, uploader)
 
 	// Start a new tar bundle, walk the archiveDirectory and upload everything there.
-	bundle.StartQueue()
+	err = bundle.StartQueue()
+	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Println("Walking ...")
 	err = filepath.Walk(archiveDirectory, bundle.HandleWalkedFSObject)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	err = bundle.FinishQueue()
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	err = bundle.UploadPgControl(uploader.Compressor.FileExtension())
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
 	finishLsn, err := bundle.UploadLabelFiles(conn)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	timelineChanged := bundle.checkTimelineChanged(conn)
 
@@ -186,17 +171,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	// If pushing permanent delta backup, mark all previous backups permanent
 	// Do this before uploading current meta to ensure that backups are marked in increasing order
 	if isPermanent && currentBackupSentinelDto.IsIncremental() {
-		tracelog.InfoLogger.Printf("Retrieving previous related backups to be marked as permanent")
-		impermanentBackupMetadata, err := GetImpermanentBackupMetadataBefore(basebackupFolder, previousBackupName)
-		if err != nil {
-			tracelog.ErrorLogger.Fatalf("Failed to get previous backups: %v", err)
-		} else {
-			tracelog.InfoLogger.Printf("Retrieved backups to mark as permanent, marking: %v", impermanentBackupMetadata)
-			err = uploader.UploadMultiple(impermanentBackupMetadata)
-			if err != nil {
-				tracelog.ErrorLogger.Fatalf("Failed to mark previous backups as permanent: %v", err)
-			}
-		}
+		MarkBackup(uploader, folder, previousBackupName, true)
 	}
 
 	err = UploadMetadata(uploader, currentBackupSentinelDto, backupName, meta)

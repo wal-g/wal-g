@@ -1,58 +1,65 @@
 package mongo
 
 import (
-	"encoding/json"
-	"time"
-
-	"github.com/pkg/errors"
-
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/wal-g/internal/tracelog"
+	"os"
+	"path"
 )
 
-func FetchBackupStreamAndOplog(folder storage.Folder, backup *internal.Backup) error {
-	streamSentinel, err := fetchStreamSentinel(backup)
+type OpLogFetchSettings struct{}
+
+func (settings OpLogFetchSettings) GetEndTsEnv() string {
+	return OplogEndTs
+}
+
+func (settings OpLogFetchSettings) GetDstEnv() string {
+	return OplogDst
+}
+
+func (settings OpLogFetchSettings) GetLogFolderPath() string {
+	return OplogPath
+}
+
+type OpLogFetchHandlers struct {
+	dstPathFolder string
+}
+
+func (handlers OpLogFetchHandlers) HandleAbortFetch(logFilePath string) error {
+	return os.Remove(logFilePath)
+}
+
+func (handlers OpLogFetchHandlers) GetLogFilePath(pathToLog string) (string, error) {
+	oplogFileSubFolder := path.Join(handlers.dstPathFolder, pathToLog)
+	err := os.MkdirAll(oplogFileSubFolder, os.ModePerm)
+	if err != nil {
+		return "", err
+	}
+	oplogFilePath := path.Join(oplogFileSubFolder, "oplog.bson")
+	return oplogFilePath, nil
+}
+
+func (handlers OpLogFetchHandlers) DownloadLogTo(logFolder storage.Folder, logName string, dstLogFilePath string) error {
+	return internal.DownloadWALFileTo(logFolder, logName, dstLogFilePath)
+}
+
+func (handlers OpLogFetchHandlers) ShouldBeAborted(pathToLog string) (bool, error) {
+	return false, nil
+}
+
+func FetchLogs(folder storage.Folder, backup *internal.Backup) error {
+	var streamSentinel StreamSentinelDto
+	var opLogFetchSettings OpLogFetchSettings
+
+	err := internal.FetchStreamSentinel(backup, &streamSentinel)
 	if err != nil {
 		return err
 	}
-	oplogsAreDone := make(chan error)
-	go fetchOplogs(folder, streamSentinel.StartLocalTime, oplogsAreDone)
-	err = internal.DownloadAndDecompressStream(backup)
-	if err != nil {
-		return err
-	}
-	tracelog.DebugLogger.Println("Waiting for oplogs")
-	err = <-oplogsAreDone
+
+	endTS, dstFolder, err := internal.GetOperationLogsSettings(opLogFetchSettings)
+
+	handlers := OpLogFetchHandlers{dstPathFolder: dstFolder}
+
+	_, err = internal.FetchLogs(folder, streamSentinel.StartLocalTime, endTS, opLogFetchSettings, handlers)
 	return err
-}
-
-func fetchStreamSentinel(backup *internal.Backup) (StreamSentinelDto, error) {
-	sentinelDto := StreamSentinelDto{}
-	sentinelDtoData, err := backup.FetchSentinelData()
-	if err != nil {
-		return sentinelDto, errors.Wrap(err, "failed to fetch sentinel")
-	}
-	err = json.Unmarshal(sentinelDtoData, &sentinelDto)
-	return sentinelDto, errors.Wrap(err, "failed to unmarshal sentinel")
-}
-
-func fetchOplogs(folder storage.Folder, startTime time.Time, oplogAreDone chan error) {
-	endTS, oplogDstFolder, err := getOplogConfigs()
-	if err != nil {
-		oplogAreDone <- err
-		return
-	}
-	oplogFolder := folder.GetSubFolder(OplogPath)
-	logsToFetch, err := internal.GetOperationLogsCoveringInterval(oplogFolder, startTime, endTS)
-	if err != nil {
-		oplogAreDone <- err
-		return
-	}
-
-	oplogAreDone <- internal.DownloadOplogFiles(logsToFetch, oplogFolder, oplogDstFolder, "oplog.bson")
-}
-
-func getOplogConfigs() (*time.Time, string, error) {
-	return internal.GetOperationLogsSettings(OplogEndTs, OplogDst)
 }

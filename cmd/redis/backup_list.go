@@ -15,13 +15,11 @@ var backupListCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
-		}
+		tracelog.ErrorLogger.FatalOnError(err)
 		internal.HandleBackupList(folder)
 	},
 }
 
 func init() {
-	RedisCmd.AddCommand(backupListCmd)
+	Cmd.AddCommand(backupListCmd)
 }

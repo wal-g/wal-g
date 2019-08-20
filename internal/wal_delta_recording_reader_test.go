@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/testtools"
+	"github.com/wal-g/wal-g/utility"
 	"io/ioutil"
 	"os"
 	"path"
@@ -16,17 +17,6 @@ var ParserFilePath = path.Join(WalgTestDataFolderPath, internal.RecordPartFilena
 var WalFilePath = path.Join(WalgTestDataFolderPath, WalFilename)
 var DeltaFilePath = path.Join(WalgTestDataFolderPath, DeltaFilename)
 var RealLocation = *walparser.NewBlockLocation(internal.DefaultSpcNode, 16384, 16397, 2062)
-
-func createWalParser() (*walparser.WalParser, error) {
-	data := testtools.CreateWalPageWithContinuation()
-
-	walParser := walparser.NewWalParser()
-	_, _, err := walParser.ParseRecordsFromPage(bytes.NewReader(data)) // initializing parsing
-	if err != nil {
-		return nil, err
-	}
-	return walParser, nil
-}
 
 func TestRecordBlockLocationsFromPage(t *testing.T) {
 	walParser := walparser.NewWalParser()
@@ -77,7 +67,7 @@ func TestRead_CorrectData(t *testing.T) {
 func TestRead_CorrectRecording(t *testing.T) {
 	walFile, err := os.Open(WalFilePath)
 	assert.NoError(t, err)
-	defer walFile.Close()
+	defer utility.LoggedClose(walFile, "")
 
 	dataFolder := testtools.NewMockDataFolder()
 	manager := internal.NewDeltaFileManager(dataFolder)

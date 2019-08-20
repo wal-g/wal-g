@@ -21,12 +21,10 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-// It is made so to load big database files of size 1GB one by one
 const (
-	DefaultTarSizeThreshold = int64((1 << 30) - 1)
-	PgControl               = "pg_control"
-	BackupLabelFilename     = "backup_label"
-	TablespaceMapFilename   = "tablespace_map"
+	PgControl             = "pg_control"
+	BackupLabelFilename   = "backup_label"
+	TablespaceMapFilename = "tablespace_map"
 )
 
 type TarSizeError struct {
@@ -403,7 +401,7 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 		}
 
 		tarBall.AddSize(fileInfoHeader.Size)
-		file.Close()
+		utility.LoggedClose(file, "")
 	}
 
 	err = tarBall.CloseTar()
@@ -494,13 +492,17 @@ func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uin
 			return errors.Wrapf(err, "Error during reading delta file '%s'", deltaFilename)
 		}
 		walParser = deltaFile.WalParser
-		reader.Close()
+		err = reader.Close()
+		if err != nil {
+			return errors.Wrapf(err, "Error during reading delta file '%s'", deltaFilename)
+		}
 		for _, location := range deltaFile.Locations {
 			deltaMap.AddToDelta(location)
 		}
 	}
 	// We don't consider the case when there is no delta files from previous backup,
 	// because in such a case postgres do a WAL-Switch and first WAL file appears to be whole.
+	lastLogSegNo += 1
 	for ; logSegNo <= lastLogSegNo; logSegNo++ {
 		walFilename := formatWALFileName(bundle.Timeline, logSegNo)
 		reader, err := DownloadAndDecompressWALFile(folder, walFilename)
@@ -511,7 +513,10 @@ func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uin
 		if err != nil {
 			return errors.Wrapf(err, "Error during extracting locations from wal file: '%s'", walFilename)
 		}
-		reader.Close()
+		err = reader.Close()
+		if err != nil {
+			return errors.Wrapf(err, "Error during extracting locations from wal file: '%s'", walFilename)
+		}
 		for _, location := range locations {
 			deltaMap.AddToDelta(location)
 		}
@@ -560,7 +565,7 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 			return err
 		}
 	}
-	defer fileReader.Close()
+	defer utility.LoggedClose(fileReader, "")
 
 	bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: false, IsIncremented: isIncremented, MTime: info.ModTime()})
 

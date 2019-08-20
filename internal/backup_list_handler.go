@@ -17,9 +17,7 @@ import (
 // HandleBackupList is invoked to perform wal-g backup-list
 func HandleBackupList(folder storage.Folder) {
 	backups, err := getBackups(folder)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	WriteBackupList(backups, os.Stdout)
 }
@@ -27,26 +25,14 @@ func HandleBackupList(folder storage.Folder) {
 // TODO : unit tests
 func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, detail bool) {
 	backups, err := getBackups(folder)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	// if details are requested we append content of metadata.json to each line
-	backupDetails := make([]BackupDetail, len(backups))
 	if detail {
-		for i := len(backups) - 1; i >= 0; i-- {
-			backup, err := GetBackupByName(backups[i].BackupName, folder)
-			if err != nil {
-				tracelog.ErrorLogger.FatalError(err)
-			} else {
-				metaData, err := backup.FetchMeta()
-				if err != nil {
-					tracelog.ErrorLogger.FatalError(err)
-				}
-				backupDetails[i] = BackupDetail{backups[i], metaData}
-			}
-		}
+		backupDetails, err := getBackupDetails(folder, backups)
+		tracelog.ErrorLogger.FatalOnError(err)
 		if json {
-			WriteBackupListDetailsAsJson(backupDetails, os.Stdout, pretty)
+			err = WriteAsJson(backupDetails, os.Stdout, pretty)
+			tracelog.ErrorLogger.FatalOnError(err)
 		} else if pretty {
 			WritePrettyBackupListDetails(backupDetails, os.Stdout)
 		} else {
@@ -54,13 +40,31 @@ func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, de
 		}
 	} else {
 		if json {
-			WriteBackupListAsJson(backups, os.Stdout, pretty)
+			err = WriteAsJson(backups, os.Stdout, pretty)
+			tracelog.ErrorLogger.FatalOnError(err)
 		} else if pretty {
 			WritePrettyBackupList(backups, os.Stdout)
 		} else {
 			WriteBackupList(backups, os.Stdout)
 		}
 	}
+}
+
+func getBackupDetails(folder storage.Folder, backups []BackupTime) ([]BackupDetail, error) {
+	backupDetails := make([]BackupDetail, len(backups))
+	for i := len(backups) - 1; i >= 0; i-- {
+		backup, err := GetBackupByName(backups[i].BackupName, folder)
+		if err != nil {
+			return nil, err
+		} else {
+			metaData, err := backup.FetchMeta()
+			if err != nil {
+				return nil, err
+			}
+			backupDetails[i] = BackupDetail{backups[i], metaData}
+		}
+	}
+	return backupDetails, nil
 }
 
 // TODO : unit tests
@@ -107,26 +111,17 @@ func WritePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer
 	}
 }
 
-// TODO : unit tests
-func WriteBackupListAsJson(backups []BackupTime, output io.Writer, pretty bool) {
+func WriteAsJson(data interface{}, output io.Writer, pretty bool) error {
 	var bytes []byte
-	var _ error
+	var err error
 	if pretty {
-		bytes, _ = json.MarshalIndent(backups, "", "    ")
+		bytes, err = json.MarshalIndent(data, "", "    ")
 	} else {
-		bytes, _ = json.Marshal(backups)
+		bytes, err = json.Marshal(data)
 	}
-	output.Write(bytes)
-}
-
-// TODO : unit tests
-func WriteBackupListDetailsAsJson(backupDetails []BackupDetail, output io.Writer, pretty bool) {
-	var bytes []byte
-	var _ error
-	if pretty {
-		bytes, _ = json.MarshalIndent(backupDetails, "", "    ")
-	} else {
-		bytes, _ = json.Marshal(backupDetails)
+	if err != nil {
+		return err
 	}
-	output.Write(bytes)
+	_, err = output.Write(bytes)
+	return err
 }

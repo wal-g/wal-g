@@ -8,21 +8,21 @@ import (
 	"strings"
 )
 
-var RedisShortDescription = "Redis backup tool"
+var ShortDescription = "Redis backup tool"
 
 // These variables are here only to show current version. They are set in makefile during build process
 var WalgVersion = "devel"
 var GitRevision = "devel"
 var BuildDate = "devel"
 
-var RedisCmd = &cobra.Command{
+var Cmd = &cobra.Command{
 	Use:     "redis",
-	Short:   RedisShortDescription, // TODO : improve description
+	Short:   ShortDescription, // TODO : improve description
 	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "Redis"}, "\t"),
 }
 
 func Execute() {
-	if err := RedisCmd.Execute(); err != nil {
+	if err := Cmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -31,6 +31,6 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
-	RedisCmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
-	RedisCmd.InitDefaultVersionFlag()
+	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
+	Cmd.InitDefaultVersionFlag()
 }

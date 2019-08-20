@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/utility"
 	"sync"
 )
 
@@ -81,7 +82,7 @@ func (manager *DeltaFileManager) LoadDeltaFileWriter(deltaFilename string) (delt
 			return nil, err
 		}
 	} else {
-		defer physicalDeltaFile.Close()
+		defer utility.LoggedClose(physicalDeltaFile, "")
 		deltaFile, err = LoadDeltaFile(physicalDeltaFile)
 		if err != nil {
 			return nil, err
@@ -112,7 +113,7 @@ func (manager *DeltaFileManager) LoadPartFile(partFilename string) (*WalPartFile
 		}
 		partFile = NewWalPartFile()
 	} else {
-		defer physicalPartFile.Close()
+		defer utility.LoggedClose(physicalPartFile, "")
 		partFile, err = LoadPartFile(physicalPartFile)
 		if err != nil {
 			return nil, err
@@ -171,7 +172,7 @@ func (manager *DeltaFileManager) FlushDeltaFiles(uploader *Uploader, completedPa
 			if err != nil {
 				tracelog.WarningLogger.Printf("Failed to upload delta file: '%s' because of saving error: '%v'\n", deltaFilename, err)
 			} else {
-				err = uploader.UploadFile(&NamedReaderImpl{&deltaFileData, deltaFilename})
+				err = uploader.UploadFile(NewNamedReaderImpl(&deltaFileData, deltaFilename))
 				if err != nil {
 					tracelog.WarningLogger.Printf("Failed to upload delta file: '%s' because of uploading error: '%v'\n", deltaFilename, err)
 				}

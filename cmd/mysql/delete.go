@@ -37,9 +37,7 @@ var deleteRetainCmd = &cobra.Command{
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	isFullBackup := func(object storage.Object) bool {
 		return IsFullBackup(folder, object)
 	}
@@ -48,9 +46,7 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	isFullBackup := func(object storage.Object) bool {
 		return IsFullBackup(folder, object)
 	}
@@ -58,7 +54,7 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	MySQLCmd.AddCommand(deleteCmd)
+	Cmd.AddCommand(deleteCmd)
 	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
@@ -101,8 +97,9 @@ func tryFetchBinlogName(folder storage.Folder, object storage.Object) (string, b
 	}
 	name = strings.Replace(name, utility.SentinelSuffix, "", 1)
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	backup := mysql.Backup{Backup: internal.NewBackup(baseBackupFolder, name)}
-	sentinel, err := backup.FetchStreamSentinel()
+	backup := internal.NewBackup(baseBackupFolder, name)
+	var sentinel mysql.StreamSentinelDto
+	err := internal.FetchStreamSentinel(backup, &sentinel)
 	if err != nil {
 		tracelog.InfoLogger.Println("Fail to fetch stream sentinel " + name)
 		return "", false

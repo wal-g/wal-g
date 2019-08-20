@@ -17,13 +17,11 @@ var walPrefetchCmd = &cobra.Command{
 	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
-		}
+		tracelog.ErrorLogger.FatalOnError(err)
 		internal.HandleWALPrefetch(uploader, args[0], args[1])
 	},
 }
 
 func init() {
-	PgCmd.AddCommand(walPrefetchCmd)
+	Cmd.AddCommand(walPrefetchCmd)
 }

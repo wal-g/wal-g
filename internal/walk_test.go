@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/testtools"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/ioutil"
 	"os"
@@ -49,8 +50,8 @@ func createLabelFiles(t *testing.T, dir string) {
 		t.Log(err)
 	}
 
-	defer l.Close()
-	defer s.Close()
+	defer utility.LoggedClose(l, "")
+	defer utility.LoggedClose(s, "")
 }
 
 // Generate 5 1MB of random data and write to temp
@@ -82,7 +83,7 @@ func generateData(t *testing.T) string {
 			t.Log(err)
 		}
 		io.Copy(f, lr)
-		defer f.Close()
+		defer utility.LoggedClose(f, "")
 	}
 
 	// Make sentinel
@@ -120,8 +121,8 @@ func generateData(t *testing.T) string {
 		t.Log(err)
 	}
 
-	defer f.Close()
-	defer s.Close()
+	defer utility.LoggedClose(f, "")
+	defer utility.LoggedClose(s, "")
 
 	// Create excluded directory with one file in it.
 	err = os.MkdirAll(filepath.Join(dir, "pg_notify"), 0700)
@@ -136,7 +137,7 @@ func generateData(t *testing.T) string {
 	if err != nil {
 		t.Log(err)
 	}
-	defer n.Close()
+	defer utility.LoggedClose(n, "")
 
 	// Create `backup_label` and `tablespace_map` files.
 	createLabelFiles(t, dir)
@@ -264,8 +265,8 @@ func computeSha(t *testing.T, file1, file2 string) bool {
 		t.Log(err)
 	}
 
-	defer f1.Close()
-	defer f2.Close()
+	defer utility.LoggedClose(f1, "")
+	defer utility.LoggedClose(f2, "")
 
 	// Check if first 4KB of files are the same.
 	buf1 := make([]byte, BUFSIZE)
@@ -318,7 +319,7 @@ func isEmpty(t *testing.T, path string) bool {
 	if err != nil {
 		t.Log(err)
 	}
-	defer f.Close()
+	defer utility.LoggedClose(f, "")
 	_, err = f.Readdirnames(1)
 	if err == io.EOF {
 		return true

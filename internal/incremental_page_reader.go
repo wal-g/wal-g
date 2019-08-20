@@ -136,10 +136,10 @@ func (pageReader *IncrementalPageReader) FullScanInitialize() error {
 // WriteDiffMapToHeader is currently used only with buffers, so we don't handle any writing errors
 func (pageReader *IncrementalPageReader) WriteDiffMapToHeader(headerWriter io.Writer) {
 	diffBlockCount := len(pageReader.Blocks)
-	headerWriter.Write(utility.ToBytes(uint32(diffBlockCount)))
+	_, _ = headerWriter.Write(utility.ToBytes(uint32(diffBlockCount)))
 
 	for _, blockNo := range pageReader.Blocks {
-		binary.Write(headerWriter, binary.LittleEndian, blockNo)
+		_ = binary.Write(headerWriter, binary.LittleEndian, blockNo)
 	}
 	return
 }

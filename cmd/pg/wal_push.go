@@ -15,13 +15,11 @@ var walPushCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
-		if err != nil {
-			tracelog.ErrorLogger.FatalError(err)
-		}
+		tracelog.ErrorLogger.FatalOnError(err)
 		internal.HandleWALPush(uploader, args[0])
 	},
 }
 
 func init() {
-	PgCmd.AddCommand(walPushCmd)
+	Cmd.AddCommand(walPushCmd)
 }

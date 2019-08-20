@@ -123,19 +123,6 @@ func (readWriteNopCloser *ReadWriteNopCloser) Close() error {
 	return nil
 }
 
-func Contains(s *[]string, e string) bool {
-	// AB: Go is sick
-	if s == nil {
-		return false
-	}
-	for _, a := range *s {
-		if a == e {
-			return true
-		}
-	}
-	return false
-}
-
 func AssertReaderIsEmpty(t *testing.T, reader io.Reader) {
 	buf := make([]byte, 1)
 	_, err := reader.Read(buf)

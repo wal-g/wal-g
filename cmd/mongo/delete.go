@@ -33,18 +33,14 @@ var deleteRetainCmd = &cobra.Command{
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	internal.HandleDeleteBefore(folder, args, confirmed, isFullBackup, GetLessFunc(folder))
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	internal.HandleDeleteRetain(folder, args, confirmed, isFullBackup, GetLessFunc(folder))
 }
@@ -54,7 +50,7 @@ func isFullBackup(object storage.Object) bool {
 }
 
 func init() {
-	MongoCmd.AddCommand(deleteCmd)
+	Cmd.AddCommand(deleteCmd)
 	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }

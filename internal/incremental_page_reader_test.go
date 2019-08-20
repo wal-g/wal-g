@@ -3,6 +3,7 @@ package internal_test
 import (
 	"bytes"
 	"encoding/binary"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"testing"
@@ -57,7 +58,7 @@ func TestSelectNewValidPage_ValidPageLowLsn(t *testing.T) {
 	var blockNo uint32 = 10
 	pageFile, err := os.Open(pagedFileName)
 	assert.NoError(t, err)
-	defer pageFile.Close()
+	defer utility.LoggedClose(pageFile, "")
 	pageData := make([]byte, internal.DatabasePageSize)
 	_, err = io.ReadFull(pageFile, pageData)
 	assert.NoError(t, err)
@@ -75,7 +76,7 @@ func TestSelectNewValidPage_ValidPageHighLsn(t *testing.T) {
 	var blockNo uint32 = 10
 	pageFile, err := os.Open(pagedFileName)
 	assert.NoError(t, err)
-	defer pageFile.Close()
+	defer utility.LoggedClose(pageFile, "")
 	pageData := make([]byte, internal.DatabasePageSize)
 	_, err = io.ReadFull(pageFile, pageData)
 	assert.NoError(t, err)
@@ -107,7 +108,7 @@ func TestWriteDiffMapToHeader(t *testing.T) {
 
 func TestFullScanInitialize(t *testing.T) {
 	pageFile, err := os.Open(pagedFileName)
-	defer pageFile.Close()
+	defer utility.LoggedClose(pageFile, "")
 	assert.NoError(t, err)
 	pageReader := internal.IncrementalPageReader{
 		PagedFile: pageFile,

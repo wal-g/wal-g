@@ -17,7 +17,7 @@ func TestGetOnlyWalName(t *testing.T) {
 	samples = append(samples, pair{"123456765.history.ready", "123456765.history"})
 	samples = append(samples, pair{"somedir/123456765.done", "123456765"})
 
-	for _, sample := range samples{
+	for _, sample := range samples {
 		assert.Equal(t, sample.expectedResult, getOnlyWalName(sample.testData))
 	}
 }

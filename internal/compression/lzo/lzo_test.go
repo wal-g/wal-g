@@ -38,8 +38,8 @@ func testLzopRoundTrip(t *testing.T, stride, nBytes int) {
 	r, w := io.Pipe()
 	lzow := lzo.NewWriter(w)
 	go func() {
-		defer lzow.Close()
-		defer w.Close()
+		defer utility.LoggedClose(lzow, "")
+		defer utility.LoggedClose(w, "")
 		bw := bufio.NewWriterSize(lzow, LzopBlockSize)
 		defer func() {
 			if err := bw.Flush(); err != nil {
@@ -89,8 +89,8 @@ func setupRand(stride, nBytes int) *BufferReaderMaker {
 
 	go func() {
 		testtools.CreateTar(lzow, lr)
-		defer lzow.Close()
-		defer pw.Close()
+		defer utility.LoggedClose(lzow, "")
+		defer utility.LoggedClose(pw, "")
 	}()
 
 	_, err := io.Copy(b.Buf, pr)

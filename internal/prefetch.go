@@ -25,9 +25,7 @@ func HandleWALPrefetch(uploader *Uploader, walFileName string, location string) 
 	location = path.Dir(location)
 	waitGroup := &sync.WaitGroup{}
 	concurrency, err := GetMaxDownloadConcurrency()
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	for i := 0; i < concurrency; i++ {
 		fileName, err = GetNextWalFilename(fileName)
@@ -83,9 +81,7 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 	bundle.StartQueue()
 	tracelog.InfoLogger.Println("Walking for prefault...")
 	err = filepath.Walk(archiveDirectory, bundle.PrefaultWalkedFSObject)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	err = bundle.FinishQueue()
 }
 
@@ -203,9 +199,7 @@ func prefetchFile(location string, folder storage.Folder, walFileName string, wa
 	os.MkdirAll(runningLocation, 0755)
 
 	err := DownloadWALFileTo(folder, walFileName, oldPath)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	_, errO = os.Stat(oldPath)
 	_, errN = os.Stat(newPath)
