@@ -26,6 +26,7 @@ pg_build_image:
 
 pg_save_image: build_image pg_build_image
 	mkdir -p ${CACHE_FOLDER}
+	sudo rm -rf ${CACHE_FOLDER}/*
 	docker save ${IMAGE} | gzip -c > ${CACHE_FILE}
 	docker save ${IMAGE_UBUNTU} | gzip -c > ${CACHE_FILE_UBUNTU}
 	docker save ${IMAGE_GOLANG} | gzip -c > ${CACHE_FILE_GOLANG}
