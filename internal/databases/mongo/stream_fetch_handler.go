@@ -1,11 +1,10 @@
 package mongo
 
 import (
-	"os"
-	"path"
-
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/storages/storage"
+	"os"
+	"path"
 )
 
 type OpLogFetchSettings struct{}
@@ -22,8 +21,16 @@ func (settings OpLogFetchSettings) GetLogFolderPath() string {
 	return OplogPath
 }
 
-func (settings OpLogFetchSettings) GetFilePath(dstFolder string, logName string) (string, error) {
-	oplogFileSubFolder := path.Join(dstFolder, logName)
+type OpLogFetchHandlers struct {
+	dstPathFolder string
+}
+
+func (handlers OpLogFetchHandlers) HandleAbortFetch(logFilePath string) error {
+	return os.Remove(logFilePath)
+}
+
+func (handlers OpLogFetchHandlers) GetLogFilePath(pathToLog string) (string, error) {
+	oplogFileSubFolder := path.Join(handlers.dstPathFolder, pathToLog)
 	err := os.MkdirAll(oplogFileSubFolder, os.ModePerm)
 	if err != nil {
 		return "", err
@@ -32,12 +39,27 @@ func (settings OpLogFetchSettings) GetFilePath(dstFolder string, logName string)
 	return oplogFilePath, nil
 }
 
+func (handlers OpLogFetchHandlers) DownloadLogTo(logFolder storage.Folder, logName string, dstLogFilePath string) error {
+	return internal.DownloadWALFileTo(logFolder, logName, dstLogFilePath)
+}
+
+func (handlers OpLogFetchHandlers) ShouldBeAborted(pathToLog string) (bool, error) {
+	return false, nil
+}
+
 func FetchLogs(folder storage.Folder, backup *internal.Backup) error {
 	var streamSentinel StreamSentinelDto
+	var opLogFetchSettings OpLogFetchSettings
+
 	err := internal.FetchStreamSentinel(backup, &streamSentinel)
 	if err != nil {
 		return err
 	}
-	_, _, err = internal.FetchLogs(folder, streamSentinel.StartLocalTime, OpLogFetchSettings{})
+
+	endTS, dstFolder, err := internal.GetOperationLogsSettings(opLogFetchSettings)
+
+	handlers := OpLogFetchHandlers{dstPathFolder: dstFolder}
+
+	_, err = internal.FetchLogs(folder, streamSentinel.StartLocalTime, endTS, opLogFetchSettings, handlers)
 	return err
 }
