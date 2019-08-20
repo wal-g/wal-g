@@ -28,6 +28,7 @@ pg_save_image: build_image pg_build_image
 	mkdir -p ${CACHE_FOLDER}
 	docker save ${IMAGE} | gzip -c > ${CACHE_FILE}
 	docker save ${IMAGE_UBUNTU} | gzip -c > ${CACHE_FILE_UBUNTU}
+	docker save ${IMAGE_GOLANG} | gzip -c > ${CACHE_FILE_GOLANG}
 	ls ${CACHE_FOLDER}
 
 pg_integration_test:
@@ -76,6 +77,7 @@ mysql_integration_test:
 		make build_image;\
 	else\
 		docker load -i ${CACHE_FILE_UBUNTU};\
+		docker load -i ${CACHE_FILE_GOLANG};\
 	fi
 	docker-compose build mysql mysql_tests
 	docker-compose up --exit-code-from mysql_tests mysql_tests
@@ -101,6 +103,7 @@ mongo_integration_test:
 		make build_image;\
 	else\
 		docker load -i ${CACHE_FILE_UBUNTU};\
+		docker load -i ${CACHE_FILE_GOLANG};\
 	fi
 	docker-compose build mongo mongo_tests
 	docker-compose up --exit-code-from mongo_tests mongo_tests
@@ -116,6 +119,7 @@ redis_integration_test:
 		make build_image;\
 	else\
 		docker load -i ${CACHE_FILE_UBUNTU};\
+		docker load -i ${CACHE_FILE_GOLANG};\
 	fi
 	docker-compose build redis redis_tests
 	docker-compose up --exit-code-from redis_tests redis_tests

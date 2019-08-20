@@ -16,7 +16,9 @@ env:
     - CACHE_FOLDER=$HOME/docker-images
     - IMAGE=wal-g/docker_prefix
     - IMAGE_UBUNTU=wal-g/ubuntu
+    - IMAGE_GOLANG=wal-g/golang
     - CACHE_FILE_UBUNTU=${CACHE_FOLDER}/wal-g_ubuntu-${TRAVIS_COMMIT}.tgz
+    - CACHE_FILE_GOLANG=${CACHE_FOLDER}/wal-g_golang-${TRAVIS_COMMIT}.tgz
     - CACHE_FILE=${CACHE_FOLDER}/docker_prefix-${TRAVIS_COMMIT}.tgz
 
 jobs:

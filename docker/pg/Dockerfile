@@ -9,7 +9,8 @@ RUN apt-get update && \
     gnupg \
     gpg-agent \
     pinentry-qt \
-    time
+    time \
+    bc
 
 COPY docker/pg/PGP_KEY /tmp/PGP_KEY
 COPY docker/pg/gpg.conf /var/lib/postgresql/.gnupg/gpg.conf
