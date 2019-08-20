@@ -14,6 +14,8 @@ tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
 
 BACKUP_PUSH_LOGS="/tmp/logs/pg_backup_perftest_push"
 BACKUP_FETCH_LOGS="/tmp/logs/pg_backup_perftest_fetch"
+echo "" > ${BACKUP_PUSH_LOGS}
+echo "" > ${BACKUP_FETCH_LOGS}
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
@@ -22,7 +24,7 @@ BACKUP_FETCH_LOGS="/tmp/logs/pg_backup_perftest_fetch"
 # push permanent and impermanent delta backups
 du -hs ${PGDATA}
 sleep 1
-pgbench -i -s 200 postgres
+pgbench -i -s 100 postgres
 sleep 1
 du -hs ${PGDATA}
 
@@ -37,5 +39,8 @@ first_backup_name=`wal-g --config=${TMP_CONFIG} backup-list | sed '2q;d' | cut -
 /usr/bin/time -v -a --output ${BACKUP_FETCH_LOGS} wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} $first_backup_name
 
 tmp/scripts/drop_pg.sh
+
+tmp/scripts/parselogs.sh ${BACKUP_PUSH_LOGS}
+tmp/scripts/parselogs.sh ${BACKUP_FETCH_LOGS}
 
 echo "Backup perftest success"

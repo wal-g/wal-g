@@ -15,6 +15,7 @@ env:
     - TEST_MODIFIER=-race
     - CACHE_FOLDER=$HOME/docker-images
     - IMAGE=wal-g/docker_prefix
+    - CACHE_DOCKER_COMMON=${CACHE_FOLDER}/wal-g_s3-${TRAVIS_COMMIT}.tgz
     - CACHE_FILE=${CACHE_FOLDER}/docker_prefix-${TRAVIS_COMMIT}.tgz
     - PERF_TEST_FOLDER=$HOME/perftest
 
@@ -45,8 +46,6 @@ jobs:
     - script: make redis_test
     - script: make TEST="pg_wal_perftest" pg_perftest
     - script: make TEST="pg_backup_perftest" pg_perftest
-    - stage: perftest result
-      script: make show_perftest_result
 
 notifications:
   email: false

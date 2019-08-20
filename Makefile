@@ -23,8 +23,6 @@ pg_build_image: install deps pg_build unlink_brotli
 	mkdir -p ${CACHE_FOLDER}
 	docker save ${IMAGE} | gzip -c > ${CACHE_FILE}
 	ls ${CACHE_FOLDER}
-	md5sum ${CACHE_FILE}
-	mkdir -p ${PERF_TEST_FOLDER}/logs
 
 pg_integration_test:
 	@if [ ! -f ${CACHE_FILE} ]; then\
@@ -45,15 +43,8 @@ pg_perftest:
 	fi
 	docker-compose build $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
-	docker cp wal-g_${TEST}:tmp/logs/$(TEST)_push ${PERF_TEST_FOLDER}/logs || true
-	docker cp wal-g_${TEST}:tmp/logs/$(TEST)_fetch ${PERF_TEST_FOLDER}/logs || true
-
 
 all_unittests: install deps lint unittest
-
-pg_integration_tests_with_args: install deps pg_build unlink_brotli
-	docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix $(ARGS)
-	docker-compose up --exit-code-from $(ARGS) $(ARGS)
 
 pg_int_tests_only:
 	docker-compose build pg_tests
@@ -150,11 +141,3 @@ unlink_brotli:
 	rm -rf vendor/github.com/google/brotli/*
 	mv tmp/* vendor/github.com/google/brotli/
 	rm -rf tmp/
-
-show_perftest_result:
-	bash ./docker/pg_tests/scripts/scripts/parselogs.sh ${PERF_TEST_FOLDER}/logs/pg_wal_perftest_push
-	bash ./docker/pg_tests/scripts/scripts/parselogs.sh ${PERF_TEST_FOLDER}/logs/pg_wal_perftest_fetch
-	bash ./docker/pg_tests/scripts/scripts/parselogs.sh ${PERF_TEST_FOLDER}/logs/pg_backup_perftest_push
-	bash ./docker/pg_tests/scripts/scripts/parselogs.sh ${PERF_TEST_FOLDER}/logs/pg_backup_perftest_fetch
-
-
