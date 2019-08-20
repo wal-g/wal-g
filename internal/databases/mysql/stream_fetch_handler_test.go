@@ -13,6 +13,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -69,11 +70,16 @@ func TestFetchBinlogs(t *testing.T) {
 		data, exist := storage_.Load(filepath.Join(BinlogPath, object.GetName()))
 		assert.True(t, exist)
 
-		if object.GetName() == "mysql-bin-log.000017" {
+		if object.GetName() == "mysql-bin-log.000017.lz4"	 {
 			continue
 		}
 		headersData = append(headersData, data.Data)
 	}
+
+	sort.Slice(headersData, func(i, j int) bool {
+		return objects[i].GetLastModified().Before(objects[j].GetLastModified())
+	})
+
 
 	viper.AutomaticEnv()
 	os.Setenv(BinlogEndTsSetting, cutPoint.Format("2006-01-02T15:04:05Z07:00"))
