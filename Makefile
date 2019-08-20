@@ -29,9 +29,9 @@ pg_build_image: install deps pg_build unlink_brotli
 pg_integration_test:
 	@if [ ! -f ${CACHE_FILE} ]; then\
 		echo "Rebuild";\
-		docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix\
+		docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix;\
 	else\
-		docker load -i ${CACHE_FILE}\
+		docker load -i ${CACHE_FILE};\
 	fi
 	docker-compose build $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
@@ -39,9 +39,9 @@ pg_integration_test:
 pg_perftest:
 	@if [ ! -f ${CACHE_FILE} ]; then\
 		echo "Rebuild";\
-		docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix\
+		docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix;\
 	else\
-		docker load -i ${CACHE_FILE}\
+		docker load -i ${CACHE_FILE};\
 	fi
 	docker-compose build $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
