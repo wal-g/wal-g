@@ -46,8 +46,8 @@ jobs:
     - script: make mysql_test
     - script: make mongo_test
     - script: make redis_test
-    - script: make TEST="pg_wal_perftest" pg_perftest
-    - script: make TEST="pg_backup_perftest" pg_perftest
+    - script: make TEST="pg_wal_perftest" pg_integration_test
+    - script: make TEST="pg_backup_perftest" pg_integration_test
 
 notifications:
   email: false

@@ -43,17 +43,6 @@ pg_integration_test:
 	docker-compose build $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
 
-pg_perftest:
-	@if [ ! -f ${CACHE_FILE} ]; then\
-		echo "Rebuild";\
-		make build_image;\
-		make pg_build_image;\
-	else\
-		docker load -i ${CACHE_FILE};\
-	fi
-	docker-compose build $(TEST)
-	docker-compose up --exit-code-from $(TEST) $(TEST)
-
 all_unittests: install deps lint unittest
 
 pg_int_tests_only:
@@ -72,7 +61,7 @@ mysql_test: install deps mysql_build lint unlink_brotli mysql_integration_test
 mysql_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_MYSQL_PATH) && go build -tags brotli -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd.WalgVersion=`git tag -l --points-at HEAD`")
 
-mysql_integration_test:
+load_docker_common:
 	@if [ ! -f ${CACHE_FILE_UBUNTU} ]; then\
 		echo "Rebuild";\
 		make build_image;\
@@ -80,6 +69,8 @@ mysql_integration_test:
 		docker load -i ${CACHE_FILE_UBUNTU};\
 		docker load -i ${CACHE_FILE_GOLANG};\
 	fi
+
+mysql_integration_test: load_docker_common
 	docker-compose build mysql mysql_tests
 	docker-compose up --exit-code-from mysql_tests mysql_tests
 
@@ -98,14 +89,7 @@ mongo_build: $(CMD_FILES) $(PKG_FILES)
 mongo_install: mongo_build
 	mv $(MAIN_MONGO_PATH)/wal-g $(GOBIN)/wal-g
 
-mongo_integration_test:
-	@if [ ! -f ${CACHE_FILE_UBUNTU} ]; then\
-		echo "Rebuild";\
-		make build_image;\
-	else\
-		docker load -i ${CACHE_FILE_UBUNTU};\
-		docker load -i ${CACHE_FILE_GOLANG};\
-	fi
+mongo_integration_test: load_docker_common
 	docker-compose build mongo mongo_tests
 	docker-compose up --exit-code-from mongo_tests mongo_tests
 
@@ -114,14 +98,7 @@ redis_test: install deps redis_build lint unlink_brotli redis_integration_test
 redis_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_REDIS_PATH) && go build -tags brotli -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd.WalgVersion=`git tag -l --points-at HEAD`")
 
-redis_integration_test:
-	@if [ ! -f ${CACHE_FILE_UBUNTU} ]; then\
-		echo "Rebuild";\
-		make build_image;\
-	else\
-		docker load -i ${CACHE_FILE_UBUNTU};\
-		docker load -i ${CACHE_FILE_GOLANG};\
-	fi
+redis_integration_test: load_docker_common
 	docker-compose build redis redis_tests
 	docker-compose up --exit-code-from redis_tests redis_tests
 
