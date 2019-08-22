@@ -1,14 +1,13 @@
 package compression
 
 import (
-	"github.com/wal-g/wal-g/internal/compression/brotli"
 	"github.com/wal-g/wal-g/internal/compression/lz4"
 	"github.com/wal-g/wal-g/internal/compression/lzma"
 	"github.com/wal-g/wal-g/internal/compression/zstd"
 	"io"
 )
 
-var CompressingAlgorithms = []string{lz4.AlgorithmName, lzma.AlgorithmName, brotli.AlgorithmName}
+var CompressingAlgorithms = []string{lz4.AlgorithmName, lzma.AlgorithmName}
 
 type Compressor interface {
 	NewWriter(writer io.Writer) io.WriteCloser
@@ -21,14 +20,12 @@ type Decompressor interface {
 }
 
 var Compressors = map[string]Compressor{
-	lz4.AlgorithmName:    lz4.Compressor{},
-	lzma.AlgorithmName:   lzma.Compressor{},
-	brotli.AlgorithmName: brotli.Compressor{},
+	lz4.AlgorithmName:  lz4.Compressor{},
+	lzma.AlgorithmName: lzma.Compressor{},
 }
 
 var Decompressors = []Decompressor{
 	lz4.Decompressor{},
-	brotli.Decompressor{},
 	lzma.Decompressor{},
 	zstd.Decompressor{},
 }

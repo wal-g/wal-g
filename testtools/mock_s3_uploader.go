@@ -5,7 +5,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
-	"github.com/wal-g/wal-g/internal/storages/memory"
+	"github.com/tinsane/storages/memory"
 	"io"
 	"io/ioutil"
 )

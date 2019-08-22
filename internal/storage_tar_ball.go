@@ -6,8 +6,8 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
+	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
-	"github.com/wal-g/wal-g/internal/tracelog"
 )
 
 // StorageTarBall represents a tar file that is
