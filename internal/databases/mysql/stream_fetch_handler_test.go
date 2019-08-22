@@ -5,10 +5,10 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"github.com/tinsane/storages/memory"
+	"github.com/tinsane/storages/storage"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/ioextensions"
-	"github.com/wal-g/wal-g/internal/storages/memory"
-	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
 	"os"
@@ -70,7 +70,7 @@ func TestFetchBinlogs(t *testing.T) {
 		data, exist := storage_.Load(filepath.Join(BinlogPath, object.GetName()))
 		assert.True(t, exist)
 
-		if object.GetName() == "mysql-bin-log.000017.lz4"	 {
+		if object.GetName() == "mysql-bin-log.000017.lz4" {
 			continue
 		}
 		headersData = append(headersData, data.Data)
@@ -79,7 +79,6 @@ func TestFetchBinlogs(t *testing.T) {
 	sort.Slice(headersData, func(i, j int) bool {
 		return objects[i].GetLastModified().Before(objects[j].GetLastModified())
 	})
-
 
 	viper.AutomaticEnv()
 	os.Setenv(BinlogEndTsSetting, cutPoint.Format("2006-01-02T15:04:05Z07:00"))

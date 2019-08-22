@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/tinsane/storages/storage"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/utility"
 	"io"
@@ -13,9 +13,9 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/stretchr/testify/assert"
+	"github.com/tinsane/storages/memory"
+	"github.com/tinsane/storages/s3"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/storages/memory"
-	"github.com/wal-g/wal-g/internal/storages/s3"
 )
 
 func MakeDefaultInMemoryStorageFolder() *memory.Folder {

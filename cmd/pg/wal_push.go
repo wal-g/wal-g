@@ -3,7 +3,7 @@ package pg
 import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/tinsane/tracelog"
 )
 
 const WalPushShortDescription = "Uploads a WAL file to storage"

@@ -2,7 +2,7 @@ package pg
 
 import (
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/tinsane/tracelog"
 
 	"github.com/spf13/cobra"
 )

@@ -3,8 +3,8 @@ package mongo
 import (
 	"os"
 
+	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 

@@ -2,8 +2,8 @@ package redis
 
 import (
 	"github.com/go-redis/redis"
+	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"strconv"
 )
 
