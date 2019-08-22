@@ -42,8 +42,6 @@ pg_integration_test:
 	fi
 	docker-compose build $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
-	ls ${CACHE_FOLDER}
-	md5sum ${CACHE_FILE}
 
 all_unittests: install deps lint unittest
 
