@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"fmt"
 	"github.com/spf13/viper"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"io"
 	"os"
 	"path/filepath"
@@ -15,9 +16,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/ioextensions"
-	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/internal/tracelog"
-	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -478,43 +477,9 @@ func (bundle *Bundle) getDeltaBitmapFor(filePath string) (*roaring.Bitmap, error
 }
 
 func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uint64) error {
-	deltaMap := NewPagedFileDeltaMap()
-	logSegNo := logSegNoFromLsn(*bundle.IncrementFromLsn + 1)
-	logSegNo -= logSegNo % WalFileInDelta
-	lastLogSegNo := logSegNoFromLsn(backupStartLSN) - 1
-	walParser := walparser.NewWalParser()
-	for ; logSegNo+(WalFileInDelta-1) <= lastLogSegNo; logSegNo += WalFileInDelta {
-		deltaFilename := toDeltaFilename(formatWALFileName(bundle.Timeline, logSegNo))
-		reader, err := DownloadAndDecompressWALFile(folder, deltaFilename)
-		if err != nil {
-			return errors.Wrapf(err, "Error during delta file '%s' downloading.", deltaFilename)
-		}
-		deltaFile, err := LoadDeltaFile(reader)
-		if err != nil {
-			return errors.Wrapf(err, "Error during reading delta file '%s'", deltaFilename)
-		}
-		walParser = deltaFile.WalParser
-		reader.Close()
-		for _, location := range deltaFile.Locations {
-			deltaMap.AddToDelta(location)
-		}
-	}
-	// We don't consider the case when there is no delta files from previous backup,
-	// because in such a case postgres do a WAL-Switch and first WAL file appears to be whole.
-	for ; logSegNo <= lastLogSegNo; logSegNo++ {
-		walFilename := formatWALFileName(bundle.Timeline, logSegNo)
-		reader, err := DownloadAndDecompressWALFile(folder, walFilename)
-		if err != nil {
-			return errors.Wrapf(err, "Error during wal file '%s' downloading", walFilename)
-		}
-		locations, err := extractLocationsFromWalFile(walParser, reader)
-		if err != nil {
-			return errors.Wrapf(err, "Error during extracting locations from wal file: '%s'", walFilename)
-		}
-		reader.Close()
-		for _, location := range locations {
-			deltaMap.AddToDelta(location)
-		}
+	deltaMap, err := GetDeltaMap(folder, bundle.Timeline, *bundle.IncrementFromLsn, backupStartLSN)
+	if err != nil {
+		return err
 	}
 	bundle.DeltaMap = deltaMap
 	return nil

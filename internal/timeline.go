@@ -55,10 +55,6 @@ const (
 	xLogSegmentsPerXLogId = 0x100000000 / WalSegmentSize // xlog_internal.h line 101
 )
 
-func logSegNoFromLsn(lsn uint64) uint64 {
-	return (lsn - 1) / WalSegmentSize // xlog_internal.h line 121
-}
-
 // getWalFilename formats WAL file name using PostgreSQL connection. Essentially reads timeline of the server.
 func getWalFilename(lsn uint64, conn *pgx.Conn) (walFilename string, timeline uint32, err error) {
 	timeline, err = readTimeline(conn)
@@ -66,9 +62,9 @@ func getWalFilename(lsn uint64, conn *pgx.Conn) (walFilename string, timeline ui
 		return "", 0, err
 	}
 
-	logSegNo := logSegNoFromLsn(lsn)
+	walSegmentNo := NewWalSegmentNo(lsn - 1)
 
-	return formatWALFileName(timeline, logSegNo), timeline, nil
+	return walSegmentNo.GetFilename(timeline), timeline, nil
 }
 
 func formatWALFileName(timeline uint32, logSegNo uint64) string {

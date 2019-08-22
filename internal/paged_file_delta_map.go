@@ -50,13 +50,19 @@ func NewPagedFileDeltaMap() PagedFileDeltaMap {
 	return pagedFileDeltaMap
 }
 
-func (deltaMap *PagedFileDeltaMap) AddToDelta(location walparser.BlockLocation) {
+func (deltaMap *PagedFileDeltaMap) AddLocationToDelta(location walparser.BlockLocation) {
 	_, contains := (*deltaMap)[location.RelationFileNode]
 	if !contains {
 		(*deltaMap)[location.RelationFileNode] = roaring.BitmapOf(location.BlockNo)
 	} else {
 		bitmap := (*deltaMap)[location.RelationFileNode]
 		bitmap.Add(location.BlockNo)
+	}
+}
+
+func (deltaMap *PagedFileDeltaMap) AddLocationsToDelta(locations []walparser.BlockLocation) {
+	for _, location := range locations {
+		deltaMap.AddLocationToDelta(location)
 	}
 }
 
