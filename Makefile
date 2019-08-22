@@ -96,12 +96,6 @@ unittest:
 	go test -v $(TEST_MODIFIER) ./internal/crypto/openpgp/
 	go test -v $(TEST_MODIFIER) ./internal/crypto/awskms/
 	go test -v $(TEST_MODIFIER) ./internal/databases/mysql
-	go test -v $(TEST_MODIFIER) ./internal/storages/azure/
-	go test -v $(TEST_MODIFIER) ./internal/storages/fs/
-	go test -v $(TEST_MODIFIER) ./internal/storages/gcs/
-	go test -v $(TEST_MODIFIER) ./internal/storages/s3/
-	go test -v $(TEST_MODIFIER) ./internal/storages/storage
-	go test -v $(TEST_MODIFIER) ./internal/storages/swift/
 	go test -v $(TEST_MODIFIER) ./internal/walparser/
 	go test -v $(TEST_MODIFIER) ./utility
 
