@@ -12,8 +12,8 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/go-sql-driver/mysql"
+	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 

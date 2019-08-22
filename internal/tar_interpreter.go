@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/tracelog"
+	"github.com/tinsane/tracelog"
 )
 
 // TarInterpreter behaves differently

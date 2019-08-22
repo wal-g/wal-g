@@ -92,3 +92,7 @@
 [[constraint]]
   name = "github.com/minio/sio"
   version = "0.2.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/tinsane/tracelog"

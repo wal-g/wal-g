@@ -20,8 +20,8 @@ type Decompressor interface {
 }
 
 var Compressors = map[string]Compressor{
-	lz4.AlgorithmName:    lz4.Compressor{},
-	lzma.AlgorithmName:   lzma.Compressor{},
+	lz4.AlgorithmName:  lz4.Compressor{},
+	lzma.AlgorithmName: lzma.Compressor{},
 }
 
 var Decompressors = []Decompressor{
