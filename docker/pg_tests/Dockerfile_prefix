@@ -25,4 +25,10 @@ COPY --from=build /go/src/github.com/wal-g/wal-g/main/pg/wal-g /usr/bin
 
 COPY docker/pg_tests/scripts/ /tmp
 
+RUN mkdir -p /tmp/logs/wal_push_logs
+RUN mkdir /tmp/logs/wal_fetch_logs
+RUN mkdir /tmp/logs/backup_push_logs
+RUN mkdir /tmp/logs/backup_fetch_logs
+RUN chmod 777 -R tmp/logs/
+
 RUN chmod 777 tmp/configs/

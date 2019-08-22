@@ -6,28 +6,31 @@ go:
 services:
   - docker
 
-env:
-  global:
-  - TEST_MODIFIER=-race
-
 addons:
   apt:
     packages: [liblzo2-dev]
 
 env:
   global:
+    - TEST_MODIFIER=-race
     - CACHE_FOLDER=$HOME/docker-images
     - IMAGE=wal-g/docker_prefix
+    - IMAGE_UBUNTU=wal-g/ubuntu
+    - IMAGE_GOLANG=wal-g/golang
+    - CACHE_FILE_UBUNTU=${CACHE_FOLDER}/wal-g_ubuntu-${TRAVIS_COMMIT}.tgz
+    - CACHE_FILE_GOLANG=${CACHE_FOLDER}/wal-g_golang-${TRAVIS_COMMIT}.tgz
     - CACHE_FILE=${CACHE_FOLDER}/docker_prefix-${TRAVIS_COMMIT}.tgz
 
 jobs:
   include:
     - stage: build image
-      script: make pg_build_image
+      script: make pg_save_image
     - stage: test
       script: make all_unittests
     - script: make TEST="pg_config_test" pg_integration_test
     - script: make TEST="pg_crypto_test" pg_integration_test
+    - script: make TEST="pg_delta_backup_wal_delta_test" pg_integration_test
+    - script: make TEST="pg_full_backup_test" pg_integration_test
     - script: make TEST="pg_delete_before_name_find_full_test" pg_integration_test
     - script: make TEST="pg_delete_retain_full_test" pg_integration_test
     - script: make TEST="pg_delete_before_time_find_full_test" pg_integration_test
@@ -43,6 +46,8 @@ jobs:
     - script: make mysql_test
     - script: make mongo_test
     - script: make redis_test
+    - script: make TEST="pg_wal_perftest" pg_integration_test
+    - script: make TEST="pg_backup_perftest" pg_integration_test
 
 notifications:
   email: false
@@ -61,6 +66,5 @@ deploy:
     tags: true
 
 cache:
-  bundler: true
   directories:
     - ${CACHE_FOLDER}
