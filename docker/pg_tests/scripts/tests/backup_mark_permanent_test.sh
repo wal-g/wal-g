@@ -1,6 +1,7 @@
 #!/bin/sh
 set -e -x
-CONFIG_FILE="/tmp/configs/delete_before_permanent_full_test_config.json"
+
+CONFIG_FILE="/tmp/configs/backup_mark_permanent_test_config.json"
 
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
@@ -18,15 +19,25 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 
-# push first backup as permanent
+# push first backup as impermanent
 pgbench -i -s 1 postgres &
 sleep 1
-wal-g --config=${TMP_CONFIG} backup-push --permanent ${PGDATA}
+wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 wal-g --config=${TMP_CONFIG} backup-list
-permanent_backup_name=`wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " "`
+backup_name=`wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " "`
+first_backup_status=`wal-g --config=${TMP_CONFIG} backup-list --detail | tail -n 1 | egrep -o -e "true" -e "false"`
+
+wal-g --config=${TMP_CONFIG} backup-mark $backup_name
+last_backup_status=`wal-g --config=${TMP_CONFIG} backup-list --detail | tail -n 1 | egrep -o -e "true" -e "false"`
+
+if [ $first_backup_status = $last_backup_status ];
+then
+    echo "Wrong backup status"
+    exit 2
+fi
 
 # push a few more impermanent backups
-for i in 2 3 4
+for i in 2 3
 do
     pgbench -i -s 1 postgres &
     sleep 1
@@ -41,14 +52,14 @@ wal-g --config=${TMP_CONFIG} backup-list
 
 # check that permanent backup still exists
 first_backup_name=`wal-g --config=${TMP_CONFIG} backup-list | sed '2q;d' | cut -f 1 -d " "`
-if [ $first_backup_name != $permanent_backup_name ];
+if [ $first_backup_name != $backup_name ];
 then
-    echo $permanent_backup_name > /tmp/before_mark
+    echo $backup_name > /tmp/before_mark
     echo $first_backup_name > /tmp/after_mark
     echo "permanent backup does not exist after deletion"
     diff /tmp/before_mark /tmp/after_mark
 fi
 
 tmp/scripts/drop_pg.sh
-rm ${TMP_CONFIG}
-echo "Delete before permanent full success!!!!!!"
+
+echo "Backup mark permanent test success!"

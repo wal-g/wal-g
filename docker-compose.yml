@@ -91,6 +91,29 @@ services:
     links:
       - s3
 
+  pg_backup_mark_permanent_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_backup_mark_permanent_test
+      context: .
+    image: wal-g/backup_mark_permanent_test
+    container_name: wal-g_pg_backup_mark_permanent_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_backup_mark_impermanent_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_backup_mark_impermanent_test
+      context: .
+    image: wal-g/backup_mark_impermanent_test
+    container_name: wal-g_pg_backup_mark_impermanent_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+
   pg_delete_before_permanent_delta_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_delete_before_permanent_delta_test

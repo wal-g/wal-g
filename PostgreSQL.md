@@ -141,3 +141,12 @@ When uploading WAL archives to S3, the user should pass in the absolute path to 
 ```
 wal-g wal-push /path/to/archive
 ```
+
+
+* ``backup-mark``
+
+Backups can be marked as permanent to prevent them from being removed when running ``delete``. Backup permanence can be altered via this command by passing in the name of the backup (retrievable via `wal-g backup-list --pretty --detail --json`), which will mark the named backup and all previous related backups as permanent. The reverse is also possible by providing the `-i` flag.
+
+```
+wal-g backup-mark example-backup -i
+```
