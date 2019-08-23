@@ -264,11 +264,10 @@ func getPermanentObjects(folder storage.Folder) (map[string]bool, map[string]boo
 			}
 			timelineID := uint32(timelineID64)
 
-			startLogSegNo := logSegNoFromLsn(meta.StartLsn)
-			endLogSegNo := logSegNoFromLsn(meta.FinishLsn)
-			for startLogSegNo <= endLogSegNo {
-				permanentWals[formatWALFileName(timelineID, startLogSegNo)] = true
-				startLogSegNo++
+			startWalSegmentNo := NewWalSegmentNo(meta.StartLsn - 1)
+			endWalSegmentNo := NewWalSegmentNo(meta.FinishLsn - 1)
+			for walSegmentNo := startWalSegmentNo; walSegmentNo <= endWalSegmentNo; walSegmentNo = walSegmentNo.Next() {
+				permanentWals[walSegmentNo.GetFilename(timelineID)] = true
 			}
 			permanentBackups[backupTime.BackupName[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+24]] = true
 		}

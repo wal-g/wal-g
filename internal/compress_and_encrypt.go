@@ -41,17 +41,17 @@ func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, cry
 	}
 
 	writeIgnorer := &EmptyWriteIgnorer{writeCloser}
-	lzWriter := compressor.NewWriter(writeIgnorer)
+	compressedWriter := compressor.NewWriter(writeIgnorer)
 
 	go func() {
-		_, err := utility.FastCopy(lzWriter, source)
+		_, err := utility.FastCopy(compressedWriter, source)
 
 		if err != nil {
 			e := NewCompressingPipeWriterError("CompressAndEncrypt: compression failed")
 			_ = dstWriter.CloseWithError(e)
 		}
 
-		if err := lzWriter.Close(); err != nil {
+		if err := compressedWriter.Close(); err != nil {
 			e := NewCompressingPipeWriterError("CompressAndEncrypt: writer close failed")
 			_ = dstWriter.CloseWithError(e)
 			return
