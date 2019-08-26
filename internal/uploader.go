@@ -2,6 +2,7 @@ package internal
 
 import (
 	"io"
+	"io/ioutil"
 	"path"
 	"path/filepath"
 	"sync"
@@ -105,7 +106,8 @@ func (uploader *Uploader) UploadFile(file NamedReader) error {
 
 // TODO : unit tests
 func (uploader *Uploader) Upload(path string, content io.Reader) error {
-	err := uploader.UploadingFolder.PutObject(path, content)
+	//err := uploader.UploadingFolder.PutObject(path, content)
+	_, err := io.Copy(ioutil.Discard, content)
 	if err == nil {
 		return nil
 	}
