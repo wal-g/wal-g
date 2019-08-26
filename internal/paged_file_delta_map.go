@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
+	"github.com/tinsane/storages/storage"
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"os"
@@ -50,13 +51,19 @@ func NewPagedFileDeltaMap() PagedFileDeltaMap {
 	return pagedFileDeltaMap
 }
 
-func (deltaMap *PagedFileDeltaMap) AddToDelta(location walparser.BlockLocation) {
+func (deltaMap *PagedFileDeltaMap) AddLocationToDelta(location walparser.BlockLocation) {
 	_, contains := (*deltaMap)[location.RelationFileNode]
 	if !contains {
 		(*deltaMap)[location.RelationFileNode] = roaring.BitmapOf(location.BlockNo)
 	} else {
 		bitmap := (*deltaMap)[location.RelationFileNode]
 		bitmap.Add(location.BlockNo)
+	}
+}
+
+func (deltaMap *PagedFileDeltaMap) AddLocationsToDelta(locations []walparser.BlockLocation) {
+	for _, location := range locations {
+		deltaMap.AddLocationToDelta(location)
 	}
 }
 
@@ -122,4 +129,62 @@ func GetRelFileNodeFrom(filePath string) (*walparser.RelFileNode, error) {
 	} else {
 		return nil, NewUnknownTableSpaceError()
 	}
+}
+
+func (deltaMap *PagedFileDeltaMap) GetLocationsFromDeltas(folder storage.Folder, timeline uint32, first, last DeltaNo) error {
+	for deltaNo := first; deltaNo < last; deltaNo = deltaNo.Next() {
+		filename := deltaNo.GetFilename(timeline)
+		deltaFile, err := getDeltaFile(folder, filename)
+		if err != nil {
+			return err
+		}
+		tracelog.InfoLogger.Printf("Sucessfully downloaded delta file %s\n", filename)
+		deltaMap.AddLocationsToDelta(deltaFile.Locations)
+	}
+	return nil
+}
+
+func (deltaMap *PagedFileDeltaMap) GetLocationsFromWals(folder storage.Folder, timeline uint32, first, last WalSegmentNo, walParser *walparser.WalParser) error {
+	for walSegmentNo := first; walSegmentNo < last; walSegmentNo = walSegmentNo.Next() {
+		filename := walSegmentNo.GetFilename(timeline)
+		err := deltaMap.getLocationsFromWal(folder, filename, walParser)
+		if err != nil {
+			return err
+		}
+		tracelog.InfoLogger.Printf("Sucessfully downloaded wal file %s\n", filename)
+	}
+	return nil
+}
+
+func (deltaMap *PagedFileDeltaMap) getLocationsFromWal(folder storage.Folder, filename string, walParser *walparser.WalParser) error {
+	reader, err := DownloadAndDecompressWALFile(folder, filename)
+	if err != nil {
+		return errors.Wrapf(err, "Error during wal segment'%s' downloading.", filename)
+	}
+	locations, err := extractLocationsFromWalFile(walParser, reader)
+	if err != nil {
+		return errors.Wrapf(err, "Error during extracting locations from wal segment: '%s'", filename)
+	}
+	err = reader.Close()
+	if err != nil {
+		return errors.Wrapf(err, "Error during reading wal segment '%s'", filename)
+	}
+	deltaMap.AddLocationsToDelta(locations)
+	return nil
+}
+
+func getDeltaFile(folder storage.Folder, filename string) (*DeltaFile, error) {
+	reader, err := DownloadAndDecompressWALFile(folder, filename)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error during delta file '%s' downloading.", filename)
+	}
+	deltaFile, err := LoadDeltaFile(reader)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error during extracting locations from delta file: '%s'", filename)
+	}
+	err = reader.Close()
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error during reading delta file '%s'", filename)
+	}
+	return deltaFile, nil
 }

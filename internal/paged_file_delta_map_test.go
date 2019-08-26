@@ -46,9 +46,9 @@ func TestSelectRelFileBlocks(t *testing.T) {
 func TestAddToDelta(t *testing.T) {
 	deltaMap := internal.NewPagedFileDeltaMap()
 	location := *walparser.NewBlockLocation(1, 2, 3, 4)
-	deltaMap.AddToDelta(location)
+	deltaMap.AddLocationToDelta(location)
 	assert.Equal(t, []uint32{location.BlockNo}, deltaMap[location.RelationFileNode].ToArray())
-	deltaMap.AddToDelta(location)
+	deltaMap.AddLocationToDelta(location)
 	assert.Equal(t, []uint32{location.BlockNo}, deltaMap[location.RelationFileNode].ToArray())
 }
 
@@ -71,11 +71,9 @@ func TestGetDeltaBitmapFor(t *testing.T) {
 	}
 	deltaMap := internal.NewPagedFileDeltaMap()
 	for _, block := range blocks {
-		deltaMap.AddToDelta(walparser.BlockLocation{RelationFileNode: testingRelNode, BlockNo: block})
+		deltaMap.AddLocationToDelta(walparser.BlockLocation{RelationFileNode: testingRelNode, BlockNo: block})
 	}
-	for _, location := range otherLocations {
-		deltaMap.AddToDelta(location)
-	}
+	deltaMap.AddLocationsToDelta(otherLocations)
 
 	bitmap, err := deltaMap.GetDeltaBitmapFor("~/DemoDb/base/1/2.1")
 	assert.NoError(t, err)
