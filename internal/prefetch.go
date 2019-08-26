@@ -3,6 +3,7 @@ package internal
 import (
 	"archive/tar"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"github.com/tinsane/storages/storage"
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/utility"
@@ -68,21 +69,19 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 	archiveDirectory := uploader.deltaFileManager.dataFolder.(*DiskDataFolder).path
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	archiveDirectory = filepath.Dir(archiveDirectory)
-	bundle := NewBundle(archiveDirectory, nil, &prefaultStartLsn, nil)
-	bundle.Timeline = timelineId
-	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(utility.WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
+	uploadPooler, err := NewUploadPooler(NewNopTarBallMaker(), viper.GetInt64(TarSizeThresholdSetting), nil)
+	tracelog.ErrorLogger.FatalOnError(err)
+	bundle := NewBundle(uploadPooler, archiveDirectory, &prefaultStartLsn, nil, timelineId)
+	err = bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(utility.WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Error during loading delta map: '%+v'.", err)
 		return
 	}
-	bundle.TarBallMaker = NewNopTarBallMaker()
 
 	// Start a new tar bundle, walk the archiveDirectory and upload everything there.
-	bundle.StartQueue()
 	tracelog.InfoLogger.Println("Walking for prefault...")
 	err = filepath.Walk(archiveDirectory, bundle.PrefaultWalkedFSObject)
 	tracelog.ErrorLogger.FatalOnError(err)
-	err = bundle.FinishQueue()
 }
 
 // TODO : unit tests
@@ -125,14 +124,13 @@ func (bundle *Bundle) prefaultHandleTar(path string, info os.FileInfo) error {
 	fileInfoHeader.Name = bundle.GetFileRelPath(path)
 
 	if !excluded && info.Mode().IsRegular() {
-		tarBall := bundle.Deque()
-		tarBall.SetUp(nil)
+		tarBall := bundle.UploadPooler.Deque()
 		go func() {
 			err := bundle.prefaultFile(path, info, fileInfoHeader)
 			if err != nil {
 				panic(err)
 			}
-			err = bundle.CheckSizeAndEnqueueBack(tarBall)
+			err = bundle.UploadPooler.CheckSizeAndEnqueueBack(tarBall)
 			if err != nil {
 				panic(err)
 			}

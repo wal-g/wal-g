@@ -5,9 +5,10 @@ import (
 	"time"
 )
 
+const InvalidLSN = 0
+
 // BackupSentinelDto describes file structure of json sentinel
 type BackupSentinelDto struct {
-	BackupStartLSN    *uint64 `json:"LSN"`
 	IncrementFromLSN  *uint64 `json:"DeltaFromLSN,omitempty"`
 	IncrementFrom     *string `json:"DeltaFrom,omitempty"`
 	IncrementFullName *string `json:"DeltaFullName,omitempty"`
@@ -15,9 +16,6 @@ type BackupSentinelDto struct {
 
 	Files       BackupFileList      `json:"Files"`
 	TarFileSets map[string][]string `json:"TarFileSets"`
-
-	PgVersion       int     `json:"PgVersion"`
-	BackupFinishLSN *uint64 `json:"FinishLSN"`
 
 	UserData interface{} `json:"UserData,omitempty"`
 }

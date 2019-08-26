@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/jackc/pgx"
 	"os"
 	"path/filepath"
 	"time"
@@ -43,94 +44,108 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 	return
 }
 
+func getPreviousBackup(folder storage.Folder) *Backup {
+	incrementCount := 1
+	maxDeltas, fromFull := getDeltaConfig()
+	basebackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
+	name, err := GetLatestBackupName(folder)
+	if err != nil {
+		if _, ok := err.(NoBackupsFoundError); ok {
+			tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
+			return nil
+		} else {
+			tracelog.ErrorLogger.FatalError(err)
+		}
+	}
+	backup := NewBackup(basebackupFolder, name)
+	sentinelDto, err := backup.GetSentinel()
+	tracelog.ErrorLogger.FatalOnError(err)
+	metadata, err := backup.GetMeta()
+	tracelog.ErrorLogger.FatalOnError(err)
+	if sentinelDto.IncrementCount != nil {
+		incrementCount = *sentinelDto.IncrementCount + 1
+	}
+
+	if incrementCount > maxDeltas {
+		tracelog.InfoLogger.Println("Reached max delta steps. Doing full backup.")
+		return nil
+	}
+	if metadata.StartLsn == InvalidLSN {
+		tracelog.InfoLogger.Println("LATEST backup was made without support for delta feature. Fallback to full backup with LSN marker for future deltas.")
+		return nil
+	}
+	if fromFull {
+		tracelog.InfoLogger.Println("Delta will be made from full backup.")
+		name = *sentinelDto.IncrementFullName
+		backup = NewBackup(basebackupFolder, name)
+		metadata, err = backup.GetMeta()
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
+	tracelog.InfoLogger.Printf("Delta backup from %v with LSN %x. \n", name, metadata.StartLsn)
+
+	return backup
+}
+
 // TODO : unit tests
 // HandleBackupPush is invoked to perform a wal-g backup-push
 func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent bool, isFullBackup bool) {
 	archiveDirectory = utility.ResolveSymlink(archiveDirectory)
-	maxDeltas, fromFull := getDeltaConfig()
+	maxDeltas, _ := getDeltaConfig()
 
-	var previousBackupSentinelDto BackupSentinelDto
-	var previousBackupName string
-	var err error
-	incrementCount := 1
+	var previousBackup *Backup
 
 	folder := uploader.UploadingFolder
 	basebackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	if maxDeltas > 0 && !isFullBackup {
-		previousBackupName, err = GetLatestBackupName(folder)
-		if err != nil {
-			if _, ok := err.(NoBackupsFoundError); ok {
-				tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
-			} else {
-				tracelog.ErrorLogger.FatalError(err)
-			}
-		} else {
-			previousBackup := NewBackup(basebackupFolder, previousBackupName)
-			previousBackupSentinelDto, err = previousBackup.GetSentinel()
-			tracelog.ErrorLogger.FatalOnError(err)
-			if previousBackupSentinelDto.IncrementCount != nil {
-				incrementCount = *previousBackupSentinelDto.IncrementCount + 1
-			}
-
-			if incrementCount > maxDeltas {
-				tracelog.InfoLogger.Println("Reached max delta steps. Doing full backup.")
-				previousBackupSentinelDto = BackupSentinelDto{}
-			} else if previousBackupSentinelDto.BackupStartLSN == nil {
-				tracelog.InfoLogger.Println("LATEST backup was made without support for delta feature. Fallback to full backup with LSN marker for future deltas.")
-			} else {
-				if fromFull {
-					tracelog.InfoLogger.Println("Delta will be made from full backup.")
-					previousBackupName = *previousBackupSentinelDto.IncrementFullName
-					previousBackup := NewBackup(basebackupFolder, previousBackupName)
-					previousBackupSentinelDto, err = previousBackup.GetSentinel()
-					tracelog.ErrorLogger.FatalOnError(err)
-				}
-				tracelog.InfoLogger.Printf("Delta backup from %v with LSN %x. \n", previousBackupName, *previousBackupSentinelDto.BackupStartLSN)
-			}
-		}
+		previousBackup = getPreviousBackup(folder)
 	} else {
 		tracelog.InfoLogger.Println("Doing full backup.")
 	}
 
 	uploader.UploadingFolder = basebackupFolder // TODO: AB: this subfolder switch look ugly. I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
 
-	crypter := ConfigureCrypter()
-	bundle := NewBundle(archiveDirectory, crypter, previousBackupSentinelDto.BackupStartLSN, previousBackupSentinelDto.Files)
+	var incrementFromLsn *uint64 = nil
+	var previousBackupSentinelDto BackupSentinelDto
+	if previousBackup != nil {
+		incrementFromLsn = &previousBackup.Metadata.StartLsn
+		previousBackupSentinelDto = *previousBackup.SentinelDto
+	}
+
+	// Connect to postgres and start/finish a nonexclusive backup.
+	conn, err := Connect()
+	tracelog.ErrorLogger.FatalOnError(err)
+	backupName, backupStartLSN, pgVersion, dataDir, isReplica, timeline, err := StartBackup(conn,
+		utility.CeilTimeUpToMicroseconds(time.Now()).String())
+	tracelog.ErrorLogger.FatalOnError(err)
+	if previousBackup != nil {
+		backupName = backupName + "_D_" + utility.StripWalFileName(previousBackup.Name)
+	}
+
+	uploadPooler, err := NewUploadPooler(NewStorageTarBallMaker(backupName, uploader), viper.GetInt64(TarSizeThresholdSetting), ConfigureCrypter())
+	tracelog.ErrorLogger.FatalOnError(err)
+	bundle := NewBundle(uploadPooler, archiveDirectory, incrementFromLsn, previousBackupSentinelDto.Files, timeline)
 
 	var meta ExtendedMetadataDto
 	meta.StartTime = utility.TimeNowCrossPlatformUTC()
 	meta.Hostname, _ = os.Hostname()
 	meta.IsPermanent = isPermanent
 
-	// Connect to postgres and start/finish a nonexclusive backup.
-	conn, err := Connect()
-	tracelog.ErrorLogger.FatalOnError(err)
-	backupName, backupStartLSN, pgVersion, dataDir, err := bundle.StartBackup(conn,
-		utility.CeilTimeUpToMicroseconds(time.Now()).String())
 	meta.DataDir = dataDir
-	tracelog.ErrorLogger.FatalOnError(err)
 
-	if len(previousBackupName) > 0 && previousBackupSentinelDto.BackupStartLSN != nil {
-		if uploader.getUseWalDelta() {
-			err = bundle.DownloadDeltaMap(folder.GetSubFolder(utility.WalPath), backupStartLSN)
-			if err == nil {
-				tracelog.InfoLogger.Println("Successfully loaded delta map, delta backup will be made with provided delta map")
-			} else {
-				tracelog.WarningLogger.Printf("Error during loading delta map: '%v'. Fallback to full scan delta backup\n", err)
-			}
+	if previousBackup != nil && uploader.getUseWalDelta() {
+		err = bundle.DownloadDeltaMap(folder.GetSubFolder(utility.WalPath), backupStartLSN)
+		if err == nil {
+			tracelog.InfoLogger.Println("Successfully loaded delta map, delta backup will be made with provided delta map")
+		} else {
+			tracelog.WarningLogger.Printf("Error during loading delta map: '%v'. Fallback to full scan delta backup\n", err)
 		}
-		backupName = backupName + "_D_" + utility.StripWalFileName(previousBackupName)
 	}
 
-	bundle.TarBallMaker = NewStorageTarBallMaker(backupName, uploader)
-
 	// Start a new tar bundle, walk the archiveDirectory and upload everything there.
-	err = bundle.StartQueue()
-	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Println("Walking ...")
 	err = filepath.Walk(archiveDirectory, bundle.HandleWalkedFSObject)
 	tracelog.ErrorLogger.FatalOnError(err)
-	err = bundle.FinishQueue()
+	err = uploadPooler.FinishQueue()
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = bundle.UploadPgControl(uploader.Compressor.FileExtension())
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -138,7 +153,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	finishLsn, err := bundle.UploadLabelFiles(conn)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	timelineChanged := bundle.checkTimelineChanged(conn)
+	timelineChanged := checkTimelineChanged(conn, isReplica, timeline)
 
 	// Wait for all uploads to finish.
 	uploader.finish()
@@ -150,31 +165,32 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	}
 
 	currentBackupSentinelDto := &BackupSentinelDto{
-		BackupStartLSN:   &backupStartLSN,
-		IncrementFromLSN: previousBackupSentinelDto.BackupStartLSN,
-		PgVersion:        pgVersion,
+		IncrementFromLSN: incrementFromLsn,
 	}
-	if previousBackupSentinelDto.BackupStartLSN != nil {
-		currentBackupSentinelDto.IncrementFrom = &previousBackupName
+	if previousBackup != nil {
+		currentBackupSentinelDto.IncrementFrom = &previousBackup.Name
 		if previousBackupSentinelDto.IsIncremental() {
 			currentBackupSentinelDto.IncrementFullName = previousBackupSentinelDto.IncrementFullName
 		} else {
-			currentBackupSentinelDto.IncrementFullName = &previousBackupName
+			currentBackupSentinelDto.IncrementFullName = &previousBackup.Name
 		}
-		currentBackupSentinelDto.IncrementCount = &incrementCount
+		currentIncrementCount := *previousBackupSentinelDto.IncrementCount + 1
+		currentBackupSentinelDto.IncrementCount = &currentIncrementCount
 	}
 
-	currentBackupSentinelDto.setFiles(bundle.GetFiles())
-	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
+	currentBackupSentinelDto.setFiles(bundle.Files)
+	meta.PgVersion = pgVersion
+	meta.StartLsn = backupStartLSN
+	meta.FinishLsn = finishLsn
 	currentBackupSentinelDto.UserData = GetSentinelUserData()
 
 	// If pushing permanent delta backup, mark all previous backups permanent
 	// Do this before uploading current meta to ensure that backups are marked in increasing order
-	if isPermanent && currentBackupSentinelDto.IsIncremental() {
-		MarkBackup(uploader, folder, previousBackupName, true)
+	if isPermanent && previousBackup != nil {
+		MarkBackup(uploader, folder, previousBackup.Name, true)
 	}
 
-	err = UploadMetadata(uploader, currentBackupSentinelDto, backupName, meta)
+	err = UploadMetadata(uploader, backupName, meta)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload metadata file for backup: %s %v", backupName, err)
 		tracelog.ErrorLogger.FatalError(err)
@@ -189,14 +205,11 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 }
 
 // TODO : unit tests
-func UploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupName string, meta ExtendedMetadataDto) error {
+func UploadMetadata(uploader *Uploader, backupName string, meta ExtendedMetadataDto) error {
 	// BackupSentinelDto struct allows nil field for backward compatiobility
 	// We do not expect here nil dto since it is new dto to upload
 	meta.DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
 	meta.FinishTime = utility.TimeNowCrossPlatformUTC()
-	meta.StartLsn = *sentinelDto.BackupStartLSN
-	meta.FinishLsn = *sentinelDto.BackupFinishLSN
-	meta.PgVersion = sentinelDto.PgVersion
 
 	metaFile := storage.JoinPath(backupName, utility.MetadataFileName)
 	dtoBody, err := json.Marshal(meta)
@@ -217,4 +230,58 @@ func UploadSentinel(uploader *Uploader, sentinelDto interface{}, backupName stri
 	}
 
 	return uploader.Upload(sentinelName, bytes.NewReader(dtoBody))
+}
+
+// TODO : unit tests
+// StartBackup starts a non-exclusive base backup immediately. When finishing the backup,
+// `backup_label` and `tablespace_map` contents are not immediately written to
+// a file but returned instead. Returns empty string and an error if backup
+// fails.
+func StartBackup(conn *pgx.Conn, backup string) (backupName string, lsn uint64, version int, dataDir string, isReplica bool, timeline uint32, err error) {
+	var name, lsnStr string
+	queryRunner, err := NewPgQueryRunner(conn)
+	if err != nil {
+		return "", 0, queryRunner.Version, "", false, 0, errors.Wrap(err, "StartBackup: Failed to build query runner.")
+	}
+	name, lsnStr, isReplica, dataDir, err = queryRunner.StartBackup(backup)
+
+	if err != nil {
+		return "", 0, queryRunner.Version, "", false, 0, err
+	}
+	lsn, err = pgx.ParseLSN(lsnStr)
+
+	if isReplica {
+		name, timeline, err = getWalFilename(lsn, conn)
+		if err != nil {
+			return "", 0, queryRunner.Version, "", false, 0, err
+		}
+	} else {
+		timeline, err = readTimeline(conn)
+		if err != nil {
+			tracelog.WarningLogger.Printf("Couldn't get current timeline because of error: '%v'\n", err)
+		}
+	}
+	return "base_" + name, lsn, queryRunner.Version, dataDir, isReplica, timeline, nil
+
+}
+
+// TODO : unit tests
+// checkTimelineChanged compares timelines of pg_backup_start() and pg_backup_stop()
+func checkTimelineChanged(conn *pgx.Conn, isReplica bool, oldTimeline uint32) bool {
+	if isReplica {
+		timeline, err := readTimeline(conn)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("Unable to check timeline change. Sentinel for the backup will not be uploaded.")
+			return true
+		}
+
+		// Per discussion in
+		// https://www.postgresql.org/message-id/flat/BF2AD4A8-E7F5-486F-92C8-A6959040DEB6%40yandex-team.ru#BF2AD4A8-E7F5-486F-92C8-A6959040DEB6@yandex-team.ru
+		// Following check is the very pessimistic approach on replica backup invalidation
+		if timeline != oldTimeline {
+			tracelog.ErrorLogger.Printf("Timeline has changed since backup start. Sentinel for the backup will not be uploaded.")
+			return true
+		}
+	}
+	return false
 }
