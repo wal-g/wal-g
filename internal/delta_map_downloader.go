@@ -3,9 +3,13 @@ package internal
 import (
 	"github.com/pkg/errors"
 	"github.com/tinsane/storages/storage"
+	"github.com/tinsane/tracelog"
 )
 
 func GetDeltaMap(folder storage.Folder, timeline uint32, firstUsedLSN, firstNotUsedLSN uint64) (PagedFileDeltaMap, error) {
+	tracelog.InfoLogger.Printf("Timeline: %d, FirstUsedLsn: %d, FirstNotUsedLsn: %d\n", timeline, firstUsedLSN, firstNotUsedLSN)
+	tracelog.InfoLogger.Printf("First WAL should participate in building delta map: %s", NewWalSegmentNo(firstUsedLSN).GetFilename(timeline))
+	tracelog.InfoLogger.Printf("First WAL shouldn't participate in building delta map: %s", NewWalSegmentNo(firstNotUsedLSN).GetFilename(timeline))
 	deltaMap := NewPagedFileDeltaMap()
 	firstUsedDeltaNo, firstNotUsedDeltaNo := GetDeltaRange(firstUsedLSN, firstNotUsedLSN)
 	// Get locations from [firstUsedDeltaNo, lastUsedDeltaNo). We use lastUsedDeltaNo in next step
