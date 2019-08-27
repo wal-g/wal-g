@@ -148,31 +148,27 @@ func (bundle *Bundle) prefaultHandleTar(path string, info os.FileInfo) error {
 func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader *tar.Header) error {
 	incrementBaseLsn := bundle.GetIncrementBaseLsn()
 	isIncremented := isPagedFile(info, path)
-	var fileReader io.ReadCloser
-	if isIncremented {
-		bitmap, err := bundle.getDeltaBitmapFor(path)
-		if _, ok := err.(NoBitmapFoundError); !ok { // this file has changed after the start of backup, so just skip it
-			if err != nil {
-				return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
-			}
-			tracelog.InfoLogger.Println("Prefaulting ", path)
-			fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
-			if _, ok := err.(InvalidBlockError); ok {
-				return nil
-			} else if err != nil {
-				return errors.Wrapf(err, "packFileIntoTar: failed reading incremental file '%s'\n", path)
-			}
-
-			_, err := io.Copy(ioutil.Discard, fileReader)
-
-			if err != nil {
-				return errors.Wrap(err, "packFileIntoTar: operation failed")
-			}
-			fileReader.Close()
-		}
+	if !isIncremented {
+		return nil
 	}
+	bitmap, err := bundle.getDeltaBitmapFor(path)
+	if _, ok := err.(NoBitmapFoundError); ok { // this file has not changed after the start of backup, so just skip it
+		return nil
+	} else if err != nil {
+		return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
+	}
+	tracelog.InfoLogger.Println("Prefaulting ", path)
+	var fileReader io.ReadCloser
+	fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
+	if _, ok := err.(InvalidBlockError); ok {
+		return nil
+	} else if err != nil {
+		return errors.Wrapf(err, "packFileIntoTar: failed reading incremental file '%s'\n", path)
+	}
+	defer utility.LoggedClose(fileReader, "")
 
-	return nil
+	_, err = io.Copy(ioutil.Discard, fileReader)
+	return errors.Wrap(err, "packFileIntoTar: operation failed")
 }
 
 // TODO : unit tests

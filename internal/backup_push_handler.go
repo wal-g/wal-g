@@ -150,8 +150,12 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	err = bundle.UploadPgControl(uploader.Compressor.FileExtension())
 	tracelog.ErrorLogger.FatalOnError(err)
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
-	finishLsn, err := bundle.UploadLabelFiles(conn)
+	label, offsetMap, finishLsn, err := StopBackup(conn)
 	tracelog.ErrorLogger.FatalOnError(err)
+	if pgVersion >= 90600 {
+		err := bundle.UploadLabelFiles(label, offsetMap)
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
 
 	timelineChanged := checkTimelineChanged(conn, isReplica, timeline)
 
@@ -267,6 +271,24 @@ func StartBackup(conn *pgx.Conn, backup string) (backupName string, lsn uint64, 
 	}
 	return "base_" + name, lsn, queryRunner.Version, dataDir, isReplica, timeline, nil
 
+}
+
+func StopBackup(conn *pgx.Conn) (label, offsetMap string, lsn uint64, err error) {
+	queryRunner, err := NewPgQueryRunner(conn)
+	if err != nil {
+		return "", "", 0, errors.Wrap(err, "UploadLabelFiles: Failed to build query runner.")
+	}
+	var lsnStr string
+	label, offsetMap, lsnStr, err = queryRunner.StopBackup()
+	if err != nil {
+		return "", "", 0, errors.Wrap(err, "UploadLabelFiles: failed to stop backup")
+	}
+
+	lsn, err = pgx.ParseLSN(lsnStr)
+	if err != nil {
+		return "", "", 0, errors.Wrap(err, "UploadLabelFiles: failed to parse finish LSN")
+	}
+	return
 }
 
 // TODO : unit tests
