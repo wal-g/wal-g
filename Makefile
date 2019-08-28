@@ -27,18 +27,18 @@ pg_build_image:
 pg_save_image: build_image pg_build_image
 	mkdir -p ${CACHE_FOLDER}
 	sudo rm -rf ${CACHE_FOLDER}/*
-	docker save ${IMAGE} | gzip -c > ${CACHE_FILE}
+	docker save ${IMAGE} | gzip -c > ${CACHE_FILE_DOCKER_PREFIX}
 	docker save ${IMAGE_UBUNTU} | gzip -c > ${CACHE_FILE_UBUNTU}
 	docker save ${IMAGE_GOLANG} | gzip -c > ${CACHE_FILE_GOLANG}
 	ls ${CACHE_FOLDER}
 
 pg_integration_test:
-	@if [ ! -f ${CACHE_FILE} ]; then\
+	@if [ "x" = "${CACHE_FILE_DOCKER_PREFIX}x" ]; then\
 		echo "Rebuild";\
 		make build_image;\
 		make pg_build_image;\
 	else\
-		docker load -i ${CACHE_FILE};\
+		docker load -i ${CACHE_FILE_DOCKER_PREFIX};\
 	fi
 	docker-compose build $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
@@ -62,7 +62,7 @@ mysql_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_MYSQL_PATH) && go build -tags brotli -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd.WalgVersion=`git tag -l --points-at HEAD`")
 
 load_docker_common:
-	@if [ ! -f ${CACHE_FILE_UBUNTU} ]; then\
+	@if [ "x" = "${CACHE_FILE_UBUNTU}x" ]; then\
 		echo "Rebuild";\
 		make build_image;\
 	else\
