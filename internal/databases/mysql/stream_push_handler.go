@@ -1,30 +1,50 @@
 package mysql
 
 import (
+	"bytes"
 	"database/sql"
 	"io"
 	"os"
-	"strings"
+	"os/exec"
 
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleStreamPush(uploader *Uploader) {
+func HandleStreamPush(uploader *Uploader, command []string) {
+	if len(command) == 0{
+		tracelog.ErrorLogger.Println("WARNING: command not specified")
+		os.Exit(1)
+	}
+	waitFunc, stream, stderr := startCommand(command)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	db, err := getMySQLConnection()
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(db, "")
-	var stream io.Reader = os.Stdin
-	if internal.FileIsPiped(os.Stdin) {
-		tracelog.InfoLogger.Println("Data is piped from stdin")
-	} else {
-		tracelog.ErrorLogger.Println("WARNING: stdin is terminal: operating in test mode!")
-		stream = strings.NewReader("testtesttest")
-	}
 	err = uploader.UploadStream(db, stream)
 	tracelog.ErrorLogger.FatalOnError(err)
+	err = waitFunc()
+	tracelog.ErrorLogger.FatalOnError(err)
+	buf := new(bytes.Buffer)
+	_, err = buf.ReadFrom(stderr)
+	s := buf.String()
+	if s != ""{
+		tracelog.ErrorLogger.Println("ERROR: Stderr of the command is not empty.")
+		os.Exit(1)
+	}
+}
+
+func startCommand(command []string) (waitFunc func() error, stdout, stderr io.ReadCloser) {
+	c := exec.Command(command[0], command[1:]...)
+	stdout, err := c.StdoutPipe()
+	tracelog.ErrorLogger.FatalOnError(err)
+	stderr, err = c.StderrPipe()
+	tracelog.ErrorLogger.FatalOnError(err)
+	err = c.Start()
+	waitFunc = c.Wait
+	tracelog.ErrorLogger.FatalOnError(err)
+	return
 }
 
 // TODO : unit tests

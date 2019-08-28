@@ -9,12 +9,13 @@ export WALG_MYSQL_BINLOG_DST=${MYSQLDATA}
 mysqld --initialize --init-file=/etc/mysql/init.sql
 
 service mysql start
-xtrabackup --backup \
-           --stream=xbstream \
-           --user=sbtest \
-           --host=localhost \
-           --parallel=2 \
-           --datadir=${MYSQLDATA} | wal-g stream-push
+wal-g stream-push xtrabackup\ --backup\ \
+--stream=xbstream\ \
+--user=sbtest\ \
+--host=localhost\ \
+--parallel=2\ \
+--datadir=${MYSQLDATA}
+
 
 mysql -u sbtest -h localhost -e "FLUSH LOGS";
 sysbench /usr/share/sysbench/oltp_insert.lua --table-size=10 prepare

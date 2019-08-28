@@ -28,12 +28,12 @@ do
         mv /tmp/mysql ${MYSQLDATA}/mysql
     fi
 
-    xtrabackup --backup \
-           --stream=xbstream \
-           --user=sbtest \
-           --host=localhost \
-           --parallel=2 \
-           --datadir=${MYSQLDATA} | wal-g stream-push
+    wal-g stream-push xtrabackup\ --backup\ \
+--stream=xbstream\ \
+--user=sbtest\ \
+--host=localhost\ \
+--parallel=2\ \
+--datadir=${MYSQLDATA}
 done
 
 wal-g backup-list
