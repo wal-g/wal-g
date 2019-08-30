@@ -8,13 +8,15 @@ export WALG_MYSQL_BINLOG_DST=${MYSQLDATA}
 
 mysqld --initialize --init-file=/etc/mysql/init.sql
 
+export WALG_STREAM_CREATE_COMMAND="xtrabackup --backup \
+--stream=xbstream \
+--user=sbtest \
+--host=localhost \
+--parallel=2 \
+--datadir=${MYSQLDATA}"
+
 service mysql start
-wal-g stream-push xtrabackup\ --backup\ \
---stream=xbstream\ \
---user=sbtest\ \
---host=localhost\ \
---parallel=2\ \
---datadir=${MYSQLDATA}
+wal-g stream-push
 
 
 mysql -u sbtest -h localhost -e "FLUSH LOGS";

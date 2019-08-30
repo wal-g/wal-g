@@ -6,6 +6,13 @@ export WALG_MYSQL_DATASOURCE_NAME=sbtest:@/sbtest
 export WALG_MYSQL_BINLOG_SRC=${MYSQLDATA}
 export WALG_MYSQL_BINLOG_DST=${MYSQLDATA}
 
+export WALG_STREAM_CREATE_COMMAND="xtrabackup --backup \
+--stream=xbstream \
+--user=sbtest \
+--host=localhost \
+--parallel=2 \
+--datadir=${MYSQLDATA}"
+
 mysqld --initialize --init-file=/etc/mysql/init.sql
 
 service mysql start
@@ -28,12 +35,7 @@ do
         mv /tmp/mysql ${MYSQLDATA}/mysql
     fi
 
-    wal-g stream-push xtrabackup\ --backup\ \
---stream=xbstream\ \
---user=sbtest\ \
---host=localhost\ \
---parallel=2\ \
---datadir=${MYSQLDATA}
+    wal-g stream-push
 done
 
 wal-g backup-list

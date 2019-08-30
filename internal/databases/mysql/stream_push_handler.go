@@ -1,11 +1,8 @@
 package mysql
 
 import (
-	"bytes"
 	"database/sql"
 	"io"
-	"os"
-	"os/exec"
 
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -13,11 +10,7 @@ import (
 )
 
 func HandleStreamPush(uploader *Uploader, command []string) {
-	if len(command) == 0{
-		tracelog.ErrorLogger.Println("WARNING: command not specified")
-		os.Exit(1)
-	}
-	waitFunc, stream, stderr := startCommand(command)
+	waitFunc, stream:= internal.StartCommand(command)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	db, err := getMySQLConnection()
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -26,25 +19,6 @@ func HandleStreamPush(uploader *Uploader, command []string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = waitFunc()
 	tracelog.ErrorLogger.FatalOnError(err)
-	buf := new(bytes.Buffer)
-	_, err = buf.ReadFrom(stderr)
-	s := buf.String()
-	if s != ""{
-		tracelog.ErrorLogger.Println("ERROR: Stderr of the command is not empty.")
-		os.Exit(1)
-	}
-}
-
-func startCommand(command []string) (waitFunc func() error, stdout, stderr io.ReadCloser) {
-	c := exec.Command(command[0], command[1:]...)
-	stdout, err := c.StdoutPipe()
-	tracelog.ErrorLogger.FatalOnError(err)
-	stderr, err = c.StderrPipe()
-	tracelog.ErrorLogger.FatalOnError(err)
-	err = c.Start()
-	waitFunc = c.Wait
-	tracelog.ErrorLogger.FatalOnError(err)
-	return
 }
 
 // TODO : unit tests

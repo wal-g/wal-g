@@ -17,8 +17,9 @@ service mongodb start
 sleep 1
 
 add_test_data
+export WALG_STREAM_CREATE_COMMAND="mongodump --archive --oplog"
 
-mongodump --archive --oplog | wal-g stream-push
+wal-g stream-push
 
 add_test_data
 mongoexport -d test -c testData | sort  > /tmp/export1.json

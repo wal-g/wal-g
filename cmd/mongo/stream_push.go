@@ -17,7 +17,8 @@ var streamPushCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
-		mongo.HandleStreamPush(&mongo.Uploader{Uploader: uploader})
+		command := internal.GetNameStreamCreateCmd()
+		mongo.HandleStreamPush(&mongo.Uploader{Uploader: uploader}, command)
 	},
 }
 

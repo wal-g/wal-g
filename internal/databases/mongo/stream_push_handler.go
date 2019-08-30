@@ -1,21 +1,19 @@
 package mongo
 
 import (
-	"io"
-	"os"
-
 	"github.com/wal-g/wal-g/internal"
+	"io"
 
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleStreamPush(uploader *Uploader) {
-	if !internal.FileIsPiped(os.Stdin) {
-		tracelog.ErrorLogger.Fatal("Use stdin\n")
-	}
+func HandleStreamPush(uploader *Uploader, command []string) {
+	waitFunc, stream:= internal.StartCommand(command)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
-	err := uploader.UploadStream(os.Stdin)
+	err := uploader.UploadStream(stream)
+	tracelog.ErrorLogger.FatalOnError(err)
+	err = waitFunc()
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
