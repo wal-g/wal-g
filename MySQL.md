@@ -71,8 +71,11 @@ wal-g stream-fetch LATEST | xbstream -x -C mysql_datadir
 Command for compressing, encrypting and sending backup from stream to storage.
 
 ```
-xtrabackup --backup --stream=xbstream --datadir=mysql_datadir | wal-g stream-push
+wal-g stream-push
 ```
+
+Variable _WALG_STREAM_CREATE_COMMAND_ is required for use stream-push 
+(eg. ```xtrabackup --backup --stream=xbstream --datadir=mysql_datadir"```)
 
 * ``binlog-push``
 
