@@ -81,6 +81,17 @@ func NewBundle(uploadPooler *UploadPooler, archiveDirectory string, incrementFro
 	}
 }
 
+func (bundle *Bundle) GetFiles() BackupFileList {
+	files := make(BackupFileList)
+	bundle.Files.Range(func(k, v interface{}) bool {
+		key := k.(string)
+		description := v.(BackupFileDescription)
+		files[key] = description
+		return true
+	})
+	return files
+}
+
 func (bundle *Bundle) GetFileRelPath(fileAbsPath string) string {
 	return utility.GetFileRelativePath(fileAbsPath, bundle.ArchiveDirectory)
 }
@@ -187,13 +198,13 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 // TODO : unit tests
 // UploadPgControl should only be called
 // after the rest of the backup is successfully uploaded to S3.
-func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
+func (bundle *Bundle) UploadPgControl() error {
 	fileName := bundle.Sentinel.Info.Name()
 	info := bundle.Sentinel.Info
 	path := bundle.Sentinel.path
 
 	tarBall := bundle.UploadPooler.tarBallMaker.Make(false)
-	tarBall.SetUp(bundle.UploadPooler.Crypter, "pg_control.tar."+compressorFileExtension)
+	tarBall.SetUp(bundle.UploadPooler.Crypter, "pg_control")
 	tarWriter := tarBall.TarWriter()
 
 	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
@@ -284,6 +295,19 @@ func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uin
 	}
 	bundle.DeltaMap = deltaMap
 	return nil
+}
+
+func (bundle *Bundle) uploadBackup() error {
+	tracelog.InfoLogger.Println("Walking ...")
+	err := filepath.Walk(bundle.ArchiveDirectory, bundle.HandleWalkedFSObject)
+	if err != nil {
+		return err
+	}
+	err = bundle.UploadPooler.FinishQueue()
+	if err != nil {
+		return err
+	}
+	return bundle.UploadPgControl()
 }
 
 // TODO : unit tests

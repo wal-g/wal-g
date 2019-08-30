@@ -358,7 +358,7 @@ func TestWalk(t *testing.T) {
 	sen := bundle.Sentinel.Info.Name()
 	assert.Equal(t, internal.PgControl, sen)
 
-	err = bundle.UploadPgControl("lz4")
+	err = bundle.UploadPgControl()
 	assert.NoError(t, err)
 
 	// err = bundle.UploadLabelFiles("backup", "table")

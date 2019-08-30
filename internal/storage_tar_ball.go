@@ -31,7 +31,7 @@ func (tarBall *StorageTarBall) SetUp(crypter crypto.Crypter, names ...string) {
 	}
 	var name string
 	if len(names) > 0 {
-		name = names[0]
+		name = fmt.Sprintf("%v.tar.%v", names[0], tarBall.uploader.Compressor.FileExtension())
 	} else {
 		name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partNumber, tarBall.uploader.Compressor.FileExtension())
 	}
