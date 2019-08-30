@@ -14,6 +14,7 @@ import (
 	"golang.org/x/time/rate"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -294,4 +295,12 @@ func GetSentinelUserData() interface{} {
 		return dataStr
 	}
 	return out
+}
+
+func GetNameStreamCreateCmd() []string {
+	dataStr, ok := GetSetting(NameStreamCreateCmd)
+	if !ok || len(dataStr) == 0 {
+		tracelog.ErrorLogger.Fatal("WALG_STREAM_CREATE_COMMAND expected.")
+	}
+	return strings.Split(dataStr, " ")
 }

@@ -1,11 +1,10 @@
 package mysql
 
 import (
+	"github.com/spf13/cobra"
+	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
-	"github.com/tinsane/tracelog"
-
-	"github.com/spf13/cobra"
 )
 
 const StreamPushShortDescription = ""
@@ -17,7 +16,8 @@ var streamPushCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
-		mysql.HandleStreamPush(&mysql.Uploader{Uploader: uploader})
+		command := internal.GetNameStreamCreateCmd()
+		mysql.HandleStreamPush(&mysql.Uploader{Uploader: uploader}, command)
 	},
 }
 

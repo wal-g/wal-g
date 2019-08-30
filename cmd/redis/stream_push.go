@@ -18,7 +18,8 @@ var streamPushCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
-		redis.HandleStreamPush(&redis.Uploader{Uploader: uploader})
+		command := internal.GetNameStreamCreateCmd()
+		redis.HandleStreamPush(&redis.Uploader{Uploader: uploader}, command)
 	},
 }
 

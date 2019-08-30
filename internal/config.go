@@ -33,6 +33,7 @@ const (
 	PgUserSetting                = "PGUSER" // TODO : do something with it
 	PgHostSetting                = "PGHOST" // TODO : do something with it
 	TotalBgUploadedLimit         = "TOTAL_BG_UPLOADED_LIMIT"
+	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
 )
 
 var (

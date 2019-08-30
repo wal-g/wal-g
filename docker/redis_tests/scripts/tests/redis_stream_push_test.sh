@@ -8,8 +8,8 @@ sleep 10 # Wait until port 6379 will be available
 service redis-server start &
 
 sleep 10 # Wait for full redis-server start
-
-redis-cli -a {password} --rdb /dev/stdout | wal-g stream-push # Send stream of dump to wal-g
+export WALG_STREAM_CREATE_COMMAND="redis-cli -a {password} --rdb /dev/stdout"
+wal-g stream-push # Send stream of dump to wal-g
 
 wal-g backup-list
 

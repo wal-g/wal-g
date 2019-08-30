@@ -3,27 +3,21 @@ package mysql
 import (
 	"database/sql"
 	"io"
-	"os"
-	"strings"
 
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleStreamPush(uploader *Uploader) {
+func HandleStreamPush(uploader *Uploader, command []string) {
+	waitFunc, stream:= internal.StartCommand(command)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	db, err := getMySQLConnection()
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(db, "")
-	var stream io.Reader = os.Stdin
-	if internal.FileIsPiped(os.Stdin) {
-		tracelog.InfoLogger.Println("Data is piped from stdin")
-	} else {
-		tracelog.ErrorLogger.Println("WARNING: stdin is terminal: operating in test mode!")
-		stream = strings.NewReader("testtesttest")
-	}
 	err = uploader.UploadStream(db, stream)
+	tracelog.ErrorLogger.FatalOnError(err)
+	err = waitFunc()
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 

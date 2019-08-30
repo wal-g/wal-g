@@ -11,12 +11,12 @@ add_test_data() {
 }
 
 service mongodb start
-
+export WALG_STREAM_CREATE_COMMAND="mongodump --archive --oplog"
 for i in $(seq 1 5);
 do
     sleep 1
     add_test_data
-    mongodump --archive --oplog | wal-g stream-push
+    wal-g stream-push
 
     if [ $i -eq 3 ];
     then
