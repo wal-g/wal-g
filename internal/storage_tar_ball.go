@@ -85,6 +85,8 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) 
 		if err != nil {
 			tracelog.ErrorLogger.Printf("upload: could not upload '%s'\n", path)
 			tracelog.ErrorLogger.Printf("%v\n", err)
+			err = pipeReader.Close()
+			tracelog.ErrorLogger.FatalfOnError("Failed to close pipe: %v", err)
 		}
 	}()
 
