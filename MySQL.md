@@ -75,7 +75,7 @@ wal-g stream-push
 ```
 
 Variable _WALG_STREAM_CREATE_COMMAND_ is required for use stream-push 
-(eg. ```xtrabackup --backup --stream=xbstream --datadir=mysql_datadir"```)
+(eg. ```xtrabackup --backup --stream=xbstream --datadir=mysql_datadir```)
 
 * ``binlog-push``
 
