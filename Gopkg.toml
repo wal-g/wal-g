@@ -96,3 +96,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/tinsane/tracelog"
+
+[[constraint]]
+  revision = "94d6f74dd32347e5c486253b623c49d4d7216e17"
+  name = "github.com/tinsane/storages"

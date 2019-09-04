@@ -441,8 +441,7 @@
   version = "v1.4.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:72d18b8f96c4bf3f10bf48d8303b477a348c86b6792bf9a1f5fe1111fb82e8bb"
+  digest = "1:3dc468973d515412e46671b4437f224379cade137adf96540c8e6669abf35a73"
   name = "github.com/tinsane/storages"
   packages = [
     "azure",
@@ -454,7 +453,7 @@
     "swift",
   ]
   pruneopts = "UT"
-  revision = "5818ecf3450604c1120b7234c08f0b186f8f408a"
+  revision = "94d6f74dd32347e5c486253b623c49d4d7216e17"
 
 [[projects]]
   branch = "master"
