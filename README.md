@@ -14,9 +14,11 @@ WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4
 - [Development](#development)
 	- [Installing](#installing)
 	- [Testing](#testing)
+	- [Development on windows](#Development on Windows) 
 - [Authors](#authors)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
+- [Chat](#chat)
 
 Installation
 ----------
@@ -203,6 +205,9 @@ Test coverage can be obtained using:
 make coverage
 ```
 This command generates `coverage.out` file and opens HTML representation of the coverage.
+### Development on Windows
+
+[Information about installing and usage](https://github.com/wal-g/wal-g/blob/master/Windows.md)
 
 
 Authors
