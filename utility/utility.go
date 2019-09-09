@@ -82,7 +82,11 @@ func NormalizePath(path string) string {
 }
 
 func IsInDirectory(path, directoryPath string) bool {
-	return strings.HasPrefix(NormalizePath(path), NormalizePath(directoryPath))
+	relativePath, err := filepath.Rel(directoryPath, path)
+	if err != nil {
+		return false
+	}
+	return relativePath == "." || NormalizePath(NormalizePath(directoryPath)+PathSeparator+relativePath) == NormalizePath(path)
 }
 
 func PathsEqual(path1, path2 string) bool {

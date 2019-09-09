@@ -270,7 +270,7 @@ func TestPathsEqual_RelativeDoesNotEqualAbsolute(t *testing.T) {
 }
 
 func TestIsInDirectory_SamePaths(t *testing.T) {
-	assert.True(t, utility.IsInDirectory("/home/", "/home/"))
+	assert.True(t, utility.IsInDirectory("/home", "/home"))
 }
 
 func TestIsInDirectory_NeedPathNormalization(t *testing.T) {
