@@ -38,9 +38,7 @@ pkill -9 postgres
 
 cd /tmp/basebackups_005
 mkdir /tmp/conf_files
-cp ${PGDATA}/postgresql.conf /tmp/conf_files
-cp ${PGDATA}/pg_hba.conf /tmp/conf_files
-cp ${PGDATA}/pg_ident.conf /tmp/conf_files
+cp -t /tmp/conf_files/ ${PGDATA}/postgresql.conf ${PGDATA}/pg_hba.conf ${PGDATA}/pg_ident.conf
 cp -r /tmp/spaces /tmp/spaces_backup
 
 rm -rf /tmp/spaces/*
@@ -50,9 +48,7 @@ wal-g backup-fetch ${PGDATA} LATEST
 
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
 
-cp /tmp/conf_files/postgresql.conf ${PGDATA}
-cp /tmp/conf_files/pg_hba.conf ${PGDATA}
-cp /tmp/conf_files/pg_ident.conf ${PGDATA}
+cp -t ${PGDATA} /tmp/conf_files/postgresql.conf /tmp/conf_files/pg_hba.conf /tmp/conf_files/pg_ident.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 
@@ -61,7 +57,6 @@ pg_dumpall -f /tmp/dump2
 diff /tmp/dump1 /tmp/dump2
 diff -r /tmp/spaces_backup /tmp/spaces
 
-pkill -9 postgres
-rm -rf ${PGDATA}
+../scripts/drop_pg.sh
 
 echo "Tablespaces work!!!"

@@ -25,7 +25,7 @@ const (
 	PgControl             = "pg_control"
 	BackupLabelFilename   = "backup_label"
 	TablespaceMapFilename = "tablespace_map"
-	TablespaceFolder        = "pg_tblspc"
+	TablespaceFolder      = "pg_tblspc"
 )
 
 type TarSizeError struct {
@@ -87,17 +87,15 @@ type Bundle struct {
 
 // TODO: use DiskDataFolder
 func NewBundle(archiveDirectory string, crypter crypto.Crypter, incrementFromLsn *uint64, incrementFromFiles BackupFileList) *Bundle {
-	bundle := &Bundle{
+	return &Bundle{
 		ArchiveDirectory:   archiveDirectory,
 		TarSizeThreshold:   viper.GetInt64(TarSizeThresholdSetting),
 		Crypter:            crypter,
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
 		Files:              &sync.Map{},
-		TablespaceSpec:     make(TablespaceSpec),
+		TablespaceSpec:     NewTablespaceSpec(archiveDirectory),
 	}
-	bundle.TablespaceSpec.SetBasePrefix(archiveDirectory)
-	return bundle
 }
 
 func (bundle *Bundle) GetFileRelPath(fileAbsPath string) string {
@@ -280,11 +278,15 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 		return errors.Wrap(err, "HandleWalkedFSObject: walk failed")
 	}
 
-	path, ok := bundle.TablespaceSpec.MakeTablespaceSymlinkPath(path)
-	if !ok {
-		return fmt.Errorf("Could not make symlink path for location %s\n", path)
+	path, err = bundle.TablespaceSpec.MakeTablespaceSymlinkPath(path)
+	if err != nil {
+		return fmt.Errorf("Could not make symlink path for location %s. %v\n", path, err)
 	}
-	if isSymlink := bundle.TablespaceSpec.IsTablespaceSymlink(path); isSymlink {
+	isSymlink, err := bundle.TablespaceSpec.IsTablespaceSymlink(path)
+	if err != nil {
+		return fmt.Errorf("Could not check whether path %s is symlink or not. %v\n", path, err)
+	}
+	if isSymlink {
 		return nil
 	}
 

@@ -1,29 +1,28 @@
-package test
+package internal
 
 import (
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
 	"path/filepath"
 	"sort"
 	"testing"
 )
 
-func addTablespaces(spec internal.TablespaceSpec, strs []internal.TablespaceLocation) {
+func addTablespaces(spec *TablespaceSpec, strs []TablespaceLocation) {
 	for _, loc := range strs {
 		spec.AddTablespace(loc.Symlink, loc.Location)
 	}
 }
 
-func marshalAndUnmarshal(t *testing.T, spec internal.TablespaceSpec) {
+func marshalAndUnmarshal(t *testing.T, spec *TablespaceSpec) {
 	bytes, err := json.Marshal(spec)
 	assert.NoError(t, err)
-	err = json.Unmarshal(bytes, &spec)
+	err = json.Unmarshal(bytes, spec)
 	assert.NoError(t, err)
 }
 
-func requireLocation(t *testing.T, spec internal.TablespaceSpec, symlinkName string) internal.TablespaceLocation {
+func requireLocation(t *testing.T, spec TablespaceSpec, symlinkName string) TablespaceLocation {
 	location, ok := spec.Location(symlinkName)
 	if !ok {
 		t.Fail()
@@ -31,23 +30,29 @@ func requireLocation(t *testing.T, spec internal.TablespaceSpec, symlinkName str
 	return location
 }
 
-func formatLocations(tablespaceLocations []internal.TablespaceLocation) {
+func requireIsTablespaceSymlink(t *testing.T, spec TablespaceSpec, path string) bool {
+	isSymlink, err := spec.IsTablespaceSymlink(path)
+	assert.NoError(t, err)
+	return isSymlink
+}
+
+func formatLocations(tablespaceLocations []TablespaceLocation) {
 	for index, loc := range tablespaceLocations {
-		tablespaceLocations[index].Symlink = filepath.Join(internal.TablespaceFolder, loc.Symlink)
+		tablespaceLocations[index].Symlink = filepath.Join(TablespaceFolder, loc.Symlink)
 		tablespaceLocations[index].Location = utility.NormalizePath(loc.Location)
 	}
 }
 
 func TestTablespaceNames(t *testing.T) {
-	spec := internal.TablespaceSpec{}
-	tablespaceLocations := []internal.TablespaceLocation{
+	spec := NewTablespaceSpec("/psql/")
+	tablespaceLocations := []TablespaceLocation{
 		{Location: "", Symlink: "12"},
 		{Location: "", Symlink: "100"},
 		{Location: "", Symlink: "101"},
 	}
-	addTablespaces(spec, tablespaceLocations)
+	addTablespaces(&spec, tablespaceLocations)
 
-	marshalAndUnmarshal(t, spec)
+	marshalAndUnmarshal(t, &spec)
 
 	names := spec.TablespaceNames()
 	sort.Slice(names, func(i, j int) bool {
@@ -60,15 +65,15 @@ func TestTablespaceNames(t *testing.T) {
 }
 
 func TestTablespaceLocation(t *testing.T) {
-	spec := internal.TablespaceSpec{}
-	tablespaceLocations := []internal.TablespaceLocation{
+	spec := NewTablespaceSpec("/psql/")
+	tablespaceLocations := []TablespaceLocation{
 		{Location: "/home/ismirn0ff/space1/", Symlink: "3"},
 		{Location: "/home/ismirn0ff/space2", Symlink: "1"},
 		{Location: "/home/ismirn0ff/space3/", Symlink: "2"},
 	}
-	addTablespaces(spec, tablespaceLocations)
+	addTablespaces(&spec, tablespaceLocations)
 
-	marshalAndUnmarshal(t, spec)
+	marshalAndUnmarshal(t, &spec)
 	formatLocations(tablespaceLocations)
 
 	assert.Equal(t, tablespaceLocations[0], requireLocation(t, spec, "3"))
@@ -77,99 +82,96 @@ func TestTablespaceLocation(t *testing.T) {
 }
 
 func TestBasePrefix(t *testing.T) {
-	spec := internal.TablespaceSpec{}
-	spec.SetBasePrefix("/psql/")
+	spec := NewTablespaceSpec("/psql/")
 
-	marshalAndUnmarshal(t, spec)
+	marshalAndUnmarshal(t, &spec)
 
 	val, ok := spec.BasePrefix()
 	assert.Equal(t, ok, true)
 	assert.Equal(t, "/psql", val)
 }
 
-func setUpIsTablespaceSymlink(t *testing.T) internal.TablespaceSpec {
-	spec := internal.TablespaceSpec{}
-	spec.SetBasePrefix("/psql/")
-	tablespaceLocations := []internal.TablespaceLocation{
+func setUpIsTablespaceSymlink(t *testing.T) TablespaceSpec {
+	spec := NewTablespaceSpec("/psql/")
+	tablespaceLocations := []TablespaceLocation{
 		{Location: "/home/ismirn0ff/space1/", Symlink: "3"},
 		{Location: "/home/ismirn0ff/space2", Symlink: "1"},
 	}
-	addTablespaces(spec, tablespaceLocations)
+	addTablespaces(&spec, tablespaceLocations)
 
-	marshalAndUnmarshal(t, spec)
+	marshalAndUnmarshal(t, &spec)
 
 	return spec
 }
 
 func TestIsTablespaceSymlink_NotActualPath(t *testing.T) {
 	spec := setUpIsTablespaceSymlink(t)
-	assert.False(t, spec.IsTablespaceSymlink("/home/ismirn0ff/space2"))
-	assert.False(t, spec.IsTablespaceSymlink("/home/ismirn0ff/space1"))
+	assert.False(t, requireIsTablespaceSymlink(t, spec, "/home/ismirn0ff/space2"))
+	assert.False(t, requireIsTablespaceSymlink(t, spec, "/home/ismirn0ff/space1"))
 }
 
 func TestIsTablespaceSymlink_NotActualPathSlash(t *testing.T) {
 	spec := setUpIsTablespaceSymlink(t)
-	assert.False(t, spec.IsTablespaceSymlink("/home/ismirn0ff/space2/"))
-	assert.False(t, spec.IsTablespaceSymlink("/home/ismirn0ff/space1/"))
+	assert.False(t, requireIsTablespaceSymlink(t, spec, "/home/ismirn0ff/space2/"))
+	assert.False(t, requireIsTablespaceSymlink(t, spec, "/home/ismirn0ff/space1/"))
 }
 
 func TestIsTablespaceSymlink_NotActualPathSubdirectory(t *testing.T) {
 	spec := setUpIsTablespaceSymlink(t)
-	assert.False(t, spec.IsTablespaceSymlink("/home/ismirn0ff/space1/folder"))
+	assert.False(t, requireIsTablespaceSymlink(t, spec, "/home/ismirn0ff/space1/folder"))
 }
 
 func TestIsTablespaceSymlink_NotPgTblspcRoot(t *testing.T) {
 	spec := setUpIsTablespaceSymlink(t)
-	assert.False(t, spec.IsTablespaceSymlink("/psql/pg_tblspc/"))
+	assert.False(t, requireIsTablespaceSymlink(t, spec, "/psql/pg_tblspc/"))
 }
 
 func TestIsTablespaceSymlink_Symlink(t *testing.T) {
 	spec := setUpIsTablespaceSymlink(t)
-	assert.True(t, spec.IsTablespaceSymlink("/psql/pg_tblspc/1"))
-	assert.True(t, spec.IsTablespaceSymlink("/psql/pg_tblspc/3"))
+	assert.True(t, requireIsTablespaceSymlink(t, spec, "/psql/pg_tblspc/1"))
+	assert.True(t, requireIsTablespaceSymlink(t, spec, "/psql/pg_tblspc/3"))
 }
 
 func TestIsTablespaceSymlink_SymlinkSlash(t *testing.T) {
 	spec := setUpIsTablespaceSymlink(t)
-	assert.True(t, spec.IsTablespaceSymlink("/psql/pg_tblspc/1/"))
-	assert.True(t, spec.IsTablespaceSymlink("/psql/pg_tblspc/3/"))
+	assert.True(t, requireIsTablespaceSymlink(t, spec, "/psql/pg_tblspc/1/"))
+	assert.True(t, requireIsTablespaceSymlink(t, spec, "/psql/pg_tblspc/3/"))
 }
 
 func TestMakeTablespaceSymlinkPath(t *testing.T) {
-	spec := internal.TablespaceSpec{}
-	spec.SetBasePrefix("/psql/")
+	spec := NewTablespaceSpec("/psql/")
 	spec.AddTablespace("1", "/home/ismirn0ff/space1/")
 
-	marshalAndUnmarshal(t, spec)
+	marshalAndUnmarshal(t, &spec)
 
-	path, ok := spec.MakeTablespaceSymlinkPath("/home/ismirn0ff/space1/folder")
-	assert.True(t, ok)
+	path, err := spec.MakeTablespaceSymlinkPath("/home/ismirn0ff/space1/folder")
+	assert.NoError(t, err)
 	assert.Equal(t, "/psql/pg_tblspc/1/folder", path)
 
-	path, ok = spec.MakeTablespaceSymlinkPath("/home/ismirn0ff/space1")
-	assert.True(t, ok)
+	path, err = spec.MakeTablespaceSymlinkPath("/home/ismirn0ff/space1")
+	assert.NoError(t, err)
 	assert.Equal(t, "/psql/pg_tblspc/1", path)
 
 	// Invalid path
-	path, ok = spec.MakeTablespaceSymlinkPath("/home/ismirn0ff/")
-	assert.False(t, ok)
+	path, err = spec.MakeTablespaceSymlinkPath("/home/ismirn0ff/")
+	assert.Error(t, err)
 
 	// usual postgres path
-	path, ok = spec.MakeTablespaceSymlinkPath("/psql/some_path")
-	assert.True(t, ok)
+	path, err = spec.MakeTablespaceSymlinkPath("/psql/some_path")
+	assert.NoError(t, err)
 	assert.Equal(t, "/psql/some_path", path)
 }
 
 func TestTablespaceLocations(t *testing.T) {
-	spec := internal.TablespaceSpec{}
-	tablespaceLocations := []internal.TablespaceLocation{
+	spec := NewTablespaceSpec("/psql/")
+	tablespaceLocations := []TablespaceLocation{
 		{Location: "/home/ismirn0ff/space1/", Symlink: "3"},
 		{Location: "/home/ismirn0ff/space2", Symlink: "1"},
 		{Location: "/home/ismirn0ff/space3/", Symlink: "2"},
 	}
-	addTablespaces(spec, tablespaceLocations)
+	addTablespaces(&spec, tablespaceLocations)
 
-	marshalAndUnmarshal(t, spec)
+	marshalAndUnmarshal(t, &spec)
 	formatLocations(tablespaceLocations)
 
 	returnedLocations := spec.TablespaceLocations()
