@@ -37,8 +37,6 @@ wal-g backup-push ${PGDATA}
 pkill -9 postgres
 
 cd /tmp/basebackups_005
-mkdir /tmp/conf_files
-cp -t /tmp/conf_files/ ${PGDATA}/postgresql.conf ${PGDATA}/pg_hba.conf ${PGDATA}/pg_ident.conf
 cp -r /tmp/spaces /tmp/spaces_backup
 
 rm -rf /tmp/spaces/*
@@ -47,8 +45,6 @@ rm -rf ${PGDATA}
 wal-g backup-fetch ${PGDATA} LATEST
 
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
-
-cp -t ${PGDATA} /tmp/conf_files/postgresql.conf /tmp/conf_files/pg_hba.conf /tmp/conf_files/pg_ident.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 
