@@ -60,10 +60,10 @@ func HandleWALPush(uploader *Uploader, walFilePath string) {
 func UploadWALFile(uploader *Uploader, walFilePath string, preventWalOverwrite bool) error {
 	if preventWalOverwrite {
 		overwriteAttempt, err := checkWALOverwrite(uploader, walFilePath)
-		if err != nil {
+		if overwriteAttempt {
+			return err
+		} else if err != nil {
 			return errors.Wrap(err, "Couldn't check whether there is an overwrite attempt due to inner error")
-		} else if overwriteAttempt {
-			return NewCantOverwriteWalFileError(walFilePath)
 		}
 	}
 	walFile, err := os.Open(walFilePath)
@@ -95,9 +95,9 @@ func checkWALOverwrite(uploader *Uploader, walFilePath string) (overwriteAttempt
 	}
 
 	if !bytes.Equal(archived, localBytes) {
-		return true, nil
+		return true, NewCantOverwriteWalFileError(walFilePath)
 	} else {
-		tracelog.WarningLogger.Printf("WAL file '%s' already archived, archived content equals\n", walFilePath)
-		return false, nil
+		tracelog.InfoLogger.Printf("WAL file '%s' already archived with equal content, skipping", walFilePath)
+		return true, nil
 	}
 }
