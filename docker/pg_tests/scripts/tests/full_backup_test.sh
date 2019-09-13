@@ -38,6 +38,26 @@ pg_dumpall -f /tmp/dump2
 diff /tmp/dump1 /tmp/dump2
 
 psql -f /tmp/scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
+
+echo "Full backup success!!!!!!"
+
+# Also we test here WAL overwrite prevention as a part of regular backup functionality
+
+export WALG_PREVENT_WAL_OVERWRITE=true
+
+echo test > ${PGDATA}/pg_wal/test_file
+wal-g --config=${TMP_CONFIG} wal-push ${PGDATA}/pg_wal/test_file
+wal-g --config=${TMP_CONFIG} wal-push ${PGDATA}/pg_wal/test_file
+
+echo test1 > ${PGDATA}/pg_wal/test_file
+wal-g --config=${TMP_CONFIG} wal-push ${PGDATA}/pg_wal/test_file && EXIT_STATUS=$? || EXIT_STATUS=$?
+
+if [ "$EXIT_STATUS" -eq 0 ] ; then
+    echo "Error: Duplicate WAL with different content was pushed"
+    exit 1
+fi
+
 /tmp/scripts/drop_pg.sh
 rm ${TMP_CONFIG}
-echo "Full backup success!!!!!!"
+
+echo "Prevent WAL overwrite success!!!!!!"
