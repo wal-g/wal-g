@@ -20,6 +20,32 @@ type SentinelMarshallingError struct {
 	error
 }
 
+func GetLatestFullBackupName(folder storage.Folder) (string, BackupSentinelDto, error) {
+	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
+
+	previousBackupSentinelDto := BackupSentinelDto{}
+
+	sortTimes, err := getBackups(folder)
+	if err != nil {
+		return "", BackupSentinelDto{}, err
+	}
+
+	for _, backup := range sortTimes {
+		previousBackup := NewBackup(baseBackupFolder, backup.BackupName)
+
+		previousBackupSentinelDto, err = previousBackup.GetSentinel()
+		if err != nil {
+			return "", previousBackupSentinelDto, errors.Wrapf(err, "Failed to get sentinel file")
+		}
+
+		if !previousBackupSentinelDto.IsIncremental() {
+			return backup.BackupName, previousBackupSentinelDto, nil
+		}
+	}
+
+	return "", previousBackupSentinelDto, errors.New("cannot find any full backups")
+}
+
 func NewSentinelMarshallingError(sentinelName string, err error) SentinelMarshallingError {
 	return SentinelMarshallingError{errors.Wrapf(err, "Failed to marshall sentinel file: '%s'", sentinelName)}
 }
@@ -80,9 +106,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 			} else {
 				if fromFull {
 					tracelog.InfoLogger.Println("Delta will be made from full backup.")
-					previousBackupName = *previousBackupSentinelDto.IncrementFullName
-					previousBackup := NewBackup(basebackupFolder, previousBackupName)
-					previousBackupSentinelDto, err = previousBackup.GetSentinel()
+					previousBackupName, previousBackupSentinelDto, err = GetLatestFullBackupName(folder)
 					tracelog.ErrorLogger.FatalOnError(err)
 				}
 				tracelog.InfoLogger.Printf("Delta backup from %v with LSN %x. \n", previousBackupName, *previousBackupSentinelDto.BackupStartLSN)
