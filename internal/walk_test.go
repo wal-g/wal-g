@@ -336,6 +336,7 @@ func TestWalk(t *testing.T) {
 		ArchiveDirectory: data,
 		TarSizeThreshold: int64(10),
 		Files:            &sync.Map{},
+		TablespaceSpec:   internal.NewTablespaceSpec(data),
 	}
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
 	bundle.TarBallMaker = &testtools.FileTarBallMaker{

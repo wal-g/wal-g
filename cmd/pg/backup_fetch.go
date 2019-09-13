@@ -2,8 +2,8 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/wal-g/internal"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/wal-g/internal"
 )
 
 const (
@@ -11,9 +11,11 @@ const (
 	MaskFlagDescription         = `Fetches only files which path relative to destination_directory
 matches given shell file pattern.
 For information about pattern syntax view: https://golang.org/pkg/path/filepath/#Match`
+	RestoreSpecDescription = "Path to file containing tablespace restore specification"
 )
 
 var fileMask string
+var restoreSpec string
 
 // backupFetchCmd represents the backupFetch command
 var backupFetchCmd = &cobra.Command{
@@ -23,12 +25,12 @@ var backupFetchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
-		internal.HandleBackupFetch(folder, args[0], args[1], fileMask)
+		internal.HandleBackupFetch(folder, args[0], args[1], fileMask, restoreSpec)
 	},
 }
 
 func init() {
 	backupFetchCmd.Flags().StringVar(&fileMask, "mask", "", MaskFlagDescription)
-
+	backupFetchCmd.Flags().StringVar(&restoreSpec, "restore-spec", "", RestoreSpecDescription)
 	Cmd.AddCommand(backupFetchCmd)
 }

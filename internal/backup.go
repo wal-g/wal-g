@@ -9,6 +9,7 @@ import (
 	"regexp"
 
 	"github.com/pkg/errors"
+	"github.com/tinsane/storages/fs"
 	"github.com/tinsane/storages/storage"
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/utility"
@@ -152,6 +153,36 @@ func checkDbDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentine
 			if fileDescription.IsSkipped {
 				tracelog.DebugLogger.Printf("Skipped file %v\n", fileName)
 			}
+		}
+	}
+
+	if sentinelDto.TablespaceSpec != nil && !sentinelDto.TablespaceSpec.Empty() {
+		err := setTablespacePaths(*sentinelDto.TablespaceSpec)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func setTablespacePaths(spec TablespaceSpec) error {
+	basePrefix, ok := spec.BasePrefix()
+	if !ok {
+		return fmt.Errorf("Tablespace specification base path is not set\n")
+	}
+	err := fs.NewFolder(basePrefix, TablespaceFolder).EnsureExists()
+	if err != nil {
+		return fmt.Errorf("Error creating pg_tblspc folder %v\n", err)
+	}
+	for _, location := range spec.TablespaceLocations() {
+		err := fs.NewFolder(location.Location, "").EnsureExists()
+		if err != nil {
+			return fmt.Errorf("Error creating folder for tablespace %v\n", err)
+		}
+		err = os.Symlink(location.Location, filepath.Join(basePrefix, location.Symlink))
+		if err != nil {
+			return fmt.Errorf("Error creating tablespace symkink %v\n", err)
 		}
 	}
 	return nil

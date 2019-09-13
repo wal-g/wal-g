@@ -18,12 +18,14 @@ import (
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
+	"io/ioutil"
 )
 
 const (
 	PgControl             = "pg_control"
 	BackupLabelFilename   = "backup_label"
 	TablespaceMapFilename = "tablespace_map"
+	TablespaceFolder      = "pg_tblspc"
 )
 
 type TarSizeError struct {
@@ -71,6 +73,7 @@ type Bundle struct {
 	IncrementFromLsn   *uint64
 	IncrementFromFiles BackupFileList
 	DeltaMap           PagedFileDeltaMap
+	TablespaceSpec     TablespaceSpec
 
 	tarballQueue     chan TarBall
 	uploadQueue      chan TarBall
@@ -91,11 +94,12 @@ func NewBundle(archiveDirectory string, crypter crypto.Crypter, incrementFromLsn
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
 		Files:              &sync.Map{},
+		TablespaceSpec:     NewTablespaceSpec(archiveDirectory),
 	}
 }
 
 func (bundle *Bundle) GetFileRelPath(fileAbsPath string) string {
-	return utility.GetFileRelativePath(fileAbsPath, bundle.ArchiveDirectory)
+	return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.ArchiveDirectory)
 }
 
 func (bundle *Bundle) GetFiles() *sync.Map { return bundle.Files }
@@ -274,6 +278,40 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 		return errors.Wrap(err, "HandleWalkedFSObject: walk failed")
 	}
 
+	path, err = bundle.TablespaceSpec.MakeTablespaceSymlinkPath(path)
+	if err != nil {
+		return fmt.Errorf("Could not make symlink path for location %s. %v\n", path, err)
+	}
+	isSymlink, err := bundle.TablespaceSpec.IsTablespaceSymlink(path)
+	if err != nil {
+		return fmt.Errorf("Could not check whether path %s is symlink or not. %v\n", path, err)
+	}
+	if isSymlink {
+		return nil
+	}
+
+	// Resolve symlinks for tablespaces and save folder structure.
+	if filepath.Base(path) == TablespaceFolder {
+		tablespaceInfos, err := ioutil.ReadDir(path)
+		if err != nil {
+			return fmt.Errorf("Could not read directory structure in %s: %v\n", TablespaceFolder, err)
+		}
+		for _, tablespaceInfo := range tablespaceInfos {
+			if (tablespaceInfo.Mode() & os.ModeSymlink) != 0 {
+				symlinkName := tablespaceInfo.Name()
+				actualPath, err := os.Readlink(filepath.Join(path, symlinkName))
+				if err != nil {
+					return fmt.Errorf("Could not read symlink for tablespace %v\n", err)
+				}
+				bundle.TablespaceSpec.AddTablespace(symlinkName, actualPath)
+				err = filepath.Walk(actualPath, bundle.HandleWalkedFSObject)
+				if err != nil {
+					return fmt.Errorf("Could not walk tablespace symlink tree error %v\n", err)
+				}
+			}
+		}
+	}
+
 	if info.Name() == PgControl {
 		bundle.Sentinel = &Sentinel{info, path}
 	} else {
@@ -290,7 +328,7 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 
 // TODO : unit tests
 // handleTar creates underlying tar writer and handles one given file.
-// Does not follow symlinks. If file is in ExcludedFilenames, will not be included
+// Does not follow symlinks (it seems like it does). If file is in ExcludedFilenames, will not be included
 // in the final tarball. EXCLUDED directories are created
 // but their contents are not written to local disk.
 func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
