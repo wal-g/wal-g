@@ -12,7 +12,10 @@ echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g wal-push %p'" >> /v
 echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
-wal-g delete everything INCLUDE_PERM --confirm
+
+#delete all backups of any
+wal-g delete everything FORCE --confirm
+
 # push permanent and impermanent delta backups
 for i in 1 2 3 4
 do
@@ -52,7 +55,7 @@ diff /tmp/dump1 /tmp/dump2
 wal-g backup-list --detail
 
 # delete all backups after previous tests
-wal-g delete everything INCLUDE_PERM --confirm
+wal-g delete everything FORCE --confirm
 
 # make impermanent base backup
 wal-g backup-push ${PGDATA}
@@ -63,24 +66,17 @@ imperm_backup=`wal-g backup-list | egrep -o "[0-9A-F]{24}"`
 wal-g backup-push --permanent ${PGDATA}
 wal-g backup-list --detail
 
-# check that nothing chanched when permanent backups exist
+# check that nothing changed when permanent backups exist
 wal-g backup-list > /tmp/dump1
 wal-g delete everything --confirm || true
 wal-g backup-list > /tmp/dump2
 diff /tmp/dump1 /tmp/dump2
 
-# delete all impermanent backups
-wal-g delete everything EXCEPT_PERM --confirm
-wal-g backup-list | egrep -o "$imperm_backup" | head -n1 > /tmp/dump1
 rm /tmp/dump2
 touch /tmp/dump2
-diff /tmp/dump1 /tmp/dump2
-
-# make impermanent base backup
-wal-g backup-push ${PGDATA}
 
 # delete all backups
-wal-g delete everything INCLUDE_PERM --confirm
+wal-g delete everything FORCE --confirm
 wal-g backup-list 2> /tmp/2 1> /tmp/1
 
 # check that stdout not include any backup

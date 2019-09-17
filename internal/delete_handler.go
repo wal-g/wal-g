@@ -19,8 +19,7 @@ const (
 	NoDeleteModifier = iota
 	FullDeleteModifier
 	FindFullDeleteModifier
-	IgnorePermanentDeleteModifier
-	ExceptPermanentDeleteModifier
+	ForceDeleteModifier
 	ConfirmFlag            = "confirm"
 	DeleteShortDescription = "Clears old backups and WALs"
 
@@ -35,13 +34,13 @@ const (
   everything INCLUDE_PERM   delete every backup including permanents
   everything EXCEPT_PERM    delete every backup except permanents`
 
-	DeleteEverythingUsageExample = "everything [EXCEPT_PERM|INCLUDE_PERM]"
+	DeleteEverythingUsageExample = "everything [FORCE]"
 	DeleteRetainUsageExample = "retain [FULL|FIND_FULL] backup_count"
 	DeleteBeforeUsageExample = "before [FIND_FULL] backup_name|timestamp"
 )
 
 var StringModifiers = []string{"FULL", "FIND_FULL"}
-var StringModifiersDeleteEverything = []string{"INCLUDE_PERM", "EXCEPT_PERM"}
+var StringModifiersDeleteEverything = []string{"FORCE"}
 
 // TODO : unit tests
 func GetLatestBackupName(folder storage.Folder) (string, error) {
@@ -231,41 +230,19 @@ func GetRetainChoiceFunc(retentionCount, modifier int,
 func DeleteEverything(folder storage.Folder,
 	confirmed bool,
 	args []string) {
-	exceptPermanent := false
-	ignorePermanent := false
+	forceModifier := false
 	modifier := extractDeleteEverythingModifierFromArgs(args)
-	switch modifier {
-	case IgnorePermanentDeleteModifier:
-		ignorePermanent = true
-	case ExceptPermanentDeleteModifier:
-		exceptPermanent = true
+	if modifier == ForceDeleteModifier {
+		forceModifier = true
 	}
 	permanentBackups, permanentWals := getPermanentObjects(folder)
-	if len(permanentBackups) > 0 && !ignorePermanent && !exceptPermanent{
+	if len(permanentBackups) > 0 && !forceModifier {
 		tracelog.ErrorLogger.Fatal(fmt.Sprintf("Found permanent objects: backups=%v, wals=%v\n", permanentBackups, permanentWals))
 	}
 
-	filter := GetFilterToDelete(exceptPermanent, ignorePermanent, permanentBackups, permanentWals)
+	filter := func(object storage.Object) bool { return true }
 	err := storage.DeleteObjectsWhere(folder, confirmed, filter)
 	tracelog.ErrorLogger.FatalOnError(err)
-}
-
-func GetFilterToDelete(
-	exceptPermanent bool,
-	ignorePermanent bool,
-	permanentBackups,
-	permanentWals map[string]bool) func(object storage.Object) bool {
-	if exceptPermanent {
-		return func(object storage.Object) bool {
-			return !isPermanent(object.GetName(), permanentBackups, permanentWals)
-		}
-	}
-	if ignorePermanent {
-		return func(object storage.Object) bool {
-			return true
-		}
-	}
-	return nil
 }
 
 func DeleteBeforeTarget(folder storage.Folder, target storage.Object,
@@ -382,10 +359,8 @@ func HandleDeleteRetain(folder storage.Folder, args []string, confirmed bool,
 func extractDeleteEverythingModifierFromArgs(args []string) int {
 	if len(args) == 0 {
 		return NoDeleteModifier
-	} else if args[0] == StringModifiersDeleteEverything[0] {
-		return IgnorePermanentDeleteModifier
 	} else {
-		return ExceptPermanentDeleteModifier
+		return ForceDeleteModifier
 	}
 }
 
