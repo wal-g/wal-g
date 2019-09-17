@@ -17,6 +17,10 @@ import (
 // HandleBackupList is invoked to perform wal-g backup-list
 func HandleBackupList(folder storage.Folder) {
 	backups, err := getBackups(folder)
+	if len(backups) == 0 {
+		tracelog.InfoLogger.Println("No backups found")
+		return
+	}
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	WriteBackupList(backups, os.Stdout)
@@ -25,6 +29,10 @@ func HandleBackupList(folder storage.Folder) {
 // TODO : unit tests
 func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, detail bool) {
 	backups, err := getBackups(folder)
+	if len(backups) == 0 {
+		tracelog.InfoLogger.Println("No backups found")
+		return
+	}
 	tracelog.ErrorLogger.FatalOnError(err)
 	// if details are requested we append content of metadata.json to each line
 	if detail {
