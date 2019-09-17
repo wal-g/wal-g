@@ -23,7 +23,7 @@ install_and_build_pg: install deps pg_build
 pg_build_image:
 	docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix
 
-pg_save_image: pg_build_image
+pg_save_image: install_and_build_pg pg_build_image
 	mkdir -p ${CACHE_FOLDER}
 	sudo rm -rf ${CACHE_FOLDER}/*
 	docker save ${IMAGE} | gzip -c > ${CACHE_FILE_DOCKER_PREFIX}
