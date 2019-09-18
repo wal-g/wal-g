@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -48,10 +49,10 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent bool, isFullBackup bool) {
 	archiveDirectory = utility.ResolveSymlink(archiveDirectory)
 	maxDeltas, fromFull := getDeltaConfig()
-
+	CheckPgVersionAndPgControl(archiveDirectory)
+	var err error
 	var previousBackupSentinelDto BackupSentinelDto
 	var previousBackupName string
-	var err error
 	incrementCount := 1
 
 	folder := uploader.UploadingFolder
@@ -108,6 +109,10 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	backupName, backupStartLSN, pgVersion, dataDir, err := bundle.StartBackup(conn,
 		utility.CeilTimeUpToMicroseconds(time.Now()).String())
 	meta.DataDir = dataDir
+	if dataDir != archiveDirectory {
+		warning := fmt.Sprintf("Data directory '%s' is not equal to archive directory '%s'", dataDir, archiveDirectory)
+		tracelog.WarningLogger.Println(warning)
+	}
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if len(previousBackupName) > 0 && previousBackupSentinelDto.BackupStartLSN != nil {
@@ -217,4 +222,11 @@ func UploadSentinel(uploader *Uploader, sentinelDto interface{}, backupName stri
 	}
 
 	return uploader.Upload(sentinelName, bytes.NewReader(dtoBody))
+}
+
+func CheckPgVersionAndPgControl(archiveDirectory string) {
+	_, err := ioutil.ReadFile(filepath.Join(archiveDirectory, PgControlPath))
+	tracelog.ErrorLogger.FatalfOnError("It looks like you are trying to backup not pg_data. PgControl file not found: %v\n", err)
+	_, err = ioutil.ReadFile(filepath.Join(archiveDirectory, "PG_VERSION"))
+	tracelog.ErrorLogger.FatalfOnError("It looks like you are trying to backup not pg_data. PG_VERSION file not found: %v\n", err)
 }
