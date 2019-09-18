@@ -163,15 +163,13 @@ if FULL is specified keep 5 full backups and everything in the middle
 
 if FIND_FULL is specified WAL-G will calculate minimum backup needed to keep all deltas alive. If FIND_FULL is not specified and call can produce orphaned deltas - call will fail with the list.
 
-``everything`` [EXCEPT_PERM|INCLUDE_PERM]
+``everything`` [FORCE]
 
 Examples: 
 
 ``everything`` all backups will be deleted (if there is no permanent backups)
 
-``everything EXCEPT_PERM`` only impermanent backups will be deleted
-
-``everything INCLUDE_PERM`` all backups, include permanent, will be deleted
+``everything FORCE`` all backups, include permanent, will be deleted
 
 ``retain 5`` will fail if 5th is delta
 
