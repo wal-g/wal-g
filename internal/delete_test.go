@@ -94,40 +94,9 @@ func testFindTargetBeforeTime(t *testing.T, minute int, modifier int) (storage.O
 	return internal.FindTargetBeforeTime(mockFolder, timeLine, modifier, isFullBackup, lessByTime)
 }
 
-func TestDeleteBeforeTarget_WithPermanentBackups(t *testing.T) {
-	folder := createMockStorageFolderWithPermanentBackups(t)
+func verifyThatExistBackupsAndWals(t *testing.T, expectBackupExistAfterDelete, expectWalExistAfterDelete map[string]bool, folder storage.Folder) {
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	walBackupFolder := folder.GetSubFolder(utility.WalPath)
-	expectBackupExistAfterDelete := map[string]bool{
-		"base_000000010000000000000002":                            false,
-		"base_000000010000000000000004_D_000000010000000000000002": true,
-		"base_000000010000000000000006_D_000000010000000000000004": false,
-	}
-	expectWalExistAfterDelete := map[string]bool{
-		"000000010000000000000001": true,
-		"000000010000000000000002": true,
-		"000000010000000000000003": false,
-	}
-
-	// verify that they exist initially
-	for backupName := range expectBackupExistAfterDelete {
-		exists, err := baseBackupFolder.Exists(backupName + "/" + utility.MetadataFileName)
-		assert.NoError(t, err)
-		assert.True(t, exists, "expected backup "+backupName+" to exist")
-
-	}
-	for walName := range expectWalExistAfterDelete {
-		exists, err := walBackupFolder.Exists(walName + ".lz4")
-		assert.NoError(t, err)
-		assert.True(t, exists, "expected wal "+walName+" to exist")
-	}
-
-	// attempt delete
-	target := storage.NewLocalObject("", utility.TimeNowCrossPlatformLocal().Add(time.Duration(1*int(time.Minute))))
-	err := internal.DeleteBeforeTarget(folder, target, true, isFullBackup, lessByTime)
-	assert.NoError(t, err)
-
-	// verify expected permanent still exists
 	for backupName, expect := range expectBackupExistAfterDelete {
 		exists, err := baseBackupFolder.Exists(backupName + "/" + utility.MetadataFileName)
 		assert.NoError(t, err)
@@ -138,6 +107,43 @@ func TestDeleteBeforeTarget_WithPermanentBackups(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, expect, exists, "errored on "+walName+".lz4")
 	}
+}
+
+func TestDeleteBeforeTargetWithPermanentBackups(t *testing.T) {
+	folder := createMockStorageFolderWithPermanentBackups(t)
+
+	expectBackupExistBeforeDelete := map[string]bool{
+		"base_000000010000000000000002":                            true,
+		"base_000000010000000000000004_D_000000010000000000000002": true,
+		"base_000000010000000000000006_D_000000010000000000000004": true,
+	}
+	expectWalExistBeforeDelete := map[string]bool{
+		"000000010000000000000001": true,
+		"000000010000000000000002": true,
+		"000000010000000000000003": true,
+	}
+
+	expectBackupExistAfterDelete := map[string]bool{
+		"base_000000010000000000000002":                            true,
+		"base_000000010000000000000004_D_000000010000000000000002": true,
+		"base_000000010000000000000006_D_000000010000000000000004": false,
+	}
+	expectWalExistAfterDelete := map[string]bool{
+		"000000010000000000000001": true,
+		"000000010000000000000002": true,
+		"000000010000000000000003": false,
+	}
+
+	// verify that they exist initially
+	verifyThatExistBackupsAndWals(t, expectBackupExistBeforeDelete, expectWalExistBeforeDelete, folder)
+
+	// attempt delete
+	target := storage.NewLocalObject("", utility.TimeNowCrossPlatformLocal().Add(time.Duration(1*int(time.Minute))))
+	err := internal.DeleteBeforeTarget(folder, target, true, isFullBackup, lessByTime)
+	assert.NoError(t, err)
+
+	// verify expected permanent still exists
+	verifyThatExistBackupsAndWals(t, expectBackupExistAfterDelete, expectWalExistAfterDelete, folder)
 }
 
 func createMockFolderWithTime(t *testing.T, baseTime time.Time) *mocks.MockFolder {
@@ -225,7 +231,16 @@ func createMockStorageFolderWithPermanentBackups(t *testing.T) storage.Folder {
 	walBackupFolder := folder.GetSubFolder(utility.WalPath)
 	emptyData := map[string]interface{}{}
 	backupNames := map[string]interface{}{
-		"base_000000010000000000000002": emptyData,
+		"base_000000010000000000000002": map[string]interface{}{
+			"start_time":   utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
+			"finish_time":  utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
+			"hostname":     "",
+			"data_dir":     "",
+			"pg_version":   0,
+			"start_lsn":    16777216, // logSegNo = 1
+			"finish_lsn":   33554432, // logSegNo = 2
+			"is_permanent": true,
+		},
 		"base_000000010000000000000004_D_000000010000000000000002": map[string]interface{}{
 			"start_time":   utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
 			"finish_time":  utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),

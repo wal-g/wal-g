@@ -18,13 +18,12 @@ pg_test: install deps pg_build lint unlink_brotli pg_integration_test
 pg_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_PG_PATH) && go build -tags "brotli lzo" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/pg.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/pg.WalgVersion=`git tag -l --points-at HEAD`")
 
-build_image: install deps pg_build unlink_brotli
-	docker-compose build $(DOCKER_COMMON)
+install_and_build_pg: install deps pg_build
 
 pg_build_image:
-	docker-compose build pg pg_build_docker_prefix
+	docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix
 
-pg_save_image: build_image pg_build_image
+pg_save_image: install_and_build_pg pg_build_image
 	mkdir -p ${CACHE_FOLDER}
 	sudo rm -rf ${CACHE_FOLDER}/*
 	docker save ${IMAGE} | gzip -c > ${CACHE_FILE_DOCKER_PREFIX}
@@ -35,7 +34,8 @@ pg_save_image: build_image pg_build_image
 pg_integration_test:
 	@if [ "x" = "${CACHE_FILE_DOCKER_PREFIX}x" ]; then\
 		echo "Rebuild";\
-		make build_image;\
+		make install_and_build_pg;\
+		docker-compose build $(DOCKER_COMMON);\
 		make pg_build_image;\
 	else\
 		docker load -i ${CACHE_FILE_DOCKER_PREFIX};\
@@ -64,7 +64,7 @@ mysql_build: $(CMD_FILES) $(PKG_FILES)
 load_docker_common:
 	@if [ "x" = "${CACHE_FILE_UBUNTU}x" ]; then\
 		echo "Rebuild";\
-		make build_image;\
+		docker-compose build $(DOCKER_COMMON);\
 	else\
 		docker load -i ${CACHE_FILE_UBUNTU};\
 		docker load -i ${CACHE_FILE_GOLANG};\

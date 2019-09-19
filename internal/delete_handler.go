@@ -19,6 +19,7 @@ const (
 	NoDeleteModifier = iota
 	FullDeleteModifier
 	FindFullDeleteModifier
+	ForceDeleteModifier
 	ConfirmFlag            = "confirm"
 	DeleteShortDescription = "Clears old backups and WALs"
 
@@ -28,9 +29,18 @@ const (
 
 	DeleteBeforeExamples = `  before base_0123              keep everything after base_0123 including itself
   before FIND_FULL base_0123    keep everything after the base of base_0123`
+
+	DeleteEverythingExamples = `  everything                delete every backup only if there is no permanent backups
+  everything INCLUDE_PERM   delete every backup including permanents
+  everything EXCEPT_PERM    delete every backup except permanents`
+
+	DeleteEverythingUsageExample = "everything [FORCE]"
+	DeleteRetainUsageExample = "retain [FULL|FIND_FULL] backup_count"
+	DeleteBeforeUsageExample = "before [FIND_FULL] backup_name|timestamp"
 )
 
 var StringModifiers = []string{"FULL", "FIND_FULL"}
+var StringModifiersDeleteEverything = []string{"FORCE"}
 
 // TODO : unit tests
 func GetLatestBackupName(folder storage.Folder) (string, error) {
@@ -217,6 +227,24 @@ func GetRetainChoiceFunc(retentionCount, modifier int,
 	return nil
 }
 
+func DeleteEverything(folder storage.Folder,
+	confirmed bool,
+	args []string) {
+	forceModifier := false
+	modifier := extractDeleteEverythingModifierFromArgs(args)
+	if modifier == ForceDeleteModifier {
+		forceModifier = true
+	}
+	permanentBackups, permanentWals := getPermanentObjects(folder)
+	if len(permanentBackups) > 0 && !forceModifier {
+		tracelog.ErrorLogger.Fatal(fmt.Sprintf("Found permanent objects: backups=%v, wals=%v\n", permanentBackups, permanentWals))
+	}
+
+	filter := func(object storage.Object) bool { return true }
+	err := storage.DeleteObjectsWhere(folder, confirmed, filter)
+	tracelog.ErrorLogger.FatalOnError(err)
+}
+
 func DeleteBeforeTarget(folder storage.Folder, target storage.Object,
 	confirmed bool,
 	isFullBackup func(object storage.Object) bool,
@@ -328,10 +356,18 @@ func HandleDeleteRetain(folder storage.Folder, args []string, confirmed bool,
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
+func extractDeleteEverythingModifierFromArgs(args []string) int {
+	if len(args) == 0 {
+		return NoDeleteModifier
+	} else {
+		return ForceDeleteModifier
+	}
+}
+
 func extractDeleteModifierFromArgs(args []string) (int, string) {
 	if len(args) == 1 {
 		return NoDeleteModifier, args[0]
-	} else if args[0] == StringModifiers[FullDeleteModifier-1] {
+	} else if args[0] == StringModifiers[0] {
 		return FullDeleteModifier, args[1]
 	} else {
 		return FindFullDeleteModifier, args[1]
@@ -339,7 +375,7 @@ func extractDeleteModifierFromArgs(args []string) (int, string) {
 }
 
 func DeleteBeforeArgsValidator(cmd *cobra.Command, args []string) error {
-	err := deleteArgsValidator(cmd, args)
+	err := deleteArgsValidator(cmd, args, StringModifiers, 1, 2)
 	if err != nil {
 		return err
 	}
@@ -355,30 +391,40 @@ func DeleteBeforeArgsValidator(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func DeleteRetainArgsValidator(cmd *cobra.Command, args []string) error {
-	err := deleteArgsValidator(cmd, args)
+func DeleteEverythingArgsValidator(cmd *cobra.Command, args []string) error {
+	err := deleteArgsValidator(cmd, args, StringModifiersDeleteEverything, 0, 1)
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func DeleteRetainArgsValidator(cmd *cobra.Command, args []string) error {
 	_, retantionStr := extractDeleteModifierFromArgs(args)
 	retantionNumber, err := strconv.Atoi(retantionStr)
 	if err != nil {
 		return errors.Wrapf(err, "expected to get a number as retantion count, but got: '%s'", retantionStr)
 	}
 	if retantionNumber <= 0 {
-		return fmt.Errorf("cannot retain less than one backup") // TODO : Consider allowing to delete everything
+		return fmt.Errorf("cannot retain less than one backup. Check out delete everything")
 	}
 	return nil
 }
 
-func deleteArgsValidator(cmd *cobra.Command, args []string) error {
-	if len(args) != 1 && len(args) != 2 {
-		return fmt.Errorf("accepts between 1 and 2 arg(s), received %d", len(args))
+func deleteArgsValidator(cmd *cobra.Command, args, stringModifiers []string, minArgs int, maxArgs int) error {
+	if len(args) < minArgs || len(args) > maxArgs {
+		return fmt.Errorf("accepts between %d and %d arg(s), received %d", minArgs, maxArgs, len(args))
 	}
-	if len(args) == 2 {
+	if len(args) == maxArgs {
 		expectedModifier := args[0]
-		if expectedModifier != StringModifiers[0] && expectedModifier != StringModifiers[1] {
-			return fmt.Errorf("expected to get one of modifiers: %v as first argument", StringModifiers)
+		isModifierInList := false
+		for _, modifier := range stringModifiers {
+			if isModifierInList = modifier == expectedModifier; isModifierInList {
+				break
+			}
+		}
+		if !isModifierInList {
+			return fmt.Errorf("expected to get one of modifiers: %v as first argument", stringModifiers)
 		}
 	}
 	return nil

@@ -155,7 +155,7 @@ Lists names and creation time of available backups.
 
 Is used to delete backups and WALs before them. By default ``delete`` will perform dry run. If you want to execute deletion you have to add ``--confirm`` flag at the end of the command. Backups marked as permanent will not be deleted.
 
-``delete`` can operate in two modes: ``retain`` and ``before``.
+``delete`` can operate in three modes: ``retain``, ``before`` and ``everything``.
 
 ``retain`` [FULL|FIND_FULL] %number%
 
@@ -164,6 +164,14 @@ if FULL is specified keep 5 full backups and everything in the middle
 ``before`` [FIND_FULL] %name%
 
 if FIND_FULL is specified WAL-G will calculate minimum backup needed to keep all deltas alive. If FIND_FULL is not specified and call can produce orphaned deltas - call will fail with the list.
+
+``everything`` [FORCE]
+
+Examples: 
+
+``everything`` all backups will be deleted (if there is no permanent backups)
+
+``everything FORCE`` all backups, include permanent, will be deleted
 
 ``retain 5`` will fail if 5th is delta
 

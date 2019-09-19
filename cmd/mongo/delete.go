@@ -31,6 +31,20 @@ var deleteRetainCmd = &cobra.Command{
 	Run:       runDeleteRetain,
 }
 
+var deleteEverythingCmd = &cobra.Command{
+	Use:       internal.DeleteEverythingUsageExample, // TODO : improve description
+	Example:   internal.DeleteEverythingExamples,
+	ValidArgs: internal.StringModifiersDeleteEverything,
+	Args:      internal.DeleteEverythingArgsValidator,
+	Run:       runDeleteEverything,
+}
+
+func runDeleteEverything(cmd *cobra.Command, args []string) {
+	folder, err := internal.ConfigureFolder()
+	tracelog.ErrorLogger.FatalOnError(err)
+	internal.DeleteEverything(folder, confirmed, args)
+}
+
 func runDeleteBefore(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -51,7 +65,7 @@ func isFullBackup(object storage.Object) bool {
 
 func init() {
 	Cmd.AddCommand(deleteCmd)
-	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd)
+	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 
