@@ -302,5 +302,12 @@ func GetNameStreamCreateCmd() []string {
 	if !ok || len(dataStr) == 0 {
 		tracelog.ErrorLogger.Fatal("WALG_STREAM_CREATE_COMMAND expected.")
 	}
-	return strings.Split(dataStr, " ")
+	command := strings.Split(dataStr, " ")
+	resultCommand := []string{}
+	for _, argument := range(command) {
+		if argument != "" {
+			resultCommand = append(resultCommand, argument)
+		}
+	}
+	return resultCommand
 }

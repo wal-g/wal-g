@@ -3,17 +3,26 @@ package mongo
 import (
 	"github.com/wal-g/wal-g/internal"
 	"io"
+	"io/ioutil"
 
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
 func HandleStreamPush(uploader *Uploader, command []string) {
-	waitFunc, stream:= internal.StartCommand(command)
+	waitFunc, stream, errorStream := internal.StartCommand(command)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	err := uploader.UploadStream(stream)
 	tracelog.ErrorLogger.FatalOnError(err)
+	var errorString string
+	if b, err := ioutil.ReadAll(errorStream); err == nil {
+		errorString = string(b)
+	}
 	err = waitFunc()
+	if err == nil {
+		return
+	}
+	tracelog.ErrorLogger.Println(errorString)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 

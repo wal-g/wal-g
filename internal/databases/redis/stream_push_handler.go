@@ -5,17 +5,26 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
 	"io"
+	"io/ioutil"
 	"time"
 )
 
 func HandleStreamPush(uploader *Uploader, command []string) {
 	// Configure folder
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
-	waitFunc, stream:= internal.StartCommand(command)
+	waitFunc, stream, errorStream := internal.StartCommand(command)
 	backupName := "dump_" + time.Now().Format(time.RFC3339)
 	err := uploader.UploadStream(backupName, stream)
 	tracelog.ErrorLogger.FatalOnError(err)
+	var errorString string
+	if b, err := ioutil.ReadAll(errorStream); err == nil {
+		errorString = string(b)
+	}
 	err = waitFunc()
+	if err == nil {
+		return
+	}
+	tracelog.ErrorLogger.Println(errorString)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
