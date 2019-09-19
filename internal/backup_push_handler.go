@@ -110,7 +110,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 		utility.CeilTimeUpToMicroseconds(time.Now()).String())
 	meta.DataDir = dataDir
 	if dataDir != archiveDirectory {
-		warning := fmt.Sprintf("Data directory '%s' is not equal to archive directory '%s'", dataDir, archiveDirectory)
+		warning := fmt.Sprintf("Data directory '%s' is not equal to backup-push argument '%s'", dataDir, archiveDirectory)
 		tracelog.WarningLogger.Println(warning)
 	}
 	tracelog.ErrorLogger.FatalOnError(err)
