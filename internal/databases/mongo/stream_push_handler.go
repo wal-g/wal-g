@@ -18,6 +18,8 @@ func HandleStreamPush(uploader *Uploader, command []string) {
 	if errorBytes, err := ioutil.ReadAll(errorStream); err == nil {
 		errorString = string(errorBytes)
 	}
+	tracelog.ErrorLogger.FatalOnError(err)
+
 	err = waitFunc()
 	if err != nil {
 		tracelog.ErrorLogger.Println(errorString)
