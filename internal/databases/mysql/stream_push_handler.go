@@ -3,6 +3,7 @@ package mysql
 import (
 	"database/sql"
 	"io"
+	"io/ioutil"
 
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -10,14 +11,22 @@ import (
 )
 
 func HandleStreamPush(uploader *Uploader, command []string) {
-	waitFunc, stream:= internal.StartCommand(command)
+	waitFunc, stream, errorStream:= internal.StartCommand(command)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	db, err := getMySQLConnection()
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(db, "")
 	err = uploader.UploadStream(db, stream)
 	tracelog.ErrorLogger.FatalOnError(err)
+	var errorString string
+	if b, err := ioutil.ReadAll(errorStream); err == nil {
+		errorString = string(b)
+	}
 	err = waitFunc()
+	if err == nil {
+		return
+	}
+	tracelog.ErrorLogger.Println(errorString)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
