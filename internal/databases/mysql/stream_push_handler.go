@@ -19,15 +19,15 @@ func HandleStreamPush(uploader *Uploader, command []string) {
 	err = uploader.UploadStream(db, stream)
 	tracelog.ErrorLogger.FatalOnError(err)
 	var errorString string
-	if b, err := ioutil.ReadAll(errorStream); err == nil {
-		errorString = string(b)
+	if errorBytes, err := ioutil.ReadAll(errorStream); err == nil {
+		errorString = string(errorBytes)
 	}
 	err = waitFunc()
 	if err == nil {
-		return
+		tracelog.ErrorLogger.Println(errorString)
+		tracelog.ErrorLogger.FatalOnError(err)
 	}
-	tracelog.ErrorLogger.Println(errorString)
-	tracelog.ErrorLogger.FatalOnError(err)
+
 }
 
 // TODO : unit tests
