@@ -3,7 +3,9 @@ package internal
 import (
 	"github.com/spf13/viper"
 	"github.com/tinsane/tracelog"
+	"os"
 	"os/user"
+	"strings"
 )
 
 const (
@@ -114,5 +116,17 @@ func InitConfig() {
 	err := viper.ReadInConfig()
 	if err == nil {
 		tracelog.InfoLogger.Println("Using config file:", viper.ConfigFileUsed())
+	}
+
+	// Set compiled config to ENV.
+	// Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
+	for k, v := range viper.AllSettings() {
+		val, ok := v.(string)
+		if ok {
+			if err := os.Setenv(strings.ToUpper(k), val); err != nil {
+				tracelog.ErrorLogger.Println("failed to bind config to env variable", err.Error())
+				os.Exit(1)
+			}
+		}
 	}
 }
