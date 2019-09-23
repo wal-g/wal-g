@@ -8,6 +8,7 @@ PKG_FILES = $(wildcard internal/**/*.go internal/**/**/*.go internal/*.go)
 TEST_FILES = $(wildcard test/*.go testtools/*.go)
 PKG := github.com/wal-g/wal-g
 COVERAGE_FILE := coverage.out
+TEST := "pg_tests"
 
 .PHONY: unittest fmt lint install clean
 
@@ -35,7 +36,6 @@ pg_integration_test:
 	@if [ "x" = "${CACHE_FILE_DOCKER_PREFIX}x" ]; then\
 		echo "Rebuild";\
 		make install_and_build_pg;\
-		docker-compose build $(DOCKER_COMMON);\
 		make pg_build_image;\
 	else\
 		docker load -i ${CACHE_FILE_DOCKER_PREFIX};\

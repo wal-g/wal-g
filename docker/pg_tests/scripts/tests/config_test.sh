@@ -9,8 +9,7 @@ cat ${CONFIG_FILE} > ${TMP_CONFIG}
 
 echo "," >> ${TMP_CONFIG}
 cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
-
-tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
+/tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
@@ -19,6 +18,8 @@ echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${TMP_CONF
 echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+
+wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
 pgbench -i -s 10 postgres
 pg_dumpall -f /tmp/dump1

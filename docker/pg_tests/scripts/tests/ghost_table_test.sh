@@ -6,8 +6,7 @@ TMP_CONFIG="/tmp/configs/tmp_config.json"
 cat ${CONFIG_FILE} > ${TMP_CONFIG}
 echo "," >> ${TMP_CONFIG}
 cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
-
-tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
+/tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
@@ -16,6 +15,8 @@ echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${TMP_CONF
 echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+
+wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
 pgbench -i -s 10 postgres
 psql -c "create table ghost (a int, b int);"
@@ -36,8 +37,7 @@ psql -c "insert into ghost values (3, 4);"
 pg_dumpall -f /tmp/dump1
 sleep 1
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
-
-tmp/scripts/drop_pg.sh
+/tmp/scripts/drop_pg.sh
 
 wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST
 
@@ -48,7 +48,6 @@ echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g 
 pg_dumpall -f /tmp/dump2
 
 diff /tmp/dump1 /tmp/dump2
-
-tmp/scripts/drop_pg.sh
+/tmp/scripts/drop_pg.sh
 rm ${TMP_CONFIG}
 echo "Ghost table backup success!!!!!!"

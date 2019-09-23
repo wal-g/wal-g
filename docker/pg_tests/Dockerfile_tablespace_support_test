@@ -1,4 +1,3 @@
 FROM wal-g/docker_prefix:latest
-RUN chmod -R 777 /tmp/tests
 
 CMD su postgres -c "/tmp/tests/tablespace_support_test.sh"
