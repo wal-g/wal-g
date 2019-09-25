@@ -23,6 +23,9 @@ WALE_LOG_DESTINATION=stderr \
 echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+
+/tmp/scripts/wait_while_pg_not_ready.sh
+
 mkdir /tmp/spaces
 mkdir /tmp/spaces/space
 mkdir /tmp/spaces/space2
