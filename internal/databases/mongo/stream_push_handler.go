@@ -36,5 +36,10 @@ func (uploader *Uploader) UploadStream(stream io.Reader) error {
 	if err != nil {
 		return err
 	}
-	return internal.UploadSentinel(uploader.Uploader, &StreamSentinelDto{StartLocalTime: timeStart}, backupName)
+	currentBackupSentinelDto := &StreamSentinelDto{
+		StartLocalTime:  timeStart,
+		FinishLocalTime: utility.TimeNowCrossPlatformLocal(),
+		UserData:        internal.GetSentinelUserData(),
+	}
+	return internal.UploadSentinel(uploader.Uploader, currentBackupSentinelDto, backupName)
 }

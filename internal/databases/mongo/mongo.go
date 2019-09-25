@@ -19,5 +19,7 @@ type Uploader struct {
 }
 
 type StreamSentinelDto struct {
-	StartLocalTime time.Time
+	StartLocalTime  time.Time   `json:"StartLocalTime,omitempty"`
+	FinishLocalTime time.Time   `json:"FinishLocalTime,omitempty"`
+	UserData        interface{} `json:"UserData,omitempty"`
 }
