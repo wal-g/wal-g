@@ -35,8 +35,8 @@ const (
   everything EXCEPT_PERM    delete every backup except permanents`
 
 	DeleteEverythingUsageExample = "everything [FORCE]"
-	DeleteRetainUsageExample = "retain [FULL|FIND_FULL] backup_count"
-	DeleteBeforeUsageExample = "before [FIND_FULL] backup_name|timestamp"
+	DeleteRetainUsageExample     = "retain [FULL|FIND_FULL] backup_count"
+	DeleteBeforeUsageExample     = "before [FIND_FULL] backup_name|timestamp"
 )
 
 var StringModifiers = []string{"FULL", "FIND_FULL"}

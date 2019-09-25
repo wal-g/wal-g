@@ -1,8 +1,8 @@
 package pg
 
 import (
-	"github.com/wal-g/wal-g/internal"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/wal-g/internal"
 
 	"github.com/spf13/cobra"
 )
@@ -10,9 +10,9 @@ import (
 const (
 	BackupPushShortDescription = "Makes backup and uploads it to storage"
 	PermanentFlag              = "permanent"
-	FullBackupFlag			   = "full"
-	PermanentShorthand		   = "p"
-	FullBackupShorthand		   = "f"
+	FullBackupFlag             = "full"
+	PermanentShorthand         = "p"
+	FullBackupShorthand        = "f"
 )
 
 var (
