@@ -1,9 +1,9 @@
 package redis
 
 import (
+	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/redis"
-	"github.com/tinsane/tracelog"
 
 	"github.com/spf13/cobra"
 )

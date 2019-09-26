@@ -1,9 +1,9 @@
 package mysql
 
 import (
+	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
-	"github.com/tinsane/tracelog"
 
 	"github.com/spf13/cobra"
 )

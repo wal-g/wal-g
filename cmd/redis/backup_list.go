@@ -2,8 +2,8 @@ package redis
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/wal-g/internal"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/wal-g/internal"
 )
 
 const BackupListShortDescription = "Print available backups"

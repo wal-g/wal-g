@@ -11,7 +11,7 @@ import (
 )
 
 func HandleStreamPush(uploader *Uploader, command []string) {
-	waitFunc, stream, errorStream:= internal.StartCommand(command)
+	waitFunc, stream, errorStream := internal.StartCommand(command)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	db, err := getMySQLConnection()
 	tracelog.ErrorLogger.FatalOnError(err)

@@ -2,8 +2,8 @@ package mongo
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/wal-g/internal"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/wal-g/internal"
 )
 
 const BackupListShortDescription = "Prints available backups"
