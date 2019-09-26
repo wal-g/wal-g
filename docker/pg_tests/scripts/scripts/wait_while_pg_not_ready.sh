@@ -6,6 +6,7 @@ while [[ "${STATUS}" != "server is running" ]]
 do
   echo "Wait a sec to start server"
   sleep 1
+  usr/lib/postgresql/10/bin/pg_ctl status
   STATUS=`/usr/lib/postgresql/10/bin/pg_ctl status | egrep -o "server is running|no server running"`
 done
 
@@ -17,7 +18,7 @@ while [[ "${STATUS_READ_ONLY}" != "off" ]]
 do
   echo "Wait a sec to not read-only mode"
   sleep 1
-  echo "show transaction_read_only;" | psql postgres | egrep -o "off"
+  echo "show transaction_read_only;" | psql postgres
   STATUS_READ_ONLY=`echo "show transaction_read_only;" | psql | egrep -o "off"`
 done
 echo "postgresql read_only mode is off"
