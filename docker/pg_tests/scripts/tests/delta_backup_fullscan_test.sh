@@ -6,8 +6,7 @@ TMP_CONFIG="/tmp/configs/tmp_config.json"
 cat ${CONFIG_FILE} > ${TMP_CONFIG}
 echo "," >> ${TMP_CONFIG}
 cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
-
-tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
+/tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
@@ -17,6 +16,10 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 
+/tmp/scripts/wait_while_pg_not_ready.sh
+
+wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
+
 pgbench -i -s 10 postgres
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
@@ -25,8 +28,7 @@ pg_dumpall -f /tmp/dump1
 pgbench -c 2 -T 100000000 -S &
 sleep 1
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
-
-tmp/scripts/drop_pg.sh
+/tmp/scripts/drop_pg.sh
 
 wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST
 
@@ -38,7 +40,7 @@ pg_dumpall -f /tmp/dump2
 
 diff /tmp/dump1 /tmp/dump2
 
-psql -f tmp/scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
-tmp/scripts/drop_pg.sh
+psql -f /tmp/scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
+/tmp/scripts/drop_pg.sh
 rm ${TMP_CONFIG}
 echo "Fullscan delta backup success!!!!!!"

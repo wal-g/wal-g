@@ -69,10 +69,8 @@ func HandleBackupFetch(folder storage.Folder, dbDataDirectory string, backupName
 	if restoreSpecPath != "" {
 		spec = &TablespaceSpec{}
 		err := ReadRestoreSpec(restoreSpecPath, spec)
-		if err != nil {
-			tracelog.ErrorLogger.Fatalf("Invalid restore specification path %s\n", restoreSpecPath)
-			return
-		}
+		errMessege := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
+		tracelog.ErrorLogger.FatalfOnError(errMessege, err)
 	}
 	backup, err := GetBackupByName(backupName, folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)

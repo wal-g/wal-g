@@ -62,9 +62,6 @@ services:
       context: .
     image: wal-g/pg_tests
     container_name: wal-g_pg_tests
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
 
   pg_build_docker_prefix:
     build:
@@ -72,9 +69,6 @@ services:
       context: .
     image: wal-g/docker_prefix
     container_name: wal-g_pg_docker_prefix
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -120,9 +114,6 @@ services:
       context: .
     image: wal-g/delete_before_permanent_delta_test
     container_name: wal-g_pg_delete_before_permanent_delta_test
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -134,9 +125,6 @@ services:
       context: .
     image: wal-g/wal_perftest
     container_name: wal-g_pg_wal_perftest
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -148,9 +136,6 @@ services:
       context: .
     image: wal-g/backup_perftest
     container_name: wal-g_pg_backup_perftest
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -305,9 +290,6 @@ services:
       context: .
     image: wal-g/wale_compatibility_test
     container_name: wal-g_pg_wale_compatibility_test
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
