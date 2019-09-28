@@ -11,9 +11,7 @@ COPY cmd/ cmd/
 COPY main/ main/
 COPY utility/ utility/
 
-RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
-        vendor/github.com/google/brotli/go/cbrotli/cgo.go && \
-    cd main/redis && \
+RUN cd main/redis && \
     go build -tags brotli -race -o wal-g -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 
 FROM wal-g/redis:latest

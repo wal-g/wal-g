@@ -8,9 +8,3 @@ RUN apt-get update && \
     cmake && \
     rm -rf /var/lib/apt/lists/*
 
-COPY submodules/ tmp/
-
-RUN cd tmp/brotli && \
-    mkdir out && cd out && \
-    ../configure-cmake --disable-debug && \
-    make && make install
