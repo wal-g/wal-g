@@ -1,7 +1,6 @@
 #!/bin/sh
 
 rm -rf tmp/
-rm -rf vendor/github.com/google/brotli/*
 
 walg_images=$(docker ps --all --format '{{.Names}}' | grep wal-g_*)
 
