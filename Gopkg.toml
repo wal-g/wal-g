@@ -24,6 +24,9 @@
 #   go-tests = true
 #   unused-packages = true
 
+[[prune.project]]
+  name = "github.com/itchio/go-brotli"
+  unused-packages = false
 
 [[constraint]]
   name = "github.com/DataDog/zstd"
@@ -46,8 +49,8 @@
   version = "2.2.1"
 
 [[constraint]]
-  name = "github.com/google/brotli"
-  version = "1.0.7"
+  branch = "master"
+  name = "github.com/itchio/go-brotli"
 
 [[constraint]]
   name = "github.com/jackc/pgx"

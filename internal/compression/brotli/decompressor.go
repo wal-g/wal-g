@@ -3,7 +3,7 @@
 package brotli
 
 import (
-	"github.com/google/brotli/go/cbrotli"
+	"github.com/itchio/go-brotli/dec"
 	"github.com/wal-g/wal-g/internal/compression/computils"
 	"github.com/wal-g/wal-g/utility"
 	"io"
@@ -12,7 +12,7 @@ import (
 type Decompressor struct{}
 
 func (decompressor Decompressor) Decompress(dst io.Writer, src io.Reader) error {
-	brotliReader := cbrotli.NewReader(computils.NewUntilEofReader(src))
+	brotliReader := dec.NewBrotliReader(computils.NewUntilEofReader(src))
 	defer utility.LoggedClose(brotliReader, "")
 	_, err := utility.FastCopy(dst, brotliReader)
 	return err

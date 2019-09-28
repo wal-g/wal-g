@@ -200,14 +200,6 @@
   revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
 
 [[projects]]
-  digest = "1:acc27c8f27da9682e170d84713e12951fca77331ff7bf217b05f914d975b5a95"
-  name = "github.com/google/brotli"
-  packages = ["go/cbrotli"]
-  pruneopts = "UT"
-  revision = "d6d98957ca8ccb1ef45922e978bb10efca0ea541"
-  version = "v1.0.7"
-
-[[projects]]
   digest = "1:4f880e8e7ff8803aab4bcf2c479eb766435f7decaa1edf080d8f2bf56668de1d"
   name = "github.com/googleapis/gax-go"
   packages = [
@@ -252,6 +244,18 @@
   pruneopts = "UT"
   revision = "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
   version = "v1.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:a40f72bac3a99eaf5a827c70075d6a0d3b08ed1ff34b094d83cc6b23cb02fd4d"
+  name = "github.com/itchio/go-brotli"
+  packages = [
+    "common",
+    "dec",
+    "enc",
+  ]
+  pruneopts = "T"
+  revision = "3f28d645a45c972770a6cf526c373f6e945d7d5f"
 
 [[projects]]
   digest = "1:8dfbec76b4834d96c37ba4c4969fc47c9a15e67c5a7eecfa031fbe67dab50429"
@@ -823,7 +827,8 @@
     "github.com/go-redis/redis",
     "github.com/go-sql-driver/mysql",
     "github.com/golang/mock/gomock",
-    "github.com/google/brotli/go/cbrotli",
+    "github.com/itchio/go-brotli/dec",
+    "github.com/itchio/go-brotli/enc",
     "github.com/jackc/pgx",
     "github.com/jedib0t/go-pretty/table",
     "github.com/minio/sio",
