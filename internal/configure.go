@@ -144,7 +144,6 @@ func getWalFolderPath() string {
 	return DefaultDataFolderPath
 }
 
-// TODO : unit tests
 func GetDataFolderPath() string {
 	return filepath.Join(getWalFolderPath(), "walg_data")
 }
@@ -304,7 +303,7 @@ func GetNameStreamCreateCmd() []string {
 	}
 	command := strings.Split(dataStr, " ")
 	resultCommand := []string{}
-	for _, argument := range(command) {
+	for _, argument := range command {
 		if argument != "" {
 			resultCommand = append(resultCommand, argument)
 		}
