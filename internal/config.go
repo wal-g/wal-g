@@ -19,6 +19,7 @@ const (
 	DiskRateLimitSetting         = "WALG_DISK_RATE_LIMIT"
 	NetworkRateLimitSetting      = "WALG_NETWORK_RATE_LIMIT"
 	UseWalDeltaSetting           = "WALG_USE_WAL_DELTA"
+	UseIncrementalBackupSetting  = "WALG_USE_INCREMENTAL_BACKUP"
 	LogLevelSetting              = "WALG_LOG_LEVEL"
 	TarSizeThresholdSetting      = "WALG_TAR_SIZE_THRESHOLD"
 	CseKmsIDSetting              = "WALG_CSE_KMS_ID"
@@ -28,10 +29,6 @@ const (
 	PgpKeyPathSetting            = "WALG_PGP_KEY_PATH"
 	PgpKeyPassphraseSetting      = "WALG_PGP_KEY_PASSPHRASE"
 	PgDataSetting                = "PGDATA" // TODO : do something with it
-	UserSetting                  = "USER"   // TODO : do something with it
-	PgPortSetting                = "PGPORT" // TODO : do something with it
-	PgUserSetting                = "PGUSER" // TODO : do something with it
-	PgHostSetting                = "PGHOST" // TODO : do something with it
 	TotalBgUploadedLimit         = "TOTAL_BG_UPLOADED_LIMIT"
 	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
 )

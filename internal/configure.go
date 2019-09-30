@@ -150,15 +150,21 @@ func GetDataFolderPath() string {
 }
 
 // TODO : unit tests
-func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err error) {
-	useWalDelta = viper.GetBool(UseWalDeltaSetting)
-	if !useWalDelta {
+func configureIncrementalBackupFeatureUsage() (useIncrementalBackup bool, deltaDataFolder DataFolder, err error) {
+	// Configures usage of incremental backup feature, supports only pg WAL delta for now
+	if viper.GetBool(UseWalDeltaSetting){
+		useIncrementalBackup = true
+		tracelog.WarningLogger.Printf("WARNING: Usage of WALG_USE_WAL_DELTA is deprecated," +
+			" use WALG_USE_INCREMENTAL_BACKUP instead")
+	}
+	useIncrementalBackup = useIncrementalBackup || viper.GetBool(UseIncrementalBackupSetting) // TODO: drop UseWalDeltaSetting
+	if !useIncrementalBackup {
 		return
 	}
 	dataFolderPath := GetDataFolderPath()
 	deltaDataFolder, err = NewDiskDataFolder(dataFolderPath)
 	if err != nil {
-		useWalDelta = false
+		useIncrementalBackup = false
 		tracelog.WarningLogger.Printf("can't use wal delta feature because can't open delta data folder '%s'"+
 			" due to error: '%v'\n", dataFolderPath, err)
 		err = nil
@@ -195,6 +201,7 @@ func configureArchiveStatusManager() (DataFolder, error) {
 // ConfigureUploader connects to storage and creates an uploader. It makes sure
 // that a valid session has started; if invalid, returns AWS error
 // and `<nil>` values.
+// TODO: remove dependency on postgres
 func ConfigureUploader() (uploader *Uploader, err error) {
 	folder, err := ConfigureFolder()
 	if err != nil {
@@ -206,18 +213,17 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 		return nil, errors.Wrap(err, "failed to configure compression")
 	}
 
-	useWalDelta, deltaDataFolder, err := configureWalDeltaUsage()
+	useIncrementalBackup, deltaDataFolder, err := configureIncrementalBackupFeatureUsage()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure WAL Delta usage")
 	}
 
 	var deltaFileManager *DeltaFileManager = nil
-	if useWalDelta {
+	if useIncrementalBackup {
 		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
 	}
 
 	archiveStatusManager, err := configureArchiveStatusManager()
-
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure Archive Status Manager")
 	}
