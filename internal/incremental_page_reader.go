@@ -156,7 +156,6 @@ func (pageReader *IncrementalPageReader) SelectNewValidPage(pageBytes []byte, bl
 			isNew = true
 			valid = true
 		} else {
-			tracelog.WarningLogger.Println("Invalid page ", blockNo, " page header ", pageHeader)
 			return false
 		}
 	}
