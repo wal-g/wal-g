@@ -81,6 +81,8 @@ var (
 		"PGUSER":     true,
 		"PGHOST":     true,
 		"PGPASSWORD": true,
+		"PGDATABASE": true,
+		"PGSSLMODE":  true,
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,
@@ -200,7 +202,8 @@ func InitConfig() {
 	// Сheck allowed settings
 	foundNotAllowed := false
 	for k := range viper.AllSettings() {
-		if !IsAllowedSetting(strings.ToUpper(k), AllowedSettings) {
+		k = strings.ToUpper(k)
+		if !IsAllowedSetting(k, AllowedSettings) {
 			tracelog.WarningLogger.Println(k + " is unknown")
 			foundNotAllowed = true
 		}
