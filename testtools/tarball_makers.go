@@ -10,7 +10,7 @@ import (
 // extracted to.
 type FileTarBallMaker struct {
 	number int
-	size   *int64
+	Size   *int64
 	Out    string
 }
 
@@ -19,14 +19,14 @@ func (tarBallMaker *FileTarBallMaker) Make(inheritState bool) internal.TarBall {
 	tarBallMaker.number++
 	return &FileTarBall{
 		number: tarBallMaker.number,
-		size:   tarBallMaker.size,
+		size:   tarBallMaker.Size,
 		out:    tarBallMaker.Out,
 	}
 }
 
 type BufferTarBallMaker struct {
 	number        int
-	size          *int64
+	Size          *int64
 	BufferToWrite *bytes.Buffer
 }
 
@@ -34,7 +34,7 @@ func (tarBallMaker *BufferTarBallMaker) Make(dedicatedUploader bool) internal.Ta
 	tarBallMaker.number++
 	return &BufferTarBall{
 		number:     tarBallMaker.number,
-		size:       tarBallMaker.size,
+		size:       tarBallMaker.Size,
 		underlying: tarBallMaker.BufferToWrite,
 	}
 }
