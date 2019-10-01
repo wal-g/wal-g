@@ -29,11 +29,14 @@ const (
 	PgpKeySetting                = "WALG_PGP_KEY"
 	PgpKeyPathSetting            = "WALG_PGP_KEY_PATH"
 	PgpKeyPassphraseSetting      = "WALG_PGP_KEY_PASSPHRASE"
-	PgDataSetting                = "PGDATA" // TODO : do something with it
-	UserSetting                  = "USER"   // TODO : do something with it
-	PgPortSetting                = "PGPORT" // TODO : do something with it
-	PgUserSetting                = "PGUSER" // TODO : do something with it
-	PgHostSetting                = "PGHOST" // TODO : do something with it
+	PgDataSetting                = "PGDATA"
+	UserSetting                  = "USER" // TODO : do something with it
+	PgPortSetting                = "PGPORT"
+	PgUserSetting                = "PGUSER"
+	PgHostSetting                = "PGHOST"
+	PgPasswordSetting            = "PGPASSWORD"
+	PgDatabaseSetting            = "PGDATABASE"
+	PgSslModeSetting             = "PGSSLMODE"
 	TotalBgUploadedLimit         = "TOTAL_BG_UPLOADED_LIMIT"
 	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
 )
@@ -55,34 +58,35 @@ var (
 
 	AllowedSettings = map[string]bool{
 		// WAL-G core
-		"WALG_DOWNLOAD_CONCURRENCY":    true,
-		"WALG_UPLOAD_CONCURRENCY":      true,
-		"WALG_UPLOAD_DISK_CONCURRENCY": true,
-		"WALG_UPLOAD_QUEUE":            true,
-		"WALG_SENTINEL_USER_DATA":      true,
-		"WALG_PREVENT_WAL_OVERWRITE":   true,
-		"WALG_DELTA_MAX_STEPS":         true,
-		"WALG_DELTA_ORIGIN":            true,
-		"WALG_COMPRESSION_METHOD":      true,
-		"WALG_DISK_RATE_LIMIT":         true,
-		"WALG_NETWORK_RATE_LIMIT":      true,
-		"WALG_USE_WAL_DELTA":           true,
-		"WALG_LOG_LEVEL":               true,
-		"WALG_TAR_SIZE_THRESHOLD":      true,
-		"GPG_KEY_ID":                   true,
-		"WALG_PGP_KEY":                 true,
-		"WALG_PGP_KEY_PATH":            true,
-		"WALG_PGP_KEY_PASSPHRASE":      true,
-		"TOTAL_BG_UPLOADED_LIMIT":      true,
-		"WALG_STREAM_CREATE_COMMAND":   true,
+		DownloadConcurrencySetting:   true,
+		UploadConcurrencySetting:     true,
+		UploadDiskConcurrencySetting: true,
+		UploadQueueSetting:           true,
+		SentinelUserDataSetting:      true,
+		PreventWalOverwriteSetting:   true,
+		DeltaMaxStepsSetting:         true,
+		DeltaOriginSetting:           true,
+		CompressionMethodSetting:     true,
+		DiskRateLimitSetting:         true,
+		NetworkRateLimitSetting:      true,
+		UseWalDeltaSetting:           true,
+		LogLevelSetting:              true,
+		TarSizeThresholdSetting:      true,
+		"WALG_" + GpgKeyIDSetting:    true,
+		"WALE_" + GpgKeyIDSetting:    true,
+		PgpKeySetting:                true,
+		PgpKeyPathSetting:            true,
+		PgpKeyPassphraseSetting:      true,
+		TotalBgUploadedLimit:         true,
+		NameStreamCreateCmd:          true,
 
 		// Postgres
-		"PGPORT":     true,
-		"PGUSER":     true,
-		"PGHOST":     true,
-		"PGPASSWORD": true,
-		"PGDATABASE": true,
-		"PGSSLMODE":  true,
+		PgPortSetting:     true,
+		PgUserSetting:     true,
+		PgHostSetting:     true,
+		PgPasswordSetting: true,
+		PgDatabaseSetting: true,
+		PgSslModeSetting:  true,
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,
@@ -170,6 +174,13 @@ func Configure() {
 	}
 
 	ConfigureLimiters()
+
+	for _, adapter := range StorageAdapters {
+		for _,setting :=  range adapter.settingNames {
+			AllowedSettings[setting] = true
+		}
+		AllowedSettings["WALG_" + adapter.prefixName] = true
+	}
 }
 
 // initConfig reads in config file and ENV variables if set.
