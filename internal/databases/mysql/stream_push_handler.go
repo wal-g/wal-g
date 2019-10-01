@@ -2,33 +2,21 @@ package mysql
 
 import (
 	"database/sql"
-	"io"
-	"io/ioutil"
-
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
+	"io"
 )
 
 func HandleStreamPush(uploader *Uploader, command []string) {
-	waitFunc, stream, errorStream := internal.StartCommand(command)
+	waitAndFatalOnError, stream := internal.StartCommand(command)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	db, err := getMySQLConnection()
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(db, "")
 	err = uploader.UploadStream(db, stream)
 	tracelog.ErrorLogger.FatalOnError(err)
-	var errorString string
-	if errorBytes, err := ioutil.ReadAll(errorStream); err == nil {
-		errorString = string(errorBytes)
-	}
-	tracelog.ErrorLogger.FatalOnError(err)
-	err = waitFunc()
-	if err != nil {
-		tracelog.ErrorLogger.Println(errorString)
-		tracelog.ErrorLogger.FatalOnError(err)
-	}
-
+	waitAndFatalOnError()
 }
 
 // TODO : unit tests

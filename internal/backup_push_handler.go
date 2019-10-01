@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/spf13/viper"
@@ -132,6 +133,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = bundle.FinishQueue()
 	tracelog.ErrorLogger.FatalOnError(err)
+	dataSize := bundle.TarBall.Size()
 	err = bundle.UploadPgControl(uploader.Compressor.FileExtension())
 	tracelog.ErrorLogger.FatalOnError(err)
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
@@ -171,7 +173,12 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 
 	currentBackupSentinelDto.setFiles(bundle.GetFiles())
 	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
-	currentBackupSentinelDto.UserData = GetSentinelUserData()
+	userData := map[string]interface{}{"backupSize": dataSize, "backupTarSize": atomic.LoadInt64(uploader.tarSize)}
+	sentinelUserData := GetSentinelUserData()
+	if sentinelUserData != nil {
+		userData["data"] = sentinelUserData
+	}
+	currentBackupSentinelDto.UserData = userData
 
 	// If pushing permanent delta backup, mark all previous backups permanent
 	// Do this before uploading current meta to ensure that backups are marked in increasing order
@@ -209,7 +216,6 @@ func UploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupNa
 	if err != nil {
 		return NewSentinelMarshallingError(metaFile, err)
 	}
-
 	return uploader.Upload(metaFile, bytes.NewReader(dtoBody))
 }
 
