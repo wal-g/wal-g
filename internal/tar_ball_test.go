@@ -84,8 +84,11 @@ func TestPackFileTo(t *testing.T) {
 		Typeflag: tar.TypeReg,
 	}
 	buffer := bytes.NewBuffer(make([]byte, 0))
+	size := int64(0)
+
 	tarBallMaker := testtools.BufferTarBallMaker{
 		BufferToWrite: buffer,
+		Size:          &size,
 	}
 	tarBall := tarBallMaker.Make(false)
 	tarBall.SetUp(nil)
