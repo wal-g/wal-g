@@ -31,8 +31,7 @@ const (
   before FIND_FULL base_0123    keep everything after the base of base_0123`
 
 	DeleteEverythingExamples = `  everything                delete every backup only if there is no permanent backups
-  everything INCLUDE_PERM   delete every backup including permanents
-  everything EXCEPT_PERM    delete every backup except permanents`
+  everything FORCE          delete every backup include permanents`
 
 	DeleteEverythingUsageExample = "everything [FORCE]"
 	DeleteRetainUsageExample     = "retain [FULL|FIND_FULL] backup_count"
