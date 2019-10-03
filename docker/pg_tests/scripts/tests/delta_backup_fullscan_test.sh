@@ -77,6 +77,6 @@ echo "greater than current LSN" > /tmp/2
 diff /tmp/1 /tmp/2
 
 rm ${TMP_CONFIG}
-/tmp/scripts/drop_pg.shg
+/tmp/scripts/drop_pg.sh
 
 echo "Fullscan delta backup success!!!!!!"
