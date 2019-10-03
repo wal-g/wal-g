@@ -110,7 +110,7 @@ WALE_LOG_DESTINATION=stderr \
 cp -t ${PGDATA} /tmp/conf_files/postgresql.conf /tmp/conf_files/pg_hba.conf /tmp/conf_files/pg_ident.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
-
+/tmp/scripts/wait_while_pg_not_ready.sh
 pg_dumpall -f /tmp/dump2
 
 diff /tmp/dump1 /tmp/dump2
