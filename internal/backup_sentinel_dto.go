@@ -20,7 +20,7 @@ type BackupSentinelDto struct {
 	BackupFinishLSN *uint64         `json:"FinishLSN"`
 	DataSize        int64           `json:"DataSize"`
 	DataTarSize     int64           `json:"DataTarSize"`
-	TablespaceSpec  *TablespaceSpec `json:"spec"`
+	TablespaceSpec  *TablespaceSpec `json:"Spec"`
 
 	UserData interface{} `json:"UserData,omitempty"`
 }
