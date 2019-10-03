@@ -16,10 +16,11 @@ type BackupSentinelDto struct {
 	Files       BackupFileList      `json:"Files"`
 	TarFileSets map[string][]string `json:"TarFileSets"`
 
-	PgVersion       int     `json:"PgVersion"`
-	BackupFinishLSN *uint64 `json:"FinishLSN"`
-
-	TablespaceSpec *TablespaceSpec `json:"spec"`
+	PgVersion       int             `json:"PgVersion"`
+	BackupFinishLSN *uint64         `json:"FinishLSN"`
+	DataSize        int64           `json:"DataSize"`
+	DataTarSize     int64           `json:"DataTarSize"`
+	TablespaceSpec  *TablespaceSpec `json:"spec"`
 
 	UserData interface{} `json:"UserData,omitempty"`
 }
@@ -35,8 +36,10 @@ type ExtendedMetadataDto struct {
 	StartLsn       uint64    `json:"start_lsn"`
 	FinishLsn      uint64    `json:"finish_lsn"`
 	IsPermanent    bool      `json:"is_permanent"`
+	DataSize       int64     `json:"data_size"`
+	DataTarSize    int64     `json:"data_tar_size"`
 
-	UserData interface{} `json:"UserData,omitempty"`
+	UserData interface{} `json:"user_data,omitempty"`
 }
 
 func (dto *BackupSentinelDto) setFiles(p *sync.Map) {
