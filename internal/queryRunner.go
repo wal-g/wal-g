@@ -43,8 +43,9 @@ type QueryRunner interface {
 
 // PgQueryRunner is implementation for controlling PostgreSQL 9.0+
 type PgQueryRunner struct {
-	connection *pgx.Conn
-	Version    int
+	connection       *pgx.Conn
+	Version          int
+	SystemIdentifier *uint64
 }
 
 // BuildGetVersion formats a query to retrieve PostgreSQL numeric version
@@ -87,12 +88,20 @@ func (queryRunner *PgQueryRunner) BuildStopBackup() (string, error) {
 // NewPgQueryRunner builds QueryRunner from available connection
 func NewPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
 	r := &PgQueryRunner{connection: conn}
-
 	err := r.getVersion()
 	if err != nil {
 		return nil, err
 	}
+	err = r.getSystemIdentifier()
+	if err != nil {
+		return nil, err
+	}
+
 	return r, nil
+}
+
+func (queryRunner *PgQueryRunner) BuildGetSystemIdentifier() string {
+	return "select system_identifier from pg_control_system();"
 }
 
 // Retrieve PostgreSQL numeric version
@@ -100,6 +109,12 @@ func (queryRunner *PgQueryRunner) getVersion() (err error) {
 	conn := queryRunner.connection
 	err = conn.QueryRow(queryRunner.BuildGetVersion()).Scan(&queryRunner.Version)
 	return errors.Wrap(err, "GetVersion: getting Postgres version failed")
+}
+
+func (queryRunner *PgQueryRunner) getSystemIdentifier() (err error) {
+	conn := queryRunner.connection
+	err = conn.QueryRow(queryRunner.BuildGetSystemIdentifier()).Scan(&queryRunner.SystemIdentifier)
+	return errors.Wrap(err, "System Identifier: getting identifier of DB failed")
 }
 
 // StartBackup informs the database that we are starting copy of cluster contents
