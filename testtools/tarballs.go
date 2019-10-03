@@ -17,11 +17,11 @@ import (
 // FileTarBall represents a tarball that is
 // written to disk.
 type FileTarBall struct {
-	out         string
-	number      int
-	size        *int64
-	writeCloser io.WriteCloser
-	tarWriter   *tar.Writer
+	out             string
+	number          int
+	allTarballsSize *int64
+	writeCloser     io.WriteCloser
+	tarWriter       *tar.Writer
 }
 
 // SetUp creates a new LZ4 writer, tar writer and file for
@@ -69,18 +69,18 @@ func (tarBall *FileTarBall) CloseTar() error {
 	return tarBall.writeCloser.Close()
 }
 
-func (tarBall *FileTarBall) Size() int64            { return atomic.LoadInt64(tarBall.size) }
-func (tarBall *FileTarBall) AddSize(i int64)        { atomic.AddInt64(tarBall.size, i) }
+func (tarBall *FileTarBall) Size() int64            { return atomic.LoadInt64(tarBall.allTarballsSize) }
+func (tarBall *FileTarBall) AddSize(i int64)        { atomic.AddInt64(tarBall.allTarballsSize, i) }
 func (tarBall *FileTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
 func (tarBall *FileTarBall) AwaitUploads()          {}
 
 // BufferTarBall represents a tarball that is
 // written to buffer.
 type BufferTarBall struct {
-	number     int
-	size       *int64
-	underlying *bytes.Buffer
-	tarWriter  *tar.Writer
+	number          int
+	allTarballsSize *int64
+	underlying      *bytes.Buffer
+	tarWriter       *tar.Writer
 }
 
 func (tarBall *BufferTarBall) SetUp(crypter crypto.Crypter, args ...string) {
@@ -92,11 +92,11 @@ func (tarBall *BufferTarBall) CloseTar() error {
 }
 
 func (tarBall *BufferTarBall) Size() int64 {
-	return atomic.LoadInt64(tarBall.size)
+	return atomic.LoadInt64(tarBall.allTarballsSize)
 }
 
 func (tarBall *BufferTarBall) AddSize(add int64) {
-	atomic.AddInt64(tarBall.size, add)
+	atomic.AddInt64(tarBall.allTarballsSize, add)
 }
 
 func (tarBall *BufferTarBall) TarWriter() *tar.Writer {

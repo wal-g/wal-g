@@ -20,9 +20,9 @@ func (tarBallMaker *StorageTarBallMaker) Make(dedicatedUploader bool) TarBall {
 	}
 	size := int64(0)
 	return &StorageTarBall{
-		partNumber: tarBallMaker.partCount,
-		backupName: tarBallMaker.backupName,
-		uploader:   uploader,
-		size:       &size,
+		partNumber:      tarBallMaker.partCount,
+		backupName:      tarBallMaker.backupName,
+		uploader:        uploader,
+		allTarballsSize: &size,
 	}
 }
