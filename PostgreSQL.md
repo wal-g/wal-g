@@ -45,7 +45,7 @@ Concurrency values can be configured using:
 
 * `WALG_DOWNLOAD_CONCURRENCY`
 
-To configure how many goroutines to use during backup-fetch and wal-fetch, use `WALG_DOWNLOAD_CONCURRENCY`. By default, WAL-G uses the minimum of the number of files to extract and 10.
+To configure how many goroutines to use during ```backup-fetch``` and ```wal-fetch```, use `WALG_DOWNLOAD_CONCURRENCY`. By default, WAL-G uses the minimum of the number of files to extract and 10.
 
 * `WALG_UPLOAD_CONCURRENCY`
 
