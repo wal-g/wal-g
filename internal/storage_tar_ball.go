@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"fmt"
 	"io"
+	"sync/atomic"
 
 	"github.com/pkg/errors"
 	"github.com/tinsane/tracelog"
@@ -13,12 +14,12 @@ import (
 // StorageTarBall represents a tar file that is
 // going to be uploaded to storage.
 type StorageTarBall struct {
-	backupName  string
-	partNumber  int
-	size        int64
-	writeCloser io.Closer
-	tarWriter   *tar.Writer
-	uploader    *Uploader
+	backupName      string
+	partNumber      int
+	allTarballsSize *int64
+	writeCloser     io.Closer
+	tarWriter       *tar.Writer
+	uploader        *Uploader
 }
 
 // SetUp creates a new tar writer and starts upload to storage.
@@ -106,9 +107,9 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) 
 }
 
 // Size accumulated in this tarball
-func (tarBall *StorageTarBall) Size() int64 { return tarBall.size }
+func (tarBall *StorageTarBall) Size() int64 { return atomic.LoadInt64(tarBall.allTarballsSize) }
 
 // AddSize to total Size
-func (tarBall *StorageTarBall) AddSize(i int64) { tarBall.size += i }
+func (tarBall *StorageTarBall) AddSize(i int64) { atomic.AddInt64(tarBall.allTarballsSize, i) }
 
 func (tarBall *StorageTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }

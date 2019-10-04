@@ -339,8 +339,10 @@ func TestWalk(t *testing.T) {
 		TablespaceSpec:   internal.NewTablespaceSpec(data),
 	}
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
+	size := int64(0)
 	bundle.TarBallMaker = &testtools.FileTarBallMaker{
-		Out: compressed,
+		Out:  compressed,
+		Size: &size,
 	}
 	err := os.MkdirAll(compressed, 0766)
 	if err != nil {

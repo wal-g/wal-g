@@ -22,6 +22,7 @@ type Uploader struct {
 	deltaFileManager     *DeltaFileManager
 	archiveStatusManager DataFolder
 	Failed               atomic.Value
+	tarSize              *int64
 }
 
 // UploadObject
@@ -40,12 +41,14 @@ func NewUploader(
 	deltaFileManager *DeltaFileManager,
 	archiveStatusManager DataFolder,
 ) *Uploader {
+	size := int64(0)
 	uploader := &Uploader{
 		UploadingFolder:      uploadingLocation,
 		Compressor:           compressor,
 		waitGroup:            &sync.WaitGroup{},
 		deltaFileManager:     deltaFileManager,
 		archiveStatusManager: archiveStatusManager,
+		tarSize:              &size,
 	}
 	uploader.Failed.Store(false)
 	return uploader
@@ -69,6 +72,7 @@ func (uploader *Uploader) Clone() *Uploader {
 		uploader.deltaFileManager,
 		uploader.archiveStatusManager,
 		uploader.Failed,
+		uploader.tarSize,
 	}
 }
 
@@ -105,7 +109,7 @@ func (uploader *Uploader) UploadFile(file NamedReader) error {
 
 // TODO : unit tests
 func (uploader *Uploader) Upload(path string, content io.Reader) error {
-	err := uploader.UploadingFolder.PutObject(path, content)
+	err := uploader.UploadingFolder.PutObject(path, &WithSizeReader{content, uploader.tarSize})
 	if err == nil {
 		return nil
 	}

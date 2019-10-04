@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/spf13/viper"
@@ -163,6 +164,8 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = bundle.FinishQueue()
 	tracelog.ErrorLogger.FatalOnError(err)
+	uncompressedSize := bundle.TarBall.Size()
+	compressedSize := atomic.LoadInt64(uploader.tarSize)
 	err = bundle.UploadPgControl(uploader.Compressor.FileExtension())
 	tracelog.ErrorLogger.FatalOnError(err)
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
@@ -204,6 +207,8 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
 	currentBackupSentinelDto.UserData = GetSentinelUserData()
 	currentBackupSentinelDto.SystemIdentifier = systemIdentifier
+	currentBackupSentinelDto.UncompressedSize = uncompressedSize
+	currentBackupSentinelDto.CompressedSize = compressedSize
 	// If pushing permanent delta backup, mark all previous backups permanent
 	// Do this before uploading current meta to ensure that backups are marked in increasing order
 	if isPermanent && currentBackupSentinelDto.IsIncremental() {
@@ -235,13 +240,14 @@ func UploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupNa
 	meta.PgVersion = sentinelDto.PgVersion
 	meta.SystemIdentifier = sentinelDto.SystemIdentifier
 	meta.UserData = sentinelDto.UserData
+	meta.UncompressedSize = sentinelDto.UncompressedSize
+	meta.CompressedSize = sentinelDto.CompressedSize
 
 	metaFile := storage.JoinPath(backupName, utility.MetadataFileName)
 	dtoBody, err := json.Marshal(meta)
 	if err != nil {
 		return NewSentinelMarshallingError(metaFile, err)
 	}
-
 	return uploader.Upload(metaFile, bytes.NewReader(dtoBody))
 }
 
