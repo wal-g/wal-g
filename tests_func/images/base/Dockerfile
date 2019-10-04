@@ -18,16 +18,25 @@ RUN cp --force --recursive --verbose \
     apt-get -qq update && \
     \
     apt-get -y install \
-    supervisor \
+    supervisor wget ca-certificates \
     openssl git openssh-client openssh-server \
-    build-essential \
-    netcat-openbsd \
-    iputils-ping \
-    net-tools \
-    dnsutils \
-    nginx \
-    nginx-full \
-    nginx-common
+    build-essential cmake \
+    netcat-openbsd iputils-ping \
+    net-tools dnsutils \
+    nginx nginx-full nginx-common \
+	&& rm -rf /var/lib/apt/lists/*
+
+ENV GOLANG_URL "https://golang.org/dl/go1.13.1.linux-amd64.tar.gz"
+RUN wget -O go.tgz "https://golang.org/dl/go1.13.1.linux-amd64.tar.gz" && \
+	tar -C /usr/local -xzf go.tgz && \
+	rm go.tgz && \
+	export PATH="/usr/local/go/bin:$PATH" && \
+	go version
+
+ENV GOPATH /go
+ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
+
+RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 
 RUN echo "root:root" | chpasswd
 RUN sed -i -e '/PermitRootLogin/ s/ .*/ yes/' /etc/ssh/sshd_config

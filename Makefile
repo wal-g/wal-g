@@ -71,8 +71,10 @@ mongo_integration_test: mongo_features
 	docker-compose build $(DOCKER_COMMON) mongo mongo_tests
 	docker-compose up --exit-code-from mongo_tests mongo_tests
 
-mongo_features: mongo_build
-	mv $(MAIN_MONGO_PATH)/wal-g ./tests_func/wal-g
+mongo_features:
+	rm -rf ./tests_func/wal-g
+	mkdir -p ./tests_func/wal-g
+	cp -r `ls -A | grep -v "tests_func"` tests_func/wal-g/
 	$(MAKE) -C ./tests_func func_test
 	rm -rf ./tests_func/wal-g
 
