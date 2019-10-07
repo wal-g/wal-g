@@ -9,5 +9,6 @@
 	"WALG_DELTA_MAX_STEPS": "6",
 	"WALG_UPLOAD_CONCURRENCY": "10",
 	"WALG_DISK_RATE_LIMIT": "41943040",
-	"WALG_NETWORK_RATE_LIMIT": "10485760"
+	"WALG_NETWORK_RATE_LIMIT": "10485760",
+    "WALG_STREAM_CREATE_COMMAND": "mongodump --host 127.0.0.1:{{conf.projects.mongodb.expose.mongod}} --archive --numParallelCollections 4 --oplog --authenticationDatabase admin --username admin --password {{conf.projects.mongodb.users.admin.password}}"
 }

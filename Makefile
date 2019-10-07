@@ -89,7 +89,7 @@ mongo_build: $(CMD_FILES) $(PKG_FILES)
 mongo_install: mongo_build
 	mv $(MAIN_MONGO_PATH)/wal-g $(GOBIN)/wal-g
 
-mongo_integration_test: mongo_features load_docker_common
+mongo_integration_test: load_docker_common
 	docker-compose build mongo mongo_tests
 	docker-compose up --exit-code-from mongo_tests mongo_tests
 
@@ -122,7 +122,7 @@ redis_install: redis_build
 	mv $(MAIN_REDIS_PATH)/wal-g $(GOBIN)/wal-g
 
 unittest:
-	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet
+	go list ./... | grep -Ev 'vendor|submodules|tmp|tests_func' | xargs go vet
 	go test -v $(TEST_MODIFIER) ./internal/
 	go test -v $(TEST_MODIFIER) ./internal/compression/
 	go test -v $(TEST_MODIFIER) ./internal/crypto/openpgp/
