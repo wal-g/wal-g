@@ -29,6 +29,30 @@ func (err SentinelMarshallingError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
+type BackupFromFuture struct {
+	error
+}
+
+func NewBackupFromFuture(backupName string) BackupFromFuture {
+	return BackupFromFuture{errors.Errorf("Finish LSN of backup %v greater than current LSN", backupName)}
+}
+
+func (err BackupFromFuture) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
+type BackupFromOtherBD struct {
+	error
+}
+
+func NewBackupFromOtherBD() BackupFromOtherBD {
+	return BackupFromOtherBD{errors.Errorf("Current database and database of base backup are not equal.")}
+}
+
+func (err BackupFromOtherBD) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
 // TODO : unit tests
 func getDeltaConfig() (maxDeltas int, fromFull bool) {
 	maxDeltas = viper.GetInt(DeltaMaxStepsSetting)
@@ -106,12 +130,19 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	// Connect to postgres and start/finish a nonexclusive backup.
 	conn, err := Connect()
 	tracelog.ErrorLogger.FatalOnError(err)
-	backupName, backupStartLSN, pgVersion, dataDir, err := bundle.StartBackup(conn,
+	backupName, backupStartLSN, pgVersion, dataDir, systemIdentifier, err := bundle.StartBackup(conn,
 		utility.CeilTimeUpToMicroseconds(time.Now()).String())
 	meta.DataDir = dataDir
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if len(previousBackupName) > 0 && previousBackupSentinelDto.BackupStartLSN != nil {
+		if *previousBackupSentinelDto.BackupFinishLSN > backupStartLSN {
+			tracelog.ErrorLogger.FatalOnError(NewBackupFromFuture(previousBackupName))
+		}
+		if previousBackupSentinelDto.SystemIdentifier != nil && *systemIdentifier != *previousBackupSentinelDto.SystemIdentifier {
+
+			tracelog.ErrorLogger.FatalOnError(NewBackupFromOtherBD())
+		}
 		if uploader.getUseWalDelta() {
 			err = bundle.DownloadDeltaMap(folder.GetSubFolder(utility.WalPath), backupStartLSN)
 			if err == nil {
@@ -175,9 +206,9 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	currentBackupSentinelDto.setFiles(bundle.GetFiles())
 	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
 	currentBackupSentinelDto.UserData = GetSentinelUserData()
+	currentBackupSentinelDto.SystemIdentifier = systemIdentifier
 	currentBackupSentinelDto.UncompressedSize = uncompressedSize
 	currentBackupSentinelDto.CompressedSize = compressedSize
-
 	// If pushing permanent delta backup, mark all previous backups permanent
 	// Do this before uploading current meta to ensure that backups are marked in increasing order
 	if isPermanent && currentBackupSentinelDto.IsIncremental() {
@@ -207,6 +238,7 @@ func UploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupNa
 	meta.StartLsn = *sentinelDto.BackupStartLSN
 	meta.FinishLsn = *sentinelDto.BackupFinishLSN
 	meta.PgVersion = sentinelDto.PgVersion
+	meta.SystemIdentifier = sentinelDto.SystemIdentifier
 	meta.UserData = sentinelDto.UserData
 	meta.UncompressedSize = sentinelDto.UncompressedSize
 	meta.CompressedSize = sentinelDto.CompressedSize

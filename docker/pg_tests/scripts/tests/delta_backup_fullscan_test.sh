@@ -43,6 +43,42 @@ pg_dumpall -f /tmp/dump2
 diff /tmp/dump1 /tmp/dump2
 
 psql -f /tmp/scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
+wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 /tmp/scripts/drop_pg.sh
+
+# check that we cant make delta from other database then previous backup
+
+# create db
+/usr/lib/postgresql/10/bin/initdb ${PGDATA}
+echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
+echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${TMP_CONFIG} wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
+echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+pgbench -i -s 1 postgres
+
+# make fullbackup
+wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} -f
+
+#delete that db
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w stop
+rm -rf ${PGDATA}
+
+# create new db
+/usr/lib/postgresql/10/bin/initdb ${PGDATA}
+echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
+echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${TMP_CONFIG} wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
+echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+pgbench -i -s 1 postgres
+
+# try to make delta backup
+! wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} 2> /tmp/2
+# check error
+cat /tmp/2 | egrep -o "greater than current LSN" > /tmp/1
+echo "greater than current LSN" > /tmp/2
+diff /tmp/1 /tmp/2
+
 rm ${TMP_CONFIG}
+/tmp/scripts/drop_pg.sh
+
 echo "Fullscan delta backup success!!!!!!"

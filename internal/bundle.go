@@ -234,23 +234,23 @@ func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
 // `backup_label` and `tablespace_map` contents are not immediately written to
 // a file but returned instead. Returns empty string and an error if backup
 // fails.
-func (bundle *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName string, lsn uint64, version int, dataDir string, err error) {
+func (bundle *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName string, lsn uint64, version int, dataDir string, systemIdentifier *uint64, err error) {
 	var name, lsnStr string
 	queryRunner, err := NewPgQueryRunner(conn)
 	if err != nil {
-		return "", 0, queryRunner.Version, "", errors.Wrap(err, "StartBackup: Failed to build query runner.")
+		return "", 0, 0, "", nil, errors.Wrap(err, "StartBackup: Failed to build query runner.")
 	}
 	name, lsnStr, bundle.Replica, dataDir, err = queryRunner.StartBackup(backup)
 
 	if err != nil {
-		return "", 0, queryRunner.Version, "", err
+		return "", 0, queryRunner.Version, "", queryRunner.SystemIdentifier, err
 	}
 	lsn, err = pgx.ParseLSN(lsnStr)
 
 	if bundle.Replica {
 		name, bundle.Timeline, err = getWalFilename(lsn, conn)
 		if err != nil {
-			return "", 0, queryRunner.Version, "", err
+			return "", 0, queryRunner.Version, "", queryRunner.SystemIdentifier, err
 		}
 	} else {
 		bundle.Timeline, err = readTimeline(conn)
@@ -258,7 +258,7 @@ func (bundle *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName str
 			tracelog.WarningLogger.Printf("Couldn't get current timeline because of error: '%v'\n", err)
 		}
 	}
-	return "base_" + name, lsn, queryRunner.Version, dataDir, nil
+	return "base_" + name, lsn, queryRunner.Version, dataDir, queryRunner.SystemIdentifier, nil
 
 }
 
