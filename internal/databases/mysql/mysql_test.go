@@ -46,3 +46,9 @@ func TestGetBinlogConfigNoError(t *testing.T) {
 	assert.Error(t, err)
 	assert.IsType(t, internal.UnsetRequiredSettingError{}, err)
 }
+
+func TestReplaceHostInDatasourceName(t *testing.T) {
+	actual := replaceHostInDatasourceName("user:pass@oldHost/database?a=1", "newHost")
+
+	assert.Equal(t, "user:pass@newHost/database?a=1", actual)
+}
