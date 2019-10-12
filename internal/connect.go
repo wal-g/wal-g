@@ -20,7 +20,17 @@ func Connect() (*pgx.Conn, error) {
 
 	conn, err := pgx.Connect(config)
 	if err != nil {
-		return nil, errors.Wrap(err, "Connect: postgres connection failed")
+		connErr := err
+		if config.Host != "localhost" {
+			tracelog.WarningLogger.Println("Failed to connect using provided PGHOST and PGPORT, trying localhost:5432")
+			config.Host = "localhost"
+			config.Port = 5432
+			conn, err = pgx.Connect(config)
+		}
+		if err != nil {
+			tracelog.ErrorLogger.Println(err.Error())
+			return nil, errors.Wrap(connErr, "Connect: postgres connection failed")
+		}
 	}
 
 	var archiveMode string
