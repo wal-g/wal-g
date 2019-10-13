@@ -216,7 +216,7 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
 	}
 
-	uploader = NewUploader(compressor, folder, deltaFileManager)
+	uploader = NewUploader(compressor, folder, deltaFileManager, nil)
 	return uploader, err
 }
 
