@@ -20,7 +20,7 @@ type Uploader struct {
 	Compressor           compression.Compressor
 	waitGroup            *sync.WaitGroup
 	deltaFileManager     *DeltaFileManager
-	archiveStatusManager DataFolder
+	ArchiveStatusManager DataFolder
 	Failed               atomic.Value
 	tarSize              *int64
 }
@@ -47,7 +47,7 @@ func NewUploader(
 		Compressor:           compressor,
 		waitGroup:            &sync.WaitGroup{},
 		deltaFileManager:     deltaFileManager,
-		archiveStatusManager: archiveStatusManager,
+		ArchiveStatusManager: archiveStatusManager,
 		tarSize:              &size,
 	}
 	uploader.Failed.Store(false)
@@ -70,7 +70,7 @@ func (uploader *Uploader) Clone() *Uploader {
 		uploader.Compressor,
 		&sync.WaitGroup{},
 		uploader.deltaFileManager,
-		uploader.archiveStatusManager,
+		uploader.ArchiveStatusManager,
 		uploader.Failed,
 		uploader.tarSize,
 	}
