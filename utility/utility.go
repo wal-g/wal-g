@@ -196,11 +196,10 @@ func TimeNowCrossPlatformLocal() time.Time {
 var patternTimeRFC3339 = "[0-9]{8}T[0-9]{6}Z"
 var regexpTimeRFC3339 = regexp.MustCompile(patternTimeRFC3339)
 
-// TODO : unit tests
 func TryFetchTimeRFC3999(name string) (string, bool) {
 	times := regexpTimeRFC3339.FindAllString(name, 1)
 	if len(times) > 0 {
-		return regexpTimeRFC3339.FindAllString(name, 1)[0], true
+		return times[0], true
 	}
 	return "", false
 }
