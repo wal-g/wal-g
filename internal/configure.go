@@ -188,7 +188,7 @@ func getArchiveDataFolderPath() string {
 }
 
 // TODO : unit tests
-func configureArchiveStatusManager() (DataFolder, error) {
+func ConfigureArchiveStatusManager() (DataFolder, error) {
 	return NewDiskDataFolder(getArchiveDataFolderPath())
 }
 
@@ -216,14 +216,7 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
 	}
 
-	archiveStatusManager, err := configureArchiveStatusManager()
-
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure Archive Status Manager")
-	}
-
-	uploader = NewUploader(compressor, folder, deltaFileManager, archiveStatusManager)
-
+	uploader = NewUploader(compressor, folder, deltaFileManager)
 	return uploader, err
 }
 

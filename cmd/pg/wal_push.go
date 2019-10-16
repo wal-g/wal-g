@@ -16,6 +16,14 @@ var walPushCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
+
+		archiveStatusManager, err := internal.ConfigureArchiveStatusManager()
+		tracelog.ErrorLogger.PrintError(err)
+		if err != nil {
+			uploader.ArchiveStatusManager = internal.NewDataFolderASM(archiveStatusManager)
+		} else {
+			uploader.ArchiveStatusManager  = internal.NewNopASM()
+		}
 		internal.HandleWALPush(uploader, args[0])
 	},
 }

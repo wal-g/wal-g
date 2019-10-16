@@ -97,7 +97,7 @@ func (bgUploader *BgUploader) scanOnce() {
 			break
 		}
 		name := f.Name()
-		if !strings.HasSuffix(name, readySuffix) || isWalAlreadyUploaded(bgUploader.uploader, name) {
+		if !strings.HasSuffix(name, readySuffix) || bgUploader.uploader.ArchiveStatusManager.isWalAlreadyUploaded(name) {
 			continue
 		}
 		if _, ok := bgUploader.started[name]; ok {
@@ -132,7 +132,7 @@ func (bgUploader *BgUploader) upload(walStatusFilename string) {
 		return
 	}
 
-	if err := markWalUploaded(bgUploader.uploader, walFilename); err != nil {
+	if err := bgUploader.uploader.ArchiveStatusManager.markWalUploaded(walFilename); err != nil {
 		tracelog.ErrorLogger.Printf("Error mark wal file %s uploader due %v", walFilename, err)
 	}
 
