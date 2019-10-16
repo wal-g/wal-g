@@ -4,7 +4,7 @@ type NopASM struct {
 	folder DataFolder
 }
 
-func NewNopASM() ArchiveStatusManager	 {
+func NewNopASM() ArchiveStatusManager {
 	return NopASM{}
 }
 

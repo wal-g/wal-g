@@ -176,10 +176,10 @@ func Configure() {
 	ConfigureLimiters()
 
 	for _, adapter := range StorageAdapters {
-		for _,setting :=  range adapter.settingNames {
+		for _, setting := range adapter.settingNames {
 			AllowedSettings[setting] = true
 		}
-		AllowedSettings["WALG_" + adapter.prefixName] = true
+		AllowedSettings["WALG_"+adapter.prefixName] = true
 	}
 }
 
