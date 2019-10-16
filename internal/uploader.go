@@ -42,11 +42,11 @@ func NewUploader(
 ) *Uploader {
 	size := int64(0)
 	uploader := &Uploader{
-		UploadingFolder:      uploadingLocation,
-		Compressor:           compressor,
-		waitGroup:            &sync.WaitGroup{},
-		deltaFileManager:     deltaFileManager,
-		tarSize:              &size,
+		UploadingFolder:  uploadingLocation,
+		Compressor:       compressor,
+		waitGroup:        &sync.WaitGroup{},
+		deltaFileManager: deltaFileManager,
+		tarSize:          &size,
 	}
 	uploader.Failed.Store(false)
 	return uploader

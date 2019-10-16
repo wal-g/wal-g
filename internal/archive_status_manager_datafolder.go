@@ -4,7 +4,7 @@ type DataFolderASM struct {
 	folder DataFolder
 }
 
-func NewDataFolderASM(folder DataFolder) DataFolderASM	 {
+func NewDataFolderASM(folder DataFolder) DataFolderASM {
 	return DataFolderASM{
 		folder: folder,
 	}

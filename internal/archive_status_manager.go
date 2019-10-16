@@ -15,4 +15,3 @@ type ArchiveStatusManager interface {
 	markWalUploaded(string) error
 	unmarkWalFile(string) error
 }
-

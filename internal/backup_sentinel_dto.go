@@ -16,9 +16,9 @@ type BackupSentinelDto struct {
 	Files       BackupFileList      `json:"Files"`
 	TarFileSets map[string][]string `json:"TarFileSets"`
 
-	PgVersion        int             `json:"PgVersion"`
-	BackupFinishLSN  *uint64         `json:"FinishLSN"`
-  SystemIdentifier *uint64         `json:"SystemIdentifier,omitempty"`
+	PgVersion        int     `json:"PgVersion"`
+	BackupFinishLSN  *uint64 `json:"FinishLSN"`
+	SystemIdentifier *uint64 `json:"SystemIdentifier,omitempty"`
 
 	UncompressedSize int64           `json:"UncompressedSize"`
 	CompressedSize   int64           `json:"CompressedSize"`
@@ -38,10 +38,10 @@ type ExtendedMetadataDto struct {
 	StartLsn         uint64    `json:"start_lsn"`
 	FinishLsn        uint64    `json:"finish_lsn"`
 	IsPermanent      bool      `json:"is_permanent"`
-  SystemIdentifier *uint64   `json:"system_identifier"`
+	SystemIdentifier *uint64   `json:"system_identifier"`
 
-	UncompressedSize int64     `json:"uncompressed_size"`
-	CompressedSize   int64     `json:"compressed_size"`
+	UncompressedSize int64 `json:"uncompressed_size"`
+	CompressedSize   int64 `json:"compressed_size"`
 
 	UserData interface{} `json:"user_data,omitempty"`
 }
