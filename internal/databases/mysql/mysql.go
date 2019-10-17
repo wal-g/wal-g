@@ -66,6 +66,20 @@ func getMySQLConnection() (*sql.DB, error) {
 		return nil, internal.NewUnsetRequiredSettingError(DatasourceNameSetting)
 	}
 	datasourceName := viper.GetString(DatasourceNameSetting)
+	db, err := getMySqlConnectionFromDatasource(datasourceName)
+	if err != nil {
+		fallbackDatasourceName := replaceHostInDatasourceName(datasourceName, "localhost")
+		if fallbackDatasourceName != datasourceName {
+			tracelog.ErrorLogger.Println(err.Error())
+			tracelog.ErrorLogger.Println("Failed to connect using provided host, trying localhost")
+
+			db, err = getMySqlConnectionFromDatasource(datasourceName)
+		}
+	}
+	return db, err
+}
+
+func getMySqlConnectionFromDatasource(datasourceName string) (*sql.DB, error) {
 	if viper.IsSet(SslCaSetting) {
 		caFile := viper.GetString(SslCaSetting)
 		rootCertPool := x509.NewCertPool()
@@ -93,6 +107,25 @@ func getMySQLConnection() (*sql.DB, error) {
 	}
 	db, err := sql.Open("mysql", datasourceName)
 	return db, err
+}
+
+func replaceHostInDatasourceName(datasourceName string, newHost string) string {
+	var userData, dbNameAndParams string
+
+	splitName := strings.SplitN(datasourceName, "@", 2)
+	if len(splitName) == 2 {
+		userData = splitName[0]
+	} else {
+		userData = ""
+	}
+	splitName = strings.SplitN(datasourceName, "/", 2)
+	if len(splitName) == 2 {
+		dbNameAndParams = splitName[1]
+	} else {
+		dbNameAndParams = ""
+	}
+
+	return userData + "@" + newHost + "/" + dbNameAndParams
 }
 
 type StreamSentinelDto struct {

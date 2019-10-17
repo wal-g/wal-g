@@ -144,7 +144,6 @@ func getWalFolderPath() string {
 	return DefaultDataFolderPath
 }
 
-// TODO : unit tests
 func GetDataFolderPath() string {
 	return filepath.Join(getWalFolderPath(), "walg_data")
 }
