@@ -79,7 +79,7 @@ func getBackupDetails(folder storage.Folder, backups []BackupTime) ([]BackupDeta
 func WriteBackupList(backups []BackupTime, output io.Writer) {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
-	fmt.Fprintln(writer, "name\tfinish_time\twal_segment_backup_start")
+	fmt.Fprintln(writer, "name    finish_time    wal_segment_backup_start")
 	for i := len(backups) - 1; i >= 0; i-- {
 		b := backups[i]
 		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v", b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName))
@@ -102,7 +102,7 @@ func WritePrettyBackupList(backups []BackupTime, output io.Writer) {
 	writer := table.NewWriter()
 	writer.SetOutputMirror(output)
 	defer writer.Render()
-	writer.AppendHeader(table.Row{"#", "Name", "Last modified", "WAL segment backup start"})
+	writer.AppendHeader(table.Row{"#", "Name", "Finish time", "WAL segment backup start"})
 	for i, b := range backups {
 		writer.AppendRow(table.Row{i, b.BackupName, b.Time.Format(time.RFC850), b.WalFileName})
 	}
