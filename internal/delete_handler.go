@@ -92,11 +92,14 @@ func getBackupTimeSlices(backups []storage.Object, folder storage.Folder) []Back
 		if err != nil {
 			continue
 		}
+		var finishTime time.Time
 		meta, err := backup.FetchMeta()
-		if err != nil {
-			continue
+		if err == nil {
+			finishTime = meta.FinishTime
+		} else {
+			finishTime = object.GetLastModified()
 		}
-		sortTimes = append(sortTimes, BackupTime{name, meta.FinishTime, utility.StripWalFileName(key)})
+		sortTimes = append(sortTimes, BackupTime{name, finishTime, utility.StripWalFileName(key)})
 	}
 	sort.Slice(sortTimes, func(i, j int) bool {
 		return sortTimes[i].Time.After(sortTimes[j].Time)
