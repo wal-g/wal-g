@@ -36,7 +36,7 @@ var backups = []internal.BackupTime{
 
 func TestBackupListCorrectOutput(t *testing.T) {
 	const expected = "" +
-		"name    finish_time    wal_segment_backup_start\n" +
+		"name     last_modified        wal_segment_backup_start\n" +
 		"base_456 2018-07-05T01:01:50Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
 		"base_123 2019-04-25T14:48:00Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n"
 
@@ -48,7 +48,7 @@ func TestBackupListCorrectOutput(t *testing.T) {
 func TestBackupListCorrectPrettyOutput(t *testing.T) {
 	const expected = "" +
 		"+---+----------+----------------------------------+--------------------------+\n" +
-		"| # | NAME     | FINISH TIME                      | WAL SEGMENT BACKUP START |\n" +
+		"| # | NAME     | LAST MODIFIED                    | WAL SEGMENT BACKUP START |\n" +
 		"+---+----------+----------------------------------+--------------------------+\n" +
 		"| 0 | base_123 | Thursday, 25-Apr-19 14:48:00 UTC | ZZZZZZZZZZZZZZZZZZZZZZZZ |\n" +
 		"| 1 | base_456 | Thursday, 05-Jul-18 01:01:50 UTC | ZZZZZZZZZZZZZZZZZZZZZZZZ |\n" +
