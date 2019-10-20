@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"github.com/tinsane/storages/storage"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/utility"
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/stretchr/testify/assert"
@@ -45,11 +47,17 @@ func NewStoringMockUploader(storage *memory.Storage, deltaDataFolder internal.Da
 
 func CreateMockStorageFolder() storage.Folder {
 	var folder = MakeDefaultInMemoryStorageFolder()
+	meta123 := fmt.Sprintf("{\"finish_time\":\"%s\"}", time.Now().AddDate(0, 0, -2).Format(time.RFC3339))
+	meta456 := fmt.Sprintf("{\"finish_time\":\"%s\"}", time.Now().AddDate(0, 0, -1).Format(time.RFC3339))
+	meta000 := fmt.Sprintf("{\"finish_time\":\"%s\"}", time.Now().Format(time.RFC3339))
 	subFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	subFolder.PutObject("base_123_backup_stop_sentinel.json", &bytes.Buffer{})
+	subFolder.PutObject("base_123/metadata.json", strings.NewReader(meta123))
 	subFolder.PutObject("base_456_backup_stop_sentinel.json", strings.NewReader("{}"))
+	subFolder.PutObject("base_456/metadata.json", strings.NewReader(meta456))
 	subFolder.PutObject("base_000_backup_stop_sentinel.json", &bytes.Buffer{}) // last put
-	subFolder.PutObject("base_123312", &bytes.Buffer{})                        // not a sentinel
+	subFolder.PutObject("base_000/metadata.json", strings.NewReader(meta000))
+	subFolder.PutObject("base_123312", &bytes.Buffer{}) // not a sentinel
 	subFolder.PutObject("base_321/nop", &bytes.Buffer{})
 	subFolder.PutObject("folder123/nop", &bytes.Buffer{})
 	subFolder.PutObject("base_456/tar_partitions/1", &bytes.Buffer{})

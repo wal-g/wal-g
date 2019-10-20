@@ -73,22 +73,30 @@ func getBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage 
 		return nil, nil, err
 	}
 
-	sortTimes := getBackupTimeSlices(backupObjects)
+	sortTimes := getBackupTimeSlices(backupObjects, folder)
 	garbage = getGarbageFromPrefix(subFolders, sortTimes)
 
 	return sortTimes, garbage, nil
 }
 
 // TODO : unit tests
-func getBackupTimeSlices(backups []storage.Object) []BackupTime {
+func getBackupTimeSlices(backups []storage.Object, folder storage.Folder) []BackupTime {
 	sortTimes := make([]BackupTime, len(backups))
 	for i, object := range backups {
 		key := object.GetName()
 		if !strings.HasSuffix(key, utility.SentinelSuffix) {
 			continue
 		}
-		time := object.GetLastModified()
-		sortTimes[i] = BackupTime{utility.StripBackupName(key), time, utility.StripWalFileName(key)}
+		name := utility.StripBackupName(key)
+		backup, err := GetBackupByName(name, folder)
+		if err != nil {
+			continue
+		}
+		meta, err := backup.FetchMeta()
+		if err != nil {
+			continue
+		}
+		sortTimes[i] = BackupTime{name, meta.FinishTime, utility.StripWalFileName(key)}
 	}
 	sort.Slice(sortTimes, func(i, j int) bool {
 		return sortTimes[i].Time.After(sortTimes[j].Time)

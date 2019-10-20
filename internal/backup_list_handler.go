@@ -79,7 +79,7 @@ func getBackupDetails(folder storage.Folder, backups []BackupTime) ([]BackupDeta
 func WriteBackupList(backups []BackupTime, output io.Writer) {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
-	fmt.Fprintln(writer, "name\tlast_modified\twal_segment_backup_start")
+	fmt.Fprintln(writer, "name\tfinish_time\twal_segment_backup_start")
 	for i := len(backups) - 1; i >= 0; i-- {
 		b := backups[i]
 		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v", b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName))
@@ -90,7 +90,7 @@ func WriteBackupList(backups []BackupTime, output io.Writer) {
 func WriteBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
-	fmt.Fprintln(writer, "name\tlast_modified\twal_segment_backup_start\tstart_time\tfinish_time\thostname\tdata_dir\tpg_version\tstart_lsn\tfinish_lsn\tis_permanent")
+	fmt.Fprintln(writer, "name\tfinish_time\twal_segment_backup_start\tstart_time\tfinish_time\thostname\tdata_dir\tpg_version\tstart_lsn\tfinish_lsn\tis_permanent")
 	for i := len(backupDetails) - 1; i >= 0; i-- {
 		b := backupDetails[i]
 		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v", b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName, b.StartTime.Format(time.RFC850), b.FinishTime.Format(time.RFC850), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent))
