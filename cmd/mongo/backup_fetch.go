@@ -1,0 +1,27 @@
+package mongo
+
+import (
+	"github.com/spf13/cobra"
+	"github.com/tinsane/tracelog"
+	"github.com/wal-g/wal-g/internal"
+	"os"
+)
+
+const BackupFetchShortDescription = ""
+
+// backupFetchCmd represents the streamFetch command
+var backupFetchCmd = &cobra.Command{
+	Use:   "backup-fetch destination_directory backup-name",
+	Short: BackupFetchShortDescription,
+	Args:  cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		folder, err := internal.ConfigureFolder()
+		tracelog.ErrorLogger.FatalOnError(err)
+		tracelog.ErrorLogger.FatalfOnError("Failed to parse until timestamp ", err, )
+		internal.HandleBackupFetch(folder, args[0], args[1], internal.GetStreamFetcher(os.Stdout))
+	},
+}
+
+func init() {
+	Cmd.AddCommand(backupFetchCmd)
+}

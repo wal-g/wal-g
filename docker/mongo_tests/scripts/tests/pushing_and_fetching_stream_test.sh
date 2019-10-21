@@ -16,9 +16,9 @@ for i in $(seq 1 5);
 do
     sleep 1
     add_test_data
-    wal-g stream-push
+    wal-g backup-push
 
-    if [ $i -eq 3 ];
+    if [ "$i" -eq 3 ];
     then
         mongoexport -d test -c testData | sort  > /tmp/export1.json
     fi
@@ -30,9 +30,10 @@ service mongodb start
 
 wal-g backup-list
 
-backup_name=`wal-g backup-list | tail -n 3 | head -n 1 | cut -f 1 -d " "`
+backup_name=$(wal-g backup-list | tail -n 3 | head -n 1 | cut -f 1 -d " ")
 
-wal-g stream-fetch $backup_name | mongorestore --archive --oplogReplay
+wal-g backup-fetch "${MONGODBDATA}" "$backup_name" | mongorestore --archive --oplogReplay
+wal-g oplog-fetch --since "$backup_name"
 
 mongoexport -d test -c testData | sort  > /tmp/export2.json
 

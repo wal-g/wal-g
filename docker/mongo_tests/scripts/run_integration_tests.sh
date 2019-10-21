@@ -2,6 +2,6 @@
 set -e -x
 
 for i in /tmp/tests/*; do 
-    .$i;
+    ."$i";
     echo "${i} success"
 done

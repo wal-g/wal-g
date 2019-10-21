@@ -8,12 +8,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const StreamPushShortDescription = ""
+const BackupPushShortDescription = ""
 
-// streamPushCmd represents the streamPush command
-var streamPushCmd = &cobra.Command{
-	Use:   "stream-push",
-	Short: StreamPushShortDescription,
+// backupPushCmd represents the backupPush command
+var backupPushCmd = &cobra.Command{
+	Use:   "backup-push",
+	Short: BackupPushShortDescription,
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -23,5 +23,5 @@ var streamPushCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(streamPushCmd)
+	Cmd.AddCommand(backupPushCmd)
 }

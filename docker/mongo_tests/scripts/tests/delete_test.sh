@@ -9,7 +9,7 @@ test_delete_command() {
     DELETE_COMMAND=$1
     OPLOG_DUMP_DIR=/tmp/oplog_dump
 
-    mkdir -p $WALG_MONGO_OPLOG_DST
+    mkdir -p "$WALG_MONGO_OPLOG_DST"
     mkdir -p $OPLOG_DUMP_DIR
     export WALG_STREAM_CREATE_COMMAND="mongodump --archive --oplog"
     service mongodb start
@@ -19,9 +19,9 @@ test_delete_command() {
         sleep 1
         add_test_data
 
-        wal-g stream-push
+        wal-g backup-push
 
-        if [ $i -eq 3 ];
+        if [ "$i" -eq 3 ];
         then
             mongoexport -d test -c testData | sort  > /tmp/export1.json
         fi
@@ -41,9 +41,10 @@ test_delete_command() {
     rm -rf /var/lib/mongodb/*
     service mongodb start
 
-    first_backup_name=`wal-g backup-list | head -n 2 | tail -n 1 | cut -f 1 -d " "`
+    first_backup_name=$(wal-g backup-list | head -n 2 | tail -n 1 | cut -f 1 -d " ")
 
-    wal-g stream-fetch $first_backup_name | mongorestore --archive --oplogReplay
+    wal-g backup-fetch "${MONGODBDATA}" "$first_backup_name" | mongorestore --archive --oplogReplay
+    wal-g oplog-fetch --since "$first_backup_name"
 
     mongoexport -d test -c testData | sort  > /tmp/export2.json
 
@@ -51,24 +52,24 @@ test_delete_command() {
 
     diff /tmp/export1.json /tmp/export2.json
 
-    oplogCount=`ls $WALG_MONGO_OPLOG_DST | wc -l`
-    if [ $oplogCount -ne 3 ]
+    oplogCount=$(ls "$WALG_MONGO_OPLOG_DST" | wc -l)
+    if [ "$oplogCount" -ne 3 ]
     then
         echo "Expected oplog count is 3. Actual: $oplogCount"
         exit 1
     fi
 
     rm -rf $OPLOG_DUMP_DIR
-    rm -rf $WALG_MONGO_OPLOG_DST
+    rm -rf "$WALG_MONGO_OPLOG_DST"
     rm /tmp/export?.json
 }
 
 export WALG_MONGO_OPLOG_DST=/tmp/fetched_oplogs
 
 delete_before_name() {
-    backup_name=`wal-g backup-list | tail -n 3 | head -n 1 | cut -f 1 -d " "`
+    backup_name=$(wal-g backup-list | tail -n 3 | head -n 1 | cut -f 1 -d " ")
 
-    wal-g delete before $backup_name --confirm
+    wal-g delete before "$backup_name" --confirm
 }
 
 export WALE_S3_PREFIX=s3://mongodeletebeforebucket

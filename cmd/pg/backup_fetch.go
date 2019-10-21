@@ -25,7 +25,7 @@ var backupFetchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
-		internal.HandleBackupFetch(folder, args[0], args[1], fileMask, restoreSpec)
+		internal.HandleBackupFetch(folder, args[0], args[1], internal.GetPgFetcher(fileMask, restoreSpec))
 	},
 }
 
