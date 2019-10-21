@@ -39,6 +39,7 @@ const (
 	PgSslModeSetting             = "PGSSLMODE"
 	TotalBgUploadedLimit         = "TOTAL_BG_UPLOADED_LIMIT"
 	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
+	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
 )
 
 var (
@@ -176,10 +177,10 @@ func Configure() {
 	ConfigureLimiters()
 
 	for _, adapter := range StorageAdapters {
-		for _,setting :=  range adapter.settingNames {
+		for _, setting := range adapter.settingNames {
 			AllowedSettings[setting] = true
 		}
-		AllowedSettings["WALG_" + adapter.prefixName] = true
+		AllowedSettings["WALG_"+adapter.prefixName] = true
 	}
 }
 

@@ -9,18 +9,18 @@ import (
 
 const StreamPushShortDescription = ""
 
-// streamPushCmd represents the streamPush command
-var streamPushCmd = &cobra.Command{
-	Use:   "stream-push",
+// backupPushCmd represents the backupPush command
+var backupPushCmd = &cobra.Command{
+	Use:   "backup-push",
 	Short: StreamPushShortDescription,
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 		command := internal.GetNameStreamCreateCmd()
-		mysql.HandleStreamPush(&mysql.Uploader{Uploader: uploader}, command)
+		mysql.HandleBackupPush(&mysql.Uploader{Uploader: uploader}, command)
 	},
 }
 
 func init() {
-	Cmd.AddCommand(streamPushCmd)
+	Cmd.AddCommand(backupPushCmd)
 }

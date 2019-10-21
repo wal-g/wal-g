@@ -11,20 +11,6 @@ import (
 	"time"
 )
 
-type BinlogFetchSettings struct{}
-
-func (settings BinlogFetchSettings) GetEndTsEnv() string {
-	return BinlogEndTsSetting
-}
-
-func (settings BinlogFetchSettings) GetDstEnv() string {
-	return BinlogDstSetting
-}
-
-func (settings BinlogFetchSettings) GetLogFolderPath() string {
-	return BinlogPath
-}
-
 type BinlogFetchHandlers struct {
 	dstPathFolder string
 	endTS         *time.Time
@@ -50,20 +36,14 @@ func (handlers BinlogFetchHandlers) ShouldBeAborted(pathToLog string) (bool, err
 	return binlogIsTooOld(timestamp, handlers.endTS), nil
 }
 
-func FetchLogs(folder storage.Folder, backup *internal.Backup) error {
-	settings := BinlogFetchSettings{}
-
-	endTS, dstFolder, err := internal.GetOperationLogsSettings(settings)
-	if err != nil {
-		return err
-	}
-
-	backupUploadTime, err := getBackupUploadTime(folder, backup)
+func FetchLogs(folder storage.Folder, backupUploadTime time.Time, settings internal.LogFetchSettings) error {
+	endTS, err := settings.GetEndTS()
+	dstFolder, err := settings.GetDestFolderPath()
 	if err != nil {
 		return err
 	}
 	handlers := BinlogFetchHandlers{dstPathFolder: dstFolder, endTS: endTS}
-	fetchedBinlogs, err := internal.FetchLogs(folder, backupUploadTime, nil, settings, handlers)
+	fetchedBinlogs, err := internal.FetchLogs(folder, backupUploadTime, nil, settings.GetLogFolderPath(), handlers)
 
 	if err != nil {
 		return err

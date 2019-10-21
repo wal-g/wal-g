@@ -290,17 +290,28 @@ func GetSentinelUserData() interface{} {
 	return out
 }
 
-func GetNameStreamCreateCmd() []string {
-	dataStr, ok := GetSetting(NameStreamCreateCmd)
+func getCommandFromEnvAndParse(variableName string) ([]string, error) {
+	dataStr, ok := GetSetting(variableName)
 	if !ok || len(dataStr) == 0 {
-		tracelog.ErrorLogger.Fatal("WALG_STREAM_CREATE_COMMAND expected.")
+		tracelog.ErrorLogger.Fatal(variableName + " expected.")
+		return nil, errors.New(variableName + " not configured")
 	}
 	command := strings.Split(dataStr, " ")
-	resultCommand := []string{}
+	var resultCommand []string
 	for _, argument := range command {
 		if argument != "" {
 			resultCommand = append(resultCommand, argument)
 		}
 	}
-	return resultCommand
+	return resultCommand, nil
+}
+
+func GetNameStreamCreateCmd() []string {
+	// ignore error here explicitly to backward comparability
+	val, _ := getCommandFromEnvAndParse(NameStreamCreateCmd)
+	return val
+}
+
+func GetNameStreamRestoreCmd() ([]string, error) {
+	return getCommandFromEnvAndParse(NameStreamRestoreCmd)
 }
