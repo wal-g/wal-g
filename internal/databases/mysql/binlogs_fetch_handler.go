@@ -8,23 +8,7 @@ import (
 	"time"
 )
 
-type BinlogFetchSettings struct {
-	dt time.Time
-}
-
-func (settings BinlogFetchSettings) GetEndTS() (*time.Time, error) {
-	return &settings.dt, nil
-}
-
-func (settings BinlogFetchSettings) GetDestFolderPath() (string, error) {
-	return internal.GetLogsDstSettingsFromEnv(BinlogDstSetting)
-}
-
-func (settings BinlogFetchSettings) GetLogFolderPath() string {
-	return BinlogPath
-}
-
-func HandleBinlogFetch(folder storage.Folder, backupName string, dt time.Time) error {
+func HandleBinlogFetch(folder storage.Folder, backupName string, untilDT time.Time, needApply bool) error {
 	if !internal.FileIsPiped(os.Stdout) {
 		tracelog.ErrorLogger.Fatalf("stdout is a terminal")
 	}
@@ -35,7 +19,5 @@ func HandleBinlogFetch(folder storage.Folder, backupName string, dt time.Time) e
 	if err != nil {
 		return err
 	}
-
-	settings := BinlogFetchSettings{dt: dt}
-	return FetchLogs(folder, backupUploadTime, settings)
+	return FetchLogs(folder, backupUploadTime, untilDT, needApply)
 }

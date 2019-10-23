@@ -43,7 +43,7 @@ test_delete_command() {
 
     first_backup_name=$(wal-g backup-list | head -n 2 | tail -n 1 | cut -f 1 -d " ")
 
-    wal-g backup-fetch "${MONGODBDATA}" "$first_backup_name" | mongorestore --archive --oplogReplay
+    wal-g backup-fetch "$first_backup_name" | mongorestore --archive --oplogReplay
     wal-g oplog-fetch --since "$first_backup_name"
 
     mongoexport -d test -c testData | sort  > /tmp/export2.json

@@ -15,7 +15,7 @@ export WALG_STREAM_CREATE_COMMAND="xtrabackup --backup \
 export WALG_STREAM_RESTORE_COMMAND="xbstream -x -C ${MYSQLDATA}"
 
 kill_mysql_and_cleanup_data() {
-    pkill -9 mysql
+    pkill -9 mysqld
     rm -rf "${MYSQLDATA}"
 }
 
@@ -54,7 +54,7 @@ wal-g backup-list && sleep 3
 kill_mysql_and_cleanup_data
 
 mkdir "${MYSQLDATA}"
-wal-g backup-fetch "${MYSQLDATA}" "$target_backup_name"
+wal-g backup-fetch "$target_backup_name"
 chown -R mysql:mysql "${MYSQLDATA}"
 
 sleep 10

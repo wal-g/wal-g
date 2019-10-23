@@ -34,7 +34,7 @@ pkill -9 mongod
 rm -rf /var/lib/mongodb/*
 service mongodb start
 
-wal-g backup-fetch "${MONGODBDATA}" LATEST | mongorestore --archive --oplogReplay
+wal-g backup-fetch LATEST | mongorestore --archive --oplogReplay
 wal-g oplog-fetch --since LATEST
 
 ls $WALG_MONGO_OPLOG_DST

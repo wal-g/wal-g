@@ -62,8 +62,8 @@ func ReadRestoreSpec(path string, spec *TablespaceSpec) (err error) {
 	return nil
 }
 
-func GetPgFetcher(fileMask string, restoreSpecPath string) func(folder storage.Folder, dbDataDirectory string, backup Backup) {
-	return func(folder storage.Folder, dbDataDirectory string, backup Backup) {
+func GetPgFetcher(dbDataDirectory, fileMask, restoreSpecPath string) func(folder storage.Folder, backup Backup) {
+	return func(folder storage.Folder, backup Backup) {
 		filesToUnwrap, err := backup.GetFilesToUnwrap(fileMask)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 
@@ -79,8 +79,8 @@ func GetPgFetcher(fileMask string, restoreSpecPath string) func(folder storage.F
 	}
 }
 
-func GetStreamFetcher(writeCloser io.WriteCloser) func(folder storage.Folder, dbDataDirectory string, backup Backup) {
-	return func(folder storage.Folder, dbDataDirectory string, backup Backup) {
+func GetStreamFetcher(writeCloser io.WriteCloser) func(folder storage.Folder, backup Backup) {
+	return func(folder storage.Folder, backup Backup) {
 		err := DownloadAndDecompressStream(&backup, writeCloser)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 	}
@@ -88,12 +88,12 @@ func GetStreamFetcher(writeCloser io.WriteCloser) func(folder storage.Folder, db
 
 // TODO : unit tests
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
-func HandleBackupFetch(folder storage.Folder, dbDataDirectory string, backupName string, fetcher func(folder storage.Folder, dbDataDirectory string, backup Backup)) {
-	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder, %s)\n", backupName, dbDataDirectory)
+func HandleBackupFetch(folder storage.Folder, backupName string, fetcher func(folder storage.Folder, backup Backup)) {
+	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder,)\n", backupName)
 	backup, err := GetBackupByName(backupName, folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 
-	fetcher(folder, dbDataDirectory, *backup)
+	fetcher(folder, *backup)
 }
 
 func GetBackupByName(backupName string, folder storage.Folder) (*Backup, error) {

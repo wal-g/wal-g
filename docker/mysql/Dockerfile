@@ -15,7 +15,8 @@ RUN curl -s https://packagecloud.io/install/repositories/akopytov/sysbench/scrip
 RUN rm -rf $MYSQLDATA
 
 COPY docker/mysql/init.sql /etc/mysql/init.sql
+COPY docker/mysql/test_apply.sh /tmp/test_apply.sh
 
 # append
-COPY docker/mysql/my.cnf /tmp/my.cnf
-RUN cat /tmp/my.cnf >> /etc/mysql/my.cnf && rm -f /tmp/my.cnf
+COPY docker/mysql/my.cnf /root/my.cnf
+RUN cat /root/my.cnf >> /etc/mysql/my.cnf

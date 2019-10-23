@@ -56,3 +56,17 @@ func RestoreCommand(command []string) (waitFunc func(), stdout io.WriteCloser) {
 		}
 	}, stdinWriteCLoser
 }
+
+func ApplyCommand(path string, args []string) (applyFunc func() error) {
+	c := exec.Command(path, args[1:]...)
+	return func() error {
+		var err error
+		err = c.Start()
+		waitFuncResult := c.Wait
+		if err != nil {
+			tracelog.ErrorLogger.FatalOnError(err)
+			return err
+		}
+		return waitFuncResult()
+	}
+}

@@ -293,7 +293,7 @@ func GetSentinelUserData() interface{} {
 func getCommandFromEnvAndParse(variableName string) ([]string, error) {
 	dataStr, ok := GetSetting(variableName)
 	if !ok || len(dataStr) == 0 {
-		tracelog.ErrorLogger.Fatal(variableName + " expected.")
+		tracelog.ErrorLogger.Print(variableName + " expected.")
 		return nil, errors.New(variableName + " not configured")
 	}
 	command := strings.Split(dataStr, " ")
@@ -306,12 +306,21 @@ func getCommandFromEnvAndParse(variableName string) ([]string, error) {
 	return resultCommand, nil
 }
 
-func GetNameStreamCreateCmd() []string {
+func GetStreamCreateCmd() []string {
 	// ignore error here explicitly to backward comparability
 	val, _ := getCommandFromEnvAndParse(NameStreamCreateCmd)
 	return val
 }
 
-func GetNameStreamRestoreCmd() ([]string, error) {
+func GetStreamRestoreCmd() ([]string, error) {
 	return getCommandFromEnvAndParse(NameStreamRestoreCmd)
+}
+
+func GetLogApplyCmd() string {
+	path, ok := GetSetting(NameLogApplyCmdPath)
+	if !ok || len(path) == 0 {
+		tracelog.ErrorLogger.Fatal(NameLogApplyCmdPath + " expected.")
+	}
+
+	return path
 }

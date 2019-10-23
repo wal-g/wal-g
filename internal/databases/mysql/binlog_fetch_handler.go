@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"github.com/tinsane/storages/storage"
+	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
 	"os"
@@ -11,9 +12,26 @@ import (
 	"time"
 )
 
+type BinlogFetchSettings struct {
+	dt time.Time
+}
+
+func (settings BinlogFetchSettings) GetEndTS() (*time.Time, error) {
+	return &settings.dt, nil
+}
+
+func (settings BinlogFetchSettings) GetDestFolderPath() (string, error) {
+	return internal.GetLogsDstSettingsFromEnv(BinlogDstSetting)
+}
+
+func (settings BinlogFetchSettings) GetLogFolderPath() string {
+	return BinlogPath
+}
+
 type BinlogFetchHandlers struct {
 	dstPathFolder string
 	endTS         *time.Time
+	applier       Applier
 }
 
 func (handlers BinlogFetchHandlers) HandleAbortFetch(logFilePath string) error {
@@ -21,7 +39,12 @@ func (handlers BinlogFetchHandlers) HandleAbortFetch(logFilePath string) error {
 }
 
 func (handlers BinlogFetchHandlers) DownloadLogTo(logFolder storage.Folder, logName string, dstLogFilePath string) error {
-	return internal.DownloadWALFileTo(logFolder, logName, dstLogFilePath)
+	if err := internal.DownloadWALFileTo(logFolder, logName, dstLogFilePath); err != nil {
+		tracelog.ErrorLogger.Print(err)
+		return err
+	}
+
+	return handlers.applier(dstLogFilePath)
 }
 
 func (handlers BinlogFetchHandlers) GetLogFilePath(pathToLog string) (string, error) {
@@ -36,13 +59,19 @@ func (handlers BinlogFetchHandlers) ShouldBeAborted(pathToLog string) (bool, err
 	return binlogIsTooOld(timestamp, handlers.endTS), nil
 }
 
-func FetchLogs(folder storage.Folder, backupUploadTime time.Time, settings internal.LogFetchSettings) error {
+func FetchLogs(folder storage.Folder, backupUploadTime time.Time, untilDT time.Time, needApply bool) error {
+	settings := BinlogFetchSettings{dt: untilDT}
 	endTS, err := settings.GetEndTS()
 	dstFolder, err := settings.GetDestFolderPath()
 	if err != nil {
 		return err
 	}
-	handlers := BinlogFetchHandlers{dstPathFolder: dstFolder, endTS: endTS}
+	var handlers BinlogFetchHandlers
+	if needApply {
+		handlers = BinlogFetchHandlers{dstPathFolder: dstFolder, endTS: endTS, applier: GetCommandApplier(untilDT.Format(time.RFC3339))}
+	} else {
+		handlers = BinlogFetchHandlers{dstPathFolder: dstFolder, endTS: endTS, applier: NoopApplier}
+	}
 	fetchedBinlogs, err := internal.FetchLogs(folder, backupUploadTime, nil, settings.GetLogFolderPath(), handlers)
 
 	if err != nil {

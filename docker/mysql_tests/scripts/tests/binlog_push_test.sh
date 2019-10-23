@@ -15,7 +15,7 @@ export WALG_MYSQL_BINLOG_END_TS=$(date --rfc-3339=ns | sed 's/ /T/')
 export WALG_STREAM_RESTORE_COMMAND="xbstream -x -C ${MYSQLDATA}"
 
 kill_mysql_and_cleanup_data() {
-    pkill -9 mysql
+    pkill -9 mysqld
     rm -rf "${MYSQLDATA}"
 }
 
@@ -37,8 +37,9 @@ sleep 1
 kill_mysql_and_cleanup_data
 
 mkdir "${MYSQLDATA}"
-wal-g backup-fetch "${MYSQLDATA}" LATEST
-wal-g binlog-fetch --since LATEST && xtrabackup --prepare --target-dir="${MYSQLDATA}"
+wal-g backup-fetch LATEST
+xtrabackup --prepare --target-dir="${MYSQLDATA}"
+wal-g binlog-fetch --since LATEST
 
 chown -R mysql:mysql "${MYSQLDATA}"
 sort "${MYSQLDATA}"/binlogs_order > /tmp/sorted_binlogs_order

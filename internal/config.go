@@ -40,6 +40,7 @@ const (
 	TotalBgUploadedLimit         = "TOTAL_BG_UPLOADED_LIMIT"
 	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
 	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
+	NameLogApplyCmdPath          = "WALG_MYSQL_BINLOG_APPLY_COMMAND_PATH"
 )
 
 var (
