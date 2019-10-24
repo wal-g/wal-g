@@ -173,6 +173,12 @@ func Configure() {
 		tracelog.ErrorLogger.FatalError(err)
 	}
 
+	// Show all ENV vars in DEVEL Logging Mode
+	tracelog.DebugLogger.Println("--- COMPILED ENVIRONMENT VARS ---")
+	for _, pair := range os.Environ() {
+		tracelog.DebugLogger.Println(pair)
+	}
+
 	ConfigureLimiters()
 
 	for _, adapter := range StorageAdapters {
