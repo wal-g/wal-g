@@ -7,8 +7,8 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 )
 
-const OplogFetchShortDescription = "Fetches a OpLog file from storage"
-const sinceFlagShortDescription  = ""
+const OplogFetchShortDescription = "Fetches OpLogs from storage"
+const sinceFlagShortDescription  = "backup name starting from which you want to take binlog"
 
 var backupName string
 

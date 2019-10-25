@@ -8,9 +8,9 @@ import (
 	"time"
 )
 
-const binlogFetchShortDescription = ""
-const sinceFlagShortDescription = "backup name"
-const untilFlagShortDescription = ""
+const binlogFetchShortDescription = "fetches binlog from storage"
+const sinceFlagShortDescription = "backup name starting from which you want to take binlog"
+const untilFlagShortDescription = "time in RFC3339 for PITR"
 const applyFlagShortDescription = "Apply fetched binlogs (not implemented yet)"
 
 var backupName string

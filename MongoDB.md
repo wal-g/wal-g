@@ -53,7 +53,17 @@ WAL-G can also fetch the latest backup using:
 wal-g backup-fetch LATEST | mongorestore --archive --oplogReplay
 ```
 
-* ``sbackup-push``
+
+* ``oplog-fetch``
+
+When fetching oplog's, the user should specify the name of the backup starting with which to take an oplog and time in RFC3339 format for PITR
+```
+wal-g oplog-fetch --since "backupname" --until "2006-01-02T15:04:05Z07:00"
+```
+
+Both keys are optional. Default value for --since flag is 'LATEST'. If --until flag is not specified, its value will be set to time.Now()
+
+* ``backup-push``
 
 Command for compressing, encrypting and sending backup from stream to storage.
 
