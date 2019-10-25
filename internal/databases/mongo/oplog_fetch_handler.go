@@ -2,19 +2,21 @@ package mongo
 
 import (
 	"github.com/tinsane/storages/storage"
+	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"os"
 	"path"
+	"time"
 )
 
 type OpLogFetchSettings struct{}
 
-func (settings OpLogFetchSettings) GetEndTsEnv() string {
-	return OplogEndTs
+func (settings OpLogFetchSettings) GetEndTS() (*time.Time, error) {
+	return internal.ParseTSFromEnv(OplogEndTs)
 }
 
-func (settings OpLogFetchSettings) GetDstEnv() string {
-	return OplogDst
+func (settings OpLogFetchSettings) GetDestFolderPath() (string, error) {
+	return internal.GetLogsDstSettingsFromEnv(OplogDst)
 }
 
 func (settings OpLogFetchSettings) GetLogFolderPath() string {
@@ -47,19 +49,33 @@ func (handlers OpLogFetchHandlers) ShouldBeAborted(pathToLog string) (bool, erro
 	return false, nil
 }
 
-func FetchLogs(folder storage.Folder, backup *internal.Backup) error {
+func FetchLogs(folder storage.Folder, backup *internal.Backup, settings internal.LogFetchSettings) error {
 	var streamSentinel StreamSentinelDto
-	var opLogFetchSettings OpLogFetchSettings
 
 	err := internal.FetchStreamSentinel(backup, &streamSentinel)
 	if err != nil {
 		return err
 	}
 
-	endTS, dstFolder, err := internal.GetOperationLogsSettings(opLogFetchSettings)
+	endTS, err := settings.GetEndTS()
+	if err != nil {
+		return err
+	}
 
+	dstFolder, err := settings.GetDestFolderPath()
+	if err != nil {
+		return err
+	}
 	handlers := OpLogFetchHandlers{dstPathFolder: dstFolder}
-
-	_, err = internal.FetchLogs(folder, streamSentinel.StartLocalTime, endTS, opLogFetchSettings, handlers)
+	_, err = internal.FetchLogs(folder, streamSentinel.StartLocalTime, endTS, settings.GetLogFolderPath(), handlers)
 	return err
+}
+
+func HandleOplogFetch(folder storage.Folder, backupName string) error {
+	if !internal.FileIsPiped(os.Stdout) {
+		tracelog.ErrorLogger.Fatalf("stdout is a terminal")
+	}
+	backup, err := internal.GetBackupByName(backupName, folder)
+	tracelog.ErrorLogger.FatalfOnError("Unable to get backup %+v\n", err)
+	return FetchLogs(folder, backup, OpLogFetchSettings{})
 }
