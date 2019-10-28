@@ -200,6 +200,44 @@ func TestFastCopy_ReturnsError_WhenWriterFails(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestTryFetchTimeRFC3999_Valid(t *testing.T) {
+	var testCases = []struct {
+		input    string
+		expected string
+	}{
+		{"20191015T211200Z", "20191015T211200Z"},
+		{"20191015T211200Z22221015T211200Z", "20191015T211200Z"},
+		{"         20191015T211200Z", "20191015T211200Z"},
+		{"000000020191015T211200Z", "20191015T211200Z"},
+		{"20191015T211200ZZZZZ", "20191015T211200Z"},
+	}
+
+	for _, testCase := range testCases {
+		actual, ok := utility.TryFetchTimeRFC3999(testCase.input)
+		assert.Equal(t, true, ok)
+		assert.Equal(t, testCase.expected, actual)
+	}
+}
+
+func TestTryFetchTimeRFC3999_Invalid(t *testing.T) {
+	var testCases = []struct {
+		input string
+	}{
+		{""},
+		{"20191015T211200"},
+		{"20191015211200Z"},
+		{"20191015:211200Z"},
+		{"20191015 211200Z"},
+		{"TotallyBadTimeString"},
+	}
+
+	for _, testCase := range testCases {
+		actual, ok := utility.TryFetchTimeRFC3999(testCase.input)
+		assert.Equal(t, actual, "")
+		assert.Equal(t, ok, false)
+	}
+}
+
 func TestSelectMatchingFiles_EmptyMask(t *testing.T) {
 	files := map[string]bool{
 		"/a":   true,
