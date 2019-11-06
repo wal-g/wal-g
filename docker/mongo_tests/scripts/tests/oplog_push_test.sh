@@ -19,7 +19,7 @@ sleep 1
 add_test_data
 export WALG_STREAM_CREATE_COMMAND="mongodump --archive --oplog"
 
-wal-g stream-push
+wal-g backup-push
 
 add_test_data
 mongoexport -d test -c testData | sort  > /tmp/export1.json
@@ -28,16 +28,17 @@ mongodump -d local -c oplog.\$main --out $OPLOG_DUMP_DIR
 cat $OPLOG_DUMP_DIR/local/oplog.\$main.bson | wal-g oplog-push
 
 sleep 1
-export WALG_MONGO_OPLOG_END_TS=`date --rfc-3339=ns | sed 's/ /T/'`
+export WALG_MONGO_OPLOG_END_TS=$(date --rfc-3339=ns | sed 's/ /T/')
 
 pkill -9 mongod
 rm -rf /var/lib/mongodb/*
 service mongodb start
 
-wal-g stream-fetch LATEST | mongorestore --archive --oplogReplay
+wal-g backup-fetch LATEST | mongorestore --archive --oplogReplay
+wal-g oplog-fetch --since LATEST
 
 ls $WALG_MONGO_OPLOG_DST
-mongorestore --oplogReplay $WALG_MONGO_OPLOG_DST/`ls $WALG_MONGO_OPLOG_DST | head -n 1`
+mongorestore --oplogReplay $WALG_MONGO_OPLOG_DST/$(ls $WALG_MONGO_OPLOG_DST | head -n 1)
 
 mongoexport -d test -c testData | sort  > /tmp/export2.json
 

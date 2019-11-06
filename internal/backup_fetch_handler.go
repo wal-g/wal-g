@@ -7,6 +7,7 @@ import (
 	"github.com/tinsane/storages/storage"
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/utility"
+	"io"
 	"io/ioutil"
 )
 
@@ -61,23 +62,38 @@ func ReadRestoreSpec(path string, spec *TablespaceSpec) (err error) {
 	return nil
 }
 
+func GetPgFetcher(dbDataDirectory, fileMask, restoreSpecPath string) func(folder storage.Folder, backup Backup) {
+	return func(folder storage.Folder, backup Backup) {
+		filesToUnwrap, err := backup.GetFilesToUnwrap(fileMask)
+		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+
+		var spec *TablespaceSpec
+		if restoreSpecPath != "" {
+			spec = &TablespaceSpec{}
+			err := ReadRestoreSpec(restoreSpecPath, spec)
+			errMessege := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
+			tracelog.ErrorLogger.FatalfOnError(errMessege, err)
+		}
+		err = deltaFetchRecursion(backup.Name, folder, utility.ResolveSymlink(dbDataDirectory), spec, filesToUnwrap)
+		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+	}
+}
+
+func GetStreamFetcher(writeCloser io.WriteCloser) func(folder storage.Folder, backup Backup) {
+	return func(folder storage.Folder, backup Backup) {
+		err := DownloadAndDecompressStream(&backup, writeCloser)
+		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+	}
+}
+
 // TODO : unit tests
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
-func HandleBackupFetch(folder storage.Folder, dbDataDirectory string, backupName string, fileMask string, restoreSpecPath string) {
-	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder, %s)\n", backupName, dbDataDirectory)
-	var spec *TablespaceSpec
-	if restoreSpecPath != "" {
-		spec = &TablespaceSpec{}
-		err := ReadRestoreSpec(restoreSpecPath, spec)
-		errMessege := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
-		tracelog.ErrorLogger.FatalfOnError(errMessege, err)
-	}
+func HandleBackupFetch(folder storage.Folder, backupName string, fetcher func(folder storage.Folder, backup Backup)) {
+	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder,)\n", backupName)
 	backup, err := GetBackupByName(backupName, folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
-	filesToUnwrap, err := backup.GetFilesToUnwrap(fileMask)
-	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
-	err = deltaFetchRecursion(backupName, folder, utility.ResolveSymlink(dbDataDirectory), spec, filesToUnwrap)
-	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+
+	fetcher(folder, *backup)
 }
 
 func GetBackupByName(backupName string, folder storage.Folder) (*Backup, error) {

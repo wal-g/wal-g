@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
-	"os"
+	"io"
 	"sort"
 	"time"
 
@@ -15,8 +15,8 @@ import (
 )
 
 type LogFetchSettings interface {
-	GetEndTsEnv() string
-	GetDstEnv() string
+	GetEndTS() (*time.Time, error)
+	GetDestFolderPath() (string, error)
 	GetLogFolderPath() string
 }
 
@@ -27,46 +27,29 @@ type LogFetchHandlers interface {
 	HandleAbortFetch(string) error
 }
 
-// GetOperationLogsSettings reads from the environment variables fetch settings
-func GetOperationLogsSettings(settings LogFetchSettings) (endTS *time.Time, dstFolder string, err error) {
-	endTSStr, ok := GetSetting(settings.GetEndTsEnv())
+func ParseTS(endTSEnvVar string) (endTS *time.Time, err error) {
+	endTSStr, ok := GetSetting(endTSEnvVar)
 	if ok {
 		t, err := time.Parse(time.RFC3339, endTSStr)
 		if err != nil {
-			return nil, "", err
+			return nil, err
 		}
 		endTS = &t
 	}
-	operationLogsDstSetting := settings.GetDstEnv()
-	dstFolder, ok = GetSetting(operationLogsDstSetting)
-	if !ok {
-		return endTS, dstFolder, NewUnsetRequiredSettingError(operationLogsDstSetting)
-	}
-	return endTS, dstFolder, nil
+	return endTS, nil
 }
 
-// HandleStreamFetch is invoked to perform wal-g stream-fetch
-func HandleStreamFetch(backupName string, folder storage.Folder,
-	fetchLogs func(storage.Folder, *Backup) error) {
-	if !FileIsPiped(os.Stdout) {
-		tracelog.ErrorLogger.Fatalf("stdout is a terminal")
+// GetLogsDstSettings reads from the environment variables fetch settings
+func GetLogsDstSettings(operationLogsDstEnvVariable string) (dstFolder string, err error) {
+	dstFolder, ok := GetSetting(operationLogsDstEnvVariable)
+	if !ok {
+		return dstFolder, NewUnsetRequiredSettingError(operationLogsDstEnvVariable)
 	}
-
-	backup, err := GetBackupByName(backupName, folder)
-	tracelog.ErrorLogger.FatalfOnError("Unable to get backup %+v\n", err)
-	logsAreDone := make(chan error)
-	go func() {
-		logsAreDone <- fetchLogs(folder, backup)
-	}()
-	err = DownloadAndDecompressStream(backup)
-	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.DebugLogger.Println("Waiting for logs")
-	err = <-logsAreDone
-	tracelog.ErrorLogger.FatalOnError(err)
+	return dstFolder, nil
 }
 
 // DownloadAndDecompressStream downloads, decompresses and writes stream to stdout
-func DownloadAndDecompressStream(backup *Backup) error {
+func DownloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) error {
 	for _, decompressor := range compression.Decompressors {
 		archiveReader, exists, err := TryDownloadWALFile(backup.BaseBackupFolder, getStreamName(backup.Name, decompressor.FileExtension()))
 		if err != nil {
@@ -76,11 +59,11 @@ func DownloadAndDecompressStream(backup *Backup) error {
 			continue
 		}
 
-		err = DecompressWALFile(&EmptyWriteIgnorer{WriteCloser: os.Stdout}, archiveReader, decompressor)
+		err = DecompressWALFile(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
 		if err != nil {
 			return err
 		}
-		utility.LoggedClose(os.Stdout, "")
+		utility.LoggedClose(writeCloser, "")
 		return nil
 	}
 	return NewArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))
@@ -140,8 +123,8 @@ func DownloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, handl
 	return fetched, nil
 }
 
-func FetchLogs(folder storage.Folder, startTS time.Time, endTS *time.Time, settings LogFetchSettings, handlers LogFetchHandlers) (fetched []storage.Object, err error) {
-	logFolder := folder.GetSubFolder(settings.GetLogFolderPath())
+func FetchLogs(folder storage.Folder, startTS time.Time, endTS *time.Time, logFolderPath string, handlers LogFetchHandlers) (fetched []storage.Object, err error) {
+	logFolder := folder.GetSubFolder(logFolderPath)
 	logsToFetch, err := GetLogsCoveringInterval(logFolder, startTS, endTS)
 	if err != nil {
 		return nil, err

@@ -12,7 +12,7 @@ const StreamPushShortDescription = ""
 
 // streamPushCmd represents the streamPush command
 var streamPushCmd = &cobra.Command{
-	Use:   "stream-push",
+	Use:   "backup-push",
 	Short: StreamPushShortDescription,
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
