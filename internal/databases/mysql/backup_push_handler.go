@@ -8,7 +8,7 @@ import (
 	"io"
 )
 
-func HandleStreamPush(uploader *Uploader, command []string) {
+func HandleBackupPush(uploader *Uploader, command []string) {
 	waitAndFatalOnError, stream := internal.StartCommand(command)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	db, err := getMySQLConnection()

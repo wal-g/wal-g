@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-const BackupFetchShortDescription = ""
+const BackupFetchShortDescription = "Fetches desired backup from storage"
 
 // backupFetchCmd represents the streamFetch command
 var backupFetchCmd = &cobra.Command{

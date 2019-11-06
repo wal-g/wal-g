@@ -66,12 +66,6 @@ WAL-G can also fetch the latest backup using:
 wal-g backup-fetch  LATEST | xbstream -x -C mysql_datadir
 ```
 
-
-When fetching binlog's, the user should specify the name of the backup starting with which to take an oplog and time in RFC3339 format for PITR
-```
-wal-g binlog-fetch --since "backupname" --until "2006-01-02T15:04:05Z07:00"
-```
-
 Both keys are optional. Default value for --since flag is 'LATEST'. If --until flag is not specified, its value will be set to time.Now()
 
 * ``backup-push``
@@ -91,4 +85,9 @@ Command for sending binlogs to storage by CRON.
 
 ```
 wal-g binlog-push
+```
+
+When fetching binlog's, the user should specify the name of the backup starting with which to take an binlog and time in RFC3339 format for PITR
+```
+wal-g binlog-fetch --since "backupname" --until "2006-01-02T15:04:05Z07:00"
 ```

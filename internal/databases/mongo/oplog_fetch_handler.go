@@ -12,11 +12,11 @@ import (
 type OpLogFetchSettings struct{}
 
 func (settings OpLogFetchSettings) GetEndTS() (*time.Time, error) {
-	return internal.ParseTSFromEnv(OplogEndTs)
+	return internal.ParseTS(OplogEndTs)
 }
 
 func (settings OpLogFetchSettings) GetDestFolderPath() (string, error) {
-	return internal.GetLogsDstSettingsFromEnv(OplogDst)
+	return internal.GetLogsDstSettings(OplogDst)
 }
 
 func (settings OpLogFetchSettings) GetLogFolderPath() string {

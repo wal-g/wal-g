@@ -27,7 +27,7 @@ type LogFetchHandlers interface {
 	HandleAbortFetch(string) error
 }
 
-func ParseTSFromEnv(endTSEnvVar string) (endTS *time.Time, err error) {
+func ParseTS(endTSEnvVar string) (endTS *time.Time, err error) {
 	endTSStr, ok := GetSetting(endTSEnvVar)
 	if ok {
 		t, err := time.Parse(time.RFC3339, endTSStr)
@@ -39,8 +39,8 @@ func ParseTSFromEnv(endTSEnvVar string) (endTS *time.Time, err error) {
 	return endTS, nil
 }
 
-// GetLogsDstSettingsFromEnv reads from the environment variables fetch settings
-func GetLogsDstSettingsFromEnv(operationLogsDstEnvVariable string) (dstFolder string, err error) {
+// GetLogsDstSettings reads from the environment variables fetch settings
+func GetLogsDstSettings(operationLogsDstEnvVariable string) (dstFolder string, err error) {
 	dstFolder, ok := GetSetting(operationLogsDstEnvVariable)
 	if !ok {
 		return dstFolder, NewUnsetRequiredSettingError(operationLogsDstEnvVariable)

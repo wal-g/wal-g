@@ -17,7 +17,7 @@ var streamPushCmd = &cobra.Command{
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 		command := internal.GetNameStreamCreateCmd()
-		mysql.HandleStreamPush(&mysql.Uploader{Uploader: uploader}, command)
+		mysql.HandleBackupPush(&mysql.Uploader{Uploader: uploader}, command)
 	},
 }
 

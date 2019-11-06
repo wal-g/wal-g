@@ -17,8 +17,8 @@ func TestGetBinlogConfig(t *testing.T) {
 	os.Setenv(BinlogEndTsSetting, "2018-12-06T11:50:58Z")
 	samplePath := "/xxx/"
 	os.Setenv(BinlogDstSetting, samplePath)
-	path, err := internal.GetLogsDstSettingsFromEnv(BinlogDstSetting)
-	time, err := internal.ParseTSFromEnv(BinlogEndTsSetting)
+	path, err := internal.GetLogsDstSettings(BinlogDstSetting)
+	time, err := internal.ParseTS(BinlogEndTsSetting)
 	assert.NoError(t, err)
 	assert.Equal(t, (*time).Year(), 2018)
 	assert.Equal(t, int((*time).Month()), 12)
@@ -29,11 +29,9 @@ func TestGetBinlogConfig(t *testing.T) {
 }
 
 func TestGetBinlogConfigNoError(t *testing.T) {
-	mockController := gomock.NewController(t)
-	defer mockController.Finish()
 	os.Unsetenv(BinlogEndTsSetting)
 	os.Unsetenv(BinlogDstSetting)
-	_, err := internal.GetLogsDstSettingsFromEnv(BinlogDstSetting)
+	_, err := internal.GetLogsDstSettings(BinlogDstSetting)
 	assert.Error(t, err)
 	assert.IsType(t, internal.UnsetRequiredSettingError{}, err)
 }

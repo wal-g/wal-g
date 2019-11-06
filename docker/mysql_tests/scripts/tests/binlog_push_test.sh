@@ -13,11 +13,6 @@ export WALG_STREAM_CREATE_COMMAND="xtrabackup --backup \
     --datadir=${MYSQLDATA}"
 export WALG_MYSQL_BINLOG_END_TS=$(date --rfc-3339=ns | sed 's/ /T/')
 
-kill_mysql_and_cleanup_data() {
-    pkill -9 mysqld
-    rm -rf "${MYSQLDATA}"
-}
-
 mysqld --initialize --init-file=/etc/mysql/init.sql
 
 service mysql start

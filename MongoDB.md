@@ -71,7 +71,7 @@ Command for compressing, encrypting and sending backup from stream to storage.
 wal-g backup-push
 ```
 
-Variable _WALG_STREAM_CREATE_COMMAND_ is required for use stream-push 
+Variable _WALG_STREAM_CREATE_COMMAND_ is required for use backup-push 
 (eg. ```mongodump --archive --oplog```)
 
 * ``oplog-push``
