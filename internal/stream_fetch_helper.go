@@ -15,16 +15,15 @@ import (
 )
 
 type LogFetchSettings interface {
-	GetEndTS() (*time.Time, error)
-	GetDestFolderPath() (string, error)
 	GetLogFolderPath() string
+	// second value maybe nil, this means upper limit is inf
+	GetLogsFetchInterval() (time.Time, *time.Time)
 }
 
 type LogFetchHandlers interface {
-	GetLogFilePath(pathToLog string) (string, error)
-	ShouldBeAborted(pathToLog string) (bool, error)
-	DownloadLogTo(logFolder storage.Folder, logName string, dstLogFilePath string) error
-	HandleAbortFetch(string) error
+	FetchLog(logFolder storage.Folder, logName string) (needAbortFetch bool, err error)
+	HandleAbortFetch(LogName string) error
+	AfterFetch(logs []storage.Object) error
 }
 
 // TODO : unit tests
@@ -74,7 +73,7 @@ func downloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) err
 
 // TODO : unit tests
 // GetLogsCoveringInterval lists the operation logs that cover the interval
-func getLogsCoveringInterval(folder storage.Folder, start time.Time, end *time.Time) ([]storage.Object, error) {
+func GetLogsCoveringInterval(folder storage.Folder, start time.Time, end *time.Time) ([]storage.Object, error) {
 	logFiles, _, err := folder.ListFolder()
 	if err != nil {
 		return nil, err
@@ -95,31 +94,17 @@ func getLogsCoveringInterval(folder storage.Folder, start time.Time, end *time.T
 
 // TODO : unit tests
 // DownloadLogFiles downloads files to specified folder
-func downloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, handlers LogFetchHandlers) ([]storage.Object, error) {
+// FetchLogFiles downloads files to specified folder
+func FetchLogFiles(logFiles []storage.Object, logFolder storage.Folder, handlers LogFetchHandlers) ([]storage.Object, error) {
 	var fetched []storage.Object
 	for _, logFile := range logFiles {
 		logName := utility.TrimFileExtension(logFile.GetName())
-
-		logFilePath, err := handlers.GetLogFilePath(logName)
-		if err != nil {
+		if needAbortFetch, err := handlers.FetchLog(logFolder, logName); err != nil {
 			return nil, err
-		}
-
-		tracelog.InfoLogger.Printf("Download %v to %v\n", logName, logFilePath)
-		err = handlers.DownloadLogTo(logFolder, logName, logFilePath)
-		if err != nil {
-			return nil, err
-		}
-
-		needAbortFetch, err := handlers.ShouldBeAborted(logFilePath)
-		if err != nil {
-			return nil, err
-		}
-		if needAbortFetch {
-			if err = handlers.HandleAbortFetch(logFilePath); err != nil {
+		} else if needAbortFetch {
+			if err = handlers.HandleAbortFetch(logName); err != nil {
 				return nil, err
 			}
-
 			return fetched, nil
 		}
 		fetched = append(fetched, logFile)
@@ -128,18 +113,23 @@ func downloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, handl
 	return fetched, nil
 }
 
-func FetchLogs(folder storage.Folder, startTS time.Time, endTS *time.Time, logFolderPath string, handlers LogFetchHandlers) (fetched []storage.Object, err error) {
+// TODO : unit tests
+func FetchLogs(folder storage.Folder, settings LogFetchSettings, handlers LogFetchHandlers) ([]storage.Object, error) {
+	logFolderPath := settings.GetLogFolderPath()
 	logFolder := folder.GetSubFolder(logFolderPath)
-	logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, endTS)
+	startTS, endTS := settings.GetLogsFetchInterval()
+	logsToFetch, err := GetLogsCoveringInterval(logFolder, startTS, endTS)
 	if err != nil {
 		return nil, err
 	}
 
-	fetched, err = downloadLogFiles(logsToFetch, logFolder, handlers)
+	fetched, err := FetchLogFiles(logsToFetch, logFolder, handlers)
 	if err != nil {
 		return nil, err
 	}
-
+	if err = handlers.AfterFetch(fetched); err != nil {
+		return nil, err
+	}
 	return fetched, nil
 }
 

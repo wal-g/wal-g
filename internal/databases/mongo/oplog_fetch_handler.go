@@ -9,10 +9,13 @@ import (
 	"time"
 )
 
-type OpLogFetchSettings struct{}
+type OpLogFetchSettings struct {
+	startTs time.Time
+	endTS   *time.Time
+}
 
-func (settings OpLogFetchSettings) GetEndTS() (*time.Time, error) {
-	return internal.ParseTS(OplogEndTs)
+func (settings OpLogFetchSettings) GetLogsFetchInterval() (time.Time, *time.Time) {
+	return settings.startTs, settings.endTS
 }
 
 func (settings OpLogFetchSettings) GetDestFolderPath() (string, error) {
@@ -31,8 +34,8 @@ func (handlers OpLogFetchHandlers) HandleAbortFetch(logFilePath string) error {
 	return os.Remove(logFilePath)
 }
 
-func (handlers OpLogFetchHandlers) GetLogFilePath(pathToLog string) (string, error) {
-	oplogFileSubFolder := path.Join(handlers.dstPathFolder, pathToLog)
+func GetLogFilePath(dstPathFolder, pathToLog string) (string, error) {
+	oplogFileSubFolder := path.Join(dstPathFolder, pathToLog)
 	err := os.MkdirAll(oplogFileSubFolder, os.ModePerm)
 	if err != nil {
 		return "", err
@@ -42,34 +45,39 @@ func (handlers OpLogFetchHandlers) GetLogFilePath(pathToLog string) (string, err
 }
 
 // TODO : unit tests
-func (handlers OpLogFetchHandlers) DownloadLogTo(logFolder storage.Folder, logName string, dstLogFilePath string) error {
-	return internal.DownloadWALFileTo(logFolder, logName, dstLogFilePath)
+func (handlers OpLogFetchHandlers) FetchLog(logFolder storage.Folder, logName string) (needAbortFetch bool, err error) {
+	pathToLog, err := GetLogFilePath(handlers.dstPathFolder, logName)
+	if err != nil {
+		return true, nil
+	}
+	return false, internal.DownloadWALFileTo(logFolder, logName, pathToLog)
 }
 
-func (handlers OpLogFetchHandlers) ShouldBeAborted(pathToLog string) (bool, error) {
-	return false, nil
+func (handlers OpLogFetchHandlers) AfterFetch([]storage.Object) error {
+	return nil
 }
 
 // TODO : unit tests
-func FetchLogs(folder storage.Folder, backup *internal.Backup, settings internal.LogFetchSettings) error {
+func FetchLogs(folder storage.Folder, backup *internal.Backup) error {
 	var streamSentinel StreamSentinelDto
-
-	err := internal.FetchStreamSentinel(backup, &streamSentinel)
+	if err := internal.FetchStreamSentinel(backup, &streamSentinel); err != nil {
+		return err
+	}
+	endTS, err := internal.ParseTS(OplogEndTs)
 	if err != nil {
 		return err
 	}
+	settings := OpLogFetchSettings{
+		startTs: streamSentinel.StartLocalTime,
+		endTS:   endTS,
+	}
 
-	endTS, err := settings.GetEndTS()
+	dstPathFolder, err := settings.GetDestFolderPath()
 	if err != nil {
 		return err
 	}
-
-	dstFolder, err := settings.GetDestFolderPath()
-	if err != nil {
-		return err
-	}
-	handlers := OpLogFetchHandlers{dstPathFolder: dstFolder}
-	_, err = internal.FetchLogs(folder, streamSentinel.StartLocalTime, endTS, settings.GetLogFolderPath(), handlers)
+	handlers := OpLogFetchHandlers{dstPathFolder: dstPathFolder}
+	_, err = internal.FetchLogs(folder, settings, handlers)
 	return err
 }
 
@@ -80,5 +88,5 @@ func HandleOplogFetch(folder storage.Folder, backupName string) error {
 	}
 	backup, err := internal.GetBackupByName(backupName, folder)
 	tracelog.ErrorLogger.FatalfOnError("Unable to get backup %+v\n", err)
-	return FetchLogs(folder, backup, OpLogFetchSettings{})
+	return FetchLogs(folder, backup)
 }

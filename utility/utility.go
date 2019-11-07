@@ -39,6 +39,7 @@ const (
 	CopiedBlockMaxSize     = CompressedBlockMaxSize
 	MetadataFileName       = "metadata.json"
 	PathSeparator          = string(os.PathSeparator)
+	Mebibyte               = 1024 * 1024
 )
 
 // Empty is used for channel signaling.

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/ioextensions"
 	"io"
 	"os"
 	"time"
@@ -13,37 +12,41 @@ import (
 const (
 	BinlogMagicOffset     = 4
 	TimestampHeaderLength = 4
+	TotalRequiredLen      = BinlogMagicOffset + TimestampHeaderLength
 )
 
-func parseFirstTimestampFromHeader(fileReadSeekCloser ioextensions.ReadSeekCloser) (int32, error) {
-	defer fileReadSeekCloser.Close()
-
-	if _, err := fileReadSeekCloser.Seek(BinlogMagicOffset, io.SeekStart); err != nil {
-		return 0, errors.Wrapf(err, "Unable to parse header testLogPath from file due %v", err)
-	}
-	headerEventBytes := make([]byte, TimestampHeaderLength)
-	if _, err := fileReadSeekCloser.Read(headerEventBytes); err != nil {
-		return 0, errors.Wrapf(err, "Unable to parse header testLogPath from file due %v", err)
-	}
-
+func bytesToInt(p []byte) (int32, error) {
 	var timestamp int32
-	if err := binary.Read(bytes.NewReader(headerEventBytes), binary.LittleEndian, &timestamp); err != nil {
+	if err := binary.Read(bytes.NewReader(p), binary.LittleEndian, &timestamp); err != nil {
 		return 0, errors.Wrapf(err, "Unable to read header event bytes due %v", err)
 	}
 
 	return timestamp, nil
 }
 
-func parseFromBinlog(filePath string) (time.Time, error) {
+func parseFirstTimestampFromHeader(readSeeker io.Reader) (int32, error) {
+	headerEventBytes := make([]byte, TotalRequiredLen)
+	if _, err := readSeeker.Read(headerEventBytes); err != nil {
+		return 0, errors.Wrapf(err, "Unable to parse header testLogPath from file due %v", err)
+	}
+	return bytesToInt(headerEventBytes[BinlogMagicOffset:])
+}
+
+func int32toTime(timestamp int32) time.Time {
+	return time.Unix(int64(timestamp), 0)
+}
+
+func parseFromBinlog(filePath string) (*time.Time, error) {
 	file, err := os.Open(filePath)
+	defer file.Close()
 	if err != nil {
-		return time.Time{}, err
+		return nil, err
 	}
 
 	timestamp, err := parseFirstTimestampFromHeader(file)
 	if err != nil {
-		return time.Time{}, err
+		return nil, err
 	}
-
-	return time.Unix(int64(timestamp), 0), nil
+	tm := int32toTime(timestamp)
+	return &tm, nil
 }

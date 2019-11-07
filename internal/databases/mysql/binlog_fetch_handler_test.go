@@ -24,21 +24,18 @@ type TestBinlogHandlers struct {
 	endTS          *time.Time
 }
 
-func (t TestBinlogHandlers) HandleAbortFetch(string) error {
+func (t TestBinlogHandlers) FetchLog(storage.Folder, string) (needAbortFetch bool, err error) {
+	tm, _ := parseFirstTimestampFromHeader(t.readSeekCloser)
+
+	return isBinlogCreatedAfterEndTs(time.Unix(int64(tm), 0), t.endTS), nil
+
+}
+
+func (t TestBinlogHandlers) HandleAbortFetch(logFilePath string) error {
 	return nil
 }
 
-func (t TestBinlogHandlers) GetLogFilePath(pathToLog string) (string, error) {
-	return "", nil
-}
-
-func (t TestBinlogHandlers) ShouldBeAborted(pathToLog string) (bool, error) {
-	tm, _ := parseFirstTimestampFromHeader(t.readSeekCloser)
-
-	return binlogIsTooOld(time.Unix(int64(tm), 0), t.endTS), nil
-}
-
-func (t TestBinlogHandlers) DownloadLogTo(logFolder storage.Folder, logName string, dstLogFilePath string) error {
+func (t TestBinlogHandlers) AfterFetch(logs []storage.Object) error {
 	return nil
 }
 
@@ -85,13 +82,18 @@ func TestFetchBinlogs(t *testing.T) {
 	samplePath := "/xxx/"
 	os.Setenv(BinlogDstSetting, samplePath)
 
-	var settings BinlogFetchSettings
 	var handlers TestBinlogHandlers
+
+	settings := BinlogFetchSettings{
+		startTs:   startBinlog.GetLastModified(),
+		endTS:     &cutPoint,
+		needApply: false,
+	}
 
 	handlers.readSeekCloser = getTestReadSeekCloserWithExpectedData(mockController, headersData)
 	handlers.endTS = &cutPoint
 
-	fetched, err := internal.FetchLogs(folder, startBinlog.GetLastModified(), nil, settings.GetLogFolderPath(), handlers)
+	fetched, err := internal.FetchLogs(folder, settings, handlers)
 	assert.NoError(t, err)
 
 	for _, object := range fetched {

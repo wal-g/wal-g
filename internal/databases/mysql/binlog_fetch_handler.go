@@ -13,11 +13,13 @@ import (
 )
 
 type BinlogFetchSettings struct {
-	dt time.Time
+	startTs   time.Time
+	endTS     *time.Time
+	needApply bool
 }
 
-func (settings BinlogFetchSettings) GetEndTS() (*time.Time, error) {
-	return &settings.dt, nil
+func (settings BinlogFetchSettings) GetLogsFetchInterval() (time.Time, *time.Time) {
+	return settings.startTs, settings.endTS
 }
 
 func (settings BinlogFetchSettings) GetDestFolderPath() (string, error) {
@@ -28,54 +30,89 @@ func (settings BinlogFetchSettings) GetLogFolderPath() string {
 	return BinlogPath
 }
 
-type BinlogFetchHandlers struct {
-	dstPathFolder string
-	endTS         *time.Time
+type BinlogFetchHandler struct {
+	settings     BinlogFetchSettings
+	applier      Applier
+	afterFetch   func([]storage.Object) error
+	abortHandler func(string) error
 }
 
-func (handlers BinlogFetchHandlers) HandleAbortFetch(logFilePath string) error {
-	return os.Remove(logFilePath)
+func (handler BinlogFetchHandler) AfterFetch(logs []storage.Object) error {
+	return handler.afterFetch(logs)
 }
 
-func (handlers BinlogFetchHandlers) DownloadLogTo(logFolder storage.Folder, logName string, dstLogFilePath string) error {
-	if err := internal.DownloadWALFileTo(logFolder, logName, dstLogFilePath); err != nil {
-		tracelog.ErrorLogger.Print(err)
+func (handler BinlogFetchHandler) HandleAbortFetch(logFileName string) error {
+	tracelog.InfoLogger.Printf("handling abort fetch over %s", logFileName)
+	return handler.abortHandler(logFileName)
+}
+
+func (handler BinlogFetchHandler) FetchLog(logFolder storage.Folder, logName string) (bool, error) {
+	tracelog.InfoLogger.Printf("fetching log file %s", logName)
+	return handler.applier(logFolder, logName, handler.settings)
+}
+
+var indexFileCreator = func(logsFolderPath string, logs []storage.Object) error {
+	tracelog.InfoLogger.Printf("creating index file %s", logsFolderPath)
+	return createIndexFile(logsFolderPath, logs)
+}
+
+func NewBinlogFetchHandler(settings BinlogFetchSettings) BinlogFetchHandler {
+	if settings.needApply {
+		return BinlogFetchHandler{
+			settings: settings,
+			applier:  StreamApplier,
+			afterFetch: func(objects []storage.Object) error {
+				return nil
+			},
+			abortHandler: func(s string) error {
+				return nil
+			},
+		}
+	}
+	return BinlogFetchHandler{
+		settings: settings,
+		applier:  FSDownloadApplier,
+		afterFetch: func(objects []storage.Object) error {
+			destLogFolderPath, err := settings.GetDestFolderPath()
+			if err != nil {
+				return err
+			}
+			return indexFileCreator(destLogFolderPath, objects)
+		},
+		abortHandler: func(logName string) error {
+			dstPathFolder, err := settings.GetDestFolderPath()
+			if err != nil {
+				return err
+			}
+			return os.Remove(path.Join(dstPathFolder, logName))
+		},
+	}
+}
+
+func configureEndTs(untilDT string) (*time.Time, error) {
+	if untilDT != "" {
+		dt, err := time.Parse(time.RFC3339, untilDT)
+		if err != nil {
+			return nil, err
+		}
+		return &dt, nil
+	}
+	return internal.ParseTS(BinlogEndTsSetting)
+}
+
+func FetchLogs(folder storage.Folder, backupUploadTime time.Time, untilDT string, needApply bool) error {
+	endTS, err := configureEndTs(untilDT)
+	if err != nil {
 		return err
 	}
-	return nil
-}
-
-func (handlers BinlogFetchHandlers) GetLogFilePath(pathToLog string) (string, error) {
-	return path.Join(handlers.dstPathFolder, pathToLog), nil
-}
-
-func (handlers BinlogFetchHandlers) ShouldBeAborted(pathToLog string) (bool, error) {
-	timestamp, err := parseFromBinlog(pathToLog)
-	if err != nil {
-		return false, err
+	settings := BinlogFetchSettings{
+		startTs:   backupUploadTime,
+		endTS:     endTS,
+		needApply: needApply,
 	}
-	return binlogIsTooOld(timestamp, handlers.endTS), nil
-}
-
-func FetchLogs(folder storage.Folder, backupUploadTime time.Time, untilDT string) error {
-	dt, err := time.Parse(time.RFC3339, untilDT)
-	settings := BinlogFetchSettings{dt: dt}
-	endTS, err := settings.GetEndTS()
-
-	dstFolder, err := settings.GetDestFolderPath()
-	if err != nil {
-		return err
-	}
-
-	handlers := BinlogFetchHandlers{dstPathFolder: dstFolder, endTS: endTS}
-
-	fetchedBinlogs, err := internal.FetchLogs(folder, backupUploadTime, nil, settings.GetLogFolderPath(), handlers)
-
-	if err != nil {
-		return err
-	}
-
-	return createIndexFile(dstFolder, fetchedBinlogs)
+	handler := NewBinlogFetchHandler(settings)
+	_, err = internal.FetchLogs(folder, settings, handler)
+	return err
 }
 
 func getBackupUploadTime(folder storage.Folder, backup *internal.Backup) (time.Time, error) {
@@ -100,12 +137,12 @@ func getBackupUploadTime(folder storage.Folder, backup *internal.Backup) (time.T
 	return backupUploadTime, nil
 }
 
-func binlogIsTooOld(binlogTimestamp time.Time, endTS *time.Time) bool {
+func isBinlogCreatedAfterEndTs(binlogTimestamp time.Time, endTS *time.Time) bool {
 	return endTS != nil && binlogTimestamp.After(*endTS)
 }
 
-func createIndexFile(dstFolder string, fetchedBinlogs []storage.Object) error {
-	indexFile, err := os.Create(filepath.Join(dstFolder, "binlogs_order"))
+func createIndexFile(logsFolder string, fetchedBinlogs []storage.Object) error {
+	indexFile, err := os.Create(filepath.Join(logsFolder, "binlogs_order"))
 	if err != nil {
 		return err
 	}
@@ -120,15 +157,11 @@ func createIndexFile(dstFolder string, fetchedBinlogs []storage.Object) error {
 }
 
 func HandleBinlogFetch(folder storage.Folder, backupName string, untilDT string, needApply bool) error {
-	if !internal.FileIsPiped(os.Stdout) {
-		tracelog.ErrorLogger.Fatalf("stdout is a terminal")
-	}
 	backup, err := internal.GetBackupByName(backupName, folder)
 	tracelog.ErrorLogger.FatalfOnError("Unable to get backup %+v\n", err)
 	backupUploadTime, err := getBackupUploadTime(folder, backup)
-
 	if err != nil {
 		return err
 	}
-	return FetchLogs(folder, backupUploadTime, untilDT)
+	return FetchLogs(folder, backupUploadTime, untilDT, needApply)
 }

@@ -42,6 +42,8 @@ const (
 	MongoDBUriSetting            = "MONGODB_URI"
 	OplogArchiveAfterSize        = "OPLOG_ARCHIVE_AFTER_SIZE"
 	OplogArchiveTimeoutSetting   = "OPLOG_ARCHIVE_TIMEOUT"
+	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
+	NameLogApplyCmdPath          = "WALG_LOG_APPLY_COMMAND"
 )
 
 var (
