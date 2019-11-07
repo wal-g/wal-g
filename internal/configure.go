@@ -303,19 +303,39 @@ func GetSentinelUserData() interface{} {
 	return out
 }
 
-func GetNameStreamCreateCmd() []string {
-	dataStr, ok := GetSetting(NameStreamCreateCmd)
-	if !ok || len(dataStr) == 0 {
-		tracelog.ErrorLogger.Fatal("WALG_STREAM_CREATE_COMMAND expected.")
+func getCommandFromEnvAndParse(variableName string) ([]string, error) {
+	dataStr, ok := GetSetting(variableName)
+	if !ok {
+		tracelog.InfoLogger.Printf("command %s not configured", variableName)
+		return []string{}, errors.New("command not configured")
 	}
-	command := strings.Split(dataStr, " ")
-	resultCommand := []string{}
-	for _, argument := range command {
-		if argument != "" {
-			resultCommand = append(resultCommand, argument)
-		}
+	if len(dataStr) == 0 {
+		tracelog.ErrorLogger.Print(variableName + " expected.")
+		return nil, errors.New(variableName + " not configured")
 	}
-	return resultCommand
+	return strings.Fields(dataStr), nil
+}
+
+func GetStreamCreateCmd() []string {
+	// ignore error here explicitly to backward comparability
+	val, _ := getCommandFromEnvAndParse(NameStreamCreateCmd)
+	return val
+}
+
+func GetStreamRestoreCmd() ([]string, error) {
+	val, err := getCommandFromEnvAndParse(NameStreamRestoreCmd)
+	if err != nil {
+		return nil, err
+	}
+	return val, nil
+}
+
+func GetLogApplyCmd() ([]string, error) {
+	val, err := getCommandFromEnvAndParse(NameLogApplyCmdPath)
+	if err != nil {
+		return nil, err
+	}
+	return val, nil
 }
 
 func GetOplogArchiveTimeout() (time.Duration, error) {

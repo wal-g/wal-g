@@ -19,6 +19,10 @@ var backupFetchCmd = &cobra.Command {
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		internal.HandleBackupFetch(folder, args[0], internal.GetStreamFetcher(os.Stdout))
+		if command, err := internal.GetStreamRestoreCmd(); err == nil {
+			err := internal.ApplyCommand(command, nil)
+			tracelog.ErrorLogger.FatalfOnError("failed to fetch backup due %v", err)
+		}
 	},
 }
 

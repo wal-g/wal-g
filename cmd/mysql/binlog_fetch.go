@@ -11,7 +11,7 @@ import (
 const binlogFetchShortDescription = "fetches binlog from storage"
 const sinceFlagShortDescription = "backup name starting from which you want to take binlog"
 const untilFlagShortDescription = "time in RFC3339 for PITR"
-const applyFlagShortDescription = "Apply fetched binlogs (not implemented yet)"
+const applyFlagShortDescription = "Apply fetched binlogs"
 
 var backupName string
 var untilDt string
@@ -24,9 +24,9 @@ var binlogFetchCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
-		tracelog.ErrorLogger.FatalOnError(err)
+		tracelog.ErrorLogger.FatalfOnError("Failed to parse until timestamp " +  untilDt, err)
 		err = mysql.HandleBinlogFetch(folder, backupName, untilDt, apply)
-		tracelog.ErrorLogger.FatalOnError(err)
+		tracelog.ErrorLogger.FatalfOnError("binlog fetch failed", err)
 	},
 }
 

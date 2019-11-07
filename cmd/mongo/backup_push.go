@@ -8,20 +8,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const StreamPushShortDescription = ""
+const BackupPushShortDescription = "Pushes backup to storage"
 
-// streamPushCmd represents the streamPush command
-var streamPushCmd = &cobra.Command{
+// backupPushCmd represents the backupPush command
+var backupPushCmd = &cobra.Command{
 	Use:   "backup-push",
-	Short: StreamPushShortDescription,
+	Short: BackupPushShortDescription,
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
-		command := internal.GetNameStreamCreateCmd()
+		command := internal.GetStreamCreateCmd()
 		mongo.HandleStreamPush(&mongo.Uploader{Uploader: uploader}, command)
 	},
 }
 
 func init() {
-	Cmd.AddCommand(streamPushCmd)
+	Cmd.AddCommand(backupPushCmd)
 }

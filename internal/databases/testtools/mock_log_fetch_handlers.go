@@ -34,36 +34,6 @@ func (m *MockLogFetchSettings) EXPECT() *MockLogFetchSettingsMockRecorder {
 	return m.recorder
 }
 
-// GetEndTS mocks base method
-func (m *MockLogFetchSettings) GetEndTS() (*time.Time, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetEndTS")
-	ret0, _ := ret[0].(*time.Time)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetEndTS indicates an expected call of GetEndTS
-func (mr *MockLogFetchSettingsMockRecorder) GetEndTS() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEndTS", reflect.TypeOf((*MockLogFetchSettings)(nil).GetEndTS))
-}
-
-// GetDestFolderPath mocks base method
-func (m *MockLogFetchSettings) GetDestFolderPath() (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDestFolderPath")
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetDestFolderPath indicates an expected call of GetDestFolderPath
-func (mr *MockLogFetchSettingsMockRecorder) GetDestFolderPath() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDestFolderPath", reflect.TypeOf((*MockLogFetchSettings)(nil).GetDestFolderPath))
-}
-
 // GetLogFolderPath mocks base method
 func (m *MockLogFetchSettings) GetLogFolderPath() string {
 	m.ctrl.T.Helper()
@@ -76,6 +46,21 @@ func (m *MockLogFetchSettings) GetLogFolderPath() string {
 func (mr *MockLogFetchSettingsMockRecorder) GetLogFolderPath() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogFolderPath", reflect.TypeOf((*MockLogFetchSettings)(nil).GetLogFolderPath))
+}
+
+// GetLogsFetchInterval mocks base method
+func (m *MockLogFetchSettings) GetLogsFetchInterval() (time.Time, *time.Time) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLogsFetchInterval")
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].(*time.Time)
+	return ret0, ret1
+}
+
+// GetLogsFetchInterval indicates an expected call of GetLogsFetchInterval
+func (mr *MockLogFetchSettingsMockRecorder) GetLogsFetchInterval() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogsFetchInterval", reflect.TypeOf((*MockLogFetchSettings)(nil).GetLogsFetchInterval))
 }
 
 // MockLogFetchHandlers is a mock of LogFetchHandlers interface
@@ -101,61 +86,45 @@ func (m *MockLogFetchHandlers) EXPECT() *MockLogFetchHandlersMockRecorder {
 	return m.recorder
 }
 
-// GetLogFilePath mocks base method
-func (m *MockLogFetchHandlers) GetLogFilePath(pathToLog string) (string, error) {
+// FetchLog mocks base method
+func (m *MockLogFetchHandlers) FetchLog(logFolder storage.Folder, logName string) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLogFilePath", pathToLog)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetLogFilePath indicates an expected call of GetLogFilePath
-func (mr *MockLogFetchHandlersMockRecorder) GetLogFilePath(pathToLog interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogFilePath", reflect.TypeOf((*MockLogFetchHandlers)(nil).GetLogFilePath), pathToLog)
-}
-
-// ShouldBeAborted mocks base method
-func (m *MockLogFetchHandlers) ShouldBeAborted(pathToLog string) (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ShouldBeAborted", pathToLog)
+	ret := m.ctrl.Call(m, "FetchLog", logFolder, logName)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ShouldBeAborted indicates an expected call of ShouldBeAborted
-func (mr *MockLogFetchHandlersMockRecorder) ShouldBeAborted(pathToLog interface{}) *gomock.Call {
+// FetchLog indicates an expected call of FetchLog
+func (mr *MockLogFetchHandlersMockRecorder) FetchLog(logFolder, logName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldBeAborted", reflect.TypeOf((*MockLogFetchHandlers)(nil).ShouldBeAborted), pathToLog)
-}
-
-// DownloadLogTo mocks base method
-func (m *MockLogFetchHandlers) DownloadLogTo(logFolder storage.Folder, logName, dstLogFilePath string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DownloadLogTo", logFolder, logName, dstLogFilePath)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DownloadLogTo indicates an expected call of DownloadLogTo
-func (mr *MockLogFetchHandlersMockRecorder) DownloadLogTo(logFolder, logName, dstLogFilePath interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DownloadLogTo", reflect.TypeOf((*MockLogFetchHandlers)(nil).DownloadLogTo), logFolder, logName, dstLogFilePath)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FetchLog", reflect.TypeOf((*MockLogFetchHandlers)(nil).FetchLog), logFolder, logName)
 }
 
 // HandleAbortFetch mocks base method
-func (m *MockLogFetchHandlers) HandleAbortFetch(arg0 string) error {
+func (m *MockLogFetchHandlers) HandleAbortFetch(LogName string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HandleAbortFetch", arg0)
+	ret := m.ctrl.Call(m, "HandleAbortFetch", LogName)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // HandleAbortFetch indicates an expected call of HandleAbortFetch
-func (mr *MockLogFetchHandlersMockRecorder) HandleAbortFetch(arg0 interface{}) *gomock.Call {
+func (mr *MockLogFetchHandlersMockRecorder) HandleAbortFetch(LogName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleAbortFetch", reflect.TypeOf((*MockLogFetchHandlers)(nil).HandleAbortFetch), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleAbortFetch", reflect.TypeOf((*MockLogFetchHandlers)(nil).HandleAbortFetch), LogName)
 }
 
+// AfterFetch mocks base method
+func (m *MockLogFetchHandlers) AfterFetch(logs []storage.Object) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AfterFetch", logs)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AfterFetch indicates an expected call of AfterFetch
+func (mr *MockLogFetchHandlersMockRecorder) AfterFetch(logs interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AfterFetch", reflect.TypeOf((*MockLogFetchHandlers)(nil).AfterFetch), logs)
+}

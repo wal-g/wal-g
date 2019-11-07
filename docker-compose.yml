@@ -42,6 +42,7 @@ services:
       &&  mkdir -p /export/mysqlfullbucket
       &&  mkdir -p /export/mysqlbinlogpushbucket
       &&  mkdir -p /export/mysqldeleteendtoendbucket
+      &&  mkdir -p /export/mysqlbinlogapplyuntilbucket
       &&  mkdir -p /export/mongostreampushbucket
       &&  mkdir -p /export/mongooplogpushbucket
       &&  mkdir -p /export/mongodeletebeforebucket
@@ -334,6 +335,8 @@ services:
     build:
       dockerfile: docker/mysql_tests/Dockerfile
       context: .
+    security_opt:
+      - seccomp:unconfined
     image: wal-g/mysql_tests
     container_name: wal-g_mysql_tests
     env_file:

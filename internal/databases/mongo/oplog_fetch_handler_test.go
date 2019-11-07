@@ -57,16 +57,16 @@ func TestFetchOplogs(t *testing.T) {
 	os.Setenv(OplogDst, samplePath)
 
 	settings := mock_internal.NewMockLogFetchSettings(gomock.NewController(t))
-	settings.EXPECT().GetEndTS().Return(&cutPoint, nil)
-	settings.EXPECT().GetDestFolderPath().Return(internal.GetLogsDstSettings(OplogDst)).AnyTimes()
+	settings.EXPECT().GetLogsFetchInterval().Return(gomock.Any(), &cutPoint, nil)
+	settings.EXPECT().GetLogFolderPath().Return(internal.GetLogsDstSettings(OplogDst)).AnyTimes()
 	settings.EXPECT().GetLogFolderPath().Return(OplogPath).AnyTimes()
 
 	handlers := mock_internal.NewMockLogFetchHandlers(gomock.NewController(t))
-	handlers.EXPECT().GetLogFilePath(gomock.Any()).Times(4)
-	handlers.EXPECT().DownloadLogTo(gomock.Any(), gomock.Any(), gomock.Any()).Times(3)
-	handlers.EXPECT().ShouldBeAborted(gomock.Any()).Times(3)
+	handlers.EXPECT().AfterFetch(gomock.Any()).Times(4)
+	handlers.EXPECT().FetchLog(gomock.Any(), gomock.Any()).Times(3)
+	handlers.EXPECT().HandleAbortFetch(gomock.Any()).Times(3)
 
-	fetched, err := internal.FetchLogs(folder, startBinlog.GetLastModified(), &cutPoint, settings.GetLogFolderPath(), handlers)
+	fetched, err := internal.FetchLogs(folder, settings, handlers)
 	assert.NoError(t, err)
 
 	for _, object := range fetched {

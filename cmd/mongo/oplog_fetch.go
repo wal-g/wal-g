@@ -8,7 +8,7 @@ import (
 )
 
 const OplogFetchShortDescription = "Fetches OpLogs from storage"
-const sinceFlagShortDescription  = "backup name starting from which you want to take binlog"
+const SinceFlagShortDescription = "backup name starting from which you want to take binlog"
 
 var backupName string
 
@@ -26,6 +26,6 @@ var oplogFetchCmd = &cobra.Command{
 }
 
 func init() {
-	oplogFetchCmd.PersistentFlags().StringVar(&backupName, "since", "LATEST", sinceFlagShortDescription)
+	oplogFetchCmd.PersistentFlags().StringVar(&backupName, "since", "LATEST", SinceFlagShortDescription)
 	Cmd.AddCommand(oplogFetchCmd)
 }

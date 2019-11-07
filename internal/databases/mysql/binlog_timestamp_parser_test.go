@@ -23,11 +23,11 @@ func TestParseFirstTimestampFromHeader_ParseDataCorrect(t *testing.T) {
 			got, err := parseFromBinlog(tt.testLogPath)
 
 			if err != nil {
-				t.Errorf("ParseFirstTimestampFromHeader(%s) error %v", tt.testLogPath, err)
+				t.Errorf("parseFirstTimestampFromHeader(%s) error %v", tt.testLogPath, err)
 			}
 
-			if got != tt.exp {
-				t.Errorf("ParseFirstTimestampFromHeader(%s) got %v, want %v", tt.testLogPath, got, tt.exp)
+			if *got != tt.exp {
+				t.Errorf("parseFirstTimestampFromHeader(%s) got %v, want %v", tt.testLogPath, got, tt.exp)
 			}
 		})
 	}
