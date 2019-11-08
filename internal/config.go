@@ -97,6 +97,7 @@ var (
 		"OS_REGION_NAME":    true,
 
 		// AWS s3
+		"WALG_S3_PREFIX":              true,
 		"WALE_S3_PREFIX":              true,
 		"AWS_ACCESS_KEY_ID":           true,
 		"AWS_SECRET_ACCESS_KEY":       true,
