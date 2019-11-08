@@ -45,3 +45,12 @@ Feature: MongoDB backups check
     When we delete backups retain 3 via mongodb01
     Then we got 3 backup entries of mongodb01
 
+
+  Scenario: Backup1 restored successfully
+    When we restore #0 backup to mongodb02
+    Then we got same mongodb data at mongodb01 mongodb02
+
+  Scenario: Backup2 restored successfully
+    When we restore #1 backup to mongodb01
+    And we restore #1 backup to mongodb02
+    Then we got same mongodb data at mongodb01 mongodb02

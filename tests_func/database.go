@@ -14,7 +14,7 @@ func SetupDatabase(testContext *TestContextType) {
 		"status":       "vacant",
 		"hostname":     GetVarFromEnvList(testContext.Env, "TARGET_HOST"),
 		"ssh_user":     GetVarFromEnvList(testContext.Env, "TARGET_SSH_USER_USER"),
-		"ssh_password": GetVarFromEnvList(testContext.Env, "TARGET_SSH_USER_PASSWORD"),
+		"ssh_passwoeard": GetVarFromEnvList(testContext.Env, "TARGET_SSH_USER_PASSWORD"),
 		"ssh_port":     GetVarFromEnvList(testContext.Env, "TARGET_SSH_PORT"),
 	})
 	if err != nil {

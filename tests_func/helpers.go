@@ -95,7 +95,8 @@ func callCompose(testContext  *TestContextType, actions []string) {
 		panic(err)
 	}
 	b := buf.Bytes()
-	_ = *(*string)(unsafe.Pointer(&b))
+	log := *(*string)(unsafe.Pointer(&b))
+	fmt.Printf("\n%+v\n", log)
 }
 
 func getNetworkListWithName(testContext *TestContextType, name string) []types.NetworkResource {

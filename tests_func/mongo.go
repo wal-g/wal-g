@@ -145,12 +145,15 @@ func GetBackups(testContext *TestContextType, containerName string) []string {
 	return getBackupNamesFromExecOutput(response)
 }
 
-func MakeBackup(testContext *TestContextType, containerName string, cmdArgs string) string {
-	backupCommand := []string{WalgCliPath, "--config", WalgConfPath, "stream-push" , cmdArgs}
+func MakeBackup(testContext *TestContextType, containerName string, cmdArgs string, creds UserConfiguration) string {
+	uri := fmt.Sprintf("mongodb://%s:%s@%s:%d/", creds.Username, creds.Password, "127.0.0.1", 27018)
+	mongoDumpCommand := []string{"mongodump", fmt.Sprintf("--uri=\"%s\"", uri), "--archive"}
+	backupCommand := []string{"|", WalgCliPath, "--config", WalgConfPath, "stream-push" , cmdArgs}
+	command := strings.Join(append(mongoDumpCommand, backupCommand...), " ")
 	config :=  types.ExecConfig{
 		AttachStderr: true,
 		AttachStdout: true,
-		Cmd: backupCommand,
+		Cmd: []string{"bash", "-c", command},
 	}
 	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(context.Background(), containerName, config)
 	if err != nil {
@@ -170,7 +173,6 @@ func MakeBackup(testContext *TestContextType, containerName string, cmdArgs stri
 
 func DeleteBackup(testContext *TestContextType, containerName string, backupNum int) {
 	backupEntries := GetBackups(testContext, containerName)
-	fmt.Printf("\n\n%+v\n\n", backupEntries)
 	command := []string{WalgCliPath, "--config", WalgConfPath, "delete", "before", backupEntries[backupNum + 1], "--confirm"}
 	RunCommandInContainer(testContext, containerName, command)
 }
@@ -206,6 +208,10 @@ type UserData struct {
 	Row        bson.M
 }
 
+func isSystemCollection(collectionName string) bool {
+	return strings.HasPrefix(collectionName, "system.")
+}
+
 func GetAllUserData(connection *mongo.Client) []UserData {
 	var userData []UserData
 	dbNames, err := connection.ListDatabaseNames(context.Background(), bson.M{})
@@ -218,7 +224,10 @@ func GetAllUserData(connection *mongo.Client) []UserData {
 			panic(err)
 		}
 		for _, table := range tables {
-			if dbName == "local" {
+			if isSystemCollection(table) {
+				continue
+			}
+			if dbName == "local" || dbName == "config" {
 				continue
 			}
 			cur, err := connection.Database(dbName, &options.DatabaseOptions{}).Collection(table).Find(context.Background(), bson.M{})
@@ -276,8 +285,10 @@ func StepEnsureRsInitialized(testContext *TestContextType, containerName string)
 
 func restoreBackupById(testContext *TestContextType, containerName string, backupNum int) {
 	backupEntries := GetBackups(testContext, containerName)
-	command := []string{WalgCliPath, "--config", WalgConfPath, "stream-fetch", backupEntries[backupNum]}
-	RunCommandInContainer(testContext, containerName, command)
+	walgCommand := []string{WalgCliPath, "--config", WalgConfPath, "stream-fetch", backupEntries[len(backupEntries) - backupNum - 1]}
+	mongoCommand := []string{"|", "mongorestore", "--archive", "--uri=\"mongodb://admin:password@127.0.0.1:27018\""}
+	command := strings.Join(append(walgCommand, mongoCommand...), " ")
+	_ = RunCommandInContainer(testContext, containerName, []string{"bash", "-c", command})
 }
 
 func MongoPurgeBackups(testContext *TestContextType, containerName string, keepNumber int) {

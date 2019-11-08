@@ -30,4 +30,5 @@ var Env = map[string]string{
 	"TEST_CLEANUP_DELAY":        "60",
 	"MINIO_ACCESS_KEY": 		 "1NdvGnOio1ad3HFmWNae",
 	"MINIO_SECRET_KEY": 		 "PZK1ZuHiVM7I8vzLfBeEf6yfElqrXrZdNfaPORIM",
+	"WALG_S3_PREFIX": 		     "s3://dbaas/mongodb-backup/test_uuid/test_mongodb",
 }

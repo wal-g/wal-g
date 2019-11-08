@@ -20,11 +20,9 @@ func FeatureContext(s *godog.Suite) {
 	testContext.TestData = make(map[string]map[string]map[string][]DatabaseRecord)
 
 	s.BeforeFeature(func(feature *gherkin.Feature) {
-		fmt.Println("start")
 		SetupStaging(testContext)
 		BuildBase(testContext)
 		Start(testContext)
-		fmt.Println("end")
 	})
 
 	s.AfterFeature(func(feature *gherkin.Feature) {
@@ -163,7 +161,8 @@ func mongodbHasTestMongodbDataTest(arg1, arg2 int) error {
 func weCreateMongodbBackup(arg1 int) error {
 	var cmdArgs = ""
 	containerName := fmt.Sprintf("mongodb%02d", arg1) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
-	currentBackupId := MakeBackup(testContext, containerName, cmdArgs)
+	creds := testContext.Configuration.Projects["mongodb"].Users["admin"]
+	currentBackupId := MakeBackup(testContext, containerName, cmdArgs, creds)
 	testContext.SafeStorage.CreatedBackupNames = append(testContext.SafeStorage.CreatedBackupNames, currentBackupId)
 	return nil
 }
@@ -178,7 +177,7 @@ func weGotBackupEntriesOfMongodb(arg1, arg2 int) error {
 }
 
 func wePutEmptyBackupViaMinio(arg1 int) error {
-	containerName := fmt.Sprintf("mongodb%02d", arg1) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
+	containerName := fmt.Sprintf("minio%02d", arg1) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
 	backupName := "20010203T040506"
 	bucketName := testContext.Configuration.DynamicConfiguration.s3.bucket
 	backupRootDir := testContext.Configuration.DynamicConfiguration.walg.path
