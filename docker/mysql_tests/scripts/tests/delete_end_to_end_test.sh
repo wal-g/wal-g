@@ -22,50 +22,44 @@ for i in $(seq 1 4);
 do
     sysbench /usr/share/sysbench/oltp_insert.lua --table-size=10 run
 
-    if [ $i -eq 3 ];
+    if [ "$i" -eq 3 ];
     then
         sleep 3
         # mv ${MYSQLDATA}/mysql /tmp/mysql
         # mv /tmp/mysql ${MYSQLDATA}/mysql
         # allows to avoid flap in test, because stats in mysql db can be different after dump
 
-        mv ${MYSQLDATA}/mysql /tmp/mysql
+        mv "${MYSQLDATA}"/mysql /tmp/mysql
         mysqldump -u sbtest --all-databases --lock-tables=false | head -n -1  > /tmp/dump_backup
         sleep 3
-        mv /tmp/mysql ${MYSQLDATA}/mysql
+        mv /tmp/mysql "${MYSQLDATA}"/mysql
     fi
 
-    wal-g stream-push
+    wal-g backup-push
 done
 
 wal-g backup-list
 
-target_backup_name=`wal-g backup-list | tail -n 2 | head -n 1 | cut -f 1 -d " "`
+target_backup_name=$(wal-g backup-list | tail -n 2 | head -n 1 | cut -f 1 -d " ")
 
-wal-g delete before FIND_FULL $target_backup_name --confirm
+wal-g delete before FIND_FULL "$target_backup_name" --confirm
+wal-g backup-list && sleep 3
 
-wal-g backup-list
+kill_mysql_and_cleanup_data
 
-sleep 3
-
-pkill -9 mysql
-rm -rf ${MYSQLDATA}
-
-mkdir ${MYSQLDATA}
-wal-g stream-fetch $target_backup_name | xbstream -x -C ${MYSQLDATA}
-chown -R mysql:mysql ${MYSQLDATA}
+mkdir "${MYSQLDATA}"
+wal-g backup-fetch "$target_backup_name" | xbstream -x -C "${MYSQLDATA}"
+chown -R mysql:mysql "${MYSQLDATA}"
 
 sleep 10
 service mysql start || cat /var/log/mysql/error.log
 
 sleep 10
-mv ${MYSQLDATA}/mysql /tmp/mysql
+mv "${MYSQLDATA}"/mysql /tmp/mysql
 mysqldump -u sbtest --all-databases --lock-tables=false | head -n -1 > /tmp/dump_restored
 sleep 10
-mv /tmp/mysql ${MYSQLDATA}/mysql
+mv /tmp/mysql "${MYSQLDATA}"/mysql
 
 diff /tmp/dump_backup /tmp/dump_restored
 
-pkill -9 mysql
-rm -rf ${MYSQLDATA}
-echo "Mysql delete end to end test success!!!!!!"
+kill_mysql_and_cleanup_data

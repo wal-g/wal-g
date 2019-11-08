@@ -34,7 +34,7 @@ To configure the connection string for MySQL. Format ```user:password@host/dbnam
 
 * `WALG_MYSQL_BINLOG_DST`
 
-To place binlogs in the specified directory during stream-fetch.
+To place binlogs in the specified directory during backup-fetch.
 
 * `WALG_MYSQL_BINLOG_SRC`
 
@@ -54,27 +54,29 @@ Usage
 
 WAL-G mysql extension currently supports these commands:
 
-* ``stream-fetch``
+* ``backup-fetch``
 
-When fetching backup's stream, the user should pass in the name of the backup. It returns an encrypted data stream to stdout, you should pass it to a backup tool that you used to create this backup.
+When fetching backup's stream, the user should pass in the directory to store backup and the name of the backup. It returns an encrypted data stream to stdout, you should pass it to a backup tool that you used to create this backup.
 ```
-wal-g stream-fetch example_backup | xbstream -x -C mysql_datadir
+wal-g backup-fetch example_backup | xbstream -x -C mysql_datadir
 ```
 WAL-G can also fetch the latest backup using:
 
 ```
-wal-g stream-fetch LATEST | xbstream -x -C mysql_datadir
+wal-g backup-fetch  LATEST | xbstream -x -C mysql_datadir
 ```
 
-* ``stream-push``
+Both keys are optional. Default value for --since flag is 'LATEST'. If --until flag is not specified, its value will be set to time.Now()
+
+* ``backup-push``
 
 Command for compressing, encrypting and sending backup from stream to storage.
 
 ```
-wal-g stream-push
+wal-g backup-push
 ```
 
-Variable _WALG_STREAM_CREATE_COMMAND_ is required for use stream-push 
+Variable _WALG_STREAM_CREATE_COMMAND_ is required for use backup-push 
 (eg. ```xtrabackup --backup --stream=xbstream --datadir=mysql_datadir```)
 
 * ``binlog-push``
@@ -83,4 +85,9 @@ Command for sending binlogs to storage by CRON.
 
 ```
 wal-g binlog-push
+```
+
+When fetching binlog's, the user should specify the name of the backup starting with which to take an binlog and time in RFC3339 format for PITR
+```
+wal-g binlog-fetch --since "backupname" --until "2006-01-02T15:04:05Z07:00"
 ```

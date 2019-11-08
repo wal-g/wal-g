@@ -15,6 +15,7 @@ RUN curl -s https://packagecloud.io/install/repositories/akopytov/sysbench/scrip
 RUN rm -rf $MYSQLDATA
 
 COPY docker/mysql/init.sql /etc/mysql/init.sql
+COPY docker/mysql/kill_mysql_and_cleanup_data.sh /usr/bin/kill_mysql_and_cleanup_data
 
 # append
 COPY docker/mysql/my.cnf /tmp/my.cnf

@@ -91,7 +91,7 @@ func TestFetchBinlogs(t *testing.T) {
 	handlers.readSeekCloser = getTestReadSeekCloserWithExpectedData(mockController, headersData)
 	handlers.endTS = &cutPoint
 
-	fetched, err := internal.FetchLogs(folder, startBinlog.GetLastModified(), nil, settings, handlers)
+	fetched, err := internal.FetchLogs(folder, startBinlog.GetLastModified(), nil, settings.GetLogFolderPath(), handlers)
 	assert.NoError(t, err)
 
 	for _, object := range fetched {
