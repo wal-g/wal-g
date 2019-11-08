@@ -112,7 +112,6 @@ func GetFileExtension(filePath string) string {
 	return ext
 }
 
-// TODO : unit tests
 func TrimFileExtension(filePath string) string {
 	return strings.TrimSuffix(filePath, "."+GetFileExtension(filePath))
 }
