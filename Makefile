@@ -93,6 +93,14 @@ mongo_integration_test: load_docker_common
 	docker-compose build mongo mongo_tests
 	docker-compose up --exit-code-from mongo_tests mongo_tests
 
+mongo_features:
+	rm -rf ./tests_func/wal-g
+	mkdir -p ./tests_func/wal-g
+	cp -r `ls -A | grep -v "tests_func"` tests_func/wal-g/
+	(cd tests_func/wal-g/ ; git rm --cached tests_func/wal-g ; cd ../..)
+	(cd tests_func ; godog ; cd ..)
+	rm -rf ./tests_func/wal-g
+
 redis_test: install deps redis_build lint unlink_brotli redis_integration_test
 
 redis_build: $(CMD_FILES) $(PKG_FILES)
