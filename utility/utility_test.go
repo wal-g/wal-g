@@ -335,6 +335,38 @@ func TestIsInDirectory_DifferentDirectories(t *testing.T) {
 	assert.False(t, utility.IsInDirectory("/tmp", "/home/ismirn0ff"))
 }
 
+func TestTrimFileExtension_EmptyFilePath(t *testing.T) {
+	assert.Equal(t, "", utility.TrimFileExtension(""))
+}
+
+func TestTrimFileExtension_FileWithoutFilename(t *testing.T) {
+	assert.Equal(t, "", utility.TrimFileExtension(".hidden"))
+}
+
+func TestTrimFileExtension_PathWithoutFilename(t *testing.T) {
+	assert.Equal(t, "path/", utility.TrimFileExtension("path/.hidden"))
+}
+
+func TestTrimFileExtension_FileWithoutExtension(t *testing.T) {
+	assert.Equal(t, "index", utility.TrimFileExtension("index"))
+}
+
+func TestTrimFileExtension_PathWithoutExtension(t *testing.T) {
+	assert.Equal(t, "path/index", utility.TrimFileExtension("path/index"))
+}
+
+func TestTrimFileExtension_FileWithExtension(t *testing.T) {
+	assert.Equal(t, "index", utility.TrimFileExtension("index.js"))
+}
+
+func TestTrimFileExtension_FileWithComplexExtension(t *testing.T) {
+	assert.Equal(t, "index.test", utility.TrimFileExtension("index.test.js"))
+}
+
+func TestTrimFileExtension_PathWithExtension(t *testing.T) {
+	assert.Equal(t, "/path/index", utility.TrimFileExtension("/path/index.js"))
+}
+
 func TestGetSubdirectoryRelativePath_NormalizedDirectory(t *testing.T) {
 	assert.Equal(t, "ismirn0ff/documents", utility.GetSubdirectoryRelativePath("/home/ismirn0ff/documents", "/home"))
 }
