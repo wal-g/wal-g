@@ -1,11 +1,10 @@
 package main
 
 import (
-	//"golang.org/x/crypto/nacl/box"
-	//crypto_rand "crypto/rand"
 	"golang.org/x/crypto/openpgp"
 	"golang.org/x/crypto/openpgp/packet"
 	"math/rand"
+	"time"
 )
 
 func genGPG(name string, email string) *openpgp.Entity {
@@ -16,10 +15,11 @@ func genGPG(name string, email string) *openpgp.Entity {
 	return entity
 }
 
-var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+var letters = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 func RandSeq(n int) string {
-	b := make([]rune, n)
+	rand.Seed(time.Now().UTC().UnixNano())
+	b := make([]byte, n)
 	for i := range b {
 		b[i] = letters[rand.Intn(len(letters))]
 	}

@@ -46,6 +46,18 @@
   revision = "96731eaefa46de6281a0d63253fe4cba1cb27dae"
 
 [[projects]]
+  digest = "1:8eacd45a4fb9c351d20c6050ae91783a844f171e65470fca0380c30a5eabb726"
+  name = "github.com/DATA-DOG/godog"
+  packages = [
+    ".",
+    "colors",
+    "gherkin",
+  ]
+  pruneopts = "UT"
+  revision = "8e7bc15e741c4f6c93c0fc2e797ed869cbc1b8f7"
+  version = "v0.7.13"
+
+[[projects]]
   digest = "1:c99bd4548f502371b98c77534239a514c9a1e715d468af3c108db06186aa692a"
   name = "github.com/DataDog/zstd"
   packages = ["."]
@@ -71,6 +83,14 @@
   pruneopts = "UT"
   revision = "3d677d3262197ee558b85029301eb69b8239f91a"
   version = "v0.4.16"
+
+[[projects]]
+  digest = "1:04457f9f6f3ffc5fea48e71d62f2ca256637dee0a04d710288e27e05c8b41976"
+  name = "github.com/Sirupsen/logrus"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "839c75faf7f98a33d445d181f3018b5c3409a45e"
+  version = "v1.4.2"
 
 [[projects]]
   digest = "1:e1232168b655eb16d14171898f67517677005885e208ba41e3d5bdd12f50965e"
@@ -147,7 +167,7 @@
   version = "v1.1.1"
 
 [[projects]]
-  digest = "1:5d7f88f9487f370e3ae52155465156370fc5798102d811d2d4448d2385ccaf67"
+  digest = "1:4ddc17aeaa82cb18c5f0a25d7c253a10682f518f4b2558a82869506eec223d76"
   name = "github.com/docker/distribution"
   packages = [
     "digestset",
@@ -180,10 +200,19 @@
     "api/types/versions",
     "api/types/volume",
     "client",
-    "errdefs",
+    "pkg/archive",
+    "pkg/fileutils",
+    "pkg/idtools",
+    "pkg/ioutils",
+    "pkg/longpath",
+    "pkg/pools",
+    "pkg/promise",
+    "pkg/system",
+    "pkg/tlsconfig",
   ]
   pruneopts = "UT"
-  revision = "44d39013868abb9fd9b2091dd4f7e1c27f3fb610"
+  revision = "092cba3727bb9b4a2f0e922cd6c0f93ea270e363"
+  version = "v1.13.1"
 
 [[projects]]
   digest = "1:811c86996b1ca46729bad2724d4499014c4b9effd05ef8c71b852aad90deb0ce"
@@ -453,6 +482,16 @@
   pruneopts = "UT"
   revision = "d60099175f88c47cd379c4738d158884749ed235"
   version = "v1.0.1"
+[[projects]]
+  digest = "1:1869683e323ebff2bdf8adcb560f82bf6f8d94019d35099e3403f7df12e9c07e"
+  name = "github.com/opencontainers/runc"
+  packages = [
+    "libcontainer/system",
+    "libcontainer/user",
+  ]
+  pruneopts = "UT"
+  revision = "baf6536d6259209c3edfa2b22237af82942d3dfa"
+  version = "v0.1.1"
 
 [[projects]]
   digest = "1:95741de3af260a92cc5c7f3f3061e85273f5a81b5db20d4bd68da74bd521675e"
@@ -611,6 +650,40 @@
   pruneopts = "UT"
   revision = "ecd376af8972cd9c3e355831c126a7862de6b2b9"
 
+ [[projects]]
+  digest = "1:4a27ce9df1be95b7e15d14f3810a446343978cf397c962089e505c4ed5338861"
+  name = "github.com/wal-g/wal-g"
+  packages = [
+    "cmd/mongo",
+    "cmd/mysql",
+    "cmd/pg",
+    "cmd/redis",
+    "internal",
+    "internal/compression",
+    "internal/compression/brotli",
+    "internal/compression/computils",
+    "internal/compression/lz4",
+    "internal/compression/lzma",
+    "internal/compression/lzo",
+    "internal/compression/zstd",
+    "internal/crypto",
+    "internal/crypto/awskms",
+    "internal/crypto/openpgp",
+    "internal/databases/mongo",
+    "internal/databases/mysql",
+    "internal/databases/redis",
+    "internal/ioextensions",
+    "internal/limited",
+    "internal/walparser",
+    "internal/walparser/parsingutil",
+    "test/mocks",
+    "testtools",
+    "utility",
+  ]
+  pruneopts = "UT"
+  revision = "271f64fa6db2e59df012ff09539594e51de08d4d"
+  version = "v0.2.13"
+
 [[projects]]
   digest = "1:4a27ce9df1be95b7e15d14f3810a446343978cf397c962089e505c4ed5338861"
   name = "github.com/wal-g/wal-g"
@@ -751,6 +824,28 @@
   ]
   pruneopts = "UT"
   revision = "e657309f52e71501f9934566ac06dc5c2f7f11a1"
+
+[[projects]]
+  branch = "master"
+  digest = "1:691f3a202dd569bd0d33b8b16bcb390a479b3c6ccc8ced9cb13085e47030e11a"
+  name = "golang.org/x/exp"
+  packages = [
+    "apidiff",
+    "cmd/apidiff",
+  ]
+  pruneopts = "UT"
+  revision = "ec7cb31e5a562f5e9e31b300128d2f530f55d127"
+
+[[projects]]
+  branch = "master"
+  digest = "1:134674d729e1afbae39eeaa6abcf8e5f3106338f83643394ab5205a020efbd9b"
+  name = "golang.org/x/lint"
+  packages = [
+    ".",
+    "golint",
+  ]
+  pruneopts = "UT"
+  revision = "959b441ac422379a43da2230f62be024250818b0"
 
 [[projects]]
   branch = "master"
@@ -967,6 +1062,7 @@
     "github.com/docker/docker/api/types/filters",
     "github.com/docker/docker/api/types/network",
     "github.com/docker/docker/client",
+    "github.com/docker/docker/pkg/archive",
     "github.com/go-redis/redis",
     "github.com/go-sql-driver/mysql",
     "github.com/golang/mock/gomock",
@@ -1017,7 +1113,9 @@
     "go.mongodb.org/mongo-driver/mongo",
     "go.mongodb.org/mongo-driver/mongo/options",
     "go.mongodb.org/mongo-driver/mongo/readpref",
+    "go.mongodb.org/mongo-driver/x/bsonx",
     "golang.org/x/crypto/openpgp",
+    "golang.org/x/crypto/openpgp/packet",
     "golang.org/x/sync/semaphore",
     "golang.org/x/time/rate",
   ]
