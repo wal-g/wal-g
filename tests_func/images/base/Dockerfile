@@ -5,7 +5,6 @@ ENV DEBIAN_FRONTEND noninteractive
 ENV LANG en_US.utf8 
 
 # Configure apt and locale
-COPY ./config/.walg /home/.walg22.json
 COPY ./config/apt/ /var/lib/dist/config/apt
 RUN mkdir -p /code /config /data/db /tmp/storage
 COPY ./config/.walg /home/.walg.json
