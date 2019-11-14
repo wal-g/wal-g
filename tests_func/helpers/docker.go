@@ -1,4 +1,4 @@
-package main
+package helpers
 
 import (
 	"bytes"
@@ -9,19 +9,19 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
+	. "github.com/wal-g/wal-g/tests_func/utils"
 	"log"
 	"math/rand"
 	"os"
 	"os/exec"
-	"unsafe"
 )
 
 const envDockerMachineName = "DOCKER_MACHINE_NAME"
 const composeFile = "./staging/docker-compose.yml"
 
-func getContainerWithPrefix(containers []types.Container, name string) (*types.Container, error) {
+func GetContainerWithPrefix(containers []types.Container, name string) (*types.Container, error) {
 	for _, container := range containers {
-		if stringInSlice(name, container.Names) {
+		if StringInSlice(name, container.Names) {
 			return &container, nil
 		}
 	}
@@ -34,14 +34,14 @@ func GetDockerContainer(testContext *TestContextType, prefix string) *types.Cont
 	if err != nil {
 		panic(err)
 	}
-	containerWithPrefixPointer, err := getContainerWithPrefix(containers, fmt.Sprintf("/%s", prefix))
+	containerWithPrefixPointer, err := GetContainerWithPrefix(containers, fmt.Sprintf("/%s", prefix))
 	if err != nil {
 		panic(err)
 	}
 	return containerWithPrefixPointer
 }
 
-func getExposedPort(container types.Container, port uint16) (string, uint16) {
+func GetExposedPort(container types.Container, port uint16) (string, uint16) {
 	machineName, hasMachineName := os.LookupEnv(envDockerMachineName)
 	host := "127.0.0.1"
 	if hasMachineName {
@@ -63,7 +63,7 @@ func getExposedPort(container types.Container, port uint16) (string, uint16) {
 	panic("cannot get port")
 }
 
-func callCompose(testContext *TestContextType, actions []string) {
+func CallCompose(testContext *TestContextType, actions []string) {
 	baseArgs := []string{"--file", composeFile, "-p", "test"}
 	baseArgs = append(baseArgs, actions...)
 	cmd := exec.Command("docker-compose", baseArgs...)
@@ -82,9 +82,7 @@ func callCompose(testContext *TestContextType, actions []string) {
 	if err != nil {
 		panic(err)
 	}
-	b := buf.Bytes()
-	log := *(*string)(unsafe.Pointer(&b))
-	fmt.Printf("\n%+v\n", log)
+	fmt.Printf("\n%+v\n", buf.String())
 }
 
 func getNetworkListWithName(testContext *TestContextType, name string) []types.NetworkResource {
@@ -104,7 +102,7 @@ func getNetworkListWithName(testContext *TestContextType, name string) []types.N
 	return result
 }
 
-func createNet(testContext *TestContextType, name string) {
+func CreateNet(testContext *TestContextType, name string) {
 	dockerClient := testContext.DockerClient
 	name = testContext.Configuration.NetworkName
 	if len(getNetworkListWithName(testContext, name)) != 0 {
@@ -152,7 +150,7 @@ type TestContextType struct {
 }
 
 func ShutdownContainers(testContext *TestContextType) {
-	callCompose(testContext, []string{"down", "--rmi", "local", "--remove-orphans"})
+	CallCompose(testContext, []string{"down", "--rmi", "local", "--remove-orphans"})
 }
 
 func ShutdownNetwork(testContext *TestContextType) {

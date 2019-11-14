@@ -1,10 +1,11 @@
-package main
+package helpers
 
 import (
 	"bufio"
 	"context"
 	"fmt"
 	"github.com/docker/docker/api/types"
+	. "github.com/wal-g/wal-g/tests_func/utils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -46,7 +47,7 @@ func EnvDBConnect(testContext *TestContextType, nodeName string) *mongo.Client {
 		panic(err)
 	}
 	dbHost := GetDockerContainer(testContext, nodeName)
-	host, port := getExposedPort(*dbHost, uint16(dbMongoPort))
+	host, port := GetExposedPort(*dbHost, uint16(dbMongoPort))
 	conn := connectHostPort(
 		host,
 		port)
@@ -59,7 +60,7 @@ func EnvDBConnectWithCreds(testContext *TestContextType, nodeName string, creds 
 		panic(err)
 	}
 	dbHost := GetDockerContainer(testContext, nodeName)
-	host, port := getExposedPort(*dbHost, uint16(dbMongoPort))
+	host, port := GetExposedPort(*dbHost, uint16(dbMongoPort))
 	conn := connect(
 		creds.Username,
 		creds.Password,
@@ -280,7 +281,7 @@ func StepEnsureRsInitialized(testContext *TestContextType, containerName string)
 	panic(fmt.Errorf("replset was not initialized: %s", response))
 }
 
-func restoreBackupById(testContext *TestContextType, containerName string, backupNum int) {
+func RestoreBackupById(testContext *TestContextType, containerName string, backupNum int) {
 	WalgCliPath := GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
 	WalgConfPath := GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
 	backupEntries := GetBackups(testContext, containerName)

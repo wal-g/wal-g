@@ -1,4 +1,4 @@
-package main
+package functest
 
 import (
 	"context"
@@ -6,6 +6,9 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
+	. "github.com/wal-g/wal-g/tests_func/config"
+	. "github.com/wal-g/wal-g/tests_func/helpers"
+	. "github.com/wal-g/wal-g/tests_func/utils"
 	"os"
 )
 
@@ -15,11 +18,11 @@ func BuildBase(testContext *TestContextType) {
 	if err != nil {
 		panic(err)
 	}
-	conf := getConfiguration(testContext)
+	conf := GetConfiguration(testContext)
 	opts := types.ImageBuildOptions{
-		Tags: []string{conf.BaseImages["mongodb-backup-base"].tag},
+		Tags: []string{conf.BaseImages["mongodb-backup-base"].Tag},
 	}
-	buildContext, err := archive.TarWithOptions(conf.BaseImages["mongodb-backup-base"].path, &archive.TarOptions{})
+	buildContext, err := archive.TarWithOptions(conf.BaseImages["mongodb-backup-base"].Path, &archive.TarOptions{})
 	if err != nil {
 		panic(err)
 	}
@@ -31,34 +34,34 @@ func BuildBase(testContext *TestContextType) {
 }
 
 func Stop(testContext *TestContextType) {
-	callCompose(testContext, []string{"down", "--rmi", "local", "--remove-orphans"})
+	CallCompose(testContext, []string{"down", "--rmi", "local", "--remove-orphans"})
 }
 
 func Start(testContext *TestContextType) {
-	testContext.Env = mergeEnvs(os.Environ(), testContext.Env)
-	createNet(testContext, GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	testContext.Env = MergeEnvs(os.Environ(), testContext.Env)
+	CreateNet(testContext, GetVarFromEnvList(testContext.Env, "TEST_ID"))
 	fmt.Printf("`docker-compose build` is running\n")
-	callCompose(testContext, []string{"build"})
+	CallCompose(testContext, []string{"build"})
 	fmt.Printf("`docker-compose up --detach --build --force-recreate` is running\n")
-	callCompose(testContext, []string{"up", "--detach", "--build", "--force-recreate"})
+	CallCompose(testContext, []string{"up", "--detach", "--build", "--force-recreate"})
 }
 
 func SetupStaging(testContext *TestContextType) {
-	for key, value := range generateSecrets(testContext) {
+	for key, value := range GenerateSecrets() {
 		Env[key] = value
 	}
 
-	updateFileValues("./staging/images/minio/Dockerfile", map[string]string{
+	UpdateFileValues("./staging/images/minio/Dockerfile", map[string]string{
 		"ENV MINIO_ACCESS_KEY ": Env["MINIO_ACCESS_KEY"],
 		"ENV MINIO_SECRET_KEY ": Env["MINIO_SECRET_KEY"],
 	})
 
-	updateFileValues("./staging/images/base/config/.walg", map[string]string{
+	UpdateFileValues("./staging/images/base/config/.walg", map[string]string{
 		"\"AWS_ACCESS_KEY_ID\": ":     "\"" + Env["MINIO_ACCESS_KEY"] + "\",",
 		"\"AWS_SECRET_ACCESS_KEY\": ": "\"" + Env["MINIO_SECRET_KEY"] + "\",",
 	})
 
-	updateFileValues("./staging/images/mongodb/config/s3cmd.conf", map[string]string{
+	UpdateFileValues("./staging/images/mongodb/config/s3cmd.conf", map[string]string{
 		"access_key = ": Env["MINIO_ACCESS_KEY"],
 		"secret_key = ": Env["MINIO_SECRET_KEY"],
 	})
@@ -85,5 +88,5 @@ func SetupStaging(testContext *TestContextType) {
 		}
 	}
 
-	testContext.Env = getTestEnv(testContext)
+	testContext.Env = GetTestEnv(testContext)
 }
