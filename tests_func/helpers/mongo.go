@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/docker/docker/api/types"
-	. "github.com/wal-g/wal-g/tests_func/utils"
+	u "github.com/wal-g/wal-g/tests_func/utils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -42,7 +42,7 @@ func connect(user string, password string, dbname string, host string, port uint
 }
 
 func EnvDBConnect(testContext *TestContextType, nodeName string) *mongo.Client {
-	dbMongoPort, err := strconv.Atoi(GetVarFromEnvList(testContext.Env, "DB_MONGO_PORT"))
+	dbMongoPort, err := strconv.Atoi(u.GetVarFromEnvList(testContext.Env, "MONGO_EXPOSE_MONGOD"))
 	if err != nil {
 		panic(err)
 	}
@@ -55,7 +55,7 @@ func EnvDBConnect(testContext *TestContextType, nodeName string) *mongo.Client {
 }
 
 func EnvDBConnectWithCreds(testContext *TestContextType, nodeName string, creds UserConfiguration) *mongo.Client {
-	dbMongoPort, err := strconv.Atoi(GetVarFromEnvList(testContext.Env, "DB_MONGO_PORT"))
+	dbMongoPort, err := strconv.Atoi(u.GetVarFromEnvList(testContext.Env, "MONGO_EXPOSE_MONGOD"))
 	if err != nil {
 		panic(err)
 	}
@@ -105,7 +105,7 @@ func generateRecord(rowNum int, strLen int, strPrefix string) DatabaseRecord {
 	return DatabaseRecord{
 		Datetime: time.Now(),
 		IntNum:   rowNum,
-		Str:      strPrefix + RandSeq(strLen),
+		Str:      strPrefix + u.RandSeq(strLen),
 	}
 }
 
@@ -119,8 +119,8 @@ func getBackupNamesFromExecOutput(output string) []string {
 }
 
 func GetBackups(testContext *TestContextType, containerName string) []string {
-	WalgCliPath := GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
+	WalgCliPath := u.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
+	WalgConfPath := u.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
 	backupListCommand := []string{WalgCliPath, "--config", WalgConfPath, "backup-list"}
 	config := types.ExecConfig{
 		AttachStderr: true,
@@ -144,8 +144,8 @@ func GetBackups(testContext *TestContextType, containerName string) []string {
 }
 
 func MakeBackup(testContext *TestContextType, containerName string, cmdArgs string, creds UserConfiguration) string {
-	WalgCliPath := GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
+	WalgCliPath := u.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
+	WalgConfPath := u.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
 	command := strings.Join([]string{WalgCliPath, "--config", WalgConfPath, "backup-push", cmdArgs}, " ")
 	config := types.ExecConfig{
 		AttachStderr: true,
@@ -169,8 +169,8 @@ func MakeBackup(testContext *TestContextType, containerName string, cmdArgs stri
 }
 
 func DeleteBackup(testContext *TestContextType, containerName string, backupNum int) {
-	WalgCliPath := GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
+	WalgCliPath := u.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
+	WalgConfPath := u.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
 	backupEntries := GetBackups(testContext, containerName)
 	command := []string{WalgCliPath, "--config", WalgConfPath, "delete", "before", backupEntries[backupNum+1], "--confirm"}
 	RunCommandInContainer(testContext, containerName, command)
@@ -271,7 +271,12 @@ func StepEnsureRsInitialized(testContext *TestContextType, containerName string)
 			ncmd := []string{"mongo", "--host", "localhost", "--quiet", "--norc", "--port", "27018", "--eval", "rs.initiate()"}
 			_ = RunCommandInContainer(testContext, containerName, ncmd)
 		} else if strings.Contains(response, "Unauthorized") {
-			creds := testContext.Configuration.Projects["mongodb"].Users["admin"]
+			creds := UserConfiguration{
+				Username: u.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_USERNAME"),
+				Password: u.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_PASSWORD"),
+				Dbname:   u.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_DB_NAME"),
+				Roles:    strings.Split(u.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_ROLES"), " "),
+			}
 			connection := EnvDBConnectWithCreds(testContext, containerName, creds)
 			if checkRsInitialized(connection) {
 				return
@@ -282,8 +287,8 @@ func StepEnsureRsInitialized(testContext *TestContextType, containerName string)
 }
 
 func RestoreBackupById(testContext *TestContextType, containerName string, backupNum int) {
-	WalgCliPath := GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
+	WalgCliPath := u.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
+	WalgConfPath := u.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
 	backupEntries := GetBackups(testContext, containerName)
 	walgCommand := []string{WalgCliPath, "--config", WalgConfPath, "backup-fetch", backupEntries[len(backupEntries)-backupNum-1]}
 	mongoCommand := []string{"|", "mongorestore", "--archive", "--uri=\"mongodb://admin:password@127.0.0.1:27018\""}
@@ -292,8 +297,8 @@ func RestoreBackupById(testContext *TestContextType, containerName string, backu
 }
 
 func MongoPurgeBackups(testContext *TestContextType, containerName string, keepNumber int) {
-	WalgCliPath := GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
+	WalgCliPath := u.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
+	WalgConfPath := u.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
 	command := []string{WalgCliPath, "--config", WalgConfPath, "delete", "retain", strconv.Itoa(keepNumber), "--confirm"}
 	_ = RunCommandInContainer(testContext, containerName, command)
 }

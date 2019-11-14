@@ -9,7 +9,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
-	. "github.com/wal-g/wal-g/tests_func/utils"
+	u "github.com/wal-g/wal-g/tests_func/utils"
 	"log"
 	"math/rand"
 	"os"
@@ -21,7 +21,7 @@ const composeFile = "./staging/docker-compose.yml"
 
 func GetContainerWithPrefix(containers []types.Container, name string) (*types.Container, error) {
 	for _, container := range containers {
-		if StringInSlice(name, container.Names) {
+		if u.StringInSlice(name, container.Names) {
 			return &container, nil
 		}
 	}
@@ -104,7 +104,7 @@ func getNetworkListWithName(testContext *TestContextType, name string) []types.N
 
 func CreateNet(testContext *TestContextType, name string) {
 	dockerClient := testContext.DockerClient
-	name = testContext.Configuration.NetworkName
+	name = u.GetVarFromEnvList(testContext.Env, "NETWORK_NAME")
 	if len(getNetworkListWithName(testContext, name)) != 0 {
 		return
 	}
@@ -142,11 +142,10 @@ type SafeStorageType struct {
 }
 
 type TestContextType struct {
-	DockerClient  *client.Client
-	Env           []string
-	SafeStorage   SafeStorageType
-	Configuration ConfigurationType
-	TestData      map[string]map[string]map[string][]DatabaseRecord
+	DockerClient *client.Client
+	Env          []string
+	SafeStorage  SafeStorageType
+	TestData     map[string]map[string]map[string][]DatabaseRecord
 }
 
 func ShutdownContainers(testContext *TestContextType) {
@@ -154,7 +153,7 @@ func ShutdownContainers(testContext *TestContextType) {
 }
 
 func ShutdownNetwork(testContext *TestContextType) {
-	networkName := testContext.Configuration.NetworkName
+	networkName := u.GetVarFromEnvList(testContext.Env, "NETWORK_NAME")
 	err := testContext.DockerClient.NetworkRemove(context.Background(), networkName)
 	if err != nil {
 		panic(err)
