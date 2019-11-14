@@ -93,7 +93,7 @@ mongo_integration_test: load_docker_common
 	docker-compose build mongo mongo_tests
 	docker-compose up --exit-code-from mongo_tests mongo_tests
 
-mongo_features:
+mongo_features: deps 
 	rm -rf ./tests_func/wal-g
 	mkdir -p ./tests_func/wal-g
 	cp -a `ls -A | grep -v "tests_func"` tests_func/wal-g/
