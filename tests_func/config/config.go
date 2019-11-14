@@ -1,4 +1,4 @@
-package main
+package config
 
 var Env = map[string]string{
 	"STAGING_DIR":               "staging",

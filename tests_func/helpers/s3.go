@@ -1,4 +1,4 @@
-package main
+package helpers
 
 import (
 	"fmt"
@@ -9,9 +9,9 @@ import (
 func ConfigureS3(testContext *TestContextType, containerName *types.Container) {
 	var response string
 	for i := 0; i < 100; i++ {
-		bucketName := testContext.Configuration.DynamicConfiguration.s3.bucket
-		accessKeyId := testContext.Configuration.DynamicConfiguration.s3.accessKeyId
-		accessSecretKey := testContext.Configuration.DynamicConfiguration.s3.accessSecretKey
+		bucketName := testContext.Configuration.DynamicConfiguration.S3.Bucket
+		accessKeyId := testContext.Configuration.DynamicConfiguration.S3.accessKeyId
+		accessSecretKey := testContext.Configuration.DynamicConfiguration.S3.accessSecretKey
 
 		command := []string{"mc", "--debug", "config", "host", "add", "local", "http://localhost:9000", accessKeyId, accessSecretKey}
 		response = RunCommandInContainer(testContext, containerName.Names[0], command)
