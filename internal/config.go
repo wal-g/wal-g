@@ -214,7 +214,7 @@ func InitConfig() {
 	// If a config file is found, read it in.
 	err := viper.ReadInConfig()
 	if err == nil {
-		tracelog.InfoLogger.Println("Using config file:", viper.ConfigFileUsed())
+		tracelog.DebugLogger.Println("Using config file:", viper.ConfigFileUsed())
 	}
 
 	// Сheck allowed settings
