@@ -36,7 +36,7 @@ func TestConfigureDeepBucket(t *testing.T) {
 func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer string) {
 	// Test empty environment variables
 	viper.Reset()
-	uploader, err := internal.ConfigureUploader()
+	uploader, err := internal.ConfigureUploader(true)
 	if _, ok := (errors.Cause(err)).(internal.UnconfiguredStorageError); !ok {
 		t.Errorf("upload: Expected error 'UnconfiguredStorageError' but got %s", err)
 	}
@@ -49,19 +49,19 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	viper.Set("WALE_S3_PREFIX", "gs://abc.com")
 	viper.Set("AWS_ENDPOINT", "http://127.0.0.1:9000")
 	viper.Set("AWS_REGION", "")
-	_, err = internal.ConfigureUploader()
+	_, err = internal.ConfigureUploader(true)
 	assert.NoError(t, err)
 	viper.Set("WALE_S3_PREFIX", "test_fail:")
-	_, err = internal.ConfigureUploader()
+	_, err = internal.ConfigureUploader(true)
 	assert.Error(t, err)
 	viper.Set("WALE_S3_PREFIX", bucketPath)
-	uploader, err = internal.ConfigureUploader()
+	uploader, err = internal.ConfigureUploader(true)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedServer, strings.TrimSuffix(uploader.UploadingFolder.GetPath(), "/"))
 	assert.NotNil(t, uploader)
 	assert.NoError(t, err)
 	// Test STANDARD_IA storage class
 	viper.Set("WALG_S3_STORAGE_CLASS", "STANDARD_IA")
-	_, err = internal.ConfigureUploader()
+	_, err = internal.ConfigureUploader(true)
 	assert.NoError(t, err)
 }

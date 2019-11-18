@@ -15,7 +15,7 @@ var streamPushCmd = &cobra.Command{
 	Use:   "backup-push",
 	Short: StreamPushShortDescription,
 	Run: func(cmd *cobra.Command, args []string) {
-		uploader, err := internal.ConfigureUploader()
+		uploader, err := internal.ConfigureUploader(true)
 		tracelog.ErrorLogger.FatalOnError(err)
 		command := internal.GetNameStreamCreateCmd()
 		mongo.HandleStreamPush(&mongo.Uploader{Uploader: uploader}, command)

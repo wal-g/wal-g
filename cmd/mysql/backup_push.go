@@ -14,7 +14,7 @@ var streamPushCmd = &cobra.Command{
 	Use:   "backup-push",
 	Short: StreamPushShortDescription,
 	Run: func(cmd *cobra.Command, args []string) {
-		uploader, err := internal.ConfigureUploader()
+		uploader, err := internal.ConfigureUploader(true)
 		tracelog.ErrorLogger.FatalOnError(err)
 		command := internal.GetNameStreamCreateCmd()
 		mysql.HandleBackupPush(&mysql.Uploader{Uploader: uploader}, command)
