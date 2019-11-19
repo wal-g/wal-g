@@ -73,14 +73,6 @@
   version = "v0.4.14"
 
 [[projects]]
-  digest = "1:6b6d999be55cc0e0704ed0ac4532175f1f71639fbda6d143dc86ac5a5d3bc87f"
-  name = "github.com/Microsoft/hcsshim"
-  packages = ["osversion"]
-  pruneopts = "UT"
-  revision = "f92b8fb9c92e17da496af5a69e3ee13fbe9916e1"
-  version = "v0.8.6"
-
-[[projects]]
   digest = "1:72fff13e105db55c6d4b1acb69216b88d9d3009433f43d7df3488f842b0b6929"
   name = "github.com/RoaringBitmap/roaring"
   packages = ["."]
@@ -147,18 +139,6 @@
   version = "v1.3.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:33d9066d4a56cf6de4e81e37d85758f46ea154e874503cd2a0bf7a8b934fa203"
-  name = "github.com/containerd/continuity"
-  packages = [
-    "fs",
-    "syscallx",
-    "sysx",
-  ]
-  pruneopts = "UT"
-  revision = "75bee3e2ccb6402e3a986ab8bd3b17003fc0fdec"
-
-[[projects]]
   digest = "1:ad8b4e90264438ea13214e2cac5d26fde580dee47c11d5ba66537b6a97e1baee"
   name = "github.com/cyberdelia/lzo"
   packages = ["."]
@@ -188,7 +168,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:91e657c243835368106be2161cefdc3195b4ed11b0955721178e78ea59ff2b54"
+  digest = "1:c16dda46047f70fa41aa1092e09d2316a301e30bc016e03f3402b1681f8cbd67"
   name = "github.com/docker/docker"
   packages = [
     "api",
@@ -209,14 +189,6 @@
     "api/types/volume",
     "client",
     "errdefs",
-    "pkg/archive",
-    "pkg/fileutils",
-    "pkg/idtools",
-    "pkg/ioutils",
-    "pkg/longpath",
-    "pkg/mount",
-    "pkg/pools",
-    "pkg/system",
   ]
   pruneopts = "UT"
   revision = "44d39013868abb9fd9b2091dd4f7e1c27f3fb610"
@@ -494,17 +466,6 @@
   pruneopts = "UT"
   revision = "d60099175f88c47cd379c4738d158884749ed235"
   version = "v1.0.1"
-
-[[projects]]
-  digest = "1:1869683e323ebff2bdf8adcb560f82bf6f8d94019d35099e3403f7df12e9c07e"
-  name = "github.com/opencontainers/runc"
-  packages = [
-    "libcontainer/system",
-    "libcontainer/user",
-  ]
-  pruneopts = "UT"
-  revision = "baf6536d6259209c3edfa2b22237af82942d3dfa"
-  version = "v0.1.1"
 
 [[projects]]
   digest = "1:95741de3af260a92cc5c7f3f3061e85273f5a81b5db20d4bd68da74bd521675e"
@@ -862,12 +823,9 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:d6b0cfc5ae30841c4b116ac589629f56f8add0955a39f11d8c0d06ca67f5b3d5"
+  digest = "1:5e4d81c50cffcb124b899e4f3eabec3930c73532f0096c27f94476728ba03028"
   name = "golang.org/x/sync"
-  packages = [
-    "errgroup",
-    "semaphore",
-  ]
+  packages = ["semaphore"]
   pruneopts = "UT"
   revision = "42b317875d0fa942474b76e1b46a6060d720ae6e"
 
@@ -1104,7 +1062,6 @@
     "github.com/docker/docker/api/types/filters",
     "github.com/docker/docker/api/types/network",
     "github.com/docker/docker/client",
-    "github.com/docker/docker/pkg/archive",
     "github.com/go-redis/redis",
     "github.com/go-sql-driver/mysql",
     "github.com/golang/mock/gomock",

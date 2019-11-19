@@ -1,15 +1,13 @@
 package functest
 
 import (
-	"context"
 	"fmt"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/archive"
-	. "github.com/wal-g/wal-g/tests_func/config"
-	. "github.com/wal-g/wal-g/tests_func/helpers"
-	. "github.com/wal-g/wal-g/tests_func/utils"
+	c "github.com/wal-g/wal-g/tests_func/config"
+	h "github.com/wal-g/wal-g/tests_func/helpers"
+	u "github.com/wal-g/wal-g/tests_func/utils"
 	"os"
+	"os/exec"
 )
 
 func BuildBase(testContext *TestContextType) {
@@ -18,15 +16,10 @@ func BuildBase(testContext *TestContextType) {
 	if err != nil {
 		panic(err)
 	}
-	conf := GetConfiguration(testContext)
-	opts := types.ImageBuildOptions{
-		Tags: []string{conf.BaseImages["mongodb-backup-base"].Tag},
-	}
-	buildContext, err := archive.TarWithOptions(conf.BaseImages["mongodb-backup-base"].Path, &archive.TarOptions{})
-	if err != nil {
-		panic(err)
-	}
-	_, err = testContext.DockerClient.ImageBuild(context.Background(), buildContext, opts)
+	testContext.Env = u.MergeEnvs(testContext.Env, h.GetConfiguration(testContext))
+	cmd := exec.Command("docker", "build", "-t", u.GetVarFromEnvList(testContext.Env, "MONGODB_BACKUP_BASE_TAG"), u.GetVarFromEnvList(testContext.Env, "MONGODB_BACKUP_BASE_PATH"))
+	cmd.Stdout = os.Stdout
+	err = cmd.Run()
 	if err != nil {
 		panic(err)
 	}
