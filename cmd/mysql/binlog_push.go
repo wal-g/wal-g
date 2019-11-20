@@ -16,7 +16,7 @@ var binlogPushCmd = &cobra.Command{
 	Short: binlogPushShortDescription,
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		uploader, err := internal.ConfigureUploader(true)
+		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 		mysql.HandleBinlogPush(&mysql.Uploader{Uploader: uploader})
 	},

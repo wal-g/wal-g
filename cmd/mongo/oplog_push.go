@@ -16,7 +16,7 @@ var oplogPushCmd = &cobra.Command{
 	Short: oplogPushShortDescription,
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		uploader, err := internal.ConfigureUploader(true)
+		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 		mongo.HandleOplogPush(&mongo.Uploader{Uploader: uploader})
 	},
