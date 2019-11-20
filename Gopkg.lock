@@ -254,7 +254,7 @@
   version = "v1.0"
 
 [[projects]]
-  digest = "1:8dfbec76b4834d96c37ba4c4969fc47c9a15e67c5a7eecfa031fbe67dab50429"
+  digest = "1:a0c8d7eac430b194e7fd601224a44e84cc9eefaf174b4de88863f7086e0cc4e8"
   name = "github.com/jackc/pgx"
   packages = [
     ".",
@@ -265,8 +265,8 @@
     "pgtype",
   ]
   pruneopts = "UT"
-  revision = "89f1e6ac7276b61d885db5e5aed6fcbedd1c7e31"
-  version = "v3.2.0"
+  revision = "c73e7d75061bb42b0282945710f344cfe1113d10"
+  version = "v3.6.0"
 
 [[projects]]
   digest = "1:4ef2c452afd1700966b7263f2e6bb8999ea636be18ce4d3960c02cd74b5da4b8"
@@ -518,7 +518,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:ffc7715fff70ae51f8d9dd673dfc0ae89d2c624779e852e7f19ab1330439b1de"
+  digest = "1:cdda0ec7ebe6fe946908f31edf1181050d7a2afc839ffbef7f21b4b2671b38d0"
   name = "golang.org/x/crypto"
   packages = [
     "cast5",
@@ -531,6 +531,7 @@
     "openpgp/errors",
     "openpgp/packet",
     "openpgp/s2k",
+    "pbkdf2",
     "poly1305",
   ]
   pruneopts = "UT"
@@ -612,23 +613,28 @@
   revision = "4d1cda033e0619309c606fc686de3adcf599539e"
 
 [[projects]]
-  digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
+  digest = "1:2b43038ba580394ec711455c92dc9c89f3c29ad758136afe6aef01685ef3b557"
   name = "golang.org/x/text"
   packages = [
+    "cases",
     "collate",
     "collate/build",
+    "internal",
     "internal/colltab",
     "internal/gen",
     "internal/tag",
     "internal/triegen",
     "internal/ucd",
     "language",
+    "runes",
     "secure/bidirule",
+    "secure/precis",
     "transform",
     "unicode/bidi",
     "unicode/cldr",
     "unicode/norm",
     "unicode/rangetable",
+    "width",
   ]
   pruneopts = "UT"
   revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
