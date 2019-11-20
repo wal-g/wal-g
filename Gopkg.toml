@@ -51,7 +51,7 @@
 
 [[constraint]]
   name = "github.com/jackc/pgx"
-  version = "3.2.0"
+  version = "v3.6.0"
 
 [[constraint]]
   name = "github.com/pierrec/lz4"
