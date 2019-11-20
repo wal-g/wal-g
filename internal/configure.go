@@ -195,14 +195,27 @@ func ConfigureArchiveStatusManager() (DataFolder, error) {
 // that a valid session has started; if invalid, returns AWS error
 // and `<nil>` values.
 func ConfigureUploader() (uploader *Uploader, err error) {
-	folder, err := ConfigureFolder()
+	uploader, err = ConfigureMockUploaderWithoutCompressMethod()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure folder")
+		return nil, err
 	}
+
+	folder := uploader.UploadingFolder
+	deltaFileManager := uploader.deltaFileManager
 
 	compressor, err := configureCompressor()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure compression")
+	}
+
+	uploader = NewUploader(compressor, folder, deltaFileManager)
+	return uploader, err
+}
+
+func ConfigureMockUploaderWithoutCompressMethod() (uploader *Uploader, err error) {
+	folder, err := ConfigureFolder()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure folder")
 	}
 
 	useWalDelta, deltaDataFolder, err := configureWalDeltaUsage()
@@ -215,7 +228,7 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
 	}
 
-	uploader = NewUploader(compressor, folder, deltaFileManager)
+	uploader = NewUploader(nil, folder, deltaFileManager)
 	return uploader, err
 }
 
