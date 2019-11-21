@@ -15,26 +15,26 @@ import (
 	"time"
 )
 
-func connectHostPort(host string, port uint16) *mongo.Client {
+func connectHostPort(context context.Context, host string, port uint16) *mongo.Client {
 	uri := fmt.Sprintf("mongodb://%s:%d/?connect=direct", host, port)
 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
 	if err != nil {
 		panic(err)
 	}
-	err = client.Connect(context.Background())
+	err = client.Connect(context)
 	if err != nil {
 		panic(err)
 	}
 	return client
 }
 
-func connect(user string, password string, dbname string, host string, port uint16) *mongo.Client {
+func connect(context context.Context, user string, password string, dbname string, host string, port uint16) *mongo.Client {
 	uri := fmt.Sprintf("mongodb://%s:%s@%s:%d/%s?connect=direct&authMechanism=SCRAM-SHA-1", user, password, host, port, dbname)
 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
 	if err != nil {
 		panic(err)
 	}
-	err = client.Connect(context.Background())
+	err = client.Connect(context)
 	if err != nil {
 		panic(err)
 	}
@@ -49,6 +49,7 @@ func EnvDBConnect(testContext *TestContextType, nodeName string) *mongo.Client {
 	dbHost := GetDockerContainer(testContext, nodeName)
 	host, port := GetExposedPort(*dbHost, uint16(dbMongoPort))
 	conn := connectHostPort(
+		testContext.Context,
 		host,
 		port)
 	return conn
@@ -62,6 +63,7 @@ func EnvDBConnectWithCreds(testContext *TestContextType, nodeName string, creds 
 	dbHost := GetDockerContainer(testContext, nodeName)
 	host, port := GetExposedPort(*dbHost, uint16(dbMongoPort))
 	conn := connect(
+		testContext.Context,
 		creds.Username,
 		creds.Password,
 		creds.Dbname,
@@ -70,7 +72,7 @@ func EnvDBConnectWithCreds(testContext *TestContextType, nodeName string, creds 
 	return conn
 }
 
-func FillWithData(database *mongo.Client, mark string) map[string]map[string][]DatabaseRecord {
+func FillWithData(context context.Context, database *mongo.Client, mark string) map[string]map[string][]DatabaseRecord {
 	var data = make(map[string]map[string][]DatabaseRecord, 0)
 	for i := 1; i <= 2; i++ {
 		dbName := fmt.Sprintf("test_db_%02d", i)
@@ -85,7 +87,7 @@ func FillWithData(database *mongo.Client, mark string) map[string]map[string][]D
 				rows = append(rows, generateRecord(k, 5, mark))
 				irows = append(irows, generateRecord(k, 5, mark))
 			}
-			_, err := database.Database(dbName).Collection(tableName).InsertMany(context.Background(), irows)
+			_, err := database.Database(dbName).Collection(tableName).InsertMany(context, irows)
 			if err != nil {
 				panic(err)
 			}
@@ -127,11 +129,11 @@ func GetBackups(testContext *TestContextType, containerName string) []string {
 		AttachStdout: true,
 		Cmd:          backupListCommand,
 	}
-	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(context.Background(), containerName, config)
+	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(testContext.Context, containerName, config)
 	if err != nil {
 		panic(err)
 	}
-	responseId, err := testContext.DockerClient.ContainerExecAttach(context.Background(), responseIdExecCreate.ID, types.ExecStartCheck{})
+	responseId, err := testContext.DockerClient.ContainerExecAttach(testContext.Context, responseIdExecCreate.ID, types.ExecStartCheck{})
 	if err != nil {
 		panic(err)
 	}
@@ -152,11 +154,11 @@ func MakeBackup(testContext *TestContextType, containerName string, cmdArgs stri
 		AttachStdout: true,
 		Cmd:          []string{"bash", "-c", command},
 	}
-	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(context.Background(), containerName, config)
+	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(testContext.Context, containerName, config)
 	if err != nil {
 		panic(err)
 	}
-	responseId, err := testContext.DockerClient.ContainerExecAttach(context.Background(), responseIdExecCreate.ID, types.ExecStartCheck{})
+	responseId, err := testContext.DockerClient.ContainerExecAttach(testContext.Context, responseIdExecCreate.ID, types.ExecStartCheck{})
 	if err != nil {
 		panic(err)
 	}
@@ -181,11 +183,11 @@ func RunCommandInContainerWithOptions(testContext *TestContextType, containerNam
 	config.AttachStderr = true
 	config.AttachStdout = true
 	config.Cmd = command
-	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(context.Background(), containerName, config)
+	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(testContext.Context, containerName, config)
 	if err != nil {
 		panic(err)
 	}
-	responseId, err := testContext.DockerClient.ContainerExecAttach(context.Background(), responseIdExecCreate.ID, types.ExecStartCheck{})
+	responseId, err := testContext.DockerClient.ContainerExecAttach(testContext.Context, responseIdExecCreate.ID, types.ExecStartCheck{})
 	if err != nil {
 		panic(err)
 	}
@@ -211,14 +213,14 @@ func isSystemCollection(collectionName string) bool {
 	return strings.HasPrefix(collectionName, "system.")
 }
 
-func GetAllUserData(connection *mongo.Client) []UserData {
+func GetAllUserData(context context.Context, connection *mongo.Client) []UserData {
 	var userData []UserData
-	dbNames, err := connection.ListDatabaseNames(context.Background(), bson.M{})
+	dbNames, err := connection.ListDatabaseNames(context, bson.M{})
 	if err != nil {
 		panic(err)
 	}
 	for _, dbName := range dbNames {
-		tables, err := connection.Database(dbName, &options.DatabaseOptions{}).ListCollectionNames(context.Background(), bson.M{})
+		tables, err := connection.Database(dbName, &options.DatabaseOptions{}).ListCollectionNames(context, bson.M{})
 		if err != nil {
 			panic(err)
 		}
@@ -229,11 +231,11 @@ func GetAllUserData(connection *mongo.Client) []UserData {
 			if dbName == "local" || dbName == "config" {
 				continue
 			}
-			cur, err := connection.Database(dbName, &options.DatabaseOptions{}).Collection(table).Find(context.Background(), bson.M{})
+			cur, err := connection.Database(dbName, &options.DatabaseOptions{}).Collection(table).Find(context, bson.M{})
 			if err != nil {
 				panic(err)
 			}
-			for cur.Next(context.Background()) {
+			for cur.Next(context) {
 				var row bson.M
 				err = cur.Decode(&row)
 				if err != nil {
@@ -245,7 +247,7 @@ func GetAllUserData(connection *mongo.Client) []UserData {
 					Row:        row,
 				})
 			}
-			err = cur.Close(context.Background())
+			err = cur.Close(context)
 			if err != nil {
 				panic(err)
 			}
@@ -254,8 +256,8 @@ func GetAllUserData(connection *mongo.Client) []UserData {
 	return userData
 }
 
-func checkRsInitialized(connection *mongo.Client) bool {
-	response := connection.Database("admin").RunCommand(context.Background(), "replSetGetStatus")
+func checkRsInitialized(context context.Context, connection *mongo.Client) bool {
+	response := connection.Database("admin").RunCommand(context, "replSetGetStatus")
 	return response != nil
 }
 
@@ -278,7 +280,7 @@ func StepEnsureRsInitialized(testContext *TestContextType, containerName string)
 				Roles:    strings.Split(u.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_ROLES"), " "),
 			}
 			connection := EnvDBConnectWithCreds(testContext, containerName, creds)
-			if checkRsInitialized(connection) {
+			if checkRsInitialized(testContext.Context, connection) {
 				return
 			}
 		}
