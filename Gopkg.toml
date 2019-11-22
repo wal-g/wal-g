@@ -98,5 +98,5 @@
   name = "github.com/tinsane/tracelog"
 
 [[constraint]]
-  revision = "56a2d8d8a9ecace0881c60f453e257f3bc17f077"
-  name = "github.com/tinsane/storages"
+  revision = "bfd01a51742b12fdc5bf9f170e4c59a681c5bb8e"
+  name = "github.com/wal-g/storages"

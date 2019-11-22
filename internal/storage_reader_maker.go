@@ -1,7 +1,7 @@
 package internal
 
 import (
-	"github.com/tinsane/storages/storage"
+	"github.com/wal-g/storages/storage"
 	"io"
 )
 

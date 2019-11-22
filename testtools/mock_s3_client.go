@@ -5,7 +5,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	walgs3 "github.com/tinsane/storages/s3"
+	walgs3 "github.com/wal-g/storages/s3"
 	"io/ioutil"
 	"strings"
 	"time"

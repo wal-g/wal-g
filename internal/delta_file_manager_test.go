@@ -2,7 +2,7 @@ package internal_test
 
 import (
 	"github.com/stretchr/testify/assert"
-	"github.com/tinsane/storages/memory"
+	"github.com/wal-g/storages/memory"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/testtools"
