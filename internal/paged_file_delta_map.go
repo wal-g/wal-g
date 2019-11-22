@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
-	"github.com/tinsane/storages/storage"
+	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"os"

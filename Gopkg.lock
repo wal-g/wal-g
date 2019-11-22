@@ -441,21 +441,6 @@
   version = "v1.4.0"
 
 [[projects]]
-  digest = "1:d6f4079996bcfa181a3863b17f2cc67c6b569efc7d7bbf6d1d60f9c22a5c5eb9"
-  name = "github.com/tinsane/storages"
-  packages = [
-    "azure",
-    "fs",
-    "gcs",
-    "memory",
-    "s3",
-    "storage",
-    "swift",
-  ]
-  pruneopts = "UT"
-  revision = "56a2d8d8a9ecace0881c60f453e257f3bc17f077"
-
-[[projects]]
   branch = "master"
   digest = "1:2eacf1a31bd965a75061848017e01b30ef66801bdcc334232396693e2b6220d6"
   name = "github.com/tinsane/tracelog"
@@ -482,6 +467,21 @@
   pruneopts = "UT"
   revision = "590df8077fbcb06ad62d7714da06c00e5dd2316d"
   version = "v0.5.5"
+
+[[projects]]
+  digest = "1:8173fc77eee2e7c6fefeb9bcbba14da0ee3562f0cc03d941fa8d209d41cd557a"
+  name = "github.com/wal-g/storages"
+  packages = [
+    "azure",
+    "fs",
+    "gcs",
+    "memory",
+    "s3",
+    "storage",
+    "swift",
+  ]
+  pruneopts = "UT"
+  revision = "bfd01a51742b12fdc5bf9f170e4c59a681c5bb8e"
 
 [[projects]]
   digest = "1:211f9cf21d532e2da93a420426d714af492743f4c602389cb0cd14ec8eebe256"
@@ -838,15 +838,15 @@
     "github.com/spf13/cobra",
     "github.com/spf13/viper",
     "github.com/stretchr/testify/assert",
-    "github.com/tinsane/storages/azure",
-    "github.com/tinsane/storages/fs",
-    "github.com/tinsane/storages/gcs",
-    "github.com/tinsane/storages/memory",
-    "github.com/tinsane/storages/s3",
-    "github.com/tinsane/storages/storage",
-    "github.com/tinsane/storages/swift",
     "github.com/tinsane/tracelog",
     "github.com/ulikunitz/xz/lzma",
+    "github.com/wal-g/storages/azure",
+    "github.com/wal-g/storages/fs",
+    "github.com/wal-g/storages/gcs",
+    "github.com/wal-g/storages/memory",
+    "github.com/wal-g/storages/s3",
+    "github.com/wal-g/storages/storage",
+    "github.com/wal-g/storages/swift",
     "golang.org/x/crypto/openpgp",
     "golang.org/x/sync/semaphore",
     "golang.org/x/time/rate",

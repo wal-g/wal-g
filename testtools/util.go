@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/tinsane/storages/storage"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/utility"
 	"io"
@@ -13,8 +13,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/stretchr/testify/assert"
-	"github.com/tinsane/storages/memory"
-	"github.com/tinsane/storages/s3"
+	"github.com/wal-g/storages/memory"
+	"github.com/wal-g/storages/s3"
 	"github.com/wal-g/wal-g/internal"
 )
 
