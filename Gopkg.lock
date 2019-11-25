@@ -469,7 +469,7 @@
   version = "v0.5.5"
 
 [[projects]]
-  digest = "1:49f2737451169dc4904ad9feba4dc4d19e57896f9d68e900f965565eb08bebc3"
+  digest = "1:313b2f1c48ff2c9212b682bbb94182d2b1f8f088e93073c80f880ea5fa11cc5f"
   name = "github.com/wal-g/storages"
   packages = [
     "azure",
@@ -481,7 +481,7 @@
     "swift",
   ]
   pruneopts = "UT"
-  revision = "12fc1895d5dd5c299ac5f805d7cb86561c86eb1c"
+  revision = "f9b14169c655775a907d388c153a4440a84a0a14"
 
 [[projects]]
   digest = "1:211f9cf21d532e2da93a420426d714af492743f4c602389cb0cd14ec8eebe256"
