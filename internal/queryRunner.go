@@ -94,7 +94,7 @@ func NewPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
 	}
 	err = r.getSystemIdentifier()
 	if err != nil {
-		return nil, err
+		tracelog.WarningLogger.Printf("Couldn't get system identifier because of error: '%v'\n", err)
 	}
 
 	return r, nil
