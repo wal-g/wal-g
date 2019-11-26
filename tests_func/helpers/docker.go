@@ -9,45 +9,43 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
-	u "github.com/wal-g/wal-g/tests_func/utils"
-	"log"
+	testUtils "github.com/wal-g/wal-g/tests_func/utils"
 	"math/rand"
 	"os"
 	"os/exec"
 )
 
 const envDockerMachineName = "DOCKER_MACHINE_NAME"
-const composeFile = "./staging/docker-compose.yml"
 
 func GetContainerWithPrefix(containers []types.Container, name string) (*types.Container, error) {
 	for _, container := range containers {
-		if u.StringInSlice(name, container.Names) {
+		if testUtils.StringInSlice(name, container.Names) {
 			return &container, nil
 		}
 	}
-	return nil, errors.New(fmt.Sprintf("Cannot find container with name %s", name))
+	return nil, errors.New(fmt.Sprintf("cannot find container with name %s", name))
 }
 
-func GetDockerContainer(testContext *TestContextType, prefix string) *types.Container {
+func GetDockerContainer(testContext *TestContextType, prefix string) (*types.Container, error) {
 	dockerClient := testContext.DockerClient
 	containers, err := dockerClient.ContainerList(testContext.Context, types.ContainerListOptions{})
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("error in getting docker container: %w", err)
 	}
 	containerWithPrefixPointer, err := GetContainerWithPrefix(containers, fmt.Sprintf("/%s", prefix))
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("error in getting docker container: %w", err)
 	}
-	return containerWithPrefixPointer
+	return containerWithPrefixPointer, nil
 }
 
-func GetExposedPort(container types.Container, port uint16) (string, uint16) {
+func GetExposedPort(container types.Container, port uint16) (string, uint16, error) {
 	machineName, hasMachineName := os.LookupEnv(envDockerMachineName)
-	host := "127.0.0.1"
+	host := "localhost"
 	if hasMachineName {
 		hostBytes, err := exec.Command("docker-machine", "ip", machineName).Output()
 		if err != nil {
-			panic(err)
+			return "", 0, fmt.Errorf("error in getting exposed port: %w", err)
 		}
 		host = string(hostBytes)
 	}
@@ -57,13 +55,14 @@ func GetExposedPort(container types.Container, port uint16) (string, uint16) {
 			continue
 		}
 		if value.PrivatePort == port {
-			return host, value.PublicPort
+			return host, value.PublicPort, nil
 		}
 	}
-	panic("cannot get port")
+	return "", 0, fmt.Errorf("error in getting exposed port")
 }
 
-func CallCompose(testContext *TestContextType, actions []string) {
+func CallCompose(testContext *TestContextType, actions []string) error {
+	composeFile := testUtils.GetVarFromEnvList(testContext.Env, "COMPOSE_FILE")
 	baseArgs := []string{"--file", composeFile, "-p", "test"}
 	baseArgs = append(baseArgs, actions...)
 	cmd := exec.Command("docker-compose", baseArgs...)
@@ -72,20 +71,21 @@ func CallCompose(testContext *TestContextType, actions []string) {
 	}
 	stdout, err := cmd.StderrPipe()
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("error when calling compose: %w", err)
 	}
 	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("error when calling compose: %w", err)
 	}
 	buf := new(bytes.Buffer)
 	_, err = buf.ReadFrom(stdout)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("error when calling compose: %w", err)
 	}
 	fmt.Printf("\n%+v\n", buf.String())
+	return nil
 }
 
-func getNetworkListWithName(testContext *TestContextType, name string) []types.NetworkResource {
+func getNetworkListWithName(testContext *TestContextType, name string) ([]types.NetworkResource, error) {
 	networkFilters := filters.NewArgs()
 	networkResources, err := testContext.DockerClient.NetworkList(testContext.Context, types.NetworkListOptions{
 		Filters: networkFilters,
@@ -97,16 +97,20 @@ func getNetworkListWithName(testContext *TestContextType, name string) []types.N
 		}
 	}
 	if err != nil {
-		panic(err)
+		return []types.NetworkResource{}, fmt.Errorf("error in getting network list with name: %w", err)
 	}
-	return result
+	return result, nil
 }
 
-func CreateNet(testContext *TestContextType, name string) {
+func CreateNet(testContext *TestContextType, name string) error {
 	dockerClient := testContext.DockerClient
-	name = u.GetVarFromEnvList(testContext.Env, "NETWORK_NAME")
-	if len(getNetworkListWithName(testContext, name)) != 0 {
-		return
+	name = testUtils.GetVarFromEnvList(testContext.Env, "NETWORK_NAME")
+	networkList, err := getNetworkListWithName(testContext, name)
+	if err != nil {
+		return fmt.Errorf("error in creating network: %w", err)
+	}
+	if len(networkList) != 0 {
+		return nil
 	}
 	ipam := &network.IPAM{
 		Config: []network.IPAMConfig{{Subnet: fmt.Sprintf("10.0.%d.0/24", rand.Intn(255))}},
@@ -120,20 +124,25 @@ func CreateNet(testContext *TestContextType, name string) {
 		IPAM:    ipam,
 		Options: netOpts,
 	}
-	_, err := dockerClient.NetworkCreate(testContext.Context, name, config)
+	_, err = dockerClient.NetworkCreate(testContext.Context, name, config)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("error in creating network: %w", err)
 	}
+	return nil
 }
 
-func RemoveNet(testContext *TestContextType, name string) {
-	nets := getNetworkListWithName(testContext, name)
+func RemoveNet(testContext *TestContextType, name string) error {
+	nets, err := getNetworkListWithName(testContext, name)
+	if err != nil {
+		return fmt.Errorf("error im removing network %s: %w", name, err)
+	}
 	for _, net := range nets {
 		err := testContext.DockerClient.NetworkRemove(testContext.Context, net.ID)
 		if err != nil {
 			panic(err)
 		}
 	}
+	return nil
 }
 
 type SafeStorageType struct {
@@ -149,14 +158,15 @@ type TestContextType struct {
 	Context      context.Context
 }
 
-func ShutdownContainers(testContext *TestContextType) {
-	CallCompose(testContext, []string{"down", "--rmi", "local", "--remove-orphans"})
+func ShutdownContainers(testContext *TestContextType) error {
+	return CallCompose(testContext, []string{"down", "--rmi", "local", "--remove-orphans"})
 }
 
-func ShutdownNetwork(testContext *TestContextType) {
-	networkName := u.GetVarFromEnvList(testContext.Env, "NETWORK_NAME")
+func ShutdownNetwork(testContext *TestContextType) error {
+	networkName := testUtils.GetVarFromEnvList(testContext.Env, "NETWORK_NAME")
 	err := testContext.DockerClient.NetworkRemove(testContext.Context, networkName)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("error in shutting down network: %w", err)
 	}
+	return nil
 }
