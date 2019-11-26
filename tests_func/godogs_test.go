@@ -2,6 +2,7 @@ package functest
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/DATA-DOG/godog"
 	"github.com/DATA-DOG/godog/gherkin"
@@ -79,10 +80,48 @@ func FeatureContext(s *godog.Suite) {
 
 }
 
-func mongodbBackupMetadataContainsUserData(arg1, arg2 int, arg3 *gherkin.DocString) error {
+func mongodbBackupMetadataContainsUserData(arg1 int, arg2 int, arg3 *gherkin.DocString) error {
+	//var metadata internalMongo.StreamSentinelDto
+	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", arg1, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	backupList, err := testHelper.GetBackups(testContext, nodeName)
+	if err != nil {
+		return err
+	}
+	if len(backupList)-1-arg2 < 0 {
+		return fmt.Errorf("cannot get %dth backup - there are only %d", arg2, len(backupList))
+	}
+	backup := backupList[len(backupList)-1-arg2]
+	path := fmt.Sprintf("/export/dbaas/mongodb-backup/test_uuid/test_mongodb/basebackups_005/%s_backup_stop_sentinel.json", backup)
+	cmd := []string{"cat", path}
+	jsonString, _ := testHelper.RunCommandInContainer(testContext, fmt.Sprintf("minio01.test_net_%s", testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID")), cmd)
+	jsonString = jsonString[strings.Index(jsonString, "{"):]
+
+	var rawUserData map[string]*json.RawMessage
+	err = json.Unmarshal([]byte(jsonString), &rawUserData)
+	if err != nil {
+		return err
+	}
+
+	var userData map[string]*json.RawMessage
+	err = json.Unmarshal(*rawUserData["UserData"], &userData)
+	if err != nil {
+		return err
+	}
+
+	var labels map[string]string
+	err = json.Unmarshal(*userData["labels"], &labels)
+	if err != nil {
+		return err
+	}
+
+	content := getMakeBackupContentFromDocString(arg3)
+
+	if !reflect.DeepEqual(labels, content["labels"]) {
+		return fmt.Errorf("error: expected labels don't equal to existing in backup")
+	}
+
 	return nil
 }
-
 
 func testMongodbConnect(arg1 int) error {
 	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", arg1, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
@@ -209,7 +248,7 @@ func getMakeBackupContentFromDocString(content *gherkin.DocString) map[string]ma
 			outerKey = strings.Trim(line, " :")
 			res[outerKey] = map[string]string{}
 		} else {
-			values := strings.Split(line, " ")
+			values := strings.Split(strings.Trim(line, " "), " ")
 			innerKey := strings.Trim(values[0], ": ")
 			value := strings.Trim(values[1], ": ")
 			res[outerKey][innerKey] = value
@@ -226,10 +265,10 @@ func createMongodbBackupWithUserData(arg1 int, arg2 *gherkin.DocString) error {
 		var args []string
 		if labels, ok := content["labels"]; ok {
 			for key, value := range labels {
-				args = append(args, fmt.Sprintf("\"%s\": \"%s\"", key, value))
+				args = append(args, fmt.Sprintf(`"%s": "%s"`, key, value))
 			}
 		}
-		envs = append(envs, "WALG_SENTINEL_USER_DATA='{" + strings.Join(args, ", ") + "}'")
+		envs = append(envs, `WALG_SENTINEL_USER_DATA={"labels": {`+strings.Join(args, ", ")+`}}`)
 	}
 	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", arg1, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
 	creds := testHelper.UserConfiguration{
