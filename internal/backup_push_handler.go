@@ -144,7 +144,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 		if *previousBackupSentinelDto.BackupFinishLSN > backupStartLSN {
 			tracelog.ErrorLogger.FatalOnError(NewBackupFromFuture(previousBackupName))
 		}
-		if previousBackupSentinelDto.SystemIdentifier != nil && *systemIdentifier != *previousBackupSentinelDto.SystemIdentifier {
+		if previousBackupSentinelDto.SystemIdentifier != nil && systemIdentifier != nil && *systemIdentifier != *previousBackupSentinelDto.SystemIdentifier {
 
 			tracelog.ErrorLogger.FatalOnError(NewBackupFromOtherBD())
 		}
