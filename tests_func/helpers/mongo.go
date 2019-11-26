@@ -175,6 +175,7 @@ func MakeBackup(testContext *TestContextType, containerName string, cmdArgs stri
 		Cmd:          []string{"bash", "-c", command},
 		Env:		  append(os.Environ(), envs...),
 	}
+	fmt.Print("\n\n\n%+v\n\n\n", config.Env)
 	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(testContext.Context, containerName, config)
 	if err != nil {
 		return "", fmt.Errorf("error in making backup: %v", err)
