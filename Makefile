@@ -146,7 +146,6 @@ deps:
 install:
 	go get -u github.com/golang/dep/cmd/dep
 	go get -u golang.org/x/lint/golint
-	go get -u github.com/DATA-DOG/godog/cmd/godog
 
 unlink_brotli:
 	rm -rf vendor/github.com/google/brotli/*
