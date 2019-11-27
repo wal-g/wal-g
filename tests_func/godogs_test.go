@@ -16,14 +16,18 @@ import (
 	"time"
 )
 
-var testContext = &testHelper.TestContextType{}
+var testContext *testHelper.TestContextType
 
 func FeatureContext(s *godog.Suite) {
-
+	testContext = &testHelper.TestContextType{}
 	testContext.TestData = make(map[string]map[string]map[string][]testHelper.DatabaseRecord)
 	testContext.Context = context.Background()
 
 	s.BeforeFeature(func(feature *gherkin.Feature) {
+		testContext = &testHelper.TestContextType{}
+		testContext.TestData = make(map[string]map[string]map[string][]testHelper.DatabaseRecord)
+		testContext.Context = context.Background()
+
 		err := SetupStaging(testContext)
 		if err != nil {
 			panic(err)
@@ -81,7 +85,6 @@ func FeatureContext(s *godog.Suite) {
 }
 
 func mongodbBackupMetadataContainsUserData(arg1 int, arg2 int, arg3 *gherkin.DocString) error {
-	//var metadata internalMongo.StreamSentinelDto
 	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", arg1, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
 	backupList, err := testHelper.GetBackups(testContext, nodeName)
 	if err != nil {
