@@ -93,13 +93,32 @@ mongo_integration_test: load_docker_common
 	docker-compose build mongo mongo_tests
 	docker-compose up --exit-code-from mongo_tests mongo_tests
 
-mongo_features: install deps mongo_build lint unlink_brotli
+mongo_features_421: install deps mongo_build lint unlink_brotli
 	rm -rf ./tests_func/wal-g
 	mkdir -p ./tests_func/wal-g
 	cp -a `ls -A | grep -v "tests_func"` tests_func/wal-g/
 	(cd tests_func/wal-g/ ; git rm --cached tests_func/wal-g ; cd ../..)
-	(cd tests_func ; MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) godog --stop-on-failure ; cd ..)
+	(cd tests_func ; MONGO_MAJOR=4.2 MONGO_VERSION=4.2.1 godog ; cd ..)
 	rm -rf ./tests_func/wal-g
+
+mongo_features_403: install deps mongo_build lint unlink_brotli
+	rm -rf ./tests_func/wal-g
+	mkdir -p ./tests_func/wal-g
+	cp -a `ls -A | grep -v "tests_func"` tests_func/wal-g/
+	(cd tests_func/wal-g/ ; git rm --cached tests_func/wal-g ; cd ../..)
+	(cd tests_func ; MONGO_MAJOR=4.0 MONGO_VERSION=4.0.3 godog ; cd ..)
+	rm -rf ./tests_func/wal-g
+
+mongo_features_363: install deps mongo_build lint unlink_brotli
+	rm -rf ./tests_func/wal-g
+	mkdir -p ./tests_func/wal-g
+	cp -a `ls -A | grep -v "tests_func"` tests_func/wal-g/
+	(cd tests_func/wal-g/ ; git rm --cached tests_func/wal-g ; cd ../..)
+	(cd tests_func ; MONGO_MAJOR=3.6 MONGO_VERSION=3.6.3 godog ; cd ..)
+	rm -rf ./tests_func/wal-g
+
+mongo_features: mongo_features_363 mongo_features_403 mongo_features_4210
+
 
 redis_test: install deps redis_build lint unlink_brotli redis_integration_test
 
