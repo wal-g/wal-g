@@ -26,17 +26,36 @@ type Logging struct {
 	ErrorLogger ErrorLogger
 }
 
+func DefaultHandleBackupList(folder storage.Folder) {
+	getBackupsFunc := func() ([]BackupTime, error) {
+		return getBackups(folder)
+	}
+	writeBackupListFunc := func (backups []BackupTime) {
+		WriteBackupList(backups, os.Stdout)
+	}
+	logging := Logging{
+		InfoLogger: tracelog.InfoLogger,
+		ErrorLogger: tracelog.ErrorLogger,
+	}
+
+	HandleBackupList(getBackupsFunc, writeBackupListFunc, logging)
+}
+
 // TODO : unit tests
-// HandleBackupList is invoked to perform wal-g backup-list
-func HandleBackupList(folder storage.Folder, logging Logging) {
-	backups, err := getBackups(folder)
+// DefaultHandleBackupList is invoked to perform wal-g backup-list
+func HandleBackupList(
+	getBackupsFunc func() ([]BackupTime, error),
+	writeBackupListFunc func ([]BackupTime),
+	logging Logging,
+) {
+	backups, err := getBackupsFunc()
 	if len(backups) == 0 {
 		logging.InfoLogger.Println("No backups found")
 		return
 	}
 	logging.ErrorLogger.FatalOnError(err)
 
-	WriteBackupList(backups, os.Stdout)
+	writeBackupListFunc(backups)
 }
 
 // TODO : unit tests
