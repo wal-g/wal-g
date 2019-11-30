@@ -25,7 +25,7 @@ var (
 			if pretty || json || detail {
 				internal.HandleBackupListWithFlags(folder, pretty, json, detail)
 			} else {
-				internal.HandleBackupList(folder)
+				internal.DefaultHandleBackupList(folder)
 			}
 		},
 	}
