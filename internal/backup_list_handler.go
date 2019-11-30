@@ -13,15 +13,28 @@ import (
 	"github.com/tinsane/tracelog"
 )
 
+type InfoLogger interface {
+	Println(v ...interface{})
+}
+
+type ErrorLogger interface {
+	FatalOnError(err error)
+}
+
+type Logging struct {
+	InfoLogger InfoLogger
+	ErrorLogger ErrorLogger
+}
+
 // TODO : unit tests
 // HandleBackupList is invoked to perform wal-g backup-list
-func HandleBackupList(folder storage.Folder) {
+func HandleBackupList(folder storage.Folder, logging Logging) {
 	backups, err := getBackups(folder)
 	if len(backups) == 0 {
-		tracelog.InfoLogger.Println("No backups found")
+		logging.InfoLogger.Println("No backups found")
 		return
 	}
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.ErrorLogger.FatalOnError(err)
 
 	WriteBackupList(backups, os.Stdout)
 }
