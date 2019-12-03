@@ -221,14 +221,14 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenNestedDirectoryIsInDirectory(t *testi
 	assert.False(t, actual)
 }
 
-func TestIsDirectoryEmpty_ReturnsError_WhenDirectoryDoesntExist(t *testing.T) {
+func TestIsDirectoryEmpty_ReturnsTrue_WhenDirectoryDoesntExist(t *testing.T) {
 	dir, err := createTempDir("not_empty")
 	if err != nil {
 		t.Fatal(err)
 	}
 	os.Remove(dir)
 
-	_, err = internal.IsDirectoryEmpty(dir)
+	actual, err := internal.IsDirectoryEmpty(dir)
 
-	assert.Error(t, err)
+	assert.True(t, actual)
 }
