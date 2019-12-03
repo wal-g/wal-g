@@ -182,3 +182,53 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenOneFileIsInDirectory(t *testing.T) {
 
 	assert.False(t, actual)
 }
+
+func TestIsDirectoryEmpty_ReturnsFalse_WhenFilesAreInDirectory(t *testing.T) {
+	dir, err := createTempDir("not_empty")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(dir)
+
+	for i := 0; i < 3; i++ {
+		file, err := ioutil.TempFile(dir, "file")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.Remove(file.Name())
+	}
+
+	actual, err := internal.IsDirectoryEmpty(dir)
+
+	assert.False(t, actual)
+}
+
+func TestIsDirectoryEmpty_ReturnsFalse_WhenNestedDirectoryIsInDirectory(t *testing.T) {
+	dir, err := createTempDir("not_empty")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(dir)
+
+	nested, err := ioutil.TempDir(dir, "nested")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(nested)
+
+	actual, err := internal.IsDirectoryEmpty(dir)
+
+	assert.False(t, actual)
+}
+
+func TestIsDirectoryEmpty_ReturnsError_WhenDirectoryDoesntExists(t *testing.T) {
+	dir, err := createTempDir("not_empty")
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Remove(dir)
+
+	_, err = internal.IsDirectoryEmpty(dir)
+
+	assert.Error(t, err)
+}
