@@ -10,8 +10,8 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-// MarkBackup marks a backup as permanent or impermanent
-func MarkBackup(uploader *Uploader, folder storage.Folder, backupName string, toPermanent bool) {
+// markBackup marks a backup as permanent or impermanent
+func markBackup(uploader *Uploader, folder storage.Folder, backupName string, toPermanent bool) {
 	tracelog.InfoLogger.Printf("Retrieving previous related backups to be marked: toPermanent=%t", toPermanent)
 	metadataToUpload, err := GetMarkedBackupMetadataToUpload(folder, backupName, toPermanent)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get previous backups: %v", err)
@@ -35,7 +35,7 @@ func GetMarkedBackupMetadataToUpload(
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 
 	backup := NewBackup(baseBackupFolder, backupName)
-	meta, err := backup.FetchMeta()
+	meta, err := backup.fetchMeta()
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func getMarkedPermanentBackupMetadata(baseBackupFolder storage.Folder, backupNam
 		return nil, err
 	}
 
-	meta, err := backup.FetchMeta()
+	meta, err := backup.fetchMeta()
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string
 	// retrieve current backup meta
 	backup := NewBackup(baseBackupFolder, backupName)
 
-	meta, err := backup.FetchMeta()
+	meta, err := backup.fetchMeta()
 	if err != nil {
 		return nil, err
 	}

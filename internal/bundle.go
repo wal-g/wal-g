@@ -13,8 +13,8 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
-	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
@@ -94,26 +94,26 @@ func NewBundle(archiveDirectory string, crypter crypto.Crypter, incrementFromLsn
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
 		Files:              &sync.Map{},
-		TablespaceSpec:     NewTablespaceSpec(archiveDirectory),
+		TablespaceSpec:     newTablespaceSpec(archiveDirectory),
 	}
 }
 
-func (bundle *Bundle) GetFileRelPath(fileAbsPath string) string {
+func (bundle *Bundle) getFileRelPath(fileAbsPath string) string {
 	return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.ArchiveDirectory)
 }
 
-func (bundle *Bundle) GetFiles() *sync.Map { return bundle.Files }
+func (bundle *Bundle) getFiles() *sync.Map { return bundle.Files }
 
 func (bundle *Bundle) StartQueue() error {
 	if bundle.started {
 		panic("Trying to start already started Queue")
 	}
 	var err error
-	bundle.parallelTarballs, err = GetMaxUploadDiskConcurrency()
+	bundle.parallelTarballs, err = getMaxUploadDiskConcurrency()
 	if err != nil {
 		return err
 	}
-	bundle.maxUploadQueue, err = GetMaxUploadQueue()
+	bundle.maxUploadQueue, err = getMaxUploadQueue()
 	if err != nil {
 		return err
 	}
@@ -230,17 +230,17 @@ func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
 }
 
 // TODO : unit tests
-// StartBackup starts a non-exclusive base backup immediately. When finishing the backup,
+// startBackup starts a non-exclusive base backup immediately. When finishing the backup,
 // `backup_label` and `tablespace_map` contents are not immediately written to
 // a file but returned instead. Returns empty string and an error if backup
 // fails.
-func (bundle *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName string, lsn uint64, version int, dataDir string, systemIdentifier *uint64, err error) {
+func (bundle *Bundle) startBackup(conn *pgx.Conn, backup string) (backupName string, lsn uint64, version int, dataDir string, systemIdentifier *uint64, err error) {
 	var name, lsnStr string
-	queryRunner, err := NewPgQueryRunner(conn)
+	queryRunner, err := newPgQueryRunner(conn)
 	if err != nil {
-		return "", 0, 0, "", nil, errors.Wrap(err, "StartBackup: Failed to build query runner.")
+		return "", 0, 0, "", nil, errors.Wrap(err, "startBackup: Failed to build query runner.")
 	}
-	name, lsnStr, bundle.Replica, dataDir, err = queryRunner.StartBackup(backup)
+	name, lsnStr, bundle.Replica, dataDir, err = queryRunner.startBackup(backup)
 
 	if err != nil {
 		return "", 0, queryRunner.Version, "", queryRunner.SystemIdentifier, err
@@ -278,11 +278,11 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 		return errors.Wrap(err, "HandleWalkedFSObject: walk failed")
 	}
 
-	path, err = bundle.TablespaceSpec.MakeTablespaceSymlinkPath(path)
+	path, err = bundle.TablespaceSpec.makeTablespaceSymlinkPath(path)
 	if err != nil {
 		return fmt.Errorf("Could not make symlink path for location %s. %v\n", path, err)
 	}
-	isSymlink, err := bundle.TablespaceSpec.IsTablespaceSymlink(path)
+	isSymlink, err := bundle.TablespaceSpec.isTablespaceSymlink(path)
 	if err != nil {
 		return fmt.Errorf("Could not check whether path %s is symlink or not. %v\n", path, err)
 	}
@@ -303,7 +303,7 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 				if err != nil {
 					return fmt.Errorf("Could not read symlink for tablespace %v\n", err)
 				}
-				bundle.TablespaceSpec.AddTablespace(symlinkName, actualPath)
+				bundle.TablespaceSpec.addTablespace(symlinkName, actualPath)
 				err = filepath.Walk(actualPath, bundle.HandleWalkedFSObject)
 				if err != nil {
 					return fmt.Errorf("Could not walk tablespace symlink tree error %v\n", err)
@@ -345,7 +345,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 		return errors.Wrap(err, "handleTar: could not grab header info")
 	}
 
-	fileInfoHeader.Name = bundle.GetFileRelPath(path)
+	fileInfoHeader.Name = bundle.getFileRelPath(path)
 	tracelog.DebugLogger.Println(fileInfoHeader.Name)
 
 	if !excluded && info.Mode().IsRegular() {
@@ -361,7 +361,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 		if wasInBase && (time.Equal(baseFile.MTime)) {
 			// File was not changed since previous backup
 			tracelog.DebugLogger.Println("Skipped due to unchanged modification time")
-			bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time})
+			bundle.getFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time})
 			return nil
 		}
 
@@ -413,7 +413,7 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 		return errors.Wrap(err, "UploadPgControl: failed to grab header info")
 	}
 
-	fileInfoHeader.Name = bundle.GetFileRelPath(path)
+	fileInfoHeader.Name = bundle.getFileRelPath(path)
 	tracelog.InfoLogger.Println(fileInfoHeader.Name)
 
 	err = tarWriter.WriteHeader(fileInfoHeader) // TODO : what happens in case of irregular pg_control?
@@ -446,21 +446,21 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 }
 
 // TODO : unit tests
-// UploadLabelFiles creates the `backup_label` and `tablespace_map` files by stopping the backup
+// uploadLabelFiles creates the `backup_label` and `tablespace_map` files by stopping the backup
 // and uploads them to S3.
-func (bundle *Bundle) UploadLabelFiles(conn *pgx.Conn) (uint64, error) {
-	queryRunner, err := NewPgQueryRunner(conn)
+func (bundle *Bundle) uploadLabelFiles(conn *pgx.Conn) (uint64, error) {
+	queryRunner, err := newPgQueryRunner(conn)
 	if err != nil {
-		return 0, errors.Wrap(err, "UploadLabelFiles: Failed to build query runner.")
+		return 0, errors.Wrap(err, "uploadLabelFiles: Failed to build query runner.")
 	}
-	label, offsetMap, lsnStr, err := queryRunner.StopBackup()
+	label, offsetMap, lsnStr, err := queryRunner.stopBackup()
 	if err != nil {
-		return 0, errors.Wrap(err, "UploadLabelFiles: failed to stop backup")
+		return 0, errors.Wrap(err, "uploadLabelFiles: failed to stop backup")
 	}
 
 	lsn, err := pgx.ParseLSN(lsnStr)
 	if err != nil {
-		return 0, errors.Wrap(err, "UploadLabelFiles: failed to parse finish LSN")
+		return 0, errors.Wrap(err, "uploadLabelFiles: failed to parse finish LSN")
 	}
 
 	if queryRunner.Version < 90600 {
@@ -480,7 +480,7 @@ func (bundle *Bundle) UploadLabelFiles(conn *pgx.Conn) (uint64, error) {
 
 	_, err = PackFileTo(tarBall, labelHeader, strings.NewReader(label))
 	if err != nil {
-		return 0, errors.Wrapf(err, "UploadLabelFiles: failed to put %s to tar", labelHeader.Name)
+		return 0, errors.Wrapf(err, "uploadLabelFiles: failed to put %s to tar", labelHeader.Name)
 	}
 	tracelog.InfoLogger.Println(labelHeader.Name)
 
@@ -493,13 +493,13 @@ func (bundle *Bundle) UploadLabelFiles(conn *pgx.Conn) (uint64, error) {
 
 	_, err = PackFileTo(tarBall, offsetMapHeader, strings.NewReader(offsetMap))
 	if err != nil {
-		return 0, errors.Wrapf(err, "UploadLabelFiles: failed to put %s to tar", offsetMapHeader.Name)
+		return 0, errors.Wrapf(err, "uploadLabelFiles: failed to put %s to tar", offsetMapHeader.Name)
 	}
 	tracelog.InfoLogger.Println(offsetMapHeader.Name)
 
 	err = tarBall.CloseTar()
 	if err != nil {
-		return 0, errors.Wrap(err, "UploadLabelFiles: failed to close tarball")
+		return 0, errors.Wrap(err, "uploadLabelFiles: failed to close tarball")
 	}
 
 	return lsn, nil
@@ -513,7 +513,7 @@ func (bundle *Bundle) getDeltaBitmapFor(filePath string) (*roaring.Bitmap, error
 }
 
 func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uint64) error {
-	deltaMap, err := GetDeltaMap(folder, bundle.Timeline, *bundle.IncrementFromLsn, backupStartLSN)
+	deltaMap, err := getDeltaMap(folder, bundle.Timeline, *bundle.IncrementFromLsn, backupStartLSN)
 	if err != nil {
 		return err
 	}
@@ -529,7 +529,7 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 	if isIncremented {
 		bitmap, err := bundle.getDeltaBitmapFor(path)
 		if _, ok := err.(NoBitmapFoundError); ok { // this file has changed after the start of backup, so just skip it
-			bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: info.ModTime()})
+			bundle.getFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: info.ModTime()})
 			return nil
 		} else if err != nil {
 			return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
@@ -563,7 +563,7 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 	}
 	defer utility.LoggedClose(fileReader, "")
 
-	bundle.GetFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: false, IsIncremented: isIncremented, MTime: info.ModTime()})
+	bundle.getFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: false, IsIncremented: isIncremented, MTime: info.ModTime()})
 
 	packedFileSize, err := PackFileTo(tarBall, fileInfoHeader, fileReader)
 	if err != nil {

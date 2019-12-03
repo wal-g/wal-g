@@ -85,11 +85,11 @@ func extractOne(tarInterpreter TarInterpreter, source io.Reader) error {
 // TODO : unit tests
 // Ensures that file extension is valid. Any subsequent behavior
 // depends on file type.
-func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter crypto.Crypter) error {
+func decryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter crypto.Crypter) error {
 	readCloser, err := readerMaker.Reader()
 
 	if err != nil {
-		return errors.Wrap(err, "DecryptAndDecompressTar: failed to create new reader")
+		return errors.Wrap(err, "decryptAndDecompressTar: failed to create new reader")
 	}
 	defer utility.LoggedClose(readCloser, "")
 
@@ -97,7 +97,7 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 		var reader io.Reader
 		reader, err = crypter.Decrypt(readCloser)
 		if err != nil {
-			return errors.Wrap(err, "DecryptAndDecompressTar: decrypt failed")
+			return errors.Wrap(err, "decryptAndDecompressTar: decrypt failed")
 		}
 		readCloser = ioextensions.ReadCascadeCloser{
 			Reader: reader,
@@ -111,12 +111,12 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 			continue
 		}
 		err = decompressor.Decompress(writer, readCloser)
-		return errors.Wrapf(err, "DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?", decompressor.FileExtension())
+		return errors.Wrapf(err, "decryptAndDecompressTar: %v decompress failed. Is archive encrypted?", decompressor.FileExtension())
 	}
 	switch fileExtension {
 	case "tar":
 		_, err = io.Copy(writer, readCloser)
-		return errors.Wrap(err, "DecryptAndDecompressTar: tar extract failed")
+		return errors.Wrap(err, "decryptAndDecompressTar: tar extract failed")
 	case "nop":
 	case "lzo":
 		return NewUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
@@ -138,7 +138,7 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 
 	retrier := NewExponentialRetrier(MinExtractRetryWait, MaxExtractRetryWait)
 	// Set maximum number of goroutines spun off by ExtractAll
-	downloadingConcurrency, err := GetMaxDownloadConcurrency()
+	downloadingConcurrency, err := getMaxDownloadConcurrency()
 	if err != nil {
 		return err
 	}
@@ -149,7 +149,7 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 			downloadingConcurrency /= 2
 		} else if len(failed) == len(currentRun) {
 			return errors.Errorf("failed to extract files:\n%s\n",
-				strings.Join(ReaderMakersToFilePaths(failed), "\n"))
+				strings.Join(readerMakersToFilePaths(failed), "\n"))
 		}
 		currentRun = failed
 		if len(failed) > 0 {
@@ -173,7 +173,7 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 		extractingReader, pipeWriter := io.Pipe()
 		decompressingWriter := &EmptyWriteIgnorer{pipeWriter}
 		go func() {
-			err := DecryptAndDecompressTar(decompressingWriter, fileClosure, crypter)
+			err := decryptAndDecompressTar(decompressingWriter, fileClosure, crypter)
 			utility.LoggedClose(decompressingWriter, "")
 			tracelog.InfoLogger.Printf("Finished decompression of %s", fileClosure.Path())
 			if err != nil {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
-	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"os"
 	"path"
@@ -131,9 +131,9 @@ func GetRelFileNodeFrom(filePath string) (*walparser.RelFileNode, error) {
 	}
 }
 
-func (deltaMap *PagedFileDeltaMap) GetLocationsFromDeltas(folder storage.Folder, timeline uint32, first, last DeltaNo) error {
-	for deltaNo := first; deltaNo < last; deltaNo = deltaNo.Next() {
-		filename := deltaNo.GetFilename(timeline)
+func (deltaMap *PagedFileDeltaMap) getLocationsFromDeltas(folder storage.Folder, timeline uint32, first, last DeltaNo) error {
+	for deltaNo := first; deltaNo < last; deltaNo = deltaNo.next() {
+		filename := deltaNo.getFilename(timeline)
 		deltaFile, err := getDeltaFile(folder, filename)
 		if err != nil {
 			return err
@@ -144,7 +144,7 @@ func (deltaMap *PagedFileDeltaMap) GetLocationsFromDeltas(folder storage.Folder,
 	return nil
 }
 
-func (deltaMap *PagedFileDeltaMap) GetLocationsFromWals(folder storage.Folder, timeline uint32, first, last WalSegmentNo, walParser *walparser.WalParser) error {
+func (deltaMap *PagedFileDeltaMap) getLocationsFromWals(folder storage.Folder, timeline uint32, first, last WalSegmentNo, walParser *walparser.WalParser) error {
 	for walSegmentNo := first; walSegmentNo < last; walSegmentNo = walSegmentNo.Next() {
 		filename := walSegmentNo.GetFilename(timeline)
 		err := deltaMap.getLocationsFromWal(folder, filename, walParser)

@@ -47,14 +47,14 @@ func NewDeltaFileManager(dataFolder DataFolder) *DeltaFileManager {
 		if !ok {
 			return nil, NewWrongTypeError("string")
 		}
-		return manager.LoadPartFile(partFilename)
+		return manager.loadPartFile(partFilename)
 	})
 	manager.DeltaFileWriters = NewLazyCache(func(deltaFilenameInterface interface{}) (deltaFileWriter interface{}, err error) {
 		deltaFilename, ok := deltaFilenameInterface.(string)
 		if !ok {
 			return nil, NewWrongTypeError("string")
 		}
-		return manager.LoadDeltaFileWriter(deltaFilename)
+		return manager.loadDeltaFileWriter(deltaFilename)
 	})
 	manager.canceledWaiter.Add(1)
 	go manager.collectCanceledDeltaFiles()
@@ -70,7 +70,7 @@ func (manager *DeltaFileManager) GetBlockLocationConsumer(deltaFilename string) 
 }
 
 // TODO : unit tests
-func (manager *DeltaFileManager) LoadDeltaFileWriter(deltaFilename string) (deltaFileWriter *DeltaFileChanWriter, err error) {
+func (manager *DeltaFileManager) loadDeltaFileWriter(deltaFilename string) (deltaFileWriter *DeltaFileChanWriter, err error) {
 	physicalDeltaFile, err := manager.dataFolder.OpenReadonlyFile(deltaFilename)
 	var deltaFile *DeltaFile
 	if err != nil {
@@ -104,7 +104,7 @@ func (manager *DeltaFileManager) GetPartFile(deltaFilename string) (*WalPartFile
 }
 
 // TODO : unit tests
-func (manager *DeltaFileManager) LoadPartFile(partFilename string) (*WalPartFile, error) {
+func (manager *DeltaFileManager) loadPartFile(partFilename string) (*WalPartFile, error) {
 	physicalPartFile, err := manager.dataFolder.OpenReadonlyFile(partFilename)
 	var partFile *WalPartFile
 	if err != nil {

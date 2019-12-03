@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/jedib0t/go-pretty/table"
-	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
 )
 
 // TODO : unit tests
@@ -42,7 +42,7 @@ func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, de
 			err = WriteAsJson(backupDetails, os.Stdout, pretty)
 			tracelog.ErrorLogger.FatalOnError(err)
 		} else if pretty {
-			WritePrettyBackupListDetails(backupDetails, os.Stdout)
+			writePrettyBackupListDetails(backupDetails, os.Stdout)
 		} else {
 			WriteBackupListDetails(backupDetails, os.Stdout)
 		}
@@ -65,7 +65,7 @@ func getBackupDetails(folder storage.Folder, backups []BackupTime) ([]BackupDeta
 		if err != nil {
 			return nil, err
 		} else {
-			metaData, err := backup.FetchMeta()
+			metaData, err := backup.fetchMeta()
 			if err != nil {
 				return nil, err
 			}
@@ -109,7 +109,7 @@ func WritePrettyBackupList(backups []BackupTime, output io.Writer) {
 }
 
 // TODO : unit tests
-func WritePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
+func writePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
 	writer := table.NewWriter()
 	writer.SetOutputMirror(output)
 	defer writer.Render()

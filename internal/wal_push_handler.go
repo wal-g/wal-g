@@ -16,7 +16,7 @@ type CantOverwriteWalFileError struct {
 	error
 }
 
-func NewCantOverwriteWalFileError(walFilePath string) CantOverwriteWalFileError {
+func newCantOverwriteWalFileError(walFilePath string) CantOverwriteWalFileError {
 	return CantOverwriteWalFileError{errors.Errorf("WAL file '%s' already archived, contents differ, unable to overwrite", walFilePath)}
 }
 
@@ -38,7 +38,7 @@ func HandleWALPush(uploader *Uploader, walFilePath string) {
 
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
 
-	concurrency, err := GetMaxUploadConcurrency()
+	concurrency, err := getMaxUploadConcurrency()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	preventWalOverwrite := viper.GetBool(PreventWalOverwriteSetting)
@@ -51,7 +51,7 @@ func HandleWALPush(uploader *Uploader, walFilePath string) {
 
 	bgUploader.Stop()
 	if uploader.getUseWalDelta() {
-		uploader.deltaFileManager.FlushFiles(uploader.Clone())
+		uploader.deltaFileManager.FlushFiles(uploader.clone())
 	}
 } //
 
@@ -95,7 +95,7 @@ func checkWALOverwrite(uploader *Uploader, walFilePath string) (overwriteAttempt
 	}
 
 	if !bytes.Equal(archived, localBytes) {
-		return true, NewCantOverwriteWalFileError(walFilePath)
+		return true, newCantOverwriteWalFileError(walFilePath)
 	} else {
 		tracelog.InfoLogger.Printf("WAL file '%s' already archived with equal content, skipping", walFilePath)
 		return true, nil

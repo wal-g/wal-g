@@ -68,7 +68,7 @@ func TestTar(t *testing.T) {
 //	assert.NoError(t, err)
 //	defer utility.LoggedClose(result, "")
 //	var crypter internal.OpenPGPCrypter
-//	err = internal.DecryptAndDecompressTar(result, readerMaker, &crypter)
+//	err = internal.decryptAndDecompressTar(result, readerMaker, &crypter)
 //	assert.NoError(t, err)
 //}
 

@@ -336,7 +336,7 @@ func TestWalk(t *testing.T) {
 		ArchiveDirectory: data,
 		TarSizeThreshold: int64(10),
 		Files:            &sync.Map{},
-		TablespaceSpec:   internal.NewTablespaceSpec(data),
+		TablespaceSpec:   internal.newTablespaceSpec(data),
 	}
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
 	size := int64(0)
@@ -368,7 +368,7 @@ func TestWalk(t *testing.T) {
 	err = bundle.UploadPgControl("lz4")
 	assert.NoError(t, err)
 
-	// err = bundle.UploadLabelFiles("backup", "table")
+	// err = bundle.uploadLabelFiles("backup", "table")
 	// if err != nil {
 	// 	t.Errorf("walk: Sentinel expected to succeed but got %+v\n", err)
 	// }

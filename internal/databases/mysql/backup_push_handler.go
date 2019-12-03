@@ -20,7 +20,7 @@ func HandleBackupPush(uploader *Uploader, command []string) {
 }
 
 // TODO : unit tests
-// UploadFile compresses a file and uploads it.
+// uploadFile compresses a file and uploads it.
 func (uploader *Uploader) UploadStream(db *sql.DB, stream io.Reader) error {
 	binlogStart := getMySQLCurrentBinlogFile(db)
 	tracelog.DebugLogger.Println("Binlog start file", binlogStart)

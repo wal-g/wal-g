@@ -41,7 +41,7 @@ const (
 	PathSeparator          = string(os.PathSeparator)
 )
 
-// Empty is used for channel signaling.
+// empty is used for channel signaling.
 type Empty struct{}
 
 func Min(a, b int) int {

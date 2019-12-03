@@ -48,12 +48,12 @@ type PgQueryRunner struct {
 	SystemIdentifier *uint64
 }
 
-// BuildGetVersion formats a query to retrieve PostgreSQL numeric version
-func (queryRunner *PgQueryRunner) BuildGetVersion() string {
+// buildGetVersion formats a query to retrieve PostgreSQL numeric version
+func (queryRunner *PgQueryRunner) buildGetVersion() string {
 	return "select (current_setting('server_version_num'))::int"
 }
 
-// BuildStartBackup formats a query that starts backup according to server features and version
+// buildStartBackup formats a query that starts backup according to server features and version
 func (queryRunner *PgQueryRunner) BuildStartBackup() (string, error) {
 	// TODO: rewrite queries for older versions to remove pg_is_in_recovery()
 	// where pg_start_backup() will fail on standby anyway
@@ -85,8 +85,8 @@ func (queryRunner *PgQueryRunner) BuildStopBackup() (string, error) {
 	}
 }
 
-// NewPgQueryRunner builds QueryRunner from available connection
-func NewPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
+// newPgQueryRunner builds QueryRunner from available connection
+func newPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
 	r := &PgQueryRunner{connection: conn}
 	err := r.getVersion()
 	if err != nil {
@@ -100,72 +100,72 @@ func NewPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
 	return r, nil
 }
 
-func (queryRunner *PgQueryRunner) BuildGetSystemIdentifier() string {
+func (queryRunner *PgQueryRunner) buildGetSystemIdentifier() string {
 	return "select system_identifier from pg_control_system();"
 }
 
 // Retrieve PostgreSQL numeric version
 func (queryRunner *PgQueryRunner) getVersion() (err error) {
 	conn := queryRunner.connection
-	err = conn.QueryRow(queryRunner.BuildGetVersion()).Scan(&queryRunner.Version)
+	err = conn.QueryRow(queryRunner.buildGetVersion()).Scan(&queryRunner.Version)
 	return errors.Wrap(err, "GetVersion: getting Postgres version failed")
 }
 
 func (queryRunner *PgQueryRunner) getSystemIdentifier() (err error) {
 	conn := queryRunner.connection
-	err = conn.QueryRow(queryRunner.BuildGetSystemIdentifier()).Scan(&queryRunner.SystemIdentifier)
+	err = conn.QueryRow(queryRunner.buildGetSystemIdentifier()).Scan(&queryRunner.SystemIdentifier)
 	return errors.Wrap(err, "System Identifier: getting identifier of DB failed")
 }
 
-// StartBackup informs the database that we are starting copy of cluster contents
-func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string, lsnString string, inRecovery bool, dataDir string, err error) {
+// startBackup informs the database that we are starting copy of cluster contents
+func (queryRunner *PgQueryRunner) startBackup(backup string) (backupName string, lsnString string, inRecovery bool, dataDir string, err error) {
 	tracelog.InfoLogger.Println("Calling pg_start_backup()")
 	startBackupQuery, err := queryRunner.BuildStartBackup()
 	conn := queryRunner.connection
 	if err != nil {
-		return "", "", false, "", errors.Wrap(err, "QueryRunner StartBackup: Building start backup query failed")
+		return "", "", false, "", errors.Wrap(err, "QueryRunner startBackup: Building start backup query failed")
 	}
 
 	if err = conn.QueryRow(startBackupQuery, backup).Scan(&backupName, &lsnString, &inRecovery); err != nil {
-		return "", "", false, "", errors.Wrap(err, "QueryRunner StartBackup: pg_start_backup() failed")
+		return "", "", false, "", errors.Wrap(err, "QueryRunner startBackup: pg_start_backup() failed")
 	}
 
 	if err = conn.QueryRow("show data_directory").Scan(&dataDir); err != nil {
-		return "", "", false, "", errors.Wrap(err, "QueryRunner StartBackup: show data_directory failed")
+		return "", "", false, "", errors.Wrap(err, "QueryRunner startBackup: show data_directory failed")
 	}
 
 	return backupName, lsnString, inRecovery, dataDir, nil
 }
 
-// StopBackup informs the database that copy is over
-func (queryRunner *PgQueryRunner) StopBackup() (label string, offsetMap string, lsnStr string, err error) {
+// stopBackup informs the database that copy is over
+func (queryRunner *PgQueryRunner) stopBackup() (label string, offsetMap string, lsnStr string, err error) {
 	tracelog.InfoLogger.Println("Calling pg_stop_backup()")
 	conn := queryRunner.connection
 
 	tx, err := conn.Begin()
 	if err != nil {
-		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: transaction begin failed")
+		return "", "", "", errors.Wrap(err, "QueryRunner stopBackup: transaction begin failed")
 	}
 	defer tx.Rollback()
 
 	_, err = tx.Exec("SET statement_timeout=0;")
 	if err != nil {
-		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: failed setting statement timeout in transaction")
+		return "", "", "", errors.Wrap(err, "QueryRunner stopBackup: failed setting statement timeout in transaction")
 	}
 
 	stopBackupQuery, err := queryRunner.BuildStopBackup()
 	if err != nil {
-		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: Building stop backup query failed")
+		return "", "", "", errors.Wrap(err, "QueryRunner stopBackup: Building stop backup query failed")
 	}
 
 	err = tx.QueryRow(stopBackupQuery).Scan(&label, &offsetMap, &lsnStr)
 	if err != nil {
-		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: stop backup failed")
+		return "", "", "", errors.Wrap(err, "QueryRunner stopBackup: stop backup failed")
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: commit failed")
+		return "", "", "", errors.Wrap(err, "QueryRunner stopBackup: commit failed")
 	}
 
 	return label, offsetMap, lsnStr, nil

@@ -6,16 +6,16 @@ import (
 	"github.com/tinsane/tracelog"
 )
 
-// Connect establishes a connection to postgres using
+// connect establishes a connection to postgres using
 // a UNIX socket. Must export PGHOST and run with `sudo -E -u postgres`.
 // If PGHOST is not set or if the connection fails, an error is returned
 // and the connection is `<nil>`.
 //
 // Example: PGHOST=/var/run/postgresql or PGHOST=10.0.0.1
-func Connect() (*pgx.Conn, error) {
+func connect() (*pgx.Conn, error) {
 	config, err := pgx.ParseEnvLibpq()
 	if err != nil {
-		return nil, errors.Wrap(err, "Connect: unable to read environment variables")
+		return nil, errors.Wrap(err, "connect: unable to read environment variables")
 	}
 
 	conn, err := pgx.Connect(config)
@@ -29,7 +29,7 @@ func Connect() (*pgx.Conn, error) {
 		}
 
 		if err != nil {
-			return nil, errors.Wrap(err, "Connect: postgres connection failed")
+			return nil, errors.Wrap(err, "connect: postgres connection failed")
 		}
 	}
 
@@ -39,7 +39,7 @@ func Connect() (*pgx.Conn, error) {
 	err = conn.QueryRow("show archive_mode").Scan(&archiveMode)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "Connect: postgres archive_mode test failed")
+		return nil, errors.Wrap(err, "connect: postgres archive_mode test failed")
 	}
 
 	if archiveMode != "on" && archiveMode != "always" {
@@ -50,7 +50,7 @@ func Connect() (*pgx.Conn, error) {
 		err = conn.QueryRow("show archive_command").Scan(&archiveCommand)
 
 		if err != nil {
-			return nil, errors.Wrap(err, "Connect: postgres archive_mode test failed")
+			return nil, errors.Wrap(err, "connect: postgres archive_mode test failed")
 		}
 
 		if len(archiveCommand) == 0 || archiveCommand == "(disabled)" {

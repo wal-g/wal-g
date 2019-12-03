@@ -6,7 +6,7 @@ import (
 
 type WalSegmentNo uint64
 
-func NewWalSegmentNo(lsn uint64) WalSegmentNo {
+func newWalSegmentNo(lsn uint64) WalSegmentNo {
 	return WalSegmentNo(lsn / WalSegmentSize)
 }
 

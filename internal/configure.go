@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/awskms"
@@ -92,15 +92,15 @@ func (err UnmarshallingError) Error() string {
 }
 
 // TODO : unit tests
-func ConfigureLimiters() {
+func configureLimiters() {
 	if viper.IsSet(DiskRateLimitSetting) {
 		diskLimit := viper.GetInt64(DiskRateLimitSetting)
-		DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
+		DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+DefaultDataBurstRateLimit)) // add 8 pages to possible bursts
 	}
 
 	if viper.IsSet(NetworkRateLimitSetting) {
 		netLimit := viper.GetInt64(NetworkRateLimitSetting)
-		NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
+		NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+DefaultDataBurstRateLimit)) // add 8 pages to possible bursts
 	}
 }
 
@@ -108,7 +108,7 @@ func ConfigureLimiters() {
 func ConfigureFolder() (storage.Folder, error) {
 	skippedPrefixes := make([]string, 0)
 	for _, adapter := range StorageAdapters {
-		prefix, ok := GetWaleCompatibleSetting(adapter.prefixName)
+		prefix, ok := getWaleCompatibleSetting(adapter.prefixName)
 		if !ok {
 			skippedPrefixes = append(skippedPrefixes, "WALG_"+adapter.prefixName)
 			continue
@@ -155,7 +155,7 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err
 		return
 	}
 	dataFolderPath := GetDataFolderPath()
-	deltaDataFolder, err = NewDiskDataFolder(dataFolderPath)
+	deltaDataFolder, err = newDiskDataFolder(dataFolderPath)
 	if err != nil {
 		useWalDelta = false
 		tracelog.WarningLogger.Printf("can't use wal delta feature because can't open delta data folder '%s'"+
@@ -175,7 +175,7 @@ func configureCompressor() (compression.Compressor, error) {
 }
 
 // TODO : unit tests
-func ConfigureLogging() error {
+func configureLogging() error {
 	if viper.IsSet(LogLevelSetting) {
 		return tracelog.UpdateLogLevel(viper.GetString(LogLevelSetting))
 	}
@@ -188,7 +188,7 @@ func getArchiveDataFolderPath() string {
 
 // TODO : unit tests
 func ConfigureArchiveStatusManager() (DataFolder, error) {
-	return NewDiskDataFolder(getArchiveDataFolderPath())
+	return newDiskDataFolder(getArchiveDataFolderPath())
 }
 
 // ConfigureUploader connects to storage and creates an uploader. It makes sure
@@ -249,7 +249,7 @@ func ConfigureCrypter() crypto.Crypter {
 		return openpgp.CrypterFromKeyPath(viper.GetString(PgpKeyPathSetting), loadPassphrase)
 	}
 
-	if keyRingID, ok := GetWaleCompatibleSetting(GpgKeyIDSetting); ok {
+	if keyRingID, ok := getWaleCompatibleSetting(GpgKeyIDSetting); ok {
 		tracelog.WarningLogger.Printf(DeprecatedExternalGpgMessage)
 		return openpgp.CrypterFromKeyRingID(keyRingID, loadPassphrase)
 	}
@@ -261,21 +261,21 @@ func ConfigureCrypter() crypto.Crypter {
 	return nil
 }
 
-func GetMaxDownloadConcurrency() (int, error) {
+func getMaxDownloadConcurrency() (int, error) {
 	return GetMaxConcurrency(DownloadConcurrencySetting)
 }
 
-func GetMaxUploadConcurrency() (int, error) {
+func getMaxUploadConcurrency() (int, error) {
 	return GetMaxConcurrency(UploadConcurrencySetting)
 }
 
 // This setting is intentionally undocumented in README. Effectively, this configures how many prepared tar Files there
 // may be in uploading state during backup-push.
-func GetMaxUploadQueue() (int, error) {
+func getMaxUploadQueue() (int, error) {
 	return GetMaxConcurrency(UploadQueueSetting)
 }
 
-func GetMaxUploadDiskConcurrency() (int, error) {
+func getMaxUploadDiskConcurrency() (int, error) {
 	return GetMaxConcurrency(UploadDiskConcurrencySetting)
 }
 

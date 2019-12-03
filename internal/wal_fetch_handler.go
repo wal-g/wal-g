@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
@@ -24,7 +24,7 @@ type InvalidWalFileMagicError struct {
 	error
 }
 
-func NewInvalidWalFileMagicError() InvalidWalFileMagicError {
+func newInvalidWalFileMagicError() InvalidWalFileMagicError {
 	return InvalidWalFileMagicError{errors.New("WAL-G: WAL file magic is invalid ")}
 }
 
@@ -36,7 +36,7 @@ type ArchiveNonExistenceError struct {
 	error
 }
 
-func NewArchiveNonExistenceError(archiveName string) ArchiveNonExistenceError {
+func newArchiveNonExistenceError(archiveName string) ArchiveNonExistenceError {
 	return ArchiveNonExistenceError{errors.Errorf("Archive '%s' does not exist.\n", archiveName)}
 }
 
@@ -54,7 +54,7 @@ func HandleWALFetch(folder storage.Folder, walFileName string, location string, 
 		defer forkPrefetch(walFileName, location)
 	}
 
-	_, _, running, prefetched := GetPrefetchLocations(path.Dir(location), walFileName)
+	_, _, running, prefetched := getPrefetchLocations(path.Dir(location), walFileName)
 	seenSize := int64(-1)
 
 	for {
@@ -116,7 +116,7 @@ func checkWALFileMagic(prefetched string) error {
 		return err
 	}
 	if binary.LittleEndian.Uint32(magic) < 0xD061 {
-		return NewInvalidWalFileMagicError()
+		return newInvalidWalFileMagicError()
 	}
 
 	return nil
@@ -238,7 +238,7 @@ func DownloadAndDecompressWALFile(folder storage.Folder, walFileName string) (io
 		}()
 		return reader, nil
 	}
-	return nil, NewArchiveNonExistenceError(walFileName)
+	return nil, newArchiveNonExistenceError(walFileName)
 }
 
 // TODO : unit tests

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -61,8 +61,8 @@ func (uploader *Uploader) finish() {
 	}
 }
 
-// Clone creates similar Uploader with new WaitGroup
-func (uploader *Uploader) Clone() *Uploader {
+// clone creates similar Uploader with new WaitGroup
+func (uploader *Uploader) clone() *Uploader {
 	return &Uploader{
 		uploader.UploadingFolder,
 		uploader.Compressor,
@@ -95,7 +95,7 @@ func (uploader *Uploader) UploadWalFile(file NamedReader) error {
 }
 
 // TODO : unit tests
-// UploadFile compresses a file and uploads it.
+// uploadFile compresses a file and uploads it.
 func (uploader *Uploader) UploadFile(file NamedReader) error {
 	compressedFile := CompressAndEncrypt(file, uploader.Compressor, ConfigureCrypter())
 	dstPath := utility.SanitizePath(filepath.Base(file.Name()) + "." + uploader.Compressor.FileExtension())

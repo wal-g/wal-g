@@ -62,7 +62,7 @@ func getWalFilename(lsn uint64, conn *pgx.Conn) (walFilename string, timeline ui
 		return "", 0, err
 	}
 
-	walSegmentNo := NewWalSegmentNo(lsn - 1)
+	walSegmentNo := newWalSegmentNo(lsn - 1)
 
 	return walSegmentNo.GetFilename(timeline), timeline, nil
 }
@@ -117,7 +117,7 @@ func GetNextWalFilename(name string) (string, error) {
 	return formatWALFileName(uint32(timelineId), logSegNo), nil
 }
 
-func ShouldPrefault(name string) (lsn uint64, shouldPrefault bool, timelineId uint32, err error) {
+func shouldPrefault(name string) (lsn uint64, shouldPrefault bool, timelineId uint32, err error) {
 	timelineId, logSegNo, err := ParseWALFilename(name)
 	if err != nil {
 		return 0, false, 0, err
