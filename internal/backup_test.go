@@ -183,7 +183,7 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenOneFileIsInDirectory(t *testing.T) {
 	assert.False(t, actual)
 }
 
-func TestIsDirectoryEmpty_ReturnsFalse_WhenFilesAreInDirectory(t *testing.T) {
+func TestIsDirectoryEmpty_ReturnsFalse_WhenSeveralFilesAreInDirectory(t *testing.T) {
 	dir, err := createTempDir("not_empty")
 	if err != nil {
 		t.Fatal(err)
@@ -221,7 +221,7 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenNestedDirectoryIsInDirectory(t *testi
 	assert.False(t, actual)
 }
 
-func TestIsDirectoryEmpty_ReturnsError_WhenDirectoryDoesntExists(t *testing.T) {
+func TestIsDirectoryEmpty_ReturnsError_WhenDirectoryDoesntExist(t *testing.T) {
 	dir, err := createTempDir("not_empty")
 	if err != nil {
 		t.Fatal(err)
