@@ -917,6 +917,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/DATA-DOG/godog",
+    "github.com/DATA-DOG/godog/colors",
     "github.com/DATA-DOG/godog/gherkin",
     "github.com/DataDog/zstd",
     "github.com/RoaringBitmap/roaring",
