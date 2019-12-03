@@ -156,15 +156,16 @@ func createTempDir(prefix string) (name string, err error) {
 func TestIsDirectoryEmpty_ReturnsTrue_WhenDirectoryIsEmpty(t *testing.T) {
 	dir, err := createTempDir("empty")
 	if err != nil {
-		t.Log(err)
+		t.Fatal(err)
 	}
+	defer os.Remove(dir)
 
 	actual, err := internal.IsDirectoryEmpty(dir)
 
 	assert.True(t, actual)
 }
 
-func TestIsDirectoryEmpty_ReturnsFalse_WhenDirectoryIsNotEmpty(t *testing.T) {
+func TestIsDirectoryEmpty_ReturnsFalse_WhenOneFileIsInDirectory(t *testing.T) {
 	dir, err := createTempDir("not_empty")
 	if err != nil {
 		t.Fatal(err)
