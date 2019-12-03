@@ -222,7 +222,7 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenNestedDirectoryIsInDirectory(t *testi
 }
 
 func TestIsDirectoryEmpty_ReturnsTrue_WhenDirectoryDoesntExist(t *testing.T) {
-	dir, err := createTempDir("not_empty")
+	dir, err := createTempDir("not_existing")
 	if err != nil {
 		t.Fatal(err)
 	}
