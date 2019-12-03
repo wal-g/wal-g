@@ -234,6 +234,11 @@ func IsPgControlRequired(backup *Backup, sentinelDto BackupSentinelDto) bool {
 
 func IsDirectoryEmpty(directoryPath string) (bool, error) {
 	var isEmpty = true
+
+	if _, err := os.Stat(directoryPath); os.IsNotExist(err) {
+		return isEmpty, errors.Wrapf(err, "directory: '%s' does not exist", directoryPath)
+	}
+
 	searchLambda := func(path string, info os.FileInfo, err error) error {
 		if path != directoryPath {
 			isEmpty = false
