@@ -14,14 +14,14 @@ func BuildBase(testContext *testHelper.TestContextType) error {
 	var err error
 	testContext.DockerClient, err = client.NewClientWithOpts(client.WithVersion("1.38"))
 	if err != nil {
-		return fmt.Errorf("error in building base: %v", err)
+		return fmt.Errorf("error in building base: %w", err)
 	}
 	testContext.Env = testUtils.MergeEnvs(testContext.Env, testHelper.GetConfiguration(testContext))
 	cmd := exec.Command("docker", "build", "-t", testUtils.GetVarFromEnvList(testContext.Env, "MONGODB_BACKUP_BASE_TAG"), testUtils.GetVarFromEnvList(testContext.Env, "MONGODB_BACKUP_BASE_PATH"))
 	cmd.Stdout = os.Stdout
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf("error in building base: %v", err)
+		return fmt.Errorf("error in building base: %w", err)
 	}
 	return nil
 }
@@ -52,7 +52,7 @@ func SetupStaging(testContext *testHelper.TestContextType) error {
 
 	err := testUtils.CopyDirectory("./images/", "./staging/images")
 	if err != nil {
-		return fmt.Errorf("error in setuping staging: %v", err)
+		return fmt.Errorf("error in setuping staging: %w", err)
 	}
 
 	testUtils.UpdateFileValues("./staging/images/minio/Dockerfile", map[string]string{
@@ -74,7 +74,7 @@ func SetupStaging(testContext *testHelper.TestContextType) error {
 	if _, err := os.Stat(stagingDir); os.IsNotExist(err) {
 		err = os.Mkdir(stagingDir, os.ModeDir)
 		if err != nil {
-			return fmt.Errorf("error in setuping staging: %v", err)
+			return fmt.Errorf("error in setuping staging: %w", err)
 		}
 	}
 
@@ -82,13 +82,13 @@ func SetupStaging(testContext *testHelper.TestContextType) error {
 	_, err = os.Stat(envFile)
 	file, err := os.OpenFile(envFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
-		return fmt.Errorf("error in setuping staging: %v", err)
+		return fmt.Errorf("error in setuping staging: %w", err)
 	}
 	defer file.Close()
 	for key, value := range testConf.Env {
 		_, err = fmt.Fprintf(file, "%s=%s\n", key, value)
 		if err != nil {
-			return fmt.Errorf("error in setuping staging: %v", err)
+			return fmt.Errorf("error in setuping staging: %w", err)
 		}
 	}
 
