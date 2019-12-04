@@ -11,7 +11,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"os"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -244,13 +243,11 @@ func GetAllUserData(context context.Context, connection *mongo.Client) []UserDat
 	if err != nil {
 		panic(err)
 	}
-	sort.Strings(dbNames)
 	for _, dbName := range dbNames {
 		tables, err := connection.Database(dbName, &options.DatabaseOptions{}).ListCollectionNames(context, bson.M{})
 		if err != nil {
 			panic(err)
 		}
-		sort.Strings(tables)
 		for _, table := range tables {
 			if isSystemCollection(table) {
 				continue
@@ -258,9 +255,7 @@ func GetAllUserData(context context.Context, connection *mongo.Client) []UserDat
 			if dbName == "local" || dbName == "config" {
 				continue
 			}
-			findOptions := options.Find()
-			findOptions.SetSort(bson.D{{"_id", 1}})
-			cur, err := connection.Database(dbName, &options.DatabaseOptions{}).Collection(table).Find(context, bson.M{}, findOptions)
+			cur, err := connection.Database(dbName, &options.DatabaseOptions{}).Collection(table).Find(context, bson.M{})
 			if err != nil {
 				panic(err)
 			}
