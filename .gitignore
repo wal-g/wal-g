@@ -12,14 +12,8 @@ main/mongo/wal-g
 test/testdata/00000*
 test/testdata/broken_wals/
 coverage.out
-.DS_Store
-Gopkg.lock
 
 tmp/
 *.xml
 *.iml
 *.so
-.session_conf.sav
-__pycache__/
-venv/
-

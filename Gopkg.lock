@@ -1156,6 +1156,7 @@
     "go.mongodb.org/mongo-driver/mongo/options",
     "go.mongodb.org/mongo-driver/mongo/readpref",
     "golang.org/x/crypto/openpgp",
+    "golang.org/x/crypto/openpgp/packet",
     "golang.org/x/sync/semaphore",
     "golang.org/x/time/rate",
   ]
