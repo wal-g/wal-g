@@ -94,13 +94,7 @@ jobs:
     - script: make mongo_test
       workspaces:
         use: image_cache
-    - script: make mongo_features_421
-      workspaces:
-        use: image_cache
-    - script: make mongo_features_403
-      workspaces:
-        use: image_cache
-    - script: make mongo_features_363
+    - script: make mongo_features
       workspaces:
         use: image_cache
     - script: make redis_test
