@@ -1,7 +1,6 @@
 package helpers
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -10,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	testUtils "github.com/wal-g/wal-g/tests_func/utils"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -76,12 +76,11 @@ func CallCompose(testContext *TestContextType, actions []string) error {
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("error when calling compose: %v", err)
 	}
-	buf := new(bytes.Buffer)
-	_, err = buf.ReadFrom(stdout)
+	buf, err := ioutil.ReadAll(stdout)
 	if err != nil {
 		return fmt.Errorf("error when calling compose: %v", err)
 	}
-	fmt.Printf("\n%+v\n", buf.String())
+	fmt.Printf("\n%+v\n", string(buf))
 	return nil
 }
 
