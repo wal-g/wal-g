@@ -84,16 +84,16 @@ func FeatureContext(s *godog.Suite) {
 
 }
 
-func mongodbBackupMetadataContainsUserData(mongodbId int, backupId int, data *gherkin.DocString) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+func mongodbBackupMetadataContainsUserData(arg1 int, arg2 int, arg3 *gherkin.DocString) error {
+	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", arg1, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
 	backupList, err := testHelper.GetBackups(testContext, nodeName)
 	if err != nil {
 		return err
 	}
-	if len(backupList)-1-backupId < 0 {
-		return fmt.Errorf("cannot get %dth backup - there are only %d", backupId, len(backupList))
+	if len(backupList)-1-arg2 < 0 {
+		return fmt.Errorf("cannot get %dth backup - there are only %d", arg2, len(backupList))
 	}
-	backup := backupList[len(backupList)-1-backupId]
+	backup := backupList[len(backupList)-1-arg2]
 	path := fmt.Sprintf("/export/dbaas/mongodb-backup/test_uuid/test_mongodb/basebackups_005/%s_backup_stop_sentinel.json", backup)
 	cmd := []string{"cat", path}
 	jsonString, _ := testHelper.RunCommandInContainer(testContext, fmt.Sprintf("minio01.test_net_%s", testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID")), cmd)
@@ -117,7 +117,7 @@ func mongodbBackupMetadataContainsUserData(mongodbId int, backupId int, data *gh
 		return err
 	}
 
-	content := getMakeBackupContentFromDocString(data)
+	content := getMakeBackupContentFromDocString(arg3)
 
 	if !reflect.DeepEqual(labels, content["labels"]) {
 		return fmt.Errorf("error: expected labels don't equal to existing in backup")
@@ -126,8 +126,8 @@ func mongodbBackupMetadataContainsUserData(mongodbId int, backupId int, data *gh
 	return nil
 }
 
-func testMongodbConnect(mongodbId int) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+func testMongodbConnect(arg1 int) error {
+	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", arg1, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
 	for i := 0; i < 25; i++ {
 		connection, _ := testHelper.EnvDBConnect(testContext, nodeName)
 		err := connection.Database(nodeName).Client().Ping(testContext.Context, nil)
@@ -139,8 +139,8 @@ func testMongodbConnect(mongodbId int) error {
 	return fmt.Errorf("cannot connect to %s", nodeName)
 }
 
-func configureS3OnMinio(minioId int) error {
-	nodeName := fmt.Sprintf("minio%02d.test_net_%s", minioId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+func configureS3OnMinio(arg1 int) error {
+	nodeName := fmt.Sprintf("minio%02d.test_net_%s", arg1, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
 	container, err := testHelper.GetDockerContainer(testContext, nodeName)
 	if err != nil {
 		return err
@@ -152,8 +152,8 @@ func configureS3OnMinio(minioId int) error {
 	return nil
 }
 
-func replsetinitiateOnMongodb(mongodbId int) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+func replsetinitiateOnMongodb(arg1 int) error {
+	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", arg1, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
 	err := testHelper.StepEnsureRsInitialized(testContext, nodeName)
 	if err != nil {
 		return err
@@ -161,8 +161,8 @@ func replsetinitiateOnMongodb(mongodbId int) error {
 	return nil
 }
 
-func testMongodbPrimaryRole(mongodbId int) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+func testMongodbPrimaryRole(arg1 int) error {
+	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", arg1, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
 	creds := testHelper.UserConfiguration{
 		Username: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_USERNAME"),
 		Password: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_PASSWORD"),
@@ -177,8 +177,8 @@ func testMongodbPrimaryRole(mongodbId int) error {
 	return smth
 }
 
-func authenticateOnMongodb(mongodbId int) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+func authenticateOnMongodb(arg1 int) error {
+	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", arg1, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
 	creds := testHelper.UserConfiguration{
 		Username: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_USERNAME"),
 		Password: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_PASSWORD"),
@@ -207,9 +207,9 @@ func authenticateOnMongodb(mongodbId int) error {
 	return nil
 }
 
-func fillMongodbWithTestData(mongodbId, testId int) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
-	testName := fmt.Sprintf("test%02d", testId)
+func fillMongodbWithTestData(arg1, arg2 int) error {
+	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", arg1, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	testName := fmt.Sprintf("test%02d", arg2)
 	creds := testHelper.UserConfiguration{
 		Username: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_USERNAME"),
 		Password: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_PASSWORD"),
@@ -221,13 +221,13 @@ func fillMongodbWithTestData(mongodbId, testId int) error {
 		return err
 	}
 	data := testHelper.FillWithData(testContext.Context, conn, testName)
-	testContext.TestData["test"+string(testId)] = data
+	testContext.TestData["test"+string(arg2)] = data
 	return nil
 }
 
-func createMongodbBackup(mongodbId int) error {
+func createMongodbBackup(arg1 int) error {
 	var cmdArgs = ""
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", arg1, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
 	creds := testHelper.UserConfiguration{
 		Username: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_USERNAME"),
 		Password: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_PASSWORD"),
@@ -260,20 +260,20 @@ func getMakeBackupContentFromDocString(content *gherkin.DocString) map[string]ma
 	return res
 }
 
-func createMongodbBackupWithUserData(mongodbId int, data *gherkin.DocString) error {
+func createMongodbBackupWithUserData(arg1 int, arg2 *gherkin.DocString) error {
 	var cmdArgs = ""
 	var envs []string
-	if data != nil {
-		content := getMakeBackupContentFromDocString(data)
+	if arg2 != nil {
+		content := getMakeBackupContentFromDocString(arg2)
 		var args []string
 		if labels, ok := content["labels"]; ok {
 			for key, value := range labels {
 				args = append(args, fmt.Sprintf(`"%s": "%s"`, key, value))
 			}
 		}
-		envs = append(envs, fmt.Sprintf(`WALG_SENTINEL_USER_DATA={"labels": {%s}}`, strings.Join(args, ", ")))
+		envs = append(envs, `WALG_SENTINEL_USER_DATA={"labels": {`+strings.Join(args, ", ")+`}}`)
 	}
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", arg1, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
 	creds := testHelper.UserConfiguration{
 		Username: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_USERNAME"),
 		Password: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_PASSWORD"),
@@ -288,20 +288,20 @@ func createMongodbBackupWithUserData(mongodbId int, data *gherkin.DocString) err
 	return nil
 }
 
-func testBackupEntriesOfMongodb(backupCount, mongodbId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+func testBackupEntriesOfMongodb(arg1, arg2 int) error {
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", arg2, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
 	backupNames, err := testHelper.GetBackups(testContext, containerName)
 	if err != nil {
 		return err
 	}
-	if len(backupNames) != backupCount {
-		return fmt.Errorf("expected %d number of backups, but found %d", backupCount, len(backupNames))
+	if len(backupNames) != arg1 {
+		return fmt.Errorf("expected %d number of backups, but found %d", arg1, len(backupNames))
 	}
 	return nil
 }
 
-func putEmptyBackupViaMinio(minioId int) error {
-	containerName := fmt.Sprintf("minio%02d.test_net_%s", minioId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+func putEmptyBackupViaMinio(arg1 int) error {
+	containerName := fmt.Sprintf("minio%02d.test_net_%s", arg1, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
 	backupName := "20010203T040506"
 	bucketName := testUtils.GetVarFromEnvList(testContext.Env, "S3_BUCKET")
 	backupRootDir := testUtils.GetVarFromEnvList(testContext.Env, "WALG_S3_PREFIX")
@@ -319,13 +319,13 @@ func putEmptyBackupViaMinio(minioId int) error {
 	return nil
 }
 
-func deleteBackupsRetainViaMongodb(retainCount, mongodbId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
-	return testHelper.MongoPurgeBackups(testContext, containerName, retainCount)
+func deleteBackupsRetainViaMongodb(arg1, arg2 int) error {
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", arg2, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	return testHelper.MongoPurgeBackups(testContext, containerName, arg1)
 }
 
-func testEmptyBackupsViaMinio(minioId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", minioId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+func testEmptyBackupsViaMinio(arg1 int) error {
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", arg1, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
 	bucketName := testUtils.GetVarFromEnvList(testContext.Env, "S3_BUCKET")
 	backupRootDir := testUtils.GetVarFromEnvList(testContext.Env, "WALG_S3_PREFIX")
 	backupNames := testContext.SafeStorage.NometaBackupNames
@@ -339,25 +339,25 @@ func testEmptyBackupsViaMinio(minioId int) error {
 	return nil
 }
 
-func deleteBackupViaMongodb(backupId, mongodbId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
-	return testHelper.DeleteBackup(testContext, containerName, backupId)
+func deleteBackupViaMongodb(arg1, arg2 int) error {
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", arg2, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	return testHelper.DeleteBackup(testContext, containerName, arg1)
 }
 
-func restoreBackupToMongodb(backupId, mongodbId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
-	return testHelper.RestoreBackupById(testContext, containerName, backupId)
+func restoreBackupToMongodb(arg1, arg2 int) error {
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", arg2, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	return testHelper.RestoreBackupById(testContext, containerName, arg1)
 }
 
-func testEqualMongodbDataAtMongodbs(mongodbId1, mongodbId2 int) error {
+func testEqualMongodbDataAtMongodbs(arg1, arg2 int) error {
 	creds := testHelper.UserConfiguration{
 		Username: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_USERNAME"),
 		Password: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_PASSWORD"),
 		Dbname:   testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_DB_NAME"),
 		Roles:    strings.Split(testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_ROLES"), " "),
 	}
-	containerName1 := fmt.Sprintf("mongodb%02d", mongodbId1) + ".test_net_" + testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID")
-	containerName2 := fmt.Sprintf("mongodb%02d", mongodbId2) + ".test_net_" + testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID")
+	containerName1 := fmt.Sprintf("mongodb%02d", arg1) + ".test_net_" + testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID")
+	containerName2 := fmt.Sprintf("mongodb%02d", arg2) + ".test_net_" + testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID")
 
 	connection1, err := testHelper.EnvDBConnectWithCreds(testContext, containerName1, creds)
 	if err != nil {
