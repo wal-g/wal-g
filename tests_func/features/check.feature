@@ -10,6 +10,9 @@ Feature: MongoDB backups check
     And mongodb auth initialized on mongodb02
     And mongodb role is primary on mongodb01
     And mongodb role is primary on mongodb02
+    And a trusted gpg keys on mongodb01
+    And a trusted gpg keys on mongodb02
+
 
   Scenario: First backup was done successfully
     Given mongodb01 has test mongodb data test1
