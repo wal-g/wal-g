@@ -20,7 +20,7 @@ func ConfigureS3(testContext *TestContextType, containerName *types.Container) {
 		response = RunCommandInContainer(testContext, containerName.Names[0], command)
 
 		if strings.Contains(response, "created successfully") ||
-			strings.Contains(response, "already own it") {
+			strings.Contains(response, "already own it"){
 			return
 		}
 	}

@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"strings"
+	"time"
 )
 
 type TempNameType1 struct {
@@ -71,7 +73,7 @@ func getConfiguration(testContext *TestContextType) ConfigurationType {
 				},
 				Expose: map[string]int{
 					"mongod": 27018,
-					"ssh":    22,
+					"ssh": 22,
 				},
 				DockerInstances: 2,
 				ExternalLinks:   []string{dynamicConfig.s3.host, dynamicConfig.s3.fakeHost},
@@ -120,7 +122,22 @@ type DynamicConfigurationType struct {
 	walg WalgConfiguration
 }
 
+func generateRandomString(length int) string {
+	rand.Seed(time.Now().UnixNano())
+	chars := []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+		"abcdefghijklmnopqrstuvwxyz" +
+		"0123456789")
+	var b strings.Builder
+	for i := 0; i < length; i++ {
+		b.WriteRune(chars[rand.Intn(len(chars))])
+	}
+	return b.String()
+}
+
 func getDynamicConfiguration(testContext *TestContextType) DynamicConfigurationType {
+	accessKeyId := "1NdvGnOio1ad3HFmWNae"
+	accessSecretKey := "PZK1ZuHiVM7I8vzLfBeEf6yfElqrXrZdNfaPORIM"
+
 	return DynamicConfigurationType{
 		s3: S3Configuration{
 			host:               fmt.Sprintf("minio01.%s", GetVarFromEnvList(testContext.Env, "TEST_ID")),
@@ -128,8 +145,8 @@ func getDynamicConfiguration(testContext *TestContextType) DynamicConfigurationT
 			fakeHostPort:       "minio:9000",
 			bucket:             "dbaas",
 			endpoint:           "http://minio:9000",
-			accessSecretKey:    GetVarFromEnvList(testContext.Env, "MINIO_SECRET_KEY"),
-			accessKeyId:        GetVarFromEnvList(testContext.Env, "MINIO_ACCESS_KEY"),
+			accessSecretKey:    accessSecretKey,
+			accessKeyId:        accessKeyId,
 			encAccessSecretKey: "TODO",
 			encAccessKeyId:     "TODO",
 		},
@@ -139,6 +156,6 @@ func getDynamicConfiguration(testContext *TestContextType) DynamicConfigurationT
 			user:       "mongodb",
 			homedir:    "/home/mongodb/.gnupg",
 		},
-		walg: WalgConfiguration{path: GetVarFromEnvList(testContext.Env, "WALG_S3_PREFIX")},
+		walg: WalgConfiguration{path: "mongodb-backup/test_uuid/test_mongodb"},
 	}
 }
