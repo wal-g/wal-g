@@ -611,6 +611,74 @@
   pruneopts = "UT"
   revision = "ecd376af8972cd9c3e355831c126a7862de6b2b9"
 
+ [[projects]]
+  digest = "1:4a27ce9df1be95b7e15d14f3810a446343978cf397c962089e505c4ed5338861"
+  name = "github.com/wal-g/wal-g"
+  packages = [
+    "cmd/mongo",
+    "cmd/mysql",
+    "cmd/pg",
+    "cmd/redis",
+    "internal",
+    "internal/compression",
+    "internal/compression/brotli",
+    "internal/compression/computils",
+    "internal/compression/lz4",
+    "internal/compression/lzma",
+    "internal/compression/lzo",
+    "internal/compression/zstd",
+    "internal/crypto",
+    "internal/crypto/awskms",
+    "internal/crypto/openpgp",
+    "internal/databases/mongo",
+    "internal/databases/mysql",
+    "internal/databases/redis",
+    "internal/ioextensions",
+    "internal/limited",
+    "internal/walparser",
+    "internal/walparser/parsingutil",
+    "test/mocks",
+    "testtools",
+    "utility",
+  ]
+  pruneopts = "UT"
+  revision = "271f64fa6db2e59df012ff09539594e51de08d4d"
+  version = "v0.2.13"
+
+[[projects]]
+  digest = "1:4a27ce9df1be95b7e15d14f3810a446343978cf397c962089e505c4ed5338861"
+  name = "github.com/wal-g/wal-g"
+  packages = [
+    "cmd/mongo",
+    "cmd/mysql",
+    "cmd/pg",
+    "cmd/redis",
+    "internal",
+    "internal/compression",
+    "internal/compression/brotli",
+    "internal/compression/computils",
+    "internal/compression/lz4",
+    "internal/compression/lzma",
+    "internal/compression/lzo",
+    "internal/compression/zstd",
+    "internal/crypto",
+    "internal/crypto/awskms",
+    "internal/crypto/openpgp",
+    "internal/databases/mongo",
+    "internal/databases/mysql",
+    "internal/databases/redis",
+    "internal/ioextensions",
+    "internal/limited",
+    "internal/walparser",
+    "internal/walparser/parsingutil",
+    "test/mocks",
+    "testtools",
+    "utility",
+  ]
+  pruneopts = "UT"
+  revision = "271f64fa6db2e59df012ff09539594e51de08d4d"
+  version = "v0.2.13"
+
 [[projects]]
   digest = "1:211f9cf21d532e2da93a420426d714af492743f4c602389cb0cd14ec8eebe256"
   name = "github.com/willf/bitset"
@@ -954,6 +1022,31 @@
     "github.com/wal-g/storages/s3",
     "github.com/wal-g/storages/storage",
     "github.com/wal-g/storages/swift",
+    "github.com/wal-g/wal-g/cmd/mongo",
+    "github.com/wal-g/wal-g/cmd/mysql",
+    "github.com/wal-g/wal-g/cmd/pg",
+    "github.com/wal-g/wal-g/cmd/redis",
+    "github.com/wal-g/wal-g/internal",
+    "github.com/wal-g/wal-g/internal/compression",
+    "github.com/wal-g/wal-g/internal/compression/brotli",
+    "github.com/wal-g/wal-g/internal/compression/computils",
+    "github.com/wal-g/wal-g/internal/compression/lz4",
+    "github.com/wal-g/wal-g/internal/compression/lzma",
+    "github.com/wal-g/wal-g/internal/compression/lzo",
+    "github.com/wal-g/wal-g/internal/compression/zstd",
+    "github.com/wal-g/wal-g/internal/crypto",
+    "github.com/wal-g/wal-g/internal/crypto/awskms",
+    "github.com/wal-g/wal-g/internal/crypto/openpgp",
+    "github.com/wal-g/wal-g/internal/databases/mongo",
+    "github.com/wal-g/wal-g/internal/databases/mysql",
+    "github.com/wal-g/wal-g/internal/databases/redis",
+    "github.com/wal-g/wal-g/internal/ioextensions",
+    "github.com/wal-g/wal-g/internal/limited",
+    "github.com/wal-g/wal-g/internal/walparser",
+    "github.com/wal-g/wal-g/internal/walparser/parsingutil",
+    "github.com/wal-g/wal-g/test/mocks",
+    "github.com/wal-g/wal-g/testtools",
+    "github.com/wal-g/wal-g/utility",
     "go.mongodb.org/mongo-driver/bson",
     "go.mongodb.org/mongo-driver/mongo",
     "go.mongodb.org/mongo-driver/mongo/options",

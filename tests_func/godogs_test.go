@@ -9,7 +9,6 @@ import (
 	testHelper "github.com/wal-g/wal-g/tests_func/helpers"
 	testUtils "github.com/wal-g/wal-g/tests_func/utils"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
-	"log"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -31,30 +30,30 @@ func FeatureContext(s *godog.Suite) {
 
 		err := SetupStaging(testContext)
 		if err != nil {
-			log.Fatalln(err)
+			panic(err)
 		}
 		err = BuildBase(testContext)
 		if err != nil {
-			log.Fatalln(err)
+			panic(err)
 		}
 		err = Start(testContext)
 		if err != nil {
-			log.Fatalln(err)
+			panic(err)
 		}
 	})
 
 	s.AfterFeature(func(feature *gherkin.Feature) {
 		err := testHelper.ShutdownContainers(testContext)
 		if err != nil {
-			log.Fatalln(err)
+			panic(err)
 		}
 		err = testHelper.ShutdownNetwork(testContext)
 		if err != nil {
-			log.Fatalln(err)
+			panic(err)
 		}
 		err = os.RemoveAll("./staging/images/")
 		if err != nil {
-			log.Fatalln(err)
+			panic(err)
 		}
 	})
 
@@ -129,14 +128,13 @@ func mongodbBackupMetadataContainsUserData(mongodbId int, backupId int, data *gh
 
 func testMongodbConnect(mongodbId int) error {
 	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
-	const timeoutInterval = 100 * time.Millisecond
 	for i := 0; i < 25; i++ {
 		connection, _ := testHelper.EnvDBConnect(testContext, nodeName)
 		err := connection.Database(nodeName).Client().Ping(testContext.Context, nil)
 		if err == nil {
 			return nil
 		}
-		time.Sleep(timeoutInterval)
+		time.Sleep(100 * time.Millisecond)
 	}
 	return fmt.Errorf("cannot connect to %s", nodeName)
 }
@@ -212,7 +210,7 @@ func authenticateOnMongodb(mongodbId int) error {
 	}
 	if !strings.Contains(response, "Successfully added user") &&
 		!strings.Contains(response, "not authorized on admin") &&
-		!strings.Contains(response, "already exists") {
+		!strings.Contains(response, "already exists"){
 		return fmt.Errorf("can not initialize auth: %s", response)
 	}
 	return nil
