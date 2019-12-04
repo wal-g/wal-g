@@ -13,7 +13,7 @@ test/testdata/00000*
 test/testdata/broken_wals/
 coverage.out
 .DS_Store
-tests_func/staging/env.file
+Gopkg.lock
 
 tmp/
 *.xml
