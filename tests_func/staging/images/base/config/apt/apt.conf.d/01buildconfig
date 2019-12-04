@@ -1,4 +1,0 @@
-APT::Install-Recommends "0";
-APT::Get::Assume-Yes "true";
-APT::Get::force-yes "true";
-APT::Install-Suggests "0";
