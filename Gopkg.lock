@@ -73,20 +73,20 @@
   version = "v0.4.14"
 
 [[projects]]
-  digest = "1:6b6d999be55cc0e0704ed0ac4532175f1f71639fbda6d143dc86ac5a5d3bc87f"
-  name = "github.com/Microsoft/hcsshim"
-  packages = ["osversion"]
-  pruneopts = "UT"
-  revision = "f92b8fb9c92e17da496af5a69e3ee13fbe9916e1"
-  version = "v0.8.6"
-
-[[projects]]
   digest = "1:72fff13e105db55c6d4b1acb69216b88d9d3009433f43d7df3488f842b0b6929"
   name = "github.com/RoaringBitmap/roaring"
   packages = ["."]
   pruneopts = "UT"
   revision = "3d677d3262197ee558b85029301eb69b8239f91a"
   version = "v0.4.16"
+
+[[projects]]
+  digest = "1:04457f9f6f3ffc5fea48e71d62f2ca256637dee0a04d710288e27e05c8b41976"
+  name = "github.com/Sirupsen/logrus"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "839c75faf7f98a33d445d181f3018b5c3409a45e"
+  version = "v1.4.2"
 
 [[projects]]
   digest = "1:e1232168b655eb16d14171898f67517677005885e208ba41e3d5bdd12f50965e"
@@ -139,26 +139,6 @@
   version = "v1.23.6"
 
 [[projects]]
-  digest = "1:771809465d2d81b1e2631f0e062b7458647135b2eca9e1cc577e58d1db0d987f"
-  name = "github.com/containerd/containerd"
-  packages = ["errdefs"]
-  pruneopts = "UT"
-  revision = "36cf5b690dcc00ff0f34ff7799209050c3d0c59a"
-  version = "v1.3.0"
-
-[[projects]]
-  branch = "master"
-  digest = "1:33d9066d4a56cf6de4e81e37d85758f46ea154e874503cd2a0bf7a8b934fa203"
-  name = "github.com/containerd/continuity"
-  packages = [
-    "fs",
-    "syscallx",
-    "sysx",
-  ]
-  pruneopts = "UT"
-  revision = "75bee3e2ccb6402e3a986ab8bd3b17003fc0fdec"
-
-[[projects]]
   digest = "1:ad8b4e90264438ea13214e2cac5d26fde580dee47c11d5ba66537b6a97e1baee"
   name = "github.com/cyberdelia/lzo"
   packages = ["."]
@@ -175,51 +155,48 @@
   version = "v1.1.1"
 
 [[projects]]
-  digest = "1:5d7f88f9487f370e3ae52155465156370fc5798102d811d2d4448d2385ccaf67"
+  digest = "1:4ddc17aeaa82cb18c5f0a25d7c253a10682f518f4b2558a82869506eec223d76"
   name = "github.com/docker/distribution"
   packages = [
     "digestset",
     "reference",
-    "registry/api/errcode",
   ]
   pruneopts = "UT"
   revision = "2461543d988979529609e8cb6fca9ca190dc48da"
   version = "v2.7.1"
 
 [[projects]]
-  branch = "master"
-  digest = "1:91e657c243835368106be2161cefdc3195b4ed11b0955721178e78ea59ff2b54"
+  digest = "1:3ff7592ed102201cb64c94401943199c79ed3deac18d76f306dc64e54a53955b"
   name = "github.com/docker/docker"
   packages = [
-    "api",
     "api/types",
     "api/types/blkiodev",
     "api/types/container",
     "api/types/events",
     "api/types/filters",
-    "api/types/image",
     "api/types/mount",
     "api/types/network",
+    "api/types/reference",
     "api/types/registry",
     "api/types/strslice",
     "api/types/swarm",
-    "api/types/swarm/runtime",
     "api/types/time",
     "api/types/versions",
     "api/types/volume",
     "client",
-    "errdefs",
     "pkg/archive",
     "pkg/fileutils",
     "pkg/idtools",
     "pkg/ioutils",
     "pkg/longpath",
-    "pkg/mount",
     "pkg/pools",
+    "pkg/promise",
     "pkg/system",
+    "pkg/tlsconfig",
   ]
   pruneopts = "UT"
-  revision = "44d39013868abb9fd9b2091dd4f7e1c27f3fb610"
+  revision = "092cba3727bb9b4a2f0e922cd6c0f93ea270e363"
+  version = "v1.13.1"
 
 [[projects]]
   digest = "1:811c86996b1ca46729bad2724d4499014c4b9effd05ef8c71b852aad90deb0ce"
@@ -288,14 +265,6 @@
   pruneopts = "UT"
   revision = "2fee6af1a9795aafbe0253a0cfbdf668e1fb8a9a"
   version = "v1.8.0"
-
-[[projects]]
-  digest = "1:4caab6f14c6b9654ccb7d398791d1f71a2d4e693ea508d29659a173e1b2e644a"
-  name = "github.com/gogo/protobuf"
-  packages = ["proto"]
-  pruneopts = "UT"
-  revision = "5628607bb4c51c3157aacc3a50f0ab707582b805"
-  version = "v1.3.1"
 
 [[projects]]
   digest = "1:b60efdeb75d3c0ceed88783ac2495256aba3491a537d0f31401202579fd62a94"
@@ -485,17 +454,6 @@
   version = "v1.0.0-rc1"
 
 [[projects]]
-  digest = "1:11db38d694c130c800d0aefb502fb02519e514dc53d9804ce51d1ad25ec27db6"
-  name = "github.com/opencontainers/image-spec"
-  packages = [
-    "specs-go",
-    "specs-go/v1",
-  ]
-  pruneopts = "UT"
-  revision = "d60099175f88c47cd379c4738d158884749ed235"
-  version = "v1.0.1"
-
-[[projects]]
   digest = "1:1869683e323ebff2bdf8adcb560f82bf6f8d94019d35099e3403f7df12e9c07e"
   name = "github.com/opencontainers/runc"
   packages = [
@@ -552,14 +510,6 @@
   pruneopts = "UT"
   revision = "792786c7400a136282c1664665ae0a8db921c6c2"
   version = "v1.0.0"
-
-[[projects]]
-  digest = "1:04457f9f6f3ffc5fea48e71d62f2ca256637dee0a04d710288e27e05c8b41976"
-  name = "github.com/sirupsen/logrus"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "839c75faf7f98a33d445d181f3018b5c3409a45e"
-  version = "v1.4.2"
 
 [[projects]]
   digest = "1:3e39bafd6c2f4bf3c76c3bfd16a2e09e016510ad5db90dc02b88e2f565d6d595"
@@ -862,12 +812,9 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:d6b0cfc5ae30841c4b116ac589629f56f8add0955a39f11d8c0d06ca67f5b3d5"
+  digest = "1:5e4d81c50cffcb124b899e4f3eabec3930c73532f0096c27f94476728ba03028"
   name = "golang.org/x/sync"
-  packages = [
-    "errgroup",
-    "semaphore",
-  ]
+  packages = ["semaphore"]
   pruneopts = "UT"
   revision = "42b317875d0fa942474b76e1b46a6060d720ae6e"
 

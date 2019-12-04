@@ -24,9 +24,6 @@
 #   go-tests = true
 #   unused-packages = true
 
-[[constraint]]
-  branch = "master"
-  name = "github.com/docker/docker"
 
 [[constraint]]
   name = "github.com/DataDog/zstd"
