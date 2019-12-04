@@ -86,14 +86,14 @@ mongo_test: install deps mongo_build lint unlink_brotli mongo_integration_test
 mongo_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_MONGO_PATH) && go build -tags brotli -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mongo.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mongo.WalgVersion=`git tag -l --points-at HEAD`")
 
-mongo_install:
+mongo_install: mongo_build
 	mv $(MAIN_MONGO_PATH)/wal-g $(GOBIN)/wal-g
 
 mongo_integration_test: load_docker_common
 	docker-compose build mongo mongo_tests
 	docker-compose up --exit-code-from mongo_tests mongo_tests
 
-mongo_features: install deps mongo_build lint unlink_brotli
+mongo_features: deps 
 	rm -rf ./tests_func/wal-g
 	mkdir -p ./tests_func/wal-g
 	cp -a `ls -A | grep -v "tests_func"` tests_func/wal-g/
