@@ -117,7 +117,7 @@ mongo_features_363: install deps mongo_build lint unlink_brotli
 	(cd tests_func ; MONGO_MAJOR=3.6 MONGO_VERSION=3.6.3 godog ; cd ..)
 	rm -rf ./tests_func/wal-g
 
-mongo_features: mongo_features_363 mongo_features_403 mongo_features_421
+mongo_features: mongo_features_363 mongo_features_403 mongo_features_4210
 
 
 redis_test: install deps redis_build lint unlink_brotli redis_integration_test
