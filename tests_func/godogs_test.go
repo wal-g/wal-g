@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/DATA-DOG/godog"
 	"github.com/DATA-DOG/godog/gherkin"
+	"github.com/docker/docker/api/types"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"path/filepath"
 	"reflect"
@@ -112,38 +113,38 @@ func mongodbAuthInitializedOnMongodb(arg1 int) error {
 }
 
 func aTrustedGpgKeysOnMongodb(arg1 int) error {
-//	containerName := fmt.Sprintf("mongodb%02d", arg1) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
-//	command := []string{"gpg", "--list-keys", "--list-options", "show-uid-validity"}
-//	response := RunCommandInContainerWithOptions(testContext, containerName, command, types.ExecConfig{User: testContext.Configuration.DynamicConfiguration.gpg.user})
-//
-//	if strings.Contains(response, "[ultimate] test_cluster") {
-//		return nil
-//	}
-//
-//	homedir := testContext.Configuration.DynamicConfiguration.gpg.homedir
-//	command = []string{"gpg", "--homedir", homedir, "--no-tty", "--import", "/config/gpg-key.armor"}
-//	response = RunCommandInContainerWithOptions(testContext, containerName, command, types.ExecConfig{User: testContext.Configuration.DynamicConfiguration.gpg.user, Tty: true})
-//
-//	if !strings.Contains(response,"secret keys imported: 1") {
-//		panic(fmt.Errorf("can not import keys: %s", response))
-//	}
+	containerName := fmt.Sprintf("mongodb%02d", arg1) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
+	command := []string{"gpg", "--list-keys", "--list-options", "show-uid-validity"}
+	response := RunCommandInContainerWithOptions(testContext, containerName, command, types.ExecConfig{User: testContext.Configuration.DynamicConfiguration.gpg.user})
 
-//	longcmd := fmt.Sprintf(`for key in $(gpg --no-tty --homedir %s -k | grep ^pub |
-//cut -d'/' -f2 | awk '{print $1};' 2>/dev/null); do
-//	printf "trust\n5\ny\nquit" | \
-//	gpg --homedir %s --debug --no-tty --command-fd 0 \
-//		--edit-key ${key};
-//done`, homedir, homedir)
-//
-//	command = []string{"bash", "-c", longcmd}
-//	response = RunCommandInContainerWithOptions(testContext, containerName, command, types.ExecConfig{User: testContext.Configuration.DynamicConfiguration.gpg.user, Tty: true})
-//
-//	command = []string{"gpg", "--list-keys", "--list-options", "show-uid-validity"}
-//	response = RunCommandInContainerWithOptions(testContext, containerName, command, types.ExecConfig{User: testContext.Configuration.DynamicConfiguration.gpg.user})
-//
-//	if !strings.Contains(response, "[ultimate] test_cluster") {
-//		return fmt.Errorf("can not trust keys: %s", response)
-//	}
+	if strings.Contains(response, "[ultimate] test_cluster") {
+		return nil
+	}
+
+	homedir := testContext.Configuration.DynamicConfiguration.gpg.homedir
+	command = []string{"gpg", "--homedir", homedir, "--no-tty", "--import", "/config/gpg-key.armor"}
+	response = RunCommandInContainerWithOptions(testContext, containerName, command, types.ExecConfig{User: testContext.Configuration.DynamicConfiguration.gpg.user, Tty: true})
+
+	if !strings.Contains(response,"secret keys imported: 1") {
+		panic(fmt.Errorf("can not import keys: %s", response))
+	}
+
+	longcmd := fmt.Sprintf(`for key in $(gpg --no-tty --homedir %s -k | grep ^pub |
+cut -d'/' -f2 | awk '{print $1};' 2>/dev/null); do
+	printf "trust\n5\ny\nquit" | \
+	gpg --homedir %s --debug --no-tty --command-fd 0 \
+		--edit-key ${key};
+done`, homedir, homedir)
+
+	command = []string{"bash", "-c", longcmd}
+	response = RunCommandInContainerWithOptions(testContext, containerName, command, types.ExecConfig{User: testContext.Configuration.DynamicConfiguration.gpg.user, Tty: true})
+
+	command = []string{"gpg", "--list-keys", "--list-options", "show-uid-validity"}
+	response = RunCommandInContainerWithOptions(testContext, containerName, command, types.ExecConfig{User: testContext.Configuration.DynamicConfiguration.gpg.user})
+
+	if !strings.Contains(response, "[ultimate] test_cluster") {
+		return fmt.Errorf("can not trust keys: %s", response)
+	}
 	return nil
 }
 

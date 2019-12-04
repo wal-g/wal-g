@@ -28,7 +28,7 @@ var Env = map[string]string{
 	"TARGET_SSH_ADMIN_PASSWORD": "rootpw",
 	"TEST_ID":                   "13",
 	"TEST_CLEANUP_DELAY":        "60",
-	"WALG_S3_PREFIX":            "s3://dbaas/mongodb-backup/test_uuid/test_mongodb",
-	"WALG_CLIENT_PATH":          "/usr/bin/wal-g",
-	"WALG_CONF_PATH":            "/home/.walg.json",
+	"MINIO_ACCESS_KEY": 		 "1NdvGnOio1ad3HFmWNae",
+	"MINIO_SECRET_KEY": 		 "PZK1ZuHiVM7I8vzLfBeEf6yfElqrXrZdNfaPORIM",
+	"WALG_S3_PREFIX": 		     "s3://dbaas/mongodb-backup/test_uuid/test_mongodb",
 }

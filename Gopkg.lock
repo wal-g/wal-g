@@ -42,18 +42,6 @@
   version = "v0.3.1"
 
 [[projects]]
-  digest = "1:8eacd45a4fb9c351d20c6050ae91783a844f171e65470fca0380c30a5eabb726"
-  name = "github.com/DATA-DOG/godog"
-  packages = [
-    ".",
-    "colors",
-    "gherkin",
-  ]
-  pruneopts = "UT"
-  revision = "8e7bc15e741c4f6c93c0fc2e797ed869cbc1b8f7"
-  version = "v0.7.13"
-
-[[projects]]
   digest = "1:c99bd4548f502371b98c77534239a514c9a1e715d468af3c108db06186aa692a"
   name = "github.com/DataDog/zstd"
   packages = ["."]
@@ -62,31 +50,12 @@
   version = "v1.3.4"
 
 [[projects]]
-  digest = "1:d5e752c67b445baa5b6cb6f8aa706775c2aa8e41aca95a0c651520ff2c80361a"
-  name = "github.com/Microsoft/go-winio"
-  packages = [
-    ".",
-    "pkg/guid",
-  ]
-  pruneopts = "UT"
-  revision = "6c72808b55902eae4c5943626030429ff20f3b63"
-  version = "v0.4.14"
-
-[[projects]]
   digest = "1:72fff13e105db55c6d4b1acb69216b88d9d3009433f43d7df3488f842b0b6929"
   name = "github.com/RoaringBitmap/roaring"
   packages = ["."]
   pruneopts = "UT"
   revision = "3d677d3262197ee558b85029301eb69b8239f91a"
   version = "v0.4.16"
-
-[[projects]]
-  digest = "1:04457f9f6f3ffc5fea48e71d62f2ca256637dee0a04d710288e27e05c8b41976"
-  name = "github.com/Sirupsen/logrus"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "839c75faf7f98a33d445d181f3018b5c3409a45e"
-  version = "v1.4.2"
 
 [[projects]]
   digest = "1:e1232168b655eb16d14171898f67517677005885e208ba41e3d5bdd12f50965e"
@@ -155,70 +124,6 @@
   version = "v1.1.1"
 
 [[projects]]
-  digest = "1:4ddc17aeaa82cb18c5f0a25d7c253a10682f518f4b2558a82869506eec223d76"
-  name = "github.com/docker/distribution"
-  packages = [
-    "digestset",
-    "reference",
-  ]
-  pruneopts = "UT"
-  revision = "2461543d988979529609e8cb6fca9ca190dc48da"
-  version = "v2.7.1"
-
-[[projects]]
-  digest = "1:3ff7592ed102201cb64c94401943199c79ed3deac18d76f306dc64e54a53955b"
-  name = "github.com/docker/docker"
-  packages = [
-    "api/types",
-    "api/types/blkiodev",
-    "api/types/container",
-    "api/types/events",
-    "api/types/filters",
-    "api/types/mount",
-    "api/types/network",
-    "api/types/reference",
-    "api/types/registry",
-    "api/types/strslice",
-    "api/types/swarm",
-    "api/types/time",
-    "api/types/versions",
-    "api/types/volume",
-    "client",
-    "pkg/archive",
-    "pkg/fileutils",
-    "pkg/idtools",
-    "pkg/ioutils",
-    "pkg/longpath",
-    "pkg/pools",
-    "pkg/promise",
-    "pkg/system",
-    "pkg/tlsconfig",
-  ]
-  pruneopts = "UT"
-  revision = "092cba3727bb9b4a2f0e922cd6c0f93ea270e363"
-  version = "v1.13.1"
-
-[[projects]]
-  digest = "1:811c86996b1ca46729bad2724d4499014c4b9effd05ef8c71b852aad90deb0ce"
-  name = "github.com/docker/go-connections"
-  packages = [
-    "nat",
-    "sockets",
-    "tlsconfig",
-  ]
-  pruneopts = "UT"
-  revision = "7395e3f8aa162843a74ed6d48e79627d9792ac55"
-  version = "v0.4.0"
-
-[[projects]]
-  digest = "1:e95ef557dc3120984bb66b385ae01b4bb8ff56bcde28e7b0d1beed0cccc4d69f"
-  name = "github.com/docker/go-units"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "519db1ee28dcc9fd2474ae59fca29a810482bfb1"
-  version = "v0.4.0"
-
-[[projects]]
   digest = "1:abeb38ade3f32a92943e5be54f55ed6d6e3b6602761d74b4aab4c9dd45c18abd"
   name = "github.com/fsnotify/fsnotify"
   packages = ["."]
@@ -257,14 +162,6 @@
   pruneopts = "UT"
   revision = "72cd26f257d44c1114970e19afddcd812016007e"
   version = "v1.4.1"
-
-[[projects]]
-  digest = "1:586ea76dbd0374d6fb649a91d70d652b7fe0ccffb8910a77468e7702e7901f3d"
-  name = "github.com/go-stack/stack"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "2fee6af1a9795aafbe0253a0cfbdf668e1fb8a9a"
-  version = "v1.8.0"
 
 [[projects]]
   digest = "1:b60efdeb75d3c0ceed88783ac2495256aba3491a537d0f31401202579fd62a94"
@@ -390,14 +287,6 @@
   revision = "c2b33e84"
 
 [[projects]]
-  digest = "1:31e761d97c76151dde79e9d28964a812c46efc5baee4085b86f68f0c654450de"
-  name = "github.com/konsorten/go-windows-terminal-sequences"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "f55edac94c9bbba5d6182a4be46d86a2c9b5b50e"
-  version = "v1.0.2"
-
-[[projects]]
   digest = "1:c568d7727aa262c32bdf8a3f7db83614f7af0ed661474b24588de635c20024c7"
   name = "github.com/magiconair/properties"
   packages = ["."]
@@ -444,25 +333,6 @@
   pruneopts = "UT"
   revision = "f737f4e00462f79ff2e0ddbcfb09331ce7ec4fa9"
   version = "v1.0.49"
-
-[[projects]]
-  digest = "1:ee4d4af67d93cc7644157882329023ce9a7bcfce956a079069a9405521c7cc8d"
-  name = "github.com/opencontainers/go-digest"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "279bed98673dd5bef374d3b6e4b09e2af76183bf"
-  version = "v1.0.0-rc1"
-
-[[projects]]
-  digest = "1:1869683e323ebff2bdf8adcb560f82bf6f8d94019d35099e3403f7df12e9c07e"
-  name = "github.com/opencontainers/runc"
-  packages = [
-    "libcontainer/system",
-    "libcontainer/user",
-  ]
-  pruneopts = "UT"
-  revision = "baf6536d6259209c3edfa2b22237af82942d3dfa"
-  version = "v0.1.1"
 
 [[projects]]
   digest = "1:95741de3af260a92cc5c7f3f3061e85273f5a81b5db20d4bd68da74bd521675e"
@@ -614,99 +484,12 @@
   revision = "ecd376af8972cd9c3e355831c126a7862de6b2b9"
 
 [[projects]]
-  digest = "1:4a27ce9df1be95b7e15d14f3810a446343978cf397c962089e505c4ed5338861"
-  name = "github.com/wal-g/wal-g"
-  packages = [
-    "cmd/mongo",
-    "cmd/mysql",
-    "cmd/pg",
-    "cmd/redis",
-    "internal",
-    "internal/compression",
-    "internal/compression/brotli",
-    "internal/compression/computils",
-    "internal/compression/lz4",
-    "internal/compression/lzma",
-    "internal/compression/lzo",
-    "internal/compression/zstd",
-    "internal/crypto",
-    "internal/crypto/awskms",
-    "internal/crypto/openpgp",
-    "internal/databases/mongo",
-    "internal/databases/mysql",
-    "internal/databases/redis",
-    "internal/ioextensions",
-    "internal/limited",
-    "internal/walparser",
-    "internal/walparser/parsingutil",
-    "test/mocks",
-    "testtools",
-    "utility",
-  ]
-  pruneopts = "UT"
-  revision = "271f64fa6db2e59df012ff09539594e51de08d4d"
-  version = "v0.2.13"
-
-[[projects]]
   digest = "1:211f9cf21d532e2da93a420426d714af492743f4c602389cb0cd14ec8eebe256"
   name = "github.com/willf/bitset"
   packages = ["."]
   pruneopts = "UT"
   revision = "e553b05586428962bf7058d1044519d87ca72d74"
   version = "v1.1.9"
-
-[[projects]]
-  branch = "master"
-  digest = "1:40fdfd6ab85ca32b6935853bbba35935dcb1d796c8135efd85947566c76e662e"
-  name = "github.com/xdg/scram"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "7eeb5667e42c09cb51bf7b7c28aea8c56767da90"
-
-[[projects]]
-  branch = "master"
-  digest = "1:f5c1d04bc09c644c592b45b9f0bad4030521b1a7d11c7dadbb272d9439fa6e8e"
-  name = "github.com/xdg/stringprep"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "73f8eece6fdcd902c185bf651de50f3828bed5ed"
-
-[[projects]]
-  digest = "1:a514d9bdaa3454762c55499285c8872111f5b89743193a508b1f057c1298caf6"
-  name = "go.mongodb.org/mongo-driver"
-  packages = [
-    "bson",
-    "bson/bsoncodec",
-    "bson/bsonrw",
-    "bson/bsontype",
-    "bson/primitive",
-    "event",
-    "internal",
-    "mongo",
-    "mongo/options",
-    "mongo/readconcern",
-    "mongo/readpref",
-    "mongo/writeconcern",
-    "tag",
-    "version",
-    "x/bsonx",
-    "x/bsonx/bsoncore",
-    "x/mongo/driver",
-    "x/mongo/driver/address",
-    "x/mongo/driver/auth",
-    "x/mongo/driver/auth/internal/gssapi",
-    "x/mongo/driver/connstring",
-    "x/mongo/driver/description",
-    "x/mongo/driver/dns",
-    "x/mongo/driver/operation",
-    "x/mongo/driver/session",
-    "x/mongo/driver/topology",
-    "x/mongo/driver/uuid",
-    "x/mongo/driver/wiremessage",
-  ]
-  pruneopts = "UT"
-  revision = "797e0a635920c291b1808180bf7249eaac5eafed"
-  version = "v1.1.3"
 
 [[projects]]
   digest = "1:74055050ea547bb04600be79cc501965cb3de8988018262f2ca430f0a0b48ec3"
@@ -778,7 +561,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:3b14bf00ecd0641bbb7cc01c49c4b4c3920883f029820ebfee16f8999ccf8600"
+  digest = "1:052f9e272e028beacdbc08f3b3f1591c07bc6961a145ee25f42dc2c5ca403c7d"
   name = "golang.org/x/net"
   packages = [
     "context",
@@ -788,9 +571,7 @@
     "http2",
     "http2/hpack",
     "idna",
-    "internal/socks",
     "internal/timeseries",
-    "proxy",
     "trace",
   ]
   pruneopts = "UT"
@@ -1034,8 +815,6 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/DATA-DOG/godog",
-    "github.com/DATA-DOG/godog/gherkin",
     "github.com/DataDog/zstd",
     "github.com/RoaringBitmap/roaring",
     "github.com/aws/aws-sdk-go/aws",
@@ -1047,11 +826,6 @@
     "github.com/aws/aws-sdk-go/service/s3/s3manager",
     "github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface",
     "github.com/cyberdelia/lzo",
-    "github.com/docker/docker/api/types",
-    "github.com/docker/docker/api/types/filters",
-    "github.com/docker/docker/api/types/network",
-    "github.com/docker/docker/client",
-    "github.com/docker/docker/pkg/archive",
     "github.com/go-redis/redis",
     "github.com/go-sql-driver/mysql",
     "github.com/golang/mock/gomock",
@@ -1073,38 +847,7 @@
     "github.com/wal-g/storages/s3",
     "github.com/wal-g/storages/storage",
     "github.com/wal-g/storages/swift",
-    "github.com/wal-g/wal-g/cmd/mongo",
-    "github.com/wal-g/wal-g/cmd/mysql",
-    "github.com/wal-g/wal-g/cmd/pg",
-    "github.com/wal-g/wal-g/cmd/redis",
-    "github.com/wal-g/wal-g/internal",
-    "github.com/wal-g/wal-g/internal/compression",
-    "github.com/wal-g/wal-g/internal/compression/brotli",
-    "github.com/wal-g/wal-g/internal/compression/computils",
-    "github.com/wal-g/wal-g/internal/compression/lz4",
-    "github.com/wal-g/wal-g/internal/compression/lzma",
-    "github.com/wal-g/wal-g/internal/compression/lzo",
-    "github.com/wal-g/wal-g/internal/compression/zstd",
-    "github.com/wal-g/wal-g/internal/crypto",
-    "github.com/wal-g/wal-g/internal/crypto/awskms",
-    "github.com/wal-g/wal-g/internal/crypto/openpgp",
-    "github.com/wal-g/wal-g/internal/databases/mongo",
-    "github.com/wal-g/wal-g/internal/databases/mysql",
-    "github.com/wal-g/wal-g/internal/databases/redis",
-    "github.com/wal-g/wal-g/internal/ioextensions",
-    "github.com/wal-g/wal-g/internal/limited",
-    "github.com/wal-g/wal-g/internal/walparser",
-    "github.com/wal-g/wal-g/internal/walparser/parsingutil",
-    "github.com/wal-g/wal-g/test/mocks",
-    "github.com/wal-g/wal-g/testtools",
-    "github.com/wal-g/wal-g/utility",
-    "go.mongodb.org/mongo-driver/bson",
-    "go.mongodb.org/mongo-driver/mongo",
-    "go.mongodb.org/mongo-driver/mongo/options",
-    "go.mongodb.org/mongo-driver/mongo/readpref",
-    "go.mongodb.org/mongo-driver/x/bsonx",
     "golang.org/x/crypto/openpgp",
-    "golang.org/x/crypto/openpgp/packet",
     "golang.org/x/sync/semaphore",
     "golang.org/x/time/rate",
   ]

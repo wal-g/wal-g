@@ -3,47 +3,8 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"strings"
 )
-
-func mergeEnvs(env []string, values []string) []string {
-	envMap := make(map[string]string, 0)
-	for _, line := range append(env, values...) {
-		name, value := SplitEnvLine(line)
-		envMap[name] = value
-	}
-	updatedEnv := make([]string, 0)
-	for name, value := range envMap {
-		updatedEnv = append(updatedEnv, fmt.Sprintf("%s=%s", name, value))
-	}
-	return updatedEnv
-}
-
-func stringInSlice(a string, list []string) bool {
-	for _, b := range list {
-		if b == a {
-			return true
-		}
-	}
-	return false
-}
-
-func SplitEnvLine(line string) (string, string) {
-	values := strings.Split(line, "=")
-	return values[0], values[1]
-}
-
-func GetVarFromEnvList(env []string, name string) string {
-	for _, value := range env {
-		currentName, currentValue := SplitEnvLine(value)
-		if currentName == name {
-			return currentValue
-		}
-	}
-	return ""
-}
 
 func getTestEnv(testContext *TestContextType) []string {
 	if testContext.Env != nil {
@@ -68,31 +29,27 @@ func getTestEnv(testContext *TestContextType) []string {
 	return env
 }
 
-func generateSecrets(testContext *TestContextType) map[string]string {
-	return map[string]string{
-		"MINIO_ACCESS_KEY": RandSeq(20),
-		"MINIO_SECRET_KEY": RandSeq(40),
+func SetupStaging(testContext *TestContextType) {
+	stagingDir := Env["STAGING_DIR"]
+	if _, err := os.Stat(stagingDir); os.IsNotExist(err) {
+		err = os.Mkdir(stagingDir, os.ModeDir)
+		if err != nil {
+			panic(err)
+		}
 	}
-}
-
-func updateFileValues(filepath string, subs map[string]string) {
-	minioDockerfile, err := ioutil.ReadFile(filepath)
-	if err != nil {
-		panic(err)
-	}
-
-	lines := strings.Split(string(minioDockerfile), "\n")
-
-	for i, line := range lines {
-		for prefix, value := range subs {
-			if strings.HasPrefix(line, prefix) {
-				lines[i] = prefix + value
+	envFile := Env["ENV_FILE"]
+	if _, err := os.Stat(envFile); os.IsNotExist(err) {
+		file, err := os.OpenFile(envFile, os.O_CREATE | os.O_WRONLY, 0644)
+		if err != nil {
+			panic(err)
+		}
+		defer file.Close()
+		for key, value := range Env {
+			_, err = fmt.Fprintf(file, "%s=%s\n", key, value)
+			if err != nil {
+				panic(err)
 			}
 		}
 	}
-
-	err = ioutil.WriteFile(filepath, []byte(strings.Join(lines, "\n")), 0644)
-	if err != nil {
-		panic(err)
-	}
+	testContext.Env = getTestEnv(testContext)
 }

@@ -14,7 +14,11 @@ import (
 	"time"
 )
 
-func connectHostPort(host string, port uint16) *mongo.Client {
+var WalgCliPath = "/usr/bin/wal-g"
+var WalgConfPath = "/home/.walg.json"
+var WalgDefaultArgs = ""
+
+func connectHP(host string, port uint16) *mongo.Client {
 	uri := fmt.Sprintf("mongodb://%s:%d/?connect=direct", host, port)
 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
 	if err != nil {
@@ -47,13 +51,13 @@ func EnvDBConnect(testContext *TestContextType, nodeName string) *mongo.Client {
 	}
 	dbHost := GetDockerContainer(testContext, nodeName)
 	host, port := getExposedPort(*dbHost, uint16(dbMongoPort))
-	conn := connectHostPort(
+	conn := connectHP(
 		host,
 		port)
 	return conn
 }
 
-func EnvDBConnectWithCreds(testContext *TestContextType, nodeName string, creds UserConfiguration) *mongo.Client {
+func EnvDBConnectWithCreds(testContext *TestContextType, nodeName string, creds UserConfiguration) * mongo.Client {
 	dbMongoPort, err := strconv.Atoi(GetVarFromEnvList(testContext.Env, "DB_MONGO_PORT"))
 	if err != nil {
 		panic(err)
@@ -69,7 +73,8 @@ func EnvDBConnectWithCreds(testContext *TestContextType, nodeName string, creds 
 	return conn
 }
 
-func FillWithData(database *mongo.Client, mark string) map[string]map[string][]DatabaseRecord {
+
+func FillWithData(database *mongo.Client, mark string)  map[string]map[string][]DatabaseRecord {
 	var data = make(map[string]map[string][]DatabaseRecord, 0)
 	for i := 1; i <= 2; i++ {
 		dbName := fmt.Sprintf("test_db_%02d", i)
@@ -109,6 +114,7 @@ func generateRecord(rowNum int, strLen int, strPrefix string) DatabaseRecord {
 }
 
 func getBackupNameFromExecOutput(output string) string {
+	fmt.Printf("\n\n%+v\n\n", output)
 	return strings.Trim(strings.Split(output, "FILE PATH: ")[1], " ")
 }
 
@@ -118,13 +124,11 @@ func getBackupNamesFromExecOutput(output string) []string {
 }
 
 func GetBackups(testContext *TestContextType, containerName string) []string {
-	WalgCliPath := GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
 	backupListCommand := []string{WalgCliPath, "--config", WalgConfPath, "backup-list"}
-	config := types.ExecConfig{
+	config :=  types.ExecConfig{
 		AttachStderr: true,
 		AttachStdout: true,
-		Cmd:          backupListCommand,
+		Cmd: backupListCommand,
 	}
 	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(context.Background(), containerName, config)
 	if err != nil {
@@ -143,13 +147,15 @@ func GetBackups(testContext *TestContextType, containerName string) []string {
 }
 
 func MakeBackup(testContext *TestContextType, containerName string, cmdArgs string, creds UserConfiguration) string {
-	WalgCliPath := GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
-	command := strings.Join([]string{WalgCliPath, "--config", WalgConfPath, "backup-push", cmdArgs}, " ")
-	config := types.ExecConfig{
+	//uri := fmt.Sprintf("mongodb://%s:%s@%s:%d/", creds.Username, creds.Password, "127.0.0.1", 27018)
+	//mongoDumpCommand := []string{"mongodump", fmt.Sprintf("--uri=\"%s\"", uri), "--archive"}
+	//backupCommand := []string{"|", WalgCliPath, "--config", WalgConfPath, "backup-push" , cmdArgs}
+	command := strings.Join([]string{WalgCliPath, "--config", WalgConfPath, "backup-push" , cmdArgs}, " ")
+	//command := strings.Join(append(mongoDumpCommand, backupCommand...), " ")
+	config :=  types.ExecConfig{
 		AttachStderr: true,
 		AttachStdout: true,
-		Cmd:          []string{"bash", "-c", command},
+		Cmd: []string{"bash", "-c", command},
 	}
 	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(context.Background(), containerName, config)
 	if err != nil {
@@ -168,10 +174,8 @@ func MakeBackup(testContext *TestContextType, containerName string, cmdArgs stri
 }
 
 func DeleteBackup(testContext *TestContextType, containerName string, backupNum int) {
-	WalgCliPath := GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
 	backupEntries := GetBackups(testContext, containerName)
-	command := []string{WalgCliPath, "--config", WalgConfPath, "delete", "before", backupEntries[backupNum+1], "--confirm"}
+	command := []string{WalgCliPath, "--config", WalgConfPath, "delete", "before", backupEntries[backupNum + 1], "--confirm"}
 	RunCommandInContainer(testContext, containerName, command)
 }
 
@@ -254,6 +258,7 @@ func GetAllUserData(connection *mongo.Client) []UserData {
 }
 
 func checkRsInitialized(connection *mongo.Client) bool {
+	// example from here https://github.com/stefanprodan/mongo-swarm/blob/4c80693d3a6cf74282d1bd249f35cf4bded13cc1/bootstrap/replicaset.go
 	response := connection.Database("admin").RunCommand(context.Background(), "replSetGetStatus")
 	return response != nil
 }
@@ -281,18 +286,14 @@ func StepEnsureRsInitialized(testContext *TestContextType, containerName string)
 }
 
 func restoreBackupById(testContext *TestContextType, containerName string, backupNum int) {
-	WalgCliPath := GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
 	backupEntries := GetBackups(testContext, containerName)
-	walgCommand := []string{WalgCliPath, "--config", WalgConfPath, "backup-fetch", backupEntries[len(backupEntries)-backupNum-1]}
+	walgCommand := []string{WalgCliPath, "--config", WalgConfPath, "backup-fetch", backupEntries[len(backupEntries) - backupNum - 1]}
 	mongoCommand := []string{"|", "mongorestore", "--archive", "--uri=\"mongodb://admin:password@127.0.0.1:27018\""}
 	command := strings.Join(append(walgCommand, mongoCommand...), " ")
 	_ = RunCommandInContainer(testContext, containerName, []string{"bash", "-c", command})
 }
 
 func MongoPurgeBackups(testContext *TestContextType, containerName string, keepNumber int) {
-	WalgCliPath := GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
 	command := []string{WalgCliPath, "--config", WalgConfPath, "delete", "retain", strconv.Itoa(keepNumber), "--confirm"}
 	_ = RunCommandInContainer(testContext, containerName, command)
 }
