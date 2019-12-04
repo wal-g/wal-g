@@ -3,96 +3,83 @@ package functest
 import (
 	"fmt"
 	"github.com/docker/docker/client"
-	testConf "github.com/wal-g/wal-g/tests_func/config"
-	testHelper "github.com/wal-g/wal-g/tests_func/helpers"
-	testUtils "github.com/wal-g/wal-g/tests_func/utils"
+	c "github.com/wal-g/wal-g/tests_func/config"
+	h "github.com/wal-g/wal-g/tests_func/helpers"
+	u "github.com/wal-g/wal-g/tests_func/utils"
 	"os"
 	"os/exec"
 )
 
-func BuildBase(testContext *testHelper.TestContextType) error {
+func BuildBase(testContext *TestContextType) {
 	var err error
 	testContext.DockerClient, err = client.NewClientWithOpts(client.WithVersion("1.38"))
 	if err != nil {
-		return fmt.Errorf("error in building base: %w", err)
+		panic(err)
 	}
-	testContext.Env = testUtils.MergeEnvs(testContext.Env, testHelper.GetConfiguration(testContext))
-	cmd := exec.Command("docker", "build", "-t", testUtils.GetVarFromEnvList(testContext.Env, "MONGODB_BACKUP_BASE_TAG"), testUtils.GetVarFromEnvList(testContext.Env, "MONGODB_BACKUP_BASE_PATH"))
+	testContext.Env = u.MergeEnvs(testContext.Env, h.GetConfiguration(testContext))
+	cmd := exec.Command("docker", "build", "-t", u.GetVarFromEnvList(testContext.Env, "MONGODB_BACKUP_BASE_TAG"), u.GetVarFromEnvList(testContext.Env, "MONGODB_BACKUP_BASE_PATH"))
 	cmd.Stdout = os.Stdout
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf("error in building base: %w", err)
+		panic(err)
 	}
-	return nil
+	testContext.Configuration = conf
 }
 
-func Stop(testContext *testHelper.TestContextType) error {
-	return testHelper.CallCompose(testContext, []string{"down", "--rmi", "local", "--remove-orphans"})
+func Stop(testContext *TestContextType) {
+	CallCompose(testContext, []string{"down", "--rmi", "local", "--remove-orphans"})
 }
 
-func Start(testContext *testHelper.TestContextType) error {
-	testContext.Env = testUtils.MergeEnvs(os.Environ(), testContext.Env)
-	err := testHelper.CreateNet(testContext, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
-	if err != nil {
-		return err
-	}
+func Start(testContext *TestContextType) {
+	testContext.Env = MergeEnvs(os.Environ(), testContext.Env)
+	CreateNet(testContext, GetVarFromEnvList(testContext.Env, "TEST_ID"))
 	fmt.Printf("`docker-compose build` is running\n")
-	err = testHelper.CallCompose(testContext, []string{"build"})
-	if err != nil {
-		return err
-	}
+	CallCompose(testContext, []string{"build"})
 	fmt.Printf("`docker-compose up --detach --build --force-recreate` is running\n")
-	return testHelper.CallCompose(testContext, []string{"up", "--detach", "--build", "--force-recreate"})
+	CallCompose(testContext, []string{"up", "--detach", "--build", "--force-recreate"})
 }
 
-func SetupStaging(testContext *testHelper.TestContextType) error {
-	for key, value := range testUtils.GenerateSecrets() {
-		testConf.Env[key] = value
+func SetupStaging(testContext *TestContextType) {
+	for key, value := range GenerateSecrets() {
+		Env[key] = value
 	}
 
-	err := testUtils.CopyDirectory("./images/", "./staging/images")
-	if err != nil {
-		return fmt.Errorf("error in setuping staging: %w", err)
-	}
-
-	testUtils.UpdateFileValues("./staging/images/minio/Dockerfile", map[string]string{
-		"MINIO_ACCESS_KEY": testConf.Env["MINIO_ACCESS_KEY"],
-		"MINIO_SECRET_KEY": testConf.Env["MINIO_SECRET_KEY"],
+	UpdateFileValues("./staging/images/minio/Dockerfile", map[string]string{
+		"ENV MINIO_ACCESS_KEY ": Env["MINIO_ACCESS_KEY"],
+		"ENV MINIO_SECRET_KEY ": Env["MINIO_SECRET_KEY"],
 	})
 
-	testUtils.UpdateFileValues("./staging/images/base/config/.walg", map[string]string{
-		"MINIO_ACCESS_KEY": testConf.Env["MINIO_ACCESS_KEY"],
-		"MINIO_SECRET_KEY": testConf.Env["MINIO_SECRET_KEY"],
+	UpdateFileValues("./staging/images/base/config/.walg", map[string]string{
+		"\"AWS_ACCESS_KEY_ID\": ":     "\"" + Env["MINIO_ACCESS_KEY"] + "\",",
+		"\"AWS_SECRET_ACCESS_KEY\": ": "\"" + Env["MINIO_SECRET_KEY"] + "\",",
 	})
 
-	testUtils.UpdateFileValues("./staging/images/mongodb/config/s3cmd.conf", map[string]string{
-		"MINIO_ACCESS_KEY": testConf.Env["MINIO_ACCESS_KEY"],
-		"MINIO_SECRET_KEY": testConf.Env["MINIO_SECRET_KEY"],
+	UpdateFileValues("./staging/images/mongodb/config/s3cmd.conf", map[string]string{
+		"access_key = ": Env["MINIO_ACCESS_KEY"],
+		"secret_key = ": Env["MINIO_SECRET_KEY"],
 	})
 
-	stagingDir := testConf.Env["STAGING_DIR"]
+	stagingDir := Env["STAGING_DIR"]
 	if _, err := os.Stat(stagingDir); os.IsNotExist(err) {
 		err = os.Mkdir(stagingDir, os.ModeDir)
 		if err != nil {
-			return fmt.Errorf("error in setuping staging: %w", err)
+			panic(err)
 		}
 	}
 
-	envFile := testConf.Env["ENV_FILE"]
-	_, err = os.Stat(envFile)
+	envFile := Env["ENV_FILE"]
+	_, err := os.Stat(envFile)
 	file, err := os.OpenFile(envFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
-		return fmt.Errorf("error in setuping staging: %w", err)
+		panic(err)
 	}
 	defer file.Close()
-	for key, value := range testConf.Env {
+	for key, value := range Env {
 		_, err = fmt.Fprintf(file, "%s=%s\n", key, value)
 		if err != nil {
-			return fmt.Errorf("error in setuping staging: %w", err)
+			panic(err)
 		}
 	}
 
-	testContext.Env, err = testHelper.GetTestEnv(testContext)
-
-	return err
+	testContext.Env = GetTestEnv(testContext)
 }

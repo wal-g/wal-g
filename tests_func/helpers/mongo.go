@@ -5,90 +5,71 @@ import (
 	"context"
 	"fmt"
 	"github.com/docker/docker/api/types"
-	testUtils "github.com/wal-g/wal-g/tests_func/utils"
+	u "github.com/wal-g/wal-g/tests_func/utils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
-func connectHostPort(context context.Context, host string, port uint16) (*mongo.Client, error) {
+func connectHostPort(context context.Context, host string, port uint16) *mongo.Client {
 	uri := fmt.Sprintf("mongodb://%s:%d/?connect=direct", host, port)
 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
 	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongo via host and port: %w", err)
+		panic(err)
 	}
 	err = client.Connect(context)
 	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongo via host and port: %w", err)
+		panic(err)
 	}
-	return client, nil
+	return client
 }
 
-func connect(context context.Context, user string, password string, dbname string, host string, port uint16) (*mongo.Client, error) {
+func connect(context context.Context, user string, password string, dbname string, host string, port uint16) *mongo.Client {
 	uri := fmt.Sprintf("mongodb://%s:%s@%s:%d/%s?connect=direct&authMechanism=SCRAM-SHA-1", user, password, host, port, dbname)
 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
 	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongo via host, port, dbname and user creds: %w", err)
+		panic(err)
 	}
 	err = client.Connect(context)
 	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongo via host, port, dbname and user creds: %w", err)
+		panic(err)
 	}
-	return client, nil
+	return client
 }
 
-func EnvDBConnect(testContext *TestContextType, nodeName string) (*mongo.Client, error) {
-	dbMongoPort, err := strconv.Atoi(testUtils.GetVarFromEnvList(testContext.Env, "MONGO_EXPOSE_MONGOD"))
+func EnvDBConnect(testContext *TestContextType, nodeName string) *mongo.Client {
+	dbMongoPort, err := strconv.Atoi(u.GetVarFromEnvList(testContext.Env, "MONGO_EXPOSE_MONGOD"))
 	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongodb: %w", err)
+		panic(err)
 	}
-	dbHost, err := GetDockerContainer(testContext, nodeName)
-	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongodb: %w", err)
-	}
-	host, port, err := GetExposedPort(*dbHost, uint16(dbMongoPort))
-	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongodb: %w", err)
-	}
-	conn, err := connectHostPort(
+	dbHost := GetDockerContainer(testContext, nodeName)
+	host, port := GetExposedPort(*dbHost, uint16(dbMongoPort))
+	conn := connectHostPort(
 		testContext.Context,
 		host,
 		port)
-	if err != nil {
-		return nil, fmt.Errorf("error in connection to mongodb: %w", err)
-	}
-	return conn, nil
+	return conn
 }
 
-func EnvDBConnectWithCreds(testContext *TestContextType, nodeName string, creds UserConfiguration) (*mongo.Client, error) {
-	dbMongoPort, err := strconv.Atoi(testUtils.GetVarFromEnvList(testContext.Env, "MONGO_EXPOSE_MONGOD"))
+func EnvDBConnectWithCreds(testContext *TestContextType, nodeName string, creds UserConfiguration) *mongo.Client {
+	dbMongoPort, err := strconv.Atoi(u.GetVarFromEnvList(testContext.Env, "MONGO_EXPOSE_MONGOD"))
 	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongodb: %w", err)
+		panic(err)
 	}
-	dbHost, err := GetDockerContainer(testContext, nodeName)
-	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongodb: %w", err)
-	}
-	host, port, err := GetExposedPort(*dbHost, uint16(dbMongoPort))
-	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongodb: %w", err)
-	}
-	conn, err := connect(
+	dbHost := GetDockerContainer(testContext, nodeName)
+	host, port := GetExposedPort(*dbHost, uint16(dbMongoPort))
+	conn := connect(
 		testContext.Context,
 		creds.Username,
 		creds.Password,
 		creds.Dbname,
 		host,
 		port)
-	if err != nil {
-		return nil, fmt.Errorf("error in connection to mongodb: %w", err)
-	}
-	return conn, nil
+	return conn
 }
 
 func FillWithData(context context.Context, database *mongo.Client, mark string) map[string]map[string][]DatabaseRecord {
@@ -126,7 +107,7 @@ func generateRecord(rowNum int, strLen int, strPrefix string) DatabaseRecord {
 	return DatabaseRecord{
 		Datetime: time.Now(),
 		IntNum:   rowNum,
-		Str:      strPrefix + testUtils.RandSeq(strLen),
+		Str:      strPrefix + u.RandSeq(strLen),
 	}
 }
 
@@ -139,9 +120,9 @@ func getBackupNamesFromExecOutput(output string) []string {
 	return re.FindAllString(output, -1)
 }
 
-func GetBackups(testContext *TestContextType, containerName string) ([]string, error) {
-	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
+func GetBackups(testContext *TestContextType, containerName string) []string {
+	WalgCliPath := u.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
+	WalgConfPath := u.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
 	backupListCommand := []string{WalgCliPath, "--config", WalgConfPath, "backup-list"}
 	config := types.ExecConfig{
 		AttachStderr: true,
@@ -150,81 +131,75 @@ func GetBackups(testContext *TestContextType, containerName string) ([]string, e
 	}
 	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(testContext.Context, containerName, config)
 	if err != nil {
-		return []string{}, fmt.Errorf("error in getting backups: %w", err)
+		panic(err)
 	}
 	responseId, err := testContext.DockerClient.ContainerExecAttach(testContext.Context, responseIdExecCreate.ID, types.ExecStartCheck{})
 	if err != nil {
-		return []string{}, fmt.Errorf("error in getting backups: %w", err)
+		panic(err)
 	}
 	scanner := bufio.NewScanner(responseId.Reader)
 	var response string
 	for scanner.Scan() {
 		response = response + scanner.Text()
 	}
-	return getBackupNamesFromExecOutput(response), nil
+	return getBackupNamesFromExecOutput(response)
 }
 
-func MakeBackup(testContext *TestContextType, containerName string, cmdArgs string, creds UserConfiguration, envs []string) (string, error) {
-	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
+func MakeBackup(testContext *TestContextType, containerName string, cmdArgs string, creds UserConfiguration) string {
+	WalgCliPath := u.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
+	WalgConfPath := u.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
 	command := strings.Join([]string{WalgCliPath, "--config", WalgConfPath, "backup-push", cmdArgs}, " ")
 	config := types.ExecConfig{
 		AttachStderr: true,
 		AttachStdout: true,
 		Cmd:          []string{"bash", "-c", command},
-		Env:		  append(os.Environ(), envs...),
 	}
-	fmt.Print("\n\n\n%+v\n\n\n", config.Env)
 	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(testContext.Context, containerName, config)
 	if err != nil {
-		return "", fmt.Errorf("error in making backup: %w", err)
+		panic(err)
 	}
 	responseId, err := testContext.DockerClient.ContainerExecAttach(testContext.Context, responseIdExecCreate.ID, types.ExecStartCheck{})
 	if err != nil {
-		return "", fmt.Errorf("error in making backup: %w", err)
+		panic(err)
 	}
 	scanner := bufio.NewScanner(responseId.Reader)
 	var response string
 	for scanner.Scan() {
 		response = response + scanner.Text()
 	}
-	return getBackupNameFromExecOutput(response), nil
+	return getBackupNameFromExecOutput(response)
 }
 
-func DeleteBackup(testContext *TestContextType, containerName string, backupNum int) error {
-	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
-	backupEntries, err := GetBackups(testContext, containerName)
-	if err != nil {
-		return err
-	}
+func DeleteBackup(testContext *TestContextType, containerName string, backupNum int) {
+	WalgCliPath := u.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
+	WalgConfPath := u.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
+	backupEntries := GetBackups(testContext, containerName)
 	command := []string{WalgCliPath, "--config", WalgConfPath, "delete", "before", backupEntries[backupNum+1], "--confirm"}
-	_, err = RunCommandInContainer(testContext, containerName, command)
-	return fmt.Errorf("error in deleting backup: %w", err)
+	RunCommandInContainer(testContext, containerName, command)
 }
 
-func RunCommandInContainerWithOptions(testContext *TestContextType, containerName string, command []string, options types.ExecConfig) (string, error) {
+func RunCommandInContainerWithOptions(testContext *TestContextType, containerName string, command []string, options types.ExecConfig) string {
 	config := options
 	config.AttachStderr = true
 	config.AttachStdout = true
 	config.Cmd = command
 	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(testContext.Context, containerName, config)
 	if err != nil {
-		return "", fmt.Errorf("error in running command in container: %w", err)
+		panic(err)
 	}
 	responseId, err := testContext.DockerClient.ContainerExecAttach(testContext.Context, responseIdExecCreate.ID, types.ExecStartCheck{})
 	if err != nil {
-		return "", fmt.Errorf("error in running command in container: %w", err)
+		panic(err)
 	}
 	scanner := bufio.NewScanner(responseId.Reader)
 	var response string
 	for scanner.Scan() {
 		response = response + scanner.Text()
 	}
-	return response, nil
+	return response
 }
 
-func RunCommandInContainer(testContext *TestContextType, containerName string, command []string) (string, error) {
+func RunCommandInContainer(testContext *TestContextType, containerName string, command []string) string {
 	return RunCommandInContainerWithOptions(testContext, containerName, command, types.ExecConfig{})
 }
 
@@ -286,53 +261,46 @@ func checkRsInitialized(context context.Context, connection *mongo.Client) bool 
 	return response != nil
 }
 
-func StepEnsureRsInitialized(testContext *TestContextType, containerName string) error {
+func StepEnsureRsInitialized(testContext *TestContextType, containerName string) {
 	var response string
-	var err error
 	for i := 0; i < 15; i++ {
 		command := []string{"mongo", "--host", "localhost", "--quiet", "--norc", "--port", "27018", "--eval", "rs.status()"}
-		response, err = RunCommandInContainer(testContext, containerName, command)
+		response = RunCommandInContainer(testContext, containerName, command)
 		if strings.Contains(response, "myState") {
-			return nil
+			return
 		}
 		if strings.Contains(response, "NotYetInitialized") {
 			ncmd := []string{"mongo", "--host", "localhost", "--quiet", "--norc", "--port", "27018", "--eval", "rs.initiate()"}
-			_, err = RunCommandInContainer(testContext, containerName, ncmd)
+			_ = RunCommandInContainer(testContext, containerName, ncmd)
 		} else if strings.Contains(response, "Unauthorized") {
 			creds := UserConfiguration{
-				Username: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_USERNAME"),
-				Password: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_PASSWORD"),
-				Dbname:   testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_DB_NAME"),
-				Roles:    strings.Split(testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_ROLES"), " "),
+				Username: u.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_USERNAME"),
+				Password: u.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_PASSWORD"),
+				Dbname:   u.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_DB_NAME"),
+				Roles:    strings.Split(u.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_ROLES"), " "),
 			}
-			var connection *mongo.Client
-			connection, err = EnvDBConnectWithCreds(testContext, containerName, creds)
+			connection := EnvDBConnectWithCreds(testContext, containerName, creds)
 			if checkRsInitialized(testContext.Context, connection) {
-				return nil
+				return
 			}
 		}
 	}
-	return fmt.Errorf("replset was not initialized: %s;\n and finished with last error: %w", response, err)
+	panic(fmt.Errorf("replset was not initialized: %s", response))
 }
 
-func RestoreBackupById(testContext *TestContextType, containerName string, backupNum int) error {
-	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
-	backupEntries, err := GetBackups(testContext, containerName)
-	if err != nil {
-		return fmt.Errorf("error in restoring backup by id: %w", err)
-	}
+func RestoreBackupById(testContext *TestContextType, containerName string, backupNum int) {
+	WalgCliPath := u.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
+	WalgConfPath := u.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
+	backupEntries := GetBackups(testContext, containerName)
 	walgCommand := []string{WalgCliPath, "--config", WalgConfPath, "backup-fetch", backupEntries[len(backupEntries)-backupNum-1]}
 	mongoCommand := []string{"|", "mongorestore", "--archive", "--uri=\"mongodb://admin:password@127.0.0.1:27018\""}
 	command := strings.Join(append(walgCommand, mongoCommand...), " ")
-	_, err = RunCommandInContainer(testContext, containerName, []string{"bash", "-c", command})
-	return err
+	_ = RunCommandInContainer(testContext, containerName, []string{"bash", "-c", command})
 }
 
-func MongoPurgeBackups(testContext *TestContextType, containerName string, keepNumber int) error {
-	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
+func MongoPurgeBackups(testContext *TestContextType, containerName string, keepNumber int) {
+	WalgCliPath := u.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
+	WalgConfPath := u.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
 	command := []string{WalgCliPath, "--config", WalgConfPath, "delete", "retain", strconv.Itoa(keepNumber), "--confirm"}
-	_, err := RunCommandInContainer(testContext, containerName, command)
-	return err
+	_ = RunCommandInContainer(testContext, containerName, command)
 }

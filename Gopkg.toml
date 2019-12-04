@@ -26,10 +26,6 @@
 
 [[constraint]]
   branch = "master"
-  name = "github.com/DATA-DOG/godog"
-
-[[constraint]]
-  branch = "master"
   name = "github.com/docker/docker"
 
 [[constraint]]
