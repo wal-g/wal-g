@@ -34,6 +34,18 @@
   version = "v0.8.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:80f2160304b9c3defc0e6295a65f16f5457a63ef3eb2a71a5690b56d9e0f5727"
+  name = "github.com/DATA-DOG/godog"
+  packages = [
+    ".",
+    "colors",
+    "gherkin",
+  ]
+  pruneopts = "UT"
+  revision = "96731eaefa46de6281a0d63253fe4cba1cb27dae"
+
+[[projects]]
   digest = "1:8eacd45a4fb9c351d20c6050ae91783a844f171e65470fca0380c30a5eabb726"
   name = "github.com/DATA-DOG/godog"
   packages = [
@@ -785,6 +797,28 @@
   ]
   pruneopts = "UT"
   revision = "e657309f52e71501f9934566ac06dc5c2f7f11a1"
+
+[[projects]]
+  branch = "master"
+  digest = "1:691f3a202dd569bd0d33b8b16bcb390a479b3c6ccc8ced9cb13085e47030e11a"
+  name = "golang.org/x/exp"
+  packages = [
+    "apidiff",
+    "cmd/apidiff",
+  ]
+  pruneopts = "UT"
+  revision = "ec7cb31e5a562f5e9e31b300128d2f530f55d127"
+
+[[projects]]
+  branch = "master"
+  digest = "1:134674d729e1afbae39eeaa6abcf8e5f3106338f83643394ab5205a020efbd9b"
+  name = "golang.org/x/lint"
+  packages = [
+    ".",
+    "golint",
+  ]
+  pruneopts = "UT"
+  revision = "959b441ac422379a43da2230f62be024250818b0"
 
 [[projects]]
   branch = "master"
