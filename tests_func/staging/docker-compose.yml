@@ -22,11 +22,7 @@ services:
         - ./code/minio:/code:rw
         - ./images/minio/config:/config:rw
     mongodb01:
-        build:
-            context: ..
-            args:
-                - MONGO_MAJOR=${MONGO_MAJOR}
-                - MONGO_VERSION=${MONGO_VERSION}
+        build: ..
         container_name: mongodb01.test_net_${TEST_ID}
         dns:
         - 2a02:6b8:0:3400::1023
@@ -48,11 +44,7 @@ services:
         - ./images/base/config/.walg:/home/.walg.json:rw
         - ./images/mongodb/config/gpg-key.armor:/home/gpg-key.armor:rw
     mongodb02:
-        build:
-            context: ..
-            args:
-                - MONGO_MAJOR=${MONGO_MAJOR}
-                - MONGO_VERSION=${MONGO_VERSION}
+        build: ..
         container_name: mongodb02.test_net_${TEST_ID}
         dns:
         - 2a02:6b8:0:3400::1023

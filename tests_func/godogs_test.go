@@ -158,7 +158,6 @@ func replsetinitiateOnMongodb(mongodbId int) error {
 	if err != nil {
 		return err
 	}
-	time.Sleep(30 * time.Second)
 	return nil
 }
 
@@ -201,16 +200,8 @@ func authenticateOnMongodb(mongodbId int) error {
 	if err != nil {
 		return err
 	}
-	if strings.Contains(response, "command createUser requires authentication") {
-		command = append(command, "-u", creds.Username, "-p", creds.Password)
-		response, err = testHelper.RunCommandInContainer(testContext, nodeName, command)
-		if err != nil {
-			return err
-		}
-	}
 	if !strings.Contains(response, "Successfully added user") &&
-		!strings.Contains(response, "not authorized on admin") &&
-		!strings.Contains(response, "already exists"){
+		!strings.Contains(response, "not authorized on admin") {
 		return fmt.Errorf("can not initialize auth: %s", response)
 	}
 	return nil
