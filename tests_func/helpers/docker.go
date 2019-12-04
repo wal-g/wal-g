@@ -30,7 +30,7 @@ func GetContainerWithPrefix(containers []types.Container, name string) (*types.C
 
 func GetDockerContainer(testContext *TestContextType, prefix string) *types.Container {
 	dockerClient := testContext.DockerClient
-	containers, err := dockerClient.ContainerList(testContext.Context, types.ContainerListOptions{})
+	containers, err := dockerClient.ContainerList(context.Background(), types.ContainerListOptions{})
 	if err != nil {
 		panic(err)
 	}
@@ -87,7 +87,7 @@ func CallCompose(testContext *TestContextType, actions []string) {
 
 func getNetworkListWithName(testContext *TestContextType, name string) []types.NetworkResource {
 	networkFilters := filters.NewArgs()
-	networkResources, err := testContext.DockerClient.NetworkList(testContext.Context, types.NetworkListOptions{
+	networkResources, err := testContext.DockerClient.NetworkList(context.Background(), types.NetworkListOptions{
 		Filters: networkFilters,
 	})
 	var result []types.NetworkResource
@@ -120,7 +120,7 @@ func CreateNet(testContext *TestContextType, name string) {
 		IPAM:    ipam,
 		Options: netOpts,
 	}
-	_, err := dockerClient.NetworkCreate(testContext.Context, name, config)
+	_, err := dockerClient.NetworkCreate(context.Background(), name, config)
 	if err != nil {
 		panic(err)
 	}
@@ -129,7 +129,7 @@ func CreateNet(testContext *TestContextType, name string) {
 func RemoveNet(testContext *TestContextType, name string) {
 	nets := getNetworkListWithName(testContext, name)
 	for _, net := range nets {
-		err := testContext.DockerClient.NetworkRemove(testContext.Context, net.ID)
+		err := testContext.DockerClient.NetworkRemove(context.Background(), net.ID)
 		if err != nil {
 			panic(err)
 		}
@@ -146,7 +146,6 @@ type TestContextType struct {
 	Env          []string
 	SafeStorage  SafeStorageType
 	TestData     map[string]map[string]map[string][]DatabaseRecord
-	Context      context.Context
 }
 
 func ShutdownContainers(testContext *TestContextType) {
@@ -155,7 +154,7 @@ func ShutdownContainers(testContext *TestContextType) {
 
 func ShutdownNetwork(testContext *TestContextType) {
 	networkName := u.GetVarFromEnvList(testContext.Env, "NETWORK_NAME")
-	err := testContext.DockerClient.NetworkRemove(testContext.Context, networkName)
+	err := testContext.DockerClient.NetworkRemove(context.Background(), networkName)
 	if err != nil {
 		panic(err)
 	}

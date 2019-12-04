@@ -20,7 +20,6 @@ var testContext = &h.TestContextType{}
 func FeatureContext(s *godog.Suite) {
 
 	testContext.TestData = make(map[string]map[string]map[string][]h.DatabaseRecord)
-	testContext.Context = context.Background()
 
 	s.BeforeFeature(func(feature *gherkin.Feature) {
 		SetupStaging(testContext)
@@ -66,7 +65,7 @@ func testMongodbConnect(arg1 int) error {
 	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", arg1, u.GetVarFromEnvList(testContext.Env, "TEST_ID"))
 	for i := 0; i < 25; i++ {
 		connection := h.EnvDBConnect(testContext, nodeName)
-		err := connection.Database(nodeName).Client().Ping(testContext.Context, nil)
+		err := connection.Database(nodeName).Client().Ping(context.Background(), nil)
 		if err == nil {
 			return nil
 		}
@@ -97,7 +96,7 @@ func testMongodbPrimaryRole(arg1 int) error {
 		Roles:    strings.Split(u.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_ROLES"), " "),
 	}
 	connection := h.EnvDBConnectWithCreds(testContext, nodeName, creds)
-	smth := connection.Ping(testContext.Context, readpref.Primary())
+	smth := connection.Ping(context.Background(), readpref.Primary())
 	return smth
 }
 
@@ -138,7 +137,7 @@ func fillMongodbWithTestData(arg1, arg2 int) error {
 		Roles:    strings.Split(u.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_ROLES"), " "),
 	}
 	conn := h.EnvDBConnectWithCreds(testContext, nodeName, creds)
-	data := h.FillWithData(testContext.Context, conn, testName)
+	data := h.FillWithData(conn, testName)
 	testContext.TestData["test"+string(arg2)] = data
 	return nil
 }
@@ -267,8 +266,8 @@ func testEqualMongodbDataAtMongodbs(arg1, arg2 int) error {
 	connection2 := h.EnvDBConnectWithCreds(testContext, containerName2, creds)
 
 	var userData [][]h.UserData
-	rowsData1 := h.GetAllUserData(testContext.Context, connection1)
-	rowsData2 := h.GetAllUserData(testContext.Context, connection2)
+	rowsData1 := h.GetAllUserData(connection1)
+	rowsData2 := h.GetAllUserData(connection2)
 
 	userData = append(userData, rowsData1)
 	userData = append(userData, rowsData2)
