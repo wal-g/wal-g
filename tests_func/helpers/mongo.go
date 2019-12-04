@@ -259,7 +259,7 @@ func GetAllUserData(context context.Context, connection *mongo.Client) []UserDat
 				continue
 			}
 			findOptions := options.Find()
-			findOptions.SetSort(map[string]int{"_id": 1})
+			findOptions.SetSort(bson.D{{"_id", 1}})
 			cur, err := connection.Database(dbName, &options.DatabaseOptions{}).Collection(table).Find(context, bson.M{}, findOptions)
 			if err != nil {
 				panic(err)
