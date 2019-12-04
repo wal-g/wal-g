@@ -12,7 +12,7 @@ import (
 
 func BuildBase(testContext *TestContextType) {
 	var err error
-	testContext.DockerClient, err = client.NewClientWithOpts(client.WithVersion("1.38"))
+	testContext.DockerClient, err = client.NewClientWithOpts(client.WithVersion("1.40"))
 	if err != nil {
 		panic(err)
 	}
