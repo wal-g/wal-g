@@ -94,13 +94,15 @@ func EnvDBConnectWithCreds(testContext *TestContextType, nodeName string, creds 
 
 func FillWithData(context context.Context, database *mongo.Client, mark string) map[string]map[string][]DatabaseRecord {
 	var data = make(map[string]map[string][]DatabaseRecord, 0)
-	for _, dbName := range []string{"test_db_01", "test_db_02"} {
+	for i := 1; i <= 2; i++ {
+		dbName := fmt.Sprintf("test_db_%02d", i)
 		if _, ok := data[dbName]; !ok {
 			data[dbName] = map[string][]DatabaseRecord{}
 		}
-		for _, tableName := range []string{"test_table_01", "test_table_02"} {
+		for j := 1; j <= 2; j++ {
 			var rows []DatabaseRecord
 			var irows []interface{}
+			tableName := fmt.Sprintf("test_table_%02d", j)
 			for k := 1; k <= 2; k++ {
 				rows = append(rows, generateRecord(k, 5, mark))
 				irows = append(irows, generateRecord(k, 5, mark))
@@ -236,17 +238,17 @@ func isSystemCollection(collectionName string) bool {
 	return strings.HasPrefix(collectionName, "system.")
 }
 
-func GetAllUserData(context context.Context, connection *mongo.Client) ([]UserData, error) {
+func GetAllUserData(context context.Context, connection *mongo.Client) []UserData {
 	var userData []UserData
 	dbNames, err := connection.ListDatabaseNames(context, bson.M{})
 	if err != nil {
-		return []UserData{}, fmt.Errorf("error in getting data from mongodb: %v", err)
+		panic(err)
 	}
 	sort.Strings(dbNames)
 	for _, dbName := range dbNames {
 		tables, err := connection.Database(dbName, &options.DatabaseOptions{}).ListCollectionNames(context, bson.M{})
 		if err != nil {
-			return []UserData{}, fmt.Errorf("error in getting data from mongodb: %v", err)
+			panic(err)
 		}
 		sort.Strings(tables)
 		for _, table := range tables {
@@ -260,13 +262,13 @@ func GetAllUserData(context context.Context, connection *mongo.Client) ([]UserDa
 			findOptions.SetSort(map[string]int{"_id": 1})
 			cur, err := connection.Database(dbName, &options.DatabaseOptions{}).Collection(table).Find(context, bson.M{}, findOptions)
 			if err != nil {
-				return []UserData{}, fmt.Errorf("error in getting data from mongodb: %v", err)
+				panic(err)
 			}
 			for cur.Next(context) {
 				var row bson.M
 				err = cur.Decode(&row)
 				if err != nil {
-					return []UserData{}, fmt.Errorf("error in getting data from mongodb: %v", err)
+					panic(err)
 				}
 				userData = append(userData, UserData{
 					Database:   dbName,
@@ -276,11 +278,11 @@ func GetAllUserData(context context.Context, connection *mongo.Client) ([]UserDa
 			}
 			err = cur.Close(context)
 			if err != nil {
-				return []UserData{}, fmt.Errorf("error in getting data from mongodb: %v", err)
+				panic(err)
 			}
 		}
 	}
-	return userData, nil
+	return userData
 }
 
 func checkRsInitialized(context context.Context, connection *mongo.Client) bool {

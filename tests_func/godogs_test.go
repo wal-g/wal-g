@@ -383,14 +383,8 @@ func testEqualMongodbDataAtMongodbs(mongodbId1, mongodbId2 int) error {
 	}
 
 	var userData [][]testHelper.UserData
-	rowsData1, err := testHelper.GetAllUserData(testContext.Context, connection1)
-	if err != nil {
-		return err
-	}
-	rowsData2, err := testHelper.GetAllUserData(testContext.Context, connection2)
-	if err != nil {
-		return err
-	}
+	rowsData1 := testHelper.GetAllUserData(testContext.Context, connection1)
+	rowsData2 := testHelper.GetAllUserData(testContext.Context, connection2)
 
 	userData = append(userData, rowsData1)
 	userData = append(userData, rowsData2)
