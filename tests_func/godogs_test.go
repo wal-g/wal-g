@@ -1,12 +1,10 @@
-package functest
+package main
 
 import (
 	"context"
 	"fmt"
 	"github.com/DATA-DOG/godog"
 	"github.com/DATA-DOG/godog/gherkin"
-	. "github.com/wal-g/wal-g/tests_func/helpers"
-	. "github.com/wal-g/wal-g/tests_func/utils"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"path/filepath"
 	"reflect"
@@ -38,25 +36,26 @@ func FeatureContext(s *godog.Suite) {
 	s.AfterStep(func (s *gherkin.Step, err error){
 	})
 
-	s.Step(`^a working mongodb on mongodb(\d+)$`, testMongodbConnect)
-	s.Step(`^a configured s3 on minio(\d+)$`, configureS3OnMinio)
-	s.Step(`^mongodb replset initialized on mongodb(\d+)$`, replsetinitiateOnMongodb)
-	s.Step(`^mongodb role is primary on mongodb(\d+)$`, testMongodbPrimaryRole)
-	s.Step(`^mongodb auth initialized on mongodb(\d+)$`, authenticateOnMongodb)
-	s.Step(`^mongodb(\d+) has test mongodb data test(\d+)$`, fillMongodbWithTestData)
-	s.Step(`^we create mongodb(\d+) backup$`, createMongodbBackup)
-	s.Step(`^we got (\d+) backup entries of mongodb(\d+)$`, testBackupEntriesOfMongodb)
-	s.Step(`^we put empty backup via minio(\d+)$`, putEmptyBackupViaMinio)
-	s.Step(`^we delete backups retain (\d+) via mongodb(\d+)$`, deleteBackupsRetainViaMongodb)
-	s.Step(`^we check if empty backups were purged via minio(\d+)$`, testEmptyBackupsViaMinio)
+	s.Step(`^a working mongodb on mongodb(\d+)$`, aWorkingMongodbOnMongodb)
+	s.Step(`^a configured s3 on minio(\d+)$`, aConfiguredSOnMinio)
+	s.Step(`^mongodb replset initialized on mongodb(\d+)$`, mongodbReplsetInitializedOnMongodb)
+	s.Step(`^mongodb role is primary on mongodb(\d+)$`, mongodbRoleIsPrimaryOnMongodb)
+	s.Step(`^mongodb auth initialized on mongodb(\d+)$`, mongodbAuthInitializedOnMongodb)
+	s.Step(`^a trusted gpg keys on mongodb(\d+)$`, aTrustedGpgKeysOnMongodb)
+	s.Step(`^mongodb(\d+) has test mongodb data test(\d+)$`, mongodbHasTestMongodbDataTest)
+	s.Step(`^we create mongodb(\d+) backup$`, weCreateMongodbBackup)
+	s.Step(`^we got (\d+) backup entries of mongodb(\d+)$`, weGotBackupEntriesOfMongodb)
+	s.Step(`^we put empty backup via minio(\d+)$`, wePutEmptyBackupViaMinio)
+	s.Step(`^we delete backups retain (\d+) via mongodb(\d+)$`, weDeleteBackupsRetainViaMongodb)
+	s.Step(`^we check if empty backups were purged via minio(\d+)$`, weCheckIfEmptyBackupsWerePurgedViaMinio)
 
-	s.Step(`^we delete #(\d+) backup via mongodb(\d+)$`, deleteBackupViaMongodb)
-	s.Step(`^we restore #(\d+) backup to mongodb(\d+)$`, restoreBackupToMongodb)
-	s.Step(`^we got same mongodb data at mongodb(\d+) mongodb(\d+)$`, testEqualMongodbDataAtMongodbs)
+	s.Step(`^we delete #(\d+) backup via mongodb(\d+)$`, weDeleteBackupViaMongodb)
+	s.Step(`^we restore #(\d+) backup to mongodb(\d+)$`, weRestoreBackupToMongodb)
+	s.Step(`^we got same mongodb data at mongodb(\d+) mongodb(\d+)$`, weGotSameMongodbDataAtMongodbMongodb)
 
 }
 
-func testMongodbConnect(arg1 int) error {
+func aWorkingMongodbOnMongodb(arg1 int) error {
 	nodeName := fmt.Sprintf("mongodb%02d", arg1) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
 	for i := 0; i < 25; i++ {
 		connection := EnvDBConnect(testContext, nodeName)
@@ -69,20 +68,20 @@ func testMongodbConnect(arg1 int) error {
 	return fmt.Errorf("cannot connect to %s", nodeName)
 }
 
-func configureS3OnMinio(arg1 int) error {
+func aConfiguredSOnMinio(arg1 int) error {
 	nodeName := fmt.Sprintf("minio%02d", arg1) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
 	container := GetDockerContainer(testContext, nodeName)
 	ConfigureS3(testContext, container)
 	return nil
 }
 
-func replsetinitiateOnMongodb(arg1 int) error {
+func mongodbReplsetInitializedOnMongodb(arg1 int) error {
 	nodeName := fmt.Sprintf("mongodb%02d", arg1) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
 	StepEnsureRsInitialized(testContext, nodeName)
 	return nil
 }
 
-func testMongodbPrimaryRole(arg1 int) error {
+func mongodbRoleIsPrimaryOnMongodb(arg1 int) error {
 	nodeName := fmt.Sprintf("mongodb%02d", arg1) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
 	creds := testContext.Configuration.Projects["mongodb"].Users["admin"]
 	connection := EnvDBConnectWithCreds(testContext, nodeName, creds)
@@ -90,7 +89,7 @@ func testMongodbPrimaryRole(arg1 int) error {
 	return smth
 }
 
-func authenticateOnMongodb(arg1 int) error {
+func mongodbAuthInitializedOnMongodb(arg1 int) error {
 	nodeName := fmt.Sprintf("mongodb%02d", arg1) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
 	creds := testContext.Configuration.Projects["mongodb"].Users["admin"]
 	roles := "["
@@ -112,7 +111,43 @@ func authenticateOnMongodb(arg1 int) error {
 	return nil
 }
 
-func fillMongodbWithTestData(arg1, arg2 int) error {
+func aTrustedGpgKeysOnMongodb(arg1 int) error {
+//	containerName := fmt.Sprintf("mongodb%02d", arg1) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
+//	command := []string{"gpg", "--list-keys", "--list-options", "show-uid-validity"}
+//	response := RunCommandInContainerWithOptions(testContext, containerName, command, types.ExecConfig{User: testContext.Configuration.DynamicConfiguration.gpg.user})
+//
+//	if strings.Contains(response, "[ultimate] test_cluster") {
+//		return nil
+//	}
+//
+//	homedir := testContext.Configuration.DynamicConfiguration.gpg.homedir
+//	command = []string{"gpg", "--homedir", homedir, "--no-tty", "--import", "/config/gpg-key.armor"}
+//	response = RunCommandInContainerWithOptions(testContext, containerName, command, types.ExecConfig{User: testContext.Configuration.DynamicConfiguration.gpg.user, Tty: true})
+//
+//	if !strings.Contains(response,"secret keys imported: 1") {
+//		panic(fmt.Errorf("can not import keys: %s", response))
+//	}
+
+//	longcmd := fmt.Sprintf(`for key in $(gpg --no-tty --homedir %s -k | grep ^pub |
+//cut -d'/' -f2 | awk '{print $1};' 2>/dev/null); do
+//	printf "trust\n5\ny\nquit" | \
+//	gpg --homedir %s --debug --no-tty --command-fd 0 \
+//		--edit-key ${key};
+//done`, homedir, homedir)
+//
+//	command = []string{"bash", "-c", longcmd}
+//	response = RunCommandInContainerWithOptions(testContext, containerName, command, types.ExecConfig{User: testContext.Configuration.DynamicConfiguration.gpg.user, Tty: true})
+//
+//	command = []string{"gpg", "--list-keys", "--list-options", "show-uid-validity"}
+//	response = RunCommandInContainerWithOptions(testContext, containerName, command, types.ExecConfig{User: testContext.Configuration.DynamicConfiguration.gpg.user})
+//
+//	if !strings.Contains(response, "[ultimate] test_cluster") {
+//		return fmt.Errorf("can not trust keys: %s", response)
+//	}
+	return nil
+}
+
+func mongodbHasTestMongodbDataTest(arg1, arg2 int) error {
 	nodeName := fmt.Sprintf("mongodb%02d", arg1) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
 	testName := fmt.Sprintf("test%02d", arg2)
 	creds := testContext.Configuration.Projects["mongodb"].Users["admin"]
@@ -122,7 +157,7 @@ func fillMongodbWithTestData(arg1, arg2 int) error {
 	return nil
 }
 
-func createMongodbBackup(arg1 int) error {
+func weCreateMongodbBackup(arg1 int) error {
 	var cmdArgs = ""
 	containerName := fmt.Sprintf("mongodb%02d", arg1) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
 	creds := testContext.Configuration.Projects["mongodb"].Users["admin"]
@@ -149,7 +184,7 @@ func getMakeBackupContentFromDocString(content *gherkin.DocString) map[string]ma
 	return res
 }
 
-func createMongodbBackupWithContent(arg1 int, arg2 *gherkin.DocString) error {
+func weCreateMongodbBackupWithContent(arg1 int, arg2 *gherkin.DocString) error {
 	var cmdArgs = ""
 	if arg2 != nil {
 		content := getMakeBackupContentFromDocString(arg2)
@@ -171,7 +206,7 @@ func createMongodbBackupWithContent(arg1 int, arg2 *gherkin.DocString) error {
 	return nil
 }
 
-func testBackupEntriesOfMongodb(arg1, arg2 int) error {
+func weGotBackupEntriesOfMongodb(arg1, arg2 int) error {
 	containerName := fmt.Sprintf("mongodb%02d", arg2) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
 	backupNames := GetBackups(testContext, containerName)
 	if len(backupNames) != arg1 {
@@ -180,11 +215,11 @@ func testBackupEntriesOfMongodb(arg1, arg2 int) error {
 	return nil
 }
 
-func putEmptyBackupViaMinio(arg1 int) error {
+func wePutEmptyBackupViaMinio(arg1 int) error {
 	containerName := fmt.Sprintf("minio%02d", arg1) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
 	backupName := "20010203T040506"
-	bucketName := testContext.Configuration.DynamicConfiguration.S3.Bucket
-	backupRootDir := testContext.Configuration.DynamicConfiguration.Walg.Path
+	bucketName := testContext.Configuration.DynamicConfiguration.s3.bucket
+	backupRootDir := testContext.Configuration.DynamicConfiguration.walg.path
 	backupDir := "/export/" + bucketName + "/" + backupRootDir + "/" + backupName
 	backupDumpPath := filepath.Join(backupDir, "mongodump.archive")
 	testContext.SafeStorage.NometaBackupNames = append(testContext.SafeStorage.NometaBackupNames, backupName)
@@ -193,16 +228,16 @@ func putEmptyBackupViaMinio(arg1 int) error {
 	return nil
 }
 
-func deleteBackupsRetainViaMongodb(arg1, arg2 int) error {
+func weDeleteBackupsRetainViaMongodb(arg1, arg2 int) error {
 	containerName := fmt.Sprintf("mongodb%02d", arg2) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
 	MongoPurgeBackups(testContext, containerName, arg1)
 	return nil
 }
 
-func testEmptyBackupsViaMinio(arg1 int) error {
+func weCheckIfEmptyBackupsWerePurgedViaMinio(arg1 int) error {
 	containerName := fmt.Sprintf("mongodb%02d", arg1) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
-	bucketName := testContext.Configuration.DynamicConfiguration.S3.Bucket
-	backupRootDir := testContext.Configuration.DynamicConfiguration.Walg.Path
+	bucketName := testContext.Configuration.DynamicConfiguration.s3.bucket
+	backupRootDir := testContext.Configuration.DynamicConfiguration.walg.path
 	backupNames := testContext.SafeStorage.NometaBackupNames
 	for _, backupName := range backupNames {
 		backupDir := filepath.Join("/export", bucketName, backupRootDir, backupName)
@@ -211,19 +246,19 @@ func testEmptyBackupsViaMinio(arg1 int) error {
 	return nil
 }
 
-func deleteBackupViaMongodb(arg1, arg2 int) error {
+func weDeleteBackupViaMongodb(arg1, arg2 int) error {
 	containerName := fmt.Sprintf("mongodb%02d", arg2) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
 	DeleteBackup(testContext, containerName, arg1)
 	return nil
 }
 
-func restoreBackupToMongodb(arg1, arg2 int) error {
+func weRestoreBackupToMongodb(arg1, arg2 int) error {
 	containerName := fmt.Sprintf("mongodb%02d", arg2) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
-	RestoreBackupById(testContext, containerName, arg1)
+	restoreBackupById(testContext, containerName, arg1)
 	return nil
 }
 
-func testEqualMongodbDataAtMongodbs(arg1, arg2 int) error {
+func weGotSameMongodbDataAtMongodbMongodb(arg1, arg2 int) error {
 	creds := testContext.Configuration.Projects["mongodb"].Users["admin"]
 	containerName1 := fmt.Sprintf("mongodb%02d", arg1) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")
 	containerName2 := fmt.Sprintf("mongodb%02d", arg2) + ".test_net_" + GetVarFromEnvList(testContext.Env, "TEST_ID")

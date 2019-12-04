@@ -1,17 +1,13 @@
-package helpers
+package main
 
 import (
-	"bufio"
 	"fmt"
-	. "github.com/wal-g/wal-g/tests_func/config"
-	. "github.com/wal-g/wal-g/tests_func/utils"
 	"math/rand"
-	"os"
 )
 
-type BaseImageType struct {
-	Tag  string
-	Path string
+type TempNameType1 struct {
+	tag  string
+	path string
 }
 
 type ConfigurationType struct {
@@ -27,7 +23,7 @@ type ConfigurationType struct {
 	PortFactor           string
 	NetworkName          string
 	Projects             map[string]DockerComposeConfiguration
-	BaseImages           map[string]BaseImageType
+	BaseImages           map[string]TempNameType1
 }
 
 type UserConfiguration struct {
@@ -45,7 +41,7 @@ type DockerComposeConfiguration struct {
 	ExternalLinks   []string
 }
 
-func GetConfiguration(testContext *TestContextType) ConfigurationType {
+func getConfiguration(testContext *TestContextType) ConfigurationType {
 	portFactor := GetVarFromEnvList(testContext.Env, "TEST_ID")
 	netName := fmt.Sprintf("test_net_%s", portFactor)
 	dynamicConfig := getDynamicConfiguration(testContext)
@@ -78,17 +74,17 @@ func GetConfiguration(testContext *TestContextType) ConfigurationType {
 					"ssh":    22,
 				},
 				DockerInstances: 2,
-				ExternalLinks:   []string{dynamicConfig.S3.host, dynamicConfig.S3.fakeHost},
+				ExternalLinks:   []string{dynamicConfig.s3.host, dynamicConfig.s3.fakeHost},
 			},
 			"minio": {
 				Build:  "staging/images/minio",
 				Expose: map[string]int{"http": 9000},
 			},
 		},
-		BaseImages: map[string]BaseImageType{
+		BaseImages: map[string]TempNameType1{
 			"mongodb-backup-base": {
-				Tag:  "mongodb-backup-base",
-				Path: "staging/images/base",
+				tag:  "mongodb-backup-base",
+				path: "staging/images/base",
 			},
 		},
 	}
@@ -99,7 +95,7 @@ type S3Configuration struct {
 	host               string
 	fakeHost           string
 	fakeHostPort       string
-	Bucket             string
+	bucket             string
 	endpoint           string
 	accessSecretKey    string
 	accessKeyId        string
@@ -115,57 +111,34 @@ type GPGConfiguration struct {
 }
 
 type WalgConfiguration struct {
-	Path string
+	path string
 }
 
 type DynamicConfigurationType struct {
-	S3   S3Configuration
-	Gpg  GPGConfiguration
-	Walg WalgConfiguration
+	s3   S3Configuration
+	gpg  GPGConfiguration
+	walg WalgConfiguration
 }
 
 func getDynamicConfiguration(testContext *TestContextType) DynamicConfigurationType {
 	return DynamicConfigurationType{
-		S3: S3Configuration{
+		s3: S3Configuration{
 			host:               fmt.Sprintf("minio01.%s", GetVarFromEnvList(testContext.Env, "TEST_ID")),
 			fakeHost:           "minio",
 			fakeHostPort:       "minio:9000",
-			Bucket:             "dbaas",
+			bucket:             "dbaas",
 			endpoint:           "http://minio:9000",
 			accessSecretKey:    GetVarFromEnvList(testContext.Env, "MINIO_SECRET_KEY"),
 			accessKeyId:        GetVarFromEnvList(testContext.Env, "MINIO_ACCESS_KEY"),
 			encAccessSecretKey: "TODO",
 			encAccessKeyId:     "TODO",
 		},
-		Gpg: GPGConfiguration{
+		gpg: GPGConfiguration{
 			privateKey: "TODO",
 			keyId:      "TODO",
 			user:       "mongodb",
 			homedir:    "/home/mongodb/.gnupg",
 		},
-		Walg: WalgConfiguration{Path: GetVarFromEnvList(testContext.Env, "WALG_S3_PREFIX")},
+		walg: WalgConfiguration{path: GetVarFromEnvList(testContext.Env, "WALG_S3_PREFIX")},
 	}
-}
-
-func GetTestEnv(testContext *TestContextType) []string {
-	if testContext.Env != nil {
-		return testContext.Env
-	}
-	env := make([]string, 0)
-	envFile := Env["ENV_FILE"]
-	file, err := os.OpenFile(envFile, os.O_RDONLY, 0644)
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		key, value := SplitEnvLine(line)
-		env = append(env, fmt.Sprintf("%s=%s", key, value))
-	}
-	if err := scanner.Err(); err != nil {
-		panic(err)
-	}
-	return env
 }

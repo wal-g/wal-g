@@ -42,7 +42,6 @@ services:
         - ./code/mongodb:/code:rw
         - ./images/mongodb/config:/config:rw
         - ./images/base/config/.walg:/home/.walg.json:rw
-        - ./images/mongodb/config/gpg-key.armor:/home/gpg-key.armor:rw
     mongodb02:
         build: ..
         container_name: mongodb02.test_net_${TEST_ID}
@@ -64,5 +63,4 @@ services:
         - ./code/mongodb:/code:rw
         - ./images/mongodb/config:/config:rw
         - ./images/base/config/.walg:/home/.walg.json:rw
-        - ./images/mongodb/config/gpg-key.armor:/home/gpg-key.armor:rw
 version: '2'
