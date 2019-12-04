@@ -3,10 +3,8 @@ package functest
 import (
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"github.com/DATA-DOG/godog"
-	"github.com/DATA-DOG/godog/colors"
 	"github.com/DATA-DOG/godog/gherkin"
 	testHelper "github.com/wal-g/wal-g/tests_func/helpers"
 	testUtils "github.com/wal-g/wal-g/tests_func/utils"
@@ -16,7 +14,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
-	"testing"
 	"time"
 )
 
@@ -393,27 +390,4 @@ func testEqualMongodbDataAtMongodbs(mongodbId1, mongodbId2 int) error {
 		return fmt.Errorf("expected the same data in %s and %s", containerName1, containerName2)
 	}
 	return nil
-}
-
-var opt = godog.Options{
-	Output: colors.Colored(os.Stdout),
-	Format: "progress",
-}
-
-func init() {
-	godog.BindFlags("godog.", flag.CommandLine, &opt)
-}
-
-func TestMain(m *testing.M) {
-	flag.Parse()
-	opt.Paths = flag.Args()
-
-	status := godog.RunWithOptions("godogs", func(s *godog.Suite) {
-		FeatureContext(s)
-	}, opt)
-
-	if st := m.Run(); st > status {
-		status = st
-	}
-	os.Exit(status)
 }
