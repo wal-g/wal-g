@@ -13,6 +13,7 @@ func ConfigureS3(testContext *TestContextType, containerName *types.Container) e
 		bucketName := testUtils.GetVarFromEnvList(testContext.Env, "S3_BUCKET")
 		accessKeyId := testUtils.GetVarFromEnvList(testContext.Env, "S3_ACCESS_KEY_ID")
 		accessSecretKey := testUtils.GetVarFromEnvList(testContext.Env, "S3_ACCESS_SECRET_KEY")
+
 		command := []string{"mc", "--debug", "config", "host", "add", "local", "http://localhost:9000", accessKeyId, accessSecretKey}
 		response, _ = RunCommandInContainer(testContext, containerName.Names[0], command)
 

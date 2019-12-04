@@ -1,0 +1,13 @@
+{
+"WALG_S3_PREFIX": "s3://dbaas/mongodb-backup/test_uuid/test_mongodb",
+"AWS_ACCESS_KEY_ID": "OcXmmFSxAjd0ncwEZySp",
+"AWS_SECRET_ACCESS_KEY": "TOPwCzYieXqmRugkEChMe9qsnzXDZ6SJUg9ZCddi",
+"AWS_ENDPOINT": "http://minio:9000",
+"AWS_S3_FORCE_PATH_STYLE": "true",
+"WALG_STREAM_CREATE_COMMAND": "mongodump --archive --uri=\"mongodb://admin:password@127.0.0.1:27018\"",
+"WALG_COMPRESSION_METHOD": "brotli",
+"WALG_DELTA_MAX_STEPS": "6",
+"WALG_UPLOAD_CONCURRENCY": "10",
+"WALG_DISK_RATE_LIMIT": "41943040",
+"WALG_NETWORK_RATE_LIMIT": "10485760"
+}
