@@ -23,14 +23,14 @@ type WalPartRecorder struct {
 	walFilename string
 }
 
-func newWalPartRecorder(walFilename string, manager *DeltaFileManager) (*WalPartRecorder, error) {
+func NewWalPartRecorder(walFilename string, manager *DeltaFileManager) (*WalPartRecorder, error) {
 	if !isWalFilename(walFilename) {
 		return nil, NewNotWalFilenameError(walFilename)
 	}
 	return &WalPartRecorder{manager, walFilename}, nil
 }
 
-func (recorder *WalPartRecorder) savePreviousWalTail(tailData []byte) error {
+func (recorder *WalPartRecorder) SavePreviousWalTail(tailData []byte) error {
 	if tailData == nil {
 		tailData = make([]byte, 0)
 	}
@@ -46,7 +46,7 @@ func (recorder *WalPartRecorder) savePreviousWalTail(tailData []byte) error {
 	return nil
 }
 
-func (recorder *WalPartRecorder) saveNextWalHead(head []byte) error {
+func (recorder *WalPartRecorder) SaveNextWalHead(head []byte) error {
 	if head == nil {
 		head = make([]byte, 0)
 	}

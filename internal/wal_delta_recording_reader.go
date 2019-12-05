@@ -51,7 +51,7 @@ func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, man
 }
 
 func (reader *WalDeltaRecordingReader) Close() error {
-	err := reader.partRecorder.saveNextWalHead(reader.WalParser.GetCurrentRecordData())
+	err := reader.partRecorder.SaveNextWalHead(reader.WalParser.GetCurrentRecordData())
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to save next wal file prefix after end of recording because of: %v", err)
 	}
@@ -97,7 +97,7 @@ func (reader *WalDeltaRecordingReader) RecordBlockLocationsFromPage() error {
 	if len(discardedRecordTail) > 0 || len(records) > 0 {
 		if reader.canParsePreviousRecordTail {
 			reader.canParsePreviousRecordTail = false
-			err = reader.partRecorder.savePreviousWalTail(discardedRecordTail)
+			err = reader.partRecorder.SavePreviousWalTail(discardedRecordTail)
 			if err != nil {
 				return err
 			}
@@ -120,7 +120,7 @@ func tryOpenParserAndRecorders(walFilename string, manager *DeltaFileManager) (*
 		return nil, nil, nil, err
 	}
 	recorder := NewWalDeltaRecorder(blockLocationConsumer)
-	partRecorder, err := newWalPartRecorder(walFilename, manager)
+	partRecorder, err := NewWalPartRecorder(walFilename, manager)
 	if err != nil {
 		return nil, nil, nil, err
 	}
