@@ -11,10 +11,10 @@ func TestSavePreviousWalTail(t *testing.T) {
 	dataFolder := testtools.NewMockDataFolder()
 	manager := internal.NewDeltaFileManager(dataFolder)
 
-	walPartRecorder, err := internal.newWalPartRecorder(WalFilename, manager)
+	walPartRecorder, err := internal.NewWalPartRecorder(WalFilename, manager)
 	assert.NoError(t, err)
 	previousWalTail := []byte{1, 2, 3, 4, 5}
-	err = walPartRecorder.savePreviousWalTail(previousWalTail)
+	err = walPartRecorder.SavePreviousWalTail(previousWalTail)
 	assert.NoError(t, err)
 	manager.FlushFiles(nil)
 
@@ -30,10 +30,10 @@ func TestSaveNextWalHead_MiddleWalFile(t *testing.T) {
 	dataFolder := testtools.NewMockDataFolder()
 	manager := internal.NewDeltaFileManager(dataFolder)
 
-	walPartRecorder, err := internal.newWalPartRecorder(WalFilename, manager)
+	walPartRecorder, err := internal.NewWalPartRecorder(WalFilename, manager)
 	assert.NoError(t, err)
 	nextWalHead := []byte{1, 2, 3, 4, 5}
-	err = walPartRecorder.saveNextWalHead(nextWalHead)
+	err = walPartRecorder.SaveNextWalHead(nextWalHead)
 	assert.NoError(t, err)
 	manager.FlushFiles(nil)
 
@@ -49,10 +49,10 @@ func TestSaveNextWalHead_LastWalFile(t *testing.T) {
 	dataFolder := testtools.NewMockDataFolder()
 	manager := internal.NewDeltaFileManager(dataFolder)
 
-	walPartRecorder, err := internal.newWalPartRecorder(LastWalFilename, manager)
+	walPartRecorder, err := internal.NewWalPartRecorder(LastWalFilename, manager)
 	assert.NoError(t, err)
 	nextWalHead := []byte{1, 2, 3, 4, 5}
-	err = walPartRecorder.saveNextWalHead(nextWalHead)
+	err = walPartRecorder.SaveNextWalHead(nextWalHead)
 	assert.NoError(t, err)
 	manager.FlushFiles(nil)
 
