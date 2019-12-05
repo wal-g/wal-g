@@ -32,32 +32,32 @@ func (folder *DiskDataFolder) OpenWriteOnlyFile(filename string) (io.WriteCloser
 	return os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 }
 
-func (folder *DiskDataFolder) CleanFolder() error {
+func (folder *DiskDataFolder) cleanFolder() error {
 	cleaner := FileSystemCleaner{}
-	files, err := cleaner.GetFiles(folder.path)
+	files, err := cleaner.getFiles(folder.path)
 	if err != nil {
 		return err
 	}
 	for _, file := range files {
-		cleaner.Remove(filepath.Join(folder.path, file))
+		cleaner.remove(filepath.Join(folder.path, file))
 	}
 	return nil
 }
 
-func (folder *DiskDataFolder) FileExists(filename string) bool {
+func (folder *DiskDataFolder) fileExists(filename string) bool {
 	filePath := filepath.Join(folder.path, filename)
 	_, err := os.Stat(filePath)
 	return !os.IsNotExist(err)
 }
 
-func (folder *DiskDataFolder) CreateFile(filename string) error {
+func (folder *DiskDataFolder) createFile(filename string) error {
 	filePath := filepath.Join(folder.path, filename)
 	_, err := os.Create(filePath)
 
 	return err
 }
 
-func (folder *DiskDataFolder) DeleteFile(filename string) error {
+func (folder *DiskDataFolder) deleteFile(filename string) error {
 	filePath := filepath.Join(folder.path, filename)
 	return os.Remove(filePath)
 }

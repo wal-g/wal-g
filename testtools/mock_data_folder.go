@@ -24,7 +24,7 @@ func (folder *MockDataFolder) CreateFile(filename string) error {
 	return nil
 }
 
-func (folder *MockDataFolder) CleanFolder() error {
+func (folder *MockDataFolder) cleanFolder() error {
 	return nil
 }
 

@@ -8,8 +8,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -21,10 +21,10 @@ type LogFetchSettings interface {
 }
 
 type LogFetchHandlers interface {
-	GetLogFilePath(pathToLog string) (string, error)
-	ShouldBeAborted(pathToLog string) (bool, error)
-	DownloadLogTo(logFolder storage.Folder, logName string, dstLogFilePath string) error
-	HandleAbortFetch(string) error
+	getLogFilePath(pathToLog string) (string, error)
+	shouldBeAborted(pathToLog string) (bool, error)
+	downloadLogTo(logFolder storage.Folder, logName string, dstLogFilePath string) error
+	handleAbortFetch(string) error
 }
 
 func ParseTS(endTSEnvVar string) (endTS *time.Time, err error) {
@@ -95,23 +95,23 @@ func DownloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, handl
 	for _, logFile := range logFiles {
 		logName := utility.TrimFileExtension(logFile.GetName())
 
-		logFilePath, err := handlers.GetLogFilePath(logName)
+		logFilePath, err := handlers.getLogFilePath(logName)
 		if err != nil {
 			return nil, err
 		}
 
 		tracelog.InfoLogger.Printf("Download %v to %v\n", logName, logFilePath)
-		err = handlers.DownloadLogTo(logFolder, logName, logFilePath)
+		err = handlers.downloadLogTo(logFolder, logName, logFilePath)
 		if err != nil {
 			return nil, err
 		}
 
-		needAbortFetch, err := handlers.ShouldBeAborted(logFilePath)
+		needAbortFetch, err := handlers.shouldBeAborted(logFilePath)
 		if err != nil {
 			return nil, err
 		}
 		if needAbortFetch {
-			if err = handlers.HandleAbortFetch(logFilePath); err != nil {
+			if err = handlers.handleAbortFetch(logFilePath); err != nil {
 				return nil, err
 			}
 

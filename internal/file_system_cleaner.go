@@ -11,7 +11,7 @@ type FileSystemCleaner struct{}
 
 // TODO : unit tests
 // GetFiles of a directory
-func (cleaner FileSystemCleaner) GetFiles(directory string) (files []string, err error) {
+func (cleaner FileSystemCleaner) getFiles(directory string) (files []string, err error) {
 	fileInfos, err := ioutil.ReadDir(directory)
 	if err != nil {
 		return
@@ -27,7 +27,7 @@ func (cleaner FileSystemCleaner) GetFiles(directory string) (files []string, err
 }
 
 // Remove file
-func (cleaner FileSystemCleaner) Remove(file string) {
+func (cleaner FileSystemCleaner) remove(file string) {
 	err := os.Remove(file)
 	if err != nil {
 		tracelog.WarningLogger.Printf("Tried to remove file: '%s', but got error: '%v'\n", file, err)

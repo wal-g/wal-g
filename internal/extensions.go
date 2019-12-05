@@ -12,8 +12,8 @@ import (
 var Extensions []Extension
 
 type Extension interface {
-	RegisterCommands(cmd *cobra.Command)
-	GetAllowedConfigKeys() map[string]*string
+	registerCommands(cmd *cobra.Command)
+	getAllowedConfigKeys() map[string]*string
 }
 
 func LoadExtensions(path string) error {
@@ -49,6 +49,6 @@ func LoadExtensions(path string) error {
 
 func RegisterExtensionCommands(rootCmd *cobra.Command) {
 	for _, extension := range Extensions {
-		extension.RegisterCommands(rootCmd)
+		extension.registerCommands(rootCmd)
 	}
 }

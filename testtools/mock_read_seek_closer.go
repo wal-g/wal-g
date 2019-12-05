@@ -99,7 +99,7 @@ func (m *MockFlusher) EXPECT() *MockFlusherMockRecorder {
 }
 
 // Flush mocks base method
-func (m *MockFlusher) Flush() error {
+func (m *MockFlusher) flush() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Flush")
 	ret0, _ := ret[0].(error)

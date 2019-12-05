@@ -26,7 +26,7 @@ type FileTarBall struct {
 
 // SetUp creates a new LZ4 writer, tar writer and file for
 // writing bundled compressed bytes to.
-func (tarBall *FileTarBall) SetUp(crypter crypto.Crypter, names ...string) {
+func (tarBall *FileTarBall) setUp(crypter crypto.Crypter, names ...string) {
 	if tarBall.tarWriter == nil {
 		name := filepath.Join(tarBall.out, "part_"+fmt.Sprintf("%0.3d", tarBall.number)+".tar.lz4")
 		file, err := os.Create(name)
@@ -83,7 +83,7 @@ type BufferTarBall struct {
 	tarWriter       *tar.Writer
 }
 
-func (tarBall *BufferTarBall) SetUp(crypter crypto.Crypter, args ...string) {
+func (tarBall *BufferTarBall) setUp(crypter crypto.Crypter, args ...string) {
 	tarBall.tarWriter = tar.NewWriter(tarBall.underlying)
 }
 

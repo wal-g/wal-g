@@ -36,9 +36,9 @@ func (err UnsupportedPostgresVersionError) Error() string {
 type QueryRunner interface {
 	// This call should inform the database that we are going to copy cluster's contents
 	// Should fail if backup is currently impossible
-	StartBackup(backup string) (string, string, bool, error)
+	startBackup(backup string) (string, string, bool, error)
 	// Inform database that contents are copied, get information on backup
-	StopBackup() (string, string, string, error)
+	stopBackup() (string, string, string, error)
 }
 
 // PgQueryRunner is implementation for controlling PostgreSQL 9.0+
