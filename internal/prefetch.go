@@ -47,7 +47,7 @@ func HandleWALPrefetch(uploader *Uploader, walFileName string, location string) 
 		time.Sleep(10 * time.Millisecond) // ramp up in order
 	}
 
-	go CleanupPrefetchDirectories(walFileName, location, FileSystemCleaner{})
+	go cleanupPrefetchDirectories(walFileName, location, FileSystemCleaner{})
 
 	waitGroup.Wait()
 }

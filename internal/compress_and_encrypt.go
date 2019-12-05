@@ -11,7 +11,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-// CompressAndEncryptError is used to catch specific errors from CompressAndEncrypt
+// CompressAndEncryptError is used to catch specific errors from compressAndEncrypt
 // when uploading to Storage. Will not retry upload if this error occurs.
 type CompressAndEncryptError struct {
 	error
@@ -25,9 +25,9 @@ func (err CompressAndEncryptError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-// CompressAndEncrypt compresses input to a pipe reader. Output must be used or
+// compressAndEncrypt compresses input to a pipe reader. Output must be used or
 // pipe will block.
-func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, crypter crypto.Crypter) io.Reader {
+func compressAndEncrypt(source io.Reader, compressor compression.Compressor, crypter crypto.Crypter) io.Reader {
 	compressedReader, dstWriter := io.Pipe()
 
 	var writeCloser io.WriteCloser = dstWriter
@@ -47,12 +47,12 @@ func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, cry
 		_, err := utility.FastCopy(compressedWriter, source)
 
 		if err != nil {
-			e := NewCompressingPipeWriterError("CompressAndEncrypt: compression failed")
+			e := NewCompressingPipeWriterError("compressAndEncrypt: compression failed")
 			_ = dstWriter.CloseWithError(e)
 		}
 
 		if err := compressedWriter.Close(); err != nil {
-			e := NewCompressingPipeWriterError("CompressAndEncrypt: writer close failed")
+			e := NewCompressingPipeWriterError("compressAndEncrypt: writer close failed")
 			_ = dstWriter.CloseWithError(e)
 			return
 		}
@@ -60,7 +60,7 @@ func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, cry
 			err := writeCloser.Close()
 
 			if err != nil {
-				e := NewCompressingPipeWriterError("CompressAndEncrypt: encryption failed")
+				e := NewCompressingPipeWriterError("compressAndEncrypt: encryption failed")
 				_ = dstWriter.CloseWithError(e)
 				return
 			}

@@ -97,7 +97,7 @@ func (uploader *Uploader) UploadWalFile(file NamedReader) error {
 // TODO : unit tests
 // uploadFile compresses a file and uploads it.
 func (uploader *Uploader) UploadFile(file NamedReader) error {
-	compressedFile := CompressAndEncrypt(file, uploader.Compressor, ConfigureCrypter())
+	compressedFile := compressAndEncrypt(file, uploader.Compressor, ConfigureCrypter())
 	dstPath := utility.SanitizePath(filepath.Base(file.Name()) + "." + uploader.Compressor.FileExtension())
 
 	err := uploader.Upload(dstPath, compressedFile)

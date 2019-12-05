@@ -336,7 +336,7 @@ func TestWalk(t *testing.T) {
 		ArchiveDirectory: data,
 		TarSizeThreshold: int64(10),
 		Files:            &sync.Map{},
-		TablespaceSpec:   internal.newTablespaceSpec(data),
+		TablespaceSpec:   internal.NewTablespaceSpec(data),
 	}
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
 	size := int64(0)

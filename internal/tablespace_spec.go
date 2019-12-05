@@ -29,7 +29,7 @@ type TablespaceLocation struct {
 	Symlink  string `json:"link"`
 }
 
-func newTablespaceSpec(basePrefix string) TablespaceSpec {
+func NewTablespaceSpec(basePrefix string) TablespaceSpec {
 	spec := TablespaceSpec{
 		"",
 		make([]string, 0),

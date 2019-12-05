@@ -11,7 +11,7 @@ type Cleaner interface {
 	Remove(file string)
 }
 
-func CleanupPrefetchDirectories(walFileName string, location string, cleaner Cleaner) {
+func cleanupPrefetchDirectories(walFileName string, location string, cleaner Cleaner) {
 	timelineId, logSegNo, err := ParseWALFilename(walFileName)
 	if err != nil {
 		tracelog.WarningLogger.Println("WAL-prefetch cleanup failed: ", err, " file: ", walFileName)

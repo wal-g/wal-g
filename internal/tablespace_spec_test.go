@@ -44,7 +44,7 @@ func formatLocations(tablespaceLocations []TablespaceLocation) {
 }
 
 func TestTablespaceNames(t *testing.T) {
-	spec := newTablespaceSpec("/psql/")
+	spec := NewTablespaceSpec("/psql/")
 	tablespaceLocations := []TablespaceLocation{
 		{Location: "", Symlink: "12"},
 		{Location: "", Symlink: "100"},
@@ -65,7 +65,7 @@ func TestTablespaceNames(t *testing.T) {
 }
 
 func TestTablespaceLocation(t *testing.T) {
-	spec := newTablespaceSpec("/psql/")
+	spec := NewTablespaceSpec("/psql/")
 	tablespaceLocations := []TablespaceLocation{
 		{Location: "/home/ismirn0ff/space1/", Symlink: "3"},
 		{Location: "/home/ismirn0ff/space2", Symlink: "1"},
@@ -82,7 +82,7 @@ func TestTablespaceLocation(t *testing.T) {
 }
 
 func TestBasePrefix(t *testing.T) {
-	spec := newTablespaceSpec("/psql/")
+	spec := NewTablespaceSpec("/psql/")
 
 	marshalAndUnmarshal(t, &spec)
 
@@ -92,7 +92,7 @@ func TestBasePrefix(t *testing.T) {
 }
 
 func setUpIsTablespaceSymlink(t *testing.T) TablespaceSpec {
-	spec := newTablespaceSpec("/psql/")
+	spec := NewTablespaceSpec("/psql/")
 	tablespaceLocations := []TablespaceLocation{
 		{Location: "/home/ismirn0ff/space1/", Symlink: "3"},
 		{Location: "/home/ismirn0ff/space2", Symlink: "1"},
@@ -139,7 +139,7 @@ func TestIsTablespaceSymlink_SymlinkSlash(t *testing.T) {
 }
 
 func TestMakeTablespaceSymlinkPath(t *testing.T) {
-	spec := newTablespaceSpec("/psql/")
+	spec := NewTablespaceSpec("/psql/")
 	spec.addTablespace("1", "/home/ismirn0ff/space1/")
 
 	marshalAndUnmarshal(t, &spec)
@@ -163,7 +163,7 @@ func TestMakeTablespaceSymlinkPath(t *testing.T) {
 }
 
 func TestTablespaceLocations(t *testing.T) {
-	spec := newTablespaceSpec("/psql/")
+	spec := NewTablespaceSpec("/psql/")
 	tablespaceLocations := []TablespaceLocation{
 		{Location: "/home/ismirn0ff/space1/", Symlink: "3"},
 		{Location: "/home/ismirn0ff/space2", Symlink: "1"},

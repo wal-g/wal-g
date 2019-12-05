@@ -90,13 +90,13 @@ func GetStreamFetcher(writeCloser io.WriteCloser) func(folder storage.Folder, ba
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
 func HandleBackupFetch(folder storage.Folder, backupName string, fetcher func(folder storage.Folder, backup Backup)) {
 	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder,)\n", backupName)
-	backup, err := GetBackupByName(backupName, folder)
+	backup, err := getBackupByName(backupName, folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 
 	fetcher(folder, *backup)
 }
 
-func GetBackupByName(backupName string, folder storage.Folder) (*Backup, error) {
+func getBackupByName(backupName string, folder storage.Folder) (*Backup, error) {
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 
 	var backup *Backup
@@ -112,7 +112,7 @@ func GetBackupByName(backupName string, folder storage.Folder) (*Backup, error) 
 	} else {
 		backup = NewBackup(baseBackupFolder, backupName)
 
-		exists, err := backup.CheckExistence()
+		exists, err := backup.checkExistence()
 		if err != nil {
 			return nil, err
 		}
@@ -139,11 +139,11 @@ func chooseTablespaceSpecification(sentinelDto BackupSentinelDto, spec *Tablespa
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
 func deltaFetchRecursion(backupName string, folder storage.Folder, dbDataDirectory string,
 	tablespaceSpec *TablespaceSpec, filesToUnwrap map[string]bool) error {
-	backup, err := GetBackupByName(backupName, folder)
+	backup, err := getBackupByName(backupName, folder)
 	if err != nil {
 		return err
 	}
-	sentinelDto, err := backup.GetSentinel()
+	sentinelDto, err := backup.getSentinel()
 	if err != nil {
 		return err
 	}

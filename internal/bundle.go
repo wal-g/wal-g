@@ -94,7 +94,7 @@ func NewBundle(archiveDirectory string, crypter crypto.Crypter, incrementFromLsn
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
 		Files:              &sync.Map{},
-		TablespaceSpec:     newTablespaceSpec(archiveDirectory),
+		TablespaceSpec:     NewTablespaceSpec(archiveDirectory),
 	}
 }
 

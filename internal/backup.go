@@ -64,12 +64,12 @@ func (backup *Backup) getTarPartitionFolder() storage.Folder {
 	return backup.BaseBackupFolder.GetSubFolder(backup.Name + TarPartitionFolderName)
 }
 
-// CheckExistence checks that the specified backup exists.
-func (backup *Backup) CheckExistence() (bool, error) {
+// checkExistence checks that the specified backup exists.
+func (backup *Backup) checkExistence() (bool, error) {
 	return backup.BaseBackupFolder.Exists(backup.getStopSentinelPath())
 }
 
-func (backup *Backup) GetTarNames() ([]string, error) {
+func (backup *Backup) getTarNames() ([]string, error) {
 	tarPartitionFolder := backup.getTarPartitionFolder()
 	objects, _, err := tarPartitionFolder.ListFolder()
 	if err != nil {
@@ -82,7 +82,7 @@ func (backup *Backup) GetTarNames() ([]string, error) {
 	return result, nil
 }
 
-func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
+func (backup *Backup) getSentinel() (BackupSentinelDto, error) {
 	if backup.SentinelDto != nil {
 		return *backup.SentinelDto, nil
 	}
@@ -248,7 +248,7 @@ func isDirectoryEmpty(directoryPath string) (bool, error) {
 
 // TODO : init tests
 func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool) (tarsToExtract []ReaderMaker, pgControlKey string, err error) {
-	tarNames, err := backup.GetTarNames()
+	tarNames, err := backup.getTarNames()
 	if err != nil {
 		return nil, "", err
 	}
@@ -281,7 +281,7 @@ func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnw
 }
 
 func (backup *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error) {
-	sentinelDto, err := backup.GetSentinel()
+	sentinelDto, err := backup.getSentinel()
 	if err != nil {
 		return nil, err
 	}

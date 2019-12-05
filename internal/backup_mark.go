@@ -61,7 +61,7 @@ func getMarkedPermanentBackupMetadata(baseBackupFolder storage.Folder, backupNam
 
 	// retrieve current backup sentinel and meta
 	backup := NewBackup(baseBackupFolder, backupName)
-	sentinel, err := backup.GetSentinel()
+	sentinel, err := backup.getSentinel()
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func getGraphFromBaseToIncrement(folder storage.Folder) (map[string][]string, er
 
 func getMetadataFromBackup(baseBackupFolder storage.Folder, backupName string) (incrementFrom string, isIncrement bool, err error) {
 	backup := NewBackup(baseBackupFolder, backupName)
-	sentinel, err := backup.GetSentinel()
+	sentinel, err := backup.getSentinel()
 	if err != nil {
 		return "", false, err
 	}
