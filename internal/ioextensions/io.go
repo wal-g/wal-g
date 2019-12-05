@@ -25,7 +25,7 @@ type ReadCascadeCloser struct {
 }
 
 type Flusher interface {
-	flush() error
+	Flush() error
 }
 
 type OnCloseFlusher struct {
@@ -42,7 +42,7 @@ func (cf OnCloseFlusher) Close() error {
 	if err != nil {
 		return err
 	}
-	return cf.flush()
+	return cf.Flush()
 }
 
 // ZeroReader generates a slice of zeroes. Used to pad
