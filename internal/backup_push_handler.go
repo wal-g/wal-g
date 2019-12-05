@@ -13,8 +13,8 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -22,7 +22,7 @@ type SentinelMarshallingError struct {
 	error
 }
 
-func NewSentinelMarshallingError(sentinelName string, err error) SentinelMarshallingError {
+func newSentinelMarshallingError(sentinelName string, err error) SentinelMarshallingError {
 	return SentinelMarshallingError{errors.Wrapf(err, "Failed to marshall sentinel file: '%s'", sentinelName)}
 }
 
@@ -34,7 +34,7 @@ type BackupFromFuture struct {
 	error
 }
 
-func NewBackupFromFuture(backupName string) BackupFromFuture {
+func newBackupFromFuture(backupName string) BackupFromFuture {
 	return BackupFromFuture{errors.Errorf("Finish LSN of backup %v greater than current LSN", backupName)}
 }
 
@@ -46,7 +46,7 @@ type BackupFromOtherBD struct {
 	error
 }
 
-func NewBackupFromOtherBD() BackupFromOtherBD {
+func newBackupFromOtherBD() BackupFromOtherBD {
 	return BackupFromOtherBD{errors.Errorf("Current database and database of base backup are not equal.")}
 }
 
@@ -74,7 +74,7 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent bool, isFullBackup bool) {
 	archiveDirectory = utility.ResolveSymlink(archiveDirectory)
 	maxDeltas, fromFull := getDeltaConfig()
-	CheckPgVersionAndPgControl(archiveDirectory)
+	checkPgVersionAndPgControl(archiveDirectory)
 	var err error
 	var previousBackupSentinelDto BackupSentinelDto
 	var previousBackupName string
@@ -83,7 +83,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	folder := uploader.UploadingFolder
 	basebackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	if maxDeltas > 0 && !isFullBackup {
-		previousBackupName, err = GetLatestBackupName(folder)
+		previousBackupName, err = getLatestBackupName(folder)
 		if err != nil {
 			if _, ok := err.(NoBackupsFoundError); ok {
 				tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
@@ -121,7 +121,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	uploader.UploadingFolder = basebackupFolder // TODO: AB: this subfolder switch look ugly. I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
 
 	crypter := ConfigureCrypter()
-	bundle := NewBundle(archiveDirectory, crypter, previousBackupSentinelDto.BackupStartLSN, previousBackupSentinelDto.Files)
+	bundle := newBundle(archiveDirectory, crypter, previousBackupSentinelDto.BackupStartLSN, previousBackupSentinelDto.Files)
 
 	var meta ExtendedMetadataDto
 	meta.StartTime = utility.TimeNowCrossPlatformUTC()
@@ -142,11 +142,11 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 
 	if len(previousBackupName) > 0 && previousBackupSentinelDto.BackupStartLSN != nil {
 		if *previousBackupSentinelDto.BackupFinishLSN > backupStartLSN {
-			tracelog.ErrorLogger.FatalOnError(NewBackupFromFuture(previousBackupName))
+			tracelog.ErrorLogger.FatalOnError(newBackupFromFuture(previousBackupName))
 		}
 		if previousBackupSentinelDto.SystemIdentifier != nil && *systemIdentifier != *previousBackupSentinelDto.SystemIdentifier {
 
-			tracelog.ErrorLogger.FatalOnError(NewBackupFromOtherBD())
+			tracelog.ErrorLogger.FatalOnError(newBackupFromOtherBD())
 		}
 		if uploader.getUseWalDelta() {
 			err = bundle.DownloadDeltaMap(folder.GetSubFolder(utility.WalPath), backupStartLSN)
@@ -174,7 +174,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	err = bundle.UploadPgControl(uploader.Compressor.FileExtension())
 	tracelog.ErrorLogger.FatalOnError(err)
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
-	finishLsn, err := bundle.UploadLabelFiles(conn)
+	finishLsn, err := bundle.uploadLabelFiles(conn)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	timelineChanged := bundle.checkTimelineChanged(conn)
@@ -189,7 +189,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	}
 
 	var tablespaceSpec *TablespaceSpec
-	if !bundle.TablespaceSpec.Empty() {
+	if !bundle.TablespaceSpec.empty() {
 		tablespaceSpec = &bundle.TablespaceSpec
 	}
 	currentBackupSentinelDto := &BackupSentinelDto{
@@ -208,7 +208,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 		currentBackupSentinelDto.IncrementCount = &incrementCount
 	}
 
-	currentBackupSentinelDto.setFiles(bundle.GetFiles())
+	currentBackupSentinelDto.setFiles(bundle.getFiles())
 	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
 	currentBackupSentinelDto.UserData = GetSentinelUserData()
 	currentBackupSentinelDto.SystemIdentifier = systemIdentifier
@@ -217,10 +217,10 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	// If pushing permanent delta backup, mark all previous backups permanent
 	// Do this before uploading current meta to ensure that backups are marked in increasing order
 	if isPermanent && currentBackupSentinelDto.IsIncremental() {
-		MarkBackup(uploader, folder, previousBackupName, true)
+		markBackup(uploader, folder, previousBackupName, true)
 	}
 
-	err = UploadMetadata(uploader, currentBackupSentinelDto, backupName, meta)
+	err = uploadMetadata(uploader, currentBackupSentinelDto, backupName, meta)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload metadata file for backup: %s %v", backupName, err)
 		tracelog.ErrorLogger.FatalError(err)
@@ -235,7 +235,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 }
 
 // TODO : unit tests
-func UploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupName string, meta ExtendedMetadataDto) error {
+func uploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupName string, meta ExtendedMetadataDto) error {
 	// BackupSentinelDto struct allows nil field for backward compatiobility
 	// We do not expect here nil dto since it is new dto to upload
 	meta.DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -251,7 +251,7 @@ func UploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupNa
 	metaFile := storage.JoinPath(backupName, utility.MetadataFileName)
 	dtoBody, err := json.Marshal(meta)
 	if err != nil {
-		return NewSentinelMarshallingError(metaFile, err)
+		return newSentinelMarshallingError(metaFile, err)
 	}
 	return uploader.Upload(metaFile, bytes.NewReader(dtoBody))
 }
@@ -262,13 +262,13 @@ func UploadSentinel(uploader *Uploader, sentinelDto interface{}, backupName stri
 
 	dtoBody, err := json.Marshal(sentinelDto)
 	if err != nil {
-		return NewSentinelMarshallingError(sentinelName, err)
+		return newSentinelMarshallingError(sentinelName, err)
 	}
 
 	return uploader.Upload(sentinelName, bytes.NewReader(dtoBody))
 }
 
-func CheckPgVersionAndPgControl(archiveDirectory string) {
+func checkPgVersionAndPgControl(archiveDirectory string) {
 	_, err := ioutil.ReadFile(filepath.Join(archiveDirectory, PgControlPath))
 	tracelog.ErrorLogger.FatalfOnError("It looks like you are trying to backup not pg_data. PgControl file not found: %v\n", err)
 	_, err = ioutil.ReadFile(filepath.Join(archiveDirectory, "PG_VERSION"))

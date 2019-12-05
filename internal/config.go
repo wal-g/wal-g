@@ -135,7 +135,7 @@ var (
 	}
 )
 
-func IsAllowedSetting(setting string, AllowedSettings map[string]bool) (exists bool) {
+func isAllowedSetting(setting string, AllowedSettings map[string]bool) (exists bool) {
 	_, exists = AllowedSettings[setting]
 	return
 }
@@ -147,7 +147,7 @@ func GetSetting(key string) (value string, ok bool) {
 	return "", false
 }
 
-func GetWaleCompatibleSetting(key string) (value string, exists bool) {
+func getWaleCompatibleSetting(key string) (value string, exists bool) {
 	settingKeys := []string{
 		"WALG_" + key,
 		"WALE_" + key,
@@ -168,7 +168,7 @@ func GetWaleCompatibleSetting(key string) (value string, exists bool) {
 }
 
 func Configure() {
-	err := ConfigureLogging()
+	err := configureLogging()
 	if err != nil {
 		tracelog.ErrorLogger.Println("Failed to configure logging.")
 		tracelog.ErrorLogger.FatalError(err)
@@ -180,7 +180,7 @@ func Configure() {
 		tracelog.DebugLogger.Println(pair)
 	}
 
-	ConfigureLimiters()
+	configureLimiters()
 
 	for _, adapter := range StorageAdapters {
 		for _, setting := range adapter.settingNames {
@@ -221,7 +221,7 @@ func InitConfig() {
 	foundNotAllowed := false
 	for k := range viper.AllSettings() {
 		k = strings.ToUpper(k)
-		if !IsAllowedSetting(k, AllowedSettings) {
+		if !isAllowedSetting(k, AllowedSettings) {
 			tracelog.WarningLogger.Println(k + " is unknown")
 			foundNotAllowed = true
 		}

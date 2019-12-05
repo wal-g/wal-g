@@ -7,8 +7,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -62,7 +62,7 @@ func (uploader *Uploader) finish() {
 }
 
 // Clone creates similar Uploader with new WaitGroup
-func (uploader *Uploader) Clone() *Uploader {
+func (uploader *Uploader) clone() *Uploader {
 	return &Uploader{
 		uploader.UploadingFolder,
 		uploader.Compressor,
@@ -91,7 +91,7 @@ func (uploader *Uploader) UploadWalFile(file NamedReader) error {
 		walFileReader = file
 	}
 
-	return uploader.UploadFile(NewNamedReaderImpl(walFileReader, file.Name()))
+	return uploader.UploadFile(newNamedReaderImpl(walFileReader, file.Name()))
 }
 
 // TODO : unit tests
@@ -119,7 +119,7 @@ func (uploader *Uploader) Upload(path string, content io.Reader) error {
 // UploadMultiple uploads multiple objects from the start of the slice,
 // returning the first error if any. Note that this operation is not atomic
 // TODO : unit tests
-func (uploader *Uploader) UploadMultiple(objects []UploadObject) error {
+func (uploader *Uploader) uploadMultiple(objects []UploadObject) error {
 	for _, object := range objects {
 		err := uploader.Upload(object.Path, object.Content)
 		if err != nil {

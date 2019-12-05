@@ -8,8 +8,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -49,7 +49,7 @@ func GetLogsDstSettings(operationLogsDstEnvVariable string) (dstFolder string, e
 }
 
 // DownloadAndDecompressStream downloads, decompresses and writes stream to stdout
-func DownloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) error {
+func downloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) error {
 	for _, decompressor := range compression.Decompressors {
 		archiveReader, exists, err := TryDownloadWALFile(backup.BaseBackupFolder, getStreamName(backup.Name, decompressor.FileExtension()))
 		if err != nil {
@@ -59,18 +59,18 @@ func DownloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) err
 			continue
 		}
 
-		err = DecompressWALFile(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
+		err = decompressWALFile(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
 		if err != nil {
 			return err
 		}
 		utility.LoggedClose(writeCloser, "")
 		return nil
 	}
-	return NewArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))
+	return newArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))
 }
 
 // GetLogsCoveringInterval lists the operation logs that cover the interval
-func GetLogsCoveringInterval(folder storage.Folder, start time.Time, end *time.Time) ([]storage.Object, error) {
+func getLogsCoveringInterval(folder storage.Folder, start time.Time, end *time.Time) ([]storage.Object, error) {
 	logFiles, _, err := folder.ListFolder()
 	if err != nil {
 		return nil, err
@@ -82,7 +82,7 @@ func GetLogsCoveringInterval(folder storage.Folder, start time.Time, end *time.T
 	var logsToFetch []storage.Object
 	for _, logFile := range logFiles {
 		tracelog.InfoLogger.Println("Consider log file: ", logFile.GetName(), logFile.GetLastModified().Format(time.RFC3339))
-		if LogFileShouldBeFetched(start, end, logFile) {
+		if logFileShouldBeFetched(start, end, logFile) {
 			logsToFetch = append(logsToFetch, logFile)
 		}
 	}
@@ -90,7 +90,7 @@ func GetLogsCoveringInterval(folder storage.Folder, start time.Time, end *time.T
 }
 
 // DownloadLogFiles downloads files to specified folder
-func DownloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, handlers LogFetchHandlers) ([]storage.Object, error) {
+func downloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, handlers LogFetchHandlers) ([]storage.Object, error) {
 	var fetched []storage.Object
 	for _, logFile := range logFiles {
 		logName := utility.TrimFileExtension(logFile.GetName())
@@ -125,12 +125,12 @@ func DownloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, handl
 
 func FetchLogs(folder storage.Folder, startTS time.Time, endTS *time.Time, logFolderPath string, handlers LogFetchHandlers) (fetched []storage.Object, err error) {
 	logFolder := folder.GetSubFolder(logFolderPath)
-	logsToFetch, err := GetLogsCoveringInterval(logFolder, startTS, endTS)
+	logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, endTS)
 	if err != nil {
 		return nil, err
 	}
 
-	fetched, err = DownloadLogFiles(logsToFetch, logFolder, handlers)
+	fetched, err = downloadLogFiles(logsToFetch, logFolder, handlers)
 	if err != nil {
 		return nil, err
 	}
@@ -138,14 +138,14 @@ func FetchLogs(folder storage.Folder, startTS time.Time, endTS *time.Time, logFo
 	return fetched, nil
 }
 
-func LogFileShouldBeFetched(backupStartUploadTime time.Time, endTS *time.Time, object storage.Object) bool {
+func logFileShouldBeFetched(backupStartUploadTime time.Time, endTS *time.Time, object storage.Object) bool {
 	return (backupStartUploadTime.Before(object.GetLastModified()) || backupStartUploadTime.Equal(object.GetLastModified())) &&
 		(endTS == nil || (*endTS).After(object.GetLastModified()))
 }
 
 // TODO : unit tests
 func FetchStreamSentinel(backup *Backup, sentinelDto interface{}) error {
-	sentinelDtoData, err := backup.FetchSentinelData()
+	sentinelDtoData, err := backup.fetchSentinelData()
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch sentinel")
 	}

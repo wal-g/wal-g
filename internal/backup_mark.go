@@ -11,12 +11,12 @@ import (
 )
 
 // MarkBackup marks a backup as permanent or impermanent
-func MarkBackup(uploader *Uploader, folder storage.Folder, backupName string, toPermanent bool) {
+func markBackup(uploader *Uploader, folder storage.Folder, backupName string, toPermanent bool) {
 	tracelog.InfoLogger.Printf("Retrieving previous related backups to be marked: toPermanent=%t", toPermanent)
 	metadataToUpload, err := GetMarkedBackupMetadataToUpload(folder, backupName, toPermanent)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get previous backups: %v", err)
 	tracelog.InfoLogger.Printf("Retrieved backups to be marked, marking: %v", metadataToUpload)
-	err = uploader.UploadMultiple(metadataToUpload)
+	err = uploader.uploadMultiple(metadataToUpload)
 	tracelog.ErrorLogger.FatalfOnError("Failed to mark previous backups: %v", err)
 }
 
@@ -35,7 +35,7 @@ func GetMarkedBackupMetadataToUpload(
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 
 	backup := NewBackup(baseBackupFolder, backupName)
-	meta, err := backup.FetchMeta()
+	meta, err := backup.fetchMeta()
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func GetMarkedBackupMetadataToUpload(
 		if !meta.IsPermanent {
 			permanentType = "impermanent"
 		}
-		return nil, NewBackupAlreadyThisTypePermanentError(backupName, permanentType)
+		return nil, newBackupAlreadyThisTypePermanentError(backupName, permanentType)
 	}
 
 	if toPermanent {
@@ -66,7 +66,7 @@ func getMarkedPermanentBackupMetadata(baseBackupFolder storage.Folder, backupNam
 		return nil, err
 	}
 
-	meta, err := backup.FetchMeta()
+	meta, err := backup.fetchMeta()
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string
 	// retrieve current backup meta
 	backup := NewBackup(baseBackupFolder, backupName)
 
-	meta, err := backup.FetchMeta()
+	meta, err := backup.fetchMeta()
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string
 	}
 
 	if backupHasPermanentInFuture(&reverseLinks, backupName, &permanentBackups) {
-		return nil, NewBackupHasPermanentBackupInFutureError(backupName)
+		return nil, newBackupHasPermanentBackupInFutureError(backupName)
 	}
 
 	meta.IsPermanent = false
@@ -204,7 +204,7 @@ type BackupAlreadyThisTypePermanentError struct {
 }
 
 //raise when user try make permanent/impermanent already permanent/impermanent backup,
-func NewBackupAlreadyThisTypePermanentError(backupName string, permanentType string) BackupAlreadyThisTypePermanentError {
+func newBackupAlreadyThisTypePermanentError(backupName string, permanentType string) BackupAlreadyThisTypePermanentError {
 	return BackupAlreadyThisTypePermanentError{errors.Errorf("Backup '%s' is already %s.", backupName, permanentType)}
 }
 
@@ -212,6 +212,6 @@ type BackupHasPermanentBackupInFutureError struct {
 	error
 }
 
-func NewBackupHasPermanentBackupInFutureError(backupName string) BackupHasPermanentBackupInFutureError {
+func newBackupHasPermanentBackupInFutureError(backupName string) BackupHasPermanentBackupInFutureError {
 	return BackupHasPermanentBackupInFutureError{errors.Errorf("Can't mark backup '%s' as impermanent. There is permanent increment backup.", backupName)}
 }

@@ -11,7 +11,7 @@ type StorageReaderMaker struct {
 	RelativePath string
 }
 
-func NewStorageReaderMaker(folder storage.Folder, relativePath string) *StorageReaderMaker {
+func newStorageReaderMaker(folder storage.Folder, relativePath string) *StorageReaderMaker {
 	return &StorageReaderMaker{folder, relativePath}
 }
 
