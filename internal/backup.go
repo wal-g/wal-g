@@ -64,7 +64,7 @@ func (backup *Backup) getTarPartitionFolder() storage.Folder {
 	return backup.BaseBackupFolder.GetSubFolder(backup.Name + TarPartitionFolderName)
 }
 
-// checkExistence checks that the specified backup exists.
+// CheckExistence checks that the specified backup exists.
 func (backup *Backup) CheckExistence() (bool, error) {
 	return backup.BaseBackupFolder.Exists(backup.getStopSentinelPath())
 }
