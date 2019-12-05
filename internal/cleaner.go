@@ -7,8 +7,8 @@ import (
 
 // Cleaner interface serves to separate file system logic from prefetch clean logic to make it testable
 type Cleaner interface {
-	getFiles(directory string) ([]string, error)
-	remove(file string)
+	GetFiles(directory string) ([]string, error)
+	Remove(file string)
 }
 
 func CleanupPrefetchDirectories(walFileName string, location string, cleaner Cleaner) {
@@ -25,7 +25,7 @@ func CleanupPrefetchDirectories(walFileName string, location string, cleaner Cle
 
 // TODO : unit tests
 func cleanupPrefetchDirectory(directory string, timelineId uint32, logSegNo uint64, cleaner Cleaner) {
-	files, err := cleaner.getFiles(directory)
+	files, err := cleaner.GetFiles(directory)
 	if err != nil {
 		tracelog.WarningLogger.Println("WAL-prefetch cleanup failed, : ", err, " cannot enumerate files in dir: ", directory)
 	}
@@ -36,7 +36,7 @@ func cleanupPrefetchDirectory(directory string, timelineId uint32, logSegNo uint
 			continue
 		}
 		if fileTimelineId < timelineId || (fileTimelineId == timelineId && fileLogSegNo < logSegNo) {
-			cleaner.remove(path.Join(directory, f))
+			cleaner.Remove(path.Join(directory, f))
 		}
 	}
 }

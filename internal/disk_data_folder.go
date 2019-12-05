@@ -34,12 +34,12 @@ func (folder *DiskDataFolder) OpenWriteOnlyFile(filename string) (io.WriteCloser
 
 func (folder *DiskDataFolder) CleanFolder() error {
 	cleaner := FileSystemCleaner{}
-	files, err := cleaner.getFiles(folder.path)
+	files, err := cleaner.GetFiles(folder.path)
 	if err != nil {
 		return err
 	}
 	for _, file := range files {
-		cleaner.remove(filepath.Join(folder.path, file))
+		cleaner.Remove(filepath.Join(folder.path, file))
 	}
 	return nil
 }
