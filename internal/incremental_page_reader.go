@@ -128,7 +128,7 @@ func (pageReader *IncrementalPageReader) FullScanInitialize() error {
 
 		valid := pageReader.SelectNewValidPage(pageBytes, currentBlockNumber) // TODO : torn page possibility
 		if !valid {
-			return NewInvalidBlockError(currentBlockNumber)
+			return newInvalidBlockError(currentBlockNumber)
 		}
 	}
 }
@@ -146,13 +146,13 @@ func (pageReader *IncrementalPageReader) WriteDiffMapToHeader(headerWriter io.Wr
 
 // SelectNewValidPage checks whether page is valid and if it so, then blockNo is appended to Blocks list
 func (pageReader *IncrementalPageReader) SelectNewValidPage(pageBytes []byte, blockNo uint32) (valid bool) {
-	pageHeader, _ := ParsePostgresPageHeader(bytes.NewReader(pageBytes))
-	valid = pageHeader.IsValid()
+	pageHeader, _ := parsePostgresPageHeader(bytes.NewReader(pageBytes))
+	valid = pageHeader.isValid()
 
 	isNew := false
 
 	if !valid {
-		if pageHeader.IsNew() { // vacuumed page
+		if pageHeader.isNew() { // vacuumed page
 			isNew = true
 			valid = true
 		} else {
@@ -161,7 +161,7 @@ func (pageReader *IncrementalPageReader) SelectNewValidPage(pageBytes []byte, bl
 		}
 	}
 
-	if isNew || (pageHeader.Lsn() >= pageReader.Lsn) {
+	if isNew || (pageHeader.lsn() >= pageReader.Lsn) {
 		pageReader.Blocks = append(pageReader.Blocks, blockNo)
 	}
 	return
