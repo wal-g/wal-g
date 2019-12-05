@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/awskms"
@@ -174,7 +174,6 @@ func configureCompressor() (compression.Compressor, error) {
 	return compression.Compressors[compressionMethod], nil
 }
 
-// TODO : unit tests
 func ConfigureLogging() error {
 	if viper.IsSet(LogLevelSetting) {
 		return tracelog.UpdateLogLevel(viper.GetString(LogLevelSetting))
