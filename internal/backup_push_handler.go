@@ -189,7 +189,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 	}
 
 	var tablespaceSpec *TablespaceSpec
-	if !bundle.TablespaceSpec.empty() {
+	if !bundle.TablespaceSpec.isEmpty() {
 		tablespaceSpec = &bundle.TablespaceSpec
 	}
 	currentBackupSentinelDto := &BackupSentinelDto{

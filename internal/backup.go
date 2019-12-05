@@ -156,7 +156,7 @@ func checkDbDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentine
 		}
 	}
 
-	if sentinelDto.TablespaceSpec != nil && !sentinelDto.TablespaceSpec.empty() {
+	if sentinelDto.TablespaceSpec != nil && !sentinelDto.TablespaceSpec.isEmpty() {
 		err := setTablespacePaths(*sentinelDto.TablespaceSpec)
 		if err != nil {
 			return err
@@ -243,7 +243,7 @@ func isDirectoryEmpty(directoryPath string) (bool, error) {
 		return nil
 	}
 	err := filepath.Walk(directoryPath, searchLambda)
-	return isEmpty, errors.Wrapf(err, "can't check, that directory: '%s' is empty", directoryPath)
+	return isEmpty, errors.Wrapf(err, "can't check, that directory: '%s' is isEmpty", directoryPath)
 }
 
 // TODO : init tests
