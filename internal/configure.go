@@ -15,6 +15,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+	"strconv"
 )
 
 const (
@@ -315,4 +317,22 @@ func GetNameStreamCreateCmd() []string {
 		}
 	}
 	return resultCommand
+}
+
+func GetOplogArchiveTimeout() (time.Duration, error) {
+	oplogArchiveTimeoutStr, _ := GetSetting(OplogArchiveTimeoutSetting)
+	oplogArchiveTimeout, err := strconv.Atoi(oplogArchiveTimeoutStr)
+	if err != nil {
+		return 0, fmt.Errorf("integer expected for %s setting but given '%s': %w", OplogArchiveTimeoutSetting, oplogArchiveTimeoutStr, err)
+	}
+	return time.Duration(oplogArchiveTimeout) * time.Second, nil
+}
+
+func GetOplogArchiveAfterSize() (int, error) {
+	oplogArchiveAfterSizeStr, _ := GetSetting(OplogArchiveAfterSize)
+	oplogArchiveAfterSize, err := strconv.Atoi(oplogArchiveAfterSizeStr)
+	if err != nil {
+		return 0, fmt.Errorf("integer expected for %s setting but given '%s': %w", OplogArchiveAfterSize, oplogArchiveAfterSizeStr, err)
+	}
+	return oplogArchiveAfterSize, nil
 }

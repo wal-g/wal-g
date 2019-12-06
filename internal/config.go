@@ -39,6 +39,9 @@ const (
 	PgSslModeSetting             = "PGSSLMODE"
 	TotalBgUploadedLimit         = "TOTAL_BG_UPLOADED_LIMIT"
 	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
+	MongoDBUriSetting            = "MONGODB_URI"
+	OplogArchiveAfterSize		 = "OPLOG_ARCHIVE_AFTER_SIZE"
+	OplogArchiveTimeoutSetting   = "OPLOG_ARCHIVE_TIMEOUT"
 )
 
 var (
@@ -54,6 +57,8 @@ var (
 		UseWalDeltaSetting:           "false",
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
 		TotalBgUploadedLimit:         "32",
+		OplogArchiveTimeoutSetting:	  "60",
+		OplogArchiveAfterSize:		  "33554432",  // 32 << (10 * 2)
 	}
 
 	AllowedSettings = map[string]bool{

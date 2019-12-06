@@ -1,22 +1,77 @@
 package mongo
 
 import (
-	"os"
+	"bytes"
+	"context"
+	"fmt"
+	"sync"
+	"time"
 
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleOplogPush(uploader *Uploader) {
-	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(OplogPath)
-	if !internal.FileIsPiped(os.Stdin) {
-		tracelog.ErrorLogger.Fatal("Use stdin\n")
-	}
-	oplogName := OplogPrefix + utility.TimeNowCrossPlatformUTC().Format("20060102T150405Z")
-	dstPath := oplogName + "." + uploader.Compressor.FileExtension()
-	err := uploader.PushStreamToDestination(os.Stdin, dstPath)
+func HandleOplogPush(ctx context.Context, uploader *Uploader) {
+	lastKnownArchiveTS := fmt.Sprintf("0.0")
+	oplogStartTS, err := OplogTimestampFromStr(lastKnownArchiveTS)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	tracelog.InfoLogger.Println("Oplog file " + dstPath + " was uploaded")
+	lastKnownTS := oplogStartTS
+	batchStartTs := lastKnownTS
+
+	var buf bytes.Buffer // TODO: switch to temp file
+	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(OplogPath)
+
+	archiveSize, err := internal.GetOplogArchiveAfterSize()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	archiveTimeout, err := internal.GetOplogArchiveTimeout()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	archiveTimer := time.NewTimer(archiveTimeout)
+	defer archiveTimer.Stop()
+
+	var wg sync.WaitGroup
+	mongodbUrl, ok := internal.GetSetting(internal.MongoDBUriSetting)
+	if !ok {
+		err := internal.NewUnsetRequiredSettingError(internal.MongoDBUriSetting)
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
+	oplogFetcher := NewOplogFetcherDB(mongodbUrl, &wg)
+	ch, err := oplogFetcher.GetOplogFrom(ctx, lastKnownTS)
+	tracelog.ErrorLogger.FatalOnError(err)
+	defer wg.Wait()
+
+	for {
+		select {
+		case op, ok := <-ch:
+			// TODO: filter doc
+			// TODO: ensure first doc is with lastKnownTS
+			// TODO: validate doc: report error if op.NS == admin.system.version or op.OP == renameCollections
+			if !ok {
+				return
+			}
+			tracelog.ErrorLogger.FatalOnError(op.Err) // TODO: handle errors
+
+			lastKnownTS = op.TS
+			buf.Write(op.Data)
+			if buf.Len() < archiveSize {
+				continue
+			}
+			tracelog.DebugLogger.Println("Initializing archive upload due to archive size")
+
+		case <-archiveTimer.C:
+			if buf.Len() == 0 {
+				continue
+			}
+			tracelog.DebugLogger.Println("Initializing archive upload due to timeout expired")
+		}
+
+		archiveTimer.Reset(archiveTimeout)
+		err := uploader.uploadOplogStream(&buf, batchStartTs, lastKnownTS)
+		tracelog.ErrorLogger.FatalOnError(err) // TODO: handle errors
+
+		buf.Reset()
+		batchStartTs = lastKnownTS
+	}
 }
