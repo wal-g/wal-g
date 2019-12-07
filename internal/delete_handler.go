@@ -40,6 +40,7 @@ const (
 
 var StringModifiers = []string{"FULL", "FIND_FULL"}
 var StringModifiersDeleteEverything = []string{"FORCE"}
+var MaxTime = time.Unix(1<<63-62135596801, 999999999)
 
 // TODO : unit tests
 func GetLatestBackupName(folder storage.Folder) (string, error) {
@@ -152,6 +153,84 @@ func FindTargetRetain(folder storage.Folder,
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete retain'")
 	}
 	return FindTarget(folder, greater, choiceFunc)
+}
+
+func FindTargetRetainAfterName(folder storage.Folder,
+	retentionCount int, name string, modifier int,
+	isFullBackup func(object storage.Object) bool,
+	greater func(object1, object2 storage.Object) bool) (storage.Object, error) {
+
+	less := func(object1, object2 storage.Object) bool {return greater(object2, object1)}
+
+	choiceFuncRetain := GetRetainChoiceFunc(retentionCount, modifier, isFullBackup)
+	if choiceFuncRetain == nil {
+		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete before'")
+	}
+	meetName := false
+	choiceFuncAfterName := func(object storage.Object) bool {
+		meetName = meetName || strings.HasPrefix(object.GetName(), name)
+		if modifier == NoDeleteModifier {
+			return meetName
+		} else {
+			return meetName && isFullBackup(object)
+		}
+	}
+	if choiceFuncAfterName == nil {
+		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete before'")
+	}
+
+	target1, err := FindTarget(folder, greater, choiceFuncRetain)
+	if err != nil {
+		return nil, err
+	}
+	target2, err := FindTarget(folder, less, choiceFuncAfterName)
+	if err != nil {
+		return nil, err
+	}
+
+	if greater(target1, target2) {
+		return target1, nil
+	} else {
+		return target2, nil
+	}
+}
+
+func FindTargetRetainAfterTime(folder storage.Folder,
+	retentionCount int,
+	timeLine time.Time,
+	modifier int,
+	isFullBackup func(object storage.Object) bool,
+	greater func(object1, object2 storage.Object) bool) (storage.Object, error) {
+
+	less := func(object1, object2 storage.Object) bool {return greater(object2, object1)}
+
+	choiceFuncRetain := GetRetainChoiceFunc(retentionCount, modifier, isFullBackup)
+	if choiceFuncRetain == nil {
+		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete retain'")
+	}
+	choiceFuncAfter := func(object storage.Object) bool {
+		timeCheck := timeLine.Before(object.GetLastModified()) || timeLine.Equal(object.GetLastModified())
+		if modifier == NoDeleteModifier {
+			return timeCheck
+		} else {
+			return timeCheck && isFullBackup(object)
+		}
+	}
+
+	target1, err := FindTarget(folder, greater, choiceFuncRetain)
+	if err != nil {
+		return nil, err
+	}
+	target2, err := FindTarget(folder, less, choiceFuncAfter)
+	if err != nil {
+		return nil, err
+	}
+
+	if greater(target1, target2) {
+		return target1, nil
+	} else {
+		return target2, nil
+	}
 }
 
 func FindTarget(folder storage.Folder,
@@ -355,6 +434,44 @@ func HandleDeleteRetain(folder storage.Folder, args []string, confirmed bool,
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
+func HandleDeletaRetainAfter(folder storage.Folder, args []string, confirmed bool,
+	isFullBackup func(object storage.Object) bool,
+	less func(object1, object2 storage.Object) bool) {
+
+	modifier, retentionSir, afterStr := extractDeleteRetainModifierFromArgs(args)
+	retentionCount, err := strconv.Atoi(retentionSir)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	timeLine, err := time.Parse(time.RFC3339, afterStr)
+	var target storage.Object
+	if err == nil {
+		target, err = FindTargetRetainAfterTime(folder, retentionCount, timeLine, modifier, isFullBackup, less)
+	} else {
+		greater := func(object1, object2 storage.Object) bool { return less(object2, object1) }
+		target, err = FindTargetRetainAfterName(folder, retentionCount, afterStr, modifier, isFullBackup, greater)
+	}
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	if target == nil {
+		tracelog.InfoLogger.Printf("No backup found for deletion")
+		os.Exit(0)
+	}
+
+	greater := func(object1, object2 storage.Object) bool {return less(object2, object1)}
+	err = DeleteBeforeTarget(folder, target, confirmed, isFullBackup, greater)
+	tracelog.ErrorLogger.FatalOnError(err)
+}
+
+func extractDeleteRetainModifierFromArgs(args []string) (int, string, string) {
+	if len(args) == 2 {
+		return NoDeleteModifier, args[0], args[1]
+	} else if args[0] == StringModifiers[0] {
+		return FullDeleteModifier, args[1], args[2]
+	} else {
+		return FindFullDeleteModifier, args[1], args[2]
+	}
+}
+
 func extractDeleteEverythingModifierFromArgs(args []string) int {
 	if len(args) == 0 {
 		return NoDeleteModifier
@@ -406,6 +523,27 @@ func DeleteRetainArgsValidator(cmd *cobra.Command, args []string) error {
 	}
 	if retantionNumber <= 0 {
 		return fmt.Errorf("cannot retain less than one backup. Check out delete everything")
+	}
+	return nil
+}
+
+func DeleteRetainAfterArgsValidator(cmd *cobra.Command, args []string) error {
+	err := deleteArgsValidator(cmd, args, StringModifiers, 2, 3)
+	if err != nil {
+		return err
+	}
+	_, retentionStr, afterStr := extractDeleteRetainModifierFromArgs(args)
+	retentionNumber, err := strconv.Atoi(retentionStr)
+	if err != nil {
+		return errors.Wrapf(err, "expected to get a number as retantion count, but got: '%s'", retentionStr)
+	}
+	if retentionNumber <= 0 {
+		return fmt.Errorf("cannot retain less than one backup. Check out delete everything")
+	}
+	if before, err := time.Parse(time.RFC3339, afterStr); err == nil {
+		if before.After(utility.TimeNowCrossPlatformUTC()) {
+			return fmt.Errorf("cannot delete retain future date")
+		}
 	}
 	return nil
 }
