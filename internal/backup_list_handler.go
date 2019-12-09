@@ -41,8 +41,6 @@ func DefaultHandleBackupList(folder storage.Folder) {
 	HandleBackupList(getBackupsFunc, writeBackupListFunc, logging)
 }
 
-// TODO : unit tests
-// DefaultHandleBackupList is invoked to perform wal-g backup-list
 func HandleBackupList(
 	getBackupsFunc func() ([]BackupTime, error),
 	writeBackupListFunc func ([]BackupTime),
