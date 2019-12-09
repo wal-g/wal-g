@@ -401,7 +401,7 @@ func TestStripWalFileName_ReturnFirstLsn(t *testing.T) {
 }
 
 func RandomString(n int) string {
-	var letter = []rune("ABCDEFG0123456789")
+	var letter = []rune("ABCDEF0123456789")
 
 	b := make([]rune, n)
 	for i := range b {
