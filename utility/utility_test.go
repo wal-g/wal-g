@@ -378,6 +378,7 @@ func TestGetSubdirectoryRelativePath_NotNormalizedDirectory(t *testing.T) {
 func TestStripWalFileName_NonValidInput(t *testing.T) {
 	var path = "---"
 	var expected = strings.Repeat("Z", 24)
+
 	result := utility.StripWalFileName(path)
 
 	assert.Equal(t, expected, result)
@@ -386,12 +387,14 @@ func TestStripWalFileName_NonValidInput(t *testing.T) {
 func TestStripWalFileName_ValidLsn(t *testing.T) {
 	var path = RandomString(24)
 	result := utility.StripWalFileName(path)
+
 	assert.Equal(t, path, result)
 }
 
 func TestStripWalFileName_ReturnFirstLsn(t *testing.T) {
 	var paths = [3]string{RandomString(24), RandomString(24), RandomString(24)}
 	var path = strings.Join(paths[:], "-")
+
 	result := utility.StripWalFileName(path)
 
 	assert.Equal(t, paths[0], result)
