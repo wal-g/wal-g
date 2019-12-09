@@ -115,18 +115,18 @@ func TestGetDataFolderPath_WalIgnoreXlog(t *testing.T) {
 	cleanup(t, parentDir)
 }
 
+func TestConfigureLogging_WhenLogLevelSettingIsNotSet(t *testing.T) {
+	result := internal.ConfigureLogging()
+
+	assert.Equal(t, nil, result)
+}
+
 func TestConfigureLogging_WhenLogLevelSettingIsSet(t *testing.T) {
 	parentDir := prepareDataFolder(t, "someOtherFolder")
 	viper.Set(internal.LogLevelSetting, parentDir)
 	result := internal.ConfigureLogging()
 
 	assert.Error(t, tracelog.UpdateLogLevel(viper.GetString(internal.LogLevelSetting)), result)
-}
-
-func TestConfigureLogging_WhenLogLevelSettingIsNotSet(t *testing.T) {
-	result := internal.ConfigureLogging()
-
-	assert.Equal(t, nil, result)
 }
 
 func prepareDataFolder(t *testing.T, name string) string {
