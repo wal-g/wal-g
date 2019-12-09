@@ -443,11 +443,11 @@ func HandleDeletaRetainAfter(folder storage.Folder, args []string, confirmed boo
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	timeLine, err := time.Parse(time.RFC3339, afterStr)
+	greater := func(object1, object2 storage.Object) bool { return less(object2, object1) }
 	var target storage.Object
 	if err == nil {
-		target, err = FindTargetRetainAfterTime(folder, retentionCount, timeLine, modifier, isFullBackup, less)
+		target, err = FindTargetRetainAfterTime(folder, retentionCount, timeLine, modifier, isFullBackup, greater)
 	} else {
-		greater := func(object1, object2 storage.Object) bool { return less(object2, object1) }
 		target, err = FindTargetRetainAfterName(folder, retentionCount, afterStr, modifier, isFullBackup, greater)
 	}
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -457,8 +457,7 @@ func HandleDeletaRetainAfter(folder storage.Folder, args []string, confirmed boo
 		os.Exit(0)
 	}
 
-	greater := func(object1, object2 storage.Object) bool {return less(object2, object1)}
-	err = DeleteBeforeTarget(folder, target, confirmed, isFullBackup, greater)
+	err = DeleteBeforeTarget(folder, target, confirmed, isFullBackup, less)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
