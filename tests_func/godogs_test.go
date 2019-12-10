@@ -25,11 +25,13 @@ var testContext *testHelper.TestContextType
 func FeatureContext(s *godog.Suite) {
 	testContext = &testHelper.TestContextType{}
 	testContext.TestData = make(map[string]map[string]map[string][]testHelper.DatabaseRecord)
+	testContext.AuxData.Timestamps = make(map[int]time.Time)
 	testContext.Context = context.Background()
 
 	s.BeforeFeature(func(feature *gherkin.Feature) {
 		testContext = &testHelper.TestContextType{}
 		testContext.TestData = make(map[string]map[string]map[string][]testHelper.DatabaseRecord)
+		testContext.AuxData.Timestamps = make(map[int]time.Time)
 		testContext.Context = context.Background()
 
 		err := SetupStaging(testContext)
@@ -86,6 +88,44 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^we got same mongodb data at mongodb(\d+) mongodb(\d+)$`, testEqualMongodbDataAtMongodbs)
 	s.Step(`^we ensure mongodb(\d+) #(\d+) backup metadata contains$`, mongodbBackupMetadataContainsUserData)
 
+	s.Step(`^we delete backups retain (\d+) after #(\d+) backup via mongodb(\d+)$`, deleteBackupsRetainAfterBackupViaMongodb)
+	s.Step(`^we delete backups retain (\d+) after #(\d+) timestamp via mongodb(\d+)$`, deleteBackupsRetainAfterTimeViaMongodb)
+	s.Step(`^we create timestamp #(\d+) via mongodb(\d+)$`, createTimestamp)
+	s.Step(`^we wait for (\d+) seconds$`, wait)
+}
+
+func wait(cnt int) error {
+	time.Sleep(time.Duration(cnt * int(time.Second)))
+	return nil
+}
+
+func createTimestamp(timestampId int, mongodbId int) error {
+	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	command := []string{"date", "-u", `+%Y-%m-%dT%H:%M:%SZ`}
+	response, err := testHelper.RunCommandInContainer(testContext, nodeName, command)
+	if err != nil {
+		return fmt.Errorf("cannot create timestamp: %v", err)
+	}
+	timeStr := strings.Trim(response, " \n\t"+string([]byte{0, 1, 21}))
+	fmt.Printf("\n\n!%s!\n\n", response)
+	timeLine, err := time.Parse(time.RFC3339, timeStr)
+	fmt.Printf("\n\n!%+v!\n\n", []byte(timeStr))
+	fmt.Println(timeLine)
+	if err != nil {
+		return fmt.Errorf("cannot create timestamp: %v", err)
+	}
+	testContext.AuxData.Timestamps[timestampId] = timeLine
+	return nil
+}
+
+func deleteBackupsRetainAfterTimeViaMongodb(retainCount int, timestampId int, mongodbId int) error {
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	return testHelper.MongoPurgeBackupsAfterTime(testContext, containerName, retainCount, testContext.AuxData.Timestamps[timestampId])
+}
+
+func deleteBackupsRetainAfterBackupViaMongodb(retainCount int, afterBackupId int, mongodbId int) error {
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	return testHelper.MongoPurgeBackupsAfterBackupId(testContext, containerName, retainCount, afterBackupId)
 }
 
 func mongodbBackupMetadataContainsUserData(mongodbId int, backupId int, data *gherkin.DocString) error {
@@ -163,7 +203,7 @@ func replsetinitiateOnMongodb(mongodbId int) error {
 	if err != nil {
 		return err
 	}
-	time.Sleep(30 * time.Second)
+	time.Sleep(3 * time.Second)
 	return nil
 }
 

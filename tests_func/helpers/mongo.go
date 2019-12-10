@@ -171,7 +171,7 @@ func MakeBackup(testContext *TestContextType, containerName string, cmdArgs stri
 		AttachStderr: true,
 		AttachStdout: true,
 		Cmd:          []string{"bash", "-c", command},
-		Env:		  append(os.Environ(), envs...),
+		Env:          append(os.Environ(), envs...),
 	}
 	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(testContext.Context, containerName, config)
 	if err != nil {
@@ -335,6 +335,34 @@ func MongoPurgeBackups(testContext *TestContextType, containerName string, keepN
 	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
 	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
 	command := []string{WalgCliPath, "--config", WalgConfPath, "delete", "retain", strconv.Itoa(keepNumber), "--confirm"}
+	_, err := RunCommandInContainer(testContext, containerName, command)
+	return err
+}
+
+func MongoPurgeBackupsAfterBackupId(testContext *TestContextType, containerName string,
+	keepNumber int, afterBackupNum int) error {
+	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
+	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
+
+	backupEntries, err := GetBackups(testContext, containerName)
+	if err != nil {
+		return fmt.Errorf("error in restoring backup by id: %v", err)
+	}
+
+	command := []string{WalgCliPath, "--config", WalgConfPath, "delete",
+		"retain_after", strconv.Itoa(keepNumber), backupEntries[len(backupEntries)-afterBackupNum-1], "--confirm"}
+
+	_, err = RunCommandInContainer(testContext, containerName, command)
+	return err
+}
+
+func MongoPurgeBackupsAfterTime(testContext *TestContextType, containerName string,
+	keepNumber int, timeLine time.Time) error {
+	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
+	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
+	command := []string{WalgCliPath, "--config", WalgConfPath, "delete",
+		"retain_after", strconv.Itoa(keepNumber), timeLine.Format(time.RFC3339), "--confirm"}
+
 	_, err := RunCommandInContainer(testContext, containerName, command)
 	return err
 }
