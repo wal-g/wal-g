@@ -227,3 +227,14 @@ func SelectMatchingFiles(fileMask string, filePathsToFilter map[string]bool) (ma
 	}
 	return result, nil
 }
+
+// ResetTimer safety resets timer (drains channel if required)
+func ResetTimer(t *time.Timer, d time.Duration) {
+	if !t.Stop() {
+		select {
+		case <-t.C:
+		default:
+		}
+	}
+	t.Reset(d)
+}

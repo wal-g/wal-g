@@ -1,8 +1,8 @@
 package mongo
 
 import (
-	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal"
 	"os"
 	"path"

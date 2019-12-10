@@ -336,3 +336,11 @@ func GetOplogArchiveAfterSize() (int, error) {
 	}
 	return oplogArchiveAfterSize, nil
 }
+
+func GetRequiredSetting(setting string) (string, error) {
+	val, ok := GetSetting(setting)
+	if !ok {
+		return "", NewUnsetRequiredSettingError(setting)
+	}
+	return val, nil
+}

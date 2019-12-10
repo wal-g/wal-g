@@ -10,6 +10,7 @@ import (
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
+	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
 )
 
 const oplogPushShortDescription = ""
@@ -36,9 +37,15 @@ var oplogPushCmd = &cobra.Command{
 			}
 		}()
 
+		mongodbUrl, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
+		tracelog.ErrorLogger.FatalOnError(err)
+		oplogFetcher := oplog.NewDBFetcher(mongodbUrl)
+
+		oplogValidator := oplog.ValidateFunc(oplog.ValidateSplittingOps)
+
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
-		mongo.HandleOplogPush(ctx, &mongo.Uploader{Uploader: uploader})
+		mongo.HandleOplogPush(ctx, oplogFetcher, &mongo.Uploader{Uploader: uploader}, oplogValidator)
 	},
 }
 
