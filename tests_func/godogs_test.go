@@ -8,6 +8,7 @@ import (
 	"github.com/DATA-DOG/godog"
 	"github.com/DATA-DOG/godog/colors"
 	"github.com/DATA-DOG/godog/gherkin"
+	"github.com/docker/docker/client"
 	testHelper "github.com/wal-g/wal-g/tests_func/helpers"
 	testUtils "github.com/wal-g/wal-g/tests_func/utils"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -34,7 +35,34 @@ func FeatureContext(s *godog.Suite) {
 		testContext.AuxData.Timestamps = make(map[int]time.Time)
 		testContext.Context = context.Background()
 
-		err := SetupStaging(testContext)
+		var err error
+		testContext.Env, err = testHelper.GetTestEnv(testContext)
+		if err == nil {
+			var containerNames []string
+			testId := testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID")
+			for _, envLine := range testContext.Env {
+				key, value := testUtils.SplitEnvLine(envLine)
+				if strings.HasSuffix(key, "_WORKER") {
+					containerNames = append(containerNames, fmt.Sprintf("%s.test_net_%s", value, testId))
+				}
+			}
+			testContext.DockerClient, err = client.NewClientWithOpts(client.WithVersion("1.38"))
+			for _, container := range containerNames {
+				_, err = testHelper.GetDockerContainer(testContext, container)
+				if err != nil {
+					break
+				}
+			}
+			if err == nil {
+				nodeName := fmt.Sprintf("%s.test_net_%s", testUtils.GetVarFromEnvList(testContext.Env, "MONGO_HOST_01_WORKER"), testId)
+				if testHelper.MongoPurgeAllBackups(testContext, nodeName) == nil {
+					fmt.Printf("\nUsing existing docker containers\n")
+					return
+				}
+			}
+		}
+
+		err = SetupStaging(testContext)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -46,21 +74,14 @@ func FeatureContext(s *godog.Suite) {
 		if err != nil {
 			log.Fatalln(err)
 		}
+		err = testUtils.WriteEnvFile(testContext.Env, testUtils.GetVarFromEnvList(testContext.Env, "ENV_FILE"))
+		if err != nil {
+			log.Fatalln(err)
+		}
 	})
 
 	s.AfterFeature(func(feature *gherkin.Feature) {
-		err := testHelper.ShutdownContainers(testContext)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		err = testHelper.ShutdownNetwork(testContext)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		err = os.RemoveAll("./staging/images/")
-		if err != nil {
-			log.Fatalln(err)
-		}
+
 	})
 
 	s.BeforeStep(func(s *gherkin.Step) {
@@ -107,10 +128,7 @@ func createTimestamp(timestampId int, mongodbId int) error {
 		return fmt.Errorf("cannot create timestamp: %v", err)
 	}
 	timeStr := strings.Trim(response, " \n\t"+string([]byte{0, 1, 21}))
-	fmt.Printf("\n\n!%s!\n\n", response)
 	timeLine, err := time.Parse(time.RFC3339, timeStr)
-	fmt.Printf("\n\n!%+v!\n\n", []byte(timeStr))
-	fmt.Println(timeLine)
 	if err != nil {
 		return fmt.Errorf("cannot create timestamp: %v", err)
 	}
@@ -461,5 +479,20 @@ func TestMain(m *testing.M) {
 	if st := m.Run(); st > status {
 		status = st
 	}
+
+	err := testHelper.ShutdownContainers(testContext)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	err = testHelper.ShutdownNetwork(testContext)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	err = os.RemoveAll("./staging/images/")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	err = os.Remove(testUtils.GetVarFromEnvList(testContext.Env, "ENV_FILE"))
+
 	os.Exit(status)
 }

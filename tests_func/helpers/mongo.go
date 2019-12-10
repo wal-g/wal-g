@@ -292,6 +292,7 @@ func StepEnsureRsInitialized(testContext *TestContextType, containerName string)
 	var response string
 	var err error
 	for i := 0; i < 15; i++ {
+		time.Sleep(time.Second)
 		command := []string{"mongo", "--host", "localhost", "--quiet", "--norc", "--port", "27018", "--eval", "rs.status()"}
 		response, err = RunCommandInContainer(testContext, containerName, command)
 		if strings.Contains(response, "myState") {
@@ -328,6 +329,14 @@ func RestoreBackupById(testContext *TestContextType, containerName string, backu
 	mongoCommand := []string{"|", "mongorestore", "--archive", "--uri=\"mongodb://admin:password@127.0.0.1:27018\""}
 	command := strings.Join(append(walgCommand, mongoCommand...), " ")
 	_, err = RunCommandInContainer(testContext, containerName, []string{"bash", "-c", command})
+	return err
+}
+
+func MongoPurgeAllBackups(testContext *TestContextType, containerName string) error {
+	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
+	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
+	command := []string{WalgCliPath, "--config", WalgConfPath, "delete", "everything", "--confirm"}
+	_, err := RunCommandInContainer(testContext, containerName, command)
 	return err
 }
 
