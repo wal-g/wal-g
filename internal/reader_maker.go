@@ -9,7 +9,7 @@ type ReaderMaker interface {
 	Path() string
 }
 
-func ReaderMakersToFilePaths(readerMakers []ReaderMaker) []string {
+func readerMakersToFilePaths(readerMakers []ReaderMaker) []string {
 	paths := make([]string, 0)
 	for _, readerMaker := range readerMakers {
 		paths = append(paths, readerMaker.Path())

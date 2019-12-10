@@ -1,0 +1,76 @@
+networks:
+    test_net:
+        external:
+            name: test_net_${TEST_ID}
+services:
+    minio01:
+        build: images/minio
+        container_name: minio01.test_net_${TEST_ID}
+        dns:
+        - 2a02:6b8:0:3400::1023
+        domainname: test_net_${TEST_ID}
+        environment: []
+        external_links: []
+        hostname: minio01
+        image: minio:test_net_${TEST_ID}
+        networks:
+        - test_net
+        ports:
+        - 9000
+        tmpfs: /var/run
+        volumes:
+        - ./code/minio:/code:rw
+        - ./images/minio/config:/config:rw
+    mongodb01:
+        build:
+            context: ..
+            args:
+                - MONGO_MAJOR=${MONGO_MAJOR}
+                - MONGO_VERSION=${MONGO_VERSION}
+        container_name: mongodb01.test_net_${TEST_ID}
+        dns:
+        - 2a02:6b8:0:3400::1023
+        domainname: test_net_${TEST_ID}
+        environment: []
+        external_links:
+        - minio01.test_net_${TEST_ID}:minio
+        hostname: mongodb01
+        image: mongodb:test_net_${TEST_ID}
+        networks:
+        - test_net
+        ports:
+        - 27018
+        - 22
+        tmpfs: /var/run
+        volumes:
+        - ./code/mongodb:/code:rw
+        - ./images/mongodb/config:/config:rw
+        - ./images/base/config/.walg:/home/.walg.json:rw
+        - ./images/mongodb/config/gpg-key.armor:/home/gpg-key.armor:rw
+    mongodb02:
+        build:
+            context: ..
+            args:
+                - MONGO_MAJOR=${MONGO_MAJOR}
+                - MONGO_VERSION=${MONGO_VERSION}
+        container_name: mongodb02.test_net_${TEST_ID}
+        dns:
+        - 2a02:6b8:0:3400::1023
+        domainname: test_net_${TEST_ID}
+        environment: []
+        external_links:
+        - minio01.test_net_${TEST_ID}:minio
+        hostname: mongodb02
+        image: mongodb:test_net_${TEST_ID}
+        networks:
+        - test_net
+        ports:
+        - 27018
+        - 22
+        tmpfs: /var/run
+        volumes:
+        - ./code/mongodb:/code:rw
+        - ./images/mongodb/config:/config:rw
+        - ./images/base/config/.walg:/home/.walg.json:rw
+        - ./images/mongodb/config/gpg-key.armor:/home/gpg-key.armor:rw
+version: '2'

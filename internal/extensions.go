@@ -16,7 +16,7 @@ type Extension interface {
 	GetAllowedConfigKeys() map[string]*string
 }
 
-func LoadExtensions(path string) error {
+func loadExtensions(path string) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil
 	}
@@ -47,7 +47,7 @@ func LoadExtensions(path string) error {
 	return nil
 }
 
-func RegisterExtensionCommands(rootCmd *cobra.Command) {
+func registerExtensionCommands(rootCmd *cobra.Command) {
 	for _, extension := range Extensions {
 		extension.RegisterCommands(rootCmd)
 	}
