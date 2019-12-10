@@ -76,8 +76,8 @@ func getBoundedValue(leftBound, value, rightBound int) int {
 	}
 }
 
-func intMax(value1, value2 int) int {
-	if value1 < value2 {
+func intMin(value1, value2 int) int {
+	if value1 > value2 {
 		return value2
 	} else {
 		return value1
@@ -94,7 +94,7 @@ func TestFindTargetRetainAfter_Without_Modifier(t *testing.T) {
 	}
 	for retentionCount := 1; retentionCount <= 5; retentionCount++ {
 		for minutesCount := 0; minutesCount < 5; minutesCount++ {
-			expectedIndex := intMax(getBoundedValue(0, minutesCount, 4), 5 - retentionCount)
+			expectedIndex := intMin(getBoundedValue(0, minutesCount, 4), 5 - retentionCount)
 			expectedName := backupNames[expectedIndex]
 			duration := time.Duration(minutesCount * int(time.Minute))
 			testTargetRetainAfterTime(t, duration, expectedName, retentionCount, internal.NoDeleteModifier)
@@ -113,7 +113,7 @@ func TestFindTargetRetainAfter_With_FULL_Modifier(t *testing.T) {
 	}
 	for retentionCount := 1; retentionCount <= 3; retentionCount++ {
 		for minutesCount := 1; minutesCount < 5; minutesCount++ {
-			expectedIndex := intMax(((getBoundedValue(0, minutesCount, 4) + 1) / 2) * 2 , 6 - retentionCount * 2)
+			expectedIndex := intMin(((getBoundedValue(0, minutesCount, 4) + 1) / 2) * 2 , 6 - retentionCount * 2)
 			expectedName := backupNames[expectedIndex]
 			duration := time.Duration(minutesCount * int(time.Minute))
 			testTargetRetainAfterTime(t, duration, expectedName, retentionCount, internal.FullDeleteModifier)
@@ -132,7 +132,7 @@ func TestFindTargetRetainAfter_With_FIND_FULL_Modifier(t *testing.T) {
 	}
 	for retentionCount := 1; retentionCount <= 5; retentionCount++ {
 		for minutesCount := 0; minutesCount < 5; minutesCount++ {
-			expectedIndex := intMax(((getBoundedValue(0, minutesCount, 4) + 1) / 2) * 2 , 4 - (retentionCount / 2) * 2)
+			expectedIndex := intMin(((getBoundedValue(0, minutesCount, 4) + 1) / 2) * 2 , 4 - (retentionCount / 2) * 2)
 			expectedName := backupNames[expectedIndex]
 			duration := time.Duration(minutesCount * int(time.Minute))
 			testTargetRetainAfterTime(t, duration, expectedName, retentionCount, internal.FindFullDeleteModifier)

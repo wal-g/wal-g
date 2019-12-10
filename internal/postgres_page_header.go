@@ -16,26 +16,26 @@ type PostgresPageHeader struct {
 	pdPageSizeVersion uint16
 }
 
-func (header *PostgresPageHeader) Lsn() uint64 {
+func (header *PostgresPageHeader) lsn() uint64 {
 	return ((uint64(header.pdLsnH)) << 32) + uint64(header.pdLsnL)
 }
 
-func (header *PostgresPageHeader) IsValid() bool {
+func (header *PostgresPageHeader) isValid() bool {
 	return !((header.pdFlags&validFlags) != header.pdFlags ||
 		header.pdLower < headerSize ||
 		header.pdLower > header.pdUpper ||
 		header.pdUpper > header.pdSpecial ||
 		header.pdSpecial > DatabasePageSize ||
-		(header.Lsn() == invalidLsn) ||
+		(header.lsn() == invalidLsn) ||
 		header.pdPageSizeVersion != DatabasePageSize+layoutVersion)
 }
 
-func (header *PostgresPageHeader) IsNew() bool {
+func (header *PostgresPageHeader) isNew() bool {
 	return header.pdUpper == 0 // #define PageIsNew(page) (((PageHeader) (page))->pd_upper == 0) in bufpage.h
 }
 
 // ParsePostgresPageHeader reads information from PostgreSQL page header. Exported for test reasons.
-func ParsePostgresPageHeader(reader io.Reader) (*PostgresPageHeader, error) {
+func parsePostgresPageHeader(reader io.Reader) (*PostgresPageHeader, error) {
 	pageHeader := PostgresPageHeader{}
 	fields := []parsingutil.FieldToParse{
 		{Field: &pageHeader.pdLsnH, Name: "pdLsnH"},

@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
-	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/ioutil"
@@ -29,7 +29,7 @@ type NonEmptyDbDataDirectoryError struct {
 	error
 }
 
-func NewNonEmptyDbDataDirectoryError(dbDataDirectory string) NonEmptyDbDataDirectoryError {
+func newNonEmptyDbDataDirectoryError(dbDataDirectory string) NonEmptyDbDataDirectoryError {
 	return NonEmptyDbDataDirectoryError{errors.Errorf("Directory %v for delta base must be empty", dbDataDirectory)}
 }
 
@@ -41,7 +41,7 @@ type PgControlNotFoundError struct {
 	error
 }
 
-func NewPgControlNotFoundError() PgControlNotFoundError {
+func newPgControlNotFoundError() PgControlNotFoundError {
 	return PgControlNotFoundError{errors.Errorf("Expect pg_control archive, but not found")}
 }
 
@@ -49,7 +49,7 @@ func (err PgControlNotFoundError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-func ReadRestoreSpec(path string, spec *TablespaceSpec) (err error) {
+func readRestoreSpec(path string, spec *TablespaceSpec) (err error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("Unable to read file: %v\n", err)
@@ -70,7 +70,7 @@ func GetPgFetcher(dbDataDirectory, fileMask, restoreSpecPath string) func(folder
 		var spec *TablespaceSpec
 		if restoreSpecPath != "" {
 			spec = &TablespaceSpec{}
-			err := ReadRestoreSpec(restoreSpecPath, spec)
+			err := readRestoreSpec(restoreSpecPath, spec)
 			errMessege := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
 			tracelog.ErrorLogger.FatalfOnError(errMessege, err)
 		}
@@ -81,7 +81,7 @@ func GetPgFetcher(dbDataDirectory, fileMask, restoreSpecPath string) func(folder
 
 func GetStreamFetcher(writeCloser io.WriteCloser) func(folder storage.Folder, backup Backup) {
 	return func(folder storage.Folder, backup Backup) {
-		err := DownloadAndDecompressStream(&backup, writeCloser)
+		err := downloadAndDecompressStream(&backup, writeCloser)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 	}
 }
@@ -101,7 +101,7 @@ func GetBackupByName(backupName string, folder storage.Folder) (*Backup, error) 
 
 	var backup *Backup
 	if backupName == LatestString {
-		latest, err := GetLatestBackupName(folder)
+		latest, err := getLatestBackupName(folder)
 		if err != nil {
 			return nil, err
 		}

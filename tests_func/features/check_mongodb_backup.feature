@@ -59,8 +59,8 @@ Feature: MongoDB backups check
     Then we got 4 backup entries of mongodb01
 
   Scenario: Backups delete1 successfully
-    When we delete backups retain 4 after #2 backup via mongodb01
-    Then we got 3 backup entries of mongodb01
+    When we delete backups retain 2 after #3 backup via mongodb01
+    Then we got 4 backup entries of mongodb01
 
   Scenario: Backup3 restored successfully
     When we restore #0 backup to mongodb01
@@ -70,13 +70,13 @@ Feature: MongoDB backups check
   Scenario: Six backup was done successfully
     Given mongodb01 has test mongodb data test6
     When we create mongodb01 backup
-    Then we got 4 backup entries of mongodb01
+    Then we got 5 backup entries of mongodb01
 
   Scenario: Seventh backup was done successfully
     Given mongodb01 has test mongodb data test7
     When we create mongodb01 backup
-    Then we got 5 backup entries of mongodb01
+    Then we got 6 backup entries of mongodb01
 
   Scenario: Backups delete2 successfully
     When we delete backups retain 4 after #0 timestamp via mongodb01
-    Then we got 2 backup entries of mongodb01
+    Then we got 4 backup entries of mongodb01

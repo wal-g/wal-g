@@ -49,7 +49,7 @@ type InvalidBlockError struct {
 	error
 }
 
-func NewInvalidBlockError(blockNo uint32) InvalidBlockError {
+func newInvalidBlockError(blockNo uint32) InvalidBlockError {
 	return InvalidBlockError{errors.Errorf("block %d is invalid", blockNo)}
 }
 
@@ -61,7 +61,7 @@ type InvalidIncrementFileHeaderError struct {
 	error
 }
 
-func NewInvalidIncrementFileHeaderError() InvalidIncrementFileHeaderError {
+func newInvalidIncrementFileHeaderError() InvalidIncrementFileHeaderError {
 	return InvalidIncrementFileHeaderError{errors.New("Invalid increment file header")}
 }
 
@@ -73,7 +73,7 @@ type UnknownIncrementFileHeaderError struct {
 	error
 }
 
-func NewUnknownIncrementFileHeaderError() UnknownIncrementFileHeaderError {
+func newUnknownIncrementFileHeaderError() UnknownIncrementFileHeaderError {
 	return UnknownIncrementFileHeaderError{errors.New("Unknown increment file header")}
 }
 
@@ -85,7 +85,7 @@ type UnexpectedTarDataError struct {
 	error
 }
 
-func NewUnexpectedTarDataError() UnexpectedTarDataError {
+func newUnexpectedTarDataError() UnexpectedTarDataError {
 	return UnexpectedTarDataError{errors.New("Expected end of Tar")}
 }
 
@@ -191,7 +191,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader) error {
 
 	all, _ := increment.Read(make([]byte, 1))
 	if all > 0 {
-		return NewUnexpectedTarDataError()
+		return newUnexpectedTarDataError()
 	}
 
 	return nil
@@ -205,10 +205,10 @@ func ReadIncrementFileHeader(reader io.Reader) error {
 	}
 
 	if header[0] != 'w' || header[1] != 'i' || header[3] != SignatureMagicNumber {
-		return NewInvalidIncrementFileHeaderError()
+		return newInvalidIncrementFileHeaderError()
 	}
 	if header[2] != '1' {
-		return NewUnknownIncrementFileHeaderError()
+		return newUnknownIncrementFileHeaderError()
 	}
 	return nil
 }
