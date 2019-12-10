@@ -128,7 +128,6 @@ func downloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, handl
 	return fetched, nil
 }
 
-// TODO : unit tests
 func FetchLogs(folder storage.Folder, startTS time.Time, endTS *time.Time, logFolderPath string, handlers LogFetchHandlers) (fetched []storage.Object, err error) {
 	logFolder := folder.GetSubFolder(logFolderPath)
 	logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, endTS)
