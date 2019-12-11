@@ -376,23 +376,23 @@ func TestGetSubdirectoryRelativePath_NotNormalizedDirectory(t *testing.T) {
 }
 
 func TestStripWalFileName_NonValidInput(t *testing.T) {
-	var path = "---"
+	var lsn = "---"
 	var expected = strings.Repeat("Z", 24)
 
-	result := utility.StripWalFileName(path)
+	result := utility.StripWalFileName(lsn)
 
 	assert.Equal(t, expected, result)
 }
 
 func TestStripWalFileName_ValidLsn(t *testing.T) {
-	var path = RandomString(24)
+	var path = RandomLsn()
 	result := utility.StripWalFileName(path)
 
 	assert.Equal(t, path, result)
 }
 
 func TestStripWalFileName_ReturnFirstLsn(t *testing.T) {
-	var paths = [3]string{RandomString(24), RandomString(24), RandomString(24)}
+	var paths = [3]string{RandomLsn(), RandomLsn(), RandomLsn()}
 	var path = strings.Join(paths[:], "-")
 
 	result := utility.StripWalFileName(path)
@@ -400,10 +400,11 @@ func TestStripWalFileName_ReturnFirstLsn(t *testing.T) {
 	assert.Equal(t, paths[0], result)
 }
 
-func RandomString(n int) string {
+func RandomLsn() string {
 	var letter = []rune("ABCDEF0123456789")
+	const LSNLength = 24
 
-	b := make([]rune, n)
+	b := make([]rune, LSNLength)
 	for i := range b {
 		b[i] = letter[rand.Intn(len(letter))]
 	}
