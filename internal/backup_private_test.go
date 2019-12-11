@@ -24,9 +24,7 @@ func createTempDir(prefix string) (name string, err error) {
 
 func TestIsDirectoryEmpty_ReturnsTrue_WhenDirectoryIsEmpty(t *testing.T) {
 	dir, err := createTempDir("empty")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer os.Remove(dir)
 
 	actual, err := isDirectoryEmpty(dir)
@@ -36,15 +34,11 @@ func TestIsDirectoryEmpty_ReturnsTrue_WhenDirectoryIsEmpty(t *testing.T) {
 
 func TestIsDirectoryEmpty_ReturnsFalse_WhenOneFileIsInDirectory(t *testing.T) {
 	dir, err := createTempDir("not_empty")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer os.Remove(dir)
 
 	file, err := ioutil.TempFile(dir, "file")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer os.Remove(file.Name())
 
 	actual, err := isDirectoryEmpty(dir)
@@ -54,16 +48,12 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenOneFileIsInDirectory(t *testing.T) {
 
 func TestIsDirectoryEmpty_ReturnsFalse_WhenSeveralFilesAreInDirectory(t *testing.T) {
 	dir, err := createTempDir("not_empty")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer os.Remove(dir)
 
 	for i := 0; i < 3; i++ {
 		file, err := ioutil.TempFile(dir, "file")
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 		defer os.Remove(file.Name())
 	}
 
@@ -74,15 +64,11 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenSeveralFilesAreInDirectory(t *testing
 
 func TestIsDirectoryEmpty_ReturnsFalse_WhenNestedDirectoryIsInDirectory(t *testing.T) {
 	dir, err := createTempDir("not_empty")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer os.Remove(dir)
 
 	nested, err := ioutil.TempDir(dir, "nested")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	defer os.Remove(nested)
 
 	actual, err := isDirectoryEmpty(dir)
@@ -92,13 +78,10 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenNestedDirectoryIsInDirectory(t *testi
 
 func TestIsDirectoryEmpty_ReturnsTrue_WhenDirectoryDoesntExist(t *testing.T) {
 	dir, err := createTempDir("not_existing")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
+
 	err = os.Remove(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	actual, err := isDirectoryEmpty(dir)
 
