@@ -359,7 +359,7 @@ func MongoPurgeBackupsAfterBackupId(testContext *TestContextType, containerName 
 	}
 
 	command := []string{WalgCliPath, "--config", WalgConfPath, "delete",
-		"retain_after", strconv.Itoa(keepNumber), backupEntries[len(backupEntries)-afterBackupNum-1], "--confirm"}
+		"retain", strconv.Itoa(keepNumber), "--after", backupEntries[len(backupEntries)-afterBackupNum-1], "--confirm"}
 
 	_, err = RunCommandInContainer(testContext, containerName, command)
 	return err
@@ -370,7 +370,7 @@ func MongoPurgeBackupsAfterTime(testContext *TestContextType, containerName stri
 	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
 	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
 	command := []string{WalgCliPath, "--config", WalgConfPath, "delete",
-		"retain_after", strconv.Itoa(keepNumber), timeLine.Format(time.RFC3339), "--confirm"}
+		"retain", strconv.Itoa(keepNumber), "--after", timeLine.Format(time.RFC3339), "--confirm"}
 
 	_, err := RunCommandInContainer(testContext, containerName, command)
 	return err

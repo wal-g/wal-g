@@ -2,8 +2,8 @@ package mongo
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -28,14 +28,14 @@ var deleteRetainCmd = &cobra.Command{
 	Example:   internal.DeleteRetainExamples,
 	ValidArgs: internal.StringModifiers,
 	Args:      internal.DeleteRetainArgsValidator,
-	Run:       runDeleteRetain,
-}
-
-var deleteRetainAfterCmd = &cobra.Command{
-	Use: "retain_after",
-	ValidArgs: internal.StringModifiers,
-	Args: internal.DeleteRetainAfterArgsValidator,
-	Run: runDeleteRetainAfter,
+	Run: func(cmd *cobra.Command, args []string) {
+		afterValue, _ := cmd.Flags().GetString("after")
+		if afterValue == "" {
+			runDeleteRetain(cmd, args)
+		} else {
+			runDeleteRetainAfter(cmd, append(args, afterValue))
+		}
+	},
 }
 
 var deleteEverythingCmd = &cobra.Command{
@@ -79,7 +79,8 @@ func isFullBackup(object storage.Object) bool {
 
 func init() {
 	Cmd.AddCommand(deleteCmd)
-	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd, deleteRetainAfterCmd)
+	deleteRetainCmd.Flags().StringP("after", "a", "", "Set the time after which retain backups")
+	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 
