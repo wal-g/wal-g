@@ -122,7 +122,6 @@ func TestConfigureLogging_WhenLogLevelSettingIsNotSet(t *testing.T) {
 func TestConfigureLogging_WhenLogLevelSettingIsSet(t *testing.T) {
 	parentDir := prepareDataFolder(t, "someOtherFolder")
 	viper.Set(internal.LogLevelSetting, parentDir)
-
 	err := internal.ConfigureLogging()
 
 	assert.Error(t, tracelog.UpdateLogLevel(viper.GetString(internal.LogLevelSetting)), err)
