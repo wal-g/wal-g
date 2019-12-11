@@ -7,7 +7,7 @@ type ExponentialRetrier struct {
 	sleepDurationBound time.Duration
 }
 
-func NewExponentialRetrier(startSleepDuration, sleepDurationBound time.Duration) *ExponentialRetrier {
+func newExponentialRetrier(startSleepDuration, sleepDurationBound time.Duration) *ExponentialRetrier {
 	return &ExponentialRetrier{startSleepDuration, sleepDurationBound}
 }
 

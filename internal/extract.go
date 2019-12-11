@@ -25,7 +25,7 @@ type NoFilesToExtractError struct {
 	error
 }
 
-func NewNoFilesToExtractError() NoFilesToExtractError {
+func newNoFilesToExtractError() NoFilesToExtractError {
 	return NoFilesToExtractError{errors.New("ExtractAll: did not provide files to extract")}
 }
 
@@ -39,7 +39,7 @@ type UnsupportedFileTypeError struct {
 	error
 }
 
-func NewUnsupportedFileTypeError(path string, fileFormat string) UnsupportedFileTypeError {
+func newUnsupportedFileTypeError(path string, fileFormat string) UnsupportedFileTypeError {
 	return UnsupportedFileTypeError{errors.Errorf("WAL-G does not support the file format '%s' in '%s'", fileFormat, path)}
 }
 
@@ -85,7 +85,7 @@ func extractOne(tarInterpreter TarInterpreter, source io.Reader) error {
 // TODO : unit tests
 // Ensures that file extension is valid. Any subsequent behavior
 // depends on file type.
-func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter crypto.Crypter) error {
+func decryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter crypto.Crypter) error {
 	readCloser, err := readerMaker.Reader()
 
 	if err != nil {
@@ -119,9 +119,9 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 		return errors.Wrap(err, "DecryptAndDecompressTar: tar extract failed")
 	case "nop":
 	case "lzo":
-		return NewUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
+		return newUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
 	default:
-		return NewUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
+		return newUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
 	}
 	return nil
 }
@@ -133,12 +133,12 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 // Returns the first error encountered.
 func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 	if len(files) == 0 {
-		return NewNoFilesToExtractError()
+		return newNoFilesToExtractError()
 	}
 
-	retrier := NewExponentialRetrier(MinExtractRetryWait, MaxExtractRetryWait)
+	retrier := newExponentialRetrier(MinExtractRetryWait, MaxExtractRetryWait)
 	// Set maximum number of goroutines spun off by ExtractAll
-	downloadingConcurrency, err := GetMaxDownloadConcurrency()
+	downloadingConcurrency, err := getMaxDownloadConcurrency()
 	if err != nil {
 		return err
 	}
@@ -149,7 +149,7 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 			downloadingConcurrency /= 2
 		} else if len(failed) == len(currentRun) {
 			return errors.Errorf("failed to extract files:\n%s\n",
-				strings.Join(ReaderMakersToFilePaths(failed), "\n"))
+				strings.Join(readerMakersToFilePaths(failed), "\n"))
 		}
 		currentRun = failed
 		if len(failed) > 0 {
@@ -173,7 +173,7 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 		extractingReader, pipeWriter := io.Pipe()
 		decompressingWriter := &EmptyWriteIgnorer{pipeWriter}
 		go func() {
-			err := DecryptAndDecompressTar(decompressingWriter, fileClosure, crypter)
+			err := decryptAndDecompressTar(decompressingWriter, fileClosure, crypter)
 			utility.LoggedClose(decompressingWriter, "")
 			tracelog.InfoLogger.Printf("Finished decompression of %s", fileClosure.Path())
 			if err != nil {

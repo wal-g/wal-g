@@ -12,7 +12,7 @@ TEST := "pg_tests"
 
 .PHONY: unittest fmt lint install clean
 
-test: install deps lint unittest pg_build mysql_build redis_build mongo_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test mongo_integration_test
+test: install deps lint unittest pg_build mysql_build redis_build mongo_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test
 
 pg_test: install deps pg_build lint unlink_brotli pg_integration_test
 
@@ -81,7 +81,7 @@ mysql_clean:
 mysql_install: mysql_build
 	mv $(MAIN_MYSQL_PATH)/wal-g $(GOBIN)/wal-g
 
-mongo_test: install deps mongo_build lint unlink_brotli mongo_integration_test
+mongo_test: install deps mongo_build lint unlink_brotli
 
 mongo_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_MONGO_PATH) && go build -tags brotli -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mongo.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mongo.WalgVersion=`git tag -l --points-at HEAD`")
@@ -92,6 +92,14 @@ mongo_install: mongo_build
 mongo_integration_test: load_docker_common
 	docker-compose build mongo mongo_tests
 	docker-compose up --exit-code-from mongo_tests mongo_tests
+
+mongo_features: install deps mongo_build lint unlink_brotli
+	rm -rf ./tests_func/wal-g
+	mkdir -p ./tests_func/wal-g
+	cp -a `ls -A | grep -v "tests_func"` tests_func/wal-g/
+	(cd tests_func/wal-g/ ; git rm --cached tests_func/wal-g ; cd ../..)
+	(cd tests_func ; MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -timeout 40m --godog.stop-on-failure --godog.format=pretty; cd ..)
+	rm -rf ./tests_func/wal-g
 
 redis_test: install deps redis_build lint unlink_brotli redis_integration_test
 
@@ -138,6 +146,7 @@ deps:
 install:
 	go get -u github.com/golang/dep/cmd/dep
 	go get -u golang.org/x/lint/golint
+	go get -u github.com/DATA-DOG/godog/cmd/godog
 
 unlink_brotli:
 	rm -rf vendor/github.com/google/brotli/*

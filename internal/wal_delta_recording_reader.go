@@ -17,7 +17,7 @@ type CantDiscardWalDataError struct {
 	error
 }
 
-func NewCantDiscardWalDataError() CantDiscardWalDataError {
+func newCantDiscardWalDataError() CantDiscardWalDataError {
 	return CantDiscardWalDataError{errors.New("wanted to discard data from WAL while was restricted to do it")}
 }
 
@@ -102,7 +102,7 @@ func (reader *WalDeltaRecordingReader) RecordBlockLocationsFromPage() error {
 				return err
 			}
 		} else if len(discardedRecordTail) > 0 {
-			return NewCantDiscardWalDataError()
+			return newCantDiscardWalDataError()
 		}
 	}
 	reader.Recorder.recordWalDelta(records)
