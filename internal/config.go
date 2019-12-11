@@ -173,7 +173,7 @@ func getWaleCompatibleSetting(key string) (value string, exists bool) {
 }
 
 func Configure() {
-	err := configureLogging()
+	err := ConfigureLogging()
 	if err != nil {
 		tracelog.ErrorLogger.Println("Failed to configure logging.")
 		tracelog.ErrorLogger.FatalError(err)
