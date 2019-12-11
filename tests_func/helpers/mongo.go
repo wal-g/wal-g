@@ -171,7 +171,7 @@ func MakeBackup(testContext *TestContextType, containerName string, cmdArgs stri
 		AttachStderr: true,
 		AttachStdout: true,
 		Cmd:          []string{"bash", "-c", command},
-		Env:		  append(os.Environ(), envs...),
+		Env:          append(os.Environ(), envs...),
 	}
 	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(testContext.Context, containerName, config)
 	if err != nil {

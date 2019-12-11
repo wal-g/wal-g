@@ -14,7 +14,7 @@ type someError struct {
 }
 
 func TestHandleBackupListWriteBackups(t *testing.T) {
-	backups := []internal.BackupTime {
+	backups := []internal.BackupTime{
 		{
 			BackupName:  "backup000",
 			Time:        time.Time{},
@@ -49,7 +49,7 @@ func TestHandleBackupListWriteBackups(t *testing.T) {
 }
 
 func TestHandleBackupListLogError(t *testing.T) {
-	backups := []internal.BackupTime {
+	backups := []internal.BackupTime{
 		{
 			BackupName:  "backup000",
 			Time:        time.Time{},
@@ -95,4 +95,3 @@ func TestHandleBackupListLogNoBackups(t *testing.T) {
 	assert.Equal(t, "No backups found", infoLogger.Stats.PrintMsg)
 	assert.Equal(t, 0, errorLogger.Stats.FatalOnErrorCallsCount)
 }
-

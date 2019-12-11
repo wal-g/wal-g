@@ -22,7 +22,7 @@ type ErrorLogger interface {
 }
 
 type Logging struct {
-	InfoLogger InfoLogger
+	InfoLogger  InfoLogger
 	ErrorLogger ErrorLogger
 }
 
@@ -30,11 +30,11 @@ func DefaultHandleBackupList(folder storage.Folder) {
 	getBackupsFunc := func() ([]BackupTime, error) {
 		return getBackups(folder)
 	}
-	writeBackupListFunc := func (backups []BackupTime) {
+	writeBackupListFunc := func(backups []BackupTime) {
 		WriteBackupList(backups, os.Stdout)
 	}
 	logging := Logging{
-		InfoLogger: tracelog.InfoLogger,
+		InfoLogger:  tracelog.InfoLogger,
 		ErrorLogger: tracelog.ErrorLogger,
 	}
 
@@ -43,7 +43,7 @@ func DefaultHandleBackupList(folder storage.Folder) {
 
 func HandleBackupList(
 	getBackupsFunc func() ([]BackupTime, error),
-	writeBackupListFunc func ([]BackupTime),
+	writeBackupListFunc func([]BackupTime),
 	logging Logging,
 ) {
 	backups, err := getBackupsFunc()

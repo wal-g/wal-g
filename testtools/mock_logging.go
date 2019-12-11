@@ -2,12 +2,12 @@ package testtools
 
 type callingFatalOnErrorFuncStats struct {
 	FatalOnErrorCallsCount int
-	Err error
+	Err                    error
 }
 
 type callingPrintFuncStats struct {
 	PrintLnCallsCount int
-	PrintMsg string
+	PrintMsg          string
 }
 
 type infoLoggerMock struct {
@@ -31,13 +31,13 @@ func (loggerMock errorLoggerMock) FatalOnError(err error) {
 func MockLoggers() (infoLoggerMock, errorLoggerMock) {
 	infoStats := callingPrintFuncStats{
 		PrintLnCallsCount: 0,
-		PrintMsg: "",
+		PrintMsg:          "",
 	}
 	errorStats := callingFatalOnErrorFuncStats{
 		FatalOnErrorCallsCount: 0,
-		Err: nil,
+		Err:                    nil,
 	}
 
-	return infoLoggerMock{ Stats: &infoStats },
-		errorLoggerMock{ Stats: &errorStats }
+	return infoLoggerMock{Stats: &infoStats},
+		errorLoggerMock{Stats: &errorStats}
 }
