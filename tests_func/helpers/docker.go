@@ -13,6 +13,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"time"
 )
 
 const envDockerMachineName = "DOCKER_MACHINE_NAME"
@@ -149,12 +150,17 @@ type SafeStorageType struct {
 	NometaBackupNames  []string
 }
 
+type AuxData struct {
+	Timestamps map[int]time.Time
+}
+
 type TestContextType struct {
 	DockerClient *client.Client
 	Env          []string
 	SafeStorage  SafeStorageType
 	TestData     map[string]map[string]map[string][]DatabaseRecord
 	Context      context.Context
+	AuxData      AuxData
 }
 
 func ShutdownContainers(testContext *TestContextType) error {
