@@ -176,8 +176,7 @@ func configureCompressor() (compression.Compressor, error) {
 	return compression.Compressors[compressionMethod], nil
 }
 
-// TODO : unit tests
-func configureLogging() error {
+func ConfigureLogging() error {
 	if viper.IsSet(LogLevelSetting) {
 		return tracelog.UpdateLogLevel(viper.GetString(LogLevelSetting))
 	}

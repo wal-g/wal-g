@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"io/ioutil"
 	"os"
@@ -112,6 +113,18 @@ func TestGetDataFolderPath_WalIgnoreXlog(t *testing.T) {
 
 	assert.Equal(t, filepath.Join(parentDir, "pg_wal", "walg_data"), actual)
 	cleanup(t, parentDir)
+}
+
+func TestConfigureLogging_WhenLogLevelSettingIsNotSet(t *testing.T) {
+	assert.NoError(t, internal.ConfigureLogging())
+}
+
+func TestConfigureLogging_WhenLogLevelSettingIsSet(t *testing.T) {
+	parentDir := prepareDataFolder(t, "someOtherFolder")
+	viper.Set(internal.LogLevelSetting, parentDir)
+	err := internal.ConfigureLogging()
+
+	assert.Error(t, tracelog.UpdateLogLevel(viper.GetString(internal.LogLevelSetting)), err)
 }
 
 func prepareDataFolder(t *testing.T, name string) string {
