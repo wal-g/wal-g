@@ -24,7 +24,7 @@ var deleteBeforeCmd = &cobra.Command{
 }
 
 var deleteRetainCmd = &cobra.Command{
-	Use:       "retain backup_count", // TODO : improve description
+	Use:       "retain backup_count [--after backup_name|timestamp]", // TODO : improve description
 	Example:   internal.DeleteRetainExamples,
 	ValidArgs: internal.StringModifiers,
 	Args:      internal.DeleteRetainArgsValidator,

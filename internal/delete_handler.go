@@ -25,7 +25,8 @@ const (
 
 	DeleteRetainExamples = `  retain 5                      keep 5 backups
   retain FULL 5                 keep 5 full backups and all deltas of them
-  retain FIND_FULL 5            find necessary full for 5th and keep everything after it`
+  retain FIND_FULL 5            find necessary full for 5th and keep everything after it
+  retain 5 --after 2019-12-12T12:12:12   keep 5 most recent backups and backups made after 2019-12-12 12:12:12`
 
 	DeleteBeforeExamples = `  before base_0123              keep everything after base_0123 including itself
   before FIND_FULL base_0123    keep everything after the base of base_0123`

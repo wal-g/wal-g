@@ -165,9 +165,10 @@ Is used to delete backups and WALs before them. By default ``delete`` will perfo
 
 ``delete`` can operate in three modes: ``retain``, ``before`` and ``everything``.
 
-``retain`` [FULL|FIND_FULL] %number%
+``retain`` [FULL|FIND_FULL] %number% [--after %name|time%]
 
-if FULL is specified keep 5 full backups and everything in the middle
+if FULL is specified keep $number% full backups and everything in the middle. If with --after flag is used keep 
+$number$ the most recent backups and backups made after %name|time% (including).
 
 ``before`` [FIND_FULL] %name%
 
@@ -186,6 +187,8 @@ Examples:
 ``retain FULL 5`` will keep 5 full backups and all deltas of them
 
 ``retain FIND_FULL`` will find necessary full for 5th
+
+``retain 5 --after 2019-12-12T12:12:12`` keep 5 most recent backups and backups made after 2019-12-12 12:12:12
 
 ``before base_000010000123123123`` will fail if `base_000010000123123123` is delta
 
