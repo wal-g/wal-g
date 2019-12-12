@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/jedib0t/go-pretty/table"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/storages/storage"
 )
 

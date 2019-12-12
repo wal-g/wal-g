@@ -2,7 +2,7 @@ package mysql
 
 import (
 	"github.com/wal-g/storages/storage"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
 	"os"

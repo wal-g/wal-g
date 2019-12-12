@@ -2,7 +2,7 @@ package internal
 
 import (
 	"github.com/pkg/errors"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/storages/storage"
 )
 

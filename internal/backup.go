@@ -9,7 +9,7 @@ import (
 	"regexp"
 
 	"github.com/pkg/errors"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/storages/fs"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/utility"

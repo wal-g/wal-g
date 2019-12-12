@@ -2,7 +2,7 @@ package limited
 
 import (
 	"context"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/time/rate"
 	"io"

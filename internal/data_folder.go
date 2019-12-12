@@ -3,7 +3,7 @@ package internal
 import (
 	"fmt"
 	"github.com/pkg/errors"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"io"
 )
 
