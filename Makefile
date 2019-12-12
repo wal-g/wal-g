@@ -89,16 +89,13 @@ mongo_build: $(CMD_FILES) $(PKG_FILES)
 mongo_install: mongo_build
 	mv $(MAIN_MONGO_PATH)/wal-g $(GOBIN)/wal-g
 
-mongo_integration_test: load_docker_common
-	docker-compose build mongo mongo_tests
-	docker-compose up --exit-code-from mongo_tests mongo_tests
-
 mongo_features: install deps mongo_build lint unlink_brotli
-	rm -rf ./tests_func/wal-g
-	mkdir -p ./tests_func/wal-g
-	cp -a `ls -A | grep -v "tests_func"` tests_func/wal-g/
-	(cd tests_func/wal-g/ ; git rm --cached tests_func/wal-g ; cd ../..)
-	(cd tests_func ; MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -timeout 40m --godog.stop-on-failure --godog.format=pretty; cd ..)
+	set -e
+	rm -rf ./tests_func/wal-g		rm -rf ./tests_func/wal-g
+	mkdir -p ./tests_func/wal-g		mkdir -p ./tests_func/wal-g
+	cp -a `ls -A | grep -v "tests_func"` tests_func/wal-g/		cp -a `ls -A | grep -v "tests_func"` tests_func/wal-g/
+	(cd tests_func/wal-g/ ; git rm --cached tests_func/wal-g ; cd ../..)		(cd tests_func/wal-g/ ; git rm --cached tests_func/wal-g ; cd ../..)
+	(cd tests_func ; MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -timeout 40m --godog.stop-on-failure --godog.format=pretty; cd ..)		cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -timeout 40m --godog.stop-on-failure --godog.format=pretty || rm -rf ./wal-g
 	rm -rf ./tests_func/wal-g
 
 redis_test: install deps redis_build lint unlink_brotli redis_integration_test
