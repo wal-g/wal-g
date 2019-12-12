@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/awskms"
@@ -15,6 +15,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+	"strconv"
 )
 
 const (
@@ -35,7 +37,7 @@ type UnconfiguredStorageError struct {
 	error
 }
 
-func NewUnconfiguredStorageError(storagePrefixVariants []string) UnconfiguredStorageError {
+func newUnconfiguredStorageError(storagePrefixVariants []string) UnconfiguredStorageError {
 	return UnconfiguredStorageError{errors.Errorf("No storage is configured now, please set one of following settings: %v", storagePrefixVariants)}
 }
 
@@ -47,7 +49,7 @@ type UnknownCompressionMethodError struct {
 	error
 }
 
-func NewUnknownCompressionMethodError() UnknownCompressionMethodError {
+func newUnknownCompressionMethodError() UnknownCompressionMethodError {
 	return UnknownCompressionMethodError{errors.Errorf("Unknown compression method, supported methods are: %v", compression.CompressingAlgorithms)}
 }
 
@@ -71,7 +73,7 @@ type InvalidConcurrencyValueError struct {
 	error
 }
 
-func NewInvalidConcurrencyValueError(concurrencyType string, value int) InvalidConcurrencyValueError {
+func newInvalidConcurrencyValueError(concurrencyType string, value int) InvalidConcurrencyValueError {
 	return InvalidConcurrencyValueError{errors.Errorf("%v value is expected to be positive but is: %v", concurrencyType, value)}
 }
 
@@ -83,7 +85,7 @@ type UnmarshallingError struct {
 	error
 }
 
-func NewUnmarshallingError(subject string, err error) UnmarshallingError {
+func newUnmarshallingError(subject string, err error) UnmarshallingError {
 	return UnmarshallingError{errors.Errorf("Failed to unmarshal %s: %v", subject, err)}
 }
 
@@ -92,7 +94,7 @@ func (err UnmarshallingError) Error() string {
 }
 
 // TODO : unit tests
-func ConfigureLimiters() {
+func configureLimiters() {
 	if viper.IsSet(DiskRateLimitSetting) {
 		diskLimit := viper.GetInt64(DiskRateLimitSetting)
 		DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
@@ -108,7 +110,7 @@ func ConfigureLimiters() {
 func ConfigureFolder() (storage.Folder, error) {
 	skippedPrefixes := make([]string, 0)
 	for _, adapter := range StorageAdapters {
-		prefix, ok := GetWaleCompatibleSetting(adapter.prefixName)
+		prefix, ok := getWaleCompatibleSetting(adapter.prefixName)
 		if !ok {
 			skippedPrefixes = append(skippedPrefixes, "WALG_"+adapter.prefixName)
 			continue
@@ -123,7 +125,7 @@ func ConfigureFolder() (storage.Folder, error) {
 		}
 		return adapter.configureFolder(prefix, settings)
 	}
-	return nil, NewUnconfiguredStorageError(skippedPrefixes)
+	return nil, newUnconfiguredStorageError(skippedPrefixes)
 }
 
 func getWalFolderPath() string {
@@ -155,7 +157,7 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err
 		return
 	}
 	dataFolderPath := GetDataFolderPath()
-	deltaDataFolder, err = NewDiskDataFolder(dataFolderPath)
+	deltaDataFolder, err = newDiskDataFolder(dataFolderPath)
 	if err != nil {
 		useWalDelta = false
 		tracelog.WarningLogger.Printf("can't use wal delta feature because can't open delta data folder '%s'"+
@@ -169,12 +171,11 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err
 func configureCompressor() (compression.Compressor, error) {
 	compressionMethod := viper.GetString(CompressionMethodSetting)
 	if _, ok := compression.Compressors[compressionMethod]; !ok {
-		return nil, NewUnknownCompressionMethodError()
+		return nil, newUnknownCompressionMethodError()
 	}
 	return compression.Compressors[compressionMethod], nil
 }
 
-// TODO : unit tests
 func ConfigureLogging() error {
 	if viper.IsSet(LogLevelSetting) {
 		return tracelog.UpdateLogLevel(viper.GetString(LogLevelSetting))
@@ -188,7 +189,7 @@ func getArchiveDataFolderPath() string {
 
 // TODO : unit tests
 func ConfigureArchiveStatusManager() (DataFolder, error) {
-	return NewDiskDataFolder(getArchiveDataFolderPath())
+	return newDiskDataFolder(getArchiveDataFolderPath())
 }
 
 // ConfigureUploader connects to storage and creates an uploader. It makes sure
@@ -249,7 +250,7 @@ func ConfigureCrypter() crypto.Crypter {
 		return openpgp.CrypterFromKeyPath(viper.GetString(PgpKeyPathSetting), loadPassphrase)
 	}
 
-	if keyRingID, ok := GetWaleCompatibleSetting(GpgKeyIDSetting); ok {
+	if keyRingID, ok := getWaleCompatibleSetting(GpgKeyIDSetting); ok {
 		tracelog.WarningLogger.Printf(DeprecatedExternalGpgMessage)
 		return openpgp.CrypterFromKeyRingID(keyRingID, loadPassphrase)
 	}
@@ -261,21 +262,21 @@ func ConfigureCrypter() crypto.Crypter {
 	return nil
 }
 
-func GetMaxDownloadConcurrency() (int, error) {
+func getMaxDownloadConcurrency() (int, error) {
 	return GetMaxConcurrency(DownloadConcurrencySetting)
 }
 
-func GetMaxUploadConcurrency() (int, error) {
+func getMaxUploadConcurrency() (int, error) {
 	return GetMaxConcurrency(UploadConcurrencySetting)
 }
 
 // This setting is intentionally undocumented in README. Effectively, this configures how many prepared tar Files there
 // may be in uploading state during backup-push.
-func GetMaxUploadQueue() (int, error) {
+func getMaxUploadQueue() (int, error) {
 	return GetMaxConcurrency(UploadQueueSetting)
 }
 
-func GetMaxUploadDiskConcurrency() (int, error) {
+func getMaxUploadDiskConcurrency() (int, error) {
 	return GetMaxConcurrency(UploadDiskConcurrencySetting)
 }
 
@@ -283,7 +284,7 @@ func GetMaxConcurrency(concurrencyType string) (int, error) {
 	concurrency := viper.GetInt(concurrencyType)
 
 	if concurrency < MinAllowedConcurrency {
-		return MinAllowedConcurrency, NewInvalidConcurrencyValueError(concurrencyType, concurrency)
+		return MinAllowedConcurrency, newInvalidConcurrencyValueError(concurrencyType, concurrency)
 	}
 	return concurrency, nil
 }
@@ -296,7 +297,7 @@ func GetSentinelUserData() interface{} {
 	var out interface{}
 	err := json.Unmarshal([]byte(dataStr), &out)
 	if err != nil {
-		tracelog.WarningLogger.PrintError(NewUnmarshallingError(SentinelUserDataSetting, err))
+		tracelog.WarningLogger.PrintError(newUnmarshallingError(SentinelUserDataSetting, err))
 		return dataStr
 	}
 	return out
@@ -315,4 +316,22 @@ func GetNameStreamCreateCmd() []string {
 		}
 	}
 	return resultCommand
+}
+
+func GetOplogArchiveTimeout() (time.Duration, error) {
+	oplogArchiveTimeoutStr, _ := GetSetting(OplogArchiveTimeoutSetting)
+	oplogArchiveTimeout, err := strconv.Atoi(oplogArchiveTimeoutStr)
+	if err != nil {
+		return 0, fmt.Errorf("integer expected for %s setting but given '%s': %w", OplogArchiveTimeoutSetting, oplogArchiveTimeoutStr, err)
+	}
+	return time.Duration(oplogArchiveTimeout) * time.Second, nil
+}
+
+func GetOplogArchiveAfterSize() (int, error) {
+	oplogArchiveAfterSizeStr, _ := GetSetting(OplogArchiveAfterSize)
+	oplogArchiveAfterSize, err := strconv.Atoi(oplogArchiveAfterSizeStr)
+	if err != nil {
+		return 0, fmt.Errorf("integer expected for %s setting but given '%s': %w", OplogArchiveAfterSize, oplogArchiveAfterSizeStr, err)
+	}
+	return oplogArchiveAfterSize, nil
 }

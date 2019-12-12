@@ -4,52 +4,52 @@ import "strings"
 
 type DeltaNo uint64
 
-func NewDeltaNoFromWalSegmentNo(walSegmentNo WalSegmentNo) DeltaNo {
+func newDeltaNoFromWalSegmentNo(walSegmentNo WalSegmentNo) DeltaNo {
 	no := uint64(walSegmentNo) - (uint64(walSegmentNo) % WalFileInDelta)
 	return DeltaNo(no)
 }
 
-func NewDeltaNoFromLsn(lsn uint64) DeltaNo {
-	return NewDeltaNoFromWalSegmentNo(NewWalSegmentNo(lsn))
+func newDeltaNoFromLsn(lsn uint64) DeltaNo {
+	return newDeltaNoFromWalSegmentNo(newWalSegmentNo(lsn))
 }
 
-func NewDeltaNoFromFilename(filename string) (DeltaNo, error) {
+func newDeltaNoFromFilename(filename string) (DeltaNo, error) {
 	filename = strings.TrimSuffix(filename, DeltaFilenameSuffix)
 	_, no, err := ParseWALFilename(filename)
 	return DeltaNo(no), err
 }
 
-func NewDeltaNoFromFilenameNoError(filename string) DeltaNo {
+func newDeltaNoFromFilenameNoError(filename string) DeltaNo {
 	filename = strings.TrimSuffix(filename, DeltaFilenameSuffix)
 	_, no, _ := ParseWALFilename(filename)
 	return DeltaNo(no)
 }
 
-func (deltaNo DeltaNo) Next() DeltaNo {
-	return deltaNo.Add(1)
+func (deltaNo DeltaNo) next() DeltaNo {
+	return deltaNo.add(1)
 }
 
-func (deltaNo DeltaNo) Previous() DeltaNo {
-	return deltaNo.Sub(1)
+func (deltaNo DeltaNo) previous() DeltaNo {
+	return deltaNo.sub(1)
 }
 
-func (deltaNo DeltaNo) Add(n uint64) DeltaNo {
+func (deltaNo DeltaNo) add(n uint64) DeltaNo {
 	deltaNo = DeltaNo(uint64(deltaNo) + n*WalFileInDelta)
 	return deltaNo
 }
 
-func (deltaNo DeltaNo) Sub(n uint64) DeltaNo {
+func (deltaNo DeltaNo) sub(n uint64) DeltaNo {
 	return DeltaNo(uint64(deltaNo) - n*WalFileInDelta)
 }
 
-func (deltaNo DeltaNo) FirstWalSegmentNo() WalSegmentNo {
+func (deltaNo DeltaNo) firstWalSegmentNo() WalSegmentNo {
 	return WalSegmentNo(deltaNo)
 }
 
-func (deltaNo DeltaNo) FirstLsn() uint64 {
-	return deltaNo.FirstWalSegmentNo().FirstLsn()
+func (deltaNo DeltaNo) firstLsn() uint64 {
+	return deltaNo.firstWalSegmentNo().firstLsn()
 }
 
-func (deltaNo DeltaNo) GetFilename(timeline uint32) string {
-	return deltaNo.FirstWalSegmentNo().GetFilename(timeline) + DeltaFilenameSuffix
+func (deltaNo DeltaNo) getFilename(timeline uint32) string {
+	return deltaNo.firstWalSegmentNo().getFilename(timeline) + DeltaFilenameSuffix
 }

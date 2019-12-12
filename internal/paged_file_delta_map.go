@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
-	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"os"
 	"path"
@@ -23,7 +23,7 @@ type NoBitmapFoundError struct {
 	error
 }
 
-func NewNoBitmapFoundError() NoBitmapFoundError {
+func newNoBitmapFoundError() NoBitmapFoundError {
 	return NoBitmapFoundError{errors.New("GetDeltaBitmapFor: no bitmap found")}
 }
 
@@ -35,7 +35,7 @@ type UnknownTableSpaceError struct {
 	error
 }
 
-func NewUnknownTableSpaceError() UnknownTableSpaceError {
+func newUnknownTableSpaceError() UnknownTableSpaceError {
 	return UnknownTableSpaceError{errors.New("GetRelFileNodeFrom: unknown tablespace")}
 }
 
@@ -75,7 +75,7 @@ func (deltaMap *PagedFileDeltaMap) GetDeltaBitmapFor(filePath string) (*roaring.
 	}
 	_, ok := (*deltaMap)[*relFileNode]
 	if !ok {
-		return nil, NewNoBitmapFoundError()
+		return nil, newNoBitmapFoundError()
 	}
 	bitmap := (*deltaMap)[*relFileNode].Clone()
 	relFileId, err := GetRelFileIdFrom(filePath)
@@ -127,13 +127,13 @@ func GetRelFileNodeFrom(filePath string) (*walparser.RelFileNode, error) {
 		}
 		return &walparser.RelFileNode{SpcNode: walparser.Oid(spcNode), DBNode: walparser.Oid(dbNode), RelNode: walparser.Oid(relNode)}, nil
 	} else {
-		return nil, NewUnknownTableSpaceError()
+		return nil, newUnknownTableSpaceError()
 	}
 }
 
-func (deltaMap *PagedFileDeltaMap) GetLocationsFromDeltas(folder storage.Folder, timeline uint32, first, last DeltaNo) error {
-	for deltaNo := first; deltaNo < last; deltaNo = deltaNo.Next() {
-		filename := deltaNo.GetFilename(timeline)
+func (deltaMap *PagedFileDeltaMap) getLocationsFromDeltas(folder storage.Folder, timeline uint32, first, last DeltaNo) error {
+	for deltaNo := first; deltaNo < last; deltaNo = deltaNo.next() {
+		filename := deltaNo.getFilename(timeline)
 		deltaFile, err := getDeltaFile(folder, filename)
 		if err != nil {
 			return err
@@ -144,9 +144,9 @@ func (deltaMap *PagedFileDeltaMap) GetLocationsFromDeltas(folder storage.Folder,
 	return nil
 }
 
-func (deltaMap *PagedFileDeltaMap) GetLocationsFromWals(folder storage.Folder, timeline uint32, first, last WalSegmentNo, walParser *walparser.WalParser) error {
-	for walSegmentNo := first; walSegmentNo < last; walSegmentNo = walSegmentNo.Next() {
-		filename := walSegmentNo.GetFilename(timeline)
+func (deltaMap *PagedFileDeltaMap) getLocationsFromWals(folder storage.Folder, timeline uint32, first, last WalSegmentNo, walParser *walparser.WalParser) error {
+	for walSegmentNo := first; walSegmentNo < last; walSegmentNo = walSegmentNo.next() {
+		filename := walSegmentNo.getFilename(timeline)
 		err := deltaMap.getLocationsFromWal(folder, filename, walParser)
 		if err != nil {
 			return err

@@ -12,7 +12,7 @@ type NilWalParserError struct {
 	error
 }
 
-func NewNilWalParserError() NilWalParserError {
+func newNilWalParserError() NilWalParserError {
 	return NilWalParserError{errors.New("expected to get non nil wal parser, but got nil one")}
 }
 
@@ -27,7 +27,7 @@ type DeltaFile struct {
 
 func NewDeltaFile(walParser *walparser.WalParser) (*DeltaFile, error) {
 	if walParser == nil {
-		return nil, NewNilWalParserError()
+		return nil, newNilWalParserError()
 	}
 	return &DeltaFile{nil, walParser}, nil
 }

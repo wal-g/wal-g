@@ -21,7 +21,7 @@ type StorageAdapter struct {
 func (adapter *StorageAdapter) loadSettings() (map[string]string, error) {
 	settings := make(map[string]string)
 	for _, settingName := range adapter.settingNames {
-		settingValue, ok := GetWaleCompatibleSetting(settingName)
+		settingValue, ok := getWaleCompatibleSetting(settingName)
 		if !ok {
 			settingValue, ok = GetSetting(settingName)
 		}

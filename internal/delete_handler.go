@@ -10,8 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/wal-g/storages/storage"
 	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -42,7 +42,7 @@ var StringModifiers = []string{"FULL", "FIND_FULL"}
 var StringModifiersDeleteEverything = []string{"FORCE"}
 
 // TODO : unit tests
-func GetLatestBackupName(folder storage.Folder) (string, error) {
+func getLatestBackupName(folder storage.Folder) (string, error) {
 	sortTimes, err := getBackups(folder)
 	if err != nil {
 		return "", err
@@ -118,11 +118,11 @@ func FindTargetBeforeName(folder storage.Folder,
 	isFullBackup func(object storage.Object) bool,
 	greater func(object1, object2 storage.Object) bool) (storage.Object, error) {
 
-	choiceFunc := GetBeforeChoiceFunc(name, modifier, isFullBackup)
+	choiceFunc := getBeforeChoiceFunc(name, modifier, isFullBackup)
 	if choiceFunc == nil {
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete before'")
 	}
-	return FindTarget(folder, greater, choiceFunc)
+	return findTarget(folder, greater, choiceFunc)
 }
 
 func FindTargetBeforeTime(folder storage.Folder,
@@ -130,7 +130,7 @@ func FindTargetBeforeTime(folder storage.Folder,
 	isFullBackup func(object storage.Object) bool,
 	less func(object1, object2 storage.Object) bool) (storage.Object, error) {
 
-	potentialTarget, err := FindTarget(folder, less, func(object storage.Object) bool {
+	potentialTarget, err := findTarget(folder, less, func(object storage.Object) bool {
 		return timeLine.Before(object.GetLastModified()) || timeLine.Equal(object.GetLastModified())
 	})
 	if err != nil {
@@ -147,14 +147,14 @@ func FindTargetRetain(folder storage.Folder,
 	isFullBackup func(object storage.Object) bool,
 	greater func(object1, object2 storage.Object) bool) (storage.Object, error) {
 
-	choiceFunc := GetRetainChoiceFunc(retentionCount, modifier, isFullBackup)
+	choiceFunc := getRetainChoiceFunc(retentionCount, modifier, isFullBackup)
 	if choiceFunc == nil {
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete retain'")
 	}
-	return FindTarget(folder, greater, choiceFunc)
+	return findTarget(folder, greater, choiceFunc)
 }
 
-func FindTarget(folder storage.Folder,
+func findTarget(folder storage.Folder,
 	compare func(object1, object2 storage.Object) bool,
 	isTarget func(object storage.Object) bool) (storage.Object, error) {
 
@@ -173,7 +173,7 @@ func FindTarget(folder storage.Folder,
 	return nil, nil
 }
 
-func GetBeforeChoiceFunc(name string, modifier int,
+func getBeforeChoiceFunc(name string, modifier int,
 	isFullBackup func(object storage.Object) bool) func(object storage.Object) bool {
 
 	meetName := false
@@ -191,7 +191,7 @@ func GetBeforeChoiceFunc(name string, modifier int,
 	return nil
 }
 
-func GetRetainChoiceFunc(retentionCount, modifier int,
+func getRetainChoiceFunc(retentionCount, modifier int,
 	isFullBackup func(object storage.Object) bool) func(object storage.Object) bool {
 
 	count := 0
@@ -278,7 +278,7 @@ func getPermanentObjects(folder storage.Folder) (map[string]bool, map[string]boo
 			tracelog.ErrorLogger.Printf("failed to get backup by name with error %s, ignoring...", err.Error())
 			continue
 		}
-		meta, err := backup.FetchMeta()
+		meta, err := backup.fetchMeta()
 		if err != nil {
 			tracelog.ErrorLogger.Printf("failed to fetch backup meta for backup %s with error %s, ignoring...", backupTime.BackupName, err.Error())
 			continue
@@ -291,10 +291,10 @@ func getPermanentObjects(folder storage.Folder) (map[string]bool, map[string]boo
 			}
 			timelineID := uint32(timelineID64)
 
-			startWalSegmentNo := NewWalSegmentNo(meta.StartLsn - 1)
-			endWalSegmentNo := NewWalSegmentNo(meta.FinishLsn - 1)
-			for walSegmentNo := startWalSegmentNo; walSegmentNo <= endWalSegmentNo; walSegmentNo = walSegmentNo.Next() {
-				permanentWals[walSegmentNo.GetFilename(timelineID)] = true
+			startWalSegmentNo := newWalSegmentNo(meta.StartLsn - 1)
+			endWalSegmentNo := newWalSegmentNo(meta.FinishLsn - 1)
+			for walSegmentNo := startWalSegmentNo; walSegmentNo <= endWalSegmentNo; walSegmentNo = walSegmentNo.next() {
+				permanentWals[walSegmentNo.getFilename(timelineID)] = true
 			}
 			permanentBackups[backupTime.BackupName[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+24]] = true
 		}

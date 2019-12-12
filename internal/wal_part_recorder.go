@@ -10,7 +10,7 @@ type NotWalFilenameError struct {
 	error
 }
 
-func NewNotWalFilenameError(filename string) NotWalFilenameError {
+func newNotWalFilenameError(filename string) NotWalFilenameError {
 	return NotWalFilenameError{errors.Errorf("expected to get wal filename, but found: '%s'", filename)}
 }
 
@@ -25,7 +25,7 @@ type WalPartRecorder struct {
 
 func NewWalPartRecorder(walFilename string, manager *DeltaFileManager) (*WalPartRecorder, error) {
 	if !isWalFilename(walFilename) {
-		return nil, NewNotWalFilenameError(walFilename)
+		return nil, newNotWalFilenameError(walFilename)
 	}
 	return &WalPartRecorder{manager, walFilename}, nil
 }
