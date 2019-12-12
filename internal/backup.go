@@ -232,9 +232,10 @@ func IsPgControlRequired(backup *Backup, sentinelDto BackupSentinelDto) bool {
 	return needPgControl
 }
 
-// TODO : unit tests
+
 func isDirectoryEmpty(directoryPath string) (bool, error) {
 	var isEmpty = true
+
 	searchLambda := func(path string, info os.FileInfo, err error) error {
 		if path != directoryPath {
 			isEmpty = false
