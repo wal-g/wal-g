@@ -102,7 +102,7 @@
 
 [[constraint]]
   branch = "master"
-  name = "github.com/tinsane/tracelog"
+  name = "github.com/wal-g/tracelog"
 
 [[constraint]]
   revision = "8d5a2396c5bbded4c71cbb1906217a69d3e7af5d"

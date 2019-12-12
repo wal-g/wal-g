@@ -612,6 +612,14 @@
   revision = "8d5a2396c5bbded4c71cbb1906217a69d3e7af5d"
 
 [[projects]]
+  branch = "master"
+  digest = "1:071f14468e60665a4af11ba3115ad2b4d9aa397cd33227ce1a7840d10d3f1653"
+  name = "github.com/wal-g/tracelog"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "0ab2b054ff3055bd8d6981dfa492836dca275c2c"
+
+[[projects]]
   digest = "1:211f9cf21d532e2da93a420426d714af492743f4c602389cb0cd14ec8eebe256"
   name = "github.com/willf/bitset"
   packages = ["."]
@@ -946,7 +954,6 @@
     "github.com/spf13/cobra",
     "github.com/spf13/viper",
     "github.com/stretchr/testify/assert",
-    "github.com/tinsane/tracelog",
     "github.com/ulikunitz/xz/lzma",
     "github.com/wal-g/storages/azure",
     "github.com/wal-g/storages/fs",
@@ -955,6 +962,7 @@
     "github.com/wal-g/storages/s3",
     "github.com/wal-g/storages/storage",
     "github.com/wal-g/storages/swift",
+    "github.com/wal-g/tracelog",
     "go.mongodb.org/mongo-driver/bson",
     "go.mongodb.org/mongo-driver/bson/primitive",
     "go.mongodb.org/mongo-driver/mongo",

@@ -1,7 +1,7 @@
 package pg
 
 import (
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 
 	"github.com/spf13/cobra"

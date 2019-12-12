@@ -2,7 +2,7 @@ package internal
 
 import (
 	"github.com/spf13/viper"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"io/ioutil"
 	"path/filepath"
 	"strings"

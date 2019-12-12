@@ -1,7 +1,7 @@
 package internal
 
 import (
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"io"
 	"io/ioutil"
 	"os/exec"
