@@ -41,6 +41,7 @@ func (handlers OpLogFetchHandlers) GetLogFilePath(pathToLog string) (string, err
 	return oplogFilePath, nil
 }
 
+// TODO : unit tests
 func (handlers OpLogFetchHandlers) DownloadLogTo(logFolder storage.Folder, logName string, dstLogFilePath string) error {
 	return internal.DownloadWALFileTo(logFolder, logName, dstLogFilePath)
 }
@@ -49,6 +50,7 @@ func (handlers OpLogFetchHandlers) ShouldBeAborted(pathToLog string) (bool, erro
 	return false, nil
 }
 
+// TODO : unit tests
 func FetchLogs(folder storage.Folder, backup *internal.Backup, settings internal.LogFetchSettings) error {
 	var streamSentinel StreamSentinelDto
 
@@ -71,6 +73,7 @@ func FetchLogs(folder storage.Folder, backup *internal.Backup, settings internal
 	return err
 }
 
+// TODO : unit tests
 func HandleOplogFetch(folder storage.Folder, backupName string) error {
 	if !internal.FileIsPiped(os.Stdout) {
 		tracelog.ErrorLogger.Fatalf("stdout is a terminal")

@@ -67,7 +67,7 @@ func FetchLogs(folder storage.Folder, backupUploadTime time.Time, untilDT string
 		return err
 	}
 
-	handlers := BinlogFetchHandlers{dstPathFolder: dstFolder, endTS: endTS,}
+	handlers := BinlogFetchHandlers{dstPathFolder: dstFolder, endTS: endTS}
 
 	fetchedBinlogs, err := internal.FetchLogs(folder, backupUploadTime, nil, settings.GetLogFolderPath(), handlers)
 
