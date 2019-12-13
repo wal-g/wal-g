@@ -10,8 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -161,7 +161,7 @@ func FindTargetRetainAfterName(folder storage.Folder,
 	isFullBackup func(object storage.Object) bool,
 	greater func(object1, object2 storage.Object) bool) (storage.Object, error) {
 
-	less := func(object1, object2 storage.Object) bool {return greater(object2, object1)}
+	less := func(object1, object2 storage.Object) bool { return greater(object2, object1) }
 
 	choiceFuncRetain := getRetainChoiceFunc(retentionCount, modifier, isFullBackup)
 	if choiceFuncRetain == nil {
@@ -203,7 +203,7 @@ func FindTargetRetainAfterTime(folder storage.Folder,
 	isFullBackup func(object storage.Object) bool,
 	greater func(object1, object2 storage.Object) bool) (storage.Object, error) {
 
-	less := func(object1, object2 storage.Object) bool {return greater(object2, object1)}
+	less := func(object1, object2 storage.Object) bool { return greater(object2, object1) }
 
 	choiceFuncRetain := getRetainChoiceFunc(retentionCount, modifier, isFullBackup)
 	if choiceFuncRetain == nil {

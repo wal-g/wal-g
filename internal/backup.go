@@ -9,9 +9,9 @@ import (
 	"regexp"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/storages/fs"
 	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -231,7 +231,6 @@ func IsPgControlRequired(backup *Backup, sentinelDto BackupSentinelDto) bool {
 	needPgControl := walgBasebackupName || sentinelDto.IsIncremental()
 	return needPgControl
 }
-
 
 func isDirectoryEmpty(directoryPath string) (bool, error) {
 	var isEmpty = true

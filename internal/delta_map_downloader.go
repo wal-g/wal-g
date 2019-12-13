@@ -2,8 +2,8 @@ package internal
 
 import (
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 )
 
 func getDeltaMap(folder storage.Folder, timeline uint32, firstUsedLSN, firstNotUsedLSN uint64) (PagedFileDeltaMap, error) {
