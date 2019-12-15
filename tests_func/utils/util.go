@@ -181,3 +181,20 @@ func CopySymLink(source, dest string) error {
 	}
 	return os.Symlink(link, dest)
 }
+
+func WriteEnvFile(envLines []string, envFile string) error {
+	_, err := os.Stat(envFile)
+	file, err := os.OpenFile(envFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("error in setuping staging: %v", err)
+	}
+	defer file.Close()
+	for _, envLine:= range envLines {
+		key, value := SplitEnvLine(envLine)
+		_, err = fmt.Fprintf(file, "%s=%s\n", key, value)
+		if err != nil {
+			return fmt.Errorf("error in setuping staging: %v", err)
+		}
+	}
+	return nil
+}

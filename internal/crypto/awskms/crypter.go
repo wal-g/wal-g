@@ -3,7 +3,7 @@ package awskms
 import (
 	"bufio"
 	"github.com/minio/sio"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"io"

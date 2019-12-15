@@ -10,10 +10,10 @@ var Env = map[string]string{
 
 	"COMPOSE_FILE": "./staging/docker-compose.yml",
 
-	"WORKER_HOST_01":     "mongodb01",
-	"WORKER_HOST_02":     "mongodb02",
-	"TEST_ID":            "13",
-	"TEST_CLEANUP_DELAY": "60",
+	"MONGO_HOST_01_WORKER": "mongodb01",
+	"MONGO_HOST_02_WORKER": "mongodb02",
+	"TEST_ID":              "13",
+	"TEST_CLEANUP_DELAY":   "60",
 
 	"WALG_S3_PREFIX":   "s3://dbaas/mongodb-backup/test_uuid/test_mongodb",
 	"WALG_CLIENT_PATH": "/usr/bin/wal-g",

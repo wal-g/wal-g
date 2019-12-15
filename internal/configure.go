@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"github.com/tinsane/tracelog"
 	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/awskms"
@@ -14,9 +14,9 @@ import (
 	"golang.org/x/time/rate"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
-	"strconv"
 )
 
 const (
@@ -176,8 +176,7 @@ func configureCompressor() (compression.Compressor, error) {
 	return compression.Compressors[compressionMethod], nil
 }
 
-// TODO : unit tests
-func configureLogging() error {
+func ConfigureLogging() error {
 	if viper.IsSet(LogLevelSetting) {
 		return tracelog.UpdateLogLevel(viper.GetString(LogLevelSetting))
 	}

@@ -8,8 +8,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/tinsane/tracelog"
 	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -27,6 +27,7 @@ type LogFetchHandlers interface {
 	HandleAbortFetch(string) error
 }
 
+// TODO : unit tests
 func ParseTS(endTSEnvVar string) (endTS *time.Time, err error) {
 	endTSStr, ok := GetSetting(endTSEnvVar)
 	if ok {
@@ -39,6 +40,7 @@ func ParseTS(endTSEnvVar string) (endTS *time.Time, err error) {
 	return endTS, nil
 }
 
+// TODO : unit tests
 // GetLogsDstSettings reads from the environment variables fetch settings
 func GetLogsDstSettings(operationLogsDstEnvVariable string) (dstFolder string, err error) {
 	dstFolder, ok := GetSetting(operationLogsDstEnvVariable)
@@ -48,6 +50,7 @@ func GetLogsDstSettings(operationLogsDstEnvVariable string) (dstFolder string, e
 	return dstFolder, nil
 }
 
+// TODO : unit tests
 // DownloadAndDecompressStream downloads, decompresses and writes stream to stdout
 func downloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) error {
 	for _, decompressor := range compression.Decompressors {
@@ -69,6 +72,7 @@ func downloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) err
 	return newArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))
 }
 
+// TODO : unit tests
 // GetLogsCoveringInterval lists the operation logs that cover the interval
 func getLogsCoveringInterval(folder storage.Folder, start time.Time, end *time.Time) ([]storage.Object, error) {
 	logFiles, _, err := folder.ListFolder()
@@ -89,6 +93,7 @@ func getLogsCoveringInterval(folder storage.Folder, start time.Time, end *time.T
 	return logsToFetch, nil
 }
 
+// TODO : unit tests
 // DownloadLogFiles downloads files to specified folder
 func downloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, handlers LogFetchHandlers) ([]storage.Object, error) {
 	var fetched []storage.Object
@@ -138,6 +143,7 @@ func FetchLogs(folder storage.Folder, startTS time.Time, endTS *time.Time, logFo
 	return fetched, nil
 }
 
+// TODO : unit tests
 func logFileShouldBeFetched(backupStartUploadTime time.Time, endTS *time.Time, object storage.Object) bool {
 	return (backupStartUploadTime.Before(object.GetLastModified()) || backupStartUploadTime.Equal(object.GetLastModified())) &&
 		(endTS == nil || (*endTS).After(object.GetLastModified()))

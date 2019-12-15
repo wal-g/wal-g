@@ -171,7 +171,7 @@ func MakeBackup(testContext *TestContextType, containerName string, cmdArgs stri
 		AttachStderr: true,
 		AttachStdout: true,
 		Cmd:          []string{"bash", "-c", command},
-		Env:		  append(os.Environ(), envs...),
+		Env:          append(os.Environ(), envs...),
 	}
 	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(testContext.Context, containerName, config)
 	if err != nil {
@@ -292,6 +292,7 @@ func StepEnsureRsInitialized(testContext *TestContextType, containerName string)
 	var response string
 	var err error
 	for i := 0; i < 15; i++ {
+		time.Sleep(time.Second)
 		command := []string{"mongo", "--host", "localhost", "--quiet", "--norc", "--port", "27018", "--eval", "rs.status()"}
 		response, err = RunCommandInContainer(testContext, containerName, command)
 		if strings.Contains(response, "myState") {
@@ -331,10 +332,46 @@ func RestoreBackupById(testContext *TestContextType, containerName string, backu
 	return err
 }
 
+func MongoPurgeAllBackups(testContext *TestContextType, containerName string) error {
+	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
+	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
+	command := []string{WalgCliPath, "--config", WalgConfPath, "delete", "everything", "--confirm"}
+	_, err := RunCommandInContainer(testContext, containerName, command)
+	return err
+}
+
 func MongoPurgeBackups(testContext *TestContextType, containerName string, keepNumber int) error {
 	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
 	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
 	command := []string{WalgCliPath, "--config", WalgConfPath, "delete", "retain", strconv.Itoa(keepNumber), "--confirm"}
+	_, err := RunCommandInContainer(testContext, containerName, command)
+	return err
+}
+
+func MongoPurgeBackupsAfterBackupId(testContext *TestContextType, containerName string,
+	keepNumber int, afterBackupNum int) error {
+	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
+	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
+
+	backupEntries, err := GetBackups(testContext, containerName)
+	if err != nil {
+		return fmt.Errorf("error in restoring backup by id: %v", err)
+	}
+
+	command := []string{WalgCliPath, "--config", WalgConfPath, "delete",
+		"retain", strconv.Itoa(keepNumber), "--after", backupEntries[len(backupEntries)-afterBackupNum-1], "--confirm"}
+
+	_, err = RunCommandInContainer(testContext, containerName, command)
+	return err
+}
+
+func MongoPurgeBackupsAfterTime(testContext *TestContextType, containerName string,
+	keepNumber int, timeLine time.Time) error {
+	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
+	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
+	command := []string{WalgCliPath, "--config", WalgConfPath, "delete",
+		"retain", strconv.Itoa(keepNumber), "--after", timeLine.Format(time.RFC3339), "--confirm"}
+
 	_, err := RunCommandInContainer(testContext, containerName, command)
 	return err
 }

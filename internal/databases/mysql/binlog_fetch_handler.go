@@ -2,7 +2,7 @@ package mysql
 
 import (
 	"github.com/wal-g/storages/storage"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
 	"os"
@@ -67,7 +67,7 @@ func FetchLogs(folder storage.Folder, backupUploadTime time.Time, untilDT string
 		return err
 	}
 
-	handlers := BinlogFetchHandlers{dstPathFolder: dstFolder, endTS: endTS,}
+	handlers := BinlogFetchHandlers{dstPathFolder: dstFolder, endTS: endTS}
 
 	fetchedBinlogs, err := internal.FetchLogs(folder, backupUploadTime, nil, settings.GetLogFolderPath(), handlers)
 

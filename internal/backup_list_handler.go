@@ -9,21 +9,51 @@ import (
 	"time"
 
 	"github.com/jedib0t/go-pretty/table"
-	"github.com/tinsane/tracelog"
 	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 )
 
-// TODO : unit tests
-// HandleBackupList is invoked to perform wal-g backup-list
-func HandleBackupList(folder storage.Folder) {
-	backups, err := getBackups(folder)
+type InfoLogger interface {
+	Println(v ...interface{})
+}
+
+type ErrorLogger interface {
+	FatalOnError(err error)
+}
+
+type Logging struct {
+	InfoLogger  InfoLogger
+	ErrorLogger ErrorLogger
+}
+
+func DefaultHandleBackupList(folder storage.Folder) {
+	getBackupsFunc := func() ([]BackupTime, error) {
+		return getBackups(folder)
+	}
+	writeBackupListFunc := func(backups []BackupTime) {
+		WriteBackupList(backups, os.Stdout)
+	}
+	logging := Logging{
+		InfoLogger:  tracelog.InfoLogger,
+		ErrorLogger: tracelog.ErrorLogger,
+	}
+
+	HandleBackupList(getBackupsFunc, writeBackupListFunc, logging)
+}
+
+func HandleBackupList(
+	getBackupsFunc func() ([]BackupTime, error),
+	writeBackupListFunc func([]BackupTime),
+	logging Logging,
+) {
+	backups, err := getBackupsFunc()
 	if len(backups) == 0 {
-		tracelog.InfoLogger.Println("No backups found")
+		logging.InfoLogger.Println("No backups found")
 		return
 	}
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.ErrorLogger.FatalOnError(err)
 
-	WriteBackupList(backups, os.Stdout)
+	writeBackupListFunc(backups)
 }
 
 // TODO : unit tests

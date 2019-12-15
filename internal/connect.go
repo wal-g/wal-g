@@ -3,7 +3,7 @@ package internal
 import (
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 )
 
 // Connect establishes a connection to postgres using

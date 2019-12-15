@@ -78,21 +78,8 @@ func SetupStaging(testContext *testHelper.TestContextType) error {
 		}
 	}
 
-	envFile := testConf.Env["ENV_FILE"]
-	_, err = os.Stat(envFile)
-	file, err := os.OpenFile(envFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		return fmt.Errorf("error in setuping staging: %v", err)
-	}
-	defer file.Close()
 	for key, value := range testConf.Env {
-		_, err = fmt.Fprintf(file, "%s=%s\n", key, value)
-		if err != nil {
-			return fmt.Errorf("error in setuping staging: %v", err)
-		}
+		testContext.Env = append(testContext.Env, fmt.Sprintf("%s=%s", key, value))
 	}
-
-	testContext.Env, err = testHelper.GetTestEnv(testContext)
-
 	return err
 }

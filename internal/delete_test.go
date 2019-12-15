@@ -66,6 +66,98 @@ func testTargetRetain(t *testing.T, expectedName string, retentionCount, modifie
 	assert.Equal(t, expectedName, target.GetName())
 }
 
+func getBoundedValue(leftBound, value, rightBound int) int {
+	if value < leftBound {
+		return leftBound
+	} else if value > rightBound {
+		return rightBound
+	} else {
+		return value
+	}
+}
+
+func intMin(value1, value2 int) int {
+	if value1 > value2 {
+		return value2
+	} else {
+		return value1
+	}
+}
+
+func TestFindTargetRetainAfter_Without_Modifier(t *testing.T) {
+	backupNames := []string{
+		"base_000000010000000000000000",
+		"base_000000010000000000000001_D_000000010000000000000000",
+		"base_000000010000000000000002",
+		"base_000000010000000000000003_D_000000010000000000000002",
+		"base_000000010000000000000004",
+	}
+	for retentionCount := 1; retentionCount <= 5; retentionCount++ {
+		for minutesCount := 0; minutesCount < 5; minutesCount++ {
+			expectedIndex := intMin(getBoundedValue(0, minutesCount, 4), 5-retentionCount)
+			expectedName := backupNames[expectedIndex]
+			duration := time.Duration(minutesCount * int(time.Minute))
+			testTargetRetainAfterTime(t, duration, expectedName, retentionCount, internal.NoDeleteModifier)
+			testTargetRetainAfterName(t, backupNames[minutesCount], expectedName, retentionCount, internal.NoDeleteModifier)
+		}
+	}
+}
+
+func TestFindTargetRetainAfter_With_FULL_Modifier(t *testing.T) {
+	backupNames := []string{
+		"base_000000010000000000000000",
+		"base_000000010000000000000001_D_000000010000000000000000",
+		"base_000000010000000000000002",
+		"base_000000010000000000000003_D_000000010000000000000002",
+		"base_000000010000000000000004",
+	}
+	for retentionCount := 1; retentionCount <= 3; retentionCount++ {
+		for minutesCount := 1; minutesCount < 5; minutesCount++ {
+			expectedIndex := intMin(((getBoundedValue(0, minutesCount, 4)+1)/2)*2, 6-retentionCount*2)
+			expectedName := backupNames[expectedIndex]
+			duration := time.Duration(minutesCount * int(time.Minute))
+			testTargetRetainAfterTime(t, duration, expectedName, retentionCount, internal.FullDeleteModifier)
+			testTargetRetainAfterName(t, backupNames[minutesCount], expectedName, retentionCount, internal.FullDeleteModifier)
+		}
+	}
+}
+
+func TestFindTargetRetainAfter_With_FIND_FULL_Modifier(t *testing.T) {
+	backupNames := []string{
+		"base_000000010000000000000000",
+		"base_000000010000000000000001_D_000000010000000000000000",
+		"base_000000010000000000000002",
+		"base_000000010000000000000003_D_000000010000000000000002",
+		"base_000000010000000000000004",
+	}
+	for retentionCount := 1; retentionCount <= 5; retentionCount++ {
+		for minutesCount := 0; minutesCount < 5; minutesCount++ {
+			expectedIndex := intMin(((getBoundedValue(0, minutesCount, 4)+1)/2)*2, 4-(retentionCount/2)*2)
+			expectedName := backupNames[expectedIndex]
+			duration := time.Duration(minutesCount * int(time.Minute))
+			testTargetRetainAfterTime(t, duration, expectedName, retentionCount, internal.FindFullDeleteModifier)
+			testTargetRetainAfterName(t, backupNames[minutesCount], expectedName, retentionCount, internal.FindFullDeleteModifier)
+		}
+	}
+}
+
+func testTargetRetainAfterTime(t *testing.T, duration time.Duration, expectedName string, retentionCount, modifier int) {
+	baseTime := utility.TimeNowCrossPlatformLocal()
+	mockFolder := createMockFolderWithTime(t, baseTime)
+
+	target, err := internal.FindTargetRetainAfterTime(mockFolder, retentionCount, baseTime.Add(duration), modifier, isFullBackup, greaterByTime)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedName, target.GetName())
+}
+
+func testTargetRetainAfterName(t *testing.T, name string, expectedName string, retentionCount, modifier int) {
+	mockFolder := createMockFolderWithTime(t, utility.TimeNowCrossPlatformLocal())
+
+	target, err := internal.FindTargetRetainAfterName(mockFolder, retentionCount, name, modifier, isFullBackup, greaterByTime)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedName, target.GetName())
+}
+
 func TestFindTargetBeforeTime_ReturnBackup_Without_Modifier(t *testing.T) {
 	expected := "base_000000010000000000000001_D_000000010000000000000000"
 	target, err := testFindTargetBeforeTime(t, 1, internal.NoDeleteModifier)
