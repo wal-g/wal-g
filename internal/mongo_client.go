@@ -9,8 +9,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// TODO: unit tests
-
 const (
 	OplogDatabaseName   = "local"
 	OplogCollectionName = "oplog.rs"
