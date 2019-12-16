@@ -536,7 +536,7 @@ func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHea
 		}
 		fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
 		if os.IsNotExist(err) { // File was deleted before opening
-			bundle.skipFile(fileInfoHeader, info)
+			// We should ignore file here as if it did not exist.
 			return nil
 		}
 		switch err.(type) {
