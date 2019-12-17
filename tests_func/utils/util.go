@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"syscall"
 )
@@ -38,6 +39,30 @@ func StringInSlice(a string, list []string) bool {
 		}
 	}
 	return false
+}
+
+func GetStringType(data interface{}) string {
+	v := reflect.ValueOf(data)
+	switch v.Kind() {
+	case reflect.Bool:
+		return "bool"
+	case reflect.Int, reflect.Int8, reflect.Int32, reflect.Int64:
+		return "int"
+	case reflect.Uint, reflect.Uint8, reflect.Uint32, reflect.Uint64:
+		return "int"
+	case reflect.Float32, reflect.Float64:
+		return "float"
+	case reflect.String:
+		return "string"
+	case reflect.Slice:
+		return "array"
+	case reflect.Map:
+		return "map"
+	case reflect.Chan:
+		return "chan"
+	default:
+		return "unknown"
+	}
 }
 
 func SplitEnvLine(line string) (string, string) {
