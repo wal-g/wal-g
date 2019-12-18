@@ -53,7 +53,7 @@ func GetLogsDstSettings(operationLogsDstEnvVariable string) (dstFolder string, e
 // DownloadAndDecompressStream downloads, decompresses and writes stream to stdout
 func downloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) error {
 	for _, decompressor := range compression.Decompressors {
-		archiveReader, exists, err := TryDownloadWALFile(backup.BaseBackupFolder, getStreamName(backup.Name, decompressor.FileExtension()))
+		archiveReader, exists, err := TryDownloadFile(backup.BaseBackupFolder, getStreamName(backup.Name, decompressor.FileExtension()))
 		if err != nil {
 			return err
 		}
@@ -61,7 +61,7 @@ func downloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) err
 			continue
 		}
 
-		err = decompressWALFile(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
+		err = DecompressDecryptBytes(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
 		if err != nil {
 			return err
 		}
@@ -147,4 +147,26 @@ func FetchStreamSentinel(backup *Backup, sentinelDto interface{}) error {
 	}
 	err = json.Unmarshal(sentinelDtoData, sentinelDto)
 	return errors.Wrap(err, "failed to unmarshal sentinel")
+}
+
+// DownloadFile downloads, decompresses and decrypts
+func DownloadFile(folder storage.Folder, filename, ext string, writeCloser io.WriteCloser) error {
+	decompressor := compression.FindDecompressor(ext)
+	if decompressor == nil {
+		return fmt.Errorf("decompressor for extension '%s' was not found", ext)
+	}
+	archiveReader, exists, err := TryDownloadFile(folder, filename)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("File '%s' does not exist.\n", filename)
+	}
+
+	err = DecompressDecryptBytes(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
+	if err != nil {
+		return err
+	}
+	utility.LoggedClose(writeCloser, "")
+	return nil
 }

@@ -15,12 +15,13 @@ import (
 
 // HandleOplogPush starts oplog archiving process: fetch, validate, upload to storage.
 // TODO: unit tests
-func HandleOplogPush(ctx context.Context, oplogFetcher oplog.Fetcher, uploader *Uploader, validator oplog.Validator) {
-	oplogFolder := uploader.UploadingFolder.GetSubFolder(OplogPath)
+// TODO: fetch only majority records
+func HandleOplogPush(ctx context.Context, oplogFetcher oplog.FromFetcher, uploader *Uploader, validator oplog.Validator) {
+	oplogFolder := uploader.UploadingFolder.GetSubFolder(oplog.ArchBasePath)
 	uploader.UploadingFolder = oplogFolder
 
 	checkFirstTS := true
-	lastKnownTS, initial, err := DiscoveryArchiveResumeTS(oplogFolder)
+	lastKnownTS, initial, err := oplog.ArchivingResumeTS(oplogFolder)
 	if initial {
 		checkFirstTS = false
 		tracelog.InfoLogger.Printf("Initiating archiving first run")
@@ -28,7 +29,7 @@ func HandleOplogPush(ctx context.Context, oplogFetcher oplog.Fetcher, uploader *
 	}
 	batchStartTs := lastKnownTS
 
-	var buf bytes.Buffer // TODO: switch to temp file
+	var buf bytes.Buffer // TODO: switch to streaming interface
 	archiveSize, err := internal.GetOplogArchiveAfterSize()
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -38,12 +39,12 @@ func HandleOplogPush(ctx context.Context, oplogFetcher oplog.Fetcher, uploader *
 	archiveTimer := time.NewTimer(archiveTimeout)
 	defer archiveTimer.Stop()
 
-	var wg sync.WaitGroup
-	tracelog.InfoLogger.Printf("Starting archiving from last known timestamp: %s", lastKnownTS)
-	ch, err := oplogFetcher.GetOplogFrom(ctx, lastKnownTS, &wg)
-	tracelog.ErrorLogger.FatalOnError(err)
+	wg := &sync.WaitGroup{}
 	defer wg.Wait()
 
+	tracelog.InfoLogger.Printf("Starting archiving from last known timestamp: %s", lastKnownTS)
+	ch, err := oplogFetcher.OplogFrom(ctx, lastKnownTS, wg)
+	tracelog.ErrorLogger.FatalOnError(err)
 	for {
 		select {
 		case op, ok := <-ch:
@@ -61,9 +62,8 @@ func HandleOplogPush(ctx context.Context, oplogFetcher oplog.Fetcher, uploader *
 				checkFirstTS = false
 			}
 
-			// TODO: refactor validate func to struct - we need to check the first one oplog op
 			err := validator.ValidateRecord(op)
-			// TODO: handle errors: mark backup broken and continue
+			// TODO: handle errors: mark backup broken
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			lastKnownTS = op.TS
@@ -82,7 +82,7 @@ func HandleOplogPush(ctx context.Context, oplogFetcher oplog.Fetcher, uploader *
 		}
 		utility.ResetTimer(archiveTimer, archiveTimeout)
 
-		err := uploader.uploadOplogStream(&buf, batchStartTs, lastKnownTS)
+		err := uploader.ArchiveUpload(&buf, batchStartTs, lastKnownTS)
 		tracelog.ErrorLogger.FatalOnError(err) // TODO: handle errors
 
 		buf.Reset()

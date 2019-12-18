@@ -122,8 +122,8 @@ func checkWALFileMagic(prefetched string) error {
 	return nil
 }
 
-func TryDownloadWALFile(folder storage.Folder, walPath string) (walFileReader io.ReadCloser, exists bool, err error) {
-	walFileReader, err = folder.ReadObject(walPath)
+func TryDownloadFile(folder storage.Folder, path string) (walFileReader io.ReadCloser, exists bool, err error) {
+	walFileReader, err = folder.ReadObject(path)
 	if err == nil {
 		exists = true
 		return
@@ -135,7 +135,7 @@ func TryDownloadWALFile(folder storage.Folder, walPath string) (walFileReader io
 }
 
 // TODO : unit tests
-func decompressWALFile(dst io.Writer, archiveReader io.ReadCloser, decompressor compression.Decompressor) error {
+func DecompressDecryptBytes(dst io.Writer, archiveReader io.ReadCloser, decompressor compression.Decompressor) error {
 	crypter := ConfigureCrypter()
 	if crypter != nil {
 		reader, err := crypter.Decrypt(archiveReader)
@@ -223,7 +223,7 @@ func putCachedDecompressorInFirstPlace(decompressors []compression.Decompressor)
 // TODO : unit tests
 func DownloadAndDecompressWALFile(folder storage.Folder, walFileName string) (io.ReadCloser, error) {
 	for _, decompressor := range putCachedDecompressorInFirstPlace(compression.Decompressors) {
-		archiveReader, exists, err := TryDownloadWALFile(folder, walFileName+"."+decompressor.FileExtension())
+		archiveReader, exists, err := TryDownloadFile(folder, walFileName+"."+decompressor.FileExtension())
 		if err != nil {
 			return nil, err
 		}
@@ -233,7 +233,7 @@ func DownloadAndDecompressWALFile(folder storage.Folder, walFileName string) (io
 		_ = SetLastDecompressor(decompressor)
 		reader, writer := io.Pipe()
 		go func() {
-			err = decompressWALFile(&EmptyWriteIgnorer{writer}, archiveReader, decompressor)
+			err = DecompressDecryptBytes(&EmptyWriteIgnorer{writer}, archiveReader, decompressor)
 			_ = writer.CloseWithError(err)
 		}()
 		return reader, nil
