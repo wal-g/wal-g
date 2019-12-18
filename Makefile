@@ -140,6 +140,7 @@ lint: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 deps:
 	git submodule update --init
 	dep ensure
+	dep ensure -update github.com/cyberdelia/lzo
 	sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' vendor/github.com/cyberdelia/lzo/lzo.go
 	./link_brotli.sh
 
