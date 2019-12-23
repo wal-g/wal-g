@@ -183,22 +183,22 @@ func setTablespacePaths(spec TablespaceSpec) error {
 		if _, err := os.Lstat(filepath.Join(basePrefix, location.Symlink)); err == nil {
 			symlinkTarget, err := os.Readlink(filepath.Join(basePrefix, location.Symlink))
 			if err != nil {
-				return fmt.Errorf("Error reading symkink %v\n", err)
+				return fmt.Errorf("Error reading symlink %v\n", err)
 			}
 			if symlinkTarget != location.Location {
 				errRemove := os.Remove(filepath.Join(basePrefix, location.Symlink))
 				if errRemove != nil {
-					return fmt.Errorf("Error removing tablespace symkink %v\n", errRemove)
+					return fmt.Errorf("Error removing tablespace symlink %v\n", errRemove)
 				}
 				errCreate := os.Symlink(location.Location, filepath.Join(basePrefix, location.Symlink))
 				if errCreate != nil {
-					return fmt.Errorf("Error creating tablespace symkink %v\n", errCreate)
+					return fmt.Errorf("Error creating tablespace symlink %v\n", errCreate)
 				}
 			}
 		} else {
 			err = os.Symlink(location.Location, filepath.Join(basePrefix, location.Symlink))
 			if err != nil {
-				return fmt.Errorf("Error creating tablespace symkink %v\n", err)
+				return fmt.Errorf("Error creating tablespace symlink %v\n", err)
 			}
 		}
 	}
