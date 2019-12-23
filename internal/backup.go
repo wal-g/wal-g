@@ -187,14 +187,7 @@ func setTablespacePaths(spec TablespaceSpec) error {
 				return fmt.Errorf("Error reading symlink %v\n", err)
 			}
 			if symlinkTarget != location.Location {
-				errRemove := os.Remove(symlinkName)
-				if errRemove != nil {
-					return fmt.Errorf("Error removing tablespace symlink %v\n", errRemove)
-				}
-				errCreate := os.Symlink(location.Location, symlinkName)
-				if errCreate != nil {
-					return fmt.Errorf("Error creating tablespace symlink %v\n", errCreate)
-				}
+				return fmt.Errorf("Error: Symlink %v points to target %v, instead of %v", symlinkName, symlinkTarget, location.Location)
 			}
 		} else {
 			err = os.Symlink(location.Location, symlinkName)
