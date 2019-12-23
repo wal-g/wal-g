@@ -176,27 +176,28 @@ func setTablespacePaths(spec TablespaceSpec) error {
 		return fmt.Errorf("Error creating pg_tblspc folder %v\n", err)
 	}
 	for _, location := range spec.tablespaceLocations() {
+		symlinkName := filepath.Join(basePrefix, location.Symlink)
 		err := fs.NewFolder(location.Location, "").EnsureExists()
 		if err != nil {
 			return fmt.Errorf("Error creating folder for tablespace %v\n", err)
 		}
-		if _, err := os.Lstat(filepath.Join(basePrefix, location.Symlink)); err == nil {
-			symlinkTarget, err := os.Readlink(filepath.Join(basePrefix, location.Symlink))
+		if _, err := os.Lstat(symlinkName); err == nil {
+			symlinkTarget, err := os.Readlink(symlinkName)
 			if err != nil {
 				return fmt.Errorf("Error reading symlink %v\n", err)
 			}
 			if symlinkTarget != location.Location {
-				errRemove := os.Remove(filepath.Join(basePrefix, location.Symlink))
+				errRemove := os.Remove(symlinkName)
 				if errRemove != nil {
 					return fmt.Errorf("Error removing tablespace symlink %v\n", errRemove)
 				}
-				errCreate := os.Symlink(location.Location, filepath.Join(basePrefix, location.Symlink))
+				errCreate := os.Symlink(location.Location, symlinkName)
 				if errCreate != nil {
 					return fmt.Errorf("Error creating tablespace symlink %v\n", errCreate)
 				}
 			}
 		} else {
-			err = os.Symlink(location.Location, filepath.Join(basePrefix, location.Symlink))
+			err = os.Symlink(location.Location, symlinkName)
 			if err != nil {
 				return fmt.Errorf("Error creating tablespace symlink %v\n", err)
 			}
