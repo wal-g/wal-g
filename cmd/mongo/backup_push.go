@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 
 	"github.com/spf13/cobra"
+	"github.com/wal-g/wal-g/internal/databases/mongo/storage"
 )
 
 const BackupPushShortDescription = "Pushes backup to storage"
@@ -18,7 +19,7 @@ var backupPushCmd = &cobra.Command{
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 		command := internal.GetStreamCreateCmd()
-		mongo.HandleStreamPush(&mongo.Uploader{Uploader: uploader}, command)
+		mongo.HandleStreamPush(&storage.Uploader{Uploader: uploader}, command)
 	},
 }
 
