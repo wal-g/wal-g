@@ -3,7 +3,6 @@ package mongo
 import (
 	"context"
 	"os"
-	"os/signal"
 	"syscall"
 
 	"github.com/spf13/cobra"
@@ -11,6 +10,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const oplogPushShortDescription = ""
@@ -22,20 +22,8 @@ var oplogPushCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
-		ch := make(chan os.Signal, 1)
-		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
-		defer func() {
-			signal.Stop(ch)
-			cancel()
-		}()
-		go func() {
-			select {
-			case s := <-ch:
-				tracelog.InfoLogger.Printf("Received %s signal. Shutting down", s.String())
-				cancel()
-			case <-ctx.Done():
-			}
-		}()
+		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
+		defer func() {_ = signalHandler.Close()}()
 
 		mongodbUrl, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
 		tracelog.ErrorLogger.FatalOnError(err)

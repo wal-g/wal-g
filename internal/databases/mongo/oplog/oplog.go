@@ -19,10 +19,12 @@ type Timestamp struct {
 	Inc uint32
 }
 
+// String returns text representation of Timestamp struct
 func (ots Timestamp) String() string {
 	return fmt.Sprintf("%d%s%d", ots.TS, TimestampDelimiter, ots.Inc)
 }
 
+// TimestampFromStr builds Timestamp from string
 // TODO: unit tests
 func TimestampFromStr(s string) (Timestamp, error) {
 	strs := strings.Split(s, TimestampDelimiter)
@@ -42,25 +44,32 @@ func TimestampFromStr(s string) (Timestamp, error) {
 	return Timestamp{TS: uint32(ts), Inc: uint32(inc)}, nil
 }
 
-// Returns max of two timestamps.
+// Max returns maximum of two timestamps.
 // TODO: unit tests
 func Max(ots1, ots2 Timestamp) Timestamp {
-	if ots1.TS > ots2.TS {
-		return ots1
-	}
-	if ots1.TS < ots2.TS {
+	if Less(ots1, ots2) {
 		return ots2
 	}
-	if ots1.Inc > ots2.Inc {
-		return ots1
-	}
-	return ots2
+	return ots1
 }
 
+// Less returns if first timestamp less than second
+func Less(ots1, ots2 Timestamp) bool {
+	if ots1.TS < ots2.TS {
+		return true
+	}
+	if ots1.TS > ots2.TS {
+		return false
+	}
+	return ots1.Inc < ots2.Inc
+}
+
+// TimestampFromBson builds Timestamp from BSON primitive
 func TimestampFromBson(bts primitive.Timestamp) Timestamp {
 	return Timestamp{TS: bts.T, Inc: bts.I}
 }
 
+// BsonTimestampFromOplogTS builds BSON primitive from Timestamp
 func BsonTimestampFromOplogTS(ots Timestamp) primitive.Timestamp {
 	return primitive.Timestamp{T: ots.TS, I: ots.Inc}
 }
