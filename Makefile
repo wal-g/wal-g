@@ -48,7 +48,7 @@ all_unittests: install deps lint unittest
 pg_int_tests_only:
 	docker-compose build pg_tests
 	docker-compose up --exit-code-from pg_tests pg_tests
-	
+
 pg_clean:
 	(cd $(MAIN_PG_PATH) && go clean)
 	./cleanup.sh
@@ -139,12 +139,11 @@ lint: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 
 deps:
 	git submodule update --init
-	dep ensure
+	go mod download
 	sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' vendor/github.com/cyberdelia/lzo/lzo.go
 	./link_brotli.sh
 
 install:
-	go get -u github.com/golang/dep/cmd/dep
 	go get -u golang.org/x/lint/golint
 	go get -u github.com/DATA-DOG/godog/cmd/godog
 
