@@ -41,6 +41,7 @@ func ApplyCommand(command []string, stdin io.Reader) error {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		tracelog.ErrorLogger.Printf("cmd.Run() failed with %s\n", err)
+		tracelog.InfoLogger.Printf("combined out:\n%s\n", string(out))
 		return err
 	}
 	tracelog.InfoLogger.Printf("combined out:\n%s\n", string(out))

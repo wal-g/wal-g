@@ -27,9 +27,7 @@ type TestBinlogHandlers struct {
 
 func (t TestBinlogHandlers) FetchLog(storage.Folder, string) (needAbortFetch bool, err error) {
 	tm, _ := parseFirstTimestampFromHeader(t.readSeekCloser)
-
 	return isBinlogCreatedAfterEndTs(time.Unix(int64(tm), 0), t.endTS), nil
-
 }
 
 func (t TestBinlogHandlers) HandleAbortFetch(logFilePath string) error {
@@ -108,16 +106,16 @@ func TestFetchBinlogs(t *testing.T) {
 
 func fillTestStorage() (*memory.Storage, time.Time) {
 	storage_ := memory.NewStorage()
-	storage_.Store(filepath.Join(BinlogPath, "mysql-bin-log.000017.lz4"), *bytes.NewBuffer([]byte{0x01, 0x00, 0x00, 0x00}))
-	storage_.Store(filepath.Join(BinlogPath, "mysql-bin-log.000018.lz4"), *bytes.NewBuffer([]byte{0x02, 0x00, 0x00, 0x00}))
+	storage_.Store(filepath.Join(BinlogPath, "mysql-bin-log.000017.lz4"), *bytes.NewBuffer([]byte{0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00}))
+	storage_.Store(filepath.Join(BinlogPath, "mysql-bin-log.000018.lz4"), *bytes.NewBuffer([]byte{0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00}))
 	cutPoint := utility.TimeNowCrossPlatformUTC()
 	time.Sleep(time.Millisecond * 20)
 	// this binlog will be uploaded to storage too late (in terms of GetLastModified() func)
-	storage_.Store(filepath.Join(BinlogPath, "mysql-bin-log.000019.lz4"), *bytes.NewBuffer([]byte{0x03, 0x00, 0x00, 0x00}))
+	storage_.Store(filepath.Join(BinlogPath, "mysql-bin-log.000019.lz4"), *bytes.NewBuffer([]byte{0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00}))
 	time.Sleep(time.Millisecond * 20)
 
 	// we will parse 2 ** 31 - 1 from header - binlog will be too old
-	storage_.Store(filepath.Join(BinlogPath, "mysql-bin-log.000020.lz4"), *bytes.NewBuffer([]byte{0xFF, 0xFF, 0xFF, 0x7F}))
+	storage_.Store(filepath.Join(BinlogPath, "mysql-bin-log.000020.lz4"), *bytes.NewBuffer([]byte{0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0x7F}))
 
 	return storage_, cutPoint
 }

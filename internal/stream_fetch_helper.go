@@ -74,7 +74,7 @@ func downloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) err
 
 // TODO : unit tests
 // GetLogsCoveringInterval lists the operation logs that cover the interval
-func GetLogsCoveringInterval(folder storage.Folder, start time.Time, end *time.Time) ([]storage.Object, error) {
+func GetLogsCoveringInterval(folder storage.Folder, start time.Time) ([]storage.Object, error) {
 	logFiles, _, err := folder.ListFolder()
 	if err != nil {
 		return nil, err
@@ -86,7 +86,7 @@ func GetLogsCoveringInterval(folder storage.Folder, start time.Time, end *time.T
 	var logsToFetch []storage.Object
 	for _, logFile := range logFiles {
 		tracelog.InfoLogger.Println("Consider log file: ", logFile.GetName(), logFile.GetLastModified().Format(time.RFC3339))
-		if logFileShouldBeFetched(start, end, logFile) {
+		if logFileShouldBeFetched(start, logFile) {
 			logsToFetch = append(logsToFetch, logFile)
 		}
 	}
@@ -118,8 +118,8 @@ func FetchLogFiles(logFiles []storage.Object, logFolder storage.Folder, handlers
 func FetchLogs(folder storage.Folder, settings LogFetchSettings, handlers LogFetchHandlers) ([]storage.Object, error) {
 	logFolderPath := settings.GetLogFolderPath()
 	logFolder := folder.GetSubFolder(logFolderPath)
-	startTS, endTS := settings.GetLogsFetchInterval()
-	logsToFetch, err := GetLogsCoveringInterval(logFolder, startTS, endTS)
+	startTS, _ := settings.GetLogsFetchInterval()
+	logsToFetch, err := GetLogsCoveringInterval(logFolder, startTS)
 	if err != nil {
 		return nil, err
 	}
@@ -135,9 +135,8 @@ func FetchLogs(folder storage.Folder, settings LogFetchSettings, handlers LogFet
 }
 
 // TODO : unit tests
-func logFileShouldBeFetched(backupStartUploadTime time.Time, endTS *time.Time, object storage.Object) bool {
-	return (backupStartUploadTime.Before(object.GetLastModified()) || backupStartUploadTime.Equal(object.GetLastModified())) &&
-		(endTS == nil || (*endTS).After(object.GetLastModified()))
+func logFileShouldBeFetched(backupStartUploadTime time.Time, object storage.Object) bool {
+	return backupStartUploadTime.Before(object.GetLastModified()) || backupStartUploadTime.Equal(object.GetLastModified())
 }
 
 // TODO : unit tests
