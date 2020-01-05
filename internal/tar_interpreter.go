@@ -2,12 +2,13 @@ package internal
 
 import (
 	"archive/tar"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -109,7 +110,7 @@ func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileIn
 
 // PrepareDirs makes sure all dirs exist
 func PrepareDirs(fileName string, targetPath string) error {
-	if (fileName == targetPath) {
+	if fileName == targetPath {
 		return nil // because it runs in the local directory
 	}
 	base := filepath.Base(fileName)

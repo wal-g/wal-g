@@ -2,10 +2,6 @@ package internal
 
 import (
 	"archive/tar"
-	"github.com/pkg/errors"
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/ioutil"
 	"os"
@@ -15,6 +11,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 // TODO : unit tests

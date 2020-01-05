@@ -13,12 +13,13 @@ package internal
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path"
 	"regexp"
 	"strings"
+
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"

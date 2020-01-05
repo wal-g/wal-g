@@ -1,12 +1,13 @@
 package internal_test
 
 import (
+	"strings"
+	"testing"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
-	"strings"
-	"testing"
 )
 
 func TestConfigure(t *testing.T) {

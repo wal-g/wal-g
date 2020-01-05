@@ -6,13 +6,15 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"testing"
+
 	"github.com/cyberdelia/lzo"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/testtools"
-	"io"
-	"io/ioutil"
-	"testing"
+	"github.com/wal-g/wal-g/utility"
 )
 
 // Test extraction of various lzo compressed tar files.

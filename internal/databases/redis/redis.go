@@ -1,10 +1,11 @@
 package redis
 
 import (
+	"strconv"
+
 	"github.com/go-redis/redis"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"strconv"
 )
 
 type Uploader struct {

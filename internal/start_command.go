@@ -1,10 +1,11 @@
 package internal
 
 import (
-	"github.com/wal-g/tracelog"
 	"io"
 	"io/ioutil"
 	"os/exec"
+
+	"github.com/wal-g/tracelog"
 )
 
 func StartCommand(command []string) (waitFunc func(), stdout io.ReadCloser) {

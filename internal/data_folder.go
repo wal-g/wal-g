@@ -2,9 +2,10 @@ package internal
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-	"io"
 )
 
 type NoSuchFileError struct {

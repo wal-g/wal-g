@@ -3,10 +3,11 @@ package walparser
 import (
 	"bytes"
 	"fmt"
+	"io"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
-	"io"
 )
 
 type ZeroPageHeaderError struct {

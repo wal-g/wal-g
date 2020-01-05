@@ -2,11 +2,12 @@ package internal_test
 
 import (
 	"errors"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/testtools"
-	"testing"
-	"time"
 )
 
 type someError struct {

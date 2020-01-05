@@ -1,12 +1,13 @@
 package internal
 
 import (
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"plugin"
+
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 )
 
 var Extensions []Extension

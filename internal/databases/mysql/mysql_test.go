@@ -1,12 +1,13 @@
 package mysql
 
 import (
+	"os"
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
-	"os"
-	"testing"
 )
 
 func TestGetBinlogConfig(t *testing.T) {

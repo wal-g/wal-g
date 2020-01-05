@@ -3,8 +3,9 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/wal-g/wal-g/utility"
 	"path/filepath"
+
+	"github.com/wal-g/wal-g/utility"
 )
 
 const (

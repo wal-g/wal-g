@@ -1,10 +1,11 @@
 package compression
 
 import (
+	"io"
+
 	"github.com/wal-g/wal-g/internal/compression/lz4"
 	"github.com/wal-g/wal-g/internal/compression/lzma"
 	"github.com/wal-g/wal-g/internal/compression/zstd"
-	"io"
 )
 
 var CompressingAlgorithms = []string{lz4.AlgorithmName, lzma.AlgorithmName}

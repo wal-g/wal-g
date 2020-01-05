@@ -3,12 +3,15 @@ package internal
 import (
 	"archive/tar"
 	"fmt"
-	"github.com/spf13/viper"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/spf13/viper"
+
+	"io/ioutil"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/jackc/pgx"
@@ -18,7 +21,6 @@ import (
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
-	"io/ioutil"
 )
 
 const (

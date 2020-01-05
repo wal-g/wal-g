@@ -3,10 +3,11 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"sort"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"

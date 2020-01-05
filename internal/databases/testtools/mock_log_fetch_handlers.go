@@ -5,10 +5,11 @@
 package mock_internal
 
 import (
-	gomock "github.com/golang/mock/gomock"
-	storage "github.com/wal-g/storages/storage"
 	reflect "reflect"
 	time "time"
+
+	gomock "github.com/golang/mock/gomock"
+	storage "github.com/wal-g/storages/storage"
 )
 
 // MockLogFetchSettings is a mock of LogFetchSettings interface

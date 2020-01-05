@@ -1,9 +1,10 @@
 package internal
 
 import (
+	"io"
+
 	"github.com/wal-g/wal-g/internal/limited"
 	"golang.org/x/time/rate"
-	"io"
 )
 
 var DiskLimiter *rate.Limiter

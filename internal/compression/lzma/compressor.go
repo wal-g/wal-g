@@ -1,8 +1,9 @@
 package lzma
 
 import (
-	"github.com/ulikunitz/xz/lzma"
 	"io"
+
+	"github.com/ulikunitz/xz/lzma"
 )
 
 const (

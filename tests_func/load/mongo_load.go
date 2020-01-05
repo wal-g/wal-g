@@ -4,14 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/olekukonko/tablewriter"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"io"
 	"strconv"
 	"sync"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -254,10 +253,10 @@ func makeFuncTransaction(client *mongo.Client, op *MongoRunTransactionOp) func(c
 		})
 
 		doc = bson.D{
-			primitive.E{Key:"delete", Value:"sleep_temp"},
-			primitive.E{Key:"deletes", Value: bson.A{bson.D{
-				primitive.E{Key:"q", Value: bson.D{primitive.E{Key:"aa", Value: "b"}}},
-				primitive.E{Key:"limit", Value: 1}}}}}
+			primitive.E{Key: "delete", Value: "sleep_temp"},
+			primitive.E{Key: "deletes", Value: bson.A{bson.D{
+				primitive.E{Key: "q", Value: bson.D{primitive.E{Key: "aa", Value: "b"}}},
+				primitive.E{Key: "limit", Value: 1}}}}}
 		_ = db.RunCommand(ctx, doc).Decode(&tempres)
 
 		info := NewMongoOpInfo("transaction", op.Id, tm, time.Now(), err)
@@ -295,9 +294,9 @@ func makeFuncSleep(client *mongo.Client, op *MongoRunSleepOp) func(ctx context.C
 				var result bson.M
 				tm := time.Now()
 				doc := bson.D{
-					primitive.E{Key:"find", Value: "sleep_temp"},
-					primitive.E{Key:"filter", Value: bson.D{
-						primitive.E{Key:"$where", Value:fmt.Sprintf("sleep(%f)", op.Dur)}}},
+					primitive.E{Key: "find", Value: "sleep_temp"},
+					primitive.E{Key: "filter", Value: bson.D{
+						primitive.E{Key: "$where", Value: fmt.Sprintf("sleep(%f)", op.Dur)}}},
 				}
 				err := db.RunCommand(ctx, doc).Decode(&result)
 				info := NewMongoOpInfo(doc[0].Key, op.Id, tm, time.Now(), err)

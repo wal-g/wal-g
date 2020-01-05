@@ -2,8 +2,9 @@ package walparser
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestShrinkableReader_NotEnoughDataToShrinkError(t *testing.T) {

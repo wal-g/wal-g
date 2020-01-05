@@ -1,11 +1,12 @@
 package internal_test
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/testtools"
-	"testing"
 )
 
 func TestExtractBlockLocations(t *testing.T) {

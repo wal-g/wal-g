@@ -2,8 +2,9 @@ package internal
 
 import (
 	"encoding/binary"
-	"github.com/wal-g/wal-g/internal/walparser"
 	"io"
+
+	"github.com/wal-g/wal-g/internal/walparser"
 )
 
 type BlockLocationWriter struct {

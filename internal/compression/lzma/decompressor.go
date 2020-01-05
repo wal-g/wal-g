@@ -1,11 +1,12 @@
 package lzma
 
 import (
+	"io"
+
 	"github.com/pkg/errors"
 	"github.com/ulikunitz/xz/lzma"
 	"github.com/wal-g/wal-g/internal/compression/computils"
 	"github.com/wal-g/wal-g/utility"
-	"io"
 )
 
 type Decompressor struct{}

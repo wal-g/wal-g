@@ -1,10 +1,11 @@
 package lz4
 
 import (
+	"io"
+
 	"github.com/pierrec/lz4"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/utility"
-	"io"
 )
 
 type Decompressor struct{}
