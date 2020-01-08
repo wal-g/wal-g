@@ -181,7 +181,10 @@ func setTablespacePaths(spec TablespaceSpec) error {
 		if err != nil {
 			return fmt.Errorf("Error creating folder for tablespace %v\n", err)
 		}
-		if _, err := os.Lstat(symlinkName); err == nil {
+		if FileInfo, err := os.Lstat(symlinkName); err == nil {
+			if FileInfo.Mode()&os.ModeSymlink != os.ModeSymlink {
+				return fmt.Errorf("Error, %v exists, but is not a symlink\n", symlinkName)
+			}
 			symlinkTarget, err := os.Readlink(symlinkName)
 			if err != nil {
 				return fmt.Errorf("Error reading symlink %v\n", err)
