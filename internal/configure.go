@@ -10,7 +10,6 @@ import (
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/awskms"
-	"github.com/wal-g/wal-g/internal/crypto/libsodium"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"golang.org/x/time/rate"
 	"os"
@@ -260,12 +259,8 @@ func ConfigureCrypter() crypto.Crypter {
 		return awskms.CrypterFromKeyID(viper.GetString(CseKmsIDSetting), viper.GetString(CseKmsRegionSetting))
 	}
 
-	if viper.IsSet(LibsodiumKeySetting) {
-		return libsodium.CrypterFromKey(viper.GetString(LibsodiumKeySetting))
-	}
-
-	if viper.IsSet(LibsodiumKeyPathSetting) {
-		return libsodium.CrypterFromKeyPath(viper.GetString(LibsodiumKeyPathSetting))
+	if crypter := configureLibsodiumCrypter(); crypter != nil {
+		return crypter
 	}
 
 	return nil

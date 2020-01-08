@@ -8,6 +8,8 @@ Development
 
 To compile and build the binary for Postgres:
 
+(To build with libsodium, just set `USE_LIBSODIUM` environment variable)
+
 ```
 go get github.com/wal-g/wal-g
 cd $GOPATH/src/github.com/wal-g/wal-g

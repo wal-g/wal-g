@@ -33,6 +33,8 @@ jobs:
             - ${CACHE_FILE_UBUNTU}
             - ${CACHE_FILE_GOLANG}
     - stage: test
+      env:
+      - USE_LIBSODIUM=1
       script: make all_unittests
     - script: make TEST="pg_backup_mark_impermanent_test" pg_integration_test
       workspaces:

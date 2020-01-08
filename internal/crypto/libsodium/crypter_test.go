@@ -1,3 +1,5 @@
+// +build libsodium
+
 package libsodium
 
 import (
