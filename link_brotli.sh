@@ -1,8 +1,8 @@
 #!/bin/sh
 
-test -d tmp  || mkdir tmp
+test -d tmp/brotli || mkdir -p tmp/brotli
 
-cp -rf vendor/github.com/google/brotli/* tmp/
+cp -rf vendor/github.com/google/brotli/* tmp/brotli/
 cp -rf submodules/brotli/* vendor/github.com/google/brotli/
 
 readonly CWD=$PWD

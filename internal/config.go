@@ -25,6 +25,8 @@ const (
 	TarSizeThresholdSetting      = "WALG_TAR_SIZE_THRESHOLD"
 	CseKmsIDSetting              = "WALG_CSE_KMS_ID"
 	CseKmsRegionSetting          = "WALG_CSE_KMS_REGION"
+	LibsodiumKeySetting          = "WALG_LIBSODIUM_KEY"
+	LibsodiumKeyPathSetting      = "WALG_LIBSODIUM_KEY_PATH"
 	GpgKeyIDSetting              = "GPG_KEY_ID"
 	PgpKeySetting                = "WALG_PGP_KEY"
 	PgpKeyPathSetting            = "WALG_PGP_KEY_PATH"

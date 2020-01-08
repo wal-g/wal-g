@@ -119,6 +119,7 @@ unittest:
 	go test -v $(TEST_MODIFIER) ./internal/compression/
 	go test -v $(TEST_MODIFIER) ./internal/crypto/openpgp/
 	go test -v $(TEST_MODIFIER) ./internal/crypto/awskms/
+	go test -v $(TEST_MODIFIER) ./internal/crypto/libsodium/
 	go test -v $(TEST_MODIFIER) ./internal/databases/mysql
 	go test -v $(TEST_MODIFIER) ./internal/walparser/
 	go test -v $(TEST_MODIFIER) ./utility
@@ -139,6 +140,7 @@ deps:
 	dep ensure -update github.com/cyberdelia/lzo
 	sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' vendor/github.com/cyberdelia/lzo/lzo.go
 	./link_brotli.sh
+	./link_libsodium.sh
 
 install:
 	go get -u github.com/golang/dep/cmd/dep
@@ -146,5 +148,8 @@ install:
 
 unlink_brotli:
 	rm -rf vendor/github.com/google/brotli/*
-	mv tmp/* vendor/github.com/google/brotli/
-	rm -rf tmp/
+	mv tmp/brotli/* vendor/github.com/google/brotli/
+	rm -rf tmp/brotli
+
+unlink_libsodium:
+	rm -rf tmp/libsodium
