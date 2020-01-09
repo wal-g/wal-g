@@ -259,6 +259,10 @@ func ConfigureCrypter() crypto.Crypter {
 		return awskms.CrypterFromKeyID(viper.GetString(CseKmsIDSetting), viper.GetString(CseKmsRegionSetting))
 	}
 
+	if crypter := configureLibsodiumCrypter(); crypter != nil {
+		return crypter
+	}
+
 	return nil
 }
 
