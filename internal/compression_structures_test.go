@@ -155,3 +155,19 @@ func TestCompressAndEncryptError(t *testing.T) {
 		t.Errorf("compress: CompressingPipeWriter expected CompressAndEncryptError but got %v", re)
 	}
 }
+
+func TestCompressAndEncryptWithNoCompression(t *testing.T) {
+	for _, tt := range tests {
+		in := &testtools.BufCloser{Buffer: bytes.NewBufferString(tt.testString), Err: false}
+		compressed := internal.CompressAndEncrypt(in, nil, nil)
+
+		decompressed := &testtools.BufCloser{Buffer: &bytes.Buffer{}, Err: false}
+		_, err := decompressed.ReadFrom(compressed)
+		if err != nil {
+			t.Logf("%+v\n", err)
+		}
+
+		assert.Equalf(t, tt.testString, decompressed.String(), "compress: CascadeWriteCloser expected '%s' to be written but got '%s'", tt.testString, decompressed)
+	}
+
+}
