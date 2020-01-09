@@ -1,0 +1,3 @@
+FROM wal-g/docker_prefix:latest
+
+CMD su postgres -c "/tmp/tests/catchup_perftest.sh"

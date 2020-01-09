@@ -158,7 +158,7 @@ func createIndexFile(logsFolder string, fetchedBinlogs []storage.Object) error {
 }
 
 func HandleBinlogFetch(folder storage.Folder, backupName string, untilDT string, needApply bool) error {
-	backup, err := internal.GetBackupByName(backupName, folder)
+	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalfOnError("Unable to get backup %+v\n", err)
 	backupUploadTime, err := getBackupUploadTime(folder, backup)
 	if err != nil {

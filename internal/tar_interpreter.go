@@ -25,10 +25,14 @@ type FileTarInterpreter struct {
 	DBDataDirectory string
 	Sentinel        BackupSentinelDto
 	FilesToUnwrap   map[string]bool
+
+	createNewIncrementalFiles bool
 }
 
-func NewFileTarInterpreter(dbDataDirectory string, sentinel BackupSentinelDto, filesToUnwrap map[string]bool) *FileTarInterpreter {
-	return &FileTarInterpreter{dbDataDirectory, sentinel, filesToUnwrap}
+func NewFileTarInterpreter(
+	dbDataDirectory string, sentinel BackupSentinelDto, filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
+) *FileTarInterpreter {
+	return &FileTarInterpreter{dbDataDirectory, sentinel, filesToUnwrap, createNewIncrementalFiles}
 }
 
 // TODO : unit tests
@@ -44,7 +48,7 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFile(fileReader io.Reader
 
 	// If this file is incremental we use it's base version from incremental path
 	if haveFileDescription && tarInterpreter.Sentinel.IsIncremental() && fileDescription.IsIncremented {
-		err := ApplyFileIncrement(targetPath, fileReader)
+		err := ApplyFileIncrement(targetPath, fileReader, tarInterpreter.createNewIncrementalFiles)
 		return errors.Wrapf(err, "Interpret: failed to apply increment for '%s'", targetPath)
 	}
 	err := PrepareDirs(fileInfo.Name, targetPath)

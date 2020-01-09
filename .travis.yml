@@ -120,6 +120,9 @@ jobs:
     - script: make TEST="pg_backup_perftest" pg_integration_test
       workspaces:
         use: image_cache
+    - script: make TEST="pg_catchup_perftest" pg_integration_test
+      workspaces:
+        use: image_cache
 
 
 notifications:

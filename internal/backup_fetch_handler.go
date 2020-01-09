@@ -91,14 +91,14 @@ func GetStreamFetcher(writeCloser io.WriteCloser) func(folder storage.Folder, ba
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
 func HandleBackupFetch(folder storage.Folder, backupName string, fetcher func(folder storage.Folder, backup Backup)) {
 	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder,)\n", backupName)
-	backup, err := GetBackupByName(backupName, folder)
+	backup, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 
 	fetcher(folder, *backup)
 }
 
-func GetBackupByName(backupName string, folder storage.Folder) (*Backup, error) {
-	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
+func GetBackupByName(backupName, subfolder string, folder storage.Folder) (*Backup, error) {
+	baseBackupFolder := folder.GetSubFolder(subfolder)
 
 	var backup *Backup
 	if backupName == LatestString {
@@ -140,7 +140,7 @@ func chooseTablespaceSpecification(sentinelDto BackupSentinelDto, spec *Tablespa
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
 func deltaFetchRecursion(backupName string, folder storage.Folder, dbDataDirectory string,
 	tablespaceSpec *TablespaceSpec, filesToUnwrap map[string]bool) error {
-	backup, err := GetBackupByName(backupName, folder)
+	backup, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	if err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func deltaFetchRecursion(backupName string, folder storage.Folder, dbDataDirecto
 		tracelog.InfoLogger.Printf("%v fetched. Upgrading from LSN %x to LSN %x \n", *(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN), *(sentinelDto.BackupStartLSN))
 	}
 
-	return backup.unwrap(dbDataDirectory, sentinelDto, filesToUnwrap)
+	return backup.unwrapToEmptyDirectory(dbDataDirectory, sentinelDto, filesToUnwrap, false)
 }
 
 func GetBaseFilesToUnwrap(backupFileStates BackupFileList, currentFilesToUnwrap map[string]bool) (map[string]bool, error) {

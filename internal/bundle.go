@@ -83,12 +83,17 @@ type Bundle struct {
 	maxUploadQueue   int
 	mutex            sync.Mutex
 	started          bool
+	forceIncremental bool
 
 	Files *sync.Map
 }
 
 // TODO: use DiskDataFolder
-func newBundle(archiveDirectory string, crypter crypto.Crypter, incrementFromLsn *uint64, incrementFromFiles BackupFileList) *Bundle {
+func newBundle(
+	archiveDirectory string, crypter crypto.Crypter,
+	incrementFromLsn *uint64, incrementFromFiles BackupFileList,
+	forceIncremental bool,
+) *Bundle {
 	return &Bundle{
 		ArchiveDirectory:   archiveDirectory,
 		TarSizeThreshold:   viper.GetInt64(TarSizeThresholdSetting),
@@ -97,6 +102,7 @@ func newBundle(archiveDirectory string, crypter crypto.Crypter, incrementFromLsn
 		IncrementFromFiles: incrementFromFiles,
 		Files:              &sync.Map{},
 		TablespaceSpec:     NewTablespaceSpec(archiveDirectory),
+		forceIncremental:   forceIncremental,
 	}
 }
 
@@ -360,7 +366,7 @@ func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 		// For details see
 		// https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
 
-		if wasInBase && (time.Equal(baseFile.MTime)) {
+		if (wasInBase || bundle.forceIncremental) && (time.Equal(baseFile.MTime)) {
 			// File was not changed since previous backup
 			tracelog.DebugLogger.Println("Skipped due to unchanged modification time")
 			bundle.getFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time})
@@ -526,7 +532,7 @@ func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uin
 // TODO : unit tests
 func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHeader *tar.Header, wasInBase bool, tarBall TarBall) error {
 	incrementBaseLsn := bundle.getIncrementBaseLsn()
-	isIncremented := incrementBaseLsn != nil && wasInBase && isPagedFile(info, path)
+	isIncremented := incrementBaseLsn != nil && (wasInBase || bundle.forceIncremental) && isPagedFile(info, path)
 	var fileReader io.ReadCloser
 	if isIncremented {
 		bitmap, err := bundle.getDeltaBitmapFor(path)

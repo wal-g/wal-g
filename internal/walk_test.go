@@ -175,7 +175,7 @@ func extract(t *testing.T, dir string) string {
 		"/global/pg_control": true,
 		"/pg_notify/0000":    true,
 		"/tablespace_map":    true,
-	})
+	}, false)
 	err = os.MkdirAll(outDir, 0766)
 	if err != nil {
 		t.Log(err)
