@@ -82,10 +82,9 @@ func extractOne(tarInterpreter TarInterpreter, source io.Reader) error {
 	return nil
 }
 
-// TODO : unit tests
 // Ensures that file extension is valid. Any subsequent behavior
 // depends on file type.
-func decryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter crypto.Crypter) error {
+func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter crypto.Crypter) error {
 	readCloser, err := readerMaker.Reader()
 
 	if err != nil {
@@ -173,7 +172,7 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 		extractingReader, pipeWriter := io.Pipe()
 		decompressingWriter := &EmptyWriteIgnorer{pipeWriter}
 		go func() {
-			err := decryptAndDecompressTar(decompressingWriter, fileClosure, crypter)
+			err := DecryptAndDecompressTar(decompressingWriter, fileClosure, crypter)
 			utility.LoggedClose(decompressingWriter, "")
 			tracelog.InfoLogger.Printf("Finished decompression of %s", fileClosure.Path())
 			if err != nil {
