@@ -40,8 +40,13 @@ func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, cry
 		}
 	}
 
-	writeIgnorer := &EmptyWriteIgnorer{writeCloser}
-	compressedWriter := compressor.NewWriter(writeIgnorer)
+	var compressedWriter io.WriteCloser
+	if compressor != nil {
+		writeIgnorer := &EmptyWriteIgnorer{writeCloser}
+		compressedWriter = compressor.NewWriter(writeIgnorer)
+	} else {
+		compressedWriter = writeCloser
+	}
 
 	go func() {
 		_, err := utility.FastCopy(compressedWriter, source)
