@@ -17,7 +17,7 @@ import (
 
 // FromFetcher defines interface to fetch oplog records starting given timestamp.
 type FromFetcher interface {
-	OplogFrom(context.Context, Timestamp, *sync.WaitGroup) (chan Record, error)
+	OplogFrom(context.Context, Timestamp, *sync.WaitGroup) (chan Record, chan error, error)
 }
 
 // BetweenFetcher defines interface to fetch oplog records between given timestamps.
@@ -41,22 +41,24 @@ func NewDBFetcher(uri string) *DBFetcher {
 // TODO: handle disconnects && stepdown
 // TODO: use sessions
 // TODO: use context.WithTimeout
-func (dbf *DBFetcher) OplogFrom(ctx context.Context, fromTS Timestamp, wg *sync.WaitGroup) (chan Record, error) {
+func (dbf *DBFetcher) OplogFrom(ctx context.Context, fromTS Timestamp, wg *sync.WaitGroup) (oplogc chan Record, errc chan error, err error) {
 	mc, err := internal.NewMongoClient(ctx, dbf.uri)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	coll, err := mc.GetOplogCollection(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	ch := make(chan Record)
+	oplogc = make(chan Record)
+	errc = make(chan error)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		defer close(ch)
+		defer close(errc)
+		defer close(oplogc)
 		defer mc.Close(ctx)
 
 		bsonTS := BsonTimestampFromOplogTS(fromTS)
@@ -67,7 +69,7 @@ func (dbf *DBFetcher) OplogFrom(ctx context.Context, fromTS Timestamp, wg *sync.
 			err = fmt.Errorf("dead cursor from oplog find")
 		}
 		if err != nil {
-			ch <- Record{Err: fmt.Errorf("oplog lookup failed: %w", err)}
+			errc <- fmt.Errorf("oplog lookup failed: %w", err)
 			return
 		}
 
@@ -76,16 +78,19 @@ func (dbf *DBFetcher) OplogFrom(ctx context.Context, fromTS Timestamp, wg *sync.
 			// TODO: benchmark decode vs. bson.Reader vs. bson.Raw.LookupErr
 			opMeta := Meta{}
 			if err := cur.Decode(&opMeta); err != nil {
-				ch <- Record{Err: fmt.Errorf("oplog record decoding failed: %w", err)}
+				errc <- fmt.Errorf("oplog record decoding failed: %w", err)
 				return
 			}
-			select {
-			case ch <- Record{
+			op := Record{
 				TS:   TimestampFromBson(opMeta.TS),
 				OP:   opMeta.Op,
 				NS:   opMeta.NS,
 				Data: cur.Current,
-			}:
+			}
+
+			tracelog.DebugLogger.Printf("Fetcher receieved op %s (%s on %s)", op.TS, op.OP, op.NS)
+			select {
+			case oplogc <- op:
 			case <-ctx.Done():
 				return
 			}
@@ -95,14 +100,14 @@ func (dbf *DBFetcher) OplogFrom(ctx context.Context, fromTS Timestamp, wg *sync.
 			if err == ctx.Err() {
 				return
 			}
-			ch <- Record{Err: fmt.Errorf("oplog cursor error: %w", err)}
+			errc <- fmt.Errorf("oplog cursor error: %w", err)
 			return
 		}
-		ch <- Record{Err: fmt.Errorf("oplog cursor exhausted")}
+		errc <- fmt.Errorf("oplog cursor exhausted")
 
 	}()
 
-	return ch, nil
+	return oplogc, errc, nil
 }
 
 // CloserBuffer defines buffer which wraps bytes.Buffer and has dummy implementation of Closer interface.
