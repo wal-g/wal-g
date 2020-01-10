@@ -75,8 +75,6 @@ sleep 5
 wal-g --config=${TMP_CONFIG} catchup-fetch ${PGDATA_BETA} $BACKUP_NAME
 
 # rename recovery.conf to don't care about wals and remove backup_label
-# lately it can be started as replica again when recovery.conf will be renamed back
-# and postgres restarted
 pushd ${PGDATA_BETA}
 mv recovery.conf{,.bak}
 rm backup_label
@@ -87,6 +85,13 @@ popd
 sleep 5
 
 /usr/lib/postgresql/10/bin/pg_dump -h 127.0.0.1 -p ${BETA_PORT} -f ${BETA_DUMP} postgres
+
+# return recovery.conf and start master to be sure replication works
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_ALPHA} -w start
+pushd ${PGDATA_BETA}
+mv recovery.conf{.bak,}
+popd
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w restart
 
 diff ${ALPHA_DUMP} ${BETA_DUMP}
 
