@@ -1,7 +1,7 @@
 package redis
 
 import (
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/redis"
 
@@ -18,7 +18,7 @@ var streamPushCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
-		command := internal.GetNameStreamCreateCmd()
+		command := internal.GetStreamCreateCmd()
 		redis.HandleStreamPush(&redis.Uploader{Uploader: uploader}, command)
 	},
 }

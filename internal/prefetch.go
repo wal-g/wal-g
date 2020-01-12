@@ -3,8 +3,8 @@ package internal
 import (
 	"archive/tar"
 	"github.com/pkg/errors"
-	"github.com/tinsane/storages/storage"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/ioutil"
@@ -24,7 +24,7 @@ func HandleWALPrefetch(uploader *Uploader, walFileName string, location string) 
 	var fileName = walFileName
 	location = path.Dir(location)
 	waitGroup := &sync.WaitGroup{}
-	concurrency, err := GetMaxDownloadConcurrency()
+	concurrency, err := getMaxDownloadConcurrency()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	for i := 0; i < concurrency; i++ {
@@ -35,7 +35,7 @@ func HandleWALPrefetch(uploader *Uploader, walFileName string, location string) 
 		waitGroup.Add(1)
 		go prefetchFile(location, folder, fileName, waitGroup)
 
-		prefaultStartLsn, shouldPrefault, timelineId, err := ShouldPrefault(fileName)
+		prefaultStartLsn, shouldPrefault, timelineId, err := shouldPrefault(fileName)
 		if err != nil {
 			tracelog.ErrorLogger.Println("ShouldPrefault failed: ", err, " file: ", fileName)
 		}
@@ -68,25 +68,25 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 	archiveDirectory := uploader.deltaFileManager.dataFolder.(*DiskDataFolder).path
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	archiveDirectory = filepath.Dir(archiveDirectory)
-	bundle := NewBundle(archiveDirectory, nil, &prefaultStartLsn, nil)
+	bundle := newBundle(archiveDirectory, nil, &prefaultStartLsn, nil)
 	bundle.Timeline = timelineId
 	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(utility.WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Error during loading delta map: '%+v'.", err)
 		return
 	}
-	bundle.TarBallMaker = NewNopTarBallMaker()
+	bundle.TarBallMaker = newNopTarBallMaker()
 
 	// Start a new tar bundle, walk the archiveDirectory and upload everything there.
 	bundle.StartQueue()
 	tracelog.InfoLogger.Println("Walking for prefault...")
-	err = filepath.Walk(archiveDirectory, bundle.PrefaultWalkedFSObject)
+	err = filepath.Walk(archiveDirectory, bundle.prefaultWalkedFSObject)
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = bundle.FinishQueue()
 }
 
 // TODO : unit tests
-func (bundle *Bundle) PrefaultWalkedFSObject(path string, info os.FileInfo, err error) error {
+func (bundle *Bundle) prefaultWalkedFSObject(path string, info os.FileInfo, err error) error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			tracelog.WarningLogger.Println(path, " deleted during filepath walk")
@@ -122,7 +122,7 @@ func (bundle *Bundle) prefaultHandleTar(path string, info os.FileInfo) error {
 		return errors.Wrap(err, "handleTar: could not grab header info")
 	}
 
-	fileInfoHeader.Name = bundle.GetFileRelPath(path)
+	fileInfoHeader.Name = bundle.getFileRelPath(path)
 
 	if !excluded && info.Mode().IsRegular() {
 		tarBall := bundle.Deque()
@@ -148,7 +148,7 @@ func (bundle *Bundle) prefaultHandleTar(path string, info os.FileInfo) error {
 
 // TODO : unit tests
 func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader *tar.Header) error {
-	incrementBaseLsn := bundle.GetIncrementBaseLsn()
+	incrementBaseLsn := bundle.getIncrementBaseLsn()
 	isIncremented := isPagedFile(info, path)
 	var fileReader io.ReadCloser
 	if isIncremented {
@@ -186,7 +186,7 @@ func prefetchFile(location string, folder storage.Folder, walFileName string, wa
 		waitGroup.Done()
 	}()
 
-	_, runningLocation, oldPath, newPath := GetPrefetchLocations(location, walFileName)
+	_, runningLocation, oldPath, newPath := getPrefetchLocations(location, walFileName)
 	_, errO := os.Stat(oldPath)
 	_, errN := os.Stat(newPath)
 
@@ -210,7 +210,7 @@ func prefetchFile(location string, folder storage.Folder, walFileName string, wa
 	}
 }
 
-func GetPrefetchLocations(location string, walFileName string) (prefetchLocation string, runningLocation string, runningFile string, fetchedFile string) {
+func getPrefetchLocations(location string, walFileName string) (prefetchLocation string, runningLocation string, runningFile string, fetchedFile string) {
 	prefetchLocation = path.Join(location, ".wal-g", "prefetch")
 	runningLocation = path.Join(prefetchLocation, "running")
 	oldPath := path.Join(runningLocation, walFileName)
@@ -220,7 +220,7 @@ func GetPrefetchLocations(location string, walFileName string) (prefetchLocation
 
 // TODO : unit tests
 func forkPrefetch(walFileName string, location string) {
-	concurrency, err := GetMaxDownloadConcurrency()
+	concurrency, err := getMaxDownloadConcurrency()
 	if err != nil {
 		tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err)
 	}

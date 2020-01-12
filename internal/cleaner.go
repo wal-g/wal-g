@@ -1,7 +1,7 @@
 package internal
 
 import (
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"path"
 )
 
@@ -17,7 +17,7 @@ func CleanupPrefetchDirectories(walFileName string, location string, cleaner Cle
 		tracelog.WarningLogger.Println("WAL-prefetch cleanup failed: ", err, " file: ", walFileName)
 		return
 	}
-	prefetchLocation, runningLocation, _, _ := GetPrefetchLocations(location, walFileName)
+	prefetchLocation, runningLocation, _, _ := getPrefetchLocations(location, walFileName)
 	for _, cleaningLocation := range []string{prefetchLocation, runningLocation} {
 		cleanupPrefetchDirectory(cleaningLocation, timelineId, logSegNo, cleaner)
 	}

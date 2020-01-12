@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/pkg/errors"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
 )
 

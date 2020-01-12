@@ -24,6 +24,13 @@
 #   go-tests = true
 #   unused-packages = true
 
+[[constraint]]
+  branch = "master"
+  name = "github.com/DATA-DOG/godog"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/docker/docker"
 
 [[constraint]]
   name = "github.com/DataDog/zstd"
@@ -51,7 +58,7 @@
 
 [[constraint]]
   name = "github.com/jackc/pgx"
-  version = "3.2.0"
+  version = "v3.6.0"
 
 [[constraint]]
   name = "github.com/pierrec/lz4"
@@ -95,8 +102,12 @@
 
 [[constraint]]
   branch = "master"
-  name = "github.com/tinsane/tracelog"
+  name = "github.com/wal-g/tracelog"
 
 [[constraint]]
-  revision = "56a2d8d8a9ecace0881c60f453e257f3bc17f077"
-  name = "github.com/tinsane/storages"
+  revision = "8d5a2396c5bbded4c71cbb1906217a69d3e7af5d"
+  name = "github.com/wal-g/storages"
+
+[[constraint]]
+  name = "go.mongodb.org/mongo-driver"
+  version = "1.1.3"

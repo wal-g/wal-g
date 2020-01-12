@@ -11,7 +11,7 @@ import (
 
 func addTablespaces(spec *TablespaceSpec, strs []TablespaceLocation) {
 	for _, loc := range strs {
-		spec.AddTablespace(loc.Symlink, loc.Location)
+		spec.addTablespace(loc.Symlink, loc.Location)
 	}
 }
 
@@ -23,7 +23,7 @@ func marshalAndUnmarshal(t *testing.T, spec *TablespaceSpec) {
 }
 
 func requireLocation(t *testing.T, spec TablespaceSpec, symlinkName string) TablespaceLocation {
-	location, ok := spec.Location(symlinkName)
+	location, ok := spec.location(symlinkName)
 	if !ok {
 		t.Fail()
 	}
@@ -31,7 +31,7 @@ func requireLocation(t *testing.T, spec TablespaceSpec, symlinkName string) Tabl
 }
 
 func requireIsTablespaceSymlink(t *testing.T, spec TablespaceSpec, path string) bool {
-	isSymlink, err := spec.IsTablespaceSymlink(path)
+	isSymlink, err := spec.isTablespaceSymlink(path)
 	assert.NoError(t, err)
 	return isSymlink
 }
@@ -140,24 +140,24 @@ func TestIsTablespaceSymlink_SymlinkSlash(t *testing.T) {
 
 func TestMakeTablespaceSymlinkPath(t *testing.T) {
 	spec := NewTablespaceSpec("/psql/")
-	spec.AddTablespace("1", "/home/ismirn0ff/space1/")
+	spec.addTablespace("1", "/home/ismirn0ff/space1/")
 
 	marshalAndUnmarshal(t, &spec)
 
-	path, err := spec.MakeTablespaceSymlinkPath("/home/ismirn0ff/space1/folder")
+	path, err := spec.makeTablespaceSymlinkPath("/home/ismirn0ff/space1/folder")
 	assert.NoError(t, err)
 	assert.Equal(t, "/psql/pg_tblspc/1/folder", path)
 
-	path, err = spec.MakeTablespaceSymlinkPath("/home/ismirn0ff/space1")
+	path, err = spec.makeTablespaceSymlinkPath("/home/ismirn0ff/space1")
 	assert.NoError(t, err)
 	assert.Equal(t, "/psql/pg_tblspc/1", path)
 
 	// Invalid path
-	path, err = spec.MakeTablespaceSymlinkPath("/home/ismirn0ff/")
+	path, err = spec.makeTablespaceSymlinkPath("/home/ismirn0ff/")
 	assert.Error(t, err)
 
 	// usual postgres path
-	path, err = spec.MakeTablespaceSymlinkPath("/psql/some_path")
+	path, err = spec.makeTablespaceSymlinkPath("/psql/some_path")
 	assert.NoError(t, err)
 	assert.Equal(t, "/psql/some_path", path)
 }
@@ -174,7 +174,7 @@ func TestTablespaceLocations(t *testing.T) {
 	marshalAndUnmarshal(t, &spec)
 	formatLocations(tablespaceLocations)
 
-	returnedLocations := spec.TablespaceLocations()
+	returnedLocations := spec.tablespaceLocations()
 	sort.Slice(returnedLocations, func(i, j int) bool {
 		return returnedLocations[i].Symlink < returnedLocations[j].Symlink
 	})

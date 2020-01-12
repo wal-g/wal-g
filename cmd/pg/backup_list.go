@@ -2,7 +2,7 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 )
 
@@ -25,7 +25,7 @@ var (
 			if pretty || json || detail {
 				internal.HandleBackupListWithFlags(folder, pretty, json, detail)
 			} else {
-				internal.HandleBackupList(folder)
+				internal.DefaultHandleBackupList(folder)
 			}
 		},
 	}

@@ -1,7 +1,7 @@
 package internal
 
 import (
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"io"
 	"io/ioutil"
 	"os/exec"
@@ -30,4 +30,18 @@ func StartCommand(command []string) (waitFunc func(), stdout io.ReadCloser) {
 			tracelog.ErrorLogger.FatalOnError(err)
 		}
 	}, stdoutResult
+}
+
+func ApplyCommand(command []string, stdin io.Reader) error {
+	cmd := exec.Command(command[0], command[1:]...)
+	if stdin != nil {
+		cmd.Stdin = stdin
+	}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		tracelog.ErrorLogger.Printf("cmd.Run() failed with %s\n", err)
+		return err
+	}
+	tracelog.InfoLogger.Printf("combined out:\n%s\n", string(out))
+	return nil
 }

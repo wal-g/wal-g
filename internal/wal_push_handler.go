@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 	"io/ioutil"
 	"os"
@@ -16,7 +16,7 @@ type CantOverwriteWalFileError struct {
 	error
 }
 
-func NewCantOverwriteWalFileError(walFilePath string) CantOverwriteWalFileError {
+func newCantOverwriteWalFileError(walFilePath string) CantOverwriteWalFileError {
 	return CantOverwriteWalFileError{errors.Errorf("WAL file '%s' already archived, contents differ, unable to overwrite", walFilePath)}
 }
 
@@ -38,7 +38,7 @@ func HandleWALPush(uploader *Uploader, walFilePath string) {
 
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
 
-	concurrency, err := GetMaxUploadConcurrency()
+	concurrency, err := getMaxUploadConcurrency()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	preventWalOverwrite := viper.GetBool(PreventWalOverwriteSetting)
@@ -46,18 +46,18 @@ func HandleWALPush(uploader *Uploader, walFilePath string) {
 	bgUploader := NewBgUploader(walFilePath, int32(concurrency-1), uploader, preventWalOverwrite)
 	// Look for new WALs while doing main upload
 	bgUploader.Start()
-	err = UploadWALFile(uploader, walFilePath, bgUploader.preventWalOverwrite)
+	err = uploadWALFile(uploader, walFilePath, bgUploader.preventWalOverwrite)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	bgUploader.Stop()
 	if uploader.getUseWalDelta() {
-		uploader.deltaFileManager.FlushFiles(uploader.Clone())
+		uploader.deltaFileManager.FlushFiles(uploader.clone())
 	}
 } //
 
 // TODO : unit tests
 // uploadWALFile from FS to the cloud
-func UploadWALFile(uploader *Uploader, walFilePath string, preventWalOverwrite bool) error {
+func uploadWALFile(uploader *Uploader, walFilePath string, preventWalOverwrite bool) error {
 	if preventWalOverwrite {
 		overwriteAttempt, err := checkWALOverwrite(uploader, walFilePath)
 		if overwriteAttempt {
@@ -95,7 +95,7 @@ func checkWALOverwrite(uploader *Uploader, walFilePath string) (overwriteAttempt
 	}
 
 	if !bytes.Equal(archived, localBytes) {
-		return true, NewCantOverwriteWalFileError(walFilePath)
+		return true, newCantOverwriteWalFileError(walFilePath)
 	} else {
 		tracelog.InfoLogger.Printf("WAL file '%s' already archived with equal content, skipping", walFilePath)
 		return true, nil

@@ -2,18 +2,21 @@ package utility
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 )
 
 // TODO : unit tests
@@ -39,6 +42,7 @@ const (
 	CopiedBlockMaxSize     = CompressedBlockMaxSize
 	MetadataFileName       = "metadata.json"
 	PathSeparator          = string(os.PathSeparator)
+	Mebibyte               = 1024 * 1024
 )
 
 // Empty is used for channel signaling.
@@ -226,4 +230,79 @@ func SelectMatchingFiles(fileMask string, filePathsToFilter map[string]bool) (ma
 		}
 	}
 	return result, nil
+}
+
+// ResetTimer safety resets timer (drains channel if required)
+func ResetTimer(t *time.Timer, d time.Duration) {
+	if !t.Stop() {
+		select {
+		case <-t.C:
+		default:
+		}
+	}
+	t.Reset(d)
+}
+
+// SignalHandler defines signal handler setup & shutdown representation
+type SignalHandler struct {
+	ctx    context.Context
+	ch     chan os.Signal
+	cancel func()
+}
+
+// NewSignalHandler constructs SignalHandler and sets up signal mask
+func NewSignalHandler(ctx context.Context, cancel func(), signals []os.Signal) *SignalHandler {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, signals...)
+	sh := SignalHandler{ctx: ctx, ch: ch, cancel: cancel}
+	go func() {
+		select {
+		case s := <-sh.ch:
+			tracelog.InfoLogger.Printf("Received %s signal. Shutting down", s.String())
+			sh.cancel()
+		case <-sh.ctx.Done():
+		}
+	}()
+	return &sh
+}
+
+// Close removes signal mask and call cancel func
+func (sh *SignalHandler) Close() error {
+	tracelog.InfoLogger.Printf("Removing sigmask. Shutting down")
+	signal.Stop(sh.ch)
+	sh.cancel()
+	return nil
+}
+
+// WaitFirstError returns first error from given channels or nil
+func WaitFirstError(errs ...<-chan error) error {
+	errc := MergeErrors(errs...)
+	for err := range errc {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// MergeErrors merges multiple channels of errors.
+func MergeErrors(cs ...<-chan error) <-chan error {
+	var wg sync.WaitGroup
+	out := make(chan error, len(cs))
+	output := func(c <-chan error) {
+		for n := range c {
+			out <- n
+		}
+		wg.Done()
+	}
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go output(c)
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
 }

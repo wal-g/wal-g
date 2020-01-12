@@ -5,6 +5,7 @@ WORKDIR /go/src/github.com/wal-g/wal-g
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests
 
+COPY tmp/libsodium tmp/libsodium
 COPY vendor/ vendor/
 COPY internal/ internal/
 COPY cmd/ cmd/
@@ -16,9 +17,16 @@ RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
     cd main/mysql && \
     go build -tags brotli -race -o wal-g -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 
-FROM wal-g/mysql:latest
+COPY docker/mysql/gtid_set.go /tmp/testtools/gtid_set.go
 
+RUN go get github.com/jmoiron/sqlx github.com/go-sql-driver/mysql && go build -o /bin/setter /tmp/testtools/gtid_set.go
+
+FROM wal-g/mysql:latest
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/mysql/wal-g /usr/bin
+COPY --from=build /bin/setter /usr/bin
+
+RUN mkdir /root/testtools
+COPY docker/mysql/test_apply.sh /root/testtools/test_apply.sh
 
 COPY docker/mysql_tests/scripts/ /tmp
 

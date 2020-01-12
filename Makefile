@@ -10,14 +10,20 @@ PKG := github.com/wal-g/wal-g
 COVERAGE_FILE := coverage.out
 TEST := "pg_tests"
 
+ifeq ($(USE_LIBSODIUM),)
+	LIBSODIUM_TAG=""
+else
+	LIBSODIUM_TAG=" libsodium"
+endif
+
 .PHONY: unittest fmt lint install clean
 
-test: install deps lint unittest pg_build mysql_build redis_build mongo_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test mongo_integration_test
+test: install deps lint unittest pg_build mysql_build redis_build mongo_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test
 
 pg_test: install deps pg_build lint unlink_brotli pg_integration_test
 
 pg_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_PG_PATH) && go build -tags "brotli lzo" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/pg.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/pg.WalgVersion=`git tag -l --points-at HEAD`")
+	(cd $(MAIN_PG_PATH) && go build -tags "brotli lzo$(LIBSODIUM_TAG)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/pg.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/pg.WalgVersion=`git tag -l --points-at HEAD`")
 
 install_and_build_pg: install deps pg_build
 
@@ -59,7 +65,7 @@ pg_install: pg_build
 mysql_test: install deps mysql_build lint unlink_brotli mysql_integration_test
 
 mysql_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_MYSQL_PATH) && go build -tags brotli -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mysql.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mysql.WalgVersion=`git tag -l --points-at HEAD`")
+	(cd $(MAIN_MYSQL_PATH) && go build -tags "brotli$(LIBSODIUM_TAG)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mysql.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mysql.WalgVersion=`git tag -l --points-at HEAD`")
 
 load_docker_common:
 	@if [ "x" = "${CACHE_FILE_UBUNTU}x" ]; then\
@@ -81,22 +87,26 @@ mysql_clean:
 mysql_install: mysql_build
 	mv $(MAIN_MYSQL_PATH)/wal-g $(GOBIN)/wal-g
 
-mongo_test: install deps mongo_build lint unlink_brotli mongo_integration_test
+mongo_test: install deps mongo_build lint unlink_brotli
 
 mongo_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_MONGO_PATH) && go build -tags brotli -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mongo.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mongo.WalgVersion=`git tag -l --points-at HEAD`")
+	(cd $(MAIN_MONGO_PATH) && go build -tags "brotli$(LIBSODIUM_TAG)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mongo.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mongo.WalgVersion=`git tag -l --points-at HEAD`")
 
 mongo_install: mongo_build
 	mv $(MAIN_MONGO_PATH)/wal-g $(GOBIN)/wal-g
 
-mongo_integration_test: load_docker_common
-	docker-compose build mongo mongo_tests
-	docker-compose up --exit-code-from mongo_tests mongo_tests
+mongo_features: install deps mongo_build lint unlink_brotli
+	set -e
+	rm -rf ./tests_func/wal-g
+	mkdir -p ./tests_func/wal-g
+	cp -a `ls -A | grep -v "tests_func"` tests_func/wal-g/
+	(cd tests_func/wal-g/ ; git rm --cached tests_func/wal-g ; cd ../..)
+	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -timeout 40m --godog.stop-on-failure --godog.format=pretty || rm -rf ./wal-g
 
 redis_test: install deps redis_build lint unlink_brotli redis_integration_test
 
 redis_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_REDIS_PATH) && go build -tags brotli -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/redis.WalgVersion=`git tag -l --points-at HEAD`")
+	(cd $(MAIN_REDIS_PATH) && go build -tags "brotli$(LIBSODIUM_TAG)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/redis.WalgVersion=`git tag -l --points-at HEAD`")
 
 redis_integration_test: load_docker_common
 	docker-compose build redis redis_tests
@@ -115,6 +125,9 @@ unittest:
 	go test -v $(TEST_MODIFIER) ./internal/compression/
 	go test -v $(TEST_MODIFIER) ./internal/crypto/openpgp/
 	go test -v $(TEST_MODIFIER) ./internal/crypto/awskms/
+	@if [[ ! -z "${USE_LIBSODIUM}" ]]; then\
+		go test -v $(TEST_MODIFIER) ./internal/crypto/libsodium/;\
+	fi
 	go test -v $(TEST_MODIFIER) ./internal/databases/mysql
 	go test -v $(TEST_MODIFIER) ./internal/walparser/
 	go test -v $(TEST_MODIFIER) ./utility
@@ -132,8 +145,10 @@ lint: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 deps:
 	git submodule update --init
 	dep ensure
+	dep ensure -update github.com/cyberdelia/lzo
 	sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' vendor/github.com/cyberdelia/lzo/lzo.go
 	./link_brotli.sh
+	./link_libsodium.sh
 
 install:
 	go get -u github.com/golang/dep/cmd/dep
@@ -141,5 +156,8 @@ install:
 
 unlink_brotli:
 	rm -rf vendor/github.com/google/brotli/*
-	mv tmp/* vendor/github.com/google/brotli/
-	rm -rf tmp/
+	mv tmp/brotli/* vendor/github.com/google/brotli/
+	rm -rf tmp/brotli
+
+unlink_libsodium:
+	rm -rf tmp/libsodium

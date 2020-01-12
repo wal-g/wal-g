@@ -3,18 +3,17 @@ package mysql
 import (
 	"database/sql"
 	"encoding/json"
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/utility"
 	"io/ioutil"
 	"os"
 	"os/user"
 	"path"
 	"path/filepath"
 	"sort"
-
-	"github.com/pkg/errors"
-	"github.com/tinsane/tracelog"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/utility"
 )
 
 const BinlogCacheFileName = ".walg_mysql_binlogs_cache"

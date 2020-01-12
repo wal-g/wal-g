@@ -3,12 +3,12 @@ package internal
 import (
 	"strings"
 
-	"github.com/tinsane/storages/azure"
-	"github.com/tinsane/storages/fs"
-	"github.com/tinsane/storages/gcs"
-	"github.com/tinsane/storages/s3"
-	"github.com/tinsane/storages/storage"
-	"github.com/tinsane/storages/swift"
+	"github.com/wal-g/storages/azure"
+	"github.com/wal-g/storages/fs"
+	"github.com/wal-g/storages/gcs"
+	"github.com/wal-g/storages/s3"
+	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/storages/swift"
 )
 
 type StorageAdapter struct {
@@ -21,7 +21,7 @@ type StorageAdapter struct {
 func (adapter *StorageAdapter) loadSettings() (map[string]string, error) {
 	settings := make(map[string]string)
 	for _, settingName := range adapter.settingNames {
-		settingValue, ok := GetWaleCompatibleSetting(settingName)
+		settingValue, ok := getWaleCompatibleSetting(settingName)
 		if !ok {
 			settingValue, ok = GetSetting(settingName)
 		}

@@ -2,7 +2,7 @@ package redis
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 )
 
@@ -16,7 +16,7 @@ var backupListCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
-		internal.HandleBackupList(folder)
+		internal.DefaultHandleBackupList(folder)
 	},
 }
 

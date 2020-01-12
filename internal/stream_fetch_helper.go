@@ -8,25 +8,25 @@ import (
 	"sort"
 	"time"
 
-	"github.com/tinsane/storages/storage"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/utility"
 )
 
 type LogFetchSettings interface {
-	GetEndTS() (*time.Time, error)
-	GetDestFolderPath() (string, error)
 	GetLogFolderPath() string
+	// second value maybe nil, this means upper limit is inf
+	GetLogsFetchInterval() (time.Time, *time.Time)
 }
 
 type LogFetchHandlers interface {
-	GetLogFilePath(pathToLog string) (string, error)
-	ShouldBeAborted(pathToLog string) (bool, error)
-	DownloadLogTo(logFolder storage.Folder, logName string, dstLogFilePath string) error
-	HandleAbortFetch(string) error
+	FetchLog(logFolder storage.Folder, logName string) (needAbortFetch bool, err error)
+	HandleAbortFetch(LogName string) error
+	AfterFetch(logs []storage.Object) error
 }
 
+// TODO : unit tests
 func ParseTS(endTSEnvVar string) (endTS *time.Time, err error) {
 	endTSStr, ok := GetSetting(endTSEnvVar)
 	if ok {
@@ -39,6 +39,7 @@ func ParseTS(endTSEnvVar string) (endTS *time.Time, err error) {
 	return endTS, nil
 }
 
+// TODO : unit tests
 // GetLogsDstSettings reads from the environment variables fetch settings
 func GetLogsDstSettings(operationLogsDstEnvVariable string) (dstFolder string, err error) {
 	dstFolder, ok := GetSetting(operationLogsDstEnvVariable)
@@ -48,10 +49,11 @@ func GetLogsDstSettings(operationLogsDstEnvVariable string) (dstFolder string, e
 	return dstFolder, nil
 }
 
+// TODO : unit tests
 // DownloadAndDecompressStream downloads, decompresses and writes stream to stdout
-func DownloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) error {
+func downloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) error {
 	for _, decompressor := range compression.Decompressors {
-		archiveReader, exists, err := TryDownloadWALFile(backup.BaseBackupFolder, getStreamName(backup.Name, decompressor.FileExtension()))
+		archiveReader, exists, err := TryDownloadFile(backup.BaseBackupFolder, getStreamName(backup.Name, decompressor.FileExtension()))
 		if err != nil {
 			return err
 		}
@@ -59,16 +61,17 @@ func DownloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) err
 			continue
 		}
 
-		err = DecompressWALFile(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
+		err = DecompressDecryptBytes(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
 		if err != nil {
 			return err
 		}
 		utility.LoggedClose(writeCloser, "")
 		return nil
 	}
-	return NewArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))
+	return newArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))
 }
 
+// TODO : unit tests
 // GetLogsCoveringInterval lists the operation logs that cover the interval
 func GetLogsCoveringInterval(folder storage.Folder, start time.Time, end *time.Time) ([]storage.Object, error) {
 	logFiles, _, err := folder.ListFolder()
@@ -82,39 +85,26 @@ func GetLogsCoveringInterval(folder storage.Folder, start time.Time, end *time.T
 	var logsToFetch []storage.Object
 	for _, logFile := range logFiles {
 		tracelog.InfoLogger.Println("Consider log file: ", logFile.GetName(), logFile.GetLastModified().Format(time.RFC3339))
-		if LogFileShouldBeFetched(start, end, logFile) {
+		if logFileShouldBeFetched(start, end, logFile) {
 			logsToFetch = append(logsToFetch, logFile)
 		}
 	}
 	return logsToFetch, nil
 }
 
+// TODO : unit tests
 // DownloadLogFiles downloads files to specified folder
-func DownloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, handlers LogFetchHandlers) ([]storage.Object, error) {
+// FetchLogFiles downloads files to specified folder
+func FetchLogFiles(logFiles []storage.Object, logFolder storage.Folder, handlers LogFetchHandlers) ([]storage.Object, error) {
 	var fetched []storage.Object
 	for _, logFile := range logFiles {
 		logName := utility.TrimFileExtension(logFile.GetName())
-
-		logFilePath, err := handlers.GetLogFilePath(logName)
-		if err != nil {
+		if needAbortFetch, err := handlers.FetchLog(logFolder, logName); err != nil {
 			return nil, err
-		}
-
-		tracelog.InfoLogger.Printf("Download %v to %v\n", logName, logFilePath)
-		err = handlers.DownloadLogTo(logFolder, logName, logFilePath)
-		if err != nil {
-			return nil, err
-		}
-
-		needAbortFetch, err := handlers.ShouldBeAborted(logFilePath)
-		if err != nil {
-			return nil, err
-		}
-		if needAbortFetch {
-			if err = handlers.HandleAbortFetch(logFilePath); err != nil {
+		} else if needAbortFetch {
+			if err = handlers.HandleAbortFetch(logName); err != nil {
 				return nil, err
 			}
-
 			return fetched, nil
 		}
 		fetched = append(fetched, logFile)
@@ -123,32 +113,60 @@ func DownloadLogFiles(logFiles []storage.Object, logFolder storage.Folder, handl
 	return fetched, nil
 }
 
-func FetchLogs(folder storage.Folder, startTS time.Time, endTS *time.Time, logFolderPath string, handlers LogFetchHandlers) (fetched []storage.Object, err error) {
+// TODO : unit tests
+func FetchLogs(folder storage.Folder, settings LogFetchSettings, handlers LogFetchHandlers) ([]storage.Object, error) {
+	logFolderPath := settings.GetLogFolderPath()
 	logFolder := folder.GetSubFolder(logFolderPath)
+	startTS, endTS := settings.GetLogsFetchInterval()
 	logsToFetch, err := GetLogsCoveringInterval(logFolder, startTS, endTS)
 	if err != nil {
 		return nil, err
 	}
 
-	fetched, err = DownloadLogFiles(logsToFetch, logFolder, handlers)
+	fetched, err := FetchLogFiles(logsToFetch, logFolder, handlers)
 	if err != nil {
 		return nil, err
 	}
-
+	if err = handlers.AfterFetch(fetched); err != nil {
+		return nil, err
+	}
 	return fetched, nil
 }
 
-func LogFileShouldBeFetched(backupStartUploadTime time.Time, endTS *time.Time, object storage.Object) bool {
+// TODO : unit tests
+func logFileShouldBeFetched(backupStartUploadTime time.Time, endTS *time.Time, object storage.Object) bool {
 	return (backupStartUploadTime.Before(object.GetLastModified()) || backupStartUploadTime.Equal(object.GetLastModified())) &&
 		(endTS == nil || (*endTS).After(object.GetLastModified()))
 }
 
 // TODO : unit tests
 func FetchStreamSentinel(backup *Backup, sentinelDto interface{}) error {
-	sentinelDtoData, err := backup.FetchSentinelData()
+	sentinelDtoData, err := backup.fetchSentinelData()
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch sentinel")
 	}
 	err = json.Unmarshal(sentinelDtoData, sentinelDto)
 	return errors.Wrap(err, "failed to unmarshal sentinel")
+}
+
+// DownloadFile downloads, decompresses and decrypts
+func DownloadFile(folder storage.Folder, filename, ext string, writeCloser io.WriteCloser) error {
+	decompressor := compression.FindDecompressor(ext)
+	if decompressor == nil {
+		return fmt.Errorf("decompressor for extension '%s' was not found", ext)
+	}
+	archiveReader, exists, err := TryDownloadFile(folder, filename)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("File '%s' does not exist.\n", filename)
+	}
+
+	err = DecompressDecryptBytes(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
+	if err != nil {
+		return err
+	}
+	utility.LoggedClose(writeCloser, "")
+	return nil
 }

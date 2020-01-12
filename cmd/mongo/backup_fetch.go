@@ -1,10 +1,11 @@
 package mongo
 
 import (
-	"github.com/spf13/cobra"
-	"github.com/tinsane/tracelog"
-	"github.com/wal-g/wal-g/internal"
 	"os"
+
+	"github.com/spf13/cobra"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 )
 
 const BackupFetchShortDescription = "Fetches desired backup from storage"
@@ -17,7 +18,7 @@ var backupFetchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
-		tracelog.ErrorLogger.FatalfOnError("Failed to parse until timestamp ", err, )
+		tracelog.ErrorLogger.FatalfOnError("Failed to parse until timestamp ", err)
 		internal.HandleBackupFetch(folder, args[0], internal.GetStreamFetcher(os.Stdout))
 	},
 }

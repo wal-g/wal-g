@@ -2,7 +2,7 @@ package internal
 
 import (
 	"github.com/spf13/viper"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"os"
 	"os/user"
 	"strings"
@@ -25,6 +25,8 @@ const (
 	TarSizeThresholdSetting      = "WALG_TAR_SIZE_THRESHOLD"
 	CseKmsIDSetting              = "WALG_CSE_KMS_ID"
 	CseKmsRegionSetting          = "WALG_CSE_KMS_REGION"
+	LibsodiumKeySetting          = "WALG_LIBSODIUM_KEY"
+	LibsodiumKeyPathSetting      = "WALG_LIBSODIUM_KEY_PATH"
 	GpgKeyIDSetting              = "GPG_KEY_ID"
 	PgpKeySetting                = "WALG_PGP_KEY"
 	PgpKeyPathSetting            = "WALG_PGP_KEY_PATH"
@@ -39,6 +41,11 @@ const (
 	PgSslModeSetting             = "PGSSLMODE"
 	TotalBgUploadedLimit         = "TOTAL_BG_UPLOADED_LIMIT"
 	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
+	MongoDBUriSetting            = "MONGODB_URI"
+	OplogArchiveAfterSize        = "OPLOG_ARCHIVE_AFTER_SIZE"
+	OplogArchiveTimeoutSetting   = "OPLOG_ARCHIVE_TIMEOUT"
+	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
+	NameLogApplyCmdPath          = "WALG_LOG_APPLY_COMMAND"
 )
 
 var (
@@ -54,6 +61,8 @@ var (
 		UseWalDeltaSetting:           "false",
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
 		TotalBgUploadedLimit:         "32",
+		OplogArchiveTimeoutSetting:   "60",
+		OplogArchiveAfterSize:        "33554432", // 32 << (10 * 2)
 	}
 
 	AllowedSettings = map[string]bool{
@@ -97,6 +106,7 @@ var (
 		"OS_REGION_NAME":    true,
 
 		// AWS s3
+		"WALG_S3_PREFIX":              true,
 		"WALE_S3_PREFIX":              true,
 		"AWS_ACCESS_KEY_ID":           true,
 		"AWS_SECRET_ACCESS_KEY":       true,
@@ -134,7 +144,7 @@ var (
 	}
 )
 
-func IsAllowedSetting(setting string, AllowedSettings map[string]bool) (exists bool) {
+func isAllowedSetting(setting string, AllowedSettings map[string]bool) (exists bool) {
 	_, exists = AllowedSettings[setting]
 	return
 }
@@ -146,7 +156,7 @@ func GetSetting(key string) (value string, ok bool) {
 	return "", false
 }
 
-func GetWaleCompatibleSetting(key string) (value string, exists bool) {
+func getWaleCompatibleSetting(key string) (value string, exists bool) {
 	settingKeys := []string{
 		"WALG_" + key,
 		"WALE_" + key,
@@ -179,7 +189,7 @@ func Configure() {
 		tracelog.DebugLogger.Println(pair)
 	}
 
-	ConfigureLimiters()
+	configureLimiters()
 
 	for _, adapter := range StorageAdapters {
 		for _, setting := range adapter.settingNames {
@@ -213,14 +223,14 @@ func InitConfig() {
 	// If a config file is found, read it in.
 	err := viper.ReadInConfig()
 	if err == nil {
-		tracelog.InfoLogger.Println("Using config file:", viper.ConfigFileUsed())
+		tracelog.DebugLogger.Println("Using config file:", viper.ConfigFileUsed())
 	}
 
 	// Сheck allowed settings
 	foundNotAllowed := false
 	for k := range viper.AllSettings() {
 		k = strings.ToUpper(k)
-		if !IsAllowedSetting(k, AllowedSettings) {
+		if !isAllowedSetting(k, AllowedSettings) {
 			tracelog.WarningLogger.Println(k + " is unknown")
 			foundNotAllowed = true
 		}

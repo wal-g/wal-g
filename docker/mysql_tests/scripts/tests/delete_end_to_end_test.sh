@@ -1,17 +1,11 @@
 #!/bin/sh
 set -e -x
 
-export WALE_S3_PREFIX=s3://mysqldeleteendtoendbucket
-export WALG_MYSQL_DATASOURCE_NAME=sbtest:@/sbtest
-export WALG_MYSQL_BINLOG_SRC=${MYSQLDATA}
-export WALG_MYSQL_BINLOG_DST=${MYSQLDATA}
+. /usr/local/export_common.sh
 
-export WALG_STREAM_CREATE_COMMAND="xtrabackup --backup \
---stream=xbstream \
---user=sbtest \
---host=localhost \
---parallel=2 \
---datadir=${MYSQLDATA}"
+export WALE_S3_PREFIX=s3://mysqldeleteendtoendbucket
+export WALG_STREAM_RESTORE_COMMAND="xtrabackup --prepare --target-dir=${MYSQLDATA}"
+
 
 mysqld --initialize --init-file=/etc/mysql/init.sql
 
@@ -59,7 +53,5 @@ mv "${MYSQLDATA}"/mysql /tmp/mysql
 mysqldump -u sbtest --all-databases --lock-tables=false | head -n -1 > /tmp/dump_restored
 sleep 10
 mv /tmp/mysql "${MYSQLDATA}"/mysql
+diff -I 'SET @@GLOBAL.GTID_PURGED' /tmp/dump_backup /tmp/dump_restored
 
-diff /tmp/dump_backup /tmp/dump_restored
-
-kill_mysql_and_cleanup_data

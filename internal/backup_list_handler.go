@@ -9,21 +9,51 @@ import (
 	"time"
 
 	"github.com/jedib0t/go-pretty/table"
-	"github.com/tinsane/storages/storage"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 )
 
-// TODO : unit tests
-// HandleBackupList is invoked to perform wal-g backup-list
-func HandleBackupList(folder storage.Folder) {
-	backups, err := getBackups(folder)
+type InfoLogger interface {
+	Println(v ...interface{})
+}
+
+type ErrorLogger interface {
+	FatalOnError(err error)
+}
+
+type Logging struct {
+	InfoLogger  InfoLogger
+	ErrorLogger ErrorLogger
+}
+
+func DefaultHandleBackupList(folder storage.Folder) {
+	getBackupsFunc := func() ([]BackupTime, error) {
+		return getBackups(folder)
+	}
+	writeBackupListFunc := func(backups []BackupTime) {
+		WriteBackupList(backups, os.Stdout)
+	}
+	logging := Logging{
+		InfoLogger:  tracelog.InfoLogger,
+		ErrorLogger: tracelog.ErrorLogger,
+	}
+
+	HandleBackupList(getBackupsFunc, writeBackupListFunc, logging)
+}
+
+func HandleBackupList(
+	getBackupsFunc func() ([]BackupTime, error),
+	writeBackupListFunc func([]BackupTime),
+	logging Logging,
+) {
+	backups, err := getBackupsFunc()
 	if len(backups) == 0 {
-		tracelog.InfoLogger.Println("No backups found")
+		logging.InfoLogger.Println("No backups found")
 		return
 	}
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.ErrorLogger.FatalOnError(err)
 
-	WriteBackupList(backups, os.Stdout)
+	writeBackupListFunc(backups)
 }
 
 // TODO : unit tests
@@ -42,9 +72,9 @@ func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, de
 			err = WriteAsJson(backupDetails, os.Stdout, pretty)
 			tracelog.ErrorLogger.FatalOnError(err)
 		} else if pretty {
-			WritePrettyBackupListDetails(backupDetails, os.Stdout)
+			writePrettyBackupListDetails(backupDetails, os.Stdout)
 		} else {
-			WriteBackupListDetails(backupDetails, os.Stdout)
+			writeBackupListDetails(backupDetails, os.Stdout)
 		}
 	} else {
 		if json {
@@ -65,7 +95,7 @@ func getBackupDetails(folder storage.Folder, backups []BackupTime) ([]BackupDeta
 		if err != nil {
 			return nil, err
 		} else {
-			metaData, err := backup.FetchMeta()
+			metaData, err := backup.fetchMeta()
 			if err != nil {
 				return nil, err
 			}
@@ -87,7 +117,7 @@ func WriteBackupList(backups []BackupTime, output io.Writer) {
 }
 
 // TODO : unit tests
-func WriteBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
+func writeBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
 	fmt.Fprintln(writer, "name\tlast_modified\twal_segment_backup_start\tstart_time\tfinish_time\thostname\tdata_dir\tpg_version\tstart_lsn\tfinish_lsn\tis_permanent")
@@ -109,7 +139,7 @@ func WritePrettyBackupList(backups []BackupTime, output io.Writer) {
 }
 
 // TODO : unit tests
-func WritePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
+func writePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
 	writer := table.NewWriter()
 	writer.SetOutputMirror(output)
 	defer writer.Render()
