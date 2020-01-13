@@ -178,14 +178,16 @@ func (sf *StorageFetcher) OplogBetween(ctx context.Context, from, until Timestam
 					tracelog.InfoLogger.Println("Oplog archives fetching is completed")
 					return
 				}
-
-				select {
-				case data <- Record{
+				op := Record{
 					TS:   TimestampFromBson(opMeta.TS),
 					OP:   opMeta.Op,
 					NS:   opMeta.NS,
 					Data: raw,
-				}:
+				}
+				tracelog.DebugLogger.Printf("Fetcher receieved op %s (%s on %s)", op.TS, op.OP, op.NS)
+
+				select {
+				case data <- op:
 				case <-ctx.Done():
 					tracelog.InfoLogger.Println("Oplog archives fetching is canceled")
 					return

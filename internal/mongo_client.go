@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/mongodb/mongo-tools-common/db"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -32,8 +32,8 @@ func (mc *MongoClient) Close(ctx context.Context) {
 }
 
 func (mc *MongoClient) GetOplogCollection(ctx context.Context) (*mongo.Collection, error) {
-	db := mc.c.Database(OplogDatabaseName)
-	colls, err := db.ListCollectionNames(ctx, bson.M{"name": OplogCollectionName})
+	odb := mc.c.Database(OplogDatabaseName)
+	colls, err := odb.ListCollectionNames(ctx, bson.M{"name": OplogCollectionName})
 	if err != nil {
 		return nil, fmt.Errorf("can not list collections in 'local' database: %w", err)
 	}
@@ -42,7 +42,7 @@ func (mc *MongoClient) GetOplogCollection(ctx context.Context) (*mongo.Collectio
 			OplogCollectionName, OplogDatabaseName)
 	}
 
-	return db.Collection(OplogCollectionName), nil
+	return odb.Collection(OplogCollectionName), nil
 }
 
 type CmdResponse struct {
@@ -54,21 +54,7 @@ func (cr CmdResponse) String() string {
 	return fmt.Sprintf("ok=%d (%s)", cr.Ok, cr.ErrMsg)
 }
 
-type Oplog struct {
-	Timestamp primitive.Timestamp `bson:"ts"`
-	HistoryID int64               `bson:"h"`
-	Version   int                 `bson:"v"`
-	Operation string              `bson:"op"`
-	Namespace string              `bson:"ns"`
-	Object    bson.D              `bson:"o"`
-}
-
-func (mc *MongoClient) ApplyOp(ctx context.Context, rawOp []byte) error {
-	op := Oplog{}
-	if err := bson.Unmarshal(rawOp, &op); err != nil {
-		return fmt.Errorf("can not unmarshall oplog entry: %w", err)
-	}
-
+func (mc *MongoClient) ApplyOp(ctx context.Context, op db.Oplog) error {
 	apply := mc.c.Database("admin").RunCommand(ctx, bson.M{"applyOps": []interface{}{op}})
 	if err := apply.Err(); err != nil {
 		return fmt.Errorf("applyOps command failed: %w", err)

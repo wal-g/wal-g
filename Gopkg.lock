@@ -413,6 +413,13 @@
   version = "v4.3.0"
 
 [[projects]]
+  digest = "1:fb26351f6c6501b149453ecc70fdb5ffeb08191bf4aa3e32dd5cd1e78336df23"
+  name = "github.com/jessevdk/go-flags"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "97448c91aac742cbca3d020b3e769013a420a06f"
+
+[[projects]]
   digest = "1:bb81097a5b62634f3e9fec1014657855610c82d19b9a40c17612e32651e35dca"
   name = "github.com/jmespath/go-jmespath"
   packages = ["."]
@@ -477,6 +484,23 @@
   pruneopts = "UT"
   revision = "3536a929edddb9a5b34bd6861dc4a9647cb459fe"
   version = "v1.1.2"
+
+[[projects]]
+  digest = "1:e3c568a94bf376ab0d8a46e0ca90ba7e5cb8c2b7087eb72289ea515caf9354b4"
+  name = "github.com/mongodb/mongo-tools-common"
+  packages = [
+    "bsonutil",
+    "db",
+    "failpoint",
+    "json",
+    "log",
+    "options",
+    "password",
+    "txn",
+    "util",
+  ]
+  pruneopts = "UT"
+  revision = "34f3c6923c6a879b471bcfd34df1da951cb88f81"
 
 [[projects]]
   branch = "master"
@@ -777,7 +801,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:bc95e0ac4d2da67db9b663ea8cbe1eb7714e70afa808bfe36eb4b48f1bac7046"
+  digest = "1:7ca355c94503076ca6a03ac7b0dd2c8b4190e3964841961dc8c4e9478256a93d"
   name = "golang.org/x/crypto"
   packages = [
     "cast5",
@@ -792,6 +816,7 @@
     "openpgp/s2k",
     "pbkdf2",
     "poly1305",
+    "ssh/terminal",
   ]
   pruneopts = "UT"
   revision = "e9b2fee46413994441b28dfca259d911d963dfed"
@@ -1114,6 +1139,8 @@
     "github.com/jedib0t/go-pretty/table",
     "github.com/jmoiron/sqlx",
     "github.com/minio/sio",
+    "github.com/mongodb/mongo-tools-common/db",
+    "github.com/mongodb/mongo-tools-common/txn",
     "github.com/pierrec/lz4",
     "github.com/pkg/errors",
     "github.com/spf13/cobra",
