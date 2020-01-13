@@ -10,7 +10,7 @@ BETA_DUMP="/tmp/beta_dump"
 BETA_PORT=5433
 
 # init config
-CONFIG_FILE="/tmp/configs/catchup_perftest_config.json"
+CONFIG_FILE="/tmp/configs/catchup_test_config.json"
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
 cp ${CONFIG_FILE} ${TMP_CONFIG}
@@ -53,7 +53,8 @@ pgbench -i -s 100 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
 
 LSN=`psql -c "SELECT pg_current_wal_lsn() - '0/0'::pg_lsn;" | grep -E '[0-9]+' | head -1`
 
-/tmp/scripts/wait_while_replication_complete.sh postgres pgbench_accounts ${BETA_PORT}
+#                                               db       table            conn_port    row_count
+/tmp/scripts/wait_while_replication_complete.sh postgres pgbench_accounts ${BETA_PORT} 10000000 # 100 * 100000, 100 is value of -s in pgbench
 # script above waits only one table, so just in case sleep
 sleep 5
 
@@ -95,4 +96,4 @@ popd
 
 diff ${ALPHA_DUMP} ${BETA_DUMP}
 
-echo "Catchup perftest success"
+echo "Catchup test success"

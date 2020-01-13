@@ -71,8 +71,8 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 
 func createAndPushBackup(
 	uploader *Uploader,
-	archiveDirectory, backupsFolder,
-	previousBackupName string, previousBackupSentinelDto BackupSentinelDto,
+	archiveDirectory, backupsFolder, previousBackupName string,
+	previousBackupSentinelDto BackupSentinelDto,
 	isPermanent, forceIncremental bool,
 	incrementCount int,
 ) {

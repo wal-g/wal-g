@@ -324,12 +324,12 @@ services:
     links:
       - s3
 
-  pg_catchup_perftest:
+  pg_catchup_test:
     build:
-      dockerfile: docker/pg_tests/Dockerfile_catchup_perftest
+      dockerfile: docker/pg_tests/Dockerfile_catchup_test
       context: .
-    image: wal-g/catchup_perftest
-    container_name: wal-g_pg_catchup_perftest
+    image: wal-g/catchup_test
+    container_name: wal-g_pg_catchup_test
     depends_on:
       - s3
     links:
