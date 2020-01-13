@@ -117,6 +117,9 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 			continue
 		}
 		err = decompressor.Decompress(writer, readCloser)
+		if err == nil {
+			return nil
+		}
 		decompressionError := newDecompressionError(err)
 		return errors.Wrapf(decompressionError, "DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?", decompressor.FileExtension())
 	}
