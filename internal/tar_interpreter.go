@@ -46,7 +46,7 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFile(fileReader io.Reader
 		err := ApplyFileIncrement(targetPath, fileReader)
 		return errors.Wrapf(err, "Interpret: failed to apply increment for '%s'", targetPath)
 	}
-	err := prepareDirs(fileInfo.Name, targetPath)
+	err := PrepareDirs(fileInfo.Name, targetPath)
 	if err != nil {
 		return errors.Wrap(err, "Interpret: failed to create all directories")
 	}
@@ -107,8 +107,11 @@ func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileIn
 	return nil
 }
 
-// Make sure all dirs exist
-func prepareDirs(fileName string, targetPath string) error {
+// PrepareDirs makes sure all dirs exist
+func PrepareDirs(fileName string, targetPath string) error {
+	if (fileName == targetPath) {
+		return nil // because it runs in the local directory
+	}
 	base := filepath.Base(fileName)
 	dir := strings.TrimSuffix(targetPath, base)
 	err := os.MkdirAll(dir, 0755)

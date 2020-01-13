@@ -153,3 +153,8 @@ func TestInterpretTypeSymlink(t *testing.T) {
 
 	assert.True(t, dstFileInfo.Mode()&os.ModeSymlink != 0)
 }
+
+func TestPrepareDirsForLocalDirectory(t *testing.T) {
+	err := internal.PrepareDirs("filename", "filename")
+	assert.NoError(t, err)
+}
