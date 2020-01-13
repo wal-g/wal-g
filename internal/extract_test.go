@@ -2,6 +2,7 @@ package internal_test
 
 import (
 	"bytes"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
@@ -155,7 +156,8 @@ func TestDecryptAndDecompressTar_noCrypter(t *testing.T) {
 	}
 
 	assert.Error(t, err)
-	assert.EqualError(t, err, "DecryptAndDecompressTar: lz4 decompress failed. Is archive encrypted?: DecompressLz4: lz4 write failed: invalid lz4 data")
+	originalError := errors.Cause(err)
+	assert.IsType(t, internal.DecompressionError{}, originalError)
 }
 
 func TestDecryptAndDecompressTar_wrongCrypter(t *testing.T) {
@@ -183,7 +185,8 @@ func TestDecryptAndDecompressTar_wrongCrypter(t *testing.T) {
 	err = internal.DecryptAndDecompressTar(decompressed, brm, crypter)
 
 	assert.Error(t, err)
-	assert.EqualError(t, err, "DecryptAndDecompressTar: lzma decompress failed. Is archive encrypted?: DecompressLzma: lzma reader creation failed: newRangeDecoder: first byte not zero")
+	originalError := errors.Cause(err)
+	assert.IsType(t, internal.DecompressionError{}, originalError)
 }
 
 func TestDecryptAndDecompressTar_unknownFormat(t *testing.T) {
@@ -209,7 +212,7 @@ func TestDecryptAndDecompressTar_unknownFormat(t *testing.T) {
 	}
 
 	assert.Error(t, err)
-	assert.EqualError(t, err, "WAL-G does not support the file format 'some_unsupported_file_format' in '/usr/local/test.some_unsupported_file_format'")
+	assert.IsType(t, internal.UnsupportedFileTypeError{}, err)
 }
 
 // Used to mock files in memory.

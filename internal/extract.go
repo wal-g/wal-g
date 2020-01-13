@@ -39,6 +39,13 @@ type UnsupportedFileTypeError struct {
 	error
 }
 
+type DecompressionError struct {
+	error
+}
+
+func newDecompressionError(err error) DecompressionError {
+	return DecompressionError{err}
+}
 func newUnsupportedFileTypeError(path string, fileFormat string) UnsupportedFileTypeError {
 	return UnsupportedFileTypeError{errors.Errorf("WAL-G does not support the file format '%s' in '%s'", fileFormat, path)}
 }
@@ -110,7 +117,8 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 			continue
 		}
 		err = decompressor.Decompress(writer, readCloser)
-		return errors.Wrapf(err, "DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?", decompressor.FileExtension())
+		decompressionError := newDecompressionError(err)
+		return errors.Wrapf(decompressionError, "DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?", decompressor.FileExtension())
 	}
 	switch fileExtension {
 	case "tar":
