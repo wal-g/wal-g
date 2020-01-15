@@ -31,6 +31,9 @@ RUN mkdir -p /home/mongodb /var/log/wal-g/ ${TMP_DIR} && \
 COPY wal-g ${WALG_REPO}/
 WORKDIR ${WALG_REPO}
 RUN make install && \
-    make deps && \
+    git submodule update --init && \
+    sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' vendor/github.com/cyberdelia/lzo/lzo.go && \
+    ./link_brotli.sh && \
+    ./link_libsodium.sh && \
     make mongo_build && \
     cp main/mongo/wal-g /usr/bin/wal-g
