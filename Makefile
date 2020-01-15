@@ -95,13 +95,13 @@ mongo_build: $(CMD_FILES) $(PKG_FILES)
 mongo_install: mongo_build
 	mv $(MAIN_MONGO_PATH)/wal-g $(GOBIN)/wal-g
 
-mongo_features: install deps mongo_build lint unlink_brotli
+mongo_features: install deps
 	set -e
 	rm -rf ./tests_func/wal-g
 	mkdir -p ./tests_func/wal-g
 	cp -a `ls -A | grep -v "tests_func"` tests_func/wal-g/
-	(cd tests_func/wal-g/ ; git rm --cached tests_func/wal-g ; cd ../..)
-	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -timeout 40m --godog.stop-on-failure --godog.format=pretty || rm -rf ./wal-g
+	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -timeout 40m --godog.stop-on-failure --godog.format=pretty
+	rm -rf tests_func/wal-g/
 
 redis_test: install deps redis_build lint unlink_brotli redis_integration_test
 
@@ -142,17 +142,27 @@ fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 lint: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs golint
 
-deps:
+deps: go_deps link_external_deps
+
+go_deps:
 	git submodule update --init
 	dep ensure
 	dep ensure -update github.com/cyberdelia/lzo
 	sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' vendor/github.com/cyberdelia/lzo/lzo.go
-	./link_brotli.sh
-	./link_libsodium.sh
+
+link_external_deps: link_brotli link_libsodium
+
+unlink_external_deps: unlink_brotli unlink_libsodium
 
 install:
 	go get -u github.com/golang/dep/cmd/dep
 	go get -u golang.org/x/lint/golint
+
+link_brotli:
+	./link_brotli.sh
+
+link_libsodium:
+	./link_libsodium.sh
 
 unlink_brotli:
 	rm -rf vendor/github.com/google/brotli/*

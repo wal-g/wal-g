@@ -7,7 +7,6 @@ ENV LANG en_US.utf8
 # Configure apt and locale
 COPY ./config/apt/ /var/lib/dist/config/apt
 RUN mkdir -p /code /config /data/db /tmp/storage
-COPY ./config/.walg /home/.walg.json
 
 RUN apt-get clean && apt-get update && apt-get install -y locales
 
@@ -18,7 +17,7 @@ RUN cp --force --recursive --verbose \
     apt-get -qq update && \
     \
     apt-get -y install \
-    supervisor wget ca-certificates \
+    supervisor wget curl ca-certificates \
     openssl git openssh-client openssh-server \
     build-essential cmake \
     netcat-openbsd iputils-ping \
@@ -26,10 +25,7 @@ RUN cp --force --recursive --verbose \
     nginx nginx-full nginx-common \
 	&& rm -rf /var/lib/apt/lists/*
 
-ENV GOLANG_URL "https://golang.org/dl/go1.13.1.linux-amd64.tar.gz"
-RUN wget -O go.tgz "https://golang.org/dl/go1.13.1.linux-amd64.tar.gz" && \
-	tar -C /usr/local -xzf go.tgz && \
-	rm go.tgz && \
+RUN wget -O - "https://golang.org/dl/go1.13.1.linux-amd64.tar.gz" | tar -C /usr/local -xz && \
 	export PATH="/usr/local/go/bin:$PATH" && \
 	go version
 
@@ -38,9 +34,9 @@ ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
 
 RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 
-RUN echo "root:root" | chpasswd
-RUN sed -i -e '/PermitRootLogin/ s/ .*/ yes/' /etc/ssh/sshd_config
-RUN mkdir /var/run/sshd
+RUN echo "root:root" | chpasswd && \
+    sed -i -e '/PermitRootLogin/ s/ .*/ yes/' /etc/ssh/sshd_config && \
+    mkdir /var/run/sshd
 
 COPY ./config/supervisor /etc/supervisor
 
