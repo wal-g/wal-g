@@ -6,7 +6,6 @@ import (
 
 	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -22,10 +21,15 @@ func HandleOplogReplay(ctx context.Context, since, until oplog.Timestamp, fetche
 
 	var errs []<-chan error
 	oplogc, errc, err := fetcher.OplogBetween(ctx, since, until, wg)
-	tracelog.ErrorLogger.FatalOnError(err)
+	if err != nil {
+		return err
+	}
 	errs = append(errs, errc)
+
 	errc, err = applier.Apply(ctx, oplogc, wg)
-	tracelog.ErrorLogger.FatalOnError(err)
+	if err != nil {
+		return err
+	}
 	errs = append(errs, errc)
 
 	return utility.WaitFirstError(errs...)

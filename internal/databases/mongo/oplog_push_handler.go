@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -22,15 +21,21 @@ func HandleOplogPush(ctx context.Context, since oplog.Timestamp, fetcher oplog.F
 
 	var errs []<-chan error
 	oplogc, errc, err := fetcher.OplogFrom(ctx, since, wg)
-	tracelog.ErrorLogger.FatalOnError(err)
+	if err != nil {
+		return err
+	}
 	errs = append(errs, errc)
 
 	validc, errc, err := validator.Validate(ctx, oplogc, wg)
-	tracelog.ErrorLogger.FatalOnError(err)
+	if err != nil {
+		return err
+	}
 	errs = append(errs, errc)
 
 	errc, err = applier.Apply(ctx, validc, wg)
-	tracelog.ErrorLogger.FatalOnError(err)
+	if err != nil {
+		return err
+	}
 	errs = append(errs, errc)
 
 	return utility.WaitFirstError(errs...)

@@ -1,0 +1,127 @@
+package mongo
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"testing"
+
+	"github.com/wal-g/wal-g/internal/databases/mongo/mocks"
+	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+)
+
+type betweenFetcherReturn struct {
+	outChan chan oplog.Record
+	errChan chan error
+	err     error
+}
+
+type oplogReplayTestArgs struct {
+	ctx   context.Context
+	since oplog.Timestamp
+	until oplog.Timestamp
+	wg    *sync.WaitGroup
+
+	betweenFetcherReturn *betweenFetcherReturn
+	applierReturn        *applierReturn
+}
+
+type oplogReplayTestMocks struct {
+	fetcher *mocks.BetweenFetcher
+	applier *mocks.Applier
+}
+
+func (tm *oplogReplayTestMocks) AssertExpectations(t *testing.T) {
+	if tm.fetcher != nil {
+		tm.fetcher.AssertExpectations(t)
+	}
+
+	if tm.applier != nil {
+		tm.applier.AssertExpectations(t)
+	}
+}
+
+func buildOplogReplayTestArgs() oplogReplayTestArgs {
+	return oplogReplayTestArgs{
+		ctx:   context.TODO(),
+		since: oplog.Timestamp{TS: 1579021614, Inc: 15},
+		until: oplog.Timestamp{TS: 1579023614, Inc: 11},
+		wg:    &sync.WaitGroup{},
+
+		betweenFetcherReturn: &betweenFetcherReturn{make(chan oplog.Record), make(chan error), nil},
+		applierReturn:        &applierReturn{make(chan error), nil},
+	}
+}
+
+func prepareOplogReplayMocks(args oplogReplayTestArgs, mocks oplogReplayTestMocks) {
+	if mocks.fetcher != nil {
+		mocks.fetcher.On("OplogBetween", mock.Anything, args.since, args.until, args.wg).
+			Return(args.betweenFetcherReturn.outChan, args.betweenFetcherReturn.errChan, args.betweenFetcherReturn.err)
+	}
+	if mocks.applier != nil {
+		mocks.applier.On("Apply", mock.Anything, args.betweenFetcherReturn.outChan, args.wg).
+			Return(args.applierReturn.errChan, args.applierReturn.err)
+	}
+}
+
+func TestHandleOplogReplay(t *testing.T) {
+	tests := []struct {
+		name        string
+		args        oplogReplayTestArgs
+		mocks       oplogReplayTestMocks
+		failErrRet  func(args oplogReplayTestArgs)
+		failErrChan func(args oplogReplayTestArgs)
+		expectedErr error
+	}{
+		{
+			name:        "fetcher call returns error",
+			args:        buildOplogReplayTestArgs(),
+			mocks:       oplogReplayTestMocks{&mocks.BetweenFetcher{}, nil},
+			failErrRet:  func(args oplogReplayTestArgs) { args.betweenFetcherReturn.err = fmt.Errorf("fetcher ret err") },
+			expectedErr: fmt.Errorf("fetcher ret err"),
+		},
+		{
+			name:        "applier call returns error",
+			args:        buildOplogReplayTestArgs(),
+			mocks:       oplogReplayTestMocks{&mocks.BetweenFetcher{}, &mocks.Applier{}},
+			failErrRet:  func(args oplogReplayTestArgs) { args.applierReturn.err = fmt.Errorf("applier ret err") },
+			expectedErr: fmt.Errorf("applier ret err"),
+		},
+		{
+			name:        "fetcher returns error via error channel",
+			args:        buildOplogReplayTestArgs(),
+			mocks:       oplogReplayTestMocks{&mocks.BetweenFetcher{}, &mocks.Applier{}},
+			failErrChan: func(args oplogReplayTestArgs) { args.betweenFetcherReturn.errChan <- fmt.Errorf("fetcher chan err") },
+			expectedErr: fmt.Errorf("fetcher chan err"),
+		},
+		{
+			name:        "applier returns error via error channel",
+			args:        buildOplogReplayTestArgs(),
+			mocks:       oplogReplayTestMocks{&mocks.BetweenFetcher{}, &mocks.Applier{}},
+			failErrChan: func(args oplogReplayTestArgs) { args.applierReturn.errChan <- fmt.Errorf("applier chan err") },
+			expectedErr: fmt.Errorf("applier chan err"),
+		},
+	}
+
+	for _, tc := range tests {
+		if tc.failErrRet != nil {
+			tc.failErrRet(tc.args)
+		}
+		if tc.failErrChan != nil {
+			go tc.failErrChan(tc.args)
+		}
+
+		prepareOplogReplayMocks(tc.args, tc.mocks)
+		err := HandleOplogReplay(tc.args.ctx, tc.args.since, tc.args.until, tc.mocks.fetcher, tc.mocks.applier)
+		if tc.expectedErr != nil {
+			assert.EqualError(t, err, tc.expectedErr.Error())
+		} else {
+			assert.Nil(t, err)
+		}
+
+		tc.mocks.AssertExpectations(t)
+	}
+}
