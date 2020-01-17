@@ -39,6 +39,13 @@ type UnsupportedFileTypeError struct {
 	error
 }
 
+type DecompressionError struct {
+	error
+}
+
+func newDecompressionError(err error) DecompressionError {
+	return DecompressionError{err}
+}
 func newUnsupportedFileTypeError(path string, fileFormat string) UnsupportedFileTypeError {
 	return UnsupportedFileTypeError{errors.Errorf("WAL-G does not support the file format '%s' in '%s'", fileFormat, path)}
 }
@@ -82,10 +89,9 @@ func extractOne(tarInterpreter TarInterpreter, source io.Reader) error {
 	return nil
 }
 
-// TODO : unit tests
 // Ensures that file extension is valid. Any subsequent behavior
 // depends on file type.
-func decryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter crypto.Crypter) error {
+func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter crypto.Crypter) error {
 	readCloser, err := readerMaker.Reader()
 
 	if err != nil {
@@ -111,7 +117,11 @@ func decryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 			continue
 		}
 		err = decompressor.Decompress(writer, readCloser)
-		return errors.Wrapf(err, "DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?", decompressor.FileExtension())
+		if err == nil {
+			return nil
+		}
+		decompressionError := newDecompressionError(err)
+		return errors.Wrapf(decompressionError, "DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?", decompressor.FileExtension())
 	}
 	switch fileExtension {
 	case "tar":
@@ -173,7 +183,7 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 		extractingReader, pipeWriter := io.Pipe()
 		decompressingWriter := &EmptyWriteIgnorer{pipeWriter}
 		go func() {
-			err := decryptAndDecompressTar(decompressingWriter, fileClosure, crypter)
+			err := DecryptAndDecompressTar(decompressingWriter, fileClosure, crypter)
 			utility.LoggedClose(decompressingWriter, "")
 			tracelog.InfoLogger.Printf("Finished decompression of %s", fileClosure.Path())
 			if err != nil {
