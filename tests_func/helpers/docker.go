@@ -1,19 +1,20 @@
 package helpers
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
+	"os"
+	"os/exec"
+	"time"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	testUtils "github.com/wal-g/wal-g/tests_func/utils"
-	"io/ioutil"
-	"math/rand"
-	"os"
-	"os/exec"
-	"time"
 )
 
 const envDockerMachineName = "DOCKER_MACHINE_NAME"
@@ -63,25 +64,34 @@ func GetExposedPort(container types.Container, port uint16) (string, uint16, err
 }
 
 func CallCompose(testContext *TestContextType, actions []string) error {
-	composeFile := testUtils.GetVarFromEnvList(testContext.Env, "COMPOSE_FILE")
+	composeFile := testContext.Env["COMPOSE_FILE"]
 	baseArgs := []string{"--file", composeFile, "-p", "test"}
 	baseArgs = append(baseArgs, actions...)
 	cmd := exec.Command("docker-compose", baseArgs...)
-	for _, line := range testContext.Env {
+	for _, line := range testUtils.EnvToList(testContext.Env) {
 		cmd.Env = append(cmd.Env, line)
 	}
-	stdout, err := cmd.StderrPipe()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("error when calling compose: %v", err)
+		return fmt.Errorf("can not get command pipeline: %v", err)
 	}
 	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("can not start command: %v", err)
+	}
+
+	scanner := bufio.NewScanner(stdout)
+	for scanner.Scan() {
+		fmt.Println(scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("bufio scanner received error: %v", err)
+	}
+
+	if err := cmd.Wait(); err != nil {
+		// TODO: log stderr
 		return fmt.Errorf("error when calling compose: %v", err)
 	}
-	buf, err := ioutil.ReadAll(stdout)
-	if err != nil {
-		return fmt.Errorf("error when calling compose: %v", err)
-	}
-	fmt.Printf("\n%+v\n", string(buf))
+
 	return nil
 }
 
@@ -104,7 +114,7 @@ func getNetworkListWithName(testContext *TestContextType, name string) ([]types.
 
 func CreateNet(testContext *TestContextType, name string) error {
 	dockerClient := testContext.DockerClient
-	name = testUtils.GetVarFromEnvList(testContext.Env, "NETWORK_NAME")
+	name = testContext.Env["NETWORK_NAME"]
 	networkList, err := getNetworkListWithName(testContext, name)
 	if err != nil {
 		return fmt.Errorf("error in creating network: %v", err)
@@ -131,7 +141,8 @@ func CreateNet(testContext *TestContextType, name string) error {
 	return nil
 }
 
-func RemoveNet(testContext *TestContextType, name string) error {
+func RemoveNet(testContext *TestContextType) error {
+	name := testContext.Env["NETWORK_NAME"]
 	nets, err := getNetworkListWithName(testContext, name)
 	if err != nil {
 		return fmt.Errorf("error im removing network %s: %v", name, err)
@@ -156,7 +167,7 @@ type AuxData struct {
 
 type TestContextType struct {
 	DockerClient *client.Client
-	Env          []string
+	Env          map[string]string
 	SafeStorage  SafeStorageType
 	TestData     map[string]map[string]map[string][]DatabaseRecord
 	Context      context.Context
@@ -168,7 +179,7 @@ func ShutdownContainers(testContext *TestContextType) error {
 }
 
 func ShutdownNetwork(testContext *TestContextType) error {
-	networkName := testUtils.GetVarFromEnvList(testContext.Env, "NETWORK_NAME")
+	networkName := testContext.Env["NETWORK_NAME"]
 	err := testContext.DockerClient.NetworkRemove(testContext.Context, networkName)
 	if err != nil {
 		return fmt.Errorf("error in shutting down network: %v", err)

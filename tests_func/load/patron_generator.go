@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	testUtil "github.com/wal-g/wal-g/tests_func/utils"
 	"math/rand"
 	"os"
 	"strings"
 	"time"
+
+	testUtil "github.com/wal-g/wal-g/tests_func/utils"
 )
 
 type opConfig struct {

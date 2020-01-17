@@ -1,35 +1,60 @@
 package utils
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"syscall"
 )
 
-func MapEnvToListEnv(mpEnv map[string]string) []string {
+func ReadLines(r io.Reader) ([]string, error) {
+	var lines []string
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines, scanner.Err()
+}
+
+func ParseEnvLines(lines []string) map[string]string {
+	env := make(map[string]string)
+	for _, line := range lines {
+		key, value := SplitEnvLine(line)
+		env[key] = value
+	}
+	return env
+}
+
+func WriteEnv(env map[string]string, w io.Writer) error {
+	for k, v := range env {
+		if _, err := fmt.Fprintf(w, "%s=%s\n", k, v); err != nil {
+			return fmt.Errorf("can not write line: %v", err)
+		}
+	}
+	return nil
+}
+
+func EnvToList(env map[string]string) []string {
 	var result []string
-	for key, value := range mpEnv {
+	for key, value := range env {
 		result = append(result, fmt.Sprintf("%s=%s", key, value))
 	}
 	return result
 }
 
-func MergeEnvs(env []string, values []string) []string {
-	envMap := make(map[string]string, 0)
-	for _, line := range append(env, values...) {
-		name, value := SplitEnvLine(line)
-		envMap[name] = value
+func MergeEnvs(env1, env2 map[string]string) map[string]string {
+	env := make(map[string]string)
+	for k, v := range env1 {
+		env[k] = v
 	}
-	updatedEnv := make([]string, 0)
-	for name, value := range envMap {
-		updatedEnv = append(updatedEnv, fmt.Sprintf("%s=%s", name, value))
+	for k, v := range env2 {
+		env[k] = v
 	}
-	return updatedEnv
+	return env
 }
 
 func StringInSlice(a string, list []string) bool {
@@ -41,70 +66,9 @@ func StringInSlice(a string, list []string) bool {
 	return false
 }
 
-func GetStringType(data interface{}) string {
-	v := reflect.ValueOf(data)
-	switch v.Kind() {
-	case reflect.Bool:
-		return "bool"
-	case reflect.Int, reflect.Int8, reflect.Int32, reflect.Int64:
-		return "int"
-	case reflect.Uint, reflect.Uint8, reflect.Uint32, reflect.Uint64:
-		return "int"
-	case reflect.Float32, reflect.Float64:
-		return "float"
-	case reflect.String:
-		return "string"
-	case reflect.Slice:
-		return "array"
-	case reflect.Map:
-		return "map"
-	case reflect.Chan:
-		return "chan"
-	default:
-		return "unknown"
-	}
-}
-
 func SplitEnvLine(line string) (string, string) {
-	values := strings.Split(line, "=")
+	values := strings.SplitN(line, "=", 2)
 	return values[0], values[1]
-}
-
-func GetVarFromEnvList(env []string, name string) string {
-	for _, value := range env {
-		currentName, currentValue := SplitEnvLine(value)
-		if currentName == name {
-			return currentValue
-		}
-	}
-	return ""
-}
-
-func GenerateSecrets() map[string]string {
-	return map[string]string{
-		"MINIO_ACCESS_KEY": RandSeq(20),
-		"MINIO_SECRET_KEY": RandSeq(40),
-	}
-}
-
-func UpdateFileValues(filepath string, subs map[string]string) {
-	minioDockerfile, err := ioutil.ReadFile(filepath)
-	if err != nil {
-		panic(err)
-	}
-
-	lines := strings.Split(string(minioDockerfile), "\n")
-
-	for i, _ := range lines {
-		for key, value := range subs {
-			lines[i] = strings.Replace(lines[i], "{{"+key+"}}", value, -1)
-		}
-	}
-
-	err = ioutil.WriteFile(filepath, []byte(strings.Join(lines, "\n")), 0644)
-	if err != nil {
-		panic(err)
-	}
 }
 
 func CopyDirectory(scrDir, dest string) error {
@@ -205,21 +169,4 @@ func CopySymLink(source, dest string) error {
 		return err
 	}
 	return os.Symlink(link, dest)
-}
-
-func WriteEnvFile(envLines []string, envFile string) error {
-	_, err := os.Stat(envFile)
-	file, err := os.OpenFile(envFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		return fmt.Errorf("error in setuping staging: %v", err)
-	}
-	defer file.Close()
-	for _, envLine:= range envLines {
-		key, value := SplitEnvLine(envLine)
-		_, err = fmt.Fprintf(file, "%s=%s\n", key, value)
-		if err != nil {
-			return fmt.Errorf("error in setuping staging: %v", err)
-		}
-	}
-	return nil
 }

@@ -3,11 +3,12 @@ package mongoload
 import (
 	"context"
 	"fmt"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"os"
 	"testing"
 	"time"
+
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func prepareTestLoad(configFile, patronFile, mongoUri string, ctx context.Context) (*mongo.Client, *os.File, error) {
@@ -36,7 +37,7 @@ func prepareTestLoad(configFile, patronFile, mongoUri string, ctx context.Contex
 }
 
 func TestLoadRange(t *testing.T) {
-	ctx, cancel:= context.WithTimeout(context.Background(), 250 * time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 	defer cancel()
 
 	cli, f, err := prepareTestLoad("mongo_load_config.json",

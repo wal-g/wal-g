@@ -1,17 +1,9 @@
 package functest
 
 import (
-	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/DATA-DOG/godog"
-	"github.com/DATA-DOG/godog/colors"
-	"github.com/DATA-DOG/godog/gherkin"
-	"github.com/docker/docker/client"
-	testHelper "github.com/wal-g/wal-g/tests_func/helpers"
-	testUtils "github.com/wal-g/wal-g/tests_func/utils"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"log"
 	"os"
 	"path/filepath"
@@ -19,65 +11,53 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	testConf "github.com/wal-g/wal-g/tests_func/config"
+	testHelper "github.com/wal-g/wal-g/tests_func/helpers"
+	testUtils "github.com/wal-g/wal-g/tests_func/utils"
+
+	"github.com/DATA-DOG/godog"
+	"github.com/DATA-DOG/godog/colors"
+	"github.com/DATA-DOG/godog/gherkin"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 var testContext *testHelper.TestContextType
 
 func FeatureContext(s *godog.Suite) {
-	testContext = &testHelper.TestContextType{}
-	testContext.TestData = make(map[string]map[string]map[string][]testHelper.DatabaseRecord)
-	testContext.AuxData.Timestamps = make(map[int]time.Time)
-	testContext.Context = context.Background()
-
 	s.BeforeFeature(func(feature *gherkin.Feature) {
-		testContext = &testHelper.TestContextType{}
 		testContext.TestData = make(map[string]map[string]map[string][]testHelper.DatabaseRecord)
 		testContext.AuxData.Timestamps = make(map[int]time.Time)
-		testContext.Context = context.Background()
+		if err := StartRecreate(testContext); err != nil {
+			log.Fatalln(err)
+		}
+	})
 
-		var err error
-		testContext.Env, err = testHelper.GetTestEnv(testContext)
-		if err == nil {
-			var containerNames []string
-			testId := testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID")
-			for _, envLine := range testContext.Env {
-				key, value := testUtils.SplitEnvLine(envLine)
-				if strings.HasSuffix(key, "_WORKER") {
-					containerNames = append(containerNames, fmt.Sprintf("%s.test_net_%s", value, testId))
-				}
+	s.BeforeSuite(func() {
+		stagingPath := testConf.Env["STAGING_DIR"]
+		envFilePath := testConf.Env["ENV_FILE"]
+		newEnv := !EnvExists(envFilePath)
+		if newEnv {
+			if err := SetupEnv(envFilePath, stagingPath); err != nil {
+				log.Fatalln(err)
 			}
-			testContext.DockerClient, err = client.NewClientWithOpts(client.WithVersion("1.38"))
-			for _, container := range containerNames {
-				_, err = testHelper.GetDockerContainer(testContext, container)
-				if err != nil {
-					break
-				}
+		}
+		env, err := ReadEnv(envFilePath)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		testContext.Env = testUtils.MergeEnvs(testUtils.ParseEnvLines(os.Environ()), env)
+
+		if newEnv {
+			if err := SetupStaging(testContext); err != nil {
+				log.Fatalln(err)
 			}
-			if err == nil {
-				nodeName := fmt.Sprintf("%s.test_net_%s", testUtils.GetVarFromEnvList(testContext.Env, "MONGO_HOST_01_WORKER"), testId)
-				if testHelper.MongoPurgeAllBackups(testContext, nodeName) == nil {
-					fmt.Printf("\nUsing existing docker containers\n")
-					return
-				}
+
+			if err := BuildBase(testContext); err != nil {
+				log.Fatalln(err)
 			}
 		}
 
-		err = SetupStaging(testContext)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		err = BuildBase(testContext)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		err = Start(testContext)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		err = testUtils.WriteEnvFile(testContext.Env, testUtils.GetVarFromEnvList(testContext.Env, "ENV_FILE"))
-		if err != nil {
-			log.Fatalln(err)
-		}
 	})
 
 	s.AfterFeature(func(feature *gherkin.Feature) {
@@ -121,7 +101,7 @@ func wait(cnt int) error {
 }
 
 func createTimestamp(timestampId int, mongodbId int) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
 	command := []string{"date", "-u", `+%Y-%m-%dT%H:%M:%SZ`}
 	response, err := testHelper.RunCommandInContainer(testContext, nodeName, command)
 	if err != nil {
@@ -137,17 +117,17 @@ func createTimestamp(timestampId int, mongodbId int) error {
 }
 
 func deleteBackupsRetainAfterTimeViaMongodb(retainCount int, timestampId int, mongodbId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
 	return testHelper.MongoPurgeBackupsAfterTime(testContext, containerName, retainCount, testContext.AuxData.Timestamps[timestampId])
 }
 
 func deleteBackupsRetainAfterBackupViaMongodb(retainCount int, afterBackupId int, mongodbId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
 	return testHelper.MongoPurgeBackupsAfterBackupId(testContext, containerName, retainCount, afterBackupId)
 }
 
 func mongodbBackupMetadataContainsUserData(mongodbId int, backupId int, data *gherkin.DocString) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
 	backupList, err := testHelper.GetBackups(testContext, nodeName)
 	if err != nil {
 		return err
@@ -158,7 +138,7 @@ func mongodbBackupMetadataContainsUserData(mongodbId int, backupId int, data *gh
 	backup := backupList[len(backupList)-1-backupId]
 	path := fmt.Sprintf("/export/dbaas/mongodb-backup/test_uuid/test_mongodb/basebackups_005/%s_backup_stop_sentinel.json", backup)
 	cmd := []string{"cat", path}
-	jsonString, _ := testHelper.RunCommandInContainer(testContext, fmt.Sprintf("minio01.test_net_%s", testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID")), cmd)
+	jsonString, _ := testHelper.RunCommandInContainer(testContext, fmt.Sprintf("minio01.test_net_%s", testContext.Env["TEST_ID"]), cmd)
 	jsonString = jsonString[strings.Index(jsonString, "{"):]
 
 	var rawUserData map[string]*json.RawMessage
@@ -189,7 +169,7 @@ func mongodbBackupMetadataContainsUserData(mongodbId int, backupId int, data *gh
 }
 
 func testMongodbConnect(mongodbId int) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
 	const timeoutInterval = 100 * time.Millisecond
 	for i := 0; i < 25; i++ {
 		connection, _ := testHelper.EnvDBConnect(testContext, nodeName)
@@ -203,7 +183,7 @@ func testMongodbConnect(mongodbId int) error {
 }
 
 func configureS3OnMinio(minioId int) error {
-	nodeName := fmt.Sprintf("minio%02d.test_net_%s", minioId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	nodeName := fmt.Sprintf("minio%02d.test_net_%s", minioId, testContext.Env["TEST_ID"])
 	container, err := testHelper.GetDockerContainer(testContext, nodeName)
 	if err != nil {
 		return err
@@ -216,7 +196,7 @@ func configureS3OnMinio(minioId int) error {
 }
 
 func replsetinitiateOnMongodb(mongodbId int) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
 	err := testHelper.StepEnsureRsInitialized(testContext, nodeName)
 	if err != nil {
 		return err
@@ -226,14 +206,8 @@ func replsetinitiateOnMongodb(mongodbId int) error {
 }
 
 func testMongodbPrimaryRole(mongodbId int) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
-	creds := testHelper.UserConfiguration{
-		Username: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_USERNAME"),
-		Password: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_PASSWORD"),
-		Dbname:   testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_DB_NAME"),
-		Roles:    strings.Split(testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_ROLES"), " "),
-	}
-	connection, err := testHelper.EnvDBConnectWithCreds(testContext, nodeName, creds)
+	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
+	connection, err := testHelper.AdminConnect(testContext, nodeName)
 	if err != nil {
 		return err
 	}
@@ -242,13 +216,8 @@ func testMongodbPrimaryRole(mongodbId int) error {
 }
 
 func authenticateOnMongodb(mongodbId int) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
-	creds := testHelper.UserConfiguration{
-		Username: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_USERNAME"),
-		Password: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_PASSWORD"),
-		Dbname:   testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_DB_NAME"),
-		Roles:    strings.Split(testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_ROLES"), " "),
-	}
+	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
+	creds := testHelper.AdminCreds(testContext.Env)
 	roles := "["
 	for _, value := range creds.Roles {
 		roles = roles + "'" + value + "', "
@@ -259,7 +228,7 @@ func authenticateOnMongodb(mongodbId int) error {
 			creds.Username,
 			creds.Password,
 			roles),
-		testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_DB_NAME")}
+		testContext.Env["MONGO_ADMIN_DB_NAME"]}
 	response, err := testHelper.RunCommandInContainer(testContext, nodeName, command)
 	if err != nil {
 		return err
@@ -280,15 +249,9 @@ func authenticateOnMongodb(mongodbId int) error {
 }
 
 func fillMongodbWithTestData(mongodbId, testId int) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
 	testName := fmt.Sprintf("test%02d", testId)
-	creds := testHelper.UserConfiguration{
-		Username: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_USERNAME"),
-		Password: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_PASSWORD"),
-		Dbname:   testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_DB_NAME"),
-		Roles:    strings.Split(testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_ROLES"), " "),
-	}
-	conn, err := testHelper.EnvDBConnectWithCreds(testContext, nodeName, creds)
+	conn, err := testHelper.AdminConnect(testContext, nodeName)
 	if err != nil {
 		return err
 	}
@@ -299,14 +262,8 @@ func fillMongodbWithTestData(mongodbId, testId int) error {
 
 func createMongodbBackup(mongodbId int) error {
 	var cmdArgs = ""
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
-	creds := testHelper.UserConfiguration{
-		Username: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_USERNAME"),
-		Password: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_PASSWORD"),
-		Dbname:   testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_DB_NAME"),
-		Roles:    strings.Split(testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_ROLES"), " "),
-	}
-	currentBackupId, err := testHelper.MakeBackup(testContext, containerName, cmdArgs, creds, []string{})
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
+	currentBackupId, err := testHelper.MakeBackup(testContext, containerName, cmdArgs, []string{})
 	if err != nil {
 		return err
 	}
@@ -345,14 +302,8 @@ func createMongodbBackupWithUserData(mongodbId int, data *gherkin.DocString) err
 		}
 		envs = append(envs, fmt.Sprintf(`WALG_SENTINEL_USER_DATA={"labels": {%s}}`, strings.Join(args, ", ")))
 	}
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
-	creds := testHelper.UserConfiguration{
-		Username: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_USERNAME"),
-		Password: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_PASSWORD"),
-		Dbname:   testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_DB_NAME"),
-		Roles:    strings.Split(testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_ROLES"), " "),
-	}
-	currentBackupId, err := testHelper.MakeBackup(testContext, containerName, cmdArgs, creds, envs)
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
+	currentBackupId, err := testHelper.MakeBackup(testContext, containerName, cmdArgs, envs)
 	if err != nil {
 		return err
 	}
@@ -361,7 +312,7 @@ func createMongodbBackupWithUserData(mongodbId int, data *gherkin.DocString) err
 }
 
 func testBackupEntriesOfMongodb(backupCount, mongodbId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
 	backupNames, err := testHelper.GetBackups(testContext, containerName)
 	if err != nil {
 		return err
@@ -373,10 +324,10 @@ func testBackupEntriesOfMongodb(backupCount, mongodbId int) error {
 }
 
 func putEmptyBackupViaMinio(minioId int) error {
-	containerName := fmt.Sprintf("minio%02d.test_net_%s", minioId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	containerName := fmt.Sprintf("minio%02d.test_net_%s", minioId, testContext.Env["TEST_ID"])
 	backupName := "20010203T040506"
-	bucketName := testUtils.GetVarFromEnvList(testContext.Env, "S3_BUCKET")
-	backupRootDir := testUtils.GetVarFromEnvList(testContext.Env, "WALG_S3_PREFIX")
+	bucketName := testContext.Env["S3_BUCKET"]
+	backupRootDir := testContext.Env["WALG_S3_PREFIX"]
 	backupDir := "/export/" + bucketName + "/" + backupRootDir + "/" + backupName
 	backupDumpPath := filepath.Join(backupDir, "mongodump.archive")
 	testContext.SafeStorage.NometaBackupNames = append(testContext.SafeStorage.NometaBackupNames, backupName)
@@ -392,14 +343,14 @@ func putEmptyBackupViaMinio(minioId int) error {
 }
 
 func deleteBackupsRetainViaMongodb(retainCount, mongodbId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
 	return testHelper.MongoPurgeBackups(testContext, containerName, retainCount)
 }
 
 func testEmptyBackupsViaMinio(minioId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", minioId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
-	bucketName := testUtils.GetVarFromEnvList(testContext.Env, "S3_BUCKET")
-	backupRootDir := testUtils.GetVarFromEnvList(testContext.Env, "WALG_S3_PREFIX")
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", minioId, testContext.Env["TEST_ID"])
+	bucketName := testContext.Env["S3_BUCKET"]
+	backupRootDir := testContext.Env["WALG_S3_PREFIX"]
 	backupNames := testContext.SafeStorage.NometaBackupNames
 	for _, backupName := range backupNames {
 		backupDir := filepath.Join("/export", bucketName, backupRootDir, backupName)
@@ -412,30 +363,24 @@ func testEmptyBackupsViaMinio(minioId int) error {
 }
 
 func deleteBackupViaMongodb(backupId, mongodbId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
 	return testHelper.DeleteBackup(testContext, containerName, backupId)
 }
 
 func restoreBackupToMongodb(backupId, mongodbId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID"))
+	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
 	return testHelper.RestoreBackupById(testContext, containerName, backupId)
 }
 
 func testEqualMongodbDataAtMongodbs(mongodbId1, mongodbId2 int) error {
-	creds := testHelper.UserConfiguration{
-		Username: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_USERNAME"),
-		Password: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_PASSWORD"),
-		Dbname:   testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_DB_NAME"),
-		Roles:    strings.Split(testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_ROLES"), " "),
-	}
-	containerName1 := fmt.Sprintf("mongodb%02d", mongodbId1) + ".test_net_" + testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID")
-	containerName2 := fmt.Sprintf("mongodb%02d", mongodbId2) + ".test_net_" + testUtils.GetVarFromEnvList(testContext.Env, "TEST_ID")
+	containerName1 := fmt.Sprintf("mongodb%02d", mongodbId1) + ".test_net_" + testContext.Env["TEST_ID"]
+	containerName2 := fmt.Sprintf("mongodb%02d", mongodbId2) + ".test_net_" + testContext.Env["TEST_ID"]
 
-	connection1, err := testHelper.EnvDBConnectWithCreds(testContext, containerName1, creds)
+	connection1, err := testHelper.AdminConnect(testContext, containerName1)
 	if err != nil {
 		return err
 	}
-	connection2, err := testHelper.EnvDBConnectWithCreds(testContext, containerName2, creds)
+	connection2, err := testHelper.AdminConnect(testContext, containerName2)
 	if err != nil {
 		return err
 	}
@@ -464,13 +409,34 @@ var opt = godog.Options{
 	Format: "progress",
 }
 
+var cleanEnv bool
+
 func init() {
+	flag.BoolVar(&cleanEnv, "env.clean", false, "shutdown and delete test environment")
 	godog.BindFlags("godog.", flag.CommandLine, &opt)
 }
 
 func TestMain(m *testing.M) {
 	flag.Parse()
 	opt.Paths = flag.Args()
+
+	testContext = &testHelper.TestContextType{}
+	if err := SetupTestContext(testContext); err != nil {
+		log.Fatalln(err)
+	}
+
+	if cleanEnv {
+		env, err := ReadEnv(testConf.Env["ENV_FILE"])
+		if err != nil {
+			log.Fatalln(err)
+		}
+		testContext.Env = env
+
+		if err := ShutdownEnv(testContext); err != nil {
+			log.Fatal(err)
+		}
+		os.Exit(0)
+	}
 
 	status := godog.RunWithOptions("godogs", func(s *godog.Suite) {
 		FeatureContext(s)
@@ -480,19 +446,11 @@ func TestMain(m *testing.M) {
 		status = st
 	}
 
-	err := testHelper.ShutdownContainers(testContext)
-	if err != nil {
-		log.Fatalln(err)
+	if testUtils.ParseEnvLines(os.Environ())["DEBUG"] == "" {
+		if err := ShutdownEnv(testContext); err != nil {
+			log.Fatal(err)
+		}
 	}
-	err = testHelper.ShutdownNetwork(testContext)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	err = os.RemoveAll("./staging/images/")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	err = os.Remove(testUtils.GetVarFromEnvList(testContext.Env, "ENV_FILE"))
 
 	os.Exit(status)
 }

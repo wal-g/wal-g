@@ -2,17 +2,17 @@ package helpers
 
 import (
 	"fmt"
-	"github.com/docker/docker/api/types"
-	testUtils "github.com/wal-g/wal-g/tests_func/utils"
 	"strings"
+
+	"github.com/docker/docker/api/types"
 )
 
 func ConfigureS3(testContext *TestContextType, containerName *types.Container) error {
 	var response string
 	for i := 0; i < 100; i++ {
-		bucketName := testUtils.GetVarFromEnvList(testContext.Env, "S3_BUCKET")
-		accessKeyId := testUtils.GetVarFromEnvList(testContext.Env, "S3_ACCESS_KEY_ID")
-		accessSecretKey := testUtils.GetVarFromEnvList(testContext.Env, "S3_ACCESS_SECRET_KEY")
+		bucketName := testContext.Env["S3_BUCKET"]
+		accessKeyId := testContext.Env["S3_ACCESS_KEY"]
+		accessSecretKey := testContext.Env["S3_SECRET_KEY"]
 		command := []string{"mc", "--debug", "config", "host", "add", "local", "http://localhost:9000", accessKeyId, accessSecretKey}
 		response, _ = RunCommandInContainer(testContext, containerName.Names[0], command)
 
