@@ -12,7 +12,7 @@ import (
 )
 
 func prepareTestLoad(configFile, patronFile, mongoUri string, ctx context.Context) (*mongo.Client, *os.File, error) {
-	err := generatePatronsFromFile(configFile)
+	_, err := GeneratePatronsFromFile(configFile)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -37,7 +37,7 @@ func prepareTestLoad(configFile, patronFile, mongoUri string, ctx context.Contex
 }
 
 func TestLoadRange(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 8050*time.Millisecond)
 	defer cancel()
 
 	cli, f, err := prepareTestLoad("mongo_load_config.json",
@@ -58,7 +58,9 @@ func TestLoadRange(t *testing.T) {
 	cmdc, errc1 := MakeMongoOps(ctx, cli, roc)
 	errcList = append(errcList, errc1)
 	rsc := RunMongoOpFuncs(ctx, cmdc, 3, 3)
-	PrintMongoOpRes(ctx, rsc)
+	s := CollectStat(ctx, rsc)
+	time.Sleep(1 * time.Second)
+	PrintStat(s, os.Stdout, "json")
 	err = WaitForPipeline(errcList...)
 	if err != nil {
 		t.Error(err)

@@ -4,14 +4,44 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/olekukonko/tablewriter"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"io"
+	"strconv"
 	"sync"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type RawMongoOp = map[string]json.RawMessage
+
+type MongoOpInfo struct {
+	command   bson.D
+	id        int
+	opName    string
+	status    bool
+	err       error
+	timeStart time.Time
+	timeEnd   time.Time
+	subcmds   []MongoOpInfo
+	res       bson.M
+}
+
+func NewMongoOpInfo(opName string, id int, timeStart time.Time, timeEnd time.Time, err error) MongoOpInfo {
+	return MongoOpInfo{
+		command:   bson.D{},
+		id:        id,
+		opName:    opName,
+		status:    err == nil,
+		err:       err,
+		timeStart: timeStart,
+		timeEnd:   timeEnd,
+		subcmds:   nil,
+		res:       nil,
+	}
+}
 
 func ReadRawMongoOps(ctx context.Context, reader io.Reader, mxCmdsSize int) (<-chan RawMongoOp, <-chan error, error) {
 	cmds := make(chan RawMongoOp, mxCmdsSize)
@@ -34,8 +64,7 @@ func ReadRawMongoOps(ctx context.Context, reader io.Reader, mxCmdsSize int) (<-c
 
 		for dec.More() {
 			var cmd map[string]json.RawMessage
-			err := dec.Decode(&cmd)
-			if err != nil {
+			if err := dec.Decode(&cmd); err != nil {
 				errc <- fmt.Errorf("cannot parse command from patron: %v", err)
 				return
 			}
@@ -46,8 +75,7 @@ func ReadRawMongoOps(ctx context.Context, reader io.Reader, mxCmdsSize int) (<-c
 			}
 		}
 
-		t, err = dec.Token()
-		if err != nil {
+		if _, err = dec.Token(); err != nil {
 			errc <- fmt.Errorf("expected the end of the array of commands")
 			return
 		}
@@ -56,8 +84,8 @@ func ReadRawMongoOps(ctx context.Context, reader io.Reader, mxCmdsSize int) (<-c
 	return cmds, errc, nil
 }
 
-func MakeMongoOps(ctx context.Context, cli *mongo.Client, roc <-chan RawMongoOp) (<-chan func(ctx context.Context) string, <-chan error) {
-	cmds := make(chan func(ctx context.Context) string, cap(roc))
+func MakeMongoOps(ctx context.Context, cli *mongo.Client, roc <-chan RawMongoOp) (<-chan func(ctx context.Context) MongoOpInfo, <-chan error) {
+	cmds := make(chan func(ctx context.Context) MongoOpInfo, cap(roc))
 	errc := make(chan error, 1)
 
 	go func() {
@@ -82,7 +110,7 @@ func MakeMongoOps(ctx context.Context, cli *mongo.Client, roc <-chan RawMongoOp)
 	return cmds, errc
 }
 
-func makeMongoOp(client *mongo.Client, opdata map[string]json.RawMessage) (func(ctx context.Context) string, error) {
+func makeMongoOp(client *mongo.Client, opdata map[string]json.RawMessage) (func(ctx context.Context) MongoOpInfo, error) {
 	switch string(opdata["op"]) {
 	case `"c"`:
 		commandDoc, err := parseCommandOp(opdata)
@@ -96,15 +124,36 @@ func makeMongoOp(client *mongo.Client, opdata map[string]json.RawMessage) (func(
 			return nil, err
 		}
 		return makeFuncTransaction(client, transactionDoc), nil
+	case `"sleep"`:
+		sleepDoc, err := parseSleepOp(opdata)
+		if err != nil {
+			return nil, err
+		}
+		return makeFuncSleep(client, sleepDoc), nil
+	case `"abort"`:
+		abortDoc, err := parseAbortOp(opdata)
+		if err != nil {
+			return nil, err
+		}
+		return func(ctx context.Context) MongoOpInfo {
+			t := time.Time{}
+			sessCtx, ok := ctx.(mongo.SessionContext)
+			if !ok {
+				return MongoOpInfo{err: fmt.Errorf("expeted sessioinContext instance")}
+			}
+
+			err := sessCtx.AbortTransaction(sessCtx)
+			return NewMongoOpInfo("abort", abortDoc.Id, t, time.Time{}, err)
+		}, nil
 	default:
 		return nil, fmt.Errorf("unknown command %v", string(opdata["op"]))
 	}
 }
 
 type MongoRunCommandOp struct {
-	DbName string `json:"db"`
-	Id     int    `json:"id"`
-	Doc    bson.D
+	DbName   string `json:"db"`
+	Id       int    `json:"id"`
+	callback func(ctx context.Context, client *mongo.Client) MongoOpInfo
 }
 
 func parseCommandOp(cd map[string]json.RawMessage) (*MongoRunCommandOp, error) {
@@ -113,30 +162,32 @@ func parseCommandOp(cd map[string]json.RawMessage) (*MongoRunCommandOp, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse opts for commad: %+v", err)
 	}
-	err = json.Unmarshal(bmrco, &res)
-	if err != nil {
+	if err = json.Unmarshal(bmrco, &res); err != nil {
 		return nil, fmt.Errorf("cannot parse opts for commad: %+v", err)
 	}
-	err = bson.UnmarshalExtJSON(cd["dc"], true, &res.Doc)
-	if err != nil {
+	var doc bson.D
+	if err = bson.UnmarshalExtJSON(cd["dc"], true, &doc); err != nil {
 		return nil, err
+	}
+	res.callback = func(ctx context.Context, client *mongo.Client) MongoOpInfo {
+		db := client.Database(res.DbName)
+		var result bson.M
+		tm := time.Now()
+		err := db.RunCommand(ctx, doc).Decode(&result)
+		info := NewMongoOpInfo(doc[0].Key, res.Id, tm, time.Now(), err)
+		info.command = doc
+		info.res = result
+		return info
 	}
 	return &res, nil
 }
 
-func mongoRunCommandOp(ctx context.Context, client *mongo.Client, op *MongoRunCommandOp) string {
-	db := client.Database(op.DbName)
-	var result bson.M
-	err := db.RunCommand(ctx, op.Doc).Decode(&result)
-	if err != nil {
-		return fmt.Sprintf("Failed execution of runCommand with id %d: %+v", op.Id, err)
-	} else {
-		return fmt.Sprintf("Successful execution of runCommand with id %d", op.Id)
-	}
+func mongoRunCommandOp(ctx context.Context, client *mongo.Client, op *MongoRunCommandOp) MongoOpInfo {
+	return op.callback(ctx, client)
 }
 
-func makeFuncCommand(client *mongo.Client, op *MongoRunCommandOp) func(ctx context.Context) string {
-	return func(ctx context.Context) string {
+func makeFuncCommand(client *mongo.Client, op *MongoRunCommandOp) func(ctx context.Context) MongoOpInfo {
+	return func(ctx context.Context) MongoOpInfo {
 		return mongoRunCommandOp(ctx, client, op)
 	}
 }
@@ -153,50 +204,132 @@ func parseTransactionOp(cd map[string]json.RawMessage) (*MongoRunTransactionOp, 
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse opts for commad: %+v", err)
 	}
-	err = json.Unmarshal(bmrco, &res)
-	if err != nil {
+	if err = json.Unmarshal(bmrco, &res); err != nil {
 		return nil, fmt.Errorf("cannot parse opts for commad: %+v", err)
 	}
-	var fns []func(ctx context.Context, client *mongo.Client) string
+	var fns []func(ctx context.Context, client *mongo.Client) MongoOpInfo
 	for _, cmd := range res.Cmds {
-		commandDoc, err := parseCommandOp(cmd)
-		if err != nil {
-			return nil, err
+		curCmd := cmd
+		command := func(ctx context.Context, client *mongo.Client) MongoOpInfo {
+			f, err := makeMongoOp(client, curCmd)
+			if err != nil {
+				return NewMongoOpInfo("transaction", res.Id, time.Time{}, time.Time{}, err)
+			}
+			opLog := f(ctx)
+			return opLog
 		}
-		fns = append(fns, func(ctx context.Context, client *mongo.Client) string {
-			return mongoRunCommandOp(ctx, client, commandDoc)
+		fns = append(fns, func(ctx context.Context, client *mongo.Client) MongoOpInfo {
+			return command(ctx, client)
 		})
 	}
 	res.callback = func(ctx context.Context, client *mongo.Client) (interface{}, error) {
-		var res string
+		var res []MongoOpInfo
 		for _, f := range fns {
-			res = res + "\n\t|\t" + f(ctx, client)
+			res = append(res, f(ctx, client))
 		}
 		return res, nil
 	}
 	return &res, nil
 }
 
-func makeFuncTransaction(client *mongo.Client, op *MongoRunTransactionOp) func(ctx context.Context) string {
-	return func(ctx context.Context) string {
+func makeFuncTransaction(client *mongo.Client, op *MongoRunTransactionOp) func(ctx context.Context) MongoOpInfo {
+	return func(ctx context.Context) MongoOpInfo {
+		tm := time.Now()
+		var tempres bson.D
+		doc := bson.D{
+			primitive.E{Key: "insert", Value: "sleep_temp"},
+			primitive.E{Key: "documents", Value: bson.A{bson.D{primitive.E{Key: "aa", Value: "b"}}}}}
+		db := client.Database("sleep_db_temp")
+		if err := db.RunCommand(ctx, doc).Decode(&tempres); err != nil {
+			return NewMongoOpInfo("transaction", op.Id, time.Time{}, time.Time{}, fmt.Errorf("cannot start transaction because temp collection cannot be created: %+v", err))
+		}
+
 		session, err := client.StartSession()
 		if err != nil {
-			return fmt.Sprintf("Cannot start session: %+v", err)
+			return NewMongoOpInfo("transaction", op.Id, tm, time.Now(), err)
 		}
 		defer session.EndSession(context.Background())
 		tres, err := session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
-			return op.callback(ctx, client)
+			return op.callback(sessCtx, client)
 		})
-		if err != nil {
-			return fmt.Sprintf("Failed execution of transaction with id %d: %+v", op.Id, err)
-		} else {
-			return fmt.Sprintf("Successful execution of transaction with id %d%s", op.Id, tres)
-		}
+
+		doc = bson.D{
+			primitive.E{Key:"delete", Value:"sleep_temp"},
+			primitive.E{Key:"deletes", Value: bson.A{bson.D{
+				primitive.E{Key:"q", Value: bson.D{primitive.E{Key:"aa", Value: "b"}}},
+				primitive.E{Key:"limit", Value: 1}}}}}
+		_ = db.RunCommand(ctx, doc).Decode(&tempres)
+
+		info := NewMongoOpInfo("transaction", op.Id, tm, time.Now(), err)
+		info.subcmds = tres.([]MongoOpInfo)
+		return info
 	}
 }
 
-func RunMongoOpFuncs(ctx context.Context, fc <-chan func(ctx context.Context) string, mxWorkCnt, resSize int) <-chan string {
-	resc := make(chan string, resSize)
+type MongoRunSleepOp struct {
+	DbName  string  `json:"db"`
+	ColName string  `json:"cl"`
+	Id      int     `json:"id"`
+	Dur     float32 `json:"time"`
+}
+
+func parseSleepOp(cd map[string]json.RawMessage) (*MongoRunSleepOp, error) {
+	var res MongoRunSleepOp
+	bmrco, err := json.Marshal(cd)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse opts for commad: %+v", err)
+	}
+	if err = json.Unmarshal(bmrco, &res); err != nil {
+		return nil, fmt.Errorf("cannot parse opts for commad: %+v", err)
+	}
+	return &res, nil
+}
+
+func makeFuncSleep(client *mongo.Client, op *MongoRunSleepOp) func(ctx context.Context) MongoOpInfo {
+	return func(ctx context.Context) MongoOpInfo {
+		sleepCmd := MongoRunCommandOp{
+			DbName: op.DbName,
+			Id:     op.Id,
+			callback: func(ctx context.Context, client *mongo.Client) MongoOpInfo {
+				db := client.Database("sleep_db_temp")
+				var result bson.M
+				tm := time.Now()
+				doc := bson.D{
+					primitive.E{Key:"find", Value: "sleep_temp"},
+					primitive.E{Key:"filter", Value: bson.D{
+						primitive.E{Key:"$where", Value:fmt.Sprintf("sleep(%f)", op.Dur)}}},
+				}
+				err := db.RunCommand(ctx, doc).Decode(&result)
+				info := NewMongoOpInfo(doc[0].Key, op.Id, tm, time.Now(), err)
+				info.command = doc
+				info.res = result
+				return info
+			},
+		}
+		opLog := mongoRunCommandOp(ctx, client, &sleepCmd)
+		opLog.opName = "sleep"
+		return opLog
+	}
+}
+
+type MongoRunAbortOp struct {
+	Id int `json:"id"`
+}
+
+func parseAbortOp(cd map[string]json.RawMessage) (*MongoRunAbortOp, error) {
+	var res MongoRunAbortOp
+	bmrco, err := json.Marshal(cd)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse opts for commad: %+v", err)
+	}
+	if err = json.Unmarshal(bmrco, &res); err != nil {
+		return nil, fmt.Errorf("cannot parse opts for commad: %+v", err)
+	}
+	return &res, nil
+}
+
+func RunMongoOpFuncs(ctx context.Context, fc <-chan func(ctx context.Context) MongoOpInfo, mxWorkCnt, resSize int) <-chan MongoOpInfo {
+	resc := make(chan MongoOpInfo, resSize)
 	wg := sync.WaitGroup{}
 
 	wg.Add(mxWorkCnt)
@@ -221,17 +354,127 @@ func RunMongoOpFuncs(ctx context.Context, fc <-chan func(ctx context.Context) st
 	return resc
 }
 
-func PrintMongoOpRes(ctx context.Context, resc <-chan string) {
-	go func() {
-		for res := range resc {
-			fmt.Println(res)
-			select {
-			case <-ctx.Done():
-				return
-			default:
+type MongoOpsStat struct {
+	Succ       map[string]int
+	Fail       map[string]int
+	InsDocsCnt int
+	UpdDocsCnt int
+	DelDocsCnt int
+}
+
+type MongoOpStat struct {
+	CmdStat MongoOpsStat
+	TxnStat MongoOpsStat
+}
+
+func updateStatWithMongoOpLog(stat *MongoOpsStat, log MongoOpInfo) {
+	if stat.Succ == nil {
+		stat.Succ = make(map[string]int)
+	}
+	if stat.Fail == nil {
+		stat.Fail = make(map[string]int)
+	}
+	if log.status {
+		stat.Succ[log.opName]++
+	} else {
+		stat.Fail[log.opName]++
+		return
+	}
+	var docs int
+	if log.res != nil && log.res["n"] != nil {
+		docs = int(log.res["n"].(int32))
+	}
+	if log.opName == "insert" {
+		stat.InsDocsCnt += docs
+	} else if log.opName == "update" {
+		stat.UpdDocsCnt += docs
+	} else if log.opName == "delete" {
+		stat.DelDocsCnt += docs
+	}
+}
+
+func CollectStat(ctx context.Context, logs <-chan MongoOpInfo) MongoOpStat {
+	var stat MongoOpStat
+	for log := range logs {
+		updateStatWithMongoOpLog(&stat.CmdStat, log)
+		if log.opName == "transaction" {
+			for _, cmdLog := range log.subcmds {
+				updateStatWithMongoOpLog(&stat.TxnStat, cmdLog)
 			}
 		}
-	}()
+		select {
+		case <-ctx.Done():
+			return stat
+		default:
+		}
+	}
+	return stat
+}
+
+func mergeKeys(mp1 map[string]int, mp2 map[string]int) []string {
+	var res []string
+	for k, _ := range mp1 {
+		if _, ok := mp2[k]; !ok {
+			res = append(res, k)
+		}
+	}
+	for k, _ := range mp2 {
+		if _, ok := mp1[k]; !ok {
+			res = append(res, k)
+		}
+	}
+	for k, _ := range mp1 {
+		if _, ok := mp2[k]; ok {
+			res = append(res, k)
+		}
+	}
+	return res
+}
+
+func PrintStat(stat MongoOpStat, writer io.Writer, format string) error {
+	if format == "table" {
+		var data [][]string
+		var cmds []string
+		cmdTable := tablewriter.NewWriter(writer)
+		_, err := fmt.Fprintln(writer, "Command stat")
+		if err != nil {
+			return err
+		}
+		cmdTable.SetHeader([]string{"Txn", "Command", "Total", "Successful", "Failed"})
+		cmds = mergeKeys(stat.CmdStat.Succ, stat.CmdStat.Fail)
+		for _, cmd := range cmds {
+			data = append(data, []string{"-", cmd, strconv.Itoa(stat.CmdStat.Succ[cmd] + stat.CmdStat.Fail[cmd]),
+				strconv.Itoa(stat.CmdStat.Succ[cmd]), strconv.Itoa(stat.CmdStat.Fail[cmd])})
+		}
+		cmds = mergeKeys(stat.TxnStat.Succ, stat.TxnStat.Fail)
+		for _, cmd := range cmds {
+			data = append(data, []string{"+", cmd, strconv.Itoa(stat.TxnStat.Succ[cmd] + stat.TxnStat.Fail[cmd]),
+				strconv.Itoa(stat.TxnStat.Succ[cmd]), strconv.Itoa(stat.TxnStat.Fail[cmd])})
+		}
+		cmdTable.AppendBulk(data)
+		cmdTable.Render()
+		_, err = fmt.Fprintln(writer, "Documents stat")
+		if err != nil {
+			return err
+		}
+		docTable := tablewriter.NewWriter(writer)
+		docTable.SetHeader([]string{"Txn", "inserted", "updated", "deleted"})
+		docTable.Append([]string{"-", strconv.Itoa(stat.CmdStat.InsDocsCnt), strconv.Itoa(stat.CmdStat.UpdDocsCnt),
+			strconv.Itoa(stat.CmdStat.DelDocsCnt)})
+		docTable.Append([]string{"+", strconv.Itoa(stat.TxnStat.InsDocsCnt), strconv.Itoa(stat.TxnStat.UpdDocsCnt),
+			strconv.Itoa(stat.TxnStat.DelDocsCnt)})
+		docTable.Render()
+	} else if format == "json" {
+		bstat, err := json.MarshalIndent(stat, "", "    ")
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintln(writer, string(bstat))
+		if err != nil {
+			return err
+		}
+	}
+	return fmt.Errorf("no such format for printing mongo load operations stat")
 }
 
 func WaitForPipeline(errs ...<-chan error) error {
