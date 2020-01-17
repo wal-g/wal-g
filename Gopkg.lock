@@ -519,6 +519,14 @@
   version = "v1.0.49"
 
 [[projects]]
+  digest = "1:b8261a46d75566ebf5b4fb6bb762f54f47e6633e0995118393afc80bb1f428f5"
+  name = "github.com/olekukonko/tablewriter"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "876dd0e0227ec99c0243b639b92139915b65331a"
+  version = "v0.0.4"
+
+[[projects]]
   digest = "1:ee4d4af67d93cc7644157882329023ce9a7bcfce956a079069a9405521c7cc8d"
   name = "github.com/opencontainers/go-digest"
   packages = ["."]
@@ -644,9 +652,20 @@
   version = "v1.6.1"
 
 [[projects]]
-  digest = "1:8548c309c65a85933a625be5e7d52b6ac927ca30c56869fae58123b8a77a75e1"
+  digest = "1:ac83cf90d08b63ad5f7e020ef480d319ae890c208f8524622a2f3136e2686b02"
+  name = "github.com/stretchr/objx"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "477a77ecc69700c7cdeb1fa9e129548e1c1c393c"
+  version = "v0.1.1"
+
+[[projects]]
+  digest = "1:ad527ce5c6b2426790449db7663fe53f8bb647f9387295406794c8be001238da"
   name = "github.com/stretchr/testify"
-  packages = ["assert"]
+  packages = [
+    "assert",
+    "mock",
+  ]
   pruneopts = "UT"
   revision = "221dbe5ed46703ee255b1da0dec05086f5035f62"
   version = "v1.4.0"
@@ -1141,11 +1160,13 @@
     "github.com/minio/sio",
     "github.com/mongodb/mongo-tools-common/db",
     "github.com/mongodb/mongo-tools-common/txn",
+    "github.com/olekukonko/tablewriter",
     "github.com/pierrec/lz4",
     "github.com/pkg/errors",
     "github.com/spf13/cobra",
     "github.com/spf13/viper",
     "github.com/stretchr/testify/assert",
+    "github.com/stretchr/testify/mock",
     "github.com/tinsane/tracelog",
     "github.com/ulikunitz/xz/lzma",
     "github.com/wal-g/storages/azure",

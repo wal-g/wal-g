@@ -4,24 +4,38 @@
     "config": [
       {
         "op": "insert",
-        "cnt": 5,
+        "cnt": 6,
         "db": "t1",
-        "col": "c1",
-        "log": true,
+        "cl": "c1",
         "adv": {
-          "values": ["v1", "v2", "v3"],
-          "keys": ["k1", "k2", "k3"],
-          "mx_keys_cnt": 1,
+          "values": [
+            "v1",
+            "v2",
+            "v3"
+          ],
+          "keys": [
+            "k1",
+            "k2",
+            "k3"
+          ],
+          "mn_keys_cnt": 10,
           "mx_docs_cnt": 2,
-          "mn_docs_cnt": 2
+          "mn_docs_cnt": 100
+        }
+      },
+      {
+        "op": "delete",
+        "cnt": 1,
+        "db": "t1",
+        "cl": "c1",
+        "adv": {
         }
       },
       {
         "op": "insert",
         "cnt": 5,
-        "db": "t1",
-        "col": "c1",
-        "log": true,
+        "db": "t2",
+        "cl": "c1",
         "adv": {
           "mx_keys_cnt": 1,
           "mx_docs_cnt": 1
@@ -31,6 +45,7 @@
         "cmds": [
           {
             "op": "t",
+            "db": "t1",
             "cmds": [
               {
                 "op": "c",
@@ -39,16 +54,16 @@
                   "insert": "c1",
                   "documents": [
                     {
-                      "tkey1": "tname1",
-                      "tkey2": "tname2"
-                    },
-                    {
-                      "ttkey1": "tname1",
-                      "ttkey2": "tname2",
-                      "ttkey3": "tname3"
+                      "tt1": "ttn1"
                     }
                   ]
                 }
+              },
+              {
+                "op": "sleep",
+                "db": "t1",
+                "cl": "c2",
+                "time": 5000
               },
               {
                 "op": "c",
@@ -67,6 +82,9 @@
                     }
                   ]
                 }
+              },
+              {
+                "op": "abort"
               }
             ]
           }
@@ -76,8 +94,7 @@
         "op": "insert",
         "cnt": 10,
         "db": "t1",
-        "col": "c1",
-        "log": true
+        "cl": "c1"
       }
     ]
   }

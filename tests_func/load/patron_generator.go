@@ -16,7 +16,7 @@ type opConfig struct {
 	Op      string            `json:"op"`
 	Cnt     int               `json:"cnt"`
 	DbName  string            `json:"db"`
-	ColName string            `json:"col"`
+	ColName string            `json:"cl"`
 	Cmds    []json.RawMessage `json:"cmds"`
 	Adv     json.RawMessage   `json:"adv"`
 }
@@ -32,6 +32,19 @@ type advInsert struct {
 	MxDocsCnt int      `json:"mx_docs_cnt"`
 	MnKeysCnt int      `json:"mn_keys_cnt"`
 	MxKeysCnt int      `json:"mx_keys_cnt"`
+}
+
+type advDelete struct {
+	Values   []string `json:"values"`
+	MnValLen int      `json:"mn_val_len"`
+	MxValLen int      `json:"mx_val_len"`
+	Keys     []string `json:"keys"`
+	MnKeyLen int      `json:"mn_key_len"`
+	MxKeyLen int      `json:"mx_key_len"`
+}
+
+type advSleep struct {
+	Time float32 `json:"time"`
 }
 
 type patronConfig struct {
@@ -108,6 +121,36 @@ var processOp = map[string]func(config opConfig) (string, error){
 		return fmt.Sprintf(`{"op":"c", "db":"%s", "id": %d, "dc":{"insert":"%s", "documents": %s}}`,
 			config.DbName, id, config.ColName, docsGen()), nil
 
+	},
+	"delete": func(config opConfig) (string, error) {
+		var adv advDelete
+		if len(config.Adv) != 0 {
+			err := json.Unmarshal(config.Adv, &adv)
+			if err != nil {
+				fmt.Println(err)
+				return "", err
+			}
+		}
+		delsGen := func() string {
+			return `[{"q": {}, "limit": 0}]`
+		}
+
+		id++
+		return fmt.Sprintf(`{"op":"c", "db":"%s", "id": %d, "dc":{"delete":"%s", "deletes": %s}}`,
+			config.DbName, id, config.ColName, delsGen()), nil
+	},
+	"sleep": func(config opConfig) (string, error) {
+		var adv advSleep
+		if len(config.Adv) != 0 {
+			err := json.Unmarshal(config.Adv, &adv)
+			if err != nil {
+				fmt.Println(err)
+				return "", err
+			}
+		}
+		id++
+		return fmt.Sprintf(`{"op":"sleep", "db":"%s", "cl": "%s", "id": %d, "time": %f}`,
+			config.DbName, config.ColName, id, adv.Time), nil
 	},
 }
 
@@ -191,25 +234,26 @@ func generatePatron(config patronConfig) error {
 	return nil
 }
 
-func generatePatronsFromFile(filepath string) error {
+func GeneratePatronsFromFile(filepath string) ([]string, error) {
 	rand.Seed(time.Now().UnixNano())
+	var patrons []string
 	hndl, err := os.Open(filepath)
 	if err != nil {
-		return fmt.Errorf("cannot generate patrons from file: %v", err)
+		return []string{}, fmt.Errorf("cannot generate patrons from file: %v", err)
 	}
 	defer hndl.Close()
 	decoder := json.NewDecoder(hndl)
 	var configs []patronConfig
 	err = decoder.Decode(&configs)
 	if err != nil {
-		return fmt.Errorf("cannot decode config JSON: %v", err)
+		return []string{}, fmt.Errorf("cannot decode config JSON: %v", err)
 	}
 	for i := range configs {
 		id = 0
 		err = generatePatron(configs[i])
 		if err != nil {
-			return err
+			return patrons, err
 		}
 	}
-	return nil
+	return patrons, nil
 }
