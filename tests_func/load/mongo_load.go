@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/olekukonko/tablewriter"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
