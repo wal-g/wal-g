@@ -125,8 +125,8 @@ unittest:
 	go test -v $(TEST_MODIFIER) ./internal/compression/
 	go test -v $(TEST_MODIFIER) ./internal/crypto/openpgp/
 	go test -v $(TEST_MODIFIER) ./internal/crypto/awskms/
-	@if [[ ! -z "${USE_LIBSODIUM}" ]]; then\
-		go test -v $(TEST_MODIFIER) ./internal/crypto/libsodium/;\
+	@if [ ! -z "${USE_LIBSODIUM}" ]; then\
+		go test -v $(TEST_MODIFIER) -tags libsodium ./internal/crypto/libsodium/;\
 	fi
 	go test -v $(TEST_MODIFIER) ./internal/databases/mysql
 	go test -v $(TEST_MODIFIER) ./internal/databases/mongo/...
@@ -162,7 +162,9 @@ link_brotli:
 	./link_brotli.sh
 
 link_libsodium:
-	./link_libsodium.sh
+	@if [ ! -z "${USE_LIBSODIUM}" ]; then\
+		./link_libsodium.sh;\
+	fi
 
 unlink_brotli:
 	rm -rf vendor/github.com/google/brotli/*
