@@ -11,6 +11,7 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 type InfoLogger interface {
@@ -91,7 +92,7 @@ func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, de
 func getBackupDetails(folder storage.Folder, backups []BackupTime) ([]BackupDetail, error) {
 	backupDetails := make([]BackupDetail, len(backups))
 	for i := len(backups) - 1; i >= 0; i-- {
-		backup, err := GetBackupByName(backups[i].BackupName, folder)
+		backup, err := GetBackupByName(backups[i].BackupName, utility.BaseBackupPath, folder)
 		if err != nil {
 			return nil, err
 		} else {

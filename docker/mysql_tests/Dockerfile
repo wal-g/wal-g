@@ -6,6 +6,7 @@ RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests
 
 COPY tmp/libsodium tmp/libsodium
+COPY go.mod go.mod
 COPY vendor/ vendor/
 COPY internal/ internal/
 COPY cmd/ cmd/
@@ -15,7 +16,7 @@ COPY utility/ utility/
 RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
         vendor/github.com/google/brotli/go/cbrotli/cgo.go && \
     cd main/mysql && \
-    go build -tags brotli -race -o wal-g -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
+    go build -mod vendor -tags brotli -race -o wal-g -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 
 COPY docker/mysql/gtid_set.go /tmp/testtools/gtid_set.go
 

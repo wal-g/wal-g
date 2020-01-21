@@ -13,12 +13,13 @@ package internal
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path"
 	"regexp"
 	"strings"
+
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
@@ -136,7 +137,7 @@ func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitma
 }
 
 // ApplyFileIncrement changes pages according to supplied change map file
-func ApplyFileIncrement(fileName string, increment io.Reader) error {
+func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrementalFiles bool) error {
 	tracelog.DebugLogger.Printf("Incrementing %s\n", fileName)
 	err := ReadIncrementFileHeader(increment)
 	if err != nil {
@@ -160,7 +161,12 @@ func ApplyFileIncrement(fileName string, increment io.Reader) error {
 		return err
 	}
 
-	file, err := os.OpenFile(fileName, os.O_RDWR, 0666)
+	openFlags := os.O_RDWR
+	if createNewIncrementalFiles {
+		openFlags = openFlags | os.O_CREATE
+	}
+
+	file, err := os.OpenFile(fileName, openFlags, 0666)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return errors.Wrap(err, "incremented file should always exist")

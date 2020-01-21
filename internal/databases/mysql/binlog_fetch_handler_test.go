@@ -2,6 +2,13 @@ package mysql
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/golang/mock/gomock"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -11,12 +18,6 @@ import (
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
-	"testing"
-	"time"
 )
 
 type TestBinlogHandlers struct {

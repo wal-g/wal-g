@@ -2,14 +2,15 @@ package internal_test
 
 import (
 	"bytes"
+	"io"
+	"io/ioutil"
+	"testing"
+
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/testtools"
-	"io"
-	"io/ioutil"
-	"testing"
 )
 
 const (

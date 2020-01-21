@@ -3,11 +3,12 @@ package internal
 import (
 	"bytes"
 	"fmt"
+	"sync"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/utility"
-	"sync"
 )
 
 type DeltaFileWriterNotFoundError struct {

@@ -3,6 +3,7 @@ package internal
 import (
 	"bytes"
 	"encoding/json"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 

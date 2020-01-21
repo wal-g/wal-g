@@ -2,6 +2,11 @@ package internal_test
 
 import (
 	"encoding/json"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/storages/storage"
@@ -9,10 +14,6 @@ import (
 	"github.com/wal-g/wal-g/test/mocks"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
-	"strconv"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestFindTargetBeforeName_ReturnsBackup_Without_Modifier(t *testing.T) {

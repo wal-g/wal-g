@@ -324,6 +324,17 @@ services:
     links:
       - s3
 
+  pg_catchup_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_catchup_test
+      context: .
+    image: wal-g/catchup_test
+    container_name: wal-g_pg_catchup_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   mysql:
     build:
       dockerfile: docker/mysql/Dockerfile

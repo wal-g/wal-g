@@ -1,8 +1,9 @@
 package internal
 
 import (
-	"github.com/wal-g/tracelog"
 	"path"
+
+	"github.com/wal-g/tracelog"
 )
 
 // Cleaner interface serves to separate file system logic from prefetch clean logic to make it testable

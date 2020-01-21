@@ -2,6 +2,9 @@ package internal_test
 
 import (
 	"bytes"
+	"testing"
+	"time"
+
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/storages/memory"
@@ -12,8 +15,6 @@ import (
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
-	"testing"
-	"time"
 )
 
 var BundleTestLocations = []walparser.BlockLocation{

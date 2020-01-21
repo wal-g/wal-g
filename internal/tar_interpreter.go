@@ -2,12 +2,13 @@ package internal
 
 import (
 	"archive/tar"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -24,10 +25,14 @@ type FileTarInterpreter struct {
 	DBDataDirectory string
 	Sentinel        BackupSentinelDto
 	FilesToUnwrap   map[string]bool
+
+	createNewIncrementalFiles bool
 }
 
-func NewFileTarInterpreter(dbDataDirectory string, sentinel BackupSentinelDto, filesToUnwrap map[string]bool) *FileTarInterpreter {
-	return &FileTarInterpreter{dbDataDirectory, sentinel, filesToUnwrap}
+func NewFileTarInterpreter(
+	dbDataDirectory string, sentinel BackupSentinelDto, filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
+) *FileTarInterpreter {
+	return &FileTarInterpreter{dbDataDirectory, sentinel, filesToUnwrap, createNewIncrementalFiles}
 }
 
 // TODO : unit tests
@@ -43,7 +48,7 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFile(fileReader io.Reader
 
 	// If this file is incremental we use it's base version from incremental path
 	if haveFileDescription && tarInterpreter.Sentinel.IsIncremental() && fileDescription.IsIncremented {
-		err := ApplyFileIncrement(targetPath, fileReader)
+		err := ApplyFileIncrement(targetPath, fileReader, tarInterpreter.createNewIncrementalFiles)
 		return errors.Wrapf(err, "Interpret: failed to apply increment for '%s'", targetPath)
 	}
 	err := PrepareDirs(fileInfo.Name, targetPath)
@@ -109,7 +114,7 @@ func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileIn
 
 // PrepareDirs makes sure all dirs exist
 func PrepareDirs(fileName string, targetPath string) error {
-	if (fileName == targetPath) {
+	if fileName == targetPath {
 		return nil // because it runs in the local directory
 	}
 	base := filepath.Base(fileName)

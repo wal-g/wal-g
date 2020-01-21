@@ -2,14 +2,15 @@ package internal_test
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/utility"
-	"golang.org/x/time/rate"
 	"io"
 	"io/ioutil"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/utility"
+	"golang.org/x/time/rate"
 )
 
 type fakeCloser struct {

@@ -1,8 +1,9 @@
 package internal
 
 import (
-	"github.com/pkg/errors"
 	"io"
+
+	"github.com/pkg/errors"
 )
 
 // CascadeWriteCloser bundles multiple closures

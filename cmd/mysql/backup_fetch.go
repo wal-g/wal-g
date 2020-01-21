@@ -1,16 +1,17 @@
 package mysql
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"os"
 )
 
 const BackupFetchShortDescription = "Fetches desired backup from storage"
 
 // backupFetchCmd represents the streamFetch command
-var backupFetchCmd = &cobra.Command {
+var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch backup-name",
 	Short: BackupFetchShortDescription,
 	Args:  cobra.ExactArgs(1),

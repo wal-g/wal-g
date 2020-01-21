@@ -12,13 +12,12 @@ import (
 	"testing"
 	"time"
 
-	testConf "github.com/wal-g/wal-g/tests_func/config"
-	testHelper "github.com/wal-g/wal-g/tests_func/helpers"
-	testUtils "github.com/wal-g/wal-g/tests_func/utils"
-
 	"github.com/DATA-DOG/godog"
 	"github.com/DATA-DOG/godog/colors"
 	"github.com/DATA-DOG/godog/gherkin"
+	testConf "github.com/wal-g/wal-g/tests_func/config"
+	testHelper "github.com/wal-g/wal-g/tests_func/helpers"
+	testUtils "github.com/wal-g/wal-g/tests_func/utils"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 

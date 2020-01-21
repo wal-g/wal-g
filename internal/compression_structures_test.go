@@ -3,15 +3,16 @@ package internal_test
 import (
 	"bytes"
 	"errors"
+	"io"
+	"io/ioutil"
+	"math/rand"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/compression/lz4"
 	"github.com/wal-g/wal-g/testtools"
-	"io"
-	"io/ioutil"
-	"math/rand"
-	"testing"
 )
 
 func GetLz4Compressor() compression.Compressor {

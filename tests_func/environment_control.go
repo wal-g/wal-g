@@ -3,17 +3,16 @@ package functest
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
 
+	"github.com/docker/docker/client"
 	testConf "github.com/wal-g/wal-g/tests_func/config"
 	testHelper "github.com/wal-g/wal-g/tests_func/helpers"
 	testUtils "github.com/wal-g/wal-g/tests_func/utils"
-
-	"github.com/docker/docker/client"
-	"strconv"
-	"math/rand"
 )
 
 func BuildBase(testContext *testHelper.TestContextType) error {

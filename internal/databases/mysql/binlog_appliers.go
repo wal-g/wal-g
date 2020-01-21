@@ -3,11 +3,12 @@ package mysql
 import (
 	"bufio"
 	"bytes"
+	"path"
+
 	"github.com/tinsane/tracelog"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
-	"path"
 )
 
 type Applier = func(logFolder storage.Folder, logName string, settings BinlogFetchSettings) (needAbortFetch bool, err error)

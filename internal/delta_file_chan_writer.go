@@ -1,8 +1,9 @@
 package internal
 
 import (
-	"github.com/wal-g/wal-g/internal/walparser"
 	"sync"
+
+	"github.com/wal-g/wal-g/internal/walparser"
 )
 
 type DeltaFileChanWriter struct {

@@ -1,10 +1,11 @@
 package internal
 
 import (
+	"io"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
-	"io"
 )
 
 type BlockLocationReader struct {

@@ -2,9 +2,10 @@ package pg
 
 import (
 	"fmt"
-	"github.com/wal-g/wal-g/internal"
 	"os"
 	"strings"
+
+	"github.com/wal-g/wal-g/internal"
 
 	"github.com/spf13/cobra"
 )

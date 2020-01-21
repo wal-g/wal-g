@@ -2,14 +2,15 @@ package internal_test
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 )
 
 func TestGetMaxConcurrency_InvalidKey(t *testing.T) {

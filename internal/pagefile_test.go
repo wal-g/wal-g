@@ -3,14 +3,15 @@ package internal_test
 import (
 	"bytes"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const (
@@ -65,7 +66,7 @@ func postgresFileTest(loclLSN uint64, t *testing.T) {
 	tmpFile.WriteAt(make([]byte, 12345), 477421568-12345)
 	tmpFile.Close()
 	newReader := bytes.NewReader(buf)
-	err = internal.ApplyFileIncrement(tmpFileName, newReader)
+	err = internal.ApplyFileIncrement(tmpFileName, newReader, false)
 	assert.NoError(t, err)
 	_, err = newReader.Read(make([]byte, 1))
 	assert.Equalf(t, io.EOF, err, "Not read to the end")

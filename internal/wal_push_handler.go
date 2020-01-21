@@ -3,13 +3,14 @@ package internal
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 )
 
 type CantOverwriteWalFileError struct {
