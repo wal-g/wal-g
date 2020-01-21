@@ -6,7 +6,7 @@ import (
 	context "context"
 
 	mock "github.com/stretchr/testify/mock"
-	oplog "github.com/wal-g/wal-g/internal/databases/mongo/oplog"
+	models "github.com/wal-g/wal-g/internal/databases/mongo/models"
 
 	sync "sync"
 )
@@ -17,11 +17,11 @@ type Applier struct {
 }
 
 // Apply provides a mock function with given fields: _a0, _a1, _a2
-func (_m *Applier) Apply(_a0 context.Context, _a1 chan oplog.Record, _a2 *sync.WaitGroup) (chan error, error) {
+func (_m *Applier) Apply(_a0 context.Context, _a1 chan models.Oplog, _a2 *sync.WaitGroup) (chan error, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 chan error
-	if rf, ok := ret.Get(0).(func(context.Context, chan oplog.Record, *sync.WaitGroup) chan error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, chan models.Oplog, *sync.WaitGroup) chan error); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
@@ -30,7 +30,7 @@ func (_m *Applier) Apply(_a0 context.Context, _a1 chan oplog.Record, _a2 *sync.W
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, chan oplog.Record, *sync.WaitGroup) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, chan models.Oplog, *sync.WaitGroup) error); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
 		r1 = ret.Error(1)

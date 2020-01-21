@@ -1,4 +1,4 @@
-package oplog
+package models
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	TimestampDelimiter = "."
-	TimestampRegexp    = `[0-9]+\` + TimestampDelimiter + `[0-9]+`
+	timestampDelimiter = "."
+	timestampRegexp    = `[0-9]+\` + timestampDelimiter + `[0-9]+`
 )
 
 // Timestamp represents oplog record uniq id.
@@ -21,13 +21,13 @@ type Timestamp struct {
 
 // String returns text representation of Timestamp struct
 func (ots Timestamp) String() string {
-	return fmt.Sprintf("%d%s%d", ots.TS, TimestampDelimiter, ots.Inc)
+	return fmt.Sprintf("%d%s%d", ots.TS, timestampDelimiter, ots.Inc)
 }
 
 // TimestampFromStr builds Timestamp from string
 // TODO: unit tests
 func TimestampFromStr(s string) (Timestamp, error) {
-	strs := strings.Split(s, TimestampDelimiter)
+	strs := strings.Split(s, timestampDelimiter)
 	if len(strs) != 2 {
 		return Timestamp{}, fmt.Errorf("can not split oplog ts string '%s': two parts expected", s)
 	}
@@ -74,8 +74,8 @@ func BsonTimestampFromOplogTS(ots Timestamp) primitive.Timestamp {
 	return primitive.Timestamp{T: ots.TS, I: ots.Inc}
 }
 
-// Record represents oplog raw and parsed metadata.
-type Record struct {
+// Oplog represents oplog raw and parsed metadata.
+type Oplog struct {
 	TS   Timestamp
 	OP   string
 	NS   string
@@ -83,8 +83,8 @@ type Record struct {
 	Err  error
 }
 
-// Meta is used to decode raw bson record.
-type Meta struct {
+// OplogMeta is used to decode raw bson record.
+type OplogMeta struct {
 	TS primitive.Timestamp `bson:"ts"`
 	NS string              `bson:"ns"`
 	Op string              `bson:"op"`

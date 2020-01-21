@@ -6,21 +6,21 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/wal-g/wal-g/internal/databases/mongo/mocks"
-	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/internal/databases/mongo/oplog/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 type fromFetcherReturn struct {
-	outChan chan oplog.Record
+	outChan chan models.Oplog
 	errChan chan error
 	err     error
 }
 
 type validatorReturn struct {
-	outChan chan oplog.Record
+	outChan chan models.Oplog
 	errChan chan error
 	err     error
 }
@@ -32,7 +32,7 @@ type applierReturn struct {
 
 type oplogPushArgs struct {
 	ctx   context.Context
-	since oplog.Timestamp
+	since models.Timestamp
 	wg    *sync.WaitGroup
 
 	fromFetcherReturn *fromFetcherReturn
@@ -61,11 +61,11 @@ func (tm *oplogPushMocks) AssertExpectations(t *testing.T) {
 func buildTestArgs() oplogPushArgs {
 	return oplogPushArgs{
 		ctx:   context.TODO(),
-		since: oplog.Timestamp{TS: 1579021614, Inc: 15},
+		since: models.Timestamp{TS: 1579021614, Inc: 15},
 		wg:    &sync.WaitGroup{},
 
-		fromFetcherReturn: &fromFetcherReturn{make(chan oplog.Record), make(chan error), nil},
-		validatorReturn:   &validatorReturn{make(chan oplog.Record), make(chan error), nil},
+		fromFetcherReturn: &fromFetcherReturn{make(chan models.Oplog), make(chan error), nil},
+		validatorReturn:   &validatorReturn{make(chan models.Oplog), make(chan error), nil},
 		applierReturn:     &applierReturn{make(chan error), nil},
 	}
 }

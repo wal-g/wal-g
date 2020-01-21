@@ -7,8 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/mongo/storage"
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
+	"github.com/wal-g/wal-g/internal/databases/mongo/client"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/mongodb/mongo-tools-common/db"
@@ -19,39 +20,30 @@ import (
 
 // Applier defines interface to apply given oplog records.
 type Applier interface {
-	Apply(context.Context, chan Record, *sync.WaitGroup) (chan error, error)
+	Apply(context.Context, chan models.Oplog, *sync.WaitGroup) (chan error, error)
 }
 
 // DBApplier implements Applier interface for mongodb.
 type DBApplier struct {
-	uri       string
-	mc        *internal.MongoClient
+	db        client.MongoDriver
 	txnBuffer *txn.Buffer
 }
 
 // NewDBApplier builds DBApplier with given args.
-func NewDBApplier(uri string) *DBApplier {
-	return &DBApplier{uri: uri}
+func NewDBApplier(m client.MongoDriver) *DBApplier {
+	return &DBApplier{db: m}
 }
 
 // Apply runs working cycle that applies oplog records.
 // TODO: filter noop, sessions ...
-func (dba *DBApplier) Apply(ctx context.Context, ch chan Record, wg *sync.WaitGroup) (chan error, error) {
-	mc, err := internal.NewMongoClient(ctx, dba.uri)
-	dba.mc = mc
-	if err != nil {
-		return nil, err
-	}
-	if _, err := mc.GetOplogCollection(ctx); err != nil {
-		return nil, err
-	}
+func (dba *DBApplier) Apply(ctx context.Context, ch chan models.Oplog, wg *sync.WaitGroup) (chan error, error) {
 	dba.txnBuffer = txn.NewBuffer()
 
 	errc := make(chan error)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		defer mc.Close(ctx)
+		defer func() { _ = dba.db.Close(ctx) }()
 		defer func() { _ = dba.txnBuffer.Stop() }()
 		defer close(errc)
 
@@ -86,16 +78,16 @@ func (dba *DBApplier) Apply(ctx context.Context, ch chan Record, wg *sync.WaitGr
 	return errc, nil
 }
 
-// handleNonTxnOp tries to apply given oplog record
+// handleNonTxnOp tries to apply given oplog record.
 // TODO: support UI filtering due to partial restore support
 func (dba *DBApplier) handleNonTxnOp(ctx context.Context, op db.Oplog) error {
-	if err := dba.mc.ApplyOp(ctx, op); err != nil {
+	if err := dba.db.ApplyOp(ctx, op); err != nil {
 		return fmt.Errorf("apply op (%v %s on %s) failed with: %w", op.Timestamp, op.Operation, op.Namespace, err)
 	}
 	return nil
 }
 
-// handleTxnOp handles oplog record with transaction attributes
+// handleTxnOp handles oplog record with transaction attributes.
 func (dba *DBApplier) handleTxnOp(ctx context.Context, meta txn.Meta, op db.Oplog) error {
 	if meta.IsAbort() {
 		if err := dba.txnBuffer.PurgeTxn(meta); err != nil {
@@ -143,19 +135,22 @@ func (dba *DBApplier) applyTxn(ctx context.Context, meta txn.Meta) error {
 	}
 }
 
+// StorageApplier implements Applier interface for storage.
 type StorageApplier struct {
-	uploader *storage.Uploader
+	uploader archive.Uploader
 	size     int
 	timeout  time.Duration
 }
 
-func NewStorageApplier(uploader *storage.Uploader, archiveAfterSize int, archiveTimeout time.Duration) *StorageApplier {
+// NewStorageApplier builds StorageApplier.
+func NewStorageApplier(uploader archive.Uploader, archiveAfterSize int, archiveTimeout time.Duration) *StorageApplier {
 	return &StorageApplier{uploader, archiveAfterSize, archiveTimeout}
 }
 
-func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan Record, wg *sync.WaitGroup) (chan error, error) {
+// Apply runs working cycle that sends oplog records to storage.
+func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan models.Oplog, wg *sync.WaitGroup) (chan error, error) {
 	archiveTimer := time.NewTimer(sa.timeout)
-	var lastKnownTS, batchStartTs Timestamp
+	var lastKnownTS, batchStartTs models.Timestamp
 	isFirstBatch := true
 
 	errc := make(chan error)
@@ -193,12 +188,13 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan Record, wg *syn
 			}
 			utility.ResetTimer(archiveTimer, sa.timeout)
 
-			arch, err := NewArchive(batchStartTs, lastKnownTS, sa.uploader.Compressor.FileExtension())
+			arch, err := models.NewArchive(batchStartTs, lastKnownTS, sa.uploader.FileExtension())
 			if err != nil {
 				errc <- fmt.Errorf("can not build archive: %w", err)
 				return
 			}
-			if err := sa.uploader.UploadStreamTo(&buf, arch.Filename()); err != nil {
+
+			if err := sa.uploader.UploadOplogArchive(&buf, arch); err != nil {
 				errc <- fmt.Errorf("can not upload archive: %w", err)
 				return
 			}

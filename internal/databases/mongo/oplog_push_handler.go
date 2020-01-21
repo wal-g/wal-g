@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -11,7 +12,7 @@ import (
 // HandleOplogPush starts oplog archiving process: fetch, validate, upload to storage.
 // TODO: unit tests
 // TODO: fetch only majority records
-func HandleOplogPush(ctx context.Context, since oplog.Timestamp, fetcher oplog.FromFetcher, validator oplog.Validator, applier oplog.Applier) error {
+func HandleOplogPush(ctx context.Context, since models.Timestamp, fetcher oplog.FromFetcher, validator oplog.Validator, applier oplog.Applier) error {
 	ctx, cancel := context.WithCancel(ctx)
 	wg := &sync.WaitGroup{}
 	defer func() {

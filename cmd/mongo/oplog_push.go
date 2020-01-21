@@ -5,13 +5,16 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
+	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
-	"github.com/wal-g/wal-g/internal/databases/mongo/storage"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"
+
+	"github.com/spf13/cobra"
+	"github.com/wal-g/tracelog"
 )
 
 const oplogPushShortDescription = ""
@@ -26,28 +29,38 @@ var oplogPushCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		mongodbUrl, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
-		tracelog.ErrorLogger.FatalOnError(err)
-		oplogFetcher := oplog.NewDBFetcher(mongodbUrl)
-
-		uploader, err := storage.NewUploader(oplog.ArchBasePath)
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		// discover last archived timestamp
-		since, initial, err := oplog.ArchivingResumeTS(uploader.UploadingFolder)
-		if initial {
-			tracelog.InfoLogger.Printf("Initiating archiving first run")
-		}
-		tracelog.InfoLogger.Printf("Archiving last known timestamp is %s", since)
-		oplogValidator := oplog.NewDBValidator(since)
-
-		// set up archiving settings
+		// resolve archiving settings
 		archiveAfterSize, err := internal.GetOplogArchiveAfterSize()
 		tracelog.ErrorLogger.FatalOnError(err)
 		archiveTimeout, err := internal.GetOplogArchiveTimeout()
 		tracelog.ErrorLogger.FatalOnError(err)
 
+		mongodbUrl, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		// set up mongodb client and oplog fetcher
+		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl)
+		tracelog.ErrorLogger.FatalOnError(err)
+		oplogFetcher := oplog.NewDBFetcher(mongoClient)
+
+		// set up storage client
+		uploader, err := archive.NewStorageUploader(models.ArchBasePath)
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		// discover last archived timestamp
+		since, initial, err := archive.ArchivingResumeTS(uploader.UploadingFolder)
+		if initial {
+			tracelog.InfoLogger.Printf("Initiating archiving first run")
+		}
+		tracelog.InfoLogger.Printf("Archiving last known timestamp is %s", since)
+
+		// set up oplog validator
+		oplogValidator := oplog.NewDBValidator(since)
+
+		// set up storage archiver
 		oplogApplier := oplog.NewStorageApplier(uploader, archiveAfterSize, archiveTimeout)
+
+		// run working cycle
 		err = mongo.HandleOplogPush(ctx, since, oplogFetcher, oplogValidator, oplogApplier)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},

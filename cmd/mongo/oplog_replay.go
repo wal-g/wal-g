@@ -7,11 +7,14 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
+	"github.com/wal-g/wal-g/internal/databases/mongo/client"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/utility"
 )
 
 // oplogReplayCmd represents oplog replay procedure
@@ -24,23 +27,34 @@ var oplogReplayCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
+		// resolve archiving settings
+		since, err := models.TimestampFromStr(args[0])
+		tracelog.ErrorLogger.FatalOnError(err)
+		until, err := models.TimestampFromStr(args[1])
+		tracelog.ErrorLogger.FatalOnError(err)
+
 		mongodbUrl, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
 		tracelog.ErrorLogger.FatalOnError(err)
-		oplogApplier := oplog.NewDBApplier(mongodbUrl)
 
-		since, err := oplog.TimestampFromStr(args[0])
+		// set up mongodb client and oplog applier
+		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl)
 		tracelog.ErrorLogger.FatalOnError(err)
-		until, err := oplog.TimestampFromStr(args[1])
+		oplogApplier := oplog.NewDBApplier(mongoClient)
+
+		// set up storage downloader client
+		downloader, err := archive.NewStorageDownloader(models.ArchBasePath)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		folder, err := internal.ConfigureFolder()
+		// discover archive sequence to replay
+		archives, err := downloader.ListOplogArchives()
 		tracelog.ErrorLogger.FatalOnError(err)
-		folder = folder.GetSubFolder(oplog.ArchBasePath)
-
-		path, err := oplog.PathBetweenTS(folder, since, until)
+		path, err := archive.SequenceBetweenTS(archives, since, until)
 		tracelog.ErrorLogger.FatalOnError(err)
-		oplogFetcher := oplog.NewStorageFetcher(folder, path)
 
+		// setup storage fetcher
+		oplogFetcher := oplog.NewStorageFetcher(downloader, path)
+
+		// run worker cycle
 		err = mongo.HandleOplogReplay(ctx, since, until, oplogFetcher, oplogApplier)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
