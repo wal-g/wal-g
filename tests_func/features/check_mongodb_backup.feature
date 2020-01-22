@@ -55,7 +55,7 @@ Feature: MongoDB backups check
     Given mongodb01 has test mongodb data test5
     When we create mongodb01 backup
     And we wait for 1 seconds
-    And we create timestamp #0 via mongodb01
+    And we create timestamp "#0" via mongodb01
     Then we got 4 backup entries of mongodb01
 
   Scenario: Backups delete1 successfully
@@ -78,5 +78,5 @@ Feature: MongoDB backups check
     Then we got 6 backup entries of mongodb01
 
   Scenario: Backups delete2 successfully
-    When we delete backups retain 4 after #0 timestamp via mongodb01
+    When we delete backups retain 4 after "#0" timestamp via mongodb01
     Then we got 4 backup entries of mongodb01

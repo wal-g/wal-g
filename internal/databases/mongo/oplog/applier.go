@@ -152,6 +152,14 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan models.Oplog, w
 	archiveTimer := time.NewTimer(sa.timeout)
 	var lastKnownTS, batchStartTs models.Timestamp
 	isFirstBatch := true
+	//var skipNs = map[string]struct{}{
+	//	"config.system.sessions":   {},
+	//	"config.cache.collections": {},
+	//	"config.mongos":            {},
+	//	"config.lockpings":         {},
+	//	"admin.system.version":     {},
+	//	"admin.system.users":       {},
+	//}
 
 	errc := make(chan error)
 	wg.Add(1)
@@ -167,6 +175,9 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan models.Oplog, w
 				if !ok {
 					return
 				}
+				//if _, ok := skipNs[op.NS]; ok {
+				//	continue
+				//}
 				if isFirstBatch {
 					batchStartTs = op.TS
 					isFirstBatch = false

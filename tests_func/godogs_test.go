@@ -1,9 +1,11 @@
 package functest
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"go.mongodb.org/mongo-driver/bson"
 	"log"
 	"os"
 	"path/filepath"
@@ -15,9 +17,12 @@ import (
 	"github.com/DATA-DOG/godog"
 	"github.com/DATA-DOG/godog/colors"
 	"github.com/DATA-DOG/godog/gherkin"
+
 	testConf "github.com/wal-g/wal-g/tests_func/config"
 	testHelper "github.com/wal-g/wal-g/tests_func/helpers"
+	testLoad "github.com/wal-g/wal-g/tests_func/load"
 	testUtils "github.com/wal-g/wal-g/tests_func/utils"
+
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
@@ -26,7 +31,8 @@ var testContext *testHelper.TestContextType
 func FeatureContext(s *godog.Suite) {
 	s.BeforeFeature(func(feature *gherkin.Feature) {
 		testContext.TestData = make(map[string]map[string]map[string][]testHelper.DatabaseRecord)
-		testContext.AuxData.Timestamps = make(map[int]time.Time)
+		testContext.AuxData.Timestamps = make(map[string]time.Time)
+		testContext.AuxData.DatabaseSnap = make(map[string][]testHelper.UserData)
 		if err := StartRecreate(testContext); err != nil {
 			log.Fatalln(err)
 		}
@@ -70,28 +76,153 @@ func FeatureContext(s *godog.Suite) {
 	s.AfterStep(func(s *gherkin.Step, err error) {
 	})
 
-	s.Step(`^a working mongodb on mongodb(\d+)$`, testMongodbConnect)
-	s.Step(`^a configured s3 on minio(\d+)$`, configureS3OnMinio)
-	s.Step(`^mongodb replset initialized on mongodb(\d+)$`, replsetinitiateOnMongodb)
-	s.Step(`^mongodb role is primary on mongodb(\d+)$`, testMongodbPrimaryRole)
-	s.Step(`^mongodb auth initialized on mongodb(\d+)$`, authenticateOnMongodb)
-	s.Step(`^mongodb(\d+) has test mongodb data test(\d+)$`, fillMongodbWithTestData)
-	s.Step(`^we create mongodb(\d+) backup$`, createMongodbBackup)
-	s.Step(`^we create mongodb(\d+) backup with user data$`, createMongodbBackupWithUserData)
-	s.Step(`^we got (\d+) backup entries of mongodb(\d+)$`, testBackupEntriesOfMongodb)
-	s.Step(`^we put empty backup via minio(\d+)$`, putEmptyBackupViaMinio)
-	s.Step(`^we delete backups retain (\d+) via mongodb(\d+)$`, deleteBackupsRetainViaMongodb)
-	s.Step(`^we check if empty backups were purged via minio(\d+)$`, testEmptyBackupsViaMinio)
+	s.Step(`^a working mongodb on ([^\s]*)$`, testMongodbConnect)
+	s.Step(`^a configured s3 on ([^\s]*)$`, configureS3OnMinio)
+	s.Step(`^mongodb replset initialized on ([^\s]*)$`, replsetinitiateOnMongodb)
+	s.Step(`^mongodb role is primary on ([^\s]*)$`, testMongodbPrimaryRole)
+	s.Step(`^mongodb auth initialized on ([^\s]*)$`, authenticateOnMongodb)
+	s.Step(`^([^\s]*) has test mongodb data test(\d+)$`, fillMongodbWithTestData)
+	s.Step(`^we create ([^\s]*) backup$`, createMongodbBackup)
+	s.Step(`^we create ([^\s]*) backup with user data$`, createMongodbBackupWithUserData)
+	s.Step(`^we got (\d+) backup entries of ([^\s]*)$`, testBackupEntriesOfMongodb)
+	s.Step(`^we put empty backup via ([^\s]*)$`, putEmptyBackupViaMinio)
+	s.Step(`^we delete backups retain (\d+) via ([^\s]*)$`, deleteBackupsRetainViaMongodb)
+	s.Step(`^we check if empty backups were purged via ([^\s]*)$`, testEmptyBackupsViaMinio)
 
-	s.Step(`^we delete #(\d+) backup via mongodb(\d+)$`, deleteBackupViaMongodb)
-	s.Step(`^we restore #(\d+) backup to mongodb(\d+)$`, restoreBackupToMongodb)
-	s.Step(`^we got same mongodb data at mongodb(\d+) mongodb(\d+)$`, testEqualMongodbDataAtMongodbs)
-	s.Step(`^we ensure mongodb(\d+) #(\d+) backup metadata contains$`, mongodbBackupMetadataContainsUserData)
+	s.Step(`^we delete #(\d+) backup via ([^\s]*)$`, deleteBackupViaMongodb)
+	s.Step(`^we restore #(\d+) backup to ([^\s]*)$`, restoreBackupToMongodb)
+	s.Step(`^we got same mongodb data at ([^\s]*) ([^\s]*)$`, testEqualMongodbDataAtMongodbs)
+	s.Step(`^we ensure ([^\s]*) #(\d+) backup metadata contains$`, mongodbBackupMetadataContainsUserData)
 
-	s.Step(`^we delete backups retain (\d+) after #(\d+) backup via mongodb(\d+)$`, deleteBackupsRetainAfterBackupViaMongodb)
-	s.Step(`^we delete backups retain (\d+) after #(\d+) timestamp via mongodb(\d+)$`, deleteBackupsRetainAfterTimeViaMongodb)
-	s.Step(`^we create timestamp #(\d+) via mongodb(\d+)$`, createTimestamp)
+	s.Step(`^we delete backups retain (\d+) after #(\d+) backup via ([^\s]*)$`, deleteBackupsRetainAfterBackupViaMongodb)
+	s.Step(`^we delete backups retain (\d+) after "([^"]*)" timestamp via ([^\s]*)$`, deleteBackupsRetainAfterTimeViaMongodb)
+	s.Step(`^we create timestamp "([^"]*)" via ([^\s]*)$`, createTimestamp)
 	s.Step(`^we wait for (\d+) seconds$`, wait)
+	s.Step(`^oplog archive is on ([^\s]*)$`, sendOplogOn)
+	s.Step(`^we load ([^\s]*) with "([^"]*)" config$`, loadMongodbWithConfig)
+	s.Step(`^we save ([^\s]*) data "([^"]*)"$`, saveMongodbData)
+	s.Step(`^([^\s]*) has no data$`, cleanMongoDb)
+	s.Step(`^we restore from "([^"]*)" timestamp to "([^"]*)" timestamp to ([^\s]*)$`, mongodbRestoreOplog)
+	s.Step(`^we have same data in "([^"]*)" and "([^"]*)"$`, sameDataCheck)
+
+}
+
+func sameDataCheck(dataId1, dataId2 string) error {
+	if data1, ok := testContext.AuxData.DatabaseSnap[dataId1]; ok {
+		if data2, ok := testContext.AuxData.DatabaseSnap[dataId2]; ok {
+			if !reflect.DeepEqual(data1, data2) {
+				if testUtils.ParseEnvLines(os.Environ())["DEBUG"] != "" {
+					fmt.Printf("\nData check failed:\nData %s:\n %+v\n\nData %s:\n %+v\n",
+						dataId1, data1, dataId2, data2)
+				}
+				return fmt.Errorf("expected the same data in %s and %s", dataId1, dataId2)
+			}
+			return nil
+		}
+		return fmt.Errorf("no data is saved for with id %s", dataId2)
+	}
+	return fmt.Errorf("no data is saved for with id %s", dataId1)
+}
+
+func mongodbRestoreOplog(timestampIdFrom, timestampIdUntil, nodeName string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
+	storageName := fmt.Sprintf("minio%02d.test_net_%s", 1, testContext.Env["TEST_ID"])
+	return testHelper.MongoOplogFetch(testContext, containerName, storageName, timestampIdFrom, timestampIdUntil)
+}
+
+func cleanMongoDb(nodeName string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
+	connection, _ := testHelper.AdminConnect(testContext, containerName)
+
+	dbNames, err := connection.ListDatabaseNames(testContext.Context, bson.M{})
+	if err != nil {
+		return fmt.Errorf("error in getting data from mongodb: %v", err)
+	}
+
+	for _, dbName := range dbNames {
+		if dbName == "local" || dbName == "config" || dbName == "admin" {
+			continue
+		}
+		err := connection.Database(dbName).Drop(testContext.Context)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func saveMongodbData(nodeName, dataId string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
+	connection, err := testHelper.AdminConnect(testContext, containerName)
+	if err != nil {
+		return err
+	}
+	rowsData, err := testHelper.GetAllUserData(testContext.Context, connection)
+	if err != nil {
+		return err
+	}
+	if testUtils.ParseEnvLines(os.Environ())["DEBUG"] != "" {
+		fmt.Printf("\nSaving data from %s to data %s:\n %+v\n", containerName, dataId, rowsData)
+	}
+	testContext.AuxData.DatabaseSnap[dataId] = rowsData
+	return nil
+}
+
+func loadMongodbWithConfig(nodeName, configFile string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
+
+	patrons, err := testLoad.GeneratePatronsFromFile(configFile)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 8050*time.Millisecond)
+	defer func() {
+		for _, patronFile := range patrons {
+			if err := os.RemoveAll(patronFile + ".json"); err != nil {
+			}
+		}
+		cancel()
+	}()
+
+	for _, patronFile := range patrons {
+		err := func() error {
+			f, err := os.Open(patronFile + ".json")
+			if err != nil {
+				return fmt.Errorf("cannot read patron: %v", err)
+			}
+			defer f.Close()
+			roc, _, err := testLoad.ReadRawMongoOps(ctx, f, 3)
+			if err != nil {
+				return err
+			}
+			cli, err := testHelper.AdminConnect(testContext, containerName)
+			if err != nil {
+				return err
+			}
+			cmdc, erc := testLoad.MakeMongoOps(ctx, cli, roc)
+			// put all results somewhere for stats maybe
+			c := testLoad.RunMongoOpFuncs(ctx, cmdc, 3, 3)
+			for _ = range c {
+			}
+			for err := range erc {
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func sendOplogOn(nodeName string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
+	return testHelper.MongoOplogPush(testContext, containerName)
 }
 
 func wait(cnt int) error {
@@ -99,10 +230,10 @@ func wait(cnt int) error {
 	return nil
 }
 
-func createTimestamp(timestampId int, mongodbId int) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
+func createTimestamp(timestampId, nodeName string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
 	command := []string{"date", "-u", `+%Y-%m-%dT%H:%M:%SZ`}
-	response, err := testHelper.RunCommandInContainer(testContext, nodeName, command)
+	response, err := testHelper.RunCommandInContainer(testContext, containerName, command)
 	if err != nil {
 		return fmt.Errorf("cannot create timestamp: %v", err)
 	}
@@ -115,19 +246,19 @@ func createTimestamp(timestampId int, mongodbId int) error {
 	return nil
 }
 
-func deleteBackupsRetainAfterTimeViaMongodb(retainCount int, timestampId int, mongodbId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
+func deleteBackupsRetainAfterTimeViaMongodb(retainCount int, timestampId string, nodeName string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
 	return testHelper.MongoPurgeBackupsAfterTime(testContext, containerName, retainCount, testContext.AuxData.Timestamps[timestampId])
 }
 
-func deleteBackupsRetainAfterBackupViaMongodb(retainCount int, afterBackupId int, mongodbId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
+func deleteBackupsRetainAfterBackupViaMongodb(retainCount int, afterBackupId int, nodeName string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
 	return testHelper.MongoPurgeBackupsAfterBackupId(testContext, containerName, retainCount, afterBackupId)
 }
 
-func mongodbBackupMetadataContainsUserData(mongodbId int, backupId int, data *gherkin.DocString) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
-	backupList, err := testHelper.GetBackups(testContext, nodeName)
+func mongodbBackupMetadataContainsUserData(nodeName string, backupId int, data *gherkin.DocString) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
+	backupList, err := testHelper.GetBackups(testContext, containerName)
 	if err != nil {
 		return err
 	}
@@ -167,23 +298,23 @@ func mongodbBackupMetadataContainsUserData(mongodbId int, backupId int, data *gh
 	return nil
 }
 
-func testMongodbConnect(mongodbId int) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
+func testMongodbConnect(nodeName string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
 	const timeoutInterval = 100 * time.Millisecond
 	for i := 0; i < 25; i++ {
-		connection, _ := testHelper.EnvDBConnect(testContext, nodeName)
-		err := connection.Database(nodeName).Client().Ping(testContext.Context, nil)
+		connection, _ := testHelper.EnvDBConnect(testContext, containerName)
+		err := connection.Database(containerName).Client().Ping(testContext.Context, nil)
 		if err == nil {
 			return nil
 		}
 		time.Sleep(timeoutInterval)
 	}
-	return fmt.Errorf("cannot connect to %s", nodeName)
+	return fmt.Errorf("cannot connect to %s", containerName)
 }
 
-func configureS3OnMinio(minioId int) error {
-	nodeName := fmt.Sprintf("minio%02d.test_net_%s", minioId, testContext.Env["TEST_ID"])
-	container, err := testHelper.GetDockerContainer(testContext, nodeName)
+func configureS3OnMinio(nodeName string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
+	container, err := testHelper.GetDockerContainer(testContext, containerName)
 	if err != nil {
 		return err
 	}
@@ -194,9 +325,9 @@ func configureS3OnMinio(minioId int) error {
 	return nil
 }
 
-func replsetinitiateOnMongodb(mongodbId int) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
-	err := testHelper.StepEnsureRsInitialized(testContext, nodeName)
+func replsetinitiateOnMongodb(nodeName string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
+	err := testHelper.StepEnsureRsInitialized(testContext, containerName)
 	if err != nil {
 		return err
 	}
@@ -204,9 +335,9 @@ func replsetinitiateOnMongodb(mongodbId int) error {
 	return nil
 }
 
-func testMongodbPrimaryRole(mongodbId int) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
-	connection, err := testHelper.AdminConnect(testContext, nodeName)
+func testMongodbPrimaryRole(nodeName string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
+	connection, err := testHelper.AdminConnect(testContext, containerName)
 	if err != nil {
 		return err
 	}
@@ -214,8 +345,8 @@ func testMongodbPrimaryRole(mongodbId int) error {
 	return smth
 }
 
-func authenticateOnMongodb(mongodbId int) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
+func authenticateOnMongodb(nodeName string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
 	creds := testHelper.AdminCreds(testContext.Env)
 	roles := "["
 	for _, value := range creds.Roles {
@@ -228,13 +359,13 @@ func authenticateOnMongodb(mongodbId int) error {
 			creds.Password,
 			roles),
 		testContext.Env["MONGO_ADMIN_DB_NAME"]}
-	response, err := testHelper.RunCommandInContainer(testContext, nodeName, command)
+	response, err := testHelper.RunCommandInContainer(testContext, containerName, command)
 	if err != nil {
 		return err
 	}
 	if strings.Contains(response, "command createUser requires authentication") {
 		command = append(command, "-u", creds.Username, "-p", creds.Password)
-		response, err = testHelper.RunCommandInContainer(testContext, nodeName, command)
+		response, err = testHelper.RunCommandInContainer(testContext, containerName, command)
 		if err != nil {
 			return err
 		}
@@ -244,13 +375,49 @@ func authenticateOnMongodb(mongodbId int) error {
 		!strings.Contains(response, "already exists") {
 		return fmt.Errorf("can not initialize auth: %s", response)
 	}
+	newRoleCmd := []string{"mongo", "mongodb://admin:password@127.0.0.1:27018/admin", "--eval",
+		`db.createRole( {
+    		role: "interalUseOnlyOplogRestore",
+  			privileges: [
+      			{ resource: { anyResource: true }, actions: [ "anyAction" ] }
+    		],
+    		roles: []
+   		})`,
+	}
+
+	roleResp, err := testHelper.RunCommandInContainer(testContext, containerName, newRoleCmd)
+	if err != nil {
+		return err
+	}
+
+	if !(strings.Contains(roleResp, `"role" : "interalUseOnlyOplogRestore",`) ||
+		strings.Contains(roleResp, `Role "interalUseOnlyOplogRestore@admin" already exists`)) {
+		return fmt.Errorf("can not create role for auth: %s", roleResp)
+	}
+
+	updRoleCmd := []string{"mongo", "mongodb://admin:password@127.0.0.1:27018/admin", "--eval",
+		`db.grantRolesToUser(
+			"admin",
+    		["interalUseOnlyOplogRestore"]
+   		)`,
+	}
+
+	updRoleResp, err := testHelper.RunCommandInContainer(testContext, containerName, updRoleCmd)
+	if err != nil {
+		return err
+	}
+
+	if !strings.Contains(updRoleResp, ` `) {
+		return fmt.Errorf("can not create role for auth: %s", updRoleResp)
+	}
+
 	return nil
 }
 
-func fillMongodbWithTestData(mongodbId, testId int) error {
-	nodeName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
+func fillMongodbWithTestData(nodeName string, testId int) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
 	testName := fmt.Sprintf("test%02d", testId)
-	conn, err := testHelper.AdminConnect(testContext, nodeName)
+	conn, err := testHelper.AdminConnect(testContext, containerName)
 	if err != nil {
 		return err
 	}
@@ -259,9 +426,9 @@ func fillMongodbWithTestData(mongodbId, testId int) error {
 	return nil
 }
 
-func createMongodbBackup(mongodbId int) error {
+func createMongodbBackup(nodeName string) error {
 	var cmdArgs = ""
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
 	currentBackupId, err := testHelper.MakeBackup(testContext, containerName, cmdArgs, []string{})
 	if err != nil {
 		return err
@@ -288,7 +455,7 @@ func getMakeBackupContentFromDocString(content *gherkin.DocString) map[string]ma
 	return res
 }
 
-func createMongodbBackupWithUserData(mongodbId int, data *gherkin.DocString) error {
+func createMongodbBackupWithUserData(nodeName string, data *gherkin.DocString) error {
 	var cmdArgs = ""
 	var envs []string
 	if data != nil {
@@ -301,7 +468,7 @@ func createMongodbBackupWithUserData(mongodbId int, data *gherkin.DocString) err
 		}
 		envs = append(envs, fmt.Sprintf(`WALG_SENTINEL_USER_DATA={"labels": {%s}}`, strings.Join(args, ", ")))
 	}
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
 	currentBackupId, err := testHelper.MakeBackup(testContext, containerName, cmdArgs, envs)
 	if err != nil {
 		return err
@@ -310,8 +477,8 @@ func createMongodbBackupWithUserData(mongodbId int, data *gherkin.DocString) err
 	return nil
 }
 
-func testBackupEntriesOfMongodb(backupCount, mongodbId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
+func testBackupEntriesOfMongodb(backupCount int, nodeName string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
 	backupNames, err := testHelper.GetBackups(testContext, containerName)
 	if err != nil {
 		return err
@@ -322,8 +489,8 @@ func testBackupEntriesOfMongodb(backupCount, mongodbId int) error {
 	return nil
 }
 
-func putEmptyBackupViaMinio(minioId int) error {
-	containerName := fmt.Sprintf("minio%02d.test_net_%s", minioId, testContext.Env["TEST_ID"])
+func putEmptyBackupViaMinio(nodeName string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
 	backupName := "20010203T040506"
 	bucketName := testContext.Env["S3_BUCKET"]
 	backupRootDir := testContext.Env["WALG_S3_PREFIX"]
@@ -341,13 +508,13 @@ func putEmptyBackupViaMinio(minioId int) error {
 	return nil
 }
 
-func deleteBackupsRetainViaMongodb(retainCount, mongodbId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
+func deleteBackupsRetainViaMongodb(retainCount int, nodeName string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
 	return testHelper.MongoPurgeBackups(testContext, containerName, retainCount)
 }
 
-func testEmptyBackupsViaMinio(minioId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", minioId, testContext.Env["TEST_ID"])
+func testEmptyBackupsViaMinio(nodeName string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
 	bucketName := testContext.Env["S3_BUCKET"]
 	backupRootDir := testContext.Env["WALG_S3_PREFIX"]
 	backupNames := testContext.SafeStorage.NometaBackupNames
@@ -361,19 +528,19 @@ func testEmptyBackupsViaMinio(minioId int) error {
 	return nil
 }
 
-func deleteBackupViaMongodb(backupId, mongodbId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
+func deleteBackupViaMongodb(backupId int, nodeName string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
 	return testHelper.DeleteBackup(testContext, containerName, backupId)
 }
 
-func restoreBackupToMongodb(backupId, mongodbId int) error {
-	containerName := fmt.Sprintf("mongodb%02d.test_net_%s", mongodbId, testContext.Env["TEST_ID"])
+func restoreBackupToMongodb(backupId int, nodeName string) error {
+	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, testContext.Env["TEST_ID"])
 	return testHelper.RestoreBackupById(testContext, containerName, backupId)
 }
 
-func testEqualMongodbDataAtMongodbs(mongodbId1, mongodbId2 int) error {
-	containerName1 := fmt.Sprintf("mongodb%02d", mongodbId1) + ".test_net_" + testContext.Env["TEST_ID"]
-	containerName2 := fmt.Sprintf("mongodb%02d", mongodbId2) + ".test_net_" + testContext.Env["TEST_ID"]
+func testEqualMongodbDataAtMongodbs(nodeName1, nodeName2 string) error {
+	containerName1 := fmt.Sprintf("%s.test_net_%s", nodeName1, testContext.Env["TEST_ID"])
+	containerName2 := fmt.Sprintf("%s.test_net_%s", nodeName2, testContext.Env["TEST_ID"])
 
 	connection1, err := testHelper.AdminConnect(testContext, containerName1)
 	if err != nil {

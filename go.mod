@@ -14,7 +14,7 @@ require (
 	github.com/aws/aws-sdk-go v1.26.1
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/containerd/containerd v1.3.2 // indirect
-	github.com/cyberdelia/lzo v0.0.0-20130713063448-feb520148d89
+	github.com/cyberdelia/lzo v0.0.0-20171006181345-d85071271a6f
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/docker v1.4.2-0.20191213092508-0a4d980d71ec
 	github.com/docker/go-connections v0.4.0 // indirect
@@ -68,11 +68,13 @@ require (
 	go.mongodb.org/mongo-driver v1.2.0
 	go.opencensus.io v0.22.2 // indirect
 	golang.org/x/crypto v0.0.0-20191206172530-e9b2fee46413
+	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f // indirect
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553 // indirect
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6 // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/sys v0.0.0-20191210023423-ac6580df4449 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
+	golang.org/x/tools v0.0.0-20200124021010-5c352bb417e0 // indirect
 	google.golang.org/api v0.9.0 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/genproto v0.0.0-20191206224255-0243a4be9c8f // indirect

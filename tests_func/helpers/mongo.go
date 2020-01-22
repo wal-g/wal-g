@@ -52,7 +52,7 @@ func connectHostPort(context context.Context, host string, port uint16) (*mongo.
 }
 
 func connect(context context.Context, user string, password string, dbname string, host string, port uint16) (*mongo.Client, error) {
-	uri := fmt.Sprintf("mongodb://%s:%s@%s:%d/%s?connect=direct&authMechanism=SCRAM-SHA-1", user, password, host, port, dbname)
+	uri := fmt.Sprintf("mongodb://%s:%s@%s:%d/%s?connect=direct&authMechanism=SCRAM-SHA-1&autoReconnect=true&socketTimeoutMS=3000&connectTimeoutMS=3000&readPreference=primary", user, password, host, port, dbname)
 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
 	if err != nil {
 		return nil, fmt.Errorf("error in connecting to mongo via host, port, dbname and user creds: %v", err)
@@ -277,7 +277,10 @@ func GetAllUserData(context context.Context, connection *mongo.Client) ([]UserDa
 			if isSystemCollection(table) {
 				continue
 			}
-			if dbName == "local" || dbName == "config" {
+			if strings.Contains(table, ".") {
+				continue
+			}
+			if dbName == "local" || dbName == "config" || dbName == "admin"{
 				continue
 			}
 			findOptions := options.Find()
@@ -388,5 +391,96 @@ func MongoPurgeBackupsAfterTime(testContext *TestContextType, containerName stri
 		"retain", strconv.Itoa(keepNumber), "--after", timeLine.Format(time.RFC3339), "--confirm"}
 
 	_, err := RunCommandInContainer(testContext, containerName, command)
+	return err
+}
+
+func MongoOplogPush(testContext *TestContextType, containerName string) error {
+	walgCliPath, walgConfPath := walgPaths(testContext.Env)
+
+	command := []string{walgCliPath, "--config", walgConfPath, "oplog-push"}
+	go func() {
+		x, err := RunCommandInContainer(testContext, containerName, command)
+		if testUtils.ParseEnvLines(os.Environ())["DEBUG"] != "" {
+			fmt.Printf("\nWal-g oplog-push:\n error: %+v\n result:\n %+v\n", err, x)
+		}
+	}()
+	return nil
+}
+
+func lessTs(a, b string) (bool, error) {
+	as := strings.Split(a, ".")
+	bs := strings.Split(b, ".")
+	if len(as) == 2 && len(bs) == 2 {
+		return as[0] < bs[0] || (as[0] == bs[0] && as[1] <= bs[1]), nil
+	}
+	return false, fmt.Errorf("wrong format of timestamps: %s, %s", a, b)
+}
+
+func arcTsExists(testContext *TestContextType, containerName string, timestamp string) (bool, error) {
+	command := []string{"ls", "/export/dbaas/mongodb-backup/test_uuid/test_mongodb/oplog_005/", "-1"}
+	resp, err := RunCommandInContainer(testContext, containerName, command)
+
+	r, _ := regexp.Compile(`(oplog_(\d+).(\d+)_(\d+).(\d+).br)`)
+	as := r.FindAllString(resp, -1)
+
+	if testUtils.ParseEnvLines(os.Environ())["DEBUG"] != "" {
+		fmt.Printf("\nArchives in S3 storage now:\n %s\n", strings.Join(as, " \n "))
+	}
+
+	for _, a := range as {
+		rd, _ := regexp.Compile(`(\d+).(\d+)`)
+		ds := rd.FindAllString(a, -1)
+		if len(ds) != 2 {
+			return false, fmt.Errorf("Wrong archive name format: %s", a)
+		}
+		fa, err := lessTs(ds[0], timestamp)
+		if err != nil {
+			return false, err
+		}
+		fb, err := lessTs(timestamp, ds[1])
+		if err != nil {
+			return false, err
+		}
+		if fa && fb {
+			return true, nil
+		}
+	}
+	return true, err
+}
+
+func MongoOplogFetch(testContext *TestContextType, containerName string, storageName string, timestampIdFrom string, timestampIdUntil string) error {
+	walgCliPath, walgConfPath := walgPaths(testContext.Env)
+
+	timestampFrom := strconv.FormatInt(testContext.AuxData.Timestamps[timestampIdFrom].Unix(), 10) + ".1"
+	timestampUntil := strconv.FormatInt(testContext.AuxData.Timestamps[timestampIdUntil].Unix(), 10) + ".1"
+
+	c := false
+	var err error
+
+	for !c {
+		fr, err := arcTsExists(testContext, storageName, timestampFrom)
+		if err != nil {
+			return err
+		}
+		un, err := arcTsExists(testContext, storageName, timestampUntil)
+		if err != nil {
+			return err
+		}
+		c = fr && un
+	}
+
+	if testUtils.ParseEnvLines(os.Environ())["DEBUG"] != "" {
+		fmt.Printf("\nTimestamps for wal-g oplog-replay:\n from: %s\n until: %s\n", timestampFrom, timestampUntil)
+	}
+
+	time.Sleep(4 * time.Second)
+	command := []string{walgCliPath, "--config", walgConfPath, "oplog-replay",
+		timestampFrom, timestampUntil}
+
+	x, err := RunCommandInContainer(testContext, containerName, command)
+
+	if testUtils.ParseEnvLines(os.Environ())["DEBUG"] != "" {
+		fmt.Printf("\nWal-g oplog-replay result:\n %+v\n", x)
+	}
 	return err
 }

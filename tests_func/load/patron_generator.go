@@ -251,6 +251,7 @@ func GeneratePatronsFromFile(filepath string) ([]string, error) {
 	for i := range configs {
 		id = 0
 		err = generatePatron(configs[i])
+		patrons = append(patrons, configs[i].PatronName)
 		if err != nil {
 			return patrons, err
 		}

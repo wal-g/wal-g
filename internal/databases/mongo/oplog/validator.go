@@ -66,9 +66,9 @@ func (dbv *DBValidator) Validate(ctx context.Context, in chan models.Oplog, wg *
 
 // ValidateSplittingOps returns error if oplog record breaks archive replay possibility.
 func ValidateSplittingOps(op models.Oplog) error {
-	if op.NS == "admin.system.version" {
-		return models.NewError(models.VersionChanged, fmt.Sprintf("operation '%s'", op.OP))
-	}
+	//if op.NS == "admin.system.version" {
+	//	return models.NewError(models.VersionChanged, fmt.Sprintf("operation '%s'", op.OP))
+	//}
 	if op.OP == "renameCollections" {
 		return models.NewError(models.CollectionRenamed, op.NS)
 	}
