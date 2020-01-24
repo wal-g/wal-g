@@ -28,14 +28,14 @@ var tests = []struct {
 }
 
 func TestCascadeFileCloser(t *testing.T) {
-	for _, tt := range tests {
-		b := &testtools.BufCloser{Buffer: bytes.NewBufferString(tt.testString), Err: false}
+	for _, testCase := range tests {
+		b := &testtools.BufCloser{Buffer: bytes.NewBufferString(testCase.testString), Err: false}
 		lz := &internal.CascadeWriteCloser{
 			WriteCloser: GetLz4Compressor().NewWriter(b),
 			Underlying:  b,
 		}
 
-		random := make([]byte, tt.written)
+		random := make([]byte, testCase.written)
 		_, err := rand.Read(random)
 		if err != nil {
 			t.Log(err)
@@ -43,7 +43,8 @@ func TestCascadeFileCloser(t *testing.T) {
 
 		n, err := lz.Write(random)
 		assert.NoErrorf(t, err, "compress: CascadeWriteCloser expected `<nil>` but got %v", err)
-		assert.Equalf(t, n, tt.written, "compress: CascadeWriteCloser expected %d bytes written but got %d", tt.written, n)
+		assert.Equalf(t, n, testCase.written,
+			"compress: CascadeWriteCloser expected %d bytes written but got %d", testCase.written, n)
 
 		err = lz.Close()
 		assert.NoErrorf(t, err, "compress: CascadeWriteCloser expected `<nil>` but got %v", err)
@@ -71,8 +72,8 @@ func TestCascadeFileCloserError(t *testing.T) {
 }
 
 func TestCompressAndEncrypt(t *testing.T) {
-	for _, tt := range tests {
-		in := &testtools.BufCloser{Buffer: bytes.NewBufferString(tt.testString), Err: false}
+	for _, testCase := range tests {
+		in := &testtools.BufCloser{Buffer: bytes.NewBufferString(testCase.testString), Err: false}
 		compressor := GetLz4Compressor()
 		compressed := internal.CompressAndEncrypt(in, compressor, nil)
 
@@ -83,7 +84,9 @@ func TestCompressAndEncrypt(t *testing.T) {
 			t.Logf("%+v\n", err)
 		}
 
-		assert.Equalf(t, tt.testString, decompressed.String(), "compress: CascadeWriteCloser expected '%s' to be written but got '%s'", tt.testString, decompressed)
+		assert.Equalf(t, testCase.testString, decompressed.String(),
+			"compress: CascadeWriteCloser expected '%s' to be written but got '%s'",
+			testCase.testString, decompressed)
 	}
 
 }
@@ -155,4 +158,22 @@ func TestCompressAndEncryptError(t *testing.T) {
 	if re, ok := err.(internal.CompressAndEncryptError); !ok {
 		t.Errorf("compress: CompressingPipeWriter expected CompressAndEncryptError but got %v", re)
 	}
+}
+
+func TestCompressAndEncryptWithNoCompression(t *testing.T) {
+	for _, testCase := range tests {
+		in := &testtools.BufCloser{Buffer: bytes.NewBufferString(testCase.testString), Err: false}
+		compressed := internal.CompressAndEncrypt(in, nil, nil)
+
+		decompressed := &testtools.BufCloser{Buffer: &bytes.Buffer{}, Err: false}
+		_, err := decompressed.ReadFrom(compressed)
+		if err != nil {
+			t.Logf("%+v\n", err)
+		}
+
+		assert.Equalf(t, testCase.testString, decompressed.String(),
+			"compress: CascadeWriteCloser expected '%s' to be written but got '%s'",
+			testCase.testString, decompressed)
+	}
+
 }

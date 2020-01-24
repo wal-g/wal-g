@@ -216,6 +216,31 @@ func TestDecryptAndDecompressTar_unknownFormat(t *testing.T) {
 	assert.IsType(t, internal.UnsupportedFileTypeError{}, err)
 }
 
+func TestDecryptAndDecompressTar_uncompressed(t *testing.T) {
+	sb := testtools.NewStrideByteReader(10)
+	in := &io.LimitedReader{
+		R: sb,
+		N: int64(1024),
+	}
+	b, err := ioutil.ReadAll(in)
+	bCopy := make([]byte, len(b))
+	copy(bCopy, b)
+
+	compressed := internal.CompressAndEncrypt(bytes.NewReader(b), nil, nil)
+
+	compressedBuffer := &bytes.Buffer{}
+	_, _ = compressedBuffer.ReadFrom(compressed)
+	brm := &BufferReaderMaker{compressedBuffer, "/usr/local/test.tar"}
+
+	decompressed := &bytes.Buffer{}
+	err = internal.DecryptAndDecompressTar(decompressed, brm, nil)
+
+	if err != nil {
+		t.Logf("%+v\n", err)
+	}
+	assert.Equalf(t, bCopy, decompressed.Bytes(), "decompressed tar does not match the input")
+}
+
 // Used to mock files in memory.
 type BufferReaderMaker struct {
 	Buf *bytes.Buffer

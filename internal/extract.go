@@ -46,6 +46,7 @@ type DecompressionError struct {
 func newDecompressionError(err error) DecompressionError {
 	return DecompressionError{err}
 }
+
 func newUnsupportedFileTypeError(path string, fileFormat string) UnsupportedFileTypeError {
 	return UnsupportedFileTypeError{errors.Errorf("WAL-G does not support the file format '%s' in '%s'", fileFormat, path)}
 }
@@ -89,8 +90,9 @@ func extractOne(tarInterpreter TarInterpreter, source io.Reader) error {
 	return nil
 }
 
-// Ensures that file extension is valid. Any subsequent behavior
-// depends on file type.
+// DecryptAndDecompressTar decrypts file and checks its extension.
+// If it's tar, a decompression is not needed.
+// Otherwise it uses corresponding decompressor. If none found an error will be returned.
 func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter crypto.Crypter) error {
 	readCloser, err := readerMaker.Reader()
 
@@ -112,6 +114,11 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 	}
 
 	fileExtension := utility.GetFileExtension(readerMaker.Path())
+	if fileExtension == "tar" {
+		_, err = io.Copy(writer, readCloser)
+		return errors.Wrap(err, "DecryptAndDecompressTar: tar extract failed")
+	}
+
 	for _, decompressor := range compression.Decompressors {
 		if fileExtension != decompressor.FileExtension() {
 			continue
@@ -121,19 +128,12 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 			return nil
 		}
 		decompressionError := newDecompressionError(err)
-		return errors.Wrapf(decompressionError, "DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?", decompressor.FileExtension())
+		return errors.Wrapf(decompressionError,
+			"DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?",
+			decompressor.FileExtension())
 	}
-	switch fileExtension {
-	case "tar":
-		_, err = io.Copy(writer, readCloser)
-		return errors.Wrap(err, "DecryptAndDecompressTar: tar extract failed")
-	case "nop":
-	case "lzo":
-		return newUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
-	default:
-		return newUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
-	}
-	return nil
+
+	return newUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
 }
 
 // TODO : unit tests
