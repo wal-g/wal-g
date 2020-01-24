@@ -147,7 +147,6 @@ deps: go_deps link_external_deps
 
 go_deps:
 	git submodule update --init
-	go get -u github.com/cyberdelia/lzo
 	go mod vendor
 	sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' vendor/github.com/cyberdelia/lzo/lzo.go
 
