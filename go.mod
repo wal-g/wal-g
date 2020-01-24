@@ -14,7 +14,7 @@ require (
 	github.com/aws/aws-sdk-go v1.26.1
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/containerd/containerd v1.3.2 // indirect
-	github.com/cyberdelia/lzo v0.0.0-20130713063448-feb520148d89
+	github.com/cyberdelia/lzo v0.0.0-20171006181345-d85071271a6f
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/docker v1.4.2-0.20191213092508-0a4d980d71ec
 	github.com/docker/go-connections v0.4.0 // indirect

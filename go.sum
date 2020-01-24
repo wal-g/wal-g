@@ -59,8 +59,8 @@ github.com/coreos/go-semver v0.2.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3Ee
 github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e/go.mod h1:F5haX7vjVVG0kc13fIWeqUViNPyEJxv/OmvnBo0Yme4=
 github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f/go.mod h1:E3G3o1h8I7cfcXa63jLwjI0eiQQMgzzUDFVpN/nH/eA=
 github.com/cpuguy83/go-md2man v1.0.10/go.mod h1:SmD6nW6nTyfqj6ABTjUi3V3JVMnlJmwcJI5acqYI6dE=
-github.com/cyberdelia/lzo v0.0.0-20130713063448-feb520148d89 h1:0Q7Z8RlYe+VIujInnya0g+x1dKujquizzuX/8MovACM=
-github.com/cyberdelia/lzo v0.0.0-20130713063448-feb520148d89/go.mod h1:JlLvEOSII00CtpkusaXvTNwU1DdFRdh75AzBmy2G9xo=
+github.com/cyberdelia/lzo v0.0.0-20171006181345-d85071271a6f h1:xVwzPiGkbwW+IVG3gSL/2lRHbiGgdbtTM6ctagpBKL0=
+github.com/cyberdelia/lzo v0.0.0-20171006181345-d85071271a6f/go.mod h1:JlLvEOSII00CtpkusaXvTNwU1DdFRdh75AzBmy2G9xo=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
