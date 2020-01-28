@@ -21,7 +21,7 @@ type StreamSentinelDto struct {
 
 // Uploader defines interface to store mongodb backups and oplog archives
 type Uploader interface {
-	UploadOplogArchive(stream io.Reader, arch models.Archive) error
+	UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error // TODO: rename firstTS
 	UploadBackup(stream io.Reader) error
 	FileExtension() string
 }
@@ -64,7 +64,7 @@ func (sd *StorageDownloader) ListOplogArchives() ([]models.Archive, error) {
 		archName := key.GetName()
 		arch, err := models.ArchFromFilename(archName)
 		if err != nil {
-			return nil, fmt.Errorf("can not convert retrieve timestamps from oplog archive Ext '%s': %w", archName, err)
+			return nil, fmt.Errorf("can not convert retrieve timestamps since oplog archive Ext '%s': %w", archName, err)
 		}
 		archives = append(archives, arch)
 	}
@@ -89,8 +89,11 @@ func NewStorageUploader(path string) (*StorageUploader, error) {
 }
 
 // UploadOplogArchive compresses a stream and uploads it with given archive name.
-func (su *StorageUploader) UploadOplogArchive(stream io.Reader, arch models.Archive) error {
-	//if err := sa.uploader.UploadOplogArchive(&buf, arch.Filename()); err != nil {
+func (su *StorageUploader) UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error {
+	arch, err := models.NewArchive(firstTS, lastTS, su.FileExtension())
+	if err != nil {
+		return fmt.Errorf("can not build archive: %w", err)
+	}
 
 	if err := su.PushStreamToDestination(stream, arch.Filename()); err != nil {
 		return fmt.Errorf("error while uploading stream: %w", err)

@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -25,7 +26,6 @@ func (ots Timestamp) String() string {
 }
 
 // TimestampFromStr builds Timestamp from string
-// TODO: unit tests
 func TimestampFromStr(s string) (Timestamp, error) {
 	strs := strings.Split(s, timestampDelimiter)
 	if len(strs) != 2 {
@@ -44,17 +44,16 @@ func TimestampFromStr(s string) (Timestamp, error) {
 	return Timestamp{TS: uint32(ts), Inc: uint32(inc)}, nil
 }
 
-// Max returns maximum of two timestamps.
-// TODO: unit tests
-func Max(ots1, ots2 Timestamp) Timestamp {
-	if Less(ots1, ots2) {
+// MaxTS returns maximum of two timestamps.
+func MaxTS(ots1, ots2 Timestamp) Timestamp {
+	if LessTS(ots1, ots2) {
 		return ots2
 	}
 	return ots1
 }
 
-// Less returns if first timestamp less than second
-func Less(ots1, ots2 Timestamp) bool {
+// LessTS returns if first timestamp less than second
+func LessTS(ots1, ots2 Timestamp) bool {
 	if ots1.TS < ots2.TS {
 		return true
 	}
@@ -76,11 +75,10 @@ func BsonTimestampFromOplogTS(ots Timestamp) primitive.Timestamp {
 
 // Oplog represents oplog raw and parsed metadata.
 type Oplog struct {
-	TS   Timestamp
-	OP   string
-	NS   string
+	TS   Timestamp `bson:"ts"`
+	OP   string    `bson:"op"`
+	NS   string    `bson:"ns"`
 	Data []byte
-	Err  error
 }
 
 // OplogMeta is used to decode raw bson record.
@@ -88,4 +86,18 @@ type OplogMeta struct {
 	TS primitive.Timestamp `bson:"ts"`
 	NS string              `bson:"ns"`
 	Op string              `bson:"op"`
+}
+
+// OplogFromRaw tries to decode bytes to Oplog model
+func OplogFromRaw(raw []byte) (Oplog, error) {
+	opMeta := OplogMeta{}
+	if err := bson.Unmarshal(raw, &opMeta); err != nil {
+		return Oplog{}, fmt.Errorf("oplog record decoding failed: %w", err)
+	}
+	return Oplog{
+		TS:   TimestampFromBson(opMeta.TS),
+		OP:   opMeta.Op,
+		NS:   opMeta.NS,
+		Data: raw,
+	}, nil
 }

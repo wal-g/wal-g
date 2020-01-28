@@ -88,6 +88,7 @@ func (dba *DBApplier) handleNonTxnOp(ctx context.Context, op db.Oplog) error {
 }
 
 // handleTxnOp handles oplog record with transaction attributes.
+// TODO: unit test
 func (dba *DBApplier) handleTxnOp(ctx context.Context, meta txn.Meta, op db.Oplog) error {
 	if meta.IsAbort() {
 		if err := dba.txnBuffer.PurgeTxn(meta); err != nil {
@@ -156,16 +157,17 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan models.Oplog, w
 	errc := make(chan error)
 	wg.Add(1)
 	go func() {
-		var buf bytes.Buffer // TODO: switch to tmp files
+		var buf bytes.Buffer
 
 		defer wg.Done()
 		defer close(errc)
 		defer archiveTimer.Stop()
-		for {
+		for oplogc != nil {
 			select {
 			case op, ok := <-oplogc:
 				if !ok {
-					return
+					oplogc = nil
+					break
 				}
 				if isFirstBatch {
 					batchStartTs = op.TS
@@ -180,27 +182,24 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan models.Oplog, w
 				tracelog.DebugLogger.Println("Initializing archive upload due to archive size")
 
 			case <-archiveTimer.C:
-				if buf.Len() == 0 {
-					utility.ResetTimer(archiveTimer, sa.timeout)
-					continue
-				}
 				tracelog.DebugLogger.Println("Initializing archive upload due to timeout expired")
 			}
-			utility.ResetTimer(archiveTimer, sa.timeout)
 
-			arch, err := models.NewArchive(batchStartTs, lastKnownTS, sa.uploader.FileExtension())
-			if err != nil {
-				errc <- fmt.Errorf("can not build archive: %w", err)
-				return
+			utility.ResetTimer(archiveTimer, sa.timeout)
+			if buf.Len() == 0 {
+				continue
 			}
 
-			if err := sa.uploader.UploadOplogArchive(&buf, arch); err != nil {
+			// TODO: switch to PushStreamToDestination (async api)
+			// upload and rename (because we don't know last ts of uploading batch)
+			if err := sa.uploader.UploadOplogArchive(&buf, batchStartTs, lastKnownTS); err != nil {
 				errc <- fmt.Errorf("can not upload archive: %w", err)
 				return
 			}
 
 			buf.Reset()
 			batchStartTs = lastKnownTS
+
 		}
 	}()
 
