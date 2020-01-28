@@ -23,7 +23,7 @@ type Archive struct {
 
 // NewArchive builds Archive struct with given arguments
 func NewArchive(start, end Timestamp, ext string) (Archive, error) {
-	if Less(end, start) {
+	if LessTS(end, start) {
 		return Archive{}, fmt.Errorf("malformed archive, Start timestamp < End timestamp: %s < %s", start, end)
 	}
 	return Archive{start, end, ext}, nil
@@ -31,7 +31,7 @@ func NewArchive(start, end Timestamp, ext string) (Archive, error) {
 
 // In returns if oplog with given timestamp is exists in archive
 func (a Archive) In(ts Timestamp) bool {
-	return (Less(a.Start, ts) && Less(ts, a.End)) || a.Start == ts || a.End == ts
+	return (LessTS(a.Start, ts) && LessTS(ts, a.End)) || a.End == ts
 }
 
 // Filename builds archive filename from timestamps and extension
@@ -47,7 +47,7 @@ func (a Archive) Extension() string {
 
 // ArchFromFilename builds Arch from given path
 func ArchFromFilename(path string) (Archive, error) {
-	// TODO: add unit test and move regexp to const
+	// support empty extension
 	reStr := fmt.Sprintf(`%s(?P<startTS>%s)%s(?P<endTS>%s)\.(?P<Ext>[^$]+)$`,
 		archNamePrefix, timestampRegexp, ArchNameTSDelimiter, timestampRegexp)
 	re, err := regexp.Compile(reStr)

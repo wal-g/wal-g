@@ -10,7 +10,6 @@ import (
 )
 
 // HandleOplogPush starts oplog archiving process: fetch, validate, upload to storage.
-// TODO: unit tests
 // TODO: fetch only majority records
 func HandleOplogPush(ctx context.Context, since models.Timestamp, fetcher oplog.FromFetcher, validator oplog.Validator, applier oplog.Applier) error {
 	ctx, cancel := context.WithCancel(ctx)

@@ -73,15 +73,18 @@ func buildTestArgs() oplogPushArgs {
 func prepareOplogPushMocks(args oplogPushArgs, mocks oplogPushMocks) {
 	if mocks.fetcher != nil {
 		mocks.fetcher.On("OplogFrom", mock.Anything, args.since, args.wg).
-			Return(args.fromFetcherReturn.outChan, args.fromFetcherReturn.errChan, args.fromFetcherReturn.err)
+			Return(args.fromFetcherReturn.outChan, args.fromFetcherReturn.errChan, args.fromFetcherReturn.err).
+			Once()
 	}
 	if mocks.validator != nil {
 		mocks.validator.On("Validate", mock.Anything, args.fromFetcherReturn.outChan, args.wg).
-			Return(args.validatorReturn.outChan, args.validatorReturn.errChan, args.validatorReturn.err)
+			Return(args.validatorReturn.outChan, args.validatorReturn.errChan, args.validatorReturn.err).
+			Once()
 	}
 	if mocks.applier != nil {
 		mocks.applier.On("Apply", mock.Anything, args.validatorReturn.outChan, args.wg).
-			Return(args.applierReturn.errChan, args.applierReturn.err)
+			Return(args.applierReturn.errChan, args.applierReturn.err).
+			Once()
 	}
 }
 

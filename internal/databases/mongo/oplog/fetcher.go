@@ -36,12 +36,11 @@ func NewDBFetcher(m client.MongoDriver) *DBFetcher {
 }
 
 // OplogFrom returns channel of oplog records, channel is filled in background.
-// TODO: unit tests
 // TODO: handle disconnects && stepdown
 // TODO: use sessions
 // TODO: use context.WithTimeout
-func (dbf *DBFetcher) OplogFrom(ctx context.Context, fromTS models.Timestamp, wg *sync.WaitGroup) (oplogc chan models.Oplog, errc chan error, err error) {
-	cur, err := dbf.db.TailOplogFrom(ctx, fromTS)
+func (dbf *DBFetcher) OplogFrom(ctx context.Context, from models.Timestamp, wg *sync.WaitGroup) (oplogc chan models.Oplog, errc chan error, err error) {
+	cur, err := dbf.db.TailOplogFrom(ctx, from)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -55,18 +54,22 @@ func (dbf *DBFetcher) OplogFrom(ctx context.Context, fromTS models.Timestamp, wg
 		defer close(oplogc)
 		defer func() { _ = cur.Close(ctx) }()
 
+		fromFound := false
+
 		for cur.Next(ctx) {
 			// TODO: benchmark decode vs. bson.Reader vs. bson.Raw.LookupErr
-			opMeta := models.OplogMeta{}
-			if err := cur.Decode(&opMeta); err != nil {
+			op, err := models.OplogFromRaw(cur.Data())
+			if err != nil {
 				errc <- fmt.Errorf("oplog record decoding failed: %w", err)
 				return
 			}
-			op := models.Oplog{
-				TS:   models.TimestampFromBson(opMeta.TS),
-				OP:   opMeta.Op,
-				NS:   opMeta.NS,
-				Data: cur.Data(),
+
+			if !fromFound {
+				if op.TS != from { // from ts is not reached, continue
+					errc <- fmt.Errorf("'from' timestamp '%s' was not found", from)
+					return
+				}
+				fromFound = true
 			}
 
 			tracelog.DebugLogger.Printf("Fetcher receieved op %s (%s on %s)", op.TS, op.OP, op.NS)
@@ -119,20 +122,25 @@ func NewStorageFetcher(downloader archive.Downloader, path archive.Sequence) *St
 
 // OplogBetween returns channel of oplog records, channel is filled in background.
 func (sf *StorageFetcher) OplogBetween(ctx context.Context, from, until models.Timestamp, wg *sync.WaitGroup) (chan models.Oplog, chan error, error) {
+	if models.LessTS(until, from) {
+		return nil, nil, fmt.Errorf("fromTS '%s' must be less than untilTS '%s'", from, until)
+	}
+
 	data := make(chan models.Oplog)
 	errc := make(chan error)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		defer close(data)
-		defer close(errc) // TODO: wait until error chan drained
+		defer close(errc)
 
 		buf := NewCloserBuffer() // TODO: switch to streaming interface
 		path := sf.path
+		firstFound := false
+
 		for _, arch := range path {
 			tracelog.DebugLogger.Printf("Fetching archive %s", arch.Filename())
 
-			//err := sf.downloader.DownloadOplogArchive(arch.Filename(), arch.Extension(), buf); if err != nil {
 			err := sf.downloader.DownloadOplogArchive(arch, buf)
 			if err != nil {
 				errc <- fmt.Errorf("failed to download archive %s: %w", arch.Filename(), err)
@@ -149,26 +157,26 @@ func (sf *StorageFetcher) OplogBetween(ctx context.Context, from, until models.T
 					errc <- fmt.Errorf("error during read bson: %w", err)
 				}
 
-				opMeta := models.OplogMeta{}
-				if err := bson.Unmarshal(raw, &opMeta); err != nil {
+				op, err := models.OplogFromRaw(raw)
+				if err != nil {
 					errc <- fmt.Errorf("oplog record decoding failed: %w", err)
 					return
 				}
-				ts := models.TimestampFromBson(opMeta.TS)
-				if models.Less(ts, from) {
-					continue
-				} else if models.Less(until, ts) || ts == until {
+
+				if !firstFound {
+					if op.TS != from { // from ts is not reached, continue
+						continue
+					}
+					firstFound = true
+				}
+
+				// TODO: do we need also check every op "op.TS > from"
+				if models.LessTS(until, op.TS) || op.TS == until {
 					tracelog.InfoLogger.Println("Oplog archives fetching is completed")
 					return
 				}
-				op := models.Oplog{
-					TS:   models.TimestampFromBson(opMeta.TS),
-					OP:   opMeta.Op,
-					NS:   opMeta.NS,
-					Data: raw,
-				}
-				tracelog.DebugLogger.Printf("Fetcher receieved op %s (%s on %s)", op.TS, op.OP, op.NS)
 
+				tracelog.DebugLogger.Printf("Fetcher receieved op %s (%s on %s)", op.TS, op.OP, op.NS)
 				select {
 				case data <- op:
 				case <-ctx.Done():
@@ -177,7 +185,13 @@ func (sf *StorageFetcher) OplogBetween(ctx context.Context, from, until models.T
 				}
 			}
 			buf.Reset()
+			if !firstFound { // TODO: do we need this check, add skip flag
+				errc <- fmt.Errorf("'from' timestamp '%s' was not found in first archive: %s", from, arch.Filename())
+				return
+			}
 		}
+		errc <- fmt.Errorf("restore sequence was fetched, but restore point '%s' is not reached",
+			until)
 	}()
 
 	return data, errc, nil

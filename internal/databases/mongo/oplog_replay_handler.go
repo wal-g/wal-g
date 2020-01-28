@@ -10,7 +10,6 @@ import (
 )
 
 // HandleOplogReplay starts oplog replay process: download from storage and apply to mongodb
-// TODO: unit tests
 func HandleOplogReplay(ctx context.Context, since, until models.Timestamp, fetcher oplog.BetweenFetcher, applier oplog.Applier) error {
 	ctx, cancel := context.WithCancel(ctx)
 	wg := &sync.WaitGroup{}

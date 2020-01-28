@@ -6,7 +6,6 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 
 	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/tracelog"
 )
 
 // Sequence represents serial archive route
@@ -19,33 +18,46 @@ func (p Sequence) Reverse() {
 	}
 }
 
-// SequenceBetweenTS builds archive order between begin and target timestamps
-func SequenceBetweenTS(archives []models.Archive, begin, target models.Timestamp) (Sequence, error) {
-	var lastArch *models.Archive
-	endArch := make(map[models.Timestamp]*models.Archive)
+// SequenceBetweenTS builds archive order between since and until timestamps
+// archives can be written since multiple nodes and overlap each over,
+// some timestamps may be lost, we should detect these cases
+func SequenceBetweenTS(archives []models.Archive, since, until models.Timestamp) (Sequence, error) {
+	if models.LessTS(until, since) {
+		return nil, fmt.Errorf("until ts must be greater or equal to since ts")
+	}
 
-	for _, arch := range archives {
-		endArch[arch.End] = &arch
-		if lastArch == nil && arch.In(target) {
-			lastArch = &arch
+	var seqEnd *models.Archive
+	lastTSArch := make(map[models.Timestamp]*models.Archive)
+
+	for i := range archives {
+		arch := archives[i]
+		lastTSArch[arch.End] = &arch // TODO: we can have few archives with same endTS
+		if seqEnd == nil && arch.In(until) {
+			seqEnd = &arch
 		}
 	}
-	if lastArch == nil {
-		return nil, fmt.Errorf("can not find archive with target timestamp %s", target)
+	if seqEnd == nil {
+		return nil, fmt.Errorf("can not find archive with until timestamp '%s'", until)
 	}
 
-	archPath := make(Sequence, 0, len(endArch))
+	archPath := Sequence{}
 	ok := true
-	for ok { // TODO: detect cycles
-		archPath = append(archPath, *lastArch)
-		if lastArch.In(begin) {
+	i := 0
+	ts := models.Timestamp{}
+	for ok && i <= len(archives) {
+		archPath = append(archPath, *seqEnd)
+		if seqEnd.In(since) {
 			archPath.Reverse()
 			return archPath, nil
 		}
-		ts := lastArch.Start
-		lastArch, ok = endArch[ts]
+		ts = seqEnd.Start
+		seqEnd, ok = lastTSArch[ts]
+		i++
 	}
-	return nil, fmt.Errorf("previous archive with starting ts '%s' does not exist", begin)
+	if !ok {
+		return nil, fmt.Errorf("previous archive in sequence with last ts '%s' does not exist", ts)
+	}
+	return nil, fmt.Errorf("cycles in archive sequence detected")
 }
 
 // ArchivingResumeTS returns archiving Start timestamp
@@ -66,15 +78,16 @@ func ArchivingResumeTS(folder storage.Folder) (models.Timestamp, bool, error) {
 func LastKnownArchiveTS(folder storage.Folder) (models.Timestamp, error) {
 	maxTS := models.Timestamp{}
 	keys, _, err := folder.ListFolder()
-	tracelog.ErrorLogger.FatalOnError(err)
-
+	if err != nil {
+		return models.Timestamp{}, fmt.Errorf("can not fetch keys since storage folder: %w ", err)
+	}
 	for _, key := range keys {
 		filename := key.GetName()
 		arch, err := models.ArchFromFilename(filename)
 		if err != nil {
-			return models.Timestamp{}, fmt.Errorf("can not build archive from filename '%s': %w", filename, err)
+			return models.Timestamp{}, fmt.Errorf("can not build archive since filename '%s': %w", filename, err)
 		}
-		maxTS = models.Max(maxTS, arch.End)
+		maxTS = models.MaxTS(maxTS, arch.End)
 	}
 	return maxTS, nil
 }
