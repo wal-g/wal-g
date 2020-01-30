@@ -28,6 +28,7 @@ To decompress the binary, use:
 
 ```
 tar -zxvf wal-g.linux-amd64.tar.gz
+mv wal-g /usr/local/bin/
 ```
 For other incompatible systems, please consult the [Development](#development) section for more information.
 
