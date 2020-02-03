@@ -8,6 +8,7 @@ import (
 
 	"github.com/mongodb/mongo-tools-common/db"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -23,8 +24,27 @@ type CmdResponse struct {
 	ErrMsg string `bson:"errmsg, omitempty"`
 }
 
+// Optime ...
+type OpTime struct {
+	TS   primitive.Timestamp `bson:"ts" json:"ts"`
+	Term int64               `bson:"t" json:"t"`
+}
+
+// IsMasterLastWrite ...
+type IsMasterLastWrite struct {
+	OpTime         OpTime `bson:"opTime"`
+	MajorityOpTime OpTime `bson:"majorityOpTime"`
+}
+
+// IsMaster is used to unmarshal results of isMaster command
+type IsMaster struct {
+	IsMaster  bool              `bson:"ismaster"`
+	LastWrite IsMasterLastWrite `bson:"lastWrite"`
+}
+
 // MongoDriver defines methods to work with mongodb.
 type MongoDriver interface {
+	LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp, err error)
 	TailOplogFrom(ctx context.Context, from models.Timestamp) (OplogCursor, error)
 	ApplyOp(ctx context.Context, op db.Oplog) error
 	Close(ctx context.Context) error
@@ -66,6 +86,27 @@ func NewMongoClient(ctx context.Context, uri string) (*MongoClient, error) {
 		return nil, err
 	}
 	return &MongoClient{c: client}, client.Ping(ctx, nil)
+}
+
+func (mc *MongoClient) isMaster(ctx context.Context) (*IsMaster, error) {
+	im := IsMaster{}
+	err := mc.c.Database("test").RunCommand(ctx, bson.D{{Key:"isMaster", Value: 1}}).Decode(&im)
+	if err != nil {
+		return nil, fmt.Errorf("isMaster command failed: %w", err)
+	}
+	return &im, nil
+}
+
+// LastWriteTS fetches timestamps with last write
+// TODO: support non-replset setups
+func (mc *MongoClient) LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp, err error) {
+	im, err := mc.isMaster(ctx)
+	if err != nil {
+		return models.Timestamp{}, models.Timestamp{}, err
+	}
+	return models.TimestampFromBson(im.LastWrite.OpTime.TS),
+		models.TimestampFromBson(im.LastWrite.MajorityOpTime.TS),
+		nil
 }
 
 // Close disconnects from mongodb

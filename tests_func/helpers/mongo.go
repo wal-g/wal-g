@@ -154,10 +154,6 @@ func generateRecord(rowNum int, strLen int, strPrefix string) DatabaseRecord {
 	}
 }
 
-func getBackupNameFromExecOutput(output string) string {
-	return strings.Trim(strings.Split(output, "FILE PATH: ")[1], " ")
-}
-
 func getBackupNamesFromExecOutput(output string) []string {
 	re := regexp.MustCompile("stream_[0-9]{8}T[0-9]{6}Z")
 	return re.FindAllString(output, -1)
@@ -211,7 +207,7 @@ func MakeBackup(testContext *TestContextType, containerName string, cmdArgs stri
 	for scanner.Scan() {
 		response = response + scanner.Text()
 	}
-	return getBackupNameFromExecOutput(response), nil
+	return getBackupNamesFromExecOutput(response)[0], nil
 }
 
 func DeleteBackup(testContext *TestContextType, containerName string, backupNum int) error {

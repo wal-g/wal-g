@@ -47,6 +47,34 @@ func (_m *MongoDriver) Close(ctx context.Context) error {
 	return r0
 }
 
+// LastWriteTS provides a mock function with given fields: ctx
+func (_m *MongoDriver) LastWriteTS(ctx context.Context) (models.Timestamp, models.Timestamp, error) {
+	ret := _m.Called(ctx)
+
+	var r0 models.Timestamp
+	if rf, ok := ret.Get(0).(func(context.Context) models.Timestamp); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(models.Timestamp)
+	}
+
+	var r1 models.Timestamp
+	if rf, ok := ret.Get(1).(func(context.Context) models.Timestamp); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Get(1).(models.Timestamp)
+	}
+
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context) error); ok {
+		r2 = rf(ctx)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
 // TailOplogFrom provides a mock function with given fields: ctx, from
 func (_m *MongoDriver) TailOplogFrom(ctx context.Context, from models.Timestamp) (client.OplogCursor, error) {
 	ret := _m.Called(ctx, from)

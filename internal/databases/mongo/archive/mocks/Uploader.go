@@ -5,7 +5,10 @@ package mocks
 import (
 	io "io"
 
+	archive "github.com/wal-g/wal-g/internal/databases/mongo/archive"
+
 	mock "github.com/stretchr/testify/mock"
+
 	models "github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
@@ -28,13 +31,13 @@ func (_m *Uploader) FileExtension() string {
 	return r0
 }
 
-// UploadBackup provides a mock function with given fields: stream
-func (_m *Uploader) UploadBackup(stream io.Reader) error {
-	ret := _m.Called(stream)
+// UploadBackup provides a mock function with given fields: stream, metaProvider
+func (_m *Uploader) UploadBackup(stream io.Reader, metaProvider archive.BackupMetaProvider) error {
+	ret := _m.Called(stream, metaProvider)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(io.Reader) error); ok {
-		r0 = rf(stream)
+	if rf, ok := ret.Get(0).(func(io.Reader, archive.BackupMetaProvider) error); ok {
+		r0 = rf(stream, metaProvider)
 	} else {
 		r0 = ret.Error(0)
 	}
