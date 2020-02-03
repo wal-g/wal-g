@@ -3,7 +3,6 @@ package archive
 import (
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
@@ -12,22 +11,16 @@ import (
 	"github.com/wal-g/storages/storage"
 )
 
-// StreamSentinelDto represents backup sentinel data
-type StreamSentinelDto struct {
-	StartLocalTime  time.Time   `json:"StartLocalTime,omitempty"`
-	FinishLocalTime time.Time   `json:"FinishLocalTime,omitempty"`
-	UserData        interface{} `json:"UserData,omitempty"`
-}
-
 // Uploader defines interface to store mongodb backups and oplog archives
 type Uploader interface {
 	UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error // TODO: rename firstTS
-	UploadBackup(stream io.Reader) error
+	UploadBackup(stream io.Reader, metaProvider BackupMetaProvider) error
 	FileExtension() string
 }
 
 // Downloader defines interface to fetch mongodb oplog archives
 type Downloader interface {
+	Sentinel(name string) (StreamSentinelDto, error) // TODO: reformat backup json, we use text for now
 	DownloadOplogArchive(arch models.Archive, writeCloser io.WriteCloser) error
 	ListOplogArchives() ([]models.Archive, error)
 }
@@ -43,8 +36,21 @@ func NewStorageDownloader(path string) (*StorageDownloader, error) {
 	if err != nil {
 		return nil, err
 	}
-	folder = folder.GetSubFolder(path)
+	if path != "" {
+		folder = folder.GetSubFolder(path)
+	}
 	return &StorageDownloader{folder}, nil
+}
+
+// Sentinel downloads sentinel contents.
+func (sd *StorageDownloader) Sentinel(name string) (StreamSentinelDto, error) {
+	backup := internal.NewBackup(sd.folder.GetSubFolder(utility.BaseBackupPath), name)
+	var sentinel StreamSentinelDto
+	err := internal.FetchStreamSentinel(backup, &sentinel)
+	if err != nil {
+		return StreamSentinelDto{}, fmt.Errorf("can not fetch stream sentinel: %w", err)
+	}
+	return sentinel, nil
 }
 
 // DownloadOplogArchive downloads, decompresses and decrypts (if needed) oplog archive.
@@ -102,16 +108,22 @@ func (su *StorageUploader) UploadOplogArchive(stream io.Reader, firstTS, lastTS 
 }
 
 // UploadBackup compresses a stream and uploads it.
-func (su *StorageUploader) UploadBackup(stream io.Reader) error {
+func (su *StorageUploader) UploadBackup(stream io.Reader, metaProvider BackupMetaProvider) error {
 	timeStart := utility.TimeNowCrossPlatformLocal()
 	backupName, err := su.PushStream(stream)
 	if err != nil {
 		return err
 	}
+
+	if err := metaProvider.Finalize(); err != nil {
+		return err
+	}
+
 	currentBackupSentinelDto := &StreamSentinelDto{
 		StartLocalTime:  timeStart,
 		FinishLocalTime: utility.TimeNowCrossPlatformLocal(),
 		UserData:        internal.GetSentinelUserData(),
+		MongoMeta:       metaProvider.Meta(),
 	}
 	return internal.UploadSentinel(su.Uploader, currentBackupSentinelDto, backupName)
 }

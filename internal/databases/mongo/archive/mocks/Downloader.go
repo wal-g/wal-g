@@ -5,7 +5,10 @@ package mocks
 import (
 	io "io"
 
+	archive "github.com/wal-g/wal-g/internal/databases/mongo/archive"
+
 	mock "github.com/stretchr/testify/mock"
+
 	models "github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
@@ -44,6 +47,27 @@ func (_m *Downloader) ListOplogArchives() ([]models.Archive, error) {
 	var r1 error
 	if rf, ok := ret.Get(1).(func() error); ok {
 		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// Sentinel provides a mock function with given fields: name
+func (_m *Downloader) Sentinel(name string) (archive.StreamSentinelDto, error) {
+	ret := _m.Called(name)
+
+	var r0 archive.StreamSentinelDto
+	if rf, ok := ret.Get(0).(func(string) archive.StreamSentinelDto); ok {
+		r0 = rf(name)
+	} else {
+		r0 = ret.Get(0).(archive.StreamSentinelDto)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(name)
 	} else {
 		r1 = ret.Error(1)
 	}
