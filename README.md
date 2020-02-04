@@ -186,7 +186,7 @@ Examples:
 
 ``retain FULL 5`` will keep 5 full backups and all deltas of them
 
-``retain FIND_FULL`` will find necessary full for 5th
+``retain FIND_FULL 5`` will find necessary full for 5th and keep everything after it
 
 ``retain 5 --after 2019-12-12T12:12:12`` keep 5 most recent backups and backups made after 2019-12-12 12:12:12
 
