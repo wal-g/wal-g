@@ -9,8 +9,8 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
-	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/spf13/cobra"
@@ -51,6 +51,8 @@ var oplogPushCmd = &cobra.Command{
 		since, initial, err := archive.ArchivingResumeTS(uploader.UploadingFolder)
 		if initial {
 			tracelog.InfoLogger.Printf("Initiating archiving first run")
+			_, since, err = mongoClient.LastWriteTS(ctx)
+			tracelog.ErrorLogger.FatalOnError(err)
 		}
 		tracelog.InfoLogger.Printf("Archiving last known timestamp is %s", since)
 
