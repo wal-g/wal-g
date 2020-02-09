@@ -81,10 +81,7 @@ func (dba *DBApplier) Apply(ctx context.Context, ch chan models.Oplog, wg *sync.
 // handleNonTxnOp tries to apply given oplog record.
 // TODO: support UI filtering due to partial restore support
 func (dba *DBApplier) handleNonTxnOp(ctx context.Context, op db.Oplog) error {
-	if err := dba.db.ApplyOp(ctx, op); err != nil {
-		return fmt.Errorf("apply op (%v %s on %s) failed with: %w", op.Timestamp, op.Operation, op.Namespace, err)
-	}
-	return nil
+	return dba.db.ApplyOp(ctx, op)
 }
 
 // handleTxnOp handles oplog record with transaction attributes.
