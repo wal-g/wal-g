@@ -1,0 +1,28 @@
+[
+  {
+    "name": "mongo_load_patron_1",
+    "config": [
+      {
+        "op": "insert",
+        "cnt": 3,
+        "db": "t1",
+        "cl": "c1",
+        "adv": {
+          "values": [
+            "v1",
+            "v2",
+            "v3"
+          ],
+          "keys": [
+            "k1",
+            "k2",
+            "k3"
+          ],
+          "mn_keys_cnt": 2,
+          "mx_docs_cnt": 2,
+          "mn_docs_cnt": 2
+        }
+      }
+    ]
+  }
+]

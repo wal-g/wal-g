@@ -413,17 +413,17 @@ func CollectStat(ctx context.Context, logs <-chan MongoOpInfo) MongoOpStat {
 
 func mergeKeys(mp1 map[string]int, mp2 map[string]int) []string {
 	var res []string
-	for k, _ := range mp1 {
+	for k := range mp1 {
 		if _, ok := mp2[k]; !ok {
 			res = append(res, k)
 		}
 	}
-	for k, _ := range mp2 {
+	for k := range mp2 {
 		if _, ok := mp1[k]; !ok {
 			res = append(res, k)
 		}
 	}
-	for k, _ := range mp1 {
+	for k := range mp1 {
 		if _, ok := mp2[k]; ok {
 			res = append(res, k)
 		}

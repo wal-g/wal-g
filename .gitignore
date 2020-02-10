@@ -14,6 +14,7 @@ test/testdata/broken_wals/
 coverage.out
 .DS_Store
 tests_func/staging
+tests_func/wal-g
 
 tmp/
 *.xml
