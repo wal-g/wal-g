@@ -21,11 +21,11 @@ var Env = map[string]string{
 	"MONGO_ADMIN_USERNAME": "admin",
 	"MONGO_ADMIN_PASSWORD": "password",
 	"MONGO_ADMIN_DB_NAME":  "admin",
-	"MONGO_ADMIN_ROLES":    "root",
 	"MONGO_EXPOSE_MONGOD":  "27018",
 	"MONGO_EXPOSE_SSH":     "22",
 
 	"MINIO_BUILD_PATH": "staging/images/minio",
+	"S3_HOST":          "minio01",
 	"S3_PORT":          "9000",
 	"S3_BUCKET":        "dbaas",
 	"S3_ACCESS_KEY":    "S3_ACCESS_KEY",

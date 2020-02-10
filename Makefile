@@ -10,6 +10,9 @@ PKG := github.com/wal-g/wal-g
 COVERAGE_FILE := coverage.out
 TEST := "pg_tests"
 
+MONGO_MAJOR ?= "4.2"
+MONGO_VERSION ?= "4.2.1"
+
 ifeq ($(USE_LIBSODIUM),)
 	LIBSODIUM_TAG=""
 else
@@ -95,12 +98,17 @@ mongo_build: $(CMD_FILES) $(PKG_FILES)
 mongo_install: mongo_build
 	mv $(MAIN_MONGO_PATH)/wal-g $(GOBIN)/wal-g
 
-mongo_features: install deps
+mongo_features:
 	set -e
+	make go_deps
 	rm -rf ./tests_func/wal-g
 	mkdir -p ./tests_func/wal-g
 	cp -a `ls -A | grep -v "tests_func"` tests_func/wal-g/
-	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -timeout 40m --godog.stop-on-failure --godog.format=pretty
+	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -v -timeout 40m
+	rm -rf tests_func/wal-g/
+
+clean_mongo_features:
+	cd tests_func/ && go test -v --env.clean
 	rm -rf tests_func/wal-g/
 
 redis_test: install deps redis_build lint unlink_brotli redis_integration_test

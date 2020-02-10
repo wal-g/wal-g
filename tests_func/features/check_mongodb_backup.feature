@@ -1,3 +1,4 @@
+#noinspection CucumberUndefinedStep
 Feature: MongoDB backups check
 
   Background: Wait for working infrastructure
@@ -11,25 +12,23 @@ Feature: MongoDB backups check
     And mongodb role is primary on mongodb01
     And mongodb role is primary on mongodb02
 
-  Scenario: First backup was done successfully
-    Given mongodb01 has test mongodb data test1
-    When we create mongodb01 backup
+  Scenario: Backups were done successfully
+    When mongodb01 has test mongodb data test1
+    And we create mongodb01 backup
     Then we got 1 backup entries of mongodb01
 
-  Scenario: Second backup was done successfully
-    Given mongodb01 has test mongodb data test2
-    When we create mongodb01 backup
+    When mongodb01 has test mongodb data test2
+    And we create mongodb01 backup
     Then we got 2 backup entries of mongodb01
 
-  Scenario: Third backup was done successfully
-    Given mongodb01 has test mongodb data test3
-    When we create mongodb01 backup
+    When mongodb01 has test mongodb data test3
+    And we create mongodb01 backup
     Then we got 3 backup entries of mongodb01
 
-  Scenario: Fourth backup was done successfully
-    Given mongodb01 has test mongodb data test4
-    When we create mongodb01 backup
+    When mongodb01 has test mongodb data test4
+    And we create mongodb01 backup
     Then we got 4 backup entries of mongodb01
+
     When we put empty backup via minio01
     Then we got 4 backup entries of mongodb01
 
@@ -42,11 +41,11 @@ Feature: MongoDB backups check
     When we delete backups retain 3 via mongodb01
     Then we got 3 backup entries of mongodb01
 
-  Scenario: Backup1 restored successfully
-    When we restore #0 backup to mongodb02
+  Scenario: Last backup restored successfully
+    When we restore #2 backup to mongodb02
     Then we got same mongodb data at mongodb01 mongodb02
 
-  Scenario: Backup2 restored successfully
+  Scenario: Pre-last backup restored successfully
     When we restore #1 backup to mongodb01
     And we restore #1 backup to mongodb02
     Then we got same mongodb data at mongodb01 mongodb02
@@ -54,29 +53,4 @@ Feature: MongoDB backups check
   Scenario: Fifth backup was done successfully
     Given mongodb01 has test mongodb data test5
     When we create mongodb01 backup
-    And we wait for 1 seconds
-    And we create timestamp #0 via mongodb01
-    Then we got 4 backup entries of mongodb01
-
-  Scenario: Backups delete1 successfully
-    When we delete backups retain 2 after #3 backup via mongodb01
-    Then we got 4 backup entries of mongodb01
-
-  Scenario: Backup3 restored successfully
-    When we restore #0 backup to mongodb01
-    And we restore #0 backup to mongodb02
-    Then we got same mongodb data at mongodb01 mongodb02
-
-  Scenario: Six backup was done successfully
-    Given mongodb01 has test mongodb data test6
-    When we create mongodb01 backup
-    Then we got 5 backup entries of mongodb01
-
-  Scenario: Seventh backup was done successfully
-    Given mongodb01 has test mongodb data test7
-    When we create mongodb01 backup
-    Then we got 6 backup entries of mongodb01
-
-  Scenario: Backups delete2 successfully
-    When we delete backups retain 4 after #0 timestamp via mongodb01
     Then we got 4 backup entries of mongodb01

@@ -35,6 +35,6 @@ RUN mkdir -p /home/mongodb /var/log/wal-g/ ${TMP_DIR} && \
 COPY wal-g ${WALG_REPO}/
 WORKDIR ${WALG_REPO}
 
-RUN make unlink_brotli && make unlink_libsodium && make link_brotli && make link_libsodium
+RUN make link_external_deps
 RUN make mongo_build && \
     cp main/mongo/wal-g /usr/bin/wal-g
