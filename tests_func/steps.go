@@ -248,7 +248,6 @@ func (tctx *TestContext) initiateReplSet(host string) error {
 	return nil
 }
 
-
 func (tctx *TestContext) isPrimary(host string) error {
 	mc, err := MongoCtlFromTestContext(tctx, host)
 	if err != nil {

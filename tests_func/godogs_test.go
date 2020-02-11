@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
-	testConf "github.com/wal-g/wal-g/tests_func/config"
-	testUtils "github.com/wal-g/wal-g/tests_func/utils"
+	"github.com/wal-g/wal-g/tests_func/config"
+	"github.com/wal-g/wal-g/tests_func/utils"
 
 	"github.com/DATA-DOG/godog"
 	"github.com/DATA-DOG/godog/colors"
@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 	opt.Paths = flag.Args()
 
-	environ := testUtils.ParseEnvLines(os.Environ())
+	environ := utils.ParseEnvLines(os.Environ())
 	debug := environ["DEBUG"] != ""
 	if debug {
 		err := tracelog.UpdateLogLevel(tracelog.DevelLogLevel)
@@ -42,7 +42,7 @@ func TestMain(m *testing.M) {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if cleanEnv {
-		env, err := ReadEnv(testConf.Env["ENV_FILE"])
+		env, err := ReadEnv(config.Env["ENV_FILE"])
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		tctx.Env = env
