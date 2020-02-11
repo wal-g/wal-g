@@ -4,7 +4,7 @@ var Env = map[string]string{
 	"STAGING_DIR":        "staging",
 	"ENV_FILE":           "staging/env.file",
 	"IMAGES_DIR":         "images",
-	"DOCKER_BRIDGE_NAME": "dbaas",
+	"DOCKER_BRIDGE_NAME": "walg-func-test",
 	"DOCKER_IP4_SUBNET":  "10.%s.0/24",
 	"DOCKER_IP6_SUBNET":  "fd00:dead:beef:%s::/96",
 
@@ -24,13 +24,12 @@ var Env = map[string]string{
 	"MONGO_EXPOSE_MONGOD":  "27018",
 	"MONGO_EXPOSE_SSH":     "22",
 
-	"MINIO_BUILD_PATH": "staging/images/minio",
 	"S3_HOST":          "minio01",
 	"S3_PORT":          "9000",
 	"S3_BUCKET":        "dbaas",
 	"S3_ACCESS_KEY":    "S3_ACCESS_KEY",
 	"S3_SECRET_KEY":    "S3_SECRET_KEY",
 
-	"MONGODB_BACKUP_BASE_TAG":  "mongodb-backup-base",
-	"MONGODB_BACKUP_BASE_PATH": "staging/images/base",
+	"BACKUP_BASE_TAG":  "walg-func-test-base",
+	"BACKUP_BASE_PATH": "staging/images/base",
 }

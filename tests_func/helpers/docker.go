@@ -9,7 +9,7 @@ import (
 	"os"
 	"os/exec"
 
-	testUtils "github.com/wal-g/wal-g/tests_func/utils"
+	"github.com/wal-g/wal-g/tests_func/utils"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -108,7 +108,7 @@ func RunCommand(ctx context.Context, container string, cmd []string, setters ...
 
 func ContainerWithPrefix(containers []types.Container, name string) (*types.Container, error) {
 	for _, container := range containers {
-		if testUtils.StringInSlice(name, container.Names) {
+		if utils.StringInSlice(name, container.Names) {
 			return &container, nil
 		}
 	}
@@ -148,27 +148,6 @@ func ExposedPort(container types.Container, port int) (string, int, error) {
 		}
 	}
 	return "", 0, fmt.Errorf("error in getting exposed port")
-}
-
-func CallCompose(config string, env map[string]string, actions []string) error {
-	baseArgs := []string{"--file", config, "-p", "test"}
-	baseArgs = append(baseArgs, actions...)
-	cmd := exec.Command("docker-compose", baseArgs...)
-	for _, line := range testUtils.EnvToList(env) {
-		cmd.Env = append(cmd.Env, line)
-	}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("can not start command: %v", err)
-	}
-
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("error when calling compose: %v", err)
-	}
-
-	return nil
 }
 
 func ListNets(ctx context.Context, name string) ([]types.NetworkResource, error) {
@@ -228,17 +207,6 @@ func RemoveNet(ctx context.Context, netName string) error {
 	return nil
 }
 
-func ShutdownContainers(config string, env map[string]string) error {
-	return CallCompose(config, env, []string{"down", "--rmi", "local", "--remove-orphans"})
-}
-
-func ShutdownNetwork(ctx context.Context, netName string) error {
-	if err := Docker.NetworkRemove(ctx, netName); err != nil {
-		return fmt.Errorf("error in shutting down network: %v", err)
-	}
-	return nil
-}
-
 func ExposedHostPort(ctx context.Context, fqdn string, port int) (string, int, error) {
 	dockerContainer, err := DockerContainer(ctx, fqdn)
 	if err != nil {
@@ -246,6 +214,95 @@ func ExposedHostPort(ctx context.Context, fqdn string, port int) (string, int, e
 	}
 	return ExposedPort(*dockerContainer, port)
 }
+
+func BuildImage(ctx context.Context, tag string, path string) error {
+	cmd := exec.CommandContext(ctx, "docker", "build", "-t", tag, path)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("error in building base: %v", err)
+	}
+	return nil
+}
+
+type BaseImage struct{
+	Path string
+	Tag  string
+}
+
+type Infra struct {
+	ctx context.Context
+	config string
+	env map[string]string
+	net string
+	baseImage BaseImage
+}
+
+func NewInfra(ctx context.Context, config string, env map[string]string, net string, base BaseImage) *Infra {
+	return &Infra{
+		ctx:    ctx,
+		config: config,
+		env:    env,
+		net:    net,
+		baseImage: base,
+	}
+}
+
+func (inf *Infra) Setup() error {
+	if err := CreateNet(inf.ctx, inf.net); err != nil {
+		return fmt.Errorf("can not create network: %v", err)
+	}
+
+	if err := BuildImage(inf.ctx, inf.baseImage.Tag, inf.baseImage.Path); err != nil {
+		return fmt.Errorf("can not build base image: %v", err)
+	}
+
+	if err := inf.callCompose([]string{"--verbose", "--log-level", "WARNING", "build"}); err != nil {
+		return fmt.Errorf("can not build images: %v", err)
+	}
+
+	return nil
+}
+
+func (inf *Infra) RecreateContainers() error {
+	if err := inf.callCompose([]string{"--verbose", "--log-level", "WARNING", "down", "--volumes", "--timeout", "0"}); err != nil {
+		return err
+	}
+	return inf.callCompose([]string{"--verbose", "--log-level", "WARNING", "up", "--detach"})
+}
+
+func (inf *Infra) Shutdown() error {
+	if err := inf.callCompose([]string{"down", "--rmi", "local", "--remove-orphans", "--timeout", "0"}); err != nil {
+		return fmt.Errorf("can not shutdown containers: %v", err)
+	}
+
+	if err := Docker.NetworkRemove(inf.ctx, inf.net); err != nil {
+		return fmt.Errorf("error in shutting down network: %v", err)
+	}
+	return nil
+}
+
+func (inf *Infra) callCompose(actions []string) error {
+	baseArgs := []string{"--file", inf.config, "-p", "test"}
+	baseArgs = append(baseArgs, actions...)
+	cmd := exec.CommandContext(inf.ctx,"docker-compose", baseArgs...)
+	for _, line := range utils.EnvToList(inf.env) {
+		cmd.Env = append(cmd.Env, line)
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("can not start command: %v", err)
+	}
+
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("error when calling compose: %v", err)
+	}
+
+	return nil
+}
+
 
 func init() {
 	var err error

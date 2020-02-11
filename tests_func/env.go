@@ -4,28 +4,13 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"os/exec"
 	"path"
 	"strconv"
 
 	"github.com/wal-g/wal-g/tests_func/config"
-	"github.com/wal-g/wal-g/tests_func/helpers"
 	"github.com/wal-g/wal-g/tests_func/utils"
 )
 
-func BuildBase(tctx *TestContext) error {
-	cmd := exec.Command("docker", "build", "-t", tctx.Env["MONGODB_BACKUP_BASE_TAG"], tctx.Env["MONGODB_BACKUP_BASE_PATH"])
-	cmd.Stdout = os.Stdout
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("error in building base: %v", err)
-	}
-
-	if err := helpers.CreateNet(tctx.Context, tctx.Env["NETWORK_NAME"]); err != nil {
-		return err
-	}
-	fmt.Printf("`docker-compose build` is running\n")
-	return helpers.CallCompose(tctx.Env["COMPOSE_FILE"], tctx.Env, []string{"--verbose", "--log-level", "WARNING", "build"})
-}
 
 func EnvExists(path string) bool {
 	_, err := os.Stat(path)
@@ -63,8 +48,8 @@ func ReadEnv(path string) (map[string]string, error) {
 	return utils.ParseEnvLines(envLines), nil
 }
 
-func (tctx *TestContext) SetupStaging() error {
-	if err := utils.CopyDirectory(tctx.Env["IMAGES_DIR"], path.Join(tctx.Env["STAGING_DIR"], tctx.Env["IMAGES_DIR"])); err != nil {
+func SetupStaging(imagesDir, stagingDir string) error {
+	if err := utils.CopyDirectory(imagesDir, path.Join(stagingDir, imagesDir)); err != nil {
 		return fmt.Errorf("can not copy images into staging: %v", err)
 	}
 	return nil

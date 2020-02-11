@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	testUtils "github.com/wal-g/wal-g/tests_func/utils"
+	"github.com/wal-g/wal-g/tests_func/utils"
 
 	"github.com/wal-g/tracelog"
 	"go.mongodb.org/mongo-driver/bson"
@@ -30,7 +30,7 @@ func generateRecord(rowNum int, strLen int, strPrefix string) DatabaseRecord {
 	return DatabaseRecord{
 		Timestamp: time.Now().Unix(),
 		IntNum:    rowNum,
-		Str:       fmt.Sprintf("%s_%s", strPrefix, testUtils.RandSeq(strLen)),
+		Str:       fmt.Sprintf("%s_%s", strPrefix, utils.RandSeq(strLen)),
 	}
 }
 

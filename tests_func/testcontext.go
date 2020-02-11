@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
-	testConf "github.com/wal-g/wal-g/tests_func/config"
-	testHelper "github.com/wal-g/wal-g/tests_func/helpers"
-	testUtils "github.com/wal-g/wal-g/tests_func/utils"
+	"github.com/wal-g/wal-g/tests_func/config"
+	"github.com/wal-g/wal-g/tests_func/helpers"
+	"github.com/wal-g/wal-g/tests_func/utils"
 
 	"github.com/DATA-DOG/godog"
 	"github.com/DATA-DOG/godog/gherkin"
 	"github.com/docker/docker/client"
 	"github.com/wal-g/tracelog"
-	"time"
 )
 
 func (tctx *TestContext) ContainerFQDN(name string) string {
@@ -24,16 +24,16 @@ func (tctx *TestContext) S3Host() string {
 	return tctx.Env["S3_HOST"]
 }
 
-func WalgUtilFromTestContext(tctx *TestContext, host string) *testHelper.WalgUtil {
-	return testHelper.NewWalgUtil(
+func WalgUtilFromTestContext(tctx *TestContext, host string) *helpers.WalgUtil {
+	return helpers.NewWalgUtil(
 		tctx.Context,
 		tctx.ContainerFQDN(host),
 		tctx.Env["WALG_CLIENT_PATH"],
 		tctx.Env["WALG_CONF_PATH"])
 }
 
-func S3StorageFromTestContext(tctx *TestContext, host string) *testHelper.S3Storage {
-	return testHelper.NewS3Storage(
+func S3StorageFromTestContext(tctx *TestContext, host string) *helpers.S3Storage {
+	return helpers.NewS3Storage(
 		tctx.Context,
 		tctx.ContainerFQDN(host),
 		tctx.Env["S3_BUCKET"],
@@ -41,16 +41,25 @@ func S3StorageFromTestContext(tctx *TestContext, host string) *testHelper.S3Stor
 		tctx.Env["S3_SECRET_KEY"])
 }
 
-func MongoCtlFromTestContext(tctx *TestContext, host string) (*testHelper.MongoCtl, error) {
-	return testHelper.NewMongoCtl(
+func MongoCtlFromTestContext(tctx *TestContext, host string) (*helpers.MongoCtl, error) {
+	return helpers.NewMongoCtl(
 		tctx.Context,
 		tctx.ContainerFQDN(host),
-		testHelper.AdminCreds(testHelper.AdminCredsFromEnv(tctx.Env)))
+		helpers.AdminCreds(helpers.AdminCredsFromEnv(tctx.Env)))
+}
+
+func InfraFromTestContext(tctx *TestContext) *helpers.Infra {
+	return helpers.NewInfra(
+		tctx.Context,
+		tctx.Env["COMPOSE_FILE"],
+		tctx.Env,
+		tctx.Env["NETWORK_NAME"],
+		helpers.BaseImage{Path: tctx.Env["BACKUP_BASE_PATH"], Tag: tctx.Env["BACKUP_BASE_TAG"],})
 }
 
 type AuxData struct {
-	Timestamps         map[string]testHelper.OpTimestamp
-	DatabaseSnap       map[string][]testHelper.UserData
+	Timestamps         map[string]helpers.OpTimestamp
+	DatabaseSnap       map[string][]helpers.UserData
 	CreatedBackupNames []string
 	NometaBackupNames  []string
 	OplogPushEnabled   bool
@@ -59,45 +68,27 @@ type AuxData struct {
 
 type TestContext struct {
 	Docker  *client.Client
+	Infra   *helpers.Infra
 	Env     map[string]string
 	Context context.Context
 	AuxData AuxData
 }
 
 func NewTestContext() (*TestContext, error) {
-	tctx := &TestContext{}
-
-	var err error
-	tctx.Context = context.Background()
-	tctx.Docker, err = client.NewEnvClient()
-	if err != nil {
-		return nil, fmt.Errorf("can not setup docker client: %v", err)
-	}
-	return tctx, nil
-}
-
-func (tctx *TestContext) Stop() error {
-	return testHelper.CallCompose(tctx.Env["COMPOSE_FILE"], tctx.Env, []string{"down", "--rmi", "local", "--remove-orphans"})
-}
-
-func (tctx *TestContext) StartRecreate() error {
-	return testHelper.CallCompose(tctx.Env["COMPOSE_FILE"], tctx.Env, []string{"--verbose", "--log-level", "WARNING", "up", "--detach", "--build", "--force-recreate"})
+	return &TestContext{Context: context.Background()}, nil
 }
 
 func (tctx *TestContext) ShutdownEnv() error {
-	if err := testHelper.ShutdownContainers(tctx.Env["COMPOSE_FILE"], tctx.Env); err != nil {
-		return err
-	}
-	if err := testHelper.ShutdownNetwork(tctx.Context, tctx.Env["NETWORK_NAME"]); err != nil {
+	if err := tctx.Infra.Shutdown(); err != nil {
 		return err
 	}
 
 	// TODO: Enable net cleanup
-	//if err := testHelper.RemoveNet(TestContext); err != nil {
+	//if err := helpers.RemoveNet(TestContext); err != nil {
 	//	log.Fatalln(err)
 	//}
 
-	if err := os.RemoveAll(testConf.Env["STAGING_DIR"]); err != nil {
+	if err := os.RemoveAll(config.Env["STAGING_DIR"]); err != nil {
 		return err
 	}
 	return nil
@@ -108,17 +99,17 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 		tctx.AuxData.CreatedBackupNames = []string{}
 		tctx.AuxData.NometaBackupNames = []string{}
 		tctx.AuxData.OplogPushEnabled = false
-		tctx.AuxData.Timestamps = make(map[string]testHelper.OpTimestamp)
-		tctx.AuxData.DatabaseSnap = make(map[string][]testHelper.UserData)
+		tctx.AuxData.Timestamps = make(map[string]helpers.OpTimestamp)
+		tctx.AuxData.DatabaseSnap = make(map[string][]helpers.UserData)
 		tctx.AuxData.PreviousBackupTime = time.Unix(0, 0)
-		if err := tctx.StartRecreate(); err != nil {
+		if err := tctx.Infra.RecreateContainers(); err != nil {
 			tracelog.ErrorLogger.Fatalln(err)
 		}
 	})
 
 	s.BeforeSuite(func() {
-		stagingPath := testConf.Env["STAGING_DIR"]
-		envFilePath := testConf.Env["ENV_FILE"]
+		stagingPath := config.Env["STAGING_DIR"]
+		envFilePath := config.Env["ENV_FILE"]
 		newEnv := !EnvExists(envFilePath)
 		if newEnv {
 			err := SetupEnv(envFilePath, stagingPath)
@@ -127,15 +118,16 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 
 		env, err := ReadEnv(envFilePath)
 		tracelog.ErrorLogger.FatalOnError(err)
-		tctx.Env = testUtils.MergeEnvs(testUtils.ParseEnvLines(os.Environ()), env)
+		tctx.Env = utils.MergeEnvs(utils.ParseEnvLines(os.Environ()), env)
+		tctx.Infra = InfraFromTestContext(tctx)
 
 		if newEnv {
-			err := tctx.SetupStaging()
-			tracelog.ErrorLogger.FatalOnError(err)
-
-			err = BuildBase(tctx)
+			err := SetupStaging(tctx.Env["IMAGES_DIR"], tctx.Env["STAGING_DIR"])
 			tracelog.ErrorLogger.FatalOnError(err)
 		}
+
+		err = tctx.Infra.Setup()
+		tracelog.ErrorLogger.FatalOnError(err)
 
 	})
 

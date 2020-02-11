@@ -1,5 +1,5 @@
 # vim:set ft=dockerfile:
-FROM mongodb-backup-base
+FROM walg-func-test-base
 
 ARG MONGO_PACKAGE=mongodb-org
 ARG MONGO_REPO=repo.mongodb.org
