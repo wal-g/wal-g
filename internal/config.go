@@ -89,6 +89,7 @@ var (
 		PgpKeyPassphraseSetting:      true,
 		TotalBgUploadedLimit:         true,
 		NameStreamCreateCmd:          true,
+		NameStreamRestoreCmd:         true,
 
 		// Postgres
 		PgPortSetting:     true,
@@ -142,6 +143,11 @@ var (
 
 		//File
 		"WALG_FILE_PREFIX": true,
+
+		// MongoDB
+		MongoDBUriSetting:          true,
+		OplogArchiveTimeoutSetting: true,
+		OplogArchiveAfterSize:      true,
 	}
 )
 
