@@ -1,23 +1,31 @@
-package mongoload
+package internal
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
-	"os"
 	"strings"
 	"time"
-
-	testUtil "github.com/wal-g/wal-g/tests_func/utils"
 )
+
+var letters = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+func RandSeq(n int) string {
+	rand.Seed(time.Now().UTC().UnixNano())
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
+}
 
 type opConfig struct {
 	Op      string            `json:"op"`
 	Cnt     int               `json:"cnt"`
 	DbName  string            `json:"db"`
 	ColName string            `json:"cl"`
-	Cmds    []json.RawMessage `json:"cmds"`
+	Cmds    []json.RawMessage `json:"dc"`
 	Adv     json.RawMessage   `json:"adv"`
 }
 
@@ -47,7 +55,7 @@ type advSleep struct {
 	Time float32 `json:"time"`
 }
 
-type patronConfig struct {
+type ammoConfig struct {
 	PatronName string     `json:"name"`
 	OpConfig   []opConfig `json:"config"`
 }
@@ -72,7 +80,7 @@ func valueGenF(values []string, mnLen, mxLen int) func() string {
 		return func() string {
 			mnLen, mxLen = updateMnMx(mnLen, mxLen, 2, 10)
 			ln := rand.Intn(mxLen-mnLen+1) + mnLen
-			return testUtil.RandSeq(ln)
+			return RandSeq(ln)
 		}
 	}
 	return func() string {
@@ -163,7 +171,7 @@ func addIndeciesAfterOp(str string) string {
 	return str[:i] + fmt.Sprintf(`"id": %d, "op"`, id) + addIndeciesAfterOp(str[(i+4):])
 }
 
-func generateOp(writer *bufio.Writer, config opConfig, lastComma bool) error {
+func generateOp(writer io.Writer, config opConfig, lastComma bool) error {
 	if config.Cmds != nil {
 		if config.Op != "" {
 			return fmt.Errorf("if explicit cmds is used, op field cannot be set")
@@ -184,7 +192,7 @@ func generateOp(writer *bufio.Writer, config opConfig, lastComma bool) error {
 			cmdLine += ","
 		}
 		cmdLine += "\n"
-		_, err := writer.WriteString(cmdLine)
+		_, err := writer.Write([]byte(cmdLine))
 		if err != nil {
 			return fmt.Errorf("cannot generate op %s: %v", config.Op, err)
 		}
@@ -199,7 +207,7 @@ func generateOp(writer *bufio.Writer, config opConfig, lastComma bool) error {
 			cmdLine = cmdLine + ","
 		}
 		cmdLine = cmdLine + "\n"
-		_, err = writer.WriteString(cmdLine)
+		_, err = writer.Write([]byte(cmdLine))
 		if err != nil {
 			return fmt.Errorf("cannot generate op %s: %v", config.Op, err)
 		}
@@ -207,54 +215,32 @@ func generateOp(writer *bufio.Writer, config opConfig, lastComma bool) error {
 	return nil
 }
 
-func generatePatron(config patronConfig) error {
-
-	//hndl, err := os.Create("tests_func/load/" + config.PatronName + ".json")
-	hndl, err := os.Create(config.PatronName + ".json")
-	if err != nil {
-		return fmt.Errorf("cannot generate patron %s: %v", config.PatronName, err)
-	}
-	defer hndl.Close()
-	w := bufio.NewWriter(hndl)
-
-	_, err = w.WriteString("[\n")
+func generateAmmo(config ammoConfig, w io.Writer) error {
+	_, err := w.Write([]byte("[\n"))
 	for i, opConfig := range config.OpConfig {
 		err = generateOp(w, opConfig, i != len(config.OpConfig)-1)
 		if err != nil {
 			return fmt.Errorf("cannot generate patron %s: %v", config.PatronName, err)
 		}
 	}
-	_, err = w.WriteString("]\n")
-
-	err = w.Flush()
-	if err != nil {
-		return fmt.Errorf("cannot generate patron %s: %v", config.PatronName, err)
-	}
-
+	_, err = w.Write([]byte("]\n"))
 	return nil
 }
 
-func GeneratePatronsFromFile(filepath string) ([]string, error) {
+func GenerateAmmo(r io.Reader, w io.Writer) error {
 	rand.Seed(time.Now().UnixNano())
-	var patrons []string
-	hndl, err := os.Open(filepath)
+
+	decoder := json.NewDecoder(r)
+	var configs []ammoConfig
+	err := decoder.Decode(&configs)
 	if err != nil {
-		return []string{}, fmt.Errorf("cannot generate patrons from file: %v", err)
-	}
-	defer hndl.Close()
-	decoder := json.NewDecoder(hndl)
-	var configs []patronConfig
-	err = decoder.Decode(&configs)
-	if err != nil {
-		return []string{}, fmt.Errorf("cannot decode config JSON: %v", err)
+		return fmt.Errorf("cannot decode config JSON: %v", err)
 	}
 	for i := range configs {
 		id = 0
-		err = generatePatron(configs[i])
-		patrons = append(patrons, configs[i].PatronName)
-		if err != nil {
-			return patrons, err
+		if err := generateAmmo(configs[i], w); err != nil {
+			return err
 		}
 	}
-	return patrons, nil
+	return nil
 }

@@ -1,0 +1,8 @@
+[
+  {"op":"c", "db":"db1", "id": 1, "dc":{"insert":"c1", "documents": [{"key1": "val1", "i": 1}]}},
+  {"op":"c", "db":"db1", "id": 2, "dc":{"insert":"c1", "documents": [{"key1": "val2"}, {"key2": "val3", "i":  2}]}},
+  {"op":"c", "db":"db1", "id": 3, "dc":{"update":"c1", "updates": [{"q": {"key2": "val3"}, "u": {"$inc": {"i": 2 }}} ]}},
+  {"op":"c", "db":"db1", "id": 4, "dc":{"delete":"c1", "deletes": [{"q": {"key1": "val2"}, "limit": 0}]}},
+  {"op":"t", "db":"db2", "id": 5, "dc":[{"id": 14, "op":"c","db":"t1","dc":{"insert":"c1","documents":[{"tt1":"ttn1"}]}},{"id": 15, "op":"sleep","db":"t1","cl":"c2","time":5000},{"id": 17, "op":"abort"}]},
+  {"op":"t", "db":"db3", "id": 5, "dc":[{"id": 14, "op":"c","db":"t1","dc":{"insert":"c1","documents":[{"tt1":"ttn1"}]}}]}
+]
