@@ -34,10 +34,10 @@ require (
 	github.com/jessevdk/go-flags v1.4.0 // indirect
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/mattn/go-ieproxy v0.0.0-20191113090002-7c0f6868bffe // indirect
+	github.com/mattn/go-runewidth v0.0.8 // indirect
 	github.com/minio/sio v0.2.0
 	github.com/mongodb/mongo-tools-common v2.0.1+incompatible
 	github.com/ncw/swift v1.0.49 // indirect
-	github.com/olekukonko/tablewriter v0.0.4
 	github.com/onsi/ginkgo v1.11.0 // indirect
 	github.com/onsi/gomega v1.8.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
