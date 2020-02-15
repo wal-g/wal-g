@@ -11,7 +11,7 @@ import (
 	"github.com/wal-g/storages/storage"
 )
 
-// Uploader defines interface to store mongodb backups and oplog archives
+// WalUploader defines interface to store mongodb backups and oplog archives
 type Uploader interface {
 	UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error // TODO: rename firstTS
 	UploadBackup(stream io.Reader, metaProvider BackupMetaProvider) error
@@ -79,7 +79,7 @@ func (sd *StorageDownloader) ListOplogArchives() ([]models.Archive, error) {
 
 // StorageUploader extends base uploader with mongodb specific.
 type StorageUploader struct {
-	*internal.Uploader
+	*internal.WalUploader
 }
 
 // NewStorageUploader builds mongodb uploader.
@@ -125,7 +125,7 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, metaProvider BackupMet
 		UserData:        internal.GetSentinelUserData(),
 		MongoMeta:       metaProvider.Meta(),
 	}
-	return internal.UploadSentinel(su.Uploader, currentBackupSentinelDto, backupName)
+	return internal.UploadSentinel(su.WalUploader, currentBackupSentinelDto, backupName)
 }
 
 // FileExtension returns current file extension (based on configured compression)

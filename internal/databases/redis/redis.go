@@ -9,7 +9,7 @@ import (
 )
 
 type Uploader struct {
-	*internal.Uploader
+	*internal.WalUploader
 }
 type Backup struct {
 	*internal.Backup

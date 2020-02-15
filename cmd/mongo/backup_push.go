@@ -1,15 +1,15 @@
 package mongo
 
 import (
+	"context"
 	"os"
 	"syscall"
-	"context"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
-	"github.com/wal-g/wal-g/utility"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
@@ -39,7 +39,7 @@ var backupPushCmd = &cobra.Command{
 		uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 
 		command := internal.GetStreamCreateCmd()
-		mongo.HandleStreamPush(&archive.StorageUploader{Uploader: uploader}, command, metaProvider)
+		mongo.HandleStreamPush(&archive.StorageUploader{WalUploader: uploader}, command, metaProvider)
 	},
 }
 

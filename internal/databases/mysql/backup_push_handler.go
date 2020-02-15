@@ -36,5 +36,5 @@ func (uploader *Uploader) UploadStream(db *sql.DB, stream io.Reader) error {
 	tracelog.DebugLogger.Println("Binlog end file", binlogEnd)
 
 	sentinel := StreamSentinelDto{BinLogStart: binlogStart, BinLogEnd: binlogEnd, StartLocalTime: timeStart}
-	return internal.UploadSentinel(uploader.Uploader, &sentinel, fileName)
+	return internal.UploadSentinel(uploader.WalUploader, &sentinel, fileName)
 }

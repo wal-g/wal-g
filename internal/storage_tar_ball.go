@@ -19,7 +19,7 @@ type StorageTarBall struct {
 	allTarballsSize *int64
 	writeCloser     io.Closer
 	tarWriter       *tar.Writer
-	uploader        *Uploader
+	uploader        *WalUploader
 }
 
 // SetUp creates a new tar writer and starts upload to storage.

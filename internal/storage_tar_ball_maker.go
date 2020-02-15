@@ -4,10 +4,10 @@ package internal
 type StorageTarBallMaker struct {
 	partCount  int
 	backupName string
-	uploader   *Uploader
+	uploader   *WalUploader
 }
 
-func NewStorageTarBallMaker(backupName string, uploader *Uploader) *StorageTarBallMaker {
+func NewStorageTarBallMaker(backupName string, uploader *WalUploader) *StorageTarBallMaker {
 	return &StorageTarBallMaker{0, backupName, uploader}
 }
 

@@ -20,7 +20,7 @@ import (
 
 // TODO : unit tests
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
-func HandleWALPrefetch(uploader *Uploader, walFileName string, location string) {
+func HandleWALPrefetch(uploader *WalUploader, walFileName string, location string) {
 	folder := uploader.UploadingFolder.GetSubFolder(utility.WalPath)
 	var fileName = walFileName
 	location = path.Dir(location)
@@ -54,7 +54,7 @@ func HandleWALPrefetch(uploader *Uploader, walFileName string, location string) 
 }
 
 // TODO : unit tests
-func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.WaitGroup, uploader *Uploader) {
+func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.WaitGroup, uploader *WalUploader) {
 	defer func() {
 		if r := recover(); r != nil {
 			tracelog.ErrorLogger.Println("Prefault unsuccessful ", prefaultStartLsn)

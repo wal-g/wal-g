@@ -25,7 +25,7 @@ func (err mockMultiFailureError) Error() string {
 }
 
 // Mock out uploader client for S3. Includes these methods:
-// Upload(*UploadInput, ...func(*s3manager.Uploader))
+// Upload(*UploadInput, ...func(*s3manager.WalUploader))
 type mockS3Uploader struct {
 	s3manageriface.UploaderAPI
 	multiErr bool

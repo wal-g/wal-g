@@ -70,7 +70,7 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 }
 
 func createAndPushBackup(
-	uploader *Uploader,
+	uploader *WalUploader,
 	archiveDirectory, backupsFolder, previousBackupName string,
 	previousBackupSentinelDto BackupSentinelDto,
 	isPermanent, forceIncremental bool,
@@ -196,7 +196,7 @@ func createAndPushBackup(
 
 // TODO : unit tests
 // HandleBackupPush is invoked to perform a wal-g backup-push
-func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent bool, isFullBackup bool) {
+func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanent bool, isFullBackup bool) {
 	archiveDirectory = utility.ResolveSymlink(archiveDirectory)
 	maxDeltas, fromFull := getDeltaConfig()
 	checkPgVersionAndPgControl(archiveDirectory)
@@ -247,7 +247,7 @@ func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent b
 }
 
 // TODO : unit tests
-func uploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupName string, meta ExtendedMetadataDto) error {
+func uploadMetadata(uploader *WalUploader, sentinelDto *BackupSentinelDto, backupName string, meta ExtendedMetadataDto) error {
 	// BackupSentinelDto struct allows nil field for backward compatiobility
 	// We do not expect here nil dto since it is new dto to upload
 	meta.DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -269,7 +269,7 @@ func uploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupNa
 }
 
 // TODO : unit tests
-func UploadSentinel(uploader *Uploader, sentinelDto interface{}, backupName string) error {
+func UploadSentinel(uploader *WalUploader, sentinelDto interface{}, backupName string) error {
 	sentinelName := backupName + utility.SentinelSuffix
 
 	dtoBody, err := json.Marshal(sentinelDto)
