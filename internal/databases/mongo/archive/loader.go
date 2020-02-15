@@ -11,7 +11,7 @@ import (
 	"github.com/wal-g/storages/storage"
 )
 
-// WalUploader defines interface to store mongodb backups and oplog archives
+// Uploader defines interface to store mongodb backups and oplog archives
 type Uploader interface {
 	UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error // TODO: rename firstTS
 	UploadBackup(stream io.Reader, metaProvider BackupMetaProvider) error

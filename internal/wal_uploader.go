@@ -8,7 +8,7 @@ import (
 	"path"
 )
 
-// WalUploader contains fields associated with uploading tarballs.
+// Uploader contains fields associated with uploading tarballs.
 // Multiple tarballs can share one uploader.
 type WalUploader struct {
 	*Uploader

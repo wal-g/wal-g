@@ -13,7 +13,7 @@ import (
 )
 
 // Uploader contains fields associated with uploading tarballs.
-// Multiple tarballs can share one trueUploader.
+// Multiple tarballs can share one uploader.
 type Uploader struct {
 	UploadingFolder      storage.Folder
 	Compressor           compression.Compressor
@@ -34,55 +34,55 @@ func NewUploader(
 	uploadingLocation storage.Folder,
 ) *Uploader {
 	size := int64(0)
-	trueUploader := &Uploader{
+	uploader := &Uploader{
 		UploadingFolder: uploadingLocation,
 		Compressor:      compressor,
 		waitGroup:       &sync.WaitGroup{},
 		tarSize:         &size,
 	}
-	trueUploader.Failed.Store(false)
-	return trueUploader
+	uploader.Failed.Store(false)
+	return uploader
 }
 
 // finish waits for all waiting parts to be uploaded. If an error occurs,
 // prints alert to stderr.
-func (trueUploader *Uploader) finish() {
-	trueUploader.waitGroup.Wait()
-	if trueUploader.Failed.Load().(bool) {
+func (uploader *Uploader) finish() {
+	uploader.waitGroup.Wait()
+	if uploader.Failed.Load().(bool) {
 		tracelog.ErrorLogger.Printf("WAL-G could not complete upload.\n")
 	}
 }
 
 // Clone creates similar Uploader with new WaitGroup
-func (trueUploader *Uploader) clone() *Uploader {
+func (uploader *Uploader) clone() *Uploader {
 	return &Uploader{
-		trueUploader.UploadingFolder,
-		trueUploader.Compressor,
+		uploader.UploadingFolder,
+		uploader.Compressor,
 		&sync.WaitGroup{},
-		trueUploader.ArchiveStatusManager,
-		trueUploader.Failed,
-		trueUploader.tarSize,
+		uploader.ArchiveStatusManager,
+		uploader.Failed,
+		uploader.tarSize,
 	}
 }
 
 // TODO : unit tests
 // UploadFile compresses a file and uploads it.
-func (trueUploader *Uploader) UploadFile(file NamedReader) error {
-	compressedFile := CompressAndEncrypt(file, trueUploader.Compressor, ConfigureCrypter())
-	dstPath := utility.SanitizePath(filepath.Base(file.Name()) + "." + trueUploader.Compressor.FileExtension())
+func (uploader *Uploader) UploadFile(file NamedReader) error {
+	compressedFile := CompressAndEncrypt(file, uploader.Compressor, ConfigureCrypter())
+	dstPath := utility.SanitizePath(filepath.Base(file.Name()) + "." + uploader.Compressor.FileExtension())
 
-	err := trueUploader.Upload(dstPath, compressedFile)
+	err := uploader.Upload(dstPath, compressedFile)
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
 	return err
 }
 
 // TODO : unit tests
-func (trueUploader *Uploader) Upload(path string, content io.Reader) error {
-	err := trueUploader.UploadingFolder.PutObject(path, &WithSizeReader{content, trueUploader.tarSize})
+func (uploader *Uploader) Upload(path string, content io.Reader) error {
+	err := uploader.UploadingFolder.PutObject(path, &WithSizeReader{content, uploader.tarSize})
 	if err == nil {
 		return nil
 	}
-	trueUploader.Failed.Store(true)
+	uploader.Failed.Store(true)
 	tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"\n", err)
 	return err
 }
@@ -90,9 +90,9 @@ func (trueUploader *Uploader) Upload(path string, content io.Reader) error {
 // UploadMultiple uploads multiple objects from the start of the slice,
 // returning the first error if any. Note that this operation is not atomic
 // TODO : unit tests
-func (trueUploader *Uploader) uploadMultiple(objects []UploadObject) error {
+func (uploader *Uploader) uploadMultiple(objects []UploadObject) error {
 	for _, object := range objects {
-		err := trueUploader.Upload(object.Path, object.Content)
+		err := uploader.Upload(object.Path, object.Content)
 		if err != nil {
 			// possibly do a retry here
 			return err
