@@ -203,7 +203,7 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 	}
 
 	folder := uploader.UploadingFolder
-	deltaFileManager := uploader.deltaFileManager
+	deltaFileManager := uploader.DeltaFileManager
 
 	compressor, err := configureCompressor()
 	if err != nil {
