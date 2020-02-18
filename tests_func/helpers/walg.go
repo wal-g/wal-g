@@ -96,16 +96,19 @@ func (w *WalgUtil) runCmd(run []string) (ExecResult, error) {
 	command := []string{w.cliPath, "--config", w.confPath}
 	command = append(command, run...)
 
-	exec, err := RunCommand(w.ctx, w.host, command)
 	cmdLine := strings.Join(command, " ")
+	tracelog.DebugLogger.Printf("Running command: %v", cmdLine)
+
+	exec, err := RunCommand(w.ctx, w.host, command)
+	tracelog.DebugLogger.Printf("Output was: %v", exec.String())
 
 	if err != nil {
-		tracelog.DebugLogger.Printf("Command failed '%s' failed: %v", cmdLine, exec.String())
+		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", cmdLine, exec.String())
 		return exec, err
 	}
 
 	if exec.ExitCode != 0 {
-		tracelog.DebugLogger.Printf("Command failed '%s' failed: %v", cmdLine, exec.String())
+		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", cmdLine, exec.String())
 		err = fmt.Errorf("command '%s' exit code: %d", cmdLine, exec.ExitCode)
 	}
 

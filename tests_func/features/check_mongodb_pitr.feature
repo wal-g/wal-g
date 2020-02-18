@@ -18,7 +18,7 @@ Feature: MongoDB PITR backups check
 
 
   Scenario: First load
-    Given mongodb01 has test mongodb data test2
+    Given mongodb01 has been loaded with "load1"
     And we save last oplog timestamp on mongodb01 to "after first load"
     And we save mongodb01 data "after first load"
 
@@ -29,7 +29,7 @@ Feature: MongoDB PITR backups check
 
 
   Scenario: Second load
-    Given mongodb01 has test mongodb data test3
+    Given mongodb01 has been loaded with "load2"
     And we save last oplog timestamp on mongodb01 to "after second load"
     And we save mongodb01 data "after second load"
     Then we got 2 backup entries of mongodb01

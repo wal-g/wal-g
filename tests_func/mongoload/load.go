@@ -2,15 +2,21 @@ package mongoload
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 
 	"github.com/wal-g/wal-g/tests_func/mongoload/internal"
+	"github.com/wal-g/wal-g/tests_func/mongoload/models"
 
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func HandleLoad(ctx context.Context, reader io.Reader, mc *mongo.Client) (internal.LoadStat, error) {
+func HandleLoad(ctx context.Context, reader io.Reader, mc *mongo.Client, workers int) (models.LoadStat, error) {
+	if workers < 1 {
+		return models.LoadStat{}, fmt.Errorf("positive workers count expected")
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	wg := &sync.WaitGroup{}
 	defer wg.Wait()
@@ -18,20 +24,20 @@ func HandleLoad(ctx context.Context, reader io.Reader, mc *mongo.Client) (intern
 
 	var errs []<-chan error
 
-	rawOpc, errc0, err := internal.ReadRawStage(ctx, reader, 3, wg)
+	rawOpc, errc0, err := internal.ReadRawStage(ctx, reader, 1, wg)
 	if err != nil {
-		return internal.LoadStat{}, err
+		return models.LoadStat{}, err
 	}
 	errs = append(errs, errc0)
 
 	opsc, errc1 := internal.BuildStage(ctx, mc, rawOpc, wg)
 	errs = append(errs, errc1)
 
-	runc := internal.ExecStage(ctx, opsc, 3, 3, wg)
+	runc := internal.ExecStage(ctx, opsc, workers, workers, wg)
 	stat := internal.CollectStat(runc)
 
 	if err := WaitForPipeline(errs...); err != nil {
-		return internal.LoadStat{}, err
+		return models.LoadStat{}, err
 	}
 
 	return stat, nil

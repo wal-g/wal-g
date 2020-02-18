@@ -3,39 +3,16 @@ package internal
 import (
 	"encoding/json"
 	"io"
+
+	"github.com/wal-g/wal-g/tests_func/mongoload/models"
 )
 
-type OpsStat struct {
-	Success map[string]int `json:"succeeded"`
-	Fail    map[string]int `json:"failed"`
-	Docs    map[string]int `json:"docs"`
-}
-
-type LoadStat struct {
-	CmdStat OpsStat `json:"commands"`
-	TxnStat OpsStat `json:"transactions"`
-}
-
-func NewLoadStat() *LoadStat {
-	return &LoadStat{
-		CmdStat: OpsStat{
-			Success: make(map[string]int),
-			Fail:    make(map[string]int),
-			Docs:    make(map[string]int),
-		},
-		TxnStat: OpsStat{
-			Success: make(map[string]int),
-			Fail:    make(map[string]int),
-			Docs:    make(map[string]int),
-		},
-	}
-}
-
-func updateStatWithMongoOpLog(stat *OpsStat, log OpInfo) {
+func updateStatWithMongoOpLog(stat *models.OpsStat, log OpInfo) {
 	if log.status {
 		stat.Success[log.opName]++
 	} else {
 		stat.Fail[log.opName]++
+		stat.Errors[log.opName] = append(stat.Errors[log.opName], log.err)
 		return
 	}
 	var docs int
@@ -45,8 +22,8 @@ func updateStatWithMongoOpLog(stat *OpsStat, log OpInfo) {
 	stat.Docs[log.opName] += docs
 }
 
-func CollectStat(opInfoCh <-chan OpInfo) LoadStat {
-	stat := NewLoadStat()
+func CollectStat(opInfoCh <-chan OpInfo) models.LoadStat {
+	stat := models.NewLoadStat()
 	for opInfo := range opInfoCh {
 		updateStatWithMongoOpLog(&stat.CmdStat, opInfo)
 		if opInfo.opName == "transaction" {
@@ -58,7 +35,7 @@ func CollectStat(opInfoCh <-chan OpInfo) LoadStat {
 	return *stat
 }
 
-func PrintStat(stat LoadStat, writer io.Writer) error {
+func PrintStat(stat models.LoadStat, writer io.Writer) error {
 	bstat, err := json.MarshalIndent(stat, "", "    ")
 	if err != nil {
 		return err

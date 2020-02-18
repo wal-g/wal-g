@@ -225,25 +225,25 @@ func BuildImage(ctx context.Context, tag string, path string) error {
 	return nil
 }
 
-type BaseImage struct{
+type BaseImage struct {
 	Path string
 	Tag  string
 }
 
 type Infra struct {
-	ctx context.Context
-	config string
-	env map[string]string
-	net string
+	ctx       context.Context
+	config    string
+	env       map[string]string
+	net       string
 	baseImage BaseImage
 }
 
 func NewInfra(ctx context.Context, config string, env map[string]string, net string, base BaseImage) *Infra {
 	return &Infra{
-		ctx:    ctx,
-		config: config,
-		env:    env,
-		net:    net,
+		ctx:       ctx,
+		config:    config,
+		env:       env,
+		net:       net,
 		baseImage: base,
 	}
 }
@@ -285,7 +285,7 @@ func (inf *Infra) Shutdown() error {
 func (inf *Infra) callCompose(actions []string) error {
 	baseArgs := []string{"--file", inf.config, "-p", "test"}
 	baseArgs = append(baseArgs, actions...)
-	cmd := exec.CommandContext(inf.ctx,"docker-compose", baseArgs...)
+	cmd := exec.CommandContext(inf.ctx, "docker-compose", baseArgs...)
 	for _, line := range utils.EnvToList(inf.env) {
 		cmd.Env = append(cmd.Env, line)
 	}
@@ -302,7 +302,6 @@ func (inf *Infra) callCompose(actions []string) error {
 
 	return nil
 }
-
 
 func init() {
 	var err error
