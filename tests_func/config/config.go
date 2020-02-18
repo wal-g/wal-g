@@ -24,11 +24,11 @@ var Env = map[string]string{
 	"MONGO_EXPOSE_MONGOD":  "27018",
 	"MONGO_EXPOSE_SSH":     "22",
 
-	"S3_HOST":          "minio01",
-	"S3_PORT":          "9000",
-	"S3_BUCKET":        "dbaas",
-	"S3_ACCESS_KEY":    "S3_ACCESS_KEY",
-	"S3_SECRET_KEY":    "S3_SECRET_KEY",
+	"S3_HOST":       "minio01",
+	"S3_PORT":       "9000",
+	"S3_BUCKET":     "dbaas",
+	"S3_ACCESS_KEY": "S3_ACCESS_KEY",
+	"S3_SECRET_KEY": "S3_SECRET_KEY",
 
 	"BACKUP_BASE_TAG":  "walg-func-test-base",
 	"BACKUP_BASE_PATH": "staging/images/base",

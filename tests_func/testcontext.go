@@ -54,16 +54,16 @@ func InfraFromTestContext(tctx *TestContext) *helpers.Infra {
 		tctx.Env["COMPOSE_FILE"],
 		tctx.Env,
 		tctx.Env["NETWORK_NAME"],
-		helpers.BaseImage{Path: tctx.Env["BACKUP_BASE_PATH"], Tag: tctx.Env["BACKUP_BASE_TAG"],})
+		helpers.BaseImage{Path: tctx.Env["BACKUP_BASE_PATH"], Tag: tctx.Env["BACKUP_BASE_TAG"]})
 }
 
 type AuxData struct {
 	Timestamps         map[string]helpers.OpTimestamp
-	DatabaseSnap       map[string][]helpers.UserData
+	Snapshots          map[string][]helpers.NsSnapshot
 	CreatedBackupNames []string
 	NometaBackupNames  []string
 	OplogPushEnabled   bool
-	PreviousBackupTime   time.Time
+	PreviousBackupTime time.Time
 }
 
 type TestContext struct {
@@ -100,7 +100,7 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 		tctx.AuxData.NometaBackupNames = []string{}
 		tctx.AuxData.OplogPushEnabled = false
 		tctx.AuxData.Timestamps = make(map[string]helpers.OpTimestamp)
-		tctx.AuxData.DatabaseSnap = make(map[string][]helpers.UserData)
+		tctx.AuxData.Snapshots = make(map[string][]helpers.NsSnapshot)
 		tctx.AuxData.PreviousBackupTime = time.Unix(0, 0)
 		if err := tctx.Infra.RecreateContainers(); err != nil {
 			tracelog.ErrorLogger.Fatalln(err)
@@ -142,9 +142,10 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 
 	s.Step(`we save last oplog timestamp on ([^\s]*) to "([^"]*)"`, tctx.saveOplogTimestamp)
 	s.Step(`^([^\s]*) has test mongodb data test(\d+)$`, tctx.fillMongodbWithTestData)
+	s.Step(`^([^\s]*) has been loaded with "([^"]*)"$`, tctx.loadMongodbOpsFromConfig)
 	s.Step(`^we got same mongodb data at ([^\s]*) ([^\s]*)$`, tctx.testEqualMongodbDataAtHosts)
 	s.Step(`^we have same data in "([^"]*)" and "([^"]*)"$`, tctx.sameDataCheck)
-	s.Step(`^we save ([^\s]*) data "([^"]*)"$`, tctx.saveUserData)
+	s.Step(`^we save ([^\s]*) data "([^"]*)"$`, tctx.saveSnapshot)
 
 	s.Step(`^we create ([^\s]*) backup$`, tctx.createBackup)
 	s.Step(`^we got (\d+) backup entries of ([^\s]*)$`, tctx.checkBackupsCount)

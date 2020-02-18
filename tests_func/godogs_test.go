@@ -46,6 +46,7 @@ func TestMain(m *testing.M) {
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		tctx.Env = env
+		tctx.Infra = InfraFromTestContext(tctx)
 		err = tctx.ShutdownEnv()
 		tracelog.ErrorLogger.FatalOnError(err)
 

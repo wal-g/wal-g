@@ -11,7 +11,6 @@ import (
 	"github.com/wal-g/wal-g/tests_func/utils"
 )
 
-
 func EnvExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
