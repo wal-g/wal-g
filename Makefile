@@ -101,15 +101,7 @@ mongo_install: mongo_build
 mongo_features:
 	set -e
 	make go_deps
-	rm -rf ./tests_func/wal-g
-	mkdir -p ./tests_func/wal-g
-	cp -a `ls -A | grep -v "tests_func"` tests_func/wal-g/
-	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -v -timeout 40m
-	rm -rf tests_func/wal-g/
-
-clean_mongo_features:
-	cd tests_func/ && go test -v --env.clean
-	rm -rf tests_func/wal-g/
+	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -v -count=1 -timeout 20m
 
 redis_test: install deps redis_build lint unlink_brotli redis_integration_test
 

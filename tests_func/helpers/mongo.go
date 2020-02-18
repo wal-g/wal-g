@@ -354,7 +354,6 @@ func (mc *MongoCtl) LastTS() (OpTimestamp, error) {
 	err = conn.Database(LocalDB).Collection(OplogColl).
 		FindOne(mc.ctx, bson.D{}, opts).Decode(&op)
 
-	fmt.Println("asdasd")
 	if err != nil {
 		return OpTimestamp{}, err
 	}
@@ -388,7 +387,9 @@ func (mc *MongoCtl) EnableAuth() error {
 		return err
 	}
 
-	if strings.Contains(response.Combined(), "command createUser requires authentication") {
+	if strings.Contains(response.Combined(), "command createUser requires authentication") ||
+		strings.Contains(response.Combined(), "couldn't add user: not authorized on admin to execute command") ||
+		strings.Contains(response.Combined(), "there are no users authenticated"){
 		return nil
 	}
 	if !strings.Contains(response.Combined(), "Successfully added user") {
@@ -429,19 +430,14 @@ func (mc *MongoCtl) EnableAuth() error {
 }
 
 func (mc *MongoCtl) runCmd(run []string) (ExecResult, error) {
-	exec, err := RunCommand(mc.ctx, mc.host, run)
+	exc, err := RunCommandStrict(mc.ctx, mc.host, run)
 	cmdLine := strings.Join(run, " ")
 
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", cmdLine, exec.String())
-		return exec, err
+		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", cmdLine, exc.String())
+		return exc, err
 	}
-
-	if exec.ExitCode != 0 {
-		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", cmdLine, exec.String())
-		err = fmt.Errorf("command '%s' exit code: %d", cmdLine, exec.ExitCode)
-	}
-	return exec, err
+	return exc, err
 }
 
 func (mc *MongoCtl) PurgeDatadir() error {

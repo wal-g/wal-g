@@ -12,8 +12,14 @@ import (
 
 	"github.com/DATA-DOG/godog"
 	"github.com/DATA-DOG/godog/gherkin"
-	"github.com/docker/docker/client"
 	"github.com/wal-g/tracelog"
+)
+
+var (
+	featureFiles = map[string]string{
+		"backup": "features/check_mongodb_backup.feature",
+		"pitr":   "features/check_mongodb_pitr.feature",
+	}
 )
 
 func (tctx *TestContext) ContainerFQDN(name string) string {
@@ -29,7 +35,8 @@ func WalgUtilFromTestContext(tctx *TestContext, host string) *helpers.WalgUtil {
 		tctx.Context,
 		tctx.ContainerFQDN(host),
 		tctx.Env["WALG_CLIENT_PATH"],
-		tctx.Env["WALG_CONF_PATH"])
+		tctx.Env["WALG_CONF_PATH"],
+		tctx.Version.Major)
 }
 
 func S3StorageFromTestContext(tctx *TestContext, host string) *helpers.S3Storage {
@@ -66,32 +73,52 @@ type AuxData struct {
 	PreviousBackupTime time.Time
 }
 
+type MongoVersion struct {
+	Major string
+	Full  string
+}
+
 type TestContext struct {
-	Docker  *client.Client
-	Infra   *helpers.Infra
-	Env     map[string]string
-	Context context.Context
-	AuxData AuxData
+	Infra    *helpers.Infra
+	Env      map[string]string
+	Context  context.Context
+	AuxData  AuxData
+	Version  MongoVersion
+	Features []string
 }
 
 func NewTestContext() (*TestContext, error) {
-	return &TestContext{Context: context.Background()}, nil
-}
+	environ := utils.ParseEnvLines(os.Environ())
 
-func (tctx *TestContext) ShutdownEnv() error {
-	if err := tctx.Infra.Shutdown(); err != nil {
-		return err
+	features := utils.GetMapValues(featureFiles)
+	requestedFeature := environ["MONGO_FEATURE"]
+	if requestedFeature != "" {
+		feature, ok := featureFiles[requestedFeature]
+		if !ok {
+			return nil, fmt.Errorf("requested feature is not found: %s", requestedFeature)
+		}
+		features = []string{feature}
 	}
 
+	return &TestContext{
+		Context: context.Background(),
+		Version: MongoVersion{
+			Major: environ["MONGO_MAJOR"],
+			Full:  environ["MONGO_VERSION"]},
+		Features: features}, nil
+}
+
+func (tctx *TestContext) StopEnv() error {
+	return tctx.Infra.Shutdown()
+}
+
+func (tctx *TestContext) CleanEnv() error {
 	// TODO: Enable net cleanup
 	//if err := helpers.RemoveNet(TestContext); err != nil {
 	//	log.Fatalln(err)
 	//}
 
-	if err := os.RemoveAll(config.Env["STAGING_DIR"]); err != nil {
-		return err
-	}
-	return nil
+	return os.RemoveAll(config.Env["STAGING_DIR"])
 }
 
 func (tctx *TestContext) setupSuites(s *godog.Suite) {
