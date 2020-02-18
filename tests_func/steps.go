@@ -39,11 +39,18 @@ func (tctx *TestContext) sameDataCheck(dataId1, dataId2 string) error {
 }
 
 func (tctx *TestContext) createBackup(container string) error {
-	// backups may have the same name if less than one second has passed since the last backup
-	before := time.Now()
-	passed := before.Sub(tctx.AuxData.PreviousBackupTime)
+	host := tctx.ContainerFQDN(container)
+	beforeBackupTime, err := helpers.TimeInContainer(tctx.Context, host)
+	if err != nil {
+		return err
+	}
+
+	passed := beforeBackupTime.Sub(tctx.AuxData.PreviousBackupTime)
 	if passed < time.Second {
-		time.Sleep(time.Second - passed)
+		cmd := []string{"sleep", "1"}
+		if _, err := helpers.RunCommandStrict(tctx.Context, host, cmd); err != nil {
+			return err
+		}
 	}
 
 	walg := WalgUtilFromTestContext(tctx, container)
@@ -51,7 +58,14 @@ func (tctx *TestContext) createBackup(container string) error {
 	if err != nil {
 		return err
 	}
-	tctx.AuxData.PreviousBackupTime = before
+	tracelog.DebugLogger.Println("Backup created: ", backupId)
+
+	afterBackupTime, err := helpers.TimeInContainer(tctx.Context, host)
+	if err != nil {
+		return err
+	}
+
+	tctx.AuxData.PreviousBackupTime = afterBackupTime
 	tctx.AuxData.CreatedBackupNames = append(tctx.AuxData.CreatedBackupNames, backupId)
 	return nil
 }

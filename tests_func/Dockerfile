@@ -32,7 +32,7 @@ RUN mkdir -p /home/mongodb /var/log/wal-g/ ${TMP_DIR} && \
     ln --force -s /config/wal-g.json ${WALG_CONF_DIR}/wal-g.json && \
     ln --force -s /config/gpg-key.armor ${WALG_CONF_DIR}/gpg-key.armor
 
-COPY wal-g ${WALG_REPO}/
+COPY staging/wal-g ${WALG_REPO}/
 WORKDIR ${WALG_REPO}
 
 RUN make link_external_deps
