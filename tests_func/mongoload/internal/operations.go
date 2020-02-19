@@ -65,7 +65,8 @@ func NewTxnOp(rawOp RawMongoOp) (*TxnOp, error) {
 
 	// Build exec functions for all transaction's operations
 	var fns []func(ctx context.Context, client *mongo.Client) OpInfo
-	for _, cmd := range op.Cmds {
+	for _, opCmd := range op.Cmds {
+		cmd := opCmd
 		command := func(ctx context.Context, client *mongo.Client) OpInfo {
 			f, err := NewExecFunc(client, cmd)
 			if err != nil {
@@ -93,15 +94,6 @@ func NewTxnExec(client *mongo.Client, op *TxnOp) ExecFunc {
 	// TODO: do we need these tmp namespace
 	return func(ctx context.Context) OpInfo {
 		tm := time.Now()
-		var cmdResult bson.D
-		doc := bson.D{
-			primitive.E{Key: "insert", Value: "sleep_temp"},
-			primitive.E{Key: "documents", Value: bson.A{bson.D{primitive.E{Key: "aa", Value: "b"}}}}}
-		db := client.Database("sleep_db_temp")
-		if err := db.RunCommand(ctx, doc).Decode(&cmdResult); err != nil {
-			return NewOpInfo("transaction", op.ID, time.Time{}, time.Time{},
-				fmt.Errorf("cannot start transaction because temp collection cannot be created: %+v", err))
-		}
 
 		session, err := client.StartSession()
 		if err != nil {
@@ -111,13 +103,6 @@ func NewTxnExec(client *mongo.Client, op *TxnOp) ExecFunc {
 		tres, err := session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
 			return op.callback(sessCtx, client)
 		})
-
-		doc = bson.D{
-			primitive.E{Key: "delete", Value: "sleep_temp"},
-			primitive.E{Key: "deletes", Value: bson.A{bson.D{
-				primitive.E{Key: "q", Value: bson.D{primitive.E{Key: "aa", Value: "b"}}},
-				primitive.E{Key: "limit", Value: 1}}}}}
-		_ = db.RunCommand(ctx, doc).Decode(&cmdResult)
 
 		info := NewOpInfo("transaction", op.ID, tm, time.Now(), err)
 		info.subcmds = tres.([]OpInfo)
