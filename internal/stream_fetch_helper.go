@@ -27,7 +27,6 @@ type LogFetchHandlers interface {
 	AfterFetch(logs []storage.Object) error
 }
 
-// TODO : unit tests
 func ParseTS(endTSEnvVar string) (endTS *time.Time, err error) {
 	endTSStr, ok := GetSetting(endTSEnvVar)
 	if ok {
