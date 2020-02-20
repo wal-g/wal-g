@@ -95,6 +95,7 @@ var (
 		PgPortSetting:     true,
 		PgUserSetting:     true,
 		PgHostSetting:     true,
+                PgDataSetting:     true,
 		PgPasswordSetting: true,
 		PgDatabaseSetting: true,
 		PgSslModeSetting:  true,
