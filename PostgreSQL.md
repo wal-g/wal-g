@@ -6,6 +6,12 @@ Development
 -----------
 ### Installing
 
+Prepare on Ubuntu:
+```
+sudo apt-get install liblzo2-dev
+export CGO_LDFLAGS='-no-pie'
+```
+
 To compile and build the binary for Postgres:
 
 (To build with libsodium, just set `USE_LIBSODIUM` environment variable)
