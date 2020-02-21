@@ -101,6 +101,10 @@ func (w *WalgUtil) runCmd(run []string) (ExecResult, error) {
 }
 
 func (w *WalgUtil) PushBackup() (string, error) {
+	PgDataSettingString, ok := GetSetting(PgDataSetting)
+	if w.cliPath != PgDataSettingString {
+		tracelog.WarningLogger.Printf("cliPath '%s' differ from conf PGDATA '%s'\n", w.cliPath, PgDataSettingString)
+	}
 	exec, err := w.runCmd([]string{"backup-push"})
 	if err != nil {
 		return "", err
