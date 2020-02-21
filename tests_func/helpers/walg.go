@@ -103,6 +103,9 @@ func (w *WalgUtil) runCmd(run []string) (ExecResult, error) {
 
 func (w *WalgUtil) PushBackup() (string, error) {
 	PgDataSettingString, ok := internal.GetSetting(internal.PgDataSetting)
+	if ok == false {
+		tracelog.InfoLogger.Print("\nPGDATA is not set in the conf.\n")
+	}
 	if w.cliPath != PgDataSettingString {
 		tracelog.WarningLogger.Printf("cliPath '%s' differ from conf PGDATA '%s'\n", w.cliPath, PgDataSettingString)
 	}
