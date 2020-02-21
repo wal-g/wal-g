@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 )
 
 type Sentinel struct {
@@ -101,7 +102,7 @@ func (w *WalgUtil) runCmd(run []string) (ExecResult, error) {
 }
 
 func (w *WalgUtil) PushBackup() (string, error) {
-	PgDataSettingString, ok := GetSetting(PgDataSetting)
+	PgDataSettingString, ok := internal.GetSetting(internal.PgDataSetting)
 	if w.cliPath != PgDataSettingString {
 		tracelog.WarningLogger.Printf("cliPath '%s' differ from conf PGDATA '%s'\n", w.cliPath, PgDataSettingString)
 	}
