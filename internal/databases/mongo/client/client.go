@@ -3,6 +3,8 @@ package client
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 
@@ -90,7 +92,7 @@ func NewMongoClient(ctx context.Context, uri string) (*MongoClient, error) {
 
 func (mc *MongoClient) isMaster(ctx context.Context) (*IsMaster, error) {
 	im := IsMaster{}
-	err := mc.c.Database("test").RunCommand(ctx, bson.D{{Key:"isMaster", Value: 1}}).Decode(&im)
+	err := mc.c.Database("test").RunCommand(ctx, bson.D{{Key: "isMaster", Value: 1}}).Decode(&im)
 	if err != nil {
 		return nil, fmt.Errorf("isMaster command failed: %w", err)
 	}
@@ -164,4 +166,21 @@ func (mc *MongoClient) ApplyOp(ctx context.Context, op db.Oplog) error {
 	}
 
 	return nil
+}
+
+type OpTimeUpdater struct {
+	db        MongoDriver
+	mu        *sync.Mutex
+	delay     time.Duration
+	lastWrite IsMasterLastWrite
+}
+
+func NewOptimeUpdater(db MongoDriver, delay time.Duration) *OpTimeUpdater {
+	return &OpTimeUpdater{db, &sync.Mutex{}, delay, IsMasterLastWrite{}}
+}
+
+func (u *OpTimeUpdater) LastWrite() IsMasterLastWrite {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.lastWrite
 }
