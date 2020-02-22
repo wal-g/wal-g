@@ -361,6 +361,15 @@ func GetOplogArchiveAfterSize() (int, error) {
 	return oplogArchiveAfterSize, nil
 }
 
+func GetLastWriteUpdateInterval() (time.Duration, error) {
+	intervalStr, _ := GetSetting(MongoDBLastWriteUpdateSeconds)
+	interval, err := strconv.Atoi(intervalStr)
+	if err != nil {
+		return 0, fmt.Errorf("integer(seconds) expected for %s setting but given '%s': %w", MongoDBLastWriteUpdateSeconds, intervalStr, err)
+	}
+	return time.Duration(interval) * time.Second, nil
+}
+
 func GetRequiredSetting(setting string) (string, error) {
 	val, ok := GetSetting(setting)
 	if !ok {

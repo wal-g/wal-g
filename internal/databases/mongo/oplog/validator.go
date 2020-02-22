@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
+	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
@@ -15,12 +17,15 @@ type Validator interface {
 
 // DBValidator implements validation for database source.
 type DBValidator struct {
-	since models.Timestamp
+	ctx        context.Context
+	db         client.MongoDriver
+	lwInterval time.Duration
+	since      models.Timestamp
 }
 
 // NewDBValidator builds DBValidator.
-func NewDBValidator(since models.Timestamp) *DBValidator {
-	return &DBValidator{since}
+func NewDBValidator(ctx context.Context, since models.Timestamp, LWUpdateInterval time.Duration, db client.MongoDriver) *DBValidator {
+	return &DBValidator{ctx, db, LWUpdateInterval, since}
 }
 
 // Validate verifies incoming records.
@@ -39,6 +44,8 @@ func (dbv *DBValidator) Validate(ctx context.Context, in chan models.Oplog, wg *
 		defer close(errc)
 		defer close(out)
 
+		majTs := models.Timestamp{}
+
 		for op := range in {
 			if checkFirstTS {
 				if op.TS != dbv.since {
@@ -52,6 +59,17 @@ func (dbv *DBValidator) Validate(ctx context.Context, in chan models.Oplog, wg *
 				errc <- err
 				return
 			}
+
+			// TODO: move to separate component and fetch last writes in background
+			for models.LessTS(majTs, op.TS) {
+				time.Sleep(dbv.lwInterval)
+				_, majTs, err = dbv.db.LastWriteTS(ctx)
+				if err != nil {
+					errc <- err
+					return
+				}
+			}
+
 			select {
 			case out <- op:
 			case <-ctx.Done():

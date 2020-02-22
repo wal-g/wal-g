@@ -5,10 +5,14 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
+	mongoMocks "github.com/wal-g/wal-g/internal/databases/mongo/client/mocks"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 )
 
 func gatherOps(in chan models.Oplog) chan []models.Oplog {
@@ -24,9 +28,22 @@ func gatherOps(in chan models.Oplog) chan []models.Oplog {
 	return ch
 }
 
+func SetupMongoDriverMock() *mongoMocks.MongoDriver {
+	md := &mongoMocks.MongoDriver{}
+	ts := models.Timestamp{
+		TS:  uint32(time.Now().Add(24 * time.Hour).Unix()),
+		Inc: 0,
+	}
+	md.On("LastWriteTS", mock.Anything, mock.Anything).Return(
+		ts, ts, nil)
+	return md
+}
+
 func TestDBValidator_Validate(t *testing.T) {
 	type fields struct {
-		since models.Timestamp
+		since      models.Timestamp
+		db         client.MongoDriver
+		lwInterval time.Duration
 	}
 	type args struct {
 		ctx context.Context
@@ -44,7 +61,9 @@ func TestDBValidator_Validate(t *testing.T) {
 		{
 			name: "3 docs, no error",
 			fields: fields{
-				since: models.Timestamp{},
+				since:      models.Timestamp{},
+				db:         SetupMongoDriverMock(),
+				lwInterval: 3 * time.Second,
 			},
 			args: args{
 				ctx: context.TODO(),
@@ -73,7 +92,9 @@ func TestDBValidator_Validate(t *testing.T) {
 		{
 			name: "1 doc, gap error",
 			fields: fields{
-				since: models.Timestamp{TS: 1579002001, Inc: 2},
+				since:      models.Timestamp{TS: 1579002001, Inc: 2},
+				db:         SetupMongoDriverMock(),
+				lwInterval: 3 * time.Second,
 			},
 			args: args{
 				ctx: context.TODO(),
@@ -92,7 +113,9 @@ func TestDBValidator_Validate(t *testing.T) {
 		{
 			name: "2 docs, validation error: renameCollection",
 			fields: fields{
-				since: models.Timestamp{TS: 1579002001, Inc: 1},
+				since:      models.Timestamp{TS: 1579002001, Inc: 1},
+				db:         SetupMongoDriverMock(),
+				lwInterval: 3 * time.Second,
 			},
 			args: args{
 				ctx: context.TODO(),
@@ -116,7 +139,9 @@ func TestDBValidator_Validate(t *testing.T) {
 		{
 			name: "2 docs, validation error: auth schema",
 			fields: fields{
-				since: models.Timestamp{TS: 1579002001, Inc: 1},
+				since:      models.Timestamp{TS: 1579002001, Inc: 1},
+				db:         SetupMongoDriverMock(),
+				lwInterval: 3 * time.Second,
 			},
 			args: args{
 				ctx: context.TODO(),
@@ -136,7 +161,9 @@ func TestDBValidator_Validate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dbv := &DBValidator{
-				since: tt.fields.since,
+				db:         tt.fields.db,
+				lwInterval: tt.fields.lwInterval,
+				since:      tt.fields.since,
 			}
 			outc, errc, err := dbv.Validate(tt.args.ctx, tt.args.in, tt.args.wg)
 			assert.Nil(t, err)
