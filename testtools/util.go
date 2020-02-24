@@ -27,19 +27,26 @@ func MakeDefaultUploader(uploaderAPI s3manageriface.UploaderAPI) *s3.Uploader {
 	return s3.NewUploader(uploaderAPI, "", "", "STANDARD")
 }
 
-func NewMockUploader(apiMultiErr, apiErr bool) *internal.WalUploader {
+func NewMockUploader(apiMultiErr, apiErr bool) *internal.Uploader {
+	s3Uploader := MakeDefaultUploader(NewMockS3Uploader(apiMultiErr, apiErr, nil))
+	return internal.NewUploader(
+		&MockCompressor{},
+		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), "bucket/", "server/"),
+	)
+}
+
+func NewStoringMockUploader(storage *memory.Storage, deltaDataFolder internal.DataFolder) *internal.Uploader {
+	return internal.NewUploader(
+		&MockCompressor{},
+		memory.NewFolder("in_memory/", storage),
+	)
+}
+
+func NewMockWalUploader(apiMultiErr, apiErr bool) *internal.WalUploader {
 	s3Uploader := MakeDefaultUploader(NewMockS3Uploader(apiMultiErr, apiErr, nil))
 	return internal.NewWalUploader(
 		&MockCompressor{},
 		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), "bucket/", "server/"),
-		nil,
-	)
-}
-
-func NewStoringMockUploader(storage *memory.Storage, deltaDataFolder internal.DataFolder) *internal.WalUploader {
-	return internal.NewWalUploader(
-		&MockCompressor{},
-		memory.NewFolder("in_memory/", storage),
 		nil,
 	)
 }

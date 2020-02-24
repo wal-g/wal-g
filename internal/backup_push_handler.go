@@ -118,7 +118,7 @@ func createAndPushBackup(
 		backupName = backupName + "_D_" + utility.StripWalFileName(previousBackupName)
 	}
 
-	bundle.TarBallMaker = NewStorageTarBallMaker(backupName, uploader)
+	bundle.TarBallMaker = NewStorageTarBallMaker(backupName, uploader.Uploader)
 
 	// Start a new tar bundle, walk the archiveDirectory and upload everything there.
 	err = bundle.StartQueue()
@@ -176,15 +176,15 @@ func createAndPushBackup(
 	// If pushing permanent delta backup, mark all previous backups permanent
 	// Do this before uploading current meta to ensure that backups are marked in increasing order
 	if isPermanent && currentBackupSentinelDto.IsIncremental() {
-		markBackup(uploader, folder, previousBackupName, true)
+		markBackup(uploader.Uploader, folder, previousBackupName, true)
 	}
 
-	err = uploadMetadata(uploader, currentBackupSentinelDto, backupName, meta)
+	err = uploadMetadata(uploader.Uploader, currentBackupSentinelDto, backupName, meta)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload metadata file for backup: %s %v", backupName, err)
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	err = UploadSentinel(uploader, currentBackupSentinelDto, backupName)
+	err = UploadSentinel(uploader.Uploader, currentBackupSentinelDto, backupName)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", backupName)
 		tracelog.ErrorLogger.FatalError(err)
@@ -247,7 +247,7 @@ func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanen
 }
 
 // TODO : unit tests
-func uploadMetadata(uploader *WalUploader, sentinelDto *BackupSentinelDto, backupName string, meta ExtendedMetadataDto) error {
+func uploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupName string, meta ExtendedMetadataDto) error {
 	// BackupSentinelDto struct allows nil field for backward compatiobility
 	// We do not expect here nil dto since it is new dto to upload
 	meta.DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -269,7 +269,7 @@ func uploadMetadata(uploader *WalUploader, sentinelDto *BackupSentinelDto, backu
 }
 
 // TODO : unit tests
-func UploadSentinel(uploader *WalUploader, sentinelDto interface{}, backupName string) error {
+func UploadSentinel(uploader *Uploader, sentinelDto interface{}, backupName string) error {
 	sentinelName := backupName + utility.SentinelSuffix
 
 	dtoBody, err := json.Marshal(sentinelDto)

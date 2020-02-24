@@ -28,7 +28,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 	}
 
 	// Re-use generated data to test uploading WAL.
-	tu := testtools.NewMockUploader(false, false)
+	tu := testtools.NewMockWalUploader(false, false)
 	bu := internal.NewBgUploader(a, 16, tu, false)
 	// Look for new WALs while doing main upload
 	bu.Start()

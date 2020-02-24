@@ -39,7 +39,7 @@ var backupPushCmd = &cobra.Command{
 		uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 
 		command := internal.GetStreamCreateCmd()
-		mongo.HandleStreamPush(&archive.StorageUploader{WalUploader: uploader}, command, metaProvider)
+		mongo.HandleStreamPush(&archive.StorageUploader{Uploader: uploader}, command, metaProvider)
 	},
 }
 

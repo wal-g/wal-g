@@ -196,8 +196,28 @@ func ConfigureArchiveStatusManager() (DataFolder, error) {
 // ConfigureUploader connects to storage and creates an uploader. It makes sure
 // that a valid session has started; if invalid, returns AWS error
 // and `<nil>` values.
-func ConfigureUploader() (uploader *WalUploader, err error) {
+func ConfigureUploader() (uploader *Uploader, err error) {
 	uploader, err = ConfigureMockUploaderWithoutCompressMethod()
+	if err != nil {
+		return nil, err
+	}
+
+	folder := uploader.UploadingFolder
+
+	compressor, err := configureCompressor()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure compression")
+	}
+
+	uploader = NewUploader(compressor, folder)
+	return uploader, err
+}
+
+// ConfigureWalUploader connects to storage and creates an uploader. It makes sure
+// that a valid session has started; if invalid, returns AWS error
+// and `<nil>` values.
+func ConfigureWalUploader() (uploader *WalUploader, err error) {
+	uploader, err = ConfigureMockWalUploaderWithoutCompressMethod()
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +234,17 @@ func ConfigureUploader() (uploader *WalUploader, err error) {
 	return uploader, err
 }
 
-func ConfigureMockUploaderWithoutCompressMethod() (uploader *WalUploader, err error) {
+func ConfigureMockUploaderWithoutCompressMethod() (uploader *Uploader, err error) {
+	folder, err := ConfigureFolder()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure folder")
+	}
+
+	uploader = NewUploader(nil, folder)
+	return uploader, err
+}
+
+func ConfigureMockWalUploaderWithoutCompressMethod() (uploader *WalUploader, err error) {
 	folder, err := ConfigureFolder()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure folder")

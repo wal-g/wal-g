@@ -27,7 +27,7 @@ const (
 )
 
 type Uploader struct {
-	*internal.WalUploader
+	*internal.Uploader
 }
 
 func scanToMap(rows *sql.Rows, dst map[string]interface{}) error {

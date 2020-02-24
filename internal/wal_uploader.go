@@ -8,8 +8,7 @@ import (
 	"path"
 )
 
-// Uploader contains fields associated with uploading tarballs.
-// Multiple tarballs can share one uploader.
+// WalUploader extends uploader with wal specific functionality.
 type WalUploader struct {
 	*Uploader
 	*DeltaFileManager
@@ -58,4 +57,8 @@ func (uploader *WalUploader) UploadWalFile(file NamedReader) error {
 	}
 
 	return uploader.UploadFile(newNamedReaderImpl(walFileReader, file.Name()))
+}
+
+func (uploader *WalUploader) FlushFiles() {
+	uploader.DeltaFileManager.FlushFiles(uploader.Uploader.clone())
 }

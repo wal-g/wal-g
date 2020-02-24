@@ -79,7 +79,7 @@ func (sd *StorageDownloader) ListOplogArchives() ([]models.Archive, error) {
 
 // StorageUploader extends base uploader with mongodb specific.
 type StorageUploader struct {
-	*internal.WalUploader
+	*internal.Uploader
 }
 
 // NewStorageUploader builds mongodb uploader.
@@ -125,7 +125,7 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, metaProvider BackupMet
 		UserData:        internal.GetSentinelUserData(),
 		MongoMeta:       metaProvider.Meta(),
 	}
-	return internal.UploadSentinel(su.WalUploader, currentBackupSentinelDto, backupName)
+	return internal.UploadSentinel(su.Uploader, currentBackupSentinelDto, backupName)
 }
 
 // FileExtension returns current file extension (based on configured compression)
