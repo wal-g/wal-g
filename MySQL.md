@@ -9,6 +9,10 @@ Development
 ### Installing
 To compile and build the binary for MySQL:
 
+Optional:
+
+- To build with libsodium, just set `USE_LIBSODIUM` environment variable.
+- To build with lzo decompressor, just set `USE_LZO` environment variable.
 ```
 go get github.com/wal-g/wal-g
 cd $GOPATH/src/github.com/wal-g/wal-g

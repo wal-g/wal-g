@@ -13,10 +13,14 @@ TEST := "pg_tests"
 MONGO_MAJOR ?= "4.2"
 MONGO_VERSION ?= "4.2.1"
 
-ifeq ($(USE_LIBSODIUM),)
-	LIBSODIUM_TAG=""
-else
-	LIBSODIUM_TAG=" libsodium"
+BUILD_TAGS:=brotli
+
+ifdef USE_LIBSODIUM
+	BUILD_TAGS:=$(BUILD_TAGS) libsodium
+endif
+
+ifdef USE_LZO
+	BUILD_TAGS:=$(BUILD_TAGS) lzo
 endif
 
 .PHONY: unittest fmt lint install clean
@@ -26,7 +30,7 @@ test: install deps lint unittest pg_build mysql_build redis_build mongo_build un
 pg_test: install deps pg_build lint unlink_brotli pg_integration_test
 
 pg_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_PG_PATH) && go build -mod vendor -tags "brotli lzo$(LIBSODIUM_TAG)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/pg.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/pg.WalgVersion=`git tag -l --points-at HEAD`")
+	(cd $(MAIN_PG_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/pg.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/pg.WalgVersion=`git tag -l --points-at HEAD`")
 
 install_and_build_pg: install deps pg_build
 
@@ -68,7 +72,7 @@ pg_install: pg_build
 mysql_test: install deps mysql_build lint unlink_brotli mysql_integration_test
 
 mysql_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_MYSQL_PATH) && go build -mod vendor -tags "brotli$(LIBSODIUM_TAG)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mysql.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mysql.WalgVersion=`git tag -l --points-at HEAD`")
+	(cd $(MAIN_MYSQL_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mysql.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mysql.WalgVersion=`git tag -l --points-at HEAD`")
 
 load_docker_common:
 	@if [ "x" = "${CACHE_FILE_UBUNTU}x" ]; then\
@@ -93,7 +97,7 @@ mysql_install: mysql_build
 mongo_test: install deps mongo_build lint unlink_brotli
 
 mongo_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_MONGO_PATH) && go build -mod vendor -tags "brotli$(LIBSODIUM_TAG)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mongo.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mongo.WalgVersion=`git tag -l --points-at HEAD`")
+	(cd $(MAIN_MONGO_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mongo.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mongo.WalgVersion=`git tag -l --points-at HEAD`")
 
 mongo_install: mongo_build
 	mv $(MAIN_MONGO_PATH)/wal-g $(GOBIN)/wal-g
@@ -106,7 +110,7 @@ mongo_features:
 redis_test: install deps redis_build lint unlink_brotli redis_integration_test
 
 redis_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_REDIS_PATH) && go build -mod vendor -tags "brotli$(LIBSODIUM_TAG)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/redis.WalgVersion=`git tag -l --points-at HEAD`")
+	(cd $(MAIN_REDIS_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/redis.WalgVersion=`git tag -l --points-at HEAD`")
 
 redis_integration_test: load_docker_common
 	docker-compose build redis redis_tests
@@ -148,7 +152,9 @@ deps: go_deps link_external_deps
 go_deps:
 	git submodule update --init
 	go mod vendor
+ifdef USE_LZO
 	sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' vendor/github.com/cyberdelia/lzo/lzo.go
+endif
 
 link_external_deps: link_brotli link_libsodium
 
