@@ -173,7 +173,6 @@ func CopySymLink(source, dest string) error {
 	return os.Symlink(link, dest)
 }
 
-
 func GetMapValues(m map[string]string) []string {
 	values := make([]string, 0, len(m))
 	for _, v := range m {

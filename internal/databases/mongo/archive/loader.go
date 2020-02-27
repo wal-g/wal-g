@@ -2,19 +2,23 @@ package archive
 
 import (
 	"fmt"
-	"io"
-
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"
+	"io"
 
 	"github.com/wal-g/storages/storage"
 )
 
+// ErrWaiter
+type ErrWaiter interface {
+	Wait() error
+}
+
 // Uploader defines interface to store mongodb backups and oplog archives
 type Uploader interface {
 	UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error // TODO: rename firstTS
-	UploadBackup(stream io.Reader, metaProvider BackupMetaProvider) error
+	UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider BackupMetaProvider) error
 	FileExtension() string
 }
 
@@ -108,7 +112,7 @@ func (su *StorageUploader) UploadOplogArchive(stream io.Reader, firstTS, lastTS 
 }
 
 // UploadBackup compresses a stream and uploads it.
-func (su *StorageUploader) UploadBackup(stream io.Reader, metaProvider BackupMetaProvider) error {
+func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider BackupMetaProvider) error {
 	timeStart := utility.TimeNowCrossPlatformLocal()
 	backupName, err := su.PushStream(stream)
 	if err != nil {
@@ -116,6 +120,10 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, metaProvider BackupMet
 	}
 
 	if err := metaProvider.Finalize(); err != nil {
+		return err
+	}
+
+	if err := cmd.Wait(); err != nil {
 		return err
 	}
 

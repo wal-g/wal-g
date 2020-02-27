@@ -9,4 +9,5 @@ export WALG_STREAM_CREATE_COMMAND="xtrabackup --backup \
     --host=localhost \
     --parallel=2 \
     --datadir=${MYSQLDATA}"
-export WALG_STREAM_RESTORE_COMMAND="xtrabackup --prepare --target-dir=${MYSQLDATA}"
+export WALG_STREAM_RESTORE_COMMAND="xbstream -x -C ${MYSQLDATA}"
+export WALG_MYSQL_BACKUP_PREPARE_COMMAND="xtrabackup --prepare --target-dir=${MYSQLDATA}"

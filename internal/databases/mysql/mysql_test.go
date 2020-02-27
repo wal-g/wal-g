@@ -15,24 +15,24 @@ func TestGetBinlogConfig(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	viper.AutomaticEnv()
-	os.Setenv(BinlogEndTsSetting, "2018-12-06T11:50:58Z")
+	os.Setenv(internal.MysqlBinlogEndTsSetting, "2018-12-06T11:50:58Z")
 	samplePath := "/xxx/"
-	os.Setenv(BinlogDstSetting, samplePath)
-	path, err := internal.GetLogsDstSettings(BinlogDstSetting)
-	time, err := internal.ParseTS(BinlogEndTsSetting)
+	os.Setenv(internal.MysqlBinlogDstSetting, samplePath)
+	path, err := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
+	time, err := internal.ParseTS(internal.MysqlBinlogEndTsSetting)
 	assert.NoError(t, err)
 	assert.Equal(t, (*time).Year(), 2018)
 	assert.Equal(t, int((*time).Month()), 12)
 	assert.Equal(t, (*time).Day(), 6)
 	assert.Equal(t, path, samplePath)
-	os.Unsetenv(BinlogEndTsSetting)
-	os.Unsetenv(BinlogDstSetting)
+	os.Unsetenv(internal.MysqlBinlogEndTsSetting)
+	os.Unsetenv(internal.MysqlBinlogDstSetting)
 }
 
 func TestGetBinlogConfigNoError(t *testing.T) {
-	os.Unsetenv(BinlogEndTsSetting)
-	os.Unsetenv(BinlogDstSetting)
-	_, err := internal.GetLogsDstSettings(BinlogDstSetting)
+	os.Unsetenv(internal.MysqlBinlogEndTsSetting)
+	os.Unsetenv(internal.MysqlBinlogDstSetting)
+	_, err := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
 	assert.Error(t, err)
 	assert.IsType(t, internal.UnsetRequiredSettingError{}, err)
 }

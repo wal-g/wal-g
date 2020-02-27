@@ -12,14 +12,15 @@ const streamPushShortDescription = "Makes backup and uploads it to storage"
 
 // streamPushCmd represents the streamPush command
 var streamPushCmd = &cobra.Command{
-	Use:   "stream-push",
+	Use:   "backup-push",
 	Short: streamPushShortDescription,
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
-		command := internal.GetStreamCreateCmd()
-		redis.HandleStreamPush(&redis.Uploader{Uploader: uploader}, command)
+		backupCmd, err := internal.GetCommandSetting(internal.NameStreamCreateCmd)
+		tracelog.ErrorLogger.FatalOnError(err)
+		redis.HandleBackupPush(uploader, backupCmd)
 	},
 }
 

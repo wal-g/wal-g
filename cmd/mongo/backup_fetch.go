@@ -1,9 +1,10 @@
 package mongo
 
 import (
+	"context"
+	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"os"
 	"syscall"
-	"context"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
@@ -26,8 +27,11 @@ var backupFetchCmd = &cobra.Command{
 
 		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
-		tracelog.ErrorLogger.FatalfOnError("Failed to parse until timestamp ", err)
-		internal.HandleBackupFetch(folder, args[0], internal.GetStreamFetcher(os.Stdout))
+
+		restoreCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamRestoreCmd)
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		mongo.HandleBackupFetch(ctx, folder, args[0], restoreCmd)
 	},
 }
 

@@ -24,7 +24,7 @@ func (settings BinlogFetchSettings) GetLogsFetchInterval() (time.Time, *time.Tim
 }
 
 func (settings BinlogFetchSettings) GetDestFolderPath() (string, error) {
-	return internal.GetLogsDstSettings(BinlogDstSetting)
+	return internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
 }
 
 func (settings BinlogFetchSettings) GetLogFolderPath() string {
@@ -98,7 +98,7 @@ func configureEndTs(untilDT string) (*time.Time, error) {
 		}
 		return &dt, nil
 	}
-	return internal.ParseTS(BinlogEndTsSetting)
+	return internal.ParseTS(internal.MysqlBinlogEndTsSetting)
 }
 
 func FetchLogs(folder storage.Folder, backupUploadTime time.Time, untilDT string, needApply bool) error {

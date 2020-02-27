@@ -2,9 +2,9 @@
 set -e -x
 
 . /usr/local/export_common.sh
+
 export WALE_S3_PREFIX=s3://mysqlbinlogapplyuntilbucket
-export WALG_STREAM_RESTORE_COMMAND="xtrabackup --prepare --target-dir=${MYSQLDATA}"
-export WALG_LOG_APPLY_COMMAND=/root/testtools/test_apply.sh
+export WALG_MYSQL_BINLOG_APPLY_COMMAND=/root/testtools/test_apply.sh
 
 add_test_data() {
   mysql -u sbtest -h localhost -e "
@@ -40,7 +40,7 @@ UNTILL2=$(date "+%Y-%m-%dT%H:%M:%S")
 kill_mysql_and_cleanup_data
 
 mkdir "${MYSQLDATA}"
-wal-g backup-fetch LATEST | xbstream -x -C "${MYSQLDATA}"
+wal-g backup-fetch LATEST
 chown -R mysql:mysql "${MYSQLDATA}"
 
 sleep 10
@@ -54,7 +54,7 @@ check_test_additional_data
 kill_mysql_and_cleanup_data
 
 mkdir "${MYSQLDATA}"
-wal-g backup-fetch LATEST | xbstream -x -C "${MYSQLDATA}"
+wal-g backup-fetch LATEST
 chown -R mysql:mysql "${MYSQLDATA}"
 
 sleep 10

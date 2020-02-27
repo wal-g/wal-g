@@ -29,7 +29,7 @@ RUN mkdir -p /home/mongodb /var/log/wal-g/ ${TMP_DIR} && \
     mkdir -p ${WALG_REPO} ${WALG_CONF_DIR} && \
     mkdir -p /home/mongodb/.gnupg && touch /home/mongodb/.gnupg/gpg.conf && \
     chmod -R 700 /home/mongodb/.gnupg && chown mongodb:mongodb -R /home/mongodb/.gnupg && \
-    ln --force -s /config/wal-g.json ${WALG_CONF_DIR}/wal-g.json && \
+    ln --force -s /config/wal-g-${MONGO_MAJOR}.json ${WALG_CONF_DIR}/wal-g.json && \
     ln --force -s /config/gpg-key.armor ${WALG_CONF_DIR}/gpg-key.armor
 
 COPY staging/wal-g ${WALG_REPO}/

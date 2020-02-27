@@ -8,13 +8,6 @@ import (
 	"github.com/wal-g/wal-g/internal"
 )
 
-type Uploader struct {
-	*internal.Uploader
-}
-type Backup struct {
-	*internal.Backup
-}
-
 // DISCUSS: In some cases, we have default values, but we don't want to store it at global default settings.
 // Naming is far from best, if Go allowed overloads, name GetSettingWithDefault would be more appropriate
 func GetSettingWithLocalDefault(key string, defaultValue string) string {

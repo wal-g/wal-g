@@ -50,7 +50,7 @@ func GetLogsDstSettings(operationLogsDstEnvVariable string) (dstFolder string, e
 }
 
 // TODO : unit tests
-// DownloadAndDecompressStream downloads, decompresses and writes stream to stdout
+// downloadAndDecompressStream downloads, decompresses and writes stream to stdout
 func downloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) error {
 	for _, decompressor := range compression.Decompressors {
 		archiveReader, exists, err := TryDownloadFile(backup.BaseBackupFolder, getStreamName(backup.Name, decompressor.FileExtension()))
