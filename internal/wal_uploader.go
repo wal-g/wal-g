@@ -14,8 +14,8 @@ type WalUploader struct {
 	*DeltaFileManager
 }
 
-func (uploader *WalUploader) getUseWalDelta() (useWalDelta bool) {
-	return uploader.DeltaFileManager != nil
+func (walUploader *WalUploader) getUseWalDelta() (useWalDelta bool) {
+	return walUploader.DeltaFileManager != nil
 }
 
 func NewWalUploader(
@@ -32,20 +32,20 @@ func NewWalUploader(
 }
 
 // Clone creates similar WalUploader with new WaitGroup
-func (uploader *WalUploader) clone() *WalUploader {
+func (walUploader *WalUploader) clone() *WalUploader {
 	return &WalUploader{
-		uploader.Uploader.clone(),
-		uploader.DeltaFileManager,
+		walUploader.Uploader.clone(),
+		walUploader.DeltaFileManager,
 	}
 }
 
 // TODO : unit tests
-func (uploader *WalUploader) UploadWalFile(file NamedReader) error {
+func (walUploader *WalUploader) UploadWalFile(file NamedReader) error {
 	var walFileReader io.Reader
 
 	filename := path.Base(file.Name())
-	if uploader.getUseWalDelta() && isWalFilename(filename) {
-		recordingReader, err := NewWalDeltaRecordingReader(file, filename, uploader.DeltaFileManager)
+	if walUploader.getUseWalDelta() && isWalFilename(filename) {
+		recordingReader, err := NewWalDeltaRecordingReader(file, filename, walUploader.DeltaFileManager)
 		if err != nil {
 			walFileReader = file
 		} else {
@@ -56,9 +56,9 @@ func (uploader *WalUploader) UploadWalFile(file NamedReader) error {
 		walFileReader = file
 	}
 
-	return uploader.UploadFile(newNamedReaderImpl(walFileReader, file.Name()))
+	return walUploader.UploadFile(newNamedReaderImpl(walFileReader, file.Name()))
 }
 
-func (uploader *WalUploader) FlushFiles() {
-	uploader.DeltaFileManager.FlushFiles(uploader.Uploader.clone())
+func (walUploader *WalUploader) FlushFiles() {
+	walUploader.DeltaFileManager.FlushFiles(walUploader.Uploader.clone())
 }

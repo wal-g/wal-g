@@ -197,7 +197,7 @@ func ConfigureArchiveStatusManager() (DataFolder, error) {
 // that a valid session has started; if invalid, returns AWS error
 // and `<nil>` values.
 func ConfigureUploader() (uploader *Uploader, err error) {
-	uploader, err = ConfigureMockUploaderWithoutCompressMethod()
+	uploader, err = ConfigureUploaderWithoutCompressMethod()
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +217,7 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 // that a valid session has started; if invalid, returns AWS error
 // and `<nil>` values.
 func ConfigureWalUploader() (uploader *WalUploader, err error) {
-	uploader, err = ConfigureMockWalUploaderWithoutCompressMethod()
+	uploader, err = ConfigureWalUploaderWithoutCompressMethod()
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +234,7 @@ func ConfigureWalUploader() (uploader *WalUploader, err error) {
 	return uploader, err
 }
 
-func ConfigureMockUploaderWithoutCompressMethod() (uploader *Uploader, err error) {
+func ConfigureUploaderWithoutCompressMethod() (uploader *Uploader, err error) {
 	folder, err := ConfigureFolder()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure folder")
@@ -244,7 +244,7 @@ func ConfigureMockUploaderWithoutCompressMethod() (uploader *Uploader, err error
 	return uploader, err
 }
 
-func ConfigureMockWalUploaderWithoutCompressMethod() (uploader *WalUploader, err error) {
+func ConfigureWalUploaderWithoutCompressMethod() (uploader *WalUploader, err error) {
 	folder, err := ConfigureFolder()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure folder")
