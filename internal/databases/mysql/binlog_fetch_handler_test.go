@@ -79,9 +79,9 @@ func TestFetchBinlogs(t *testing.T) {
 	})
 
 	viper.AutomaticEnv()
-	os.Setenv(BinlogEndTsSetting, cutPoint.Format("2006-01-02T15:04:05Z07:00"))
+	os.Setenv(internal.MysqlBinlogEndTsSetting, cutPoint.Format("2006-01-02T15:04:05Z07:00"))
 	samplePath := "/xxx/"
-	os.Setenv(BinlogDstSetting, samplePath)
+	os.Setenv(internal.MysqlBinlogDstSetting, samplePath)
 
 	var handlers TestBinlogHandlers
 
@@ -102,8 +102,8 @@ func TestFetchBinlogs(t *testing.T) {
 		assert.Contains(t, allowed, binlogName)
 	}
 
-	os.Unsetenv(BinlogEndTsSetting)
-	os.Unsetenv(BinlogDstSetting)
+	os.Unsetenv(internal.MysqlBinlogEndTsSetting)
+	os.Unsetenv(internal.MysqlBinlogDstSetting)
 }
 
 func fillTestStorage() (*memory.Storage, time.Time) {

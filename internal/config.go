@@ -43,12 +43,19 @@ const (
 	TotalBgUploadedLimit         = "TOTAL_BG_UPLOADED_LIMIT"
 	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
 	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
-	NameLogApplyCmdPath          = "WALG_LOG_APPLY_COMMAND"
 
 	MongoDBUriSetting             = "MONGODB_URI"
 	MongoDBLastWriteUpdateSeconds = "MONGODB_LAST_WRITE_UPDATE_SECONDS"
 	OplogArchiveAfterSize         = "OPLOG_ARCHIVE_AFTER_SIZE"
 	OplogArchiveTimeoutSetting    = "OPLOG_ARCHIVE_TIMEOUT"
+
+	MysqlDatasourceNameSetting = "WALG_MYSQL_DATASOURCE_NAME"
+	MysqlSslCaSetting          = "WALG_MYSQL_SSL_CA"
+	MysqlBinlogApplyCmd        = "WALG_MYSQL_BINLOG_APPLY_COMMAND"
+	MysqlBinlogEndTsSetting    = "WALG_MYSQL_BINLOG_END_TS"
+	MysqlBinlogDstSetting      = "WALG_MYSQL_BINLOG_DST"
+	MysqlBinlogSrcSetting      = "WALG_MYSQL_BINLOG_SRC"
+	MysqlBackupPrepareCmd      = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
 )
 
 var (
@@ -99,7 +106,7 @@ var (
 		PgPortSetting:     true,
 		PgUserSetting:     true,
 		PgHostSetting:     true,
-                PgDataSetting:     true,
+		PgDataSetting:     true,
 		PgPasswordSetting: true,
 		PgDatabaseSetting: true,
 		PgSslModeSetting:  true,
@@ -154,6 +161,15 @@ var (
 		MongoDBLastWriteUpdateSeconds: true,
 		OplogArchiveTimeoutSetting:    true,
 		OplogArchiveAfterSize:         true,
+
+		// MySQL
+		MysqlDatasourceNameSetting: true,
+		MysqlSslCaSetting:          true,
+		MysqlBinlogApplyCmd:        true,
+		MysqlBinlogEndTsSetting:    true,
+		MysqlBinlogDstSetting:      true,
+		MysqlBinlogSrcSetting:      true,
+		MysqlBackupPrepareCmd:      true,
 	}
 )
 

@@ -31,13 +31,13 @@ func (_m *Uploader) FileExtension() string {
 	return r0
 }
 
-// UploadBackup provides a mock function with given fields: stream, metaProvider
-func (_m *Uploader) UploadBackup(stream io.Reader, metaProvider archive.BackupMetaProvider) error {
-	ret := _m.Called(stream, metaProvider)
+// UploadBackup provides a mock function with given fields: stream, cmd, metaProvider
+func (_m *Uploader) UploadBackup(stream io.Reader, cmd archive.ErrWaiter, metaProvider archive.BackupMetaProvider) error {
+	ret := _m.Called(stream, cmd, metaProvider)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(io.Reader, archive.BackupMetaProvider) error); ok {
-		r0 = rf(stream, metaProvider)
+	if rf, ok := ret.Get(0).(func(io.Reader, archive.ErrWaiter, archive.BackupMetaProvider) error); ok {
+		r0 = rf(stream, cmd, metaProvider)
 	} else {
 		r0 = ret.Error(0)
 	}

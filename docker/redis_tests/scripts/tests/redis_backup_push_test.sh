@@ -9,8 +9,8 @@ service redis-server start &
 
 sleep 10 # Wait for full redis-server start
 export WALG_STREAM_CREATE_COMMAND="redis-cli -a {password} --rdb /dev/stdout"
-wal-g stream-push # Send stream of dump to wal-g
+wal-g backup-push # Send stream of dump to wal-g
 
 wal-g backup-list
 
-echo "Redis stream-push test was successful"
+echo "Redis backup-push test was successful"

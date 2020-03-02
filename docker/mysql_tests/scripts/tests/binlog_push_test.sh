@@ -2,6 +2,7 @@
 set -e -x
 
 . /usr/local/export_common.sh
+
 export WALE_S3_PREFIX=s3://mysqlbinlogpushbucket
 export WALG_COMPRESSION_METHOD=lz4
 
@@ -20,7 +21,7 @@ sleep 10
 wal-g binlog-push && export WALG_MYSQL_BINLOG_END_TS=$(date --rfc-3339=ns | sed 's/ /T/') && kill_mysql_and_cleanup_data
 
 mkdir "${MYSQLDATA}"
-wal-g backup-fetch LATEST | xbstream -x -C "${MYSQLDATA}"
+wal-g backup-fetch LATEST
 wal-g binlog-fetch --since LATEST
 
 chown -R mysql:mysql "${MYSQLDATA}"

@@ -4,7 +4,6 @@ set -e -x
 . /usr/local/export_common.sh
 
 export WALE_S3_PREFIX=s3://mysqldeleteendtoendbucket
-export WALG_STREAM_RESTORE_COMMAND="xtrabackup --prepare --target-dir=${MYSQLDATA}"
 
 
 mysqld --initialize --init-file=/etc/mysql/init.sql
@@ -42,7 +41,7 @@ wal-g backup-list && sleep 3
 kill_mysql_and_cleanup_data
 
 mkdir "${MYSQLDATA}"
-wal-g backup-fetch "$target_backup_name" | xbstream -x -C "${MYSQLDATA}"
+wal-g backup-fetch "$target_backup_name"
 chown -R mysql:mysql "${MYSQLDATA}"
 
 sleep 10

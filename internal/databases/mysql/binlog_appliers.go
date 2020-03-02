@@ -49,14 +49,16 @@ var StreamApplier = func(logFolder storage.Folder, logName string, settings Binl
 	if needAbort {
 		return true, nil
 	}
-	cmd, err := internal.GetLogApplyCmd()
+	cmd, err := internal.GetCommandSetting(internal.MysqlBinlogApplyCmd)
 	if err != nil {
 		return true, err
 	}
+	cmd.Stdin = buffReader
+	tracelog.InfoLogger.Printf("applying %s ...", logName)
 
-	err = internal.ApplyCommand(cmd, buffReader)
+	err = cmd.Run()
 	if err != nil {
-		tracelog.ErrorLogger.Print(err)
+		tracelog.ErrorLogger.Printf("failed to apply %s: %v", logName, err)
 		return true, err
 	}
 	return false, nil

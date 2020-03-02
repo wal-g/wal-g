@@ -9,26 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/viper"
-
 	"github.com/go-sql-driver/mysql"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
 )
 
-const (
-	BinlogPath            = "binlog_" + utility.VersionStr + "/"
-	DatasourceNameSetting = "WALG_MYSQL_DATASOURCE_NAME"
-	BinlogEndTsSetting    = "WALG_MYSQL_BINLOG_END_TS"
-	BinlogDstSetting      = "WALG_MYSQL_BINLOG_DST"
-	BinlogSrcSetting      = "WALG_MYSQL_BINLOG_SRC"
-	SslCaSetting          = "WALG_MYSQL_SSL_CA"
-)
-
-type Uploader struct {
-	*internal.Uploader
-}
+const BinlogPath = "binlog_" + utility.VersionStr + "/"
 
 func scanToMap(rows *sql.Rows, dst map[string]interface{}) error {
 	columns, err := rows.Columns()
@@ -62,10 +49,7 @@ func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
 }
 
 func getMySQLConnection() (*sql.DB, error) {
-	if !viper.IsSet(DatasourceNameSetting) {
-		return nil, internal.NewUnsetRequiredSettingError(DatasourceNameSetting)
-	}
-	datasourceName := viper.GetString(DatasourceNameSetting)
+	datasourceName, err := internal.GetRequiredSetting(internal.MysqlDatasourceNameSetting)
 	db, err := getMySqlConnectionFromDatasource(datasourceName)
 	if err != nil {
 		fallbackDatasourceName := replaceHostInDatasourceName(datasourceName, "localhost")
@@ -80,8 +64,7 @@ func getMySQLConnection() (*sql.DB, error) {
 }
 
 func getMySqlConnectionFromDatasource(datasourceName string) (*sql.DB, error) {
-	if viper.IsSet(SslCaSetting) {
-		caFile := viper.GetString(SslCaSetting)
+	if caFile, ok := internal.GetSetting(internal.MysqlSslCaSetting); ok {
 		rootCertPool := x509.NewCertPool()
 		pem, err := ioutil.ReadFile(caFile)
 		if err != nil {
@@ -97,7 +80,7 @@ func getMySqlConnectionFromDatasource(datasourceName string) (*sql.DB, error) {
 			return nil, err
 		}
 		if strings.Contains(datasourceName, "?tls=") || strings.Contains(datasourceName, "&tls=") {
-			return nil, fmt.Errorf("MySQL datasource string contains tls option. It can't be used with %v option", SslCaSetting)
+			return nil, fmt.Errorf("MySQL datasource string contains tls option. It can't be used with %v option", internal.MysqlSslCaSetting)
 		}
 		if strings.Contains(datasourceName, "?") {
 			datasourceName += "&tls=custom"

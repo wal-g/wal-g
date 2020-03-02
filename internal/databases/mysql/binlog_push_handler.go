@@ -23,11 +23,11 @@ type LogsCache struct {
 	LastArchivedBinlog string `json:"LastArchivedBinlog"`
 }
 
-func HandleBinlogPush(uploader *Uploader) {
-	if !viper.IsSet(BinlogSrcSetting) {
-		tracelog.ErrorLogger.FatalError(internal.NewUnsetRequiredSettingError(BinlogSrcSetting))
+func HandleBinlogPush(uploader *internal.Uploader) {
+	if !viper.IsSet(internal.MysqlBinlogSrcSetting) {
+		tracelog.ErrorLogger.FatalError(internal.NewUnsetRequiredSettingError(internal.MysqlBinlogSrcSetting))
 	}
-	binlogsFolder := viper.GetString(BinlogSrcSetting)
+	binlogsFolder := viper.GetString(internal.MysqlBinlogSrcSetting)
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(BinlogPath)
 	db, err := getMySQLConnection()
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -62,7 +62,7 @@ func getMySQLSortedBinlogs(db *sql.DB) []string {
 	return result
 }
 
-func tryArchiveBinLog(uploader *Uploader, filename string, binLog string) error {
+func tryArchiveBinLog(uploader *internal.Uploader, filename string, binLog string) error {
 	if binLog <= getLastArchivedBinlog() {
 		tracelog.InfoLogger.Printf("Binlog %v already archived\n", binLog)
 		return nil
