@@ -3,10 +3,11 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"sort"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
@@ -26,7 +27,6 @@ type LogFetchHandlers interface {
 	AfterFetch(logs []storage.Object) error
 }
 
-// TODO : unit tests
 func ParseTS(endTSEnvVar string) (endTS *time.Time, err error) {
 	endTSStr, ok := GetSetting(endTSEnvVar)
 	if ok {

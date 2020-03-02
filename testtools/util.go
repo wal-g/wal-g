@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/wal-g/internal/walparser"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/stretchr/testify/assert"

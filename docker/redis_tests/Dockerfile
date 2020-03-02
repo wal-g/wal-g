@@ -5,7 +5,7 @@ WORKDIR /go/src/github.com/wal-g/wal-g
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests
 
-COPY tmp/libsodium tmp/libsodium
+COPY go.mod go.mod
 COPY vendor/ vendor/
 COPY internal/ internal/
 COPY cmd/ cmd/
@@ -15,7 +15,7 @@ COPY utility/ utility/
 RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
         vendor/github.com/google/brotli/go/cbrotli/cgo.go && \
     cd main/redis && \
-    go build -tags brotli -race -o wal-g -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
+    go build -mod vendor -tags brotli -race -o wal-g -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 
 FROM wal-g/redis:latest
 

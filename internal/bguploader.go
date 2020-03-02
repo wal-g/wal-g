@@ -1,14 +1,15 @@
 package internal
 
 import (
-	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/spf13/viper"
+	"github.com/wal-g/tracelog"
 )
 
 // BgUploader represents the state of concurrent WAL upload

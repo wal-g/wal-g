@@ -1,0 +1,6 @@
+[
+  {"op":"c", "db":"db1", "id": 1, "dc":{"insert":"c1", "documents": [{"key1": "val1", "i": 1}]}},
+  {"op":"c", "db":"db1", "id": 2, "dc":{"insert":"c1", "documents": [{"key1": "val2"}, {"key2": "val3", "i":  2}]}},
+  {"op":"c", "db":"db1", "id": 3, "dc":{"update":"c1", "updates": [{"q": {"key2": "val3"}, "u": {"$inc": {"i": 2 }}} ]}},
+  {"op":"c", "db":"db1", "id": 4, "dc":{"delete":"c1", "deletes": [{"q": {"key1": "val2"}, "limit": 0}]}}
+]

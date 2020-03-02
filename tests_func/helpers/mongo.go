@@ -1,377 +1,460 @@
 package helpers
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"github.com/docker/docker/api/types"
-	testUtils "github.com/wal-g/wal-g/tests_func/utils"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"os"
-	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
+
+	"github.com/wal-g/wal-g/tests_func/utils"
+
+	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/wal-g/tracelog"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func connectHostPort(context context.Context, host string, port uint16) (*mongo.Client, error) {
-	uri := fmt.Sprintf("mongodb://%s:%d/?connect=direct", host, port)
-	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
-	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongo via host and port: %v", err)
-	}
-	err = client.Connect(context)
-	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongo via host and port: %v", err)
-	}
-	return client, nil
-}
-
-func connect(context context.Context, user string, password string, dbname string, host string, port uint16) (*mongo.Client, error) {
-	uri := fmt.Sprintf("mongodb://%s:%s@%s:%d/%s?connect=direct&authMechanism=SCRAM-SHA-1", user, password, host, port, dbname)
-	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
-	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongo via host, port, dbname and user creds: %v", err)
-	}
-	err = client.Connect(context)
-	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongo via host, port, dbname and user creds: %v", err)
-	}
-	return client, nil
-}
-
-func EnvDBConnect(testContext *TestContextType, nodeName string) (*mongo.Client, error) {
-	dbMongoPort, err := strconv.Atoi(testUtils.GetVarFromEnvList(testContext.Env, "MONGO_EXPOSE_MONGOD"))
-	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongodb: %v", err)
-	}
-	dbHost, err := GetDockerContainer(testContext, nodeName)
-	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongodb: %v", err)
-	}
-	host, port, err := GetExposedPort(*dbHost, uint16(dbMongoPort))
-	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongodb: %v", err)
-	}
-	conn, err := connectHostPort(
-		testContext.Context,
-		host,
-		port)
-	if err != nil {
-		return nil, fmt.Errorf("error in connection to mongodb: %v", err)
-	}
-	return conn, nil
-}
-
-func EnvDBConnectWithCreds(testContext *TestContextType, nodeName string, creds UserConfiguration) (*mongo.Client, error) {
-	dbMongoPort, err := strconv.Atoi(testUtils.GetVarFromEnvList(testContext.Env, "MONGO_EXPOSE_MONGOD"))
-	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongodb: %v", err)
-	}
-	dbHost, err := GetDockerContainer(testContext, nodeName)
-	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongodb: %v", err)
-	}
-	host, port, err := GetExposedPort(*dbHost, uint16(dbMongoPort))
-	if err != nil {
-		return nil, fmt.Errorf("error in connecting to mongodb: %v", err)
-	}
-	conn, err := connect(
-		testContext.Context,
-		creds.Username,
-		creds.Password,
-		creds.Dbname,
-		host,
-		port)
-	if err != nil {
-		return nil, fmt.Errorf("error in connection to mongodb: %v", err)
-	}
-	return conn, nil
-}
-
-func FillWithData(context context.Context, database *mongo.Client, mark string) map[string]map[string][]DatabaseRecord {
-	var data = make(map[string]map[string][]DatabaseRecord, 0)
-	for _, dbName := range []string{"test_db_01", "test_db_02"} {
-		if _, ok := data[dbName]; !ok {
-			data[dbName] = map[string][]DatabaseRecord{}
-		}
-		for _, tableName := range []string{"test_table_01", "test_table_02"} {
-			var rows []DatabaseRecord
-			var irows []interface{}
-			for k := 1; k <= 2; k++ {
-				rows = append(rows, generateRecord(k, 5, mark))
-				irows = append(irows, generateRecord(k, 5, mark))
-			}
-			_, err := database.Database(dbName).Collection(tableName).InsertMany(context, irows)
-			if err != nil {
-				panic(err)
-			}
-			data[dbName][tableName] = rows
-		}
-	}
-	return data
-}
+const (
+	LocalDB   = "local"
+	OplogColl = "oplog.rs"
+	AdminDB   = "admin"
+)
 
 type DatabaseRecord struct {
-	Datetime time.Time
-	IntNum   int
-	Str      string
+	Timestamp int64
+	IntNum    int
+	Str       string
 }
 
 func generateRecord(rowNum int, strLen int, strPrefix string) DatabaseRecord {
 	return DatabaseRecord{
-		Datetime: time.Now(),
-		IntNum:   rowNum,
-		Str:      strPrefix + testUtils.RandSeq(strLen),
+		Timestamp: time.Now().Unix(),
+		IntNum:    rowNum,
+		Str:       fmt.Sprintf("%s_%s", strPrefix, utils.RandSeq(strLen)),
 	}
 }
 
-func getBackupNameFromExecOutput(output string) string {
-	return strings.Trim(strings.Split(output, "FILE PATH: ")[1], " ")
-}
-
-func getBackupNamesFromExecOutput(output string) []string {
-	re := regexp.MustCompile("stream_[0-9]{8}T[0-9]{6}Z")
-	return re.FindAllString(output, -1)
-}
-
-func GetBackups(testContext *TestContextType, containerName string) ([]string, error) {
-	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
-	backupListCommand := []string{WalgCliPath, "--config", WalgConfPath, "backup-list"}
-	config := types.ExecConfig{
-		AttachStderr: true,
-		AttachStdout: true,
-		Cmd:          backupListCommand,
-	}
-	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(testContext.Context, containerName, config)
-	if err != nil {
-		return []string{}, fmt.Errorf("error in getting backups: %v", err)
-	}
-	responseId, err := testContext.DockerClient.ContainerExecAttach(testContext.Context, responseIdExecCreate.ID, types.ExecStartCheck{})
-	if err != nil {
-		return []string{}, fmt.Errorf("error in getting backups: %v", err)
-	}
-	scanner := bufio.NewScanner(responseId.Reader)
-	var response string
-	for scanner.Scan() {
-		response = response + scanner.Text()
-	}
-	return getBackupNamesFromExecOutput(response), nil
-}
-
-func MakeBackup(testContext *TestContextType, containerName string, cmdArgs string, creds UserConfiguration, envs []string) (string, error) {
-	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
-	command := strings.Join([]string{WalgCliPath, "--config", WalgConfPath, "backup-push", cmdArgs}, " ")
-	config := types.ExecConfig{
-		AttachStderr: true,
-		AttachStdout: true,
-		Cmd:          []string{"bash", "-c", command},
-		Env:          append(os.Environ(), envs...),
-	}
-	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(testContext.Context, containerName, config)
-	if err != nil {
-		return "", fmt.Errorf("error in making backup: %v", err)
-	}
-	responseId, err := testContext.DockerClient.ContainerExecAttach(testContext.Context, responseIdExecCreate.ID, types.ExecStartCheck{})
-	if err != nil {
-		return "", fmt.Errorf("error in making backup: %v", err)
-	}
-	scanner := bufio.NewScanner(responseId.Reader)
-	var response string
-	for scanner.Scan() {
-		response = response + scanner.Text()
-	}
-	return getBackupNameFromExecOutput(response), nil
-}
-
-func DeleteBackup(testContext *TestContextType, containerName string, backupNum int) error {
-	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
-	backupEntries, err := GetBackups(testContext, containerName)
-	if err != nil {
-		return err
-	}
-	command := []string{WalgCliPath, "--config", WalgConfPath, "delete", "before", backupEntries[backupNum+1], "--confirm"}
-	_, err = RunCommandInContainer(testContext, containerName, command)
-	return fmt.Errorf("error in deleting backup: %v", err)
-}
-
-func RunCommandInContainerWithOptions(testContext *TestContextType, containerName string, command []string, options types.ExecConfig) (string, error) {
-	config := options
-	config.AttachStderr = true
-	config.AttachStdout = true
-	config.Cmd = command
-	responseIdExecCreate, err := testContext.DockerClient.ContainerExecCreate(testContext.Context, containerName, config)
-	if err != nil {
-		return "", fmt.Errorf("error in running command in container: %v", err)
-	}
-	responseId, err := testContext.DockerClient.ContainerExecAttach(testContext.Context, responseIdExecCreate.ID, types.ExecStartCheck{})
-	if err != nil {
-		return "", fmt.Errorf("error in running command in container: %v", err)
-	}
-	scanner := bufio.NewScanner(responseId.Reader)
-	var response string
-	for scanner.Scan() {
-		response = response + scanner.Text()
-	}
-	return response, nil
-}
-
-func RunCommandInContainer(testContext *TestContextType, containerName string, command []string) (string, error) {
-	return RunCommandInContainerWithOptions(testContext, containerName, command, types.ExecConfig{})
-}
-
-type UserData struct {
-	Database   string
-	Collection string
-	Row        bson.M
+type NsSnapshot struct {
+	NS      string
+	Docs    []bson.M
+	Indexes []bson.M
 }
 
 func isSystemCollection(collectionName string) bool {
 	return strings.HasPrefix(collectionName, "system.")
 }
 
-func GetAllUserData(context context.Context, connection *mongo.Client) ([]UserData, error) {
-	var userData []UserData
-	dbNames, err := connection.ListDatabaseNames(context, bson.M{})
-	if err != nil {
-		return []UserData{}, fmt.Errorf("error in getting data from mongodb: %v", err)
+var (
+	SystemDatabases = []string{"local", "config", "admin"}
+)
+
+func isSystemDatabase(db string) bool {
+	for _, sysdb := range SystemDatabases {
+		if db == sysdb {
+			return true
+		}
 	}
-	sort.Strings(dbNames)
-	for _, dbName := range dbNames {
-		tables, err := connection.Database(dbName, &options.DatabaseOptions{}).ListCollectionNames(context, bson.M{})
+	return false
+}
+
+type CmdResponse struct {
+	Ok       int    `bson:"ok"`
+	ErrMsg   string `bson:"errmsg, omitempty"`
+	CodeName string `bson:"codeName, omitempty"`
+}
+
+// Optime ...
+type OpTime struct {
+	TS   primitive.Timestamp `bson:"ts" json:"ts"`
+	Term int64               `bson:"t" json:"t"`
+}
+
+// IsMasterLastWrite ...
+type IsMasterLastWrite struct {
+	OpTime         OpTime `bson:"opTime"`
+	MajorityOpTime OpTime `bson:"majorityOpTime"`
+}
+
+// IsMaster ...
+type IsMaster struct {
+	IsMaster  bool              `bson:"ismaster"`
+	LastWrite IsMasterLastWrite `bson:"lastWrite"`
+	SetName   string            `bson:"setName"`
+}
+
+// AuthCreds ...
+type AuthCreds struct {
+	Username string
+	Password string
+	Database string
+}
+
+func AdminCredsFromEnv(env map[string]string) AuthCreds {
+	return AuthCreds{
+		Username: env["MONGO_ADMIN_USERNAME"],
+		Password: env["MONGO_ADMIN_PASSWORD"],
+		Database: env["MONGO_ADMIN_DB_NAME"],
+	}
+}
+
+type MongoCtl struct {
+	ctx        context.Context
+	host       string
+	port       int
+	expHost    string
+	expPort    int
+	adminCreds AuthCreds
+	adminConn  *mongo.Client
+}
+
+type MongoCtlOpt func(*MongoCtl)
+
+func AdminCreds(creds AuthCreds) MongoCtlOpt {
+	return func(mc *MongoCtl) {
+		mc.adminCreds = creds
+	}
+}
+
+func Port(port int) MongoCtlOpt {
+	return func(mc *MongoCtl) {
+		mc.port = port
+	}
+}
+
+func NewMongoCtl(ctx context.Context, host string, setters ...MongoCtlOpt) (*MongoCtl, error) {
+	mc := &MongoCtl{
+		ctx:  ctx,
+		host: host,
+		port: 27018,
+	}
+	for _, setter := range setters {
+		setter(mc)
+	}
+	expHost, expPort, err := ExposedHostPort(ctx, mc.host, mc.port)
+	if err != nil {
+		return nil, err
+	}
+	mc.expHost = expHost
+	mc.expPort = expPort
+
+	return mc, nil
+}
+
+func (mc *MongoCtl) Connect(creds *AuthCreds) (*mongo.Client, error) {
+	return mc.connect(creds)
+}
+
+func (mc *MongoCtl) AdminConnect() (*mongo.Client, error) {
+	if mc.adminConn == nil {
+		conn, err := mc.connect(&mc.adminCreds)
 		if err != nil {
-			return []UserData{}, fmt.Errorf("error in getting data from mongodb: %v", err)
+			return nil, err
 		}
-		sort.Strings(tables)
-		for _, table := range tables {
-			if isSystemCollection(table) {
+		mc.adminConn = conn
+	}
+
+	return mc.adminConn, nil
+}
+
+func (mc *MongoCtl) connect(creds *AuthCreds) (*mongo.Client, error) {
+	auth := ""
+	dbase := AdminDB
+	if creds != nil {
+		auth = fmt.Sprintf("%s:%s@", creds.Username, creds.Password)
+		dbase = creds.Database
+	}
+	uri := fmt.Sprintf("mongodb://%s%s:%d/%s?connect=direct&w=majority&socketTimeoutMS=3000&connectTimeoutMS=3000", auth, mc.expHost, mc.expPort, dbase)
+	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
+	if err != nil {
+		return nil, fmt.Errorf("can not create mongo client: %v", err)
+	}
+	err = client.Connect(mc.ctx)
+	if err != nil {
+		return nil, fmt.Errorf("can not connect via mongo client: %v", err)
+	}
+	return client, nil
+}
+
+func (mc *MongoCtl) WriteTestData(mark string) error {
+	conn, err := mc.AdminConnect()
+	if err != nil {
+		return err
+	}
+	docsCount := 3
+	for _, dbName := range []string{"test_db_01", "test_db_02"} {
+		for _, tableName := range []string{"test_table_01", "test_table_02"} {
+			var rows []interface{}
+			for k := 1; k <= docsCount; k++ {
+				rows = append(rows, generateRecord(k, 5, mark))
+			}
+			if _, err := conn.Database(dbName).Collection(tableName).InsertMany(mc.ctx, rows); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (mc *MongoCtl) Snapshot() ([]NsSnapshot, error) {
+	var snapshot []NsSnapshot
+
+	conn, err := mc.AdminConnect()
+	if err != nil {
+		return nil, err
+	}
+
+	databases, err := conn.ListDatabaseNames(mc.ctx, bson.M{})
+	if err != nil {
+		return nil, fmt.Errorf("can not list databases: %v", err)
+	}
+	sort.Strings(databases)
+	for _, database := range databases {
+		if isSystemDatabase(database) {
+			continue
+		}
+
+		collsInfo, err := ListCollections(mc.ctx, conn, database)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, collInfo := range collsInfo {
+			coll := collInfo["name"].(string)
+			if isSystemCollection(coll) {
 				continue
 			}
-			if dbName == "local" || dbName == "config" {
-				continue
-			}
-			findOptions := options.Find()
-			findOptions.SetSort(map[string]int{"_id": 1})
-			cur, err := connection.Database(dbName, &options.DatabaseOptions{}).Collection(table).Find(context, bson.M{}, findOptions)
+			docs, err := FetchNsDocs(mc.ctx, conn, database, coll)
 			if err != nil {
-				return []UserData{}, fmt.Errorf("error in getting data from mongodb: %v", err)
+				return nil, err
 			}
-			for cur.Next(context) {
-				var row bson.M
-				err = cur.Decode(&row)
-				if err != nil {
-					return []UserData{}, fmt.Errorf("error in getting data from mongodb: %v", err)
-				}
-				userData = append(userData, UserData{
-					Database:   dbName,
-					Collection: table,
-					Row:        row,
-				})
-			}
-			err = cur.Close(context)
+
+			indexes, err := ListNsIndexes(mc.ctx, conn, database, coll)
 			if err != nil {
-				return []UserData{}, fmt.Errorf("error in getting data from mongodb: %v", err)
+				return nil, err
 			}
+
+			snapshot = append(snapshot, NsSnapshot{
+				NS:      fmt.Sprintf("%s.%s", database, coll),
+				Docs:    docs,
+				Indexes: indexes,
+			})
 		}
 	}
-	return userData, nil
+
+	return snapshot, nil
 }
 
-func checkRsInitialized(context context.Context, connection *mongo.Client) bool {
-	response := connection.Database("admin").RunCommand(context, "replSetGetStatus")
-	return response != nil
-}
-
-func StepEnsureRsInitialized(testContext *TestContextType, containerName string) error {
-	var response string
-	var err error
-	for i := 0; i < 15; i++ {
-		time.Sleep(time.Second)
-		command := []string{"mongo", "--host", "localhost", "--quiet", "--norc", "--port", "27018", "--eval", "rs.status()"}
-		response, err = RunCommandInContainer(testContext, containerName, command)
-		if strings.Contains(response, "myState") {
-			return nil
-		}
-		if strings.Contains(response, "NotYetInitialized") {
-			ncmd := []string{"mongo", "--host", "localhost", "--quiet", "--norc", "--port", "27018", "--eval", "rs.initiate()"}
-			_, err = RunCommandInContainer(testContext, containerName, ncmd)
-		} else if strings.Contains(response, "Unauthorized") {
-			creds := UserConfiguration{
-				Username: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_USERNAME"),
-				Password: testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_PASSWORD"),
-				Dbname:   testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_DB_NAME"),
-				Roles:    strings.Split(testUtils.GetVarFromEnvList(testContext.Env, "MONGO_ADMIN_ROLES"), " "),
-			}
-			var connection *mongo.Client
-			connection, err = EnvDBConnectWithCreds(testContext, containerName, creds)
-			if checkRsInitialized(testContext.Context, connection) {
-				return nil
-			}
-		}
-	}
-	return fmt.Errorf("replset was not initialized: %s;\n and finished with last error: %v", response, err)
-}
-
-func RestoreBackupById(testContext *TestContextType, containerName string, backupNum int) error {
-	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
-	backupEntries, err := GetBackups(testContext, containerName)
+func ListCollections(ctx context.Context, conn *mongo.Client, database string) ([]bson.M, error) {
+	// TODO: filter system.*
+	cur, err := conn.Database(database, nil).ListCollections(ctx, bson.M{})
 	if err != nil {
-		return fmt.Errorf("error in restoring backup by id: %v", err)
+		return nil, fmt.Errorf("can not create listCollections cursor: %v", err)
 	}
-	walgCommand := []string{WalgCliPath, "--config", WalgConfPath, "backup-fetch", backupEntries[len(backupEntries)-backupNum-1]}
-	mongoCommand := []string{"|", "mongorestore", "--archive", "--uri=\"mongodb://admin:password@127.0.0.1:27018\""}
-	command := strings.Join(append(walgCommand, mongoCommand...), " ")
-	_, err = RunCommandInContainer(testContext, containerName, []string{"bash", "-c", command})
-	return err
-}
-
-func MongoPurgeAllBackups(testContext *TestContextType, containerName string) error {
-	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
-	command := []string{WalgCliPath, "--config", WalgConfPath, "delete", "everything", "--confirm"}
-	_, err := RunCommandInContainer(testContext, containerName, command)
-	return err
-}
-
-func MongoPurgeBackups(testContext *TestContextType, containerName string, keepNumber int) error {
-	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
-	command := []string{WalgCliPath, "--config", WalgConfPath, "delete", "retain", strconv.Itoa(keepNumber), "--confirm"}
-	_, err := RunCommandInContainer(testContext, containerName, command)
-	return err
-}
-
-func MongoPurgeBackupsAfterBackupId(testContext *TestContextType, containerName string,
-	keepNumber int, afterBackupNum int) error {
-	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
-
-	backupEntries, err := GetBackups(testContext, containerName)
+	colls, err := FetchAllDocs(ctx, cur)
 	if err != nil {
-		return fmt.Errorf("error in restoring backup by id: %v", err)
+		return nil, err
+	}
+	sort.Slice(colls, func(i, j int) bool {
+		return colls[i]["name"].(string) < colls[j]["name"].(string)
+	})
+	return colls, nil
+}
+
+func FetchNsDocs(ctx context.Context, conn *mongo.Client, database, table string) ([]bson.M, error) {
+	ns := fmt.Sprintf("%s.%s", database, table)
+
+	cur, err := conn.
+		Database(database, nil).
+		Collection(table).
+		Find(ctx, bson.M{}, options.Find().SetSort(map[string]int{"_id": 1}))
+	if err != nil {
+		return nil, fmt.Errorf("can not create cursor to dump docs from ns '%s': %v", ns, err)
 	}
 
-	command := []string{WalgCliPath, "--config", WalgConfPath, "delete",
-		"retain", strconv.Itoa(keepNumber), "--after", backupEntries[len(backupEntries)-afterBackupNum-1], "--confirm"}
+	nsData, err := FetchAllDocs(ctx, cur)
+	if err != nil {
+		return nil, fmt.Errorf("can not fetch docs from ns '%s': %v", ns, err)
+	}
 
-	_, err = RunCommandInContainer(testContext, containerName, command)
+	if err := cur.Close(ctx); err != nil {
+		return nil, fmt.Errorf("can not close cursor for ns '%s': %v", ns, err)
+	}
+
+	return nsData, nil
+}
+
+func ListNsIndexes(ctx context.Context, conn *mongo.Client, database, table string) ([]bson.M, error) {
+	ns := fmt.Sprintf("%s.%s", database, table)
+
+	indexes := conn.Database(database, nil).Collection(table).Indexes()
+
+	cur, err := indexes.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("can not create cursor to list indexes on ns '%s': %v", ns, err)
+	}
+
+	nsData, err := FetchAllDocs(ctx, cur)
+	if err != nil {
+		return nil, fmt.Errorf("can not list indexes on ns '%s': %v", ns, err)
+	}
+
+	if err := cur.Close(ctx); err != nil {
+		return nil, fmt.Errorf("can not close cursor for ns '%s': %v", ns, err)
+	}
+
+	return nsData, nil
+}
+
+func FetchAllDocs(ctx context.Context, cur *mongo.Cursor) ([]bson.M, error) {
+	var results []bson.M
+	err := cur.All(ctx, &results)
+	return results, err
+}
+
+func (mc *MongoCtl) runIsMaster() (IsMaster, error) {
+	conn, err := mc.Connect(nil)
+	if err != nil {
+		return IsMaster{}, err
+	}
+	im := IsMaster{}
+	err = conn.Database(AdminDB).RunCommand(mc.ctx, bson.D{{Key: "isMaster", Value: 1}}).Decode(&im)
+
+	return im, err
+}
+
+func (mc *MongoCtl) IsMaster() (bool, error) {
+	im, err := mc.runIsMaster()
+	if err != nil {
+		return false, err
+	}
+
+	return im.IsMaster, err
+}
+
+func (mc *MongoCtl) LastMajTS() (OpTimestamp, error) {
+	im, err := mc.runIsMaster()
+	if err != nil {
+		return OpTimestamp{}, err
+	}
+	ts := im.LastWrite.MajorityOpTime.TS
+
+	return OpTimestamp{TS: ts.T, Inc: ts.I}, nil
+}
+
+func (mc *MongoCtl) LastTS() (OpTimestamp, error) {
+	conn, err := mc.AdminConnect()
+	if err != nil {
+		return OpTimestamp{}, err
+	}
+	var op db.Oplog
+	opts := options.FindOne().SetSort(bson.D{{Key: "$natural", Value: -1}})
+	err = conn.Database(LocalDB).Collection(OplogColl).
+		FindOne(mc.ctx, bson.D{}, opts).Decode(&op)
+
+	if err != nil {
+		return OpTimestamp{}, err
+	}
+	ts := op.Timestamp
+
+	return OpTimestamp{TS: ts.T, Inc: ts.I}, nil
+}
+
+func (mc *MongoCtl) InitReplSet() error {
+	im, err := mc.runIsMaster()
+	if err != nil {
+		return err
+	}
+	if im.SetName != "" {
+		return nil
+	}
+	_, err = mc.runCmd([]string{"mongo", "--host", "localhost", "--quiet", "--norc", "--port", "27018", "--eval", "rs.initiate()"})
+	time.Sleep(3 * time.Second) // TODO: wait until rs initiated
+
 	return err
 }
 
-func MongoPurgeBackupsAfterTime(testContext *TestContextType, containerName string,
-	keepNumber int, timeLine time.Time) error {
-	WalgCliPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CLIENT_PATH")
-	WalgConfPath := testUtils.GetVarFromEnvList(testContext.Env, "WALG_CONF_PATH")
-	command := []string{WalgCliPath, "--config", WalgConfPath, "delete",
-		"retain", strconv.Itoa(keepNumber), "--after", timeLine.Format(time.RFC3339), "--confirm"}
+func (mc *MongoCtl) EnableAuth() error {
+	cmd := []string{"mongo", "--host", "localhost", "--quiet", "--norc", "--port", "27018",
+		"--eval", fmt.Sprintf("db.createUser({user: '%s', pwd: '%s', roles: ['root']})",
+			mc.adminCreds.Username,
+			mc.adminCreds.Password,
+		), AdminDB}
+	response, err := RunCommand(mc.ctx, mc.host, cmd)
+	if err != nil {
+		return err
+	}
 
-	_, err := RunCommandInContainer(testContext, containerName, command)
-	return err
+	if strings.Contains(response.Combined(), "command createUser requires authentication") ||
+		strings.Contains(response.Combined(), "couldn't add user: not authorized on admin to execute command") ||
+		strings.Contains(response.Combined(), "there are no users authenticated"){
+		return nil
+	}
+	if !strings.Contains(response.Combined(), "Successfully added user") {
+		tracelog.ErrorLogger.Printf("can not create admin user: %s", response.Combined())
+		return fmt.Errorf("can not initialize auth")
+	}
+
+	conn, err := mc.AdminConnect()
+	if err != nil {
+		return err
+	}
+
+	err = conn.Database(AdminDB).RunCommand(mc.ctx,
+		bson.D{
+			{Key: "createRole", Value: "anything"},
+			{Key: "privileges", Value: bson.A{
+				bson.M{
+					"resource": bson.M{"anyResource": true},
+					"actions":  bson.A{"anyAction"},
+				}}},
+			{Key: "roles", Value: bson.A{}},
+		}).Err()
+
+	if err != nil {
+		return err
+	}
+
+	err = conn.Database(AdminDB).RunCommand(mc.ctx,
+		bson.D{
+			{Key: "grantRolesToUser", Value: mc.adminCreds.Username},
+			{Key: "roles", Value: bson.A{"anything"}},
+		}).Err()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (mc *MongoCtl) runCmd(run []string) (ExecResult, error) {
+	exc, err := RunCommandStrict(mc.ctx, mc.host, run)
+	cmdLine := strings.Join(run, " ")
+
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", cmdLine, exc.String())
+		return exc, err
+	}
+	return exc, err
+}
+
+func (mc *MongoCtl) PurgeDatadir() error {
+	_, err := mc.runCmd([]string{"supervisorctl", "stop", "mongodb"})
+	if err != nil {
+		return err
+	}
+
+	_, err = mc.runCmd([]string{"rm", "-rf", "/var/lib/mongodb/*"})
+	if err != nil {
+		return err
+	}
+
+	_, err = mc.runCmd([]string{"supervisorctl", "start", "mongodb"})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

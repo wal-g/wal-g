@@ -2,10 +2,6 @@ package internal
 
 import (
 	"archive/tar"
-	"github.com/pkg/errors"
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/ioutil"
 	"os"
@@ -15,6 +11,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 // TODO : unit tests
@@ -68,7 +69,7 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 	archiveDirectory := uploader.deltaFileManager.dataFolder.(*DiskDataFolder).path
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	archiveDirectory = filepath.Dir(archiveDirectory)
-	bundle := newBundle(archiveDirectory, nil, &prefaultStartLsn, nil)
+	bundle := newBundle(archiveDirectory, nil, &prefaultStartLsn, nil, false)
 	bundle.Timeline = timelineId
 	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(utility.WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
 	if err != nil {

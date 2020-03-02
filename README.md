@@ -28,6 +28,7 @@ To decompress the binary, use:
 
 ```
 tar -zxvf wal-g.linux-amd64.tar.gz
+mv wal-g /usr/local/bin/
 ```
 For other incompatible systems, please consult the [Development](#development) section for more information.
 
@@ -186,7 +187,7 @@ Examples:
 
 ``retain FULL 5`` will keep 5 full backups and all deltas of them
 
-``retain FIND_FULL`` will find necessary full for 5th
+``retain FIND_FULL 5`` will find necessary full for 5th and keep everything after it
 
 ``retain 5 --after 2019-12-12T12:12:12`` keep 5 most recent backups and backups made after 2019-12-12 12:12:12
 
@@ -255,4 +256,4 @@ WAL-G development is supported by [Yandex Cloud](https://cloud.yandex.com)
 
 Chat
 ----
-We have a [Slack group](https://postgresteam.slack.com/messages/CA25P48P2) to discuss WAL-G usage and development. To joint PostgreSQL slack use [invite app](https://postgres-slack.herokuapp.com).
+We have a [Slack group](https://postgresteam.slack.com/messages/CA25P48P2) and [Telegram chat](https://t.me/joinchat/C03q9FOwa7GgIIW5CwfjrQ) to discuss WAL-G usage and development. To joint PostgreSQL slack use [invite app](https://postgres-slack.herokuapp.com).

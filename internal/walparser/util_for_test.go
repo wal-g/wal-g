@@ -1,9 +1,10 @@
 package walparser
 
 import (
-	"github.com/stretchr/testify/assert"
 	"io"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func AssertReaderIsEmpty(t *testing.T, reader io.Reader) {

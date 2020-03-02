@@ -2,11 +2,12 @@ package internal
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/utility"
 	"path/filepath"
 	"sort"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func addTablespaces(spec *TablespaceSpec, strs []TablespaceLocation) {

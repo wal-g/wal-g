@@ -13,7 +13,8 @@ test/testdata/00000*
 test/testdata/broken_wals/
 coverage.out
 .DS_Store
-tests_func/staging/env.file
+tests_func/staging
+tests_func/wal-g
 
 tmp/
 *.xml

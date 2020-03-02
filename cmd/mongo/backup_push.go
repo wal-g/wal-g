@@ -1,12 +1,18 @@
 package mongo
 
 import (
-	"github.com/wal-g/tracelog"
+	"os"
+	"syscall"
+	"context"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
+	"github.com/wal-g/wal-g/utility"
+	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/wal-g/internal/databases/mongo/storage"
+	"github.com/wal-g/tracelog"
 )
 
 const BackupPushShortDescription = "Pushes backup to storage"
@@ -16,10 +22,24 @@ var backupPushCmd = &cobra.Command{
 	Use:   "backup-push",
 	Short: BackupPushShortDescription,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := context.WithCancel(context.Background())
+		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
+		defer func() { _ = signalHandler.Close() }()
+
+		mongodbUrl, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		// set up mongodb client and oplog fetcher
+		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl)
+		tracelog.ErrorLogger.FatalOnError(err)
+		metaProvider := archive.NewBackupMetaMongoProvider(ctx, mongoClient)
+
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
+		uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
+
 		command := internal.GetStreamCreateCmd()
-		mongo.HandleStreamPush(&storage.Uploader{Uploader: uploader}, command)
+		mongo.HandleStreamPush(&archive.StorageUploader{Uploader: uploader}, command, metaProvider)
 	},
 }
 

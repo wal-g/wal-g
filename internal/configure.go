@@ -3,6 +3,12 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/storages/storage"
@@ -12,11 +18,6 @@ import (
 	"github.com/wal-g/wal-g/internal/crypto/awskms"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"golang.org/x/time/rate"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const (
@@ -358,6 +359,15 @@ func GetOplogArchiveAfterSize() (int, error) {
 		return 0, fmt.Errorf("integer expected for %s setting but given '%s': %w", OplogArchiveAfterSize, oplogArchiveAfterSizeStr, err)
 	}
 	return oplogArchiveAfterSize, nil
+}
+
+func GetLastWriteUpdateInterval() (time.Duration, error) {
+	intervalStr, _ := GetSetting(MongoDBLastWriteUpdateSeconds)
+	interval, err := strconv.Atoi(intervalStr)
+	if err != nil {
+		return 0, fmt.Errorf("integer(seconds) expected for %s setting but given '%s': %w", MongoDBLastWriteUpdateSeconds, intervalStr, err)
+	}
+	return time.Duration(interval) * time.Second, nil
 }
 
 func GetRequiredSetting(setting string) (string, error) {

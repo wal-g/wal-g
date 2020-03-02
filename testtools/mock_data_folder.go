@@ -2,9 +2,10 @@ package testtools
 
 import (
 	"bytes"
-	"github.com/wal-g/wal-g/internal"
 	"io"
 	"io/ioutil"
+
+	"github.com/wal-g/wal-g/internal"
 )
 
 type MockDataFolder map[string]*bytes.Buffer

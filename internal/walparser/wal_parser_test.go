@@ -2,10 +2,11 @@ package walparser
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/utility"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const (

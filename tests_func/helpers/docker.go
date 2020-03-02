@@ -1,46 +1,170 @@
 package helpers
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/wal-g/wal-g/tests_func/utils"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
-	testUtils "github.com/wal-g/wal-g/tests_func/utils"
-	"io/ioutil"
-	"math/rand"
-	"os"
-	"os/exec"
-	"time"
+	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/wal-g/tracelog"
 )
+
+var Docker *client.Client
 
 const envDockerMachineName = "DOCKER_MACHINE_NAME"
 
-func GetContainerWithPrefix(containers []types.Container, name string) (*types.Container, error) {
+type ExecResult struct {
+	ExitCode     int
+	stdoutBuffer *bytes.Buffer
+	stderrBuffer *bytes.Buffer
+}
+
+func (res *ExecResult) Stdout() string {
+	return res.stdoutBuffer.String()
+}
+
+func (res *ExecResult) Stderr() string {
+	return res.stderrBuffer.String()
+}
+
+func (res *ExecResult) Combined() string {
+	return res.stdoutBuffer.String() + res.stderrBuffer.String()
+}
+
+func (res *ExecResult) String() string {
+	return fmt.Sprintf("code: %d\nstdout:\n%s\nstderr:\n%s\n", res.ExitCode, res.Stdout(), res.Stderr())
+}
+
+type RunOptions struct {
+	user string
+}
+
+type RunOption func(*RunOptions)
+
+func User(user string) RunOption {
+	return func(args *RunOptions) {
+		args.user = user
+	}
+}
+
+func TimeInContainer(ctx context.Context, container string) (time.Time, error) {
+	exc, err := RunCommandStrict(ctx, container, []string{"date", "+%s"})
+	if err != nil {
+		return time.Time{}, err
+	}
+	ts, err := strconv.ParseInt(strings.Trim(exc.Stdout(), "\n"), 10, 64)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Unix(ts, 0), nil
+}
+
+func RunCommandStrict(ctx context.Context, container string, command []string) (ExecResult, error) {
+	cmdLine := strings.Join(command, " ")
+
+	exc, err := RunCommand(ctx, container, command)
+	if err != nil {
+		return exc, err
+	}
+	if exc.ExitCode != 0 {
+		tracelog.ErrorLogger.Printf("'%s' failed with %d\nstdout:\n%s\nstderr:\n%s\n",
+			cmdLine, exc.ExitCode, exc.Stdout(), exc.Stderr())
+		return exc, fmt.Errorf("%s exit code: %d", cmdLine, exc.ExitCode)
+	}
+	return exc, nil
+
+}
+
+func RunCommand(ctx context.Context, container string, cmd []string, setters ...RunOption) (ExecResult, error) {
+	args := &RunOptions{}
+	for _, setter := range setters {
+		setter(args)
+	}
+
+	execConfig := types.ExecConfig{
+		AttachStdout: true,
+		AttachStderr: true,
+		User:         args.user,
+		Cmd:          cmd,
+	}
+
+	containerExec, err := Docker.ContainerExecCreate(ctx, container, execConfig)
+	if err != nil {
+		return ExecResult{}, err
+	}
+
+	attach, err := Docker.ContainerExecAttach(ctx, containerExec.ID, types.ExecConfig{})
+	if err != nil {
+		return ExecResult{}, err
+	}
+	defer attach.Close()
+
+	cmdLine := strings.Join(cmd, " ")
+	tracelog.DebugLogger.Printf("Running command: %v", cmdLine)
+
+	var outBuf, errBuf bytes.Buffer
+	outputDone := make(chan error)
+
+	go func() {
+		_, err = stdcopy.StdCopy(&outBuf, &errBuf, attach.Reader)
+		outputDone <- err
+	}()
+
+	select {
+	case err := <-outputDone:
+		if err != nil {
+			return ExecResult{}, err
+		}
+	case <-ctx.Done():
+		return ExecResult{}, ctx.Err()
+	}
+
+	execInspect, err := Docker.ContainerExecInspect(ctx, containerExec.ID)
+	if err != nil {
+		return ExecResult{}, err
+	}
+	exc := ExecResult{ExitCode: execInspect.ExitCode, stdoutBuffer: &outBuf, stderrBuffer: &errBuf}
+	tracelog.DebugLogger.Printf("'%s' exit code %d\nstdout:\n%s\nstderr:\n%s\n",
+		cmdLine, exc.ExitCode, exc.Stdout(), exc.Stderr())
+
+	return exc, nil
+}
+
+func ContainerWithPrefix(containers []types.Container, name string) (*types.Container, error) {
 	for _, container := range containers {
-		if testUtils.StringInSlice(name, container.Names) {
+		if utils.StringInSlice(name, container.Names) {
 			return &container, nil
 		}
 	}
 	return nil, errors.New(fmt.Sprintf("cannot find container with name %s", name))
 }
 
-func GetDockerContainer(testContext *TestContextType, prefix string) (*types.Container, error) {
-	dockerClient := testContext.DockerClient
-	containers, err := dockerClient.ContainerList(testContext.Context, types.ContainerListOptions{})
+func DockerContainer(ctx context.Context, prefix string) (*types.Container, error) {
+	containers, err := Docker.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error in getting docker container: %v", err)
 	}
-	containerWithPrefixPointer, err := GetContainerWithPrefix(containers, fmt.Sprintf("/%s", prefix))
+	containerWithPrefixPointer, err := ContainerWithPrefix(containers, fmt.Sprintf("/%s", prefix))
 	if err != nil {
 		return nil, fmt.Errorf("error in getting docker container: %v", err)
 	}
 	return containerWithPrefixPointer, nil
 }
 
-func GetExposedPort(container types.Container, port uint16) (string, uint16, error) {
+func ExposedPort(container types.Container, port int) (string, int, error) {
 	machineName, hasMachineName := os.LookupEnv(envDockerMachineName)
 	host := "localhost"
 	if hasMachineName {
@@ -50,44 +174,22 @@ func GetExposedPort(container types.Container, port uint16) (string, uint16, err
 		}
 		host = string(hostBytes)
 	}
+
 	bindings := container.Ports
 	for _, value := range bindings {
 		if value.Type != "tcp" {
 			continue
 		}
-		if value.PrivatePort == port {
-			return host, value.PublicPort, nil
+		if int(value.PrivatePort) == port {
+			return host, int(value.PublicPort), nil
 		}
 	}
 	return "", 0, fmt.Errorf("error in getting exposed port")
 }
 
-func CallCompose(testContext *TestContextType, actions []string) error {
-	composeFile := testUtils.GetVarFromEnvList(testContext.Env, "COMPOSE_FILE")
-	baseArgs := []string{"--file", composeFile, "-p", "test"}
-	baseArgs = append(baseArgs, actions...)
-	cmd := exec.Command("docker-compose", baseArgs...)
-	for _, line := range testContext.Env {
-		cmd.Env = append(cmd.Env, line)
-	}
-	stdout, err := cmd.StderrPipe()
-	if err != nil {
-		return fmt.Errorf("error when calling compose: %v", err)
-	}
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("error when calling compose: %v", err)
-	}
-	buf, err := ioutil.ReadAll(stdout)
-	if err != nil {
-		return fmt.Errorf("error when calling compose: %v", err)
-	}
-	fmt.Printf("\n%+v\n", string(buf))
-	return nil
-}
-
-func getNetworkListWithName(testContext *TestContextType, name string) ([]types.NetworkResource, error) {
+func ListNets(ctx context.Context, name string) ([]types.NetworkResource, error) {
 	networkFilters := filters.NewArgs()
-	networkResources, err := testContext.DockerClient.NetworkList(testContext.Context, types.NetworkListOptions{
+	networkResources, err := Docker.NetworkList(ctx, types.NetworkListOptions{
 		Filters: networkFilters,
 	})
 	var result []types.NetworkResource
@@ -102,10 +204,8 @@ func getNetworkListWithName(testContext *TestContextType, name string) ([]types.
 	return result, nil
 }
 
-func CreateNet(testContext *TestContextType, name string) error {
-	dockerClient := testContext.DockerClient
-	name = testUtils.GetVarFromEnvList(testContext.Env, "NETWORK_NAME")
-	networkList, err := getNetworkListWithName(testContext, name)
+func CreateNet(ctx context.Context, netName string) error {
+	networkList, err := ListNets(ctx, netName)
 	if err != nil {
 		return fmt.Errorf("error in creating network: %v", err)
 	}
@@ -118,60 +218,130 @@ func CreateNet(testContext *TestContextType, name string) error {
 	netOpts := map[string]string{
 		"com.docker.network.bridge.enable_ip_masquerade": "true",
 		"com.docker.network.bridge.enable_icc":           "true",
-		"com.docker.network.bridge.name":                 name,
+		"com.docker.network.bridge.netName":              netName,
 	}
 	config := types.NetworkCreate{
 		IPAM:    ipam,
 		Options: netOpts,
 	}
-	_, err = dockerClient.NetworkCreate(testContext.Context, name, config)
+	_, err = Docker.NetworkCreate(ctx, netName, config)
 	if err != nil {
 		return fmt.Errorf("error in creating network: %v", err)
 	}
 	return nil
 }
 
-func RemoveNet(testContext *TestContextType, name string) error {
-	nets, err := getNetworkListWithName(testContext, name)
+func RemoveNet(ctx context.Context, netName string) error {
+	nets, err := ListNets(ctx, netName)
 	if err != nil {
-		return fmt.Errorf("error im removing network %s: %v", name, err)
+		return fmt.Errorf("error im removing network %s: %v", netName, err)
 	}
 	for _, net := range nets {
-		err := testContext.DockerClient.NetworkRemove(testContext.Context, net.ID)
-		if err != nil {
+		if err := Docker.NetworkRemove(ctx, net.ID); err != nil {
 			panic(err)
 		}
 	}
 	return nil
 }
 
-type SafeStorageType struct {
-	CreatedBackupNames []string
-	NometaBackupNames  []string
-}
-
-type AuxData struct {
-	Timestamps map[int]time.Time
-}
-
-type TestContextType struct {
-	DockerClient *client.Client
-	Env          []string
-	SafeStorage  SafeStorageType
-	TestData     map[string]map[string]map[string][]DatabaseRecord
-	Context      context.Context
-	AuxData      AuxData
-}
-
-func ShutdownContainers(testContext *TestContextType) error {
-	return CallCompose(testContext, []string{"down", "--rmi", "local", "--remove-orphans"})
-}
-
-func ShutdownNetwork(testContext *TestContextType) error {
-	networkName := testUtils.GetVarFromEnvList(testContext.Env, "NETWORK_NAME")
-	err := testContext.DockerClient.NetworkRemove(testContext.Context, networkName)
+func ExposedHostPort(ctx context.Context, fqdn string, port int) (string, int, error) {
+	dockerContainer, err := DockerContainer(ctx, fqdn)
 	if err != nil {
+		return "", 0, fmt.Errorf("can not get docker container: %v", err)
+	}
+	return ExposedPort(*dockerContainer, port)
+}
+
+func BuildImage(ctx context.Context, tag string, path string) error {
+	cmd := exec.CommandContext(ctx, "docker", "build", "-t", tag, path)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("error in building base: %v", err)
+	}
+	return nil
+}
+
+type BaseImage struct {
+	Path string
+	Tag  string
+}
+
+type Infra struct {
+	ctx       context.Context
+	config    string
+	env       map[string]string
+	net       string
+	baseImage BaseImage
+}
+
+func NewInfra(ctx context.Context, config string, env map[string]string, net string, base BaseImage) *Infra {
+	return &Infra{
+		ctx:       ctx,
+		config:    config,
+		env:       env,
+		net:       net,
+		baseImage: base,
+	}
+}
+
+func (inf *Infra) Setup() error {
+	if err := CreateNet(inf.ctx, inf.net); err != nil {
+		return fmt.Errorf("can not create network: %v", err)
+	}
+
+	if err := BuildImage(inf.ctx, inf.baseImage.Tag, inf.baseImage.Path); err != nil {
+		return fmt.Errorf("can not build base image: %v", err)
+	}
+
+	if err := inf.callCompose([]string{"--verbose", "--log-level", "WARNING", "build"}); err != nil {
+		return fmt.Errorf("can not build images: %v", err)
+	}
+
+	return nil
+}
+
+func (inf *Infra) RecreateContainers() error {
+	if err := inf.callCompose([]string{"--verbose", "--log-level", "WARNING", "down", "--volumes", "--timeout", "0"}); err != nil {
+		return err
+	}
+	return inf.callCompose([]string{"--verbose", "--log-level", "WARNING", "up", "--detach"})
+}
+
+func (inf *Infra) Shutdown() error {
+	if err := inf.callCompose([]string{"down", "--rmi", "local", "--remove-orphans", "--timeout", "0"}); err != nil {
+		return fmt.Errorf("can not shutdown containers: %v", err)
+	}
+
+	if err := Docker.NetworkRemove(inf.ctx, inf.net); err != nil {
 		return fmt.Errorf("error in shutting down network: %v", err)
 	}
 	return nil
+}
+
+func (inf *Infra) callCompose(actions []string) error {
+	baseArgs := []string{"--file", inf.config, "-p", "test"}
+	baseArgs = append(baseArgs, actions...)
+	cmd := exec.CommandContext(inf.ctx, "docker-compose", baseArgs...)
+	for _, line := range utils.EnvToList(inf.env) {
+		cmd.Env = append(cmd.Env, line)
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("can not start command: %v", err)
+	}
+
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("error when calling compose: %v", err)
+	}
+
+	return nil
+}
+
+func init() {
+	var err error
+	Docker, err = client.NewEnvClient()
+	tracelog.ErrorLogger.FatalOnError(err)
 }

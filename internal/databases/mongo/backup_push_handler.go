@@ -2,16 +2,17 @@ package mongo
 
 import (
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal/databases/mongo/storage"
-	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleStreamPush(uploader *storage.Uploader, command []string) {
+// HandleStreamPush starts backup procedure.
+func HandleStreamPush(uploader archive.Uploader, command []string, metaProvider archive.BackupMetaProvider) {
+	err := metaProvider.Init()
+	tracelog.ErrorLogger.FatalOnError(err)
 	waitAndFatalOnError, stream := internal.StartCommand(command)
-	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
-	err := uploader.UploadStream(stream)
+	err = uploader.UploadBackup(stream, metaProvider)
 	tracelog.ErrorLogger.FatalOnError(err)
 	waitAndFatalOnError()
 }

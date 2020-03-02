@@ -1,11 +1,12 @@
 package mysql
 
 import (
+	"time"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
-	"time"
 )
 
 const binlogFetchShortDescription = "fetches binlog from storage"
@@ -24,7 +25,7 @@ var binlogFetchCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
-		tracelog.ErrorLogger.FatalfOnError("Failed to parse until timestamp " +  untilDt, err)
+		tracelog.ErrorLogger.FatalfOnError("Failed to parse until timestamp "+untilDt, err)
 		err = mysql.HandleBinlogFetch(folder, backupName, untilDt, apply)
 		tracelog.ErrorLogger.FatalfOnError("binlog fetch failed", err)
 	},

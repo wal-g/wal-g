@@ -188,15 +188,24 @@ func setTablespacePaths(spec TablespaceSpec) error {
 	return nil
 }
 
-// TODO : unit tests
-// Do the job of unpacking Backup object
-func (backup *Backup) unwrap(dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool) error {
+// check that directory is empty before unwrap
+func (backup *Backup) unwrapToEmptyDirectory(
+	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
+) error {
 	err := checkDbDirectoryForUnwrap(dbDataDirectory, sentinelDto)
 	if err != nil {
 		return err
 	}
 
-	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesToUnwrap)
+	return backup.unwrap(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
+}
+
+// TODO : unit tests
+// Do the job of unpacking Backup object
+func (backup *Backup) unwrap(
+	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
+) error {
+	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
 	tarsToExtract, pgControlKey, err := backup.getTarsToExtract(sentinelDto, filesToUnwrap)
 	if err != nil {
 		return err

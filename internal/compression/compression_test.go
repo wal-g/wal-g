@@ -2,11 +2,12 @@ package compression
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"math/rand"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/utility"
 )
 
 type BiasedRandomReader struct{}

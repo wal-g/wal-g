@@ -16,6 +16,6 @@ tar xfz libsodium-$LIBSODIUM_VERSION.tar.gz --strip-components=1
 make && make check && make install
 
 # Remove shared libraries for using static
-rm lib/*.so lib/*.so.*
+rm -f lib/*.so lib/*.so.* lib/*.dylib
 
 cd ${CWD}

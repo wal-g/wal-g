@@ -1,11 +1,12 @@
 package zstd
 
 import (
+	"io"
+
 	"github.com/DataDog/zstd"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/compression/computils"
 	"github.com/wal-g/wal-g/utility"
-	"io"
 )
 
 type Decompressor struct{}

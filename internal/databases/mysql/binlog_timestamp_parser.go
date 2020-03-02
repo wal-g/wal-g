@@ -3,10 +3,11 @@ package mysql
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/pkg/errors"
 	"io"
 	"os"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 const (

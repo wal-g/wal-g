@@ -1,11 +1,12 @@
 package redis
 
 import (
+	"io"
+	"time"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
-	"io"
-	"time"
 )
 
 func HandleStreamPush(uploader *Uploader, command []string) {

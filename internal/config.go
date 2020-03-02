@@ -1,11 +1,12 @@
 package internal
 
 import (
-	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
 	"os"
 	"os/user"
 	"strings"
+
+	"github.com/spf13/viper"
+	"github.com/wal-g/tracelog"
 )
 
 const (
@@ -41,11 +42,13 @@ const (
 	PgSslModeSetting             = "PGSSLMODE"
 	TotalBgUploadedLimit         = "TOTAL_BG_UPLOADED_LIMIT"
 	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
-	MongoDBUriSetting            = "MONGODB_URI"
-	OplogArchiveAfterSize        = "OPLOG_ARCHIVE_AFTER_SIZE"
-	OplogArchiveTimeoutSetting   = "OPLOG_ARCHIVE_TIMEOUT"
 	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
 	NameLogApplyCmdPath          = "WALG_LOG_APPLY_COMMAND"
+
+	MongoDBUriSetting             = "MONGODB_URI"
+	MongoDBLastWriteUpdateSeconds = "MONGODB_LAST_WRITE_UPDATE_SECONDS"
+	OplogArchiveAfterSize         = "OPLOG_ARCHIVE_AFTER_SIZE"
+	OplogArchiveTimeoutSetting    = "OPLOG_ARCHIVE_TIMEOUT"
 )
 
 var (
@@ -61,8 +64,10 @@ var (
 		UseWalDeltaSetting:           "false",
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
 		TotalBgUploadedLimit:         "32",
-		OplogArchiveTimeoutSetting:   "60",
-		OplogArchiveAfterSize:        "33554432", // 32 << (10 * 2)
+
+		OplogArchiveTimeoutSetting:    "60",
+		OplogArchiveAfterSize:         "33554432", // 32 << (10 * 2)
+		MongoDBLastWriteUpdateSeconds: "3",
 	}
 
 	AllowedSettings = map[string]bool{
@@ -88,11 +93,13 @@ var (
 		PgpKeyPassphraseSetting:      true,
 		TotalBgUploadedLimit:         true,
 		NameStreamCreateCmd:          true,
+		NameStreamRestoreCmd:         true,
 
 		// Postgres
 		PgPortSetting:     true,
 		PgUserSetting:     true,
 		PgHostSetting:     true,
+                PgDataSetting:     true,
 		PgPasswordSetting: true,
 		PgDatabaseSetting: true,
 		PgSslModeSetting:  true,
@@ -141,6 +148,12 @@ var (
 
 		//File
 		"WALG_FILE_PREFIX": true,
+
+		// MongoDB
+		MongoDBUriSetting:             true,
+		MongoDBLastWriteUpdateSeconds: true,
+		OplogArchiveTimeoutSetting:    true,
+		OplogArchiveAfterSize:         true,
 	}
 )
 

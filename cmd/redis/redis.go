@@ -2,10 +2,11 @@ package redis
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
-	"github.com/wal-g/wal-g/internal"
 	"os"
 	"strings"
+
+	"github.com/spf13/cobra"
+	"github.com/wal-g/wal-g/internal"
 )
 
 var ShortDescription = "Redis backup tool"

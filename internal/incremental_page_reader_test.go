@@ -3,10 +3,11 @@ package internal_test
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/stretchr/testify/assert"
