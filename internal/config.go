@@ -162,22 +162,28 @@ func isAllowedSetting(setting string, AllowedSettings map[string]bool) (exists b
 	return
 }
 
+// GetSetting extract setting by key if key is set, return empty string otherwise
 func GetSetting(key string) (value string, ok bool) {
-	if viper.IsSet(key) {
-		return viper.GetString(key), true
+	return GetSettingFrom(viper.GetViper(), key)
+}
+
+// GetSettingFrom extract setting by key from config if key is set, return empty string otherwise
+func GetSettingFrom(config *viper.Viper, key string) (value string, ok bool) {
+	if config.IsSet(key) {
+		return config.GetString(key), true
 	}
 	return "", false
 }
 
-func getWaleCompatibleSetting(key string) (value string, exists bool) {
+func getWaleCompatibleSetting(key string, config *viper.Viper) (value string, exists bool) {
 	settingKeys := []string{
 		"WALG_" + key,
 		"WALE_" + key,
 	}
 	// At first we try to check whether it is configured at all
 	for _, settingKey := range settingKeys {
-		if viper.IsSet(settingKey) {
-			return viper.GetString(settingKey), true
+		if config.IsSet(settingKey) {
+			return config.GetString(settingKey), true
 		}
 	}
 	// Then we try to get default value
@@ -222,7 +228,7 @@ func InitConfig() {
 
 	// Set compiled config to ENV.
 	// Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
-	for k, v := range viper.AllSettings() {
+	for k, v := range globalViper.AllSettings() {
 		val, ok := v.(string)
 		if ok {
 			if err := os.Setenv(strings.ToUpper(k), val); err != nil {
@@ -234,37 +240,37 @@ func InitConfig() {
 }
 
 // ReadConfigFromFile read config to the viper instance 
-func ReadConfigFromFile(v *viper.Viper, configFile string) (){
+func ReadConfigFromFile(config *viper.Viper, configFile string) (){
 	if configFile != "" {
-		v.SetConfigFile(configFile)
+		config.SetConfigFile(configFile)
 	} else {
 		// Find home directory.
 		usr, err := user.Current()
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		// Search config in home directory with name ".walg" (without extension).
-		v.AddConfigPath(usr.HomeDir)
-		v.SetConfigName(".walg")
+		config.AddConfigPath(usr.HomeDir)
+		config.SetConfigName(".walg")
 	}
 
 	// If a config file is found, read it in.
-	err := v.ReadInConfig()
+	err := config.ReadInConfig()
 	if err == nil {
-		tracelog.DebugLogger.Println("Using config file:", v.ConfigFileUsed())
+		tracelog.DebugLogger.Println("Using config file:", config.ConfigFileUsed())
 	}
 }
 
 // SetDefaultValues set default settings to the viper instance
-func SetDefaultValues(v *viper.Viper){
+func SetDefaultValues(config *viper.Viper){
 	for setting, value := range defaultConfigValues {
-		v.SetDefault(setting, value)
+		config.SetDefault(setting, value)
 	}
 } 
 
-// CheckAllowedSettings warning if a viper instance's setting not allowed
-func CheckAllowedSettings(v *viper.Viper){
+// CheckAllowedSettings warnings if a viper instance's setting not allowed
+func CheckAllowedSettings(config *viper.Viper){
 	foundNotAllowed := false
-	for k := range v.AllSettings() {
+	for k := range config.AllSettings() {
 		k = strings.ToUpper(k)
 		if !isAllowedSetting(k, AllowedSettings) {
 			tracelog.WarningLogger.Println(k + " is unknown")

@@ -34,9 +34,9 @@ var (
 )
 
 func runBackupCopy(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
+	fromFolder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
-	internal.HandleCopy(&folder, toConfigFile)
+	internal.HandleCopy(fromFolder, toConfigFile)
 }
 
 func init() {
