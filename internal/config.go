@@ -212,36 +212,59 @@ func Configure() {
 	}
 }
 
-// initConfig reads in config file and ENV variables if set.
+// InitConfig reads config file and ENV variables if set.
 func InitConfig() {
-	if CfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(CfgFile)
+	var globalViper = viper.GetViper()
+	globalViper.AutomaticEnv() // read in environment variables that match
+	SetDefaultValues(globalViper)
+	ReadConfigFromFile(globalViper, CfgFile)
+	CheckAllowedSettings(globalViper)
+
+	// Set compiled config to ENV.
+	// Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
+	for k, v := range viper.AllSettings() {
+		val, ok := v.(string)
+		if ok {
+			if err := os.Setenv(strings.ToUpper(k), val); err != nil {
+				tracelog.ErrorLogger.Println("failed to bind config to env variable", err.Error())
+				os.Exit(1)
+			}
+		}
+	}
+}
+
+// ReadConfigFromFile read config to the viper instance 
+func ReadConfigFromFile(v *viper.Viper, configFile string) (){
+	if configFile != "" {
+		v.SetConfigFile(configFile)
 	} else {
 		// Find home directory.
 		usr, err := user.Current()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		// Search config in home directory with name ".wal-g" (without extension).
-		viper.AddConfigPath(usr.HomeDir)
-		viper.SetConfigName(".walg")
-	}
-
-	viper.AutomaticEnv() // read in environment variables that match
-
-	for setting, value := range defaultConfigValues {
-		viper.SetDefault(setting, value)
+		// Search config in home directory with name ".walg" (without extension).
+		v.AddConfigPath(usr.HomeDir)
+		v.SetConfigName(".walg")
 	}
 
 	// If a config file is found, read it in.
-	err := viper.ReadInConfig()
+	err := v.ReadInConfig()
 	if err == nil {
-		tracelog.DebugLogger.Println("Using config file:", viper.ConfigFileUsed())
+		tracelog.DebugLogger.Println("Using config file:", v.ConfigFileUsed())
 	}
+}
 
-	// Сheck allowed settings
+// SetDefaultValues set default settings to the viper instance
+func SetDefaultValues(v *viper.Viper){
+	for setting, value := range defaultConfigValues {
+		v.SetDefault(setting, value)
+	}
+} 
+
+// CheckAllowedSettings warning if a viper instance's setting not allowed
+func CheckAllowedSettings(v *viper.Viper){
 	foundNotAllowed := false
-	for k := range viper.AllSettings() {
+	for k := range v.AllSettings() {
 		k = strings.ToUpper(k)
 		if !isAllowedSetting(k, AllowedSettings) {
 			tracelog.WarningLogger.Println(k + " is unknown")
@@ -254,17 +277,5 @@ func InitConfig() {
 	if foundNotAllowed {
 		tracelog.WarningLogger.Println("We found that some variables in your config file detected as 'Unknown'. \n  " +
 			"If this is not right, please create issue https://github.com/wal-g/wal-g/issues/new")
-	}
-
-	// Set compiled config to ENV.
-	// Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
-	for k, v := range viper.AllSettings() {
-		val, ok := v.(string)
-		if ok {
-			if err := os.Setenv(strings.ToUpper(k), val); err != nil {
-				tracelog.ErrorLogger.Println("failed to bind config to env variable", err.Error())
-				os.Exit(1)
-			}
-		}
 	}
 }

@@ -1,19 +1,15 @@
 package pg
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 )
 
 const (
 	backupCopyUsage            = "copy backup_name"
 	backupCopyShortDescription = "Copy backup to another storage"
 	backupCopyLongDescription  = "Copy backup with specific name from one storage to another according to configs with history(by default)"
-
-	fromFlag        = "from"
-	fromShorthand   = "f"
-	fromDescription = "Storage config from where should copy backup"
 
 	toFlag        = "to"
 	toShorthand   = "t"
@@ -25,8 +21,7 @@ const (
 )
 
 var (
-	from           = ""
-	to             = ""
+	toConfigFile   string
 	withoutHistory = false
 
 	backupCopyCmd = &cobra.Command{
@@ -39,18 +34,17 @@ var (
 )
 
 func runBackupCopy(cmd *cobra.Command, args []string) {
-	fmt.Print("Not implemented")
+	folder, err := internal.ConfigureFolder()
+	tracelog.ErrorLogger.FatalOnError(err)
+	internal.HandleCopy(&folder, toConfigFile)
 }
 
 func init() {
 	Cmd.AddCommand(backupCopyCmd)
 
-	backupCopyCmd.Flags().StringVarP(&from, fromFlag, fromShorthand, "", fromDescription)
-	backupCopyCmd.Flags().StringVarP(&to, toFlag, toShorthand, "", toDescription)
+	backupCopyCmd.Flags().StringVarP(&toConfigFile, toFlag, toShorthand, "", toDescription)
 	backupCopyCmd.Flags().BoolVarP(&withoutHistory, withoutHistoryFlag, withoutHistoryShorthand, false, withoutHistoryDescription)
 
-	backupCopyCmd.MarkFlagFilename(from)
-	backupCopyCmd.MarkFlagFilename(to)
-	backupCopyCmd.MarkFlagRequired(from)
-	backupCopyCmd.MarkFlagRequired(to)
+	backupCopyCmd.MarkFlagFilename(toConfigFile)
+	backupCopyCmd.MarkFlagRequired(toConfigFile)
 }
