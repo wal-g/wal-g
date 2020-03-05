@@ -9,7 +9,8 @@ import (
 )
 
 // HandleCopy copy backups from current storage to another
-func HandleCopy(fromConfigFile string, toConfigFile string) {
+func HandleCopy(fromConfigFile string, toConfigFile string, backupName string) {
+	tracelog.InfoLogger.Printf("Handle backupname '%s'", backupName)
 	var fromFolder, fromError = configureFolderFromConfig(fromConfigFile)
 	var toFolder, toError = configureFolderFromConfig(toConfigFile)
 	if fromError != nil || toError != nil {
@@ -19,14 +20,13 @@ func HandleCopy(fromConfigFile string, toConfigFile string) {
 }
 
 func copyObjects(from storage.Folder, to storage.Folder) {
-	objects, subfolders, _ := from.ListFolder()
+	objects, err := storage.ListFolderRecursively(from)
+	tracelog.DebugLogger.FatalOnError(err)
 	for _, object := range objects {
 		tracelog.InfoLogger.Printf("Copy %s from %s to %s ", object.GetName(), from.GetPath(), to.GetPath())
 		var readCloser, _ = from.ReadObject(object.GetName())
-		to.PutObject(path.Join(from.GetPath(), object.GetName()), readCloser)
-	}
-	for _, subfolder := range subfolders {
-		copyObjects(subfolder, to)
+		var filename = path.Join(from.GetPath(), object.GetName())
+		to.PutObject(filename, readCloser)
 	}
 }
 
