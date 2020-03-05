@@ -39,10 +39,13 @@ services:
       &&  mkdir -p /export/deletebeforepermanentdeltabucket
       &&  mkdir -p /export/deletewithoutconfirm
       &&  mkdir -p /export/deleteendtoendbucket
-      &&  mkdir -p /export/mysqlfullbucket
-      &&  mkdir -p /export/mysqlbinlogpushbucket
+      &&  mkdir -p /export/mysqlfullxtrabackupbucket
+      &&  mkdir -p /export/mysqlfullmysqldumpbucket
+      &&  mkdir -p /export/mysqlbinlogpushfetchbucket
       &&  mkdir -p /export/mysqldeleteendtoendbucket
-      &&  mkdir -p /export/mysqlbinlogapplyuntilbucket
+      &&  mkdir -p /export/mysqlbinlogreplaybucket
+      &&  mkdir -p /export/mysqlpitrxtrabackupbucket
+      &&  mkdir -p /export/mysqlpitrmysqldumpbucket
       &&  mkdir -p /export/mongostreampushbucket
       &&  mkdir -p /export/mongooplogpushbucket
       &&  mkdir -p /export/mongodeletebeforebucket
@@ -352,7 +355,6 @@ services:
     container_name: wal-g_mysql_tests
     env_file:
       - docker/common/common_walg.env
-      - docker/mysql_tests/walg.env
     depends_on:
       - s3
     links:
