@@ -22,7 +22,7 @@ type StorageAdapter struct {
 func (adapter *StorageAdapter) loadSettings(config *viper.Viper) (map[string]string, error) {
 	settings := make(map[string]string)
 	for _, settingName := range adapter.settingNames {
-		settingValue, ok := getWaleCompatibleSetting(settingName, config)
+		settingValue, ok := getWaleCompatibleSettingFrom(settingName, config)
 		if !ok {
 			settingValue, ok = GetSetting(settingName)
 		}

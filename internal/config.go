@@ -99,7 +99,7 @@ var (
 		PgPortSetting:     true,
 		PgUserSetting:     true,
 		PgHostSetting:     true,
-                PgDataSetting:     true,
+		PgDataSetting:     true,
 		PgPasswordSetting: true,
 		PgDatabaseSetting: true,
 		PgSslModeSetting:  true,
@@ -175,7 +175,11 @@ func GetSettingFrom(config *viper.Viper, key string) (value string, ok bool) {
 	return "", false
 }
 
-func getWaleCompatibleSetting(key string, config *viper.Viper) (value string, exists bool) {
+func getWaleCompatibleSetting(key string) (value string, exists bool) {
+	return getWaleCompatibleSettingFrom(key, viper.GetViper())
+}
+
+func getWaleCompatibleSettingFrom(key string, config *viper.Viper) (value string, exists bool) {
 	settingKeys := []string{
 		"WALG_" + key,
 		"WALE_" + key,
@@ -239,8 +243,8 @@ func InitConfig() {
 	}
 }
 
-// ReadConfigFromFile read config to the viper instance 
-func ReadConfigFromFile(config *viper.Viper, configFile string) (){
+// ReadConfigFromFile read config to the viper instance
+func ReadConfigFromFile(config *viper.Viper, configFile string) {
 	if configFile != "" {
 		config.SetConfigFile(configFile)
 	} else {
@@ -261,14 +265,14 @@ func ReadConfigFromFile(config *viper.Viper, configFile string) (){
 }
 
 // SetDefaultValues set default settings to the viper instance
-func SetDefaultValues(config *viper.Viper){
+func SetDefaultValues(config *viper.Viper) {
 	for setting, value := range defaultConfigValues {
 		config.SetDefault(setting, value)
 	}
-} 
+}
 
 // CheckAllowedSettings warnings if a viper instance's setting not allowed
-func CheckAllowedSettings(config *viper.Viper){
+func CheckAllowedSettings(config *viper.Viper) {
 	foundNotAllowed := false
 	for k := range config.AllSettings() {
 		k = strings.ToUpper(k)

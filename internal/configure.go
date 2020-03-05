@@ -115,7 +115,7 @@ func ConfigureFolder() (storage.Folder, error) {
 func ConfigureFolderForSpecificConfig(config *viper.Viper) (storage.Folder, error) {
 	skippedPrefixes := make([]string, 0)
 	for _, adapter := range StorageAdapters {
-		prefix, ok := getWaleCompatibleSetting(adapter.prefixName, config)
+		prefix, ok := getWaleCompatibleSettingFrom(adapter.prefixName, config)
 		if !ok {
 			skippedPrefixes = append(skippedPrefixes, "WALG_"+adapter.prefixName)
 			continue
