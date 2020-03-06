@@ -5,52 +5,82 @@ set -e -x
 
 export WALE_S3_PREFIX=s3://mysqldeleteendtoendbucket
 
-
+# initialize mysql
 mysqld --initialize --init-file=/etc/mysql/init.sql
-
 service mysql start
+sysbench --table-size=10 prepare
+mysql -e "FLUSH LOGS"
 
-sysbench /usr/share/sysbench/oltp_insert.lua --table-size=10 prepare
-for i in $(seq 1 4);
-do
-    sysbench /usr/share/sysbench/oltp_insert.lua --table-size=10 run
 
-    if [ "$i" -eq 3 ];
-    then
-        sleep 3
-        # mv ${MYSQLDATA}/mysql /tmp/mysql
-        # mv /tmp/mysql ${MYSQLDATA}/mysql
-        # allows to avoid flap in test, because stats in mysql db can be different after dump
+# first backup
+sysbench --time=3 run
+wal-g backup-push
+sysbench --time=3 run
+mysql -e "FLUSH LOGS"
+wal-g binlog-push
+sleep 1
 
-        mv "${MYSQLDATA}"/mysql /tmp/mysql
-        mysqldump -u sbtest --all-databases --lock-tables=false | head -n -1  > /tmp/dump_backup
-        sleep 3
-        mv /tmp/mysql "${MYSQLDATA}"/mysql
-    fi
+mysqldump sbtest > /tmp/dump_1.sql
+test "2" -eq "$(wal-g backup-list | wc -l)"
+FIRST_BACKUP=$(wal-g backup-list | awk 'NR==2{print $1}')
+DT1=$(date3339)
 
-    wal-g backup-push
-done
 
-wal-g backup-list
+# second backup
+sysbench --time=3 run
+wal-g backup-push
+sysbench --time=3 run
+mysql -e "FLUSH LOGS"
+wal-g binlog-push
+sleep 1
 
-target_backup_name=$(wal-g backup-list | tail -n 2 | head -n 1 | cut -f 1 -d " ")
+mysqldump sbtest > /tmp/dump_2.sql
+test "3" -eq "$(wal-g backup-list | wc -l)"
+SECOND_BACKUP=$(wal-g backup-list | awk 'NR==3{print $1}')
+DT2=$(date3339)
 
-wal-g delete before FIND_FULL "$target_backup_name" --confirm
-wal-g backup-list && sleep 3
 
-kill_mysql_and_cleanup_data
+# third backup
+sysbench --time=3 run
+wal-g backup-push
+sysbench --time=3 run
+mysql -e "FLUSH LOGS"
+wal-g binlog-push
+sleep 1
 
-mkdir "${MYSQLDATA}"
-wal-g backup-fetch "$target_backup_name"
-chown -R mysql:mysql "${MYSQLDATA}"
+mysqldump sbtest > /tmp/dump_3.sql
+test "4" -eq "$(wal-g backup-list | wc -l)"
+THIRD_BACKUP=$(wal-g backup-list | awk 'NR==4{print $1}')
+DT3=$(date3339)
 
-sleep 10
-service mysql start || cat /var/log/mysql/error.log
 
-sleep 10
-mv "${MYSQLDATA}"/mysql /tmp/mysql
-mysqldump -u sbtest --all-databases --lock-tables=false | head -n -1 > /tmp/dump_restored
-sleep 10
-mv /tmp/mysql "${MYSQLDATA}"/mysql
-diff -I 'SET @@GLOBAL.GTID_PURGED' /tmp/dump_backup /tmp/dump_restored
+# delete first backup
+wal-g delete before FIND_FULL $SECOND_BACKUP --confirm
+test "3" -eq "$(wal-g backup-list | wc -l)"
 
+
+# test restore second
+mysql_kill_and_clean_data
+wal-g backup-fetch $SECOND_BACKUP
+chown -R mysql:mysql $MYSQLDATA
+service mysql start || (cat /var/log/mysql/error.log && false)
+mysql_set_gtid_purged
+wal-g binlog-replay --since $SECOND_BACKUP --until "$DT2"
+mysqldump sbtest > /tmp/dump_2_restored.sql
+diff -u /tmp/dump_2.sql /tmp/dump_2_restored.sql
+
+
+# delete second backup
+wal-g delete retain 1 --confirm
+test "2" -eq "$(wal-g backup-list | wc -l)"
+
+
+# test restore third backup
+mysql_kill_and_clean_data
+wal-g backup-fetch $THIRD_BACKUP
+chown -R mysql:mysql $MYSQLDATA
+service mysql start || (cat /var/log/mysql/error.log && false)
+mysql_set_gtid_purged
+wal-g binlog-replay --since $THIRD_BACKUP --until "$DT3"
+mysqldump sbtest > /tmp/dump_3_restored.sql
+diff -u /tmp/dump_3.sql /tmp/dump_3_restored.sql

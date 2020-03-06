@@ -1,9 +1,15 @@
 #!/bin/sh
-set -e -x
+set -e
+
+. /usr/local/export_common.sh
 
 for i in /tmp/tests/*; do
-  "$i";
-  echo "${i} success"
-  kill_mysql_and_cleanup_data
-  rm -rf /root/.walg_mysql_binlogs_cache
+  echo
+  echo "===== RUNNING $i ====="
+  set -x
+  "$i"
+  set +x
+  echo "===== SUCCESS $i ====="
+  echo
+  mysql_kill_and_clean_data
 done

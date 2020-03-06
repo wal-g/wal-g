@@ -13,10 +13,11 @@ RUN apt-get update && \
 RUN curl -s https://packagecloud.io/install/repositories/akopytov/sysbench/script.deb.sh | bash && apt -y install sysbench
 RUN rm -rf $MYSQLDATA
 
+COPY docker/mysql/client.cnf /root/.my.cnf
+COPY docker/mysql/client.cnf /etc/mysql/debian.cnf
 COPY docker/mysql/init.sql /etc/mysql/init.sql
-COPY docker/mysql/kill_mysql_and_cleanup_data.sh /usr/bin/kill_mysql_and_cleanup_data
 COPY docker/mysql/export_common.sh /usr/local/export_common.sh
 
 # append
-COPY docker/mysql/my.cnf /root/my.cnf
-RUN cat /root/my.cnf >> /etc/mysql/my.cnf
+COPY docker/mysql/my.cnf /tmp/my.cnf
+RUN cat /tmp/my.cnf >> /etc/mysql/my.cnf; rm /tmp/my.cnf

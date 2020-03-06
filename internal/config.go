@@ -51,10 +51,8 @@ const (
 
 	MysqlDatasourceNameSetting = "WALG_MYSQL_DATASOURCE_NAME"
 	MysqlSslCaSetting          = "WALG_MYSQL_SSL_CA"
-	MysqlBinlogApplyCmd        = "WALG_MYSQL_BINLOG_APPLY_COMMAND"
-	MysqlBinlogEndTsSetting    = "WALG_MYSQL_BINLOG_END_TS"
+	MysqlBinlogReplayCmd       = "WALG_MYSQL_BINLOG_REPLAY_COMMAND"
 	MysqlBinlogDstSetting      = "WALG_MYSQL_BINLOG_DST"
-	MysqlBinlogSrcSetting      = "WALG_MYSQL_BINLOG_SRC"
 	MysqlBackupPrepareCmd      = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
 )
 
@@ -165,10 +163,8 @@ var (
 		// MySQL
 		MysqlDatasourceNameSetting: true,
 		MysqlSslCaSetting:          true,
-		MysqlBinlogApplyCmd:        true,
-		MysqlBinlogEndTsSetting:    true,
+		MysqlBinlogReplayCmd:       true,
 		MysqlBinlogDstSetting:      true,
-		MysqlBinlogSrcSetting:      true,
 		MysqlBackupPrepareCmd:      true,
 	}
 )
