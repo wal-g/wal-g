@@ -60,5 +60,5 @@ func (walUploader *WalUploader) UploadWalFile(file NamedReader) error {
 }
 
 func (walUploader *WalUploader) FlushFiles() {
-	walUploader.DeltaFileManager.FlushFiles(walUploader.Uploader.clone())
+	walUploader.DeltaFileManager.FlushFiles(walUploader.Uploader)
 }
