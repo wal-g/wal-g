@@ -70,7 +70,7 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 }
 
 func createAndPushBackup(
-	uploader *Uploader,
+	uploader *WalUploader,
 	archiveDirectory, backupsFolder, previousBackupName string,
 	previousBackupSentinelDto BackupSentinelDto,
 	isPermanent, forceIncremental bool,
@@ -118,7 +118,7 @@ func createAndPushBackup(
 		backupName = backupName + "_D_" + utility.StripWalFileName(previousBackupName)
 	}
 
-	bundle.TarBallMaker = NewStorageTarBallMaker(backupName, uploader)
+	bundle.TarBallMaker = NewStorageTarBallMaker(backupName, uploader.Uploader)
 
 	// Start a new tar bundle, walk the archiveDirectory and upload everything there.
 	err = bundle.StartQueue()
@@ -176,15 +176,15 @@ func createAndPushBackup(
 	// If pushing permanent delta backup, mark all previous backups permanent
 	// Do this before uploading current meta to ensure that backups are marked in increasing order
 	if isPermanent && currentBackupSentinelDto.IsIncremental() {
-		markBackup(uploader, folder, previousBackupName, true)
+		markBackup(uploader.Uploader, folder, previousBackupName, true)
 	}
 
-	err = uploadMetadata(uploader, currentBackupSentinelDto, backupName, meta)
+	err = uploadMetadata(uploader.Uploader, currentBackupSentinelDto, backupName, meta)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload metadata file for backup: %s %v", backupName, err)
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	err = UploadSentinel(uploader, currentBackupSentinelDto, backupName)
+	err = UploadSentinel(uploader.Uploader, currentBackupSentinelDto, backupName)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", backupName)
 		tracelog.ErrorLogger.FatalError(err)
@@ -196,7 +196,7 @@ func createAndPushBackup(
 
 // TODO : unit tests
 // HandleBackupPush is invoked to perform a wal-g backup-push
-func HandleBackupPush(uploader *Uploader, archiveDirectory string, isPermanent bool, isFullBackup bool) {
+func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanent bool, isFullBackup bool) {
 	archiveDirectory = utility.ResolveSymlink(archiveDirectory)
 	maxDeltas, fromFull := getDeltaConfig()
 	checkPgVersionAndPgControl(archiveDirectory)

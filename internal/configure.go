@@ -198,24 +198,54 @@ func ConfigureArchiveStatusManager() (DataFolder, error) {
 // that a valid session has started; if invalid, returns AWS error
 // and `<nil>` values.
 func ConfigureUploader() (uploader *Uploader, err error) {
-	uploader, err = ConfigureMockUploaderWithoutCompressMethod()
+	uploader, err = ConfigureUploaderWithoutCompressMethod()
 	if err != nil {
 		return nil, err
 	}
 
 	folder := uploader.UploadingFolder
-	deltaFileManager := uploader.deltaFileManager
 
 	compressor, err := configureCompressor()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure compression")
 	}
 
-	uploader = NewUploader(compressor, folder, deltaFileManager)
+	uploader = NewUploader(compressor, folder)
 	return uploader, err
 }
 
-func ConfigureMockUploaderWithoutCompressMethod() (uploader *Uploader, err error) {
+// ConfigureWalUploader connects to storage and creates an uploader. It makes sure
+// that a valid session has started; if invalid, returns AWS error
+// and `<nil>` values.
+func ConfigureWalUploader() (uploader *WalUploader, err error) {
+	uploader, err = ConfigureWalUploaderWithoutCompressMethod()
+	if err != nil {
+		return nil, err
+	}
+
+	folder := uploader.UploadingFolder
+	deltaFileManager := uploader.DeltaFileManager
+
+	compressor, err := configureCompressor()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure compression")
+	}
+
+	uploader = NewWalUploader(compressor, folder, deltaFileManager)
+	return uploader, err
+}
+
+func ConfigureUploaderWithoutCompressMethod() (uploader *Uploader, err error) {
+	folder, err := ConfigureFolder()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure folder")
+	}
+
+	uploader = NewUploader(nil, folder)
+	return uploader, err
+}
+
+func ConfigureWalUploaderWithoutCompressMethod() (uploader *WalUploader, err error) {
 	folder, err := ConfigureFolder()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure folder")
@@ -231,7 +261,7 @@ func ConfigureMockUploaderWithoutCompressMethod() (uploader *Uploader, err error
 		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
 	}
 
-	uploader = NewUploader(nil, folder, deltaFileManager)
+	uploader = NewWalUploader(nil, folder, deltaFileManager)
 	return uploader, err
 }
 

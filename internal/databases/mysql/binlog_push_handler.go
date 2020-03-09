@@ -88,7 +88,7 @@ func tryArchiveBinLog(uploader *internal.Uploader, filename string, binLog strin
 		return errors.Wrapf(err, "upload: could not open '%s'\n", filename)
 	}
 	defer utility.LoggedClose(walFile, "")
-	err = uploader.UploadWalFile(walFile)
+	err = uploader.UploadFile(walFile)
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not upload '%s'\n", filename)
 	}
