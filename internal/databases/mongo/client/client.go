@@ -3,8 +3,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"sync"
-	"time"
 
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 
@@ -38,7 +36,7 @@ type IsMasterLastWrite struct {
 	MajorityOpTime OpTime `bson:"majorityOpTime"`
 }
 
-// IsMaster is used to unmarshal results of isMaster command
+// IsMaster is used to unmarshal results of IsMaster command
 type IsMaster struct {
 	IsMaster  bool              `bson:"ismaster"`
 	LastWrite IsMasterLastWrite `bson:"lastWrite"`
@@ -46,6 +44,7 @@ type IsMaster struct {
 
 // MongoDriver defines methods to work with mongodb.
 type MongoDriver interface {
+	IsMaster(ctx context.Context) (models.IsMaster, error)
 	LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp, err error)
 	TailOplogFrom(ctx context.Context, from models.Timestamp) (OplogCursor, error)
 	ApplyOp(ctx context.Context, op db.Oplog) error
@@ -90,25 +89,34 @@ func NewMongoClient(ctx context.Context, uri string) (*MongoClient, error) {
 	return &MongoClient{c: client}, client.Ping(ctx, nil)
 }
 
-func (mc *MongoClient) isMaster(ctx context.Context) (*IsMaster, error) {
+func (mc *MongoClient) IsMaster(ctx context.Context) (models.IsMaster, error) {
 	im := IsMaster{}
 	err := mc.c.Database("test").RunCommand(ctx, bson.D{{Key: "isMaster", Value: 1}}).Decode(&im)
 	if err != nil {
-		return nil, fmt.Errorf("isMaster command failed: %w", err)
+		return models.IsMaster{}, fmt.Errorf("isMaster command failed: %w", err)
 	}
-	return &im, nil
+
+	return models.IsMaster{
+		IsMaster: im.IsMaster,
+		LastWrite: models.IsMasterLastWrite{
+			OpTime: models.OpTime{
+				TS: models.TimestampFromBson(im.LastWrite.OpTime.TS),
+			},
+			MajorityOpTime: models.OpTime{
+				TS: models.TimestampFromBson(im.LastWrite.MajorityOpTime.TS),
+			},
+		},
+	}, nil
 }
 
 // LastWriteTS fetches timestamps with last write
 // TODO: support non-replset setups
-func (mc *MongoClient) LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp, err error) {
-	im, err := mc.isMaster(ctx)
+func (mc *MongoClient) LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp,  err error) {
+	im, err := mc.IsMaster(ctx)
 	if err != nil {
 		return models.Timestamp{}, models.Timestamp{}, err
 	}
-	return models.TimestampFromBson(im.LastWrite.OpTime.TS),
-		models.TimestampFromBson(im.LastWrite.MajorityOpTime.TS),
-		nil
+	return im.LastWrite.OpTime.TS, im.LastWrite.MajorityOpTime.TS, nil
 }
 
 // Close disconnects from mongodb
@@ -166,21 +174,4 @@ func (mc *MongoClient) ApplyOp(ctx context.Context, op db.Oplog) error {
 	}
 
 	return nil
-}
-
-type OpTimeUpdater struct {
-	db        MongoDriver
-	mu        *sync.Mutex
-	delay     time.Duration
-	lastWrite IsMasterLastWrite
-}
-
-func NewOptimeUpdater(db MongoDriver, delay time.Duration) *OpTimeUpdater {
-	return &OpTimeUpdater{db, &sync.Mutex{}, delay, IsMasterLastWrite{}}
-}
-
-func (u *OpTimeUpdater) LastWrite() IsMasterLastWrite {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	return u.lastWrite
 }

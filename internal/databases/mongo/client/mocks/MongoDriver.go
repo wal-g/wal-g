@@ -47,6 +47,27 @@ func (_m *MongoDriver) Close(ctx context.Context) error {
 	return r0
 }
 
+// IsMaster provides a mock function with given fields: ctx
+func (_m *MongoDriver) IsMaster(ctx context.Context) (models.IsMaster, error) {
+	ret := _m.Called(ctx)
+
+	var r0 models.IsMaster
+	if rf, ok := ret.Get(0).(func(context.Context) models.IsMaster); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(models.IsMaster)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // LastWriteTS provides a mock function with given fields: ctx
 func (_m *MongoDriver) LastWriteTS(ctx context.Context) (models.Timestamp, models.Timestamp, error) {
 	ret := _m.Called(ctx)
