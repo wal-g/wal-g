@@ -22,7 +22,7 @@ type LogsCache struct {
 	LastArchivedBinlog string `json:"LastArchivedBinlog"`
 }
 
-func HandleBinlogPush(uploader *internal.WalUploader) {
+func HandleBinlogPush(uploader *internal.Uploader) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(BinlogPath)
 
 	db, err := getMySQLConnection()
@@ -76,7 +76,7 @@ func getMySQLBinlogsFolder(db *sql.DB) (string, error) {
 	return path.Dir(logBinBasename), nil
 }
 
-func tryArchiveBinLog(uploader *internal.WalUploader, filename string, binLog string) error {
+func tryArchiveBinLog(uploader *internal.Uploader, filename string, binLog string) error {
 	if binLog <= getLastArchivedBinlog() {
 		tracelog.InfoLogger.Printf("Binlog %v already archived\n", binLog)
 		return nil
@@ -88,7 +88,7 @@ func tryArchiveBinLog(uploader *internal.WalUploader, filename string, binLog st
 		return errors.Wrapf(err, "upload: could not open '%s'\n", filename)
 	}
 	defer utility.LoggedClose(walFile, "")
-	err = uploader.UploadWalFile(walFile)
+	err = uploader.UploadFile(walFile)
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not upload '%s'\n", filename)
 	}
