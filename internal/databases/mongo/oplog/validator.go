@@ -63,11 +63,17 @@ func (dbv *DBValidator) Validate(ctx context.Context, in chan models.Oplog, wg *
 			// TODO: move to separate component and fetch last writes in background
 			for models.LessTS(majTs, op.TS) {
 				time.Sleep(dbv.lwInterval)
-				_, majTs, err = dbv.db.LastWriteTS(ctx)
+				im, err := dbv.db.IsMaster(ctx)
 				if err != nil {
 					errc <- err
 					return
 				}
+				// TODO: support archiving from secondary
+				if !im.IsMaster {
+					errc <- fmt.Errorf("current node does not accept writes")
+					return
+				}
+				majTs = im.LastWrite.MajorityOpTime.TS
 			}
 
 			select {

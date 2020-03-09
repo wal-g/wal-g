@@ -101,3 +101,21 @@ func OplogFromRaw(raw []byte) (Oplog, error) {
 		Data: raw,
 	}, nil
 }
+
+// Optime ...
+type OpTime struct {
+	TS   Timestamp
+	Term int64
+}
+
+// IsMasterLastWrite ...
+type IsMasterLastWrite struct {
+	OpTime         OpTime
+	MajorityOpTime OpTime
+}
+
+// IsMaster ...
+type IsMaster struct {
+	IsMaster  bool
+	LastWrite IsMasterLastWrite
+}
