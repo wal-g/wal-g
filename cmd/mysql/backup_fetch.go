@@ -1,29 +1,26 @@
 package mysql
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/mysql"
 )
 
-const BackupFetchShortDescription = "Fetches desired backup from storage"
+const backupFetchShortDescription = "Fetches desired backup from storage"
 
 // backupFetchCmd represents the streamFetch command
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch backup-name",
-	Short: BackupFetchShortDescription,
+	Short: backupFetchShortDescription,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
-
-		internal.HandleBackupFetch(folder, args[0], internal.GetStreamFetcher(os.Stdout))
-		if command, err := internal.GetStreamRestoreCmd(); err == nil {
-			err := internal.ApplyCommand(command, nil)
-			tracelog.ErrorLogger.FatalfOnError("failed to fetch backup due %v", err)
-		}
+		restoreCmd, err := internal.GetCommandSetting(internal.NameStreamRestoreCmd)
+		tracelog.ErrorLogger.FatalOnError(err)
+		prepareCmd, _ := internal.GetCommandSetting(internal.MysqlBackupPrepareCmd)
+		mysql.HandleBackupFetch(folder, args[0], restoreCmd, prepareCmd)
 	},
 }
 

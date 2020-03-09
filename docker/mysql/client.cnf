@@ -1,0 +1,11 @@
+[client]
+user = sbtest
+host = localhost
+port = 3306
+
+[mysqldump]
+user = sbtest
+host = localhost
+port = 3306
+set-gtid-purged = OFF
+comments = OFF

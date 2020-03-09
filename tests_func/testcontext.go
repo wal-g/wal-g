@@ -12,8 +12,14 @@ import (
 
 	"github.com/DATA-DOG/godog"
 	"github.com/DATA-DOG/godog/gherkin"
-	"github.com/docker/docker/client"
 	"github.com/wal-g/tracelog"
+)
+
+var (
+	featureFiles = map[string]string{
+		"backup": "features/check_mongodb_backup.feature",
+		"pitr":   "features/check_mongodb_pitr.feature",
+	}
 )
 
 func (tctx *TestContext) ContainerFQDN(name string) string {
@@ -29,7 +35,8 @@ func WalgUtilFromTestContext(tctx *TestContext, host string) *helpers.WalgUtil {
 		tctx.Context,
 		tctx.ContainerFQDN(host),
 		tctx.Env["WALG_CLIENT_PATH"],
-		tctx.Env["WALG_CONF_PATH"])
+		tctx.Env["WALG_CONF_PATH"],
+		tctx.Version.Major)
 }
 
 func S3StorageFromTestContext(tctx *TestContext, host string) *helpers.S3Storage {
@@ -54,44 +61,64 @@ func InfraFromTestContext(tctx *TestContext) *helpers.Infra {
 		tctx.Env["COMPOSE_FILE"],
 		tctx.Env,
 		tctx.Env["NETWORK_NAME"],
-		helpers.BaseImage{Path: tctx.Env["BACKUP_BASE_PATH"], Tag: tctx.Env["BACKUP_BASE_TAG"],})
+		helpers.BaseImage{Path: tctx.Env["BACKUP_BASE_PATH"], Tag: tctx.Env["BACKUP_BASE_TAG"]})
 }
 
 type AuxData struct {
 	Timestamps         map[string]helpers.OpTimestamp
-	DatabaseSnap       map[string][]helpers.UserData
+	Snapshots          map[string][]helpers.NsSnapshot
 	CreatedBackupNames []string
 	NometaBackupNames  []string
 	OplogPushEnabled   bool
-	PreviousBackupTime   time.Time
+	PreviousBackupTime time.Time
+}
+
+type MongoVersion struct {
+	Major string
+	Full  string
 }
 
 type TestContext struct {
-	Docker  *client.Client
-	Infra   *helpers.Infra
-	Env     map[string]string
-	Context context.Context
-	AuxData AuxData
+	Infra    *helpers.Infra
+	Env      map[string]string
+	Context  context.Context
+	AuxData  AuxData
+	Version  MongoVersion
+	Features []string
 }
 
 func NewTestContext() (*TestContext, error) {
-	return &TestContext{Context: context.Background()}, nil
-}
+	environ := utils.ParseEnvLines(os.Environ())
 
-func (tctx *TestContext) ShutdownEnv() error {
-	if err := tctx.Infra.Shutdown(); err != nil {
-		return err
+	features := utils.GetMapValues(featureFiles)
+	requestedFeature := environ["MONGO_FEATURE"]
+	if requestedFeature != "" {
+		feature, ok := featureFiles[requestedFeature]
+		if !ok {
+			return nil, fmt.Errorf("requested feature is not found: %s", requestedFeature)
+		}
+		features = []string{feature}
 	}
 
+	return &TestContext{
+		Context: context.Background(),
+		Version: MongoVersion{
+			Major: environ["MONGO_MAJOR"],
+			Full:  environ["MONGO_VERSION"]},
+		Features: features}, nil
+}
+
+func (tctx *TestContext) StopEnv() error {
+	return tctx.Infra.Shutdown()
+}
+
+func (tctx *TestContext) CleanEnv() error {
 	// TODO: Enable net cleanup
 	//if err := helpers.RemoveNet(TestContext); err != nil {
 	//	log.Fatalln(err)
 	//}
 
-	if err := os.RemoveAll(config.Env["STAGING_DIR"]); err != nil {
-		return err
-	}
-	return nil
+	return os.RemoveAll(config.Env["STAGING_DIR"])
 }
 
 func (tctx *TestContext) setupSuites(s *godog.Suite) {
@@ -100,7 +127,7 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 		tctx.AuxData.NometaBackupNames = []string{}
 		tctx.AuxData.OplogPushEnabled = false
 		tctx.AuxData.Timestamps = make(map[string]helpers.OpTimestamp)
-		tctx.AuxData.DatabaseSnap = make(map[string][]helpers.UserData)
+		tctx.AuxData.Snapshots = make(map[string][]helpers.NsSnapshot)
 		tctx.AuxData.PreviousBackupTime = time.Unix(0, 0)
 		if err := tctx.Infra.RecreateContainers(); err != nil {
 			tracelog.ErrorLogger.Fatalln(err)
@@ -142,9 +169,10 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 
 	s.Step(`we save last oplog timestamp on ([^\s]*) to "([^"]*)"`, tctx.saveOplogTimestamp)
 	s.Step(`^([^\s]*) has test mongodb data test(\d+)$`, tctx.fillMongodbWithTestData)
+	s.Step(`^([^\s]*) has been loaded with "([^"]*)"$`, tctx.loadMongodbOpsFromConfig)
 	s.Step(`^we got same mongodb data at ([^\s]*) ([^\s]*)$`, tctx.testEqualMongodbDataAtHosts)
 	s.Step(`^we have same data in "([^"]*)" and "([^"]*)"$`, tctx.sameDataCheck)
-	s.Step(`^we save ([^\s]*) data "([^"]*)"$`, tctx.saveUserData)
+	s.Step(`^we save ([^\s]*) data "([^"]*)"$`, tctx.saveSnapshot)
 
 	s.Step(`^we create ([^\s]*) backup$`, tctx.createBackup)
 	s.Step(`^we got (\d+) backup entries of ([^\s]*)$`, tctx.checkBackupsCount)

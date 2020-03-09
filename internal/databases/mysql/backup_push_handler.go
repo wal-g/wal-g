@@ -1,40 +1,39 @@
 package mysql
 
 import (
-	"database/sql"
-	"io"
-
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
+	"os/exec"
 )
 
-func HandleBackupPush(uploader *Uploader, command []string) {
-	waitAndFatalOnError, stream := internal.StartCommand(command)
+func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
+
 	db, err := getMySQLConnection()
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(db, "")
-	err = uploader.UploadStream(db, stream)
-	tracelog.ErrorLogger.FatalOnError(err)
-	waitAndFatalOnError()
-}
 
-// TODO : unit tests
-// UploadFile compresses a file and uploads it.
-func (uploader *Uploader) UploadStream(db *sql.DB, stream io.Reader) error {
 	binlogStart := getMySQLCurrentBinlogFile(db)
 	tracelog.DebugLogger.Println("Binlog start file", binlogStart)
 	timeStart := utility.TimeNowCrossPlatformLocal()
 
-	fileName, err := uploader.PushStream(stream)
+	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
+	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
+
+	fileName, err := uploader.PushStream(stdout)
+	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
+
+	err = backupCmd.Wait()
 	if err != nil {
-		return err
+		tracelog.ErrorLogger.Printf("Backup command output:\n%s", stderr.String())
+		tracelog.ErrorLogger.Fatalf("backup create command failed: %v", err)
 	}
 
 	binlogEnd := getMySQLCurrentBinlogFile(db)
 	tracelog.DebugLogger.Println("Binlog end file", binlogEnd)
-
 	sentinel := StreamSentinelDto{BinLogStart: binlogStart, BinLogEnd: binlogEnd, StartLocalTime: timeStart}
-	return internal.UploadSentinel(uploader.Uploader, &sentinel, fileName)
+
+	err = internal.UploadSentinel(uploader, &sentinel, fileName)
+	tracelog.ErrorLogger.FatalOnError(err)
 }

@@ -1,7 +1,7 @@
 package redis
 
 import (
-	"io"
+	"os/exec"
 	"time"
 
 	"github.com/wal-g/tracelog"
@@ -9,20 +9,21 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleStreamPush(uploader *Uploader, command []string) {
+func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
 	// Configure folder
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
-	waitAndFatalOnError, stream := internal.StartCommand(command)
+
+	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
+	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
+
 	backupName := "dump_" + time.Now().Format(time.RFC3339)
-	err := uploader.UploadStream(backupName, stream)
+	compressed := internal.CompressAndEncrypt(stdout, uploader.Compressor, internal.ConfigureCrypter())
+	err = uploader.Upload(backupName, compressed)
 	tracelog.ErrorLogger.FatalOnError(err)
-	waitAndFatalOnError()
-}
 
-func (uploader *Uploader) UploadStream(backupName string, stream io.Reader) error {
-	compressed := internal.CompressAndEncrypt(stream, uploader.Compressor, internal.ConfigureCrypter())
-
-	err := uploader.Upload(backupName, compressed)
-
-	return err
+	err = backupCmd.Wait()
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Backup command output:\n%s", stderr.String())
+		tracelog.ErrorLogger.Fatalf("backup create command failed: %v", err)
+	}
 }

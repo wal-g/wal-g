@@ -11,7 +11,6 @@ import (
 	"sort"
 
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
@@ -23,17 +22,18 @@ type LogsCache struct {
 	LastArchivedBinlog string `json:"LastArchivedBinlog"`
 }
 
-func HandleBinlogPush(uploader *Uploader) {
-	if !viper.IsSet(BinlogSrcSetting) {
-		tracelog.ErrorLogger.FatalError(internal.NewUnsetRequiredSettingError(BinlogSrcSetting))
-	}
-	binlogsFolder := viper.GetString(BinlogSrcSetting)
+func HandleBinlogPush(uploader *internal.WalUploader) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(BinlogPath)
+
 	db, err := getMySQLConnection()
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(db, "")
 
-	binlogs := getMySQLSortedBinlogs(db)
+	binlogsFolder, err := getMySQLBinlogsFolder(db)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	binlogs, err := getMySQLSortedBinlogs(db)
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	for _, binLog := range binlogs {
 		err = tryArchiveBinLog(uploader, path.Join(binlogsFolder, binLog), binLog)
@@ -41,28 +41,42 @@ func HandleBinlogPush(uploader *Uploader) {
 	}
 }
 
-func getMySQLSortedBinlogs(db *sql.DB) []string {
+func getMySQLSortedBinlogs(db *sql.DB) ([]string, error) {
 	var result []string
 
 	currentBinlog := getMySQLCurrentBinlogFile(db)
 
 	rows, err := db.Query("SHOW BINARY LOGS")
-	tracelog.ErrorLogger.FatalOnError(err)
+	if err != nil {
+		return nil, err
+	}
 	defer utility.LoggedClose(rows, "")
 	for rows.Next() {
 		var logFinName string
 		var size uint32
 		err = scanToMap(rows, map[string]interface{}{"Log_name": &logFinName, "File_size": &size})
-		tracelog.ErrorLogger.FatalOnError(err)
+		if err != nil {
+			return nil, err
+		}
 		if logFinName < currentBinlog {
 			result = append(result, logFinName)
 		}
 	}
 	sort.Strings(result)
-	return result
+	return result, nil
 }
 
-func tryArchiveBinLog(uploader *Uploader, filename string, binLog string) error {
+func getMySQLBinlogsFolder(db *sql.DB) (string, error) {
+	row := db.QueryRow("SHOW VARIABLES LIKE 'log_bin_basename'")
+	var nonce, logBinBasename string
+	err := row.Scan(&nonce, &logBinBasename)
+	if err != nil {
+		return "", err
+	}
+	return path.Dir(logBinBasename), nil
+}
+
+func tryArchiveBinLog(uploader *internal.WalUploader, filename string, binLog string) error {
 	if binLog <= getLastArchivedBinlog() {
 		tracelog.InfoLogger.Printf("Binlog %v already archived\n", binLog)
 		return nil
@@ -100,7 +114,7 @@ func getLastArchivedBinlog() string {
 		}
 	}
 	if os.IsNotExist(err) {
-		tracelog.InfoLogger.Println("MySQL cache does not exist")
+		tracelog.InfoLogger.Println("MySQL binlog cache does not exist")
 	} else {
 		tracelog.ErrorLogger.Printf("%+v\n", err)
 	}
@@ -122,7 +136,7 @@ func setLastArchivedBinlog(binlogFileName string) {
 		}
 	}
 	if err != nil && !os.IsNotExist(err) {
-		tracelog.ErrorLogger.Printf("%+v\n", err)
+		tracelog.ErrorLogger.Printf("Failed to read MySQL binlog cache file: %v\n", err)
 	}
 
 	cache.LastArchivedBinlog = binlogFileName
@@ -131,7 +145,7 @@ func setLastArchivedBinlog(binlogFileName string) {
 	if err == nil && len(cacheFilename) > 0 {
 		err = ioutil.WriteFile(cacheFilename, marshal, 0644)
 		if err != nil {
-			tracelog.ErrorLogger.Printf("%+v\n", err)
+			tracelog.ErrorLogger.Printf("Failed to write MySQL binlog cache file: %v\n", err)
 		}
 	}
 }

@@ -14,7 +14,7 @@ WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4
 - [Development](#development)
 	- [Installing](#installing)
 	- [Testing](#testing)
-	- [Development on windows](#Development on Windows) 
+	- [Development on windows](#development-on-windows) 
 - [Authors](#authors)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
@@ -256,4 +256,4 @@ WAL-G development is supported by [Yandex Cloud](https://cloud.yandex.com)
 
 Chat
 ----
-We have a [Slack group](https://postgresteam.slack.com/messages/CA25P48P2) to discuss WAL-G usage and development. To joint PostgreSQL slack use [invite app](https://postgres-slack.herokuapp.com).
+We have a [Slack group](https://postgresteam.slack.com/messages/CA25P48P2) and [Telegram chat](https://t.me/joinchat/C03q9FOwa7GgIIW5CwfjrQ) to discuss WAL-G usage and development. To joint PostgreSQL slack use [invite app](https://postgres-slack.herokuapp.com).

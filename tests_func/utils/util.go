@@ -71,14 +71,18 @@ func SplitEnvLine(line string) (string, string) {
 	return values[0], values[1]
 }
 
-func CopyDirectory(scrDir, dest string) error {
-	entries, err := ioutil.ReadDir(scrDir)
+func CopyDirectory(src, dest string, filter string) error {
+	entries, err := ioutil.ReadDir(src)
 	if err != nil {
 		return err
 	}
 	for _, entry := range entries {
-		sourcePath := filepath.Join(scrDir, entry.Name())
+		sourcePath := filepath.Join(src, entry.Name())
 		destPath := filepath.Join(dest, entry.Name())
+
+		if strings.Contains(sourcePath, filter) && filter != "" {
+			continue
+		}
 
 		fileInfo, err := os.Stat(sourcePath)
 		if err != nil {
@@ -95,7 +99,7 @@ func CopyDirectory(scrDir, dest string) error {
 			if err := CreateDir(destPath, 0755); err != nil {
 				return err
 			}
-			if err := CopyDirectory(sourcePath, destPath); err != nil {
+			if err := CopyDirectory(sourcePath, destPath, filter); err != nil {
 				return err
 			}
 		case os.ModeSymlink:
@@ -167,4 +171,12 @@ func CopySymLink(source, dest string) error {
 		return err
 	}
 	return os.Symlink(link, dest)
+}
+
+func GetMapValues(m map[string]string) []string {
+	values := make([]string, 0, len(m))
+	for _, v := range m {
+		values = append(values, v)
+	}
+	return values
 }

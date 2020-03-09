@@ -1,12 +1,13 @@
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -338,39 +339,28 @@ func GetSentinelUserData() interface{} {
 	return out
 }
 
-func getCommandFromEnvAndParse(variableName string) ([]string, error) {
+func GetCommandSettingContext(ctx context.Context, variableName string) (*exec.Cmd, error) {
 	dataStr, ok := GetSetting(variableName)
 	if !ok {
 		tracelog.InfoLogger.Printf("command %s not configured", variableName)
-		return []string{}, errors.New("command not configured")
+		return nil, errors.New("command not configured")
 	}
 	if len(dataStr) == 0 {
 		tracelog.ErrorLogger.Print(variableName + " expected.")
 		return nil, errors.New(variableName + " not configured")
 	}
-	return strings.Fields(dataStr), nil
-}
-
-func GetStreamCreateCmd() []string {
-	// ignore error here explicitly to backward comparability
-	val, _ := getCommandFromEnvAndParse(NameStreamCreateCmd)
-	return val
-}
-
-func GetStreamRestoreCmd() ([]string, error) {
-	val, err := getCommandFromEnvAndParse(NameStreamRestoreCmd)
-	if err != nil {
-		return nil, err
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/sh"
 	}
-	return val, nil
+	cmd := exec.CommandContext(ctx, shell, "-c", dataStr)
+	// do not shut up subcommands by default
+	cmd.Stderr = os.Stderr
+	return cmd, nil
 }
 
-func GetLogApplyCmd() ([]string, error) {
-	val, err := getCommandFromEnvAndParse(NameLogApplyCmdPath)
-	if err != nil {
-		return nil, err
-	}
-	return val, nil
+func GetCommandSetting(variableName string) (*exec.Cmd, error) {
+	return GetCommandSettingContext(context.Background(), variableName)
 }
 
 func GetOplogArchiveTimeout() (time.Duration, error) {
@@ -389,6 +379,15 @@ func GetOplogArchiveAfterSize() (int, error) {
 		return 0, fmt.Errorf("integer expected for %s setting but given '%s': %w", OplogArchiveAfterSize, oplogArchiveAfterSizeStr, err)
 	}
 	return oplogArchiveAfterSize, nil
+}
+
+func GetLastWriteUpdateInterval() (time.Duration, error) {
+	intervalStr, _ := GetSetting(MongoDBLastWriteUpdateSeconds)
+	interval, err := strconv.Atoi(intervalStr)
+	if err != nil {
+		return 0, fmt.Errorf("integer(seconds) expected for %s setting but given '%s': %w", MongoDBLastWriteUpdateSeconds, intervalStr, err)
+	}
+	return time.Duration(interval) * time.Second, nil
 }
 
 func GetRequiredSetting(setting string) (string, error) {

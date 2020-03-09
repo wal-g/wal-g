@@ -9,6 +9,7 @@ import (
 
 	"github.com/wal-g/wal-g/tests_func/utils"
 
+	"github.com/mongodb/mongo-tools-common/db"
 	"github.com/wal-g/tracelog"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -17,7 +18,9 @@ import (
 )
 
 const (
-	AdminDB = "admin"
+	LocalDB   = "local"
+	OplogColl = "oplog.rs"
+	AdminDB   = "admin"
 )
 
 type DatabaseRecord struct {
@@ -34,9 +37,10 @@ func generateRecord(rowNum int, strLen int, strPrefix string) DatabaseRecord {
 	}
 }
 
-type UserData struct {
-	NS   string
-	Rows []bson.M
+type NsSnapshot struct {
+	NS      string
+	Docs    []bson.M
+	Indexes []bson.M
 }
 
 func isSystemCollection(collectionName string) bool {
@@ -157,12 +161,12 @@ func (mc *MongoCtl) AdminConnect() (*mongo.Client, error) {
 
 func (mc *MongoCtl) connect(creds *AuthCreds) (*mongo.Client, error) {
 	auth := ""
-	db := AdminDB
+	dbase := AdminDB
 	if creds != nil {
 		auth = fmt.Sprintf("%s:%s@", creds.Username, creds.Password)
-		db = creds.Database
+		dbase = creds.Database
 	}
-	uri := fmt.Sprintf("mongodb://%s%s:%d/%s?connect=direct&w=majority&socketTimeoutMS=3000&connectTimeoutMS=3000", auth, mc.expHost, mc.expPort, db)
+	uri := fmt.Sprintf("mongodb://%s%s:%d/%s?connect=direct&w=majority&socketTimeoutMS=3000&connectTimeoutMS=3000", auth, mc.expHost, mc.expPort, dbase)
 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
 	if err != nil {
 		return nil, fmt.Errorf("can not create mongo client: %v", err)
@@ -174,7 +178,7 @@ func (mc *MongoCtl) connect(creds *AuthCreds) (*mongo.Client, error) {
 	return client, nil
 }
 
-func (mc *MongoCtl) WriteTestData(mark string, ) error {
+func (mc *MongoCtl) WriteTestData(mark string) error {
 	conn, err := mc.AdminConnect()
 	if err != nil {
 		return err
@@ -194,8 +198,8 @@ func (mc *MongoCtl) WriteTestData(mark string, ) error {
 	return nil
 }
 
-func (mc *MongoCtl) UserData() ([]UserData, error) { // TODO: support indexes, etc
-	var userData []UserData
+func (mc *MongoCtl) Snapshot() ([]NsSnapshot, error) {
+	var snapshot []NsSnapshot
 
 	conn, err := mc.AdminConnect()
 	if err != nil {
@@ -204,53 +208,110 @@ func (mc *MongoCtl) UserData() ([]UserData, error) { // TODO: support indexes, e
 
 	databases, err := conn.ListDatabaseNames(mc.ctx, bson.M{})
 	if err != nil {
-		return []UserData{}, fmt.Errorf("can not list databases: %v", err)
+		return nil, fmt.Errorf("can not list databases: %v", err)
 	}
 	sort.Strings(databases)
 	for _, database := range databases {
-		tables, err := conn.Database(database, &options.DatabaseOptions{}).ListCollectionNames(mc.ctx, bson.M{})
-		if err != nil {
-			return []UserData{}, fmt.Errorf("can not list collections: %v", err)
-		}
-
 		if isSystemDatabase(database) {
 			continue
 		}
 
-		sort.Strings(tables)
-		for _, table := range tables {
-			if isSystemCollection(table) {
+		collsInfo, err := ListCollections(mc.ctx, conn, database)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, collInfo := range collsInfo {
+			coll := collInfo["name"].(string)
+			if isSystemCollection(coll) {
 				continue
 			}
-			//if strings.Contains(table, ".") {
-			//	continue
-			//}
-
-			cur, err := conn.
-				Database(database, &options.DatabaseOptions{}).
-				Collection(table).
-				Find(mc.ctx, bson.M{}, options.Find().SetSort(map[string]int{"_id": 1}))
+			docs, err := FetchNsDocs(mc.ctx, conn, database, coll)
 			if err != nil {
-				return []UserData{}, fmt.Errorf("can not dump data from ns '%s.%s': %v", database, table, err)
+				return nil, err
 			}
 
-			var results []bson.M
-			if err := cur.All(mc.ctx, &results); err != nil {
-				return []UserData{}, fmt.Errorf("can not decode dumped data: %v", err)
+			indexes, err := ListNsIndexes(mc.ctx, conn, database, coll)
+			if err != nil {
+				return nil, err
 			}
-			userData = append(userData, UserData{
-				NS:   fmt.Sprintf("%s.%s", database, table),
-				Rows: results,
+
+			snapshot = append(snapshot, NsSnapshot{
+				NS:      fmt.Sprintf("%s.%s", database, coll),
+				Docs:    docs,
+				Indexes: indexes,
 			})
-
-			err = cur.Close(mc.ctx)
-			if err != nil {
-				return []UserData{}, fmt.Errorf("can not close cursor: %v", err)
-			}
 		}
 	}
 
-	return userData, nil
+	return snapshot, nil
+}
+
+func ListCollections(ctx context.Context, conn *mongo.Client, database string) ([]bson.M, error) {
+	// TODO: filter system.*
+	cur, err := conn.Database(database, nil).ListCollections(ctx, bson.M{})
+	if err != nil {
+		return nil, fmt.Errorf("can not create listCollections cursor: %v", err)
+	}
+	colls, err := FetchAllDocs(ctx, cur)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(colls, func(i, j int) bool {
+		return colls[i]["name"].(string) < colls[j]["name"].(string)
+	})
+	return colls, nil
+}
+
+func FetchNsDocs(ctx context.Context, conn *mongo.Client, database, table string) ([]bson.M, error) {
+	ns := fmt.Sprintf("%s.%s", database, table)
+
+	cur, err := conn.
+		Database(database, nil).
+		Collection(table).
+		Find(ctx, bson.M{}, options.Find().SetSort(map[string]int{"_id": 1}))
+	if err != nil {
+		return nil, fmt.Errorf("can not create cursor to dump docs from ns '%s': %v", ns, err)
+	}
+
+	nsData, err := FetchAllDocs(ctx, cur)
+	if err != nil {
+		return nil, fmt.Errorf("can not fetch docs from ns '%s': %v", ns, err)
+	}
+
+	if err := cur.Close(ctx); err != nil {
+		return nil, fmt.Errorf("can not close cursor for ns '%s': %v", ns, err)
+	}
+
+	return nsData, nil
+}
+
+func ListNsIndexes(ctx context.Context, conn *mongo.Client, database, table string) ([]bson.M, error) {
+	ns := fmt.Sprintf("%s.%s", database, table)
+
+	indexes := conn.Database(database, nil).Collection(table).Indexes()
+
+	cur, err := indexes.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("can not create cursor to list indexes on ns '%s': %v", ns, err)
+	}
+
+	nsData, err := FetchAllDocs(ctx, cur)
+	if err != nil {
+		return nil, fmt.Errorf("can not list indexes on ns '%s': %v", ns, err)
+	}
+
+	if err := cur.Close(ctx); err != nil {
+		return nil, fmt.Errorf("can not close cursor for ns '%s': %v", ns, err)
+	}
+
+	return nsData, nil
+}
+
+func FetchAllDocs(ctx context.Context, cur *mongo.Cursor) ([]bson.M, error) {
+	var results []bson.M
+	err := cur.All(ctx, &results)
+	return results, err
 }
 
 func (mc *MongoCtl) runIsMaster() (IsMaster, error) {
@@ -273,12 +334,30 @@ func (mc *MongoCtl) IsMaster() (bool, error) {
 	return im.IsMaster, err
 }
 
-func (mc *MongoCtl) LastTS() (OpTimestamp, error) {
+func (mc *MongoCtl) LastMajTS() (OpTimestamp, error) {
 	im, err := mc.runIsMaster()
 	if err != nil {
 		return OpTimestamp{}, err
 	}
 	ts := im.LastWrite.MajorityOpTime.TS
+
+	return OpTimestamp{TS: ts.T, Inc: ts.I}, nil
+}
+
+func (mc *MongoCtl) LastTS() (OpTimestamp, error) {
+	conn, err := mc.AdminConnect()
+	if err != nil {
+		return OpTimestamp{}, err
+	}
+	var op db.Oplog
+	opts := options.FindOne().SetSort(bson.D{{Key: "$natural", Value: -1}})
+	err = conn.Database(LocalDB).Collection(OplogColl).
+		FindOne(mc.ctx, bson.D{}, opts).Decode(&op)
+
+	if err != nil {
+		return OpTimestamp{}, err
+	}
+	ts := op.Timestamp
 
 	return OpTimestamp{TS: ts.T, Inc: ts.I}, nil
 }
@@ -308,7 +387,9 @@ func (mc *MongoCtl) EnableAuth() error {
 		return err
 	}
 
-	if strings.Contains(response.Combined(), "command createUser requires authentication") {
+	if strings.Contains(response.Combined(), "command createUser requires authentication") ||
+		strings.Contains(response.Combined(), "couldn't add user: not authorized on admin to execute command") ||
+		strings.Contains(response.Combined(), "there are no users authenticated") {
 		return nil
 	}
 	if !strings.Contains(response.Combined(), "Successfully added user") {
@@ -349,19 +430,14 @@ func (mc *MongoCtl) EnableAuth() error {
 }
 
 func (mc *MongoCtl) runCmd(run []string) (ExecResult, error) {
-	exec, err := RunCommand(mc.ctx, mc.host, run)
+	exc, err := RunCommandStrict(mc.ctx, mc.host, run)
 	cmdLine := strings.Join(run, " ")
 
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", cmdLine, exec.String())
-		return exec, err
+		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", cmdLine, exc.String())
+		return exc, err
 	}
-
-	if exec.ExitCode != 0 {
-		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", cmdLine, exec.String())
-		err = fmt.Errorf("command '%s' exit code: %d", cmdLine, exec.ExitCode)
-	}
-	return exec, err
+	return exc, err
 }
 
 func (mc *MongoCtl) PurgeDatadir() error {

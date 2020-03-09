@@ -57,7 +57,9 @@ var oplogPushCmd = &cobra.Command{
 		tracelog.InfoLogger.Printf("Archiving last known timestamp is %s", since)
 
 		// set up oplog validator
-		oplogValidator := oplog.NewDBValidator(since)
+		lwUpdate, err := internal.GetLastWriteUpdateInterval()
+		tracelog.ErrorLogger.FatalOnError(err)
+		oplogValidator := oplog.NewDBValidator(ctx, since, lwUpdate, mongoClient)
 
 		// set up storage archiver
 		oplogApplier := oplog.NewStorageApplier(uploader, archiveAfterSize, archiveTimeout)

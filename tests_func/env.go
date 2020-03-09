@@ -11,7 +11,6 @@ import (
 	"github.com/wal-g/wal-g/tests_func/utils"
 )
 
-
 func EnvExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
@@ -49,9 +48,19 @@ func ReadEnv(path string) (map[string]string, error) {
 }
 
 func SetupStaging(imagesDir, stagingDir string) error {
-	if err := utils.CopyDirectory(imagesDir, path.Join(stagingDir, imagesDir)); err != nil {
+	if err := utils.CopyDirectory(imagesDir, path.Join(stagingDir, imagesDir), ""); err != nil {
 		return fmt.Errorf("can not copy images into staging: %v", err)
 	}
+	walgDir := path.Join(stagingDir, "wal-g")
+
+	if err := utils.CreateDir(walgDir, 0755); err != nil {
+		return err
+	}
+
+	if err := utils.CopyDirectory("..", walgDir, "tests_func"); err != nil {
+		return fmt.Errorf("can not copy wal-g into staging: %v", err)
+	}
+
 	return nil
 }
 

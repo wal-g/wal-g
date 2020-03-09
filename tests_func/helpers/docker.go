@@ -8,6 +8,9 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/wal-g/wal-g/tests_func/utils"
 
@@ -57,6 +60,34 @@ func User(user string) RunOption {
 	}
 }
 
+func TimeInContainer(ctx context.Context, container string) (time.Time, error) {
+	exc, err := RunCommandStrict(ctx, container, []string{"date", "+%s"})
+	if err != nil {
+		return time.Time{}, err
+	}
+	ts, err := strconv.ParseInt(strings.Trim(exc.Stdout(), "\n"), 10, 64)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Unix(ts, 0), nil
+}
+
+func RunCommandStrict(ctx context.Context, container string, command []string) (ExecResult, error) {
+	cmdLine := strings.Join(command, " ")
+
+	exc, err := RunCommand(ctx, container, command)
+	if err != nil {
+		return exc, err
+	}
+	if exc.ExitCode != 0 {
+		tracelog.ErrorLogger.Printf("'%s' failed with %d\nstdout:\n%s\nstderr:\n%s\n",
+			cmdLine, exc.ExitCode, exc.Stdout(), exc.Stderr())
+		return exc, fmt.Errorf("%s exit code: %d", cmdLine, exc.ExitCode)
+	}
+	return exc, nil
+
+}
+
 func RunCommand(ctx context.Context, container string, cmd []string, setters ...RunOption) (ExecResult, error) {
 	args := &RunOptions{}
 	for _, setter := range setters {
@@ -81,6 +112,9 @@ func RunCommand(ctx context.Context, container string, cmd []string, setters ...
 	}
 	defer attach.Close()
 
+	cmdLine := strings.Join(cmd, " ")
+	tracelog.DebugLogger.Printf("Running command: %v", cmdLine)
+
 	var outBuf, errBuf bytes.Buffer
 	outputDone := make(chan error)
 
@@ -102,8 +136,11 @@ func RunCommand(ctx context.Context, container string, cmd []string, setters ...
 	if err != nil {
 		return ExecResult{}, err
 	}
+	exc := ExecResult{ExitCode: execInspect.ExitCode, stdoutBuffer: &outBuf, stderrBuffer: &errBuf}
+	tracelog.DebugLogger.Printf("'%s' exit code %d\nstdout:\n%s\nstderr:\n%s\n",
+		cmdLine, exc.ExitCode, exc.Stdout(), exc.Stderr())
 
-	return ExecResult{ExitCode: execInspect.ExitCode, stdoutBuffer: &outBuf, stderrBuffer: &errBuf}, nil
+	return exc, nil
 }
 
 func ContainerWithPrefix(containers []types.Container, name string) (*types.Container, error) {
@@ -225,25 +262,25 @@ func BuildImage(ctx context.Context, tag string, path string) error {
 	return nil
 }
 
-type BaseImage struct{
+type BaseImage struct {
 	Path string
 	Tag  string
 }
 
 type Infra struct {
-	ctx context.Context
-	config string
-	env map[string]string
-	net string
+	ctx       context.Context
+	config    string
+	env       map[string]string
+	net       string
 	baseImage BaseImage
 }
 
 func NewInfra(ctx context.Context, config string, env map[string]string, net string, base BaseImage) *Infra {
 	return &Infra{
-		ctx:    ctx,
-		config: config,
-		env:    env,
-		net:    net,
+		ctx:       ctx,
+		config:    config,
+		env:       env,
+		net:       net,
 		baseImage: base,
 	}
 }
@@ -285,7 +322,7 @@ func (inf *Infra) Shutdown() error {
 func (inf *Infra) callCompose(actions []string) error {
 	baseArgs := []string{"--file", inf.config, "-p", "test"}
 	baseArgs = append(baseArgs, actions...)
-	cmd := exec.CommandContext(inf.ctx,"docker-compose", baseArgs...)
+	cmd := exec.CommandContext(inf.ctx, "docker-compose", baseArgs...)
 	for _, line := range utils.EnvToList(inf.env) {
 		cmd.Env = append(cmd.Env, line)
 	}
@@ -302,7 +339,6 @@ func (inf *Infra) callCompose(actions []string) error {
 
 	return nil
 }
-
 
 func init() {
 	var err error

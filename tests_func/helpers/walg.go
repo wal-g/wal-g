@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 )
 
 type Sentinel struct {
@@ -85,34 +86,29 @@ type WalgUtil struct {
 	host     string
 	cliPath  string
 	confPath string
+	mongoMaj string
 }
 
-func NewWalgUtil(ctx context.Context, host, cliPath, confPath string) *WalgUtil {
-	return &WalgUtil{ctx, host, cliPath, confPath}
+func NewWalgUtil(ctx context.Context, host, cliPath, confPath, mongoMaj string) *WalgUtil {
+	return &WalgUtil{ctx, host, cliPath, confPath, mongoMaj}
 }
 
 func (w *WalgUtil) runCmd(run []string) (ExecResult, error) {
-	var err error
 	command := []string{w.cliPath, "--config", w.confPath}
 	command = append(command, run...)
 
-	exec, err := RunCommand(w.ctx, w.host, command)
-	cmdLine := strings.Join(command, " ")
-
-	if err != nil {
-		tracelog.DebugLogger.Printf("Command failed '%s' failed: %v", cmdLine, exec.String())
-		return exec, err
-	}
-
-	if exec.ExitCode != 0 {
-		tracelog.DebugLogger.Printf("Command failed '%s' failed: %v", cmdLine, exec.String())
-		err = fmt.Errorf("command '%s' exit code: %d", cmdLine, exec.ExitCode)
-	}
-
-	return exec, err
+	exc, err := RunCommandStrict(w.ctx, w.host, command)
+	return exc, err
 }
 
 func (w *WalgUtil) PushBackup() (string, error) {
+	PgDataSettingString, ok := internal.GetSetting(internal.PgDataSetting)
+	if ok == false {
+		tracelog.InfoLogger.Print("\nPGDATA is not set in the conf.\n")
+	}
+	if w.cliPath != PgDataSettingString {
+		tracelog.WarningLogger.Printf("cliPath '%s' differ from conf PGDATA '%s'\n", w.cliPath, PgDataSettingString)
+	}
 	exec, err := w.runCmd([]string{"backup-push"})
 	if err != nil {
 		return "", err
@@ -128,11 +124,7 @@ func (w *WalgUtil) FetchBackupByNum(backupNum int) error {
 	if backupNum >= len(backups) {
 		return fmt.Errorf("only %d backups exists, backup #%d is not found", len(backups), backupNum)
 	}
-
-	walgCommand := []string{w.cliPath, "--config", w.confPath, "backup-fetch", backups[backupNum]}
-	mongoCommand := []string{"|", "mongorestore", "--archive", "--preserveUUID", "--drop", "--uri=\"mongodb://admin:password@127.0.0.1:27018\""}
-	command := strings.Join(append(walgCommand, mongoCommand...), " ")
-	_, err = RunCommand(w.ctx, w.host, []string{"bash", "-c", command})
+	_, err = w.runCmd([]string{"backup-fetch", backups[backupNum]})
 	return err
 }
 
@@ -198,8 +190,18 @@ func (w *WalgUtil) PurgeAfterTime(keepNumber int, timeLine time.Time) error {
 }
 
 func (w *WalgUtil) OplogPush() error {
-	_, err := w.runCmd([]string{"oplog-push"})
-	return err
+	cmd := []string{w.cliPath, "--config", w.confPath, "oplog-push"}
+	cmdLine := strings.Join(cmd, " ")
+
+	exc, err := RunCommand(w.ctx, w.host, cmd)
+
+	if err != nil || exc.ExitCode != 0 {
+		tracelog.DebugLogger.Printf("'%s' failed with error %s, exit code %d, stdout:\n%s\nstderr:\n%s\n",
+			cmdLine, err, exc.ExitCode, exc.Stdout(), exc.Stderr())
+		return fmt.Errorf("%s exit code: %d", cmdLine, exc.ExitCode)
+	}
+
+	return nil
 }
 
 func (w *WalgUtil) OplogReplay(from, until OpTimestamp) error {

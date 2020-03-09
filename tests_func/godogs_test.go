@@ -5,68 +5,90 @@ import (
 	"os"
 	"testing"
 
-	"github.com/wal-g/wal-g/tests_func/config"
-	"github.com/wal-g/wal-g/tests_func/utils"
-
 	"github.com/DATA-DOG/godog"
 	"github.com/DATA-DOG/godog/colors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/tests_func/config"
 )
 
-var opt = godog.Options{
-	Output:        colors.Colored(os.Stdout),
-	Format:        "pretty",
-	StopOnFailure: true,
-	Strict:        true,
+type TestOpts struct {
+	test  bool
+	clean bool
+	stop  bool
+	debug bool
 }
 
-var cleanEnv bool
+const (
+	testOptsPrefix = "tf."
+)
+
+var (
+	godogOpts = godog.Options{
+		Output:        colors.Colored(os.Stdout),
+		Format:        "pretty",
+		StopOnFailure: true,
+		Strict:        true,
+	}
+
+	testOpts = TestOpts{}
+)
 
 func init() {
-	flag.BoolVar(&cleanEnv, "env.clean", false, "shutdown and delete test environment")
-	godog.BindFlags("godog.", flag.CommandLine, &opt)
+	flag.BoolVar(&testOpts.test, testOptsPrefix+"test", true, "run tests")
+	flag.BoolVar(&testOpts.stop, testOptsPrefix+"stop", true, "shutdown test environment")
+	flag.BoolVar(&testOpts.clean, testOptsPrefix+"clean", true, "delete test environment")
+	flag.BoolVar(&testOpts.debug, testOptsPrefix+"debug", false, "enable debug logging")
+	godog.BindFlags("godog.", flag.CommandLine, &godogOpts)
 }
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	opt.Paths = flag.Args()
 
-	environ := utils.ParseEnvLines(os.Environ())
-	debug := environ["DEBUG"] != ""
-	if debug {
+	status := 0
+	if testOpts.debug {
 		err := tracelog.UpdateLogLevel(tracelog.DevelLogLevel)
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
 
+	envFilePath := config.Env["ENV_FILE"]
+
 	tctx, err := NewTestContext()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	if cleanEnv {
-		env, err := ReadEnv(config.Env["ENV_FILE"])
-		tracelog.ErrorLogger.FatalOnError(err)
+	if testOpts.test {
+		godogOpts.Paths = tctx.Features
 
-		tctx.Env = env
-		err = tctx.ShutdownEnv()
-		tracelog.ErrorLogger.FatalOnError(err)
+		tracelog.InfoLogger.Printf("Starting testing environment: mongodb %s with features: %v",
+			tctx.Version.Full, godogOpts.Paths)
 
-		return
+		status = godog.RunWithOptions("godogs", func(s *godog.Suite) {
+			tctx.setupSuites(s)
+		}, godogOpts)
+
+		if st := m.Run(); st > status {
+			status = st
+		}
 	}
 
-	tracelog.InfoLogger.Printf("Starting testing environment: mongodb %s (%s)",
-		environ["MONGO_MAJOR"], environ["MONGO_VERSION"])
-
-	status := godog.RunWithOptions("godogs", func(s *godog.Suite) {
-		tctx.setupSuites(s)
-	}, opt)
-
-	if st := m.Run(); st > status {
-		status = st
+	if !EnvExists(envFilePath) {
+		tracelog.ErrorLogger.Fatalln("Environment file is not found: ", envFilePath)
 	}
 
-	if debug {
-		os.Exit(status)
-	}
-
-	err = tctx.ShutdownEnv()
+	env, err := ReadEnv(envFilePath)
 	tracelog.ErrorLogger.FatalOnError(err)
+
+	tctx.Env = env
+	tctx.Infra = InfraFromTestContext(tctx)
+
+	if testOpts.stop {
+		err = tctx.StopEnv()
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
+
+	if testOpts.clean {
+		err = tctx.CleanEnv()
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
+
+	os.Exit(status)
 }

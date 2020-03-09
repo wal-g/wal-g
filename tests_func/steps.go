@@ -3,38 +3,54 @@ package functests
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"time"
 
 	"github.com/wal-g/wal-g/tests_func/helpers"
+	"github.com/wal-g/wal-g/tests_func/mongoload"
+	"github.com/wal-g/wal-g/tests_func/mongoload/models"
 
 	"github.com/DATA-DOG/godog/gherkin"
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
 )
 
+type TestingfWrap func(format string, args ...interface{})
+
+func (tf TestingfWrap) Errorf(format string, args ...interface{}) {
+	tf(format, args)
+}
+
 func (tctx *TestContext) sameDataCheck(dataId1, dataId2 string) error {
-	if data1, ok := tctx.AuxData.DatabaseSnap[dataId1]; ok {
-		if data2, ok := tctx.AuxData.DatabaseSnap[dataId2]; ok {
-			if !reflect.DeepEqual(data1, data2) {
+	if snap1, ok := tctx.AuxData.Snapshots[dataId1]; ok {
+		if snap2, ok := tctx.AuxData.Snapshots[dataId2]; ok {
+			if assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), snap1, snap2) {
 				return nil
 			}
-			tracelog.ErrorLogger.Printf(
-				"Data check failed:\nData %s:\n %+v\n\nData %s:\n %+v\n",
-				dataId1, data1, dataId2, data2)
-			return fmt.Errorf("expected the same data in %s and %s", dataId1, dataId2)
+			return fmt.Errorf("same snapshots expected (%s) == (%s)", dataId1, dataId2)
 		}
-		return fmt.Errorf("no data is saved for with id %s", dataId2)
+		return fmt.Errorf("no snapshot is saved for with id %s", dataId2)
 	}
-	return fmt.Errorf("no data is saved for with id %s", dataId1)
+	return fmt.Errorf("no snapshot is saved for with id %s", dataId1)
 }
 
 func (tctx *TestContext) createBackup(container string) error {
-	// backups may have the same name if less than one second has passed since the last backup
-	before := time.Now()
-	passed := before.Sub(tctx.AuxData.PreviousBackupTime)
+	host := tctx.ContainerFQDN(container)
+	beforeBackupTime, err := helpers.TimeInContainer(tctx.Context, host)
+	if err != nil {
+		return err
+	}
+
+	passed := beforeBackupTime.Sub(tctx.AuxData.PreviousBackupTime)
 	if passed < time.Second {
-		time.Sleep(time.Second - passed)
+		cmd := []string{"sleep", "1"}
+		if _, err := helpers.RunCommandStrict(tctx.Context, host, cmd); err != nil {
+			return err
+		}
 	}
 
 	walg := WalgUtilFromTestContext(tctx, container)
@@ -42,7 +58,14 @@ func (tctx *TestContext) createBackup(container string) error {
 	if err != nil {
 		return err
 	}
-	tctx.AuxData.PreviousBackupTime = before
+	tracelog.DebugLogger.Println("Backup created: ", backupId)
+
+	afterBackupTime, err := helpers.TimeInContainer(tctx.Context, host)
+	if err != nil {
+		return err
+	}
+
+	tctx.AuxData.PreviousBackupTime = afterBackupTime
 	tctx.AuxData.CreatedBackupNames = append(tctx.AuxData.CreatedBackupNames, backupId)
 	return nil
 }
@@ -106,9 +129,13 @@ func (tctx *TestContext) replayOplog(backupId int, timestampId string, container
 	}
 	from := backupMeta.MongoMeta.Before.LastMajTS
 	until := tctx.AuxData.Timestamps[timestampId]
-	s3 := S3StorageFromTestContext(tctx, tctx.S3Host())
+	tracelog.DebugLogger.Printf("Saved timestamps:\nbackup #%d majTs: %v\n%s: %v\n", backupId, from, timestampId, until)
+	until.Inc++
 
-	err = helpers.Retry(tctx.Context, 15, func() error {
+	s3 := S3StorageFromTestContext(tctx, tctx.S3Host())
+	tracelog.DebugLogger.Printf("Waiting until ts %v appears in storage", until)
+
+	err = helpers.Retry(tctx.Context, 30, func() error {
 		exists, err := s3.ArchTsExists(until)
 		if err != nil {
 			return err
@@ -122,6 +149,7 @@ func (tctx *TestContext) replayOplog(backupId int, timestampId string, container
 		return err
 	}
 
+	tracelog.DebugLogger.Printf("Starting oplog replay from %v until %v", from, until)
 	return walg.OplogReplay(from, until)
 }
 
@@ -145,18 +173,18 @@ func (tctx *TestContext) purgeDataDir(host string) error {
 	return mc.PurgeDatadir()
 }
 
-func (tctx *TestContext) saveUserData(host, dataId string) error {
+func (tctx *TestContext) saveSnapshot(host, dataId string) error {
 	mc, err := MongoCtlFromTestContext(tctx, host)
 	if err != nil {
 		return err
 	}
 
-	userData, err := mc.UserData()
+	snapshot, err := mc.Snapshot()
 	if err != nil {
 		return err
 	}
 
-	tctx.AuxData.DatabaseSnap[dataId] = userData
+	tctx.AuxData.Snapshots[dataId] = snapshot
 	return nil
 }
 
@@ -165,7 +193,7 @@ func (tctx *TestContext) saveOplogTimestamp(host, timestampId string) error {
 	if err != nil {
 		return err
 	}
-	ts, err := mc.LastTS()
+	ts, err := mc.LastMajTS()
 	if err != nil {
 		return err
 	}
@@ -274,6 +302,71 @@ func (tctx *TestContext) enableAuth(host string) error {
 	return mc.EnableAuth()
 }
 
+func (tctx *TestContext) loadMongodbOpsFromConfig(host string, loadId string) error {
+
+	ammoFile, err := os.Open(path.Join("config", loadId, "config.json"))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = ammoFile.Close() }()
+
+	expectedFile, err := os.Open(path.Join("config", loadId, "expected.json"))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = expectedFile.Close() }()
+
+	expectedData, err := ioutil.ReadAll(expectedFile)
+	if err != nil {
+		return err
+	}
+	var expectedStat models.LoadStat
+	if err := json.Unmarshal(expectedData, &expectedStat); err != nil {
+		return err
+	}
+
+	mc, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+	client, err := mc.AdminConnect()
+	if err != nil {
+		return err
+	}
+
+	currentStat, err := mongoload.HandleLoad(tctx.Context, ammoFile, client, 1)
+	if err != nil {
+		return err
+	}
+	tracelog.DebugLogger.Printf("load stat: %+v", currentStat)
+
+	if err := currentStat.GetError(); err != nil {
+		return err
+	}
+
+	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), expectedStat, currentStat) {
+		return fmt.Errorf("expected and current stat are different")
+	}
+
+	tsLast, err := mc.LastTS()
+	if err != nil {
+		return err
+	}
+
+	return helpers.Retry(tctx.Context, 10, func() error {
+		tsMaj, err := mc.LastMajTS()
+		if err != nil {
+			return err
+		}
+		if helpers.LessTS(tsMaj, tsLast) {
+			return fmt.Errorf("last maj (%v) < last ts (%v)", tsLast, tsMaj)
+		}
+		tracelog.DebugLogger.Printf("last ts (%v) == last maj (%v)\n", tsLast, tsMaj)
+
+		return nil
+	})
+}
+
 func (tctx *TestContext) fillMongodbWithTestData(host string, testId int) error {
 	mc, err := MongoCtlFromTestContext(tctx, host)
 	if err != nil {
@@ -327,18 +420,18 @@ func (tctx *TestContext) testEqualMongodbDataAtHosts(host1, host2 string) error 
 		return err
 	}
 
-	data1, err := mc1.UserData()
+	snap1, err := mc1.Snapshot()
 	if err != nil {
 		return err
 	}
-	data2, err := mc2.UserData()
+	snap2, err := mc2.Snapshot()
 	if err != nil {
 		return err
 	}
 
-	if !reflect.DeepEqual(data1, data2) {
-		tracelog.ErrorLogger.Printf("Captured data:\n%s:\n%+v\n\n%s:\n%+v\n", host1, data1, host2, data2)
+	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), snap1, snap2) {
 		return fmt.Errorf("expected the same data at hosts %s and %s", host1, host2)
 	}
+
 	return nil
 }

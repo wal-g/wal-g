@@ -9,31 +9,26 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 )
 
-const binlogFetchShortDescription = "fetches binlog from storage"
-const sinceFlagShortDescription = "backup name starting from which you want to take binlog"
-const untilFlagShortDescription = "time in RFC3339 for PITR"
-const applyFlagShortDescription = "Apply fetched binlogs"
+const fetchSinceFlagShortDescr = "backup name starting from which you want to fetch binlogs"
+const fetchUntilFlagShortDescr = "time in RFC3339 for PITR"
 
-var backupName string
-var untilDt string
-var apply bool
+var fetchBackupName string
+var fetchUntilDt string
 
 // binlogPushCmd represents the cron command
 var binlogFetchCmd = &cobra.Command{
 	Use:   "binlog-fetch",
-	Short: binlogFetchShortDescription,
+	Short: "fetches binlog from storage and save to the disk",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
-		tracelog.ErrorLogger.FatalfOnError("Failed to parse until timestamp "+untilDt, err)
-		err = mysql.HandleBinlogFetch(folder, backupName, untilDt, apply)
-		tracelog.ErrorLogger.FatalfOnError("binlog fetch failed", err)
+		tracelog.ErrorLogger.FatalOnError(err)
+		mysql.HandleBinlogFetch(folder, fetchBackupName, fetchUntilDt)
 	},
 }
 
 func init() {
-	binlogFetchCmd.PersistentFlags().StringVar(&backupName, "since", "LATEST", sinceFlagShortDescription)
-	binlogFetchCmd.PersistentFlags().StringVar(&untilDt, "until", time.Now().Format(time.RFC3339), untilFlagShortDescription)
-	binlogFetchCmd.PersistentFlags().BoolVar(&apply, "apply", false, applyFlagShortDescription)
+	binlogFetchCmd.PersistentFlags().StringVar(&fetchBackupName, "since", "LATEST", fetchSinceFlagShortDescr)
+	binlogFetchCmd.PersistentFlags().StringVar(&fetchUntilDt, "until", time.Now().Format(time.RFC3339), fetchUntilFlagShortDescr)
 	Cmd.AddCommand(binlogFetchCmd)
 }
