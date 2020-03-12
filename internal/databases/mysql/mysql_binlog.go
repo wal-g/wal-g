@@ -109,9 +109,6 @@ func (bl *BinlogReader) readEvent(buf []byte) (int, error) {
 
 func (bl *BinlogReader) Read(buf []byte) (int, error) {
 	blen := len(buf)
-	if blen < 4 {
-		panic("incoming buffer is too small") // for magic
-	}
 	// save magic and first event (aka header) into the temporary buffer
 	// and keep them until first appropriate event
 	if !bl.headerSaved {
@@ -133,10 +130,12 @@ func (bl *BinlogReader) Read(buf []byte) (int, error) {
 			}
 		}
 		// pass next event to client
-		read, err := bl.readEvent(buf[offset:])
-		offset += read
-		if err != nil || bl.tail > 0 {
-			return offset, err
+		if bl.tail > 0 {
+			read, err := bl.readEvent(buf[offset:])
+			offset += read
+			if err != nil || bl.tail > 0 {
+				return offset, err
+			}
 		}
 		// parse next event
 		hbuf, err := bl.reader.Peek(BinlogEventHeaderSize)
