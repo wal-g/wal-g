@@ -139,7 +139,7 @@ func TestReadWholeBinlogWithDifferentChunks(t *testing.T) {
 		t.Errorf("failed to read data exapmple: %v", err)
 	}
 	// read binlog through binlog reader with different input and output chunk combinations
-	variants := []int{5, 13, 967, 11087}
+	variants := []int{3, 13, 967, 11087}
 	for _, underChunk := range variants {
 		for _, overChunk := range variants {
 			_, err = binlog.Seek(0, 0)

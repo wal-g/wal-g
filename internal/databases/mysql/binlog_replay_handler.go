@@ -6,22 +6,56 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
+	"io"
 	"time"
 )
 
+const pipeChunkSize = 64 * 1024
+
+func copyFixed(dst io.Writer, src io.Reader, chunk int) error {
+	buf := make([]byte, chunk)
+	for {
+		n, err := io.ReadFull(src, buf)
+		if n > 0 {
+			_, err2 := dst.Write(buf[:n])
+			if err2 != nil {
+				return err2
+			}
+		}
+		if err == io.EOF || err == io.ErrUnexpectedEOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+	}
+}
+
 func replayHandler(logFolder storage.Folder, logName string, endTs time.Time) (needAbortFetch bool, err error) {
 	reader, err := internal.DownloadAndDecompressWALFile(logFolder, logName)
-	binlogReader := NewBinlogReader(reader, time.Unix(0, 0), endTs)
-	bufReader := bufio.NewReaderSize(binlogReader, 10*utility.Mebibyte)
+	bufReader := bufio.NewReaderSize(reader, utility.Mebibyte)
+	binlogReader := NewBinlogReader(bufReader, time.Unix(0, 0), endTs)
 	cmd, err := internal.GetCommandSetting(internal.MysqlBinlogReplayCmd)
 	if err != nil {
 		return true, err
 	}
-	cmd.Stdin = bufReader
-	tracelog.InfoLogger.Printf("replaying %s ...", logName)
-	err = cmd.Run()
+	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		tracelog.ErrorLogger.Printf("failed to replay %s: %v", logName, err)
+		return true, err
+	}
+	defer stdin.Close()
+	tracelog.InfoLogger.Printf("replaying %s ...", logName)
+	err = cmd.Start()
+	if err != nil {
+		return true, err
+	}
+	err = copyFixed(stdin, binlogReader, pipeChunkSize)
+	stdin.Close()
+	cmdErr := cmd.Wait()
+	if cmdErr != nil {
+		return true, cmdErr
+	}
+	if err != nil {
 		return true, err
 	}
 	return binlogReader.NeedAbort(), nil
