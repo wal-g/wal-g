@@ -128,7 +128,6 @@ func writeBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
 	}
 }
 
-// TODO : unit tests
 func WritePrettyBackupList(backups []BackupTime, output io.Writer) {
 	writer := table.NewWriter()
 	writer.SetOutputMirror(output)
