@@ -32,7 +32,7 @@ require (
 	github.com/jackc/pgx v3.6.0+incompatible
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/jessevdk/go-flags v1.4.0 // indirect
-	github.com/jmoiron/sqlx v1.2.0
+	github.com/jmoiron/sqlx v1.2.0 // indirect
 	github.com/mattn/go-ieproxy v0.0.0-20191113090002-7c0f6868bffe // indirect
 	github.com/mattn/go-runewidth v0.0.8 // indirect
 	github.com/minio/sio v0.2.0
@@ -52,7 +52,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.4.0
-	github.com/tinsane/tracelog v0.0.0-20190824100002-0ab2b054ff30
+	github.com/tinsane/tracelog v0.0.0-20190824100002-0ab2b054ff30 // indirect
 	github.com/ulikunitz/xz v0.5.6
 	github.com/wal-g/storages v0.0.0-20200123152726-d4de6f533d23
 	github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30
