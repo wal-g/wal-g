@@ -7,9 +7,10 @@ import (
 
 func TestNewArchive(t *testing.T) {
 	type args struct {
-		start Timestamp
-		end   Timestamp
-		ext   string
+		Start Timestamp
+		End   Timestamp
+		Ext   string
+		Type  string
 	}
 	tests := []struct {
 		name    string
@@ -18,32 +19,45 @@ func TestNewArchive(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "start > end",
+			name: "unknown_type",
 			args: args{
-				start: Timestamp{1579541543, 32},
-				end:   Timestamp{1579541443, 33},
-				ext:   "lzo",
+				Start: Timestamp{1579541143, 32},
+				End:   Timestamp{1579541443, 33},
+				Ext:   "lzo",
+				Type:  "type",
 			},
 			wantErr: true,
 		},
 		{
-			name: "start end ext",
+			name: "start_>_End",
 			args: args{
-				start: Timestamp{1579541143, 39},
-				end:   Timestamp{1579541443, 33},
-				ext:   "lzo",
+				Start: Timestamp{1579541543, 32},
+				End:   Timestamp{1579541443, 33},
+				Ext:   "lzo",
+				Type:  "oplog",
+			},
+			wantErr: true,
+		},
+		{
+			name: "start_end_ext_type",
+			args: args{
+				Start: Timestamp{1579541143, 39},
+				End:   Timestamp{1579541443, 33},
+				Ext:   "lzo",
+				Type:  "oplog",
 			},
 			want: Archive{
 				Start: Timestamp{1579541143, 39},
 				End:   Timestamp{1579541443, 33},
 				Ext:   "lzo",
+				Type:  "oplog",
 			},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewArchive(tt.args.start, tt.args.end, tt.args.ext)
+			got, err := NewArchive(tt.args.Start, tt.args.End, tt.args.Ext, tt.args.Type)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewArchive() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -150,6 +164,7 @@ func TestArchive_Filename(t *testing.T) {
 		Start Timestamp
 		End   Timestamp
 		Ext   string
+		Type  string
 	}
 	tests := []struct {
 		name   string
@@ -157,22 +172,24 @@ func TestArchive_Filename(t *testing.T) {
 		want   string
 	}{
 		{
-			name: "Archive, lzo",
+			name: "archive,_lzo",
 			fields: fields{
 				Start: Timestamp{1579541143, 39},
 				End:   Timestamp{1579541443, 33},
 				Ext:   "lzo",
+				Type:  "oplog",
 			},
 			want: "oplog_1579541143.39_1579541443.33.lzo",
 		},
 		{
-			name: "Archive, zip",
+			name: "archive,_zip",
 			fields: fields{
 				Start: Timestamp{1579543687, 1},
 				End:   Timestamp{1579543705, 2},
 				Ext:   "zip",
+				Type:  "gap",
 			},
-			want: "oplog_1579543687.1_1579543705.2.zip",
+			want: "gap_1579543687.1_1579543705.2.zip",
 		},
 	}
 	for _, tt := range tests {
@@ -181,9 +198,10 @@ func TestArchive_Filename(t *testing.T) {
 				Start: tt.fields.Start,
 				End:   tt.fields.End,
 				Ext:   tt.fields.Ext,
+				Type:  tt.fields.Type,
 			}
 			if got := a.Filename(); got != tt.want {
-				t.Errorf("Filename() = %v, want %v", got, tt.want)
+				t.Errorf("OplogFilename() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -200,7 +218,7 @@ func TestArchFromFilename(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "Filename with lzo",
+			name: "archive_lzo",
 			args: args{
 				path: "oplog_1579541143.39_1579541443.33.lzo",
 			},
@@ -208,11 +226,12 @@ func TestArchFromFilename(t *testing.T) {
 				Start: Timestamp{1579541143, 39},
 				End:   Timestamp{1579541443, 33},
 				Ext:   "lzo",
+				Type:  "oplog",
 			},
 			wantErr: false,
 		},
 		{
-			name: "Filename with zip",
+			name: "archive_zip",
 			args: args{
 				path: "oplog_1579541143.1_1579541443.2.zip",
 			},
@@ -220,25 +239,39 @@ func TestArchFromFilename(t *testing.T) {
 				Start: Timestamp{1579541143, 1},
 				End:   Timestamp{1579541443, 2},
 				Ext:   "zip",
+				Type:  "oplog",
 			},
 			wantErr: false,
 		},
 		{
-			name: "Filename without prefix",
+			name: "archive_gap",
+			args: args{
+				path: "gap_1579541143.39_1579541443.33.lzo",
+			},
+			want: Archive{
+				Start: Timestamp{1579541143, 39},
+				End:   Timestamp{1579541443, 33},
+				Ext:   "lzo",
+				Type:  "gap",
+			},
+			wantErr: false,
+		},
+		{
+			name: "archive_without_prefix",
 			args: args{
 				path: "1579541143.1_1579541443.2.zip",
 			},
 			wantErr: true,
 		},
 		{
-			name: "Filename without extension",
+			name: "archive_without_extension",
 			args: args{
 				path: "oplog_1579541143.39_1579541443.33",
 			},
 			wantErr: true,
 		},
 		{
-			name: "Filename without second TS",
+			name: "archive_without_second_TS",
 			args: args{
 				path: "oplog_1579541143.39",
 			},

@@ -45,6 +45,20 @@ func (_m *Uploader) UploadBackup(stream io.Reader, cmd archive.ErrWaiter, metaPr
 	return r0
 }
 
+// UploadGapArchive provides a mock function with given fields: err, firstTS, lastTS
+func (_m *Uploader) UploadGapArchive(err error, firstTS models.Timestamp, lastTS models.Timestamp) error {
+	ret := _m.Called(err, firstTS, lastTS)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(error, models.Timestamp, models.Timestamp) error); ok {
+		r0 = rf(err, firstTS, lastTS)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // UploadOplogArchive provides a mock function with given fields: stream, firstTS, lastTS
 func (_m *Uploader) UploadOplogArchive(stream io.Reader, firstTS models.Timestamp, lastTS models.Timestamp) error {
 	ret := _m.Called(stream, firstTS, lastTS)

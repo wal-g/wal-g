@@ -424,14 +424,31 @@ func (tctx *TestContext) testEqualMongodbDataAtHosts(host1, host2 string) error 
 	if err != nil {
 		return err
 	}
+	if !assert.NotEmpty(TestingfWrap(tracelog.ErrorLogger.Printf), snap1) {
+		return fmt.Errorf("host %s snapshot is empty: %+v", host1, snap1)
+	}
+
 	snap2, err := mc2.Snapshot()
 	if err != nil {
 		return err
 	}
+	if !assert.NotEmpty(TestingfWrap(tracelog.ErrorLogger.Printf), snap2) {
+		return fmt.Errorf("host %s snapshot is empty: %+v", host2, snap2)
+	}
+
 
 	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), snap1, snap2) {
 		return fmt.Errorf("expected the same data at hosts %s and %s", host1, host2)
 	}
 
+	return nil
+}
+
+func (tctx *TestContext) sleep (duration string) error {
+	dur, err := time.ParseDuration(duration)
+	if err != nil {
+		return err
+	}
+	time.Sleep(dur)
 	return nil
 }

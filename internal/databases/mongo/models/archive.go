@@ -9,9 +9,14 @@ import (
 
 // Archive path constants
 const (
-	archNamePrefix      = "oplog_"
-	ArchBasePath        = "oplog_" + utility.VersionStr + "/"
+	OplogArchBasePath   = "oplog_" + utility.VersionStr + "/"
 	ArchNameTSDelimiter = "_"
+	ArchiveTypeOplog    = "oplog"
+	ArchiveTypeGap      = "gap"
+)
+
+var (
+	ArchRegexp = regexp.MustCompile(`^(oplog|gap)_(?P<startTS>[0-9]+\.[0-9]+)_(?P<endTS>[0-9]+\.[0-9]+)\.(?P<Ext>[^$]+)$`)
 )
 
 // Archive defines oplog archive representation
@@ -19,14 +24,19 @@ type Archive struct {
 	Start Timestamp
 	End   Timestamp
 	Ext   string
+	Type  string
 }
 
 // NewArchive builds Archive struct with given arguments
-func NewArchive(start, end Timestamp, ext string) (Archive, error) {
+func NewArchive(start, end Timestamp, ext string, atype string) (Archive, error) {
 	if LessTS(end, start) {
 		return Archive{}, fmt.Errorf("malformed archive, Start timestamp < End timestamp: %s < %s", start, end)
 	}
-	return Archive{start, end, ext}, nil
+	if atype != ArchiveTypeOplog && atype != ArchiveTypeGap {
+		return Archive{}, fmt.Errorf("malformed archive, unknown type: %s", atype)
+	}
+
+	return Archive{start, end, ext, atype}, nil
 }
 
 // In returns if oplog with given timestamp is exists in archive
@@ -34,10 +44,10 @@ func (a Archive) In(ts Timestamp) bool {
 	return (LessTS(a.Start, ts) && LessTS(ts, a.End)) || a.End == ts
 }
 
-// Filename builds archive filename from timestamps and extension
+// Filename builds archive filename from timestamps, extension and type
 // example: oplog_1569009857.10_1569009101.99.lzma
 func (a Archive) Filename() string {
-	return fmt.Sprintf("%s%v%s%v.%s", archNamePrefix, a.Start, ArchNameTSDelimiter, a.End, a.Ext)
+	return fmt.Sprintf("%s_%v%s%v.%s", a.Type, a.Start, ArchNameTSDelimiter, a.End, a.Ext)
 }
 
 // Extension returns extension of archive file name
@@ -46,23 +56,18 @@ func (a Archive) Extension() string {
 }
 
 // ArchFromFilename builds Arch from given path
+// TODO: support empty extension
 func ArchFromFilename(path string) (Archive, error) {
-	// support empty extension
-	reStr := fmt.Sprintf(`%s(?P<startTS>%s)%s(?P<endTS>%s)\.(?P<Ext>[^$]+)$`,
-		archNamePrefix, timestampRegexp, ArchNameTSDelimiter, timestampRegexp)
-	re, err := regexp.Compile(reStr)
-	if err != nil {
-		return Archive{}, fmt.Errorf("can not compile oplog archive regexp: %w", err)
-	}
-	res := re.FindAllStringSubmatch(path, -1)
+	res := ArchRegexp.FindAllStringSubmatch(path, -1)
 	for i := range res {
-		startTS, startErr := TimestampFromStr(res[i][1])
-		endTS, endErr := TimestampFromStr(res[i][2])
-		ext := res[i][3]
+		archiveType := res[i][1]
+		startTS, startErr := TimestampFromStr(res[i][2])
+		endTS, endErr := TimestampFromStr(res[i][3])
+		ext := res[i][4]
 		if startErr != nil || endErr != nil {
 			break
 		}
-		return Archive{startTS, endTS, ext}, nil
+		return NewArchive(startTS, endTS, ext, archiveType)
 	}
 	return Archive{}, fmt.Errorf("can not parse oplog path: %s", path)
 }

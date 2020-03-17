@@ -31,6 +31,9 @@ func SequenceBetweenTS(archives []models.Archive, since, until models.Timestamp)
 
 	for i := range archives {
 		arch := archives[i]
+		if arch.Type != models.ArchiveTypeOplog {
+			continue
+		}
 		lastTSArch[arch.End] = &arch // TODO: we can have few archives with same endTS
 		if seqEnd == nil && arch.In(until) {
 			seqEnd = &arch

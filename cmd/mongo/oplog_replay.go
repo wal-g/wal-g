@@ -42,7 +42,7 @@ var oplogReplayCmd = &cobra.Command{
 		oplogApplier := oplog.NewDBApplier(mongoClient)
 
 		// set up storage downloader client
-		downloader, err := archive.NewStorageDownloader(models.ArchBasePath)
+		downloader, err := archive.NewStorageDownloader(models.OplogArchBasePath)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		// discover archive sequence to replay

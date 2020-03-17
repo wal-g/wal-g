@@ -1,9 +1,10 @@
 package mongo
 
 import (
+	"os/exec"
+
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/utility"
-	"os/exec"
 
 	"github.com/wal-g/tracelog"
 )
