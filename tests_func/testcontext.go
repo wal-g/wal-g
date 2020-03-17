@@ -185,4 +185,6 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 	s.Step(`^we delete backups retain (\d+) after "([^"]*)" timestamp via ([^\s]*)$`, tctx.purgeBackupsAfterTime)
 	s.Step(`^oplog archiving is enabled on ([^\s]*)$`, tctx.enableOplogPush)
 	s.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*)$`, tctx.replayOplog)
+
+	s.Step(`we sleep ([^\s]*)$`, tctx.sleep)
 }

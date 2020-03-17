@@ -2,5 +2,7 @@
   {"op":"c", "db":"db1", "id": 1, "dc":{ "createIndexes": "c1", "indexes": [{"key": { "f1": 1, "f2": 1 }, "name": "f1_1_f2_1" }]}},
   {"op":"c", "db":"db1", "id": 2, "dc":{ "createIndexes": "c1", "indexes": [{"key": { "f1": 1 }, "name": "f1_1", "background": true}]}},
   {"op":"c", "db":"db1", "id": 3, "dc":{ "createIndexes": "c1", "indexes": [{"key": { "key1": 1, "key2": 1 }, "name": "key1_key2_uniq", "unique": true}]}},
-  {"op":"c", "db":"db1", "id": 4, "dc":{ "dropIndexes": "c1", "index": "f1_1"}}
+  {"op":"c", "db":"db1", "id": 4, "dc":{ "dropIndexes": "c1", "index": "f1_1"}},
+  {"op": "c", "db":"admin", "id": 5, "dc": { "renameCollection": "db1.c1", "to": "db1.c2"}},
+  {"op": "c", "db":"admin", "id": 5, "dc": { "renameCollection": "db1.c2", "to": "db2.c2"}}
 ]

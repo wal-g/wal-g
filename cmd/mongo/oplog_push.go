@@ -38,14 +38,18 @@ var oplogPushCmd = &cobra.Command{
 		mongodbUrl, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
 		tracelog.ErrorLogger.FatalOnError(err)
 
+		// set up storage client
+		uploader, err := archive.NewStorageUploader(models.OplogArchBasePath)
+		tracelog.ErrorLogger.FatalOnError(err)
+
 		// set up mongodb client and oplog fetcher
 		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl)
 		tracelog.ErrorLogger.FatalOnError(err)
-		oplogFetcher := oplog.NewDBFetcher(mongoClient)
 
-		// set up storage client
-		uploader, err := archive.NewStorageUploader(models.ArchBasePath)
+		lwUpdate, err := internal.GetLastWriteUpdateInterval()
 		tracelog.ErrorLogger.FatalOnError(err)
+
+		oplogFetcher := oplog.NewDBFetcher(mongoClient, lwUpdate, oplog.NewStorageGapHandler(uploader))
 
 		// discover last archived timestamp
 		since, initial, err := archive.ArchivingResumeTS(uploader.UploadingFolder)
@@ -56,16 +60,11 @@ var oplogPushCmd = &cobra.Command{
 		}
 		tracelog.InfoLogger.Printf("Archiving last known timestamp is %s", since)
 
-		// set up oplog validator
-		lwUpdate, err := internal.GetLastWriteUpdateInterval()
-		tracelog.ErrorLogger.FatalOnError(err)
-		oplogValidator := oplog.NewDBValidator(ctx, since, lwUpdate, mongoClient)
-
 		// set up storage archiver
 		oplogApplier := oplog.NewStorageApplier(uploader, archiveAfterSize, archiveTimeout)
 
 		// run working cycle
-		err = mongo.HandleOplogPush(ctx, since, oplogFetcher, oplogValidator, oplogApplier)
+		err = mongo.HandleOplogPush(ctx, since, oplogFetcher, oplogApplier)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

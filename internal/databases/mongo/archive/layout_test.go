@@ -29,33 +29,40 @@ func copyArchives(a []models.Archive) []models.Archive {
 
 var (
 	continuousArchives = []models.Archive{
-		{Start: models.Timestamp{TS: 1579000001, Inc: 1}, End: models.Timestamp{TS: 1579001001, Inc: 2}, Ext: "br"},
-		{Start: models.Timestamp{TS: 1579001001, Inc: 2}, End: models.Timestamp{TS: 1579002001, Inc: 1}, Ext: "br"},
-		{Start: models.Timestamp{TS: 1579002001, Inc: 1}, End: models.Timestamp{TS: 1579002001, Inc: 99}, Ext: "br"},
-		{Start: models.Timestamp{TS: 1579002001, Inc: 99}, End: models.Timestamp{TS: 1579003001, Inc: 3}, Ext: "br"},
-		{Start: models.Timestamp{TS: 1579003001, Inc: 3}, End: models.Timestamp{TS: 1579004001, Inc: 2}, Ext: "br"},
+		{Start: models.Timestamp{TS: 1579000001, Inc: 1}, End: models.Timestamp{TS: 1579001001, Inc: 2}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579001001, Inc: 2}, End: models.Timestamp{TS: 1579002001, Inc: 1}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579002001, Inc: 1}, End: models.Timestamp{TS: 1579002001, Inc: 99}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579002001, Inc: 99}, End: models.Timestamp{TS: 1579003001, Inc: 3}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579003001, Inc: 3}, End: models.Timestamp{TS: 1579004001, Inc: 2}, Ext: "br", Type: "oplog"},
 	}
 	continuousArchivesOverlappedFirst = []models.Archive{
-		{Start: models.Timestamp{TS: 1579000001, Inc: 1}, End: models.Timestamp{TS: 1579001001, Inc: 2}, Ext: "br"},
-		{Start: models.Timestamp{TS: 1579000001, Inc: 1}, End: models.Timestamp{TS: 1579002001, Inc: 3}, Ext: "br"},
-		{Start: models.Timestamp{TS: 1579001001, Inc: 2}, End: models.Timestamp{TS: 1579002001, Inc: 1}, Ext: "br"},
-		{Start: models.Timestamp{TS: 1579002001, Inc: 1}, End: models.Timestamp{TS: 1579002001, Inc: 99}, Ext: "br"},
-		{Start: models.Timestamp{TS: 1579002001, Inc: 99}, End: models.Timestamp{TS: 1579003001, Inc: 3}, Ext: "br"},
-		{Start: models.Timestamp{TS: 1579003001, Inc: 3}, End: models.Timestamp{TS: 1579004001, Inc: 2}, Ext: "br"},
+		{Start: models.Timestamp{TS: 1579000001, Inc: 1}, End: models.Timestamp{TS: 1579001001, Inc: 2}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579000001, Inc: 1}, End: models.Timestamp{TS: 1579002001, Inc: 3}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579001001, Inc: 2}, End: models.Timestamp{TS: 1579002001, Inc: 1}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579002001, Inc: 1}, End: models.Timestamp{TS: 1579002001, Inc: 99}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579002001, Inc: 99}, End: models.Timestamp{TS: 1579003001, Inc: 3}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579003001, Inc: 3}, End: models.Timestamp{TS: 1579004001, Inc: 2}, Ext: "br", Type: "oplog"},
 	}
 	continuousArchivesOverlappedMiddle = []models.Archive{
-		{Start: models.Timestamp{TS: 1579000001, Inc: 1}, End: models.Timestamp{TS: 1579001001, Inc: 2}, Ext: "br"},
-		{Start: models.Timestamp{TS: 1579001001, Inc: 2}, End: models.Timestamp{TS: 1579002001, Inc: 1}, Ext: "br"},
-		{Start: models.Timestamp{TS: 1579002001, Inc: 1}, End: models.Timestamp{TS: 1579002001, Inc: 99}, Ext: "br"},
-		{Start: models.Timestamp{TS: 1579002001, Inc: 99}, End: models.Timestamp{TS: 1579003001, Inc: 3}, Ext: "br"},
-		{Start: models.Timestamp{TS: 1579002001, Inc: 1}, End: models.Timestamp{TS: 1579002010, Inc: 1}, Ext: "br"},
-		{Start: models.Timestamp{TS: 1579003001, Inc: 3}, End: models.Timestamp{TS: 1579004001, Inc: 2}, Ext: "br"},
+		{Start: models.Timestamp{TS: 1579000001, Inc: 1}, End: models.Timestamp{TS: 1579001001, Inc: 2}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579001001, Inc: 2}, End: models.Timestamp{TS: 1579002001, Inc: 1}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579002001, Inc: 1}, End: models.Timestamp{TS: 1579002001, Inc: 99}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579002001, Inc: 99}, End: models.Timestamp{TS: 1579003001, Inc: 3}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579002001, Inc: 1}, End: models.Timestamp{TS: 1579002010, Inc: 1}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579003001, Inc: 3}, End: models.Timestamp{TS: 1579004001, Inc: 2}, Ext: "br", Type: "oplog"},
 	}
 	gapArchives = []models.Archive{
-		{Start: models.Timestamp{TS: 1579000001, Inc: 1}, End: models.Timestamp{TS: 1579001001, Inc: 2}, Ext: "br"},
-		{Start: models.Timestamp{TS: 1579001001, Inc: 2}, End: models.Timestamp{TS: 1579002001, Inc: 1}, Ext: "br"},
-		{Start: models.Timestamp{TS: 1579002001, Inc: 99}, End: models.Timestamp{TS: 1579003001, Inc: 3}, Ext: "br"},
-		{Start: models.Timestamp{TS: 1579003001, Inc: 3}, End: models.Timestamp{TS: 1579004001, Inc: 2}, Ext: "br"},
+		{Start: models.Timestamp{TS: 1579000001, Inc: 1}, End: models.Timestamp{TS: 1579001001, Inc: 2}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579001001, Inc: 2}, End: models.Timestamp{TS: 1579002001, Inc: 1}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579002001, Inc: 99}, End: models.Timestamp{TS: 1579003001, Inc: 3}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579003001, Inc: 3}, End: models.Timestamp{TS: 1579004001, Inc: 2}, Ext: "br", Type: "oplog"},
+	}
+	gapArchivesWithMarks = []models.Archive{
+		{Start: models.Timestamp{TS: 1579000001, Inc: 1}, End: models.Timestamp{TS: 1579001001, Inc: 2}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579001001, Inc: 2}, End: models.Timestamp{TS: 1579002001, Inc: 1}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579002001, Inc: 1}, End: models.Timestamp{TS: 1579002001, Inc: 98}, Ext: "br", Type: "gap"},
+		{Start: models.Timestamp{TS: 1579002001, Inc: 99}, End: models.Timestamp{TS: 1579003001, Inc: 3}, Ext: "br", Type: "oplog"},
+		{Start: models.Timestamp{TS: 1579003001, Inc: 3}, End: models.Timestamp{TS: 1579004001, Inc: 2}, Ext: "br", Type: "oplog"},
 	}
 )
 
@@ -250,10 +257,45 @@ func TestSequenceBetweenTSGaps(t *testing.T) {
 	}
 }
 
+func TestSequenceBetweenTSMarkedGaps(t *testing.T) {
+	type args struct {
+		since models.Timestamp
+		until models.Timestamp
+	}
+
+	archivesCases := map[string][]models.Archive{
+		"gap archives": shuffledArchives(gapArchivesWithMarks),
+	}
+
+	tests := []struct {
+		name string
+		args args
+		err  error
+	}{
+		{
+			name: "error: ts are borders of archives",
+			args: args{
+				since: models.Timestamp{TS: 1579000001, Inc: 2},
+				until: models.Timestamp{TS: 1579004001, Inc: 2},
+			},
+			err: fmt.Errorf("previous archive in sequence with last ts '1579002001.99' does not exist"),
+		},
+	}
+
+	for _, tt := range tests {
+		for archivesDesc, archives := range archivesCases {
+			t.Run(fmt.Sprintf("%s; %s", tt.name, archivesDesc), func(t *testing.T) {
+				_, err := SequenceBetweenTS(archives, tt.args.since, tt.args.until)
+				assert.EqualError(t, err, tt.err.Error())
+			})
+		}
+	}
+}
+
 var (
-	arch1 = models.Archive{Start: models.Timestamp{TS: 1579881975, Inc: 1}, End: models.Timestamp{TS: 1579881985, Inc: 2}, Ext: "br"}
-	arch2 = models.Archive{Start: models.Timestamp{TS: 1579881985, Inc: 2}, End: models.Timestamp{TS: 1579882985, Inc: 1}, Ext: "br"}
-	arch3 = models.Archive{Start: models.Timestamp{TS: 1579882985, Inc: 1}, End: models.Timestamp{TS: 1579882985, Inc: 99}, Ext: "br"}
+	arch1 = models.Archive{Start: models.Timestamp{TS: 1579881975, Inc: 1}, End: models.Timestamp{TS: 1579881985, Inc: 2}, Ext: "br", Type: "oplog"}
+	arch2 = models.Archive{Start: models.Timestamp{TS: 1579881985, Inc: 2}, End: models.Timestamp{TS: 1579882985, Inc: 1}, Ext: "br", Type: "oplog"}
+	arch3 = models.Archive{Start: models.Timestamp{TS: 1579882985, Inc: 1}, End: models.Timestamp{TS: 1579882985, Inc: 99}, Ext: "br", Type: "oplog"}
 )
 
 func TestSequence_Reverse(t *testing.T) {

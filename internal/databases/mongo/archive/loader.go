@@ -2,10 +2,12 @@ package archive
 
 import (
 	"fmt"
+	"io"
+	"strings"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"
-	"io"
 
 	"github.com/wal-g/storages/storage"
 )
@@ -18,6 +20,7 @@ type ErrWaiter interface {
 // Uploader defines interface to store mongodb backups and oplog archives
 type Uploader interface {
 	UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error // TODO: rename firstTS
+	UploadGapArchive(err error, firstTS, lastTS models.Timestamp) error
 	UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider BackupMetaProvider) error
 	FileExtension() string
 }
@@ -100,12 +103,29 @@ func NewStorageUploader(path string) (*StorageUploader, error) {
 
 // UploadOplogArchive compresses a stream and uploads it with given archive name.
 func (su *StorageUploader) UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error {
-	arch, err := models.NewArchive(firstTS, lastTS, su.FileExtension())
+	arch, err := models.NewArchive(firstTS, lastTS, su.FileExtension(), models.ArchiveTypeOplog)
 	if err != nil {
 		return fmt.Errorf("can not build archive: %w", err)
 	}
 
 	if err := su.PushStreamToDestination(stream, arch.Filename()); err != nil {
+		return fmt.Errorf("error while uploading stream: %w", err)
+	}
+	return nil
+}
+
+// UploadGap uploads mark indicating archiving gap.
+func (su *StorageUploader) UploadGapArchive(archErr error, firstTS, lastTS models.Timestamp) error {
+	if archErr == nil {
+		return fmt.Errorf("archErr must not be nil")
+	}
+
+	arch, err := models.NewArchive(firstTS, lastTS, su.FileExtension(), models.ArchiveTypeGap)
+	if err != nil {
+		return fmt.Errorf("can not build archive: %w", err)
+	}
+
+	if err := su.PushStreamToDestination(strings.NewReader(archErr.Error()), arch.Filename()); err != nil {
 		return fmt.Errorf("error while uploading stream: %w", err)
 	}
 	return nil

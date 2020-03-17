@@ -146,10 +146,11 @@ func NewStorageApplier(uploader archive.Uploader, archiveAfterSize int, archiveT
 }
 
 // Apply runs working cycle that sends oplog records to storage.
+// TODO: rename models.Oplog to something like models.Message
 func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan models.Oplog, wg *sync.WaitGroup) (chan error, error) {
 	archiveTimer := time.NewTimer(sa.timeout)
 	var lastKnownTS, batchStartTs models.Timestamp
-	isFirstBatch := true
+	restartBatch := true
 
 	errc := make(chan error)
 	wg.Add(1)
@@ -166,11 +167,10 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan models.Oplog, w
 					oplogc = nil
 					break
 				}
-				if isFirstBatch {
+				if restartBatch {
 					batchStartTs = op.TS
-					isFirstBatch = false
+					restartBatch = false
 				}
-
 				lastKnownTS = op.TS
 				buf.Write(op.Data)
 				if buf.Len() < sa.size {
@@ -190,7 +190,7 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan models.Oplog, w
 			// TODO: switch to PushStreamToDestination (async api)
 			// upload and rename (because we don't know last ts of uploading batch)
 			if err := sa.uploader.UploadOplogArchive(&buf, batchStartTs, lastKnownTS); err != nil {
-				errc <- fmt.Errorf("can not upload archive: %w", err)
+				errc <- fmt.Errorf("can not upload oplog archive: %w", err)
 				return
 			}
 
