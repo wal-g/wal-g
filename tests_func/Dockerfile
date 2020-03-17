@@ -36,5 +36,5 @@ COPY staging/wal-g ${WALG_REPO}/
 WORKDIR ${WALG_REPO}
 
 RUN make link_external_deps
-RUN make mongo_build && \
+RUN make BUILD_ARGS=-race mongo_build && \
     cp main/mongo/wal-g /usr/bin/wal-g
