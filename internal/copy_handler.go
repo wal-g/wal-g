@@ -4,16 +4,15 @@ import (
 	"path"
 	"strings"
 
-	"github.com/spf13/viper"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
-// HandleCopy copy backups from current storage to another
+// HandleCopy copy specific or all backups from one storage to another
 func HandleCopy(fromConfigFile string, toConfigFile string, backupName string) {
-	var fromFolder, fromError = configureFolderFromConfig(fromConfigFile)
-	var toFolder, toError = configureFolderFromConfig(toConfigFile)
+	var fromFolder, fromError = ConfigureFolderFromConfig(fromConfigFile)
+	var toFolder, toError = ConfigureFolderFromConfig(toConfigFile)
 	if fromError != nil || toError != nil {
 		return
 	}
@@ -31,11 +30,11 @@ func HandleCopy(fromConfigFile string, toConfigFile string, backupName string) {
 		return
 	}
 
-	copyBaseBackup(backup, fromFolder, toFolder)
+	copyBackup(backup, fromFolder, toFolder)
 	copyWals(fromFolder, toFolder)
 }
 
-func copyBaseBackup(backup *Backup, from storage.Folder, to storage.Folder) {
+func copyBackup(backup *Backup, from storage.Folder, to storage.Folder) {
 	tracelog.InfoLogger.Print("Copy base backup")
 	var backupPrefix = path.Join(utility.BaseBackupPath, backup.Name)
 	var objects, err = storage.ListFolderRecursively(from)
@@ -66,18 +65,4 @@ func copyObject(object storage.Object, from storage.Folder, to storage.Folder) {
 	var readCloser, _ = from.ReadObject(object.GetName())
 	var filename = path.Join(from.GetPath(), object.GetName())
 	to.PutObject(filename, readCloser)
-}
-
-func configureFolderFromConfig(configFile string) (storage.Folder, error) {
-	var config = viper.New()
-	SetDefaultValues(config)
-	ReadConfigFromFile(config, configFile)
-	CheckAllowedSettings(config)
-
-	var folder, err = ConfigureFolderForSpecificConfig(config)
-	if err != nil {
-		tracelog.ErrorLogger.Println("Failed configure folder according to config " + configFile)
-		tracelog.ErrorLogger.FatalError(err)
-	}
-	return folder, err
 }

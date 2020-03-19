@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/spf13/viper"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 )
 
@@ -288,4 +289,18 @@ func CheckAllowedSettings(config *viper.Viper) {
 		tracelog.WarningLogger.Println("We found that some variables in your config file detected as 'Unknown'. \n  " +
 			"If this is not right, please create issue https://github.com/wal-g/wal-g/issues/new")
 	}
+}
+
+func ConfigureFolderFromConfig(configFile string) (storage.Folder, error) {
+	var config = viper.New()
+	SetDefaultValues(config)
+	ReadConfigFromFile(config, configFile)
+	CheckAllowedSettings(config)
+
+	var folder, err = ConfigureFolderForSpecificConfig(config)
+	if err != nil {
+		tracelog.ErrorLogger.Println("Failed configure folder according to config " + configFile)
+		tracelog.ErrorLogger.FatalError(err)
+	}
+	return folder, err
 }
