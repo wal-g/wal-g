@@ -18,7 +18,7 @@ var (
 		Short: catchupPushShortDescription,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			uploader, err := internal.ConfigureUploader()
+			uploader, err := internal.ConfigureWalUploader()
 			tracelog.ErrorLogger.FatalOnError(err)
 			internal.HandleCatchupPush(uploader, args[0], fromLSN)
 		},

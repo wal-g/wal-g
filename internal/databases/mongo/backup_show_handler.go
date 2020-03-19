@@ -7,7 +7,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 )
 
-// HandleStreamPush prints sentinel contents.
+// HandleBackupPush prints sentinel contents.
 func HandleBackupShow(downloader archive.Downloader, backup string, marshaller archive.SentinelMarshalFunc, output io.Writer) error {
 	sentinel, err := downloader.Sentinel(backup)
 	if err != nil {

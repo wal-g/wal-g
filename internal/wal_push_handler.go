@@ -27,7 +27,7 @@ func (err CantOverwriteWalFileError) Error() string {
 
 // TODO : unit tests
 // HandleWALPush is invoked to perform wal-g wal-push
-func HandleWALPush(uploader *Uploader, walFilePath string) {
+func HandleWALPush(uploader *WalUploader, walFilePath string) {
 	if uploader.ArchiveStatusManager.isWalAlreadyUploaded(walFilePath) {
 		err := uploader.ArchiveStatusManager.unmarkWalFile(walFilePath)
 
@@ -52,13 +52,13 @@ func HandleWALPush(uploader *Uploader, walFilePath string) {
 
 	bgUploader.Stop()
 	if uploader.getUseWalDelta() {
-		uploader.deltaFileManager.FlushFiles(uploader.clone())
+		uploader.FlushFiles()
 	}
 } //
 
 // TODO : unit tests
 // uploadWALFile from FS to the cloud
-func uploadWALFile(uploader *Uploader, walFilePath string, preventWalOverwrite bool) error {
+func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrite bool) error {
 	if preventWalOverwrite {
 		overwriteAttempt, err := checkWALOverwrite(uploader, walFilePath)
 		if overwriteAttempt {
@@ -76,7 +76,7 @@ func uploadWALFile(uploader *Uploader, walFilePath string, preventWalOverwrite b
 }
 
 // TODO : unit tests
-func checkWALOverwrite(uploader *Uploader, walFilePath string) (overwriteAttempt bool, err error) {
+func checkWALOverwrite(uploader *WalUploader, walFilePath string) (overwriteAttempt bool, err error) {
 	walFileReader, err := DownloadAndDecompressWALFile(uploader.UploadingFolder, filepath.Base(walFilePath))
 	if err != nil {
 		if _, ok := err.(ArchiveNonExistenceError); ok {

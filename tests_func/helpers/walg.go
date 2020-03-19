@@ -124,15 +124,7 @@ func (w *WalgUtil) FetchBackupByNum(backupNum int) error {
 	if backupNum >= len(backups) {
 		return fmt.Errorf("only %d backups exists, backup #%d is not found", len(backups), backupNum)
 	}
-
-	walgCommand := []string{w.cliPath, "--config", w.confPath, "backup-fetch", backups[backupNum]}
-	mongoCommand := []string{"|", "mongorestore", "--archive", "--preserveUUID", "--drop", "--uri=\"mongodb://admin:password@127.0.0.1:27018\""}
-	if w.mongoMaj == "3.6" {  // TODO: refactor
-		mongoCommand = []string{"|", "mongorestore", "--archive", "--drop", "--uri=\"mongodb://admin:password@127.0.0.1:27018\""}
-	}
-	command := strings.Join(append(walgCommand, mongoCommand...), " ")
-	_, err = RunCommandStrict(w.ctx, w.host, []string{"bash", "-c", command})
-
+	_, err = w.runCmd([]string{"backup-fetch", backups[backupNum]})
 	return err
 }
 

@@ -1,14 +1,14 @@
 package mongo
 
 import (
-	"os"
-	"syscall"
 	"context"
 	"encoding/json"
+	"os"
+	"syscall"
 
-	"github.com/wal-g/wal-g/utility"
-	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"

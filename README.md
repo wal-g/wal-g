@@ -14,7 +14,7 @@ WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4
 - [Development](#development)
 	- [Installing](#installing)
 	- [Testing](#testing)
-	- [Development on windows](#Development on Windows) 
+	- [Development on windows](#development-on-windows) 
 - [Authors](#authors)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)

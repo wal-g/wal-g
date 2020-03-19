@@ -11,7 +11,7 @@ func extendExcludedFiles() {
 }
 
 // HandleCatchupPush is invoked to perform a wal-g catchup-push
-func HandleCatchupPush(uploader *Uploader, archiveDirectory string, fromLSN uint64) {
+func HandleCatchupPush(uploader *WalUploader, archiveDirectory string, fromLSN uint64) {
 	archiveDirectory = utility.ResolveSymlink(archiveDirectory)
 	checkPgVersionAndPgControl(archiveDirectory)
 
