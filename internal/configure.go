@@ -1,12 +1,13 @@
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -201,24 +202,54 @@ func ConfigureArchiveStatusManager() (DataFolder, error) {
 // that a valid session has started; if invalid, returns AWS error
 // and `<nil>` values.
 func ConfigureUploader() (uploader *Uploader, err error) {
-	uploader, err = ConfigureMockUploaderWithoutCompressMethod()
+	uploader, err = ConfigureUploaderWithoutCompressMethod()
 	if err != nil {
 		return nil, err
 	}
 
 	folder := uploader.UploadingFolder
-	deltaFileManager := uploader.deltaFileManager
 
 	compressor, err := configureCompressor()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure compression")
 	}
 
-	uploader = NewUploader(compressor, folder, deltaFileManager)
+	uploader = NewUploader(compressor, folder)
 	return uploader, err
 }
 
-func ConfigureMockUploaderWithoutCompressMethod() (uploader *Uploader, err error) {
+// ConfigureWalUploader connects to storage and creates an uploader. It makes sure
+// that a valid session has started; if invalid, returns AWS error
+// and `<nil>` values.
+func ConfigureWalUploader() (uploader *WalUploader, err error) {
+	uploader, err = ConfigureWalUploaderWithoutCompressMethod()
+	if err != nil {
+		return nil, err
+	}
+
+	folder := uploader.UploadingFolder
+	deltaFileManager := uploader.DeltaFileManager
+
+	compressor, err := configureCompressor()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure compression")
+	}
+
+	uploader = NewWalUploader(compressor, folder, deltaFileManager)
+	return uploader, err
+}
+
+func ConfigureUploaderWithoutCompressMethod() (uploader *Uploader, err error) {
+	folder, err := ConfigureFolder()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure folder")
+	}
+
+	uploader = NewUploader(nil, folder)
+	return uploader, err
+}
+
+func ConfigureWalUploaderWithoutCompressMethod() (uploader *WalUploader, err error) {
 	folder, err := ConfigureFolder()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure folder")
@@ -234,7 +265,7 @@ func ConfigureMockUploaderWithoutCompressMethod() (uploader *Uploader, err error
 		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
 	}
 
-	uploader = NewUploader(nil, folder, deltaFileManager)
+	uploader = NewWalUploader(nil, folder, deltaFileManager)
 	return uploader, err
 }
 
@@ -312,39 +343,28 @@ func GetSentinelUserData() interface{} {
 	return out
 }
 
-func getCommandFromEnvAndParse(variableName string) ([]string, error) {
+func GetCommandSettingContext(ctx context.Context, variableName string) (*exec.Cmd, error) {
 	dataStr, ok := GetSetting(variableName)
 	if !ok {
 		tracelog.InfoLogger.Printf("command %s not configured", variableName)
-		return []string{}, errors.New("command not configured")
+		return nil, errors.New("command not configured")
 	}
 	if len(dataStr) == 0 {
 		tracelog.ErrorLogger.Print(variableName + " expected.")
 		return nil, errors.New(variableName + " not configured")
 	}
-	return strings.Fields(dataStr), nil
-}
-
-func GetStreamCreateCmd() []string {
-	// ignore error here explicitly to backward comparability
-	val, _ := getCommandFromEnvAndParse(NameStreamCreateCmd)
-	return val
-}
-
-func GetStreamRestoreCmd() ([]string, error) {
-	val, err := getCommandFromEnvAndParse(NameStreamRestoreCmd)
-	if err != nil {
-		return nil, err
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/sh"
 	}
-	return val, nil
+	cmd := exec.CommandContext(ctx, shell, "-c", dataStr)
+	// do not shut up subcommands by default
+	cmd.Stderr = os.Stderr
+	return cmd, nil
 }
 
-func GetLogApplyCmd() ([]string, error) {
-	val, err := getCommandFromEnvAndParse(NameLogApplyCmdPath)
-	if err != nil {
-		return nil, err
-	}
-	return val, nil
+func GetCommandSetting(variableName string) (*exec.Cmd, error) {
+	return GetCommandSettingContext(context.Background(), variableName)
 }
 
 func GetOplogArchiveTimeout() (time.Duration, error) {

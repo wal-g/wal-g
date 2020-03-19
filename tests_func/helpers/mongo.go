@@ -389,7 +389,7 @@ func (mc *MongoCtl) EnableAuth() error {
 
 	if strings.Contains(response.Combined(), "command createUser requires authentication") ||
 		strings.Contains(response.Combined(), "couldn't add user: not authorized on admin to execute command") ||
-		strings.Contains(response.Combined(), "there are no users authenticated"){
+		strings.Contains(response.Combined(), "there are no users authenticated") {
 		return nil
 	}
 	if !strings.Contains(response.Combined(), "Successfully added user") {

@@ -1,10 +1,12 @@
 package internal
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os/exec"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/storages/storage"
@@ -83,6 +85,24 @@ func GetPgFetcher(dbDataDirectory, fileMask, restoreSpecPath string) func(folder
 func GetStreamFetcher(writeCloser io.WriteCloser) func(folder storage.Folder, backup Backup) {
 	return func(folder storage.Folder, backup Backup) {
 		err := downloadAndDecompressStream(&backup, writeCloser)
+		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+	}
+}
+
+func GetCommandStreamFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup Backup) {
+	return func(folder storage.Folder, backup Backup) {
+		stdin, err := cmd.StdinPipe()
+		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+		stderr := &bytes.Buffer{}
+		cmd.Stderr = stderr
+		err = cmd.Start()
+		tracelog.ErrorLogger.FatalfOnError("Failed to start restore command: %v\n", err)
+		err = downloadAndDecompressStream(&backup, stdin)
+		cmdErr := cmd.Wait()
+		if cmdErr != nil {
+			tracelog.ErrorLogger.Printf("Restore command output:\n%s", stderr.String())
+			err = cmdErr
+		}
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 	}
 }

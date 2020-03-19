@@ -8,7 +8,7 @@
   "AWS_S3_FORCE_PATH_STYLE": "true",
 
   "WALG_STREAM_CREATE_COMMAND": "mongodump --archive --uri=\"mongodb://admin:password@127.0.0.1:27018\"",
-  "WALG_STREAM_RESTORE_COMMAND": "mongorestore --archive  --preserveUUID --drop --uri=\"mongodb://admin:password@127.0.0.1:27018\"",
+  "WALG_STREAM_RESTORE_COMMAND": "mongorestore --archive  --drop --uri=\"mongodb://admin:password@127.0.0.1:27018\"",
   "MONGODB_URI": "mongodb://admin:password@127.0.0.1:27018/admin?authSource=admin&keepAlive=true&autoReconnect=true&socketTimeoutMS=3000&connectTimeoutMS=3000&readPreference=primary&connect=direct",
 
   "WALG_SENTINEL_USER_DATA":    "{\"key\": \"value\"}",

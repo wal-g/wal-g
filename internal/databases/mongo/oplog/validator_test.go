@@ -34,8 +34,14 @@ func SetupMongoDriverMock() *mongoMocks.MongoDriver {
 		TS:  uint32(time.Now().Add(24 * time.Hour).Unix()),
 		Inc: 0,
 	}
-	md.On("LastWriteTS", mock.Anything, mock.Anything).Return(
-		ts, ts, nil)
+	md.On("IsMaster", mock.Anything, mock.Anything).Return(
+		models.IsMaster{
+			IsMaster:  true,
+			LastWrite: models.IsMasterLastWrite{
+				OpTime: models.OpTime{TS: ts},
+				MajorityOpTime: models.OpTime{TS: ts},
+			},
+		}, nil)
 	return md
 }
 

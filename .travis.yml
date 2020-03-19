@@ -133,13 +133,16 @@ notifications:
 
 before_deploy:
   - tar -zcf wal-g.linux-amd64.tar.gz -C main/pg wal-g
+  - sha256sum wal-g.linux-amd64.tar.gz > wal-g.linux-amd64.tar.gz.sha256
 
 deploy:
   provider: releases
   api_key:
     secure: nRVV5uKaBdCi/J/sLP7+c/shuDEaSeMiapEsro5gp4gr8n/QMgGm5AHNZhkfQVBmhmaKNB7dDzg34RVD2qacVpeZQTTUWetorBiwWvSjf+mlVcmBPKOIivamqetIdMEPgGQ0vudDADMpYiiqWBV893vAg1w0x02Cz7yvduzKEDyVttH+P4A7MPZ9tPtwLyMoOKjxe7Z0IOp82DK0rj+2KXQYe+El9Ipya+2WB88NBuRn2dJSfsAx9VI+5VmUz0waB1lP3ityjgQpaL13QEV6qsCXl+ntb4vGACbPYoPt0pgesq/zkL2ScFKTbzSSo6yByf3zHhV+elZ2sXnK/UYrqe4erC3qkG5qiTuy+uzPKg0pOVdqI1kDtMNoIanCjSVblXXsR+vz0UVHbzOmTMm7ckpnMB1nxsSyaQfs1C2e42SCgIB57RJsWUSsRx/Uq9iJS32ab/8pSnzJ2dZLNo4BxNHJDgKpmfj6ZKhBne+JUcfBsx2DOXs1ad9s0+ahpnlLiijhQQ5ZxGTfzYcXjijtAOyN2Y42wU6YI3L7ezsZTw+AoJeBMdc2MM8yy1CI/PM0x5IL+e9cZ+LoL87f0WZFxMd0KYblEeQzL+yRv0M5cRf4GPgqgEFsYUU4WXAH6Fnah2dailOvkfV1ygbaTxjvrSiIDnk0DKls3y8QLwSJPLw=
   skip_cleanup: true
-  file: wal-g.linux-amd64.tar.gz
+  file:
+    - wal-g.linux-amd64.tar.gz
+    - wal-g.linux-amd64.tar.gz.sha256
   on:
     repo: wal-g/wal-g
     tags: true

@@ -2,7 +2,6 @@ package internal
 
 import (
 	"io"
-	"path"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -19,7 +18,6 @@ type Uploader struct {
 	UploadingFolder      storage.Folder
 	Compressor           compression.Compressor
 	waitGroup            *sync.WaitGroup
-	deltaFileManager     *DeltaFileManager
 	ArchiveStatusManager ArchiveStatusManager
 	Failed               atomic.Value
 	tarSize              *int64
@@ -31,22 +29,16 @@ type UploadObject struct {
 	Content io.Reader
 }
 
-func (uploader *Uploader) getUseWalDelta() (useWalDelta bool) {
-	return uploader.deltaFileManager != nil
-}
-
 func NewUploader(
 	compressor compression.Compressor,
 	uploadingLocation storage.Folder,
-	deltaFileManager *DeltaFileManager,
 ) *Uploader {
 	size := int64(0)
 	uploader := &Uploader{
-		UploadingFolder:  uploadingLocation,
-		Compressor:       compressor,
-		waitGroup:        &sync.WaitGroup{},
-		deltaFileManager: deltaFileManager,
-		tarSize:          &size,
+		UploadingFolder: uploadingLocation,
+		Compressor:      compressor,
+		waitGroup:       &sync.WaitGroup{},
+		tarSize:         &size,
 	}
 	uploader.Failed.Store(false)
 	return uploader
@@ -67,31 +59,10 @@ func (uploader *Uploader) clone() *Uploader {
 		uploader.UploadingFolder,
 		uploader.Compressor,
 		&sync.WaitGroup{},
-		uploader.deltaFileManager,
 		uploader.ArchiveStatusManager,
 		uploader.Failed,
 		uploader.tarSize,
 	}
-}
-
-// TODO : unit tests
-func (uploader *Uploader) UploadWalFile(file NamedReader) error {
-	var walFileReader io.Reader
-
-	filename := path.Base(file.Name())
-	if uploader.getUseWalDelta() && isWalFilename(filename) {
-		recordingReader, err := NewWalDeltaRecordingReader(file, filename, uploader.deltaFileManager)
-		if err != nil {
-			walFileReader = file
-		} else {
-			walFileReader = recordingReader
-			defer utility.LoggedClose(recordingReader, "")
-		}
-	} else {
-		walFileReader = file
-	}
-
-	return uploader.UploadFile(newNamedReaderImpl(walFileReader, file.Name()))
 }
 
 // TODO : unit tests

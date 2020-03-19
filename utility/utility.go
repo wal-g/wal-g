@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path"
 	"path/filepath"
@@ -306,4 +307,18 @@ func MergeErrors(cs ...<-chan error) <-chan error {
 		close(out)
 	}()
 	return out
+}
+
+func StartCommandWithStdoutStderr(cmd *exec.Cmd) (io.ReadCloser, *bytes.Buffer, error) {
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, nil, err
+	}
+	stderr := &bytes.Buffer{}
+	cmd.Stderr = stderr
+	err = cmd.Start()
+	if err != nil {
+		return nil, nil, err
+	}
+	return stdout, stderr, err
 }

@@ -30,7 +30,7 @@ type BgUploader struct {
 	started map[string]interface{}
 
 	// uploading structure
-	uploader *Uploader
+	uploader *WalUploader
 
 	// to control amount of work done in one cycle of archive_command
 	totalUploaded int32
@@ -40,7 +40,7 @@ type BgUploader struct {
 	preventWalOverwrite bool
 }
 
-func NewBgUploader(walFilePath string, maxParallelWorkers int32, uploader *Uploader, preventWalOverwrite bool) *BgUploader {
+func NewBgUploader(walFilePath string, maxParallelWorkers int32, uploader *WalUploader, preventWalOverwrite bool) *BgUploader {
 	started := make(map[string]interface{})
 	started[filepath.Base(walFilePath)+readySuffix] = walFilePath
 	return &BgUploader{

@@ -2,67 +2,62 @@
 set -e -x
 
 . /usr/local/export_common.sh
-export WALE_S3_PREFIX=s3://mysqlbinlogapplyuntilbucket
-export WALG_STREAM_RESTORE_COMMAND="xtrabackup --prepare --target-dir=${MYSQLDATA}"
-export WALG_LOG_APPLY_COMMAND=/root/testtools/test_apply.sh
 
-add_test_data() {
-  mysql -u sbtest -h localhost -e "
-  USE sbtest;
-  CREATE TABLE example ( id smallint unsigned not null auto_increment, name varchar(20) not null, constraint pk_example primary key (id) );
-  INSERT INTO example ( id, name ) VALUES ( null, 'Sample data' );
-  "
-}
+export WALE_S3_PREFIX=s3://mysqlbinlogreplaybucket
+export WALG_MYSQL_BINLOG_REPLAY_COMMAND="mysqlbinlog -v - >> /tmp/binlog.sql"
 
-check_test_additional_data() {
-  if [ -z "$(mysql -u sbtest -h localhost -e "USE sbtest; SHOW TABLES like 'example';")" ]; then
-    echo no data!!!
-    return 1
-  fi;
-  return 0
-}
 
 mysqld --initialize --init-file=/etc/mysql/init.sql
-
 service mysql start
 wal-g backup-push
-export dtime1=$(date --rfc-3339=ns | sed 's/ /T/')
-UNTILL1=$(date "+%Y-%m-%dT%H:%M:%S")
-sleep 2s
-mysql -u sbtest -h localhost -e 'FLUSH LOGS'
-add_test_data
-sleep 2s
-mysql -u sbtest -h localhost -e 'FLUSH LOGS'
+sleep 1
+
+mysql -e "CREATE TABLE sbtest.pitr(id VARCHAR(32), ts DATETIME)"
+mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr01', NOW())"
+sleep 1
+
+DT1=$(date3339)
+sleep 1
+
+mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr02', NOW())"
+mysql -e "FLUSH LOGS"
 wal-g binlog-push
-export dtime2=$(date --rfc-3339=ns | sed 's/ /T/')
-UNTILL2=$(date "+%Y-%m-%dT%H:%M:%S")
+mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr03', NOW())"
+sleep 1
 
-kill_mysql_and_cleanup_data
+DT2=$(date3339)
+sleep 1
 
-mkdir "${MYSQLDATA}"
-wal-g backup-fetch LATEST | xbstream -x -C "${MYSQLDATA}"
-chown -R mysql:mysql "${MYSQLDATA}"
+mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr04', NOW())"
+mysql -e "FLUSH LOGS"
+wal-g binlog-push
+sleep 1
 
-sleep 10
-service mysql start || cat /var/log/mysql/error.log
 
-export UNTILL=${UNTILL2}
-wal-g binlog-fetch --since LATEST --until "${dtime2}" --apply
+# test first point
+rm -rf /tmp/binlog.sql
+wal-g binlog-replay --since LATEST --until "$DT1"
+test -f /tmp/binlog.sql
+grep -w 'testpitr01' /tmp/binlog.sql
+! grep -w 'testpitr02' /tmp/binlog.sql
+! grep -w 'testpitr03' /tmp/binlog.sql
+! grep -w 'testpitr04' /tmp/binlog.sql
 
-check_test_additional_data
 
-kill_mysql_and_cleanup_data
+# test second point
+rm -rf /tmp/binlog.sql
+wal-g binlog-replay --since LATEST --until "$DT2"
+test -f /tmp/binlog.sql
+grep -w 'testpitr01' /tmp/binlog.sql
+grep -w 'testpitr02' /tmp/binlog.sql
+grep -w 'testpitr03' /tmp/binlog.sql
+! grep -w 'testpitr04' /tmp/binlog.sql
 
-mkdir "${MYSQLDATA}"
-wal-g backup-fetch LATEST | xbstream -x -C "${MYSQLDATA}"
-chown -R mysql:mysql "${MYSQLDATA}"
-
-sleep 10
-service mysql start || cat /var/log/mysql/error.log
-
-export UNTILL=${UNTILL1}
-wal-g binlog-fetch --since LATEST --until "${dtime1}" --apply
-
-if check_test_additional_data; then
-  return 1
-fi
+# test whole history
+rm -rf /tmp/binlog.sql
+wal-g binlog-replay --since LATEST
+test -f /tmp/binlog.sql
+grep -w 'testpitr01' /tmp/binlog.sql
+grep -w 'testpitr02' /tmp/binlog.sql
+grep -w 'testpitr03' /tmp/binlog.sql
+grep -w 'testpitr04' /tmp/binlog.sql
