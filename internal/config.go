@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/spf13/cobra"
 	"os"
 	"os/user"
 	"strings"
@@ -167,6 +168,8 @@ var (
 		MysqlBinlogDstSetting:      true,
 		MysqlBackupPrepareCmd:      true,
 	}
+
+	flagConfigValues = make(map[string]*string)
 )
 
 func isAllowedSetting(setting string, AllowedSettings map[string]bool) (exists bool) {
@@ -175,8 +178,20 @@ func isAllowedSetting(setting string, AllowedSettings map[string]bool) (exists b
 }
 
 func GetSetting(key string) (value string, ok bool) {
+	value, ok = getFlagSetting(key)
+	if ok {
+		return
+	}
 	if viper.IsSet(key) {
 		return viper.GetString(key), true
+	}
+	return "", false
+}
+
+func getFlagSetting(key string) (value string, ok bool) {
+	flagValue, exist := flagConfigValues[key]
+	if exist && *flagValue != "" {
+		return *flagValue, true
 	}
 	return "", false
 }
@@ -221,6 +236,17 @@ func Configure() {
 			AllowedSettings[setting] = true
 		}
 		AllowedSettings["WALG_"+adapter.prefixName] = true
+	}
+}
+
+func AddConfigFlags(Cmd *cobra.Command) {
+	for k := range AllowedSettings {
+		value := ""
+		flagConfigValues[k] = &value
+		flagName := strings.ReplaceAll(strings.ToLower(k), "_", "-")
+		flagUsage := ""
+
+		Cmd.PersistentFlags().StringVar(flagConfigValues[k], flagName, "", flagUsage)
 	}
 }
 
@@ -273,10 +299,21 @@ func InitConfig() {
 	for k, v := range viper.AllSettings() {
 		val, ok := v.(string)
 		if ok {
-			if err := os.Setenv(strings.ToUpper(k), val); err != nil {
-				tracelog.ErrorLogger.Println("failed to bind config to env variable", err.Error())
-				os.Exit(1)
-			}
+			bindToEnv(k, val)
 		}
+	}
+
+	for k, v := range flagConfigValues {
+		val := *v
+		if val != "" {
+			bindToEnv(k, val)
+		}
+	}
+}
+
+func bindToEnv(k string, val string) {
+	if err := os.Setenv(strings.ToUpper(k), val); err != nil {
+		tracelog.ErrorLogger.Println("failed to bind config to env variable", err.Error())
+		os.Exit(1)
 	}
 }

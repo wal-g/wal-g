@@ -34,4 +34,5 @@ func init() {
 
 	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
 	Cmd.InitDefaultVersionFlag()
+	internal.AddConfigFlags(Cmd)
 }

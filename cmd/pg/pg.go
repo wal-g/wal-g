@@ -37,4 +37,5 @@ func init() {
 
 	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 	Cmd.InitDefaultVersionFlag()
+	internal.AddConfigFlags(Cmd)
 }
