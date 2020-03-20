@@ -2,6 +2,7 @@ package internal
 
 import (
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/wal-g/storages/storage"
@@ -10,7 +11,7 @@ import (
 )
 
 // HandleCopy copy specific or all backups from one storage to another
-func HandleCopy(fromConfigFile string, toConfigFile string, backupName string) {
+func HandleCopy(fromConfigFile string, toConfigFile string, backupName string, withoutHistory bool) {
 	var fromFolder, fromError = ConfigureFolderFromConfig(fromConfigFile)
 	var toFolder, toError = ConfigureFolderFromConfig(toConfigFile)
 	if fromError != nil || toError != nil {
@@ -29,9 +30,10 @@ func HandleCopy(fromConfigFile string, toConfigFile string, backupName string) {
 		tracelog.ErrorLogger.FatalOnError(err)
 		return
 	}
-
 	copyBackup(backup, fromFolder, toFolder)
-	copyWals(fromFolder, toFolder)
+	if !withoutHistory {
+		copyHistory(backup, fromFolder, toFolder)
+	}
 }
 
 func copyBackup(backup *Backup, from storage.Folder, to storage.Folder) {
@@ -46,10 +48,39 @@ func copyBackup(backup *Backup, from storage.Folder, to storage.Folder) {
 	}
 }
 
-func copyWals(from storage.Folder, to storage.Folder) {
-	tracelog.InfoLogger.Print("Copy wal files")
-	var walsFolder = from.GetSubFolder(utility.WalPath)
-	copyAll(walsFolder, to)
+func copyHistory(backup *Backup, from storage.Folder, to storage.Folder) {
+	var fromWalFolder, toWalFolder = from.GetSubFolder(utility.WalPath), to.GetSubFolder(utility.WalPath)
+	var lastWalFilename, err = getLastWalFilename(backup)
+	if err != nil {
+		return
+	}
+	tracelog.InfoLogger.Printf("Copy all wal files after %s\n", lastWalFilename)
+	objects, err := storage.ListFolderRecursively(fromWalFolder)
+	if err != nil {
+		tracelog.DebugLogger.FatalOnError(err)
+		return
+	}
+	for _, object := range objects {
+		if lastWalFilename <= object.GetName() {
+			copyObject(object, fromWalFolder, toWalFolder)
+		}
+	}
+}
+
+func getLastWalFilename(backup *Backup) (string, error) {
+	meta, err := backup.fetchMeta()
+	if err != nil {
+		tracelog.DebugLogger.FatalError(err)
+		return "", err
+	}
+	timelineID64, err := strconv.ParseUint(backup.Name[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+8], 0x10, sizeofInt32bits)
+	if err != nil {
+		tracelog.DebugLogger.FatalError(err)
+		return "", err
+	}
+	timelineID := uint32(timelineID64)
+	endWalSegmentNo := newWalSegmentNo(meta.FinishLsn - 1)
+	return endWalSegmentNo.getFilename(timelineID), nil
 }
 
 func copyAll(from storage.Folder, to storage.Folder) {

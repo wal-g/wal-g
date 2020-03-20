@@ -2,7 +2,6 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 )
 
@@ -44,11 +43,7 @@ var (
 )
 
 func runBackupCopy(cmd *cobra.Command, args []string) {
-	if withoutHistory {
-		tracelog.InfoLogger.Fatal("Sorry but without-history flag not supported yet.")
-		return
-	}
-	internal.HandleCopy(fromConfigFile, toConfigFile, backupName)
+	internal.HandleCopy(fromConfigFile, toConfigFile, backupName, withoutHistory)
 }
 
 func init() {
