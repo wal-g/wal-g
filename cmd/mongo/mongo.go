@@ -30,8 +30,9 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(internal.InitConfig, internal.Configure)
+	cobra.OnInitialize(internal.InitConfig, internal.Configure, internal.AssertRequiredSettingsSet)
 
+	internal.RequiredSettings[internal.MongoDBUriSetting] = true
 	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
 	Cmd.InitDefaultVersionFlag()
 	internal.AddConfigFlags(Cmd)

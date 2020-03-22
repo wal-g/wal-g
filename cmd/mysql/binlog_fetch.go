@@ -28,6 +28,8 @@ var binlogFetchCmd = &cobra.Command{
 }
 
 func init() {
+	internal.RequiredSettings[internal.MysqlBinlogReplayCmd] = true
+	internal.RequiredSettings[internal.MysqlBinlogDstSetting] = true
 	binlogFetchCmd.PersistentFlags().StringVar(&fetchBackupName, "since", "LATEST", fetchSinceFlagShortDescr)
 	binlogFetchCmd.PersistentFlags().StringVar(&fetchUntilDt, "until", time.Now().Format(time.RFC3339), fetchUntilFlagShortDescr)
 	Cmd.AddCommand(binlogFetchCmd)

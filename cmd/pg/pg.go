@@ -12,16 +12,18 @@ import (
 
 const WalgShortDescription = "PostgreSQL backup tool"
 
-// These variables are here only to show current version. They are set in makefile during build process
-var WalgVersion = "devel"
-var GitRevision = "devel"
-var BuildDate = "devel"
+var (
+	// These variables are here only to show current version. They are set in makefile during build process
+	WalgVersion = "devel"
+	GitRevision = "devel"
+	BuildDate   = "devel"
 
-var Cmd = &cobra.Command{
-	Use:     "wal-g",
-	Short:   WalgShortDescription, // TODO : improve short and long descriptions
-	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "PostgreSQL"}, "\t"),
-}
+	Cmd = &cobra.Command{
+		Use:     "wal-g",
+		Short:   WalgShortDescription, // TODO : improve short and long descriptions
+		Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "PostgreSQL"}, "\t"),
+	}
+)
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the PgCmd.
@@ -33,8 +35,10 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(internal.InitConfig, internal.Configure)
+	cobra.OnInitialize(internal.InitConfig, internal.Configure, internal.AssertRequiredSettingsSet)
 
+	internal.RequiredSettings[internal.PgHostSetting] = true
+	internal.RequiredSettings[internal.PgPortSetting] = true
 	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 	Cmd.InitDefaultVersionFlag()
 	internal.AddConfigFlags(Cmd)

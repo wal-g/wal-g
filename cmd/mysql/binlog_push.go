@@ -23,5 +23,6 @@ var binlogPushCmd = &cobra.Command{
 }
 
 func init() {
+	internal.RequiredSettings[internal.NameStreamCreateCmd] = true
 	Cmd.AddCommand(binlogPushCmd)
 }

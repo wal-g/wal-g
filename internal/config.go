@@ -169,7 +169,7 @@ var (
 		MysqlBackupPrepareCmd:      true,
 	}
 
-	flagConfigValues = make(map[string]*string)
+	RequiredSettings = make(map[string]bool)
 )
 
 func isAllowedSetting(setting string, AllowedSettings map[string]bool) (exists bool) {
@@ -178,20 +178,8 @@ func isAllowedSetting(setting string, AllowedSettings map[string]bool) (exists b
 }
 
 func GetSetting(key string) (value string, ok bool) {
-	value, ok = getFlagSetting(key)
-	if ok {
-		return
-	}
 	if viper.IsSet(key) {
 		return viper.GetString(key), true
-	}
-	return "", false
-}
-
-func getFlagSetting(key string) (value string, ok bool) {
-	flagValue, exist := flagConfigValues[key]
-	if exist && *flagValue != "" {
-		return *flagValue, true
 	}
 	return "", false
 }
@@ -241,12 +229,15 @@ func Configure() {
 
 func AddConfigFlags(Cmd *cobra.Command) {
 	for k := range AllowedSettings {
-		value := ""
-		flagConfigValues[k] = &value
-		flagName := strings.ReplaceAll(strings.ToLower(k), "_", "-")
+		flagName := toFlagName(k)
+		isRequired, exist := RequiredSettings[k]
 		flagUsage := ""
+		if exist && isRequired {
+			flagUsage = "Required, can be set though this flag or " + k + " variable"
+		}
 
-		Cmd.PersistentFlags().StringVar(flagConfigValues[k], flagName, "", flagUsage)
+		Cmd.PersistentFlags().String(flagName, "", flagUsage)
+		_ = viper.BindPFlag(k, Cmd.PersistentFlags().Lookup(flagName))
 	}
 }
 
@@ -277,6 +268,19 @@ func InitConfig() {
 		tracelog.DebugLogger.Println("Using config file:", viper.ConfigFileUsed())
 	}
 
+	checkAndWarnNotAllowedSettings()
+
+	// Set compiled config to ENV.
+	// Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
+	for k, v := range viper.AllSettings() {
+		val, ok := v.(string)
+		if ok {
+			bindToEnv(k, val)
+		}
+	}
+}
+
+func checkAndWarnNotAllowedSettings() {
 	// Сheck allowed settings
 	foundNotAllowed := false
 	for k := range viper.AllSettings() {
@@ -293,22 +297,6 @@ func InitConfig() {
 		tracelog.WarningLogger.Println("We found that some variables in your config file detected as 'Unknown'. \n  " +
 			"If this is not right, please create issue https://github.com/wal-g/wal-g/issues/new")
 	}
-
-	// Set compiled config to ENV.
-	// Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
-	for k, v := range viper.AllSettings() {
-		val, ok := v.(string)
-		if ok {
-			bindToEnv(k, val)
-		}
-	}
-
-	for k, v := range flagConfigValues {
-		val := *v
-		if val != "" {
-			bindToEnv(k, val)
-		}
-	}
 }
 
 func bindToEnv(k string, val string) {
@@ -316,4 +304,37 @@ func bindToEnv(k string, val string) {
 		tracelog.ErrorLogger.Println("failed to bind config to env variable", err.Error())
 		os.Exit(1)
 	}
+}
+
+func AssertRequiredSettingsSet() {
+	if !isAnyStorageSet() {
+		tracelog.ErrorLogger.Println("Failed to find any configured storage")
+		os.Exit(1)
+	}
+
+	for setting, required := range RequiredSettings {
+		isSet := viper.IsSet(setting)
+
+		if !isSet && required {
+			message := "Required variable " + setting + " is not set. You can set is using --" + toFlagName(setting) +
+				" flag or variable " + setting
+			tracelog.ErrorLogger.Println(message)
+			os.Exit(1)
+		}
+	}
+}
+
+func isAnyStorageSet() bool {
+	for _, adapter := range StorageAdapters {
+		_, exists := getWaleCompatibleSetting(adapter.prefixName)
+		if exists {
+			return true
+		}
+	}
+
+	return false
+}
+
+func toFlagName(s string) string {
+	return strings.ReplaceAll(strings.ToLower(s), "_", "-")
 }
