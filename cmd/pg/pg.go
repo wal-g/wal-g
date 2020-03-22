@@ -22,6 +22,9 @@ var (
 		Use:     "wal-g",
 		Short:   WalgShortDescription, // TODO : improve short and long descriptions
 		Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "PostgreSQL"}, "\t"),
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			internal.AssertRequiredSettingsSet()
+		},
 	}
 )
 
@@ -35,7 +38,7 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(internal.InitConfig, internal.Configure, internal.AssertRequiredSettingsSet)
+	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
 	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 	Cmd.InitDefaultVersionFlag()

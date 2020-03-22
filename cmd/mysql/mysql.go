@@ -20,6 +20,9 @@ var Cmd = &cobra.Command{
 	Use:     "mysql",
 	Short:   ShortDescription, // TODO : improve description
 	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "MySQL"}, "\t"),
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		internal.AssertRequiredSettingsSet()
+	},
 }
 
 func Execute() {
@@ -30,7 +33,7 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(internal.InitConfig, internal.Configure, internal.AssertRequiredSettingsSet)
+	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
 	internal.RequiredSettings[internal.MysqlDatasourceNameSetting] = true
 	internal.RequiredSettings[internal.NameStreamRestoreCmd] = true
