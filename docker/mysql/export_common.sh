@@ -10,7 +10,8 @@ export WALG_STREAM_CREATE_COMMAND="xtrabackup --backup \
     --datadir=${MYSQLDATA}"
 export WALG_STREAM_RESTORE_COMMAND="xbstream -x -C ${MYSQLDATA}"
 export WALG_MYSQL_BACKUP_PREPARE_COMMAND="xtrabackup --prepare --target-dir=${MYSQLDATA}"
-export WALG_MYSQL_BINLOG_REPLAY_COMMAND="mysqlbinlog -v - | mysql"
+export WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
+export WALG_MYSQL_BINLOG_DST=/tmp
 
 # test tools
 mysql_kill_and_clean_data() {

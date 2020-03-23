@@ -8,6 +8,7 @@ import (
 	"github.com/wal-g/storages/storage"
 	"io/ioutil"
 	"math"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -19,6 +20,8 @@ import (
 )
 
 const BinlogPath = "binlog_" + utility.VersionStr + "/"
+
+const TimeMysqlFormat = "2006-01-02 15:04:05"
 
 // not really the maximal value, but high enough.
 // NOTE: can't use MaxInt64, due to time.Time implementation issues (it adds some value to it)
@@ -126,25 +129,37 @@ type StreamSentinelDto struct {
 	StartLocalTime time.Time
 }
 
-type BinlogHandler func(logFolder storage.Folder, logName string, endTs time.Time) (needAbortFetch bool, err error)
+type binlogHandler interface {
+	handleBinlog(binlogPath string) error
+}
 
-func fetchLogs(folder storage.Folder, startTs time.Time, endTs time.Time, handler BinlogHandler) ([]storage.Object, error) {
+func fetchLogs(folder storage.Folder, dstDir string, startTs time.Time, endTs time.Time, handler binlogHandler) error {
 	logFolder := folder.GetSubFolder(BinlogPath)
 	logsToFetch, err := getLogsCoveringInterval(logFolder, startTs)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	var fetchedLogs []storage.Object
 	for _, logFile := range logsToFetch {
-		logName := utility.TrimFileExtension(logFile.GetName())
-		if needAbortFetch, err := handler(logFolder, logName, endTs); err != nil {
-			return nil, err
-		} else if needAbortFetch {
+		binlogName := utility.TrimFileExtension(logFile.GetName())
+		binlogPath := path.Join(dstDir, binlogName)
+		tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
+		if err = internal.DownloadWALFileTo(logFolder, binlogName, binlogPath); err != nil {
+			tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
+			return err
+		}
+		timestamp, err := GetBinlogStartTimestamp(binlogPath)
+		if err != nil {
+			return err
+		}
+		err = handler.handleBinlog(binlogPath)
+		if err != nil {
+			return err
+		}
+		if timestamp.After(endTs) {
 			break
 		}
-		fetchedLogs = append(fetchedLogs, logFile)
 	}
-	return fetchedLogs, nil
+	return nil
 }
 
 func configureEndTs(untilDt string) (time.Time, error) {
