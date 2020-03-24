@@ -6,6 +6,11 @@ Development
 -----------
 ### Installing
 
+Prepare on Ubuntu:
+```
+sudo apt-get install liblzo2-dev
+```
+
 To compile and build the binary for Postgres:
 
 Optional:
