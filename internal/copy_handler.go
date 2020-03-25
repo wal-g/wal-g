@@ -2,7 +2,6 @@ package internal
 
 import (
 	"path"
-	"strconv"
 	"strings"
 
 	"github.com/wal-g/storages/storage"
@@ -10,116 +9,133 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-type copyingStatus struct {
-	objectName string
-	fromPath   string
-	toPath     string
-	isSuccess  bool
+type copyingInfo struct {
+	object storage.Object
+	from   storage.Folder
+	to     storage.Folder
 }
 
 // HandleCopy copy specific or all backups from one storage to another
 func HandleCopy(fromConfigFile string, toConfigFile string, backupName string, withoutHistory bool) {
-	var fromFolder, fromError = ConfigureFolderFromConfig(fromConfigFile)
-	var toFolder, toError = ConfigureFolderFromConfig(toConfigFile)
+	var from, fromError = ConfigureFolderFromConfig(fromConfigFile)
+	var to, toError = ConfigureFolderFromConfig(toConfigFile)
 	if fromError != nil || toError != nil {
 		return
 	}
+	var infos, err = getObjectsToCopy(backupName, from, to, withoutHistory)
+	if err != nil {
+		tracelog.ErrorLogger.FatalError(err)
+		return
+	}
+	startCopy(infos)
+}
 
-	var queue = make(chan copyingStatus)
+func getObjectsToCopy(backupName string, from storage.Folder, to storage.Folder, withoutHistory bool) ([]copyingInfo, error) {
 	if backupName == "" {
 		tracelog.InfoLogger.Printf("Copy all backups and history.")
-		copyAll(fromFolder, toFolder, queue)
-	} else {
-		tracelog.InfoLogger.Printf("Handle backupname '%s'.", backupName)
-		backup, err := GetBackupByName(backupName, utility.BaseBackupPath, fromFolder)
-		if err != nil {
-			tracelog.ErrorLogger.FatalOnError(err)
-			return
-		}
-		copyBackup(backup, fromFolder, toFolder, queue)
-		if !withoutHistory {
-			copyHistory(backup, fromFolder, toFolder, queue)
-		}
+		return copyAll(from, to)
 	}
-	handleQueue(queue)
+	tracelog.InfoLogger.Printf("Handle backupname '%s'.", backupName)
+	backup, err := GetBackupByName(backupName, utility.BaseBackupPath, from)
+	if err != nil {
+		return nil, err
+	}
+
+	infos, err := copyBackup(backup, from, to)
+	if err != nil {
+		return nil, err
+	}
+	if !withoutHistory {
+		var history, err = copyHistory(backup, from, to)
+		if err != nil {
+			return nil, err
+		}
+		infos = append(infos, history...)
+	}
+	return infos, nil
 }
 
-func copyBackup(backup *Backup, from storage.Folder, to storage.Folder, queue chan copyingStatus) {
-	tracelog.InfoLogger.Print("Copy base backup")
+func copyBackup(backup *Backup, from storage.Folder, to storage.Folder) ([]copyingInfo, error) {
+	tracelog.InfoLogger.Print("Collecting backup files...")
 	var backupPrefix = path.Join(utility.BaseBackupPath, backup.Name)
 	var objects, err = storage.ListFolderRecursively(from)
-	tracelog.DebugLogger.FatalOnError(err)
-	for _, object := range objects {
-		if strings.HasPrefix(object.GetName(), backupPrefix) {
-			go copyObject(object, from, to, queue)
-		}
+	if err != nil {
+		return nil, err
 	}
+	var hasBackupPrefix = func(object storage.Object) bool { return strings.HasPrefix(object.GetName(), backupPrefix) }
+	return buildCopyingInfos(from, to, objects, hasBackupPrefix), nil
 }
 
-func copyHistory(backup *Backup, from storage.Folder, to storage.Folder, queue chan copyingStatus) {
+func copyHistory(backup *Backup, from storage.Folder, to storage.Folder) ([]copyingInfo, error) {
+	tracelog.InfoLogger.Print("Collecting history files... ")
 	var fromWalFolder = from.GetSubFolder(utility.WalPath)
 	var lastWalFilename, err = getLastWalFilename(backup)
 	if err != nil {
-		return
+		return nil, err
 	}
-	tracelog.InfoLogger.Printf("Copy all wal files after %s\n", lastWalFilename)
+	tracelog.InfoLogger.Printf("after %s\n", lastWalFilename)
 	objects, err := storage.ListFolderRecursively(fromWalFolder)
 	if err != nil {
-		tracelog.DebugLogger.FatalOnError(err)
-		return
+		return nil, err
 	}
-	for _, object := range objects {
-		if lastWalFilename <= object.GetName() {
-			go copyObject(object, fromWalFolder, to, queue)
-		}
-	}
+	var older = func(object storage.Object) bool { return lastWalFilename <= object.GetName() }
+	return buildCopyingInfos(fromWalFolder, to, objects, older), nil
 }
 
-func copyAll(from storage.Folder, to storage.Folder, queue chan copyingStatus) {
+func copyAll(from storage.Folder, to storage.Folder) ([]copyingInfo, error) {
 	objects, err := storage.ListFolderRecursively(from)
-	tracelog.DebugLogger.FatalOnError(err)
-	for _, object := range objects {
-		go copyObject(object, from, to, queue)
+	if err != nil {
+		return nil, err
 	}
+	return buildCopyingInfos(from, to, objects, func(object storage.Object) bool { return true }), nil
 }
 
-func copyObject(object storage.Object, from storage.Folder, to storage.Folder, queue chan<- copyingStatus) {
-	var readCloser, err = from.ReadObject(object.GetName())
+func copyObject(info copyingInfo, queue chan<- bool) {
+	var objectName, from, to = info.object.GetName(), info.from, info.to
+	var readCloser, err = from.ReadObject(objectName)
 	if err != nil {
-		queue <- copyingStatus{object.GetName(), from.GetPath(), to.GetPath(), false}
+		tracelog.ErrorLogger.FatalError(err)
+		queue <- false
 		return
 	}
-	var filename = path.Join(from.GetPath(), object.GetName())
+	var filename = path.Join(from.GetPath(), objectName)
 	err = to.PutObject(filename, readCloser)
 	if err != nil {
-		queue <- copyingStatus{object.GetName(), from.GetPath(), to.GetPath(), false}
+		tracelog.ErrorLogger.FatalError(err)
+		queue <- false
 		return
 	}
-	queue <- copyingStatus{object.GetName(), from.GetPath(), to.GetPath(), true}
+	tracelog.InfoLogger.Printf("Copied '%s' from '%s' to '%s'.", objectName, from.GetPath(), to.GetPath())
+	queue <- true
 }
 
-func getLastWalFilename(backup *Backup) (string, error) {
-	meta, err := backup.fetchMeta()
-	if err != nil {
-		tracelog.DebugLogger.FatalError(err)
-		return "", err
-	}
-	timelineID64, err := strconv.ParseUint(backup.Name[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+8], 0x10, sizeofInt32bits)
-	if err != nil {
-		tracelog.DebugLogger.FatalError(err)
-		return "", err
-	}
-	timelineID := uint32(timelineID64)
-	endWalSegmentNo := newWalSegmentNo(meta.FinishLsn - 1)
-	return endWalSegmentNo.getFilename(timelineID), nil
-}
-
-func handleQueue(queue chan copyingStatus) {
-	for status := range queue {
-		if status.isSuccess {
-			tracelog.InfoLogger.Printf("Copied '%s' from '%s' to '%s'.", status.objectName, status.fromPath, status.toPath)
-		} else {
-			tracelog.ErrorLogger.Fatalf("Coping '%s' from '%s' to '%s' failed.", status.objectName, status.fromPath, status.toPath)
+func buildCopyingInfos(from storage.Folder, to storage.Folder,
+	objects []storage.Object, condition func(storage.Object) bool) (infos []copyingInfo) {
+	for _, object := range objects {
+		if condition(object) {
+			infos = append(infos, copyingInfo{object, from, to})
 		}
 	}
+	return
+}
+
+func startCopy(infos []copyingInfo) {
+	var maxParallelJobsCount = 8 // TODO place for improvement
+	var jobs = make(chan bool, maxParallelJobsCount)
+
+	for i := 0; i < len(infos); i += maxParallelJobsCount {
+		var jobsToRun = utility.Min(maxParallelJobsCount, len(infos)-(i+1))
+		for j := 0; j < jobsToRun; j++ {
+			var info = infos[i+j]
+			go copyObject(info, jobs)
+		}
+		for j := 0; j < jobsToRun; j++ {
+			var isSuccess = <-jobs
+			if !isSuccess {
+				tracelog.DebugLogger.Fatal("Something went wrong.")
+				return
+			}
+		}
+	}
+	tracelog.InfoLogger.Println("Success.")
 }
