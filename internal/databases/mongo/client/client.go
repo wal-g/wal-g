@@ -111,7 +111,7 @@ func (mc *MongoClient) IsMaster(ctx context.Context) (models.IsMaster, error) {
 
 // LastWriteTS fetches timestamps with last write
 // TODO: support non-replset setups
-func (mc *MongoClient) LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp,  err error) {
+func (mc *MongoClient) LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp, err error) {
 	im, err := mc.IsMaster(ctx)
 	if err != nil {
 		return models.Timestamp{}, models.Timestamp{}, err

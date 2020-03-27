@@ -10,7 +10,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
+	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/spf13/cobra"
@@ -49,7 +49,7 @@ var oplogPushCmd = &cobra.Command{
 		lwUpdate, err := internal.GetLastWriteUpdateInterval()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		oplogFetcher := oplog.NewDBFetcher(mongoClient, lwUpdate, oplog.NewStorageGapHandler(uploader))
+		oplogFetcher := stages.NewDBFetcher(mongoClient, lwUpdate, stages.NewStorageGapHandler(uploader))
 
 		// discover last archived timestamp
 		since, initial, err := archive.ArchivingResumeTS(uploader.UploadingFolder)
@@ -61,7 +61,7 @@ var oplogPushCmd = &cobra.Command{
 		tracelog.InfoLogger.Printf("Archiving last known timestamp is %s", since)
 
 		// set up storage archiver
-		oplogApplier := oplog.NewStorageApplier(uploader, archiveAfterSize, archiveTimeout)
+		oplogApplier := stages.NewStorageApplier(uploader, archiveAfterSize, archiveTimeout)
 
 		// run working cycle
 		err = mongo.HandleOplogPush(ctx, since, oplogFetcher, oplogApplier)

@@ -10,11 +10,12 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
+	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
 )
 
 // oplogReplayCmd represents oplog replay procedure
@@ -39,7 +40,8 @@ var oplogReplayCmd = &cobra.Command{
 		// set up mongodb client and oplog applier
 		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl)
 		tracelog.ErrorLogger.FatalOnError(err)
-		oplogApplier := oplog.NewDBApplier(mongoClient)
+		dbApplier := oplog.NewDBApplier(mongoClient)
+		oplogApplier := stages.NewGenericApplier(dbApplier)
 
 		// set up storage downloader client
 		downloader, err := archive.NewStorageDownloader(models.OplogArchBasePath)
@@ -52,7 +54,7 @@ var oplogReplayCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		// setup storage fetcher
-		oplogFetcher := oplog.NewStorageFetcher(downloader, path)
+		oplogFetcher := stages.NewStorageFetcher(downloader, path)
 
 		// run worker cycle
 		err = mongo.HandleOplogReplay(ctx, since, until, oplogFetcher, oplogApplier)
