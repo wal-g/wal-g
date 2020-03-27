@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"github.com/wal-g/wal-g/internal/databases/mongo/oplog/mocks"
+	"github.com/wal-g/wal-g/internal/databases/mongo/stages/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

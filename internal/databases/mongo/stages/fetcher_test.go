@@ -1,4 +1,4 @@
-package oplog
+package stages
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/wal-g/wal-g/internal/databases/mongo/oplog/mocks"
+	"github.com/wal-g/wal-g/internal/databases/mongo/stages/mocks"
 	"go.mongodb.org/mongo-driver/bson"
 )
 

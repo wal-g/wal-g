@@ -1,27 +1,24 @@
 package oplog
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"sync"
-	"time"
 
-	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"github.com/wal-g/wal-g/utility"
 
 	"github.com/mongodb/mongo-tools-common/db"
 	"github.com/mongodb/mongo-tools-common/txn"
-	"github.com/wal-g/tracelog"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
 // Applier defines interface to apply given oplog records.
 type Applier interface {
-	Apply(context.Context, chan models.Oplog, *sync.WaitGroup) (chan error, error)
+	Apply(ctx context.Context, opr models.Oplog) error
+	Close(ctx context.Context) error
 }
+
+var _ Applier = &DBApplier{}
 
 // DBApplier implements Applier interface for mongodb.
 type DBApplier struct {
@@ -31,51 +28,41 @@ type DBApplier struct {
 
 // NewDBApplier builds DBApplier with given args.
 func NewDBApplier(m client.MongoDriver) *DBApplier {
-	return &DBApplier{db: m}
+	return &DBApplier{db: m, txnBuffer: txn.NewBuffer()}
 }
 
-// Apply runs working cycle that applies oplog records.
-// TODO: filter noop, sessions ...
-func (dba *DBApplier) Apply(ctx context.Context, ch chan models.Oplog, wg *sync.WaitGroup) (chan error, error) {
-	dba.txnBuffer = txn.NewBuffer()
+func (dba *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
+	op := db.Oplog{}
+	if err := bson.Unmarshal(opr.Data, &op); err != nil {
+		return fmt.Errorf("can not unmarshall oplog entry: %w", err)
+	}
 
-	errc := make(chan error)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer func() { _ = dba.db.Close(ctx) }()
-		defer func() { _ = dba.txnBuffer.Stop() }()
-		defer close(errc)
+	meta, err := txn.NewMeta(op)
+	if err != nil {
+		return fmt.Errorf("can not extract op metadata: %w", err)
+	}
 
-		for opr := range ch {
-			tracelog.DebugLogger.Printf("Applyer receieved op %s (%s on %s)", opr.TS, opr.OP, opr.NS)
+	if meta.IsTxn() {
+		err = dba.handleTxnOp(ctx, meta, op)
+	} else {
+		err = dba.handleNonTxnOp(ctx, op)
+	}
 
-			op := db.Oplog{}
-			if err := bson.Unmarshal(opr.Data, &op); err != nil {
-				errc <- fmt.Errorf("can not unmarshall oplog entry: %w", err)
-				return
-			}
+	if err != nil {
+		return fmt.Errorf("can not handle op: %w", err)
+	}
 
-			meta, err := txn.NewMeta(op)
-			if err != nil {
-				errc <- fmt.Errorf("can not extract op metadata: %w", err)
-				return
-			}
+	return nil
+}
 
-			if meta.IsTxn() {
-				err = dba.handleTxnOp(ctx, meta, op)
-			} else {
-				err = dba.handleNonTxnOp(ctx, op)
-			}
-
-			if err != nil {
-				errc <- fmt.Errorf("can not handle op: %w", err)
-				return
-			}
-		}
-	}()
-
-	return errc, nil
+func (dba *DBApplier) Close(ctx context.Context) error {
+	if err := dba.db.Close(ctx); err != nil {
+		return err
+	}
+	if err := dba.txnBuffer.Stop(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // handleNonTxnOp tries to apply given oplog record.
@@ -131,74 +118,4 @@ func (dba *DBApplier) applyTxn(ctx context.Context, meta txn.Meta) error {
 			return nil
 		}
 	}
-}
-
-// StorageApplier implements Applier interface for storage.
-type StorageApplier struct {
-	uploader archive.Uploader
-	size     int
-	timeout  time.Duration
-}
-
-// NewStorageApplier builds StorageApplier.
-func NewStorageApplier(uploader archive.Uploader, archiveAfterSize int, archiveTimeout time.Duration) *StorageApplier {
-	return &StorageApplier{uploader, archiveAfterSize, archiveTimeout}
-}
-
-// Apply runs working cycle that sends oplog records to storage.
-// TODO: rename models.Oplog to something like models.Message
-func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan models.Oplog, wg *sync.WaitGroup) (chan error, error) {
-	archiveTimer := time.NewTimer(sa.timeout)
-	var lastKnownTS, batchStartTs models.Timestamp
-	restartBatch := true
-
-	errc := make(chan error)
-	wg.Add(1)
-	go func() {
-		var buf bytes.Buffer
-
-		defer wg.Done()
-		defer close(errc)
-		defer archiveTimer.Stop()
-		for oplogc != nil {
-			select {
-			case op, ok := <-oplogc:
-				if !ok {
-					oplogc = nil
-					break
-				}
-				if restartBatch {
-					batchStartTs = op.TS
-					restartBatch = false
-				}
-				lastKnownTS = op.TS
-				buf.Write(op.Data)
-				if buf.Len() < sa.size {
-					continue
-				}
-				tracelog.DebugLogger.Println("Initializing archive upload due to archive size")
-
-			case <-archiveTimer.C:
-				tracelog.DebugLogger.Println("Initializing archive upload due to timeout expired")
-			}
-
-			utility.ResetTimer(archiveTimer, sa.timeout)
-			if buf.Len() == 0 {
-				continue
-			}
-
-			// TODO: switch to PushStreamToDestination (async api)
-			// upload and rename (because we don't know last ts of uploading batch)
-			if err := sa.uploader.UploadOplogArchive(&buf, batchStartTs, lastKnownTS); err != nil {
-				errc <- fmt.Errorf("can not upload oplog archive: %w", err)
-				return
-			}
-
-			buf.Reset()
-			batchStartTs = lastKnownTS
-
-		}
-	}()
-
-	return errc, nil
 }
