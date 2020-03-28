@@ -17,12 +17,11 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
-const oplogPushShortDescription = ""
 
 // oplogPushCmd represents the continuous oplog archiving procedure
 var oplogPushCmd = &cobra.Command{
 	Use:   "oplog-push",
-	Short: oplogPushShortDescription,
+	Short: "Fetches oplog from mongodb and uploads to storage",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
