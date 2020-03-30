@@ -64,7 +64,7 @@ Feature: MongoDB PITR backups check
     Then we have same data in "after second load" and "restore to after second load from second backup"
 
 
-  Scenario: PITR: 1st backup to 2st ts
+  Scenario: PITR: 1st backup to 2nd ts
     Given mongodb02 has no data
     And mongodb replset initialized on mongodb02
     And mongodb auth initialized on mongodb02
@@ -76,7 +76,7 @@ Feature: MongoDB PITR backups check
     Then we have same data in "after second load" and "restore to after second load from first backup"
 
 
-  Scenario: PITR: 2st backup to 3st ts
+  Scenario: PITR: 2nd backup to 3rd ts
     Given mongodb02 has no data
     And mongodb replset initialized on mongodb02
     And mongodb auth initialized on mongodb02

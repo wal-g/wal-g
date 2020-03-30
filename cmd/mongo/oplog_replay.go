@@ -40,7 +40,7 @@ var oplogReplayCmd = &cobra.Command{
 		// set up mongodb client and oplog applier
 		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl)
 		tracelog.ErrorLogger.FatalOnError(err)
-		dbApplier := oplog.NewDBApplier(mongoClient)
+		dbApplier := oplog.NewDBApplier(mongoClient, false)
 		oplogApplier := stages.NewGenericApplier(dbApplier)
 
 		// set up storage downloader client

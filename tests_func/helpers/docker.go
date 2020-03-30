@@ -113,7 +113,7 @@ func RunCommand(ctx context.Context, container string, cmd []string, setters ...
 	defer attach.Close()
 
 	cmdLine := strings.Join(cmd, " ")
-	tracelog.DebugLogger.Printf("Running command: %v", cmdLine)
+	tracelog.DebugLogger.Printf("Running command on %s: %v", container, cmdLine)
 
 	var outBuf, errBuf bytes.Buffer
 	outputDone := make(chan error)

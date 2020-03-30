@@ -431,10 +431,9 @@ func (mc *MongoCtl) EnableAuth() error {
 
 func (mc *MongoCtl) runCmd(run []string) (ExecResult, error) {
 	exc, err := RunCommandStrict(mc.ctx, mc.host, run)
-	cmdLine := strings.Join(run, " ")
 
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", cmdLine, exc.String())
+		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", strings.Join(run, " "), exc.String())
 		return exc, err
 	}
 	return exc, err
