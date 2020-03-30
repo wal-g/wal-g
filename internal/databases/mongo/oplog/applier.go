@@ -43,13 +43,14 @@ func NewWriteApplier(format string, wc io.WriteCloser) (Applier, error) {
 
 // DBApplier implements Applier interface for mongodb.
 type DBApplier struct {
-	db        client.MongoDriver
-	txnBuffer *txn.Buffer
+	db           client.MongoDriver
+	txnBuffer    *txn.Buffer
+	preserveUUID bool
 }
 
 // NewDBApplier builds DBApplier with given args.
-func NewDBApplier(m client.MongoDriver) *DBApplier {
-	return &DBApplier{db: m, txnBuffer: txn.NewBuffer()}
+func NewDBApplier(m client.MongoDriver, preserveUUID bool) *DBApplier {
+	return &DBApplier{db: m, txnBuffer: txn.NewBuffer(), preserveUUID: preserveUUID}
 }
 
 func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
@@ -89,6 +90,14 @@ func (ap *DBApplier) Close(ctx context.Context) error {
 // handleNonTxnOp tries to apply given oplog record.
 // TODO: support UI filtering due to partial restore support
 func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op db.Oplog) error {
+	if !ap.preserveUUID {
+		var err error
+		op, err = filterUUIDs(op)
+		if err != nil {
+			return fmt.Errorf("error filtering UUIDs from oplog: %v", err)
+		}
+	}
+
 	return ap.db.ApplyOp(ctx, op)
 }
 
