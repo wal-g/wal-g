@@ -445,8 +445,7 @@ func (mc *MongoCtl) PurgeDatadir() error {
 	if err != nil {
 		return err
 	}
-
-	_, err = mc.runCmd([]string{"rm", "-rf", "/var/lib/mongodb/*"})
+	_, err = mc.runCmd([]string{"bash", "-c", "rm -rf /var/lib/mongodb/*"})
 	if err != nil {
 		return err
 	}
