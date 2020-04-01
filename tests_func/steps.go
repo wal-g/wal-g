@@ -27,7 +27,13 @@ func (tf TestingfWrap) Errorf(format string, args ...interface{}) {
 
 func (tctx *TestContext) sameDataCheck(dataId1, dataId2 string) error {
 	if snap1, ok := tctx.AuxData.Snapshots[dataId1]; ok {
+		if !assert.NotEmpty(TestingfWrap(tracelog.ErrorLogger.Printf), snap1) {
+			return fmt.Errorf("data '%s' snapshot is empty: %+v", dataId1, snap1)
+		}
 		if snap2, ok := tctx.AuxData.Snapshots[dataId2]; ok {
+			if !assert.NotEmpty(TestingfWrap(tracelog.ErrorLogger.Printf), snap2) {
+				return fmt.Errorf("data '%s' snapshot is empty: %+v", dataId2, snap2)
+			}
 			if assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), snap1, snap2) {
 				return nil
 			}
