@@ -39,6 +39,8 @@ func generateRecord(rowNum int, strLen int, strPrefix string) DatabaseRecord {
 
 type NsSnapshot struct {
 	NS      string
+	Options bson.M
+	IdIndex bson.M
 	Docs    []bson.M
 	Indexes []bson.M
 }
@@ -238,6 +240,8 @@ func (mc *MongoCtl) Snapshot() ([]NsSnapshot, error) {
 
 			snapshot = append(snapshot, NsSnapshot{
 				NS:      fmt.Sprintf("%s.%s", database, coll),
+				Options: collInfo["options"].(bson.M),
+				IdIndex: collInfo["idIndex"].(bson.M),
 				Docs:    docs,
 				Indexes: indexes,
 			})
