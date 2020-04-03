@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/testtools"
@@ -409,4 +410,44 @@ func RandomLsn() string {
 		b[i] = letter[rand.Intn(len(letter))]
 	}
 	return string(b)
+}
+
+func TestLoggedCloseWithoutError(t *testing.T) {
+	defer tracelog.ErrorLogger.SetOutput(tracelog.ErrorLogger.Writer())
+	var buf bytes.Buffer
+	tracelog.ErrorLogger.SetOutput(&buf)
+	utility.LoggedClose(&testtools.NopCloser{}, "")
+	loggedData, err := ioutil.ReadAll(&buf)
+	if err != nil {
+		t.Errorf("failed read from pipe: %v", err)
+	}
+	assert.Equal(t, "", string(loggedData))
+}
+
+func TestLoggedCloseWithErrorAndDefaultMessage(t *testing.T) {
+	defer tracelog.ErrorLogger.SetOutput(tracelog.ErrorLogger.Writer())
+	var buf bytes.Buffer
+	tracelog.ErrorLogger.SetOutput(&buf)
+	utility.LoggedClose(&testtools.ErrorWriteCloser{}, "")
+	loggedData, err := ioutil.ReadAll(&buf)
+	if err != nil {
+		t.Errorf("failed read from buffer: %v", err)
+	}
+
+	// "ERROR: YYYY/mm/dd HH:MM:SS.000000 " remove this prefix from loggedData
+	assert.Equal(t, "Problem with closing object: mock close: close error\n", string(loggedData[34:]))
+}
+
+func TestLoggedCloseWithErrorAndCustomMessage(t *testing.T) {
+	defer tracelog.ErrorLogger.SetOutput(tracelog.ErrorLogger.Writer())
+	var buf bytes.Buffer
+	tracelog.ErrorLogger.SetOutput(&buf)
+	utility.LoggedClose(&testtools.ErrorWriteCloser{}, "custom error message")
+	loggedData, err := ioutil.ReadAll(&buf)
+	if err != nil {
+		t.Errorf("failed read from buffer: %v", err)
+	}
+
+	// "ERROR: YYYY/mm/dd HH:MM:SS.000000 " remove this prefix from loggedData
+	assert.Equal(t, "custom error message: mock close: close error\n", string(loggedData[34:]))
 }
