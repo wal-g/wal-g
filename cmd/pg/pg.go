@@ -2,6 +2,7 @@ package pg
 
 import (
 	"fmt"
+	"github.com/wal-g/tracelog"
 	"os"
 	"strings"
 
@@ -23,7 +24,8 @@ var (
 		Short:   WalgShortDescription, // TODO : improve short and long descriptions
 		Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "PostgreSQL"}, "\t"),
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			internal.AssertRequiredSettingsSet()
+			err := internal.AssertRequiredSettingsSet()
+			tracelog.ErrorLogger.FatalOnError(err)
 		},
 	}
 )

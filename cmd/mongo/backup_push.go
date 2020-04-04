@@ -45,7 +45,8 @@ var backupPushCmd = &cobra.Command{
 	},
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		internal.RequiredSettings[internal.NameStreamCreateCmd] = true
-		internal.AssertRequiredSettingsSet()
+		err := internal.AssertRequiredSettingsSet()
+		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
 

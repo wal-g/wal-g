@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"os"
 	"os/user"
@@ -275,7 +276,8 @@ func InitConfig() {
 	for k, v := range viper.AllSettings() {
 		val, ok := v.(string)
 		if ok {
-			bindToEnv(k, val)
+			err = bindToEnv(k, val)
+			tracelog.ErrorLogger.FatalOnError(err)
 		}
 	}
 }
@@ -299,17 +301,16 @@ func checkAndWarnNotAllowedSettings() {
 	}
 }
 
-func bindToEnv(k string, val string) {
+func bindToEnv(k string, val string) error {
 	if err := os.Setenv(strings.ToUpper(k), val); err != nil {
-		tracelog.ErrorLogger.Println("failed to bind config to env variable", err.Error())
-		os.Exit(1)
+		return errors.Wrap(err, "Failed to bind config to env variable")
 	}
+	return nil
 }
 
-func AssertRequiredSettingsSet() {
+func AssertRequiredSettingsSet() error {
 	if !isAnyStorageSet() {
-		tracelog.ErrorLogger.Println("Failed to find any configured storage")
-		os.Exit(1)
+		return errors.New("Failed to find any configured storage")
 	}
 
 	for setting, required := range RequiredSettings {
@@ -318,10 +319,11 @@ func AssertRequiredSettingsSet() {
 		if !isSet && required {
 			message := "Required variable " + setting + " is not set. You can set is using --" + toFlagName(setting) +
 				" flag or variable " + setting
-			tracelog.ErrorLogger.Println(message)
-			os.Exit(1)
+			return errors.New(message)
 		}
 	}
+
+	return nil
 }
 
 func isAnyStorageSet() bool {
