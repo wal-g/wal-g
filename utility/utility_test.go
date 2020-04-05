@@ -414,40 +414,58 @@ func RandomLsn() string {
 
 func TestLoggedCloseWithoutError(t *testing.T) {
 	defer tracelog.ErrorLogger.SetOutput(tracelog.ErrorLogger.Writer())
+
 	var buf bytes.Buffer
 	tracelog.ErrorLogger.SetOutput(&buf)
+
 	utility.LoggedClose(&testtools.NopCloser{}, "")
+
 	loggedData, err := ioutil.ReadAll(&buf)
 	if err != nil {
-		t.Errorf("failed read from pipe: %v", err)
+		t.Logf("failed read from pipe: %v", err)
 	}
+
 	assert.Equal(t, "", string(loggedData))
 }
 
 func TestLoggedCloseWithErrorAndDefaultMessage(t *testing.T) {
 	defer tracelog.ErrorLogger.SetOutput(tracelog.ErrorLogger.Writer())
+	defer tracelog.ErrorLogger.SetPrefix(tracelog.ErrorLogger.Prefix())
+	defer tracelog.ErrorLogger.SetFlags(tracelog.ErrorLogger.Flags())
+
 	var buf bytes.Buffer
+
+	tracelog.ErrorLogger.SetPrefix("")
 	tracelog.ErrorLogger.SetOutput(&buf)
+	tracelog.ErrorLogger.SetFlags(0)
+
 	utility.LoggedClose(&testtools.ErrorWriteCloser{}, "")
+
 	loggedData, err := ioutil.ReadAll(&buf)
 	if err != nil {
-		t.Errorf("failed read from buffer: %v", err)
+		t.Logf("failed read from buffer: %v", err)
 	}
 
-	// "ERROR: YYYY/mm/dd HH:MM:SS.000000 " remove this prefix from loggedData
-	assert.Equal(t, "Problem with closing object: mock close: close error\n", string(loggedData[34:]))
+	assert.Equal(t, "Problem with closing object: mock close: close error\n", string(loggedData))
 }
 
 func TestLoggedCloseWithErrorAndCustomMessage(t *testing.T) {
 	defer tracelog.ErrorLogger.SetOutput(tracelog.ErrorLogger.Writer())
+	defer tracelog.ErrorLogger.SetPrefix(tracelog.ErrorLogger.Prefix())
+	defer tracelog.ErrorLogger.SetFlags(tracelog.ErrorLogger.Flags())
+
 	var buf bytes.Buffer
+
+	tracelog.ErrorLogger.SetPrefix("")
 	tracelog.ErrorLogger.SetOutput(&buf)
+	tracelog.ErrorLogger.SetFlags(0)
+
 	utility.LoggedClose(&testtools.ErrorWriteCloser{}, "custom error message")
+
 	loggedData, err := ioutil.ReadAll(&buf)
 	if err != nil {
-		t.Errorf("failed read from buffer: %v", err)
+		t.Logf("failed read from buffer: %v", err)
 	}
 
-	// "ERROR: YYYY/mm/dd HH:MM:SS.000000 " remove this prefix from loggedData
-	assert.Equal(t, "custom error message: mock close: close error\n", string(loggedData[34:]))
+	assert.Equal(t, "custom error message: mock close: close error\n", string(loggedData))
 }
