@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 
 	"github.com/mongodb/mongo-tools-common/db"
 	"github.com/mongodb/mongo-tools-common/txn"
+	"github.com/wal-g/tracelog"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -59,6 +61,11 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 		return fmt.Errorf("can not unmarshal oplog entry: %w", err)
 	}
 
+	if err := ap.shouldSkip(op); err != nil {
+		tracelog.DebugLogger.Printf("skipping op %+v due to: %+v", op, err)
+		return nil
+	}
+
 	meta, err := txn.NewMeta(op)
 	if err != nil {
 		return fmt.Errorf("can not extract op metadata: %w", err)
@@ -87,8 +94,25 @@ func (ap *DBApplier) Close(ctx context.Context) error {
 	return nil
 }
 
+func (ap *DBApplier) shouldSkip(op db.Oplog) error {
+	if op.Operation == "n" {
+		return fmt.Errorf("noop op")
+	}
+
+	// sharded clusters are not supported yet
+	if strings.HasPrefix(op.Namespace, "config.") {
+		return fmt.Errorf("config database op")
+	}
+
+	// temporary skip view creation due to mongodb bug
+	if strings.HasSuffix(op.Namespace, "system.views") {
+		return fmt.Errorf("view op")
+	}
+
+	return nil
+}
+
 // handleNonTxnOp tries to apply given oplog record.
-// TODO: support UI filtering due to partial restore support
 func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op db.Oplog) error {
 	if !ap.preserveUUID {
 		var err error

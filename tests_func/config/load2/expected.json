@@ -4,7 +4,7 @@
       "createIndexes": 3,
       "dropIndexes": 1,
       "renameCollection": 2,
-      "insert": 1,
+      "insert": 2,
       "create": 1
     },
     "failed": {},
@@ -12,7 +12,7 @@
       "createIndexes": 0,
       "dropIndexes": 0,
       "renameCollection": 0,
-      "insert": 1,
+      "insert": 2,
       "create": 0
     },
     "errors": {}
