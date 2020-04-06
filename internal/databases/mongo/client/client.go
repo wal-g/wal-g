@@ -163,7 +163,7 @@ func (mc *MongoClient) getOplogCollection(ctx context.Context) (*mongo.Collectio
 func (mc *MongoClient) ApplyOp(ctx context.Context, op db.Oplog) error {
 	apply := mc.c.Database("admin").RunCommand(ctx, bson.M{"applyOps": []interface{}{op}})
 	if err := apply.Err(); err != nil {
-		return fmt.Errorf("applyOps command failed: %w", err)
+		return fmt.Errorf("applyOps command failed: %w\nop:\n%+v", err, op)
 	}
 	resp := CmdResponse{}
 	if err := apply.Decode(&resp); err != nil {

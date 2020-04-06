@@ -39,6 +39,7 @@ func generateRecord(rowNum int, strLen int, strPrefix string) DatabaseRecord {
 
 type NsSnapshot struct {
 	NS      string
+	Type    string
 	Options bson.M
 	IdIndex bson.M
 	Docs    []bson.M
@@ -225,26 +226,32 @@ func (mc *MongoCtl) Snapshot() ([]NsSnapshot, error) {
 
 		for _, collInfo := range collsInfo {
 			coll := collInfo["name"].(string)
+			collType := collInfo["type"].(string)
 			if isSystemCollection(coll) {
 				continue
 			}
-			docs, err := FetchNsDocs(mc.ctx, conn, database, coll)
-			if err != nil {
-				return nil, err
-			}
-
-			indexes, err := ListNsIndexes(mc.ctx, conn, database, coll)
-			if err != nil {
-				return nil, err
-			}
-
-			snapshot = append(snapshot, NsSnapshot{
+			nsSnapshot := NsSnapshot{
 				NS:      fmt.Sprintf("%s.%s", database, coll),
+				Type:    collType,
 				Options: collInfo["options"].(bson.M),
-				IdIndex: collInfo["idIndex"].(bson.M),
-				Docs:    docs,
-				Indexes: indexes,
-			})
+			}
+
+			if collType == "collection" {
+				docs, err := FetchNsDocs(mc.ctx, conn, database, coll)
+				if err != nil {
+					return nil, err
+				}
+				nsSnapshot.Docs = docs
+
+				indexes, err := ListNsIndexes(mc.ctx, conn, database, coll)
+				if err != nil {
+					return nil, err
+				}
+				nsSnapshot.Indexes = indexes
+				nsSnapshot.IdIndex = collInfo["idIndex"].(bson.M)
+			}
+
+			snapshot = append(snapshot, nsSnapshot)
 		}
 	}
 
