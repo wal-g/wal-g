@@ -2,6 +2,7 @@ package mongo
 
 import (
 	"fmt"
+	"github.com/wal-g/tracelog"
 	"os"
 	"strings"
 
@@ -20,6 +21,10 @@ var Cmd = &cobra.Command{
 	Use:     "wal-g",
 	Short:   DBShortDescription, // TODO : improve description
 	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "MongoDB"}, "\t"),
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		err := internal.AssertRequiredSettingsSet()
+		tracelog.ErrorLogger.FatalOnError(err)
+	},
 }
 
 func Execute() {
@@ -32,6 +37,8 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
+	internal.RequiredSettings[internal.MongoDBUriSetting] = true
 	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
 	Cmd.InitDefaultVersionFlag()
+	internal.AddConfigFlags(Cmd)
 }

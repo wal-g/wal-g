@@ -43,6 +43,11 @@ var backupPushCmd = &cobra.Command{
 
 		mongo.HandleBackupPush(&archive.StorageUploader{Uploader: uploader}, metaProvider, backupCmd)
 	},
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		internal.RequiredSettings[internal.NameStreamCreateCmd] = true
+		err := internal.AssertRequiredSettingsSet()
+		tracelog.ErrorLogger.FatalOnError(err)
+	},
 }
 
 func init() {

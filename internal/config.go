@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 	"os"
 	"os/user"
 	"strings"
@@ -167,6 +169,8 @@ var (
 		MysqlBinlogDstSetting:      true,
 		MysqlBackupPrepareCmd:      true,
 	}
+
+	RequiredSettings = make(map[string]bool)
 )
 
 func isAllowedSetting(setting string, AllowedSettings map[string]bool) (exists bool) {
@@ -224,6 +228,20 @@ func Configure() {
 	}
 }
 
+func AddConfigFlags(Cmd *cobra.Command) {
+	for k := range AllowedSettings {
+		flagName := toFlagName(k)
+		isRequired, exist := RequiredSettings[k]
+		flagUsage := ""
+		if exist && isRequired {
+			flagUsage = "Required, can be set though this flag or " + k + " variable"
+		}
+
+		Cmd.PersistentFlags().String(flagName, "", flagUsage)
+		_ = viper.BindPFlag(k, Cmd.PersistentFlags().Lookup(flagName))
+	}
+}
+
 // initConfig reads in config file and ENV variables if set.
 func InitConfig() {
 	if CfgFile != "" {
@@ -251,6 +269,20 @@ func InitConfig() {
 		tracelog.DebugLogger.Println("Using config file:", viper.ConfigFileUsed())
 	}
 
+	checkAndWarnNotAllowedSettings()
+
+	// Set compiled config to ENV.
+	// Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
+	for k, v := range viper.AllSettings() {
+		val, ok := v.(string)
+		if ok {
+			err = bindToEnv(k, val)
+			tracelog.ErrorLogger.FatalOnError(err)
+		}
+	}
+}
+
+func checkAndWarnNotAllowedSettings() {
 	// Сheck allowed settings
 	foundNotAllowed := false
 	for k := range viper.AllSettings() {
@@ -267,16 +299,44 @@ func InitConfig() {
 		tracelog.WarningLogger.Println("We found that some variables in your config file detected as 'Unknown'. \n  " +
 			"If this is not right, please create issue https://github.com/wal-g/wal-g/issues/new")
 	}
+}
 
-	// Set compiled config to ENV.
-	// Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
-	for k, v := range viper.AllSettings() {
-		val, ok := v.(string)
-		if ok {
-			if err := os.Setenv(strings.ToUpper(k), val); err != nil {
-				tracelog.ErrorLogger.Println("failed to bind config to env variable", err.Error())
-				os.Exit(1)
-			}
+func bindToEnv(k string, val string) error {
+	if err := os.Setenv(strings.ToUpper(k), val); err != nil {
+		return errors.Wrap(err, "Failed to bind config to env variable")
+	}
+	return nil
+}
+
+func AssertRequiredSettingsSet() error {
+	if !isAnyStorageSet() {
+		return errors.New("Failed to find any configured storage")
+	}
+
+	for setting, required := range RequiredSettings {
+		isSet := viper.IsSet(setting)
+
+		if !isSet && required {
+			message := "Required variable " + setting + " is not set. You can set is using --" + toFlagName(setting) +
+				" flag or variable " + setting
+			return errors.New(message)
 		}
 	}
+
+	return nil
+}
+
+func isAnyStorageSet() bool {
+	for _, adapter := range StorageAdapters {
+		_, exists := getWaleCompatibleSetting(adapter.prefixName)
+		if exists {
+			return true
+		}
+	}
+
+	return false
+}
+
+func toFlagName(s string) string {
+	return strings.ReplaceAll(strings.ToLower(s), "_", "-")
 }
