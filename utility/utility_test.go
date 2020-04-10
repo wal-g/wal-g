@@ -410,3 +410,11 @@ func RandomLsn() string {
 	}
 	return string(b)
 }
+
+func TestFileExists(t *testing.T) {
+	file, err := os.Create("new_file")
+	assert.NoError(t, err)
+	defer file.Close()
+	assert.True(t, utility.FileExists("new_file"))
+	assert.False(t, utility.FileExists("unknown_file"))
+}
