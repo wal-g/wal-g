@@ -1,11 +1,11 @@
-## WAL-G for MongoDB
+# WAL-G for MongoDB
 
 **Interface of Mongo now is unstable**
 
 You can use wal-g as a tool for encrypting, compressing Mongo backups and push/fetch them to/from storage without saving it on your filesystem.
 
-Development
------------
+## Development
+
 ### Installing
 To compile and build the binary for Mongo:
 
@@ -29,8 +29,7 @@ make deps
 make mongo_install
 ```
 
-Configuration
--------------
+## Configuration
 
 * `WALG_MONGO_OPLOG_END_TS`
 
@@ -40,8 +39,7 @@ To set time [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) for recovery point.
 
 To place oplogs in the specified directory during backup-fetch.
 
-Usage
------
+## Usage
 
 WAL-G mongo extension currently supports these commands:
 

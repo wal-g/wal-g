@@ -1,4 +1,5 @@
 # WAL-G
+
 [![Build Status](https://travis-ci.org/wal-g/wal-g.svg?branch=master)](https://travis-ci.org/wal-g/wal-g)
 [![Go Report Card](https://goreportcard.com/badge/github.com/wal-g/wal-g)](https://goreportcard.com/report/github.com/wal-g/wal-g)
 
@@ -7,21 +8,25 @@ WAL-G is an archival restoration tool for Postgres(beta for MySQL, MongoDB, and 
 WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4, LZMA, or Brotli compression, multiple processors, and non-exclusive base backups for Postgres. More information on the design and implementation of WAL-G can be found on the Citus Data blog post ["Introducing WAL-G by Citus: Faster Disaster Recovery for Postgres"](https://www.citusdata.com/blog/2017/08/18/introducing-wal-g-faster-restores-for-postgres/).
 
 **Table of Contents**
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Databases](#databases)
-- [Development](#development)
-	- [Installing](#installing)
-	- [Testing](#testing)
-	- [Development on windows](#development-on-windows) 
-- [Authors](#authors)
-- [License](#license)
-- [Acknowledgements](#acknowledgements)
-- [Chat](#chat)
+- [WAL-G](#wal-g)
+	- [Installation](#installation)
+	- [Configuration](#configuration)
+	- [Usage](#usage)
+	- [Databases](#databases)
+		- [PostgreSQL](#postgresql)
+		- [MySQL](#mysql)
+		- [Mongo](#mongo)
+	- [Development](#development)
+		- [Installing](#installing)
+		- [Testing](#testing)
+		- [Development on Windows](#development-on-windows)
+	- [Authors](#authors)
+	- [License](#license)
+	- [Acknowledgments](#acknowledgments)
+	- [Chat](#chat)
 
-Installation
-----------
+## Installation
+
 A precompiled binary for Linux AMD 64 of the latest version of WAL-G can be obtained under the [Releases tab](https://github.com/wal-g/wal-g/releases).
 
 To decompress the binary, use:
@@ -32,8 +37,7 @@ mv wal-g /usr/local/bin/
 ```
 For other incompatible systems, please consult the [Development](#development) section for more information.
 
-Configuration
--------------
+## Configuration
 
 **One of these variables is required**
 
@@ -145,8 +149,7 @@ LZMA is way much slower. However, it compresses backups about 6 times better tha
 
 **More options are available for the chosen database. See it in [Databases](#databases)**
 
-Usage
------
+## Usage
 
 WAL-G currently supports these commands for all type of databases:
 
@@ -197,8 +200,8 @@ Examples:
 
 **More commands are available for the chosen database engine. See it in [Databases](#databases)**
 
-Databases
------------
+## Databases
+
 ### PostgreSQL
 [Information about installing, configuration and usage](https://github.com/wal-g/wal-g/blob/master/PostgreSQL.md)
 
@@ -208,8 +211,8 @@ Databases
 ### Mongo
 [Information about installing, configuration and usage](https://github.com/wal-g/wal-g/blob/master/MongoDB.md)
 
-Development
------------
+## Development
+
 ### Installing
 It is specified for your type of [database](#databases).
 
@@ -228,32 +231,30 @@ Test coverage can be obtained using:
 make coverage
 ```
 This command generates `coverage.out` file and opens HTML representation of the coverage.
+
 ### Development on Windows
 
 [Information about installing and usage](https://github.com/wal-g/wal-g/blob/master/Windows.md)
 
-
-Authors
--------
+## Authors
 
 * [Katie Li](https://github.com/katie31)
 * [Daniel Farina](https://github.com/fdr)
 
 See also the list of [contributors](CONTRIBUTORS) who participated in this project.
 
-License
--------
+## License
 
 This project is licensed under the Apache License, Version 2.0, but the lzo support is licensed under GPL 3.0+. Please refer to the [LICENSE.md](LICENSE.md) file for more details.
 
-Acknowledgments
-----------------
+## Acknowledgments
+
 WAL-G would not have happened without the support of [Citus Data](https://www.citusdata.com/)
 
 WAL-G came into existence as a result of the collaboration between a summer engineering intern at Citus, Katie Li, and Daniel Farina, the original author of WAL-E, who currently serves as a principal engineer on the Citus Cloud team. Citus Data also has an [open source extension to Postgres](https://github.com/citusdata) that distributes database queries horizontally to deliver scale and performance.
 
 WAL-G development is supported by [Yandex Cloud](https://cloud.yandex.com)
 
-Chat
-----
+## Chat
+
 We have a [Slack group](https://postgresteam.slack.com/messages/CA25P48P2) and [Telegram chat](https://t.me/joinchat/C03q9FOwa7GgIIW5CwfjrQ) to discuss WAL-G usage and development. To joint PostgreSQL slack use [invite app](https://postgres-slack.herokuapp.com).
