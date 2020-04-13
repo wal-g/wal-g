@@ -20,14 +20,13 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
-// TODO : unit tests
 func LoggedClose(c io.Closer, errmsg string) {
 	err := c.Close()
 	if errmsg == "" {
-		errmsg = "Problem with closing object: %v"
+		errmsg = "Problem with closing object"
 	}
 	if err != nil {
-		tracelog.ErrorLogger.Printf(errmsg+": %v", err)
+		tracelog.ErrorLogger.Printf("%s: %v", errmsg, err)
 	}
 }
 
