@@ -24,10 +24,7 @@ func HandleCopy(fromConfigFile string, toConfigFile string, backupName string, w
 		return
 	}
 	var infos, err = getObjectsToCopy(backupName, from, to, withoutHistory)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-		return
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	startCopy(infos)
 }
 
@@ -95,16 +92,10 @@ func copyObject(info copyingInfo, wg *sync.WaitGroup) {
 	defer wg.Done()
 	var objectName, from, to = info.object.GetName(), info.from, info.to
 	var readCloser, err = from.ReadObject(objectName)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-		return
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	var filename = path.Join(from.GetPath(), objectName)
 	err = to.PutObject(filename, readCloser)
-	if err != nil {
-		tracelog.ErrorLogger.FatalError(err)
-		return
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Copied '%s' from '%s' to '%s'.", objectName, from.GetPath(), to.GetPath())
 }
 
