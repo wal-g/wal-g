@@ -330,7 +330,8 @@ func getLastWalFilename(backup *Backup) (string, error) {
 		tracelog.DebugLogger.FatalError(err)
 		return "", err
 	}
-	timelineID64, err := strconv.ParseUint(backup.Name[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+8], 0x10, sizeofInt32bits)
+	prefixLenght := len(utility.BackupNamePrefix)
+	timelineID64, err := strconv.ParseUint(backup.Name[prefixLenght:prefixLenght+8], hexadecimal, sizeofInt32bits)
 	if err != nil {
 		tracelog.DebugLogger.FatalError(err)
 		return "", err

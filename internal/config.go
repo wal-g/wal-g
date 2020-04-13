@@ -177,13 +177,8 @@ func isAllowedSetting(setting string, AllowedSettings map[string]bool) (exists b
 
 // GetSetting extract setting by key if key is set, return empty string otherwise
 func GetSetting(key string) (value string, ok bool) {
-	return GetSettingFrom(viper.GetViper(), key)
-}
-
-// GetSettingFrom extract setting by key from config if key is set, return empty string otherwise
-func GetSettingFrom(config *viper.Viper, key string) (value string, ok bool) {
-	if config.IsSet(key) {
-		return config.GetString(key), true
+	if viper.IsSet(key) {
+		return viper.GetString(key), true
 	}
 	return "", false
 }
