@@ -3,6 +3,7 @@ package internal
 import (
 	"path"
 	"strings"
+	"sync"
 
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
@@ -90,23 +91,21 @@ func copyAll(from storage.Folder, to storage.Folder) ([]copyingInfo, error) {
 	return buildCopyingInfos(from, to, objects, func(object storage.Object) bool { return true }), nil
 }
 
-func copyObject(info copyingInfo, queue chan<- bool) {
+func copyObject(info copyingInfo, wg *sync.WaitGroup) {
+	defer wg.Done()
 	var objectName, from, to = info.object.GetName(), info.from, info.to
 	var readCloser, err = from.ReadObject(objectName)
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
-		queue <- false
 		return
 	}
 	var filename = path.Join(from.GetPath(), objectName)
 	err = to.PutObject(filename, readCloser)
 	if err != nil {
 		tracelog.ErrorLogger.FatalError(err)
-		queue <- false
 		return
 	}
 	tracelog.InfoLogger.Printf("Copied '%s' from '%s' to '%s'.", objectName, from.GetPath(), to.GetPath())
-	queue <- true
 }
 
 func buildCopyingInfos(from storage.Folder, to storage.Folder,
@@ -121,21 +120,16 @@ func buildCopyingInfos(from storage.Folder, to storage.Folder,
 
 func startCopy(infos []copyingInfo) {
 	var maxParallelJobsCount = 8 // TODO place for improvement
-	var jobs = make(chan bool, maxParallelJobsCount)
 
 	for i := 0; i < len(infos); i += maxParallelJobsCount {
 		var jobsToRun = utility.Min(maxParallelJobsCount, len(infos)-(i+1))
+		var wg sync.WaitGroup
 		for j := 0; j < jobsToRun; j++ {
+			wg.Add(1)
 			var info = infos[i+j]
-			go copyObject(info, jobs)
+			go copyObject(info, &wg)
 		}
-		for j := 0; j < jobsToRun; j++ {
-			var isSuccess = <-jobs
-			if !isSuccess {
-				tracelog.DebugLogger.Fatal("Something went wrong.")
-				return
-			}
-		}
+		wg.Wait()
 	}
 	tracelog.InfoLogger.Println("Success.")
 }
