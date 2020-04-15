@@ -2,6 +2,7 @@ MAIN_PG_PATH := main/pg
 MAIN_MYSQL_PATH := main/mysql
 MAIN_REDIS_PATH := main/redis
 MAIN_MONGO_PATH := main/mongo
+MAIN_FDB_PATH := main/fdb
 DOCKER_COMMON := golang ubuntu s3
 CMD_FILES = $(wildcard wal-g/*.go)
 PKG_FILES = $(wildcard internal/**/*.go internal/**/**/*.go internal/*.go)
@@ -61,7 +62,7 @@ all_unittests: install deps lint unittest
 pg_int_tests_only:
 	docker-compose build pg_tests
 	docker-compose up --exit-code-from pg_tests pg_tests
-	
+
 pg_clean:
 	(cd $(MAIN_PG_PATH) && go clean)
 	./cleanup.sh
@@ -110,6 +111,12 @@ mongo_features:
 clean_mongo_features:
 	set -e
 	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -v -count=1  -timeout 5m -tf.test=false -tf.debug=false -tf.clean=true -tf.stop=true
+
+fdb_build: $(CMD_FILES) $(PKG_FILES)
+	(cd $(MAIN_FDB_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w")
+
+fdb_install: fdb_build
+	mv $(MAIN_FDB_PATH)/wal-g $(GOBIN)/wal-g
 
 redis_test: install deps redis_build lint unlink_brotli redis_integration_test
 
