@@ -19,14 +19,21 @@ GOLANGCI_LINT_VERSION ?= "v1.37.0"
 REDIS_VERSION ?= "5.0.8"
 TOOLS_MOD_DIR := ./internal/tools
 
-BUILD_TAGS:=brotli
-
-ifdef USE_LIBSODIUM
-	BUILD_TAGS:=$(BUILD_TAGS) libsodium
-endif
+WALG_COMPRESSION_METHOD:=lz4
+BUILD_TAGS:=
 
 ifdef USE_LZO
 	BUILD_TAGS:=$(BUILD_TAGS) lzo
+	WALG_COMPRESSION_METHOD:=lzo
+endif
+
+ifdef USE_BROTLI
+	BUILD_TAGS=$(BUILD_TAGS) brotli
+	WALG_COMPRESSION_METHOD:=brotli
+endif
+
+ifdef USE_LIBSODIUM
+	BUILD_TAGS:=$(BUILD_TAGS) libsodium
 endif
 
 .PHONY: unittest fmt lint clean install_tools
@@ -41,7 +48,7 @@ pg_build: $(CMD_FILES) $(PKG_FILES)
 install_and_build_pg: deps pg_build
 
 pg_build_image:
-	docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix
+	docker-compose build --build-arg build_tags=$(BUILD_TAGS) --build-arg use_brotli=$(USE_BROTLI) --build-arg use_libsodium=$(USE_LIBSODIUM) --build-arg use_lzo=$(USE_LZO) --build-arg walg_compression_method=$(WALG_COMPRESSION_METHOD) $(DOCKER_COMMON) pg pg_build_docker_prefix
 
 pg_save_image: install_and_build_pg pg_build_image
 	mkdir -p ${CACHE_FOLDER}
@@ -59,7 +66,7 @@ pg_integration_test:
 	else\
 		docker load -i ${CACHE_FILE_DOCKER_PREFIX};\
 	fi
-	docker-compose build $(TEST)
+	docker-compose build --build-arg build_tags=$(BUILD_TAGS) --build-arg use_brotli=$(USE_BROTLI) --build-arg use_libsodium=$(USE_LIBSODIUM) --build-arg use_lzo=$(USE_LZO) --build-arg walg_compression_method=$(WALG_COMPRESSION_METHOD) $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
 
 all_unittests: deps unittest
@@ -246,7 +253,9 @@ install:
 	@echo "Nothing to be done. Use pg_install/mysql_install/mongo_install/fdb_install/gp_install... instead."
 
 link_brotli:
-	./link_brotli.sh
+	@if [ ! -z "${USE_BROTLI}" ]; then\
+		./link_brotli.sh;\
+	fi
 
 link_libsodium:
 	@if [ ! -z "${USE_LIBSODIUM}" ]; then\
@@ -254,9 +263,11 @@ link_libsodium:
 	fi
 
 unlink_brotli:
-	rm -rf vendor/github.com/google/brotli/*
-	mv tmp/brotli/* vendor/github.com/google/brotli/
-	rm -rf tmp/brotli
+	@if [ ! -z "${USE_BROTLI}" ]; then\
+		rm -rf vendor/github.com/google/brotli/*;\
+		mv tmp/brotli/* vendor/github.com/google/brotli/;\
+		rm -rf tmp/brotli;\
+	fi
 
 unlink_libsodium:
 	rm -rf tmp/libsodium
