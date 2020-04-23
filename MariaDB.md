@@ -61,7 +61,9 @@ Command to replay binlog on runing MariaDB. Required for binlog-fetch command.
 
 To place binlogs in the specified directory during binlog-fetch or binlog-replay     
 
-> **Important**: To make wal-g work with mariadb, you need to [activate the binary log](https://mariadb.com/kb/en/activating-the-binary-log/) by starting mariadb with [--log-bin](https://mariadb.com/kb/en/replication-and-binary-log-server-system-variables/#log_bin) and [--log-basename](https://mariadb.com/kb/en/mysqld-options/#-log-basename)=\[name\].
+### Important
+
+To make wal-g work with mariadb, you need to [activate the binary log](https://mariadb.com/kb/en/activating-the-binary-log/) by starting mariadb with [--log-bin](https://mariadb.com/kb/en/replication-and-binary-log-server-system-variables/#log_bin) and [--log-basename](https://mariadb.com/kb/en/mysqld-options/#-log-basename)=\[name\].
 
 
 Usage
