@@ -202,11 +202,8 @@ Databases
 ### PostgreSQL
 [Information about installing, configuration and usage](https://github.com/wal-g/wal-g/blob/master/PostgreSQL.md)
 
-### MySQL
+### MySQL/MariaDB
 [Information about installing, configuration and usage](https://github.com/wal-g/wal-g/blob/master/MySQL.md)
-
-### MariaDB
-[Information about installing, configuration and usage](https://github.com/wal-g/wal-g/blob/master/MariaDB.md)
 
 ### Mongo
 [Information about installing, configuration and usage](https://github.com/wal-g/wal-g/blob/master/MongoDB.md)
