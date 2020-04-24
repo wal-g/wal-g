@@ -5,6 +5,7 @@ ENV TERM xterm-256color
 
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests \
+    build-essential \
     python3.6 \
     python3-setuptools \
     python3-pip \
