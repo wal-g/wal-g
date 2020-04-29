@@ -206,8 +206,8 @@ Here's typical wal-g configuration for that case:
 ```
  WALG_MYSQL_DATASOURCE_NAME=user:pass@tcp(localhost:3305)/mysql                                                                                                                                      
  WALG_STREAM_CREATE_COMMAND="mariabackup --backup --stream=xbstream --datadir=/var/lib/mysql"                                                                                                                               
- WALG_STREAM_RESTORE_COMMAND="xbstream -x -C /var/backups/mariadb"                                                                                                                       
- WALG_MYSQL_BACKUP_PREPARE_COMMAND="mariabackup --prepare --target-dir=/var/backups/mariadb"                                                                                              
+ WALG_STREAM_RESTORE_COMMAND="xbstream -x -C /var/lib/mysql"                                                                                                                       
+ WALG_MYSQL_BACKUP_PREPARE_COMMAND="mariabackup --prepare --target-dir=/var/lib/mysql"                                                                                              
  WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
 ```
 
@@ -215,11 +215,7 @@ For the restore procedure you can follow the major part of [the offical docs for
 * stop mariadb
 * clean a datadir (typically `/var/lib/mysql`)
 * fetch and prepare desired backup using `wal-g backup-fetch "backup_name"`
-* restore with either [`--copy-back`](https://mariadb.com/kb/en/mariabackup-options/#-copy-back) or [`--move-back`](https://mariadb.com/kb/en/mariabackup-options/#-move-back) argument of `mariabackup`:
-```
-mariabackup --move-back --target-dir=/var/backups/mysql
-```
-* after the above command you might have to fix file permissions: `chown -R mysql:mysql /var/lib/mysql`
+* after the previous step you might have to fix file permissions: `chown -R mysql:mysql /var/lib/mysql`
 * in case of restoring for a replication slave you can follow the [official docs](https://mariadb.com/kb/en/setting-up-a-replication-slave-with-mariabackup/#gtids)
 * for PITR, replay binlogs with
 ```
