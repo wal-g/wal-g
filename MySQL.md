@@ -201,7 +201,7 @@ Restore procedure is straightforward:
 
 ### MariaDB - using with `mariabackup`
 
-It's recommended to use wal-g with mariabackup tool in case of MariaDB for creating lock-less backups.
+It's recommended to use wal-g with `mariabackup` tool in case of MariaDB for creating lock-less backups.
 Here's typical wal-g configuration for that case:
 ```
  WALG_MYSQL_DATASOURCE_NAME=user:pass@tcp(localhost:3305)/mysql                                                                                                                                      
@@ -211,7 +211,7 @@ Here's typical wal-g configuration for that case:
  WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
 ```
 
-For the restore procedure you can follow the major part of [the offical docs for full backup and restore](https://mariadb.com/kb/en/full-backup-and-restore-with-mariabackup/):
+For the restore procedure you have to do similar things to [what the offical docs says about full backup and restore](https://mariadb.com/kb/en/full-backup-and-restore-with-mariabackup/):
 * stop mariadb
 * clean a datadir (typically `/var/lib/mysql`)
 * fetch and prepare desired backup using `wal-g backup-fetch "backup_name"`
