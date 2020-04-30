@@ -41,7 +41,7 @@ wal-g backup-fetch example_backup
 ```
 
 Variable _WALG_STREAM_RESTORE_COMMAND_ is required for use backup-fetch
-(eg. ```TMP_DIR=\$(mktemp -d) && chmod 777 \$TMP_DIR && tar -xf - -C \$TMP_DIR && BACKUP_DIR=\$(find \$TMP_DIR -mindepth 1 -print -quit) && fdbrestore start -r file://\$BACKUP_DIR -w --dest_cluster_file "/etc/foundationdb/fdb.cluster"  1>&2```)
+(eg. ```TMP_DIR=$(mktemp -d) && chmod 777 $TMP_DIR && tar -xf - -C $TMP_DIR && BACKUP_DIR=$(find $TMP_DIR -mindepth 1 -print -quit) && fdbrestore start -r file://$BACKUP_DIR -w --dest_cluster_file "/etc/foundationdb/fdb.cluster"  1>&2```)
 
 WAL-G can also fetch the latest backup using:
 
@@ -58,6 +58,6 @@ wal-g backup-push
 ```
 
 Variable _WALG_STREAM_CREATE_COMMAND_ is required for use backup-push 
-(eg. ```TMP_DIR=\$(mktemp -d) && chmod 777 \$TMP_DIR && fdbbackup start -d file://\$TMP_DIR -w 1>&2 && tar -c -C \$TMP_DIR .```)
+(eg. ```TMP_DIR=$(mktemp -d) && chmod 777 $TMP_DIR && fdbbackup start -d file://$TMP_DIR -w 1>&2 && tar -c -C $TMP_DIR .```)
 
 

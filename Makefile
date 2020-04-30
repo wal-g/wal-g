@@ -26,7 +26,7 @@ endif
 
 .PHONY: unittest fmt lint install clean
 
-test: install deps lint unittest pg_build mysql_build redis_build mongo_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test
+test: install deps lint unittest pg_build mysql_build redis_build mongo_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test
 
 pg_test: install deps pg_build lint unlink_brotli pg_integration_test
 
@@ -117,6 +117,11 @@ fdb_build: $(CMD_FILES) $(PKG_FILES)
 
 fdb_install: fdb_build
 	mv $(MAIN_FDB_PATH)/wal-g $(GOBIN)/wal-g
+
+fdb_integration_test: load_docker_common
+	docker-compose down -v
+	docker-compose build fdb_tests
+	docker-compose up --force-recreate --renew-anon-volumes --exit-code-from fdb_tests fdb_tests
 
 redis_test: install deps redis_build lint unlink_brotli redis_integration_test
 
