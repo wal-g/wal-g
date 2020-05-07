@@ -89,11 +89,20 @@ func (dbf *DBFetcher) OplogFrom(ctx context.Context, from models.Timestamp, wg *
 			// TODO: move to separate component and fetch last writes in background
 			for models.LessTS(majTs, op.TS) {
 				time.Sleep(dbf.lwInterval)
-				_, majTs, err = dbf.db.LastWriteTS(ctx)
+
+				im, err := dbf.db.IsMaster(ctx)
 				if err != nil {
 					errc <- err
 					return
 				}
+
+				// TODO: support archiving from secondary
+				if !im.IsMaster {
+					errc <- fmt.Errorf("current node is not a primary")
+					return
+				}
+
+				majTs = im.LastWrite.MajorityOpTime.TS
 			}
 
 			if !fromFound {
