@@ -15,15 +15,22 @@ import (
 )
 
 // This test has known race condition
-// We expect that background worker will upload 100 files.
+// We expect that background worker will upload 32 files.
 // But we have no guaranties for this
 func TestBackgroundWALUpload(t *testing.T) {
 
 	internal.InitConfig()
-	iterNum, _ := strconv.ParseInt(internal.TotalBgUploadedLimit, 10, 32)
+	totalBgUploadedLimitStr, ok := internal.GetSetting(internal.TotalBgUploadedLimit)
+	if !ok {
+		t.Fatalf("failed to get setting for %s", internal.TotalBgUploadedLimit)
+	}
+	numBgUploadFiles, err := strconv.Atoi(totalBgUploadedLimitStr)
+	if err != nil {
+		t.Fatalf("failed to parse setting for %s: %v", internal.TotalBgUploadedLimit, err)
+	}
 
 	dir, a := setupArchiveStatus(t, "")
-	for i := 0; i < int(iterNum); i++ {
+	for i := 0; i < int(numBgUploadFiles); i++ {
 		addTestDataFile(t, dir, i)
 	}
 
@@ -37,7 +44,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 
 	walgDataDir := internal.GetDataFolderPath()
 
-	for i := 0; i < int(iterNum); i++ {
+	for i := 0; i < int(numBgUploadFiles); i++ {
 		bname := "B" + strconv.Itoa(i)
 		bd := filepath.Join(walgDataDir, "walg_archive_status", bname)
 		_, err := os.Stat(bd)
