@@ -63,8 +63,9 @@ func NewBgUploader(walFilePath string, maxParallelWorkers int32, maxNumUploaded 
 
 // Start up checking what's inside archive_status
 func (b *BgUploader) Start() {
-	if b.maxParallelWorkers < 1 {
-		return // Nothing to start
+	// Exit early if BgUploader is effectively disabled
+	if b.maxParallelWorkers < 1 || b.maxNumUploaded < 1 {
+		return
 	}
 
 	go b.scanFiles()
