@@ -36,6 +36,8 @@ func TestBackgroundWALUpload(t *testing.T) {
 
 	// Re-use generated data to test uploading WAL.
 	tu := testtools.NewMockWalUploader(false, false)
+	fakeASM := internal.NewFakeASM()
+	tu.ArchiveStatusManager = fakeASM
 	bu := internal.NewBgUploader(a, 16, tu, false)
 	// Look for new WALs while doing main upload
 	bu.Start()
@@ -46,9 +48,8 @@ func TestBackgroundWALUpload(t *testing.T) {
 
 	for i := 0; i < int(numBgUploadFiles); i++ {
 		bname := "B" + strconv.Itoa(i)
-		bd := filepath.Join(walgDataDir, "walg_archive_status", bname)
-		_, err := os.Stat(bd)
-		assert.Falsef(t, os.IsNotExist(err), bname+" status file was not created")
+		wasUploaded := fakeASM.IsWalAlreadyUploaded(bname)
+		assert.True(t, wasUploaded, bname+" was not marked as uploaded")
 	}
 
 	cleanup(t, dir)
