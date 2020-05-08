@@ -18,44 +18,84 @@ import (
 // This test has known race condition. We expect that background worker will
 // upload 32 files. But we have no guarantees for this.
 func TestBackgroundWALUpload(t *testing.T) {
-
-	internal.InitConfig()
-	totalBgUploadedLimitStr, ok := internal.GetSetting(internal.TotalBgUploadedLimit)
-	if !ok {
-		t.Fatalf("failed to get setting for %s", internal.TotalBgUploadedLimit)
+	tests := []struct {
+		name                 string
+		numFilesOnDisk       int
+		maxNumFilesUploaded  int
+		maxParallelism       int
+		wantNumFilesUploaded int
+	}{
+		{
+			name:                 "parallelism=1",
+			numFilesOnDisk:       100,
+			maxNumFilesUploaded:  32,
+			maxParallelism:       1,
+			wantNumFilesUploaded: 32,
+		},
+		{
+			name:                 "parallelism=10",
+			numFilesOnDisk:       100,
+			maxNumFilesUploaded:  32,
+			maxParallelism:       10,
+			wantNumFilesUploaded: 32,
+		},
+		{
+			name:                 "parallelism=100 and fewer files on disk",
+			numFilesOnDisk:       16,
+			maxNumFilesUploaded:  32,
+			maxParallelism:       100,
+			wantNumFilesUploaded: 16,
+		},
+		{
+			name:                 "parallelism=100 and extra files on disk",
+			numFilesOnDisk:       100,
+			maxNumFilesUploaded:  32,
+			maxParallelism:       100,
+			wantNumFilesUploaded: 32,
+		},
 	}
-	numBgUploadFiles, err := strconv.Atoi(totalBgUploadedLimitStr)
-	if err != nil {
-		t.Fatalf("failed to parse setting for %s: %v", internal.TotalBgUploadedLimit, err)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			internal.InitConfig()
+			totalBgUploadedLimitStr, ok := internal.GetSetting(internal.TotalBgUploadedLimit)
+			if !ok {
+				t.Fatalf("failed to get setting for %s", internal.TotalBgUploadedLimit)
+			}
+			numBgUploadFiles, err := strconv.Atoi(totalBgUploadedLimitStr)
+			if err != nil {
+				t.Fatalf("failed to parse setting for %s: %v", internal.TotalBgUploadedLimit, err)
+			}
+
+			dir, a := setupArchiveStatus(t, "")
+			// create more files than the TotalBgUploadedLimit
+			for i := 0; i < tt.numFilesOnDisk; i++ {
+				addTestDataFile(t, dir, i)
+			}
+
+			// Re-use generated data to test uploading WAL.
+			tu := testtools.NewMockWalUploader(false, false)
+			fakeASM := internal.NewFakeASM()
+			tu.ArchiveStatusManager = fakeASM
+			bu := internal.NewBgUploader(a, int32(tt.maxParallelism), int32(numBgUploadFiles), tu, false)
+
+			// Look for new WALs while doing main upload
+			bu.Start()
+			time.Sleep(time.Second) // time to spin up new uploaders
+			bu.Stop()
+
+			walgDataDir := internal.GetDataFolderPath()
+
+			for i := 0; i < tt.wantNumFilesUploaded; i++ {
+				bname := testFilename(i)
+				wasUploaded := fakeASM.IsWalAlreadyUploaded(bname)
+				assert.True(t, wasUploaded, bname+" was not marked as uploaded")
+			}
+
+			cleanup(t, dir)
+			cleanup(t, walgDataDir)
+		})
 	}
-
-	dir, a := setupArchiveStatus(t, "")
-	// create more files than the TotalBgUploadedLimit
-	for i := 0; i < int(numBgUploadFiles)+100; i++ {
-		addTestDataFile(t, dir, i)
-	}
-
-	// Re-use generated data to test uploading WAL.
-	tu := testtools.NewMockWalUploader(false, false)
-	fakeASM := internal.NewFakeASM()
-	tu.ArchiveStatusManager = fakeASM
-	bu := internal.NewBgUploader(a, 16, tu, false)
-
-	// Look for new WALs while doing main upload
-	bu.Start()
-	time.Sleep(time.Second) // time to spin up new uploaders
-	bu.Stop()
-
-	walgDataDir := internal.GetDataFolderPath()
-
-	for i := 0; i < int(numBgUploadFiles); i++ {
-		bname := testFilename(i)
-		wasUploaded := fakeASM.IsWalAlreadyUploaded(bname)
-		assert.True(t, wasUploaded, bname+" was not marked as uploaded")
-	}
-
-	cleanup(t, dir)
-	cleanup(t, walgDataDir)
 }
 
 func setupArchiveStatus(t *testing.T, dir string) (string, string) {
