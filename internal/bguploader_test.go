@@ -1,6 +1,7 @@
 package internal_test
 
 import (
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -14,9 +15,8 @@ import (
 	"github.com/wal-g/wal-g/testtools"
 )
 
-// This test has known race condition
-// We expect that background worker will upload 32 files.
-// But we have no guaranties for this
+// This test has known race condition. We expect that background worker will
+// upload 32 files. But we have no guarantees for this.
 func TestBackgroundWALUpload(t *testing.T) {
 
 	internal.InitConfig()
@@ -30,7 +30,8 @@ func TestBackgroundWALUpload(t *testing.T) {
 	}
 
 	dir, a := setupArchiveStatus(t, "")
-	for i := 0; i < int(numBgUploadFiles); i++ {
+	// create more files than the TotalBgUploadedLimit
+	for i := 0; i < int(numBgUploadFiles)+100; i++ {
 		addTestDataFile(t, dir, i)
 	}
 
@@ -39,6 +40,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 	fakeASM := internal.NewFakeASM()
 	tu.ArchiveStatusManager = fakeASM
 	bu := internal.NewBgUploader(a, 16, tu, false)
+
 	// Look for new WALs while doing main upload
 	bu.Start()
 	time.Sleep(time.Second) // time to spin up new uploaders
@@ -47,7 +49,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 	walgDataDir := internal.GetDataFolderPath()
 
 	for i := 0; i < int(numBgUploadFiles); i++ {
-		bname := "B" + strconv.Itoa(i)
+		bname := testFilename(i)
 		wasUploaded := fakeASM.IsWalAlreadyUploaded(bname)
 		assert.True(t, wasUploaded, bname+" was not marked as uploaded")
 	}
@@ -97,7 +99,7 @@ func setupArchiveStatus(t *testing.T, dir string) (string, string) {
 }
 
 func addTestDataFile(t *testing.T, dir string, i int) {
-	bname := "B" + strconv.Itoa(i)
+	bname := testFilename(i)
 	b := filepath.Join(dir, bname)
 
 	if _, err := os.Stat(b); os.IsNotExist(err) {
@@ -116,6 +118,10 @@ func addTestDataFile(t *testing.T, dir string, i int) {
 		}
 		file.Close()
 	}
+}
+
+func testFilename(i int) string {
+	return fmt.Sprintf("B%010d", i)
 }
 
 func cleanup(t *testing.T, dir string) {
