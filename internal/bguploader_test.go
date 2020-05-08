@@ -43,9 +43,16 @@ func TestBackgroundWALUpload(t *testing.T) {
 		{
 			name:                 "parallelism=1 with lots of files",
 			maxParallelism:       1,
-			numFilesOnDisk:       100,
+			numFilesOnDisk:       200,
 			maxNumFilesUploaded:  32,
 			wantNumFilesUploaded: 32,
+		},
+		{
+			name:                 "parallelism=3 with lots of files",
+			maxParallelism:       3,
+			numFilesOnDisk:       200,
+			maxNumFilesUploaded:  150,
+			wantNumFilesUploaded: 150,
 		},
 		{
 			name:                 "parallelism=10",
