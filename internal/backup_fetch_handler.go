@@ -74,9 +74,18 @@ func GetPgFetcher(dbDataDirectory, fileMask, restoreSpecPath string) func(folder
 		if restoreSpecPath != "" {
 			spec = &TablespaceSpec{}
 			err := readRestoreSpec(restoreSpecPath, spec)
-			errMessege := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
-			tracelog.ErrorLogger.FatalfOnError(errMessege, err)
+			errMessage := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
+			tracelog.ErrorLogger.FatalfOnError(errMessage, err)
 		}
+
+		// directory must be empty before starting a deltaFetch
+		isEmpty, err := isDirectoryEmpty(dbDataDirectory)
+		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+
+		if !isEmpty {
+			tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", newNonEmptyDbDataDirectoryError(dbDataDirectory))
+		}
+
 		err = deltaFetchRecursion(backup.Name, folder, utility.ResolveSymlink(dbDataDirectory), spec, filesToUnwrap)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 	}
