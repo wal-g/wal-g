@@ -44,6 +44,8 @@ var oplogPushCmd = &cobra.Command{
 		// set up mongodb client and oplog fetcher
 		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl)
 		tracelog.ErrorLogger.FatalOnError(err)
+		err = mongoClient.EnsureIsMaster(ctx)
+		tracelog.ErrorLogger.FatalOnError(err)
 
 		lwUpdate, err := internal.GetLastWriteUpdateInterval()
 		tracelog.ErrorLogger.FatalOnError(err)
