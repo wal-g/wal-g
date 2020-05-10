@@ -28,20 +28,29 @@ type BgUploader struct {
 	// cancelFunc signals internals to stop enqueuing more uploads
 	cancelFunc context.CancelFunc
 
-	// workerCount tracks number of concurrent uploaders. Limited to maxParallelWorkers
-	workerCount *semaphore.Weighted
-	// maxParallelWorkers usually defined by WALG_DOWNLOAD_CONCURRENCY
+	// workerCountSem tracks number of concurrent uploaders. Limited to
+	// maxParallelWorkers.
+	workerCountSem *semaphore.Weighted
+	// maxParallelWorkers defines the maximum number of concurrent uploading
+	// files. Usually defined by WALG_DOWNLOAD_CONCURRENCY
 	maxParallelWorkers int32
 
-	// numUploaded is tracked to control amount of work done in one cycle of archive_command
+	// numUploaded counts the number of files uploaded by BgUploader
 	numUploaded int32
-	// maxNumUploaded controls the amount of work done in one cycle of archive_command
+	// maxNumUploaded controls the amount of work done in one cycle of
+	// archive_command. Usually defined by TOTAL_BG_UPLOADED_LIMIT. This is
+	// not enforced exactly. Actual number of files uploaded may be up to
+	// maxParallelWorkers higher than this setting.
 	maxNumUploaded int32
 
-	// started tracks filenames of ongoing and complete uploads to avoid repeating work
+	// started tracks filenames of ongoing and complete uploads to avoid
+	// repeating work
 	started map[string]struct{}
 }
 
+// NewBgUploader creates a new BgUploader which looks for WAL files adjacent to
+// walFilePath. maxParallelWorkers and maxNumUploaded limits maximum concurrency
+// and total work done by this BgUploader respectively.
 func NewBgUploader(walFilePath string, maxParallelWorkers int32, maxNumUploaded int32, uploader *WalUploader, preventWalOverwrite bool) *BgUploader {
 	started := make(map[string]struct{})
 	started[filepath.Base(walFilePath)+readySuffix] = struct{}{}
@@ -53,7 +62,7 @@ func NewBgUploader(walFilePath string, maxParallelWorkers int32, maxNumUploaded 
 
 		ctx:                ctx,
 		cancelFunc:         cancelFunc,
-		workerCount:        semaphore.NewWeighted(int64(maxParallelWorkers)),
+		workerCountSem:     semaphore.NewWeighted(int64(maxParallelWorkers)),
 		maxParallelWorkers: maxParallelWorkers,
 		numUploaded:        0,
 		maxNumUploaded:     maxNumUploaded,
@@ -68,7 +77,7 @@ func (b *BgUploader) Start() {
 		return
 	}
 
-	go b.scanFiles()
+	go b.scanAndProcessFiles()
 }
 
 // Stop pipeline. Stop can be safely called concurrently and repeatedly.
@@ -76,13 +85,15 @@ func (b *BgUploader) Stop() {
 	// Send signal to stop scanning for and uploading new files
 	b.cancelFunc()
 	// Wait for all running uploads
-	b.workerCount.Acquire(context.TODO(), int64(b.maxParallelWorkers))
+	b.workerCountSem.Acquire(context.TODO(), int64(b.maxParallelWorkers))
 }
 
 var readySuffix = ".ready"
 var archiveStatus = "archive_status"
 
-func (b *BgUploader) scanFiles() {
+// scanAndProcessFiles scans directory for WAL segments and attempts to upload them. It
+// makes best effort attempts to avoid duplicating work (re-uploading files).
+func (b *BgUploader) scanAndProcessFiles() {
 	fileChan := make(chan os.FileInfo)
 	defer close(fileChan)
 	go b.processFiles(fileChan)
@@ -117,7 +128,9 @@ func (b *BgUploader) scanFiles() {
 // when the input channel is closed. processFiles also tracks number of
 // successfully uploaded WAL files and signals to BgUploader when total count
 // has exceeded maxNumUploaded. Concurrency is controlled by semaphore in
-// BgUploader
+// BgUploader.
+//
+// This function should only be invoked once (in scanFiles)
 func (b *BgUploader) processFiles(fileChan <-chan os.FileInfo) {
 	var numUploaded int32 = 0
 	for {
@@ -136,10 +149,10 @@ func (b *BgUploader) processFiles(fileChan <-chan os.FileInfo) {
 		}
 
 		b.started[name] = struct{}{}
-		if err := b.workerCount.Acquire(b.ctx, 1); err == nil {
+		if err := b.workerCountSem.Acquire(b.ctx, 1); err == nil {
 			go func() {
 				uploadedFile := b.upload(name)
-				b.workerCount.Release(1)
+				b.workerCountSem.Release(1)
 				if uploadedFile {
 					if atomic.AddInt32(&numUploaded, 1) >= b.maxNumUploaded {
 						b.cancelFunc()
@@ -150,11 +163,14 @@ func (b *BgUploader) processFiles(fileChan <-chan os.FileInfo) {
 	}
 }
 
+// shouldSkipFile returns true when the file in question has either already been
+// uploaded or if the filename doesn't match the expected pattern
 func (b *BgUploader) shouldSkipFile(filename string) bool {
 	return !strings.HasSuffix(filename, readySuffix) || b.uploader.ArchiveStatusManager.isWalAlreadyUploaded(filename)
 }
 
-// upload one WAL file. Returns true if the file was uploaded and false if the upload failed.
+// upload one WAL file. Returns true if the file was uploaded and false if the
+// upload failed.
 func (b *BgUploader) upload(walStatusFilename string) bool {
 	walFilename := strings.TrimSuffix(walStatusFilename, readySuffix)
 	err := uploadWALFile(b.uploader.clone(), filepath.Join(b.dir, walFilename), b.preventWalOverwrite)
@@ -164,7 +180,7 @@ func (b *BgUploader) upload(walStatusFilename string) bool {
 	}
 
 	if err := b.uploader.ArchiveStatusManager.markWalUploaded(walFilename); err != nil {
-		tracelog.ErrorLogger.Printf("Error mark wal file %s uploader due %v", walFilename, err)
+		tracelog.ErrorLogger.Printf("Error marking wal file %s as uploaded: %v", walFilename, err)
 	}
 
 	return true
