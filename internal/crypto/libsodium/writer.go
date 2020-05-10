@@ -111,7 +111,7 @@ func (writer *Writer) writeNextChunk(last bool) (err error) {
 
 // Close implements io.Closer
 func (writer *Writer) Close() (err error) {
-	if closer, ok := writer.Writer.(io.WriteCloser); ok {
+	if closer, ok := writer.Writer.(io.Closer); ok {
 		defer closer.Close()
 	}
 	return writer.writeNextChunk(true)
