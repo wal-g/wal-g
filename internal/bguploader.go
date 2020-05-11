@@ -13,6 +13,20 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+const (
+	// readySuffix is the filename suffix indicating WAL archives which are
+	// ready for upload
+	readySuffix = ".ready"
+
+	// archiveStatusDir is the subdirectory containing status files of WAL
+	// segments
+	archiveStatusDir = "archive_status"
+
+	// pollPause defines the amount of time to pause before scanning the
+	// filesystem again to find WAL segments
+	pollPause = 5 * time.Second
+)
+
 // BgUploader represents the state of concurrent WAL upload
 type BgUploader struct {
 	// pg_[wals|xlog]
@@ -88,9 +102,6 @@ func (b *BgUploader) Stop() {
 	b.workerCountSem.Acquire(context.TODO(), int64(b.maxParallelWorkers))
 }
 
-var readySuffix = ".ready"
-var archiveStatus = "archive_status"
-
 // scanAndProcessFiles scans directory for WAL segments and attempts to upload them. It
 // makes best effort attempts to avoid duplicating work (re-uploading files).
 func (b *BgUploader) scanAndProcessFiles() {
@@ -99,7 +110,7 @@ func (b *BgUploader) scanAndProcessFiles() {
 	go b.processFiles(fileChan)
 
 	for {
-		files, err := ioutil.ReadDir(filepath.Join(b.dir, archiveStatus))
+		files, err := ioutil.ReadDir(filepath.Join(b.dir, archiveStatusDir))
 		if err != nil {
 			tracelog.ErrorLogger.Print("Error of parallel upload: ", err)
 			return
@@ -118,7 +129,7 @@ func (b *BgUploader) scanAndProcessFiles() {
 		select {
 		case <-b.ctx.Done():
 			return
-		case <-time.After(5 * time.Second):
+		case <-time.After(pollPause):
 		}
 	}
 
