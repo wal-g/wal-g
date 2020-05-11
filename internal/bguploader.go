@@ -22,9 +22,9 @@ const (
 	// segments
 	archiveStatusDir = "archive_status"
 
-	// pollPause defines the amount of time to pause before scanning the
+	// pollPauseDuration defines the amount of time to pause before scanning the
 	// filesystem again to find WAL segments
-	pollPause = 5 * time.Second
+	pollPauseDuration = 100 * time.Millisecond
 )
 
 // BgUploader represents the state of concurrent WAL upload
@@ -129,7 +129,7 @@ func (b *BgUploader) scanAndProcessFiles() {
 		select {
 		case <-b.ctx.Done():
 			return
-		case <-time.After(pollPause):
+		case <-time.After(pollPauseDuration):
 		}
 	}
 
