@@ -3,6 +3,7 @@ package archive
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/wal-g/wal-g/internal"
@@ -21,15 +22,17 @@ type ErrWaiter interface {
 type Uploader interface {
 	UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error // TODO: rename firstTS
 	UploadGapArchive(err error, firstTS, lastTS models.Timestamp) error
-	UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider BackupMetaProvider) error
+	UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider MongoMetaProvider) error
 	FileExtension() string
 }
 
 // Downloader defines interface to fetch mongodb oplog archives
 type Downloader interface {
-	Sentinel(name string) (StreamSentinelDto, error) // TODO: reformat backup json, we use text for now
+	BackupMeta(name string) (Backup, error)
 	DownloadOplogArchive(arch models.Archive, writeCloser io.WriteCloser) error
 	ListOplogArchives() ([]models.Archive, error)
+	LoadBackups(names []string) ([]Backup, error)
+	ListBackupNames() ([]internal.BackupTime, error)
 }
 
 // StorageDownloader extends base folder with mongodb specific.
@@ -49,15 +52,55 @@ func NewStorageDownloader(path string) (*StorageDownloader, error) {
 	return &StorageDownloader{folder}, nil
 }
 
-// Sentinel downloads sentinel contents.
-func (sd *StorageDownloader) Sentinel(name string) (StreamSentinelDto, error) {
+// BackupMeta downloads sentinel contents.
+func (sd *StorageDownloader) BackupMeta(name string) (Backup, error) {
 	backup := internal.NewBackup(sd.folder.GetSubFolder(utility.BaseBackupPath), name)
-	var sentinel StreamSentinelDto
+	var sentinel Backup
 	err := internal.FetchStreamSentinel(backup, &sentinel)
 	if err != nil {
-		return StreamSentinelDto{}, fmt.Errorf("can not fetch stream sentinel: %w", err)
+		return Backup{}, fmt.Errorf("can not fetch stream sentinel: %w", err)
 	}
+	if sentinel.BackupName == "" {
+		sentinel.BackupName = name
+	}
+
 	return sentinel, nil
+}
+
+func (sd *StorageDownloader) LoadBackups(names []string) ([]Backup, error) {
+	backups := make([]Backup, 0, len(names))
+	for _, name := range names {
+		backup, err := sd.BackupMeta(name)
+		if err != nil {
+			return nil, err
+		}
+		backups = append(backups, backup)
+	}
+	sort.Slice(backups, func(i, j int) bool {
+		return backups[i].FinishLocalTime.After(backups[j].FinishLocalTime)
+	})
+
+	return backups, nil
+}
+
+func (sd *StorageDownloader) ListBackupNames() ([]internal.BackupTime, error) {
+	backupObjects, _, err := sd.folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
+	if err != nil {
+		return nil, err
+	}
+	sortTimes := make([]internal.BackupTime, 0, len(backupObjects))
+	for _, object := range backupObjects {
+		key := object.GetName()
+		if !strings.HasSuffix(key, utility.SentinelSuffix) {
+			continue
+		}
+		mtime := object.GetLastModified()
+		sortTimes = append(sortTimes, internal.BackupTime{BackupName: utility.StripBackupName(key), Time: mtime, WalFileName: utility.StripWalFileName(key)})
+	}
+	sort.Slice(sortTimes, func(i, j int) bool {
+		return sortTimes[i].Time.After(sortTimes[j].Time)
+	})
+	return sortTimes, nil
 }
 
 // DownloadOplogArchive downloads, decompresses and decrypts (if needed) oplog archive.
@@ -132,7 +175,7 @@ func (su *StorageUploader) UploadGapArchive(archErr error, firstTS, lastTS model
 }
 
 // UploadBackup compresses a stream and uploads it.
-func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider BackupMetaProvider) error {
+func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider MongoMetaProvider) error {
 	timeStart := utility.TimeNowCrossPlatformLocal()
 	backupName, err := su.PushStream(stream)
 	if err != nil {
@@ -147,13 +190,13 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaPro
 		return err
 	}
 
-	currentBackupSentinelDto := &StreamSentinelDto{
+	backupSentinel := &Backup{
 		StartLocalTime:  timeStart,
 		FinishLocalTime: utility.TimeNowCrossPlatformLocal(),
 		UserData:        internal.GetSentinelUserData(),
 		MongoMeta:       metaProvider.Meta(),
 	}
-	return internal.UploadSentinel(su.Uploader, currentBackupSentinelDto, backupName)
+	return internal.UploadSentinel(su.Uploader, backupSentinel, backupName)
 }
 
 // FileExtension returns current file extension (based on configured compression)
