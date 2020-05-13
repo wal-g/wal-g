@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	driverAppName		= "wal-g-mongo"
+	driverAppName       = "wal-g-mongo"
 	oplogDatabaseName   = "local"
 	oplogCollectionName = "oplog.rs"
 )
@@ -86,9 +86,9 @@ type MongoClient struct {
 func NewMongoClient(ctx context.Context, uri string) (*MongoClient, error) {
 	client, err := mongo.Connect(ctx,
 		options.Client().ApplyURI(uri).
-		SetAppName(driverAppName).
-		SetDirect(true).
-		SetRetryReads(false))
+			SetAppName(driverAppName).
+			SetDirect(true).
+			SetRetryReads(false))
 	if err != nil {
 		return nil, err
 	}

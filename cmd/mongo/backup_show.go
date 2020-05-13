@@ -33,8 +33,8 @@ var backupShowCmd = &cobra.Command{
 		err = mongo.HandleBackupShow(
 			downloader,
 			args[0],
-			func(dto archive.StreamSentinelDto) (bytes []byte, err error) {
-				return json.Marshal(dto)
+			func(b archive.Backup) (bytes []byte, err error) {
+				return json.Marshal(b)
 			},
 			os.Stdout)
 		tracelog.ErrorLogger.FatalOnError(err)
