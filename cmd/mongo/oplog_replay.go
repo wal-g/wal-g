@@ -46,7 +46,7 @@ var oplogReplayCmd = &cobra.Command{
 		oplogApplier := stages.NewGenericApplier(dbApplier)
 
 		// set up storage downloader client
-		downloader, err := archive.NewStorageDownloader(models.OplogArchBasePath)
+		downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		// discover archive sequence to replay

@@ -156,36 +156,8 @@ func (w *WalgUtil) Backups() ([]string, error) {
 	return BackupNamesFromListing(exec.Combined()), nil
 }
 
-func (w *WalgUtil) PurgeAll() error {
-	_, err := w.runCmd([]string{"delete", "everything", "--confirm"})
-	return err
-}
-
 func (w *WalgUtil) PurgeRetain(keepNumber int) error {
-	_, err := w.runCmd([]string{"delete", "retain", strconv.Itoa(keepNumber), "--confirm"})
-	return err
-}
-
-func (w *WalgUtil) PurgeAfterNum(keepNumber int, afterBackupNum int) error {
-	backups, err := w.Backups()
-	if err != nil {
-		return err
-	}
-
-	if afterBackupNum >= len(backups) {
-		return fmt.Errorf("only %d backups exists, backup #%d is not found", len(backups), afterBackupNum)
-	}
-
-	_, err = w.runCmd([]string{
-		"delete", "retain", strconv.Itoa(keepNumber), "--after", backups[len(backups)-afterBackupNum-1], "--confirm"})
-
-	return err
-}
-
-func (w *WalgUtil) PurgeAfterTime(keepNumber int, timeLine time.Time) error {
-	_, err := w.runCmd([]string{
-		"delete", "retain", strconv.Itoa(keepNumber), "--after", timeLine.Format(time.RFC3339), "--confirm",
-	})
+	_, err := w.runCmd([]string{"delete", "--retain-count", strconv.Itoa(keepNumber), "--confirm"})
 	return err
 }
 

@@ -27,7 +27,7 @@ var backupShowCmd = &cobra.Command{
 		defer func() { _ = signalHandler.Close() }()
 
 		// set up storage downloader client
-		downloader, err := archive.NewStorageDownloader("")
+		downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		err = mongo.HandleBackupShow(

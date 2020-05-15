@@ -159,16 +159,6 @@ func (tctx *TestContext) replayOplog(backupId int, timestampId string, container
 	return walg.OplogReplay(from, until)
 }
 
-func (tctx *TestContext) purgeBackupsAfterTime(retainCount int, timestampId string, container string) error {
-	walg := WalgUtilFromTestContext(tctx, container)
-	afterTime := time.Unix(int64(tctx.AuxData.Timestamps[timestampId].TS), 0)
-	return walg.PurgeAfterTime(retainCount, afterTime)
-}
-
-func (tctx *TestContext) purgeBackupsAfterID(retainCount int, afterBackupId int, container string) error {
-	walg := WalgUtilFromTestContext(tctx, container)
-	return walg.PurgeAfterNum(retainCount, afterBackupId)
-}
 
 func (tctx *TestContext) purgeDataDir(host string) error {
 	mc, err := MongoCtlFromTestContext(tctx, host)
