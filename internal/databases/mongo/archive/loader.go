@@ -35,26 +35,43 @@ type Downloader interface {
 	ListBackupNames() ([]internal.BackupTime, error)
 }
 
+type Purger interface {
+	DeleteBackups(backups []Backup) error
+	DeleteOplogArchives(archives []models.Archive) error
+}
+
+// StorageSettings defines storage relative paths
+type StorageSettings struct {
+	oplogsPath  string
+	backupsPath string
+}
+
+// NewDefaultStorageSettings builds default storage settings struct
+func NewDefaultStorageSettings() StorageSettings {
+	return StorageSettings{
+		oplogsPath:  models.OplogArchBasePath,
+		backupsPath: utility.BaseBackupPath,
+	}
+}
+
 // StorageDownloader extends base folder with mongodb specific.
 type StorageDownloader struct {
-	folder storage.Folder
+	oplogsFolder  storage.Folder
+	backupsFolder storage.Folder
 }
 
 // NewStorageDownloader builds mongodb downloader.
-func NewStorageDownloader(path string) (*StorageDownloader, error) {
+func NewStorageDownloader(opts StorageSettings) (*StorageDownloader, error) {
 	folder, err := internal.ConfigureFolder()
 	if err != nil {
 		return nil, err
 	}
-	if path != "" {
-		folder = folder.GetSubFolder(path)
-	}
-	return &StorageDownloader{folder}, nil
+	return &StorageDownloader{oplogsFolder: folder.GetSubFolder(opts.oplogsPath), backupsFolder: folder.GetSubFolder(opts.backupsPath)}, nil
 }
 
 // BackupMeta downloads sentinel contents.
 func (sd *StorageDownloader) BackupMeta(name string) (Backup, error) {
-	backup := internal.NewBackup(sd.folder.GetSubFolder(utility.BaseBackupPath), name)
+	backup := internal.NewBackup(sd.backupsFolder, name)
 	var sentinel Backup
 	err := internal.FetchStreamSentinel(backup, &sentinel)
 	if err != nil {
@@ -63,10 +80,10 @@ func (sd *StorageDownloader) BackupMeta(name string) (Backup, error) {
 	if sentinel.BackupName == "" {
 		sentinel.BackupName = name
 	}
-
 	return sentinel, nil
 }
 
+// LoadBackups downloads backups metadata
 func (sd *StorageDownloader) LoadBackups(names []string) ([]Backup, error) {
 	backups := make([]Backup, 0, len(names))
 	for _, name := range names {
@@ -79,12 +96,12 @@ func (sd *StorageDownloader) LoadBackups(names []string) ([]Backup, error) {
 	sort.Slice(backups, func(i, j int) bool {
 		return backups[i].FinishLocalTime.After(backups[j].FinishLocalTime)
 	})
-
 	return backups, nil
 }
 
+// ListBackupNames lists backups in folder
 func (sd *StorageDownloader) ListBackupNames() ([]internal.BackupTime, error) {
-	backupObjects, _, err := sd.folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
+	backupObjects, _, err := sd.backupsFolder.ListFolder()
 	if err != nil {
 		return nil, err
 	}
@@ -105,14 +122,14 @@ func (sd *StorageDownloader) ListBackupNames() ([]internal.BackupTime, error) {
 
 // DownloadOplogArchive downloads, decompresses and decrypts (if needed) oplog archive.
 func (sd *StorageDownloader) DownloadOplogArchive(arch models.Archive, writeCloser io.WriteCloser) error {
-	return internal.DownloadFile(sd.folder, arch.Filename(), arch.Extension(), writeCloser)
+	return internal.DownloadFile(sd.oplogsFolder, arch.Filename(), arch.Extension(), writeCloser)
 }
 
 // ListOplogArchives fetches all oplog archives existed in storage.
 func (sd *StorageDownloader) ListOplogArchives() ([]models.Archive, error) {
-	objects, _, err := sd.folder.ListFolder()
+	objects, _, err := sd.oplogsFolder.ListFolder()
 	if err != nil {
-		return nil, fmt.Errorf("can not list archive folder: %w", err)
+		return nil, fmt.Errorf("can not list oplog archives folder: %w", err)
 	}
 
 	archives := make([]models.Archive, 0, len(objects))
@@ -202,4 +219,47 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaPro
 // FileExtension returns current file extension (based on configured compression)
 func (su *StorageUploader) FileExtension() string {
 	return su.Compressor.FileExtension()
+}
+
+type StoragePurger struct {
+	oplogsFolder  storage.Folder
+	backupsFolder storage.Folder
+}
+
+// NewStorageDownloader builds mongodb downloader.
+func NewStoragePurger(opts StorageSettings) (*StoragePurger, error) {
+	folder, err := internal.ConfigureFolder()
+	if err != nil {
+		return nil, err
+	}
+
+	return &StoragePurger{oplogsFolder: folder.GetSubFolder(opts.oplogsPath), backupsFolder: folder.GetSubFolder(opts.backupsPath)}, nil
+}
+
+// DeleteBackups purges given backups files
+func (sp *StoragePurger) DeleteBackups(backups []Backup) error {
+	keys := make([]string, 0, len(backups)*2)
+	for _, backup := range backups {
+		b := internal.NewBackup(sp.backupsFolder, backup.BackupName)
+		dataKeys, err := b.GetTarNames()
+		if err != nil {
+			return err
+		}
+		keys = append(keys, dataKeys...)
+		keys = append(keys, b.GetStopSentinelPath())
+	}
+
+	if err := sp.backupsFolder.DeleteObjects(keys); err != nil {
+		return err
+	}
+	return nil
+}
+
+// DeleteOplogArchives purges given oplogs files
+func (sp *StoragePurger) DeleteOplogArchives(archives []models.Archive) error {
+	oplogKeys := make([]string, 0, len(archives))
+	for _, arch := range archives {
+		oplogKeys = append(oplogKeys, arch.Filename())
+	}
+	return sp.oplogsFolder.DeleteObjects(oplogKeys)
 }

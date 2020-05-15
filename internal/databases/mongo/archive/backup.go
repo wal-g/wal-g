@@ -139,11 +139,3 @@ func (m *MongoMetaDBProvider) Finalize() error {
 func (m *MongoMetaDBProvider) Meta() MongoMeta {
 	return m.meta
 }
-
-func BackupNamesFromBackupTimes(backups []internal.BackupTime) []string {
-	names := make([]string, 0, len(backups))
-	for _, b := range backups {
-		names = append(names, b.BackupName)
-	}
-	return names
-}

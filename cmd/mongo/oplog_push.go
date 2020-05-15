@@ -17,7 +17,6 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
-
 // oplogPushCmd represents the continuous oplog archiving procedure
 var oplogPushCmd = &cobra.Command{
 	Use:   "oplog-push",

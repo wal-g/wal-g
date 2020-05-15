@@ -2,16 +2,16 @@ package mongo
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"syscall"
-	"fmt"
 
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	"github.com/wal-g/wal-g/utility"
-	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
@@ -42,7 +42,7 @@ var oplogFetchCmd = &cobra.Command{
 		oplogApplier := stages.NewGenericApplier(formatApplier)
 
 		// set up storage downloader client
-		downloader, err := archive.NewStorageDownloader(models.OplogArchBasePath)
+		downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		// discover archive sequence to replay
