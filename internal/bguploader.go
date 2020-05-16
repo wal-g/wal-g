@@ -39,7 +39,8 @@ type BgUploader struct {
 
 	// ctx signals internals to keep/stop enqueueing more uploads
 	ctx context.Context
-	// cancelFunc signals internals to stop enqueuing more uploads
+	// cancelFunc signals internals to stop enqueuing more uploads. It is
+	// safe to call this function repeatedly and concurrently.
 	cancelFunc context.CancelFunc
 
 	// workerCountSem tracks number of concurrent uploaders. Limited to
@@ -94,11 +95,13 @@ func (b *BgUploader) Start() {
 	go b.scanAndProcessFiles()
 }
 
-// Stop pipeline. Stop can be safely called concurrently and repeatedly.
+// Stop pipeline. Stop can only be called once. Subsequent invokations will deadlock.
 func (b *BgUploader) Stop() {
 	// Send signal to stop scanning for and uploading new files
 	b.cancelFunc()
-	// Wait for all running uploads
+	// Wait for all running uploads. JANK: grabs all available worker slots
+	// and never releases them. This prevents this BgUploader for being
+	// restarted (or restopped) in the future.
 	b.workerCountSem.Acquire(context.TODO(), int64(b.maxParallelWorkers))
 }
 
@@ -124,8 +127,8 @@ func (b *BgUploader) scanAndProcessFiles() {
 			}
 		}
 
-		// Sleep 5 seconds before scanning filesystem again. Exit if
-		// BgUploader.Stop() has been invoked.
+		// Sleep pollPauseDuration before scanning filesystem again.
+		// Exit if BgUploader.Stop() has been invoked.
 		select {
 		case <-b.ctx.Done():
 			return
