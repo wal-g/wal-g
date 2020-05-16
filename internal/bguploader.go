@@ -2,8 +2,6 @@ package internal
 
 import (
 	"context"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -27,10 +25,16 @@ const (
 	pollPauseDuration = 100 * time.Millisecond
 )
 
-// BgUploader represents the state of concurrent WAL upload
+// BgUploader represents the state of concurrent WAL upload.
 type BgUploader struct {
+	// ArchiveStatusFolder is used to search for WAL segments to upload. The
+	// implementation can be mocked in tests to influence behavior.
+	ArchiveStatusFolder DataFolder
+
 	// pg_[wals|xlog]
 	dir string
+
+	initialWalSegment string
 
 	// uploading structure
 	uploader *WalUploader
@@ -67,11 +71,19 @@ type BgUploader struct {
 // walFilePath. maxParallelWorkers and maxNumUploaded limits maximum concurrency
 // and total work done by this BgUploader respectively.
 func NewBgUploader(walFilePath string, maxParallelWorkers int32, maxNumUploaded int32, uploader *WalUploader, preventWalOverwrite bool) *BgUploader {
+	initialWalSegment := filepath.Base(walFilePath)
+	walDir := filepath.Dir(walFilePath)
+
 	started := make(map[string]struct{})
-	started[filepath.Base(walFilePath)+readySuffix] = struct{}{}
+	started[initialWalSegment+readySuffix] = struct{}{}
+
 	ctx, cancelFunc := context.WithCancel(context.Background())
+
 	return &BgUploader{
-		dir:                 filepath.Dir(walFilePath),
+		ArchiveStatusFolder: &DiskDataFolder{filepath.Join(walDir, archiveStatusDir)},
+
+		dir:                 walDir,
+		initialWalSegment:   initialWalSegment,
 		uploader:            uploader,
 		preventWalOverwrite: preventWalOverwrite,
 
@@ -108,22 +120,30 @@ func (b *BgUploader) Stop() {
 // scanAndProcessFiles scans directory for WAL segments and attempts to upload them. It
 // makes best effort attempts to avoid duplicating work (re-uploading files).
 func (b *BgUploader) scanAndProcessFiles() {
-	fileChan := make(chan os.FileInfo)
-	defer close(fileChan)
-	go b.processFiles(fileChan)
+	readyFilenameChan := make(chan string)
+	defer close(readyFilenameChan)
+	go b.processFiles(readyFilenameChan)
+
+	// Immediately start attempting uploads for the "next" wal segments
+	// after initialWalSegment. This process is stopped as soon as the first
+	// filesystem scan is completed.
+	speculativeCtx, cancelSpeculativeUploadFunc := context.WithCancel(b.ctx)
+	defer cancelSpeculativeUploadFunc()
+	go b.speculativelyGenerateNextWalFilenames(speculativeCtx, readyFilenameChan)
 
 	for {
-		files, err := ioutil.ReadDir(filepath.Join(b.dir, archiveStatusDir))
+		filenames, err := b.ArchiveStatusFolder.ListFilenames()
+		cancelSpeculativeUploadFunc()
 		if err != nil {
-			tracelog.ErrorLogger.Print("Error of parallel upload: ", err)
+			tracelog.ErrorLogger.Println("Error while looking for WAL segments: ", err)
 			return
 		}
 
-		for _, f := range files {
+		for _, filename := range filenames {
 			select {
 			case <-b.ctx.Done():
 				return
-			case fileChan <- f:
+			case readyFilenameChan <- filename:
 			}
 		}
 
@@ -138,6 +158,32 @@ func (b *BgUploader) scanAndProcessFiles() {
 
 }
 
+// speculativelyGenerateNextWalFilenames continually generates and sends the
+// subsequent WAL segment names after b.initialWalSegment to fileChan until ctx
+// is canceled or 100 * b.maxNumUploaded filenames have been generated.
+func (b *BgUploader) speculativelyGenerateNextWalFilenames(ctx context.Context, fileChan chan<- string) {
+	walSegment := b.initialWalSegment
+	for i := 0; i < 100*int(b.maxNumUploaded); i++ {
+		nextWalSegment, err := GetNextWalFilename(walSegment)
+		if err != nil {
+			tracelog.InfoLogger.Printf("failed to parse %s as wal segment name: %v", walSegment, err)
+			return
+		}
+
+		nextWalReadyFilename := nextWalSegment + readySuffix
+
+		if b.ArchiveStatusFolder.FileExists(nextWalReadyFilename) {
+			select {
+			case <-ctx.Done():
+				return
+			case fileChan <- nextWalReadyFilename:
+			}
+		}
+
+		walSegment = nextWalSegment
+	}
+}
+
 // processFiles reads from input channel and uploads relevant WAL files. Exits
 // when the input channel is closed. processFiles also tracks number of
 // successfully uploaded WAL files and signals to BgUploader when total count
@@ -145,15 +191,13 @@ func (b *BgUploader) scanAndProcessFiles() {
 // BgUploader.
 //
 // This function should only be invoked once (in scanFiles)
-func (b *BgUploader) processFiles(fileChan <-chan os.FileInfo) {
+func (b *BgUploader) processFiles(readyFilenameChan <-chan string) {
 	var numUploaded int32 = 0
 	for {
-		f, ok := <-fileChan
+		name, ok := <-readyFilenameChan
 		if !ok {
 			break
 		}
-
-		name := f.Name()
 
 		if b.shouldSkipFile(name) {
 			continue

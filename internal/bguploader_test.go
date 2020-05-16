@@ -1,6 +1,7 @@
 package internal_test
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -24,6 +25,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 		maxParallelism       int
 		numFilesOnDisk       int
 		maxNumFilesUploaded  int
+		readDirLatency       time.Duration
 		wantNumFilesUploaded int // This is more of a minimum. BgUploader may actually upload more files.
 	}{
 		{
@@ -41,6 +43,14 @@ func TestBackgroundWALUpload(t *testing.T) {
 			wantNumFilesUploaded: 3,
 		},
 		{
+			name:                 "parallelism=1 with a few files and slow ReadDir",
+			maxParallelism:       1,
+			numFilesOnDisk:       3,
+			maxNumFilesUploaded:  32,
+			readDirLatency:       time.Minute, // This basically disables ReadDir
+			wantNumFilesUploaded: 3,
+		},
+		{
 			name:                 "parallelism=1 with lots of files",
 			maxParallelism:       1,
 			numFilesOnDisk:       200,
@@ -52,6 +62,14 @@ func TestBackgroundWALUpload(t *testing.T) {
 			maxParallelism:       3,
 			numFilesOnDisk:       200,
 			maxNumFilesUploaded:  150,
+			wantNumFilesUploaded: 150,
+		},
+		{
+			name:                 "parallelism=3 with lots of files and slow ReadDir",
+			maxParallelism:       3,
+			numFilesOnDisk:       200,
+			maxNumFilesUploaded:  150,
+			readDirLatency:       time.Minute, // This basically disables ReadDir
 			wantNumFilesUploaded: 150,
 		},
 		{
@@ -75,6 +93,14 @@ func TestBackgroundWALUpload(t *testing.T) {
 			maxNumFilesUploaded:  32,
 			wantNumFilesUploaded: 32,
 		},
+		{
+			name:                 "parallelism=100 and extra files on disk and slow ReadDir",
+			maxParallelism:       100,
+			numFilesOnDisk:       100,
+			maxNumFilesUploaded:  32,
+			readDirLatency:       time.Minute, // This basically disables ReadDir
+			wantNumFilesUploaded: 32,
+		},
 	}
 
 	for _, tt := range tests {
@@ -82,17 +108,34 @@ func TestBackgroundWALUpload(t *testing.T) {
 			defer cleanup(t, internal.GetDataFolderPath())
 
 			// Use generated data to test uploading WAL.
-			dir, a := setupArchiveStatus(t, "")
+			dir, oldestWalFilepath := setupArchiveStatus(t, "")
 			for i := 0; i < tt.numFilesOnDisk; i++ {
-				addTestDataFile(t, dir, i)
+				addTestDataFile(t, dir, i+1)
 			}
 			defer cleanup(t, dir)
 
-			// Setup BgUploader
-			tu := testtools.NewMockWalUploader(false, false)
+			// Setup BgUploader dependencies
+			mockWalUploader := testtools.NewMockWalUploader(false, false)
 			fakeASM := internal.NewFakeASM()
-			tu.ArchiveStatusManager = fakeASM
-			bu := internal.NewBgUploader(a, int32(tt.maxParallelism), int32(tt.maxNumFilesUploaded), tu, false)
+			mockWalUploader.ArchiveStatusManager = fakeASM
+
+			fdrCtx, cancelFdrFunc := context.WithCancel(context.TODO())
+			defer cancelFdrFunc()
+			fakeArchiveStatusDataFolder := &stallableDataFolder{
+				dirname:      filepath.Join(dir, "archive_status"),
+				ctx:          fdrCtx,
+				waitDuration: tt.readDirLatency,
+			}
+
+			// Setup BgUploader
+			bu := internal.NewBgUploader(
+				oldestWalFilepath,
+				int32(tt.maxParallelism),
+				int32(tt.maxNumFilesUploaded),
+				mockWalUploader,
+				false,
+			)
+			bu.ArchiveStatusFolder = fakeArchiveStatusDataFolder
 
 			// Run BgUploader and wait 1 second before stopping
 			bu.Start()
@@ -101,12 +144,13 @@ func TestBackgroundWALUpload(t *testing.T) {
 				time.Sleep(time.Second) // time to spin up new uploaders
 			}
 			bu.Stop()
+			cancelFdrFunc()
 
 			// Check that at least the expected number of files were created
 			for i := 0; i < tt.wantNumFilesUploaded; i++ {
-				bname := testFilename(i)
-				wasUploaded := fakeASM.IsWalAlreadyUploaded(bname)
-				assert.True(t, wasUploaded, bname+" was not marked as uploaded")
+				walFilename := testFilename(i + 1)
+				wasUploaded := fakeASM.IsWalAlreadyUploaded(walFilename)
+				assert.True(t, wasUploaded, walFilename+" was not marked as uploaded")
 			}
 
 		})
@@ -141,7 +185,7 @@ func setupArchiveStatus(t *testing.T, dir string) (string, string) {
 		t.Log(err)
 	}
 
-	a := filepath.Join(testDir, "A")
+	a := filepath.Join(testDir, testFilename(0))
 	file, err := os.Create(a)
 	if err != nil {
 		t.Log(err)
@@ -176,7 +220,8 @@ func addTestDataFile(t *testing.T, dir string, i int) {
 }
 
 func testFilename(i int) string {
-	return fmt.Sprintf("B%010d", i)
+	arbitraryTimeline := uint32(578)
+	return internal.FormatWALFileName(arbitraryTimeline, uint64(i))
 }
 
 func cleanup(t *testing.T, dir string) {
@@ -184,4 +229,41 @@ func cleanup(t *testing.T, dir string) {
 	if err != nil {
 		t.Log("temporary data directory was not deleted ", err)
 	}
+}
+
+// stallableDataFolder implements a portion of internal.DataFolder and can be
+// used to simulate a very slow ioutil.ReadDir operation. This can be used to
+// test BgUploader behavior in adverse conditions.
+type stallableDataFolder struct {
+	internal.DataFolder
+	dirname      string
+	ctx          context.Context
+	waitDuration time.Duration
+}
+
+func (s *stallableDataFolder) ListFilenames() ([]string, error) {
+	select {
+	case <-s.ctx.Done():
+		return nil, fmt.Errorf(
+			"fake dir reader was cancelled before wait completed: %v",
+			s.ctx.Err(),
+		)
+	case <-time.After(s.waitDuration):
+	}
+
+	files, err := ioutil.ReadDir(s.dirname)
+	if err != nil {
+		return nil, err
+	}
+	filenames := []string{}
+	for _, file := range files {
+		filenames = append(filenames, file.Name())
+	}
+	return filenames, err
+}
+
+func (s *stallableDataFolder) FileExists(filename string) bool {
+	filePath := filepath.Join(s.dirname, filename)
+	_, err := os.Stat(filePath)
+	return !os.IsNotExist(err)
 }
