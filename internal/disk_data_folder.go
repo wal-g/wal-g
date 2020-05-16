@@ -2,6 +2,7 @@ package internal
 
 import (
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -16,6 +17,18 @@ func newDiskDataFolder(folderPath string) (*DiskDataFolder, error) {
 		return nil, err
 	}
 	return &DiskDataFolder{folderPath}, nil
+}
+
+func (folder *DiskDataFolder) ListFilenames() ([]string, error) {
+	files, err := ioutil.ReadDir(folder.path)
+	if err != nil {
+		return nil, err
+	}
+	filenames := []string{}
+	for _, file := range files {
+		filenames = append(filenames, file.Name())
+	}
+	return filenames, nil
 }
 
 func (folder *DiskDataFolder) OpenReadonlyFile(filename string) (io.ReadCloser, error) {

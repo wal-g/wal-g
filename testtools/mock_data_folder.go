@@ -4,11 +4,26 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"sort"
 
 	"github.com/wal-g/wal-g/internal"
 )
 
 type MockDataFolder map[string]*bytes.Buffer
+
+func NewMockDataFolder() *MockDataFolder {
+	dataFolder := MockDataFolder(make(map[string]*bytes.Buffer))
+	return &dataFolder
+}
+
+func (folder *MockDataFolder) ListFilenames() ([]string, error) {
+	filenames := []string{}
+	for filename, _ := range *folder {
+		filenames = append(filenames, filename)
+	}
+	sort.Strings(filenames)
+	return filenames, nil
+}
 
 func (folder *MockDataFolder) FileExists(filename string) bool {
 	_, ok := (*folder)[filename]
@@ -27,11 +42,6 @@ func (folder *MockDataFolder) CreateFile(filename string) error {
 
 func (folder *MockDataFolder) CleanFolder() error {
 	return nil
-}
-
-func NewMockDataFolder() *MockDataFolder {
-	dataFolder := MockDataFolder(make(map[string]*bytes.Buffer))
-	return &dataFolder
 }
 
 func (folder *MockDataFolder) IsEmpty() bool {

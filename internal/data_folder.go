@@ -21,6 +21,8 @@ func (err NoSuchFileError) Error() string {
 }
 
 type DataFolder interface {
+	// ListFilenames returns a list of sorted filenames
+	ListFilenames() (filenames []string, err error)
 	// OpenReadonlyFile should return NoSuchFileError if it cannot find desired file
 	OpenReadonlyFile(filename string) (io.ReadCloser, error)
 	OpenWriteOnlyFile(filename string) (io.WriteCloser, error)
