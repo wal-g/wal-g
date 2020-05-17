@@ -13,6 +13,11 @@ COPY main/ main/
 COPY utility/ utility/
 COPY Makefile Makefile
 
+RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
+        vendor/github.com/google/brotli/go/cbrotli/cgo.go && \
+    cd main/fdb && \
+    go build -mod vendor -tags brotli -race -o wal-g -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
+    
 RUN make fdb_build
 
 FROM foundationdb/foundationdb:latest

@@ -11,13 +11,17 @@ mkdir $WALG_FILE_PREFIX
 
 wal-g backup-push
 
-fdbcli -C /var/fdb/fdb.cluster --exec 'writemode on; clearrange "" \xFF'
+expected_output=$(fdbcli -C /var/fdb/fdb.cluster --exec 'getrange "" "\xFF" 10000')
+
+fdbcli -C /var/fdb/fdb.cluster --exec 'writemode on; clearrange "" "\xFF"'
 
 wal-g backup-fetch LATEST
 
-actual_output=$(fdbcli -C /var/fdb/fdb.cluster --exec 'get test_key')
+actual_output=$(fdbcli -C /var/fdb/fdb.cluster --exec 'getrange "" "\xFF" 10000')
 
-if [ "$actual_output" != "\`test_key' is \`test_value'" ]; then
-  echo "Unexpected output: $actual_output"
+if [ "$actual_output" != "$expected_output" ]; then
+  echo "Error: actual output doesn't match expected output"
+  echo "Expected output: $expected_output"
+  echo "Actual output: $actual_output"
   exit 1
 fi

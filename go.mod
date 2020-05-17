@@ -52,7 +52,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.4.0
-	github.com/tinsane/tracelog v0.0.0-20190824100002-0ab2b054ff30
+	github.com/tinsane/tracelog v0.0.0-20190824100002-0ab2b054ff30 // indirect
 	github.com/ulikunitz/xz v0.5.6
 	github.com/wal-g/storages v0.0.0-20200511083259-4a94923055a1
 	github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30
