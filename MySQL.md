@@ -1,11 +1,11 @@
-## WAL-G for MySQL
+# WAL-G for MySQL
 
 **Interface of MySQL now is unstable**
 
 You can use wal-g as a tool for encrypting, compressing MySQL backups and push/fetch them to/from storage without saving it on your filesystem.
 
-Development
------------
+## Development
+
 ### Installing
 To compile and build the binary for MySQL:
 
@@ -29,8 +29,7 @@ make deps
 make mysql_install
 ```
 
-Configuration
--------------
+## Configuration
 
 * `WALG_MYSQL_DATASOURCE_NAME`
 
@@ -62,8 +61,7 @@ Command to replay binlog on runing MySQL. Required for binlog-fetch command.
 To place binlogs in the specified directory during binlog-fetch or binlog-replay
 
 
-Usage
------
+## Usage
 
 WAL-G mysql extension currently supports these commands:
 
@@ -147,8 +145,7 @@ wal-g binlog-replay --since LATEST --until "2006-01-02T15:04:05Z07:00"
 ```
 
 
-Typical configuration for using with xtrabackup
------
+## Typical configuration for using with xtrabackup
 
 It's recommended to use wal-g with xtrabackup tool for creating lock-less backups.
 Here's typical wal-g configuration for that case:
@@ -174,8 +171,7 @@ mysql -e "RESET MASTER; SET @@GLOBAL.GTID_PURGED='$gtids';"
 wal-g binlog-replay --since "backup_name" --until  "2006-01-02T15:04:05Z07:00"
 ```
 
-Typical configuration for using with mysqldump
------
+## Typical configuration for using with mysqldump
 
 It's possible to use wal-g with standard mysqldump/mysql tools.
 In that case MySQL mysql backup is a plain SQL script.

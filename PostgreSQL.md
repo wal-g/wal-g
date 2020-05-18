@@ -1,9 +1,9 @@
-## WAL-G for PostgreSQL
+# WAL-G for PostgreSQL
 
 You can use wal-g as a tool for making encrypted, compressed PostgreSQL backups(full and incremental) and push/fetch them to/from storage without saving it on your filesystem.
 
-Development
------------
+## Development
+
 ### Installing
 
 Prepare on Ubuntu:
@@ -17,6 +17,7 @@ Optional:
 
 - To build with libsodium, just set `USE_LIBSODIUM` environment variable.
 - To build with lzo decompressor, just set `USE_LZO` environment variable.
+
 ```
 go get github.com/wal-g/wal-g
 cd $GOPATH/src/github.com/wal-g/wal-g
@@ -35,8 +36,8 @@ make deps
 make pg_install
 ```
 
-Configuration
--------------
+## Configuration
+
 WAL-G uses [the usual PostgreSQL environment variables](https://www.postgresql.org/docs/current/static/libpq-envars.html) to configure its connection, especially including `PGHOST`, `PGPORT`, `PGUSER`, and `PGPASSWORD`/`PGPASSFILE`/`~/.pgpass`.
 
 `PGHOST` can connect over a UNIX socket. This mode is preferred for localhost connections, set `PGHOST=/var/run/postgresql` to use it. WAL-G will connect over TCP if `PGHOST` is an IP address.
@@ -47,7 +48,6 @@ To configure disk read rate limit during ```backup-push``` in bytes per second.
 
 * `WALG_NETWORK_RATE_LIMIT`
 To configure the network upload rate limit during ```backup-push``` in bytes per second.
-
 
 Concurrency values can be configured using:
 
@@ -112,8 +112,7 @@ To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not e
 
 To configure the size of one backup bundle (in bytes). Smaller size causes granularity and more optimal, faster recovering. It also increases the number of storage requests, so it can costs you much money. Default size is 1 GB (`1 << 30 - 1` bytes).
 
-Usage
------
+## Usage
 
 * ``backup-fetch``
 
