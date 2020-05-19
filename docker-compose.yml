@@ -31,6 +31,8 @@ services:
       &&  mkdir -p /export/waldeltabucket
       &&  mkdir -p /export/ghostbucket
       &&  mkdir -p /export/compressionbucket
+      &&  mkdir -p /export/copyallbucket
+      &&  mkdir -p /export/copybackupbucket
       &&  mkdir -p /export/deleteretainfullbucket
       &&  mkdir -p /export/deleteretainfindfullbucket
       &&  mkdir -p /export/deletebeforenamefindfullbucket
