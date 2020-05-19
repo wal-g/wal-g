@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e -x
-CONFIG_FILE="/tmp/configs/copy_all_from_test_config.json"
+CONFIG_FILE="/tmp/configs/copy_all_test_config.json"
 
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
@@ -9,7 +9,7 @@ echo "," >> ${TMP_CONFIG}
 cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 /tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
 
-mkdir /tmp/storage
+mkdir /tmp/copy_all_test_storage
 TO_CONFIG_FILE="/tmp/configs/copy_all_to_test_config.json"
 TO_TMP_CONFIG="/tmp/configs/to_tmp_config.json"
 cat ${TO_CONFIG_FILE} > ${TO_TMP_CONFIG}
