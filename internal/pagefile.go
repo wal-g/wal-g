@@ -176,21 +176,21 @@ func CreateFileFromIncrement(increment io.Reader, file *os.File) error {
 	}
 
 	// set represents all block numbers with non-empty pages
-	deltaBlockNumbers := make(map[uint32]bool, diffBlockCount)
+	deltaBlockNumbers := make(map[int64]bool, diffBlockCount)
 	for i := uint32(0); i < diffBlockCount; i++ {
 		blockNo := binary.LittleEndian.Uint32(diffMap[i*sizeofInt32 : (i+1)*sizeofInt32])
-		deltaBlockNumbers[blockNo] = true
+		deltaBlockNumbers[int64(blockNo)] = true
 	}
-	pageCount := uint32(fileSize / uint64(DatabasePageSize))
+	pageCount := int64(fileSize / uint64(DatabasePageSize))
 	emptyPage := make([]byte, DatabasePageSize)
-	for i := uint32(0); i < pageCount; i++ {
+	for i := int64(0); i < pageCount; i++ {
 		if deltaBlockNumbers[i] {
-			err = writePage(file, int64(i), increment, true)
+			err = writePage(file, i, increment, true)
 			if err != nil {
 				return err
 			}
 		} else {
-			_, err = file.WriteAt(emptyPage, int64(i)*int64(DatabasePageSize))
+			_, err = file.WriteAt(emptyPage, i*DatabasePageSize)
 			if err != nil {
 				return err
 			}
