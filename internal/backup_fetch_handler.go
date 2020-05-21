@@ -83,7 +83,8 @@ func GetPgFetcher(dbDataDirectory, fileMask, restoreSpecPath string) func(folder
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 
 		if !isEmpty {
-			tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", newNonEmptyDbDataDirectoryError(dbDataDirectory))
+			tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n",
+				newNonEmptyDbDataDirectoryError(dbDataDirectory))
 		}
 
 		err = deltaFetchRecursion(backup.Name, folder, utility.ResolveSymlink(dbDataDirectory), spec, filesToUnwrap)
