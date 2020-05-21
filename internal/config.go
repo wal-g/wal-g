@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 	"os"
 	"os/user"
 	"strings"
