@@ -14,15 +14,19 @@ import (
 
 func TestStartCopy_WhenThereAreNoObjectsToCopy(t *testing.T) {
 	var infos = make([]internal.CopyingInfo, 0)
-	internal.StartCopy(infos)
+	var isSuccess, err = internal.StartCopy(infos)
+	assert.NoError(t, err)
+	assert.True(t, isSuccess)
 }
 
 func TestStartCopy_WhenThereAreObjectsToCopy(t *testing.T) {
 	var from = testtools.CreateMockStorageFolderWithPermanentBackups(t)
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
-	var infos, err = internal.GetAllObjects(from, to)
+	infos, err := internal.GetAllObjects(from, to)
 	assert.NoError(t, err)
-	internal.StartCopy(infos)
+	isSuccess, err := internal.StartCopy(infos)
+	assert.NoError(t, err)
+	assert.True(t, isSuccess)
 
 	for _, info := range infos {
 		var filename = path.Join(from.GetPath(), info.Object.GetName())

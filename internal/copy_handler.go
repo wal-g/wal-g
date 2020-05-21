@@ -23,34 +23,56 @@ func HandleCopy(fromConfigFile string, toConfigFile string, backupName string, w
 	if fromError != nil || toError != nil {
 		return
 	}
-	var infos, err = getObjectsToCopy(backupName, from, to, withoutHistory)
+	infos, err := getObjectsToCopy(backupName, from, to, withoutHistory)
 	tracelog.ErrorLogger.FatalOnError(err)
-	StartCopy(infos)
+	isSuccess, err := StartCopy(infos)
+	tracelog.ErrorLogger.FatalOnError(err)
+	if isSuccess {
+		tracelog.InfoLogger.Println("Success.")
+	}
 }
 
-func StartCopy(infos []CopyingInfo) {
+func StartCopy(infos []CopyingInfo) (bool, error) {
 	var maxParallelJobsCount = 8 // TODO place for improvement
 	for i := 0; i < len(infos); i += maxParallelJobsCount {
+		errors := make(chan error)
+		wgDone := make(chan bool)
+
 		var lastIndex = utility.Min(i+maxParallelJobsCount, len(infos))
 		var infosToCopy = infos[i:lastIndex]
 		var wg sync.WaitGroup
 		for _, info := range infosToCopy {
 			wg.Add(1)
-			go copyObject(info, &wg)
+			go copyObject(info, &wg, errors)
 		}
 		wg.Wait()
+		close(wgDone)
+
+		select {
+		case <-wgDone:
+			break
+		case err := <-errors:
+			close(errors)
+			return false, err
+		}
 	}
-	tracelog.InfoLogger.Println("Success.")
+	return true, nil
 }
 
-func copyObject(info CopyingInfo, wg *sync.WaitGroup) {
+func copyObject(info CopyingInfo, wg *sync.WaitGroup, errors chan error) {
 	defer wg.Done()
 	var objectName, from, to = info.Object.GetName(), info.From, info.To
 	var readCloser, err = from.ReadObject(objectName)
-	tracelog.ErrorLogger.FatalOnError(err)
+	if err != nil {
+		errors <- err
+		return
+	}
 	var filename = path.Join(from.GetPath(), objectName)
 	err = to.PutObject(filename, readCloser)
-	tracelog.ErrorLogger.FatalOnError(err)
+	if err != nil {
+		errors <- err
+		return
+	}
 	tracelog.InfoLogger.Printf("Copied '%s' from '%s' to '%s'.", objectName, from.GetPath(), to.GetPath())
 }
 
