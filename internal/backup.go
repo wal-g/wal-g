@@ -327,13 +327,13 @@ func shouldUnwrapTar(tarName string, sentinelDto BackupSentinelDto, filesToUnwra
 func getLastWalFilename(backup *Backup) (string, error) {
 	meta, err := backup.fetchMeta()
 	if err != nil {
-		tracelog.DebugLogger.FatalError(err)
+		tracelog.InfoLogger.Print("No meta found.")
 		return "", err
 	}
 	prefixLenght := len(utility.BackupNamePrefix)
 	timelineID64, err := strconv.ParseUint(backup.Name[prefixLenght:prefixLenght+8], hexadecimal, sizeofInt32bits)
 	if err != nil {
-		tracelog.DebugLogger.FatalError(err)
+		tracelog.InfoLogger.FatalError(err)
 		return "", err
 	}
 	timelineID := uint32(timelineID64)

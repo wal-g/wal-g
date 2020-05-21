@@ -11,9 +11,9 @@ import (
 )
 
 type CopyingInfo struct {
-	object storage.Object
-	from   storage.Folder
-	to     storage.Folder
+	Object storage.Object
+	From   storage.Folder
+	To     storage.Folder
 }
 
 // HandleCopy copy specific or all backups from one storage to another
@@ -25,18 +25,17 @@ func HandleCopy(fromConfigFile string, toConfigFile string, backupName string, w
 	}
 	var infos, err = getObjectsToCopy(backupName, from, to, withoutHistory)
 	tracelog.ErrorLogger.FatalOnError(err)
-	startCopy(infos)
+	StartCopy(infos)
 }
 
-func startCopy(infos []CopyingInfo) {
+func StartCopy(infos []CopyingInfo) {
 	var maxParallelJobsCount = 8 // TODO place for improvement
-
 	for i := 0; i < len(infos); i += maxParallelJobsCount {
-		var jobsToRun = utility.Min(maxParallelJobsCount, len(infos)-(i+1))
+		var lastIndex = utility.Min(i+maxParallelJobsCount, len(infos))
+		var infosToCopy = infos[i:lastIndex]
 		var wg sync.WaitGroup
-		for j := 0; j < jobsToRun; j++ {
+		for _, info := range infosToCopy {
 			wg.Add(1)
-			var info = infos[i+j]
 			go copyObject(info, &wg)
 		}
 		wg.Wait()
@@ -46,7 +45,7 @@ func startCopy(infos []CopyingInfo) {
 
 func copyObject(info CopyingInfo, wg *sync.WaitGroup) {
 	defer wg.Done()
-	var objectName, from, to = info.object.GetName(), info.from, info.to
+	var objectName, from, to = info.Object.GetName(), info.From, info.To
 	var readCloser, err = from.ReadObject(objectName)
 	tracelog.ErrorLogger.FatalOnError(err)
 	var filename = path.Join(from.GetPath(), objectName)
@@ -80,7 +79,6 @@ func getObjectsToCopy(backupName string, from storage.Folder, to storage.Folder,
 	return infos, nil
 }
 
-// TODO make unittests
 func GetBackupObjects(backup *Backup, from storage.Folder, to storage.Folder) ([]CopyingInfo, error) {
 	tracelog.InfoLogger.Print("Collecting backup files...")
 	var backupPrefix = path.Join(utility.BaseBackupPath, backup.Name)
@@ -92,14 +90,15 @@ func GetBackupObjects(backup *Backup, from storage.Folder, to storage.Folder) ([
 	return BuildCopyingInfos(from, to, objects, hasBackupPrefix), nil
 }
 
-// TODO make unittests
 func GetHistoryObjects(backup *Backup, from storage.Folder, to storage.Folder) ([]CopyingInfo, error) {
 	tracelog.InfoLogger.Print("Collecting history files... ")
 	var fromWalFolder = from.GetSubFolder(utility.WalPath)
+	tracelog.InfoLogger.Print("getSubFolder succeess!")
 	var lastWalFilename, err = getLastWalFilename(backup)
 	if err != nil {
-		return nil, err
+		return make([]CopyingInfo, 0), nil
 	}
+	tracelog.InfoLogger.Print("getLastWalFilename not failed!")
 	tracelog.InfoLogger.Printf("after %s\n", lastWalFilename)
 	objects, err := storage.ListFolderRecursively(fromWalFolder)
 	if err != nil {
@@ -109,7 +108,6 @@ func GetHistoryObjects(backup *Backup, from storage.Folder, to storage.Folder) (
 	return BuildCopyingInfos(fromWalFolder, to, objects, older), nil
 }
 
-// TODO make unittests
 func GetAllObjects(from storage.Folder, to storage.Folder) ([]CopyingInfo, error) {
 	objects, err := storage.ListFolderRecursively(from)
 	if err != nil {
@@ -118,7 +116,6 @@ func GetAllObjects(from storage.Folder, to storage.Folder) ([]CopyingInfo, error
 	return BuildCopyingInfos(from, to, objects, func(object storage.Object) bool { return true }), nil
 }
 
-// TODO make unittests
 func BuildCopyingInfos(from storage.Folder, to storage.Folder, objects []storage.Object,
 	condition func(storage.Object) bool) (infos []CopyingInfo) {
 	for _, object := range objects {
