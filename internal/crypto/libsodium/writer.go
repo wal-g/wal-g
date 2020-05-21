@@ -24,9 +24,9 @@ type Writer struct {
 	inIdx int
 
 	// In case of using io.Pipe we can't write header until reader doesn't read, therefor we use these sync
-	o         sync.Once
-	key       []byte
-	headerErr error
+	onceHeader sync.Once
+	key        []byte
+	headerErr  error
 }
 
 // NewWriter creates Writer from ordinary writer and key
@@ -60,7 +60,7 @@ func (writer *Writer) writeHeader() {
 
 // Write implements io.Writer
 func (writer *Writer) Write(p []byte) (n int, err error) {
-	writer.o.Do(writer.writeHeader)
+	writer.onceHeader.Do(writer.writeHeader)
 	if writer.headerErr != nil {
 		return 0, err
 	}

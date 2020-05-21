@@ -25,9 +25,9 @@ type Reader struct {
 	outLen int
 
 	// In case of using io.Pipe we can't read header until writer doesn't write, therefor we use these sync
-	o         sync.Once
-	key       []byte
-	headerErr error
+	onceHeader sync.Once
+	key        []byte
+	headerErr  error
 }
 
 // NewReader creates Reader from ordinary reader and key
@@ -68,7 +68,7 @@ func (reader *Reader) readHeader() {
 
 // Read implements io.Reader
 func (reader *Reader) Read(p []byte) (n int, err error) {
-	reader.o.Do(reader.readHeader)
+	reader.onceHeader.Do(reader.readHeader)
 	if reader.headerErr != nil {
 		return 0, reader.headerErr
 	}
