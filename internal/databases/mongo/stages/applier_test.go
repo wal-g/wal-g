@@ -1,4 +1,4 @@
-package oplog
+package stages
 
 import (
 	"bytes"
@@ -156,7 +156,7 @@ func TestStorageApplier_Apply(t *testing.T) {
 				},
 			},
 			want:    nil,
-			wantErr: fmt.Errorf("can not upload archive: error while uploading stream: X"),
+			wantErr: fmt.Errorf("can not upload oplog archive: error while uploading stream: X"),
 		},
 	}
 	for _, tt := range tests {

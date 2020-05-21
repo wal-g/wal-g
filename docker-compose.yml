@@ -1,5 +1,8 @@
 version: '3'
 
+volumes:
+  fdb_volume:
+
 services:
   golang:
     build:
@@ -361,6 +364,23 @@ services:
       - s3
     links:
       - s3
+
+  fdb:
+    image: foundationdb/foundationdb
+    container_name: wal-g_fdb
+    volumes:
+      - fdb_volume:/var/fdb
+
+  fdb_tests:
+    build:
+      dockerfile: docker/fdb_tests/Dockerfile
+      context: .
+    image: wal-g/fdb_tests
+    container_name: wal-g_fdb_tests
+    volumes:
+      - fdb_volume:/var/fdb
+    depends_on:
+      - fdb
 
   redis:
     build:

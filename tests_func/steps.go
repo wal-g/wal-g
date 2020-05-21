@@ -27,7 +27,13 @@ func (tf TestingfWrap) Errorf(format string, args ...interface{}) {
 
 func (tctx *TestContext) sameDataCheck(dataId1, dataId2 string) error {
 	if snap1, ok := tctx.AuxData.Snapshots[dataId1]; ok {
+		if !assert.NotEmpty(TestingfWrap(tracelog.ErrorLogger.Printf), snap1) {
+			return fmt.Errorf("data '%s' snapshot is empty: %+v", dataId1, snap1)
+		}
 		if snap2, ok := tctx.AuxData.Snapshots[dataId2]; ok {
+			if !assert.NotEmpty(TestingfWrap(tracelog.ErrorLogger.Printf), snap2) {
+				return fmt.Errorf("data '%s' snapshot is empty: %+v", dataId2, snap2)
+			}
 			if assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), snap1, snap2) {
 				return nil
 			}
@@ -153,16 +159,6 @@ func (tctx *TestContext) replayOplog(backupId int, timestampId string, container
 	return walg.OplogReplay(from, until)
 }
 
-func (tctx *TestContext) purgeBackupsAfterTime(retainCount int, timestampId string, container string) error {
-	walg := WalgUtilFromTestContext(tctx, container)
-	afterTime := time.Unix(int64(tctx.AuxData.Timestamps[timestampId].TS), 0)
-	return walg.PurgeAfterTime(retainCount, afterTime)
-}
-
-func (tctx *TestContext) purgeBackupsAfterID(retainCount int, afterBackupId int, container string) error {
-	walg := WalgUtilFromTestContext(tctx, container)
-	return walg.PurgeAfterNum(retainCount, afterBackupId)
-}
 
 func (tctx *TestContext) purgeDataDir(host string) error {
 	mc, err := MongoCtlFromTestContext(tctx, host)
@@ -424,14 +420,31 @@ func (tctx *TestContext) testEqualMongodbDataAtHosts(host1, host2 string) error 
 	if err != nil {
 		return err
 	}
+	if !assert.NotEmpty(TestingfWrap(tracelog.ErrorLogger.Printf), snap1) {
+		return fmt.Errorf("host %s snapshot is empty: %+v", host1, snap1)
+	}
+
 	snap2, err := mc2.Snapshot()
 	if err != nil {
 		return err
 	}
+	if !assert.NotEmpty(TestingfWrap(tracelog.ErrorLogger.Printf), snap2) {
+		return fmt.Errorf("host %s snapshot is empty: %+v", host2, snap2)
+	}
+
 
 	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), snap1, snap2) {
 		return fmt.Errorf("expected the same data at hosts %s and %s", host1, host2)
 	}
 
+	return nil
+}
+
+func (tctx *TestContext) sleep (duration string) error {
+	dur, err := time.ParseDuration(duration)
+	if err != nil {
+		return err
+	}
+	time.Sleep(dur)
 	return nil
 }

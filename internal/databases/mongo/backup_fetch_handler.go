@@ -2,9 +2,10 @@ package mongo
 
 import (
 	"context"
+	"os/exec"
+
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal"
-	"os/exec"
 )
 
 func HandleBackupFetch(ctx context.Context, folder storage.Folder, backupName string, restoreCmd *exec.Cmd) {

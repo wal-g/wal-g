@@ -6,6 +6,11 @@ Development
 -----------
 ### Installing
 
+Prepare on Ubuntu:
+```
+sudo apt-get install liblzo2-dev
+```
+
 To compile and build the binary for Postgres:
 
 Optional:
@@ -41,7 +46,6 @@ WAL-G uses [the usual PostgreSQL environment variables](https://www.postgresql.o
 To configure disk read rate limit during ```backup-push``` in bytes per second.
 
 * `WALG_NETWORK_RATE_LIMIT`
-
 To configure the network upload rate limit during ```backup-push``` in bytes per second.
 
 
@@ -161,4 +165,29 @@ Backups can be marked as permanent to prevent them from being removed when runni
 
 ```
 wal-g backup-mark example-backup -i
+```
+
+
+* ``catchup-push``
+
+To create an catchup incremental backup, the user should pass the path to the master Postgres directory and the LSN of the replica
+for which the backup is created.
+
+Steps:
+1) Stop replica
+2) Get replica LSN (for example using pg_controldata command)
+3) Start uploading incremental backup on master.
+
+``` bash
+wal-g catchup-push /path/to/master/postgres --from-lsn replica_lsn
+```
+
+
+* ``catchup-fetch``
+
+To accept catchup incremental backup created by `catchup-push`, the user should pass the path to the replica Postgres
+directory and name of the backup.
+
+``` bash
+wal-g catchup-fetch /path/to/replica/postgres backup_name
 ```

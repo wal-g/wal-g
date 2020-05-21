@@ -5,13 +5,12 @@ import (
 	"sync"
 
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
+	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	"github.com/wal-g/wal-g/utility"
 )
 
 // HandleOplogPush starts oplog archiving process: fetch, validate, upload to storage.
-// TODO: fetch only majority records
-func HandleOplogPush(ctx context.Context, since models.Timestamp, fetcher oplog.FromFetcher, validator oplog.Validator, applier oplog.Applier) error {
+func HandleOplogPush(ctx context.Context, since models.Timestamp, fetcher stages.FromFetcher, applier stages.Applier) error {
 	ctx, cancel := context.WithCancel(ctx)
 	wg := &sync.WaitGroup{}
 	defer func() {
@@ -26,13 +25,7 @@ func HandleOplogPush(ctx context.Context, since models.Timestamp, fetcher oplog.
 	}
 	errs = append(errs, errc)
 
-	validc, errc, err := validator.Validate(ctx, oplogc, wg)
-	if err != nil {
-		return err
-	}
-	errs = append(errs, errc)
-
-	errc, err = applier.Apply(ctx, validc, wg)
+	errc, err = applier.Apply(ctx, oplogc, wg)
 	if err != nil {
 		return err
 	}

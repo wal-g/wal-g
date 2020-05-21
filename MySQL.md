@@ -55,11 +55,11 @@ Command to prepare MySQL backup after restoring. Optional. Needed for xtrabackup
 
 * `WALG_MYSQL_BINLOG_REPLAY_COMMAND`
 
-Command to replay binlog on runing MySQL. Required for binlog-fetch command
+Command to replay binlog on runing MySQL. Required for binlog-fetch command.
 
 * `WALG_MYSQL_BINLOG_DST`
 
-To place binlogs in the specified directory during binlog-fetch. Required for binlog-fetch command
+To place binlogs in the specified directory during binlog-fetch or binlog-replay
 
 
 Usage
@@ -131,6 +131,8 @@ wal-g binlog-fetch --since LATEST --until "2006-01-02T15:04:05Z07:00"
 Fetches binlogs from storage and passes them to `WALG_MYSQL_BINLOG_REPLAY_COMMAND` to replay on running MySQL server.
 User should specify the name of the backup starting with which to fetch an binlog.
 User may also specify time in  RFC3339 format until which should be fetched (used for PITR).
+Binlogs are temporarily save in `WALG_MYSQL_BINLOG_DST` folder.
+Replay command gets name of binlog to replay via environment variable `WALG_MYSQL_CURRENT_BINLOG` and stop-date via `WALG_MYSQL_BINLOG_END_TS`, which are set for each invocation.
 
 ```
 wal-g binlog-replay --since "backupname"
@@ -155,7 +157,7 @@ Here's typical wal-g configuration for that case:
  WALG_STREAM_CREATE_COMMAND="xtrabackup --backup --stream=xbstream --datadir=/var/lib/mysql"                                                                                                                               
  WALG_STREAM_RESTORE_COMMAND="xbstream -x -C /var/lib/mysql"                                                                                                                       
  WALG_MYSQL_BACKUP_PREPARE_COMMAND="xtrabackup --prepare --target-dir=/var/lib/mysql"                                                                                              
- WALG_MYSQL_BINLOG_REPLAY_COMMAND="mysqlbinlog -v - | mysql" 
+ WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
 ```
 
 Restore procedure is a bit tricky:
@@ -183,7 +185,7 @@ Here's typical wal-g configuration for that case:
  WALG_MYSQL_DATASOURCE_NAME=user:pass@localhost/mysql                                                                                                               
  WALG_STREAM_CREATE_COMMAND="mysqldump --all-databases --single-transaction --set-gtid-purged=ON"                                                                                                                               
  WALG_STREAM_RESTORE_COMMAND="mysql"
- WALG_MYSQL_BINLOG_REPLAY_COMMAND="mysqlbinlog -v - | mysql" 
+ WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
 ```
 
 Restore procedure is straightforward:

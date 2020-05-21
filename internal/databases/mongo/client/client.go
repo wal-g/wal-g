@@ -14,6 +14,7 @@ import (
 )
 
 const (
+	driverAppName       = "wal-g-mongo"
 	oplogDatabaseName   = "local"
 	oplogCollectionName = "oplog.rs"
 )
@@ -44,6 +45,7 @@ type IsMaster struct {
 
 // MongoDriver defines methods to work with mongodb.
 type MongoDriver interface {
+	EnsureIsMaster(ctx context.Context) error
 	IsMaster(ctx context.Context) (models.IsMaster, error)
 	LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp, err error)
 	TailOplogFrom(ctx context.Context, from models.Timestamp) (OplogCursor, error)
@@ -82,11 +84,27 @@ type MongoClient struct {
 
 // NewMongoClient builds MongoClient
 func NewMongoClient(ctx context.Context, uri string) (*MongoClient, error) {
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	client, err := mongo.Connect(ctx,
+		options.Client().ApplyURI(uri).
+			SetAppName(driverAppName).
+			SetDirect(true).
+			SetRetryReads(false))
 	if err != nil {
 		return nil, err
 	}
 	return &MongoClient{c: client}, client.Ping(ctx, nil)
+}
+
+func (mc *MongoClient) EnsureIsMaster(ctx context.Context) error {
+	im, err := mc.IsMaster(ctx)
+	if err != nil {
+		return err
+	}
+
+	if !im.IsMaster {
+		return fmt.Errorf("current node is not a primary")
+	}
+	return nil
 }
 
 func (mc *MongoClient) IsMaster(ctx context.Context) (models.IsMaster, error) {
@@ -111,7 +129,7 @@ func (mc *MongoClient) IsMaster(ctx context.Context) (models.IsMaster, error) {
 
 // LastWriteTS fetches timestamps with last write
 // TODO: support non-replset setups
-func (mc *MongoClient) LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp,  err error) {
+func (mc *MongoClient) LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp, err error) {
 	im, err := mc.IsMaster(ctx)
 	if err != nil {
 		return models.Timestamp{}, models.Timestamp{}, err
@@ -163,7 +181,7 @@ func (mc *MongoClient) getOplogCollection(ctx context.Context) (*mongo.Collectio
 func (mc *MongoClient) ApplyOp(ctx context.Context, op db.Oplog) error {
 	apply := mc.c.Database("admin").RunCommand(ctx, bson.M{"applyOps": []interface{}{op}})
 	if err := apply.Err(); err != nil {
-		return fmt.Errorf("applyOps command failed: %w", err)
+		return fmt.Errorf("applyOps command failed: %w\nop:\n%+v", err, op)
 	}
 	resp := CmdResponse{}
 	if err := apply.Decode(&resp); err != nil {

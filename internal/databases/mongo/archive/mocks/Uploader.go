@@ -32,12 +32,26 @@ func (_m *Uploader) FileExtension() string {
 }
 
 // UploadBackup provides a mock function with given fields: stream, cmd, metaProvider
-func (_m *Uploader) UploadBackup(stream io.Reader, cmd archive.ErrWaiter, metaProvider archive.BackupMetaProvider) error {
+func (_m *Uploader) UploadBackup(stream io.Reader, cmd archive.ErrWaiter, metaProvider archive.MongoMetaProvider) error {
 	ret := _m.Called(stream, cmd, metaProvider)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(io.Reader, archive.ErrWaiter, archive.BackupMetaProvider) error); ok {
+	if rf, ok := ret.Get(0).(func(io.Reader, archive.ErrWaiter, archive.MongoMetaProvider) error); ok {
 		r0 = rf(stream, cmd, metaProvider)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UploadGapArchive provides a mock function with given fields: err, firstTS, lastTS
+func (_m *Uploader) UploadGapArchive(err error, firstTS models.Timestamp, lastTS models.Timestamp) error {
+	ret := _m.Called(err, firstTS, lastTS)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(error, models.Timestamp, models.Timestamp) error); ok {
+		r0 = rf(err, firstTS, lastTS)
 	} else {
 		r0 = ret.Error(0)
 	}

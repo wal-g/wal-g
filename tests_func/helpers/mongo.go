@@ -39,6 +39,9 @@ func generateRecord(rowNum int, strLen int, strPrefix string) DatabaseRecord {
 
 type NsSnapshot struct {
 	NS      string
+	Type    string
+	Options bson.M
+	IdIndex bson.M
 	Docs    []bson.M
 	Indexes []bson.M
 }
@@ -223,24 +226,32 @@ func (mc *MongoCtl) Snapshot() ([]NsSnapshot, error) {
 
 		for _, collInfo := range collsInfo {
 			coll := collInfo["name"].(string)
+			collType := collInfo["type"].(string)
 			if isSystemCollection(coll) {
 				continue
 			}
-			docs, err := FetchNsDocs(mc.ctx, conn, database, coll)
-			if err != nil {
-				return nil, err
-			}
-
-			indexes, err := ListNsIndexes(mc.ctx, conn, database, coll)
-			if err != nil {
-				return nil, err
-			}
-
-			snapshot = append(snapshot, NsSnapshot{
+			nsSnapshot := NsSnapshot{
 				NS:      fmt.Sprintf("%s.%s", database, coll),
-				Docs:    docs,
-				Indexes: indexes,
-			})
+				Type:    collType,
+				Options: collInfo["options"].(bson.M),
+			}
+
+			if collType == "collection" {
+				docs, err := FetchNsDocs(mc.ctx, conn, database, coll)
+				if err != nil {
+					return nil, err
+				}
+				nsSnapshot.Docs = docs
+
+				indexes, err := ListNsIndexes(mc.ctx, conn, database, coll)
+				if err != nil {
+					return nil, err
+				}
+				nsSnapshot.Indexes = indexes
+				nsSnapshot.IdIndex = collInfo["idIndex"].(bson.M)
+			}
+
+			snapshot = append(snapshot, nsSnapshot)
 		}
 	}
 
@@ -431,10 +442,9 @@ func (mc *MongoCtl) EnableAuth() error {
 
 func (mc *MongoCtl) runCmd(run []string) (ExecResult, error) {
 	exc, err := RunCommandStrict(mc.ctx, mc.host, run)
-	cmdLine := strings.Join(run, " ")
 
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", cmdLine, exc.String())
+		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", strings.Join(run, " "), exc.String())
 		return exc, err
 	}
 	return exc, err
@@ -445,8 +455,7 @@ func (mc *MongoCtl) PurgeDatadir() error {
 	if err != nil {
 		return err
 	}
-
-	_, err = mc.runCmd([]string{"rm", "-rf", "/var/lib/mongodb/*"})
+	_, err = mc.runCmd([]string{"bash", "-c", "rm -rf /var/lib/mongodb/*"})
 	if err != nil {
 		return err
 	}

@@ -2,6 +2,7 @@ package redis
 
 import (
 	"fmt"
+	"github.com/wal-g/tracelog"
 	"os"
 	"strings"
 
@@ -20,6 +21,10 @@ var Cmd = &cobra.Command{
 	Use:     "redis",
 	Short:   ShortDescription, // TODO : improve description
 	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "Redis"}, "\t"),
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		err := internal.AssertRequiredSettingsSet()
+		tracelog.ErrorLogger.FatalOnError(err)
+	},
 }
 
 func Execute() {
@@ -34,4 +39,5 @@ func init() {
 
 	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 	Cmd.InitDefaultVersionFlag()
+	internal.AddConfigFlags(Cmd)
 }

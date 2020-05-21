@@ -1,12 +1,12 @@
 [
-  {"op": "c", "db": "t1", "id": 1, "dc": {"create":  "c1"}},
-  {"op": "t", "db": "t1", "id": 2, "dc": [
-    {"id": 21, "op": "c", "db": "t1", "dc": {"insert": "c1", "documents": [{"key1": "i1_t1"}]}},
-    {"id": 22, "op": "c", "db": "t1", "dc": {"insert": "c1", "documents": [{"key1": "i2_t1", "key2": "i2_t1"}, {"key1": "i2_t1", "key2": "i2_t1", "key3": "i2_t1"}]}},
+  {"op": "c", "db": "load3_db", "id": 1, "dc": {"create":  "coll_txn"}},
+  {"op": "t", "db": "load3_db", "id": 2, "dc": [
+    {"id": 21, "op": "c", "db": "load3_db", "dc": {"insert": "coll_txn", "documents": [{"key1": "i1_t1"}]}},
+    {"id": 22, "op": "c", "db": "load3_db", "dc": {"insert": "coll_txn", "documents": [{"key1": "i2_t1", "key2": "i2_t1"}, {"key1": "i2_t1", "key2": "i2_t1", "key3": "i2_t1"}]}},
     {"id": 23, "op": "abort"}
   ]},
-  {"op": "t", "db": "t1", "id": 3, "dc": [
-    {"id": 31, "op": "c", "db": "t1", "dc": {"insert": "c1", "documents": [{"key2": "i1_t2"}]}},
-    {"id": 32, "op": "c", "db": "t1", "dc": {"insert": "c1", "documents": [{"key5": "i2_t2"}, {"key1": "i2_t2", "key3": "i2_t2"}]}}
+  {"op": "t", "db": "load3_db", "id": 3, "dc": [
+    {"id": 31, "op": "c", "db": "load3_db", "dc": {"insert": "coll_txn", "documents": [{"key2": "i1_t2"}]}},
+    {"id": 32, "op": "c", "db": "load3_db", "dc": {"insert": "coll_txn", "documents": [{"key5": "i2_t2"}, {"key1": "i2_t2", "key3": "i2_t2"}]}}
   ]}
 ]

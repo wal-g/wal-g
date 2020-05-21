@@ -1,4 +1,4 @@
-package oplog
+package stages
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
@@ -14,6 +15,25 @@ import (
 	"github.com/wal-g/tracelog"
 	"go.mongodb.org/mongo-driver/bson"
 )
+
+type GapHandler interface {
+	HandleGap(from, until models.Timestamp, err error) error
+}
+
+type StorageGapHandler struct {
+	uploader archive.Uploader
+}
+
+func NewStorageGapHandler(uploader archive.Uploader) *StorageGapHandler {
+	return &StorageGapHandler{uploader}
+}
+
+func (sgh *StorageGapHandler) HandleGap(from, until models.Timestamp, gapErr error) error {
+	if err := sgh.uploader.UploadGapArchive(gapErr, from, until); err != nil {
+		return fmt.Errorf("can not upload gap archive: %w", err)
+	}
+	return nil
+}
 
 // FromFetcher defines interface to fetch oplog records starting given timestamp.
 type FromFetcher interface {
@@ -27,12 +47,14 @@ type BetweenFetcher interface {
 
 // DBFetcher implements FromFetcher interface for mongodb
 type DBFetcher struct {
-	db client.MongoDriver
+	db         client.MongoDriver
+	lwInterval time.Duration
+	gapHandler GapHandler
 }
 
 // NewDBFetcher builds DBFetcher with given args.
-func NewDBFetcher(m client.MongoDriver) *DBFetcher {
-	return &DBFetcher{m}
+func NewDBFetcher(m client.MongoDriver, LWUpdateInterval time.Duration, gapHandler GapHandler) *DBFetcher {
+	return &DBFetcher{m, LWUpdateInterval, gapHandler}
 }
 
 // OplogFrom returns channel of oplog records, channel is filled in background.
@@ -55,7 +77,7 @@ func (dbf *DBFetcher) OplogFrom(ctx context.Context, from models.Timestamp, wg *
 		defer func() { _ = cur.Close(ctx) }()
 
 		fromFound := false
-
+		majTs := models.Timestamp{}
 		for cur.Next(ctx) {
 			// TODO: benchmark decode vs. bson.Reader vs. bson.Raw.LookupErr
 			op, err := models.OplogFromRaw(cur.Data())
@@ -64,10 +86,33 @@ func (dbf *DBFetcher) OplogFrom(ctx context.Context, from models.Timestamp, wg *
 				return
 			}
 
-			if !fromFound {
-				if op.TS != from { // from ts is not reached, continue
-					errc <- fmt.Errorf("'from' timestamp '%s' was not found", from)
+			// TODO: move to separate component and fetch last writes in background
+			for models.LessTS(majTs, op.TS) {
+				time.Sleep(dbf.lwInterval)
+
+				im, err := dbf.db.IsMaster(ctx)
+				if err != nil {
+					errc <- err
 					return
+				}
+
+				// TODO: support archiving from secondary
+				if !im.IsMaster {
+					errc <- fmt.Errorf("current node is not a primary")
+					return
+				}
+
+				majTs = im.LastWrite.MajorityOpTime.TS
+			}
+
+			if !fromFound {
+				if op.TS != from { // from ts is not exists, report gap and continue
+					gapErr := models.NewError(models.SplitFound, fmt.Sprintf("expected first ts is %v, but %v is given", from, op.TS))
+					tracelog.ErrorLogger.PrintError(gapErr)
+					if err := dbf.gapHandler.HandleGap(from, op.TS, gapErr); err != nil {
+						errc <- err
+						return
+					}
 				}
 				fromFound = true
 			}

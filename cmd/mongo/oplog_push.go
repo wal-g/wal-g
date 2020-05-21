@@ -10,19 +10,17 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
+	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 )
 
-const oplogPushShortDescription = ""
-
 // oplogPushCmd represents the continuous oplog archiving procedure
 var oplogPushCmd = &cobra.Command{
 	Use:   "oplog-push",
-	Short: oplogPushShortDescription,
+	Short: "Fetches oplog from mongodb and uploads to storage",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -38,14 +36,20 @@ var oplogPushCmd = &cobra.Command{
 		mongodbUrl, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
 		tracelog.ErrorLogger.FatalOnError(err)
 
+		// set up storage client
+		uploader, err := archive.NewStorageUploader(models.OplogArchBasePath)
+		tracelog.ErrorLogger.FatalOnError(err)
+
 		// set up mongodb client and oplog fetcher
 		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl)
 		tracelog.ErrorLogger.FatalOnError(err)
-		oplogFetcher := oplog.NewDBFetcher(mongoClient)
-
-		// set up storage client
-		uploader, err := archive.NewStorageUploader(models.ArchBasePath)
+		err = mongoClient.EnsureIsMaster(ctx)
 		tracelog.ErrorLogger.FatalOnError(err)
+
+		lwUpdate, err := internal.GetLastWriteUpdateInterval()
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		oplogFetcher := stages.NewDBFetcher(mongoClient, lwUpdate, stages.NewStorageGapHandler(uploader))
 
 		// discover last archived timestamp
 		since, initial, err := archive.ArchivingResumeTS(uploader.UploadingFolder)
@@ -56,16 +60,11 @@ var oplogPushCmd = &cobra.Command{
 		}
 		tracelog.InfoLogger.Printf("Archiving last known timestamp is %s", since)
 
-		// set up oplog validator
-		lwUpdate, err := internal.GetLastWriteUpdateInterval()
-		tracelog.ErrorLogger.FatalOnError(err)
-		oplogValidator := oplog.NewDBValidator(ctx, since, lwUpdate, mongoClient)
-
 		// set up storage archiver
-		oplogApplier := oplog.NewStorageApplier(uploader, archiveAfterSize, archiveTimeout)
+		oplogApplier := stages.NewStorageApplier(uploader, archiveAfterSize, archiveTimeout)
 
 		// run working cycle
-		err = mongo.HandleOplogPush(ctx, since, oplogFetcher, oplogValidator, oplogApplier)
+		err = mongo.HandleOplogPush(ctx, since, oplogFetcher, oplogApplier)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

@@ -1,4 +1,4 @@
-package oplog
+package stages
 
 import (
 	"bytes"
@@ -14,8 +14,11 @@ import (
 	mongoMocks "github.com/wal-g/wal-g/internal/databases/mongo/client/mocks"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/wal-g/wal-g/internal/databases/mongo/stages/mocks"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -63,7 +66,7 @@ func ArchRawMocks(batches ...[]models.Oplog) ([]models.Archive, [][]byte) {
 		for _, op := range ops {
 			buf.Write(op.Data)
 		}
-		arch, err := models.NewArchive(startTS, ops[len(ops)-1].TS, archiveExt)
+		arch, err := models.NewArchive(startTS, ops[len(ops)-1].TS, archiveExt, models.ArchiveTypeOplog)
 		if err != nil {
 			panic(err)
 		}
@@ -101,6 +104,19 @@ func SetupDownloaderMocks(ops ...[]models.Oplog) DownloaderFields {
 	return DownloaderFields{downloader: &dl, path: archives}
 }
 
+func gatherOps(in chan models.Oplog) chan []models.Oplog {
+	ch := make(chan []models.Oplog)
+	go func() {
+		outOps := make([]models.Oplog, 0, 0)
+		for op := range in {
+			outOps = append(outOps, op)
+		}
+		ch <- outOps
+		close(ch)
+	}()
+	return ch
+}
+
 func TestStorageFetcher_OplogBetween(t *testing.T) {
 	type args struct {
 		ctx   context.Context
@@ -117,7 +133,7 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 		wantErrc error
 	}{
 		{
-			name:   "from first until last, one archive",
+			name:   "from_first_until_last,_one_archive",
 			fields: SetupDownloaderMocks(ops),
 			args: args{
 				ctx:   context.TODO(),
@@ -129,7 +145,7 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 			wantErrc: nil,
 		},
 		{
-			name:   "from first until last, three archives",
+			name:   "from_first_until_last,_three_archives",
 			fields: SetupDownloaderMocks(ops[0:2], ops[2:3], ops[3:]),
 			args: args{
 				ctx:   context.TODO(),
@@ -141,7 +157,7 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 			wantErrc: nil,
 		},
 		{
-			name:   "from second until pre-last, three archives",
+			name:   "from_second_until_pre-last,_three_archives",
 			fields: SetupDownloaderMocks(ops[0:3], ops[3:4], ops[4:]),
 			args: args{
 				ctx:   context.TODO(),
@@ -153,7 +169,7 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 			wantErrc: nil,
 		},
 		{
-			name:   "error: first > until",
+			name:   "error:_first_>_until",
 			fields: SetupDownloaderMocks(ops[0:2], ops[2:3], ops[3:]),
 			args: args{
 				ctx:   context.TODO(),
@@ -165,7 +181,7 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 			wantErr: fmt.Errorf("fromTS '1579002001.1' must be less than untilTS '1579002000.1'"),
 		},
 		{
-			name:   "error: first was not found in first archive",
+			name:   "error:_first_was_not_found_in_first_archive",
 			fields: SetupDownloaderMocks(ops),
 			args: args{
 				ctx:   context.TODO(),
@@ -177,7 +193,7 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 			wantErrc: fmt.Errorf("'from' timestamp '1579002000.1' was not found in first archive: oplog_0.0_1579002006.1.br"),
 		},
 		{
-			name:   "error: until is not reached",
+			name:   "error:_until_is_not_reached",
 			fields: SetupDownloaderMocks(ops[0:2], ops[2:3], ops[3:]),
 			args: args{
 				ctx:   context.TODO(),
@@ -229,11 +245,38 @@ type MongoDriverFields struct {
 	cursor *mongoMocks.OplogCursor
 }
 
+func SetupSecondaryMongoDriverMocks(op models.Oplog) MongoDriverFields {
+	md := &mongoMocks.MongoDriver{}
+	cur := &mongoMocks.OplogCursor{}
+
+	isMaster := models.IsMaster{IsMaster: false}
+	md.On("IsMaster", mock.Anything).Return(isMaster, nil)
+
+	cur.On("Data").Return(op.Data).Once().
+		On("Next", mock.Anything).Return(true).Once()
+
+	cur.On("Close", mock.Anything).Return(nil).Once()
+
+	md.On("TailOplogFrom", mock.Anything, mock.Anything).Return(cur, nil).Once()
+
+	return MongoDriverFields{mongo: md, cursor: cur}
+}
+
 func SetupMongoDriverMocks(ops []models.Oplog, driverErr, curErr error, badOp bool) MongoDriverFields {
 	md := &mongoMocks.MongoDriver{}
 	cur := &mongoMocks.OplogCursor{}
 
 	if curErr == nil {
+		tsInFuture := models.OpTime{TS: models.Timestamp{TS: uint32(time.Now().Add(24 * time.Hour).Unix()), Inc: 1}}
+		isMaster := models.IsMaster{
+			IsMaster: true,
+			LastWrite: models.IsMasterLastWrite{
+				OpTime:         tsInFuture,
+				MajorityOpTime: tsInFuture,
+			},
+		}
+		md.On("IsMaster", mock.Anything).Return(isMaster, nil)
+
 		for i := range ops {
 			cur.On("Data").Return(ops[i].Data).Once().
 				On("Next", mock.Anything).Return(true).Once()
@@ -246,7 +289,6 @@ func SetupMongoDriverMocks(ops []models.Oplog, driverErr, curErr error, badOp bo
 		cur.On("Next", mock.Anything).Return(false).Once().
 			On("Err").Return(curErr).Once()
 	}
-
 	md.On("TailOplogFrom", mock.Anything, mock.Anything).Return(cur, driverErr).Once()
 
 	return MongoDriverFields{mongo: md, cursor: cur}
@@ -259,16 +301,18 @@ func TestDBFetcher_OplogFrom(t *testing.T) {
 		wg   *sync.WaitGroup
 	}
 	tests := []struct {
-		name     string
-		fields   MongoDriverFields
-		args     args
-		wantOps  []models.Oplog
-		wantErr  error
-		wantErrc error
+		name       string
+		dbFields   MongoDriverFields
+		gapHandler *mocks.GapHandler
+		args       args
+		wantOps    []models.Oplog
+		wantErr    error
+		wantErrc   error
 	}{
 		{
-			name:   "from first until last, until cursor exhausted",
-			fields: SetupMongoDriverMocks(ops, nil, nil, false),
+			name:       "from_first_until_last,_until_cursor_exhausted",
+			dbFields:   SetupMongoDriverMocks(ops, nil, nil, false),
+			gapHandler: &mocks.GapHandler{},
 			args: args{
 				ctx:  context.TODO(),
 				from: ops[0].TS,
@@ -278,8 +322,9 @@ func TestDBFetcher_OplogFrom(t *testing.T) {
 			wantErrc: fmt.Errorf("oplog cursor exhausted"),
 		},
 		{
-			name:   "error: cursor error",
-			fields: SetupMongoDriverMocks(ops, nil, fmt.Errorf("cursor error"), false),
+			name:       "error:_cursor_error",
+			dbFields:   SetupMongoDriverMocks(ops, nil, fmt.Errorf("cursor error"), false),
+			gapHandler: &mocks.GapHandler{},
 			args: args{
 				ctx:  context.TODO(),
 				from: ops[0].TS,
@@ -289,33 +334,53 @@ func TestDBFetcher_OplogFrom(t *testing.T) {
 			wantErrc: fmt.Errorf("oplog cursor error: cursor error"),
 		},
 		{
-			name:   "error: from ts is not found",
-			fields: SetupMongoDriverMocks(ops[1:2], nil, nil, true),
+			name:     "from_first_with_gap_until_last,_until_cursor_exhausted",
+			dbFields: SetupMongoDriverMocks(ops[1:], nil, nil, false),
+			gapHandler: func() *mocks.GapHandler {
+				err := models.NewError(models.SplitFound, fmt.Sprintf("expected first ts is %v, but %v is given", ops[0].TS, ops[1].TS))
+				gh := mocks.GapHandler{}
+				gh.On("HandleGap", ops[0].TS, ops[1].TS, err).Return(nil).Once()
+				return &gh
+			}(),
 			args: args{
 				ctx:  context.TODO(),
 				from: ops[0].TS,
 				wg:   &sync.WaitGroup{},
 			},
-			wantOps:  []models.Oplog{},
-			wantErrc: fmt.Errorf("'from' timestamp '1579002001.1' was not found"),
+			wantErrc: fmt.Errorf("oplog cursor exhausted"),
+			wantOps:  ops[1:],
 		},
 		{
-			name:   "error: driver error",
-			fields: SetupMongoDriverMocks(ops, fmt.Errorf("driver error"), nil, false),
+			name:       "error:_driver_error",
+			dbFields:   SetupMongoDriverMocks(ops, fmt.Errorf("driver error"), nil, false),
+			gapHandler: &mocks.GapHandler{},
 			args: args{
 				ctx:  context.TODO(),
 				from: ops[0].TS,
 				wg:   &sync.WaitGroup{},
 			},
-			wantOps: ops,
 			wantErr: fmt.Errorf("driver error"),
+		},
+		{
+			name:       "error:_primary_expected",
+			dbFields:   SetupSecondaryMongoDriverMocks(ops[0]),
+			gapHandler: &mocks.GapHandler{},
+			args: args{
+				ctx:  context.TODO(),
+				from: ops[0].TS,
+				wg:   &sync.WaitGroup{},
+			},
+			wantErrc: fmt.Errorf("current node is not a primary"),
+			wantOps:  []models.Oplog{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dbf := &DBFetcher{
-				db: tt.fields.mongo,
+				db:         tt.dbFields.mongo,
+				lwInterval: time.Microsecond,
+				gapHandler: tt.gapHandler,
 			}
 
 			outc, errc, err := dbf.OplogFrom(tt.args.ctx, tt.args.from, tt.args.wg)
@@ -340,8 +405,9 @@ func TestDBFetcher_OplogFrom(t *testing.T) {
 			_, ok := <-errc
 			assert.False(t, ok)
 
-			tt.fields.mongo.AssertExpectations(t)
-			tt.fields.cursor.AssertExpectations(t)
+			tt.dbFields.mongo.AssertExpectations(t)
+			tt.dbFields.cursor.AssertExpectations(t)
+			tt.gapHandler.AssertExpectations(t)
 		})
 	}
 }

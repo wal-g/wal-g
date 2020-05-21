@@ -6,8 +6,8 @@ ARG MONGO_REPO=repo.mongodb.org
 ARG WALG_REPO=${GOPATH}/src/github.com/wal-g/wal-g
 
 ENV MONGO_PACKAGE=${MONGO_PACKAGE} MONGO_REPO=${MONGO_REPO}
-ARG MONGO_MAJOR=3.6
-ARG MONGO_VERSION=3.6.3
+ARG MONGO_MAJOR=4.2
+ARG MONGO_VERSION=4.2.3
 ENV TMP_DIR /var/tmp/wal-g
 ENV WALG_CONF_DIR /etc/wal-g/
 
@@ -36,5 +36,5 @@ COPY staging/wal-g ${WALG_REPO}/
 WORKDIR ${WALG_REPO}
 
 RUN make link_external_deps
-RUN make mongo_build && \
+RUN make BUILD_ARGS=-race mongo_build && \
     cp main/mongo/wal-g /usr/bin/wal-g
