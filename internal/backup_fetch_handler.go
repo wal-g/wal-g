@@ -65,7 +65,7 @@ func readRestoreSpec(path string, spec *TablespaceSpec) (err error) {
 	return nil
 }
 
-func GetPgFetcher(dbDataDirectory, fileMask, restoreSpecPath string) func(folder storage.Folder, backup Backup) {
+func GetPgFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string) func(folder storage.Folder, backup Backup) {
 	return func(folder storage.Folder, backup Backup) {
 		filesToUnwrap, err := backup.GetFilesToUnwrap(fileMask)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
@@ -74,20 +74,10 @@ func GetPgFetcher(dbDataDirectory, fileMask, restoreSpecPath string) func(folder
 		if restoreSpecPath != "" {
 			spec = &TablespaceSpec{}
 			err := readRestoreSpec(restoreSpecPath, spec)
-			errMessage := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
-			tracelog.ErrorLogger.FatalfOnError(errMessage, err)
+			errMessege := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
+			tracelog.ErrorLogger.FatalfOnError(errMessege, err)
 		}
-
-		// directory must be empty before starting a deltaFetch
-		isEmpty, err := isDirectoryEmpty(dbDataDirectory)
-		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
-
-		if !isEmpty {
-			tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n",
-				newNonEmptyDbDataDirectoryError(dbDataDirectory))
-		}
-
-		err = deltaFetchRecursion(backup.Name, folder, utility.ResolveSymlink(dbDataDirectory), spec, filesToUnwrap)
+		err = deltaFetchRecursionOld(backup.Name, folder, utility.ResolveSymlink(dbDataDirectory), spec, filesToUnwrap)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 	}
 }
@@ -168,7 +158,7 @@ func chooseTablespaceSpecification(sentinelDto BackupSentinelDto, spec *Tablespa
 
 // TODO : unit tests
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
-func deltaFetchRecursion(backupName string, folder storage.Folder, dbDataDirectory string,
+func deltaFetchRecursionOld(backupName string, folder storage.Folder, dbDataDirectory string,
 	tablespaceSpec *TablespaceSpec, filesToUnwrap map[string]bool) error {
 	backup, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	if err != nil {
@@ -181,27 +171,19 @@ func deltaFetchRecursion(backupName string, folder storage.Folder, dbDataDirecto
 	chooseTablespaceSpecification(sentinelDto, tablespaceSpec)
 
 	if sentinelDto.IsIncremental() {
-		tracelog.InfoLogger.Printf("Delta %v at LSN %x \n", backupName, *(sentinelDto.BackupStartLSN))
+		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n", *(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN))
 		baseFilesToUnwrap, err := GetBaseFilesToUnwrap(sentinelDto.Files, filesToUnwrap)
 		if err != nil {
 			return err
 		}
-
-		err = backup.unwrap(dbDataDirectory, sentinelDto, filesToUnwrap, false)
+		err = deltaFetchRecursionOld(*sentinelDto.IncrementFrom, folder, dbDataDirectory, tablespaceSpec, baseFilesToUnwrap)
 		if err != nil {
 			return err
 		}
-		tracelog.InfoLogger.Printf("%v fetched. Downgrading from LSN %x to LSN %x \n", backupName, *(sentinelDto.BackupStartLSN), *(sentinelDto.IncrementFromLSN))
-		err = deltaFetchRecursion(*sentinelDto.IncrementFrom, folder, dbDataDirectory, tablespaceSpec, baseFilesToUnwrap)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		tracelog.InfoLogger.Printf("%v fetched. Upgrading from LSN %x to LSN %x \n", *(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN), *(sentinelDto.BackupStartLSN))
 	}
-	
-	tracelog.InfoLogger.Printf("%x reached. Applying base backup... \n", *(sentinelDto.BackupStartLSN))
-	return backup.unwrap(dbDataDirectory, sentinelDto, filesToUnwrap, false)
+
+	return backup.unwrapToEmptyDirectory(dbDataDirectory, sentinelDto, filesToUnwrap, false)
 }
 
 func GetBaseFilesToUnwrap(backupFileStates BackupFileList, currentFilesToUnwrap map[string]bool) (map[string]bool, error) {
