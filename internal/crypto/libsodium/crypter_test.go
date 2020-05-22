@@ -3,7 +3,7 @@
 package libsodium
 
 import (
-	"bytes"
+	"io"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -43,16 +43,18 @@ func TestMockCrypterFromKeyPath_ShouldReturnErrorOnNonExistentFile(t *testing.T)
 
 func EncryptionCycle(t *testing.T, crypter crypto.Crypter) {
 	secret := strings.Repeat(" so very secret thing ", 1000)
+	reader, writer := io.Pipe()
 
-	buffer := new(bytes.Buffer)
-	encrypt, err := crypter.Encrypt(buffer)
+	encrypt, err := crypter.Encrypt(writer)
 	assert.NoErrorf(t, err, "encryption error: %v", err)
 
-	encrypt.Write([]byte(secret))
-	encrypt.Close()
-
-	decrypt, err := crypter.Decrypt(buffer)
+	decrypt, err := crypter.Decrypt(reader)
 	assert.NoErrorf(t, err, "decryption error: %v", err)
+
+	go func() {
+		encrypt.Write([]byte(secret))
+		encrypt.Close()
+	}()
 
 	decrypted, err := ioutil.ReadAll(decrypt)
 	assert.NoErrorf(t, err, "decryption read error: %v", err)
