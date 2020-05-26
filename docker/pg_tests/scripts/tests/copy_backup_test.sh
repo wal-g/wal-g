@@ -34,9 +34,9 @@ pgbench -i -s 1 postgres &
 sleep 1
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 wal-g --config=${TMP_CONFIG} backup-list
-backup_name=`wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " "`
 
 # copy backup with backup-name
+backup_name=`wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " "`
 wal-g copy --backup-name=${backup_name} --from=${TMP_CONFIG} --to=${TO_TMP_CONFIG} --without-history
 copied_backup_name=`wal-g --config=${TO_TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " "`
 
@@ -46,7 +46,7 @@ then
     exit 2
 fi
 
-# push a few more backups
+# push some more backups
 for i in 2 3
 do
     pgbench -i -s 1 postgres &
@@ -54,9 +54,10 @@ do
     wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 done
 
+# remember a backup...
 backup_name=`wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " "`
 
-# push a few more backups
+# ...and push backups again
 for i in 2 3
 do
     pgbench -i -s 1 postgres &
@@ -65,15 +66,16 @@ do
 done
 
 # copy that backup
-wal-g copy --backup-name=${last_backup_name} --from=${TMP_CONFIG} --to=${TO_TMP_CONFIG}
+wal-g copy --backup-name=${backup_name} --from=${TMP_CONFIG} --to=${TO_TMP_CONFIG}
+copied_backup_name=`wal-g --config=${TO_TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " "`
 
 # check if backup copied
 if [ $last_backup_name != $copied_last_backup_name ];
 then
-    echo "Copying all backups failed"
+    echo "Copying backup failed"
     exit 2
 fi
 
 /tmp/scripts/drop_pg.sh
 
-echo "Copy backup test success!!!!!!"
+echo "Copying backup test success!!!!!!"

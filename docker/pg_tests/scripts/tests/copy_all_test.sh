@@ -57,11 +57,14 @@ wal-g --config=${TMP_CONFIG} backup-list
 
 # copy all again
 wal-g copy --from=${TMP_CONFIG} --to=${TO_TMP_CONFIG}
-last_backup_name=`wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " "`
-copied_last_backup_name=`wal-g --config=${TO_TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " "`
 
-# check if backup copied
-if [ $last_backup_name != $copied_last_backup_name ];
+# save backup names to temp files
+wal-g --config=${TMP_CONFIG} backup-list | cut -f 1 -d " " | sort > /tmp/actual_backup_list
+wal-g --config=${TO_TMP_CONFIG} backup-list | cut -f 1 -d " " | sort > /tmp/copied_backup_list
+# and count lines in diff
+lines_count=`diff /tmp/actual_backup_list /tmp/copied_backup_list | wc -l`
+
+if [ lines_count > 0 ];
 then
     echo "Copying all backups failed"
     exit 2

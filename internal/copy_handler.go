@@ -23,12 +23,12 @@ func HandleCopy(fromConfigFile string, toConfigFile string, backupName string, w
 	if fromError != nil || toError != nil {
 		return
 	}
-	infos, err := getObjectsToCopy(backupName, from, to, withoutHistory)
+	infos, err := getCopyingInfoToCopy(backupName, from, to, withoutHistory)
 	tracelog.ErrorLogger.FatalOnError(err)
 	isSuccess, err := StartCopy(infos)
 	tracelog.ErrorLogger.FatalOnError(err)
 	if isSuccess {
-		tracelog.InfoLogger.Println("Success.")
+		tracelog.InfoLogger.Println("Success copy.")
 	}
 }
 
@@ -76,10 +76,10 @@ func copyObject(info CopyingInfo, wg *sync.WaitGroup, errors chan error) {
 	tracelog.InfoLogger.Printf("Copied '%s' from '%s' to '%s'.", objectName, from.GetPath(), to.GetPath())
 }
 
-func getObjectsToCopy(backupName string, from storage.Folder, to storage.Folder, withoutHistory bool) ([]CopyingInfo, error) {
+func getCopyingInfoToCopy(backupName string, from storage.Folder, to storage.Folder, withoutHistory bool) ([]CopyingInfo, error) {
 	if backupName == "" {
 		tracelog.InfoLogger.Printf("Copy all backups and history.")
-		return GetAllObjects(from, to)
+		return GetAllCopyingInfo(from, to)
 	}
 	tracelog.InfoLogger.Printf("Handle backupname '%s'.", backupName)
 	backup, err := GetBackupByName(backupName, utility.BaseBackupPath, from)
@@ -87,12 +87,12 @@ func getObjectsToCopy(backupName string, from storage.Folder, to storage.Folder,
 		return nil, err
 	}
 
-	infos, err := GetBackupObjects(backup, from, to)
+	infos, err := GetBackupCopyingInfo(backup, from, to)
 	if err != nil {
 		return nil, err
 	}
 	if !withoutHistory {
-		var history, err = GetHistoryObjects(backup, from, to)
+		var history, err = GetHistoryCopyingInfo(backup, from, to)
 		if err != nil {
 			return nil, err
 		}
@@ -101,7 +101,7 @@ func getObjectsToCopy(backupName string, from storage.Folder, to storage.Folder,
 	return infos, nil
 }
 
-func GetBackupObjects(backup *Backup, from storage.Folder, to storage.Folder) ([]CopyingInfo, error) {
+func GetBackupCopyingInfo(backup *Backup, from storage.Folder, to storage.Folder) ([]CopyingInfo, error) {
 	tracelog.InfoLogger.Print("Collecting backup files...")
 	var backupPrefix = path.Join(utility.BaseBackupPath, backup.Name)
 	var objects, err = storage.ListFolderRecursively(from)
@@ -112,7 +112,7 @@ func GetBackupObjects(backup *Backup, from storage.Folder, to storage.Folder) ([
 	return BuildCopyingInfos(from, to, objects, hasBackupPrefix), nil
 }
 
-func GetHistoryObjects(backup *Backup, from storage.Folder, to storage.Folder) ([]CopyingInfo, error) {
+func GetHistoryCopyingInfo(backup *Backup, from storage.Folder, to storage.Folder) ([]CopyingInfo, error) {
 	tracelog.InfoLogger.Print("Collecting history files... ")
 	var fromWalFolder = from.GetSubFolder(utility.WalPath)
 	tracelog.InfoLogger.Print("getSubFolder succeess!")
@@ -130,7 +130,7 @@ func GetHistoryObjects(backup *Backup, from storage.Folder, to storage.Folder) (
 	return BuildCopyingInfos(fromWalFolder, to, objects, older), nil
 }
 
-func GetAllObjects(from storage.Folder, to storage.Folder) ([]CopyingInfo, error) {
+func GetAllCopyingInfo(from storage.Folder, to storage.Folder) ([]CopyingInfo, error) {
 	objects, err := storage.ListFolderRecursively(from)
 	if err != nil {
 		return nil, err

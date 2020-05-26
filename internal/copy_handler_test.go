@@ -22,7 +22,7 @@ func TestStartCopy_WhenThereAreNoObjectsToCopy(t *testing.T) {
 func TestStartCopy_WhenThereAreObjectsToCopy(t *testing.T) {
 	var from = testtools.CreateMockStorageFolderWithPermanentBackups(t)
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
-	infos, err := internal.GetAllObjects(from, to)
+	infos, err := internal.GetAllCopyingInfo(from, to)
 	assert.NoError(t, err)
 	isSuccess, err := internal.StartCopy(infos)
 	assert.NoError(t, err)
@@ -39,55 +39,55 @@ func TestStartCopy_WhenThereAreObjectsToCopy(t *testing.T) {
 	}
 }
 
-func TestGetBackupObjects_WhenFolderIsEmpty(t *testing.T) {
+func TestGetBackupCopyingInfo_WhenFolderIsEmpty(t *testing.T) {
 	var from = testtools.MakeDefaultInMemoryStorageFolder()
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var backup = internal.NewBackup(from, "base_000000010000000000000002")
-	var infos, err = internal.GetBackupObjects(backup, from, to)
+	var infos, err = internal.GetBackupCopyingInfo(backup, from, to)
 	assert.NoError(t, err)
 	assert.Empty(t, infos)
 }
 
-func TestGetBackupObjects_WhenFolderIsNotEmpty(t *testing.T) {
+func TestGetBackupCopyingInfo_WhenFolderIsNotEmpty(t *testing.T) {
 	var from = testtools.CreateMockStorageFolderWithPermanentBackups(t)
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var backup = internal.NewBackup(from, "base_000000010000000000000002")
-	var infos, err = internal.GetBackupObjects(backup, from, to)
+	var infos, err = internal.GetBackupCopyingInfo(backup, from, to)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(infos))
 	assert.NotEmpty(t, infos)
 }
 
-func TestGetHistoryObjects_WhenFolderIsEmpty(t *testing.T) {
+func TestGetHistoryCopyingInfo_WhenFolderIsEmpty(t *testing.T) {
 	var from = testtools.MakeDefaultInMemoryStorageFolder()
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var backup = internal.NewBackup(from, "base_000000010000000000000002")
-	var infos, err = internal.GetHistoryObjects(backup, from, to)
+	var infos, err = internal.GetHistoryCopyingInfo(backup, from, to)
 	assert.NoError(t, err)
 	assert.Empty(t, infos)
 }
 
-func TestGetHistoryObjects_WhenThereIsNoHistoryObjects(t *testing.T) {
+func TestGetHistoryCopyingInfo_WhenThereIsNoHistoryObjects(t *testing.T) {
 	var from = testtools.CreateMockStorageFolder()
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var backup = internal.NewBackup(from, "base_000000010000000000000002")
-	var infos, err = internal.GetHistoryObjects(backup, from, to)
+	var infos, err = internal.GetHistoryCopyingInfo(backup, from, to)
 	assert.NoError(t, err)
 	assert.Empty(t, infos)
 }
 
-func TestGetAllObjects_WhenFromFolderIsEmpty(t *testing.T) {
+func TestGetAllCopyingInfo_WhenFromFolderIsEmpty(t *testing.T) {
 	var from = testtools.MakeDefaultInMemoryStorageFolder()
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
-	var infos, err = internal.GetAllObjects(from, to)
+	var infos, err = internal.GetAllCopyingInfo(from, to)
 	assert.NoError(t, err)
 	assert.Empty(t, infos)
 }
 
-func TestGetAllObjects_WhenFromFolderIsNotEmpty(t *testing.T) {
+func TestGetAllCopyingInfo_WhenFromFolderIsNotEmpty(t *testing.T) {
 	var from = testtools.CreateMockStorageFolderWithPermanentBackups(t)
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
-	var infos, err = internal.GetAllObjects(from, to)
+	var infos, err = internal.GetAllCopyingInfo(from, to)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, infos)
 
