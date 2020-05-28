@@ -1,13 +1,11 @@
 package internal
 
 import (
-	"fmt"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"os"
 	"os/user"
 	"runtime"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -293,12 +291,9 @@ func InitConfig() {
 }
 
 func setGoMaxProcs() {
-	gomaxprocs := viper.Get(GoMaxProcs)
-	x_str := fmt.Sprintf("%v", gomaxprocs)
-	if gomaxprocs != nil && x_str != "" {
-		x, err := strconv.Atoi(x_str)
-		tracelog.ErrorLogger.FatalOnError(err)
-		runtime.GOMAXPROCS(x)
+	gomaxprocs := viper.GetInt(GoMaxProcs)
+	if gomaxprocs > 0 {
+		runtime.GOMAXPROCS(gomaxprocs)
 	}
 }
 
