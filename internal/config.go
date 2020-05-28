@@ -294,8 +294,9 @@ func InitConfig() {
 
 func setGoMaxProcs() {
 	gomaxprocs := viper.Get(GoMaxProcs)
-	if gomaxprocs != nil {
-		x, err := strconv.Atoi(fmt.Sprintf("%v", gomaxprocs))
+	x_str := fmt.Sprintf("%v", gomaxprocs)
+	if gomaxprocs != nil && x_str != "" {
+		x, err := strconv.Atoi(x_str)
 		tracelog.ErrorLogger.FatalOnError(err)
 		runtime.GOMAXPROCS(x)
 	}
