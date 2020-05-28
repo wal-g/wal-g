@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 	"os"
 	"os/user"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -56,6 +57,8 @@ const (
 	MysqlBinlogReplayCmd       = "WALG_MYSQL_BINLOG_REPLAY_COMMAND"
 	MysqlBinlogDstSetting      = "WALG_MYSQL_BINLOG_DST"
 	MysqlBackupPrepareCmd      = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
+
+	GoMaxProcs = "GOMAXPROCS"
 )
 
 var (
@@ -168,6 +171,9 @@ var (
 		MysqlBinlogReplayCmd:       true,
 		MysqlBinlogDstSetting:      true,
 		MysqlBackupPrepareCmd:      true,
+
+		// GOLANG
+		GoMaxProcs:	true,
 	}
 
 	RequiredSettings = make(map[string]bool)
@@ -279,6 +285,15 @@ func InitConfig() {
 			err = bindToEnv(k, val)
 			tracelog.ErrorLogger.FatalOnError(err)
 		}
+	}
+
+	setGoMaxProcs()
+}
+
+func setGoMaxProcs() {
+	gomaxprocs := viper.GetInt(GoMaxProcs)
+	if gomaxprocs > 0 {
+		runtime.GOMAXPROCS(gomaxprocs)
 	}
 }
 
