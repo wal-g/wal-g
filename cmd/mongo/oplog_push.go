@@ -17,7 +17,6 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
-
 // oplogPushCmd represents the continuous oplog archiving procedure
 var oplogPushCmd = &cobra.Command{
 	Use:   "oplog-push",
@@ -43,6 +42,8 @@ var oplogPushCmd = &cobra.Command{
 
 		// set up mongodb client and oplog fetcher
 		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl)
+		tracelog.ErrorLogger.FatalOnError(err)
+		err = mongoClient.EnsureIsMaster(ctx)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		lwUpdate, err := internal.GetLastWriteUpdateInterval()

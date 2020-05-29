@@ -245,13 +245,37 @@ type MongoDriverFields struct {
 	cursor *mongoMocks.OplogCursor
 }
 
+func SetupSecondaryMongoDriverMocks(op models.Oplog) MongoDriverFields {
+	md := &mongoMocks.MongoDriver{}
+	cur := &mongoMocks.OplogCursor{}
+
+	isMaster := models.IsMaster{IsMaster: false}
+	md.On("IsMaster", mock.Anything).Return(isMaster, nil)
+
+	cur.On("Data").Return(op.Data).Once().
+		On("Next", mock.Anything).Return(true).Once()
+
+	cur.On("Close", mock.Anything).Return(nil).Once()
+
+	md.On("TailOplogFrom", mock.Anything, mock.Anything).Return(cur, nil).Once()
+
+	return MongoDriverFields{mongo: md, cursor: cur}
+}
+
 func SetupMongoDriverMocks(ops []models.Oplog, driverErr, curErr error, badOp bool) MongoDriverFields {
 	md := &mongoMocks.MongoDriver{}
 	cur := &mongoMocks.OplogCursor{}
 
 	if curErr == nil {
-		lastWriteTs := models.Timestamp{TS: uint32(time.Now().Add(24 * time.Hour).Unix()), Inc: 1}
-		md.On("LastWriteTS", mock.Anything).Return(lastWriteTs, lastWriteTs, nil)
+		tsInFuture := models.OpTime{TS: models.Timestamp{TS: uint32(time.Now().Add(24 * time.Hour).Unix()), Inc: 1}}
+		isMaster := models.IsMaster{
+			IsMaster: true,
+			LastWrite: models.IsMasterLastWrite{
+				OpTime:         tsInFuture,
+				MajorityOpTime: tsInFuture,
+			},
+		}
+		md.On("IsMaster", mock.Anything).Return(isMaster, nil)
 
 		for i := range ops {
 			cur.On("Data").Return(ops[i].Data).Once().
@@ -280,11 +304,10 @@ func TestDBFetcher_OplogFrom(t *testing.T) {
 		name       string
 		dbFields   MongoDriverFields
 		gapHandler *mocks.GapHandler
-		//gapHandlers GapHandlers
-		args     args
-		wantOps  []models.Oplog
-		wantErr  error
-		wantErrc error
+		args       args
+		wantOps    []models.Oplog
+		wantErr    error
+		wantErrc   error
 	}{
 		{
 			name:       "from_first_until_last,_until_cursor_exhausted",
@@ -337,6 +360,18 @@ func TestDBFetcher_OplogFrom(t *testing.T) {
 				wg:   &sync.WaitGroup{},
 			},
 			wantErr: fmt.Errorf("driver error"),
+		},
+		{
+			name:       "error:_primary_expected",
+			dbFields:   SetupSecondaryMongoDriverMocks(ops[0]),
+			gapHandler: &mocks.GapHandler{},
+			args: args{
+				ctx:  context.TODO(),
+				from: ops[0].TS,
+				wg:   &sync.WaitGroup{},
+			},
+			wantErrc: fmt.Errorf("current node is not a primary"),
+			wantOps:  []models.Oplog{},
 		},
 	}
 

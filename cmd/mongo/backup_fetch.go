@@ -2,9 +2,10 @@ package mongo
 
 import (
 	"context"
-	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"os"
 	"syscall"
+
+	"github.com/wal-g/wal-g/internal/databases/mongo"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"

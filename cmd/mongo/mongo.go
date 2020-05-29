@@ -2,9 +2,10 @@ package mongo
 
 import (
 	"fmt"
-	"github.com/wal-g/tracelog"
 	"os"
 	"strings"
+
+	"github.com/wal-g/tracelog"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/wal-g/internal"

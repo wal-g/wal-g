@@ -52,7 +52,8 @@ func NewBackup(baseBackupFolder storage.Folder, name string) *Backup {
 	return &Backup{baseBackupFolder, name, nil}
 }
 
-func (backup *Backup) getStopSentinelPath() string {
+// GetStopSentinelPath returns sentinel path.
+func (backup *Backup) GetStopSentinelPath() string {
 	return backup.Name + utility.SentinelSuffix
 }
 
@@ -66,7 +67,7 @@ func (backup *Backup) getTarPartitionFolder() storage.Folder {
 
 // CheckExistence checks that the specified backup exists.
 func (backup *Backup) CheckExistence() (bool, error) {
-	return backup.BaseBackupFolder.Exists(backup.getStopSentinelPath())
+	return backup.BaseBackupFolder.Exists(backup.GetStopSentinelPath())
 }
 
 func (backup *Backup) GetTarNames() ([]string, error) {
@@ -102,7 +103,7 @@ func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
 
 // TODO : unit tests
 func (backup *Backup) fetchSentinelData() ([]byte, error) {
-	backupReaderMaker := newStorageReaderMaker(backup.BaseBackupFolder, backup.getStopSentinelPath())
+	backupReaderMaker := newStorageReaderMaker(backup.BaseBackupFolder, backup.GetStopSentinelPath())
 	backupReader, err := backupReaderMaker.Reader()
 	if err != nil {
 		return make([]byte, 0), err

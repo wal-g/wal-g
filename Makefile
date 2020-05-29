@@ -2,6 +2,7 @@ MAIN_PG_PATH := main/pg
 MAIN_MYSQL_PATH := main/mysql
 MAIN_REDIS_PATH := main/redis
 MAIN_MONGO_PATH := main/mongo
+MAIN_FDB_PATH := main/fdb
 DOCKER_COMMON := golang ubuntu s3
 CMD_FILES = $(wildcard wal-g/*.go)
 PKG_FILES = $(wildcard internal/**/*.go internal/**/**/*.go internal/*.go)
@@ -25,7 +26,7 @@ endif
 
 .PHONY: unittest fmt lint install clean
 
-test: install deps lint unittest pg_build mysql_build redis_build mongo_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test
+test: install deps lint unittest pg_build mysql_build redis_build mongo_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test
 
 pg_test: install deps pg_build lint unlink_brotli pg_integration_test
 
@@ -61,7 +62,7 @@ all_unittests: install deps lint unittest
 pg_int_tests_only:
 	docker-compose build pg_tests
 	docker-compose up --exit-code-from pg_tests pg_tests
-	
+
 pg_clean:
 	(cd $(MAIN_PG_PATH) && go clean)
 	./cleanup.sh
@@ -94,6 +95,12 @@ mysql_clean:
 mysql_install: mysql_build
 	mv $(MAIN_MYSQL_PATH)/wal-g $(GOBIN)/wal-g
 
+mariadb_test: install deps mysql_build lint unlink_brotli mariadb_integration_test
+
+mariadb_integration_test: load_docker_common
+	docker-compose build mariadb mariadb_tests
+	docker-compose up --exit-code-from mariadb_tests mariadb_tests
+
 mongo_test: install deps mongo_build lint unlink_brotli
 
 mongo_build: $(CMD_FILES) $(PKG_FILES)
@@ -110,6 +117,17 @@ mongo_features:
 clean_mongo_features:
 	set -e
 	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -v -count=1  -timeout 5m -tf.test=false -tf.debug=false -tf.clean=true -tf.stop=true
+
+fdb_build: $(CMD_FILES) $(PKG_FILES)
+	(cd $(MAIN_FDB_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w")
+
+fdb_install: fdb_build
+	mv $(MAIN_FDB_PATH)/wal-g $(GOBIN)/wal-g
+
+fdb_integration_test: load_docker_common
+	docker-compose down -v
+	docker-compose build fdb_tests
+	docker-compose up --force-recreate --renew-anon-volumes --exit-code-from fdb_tests fdb_tests
 
 redis_test: install deps redis_build lint unlink_brotli redis_integration_test
 

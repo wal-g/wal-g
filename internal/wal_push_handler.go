@@ -42,9 +42,10 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 	concurrency, err := getMaxUploadConcurrency()
 	tracelog.ErrorLogger.FatalOnError(err)
 
+	totalBgUploadedLimit := viper.GetInt32(TotalBgUploadedLimit)
 	preventWalOverwrite := viper.GetBool(PreventWalOverwriteSetting)
 
-	bgUploader := NewBgUploader(walFilePath, int32(concurrency-1), uploader, preventWalOverwrite)
+	bgUploader := NewBgUploader(walFilePath, int32(concurrency-1), totalBgUploadedLimit-1, uploader, preventWalOverwrite)
 	// Look for new WALs while doing main upload
 	bgUploader.Start()
 	err = uploadWALFile(uploader, walFilePath, bgUploader.preventWalOverwrite)
