@@ -52,7 +52,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.4.0
-	github.com/tinsane/tracelog v0.0.0-20190824100002-0ab2b054ff30
+	github.com/tinsane/tracelog v0.0.0-20190824100002-0ab2b054ff30 // indirect
 	github.com/ulikunitz/xz v0.5.6
 	github.com/wal-g/storages v0.0.0-20200511083259-4a94923055a1
 	github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30
@@ -66,6 +66,7 @@ require (
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/sys v0.0.0-20191210023423-ac6580df4449 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
+	golang.org/x/tools v0.0.0-20200528185414-6be401e3f76e // indirect
 	google.golang.org/api v0.9.0 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/genproto v0.0.0-20191206224255-0243a4be9c8f // indirect

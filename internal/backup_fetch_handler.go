@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/wal-g/wal-g/cmd/mysql"
 	"io"
 	"io/ioutil"
 	"os/exec"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/storages/storage"
@@ -107,6 +109,88 @@ func GetCommandStreamFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup B
 	}
 }
 
+func GetMysqlFetcher(restoreCmd, prepareCmd *exec.Cmd, tempDeltaDir string) func(folder storage.Folder, backup Backup) {
+	return func(folder storage.Folder, backup Backup) {
+		AppendCommandArgument(prepareCmd, mysql.XtrabackupApplyLogOnly)
+
+		err := deltaFetchMysqlRecursion(backup.Name, tempDeltaDir, folder, restoreCmd, prepareCmd, true)
+		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+	}
+}
+
+func deltaFetchMysqlRecursion(
+	backupName, tempDeltaDir string,
+	folder storage.Folder,
+	restoreCmd, prepareCmd *exec.Cmd, isLast bool) error {
+	var isFull bool
+	backup, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	if err != nil {
+		return err
+	}
+	sentinelDto, err := backup.GetSentinel()
+	if err != nil {
+		return err
+	}
+
+	if sentinelDto.IsIncremental() {
+		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n", *sentinelDto.IncrementFrom, *sentinelDto.IncrementFromLSN)
+		err = deltaFetchMysqlRecursion(*sentinelDto.IncrementFrom, tempDeltaDir, folder, restoreCmd, prepareCmd, false)
+		if err != nil {
+			return err
+		}
+	} else {
+		isFull = true
+	}
+
+	if !isFull {
+		restoreCmd = ForkCommand(restoreCmd)
+		restoreArgs := strings.Split(restoreCmd.Args[len(restoreCmd.Args)-1], " ")
+		ReplaceCommandArgument(restoreCmd, restoreArgs[len(restoreArgs)-1], tempDeltaDir)
+
+		prepareCmd = ForkCommand(prepareCmd)
+		AppendCommandArgument(prepareCmd, mysql.XtrabackupIncrementalDir+"="+tempDeltaDir)
+	}
+	if isLast {
+		ReplaceCommandArgument(prepareCmd, mysql.XtrabackupApplyLogOnly, "")
+	}
+
+	stdin, err := restoreCmd.StdinPipe()
+	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+	stderr := &bytes.Buffer{}
+	restoreCmd.Stderr = stderr
+
+	tracelog.InfoLogger.Printf("Restoring %s with cmd %v", backupName, restoreCmd.Args)
+	err = restoreCmd.Start()
+	if err != nil {
+		return err
+	}
+	err = downloadAndDecompressStream(backup, stdin)
+	if err != nil {
+		return err
+	}
+	cmdErr := restoreCmd.Wait()
+	if cmdErr != nil {
+		tracelog.ErrorLogger.Printf("Restore command output:\n%s", stderr.String())
+		err = cmdErr
+	}
+	if err != nil {
+		return err
+	}
+	tracelog.InfoLogger.Printf("Restored %s", backupName)
+
+	tracelog.InfoLogger.Printf("Preparing %s with cmd %v", backupName, prepareCmd.Args)
+	if prepareCmd != nil {
+		err = prepareCmd.Run()
+		if err != nil {
+			tracelog.ErrorLogger.Printf("Failed to prepare fetched backup: %v", err)
+			return err
+		}
+		tracelog.InfoLogger.Printf("Prepared %s", backupName)
+	}
+
+	return utility.RemoveContents(tempDeltaDir)
+}
+
 // TODO : unit tests
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
 func HandleBackupFetch(folder storage.Folder, backupName string, fetcher func(folder storage.Folder, backup Backup)) {
@@ -122,7 +206,7 @@ func GetBackupByName(backupName, subfolder string, folder storage.Folder) (*Back
 
 	var backup *Backup
 	if backupName == LatestString {
-		latest, err := getLatestBackupName(folder)
+		latest, err := GetLatestBackupName(folder)
 		if err != nil {
 			return nil, err
 		}
