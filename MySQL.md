@@ -206,7 +206,7 @@ Here's typical wal-g configuration for that case:
 ```
  WALG_MYSQL_DATASOURCE_NAME=user:pass@tcp(localhost:3305)/mysql                                                                                                                                      
  WALG_STREAM_CREATE_COMMAND="mariabackup --backup --stream=xbstream --datadir=/var/lib/mysql"                                                                                                                               
- WALG_STREAM_RESTORE_COMMAND="xbstream -x -C /var/lib/mysql"                                                                                                                       
+ WALG_STREAM_RESTORE_COMMAND="mbstream -x -C /var/lib/mysql"                                                                                                                       
  WALG_MYSQL_BACKUP_PREPARE_COMMAND="mariabackup --prepare --target-dir=/var/lib/mysql"                                                                                              
  WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
 ```
