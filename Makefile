@@ -95,6 +95,12 @@ mysql_clean:
 mysql_install: mysql_build
 	mv $(MAIN_MYSQL_PATH)/wal-g $(GOBIN)/wal-g
 
+mariadb_test: install deps mysql_build lint unlink_brotli mariadb_integration_test
+
+mariadb_integration_test: load_docker_common
+	docker-compose build mariadb mariadb_tests
+	docker-compose up --exit-code-from mariadb_tests mariadb_tests
+
 mongo_test: install deps mongo_build lint unlink_brotli
 
 mongo_build: $(CMD_FILES) $(PKG_FILES)
