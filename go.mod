@@ -10,7 +10,7 @@ require (
 	github.com/DataDog/zstd v1.4.4
 	github.com/Microsoft/go-winio v0.4.14 // indirect
 	github.com/RoaringBitmap/roaring v0.4.21
-	github.com/aws/aws-sdk-go v1.26.1
+	github.com/aws/aws-sdk-go v1.30.24
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/cyberdelia/lzo v0.0.0-20171006181345-d85071271a6f
@@ -22,7 +22,7 @@ require (
 	github.com/go-openapi/errors v0.19.3 // indirect
 	github.com/go-openapi/strfmt v0.19.4 // indirect
 	github.com/go-redis/redis v6.15.6+incompatible
-	github.com/go-sql-driver/mysql v1.4.1
+	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gofrs/uuid v3.2.0+incompatible // indirect
 	github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9 // indirect
 	github.com/golang/mock v1.3.1-0.20190508161146-9fa652df1129
@@ -44,14 +44,14 @@ require (
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/pierrec/lz4 v0.0.0-20170519170625-5a3d2245f97f
 	github.com/pierrec/xxHash v0.1.5 // indirect
-	github.com/pkg/errors v0.8.1
+	github.com/pkg/errors v0.9.1
 	github.com/shopspring/decimal v0.0.0-20200105144653-96defcb63c04 // indirect
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.6.1
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.5.1
 	github.com/tinsane/tracelog v0.0.0-20190824100002-0ab2b054ff30 // indirect
 	github.com/ulikunitz/xz v0.5.6
 	github.com/wal-g/storages v0.0.0-20200511083259-4a94923055a1
