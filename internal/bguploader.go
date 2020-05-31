@@ -166,7 +166,8 @@ func (b *BgUploader) speculativelyGenerateNextWalFilenames(ctx context.Context, 
 	for i := 0; i < 100*int(b.maxNumUploaded); i++ {
 		nextWalSegment, err := GetNextWalFilename(walSegment)
 		if err != nil {
-			tracelog.InfoLogger.Printf("failed to parse %s as wal segment name: %v", walSegment, err)
+			// couldn't generate next WAL segment name, stop try to
+			// guess next WAL
 			return
 		}
 
