@@ -2,7 +2,6 @@ package internal_test
 
 import (
 	"context"
-	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -244,10 +243,7 @@ type stallableDataFolder struct {
 func (s *stallableDataFolder) ListFilenames() ([]string, error) {
 	select {
 	case <-s.ctx.Done():
-		return nil, fmt.Errorf(
-			"fake dir reader was cancelled before wait completed: %v",
-			s.ctx.Err(),
-		)
+		return []string{}, nil
 	case <-time.After(s.waitDuration):
 	}
 
