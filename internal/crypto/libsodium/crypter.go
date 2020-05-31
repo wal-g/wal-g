@@ -46,6 +46,8 @@ func (crypter *Crypter) setup() (err error) {
 	crypter.mutex.RLock()
 
 	if crypter.Key == "" && crypter.KeyPath == "" {
+		crypter.mutex.RUnlock()
+
 		return errors.New("libsodium Crypter must have a key or key path")
 	}
 
@@ -81,7 +83,7 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 		return nil, err
 	}
 
-	return NewWriter(writer, []byte(crypter.Key))
+	return NewWriter(writer, []byte(crypter.Key)), nil
 }
 
 // Decrypt creates decrypted reader from ordinary reader
@@ -90,5 +92,5 @@ func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
 		return nil, err
 	}
 
-	return NewReader(reader, []byte(crypter.Key))
+	return NewReader(reader, []byte(crypter.Key)), nil
 }

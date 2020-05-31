@@ -49,6 +49,8 @@ services:
       &&  mkdir -p /export/mysqlbinlogreplaybucket
       &&  mkdir -p /export/mysqlpitrxtrabackupbucket
       &&  mkdir -p /export/mysqlpitrmysqldumpbucket
+      &&  mkdir -p /export/mariadbfullmysqldumpbucket
+      &&  mkdir -p /export/mariadbfullmariabackupbucket
       &&  mkdir -p /export/mongostreampushbucket
       &&  mkdir -p /export/mongooplogpushbucket
       &&  mkdir -p /export/mongodeletebeforebucket
@@ -356,6 +358,28 @@ services:
       - seccomp:unconfined
     image: wal-g/mysql_tests
     container_name: wal-g_mysql_tests
+    env_file:
+      - docker/common/common_walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  mariadb:
+    build:
+      dockerfile: docker/mariadb/Dockerfile
+      context: .
+    image: wal-g/mariadb
+    container_name: wal-g_mariadb
+
+  mariadb_tests:
+    build:
+      dockerfile: docker/mariadb_tests/Dockerfile
+      context: .
+    security_opt:
+      - seccomp:unconfined
+    image: wal-g/mariadb_tests
+    container_name: wal-g_mariadb_tests
     env_file:
       - docker/common/common_walg.env
     depends_on:

@@ -11,18 +11,17 @@ COPY internal/ internal/
 COPY cmd/ cmd/
 COPY main/ main/
 COPY utility/ utility/
-COPY Makefile Makefile
 
 RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
         vendor/github.com/google/brotli/go/cbrotli/cgo.go && \
-    cd main/fdb && \
+    cd main/mysql && \
     go build -mod vendor -tags brotli -race -o wal-g -ldflags "-s -w -X main.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
-    
-RUN make fdb_build
 
-FROM foundationdb/foundationdb:latest
-COPY --from=build /go/src/github.com/wal-g/wal-g/main/fdb/wal-g /usr/bin
+FROM wal-g/mariadb:latest
+COPY --from=build /go/src/github.com/wal-g/wal-g/main/mysql/wal-g /usr/bin
 
-COPY docker/fdb_tests/scripts/ /tmp
+RUN mkdir /root/testtools
+
+COPY docker/mariadb_tests/scripts/ /tmp
 
 CMD /tmp/run_integration_tests.sh
