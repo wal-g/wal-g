@@ -118,13 +118,15 @@ func createAndPushBackup(
 	tracelog.DebugLogger.Println("Binlog end file", binlogEnd)
 
 	sentinel := BackupSentinelDto{
-		BackupSentinelDto: getIncrementalSentinel(fromLSN, &incrementCount, previousBackupName, &fileName),
+		BackupSentinelDto: internal.BackupSentinelDto{
+			IncrementFromLSN: fromLSN, BackupFinishLSN: toLSN,
+			IncrementFrom: previousBackupName, IncrementFullName: &fileName, IncrementCount: &incrementCount,
+		},
 		StreamSentinelDto: StreamSentinelDto{
 			BinLogStart: binlogStart, BinLogEnd: binlogEnd,
 			StartLocalTime: timeStart,
 		},
 	}
-	sentinel.BackupFinishLSN = toLSN
 	err = internal.UploadSentinel(uploader, &sentinel, fileName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -134,19 +136,6 @@ func createAndPushBackup(
 			tracelog.WarningLogger.Printf("Couldn't delete data in temp dir: %v", err)
 		}
 	}
-}
-
-func getIncrementalSentinel(
-	fromLSN *uint64, incrementCount *int,
-	previousBackupName, currentBackupName *string) internal.BackupSentinelDto {
-	if fromLSN != nil {
-		return internal.BackupSentinelDto{
-			IncrementFromLSN: fromLSN, IncrementFrom: previousBackupName,
-			IncrementFullName: currentBackupName, IncrementCount: incrementCount,
-		}
-	}
-
-	return internal.BackupSentinelDto{}
 }
 
 func readToLSN(dir string) (*uint64, error) {
