@@ -3,6 +3,7 @@ package internal
 import (
 	"strings"
 
+	"github.com/spf13/viper"
 	"github.com/wal-g/storages/azure"
 	"github.com/wal-g/storages/fs"
 	"github.com/wal-g/storages/gcs"
@@ -18,10 +19,10 @@ type StorageAdapter struct {
 	prefixPreprocessor func(string) string
 }
 
-func (adapter *StorageAdapter) loadSettings() (map[string]string, error) {
+func (adapter *StorageAdapter) loadSettings(config *viper.Viper) (map[string]string, error) {
 	settings := make(map[string]string)
 	for _, settingName := range adapter.settingNames {
-		settingValue, ok := getWaleCompatibleSetting(settingName)
+		settingValue, ok := getWaleCompatibleSettingFrom(settingName, config)
 		if !ok {
 			settingValue, ok = GetSetting(settingName)
 		}

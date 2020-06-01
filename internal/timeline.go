@@ -46,6 +46,7 @@ func readTimeline(conn *pgx.Conn) (timeline uint32, err error) {
 
 const (
 	sizeofInt32bits = sizeofInt32 * 8
+	hexadecimal     = 16
 )
 
 const (

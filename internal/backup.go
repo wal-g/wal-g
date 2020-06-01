@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/storages/fs"
@@ -322,4 +323,21 @@ func shouldUnwrapTar(tarName string, sentinelDto BackupSentinelDto, filesToUnwra
 	}
 
 	return false
+}
+
+func getLastWalFilename(backup *Backup) (string, error) {
+	meta, err := backup.fetchMeta()
+	if err != nil {
+		tracelog.InfoLogger.Print("No meta found.")
+		return "", err
+	}
+	prefixLenght := len(utility.BackupNamePrefix)
+	timelineID64, err := strconv.ParseUint(backup.Name[prefixLenght:prefixLenght+8], hexadecimal, sizeofInt32bits)
+	if err != nil {
+		tracelog.InfoLogger.FatalError(err)
+		return "", err
+	}
+	timelineID := uint32(timelineID64)
+	endWalSegmentNo := newWalSegmentNo(meta.FinishLsn - 1)
+	return endWalSegmentNo.getFilename(timelineID), nil
 }

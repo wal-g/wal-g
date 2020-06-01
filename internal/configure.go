@@ -110,9 +110,13 @@ func configureLimiters() {
 
 // TODO : unit tests
 func ConfigureFolder() (storage.Folder, error) {
+	return ConfigureFolderForSpecificConfig(viper.GetViper())
+}
+
+func ConfigureFolderForSpecificConfig(config *viper.Viper) (storage.Folder, error) {
 	skippedPrefixes := make([]string, 0)
 	for _, adapter := range StorageAdapters {
-		prefix, ok := getWaleCompatibleSetting(adapter.prefixName)
+		prefix, ok := getWaleCompatibleSettingFrom(adapter.prefixName, config)
 		if !ok {
 			skippedPrefixes = append(skippedPrefixes, "WALG_"+adapter.prefixName)
 			continue
@@ -121,7 +125,7 @@ func ConfigureFolder() (storage.Folder, error) {
 			prefix = adapter.prefixPreprocessor(prefix)
 		}
 
-		settings, err := adapter.loadSettings()
+		settings, err := adapter.loadSettings(config)
 		if err != nil {
 			return nil, err
 		}

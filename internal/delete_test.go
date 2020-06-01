@@ -1,7 +1,6 @@
 package internal_test
 
 import (
-	"encoding/json"
 	"strconv"
 	"strings"
 	"testing"
@@ -38,7 +37,7 @@ func TestFindTargetBeforeName_ReturnsFullBackup_With_FIND_FULL(t *testing.T) {
 }
 
 func testFindTargetBeforeName(t *testing.T, expected, targetName string, modifier int) {
-	folder := createMockStorageFolderWithDeltaBackups(t)
+	folder := testtools.CreateMockStorageFolderWithDeltaBackups(t)
 	target, err := internal.FindTargetBeforeName(folder, targetName, modifier, isFullBackup, greaterByName)
 	assert.NoError(t, err)
 	assert.Equal(t, expected, target.GetName())
@@ -203,7 +202,7 @@ func verifyThatExistBackupsAndWals(t *testing.T, expectBackupExistAfterDelete, e
 }
 
 func TestDeleteBeforeTargetWithPermanentBackups(t *testing.T) {
-	folder := createMockStorageFolderWithPermanentBackups(t)
+	folder := testtools.CreateMockStorageFolderWithPermanentBackups(t)
 
 	expectBackupExistBeforeDelete := map[string]bool{
 		"base_000000010000000000000002":                            true,
@@ -291,87 +290,4 @@ func lessByTime(object1, object2 storage.Object) bool {
 
 func greaterByTime(object1, object2 storage.Object) bool {
 	return object1.GetLastModified().After(object2.GetLastModified())
-}
-
-func createMockStorageFolderWithDeltaBackups(t *testing.T) storage.Folder {
-	var folder = testtools.MakeDefaultInMemoryStorageFolder()
-	subFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	sentinelData := map[string]interface{}{
-		"DeltaFrom":     "",
-		"DeltaFullName": "base_000000010000000000000007",
-		"DeltaFromLSN":  0,
-		"DeltaCount":    0,
-	}
-	emptySentinelData := map[string]interface{}{}
-	backupNames := map[string]interface{}{
-		"base_000000010000000000000003":                            emptySentinelData,
-		"base_000000010000000000000005_D_000000010000000000000003": sentinelData,
-		"base_000000010000000000000007":                            emptySentinelData,
-		"base_000000010000000000000009_D_000000010000000000000007": sentinelData}
-	for backupName, sentinelD := range backupNames {
-		bytesSentinel, err := json.Marshal(&sentinelD)
-		assert.NoError(t, err)
-		sentinelString := string(bytesSentinel)
-		err = subFolder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader(sentinelString))
-		assert.NoError(t, err)
-	}
-	return folder
-}
-
-func createMockStorageFolderWithPermanentBackups(t *testing.T) storage.Folder {
-	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	walBackupFolder := folder.GetSubFolder(utility.WalPath)
-	emptyData := map[string]interface{}{}
-	backupNames := map[string]interface{}{
-		"base_000000010000000000000002": map[string]interface{}{
-			"start_time":   utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
-			"finish_time":  utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
-			"hostname":     "",
-			"data_dir":     "",
-			"pg_version":   0,
-			"start_lsn":    16777216, // logSegNo = 1
-			"finish_lsn":   33554432, // logSegNo = 2
-			"is_permanent": true,
-		},
-		"base_000000010000000000000004_D_000000010000000000000002": map[string]interface{}{
-			"start_time":   utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
-			"finish_time":  utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
-			"hostname":     "",
-			"data_dir":     "",
-			"pg_version":   0,
-			"start_lsn":    16777217, // logSegNo = 1
-			"finish_lsn":   33554433, // logSegNo = 2
-			"is_permanent": true,
-		},
-		"base_000000010000000000000006_D_000000010000000000000004": emptyData,
-	}
-	walNames := map[string]interface{}{
-		"000000010000000000000001": emptyData,
-		"000000010000000000000002": emptyData,
-		"000000010000000000000003": emptyData,
-	}
-	for backupName, metadata := range backupNames {
-		// empty sentinel
-		empty, err := json.Marshal(&emptyData)
-		assert.NoError(t, err)
-		sentinelString := string(empty)
-		err = baseBackupFolder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader(sentinelString))
-
-		// metadata
-		assert.NoError(t, err)
-		bytesMetadata, err := json.Marshal(&metadata)
-		assert.NoError(t, err)
-		metadataString := string(bytesMetadata)
-		err = baseBackupFolder.PutObject(backupName+"/"+utility.MetadataFileName, strings.NewReader(metadataString))
-		assert.NoError(t, err)
-	}
-	for walName, data := range walNames {
-		bytes, err := json.Marshal(&data)
-		assert.NoError(t, err)
-		walString := string(bytes)
-		err = walBackupFolder.PutObject(walName+".lz4", strings.NewReader(walString))
-		assert.NoError(t, err)
-	}
-	return folder
 }

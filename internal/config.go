@@ -1,14 +1,16 @@
 package internal
 
 import (
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
 	"os"
 	"os/user"
 	"runtime"
 	"strings"
 
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+
 	"github.com/spf13/viper"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 )
 
@@ -184,6 +186,7 @@ func isAllowedSetting(setting string, AllowedSettings map[string]bool) (exists b
 	return
 }
 
+// GetSetting extract setting by key if key is set, return empty string otherwise
 func GetSetting(key string) (value string, ok bool) {
 	if viper.IsSet(key) {
 		return viper.GetString(key), true
@@ -192,14 +195,18 @@ func GetSetting(key string) (value string, ok bool) {
 }
 
 func getWaleCompatibleSetting(key string) (value string, exists bool) {
+	return getWaleCompatibleSettingFrom(key, viper.GetViper())
+}
+
+func getWaleCompatibleSettingFrom(key string, config *viper.Viper) (value string, exists bool) {
 	settingKeys := []string{
 		"WALG_" + key,
 		"WALE_" + key,
 	}
 	// At first we try to check whether it is configured at all
 	for _, settingKey := range settingKeys {
-		if viper.IsSet(settingKey) {
-			return viper.GetString(settingKey), true
+		if config.IsSet(settingKey) {
+			return config.GetString(settingKey), true
 		}
 	}
 	// Then we try to get default value
@@ -248,43 +255,50 @@ func AddConfigFlags(Cmd *cobra.Command) {
 	}
 }
 
-// initConfig reads in config file and ENV variables if set.
+// InitConfig reads config file and ENV variables if set.
 func InitConfig() {
-	if CfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(CfgFile)
-	} else {
-		// Find home directory.
-		usr, err := user.Current()
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		// Search config in home directory with name ".wal-g" (without extension).
-		viper.AddConfigPath(usr.HomeDir)
-		viper.SetConfigName(".walg")
-	}
-
-	viper.AutomaticEnv() // read in environment variables that match
-
-	for setting, value := range defaultConfigValues {
-		viper.SetDefault(setting, value)
-	}
-
-	// If a config file is found, read it in.
-	err := viper.ReadInConfig()
-	if err == nil {
-		tracelog.DebugLogger.Println("Using config file:", viper.ConfigFileUsed())
-	}
-
-	checkAndWarnNotAllowedSettings()
+	var globalViper = viper.GetViper()
+	globalViper.AutomaticEnv() // read in environment variables that match
+	SetDefaultValues(globalViper)
+	ReadConfigFromFile(globalViper, CfgFile)
+	CheckAllowedSettings(globalViper)
 
 	// Set compiled config to ENV.
 	// Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
 	for k, v := range viper.AllSettings() {
 		val, ok := v.(string)
 		if ok {
-			err = bindToEnv(k, val)
+			err := bindToEnv(k, val)
 			tracelog.ErrorLogger.FatalOnError(err)
 		}
+	}
+}
+
+// ReadConfigFromFile read config to the viper instance
+func ReadConfigFromFile(config *viper.Viper, configFile string) {
+	if configFile != "" {
+		config.SetConfigFile(configFile)
+	} else {
+		// Find home directory.
+		usr, err := user.Current()
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		// Search config in home directory with name ".walg" (without extension).
+		config.AddConfigPath(usr.HomeDir)
+		config.SetConfigName(".walg")
+	}
+
+	// If a config file is found, read it in.
+	err := config.ReadInConfig()
+	if err == nil {
+		tracelog.DebugLogger.Println("Using config file:", config.ConfigFileUsed())
+	}
+}
+
+// SetDefaultValues set default settings to the viper instance
+func SetDefaultValues(config *viper.Viper) {
+	for setting, value := range defaultConfigValues {
+		config.SetDefault(setting, value)
 	}
 
 	setGoMaxProcs()
@@ -297,10 +311,10 @@ func setGoMaxProcs() {
 	}
 }
 
-func checkAndWarnNotAllowedSettings() {
-	// Сheck allowed settings
+// CheckAllowedSettings warnings if a viper instance's setting not allowed
+func CheckAllowedSettings(config *viper.Viper) {
 	foundNotAllowed := false
-	for k := range viper.AllSettings() {
+	for k := range config.AllSettings() {
 		k = strings.ToUpper(k)
 		if !isAllowedSetting(k, AllowedSettings) {
 			tracelog.WarningLogger.Println(k + " is unknown")
@@ -354,4 +368,18 @@ func isAnyStorageSet() bool {
 
 func toFlagName(s string) string {
 	return strings.ReplaceAll(strings.ToLower(s), "_", "-")
+}
+
+func ConfigureFolderFromConfig(configFile string) (storage.Folder, error) {
+	var config = viper.New()
+	SetDefaultValues(config)
+	ReadConfigFromFile(config, configFile)
+	CheckAllowedSettings(config)
+
+	var folder, err = ConfigureFolderForSpecificConfig(config)
+	if err != nil {
+		tracelog.ErrorLogger.Println("Failed configure folder according to config " + configFile)
+		tracelog.ErrorLogger.FatalError(err)
+	}
+	return folder, err
 }
