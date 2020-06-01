@@ -12,10 +12,6 @@ const (
 
 	FullBackupFlag      = "full"
 	FullBackupShorthand = "f"
-
-	XtrabackupExtraLsnDir    = "--extra-lsndir"
-	XtrabackupIncrementalLSN = "--incremental-lsn"
-	XtrabackupCheckpoints    = "xtrabackup_checkpoints"
 )
 
 var (

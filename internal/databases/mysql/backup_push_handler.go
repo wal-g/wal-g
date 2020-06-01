@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"bufio"
-	"github.com/wal-g/wal-g/cmd/mysql"
 	"os"
 	"os/exec"
 	"path"
@@ -13,6 +12,12 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
+)
+
+const (
+	XtrabackupExtraLsnDir    = "--extra-lsndir"
+	XtrabackupIncrementalLSN = "--incremental-lsn"
+	XtrabackupCheckpoints    = "xtrabackup_checkpoints"
 )
 
 func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isFullBackup bool) {
@@ -74,9 +79,9 @@ func createAndPushBackup(
 			err = os.MkdirAll(extraLsnDir, 0755)
 		}
 
-		internal.AppendCommandArgument(backupCmd, mysql.XtrabackupExtraLsnDir+"="+extraLsnDir)
+		internal.AppendCommandArgument(backupCmd, XtrabackupExtraLsnDir+"="+extraLsnDir)
 		if fromLSN != nil {
-			internal.AppendCommandArgument(backupCmd, mysql.XtrabackupIncrementalLSN+"="+strconv.FormatUint(*fromLSN, 10))
+			internal.AppendCommandArgument(backupCmd, XtrabackupIncrementalLSN+"="+strconv.FormatUint(*fromLSN, 10))
 		}
 	}
 
@@ -145,7 +150,7 @@ func getIncrementalSentinel(
 }
 
 func readToLSN(dir string) (*uint64, error) {
-	file, err := os.Open(path.Join(dir, mysql.XtrabackupCheckpoints))
+	file, err := os.Open(path.Join(dir, XtrabackupCheckpoints))
 	if err != nil {
 		return nil, err
 	}

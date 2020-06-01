@@ -7,12 +7,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 )
 
-const (
-	backupFetchShortDescription = "Fetches desired backup from storage"
-
-	XtrabackupApplyLogOnly   = "--apply-log-only"
-	XtrabackupIncrementalDir = "--incremental-dir"
-)
+const backupFetchShortDescription = "Fetches desired backup from storage"
 
 // backupFetchCmd represents the streamFetch command
 var backupFetchCmd = &cobra.Command{
