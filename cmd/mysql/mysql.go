@@ -37,7 +37,6 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
-	internal.RequiredSettings[internal.MysqlDatasourceNameSetting] = true
 	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 	Cmd.InitDefaultVersionFlag()
 	internal.AddConfigFlags(Cmd)
