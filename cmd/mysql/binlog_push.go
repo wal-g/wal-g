@@ -21,7 +21,7 @@ var binlogPushCmd = &cobra.Command{
 		mysql.HandleBinlogPush(uploader)
 	},
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		internal.RequiredSettings[internal.NameStreamCreateCmd] = true
+		internal.RequiredSettings[internal.MysqlDatasourceNameSetting] = true
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
