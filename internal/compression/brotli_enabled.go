@@ -1,4 +1,5 @@
 // +build brotli
+// +build !windows
 
 package compression
 

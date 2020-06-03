@@ -1,4 +1,5 @@
 // +build lzo
+// +build !windows
 
 package compression
 
