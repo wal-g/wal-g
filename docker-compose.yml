@@ -36,6 +36,7 @@ services:
       &&  mkdir -p /export/compressionbucket
       &&  mkdir -p /export/copyallbucket
       &&  mkdir -p /export/copybackupbucket
+      &&  mkdir -p /export/compressionreversebucket
       &&  mkdir -p /export/deleteretainfullbucket
       &&  mkdir -p /export/deleteretainfindfullbucket
       &&  mkdir -p /export/deletebeforenamefindfullbucket
@@ -257,6 +258,17 @@ services:
       context: .
     image: wal-g/several_delta_backups_test
     container_name: wal-g_pg_several_delta_backups_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_several_delta_backups_reverse_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_several_delta_backups_reverse_test
+      context: .
+    image: wal-g/several_delta_backups_reverse_test
+    container_name: wal-g_pg_several_delta_backups_reverse_test
     depends_on:
       - s3
     links:
