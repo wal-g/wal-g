@@ -129,6 +129,12 @@ WAL-G can also fetch the latest backup using:
 wal-g backup-fetch ~/extract/to/here LATEST
 ```
 
+Beta feature: WAL-G can unpack delta backups in reverse order to improve fetch efficiency. To activate this feature, add the --reverse-unpack flag:
+
+```
+wal-g backup-fetch ~/extract/to/here LATEST --reverse-unpack
+```
+
 * ``backup-push``
 
 When uploading backups to S3, the user should pass in the path containing the backup started by Postgres as in:

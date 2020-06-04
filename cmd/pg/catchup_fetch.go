@@ -8,7 +8,7 @@ import (
 
 const (
 	CatchupFetchShortDescription = "Fetches an incremental backup from storage"
-	UseNewUnwrapDescription      = "New implementation of catchup unwrap (testing)"
+	UseNewUnwrapDescription      = "Use the new implementation of catchup unwrap (beta)"
 )
 var useNewUnwrap bool
 
