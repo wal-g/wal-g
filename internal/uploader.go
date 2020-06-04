@@ -12,6 +12,14 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+type UploaderProvider interface {
+	Upload(path string, content io.Reader) error
+	UploadFile(file NamedReader) error
+	PushStream(stream io.Reader) (string, error)
+	PushStreamToDestination(stream io.Reader, dstPath string) error
+	FileExtension() string
+}
+
 // Uploader contains fields associated with uploading tarballs.
 // Multiple tarballs can share one uploader.
 type Uploader struct {
@@ -74,6 +82,11 @@ func (uploader *Uploader) UploadFile(file NamedReader) error {
 	err := uploader.Upload(dstPath, compressedFile)
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
 	return err
+}
+
+// FileExtension returns configured compressor extension
+func (uploader *Uploader) FileExtension() string {
+	return uploader.Compressor.FileExtension()
 }
 
 // TODO : unit tests

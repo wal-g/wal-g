@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -11,7 +12,6 @@ import (
 
 const (
 	timestampDelimiter = "."
-	timestampRegexp    = `[0-9]+\` + timestampDelimiter + `[0-9]+`
 )
 
 // Timestamp represents oplog record uniq id.
@@ -81,25 +81,48 @@ type Oplog struct {
 	Data []byte
 }
 
-// OplogMeta is used to decode raw bson record.
-type OplogMeta struct {
-	TS primitive.Timestamp `bson:"ts"`
-	NS string              `bson:"ns"`
-	Op string              `bson:"op"`
+var oplogPool = sync.Pool{New: func() interface{} {
+	return &Oplog{}
+}}
+
+// GetOplogEntry fetches empty Oplog struct from pool
+func GetOplogEntry() *Oplog {
+	return oplogPool.Get().(*Oplog)
+}
+
+// PutOplogEntry zeroes fields of Oplog struct and it to pool
+func PutOplogEntry(oplog *Oplog) {
+	oplog.TS.TS = 0
+	oplog.TS.Inc = 0
+	oplog.NS = ""
+	oplog.OP = ""
+	oplog.Data = nil
+	oplogPool.Put(oplog)
 }
 
 // OplogFromRaw tries to decode bytes to Oplog model
-func OplogFromRaw(raw []byte) (Oplog, error) {
-	opMeta := OplogMeta{}
-	if err := bson.Unmarshal(raw, &opMeta); err != nil {
-		return Oplog{}, fmt.Errorf("oplog record decoding failed: %w", err)
+func OplogFromRaw(raw bson.Raw) (*Oplog, error) {
+	tsT, tsI, ok := raw.Lookup("ts").TimestampOK()
+	if !ok {
+		return nil, fmt.Errorf("can not cast oplog 'ts' field to timestamp: %v", raw.Lookup("ts"))
 	}
-	return Oplog{
-		TS:   TimestampFromBson(opMeta.TS),
-		OP:   opMeta.Op,
-		NS:   opMeta.NS,
-		Data: raw,
-	}, nil
+
+	op, ok := raw.Lookup("op").StringValueOK()
+	if !ok {
+		return nil, fmt.Errorf("can not cast oplog 'op' field to string")
+	}
+
+	ns, ok := raw.Lookup("ns").StringValueOK()
+	if !ok {
+		return nil, fmt.Errorf("can not cast oplog 'ns' field to string")
+	}
+
+	oplog := GetOplogEntry()
+	oplog.TS = Timestamp{TS: tsT, Inc: tsI}
+	oplog.OP = op
+	oplog.NS = ns
+	oplog.Data = raw
+	return oplog, nil
 }
 
 // Optime ...

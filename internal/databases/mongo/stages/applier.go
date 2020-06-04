@@ -1,7 +1,6 @@
 package stages
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"sync"
@@ -15,9 +14,13 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
+var (
+	_ = []Applier{&GenericApplier{}, &StorageApplier{}}
+)
+
 // Applier defines interface to apply given oplog records.
 type Applier interface {
-	Apply(context.Context, chan models.Oplog, *sync.WaitGroup) (chan error, error)
+	Apply(context.Context, chan *models.Oplog, *sync.WaitGroup) (chan error, error)
 }
 
 // DBApplier implements Applier interface for mongodb.
@@ -31,7 +34,7 @@ func NewGenericApplier(applier oplog.Applier) *GenericApplier {
 }
 
 // Apply runs working cycle that applies oplog records.
-func (dba *GenericApplier) Apply(ctx context.Context, ch chan models.Oplog, wg *sync.WaitGroup) (chan error, error) {
+func (dba *GenericApplier) Apply(ctx context.Context, ch chan *models.Oplog, wg *sync.WaitGroup) (chan error, error) {
 	errc := make(chan error)
 	wg.Add(1)
 	go func() {
@@ -42,7 +45,8 @@ func (dba *GenericApplier) Apply(ctx context.Context, ch chan models.Oplog, wg *
 		for opr := range ch {
 			tracelog.DebugLogger.Printf("Applyer receieved op %s (%s on %s)", opr.TS, opr.OP, opr.NS)
 
-			if err := dba.applier.Apply(ctx, opr); err != nil {
+			// we still pass oplog records in generic appliers by value
+			if err := dba.applier.Apply(ctx, *opr); err != nil {
 				errc <- fmt.Errorf("can not handle op: %w", err)
 				return
 			}
@@ -55,18 +59,18 @@ func (dba *GenericApplier) Apply(ctx context.Context, ch chan models.Oplog, wg *
 // StorageApplier implements Applier interface for storage.
 type StorageApplier struct {
 	uploader archive.Uploader
+	buf      Buffer
 	size     int
 	timeout  time.Duration
 }
 
 // NewStorageApplier builds StorageApplier.
-func NewStorageApplier(uploader archive.Uploader, archiveAfterSize int, archiveTimeout time.Duration) *StorageApplier {
-	return &StorageApplier{uploader, archiveAfterSize, archiveTimeout}
+func NewStorageApplier(uploader archive.Uploader, buf Buffer, archiveAfterSize int, archiveTimeout time.Duration) *StorageApplier {
+	return &StorageApplier{uploader, buf, archiveAfterSize, archiveTimeout}
 }
 
 // Apply runs working cycle that sends oplog records to storage.
-// TODO: rename models.Oplog to something like models.Message
-func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan models.Oplog, wg *sync.WaitGroup) (chan error, error) {
+func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan *models.Oplog, wg *sync.WaitGroup) (chan error, error) {
 	archiveTimer := time.NewTimer(sa.timeout)
 	var lastKnownTS, batchStartTs models.Timestamp
 	restartBatch := true
@@ -74,8 +78,6 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan models.Oplog, w
 	errc := make(chan error)
 	wg.Add(1)
 	go func() {
-		var buf bytes.Buffer
-
 		defer wg.Done()
 		defer close(errc)
 		defer archiveTimer.Stop()
@@ -91,8 +93,12 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan models.Oplog, w
 					restartBatch = false
 				}
 				lastKnownTS = op.TS
-				buf.Write(op.Data)
-				if buf.Len() < sa.size {
+				if _, err := sa.buf.Write(op.Data); err != nil {
+					errc <- fmt.Errorf("can not write op to buffer: %w", err)
+					return
+				}
+				models.PutOplogEntry(op)
+				if sa.buf.Len() < sa.size {
 					continue
 				}
 				tracelog.DebugLogger.Println("Initializing archive upload due to archive size")
@@ -102,18 +108,29 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan models.Oplog, w
 			}
 
 			utility.ResetTimer(archiveTimer, sa.timeout)
-			if buf.Len() == 0 {
+			if sa.buf.Len() == 0 {
 				continue
 			}
 
-			// TODO: switch to PushStreamToDestination (async api)
-			// upload and rename (because we don't know last ts of uploading batch)
-			if err := sa.uploader.UploadOplogArchive(&buf, batchStartTs, lastKnownTS); err != nil {
+			bufReader, err := sa.buf.Reader()
+			if err != nil {
+				errc <- fmt.Errorf("can not get reader from buffer: %w", err)
+				return
+			}
+
+			// TODO: move upload to the next stage, batch accumulation should not be blocked by upload
+			// or switch to PushStreamToDestination (async api):
+			// we don't know archive name beforehand, so upload stream and rename key (it leads to failures and require gc)
+			// but consumes less memory
+			if err := sa.uploader.UploadOplogArchive(bufReader, batchStartTs, lastKnownTS); err != nil {
 				errc <- fmt.Errorf("can not upload oplog archive: %w", err)
 				return
 			}
 
-			buf.Reset()
+			if err := sa.buf.Reset(); err != nil {
+				errc <- fmt.Errorf("can not reset buffer for reuse: %w", err)
+				return
+			}
 			batchStartTs = lastKnownTS
 
 		}

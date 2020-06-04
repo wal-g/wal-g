@@ -37,8 +37,10 @@ var oplogPushCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		// set up storage client
-		uploader, err := archive.NewStorageUploader(models.OplogArchBasePath)
+		uplProvider, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
+		uplProvider.UploadingFolder = uplProvider.UploadingFolder.GetSubFolder(models.OplogArchBasePath)
+		uploader := archive.NewStorageUploader(uplProvider)
 
 		// set up mongodb client and oplog fetcher
 		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl)
@@ -46,13 +48,8 @@ var oplogPushCmd = &cobra.Command{
 		err = mongoClient.EnsureIsMaster(ctx)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		lwUpdate, err := internal.GetLastWriteUpdateInterval()
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		oplogFetcher := stages.NewDBFetcher(mongoClient, lwUpdate, stages.NewStorageGapHandler(uploader))
-
 		// discover last archived timestamp
-		since, initial, err := archive.ArchivingResumeTS(uploader.UploadingFolder)
+		since, initial, err := archive.ArchivingResumeTS(uplProvider.UploadingFolder)
 		if initial {
 			tracelog.InfoLogger.Printf("Initiating archiving first run")
 			_, since, err = mongoClient.LastWriteTS(ctx)
@@ -60,8 +57,24 @@ var oplogPushCmd = &cobra.Command{
 		}
 		tracelog.InfoLogger.Printf("Archiving last known timestamp is %s", since)
 
+		/* File buffer is useful for debugging:
+		fileBatchBuffer, err := stages.NewFileBuffer("/run/wal-g-oplog-push")
+		tracelog.ErrorLogger.FatalOnError(err)
+		defer tracelog.ErrorLogger.FatalOnError(fileBatchBuffer.Close())
+		*/
+
+		memoryBatchBuffer := stages.NewMemoryBuffer()
+		defer tracelog.ErrorLogger.FatalOnError(memoryBatchBuffer.Close())
 		// set up storage archiver
-		oplogApplier := stages.NewStorageApplier(uploader, archiveAfterSize, archiveTimeout)
+		oplogApplier := stages.NewStorageApplier(uploader, memoryBatchBuffer, archiveAfterSize, archiveTimeout)
+
+		lwUpdate, err := internal.GetLastWriteUpdateInterval()
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		oplogCursor, err := mongoClient.TailOplogFrom(ctx, since)
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		oplogFetcher := stages.NewDBFetcher(mongoClient, oplogCursor, lwUpdate, stages.NewStorageGapHandler(uploader))
 
 		// run working cycle
 		err = mongo.HandleOplogPush(ctx, since, oplogFetcher, oplogApplier)
