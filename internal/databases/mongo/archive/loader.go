@@ -7,10 +7,17 @@ import (
 	"strings"
 
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/wal-g/storages/storage"
+)
+
+var (
+	_ = []Uploader{&StorageUploader{}, &DiscardUploader{}}
+	_ = []Downloader{&StorageDownloader{}}
+	_ = []Purger{&StoragePurger{}}
 )
 
 // ErrWaiter
@@ -144,21 +151,54 @@ func (sd *StorageDownloader) ListOplogArchives() ([]models.Archive, error) {
 	return archives, nil
 }
 
+// DiscardUploader reads provided data and returns success
+type DiscardUploader struct {
+	compressor compression.Compressor
+	readerFrom io.ReaderFrom
+}
+
+// NewDiscardUploader builds DiscardUploader.
+func NewDiscardUploader(compressor compression.Compressor, readerFrom io.ReaderFrom) *DiscardUploader {
+	return &DiscardUploader{compressor, readerFrom}
+}
+
+// UploadOplogArchive reads all data into memory, stream is compressed and encrypted if required
+func (d *DiscardUploader) UploadOplogArchive(archReader io.Reader, firstTS, lastTS models.Timestamp) error {
+	if d.compressor != nil {
+		archReader = internal.CompressAndEncrypt(archReader, d.compressor, internal.ConfigureCrypter())
+	}
+	if d.readerFrom != nil {
+		if _, err := d.readerFrom.ReadFrom(archReader); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// UploadGapArchive returns nil error
+func (d *DiscardUploader) UploadGapArchive(err error, firstTS, lastTS models.Timestamp) error {
+	return nil
+}
+
+// UploadBackup is not implemented yet
+func (d *DiscardUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider MongoMetaProvider) error {
+	panic("implement me")
+}
+
+// FileExtension returns configured extension
+func (d *DiscardUploader) FileExtension() string {
+	return d.compressor.FileExtension()
+}
+
 // StorageUploader extends base uploader with mongodb specific.
 type StorageUploader struct {
-	*internal.Uploader
+	internal.UploaderProvider
 }
 
 // NewStorageUploader builds mongodb uploader.
-func NewStorageUploader(path string) (*StorageUploader, error) {
-	uploader, err := internal.ConfigureUploader()
-	if err != nil {
-		return nil, err
-	}
-	if path != "" {
-		uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(path)
-	}
-	return &StorageUploader{uploader}, nil
+func NewStorageUploader(upl internal.UploaderProvider) *StorageUploader {
+	return &StorageUploader{upl}
 }
 
 // UploadOplogArchive compresses a stream and uploads it with given archive name.
@@ -213,20 +253,16 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaPro
 		UserData:        internal.GetSentinelUserData(),
 		MongoMeta:       metaProvider.Meta(),
 	}
-	return internal.UploadSentinel(su.Uploader, backupSentinel, backupName)
+	return internal.UploadSentinel(su.UploaderProvider, backupSentinel, backupName)
 }
 
-// FileExtension returns current file extension (based on configured compression)
-func (su *StorageUploader) FileExtension() string {
-	return su.Compressor.FileExtension()
-}
-
+// StoragePurger deletes files in storage.
 type StoragePurger struct {
 	oplogsFolder  storage.Folder
 	backupsFolder storage.Folder
 }
 
-// NewStorageDownloader builds mongodb downloader.
+// NewStoragePurger builds mongodb StoragePurger.
 func NewStoragePurger(opts StorageSettings) (*StoragePurger, error) {
 	folder, err := internal.ConfigureFolder()
 	if err != nil {

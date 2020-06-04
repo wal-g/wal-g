@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 
@@ -11,6 +12,11 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+)
+
+var (
+	_ = []MongoDriver{&MongoClient{}}
+	_ = []OplogCursor{&MongoOplogCursor{}, &BsonCursor{}}
 )
 
 const (
@@ -57,7 +63,6 @@ type MongoDriver interface {
 type OplogCursor interface {
 	Close(ctx context.Context) error
 	Data() []byte
-	Decode(val interface{}) error
 	Err() error
 	Next(context.Context) bool
 }
@@ -192,4 +197,45 @@ func (mc *MongoClient) ApplyOp(ctx context.Context, op db.Oplog) error {
 	}
 
 	return nil
+}
+
+// BsonCursor implements OplogCursor with source io.reader
+type BsonCursor struct {
+	r   io.Reader
+	raw []byte
+	err error
+}
+
+// NewMongoOplogCursor builds MongoOplogCursor.
+func NewBsonCursor(r io.Reader) *BsonCursor {
+	return &BsonCursor{r: r}
+}
+
+// Close closes this cursor.
+func (b *BsonCursor) Close(ctx context.Context) error {
+	b.raw = nil
+	return nil
+}
+
+// Data returns current cursor document.
+func (b *BsonCursor) Data() []byte {
+	return b.raw
+}
+
+// Err returns the last error.
+func (b *BsonCursor) Err() error {
+	return b.err
+}
+
+// Next gets the next document for this cursor, returns true if there were no errors.
+func (b *BsonCursor) Next(ctx context.Context) bool {
+	if b.err != nil {
+		return false
+	}
+
+	b.raw, b.err = bson.NewFromIOReader(b.r)
+	if b.err != nil {
+		return false
+	}
+	return true
 }

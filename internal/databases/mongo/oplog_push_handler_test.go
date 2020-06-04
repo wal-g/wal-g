@@ -7,20 +7,14 @@ import (
 	"testing"
 
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"github.com/wal-g/wal-g/internal/databases/mongo/stages/mocks"
+	mocks "github.com/wal-g/wal-g/internal/databases/mongo/stages/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 type fromFetcherReturn struct {
-	outChan chan models.Oplog
-	errChan chan error
-	err     error
-}
-
-type validatorReturn struct {
-	outChan chan models.Oplog
+	outChan chan *models.Oplog
 	errChan chan error
 	err     error
 }
@@ -59,7 +53,7 @@ func buildTestArgs() oplogPushArgs {
 		since: models.Timestamp{TS: 1579021614, Inc: 15},
 		wg:    &sync.WaitGroup{},
 
-		fromFetcherReturn: &fromFetcherReturn{make(chan models.Oplog), make(chan error), nil},
+		fromFetcherReturn: &fromFetcherReturn{make(chan *models.Oplog), make(chan error), nil},
 		applierReturn:     &applierReturn{make(chan error), nil},
 	}
 }

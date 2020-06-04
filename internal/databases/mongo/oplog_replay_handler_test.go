@@ -7,14 +7,14 @@ import (
 	"testing"
 
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"github.com/wal-g/wal-g/internal/databases/mongo/stages/mocks"
+	mocks "github.com/wal-g/wal-g/internal/databases/mongo/stages/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 type betweenFetcherReturn struct {
-	outChan chan models.Oplog
+	outChan chan *models.Oplog
 	errChan chan error
 	err     error
 }
@@ -51,7 +51,7 @@ func buildOplogReplayTestArgs() oplogReplayTestArgs {
 		until: models.Timestamp{TS: 1579023614, Inc: 11},
 		wg:    &sync.WaitGroup{},
 
-		betweenFetcherReturn: &betweenFetcherReturn{make(chan models.Oplog), make(chan error), nil},
+		betweenFetcherReturn: &betweenFetcherReturn{make(chan *models.Oplog), make(chan error), nil},
 		applierReturn:        &applierReturn{make(chan error), nil},
 	}
 }

@@ -269,7 +269,7 @@ func uploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupNa
 }
 
 // TODO : unit tests
-func UploadSentinel(uploader *Uploader, sentinelDto interface{}, backupName string) error {
+func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupName string) error {
 	sentinelName := backupName + utility.SentinelSuffix
 
 	dtoBody, err := json.Marshal(sentinelDto)

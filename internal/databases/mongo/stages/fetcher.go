@@ -16,6 +16,12 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+var (
+	_ = []GapHandler{&StorageGapHandler{}}
+	_ = []FromFetcher{&DBFetcher{}}
+	_ = []BetweenFetcher{&StorageFetcher{}}
+)
+
 type GapHandler interface {
 	HandleGap(from, until models.Timestamp, err error) error
 }
@@ -37,50 +43,45 @@ func (sgh *StorageGapHandler) HandleGap(from, until models.Timestamp, gapErr err
 
 // FromFetcher defines interface to fetch oplog records starting given timestamp.
 type FromFetcher interface {
-	OplogFrom(context.Context, models.Timestamp, *sync.WaitGroup) (chan models.Oplog, chan error, error)
+	OplogFrom(context.Context, models.Timestamp, *sync.WaitGroup) (chan *models.Oplog, chan error, error)
 }
 
 // BetweenFetcher defines interface to fetch oplog records between given timestamps.
 type BetweenFetcher interface {
-	OplogBetween(context.Context, models.Timestamp, models.Timestamp, *sync.WaitGroup) (chan models.Oplog, chan error, error)
+	OplogBetween(context.Context, models.Timestamp, models.Timestamp, *sync.WaitGroup) (chan *models.Oplog, chan error, error)
 }
 
 // DBFetcher implements FromFetcher interface for mongodb
 type DBFetcher struct {
 	db         client.MongoDriver
+	cur        client.OplogCursor
 	lwInterval time.Duration
 	gapHandler GapHandler
 }
 
 // NewDBFetcher builds DBFetcher with given args.
-func NewDBFetcher(m client.MongoDriver, LWUpdateInterval time.Duration, gapHandler GapHandler) *DBFetcher {
-	return &DBFetcher{m, LWUpdateInterval, gapHandler}
+func NewDBFetcher(m client.MongoDriver, cur client.OplogCursor, LWUpdateInterval time.Duration, gapHandler GapHandler) *DBFetcher {
+	return &DBFetcher{m, cur, LWUpdateInterval, gapHandler}
 }
 
 // OplogFrom returns channel of oplog records, channel is filled in background.
 // TODO: handle disconnects && stepdown
 // TODO: use sessions
 // TODO: use context.WithTimeout
-func (dbf *DBFetcher) OplogFrom(ctx context.Context, from models.Timestamp, wg *sync.WaitGroup) (oplogc chan models.Oplog, errc chan error, err error) {
-	cur, err := dbf.db.TailOplogFrom(ctx, from)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	oplogc = make(chan models.Oplog)
+func (dbf *DBFetcher) OplogFrom(ctx context.Context, from models.Timestamp, wg *sync.WaitGroup) (oplogc chan *models.Oplog, errc chan error, err error) {
+	oplogc = make(chan *models.Oplog)
 	errc = make(chan error)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		defer close(errc)
 		defer close(oplogc)
-		defer func() { _ = cur.Close(ctx) }()
 
 		fromFound := false
 		majTs := models.Timestamp{}
-		for cur.Next(ctx) {
+		for dbf.cur.Next(ctx) {
 			// TODO: benchmark decode vs. bson.Reader vs. bson.Raw.LookupErr
-			op, err := models.OplogFromRaw(cur.Data())
+			op, err := models.OplogFromRaw(dbf.cur.Data())
 			if err != nil {
 				errc <- fmt.Errorf("oplog record decoding failed: %w", err)
 				return
@@ -117,7 +118,7 @@ func (dbf *DBFetcher) OplogFrom(ctx context.Context, from models.Timestamp, wg *
 				fromFound = true
 			}
 
-			tracelog.DebugLogger.Printf("Fetcher receieved op %s (%s on %s)", op.TS, op.OP, op.NS)
+			//tracelog.DebugLogger.Printf("Fetcher receieved op %s (%s on %s)", op.TS, op.OP, op.NS)
 			select {
 			case oplogc <- op:
 			case <-ctx.Done():
@@ -125,7 +126,7 @@ func (dbf *DBFetcher) OplogFrom(ctx context.Context, from models.Timestamp, wg *
 			}
 		}
 
-		if err := cur.Err(); err != nil {
+		if err := dbf.cur.Err(); err != nil {
 			if err == ctx.Err() {
 				return
 			}
@@ -166,12 +167,12 @@ func NewStorageFetcher(downloader archive.Downloader, path archive.Sequence) *St
 }
 
 // OplogBetween returns channel of oplog records, channel is filled in background.
-func (sf *StorageFetcher) OplogBetween(ctx context.Context, from, until models.Timestamp, wg *sync.WaitGroup) (chan models.Oplog, chan error, error) {
+func (sf *StorageFetcher) OplogBetween(ctx context.Context, from models.Timestamp, until models.Timestamp, wg *sync.WaitGroup) (chan *models.Oplog, chan error, error) {
 	if models.LessTS(until, from) {
 		return nil, nil, fmt.Errorf("fromTS '%s' must be less than untilTS '%s'", from, until)
 	}
 
-	data := make(chan models.Oplog)
+	data := make(chan *models.Oplog)
 	errc := make(chan error)
 	wg.Add(1)
 	go func() {
@@ -221,7 +222,7 @@ func (sf *StorageFetcher) OplogBetween(ctx context.Context, from, until models.T
 					return
 				}
 
-				tracelog.DebugLogger.Printf("Fetcher receieved op %s (%s on %s)", op.TS, op.OP, op.NS)
+				//tracelog.DebugLogger.Printf("Fetcher receieved op %s (%s on %s)", op.TS, op.OP, op.NS)
 				select {
 				case data <- op:
 				case <-ctx.Done():

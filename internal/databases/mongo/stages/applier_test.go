@@ -1,7 +1,6 @@
 package stages
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"sync"
@@ -15,6 +14,7 @@ import (
 )
 
 // TODO: test archive timeout
+// TODO: switch buf from MemoryBuffer to io.Reader
 func TestStorageApplier_Apply(t *testing.T) {
 	type fields struct {
 		uploader *archiveMocks.Uploader
@@ -23,28 +23,27 @@ func TestStorageApplier_Apply(t *testing.T) {
 	}
 	type args struct {
 		ctx    context.Context
-		oplogc chan models.Oplog
+		oplogc chan *models.Oplog
 		wg     *sync.WaitGroup
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		ops     []models.Oplog
+		ops     []*models.Oplog
 		want    chan error
 		wantErr error
 	}{
 		{
-			name: "3 docs, closed input channel initiates upload",
+			name: "3_docs_closed_input_channel_initiates_upload",
 			fields: fields{
 				uploader: func() *archiveMocks.Uploader {
 					upl := archiveMocks.Uploader{}
-
-					buf27 := bytes.Buffer{}
+					buf27 := NewMemoryBuffer()
 					buf27.Write(make([]byte, 27))
-
+					buf27.Reader()
 					upl.On("UploadOplogArchive",
-						&buf27,
+						buf27,
 						models.Timestamp{TS: 1579002001, Inc: 1},
 						models.Timestamp{TS: 1579002003, Inc: 1}).
 						Return(nil).Once()
@@ -55,10 +54,10 @@ func TestStorageApplier_Apply(t *testing.T) {
 			},
 			args: args{
 				ctx:    context.TODO(),
-				oplogc: make(chan models.Oplog),
+				oplogc: make(chan *models.Oplog),
 				wg:     &sync.WaitGroup{},
 			},
-			ops: []models.Oplog{
+			ops: []*models.Oplog{
 				{
 					TS:   models.Timestamp{TS: 1579002001, Inc: 1},
 					Data: make([]byte, 8),
@@ -76,24 +75,25 @@ func TestStorageApplier_Apply(t *testing.T) {
 			wantErr: nil,
 		},
 		{
-			name: "3 docs, batch size initiates upload",
+			name: "3_docs_batch_size_initiates_upload",
 			fields: fields{
 				uploader: func() *archiveMocks.Uploader {
 					upl := archiveMocks.Uploader{}
 
-					buf17 := bytes.Buffer{}
+					buf17 := NewMemoryBuffer()
 					buf17.Write(make([]byte, 17))
-
-					buf16 := bytes.Buffer{}
+					buf17.Reader()
+					buf16 := NewMemoryBuffer()
 					buf16.Write(make([]byte, 16))
+					buf16.Reader()
 
 					upl.On("UploadOplogArchive",
-						&buf17,
+						buf17,
 						models.Timestamp{TS: 1579002001, Inc: 1},
 						models.Timestamp{TS: 1579002002, Inc: 1}).
 						Return(nil).Once().
 						On("UploadOplogArchive",
-							&buf16,
+							buf16,
 							models.Timestamp{TS: 1579002002, Inc: 1},
 							models.Timestamp{TS: 1579002009, Inc: 1}).
 						Return(nil).Once()
@@ -105,10 +105,10 @@ func TestStorageApplier_Apply(t *testing.T) {
 			},
 			args: args{
 				ctx:    context.TODO(),
-				oplogc: make(chan models.Oplog),
+				oplogc: make(chan *models.Oplog),
 				wg:     &sync.WaitGroup{},
 			},
-			ops: []models.Oplog{
+			ops: []*models.Oplog{
 				{
 					TS:   models.Timestamp{TS: 1579002001, Inc: 1},
 					Data: make([]byte, 8),
@@ -126,16 +126,16 @@ func TestStorageApplier_Apply(t *testing.T) {
 			wantErr: nil,
 		},
 		{
-			name: "1 doc, upload error",
+			name: "1_doc_upload_error",
 			fields: fields{
 				uploader: func() *archiveMocks.Uploader {
 					upl := archiveMocks.Uploader{}
 
-					buf8 := bytes.Buffer{}
+					buf8 := NewMemoryBuffer()
 					buf8.Write(make([]byte, 8))
-
+					buf8.Reader()
 					upl.On("UploadOplogArchive",
-						&buf8,
+						buf8,
 						models.Timestamp{TS: 1579002001, Inc: 1},
 						models.Timestamp{TS: 1579002001, Inc: 1}).
 						Return(fmt.Errorf("error while uploading stream: X")).Once()
@@ -146,10 +146,10 @@ func TestStorageApplier_Apply(t *testing.T) {
 			},
 			args: args{
 				ctx:    context.TODO(),
-				oplogc: make(chan models.Oplog),
+				oplogc: make(chan *models.Oplog),
 				wg:     &sync.WaitGroup{},
 			},
-			ops: []models.Oplog{
+			ops: []*models.Oplog{
 				{
 					TS:   models.Timestamp{TS: 1579002001, Inc: 1},
 					Data: make([]byte, 8),
@@ -163,6 +163,7 @@ func TestStorageApplier_Apply(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sa := &StorageApplier{
 				uploader: tt.fields.uploader,
+				buf:      NewMemoryBuffer(),
 				size:     tt.fields.size,
 				timeout:  tt.fields.timeout,
 			}

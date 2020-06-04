@@ -78,7 +78,7 @@ var (
 		TotalBgUploadedLimit:         "32",
 
 		OplogArchiveTimeoutSetting:    "60",
-		OplogArchiveAfterSize:         "33554432", // 32 << (10 * 2)
+		OplogArchiveAfterSize:         "16777216", // 32 << (10 * 2)
 		MongoDBLastWriteUpdateSeconds: "3",
 	}
 
