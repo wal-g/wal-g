@@ -65,7 +65,7 @@ func readRestoreSpec(path string, spec *TablespaceSpec) (err error) {
 	return nil
 }
 
-func GetPgFetcher(dbDataDirectory, fileMask, restoreSpecPath string) func(folder storage.Folder, backup Backup) {
+func GetPgFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string) func(folder storage.Folder, backup Backup) {
 	return func(folder storage.Folder, backup Backup) {
 		filesToUnwrap, err := backup.GetFilesToUnwrap(fileMask)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
@@ -77,7 +77,7 @@ func GetPgFetcher(dbDataDirectory, fileMask, restoreSpecPath string) func(folder
 			errMessege := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
 			tracelog.ErrorLogger.FatalfOnError(errMessege, err)
 		}
-		err = deltaFetchRecursion(backup.Name, folder, utility.ResolveSymlink(dbDataDirectory), spec, filesToUnwrap)
+		err = deltaFetchRecursionOld(backup.Name, folder, utility.ResolveSymlink(dbDataDirectory), spec, filesToUnwrap)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 	}
 }
@@ -158,7 +158,7 @@ func chooseTablespaceSpecification(sentinelDto BackupSentinelDto, spec *Tablespa
 
 // TODO : unit tests
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
-func deltaFetchRecursion(backupName string, folder storage.Folder, dbDataDirectory string,
+func deltaFetchRecursionOld(backupName string, folder storage.Folder, dbDataDirectory string,
 	tablespaceSpec *TablespaceSpec, filesToUnwrap map[string]bool) error {
 	backup, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	if err != nil {
@@ -176,7 +176,7 @@ func deltaFetchRecursion(backupName string, folder storage.Folder, dbDataDirecto
 		if err != nil {
 			return err
 		}
-		err = deltaFetchRecursion(*sentinelDto.IncrementFrom, folder, dbDataDirectory, tablespaceSpec, baseFilesToUnwrap)
+		err = deltaFetchRecursionOld(*sentinelDto.IncrementFrom, folder, dbDataDirectory, tablespaceSpec, baseFilesToUnwrap)
 		if err != nil {
 			return err
 		}

@@ -81,6 +81,9 @@ jobs:
     - script: make TEST="pg_several_delta_backups_test" pg_integration_test
       workspaces:
         use: image_cache
+    - script: make TEST="pg_several_delta_backups_reverse_test" pg_integration_test
+      workspaces:
+        use: image_cache
     - script: make TEST="pg_delete_retain_find_full_test" pg_integration_test
       workspaces:
         use: image_cache

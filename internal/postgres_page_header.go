@@ -26,9 +26,9 @@ func (header *PostgresPageHeader) isValid() bool {
 		header.pdLower < headerSize ||
 		header.pdLower > header.pdUpper ||
 		header.pdUpper > header.pdSpecial ||
-		header.pdSpecial > DatabasePageSize ||
+		int64(header.pdSpecial) > DatabasePageSize ||
 		(header.lsn() == invalidLsn) ||
-		header.pdPageSizeVersion != DatabasePageSize+layoutVersion)
+		int64(header.pdPageSizeVersion) != DatabasePageSize+layoutVersion)
 }
 
 func (header *PostgresPageHeader) isNew() bool {

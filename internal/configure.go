@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	DefaultDataBurstRateLimit = 8 * int64(DatabasePageSize)
+	DefaultDataBurstRateLimit = 8 * DatabasePageSize
 	DefaultDataFolderPath     = "/tmp"
 	WaleFileHost              = "file://localhost"
 )

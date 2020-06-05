@@ -199,12 +199,12 @@ func (backup *Backup) unwrapToEmptyDirectory(
 		return err
 	}
 
-	return backup.unwrap(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
+	return backup.unwrapOld(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
 }
 
 // TODO : unit tests
 // Do the job of unpacking Backup object
-func (backup *Backup) unwrap(
+func (backup *Backup) unwrapOld(
 	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
 ) error {
 	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
