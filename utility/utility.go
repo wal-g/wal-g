@@ -125,10 +125,23 @@ func GetSubdirectoryRelativePath(subdirectoryPath string, directoryPath string) 
 	return NormalizePath(SanitizePath(strings.TrimPrefix(subdirectoryPath, directoryPath)))
 }
 
+var copyBufPool = sync.Pool{New: func() interface{} {
+	return make([]byte, CopiedBlockMaxSize)
+}}
+
+func getCopyBuf() []byte {
+	return copyBufPool.Get().([]byte)
+}
+
+func putCopyBuf(buf []byte) {
+	copyBufPool.Put(buf)
+}
+
 //FastCopy copies data from src to dst in blocks of CopiedBlockMaxSize bytes
 func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
 	n := int64(0)
-	buf := make([]byte, CopiedBlockMaxSize)
+	buf := getCopyBuf()
+	defer putCopyBuf(buf)
 	for {
 		m, readingErr := src.Read(buf)
 		if readingErr != nil && readingErr != io.EOF {
