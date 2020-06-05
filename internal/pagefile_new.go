@@ -35,8 +35,7 @@ func RestoreMissingPages(base io.Reader, file *os.File) error {
 		}
 	}
 	// check if some extra pages left in base file reader
-	all, _ := base.Read(make([]byte, 1))
-	if all > 0 {
+	if isEmpty := isTarReaderEmpty(base); !isEmpty {
 		tracelog.DebugLogger.Printf("Skipping pages after end of the local file %s, " +
 			"possibly the pagefile was truncated.\n", file.Name())
 	}
@@ -75,8 +74,11 @@ func CreateFileFromIncrement(increment io.Reader, file *os.File) error {
 			}
 		}
 	}
-	// at this point, we should have empty increment reader
-	return verifyTarReaderIsEmpty(increment)
+	// check if some extra delta blocks left in reader
+	if isEmpty := isTarReaderEmpty(increment); !isEmpty {
+		tracelog.DebugLogger.Printf("Skipping extra increment blocks, file: %s\n", file.Name())
+	}
+	return nil
 }
 
 // WritePagesFromIncrement writes pages from delta backup according to diffMap
@@ -108,7 +110,10 @@ func WritePagesFromIncrement(increment io.Reader, file *os.File, overwriteExisti
 		}
 	}
 	// at this point, we should have empty increment reader
-	return verifyTarReaderIsEmpty(increment)
+	if isEmpty := isTarReaderEmpty(increment); !isEmpty {
+		return newUnexpectedTarDataError()
+	}
+	return nil
 }
 
 // write page to local file
@@ -147,13 +152,10 @@ func checkIfMissingPage(file *os.File, blockNo int64) (bool, error) {
 	return bytes.Equal(pageHeader, emptyPageHeader), nil
 }
 
-// verify that tar reader is empty
-func verifyTarReaderIsEmpty(reader io.Reader) error {
+// check that tar reader is empty
+func isTarReaderEmpty(reader io.Reader) bool {
 	all, _ := reader.Read(make([]byte, 1))
-	if all > 0 {
-		return newUnexpectedTarDataError()
-	}
-	return nil
+	return all == 0
 }
 
 func getPageCount(file *os.File) (int64, error) {
