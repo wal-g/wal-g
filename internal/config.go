@@ -61,6 +61,9 @@ const (
 	MysqlBackupPrepareCmd      = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
 
 	GoMaxProcs = "GOMAXPROCS"
+
+	HttpListen      = "HTTP_LISTEN"
+	HttpExposePprof = "HTTP_EXPOSE_PPROF"
 )
 
 var (
@@ -176,6 +179,10 @@ var (
 
 		// GOLANG
 		GoMaxProcs:	true,
+
+		// Web server
+		HttpListen: true,
+		HttpExposePprof: true,
 	}
 
 	RequiredSettings = make(map[string]bool)
