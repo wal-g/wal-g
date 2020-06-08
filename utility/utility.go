@@ -125,23 +125,47 @@ func GetSubdirectoryRelativePath(subdirectoryPath string, directoryPath string) 
 	return NormalizePath(SanitizePath(strings.TrimPrefix(subdirectoryPath, directoryPath)))
 }
 
-var copyBufPool = sync.Pool{New: func() interface{} {
-	return make([]byte, CopiedBlockMaxSize)
-}}
-
-func getCopyBuf() []byte {
-	return copyBufPool.Get().([]byte)
+// BytesPool holds []byte.
+type BytesPool struct {
+	pool chan []byte
 }
 
-func putCopyBuf(buf []byte) {
-	copyBufPool.Put(buf)
+// NewBytesPool creates new BytesPool.
+func NewBytesPool(max int) *BytesPool {
+	return &BytesPool{
+		pool: make(chan []byte, max),
+	}
+}
+
+const CopyBytesPoolSize = 2
+
+var copyBytesPool = NewBytesPool(CopyBytesPoolSize)
+
+// Get borrows []byte from the pool.
+func (p *BytesPool) Get() []byte {
+	var buf []byte
+	select {
+	case buf = <-p.pool:
+	default:
+		buf = make([]byte, CopiedBlockMaxSize)
+	}
+	return buf
+}
+
+// Put returns []byte to the pool.
+func (p *BytesPool) Put(b []byte) {
+	select {
+	case p.pool <- b:
+	default:
+	}
 }
 
 //FastCopy copies data from src to dst in blocks of CopiedBlockMaxSize bytes
 func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
 	n := int64(0)
-	buf := getCopyBuf()
-	defer putCopyBuf(buf)
+	buf := copyBytesPool.Get()
+	defer copyBytesPool.Put(buf)
+
 	for {
 		m, readingErr := src.Read(buf)
 		if readingErr != nil && readingErr != io.EOF {
