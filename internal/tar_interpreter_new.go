@@ -11,69 +11,62 @@ import (
 )
 
 // TODO : unit tests
-func (tarInterpreter *FileTarInterpreter) unwrapRegularFileNew(fileReader io.Reader, fileInfo *tar.Header, targetPath string) error {
+func (tarInterpreter *FileTarInterpreter) unwrapRegularFileNew(fileReader io.Reader, header *tar.Header, targetPath string) error {
 	if tarInterpreter.FilesToUnwrap != nil {
-		if _, ok := tarInterpreter.FilesToUnwrap[fileInfo.Name]; !ok {
+		if _, ok := tarInterpreter.FilesToUnwrap[header.Name]; !ok {
 			// don't have to unwrap it this time
-			tracelog.DebugLogger.Printf("Don't have to unwrap '%s' this time\n", fileInfo.Name)
+			tracelog.DebugLogger.Printf("Don't have to unwrap '%s' this time\n", header.Name)
 			return nil
 		}
 	}
-	fileDescription, haveFileDescription := tarInterpreter.Sentinel.Files[fileInfo.Name]
+	fileUnwrapper := getFileUnwrapper(tarInterpreter, header, targetPath)
+	if localFileInfo, _ := getLocalFileInfo(targetPath); localFileInfo != nil {
+		return unwrapToExistFile(fileReader, header, targetPath, fileUnwrapper)
+	}
+	return unwrapToNewFile(fileReader, header, targetPath, fileUnwrapper)
+}
+
+// get file unwrapper for file depending on backup type
+func getFileUnwrapper(tarInterpreter *FileTarInterpreter, header *tar.Header, targetPath string) IBackupFileUnwrapper {
+	fileDescription, haveFileDescription := tarInterpreter.Sentinel.Files[header.Name]
 	isIncremented := haveFileDescription && fileDescription.IsIncremented
+	var isPageFile bool
+	if localFileInfo, _ := getLocalFileInfo(targetPath); localFileInfo != nil {
+		isPageFile = isPagedFile(localFileInfo, targetPath)
+	}
+	options := &BackupFileOptions{isIncremented: isIncremented, isPageFile: isPageFile}
+
 	// todo: clearer catchup backup detection logic
 	isCatchup := tarInterpreter.createNewIncrementalFiles
-
-	if localFileInfo, _ := getLocalFileInfo(targetPath); localFileInfo != nil {
-		isPageFile := isPagedFile(localFileInfo, targetPath)
-		return unwrapToExistFile(fileReader, fileInfo, targetPath, isPageFile, isIncremented, isCatchup)
+	if isCatchup {
+		return NewFileUnwrapper(CatchupBackupFileUnwrapper, options)
 	}
-	return unwrapToNewFile(fileReader, fileInfo, targetPath, isIncremented)
+	return NewFileUnwrapper(DefaultBackupFileUnwrapper, options)
 }
 
 // unwrap the file from tar to existing local file
-func unwrapToExistFile(fileReader io.Reader, fileInfo *tar.Header, targetPath string,
-	isPageFile, isIncremented, isCatchup bool) error {
+func unwrapToExistFile(fileReader io.Reader, header *tar.Header, targetPath string, unwrapper IBackupFileUnwrapper) error {
 	localFile, err := os.OpenFile(targetPath, os.O_RDWR, 0666)
 	if err != nil {
 		return err
 	}
 	defer utility.LoggedClose(localFile, "")
-	if isIncremented {
-		err := WritePagesFromIncrement(fileReader, localFile, isCatchup)
-		return errors.Wrapf(err, "Interpret: failed to write increment to file '%s'", targetPath)
-	}
-	if isCatchup {
-		err := clearLocalFile(localFile)
-		if err != nil {
-			return err
-		}
-		return writeLocalFile(fileReader, fileInfo, localFile)
-	}
-	if isPageFile {
-		err := RestoreMissingPages(fileReader, localFile)
-		return errors.Wrapf(err, "Interpret: failed to restore pages for file '%s'", targetPath)
-	}
-	// skip the non-page file because newer version is already on the disk
-	return nil
+	return unwrapper.UnwrapExistingFile(fileReader, header, localFile)
 }
 
 // unwrap file from tar to new local file
-func unwrapToNewFile(fileReader io.Reader, fileInfo *tar.Header, targetPath string, isIncremented bool) error {
-	localFile, err := createLocalFile(targetPath, fileInfo)
+func unwrapToNewFile(fileReader io.Reader, header *tar.Header, targetPath string, unwrapper IBackupFileUnwrapper) error {
+	newFile, err := createLocalFile(targetPath, header.Name)
 	if err != nil {
 		return err
 	}
-	defer utility.LoggedClose(localFile, "")
-	if isIncremented {
-		err := CreateFileFromIncrement(fileReader, localFile)
-		return errors.Wrapf(err, "Interpret: failed to create file from increment '%s'", targetPath)
-	}
-	return writeLocalFile(fileReader, fileInfo, localFile)
+	defer utility.LoggedClose(newFile, "")
+	return unwrapper.UnwrapNewFile(fileReader, header, newFile)
 }
 
-func getLocalFileInfo(filename string) (fileInfo os.FileInfo, err error) {
-	info, err := os.Stat(filename)
+// get file info by file path
+func getLocalFileInfo(targetPath string) (fileInfo os.FileInfo, err error) {
+	info, err := os.Stat(targetPath)
 	if os.IsNotExist(err) {
 		return nil, err
 	}
@@ -83,8 +76,9 @@ func getLocalFileInfo(filename string) (fileInfo os.FileInfo, err error) {
 	return info, nil
 }
 
-func createLocalFile(targetPath string, fileInfo *tar.Header) (*os.File, error) {
-	err := PrepareDirs(fileInfo.Name, targetPath)
+// create new local file on disk
+func createLocalFile(targetPath, name string) (*os.File, error) {
+	err := PrepareDirs(name, targetPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "Interpret: failed to create all directories")
 	}
@@ -93,39 +87,4 @@ func createLocalFile(targetPath string, fileInfo *tar.Header) (*os.File, error) 
 		return nil, errors.Wrapf(err, "failed to create new file: '%s'", targetPath)
 	}
 	return file, nil
-}
-
-func clearLocalFile(file *os.File) error {
-	err := file.Truncate(0)
-	if err != nil {
-		return err
-	}
-	_, err = file.Seek(0,0)
-	return err
-}
-
-// Write file from backup to local file
-func writeLocalFile(fileReader io.Reader, fileInfo *tar.Header, localFile *os.File) error {
-	_, err := io.Copy(localFile, fileReader)
-	if err != nil {
-		err1 := localFile.Close()
-		if err1 != nil {
-			tracelog.ErrorLogger.Printf("Interpret: failed to close localFile '%s' because of error: %v",
-				localFile.Name(), err1)
-		}
-		err1 = os.Remove(localFile.Name())
-		if err1 != nil {
-			tracelog.ErrorLogger.Fatalf("Interpret: failed to remove localFile '%s' because of error: %v",
-				localFile.Name(), err1)
-		}
-		return errors.Wrap(err, "Interpret: copy failed")
-	}
-
-	mode := os.FileMode(fileInfo.Mode)
-	if err = os.Chmod(localFile.Name(), mode); err != nil {
-		return errors.Wrap(err, "Interpret: chmod failed")
-	}
-
-	err = localFile.Sync()
-	return errors.Wrap(err, "Interpret: fsync failed")
 }
