@@ -61,6 +61,11 @@ const (
 	MysqlBackupPrepareCmd      = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
 
 	GoMaxProcs = "GOMAXPROCS"
+
+	SQLServerBlobEndpoint = "SQLSERVER_BLOB_ENDPOINT"
+	SQLServerBlobCertFile = "SQLSERVER_BLOB_CERT_FILE"
+	SQLServerBlobKeyFile  = "SQLSERVER_BLOB_KEY_FILE"
+	SQLServerBlobDebug    = "SQLSERVER_BLOB_DEBUG"
 )
 
 var (
@@ -175,7 +180,13 @@ var (
 		MysqlBackupPrepareCmd:      true,
 
 		// GOLANG
-		GoMaxProcs:	true,
+		GoMaxProcs: true,
+
+		// SQLServer
+		SQLServerBlobEndpoint: true,
+		SQLServerBlobCertFile: true,
+		SQLServerBlobKeyFile:  true,
+		SQLServerBlobDebug:    true,
 	}
 
 	RequiredSettings = make(map[string]bool)
