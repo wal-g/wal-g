@@ -21,6 +21,7 @@ const BackupPushShortDescription = "Pushes backup to storage"
 var backupPushCmd = &cobra.Command{
 	Use:   "backup-push",
 	Short: BackupPushShortDescription,
+	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
@@ -43,7 +44,7 @@ var backupPushCmd = &cobra.Command{
 
 		mongo.HandleBackupPush(&archive.StorageUploader{UploaderProvider: uploader}, metaProvider, backupCmd)
 	},
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	PreRun: func(cmd *cobra.Command, args []string) {
 		internal.RequiredSettings[internal.NameStreamCreateCmd] = true
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)

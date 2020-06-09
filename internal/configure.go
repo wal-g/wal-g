@@ -401,3 +401,11 @@ func GetRequiredSetting(setting string) (string, error) {
 	}
 	return val, nil
 }
+
+func GetBoolSetting(setting string, def bool) (bool, error) {
+	val, ok := GetSetting(setting)
+	if !ok {
+		return def, nil
+	}
+	return strconv.ParseBool(val)
+}

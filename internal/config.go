@@ -63,7 +63,10 @@ const (
 
 	GoMaxProcs = "GOMAXPROCS"
 
-	SQLServerBlobEndpoint = "SQLSERVER_BLOB_ENDPOINT"
+	HttpListen      = "HTTP_LISTEN"
+	HttpExposePprof = "HTTP_EXPOSE_PPROF"
+
+  SQLServerBlobEndpoint = "SQLSERVER_BLOB_ENDPOINT"
 	SQLServerBlobCertFile = "SQLSERVER_BLOB_CERT_FILE"
 	SQLServerBlobKeyFile  = "SQLSERVER_BLOB_KEY_FILE"
 	SQLServerBlobDebug    = "SQLSERVER_BLOB_DEBUG"
@@ -183,7 +186,11 @@ var (
 		MysqlBackupPrepareCmd:      true,
 
 		// GOLANG
-		GoMaxProcs: true,
+		GoMaxProcs:	true,
+
+		// Web server
+		HttpListen: true,
+		HttpExposePprof: true,
 
 		// SQLServer
 		SQLServerBlobEndpoint: true,
