@@ -129,8 +129,11 @@ WAL-G can also fetch the latest backup using:
 wal-g backup-fetch ~/extract/to/here LATEST
 ```
 
-Beta feature: WAL-G can unpack delta backups in reverse order to improve fetch efficiency. To activate this feature, add the --reverse-unpack flag:
+Beta feature: WAL-G can unpack delta backups in reverse order to improve fetch efficiency. 
+To activate this feature, do one of the following:
 
+* set the `WALG_USE_REVERSE_UNPACK`environment variable
+* add the --reverse-unpack flag
 ```
 wal-g backup-fetch ~/extract/to/here LATEST --reverse-unpack
 ```
