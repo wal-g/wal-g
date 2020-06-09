@@ -1,5 +1,6 @@
 MAIN_PG_PATH := main/pg
 MAIN_MYSQL_PATH := main/mysql
+MAIN_SQLSERVER_PATH := main/sqlserver
 MAIN_REDIS_PATH := main/redis
 MAIN_MONGO_PATH := main/mongo
 MAIN_FDB_PATH := main/fdb
@@ -74,6 +75,9 @@ mysql_test: install deps mysql_build lint unlink_brotli mysql_integration_test
 
 mysql_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_MYSQL_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mysql.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mysql.WalgVersion=`git tag -l --points-at HEAD`")
+
+sqlserver_build: $(CMD_FILES) $(PKG_FILES)
+	(cd $(MAIN_SQLSERVER_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/sqlserver.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/sqlserver.WalgVersion=`git tag -l --points-at HEAD`")
 
 load_docker_common:
 	@if [ "x" = "${CACHE_FILE_UBUNTU}x" ]; then\

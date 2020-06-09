@@ -2,6 +2,7 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -29,7 +30,8 @@ var backupFetchCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		var pgFetcher func(folder storage.Folder, backup internal.Backup)
-		if reverseDeltaUnpack {
+		useReverseUnpackEnv := viper.GetBool(internal.UseReverseUnpackSetting)
+		if reverseDeltaUnpack || useReverseUnpackEnv {
 			pgFetcher = internal.GetPgFetcherNew(args[0], fileMask, restoreSpec)
 		} else {
 			pgFetcher = internal.GetPgFetcherOld(args[0], fileMask, restoreSpec)

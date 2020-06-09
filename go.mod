@@ -28,11 +28,12 @@ require (
 	github.com/golang/mock v1.3.1-0.20190508161146-9fa652df1129
 	github.com/golang/snappy v0.0.2-0.20190904063534-ff6b7dc882cf // indirect
 	github.com/google/brotli v1.0.7
+	github.com/google/uuid v1.1.1
 	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
 	github.com/jackc/pgx v3.6.0+incompatible
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/jessevdk/go-flags v1.4.0 // indirect
-	github.com/jmoiron/sqlx v1.2.0 // indirect
+	github.com/lib/pq v1.0.0 // indirect
 	github.com/mattn/go-ieproxy v0.0.0-20191113090002-7c0f6868bffe // indirect
 	github.com/mattn/go-runewidth v0.0.8 // indirect
 	github.com/minio/sio v0.2.0
@@ -52,7 +53,6 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.5.1
-	github.com/tinsane/tracelog v0.0.0-20190824100002-0ab2b054ff30 // indirect
 	github.com/ulikunitz/xz v0.5.6
 	github.com/wal-g/storages v0.0.0-20200511083259-4a94923055a1
 	github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30
@@ -61,12 +61,12 @@ require (
 	go.mongodb.org/mongo-driver v1.2.0
 	go.opencensus.io v0.22.2 // indirect
 	golang.org/x/crypto v0.0.0-20191206172530-e9b2fee46413
-	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
+	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b // indirect
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6 // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/sys v0.0.0-20191210023423-ac6580df4449 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	golang.org/x/tools v0.0.0-20200526224456-8b020aee10d2 // indirect
+	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 // indirect
 	google.golang.org/api v0.9.0 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/genproto v0.0.0-20191206224255-0243a4be9c8f // indirect
