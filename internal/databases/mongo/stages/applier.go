@@ -43,8 +43,6 @@ func (dba *GenericApplier) Apply(ctx context.Context, ch chan *models.Oplog, wg 
 		defer close(errc)
 
 		for opr := range ch {
-			tracelog.DebugLogger.Printf("Applyer receieved op %s (%s on %s)", opr.TS, opr.OP, opr.NS)
-
 			// we still pass oplog records in generic appliers by value
 			if err := dba.applier.Apply(ctx, *opr); err != nil {
 				errc <- fmt.Errorf("can not handle op: %w", err)

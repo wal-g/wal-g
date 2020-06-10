@@ -118,7 +118,6 @@ func (dbf *DBFetcher) OplogFrom(ctx context.Context, from models.Timestamp, wg *
 				fromFound = true
 			}
 
-			//tracelog.DebugLogger.Printf("Fetcher receieved op %s (%s on %s)", op.TS, op.OP, op.NS)
 			select {
 			case oplogc <- op:
 			case <-ctx.Done():
