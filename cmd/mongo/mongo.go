@@ -27,21 +27,8 @@ var Cmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
-
-		httpListenAddr, httpListen := internal.GetSetting(internal.HttpListen)
-		if httpListen {
-			webServer = webserver.NewSimpleWebServer(httpListenAddr)
-			tracelog.ErrorLogger.FatalOnError(webServer.Serve())
-		}
-
-		exposePprof, err := internal.GetBoolSetting(internal.HttpExposePprof, false)
+		err = internal.ConfigureAndRunWebServer(webserver.DefaultWebServer)
 		tracelog.ErrorLogger.FatalOnError(err)
-		if exposePprof {
-			internal.RequiredSettings[internal.HttpListen] = true
-			err := internal.AssertRequiredSettingsSet()
-			tracelog.ErrorLogger.FatalfOnError(internal.HttpExposePprof + " failed: %v", err)
-			webserver.EnablePprofEndpoints(webServer)
-		}
 	},
 }
 

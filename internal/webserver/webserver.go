@@ -2,6 +2,7 @@ package webserver
 
 import (
 	"context"
+	"expvar"
 	"fmt"
 	"net/http"
 	"net/http/pprof"
@@ -13,6 +14,8 @@ type WebServer interface {
 	Serve() error
 	Shutdown(ctx context.Context) error
 }
+
+var DefaultWebServer WebServer
 
 // SimpleWebServer is naive implementation of WebServer.
 // is not thread-safe
@@ -33,6 +36,7 @@ func NewSimpleWebServer(addr string) *SimpleWebServer {
 }
 
 // Serve starts server.
+// TODO: handle errors properly
 func (sw *SimpleWebServer) Serve() error {
 	if sw.running {
 		return fmt.Errorf("already running")
@@ -61,4 +65,9 @@ func EnablePprofEndpoints(ws WebServer) {
 	ws.HandleFunc("/debug/pprof/profile", pprof.Profile)
 	ws.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	ws.HandleFunc("/debug/pprof/trace", pprof.Trace)
+}
+
+// EnableExpVarEndpoints exposes expvar http endpoints.
+func EnableExpVarEndpoints(ws WebServer) {
+	ws.HandleFunc("/debug/vars", expvar.Handler().ServeHTTP)
 }
