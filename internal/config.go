@@ -1,14 +1,16 @@
 package internal
 
 import (
+	"fmt"
 	"os"
 	"os/user"
 	"runtime"
 	"strings"
 
+	"github.com/wal-g/wal-g/internal/webserver"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-
 	"github.com/spf13/viper"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
@@ -63,10 +65,11 @@ const (
 
 	GoMaxProcs = "GOMAXPROCS"
 
-	HttpListen      = "HTTP_LISTEN"
-	HttpExposePprof = "HTTP_EXPOSE_PPROF"
+	HttpListen       = "HTTP_LISTEN"
+	HttpExposePprof  = "HTTP_EXPOSE_PPROF"
+	HttpExposeExpVar = "HTTP_EXPOSE_EXPVAR"
 
-  SQLServerBlobEndpoint = "SQLSERVER_BLOB_ENDPOINT"
+	SQLServerBlobEndpoint = "SQLSERVER_BLOB_ENDPOINT"
 	SQLServerBlobCertFile = "SQLSERVER_BLOB_CERT_FILE"
 	SQLServerBlobKeyFile  = "SQLSERVER_BLOB_KEY_FILE"
 	SQLServerBlobDebug    = "SQLSERVER_BLOB_DEBUG"
@@ -186,11 +189,12 @@ var (
 		MysqlBackupPrepareCmd:      true,
 
 		// GOLANG
-		GoMaxProcs:	true,
+		GoMaxProcs: true,
 
 		// Web server
-		HttpListen: true,
-		HttpExposePprof: true,
+		HttpListen:       true,
+		HttpExposePprof:  true,
+		HttpExposeExpVar: true,
 
 		// SQLServer
 		SQLServerBlobEndpoint: true,
@@ -199,7 +203,11 @@ var (
 		SQLServerBlobDebug:    true,
 	}
 
-	RequiredSettings = make(map[string]bool)
+	RequiredSettings       = make(map[string]bool)
+	HttpSettingExposeFuncs = map[string]func(webserver.WebServer){
+		HttpExposePprof:  webserver.EnablePprofEndpoints,
+		HttpExposeExpVar: webserver.EnableExpVarEndpoints,
+	}
 )
 
 func isAllowedSetting(setting string, AllowedSettings map[string]bool) (exists bool) {
@@ -260,6 +268,31 @@ func Configure() {
 		}
 		AllowedSettings["WALG_"+adapter.prefixName] = true
 	}
+}
+
+// ConfigureWebServer configures and runs web server
+func ConfigureAndRunWebServer(ws webserver.WebServer) error {
+	httpListenAddr, httpListen := GetSetting(HttpListen)
+	if httpListen {
+		ws = webserver.NewSimpleWebServer(httpListenAddr)
+		if err := ws.Serve(); err != nil {
+			return err
+		}
+	}
+	for setting, enableFunc := range HttpSettingExposeFuncs {
+		enabled, err := GetBoolSetting(setting, false)
+		if err != nil {
+			return err
+		}
+		if !enabled {
+			continue
+		}
+		if !httpListen {
+			return fmt.Errorf("%s failed: %s is not set", setting, HttpListen)
+		}
+		enableFunc(ws)
+	}
+	return nil
 }
 
 func AddConfigFlags(Cmd *cobra.Command) {
