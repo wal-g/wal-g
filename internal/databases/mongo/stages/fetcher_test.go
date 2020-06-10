@@ -29,12 +29,12 @@ const (
 
 var (
 	ops = []*models.Oplog{
-		{TS: models.Timestamp{TS: 1579002001, Inc: 1}, OP: "i", NS: "testdb.testc"},
-		{TS: models.Timestamp{TS: 1579002002, Inc: 1}, OP: "i", NS: "testdb.testc1"},
-		{TS: models.Timestamp{TS: 1579002003, Inc: 1}, OP: "i", NS: "testdb.testc1"},
-		{TS: models.Timestamp{TS: 1579002004, Inc: 1}, OP: "i", NS: "testdb.testc2"},
-		{TS: models.Timestamp{TS: 1579002005, Inc: 1}, OP: "i", NS: "testdb.testc2"},
-		{TS: models.Timestamp{TS: 1579002006, Inc: 1}, OP: "i", NS: "testdb.testc3"},
+		{TS: models.Timestamp{TS: 1579002001, Inc: 1}},
+		{TS: models.Timestamp{TS: 1579002002, Inc: 1}},
+		{TS: models.Timestamp{TS: 1579002003, Inc: 1}},
+		{TS: models.Timestamp{TS: 1579002004, Inc: 1}},
+		{TS: models.Timestamp{TS: 1579002005, Inc: 1}},
+		{TS: models.Timestamp{TS: 1579002006, Inc: 1}},
 	}
 )
 
@@ -45,16 +45,12 @@ func TestMain(m *testing.M) {
 
 type oplogMeta struct {
 	TS primitive.Timestamp `bson:"ts"`
-	NS string              `bson:"ns"`
-	OP string              `bson:"op"`
 }
 
 func fillOpsRawData() {
 	for i := range ops {
 		opMeta := oplogMeta{
 			TS: models.BsonTimestampFromOplogTS(ops[i].TS),
-			NS: ops[i].NS,
-			OP: ops[i].OP,
 		}
 		raw, err := bson.Marshal(opMeta)
 		if err != nil {

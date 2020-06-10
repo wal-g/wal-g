@@ -76,8 +76,6 @@ func BsonTimestampFromOplogTS(ots Timestamp) primitive.Timestamp {
 // Oplog represents oplog raw and parsed metadata.
 type Oplog struct {
 	TS   Timestamp `bson:"ts"`
-	OP   string    `bson:"op"`
-	NS   string    `bson:"ns"`
 	Data []byte
 }
 
@@ -94,8 +92,6 @@ func GetOplogEntry() *Oplog {
 func PutOplogEntry(oplog *Oplog) {
 	oplog.TS.TS = 0
 	oplog.TS.Inc = 0
-	oplog.NS = ""
-	oplog.OP = ""
 	oplog.Data = nil
 	oplogPool.Put(oplog)
 }
@@ -107,20 +103,8 @@ func OplogFromRaw(raw bson.Raw) (*Oplog, error) {
 		return nil, fmt.Errorf("can not cast oplog 'ts' field to timestamp: %v", raw.Lookup("ts"))
 	}
 
-	op, ok := raw.Lookup("op").StringValueOK()
-	if !ok {
-		return nil, fmt.Errorf("can not cast oplog 'op' field to string")
-	}
-
-	ns, ok := raw.Lookup("ns").StringValueOK()
-	if !ok {
-		return nil, fmt.Errorf("can not cast oplog 'ns' field to string")
-	}
-
 	oplog := GetOplogEntry()
 	oplog.TS = Timestamp{TS: tsT, Inc: tsI}
-	oplog.OP = op
-	oplog.NS = ns
 	oplog.Data = raw
 	return oplog, nil
 }
