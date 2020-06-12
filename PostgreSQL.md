@@ -96,7 +96,7 @@ Similar to `WALG_PGP_KEY`, but value is the path to the key on file system.
 
 * `WALG_PGP_KEY_PASSPHRASE`
 
-If your *private key* is encrypted with a *passphrase*, you should set *passpharse* for decrypt.
+If your *private key* is encrypted with a *passphrase*, you should set *passphrase* for decrypt.
 
 * `WALG_DELTA_MAX_STEPS`
 
