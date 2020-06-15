@@ -31,6 +31,7 @@ var backupFetchCmd = &cobra.Command{
 
 		restoreCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamRestoreCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
+		restoreCmd.Stderr = os.Stderr
 
 		mongo.HandleBackupFetch(ctx, folder, args[0], restoreCmd)
 	},

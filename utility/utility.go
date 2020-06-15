@@ -358,3 +358,15 @@ func StartCommandWithStdoutStderr(cmd *exec.Cmd) (io.ReadCloser, *bytes.Buffer, 
 	}
 	return stdout, stderr, err
 }
+
+func StartCommandWithStdoutPipe(cmd *exec.Cmd) (io.ReadCloser, error) {
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	err = cmd.Start()
+	if err != nil {
+		return nil, err
+	}
+	return stdout, err
+}
