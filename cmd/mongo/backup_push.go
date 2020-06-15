@@ -39,10 +39,12 @@ var backupPushCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 		uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 
-		backupCmd, err := internal.GetCommandSetting(internal.NameStreamCreateCmd)
+		backupCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamCreateCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
+		backupCmd.Stderr = os.Stderr
 
-		mongo.HandleBackupPush(&archive.StorageUploader{UploaderProvider: uploader}, metaProvider, backupCmd)
+		err = mongo.HandleBackupPush(&archive.StorageUploader{UploaderProvider: uploader}, metaProvider, backupCmd)
+		tracelog.ErrorLogger.FatalfOnError("Backup creation failed: %v", err)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
 		internal.RequiredSettings[internal.NameStreamCreateCmd] = true
