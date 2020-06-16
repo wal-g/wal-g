@@ -12,6 +12,7 @@ import (
 
 const (
 	timestampDelimiter = "."
+	MaxDocumentSize    = 16 * 1024 * 1024
 )
 
 // Timestamp represents oplog record uniq id.
