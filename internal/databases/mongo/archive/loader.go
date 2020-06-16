@@ -1,6 +1,7 @@
 package archive
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"sort"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"
 
@@ -30,7 +32,6 @@ type Uploader interface {
 	UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error // TODO: rename firstTS
 	UploadGapArchive(err error, firstTS, lastTS models.Timestamp) error
 	UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider MongoMetaProvider) error
-	FileExtension() string
 }
 
 // Downloader defines interface to fetch mongodb oplog archives
@@ -186,32 +187,37 @@ func (d *DiscardUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaProv
 	panic("implement me")
 }
 
-// FileExtension returns configured extension
-func (d *DiscardUploader) FileExtension() string {
-	return d.compressor.FileExtension()
-}
-
 // StorageUploader extends base uploader with mongodb specific.
+// is NOT thread-safe
 type StorageUploader struct {
 	internal.UploaderProvider
+	crypter crypto.Crypter
+	buf     *bytes.Buffer
 }
 
 // NewStorageUploader builds mongodb uploader.
 func NewStorageUploader(upl internal.UploaderProvider) *StorageUploader {
-	return &StorageUploader{upl}
+	upl.DisableSizeTracking()
+	return &StorageUploader{upl, internal.ConfigureCrypter(), &bytes.Buffer{}}
 }
 
 // UploadOplogArchive compresses a stream and uploads it with given archive name.
+// TODO: test if upload content is readerAtSeeker
 func (su *StorageUploader) UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error {
-	arch, err := models.NewArchive(firstTS, lastTS, su.FileExtension(), models.ArchiveTypeOplog)
+	arch, err := models.NewArchive(firstTS, lastTS, su.Compression().FileExtension(), models.ArchiveTypeOplog)
 	if err != nil {
 		return fmt.Errorf("can not build archive: %w", err)
 	}
 
-	if err := su.PushStreamToDestination(stream, arch.Filename()); err != nil {
-		return fmt.Errorf("error while uploading stream: %w", err)
+	_, err = su.buf.ReadFrom(internal.CompressAndEncrypt(stream, su.UploaderProvider.Compression(), su.crypter))
+	// TODO: warn if read > 2 * models.MaxDocumentSize and shrink buf capacity if it's too high
+	defer su.buf.Reset()
+	if err != nil {
+		return err
 	}
-	return nil
+
+	// providing io.ReaderAt+io.ReadSeeker to s3 upload enables buffer pool usage
+	return su.Upload(arch.Filename(), bytes.NewReader(su.buf.Bytes()))
 }
 
 // UploadGap uploads mark indicating archiving gap.
@@ -220,7 +226,7 @@ func (su *StorageUploader) UploadGapArchive(archErr error, firstTS, lastTS model
 		return fmt.Errorf("archErr must not be nil")
 	}
 
-	arch, err := models.NewArchive(firstTS, lastTS, su.FileExtension(), models.ArchiveTypeGap)
+	arch, err := models.NewArchive(firstTS, lastTS, su.Compression().FileExtension(), models.ArchiveTypeGap)
 	if err != nil {
 		return fmt.Errorf("can not build archive: %w", err)
 	}

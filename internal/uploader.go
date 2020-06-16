@@ -17,7 +17,8 @@ type UploaderProvider interface {
 	UploadFile(file NamedReader) error
 	PushStream(stream io.Reader) (string, error)
 	PushStreamToDestination(stream io.Reader, dstPath string) error
-	FileExtension() string
+	Compression() compression.Compressor
+	DisableSizeTracking()
 }
 
 // Uploader contains fields associated with uploading tarballs.
@@ -84,14 +85,22 @@ func (uploader *Uploader) UploadFile(file NamedReader) error {
 	return err
 }
 
-// FileExtension returns configured compressor extension
-func (uploader *Uploader) FileExtension() string {
-	return uploader.Compressor.FileExtension()
+// DisableSizeTracking stops bandwidth tracking
+func (uploader *Uploader) DisableSizeTracking() {
+	uploader.tarSize = nil
+}
+
+// Compression returns configured compressor
+func (uploader *Uploader) Compression() compression.Compressor {
+	return uploader.Compressor
 }
 
 // TODO : unit tests
 func (uploader *Uploader) Upload(path string, content io.Reader) error {
-	err := uploader.UploadingFolder.PutObject(path, &WithSizeReader{content, uploader.tarSize})
+	if uploader.tarSize != nil {
+		content = &WithSizeReader{content, uploader.tarSize}
+	}
+	err := uploader.UploadingFolder.PutObject(path, content)
 	if err == nil {
 		return nil
 	}
