@@ -20,10 +20,27 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFileNew(fileReader io.Rea
 		}
 	}
 	fileUnwrapper := getFileUnwrapper(tarInterpreter, header, targetPath)
-	if localFileInfo, _ := getLocalFileInfo(targetPath); localFileInfo != nil {
-		return unwrapToExistFile(fileReader, header, targetPath, fileUnwrapper)
+	localFile, isNewFile, err := getLocalFile(targetPath, header)
+	if err != nil {
+		return err
 	}
-	return unwrapToNewFile(fileReader, header, targetPath, fileUnwrapper)
+	defer localFile.Sync()
+	defer utility.LoggedClose(localFile, "")
+	if isNewFile {
+		return fileUnwrapper.UnwrapNewFile(fileReader, header, localFile)
+	}
+	return fileUnwrapper.UnwrapExistingFile(fileReader, header, localFile)
+}
+
+// get local file, create new if not existed
+func getLocalFile(targetPath string, header *tar.Header) (localFile *os.File, isNewFile bool, err error) {
+	if localFileInfo, _ := getLocalFileInfo(targetPath); localFileInfo != nil {
+		localFile, err = os.OpenFile(targetPath, os.O_RDWR, 0666)
+	} else {
+		localFile, err = createLocalFile(targetPath, header.Name)
+		isNewFile = true
+	}
+	return localFile, isNewFile, err
 }
 
 // get file unwrapper for file depending on backup type
@@ -42,26 +59,6 @@ func getFileUnwrapper(tarInterpreter *FileTarInterpreter, header *tar.Header, ta
 		return NewFileUnwrapper(CatchupBackupFileUnwrapper, options)
 	}
 	return NewFileUnwrapper(DefaultBackupFileUnwrapper, options)
-}
-
-// unwrap the file from tar to existing local file
-func unwrapToExistFile(fileReader io.Reader, header *tar.Header, targetPath string, unwrapper IBackupFileUnwrapper) error {
-	localFile, err := os.OpenFile(targetPath, os.O_RDWR, 0666)
-	if err != nil {
-		return err
-	}
-	defer utility.LoggedClose(localFile, "")
-	return unwrapper.UnwrapExistingFile(fileReader, header, localFile)
-}
-
-// unwrap file from tar to new local file
-func unwrapToNewFile(fileReader io.Reader, header *tar.Header, targetPath string, unwrapper IBackupFileUnwrapper) error {
-	newFile, err := createLocalFile(targetPath, header.Name)
-	if err != nil {
-		return err
-	}
-	defer utility.LoggedClose(newFile, "")
-	return unwrapper.UnwrapNewFile(fileReader, header, newFile)
 }
 
 // get file info by file path
