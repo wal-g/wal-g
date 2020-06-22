@@ -7,7 +7,6 @@ package internal
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 	"io"
@@ -15,18 +14,39 @@ import (
 	"os"
 )
 
+type ReadWriterAt interface {
+	io.ReaderAt
+	io.WriterAt
+	Size() int64
+	Name() string
+}
+
+func NewReadWriterAtFrom(file *os.File) (ReadWriterAt, error) {
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	size := fileInfo.Size()
+	return &ReadWriterAtFileImpl{file, size}, nil
+}
+
+type ReadWriterAtFileImpl struct {
+	*os.File
+	size int64
+}
+
+func (rw *ReadWriterAtFileImpl) Size() int64 {
+	return rw.size
+}
+
 // RestoreMissingPages restores missing pages (zero blocks)
 // of local file with their base backup version
-func RestoreMissingPages(base io.Reader, file *os.File) error {
-	tracelog.DebugLogger.Printf("Restoring missing pages from base backup: %s\n", file.Name())
-	defer file.Sync()
+func RestoreMissingPages(base io.Reader, target ReadWriterAt) error {
+	tracelog.DebugLogger.Printf("Restoring missing pages from base backup: %s\n", target.Name())
 
-	filePageCount, err := getPageCount(file)
-	if err != nil {
-		return err
-	}
-	for i := int64(0); i < filePageCount; i++ {
-		err = writePage(file, i, base, false)
+	targetPageCount := target.Size() / DatabasePageSize
+	for i := int64(0); i < targetPageCount; i++ {
+		err := writePage(target, i, base, false)
 		if err == io.EOF {
 			break
 		}
@@ -34,19 +54,18 @@ func RestoreMissingPages(base io.Reader, file *os.File) error {
 			return err
 		}
 	}
-	// check if some extra pages left in base file reader
+	// check if some extra pages left in base reader
 	if isEmpty := isTarReaderEmpty(base); !isEmpty {
-		tracelog.DebugLogger.Printf("Skipping pages after end of the local file %s, " +
-			"possibly the pagefile was truncated.\n", file.Name())
+		tracelog.DebugLogger.Printf("Skipping pages after end of the local target %s, " +
+			"possibly the pagefile was truncated.\n", target.Name())
 	}
 	return nil
 }
 
 // CreateFileFromIncrement writes the pages from the increment to local file
 // and write empty blocks in place of pages which are not present in the increment
-func CreateFileFromIncrement(increment io.Reader, file *os.File) error {
-	tracelog.DebugLogger.Printf("Generating file from increment %s\n", file.Name())
-	defer file.Sync()
+func CreateFileFromIncrement(increment io.Reader, target ReadWriterAt) error {
+	tracelog.DebugLogger.Printf("Creating from increment: %s\n", target.Name())
 
 	fileSize, diffBlockCount, diffMap, err := getIncrementHeaderFields(increment)
 	if err != nil {
@@ -63,48 +82,43 @@ func CreateFileFromIncrement(increment io.Reader, file *os.File) error {
 	emptyPage := make([]byte, DatabasePageSize)
 	for i := int64(0); i < pageCount; i++ {
 		if deltaBlockNumbers[i] {
-			err = writePage(file, i, increment, true)
+			err = writePage(target, i, increment, true)
 			if err != nil {
 				return err
 			}
 		} else {
-			_, err = file.WriteAt(emptyPage, i*DatabasePageSize)
+			_, err = target.WriteAt(emptyPage, i*DatabasePageSize)
 			if err != nil {
 				return err
 			}
 		}
 	}
-	// check if some extra delta blocks left in reader
+	// check if some extra delta blocks left in increment
 	if isEmpty := isTarReaderEmpty(increment); !isEmpty {
-		tracelog.DebugLogger.Printf("Skipping extra increment blocks, file: %s\n", file.Name())
+		tracelog.DebugLogger.Printf("Skipping extra increment blocks, target: %s\n", target.Name())
 	}
 	return nil
 }
 
 // WritePagesFromIncrement writes pages from delta backup according to diffMap
-func WritePagesFromIncrement(increment io.Reader, file *os.File, overwriteExisting bool) error {
-	tracelog.DebugLogger.Printf("Writing pages from increment: %s\n", file.Name())
-	defer file.Sync()
+func WritePagesFromIncrement(increment io.Reader, target ReadWriterAt, overwriteExisting bool) error {
+	tracelog.DebugLogger.Printf("Writing pages from increment: %s\n", target.Name())
 
 	_, diffBlockCount, diffMap, err := getIncrementHeaderFields(increment)
 	if err != nil {
 		return err
 	}
-	filePageCount, err := getPageCount(file)
-	if err != nil {
-		return err
-	}
-
+	targetPageCount := target.Size() / DatabasePageSize
 	for i := uint32(0); i < diffBlockCount; i++ {
 		blockNo := int64(binary.LittleEndian.Uint32(diffMap[i*sizeofInt32 : (i+1)*sizeofInt32]))
-		if blockNo >= filePageCount {
+		if blockNo >= targetPageCount {
 			_, err := io.CopyN(ioutil.Discard, increment, DatabasePageSize)
 			if err != nil {
 				return err
 			}
 			continue
 		}
-		err = writePage(file, blockNo, increment, overwriteExisting)
+		err = writePage(target, blockNo, increment, overwriteExisting)
 		if err != nil {
 			return err
 		}
@@ -117,7 +131,7 @@ func WritePagesFromIncrement(increment io.Reader, file *os.File, overwriteExisti
 }
 
 // write page to local file
-func writePage(file *os.File, blockNo int64, content io.Reader, overwrite bool) error {
+func writePage(target ReadWriterAt, blockNo int64, content io.Reader, overwrite bool) error {
 	page := make([]byte, DatabasePageSize)
 	_, err := io.ReadFull(content, page)
 	if err != nil {
@@ -125,7 +139,7 @@ func writePage(file *os.File, blockNo int64, content io.Reader, overwrite bool) 
 	}
 
 	if !overwrite {
-		isMissingPage, err := checkIfMissingPage(file, blockNo)
+		isMissingPage, err := checkIfMissingPage(target, blockNo)
 		if err != nil {
 			return err
 		}
@@ -133,7 +147,7 @@ func writePage(file *os.File, blockNo int64, content io.Reader, overwrite bool) 
 			return nil
 		}
 	}
-	_, err = file.WriteAt(page, blockNo*DatabasePageSize)
+	_, err = target.WriteAt(page, blockNo*DatabasePageSize)
 	if err != nil {
 		return err
 	}
@@ -141,10 +155,10 @@ func writePage(file *os.File, blockNo int64, content io.Reader, overwrite bool) 
 }
 
 // check if page is missing (block of zeros) in local file
-func checkIfMissingPage(file *os.File, blockNo int64) (bool, error) {
+func checkIfMissingPage(target ReadWriterAt, blockNo int64) (bool, error) {
 	emptyPageHeader := make([]byte, headerSize)
 	pageHeader := make([]byte, headerSize)
-	_, err := file.ReadAt(pageHeader, blockNo*DatabasePageSize)
+	_, err := target.ReadAt(pageHeader, blockNo*DatabasePageSize)
 	if err != nil {
 		return false, err
 	}
@@ -156,14 +170,6 @@ func checkIfMissingPage(file *os.File, blockNo int64) (bool, error) {
 func isTarReaderEmpty(reader io.Reader) bool {
 	all, _ := reader.Read(make([]byte, 1))
 	return all == 0
-}
-
-func getPageCount(file *os.File) (int64, error) {
-	localFileInfo, err := file.Stat()
-	if err != nil {
-		return 0, errors.Wrap(err, "error getting fileInfo")
-	}
-	return localFileInfo.Size() / DatabasePageSize, nil
 }
 
 func getIncrementHeaderFields(increment io.Reader) (uint64, uint32, []byte, error) {
