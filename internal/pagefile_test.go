@@ -75,7 +75,7 @@ func TestReadingIncrementSmallLSN(t *testing.T) {
 	postgresReadIncrementTest(smallLSN, t)
 }
 
-// this test checks that increment is being read correctly
+// This test checks that increment is being read correctly
 func postgresReadIncrementTest(localLSN uint64, t *testing.T) {
 	fileInfo, err := os.Stat(pagedFileName)
 	if err != nil {
@@ -118,6 +118,141 @@ func readIncrementFileHeaderTest(t *testing.T, headerData []byte, expectedErr er
 	assert.IsType(t, err, expectedErr)
 }
 
+// In this test series we test that new page file
+// is being correctly created from increment file
+// with different increment cases
+func TestCreatingFileFromIncrement(t *testing.T) {
+	postgresCreateFileFromIncrementTest(regularTestIncrement, t)
+}
+
+func TestCreatingFileFromIncrementBigLSN(t *testing.T) {
+	postgresCreateFileFromIncrementTest(bigLsnTestIncrement, t)
+}
+
+func TestCreatingFileFromIncrementSmallLSN(t *testing.T) {
+	postgresCreateFileFromIncrementTest(smallLsnTestIncrement, t)
+}
+
+func postgresCreateFileFromIncrementTest(testIncrement *TestIncrement, t *testing.T) {
+	incrementReader := testIncrement.NewReader()
+	mockFile := NewMockReaderAtWriterAt(make([]byte, 0))
+
+	err := internal.CreateFileFromIncrement(incrementReader, mockFile)
+	assert.NoError(t, err)
+	assert.Equal(t, testIncrement.fileSize, uint64(len(mockFile.content)))
+
+	sourceFile, _ := os.Open(pagedFileName)
+	defer utility.LoggedClose(sourceFile, "")
+
+	checkIfAllIncrementBlocksExist(mockFile, sourceFile, testIncrement.diffBlockCount, t)
+}
+
+// In this test series we test that
+// no increment blocks are being written if the
+// local file is completed (no missing blocks)
+func TestWritingIncrementToCompletedFile(t *testing.T) {
+	postgresWriteIncrementTestCompletedFile(regularTestIncrement, t)
+}
+
+func TestWritingIncrementToCompletedFileSmallLSN(t *testing.T) {
+	postgresWriteIncrementTestCompletedFile(smallLsnTestIncrement, t)
+}
+
+func TestWritingIncrementToCompletedFileBigLSN(t *testing.T) {
+	postgresWriteIncrementTestCompletedFile(bigLsnTestIncrement, t)
+}
+
+func postgresWriteIncrementTestCompletedFile(testIncrement *TestIncrement, t *testing.T) {
+	content := createPageFileContent(1, pagedFileBlockCount)
+	mockFile := NewMockReaderAtWriterAt(content)
+
+	err := internal.WritePagesFromIncrement(testIncrement.NewReader(), mockFile, false)
+
+	assert.NoError(t, err)
+	// check that no bytes were written to the mock file
+	assert.Equal(t, 0, mockFile.bytesWritten)
+}
+
+// In this test series we test that
+// all increment blocks are being written if the
+// local file is empty (all blocks are missing)
+func TestWritingIncrementToEmptyFile(t *testing.T) {
+	postgresWritePagesTestEmptyFile(regularTestIncrement, t)
+}
+
+func TestWritingIncrementToEmptyFileSmallLSN(t *testing.T) {
+	postgresWritePagesTestEmptyFile(smallLsnTestIncrement, t)
+}
+
+func TestWritingIncrementToEmptyFileBigLSN(t *testing.T) {
+	postgresWritePagesTestEmptyFile(bigLsnTestIncrement, t)
+}
+
+func postgresWritePagesTestEmptyFile(testIncrement *TestIncrement, t *testing.T) {
+	content := make([]byte, internal.DatabasePageSize*pagedFileBlockCount)
+	mockFile := NewMockReaderAtWriterAt(content)
+	err := internal.WritePagesFromIncrement(testIncrement.NewReader(), mockFile, false)
+	assert.NoError(t, err)
+	assert.Equal(t, testIncrement.fileSize, uint64(len(mockFile.content)))
+
+	sourceFile, _ := os.Open(pagedFileName)
+	defer utility.LoggedClose(sourceFile, "")
+	checkIfAllIncrementBlocksExist(mockFile, sourceFile, testIncrement.diffBlockCount,t)
+}
+
+func TestRestoringPagesToCompletedFile(t *testing.T) {
+	pagedFile, _ := os.Open(pagedFileName)
+	fileReader := io.Reader(pagedFile)
+	defer utility.LoggedClose(pagedFile, "")
+	content := createPageFileContent(1, pagedFileBlockCount)
+	mockFile := NewMockReaderAtWriterAt(content)
+
+	err := internal.RestoreMissingPages(fileReader, mockFile)
+
+	assert.NoError(t, err)
+	// check that no bytes were written to the mock file
+	assert.Equal(t, 0, mockFile.bytesWritten)
+}
+
+func TestRestoringPagesToEmptyFile(t *testing.T) {
+	pagedFile, _ := os.Open(pagedFileName)
+	fileReader := io.Reader(pagedFile)
+	defer utility.LoggedClose(pagedFile, "")
+	content := make([]byte, internal.DatabasePageSize*pagedFileBlockCount)
+	mockFile := NewMockReaderAtWriterAt(content)
+
+	err := internal.RestoreMissingPages(fileReader, mockFile)
+
+	assert.NoError(t, err)
+	mockFileReader := bytes.NewReader(mockFile.content)
+	pagedFile.Seek(0,0)
+	compareResult := deepCompareReaders(pagedFile, mockFileReader)
+	assert.Truef(t, compareResult, "Increment could not restore file")
+}
+
+func checkIfAllIncrementBlocksExist(mockFile *MockReadWriterAt, sourceFile io.ReaderAt,
+	diffBlockCount uint32, t *testing.T) {
+	emptyPage := make([]byte, internal.DatabasePageSize)
+	emptyBlockCount := uint32(0)
+	dataBlockCount := uint32(0)
+
+	for index, data := range mockFile.getBlocks() {
+		readBytes := make([]byte, internal.DatabasePageSize)
+		sourceFile.ReadAt(readBytes, index*internal.DatabasePageSize)
+		if bytes.Equal(emptyPage, data) {
+			emptyBlockCount += 1
+			continue
+		}
+		// Verify that each written block corresponds
+		// to the actual block in the original page file.
+		bytes.Equal(readBytes, data)
+		dataBlockCount += 1
+	}
+	// Make sure that we wrote exactly the same amount of blocks that was written to the increment header.
+	// These two numbers may not be equal if the increment was taken
+	// while the database cluster was running, but in this test cases they should match.
+	assert.Equal(t, diffBlockCount, dataBlockCount)
+}
 
 func readIncrementToBuffer(localLSN uint64) []byte {
 	fileInfo, _ := os.Stat(pagedFileName)
@@ -209,3 +344,58 @@ func newTestIncrement(lsn uint64) *TestIncrement {
 	return &TestIncrement{incrementBytes: incrementBytes, fileSize: fileSize, diffBlockCount: diffBlockCount}
 }
 
+// MockReadWriterAt used for mocking file in tests
+type MockReadWriterAt struct {
+	size int64
+	bytesWritten int
+	content      []byte
+}
+
+func NewMockReaderAtWriterAt(content []byte) *MockReadWriterAt {
+	return &MockReadWriterAt{size: int64(len(content)), content: content}
+}
+
+func (mrw *MockReadWriterAt) WriteAt(b []byte, offset int64) (n int, err error) {
+	bytesCount := uint64(offset) + uint64(len(b))
+	for uint64(len(mrw.content)) < bytesCount {
+		// silly slice expand method but for tests seems fine
+		mrw.content = append(mrw.content, 0)
+	}
+	copy(mrw.content[offset:], b)
+	mrw.bytesWritten += len(b)
+	return len(b), nil
+}
+
+// get mock file content represented as page blocks
+func (mrw *MockReadWriterAt) getBlocks() map[int64][]byte {
+	totalBlockCount := int64(len(mrw.content)) / internal.DatabasePageSize
+	result := make(map[int64][]byte, totalBlockCount)
+	for i := int64(0); i < totalBlockCount; i++ {
+		result[i] = make([]byte, internal.DatabasePageSize)
+		_, _ = mrw.ReadAt(result[i], i*internal.DatabasePageSize)
+	}
+	return result
+}
+
+func (mrw *MockReadWriterAt) ReadAt(b []byte, offset int64) (n int, err error) {
+	block := mrw.content[offset : offset+int64(len(b))]
+	copy(b, block)
+	return len(block), nil
+}
+
+func (mrw *MockReadWriterAt) Size() int64 {
+	return mrw.size
+}
+
+func (mrw *MockReadWriterAt) Name() string {
+	return "mock_file"
+}
+
+// create page file filled with bytes equal to the provided value
+func createPageFileContent(value byte, pageCount int64) []byte {
+	pageFileContent := make([]byte, internal.DatabasePageSize*pageCount)
+	for i := 0; i < len(pageFileContent); i++ {
+		pageFileContent[i] = value
+	}
+	return pageFileContent
+}
