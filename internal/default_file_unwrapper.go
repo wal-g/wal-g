@@ -14,11 +14,11 @@ type DefaultFileUnwrapper struct {
 
 func (u *DefaultFileUnwrapper) UnwrapNewFile(reader io.Reader, header *tar.Header, file *os.File) error {
 	if u.options.isIncremented {
-		fileInfo, err := file.Stat()
+		targetReadWriterAt, err := NewReadWriterAtFrom(file)
 		if err != nil {
 			return err
 		}
-		err = CreateFileFromIncrement(reader, NewReadWriterAtFrom(file, fileInfo))
+		err = CreateFileFromIncrement(reader, targetReadWriterAt)
 		return errors.Wrapf(err, "Interpret: failed to create file from increment '%s'", file.Name())
 	}
 
@@ -26,17 +26,17 @@ func (u *DefaultFileUnwrapper) UnwrapNewFile(reader io.Reader, header *tar.Heade
 }
 
 func (u *DefaultFileUnwrapper) UnwrapExistingFile(reader io.Reader, header *tar.Header, file *os.File) error {
-	fileInfo, err := file.Stat()
+	targetReadWriterAt, err := NewReadWriterAtFrom(file)
 	if err != nil {
 		return err
 	}
 	if u.options.isIncremented {
-		err := WritePagesFromIncrement(reader, NewReadWriterAtFrom(file, fileInfo), false)
+		err := WritePagesFromIncrement(reader, targetReadWriterAt, false)
 		return errors.Wrapf(err, "Interpret: failed to write increment to file '%s'", file.Name())
 	}
 
 	if u.options.isPageFile {
-		err := RestoreMissingPages(reader, NewReadWriterAtFrom(file, fileInfo))
+		err := RestoreMissingPages(reader, targetReadWriterAt)
 		return errors.Wrapf(err, "Interpret: failed to restore pages for file '%s'", file.Name())
 	}
 

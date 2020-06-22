@@ -21,9 +21,13 @@ type ReadWriterAt interface {
 	Name() string
 }
 
-func NewReadWriterAtFrom(file *os.File, info os.FileInfo) ReadWriterAt {
-	size := info.Size()
-	return &ReadWriterAtFileImpl{file, size}
+func NewReadWriterAtFrom(file *os.File) (ReadWriterAt, error) {
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	size := fileInfo.Size()
+	return &ReadWriterAtFileImpl{file, size}, nil
 }
 
 type ReadWriterAtFileImpl struct {

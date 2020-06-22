@@ -14,11 +14,11 @@ type CatchupFileUnwrapper struct {
 
 func (u *CatchupFileUnwrapper) UnwrapNewFile(reader io.Reader, header *tar.Header, file *os.File) error {
 	if u.options.isIncremented {
-		fileInfo, err := file.Stat()
+		targetReadWriterAt, err := NewReadWriterAtFrom(file)
 		if err != nil {
 			return err
 		}
-		err = CreateFileFromIncrement(reader, NewReadWriterAtFrom(file, fileInfo))
+		err = CreateFileFromIncrement(reader, targetReadWriterAt)
 		return errors.Wrapf(err, "Interpret: failed to create file from increment '%s'", file.Name())
 	}
 
@@ -27,11 +27,11 @@ func (u *CatchupFileUnwrapper) UnwrapNewFile(reader io.Reader, header *tar.Heade
 
 func (u *CatchupFileUnwrapper) UnwrapExistingFile(reader io.Reader, header *tar.Header, file *os.File) error {
 	if u.options.isIncremented {
-		fileInfo, err := file.Stat()
+		targetReadWriterAt, err := NewReadWriterAtFrom(file)
 		if err != nil {
 			return err
 		}
-		err = WritePagesFromIncrement(reader, NewReadWriterAtFrom(file, fileInfo), true)
+		err = WritePagesFromIncrement(reader, targetReadWriterAt, true)
 		return errors.Wrapf(err, "Interpret: failed to write increment to file '%s'", file.Name())
 	}
 
