@@ -7,7 +7,6 @@ package internal
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 	"io"
@@ -18,8 +17,22 @@ import (
 type ReadWriterAt interface {
 	io.ReaderAt
 	io.WriterAt
-	Stat() (os.FileInfo, error)
+	Size() int64
 	Name() string
+}
+
+func NewReadWriterAtFrom(file *os.File, info os.FileInfo) ReadWriterAt {
+	size := info.Size()
+	return &ReadWriterAtFileImpl{file, size}
+}
+
+type ReadWriterAtFileImpl struct {
+	*os.File
+	size int64
+}
+
+func (rw *ReadWriterAtFileImpl) Size() int64 {
+	return rw.size
 }
 
 // RestoreMissingPages restores missing pages (zero blocks)
@@ -27,12 +40,9 @@ type ReadWriterAt interface {
 func RestoreMissingPages(base io.Reader, target ReadWriterAt) error {
 	tracelog.DebugLogger.Printf("Restoring missing pages from base backup: %s\n", target.Name())
 
-	targetPageCount, err := getPageCount(target)
-	if err != nil {
-		return err
-	}
+	targetPageCount := target.Size() / DatabasePageSize
 	for i := int64(0); i < targetPageCount; i++ {
-		err = writePage(target, i, base, false)
+		err := writePage(target, i, base, false)
 		if err == io.EOF {
 			break
 		}
@@ -94,11 +104,7 @@ func WritePagesFromIncrement(increment io.Reader, target ReadWriterAt, overwrite
 	if err != nil {
 		return err
 	}
-	targetPageCount, err := getPageCount(target)
-	if err != nil {
-		return err
-	}
-
+	targetPageCount := target.Size() / DatabasePageSize
 	for i := uint32(0); i < diffBlockCount; i++ {
 		blockNo := int64(binary.LittleEndian.Uint32(diffMap[i*sizeofInt32 : (i+1)*sizeofInt32]))
 		if blockNo >= targetPageCount {
@@ -160,14 +166,6 @@ func checkIfMissingPage(target ReadWriterAt, blockNo int64) (bool, error) {
 func isTarReaderEmpty(reader io.Reader) bool {
 	all, _ := reader.Read(make([]byte, 1))
 	return all == 0
-}
-
-func getPageCount(target ReadWriterAt) (int64, error) {
-	targetFileInfo, err := target.Stat()
-	if err != nil {
-		return 0, errors.Wrap(err, "error getting fileInfo")
-	}
-	return targetFileInfo.Size() / DatabasePageSize, nil
 }
 
 func getIncrementHeaderFields(increment io.Reader) (uint64, uint32, []byte, error) {
