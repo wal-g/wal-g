@@ -12,34 +12,48 @@ type DefaultFileUnwrapper struct {
 	BackupFileUnwrapper
 }
 
-func (u *DefaultFileUnwrapper) UnwrapNewFile(reader io.Reader, header *tar.Header, file *os.File) error {
+func (u *DefaultFileUnwrapper) UnwrapNewFile(reader io.Reader, header *tar.Header,
+	file *os.File) (*FileUnwrapResult, error) {
 	if u.options.isIncremented {
 		targetReadWriterAt, err := NewReadWriterAtFrom(file)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		err = CreateFileFromIncrement(reader, targetReadWriterAt)
-		return errors.Wrapf(err, "Interpret: failed to create file from increment '%s'", file.Name())
+		missingBlockCount, err := CreateFileFromIncrement(reader, targetReadWriterAt)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Interpret: failed to create file from increment '%s'", file.Name())
+		}
+		return NewCreatedFromIncrementResult(missingBlockCount), nil
 	}
-
-	return u.writeLocalFile(reader, header, file)
+	err := u.writeLocalFile(reader, header, file)
+	if err != nil {
+		return nil, err
+	}
+	return NewCompletedResult(), nil
 }
 
-func (u *DefaultFileUnwrapper) UnwrapExistingFile(reader io.Reader, header *tar.Header, file *os.File) error {
+func (u *DefaultFileUnwrapper) UnwrapExistingFile(reader io.Reader, header *tar.Header,
+	file *os.File) (*FileUnwrapResult, error) {
 	targetReadWriterAt, err := NewReadWriterAtFrom(file)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if u.options.isIncremented {
-		err := WritePagesFromIncrement(reader, targetReadWriterAt, false)
-		return errors.Wrapf(err, "Interpret: failed to write increment to file '%s'", file.Name())
+		restoredBlockCount, err := WritePagesFromIncrement(reader, targetReadWriterAt, false)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Interpret: failed to write increment to file '%s'", file.Name())
+		}
+		return NewWroteIncrementBlocksResult(restoredBlockCount), nil
 	}
 
 	if u.options.isPageFile {
 		err := RestoreMissingPages(reader, targetReadWriterAt)
-		return errors.Wrapf(err, "Interpret: failed to restore pages for file '%s'", file.Name())
+		if err != nil {
+			return nil, errors.Wrapf(err, "Interpret: failed to restore pages for file '%s'", file.Name())
+		}
+		return NewCompletedResult(), nil
 	}
 
 	// skip the non-page file because newer version is already on the disk
-	return nil
+	return NewSkippedResult(), nil
 }

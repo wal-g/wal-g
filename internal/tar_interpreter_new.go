@@ -26,10 +26,18 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFileNew(fileReader io.Rea
 	}
 	defer localFile.Sync()
 	defer utility.LoggedClose(localFile, "")
+	var unwrapResult *FileUnwrapResult
+	var unwrapError error
 	if isNewFile {
-		return fileUnwrapper.UnwrapNewFile(fileReader, header, localFile)
+		unwrapResult, unwrapError = fileUnwrapper.UnwrapNewFile(fileReader, header, localFile)
+	} else {
+		unwrapResult, unwrapError = fileUnwrapper.UnwrapExistingFile(fileReader, header, localFile)
 	}
-	return fileUnwrapper.UnwrapExistingFile(fileReader, header, localFile)
+	if unwrapError != nil {
+		return unwrapError
+	}
+	tarInterpreter.applyFileUnwrapResult(unwrapResult, header.Name)
+	return nil
 }
 
 // get local file, create new if not existed
@@ -84,4 +92,35 @@ func createLocalFile(targetPath, name string) (*os.File, error) {
 		return nil, errors.Wrapf(err, "failed to create new file: '%s'", targetPath)
 	}
 	return file, nil
+}
+
+func (tarInterpreter *FileTarInterpreter) applyFileUnwrapResult(result *FileUnwrapResult, fileName string) {
+	switch result.FileUnwrapResultType {
+	case Skipped:
+		return
+	case Completed:
+		tarInterpreter.addToCompletedFiles(fileName)
+	case CreatedFromIncrement:
+		tarInterpreter.addToCreatedPageFiles(fileName, result.blockCount)
+	case WroteIncrementBlocks:
+		tarInterpreter.addToWrittenIncrementFiles(fileName, result.blockCount)
+	}
+}
+
+func (tarInterpreter *FileTarInterpreter) addToCompletedFiles(fileName string) {
+	tarInterpreter.mutex.Lock()
+	tarInterpreter.CompletedFiles = append(tarInterpreter.CompletedFiles, fileName)
+	tarInterpreter.mutex.Unlock()
+}
+
+func (tarInterpreter *FileTarInterpreter) addToCreatedPageFiles(fileName string, blocksToRestoreCount int64) {
+	tarInterpreter.mutex.Lock()
+	tarInterpreter.CreatedPageFiles[fileName] = blocksToRestoreCount
+	tarInterpreter.mutex.Unlock()
+}
+
+func (tarInterpreter *FileTarInterpreter) addToWrittenIncrementFiles(fileName string, writtenBlocksCount int64) {
+	tarInterpreter.mutex.Lock()
+	tarInterpreter.WrittenIncrementFiles[fileName] = writtenBlocksCount
+	tarInterpreter.mutex.Unlock()
 }

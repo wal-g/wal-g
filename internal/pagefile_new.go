@@ -46,7 +46,7 @@ func RestoreMissingPages(base io.Reader, target ReadWriterAt) error {
 
 	targetPageCount := target.Size() / DatabasePageSize
 	for i := int64(0); i < targetPageCount; i++ {
-		err := writePage(target, i, base, false)
+		_, err := writePage(target, i, base, false)
 		if err == io.EOF {
 			break
 		}
@@ -64,12 +64,12 @@ func RestoreMissingPages(base io.Reader, target ReadWriterAt) error {
 
 // CreateFileFromIncrement writes the pages from the increment to local file
 // and write empty blocks in place of pages which are not present in the increment
-func CreateFileFromIncrement(increment io.Reader, target ReadWriterAt) error {
+func CreateFileFromIncrement(increment io.Reader, target ReadWriterAt) (int64, error) {
 	tracelog.DebugLogger.Printf("Creating from increment: %s\n", target.Name())
 
 	fileSize, diffBlockCount, diffMap, err := GetIncrementHeaderFields(increment)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// set represents all block numbers with non-empty pages
@@ -80,16 +80,18 @@ func CreateFileFromIncrement(increment io.Reader, target ReadWriterAt) error {
 	}
 	pageCount := int64(fileSize / uint64(DatabasePageSize))
 	emptyPage := make([]byte, DatabasePageSize)
+	missingBlockCount := pageCount
 	for i := int64(0); i < pageCount; i++ {
 		if deltaBlockNumbers[i] {
-			err = writePage(target, i, increment, true)
+			_, err = writePage(target, i, increment, true)
 			if err != nil {
-				return err
+				return 0, err
 			}
+			missingBlockCount -= 1
 		} else {
 			_, err = target.WriteAt(emptyPage, i*DatabasePageSize)
 			if err != nil {
-				return err
+				return 0, err
 			}
 		}
 	}
@@ -97,61 +99,65 @@ func CreateFileFromIncrement(increment io.Reader, target ReadWriterAt) error {
 	if isEmpty := isTarReaderEmpty(increment); !isEmpty {
 		tracelog.DebugLogger.Printf("Skipping extra increment blocks, target: %s\n", target.Name())
 	}
-	return nil
+	return missingBlockCount, nil
 }
 
 // WritePagesFromIncrement writes pages from delta backup according to diffMap
-func WritePagesFromIncrement(increment io.Reader, target ReadWriterAt, overwriteExisting bool) error {
+func WritePagesFromIncrement(increment io.Reader, target ReadWriterAt, overwriteExisting bool) (int64, error) {
 	tracelog.DebugLogger.Printf("Writing pages from increment: %s\n", target.Name())
 
 	_, diffBlockCount, diffMap, err := GetIncrementHeaderFields(increment)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	targetPageCount := target.Size() / DatabasePageSize
+	restoredBlockCount := int64(0)
 	for i := uint32(0); i < diffBlockCount; i++ {
 		blockNo := int64(binary.LittleEndian.Uint32(diffMap[i*sizeofInt32 : (i+1)*sizeofInt32]))
 		if blockNo >= targetPageCount {
 			_, err := io.CopyN(ioutil.Discard, increment, DatabasePageSize)
 			if err != nil {
-				return err
+				return 0, err
 			}
 			continue
 		}
-		err = writePage(target, blockNo, increment, overwriteExisting)
+		wrotePage, err := writePage(target, blockNo, increment, overwriteExisting)
 		if err != nil {
-			return err
+			return 0, err
+		}
+		if wrotePage {
+			restoredBlockCount++
 		}
 	}
 	// at this point, we should have empty increment reader
 	if isEmpty := isTarReaderEmpty(increment); !isEmpty {
-		return newUnexpectedTarDataError()
+		return 0, newUnexpectedTarDataError()
 	}
-	return nil
+	return restoredBlockCount, nil
 }
 
 // write page to local file
-func writePage(target ReadWriterAt, blockNo int64, content io.Reader, overwrite bool) error {
+func writePage(target ReadWriterAt, blockNo int64, content io.Reader, overwrite bool) (bool, error) {
 	page := make([]byte, DatabasePageSize)
 	_, err := io.ReadFull(content, page)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if !overwrite {
 		isMissingPage, err := checkIfMissingPage(target, blockNo)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if !isMissingPage {
-			return nil
+			return false, nil
 		}
 	}
 	_, err = target.WriteAt(page, blockNo*DatabasePageSize)
 	if err != nil {
-		return err
+		return false, err
 	}
-	return nil
+	return true, nil
 }
 
 // check if page is missing (block of zeros) in local file

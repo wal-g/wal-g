@@ -9,10 +9,18 @@ import (
 )
 
 type FileUnwrapperType int
+type FileUnwrapResultType int
 
 const (
 	DefaultBackupFileUnwrapper FileUnwrapperType = iota + 1
 	CatchupBackupFileUnwrapper
+)
+
+const (
+	Completed FileUnwrapResultType = iota + 1
+	CreatedFromIncrement
+	WroteIncrementBlocks
+	Skipped
 )
 
 func NewFileUnwrapper(unwrapperType FileUnwrapperType, options *BackupFileOptions) IBackupFileUnwrapper {
@@ -26,14 +34,35 @@ func NewFileUnwrapper(unwrapperType FileUnwrapperType, options *BackupFileOption
 	}
 }
 
+type FileUnwrapResult struct {
+	FileUnwrapResultType
+	blockCount int64
+}
+
+func NewCompletedResult() *FileUnwrapResult {
+	return &FileUnwrapResult{Completed, 0}
+}
+
+func NewCreatedFromIncrementResult(missingBlockCount int64) *FileUnwrapResult {
+	return &FileUnwrapResult{CreatedFromIncrement, missingBlockCount}
+}
+
+func NewWroteIncrementBlocksResult(restoredBlockCount int64) *FileUnwrapResult {
+	return &FileUnwrapResult{WroteIncrementBlocks, restoredBlockCount}
+}
+
+func NewSkippedResult() *FileUnwrapResult {
+	return &FileUnwrapResult{Skipped, 0}
+}
+
 type BackupFileOptions struct {
 	isIncremented bool
 	isPageFile    bool
 }
 
 type IBackupFileUnwrapper interface {
-	UnwrapNewFile(reader io.Reader, header *tar.Header, file *os.File) error
-	UnwrapExistingFile(reader io.Reader, header *tar.Header, file *os.File) error
+	UnwrapNewFile(reader io.Reader, header *tar.Header, file *os.File) (*FileUnwrapResult, error)
+	UnwrapExistingFile(reader io.Reader, header *tar.Header, file *os.File) (*FileUnwrapResult, error)
 }
 
 type BackupFileUnwrapper struct {
