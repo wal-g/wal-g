@@ -16,7 +16,7 @@ const (
 // TODO : unit tests
 // PushStream compresses a stream and push it
 func (uploader *Uploader) PushStream(stream io.Reader) (string, error) {
-	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format("20060102T150405Z")
+	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 	dstPath := getStreamName(backupName, uploader.Compressor.FileExtension())
 	err := uploader.PushStreamToDestination(stream, dstPath)
 
