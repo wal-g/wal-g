@@ -24,11 +24,15 @@ type FileTarBall struct {
 	tarWriter   *tar.Writer
 }
 
+func (tarBall *FileTarBall) Name() string {
+	return "part_"+fmt.Sprintf("%0.3d", tarBall.number)+".tar.lz4"
+}
+
 // SetUp creates a new LZ4 writer, tar writer and file for
 // writing bundled compressed bytes to.
 func (tarBall *FileTarBall) SetUp(crypter crypto.Crypter, names ...string) {
 	if tarBall.tarWriter == nil {
-		name := filepath.Join(tarBall.out, "part_"+fmt.Sprintf("%0.3d", tarBall.number)+".tar.lz4")
+		name := filepath.Join(tarBall.out, tarBall.Name())
 		file, err := os.Create(name)
 		if err != nil {
 			panic(err)
@@ -81,6 +85,10 @@ type BufferTarBall struct {
 	partSize   *int64
 	underlying *bytes.Buffer
 	tarWriter  *tar.Writer
+}
+
+func (tarBall *BufferTarBall) Name() string {
+	return "BufferTarBall"
 }
 
 func (tarBall *BufferTarBall) SetUp(crypter crypto.Crypter, args ...string) {
