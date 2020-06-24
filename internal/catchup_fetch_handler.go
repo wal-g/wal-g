@@ -21,7 +21,7 @@ func HandleCatchupFetch(folder storage.Folder, dbDirectory, backupName string, u
 
 	// testing the new unwrap implementation
 	if useNewUnwrap {
-		err = backup.unwrapNew(dbDirectory, sentinelDto, filesToUnwrap, true)
+		_, err = backup.unwrapNew(dbDirectory, sentinelDto, filesToUnwrap, true)
 	} else {
 		err = backup.unwrapOld(dbDirectory, sentinelDto, filesToUnwrap, true)
 	}

@@ -54,8 +54,7 @@ func deltaFetchRecursionNew(backupName string, folder storage.Folder, dbDataDire
 		if err != nil {
 			return err
 		}
-
-		err = backup.unwrapNew(dbDataDirectory, sentinelDto, filesToUnwrap, false)
+		unwrapResult, err := backup.unwrapNew(cfg.dbDataDirectory, sentinelDto, cfg.filesToUnwrap, false)
 		if err != nil {
 			return err
 		}
@@ -69,5 +68,6 @@ func deltaFetchRecursionNew(backupName string, folder storage.Folder, dbDataDire
 	}
 
 	tracelog.InfoLogger.Printf("%x reached. Applying base backup... \n", *(sentinelDto.BackupStartLSN))
-	return backup.unwrapNew(dbDataDirectory, sentinelDto, filesToUnwrap, false)
+	_, err = backup.unwrapNew(dbDataDirectory, sentinelDto, filesToUnwrap, false)
+	return err
 }

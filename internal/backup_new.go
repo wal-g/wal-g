@@ -10,6 +10,23 @@ import (
 // temporary flag is used in tar interpreter to determine if it should use new unwrap logic
 var useNewUnwrapImplementation = false
 
+// UnwrapResult stores information about
+// the result of single unwrap operation
+type UnwrapResult struct {
+	// completely restored files
+	completedFiles []string
+	// for each created page file
+	// store count of blocks left to restore
+	createdPageFiles map[string]int64
+	// for those page files to which the increment was applied
+	// store count of written increment blocks
+	writtenIncrementFiles map[string]int64
+}
+
+func newUnwrapResult(completedFiles []string, createdPageFiles, writtenIncrementFiles map[string]int64) *UnwrapResult {
+	return &UnwrapResult{completedFiles, createdPageFiles, writtenIncrementFiles}
+}
+
 func checkDbDirectoryForUnwrapNew(dbDataDirectory string, sentinelDto BackupSentinelDto) error {
 	tracelog.DebugLogger.Println("DB data directory before applying backup:")
 	_ = filepath.Walk(dbDataDirectory,
@@ -42,39 +59,41 @@ func checkDbDirectoryForUnwrapNew(dbDataDirectory string, sentinelDto BackupSent
 // TODO : unit tests
 // Do the job of unpacking Backup object
 func (backup *Backup) unwrapNew(
-	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
-) error {
+	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool,
+	createIncrementalFiles bool) (*UnwrapResult, error) {
 	useNewUnwrapImplementation = true
 	err := checkDbDirectoryForUnwrapNew(dbDataDirectory, sentinelDto)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
 	tarsToExtract, pgControlKey, err := backup.getTarsToExtract(sentinelDto, filesToUnwrap)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of backup.
 	needPgControl := IsPgControlRequired(backup, sentinelDto)
 
 	if pgControlKey == "" && needPgControl {
-		return newPgControlNotFoundError()
+		return nil, newPgControlNotFoundError()
 	}
 
 	err = ExtractAll(tarInterpreter, tarsToExtract)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if needPgControl {
 		err = ExtractAll(tarInterpreter, []ReaderMaker{newStorageReaderMaker(backup.getTarPartitionFolder(), pgControlKey)})
 		if err != nil {
-			return errors.Wrap(err, "failed to extract pg_control")
+			return nil, errors.Wrap(err, "failed to extract pg_control")
 		}
 	}
 
 	tracelog.InfoLogger.Print("\nBackup extraction complete.\n")
-	return nil
+	unwrapResult := newUnwrapResult(tarInterpreter.CompletedFiles, tarInterpreter.CreatedPageFiles,
+		tarInterpreter.WrittenIncrementFiles)
+	return unwrapResult, nil
 }
