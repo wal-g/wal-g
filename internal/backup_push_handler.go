@@ -90,6 +90,8 @@ func createAndPushBackup(
 	// Connect to postgres and start/finish a nonexclusive backup.
 	conn, err := Connect()
 	tracelog.ErrorLogger.FatalOnError(err)
+	err = bundle.CollectStatistics(conn)
+	tracelog.WarningLogger.PrintOnError(err)
 	backupName, backupStartLSN, pgVersion, dataDir, systemIdentifier, err := bundle.StartBackup(conn,
 		utility.CeilTimeUpToMicroseconds(time.Now()).String())
 	meta.DataDir = dataDir

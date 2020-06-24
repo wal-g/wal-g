@@ -3,6 +3,7 @@ package internal
 import (
 	"archive/tar"
 	"fmt"
+	"github.com/wal-g/wal-g/internal/walparser"
 	"io"
 	"os"
 	"path/filepath"
@@ -33,6 +34,18 @@ const (
 
 type TarSizeError struct {
 	error
+}
+
+type PgDatabaseInfo struct {
+	name      string
+	oid       walparser.Oid
+	tblSpcOid walparser.Oid
+}
+
+type PgStatRow struct {
+	nTupleInserted uint64
+	nTupleUpdated  uint64
+	nTupleDeleted  uint64
 }
 
 func newTarSizeError(packedFileSize, expectedSize int64) TarSizeError {
@@ -78,6 +91,7 @@ type Bundle struct {
 	IncrementFromFiles BackupFileList
 	DeltaMap           PagedFileDeltaMap
 	TablespaceSpec     TablespaceSpec
+	TableStatistics    map[walparser.RelFileNode]PgStatRow
 
 	tarballQueue     chan TarBall
 	uploadQueue      chan TarBall
@@ -337,7 +351,48 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 	return nil
 }
 
-// TODO : unit tests
+// CollectStatistics collects statistics for each relFileNode
+func (bundle *Bundle) CollectStatistics(conn *pgx.Conn) error {
+	databases, err := getDatabaseInfos(conn)
+	if err != nil {
+		return errors.Wrap(err, "CollectStatistics: Failed to get db names.")
+	}
+
+	result := make(map[walparser.RelFileNode]PgStatRow)
+	for _, db := range databases {
+		databaseOption := func (c *pgx.ConnConfig) error {
+			c.Database = db.name
+			return nil
+		}
+		dbConn, err := Connect(databaseOption)
+		if err != nil {
+			tracelog.WarningLogger.Printf("Failed to collect statistics for database: %s\n'%v'\n", db.name, err)
+			continue
+		}
+
+		queryRunner, err := newPgQueryRunner(dbConn)
+		if err != nil {
+			return errors.Wrap(err, "CollectStatistics: Failed to build query runner.")
+		}
+		pgStatRows, err := queryRunner.getStatistics(&db)
+		if err != nil {
+			return errors.Wrap(err, "CollectStatistics: Failed to collect statistics.")
+		}
+		for relFileNode, statRow:= range pgStatRows {
+			result[relFileNode] = statRow
+		}
+	}
+	bundle.TableStatistics = result
+	return nil
+}
+
+func getDatabaseInfos(conn *pgx.Conn) ([]PgDatabaseInfo, error) {
+	queryRunner, err := newPgQueryRunner(conn)
+	if err != nil {
+		return nil, errors.Wrap(err, "getDatabaseInfos: Failed to build query runner.")
+	}
+	return queryRunner.getDatabaseInfos()
+}// TODO : unit tests
 // handleTar creates underlying tar writer and handles one given file.
 // Does not follow symlinks (it seems like it does). If file is in ExcludedFilenames, will not be included
 // in the final tarball. EXCLUDED directories are created

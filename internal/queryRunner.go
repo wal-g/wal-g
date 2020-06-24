@@ -2,6 +2,8 @@ package internal
 
 import (
 	"fmt"
+	"github.com/wal-g/wal-g/internal/walparser"
+	"log"
 
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
@@ -39,6 +41,8 @@ type QueryRunner interface {
 	StartBackup(backup string) (string, string, bool, error)
 	// Inform database that contents are copied, get information on backup
 	StopBackup() (string, string, string, error)
+	// get pg_stat_all_all_tables data
+	GetStatistics()
 }
 
 // PgQueryRunner is implementation for controlling PostgreSQL 9.0+
@@ -169,4 +173,104 @@ func (queryRunner *PgQueryRunner) stopBackup() (label string, offsetMap string, 
 	}
 
 	return label, offsetMap, lsnStr, nil
+}
+
+// todo desc
+func (queryRunner *PgQueryRunner) BuildStatisticsQuery() (string, error) {
+	switch {
+	case queryRunner.Version >= 90000:
+		return "SELECT c.relfilenode, c.reltablespace, s.n_tup_ins, s.n_tup_upd, s.n_tup_del " +
+			"FROM pg_class c LEFT OUTER JOIN pg_stat_all_tables s ON c.oid = s.relid " +
+			"WHERE relfilenode != 0 AND n_tup_ins IS NOT NULL", nil
+	case queryRunner.Version == 0:
+		return "", newNoPostgresVersionError()
+	default:
+		return "", newUnsupportedPostgresVersionError(queryRunner.Version)
+	}
+}
+
+// todo desc
+func (queryRunner *PgQueryRunner) getStatistics(dbInfo *PgDatabaseInfo) (map[walparser.RelFileNode]PgStatRow, error) {
+	tracelog.InfoLogger.Println("Querying pg_stat_all_tables")
+	getStatQuery, err := queryRunner.BuildStatisticsQuery()
+	conn := queryRunner.connection
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetStatistics: Building get statistics query failed")
+	}
+
+	rows, err := conn.Query(getStatQuery)
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetStatistics: pg_stat_all_tables query failed")
+	}
+
+	defer rows.Close()
+	pgStatRows := make(map[walparser.RelFileNode]PgStatRow)
+	for rows.Next() {
+		var statRow PgStatRow
+		var relFileNodeId uint32
+		var spcNode uint32
+		if err := rows.Scan(&relFileNodeId, &spcNode, &statRow.nTupleInserted, &statRow.nTupleUpdated,
+			&statRow.nTupleDeleted); err != nil {
+			log.Println(err.Error())
+		}
+		relFileNode := walparser.RelFileNode{DBNode: dbInfo.oid,
+			RelNode: walparser.Oid(relFileNodeId), SpcNode: walparser.Oid(spcNode)}
+		// if tablespace id is zero, use the default database tablespace id
+		if relFileNode.SpcNode == walparser.Oid(0) {
+			relFileNode.SpcNode = dbInfo.tblSpcOid
+		}
+		pgStatRows[relFileNode] = statRow
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	return pgStatRows, nil
+}
+
+func (queryRunner *PgQueryRunner) BuildGetDatabasesQuery() (string, error) {
+	switch {
+	case queryRunner.Version >= 90000:
+		return "SELECT oid, datname, dattablespace FROM pg_database WHERE datallowconn", nil
+	case queryRunner.Version == 0:
+		return "", newNoPostgresVersionError()
+	default:
+		return "", newUnsupportedPostgresVersionError(queryRunner.Version)
+	}
+}
+
+// todo desc
+func (queryRunner *PgQueryRunner) getDatabaseInfos() ([]PgDatabaseInfo, error) {
+	tracelog.InfoLogger.Println("Querying pg_database")
+	getDbInfoQuery, err := queryRunner.BuildGetDatabasesQuery()
+	conn := queryRunner.connection
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetDatabases: Building db names query failed")
+	}
+
+	rows, err := conn.Query(getDbInfoQuery)
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetDatabases: pg_database query failed")
+	}
+
+	defer rows.Close()
+	databases := make([]PgDatabaseInfo, 0)
+	for rows.Next() {
+		dbInfo := PgDatabaseInfo{}
+		var dbOid uint32
+		var dbTblSpcOid uint32
+		if err := rows.Scan(&dbOid, &dbInfo.name, &dbTblSpcOid); err != nil {
+			log.Println(err.Error())
+		}
+		dbInfo.oid = walparser.Oid(dbOid)
+		dbInfo.tblSpcOid = walparser.Oid(dbTblSpcOid)
+		databases = append(databases, dbInfo)
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	return databases, nil
 }
