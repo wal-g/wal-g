@@ -120,7 +120,7 @@ func (bundle *Bundle) prefaultHandleTar(path string, info os.FileInfo) error {
 
 	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
 	if err != nil {
-		return errors.Wrap(err, "handleTar: could not grab header info")
+		return errors.Wrap(err, "addToBundle: could not grab header info")
 	}
 
 	fileInfoHeader.Name = bundle.getFileRelPath(path)
