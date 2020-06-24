@@ -339,6 +339,8 @@ func TestWalk(t *testing.T) {
 		AllTarballsSize: new(int64),
 		Files:            &sync.Map{},
 		TablespaceSpec:   internal.NewTablespaceSpec(data),
+		TarBallComposer:    internal.NewTarBallComposer(
+			make(map[string]internal.BackupFileDescription)),
 	}
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
 	size := int64(0)
@@ -357,6 +359,7 @@ func TestWalk(t *testing.T) {
 	if err != nil {
 		t.Log(err)
 	}
+	bundle.PackTarballs()
 
 	err = bundle.FinishQueue()
 	if err != nil {
