@@ -36,6 +36,7 @@ const (
 	CatchupPath      = "catchup_" + VersionStr + "/"
 	WalPath          = "wal_" + VersionStr + "/"
 	BackupNamePrefix = "base_"
+	BackupTimeFormat = "20060102T150405Z"
 
 	// utility.SentinelSuffix is a suffix of backup finish sentinel file
 	SentinelSuffix         = "_backup_stop_sentinel.json"

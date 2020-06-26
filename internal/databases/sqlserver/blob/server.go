@@ -17,6 +17,8 @@ import (
 	"time"
 )
 
+const ProxyStartTimeout = 10 * time.Second
+
 type Server struct {
 	sync.Mutex
 	folder   storage.Folder
@@ -40,11 +42,11 @@ func NewServer(folder storage.Folder) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	endpoint, ok := internal.GetSetting(internal.SQLServerBlobEndpoint)
-	if !ok {
-		endpoint = "localhost:442"
+	hostname, err := internal.GetRequiredSetting(internal.SQLServerBlobHostname)
+	if err != nil {
+		return nil, err
 	}
-	bs.endpoint = endpoint
+	bs.endpoint = fmt.Sprintf("%s:%d", hostname, 443)
 	bs.server = http.Server{Addr: bs.endpoint, Handler: bs}
 	bs.indexes = make(map[string]*Index)
 	bs.leases = make(map[string]*Lease)
@@ -54,16 +56,58 @@ func NewServer(folder storage.Folder) (*Server, error) {
 func (bs *Server) Run(ctx context.Context) error {
 	errs := make(chan error)
 	go func() {
+		tracelog.InfoLogger.Printf("running proxy at %s", bs.endpoint)
 		errs <- bs.server.ListenAndServeTLS(bs.certFile, bs.keyFile)
 	}()
 	select {
 	case <-ctx.Done():
-		sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-        defer cancel()
-		return bs.server.Shutdown(sctx)
+		return bs.Shutdown()
 	case err := <-errs:
 		return err
 	}
+}
+
+func (bs *Server) RunBackground(ctx context.Context, cancel context.CancelFunc) error {
+	go func() {
+		err := bs.Run(ctx)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("proxy error: %v", err)
+			if cancel != nil {
+				cancel()
+			}
+		}
+	}()
+	return bs.WaitReady(ctx, ProxyStartTimeout)
+}
+
+func (bs *Server) WaitReady(ctx context.Context, timeout time.Duration) error {
+	sctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	url := fmt.Sprintf("https://%s/", bs.endpoint)
+	c := http.Client{Timeout: 100 * time.Millisecond}
+	t := time.NewTicker(200 * time.Millisecond)
+	for {
+		select {
+		case <-t.C:
+			resp, _ := c.Head(url)
+			if resp != nil {
+				return nil
+			}
+		case <-sctx.Done():
+			return fmt.Errorf("proxy not ready in %s", timeout)
+		}
+	}
+}
+
+func (bs *Server) Shutdown() error {
+	tracelog.InfoLogger.Printf("stopping proxy")
+	sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := bs.server.Shutdown(sctx)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("proxy shutdown error: %v", err)
+	}
+	return err
 }
 
 func (bs *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {

@@ -69,10 +69,11 @@ const (
 	HttpExposePprof  = "HTTP_EXPOSE_PPROF"
 	HttpExposeExpVar = "HTTP_EXPOSE_EXPVAR"
 
-	SQLServerBlobEndpoint = "SQLSERVER_BLOB_ENDPOINT"
-	SQLServerBlobCertFile = "SQLSERVER_BLOB_CERT_FILE"
-	SQLServerBlobKeyFile  = "SQLSERVER_BLOB_KEY_FILE"
-	SQLServerBlobDebug    = "SQLSERVER_BLOB_DEBUG"
+	SQLServerBlobHostname     = "SQLSERVER_BLOB_HOSTNAME"
+	SQLServerBlobCertFile     = "SQLSERVER_BLOB_CERT_FILE"
+	SQLServerBlobKeyFile      = "SQLSERVER_BLOB_KEY_FILE"
+	SQLServerBlobDebug        = "SQLSERVER_BLOB_DEBUG"
+	SQLServerConnectionString = "SQLSERVER_CONNECTION_STRING"
 )
 
 var (
@@ -198,10 +199,11 @@ var (
 		HttpExposeExpVar: true,
 
 		// SQLServer
-		SQLServerBlobEndpoint: true,
-		SQLServerBlobCertFile: true,
-		SQLServerBlobKeyFile:  true,
-		SQLServerBlobDebug:    true,
+		SQLServerBlobHostname:     true,
+		SQLServerBlobCertFile:     true,
+		SQLServerBlobKeyFile:      true,
+		SQLServerBlobDebug:        true,
+		SQLServerConnectionString: true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
