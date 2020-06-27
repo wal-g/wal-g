@@ -71,3 +71,13 @@ func EnablePprofEndpoints(ws WebServer) {
 func EnableExpVarEndpoints(ws WebServer) {
 	ws.HandleFunc("/debug/vars", expvar.Handler().ServeHTTP)
 }
+
+// SetDefaultWebServer sets default server instance
+// is not thread-safe
+func SetDefaultWebServer(ws WebServer) error {
+	if DefaultWebServer != nil {
+		return fmt.Errorf("default web server has been already configured")
+	}
+	DefaultWebServer = ws
+	return nil
+}

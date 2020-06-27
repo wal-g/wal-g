@@ -394,6 +394,15 @@ func GetLastWriteUpdateInterval() (time.Duration, error) {
 	return time.Duration(interval) * time.Second, nil
 }
 
+func GetDurationSetting(setting string) (time.Duration, error) {
+	intervalStr, _ := GetSetting(setting)
+	interval, err := strconv.Atoi(intervalStr)
+	if err != nil {
+		return 0, fmt.Errorf("integer(seconds) expected for %s setting but given '%s': %w", setting, intervalStr, err)
+	}
+	return time.Duration(interval) * time.Second, nil
+}
+
 func GetRequiredSetting(setting string) (string, error) {
 	val, ok := GetSetting(setting)
 	if !ok {
