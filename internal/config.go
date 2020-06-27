@@ -56,6 +56,10 @@ const (
 	MongoDBLastWriteUpdateSeconds = "MONGODB_LAST_WRITE_UPDATE_SECONDS"
 	OplogArchiveAfterSize         = "OPLOG_ARCHIVE_AFTER_SIZE"
 	OplogArchiveTimeoutSetting    = "OPLOG_ARCHIVE_TIMEOUT"
+	OplogPushStatsEnabled         = "OPLOG_PUSH_STATS_ENABLED"
+	OplogPushStatsLoggingInterval = "OPLOG_PUSH_STATS_LOGGING_INTERVAL"
+	OplogPushStatsUpdateInterval  = "OPLOG_PUSH_STATS_UPDATE_INTERVAL"
+	OplogPushStatsExposeHttp      = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
 
 	MysqlDatasourceNameSetting = "WALG_MYSQL_DATASOURCE_NAME"
 	MysqlSslCaSetting          = "WALG_MYSQL_SSL_CA"
@@ -94,6 +98,8 @@ var (
 		OplogArchiveTimeoutSetting:    "60",
 		OplogArchiveAfterSize:         "16777216", // 32 << (10 * 2)
 		MongoDBLastWriteUpdateSeconds: "3",
+		OplogPushStatsLoggingInterval: "30",
+		OplogPushStatsUpdateInterval:  "30",
 	}
 
 	AllowedSettings = map[string]bool{
@@ -183,6 +189,10 @@ var (
 		MongoDBLastWriteUpdateSeconds: true,
 		OplogArchiveTimeoutSetting:    true,
 		OplogArchiveAfterSize:         true,
+		OplogPushStatsEnabled:         true,
+		OplogPushStatsLoggingInterval: true,
+		OplogPushStatsUpdateInterval:  true,
+		OplogPushStatsExposeHttp:      true,
 
 		// MySQL
 		MysqlDatasourceNameSetting: true,
@@ -209,8 +219,9 @@ var (
 
 	RequiredSettings       = make(map[string]bool)
 	HttpSettingExposeFuncs = map[string]func(webserver.WebServer){
-		HttpExposePprof:  webserver.EnablePprofEndpoints,
-		HttpExposeExpVar: webserver.EnableExpVarEndpoints,
+		HttpExposePprof:          webserver.EnablePprofEndpoints,
+		HttpExposeExpVar:         webserver.EnableExpVarEndpoints,
+		OplogPushStatsExposeHttp: nil,
 	}
 )
 
@@ -274,16 +285,20 @@ func Configure() {
 	}
 }
 
-// ConfigureWebServer configures and runs web server
-func ConfigureAndRunWebServer(ws webserver.WebServer) error {
+// ConfigureAndRunDefaultWebServer configures and runs web server
+func ConfigureAndRunDefaultWebServer() error {
+	var ws webserver.WebServer
 	httpListenAddr, httpListen := GetSetting(HttpListen)
 	if httpListen {
 		ws = webserver.NewSimpleWebServer(httpListenAddr)
 		if err := ws.Serve(); err != nil {
 			return err
 		}
+		if err := webserver.SetDefaultWebServer(ws); err != nil {
+			return err
+		}
 	}
-	for setting, enableFunc := range HttpSettingExposeFuncs {
+	for setting, registerFunc := range HttpSettingExposeFuncs {
 		enabled, err := GetBoolSetting(setting, false)
 		if err != nil {
 			return err
@@ -294,7 +309,10 @@ func ConfigureAndRunWebServer(ws webserver.WebServer) error {
 		if !httpListen {
 			return fmt.Errorf("%s failed: %s is not set", setting, HttpListen)
 		}
-		enableFunc(ws)
+		if registerFunc == nil {
+			continue
+		}
+		registerFunc(ws)
 	}
 	return nil
 }

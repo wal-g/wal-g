@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/webserver"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 )
@@ -18,7 +16,6 @@ var DBShortDescription = "MongoDB backup tool"
 var WalgVersion = "devel"
 var GitRevision = "devel"
 var BuildDate = "devel"
-var webServer webserver.WebServer
 
 var Cmd = &cobra.Command{
 	Use:     "wal-g",
@@ -27,7 +24,7 @@ var Cmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
-		err = internal.ConfigureAndRunWebServer(webserver.DefaultWebServer)
+		err = internal.ConfigureAndRunDefaultWebServer()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

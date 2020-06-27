@@ -11,6 +11,8 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
+	"github.com/wal-g/wal-g/internal/databases/mongo/stats"
+	"github.com/wal-g/wal-g/internal/webserver"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/spf13/cobra"
@@ -57,6 +59,35 @@ var oplogPushCmd = &cobra.Command{
 		}
 		tracelog.InfoLogger.Printf("Archiving last known timestamp is %s", since)
 
+		var uploadStatsUpdater stats.OplogUploadStatsUpdater
+
+		oplogPushStatsEnabled, err := internal.GetBoolSetting(internal.OplogPushStatsEnabled, false)
+		tracelog.ErrorLogger.FatalOnError(err)
+		if oplogPushStatsEnabled {
+			statsUpdateInterval, err := internal.GetDurationSetting(internal.OplogPushStatsUpdateInterval)
+			tracelog.ErrorLogger.FatalOnError(err)
+
+			var opts []stats.OplogPushStatsOption
+
+			statsLogInterval, err := internal.GetDurationSetting(internal.OplogPushStatsLoggingInterval)
+			tracelog.ErrorLogger.FatalOnError(err)
+			if statsLogInterval > 0 {
+				opts = append(opts, stats.EnableLogReport(statsLogInterval, tracelog.InfoLogger.Printf))
+			}
+
+			exposeHttp, err := internal.GetBoolSetting(internal.OplogPushStatsExposeHttp, false)
+			tracelog.ErrorLogger.FatalOnError(err)
+			if exposeHttp {
+				opts = append(opts, stats.EnableHTTPHandler(stats.DefaultOplogPushStatsPrefix, webserver.DefaultWebServer))
+			}
+
+			uploadStats := stats.NewOplogUploadStats(since)
+			uploadStatsUpdater = uploadStats
+			archivingStats := stats.NewOplogPushStats(ctx, uploadStats, mongoClient, opts...)
+			tracelog.ErrorLogger.FatalOnError(archivingStats.Update())
+			go stats.RefreshWithInterval(ctx, statsUpdateInterval, archivingStats, tracelog.WarningLogger.Printf)
+		}
+
 		/* File buffer is useful for debugging:
 		fileBatchBuffer, err := stages.NewFileBuffer("/run/wal-g-oplog-push")
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -66,7 +97,7 @@ var oplogPushCmd = &cobra.Command{
 		memoryBatchBuffer := stages.NewMemoryBuffer()
 		defer tracelog.ErrorLogger.FatalOnError(memoryBatchBuffer.Close())
 		// set up storage archiver
-		oplogApplier := stages.NewStorageApplier(uploader, memoryBatchBuffer, archiveAfterSize, archiveTimeout)
+		oplogApplier := stages.NewStorageApplier(uploader, memoryBatchBuffer, archiveAfterSize, archiveTimeout, uploadStatsUpdater)
 
 		lwUpdate, err := internal.GetLastWriteUpdateInterval()
 		tracelog.ErrorLogger.FatalOnError(err)

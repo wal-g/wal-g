@@ -79,7 +79,7 @@ func BenchmarkHandleOplogPush(b *testing.B) {
 				uploader := archive.NewDiscardUploader(tc.compression, tc.readerFrom)
 
 				membuf := stages.NewMemoryBuffer()
-				applier := stages.NewStorageApplier(uploader, membuf, tc.archiveAfterSize, tc.archiveAfterTime)
+				applier := stages.NewStorageApplier(uploader, membuf, tc.archiveAfterSize, tc.archiveAfterTime, nil)
 
 				err := HandleOplogPush(context.TODO(), tc.since, fetcher, applier)
 
