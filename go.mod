@@ -47,6 +47,7 @@ require (
 	github.com/pierrec/lz4 v0.0.0-20170519170625-5a3d2245f97f
 	github.com/pierrec/xxHash v0.1.5 // indirect
 	github.com/pkg/errors v0.9.1
+	github.com/pkg/sftp v1.11.0 // indirect
 	github.com/shopspring/decimal v0.0.0-20200105144653-96defcb63c04 // indirect
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cobra v0.0.5
@@ -55,7 +56,7 @@ require (
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.5.1
 	github.com/ulikunitz/xz v0.5.6
-	github.com/wal-g/storages v0.0.0-20200511083259-4a94923055a1
+	github.com/wal-g/storages v0.0.0-20200628153629-eb00c571f96a
 	github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
 	github.com/xdg/stringprep v1.0.1-0.20180714160509-73f8eece6fdc // indirect
