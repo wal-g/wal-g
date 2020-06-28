@@ -60,6 +60,34 @@ func (_m *Downloader) DownloadOplogArchive(arch models.Archive, writeCloser io.W
 	return r0
 }
 
+// LastKnownArchiveTS provides a mock function with given fields:
+func (_m *Downloader) LastKnownArchiveTS() (models.Timestamp, error) {
+	ret := _m.Called()
+
+	if len(ret) == 1 {
+		rf, ok := ret.Get(0).(func() (models.Timestamp, error))
+		if ok {
+			return rf()
+		}
+	}
+
+	var r0 models.Timestamp
+	if rf, ok := ret.Get(0).(func() models.Timestamp); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(models.Timestamp)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListBackupNames provides a mock function with given fields:
 func (_m *Downloader) ListBackupNames() ([]internal.BackupTime, error) {
 	ret := _m.Called()

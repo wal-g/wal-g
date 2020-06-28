@@ -8,7 +8,6 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 )
 
@@ -65,38 +64,6 @@ func SequenceBetweenTS(archives []models.Archive, since, until models.Timestamp)
 		return nil, fmt.Errorf("previous archive in sequence with last ts '%s' does not exist", ts)
 	}
 	return nil, fmt.Errorf("cycles in archive sequence detected")
-}
-
-// ArchivingResumeTS returns archiving Start timestamp
-func ArchivingResumeTS(folder storage.Folder) (models.Timestamp, bool, error) {
-	lastKnownTS, err := LastKnownArchiveTS(folder)
-	if err != nil {
-		return models.Timestamp{}, false, err
-	}
-	zeroTS := models.Timestamp{}
-	if lastKnownTS == zeroTS {
-		// TODO: add additional check
-		return zeroTS, true, nil
-	}
-	return lastKnownTS, false, nil
-}
-
-// LastKnownArchiveTS returns the most recent existed timestamp in storage folder
-func LastKnownArchiveTS(folder storage.Folder) (models.Timestamp, error) {
-	maxTS := models.Timestamp{}
-	keys, _, err := folder.ListFolder()
-	if err != nil {
-		return models.Timestamp{}, fmt.Errorf("can not fetch keys since storage folder: %w ", err)
-	}
-	for _, key := range keys {
-		filename := key.GetName()
-		arch, err := models.ArchFromFilename(filename)
-		if err != nil {
-			return models.Timestamp{}, fmt.Errorf("can not build archive since filename '%s': %w", filename, err)
-		}
-		maxTS = models.MaxTS(maxTS, arch.End)
-	}
-	return maxTS, nil
 }
 
 // BackupNamesFromBackupTimes forms list of backup names from BackupTime

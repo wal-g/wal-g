@@ -9,6 +9,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
+	"github.com/wal-g/wal-g/internal/databases/mongo/discovery"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stats"
@@ -50,43 +51,16 @@ var oplogPushCmd = &cobra.Command{
 		err = mongoClient.EnsureIsMaster(ctx)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		// discover last archived timestamp
-		since, initial, err := archive.ArchivingResumeTS(uplProvider.UploadingFolder)
-		if initial {
-			tracelog.InfoLogger.Printf("Initiating archiving first run")
-			_, since, err = mongoClient.LastWriteTS(ctx)
-			tracelog.ErrorLogger.FatalOnError(err)
-		}
-		tracelog.InfoLogger.Printf("Archiving last known timestamp is %s", since)
-
-		var uploadStatsUpdater stats.OplogUploadStatsUpdater
-
-		oplogPushStatsEnabled, err := internal.GetBoolSetting(internal.OplogPushStatsEnabled, false)
+		// Lookup for last timestamp archived to storage (set up storage downloader client)
+		downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
 		tracelog.ErrorLogger.FatalOnError(err)
-		if oplogPushStatsEnabled {
-			statsUpdateInterval, err := internal.GetDurationSetting(internal.OplogPushStatsUpdateInterval)
-			tracelog.ErrorLogger.FatalOnError(err)
+		since, err := discovery.ResolveStartingTS(ctx, downloader, mongoClient)
+		tracelog.InfoLogger.Printf("Archiving storage last known timestamp is %s", since)
 
-			var opts []stats.OplogPushStatsOption
-
-			statsLogInterval, err := internal.GetDurationSetting(internal.OplogPushStatsLoggingInterval)
-			tracelog.ErrorLogger.FatalOnError(err)
-			if statsLogInterval > 0 {
-				opts = append(opts, stats.EnableLogReport(statsLogInterval, tracelog.InfoLogger.Printf))
-			}
-
-			exposeHttp, err := internal.GetBoolSetting(internal.OplogPushStatsExposeHttp, false)
-			tracelog.ErrorLogger.FatalOnError(err)
-			if exposeHttp {
-				opts = append(opts, stats.EnableHTTPHandler(stats.DefaultOplogPushStatsPrefix, webserver.DefaultWebServer))
-			}
-
-			uploadStats := stats.NewOplogUploadStats(since)
-			uploadStatsUpdater = uploadStats
-			archivingStats := stats.NewOplogPushStats(ctx, uploadStats, mongoClient, opts...)
-			tracelog.ErrorLogger.FatalOnError(archivingStats.Update())
-			go stats.RefreshWithInterval(ctx, statsUpdateInterval, archivingStats, tracelog.WarningLogger.Printf)
-		}
+		// fetch cursor started from since TS or from newest TS (if since is not exists)
+		oplogCursor, since, err := discovery.BuildCursorFromTS(ctx, since, uploader, mongoClient)
+		tracelog.ErrorLogger.FatalOnError(err)
+		tracelog.InfoLogger.Printf("Archiving is starting from timestamp %s", since)
 
 		/* File buffer is useful for debugging:
 		fileBatchBuffer, err := stages.NewFileBuffer("/run/wal-g-oplog-push")
@@ -97,20 +71,51 @@ var oplogPushCmd = &cobra.Command{
 		memoryBatchBuffer := stages.NewMemoryBuffer()
 		defer tracelog.ErrorLogger.FatalOnError(memoryBatchBuffer.Close())
 		// set up storage archiver
+		uploadStatsUpdater := HandleOplogPushStatistics(ctx, since, mongoClient)
 		oplogApplier := stages.NewStorageApplier(uploader, memoryBatchBuffer, archiveAfterSize, archiveTimeout, uploadStatsUpdater)
 
 		lwUpdate, err := internal.GetLastWriteUpdateInterval()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		oplogCursor, err := mongoClient.TailOplogFrom(ctx, since)
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		oplogFetcher := stages.NewDBFetcher(mongoClient, oplogCursor, lwUpdate, stages.NewStorageGapHandler(uploader))
+		oplogFetcher := stages.NewCursorMajFetcher(mongoClient, oplogCursor, lwUpdate)
 
 		// run working cycle
-		err = mongo.HandleOplogPush(ctx, since, oplogFetcher, oplogApplier)
+		err = mongo.HandleOplogPush(ctx, oplogFetcher, oplogApplier)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
+}
+
+// HandleOplogPushStatistics starts statistics updates and exposes if configured
+func HandleOplogPushStatistics(ctx context.Context, sinceTS models.Timestamp, mongoClient client.MongoDriver) stats.OplogUploadStatsUpdater {
+	oplogPushStatsEnabled, err := internal.GetBoolSetting(internal.OplogPushStatsEnabled, false)
+	tracelog.ErrorLogger.FatalOnError(err)
+	if !oplogPushStatsEnabled {
+		return nil
+	}
+
+	statsUpdateInterval, err := internal.GetDurationSetting(internal.OplogPushStatsUpdateInterval)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	var opts []stats.OplogPushStatsOption
+
+	statsLogInterval, err := internal.GetDurationSetting(internal.OplogPushStatsLoggingInterval)
+	tracelog.ErrorLogger.FatalOnError(err)
+	if statsLogInterval > 0 {
+		opts = append(opts, stats.EnableLogReport(statsLogInterval, tracelog.InfoLogger.Printf))
+	}
+
+	exposeHttp, err := internal.GetBoolSetting(internal.OplogPushStatsExposeHttp, false)
+	tracelog.ErrorLogger.FatalOnError(err)
+	if exposeHttp {
+		opts = append(opts, stats.EnableHTTPHandler(stats.DefaultOplogPushStatsPrefix, webserver.DefaultWebServer))
+	}
+
+	uploadStats := stats.NewOplogUploadStats(sinceTS)
+	archivingStats := stats.NewOplogPushStats(ctx, uploadStats, mongoClient, opts...)
+	tracelog.ErrorLogger.FatalOnError(archivingStats.Update())
+	go stats.RefreshWithInterval(ctx, statsUpdateInterval, archivingStats, tracelog.WarningLogger.Printf)
+
+	return uploadStats
 }
 
 func init() {

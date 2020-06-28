@@ -16,6 +16,7 @@ import (
 
 var (
 	_ = []MongoDriver{&MongoClient{}}
+	_ = []OplogCursor{&MongoOplogCursor{}}
 	_ = []OplogCursor{&MongoOplogCursor{}, &BsonCursor{}}
 )
 
@@ -65,21 +66,42 @@ type OplogCursor interface {
 	Data() []byte
 	Err() error
 	Next(context.Context) bool
+	Push([]byte) error
 }
 
 // MongoOplogCursor implements OplogCursor.
 type MongoOplogCursor struct {
 	*mongo.Cursor
+	pushed []byte
 }
 
 // NewMongoOplogCursor builds MongoOplogCursor.
 func NewMongoOplogCursor(c *mongo.Cursor) *MongoOplogCursor {
-	return &MongoOplogCursor{c}
+	return &MongoOplogCursor{c, nil}
 }
 
 // Data returns current cursor document
 func (m *MongoOplogCursor) Data() []byte {
 	return m.Current
+}
+
+// Push returns document back to cursor
+func (m *MongoOplogCursor) Push(data []byte) error {
+	if m.pushed != nil {
+		return fmt.Errorf("cursor already has one unread pushed document")
+	}
+	m.pushed = data
+	return nil
+}
+
+// Next fills Current by next document, returns true if there were no errors and the cursor has not been exhausted.
+func (m *MongoOplogCursor) Next(ctx context.Context) bool {
+	if m.pushed != nil {
+		m.Current = m.pushed
+		m.pushed = nil
+		return true
+	}
+	return m.Cursor.Next(ctx)
 }
 
 // MongoClient implements MongoDriver
@@ -137,7 +159,7 @@ func (mc *MongoClient) IsMaster(ctx context.Context) (models.IsMaster, error) {
 func (mc *MongoClient) LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp, err error) {
 	im, err := mc.IsMaster(ctx)
 	if err != nil {
-		return models.Timestamp{}, models.Timestamp{}, err
+		return models.Timestamp{}, models.Timestamp{}, fmt.Errorf("isMaster command failed: %+v", err)
 	}
 	return im.LastWrite.OpTime.TS, im.LastWrite.MajorityOpTime.TS, nil
 }
@@ -201,9 +223,10 @@ func (mc *MongoClient) ApplyOp(ctx context.Context, op db.Oplog) error {
 
 // BsonCursor implements OplogCursor with source io.reader
 type BsonCursor struct {
-	r   io.Reader
-	raw []byte
-	err error
+	r      io.Reader
+	raw    []byte
+	pushed []byte
+	err    error
 }
 
 // NewMongoOplogCursor builds MongoOplogCursor.
@@ -232,10 +255,24 @@ func (b *BsonCursor) Next(ctx context.Context) bool {
 	if b.err != nil {
 		return false
 	}
+	if b.pushed != nil {
+		b.raw = b.pushed
+		b.pushed = nil
+		return true
+	}
 
 	b.raw, b.err = bson.NewFromIOReader(b.r)
 	if b.err != nil {
 		return false
 	}
 	return true
+}
+
+// Push returns document back to cursor
+func (b *BsonCursor) Push(data []byte) error {
+	if b.pushed != nil {
+		return fmt.Errorf("cursor already has one unread pushed document")
+	}
+	b.pushed = data
+	return nil
 }

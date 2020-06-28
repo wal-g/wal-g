@@ -41,6 +41,7 @@ type Downloader interface {
 	ListOplogArchives() ([]models.Archive, error)
 	LoadBackups(names []string) ([]Backup, error)
 	ListBackupNames() ([]internal.BackupTime, error)
+	LastKnownArchiveTS() (models.Timestamp, error)
 }
 
 type Purger interface {
@@ -150,6 +151,24 @@ func (sd *StorageDownloader) ListOplogArchives() ([]models.Archive, error) {
 		archives = append(archives, arch)
 	}
 	return archives, nil
+}
+
+// LastKnownArchiveTS returns the most recent existed timestamp in storage folder.
+func (sd *StorageDownloader) LastKnownArchiveTS() (models.Timestamp, error) {
+	maxTS := models.Timestamp{}
+	keys, _, err := sd.oplogsFolder.ListFolder()
+	if err != nil {
+		return models.Timestamp{}, fmt.Errorf("can not fetch keys since storage folder: %w ", err)
+	}
+	for _, key := range keys {
+		filename := key.GetName()
+		arch, err := models.ArchFromFilename(filename)
+		if err != nil {
+			return models.Timestamp{}, fmt.Errorf("can not build archive since filename '%s': %w", filename, err)
+		}
+		maxTS = models.MaxTS(maxTS, arch.End)
+	}
+	return maxTS, nil
 }
 
 // DiscardUploader reads provided data and returns success

@@ -17,20 +17,6 @@ type Uploader struct {
 	mock.Mock
 }
 
-// FileExtension provides a mock function with given fields:
-func (_m *Uploader) FileExtension() string {
-	ret := _m.Called()
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
 // UploadBackup provides a mock function with given fields: stream, cmd, metaProvider
 func (_m *Uploader) UploadBackup(stream io.Reader, cmd archive.ErrWaiter, metaProvider archive.MongoMetaProvider) error {
 	ret := _m.Called(stream, cmd, metaProvider)
