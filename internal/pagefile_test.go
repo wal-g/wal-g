@@ -233,6 +233,31 @@ func postgresWritePagesTestEmptyFile(testIncrement *TestIncrement, t *testing.T)
 	checkAllWrittenBlocksCorrect(mockFile, sourceFile, testIncrement.diffBlockCount, t)
 }
 
+// Increment blocks should be written in places of missing blocks
+// of the partially completed local file. Using all blocks increment
+// ensures that each missing block exist in increment.
+// In this test case, after applying the increment,
+// we should get the completed page file
+func TestWritingIncrementToIncompleteFile(t *testing.T) {
+	incrementReader := allBlocksTestIncrement.NewReader()
+	sourceFile, _ := os.Open(pagedFileName)
+	defer utility.LoggedClose(sourceFile, "")
+	mockContent, _ := ioutil.ReadFile(pagedFileName)
+	for i := pagedFileSizeInBytes / 2; i < len(mockContent); i++ {
+		mockContent[i] = 0
+	}
+	mockFile := NewMockReadWriterAt(mockContent)
+
+	err := internal.WritePagesFromIncrement(incrementReader, mockFile, false)
+
+	assert.NoError(t, err)
+	assert.Equal(t, allBlocksTestIncrement.fileSize, uint64(len(mockFile.content)))
+
+	mockFileReader := bytes.NewReader(mockFile.content)
+	compareResult := deepCompareReaders(sourceFile, mockFileReader)
+	assert.Truef(t, compareResult, "Increment could not restore file")
+}
+
 // No bytes should be written if the file is complete (no missing blocks)
 func TestRestoringPagesToCompletedFile(t *testing.T) {
 	pagedFile, _ := os.Open(pagedFileName)
@@ -246,6 +271,26 @@ func TestRestoringPagesToCompletedFile(t *testing.T) {
 	assert.NoError(t, err)
 	// check that no bytes were written to the mock file
 	assert.Equal(t, 0, mockFile.bytesWritten)
+}
+
+// Missing blocks should be filled with pages from the local file
+func TestRestoringPagesToIncompleteFile(t *testing.T) {
+	pagedFile, _ := os.Open(pagedFileName)
+	fileReader := io.Reader(pagedFile)
+	defer utility.LoggedClose(pagedFile, "")
+	mockContent, _ := ioutil.ReadFile(pagedFileName)
+	for i := pagedFileSizeInBytes / 2; i < len(mockContent); i++ {
+		mockContent[i] = 0
+	}
+	mockFile := NewMockReadWriterAt(mockContent)
+
+	err := internal.RestoreMissingPages(fileReader, mockFile)
+
+	assert.NoError(t, err)
+	pagedFile.Seek(0, 0)
+	mockFileReader := bytes.NewReader(mockFile.content)
+	compareResult := deepCompareReaders(pagedFile, mockFileReader)
+	assert.Truef(t, compareResult, "Increment could not restore file")
 }
 
 // If the local file is empty, it should be fully restored
