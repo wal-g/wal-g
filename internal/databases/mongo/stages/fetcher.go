@@ -18,7 +18,7 @@ import (
 
 var (
 	_ = []GapHandler{&StorageGapHandler{}}
-	_ = []FromFetcher{&DBFetcher{}}
+	_ = []Fetcher{&CursorMajFetcher{}}
 	_ = []BetweenFetcher{&StorageFetcher{}}
 )
 
@@ -41,34 +41,34 @@ func (sgh *StorageGapHandler) HandleGap(from, until models.Timestamp, gapErr err
 	return nil
 }
 
-// FromFetcher defines interface to fetch oplog records starting given timestamp.
-type FromFetcher interface {
-	OplogFrom(context.Context, models.Timestamp, *sync.WaitGroup) (chan *models.Oplog, chan error, error)
+// Fetcher defines interface to fetch oplog records.
+// TODO: FIX INTERFACE METHOD NAME AND SIGNATURE
+type Fetcher interface {
+	Fetch(context.Context, *sync.WaitGroup) (chan *models.Oplog, chan error, error)
 }
 
 // BetweenFetcher defines interface to fetch oplog records between given timestamps.
 type BetweenFetcher interface {
-	OplogBetween(context.Context, models.Timestamp, models.Timestamp, *sync.WaitGroup) (chan *models.Oplog, chan error, error)
+	FetchBetween(context.Context, models.Timestamp, models.Timestamp, *sync.WaitGroup) (chan *models.Oplog, chan error, error)
 }
 
-// DBFetcher implements FromFetcher interface for mongodb
-type DBFetcher struct {
+// CursorMajFetcher implements Fetcher interface for mongodb
+type CursorMajFetcher struct {
 	db         client.MongoDriver
 	cur        client.OplogCursor
 	lwInterval time.Duration
-	gapHandler GapHandler
 }
 
-// NewDBFetcher builds DBFetcher with given args.
-func NewDBFetcher(m client.MongoDriver, cur client.OplogCursor, LWUpdateInterval time.Duration, gapHandler GapHandler) *DBFetcher {
-	return &DBFetcher{m, cur, LWUpdateInterval, gapHandler}
+// NewCursorMajFetcher builds CursorMajFetcher with given args.
+func NewCursorMajFetcher(m client.MongoDriver, cur client.OplogCursor, LWUpdateInterval time.Duration) *CursorMajFetcher {
+	return &CursorMajFetcher{m, cur, LWUpdateInterval}
 }
 
-// OplogFrom returns channel of oplog records, channel is filled in background.
+// Fetch returns channel of oplog records, channel is filled in background.
 // TODO: handle disconnects && stepdown
 // TODO: use sessions
 // TODO: use context.WithTimeout
-func (dbf *DBFetcher) OplogFrom(ctx context.Context, from models.Timestamp, wg *sync.WaitGroup) (oplogc chan *models.Oplog, errc chan error, err error) {
+func (dbf *CursorMajFetcher) Fetch(ctx context.Context, wg *sync.WaitGroup) (oplogc chan *models.Oplog, errc chan error, err error) {
 	oplogc = make(chan *models.Oplog)
 	errc = make(chan error)
 	wg.Add(1)
@@ -77,7 +77,6 @@ func (dbf *DBFetcher) OplogFrom(ctx context.Context, from models.Timestamp, wg *
 		defer close(errc)
 		defer close(oplogc)
 
-		fromFound := false
 		majTs := models.Timestamp{}
 		for dbf.cur.Next(ctx) {
 			// TODO: benchmark decode vs. bson.Reader vs. bson.Raw.LookupErr
@@ -104,18 +103,6 @@ func (dbf *DBFetcher) OplogFrom(ctx context.Context, from models.Timestamp, wg *
 				}
 
 				majTs = im.LastWrite.MajorityOpTime.TS
-			}
-
-			if !fromFound {
-				if op.TS != from { // from ts is not exists, report gap and continue
-					gapErr := models.NewError(models.SplitFound, fmt.Sprintf("expected first ts is %v, but %v is given", from, op.TS))
-					tracelog.ErrorLogger.PrintError(gapErr)
-					if err := dbf.gapHandler.HandleGap(from, op.TS, gapErr); err != nil {
-						errc <- err
-						return
-					}
-				}
-				fromFound = true
 			}
 
 			select {
@@ -165,8 +152,8 @@ func NewStorageFetcher(downloader archive.Downloader, path archive.Sequence) *St
 	return &StorageFetcher{downloader: downloader, path: path}
 }
 
-// OplogBetween returns channel of oplog records, channel is filled in background.
-func (sf *StorageFetcher) OplogBetween(ctx context.Context, from models.Timestamp, until models.Timestamp, wg *sync.WaitGroup) (chan *models.Oplog, chan error, error) {
+// FetchBetween returns channel of oplog records, channel is filled in background.
+func (sf *StorageFetcher) FetchBetween(ctx context.Context, from models.Timestamp, until models.Timestamp, wg *sync.WaitGroup) (chan *models.Oplog, chan error, error) {
 	if models.LessTS(until, from) {
 		return nil, nil, fmt.Errorf("fromTS '%s' must be less than untilTS '%s'", from, until)
 	}

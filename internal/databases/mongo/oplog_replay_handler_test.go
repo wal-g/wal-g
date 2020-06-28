@@ -58,7 +58,7 @@ func buildOplogReplayTestArgs() oplogReplayTestArgs {
 
 func prepareOplogReplayMocks(args oplogReplayTestArgs, mocks oplogReplayTestMocks) {
 	if mocks.fetcher != nil {
-		mocks.fetcher.On("OplogBetween", mock.Anything, args.since, args.until, args.wg).
+		mocks.fetcher.On("FetchBetween", mock.Anything, args.since, args.until, args.wg).
 			Return(args.betweenFetcherReturn.outChan, args.betweenFetcherReturn.errChan, args.betweenFetcherReturn.err)
 	}
 	if mocks.applier != nil {

@@ -19,7 +19,7 @@ func HandleOplogReplay(ctx context.Context, since, until models.Timestamp, fetch
 	}()
 
 	var errs []<-chan error
-	oplogc, errc, err := fetcher.OplogBetween(ctx, since, until, wg)
+	oplogc, errc, err := fetcher.FetchBetween(ctx, since, until, wg)
 	if err != nil {
 		return err
 	}

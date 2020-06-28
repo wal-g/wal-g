@@ -16,8 +16,8 @@ type BetweenFetcher struct {
 	mock.Mock
 }
 
-// OplogBetween provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *BetweenFetcher) OplogBetween(_a0 context.Context, _a1 models.Timestamp, _a2 models.Timestamp, _a3 *sync.WaitGroup) (chan *models.Oplog, chan error, error) {
+// FetchBetween provides a mock function with given fields: _a0, _a1, _a2, _a3
+func (_m *BetweenFetcher) FetchBetween(_a0 context.Context, _a1 models.Timestamp, _a2 models.Timestamp, _a3 *sync.WaitGroup) (chan *models.Oplog, chan error, error) {
 	ret := _m.Called(_a0, _a1, _a2, _a3)
 
 	if len(ret) == 1 {
