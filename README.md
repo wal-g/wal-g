@@ -14,7 +14,7 @@ WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4
 - [Development](#development)
 	- [Installing](#installing)
 	- [Testing](#testing)
-	- [Development on windows](#development-on-windows) 
+	- [Development on windows](#development-on-windows)
 - [Authors](#authors)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
@@ -46,7 +46,7 @@ WAL-G determines AWS credentials [like other AWS tools](http://docs.aws.amazon.c
 
 To store backups in Google Cloud Storage, WAL-G requires that this variable be set:
 
-* `WALG_GS_PREFIX` to specify where to store backups (e.g. `gs://x4m-test-bucket/walg-folder`) 
+* `WALG_GS_PREFIX` to specify where to store backups (e.g. `gs://x4m-test-bucket/walg-folder`)
 
 WAL-G determines Google Cloud credentials using [application-default credentials](https://cloud.google.com/docs/authentication/production) like other GCP tools. You can set `GOOGLE_APPLICATION_CREDENTIALS` to point to a service account json key from GCP. If you set nothing, WAL-G will attempt to fetch credentials from the GCE/GKE metadata service.
 
@@ -56,6 +56,8 @@ To store backups in Azure Storage, WAL-G requires that this variable be set:
 * `WALG_AZ_PREFIX` to specify where to store backups in Azure storage (e.g. `azure://test-container/walg-folder`)
 
 WAL-G determines Azure Storage credentials using [azure default credentials](https://docs.microsoft.com/en-us/azure/storage/common/storage-azure-cli#azure-cli-sample-script). You can set `AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_ACCESS_KEY` to provide azure storage credentials.
+
+You may set `AZURE_STORAGE_SAS_TOKEN` in lieu of `AZURE_STORAGE_ACCESS_KEY` to make use of [SAS tokens](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview).
 
 WAL-G sets default upload buffer size to 64 Megabytes and uses 3 buffers by default. However, users can choose to override these values by setting optional environment variables.
 
@@ -156,9 +158,9 @@ Lists names and creation time of available backups.
 
 ``--pretty``  flag prints list in a table
 
-``--json`` flag prints list in JSON format, pretty-printed if combined with ``--pretty`` 
+``--json`` flag prints list in JSON format, pretty-printed if combined with ``--pretty``
 
-``--detail`` flag prints extra backup details, pretty-printed if combined with ``--pretty`` , json-encoded if combined with ``--json`` 
+``--detail`` flag prints extra backup details, pretty-printed if combined with ``--pretty`` , json-encoded if combined with ``--json``
 
 * ``delete``
 
@@ -168,7 +170,7 @@ Is used to delete backups and WALs before them. By default ``delete`` will perfo
 
 ``retain`` [FULL|FIND_FULL] %number% [--after %name|time%]
 
-if FULL is specified keep $number% full backups and everything in the middle. If with --after flag is used keep 
+if FULL is specified keep $number% full backups and everything in the middle. If with --after flag is used keep
 $number$ the most recent backups and backups made after %name|time% (including).
 
 ``before`` [FIND_FULL] %name%
@@ -177,7 +179,7 @@ If `FIND_FULL` is specified, WAL-G will calculate minimum backup needed to keep 
 
 ``everything`` [FORCE]
 
-Examples: 
+Examples:
 
 ``everything`` all backups will be deleted (if there are no permanent backups)
 
