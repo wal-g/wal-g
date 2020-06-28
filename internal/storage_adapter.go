@@ -8,6 +8,7 @@ import (
 	"github.com/wal-g/storages/fs"
 	"github.com/wal-g/storages/gcs"
 	"github.com/wal-g/storages/s3"
+	"github.com/wal-g/storages/sh"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/storages/swift"
 )
@@ -43,4 +44,5 @@ var StorageAdapters = []StorageAdapter{
 	{"GS_PREFIX", gcs.SettingList, gcs.ConfigureFolder, nil},
 	{"AZ_PREFIX", azure.SettingList, azure.ConfigureFolder, nil},
 	{"SWIFT_PREFIX", swift.SettingList, swift.ConfigureFolder, nil},
+	{"SSH_PREFIX", sh.SettingsList, sh.ConfigureFolder, nil},
 }

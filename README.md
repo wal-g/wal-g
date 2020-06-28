@@ -75,6 +75,12 @@ To store backups on files system, WAL-G requires that these variables be set:
 
 Please, keep in mind that by default storing backups on disk along with database is not safe. Do not use it as a disaster recovery plan.
 
+To store backups via ssh, WAL-G requires that these variables be set:
+* `WALG_SSH_PREFIX` (e.g. `ssh://localhost/walg-folder`)
+* `SSH_PORT` ssh connection port
+* `SSH_USERNAME` connect with username
+* `SSH_PASSWORD` connect with password 
+
 **Optional variables**
 
 * `AWS_REGION`(e.g. `us-west-2`)
