@@ -114,7 +114,7 @@ func TestFullScanInitialize(t *testing.T) {
 	pageReader := internal.IncrementalPageReader{
 		PagedFile: pageFile,
 		Blocks:    make([]uint32, 0),
-		Lsn:       sampeLSN,
+		Lsn:       sampleLSN,
 	}
 	err = pageReader.FullScanInitialize()
 	assert.NoError(t, err)
