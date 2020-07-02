@@ -13,7 +13,7 @@ import (
 
 func TestBackupListFindsBackups(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
-	internal.HandleBackupList(folder)
+	internal.DefaultHandleBackupList(folder)
 }
 
 func TestBackupListFlagsFindsBackups(t *testing.T) {

@@ -1,18 +1,12 @@
 package redis
 
 import (
-	"github.com/go-redis/redis"
-	"github.com/tinsane/tracelog"
-	"github.com/wal-g/wal-g/internal"
 	"strconv"
-)
 
-type Uploader struct {
-	*internal.Uploader
-}
-type Backup struct {
-	*internal.Backup
-}
+	"github.com/go-redis/redis"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+)
 
 // DISCUSS: In some cases, we have default values, but we don't want to store it at global default settings.
 // Naming is far from best, if Go allowed overloads, name GetSettingWithDefault would be more appropriate

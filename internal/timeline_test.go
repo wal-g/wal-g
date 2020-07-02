@@ -1,8 +1,9 @@
 package internal
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNextWALFileName(t *testing.T) {
@@ -32,7 +33,7 @@ func TestNextWALFileName(t *testing.T) {
 }
 
 func TestPrefetchLocation(t *testing.T) {
-	prefetchLocation, runningLocation, runningFile, fetchedFile := GetPrefetchLocations("/var/pgdata/xlog/", "000000010000000000000051")
+	prefetchLocation, runningLocation, runningFile, fetchedFile := getPrefetchLocations("/var/pgdata/xlog/", "000000010000000000000051")
 	assert.Equal(t, "/var/pgdata/xlog/.wal-g/prefetch", prefetchLocation)
 	assert.Equal(t, "/var/pgdata/xlog/.wal-g/prefetch/running", runningLocation)
 	assert.Equal(t, "/var/pgdata/xlog/.wal-g/prefetch/running/000000010000000000000051", runningFile)

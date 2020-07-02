@@ -10,7 +10,7 @@ type DiskDataFolder struct {
 	path string
 }
 
-func NewDiskDataFolder(folderPath string) (*DiskDataFolder, error) {
+func newDiskDataFolder(folderPath string) (*DiskDataFolder, error) {
 	err := os.MkdirAll(folderPath, os.ModePerm)
 	if err != nil {
 		return nil, err

@@ -6,8 +6,17 @@ Development
 -----------
 ### Installing
 
+Prepare on Ubuntu:
+```
+sudo apt-get install liblzo2-dev
+```
+
 To compile and build the binary for Postgres:
 
+Optional:
+
+- To build with libsodium, just set `USE_LIBSODIUM` environment variable.
+- To build with lzo decompressor, just set `USE_LZO` environment variable.
 ```
 go get github.com/wal-g/wal-g
 cd $GOPATH/src/github.com/wal-g/wal-g
@@ -37,7 +46,6 @@ WAL-G uses [the usual PostgreSQL environment variables](https://www.postgresql.o
 To configure disk read rate limit during ```backup-push``` in bytes per second.
 
 * `WALG_NETWORK_RATE_LIMIT`
-
 To configure the network upload rate limit during ```backup-push``` in bytes per second.
 
 
@@ -45,7 +53,7 @@ Concurrency values can be configured using:
 
 * `WALG_DOWNLOAD_CONCURRENCY`
 
-To configure how many goroutines to use during backup-fetch and wal-fetch, use `WALG_DOWNLOAD_CONCURRENCY`. By default, WAL-G uses the minimum of the number of files to extract and 10.
+To configure how many goroutines to use during ```backup-fetch``` and ```wal-fetch```, use `WALG_DOWNLOAD_CONCURRENCY`. By default, WAL-G uses the minimum of the number of files to extract and 10.
 
 * `WALG_UPLOAD_CONCURRENCY`
 
@@ -62,6 +70,14 @@ This setting allows backup automation tools to add extra information to JSON sen
 * `WALG_PREVENT_WAL_OVERWRITE`
 
 If this setting is specified, during ```wal-push``` WAL-G will check the existence of WAL before uploading it. If the different file is already archived under the same name, WAL-G will return the non-zero exit code to prevent PostgreSQL from removing WAL.
+
+* `WALG_LIBSODIUM_KEY`
+
+To configure encryption and decryption with libsodium. WAL-G uses an [algorithm](https://download.libsodium.org/doc/secret-key_cryptography/secretstream#algorithm) that only requires a secret key.
+
+* `WALG_LIBSODIUM_KEY_PATH`
+
+Similar to `WALG_LIBSODIUM_KEY`, but value is the path to the key on file system. The file content will be trimmed from whitespace characters.
 
 * `WALG_GPG_KEY_ID`  (alternative form `WALE_GPG_KEY_ID`) ⚠️ **DEPRECATED**
 
@@ -80,7 +96,7 @@ Similar to `WALG_PGP_KEY`, but value is the path to the key on file system.
 
 * `WALG_PGP_KEY_PASSPHRASE`
 
-If your *private key* is encrypted with a *passphrase*, you should set *passpharse* for decrypt.
+If your *private key* is encrypted with a *passphrase*, you should set *passphrase* for decrypt.
 
 * `WALG_DELTA_MAX_STEPS`
 
@@ -111,6 +127,15 @@ WAL-G can also fetch the latest backup using:
 
 ```
 wal-g backup-fetch ~/extract/to/here LATEST
+```
+
+Beta feature: WAL-G can unpack delta backups in reverse order to improve fetch efficiency. 
+To activate this feature, do one of the following:
+
+* set the `WALG_USE_REVERSE_UNPACK`environment variable
+* add the --reverse-unpack flag
+```
+wal-g backup-fetch ~/extract/to/here LATEST --reverse-unpack
 ```
 
 * ``backup-push``
@@ -149,4 +174,29 @@ Backups can be marked as permanent to prevent them from being removed when runni
 
 ```
 wal-g backup-mark example-backup -i
+```
+
+
+* ``catchup-push``
+
+To create an catchup incremental backup, the user should pass the path to the master Postgres directory and the LSN of the replica
+for which the backup is created.
+
+Steps:
+1) Stop replica
+2) Get replica LSN (for example using pg_controldata command)
+3) Start uploading incremental backup on master.
+
+``` bash
+wal-g catchup-push /path/to/master/postgres --from-lsn replica_lsn
+```
+
+
+* ``catchup-fetch``
+
+To accept catchup incremental backup created by `catchup-push`, the user should pass the path to the replica Postgres
+directory and name of the backup.
+
+``` bash
+wal-g catchup-fetch /path/to/replica/postgres backup_name
 ```

@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
-	"github.com/tinsane/storages/storage"
-	"github.com/tinsane/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -21,18 +21,32 @@ var deleteCmd = &cobra.Command{
 }
 
 var deleteBeforeCmd = &cobra.Command{
-	Use:     "before [FIND_FULL] backup_name|timestamp", // TODO : improve description
+	Use:     internal.DeleteBeforeUsageExample, // TODO : improve description
 	Example: internal.DeleteBeforeExamples,
 	Args:    internal.DeleteBeforeArgsValidator,
 	Run:     runDeleteBefore,
 }
 
 var deleteRetainCmd = &cobra.Command{
-	Use:       "retain [FULL|FIND_FULL] backup_count", // TODO : improve description
+	Use:       internal.DeleteRetainUsageExample, // TODO : improve description
 	Example:   internal.DeleteRetainExamples,
 	ValidArgs: internal.StringModifiers,
 	Args:      internal.DeleteRetainArgsValidator,
 	Run:       runDeleteRetain,
+}
+
+var deleteEverythingCmd = &cobra.Command{
+	Use:       internal.DeleteEverythingUsageExample, // TODO : improve description
+	Example:   internal.DeleteEverythingExamples,
+	ValidArgs: internal.StringModifiersDeleteEverything,
+	Args:      internal.DeleteEverythingArgsValidator,
+	Run:       runDeleteEverything,
+}
+
+func runDeleteEverything(cmd *cobra.Command, args []string) {
+	folder, err := internal.ConfigureFolder()
+	tracelog.ErrorLogger.FatalOnError(err)
+	internal.DeleteEverything(folder, confirmed, args)
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
@@ -55,7 +69,7 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 
 func init() {
 	Cmd.AddCommand(deleteCmd)
-	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd)
+	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 

@@ -1,8 +1,9 @@
 package walparser
 
 import (
-	"github.com/pkg/errors"
 	"io"
+
+	"github.com/pkg/errors"
 )
 
 type WalPageReader struct {

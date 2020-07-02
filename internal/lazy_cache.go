@@ -2,16 +2,17 @@ package internal
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/tinsane/tracelog"
 	"sync"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 )
 
 type WrongTypeError struct {
 	error
 }
 
-func NewWrongTypeError(desiredType string) WrongTypeError {
+func newWrongTypeError(desiredType string) WrongTypeError {
 	return WrongTypeError{errors.Errorf("expected to get '%s', but not found one", desiredType)}
 }
 
@@ -25,7 +26,7 @@ type LazyCache struct {
 	cacheMutex sync.Mutex
 }
 
-func NewLazyCache(load func(key interface{}) (value interface{}, err error)) *LazyCache {
+func newLazyCache(load func(key interface{}) (value interface{}, err error)) *LazyCache {
 	return &LazyCache{
 		make(map[interface{}]interface{}),
 		load,

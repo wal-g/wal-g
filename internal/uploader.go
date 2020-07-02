@@ -2,16 +2,24 @@ package internal
 
 import (
 	"io"
-	"path"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
 
-	"github.com/tinsane/storages/storage"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/utility"
 )
+
+type UploaderProvider interface {
+	Upload(path string, content io.Reader) error
+	UploadFile(file NamedReader) error
+	PushStream(stream io.Reader) (string, error)
+	PushStreamToDestination(stream io.Reader, dstPath string) error
+	Compression() compression.Compressor
+	DisableSizeTracking()
+}
 
 // Uploader contains fields associated with uploading tarballs.
 // Multiple tarballs can share one uploader.
@@ -19,9 +27,9 @@ type Uploader struct {
 	UploadingFolder      storage.Folder
 	Compressor           compression.Compressor
 	waitGroup            *sync.WaitGroup
-	deltaFileManager     *DeltaFileManager
-	archiveStatusManager DataFolder
+	ArchiveStatusManager ArchiveStatusManager
 	Failed               atomic.Value
+	tarSize              *int64
 }
 
 // UploadObject
@@ -30,22 +38,16 @@ type UploadObject struct {
 	Content io.Reader
 }
 
-func (uploader *Uploader) getUseWalDelta() (useWalDelta bool) {
-	return uploader.deltaFileManager != nil
-}
-
 func NewUploader(
 	compressor compression.Compressor,
 	uploadingLocation storage.Folder,
-	deltaFileManager *DeltaFileManager,
-	archiveStatusManager DataFolder,
 ) *Uploader {
+	size := int64(0)
 	uploader := &Uploader{
-		UploadingFolder:      uploadingLocation,
-		Compressor:           compressor,
-		waitGroup:            &sync.WaitGroup{},
-		deltaFileManager:     deltaFileManager,
-		archiveStatusManager: archiveStatusManager,
+		UploadingFolder: uploadingLocation,
+		Compressor:      compressor,
+		waitGroup:       &sync.WaitGroup{},
+		tarSize:         &size,
 	}
 	uploader.Failed.Store(false)
 	return uploader
@@ -61,35 +63,15 @@ func (uploader *Uploader) finish() {
 }
 
 // Clone creates similar Uploader with new WaitGroup
-func (uploader *Uploader) Clone() *Uploader {
+func (uploader *Uploader) clone() *Uploader {
 	return &Uploader{
 		uploader.UploadingFolder,
 		uploader.Compressor,
 		&sync.WaitGroup{},
-		uploader.deltaFileManager,
-		uploader.archiveStatusManager,
+		uploader.ArchiveStatusManager,
 		uploader.Failed,
+		uploader.tarSize,
 	}
-}
-
-// TODO : unit tests
-func (uploader *Uploader) UploadWalFile(file NamedReader) error {
-	var walFileReader io.Reader
-
-	filename := path.Base(file.Name())
-	if uploader.getUseWalDelta() && isWalFilename(filename) {
-		recordingReader, err := NewWalDeltaRecordingReader(file, filename, uploader.deltaFileManager)
-		if err != nil {
-			walFileReader = file
-		} else {
-			walFileReader = recordingReader
-			defer utility.LoggedClose(recordingReader, "")
-		}
-	} else {
-		walFileReader = file
-	}
-
-	return uploader.UploadFile(NewNamedReaderImpl(walFileReader, file.Name()))
 }
 
 // TODO : unit tests
@@ -103,8 +85,21 @@ func (uploader *Uploader) UploadFile(file NamedReader) error {
 	return err
 }
 
+// DisableSizeTracking stops bandwidth tracking
+func (uploader *Uploader) DisableSizeTracking() {
+	uploader.tarSize = nil
+}
+
+// Compression returns configured compressor
+func (uploader *Uploader) Compression() compression.Compressor {
+	return uploader.Compressor
+}
+
 // TODO : unit tests
 func (uploader *Uploader) Upload(path string, content io.Reader) error {
+	if uploader.tarSize != nil {
+		content = &WithSizeReader{content, uploader.tarSize}
+	}
 	err := uploader.UploadingFolder.PutObject(path, content)
 	if err == nil {
 		return nil
@@ -117,7 +112,7 @@ func (uploader *Uploader) Upload(path string, content io.Reader) error {
 // UploadMultiple uploads multiple objects from the start of the slice,
 // returning the first error if any. Note that this operation is not atomic
 // TODO : unit tests
-func (uploader *Uploader) UploadMultiple(objects []UploadObject) error {
+func (uploader *Uploader) uploadMultiple(objects []UploadObject) error {
 	for _, object := range objects {
 		err := uploader.Upload(object.Path, object.Content)
 		if err != nil {

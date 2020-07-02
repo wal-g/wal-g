@@ -2,8 +2,9 @@ package internal
 
 import (
 	"bytes"
-	"github.com/wal-g/wal-g/internal/walparser"
 	"io"
+
+	"github.com/wal-g/wal-g/internal/walparser"
 )
 
 func ExtractBlockLocations(records []walparser.XLogRecord) []walparser.BlockLocation {

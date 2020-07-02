@@ -3,10 +3,11 @@ package internal
 import (
 	"bytes"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/tinsane/tracelog"
-	"github.com/wal-g/wal-g/internal/walparser"
 	"io"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/walparser"
 )
 
 const (
@@ -17,7 +18,7 @@ type CantDiscardWalDataError struct {
 	error
 }
 
-func NewCantDiscardWalDataError() CantDiscardWalDataError {
+func newCantDiscardWalDataError() CantDiscardWalDataError {
 	return CantDiscardWalDataError{errors.New("wanted to discard data from WAL while was restricted to do it")}
 }
 
@@ -102,7 +103,7 @@ func (reader *WalDeltaRecordingReader) RecordBlockLocationsFromPage() error {
 				return err
 			}
 		} else if len(discardedRecordTail) > 0 {
-			return NewCantDiscardWalDataError()
+			return newCantDiscardWalDataError()
 		}
 	}
 	reader.Recorder.recordWalDelta(records)

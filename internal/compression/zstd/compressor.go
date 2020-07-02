@@ -1,8 +1,9 @@
 package zstd
 
 import (
-	"github.com/DataDog/zstd"
 	"io"
+
+	"github.com/DataDog/zstd"
 )
 
 const (

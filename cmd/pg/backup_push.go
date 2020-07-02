@@ -1,8 +1,8 @@
 package pg
 
 import (
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/tinsane/tracelog"
 
 	"github.com/spf13/cobra"
 )
@@ -10,9 +10,9 @@ import (
 const (
 	BackupPushShortDescription = "Makes backup and uploads it to storage"
 	PermanentFlag              = "permanent"
-	FullBackupFlag			   = "full"
-	PermanentShorthand		   = "p"
-	FullBackupShorthand		   = "f"
+	FullBackupFlag             = "full"
+	PermanentShorthand         = "p"
+	FullBackupShorthand        = "f"
 )
 
 var (
@@ -22,7 +22,7 @@ var (
 		Short: BackupPushShortDescription, // TODO : improve description
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			uploader, err := internal.ConfigureUploader()
+			uploader, err := internal.ConfigureWalUploader()
 			tracelog.ErrorLogger.FatalOnError(err)
 			internal.HandleBackupPush(uploader, args[0], permanent, fullBackup)
 		},

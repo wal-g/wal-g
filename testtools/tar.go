@@ -3,9 +3,10 @@ package testtools
 import (
 	"archive/tar"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
+
+	"github.com/pkg/errors"
 )
 
 // BufferTarInterpreter extracts data to a byte slice. Used

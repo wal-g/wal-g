@@ -1,14 +1,15 @@
 package testtools
 
 import (
+	"io/ioutil"
+	"strings"
+	"time"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	walgs3 "github.com/tinsane/storages/s3"
-	"io/ioutil"
-	"strings"
-	"time"
+	walgs3 "github.com/wal-g/storages/s3"
 )
 
 // Mock out S3 client. Includes these methods:

@@ -1,10 +1,16 @@
 package internal_test
 
 import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"testing"
+
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"testing"
 )
 
 func TestGetMaxConcurrency_InvalidKey(t *testing.T) {
@@ -54,4 +60,88 @@ func TestGetSentinelUserData(t *testing.T) {
 	data = internal.GetSentinelUserData()
 	t.Log(data)
 	assert.NotNilf(t, data, "Unable to parse WALG_SENTINEL_USER_DATA")
+}
+
+func TestGetDataFolderPath_Default(t *testing.T) {
+	viper.Set(internal.PgDataSetting, nil)
+
+	actual := internal.GetDataFolderPath()
+
+	assert.Equal(t, filepath.Join(internal.DefaultDataFolderPath, "walg_data"), actual)
+}
+
+func TestGetDataFolderPath_FolderNotExist(t *testing.T) {
+	parentDir := prepareDataFolder(t, "someOtherFolder")
+	viper.Set(internal.PgDataSetting, parentDir)
+
+	actual := internal.GetDataFolderPath()
+
+	assert.Equal(t, filepath.Join(internal.DefaultDataFolderPath, "walg_data"), actual)
+	cleanup(t, parentDir)
+}
+
+func TestGetDataFolderPath_Wal(t *testing.T) {
+	parentDir := prepareDataFolder(t, "pg_wal")
+
+	viper.Set(internal.PgDataSetting, parentDir)
+
+	actual := internal.GetDataFolderPath()
+
+	assert.Equal(t, filepath.Join(parentDir, "pg_wal", "walg_data"), actual)
+	cleanup(t, parentDir)
+}
+
+func TestGetDataFolderPath_Xlog(t *testing.T) {
+	parentDir := prepareDataFolder(t, "pg_xlog")
+
+	viper.Set(internal.PgDataSetting, parentDir)
+
+	actual := internal.GetDataFolderPath()
+
+	assert.Equal(t, filepath.Join(parentDir, "pg_xlog", "walg_data"), actual)
+	cleanup(t, parentDir)
+}
+
+func TestGetDataFolderPath_WalIgnoreXlog(t *testing.T) {
+	parentDir := prepareDataFolder(t, "pg_xlog")
+	err := os.Mkdir(filepath.Join(parentDir, "pg_wal"), 0700)
+	if err != nil {
+		t.Log(err)
+	}
+	viper.Set(internal.PgDataSetting, parentDir)
+
+	actual := internal.GetDataFolderPath()
+
+	assert.Equal(t, filepath.Join(parentDir, "pg_wal", "walg_data"), actual)
+	cleanup(t, parentDir)
+}
+
+func TestConfigureLogging_WhenLogLevelSettingIsNotSet(t *testing.T) {
+	assert.NoError(t, internal.ConfigureLogging())
+}
+
+func TestConfigureLogging_WhenLogLevelSettingIsSet(t *testing.T) {
+	parentDir := prepareDataFolder(t, "someOtherFolder")
+	viper.Set(internal.LogLevelSetting, parentDir)
+	err := internal.ConfigureLogging()
+
+	assert.Error(t, tracelog.UpdateLogLevel(viper.GetString(internal.LogLevelSetting)), err)
+}
+
+func prepareDataFolder(t *testing.T, name string) string {
+	cwd, err := filepath.Abs("./")
+	if err != nil {
+		t.Log(err)
+	}
+	// Create temp directory.
+	dir, err := ioutil.TempDir(cwd, "test")
+	if err != nil {
+		t.Log(err)
+	}
+	err = os.Mkdir(filepath.Join(dir, name), 0700)
+	if err != nil {
+		t.Log(err)
+	}
+	fmt.Println(dir)
+	return dir
 }

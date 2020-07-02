@@ -7,11 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 
 	"github.com/pkg/errors"
-	"github.com/tinsane/storages/fs"
-	"github.com/tinsane/storages/storage"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/storages/fs"
+	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -52,11 +53,12 @@ func NewBackup(baseBackupFolder storage.Folder, name string) *Backup {
 	return &Backup{baseBackupFolder, name, nil}
 }
 
+// GetStopSentinelPath returns sentinel path.
 func (backup *Backup) GetStopSentinelPath() string {
 	return backup.Name + utility.SentinelSuffix
 }
 
-func (backup *Backup) GetMetadataPath() string {
+func (backup *Backup) getMetadataPath() string {
 	return backup.Name + "/" + utility.MetadataFileName
 }
 
@@ -87,7 +89,7 @@ func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
 		return *backup.SentinelDto, nil
 	}
 	sentinelDto := BackupSentinelDto{}
-	sentinelDtoData, err := backup.FetchSentinelData()
+	sentinelDtoData, err := backup.fetchSentinelData()
 	if err != nil {
 		return sentinelDto, err
 	}
@@ -101,8 +103,8 @@ func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
 }
 
 // TODO : unit tests
-func (backup *Backup) FetchSentinelData() ([]byte, error) {
-	backupReaderMaker := NewStorageReaderMaker(backup.BaseBackupFolder, backup.GetStopSentinelPath())
+func (backup *Backup) fetchSentinelData() ([]byte, error) {
+	backupReaderMaker := newStorageReaderMaker(backup.BaseBackupFolder, backup.GetStopSentinelPath())
 	backupReader, err := backupReaderMaker.Reader()
 	if err != nil {
 		return make([]byte, 0), err
@@ -114,9 +116,9 @@ func (backup *Backup) FetchSentinelData() ([]byte, error) {
 	return sentinelDtoData, nil
 }
 
-func (backup *Backup) FetchMeta() (ExtendedMetadataDto, error) {
+func (backup *Backup) fetchMeta() (ExtendedMetadataDto, error) {
 	extendedMetadataDto := ExtendedMetadataDto{}
-	backupReaderMaker := NewStorageReaderMaker(backup.BaseBackupFolder, backup.GetMetadataPath())
+	backupReaderMaker := newStorageReaderMaker(backup.BaseBackupFolder, backup.getMetadataPath())
 	backupReader, err := backupReaderMaker.Reader()
 	if err != nil {
 		return extendedMetadataDto, err
@@ -132,12 +134,12 @@ func (backup *Backup) FetchMeta() (ExtendedMetadataDto, error) {
 
 func checkDbDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentinelDto) error {
 	if !sentinelDto.IsIncremental() {
-		isEmpty, err := IsDirectoryEmpty(dbDataDirectory)
+		isEmpty, err := isDirectoryEmpty(dbDataDirectory)
 		if err != nil {
 			return err
 		}
 		if !isEmpty {
-			return NewNonEmptyDbDataDirectoryError(dbDataDirectory)
+			return newNonEmptyDbDataDirectoryError(dbDataDirectory)
 		}
 	} else {
 		tracelog.DebugLogger.Println("DB data directory before increment:")
@@ -156,7 +158,7 @@ func checkDbDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentine
 		}
 	}
 
-	if sentinelDto.TablespaceSpec != nil && !sentinelDto.TablespaceSpec.Empty() {
+	if sentinelDto.TablespaceSpec != nil && !sentinelDto.TablespaceSpec.empty() {
 		err := setTablespacePaths(*sentinelDto.TablespaceSpec)
 		if err != nil {
 			return err
@@ -175,7 +177,7 @@ func setTablespacePaths(spec TablespaceSpec) error {
 	if err != nil {
 		return fmt.Errorf("Error creating pg_tblspc folder %v\n", err)
 	}
-	for _, location := range spec.TablespaceLocations() {
+	for _, location := range spec.tablespaceLocations() {
 		err := fs.NewFolder(location.Location, "").EnsureExists()
 		if err != nil {
 			return fmt.Errorf("Error creating folder for tablespace %v\n", err)
@@ -188,15 +190,24 @@ func setTablespacePaths(spec TablespaceSpec) error {
 	return nil
 }
 
-// TODO : unit tests
-// Do the job of unpacking Backup object
-func (backup *Backup) unwrap(dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool) error {
+// check that directory is empty before unwrap
+func (backup *Backup) unwrapToEmptyDirectory(
+	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
+) error {
 	err := checkDbDirectoryForUnwrap(dbDataDirectory, sentinelDto)
 	if err != nil {
 		return err
 	}
 
-	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesToUnwrap)
+	return backup.unwrapOld(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
+}
+
+// TODO : unit tests
+// Do the job of unpacking Backup object
+func (backup *Backup) unwrapOld(
+	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
+) error {
+	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
 	tarsToExtract, pgControlKey, err := backup.getTarsToExtract(sentinelDto, filesToUnwrap)
 	if err != nil {
 		return err
@@ -206,7 +217,7 @@ func (backup *Backup) unwrap(dbDataDirectory string, sentinelDto BackupSentinelD
 	needPgControl := IsPgControlRequired(backup, sentinelDto)
 
 	if pgControlKey == "" && needPgControl {
-		return NewPgControlNotFoundError()
+		return newPgControlNotFoundError()
 	}
 
 	err = ExtractAll(tarInterpreter, tarsToExtract)
@@ -215,7 +226,7 @@ func (backup *Backup) unwrap(dbDataDirectory string, sentinelDto BackupSentinelD
 	}
 
 	if needPgControl {
-		err = ExtractAll(tarInterpreter, []ReaderMaker{NewStorageReaderMaker(backup.getTarPartitionFolder(), pgControlKey)})
+		err = ExtractAll(tarInterpreter, []ReaderMaker{newStorageReaderMaker(backup.getTarPartitionFolder(), pgControlKey)})
 		if err != nil {
 			return errors.Wrap(err, "failed to extract pg_control")
 		}
@@ -232,9 +243,9 @@ func IsPgControlRequired(backup *Backup, sentinelDto BackupSentinelDto) bool {
 	return needPgControl
 }
 
-// TODO : unit tests
-func IsDirectoryEmpty(directoryPath string) (bool, error) {
+func isDirectoryEmpty(directoryPath string) (bool, error) {
 	var isEmpty = true
+
 	searchLambda := func(path string, info os.FileInfo, err error) error {
 		if path != directoryPath {
 			isEmpty = false
@@ -274,7 +285,7 @@ func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnw
 			continue
 		}
 
-		tarToExtract := NewStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
+		tarToExtract := newStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
 		tarsToExtract = append(tarsToExtract, tarToExtract)
 	}
 	return
@@ -312,4 +323,21 @@ func shouldUnwrapTar(tarName string, sentinelDto BackupSentinelDto, filesToUnwra
 	}
 
 	return false
+}
+
+func getLastWalFilename(backup *Backup) (string, error) {
+	meta, err := backup.fetchMeta()
+	if err != nil {
+		tracelog.InfoLogger.Print("No meta found.")
+		return "", err
+	}
+	prefixLenght := len(utility.BackupNamePrefix)
+	timelineID64, err := strconv.ParseUint(backup.Name[prefixLenght:prefixLenght+8], hexadecimal, sizeofInt32bits)
+	if err != nil {
+		tracelog.InfoLogger.FatalError(err)
+		return "", err
+	}
+	timelineID := uint32(timelineID64)
+	endWalSegmentNo := newWalSegmentNo(meta.FinishLsn - 1)
+	return endWalSegmentNo.getFilename(timelineID), nil
 }

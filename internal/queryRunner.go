@@ -5,14 +5,14 @@ import (
 
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 )
 
 type NoPostgresVersionError struct {
 	error
 }
 
-func NewNoPostgresVersionError() NoPostgresVersionError {
+func newNoPostgresVersionError() NoPostgresVersionError {
 	return NoPostgresVersionError{errors.New("Postgres version not set, cannot determine backup query")}
 }
 
@@ -24,7 +24,7 @@ type UnsupportedPostgresVersionError struct {
 	error
 }
 
-func NewUnsupportedPostgresVersionError(version int) UnsupportedPostgresVersionError {
+func newUnsupportedPostgresVersionError(version int) UnsupportedPostgresVersionError {
 	return UnsupportedPostgresVersionError{errors.Errorf("Could not determine backup query for version %d", version)}
 }
 
@@ -43,12 +43,13 @@ type QueryRunner interface {
 
 // PgQueryRunner is implementation for controlling PostgreSQL 9.0+
 type PgQueryRunner struct {
-	connection *pgx.Conn
-	Version    int
+	connection       *pgx.Conn
+	Version          int
+	SystemIdentifier *uint64
 }
 
 // BuildGetVersion formats a query to retrieve PostgreSQL numeric version
-func (queryRunner *PgQueryRunner) BuildGetVersion() string {
+func (queryRunner *PgQueryRunner) buildGetVersion() string {
 	return "select (current_setting('server_version_num'))::int"
 }
 
@@ -64,9 +65,9 @@ func (queryRunner *PgQueryRunner) BuildStartBackup() (string, error) {
 	case queryRunner.Version >= 90000:
 		return "SELECT case when pg_is_in_recovery() then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true) lsn", nil
 	case queryRunner.Version == 0:
-		return "", NewNoPostgresVersionError()
+		return "", newNoPostgresVersionError()
 	default:
-		return "", NewUnsupportedPostgresVersionError(queryRunner.Version)
+		return "", newUnsupportedPostgresVersionError(queryRunner.Version)
 	}
 }
 
@@ -78,32 +79,46 @@ func (queryRunner *PgQueryRunner) BuildStopBackup() (string, error) {
 	case queryRunner.Version >= 90000:
 		return "SELECT (pg_xlogfile_name_offset(lsn)).file_name, lpad((pg_xlogfile_name_offset(lsn)).file_offset::text, 8, '0') AS file_offset, lsn::text FROM pg_stop_backup() lsn", nil
 	case queryRunner.Version == 0:
-		return "", NewNoPostgresVersionError()
+		return "", newNoPostgresVersionError()
 	default:
-		return "", NewUnsupportedPostgresVersionError(queryRunner.Version)
+		return "", newUnsupportedPostgresVersionError(queryRunner.Version)
 	}
 }
 
 // NewPgQueryRunner builds QueryRunner from available connection
-func NewPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
+func newPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
 	r := &PgQueryRunner{connection: conn}
-
 	err := r.getVersion()
 	if err != nil {
 		return nil, err
 	}
+	err = r.getSystemIdentifier()
+	if err != nil {
+		tracelog.WarningLogger.Printf("Couldn't get system identifier because of error: '%v'\n", err)
+	}
+
 	return r, nil
+}
+
+func (queryRunner *PgQueryRunner) buildGetSystemIdentifier() string {
+	return "select system_identifier from pg_control_system();"
 }
 
 // Retrieve PostgreSQL numeric version
 func (queryRunner *PgQueryRunner) getVersion() (err error) {
 	conn := queryRunner.connection
-	err = conn.QueryRow(queryRunner.BuildGetVersion()).Scan(&queryRunner.Version)
+	err = conn.QueryRow(queryRunner.buildGetVersion()).Scan(&queryRunner.Version)
 	return errors.Wrap(err, "GetVersion: getting Postgres version failed")
 }
 
+func (queryRunner *PgQueryRunner) getSystemIdentifier() (err error) {
+	conn := queryRunner.connection
+	err = conn.QueryRow(queryRunner.buildGetSystemIdentifier()).Scan(&queryRunner.SystemIdentifier)
+	return errors.Wrap(err, "System Identifier: getting identifier of DB failed")
+}
+
 // StartBackup informs the database that we are starting copy of cluster contents
-func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string, lsnString string, inRecovery bool, dataDir string, err error) {
+func (queryRunner *PgQueryRunner) startBackup(backup string) (backupName string, lsnString string, inRecovery bool, dataDir string, err error) {
 	tracelog.InfoLogger.Println("Calling pg_start_backup()")
 	startBackupQuery, err := queryRunner.BuildStartBackup()
 	conn := queryRunner.connection
@@ -123,7 +138,7 @@ func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string,
 }
 
 // StopBackup informs the database that copy is over
-func (queryRunner *PgQueryRunner) StopBackup() (label string, offsetMap string, lsnStr string, err error) {
+func (queryRunner *PgQueryRunner) stopBackup() (label string, offsetMap string, lsnStr string, err error) {
 	tracelog.InfoLogger.Println("Calling pg_stop_backup()")
 	conn := queryRunner.connection
 

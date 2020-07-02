@@ -3,18 +3,19 @@ package internal
 import (
 	"bytes"
 	"fmt"
+	"sync"
+
 	"github.com/pkg/errors"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/utility"
-	"sync"
 )
 
 type DeltaFileWriterNotFoundError struct {
 	error
 }
 
-func NewDeltaFileWriterNotFoundError(filename string) DeltaFileWriterNotFoundError {
+func newDeltaFileWriterNotFoundError(filename string) DeltaFileWriterNotFoundError {
 	return DeltaFileWriterNotFoundError{errors.Errorf("can't file delta file writer for file: '%s'", filename)}
 }
 
@@ -42,19 +43,19 @@ func NewDeltaFileManager(dataFolder DataFolder) *DeltaFileManager {
 		make(map[string]bool),
 		sync.WaitGroup{},
 	}
-	manager.PartFiles = NewLazyCache(func(partFilenameInterface interface{}) (partFile interface{}, err error) {
+	manager.PartFiles = newLazyCache(func(partFilenameInterface interface{}) (partFile interface{}, err error) {
 		partFilename, ok := partFilenameInterface.(string)
 		if !ok {
-			return nil, NewWrongTypeError("string")
+			return nil, newWrongTypeError("string")
 		}
-		return manager.LoadPartFile(partFilename)
+		return manager.loadPartFile(partFilename)
 	})
-	manager.DeltaFileWriters = NewLazyCache(func(deltaFilenameInterface interface{}) (deltaFileWriter interface{}, err error) {
+	manager.DeltaFileWriters = newLazyCache(func(deltaFilenameInterface interface{}) (deltaFileWriter interface{}, err error) {
 		deltaFilename, ok := deltaFilenameInterface.(string)
 		if !ok {
-			return nil, NewWrongTypeError("string")
+			return nil, newWrongTypeError("string")
 		}
-		return manager.LoadDeltaFileWriter(deltaFilename)
+		return manager.loadDeltaFileWriter(deltaFilename)
 	})
 	manager.canceledWaiter.Add(1)
 	go manager.collectCanceledDeltaFiles()
@@ -70,7 +71,7 @@ func (manager *DeltaFileManager) GetBlockLocationConsumer(deltaFilename string) 
 }
 
 // TODO : unit tests
-func (manager *DeltaFileManager) LoadDeltaFileWriter(deltaFilename string) (deltaFileWriter *DeltaFileChanWriter, err error) {
+func (manager *DeltaFileManager) loadDeltaFileWriter(deltaFilename string) (deltaFileWriter *DeltaFileChanWriter, err error) {
 	physicalDeltaFile, err := manager.dataFolder.OpenReadonlyFile(deltaFilename)
 	var deltaFile *DeltaFile
 	if err != nil {
@@ -104,7 +105,7 @@ func (manager *DeltaFileManager) GetPartFile(deltaFilename string) (*WalPartFile
 }
 
 // TODO : unit tests
-func (manager *DeltaFileManager) LoadPartFile(partFilename string) (*WalPartFile, error) {
+func (manager *DeltaFileManager) loadPartFile(partFilename string) (*WalPartFile, error) {
 	physicalPartFile, err := manager.dataFolder.OpenReadonlyFile(partFilename)
 	var partFile *WalPartFile
 	if err != nil {
@@ -172,7 +173,7 @@ func (manager *DeltaFileManager) FlushDeltaFiles(uploader *Uploader, completedPa
 			if err != nil {
 				tracelog.WarningLogger.Printf("Failed to upload delta file: '%s' because of saving error: '%v'\n", deltaFilename, err)
 			} else {
-				err = uploader.UploadFile(NewNamedReaderImpl(&deltaFileData, deltaFilename))
+				err = uploader.UploadFile(newNamedReaderImpl(&deltaFileData, deltaFilename))
 				if err != nil {
 					tracelog.WarningLogger.Printf("Failed to upload delta file: '%s' because of uploading error: '%v'\n", deltaFilename, err)
 				}
@@ -218,7 +219,7 @@ func (manager *DeltaFileManager) collectCanceledDeltaFiles() {
 func (manager *DeltaFileManager) CombinePartFile(deltaFilename string, partFile *WalPartFile) error {
 	deltaFileWriterInterface, exists := manager.DeltaFileWriters.LoadExisting(deltaFilename)
 	if !exists {
-		return NewDeltaFileWriterNotFoundError(deltaFilename)
+		return newDeltaFileWriterNotFoundError(deltaFilename)
 	}
 	deltaFileWriter := deltaFileWriterInterface.(*DeltaFileChanWriter)
 	deltaFileWriter.DeltaFile.WalParser = walparser.LoadWalParserFromCurrentRecordHead(partFile.WalHeads[WalFileInDelta-1])

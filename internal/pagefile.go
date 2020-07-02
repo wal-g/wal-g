@@ -13,23 +13,24 @@ package internal
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path"
 	"regexp"
 	"strings"
 
+	"github.com/wal-g/wal-g/utility"
+
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 )
 
 const (
-	DatabasePageSize            = walparser.BlockSize
+	DatabasePageSize			= int64(walparser.BlockSize)
 	sizeofInt32                 = 4
 	sizeofInt16                 = 2
 	sizeofInt64                 = 8
@@ -49,7 +50,7 @@ type InvalidBlockError struct {
 	error
 }
 
-func NewInvalidBlockError(blockNo uint32) InvalidBlockError {
+func newInvalidBlockError(blockNo uint32) InvalidBlockError {
 	return InvalidBlockError{errors.Errorf("block %d is invalid", blockNo)}
 }
 
@@ -61,7 +62,7 @@ type InvalidIncrementFileHeaderError struct {
 	error
 }
 
-func NewInvalidIncrementFileHeaderError() InvalidIncrementFileHeaderError {
+func newInvalidIncrementFileHeaderError() InvalidIncrementFileHeaderError {
 	return InvalidIncrementFileHeaderError{errors.New("Invalid increment file header")}
 }
 
@@ -73,7 +74,7 @@ type UnknownIncrementFileHeaderError struct {
 	error
 }
 
-func NewUnknownIncrementFileHeaderError() UnknownIncrementFileHeaderError {
+func newUnknownIncrementFileHeaderError() UnknownIncrementFileHeaderError {
 	return UnknownIncrementFileHeaderError{errors.New("Unknown increment file header")}
 }
 
@@ -85,7 +86,7 @@ type UnexpectedTarDataError struct {
 	error
 }
 
-func NewUnexpectedTarDataError() UnexpectedTarDataError {
+func newUnexpectedTarDataError() UnexpectedTarDataError {
 	return UnexpectedTarDataError{errors.New("Expected end of Tar")}
 }
 
@@ -136,7 +137,7 @@ func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitma
 }
 
 // ApplyFileIncrement changes pages according to supplied change map file
-func ApplyFileIncrement(fileName string, increment io.Reader) error {
+func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrementalFiles bool) error {
 	tracelog.DebugLogger.Printf("Incrementing %s\n", fileName)
 	err := ReadIncrementFileHeader(increment)
 	if err != nil {
@@ -160,7 +161,12 @@ func ApplyFileIncrement(fileName string, increment io.Reader) error {
 		return err
 	}
 
-	file, err := os.OpenFile(fileName, os.O_RDWR, 0666)
+	openFlags := os.O_RDWR
+	if createNewIncrementalFiles {
+		openFlags = openFlags | os.O_CREATE
+	}
+
+	file, err := os.OpenFile(fileName, openFlags, 0666)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return errors.Wrap(err, "incremented file should always exist")
@@ -191,7 +197,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader) error {
 
 	all, _ := increment.Read(make([]byte, 1))
 	if all > 0 {
-		return NewUnexpectedTarDataError()
+		return newUnexpectedTarDataError()
 	}
 
 	return nil
@@ -205,10 +211,10 @@ func ReadIncrementFileHeader(reader io.Reader) error {
 	}
 
 	if header[0] != 'w' || header[1] != 'i' || header[3] != SignatureMagicNumber {
-		return NewInvalidIncrementFileHeaderError()
+		return newInvalidIncrementFileHeaderError()
 	}
 	if header[2] != '1' {
-		return NewUnknownIncrementFileHeaderError()
+		return newUnknownIncrementFileHeaderError()
 	}
 	return nil
 }

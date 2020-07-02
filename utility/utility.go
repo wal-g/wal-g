@@ -2,36 +2,41 @@ package utility
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 )
 
-// TODO : unit tests
 func LoggedClose(c io.Closer, errmsg string) {
 	err := c.Close()
 	if errmsg == "" {
-		errmsg = "Problem with closing object: %v"
+		errmsg = "Problem with closing object"
 	}
 	if err != nil {
-		tracelog.ErrorLogger.Printf(errmsg+": %v", err)
+		tracelog.ErrorLogger.Printf("%s: %v", errmsg, err)
 	}
 }
 
 const (
 	VersionStr       = "005"
 	BaseBackupPath   = "basebackups_" + VersionStr + "/"
+	CatchupPath      = "catchup_" + VersionStr + "/"
 	WalPath          = "wal_" + VersionStr + "/"
 	BackupNamePrefix = "base_"
+	BackupTimeFormat = "20060102T150405Z"
 
 	// utility.SentinelSuffix is a suffix of backup finish sentinel file
 	SentinelSuffix         = "_backup_stop_sentinel.json"
@@ -39,6 +44,7 @@ const (
 	CopiedBlockMaxSize     = CompressedBlockMaxSize
 	MetadataFileName       = "metadata.json"
 	PathSeparator          = string(os.PathSeparator)
+	Mebibyte               = 1024 * 1024
 )
 
 // Empty is used for channel signaling.
@@ -112,7 +118,6 @@ func GetFileExtension(filePath string) string {
 	return ext
 }
 
-// TODO : unit tests
 func TrimFileExtension(filePath string) string {
 	return strings.TrimSuffix(filePath, "."+GetFileExtension(filePath))
 }
@@ -121,10 +126,47 @@ func GetSubdirectoryRelativePath(subdirectoryPath string, directoryPath string) 
 	return NormalizePath(SanitizePath(strings.TrimPrefix(subdirectoryPath, directoryPath)))
 }
 
+// BytesPool holds []byte.
+type BytesPool struct {
+	pool chan []byte
+}
+
+// NewBytesPool creates new BytesPool.
+func NewBytesPool(max int) *BytesPool {
+	return &BytesPool{
+		pool: make(chan []byte, max),
+	}
+}
+
+const CopyBytesPoolSize = 2
+
+var copyBytesPool = NewBytesPool(CopyBytesPoolSize)
+
+// Get borrows []byte from the pool.
+func (p *BytesPool) Get() []byte {
+	var buf []byte
+	select {
+	case buf = <-p.pool:
+	default:
+		buf = make([]byte, CopiedBlockMaxSize)
+	}
+	return buf
+}
+
+// Put returns []byte to the pool.
+func (p *BytesPool) Put(b []byte) {
+	select {
+	case p.pool <- b:
+	default:
+	}
+}
+
 //FastCopy copies data from src to dst in blocks of CopiedBlockMaxSize bytes
 func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
 	n := int64(0)
-	buf := make([]byte, CopiedBlockMaxSize)
+	buf := copyBytesPool.Get()
+	defer copyBytesPool.Put(buf)
+
 	for {
 		m, readingErr := src.Read(buf)
 		if readingErr != nil && readingErr != io.EOF {
@@ -196,11 +238,10 @@ func TimeNowCrossPlatformLocal() time.Time {
 var patternTimeRFC3339 = "[0-9]{8}T[0-9]{6}Z"
 var regexpTimeRFC3339 = regexp.MustCompile(patternTimeRFC3339)
 
-// TODO : unit tests
 func TryFetchTimeRFC3999(name string) (string, bool) {
 	times := regexpTimeRFC3339.FindAllString(name, 1)
 	if len(times) > 0 {
-		return regexpTimeRFC3339.FindAllString(name, 1)[0], true
+		return times[0], true
 	}
 	return "", false
 }
@@ -228,4 +269,105 @@ func SelectMatchingFiles(fileMask string, filePathsToFilter map[string]bool) (ma
 		}
 	}
 	return result, nil
+}
+
+// ResetTimer safety resets timer (drains channel if required)
+func ResetTimer(t *time.Timer, d time.Duration) {
+	if !t.Stop() {
+		select {
+		case <-t.C:
+		default:
+		}
+	}
+	t.Reset(d)
+}
+
+// SignalHandler defines signal handler setup & shutdown representation
+type SignalHandler struct {
+	ctx    context.Context
+	ch     chan os.Signal
+	cancel func()
+}
+
+// NewSignalHandler constructs SignalHandler and sets up signal mask
+func NewSignalHandler(ctx context.Context, cancel func(), signals []os.Signal) *SignalHandler {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, signals...)
+	sh := SignalHandler{ctx: ctx, ch: ch, cancel: cancel}
+	go func() {
+		select {
+		case s := <-sh.ch:
+			tracelog.InfoLogger.Printf("Received %s signal. Shutting down", s.String())
+			sh.cancel()
+		case <-sh.ctx.Done():
+		}
+	}()
+	return &sh
+}
+
+// Close removes signal mask and call cancel func
+func (sh *SignalHandler) Close() error {
+	tracelog.InfoLogger.Printf("Removing sigmask. Shutting down")
+	signal.Stop(sh.ch)
+	sh.cancel()
+	return nil
+}
+
+// WaitFirstError returns first error from given channels or nil
+func WaitFirstError(errs ...<-chan error) error {
+	errc := MergeErrors(errs...)
+	for err := range errc {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// MergeErrors merges multiple channels of errors.
+func MergeErrors(cs ...<-chan error) <-chan error {
+	var wg sync.WaitGroup
+	out := make(chan error, len(cs))
+	output := func(c <-chan error) {
+		for n := range c {
+			out <- n
+		}
+		wg.Done()
+	}
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go output(c)
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
+}
+
+func StartCommandWithStdoutStderr(cmd *exec.Cmd) (io.ReadCloser, *bytes.Buffer, error) {
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, nil, err
+	}
+	stderr := &bytes.Buffer{}
+	cmd.Stderr = stderr
+	err = cmd.Start()
+	if err != nil {
+		return nil, nil, err
+	}
+	return stdout, stderr, err
+}
+
+func StartCommandWithStdoutPipe(cmd *exec.Cmd) (io.ReadCloser, error) {
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	err = cmd.Start()
+	if err != nil {
+		return nil, err
+	}
+	return stdout, err
 }

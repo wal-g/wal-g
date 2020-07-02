@@ -5,8 +5,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/webserver"
+
+	"github.com/spf13/cobra"
+	"github.com/wal-g/tracelog"
 )
 
 var DBShortDescription = "MongoDB backup tool"
@@ -15,11 +18,18 @@ var DBShortDescription = "MongoDB backup tool"
 var WalgVersion = "devel"
 var GitRevision = "devel"
 var BuildDate = "devel"
+var webServer webserver.WebServer
 
 var Cmd = &cobra.Command{
 	Use:     "wal-g",
 	Short:   DBShortDescription, // TODO : improve description
 	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "MongoDB"}, "\t"),
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		err := internal.AssertRequiredSettingsSet()
+		tracelog.ErrorLogger.FatalOnError(err)
+		err = internal.ConfigureAndRunWebServer(webserver.DefaultWebServer)
+		tracelog.ErrorLogger.FatalOnError(err)
+	},
 }
 
 func Execute() {
@@ -32,6 +42,8 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
+	internal.RequiredSettings[internal.MongoDBUriSetting] = true
 	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
 	Cmd.InitDefaultVersionFlag()
+	internal.AddConfigFlags(Cmd)
 }

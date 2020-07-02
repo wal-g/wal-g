@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/testtools"
@@ -200,6 +201,44 @@ func TestFastCopy_ReturnsError_WhenWriterFails(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestTryFetchTimeRFC3999_Valid(t *testing.T) {
+	var testCases = []struct {
+		input    string
+		expected string
+	}{
+		{"20191015T211200Z", "20191015T211200Z"},
+		{"20191015T211200Z22221015T211200Z", "20191015T211200Z"},
+		{"         20191015T211200Z", "20191015T211200Z"},
+		{"000000020191015T211200Z", "20191015T211200Z"},
+		{"20191015T211200ZZZZZ", "20191015T211200Z"},
+	}
+
+	for _, testCase := range testCases {
+		actual, ok := utility.TryFetchTimeRFC3999(testCase.input)
+		assert.Equal(t, true, ok)
+		assert.Equal(t, testCase.expected, actual)
+	}
+}
+
+func TestTryFetchTimeRFC3999_Invalid(t *testing.T) {
+	var testCases = []struct {
+		input string
+	}{
+		{""},
+		{"20191015T211200"},
+		{"20191015211200Z"},
+		{"20191015:211200Z"},
+		{"20191015 211200Z"},
+		{"TotallyBadTimeString"},
+	}
+
+	for _, testCase := range testCases {
+		actual, ok := utility.TryFetchTimeRFC3999(testCase.input)
+		assert.Equal(t, actual, "")
+		assert.Equal(t, ok, false)
+	}
+}
+
 func TestSelectMatchingFiles_EmptyMask(t *testing.T) {
 	files := map[string]bool{
 		"/a":   true,
@@ -297,10 +336,136 @@ func TestIsInDirectory_DifferentDirectories(t *testing.T) {
 	assert.False(t, utility.IsInDirectory("/tmp", "/home/ismirn0ff"))
 }
 
+func TestTrimFileExtension_EmptyFilePath(t *testing.T) {
+	assert.Equal(t, "", utility.TrimFileExtension(""))
+}
+
+func TestTrimFileExtension_FileWithoutFilename(t *testing.T) {
+	assert.Equal(t, "", utility.TrimFileExtension(".hidden"))
+}
+
+func TestTrimFileExtension_PathWithoutFilename(t *testing.T) {
+	assert.Equal(t, "path/", utility.TrimFileExtension("path/.hidden"))
+}
+
+func TestTrimFileExtension_FileWithoutExtension(t *testing.T) {
+	assert.Equal(t, "index", utility.TrimFileExtension("index"))
+}
+
+func TestTrimFileExtension_PathWithoutExtension(t *testing.T) {
+	assert.Equal(t, "path/index", utility.TrimFileExtension("path/index"))
+}
+
+func TestTrimFileExtension_FileWithExtension(t *testing.T) {
+	assert.Equal(t, "index", utility.TrimFileExtension("index.js"))
+}
+
+func TestTrimFileExtension_FileWithComplexExtension(t *testing.T) {
+	assert.Equal(t, "index.test", utility.TrimFileExtension("index.test.js"))
+}
+
+func TestTrimFileExtension_PathWithExtension(t *testing.T) {
+	assert.Equal(t, "/path/index", utility.TrimFileExtension("/path/index.js"))
+}
+
 func TestGetSubdirectoryRelativePath_NormalizedDirectory(t *testing.T) {
 	assert.Equal(t, "ismirn0ff/documents", utility.GetSubdirectoryRelativePath("/home/ismirn0ff/documents", "/home"))
 }
 
 func TestGetSubdirectoryRelativePath_NotNormalizedDirectory(t *testing.T) {
 	assert.Equal(t, "ismirn0ff/documents", utility.GetSubdirectoryRelativePath("/home/ismirn0ff/documents/", "/home/"))
+}
+
+func TestStripWalFileName_NonValidInput(t *testing.T) {
+	var lsn = "---"
+	var expected = strings.Repeat("Z", 24)
+
+	result := utility.StripWalFileName(lsn)
+
+	assert.Equal(t, expected, result)
+}
+
+func TestStripWalFileName_ValidLsn(t *testing.T) {
+	var path = RandomLsn()
+	result := utility.StripWalFileName(path)
+
+	assert.Equal(t, path, result)
+}
+
+func TestStripWalFileName_ReturnFirstLsn(t *testing.T) {
+	var paths = [3]string{RandomLsn(), RandomLsn(), RandomLsn()}
+	var path = strings.Join(paths[:], "-")
+
+	result := utility.StripWalFileName(path)
+
+	assert.Equal(t, paths[0], result)
+}
+
+func RandomLsn() string {
+	var letter = []rune("ABCDEF0123456789")
+	const LSNLength = 24
+
+	b := make([]rune, LSNLength)
+	for i := range b {
+		b[i] = letter[rand.Intn(len(letter))]
+	}
+	return string(b)
+}
+
+func TestLoggedCloseWithoutError(t *testing.T) {
+	defer tracelog.ErrorLogger.SetOutput(tracelog.ErrorLogger.Writer())
+
+	var buf bytes.Buffer
+	tracelog.ErrorLogger.SetOutput(&buf)
+
+	utility.LoggedClose(&testtools.NopCloser{}, "")
+
+	loggedData, err := ioutil.ReadAll(&buf)
+	if err != nil {
+		t.Logf("failed read from pipe: %v", err)
+	}
+
+	assert.Equal(t, "", string(loggedData))
+}
+
+func TestLoggedCloseWithErrorAndDefaultMessage(t *testing.T) {
+	defer tracelog.ErrorLogger.SetOutput(tracelog.ErrorLogger.Writer())
+	defer tracelog.ErrorLogger.SetPrefix(tracelog.ErrorLogger.Prefix())
+	defer tracelog.ErrorLogger.SetFlags(tracelog.ErrorLogger.Flags())
+
+	var buf bytes.Buffer
+
+	tracelog.ErrorLogger.SetPrefix("")
+	tracelog.ErrorLogger.SetOutput(&buf)
+	tracelog.ErrorLogger.SetFlags(0)
+
+	utility.LoggedClose(&testtools.ErrorWriteCloser{}, "")
+
+	loggedData, err := ioutil.ReadAll(&buf)
+	if err != nil {
+		t.Logf("failed read from buffer: %v", err)
+	}
+
+	assert.Equal(t, "Problem with closing object: mock close: close error\n", string(loggedData))
+}
+
+func TestLoggedCloseWithErrorAndCustomMessage(t *testing.T) {
+	defer tracelog.ErrorLogger.SetOutput(tracelog.ErrorLogger.Writer())
+	defer tracelog.ErrorLogger.SetPrefix(tracelog.ErrorLogger.Prefix())
+	defer tracelog.ErrorLogger.SetFlags(tracelog.ErrorLogger.Flags())
+
+	var buf bytes.Buffer
+
+	tracelog.ErrorLogger.SetPrefix("")
+	tracelog.ErrorLogger.SetOutput(&buf)
+	tracelog.ErrorLogger.SetFlags(0)
+
+	utility.LoggedClose(&testtools.ErrorWriteCloser{}, "custom error message")
+
+	loggedData, err := ioutil.ReadAll(&buf)
+	if err != nil {
+		t.Logf("failed read from buffer: %v", err)
+	}
+
+	assert.Equal(t, "custom error message: mock close: close error\n", string(loggedData))
 }

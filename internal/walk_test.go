@@ -4,10 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/testtools"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/ioutil"
 	"os"
@@ -15,6 +11,11 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/testtools"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const BUFSIZE = 4 * 1024
@@ -174,7 +175,7 @@ func extract(t *testing.T, dir string) string {
 		"/global/pg_control": true,
 		"/pg_notify/0000":    true,
 		"/tablespace_map":    true,
-	})
+	}, false)
 	err = os.MkdirAll(outDir, 0766)
 	if err != nil {
 		t.Log(err)
@@ -339,8 +340,10 @@ func TestWalk(t *testing.T) {
 		TablespaceSpec:   internal.NewTablespaceSpec(data),
 	}
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
+	size := int64(0)
 	bundle.TarBallMaker = &testtools.FileTarBallMaker{
-		Out: compressed,
+		Out:  compressed,
+		Size: &size,
 	}
 	err := os.MkdirAll(compressed, 0766)
 	if err != nil {

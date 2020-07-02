@@ -1,8 +1,9 @@
 package internal
 
 import (
-	"github.com/tinsane/storages/storage"
 	"io"
+
+	"github.com/wal-g/storages/storage"
 )
 
 // StorageReaderMaker creates readers for downloading from storage
@@ -11,7 +12,7 @@ type StorageReaderMaker struct {
 	RelativePath string
 }
 
-func NewStorageReaderMaker(folder storage.Folder, relativePath string) *StorageReaderMaker {
+func newStorageReaderMaker(folder storage.Folder, relativePath string) *StorageReaderMaker {
 	return &StorageReaderMaker{folder, relativePath}
 }
 

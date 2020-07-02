@@ -3,9 +3,10 @@
 package lzo
 
 import (
+	"io"
+
 	"github.com/cyberdelia/lzo"
 	"github.com/wal-g/wal-g/utility"
-	"io"
 )
 
 const (

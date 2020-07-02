@@ -2,6 +2,8 @@ package internal_test
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
@@ -9,7 +11,6 @@ import (
 	"github.com/wal-g/wal-g/internal/compression/lzma"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
-	"testing"
 )
 
 func TestWallFetchCachesLastDecompressor(t *testing.T) {

@@ -2,11 +2,12 @@ package walparser
 
 import (
 	"bytes"
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"math/rand"
 	"testing"
+
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestWalPageReader_ReadPageData(t *testing.T) {

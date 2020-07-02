@@ -2,15 +2,16 @@ package internal
 
 import (
 	"archive/tar"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
+	"github.com/wal-g/wal-g/utility"
+
 	"github.com/pkg/errors"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 )
 
 // TarInterpreter behaves differently
@@ -24,14 +25,18 @@ type FileTarInterpreter struct {
 	DBDataDirectory string
 	Sentinel        BackupSentinelDto
 	FilesToUnwrap   map[string]bool
+
+	createNewIncrementalFiles bool
 }
 
-func NewFileTarInterpreter(dbDataDirectory string, sentinel BackupSentinelDto, filesToUnwrap map[string]bool) *FileTarInterpreter {
-	return &FileTarInterpreter{dbDataDirectory, sentinel, filesToUnwrap}
+func NewFileTarInterpreter(
+	dbDataDirectory string, sentinel BackupSentinelDto, filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
+) *FileTarInterpreter {
+	return &FileTarInterpreter{dbDataDirectory, sentinel, filesToUnwrap, createNewIncrementalFiles}
 }
 
 // TODO : unit tests
-func (tarInterpreter *FileTarInterpreter) unwrapRegularFile(fileReader io.Reader, fileInfo *tar.Header, targetPath string) error {
+func (tarInterpreter *FileTarInterpreter) unwrapRegularFileOld(fileReader io.Reader, fileInfo *tar.Header, targetPath string) error {
 	if tarInterpreter.FilesToUnwrap != nil {
 		if _, ok := tarInterpreter.FilesToUnwrap[fileInfo.Name]; !ok {
 			// don't have to unwrap it this time
@@ -43,10 +48,10 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFile(fileReader io.Reader
 
 	// If this file is incremental we use it's base version from incremental path
 	if haveFileDescription && tarInterpreter.Sentinel.IsIncremental() && fileDescription.IsIncremented {
-		err := ApplyFileIncrement(targetPath, fileReader)
+		err := ApplyFileIncrement(targetPath, fileReader, tarInterpreter.createNewIncrementalFiles)
 		return errors.Wrapf(err, "Interpret: failed to apply increment for '%s'", targetPath)
 	}
-	err := prepareDirs(fileInfo.Name, targetPath)
+	err := PrepareDirs(fileInfo.Name, targetPath)
 	if err != nil {
 		return errors.Wrap(err, "Interpret: failed to create all directories")
 	}
@@ -86,7 +91,11 @@ func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileIn
 	targetPath := path.Join(tarInterpreter.DBDataDirectory, fileInfo.Name)
 	switch fileInfo.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
-		return tarInterpreter.unwrapRegularFile(fileReader, fileInfo, targetPath)
+		// temporary switch to determine if new unwrap logic should be used
+		if useNewUnwrapImplementation {
+			return tarInterpreter.unwrapRegularFileNew(fileReader, fileInfo, targetPath)
+		}
+		return tarInterpreter.unwrapRegularFileOld(fileReader, fileInfo, targetPath)
 	case tar.TypeDir:
 		err := os.MkdirAll(targetPath, 0755)
 		if err != nil {
@@ -107,8 +116,11 @@ func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileIn
 	return nil
 }
 
-// Make sure all dirs exist
-func prepareDirs(fileName string, targetPath string) error {
+// PrepareDirs makes sure all dirs exist
+func PrepareDirs(fileName string, targetPath string) error {
+	if fileName == targetPath {
+		return nil // because it runs in the local directory
+	}
 	base := filepath.Base(fileName)
 	dir := strings.TrimSuffix(targetPath, base)
 	err := os.MkdirAll(dir, 0755)

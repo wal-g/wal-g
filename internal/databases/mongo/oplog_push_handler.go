@@ -1,22 +1,35 @@
 package mongo
 
 import (
-	"os"
+	"context"
+	"sync"
 
-	"github.com/tinsane/tracelog"
-	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleOplogPush(uploader *Uploader) {
-	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(OplogPath)
-	if !internal.FileIsPiped(os.Stdin) {
-		tracelog.ErrorLogger.Fatal("Use stdin\n")
-	}
-	oplogName := OplogPrefix + utility.TimeNowCrossPlatformUTC().Format("20060102T150405Z")
-	dstPath := oplogName + "." + uploader.Compressor.FileExtension()
-	err := uploader.PushStreamToDestination(os.Stdin, dstPath)
-	tracelog.ErrorLogger.FatalOnError(err)
+// HandleOplogPush starts oplog archiving process: fetch, validate, upload to storage.
+func HandleOplogPush(ctx context.Context, since models.Timestamp, fetcher stages.FromFetcher, applier stages.Applier) error {
+	ctx, cancel := context.WithCancel(ctx)
+	wg := &sync.WaitGroup{}
+	defer func() {
+		cancel()
+		wg.Wait()
+	}()
 
-	tracelog.InfoLogger.Println("Oplog file " + dstPath + " was uploaded")
+	var errs []<-chan error
+	oplogc, errc, err := fetcher.OplogFrom(ctx, since, wg)
+	if err != nil {
+		return err
+	}
+	errs = append(errs, errc)
+
+	errc, err = applier.Apply(ctx, oplogc, wg)
+	if err != nil {
+		return err
+	}
+	errs = append(errs, errc)
+
+	return utility.WaitFirstError(errs...)
 }

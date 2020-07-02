@@ -1,0 +1,5 @@
+"WALE_S3_PREFIX": "s3://deletebeforepermanentfullbucket",
+"WALG_USE_WAL_DELTA": "true",
+"WALG_UPLOAD_CONCURRENCY": "1",
+"WALG_UPLOAD_QUEUE": "1",
+"WALG_UPLOAD_DISK_CONCURRENCY": "1"

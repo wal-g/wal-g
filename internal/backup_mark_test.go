@@ -3,11 +3,12 @@ package internal_test
 import (
 	"bytes"
 	"encoding/json"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
-	"testing"
 )
 
 type backupInfo map[string]struct {

@@ -1,0 +1,34 @@
+[
+  {
+    "name": "simple_load",
+    "config": [
+      {
+        "op": "insert",
+        "cnt": 2,
+        "db": "db1",
+        "cl": "c1",
+        "adv": {
+          "values": [
+            "v1",
+            "v2",
+            "v3"
+          ],
+          "keys": [
+            "k1",
+            "k2",
+            "k3"
+          ],
+          "mx_docs_cnt": 2
+        }
+      },
+      {
+        "op": "delete",
+        "cnt": 1,
+        "db": "db1",
+        "cl": "c1",
+        "adv": {
+        }
+      }
+    ]
+  }
+]

@@ -3,10 +3,11 @@ package internal_test
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,7 @@ import (
 
 func TestDeltaBitmapInitialize(t *testing.T) {
 	pageReader := internal.IncrementalPageReader{
-		FileSize: int64(internal.DatabasePageSize * 5),
+		FileSize: internal.DatabasePageSize * 5,
 		Blocks:   make([]uint32, 0),
 	}
 	deltaBitmap := roaring.BitmapOf(0, 2, 3, 12, 14)
@@ -121,10 +122,10 @@ func TestFullScanInitialize(t *testing.T) {
 }
 
 func makePageDataReader() ioextensions.ReadSeekCloser {
-	pageCount := 8
-	pageData := make([]byte, pageCount*int(internal.DatabasePageSize))
-	for i := 0; i < pageCount; i++ {
-		for j := i * int(internal.DatabasePageSize); j < (i+1)*int(internal.DatabasePageSize); j++ {
+	pageCount := int64(8)
+	pageData := make([]byte, pageCount*internal.DatabasePageSize)
+	for i := int64(0); i < pageCount; i++ {
+		for j := i * internal.DatabasePageSize; j < (i+1)*internal.DatabasePageSize; j++ {
 			pageData[j] = byte(i)
 		}
 	}
@@ -138,7 +139,7 @@ func TestRead(t *testing.T) {
 	expectedRead := make([]byte, 3+3*internal.DatabasePageSize)
 	copy(expectedRead, header)
 	for id, i := range blocks {
-		for j := 3 + id*int(internal.DatabasePageSize); j < 3+(id+1)*int(internal.DatabasePageSize); j++ {
+		for j := 3 + int64(id)*internal.DatabasePageSize; j < 3+(int64(id)+1)*internal.DatabasePageSize; j++ {
 			expectedRead[j] = byte(i)
 		}
 	}
@@ -165,7 +166,7 @@ func TestAdvanceFileReader(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []uint32{9}, pageReader.Blocks)
 	expectedNext := make([]byte, internal.DatabasePageSize)
-	for i := 0; i < int(internal.DatabasePageSize); i++ {
+	for i := int64(0); i < internal.DatabasePageSize; i++ {
 		expectedNext[i] = 5
 	}
 	assert.Equal(t, expectedNext, pageReader.Next)
@@ -188,7 +189,7 @@ func TestDrainMoreData_HasBlocks(t *testing.T) {
 	assert.True(t, succeed)
 	assert.Equal(t, []uint32{6}, pageReader.Blocks)
 	expectedNext := make([]byte, internal.DatabasePageSize)
-	for i := 0; i < int(internal.DatabasePageSize); i++ {
+	for i := int64(0); i < internal.DatabasePageSize; i++ {
 		expectedNext[i] = 3
 	}
 	assert.Equal(t, expectedNext, pageReader.Next)

@@ -1,8 +1,9 @@
 package lz4
 
 import (
-	"github.com/pierrec/lz4"
 	"io"
+
+	"github.com/pierrec/lz4"
 )
 
 const (

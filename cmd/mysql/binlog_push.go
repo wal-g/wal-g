@@ -1,9 +1,9 @@
 package mysql
 
 import (
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
-	"github.com/tinsane/tracelog"
 
 	"github.com/spf13/cobra"
 )
@@ -18,7 +18,12 @@ var binlogPushCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
-		mysql.HandleBinlogPush(&mysql.Uploader{Uploader: uploader})
+		mysql.HandleBinlogPush(uploader)
+	},
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		internal.RequiredSettings[internal.MysqlDatasourceNameSetting] = true
+		err := internal.AssertRequiredSettingsSet()
+		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
 

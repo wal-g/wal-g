@@ -1,5 +1,8 @@
 version: '3'
 
+volumes:
+  fdb_volume:
+
 services:
   golang:
     build:
@@ -31,6 +34,9 @@ services:
       &&  mkdir -p /export/waldeltabucket
       &&  mkdir -p /export/ghostbucket
       &&  mkdir -p /export/compressionbucket
+      &&  mkdir -p /export/copyallbucket
+      &&  mkdir -p /export/copybackupbucket
+      &&  mkdir -p /export/compressionreversebucket
       &&  mkdir -p /export/deleteretainfullbucket
       &&  mkdir -p /export/deleteretainfindfullbucket
       &&  mkdir -p /export/deletebeforenamefindfullbucket
@@ -39,9 +45,15 @@ services:
       &&  mkdir -p /export/deletebeforepermanentdeltabucket
       &&  mkdir -p /export/deletewithoutconfirm
       &&  mkdir -p /export/deleteendtoendbucket
-      &&  mkdir -p /export/mysqlfullbucket
-      &&  mkdir -p /export/mysqlbinlogpushbucket
+      &&  mkdir -p /export/mysqlfullxtrabackupbucket
+      &&  mkdir -p /export/mysqlfullmysqldumpbucket
+      &&  mkdir -p /export/mysqlbinlogpushfetchbucket
       &&  mkdir -p /export/mysqldeleteendtoendbucket
+      &&  mkdir -p /export/mysqlbinlogreplaybucket
+      &&  mkdir -p /export/mysqlpitrxtrabackupbucket
+      &&  mkdir -p /export/mysqlpitrmysqldumpbucket
+      &&  mkdir -p /export/mariadbfullmysqldumpbucket
+      &&  mkdir -p /export/mariadbfullmariabackupbucket
       &&  mkdir -p /export/mongostreampushbucket
       &&  mkdir -p /export/mongooplogpushbucket
       &&  mkdir -p /export/mongodeletebeforebucket
@@ -62,9 +74,6 @@ services:
       context: .
     image: wal-g/pg_tests
     container_name: wal-g_pg_tests
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
 
   pg_build_docker_prefix:
     build:
@@ -72,9 +81,6 @@ services:
       context: .
     image: wal-g/docker_prefix
     container_name: wal-g_pg_docker_prefix
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -120,9 +126,6 @@ services:
       context: .
     image: wal-g/delete_before_permanent_delta_test
     container_name: wal-g_pg_delete_before_permanent_delta_test
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -134,9 +137,6 @@ services:
       context: .
     image: wal-g/wal_perftest
     container_name: wal-g_pg_wal_perftest
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -148,9 +148,6 @@ services:
       context: .
     image: wal-g/backup_perftest
     container_name: wal-g_pg_backup_perftest
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -266,6 +263,17 @@ services:
     links:
       - s3
 
+  pg_several_delta_backups_reverse_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_several_delta_backups_reverse_test
+      context: .
+    image: wal-g/several_delta_backups_reverse_test
+    container_name: wal-g_pg_several_delta_backups_reverse_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   pg_crypto_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_crypto_test
@@ -305,9 +313,6 @@ services:
       context: .
     image: wal-g/wale_compatibility_test
     container_name: wal-g_pg_wale_compatibility_test
-    env_file:
-      - docker/common/common_walg.env
-      - docker/pg_tests/walg.env
     depends_on:
       - s3
     links:
@@ -341,6 +346,17 @@ services:
     links:
       - s3
 
+  pg_catchup_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_catchup_test
+      context: .
+    image: wal-g/catchup_test
+    container_name: wal-g_pg_catchup_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   mysql:
     build:
       dockerfile: docker/mysql/Dockerfile
@@ -352,15 +368,55 @@ services:
     build:
       dockerfile: docker/mysql_tests/Dockerfile
       context: .
+    security_opt:
+      - seccomp:unconfined
     image: wal-g/mysql_tests
     container_name: wal-g_mysql_tests
     env_file:
       - docker/common/common_walg.env
-      - docker/mysql_tests/walg.env
     depends_on:
       - s3
     links:
       - s3
+
+  mariadb:
+    build:
+      dockerfile: docker/mariadb/Dockerfile
+      context: .
+    image: wal-g/mariadb
+    container_name: wal-g_mariadb
+
+  mariadb_tests:
+    build:
+      dockerfile: docker/mariadb_tests/Dockerfile
+      context: .
+    security_opt:
+      - seccomp:unconfined
+    image: wal-g/mariadb_tests
+    container_name: wal-g_mariadb_tests
+    env_file:
+      - docker/common/common_walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  fdb:
+    image: foundationdb/foundationdb
+    container_name: wal-g_fdb
+    volumes:
+      - fdb_volume:/var/fdb
+
+  fdb_tests:
+    build:
+      dockerfile: docker/fdb_tests/Dockerfile
+      context: .
+    image: wal-g/fdb_tests
+    container_name: wal-g_fdb_tests
+    volumes:
+      - fdb_volume:/var/fdb
+    depends_on:
+      - fdb
 
   redis:
     build:
@@ -375,26 +431,6 @@ services:
       context: .
     image: wal-g/redis_tests
     container_name: wal-g_redis_tests
-    env_file:
-      - docker/common/common_walg.env
-    depends_on:
-      - s3
-    links:
-      - s3
-
-  mongo:
-    build:
-      dockerfile: docker/mongo/Dockerfile
-      context: .
-    image: wal-g/mongo
-    container_name: wal-g_mongo
-
-  mongo_tests:
-    build:
-      dockerfile: docker/mongo_tests/Dockerfile
-      context: .
-    image: wal-g/mongo_tests
-    container_name: wal-g_mongo_tests
     env_file:
       - docker/common/common_walg.env
     depends_on:

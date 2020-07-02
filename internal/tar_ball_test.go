@@ -3,12 +3,13 @@ package internal_test
 import (
 	"archive/tar"
 	"bytes"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/testtools"
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/testtools"
 )
 
 // TODO : this test is broken now
@@ -84,8 +85,11 @@ func TestPackFileTo(t *testing.T) {
 		Typeflag: tar.TypeReg,
 	}
 	buffer := bytes.NewBuffer(make([]byte, 0))
+	size := int64(0)
+
 	tarBallMaker := testtools.BufferTarBallMaker{
 		BufferToWrite: buffer,
+		Size:          &size,
 	}
 	tarBall := tarBallMaker.Make(false)
 	tarBall.SetUp(nil)

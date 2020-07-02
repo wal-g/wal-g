@@ -4,7 +4,6 @@ package internal_test
 
 import (
 	"bytes"
-	"github.com/wal-g/wal-g/internal/crypto"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -12,6 +11,8 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/wal-g/wal-g/internal/crypto"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal/compression/lzo"

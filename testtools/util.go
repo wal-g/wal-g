@@ -3,18 +3,21 @@ package testtools
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
-	"github.com/tinsane/storages/storage"
-	"github.com/wal-g/wal-g/internal/walparser"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/stretchr/testify/assert"
-	"github.com/tinsane/storages/memory"
-	"github.com/tinsane/storages/s3"
+	"github.com/wal-g/storages/memory"
+	"github.com/wal-g/storages/s3"
 	"github.com/wal-g/wal-g/internal"
 )
 
@@ -31,8 +34,6 @@ func NewMockUploader(apiMultiErr, apiErr bool) *internal.Uploader {
 	return internal.NewUploader(
 		&MockCompressor{},
 		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), "bucket/", "server/"),
-		nil,
-		&MockDataFolder{},
 	)
 }
 
@@ -40,8 +41,15 @@ func NewStoringMockUploader(storage *memory.Storage, deltaDataFolder internal.Da
 	return internal.NewUploader(
 		&MockCompressor{},
 		memory.NewFolder("in_memory/", storage),
+	)
+}
+
+func NewMockWalUploader(apiMultiErr, apiErr bool) *internal.WalUploader {
+	s3Uploader := MakeDefaultUploader(NewMockS3Uploader(apiMultiErr, apiErr, nil))
+	return internal.NewWalUploader(
+		&MockCompressor{},
+		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), "bucket/", "server/"),
 		nil,
-		&MockDataFolder{},
 	)
 }
 
@@ -57,6 +65,89 @@ func CreateMockStorageFolder() storage.Folder {
 	subFolder.PutObject("base_456/tar_partitions/1", &bytes.Buffer{})
 	subFolder.PutObject("base_456/tar_partitions/2", &bytes.Buffer{})
 	subFolder.PutObject("base_456/tar_partitions/3", &bytes.Buffer{})
+	return folder
+}
+
+func CreateMockStorageFolderWithDeltaBackups(t *testing.T) storage.Folder {
+	var folder = MakeDefaultInMemoryStorageFolder()
+	subFolder := folder.GetSubFolder(utility.BaseBackupPath)
+	sentinelData := map[string]interface{}{
+		"DeltaFrom":     "",
+		"DeltaFullName": "base_000000010000000000000007",
+		"DeltaFromLSN":  0,
+		"DeltaCount":    0,
+	}
+	emptySentinelData := map[string]interface{}{}
+	backupNames := map[string]interface{}{
+		"base_000000010000000000000003":                            emptySentinelData,
+		"base_000000010000000000000005_D_000000010000000000000003": sentinelData,
+		"base_000000010000000000000007":                            emptySentinelData,
+		"base_000000010000000000000009_D_000000010000000000000007": sentinelData}
+	for backupName, sentinelD := range backupNames {
+		bytesSentinel, err := json.Marshal(&sentinelD)
+		assert.NoError(t, err)
+		sentinelString := string(bytesSentinel)
+		err = subFolder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader(sentinelString))
+		assert.NoError(t, err)
+	}
+	return folder
+}
+
+func CreateMockStorageFolderWithPermanentBackups(t *testing.T) storage.Folder {
+	folder := MakeDefaultInMemoryStorageFolder()
+	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
+	walBackupFolder := folder.GetSubFolder(utility.WalPath)
+	emptyData := map[string]interface{}{}
+	backupNames := map[string]interface{}{
+		"base_000000010000000000000002": map[string]interface{}{
+			"start_time":   utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
+			"finish_time":  utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
+			"hostname":     "",
+			"data_dir":     "",
+			"pg_version":   0,
+			"start_lsn":    16777216, // logSegNo = 1
+			"finish_lsn":   33554432, // logSegNo = 2
+			"is_permanent": true,
+		},
+		"base_000000010000000000000004_D_000000010000000000000002": map[string]interface{}{
+			"start_time":   utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
+			"finish_time":  utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
+			"hostname":     "",
+			"data_dir":     "",
+			"pg_version":   0,
+			"start_lsn":    16777217, // logSegNo = 1
+			"finish_lsn":   33554433, // logSegNo = 2
+			"is_permanent": true,
+		},
+		"base_000000010000000000000006_D_000000010000000000000004": emptyData,
+	}
+	walNames := map[string]interface{}{
+		"000000010000000000000001": emptyData,
+		"000000010000000000000002": emptyData,
+		"000000010000000000000003": emptyData,
+	}
+	for backupName, metadata := range backupNames {
+		// empty sentinel
+		empty, err := json.Marshal(&emptyData)
+		assert.NoError(t, err)
+		sentinelString := string(empty)
+		err = baseBackupFolder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader(sentinelString))
+
+		// metadata
+		assert.NoError(t, err)
+		bytesMetadata, err := json.Marshal(&metadata)
+		assert.NoError(t, err)
+		metadataString := string(bytesMetadata)
+		err = baseBackupFolder.PutObject(backupName+"/"+utility.MetadataFileName, strings.NewReader(metadataString))
+		assert.NoError(t, err)
+	}
+	for walName, data := range walNames {
+		bytes, err := json.Marshal(&data)
+		assert.NoError(t, err)
+		walString := string(bytes)
+		err = walBackupFolder.PutObject(walName+".lz4", strings.NewReader(walString))
+		assert.NoError(t, err)
+	}
 	return folder
 }
 

@@ -1,14 +1,30 @@
 package internal
 
 import (
-	"github.com/spf13/viper"
-	"github.com/tinsane/tracelog"
+	"context"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/wal-g/tracelog"
+	"golang.org/x/sync/semaphore"
+)
+
+const (
+	// readySuffix is the filename suffix indicating WAL archives which are
+	// ready for upload
+	readySuffix = ".ready"
+
+	// archiveStatusDir is the subdirectory containing status files of WAL
+	// segments
+	archiveStatusDir = "archive_status"
+
+	// pollPauseDuration defines the amount of time to pause before scanning the
+	// filesystem again to find WAL segments
+	pollPauseDuration = 100 * time.Millisecond
 )
 
 // BgUploader represents the state of concurrent WAL upload
@@ -16,129 +32,167 @@ type BgUploader struct {
 	// pg_[wals|xlog]
 	dir string
 
-	// count of running goroutines
-	parallelWorkers int32
-
-	// usually defined by WALG_DOWNLOAD_CONCURRENCY
-	maxParallelWorkers int32
-
-	// waitgroup to handle Stop gracefully
-	running sync.WaitGroup
-
-	// every file is attempted only once
-	started map[string]interface{}
-
 	// uploading structure
-	uploader *Uploader
-
-	// to control amount of work done in one cycle of archive_command
-	totalUploaded int32
-
-	mutex sync.Mutex
+	uploader *WalUploader
 
 	preventWalOverwrite bool
+
+	// ctx signals internals to keep/stop enqueueing more uploads
+	ctx context.Context
+	// cancelFunc signals internals to stop enqueuing more uploads
+	cancelFunc context.CancelFunc
+
+	// workerCountSem tracks number of concurrent uploaders. Limited to
+	// maxParallelWorkers.
+	workerCountSem *semaphore.Weighted
+	// maxParallelWorkers defines the maximum number of concurrent uploading
+	// files. Usually defined by WALG_DOWNLOAD_CONCURRENCY
+	maxParallelWorkers int32
+
+	// numUploaded counts the number of files uploaded by BgUploader
+	numUploaded int32
+	// maxNumUploaded controls the amount of work done in one cycle of
+	// archive_command. Usually defined by TOTAL_BG_UPLOADED_LIMIT. This is
+	// not enforced exactly. Actual number of files uploaded may be up to
+	// maxParallelWorkers higher than this setting.
+	maxNumUploaded int32
+
+	// started tracks filenames of ongoing and complete uploads to avoid
+	// repeating work
+	started map[string]struct{}
 }
 
-func NewBgUploader(walFilePath string, maxParallelWorkers int32, uploader *Uploader, preventWalOverwrite bool) *BgUploader {
-	started := make(map[string]interface{})
-	started[filepath.Base(walFilePath)+readySuffix] = walFilePath
+// NewBgUploader creates a new BgUploader which looks for WAL files adjacent to
+// walFilePath. maxParallelWorkers and maxNumUploaded limits maximum concurrency
+// and total work done by this BgUploader respectively.
+func NewBgUploader(walFilePath string, maxParallelWorkers int32, maxNumUploaded int32, uploader *WalUploader, preventWalOverwrite bool) *BgUploader {
+	started := make(map[string]struct{})
+	started[filepath.Base(walFilePath)+readySuffix] = struct{}{}
+	ctx, cancelFunc := context.WithCancel(context.Background())
 	return &BgUploader{
-		filepath.Dir(walFilePath),
-		0,
-		maxParallelWorkers,
-		sync.WaitGroup{},
-		started,
-		uploader,
-		0,
-		sync.Mutex{},
-		preventWalOverwrite,
+		dir:                 filepath.Dir(walFilePath),
+		uploader:            uploader,
+		preventWalOverwrite: preventWalOverwrite,
+
+		ctx:                ctx,
+		cancelFunc:         cancelFunc,
+		workerCountSem:     semaphore.NewWeighted(int64(maxParallelWorkers)),
+		maxParallelWorkers: maxParallelWorkers,
+		numUploaded:        0,
+		maxNumUploaded:     maxNumUploaded,
+		started:            started,
 	}
 }
 
 // Start up checking what's inside archive_status
-func (bgUploader *BgUploader) Start() {
-	if bgUploader.maxParallelWorkers < 1 {
-		return // Nothing to start
-	}
-	// This goroutine will spawn new if necessary
-	go bgUploader.scanOnce()
-}
-
-// Stop pipeline
-func (bgUploader *BgUploader) Stop() {
-	for atomic.LoadInt32(&bgUploader.parallelWorkers) != 0 {
-		time.Sleep(50 * time.Millisecond)
-	} // Wait until no one works
-
-	bgUploader.mutex.Lock()
-	// We have to do this under mutex to exclude interference with shouldKeepScanning() branch
-	atomic.StoreInt32(&bgUploader.maxParallelWorkers, 0) // stop new jobs
-	bgUploader.mutex.Unlock()
-
-	bgUploader.running.Wait() // wait again for those who jumped to the closing door
-}
-
-var readySuffix = ".ready"
-var archiveStatus = "archive_status"
-
-// TODO : unit tests
-func (bgUploader *BgUploader) scanOnce() {
-	bgUploader.mutex.Lock()
-	defer bgUploader.mutex.Unlock()
-
-	files, err := ioutil.ReadDir(filepath.Join(bgUploader.dir, archiveStatus))
-	if err != nil {
-		tracelog.ErrorLogger.Print("Error of parallel upload: ", err)
+func (b *BgUploader) Start() {
+	// Exit early if BgUploader is effectively disabled
+	if b.maxParallelWorkers < 1 || b.maxNumUploaded < 1 {
 		return
 	}
 
-	for _, f := range files {
-		if bgUploader.haveNoSlots() {
+	go b.scanAndProcessFiles()
+}
+
+// Stop pipeline. Stop can be safely called concurrently and repeatedly.
+func (b *BgUploader) Stop() {
+	// Send signal to stop scanning for and uploading new files
+	b.cancelFunc()
+	// Wait for all running uploads
+	b.workerCountSem.Acquire(context.TODO(), int64(b.maxParallelWorkers))
+}
+
+// scanAndProcessFiles scans directory for WAL segments and attempts to upload them. It
+// makes best effort attempts to avoid duplicating work (re-uploading files).
+func (b *BgUploader) scanAndProcessFiles() {
+	fileChan := make(chan os.FileInfo)
+	defer close(fileChan)
+	go b.processFiles(fileChan)
+
+	for {
+		files, err := ioutil.ReadDir(filepath.Join(b.dir, archiveStatusDir))
+		if err != nil {
+			tracelog.ErrorLogger.Print("Error of parallel upload: ", err)
+			return
+		}
+
+		for _, f := range files {
+			select {
+			case <-b.ctx.Done():
+				return
+			case fileChan <- f:
+			}
+		}
+
+		// Sleep 5 seconds before scanning filesystem again. Exit if
+		// BgUploader.Stop() has been invoked.
+		select {
+		case <-b.ctx.Done():
+			return
+		case <-time.After(pollPauseDuration):
+		}
+	}
+
+}
+
+// processFiles reads from input channel and uploads relevant WAL files. Exits
+// when the input channel is closed. processFiles also tracks number of
+// successfully uploaded WAL files and signals to BgUploader when total count
+// has exceeded maxNumUploaded. Concurrency is controlled by semaphore in
+// BgUploader.
+//
+// This function should only be invoked once (in scanFiles)
+func (b *BgUploader) processFiles(fileChan <-chan os.FileInfo) {
+	var numUploaded int32 = 0
+	for {
+		f, ok := <-fileChan
+		if !ok {
 			break
 		}
-		name := f.Name()
-		if !strings.HasSuffix(name, readySuffix) || isWalAlreadyUploaded(bgUploader.uploader, name) {
-			continue
-		}
-		if _, ok := bgUploader.started[name]; ok {
-			continue
-		}
-		bgUploader.started[name] = name
 
-		if bgUploader.shouldKeepScanning() {
-			bgUploader.running.Add(1)
-			atomic.AddInt32(&bgUploader.parallelWorkers, 1)
-			go bgUploader.upload(name)
+		name := f.Name()
+
+		if b.shouldSkipFile(name) {
+			continue
+		}
+		if _, ok := b.started[name]; ok {
+			continue
+		}
+
+		b.started[name] = struct{}{}
+		if err := b.workerCountSem.Acquire(b.ctx, 1); err == nil {
+			go func() {
+				uploadedFile := b.upload(name)
+				b.workerCountSem.Release(1)
+				if uploadedFile {
+					if atomic.AddInt32(&numUploaded, 1) >= b.maxNumUploaded {
+						b.cancelFunc()
+					}
+				}
+			}()
 		}
 	}
 }
 
-func (bgUploader *BgUploader) shouldKeepScanning() bool {
-	return atomic.LoadInt32(&bgUploader.maxParallelWorkers) > 0 && atomic.LoadInt32(&bgUploader.totalUploaded) < viper.GetInt32(TotalBgUploadedLimit)
+// shouldSkipFile returns true when the file in question has either already been
+// uploaded or if the filename doesn't match the expected pattern
+func (b *BgUploader) shouldSkipFile(filename string) bool {
+	return !strings.HasSuffix(filename, readySuffix) || b.uploader.ArchiveStatusManager.isWalAlreadyUploaded(filename)
 }
 
-func (bgUploader *BgUploader) haveNoSlots() bool {
-	return atomic.LoadInt32(&bgUploader.parallelWorkers) >= atomic.LoadInt32(&bgUploader.maxParallelWorkers)
-}
-
-// TODO : unit tests
-// upload one WAL file
-func (bgUploader *BgUploader) upload(walStatusFilename string) {
+// upload one WAL file. Returns true if the file was uploaded and false if the
+// upload failed.
+func (b *BgUploader) upload(walStatusFilename string) bool {
 	walFilename := strings.TrimSuffix(walStatusFilename, readySuffix)
-	err := UploadWALFile(bgUploader.uploader.Clone(), filepath.Join(bgUploader.dir, walFilename), bgUploader.preventWalOverwrite)
+	err := uploadWALFile(b.uploader.clone(), filepath.Join(b.dir, walFilename), b.preventWalOverwrite)
 	if err != nil {
 		tracelog.ErrorLogger.Print("Error of background uploader: ", err)
-		return
+		return false
 	}
 
-	if err := markWalUploaded(bgUploader.uploader, walFilename); err != nil {
-		tracelog.ErrorLogger.Printf("Error mark wal file %s uploader due %v", walFilename, err)
+	if err := b.uploader.ArchiveStatusManager.markWalUploaded(walFilename); err != nil {
+		tracelog.ErrorLogger.Printf("Error marking wal file %s as uploaded: %v", walFilename, err)
 	}
 
-	atomic.AddInt32(&bgUploader.totalUploaded, 1)
-
-	bgUploader.scanOnce()
-	atomic.AddInt32(&bgUploader.parallelWorkers, -1)
-
-	bgUploader.running.Done()
+	return true
 }

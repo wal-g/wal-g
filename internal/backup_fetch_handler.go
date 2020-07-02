@@ -1,13 +1,17 @@
 package internal
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/tinsane/storages/storage"
-	"github.com/tinsane/tracelog"
-	"github.com/wal-g/wal-g/utility"
+	"io"
 	"io/ioutil"
+	"os/exec"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const LatestString = "LATEST"
@@ -28,7 +32,7 @@ type NonEmptyDbDataDirectoryError struct {
 	error
 }
 
-func NewNonEmptyDbDataDirectoryError(dbDataDirectory string) NonEmptyDbDataDirectoryError {
+func newNonEmptyDbDataDirectoryError(dbDataDirectory string) NonEmptyDbDataDirectoryError {
 	return NonEmptyDbDataDirectoryError{errors.Errorf("Directory %v for delta base must be empty", dbDataDirectory)}
 }
 
@@ -40,7 +44,7 @@ type PgControlNotFoundError struct {
 	error
 }
 
-func NewPgControlNotFoundError() PgControlNotFoundError {
+func newPgControlNotFoundError() PgControlNotFoundError {
 	return PgControlNotFoundError{errors.Errorf("Expect pg_control archive, but not found")}
 }
 
@@ -48,7 +52,7 @@ func (err PgControlNotFoundError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-func ReadRestoreSpec(path string, spec *TablespaceSpec) (err error) {
+func readRestoreSpec(path string, spec *TablespaceSpec) (err error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("Unable to read file: %v\n", err)
@@ -61,33 +65,64 @@ func ReadRestoreSpec(path string, spec *TablespaceSpec) (err error) {
 	return nil
 }
 
-// TODO : unit tests
-// HandleBackupFetch is invoked to perform wal-g backup-fetch
-func HandleBackupFetch(folder storage.Folder, dbDataDirectory string, backupName string, fileMask string, restoreSpecPath string) {
-	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder, %s)\n", backupName, dbDataDirectory)
-	var spec *TablespaceSpec
-	if restoreSpecPath != "" {
-		spec = &TablespaceSpec{}
-		err := ReadRestoreSpec(restoreSpecPath, spec)
-		if err != nil {
-			tracelog.ErrorLogger.Fatalf("Invalid restore specification path %s\n", restoreSpecPath)
-			return
+func GetPgFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string) func(folder storage.Folder, backup Backup) {
+	return func(folder storage.Folder, backup Backup) {
+		filesToUnwrap, err := backup.GetFilesToUnwrap(fileMask)
+		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+
+		var spec *TablespaceSpec
+		if restoreSpecPath != "" {
+			spec = &TablespaceSpec{}
+			err := readRestoreSpec(restoreSpecPath, spec)
+			errMessege := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
+			tracelog.ErrorLogger.FatalfOnError(errMessege, err)
 		}
+		err = deltaFetchRecursionOld(backup.Name, folder, utility.ResolveSymlink(dbDataDirectory), spec, filesToUnwrap)
+		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 	}
-	backup, err := GetBackupByName(backupName, folder)
-	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
-	filesToUnwrap, err := backup.GetFilesToUnwrap(fileMask)
-	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
-	err = deltaFetchRecursion(backupName, folder, utility.ResolveSymlink(dbDataDirectory), spec, filesToUnwrap)
-	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 }
 
-func GetBackupByName(backupName string, folder storage.Folder) (*Backup, error) {
-	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
+func GetStreamFetcher(writeCloser io.WriteCloser) func(folder storage.Folder, backup Backup) {
+	return func(folder storage.Folder, backup Backup) {
+		err := downloadAndDecompressStream(&backup, writeCloser)
+		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+	}
+}
+
+func GetCommandStreamFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup Backup) {
+	return func(folder storage.Folder, backup Backup) {
+		stdin, err := cmd.StdinPipe()
+		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+		stderr := &bytes.Buffer{}
+		cmd.Stderr = stderr
+		err = cmd.Start()
+		tracelog.ErrorLogger.FatalfOnError("Failed to start restore command: %v\n", err)
+		err = downloadAndDecompressStream(&backup, stdin)
+		cmdErr := cmd.Wait()
+		if cmdErr != nil {
+			tracelog.ErrorLogger.Printf("Restore command output:\n%s", stderr.String())
+			err = cmdErr
+		}
+		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+	}
+}
+
+// TODO : unit tests
+// HandleBackupFetch is invoked to perform wal-g backup-fetch
+func HandleBackupFetch(folder storage.Folder, backupName string, fetcher func(folder storage.Folder, backup Backup)) {
+	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder,)\n", backupName)
+	backup, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+
+	fetcher(folder, *backup)
+}
+
+func GetBackupByName(backupName, subfolder string, folder storage.Folder) (*Backup, error) {
+	baseBackupFolder := folder.GetSubFolder(subfolder)
 
 	var backup *Backup
 	if backupName == LatestString {
-		latest, err := GetLatestBackupName(folder)
+		latest, err := getLatestBackupName(folder)
 		if err != nil {
 			return nil, err
 		}
@@ -123,9 +158,9 @@ func chooseTablespaceSpecification(sentinelDto BackupSentinelDto, spec *Tablespa
 
 // TODO : unit tests
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
-func deltaFetchRecursion(backupName string, folder storage.Folder, dbDataDirectory string,
+func deltaFetchRecursionOld(backupName string, folder storage.Folder, dbDataDirectory string,
 	tablespaceSpec *TablespaceSpec, filesToUnwrap map[string]bool) error {
-	backup, err := GetBackupByName(backupName, folder)
+	backup, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	if err != nil {
 		return err
 	}
@@ -141,14 +176,14 @@ func deltaFetchRecursion(backupName string, folder storage.Folder, dbDataDirecto
 		if err != nil {
 			return err
 		}
-		err = deltaFetchRecursion(*sentinelDto.IncrementFrom, folder, dbDataDirectory, tablespaceSpec, baseFilesToUnwrap)
+		err = deltaFetchRecursionOld(*sentinelDto.IncrementFrom, folder, dbDataDirectory, tablespaceSpec, baseFilesToUnwrap)
 		if err != nil {
 			return err
 		}
 		tracelog.InfoLogger.Printf("%v fetched. Upgrading from LSN %x to LSN %x \n", *(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN), *(sentinelDto.BackupStartLSN))
 	}
 
-	return backup.unwrap(dbDataDirectory, sentinelDto, filesToUnwrap)
+	return backup.unwrapToEmptyDirectory(dbDataDirectory, sentinelDto, filesToUnwrap, false)
 }
 
 func GetBaseFilesToUnwrap(backupFileStates BackupFileList, currentFilesToUnwrap map[string]bool) (map[string]bool, error) {

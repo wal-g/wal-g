@@ -2,8 +2,8 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/tinsane/tracelog"
 )
 
 const WalPrefetchShortDescription = `Used for prefetching process forking
@@ -16,7 +16,7 @@ var walPrefetchCmd = &cobra.Command{
 	Args:   cobra.ExactArgs(2),
 	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
-		uploader, err := internal.ConfigureUploader()
+		uploader, err := internal.ConfigureWalUploaderWithoutCompressMethod()
 		tracelog.ErrorLogger.FatalOnError(err)
 		internal.HandleWALPrefetch(uploader, args[0], args[1])
 	},

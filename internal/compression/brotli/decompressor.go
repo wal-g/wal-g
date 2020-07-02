@@ -3,10 +3,11 @@
 package brotli
 
 import (
+	"io"
+
 	"github.com/google/brotli/go/cbrotli"
 	"github.com/wal-g/wal-g/internal/compression/computils"
 	"github.com/wal-g/wal-g/utility"
-	"io"
 )
 
 type Decompressor struct{}

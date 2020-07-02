@@ -1,8 +1,9 @@
 package testtools
 
 import (
-	"github.com/wal-g/wal-g/internal"
 	"time"
+
+	"github.com/wal-g/wal-g/internal"
 )
 
 const (

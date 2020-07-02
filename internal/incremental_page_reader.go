@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -59,7 +59,7 @@ func (pageReader *IncrementalPageReader) AdvanceFileReader() error {
 	pageBytes := make([]byte, DatabasePageSize)
 	blockNo := pageReader.Blocks[0]
 	pageReader.Blocks = pageReader.Blocks[1:]
-	offset := int64(blockNo) * int64(DatabasePageSize)
+	offset := int64(blockNo) * DatabasePageSize
 	// TODO : possible race condition - page was deleted between blocks extraction and seek
 	_, err := pageReader.PagedFile.Seek(offset, io.SeekStart)
 	if err != nil {
@@ -84,7 +84,7 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap)
 	headerBuffer.Write(IncrementFileHeader)
 	fileSize := pageReader.FileSize
 	headerBuffer.Write(utility.ToBytes(uint64(fileSize)))
-	pageReader.Blocks = make([]uint32, 0, fileSize/int64(DatabasePageSize))
+	pageReader.Blocks = make([]uint32, 0, fileSize/DatabasePageSize)
 
 	if deltaBitmap == nil {
 		err := pageReader.FullScanInitialize()
@@ -97,7 +97,7 @@ func (pageReader *IncrementalPageReader) initialize(deltaBitmap *roaring.Bitmap)
 
 	pageReader.WriteDiffMapToHeader(&headerBuffer)
 	pageReader.Next = headerBuffer.Bytes()
-	pageDataSize := int64(len(pageReader.Blocks)) * int64(DatabasePageSize)
+	pageDataSize := int64(len(pageReader.Blocks)) * DatabasePageSize
 	size = int64(headerBuffer.Len()) + pageDataSize
 	return
 }
@@ -106,7 +106,7 @@ func (pageReader *IncrementalPageReader) DeltaBitmapInitialize(deltaBitmap *roar
 	it := deltaBitmap.Iterator()
 	for it.HasNext() { // TODO : do something with file truncation during reading
 		blockNo := it.Next()
-		if pageReader.FileSize >= int64(blockNo+1)*int64(DatabasePageSize) { // whole block fits into file
+		if pageReader.FileSize >= int64(blockNo+1)*DatabasePageSize { // whole block fits into file
 			pageReader.Blocks = append(pageReader.Blocks, blockNo)
 		} else {
 			break
@@ -128,7 +128,7 @@ func (pageReader *IncrementalPageReader) FullScanInitialize() error {
 
 		valid := pageReader.SelectNewValidPage(pageBytes, currentBlockNumber) // TODO : torn page possibility
 		if !valid {
-			return NewInvalidBlockError(currentBlockNumber)
+			return newInvalidBlockError(currentBlockNumber)
 		}
 	}
 }
@@ -146,22 +146,22 @@ func (pageReader *IncrementalPageReader) WriteDiffMapToHeader(headerWriter io.Wr
 
 // SelectNewValidPage checks whether page is valid and if it so, then blockNo is appended to Blocks list
 func (pageReader *IncrementalPageReader) SelectNewValidPage(pageBytes []byte, blockNo uint32) (valid bool) {
-	pageHeader, _ := ParsePostgresPageHeader(bytes.NewReader(pageBytes))
-	valid = pageHeader.IsValid()
+	pageHeader, _ := parsePostgresPageHeader(bytes.NewReader(pageBytes))
+	valid = pageHeader.isValid()
 
 	isNew := false
 
 	if !valid {
-		if pageHeader.IsNew() { // vacuumed page
+		if pageHeader.isNew() { // vacuumed page
 			isNew = true
 			valid = true
 		} else {
-			tracelog.WarningLogger.Println("Invalid page ", blockNo, " page header ", pageHeader)
+			tracelog.DebugLogger.Println("Invalid page ", blockNo, " page header ", pageHeader)
 			return false
 		}
 	}
 
-	if isNew || (pageHeader.Lsn() >= pageReader.Lsn) {
+	if isNew || (pageHeader.lsn() >= pageReader.Lsn) {
 		pageReader.Blocks = append(pageReader.Blocks, blockNo)
 	}
 	return

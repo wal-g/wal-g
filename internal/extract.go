@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/tinsane/tracelog"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/ioextensions"
@@ -25,7 +25,7 @@ type NoFilesToExtractError struct {
 	error
 }
 
-func NewNoFilesToExtractError() NoFilesToExtractError {
+func newNoFilesToExtractError() NoFilesToExtractError {
 	return NoFilesToExtractError{errors.New("ExtractAll: did not provide files to extract")}
 }
 
@@ -39,7 +39,15 @@ type UnsupportedFileTypeError struct {
 	error
 }
 
-func NewUnsupportedFileTypeError(path string, fileFormat string) UnsupportedFileTypeError {
+type DecompressionError struct {
+	error
+}
+
+func newDecompressionError(err error) DecompressionError {
+	return DecompressionError{err}
+}
+
+func newUnsupportedFileTypeError(path string, fileFormat string) UnsupportedFileTypeError {
 	return UnsupportedFileTypeError{errors.Errorf("WAL-G does not support the file format '%s' in '%s'", fileFormat, path)}
 }
 
@@ -82,9 +90,9 @@ func extractOne(tarInterpreter TarInterpreter, source io.Reader) error {
 	return nil
 }
 
-// TODO : unit tests
-// Ensures that file extension is valid. Any subsequent behavior
-// depends on file type.
+// DecryptAndDecompressTar decrypts file and checks its extension.
+// If it's tar, a decompression is not needed.
+// Otherwise it uses corresponding decompressor. If none found an error will be returned.
 func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter crypto.Crypter) error {
 	readCloser, err := readerMaker.Reader()
 
@@ -106,24 +114,26 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 	}
 
 	fileExtension := utility.GetFileExtension(readerMaker.Path())
+	if fileExtension == "tar" {
+		_, err = io.Copy(writer, readCloser)
+		return errors.Wrap(err, "DecryptAndDecompressTar: tar extract failed")
+	}
+
 	for _, decompressor := range compression.Decompressors {
 		if fileExtension != decompressor.FileExtension() {
 			continue
 		}
 		err = decompressor.Decompress(writer, readCloser)
-		return errors.Wrapf(err, "DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?", decompressor.FileExtension())
+		if err == nil {
+			return nil
+		}
+		decompressionError := newDecompressionError(err)
+		return errors.Wrapf(decompressionError,
+			"DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?",
+			decompressor.FileExtension())
 	}
-	switch fileExtension {
-	case "tar":
-		_, err = io.Copy(writer, readCloser)
-		return errors.Wrap(err, "DecryptAndDecompressTar: tar extract failed")
-	case "nop":
-	case "lzo":
-		return NewUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
-	default:
-		return NewUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
-	}
-	return nil
+
+	return newUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
 }
 
 // TODO : unit tests
@@ -133,12 +143,12 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 // Returns the first error encountered.
 func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 	if len(files) == 0 {
-		return NewNoFilesToExtractError()
+		return newNoFilesToExtractError()
 	}
 
-	retrier := NewExponentialRetrier(MinExtractRetryWait, MaxExtractRetryWait)
+	retrier := newExponentialRetrier(MinExtractRetryWait, MaxExtractRetryWait)
 	// Set maximum number of goroutines spun off by ExtractAll
-	downloadingConcurrency, err := GetMaxDownloadConcurrency()
+	downloadingConcurrency, err := getMaxDownloadConcurrency()
 	if err != nil {
 		return err
 	}
@@ -149,7 +159,7 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 			downloadingConcurrency /= 2
 		} else if len(failed) == len(currentRun) {
 			return errors.Errorf("failed to extract files:\n%s\n",
-				strings.Join(ReaderMakersToFilePaths(failed), "\n"))
+				strings.Join(readerMakersToFilePaths(failed), "\n"))
 		}
 		currentRun = failed
 		if len(failed) > 0 {
