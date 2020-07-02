@@ -231,7 +231,11 @@ func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanen
 			} else {
 				if fromFull {
 					tracelog.InfoLogger.Println("Delta will be made from full backup.")
-					previousBackupName = *previousBackupSentinelDto.IncrementFullName
+
+					if previousBackupSentinelDto.IncrementFullName != nil {
+						previousBackupName = *previousBackupSentinelDto.IncrementFullName
+					}
+
 					previousBackup := NewBackup(basebackupFolder, previousBackupName)
 					previousBackupSentinelDto, err = previousBackup.GetSentinel()
 					tracelog.ErrorLogger.FatalOnError(err)
