@@ -45,8 +45,8 @@ func (bl *TabbedBackupListing) Backups(backups []Backup, output io.Writer) error
 	}
 	for i := len(backups) - 1; i >= 0; i-- {
 		b := backups[i]
-		_, err := fmt.Fprintln(writer,
-			fmt.Sprintf("%v\t%v\t%v\t%v", b.BackupName, b.FinishLocalTime.Format(time.RFC3339), b.MongoMeta.Before.LastMajTS, b.MongoMeta.After.LastMajTS))
+		_, err := fmt.Fprintf(writer,
+			"%v\t%v\t%v\t%v\n", b.BackupName, b.FinishLocalTime.Format(time.RFC3339), b.MongoMeta.Before.LastMajTS, b.MongoMeta.After.LastMajTS)
 		if err != nil {
 			return err
 		}
@@ -64,8 +64,7 @@ func (bl *TabbedBackupListing) Names(backups []internal.BackupTime, output io.Wr
 	}
 	for i := len(backups) - 1; i >= 0; i-- {
 		b := backups[i]
-		_, err := fmt.Fprintln(writer,
-			fmt.Sprintf("%v\t%v\t%v", b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName))
+		_, err := fmt.Fprintf(writer, "%v\t%v\t%v\n", b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName)
 		if err != nil {
 			return err
 		}
@@ -108,8 +107,8 @@ type MongoMetaDBProvider struct {
 	meta   MongoMeta
 }
 
-func NewBackupMetaMongoProvider(ctx context.Context, client client.MongoDriver) *MongoMetaDBProvider {
-	return &MongoMetaDBProvider{ctx: ctx, client: client}
+func NewBackupMetaMongoProvider(ctx context.Context, mc client.MongoDriver) *MongoMetaDBProvider {
+	return &MongoMetaDBProvider{ctx: ctx, client: mc}
 }
 
 func (m *MongoMetaDBProvider) Init() error {

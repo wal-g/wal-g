@@ -89,18 +89,18 @@ func LastKnownInBackupTS(backups []Backup) (models.Timestamp, error) {
 	if len(backups) == 0 {
 		return models.Timestamp{}, fmt.Errorf("empty backups list given")
 	}
-	minTs := backups[0].MongoMeta.Before.LastMajTS
+	minTS := backups[0].MongoMeta.Before.LastMajTS
 	for i := 1; i < len(backups); i++ {
 		ts := backups[i].MongoMeta.Before.LastMajTS
-		if models.LessTS(ts, minTs) {
-			minTs = ts
+		if models.LessTS(ts, minTS) {
+			minTS = ts
 		}
 	}
-	return minTs, nil
+	return minTS, nil
 }
 
 // SplitPurgingBackups partitions backups to delete and retain
-func SplitPurgingBackups(backups []Backup, retainCount *int, retainAfter *time.Time) (purge []Backup, retain []Backup, err error) {
+func SplitPurgingBackups(backups []Backup, retainCount *int, retainAfter *time.Time) (purge, retain []Backup, err error) {
 	sort.Slice(backups, func(i, j int) bool {
 		return backups[i].StartLocalTime.After(backups[j].StartLocalTime)
 	})

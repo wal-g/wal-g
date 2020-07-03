@@ -201,10 +201,8 @@ func (ap *JSONApplier) Apply(ctx context.Context, opr models.Oplog) error {
 			return fmt.Errorf("can not write begin mark: %w", err)
 		}
 		ap.started = true
-	} else {
-		if _, err := ap.writer.Write(jsonDelimiter); err != nil {
-			return fmt.Errorf("can not write delimiter: %w", err)
-		}
+	} else if _, err := ap.writer.Write(jsonDelimiter); err != nil {
+		return fmt.Errorf("can not write delimiter: %w", err)
 	}
 
 	if _, err := ap.writer.Write(jsonData); err != nil {
