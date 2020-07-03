@@ -73,7 +73,7 @@ func NewStorageApplier(uploader archive.Uploader, buf Buffer, archiveAfterSize i
 // Apply runs working cycle that sends oplog records to storage.
 func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan *models.Oplog, wg *sync.WaitGroup) (chan error, error) {
 	archiveTimer := time.NewTimer(sa.timeout)
-	var lastKnownTS, batchStartTs models.Timestamp
+	var lastKnownTS, batchStartTS models.Timestamp
 	restartBatch := true
 	batchDocs := 0
 	batchSize := 0
@@ -91,7 +91,7 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan *models.Oplog, 
 					break
 				}
 				if restartBatch {
-					batchStartTs = op.TS
+					batchStartTS = op.TS
 					restartBatch = false
 				}
 				lastKnownTS = op.TS
@@ -126,7 +126,7 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan *models.Oplog, 
 			// or switch to PushStreamToDestination (async api):
 			// we don't know archive name beforehand, so upload stream and rename key (it leads to failures and require gc)
 			// but consumes less memory
-			if err := sa.uploader.UploadOplogArchive(bufReader, batchStartTs, lastKnownTS); err != nil {
+			if err := sa.uploader.UploadOplogArchive(bufReader, batchStartTS, lastKnownTS); err != nil {
 				errc <- fmt.Errorf("can not upload oplog archive: %w", err)
 				return
 			}
@@ -138,8 +138,7 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan *models.Oplog, 
 				errc <- fmt.Errorf("can not reset buffer for reuse: %w", err)
 				return
 			}
-			batchStartTs = lastKnownTS
-
+			batchStartTS = lastKnownTS
 		}
 	}()
 

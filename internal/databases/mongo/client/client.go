@@ -262,10 +262,7 @@ func (b *BsonCursor) Next(ctx context.Context) bool {
 	}
 
 	b.raw, b.err = bson.NewFromIOReader(b.r)
-	if b.err != nil {
-		return false
-	}
-	return true
+	return b.err == nil
 }
 
 // Push returns document back to cursor

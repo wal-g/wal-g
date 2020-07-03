@@ -43,8 +43,8 @@ type OplogUploadStats struct {
 }
 
 // NewOplogUploadStats builds OplogUploadStats
-func NewOplogUploadStats(LastUploadedTS models.Timestamp) *OplogUploadStats {
-	return &OplogUploadStats{rep: OplogArchivedStatsReport{LastTS: LastUploadedTS}}
+func NewOplogUploadStats(lastUploadedTS models.Timestamp) *OplogUploadStats {
+	return &OplogUploadStats{rep: OplogArchivedStatsReport{LastTS: lastUploadedTS}}
 }
 
 // Update ...

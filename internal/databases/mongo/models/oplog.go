@@ -12,6 +12,7 @@ import (
 
 const (
 	timestampDelimiter = "."
+	timestampsCount    = 2
 	MaxDocumentSize    = 16 * 1024 * 1024
 )
 
@@ -29,7 +30,7 @@ func (ots Timestamp) String() string {
 // TimestampFromStr builds Timestamp from string
 func TimestampFromStr(s string) (Timestamp, error) {
 	strs := strings.Split(s, timestampDelimiter)
-	if len(strs) != 2 {
+	if len(strs) != timestampsCount {
 		return Timestamp{}, fmt.Errorf("can not split oplog ts string '%s': two parts expected", s)
 	}
 

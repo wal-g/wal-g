@@ -69,7 +69,7 @@ func HandlePurge(downloader archive.Downloader, purger archive.Purger, setters .
 }
 
 // HandleBackupsPurge delete backups according to settings
-func HandleBackupsPurge(downloader archive.Downloader, purger archive.Purger, opts PurgeSettings) (purge []archive.Backup, retain []archive.Backup, err error) {
+func HandleBackupsPurge(downloader archive.Downloader, purger archive.Purger, opts PurgeSettings) (purge, retain []archive.Backup, err error) {
 	backupTimes, err := downloader.ListBackupNames()
 	if err != nil {
 		return nil, nil, err
@@ -86,6 +86,9 @@ func HandleBackupsPurge(downloader archive.Downloader, purger archive.Purger, op
 	}
 
 	purge, retain, err = archive.SplitPurgingBackups(backups, opts.retainCount, opts.retainAfter)
+	if err != nil {
+		return nil, nil, err
+	}
 	tracelog.InfoLogger.Printf("Backups selected to be deleted: %v", archive.BackupNamesFromBackups(purge))
 	tracelog.InfoLogger.Printf("Backups selected to be retained: %v", archive.BackupNamesFromBackups(retain))
 
