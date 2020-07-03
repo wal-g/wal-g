@@ -107,6 +107,23 @@ func GetCommandStreamFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup B
 	}
 }
 
+// StreamBackupToCommandStdin downloads and decompresses backup stream to cmd stdin.
+func StreamBackupToCommandStdin(cmd *exec.Cmd, backup *Backup) error {
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return fmt.Errorf("Failed to fetch backup: %v\n", err)
+	}
+	err = cmd.Start()
+	if err != nil {
+		return fmt.Errorf("Failed to start command: %v\n", err)
+	}
+	err = downloadAndDecompressStream(backup, stdin)
+	if err != nil {
+		return fmt.Errorf("Failed to download and decompress stream: %v\n", err)
+	}
+	return cmd.Wait()
+}
+
 // TODO : unit tests
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
 func HandleBackupFetch(folder storage.Folder, backupName string, fetcher func(folder storage.Folder, backup Backup)) {
