@@ -5,9 +5,8 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/wal-g/wal-g/internal/databases/mongo"
-
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/spf13/cobra"
@@ -31,9 +30,11 @@ var backupFetchCmd = &cobra.Command{
 
 		restoreCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamRestoreCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
+		restoreCmd.Stdout = os.Stdout
 		restoreCmd.Stderr = os.Stderr
 
-		mongo.HandleBackupFetch(ctx, folder, args[0], restoreCmd)
+		err = mongo.HandleBackupFetch(ctx, folder, args[0], restoreCmd)
+		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
 
