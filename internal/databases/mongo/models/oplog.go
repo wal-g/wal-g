@@ -18,8 +18,8 @@ const (
 
 // Timestamp represents oplog record uniq id.
 type Timestamp struct {
-	TS  uint32 `json:"ts"`
-	Inc uint32 `json:"inc"`
+	TS  uint32 `json:"TS"`
+	Inc uint32 `json:"Inc"`
 }
 
 // String returns text representation of Timestamp struct
