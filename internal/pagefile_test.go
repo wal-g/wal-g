@@ -2,6 +2,7 @@ package internal_test
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
@@ -20,10 +21,12 @@ const (
 	sampleLSN            uint64 = 0xc6bd4600
 	smallLSN             uint64 = 0
 	bigLSN                      = sampleLSN * 2
+	sizeofInt32                 = 4
 )
 
 // TestIncrement holds information about some increment for easy testing
 type TestIncrement struct {
+	diffMap        []byte
 	incrementBytes []byte
 	fileSize       uint64
 	diffBlockCount uint32
@@ -35,8 +38,9 @@ func (ti *TestIncrement) NewReader() io.Reader {
 
 func newTestIncrement(lsn uint64) *TestIncrement {
 	incrementBytes := readIncrementToBuffer(lsn)
-	fileSize, diffBlockCount, _, _ := internal.GetIncrementHeaderFields(bytes.NewReader(incrementBytes))
-	return &TestIncrement{incrementBytes: incrementBytes, fileSize: fileSize, diffBlockCount: diffBlockCount}
+	fileSize, diffBlockCount, diffMap, _ := internal.GetIncrementHeaderFields(bytes.NewReader(incrementBytes))
+	return &TestIncrement{incrementBytes: incrementBytes, fileSize: fileSize, diffBlockCount: diffBlockCount,
+		diffMap: diffMap}
 }
 
 // in regularTestIncrement backup start LSN is selected so that
@@ -171,8 +175,9 @@ func postgresCreateFileFromIncrementTest(testIncrement *TestIncrement, t *testin
 	mockFile := NewMockReadWriterAt(make([]byte, 0))
 
 	err := internal.CreateFileFromIncrement(incrementReader, mockFile)
-	assert.NoError(t, err)
-	assert.Equal(t, testIncrement.fileSize, uint64(len(mockFile.content)))
+	assert.NoError(t, err, "Expected no errors after creating file from increment")
+	assert.Equal(t, testIncrement.fileSize, uint64(len(mockFile.content)),
+		"Result file size should match the size specified in the increment header")
 
 	sourceFile, _ := os.Open(pagedFileName)
 	defer utility.LoggedClose(sourceFile, "")
@@ -201,9 +206,10 @@ func postgresWriteIncrementTestCompletedFile(testIncrement *TestIncrement, t *te
 
 	err := internal.WritePagesFromIncrement(testIncrement.NewReader(), mockFile, false)
 
-	assert.NoError(t, err)
+	assert.NoError(t, err, "Expected no errors after writing increment")
 	// check that no bytes were written to the mock file
-	assert.Equal(t, 0, mockFile.bytesWritten)
+	assert.Equal(t, 0, mockFile.bytesWritten,
+		"No bytes should be written since the file is complete")
 }
 
 // In this test series we test that
@@ -225,8 +231,9 @@ func postgresWritePagesTestEmptyFile(testIncrement *TestIncrement, t *testing.T)
 	mockContent := make([]byte, internal.DatabasePageSize*pagedFileBlockCount)
 	mockFile := NewMockReadWriterAt(mockContent)
 	err := internal.WritePagesFromIncrement(testIncrement.NewReader(), mockFile, false)
-	assert.NoError(t, err)
-	assert.Equal(t, testIncrement.fileSize, uint64(len(mockFile.content)))
+	assert.NoError(t, err, "Expected no errors after writing increment")
+	assert.Equal(t, testIncrement.fileSize, uint64(len(mockFile.content)),
+		"Result file size should match the size specified in the increment header")
 
 	sourceFile, _ := os.Open(pagedFileName)
 	defer utility.LoggedClose(sourceFile, "")
@@ -234,11 +241,53 @@ func postgresWritePagesTestEmptyFile(testIncrement *TestIncrement, t *testing.T)
 }
 
 // Increment blocks should be written in places of missing blocks
+// of the partially completed local file. Regular increment
+// does not necessarily contains all of the required blocks
+// so the resulting file may still contain empty blocks
+func TestWritingRegularIncrementToIncompleteFile(t *testing.T) {
+	incrementReader := regularTestIncrement.NewReader()
+	// store all block numbers of the increment in a set
+	deltaBlockNumbers := make(map[int64]bool, regularTestIncrement.diffBlockCount)
+	for i := uint32(0); i < regularTestIncrement.diffBlockCount; i++ {
+		blockNo := binary.LittleEndian.Uint32(regularTestIncrement.diffMap[i*sizeofInt32 : (i+1)*sizeofInt32])
+		deltaBlockNumbers[int64(blockNo)] = true
+	}
+	mockContent, _ := ioutil.ReadFile(pagedFileName)
+	// all blocks after the second will be zero (missing) blocks
+	zeroBlocksStart := int64(2)
+	for i := zeroBlocksStart*internal.DatabasePageSize; i < int64(len(mockContent)); i++ {
+		mockContent[i] = 0
+	}
+	mockFile := NewMockReadWriterAt(mockContent)
+	err := internal.WritePagesFromIncrement(incrementReader, mockFile, false)
+
+	assert.NoError(t, err, "Expected no errors after writing increment")
+	assert.Equal(t, regularTestIncrement.fileSize, uint64(len(mockFile.content)),
+		"Result file size should match the size specified in the increment header")
+
+	emptyPage := make([]byte, internal.DatabasePageSize)
+	sourceFile, _ := os.Open(pagedFileName)
+	defer utility.LoggedClose(sourceFile, "")
+	for index, data := range mockFile.getBlocks() {
+		readBytes := make([]byte, internal.DatabasePageSize)
+		sourceFile.ReadAt(readBytes, index*internal.DatabasePageSize)
+		// If block exists in the increment, it should exist in the resulting local file.
+		// Also, since in this test we zeroed only the part of the original file contents,
+		// the pages before zeroBlocksStart should match too
+		if index < zeroBlocksStart || deltaBlockNumbers[index] {
+			assert.True(t, bytes.Equal(readBytes, data), "Result file is incorrect")
+		} else {
+			assert.True(t, bytes.Equal(emptyPage, data), "Result file is incorrect")
+		}
+	}
+}
+
+// Increment blocks should be written in places of missing blocks
 // of the partially completed local file. Using all blocks increment
 // ensures that each missing block exist in increment.
 // In this test case, after applying the increment,
 // we should get the completed page file
-func TestWritingIncrementToIncompleteFile(t *testing.T) {
+func TestWritingAllBlocksIncrementToIncompleteFile(t *testing.T) {
 	incrementReader := allBlocksTestIncrement.NewReader()
 	sourceFile, _ := os.Open(pagedFileName)
 	defer utility.LoggedClose(sourceFile, "")
@@ -250,8 +299,9 @@ func TestWritingIncrementToIncompleteFile(t *testing.T) {
 
 	err := internal.WritePagesFromIncrement(incrementReader, mockFile, false)
 
-	assert.NoError(t, err)
-	assert.Equal(t, allBlocksTestIncrement.fileSize, uint64(len(mockFile.content)))
+	assert.NoError(t, err, "Expected no errors after writing increment")
+	assert.Equal(t, allBlocksTestIncrement.fileSize, uint64(len(mockFile.content)),
+		"Result file size should match the size specified in the increment header")
 
 	mockFileReader := bytes.NewReader(mockFile.content)
 	compareResult := deepCompareReaders(sourceFile, mockFileReader)
@@ -268,9 +318,10 @@ func TestRestoringPagesToCompletedFile(t *testing.T) {
 
 	err := internal.RestoreMissingPages(fileReader, mockFile)
 
-	assert.NoError(t, err)
+	assert.NoError(t, err, "Expected no errors after restoring missing pages")
 	// check that no bytes were written to the mock file
-	assert.Equal(t, 0, mockFile.bytesWritten)
+	assert.Equal(t, 0, mockFile.bytesWritten,
+		"No bytes should be written since the file is complete")
 }
 
 // Missing blocks should be filled with pages from the local file
@@ -286,7 +337,7 @@ func TestRestoringPagesToIncompleteFile(t *testing.T) {
 
 	err := internal.RestoreMissingPages(fileReader, mockFile)
 
-	assert.NoError(t, err)
+	assert.NoError(t, err, "Expected no errors after restoring missing pages")
 	pagedFile.Seek(0, 0)
 	mockFileReader := bytes.NewReader(mockFile.content)
 	compareResult := deepCompareReaders(pagedFile, mockFileReader)
@@ -303,9 +354,9 @@ func TestRestoringPagesToEmptyFile(t *testing.T) {
 
 	err := internal.RestoreMissingPages(fileReader, mockFile)
 
-	assert.NoError(t, err)
+	assert.NoError(t, err, "Expected no errors after restoring missing pages")
 	mockFileReader := bytes.NewReader(mockFile.content)
-	pagedFile.Seek(0,0)
+	pagedFile.Seek(0, 0)
 	compareResult := deepCompareReaders(pagedFile, mockFileReader)
 	assert.Truef(t, compareResult, "Increment could not restore file")
 }
@@ -325,13 +376,13 @@ func checkAllWrittenBlocksCorrect(mockFile *MockReadWriterAt, sourceFile io.Read
 		}
 		// Verify that each written block corresponds
 		// to the actual block in the original page file.
-		assert.True(t, bytes.Equal(readBytes, data))
+		assert.True(t, bytes.Equal(readBytes, data), "Result file is incorrect")
 		dataBlockCount += 1
 	}
 	// Make sure that we wrote exactly the same amount of blocks that was written to the increment header.
 	// These two numbers may not be equal if the increment was taken
 	// while the database cluster was running, but in this test cases they should match.
-	assert.Equal(t, diffBlockCount, dataBlockCount)
+	assert.Equal(t, diffBlockCount, dataBlockCount, "Result file is incorrect")
 }
 
 func readIncrementToBuffer(localLSN uint64) []byte {
