@@ -18,7 +18,7 @@ func TestS3TarBall(t *testing.T) {
 	bundle := &internal.Bundle{
 		ArchiveDirectory: "/usr/local",
 		TarSizeThreshold: int64(10),
-		allTarballsSize: new(int64),
+		AllTarballsSize: new(int64),
 	}
 
 	bundle.TarBallMaker = internal.NewStorageTarBallMaker("test", testtools.NewMockUploader(false, false))

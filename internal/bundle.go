@@ -67,7 +67,7 @@ func init() {
 type Bundle struct {
 	ArchiveDirectory   string
 	TarSizeThreshold   int64
-	allTarballsSize    *int64
+	AllTarballsSize    *int64
 	Sentinel           *Sentinel
 	TarBall            TarBall
 	TarBallMaker       TarBallMaker
@@ -99,7 +99,7 @@ func newBundle(
 	return &Bundle{
 		ArchiveDirectory:   archiveDirectory,
 		TarSizeThreshold:   viper.GetInt64(TarSizeThresholdSetting),
-		allTarballsSize:    new(int64),
+		AllTarballsSize:    new(int64),
 		Crypter:            crypter,
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
@@ -187,7 +187,7 @@ func (bundle *Bundle) CheckSizeAndEnqueueBack(tarBall TarBall) error {
 		bundle.mutex.Lock()
 		defer bundle.mutex.Unlock()
 
-		atomic.AddInt64(bundle.allTarballsSize, tarBall.Size())
+		atomic.AddInt64(bundle.AllTarballsSize, tarBall.Size())
 		err := tarBall.CloseTar()
 		if err != nil {
 			return errors.Wrap(err, "HandleWalkedFSObject: failed to close tarball")

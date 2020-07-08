@@ -336,7 +336,7 @@ func TestWalk(t *testing.T) {
 	bundle := &internal.Bundle{
 		ArchiveDirectory: data,
 		TarSizeThreshold: int64(10),
-		allTarballsSize: new(int64),
+		AllTarballsSize: new(int64),
 		Files:            &sync.Map{},
 		TablespaceSpec:   internal.NewTablespaceSpec(data),
 	}
