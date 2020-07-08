@@ -32,56 +32,125 @@ make mongo_install
 Configuration
 -------------
 
-* `WALG_MONGO_OPLOG_END_TS`
+* `WALG_STREAM_CREATE_COMMAND`
 
-To set time [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) for recovery point.
+Command to create MongoDB backup, should return backup as single stream to STDOUT. Required for backup procedure.
 
-* `WALG_MONGO_OPLOG_DST`
+* `WALG_STREAM_RESTORE_COMMAND`
 
-To place oplogs in the specified directory during backup-fetch.
+Command to unpack MongoDB backup, should take backup (created by `WALG_STREAM_CREATE_COMMAND`) 
+to STDIN and push it to MongoDB instance. Required for restore procedure.
+
+* `MONGODB_URI`
+
+URI used to connect to a MongoDB instance. Required for backup and oplog archiving procedure.
+
+* `OPLOG_ARCHIVE_AFTER_SIZE`
+
+Oplog archive batch in bytes which triggers upload to storage.
+
+* `OPLOG_ARCHIVE_TIMEOUT`
+
+Timeout in seconds (passed since previous upload) to trigger upload to storage.
+
+* `OPLOG_PUSH_STATS_ENABLED`
+
+Enables statistics collecting of oplog archiving procedure.
+
+* `OPLOG_PUSH_STATS_UPDATE_INTERVAL`
+
+Interval in seconds to update oplog archiving statistics. Disabled if reset to 0.
+
+* `OPLOG_PUSH_STATS_LOGGING_INTERVAL`
+
+Interval in seconds to log oplog archiving statistics. Disabled if reset to 0.
+
+* `OPLOG_PUSH_STATS_EXPOSE_HTTP`
+
+Exposes http-handler with oplog archiving statistics.
+
+* `MONGODB_LAST_WRITE_UPDATE_SECONDS`
+
+Interval in seconds to update the latest majority optime.
 
 Usage
 -----
 
-WAL-G mongo extension currently supports these commands:
-
-* ``backup-fetch``
-
-When fetching backup's stream, the user should pass in the name of the backup. It returns an encrypted data stream to stdout, you should pass it to a backup tool that you used to create this backup.
-```
-wal-g backup-fetch example_backup | mongorestore --archive --oplogReplay
-```
-WAL-G can also fetch the latest backup using:
-
-```
-wal-g backup-fetch LATEST | mongorestore --archive --oplogReplay
-```
-
-
-* ``oplog-fetch``
-
-When fetching oplog's, the user should specify the name of the backup starting with which to take an oplog and time in RFC3339 format for PITR
-```
-wal-g oplog-fetch --since "backupname" --until "2006-01-02T15:04:05Z07:00"
-```
-
-Both keys are optional. Default value for --since flag is 'LATEST'. If --until flag is not specified, its value will be set to time.Now()
+WAL-G mongodb extension currently supports these commands:
 
 * ``backup-push``
 
-Command for compressing, encrypting and sending backup from stream to storage.
+Creates new backup and send it to storage.
+
+Runs `WALG_STREAM_CREATE_COMMAND` to create backup.
 
 ```
 wal-g backup-push
 ```
 
-Variable _WALG_STREAM_CREATE_COMMAND_ is required for use backup-push 
-(eg. ```mongodump --archive --oplog```)
+* ``backup-list``
+
+Lists currently available backups in storage
+
+```
+wal-g backup-list
+```
+
+* ``backup-fetch``
+
+Fetches backup from storage and restores passes data to `WALG_STREAM_RESTORE_COMMAND` to restore backup.
+
+User should specify the name of the backup to fetch.
+
+```
+wal-g backup-fetch example_backup
+```
+
+* ``backup-show``
+
+Fetches backup metadata from storage to STDOUT.
+
+User should specify the name of the backup to show.
+
+```
+wal-g backup-show example_backup
+```
+
 
 * ``oplog-push``
 
-Command for sending oplogs to storage by CRON.
+Fetches oplog from mongodb instance (`MONGODB_URI`) and uploads to storage.
+
+Upload is forced when,
+  - archive batch exceeds `OPLOG_ARCHIVE_AFTER_SIZE` bytes
+  - passes `OPLOG_ARCHIVE_TIMEOUT` seconds since previous upload
+
+Archiving collects writes if optime is readable by majority reads. Optime is updated every `MONGODB_LAST_WRITE_UPDATE_SECONDS` seconds.  
 
 ```
 wal-g oplog-push
+```
+
+* ``oplog-replay``
+
+Fetches oplog archives from storage and applies to mongodb instance (`MONGODB_URI`)
+
+User should specify SINCE and UNTIL boundaries (format: `timestamp.inc`, eg `1593554809.32`). Both of them should exist in storage.
+SINCE is included and UNTIL is NOT.
+
+```
+wal-g oplog-replay 1593554109.1 1593559109.1
+```
+
+* ``oplog-fetch``
+
+Fetches oplog archives from storage and passes to STDOUT.
+
+User should specify SINCE and UNTIL boundaries (format: `timestamp.inc`, eg `1593554809.32`). Both of them should exist in storage.
+SINCE is included and UNTIL is NOT.
+
+Supported formats to output: `json`, `bson`, `bson-raw`
+
+```
+wal-g oplog-fetch 1593554109.1 1593559109.1 --format json
 ```
