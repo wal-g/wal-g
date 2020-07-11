@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
+	"strconv"
 )
 
 type NoPostgresVersionError struct {
@@ -117,8 +118,22 @@ func newPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
 	return r, nil
 }
 
+// buildGetSystemIdentifier formats a query that which gathers SystemIdentifier info
+// TODO: Unittest
 func (queryRunner *PgQueryRunner) buildGetSystemIdentifier() string {
 	return "select system_identifier from pg_control_system();"
+}
+
+// buildGetParameter formats a query to get a postgresql.conf parameter
+// TODO: Unittest
+func (queryRunner *PgQueryRunner) buildGetParameter() string {
+	return "select setting from pg_settings where name = $1"
+}
+
+// buildGetPhyisicalSlotInfo formats a query to get info on a Physical Replication Slot
+// TODO: Unittest
+func (queryRunner *PgQueryRunner) buildGetPhyisicalSlotInfo() string {
+	return "select temporary, active, restart_lsn from pg_replication_slots where slot_name = $1"
 }
 
 // Retrieve PostgreSQL numeric version
@@ -300,4 +315,41 @@ func (queryRunner *PgQueryRunner) getDatabaseInfos() ([]PgDatabaseInfo, error) {
 	}
 
 	return databases, nil
+}
+
+// GetParameter reads a Postgres setting
+// TODO: Unittest
+func (queryRunner *PgQueryRunner) GetParameter(parameterName string) (string, error) {
+	var value string
+	conn := queryRunner.connection
+	err := conn.QueryRow(queryRunner.buildGetParameter(), parameterName).Scan(&value)
+	return value, err
+}
+
+// GetWalSegmentSize reads the wals egment size and converts it to uint64
+// TODO: Unittest
+func (queryRunner *PgQueryRunner) GetWalSegmentSize() (uint64, error) {
+  strValue, err := queryRunner.GetParameter("wal_segment_size")
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseUint(strValue, 10, 64)
+}
+
+// GetPhysicalSlotInfo reads information on a physical replication slot
+// TODO: Unittest
+func (queryRunner *PgQueryRunner) GetPhysicalSlotInfo(slotName string) (PhysicalSlot, error) {
+	var temp       bool
+	var active     bool
+	var restartLSN string
+
+	conn := queryRunner.connection
+	err := conn.QueryRow(queryRunner.buildGetPhyisicalSlotInfo(), slotName).Scan(&temp, &active, &restartLSN)
+	if err == pgx.ErrNoRows {
+		// slot does not exist.
+		return PhysicalSlot{Name: slotName}, nil
+	} else if err != nil {
+		return PhysicalSlot{Name: slotName}, err
+	}
+	return NewPhysicalSlot(slotName, true, temp, active, restartLSN)
 }

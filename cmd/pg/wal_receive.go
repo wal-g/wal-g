@@ -10,9 +10,9 @@ const WalReceiveShortDescription = "Receive WAL stream and push to storage"
 
 // walReceiveCmd represents the walReceive command
 var walReceiveCmd = &cobra.Command{
-	Use:   "wal-receive tmp_filepath",
+	Use:   "wal-receive",
 	Short: WalReceiveShortDescription, // TODO : improve description
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -24,7 +24,7 @@ var walReceiveCmd = &cobra.Command{
 			tracelog.ErrorLogger.PrintError(err)
 			uploader.ArchiveStatusManager = internal.NewNopASM()
 		}
-		internal.HandleWALReceive(uploader, args[0])
+		internal.HandleWALReceive(uploader)
 	},
 }
 
