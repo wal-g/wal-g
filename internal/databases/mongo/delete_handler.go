@@ -3,6 +3,7 @@ package mongo
 import (
 	"time"
 
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 
@@ -10,10 +11,11 @@ import (
 )
 
 type PurgeSettings struct {
-	retainCount *int
-	retainAfter *time.Time
-	purgeOplog  bool
-	dryRun      bool
+	retainCount  *int
+	retainAfter  *time.Time
+	purgeOplog   bool
+	purgeGarbage bool
+	dryRun       bool
 }
 
 type PurgeOption func(*PurgeSettings)
@@ -39,6 +41,13 @@ func PurgeOplog(purgeOplog bool) PurgeOption {
 	}
 }
 
+// PurgeGarbage ...
+func PurgeGarbage(purgeGarbage bool) PurgeOption {
+	return func(args *PurgeSettings) {
+		args.purgeGarbage = purgeGarbage
+	}
+}
+
 // PurgeDryRun ...
 func PurgeDryRun(dryRun bool) PurgeOption {
 	return func(args *PurgeSettings) {
@@ -53,7 +62,12 @@ func HandlePurge(downloader archive.Downloader, purger archive.Purger, setters .
 		setter(&opts)
 	}
 
-	_, retainBackups, err := HandleBackupsPurge(downloader, purger, opts)
+	backupTimes, garbage, err := downloader.ListBackups()
+	if err != nil {
+		return err
+	}
+
+	_, retainBackups, err := HandleBackupsPurge(backupTimes, downloader, purger, opts)
 	if err != nil {
 		return err
 	}
@@ -65,16 +79,20 @@ func HandlePurge(downloader archive.Downloader, purger archive.Purger, setters .
 		}
 	}
 
+	if opts.purgeGarbage {
+		tracelog.InfoLogger.Printf("Garbage prefixes in backups folder: %v", garbage)
+		if !opts.dryRun {
+			if err := purger.DeleteGarbage(garbage); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
 // HandleBackupsPurge delete backups according to settings
-func HandleBackupsPurge(downloader archive.Downloader, purger archive.Purger, opts PurgeSettings) (purge, retain []archive.Backup, err error) {
-	backupTimes, err := downloader.ListBackupNames()
-	if err != nil {
-		return nil, nil, err
-	}
-
+func HandleBackupsPurge(backupTimes []internal.BackupTime, downloader archive.Downloader, purger archive.Purger, opts PurgeSettings) (purge, retain []archive.Backup, err error) {
 	if len(backupTimes) == 0 { // TODO: refactor && support oplog purge even if backups do not exist
 		tracelog.InfoLogger.Println("No backups found")
 		return []archive.Backup{}, []archive.Backup{}, nil

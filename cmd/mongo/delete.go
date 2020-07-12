@@ -12,16 +12,18 @@ import (
 )
 
 const (
-	RetainAfterFlag = "retain-after"
-	RetainCountFlag = "retain-count"
-	PurgeOplogFlag  = "purge-oplog"
+	RetainAfterFlag  = "retain-after"
+	RetainCountFlag  = "retain-count"
+	PurgeOplogFlag   = "purge-oplog"
+	PurgeGarbageFlag = "purge-garbage"
 )
 
 var (
-	confirmed   bool
-	purgeOplog  bool
-	retainAfter string
-	retainCount uint
+	confirmed    bool
+	purgeOplog   bool
+	purgeGarbage bool
+	retainAfter  string
+	retainCount  uint
 )
 
 // deleteCmd represents the delete command
@@ -32,7 +34,7 @@ var deleteCmd = &cobra.Command{
 }
 
 func runPurge(cmd *cobra.Command, args []string) {
-	opts := []mongo.PurgeOption{mongo.PurgeDryRun(!confirmed), mongo.PurgeOplog(purgeOplog)}
+	opts := []mongo.PurgeOption{mongo.PurgeDryRun(!confirmed), mongo.PurgeOplog(purgeOplog), mongo.PurgeGarbage(purgeGarbage)}
 	if cmd.Flags().Changed(RetainAfterFlag) {
 		retainAfterTime, err := time.Parse(time.RFC3339, retainAfter)
 		tracelog.ErrorLogger.FatalfOnError("Can not parse retain time: %v", err)
@@ -40,7 +42,7 @@ func runPurge(cmd *cobra.Command, args []string) {
 	}
 
 	if cmd.Flags().Changed(RetainCountFlag) {
-		if retainCount == 0 { // TODO: fix condition
+		if retainCount == 0 { // TODO: provide folder cleanup
 			tracelog.ErrorLogger.Fatalln("Retain count can not be 0")
 		}
 		opts = append(opts, mongo.PurgeRetainCount(int(retainCount)))
@@ -59,10 +61,11 @@ func runPurge(cmd *cobra.Command, args []string) {
 
 }
 
-func init() { // TODO: validate-fix
+func init() {
 	Cmd.AddCommand(deleteCmd)
 	deleteCmd.Flags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 	deleteCmd.Flags().BoolVar(&purgeOplog, PurgeOplogFlag, false, "Purge oplog archives")
+	deleteCmd.Flags().BoolVar(&purgeGarbage, PurgeGarbageFlag, false, "Purge garbage in backup folder")
 	deleteCmd.Flags().StringVar(&retainAfter, RetainAfterFlag, "", "Keep backups newer")
 	deleteCmd.Flags().UintVar(&retainCount, RetainCountFlag, 0, "Keep minimum count")
 }

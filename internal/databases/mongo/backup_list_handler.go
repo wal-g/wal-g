@@ -10,7 +10,7 @@ import (
 
 // HandleBackupsList prints current backups.
 func HandleBackupsList(downloader archive.Downloader, listing archive.BackupListing, output io.Writer, verbose bool) error {
-	backupTimes, err := downloader.ListBackupNames()
+	backupTimes, _, err := downloader.ListBackups()
 	if err != nil {
 		return err
 	}
