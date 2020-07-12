@@ -28,6 +28,20 @@ func (_m *Purger) DeleteBackups(backups []archive.Backup) error {
 	return r0
 }
 
+// DeleteGarbage provides a mock function with given fields: garbageKeys
+func (_m *Purger) DeleteGarbage(garbageKeys []string) error {
+	ret := _m.Called(garbageKeys)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]string) error); ok {
+		r0 = rf(garbageKeys)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // DeleteOplogArchives provides a mock function with given fields: archives
 func (_m *Purger) DeleteOplogArchives(archives []models.Archive) error {
 	ret := _m.Called(archives)

@@ -274,7 +274,7 @@ func uploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupNa
 
 // TODO : unit tests
 func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupName string) error {
-	sentinelName := backupName + utility.SentinelSuffix
+	sentinelName := SentinelNameFromBackup(backupName)
 
 	dtoBody, err := json.Marshal(sentinelDto)
 	if err != nil {
@@ -282,6 +282,10 @@ func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupNa
 	}
 
 	return uploader.Upload(sentinelName, bytes.NewReader(dtoBody))
+}
+
+func SentinelNameFromBackup(backupName string) string {
+	return backupName + utility.SentinelSuffix
 }
 
 func checkPgVersionAndPgControl(archiveDirectory string) {

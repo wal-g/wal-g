@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"path"
 	"sort"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 )
 
 var (
@@ -40,12 +42,13 @@ type Downloader interface {
 	DownloadOplogArchive(arch models.Archive, writeCloser io.WriteCloser) error
 	ListOplogArchives() ([]models.Archive, error)
 	LoadBackups(names []string) ([]Backup, error)
-	ListBackupNames() ([]internal.BackupTime, error)
+	ListBackups() ([]internal.BackupTime, []string, error)
 	LastKnownArchiveTS() (models.Timestamp, error)
 }
 
 type Purger interface {
 	DeleteBackups(backups []Backup) error
+	DeleteGarbage(garbage []string) error
 	DeleteOplogArchives(archives []models.Archive) error
 }
 
@@ -65,6 +68,7 @@ func NewDefaultStorageSettings() StorageSettings {
 
 // StorageDownloader extends base folder with mongodb specific.
 type StorageDownloader struct {
+	rootFolder    storage.Folder
 	oplogsFolder  storage.Folder
 	backupsFolder storage.Folder
 }
@@ -75,7 +79,7 @@ func NewStorageDownloader(opts StorageSettings) (*StorageDownloader, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &StorageDownloader{oplogsFolder: folder.GetSubFolder(opts.oplogsPath), backupsFolder: folder.GetSubFolder(opts.backupsPath)}, nil
+	return &StorageDownloader{rootFolder: folder, oplogsFolder: folder.GetSubFolder(opts.oplogsPath), backupsFolder: folder.GetSubFolder(opts.backupsPath)}, nil
 }
 
 // BackupMeta downloads sentinel contents.
@@ -108,25 +112,9 @@ func (sd *StorageDownloader) LoadBackups(names []string) ([]Backup, error) {
 	return backups, nil
 }
 
-// ListBackupNames lists backups in folder
-func (sd *StorageDownloader) ListBackupNames() ([]internal.BackupTime, error) {
-	backupObjects, _, err := sd.backupsFolder.ListFolder()
-	if err != nil {
-		return nil, err
-	}
-	sortTimes := make([]internal.BackupTime, 0, len(backupObjects))
-	for _, object := range backupObjects {
-		key := object.GetName()
-		if !strings.HasSuffix(key, utility.SentinelSuffix) {
-			continue
-		}
-		mtime := object.GetLastModified()
-		sortTimes = append(sortTimes, internal.BackupTime{BackupName: utility.StripBackupName(key), Time: mtime, WalFileName: utility.StripWalFileName(key)})
-	}
-	sort.Slice(sortTimes, func(i, j int) bool {
-		return sortTimes[i].Time.After(sortTimes[j].Time)
-	})
-	return sortTimes, nil
+//ListBackups lists backups in folder
+func (sd *StorageDownloader) ListBackups() ([]internal.BackupTime, []string, error) {
+	return internal.GetBackupsAndGarbage(sd.rootFolder)
 }
 
 // DownloadOplogArchive downloads, decompresses and decrypts (if needed) oplog archive.
@@ -298,22 +286,42 @@ func NewStoragePurger(opts StorageSettings) (*StoragePurger, error) {
 }
 
 // DeleteBackups purges given backups files
+// TODO: extract BackupLayout abstraction and provide DataPath(), SentinelPath(), Exists() methods
 func (sp *StoragePurger) DeleteBackups(backups []Backup) error {
 	keys := make([]string, 0, len(backups)*2)
 	for _, backup := range backups {
-		b := internal.NewBackup(sp.backupsFolder, backup.BackupName)
-		dataKeys, err := b.GetTarNames()
+		keys = append(keys, internal.SentinelNameFromBackup(backup.BackupName))
+
+		dataObjects, _, err := sp.backupsFolder.GetSubFolder(backup.BackupName).ListFolder()
 		if err != nil {
 			return err
 		}
-		keys = append(keys, dataKeys...)
-		keys = append(keys, b.GetStopSentinelPath())
+		for _, obj := range dataObjects {
+			keys = append(keys, path.Join(backup.BackupName, obj.GetName()))
+		}
 	}
 
+	tracelog.DebugLogger.Printf("Backup keys will be deleted: %+v\n", keys)
 	if err := sp.backupsFolder.DeleteObjects(keys); err != nil {
 		return err
 	}
 	return nil
+}
+
+// DeleteGarbage purges given garbage keys
+func (sp *StoragePurger) DeleteGarbage(garbage []string) error {
+	var keys []string
+	for _, prefix := range garbage {
+		garbageObjects, _, err := sp.backupsFolder.GetSubFolder(prefix).ListFolder()
+		if err != nil {
+			return err
+		}
+		for _, obj := range garbageObjects {
+			keys = append(keys, path.Join(prefix, obj.GetName()))
+		}
+	}
+	tracelog.DebugLogger.Printf("Garbage keys will be deleted: %+v\n", keys)
+	return sp.backupsFolder.DeleteObjects(keys)
 }
 
 // DeleteOplogArchives purges given oplogs files
@@ -322,5 +330,6 @@ func (sp *StoragePurger) DeleteOplogArchives(archives []models.Archive) error {
 	for _, arch := range archives {
 		oplogKeys = append(oplogKeys, arch.Filename())
 	}
+	tracelog.DebugLogger.Printf("Oplog keys will be deleted: %+v\n", oplogKeys)
 	return sp.oplogsFolder.DeleteObjects(oplogKeys)
 }

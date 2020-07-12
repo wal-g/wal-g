@@ -56,7 +56,7 @@ func getLatestBackupName(folder storage.Folder) (string, error) {
 // TODO : unit tests
 // getBackups receives backup descriptions and sorts them by time
 func getBackups(folder storage.Folder) (backups []BackupTime, err error) {
-	backups, _, err = getBackupsAndGarbage(folder)
+	backups, _, err = GetBackupsAndGarbage(folder)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func getBackups(folder storage.Folder) (backups []BackupTime, err error) {
 }
 
 // TODO : unit tests
-func getBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage []string, err error) {
+func GetBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage []string, err error) {
 	backupObjects, subFolders, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
 	if err != nil {
 		return nil, nil, err

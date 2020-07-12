@@ -88,12 +88,12 @@ func (_m *Downloader) LastKnownArchiveTS() (models.Timestamp, error) {
 	return r0, r1
 }
 
-// ListBackupNames provides a mock function with given fields:
-func (_m *Downloader) ListBackupNames() ([]internal.BackupTime, error) {
+// ListBackups provides a mock function with given fields:
+func (_m *Downloader) ListBackups() ([]internal.BackupTime, []string, error) {
 	ret := _m.Called()
 
 	if len(ret) == 1 {
-		rf, ok := ret.Get(0).(func() ([]internal.BackupTime, error))
+		rf, ok := ret.Get(0).(func() ([]internal.BackupTime, []string, error))
 		if ok {
 			return rf()
 		}
@@ -108,14 +108,23 @@ func (_m *Downloader) ListBackupNames() ([]internal.BackupTime, error) {
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
+	var r1 []string
+	if rf, ok := ret.Get(1).(func() []string); ok {
 		r1 = rf()
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).([]string)
+		}
 	}
 
-	return r0, r1
+	var r2 error
+	if rf, ok := ret.Get(2).(func() error); ok {
+		r2 = rf()
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // ListOplogArchives provides a mock function with given fields:

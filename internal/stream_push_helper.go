@@ -17,7 +17,7 @@ const (
 // PushStream compresses a stream and push it
 func (uploader *Uploader) PushStream(stream io.Reader) (string, error) {
 	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
-	dstPath := getStreamName(backupName, uploader.Compressor.FileExtension())
+	dstPath := GetStreamName(backupName, uploader.Compressor.FileExtension())
 	err := uploader.PushStreamToDestination(stream, dstPath)
 
 	return backupName, err
@@ -39,6 +39,6 @@ func FileIsPiped(stream *os.File) bool {
 	return (stat.Mode() & os.ModeCharDevice) == 0
 }
 
-func getStreamName(backupName string, extension string) string {
+func GetStreamName(backupName string, extension string) string {
 	return utility.SanitizePath(path.Join(backupName, "stream.")) + extension
 }

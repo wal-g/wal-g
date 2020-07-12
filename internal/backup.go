@@ -55,7 +55,7 @@ func NewBackup(baseBackupFolder storage.Folder, name string) *Backup {
 
 // GetStopSentinelPath returns sentinel path.
 func (backup *Backup) GetStopSentinelPath() string {
-	return backup.Name + utility.SentinelSuffix
+	return SentinelNameFromBackup(backup.Name)
 }
 
 func (backup *Backup) getMetadataPath() string {
