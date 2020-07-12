@@ -326,21 +326,25 @@ func (queryRunner *PgQueryRunner) GetParameter(parameterName string) (string, er
 	return value, err
 }
 
-// GetWalSegmentSize reads the wals egment size and converts it to uint64
+// GetWalSegmentBytes reads the wals segment size (in bytes) and converts it to uint64
 // TODO: Unittest
-func (queryRunner *PgQueryRunner) GetWalSegmentSize() (uint64, error) {
-  strValue, err := queryRunner.GetParameter("wal_segment_size")
+func (queryRunner *PgQueryRunner) GetWalSegmentBytes() (uint64, error) {
+	strValue, err := queryRunner.GetParameter("wal_segment_size")
 	if err != nil {
 		return 0, err
 	}
-	return strconv.ParseUint(strValue, 10, 64)
+	segBlocks, err := strconv.ParseUint(strValue, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return segBlocks, nil
 }
 
 // GetPhysicalSlotInfo reads information on a physical replication slot
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) GetPhysicalSlotInfo(slotName string) (PhysicalSlot, error) {
-	var temp       bool
-	var active     bool
+	var temp bool
+	var active bool
 	var restartLSN string
 
 	conn := queryRunner.connection

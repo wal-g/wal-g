@@ -14,7 +14,7 @@ var walReceiveCmd = &cobra.Command{
 	Short: WalReceiveShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		uploader, err := internal.ConfigureUploader()
+		uploader, err := internal.ConfigureWalUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		archiveStatusManager, err := internal.ConfigureArchiveStatusManager()
