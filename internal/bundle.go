@@ -481,7 +481,7 @@ func (bundle *Bundle) writeHeaders(headers []*tar.Header) error {
 
 func (bundle *Bundle) getExpectedFileSize(filePath string, fileInfo os.FileInfo, wasInBase bool) (uint64, error) {
 	incrementBaseLsn := bundle.getIncrementBaseLsn()
-	isIncremented := incrementBaseLsn != nil && (wasInBase || bundle.forceIncremental) && isPagedFile(fileInfo, filePath)
+	isIncremented := bundle.checkIfIncremented(incrementBaseLsn, fileInfo, filePath, wasInBase)
 	if isIncremented {
 		bitmap, err := bundle.getDeltaBitmapFor(filePath)
 		if _, ok := err.(NoBitmapFoundError); ok {
@@ -558,9 +558,8 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 
 		if (wasInBase || bundle.forceIncremental) && (time.Equal(baseFile.MTime)) {
 			// File was not changed since previous backup
-			tracelog.DebugLogger.Println("Skipped due to unchanged modification time")
-			bundle.getFiles().Store(fileInfoHeader.Name,
-				BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time, UpdatesCount: updatesCount})
+			tracelog.DebugLogger.Println("Skipped due to unchanged modification time: " + path)
+			bundle.skipFile(fileInfoHeader, info, updatesCount)
 			return nil
 		}
 		expectedFileSize, err := bundle.getExpectedFileSize(path, info, wasInBase)
@@ -708,12 +707,12 @@ func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uin
 // TODO : unit tests
 func (bundle *Bundle) packFileIntoTar(cfi *ComposeFileInfo, tarBall TarBall) error {
 	incrementBaseLsn := bundle.getIncrementBaseLsn()
-	isIncremented := incrementBaseLsn != nil && (cfi.wasInBase || bundle.forceIncremental) && isPagedFile(cfi.fileInfo, cfi.path)
+	isIncremented := bundle.checkIfIncremented(incrementBaseLsn, cfi.fileInfo, cfi.path, cfi.wasInBase)
 	var fileReader io.ReadCloser
 	if isIncremented {
 		bitmap, err := bundle.getDeltaBitmapFor(cfi.path)
 		if _, ok := err.(NoBitmapFoundError); ok { // this file has changed after the start of backup, so just skip it
-			bundle.skipFile(cfi)
+			bundle.skipFile(cfi.header, cfi.fileInfo, cfi.updatesCount)
 			return nil
 		} else if err != nil {
 			return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", cfi.path)
@@ -766,10 +765,14 @@ func (bundle *Bundle) packFileIntoTar(cfi *ComposeFileInfo, tarBall TarBall) err
 	return nil
 }
 
-func (bundle *Bundle) skipFile(cfi *ComposeFileInfo) {
-	bundle.getFiles().Store(cfi.header.Name,
+func (bundle *Bundle)checkIfIncremented(incrementBaseLsn *uint64, fileInfo os.FileInfo, filePath string, wasInBase bool) bool {
+	return incrementBaseLsn != nil && (wasInBase || bundle.forceIncremental) && isPagedFile(fileInfo, filePath)
+}
+
+func (bundle *Bundle) skipFile(tarHeader *tar.Header, fileInfo os.FileInfo, updatesCount uint64) {
+	bundle.getFiles().Store(tarHeader.Name,
 		BackupFileDescription{IsSkipped: true, IsIncremented: false,
-			MTime: cfi.fileInfo.ModTime(), UpdatesCount: cfi.updatesCount})
+			MTime: fileInfo.ModTime(), UpdatesCount: updatesCount})
 }
 
 // TODO : unit tests
