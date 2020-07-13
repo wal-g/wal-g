@@ -485,17 +485,16 @@ func (bundle *Bundle) getExpectedFileSize(filePath string, fileInfo os.FileInfo,
 	if isIncremented {
 		bitmap, err := bundle.getDeltaBitmapFor(filePath)
 		if _, ok := err.(NoBitmapFoundError); ok {
-			// this file has changed after the start of backup and will be skipped during file packing
-			// so let the size be zero so it won't affect the calculations
+			// this file has changed after the start of backup and will be skipped
+			// so the expected size in tar is zero
 			return 0, nil
 		}
 		if err != nil {
 			return 0, errors.Wrapf(err, "getExpectedFileSize: failed to find corresponding bitmap '%s'\n", filePath)
 		}
 		if bitmap == nil {
-			// if there was no bundle bitmap set, do a full scan instead to calculate expected changed blocks count?
-			// as for now, just return size equal to entire page file size
-			return uint64(fileInfo.Size()), nil
+			// if there was no bundle bitmap set, do a full scan instead to calculate expected increment size
+			return bundle.scanExpectedIncrementSize(filePath, fileInfo, incrementBaseLsn)
 		}
 		incrementBlocksCount := bitmap.GetCardinality()
 		// expected header size = length(IncrementFileHeader) + sizeOf(fileSize) + sizeOf(diffBlockCount) + sizeOf(blockNo)*incrementBlocksCount
@@ -504,6 +503,24 @@ func (bundle *Bundle) getExpectedFileSize(filePath string, fileInfo os.FileInfo,
 		return incrementHeaderSize + incrementPageDataSize, nil
 	}
 	return uint64(fileInfo.Size()), nil
+}
+
+func (bundle *Bundle) scanExpectedIncrementSize(path string, fileInfo os.FileInfo, incrementBaseLsn *uint64) (uint64, error) {
+	_, incrementSize, err := ReadIncrementalFile(path, fileInfo.Size(), *incrementBaseLsn, nil)
+	if os.IsNotExist(err) {
+		// File was deleted before opening, so set the expected size to zero
+		return 0, nil
+	}
+	switch err.(type) {
+	case nil:
+		return uint64(incrementSize), nil
+	case InvalidBlockError:
+		// If failed to read as incremental file, set the expected size equal to page file size
+		tracelog.WarningLogger.Printf("scanExpectedIncrementSize: failed to read file '%s' as incremented\n.", path)
+		return uint64(fileInfo.Size()), nil
+	default:
+		return 0, errors.Wrapf(err, "scanExpectedIncrementSize: failed reading incremental file '%s'\n", path)
+	}
 }
 
 // TODO : unit tests
