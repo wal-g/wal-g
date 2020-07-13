@@ -41,7 +41,7 @@ type QueryRunner interface {
 	StartBackup(backup string) (string, string, bool, error)
 	// Inform database that contents are copied, get information on backup
 	StopBackup() (string, string, string, error)
-	// get pg_stat_all_all_tables data
+	// get pg_stat_all_tables data
 	GetStatistics()
 }
 
@@ -180,8 +180,11 @@ func (queryRunner *PgQueryRunner) BuildStatisticsQuery() (string, error) {
 	switch {
 	case queryRunner.Version >= 90000:
 		return "SELECT c.relfilenode, c.reltablespace, s.n_tup_ins, s.n_tup_upd, s.n_tup_del " +
-			"FROM pg_class c LEFT OUTER JOIN pg_stat_all_tables s ON c.oid = s.relid " +
-			"WHERE relfilenode != 0 AND n_tup_ins IS NOT NULL", nil
+			"FROM pg_class c " +
+			"LEFT OUTER JOIN pg_stat_all_tables s " +
+			"ON c.oid = s.relid " +
+			"WHERE relfilenode != 0 " +
+			"AND n_tup_ins IS NOT NULL", nil
 	case queryRunner.Version == 0:
 		return "", newNoPostgresVersionError()
 	default:
