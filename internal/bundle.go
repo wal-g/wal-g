@@ -115,9 +115,10 @@ func newBundle(
 	incrementFromLsn *uint64, incrementFromFiles BackupFileList,
 	forceIncremental bool,
 ) *Bundle {
+	tarSizeThreshold := viper.GetInt64(TarSizeThresholdSetting)
 	return &Bundle{
 		ArchiveDirectory:   archiveDirectory,
-		TarSizeThreshold:   viper.GetInt64(TarSizeThresholdSetting),
+		TarSizeThreshold:   tarSizeThreshold,
 		AllTarballsSize:    new(int64),
 		Crypter:            crypter,
 		IncrementFromLsn:   incrementFromLsn,
@@ -125,7 +126,8 @@ func newBundle(
 		Files:              &sync.Map{},
 		TablespaceSpec:     NewTablespaceSpec(archiveDirectory),
 		forceIncremental:   forceIncremental,
-		TarBallComposer:    NewTarBallComposer(incrementFromFiles),
+		TarBallComposer:    NewTarBallComposer(uint64(tarSizeThreshold),
+			NewDefaultComposeRatingEvaluator(incrementFromFiles)),
 	}
 }
 
@@ -415,60 +417,57 @@ func (bundle *Bundle) getFileUpdateCount(filePath string) uint64 {
 }
 
 func (bundle *Bundle) PackTarballs() (map[string][]string, error) {
-	headers, fileInfos := bundle.TarBallComposer.Compose()
-	// write headers to separate tarball
+	headers, tarFilesCollections := bundle.TarBallComposer.Compose()
 	err := bundle.writeHeaders(headers)
 	if err != nil {
 		return nil, err
 	}
 	tarFileSets := make(map[string][]string, 0)
-	// todo: rewrite bundle queue and support parallel tarballs writing
-	tarBall := bundle.Deque()
-	tarBall.SetUp(bundle.Crypter)
-	previousUpdateRating := uint64(0)
-	for _, fileInfo := range fileInfos {
-		tarBall = bundle.CheckTarBall(tarBall, previousUpdateRating, fileInfo.updateRating)
-		previousUpdateRating = fileInfo.updateRating
-		err := bundle.packFileIntoTar(fileInfo, tarBall)
-		if err != nil {
-			return nil, err
+	for _, tarFilesCollection := range tarFilesCollections {
+		tarBall := bundle.Deque()
+		tarBall.SetUp(bundle.Crypter)
+		for _, composeFileInfo := range tarFilesCollection.files {
+			tarFileSets[tarBall.Name()] = append(tarFileSets[tarBall.Name()], composeFileInfo.header.Name)
 		}
-		tarFileSets[tarBall.Name()] = append(tarFileSets[tarBall.Name()], fileInfo.header.Name)
+		// tarFilesCollection closure
+		tarFilesCollectionLocal := tarFilesCollection
+		go func() {
+			for _, fileInfo := range tarFilesCollectionLocal.files {
+				err := bundle.packFileIntoTar(fileInfo, tarBall)
+				if err != nil {
+					panic(err)
+				}
+			}
+			err := bundle.FinishTarBall(tarBall)
+			if err != nil {
+				panic(err)
+			}
+		}()
 	}
-	bundle.tarballQueue <- tarBall
 
 	return tarFileSets, nil
 }
 
-// CheckTarBall creates new tarball
-// if current tar is too big or
-// if updateRating went to non-zero from zero
-func (bundle *Bundle) CheckTarBall(tarBall TarBall, prevUpdateRating, updateRating uint64) TarBall {
-	if tarBall.Size() > bundle.TarSizeThreshold || prevUpdateRating == 0 && updateRating > 0 && tarBall.Size() > 0 {
-		// this code is borrowed from CheckSizeAndEnqueueBack
-		bundle.mutex.Lock()
-		defer bundle.mutex.Unlock()
-		err := tarBall.CloseTar()
-		if err != nil {
-			panic(err)
-			//return errors.Wrap(err, "HandleWalkedFSObject: failed to close tarball")
-		}
-
-		bundle.uploadQueue <- tarBall
-		for len(bundle.uploadQueue) > bundle.maxUploadQueue {
-			select {
-			case otb := <-bundle.uploadQueue:
-				otb.AwaitUploads()
-			default:
-			}
-		}
-
-		bundle.NewTarBall(true)
-		tarBall = bundle.TarBall
-		// end of borrowed code
-		tarBall.SetUp(bundle.Crypter)
+func (bundle *Bundle) FinishTarBall(tarBall TarBall) error {
+	bundle.mutex.Lock()
+	defer bundle.mutex.Unlock()
+	err := tarBall.CloseTar()
+	if err != nil {
+		return errors.Wrap(err, "FinishTarBall: failed to close tarball")
 	}
-	return tarBall
+
+	bundle.uploadQueue <- tarBall
+	for len(bundle.uploadQueue) > bundle.maxUploadQueue {
+		select {
+		case otb := <-bundle.uploadQueue:
+			otb.AwaitUploads()
+		default:
+		}
+	}
+
+	bundle.NewTarBall(true)
+	bundle.tarballQueue <- bundle.TarBall
+	return nil
 }
 
 func (bundle *Bundle) writeHeaders(headers []*tar.Header) error {
@@ -482,6 +481,33 @@ func (bundle *Bundle) writeHeaders(headers []*tar.Header) error {
 	}
 	bundle.EnqueueBack(headersTarBall)
 	return nil
+}
+
+func (bundle *Bundle) getExpectedFileSize(filePath string, fileInfo os.FileInfo, wasInBase bool) (uint64, error) {
+	incrementBaseLsn := bundle.getIncrementBaseLsn()
+	isIncremented := incrementBaseLsn != nil && (wasInBase || bundle.forceIncremental) && isPagedFile(fileInfo, filePath)
+	if isIncremented {
+		bitmap, err := bundle.getDeltaBitmapFor(filePath)
+		if _, ok := err.(NoBitmapFoundError); ok {
+			// this file has changed after the start of backup and will be skipped during file packing
+			// so let the size be zero so it won't affect the calculations
+			return 0, nil
+		}
+		if err != nil {
+			return 0, errors.Wrapf(err, "getExpectedFileSize: failed to find corresponding bitmap '%s'\n", filePath)
+		}
+		if bitmap == nil {
+			// if there was no bundle bitmap set, do a full scan instead to calculate expected changed blocks count?
+			// as for now, just return size equal to entire page file size
+			return uint64(fileInfo.Size()), nil
+		}
+		incrementBlocksCount := bitmap.GetCardinality()
+		// expected header size = length(IncrementFileHeader) + sizeOf(fileSize) + sizeOf(diffBlockCount) + sizeOf(blockNo)*incrementBlocksCount
+		incrementHeaderSize := uint64(len(IncrementFileHeader)) + sizeofInt64 + sizeofInt32 + (incrementBlocksCount * sizeofInt32)
+		incrementPageDataSize := incrementBlocksCount * uint64(DatabasePageSize)
+		return incrementHeaderSize + incrementPageDataSize, nil
+	}
+	return uint64(fileInfo.Size()), nil
 }
 
 // TODO : unit tests
@@ -524,8 +550,11 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 				BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time, UpdatesCount: updatesCount})
 			return nil
 		}
-
-		bundle.TarBallComposer.AddFile(path, info, wasInBase, fileInfoHeader, updatesCount)
+		expectedFileSize, err := bundle.getExpectedFileSize(path, info, wasInBase)
+		if err != nil {
+			return err
+		}
+		bundle.TarBallComposer.AddFile(path, info, wasInBase, fileInfoHeader, updatesCount, expectedFileSize)
 	} else {
 		bundle.TarBallComposer.AddHeader(fileInfoHeader)
 		if excluded && isDir {
