@@ -17,7 +17,7 @@ type FetchConfig struct {
 	dbDataDirectory string
 }
 
-func (fc *FetchConfig) applyUnwrapResult(unwrapResult *UnwrapResult) {
+func (fc *FetchConfig) updateFetchConfig(unwrapResult *UnwrapResult) {
 	for filePath, missingBlockCount := range unwrapResult.createdPageFiles {
 		_, ok := fc.filesToUnwrap[filePath]
 		if !ok {
@@ -114,7 +114,7 @@ func deltaFetchRecursionNew(cfg *FetchConfig) error {
 		}
 		cfg.filesToUnwrap = baseFilesToUnwrap
 		cfg.backupName = *sentinelDto.IncrementFrom
-		cfg.applyUnwrapResult(unwrapResult)
+		cfg.updateFetchConfig(unwrapResult)
 		tracelog.InfoLogger.Printf("%v fetched. Downgrading from LSN %x to LSN %x \n",
 			cfg.backupName, *(sentinelDto.BackupStartLSN), *(sentinelDto.IncrementFromLSN))
 		err = deltaFetchRecursionNew(cfg)
