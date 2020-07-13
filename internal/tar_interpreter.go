@@ -2,14 +2,12 @@ package internal
 
 import (
 	"archive/tar"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
-	"sync"
-
-	"github.com/wal-g/wal-g/utility"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -23,13 +21,10 @@ type TarInterpreter interface {
 
 // FileTarInterpreter extracts input to disk.
 type FileTarInterpreter struct {
-	mutex sync.Mutex
 	DBDataDirectory string
 	Sentinel        BackupSentinelDto
 	FilesToUnwrap   map[string]bool
-	CompletedFiles []string
-	CreatedPageFiles map[string]int64
-	WrittenIncrementFiles map[string]int64
+	UnwrapResult *UnwrapResult
 
 	createNewIncrementalFiles bool
 }
@@ -37,9 +32,8 @@ type FileTarInterpreter struct {
 func NewFileTarInterpreter(
 	dbDataDirectory string, sentinel BackupSentinelDto, filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
 ) *FileTarInterpreter {
-	return &FileTarInterpreter{sync.Mutex{},dbDataDirectory, sentinel,
-		filesToUnwrap,make([]string,0), make(map[string]int64),
-		make(map[string]int64),createNewIncrementalFiles}
+	return &FileTarInterpreter{dbDataDirectory, sentinel,
+		filesToUnwrap,newUnwrapResult(),createNewIncrementalFiles}
 }
 
 // TODO : unit tests

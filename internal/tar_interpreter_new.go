@@ -108,19 +108,19 @@ func (tarInterpreter *FileTarInterpreter) applyFileUnwrapResult(result *FileUnwr
 }
 
 func (tarInterpreter *FileTarInterpreter) addToCompletedFiles(fileName string) {
-	tarInterpreter.mutex.Lock()
-	tarInterpreter.CompletedFiles = append(tarInterpreter.CompletedFiles, fileName)
-	tarInterpreter.mutex.Unlock()
+	tarInterpreter.UnwrapResult.completedFilesMutex.Lock()
+	tarInterpreter.UnwrapResult.completedFiles = append(tarInterpreter.UnwrapResult.completedFiles, fileName)
+	tarInterpreter.UnwrapResult.completedFilesMutex.Unlock()
 }
 
 func (tarInterpreter *FileTarInterpreter) addToCreatedPageFiles(fileName string, blocksToRestoreCount int64) {
-	tarInterpreter.mutex.Lock()
-	tarInterpreter.CreatedPageFiles[fileName] = blocksToRestoreCount
-	tarInterpreter.mutex.Unlock()
+	tarInterpreter.UnwrapResult.createdPageFilesMutex.Lock()
+	tarInterpreter.UnwrapResult.createdPageFiles[fileName] = blocksToRestoreCount
+	tarInterpreter.UnwrapResult.createdPageFilesMutex.Unlock()
 }
 
 func (tarInterpreter *FileTarInterpreter) addToWrittenIncrementFiles(fileName string, writtenBlocksCount int64) {
-	tarInterpreter.mutex.Lock()
-	tarInterpreter.WrittenIncrementFiles[fileName] = writtenBlocksCount
-	tarInterpreter.mutex.Unlock()
+	tarInterpreter.UnwrapResult.writtenIncrementFilesMutex.Lock()
+	tarInterpreter.UnwrapResult.writtenIncrementFiles[fileName] = writtenBlocksCount
+	tarInterpreter.UnwrapResult.writtenIncrementFilesMutex.Unlock()
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 // temporary flag is used in tar interpreter to determine if it should use new unwrap logic
@@ -15,16 +16,21 @@ var useNewUnwrapImplementation = false
 type UnwrapResult struct {
 	// completely restored files
 	completedFiles []string
+	completedFilesMutex sync.Mutex
 	// for each created page file
 	// store count of blocks left to restore
 	createdPageFiles map[string]int64
+	createdPageFilesMutex sync.Mutex
 	// for those page files to which the increment was applied
 	// store count of written increment blocks
 	writtenIncrementFiles map[string]int64
+	writtenIncrementFilesMutex sync.Mutex
 }
 
-func newUnwrapResult(completedFiles []string, createdPageFiles, writtenIncrementFiles map[string]int64) *UnwrapResult {
-	return &UnwrapResult{completedFiles, createdPageFiles, writtenIncrementFiles}
+func newUnwrapResult() *UnwrapResult {
+	return &UnwrapResult{make([]string,0),sync.Mutex{},
+		make(map[string]int64,0),sync.Mutex{},
+		make(map[string]int64,0),sync.Mutex{}}
 }
 
 func checkDbDirectoryForUnwrapNew(dbDataDirectory string, sentinelDto BackupSentinelDto) error {
@@ -93,7 +99,5 @@ func (backup *Backup) unwrapNew(
 	}
 
 	tracelog.InfoLogger.Print("\nBackup extraction complete.\n")
-	unwrapResult := newUnwrapResult(tarInterpreter.CompletedFiles, tarInterpreter.CreatedPageFiles,
-		tarInterpreter.WrittenIncrementFiles)
-	return unwrapResult, nil
+	return tarInterpreter.UnwrapResult, nil
 }
