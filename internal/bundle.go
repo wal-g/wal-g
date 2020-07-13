@@ -414,11 +414,13 @@ func (bundle *Bundle) getFileUpdateCount(filePath string) uint64 {
 
 func (bundle *Bundle) PackTarballs() (map[string][]string, error) {
 	headers, tarFilesCollections := bundle.TarBallComposer.Compose()
-	err := bundle.writeHeaders(headers)
+	headersTarName, headersNames, err := bundle.writeHeaders(headers)
 	if err != nil {
 		return nil, err
 	}
 	tarFileSets := make(map[string][]string, 0)
+	tarFileSets[headersTarName] = headersNames
+
 	for _, tarFilesCollection := range tarFilesCollections {
 		tarBall := bundle.Deque()
 		tarBall.SetUp(bundle.Crypter)
@@ -466,17 +468,19 @@ func (bundle *Bundle) FinishTarBall(tarBall TarBall) error {
 	return nil
 }
 
-func (bundle *Bundle) writeHeaders(headers []*tar.Header) error {
+func (bundle *Bundle) writeHeaders(headers []*tar.Header) (string, []string, error) {
 	headersTarBall := bundle.Deque()
 	headersTarBall.SetUp(bundle.Crypter)
+	headersNames := make([]string, 0, len(headers))
 	for _, header := range headers {
 		err := headersTarBall.TarWriter().WriteHeader(header)
+		headersNames = append(headersNames, header.Name)
 		if err != nil {
-			return errors.Wrap(err, "addToBundle: failed to write header")
+			return "", nil, errors.Wrap(err, "addToBundle: failed to write header")
 		}
 	}
 	bundle.EnqueueBack(headersTarBall)
-	return nil
+	return headersTarBall.Name(), headersNames, nil
 }
 
 func (bundle *Bundle) getExpectedFileSize(filePath string, fileInfo os.FileInfo, wasInBase bool) (uint64, error) {
@@ -569,6 +573,8 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 		bundle.TarBallComposer.AddFile(path, info, wasInBase, fileInfoHeader, updatesCount, expectedFileSize)
 	} else {
 		bundle.TarBallComposer.AddHeader(fileInfoHeader)
+		bundle.getFiles().Store(fileInfoHeader.Name,
+			BackupFileDescription{IsSkipped: false, IsIncremented: false, MTime: info.ModTime(), UpdatesCount: 0})
 		if excluded && isDir {
 			return filepath.SkipDir
 		}
