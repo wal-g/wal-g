@@ -190,7 +190,7 @@ func (queryRunner *PgQueryRunner) BuildStatisticsQuery() (string, error) {
 }
 
 // todo desc
-func (queryRunner *PgQueryRunner) getStatistics(dbInfo *PgDatabaseInfo) (map[walparser.RelFileNode]PgStatRow, error) {
+func (queryRunner *PgQueryRunner) getStatistics(dbInfo *PgDatabaseInfo) (map[walparser.RelFileNode]PgRelationStat, error) {
 	tracelog.InfoLogger.Println("Querying pg_stat_all_tables")
 	getStatQuery, err := queryRunner.BuildStatisticsQuery()
 	conn := queryRunner.connection
@@ -204,13 +204,13 @@ func (queryRunner *PgQueryRunner) getStatistics(dbInfo *PgDatabaseInfo) (map[wal
 	}
 
 	defer rows.Close()
-	pgStatRows := make(map[walparser.RelFileNode]PgStatRow)
+	relationsStats := make(map[walparser.RelFileNode]PgRelationStat)
 	for rows.Next() {
-		var statRow PgStatRow
+		var relationStat PgRelationStat
 		var relFileNodeId uint32
 		var spcNode uint32
-		if err := rows.Scan(&relFileNodeId, &spcNode, &statRow.nTupleInserted, &statRow.nTupleUpdated,
-			&statRow.nTupleDeleted); err != nil {
+		if err := rows.Scan(&relFileNodeId, &spcNode, &relationStat.insertedTuplesCount, &relationStat.updatedTuplesCount,
+			&relationStat.deletedTuplesCount); err != nil {
 			log.Println(err.Error())
 		}
 		relFileNode := walparser.RelFileNode{DBNode: dbInfo.oid,
@@ -219,14 +219,14 @@ func (queryRunner *PgQueryRunner) getStatistics(dbInfo *PgDatabaseInfo) (map[wal
 		if relFileNode.SpcNode == walparser.Oid(0) {
 			relFileNode.SpcNode = dbInfo.tblSpcOid
 		}
-		pgStatRows[relFileNode] = statRow
+		relationsStats[relFileNode] = relationStat
 	}
 
 	if rows.Err() != nil {
 		return nil, rows.Err()
 	}
 
-	return pgStatRows, nil
+	return relationsStats, nil
 }
 
 func (queryRunner *PgQueryRunner) BuildGetDatabasesQuery() (string, error) {

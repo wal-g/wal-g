@@ -42,10 +42,10 @@ type PgDatabaseInfo struct {
 	tblSpcOid walparser.Oid
 }
 
-type PgStatRow struct {
-	nTupleInserted uint64
-	nTupleUpdated  uint64
-	nTupleDeleted  uint64
+type PgRelationStat struct {
+	insertedTuplesCount uint64
+	updatedTuplesCount  uint64
+	deletedTuplesCount  uint64
 }
 
 func newTarSizeError(packedFileSize, expectedSize int64) TarSizeError {
@@ -91,7 +91,7 @@ type Bundle struct {
 	IncrementFromFiles BackupFileList
 	DeltaMap           PagedFileDeltaMap
 	TablespaceSpec     TablespaceSpec
-	TableStatistics    map[walparser.RelFileNode]PgStatRow
+	RelationsStats     map[walparser.RelFileNode]PgRelationStat
 	TarBallComposer    *TarBallComposer
 
 	tarballQueue     chan TarBall
@@ -362,7 +362,7 @@ func (bundle *Bundle) CollectStatistics(conn *pgx.Conn) error {
 		return errors.Wrap(err, "CollectStatistics: Failed to get db names.")
 	}
 
-	result := make(map[walparser.RelFileNode]PgStatRow)
+	result := make(map[walparser.RelFileNode]PgRelationStat)
 	for _, db := range databases {
 		databaseOption := func (c *pgx.ConnConfig) error {
 			c.Database = db.name
@@ -386,7 +386,7 @@ func (bundle *Bundle) CollectStatistics(conn *pgx.Conn) error {
 			result[relFileNode] = statRow
 		}
 	}
-	bundle.TableStatistics = result
+	bundle.RelationsStats = result
 	return nil
 }
 
@@ -405,11 +405,11 @@ func (bundle *Bundle) getFileUpdateCount(filePath string) uint64 {
 		// and assign the update count from corresponding tables
 		return 0
 	}
-	fileStat, ok := bundle.TableStatistics[*relFileNode]
+	fileStat, ok := bundle.RelationsStats[*relFileNode]
 	if !ok {
 		return 0
 	}
-	return fileStat.nTupleDeleted + fileStat.nTupleUpdated + fileStat.nTupleInserted
+	return fileStat.deletedTuplesCount + fileStat.updatedTuplesCount + fileStat.insertedTuplesCount
 }
 
 func (bundle *Bundle) PackTarballs() (map[string][]string, error) {
