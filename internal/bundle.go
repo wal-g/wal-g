@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/spf13/viper"
 
@@ -66,6 +67,7 @@ func init() {
 type Bundle struct {
 	ArchiveDirectory   string
 	TarSizeThreshold   int64
+	AllTarballsSize    *int64
 	Sentinel           *Sentinel
 	TarBall            TarBall
 	TarBallMaker       TarBallMaker
@@ -97,6 +99,7 @@ func newBundle(
 	return &Bundle{
 		ArchiveDirectory:   archiveDirectory,
 		TarSizeThreshold:   viper.GetInt64(TarSizeThresholdSetting),
+		AllTarballsSize:    new(int64),
 		Crypter:            crypter,
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
@@ -156,7 +159,7 @@ func (bundle *Bundle) FinishQueue() error {
 			// This had written nothing
 			continue
 		}
-		err := tarBall.CloseTar()
+		err := bundle.CloseTarball(tarBall)
 		if err != nil {
 			return errors.Wrap(err, "HandleWalkedFSObject: failed to close tarball")
 		}
@@ -184,7 +187,7 @@ func (bundle *Bundle) CheckSizeAndEnqueueBack(tarBall TarBall) error {
 		bundle.mutex.Lock()
 		defer bundle.mutex.Unlock()
 
-		err := tarBall.CloseTar()
+		err := bundle.CloseTarball(tarBall)
 		if err != nil {
 			return errors.Wrap(err, "HandleWalkedFSObject: failed to close tarball")
 		}
@@ -449,7 +452,7 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 		utility.LoggedClose(file, "")
 	}
 
-	err = tarBall.CloseTar()
+	err = bundle.CloseTarball(tarBall)
 	return errors.Wrap(err, "UploadPgControl: failed to close tarball")
 }
 
@@ -505,7 +508,7 @@ func (bundle *Bundle) uploadLabelFiles(conn *pgx.Conn) (uint64, error) {
 	}
 	tracelog.InfoLogger.Println(offsetMapHeader.Name)
 
-	err = tarBall.CloseTar()
+	err = bundle.CloseTarball(tarBall)
 	if err != nil {
 		return 0, errors.Wrap(err, "UploadLabelFiles: failed to close tarball")
 	}
@@ -609,4 +612,9 @@ func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string,
 		Closer: file,
 	}
 	return fileReader, nil
+}
+
+func (bundle *Bundle) CloseTarball(tarBall TarBall) error {
+	atomic.AddInt64(bundle.AllTarballsSize, tarBall.Size())
+	return tarBall.CloseTar()
 }

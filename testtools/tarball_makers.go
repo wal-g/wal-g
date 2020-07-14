@@ -19,9 +19,9 @@ type FileTarBallMaker struct {
 func (tarBallMaker *FileTarBallMaker) Make(inheritState bool) internal.TarBall {
 	tarBallMaker.number++
 	return &FileTarBall{
-		number:          tarBallMaker.number,
-		allTarballsSize: tarBallMaker.Size,
-		out:             tarBallMaker.Out,
+		number:   tarBallMaker.number,
+		partSize: tarBallMaker.Size,
+		out:      tarBallMaker.Out,
 	}
 }
 
@@ -34,8 +34,8 @@ type BufferTarBallMaker struct {
 func (tarBallMaker *BufferTarBallMaker) Make(dedicatedUploader bool) internal.TarBall {
 	tarBallMaker.number++
 	return &BufferTarBall{
-		number:          tarBallMaker.number,
-		allTarballsSize: tarBallMaker.Size,
-		underlying:      tarBallMaker.BufferToWrite,
+		number:     tarBallMaker.number,
+		partSize:   tarBallMaker.Size,
+		underlying: tarBallMaker.BufferToWrite,
 	}
 }
