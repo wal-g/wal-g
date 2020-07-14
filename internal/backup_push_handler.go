@@ -128,7 +128,7 @@ func createAndPushBackup(
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = bundle.FinishQueue()
 	tracelog.ErrorLogger.FatalOnError(err)
-	uncompressedSize := bundle.TarBall.Size() + atomic.LoadInt64(bundle.AllTarballsSize)
+	uncompressedSize := atomic.LoadInt64(bundle.AllTarballsSize)
 	compressedSize := atomic.LoadInt64(uploader.tarSize)
 	err = bundle.UploadPgControl(uploader.Compressor.FileExtension())
 	tracelog.ErrorLogger.FatalOnError(err)

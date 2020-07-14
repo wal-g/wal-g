@@ -159,6 +159,7 @@ func (bundle *Bundle) FinishQueue() error {
 			// This had written nothing
 			continue
 		}
+		atomic.AddInt64(bundle.AllTarballsSize, tarBall.Size())
 		err := tarBall.CloseTar()
 		if err != nil {
 			return errors.Wrap(err, "HandleWalkedFSObject: failed to close tarball")
@@ -453,6 +454,7 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 		utility.LoggedClose(file, "")
 	}
 
+	atomic.AddInt64(bundle.AllTarballsSize, tarBall.Size())
 	err = tarBall.CloseTar()
 	return errors.Wrap(err, "UploadPgControl: failed to close tarball")
 }
@@ -509,6 +511,7 @@ func (bundle *Bundle) uploadLabelFiles(conn *pgx.Conn) (uint64, error) {
 	}
 	tracelog.InfoLogger.Println(offsetMapHeader.Name)
 
+	atomic.AddInt64(bundle.AllTarballsSize, tarBall.Size())
 	err = tarBall.CloseTar()
 	if err != nil {
 		return 0, errors.Wrap(err, "UploadLabelFiles: failed to close tarball")
