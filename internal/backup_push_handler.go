@@ -128,13 +128,13 @@ func createAndPushBackup(
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = bundle.FinishQueue()
 	tracelog.ErrorLogger.FatalOnError(err)
-	uncompressedSize := atomic.LoadInt64(bundle.AllTarballsSize)
-	compressedSize := atomic.LoadInt64(uploader.tarSize)
 	err = bundle.UploadPgControl(uploader.Compressor.FileExtension())
 	tracelog.ErrorLogger.FatalOnError(err)
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
 	finishLsn, err := bundle.uploadLabelFiles(conn)
 	tracelog.ErrorLogger.FatalOnError(err)
+	uncompressedSize := atomic.LoadInt64(bundle.AllTarballsSize)
+	compressedSize := atomic.LoadInt64(uploader.tarSize)
 
 	timelineChanged := bundle.checkTimelineChanged(conn)
 
