@@ -20,7 +20,7 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
-pgbench -i -s 10 postgres
+pgbench -i -s 5 postgres
 pgbench -T 100000000 postgres &
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 

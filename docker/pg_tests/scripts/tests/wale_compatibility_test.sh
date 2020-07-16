@@ -26,7 +26,7 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /tmp/scripts/wait_while_pg_not_ready.sh
 
-pgbench -i -s 20 postgres
+pgbench -i -s 10 postgres
 pg_dumpall -f /tmp/dump1
 pgbench -c 2 -T 100000000 -S &
 sleep 1

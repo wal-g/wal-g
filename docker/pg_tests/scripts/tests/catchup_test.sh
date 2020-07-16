@@ -49,7 +49,7 @@ EOF
 popd
 
 # fill database postgres
-pgbench -i -s 100 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
+pgbench -i -s 20 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
 
 LSN=`psql -c "SELECT pg_current_wal_lsn() - '0/0'::pg_lsn;" | grep -E '[0-9]+' | head -1`
 
@@ -62,7 +62,7 @@ sleep 5
 sleep 5
 
 # change database postgres and dump database
-pgbench -i -s 200 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
+pgbench -i -s 40 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
 /usr/lib/postgresql/10/bin/pg_dump -h 127.0.0.1 -p ${ALPHA_PORT} -f ${ALPHA_DUMP} postgres
 
 wal-g --config=${TMP_CONFIG} catchup-push ${PGDATA_ALPHA} --from-lsn ${LSN} 2>/tmp/stderr 1>/tmp/stdout
