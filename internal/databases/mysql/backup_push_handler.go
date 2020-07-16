@@ -21,7 +21,7 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
-	fileName, err := uploader.PushStream(stdout)
+	fileName, err := uploader.PushStream(internal.NewDiskLimitReader(stdout))
 	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
 
 	err = backupCmd.Wait()
