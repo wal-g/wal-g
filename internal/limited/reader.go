@@ -19,7 +19,11 @@ func NewReader(reader io.Reader, limiter *rate.Limiter) *Reader {
 }
 
 func (r *Reader) Read(buf []byte) (int, error) {
-	n, err := r.reader.Read(buf)
+	end := len(buf)
+	if r.limiter.Burst() < end {
+		end = r.limiter.Burst()
+	}
+	n, err := r.reader.Read(buf[:end])
 
 	if err != nil {
 		limiterErr := r.limiter.WaitN(context.TODO(), utility.Max(n, 0))
