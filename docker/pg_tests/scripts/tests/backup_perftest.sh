@@ -27,7 +27,7 @@ wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 # push permanent and impermanent delta backups
 du -hs ${PGDATA}
 sleep 1
-pgbench -i -s 20 postgres
+pgbench -i -s 10 postgres
 sleep 1
 du -hs ${PGDATA}
 
