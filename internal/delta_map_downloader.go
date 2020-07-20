@@ -26,7 +26,7 @@ func getDeltaMap(folder storage.Folder, timeline uint32, firstUsedLSN, firstNotU
 	deltaMap.AddLocationsToDelta(lastDeltaFile.Locations)
 
 	firstUsedWalSegmentNo, firstNotUsedWalSegmentNo := getWalSegmentRange(firstNotUsedDeltaNo, firstNotUsedLSN)
-	// we handle WAL files from [firstUsedWalSegmentNo, lastUsedWalSegmentNo]
+	// we handle WAL files from [firstUsedWalSegmentNo, firstNotUsedWalSegmentNo)
 	err = deltaMap.getLocationsFromWals(folder, timeline, firstUsedWalSegmentNo, firstNotUsedWalSegmentNo, lastDeltaFile.WalParser)
 	if err != nil {
 		return deltaMap, errors.Wrapf(err, "Error during fetch locations from wal segments.\n")
@@ -42,7 +42,6 @@ func getDeltaRange(firstUsedLsn, firstNotUsedLsn uint64) (DeltaNo, DeltaNo) {
 
 func getWalSegmentRange(firstNotUsedDeltaNo DeltaNo, firstNotUsedLsn uint64) (WalSegmentNo, WalSegmentNo) {
 	firstUsedWalSegmentNo := firstNotUsedDeltaNo.firstWalSegmentNo()
-	lastUsedLsn := firstNotUsedLsn - 1
-	lastUsedWalSegmentNo := newWalSegmentNo(lastUsedLsn)
-	return firstUsedWalSegmentNo, lastUsedWalSegmentNo.next()
+	firstNotUsedWalSegmentNo := newWalSegmentNo(firstNotUsedLsn)
+	return firstUsedWalSegmentNo, firstNotUsedWalSegmentNo
 }
