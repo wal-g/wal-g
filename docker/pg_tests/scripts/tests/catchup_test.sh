@@ -49,12 +49,12 @@ EOF
 popd
 
 # fill database postgres
-pgbench -i -s 5 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
+pgbench -i -s 15 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
 
 LSN=`psql -c "SELECT pg_current_wal_lsn() - '0/0'::pg_lsn;" | grep -E '[0-9]+' | head -1`
 
 #                                               db       table            conn_port    row_count
-/tmp/scripts/wait_while_replication_complete.sh postgres pgbench_accounts ${BETA_PORT} 10000000 # 100 * 100000, 100 is value of -s in pgbench
+/tmp/scripts/wait_while_replication_complete.sh postgres pgbench_accounts ${BETA_PORT} 1500000 # 15 * 100000, 15 is value of -s in pgbench
 # script above waits only one table, so just in case sleep
 sleep 5
 
