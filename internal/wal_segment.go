@@ -116,6 +116,11 @@ func (seg *WalSegment) Stream(conn *pgconn.PgConn, standbyMessageTimeout time.Du
 					return true, nil
 				}
 			}
+		case *pgproto3.CopyDone:
+			cdr, err := pglogrepl.SendStandbyCopyDone(context.Background(), conn)
+			tracelog.ErrorLogger.FatalOnError(err)
+			tracelog.DebugLogger.Printf("CopyDoneResult => %e", cdr)
+			return false, nil
 		default:
 			tracelog.DebugLogger.Printf("Received unexpected message: %#v\n", msg)
 		}
