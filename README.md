@@ -119,7 +119,7 @@ Overrides the default `number of WAL files to upload during one scan`. By defaul
 ```
 AWS_ACCESS_KEY_ID: "<minio-key>"
 AWS_SECRET_ACCESS_KEY: "<minio-secret>"
-WALE_S3_PREFIX: "s3://my-minio-bucket/sub-dir"
+WALG_S3_PREFIX: "s3://my-minio-bucket/sub-dir"
 AWS_ENDPOINT: "http://minio:9000"
 AWS_S3_FORCE_PATH_STYLE: "true"
 AWS_REGION: us-east-1
