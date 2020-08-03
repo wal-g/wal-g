@@ -10,7 +10,7 @@ type TarBallComposer interface {
 	AddFile(info *ComposeFileInfo)
 	AddHeader(header *tar.Header, fileInfo os.FileInfo) error
 	SkipFile(tarHeader *tar.Header, fileInfo os.FileInfo)
-	PackTarballs() (map[string][]string, error)
+	PackTarballs() (TarFileSets, error)
 	GetFiles() BundleFileList
 }
 
@@ -22,6 +22,8 @@ type ComposeFileInfo struct {
 	header        *tar.Header
 	isIncremented bool
 }
+
+type TarFileSets map[string][]string
 
 func NewComposeFileInfo(path string, fileInfo os.FileInfo, wasInBase, isIncremented bool,
 	header *tar.Header) *ComposeFileInfo {
