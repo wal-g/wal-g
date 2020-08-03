@@ -7,7 +7,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string) func(folder storage.Folder, backup Backup) {
+func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedundantTars bool) func(folder storage.Folder, backup Backup) {
 	return func(folder storage.Folder, backup Backup) {
 		filesToUnwrap, err := backup.GetFilesToUnwrap(fileMask)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
@@ -28,7 +28,8 @@ func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string) func(fol
 			tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n",
 				newNonEmptyDbDataDirectoryError(dbDataDirectory))
 		}
-		config := NewFetchConfig(backup.Name, utility.ResolveSymlink(dbDataDirectory), folder, spec, filesToUnwrap)
+		config := NewFetchConfig(backup.Name,
+			utility.ResolveSymlink(dbDataDirectory), folder, spec, filesToUnwrap, skipRedundantTars)
 		err = deltaFetchRecursionNew(config)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 	}
@@ -53,7 +54,8 @@ func deltaFetchRecursionNew(cfg *FetchConfig) error {
 		if err != nil {
 			return err
 		}
-		unwrapResult, err := backup.unwrapNew(cfg.dbDataDirectory, sentinelDto, cfg.filesToUnwrap, false)
+		unwrapResult, err := backup.unwrapNew(cfg.dbDataDirectory, sentinelDto, cfg.filesToUnwrap,
+			false, cfg.skipRedundantTars)
 		if err != nil {
 			return err
 		}
@@ -71,6 +73,7 @@ func deltaFetchRecursionNew(cfg *FetchConfig) error {
 	}
 
 	tracelog.InfoLogger.Printf("%x reached. Applying base backup... \n", *(sentinelDto.BackupStartLSN))
-	_, err = backup.unwrapNew(cfg.dbDataDirectory, sentinelDto, cfg.filesToUnwrap, false)
+	_, err = backup.unwrapNew(cfg.dbDataDirectory, sentinelDto, cfg.filesToUnwrap,
+		false, cfg.skipRedundantTars)
 	return err
 }

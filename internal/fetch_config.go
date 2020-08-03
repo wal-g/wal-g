@@ -6,14 +6,15 @@ import (
 )
 
 func NewFetchConfig(backupName,dbDataDirectory string, folder storage.Folder, spec *TablespaceSpec,
-	filesToUnwrap map[string]bool) *FetchConfig {
+	filesToUnwrap map[string]bool, skipRedundantTars bool) *FetchConfig {
 	fetchConfig := &FetchConfig{
-		filesToUnwrap:          filesToUnwrap,
-		missingBlocks:          make(map[string]int64),
-		tablespaceSpec:         spec,
-		backupName:             backupName,
-		folder:                 folder,
-		dbDataDirectory:        dbDataDirectory,
+		filesToUnwrap:     filesToUnwrap,
+		missingBlocks:     make(map[string]int64),
+		tablespaceSpec:    spec,
+		backupName:        backupName,
+		folder:            folder,
+		dbDataDirectory:   dbDataDirectory,
+		skipRedundantTars: skipRedundantTars,
 	}
 	return fetchConfig
 }
@@ -21,17 +22,22 @@ func NewFetchConfig(backupName,dbDataDirectory string, folder storage.Folder, sp
 type FetchConfig struct {
 	filesToUnwrap   map[string]bool
 	// missingBlocks stores count of blocks missing for file path
-	missingBlocks          map[string]int64
-	tablespaceSpec         *TablespaceSpec
-	backupName             string
-	folder                 storage.Folder
-	dbDataDirectory        string
+	missingBlocks     map[string]int64
+	tablespaceSpec    *TablespaceSpec
+	backupName        string
+	folder            storage.Folder
+	dbDataDirectory   string
+	skipRedundantTars bool
 }
 
 func (fc *FetchConfig) UpdateFetchConfig(unwrapResult *UnwrapResult) {
-	fc.processCreatedPageFiles(unwrapResult.createdPageFiles)
-	fc.processWrittenIncrementFiles(unwrapResult.writtenIncrementFiles)
-	fc.excludeCompletedFiles(unwrapResult.completedFiles)
+	// if we skip redundant tars we should exclude files that
+	// no longer need any additional information (completed ones)
+	if fc.skipRedundantTars {
+		fc.processCreatedPageFiles(unwrapResult.createdPageFiles)
+		fc.processWrittenIncrementFiles(unwrapResult.writtenIncrementFiles)
+		fc.excludeCompletedFiles(unwrapResult.completedFiles)
+	}
 }
 
 func (fc *FetchConfig) excludeCompletedFile(filePath string) {

@@ -208,7 +208,7 @@ func (backup *Backup) unwrapOld(
 	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
 ) error {
 	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
-	tarsToExtract, pgControlKey, err := backup.getTarsToExtract(sentinelDto, filesToUnwrap)
+	tarsToExtract, pgControlKey, err := backup.getTarsToExtract(sentinelDto, filesToUnwrap, false)
 	if err != nil {
 		return err
 	}
@@ -258,7 +258,7 @@ func isDirectoryEmpty(directoryPath string) (bool, error) {
 }
 
 // TODO : init tests
-func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool) (tarsToExtract []ReaderMaker, pgControlKey string, err error) {
+func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, skipRedundantTars bool) (tarsToExtract []ReaderMaker, pgControlKey string, err error) {
 	tarNames, err := backup.GetTarNames()
 	if err != nil {
 		return nil, "", err
@@ -281,7 +281,7 @@ func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnw
 			continue
 		}
 
-		if !shouldUnwrapTar(tarName, sentinelDto, filesToUnwrap) {
+		if skipRedundantTars && !shouldUnwrapTar(tarName, sentinelDto, filesToUnwrap) {
 			continue
 		}
 

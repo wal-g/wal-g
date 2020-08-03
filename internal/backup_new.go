@@ -12,7 +12,7 @@ import (
 var useNewUnwrapImplementation = false
 
 // UnwrapResult stores information about
-// the result of single unwrap operation
+// the result of single backup unwrap operation
 type UnwrapResult struct {
 	// completely restored files
 	completedFiles []string
@@ -66,7 +66,7 @@ func checkDbDirectoryForUnwrapNew(dbDataDirectory string, sentinelDto BackupSent
 // Do the job of unpacking Backup object
 func (backup *Backup) unwrapNew(
 	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool,
-	createIncrementalFiles bool) (*UnwrapResult, error) {
+	createIncrementalFiles, skipRedundantTars bool) (*UnwrapResult, error) {
 	useNewUnwrapImplementation = true
 	err := checkDbDirectoryForUnwrapNew(dbDataDirectory, sentinelDto)
 	if err != nil {
@@ -74,7 +74,7 @@ func (backup *Backup) unwrapNew(
 	}
 
 	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
-	tarsToExtract, pgControlKey, err := backup.getTarsToExtract(sentinelDto, filesToUnwrap)
+	tarsToExtract, pgControlKey, err := backup.getTarsToExtract(sentinelDto, filesToUnwrap, skipRedundantTars)
 	if err != nil {
 		return nil, err
 	}
