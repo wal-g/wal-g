@@ -87,6 +87,11 @@ func (backup *Backup) unwrapNew(
 	}
 
 	err = ExtractAll(tarInterpreter, tarsToExtract)
+	if _, ok := err.(NoFilesToExtractError); ok {
+		// in case of no tars to extract, just ignore this backup and proceed to the next
+		tracelog.InfoLogger.Println("Skipping backup: no useful files found.")
+		return tarInterpreter.UnwrapResult, nil
+	}
 	if err != nil {
 		return nil, err
 	}
