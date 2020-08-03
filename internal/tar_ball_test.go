@@ -18,16 +18,16 @@ func TestS3TarBall(t *testing.T) {
 	bundle := &internal.Bundle{
 		ArchiveDirectory: "/usr/local",
 		TarSizeThreshold: int64(10),
-		AllTarballsSize: new(int64),
 	}
 
-	bundle.TarBallMaker = internal.NewStorageTarBallMaker("test", testtools.NewMockUploader(false, false))
+	tarBallMaker := internal.NewStorageTarBallMaker("test", testtools.NewMockUploader(false, false))
 
+	_ = bundle.StartQueue(tarBallMaker)
 	bundle.NewTarBall(false)
 
-	assert.NotNil(t, bundle.TarBall)
+	assert.NotNil(t, bundle.TarBallQueue.LastCreatedTarball)
 
-	tarBall := bundle.TarBall
+	tarBall := bundle.TarBallQueue.LastCreatedTarball
 
 	assert.Equal(t, int64(0), tarBall.Size())
 	assert.Nil(t, tarBall.TarWriter())
@@ -46,10 +46,11 @@ func TestS3DependentFunctions(t *testing.T) {
 
 	uploader := testtools.NewMockUploader(false, false)
 
-	bundle.TarBallMaker = internal.NewStorageTarBallMaker("mockBackup", uploader)
+	tarBallMaker := internal.NewStorageTarBallMaker("mockBackup", uploader)
+	_ = bundle.StartQueue(tarBallMaker)
 
 	bundle.NewTarBall(false)
-	tarBall := bundle.TarBall
+	tarBall := bundle.TarBallQueue.LastCreatedTarball
 	tarBall.SetUp(nil)
 	tarWriter := tarBall.TarWriter()
 
