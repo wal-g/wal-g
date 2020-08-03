@@ -322,7 +322,7 @@ func shouldUnwrapTar(tarName string, sentinelDto BackupSentinelDto, filesToUnwra
 		}
 	}
 
-	fmt.Printf("Skipping archive '%s'\n", tarName)
+	tracelog.DebugLogger.Printf("Skipping archive '%s'\n", tarName)
 	return false
 }
 
