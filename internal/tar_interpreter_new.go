@@ -36,7 +36,7 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFileNew(fileReader io.Rea
 	if unwrapError != nil {
 		return unwrapError
 	}
-	tarInterpreter.applyFileUnwrapResult(unwrapResult, header.Name)
+	tarInterpreter.AddFileUnwrapResult(unwrapResult, header.Name)
 	return nil
 }
 
@@ -94,7 +94,7 @@ func createLocalFile(targetPath, name string) (*os.File, error) {
 	return file, nil
 }
 
-func (tarInterpreter *FileTarInterpreter) applyFileUnwrapResult(result *FileUnwrapResult, fileName string) {
+func (tarInterpreter *FileTarInterpreter) AddFileUnwrapResult(result *FileUnwrapResult, fileName string) {
 	switch result.FileUnwrapResultType {
 	case Skipped:
 		return
