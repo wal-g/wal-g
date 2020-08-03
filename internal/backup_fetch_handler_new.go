@@ -7,61 +7,6 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-type FetchConfig struct {
-	filesToUnwrap   map[string]bool
-	// missingBlocks stores count of blocks missing for file path
-	missingBlocks   map[string]int64
-	tablespaceSpec  *TablespaceSpec
-	backupName      string
-	folder          storage.Folder
-	dbDataDirectory string
-}
-
-func (fc *FetchConfig) updateFetchConfig(unwrapResult *UnwrapResult) {
-	for filePath, missingBlockCount := range unwrapResult.createdPageFiles {
-		_, ok := fc.filesToUnwrap[filePath]
-		if !ok {
-			// file is already excluded, skip it
-			continue
-		}
-		if missingBlockCount == 0 {
-			unwrapResult.completedFiles = append(unwrapResult.completedFiles, filePath)
-		} else {
-			fc.missingBlocks[filePath] = missingBlockCount
-		}
-	}
-	for filePath, restoredBlockCount := range unwrapResult.writtenIncrementFiles {
-		_, ok := fc.filesToUnwrap[filePath]
-		if !ok {
-			// file is already excluded, skip it
-			continue
-		}
-		missingBlockCount, ok := fc.missingBlocks[filePath]
-		if !ok {
-			// file is not in file blocks to restore, skip it
-			tracelog.WarningLogger.Printf("New written increment blocks, " +
-				"but file doesn't exist in missingBlocks: '%s'", filePath)
-			continue
-		}
-		missingBlockCount -= restoredBlockCount
-		if missingBlockCount <= 0 {
-			unwrapResult.completedFiles = append(unwrapResult.completedFiles, filePath)
-		} else {
-			fc.missingBlocks[filePath] = missingBlockCount
-		}
-	}
-	for _, filePath := range unwrapResult.completedFiles {
-		delete(fc.filesToUnwrap, filePath)
-		fmt.Println("Excluded file " + filePath)
-	}
-}
-
-func newFetchConfig(backupName,dbDataDirectory string, folder storage.Folder, spec *TablespaceSpec,
-	filesToUnwrap map[string]bool) *FetchConfig {
-	return &FetchConfig{filesToUnwrap,make(map[string]int64), spec,
-		backupName, folder, dbDataDirectory}
-}
-
 func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string) func(folder storage.Folder, backup Backup) {
 	return func(folder storage.Folder, backup Backup) {
 		filesToUnwrap, err := backup.GetFilesToUnwrap(fileMask)
@@ -83,7 +28,7 @@ func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string) func(fol
 			tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n",
 				newNonEmptyDbDataDirectoryError(dbDataDirectory))
 		}
-		config := newFetchConfig(backup.Name, utility.ResolveSymlink(dbDataDirectory), folder, spec, filesToUnwrap)
+		config := NewFetchConfig(backup.Name, utility.ResolveSymlink(dbDataDirectory), folder, spec, filesToUnwrap)
 		err = deltaFetchRecursionNew(config)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 	}
@@ -114,7 +59,7 @@ func deltaFetchRecursionNew(cfg *FetchConfig) error {
 		}
 		cfg.filesToUnwrap = baseFilesToUnwrap
 		cfg.backupName = *sentinelDto.IncrementFrom
-		cfg.updateFetchConfig(unwrapResult)
+		cfg.UpdateFetchConfig(unwrapResult)
 		tracelog.InfoLogger.Printf("%v fetched. Downgrading from LSN %x to LSN %x \n",
 			cfg.backupName, *(sentinelDto.BackupStartLSN), *(sentinelDto.IncrementFromLSN))
 		err = deltaFetchRecursionNew(cfg)
