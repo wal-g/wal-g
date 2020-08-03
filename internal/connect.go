@@ -12,18 +12,12 @@ import (
 // and the connection is `<nil>`.
 //
 // Example: PGHOST=/var/run/postgresql or PGHOST=10.0.0.1
-func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, error) {
+func Connect() (*pgx.Conn, error) {
 	config, err := pgx.ParseEnvLibpq()
 	if err != nil {
 		return nil, errors.Wrap(err, "Connect: unable to read environment variables")
 	}
-	// apply passed custom config options, if any
-	for _, option := range configOptions {
-		err := option(&config)
-		if err != nil {
-			return nil, err
-		}
-	}
+
 	conn, err := pgx.Connect(config)
 	if err != nil {
 		if config.Host != "localhost" {

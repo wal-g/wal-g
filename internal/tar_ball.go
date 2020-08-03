@@ -16,7 +16,6 @@ type TarBall interface {
 	AddSize(int64)
 	TarWriter() *tar.Writer
 	AwaitUploads()
-	Name() string
 }
 
 func PackFileTo(tarBall TarBall, fileInfoHeader *tar.Header, fileContent io.Reader) (fileSize int64, err error) {

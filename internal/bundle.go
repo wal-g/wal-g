@@ -3,7 +3,6 @@ package internal
 import (
 	"archive/tar"
 	"fmt"
-	"github.com/wal-g/wal-g/internal/walparser"
 	"io"
 	"os"
 	"path/filepath"
@@ -34,18 +33,6 @@ const (
 
 type TarSizeError struct {
 	error
-}
-
-type PgDatabaseInfo struct {
-	name      string
-	oid       walparser.Oid
-	tblSpcOid walparser.Oid
-}
-
-type PgRelationStat struct {
-	insertedTuplesCount uint64
-	updatedTuplesCount  uint64
-	deletedTuplesCount  uint64
 }
 
 func newTarSizeError(packedFileSize, expectedSize int64) TarSizeError {
@@ -91,8 +78,6 @@ type Bundle struct {
 	IncrementFromFiles BackupFileList
 	DeltaMap           PagedFileDeltaMap
 	TablespaceSpec     TablespaceSpec
-	RelationsStats     map[walparser.RelFileNode]PgRelationStat
-	TarBallComposer    *TarBallComposer
 
 	tarballQueue     chan TarBall
 	uploadQueue      chan TarBall
@@ -111,10 +96,9 @@ func newBundle(
 	incrementFromLsn *uint64, incrementFromFiles BackupFileList,
 	forceIncremental bool,
 ) *Bundle {
-	tarSizeThreshold := viper.GetInt64(TarSizeThresholdSetting)
 	return &Bundle{
 		ArchiveDirectory:   archiveDirectory,
-		TarSizeThreshold:   tarSizeThreshold,
+		TarSizeThreshold:   viper.GetInt64(TarSizeThresholdSetting),
 		AllTarballsSize:    new(int64),
 		Crypter:            crypter,
 		IncrementFromLsn:   incrementFromLsn,
@@ -122,8 +106,6 @@ func newBundle(
 		Files:              &sync.Map{},
 		TablespaceSpec:     NewTablespaceSpec(archiveDirectory),
 		forceIncremental:   forceIncremental,
-		TarBallComposer:    NewTarBallComposer(uint64(tarSizeThreshold),
-			NewDefaultComposeRatingEvaluator(incrementFromFiles)),
 	}
 }
 
@@ -344,7 +326,7 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 	if info.Name() == PgControl {
 		bundle.Sentinel = &Sentinel{info, path}
 	} else {
-		err = bundle.addToBundle(path, info)
+		err = bundle.handleTar(path, info)
 		if err != nil {
 			if err == filepath.SkipDir {
 				return err
@@ -355,184 +337,12 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 	return nil
 }
 
-// CollectStatistics collects statistics for each relFileNode
-func (bundle *Bundle) CollectStatistics(conn *pgx.Conn) error {
-	databases, err := getDatabaseInfos(conn)
-	if err != nil {
-		return errors.Wrap(err, "CollectStatistics: Failed to get db names.")
-	}
-
-	result := make(map[walparser.RelFileNode]PgRelationStat)
-	for _, db := range databases {
-		databaseOption := func (c *pgx.ConnConfig) error {
-			c.Database = db.name
-			return nil
-		}
-		dbConn, err := Connect(databaseOption)
-		if err != nil {
-			tracelog.WarningLogger.Printf("Failed to collect statistics for database: %s\n'%v'\n", db.name, err)
-			continue
-		}
-
-		queryRunner, err := newPgQueryRunner(dbConn)
-		if err != nil {
-			return errors.Wrap(err, "CollectStatistics: Failed to build query runner.")
-		}
-		pgStatRows, err := queryRunner.getStatistics(&db)
-		if err != nil {
-			return errors.Wrap(err, "CollectStatistics: Failed to collect statistics.")
-		}
-		for relFileNode, statRow:= range pgStatRows {
-			result[relFileNode] = statRow
-		}
-	}
-	bundle.RelationsStats = result
-	return nil
-}
-
-func getDatabaseInfos(conn *pgx.Conn) ([]PgDatabaseInfo, error) {
-	queryRunner, err := newPgQueryRunner(conn)
-	if err != nil {
-		return nil, errors.Wrap(err, "getDatabaseInfos: Failed to build query runner.")
-	}
-	return queryRunner.getDatabaseInfos()
-}
-
-func (bundle *Bundle) getFileUpdateCount(filePath string) uint64 {
-	relFileNode, err := GetRelFileNodeFrom(filePath)
-	if err != nil {
-		// TODO: try parse _vm, _fsm etc
-		// and assign the update count from corresponding tables
-		return 0
-	}
-	fileStat, ok := bundle.RelationsStats[*relFileNode]
-	if !ok {
-		return 0
-	}
-	return fileStat.deletedTuplesCount + fileStat.updatedTuplesCount + fileStat.insertedTuplesCount
-}
-
-func (bundle *Bundle) PackTarballs() (map[string][]string, error) {
-	headers, tarFilesCollections := bundle.TarBallComposer.Compose()
-	headersTarName, headersNames, err := bundle.writeHeaders(headers)
-	if err != nil {
-		return nil, err
-	}
-	tarFileSets := make(map[string][]string, 0)
-	tarFileSets[headersTarName] = headersNames
-
-	for _, tarFilesCollection := range tarFilesCollections {
-		tarBall := bundle.Deque()
-		tarBall.SetUp(bundle.Crypter)
-		for _, composeFileInfo := range tarFilesCollection.files {
-			tarFileSets[tarBall.Name()] = append(tarFileSets[tarBall.Name()], composeFileInfo.header.Name)
-		}
-		// tarFilesCollection closure
-		tarFilesCollectionLocal := tarFilesCollection
-		go func() {
-			for _, fileInfo := range tarFilesCollectionLocal.files {
-				err := bundle.packFileIntoTar(fileInfo, tarBall)
-				if err != nil {
-					panic(err)
-				}
-			}
-			err := bundle.FinishTarBall(tarBall)
-			if err != nil {
-				panic(err)
-			}
-		}()
-	}
-
-	return tarFileSets, nil
-}
-
-func (bundle *Bundle) FinishTarBall(tarBall TarBall) error {
-	bundle.mutex.Lock()
-	defer bundle.mutex.Unlock()
-	err := tarBall.CloseTar()
-	if err != nil {
-		return errors.Wrap(err, "FinishTarBall: failed to close tarball")
-	}
-
-	bundle.uploadQueue <- tarBall
-	for len(bundle.uploadQueue) > bundle.maxUploadQueue {
-		select {
-		case otb := <-bundle.uploadQueue:
-			otb.AwaitUploads()
-		default:
-		}
-	}
-
-	bundle.NewTarBall(true)
-	bundle.tarballQueue <- bundle.TarBall
-	return nil
-}
-
-func (bundle *Bundle) writeHeaders(headers []*tar.Header) (string, []string, error) {
-	headersTarBall := bundle.Deque()
-	headersTarBall.SetUp(bundle.Crypter)
-	headersNames := make([]string, 0, len(headers))
-	for _, header := range headers {
-		err := headersTarBall.TarWriter().WriteHeader(header)
-		headersNames = append(headersNames, header.Name)
-		if err != nil {
-			return "", nil, errors.Wrap(err, "addToBundle: failed to write header")
-		}
-	}
-	bundle.EnqueueBack(headersTarBall)
-	return headersTarBall.Name(), headersNames, nil
-}
-
-func (bundle *Bundle) getExpectedFileSize(filePath string, fileInfo os.FileInfo, wasInBase bool) (uint64, error) {
-	incrementBaseLsn := bundle.getIncrementBaseLsn()
-	isIncremented := bundle.checkIfIncremented(incrementBaseLsn, fileInfo, filePath, wasInBase)
-	if isIncremented {
-		bitmap, err := bundle.getDeltaBitmapFor(filePath)
-		if _, ok := err.(NoBitmapFoundError); ok {
-			// this file has changed after the start of backup and will be skipped
-			// so the expected size in tar is zero
-			return 0, nil
-		}
-		if err != nil {
-			return 0, errors.Wrapf(err, "getExpectedFileSize: failed to find corresponding bitmap '%s'\n", filePath)
-		}
-		if bitmap == nil {
-			// if there was no bundle bitmap set, do a full scan instead to calculate expected increment size
-			return bundle.scanExpectedIncrementSize(filePath, fileInfo, incrementBaseLsn)
-		}
-		incrementBlocksCount := bitmap.GetCardinality()
-		// expected header size = length(IncrementFileHeader) + sizeOf(fileSize) + sizeOf(diffBlockCount) + sizeOf(blockNo)*incrementBlocksCount
-		incrementHeaderSize := uint64(len(IncrementFileHeader)) + sizeofInt64 + sizeofInt32 + (incrementBlocksCount * sizeofInt32)
-		incrementPageDataSize := incrementBlocksCount * uint64(DatabasePageSize)
-		return incrementHeaderSize + incrementPageDataSize, nil
-	}
-	return uint64(fileInfo.Size()), nil
-}
-
-func (bundle *Bundle) scanExpectedIncrementSize(path string, fileInfo os.FileInfo, incrementBaseLsn *uint64) (uint64, error) {
-	_, incrementSize, err := ReadIncrementalFile(path, fileInfo.Size(), *incrementBaseLsn, nil)
-	if os.IsNotExist(err) {
-		// File was deleted before opening, so set the expected size to zero
-		return 0, nil
-	}
-	switch err.(type) {
-	case nil:
-		return uint64(incrementSize), nil
-	case InvalidBlockError:
-		// If failed to read as incremental file, set the expected size equal to page file size
-		tracelog.WarningLogger.Printf("scanExpectedIncrementSize: failed to read file '%s' as incremented\n.", path)
-		return uint64(fileInfo.Size()), nil
-	default:
-		return 0, errors.Wrapf(err, "scanExpectedIncrementSize: failed reading incremental file '%s'\n", path)
-	}
-}
-
 // TODO : unit tests
-// addToBundle handles one given file.
+// handleTar creates underlying tar writer and handles one given file.
 // Does not follow symlinks (it seems like it does). If file is in ExcludedFilenames, will not be included
 // in the final tarball. EXCLUDED directories are created
 // but their contents are not written to local disk.
-func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
+func (bundle *Bundle) handleTar(path string, info os.FileInfo) error {
 	fileName := info.Name()
 	_, excluded := ExcludedFilenames[fileName]
 	isDir := info.IsDir()
@@ -543,7 +353,7 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 
 	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
 	if err != nil {
-		return errors.Wrap(err, "addToBundle: could not grab header info")
+		return errors.Wrap(err, "handleTar: could not grab header info")
 	}
 
 	fileInfoHeader.Name = bundle.getFileRelPath(path)
@@ -552,7 +362,6 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 	if !excluded && info.Mode().IsRegular() {
 		baseFiles := bundle.getIncrementBaseFiles()
 		baseFile, wasInBase := baseFiles[fileInfoHeader.Name]
-		updatesCount := bundle.getFileUpdateCount(path)
 		// It is important to take MTime before ReadIncrementalFile()
 		time := info.ModTime()
 
@@ -562,19 +371,33 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 
 		if (wasInBase || bundle.forceIncremental) && (time.Equal(baseFile.MTime)) {
 			// File was not changed since previous backup
-			tracelog.DebugLogger.Println("Skipped due to unchanged modification time: " + path)
-			bundle.skipFile(fileInfoHeader, info, updatesCount)
+			tracelog.DebugLogger.Println("Skipped due to unchanged modification time")
+			bundle.getFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: time})
 			return nil
 		}
-		expectedFileSize, err := bundle.getExpectedFileSize(path, info, wasInBase)
-		if err != nil {
-			return err
-		}
-		bundle.TarBallComposer.AddFile(path, info, wasInBase, fileInfoHeader, updatesCount, expectedFileSize)
+
+		tarBall := bundle.Deque()
+		tarBall.SetUp(bundle.Crypter)
+		go func() {
+			// TODO: Refactor this functional mess
+			// And maybe do a better error handling
+			err := bundle.packFileIntoTar(path, info, fileInfoHeader, wasInBase, tarBall)
+			if err != nil {
+				panic(err)
+			}
+			err = bundle.CheckSizeAndEnqueueBack(tarBall)
+			if err != nil {
+				panic(err)
+			}
+		}()
 	} else {
-		bundle.TarBallComposer.AddHeader(fileInfoHeader)
-		bundle.getFiles().Store(fileInfoHeader.Name,
-			BackupFileDescription{IsSkipped: false, IsIncremented: false, MTime: info.ModTime(), UpdatesCount: 0})
+		tarBall := bundle.Deque()
+		tarBall.SetUp(bundle.Crypter)
+		defer bundle.EnqueueBack(tarBall)
+		err = tarBall.TarWriter().WriteHeader(fileInfoHeader)
+		if err != nil {
+			return errors.Wrap(err, "handleTar: failed to write header")
+		}
 		if excluded && isDir {
 			return filepath.SkipDir
 		}
@@ -636,23 +459,23 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 // TODO : unit tests
 // UploadLabelFiles creates the `backup_label` and `tablespace_map` files by stopping the backup
 // and uploads them to S3.
-func (bundle *Bundle) uploadLabelFiles(conn *pgx.Conn) (string, []string, uint64, error) {
+func (bundle *Bundle) uploadLabelFiles(conn *pgx.Conn) (uint64, error) {
 	queryRunner, err := newPgQueryRunner(conn)
 	if err != nil {
-		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: Failed to build query runner.")
+		return 0, errors.Wrap(err, "UploadLabelFiles: Failed to build query runner.")
 	}
 	label, offsetMap, lsnStr, err := queryRunner.stopBackup()
 	if err != nil {
-		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: failed to stop backup")
+		return 0, errors.Wrap(err, "UploadLabelFiles: failed to stop backup")
 	}
 
 	lsn, err := pgx.ParseLSN(lsnStr)
 	if err != nil {
-		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: failed to parse finish LSN")
+		return 0, errors.Wrap(err, "UploadLabelFiles: failed to parse finish LSN")
 	}
 
 	if queryRunner.Version < 90600 {
-		return "", nil, lsn, nil
+		return lsn, nil
 	}
 
 	bundle.NewTarBall(false)
@@ -668,7 +491,7 @@ func (bundle *Bundle) uploadLabelFiles(conn *pgx.Conn) (string, []string, uint64
 
 	_, err = PackFileTo(tarBall, labelHeader, strings.NewReader(label))
 	if err != nil {
-		return "", nil, 0, errors.Wrapf(err, "UploadLabelFiles: failed to put %s to tar", labelHeader.Name)
+		return 0, errors.Wrapf(err, "UploadLabelFiles: failed to put %s to tar", labelHeader.Name)
 	}
 	tracelog.InfoLogger.Println(labelHeader.Name)
 
@@ -681,17 +504,15 @@ func (bundle *Bundle) uploadLabelFiles(conn *pgx.Conn) (string, []string, uint64
 
 	_, err = PackFileTo(tarBall, offsetMapHeader, strings.NewReader(offsetMap))
 	if err != nil {
-		return "", nil, 0, errors.Wrapf(err, "UploadLabelFiles: failed to put %s to tar", offsetMapHeader.Name)
+		return 0, errors.Wrapf(err, "UploadLabelFiles: failed to put %s to tar", offsetMapHeader.Name)
 	}
 	tracelog.InfoLogger.Println(offsetMapHeader.Name)
-	tarFileSet := make(map[string][]string, 0)
-	tarFileSet[tarBall.Name()] = []string{TablespaceMapFilename, BackupLabelFilename}
 	err = bundle.CloseTarball(tarBall)
 	if err != nil {
-		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: failed to close tarball")
+		return 0, errors.Wrap(err, "UploadLabelFiles: failed to close tarball")
 	}
 
-	return tarBall.Name(), []string{TablespaceMapFilename, BackupLabelFilename}, lsn, nil
+	return lsn, nil
 }
 
 func (bundle *Bundle) getDeltaBitmapFor(filePath string) (*roaring.Bitmap, error) {
@@ -711,19 +532,19 @@ func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uin
 }
 
 // TODO : unit tests
-func (bundle *Bundle) packFileIntoTar(cfi *ComposeFileInfo, tarBall TarBall) error {
+func (bundle *Bundle) packFileIntoTar(path string, info os.FileInfo, fileInfoHeader *tar.Header, wasInBase bool, tarBall TarBall) error {
 	incrementBaseLsn := bundle.getIncrementBaseLsn()
-	isIncremented := bundle.checkIfIncremented(incrementBaseLsn, cfi.fileInfo, cfi.path, cfi.wasInBase)
+	isIncremented := incrementBaseLsn != nil && (wasInBase || bundle.forceIncremental) && isPagedFile(info, path)
 	var fileReader io.ReadCloser
 	if isIncremented {
-		bitmap, err := bundle.getDeltaBitmapFor(cfi.path)
+		bitmap, err := bundle.getDeltaBitmapFor(path)
 		if _, ok := err.(NoBitmapFoundError); ok { // this file has changed after the start of backup, so just skip it
-			bundle.skipFile(cfi.header, cfi.fileInfo, cfi.updatesCount)
+			bundle.skipFile(fileInfoHeader, info)
 			return nil
 		} else if err != nil {
-			return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", cfi.path)
+			return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
 		}
-		fileReader, cfi.header.Size, err = ReadIncrementalFile(cfi.path, cfi.fileInfo.Size(), *incrementBaseLsn, bitmap)
+		fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
 		if os.IsNotExist(err) { // File was deleted before opening
 			// We should ignore file here as if it did not exist.
 			return nil
@@ -733,52 +554,45 @@ func (bundle *Bundle) packFileIntoTar(cfi *ComposeFileInfo, tarBall TarBall) err
 			fileReader = &ioextensions.ReadCascadeCloser{
 				Reader: &io.LimitedReader{
 					R: io.MultiReader(fileReader, &ioextensions.ZeroReader{}),
-					N: cfi.header.Size,
+					N: int64(fileInfoHeader.Size),
 				},
 				Closer: fileReader,
 			}
 		case InvalidBlockError: // fallback to full file backup
-			tracelog.WarningLogger.Printf("failed to read file '%s' as incremented\n", cfi.header.Name)
+			tracelog.WarningLogger.Printf("failed to read file '%s' as incremented\n", fileInfoHeader.Name)
 			isIncremented = false
-			fileReader, err = startReadingFile(cfi.header, cfi.fileInfo, cfi.path, fileReader)
+			fileReader, err = startReadingFile(fileInfoHeader, info, path, fileReader)
 			if err != nil {
 				return err
 			}
 		default:
-			return errors.Wrapf(err, "packFileIntoTar: failed reading incremental file '%s'\n", cfi.path)
+			return errors.Wrapf(err, "packFileIntoTar: failed reading incremental file '%s'\n", path)
 		}
 	} else {
 		var err error
-		fileReader, err = startReadingFile(cfi.header, cfi.fileInfo, cfi.path, fileReader)
+		fileReader, err = startReadingFile(fileInfoHeader, info, path, fileReader)
 		if err != nil {
 			return err
 		}
 	}
 	defer utility.LoggedClose(fileReader, "")
-	bundle.getFiles().Store(cfi.header.Name,
-		BackupFileDescription{IsSkipped: false, IsIncremented: isIncremented,
-			MTime: cfi.fileInfo.ModTime(), UpdatesCount: cfi.updatesCount})
 
-	packedFileSize, err := PackFileTo(tarBall, cfi.header, fileReader)
+	bundle.getFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: false, IsIncremented: isIncremented, MTime: info.ModTime()})
+
+	packedFileSize, err := PackFileTo(tarBall, fileInfoHeader, fileReader)
 	if err != nil {
 		return errors.Wrap(err, "packFileIntoTar: operation failed")
 	}
 
-	if packedFileSize != cfi.header.Size {
-		return newTarSizeError(packedFileSize, cfi.header.Size)
+	if packedFileSize != fileInfoHeader.Size {
+		return newTarSizeError(packedFileSize, fileInfoHeader.Size)
 	}
 
 	return nil
 }
 
-func (bundle *Bundle)checkIfIncremented(incrementBaseLsn *uint64, fileInfo os.FileInfo, filePath string, wasInBase bool) bool {
-	return incrementBaseLsn != nil && (wasInBase || bundle.forceIncremental) && isPagedFile(fileInfo, filePath)
-}
-
-func (bundle *Bundle) skipFile(tarHeader *tar.Header, fileInfo os.FileInfo, updatesCount uint64) {
-	bundle.getFiles().Store(tarHeader.Name,
-		BackupFileDescription{IsSkipped: true, IsIncremented: false,
-			MTime: fileInfo.ModTime(), UpdatesCount: updatesCount})
+func (bundle *Bundle) skipFile(fileInfoHeader *tar.Header, info os.FileInfo) {
+	bundle.getFiles().Store(fileInfoHeader.Name, BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: info.ModTime()})
 }
 
 // TODO : unit tests

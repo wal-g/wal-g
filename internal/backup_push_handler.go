@@ -90,8 +90,6 @@ func createAndPushBackup(
 	// Connect to postgres and start/finish a nonexclusive backup.
 	conn, err := Connect()
 	tracelog.ErrorLogger.FatalOnError(err)
-	err = bundle.CollectStatistics(conn)
-	tracelog.WarningLogger.PrintOnError(err)
 	backupName, backupStartLSN, pgVersion, dataDir, systemIdentifier, err := bundle.StartBackup(conn,
 		utility.CeilTimeUpToMicroseconds(time.Now()).String())
 	meta.DataDir = dataDir
@@ -128,18 +126,15 @@ func createAndPushBackup(
 	tracelog.InfoLogger.Println("Walking ...")
 	err = filepath.Walk(archiveDirectory, bundle.HandleWalkedFSObject)
 	tracelog.ErrorLogger.FatalOnError(err)
-	tarFileSets, err := bundle.PackTarballs()
-	tracelog.ErrorLogger.FatalOnError(err)
 	err = bundle.FinishQueue()
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = bundle.UploadPgControl(uploader.Compressor.FileExtension())
 	tracelog.ErrorLogger.FatalOnError(err)
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
-	labelFilesTarBallName, labelFilesList, finishLsn, err := bundle.uploadLabelFiles(conn)
+	finishLsn, err := bundle.uploadLabelFiles(conn)
 	tracelog.ErrorLogger.FatalOnError(err)
 	uncompressedSize := atomic.LoadInt64(bundle.AllTarballsSize)
 	compressedSize := atomic.LoadInt64(uploader.tarSize)
-	tarFileSets[labelFilesTarBallName] = append(tarFileSets[labelFilesTarBallName], labelFilesList...)
 	timelineChanged := bundle.checkTimelineChanged(conn)
 
 	// Wait for all uploads to finish.
@@ -177,7 +172,6 @@ func createAndPushBackup(
 	currentBackupSentinelDto.SystemIdentifier = systemIdentifier
 	currentBackupSentinelDto.UncompressedSize = uncompressedSize
 	currentBackupSentinelDto.CompressedSize = compressedSize
-	currentBackupSentinelDto.TarFileSets = tarFileSets
 	// If pushing permanent delta backup, mark all previous backups permanent
 	// Do this before uploading current meta to ensure that backups are marked in increasing order
 	if isPermanent && currentBackupSentinelDto.IsIncremental() {
