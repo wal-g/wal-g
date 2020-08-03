@@ -30,3 +30,22 @@ func NewComposeFileInfo(path string, fileInfo os.FileInfo, wasInBase, isIncremen
 	return &ComposeFileInfo{path: path, fileInfo: fileInfo,
 		wasInBase: wasInBase, header: header, isIncremented: isIncremented}
 }
+
+type TarBallComposerType int
+
+const (
+	RegularComposer TarBallComposerType = iota + 1
+)
+
+func NewTarBallComposer(composerType TarBallComposerType, bundle *Bundle) (TarBallComposer, error) {
+	switch composerType {
+	case RegularComposer:
+		fileList := &RegularBundleFileList{}
+		tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, fileList)
+		return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, fileList, bundle.Crypter), nil
+	default:
+		fileList := &RegularBundleFileList{}
+		tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, fileList)
+		return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, fileList, bundle.Crypter), nil
+	}
+}

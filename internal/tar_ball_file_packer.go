@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"archive/tar"
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -91,4 +92,22 @@ func (p *TarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall TarBal
 	}
 
 	return nil
+}
+
+// TODO : unit tests
+func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string, fileReader io.ReadCloser) (io.ReadCloser, error) {
+	fileInfoHeader.Size = info.Size()
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "startReadingFile: failed to open file '%s'\n", path)
+	}
+	diskLimitedFileReader := NewDiskLimitReader(file)
+	fileReader = &ioextensions.ReadCascadeCloser{
+		Reader: &io.LimitedReader{
+			R: io.MultiReader(diskLimitedFileReader, &ioextensions.ZeroReader{}),
+			N: fileInfoHeader.Size,
+		},
+		Closer: file,
+	}
+	return fileReader, nil
 }

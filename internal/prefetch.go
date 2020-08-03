@@ -2,6 +2,7 @@ package internal
 
 import (
 	"archive/tar"
+	"github.com/spf13/viper"
 	"io"
 	"io/ioutil"
 	"os"
@@ -69,17 +70,20 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 	archiveDirectory := uploader.DeltaFileManager.dataFolder.(*DiskDataFolder).path
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	archiveDirectory = filepath.Dir(archiveDirectory)
-	bundle := newBundle(archiveDirectory, nil, &prefaultStartLsn, nil, false)
+	bundle := NewBundle(archiveDirectory, nil, &prefaultStartLsn, nil,
+		false, viper.GetInt64(TarSizeThresholdSetting))
 	bundle.Timeline = timelineId
 	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(utility.WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Error during loading delta map: '%+v'.", err)
 		return
 	}
-	bundle.TarBallMaker = newNopTarBallMaker()
-
 	// Start a new tar bundle, walk the archiveDirectory and upload everything there.
-	bundle.StartQueue()
+	err = bundle.StartQueue(newNopTarBallMaker())
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Error during starting tar queue: '%+v'.", err)
+		return
+	}
 	tracelog.InfoLogger.Println("Walking for prefault...")
 	err = filepath.Walk(archiveDirectory, bundle.prefaultWalkedFSObject)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -120,20 +124,20 @@ func (bundle *Bundle) prefaultHandleTar(path string, info os.FileInfo) error {
 
 	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
 	if err != nil {
-		return errors.Wrap(err, "handleTar: could not grab header info")
+		return errors.Wrap(err, "addToBundle: could not grab header info")
 	}
 
 	fileInfoHeader.Name = bundle.getFileRelPath(path)
 
 	if !excluded && info.Mode().IsRegular() {
-		tarBall := bundle.Deque()
+		tarBall := bundle.TarBallQueue.Deque()
 		tarBall.SetUp(nil)
 		go func() {
 			err := bundle.prefaultFile(path, info, fileInfoHeader)
 			if err != nil {
 				panic(err)
 			}
-			err = bundle.CheckSizeAndEnqueueBack(tarBall)
+			err = bundle.TarBallQueue.CheckSizeAndEnqueueBack(tarBall)
 			if err != nil {
 				panic(err)
 			}
