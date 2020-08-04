@@ -178,11 +178,10 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 	s.Step(`^we got (\d+) backup entries of ([^\s]*)$`, tctx.checkBackupsCount)
 	s.Step(`^we put empty backup via ([^\s]*)$`, tctx.putEmptyBackupViaMinio)
 	s.Step(`^we delete backups retain (\d+) via ([^\s]*)$`, tctx.purgeBackupRetain)
+	s.Step(`^we delete backup #(\d+) via ([^\s]*)$`, tctx.deleteBackup)
 	s.Step(`^we check if empty backups were purged via ([^\s]*)$`, tctx.testEmptyBackupsViaMinio)
 	s.Step(`^we restore #(\d+) backup to ([^\s]*)$`, tctx.restoreBackupToMongodb)
 	s.Step(`^we ensure ([^\s]*) #(\d+) backup metadata contains$`, tctx.backupMetadataContains)
-	//s.Step(`^we delete backups retain (\d+) after #(\d+) backup via ([^\s]*)$`, tctx.purgeBackupsAfterID)
-	//s.Step(`^we delete backups retain (\d+) after "([^"]*)" timestamp via ([^\s]*)$`, tctx.purgeBackupsAfterTime)
 	s.Step(`^oplog archiving is enabled on ([^\s]*)$`, tctx.enableOplogPush)
 	s.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*)$`, tctx.replayOplog)
 

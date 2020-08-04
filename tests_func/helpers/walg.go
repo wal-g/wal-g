@@ -161,6 +161,12 @@ func (w *WalgUtil) PurgeRetain(keepNumber int) error {
 	return err
 }
 
+
+func (w *WalgUtil) DeleteBackup(backupName string) error {
+	_, err := w.runCmd([]string{"backup-delete", backupName, "--confirm"})
+	return err
+}
+
 func (w *WalgUtil) OplogPush() error {
 	cmd := []string{w.cliPath, "--config", w.confPath, "oplog-push"}
 	cmdLine := strings.Join(cmd, " ")

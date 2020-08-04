@@ -54,3 +54,9 @@ Feature: MongoDB backups check
     Given mongodb01 has test mongodb data test5
     When we create mongodb01 backup
     Then we got 4 backup entries of mongodb01
+
+  Scenario: Forth and first backup were deleted successfully
+    When we delete backup #3 via mongodb01
+    Then we got 3 backup entries of mongodb01
+    When we delete backup #0 via mongodb01
+    Then we got 2 backup entries of mongodb01
