@@ -61,7 +61,11 @@ func deltaFetchRecursionNew(cfg *FetchConfig) error {
 		}
 		cfg.filesToUnwrap = baseFilesToUnwrap
 		cfg.backupName = *sentinelDto.IncrementFrom
-		cfg.UpdateFetchConfig(unwrapResult)
+		if cfg.skipRedundantTars {
+			// if we skip redundant tars we should exclude files that
+			// no longer need any additional information (completed ones)
+			cfg.SkipRedundantFiles(unwrapResult)
+		}
 		tracelog.InfoLogger.Printf("%v fetched. Downgrading from LSN %x to LSN %x \n",
 			cfg.backupName, *(sentinelDto.BackupStartLSN), *(sentinelDto.IncrementFromLSN))
 		err = deltaFetchRecursionNew(cfg)

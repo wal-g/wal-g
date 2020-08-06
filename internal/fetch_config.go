@@ -5,7 +5,7 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
-func NewFetchConfig(backupName,dbDataDirectory string, folder storage.Folder, spec *TablespaceSpec,
+func NewFetchConfig(backupName, dbDataDirectory string, folder storage.Folder, spec *TablespaceSpec,
 	filesToUnwrap map[string]bool, skipRedundantTars bool) *FetchConfig {
 	fetchConfig := &FetchConfig{
 		filesToUnwrap:     filesToUnwrap,
@@ -20,7 +20,7 @@ func NewFetchConfig(backupName,dbDataDirectory string, folder storage.Folder, sp
 }
 
 type FetchConfig struct {
-	filesToUnwrap   map[string]bool
+	filesToUnwrap map[string]bool
 	// missingBlocks stores count of blocks missing for file path
 	missingBlocks     map[string]int64
 	tablespaceSpec    *TablespaceSpec
@@ -30,14 +30,10 @@ type FetchConfig struct {
 	skipRedundantTars bool
 }
 
-func (fc *FetchConfig) UpdateFetchConfig(unwrapResult *UnwrapResult) {
-	// if we skip redundant tars we should exclude files that
-	// no longer need any additional information (completed ones)
-	if fc.skipRedundantTars {
-		fc.processCreatedPageFiles(unwrapResult.createdPageFiles)
-		fc.processWrittenIncrementFiles(unwrapResult.writtenIncrementFiles)
-		fc.excludeCompletedFiles(unwrapResult.completedFiles)
-	}
+func (fc *FetchConfig) SkipRedundantFiles(unwrapResult *UnwrapResult) {
+	fc.processCreatedPageFiles(unwrapResult.createdPageFiles)
+	fc.processWrittenIncrementFiles(unwrapResult.writtenIncrementFiles)
+	fc.excludeCompletedFiles(unwrapResult.completedFiles)
 }
 
 func (fc *FetchConfig) excludeCompletedFile(filePath string) {
@@ -70,7 +66,7 @@ func (fc *FetchConfig) processWrittenIncrementFiles(writtenIncrementFiles map[st
 		missingBlockCount, ok := fc.missingBlocks[filePath]
 		if !ok {
 			// file is not in file blocks to restore, skip it
-			tracelog.WarningLogger.Printf("New written increment blocks, " +
+			tracelog.WarningLogger.Printf("New written increment blocks, "+
 				"but file doesn't exist in missingBlocks: '%s'", filePath)
 			continue
 		}
