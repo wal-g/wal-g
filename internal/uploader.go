@@ -100,12 +100,18 @@ func (uploader *Uploader) Upload(path string, content io.Reader) error {
 	if uploader.tarSize != nil {
 		content = &WithSizeReader{content, uploader.tarSize}
 	}
-	err := uploader.UploadingFolder.PutObject(path, content)
-	if err == nil {
-		return nil
+	// Add retries to work around https://github.com/aws/aws-sdk-go/issues/3406
+	const retries = 3
+	var err error
+	for i := 0; i < retries; i++ {
+		err = uploader.UploadingFolder.PutObject(path, content)
+		if err == nil {
+			return nil
+		}
+		tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"Retrying upload error:\n", err)
 	}
+	tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"Exhausted upload retries:\n", err)
 	uploader.Failed.Store(true)
-	tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"\n", err)
 	return err
 }
 
