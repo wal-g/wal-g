@@ -56,27 +56,9 @@ func HandleWALReceive(uploader *WalUploader) {
 
 	// Connect to postgres.
 	var XLogPos pglogrepl.LSN
-	var walSegmentBytes uint64
 	var segment *WalSegment
 
-	slotName := GetPgSlotName()
-	tracelog.ErrorLogger.FatalOnError(validateSlotName(slotName))
-
-	// Creating a temporary connection to read slot info and wal_segment_size
-	tracelog.DebugLogger.Println("Temp connection to read slot info")
-	tmpConn, err := Connect()
-	tracelog.ErrorLogger.FatalOnError(err)
-	queryRunner, err := newPgQueryRunner(tmpConn)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	slot, err := queryRunner.GetPhysicalSlotInfo(slotName)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	walSegmentBytes, err = queryRunner.GetWalSegmentBytes()
-	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.DebugLogger.Printf("Wal segments are %s bytes in size", walSegmentBytes)
-
-	err = tmpConn.Close()
+	slot, walSegmentBytes, err := getCurrentWalInfo()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	conn, err := pgconn.Connect(context.Background(), "replication=yes")
@@ -85,7 +67,6 @@ func HandleWALReceive(uploader *WalUploader) {
 
 	sysident, err := pglogrepl.IdentifySystem(context.Background(), conn)
 	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.DebugLogger.Println("SystemID:", sysident.SystemID, "Timeline:", sysident.Timeline, "XLogPos:", sysident.XLogPos.String(), "DBName:", sysident.DBName)
 
 	if slot.Exists {
 		XLogPos = slot.RestartLSN
@@ -94,7 +75,6 @@ func HandleWALReceive(uploader *WalUploader) {
 		_, err = pglogrepl.CreateReplicationSlot(context.Background(), conn, slot.Name, "",
 			pglogrepl.CreateReplicationSlotOptions{Mode: pglogrepl.PhysicalReplication})
 		tracelog.ErrorLogger.FatalOnError(err)
-		tracelog.DebugLogger.Println("Replication slot created.")
 		XLogPos = sysident.XLogPos
 	}
 
@@ -134,7 +114,7 @@ func HandleWALReceive(uploader *WalUploader) {
 	}
 }
 
-func getStartTimeline(conn *pgconn.PgConn, systemTimeline int32, XLogPos pglogrepl.LSN)  (int32, error){
+func getStartTimeline(conn *pgconn.PgConn, systemTimeline int32, xLogPos pglogrepl.LSN)  (int32, error){
 	if systemTimeline < 2 {
 		return 1, nil
 	}
@@ -142,10 +122,10 @@ func getStartTimeline(conn *pgconn.PgConn, systemTimeline int32, XLogPos pglogre
 	if err == nil {
 		tlh, err := NewTimeLineHistFile(systemTimeline, timelinehistfile.FileName, timelinehistfile.Content)
 		tracelog.ErrorLogger.FatalOnError(err)
-		return tlh.LSNToTimeLine(XLogPos)
+		return tlh.LSNToTimeLine(xLogPos)
 	} else {
-		if pgerr, ok := err.(*pgconn.PgError); ok {
-			if pgerr.Code == "58P01" {
+		if pgErr, ok := err.(*pgconn.PgError); ok {
+			if pgErr.Code == "58P01" {
 				return systemTimeline, nil
 			}
 		}
@@ -171,5 +151,32 @@ func validateSlotName(pgSlotName string) (err error){
 	if len(pgSlotName) > 63 || invalid {
 		err = GenericWalReceiveError{errors.Errorf("%s can only contain 1-63 word characters ([0-9A-Za-z_])", PgSlotName)}
 	}
+	return
+}
+
+func getCurrentWalInfo() (slot PhysicalSlot, walSegmentBytes uint64, err error) {
+	slotName := GetPgSlotName()
+	if err != nil {
+		return
+	}
+
+	// Creating a temporary connection to read slot info and wal_segment_size
+	tmpConn, err := Connect()
+	if err != nil {
+		return
+	}
+	defer tmpConn.Close()
+
+	queryRunner, err := newPgQueryRunner(tmpConn)
+	if err != nil {
+		return
+	}
+
+	slot, err = queryRunner.GetPhysicalSlotInfo(slotName)
+	if err != nil {
+		return
+	}
+
+	walSegmentBytes, err = queryRunner.GetWalSegmentBytes()
 	return
 }
