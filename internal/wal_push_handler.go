@@ -78,7 +78,7 @@ func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrit
 
 // TODO : unit tests
 func checkWALOverwrite(uploader *WalUploader, walFilePath string) (overwriteAttempt bool, err error) {
-	walFileReader, err := DownloadAndDecompressWALFile(uploader.UploadingFolder, filepath.Base(walFilePath))
+	walFileReader, err := DownloadAndDecompressStorageFile(uploader.UploadingFolder, filepath.Base(walFilePath))
 	if err != nil {
 		if _, ok := err.(ArchiveNonExistenceError); ok {
 			err = nil

@@ -30,7 +30,7 @@ func TestWallFetchCachesLastDecompressor(t *testing.T) {
 		assert.NoError(t, folder.PutObject(walFilename+"."+decompressor.FileExtension(),
 			bytes.NewReader([]byte("test data"))))
 
-		_, err := internal.DownloadAndDecompressWALFile(folder, walFilename)
+		_, err := internal.DownloadAndDecompressStorageFile(folder, walFilename)
 		assert.NoError(t, err)
 
 		last, err := internal.GetLastDecompressor()
