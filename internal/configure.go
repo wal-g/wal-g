@@ -157,6 +157,15 @@ func GetDataFolderPath() string {
 	return filepath.Join(getWalFolderPath(), "walg_data")
 }
 
+// GetPgSlotName reads the slot name from the environment
+func GetPgSlotName() (pgSlotName string) {
+	pgSlotName = viper.GetString(PgSlotName)
+	if pgSlotName == "" {
+		pgSlotName = "walg"
+	}
+	return
+}
+
 // TODO : unit tests
 func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err error) {
 	useWalDelta = viper.GetBool(UseWalDeltaSetting)

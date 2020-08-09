@@ -7,7 +7,6 @@ import (
 	"github.com/jackc/pglogrepl"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-	"os"
 	"regexp"
 	"time"
 )
@@ -58,18 +57,10 @@ func HandleWALReceive(uploader *WalUploader) {
 	// Connect to postgres.
 	var XLogPos pglogrepl.LSN
 	var walSegmentBytes uint64
-	var slotName string
 	var segment *WalSegment
 
-	// Check WALG_SLOTNAME env variable (can be any of [0-9A-Za-z_], and 1-63 characters long)
-	slotNameRe := regexp.MustCompile(`\w{0,63}`)
-	slotName = slotNameRe.FindString(os.Getenv("WALG_SLOTNAME"))
-	if slotName == "" {
-		tracelog.InfoLogger.Println("No (correct) replication slot specified. Using default name 'walg'.")
-		slotName = "walg"
-	} else {
-		tracelog.InfoLogger.Printf("Using slotname %s: ", slotName)
-	}
+	slotName := GetPgSlotName()
+	tracelog.ErrorLogger.FatalOnError(validateSlotName(slotName))
 
 	// Creating a temporary connection to read slot info and wal_segment_size
 	tracelog.DebugLogger.Println("Temp connection to read slot info")
@@ -168,4 +159,17 @@ func startReplication(conn *pgconn.PgConn, segment *WalSegment, slotName string)
 		pglogrepl.StartReplicationOptions{Timeline: segment.TimeLine, Mode: pglogrepl.PhysicalReplication})
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.DebugLogger.Println("Started replication")
+}
+
+//  validateSlotName validates pgSlotName to be a valid slot name
+func validateSlotName(pgSlotName string) (err error){
+	// Check WALG_SLOTNAME env variable (can be any of [0-9A-Za-z_], and 1-63 characters long)
+	invalid, err := regexp.MatchString(`\W`, pgSlotName)
+	if err != nil {
+		return
+	}
+	if len(pgSlotName) > 63 || invalid {
+		err = GenericWalReceiveError{errors.Errorf("%s can only contain 1-63 word characters ([0-9A-Za-z_])", PgSlotName)}
+	}
+	return
 }

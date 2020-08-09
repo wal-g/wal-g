@@ -52,6 +52,7 @@ const (
 	PgPasswordSetting            = "PGPASSWORD"
 	PgDatabaseSetting            = "PGDATABASE"
 	PgSslModeSetting             = "PGSSLMODE"
+	PgSlotName                   = "WALG_SLOTNAME"
 	TotalBgUploadedLimit         = "TOTAL_BG_UPLOADED_LIMIT"
 	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
 	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
@@ -155,6 +156,7 @@ var (
 		PgPasswordSetting: true,
 		PgDatabaseSetting: true,
 		PgSslModeSetting:  true,
+		PgSlotName:        true,
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,
