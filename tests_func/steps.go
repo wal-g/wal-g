@@ -116,6 +116,11 @@ func (tctx *TestContext) checkBackupsCount(backupCount int, container string) er
 	return nil
 }
 
+func (tctx *TestContext) purgeOplogArchives(container string) error {
+	walg := WalgUtilFromTestContext(tctx, container)
+	return walg.OplogPurge()
+}
+
 func (tctx *TestContext) purgeBackupRetain(retainCount int, container string) error {
 	walg := WalgUtilFromTestContext(tctx, container)
 	return walg.PurgeRetain(retainCount)
@@ -167,7 +172,6 @@ func (tctx *TestContext) replayOplog(backupId int, timestampId string, container
 	tracelog.DebugLogger.Printf("Starting oplog replay from %v until %v", from, until)
 	return walg.OplogReplay(from, until)
 }
-
 
 func (tctx *TestContext) purgeDataDir(host string) error {
 	mc, err := MongoCtlFromTestContext(tctx, host)
@@ -441,7 +445,6 @@ func (tctx *TestContext) testEqualMongodbDataAtHosts(host1, host2 string) error 
 		return fmt.Errorf("host %s snapshot is empty: %+v", host2, snap2)
 	}
 
-
 	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), snap1, snap2) {
 		return fmt.Errorf("expected the same data at hosts %s and %s", host1, host2)
 	}
@@ -449,7 +452,7 @@ func (tctx *TestContext) testEqualMongodbDataAtHosts(host1, host2 string) error 
 	return nil
 }
 
-func (tctx *TestContext) sleep (duration string) error {
+func (tctx *TestContext) sleep(duration string) error {
 	dur, err := time.ParseDuration(duration)
 	if err != nil {
 		return err

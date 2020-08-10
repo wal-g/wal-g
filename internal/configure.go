@@ -14,11 +14,12 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+	"golang.org/x/time/rate"
+
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/awskms"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
-	"golang.org/x/time/rate"
 )
 
 const (
@@ -386,6 +387,18 @@ func GetDurationSetting(setting string) (time.Duration, error) {
 		return 0, fmt.Errorf("duration expected for %s setting but given '%s': %w", setting, intervalStr, err)
 	}
 	return interval, nil
+}
+
+func GetOplogPITRDiscoveryIntervalSetting() (*time.Duration, error) {
+	durStr, ok := GetSetting(OplogPITRDiscoveryInterval)
+	if !ok {
+		return nil, nil
+	}
+	dur, err := time.ParseDuration(durStr)
+	if err != nil {
+		return nil, fmt.Errorf("duration expected for %s setting but given '%s': %w", OplogPITRDiscoveryInterval, durStr, err)
+	}
+	return &dur, nil
 }
 
 func GetRequiredSetting(setting string) (string, error) {

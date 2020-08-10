@@ -8,6 +8,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/spf13/cobra"
@@ -33,7 +34,7 @@ var backupShowCmd = &cobra.Command{
 		err = mongo.HandleBackupShow(
 			downloader,
 			args[0],
-			func(b archive.Backup) (bytes []byte, err error) {
+			func(b models.Backup) (bytes []byte, err error) {
 				return json.Marshal(b)
 			},
 			os.Stdout)
