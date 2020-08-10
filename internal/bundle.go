@@ -507,7 +507,6 @@ func (bundle *Bundle) uploadLabelFiles(conn *pgx.Conn) (uint64, error) {
 		return 0, errors.Wrapf(err, "UploadLabelFiles: failed to put %s to tar", offsetMapHeader.Name)
 	}
 	tracelog.InfoLogger.Println(offsetMapHeader.Name)
-
 	err = bundle.CloseTarball(tarBall)
 	if err != nil {
 		return 0, errors.Wrap(err, "UploadLabelFiles: failed to close tarball")

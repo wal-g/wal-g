@@ -135,7 +135,6 @@ func createAndPushBackup(
 	tracelog.ErrorLogger.FatalOnError(err)
 	uncompressedSize := atomic.LoadInt64(bundle.AllTarballsSize)
 	compressedSize := atomic.LoadInt64(uploader.tarSize)
-
 	timelineChanged := bundle.checkTimelineChanged(conn)
 
 	// Wait for all uploads to finish.

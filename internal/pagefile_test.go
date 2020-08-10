@@ -174,7 +174,7 @@ func postgresCreateFileFromIncrementTest(testIncrement *TestIncrement, t *testin
 	incrementReader := testIncrement.NewReader()
 	mockFile := NewMockReadWriterAt(make([]byte, 0))
 
-	err := internal.CreateFileFromIncrement(incrementReader, mockFile)
+	_, err := internal.CreateFileFromIncrement(incrementReader, mockFile)
 	assert.NoError(t, err, "Expected no errors after creating file from increment")
 	assert.Equal(t, testIncrement.fileSize, uint64(len(mockFile.content)),
 		"Result file size should match the size specified in the increment header")
@@ -204,7 +204,7 @@ func postgresWriteIncrementTestCompletedFile(testIncrement *TestIncrement, t *te
 	mockContent, _ := ioutil.ReadFile(pagedFileName)
 	mockFile := NewMockReadWriterAt(mockContent)
 
-	err := internal.WritePagesFromIncrement(testIncrement.NewReader(), mockFile, false)
+	_, err := internal.WritePagesFromIncrement(testIncrement.NewReader(), mockFile, false)
 
 	assert.NoError(t, err, "Expected no errors after writing increment")
 	// check that no bytes were written to the mock file
@@ -230,7 +230,7 @@ func TestWritingZeroBlocksIncrementToEmptyFile(t *testing.T) {
 func postgresWritePagesTestEmptyFile(testIncrement *TestIncrement, t *testing.T) {
 	mockContent := make([]byte, internal.DatabasePageSize*pagedFileBlockCount)
 	mockFile := NewMockReadWriterAt(mockContent)
-	err := internal.WritePagesFromIncrement(testIncrement.NewReader(), mockFile, false)
+	_, err := internal.WritePagesFromIncrement(testIncrement.NewReader(), mockFile, false)
 	assert.NoError(t, err, "Expected no errors after writing increment")
 	assert.Equal(t, testIncrement.fileSize, uint64(len(mockFile.content)),
 		"Result file size should match the size specified in the increment header")
@@ -259,7 +259,7 @@ func TestWritingRegularIncrementToIncompleteFile(t *testing.T) {
 		mockContent[i] = 0
 	}
 	mockFile := NewMockReadWriterAt(mockContent)
-	err := internal.WritePagesFromIncrement(incrementReader, mockFile, false)
+	_, err := internal.WritePagesFromIncrement(incrementReader, mockFile, false)
 
 	assert.NoError(t, err, "Expected no errors after writing increment")
 	assert.Equal(t, regularTestIncrement.fileSize, uint64(len(mockFile.content)),
@@ -297,7 +297,7 @@ func TestWritingAllBlocksIncrementToIncompleteFile(t *testing.T) {
 	}
 	mockFile := NewMockReadWriterAt(mockContent)
 
-	err := internal.WritePagesFromIncrement(incrementReader, mockFile, false)
+	_, err := internal.WritePagesFromIncrement(incrementReader, mockFile, false)
 
 	assert.NoError(t, err, "Expected no errors after writing increment")
 	assert.Equal(t, allBlocksTestIncrement.fileSize, uint64(len(mockFile.content)),

@@ -2,13 +2,12 @@ package internal
 
 import (
 	"archive/tar"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
-
-	"github.com/wal-g/wal-g/utility"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -25,6 +24,7 @@ type FileTarInterpreter struct {
 	DBDataDirectory string
 	Sentinel        BackupSentinelDto
 	FilesToUnwrap   map[string]bool
+	UnwrapResult *UnwrapResult
 
 	createNewIncrementalFiles bool
 }
@@ -32,7 +32,8 @@ type FileTarInterpreter struct {
 func NewFileTarInterpreter(
 	dbDataDirectory string, sentinel BackupSentinelDto, filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
 ) *FileTarInterpreter {
-	return &FileTarInterpreter{dbDataDirectory, sentinel, filesToUnwrap, createNewIncrementalFiles}
+	return &FileTarInterpreter{dbDataDirectory, sentinel,
+		filesToUnwrap,newUnwrapResult(),createNewIncrementalFiles}
 }
 
 // TODO : unit tests
