@@ -4,7 +4,6 @@ package archivemocks
 
 import (
 	mock "github.com/stretchr/testify/mock"
-	archive "github.com/wal-g/wal-g/internal/databases/mongo/archive"
 
 	models "github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
@@ -15,11 +14,11 @@ type Purger struct {
 }
 
 // DeleteBackups provides a mock function with given fields: backups
-func (_m *Purger) DeleteBackups(backups []archive.Backup) error {
+func (_m *Purger) DeleteBackups(backups []models.Backup) error {
 	ret := _m.Called(backups)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func([]archive.Backup) error); ok {
+	if rf, ok := ret.Get(0).(func([]models.Backup) error); ok {
 		r0 = rf(backups)
 	} else {
 		r0 = ret.Error(0)

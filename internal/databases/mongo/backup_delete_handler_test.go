@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	mocks "github.com/wal-g/wal-g/internal/databases/mongo/archive/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
 func TestHandleBackupDelete(t *testing.T) {
@@ -30,12 +31,12 @@ func TestHandleBackupDelete(t *testing.T) {
 				downloader: func() *mocks.Downloader {
 					dl := &mocks.Downloader{}
 					dl.On("BackupMeta", mock.MatchedBy(func(backupName string) bool { return backupName == "first" })).
-						Return(archive.Backup{BackupName: "first"}, nil).Once()
+						Return(models.Backup{BackupName: "first"}, nil).Once()
 					return dl
 				}(),
 				purger: func() *mocks.Purger {
 					pr := &mocks.Purger{}
-					pr.On("DeleteBackups", mock.MatchedBy(func(backups []archive.Backup) bool { return len(backups) == 1 && backups[0].BackupName == "first" })).
+					pr.On("DeleteBackups", mock.MatchedBy(func(backups []models.Backup) bool { return len(backups) == 1 && backups[0].BackupName == "first" })).
 						Return(nil).Once()
 					return pr
 				}(),
@@ -50,7 +51,7 @@ func TestHandleBackupDelete(t *testing.T) {
 				downloader: func() *mocks.Downloader {
 					dl := &mocks.Downloader{}
 					dl.On("BackupMeta", mock.MatchedBy(func(backupName string) bool { return backupName == "first" })).
-						Return(archive.Backup{BackupName: "first"}, nil).Once()
+						Return(models.Backup{BackupName: "first"}, nil).Once()
 					return dl
 				}(),
 				purger: &mocks.Purger{},
@@ -65,7 +66,7 @@ func TestHandleBackupDelete(t *testing.T) {
 				downloader: func() *mocks.Downloader {
 					dl := &mocks.Downloader{}
 					dl.On("BackupMeta", mock.MatchedBy(func(backupName string) bool { return backupName == "nonexistent" })).
-						Return(archive.Backup{}, fmt.Errorf("can not fetch stream sentinel: test")).Once()
+						Return(models.Backup{}, fmt.Errorf("can not fetch stream sentinel: test")).Once()
 					return dl
 				}(),
 				purger: &mocks.Purger{},

@@ -3,10 +3,9 @@
 package archivemocks
 
 import (
-	internal "github.com/wal-g/wal-g/internal"
-	archive "github.com/wal-g/wal-g/internal/databases/mongo/archive"
-
 	io "io"
+
+	internal "github.com/wal-g/wal-g/internal"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -19,21 +18,21 @@ type Downloader struct {
 }
 
 // BackupMeta provides a mock function with given fields: name
-func (_m *Downloader) BackupMeta(name string) (archive.Backup, error) {
+func (_m *Downloader) BackupMeta(name string) (models.Backup, error) {
 	ret := _m.Called(name)
 
 	if len(ret) == 1 {
-		rf, ok := ret.Get(0).(func(string) (archive.Backup, error))
+		rf, ok := ret.Get(0).(func(string) (models.Backup, error))
 		if ok {
 			return rf(name)
 		}
 	}
 
-	var r0 archive.Backup
-	if rf, ok := ret.Get(0).(func(string) archive.Backup); ok {
+	var r0 models.Backup
+	if rf, ok := ret.Get(0).(func(string) models.Backup); ok {
 		r0 = rf(name)
 	} else {
-		r0 = ret.Get(0).(archive.Backup)
+		r0 = ret.Get(0).(models.Backup)
 	}
 
 	var r1 error
@@ -158,22 +157,22 @@ func (_m *Downloader) ListOplogArchives() ([]models.Archive, error) {
 }
 
 // LoadBackups provides a mock function with given fields: names
-func (_m *Downloader) LoadBackups(names []string) ([]archive.Backup, error) {
+func (_m *Downloader) LoadBackups(names []string) ([]models.Backup, error) {
 	ret := _m.Called(names)
 
 	if len(ret) == 1 {
-		rf, ok := ret.Get(0).(func([]string) ([]archive.Backup, error))
+		rf, ok := ret.Get(0).(func([]string) ([]models.Backup, error))
 		if ok {
 			return rf(names)
 		}
 	}
 
-	var r0 []archive.Backup
-	if rf, ok := ret.Get(0).(func([]string) []archive.Backup); ok {
+	var r0 []models.Backup
+	if rf, ok := ret.Get(0).(func([]string) []models.Backup); ok {
 		r0 = rf(names)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]archive.Backup)
+			r0 = ret.Get(0).([]models.Backup)
 		}
 	}
 

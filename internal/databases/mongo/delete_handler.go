@@ -67,14 +67,14 @@ func HandlePurge(downloader archive.Downloader, purger archive.Purger, setters .
 		return err
 	}
 
-	_, retainBackups, err := HandleBackupsPurge(backupTimes, downloader, purger, opts)
+	_, _, err = HandleBackupsPurge(backupTimes, downloader, purger, opts)
 	if err != nil {
 		return err
 	}
 
 	if opts.purgeOplog {
 		// TODO: fix error if retainBackups is empty
-		if _, err := HandleOplogArchivesPurge(downloader, purger, retainBackups, opts); err != nil {
+		if err := HandleOplogPurge(downloader, purger, opts.retainAfter, opts.dryRun); err != nil {
 			return err
 		}
 	}
@@ -92,10 +92,10 @@ func HandlePurge(downloader archive.Downloader, purger archive.Purger, setters .
 }
 
 // HandleBackupsPurge delete backups according to settings
-func HandleBackupsPurge(backupTimes []internal.BackupTime, downloader archive.Downloader, purger archive.Purger, opts PurgeSettings) (purge, retain []archive.Backup, err error) {
+func HandleBackupsPurge(backupTimes []internal.BackupTime, downloader archive.Downloader, purger archive.Purger, opts PurgeSettings) (purge, retain []models.Backup, err error) {
 	if len(backupTimes) == 0 { // TODO: refactor && support oplog purge even if backups do not exist
 		tracelog.InfoLogger.Println("No backups found")
-		return []archive.Backup{}, []archive.Backup{}, nil
+		return []models.Backup{}, []models.Backup{}, nil
 	}
 
 	backups, err := downloader.LoadBackups(archive.BackupNamesFromBackupTimes(backupTimes))
@@ -117,32 +117,4 @@ func HandleBackupsPurge(backupTimes []internal.BackupTime, downloader archive.Do
 		tracelog.InfoLogger.Printf("Backups were purged: deleted: %d, retained: %v", len(purge), len(retain))
 	}
 	return purge, retain, nil
-}
-
-// HandleOplogArchivesPurge delete oplog archives according to settings
-func HandleOplogArchivesPurge(downloader archive.Downloader, purger archive.Purger, backups []archive.Backup, opts PurgeSettings) (purge []models.Archive, err error) {
-	archives, err := downloader.ListOplogArchives()
-	if err != nil {
-		return nil, err
-	}
-	if len(archives) == 0 {
-		return []models.Archive{}, nil
-	}
-
-	purgeBeforeTS, err := archive.LastKnownInBackupTS(backups)
-	if err != nil {
-		return nil, err
-	}
-
-	tracelog.InfoLogger.Printf("Oplog archives will be purged if start_ts < %v", purgeBeforeTS)
-	purgeArchives := archive.SplitPurgingOplogArchives(archives, purgeBeforeTS)
-	tracelog.DebugLogger.Printf("Oplog archives selected to be deleted: %v", purgeArchives)
-
-	if !opts.dryRun {
-		if err := purger.DeleteOplogArchives(purgeArchives); err != nil {
-			return nil, err
-		}
-		tracelog.InfoLogger.Printf("Oplog archives were purged: deleted: %d", len(purgeArchives))
-	}
-	return purgeArchives, nil
 }

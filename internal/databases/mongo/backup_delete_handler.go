@@ -2,6 +2,7 @@ package mongo
 
 import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 
 	"github.com/wal-g/tracelog"
 )
@@ -18,7 +19,7 @@ func HandleBackupDelete(backupName string, downloader archive.Downloader, purger
 		return nil
 	}
 
-	if err := purger.DeleteBackups([]archive.Backup{backup}); err != nil {
+	if err := purger.DeleteBackups([]models.Backup{backup}); err != nil {
 		return err
 	}
 	tracelog.InfoLogger.Printf("Backup was deleted: %+v", backup)

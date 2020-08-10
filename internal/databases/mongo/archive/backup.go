@@ -13,10 +13,10 @@ import (
 )
 
 // BackupInfoMarshalFunc defines sentinel unmarshal func
-type BackupInfoMarshalFunc func(b Backup) ([]byte, error)
+type BackupInfoMarshalFunc func(b models.Backup) ([]byte, error)
 
 type BackupListing interface {
-	Backups(backups []Backup, output io.Writer) error
+	Backups(backups []models.Backup, output io.Writer) error
 	Names(backups []internal.BackupTime, output io.Writer) error
 }
 
@@ -36,7 +36,7 @@ func NewTabbedBackupListing(minwidth, tabwidth, padding int, padchar byte, flags
 	return &TabbedBackupListing{minwidth, tabwidth, padding, padchar, flags}
 }
 
-func (bl *TabbedBackupListing) Backups(backups []Backup, output io.Writer) error {
+func (bl *TabbedBackupListing) Backups(backups []models.Backup, output io.Writer) error {
 	writer := tabwriter.NewWriter(output, bl.minwidth, bl.tabwidth, bl.padding, bl.padchar, bl.flags)
 
 	_, err := fmt.Fprintln(writer, "name\tfinish_local_time\tts_before\tts_after")
@@ -73,38 +73,17 @@ func (bl *TabbedBackupListing) Names(backups []internal.BackupTime, output io.Wr
 	return writer.Flush()
 }
 
-// Backup represents backup sentinel data
-type Backup struct {
-	BackupName      string      `json:"BackupName,omitempty"`
-	StartLocalTime  time.Time   `json:"StartLocalTime,omitempty"`
-	FinishLocalTime time.Time   `json:"FinishLocalTime,omitempty"`
-	UserData        interface{} `json:"UserData,omitempty"`
-	MongoMeta       MongoMeta   `json:"MongoMeta,omitempty"`
-}
-
-// NodeMeta represents MongoDB node metadata
-type NodeMeta struct {
-	LastTS    models.Timestamp `json:"LastTS,omitempty"`
-	LastMajTS models.Timestamp `json:"LastMajTS,omitempty"`
-}
-
-// MongoMeta includes NodeMeta Before and after backup
-type MongoMeta struct {
-	Before NodeMeta `json:"Before,omitempty"`
-	After  NodeMeta `json:"After,omitempty"`
-}
-
 // MongoMetaProvider defines interface to collect backup meta
 type MongoMetaProvider interface {
 	Init() error
 	Finalize() error
-	Meta() MongoMeta
+	Meta() models.MongoMeta
 }
 
 type MongoMetaDBProvider struct {
 	ctx    context.Context
 	client client.MongoDriver
-	meta   MongoMeta
+	meta   models.MongoMeta
 }
 
 func NewBackupMetaMongoProvider(ctx context.Context, mc client.MongoDriver) *MongoMetaDBProvider {
@@ -116,7 +95,7 @@ func (m *MongoMetaDBProvider) Init() error {
 	if err != nil {
 		return fmt.Errorf("can not initialize backup meta")
 	}
-	m.meta.Before = NodeMeta{
+	m.meta.Before = models.NodeMeta{
 		LastTS:    lastTS,
 		LastMajTS: lastMajTS,
 	}
@@ -128,13 +107,13 @@ func (m *MongoMetaDBProvider) Finalize() error {
 	if err != nil {
 		return fmt.Errorf("can not finalize backup meta")
 	}
-	m.meta.After = NodeMeta{
+	m.meta.After = models.NodeMeta{
 		LastTS:    lastTS,
 		LastMajTS: lastMajTS,
 	}
 	return nil
 }
 
-func (m *MongoMetaDBProvider) Meta() MongoMeta {
+func (m *MongoMetaDBProvider) Meta() models.MongoMeta {
 	return m.meta
 }

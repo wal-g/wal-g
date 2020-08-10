@@ -38,16 +38,16 @@ type Uploader interface {
 
 // Downloader defines interface to fetch mongodb oplog archives
 type Downloader interface {
-	BackupMeta(name string) (Backup, error)
+	BackupMeta(name string) (models.Backup, error)
 	DownloadOplogArchive(arch models.Archive, writeCloser io.WriteCloser) error
 	ListOplogArchives() ([]models.Archive, error)
-	LoadBackups(names []string) ([]Backup, error)
+	LoadBackups(names []string) ([]models.Backup, error)
 	ListBackups() ([]internal.BackupTime, []string, error)
 	LastKnownArchiveTS() (models.Timestamp, error)
 }
 
 type Purger interface {
-	DeleteBackups(backups []Backup) error
+	DeleteBackups(backups []models.Backup) error
 	DeleteGarbage(garbage []string) error
 	DeleteOplogArchives(archives []models.Archive) error
 }
@@ -83,12 +83,12 @@ func NewStorageDownloader(opts StorageSettings) (*StorageDownloader, error) {
 }
 
 // BackupMeta downloads sentinel contents.
-func (sd *StorageDownloader) BackupMeta(name string) (Backup, error) {
+func (sd *StorageDownloader) BackupMeta(name string) (models.Backup, error) {
 	backup := internal.NewBackup(sd.backupsFolder, name)
-	var sentinel Backup
+	var sentinel models.Backup
 	err := internal.FetchStreamSentinel(backup, &sentinel)
 	if err != nil {
-		return Backup{}, fmt.Errorf("can not fetch stream sentinel: %w", err)
+		return models.Backup{}, fmt.Errorf("can not fetch stream sentinel: %w", err)
 	}
 	if sentinel.BackupName == "" {
 		sentinel.BackupName = name
@@ -97,8 +97,8 @@ func (sd *StorageDownloader) BackupMeta(name string) (Backup, error) {
 }
 
 // LoadBackups downloads backups metadata
-func (sd *StorageDownloader) LoadBackups(names []string) ([]Backup, error) {
-	backups := make([]Backup, 0, len(names))
+func (sd *StorageDownloader) LoadBackups(names []string) ([]models.Backup, error) {
+	backups := make([]models.Backup, 0, len(names))
 	for _, name := range names {
 		backup, err := sd.BackupMeta(name)
 		if err != nil {
@@ -260,7 +260,7 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaPro
 		return err
 	}
 
-	backupSentinel := &Backup{
+	backupSentinel := &models.Backup{
 		StartLocalTime:  timeStart,
 		FinishLocalTime: utility.TimeNowCrossPlatformLocal(),
 		UserData:        internal.GetSentinelUserData(),
@@ -287,7 +287,7 @@ func NewStoragePurger(opts StorageSettings) (*StoragePurger, error) {
 
 // DeleteBackups purges given backups files
 // TODO: extract BackupLayout abstraction and provide DataPath(), SentinelPath(), Exists() methods
-func (sp *StoragePurger) DeleteBackups(backups []Backup) error {
+func (sp *StoragePurger) DeleteBackups(backups []models.Backup) error {
 	keys := make([]string, 0, len(backups)*2)
 	for _, backup := range backups {
 		keys = append(keys, internal.SentinelNameFromBackup(backup.BackupName))

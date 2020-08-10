@@ -76,7 +76,7 @@ func BackupNamesFromBackupTimes(backups []internal.BackupTime) []string {
 }
 
 // BackupNamesFromBackups forms list of backup names from Backups
-func BackupNamesFromBackups(backups []Backup) []string {
+func BackupNamesFromBackups(backups []models.Backup) []string {
 	names := make([]string, 0, len(backups))
 	for _, b := range backups {
 		names = append(names, b.BackupName)
@@ -85,7 +85,7 @@ func BackupNamesFromBackups(backups []Backup) []string {
 }
 
 // LastKnownInBackupTS returns begin_ts of oldest backup
-func LastKnownInBackupTS(backups []Backup) (models.Timestamp, error) {
+func LastKnownInBackupTS(backups []models.Backup) (models.Timestamp, error) {
 	if len(backups) == 0 {
 		return models.Timestamp{}, fmt.Errorf("empty backups list given")
 	}
@@ -100,7 +100,7 @@ func LastKnownInBackupTS(backups []Backup) (models.Timestamp, error) {
 }
 
 // SplitPurgingBackups partitions backups to delete and retain
-func SplitPurgingBackups(backups []Backup, retainCount *int, retainAfter *time.Time) (purge, retain []Backup, err error) {
+func SplitPurgingBackups(backups []models.Backup, retainCount *int, retainAfter *time.Time) (purge, retain []models.Backup, err error) {
 	sort.Slice(backups, func(i, j int) bool {
 		return backups[i].StartLocalTime.After(backups[j].StartLocalTime)
 	})
@@ -122,8 +122,8 @@ func SplitPurgingBackups(backups []Backup, retainCount *int, retainAfter *time.T
 	return purge, retain, nil
 }
 
-// SplitPurgingOplogArchives deletes archives with start_maj_ts < purgeBeforeTS
-func SplitPurgingOplogArchives(archives []models.Archive, purgeBeforeTS models.Timestamp) []models.Archive {
+// SplitPurgingOplogArchivesByTS returns archives with start_maj_ts < purgeBeforeTS.
+func SplitPurgingOplogArchivesByTS(archives []models.Archive, purgeBeforeTS models.Timestamp) []models.Archive {
 	purge := make([]models.Archive, 0)
 	for _, arch := range archives {
 		if models.LessTS(arch.End, purgeBeforeTS) {
@@ -134,4 +134,57 @@ func SplitPurgingOplogArchives(archives []models.Archive, purgeBeforeTS models.T
 		}
 	}
 	return purge
+}
+
+//OldestBackupAfterTime returns last backup after given time.
+func OldestBackupAfterTime(backups []models.Backup, after time.Time) (models.Backup, error) {
+	if len(backups) <= 0 {
+		return models.Backup{}, fmt.Errorf("empty backup list recieved")
+	}
+	retainAfterTS := after.Unix()
+
+	oldestBackup := backups[0]
+	fromRetain := oldestBackup.FinishLocalTime.Unix() - retainAfterTS
+	if fromRetain < 0 { // retain point is in future
+		return models.Backup{}, fmt.Errorf("no backups newer than retain point")
+	}
+
+	var curBackup models.Backup
+	for i := 1; i < len(backups); i++ {
+		curBackup = backups[i]
+		curFromRetain := curBackup.FinishLocalTime.Unix() - retainAfterTS
+		if curFromRetain > fromRetain {
+			return models.Backup{}, fmt.Errorf("backups are not sorted by finish time")
+		}
+		if curFromRetain < 0 {
+			return oldestBackup, nil
+		}
+		fromRetain = curFromRetain
+		oldestBackup = curBackup
+	}
+	return oldestBackup, nil
+}
+
+// SelectPurgingOplogArchives builds archive list to be deleted.
+func SelectPurgingOplogArchives(archives []models.Archive, backups []models.Backup, retainAfterTS *models.Timestamp) []models.Archive {
+	var purgeArchives []models.Archive
+	var arch models.Archive
+	var emptyBackup models.Backup
+	for i := range archives {
+		arch = archives[i]
+
+		// retain if arch is in pitr period
+		if retainAfterTS != nil && models.LessTS(*retainAfterTS, arch.End) { // TODO: check ts is set
+			tracelog.DebugLogger.Printf("Keeping oplog archive due to retain timestamp (%+v): %s", retainAfterTS, arch.Filename())
+			continue
+		}
+
+		// retain if arch is part of backup
+		if backup := models.FirstOverlappingBackupForArch(arch, backups); backup != emptyBackup {
+			tracelog.DebugLogger.Printf("Keeping oplog archive due to overlapping with backup (%+v): %s", backup, arch.Filename())
+			continue
+		}
+		purgeArchives = append(purgeArchives, arch)
+	}
+	return purgeArchives
 }

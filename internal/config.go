@@ -57,6 +57,7 @@ const (
 	MongoDBLastWriteUpdateInterval = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
 	OplogArchiveAfterSize          = "OPLOG_ARCHIVE_AFTER_SIZE"
 	OplogArchiveTimeoutInterval    = "OPLOG_ARCHIVE_TIMEOUT_INTERVAL"
+	OplogPITRDiscoveryInterval     = "OPLOG_PITR_DISCOVERY_INTERVAL"
 	OplogPushStatsEnabled          = "OPLOG_PUSH_STATS_ENABLED"
 	OplogPushStatsLoggingInterval  = "OPLOG_PUSH_STATS_LOGGING_INTERVAL"
 	OplogPushStatsUpdateInterval   = "OPLOG_PUSH_STATS_UPDATE_INTERVAL"
@@ -202,6 +203,7 @@ var (
 		OplogPushStatsExposeHttp:       true,
 		OplogPushWaitForBecomePrimary:  true,
 		OplogPushPrimaryCheckInterval:  true,
+		OplogPITRDiscoveryInterval:     true,
 
 		// MySQL
 		MysqlDatasourceNameSetting: true,

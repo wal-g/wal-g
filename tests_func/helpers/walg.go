@@ -161,7 +161,6 @@ func (w *WalgUtil) PurgeRetain(keepNumber int) error {
 	return err
 }
 
-
 func (w *WalgUtil) DeleteBackup(backupName string) error {
 	_, err := w.runCmd([]string{"backup-delete", backupName, "--confirm"})
 	return err
@@ -184,5 +183,10 @@ func (w *WalgUtil) OplogPush() error {
 
 func (w *WalgUtil) OplogReplay(from, until OpTimestamp) error {
 	_, err := w.runCmd([]string{"oplog-replay", from.String(), until.String()})
+	return err
+}
+
+func (w *WalgUtil) OplogPurge() error {
+	_, err := w.runCmd([]string{"oplog-purge", "--confirm"})
 	return err
 }
