@@ -33,7 +33,7 @@ var oplogPushCmd = &cobra.Command{
 		// resolve archiving settings
 		archiveAfterSize, err := internal.GetOplogArchiveAfterSize()
 		tracelog.ErrorLogger.FatalOnError(err)
-		archiveTimeout, err := internal.GetOplogArchiveTimeout()
+		archiveTimeout, err := internal.GetDurationSetting(internal.OplogArchiveTimeoutInterval)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		mongodbUrl, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
@@ -48,8 +48,19 @@ var oplogPushCmd = &cobra.Command{
 		// set up mongodb client and oplog fetcher
 		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl)
 		tracelog.ErrorLogger.FatalOnError(err)
-		err = mongoClient.EnsureIsMaster(ctx)
+
+		primaryWait, err := internal.GetBoolSetting(internal.OplogPushWaitForBecomePrimary, false)
 		tracelog.ErrorLogger.FatalOnError(err)
+
+		uploadStatsUpdater := HandleOplogPushStatistics(ctx, models.Timestamp{}, mongoClient)
+		if err := mongoClient.EnsureIsMaster(ctx); err != nil {
+			if !primaryWait {
+				tracelog.ErrorLogger.FatalOnError(err)
+			}
+			primaryWaitTimeout, err := internal.GetDurationSetting(internal.OplogPushPrimaryCheckInterval)
+			tracelog.ErrorLogger.FatalOnError(err)
+			tracelog.ErrorLogger.FatalOnError(client.WaitForBecomePrimary(ctx, mongoClient, primaryWaitTimeout))
+		}
 
 		// Lookup for last timestamp archived to storage (set up storage downloader client)
 		downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
@@ -70,11 +81,11 @@ var oplogPushCmd = &cobra.Command{
 
 		memoryBatchBuffer := stages.NewMemoryBuffer()
 		defer tracelog.ErrorLogger.FatalOnError(memoryBatchBuffer.Close())
+
 		// set up storage archiver
-		uploadStatsUpdater := HandleOplogPushStatistics(ctx, since, mongoClient)
 		oplogApplier := stages.NewStorageApplier(uploader, memoryBatchBuffer, archiveAfterSize, archiveTimeout, uploadStatsUpdater)
 
-		lwUpdate, err := internal.GetLastWriteUpdateInterval()
+		lwUpdate, err := internal.GetDurationSetting(internal.MongoDBLastWriteUpdateInterval)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		oplogFetcher := stages.NewCursorMajFetcher(mongoClient, oplogCursor, lwUpdate)

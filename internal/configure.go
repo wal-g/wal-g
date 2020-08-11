@@ -367,15 +367,6 @@ func GetCommandSetting(variableName string) (*exec.Cmd, error) {
 	return GetCommandSettingContext(context.Background(), variableName)
 }
 
-func GetOplogArchiveTimeout() (time.Duration, error) {
-	oplogArchiveTimeoutStr, _ := GetSetting(OplogArchiveTimeoutSetting)
-	oplogArchiveTimeout, err := strconv.Atoi(oplogArchiveTimeoutStr)
-	if err != nil {
-		return 0, fmt.Errorf("integer expected for %s setting but given '%s': %w", OplogArchiveTimeoutSetting, oplogArchiveTimeoutStr, err)
-	}
-	return time.Duration(oplogArchiveTimeout) * time.Second, nil
-}
-
 func GetOplogArchiveAfterSize() (int, error) {
 	oplogArchiveAfterSizeStr, _ := GetSetting(OplogArchiveAfterSize)
 	oplogArchiveAfterSize, err := strconv.Atoi(oplogArchiveAfterSizeStr)
@@ -385,22 +376,16 @@ func GetOplogArchiveAfterSize() (int, error) {
 	return oplogArchiveAfterSize, nil
 }
 
-func GetLastWriteUpdateInterval() (time.Duration, error) {
-	intervalStr, _ := GetSetting(MongoDBLastWriteUpdateSeconds)
-	interval, err := strconv.Atoi(intervalStr)
-	if err != nil {
-		return 0, fmt.Errorf("integer(seconds) expected for %s setting but given '%s': %w", MongoDBLastWriteUpdateSeconds, intervalStr, err)
-	}
-	return time.Duration(interval) * time.Second, nil
-}
-
 func GetDurationSetting(setting string) (time.Duration, error) {
-	intervalStr, _ := GetSetting(setting)
-	interval, err := strconv.Atoi(intervalStr)
-	if err != nil {
-		return 0, fmt.Errorf("integer(seconds) expected for %s setting but given '%s': %w", setting, intervalStr, err)
+	intervalStr, ok := GetSetting(setting)
+	if !ok {
+		return 0, NewUnsetRequiredSettingError(setting)
 	}
-	return time.Duration(interval) * time.Second, nil
+	interval, err := time.ParseDuration(intervalStr)
+	if err != nil {
+		return 0, fmt.Errorf("duration expected for %s setting but given '%s': %w", setting, intervalStr, err)
+	}
+	return interval, nil
 }
 
 func GetRequiredSetting(setting string) (string, error) {

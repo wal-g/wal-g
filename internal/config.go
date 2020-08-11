@@ -53,14 +53,16 @@ const (
 	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
 	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
 
-	MongoDBUriSetting             = "MONGODB_URI"
-	MongoDBLastWriteUpdateSeconds = "MONGODB_LAST_WRITE_UPDATE_SECONDS"
-	OplogArchiveAfterSize         = "OPLOG_ARCHIVE_AFTER_SIZE"
-	OplogArchiveTimeoutSetting    = "OPLOG_ARCHIVE_TIMEOUT"
-	OplogPushStatsEnabled         = "OPLOG_PUSH_STATS_ENABLED"
-	OplogPushStatsLoggingInterval = "OPLOG_PUSH_STATS_LOGGING_INTERVAL"
-	OplogPushStatsUpdateInterval  = "OPLOG_PUSH_STATS_UPDATE_INTERVAL"
-	OplogPushStatsExposeHttp      = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
+	MongoDBUriSetting              = "MONGODB_URI"
+	MongoDBLastWriteUpdateInterval = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
+	OplogArchiveAfterSize          = "OPLOG_ARCHIVE_AFTER_SIZE"
+	OplogArchiveTimeoutInterval    = "OPLOG_ARCHIVE_TIMEOUT_INTERVAL"
+	OplogPushStatsEnabled          = "OPLOG_PUSH_STATS_ENABLED"
+	OplogPushStatsLoggingInterval  = "OPLOG_PUSH_STATS_LOGGING_INTERVAL"
+	OplogPushStatsUpdateInterval   = "OPLOG_PUSH_STATS_UPDATE_INTERVAL"
+	OplogPushStatsExposeHttp       = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
+	OplogPushWaitForBecomePrimary  = "OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY"
+	OplogPushPrimaryCheckInterval  = "OPLOG_PUSH_PRIMARY_CHECK_INTERVAL"
 
 	MysqlDatasourceNameSetting = "WALG_MYSQL_DATASOURCE_NAME"
 	MysqlSslCaSetting          = "WALG_MYSQL_SSL_CA"
@@ -97,11 +99,13 @@ var (
 		UseReverseUnpackSetting:      "false",
 		SkipRedundantTarsSetting:     "false",
 
-		OplogArchiveTimeoutSetting:    "60",
-		OplogArchiveAfterSize:         "16777216", // 32 << (10 * 2)
-		MongoDBLastWriteUpdateSeconds: "3",
-		OplogPushStatsLoggingInterval: "30",
-		OplogPushStatsUpdateInterval:  "30",
+		OplogArchiveTimeoutInterval:    "60s",
+		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
+		MongoDBLastWriteUpdateInterval: "3s",
+		OplogPushStatsLoggingInterval:  "30s",
+		OplogPushStatsUpdateInterval:   "30s",
+		OplogPushWaitForBecomePrimary:  "false",
+		OplogPushPrimaryCheckInterval:  "30s",
 	}
 
 	AllowedSettings = map[string]bool{
@@ -188,14 +192,16 @@ var (
 		"WALG_FILE_PREFIX": true,
 
 		// MongoDB
-		MongoDBUriSetting:             true,
-		MongoDBLastWriteUpdateSeconds: true,
-		OplogArchiveTimeoutSetting:    true,
-		OplogArchiveAfterSize:         true,
-		OplogPushStatsEnabled:         true,
-		OplogPushStatsLoggingInterval: true,
-		OplogPushStatsUpdateInterval:  true,
-		OplogPushStatsExposeHttp:      true,
+		MongoDBUriSetting:              true,
+		MongoDBLastWriteUpdateInterval: true,
+		OplogArchiveTimeoutInterval:    true,
+		OplogArchiveAfterSize:          true,
+		OplogPushStatsEnabled:          true,
+		OplogPushStatsLoggingInterval:  true,
+		OplogPushStatsUpdateInterval:   true,
+		OplogPushStatsExposeHttp:       true,
+		OplogPushWaitForBecomePrimary:  true,
+		OplogPushPrimaryCheckInterval:  true,
 
 		// MySQL
 		MysqlDatasourceNameSetting: true,
