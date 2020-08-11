@@ -2,6 +2,7 @@ package internal
 
 import (
 	"archive/tar"
+	"errors"
 	"os"
 )
 
@@ -44,8 +45,6 @@ func NewTarBallComposer(composerType TarBallComposerType, bundle *Bundle) (TarBa
 		tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, bundleFiles)
 		return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, bundleFiles, bundle.Crypter), nil
 	default:
-		bundleFiles := &RegularBundleFiles{}
-		tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, bundleFiles)
-		return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, bundleFiles, bundle.Crypter), nil
+		return nil, errors.New("NewTarBallComposer: Unknown TarBallComposerType")
 	}
 }
