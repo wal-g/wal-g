@@ -49,9 +49,9 @@ URI used to connect to a MongoDB instance. Required for backup and oplog archivi
 
 Oplog archive batch in bytes which triggers upload to storage.
 
-* `OPLOG_ARCHIVE_TIMEOUT`
+* `OPLOG_ARCHIVE_TIMEOUT_INTERVAL`
 
-Timeout in seconds (passed since previous upload) to trigger upload to storage.
+Timeout interval (passed since previous upload) to trigger upload to storage.
 
 * `OPLOG_PUSH_STATS_ENABLED`
 
@@ -59,19 +59,19 @@ Enables statistics collecting of oplog archiving procedure.
 
 * `OPLOG_PUSH_STATS_UPDATE_INTERVAL`
 
-Interval in seconds to update oplog archiving statistics. Disabled if reset to 0.
+Interval to update oplog archiving statistics. Disabled if reset to 0.
 
 * `OPLOG_PUSH_STATS_LOGGING_INTERVAL`
 
-Interval in seconds to log oplog archiving statistics. Disabled if reset to 0.
+Interval to log oplog archiving statistics. Disabled if reset to 0.
 
 * `OPLOG_PUSH_STATS_EXPOSE_HTTP`
 
 Exposes http-handler with oplog archiving statistics.
 
-* `MONGODB_LAST_WRITE_UPDATE_SECONDS`
+* `MONGODB_LAST_WRITE_UPDATE_INTERVAL`
 
-Interval in seconds to update the latest majority optime.
+Interval to update the latest majority optime.
 
 Usage
 -----
@@ -123,9 +123,9 @@ Fetches oplog from mongodb instance (`MONGODB_URI`) and uploads to storage.
 
 Upload is forced when,
   - archive batch exceeds `OPLOG_ARCHIVE_AFTER_SIZE` bytes
-  - passes `OPLOG_ARCHIVE_TIMEOUT` seconds since previous upload
+  - passes `OPLOG_ARCHIVE_TIMEOUT_INTERVAL` since previous upload
 
-Archiving collects writes if optime is readable by majority reads. Optime is updated every `MONGODB_LAST_WRITE_UPDATE_SECONDS` seconds.  
+Archiving collects writes if optime is readable by majority reads. Optime is updated every `MONGODB_LAST_WRITE_UPDATE_INTERVAL`.
 
 ```
 wal-g oplog-push

@@ -7,7 +7,11 @@ import (
 
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 
+	"time"
+
 	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -272,4 +276,22 @@ func (b *BsonCursor) Push(data []byte) error {
 	}
 	b.pushed = data
 	return nil
+}
+
+// WaitForBecomePrimary waits until mongo client connection node becomes primary
+func WaitForBecomePrimary(ctx context.Context, mc *MongoClient, checkTimeout time.Duration) error {
+	reconnect := time.NewTimer(checkTimeout)
+	for {
+		select {
+		case <-reconnect.C:
+			err := mc.EnsureIsMaster(ctx)
+			if err == nil {
+				return nil
+			}
+			tracelog.InfoLogger.Printf("Waiting: %v", err)
+			utility.ResetTimer(reconnect, checkTimeout)
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }

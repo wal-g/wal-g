@@ -12,7 +12,7 @@
   "MONGODB_URI": "mongodb://admin:password@127.0.0.1:27018/admin?authSource=admin&keepAlive=true&autoReconnect=true&socketTimeoutMS=3000&connectTimeoutMS=3000&readPreference=primary&connect=direct",
 
   "WALG_SENTINEL_USER_DATA":    "{\"key\": \"value\"}",
-  "OPLOG_ARCHIVE_TIMEOUT": "5",
+  "OPLOG_ARCHIVE_TIMEOUT_INTERVAL": "5s",
   "OPLOG_ARCHIVE_AFTER_SIZE": "1048576",
 
   "WALG_PGP_KEY_PATH": "/etc/wal-g/gpg-key.armor",

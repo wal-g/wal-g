@@ -82,8 +82,16 @@ type OplogPushUpdater interface {
 	Update() error
 }
 
+type OplogPushStatus string
+
+const (
+	OplogPushStandBy   OplogPushStatus = "standby"
+	OplogPushArchiving OplogPushStatus = "archiving"
+)
+
 // OplogPushReport defines oplog-push statistics report
 type OplogPushReport struct {
+	Status   OplogPushStatus          `json:"status"`
 	Archived OplogArchivedStatsReport `json:"archived"`
 	Mongo    struct {
 		LastKnownMajTS models.Timestamp `json:"last_known_maj_ts"`
@@ -123,6 +131,7 @@ func NewOplogPushStats(ctx context.Context, opRep OplogArchivedStatsReporter, mc
 		ctx:      ctx,
 		uploader: opRep,
 		mc:       mc,
+		rep:      OplogPushReport{Status: OplogPushStandBy},
 	}
 	for _, optFunc := range opts {
 		optFunc(st)
@@ -146,9 +155,18 @@ func (st *OplogPushStats) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type logReport struct {
+	status        OplogPushStatus
+	archivedDocs  uint64
+	archivedBytes uint64
+	archivedTS    models.Timestamp
+	majTS         models.Timestamp
+}
+
 // RunLogging executes logFunc every logInterval with current stats
 func (st *OplogPushStats) RunLogging(logInterval time.Duration, logger logFunc) {
 	archiveTimer := time.NewTimer(logInterval)
+	var report logReport
 	for {
 		select {
 		case <-st.ctx.Done():
@@ -156,12 +174,30 @@ func (st *OplogPushStats) RunLogging(logInterval time.Duration, logger logFunc) 
 		case <-archiveTimer.C:
 		}
 		utility.ResetTimer(archiveTimer, logInterval)
+
 		st.Lock()
-		logger("OplogPushStatus: docs %d, bytes %d, lag %d seconds",
-			st.rep.Archived.Docs,
-			st.rep.Archived.Bytes,
-			st.rep.Mongo.LastKnownMajTS.TS-st.rep.Archived.LastTS.TS)
+		report.status = st.rep.Status
+		report.archivedDocs = st.rep.Archived.Docs
+		report.archivedBytes = st.rep.Archived.Bytes
+		report.archivedTS = st.rep.Archived.LastTS
+		report.majTS = st.rep.Mongo.LastKnownMajTS
 		st.Unlock()
+
+		switch report.status {
+		case "standby":
+			logger("OplogPushStatus: status '%s', majority timestamp is %+v",
+				report.status,
+				report.majTS.TS)
+		case "archiving":
+			logger("OplogPushStatus: status '%s', docs %d, bytes %d, lag %d seconds",
+				report.status,
+				report.archivedDocs,
+				report.archivedBytes,
+				report.majTS.TS-report.archivedTS.TS)
+		default:
+			logger("OplogPushStatus: unknown status '%s'", report.status)
+
+		}
 	}
 }
 
@@ -180,5 +216,8 @@ func (st *OplogPushStats) Update() error {
 	st.rep.Archived.Docs = uploader.Docs
 	st.rep.Archived.Bytes = uploader.Bytes
 	st.rep.Mongo.LastKnownMajTS = im.LastWrite.MajorityOpTime.TS
+	if st.rep.Archived.Bytes > 0 && st.rep.Status == OplogPushStandBy {
+		st.rep.Status = OplogPushArchiving
+	}
 	return nil
 }
