@@ -8,7 +8,7 @@ import (
 
 // TarBallQueue is used to process multiple tarballs concurrently
 type TarBallQueue struct {
-	tarballQueue     chan TarBall
+	tarsToFillQueue  chan TarBall
 	uploadQueue      chan TarBall
 	parallelTarballs int
 	maxUploadQueue   int
@@ -43,11 +43,11 @@ func (tarQueue *TarBallQueue) StartQueue() error {
 		return err
 	}
 
-	tarQueue.tarballQueue = make(chan TarBall, tarQueue.parallelTarballs)
+	tarQueue.tarsToFillQueue = make(chan TarBall, tarQueue.parallelTarballs)
 	tarQueue.uploadQueue = make(chan TarBall, tarQueue.parallelTarballs+tarQueue.maxUploadQueue)
 	for i := 0; i < tarQueue.parallelTarballs; i++ {
 		tarQueue.NewTarBall(true)
-		tarQueue.tarballQueue <- tarQueue.LastCreatedTarball
+		tarQueue.tarsToFillQueue <- tarQueue.LastCreatedTarball
 	}
 
 	tarQueue.started = true
@@ -58,7 +58,7 @@ func (tarQueue *TarBallQueue) Deque() TarBall {
 	if !tarQueue.started {
 		panic("Trying to deque from not started Queue")
 	}
-	return <-tarQueue.tarballQueue
+	return <-tarQueue.tarsToFillQueue
 }
 
 func (tarQueue *TarBallQueue) FinishQueue() error {
@@ -69,7 +69,7 @@ func (tarQueue *TarBallQueue) FinishQueue() error {
 
 	// We have to deque exactly this count of workers
 	for i := 0; i < tarQueue.parallelTarballs; i++ {
-		tarBall := <-tarQueue.tarballQueue
+		tarBall := <-tarQueue.tarsToFillQueue
 		if tarBall.TarWriter() == nil {
 			// This had written nothing
 			continue
@@ -94,7 +94,7 @@ func (tarQueue *TarBallQueue) FinishQueue() error {
 }
 
 func (tarQueue *TarBallQueue) EnqueueBack(tarBall TarBall) {
-	tarQueue.tarballQueue <- tarBall
+	tarQueue.tarsToFillQueue <- tarBall
 }
 
 func (tarQueue *TarBallQueue) CheckSizeAndEnqueueBack(tarBall TarBall) error {
@@ -119,7 +119,7 @@ func (tarQueue *TarBallQueue) CheckSizeAndEnqueueBack(tarBall TarBall) error {
 		tarQueue.NewTarBall(true)
 		tarBall = tarQueue.LastCreatedTarball
 	}
-	tarQueue.tarballQueue <- tarBall
+	tarQueue.tarsToFillQueue <- tarBall
 	return nil
 }
 
