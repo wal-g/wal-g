@@ -11,8 +11,8 @@ import (
 	"os"
 )
 
+// TarBallFilePacker is used to pack bundle file into tarball.
 type TarBallFilePacker struct {
-	timeline         uint32
 	deltaMap         PagedFileDeltaMap
 	incrementFromLsn *uint64
 	files            BundleFiles
@@ -39,7 +39,6 @@ func (p *TarBallFilePacker) UpdateDeltaMap(deltaMap PagedFileDeltaMap) {
 
 // TODO : unit tests
 func (p *TarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall TarBall) error {
-	incrementBaseLsn := p.incrementFromLsn
 	var fileReader io.ReadCloser
 	if cfi.isIncremented {
 		bitmap, err := p.getDeltaBitmapFor(cfi.path)
@@ -49,7 +48,7 @@ func (p *TarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall TarBal
 		} else if err != nil {
 			return errors.Wrapf(err, "PackFileIntoTar: failed to find corresponding bitmap '%s'\n", cfi.path)
 		}
-		fileReader, cfi.header.Size, err = ReadIncrementalFile(cfi.path, cfi.fileInfo.Size(), *incrementBaseLsn, bitmap)
+		fileReader, cfi.header.Size, err = ReadIncrementalFile(cfi.path, cfi.fileInfo.Size(), *p.incrementFromLsn, bitmap)
 		if os.IsNotExist(err) { // File was deleted before opening
 			// We should ignore file here as if it did not exist.
 			return nil
