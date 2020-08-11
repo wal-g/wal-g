@@ -15,14 +15,14 @@ type TarBallFilePacker struct {
 	timeline         uint32
 	deltaMap         PagedFileDeltaMap
 	incrementFromLsn *uint64
-	fileList         BundleFileList
+	files            BundleFiles
 }
 
-func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *uint64, bundleFileList BundleFileList) *TarBallFilePacker {
+func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *uint64, files BundleFiles) *TarBallFilePacker {
 	return &TarBallFilePacker{
 		deltaMap:         deltaMap,
 		incrementFromLsn: incrementFromLsn,
-		fileList:         bundleFileList,
+		files:            files,
 	}
 }
 
@@ -44,7 +44,7 @@ func (p *TarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall TarBal
 	if cfi.isIncremented {
 		bitmap, err := p.getDeltaBitmapFor(cfi.path)
 		if _, ok := err.(NoBitmapFoundError); ok { // this file has changed after the start of backup, so just skip it
-			p.fileList.AddSkippedFile(cfi.header, cfi.fileInfo)
+			p.files.AddSkippedFile(cfi.header, cfi.fileInfo)
 			return nil
 		} else if err != nil {
 			return errors.Wrapf(err, "PackFileIntoTar: failed to find corresponding bitmap '%s'\n", cfi.path)
@@ -81,7 +81,7 @@ func (p *TarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall TarBal
 		}
 	}
 	defer utility.LoggedClose(fileReader, "")
-	p.fileList.AddFile(cfi.header, cfi.fileInfo, cfi.isIncremented)
+	p.files.AddFile(cfi.header, cfi.fileInfo, cfi.isIncremented)
 	packedFileSize, err := PackFileTo(tarBall, cfi.header, fileReader)
 	if err != nil {
 		return errors.Wrap(err, "PackFileIntoTar: operation failed")

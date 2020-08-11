@@ -11,7 +11,7 @@ type TarBallComposer interface {
 	AddHeader(header *tar.Header, fileInfo os.FileInfo) error
 	SkipFile(tarHeader *tar.Header, fileInfo os.FileInfo)
 	PackTarballs() (TarFileSets, error)
-	GetFiles() BundleFileList
+	GetFiles() BundleFiles
 }
 
 // ComposeFileInfo holds data which is required to pack a file to some tarball
@@ -40,12 +40,12 @@ const (
 func NewTarBallComposer(composerType TarBallComposerType, bundle *Bundle) (TarBallComposer, error) {
 	switch composerType {
 	case RegularComposer:
-		fileList := &RegularBundleFileList{}
-		tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, fileList)
-		return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, fileList, bundle.Crypter), nil
+		bundleFiles := &RegularBundleFiles{}
+		tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, bundleFiles)
+		return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, bundleFiles, bundle.Crypter), nil
 	default:
-		fileList := &RegularBundleFileList{}
-		tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, fileList)
-		return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, fileList, bundle.Crypter), nil
+		bundleFiles := &RegularBundleFiles{}
+		tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, bundleFiles)
+		return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, bundleFiles, bundle.Crypter), nil
 	}
 }

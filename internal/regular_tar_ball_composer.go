@@ -12,7 +12,7 @@ type RegularTarBallComposer struct {
 	tarBallQueue  *TarBallQueue
 	tarFilePacker *TarBallFilePacker
 	crypter       crypto.Crypter
-	files         *RegularBundleFileList
+	files         *RegularBundleFiles
 	tarFileSets   TarFileSets
 	errorGroup    *errgroup.Group
 }
@@ -20,7 +20,7 @@ type RegularTarBallComposer struct {
 func NewRegularTarBallComposer(
 	tarBallQueue *TarBallQueue,
 	tarBallFilePacker *TarBallFilePacker,
-	files *RegularBundleFileList,
+	files *RegularBundleFiles,
 	crypter crypto.Crypter,
 ) *RegularTarBallComposer {
 	errorGroup, _ := errgroup.WithContext(context.Background())
@@ -68,6 +68,6 @@ func (c *RegularTarBallComposer) PackTarballs() (TarFileSets, error) {
 	return c.tarFileSets, nil
 }
 
-func (c *RegularTarBallComposer) GetFiles() BundleFileList {
+func (c *RegularTarBallComposer) GetFiles() BundleFiles {
 	return c.files
 }
