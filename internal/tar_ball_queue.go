@@ -2,6 +2,7 @@ package internal
 
 import (
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/abool"
 	"sync"
 	"sync/atomic"
 )
@@ -13,7 +14,7 @@ type TarBallQueue struct {
 	parallelTarballs int
 	maxUploadQueue   int
 	mutex            sync.Mutex
-	started          bool
+	started          *abool.AtomicBool
 
 	TarSizeThreshold   int64
 	AllTarballsSize    *int64
@@ -26,11 +27,12 @@ func newTarBallQueue(tarSizeThreshold int64, tarBallMaker TarBallMaker) *TarBall
 		TarSizeThreshold: tarSizeThreshold,
 		TarBallMaker:     tarBallMaker,
 		AllTarballsSize:  new(int64),
+		started:          abool.New(),
 	}
 }
 
 func (tarQueue *TarBallQueue) StartQueue() error {
-	if tarQueue.started {
+	if tarQueue.started.IsSet() {
 		panic("Trying to start already started Queue")
 	}
 	var err error
@@ -50,22 +52,22 @@ func (tarQueue *TarBallQueue) StartQueue() error {
 		tarQueue.tarsToFillQueue <- tarQueue.LastCreatedTarball
 	}
 
-	tarQueue.started = true
+	tarQueue.started.Set()
 	return nil
 }
 
 func (tarQueue *TarBallQueue) Deque() TarBall {
-	if !tarQueue.started {
+	if tarQueue.started.IsNotSet() {
 		panic("Trying to deque from not started Queue")
 	}
 	return <-tarQueue.tarsToFillQueue
 }
 
 func (tarQueue *TarBallQueue) FinishQueue() error {
-	if !tarQueue.started {
+	if tarQueue.started.IsNotSet() {
 		panic("Trying to stop not started Queue")
 	}
-	tarQueue.started = false
+	tarQueue.started.UnSet()
 
 	// We have to deque exactly this count of workers
 	for i := 0; i < tarQueue.parallelTarballs; i++ {
