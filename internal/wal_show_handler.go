@@ -90,7 +90,7 @@ func (data *WalSegmentsSequence) AddWalSegmentNo(number WalSegmentNo) {
 }
 
 // FindMissingSegments finds missing segments in range [minSegmentNo, maxSegmentNo]
-func (data *WalSegmentsSequence) FindMissingSegments() ([]*WalSegmentDescription, error) {
+func (data *WalSegmentsSequence) FindMissingSegments() ([]WalSegmentDescription, error) {
 	startWalSegment := WalSegmentDescription{Number: data.maxSegmentNo, Timeline: data.timelineId}
 
 	walSegments := make(map[WalSegmentDescription]bool, len(data.walSegmentNumbers))
@@ -101,14 +101,14 @@ func (data *WalSegmentsSequence) FindMissingSegments() ([]*WalSegmentDescription
 
 	// create WAL segment runner to run on single timeline
 	walSegmentRunner := NewWalSegmentRunner(startWalSegment, walSegments, data.minSegmentNo)
-	missingSegments := make([]*WalSegmentDescription, 0)
+	missingSegments := make([]WalSegmentDescription, 0)
 	for {
 		if _, err := walSegmentRunner.Next(); err != nil {
 			switch err := err.(type) {
 			case WalSegmentNotFoundError:
 				// force switch to the next WAL segment
 				walSegmentRunner.ForceMoveNext()
-				missingSegments = append(missingSegments, &walSegmentRunner.currentWalSegment)
+				missingSegments = append(missingSegments, walSegmentRunner.currentWalSegment)
 			case ReachedStopSegmentError:
 				// Can't continue because reached stop segment, stop at this point
 				return missingSegments, nil
