@@ -58,14 +58,13 @@ func NewWalSegmentRunner(
 		segments, stopSegmentNo}
 }
 
-// MoveNext tries to get the next segment from storage
-func (r *WalSegmentRunner) MoveNext() (WalSegmentDescription, error) {
+// Next tries to get the next segment from storage
+func (r *WalSegmentRunner) Next() (WalSegmentDescription, error) {
 	if r.currentWalSegment.number <= r.stopSegmentNo {
 		return WalSegmentDescription{}, newReachedStopSegmentError()
 	}
 	nextSegment := r.getNextSegment()
-	var fileExists bool
-	if _, fileExists = r.walFolderSegments[nextSegment]; !fileExists {
+	if _, fileExists := r.walFolderSegments[nextSegment]; !fileExists {
 		return WalSegmentDescription{}, newWalSegmentNotFoundError(nextSegment.GetFileName())
 	}
 	r.currentWalSegment = nextSegment

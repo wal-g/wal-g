@@ -103,7 +103,7 @@ func (data *WalSegmentsSequence) FindMissingSegments() ([]*WalSegmentDescription
 	walSegmentRunner := NewWalSegmentRunner(startWalSegment, walSegments, data.minSegmentNo)
 	missingSegments := make([]*WalSegmentDescription, 0)
 	for {
-		if _, err := walSegmentRunner.MoveNext(); err != nil {
+		if _, err := walSegmentRunner.Next(); err != nil {
 			switch err := err.(type) {
 			case WalSegmentNotFoundError:
 				// force switch to the next WAL segment
