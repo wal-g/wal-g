@@ -39,7 +39,7 @@ type TimelineHistoryRecord struct {
 
 func newHistoryRecordFromString(row string) (*TimelineHistoryRecord, error) {
 	matchResult := walHistoryRecordRegexp.FindStringSubmatch(row)
-	if matchResult == nil {
+	if matchResult == nil || len(matchResult) < 4 {
 		return nil, nil
 	}
 	timeline, err := strconv.ParseUint(matchResult[1], 10, sizeofInt32)
@@ -71,9 +71,9 @@ func getTimeLineHistoryRecords(startTimeline uint32, walFolder storage.Folder) (
 	return historyRecords, nil
 }
 
-func parseHistoryFile(historyReader io.Reader) (historyRecords []*TimelineHistoryRecord, err error) {
+func parseHistoryFile(historyReader io.Reader) ([]*TimelineHistoryRecord, error) {
 	scanner := bufio.NewScanner(historyReader)
-	historyRecords = make([]*TimelineHistoryRecord, 0)
+	historyRecords := make([]*TimelineHistoryRecord, 0)
 	for scanner.Scan() {
 		nextRow := scanner.Text()
 		if nextRow == "" {
@@ -81,15 +81,15 @@ func parseHistoryFile(historyReader io.Reader) (historyRecords []*TimelineHistor
 			continue
 		}
 		record, err := newHistoryRecordFromString(nextRow)
-		if record == nil {
-			break
-		}
 		if err != nil {
 			return nil, err
 		}
+		if record == nil {
+			break
+		}
 		historyRecords = append(historyRecords, record)
 	}
-	return historyRecords, err
+	return historyRecords, nil
 }
 
 func getHistoryFileFromStorage(timeline uint32, walFolder storage.Folder) (io.ReadCloser, error) {
