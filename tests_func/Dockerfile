@@ -16,10 +16,15 @@ RUN apt-get update -qq && \
     apt-get install -y apt-transport-https tzdata && \
     mkdir -p /etc/apt/sources.list.d && \
     apt-get update -qq && \
+    apt-key update && \
+    apt-get download --allow-unauthenticated mongodb-org-server=$MONGO_VERSION && \
+    dpkg --unpack mongodb-org-server*.deb && \
+    sed -i '/systemctl daemon-reload/d' /var/lib/dpkg/info/mongodb-org-server.postinst && \
+    dpkg --configure mongodb-org-server && \
+    apt-get install -yf && \
     apt-get install --allow-unauthenticated -y \
-        ${MONGO_PACKAGE}-server=$MONGO_VERSION \
-        ${MONGO_PACKAGE}-shell=$MONGO_VERSION \
-        ${MONGO_PACKAGE}-tools=$MONGO_VERSION && \
+        mongodb-org-tools=$MONGO_VERSION \
+        mongodb-org-shell=$MONGO_VERSION && \
     rm -rf /var/lib/apt/lists/* /var/cache/debconf /var/lib/mongodb/* && \
     apt-get clean
 

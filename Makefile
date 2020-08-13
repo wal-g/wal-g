@@ -13,7 +13,7 @@ COVERAGE_FILE := coverage.out
 TEST := "pg_tests"
 
 MONGO_MAJOR ?= "4.2"
-MONGO_VERSION ?= "4.2.1"
+MONGO_VERSION ?= "4.2.8"
 
 BUILD_TAGS:=brotli
 
