@@ -79,28 +79,28 @@ func NewSegmentsSequence(id uint32, segmentNo WalSegmentNo) *WalSegmentsSequence
 }
 
 // AddWalSegmentNo adds the provided segment number to collection
-func (data *WalSegmentsSequence) AddWalSegmentNo(number WalSegmentNo) {
-	data.walSegmentNumbers[number] = true
-	if data.minSegmentNo > number {
-		data.minSegmentNo = number
+func (seq *WalSegmentsSequence) AddWalSegmentNo(number WalSegmentNo) {
+	seq.walSegmentNumbers[number] = true
+	if seq.minSegmentNo > number {
+		seq.minSegmentNo = number
 	}
-	if data.maxSegmentNo < number {
-		data.maxSegmentNo = number
+	if seq.maxSegmentNo < number {
+		seq.maxSegmentNo = number
 	}
 }
 
 // FindMissingSegments finds missing segments in range [minSegmentNo, maxSegmentNo]
-func (data *WalSegmentsSequence) FindMissingSegments() ([]WalSegmentDescription, error) {
-	startWalSegment := WalSegmentDescription{Number: data.maxSegmentNo, Timeline: data.timelineId}
+func (seq *WalSegmentsSequence) FindMissingSegments() ([]WalSegmentDescription, error) {
+	startWalSegment := WalSegmentDescription{Number: seq.maxSegmentNo, Timeline: seq.timelineId}
 
-	walSegments := make(map[WalSegmentDescription]bool, len(data.walSegmentNumbers))
-	for number := range data.walSegmentNumbers {
-		segment := WalSegmentDescription{Number: number, Timeline: data.timelineId}
+	walSegments := make(map[WalSegmentDescription]bool, len(seq.walSegmentNumbers))
+	for number := range seq.walSegmentNumbers {
+		segment := WalSegmentDescription{Number: number, Timeline: seq.timelineId}
 		walSegments[segment] = true
 	}
 
 	// create WAL segment runner to run on single timeline
-	walSegmentRunner := NewWalSegmentRunner(startWalSegment, walSegments, data.minSegmentNo)
+	walSegmentRunner := NewWalSegmentRunner(startWalSegment, walSegments, seq.minSegmentNo)
 	missingSegments := make([]WalSegmentDescription, 0)
 	for {
 		if _, err := walSegmentRunner.Next(); err != nil {
