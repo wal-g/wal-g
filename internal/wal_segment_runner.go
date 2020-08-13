@@ -34,12 +34,12 @@ func (err ReachedStopSegmentError) Error() string {
 }
 
 type WalSegmentDescription struct {
-	number   WalSegmentNo
-	timeline uint32
+	Number   WalSegmentNo
+	Timeline uint32
 }
 
 func (desc *WalSegmentDescription) GetFileName() string {
-	return desc.number.getFilename(desc.timeline)
+	return desc.Number.getFilename(desc.Timeline)
 }
 
 // WalSegmentRunner is used for sequential iteration over WAL segments in the storage
@@ -60,7 +60,7 @@ func NewWalSegmentRunner(
 
 // Next tries to get the next segment from storage
 func (r *WalSegmentRunner) Next() (WalSegmentDescription, error) {
-	if r.currentWalSegment.number <= r.stopSegmentNo {
+	if r.currentWalSegment.Number <= r.stopSegmentNo {
 		return WalSegmentDescription{}, newReachedStopSegmentError()
 	}
 	nextSegment := r.getNextSegment()
@@ -79,9 +79,9 @@ func (r *WalSegmentRunner) ForceMoveNext() {
 
 // getNextSegment calculates the next segment
 func (r *WalSegmentRunner) getNextSegment() WalSegmentDescription {
-	nextTimeline := r.currentWalSegment.timeline
-	nextSegmentNo := r.currentWalSegment.number.previous()
-	return WalSegmentDescription{timeline: nextTimeline, number: nextSegmentNo}
+	nextTimeline := r.currentWalSegment.Timeline
+	nextSegmentNo := r.currentWalSegment.Number.previous()
+	return WalSegmentDescription{Timeline: nextTimeline, Number: nextSegmentNo}
 }
 
 // getFolderFilenames returns a set of filenames in provided storage folder
@@ -106,7 +106,7 @@ func getSegmentsFromFiles(filenames []string) map[WalSegmentDescription]bool {
 			// non-wal segment file, skip it
 			continue
 		}
-		segment := WalSegmentDescription{timeline: timeline, number: WalSegmentNo(segmentNo)}
+		segment := WalSegmentDescription{Timeline: timeline, Number: WalSegmentNo(segmentNo)}
 		walSegments[segment] = true
 	}
 	return walSegments

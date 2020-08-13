@@ -91,11 +91,11 @@ func (data *WalSegmentsSequence) AddWalSegmentNo(number WalSegmentNo) {
 
 // FindMissingSegments finds missing segments in range [minSegmentNo, maxSegmentNo]
 func (data *WalSegmentsSequence) FindMissingSegments() ([]*WalSegmentDescription, error) {
-	startWalSegment := WalSegmentDescription{number: data.maxSegmentNo, timeline: data.timelineId}
+	startWalSegment := WalSegmentDescription{Number: data.maxSegmentNo, Timeline: data.timelineId}
 
 	walSegments := make(map[WalSegmentDescription]bool, len(data.walSegmentNumbers))
 	for number := range data.walSegmentNumbers {
-		segment := WalSegmentDescription{number: number, timeline: data.timelineId}
+		segment := WalSegmentDescription{Number: number, Timeline: data.timelineId}
 		walSegments[segment] = true
 	}
 
@@ -161,11 +161,11 @@ func HandleWalShow(rootFolder storage.Folder, showBackups bool, outputWriter Wal
 func groupSegmentsByTimelines(segments map[WalSegmentDescription]bool) (map[uint32]*WalSegmentsSequence, error) {
 	segmentsByTimelines := make(map[uint32]*WalSegmentsSequence)
 	for segment := range segments {
-		if timelineInfo, ok := segmentsByTimelines[segment.timeline]; ok {
-			timelineInfo.AddWalSegmentNo(segment.number)
+		if timelineInfo, ok := segmentsByTimelines[segment.Timeline]; ok {
+			timelineInfo.AddWalSegmentNo(segment.Number)
 			continue
 		}
-		segmentsByTimelines[segment.timeline] = NewSegmentsSequence(segment.timeline, segment.number)
+		segmentsByTimelines[segment.Timeline] = NewSegmentsSequence(segment.Timeline, segment.Number)
 	}
 	return segmentsByTimelines, nil
 }
