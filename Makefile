@@ -155,6 +155,7 @@ unittest:
 	go test -v $(TEST_MODIFIER) ./internal/compression/
 	go test -v $(TEST_MODIFIER) ./internal/crypto/openpgp/
 	go test -v $(TEST_MODIFIER) ./internal/crypto/awskms/
+	go test -v $(TEST_MODIFIER) ./internal/abool
 	@if [ ! -z "${USE_LIBSODIUM}" ]; then\
 		go test -v $(TEST_MODIFIER) -tags libsodium ./internal/crypto/libsodium/;\
 	fi
