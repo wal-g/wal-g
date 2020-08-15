@@ -379,6 +379,11 @@ func ReadConfigFromFile(config *viper.Viper, configFile string) {
 	err := config.ReadInConfig()
 	if err == nil {
 		tracelog.DebugLogger.Println("Using config file:", config.ConfigFileUsed())
+	} else {
+		if config.ConfigFileUsed() != "" {
+			// Config file is found, but parsing failed
+			tracelog.WarningLogger.Printf("Failed to parse config file %s. %s.", config.ConfigFileUsed(), err)
+		}
 	}
 }
 
