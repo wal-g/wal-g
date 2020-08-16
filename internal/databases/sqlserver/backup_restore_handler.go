@@ -57,7 +57,7 @@ func restoreSingleDatabase(ctx context.Context, db *sql.DB, baseUrl string, dbna
 	if noRecovery {
 		sql += ", NORECOVERY"
 	}
-	tracelog.InfoLogger.Printf("staring restore database [%s] from %s", dbname, backupUrl)
+	tracelog.InfoLogger.Printf("starting restore database [%s] from %s", dbname, backupUrl)
 	tracelog.DebugLogger.Printf("SQL: %s", sql)
 	_, err := db.ExecContext(ctx, sql)
 	if err != nil {
