@@ -102,7 +102,7 @@ jobs:
     - script: make mongo_test
       workspaces:
         use: image_cache
-    - script: make MONGO_FEATURE="backup" MONGO_VERSION="4.4.0" MONGO_MAJOR="4.4" mongo_features
+    - script: make MONGO_VERSION="4.4.0" MONGO_MAJOR="4.4" mongo_features
       workspaces:
         use: image_cache
     - script: make MONGO_VERSION="4.2.8" MONGO_MAJOR="4.2" mongo_features

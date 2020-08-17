@@ -47,6 +47,20 @@ func (_m *MongoDriver) Close(ctx context.Context) error {
 	return r0
 }
 
+// CreateIndexes provides a mock function with given fields: ctx, dbName, collName, indexes
+func (_m *MongoDriver) CreateIndexes(ctx context.Context, dbName string, collName string, indexes []client.IndexDocument) error {
+	ret := _m.Called(ctx, dbName, collName, indexes)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, []client.IndexDocument) error); ok {
+		r0 = rf(ctx, dbName, collName, indexes)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // EnsureIsMaster provides a mock function with given fields: ctx
 func (_m *MongoDriver) EnsureIsMaster(ctx context.Context) error {
 	ret := _m.Called(ctx)
