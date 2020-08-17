@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-
-	"time"
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/mongodb/mongo-tools-common/db"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/utility"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -56,6 +55,7 @@ type IsMaster struct {
 
 // MongoDriver defines methods to work with mongodb.
 type MongoDriver interface {
+	CreateIndexes(ctx context.Context, dbName, collName string, indexes []IndexDocument) error
 	EnsureIsMaster(ctx context.Context) error
 	IsMaster(ctx context.Context) (models.IsMaster, error)
 	LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp, err error)
@@ -124,6 +124,26 @@ func NewMongoClient(ctx context.Context, uri string) (*MongoClient, error) {
 		return nil, err
 	}
 	return &MongoClient{c: client}, client.Ping(ctx, nil)
+}
+
+// IndexDocument holds information about a collection's index.
+type IndexDocument struct {
+	Options                 bson.M `bson:",inline"`
+	Key                     bson.D `bson:"key"`
+	PartialFilterExpression bson.D `bson:"partialFilterExpression,omitempty"`
+}
+
+func (mc *MongoClient) CreateIndexes(ctx context.Context, dbName, collName string, indexes []IndexDocument) error {
+	rawCommand := bson.D{
+		{Key: "createIndexes", Value: collName},
+		{Key: "indexes", Value: indexes},
+	}
+
+	if err := mc.c.Database(dbName).RunCommand(ctx, rawCommand).Err(); err != nil {
+		return fmt.Errorf("createIndexes command %q failed: %w\n", rawCommand, err)
+	}
+
+	return nil
 }
 
 func (mc *MongoClient) EnsureIsMaster(ctx context.Context) error {

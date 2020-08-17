@@ -11,9 +11,37 @@ import (
 
 	"github.com/mongodb/mongo-tools-common/db"
 	"github.com/mongodb/mongo-tools-common/txn"
+	"github.com/mongodb/mongo-tools-common/util"
 	"github.com/wal-g/tracelog"
 	"go.mongodb.org/mongo-driver/bson"
 )
+
+type TypeAssertionError struct {
+	etype string
+	key   string
+	value interface{}
+}
+
+func NewTypeAssertionError(etype, key string, value interface{}) *TypeAssertionError {
+	return &TypeAssertionError{etype, key, value}
+}
+
+func (e *TypeAssertionError) Error() string {
+	return fmt.Sprintf("assertion to %s failed, field %s: %+v", e.etype, e.key, e.value)
+}
+
+type OpHandleError struct {
+	op  interface{}
+	err error
+}
+
+func NewOpHandleError(op interface{}, err error) *OpHandleError {
+	return &OpHandleError{op, err}
+}
+
+func (e *OpHandleError) Error() string {
+	return fmt.Sprintf("can not handle op '%+v', error: %+v", e.op, e.err)
+}
 
 var (
 	jsonBegin     = []byte("[\n")
@@ -118,11 +146,100 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op db.Oplog) error {
 		var err error
 		op, err = filterUUIDs(op)
 		if err != nil {
-			return fmt.Errorf("error filtering UUIDs from oplog: %v", err)
+			return fmt.Errorf("can not filter UUIDs from op '%+v', error: %+v", op, err)
 		}
 	}
 
+	// TODO: wait for index building
+	if op.Operation == "c" && op.Object[0].Key == "commitIndexBuild" {
+		collName, indexes, err := indexSpecFromCommitIndexBuilds(op)
+		if err != nil {
+			return NewOpHandleError(op, err)
+		}
+		dbName, _ := util.SplitNamespace(op.Namespace)
+		return ap.db.CreateIndexes(ctx, dbName, collName, indexes)
+	}
+	if op.Operation == "c" && op.Object[0].Key == "createIndexes" {
+		collName, indexes, err := indexSpecsFromCreateIndexes(op)
+		if err != nil {
+			return NewOpHandleError(op, err)
+		}
+		dbName, _ := util.SplitNamespace(op.Namespace)
+		return ap.db.CreateIndexes(ctx, dbName, collName,
+			[]client.IndexDocument{indexes})
+	}
+
 	return ap.db.ApplyOp(ctx, op)
+}
+
+func indexSpecsFromCreateIndexes(op db.Oplog) (string, client.IndexDocument, error) {
+	index := client.IndexDocument{Options: bson.M{}}
+	var collName string
+	var elem bson.E
+	var ok bool
+	for i := range op.Object {
+		elem = op.Object[i]
+		switch elem.Key {
+		case "createIndexes":
+			if collName, ok = elem.Value.(string); !ok {
+				return "", client.IndexDocument{}, NewTypeAssertionError("string", "createIndexes", elem.Value)
+			}
+		case "key":
+			if index.Key, ok = elem.Value.(bson.D); !ok {
+				return "", client.IndexDocument{}, NewTypeAssertionError("bson.D", "key", elem.Value)
+			}
+		default:
+			index.Options[elem.Key] = elem.Value
+		}
+	}
+
+	return collName, index, nil
+}
+
+func indexSpecFromCommitIndexBuilds(op db.Oplog) (string, []client.IndexDocument, error) {
+	var collName string
+	var ok bool
+	var elemE bson.E
+	for i := range op.Object {
+		elemE = op.Object[i]
+		if elemE.Key == "commitIndexBuild" {
+			if collName, ok = elemE.Value.(string); !ok {
+				return "", nil, NewTypeAssertionError("string", "commitIndexBuild", elemE.Value)
+			}
+		}
+	}
+
+	for i := range op.Object {
+		elemE = op.Object[i]
+		if elemE.Key == "indexes" {
+			indexes, ok := elemE.Value.(bson.A)
+			if !ok {
+				return "", nil, NewTypeAssertionError("bson.A", "indexes", elemE.Value)
+			}
+
+			indexSpecs := make([]client.IndexDocument, len(indexes))
+			for i := range indexes {
+				indexSpecs[i].Options = bson.M{}
+				elements, ok := indexes[i].(bson.D)
+				if !ok {
+					return "", nil, NewTypeAssertionError("bson.D", fmt.Sprintf("indexes[%d]", i), elemE.Value)
+				}
+				for i := range elements {
+					elemE = elements[i]
+					if elemE.Key == "key" {
+						if indexSpecs[i].Key, ok = elemE.Value.(bson.D); !ok {
+							return "", nil, NewTypeAssertionError("bson.D", "key", elemE.Value)
+						}
+					} else {
+						indexSpecs[i].Options[elemE.Key] = elemE.Value
+					}
+				}
+			}
+			return collName, indexSpecs, nil
+		}
+	}
+
+	return "", nil, fmt.Errorf("can not find indexes key in op.Object: %+v", op)
 }
 
 // handleTxnOp handles oplog record with transaction attributes.
