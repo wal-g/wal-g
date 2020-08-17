@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -331,18 +330,12 @@ func isEmpty(t *testing.T, path string) bool {
 func TestWalk(t *testing.T) {
 	// Generate random data and write to tmp dir `data...`.
 	data := generateData(t)
-
+	tarSizeThreshold := int64(10)
 	// Bundle and compress files to `compressed`.
-	bundle := &internal.Bundle{
-		ArchiveDirectory: data,
-		TarSizeThreshold: int64(10),
-		AllTarballsSize: new(int64),
-		Files:            &sync.Map{},
-		TablespaceSpec:   internal.NewTablespaceSpec(data),
-	}
+	bundle := internal.NewBundle(data, nil, nil, nil, false, tarSizeThreshold)
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
 	size := int64(0)
-	bundle.TarBallMaker = &testtools.FileTarBallMaker{
+	tarBallMaker := &testtools.FileTarBallMaker{
 		Out:  compressed,
 		Size: &size,
 	}
@@ -351,9 +344,22 @@ func TestWalk(t *testing.T) {
 		t.Log(err)
 	}
 
-	bundle.StartQueue()
+	err = bundle.StartQueue(tarBallMaker)
+	if err != nil {
+		t.Log(err)
+	}
+
+	err = bundle.SetupComposer()
+	if err != nil {
+		t.Log(err)
+	}
+
 	fmt.Println("Walking ...")
 	err = filepath.Walk(data, bundle.HandleWalkedFSObject)
+	if err != nil {
+		t.Log(err)
+	}
+	_, err = bundle.PackTarballs()
 	if err != nil {
 		t.Log(err)
 	}

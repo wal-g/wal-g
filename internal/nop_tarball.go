@@ -15,6 +15,10 @@ type NOPTarBall struct {
 	tarWriter *tar.Writer
 }
 
+func (tarBall *NOPTarBall) Name() string {
+	return "NOPTarBall"
+}
+
 func (tarBall *NOPTarBall) SetUp(crypter crypto.Crypter, params ...string) {}
 func (tarBall *NOPTarBall) CloseTar() error                                { return nil }
 

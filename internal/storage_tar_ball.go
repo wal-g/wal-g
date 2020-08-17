@@ -20,6 +20,11 @@ type StorageTarBall struct {
 	writeCloser io.Closer
 	tarWriter   *tar.Writer
 	uploader    *Uploader
+	name        string
+}
+
+func (tarBall *StorageTarBall) Name() string {
+	return tarBall.name
 }
 
 // SetUp creates a new tar writer and starts upload to storage.
@@ -28,13 +33,12 @@ type StorageTarBall struct {
 // the form `part_....tar.[Compressor file extension]`.
 func (tarBall *StorageTarBall) SetUp(crypter crypto.Crypter, names ...string) {
 	if tarBall.tarWriter == nil {
-		var name string
 		if len(names) > 0 {
-			name = names[0]
+			tarBall.name = names[0]
 		} else {
-			name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partNumber, tarBall.uploader.Compressor.FileExtension())
+			tarBall.name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partNumber, tarBall.uploader.Compressor.FileExtension())
 		}
-		writeCloser := tarBall.startUpload(name, crypter)
+		writeCloser := tarBall.startUpload(tarBall.name, crypter)
 
 		tarBall.writeCloser = writeCloser
 		tarBall.tarWriter = tar.NewWriter(writeCloser)

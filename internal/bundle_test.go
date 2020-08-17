@@ -33,10 +33,9 @@ func TestEmptyBundleQueue(t *testing.T) {
 	}
 
 	uploader := testtools.NewMockUploader(false, false)
+	tarBallMaker := internal.NewStorageTarBallMaker("mockBackup", uploader)
 
-	bundle.TarBallMaker = internal.NewStorageTarBallMaker("mockBackup", uploader)
-
-	err := bundle.StartQueue()
+	err := bundle.StartQueue(tarBallMaker)
 	assert.NoError(t, err)
 
 	err = bundle.FinishQueue()
@@ -63,29 +62,29 @@ func queueTest(t *testing.T) {
 		TarSizeThreshold: 100,
 	}
 	uploader := testtools.NewMockUploader(false, false)
-	bundle.TarBallMaker = internal.NewStorageTarBallMaker("mockBackup", uploader)
+	tarBallMaker := internal.NewStorageTarBallMaker("mockBackup", uploader)
 
 	// For tests there must be at least 3 workers
 
-	bundle.StartQueue()
+	bundle.StartQueue(tarBallMaker)
 
-	a := bundle.Deque()
+	a := bundle.TarBallQueue.Deque()
 	go func() {
 		time.Sleep(10 * time.Millisecond)
 		time.Sleep(10 * time.Millisecond)
-		bundle.EnqueueBack(a)
+		bundle.TarBallQueue.EnqueueBack(a)
 	}()
 
-	c := bundle.Deque()
+	c := bundle.TarBallQueue.Deque()
 	go func() {
 		time.Sleep(10 * time.Millisecond)
-		bundle.CheckSizeAndEnqueueBack(c)
+		bundle.TarBallQueue.CheckSizeAndEnqueueBack(c)
 	}()
 
-	b := bundle.Deque()
+	b := bundle.TarBallQueue.Deque()
 	go func() {
 		time.Sleep(10 * time.Millisecond)
-		bundle.EnqueueBack(b)
+		bundle.TarBallQueue.EnqueueBack(b)
 	}()
 
 	err := bundle.FinishQueue()
