@@ -58,6 +58,10 @@ func NewWalSegmentRunner(
 		segments, stopSegmentNo}
 }
 
+func (r *WalSegmentRunner) Current() WalSegmentDescription {
+	return r.currentWalSegment
+}
+
 // Next tries to get the next segment from storage
 func (r *WalSegmentRunner) Next() (WalSegmentDescription, error) {
 	if r.currentWalSegment.Number <= r.stopSegmentNo {
