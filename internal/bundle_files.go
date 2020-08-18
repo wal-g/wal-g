@@ -55,6 +55,14 @@ type StatBundleFiles struct {
 	fileStats RelFileStatistics
 }
 
+func (files *StatBundleFiles) AddFileWithCorruptBlocks(tarHeader *tar.Header, fileInfo os.FileInfo, isIncremented bool, corruptedBlocks []uint32, storeAllBlocks bool) {
+	updatesCount := files.fileStats.getFileUpdateCount(tarHeader.Name)
+	fileDescription := BackupFileDescription{IsSkipped: false, IsIncremented: isIncremented, MTime: fileInfo.ModTime(),
+		UpdatesCount: updatesCount}
+	fileDescription.SetCorruptBlocks(corruptedBlocks, storeAllBlocks)
+	files.Store(tarHeader.Name, fileDescription)
+}
+
 func (files *StatBundleFiles) AddSkippedFile(tarHeader *tar.Header, fileInfo os.FileInfo) {
 	updatesCount := files.fileStats.getFileUpdateCount(tarHeader.Name)
 	files.Store(tarHeader.Name,

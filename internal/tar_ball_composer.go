@@ -3,6 +3,7 @@ package internal
 import (
 	"archive/tar"
 	"errors"
+	"github.com/jackc/pgx"
 	"os"
 )
 
@@ -36,11 +37,29 @@ type TarBallComposerType int
 
 const (
 	RegularComposer TarBallComposerType = iota + 1
+	RatingComposer
 )
 
 func NewTarBallComposer(composerType TarBallComposerType, bundle *Bundle,
-	filePackOptions TarBallFilePackerOptions) (TarBallComposer, error) {
+	filePackOptions TarBallFilePackerOptions, conn *pgx.Conn) (TarBallComposer, error) {
 	switch composerType {
+	case RatingComposer:
+		composeRatingEvaluator := NewDefaultComposeRatingEvaluator(bundle.IncrementFromFiles)
+		fileStats, err := newRelFileStatistics(conn)
+		if err != nil {
+			return nil, err
+		}
+		bundleFiles := newStatBundleFiles(fileStats)
+
+		return NewRatingTarBallComposer(
+			uint64(bundle.TarSizeThreshold),
+			composeRatingEvaluator,
+			bundle.IncrementFromLsn,
+			bundle.DeltaMap,
+			bundle.TarBallQueue,
+			bundle.Crypter,
+			fileStats,
+			bundleFiles)
 	case RegularComposer:
 		bundleFiles := &RegularBundleFiles{}
 		tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, bundleFiles, filePackOptions)
