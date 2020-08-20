@@ -79,7 +79,7 @@ func HandleWALReceive(uploader *WalUploader) {
 	}
 
 	// Get timeline for XLogPos from historyfile with helper function
-	timeline, err := getStartTimeline(conn, sysident.Timeline, XLogPos)
+	timeline, err := getStartTimeline(conn, uploader, sysident.Timeline, XLogPos)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	segment = NewWalSegment(timeline, XLogPos, walSegmentBytes)
@@ -114,13 +114,15 @@ func HandleWALReceive(uploader *WalUploader) {
 	}
 }
 
-func getStartTimeline(conn *pgconn.PgConn, systemTimeline int32, xLogPos pglogrepl.LSN)  (int32, error){
+func getStartTimeline(conn *pgconn.PgConn, uploader *WalUploader, systemTimeline int32, xLogPos pglogrepl.LSN)  (int32, error){
 	if systemTimeline < 2 {
 		return 1, nil
 	}
 	timelinehistfile, err := pglogrepl.TimelineHistory(context.Background(), conn, systemTimeline)
 	if err == nil {
 		tlh, err := NewTimeLineHistFile(systemTimeline, timelinehistfile.FileName, timelinehistfile.Content)
+		tracelog.ErrorLogger.FatalOnError(err)
+		err = uploader.UploadWalFile(newNamedReaderImpl(tlh, tlh.Name()))
 		tracelog.ErrorLogger.FatalOnError(err)
 		return tlh.LSNToTimeLine(xLogPos)
 	} else {
