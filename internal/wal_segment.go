@@ -1,9 +1,9 @@
-/*
-This object represents data about a physical slot.
-The data can be retrieved from Postgres with the queryRunner,
-and is consumed by the walReceiveHandler.
-*/
 package internal
+
+/*
+This object represents a wal segment. A wal segment is a memory location that holds all wal for a wal file.
+wal-g receivewal reads wal from Postgres one wal segment at a time, and writes it out using the WalUploader before reading the next wal segment.
+*/
 
 import (
 	"context"
@@ -17,11 +17,11 @@ import (
 	"time"
 )
 
-type SegmentError struct {
+type segmentError struct {
 	error
 }
 
-// The PhysicalSlot represents a Physical Replication Slot.
+// The WalSegment object represents a Postgres Wal Segment, holding all wal data for a wal file.
 type WalSegment struct {
 	TimeLine        int32
 	StartLSN        pglogrepl.LSN
@@ -33,8 +33,10 @@ type WalSegment struct {
 	lastMsg         *pgproto3.BackendMessage
 }
 
+// The ProcessMessageResult is an enum representing possible results from the methods processing the messages as received from Postgres into the wal segment.
 type ProcessMessageResult int
 
+// These are the multiple results that the methods can return
 const (
 	ProcessMessageOK ProcessMessageResult = iota
 	ProcessMessageUnknown
@@ -44,6 +46,7 @@ const (
 	ProcessMessageMismatch
 )
 
+// NewWalSegment is a helper function to declare a new WalSegment.
 func NewWalSegment(timeline int32, location pglogrepl.LSN, walSegmentBytes uint64) *WalSegment {
 	//We could test validity of walSegmentBytes (not implemented):
 	//  https://www.postgresql.org/docs/11/app-initdb.html:
@@ -60,37 +63,43 @@ func NewWalSegment(timeline int32, location pglogrepl.LSN, walSegmentBytes uint6
 	return segment
 }
 
-// Create next wal file from result of Stream
+// NextWalSegment is a helper function to create the next wal segment which comes after this wal segment.
+// Note that this will be on the same timeline. the convenience is that it also automatically processes
+// a message that crosses the boundary between the two segments.
 func (seg *WalSegment) NextWalSegment() (*WalSegment, error) {
 	// Next on this timeline, but read rest of msg
 	if ! seg.IsComplete() {
-		return nil, SegmentError{
+		return nil, segmentError{
 			errors.Errorf("Cannot run NextWalSegment until IsComplete")}
 	}
 	nextSegment := NewWalSegment(seg.TimeLine, seg.endLSN, seg.walSegmentBytes)
 	if seg.lastMsg != nil {
+		// Apparaently the last message crossed the border between the two segments, so lets have it processed into the next segment too.
 		result, err := nextSegment.ProcessMessage(*seg.lastMsg)
 		if err != nil {
 			return nil, err
 		}
 		if result != ProcessMessageOK {
-			return nil, SegmentError{
+			return nil, segmentError{
 				errors.Errorf("Unexpected result from ProcessMessage in NextWalSegment")}
 		}
 	}
 	return nextSegment, nil
 }
 
-// Name returns the filename of this wal segment
+// Name returns the filename of this wal segment.
+// This is also used by the WalUploader to set the name of the destination file during upload of the wal segment.
 func (seg *WalSegment) Name() string {
+	// Example LSN -> Name:
 	// '0/2A33FE00' -> '00000001000000000000002A'
-	segId := uint64(seg.StartLSN)/uint64(seg.walSegmentBytes)
+	segID := uint64(seg.StartLSN)/uint64(seg.walSegmentBytes)
 	if seg.IsComplete() {
-		return fmt.Sprintf("%08X%016X", seg.TimeLine, segId)
+		return fmt.Sprintf("%08X%016X", seg.TimeLine, segID)
 	}
-	return fmt.Sprintf("%08X%016X.partial", seg.TimeLine, segId)
+	return fmt.Sprintf("%08X%016X.partial", seg.TimeLine, segID)
 }
 
+// ProcessMessage is a method that processes a message from Postgres and copies its data into the right location of the wal segment.
 func (seg *WalSegment) ProcessMessage(message pgproto3.BackendMessage) (ProcessMessageResult, error) {
 	var messageOffset pglogrepl.LSN
 	switch msg := message.(type) {
@@ -109,13 +118,13 @@ func (seg *WalSegment) ProcessMessage(message pgproto3.BackendMessage) (ProcessM
 			tracelog.ErrorLogger.FatalOnError(err)
 			if xld.WALStart > seg.endLSN {
 				// This message started after this segment ended
-				return ProcessMessageMismatch, SegmentError{
+				return ProcessMessageMismatch, segmentError{
 					errors.Errorf("Message mismatch: Message started after end of this segment")}
 			}
 			walEnd := pglogrepl.LSN(uint64(xld.WALStart) + uint64(len(xld.WALData)))
 			if walEnd < seg.StartLSN {
 				// This message ended before this segment started
-				return ProcessMessageMismatch, SegmentError{
+				return ProcessMessageMismatch, segmentError{
 					errors.Errorf("Message mismatch: Message ended before start of this segment")}
 			}
 			if xld.WALStart < seg.StartLSN {
@@ -125,7 +134,7 @@ func (seg *WalSegment) ProcessMessage(message pgproto3.BackendMessage) (ProcessM
 			tracelog.DebugLogger.Println("XLogData =>", "WALStart", xld.WALStart, "WALEnd", walEnd,
 				"LenWALData", len(string(xld.WALData)), "ServerWALEnd", xld.ServerWALEnd, "messageOffset",  messageOffset)//, "ServerTime:", xld.ServerTime)
 			if seg.StartLSN + pglogrepl.LSN(seg.writeIndex) != (xld.WALStart + messageOffset) {
-				return ProcessMessageSegmentGap, SegmentError{
+				return ProcessMessageSegmentGap, segmentError{
 					errors.Errorf("WAL segment error: CopyData WALStart does not fit to segment writeIndex")}
 			}
 			copiedBytes := copy(seg.data[seg.writeIndex:], xld.WALData[messageOffset:])
@@ -137,11 +146,12 @@ func (seg *WalSegment) ProcessMessage(message pgproto3.BackendMessage) (ProcessM
 	case *pgproto3.CopyDone:
 		return ProcessMessageCopyDone, nil
 	default:
-		return ProcessMessageUnknown,SegmentError {errors.Errorf("Received unexpected message: %#v\n", msg)}
+		return ProcessMessageUnknown,segmentError {errors.Errorf("Received unexpected message: %#v\n", msg)}
 	}
 	return ProcessMessageOK, nil
 }
 
+// Stream is a helper function to retrieve messages from Postgres and have them processed by ProcessMessage().
 func (seg *WalSegment) Stream(conn *pgconn.PgConn, standbyMessageTimeout time.Duration) (ProcessMessageResult, error) {
 	// Inspired by https://github.com/jackc/pglogrepl/blob/master/example/pglogrepl_demo/main.go
 	// And https://www.postgresql.org/docs/12/protocol-replication.html
@@ -194,7 +204,7 @@ func (seg *WalSegment) Stream(conn *pgconn.PgConn, standbyMessageTimeout time.Du
 	}
 }
 
-// IsComplete returns true when all data is added
+// IsComplete is a helper function which returns true when all data is added
 func (seg *WalSegment) IsComplete() bool {
 	if seg.StartLSN + pglogrepl.LSN(seg.writeIndex) >= seg.endLSN {
 		return true
@@ -202,7 +212,7 @@ func (seg *WalSegment) IsComplete() bool {
 	return false
 }
 
-// Read is what makes the WalSegment a io.Reader, which can be handled by WalUploader.UploadWalFile
+// Read is what makes the WalSegment an io.Reader, which can be handled by WalUploader.UploadWalFile to write to a file.
 func (seg *WalSegment) Read(p []byte) (n int, err error) {
 	n = copy(p, seg.data[seg.readIndex:])
 	seg.readIndex += n
@@ -211,4 +221,3 @@ func (seg *WalSegment) Read(p []byte) (n int, err error) {
 	}
 	return n, nil
 }
-

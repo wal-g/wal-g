@@ -1,5 +1,19 @@
 package internal
 
+/*
+This module can represent a Timeline History file which can be retrieved from Postgres using the TIMELINEHISTORY SQL command.
+A Timeline History file belongs to a timeline (which also will be the last Row in the file), and contains multiple rows.
+Each row describes at what LSN that timeline came to be.
+
+Example history file:
+1	0/2A33FF50	no recovery target specified
+
+2	0/2A3400E8	no recovery target specified
+
+By storing the Timeline History file in this object, it can easilly be searched for the timeline that a specific LSN belongs too.
+Furthermore it can be read as an IOReader (having a Name() and Read() function) to easilly writeout by the WalUploader.
+*/
+
 import (
 	"github.com/jackc/pglogrepl"
 	"io"
@@ -16,7 +30,9 @@ type TimeLineHistFileRow struct {
 	Comment	   string
 }
 
-// The TimeLineHistFileRow struct represents one line in the TimeLineHistory file
+// The TimeLineHistFile struct represents a TimeLineHistory file containing TimeLineHistFileRows.
+// Since TimeLineHistFileRows are only parsed 0 or 1 rimes, the data is only 
+// preserved as []byte and parsed to TimeLineHistFileRows when required.
 type TimeLineHistFile struct {
 	TimeLineID int32
 	Filename string
@@ -24,19 +40,20 @@ type TimeLineHistFile struct {
 	readIndex int
 }
 
+//NewTimeLineHistFile is a helper function to define a new TimeLineHistFile
 func NewTimeLineHistFile(timelineid int32, filename string, body []byte) (TimeLineHistFile, error) {
 	tlh := TimeLineHistFile{TimeLineID: timelineid, Filename: filename, data: body}
 	return tlh, nil
 }
 
-// LSNToTimeLine  the timeline that is applicable to a specific LSN
+// Rows parses the data ([]byte) from a TimeLineHistFile and returns the TimeLineHistFileRows that are contained.
 func (tlh TimeLineHistFile) Rows() ([]TimeLineHistFileRow, error) {
 	var err error
 	var rows []TimeLineHistFileRow
 	r := regexp.MustCompile("[^\\s]+")
 	for _, row := range strings.Split(string(tlh.data), "\n") {
 		// Remove comments and split by one or more whitespace characters
-		// FIndAllStrings removes front spaces, and returns up to 3 cols.
+		// FindAllStrings removes front spaces, and returns up to 3 cols.
 		cols := r.FindAllString(strings.Split(row, "#")[0], 3)
 		if len(cols) >= 2 {
 			tlhr := TimeLineHistFileRow{}
@@ -57,7 +74,7 @@ func (tlh TimeLineHistFile) Rows() ([]TimeLineHistFileRow, error) {
 	return rows, nil
 }
 
-// LSNToTimeLine  the timeline that is applicable to a specific LSN
+// LSNToTimeLine uses Rows() to get all TimeLineHistFileRows and from those rows get the timeline that a LS belongs too.
 func (tlh TimeLineHistFile) LSNToTimeLine(lsn pglogrepl.LSN) (int32, error) {
 	rows, err := tlh.Rows()
 	if err != nil {
@@ -74,43 +91,13 @@ func (tlh TimeLineHistFile) LSNToTimeLine(lsn pglogrepl.LSN) (int32, error) {
 	}
 	return tlh.TimeLineID, nil
 }
-/*
-Example history file:
-1	0/2A33FF50	no recovery target specified
 
-2	0/2A3400E8	no recovery target specified
-
-3	0/2A36D148	no recovery target specified
-
-4	0/2A373A40	no recovery target specified
-
-5	0/2A37A720	no recovery target specified
-
-6	0/2A3817B8	no recovery target specified
-
-7	0/2A497520	no recovery target specified
-
-8	0/2A5ACF08	no recovery target specified
-
-9	0/2A6C2498	no recovery target specified
-
-10	0/30F1FF48	no recovery target specified
-
-11	0/3F552470	no recovery target specified
-
-12	0/416A43F8	no recovery target specified
-
-13	0/437F6630	no recovery target specified
-
-14	0/45948B20	no recovery target specified
-*/
-
-// Name returns the filename of this wal segment
+// Name returns the filename of this wal segment. This is a convenience function used by the WalUploader.
 func (tlh TimeLineHistFile) Name() string {
 	return tlh.Filename
 }
 
-// Read is what makes the WalSegment a io.Reader, which can be handled by WalUploader.UploadWalFile
+// Read is what makes the WalSegment an io.Reader, which can be handled by WalUploader.UploadWalFile.
 func (tlh TimeLineHistFile) Read(p []byte) (n int, err error) {
 	n = copy(p, tlh.data[tlh.readIndex:])
 	tlh.readIndex += n
@@ -119,4 +106,3 @@ func (tlh TimeLineHistFile) Read(p []byte) (n int, err error) {
 	}
 	return n, nil
 }
-

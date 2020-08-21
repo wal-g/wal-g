@@ -1,9 +1,10 @@
+package internal
+
 /*
 This object represents data about a physical slot.
 The data can be retrieved from Postgres with the queryRunner,
 and is consumed by the walReceiveHandler.
 */
-package internal
 
 import(
   "github.com/jackc/pglogrepl"
@@ -17,6 +18,7 @@ type PhysicalSlot struct {
 	RestartLSN pglogrepl.LSN
 }
 
+//NewPhysicalSlot is a helper function to declare a new PhysicalSlot object and set vaues from the parsed arguments
 func NewPhysicalSlot(name string, exists bool, active bool, restartLSN string) (PhysicalSlot, error) {
   var err error
   slot := PhysicalSlot{Name: name, Exists: exists, Active: active}

@@ -6,12 +6,12 @@ import (
 	"github.com/wal-g/wal-g/internal"
 )
 
-const WalReceiveShortDescription = "Receive WAL stream and push to storage"
+const walReceiveShortDescription = "Receive WAL stream with postgres Streaming Replication Protocol and push to storage"
 
 // walReceiveCmd represents the walReceive command
 var walReceiveCmd = &cobra.Command{
 	Use:   "wal-receive",
-	Short: WalReceiveShortDescription, // TODO : improve description
+	Short: walReceiveShortDescription,
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureWalUploader()

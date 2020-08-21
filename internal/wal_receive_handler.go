@@ -32,15 +32,11 @@ Things to do:
 * proper sizes for int's
 */
 
-type GenericWalReceiveError struct {
+type genericWalReceiveError struct {
 	error
 }
 
-func newGenericWalReceiveError(errortext string) GenericWalReceiveError {
-	return GenericWalReceiveError{errors.Errorf("WAL receiver error: %s", errortext)}
-}
-
-func (err GenericWalReceiveError) Error() string {
+func (err genericWalReceiveError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
@@ -99,7 +95,7 @@ func HandleWALReceive(uploader *WalUploader) {
 			tracelog.ErrorLogger.FatalOnError(err)
 		case ProcessMessageCopyDone:
 			// segment is a partial. Write, and create a new for the next timeline.
-			timeline += 1
+			timeline++
 			timelinehistfile, err := pglogrepl.TimelineHistory(context.Background(), conn, timeline)
 			tracelog.ErrorLogger.FatalOnError(err)
 			tlh, err := NewTimeLineHistFile(timeline, timelinehistfile.FileName, timelinehistfile.Content)
@@ -125,11 +121,10 @@ func getStartTimeline(conn *pgconn.PgConn, uploader *WalUploader, systemTimeline
 		err = uploader.UploadWalFile(newNamedReaderImpl(tlh, tlh.Name()))
 		tracelog.ErrorLogger.FatalOnError(err)
 		return tlh.LSNToTimeLine(xLogPos)
-	} else {
-		if pgErr, ok := err.(*pgconn.PgError); ok {
-			if pgErr.Code == "58P01" {
-				return systemTimeline, nil
-			}
+	}
+	if pgErr, ok := err.(*pgconn.PgError); ok {
+		if pgErr.Code == "58P01" {
+			return systemTimeline, nil
 		}
 	}
 	return 0, nil
@@ -151,16 +146,13 @@ func validateSlotName(pgSlotName string) (err error){
 		return
 	}
 	if len(pgSlotName) > 63 || invalid {
-		err = GenericWalReceiveError{errors.Errorf("%s can only contain 1-63 word characters ([0-9A-Za-z_])", PgSlotName)}
+		err = genericWalReceiveError{errors.Errorf("%s can only contain 1-63 word characters ([0-9A-Za-z_])", PgSlotName)}
 	}
 	return
 }
 
 func getCurrentWalInfo() (slot PhysicalSlot, walSegmentBytes uint64, err error) {
 	slotName := GetPgSlotName()
-	if err != nil {
-		return
-	}
 
 	// Creating a temporary connection to read slot info and wal_segment_size
 	tmpConn, err := Connect()
