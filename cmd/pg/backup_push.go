@@ -1,6 +1,7 @@
 package pg
 
 import (
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 
@@ -11,8 +12,10 @@ const (
 	BackupPushShortDescription = "Makes backup and uploads it to storage"
 	PermanentFlag              = "permanent"
 	FullBackupFlag             = "full"
+	VerifyPagesFlag            = "verify"
 	PermanentShorthand         = "p"
 	FullBackupShorthand        = "f"
+	VerifyPagesShorthand       = "v"
 )
 
 var (
@@ -24,11 +27,13 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			uploader, err := internal.ConfigureWalUploader()
 			tracelog.ErrorLogger.FatalOnError(err)
-			internal.HandleBackupPush(uploader, args[0], permanent, fullBackup)
+			verifyPageChecksums = verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting)
+			internal.HandleBackupPush(uploader, args[0], permanent, fullBackup, verifyPageChecksums)
 		},
 	}
 	permanent  = false
 	fullBackup = false
+	verifyPageChecksums = false
 )
 
 func init() {
@@ -36,4 +41,5 @@ func init() {
 
 	backupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes permanent backup")
 	backupPushCmd.Flags().BoolVarP(&fullBackup, FullBackupFlag, FullBackupShorthand, false, "Make full backup-push")
+	backupPushCmd.Flags().BoolVarP(&verifyPageChecksums, VerifyPagesFlag, VerifyPagesShorthand, false, "Verify page checksums")
 }

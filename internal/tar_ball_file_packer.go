@@ -47,12 +47,13 @@ type TarBallFilePacker struct {
 	verifyPageChecksums bool
 }
 
-func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *uint64, files BundleFiles) *TarBallFilePacker {
+func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *uint64, files BundleFiles,
+	verifyPageChecksums bool) *TarBallFilePacker {
 	return &TarBallFilePacker{
 		deltaMap:            deltaMap,
 		incrementFromLsn:    incrementFromLsn,
 		files:               files,
-		verifyPageChecksums: false,
+		verifyPageChecksums: verifyPageChecksums,
 	}
 }
 

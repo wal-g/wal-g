@@ -38,11 +38,11 @@ const (
 	RegularComposer TarBallComposerType = iota + 1
 )
 
-func NewTarBallComposer(composerType TarBallComposerType, bundle *Bundle) (TarBallComposer, error) {
+func NewTarBallComposer(composerType TarBallComposerType, bundle *Bundle, verifyPageChecksums bool) (TarBallComposer, error) {
 	switch composerType {
 	case RegularComposer:
 		bundleFiles := &RegularBundleFiles{}
-		tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, bundleFiles)
+		tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, bundleFiles, verifyPageChecksums)
 		return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, bundleFiles, bundle.Crypter), nil
 	default:
 		return nil, errors.New("NewTarBallComposer: Unknown TarBallComposerType")
