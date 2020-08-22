@@ -349,7 +349,7 @@ func TestWalk(t *testing.T) {
 		t.Log(err)
 	}
 
-	err = bundle.SetupComposer()
+	err = bundle.SetupComposer(false)
 	if err != nil {
 		t.Log(err)
 	}
