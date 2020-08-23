@@ -13,14 +13,13 @@ import(
 type PhysicalSlot struct {
 	Name       string
 	Exists     bool
-	Temporary  bool
 	Active     bool
 	RestartLSN pglogrepl.LSN
 }
 
-func NewPhysicalSlot(name string, exists bool, temp bool, active bool, restartLSN string) (PhysicalSlot, error) {
+func NewPhysicalSlot(name string, exists bool, active bool, restartLSN string) (PhysicalSlot, error) {
   var err error
-  slot := PhysicalSlot{Name: name, Exists: exists, Temporary: temp, Active: active}
+  slot := PhysicalSlot{Name: name, Exists: exists, Active: active}
   if exists {
     slot.RestartLSN, err = pglogrepl.ParseLSN(restartLSN)
   }

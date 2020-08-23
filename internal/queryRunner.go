@@ -133,7 +133,7 @@ func (queryRunner *PgQueryRunner) buildGetParameter() string {
 // buildGetPhyisicalSlotInfo formats a query to get info on a Physical Replication Slot
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) buildGetPhyisicalSlotInfo() string {
-	return "select temporary, active, restart_lsn from pg_replication_slots where slot_name = $1"
+	return "select active, restart_lsn from pg_replication_slots where slot_name = $1"
 }
 
 // Retrieve PostgreSQL numeric version
@@ -343,7 +343,6 @@ func (queryRunner *PgQueryRunner) GetWalSegmentBytes() (uint64, error) {
 // GetPhysicalSlotInfo reads information on a physical replication slot
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) GetPhysicalSlotInfo(slotName string) (PhysicalSlot, error) {
-	var temp bool
 	var active bool
 	var restartLSN string
 
@@ -355,5 +354,5 @@ func (queryRunner *PgQueryRunner) GetPhysicalSlotInfo(slotName string) (Physical
 	} else if err != nil {
 		return PhysicalSlot{Name: slotName}, err
 	}
-	return NewPhysicalSlot(slotName, true, temp, active, restartLSN)
+	return NewPhysicalSlot(slotName, true, active, restartLSN)
 }
