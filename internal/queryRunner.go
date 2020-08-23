@@ -328,16 +328,20 @@ func (queryRunner *PgQueryRunner) GetParameter(parameterName string) (string, er
 
 // GetWalSegmentBytes reads the wals segment size (in bytes) and converts it to uint64
 // TODO: Unittest
-func (queryRunner *PgQueryRunner) GetWalSegmentBytes() (uint64, error) {
+func (queryRunner *PgQueryRunner) GetWalSegmentBytes() (segBlocks uint64, err error) {
 	strValue, err := queryRunner.GetParameter("wal_segment_size")
 	if err != nil {
 		return 0, err
 	}
-	segBlocks, err := strconv.ParseUint(strValue, 10, 64)
+	segBlocks, err = strconv.ParseUint(strValue, 10, 64)
 	if err != nil {
 		return 0, err
 	}
-	return segBlocks, nil
+	if queryRunner.Version <= 100000 {
+		// For PG 10 and below, wal_segment_size is in 8k blocks
+		segBlocks *= 8192
+	}
+	return
 }
 
 // GetPhysicalSlotInfo reads information on a physical replication slot
