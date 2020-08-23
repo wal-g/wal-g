@@ -130,9 +130,9 @@ func (queryRunner *PgQueryRunner) buildGetParameter() string {
 	return "select setting from pg_settings where name = $1"
 }
 
-// buildGetPhyisicalSlotInfo formats a query to get info on a Physical Replication Slot
+// buildGetPhysicalSlotInfo formats a query to get info on a Physical Replication Slot
 // TODO: Unittest
-func (queryRunner *PgQueryRunner) buildGetPhyisicalSlotInfo() string {
+func (queryRunner *PgQueryRunner) buildGetPhysicalSlotInfo() string {
 	return "select active, restart_lsn from pg_replication_slots where slot_name = $1"
 }
 
@@ -351,7 +351,7 @@ func (queryRunner *PgQueryRunner) GetPhysicalSlotInfo(slotName string) (Physical
 	var restartLSN string
 
 	conn := queryRunner.connection
-	err := conn.QueryRow(queryRunner.buildGetPhyisicalSlotInfo(), slotName).Scan(&temp, &active, &restartLSN)
+	err := conn.QueryRow(queryRunner.buildGetPhysicalSlotInfo(), slotName).Scan(&active, &restartLSN)
 	if err == pgx.ErrNoRows {
 		// slot does not exist.
 		return PhysicalSlot{Name: slotName}, nil
