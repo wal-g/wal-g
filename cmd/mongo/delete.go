@@ -39,6 +39,8 @@ func runPurge(cmd *cobra.Command, args []string) {
 		retainAfterTime, err := time.Parse(time.RFC3339, retainAfter)
 		tracelog.ErrorLogger.FatalfOnError("Can not parse retain time: %v", err)
 		opts = append(opts, mongo.PurgeRetainAfter(retainAfterTime))
+	} else if cmd.Flags().Changed(PurgeOplogFlag) {
+		tracelog.ErrorLogger.Fatalf("Flag %q requires %q to be passed\n", PurgeOplogFlag, RetainAfterFlag)
 	}
 
 	if cmd.Flags().Changed(RetainCountFlag) {
