@@ -157,7 +157,12 @@ func (w *WalgUtil) Backups() ([]string, error) {
 }
 
 func (w *WalgUtil) PurgeRetain(keepNumber int) error {
-	_, err := w.runCmd([]string{"delete", "--retain-count", strconv.Itoa(keepNumber), "--confirm"})
+	_, err := w.runCmd([]string{
+		"delete",
+		"--retain-count", strconv.Itoa(keepNumber),
+		"--retain-after", time.Now().Format("2006-01-02T15:04:05Z"),
+		"--purge-oplog",
+		"--confirm"})
 	return err
 }
 
