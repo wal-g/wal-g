@@ -17,6 +17,7 @@ import (
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
+	"github.com/francoispqt/gojay"
 )
 
 type SentinelMarshallingError struct {
@@ -285,7 +286,9 @@ func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupNa
 
 	pr, pw := io.Pipe()
 
-	encoder := json.NewEncoder(pw)
+	encoder := gojay.BorrowEncoder(pw)
+
+
 	go func(){
 		err :=encoder.Encode(sentinelDto)
 		if err!=nil {
