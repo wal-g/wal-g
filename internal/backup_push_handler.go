@@ -291,6 +291,10 @@ func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupNa
 		if err!=nil {
 			panic("TODODODOD")
 		}
+		err = pw.Close()
+		if err!=nil {
+			panic("TODODODOD")
+		}
 	}()
 
 	return uploader.Upload(sentinelName, pr)
