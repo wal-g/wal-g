@@ -9,6 +9,7 @@ type Backup struct {
 	FinishLocalTime time.Time   `json:"FinishLocalTime,omitempty"`
 	UserData        interface{} `json:"UserData,omitempty"`
 	MongoMeta       MongoMeta   `json:"MongoMeta,omitempty"`
+	DataSize        int64       `json:"DataSize,omitempty"`
 }
 
 // NodeMeta represents MongoDB node metadata

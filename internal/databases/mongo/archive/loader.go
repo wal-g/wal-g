@@ -198,14 +198,15 @@ func (d *DiscardUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaProv
 // is NOT thread-safe
 type StorageUploader struct {
 	internal.UploaderProvider
+	folder  storage.Folder
 	crypter crypto.Crypter
 	buf     *bytes.Buffer
 }
 
 // NewStorageUploader builds mongodb uploader.
-func NewStorageUploader(upl internal.UploaderProvider) *StorageUploader {
+func NewStorageUploader(upl internal.UploaderProvider, folder storage.Folder) *StorageUploader {
 	upl.DisableSizeTracking()
-	return &StorageUploader{upl, internal.ConfigureCrypter(), &bytes.Buffer{}}
+	return &StorageUploader{upl, folder, internal.ConfigureCrypter(), &bytes.Buffer{}}
 }
 
 // UploadOplogArchive compresses a stream and uploads it with given archive name.
@@ -260,13 +261,32 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaPro
 		return err
 	}
 
+	//internal.GetStreamName(backupName, su.Compression().FileExtension()
+	dataSize, err := FolderSize(su.folder, backupName)
+	if err != nil {
+		return fmt.Errorf("can not get backup size: %+v", err)
+	}
+
 	backupSentinel := &models.Backup{
 		StartLocalTime:  timeStart,
 		FinishLocalTime: utility.TimeNowCrossPlatformLocal(),
 		UserData:        internal.GetSentinelUserData(),
 		MongoMeta:       metaProvider.Meta(),
+		DataSize:        dataSize,
 	}
 	return internal.UploadSentinel(su.UploaderProvider, backupSentinel, backupName)
+}
+
+func FolderSize(folder storage.Folder, path string) (int64, error) {
+	dataObjects, _, err := folder.GetSubFolder(path).ListFolder()
+	if err != nil {
+		return 0, err
+	}
+	var size int64
+	for _, obj := range dataObjects {
+		size += obj.GetSize()
+	}
+	return size, nil
 }
 
 // StoragePurger deletes files in storage.

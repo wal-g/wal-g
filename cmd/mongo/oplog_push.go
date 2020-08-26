@@ -43,7 +43,7 @@ var oplogPushCmd = &cobra.Command{
 		uplProvider, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 		uplProvider.UploadingFolder = uplProvider.UploadingFolder.GetSubFolder(models.OplogArchBasePath)
-		uploader := archive.NewStorageUploader(uplProvider)
+		uploader := archive.NewStorageUploader(uplProvider, uplProvider.UploadingFolder)
 
 		// set up mongodb client and oplog fetcher
 		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl)
