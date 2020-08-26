@@ -37,6 +37,10 @@ type TimelineHistoryRecord struct {
 	comment  string
 }
 
+func NewTimelineHistoryRecord(timeline uint32, lsn uint64, comment string) *TimelineHistoryRecord {
+	return &TimelineHistoryRecord{timeline: timeline, lsn: lsn, comment: comment}
+}
+
 func newHistoryRecordFromString(row string) (*TimelineHistoryRecord, error) {
 	matchResult := walHistoryRecordRegexp.FindStringSubmatch(row)
 	if matchResult == nil || len(matchResult) < 4 {
