@@ -4,7 +4,6 @@ package archivemocks
 
 import (
 	mock "github.com/stretchr/testify/mock"
-
 	models "github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
@@ -27,13 +26,13 @@ func (_m *Purger) DeleteBackups(backups []models.Backup) error {
 	return r0
 }
 
-// DeleteGarbage provides a mock function with given fields: garbageKeys
-func (_m *Purger) DeleteGarbage(garbageKeys []string) error {
-	ret := _m.Called(garbageKeys)
+// DeleteGarbage provides a mock function with given fields: garbage
+func (_m *Purger) DeleteGarbage(garbage []string) error {
+	ret := _m.Called(garbage)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func([]string) error); ok {
-		r0 = rf(garbageKeys)
+		r0 = rf(garbage)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -15,7 +15,13 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
-const BackupPushShortDescription = "Pushes backup to storage"
+const (
+	BackupPushShortDescription = "Pushes backup to storage"
+)
+
+var (
+	permanent = false
+)
 
 // backupPushCmd represents the backupPush command
 var backupPushCmd = &cobra.Command{
@@ -33,17 +39,18 @@ var backupPushCmd = &cobra.Command{
 		// set up mongodb client and oplog fetcher
 		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl)
 		tracelog.ErrorLogger.FatalOnError(err)
-		metaProvider := archive.NewBackupMetaMongoProvider(ctx, mongoClient)
 
-		uploader, err := internal.ConfigureUploader()
+		uplProvider, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
-		uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
+		uplProvider.UploadingFolder = uplProvider.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 
 		backupCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamCreateCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
 		backupCmd.Stderr = os.Stderr
+		uploader := archive.NewStorageUploader(uplProvider)
+		metaProvider := archive.NewBackupMetaMongoProvider(ctx, mongoClient, uplProvider.UploadingFolder)
 
-		err = mongo.HandleBackupPush(&archive.StorageUploader{UploaderProvider: uploader}, metaProvider, backupCmd)
+		err = mongo.HandleBackupPush(uploader, metaProvider, permanent, backupCmd)
 		tracelog.ErrorLogger.FatalfOnError("Backup creation failed: %v", err)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {

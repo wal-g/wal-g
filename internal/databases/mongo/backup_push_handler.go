@@ -10,8 +10,8 @@ import (
 )
 
 // HandleBackupPush starts backup procedure.
-func HandleBackupPush(uploader archive.Uploader, metaProvider archive.MongoMetaProvider, backupCmd *exec.Cmd) error {
-	err := metaProvider.Init()
+func HandleBackupPush(uploader archive.Uploader, metaProvider archive.MongoMetaProvider, permanent bool, backupCmd *exec.Cmd) error {
+	err := metaProvider.Init(permanent)
 	tracelog.ErrorLogger.FatalOnError(err)
 	stdout, err := utility.StartCommandWithStdoutPipe(backupCmd)
 	tracelog.ErrorLogger.FatalOnError(err)
