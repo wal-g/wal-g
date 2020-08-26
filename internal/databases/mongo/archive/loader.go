@@ -252,7 +252,7 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaPro
 		return err
 	}
 
-	if err := metaProvider.Finalize(); err != nil {
+	if err := metaProvider.Finalize(backupName); err != nil {
 		return err
 	}
 
@@ -260,11 +260,14 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaPro
 		return err
 	}
 
+	meta := metaProvider.Meta()
 	backupSentinel := &models.Backup{
 		StartLocalTime:  timeStart,
 		FinishLocalTime: utility.TimeNowCrossPlatformLocal(),
-		UserData:        internal.GetSentinelUserData(),
-		MongoMeta:       metaProvider.Meta(),
+		UserData:        meta.User,
+		MongoMeta:       meta.Mongo,
+		DataSize:        meta.DataSize,
+		Permanent:       meta.Permanent,
 	}
 	return internal.UploadSentinel(su.UploaderProvider, backupSentinel, backupName)
 }

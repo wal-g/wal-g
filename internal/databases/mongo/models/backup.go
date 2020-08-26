@@ -9,6 +9,8 @@ type Backup struct {
 	FinishLocalTime time.Time   `json:"FinishLocalTime,omitempty"`
 	UserData        interface{} `json:"UserData,omitempty"`
 	MongoMeta       MongoMeta   `json:"MongoMeta,omitempty"`
+	Permanent       bool        `json:"Permanent"`
+	DataSize        int64       `json:"DataSize,omitempty"`
 }
 
 // NodeMeta represents MongoDB node metadata
@@ -21,6 +23,14 @@ type NodeMeta struct {
 type MongoMeta struct {
 	Before NodeMeta `json:"Before,omitempty"`
 	After  NodeMeta `json:"After,omitempty"`
+}
+
+// BackupMeta includes mongodb and storage metadata
+type BackupMeta struct {
+	Mongo     MongoMeta
+	DataSize  int64
+	Permanent bool
+	User      interface{}
 }
 
 // FirstOverlappingBackupForArch checks if archive overlaps any backup from given list.
