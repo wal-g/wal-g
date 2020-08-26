@@ -105,15 +105,26 @@ func SplitPurgingBackups(backups []models.Backup, retainCount *int, retainAfter 
 		return backups[i].StartLocalTime.After(backups[j].StartLocalTime)
 	})
 
-	for _, backup := range backups {
-		if retainCount != nil && len(retain) < *retainCount { // TODO: fix condition, use func args
-			tracelog.DebugLogger.Printf("Preserving backup per retain count policy: %s", backup.BackupName)
+	var backup models.Backup
+	retainedCount := 0
+	for i := range backups {
+		backup = backups[i]
+		if backup.Permanent {
+			tracelog.DebugLogger.Printf("Preserving backup due to keep permanent policy: %s", backup.BackupName)
+			retain = append(retain, backup)
+			continue
+		}
+
+		if retainCount != nil && retainedCount < *retainCount { // TODO: fix condition, use func args
+			retainedCount++
+			tracelog.DebugLogger.Printf("Preserving backup due to retain count policy [%d/%d]: %s",
+				retainedCount, *retainCount, backup.BackupName)
 			retain = append(retain, backup)
 			continue
 		}
 
 		if retainAfter != nil && backup.StartLocalTime.After(*retainAfter) { // TODO: fix condition, use func args
-			tracelog.DebugLogger.Printf("Preserving backup per retain time policy: %s", backup.BackupName)
+			tracelog.DebugLogger.Printf("Preserving backup due to retain time policy: %s", backup.BackupName)
 			retain = append(retain, backup)
 			continue
 		}
@@ -125,7 +136,9 @@ func SplitPurgingBackups(backups []models.Backup, retainCount *int, retainAfter 
 // SplitPurgingOplogArchivesByTS returns archives with start_maj_ts < purgeBeforeTS.
 func SplitPurgingOplogArchivesByTS(archives []models.Archive, purgeBeforeTS models.Timestamp) []models.Archive {
 	purge := make([]models.Archive, 0)
-	for _, arch := range archives {
+	var arch models.Archive
+	for i := range archives {
+		arch = archives[i]
 		if models.LessTS(arch.End, purgeBeforeTS) {
 			tracelog.DebugLogger.Printf("Purging oplog archive: %s", arch.Filename())
 			purge = append(purge, arch)

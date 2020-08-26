@@ -69,5 +69,5 @@ func init() {
 	deleteCmd.Flags().BoolVar(&purgeOplog, PurgeOplogFlag, false, "Purge oplog archives")
 	deleteCmd.Flags().BoolVar(&purgeGarbage, PurgeGarbageFlag, false, "Purge garbage in backup folder")
 	deleteCmd.Flags().StringVar(&retainAfter, RetainAfterFlag, "", "Keep backups newer")
-	deleteCmd.Flags().UintVar(&retainCount, RetainCountFlag, 0, "Keep minimum count")
+	deleteCmd.Flags().UintVar(&retainCount, RetainCountFlag, 0, "Keep minimum count, except permanent backups")
 }

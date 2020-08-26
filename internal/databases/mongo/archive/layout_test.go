@@ -391,6 +391,16 @@ var (
 		{StartLocalTime: time.Unix(1579000100, 0), FinishLocalTime: time.Unix(1579000101, 0)},
 		{StartLocalTime: time.Unix(1579000001, 0), FinishLocalTime: time.Unix(1579000001, 0)},
 	}
+	SplitBackupsPermanent = []models.Backup{
+		{StartLocalTime: time.Unix(1579000500, 0), FinishLocalTime: time.Unix(1579000550, 0)},
+		{StartLocalTime: time.Unix(1579000300, 0), FinishLocalTime: time.Unix(1579000400, 0)},
+		{StartLocalTime: time.Unix(1579000300, 0), FinishLocalTime: time.Unix(1579000400, 0)},
+		{StartLocalTime: time.Unix(1579000200, 0), FinishLocalTime: time.Unix(1579000250, 0)},
+		{StartLocalTime: time.Unix(1579000100, 0), FinishLocalTime: time.Unix(1579000101, 0), Permanent: true},
+		{StartLocalTime: time.Unix(1579000001, 0), FinishLocalTime: time.Unix(1579000001, 0)},
+		{StartLocalTime: time.Unix(1579000001, 0), FinishLocalTime: time.Unix(1579000001, 0)},
+		{StartLocalTime: time.Unix(1579000000, 0), FinishLocalTime: time.Unix(1579000001, 0), Permanent: true},
+	}
 )
 
 func IntPtr(i int) *int {
@@ -560,6 +570,27 @@ func TestSplitPurgingBackups(t *testing.T) {
 			wantPurge:  SplitBackups[4:],
 			wantRetain: SplitBackups[:4],
 			err:        nil,
+		},
+		{
+			name: "Purge_3,count=2_gt_time_after_3",
+			args: args{
+				backups:     SplitBackupsPermanent,
+				retainCount: IntPtr(2),
+				retainAfter: TimePtr(SplitBackups[3].StartLocalTime.Add(time.Second)),
+			},
+			wantPurge: []models.Backup{
+				{StartLocalTime: time.Unix(1579000200, 0), FinishLocalTime: time.Unix(1579000250, 0)},
+				{StartLocalTime: time.Unix(1579000001, 0), FinishLocalTime: time.Unix(1579000001, 0)},
+				{StartLocalTime: time.Unix(1579000001, 0), FinishLocalTime: time.Unix(1579000001, 0)},
+			},
+			wantRetain: []models.Backup{
+				{StartLocalTime: time.Unix(1579000500, 0), FinishLocalTime: time.Unix(1579000550, 0)},
+				{StartLocalTime: time.Unix(1579000300, 0), FinishLocalTime: time.Unix(1579000400, 0)},
+				{StartLocalTime: time.Unix(1579000300, 0), FinishLocalTime: time.Unix(1579000400, 0)},
+				{StartLocalTime: time.Unix(1579000100, 0), FinishLocalTime: time.Unix(1579000101, 0), Permanent: true},
+				{StartLocalTime: time.Unix(1579000000, 0), FinishLocalTime: time.Unix(1579000001, 0), Permanent: true},
+			},
+			err: nil,
 		},
 	}
 	for _, tt := range tests {

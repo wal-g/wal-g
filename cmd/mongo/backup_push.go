@@ -17,6 +17,8 @@ import (
 
 const (
 	BackupPushShortDescription = "Pushes backup to storage"
+	PermanentFlag              = "permanent"
+	PermanentShorthand         = "p"
 )
 
 var (
@@ -61,5 +63,6 @@ var backupPushCmd = &cobra.Command{
 }
 
 func init() {
+	backupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes permanent backup")
 	Cmd.AddCommand(backupPushCmd)
 }
