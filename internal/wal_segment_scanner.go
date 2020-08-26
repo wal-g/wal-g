@@ -26,6 +26,11 @@ func (status ScannedSegmentStatus) String() string {
 	return [...]string{"", "MISSING_LOST", "MISSING_UPLOADING", "MISSING_DELAYED", "FOUND"}[status]
 }
 
+// MarshalJSON marshals the ScannedSegmentStatus enum as a quoted json string
+func (status ScannedSegmentStatus) MarshalJSON() ([]byte, error) {
+	return marshalEnumToJSON(status)
+}
+
 // WalSegmentScanner is used to scan the WAL segments storage
 type WalSegmentScanner struct {
 	ScannedSegments  []ScannedSegmentDescription
