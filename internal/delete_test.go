@@ -230,7 +230,7 @@ func TestDeleteBeforeTargetWithPermanentBackups(t *testing.T) {
 	verifyThatExistBackupsAndWals(t, expectBackupExistBeforeDelete, expectWalExistBeforeDelete, folder)
 
 	// attempt delete
-	target := storage.NewLocalObject("", utility.TimeNowCrossPlatformLocal().Add(time.Duration(1*int(time.Minute))))
+	target := storage.NewLocalObject("", utility.TimeNowCrossPlatformLocal().Add(time.Duration(1*int(time.Minute))), 0)
 	err := internal.DeleteBeforeTarget(folder, target, true, isFullBackup, lessByTime)
 	assert.NoError(t, err)
 
@@ -252,7 +252,7 @@ func createMockFolderWithTime(t *testing.T, baseTime time.Time) *mocks.MockFolde
 		} else {
 			name = baseNamePrefix + lsnPrefix + strconv.Itoa(i) + deltaMark + lastLSN
 		}
-		objects[i] = storage.NewLocalObject(name, baseTime.Add(iDuration))
+		objects[i] = storage.NewLocalObject(name, baseTime.Add(iDuration), 0)
 	}
 
 	controller := gomock.NewController(t)
