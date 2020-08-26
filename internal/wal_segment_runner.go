@@ -38,7 +38,7 @@ type WalSegmentDescription struct {
 	Timeline uint32
 }
 
-func (desc *WalSegmentDescription) GetFileName() string {
+func (desc WalSegmentDescription) GetFileName() string {
 	return desc.Number.getFilename(desc.Timeline)
 }
 
