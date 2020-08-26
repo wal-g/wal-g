@@ -57,7 +57,7 @@ func testWalSegmentRunner(t *testing.T, minSegmentNo, maxSegmentNo internal.WalS
 		}
 	}
 	startSegment := internal.WalSegmentDescription{Number: maxSegmentNo, Timeline: timelineId}
-	walSegmentRunner := internal.NewWalSegmentRunner(startSegment, walSegments, minSegmentNo)
+	walSegmentRunner := internal.NewWalSegmentRunner(startSegment, walSegments, minSegmentNo, nil)
 
 	prevSegment := startSegment
 	outputSegments := make(map[internal.WalSegmentDescription]bool)

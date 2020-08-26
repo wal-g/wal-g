@@ -54,6 +54,23 @@ func newHistoryRecordFromString(row string) (*TimelineHistoryRecord, error) {
 	return &TimelineHistoryRecord{timeline: uint32(timeline), lsn: lsn, comment: comment}, nil
 }
 
+// createTimelineSwitchMap creates a map to lookup the TimelineHistoryRecords of .history file
+// by WalSegmentNo. So we can use this map to do a fast lookup
+// and check if there was a timeline switch on the provided segment number.
+func createTimelineSwitchMap(startTimeline uint32, walFolder storage.Folder) (map[WalSegmentNo]*TimelineHistoryRecord, error) {
+	timeLineHistoryMap := make(map[WalSegmentNo]*TimelineHistoryRecord, 0)
+	historyRecords, err := getTimeLineHistoryRecords(startTimeline, walFolder)
+	if _, ok := err.(HistoryFileNotFoundError); ok {
+		// return empty map if not found any history
+		return timeLineHistoryMap, nil
+	}
+	// store records in a map for fast lookup by wal segment number
+	for _, record := range historyRecords {
+		walSegmentNo := newWalSegmentNo(record.lsn)
+		timeLineHistoryMap[walSegmentNo] = record
+	}
+	return timeLineHistoryMap, nil
+}
 
 func getTimeLineHistoryRecords(startTimeline uint32, walFolder storage.Folder) ([]*TimelineHistoryRecord, error) {
 	historyReadCloser, err := getHistoryFileFromStorage(startTimeline, walFolder)
