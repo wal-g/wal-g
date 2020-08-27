@@ -123,24 +123,11 @@ func testWalSegmentRunnerMultipleTimelines(t *testing.T, stopSegmentNo internal.
 	startSegment internal.WalSegmentDescription, timelineSwitchMap map[internal.WalSegmentNo]*internal.TimelineHistoryRecord,
 	storageSegmentsByTimeline, expectedSegmentsByTimeline map[uint32][]internal.WalSegmentNo) {
 
-	// convert storageSegmentsByTimeline
-	storageSegments := make(map[internal.WalSegmentDescription]bool, 0)
-	for timeline, segmentNumbers := range storageSegmentsByTimeline {
-		for _, segmentNo := range segmentNumbers {
-			segment := internal.WalSegmentDescription{Number: segmentNo, Timeline: timeline}
-			storageSegments[segment] = true
-		}
-	}
-	walSegmentRunner := internal.NewWalSegmentRunner(startSegment, storageSegments, stopSegmentNo, timelineSwitchMap)
+	// convert segments grouped by timeline to segments set
+	storageSegments := flattenSegmentsByTimelinesToSet(storageSegmentsByTimeline)
+	expectedSegments := flattenSegmentsByTimelinesToSet(expectedSegmentsByTimeline)
 
-	// convert expectedSegmentsByTimeline
-	expectedSegments := make(map[internal.WalSegmentDescription]bool, 0)
-	for timeline, segmentNumbers := range expectedSegmentsByTimeline {
-		for _, segmentNo := range segmentNumbers {
-			segment := internal.WalSegmentDescription{Number: segmentNo, Timeline: timeline}
-			expectedSegments[segment] = true
-		}
-	}
+	walSegmentRunner := internal.NewWalSegmentRunner(startSegment, storageSegments, stopSegmentNo, timelineSwitchMap)
 	testWalSegmentRunner(t, expectedSegments, walSegmentRunner)
 }
 
@@ -204,4 +191,15 @@ SegmentRunnerLoop:
 	for segment := range expectedFoundSegments {
 		assert.Contains(t, outputSegments, segment)
 	}
+}
+
+func flattenSegmentsByTimelinesToSet(segmentsByTimeline map[uint32][]internal.WalSegmentNo) map[internal.WalSegmentDescription]bool {
+	segmentsSet := make(map[internal.WalSegmentDescription]bool,0)
+	for timeline, segmentNumbers := range segmentsByTimeline {
+		for _, segmentNo := range segmentNumbers {
+			segment := internal.WalSegmentDescription{Number: segmentNo, Timeline: timeline}
+			segmentsSet[segment] = true
+		}
+	}
+	return segmentsSet
 }
