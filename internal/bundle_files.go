@@ -10,7 +10,8 @@ import (
 type BundleFiles interface {
 	AddSkippedFile(tarHeader *tar.Header, fileInfo os.FileInfo)
 	AddFile(tarHeader *tar.Header, fileInfo os.FileInfo, isIncremented bool)
-	AddFileWithCorruptBlocks(tarHeader *tar.Header, fileInfo os.FileInfo, isIncremented bool, corruptedBlocks []uint32)
+	AddFileWithCorruptBlocks(tarHeader *tar.Header, fileInfo os.FileInfo, isIncremented bool,
+		corruptedBlocks []uint32, storeAllBlocks bool)
 	GetUnderlyingMap() *sync.Map
 }
 
@@ -29,9 +30,9 @@ func (files *RegularBundleFiles) AddFile(tarHeader *tar.Header, fileInfo os.File
 }
 
 func (files *RegularBundleFiles) AddFileWithCorruptBlocks(tarHeader *tar.Header, fileInfo os.FileInfo,
-	isIncremented bool, corruptedBlocks []uint32) {
+	isIncremented bool, corruptedBlocks []uint32, storeAllBlocks bool) {
 	fileDescription := BackupFileDescription{IsSkipped: false, IsIncremented: isIncremented, MTime: fileInfo.ModTime()}
-	fileDescription.SetCorruptBlocks(corruptedBlocks)
+	fileDescription.SetCorruptBlocks(corruptedBlocks, storeAllBlocks)
 	files.Store(tarHeader.Name, fileDescription)
 }
 

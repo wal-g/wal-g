@@ -39,21 +39,33 @@ func (err IgnoredFileError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
+type TarBallFilePackerOptions struct {
+	verifyPageChecksums   bool
+	storeAllCorruptBlocks bool
+}
+
+func NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks bool) TarBallFilePackerOptions {
+	return TarBallFilePackerOptions{
+		verifyPageChecksums: verifyPageChecksums,
+		storeAllCorruptBlocks: storeAllCorruptBlocks,
+	}
+}
+
 // TarBallFilePacker is used to pack bundle file into tarball.
 type TarBallFilePacker struct {
-	deltaMap            PagedFileDeltaMap
-	incrementFromLsn    *uint64
-	files               BundleFiles
-	verifyPageChecksums bool
+	deltaMap         PagedFileDeltaMap
+	incrementFromLsn *uint64
+	files            BundleFiles
+	options          TarBallFilePackerOptions
 }
 
 func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *uint64, files BundleFiles,
-	verifyPageChecksums bool) *TarBallFilePacker {
+	options TarBallFilePackerOptions) *TarBallFilePacker {
 	return &TarBallFilePacker{
-		deltaMap:            deltaMap,
-		incrementFromLsn:    incrementFromLsn,
-		files:               files,
-		verifyPageChecksums: verifyPageChecksums,
+		deltaMap:         deltaMap,
+		incrementFromLsn: incrementFromLsn,
+		files:            files,
+		options:          options,
 	}
 }
 
@@ -84,7 +96,7 @@ func (p *TarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall TarBal
 	}
 	errorGroup, _ := errgroup.WithContext(context.Background())
 
-	if p.verifyPageChecksums {
+	if p.options.verifyPageChecksums {
 		var secondReadCloser io.ReadCloser
 		// newTeeReadCloser is used to provide the fileReadCloser to two consumers:
 		// fileReadCloser is needed for PackFileTo, secondReadCloser is for the page verification
@@ -94,7 +106,8 @@ func (p *TarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall TarBal
 			if err != nil {
 				return err
 			}
-			p.files.AddFileWithCorruptBlocks(cfi.header, cfi.fileInfo, cfi.isIncremented, corruptBlocks)
+			p.files.AddFileWithCorruptBlocks(cfi.header, cfi.fileInfo, cfi.isIncremented,
+				corruptBlocks, p.options.storeAllCorruptBlocks)
 			return nil
 		})
 	} else {

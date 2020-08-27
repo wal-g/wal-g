@@ -349,7 +349,7 @@ func TestWalk(t *testing.T) {
 		t.Log(err)
 	}
 
-	err = bundle.SetupComposer(false)
+	err = bundle.SetupComposer(internal.TarBallFilePackerOptions{})
 	if err != nil {
 		t.Log(err)
 	}

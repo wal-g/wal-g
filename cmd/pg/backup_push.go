@@ -9,13 +9,15 @@ import (
 )
 
 const (
-	BackupPushShortDescription = "Makes backup and uploads it to storage"
-	PermanentFlag              = "permanent"
-	FullBackupFlag             = "full"
-	VerifyPagesFlag            = "verify"
-	PermanentShorthand         = "p"
-	FullBackupShorthand        = "f"
-	VerifyPagesShorthand       = "v"
+	BackupPushShortDescription     = "Makes backup and uploads it to storage"
+	PermanentFlag                  = "permanent"
+	FullBackupFlag                 = "full"
+	VerifyPagesFlag                = "verify"
+	StoreAllCorruptBlocksFlag      = "store-all-corrupt"
+	PermanentShorthand             = "p"
+	FullBackupShorthand            = "f"
+	VerifyPagesShorthand           = "v"
+	StoreAllCorruptBlocksShorthand = "s"
 )
 
 var (
@@ -28,12 +30,14 @@ var (
 			uploader, err := internal.ConfigureWalUploader()
 			tracelog.ErrorLogger.FatalOnError(err)
 			verifyPageChecksums = verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting)
-			internal.HandleBackupPush(uploader, args[0], permanent, fullBackup, verifyPageChecksums)
+			storeAllCorruptBlocks = storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting)
+			internal.HandleBackupPush(uploader, args[0], permanent, fullBackup, verifyPageChecksums, storeAllCorruptBlocks)
 		},
 	}
-	permanent  = false
-	fullBackup = false
-	verifyPageChecksums = false
+	permanent             = false
+	fullBackup            = false
+	verifyPageChecksums   = false
+	storeAllCorruptBlocks = false
 )
 
 func init() {
@@ -42,4 +46,6 @@ func init() {
 	backupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes permanent backup")
 	backupPushCmd.Flags().BoolVarP(&fullBackup, FullBackupFlag, FullBackupShorthand, false, "Make full backup-push")
 	backupPushCmd.Flags().BoolVarP(&verifyPageChecksums, VerifyPagesFlag, VerifyPagesShorthand, false, "Verify page checksums")
+	backupPushCmd.Flags().BoolVarP(&storeAllCorruptBlocks, StoreAllCorruptBlocksFlag, StoreAllCorruptBlocksShorthand,
+		false, "Store all corrupt blocks found during page checksum verification")
 }

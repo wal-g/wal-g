@@ -32,6 +32,7 @@ const (
 	UseReverseUnpackSetting      = "WALG_USE_REVERSE_UNPACK"
 	SkipRedundantTarsSetting     = "WALG_SKIP_REDUNDANT_TARS"
 	VerifyPageChecksumsSetting   = "WALG_VERIFY_PAGE_CHECKSUMS"
+	StoreAllCorruptBlocksSetting = "WALG_STORE_ALL_CORRUPT_BLOCKS"
 	LogLevelSetting              = "WALG_LOG_LEVEL"
 	TarSizeThresholdSetting      = "WALG_TAR_SIZE_THRESHOLD"
 	CseKmsIDSetting              = "WALG_CSE_KMS_ID"
@@ -101,6 +102,7 @@ var (
 		UseReverseUnpackSetting:      "false",
 		SkipRedundantTarsSetting:     "false",
 		VerifyPageChecksumsSetting:   "false",
+		StoreAllCorruptBlocksSetting: "false",
 
 		OplogArchiveTimeoutInterval:    "60s",
 		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
@@ -138,6 +140,7 @@ var (
 		UseReverseUnpackSetting:      true,
 		SkipRedundantTarsSetting:     true,
 		VerifyPageChecksumsSetting:   true,
+		StoreAllCorruptBlocksSetting: true,
 
 		// Postgres
 		PgPortSetting:     true,
