@@ -1,6 +1,7 @@
 package ioextensions
 
 import (
+	"fmt"
 	"io"
 	"os"
 
@@ -79,9 +80,12 @@ func (m *MultiCloser) Close() error {
 	for _, c := range m.closers {
 		// still call Close on each, even if one returns an error
 		if e := c.Close(); e != nil {
-			err = e
+			if err != nil {
+				err = fmt.Errorf("%w; %v", err, e)
+			} else {
+				err = e
+			}
 		}
 	}
 	return err
 }
-
