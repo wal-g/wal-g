@@ -54,7 +54,7 @@ func (queryRunner *PgQueryRunner) buildGetVersion() string {
 }
 
 // BuildGetCurrentLSN formats a query to get cluster LSN
-func (queryRunner *PgQueryRunner) buildGetLsn() string {
+func (queryRunner *PgQueryRunner) buildGetCurrentLsn() string {
 	return "SELECT pg_current_wal_lsn()"
 }
 
@@ -119,8 +119,11 @@ func (queryRunner *PgQueryRunner) getVersion() (err error) {
 // Get current LSN of cluster
 func (queryRunner *PgQueryRunner) getCurrentLsn() (lsn string, err error) {
 	conn := queryRunner.connection
-	err = conn.QueryRow(queryRunner.buildGetLsn()).Scan(&lsn)
-	return lsn, errors.Wrap(err, "GetCurrentLsn: getting current LSN of the cluster failed")
+	err = conn.QueryRow(queryRunner.buildGetCurrentLsn()).Scan(&lsn)
+	if err != nil {
+		return "", errors.Wrap(err, "GetCurrentLsn: getting current LSN of the cluster failed")
+	}
+	return lsn, nil
 }
 
 func (queryRunner *PgQueryRunner) getSystemIdentifier() (err error) {
