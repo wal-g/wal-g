@@ -54,6 +54,17 @@ func NewWalSegmentScanner(walSegmentRunner *WalSegmentRunner) *WalSegmentScanner
 	}
 }
 
+// Scan traverse the WAL storage with WalSegmentRunner.
+// Scan starts from the WalSegmentRunner's current position,
+// so in case of subsequent Scan() call it will continue from the position
+// where it stopped previously.
+//
+// Scan always stops if:
+// - Stop segment is reached OR
+// - Unknown error encountered
+// Also, it may be configured to stop after:
+// - Scanning the ScanSegmentsLimit of segments
+// - Finding the first segment which exists in WAL storage
 func (scanner *WalSegmentScanner) Scan(config SegmentScanConfig) error {
 	// scan may have a limited number of iterations, or may be unlimited
 	for i := 0; config.UnlimitedScan || i < config.ScanSegmentsLimit; i++ {

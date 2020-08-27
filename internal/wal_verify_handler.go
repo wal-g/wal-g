@@ -121,7 +121,8 @@ func HandleWalVerify(rootFolder storage.Folder, startWalSegment WalSegmentDescri
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-// runWalIntegrityScan invokes the following storage scan series:
+// runWalIntegrityScan invokes the following storage scan series
+// (on each iteration scanner continues from the position where it stopped)
 // 1. At first, it runs scan until it finds some segment in WAL storage
 // and marks all encountered missing segments as "missing, probably delayed"
 // 2. Then it scans exactly uploadingSegmentRangeSize count of segments,
@@ -141,9 +142,8 @@ func runWalIntegrityScan(scanner *WalSegmentScanner, uploadingSegmentRangeSize i
 
 	// Traverse potentially uploading segments, mark all missing segments as probably uploading
 	err = scanner.Scan(SegmentScanConfig{
-		ScanSegmentsLimit:       uploadingSegmentRangeSize,
-		StopOnFirstFoundSegment: true,
-		MissingSegmentStatus:    ProbablyUploading,
+		ScanSegmentsLimit:    uploadingSegmentRangeSize,
+		MissingSegmentStatus: ProbablyUploading,
 	})
 	if err != nil {
 		return err
