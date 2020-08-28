@@ -33,6 +33,7 @@ const (
 	SkipRedundantTarsSetting     = "WALG_SKIP_REDUNDANT_TARS"
 	VerifyPageChecksumsSetting   = "WALG_VERIFY_PAGE_CHECKSUMS"
 	StoreAllCorruptBlocksSetting = "WALG_STORE_ALL_CORRUPT_BLOCKS"
+	UseRatingComposerSetting     = "WALG_USE_RATING_COMPOSER"
 	LogLevelSetting              = "WALG_LOG_LEVEL"
 	TarSizeThresholdSetting      = "WALG_TAR_SIZE_THRESHOLD"
 	CseKmsIDSetting              = "WALG_CSE_KMS_ID"
@@ -103,6 +104,7 @@ var (
 		SkipRedundantTarsSetting:     "false",
 		VerifyPageChecksumsSetting:   "false",
 		StoreAllCorruptBlocksSetting: "false",
+		UseRatingComposerSetting:     "false",
 
 		OplogArchiveTimeoutInterval:    "60s",
 		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
@@ -141,6 +143,7 @@ var (
 		SkipRedundantTarsSetting:     true,
 		VerifyPageChecksumsSetting:   true,
 		StoreAllCorruptBlocksSetting: true,
+		UseRatingComposerSetting:     true,
 
 		// Postgres
 		PgPortSetting:     true,
