@@ -17,7 +17,7 @@ import (
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
-	"github.com/francoispqt/gojay"
+	jsoniter "github.com/json-iterator/go"
 )
 
 type SentinelMarshallingError struct {
@@ -286,8 +286,8 @@ func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupNa
 
 	pr, pw := io.Pipe()
 
-	encoder := gojay.BorrowEncoder(pw)
-
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
+	encoder := json.NewEncoder(pw)
 
 	go func(){
 		err :=encoder.Encode(sentinelDto)

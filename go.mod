@@ -31,6 +31,7 @@ require (
 	github.com/jackc/pgx v3.6.0+incompatible
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/jessevdk/go-flags v1.4.0 // indirect
+	github.com/json-iterator/go v1.1.6
 	github.com/lib/pq v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.1
 	github.com/mattn/go-runewidth v0.0.8 // indirect
