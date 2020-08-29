@@ -15,21 +15,16 @@ const (
 	// Sets standbyMessageTimeout in Streaming Replication Protocol.
 	streamTimeout = 10
 )
-/*
-Things to test:
-* running without slot
-* Can we prevent / detect a wal-gap
-* If a slot already exists as logical slot
-* Multiple versions of postgres
-* Different wal size (>=pg11)
-* timeline increase
 
-Things to do:
-* unittests for queryrunner code
-* upgrade to pgx/v4
-* use pglogrepl.LSN in replace internal/wal_segment_no
+/*
+Things to do (future):
 * public / private classes and functions (first case on names)
 * proper sizes for int's
+* use LSN in replace internal/wal_segment_no
+* unittests for queryrunner code
+* upgrade to pgx/v4
+* we might want to add a feature to have wal-g advance multiple slots to support HA setups natively
+* Test with different wal size (>=pg11)
 */
 
 type genericWalReceiveError struct {
