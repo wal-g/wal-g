@@ -95,6 +95,8 @@ func HandleWALReceive(uploader *WalUploader) {
 			tracelog.ErrorLogger.FatalOnError(err)
 		case ProcessMessageCopyDone:
 			// segment is a partial. Write, and create a new for the next timeline.
+			err = uploader.UploadWalFile(newNamedReaderImpl(segment, segment.Name()))
+			tracelog.ErrorLogger.FatalOnError(err)
 			timeline++
 			timelinehistfile, err := pglogrepl.TimelineHistory(context.Background(), conn, timeline)
 			tracelog.ErrorLogger.FatalOnError(err)
