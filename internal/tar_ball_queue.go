@@ -99,28 +99,34 @@ func (tarQueue *TarBallQueue) EnqueueBack(tarBall TarBall) {
 	tarQueue.tarsToFillQueue <- tarBall
 }
 
+func (tarQueue *TarBallQueue) FinishTarBall(tarBall TarBall) error {
+	tarQueue.mutex.Lock()
+	defer tarQueue.mutex.Unlock()
+
+	err := tarQueue.CloseTarball(tarBall)
+	if err != nil {
+		return errors.Wrap(err, "HandleWalkedFSObject: failed to close tarball")
+	}
+
+	tarQueue.uploadQueue <- tarBall
+	for len(tarQueue.uploadQueue) > tarQueue.maxUploadQueue {
+		select {
+		case otb := <-tarQueue.uploadQueue:
+			otb.AwaitUploads()
+		default:
+		}
+	}
+
+	tarQueue.NewTarBall(true)
+	tarQueue.tarsToFillQueue <- tarQueue.LastCreatedTarball
+	return nil
+}
+
 func (tarQueue *TarBallQueue) CheckSizeAndEnqueueBack(tarBall TarBall) error {
 	if tarBall.Size() > tarQueue.TarSizeThreshold {
-		tarQueue.mutex.Lock()
-		defer tarQueue.mutex.Unlock()
-
-		err := tarQueue.CloseTarball(tarBall)
-		if err != nil {
-			return errors.Wrap(err, "HandleWalkedFSObject: failed to close tarball")
-		}
-
-		tarQueue.uploadQueue <- tarBall
-		for len(tarQueue.uploadQueue) > tarQueue.maxUploadQueue {
-			select {
-			case otb := <-tarQueue.uploadQueue:
-				otb.AwaitUploads()
-			default:
-			}
-		}
-
-		tarQueue.NewTarBall(true)
-		tarBall = tarQueue.LastCreatedTarball
+		return tarQueue.FinishTarBall(tarBall)
 	}
+
 	tarQueue.tarsToFillQueue <- tarBall
 	return nil
 }

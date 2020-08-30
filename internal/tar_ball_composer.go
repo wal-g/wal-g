@@ -3,6 +3,7 @@ package internal
 import (
 	"archive/tar"
 	"errors"
+	"github.com/jackc/pgx"
 	"os"
 )
 
@@ -36,16 +37,26 @@ type TarBallComposerType int
 
 const (
 	RegularComposer TarBallComposerType = iota + 1
+	RatingComposer
 )
 
-func NewTarBallComposer(composerType TarBallComposerType, bundle *Bundle,
-	filePackOptions TarBallFilePackerOptions) (TarBallComposer, error) {
+// TarBallComposerMaker is used to make an instance of TarBallComposer
+type TarBallComposerMaker interface {
+	Make(bundle *Bundle) (TarBallComposer, error)
+}
+
+func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn,
+	filePackOptions TarBallFilePackerOptions) (TarBallComposerMaker, error) {
 	switch composerType {
 	case RegularComposer:
-		bundleFiles := &RegularBundleFiles{}
-		tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, bundleFiles, filePackOptions)
-		return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, bundleFiles, bundle.Crypter), nil
+		return NewRegularTarBallComposerMaker(filePackOptions), nil
+	case RatingComposer:
+		relFileStats, err := newRelFileStatistics(conn)
+		if err != nil {
+			return nil, err
+		}
+		return NewRatingTarBallComposerMaker(relFileStats, filePackOptions)
 	default:
-		return nil, errors.New("NewTarBallComposer: Unknown TarBallComposerType")
+		return nil, errors.New("NewTarBallComposerMaker: Unknown TarBallComposerType")
 	}
 }

@@ -136,6 +136,37 @@ func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitma
 	return pageReader, incrementSize, nil
 }
 
+func ReadIncrementLocations(filePath string, fileSize int64, lsn uint64) ([]walparser.BlockLocation, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	fileReadSeekCloser := &ioextensions.ReadSeekCloserImpl{
+		Reader: NewDiskLimitReader(file),
+		Seeker: file,
+		Closer: file,
+	}
+	pageReader := &IncrementalPageReader{fileReadSeekCloser, fileSize, lsn, nil, nil}
+	err = pageReader.FullScanInitialize()
+	if err != nil {
+		return nil, err
+	}
+	return convertBlocksToLocations(filePath, pageReader.Blocks)
+}
+
+func convertBlocksToLocations(filePath string, blocks []uint32) ([]walparser.BlockLocation, error) {
+	relFileNode, err := GetRelFileNodeFrom(filePath)
+	if err != nil {
+		return nil, err
+	}
+	locations := make([]walparser.BlockLocation, 0, len(blocks))
+	for _, blockNo := range blocks {
+		locations = append(locations, *walparser.NewBlockLocation(relFileNode.SpcNode, relFileNode.DBNode, relFileNode.RelNode, blockNo))
+	}
+	return locations, nil
+}
+
 // ApplyFileIncrement changes pages according to supplied change map file
 func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrementalFiles bool) error {
 	tracelog.DebugLogger.Printf("Incrementing %s\n", fileName)

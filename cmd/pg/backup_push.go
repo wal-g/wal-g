@@ -14,10 +14,12 @@ const (
 	FullBackupFlag                 = "full"
 	VerifyPagesFlag                = "verify"
 	StoreAllCorruptBlocksFlag      = "store-all-corrupt"
+	UseRatingComposer              = "rating-composer"
 	PermanentShorthand             = "p"
 	FullBackupShorthand            = "f"
 	VerifyPagesShorthand           = "v"
 	StoreAllCorruptBlocksShorthand = "s"
+	UseRatingComposerShortHand     = "r"
 )
 
 var (
@@ -31,13 +33,19 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 			verifyPageChecksums = verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting)
 			storeAllCorruptBlocks = storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting)
-			internal.HandleBackupPush(uploader, args[0], permanent, fullBackup, verifyPageChecksums, storeAllCorruptBlocks)
+			tarBallComposerType := internal.RegularComposer
+			useRatingComposer = useRatingComposer || viper.GetBool(internal.UseRatingComposerSetting)
+			if useRatingComposer {
+				tarBallComposerType = internal.RatingComposer
+			}
+			internal.HandleBackupPush(uploader, args[0], permanent, fullBackup, verifyPageChecksums, storeAllCorruptBlocks, tarBallComposerType)
 		},
 	}
 	permanent             = false
 	fullBackup            = false
 	verifyPageChecksums   = false
 	storeAllCorruptBlocks = false
+	useRatingComposer     = false
 )
 
 func init() {
@@ -48,4 +56,5 @@ func init() {
 	backupPushCmd.Flags().BoolVarP(&verifyPageChecksums, VerifyPagesFlag, VerifyPagesShorthand, false, "Verify page checksums")
 	backupPushCmd.Flags().BoolVarP(&storeAllCorruptBlocks, StoreAllCorruptBlocksFlag, StoreAllCorruptBlocksShorthand,
 		false, "Store all corrupt blocks found during page checksum verification")
+	backupPushCmd.Flags().BoolVarP(&useRatingComposer, UseRatingComposer, UseRatingComposerShortHand, false, "Use rating tar composer (beta)")
 }

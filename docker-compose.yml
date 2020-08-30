@@ -29,6 +29,7 @@ services:
     entrypoint: sh
     command: >
       -c 'mkdir -p /export/fullbucket
+      &&  mkdir -p /export/fullratingcomposerbucket
       &&  mkdir -p /export/fullscandeltabucket
       &&  mkdir -p /export/cryptobucket
       &&  mkdir -p /export/waldeltabucket
@@ -181,6 +182,17 @@ services:
       context: .
     image: wal-g/full_backup_test
     container_name: wal-g_pg_full_backup_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_full_backup_rating_composer_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_rating_composer_test
+      context: .
+    image: wal-g/full_backup_rating_composer_test
+    container_name: wal-g_pg_full_backup_rating_composer_test
     depends_on:
       - s3
     links:

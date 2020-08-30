@@ -111,6 +111,9 @@ func GetRelFileNodeFrom(filePath string) (*walparser.RelFileNode, error) {
 	folderPath, name := path.Split(filePath)
 	folderPathParts := strings.Split(strings.TrimSuffix(folderPath, "/"), string(os.PathSeparator))
 	match := pagedFilenameRegexp.FindStringSubmatch(name)
+	if match == nil {
+		return nil, errors.New("GetRelFileNodeFrom: can't parse path: " + filePath)
+	}
 	relNode, err := strconv.Atoi(match[1])
 	if err != nil {
 		return nil, errors.Wrapf(err, "GetRelFileNodeFrom: can't get relNode from: '%s'", filePath)
