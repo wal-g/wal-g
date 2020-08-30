@@ -11,6 +11,36 @@ import (
 	"sync"
 )
 
+type RatingTarBallComposerMaker struct {
+	fileStats         RelFileStatistics
+	bundleFiles       BundleFiles
+	filePackerOptions TarBallFilePackerOptions
+}
+
+func NewRatingTarBallComposerMaker(relFileStats RelFileStatistics,
+	filePackerOptions TarBallFilePackerOptions) (*RatingTarBallComposerMaker, error) {
+	bundleFiles := newStatBundleFiles(relFileStats)
+	return &RatingTarBallComposerMaker{
+		fileStats:   relFileStats,
+		bundleFiles: bundleFiles,
+		filePackerOptions: filePackerOptions,
+	}, nil
+}
+
+func (maker *RatingTarBallComposerMaker) Make(bundle *Bundle) (TarBallComposer, error) {
+	composeRatingEvaluator := NewDefaultComposeRatingEvaluator(bundle.IncrementFromFiles)
+	filePacker := newTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, maker.bundleFiles, maker.filePackerOptions)
+	return NewRatingTarBallComposer(uint64(bundle.TarSizeThreshold),
+		composeRatingEvaluator,
+		bundle.IncrementFromLsn,
+		bundle.DeltaMap,
+		bundle.TarBallQueue,
+		bundle.Crypter,
+		maker.fileStats,
+		maker.bundleFiles,
+		filePacker)
+}
+
 type RatedComposeFileInfo struct {
 	ComposeFileInfo
 	updateRating uint64
@@ -77,7 +107,7 @@ type RatingTarBallComposer struct {
 func NewRatingTarBallComposer(
 	tarSizeThreshold uint64, updateRatingEvaluator ComposeRatingEvaluator,
 	incrementBaseLsn *uint64, deltaMap PagedFileDeltaMap, tarBallQueue *TarBallQueue,
-	crypter crypto.Crypter, fileStats RelFileStatistics, bundleFiles BundleFiles) (*RatingTarBallComposer, error) {
+	crypter crypto.Crypter, fileStats RelFileStatistics, bundleFiles BundleFiles, packer *TarBallFilePacker) (*RatingTarBallComposer, error) {
 
 	errorGroup, _ := errgroup.WithContext(context.Background())
 	deltaMapComplete := true
@@ -98,7 +128,7 @@ func NewRatingTarBallComposer(
 		crypter:                crypter,
 		fileStats:              fileStats,
 		bundleFiles:            bundleFiles,
-		tarFilePacker:          newTarBallFilePacker(deltaMap, incrementBaseLsn, bundleFiles),
+		tarFilePacker:          packer,
 		errorGroup:             errorGroup,
 	}
 

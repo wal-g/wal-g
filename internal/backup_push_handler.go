@@ -76,7 +76,7 @@ func createAndPushBackup(
 	isPermanent, forceIncremental bool,
 	incrementCount int,
 	verifyPageChecksums, storeAllCorruptBlocks bool,
-	useRatingComposer bool,
+	tarBallComposerType TarBallComposerType,
 ) {
 	folder := uploader.UploadingFolder
 	uploader.UploadingFolder = folder.GetSubFolder(backupsFolder) // TODO: AB: this subfolder switch look ugly. I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
@@ -123,7 +123,10 @@ func createAndPushBackup(
 	// Start a new tar bundle, walk the archiveDirectory and upload everything there.
 	err = bundle.StartQueue(NewStorageTarBallMaker(backupName, uploader.Uploader))
 	tracelog.ErrorLogger.FatalOnError(err)
-	err = bundle.SetupComposer(NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks), conn)
+	tarBallComposerMaker, err := NewTarBallComposerMaker(tarBallComposerType, conn,
+		NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks))
+	tracelog.ErrorLogger.FatalOnError(err)
+	err = bundle.SetupComposer(tarBallComposerMaker)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Println("Walking ...")
 	err = filepath.Walk(archiveDirectory, bundle.HandleWalkedFSObject)
@@ -202,7 +205,7 @@ func createAndPushBackup(
 // TODO : unit tests
 // HandleBackupPush is invoked to perform a wal-g backup-push
 func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanent, isFullBackup,
-	verifyPageChecksums, storeAllCorruptBlocks, useRatingComposer bool) {
+	verifyPageChecksums, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType) {
 	archiveDirectory = utility.ResolveSymlink(archiveDirectory)
 	maxDeltas, fromFull := getDeltaConfig()
 	checkPgVersionAndPgControl(archiveDirectory)
@@ -254,7 +257,8 @@ func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanen
 	}
 
 	createAndPushBackup(uploader, archiveDirectory, utility.BaseBackupPath, previousBackupName,
-		previousBackupSentinelDto, isPermanent, false, incrementCount, verifyPageChecksums, storeAllCorruptBlocks, useRatingComposer)
+		previousBackupSentinelDto, isPermanent, false, incrementCount, verifyPageChecksums,
+		storeAllCorruptBlocks, tarBallComposerType)
 }
 
 // TODO : unit tests

@@ -33,7 +33,11 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 			verifyPageChecksums = verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting)
 			storeAllCorruptBlocks = storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting)
-			internal.HandleBackupPush(uploader, args[0], permanent, fullBackup, verifyPageChecksums, storeAllCorruptBlocks, useRatingComposer)
+			tarBallComposerType := internal.RegularComposer
+			if useRatingComposer {
+				tarBallComposerType = internal.RatingComposer
+			}
+			internal.HandleBackupPush(uploader, args[0], permanent, fullBackup, verifyPageChecksums, storeAllCorruptBlocks, tarBallComposerType)
 		},
 	}
 	permanent             = false

@@ -103,9 +103,13 @@ func (bundle *Bundle) StartQueue(tarBallMaker TarBallMaker) error {
 	return bundle.TarBallQueue.StartQueue()
 }
 
-func (bundle *Bundle) SetupComposer(filePackOptions TarBallFilePackerOptions, conn *pgx.Conn) (err error) {
-	bundle.TarBallComposer, err = NewTarBallComposer(RegularComposer, bundle, filePackOptions, conn)
-	return err
+func (bundle *Bundle) SetupComposer(composerMaker TarBallComposerMaker) (err error) {
+	tarBallComposer, err := composerMaker.Make(bundle)
+	if err != nil {
+		return err
+	}
+	bundle.TarBallComposer = tarBallComposer
+	return nil
 }
 
 func (bundle *Bundle) FinishQueue() error {
