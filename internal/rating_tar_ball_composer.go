@@ -50,10 +50,6 @@ type RatedComposeFileInfo struct {
 	expectedSize uint64
 }
 
-//
-// UNCHANGED FRAGMENT START
-//
-
 // TarFilesCollection stores the files which are going to be written
 // to the same tarball
 type TarFilesCollection struct {
@@ -69,10 +65,6 @@ func (collection *TarFilesCollection) AddFile(file *RatedComposeFileInfo) {
 	collection.files = append(collection.files, file)
 	collection.expectedSize += file.expectedSize
 }
-
-//
-// UNCHANGED FRAGMENT END
-//
 
 // RatingTarBallComposer receives all files and tar headers
 // that are going to be written to the backup,
@@ -238,10 +230,6 @@ func (c *RatingTarBallComposer) sortFiles() {
 	})
 }
 
-//
-// UNCHANGED FRAGMENT START
-//
-
 func (c *RatingTarBallComposer) composeFiles() ([]*tar.Header, []*TarFilesCollection) {
 	c.sortFiles()
 	tarFilesCollections := make([]*TarFilesCollection, 0)
@@ -264,10 +252,6 @@ func (c *RatingTarBallComposer) composeFiles() ([]*tar.Header, []*TarFilesCollec
 	tarFilesCollections = append(tarFilesCollections, currentFilesCollection)
 	return c.headersToCompose, tarFilesCollections
 }
-
-//
-// UNCHANGED FRAGMENT END
-//
 
 func (c *RatingTarBallComposer) getExpectedFileSize(cfi *ComposeFileInfo) (uint64, error) {
 	if !cfi.isIncremented {
