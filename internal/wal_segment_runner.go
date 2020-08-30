@@ -38,7 +38,7 @@ type WalSegmentDescription struct {
 	Timeline uint32
 }
 
-func (desc *WalSegmentDescription) GetFileName() string {
+func (desc WalSegmentDescription) GetFileName() string {
 	return desc.Number.getFilename(desc.Timeline)
 }
 
@@ -47,15 +47,21 @@ type WalSegmentRunner struct {
 	currentWalSegment WalSegmentDescription
 	walFolderSegments map[WalSegmentDescription]bool
 	stopSegmentNo     WalSegmentNo
+	timelineSwitchMap map[WalSegmentNo]*TimelineHistoryRecord
 }
 
 func NewWalSegmentRunner(
 	startWalSegment WalSegmentDescription,
 	segments map[WalSegmentDescription]bool,
 	stopSegmentNo WalSegmentNo,
+	timelineSwitchMap map[WalSegmentNo]*TimelineHistoryRecord,
 ) *WalSegmentRunner {
-	return &WalSegmentRunner{startWalSegment,
-		segments, stopSegmentNo}
+	return &WalSegmentRunner{
+		currentWalSegment: startWalSegment,
+		walFolderSegments: segments,
+		stopSegmentNo:     stopSegmentNo,
+		timelineSwitchMap: timelineSwitchMap,
+	}
 }
 
 func (r *WalSegmentRunner) Current() WalSegmentDescription {
@@ -84,6 +90,10 @@ func (r *WalSegmentRunner) ForceMoveNext() {
 // getNextSegment calculates the next segment
 func (r *WalSegmentRunner) getNextSegment() WalSegmentDescription {
 	nextTimeline := r.currentWalSegment.Timeline
+	if record, ok := r.timelineSwitchMap[r.currentWalSegment.Number]; ok {
+		// switch timeline if current WAL segment number found in .history record
+		nextTimeline = record.timeline
+	}
 	nextSegmentNo := r.currentWalSegment.Number.previous()
 	return WalSegmentDescription{Timeline: nextTimeline, Number: nextSegmentNo}
 }

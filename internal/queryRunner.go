@@ -53,6 +53,11 @@ func (queryRunner *PgQueryRunner) buildGetVersion() string {
 	return "select (current_setting('server_version_num'))::int"
 }
 
+// BuildGetCurrentLSN formats a query to get cluster LSN
+func (queryRunner *PgQueryRunner) buildGetCurrentLsn() string {
+	return "SELECT pg_current_wal_lsn()"
+}
+
 // BuildStartBackup formats a query that starts backup according to server features and version
 func (queryRunner *PgQueryRunner) BuildStartBackup() (string, error) {
 	// TODO: rewrite queries for older versions to remove pg_is_in_recovery()
@@ -109,6 +114,16 @@ func (queryRunner *PgQueryRunner) getVersion() (err error) {
 	conn := queryRunner.connection
 	err = conn.QueryRow(queryRunner.buildGetVersion()).Scan(&queryRunner.Version)
 	return errors.Wrap(err, "GetVersion: getting Postgres version failed")
+}
+
+// Get current LSN of cluster
+func (queryRunner *PgQueryRunner) getCurrentLsn() (lsn string, err error) {
+	conn := queryRunner.connection
+	err = conn.QueryRow(queryRunner.buildGetCurrentLsn()).Scan(&lsn)
+	if err != nil {
+		return "", errors.Wrap(err, "GetCurrentLsn: getting current LSN of the cluster failed")
+	}
+	return lsn, nil
 }
 
 func (queryRunner *PgQueryRunner) getSystemIdentifier() (err error) {
