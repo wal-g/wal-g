@@ -327,7 +327,15 @@ func isEmpty(t *testing.T, path string) bool {
 	return false
 }
 
-func TestWalk(t *testing.T) {
+func TestWalk_RegularComposer(t *testing.T) {
+	testWalk(t, false)
+}
+
+func TestWalk_RatingComposer(t *testing.T) {
+	testWalk(t, true)
+}
+
+func testWalk(t *testing.T, useRatingComposer bool) {
 	// Generate random data and write to tmp dir `data...`.
 	data := generateData(t)
 	tarSizeThreshold := int64(10)
@@ -348,8 +356,8 @@ func TestWalk(t *testing.T) {
 	if err != nil {
 		t.Log(err)
 	}
-	
-	err = bundle.SetupComposer(internal.TarBallFilePackerOptions{}, nil)
+
+	err = bundle.SetupComposer(setupTestTarBallComposerMaker(useRatingComposer))
 	if err != nil {
 		t.Log(err)
 	}
@@ -403,4 +411,14 @@ func TestWalk(t *testing.T) {
 		// t.Errorf("upload: expected no error to occur but got %+v", err)
 		t.Logf("%+v\n", err)
 	}
+}
+
+func setupTestTarBallComposerMaker(useRatingComposer bool) internal.TarBallComposerMaker {
+	filePackOptions := internal.NewTarBallFilePackerOptions(false, false)
+	if !useRatingComposer {
+		return internal.NewRegularTarBallComposerMaker(filePackOptions)
+	}
+	relFileStats := make(internal.RelFileStatistics, 0)
+	composerMaker, _ := internal.NewRatingTarBallComposerMaker(relFileStats, filePackOptions)
+	return composerMaker
 }
