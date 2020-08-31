@@ -29,6 +29,22 @@ const (
 	oplogCollectionName = "oplog.rs"
 )
 
+type OplogAppMode string
+
+const (
+	OplogAppModeInitSync   OplogAppMode = "InitialSync"
+	OplogAppModeRecovering OplogAppMode = "Recovering"
+	OplogAppModeSecondary  OplogAppMode = "Secondary"
+)
+
+var (
+	OplogAppModes = map[OplogAppMode]struct{}{
+		OplogAppModeInitSync:   {},
+		OplogAppModeRecovering: {},
+		OplogAppModeSecondary:  {},
+	}
+)
+
 // CmdResponse is used to unmarshal mongodb cmd responses
 type CmdResponse struct {
 	Ok     int    `bson:"ok"`
@@ -110,11 +126,54 @@ func (m *MongoOplogCursor) Next(ctx context.Context) bool {
 
 // MongoClient implements MongoDriver
 type MongoClient struct {
-	c *mongo.Client
+	c           *mongo.Client
+	applyOpsCmd bson.D
+}
+
+// Options defines mongo client options
+type Options struct {
+	OplogApplicationMode *OplogAppMode
+	OplogAlwaysUpsert    *bool
+}
+
+type Option func(*Options)
+
+// OplogAlwaysUpsert sets applyOps argument oplogApplicationMode
+func OplogApplicationMode(mode OplogAppMode) Option {
+	return func(args *Options) {
+		args.OplogApplicationMode = &mode
+	}
+}
+
+// OplogAlwaysUpsert sets applyOps argument alwaysUpsert
+func OplogAlwaysUpsert(alwaysUpsert bool) Option {
+	return func(args *Options) {
+		args.OplogAlwaysUpsert = &alwaysUpsert
+	}
 }
 
 // NewMongoClient builds MongoClient
-func NewMongoClient(ctx context.Context, uri string) (*MongoClient, error) {
+func NewMongoClient(ctx context.Context, uri string, setters ...Option) (*MongoClient, error) {
+	// Default Options
+	args := &Options{}
+	for _, setter := range setters {
+		setter(args)
+	}
+
+	applyOpsCmd := bson.D{
+		{Key: "applyOps"},
+	}
+	if args.OplogApplicationMode != nil {
+		oplogApplicationMode := *args.OplogApplicationMode
+		if _, ok := OplogAppModes[oplogApplicationMode]; !ok {
+			return nil, fmt.Errorf("unsupported oplogApplicationMode: %s", oplogApplicationMode)
+		}
+		applyOpsCmd = append(applyOpsCmd, bson.E{Key: "oplogApplicationMode", Value: oplogApplicationMode})
+	}
+	if args.OplogAlwaysUpsert != nil {
+		applyOpsCmd = append(applyOpsCmd, bson.E{Key: "alwaysUpsert", Value: *args.OplogAlwaysUpsert})
+	}
+
 	client, err := mongo.Connect(ctx,
 		options.Client().ApplyURI(uri).
 			SetAppName(driverAppName).
@@ -123,7 +182,11 @@ func NewMongoClient(ctx context.Context, uri string) (*MongoClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &MongoClient{c: client}, client.Ping(ctx, nil)
+
+	return &MongoClient{
+		c:           client,
+		applyOpsCmd: applyOpsCmd,
+	}, client.Ping(ctx, nil)
 }
 
 // IndexDocument holds information about a collection's index.
@@ -228,18 +291,25 @@ func (mc *MongoClient) getOplogCollection(ctx context.Context) (*mongo.Collectio
 	return odb.Collection(oplogCollectionName), nil
 }
 
+func (mc *MongoClient) getApplyOpCmd() bson.D {
+	return mc.applyOpsCmd
+}
+
 // ApplyOp calls applyOps and check response
 func (mc *MongoClient) ApplyOp(ctx context.Context, op db.Oplog) error {
-	apply := mc.c.Database("admin").RunCommand(ctx, bson.M{"applyOps": []interface{}{op}})
+	// TODO: fix ugly interface after switch to passing pointers
+	cmd := mc.getApplyOpCmd()
+	cmd[0] = bson.E{Key: "applyOps", Value: []interface{}{op}}
+	apply := mc.c.Database("admin").RunCommand(ctx, cmd)
 	if err := apply.Err(); err != nil {
-		return fmt.Errorf("applyOps command failed: %w\nop:\n%+v", err, op)
+		return fmt.Errorf("applyOps command failed: %+v\nop:\n%+v", err, mc.applyOpsCmd)
 	}
 	resp := CmdResponse{}
 	if err := apply.Decode(&resp); err != nil {
-		return fmt.Errorf("can not unmarshall command execution response: %w", err)
+		return fmt.Errorf("can not unmarshall command execution response: %+v\ncommand was:%+v", err, cmd)
 	}
 	if resp.Ok != 1 {
-		return fmt.Errorf("command execution failed with: %s", resp.ErrMsg)
+		return fmt.Errorf("command execution failed with: %s\ncommand was: %+v", resp.ErrMsg, cmd)
 	}
 
 	return nil

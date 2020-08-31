@@ -56,17 +56,19 @@ const (
 	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
 	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
 
-	MongoDBUriSetting              = "MONGODB_URI"
-	MongoDBLastWriteUpdateInterval = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
-	OplogArchiveAfterSize          = "OPLOG_ARCHIVE_AFTER_SIZE"
-	OplogArchiveTimeoutInterval    = "OPLOG_ARCHIVE_TIMEOUT_INTERVAL"
-	OplogPITRDiscoveryInterval     = "OPLOG_PITR_DISCOVERY_INTERVAL"
-	OplogPushStatsEnabled          = "OPLOG_PUSH_STATS_ENABLED"
-	OplogPushStatsLoggingInterval  = "OPLOG_PUSH_STATS_LOGGING_INTERVAL"
-	OplogPushStatsUpdateInterval   = "OPLOG_PUSH_STATS_UPDATE_INTERVAL"
-	OplogPushStatsExposeHttp       = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
-	OplogPushWaitForBecomePrimary  = "OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY"
-	OplogPushPrimaryCheckInterval  = "OPLOG_PUSH_PRIMARY_CHECK_INTERVAL"
+	MongoDBUriSetting               = "MONGODB_URI"
+	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
+	OplogArchiveAfterSize           = "OPLOG_ARCHIVE_AFTER_SIZE"
+	OplogArchiveTimeoutInterval     = "OPLOG_ARCHIVE_TIMEOUT_INTERVAL"
+	OplogPITRDiscoveryInterval      = "OPLOG_PITR_DISCOVERY_INTERVAL"
+	OplogPushStatsEnabled           = "OPLOG_PUSH_STATS_ENABLED"
+	OplogPushStatsLoggingInterval   = "OPLOG_PUSH_STATS_LOGGING_INTERVAL"
+	OplogPushStatsUpdateInterval    = "OPLOG_PUSH_STATS_UPDATE_INTERVAL"
+	OplogPushStatsExposeHttp        = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
+	OplogPushWaitForBecomePrimary   = "OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY"
+	OplogPushPrimaryCheckInterval   = "OPLOG_PUSH_PRIMARY_CHECK_INTERVAL"
+	OplogReplayOplogAlwaysUpsert    = "OPLOG_REPLAY_OPLOG_ALWAYS_UPSERT"
+	OplogReplayOplogApplicationMode = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
 
 	MysqlDatasourceNameSetting = "WALG_MYSQL_DATASOURCE_NAME"
 	MysqlSslCaSetting          = "WALG_MYSQL_SSL_CA"
@@ -319,7 +321,7 @@ func ConfigureAndRunDefaultWebServer() error {
 		}
 	}
 	for setting, registerFunc := range HttpSettingExposeFuncs {
-		enabled, err := GetBoolSetting(setting, false)
+		enabled, err := GetBoolSettingDefault(setting, false)
 		if err != nil {
 			return err
 		}
