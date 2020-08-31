@@ -49,7 +49,7 @@ var oplogPushCmd = &cobra.Command{
 		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		primaryWait, err := internal.GetBoolSetting(internal.OplogPushWaitForBecomePrimary, false)
+		primaryWait, err := internal.GetBoolSettingDefault(internal.OplogPushWaitForBecomePrimary, false)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		uploadStatsUpdater := HandleOplogPushStatistics(ctx, models.Timestamp{}, mongoClient)
@@ -98,7 +98,7 @@ var oplogPushCmd = &cobra.Command{
 
 // HandleOplogPushStatistics starts statistics updates and exposes if configured
 func HandleOplogPushStatistics(ctx context.Context, sinceTS models.Timestamp, mongoClient client.MongoDriver) stats.OplogUploadStatsUpdater {
-	oplogPushStatsEnabled, err := internal.GetBoolSetting(internal.OplogPushStatsEnabled, false)
+	oplogPushStatsEnabled, err := internal.GetBoolSettingDefault(internal.OplogPushStatsEnabled, false)
 	tracelog.ErrorLogger.FatalOnError(err)
 	if !oplogPushStatsEnabled {
 		return nil
@@ -115,7 +115,7 @@ func HandleOplogPushStatistics(ctx context.Context, sinceTS models.Timestamp, mo
 		opts = append(opts, stats.EnableLogReport(statsLogInterval, tracelog.InfoLogger.Printf))
 	}
 
-	exposeHttp, err := internal.GetBoolSetting(internal.OplogPushStatsExposeHttp, false)
+	exposeHttp, err := internal.GetBoolSettingDefault(internal.OplogPushStatsExposeHttp, false)
 	tracelog.ErrorLogger.FatalOnError(err)
 	if exposeHttp {
 		opts = append(opts, stats.EnableHTTPHandler(stats.DefaultOplogPushStatsPrefix, webserver.DefaultWebServer))

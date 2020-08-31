@@ -37,8 +37,19 @@ var oplogReplayCmd = &cobra.Command{
 		mongodbUrl, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
 		tracelog.ErrorLogger.FatalOnError(err)
 
+		var mongoClientArgs []client.Option
+		oplogAlwaysUpsert, hasOplogAlwaysUpsert, err := internal.GetBoolSetting(internal.OplogReplayOplogAlwaysUpsert)
+		tracelog.ErrorLogger.FatalOnError(err)
+		if hasOplogAlwaysUpsert {
+			mongoClientArgs = append(mongoClientArgs, client.OplogAlwaysUpsert(oplogAlwaysUpsert))
+		}
+
+		if oplogApplicationMode, hasOplogApplicationMode := internal.GetSetting(internal.OplogReplayOplogApplicationMode); hasOplogApplicationMode {
+			mongoClientArgs = append(mongoClientArgs, client.OplogApplicationMode(client.OplogAppMode(oplogApplicationMode)))
+		}
+
 		// set up mongodb client and oplog applier
-		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl)
+		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl, mongoClientArgs...)
 		tracelog.ErrorLogger.FatalOnError(err)
 		err = mongoClient.EnsureIsMaster(ctx)
 		tracelog.ErrorLogger.FatalOnError(err)

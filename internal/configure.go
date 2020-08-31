@@ -409,10 +409,19 @@ func GetRequiredSetting(setting string) (string, error) {
 	return val, nil
 }
 
-func GetBoolSetting(setting string, def bool) (bool, error) {
+func GetBoolSettingDefault(setting string, def bool) (bool, error) {
 	val, ok := GetSetting(setting)
 	if !ok {
 		return def, nil
 	}
 	return strconv.ParseBool(val)
+}
+
+func GetBoolSetting(setting string) (val bool, ok bool, err error) {
+	valstr, ok := GetSetting(setting)
+	if !ok {
+		return false, false, nil
+	}
+	val, err = strconv.ParseBool(valstr)
+	return val, true, err
 }
