@@ -249,15 +249,15 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaPro
 	timeStart := utility.TimeNowCrossPlatformLocal()
 	backupName, err := su.PushStream(stream)
 	if err != nil {
-		return err
+		return fmt.Errorf("can not push stream: %+v", err)
 	}
 
 	if err := metaProvider.Finalize(backupName); err != nil {
-		return err
+		return fmt.Errorf("can not finalize meta provider: %+v", err)
 	}
 
 	if err := cmd.Wait(); err != nil {
-		return err
+		return fmt.Errorf("backup command failed: %+v", err)
 	}
 
 	meta := metaProvider.Meta()
@@ -269,7 +269,10 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaPro
 		DataSize:        meta.DataSize,
 		Permanent:       meta.Permanent,
 	}
-	return internal.UploadSentinel(su.UploaderProvider, backupSentinel, backupName)
+	if err := internal.UploadSentinel(su.UploaderProvider, backupSentinel, backupName); err != nil {
+		return fmt.Errorf("can not upload sentinel: %+v", err)
+	}
+	return nil
 }
 
 // StoragePurger deletes files in storage.
