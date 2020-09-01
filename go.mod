@@ -51,7 +51,7 @@ require (
 	github.com/stretchr/testify v1.5.1
 	github.com/ulikunitz/xz v0.5.6
 	github.com/wal-g/storages v0.0.0-20200827033816-72e6bf05d4be
-	github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30
+	github.com/wal-g/tracelog v0.0.0-20191217062047-377b574247ce
 	github.com/xdg/stringprep v1.0.1-0.20180714160509-73f8eece6fdc // indirect
 	go.mongodb.org/mongo-driver v1.3.4
 	golang.org/x/crypto v0.0.0-20200709230013-948cd5f35899
