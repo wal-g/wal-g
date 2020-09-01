@@ -171,6 +171,16 @@ wal-g wal-push /path/to/archive
 ```
 
 
+* ``wal-receive``
+
+Set environment variabe WALG_SLOTNAME to define the slot to be used (defaults to walg). The slot name can only consist of the following characters: [0-9A-Za-z_].
+When uploading WAL archives to S3, the user should pass in the absolute path to where the archive is located.
+
+```
+wal-g wal-receive
+```
+
+
 * ``backup-mark``
 
 Backups can be marked as permanent to prevent them from being removed when running ``delete``. Backup permanence can be altered via this command by passing in the name of the backup (retrievable via `wal-g backup-list --pretty --detail --json`), which will mark the named backup and all previous related backups as permanent. The reverse is also possible by providing the `-i` flag.
