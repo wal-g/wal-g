@@ -203,3 +203,15 @@ directory and name of the backup.
 ``` bash
 wal-g catchup-fetch /path/to/replica/postgres backup_name
 ```
+
+
+* ``copy``
+
+This command will help to change the storage and move the set of backups there or write the backups on magnetic tape. For example, `wal-g copy --from=config_from.json --to=config_to.json` will copy all backups.
+
+Flags:
+
+- `-b, --backup-name string` Copy specific backup
+- `-f, --from string` Storage config from where should copy backup
+- `-t, --to string` Storage config to where should copy backup
+- `-w, --without-history` Copy backup without history (wal files)
