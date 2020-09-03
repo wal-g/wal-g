@@ -46,8 +46,8 @@ func NewTimeLineHistFile(timelineid int32, filename string, body []byte) (TimeLi
 	return tlh, nil
 }
 
-// Rows parses the data ([]byte) from a TimeLineHistFile and returns the TimeLineHistFileRows that are contained.
-func (tlh TimeLineHistFile) Rows() ([]TimeLineHistFileRow, error) {
+// rows parses the data ([]byte) from a TimeLineHistFile and returns the TimeLineHistFileRows that are contained.
+func (tlh TimeLineHistFile) rows() ([]TimeLineHistFileRow, error) {
 	var err error
 	var rows []TimeLineHistFileRow
 	r := regexp.MustCompile("[^\\s]+")
@@ -74,9 +74,9 @@ func (tlh TimeLineHistFile) Rows() ([]TimeLineHistFileRow, error) {
 	return rows, nil
 }
 
-// LSNToTimeLine uses Rows() to get all TimeLineHistFileRows and from those rows get the timeline that a LS belongs too.
+// LSNToTimeLine uses rows() to get all TimeLineHistFileRows and from those rows get the timeline that a LS belongs too.
 func (tlh TimeLineHistFile) LSNToTimeLine(lsn pglogrepl.LSN) (int32, error) {
-	rows, err := tlh.Rows()
+	rows, err := tlh.rows()
 	if err != nil {
 		return 0, err
 	}

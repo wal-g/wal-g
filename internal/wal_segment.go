@@ -68,20 +68,20 @@ func NewWalSegment(timeline int32, location pglogrepl.LSN, walSegmentBytes uint6
 // a message that crosses the boundary between the two segments.
 func (seg *WalSegment) NextWalSegment() (*WalSegment, error) {
 	// Next on this timeline, but read rest of msg
-	if ! seg.IsComplete() {
+	if ! seg.isComplete() {
 		return nil, segmentError{
-			errors.Errorf("Cannot run NextWalSegment until IsComplete")}
+			errors.Errorf("Cannot run NextWalSegment until isComplete")}
 	}
 	nextSegment := NewWalSegment(seg.TimeLine, seg.endLSN, seg.walSegmentBytes)
 	if seg.lastMsg != nil {
 		// Apparaently the last message crossed the border between the two segments, so lets have it processed into the next segment too.
-		result, err := nextSegment.ProcessMessage(*seg.lastMsg)
+		result, err := nextSegment.processMessage(*seg.lastMsg)
 		if err != nil {
 			return nil, err
 		}
 		if result != ProcessMessageOK {
 			return nil, segmentError{
-				errors.Errorf("Unexpected result from ProcessMessage in NextWalSegment")}
+				errors.Errorf("Unexpected result from processMessage in NextWalSegment")}
 		}
 	}
 	return nextSegment, nil
@@ -93,14 +93,14 @@ func (seg *WalSegment) Name() string {
 	// Example LSN -> Name:
 	// '0/2A33FE00' -> '00000001000000000000002A'
 	segID := uint64(seg.StartLSN)/uint64(seg.walSegmentBytes)
-	if seg.IsComplete() {
+	if seg.isComplete() {
 		return fmt.Sprintf("%08X%016X", seg.TimeLine, segID)
 	}
 	return fmt.Sprintf("%08X%016X.partial", seg.TimeLine, segID)
 }
 
-// ProcessMessage is a method that processes a message from Postgres and copies its data into the right location of the wal segment.
-func (seg *WalSegment) ProcessMessage(message pgproto3.BackendMessage) (ProcessMessageResult, error) {
+// processMessage is a method that processes a message from Postgres and copies its data into the right location of the wal segment.
+func (seg *WalSegment) processMessage(message pgproto3.BackendMessage) (ProcessMessageResult, error) {
 	var messageOffset pglogrepl.LSN
 	switch msg := message.(type) {
 	case *pgproto3.CopyData:
@@ -151,7 +151,7 @@ func (seg *WalSegment) ProcessMessage(message pgproto3.BackendMessage) (ProcessM
 	return ProcessMessageOK, nil
 }
 
-// Stream is a helper function to retrieve messages from Postgres and have them processed by ProcessMessage().
+// Stream is a helper function to retrieve messages from Postgres and have them processed by processMessage().
 func (seg *WalSegment) Stream(conn *pgconn.PgConn, standbyMessageTimeout time.Duration) (ProcessMessageResult, error) {
 	// Inspired by https://github.com/jackc/pglogrepl/blob/master/example/pglogrepl_demo/main.go
 	// And https://www.postgresql.org/docs/12/protocol-replication.html
@@ -175,10 +175,10 @@ func (seg *WalSegment) Stream(conn *pgconn.PgConn, standbyMessageTimeout time.Du
 		}
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		result, err := seg.ProcessMessage(msg)
+		result, err := seg.processMessage(msg)
 		switch result {
 		case ProcessMessageOK:
-			if seg.IsComplete() {
+			if seg.isComplete() {
 				return ProcessMessageOK, nil
 			}
 		case ProcessMessageUnknown:
@@ -189,7 +189,7 @@ func (seg *WalSegment) Stream(conn *pgconn.PgConn, standbyMessageTimeout time.Du
 			tracelog.DebugLogger.Printf("CopyDoneResult => %v", cdr)
 			return result, nil
 		case ProcessMessageReplyRequested:
-			if seg.IsComplete() {
+			if seg.isComplete() {
 				return ProcessMessageOK, nil
 			}
 			nextStandbyMessageDeadline = time.Time{}
@@ -198,14 +198,14 @@ func (seg *WalSegment) Stream(conn *pgconn.PgConn, standbyMessageTimeout time.Du
 		case ProcessMessageMismatch:
 			return result, err
 		default:
-			tracelog.DebugLogger.Printf("Unexpected ProcessMessage result => %v", result)
+			tracelog.DebugLogger.Printf("Unexpected processMessage result => %v", result)
 			return result, err
 		}
 	}
 }
 
-// IsComplete is a helper function which returns true when all data is added
-func (seg *WalSegment) IsComplete() bool {
+// isComplete is a helper function which returns true when all data is added
+func (seg *WalSegment) isComplete() bool {
 	if seg.StartLSN + pglogrepl.LSN(seg.writeIndex) >= seg.endLSN {
 		return true
 	}

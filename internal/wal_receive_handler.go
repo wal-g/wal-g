@@ -7,7 +7,6 @@ import (
 	"github.com/jackc/pglogrepl"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-	"regexp"
 	"time"
 )
 
@@ -18,7 +17,6 @@ const (
 
 /*
 Things to do (future):
-* public / private classes and functions (first case on names)
 * proper sizes for int's
 * use LSN in replace internal/wal_segment_no
 * unittests for queryrunner code
@@ -135,21 +133,12 @@ func startReplication(conn *pgconn.PgConn, segment *WalSegment, slotName string)
 	tracelog.DebugLogger.Println("Started replication")
 }
 
-//  validateSlotName validates pgSlotName to be a valid slot name
-func validateSlotName(pgSlotName string) (err error){
-	// Check WALG_SLOTNAME env variable (can be any of [0-9A-Za-z_], and 1-63 characters long)
-	invalid, err := regexp.MatchString(`\W`, pgSlotName)
+func getCurrentWalInfo() (slot PhysicalSlot, walSegmentBytes uint64, err error) {
+	slotName := GetPgSlotName()
+	err = ValidateSlotName(slotName)
 	if err != nil {
 		return
 	}
-	if len(pgSlotName) > 63 || invalid {
-		err = genericWalReceiveError{errors.Errorf("%s can only contain 1-63 word characters ([0-9A-Za-z_])", PgSlotName)}
-	}
-	return
-}
-
-func getCurrentWalInfo() (slot PhysicalSlot, walSegmentBytes uint64, err error) {
-	slotName := GetPgSlotName()
 
 	// Creating a temporary connection to read slot info and wal_segment_size
 	tmpConn, err := Connect()
