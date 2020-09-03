@@ -25,7 +25,7 @@ import (
 
 // The TimeLineHistFileRow struct represents one line in the TimeLineHistory file
 type TimeLineHistFileRow struct {
-	TimeLineID int
+	TimeLineID uint32
 	StartLSN   pglogrepl.LSN
 	Comment	   string
 }
@@ -34,21 +34,20 @@ type TimeLineHistFileRow struct {
 // Since TimeLineHistFileRows are only parsed 0 or 1 rimes, the data is only 
 // preserved as []byte and parsed to TimeLineHistFileRows when required.
 type TimeLineHistFile struct {
-	TimeLineID int32
+	TimeLineID uint32
 	Filename string
 	data     []byte
 	readIndex int
 }
 
 //NewTimeLineHistFile is a helper function to define a new TimeLineHistFile
-func NewTimeLineHistFile(timelineid int32, filename string, body []byte) (TimeLineHistFile, error) {
+func NewTimeLineHistFile(timelineid uint32, filename string, body []byte) (TimeLineHistFile, error) {
 	tlh := TimeLineHistFile{TimeLineID: timelineid, Filename: filename, data: body}
 	return tlh, nil
 }
 
 // rows parses the data ([]byte) from a TimeLineHistFile and returns the TimeLineHistFileRows that are contained.
 func (tlh TimeLineHistFile) rows() ([]TimeLineHistFileRow, error) {
-	var err error
 	var rows []TimeLineHistFileRow
 	r := regexp.MustCompile("[^\\s]+")
 	for _, row := range strings.Split(string(tlh.data), "\n") {
@@ -57,10 +56,11 @@ func (tlh TimeLineHistFile) rows() ([]TimeLineHistFileRow, error) {
 		cols := r.FindAllString(strings.Split(row, "#")[0], 3)
 		if len(cols) >= 2 {
 			tlhr := TimeLineHistFileRow{}
-			tlhr.TimeLineID, err = strconv.Atoi(cols[0])
+			tlid, err := strconv.Atoi(cols[0])
 			if err != nil {
 				return rows, err
 			}
+			tlhr.TimeLineID = uint32(tlid)
 			tlhr.StartLSN, err = pglogrepl.ParseLSN(cols[1])
 			if err != nil {
 				return rows, err
@@ -75,7 +75,7 @@ func (tlh TimeLineHistFile) rows() ([]TimeLineHistFileRow, error) {
 }
 
 // LSNToTimeLine uses rows() to get all TimeLineHistFileRows and from those rows get the timeline that a LS belongs too.
-func (tlh TimeLineHistFile) LSNToTimeLine(lsn pglogrepl.LSN) (int32, error) {
+func (tlh TimeLineHistFile) LSNToTimeLine(lsn pglogrepl.LSN) (uint32, error) {
 	rows, err := tlh.rows()
 	if err != nil {
 		return 0, err
@@ -86,7 +86,7 @@ func (tlh TimeLineHistFile) LSNToTimeLine(lsn pglogrepl.LSN) (int32, error) {
 	})
 	for _, row := range rows {
 		if lsn < row.StartLSN {
-			return int32(row.TimeLineID), nil
+			return uint32(row.TimeLineID), nil
 		}
 	}
 	return tlh.TimeLineID, nil

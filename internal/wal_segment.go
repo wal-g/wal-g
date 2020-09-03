@@ -23,7 +23,7 @@ type segmentError struct {
 
 // The WalSegment object represents a Postgres Wal Segment, holding all wal data for a wal file.
 type WalSegment struct {
-	TimeLine        int32
+	TimeLine        uint32
 	StartLSN        pglogrepl.LSN
 	endLSN          pglogrepl.LSN
 	walSegmentBytes uint64
@@ -47,7 +47,7 @@ const (
 )
 
 // NewWalSegment is a helper function to declare a new WalSegment.
-func NewWalSegment(timeline int32, location pglogrepl.LSN, walSegmentBytes uint64) *WalSegment {
+func NewWalSegment(timeline uint32, location pglogrepl.LSN, walSegmentBytes uint64) *WalSegment {
 	//We could test validity of walSegmentBytes (not implemented):
 	//  https://www.postgresql.org/docs/11/app-initdb.html:
 	//    Set the WAL segment size, in megabytes...

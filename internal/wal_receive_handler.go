@@ -17,8 +17,6 @@ const (
 
 /*
 Things to do (future):
-* proper sizes for int's
-* use LSN in replace internal/wal_segment_no
 * unittests for queryrunner code
 * upgrade to pgx/v4
 * we might want to add a feature to have wal-g advance multiple slots to support HA setups natively
@@ -68,7 +66,7 @@ func HandleWALReceive(uploader *WalUploader) {
 	}
 
 	// Get timeline for XLogPos from historyfile with helper function
-	timeline, err := getStartTimeline(conn, uploader, sysident.Timeline, XLogPos)
+	timeline, err := getStartTimeline(conn, uploader, uint32(sysident.Timeline), XLogPos)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	segment = NewWalSegment(timeline, XLogPos, walSegmentBytes)
@@ -91,7 +89,7 @@ func HandleWALReceive(uploader *WalUploader) {
 			err = uploader.UploadWalFile(newNamedReaderImpl(segment, segment.Name()))
 			tracelog.ErrorLogger.FatalOnError(err)
 			timeline++
-			timelinehistfile, err := pglogrepl.TimelineHistory(context.Background(), conn, timeline)
+			timelinehistfile, err := pglogrepl.TimelineHistory(context.Background(), conn, int32(timeline))
 			tracelog.ErrorLogger.FatalOnError(err)
 			tlh, err := NewTimeLineHistFile(timeline, timelinehistfile.FileName, timelinehistfile.Content)
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -105,11 +103,11 @@ func HandleWALReceive(uploader *WalUploader) {
 	}
 }
 
-func getStartTimeline(conn *pgconn.PgConn, uploader *WalUploader, systemTimeline int32, xLogPos pglogrepl.LSN)  (int32, error){
+func getStartTimeline(conn *pgconn.PgConn, uploader *WalUploader, systemTimeline uint32, xLogPos pglogrepl.LSN)  (uint32, error){
 	if systemTimeline < 2 {
 		return 1, nil
 	}
-	timelinehistfile, err := pglogrepl.TimelineHistory(context.Background(), conn, systemTimeline)
+	timelinehistfile, err := pglogrepl.TimelineHistory(context.Background(), conn, int32(systemTimeline))
 	if err == nil {
 		tlh, err := NewTimeLineHistFile(systemTimeline, timelinehistfile.FileName, timelinehistfile.Content)
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -128,17 +126,13 @@ func getStartTimeline(conn *pgconn.PgConn, uploader *WalUploader, systemTimeline
 func startReplication(conn *pgconn.PgConn, segment *WalSegment, slotName string) {
 	tracelog.DebugLogger.Printf("Starting replication from %s: ", segment.StartLSN)
 	err := pglogrepl.StartReplication(context.Background(), conn, slotName, segment.StartLSN,
-		pglogrepl.StartReplicationOptions{Timeline: segment.TimeLine, Mode: pglogrepl.PhysicalReplication})
+		pglogrepl.StartReplicationOptions{Timeline: int32(segment.TimeLine), Mode: pglogrepl.PhysicalReplication})
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.DebugLogger.Println("Started replication")
 }
 
 func getCurrentWalInfo() (slot PhysicalSlot, walSegmentBytes uint64, err error) {
 	slotName := GetPgSlotName()
-	err = ValidateSlotName(slotName)
-	if err != nil {
-		return
-	}
 
 	// Creating a temporary connection to read slot info and wal_segment_size
 	tmpConn, err := Connect()
