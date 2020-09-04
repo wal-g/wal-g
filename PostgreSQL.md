@@ -201,6 +201,20 @@ When uploading WAL archives to S3, the user should pass in the absolute path to 
 wal-g wal-push /path/to/archive
 ```
 
+* ``wal-show``
+
+Show information about the WAL storage folder. `wal-show` shows all WAL segment timelines available in storage, displays the available backups for them, and checks them for missing segments.
+
+* if there are no gaps (missing segments) in the range, final status is `OK`
+* if there are some missing segments found, final status is `LOST_SEGMENTS`
+
+```
+wal-g wal-show
+```
+
+By default, `wal-show` shows available backups for each timeline. To turn it off, add the `--without-backups` flag.
+
+By default, `wal-show` output is plaintext table. For detailed JSON output, add the `--detailed-json` flag.
 
 * ``backup-mark``
 
