@@ -129,6 +129,8 @@ WAL-G can also fetch the latest backup using:
 wal-g backup-fetch ~/extract/to/here LATEST
 ```
 
+#### Reverse delta unpack
+
 Beta feature: WAL-G can unpack delta backups in reverse order to improve fetch efficiency.
 
 [Reverse delta unpack benchmark results](benchmarks/reverse-delta-unpack-26-03-2020.md)
@@ -138,7 +140,23 @@ To activate this feature, do one of the following:
 * set the `WALG_USE_REVERSE_UNPACK`environment variable
 * add the --reverse-unpack flag
 ```
-wal-g backup-fetch ~/extract/to/here LATEST --reverse-unpack
+wal-g backup-fetch /path LATEST --reverse-unpack
+```
+
+#### Redundant archives skipping
+
+With [reverse delta unpack](#reverse-delta-unpack) turned on, you also can turn on redundant archives skipping.
+Since this feature involves both backup creation and restore process, in order to fully enable it you need to do two things:
+
+1. Optional, but recommended. [Enable rating tar ball composer](#rating-composer-mode) for `backup-push`.
+
+2. Enable redundant backup archives skipping during backup-fetch. Do one of the following:
+  
+* set the `WALG_USE_REVERSE_UNPACK` and `WALG_SKIP_REDUNDANT_TARS` environment variables
+* add the `--reverse-unpack` and `--skip-redundant-tars` flags
+
+```  
+wal-g backup-fetch /path LATEST --reverse-unpack --skip-redundant-tars
 ```
 
 * ``backup-push``
@@ -151,6 +169,19 @@ wal-g backup-push /backup/directory/path
 If backup is pushed from replication slave, WAL-G will control timeline of the server. In case of promotion to master or timeline switch, backup will be uploaded but not finalized, WAL-G will exit with an error. In this case logs will contain information necessary to finalize the backup. You can use backuped data if you clearly understand entangled risks.
 
 ``backup-push`` can also be run with the ``--permanent`` flag, which will mark the backup as permanent and prevent it from being removed when running ``delete``.
+
+#### Rating composer mode
+
+In the rating composer mode, WAL-G places files with similar updates frequencies in the same tarballs during backup creation. This is the recommended option to use in pair with `backup-fetch` [redundant archives skipping](#redundant-archives-skipping). Be aware that although rating composer allows saving more data, it may result in slower backup creation compared to the default tarball composer.
+
+To activate this feature, do one of the following:
+
+* set the `WALG_USE_RATING_COMPOSER`environment variable
+* add the --rating-composer flag
+
+```
+wal-g backup-push /path --rating-composer
+```
 
 * ``wal-fetch``
 
