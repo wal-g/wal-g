@@ -216,6 +216,31 @@ By default, `wal-show` shows available backups for each timeline. To turn it off
 
 By default, `wal-show` output is plaintext table. For detailed JSON output, add the `--detailed-json` flag.
 
+* ``wal-verify``
+
+Ensure that there is a consistent WAL segment history for the cluster so WAL-G can perform a PITR for the backup. `wal-verify` verifies that WAL-G has all the necessary WAL segments in storage up to the current cluster LSN.
+
+```
+wal-g wal-verify
+```
+
+In `wal-verify` output, there are four statuses of WAL segments:
+
+* `FOUND` segments are present in WAL storage
+* `MISSING_DELAYED` segments are not present in WAL storage, but probably Postgres did not try to archive them via `archive_command` yet
+* `MISSING_UPLOADING` segments are the segments which are not present in WAL storage, but looks like that they are in the process of uploading to storage
+* `MISSING_LOST` segments are not present in WAL storage and not `MISSING_UPLOADING` nor `MISSING_DELAYED`
+
+Output of wal-verify is the report which consists of two parts:
+
+1. WAL storage status:
+    * `OK` if there are no missing segments 
+    * `WARNING` if there are some missing segments, but they are not `MISSING_LOST` 
+    * `FAILURE` if there are some `MISSING_LOST` segments
+2. A list that shows WAL segments in chronological order grouped by timeline and status.
+
+By default, `wal-verify` output is plaintext. To enable JSON output, add the `--json` flag.
+
 * ``backup-mark``
 
 Backups can be marked as permanent to prevent them from being removed when running ``delete``. Backup permanence can be altered via this command by passing in the name of the backup (retrievable via `wal-g backup-list --pretty --detail --json`), which will mark the named backup and all previous related backups as permanent. The reverse is also possible by providing the `-i` flag.
