@@ -187,6 +187,17 @@ services:
     links:
       - s3
 
+  pg_receive_wal_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_receive_wal_test
+      context: .
+    image: wal-g/receive_wal_test
+    container_name: wal-g_pg_receive_wal_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   pg_full_backup_rating_composer_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_full_backup_rating_composer_test
