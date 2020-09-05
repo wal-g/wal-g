@@ -13,7 +13,7 @@ import (
 	"syscall"
 )
 
-func HandleBackupPush(dbnames []string) {
+func HandleBackupPush(dbnames []string, compression bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 	defer func() { _ = signalHandler.Close() }()
@@ -41,7 +41,7 @@ func HandleBackupPush(dbnames []string) {
 	baseUrl := getBackupUrl(backupName)
 
 	err = runParallel(func(dbname string) error {
-		return backupSingleDatabase(ctx, db, baseUrl, dbname)
+		return backupSingleDatabase(ctx, db, baseUrl, dbname, compression)
 	}, dbnames)
 	tracelog.ErrorLogger.FatalfOnError("overall backup failed: %v", err)
 
@@ -58,10 +58,13 @@ func HandleBackupPush(dbnames []string) {
 	tracelog.InfoLogger.Printf("backup finished")
 }
 
-func backupSingleDatabase(ctx context.Context, db *sql.DB, baseUrl string, dbname string) error {
+func backupSingleDatabase(ctx context.Context, db *sql.DB, baseUrl string, dbname string, compression bool) error {
 	backupUrl := fmt.Sprintf("%s/%s", baseUrl, url.QueryEscape(dbname))
 	sql := fmt.Sprintf("BACKUP DATABASE %s TO URL = '%s'", quoteName(dbname), backupUrl)
-	tracelog.InfoLogger.Printf("staring backup database [%s] to %s", dbname, backupUrl)
+	if compression {
+		sql += " WITH COMPRESSION"
+	}
+	tracelog.InfoLogger.Printf("starting backup database [%s] to %s", dbname, backupUrl)
 	tracelog.DebugLogger.Printf("SQL: %s", sql)
 	_, err := db.ExecContext(ctx, sql)
 	if err != nil {
