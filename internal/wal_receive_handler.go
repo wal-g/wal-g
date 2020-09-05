@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pglogrepl"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"time"
 )
 
@@ -16,6 +17,18 @@ const (
 )
 
 /*
+NOTE: Preventing a WAL gap is a complex one (also not 100% fixed with arch_command).
+* Using replication slot helps, but that should be created and maintained
+  by wal-g on standby's too (making sure unconsumed wals are preserved on
+  potential new masters too)
+* Using sync replication is another option, but non-promotable, and we
+  should locally cache to disconnect S3 performance from database performance
+* Making something that checks 'what is in wal-g s repo' vs 'where postgres is
+  is another option, but when wal-g is no longer running there would be nothing
+  preventing postgres from advancing and cleaning, which is what slots are for.
+Cleanest would probably be to create the slot on all postgres instances and advance all of them.
+Can be done, but first, lets focus on creating wal files from repl msg...
+
 Things to do (future):
 * unittests for queryrunner code
 * upgrade to pgx/v4
@@ -33,20 +46,15 @@ func (err genericWalReceiveError) Error() string {
 
 // HandleWALReceive is invoked to receive wal with a replication connection and push
 func HandleWALReceive(uploader *WalUploader) {
-	// NOTE: Preventing a WAL gap is a complex one (also not 100% fixed with arch_command).
-	// * Using replication slot helps, but that should be created and maintained
-	//   by wal-g on standby's too (making sure unconsumed wals are preserved on
-	//   potential new masters too)
-	// * Using sync replication is another option, but non-promotable, and we
-	//   should locally cache to disonnect S3 performance from database performance
-	// Lets focus on creating wal files from repl msg first...
-
 	// Connect to postgres.
 	var XLogPos pglogrepl.LSN
 	var segment *WalSegment
 
+	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
+
 	slot, walSegmentBytes, err := getCurrentWalInfo()
 	tracelog.ErrorLogger.FatalOnError(err)
+	tracelog.DebugLogger.Printf("WAL segment bytes: %d", walSegmentBytes)
 
 	conn, err := pgconn.Connect(context.Background(), "replication=yes")
 	tracelog.ErrorLogger.FatalOnError(err)

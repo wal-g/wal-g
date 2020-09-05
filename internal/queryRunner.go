@@ -68,7 +68,11 @@ func (queryRunner *PgQueryRunner) buildGetVersion() string {
 
 // BuildGetCurrentLSN formats a query to get cluster LSN
 func (queryRunner *PgQueryRunner) buildGetCurrentLsn() string {
-	return "SELECT pg_current_wal_lsn()"
+	if queryRunner.Version >= 100000 {
+		return "SELECT pg_current_wal_lsn()"
+	}
+	return "SELECT pg_current_xlog_location()"
+
 }
 
 // BuildStartBackup formats a query that starts backup according to server features and version
@@ -337,7 +341,7 @@ func (queryRunner *PgQueryRunner) GetWalSegmentBytes() (segBlocks uint64, err er
 	if err != nil {
 		return 0, err
 	}
-	if queryRunner.Version <= 100000 {
+	if queryRunner.Version < 110000 {
 		// For PG 10 and below, wal_segment_size is in 8k blocks
 		segBlocks *= 8192
 	}
