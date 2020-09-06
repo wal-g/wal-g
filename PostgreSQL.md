@@ -148,7 +148,7 @@ wal-g backup-fetch /path LATEST --reverse-unpack
 With [reverse delta unpack](#reverse-delta-unpack) turned on, you also can turn on redundant archives skipping.
 Since this feature involves both backup creation and restore process, in order to fully enable it you need to do two things:
 
-1. Optional, but recommended. [Enable rating tar ball composer](#rating-composer-mode) for `backup-push`.
+1. Optional. Increases the chance of archive skipping, but may result in slower backup creation. [Enable rating tar ball composer](#rating-composer-mode) for `backup-push`.
 
 2. Enable redundant backup archives skipping during backup-fetch. Do one of the following:
   
@@ -172,7 +172,7 @@ If backup is pushed from replication slave, WAL-G will control timeline of the s
 
 #### Rating composer mode
 
-In the rating composer mode, WAL-G places files with similar updates frequencies in the same tarballs during backup creation. This is the recommended option to use in pair with `backup-fetch` [redundant archives skipping](#redundant-archives-skipping). Be aware that although rating composer allows saving more data, it may result in slower backup creation compared to the default tarball composer.
+In the rating composer mode, WAL-G places files with similar updates frequencies in the same tarballs during backup creation. This should increase the effectiveness of `backup-fetch` [redundant archives skipping](#redundant-archives-skipping). Be aware that although rating composer allows saving more data, it may result in slower backup creation compared to the default tarball composer.
 
 To activate this feature, do one of the following:
 
