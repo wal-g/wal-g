@@ -124,6 +124,18 @@ func (m *MongoOplogCursor) Next(ctx context.Context) bool {
 	return m.Cursor.Next(ctx)
 }
 
+// ApplyOplog is used to replay oplog entry.
+type ApplyOplog struct {
+	Operation  string            `bson:"op"`
+	Namespace  string            `bson:"ns"`
+	Object     bson.D            `bson:"o"`
+	Query      bson.D            `bson:"o2,omitempty"`
+	UI         *primitive.Binary `bson:"ui,omitempty"`
+	LSID       bson.Raw          `bson:"lsid,omitempty"`
+	TxnNumber  *int64            `bson:"txnNumber,omitempty"`
+	PrevOpTime bson.Raw          `bson:"prevOpTime,omitempty"`
+}
+
 // MongoClient implements MongoDriver
 type MongoClient struct {
 	c           *mongo.Client
@@ -291,18 +303,30 @@ func (mc *MongoClient) getOplogCollection(ctx context.Context) (*mongo.Collectio
 	return odb.Collection(oplogCollectionName), nil
 }
 
-func (mc *MongoClient) getApplyOpCmd() bson.D {
+func (mc *MongoClient) getApplyOpsCmd() bson.D {
 	return mc.applyOpsCmd
 }
 
 // ApplyOp calls applyOps and check response
-func (mc *MongoClient) ApplyOp(ctx context.Context, op db.Oplog) error {
+func (mc *MongoClient) ApplyOp(ctx context.Context, dbop db.Oplog) error {
+	// mongod complains if 'ts' or 'history' are passed to applyOps
+	op := ApplyOplog{
+		Operation:  dbop.Operation,
+		Namespace:  dbop.Namespace,
+		Object:     dbop.Object,
+		Query:      dbop.Query,
+		UI:         dbop.UI,
+		LSID:       dbop.LSID,
+		TxnNumber:  dbop.TxnNumber,
+		PrevOpTime: dbop.PrevOpTime,
+	}
+
 	// TODO: fix ugly interface after switch to passing pointers
-	cmd := mc.getApplyOpCmd()
+	cmd := mc.getApplyOpsCmd()
 	cmd[0] = bson.E{Key: "applyOps", Value: []interface{}{op}}
 	apply := mc.c.Database("admin").RunCommand(ctx, cmd)
 	if err := apply.Err(); err != nil {
-		return fmt.Errorf("applyOps command failed: %+v\nop:\n%+v", err, mc.applyOpsCmd)
+		return err
 	}
 	resp := CmdResponse{}
 	if err := apply.Decode(&resp); err != nil {

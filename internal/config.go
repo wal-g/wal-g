@@ -70,6 +70,7 @@ const (
 	OplogPushPrimaryCheckInterval   = "OPLOG_PUSH_PRIMARY_CHECK_INTERVAL"
 	OplogReplayOplogAlwaysUpsert    = "OPLOG_REPLAY_OPLOG_ALWAYS_UPSERT"
 	OplogReplayOplogApplicationMode = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
+	OplogReplayIgnoreErrorCodes     = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
 
 	MysqlDatasourceNameSetting = "WALG_MYSQL_DATASOURCE_NAME"
 	MysqlSslCaSetting          = "WALG_MYSQL_SSL_CA"

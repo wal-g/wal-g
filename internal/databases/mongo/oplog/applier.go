@@ -14,6 +14,7 @@ import (
 	"github.com/mongodb/mongo-tools-common/util"
 	"github.com/wal-g/tracelog"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type TypeAssertionError struct {
@@ -40,7 +41,7 @@ func NewOpHandleError(op interface{}, err error) *OpHandleError {
 }
 
 func (e *OpHandleError) Error() string {
-	return fmt.Sprintf("can not handle op '%+v', error: %+v", e.op, e.err)
+	return fmt.Sprintf("failed to apply with error: %+v\nop:\n%+v", e.err, e.op)
 }
 
 var (
@@ -73,14 +74,15 @@ func NewWriteApplier(format string, wc io.WriteCloser) (Applier, error) {
 
 // DBApplier implements Applier interface for mongodb.
 type DBApplier struct {
-	db           client.MongoDriver
-	txnBuffer    *txn.Buffer
-	preserveUUID bool
+	db                    client.MongoDriver
+	txnBuffer             *txn.Buffer
+	preserveUUID          bool
+	applyIgnoreErrorCodes map[string][]int32
 }
 
 // NewDBApplier builds DBApplier with given args.
-func NewDBApplier(m client.MongoDriver, preserveUUID bool) *DBApplier {
-	return &DBApplier{db: m, txnBuffer: txn.NewBuffer(), preserveUUID: preserveUUID}
+func NewDBApplier(m client.MongoDriver, preserveUUID bool, ignoreErrCodes map[string][]int32) *DBApplier {
+	return &DBApplier{db: m, txnBuffer: txn.NewBuffer(), preserveUUID: preserveUUID, applyIgnoreErrorCodes: ignoreErrCodes}
 }
 
 func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
@@ -89,7 +91,7 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 		return fmt.Errorf("can not unmarshal oplog entry: %w", err)
 	}
 
-	if err := ap.shouldSkip(op); err != nil {
+	if err := ap.shouldSkip(op.Operation, op.Namespace); err != nil {
 		tracelog.DebugLogger.Printf("skipping op %+v due to: %+v", op, err)
 		return nil
 	}
@@ -106,7 +108,7 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("can not handle op: %w", err)
+		return err
 	}
 
 	return nil
@@ -122,22 +124,42 @@ func (ap *DBApplier) Close(ctx context.Context) error {
 	return nil
 }
 
-func (ap *DBApplier) shouldSkip(op db.Oplog) error {
-	if op.Operation == "n" {
+func (ap *DBApplier) shouldSkip(op, ns string) error {
+	if op == "n" {
 		return fmt.Errorf("noop op")
 	}
 
 	// sharded clusters are not supported yet
-	if strings.HasPrefix(op.Namespace, "config.") {
+	if strings.HasPrefix(ns, "config.") {
 		return fmt.Errorf("config database op")
 	}
 
 	// temporary skip view creation due to mongodb bug
-	if strings.HasSuffix(op.Namespace, "system.views") {
+	if strings.HasSuffix(ns, "system.views") {
 		return fmt.Errorf("view op")
 	}
 
 	return nil
+}
+
+// shouldIgnore checks if error should be ignored
+func (ap *DBApplier) shouldIgnore(op string, err error) bool {
+	ce, ok := err.(mongo.CommandError)
+	if !ok {
+		return false
+	}
+
+	ignoreErrorCodes, ok := ap.applyIgnoreErrorCodes[op]
+	if !ok {
+		return false
+	}
+
+	for i := range ignoreErrorCodes {
+		if ce.Code == ignoreErrorCodes[i] {
+			return true
+		}
+	}
+	return false
 }
 
 // handleNonTxnOp tries to apply given oplog record.
@@ -169,7 +191,16 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op db.Oplog) error {
 			[]client.IndexDocument{indexes})
 	}
 
-	return ap.db.ApplyOp(ctx, op)
+	//tracelog.DebugLogger.Printf("applying op: %+v", op)
+	if err := ap.db.ApplyOp(ctx, op); err != nil {
+		// we ignore some errors (for example 'duplicate key error')
+		// TODO: check after TOOLS-2041
+		if !ap.shouldIgnore(op.Operation, err) {
+			return NewOpHandleError(op, err)
+		}
+		tracelog.WarningLogger.Printf("apply error is skipped: %+v\nop:\n%+v", err, op)
+	}
+	return nil
 }
 
 func indexSpecsFromCreateIndexes(op db.Oplog) (string, client.IndexDocument, error) {
