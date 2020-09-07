@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
+	"strconv"
 )
 
 type NoPostgresVersionError struct {
@@ -67,7 +68,11 @@ func (queryRunner *PgQueryRunner) buildGetVersion() string {
 
 // BuildGetCurrentLSN formats a query to get cluster LSN
 func (queryRunner *PgQueryRunner) buildGetCurrentLsn() string {
-	return "SELECT pg_current_wal_lsn()"
+	if queryRunner.Version >= 100000 {
+		return "SELECT pg_current_wal_lsn()"
+	}
+	return "SELECT pg_current_xlog_location()"
+
 }
 
 // BuildStartBackup formats a query that starts backup according to server features and version
@@ -117,8 +122,22 @@ func newPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
 	return r, nil
 }
 
+// buildGetSystemIdentifier formats a query that which gathers SystemIdentifier info
+// TODO: Unittest
 func (queryRunner *PgQueryRunner) buildGetSystemIdentifier() string {
 	return "select system_identifier from pg_control_system();"
+}
+
+// buildGetParameter formats a query to get a postgresql.conf parameter
+// TODO: Unittest
+func (queryRunner *PgQueryRunner) buildGetParameter() string {
+	return "select setting from pg_settings where name = $1"
+}
+
+// buildGetPhysicalSlotInfo formats a query to get info on a Physical Replication Slot
+// TODO: Unittest
+func (queryRunner *PgQueryRunner) buildGetPhysicalSlotInfo() string {
+	return "select active, restart_lsn from pg_replication_slots where slot_name = $1"
 }
 
 // Retrieve PostgreSQL numeric version
@@ -300,4 +319,48 @@ func (queryRunner *PgQueryRunner) getDatabaseInfos() ([]PgDatabaseInfo, error) {
 	}
 
 	return databases, nil
+}
+
+// GetParameter reads a Postgres setting
+// TODO: Unittest
+func (queryRunner *PgQueryRunner) GetParameter(parameterName string) (string, error) {
+	var value string
+	conn := queryRunner.connection
+	err := conn.QueryRow(queryRunner.buildGetParameter(), parameterName).Scan(&value)
+	return value, err
+}
+
+// GetWalSegmentBytes reads the wals segment size (in bytes) and converts it to uint64
+// TODO: Unittest
+func (queryRunner *PgQueryRunner) GetWalSegmentBytes() (segBlocks uint64, err error) {
+	strValue, err := queryRunner.GetParameter("wal_segment_size")
+	if err != nil {
+		return 0, err
+	}
+	segBlocks, err = strconv.ParseUint(strValue, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	if queryRunner.Version < 110000 {
+		// For PG 10 and below, wal_segment_size is in 8k blocks
+		segBlocks *= 8192
+	}
+	return
+}
+
+// GetPhysicalSlotInfo reads information on a physical replication slot
+// TODO: Unittest
+func (queryRunner *PgQueryRunner) GetPhysicalSlotInfo(slotName string) (PhysicalSlot, error) {
+	var active bool
+	var restartLSN string
+
+	conn := queryRunner.connection
+	err := conn.QueryRow(queryRunner.buildGetPhysicalSlotInfo(), slotName).Scan(&active, &restartLSN)
+	if err == pgx.ErrNoRows {
+		// slot does not exist.
+		return PhysicalSlot{Name: slotName}, nil
+	} else if err != nil {
+		return PhysicalSlot{Name: slotName}, err
+	}
+	return NewPhysicalSlot(slotName, true, active, restartLSN)
 }

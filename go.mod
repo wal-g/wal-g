@@ -9,7 +9,6 @@ require (
 	github.com/RoaringBitmap/roaring v0.4.21
 	github.com/aws/aws-sdk-go v1.34.3
 	github.com/cenkalti/backoff v2.2.1+incompatible
-	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/cyberdelia/lzo v0.0.0-20171006181345-d85071271a6f
 	github.com/denisenkom/go-mssqldb v0.0.0-20200428022330-06a60b6afbbc
 	github.com/docker/distribution v2.7.1+incompatible // indirect
@@ -27,10 +26,12 @@ require (
 	github.com/google/brotli v1.0.7
 	github.com/google/uuid v1.1.1
 	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
+	github.com/jackc/pgconn v1.6.5-0.20200823013804-5db484908cf7
+	github.com/jackc/pglogrepl v0.0.0-20200831220807-35832f1993fb
+	github.com/jackc/pgproto3/v2 v2.0.4
 	github.com/jackc/pgx v3.6.0+incompatible
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/jessevdk/go-flags v1.4.0 // indirect
-	github.com/lib/pq v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.1
 	github.com/mattn/go-runewidth v0.0.8 // indirect
 	github.com/minio/sio v0.2.0
