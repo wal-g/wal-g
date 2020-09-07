@@ -2,6 +2,7 @@ package mongo
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"syscall"
 
@@ -34,6 +35,13 @@ var oplogReplayCmd = &cobra.Command{
 		until, err := models.TimestampFromStr(args[1])
 		tracelog.ErrorLogger.FatalOnError(err)
 
+		// TODO: fix ugly config
+		ignoreErrCodes := make(map[string][]int32)
+		if ignoreErrCodesStr, ok := internal.GetSetting(internal.OplogReplayIgnoreErrorCodes); ok {
+			err := json.Unmarshal([]byte(ignoreErrCodesStr), &ignoreErrCodes)
+			tracelog.ErrorLogger.FatalOnError(err)
+		}
+
 		mongodbUrl, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
 		tracelog.ErrorLogger.FatalOnError(err)
 
@@ -53,7 +61,8 @@ var oplogReplayCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 		err = mongoClient.EnsureIsMaster(ctx)
 		tracelog.ErrorLogger.FatalOnError(err)
-		dbApplier := oplog.NewDBApplier(mongoClient, false)
+
+		dbApplier := oplog.NewDBApplier(mongoClient, false, ignoreErrCodes)
 		oplogApplier := stages.NewGenericApplier(dbApplier)
 
 		// set up storage downloader client
