@@ -2,6 +2,7 @@ package internal
 
 import (
 	"archive/tar"
+	"fmt"
 	"github.com/spf13/viper"
 	"io"
 	"io/ioutil"
@@ -235,7 +236,10 @@ func forkPrefetch(walFileName string, location string) {
 		return // There will be nothing ot prefetch anyway
 	}
 	cmd := exec.Command(os.Args[0], "wal-prefetch", walFileName, location)
-	cmd.Env = os.Environ()
+	env := os.Environ()
+	env = append(env, fmt.Sprintf("%s=%s", "S3_ENDPOINT_PORT", EndpointPortSetting))
+	env = append(env, fmt.Sprintf("%s=%s", "S3_ENDPOINT_SOURCE", EndpointSourceSetting))
+	cmd.Env = env
 	err = cmd.Start()
 
 	if err != nil {
