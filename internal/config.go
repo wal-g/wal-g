@@ -87,6 +87,9 @@ const (
 	SQLServerBlobKeyFile      = "SQLSERVER_BLOB_KEY_FILE"
 	SQLServerBlobDebug        = "SQLSERVER_BLOB_DEBUG"
 	SQLServerConnectionString = "SQLSERVER_CONNECTION_STRING"
+
+	EndpointSourceSetting = "S3_ENDPOINT_SOURCE"
+	EndpointPortSetting = "S3_ENDPOINT_PORT"
 )
 
 var (
