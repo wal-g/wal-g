@@ -62,4 +62,4 @@ require (
 	golang.org/x/tools v0.0.0-20201008025239-9df69603baec // indirect
 )
 
-replace github.com/wal-g/storages => github.com/agneum/storages v0.0.0-20200911103642-0917c1276d95
+replace github.com/wal-g/storages => github.com/agneum/storages v0.0.0-20201011163314-595abe137314
