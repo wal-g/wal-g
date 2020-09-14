@@ -13,7 +13,7 @@ test_receive_wal()
 
   pgbench -i -s 5 postgres
   pg_dumpall -f /tmp/dump1
-  pgbench -c 2 -T 100000000 -S &
+  pgbench -c 2 -T 10 -S
   sleep 1
   VERIFY_OUTPUT=$(mktemp)
   # Verify and store in temp file
