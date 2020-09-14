@@ -161,6 +161,7 @@ var (
 		PgDatabaseSetting: true,
 		PgSslModeSetting:  true,
 		PgSlotName:        true,
+		"PGPASSFILE":      true,
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,

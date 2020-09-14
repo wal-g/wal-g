@@ -18,7 +18,6 @@ PGSSLMODE=allow \
 PGDATABASE=postgres \
 PGHOST=/var/run/postgresql \
 WALE_FILE_PREFIX=file://localhost/tmp \
-WALE_LOG_DESTINATION=stderr \
 /usr/bin/timeout 600 wal-e wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
 echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
@@ -43,7 +42,6 @@ PGSSLMODE=allow \
 PGDATABASE=postgres \
 PGHOST=/var/run/postgresql \
 WALE_FILE_PREFIX=file://localhost/tmp \
-WALE_LOG_DESTINATION=stderr \
 wal-e backup-push ${PGDATA}
 
 pkill -9 postgres
@@ -70,7 +68,6 @@ PGSSLMODE=allow \
 PGDATABASE=postgres \
 PGHOST=/var/run/postgresql \
 WALE_FILE_PREFIX=file://localhost/tmp \
-WALE_LOG_DESTINATION=stderr \
 wal-g backup-fetch ${PGDATA} LATEST
 
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&&\
@@ -87,7 +84,6 @@ PGSSLMODE=allow \
 PGDATABASE=postgres \
 PGHOST=/var/run/postgresql \
 WALE_FILE_PREFIX=file://localhost/tmp \
-WALE_LOG_DESTINATION=stderr \
 /usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
 
 cp /tmp/conf_files/postgresql.conf ${PGDATA}
