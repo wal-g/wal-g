@@ -20,7 +20,6 @@ require (
 	github.com/go-openapi/strfmt v0.19.4 // indirect
 	github.com/go-redis/redis v6.15.6+incompatible
 	github.com/go-sql-driver/mysql v1.5.0
-	github.com/gofrs/uuid v3.2.0+incompatible // indirect
 	github.com/golang/mock v1.4.3
 	github.com/golang/snappy v0.0.2-0.20190904063534-ff6b7dc882cf // indirect
 	github.com/google/brotli v1.0.7
@@ -30,6 +29,7 @@ require (
 	github.com/jackc/pglogrepl v0.0.0-20200831220807-35832f1993fb
 	github.com/jackc/pgproto3/v2 v2.0.4
 	github.com/jackc/pgx v3.6.0+incompatible
+	github.com/jackc/pgx/v4 v4.8.1 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/jessevdk/go-flags v1.4.0 // indirect
 	github.com/magiconair/properties v1.8.1
@@ -43,7 +43,6 @@ require (
 	github.com/pierrec/lz4 v0.0.0-20170519170625-5a3d2245f97f
 	github.com/pierrec/xxHash v0.1.5 // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/shopspring/decimal v0.0.0-20200105144653-96defcb63c04 // indirect
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
