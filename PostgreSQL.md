@@ -11,6 +11,17 @@ Prepare on Ubuntu:
 sudo apt-get install liblzo2-dev
 ```
 
+Prepare on Mac OS:
+```
+# brew command is Homebrew for Mac OS
+brew install cmake
+export USE_LIBSODIUM="true" # since we're linking libsodium later
+./link_brotli.sh
+./link_libsodium.sh
+make install_and_build_pg
+```
+> The compiled binary to run is in `main/pg/wal-g`
+
 To compile and build the binary for Postgres:
 
 Optional:
