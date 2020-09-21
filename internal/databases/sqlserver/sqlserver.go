@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
+
 	_ "github.com/denisenkom/go-mssqldb"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
-	"strings"
-	"time"
 )
 
 const AllDatabases = "ALL"
@@ -149,6 +150,18 @@ SRC:
 			}
 		}
 		res = append(res, r)
+	}
+	return res
+}
+
+func uniq(src []string) []string {
+	res := make([]string, 0, len(src))
+	done := make(map[string]struct{}, len(src))
+	for _, s := range src {
+		if _, ok := done[s]; !ok {
+			res = append(res, s)
+			done[s] = struct{}{}
+		}
 	}
 	return res
 }
