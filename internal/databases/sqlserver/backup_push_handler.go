@@ -4,16 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
+	"os"
+	"syscall"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
 	"github.com/wal-g/wal-g/utility"
-	"net/url"
-	"os"
-	"syscall"
 )
 
-func HandleBackupPush(dbnames []string, compression bool) {
+func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 	defer func() { _ = signalHandler.Close() }()
@@ -37,7 +38,24 @@ func HandleBackupPush(dbnames []string, compression bool) {
 
 	server, _ := os.Hostname()
 	timeStart := utility.TimeNowCrossPlatformLocal()
-	backupName := generateBackupName()
+	var backupName string
+	var sentinel *SentinelDto
+	if updateLatest {
+		backup, err := internal.GetBackupByName(internal.LatestString, utility.BaseBackupPath, folder)
+		tracelog.ErrorLogger.FatalfOnError("can't find latest backup: %v", err)
+		backupName = backup.Name
+		sentinel = new(SentinelDto)
+		err = internal.FetchStreamSentinel(backup, sentinel)
+		tracelog.ErrorLogger.FatalOnError(err)
+		sentinel.Databases = uniq(append(sentinel.Databases, dbnames...))
+	} else {
+		backupName = generateBackupName()
+		sentinel = &SentinelDto{
+			Server:         server,
+			Databases:      dbnames,
+			StartLocalTime: timeStart,
+		}
+	}
 	baseUrl := getBackupUrl(backupName)
 
 	err = runParallel(func(dbname string) error {
@@ -45,11 +63,6 @@ func HandleBackupPush(dbnames []string, compression bool) {
 	}, dbnames)
 	tracelog.ErrorLogger.FatalfOnError("overall backup failed: %v", err)
 
-	sentinel := &SentinelDto{
-		Server:         server,
-		Databases:      dbnames,
-		StartLocalTime: timeStart,
-	}
 	uploader := internal.NewUploader(nil, folder.GetSubFolder(utility.BaseBackupPath))
 	tracelog.InfoLogger.Printf("uploading sentinel: %s", sentinel)
 	err = internal.UploadSentinel(uploader, sentinel, backupName)
@@ -60,15 +73,15 @@ func HandleBackupPush(dbnames []string, compression bool) {
 
 func backupSingleDatabase(ctx context.Context, db *sql.DB, baseUrl string, dbname string, compression bool) error {
 	backupUrl := fmt.Sprintf("%s/%s", baseUrl, url.QueryEscape(dbname))
-	sql := fmt.Sprintf("BACKUP DATABASE %s TO URL = '%s'", quoteName(dbname), backupUrl)
+	sql := fmt.Sprintf("BACKUP DATABASE %s TO URL = '%s' WITH FORMAT", quoteName(dbname), backupUrl)
 	if compression {
-		sql += " WITH COMPRESSION"
+		sql += ", COMPRESSION"
 	}
 	tracelog.InfoLogger.Printf("starting backup database [%s] to %s", dbname, backupUrl)
 	tracelog.DebugLogger.Printf("SQL: %s", sql)
 	_, err := db.ExecContext(ctx, sql)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("database [%s] backup failed: %v", dbname, err)
+		tracelog.ErrorLogger.Printf("database [%s] backup failed: %#v", dbname, err)
 	} else {
 		tracelog.InfoLogger.Printf("database [%s] backup successfully finished", dbname)
 	}

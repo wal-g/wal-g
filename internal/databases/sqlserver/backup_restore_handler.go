@@ -4,13 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
+	"os"
+	"syscall"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
 	"github.com/wal-g/wal-g/utility"
-	"net/url"
-	"os"
-	"syscall"
 )
 
 func HandleBackupRestore(backupName string, dbnames []string, noRecovery bool) {
@@ -25,7 +26,7 @@ func HandleBackupRestore(backupName string, dbnames []string, noRecovery bool) {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	sentinel := new(SentinelDto)
-	err = internal.FetchStreamSentinel(backup, &sentinel)
+	err = internal.FetchStreamSentinel(backup, sentinel)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	db, err := getSQLServerConnection()
