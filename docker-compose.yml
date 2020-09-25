@@ -62,6 +62,14 @@ services:
       &&  mkdir -p /export/redisbucket
       &&  /usr/bin/minio server /export'
 
+  ssh:
+    build:
+      dockerfile: docker/ssh/Dockerfile
+      context: .
+    container_name: wal-g_ssh
+    ports:
+      - "6942:6942"
+
   pg:
     build:
       dockerfile: docker/pg/Dockerfile
@@ -186,6 +194,17 @@ services:
       - s3
     links:
       - s3
+
+  pg_ssh_backup_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_ssh_backup_test
+      context: .
+    image: wal-g/ssh_backup_test
+    container_name: wal-g_pg_ssh_backup_test
+    depends_on:
+      - ssh
+    links:
+      - ssh
 
   pg_receive_wal_test:
     build:

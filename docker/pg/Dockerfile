@@ -14,6 +14,7 @@ RUN apt-get update && \
     jq
 
 COPY docker/pg/PGP_KEY /tmp/PGP_KEY
+COPY docker/pg/SSH_KEY /tmp/SSH_KEY
 COPY docker/pg/gpg.conf /var/lib/postgresql/.gnupg/gpg.conf
 COPY docker/pg/gpg-agent.conf /var/lib/postgresql/.gnupg/gpg-agent.conf
 
