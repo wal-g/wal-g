@@ -209,6 +209,13 @@ var (
 		"WALG_GS_PREFIX":                 true,
 		"GOOGLE_APPLICATION_CREDENTIALS": true,
 
+		// SH
+		"WALG_SSH_PREFIX":      true,
+		"SSH_PORT":             true,
+		"SSH_PASSWORD":         true,
+		"SSH_USERNAME":         true,
+		"SSH_PRIVATE_KEY_PATH": true,
+
 		//File
 		"WALG_FILE_PREFIX": true,
 

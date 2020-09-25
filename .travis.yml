@@ -57,6 +57,9 @@ jobs:
     - script: make TEST="pg_full_backup_test" pg_integration_test
       workspaces:
         use: image_cache
+    - script: make TEST="pg_ssh_backup_test" pg_integration_test
+      workspaces:
+        use: image_cache
     - script: make TEST="pg_receive_wal_test" pg_integration_test
       workspaces:
         use: image_cache
