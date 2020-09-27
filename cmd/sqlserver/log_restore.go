@@ -1,0 +1,38 @@
+package sqlserver
+
+import (
+	"time"
+
+	"github.com/wal-g/wal-g/utility"
+
+	"github.com/spf13/cobra"
+	"github.com/wal-g/wal-g/internal/databases/sqlserver"
+)
+
+const logRestoreShortDescription = "Restores log from the storage"
+
+var logRestoreBackupName string
+var logRestoreUntilTs string
+var logRestoreDatabases []string
+var logRestoreNoRecovery bool
+
+var logRestoreCmd = &cobra.Command{
+	Use:   "log-restore log-name",
+	Short: logRestoreShortDescription,
+	Args:  cobra.ExactArgs(0),
+	Run: func(cmd *cobra.Command, args []string) {
+		sqlserver.HandleLogRestore(logRestoreBackupName, logRestoreUntilTs, logRestoreDatabases, logRestoreNoRecovery)
+	},
+}
+
+func init() {
+	logRestoreCmd.PersistentFlags().StringVar(&logRestoreBackupName, "since", "LATEST",
+		"backup name starting from which you want to restore logs")
+	logRestoreCmd.PersistentFlags().StringVar(&logRestoreUntilTs, "until",
+		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339), "time in RFC3339 for PITR")
+	logRestoreCmd.PersistentFlags().StringSliceVarP(&logRestoreDatabases, "databases", "d", []string{},
+		"List of databases to restore logs. All non-system databases from backup as default")
+	logRestoreCmd.PersistentFlags().BoolVarP(&logRestoreNoRecovery, "no-recovery", "n", false,
+		"Restore with NO_RECOVERY option")
+	Cmd.AddCommand(logRestoreCmd)
+}

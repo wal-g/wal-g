@@ -7,14 +7,16 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/wal-g/wal-g/utility"
 )
 
 const testFilenameSmall = "testdata/binlog_small_test"
 const testFilenameBig = "testdata/binlog_big_test"
 
 func TestReadWholeBinlog(t *testing.T) {
-	startTs := MinTime
-	endTs := MaxTime
+	startTs := utility.MinTime
+	endTs := utility.MaxTime
 	binlog, err := os.Open(testFilenameBig)
 	if err != nil {
 		t.Errorf("failed to open data example: %v", err)
@@ -42,8 +44,8 @@ func TestReadWholeBinlog(t *testing.T) {
 }
 
 func TestReadBinlogAfterInterval(t *testing.T) {
-	startTs := MinTime
-	endTs := MinTime.Add(time.Second)
+	startTs := utility.MinTime
+	endTs := utility.MinTime.Add(time.Second)
 	binlog, err := os.Open(testFilenameBig)
 	if err != nil {
 		t.Errorf("failed to open data example: %v", err)
@@ -63,8 +65,8 @@ func TestReadBinlogAfterInterval(t *testing.T) {
 }
 
 func TestReadBinlogBeforeInterval(t *testing.T) {
-	startTs := MaxTime
-	endTs := MaxTime.Add(-time.Second)
+	startTs := utility.MaxTime
+	endTs := utility.MaxTime.Add(-time.Second)
 	binlog, err := os.Open(testFilenameBig)
 	if err != nil {
 		t.Errorf("failed to open data example: %v", err)
@@ -84,7 +86,7 @@ func TestReadBinlogBeforeInterval(t *testing.T) {
 }
 
 func TestReadPartOfBinlog(t *testing.T) {
-	startTs := MinTime
+	startTs := utility.MinTime
 	endTs := time.Unix(1565531903, 0) // corresponds to the middle of the binlog
 	binlog, err := os.Open(testFilenameBig)
 	if err != nil {
@@ -127,8 +129,8 @@ func (abr *antiBufReader) Read(buf []byte) (int, error) {
 }
 
 func TestReadWholeBinlogWithDifferentChunks(t *testing.T) {
-	startTs := MinTime
-	endTs := MaxTime
+	startTs := utility.MinTime
+	endTs := utility.MaxTime
 	binlog, err := os.Open(testFilenameBig)
 	if err != nil {
 		t.Errorf("failed to open data example: %v", err)

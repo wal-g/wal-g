@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -36,7 +37,7 @@ const (
 	CatchupPath      = "catchup_" + VersionStr + "/"
 	WalPath          = "wal_" + VersionStr + "/"
 	BackupNamePrefix = "base_"
-	BackupTimeFormat = "20060102T150405Z"
+	BackupTimeFormat = "20060102T150405Z" // timestamps in that format should be lexicographically sorted
 
 	// utility.SentinelSuffix is a suffix of backup finish sentinel file
 	SentinelSuffix         = "_backup_stop_sentinel.json"
@@ -46,6 +47,12 @@ const (
 	PathSeparator          = string(os.PathSeparator)
 	Mebibyte               = 1024 * 1024
 )
+
+// not really the maximal value, but high enough.
+// NOTE: can't use MaxInt64, due to time.Time implementation issues (it adds some value to it)
+var MaxTime = time.Unix(math.MaxInt64/2, 0)
+
+var MinTime = time.Unix(0, 0)
 
 // Empty is used for channel signaling.
 type Empty struct{}
@@ -370,4 +377,16 @@ func StartCommandWithStdoutPipe(cmd *exec.Cmd) (io.ReadCloser, error) {
 		return nil, err
 	}
 	return stdout, err
+}
+
+func ParseUntilTs(untilTs string) (time.Time, error) {
+	if untilTs != "" {
+		dt, err := time.Parse(time.RFC3339, untilTs)
+		if err != nil {
+			return time.Time{}, err
+		}
+		return dt, nil
+	}
+	// far future
+	return MaxTime, nil
 }

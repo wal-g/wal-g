@@ -42,22 +42,26 @@ func HandleBackupRestore(backupName string, dbnames []string, noRecovery bool) {
 	tracelog.ErrorLogger.FatalfOnError("proxy run error: %v", err)
 
 	backupName = backup.Name
-	baseUrl := getBackupUrl(backupName)
+	baseUrl := getDatabaseBackupUrl(backupName)
 
 	err = runParallel(func(dbname string) error {
-		return restoreSingleDatabase(ctx, db, baseUrl, dbname, noRecovery)
+		err := restoreSingleDatabase(ctx, db, baseUrl, dbname)
+		if err != nil {
+			return err
+		}
+		if !noRecovery {
+			return recoverSingleDatabase(ctx, db, dbname)
+		}
+		return nil
 	}, dbnames)
 	tracelog.ErrorLogger.FatalfOnError("overall restore failed: %v", err)
 
 	tracelog.InfoLogger.Printf("restore finished")
 }
 
-func restoreSingleDatabase(ctx context.Context, db *sql.DB, baseUrl string, dbname string, noRecovery bool) error {
+func restoreSingleDatabase(ctx context.Context, db *sql.DB, baseUrl string, dbname string) error {
 	backupUrl := fmt.Sprintf("%s/%s", baseUrl, url.QueryEscape(dbname))
-	sql := fmt.Sprintf("RESTORE DATABASE %s FROM URL = '%s' WITH REPLACE", quoteName(dbname), backupUrl)
-	if noRecovery {
-		sql += ", NORECOVERY"
-	}
+	sql := fmt.Sprintf("RESTORE DATABASE %s FROM URL = '%s' WITH REPLACE, NORECOVERY", quoteName(dbname), backupUrl)
 	tracelog.InfoLogger.Printf("starting restore database [%s] from %s", dbname, backupUrl)
 	tracelog.DebugLogger.Printf("SQL: %s", sql)
 	_, err := db.ExecContext(ctx, sql)
@@ -65,6 +69,19 @@ func restoreSingleDatabase(ctx context.Context, db *sql.DB, baseUrl string, dbna
 		tracelog.ErrorLogger.Printf("database [%s] restore failed: %v", dbname, err)
 	} else {
 		tracelog.InfoLogger.Printf("database [%s] restore succefully finished", dbname)
+	}
+	return err
+}
+
+func recoverSingleDatabase(ctx context.Context, db *sql.DB, dbname string) error {
+	sql := fmt.Sprintf("RESTORE DATABASE %s WITH RECOVERY", quoteName(dbname))
+	tracelog.InfoLogger.Printf("recovering database [%s]", dbname)
+	tracelog.DebugLogger.Printf("SQL: %s", sql)
+	_, err := db.ExecContext(ctx, sql)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("database [%s] recovery failed: %v", dbname, err)
+	} else {
+		tracelog.InfoLogger.Printf("database [%s] recovery succefully finished", dbname)
 	}
 	return err
 }
