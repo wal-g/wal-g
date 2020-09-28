@@ -5,7 +5,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/sqlserver"
 )
 
-const backupRestoreShortDescription = "Restores backup from storage"
+const backupRestoreShortDescription = "Restores backup from the storage"
 
 var restoreDatabases []string
 var restoreNoRecovery bool
@@ -16,6 +16,7 @@ var backupRestoreCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		sqlserver.HandleBackupRestore(args[0], restoreDatabases, restoreNoRecovery)
+
 	},
 }
 

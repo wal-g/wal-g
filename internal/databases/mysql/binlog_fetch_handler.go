@@ -1,13 +1,14 @@
 package mysql
 
 import (
+	"os"
+	"path"
+	"path/filepath"
+
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
-	"os"
-	"path"
-	"path/filepath"
 )
 
 type indexHandler struct {
@@ -41,14 +42,14 @@ func (ih *indexHandler) createIndexFile() error {
 	return nil
 }
 
-func HandleBinlogFetch(folder storage.Folder, backupName string, untilDT string) {
+func HandleBinlogFetch(folder storage.Folder, backupName string, untilTs string) {
 	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalfOnError("Unable to get backup %v", err)
 
-	startTs, err := getBinlogStartTs(folder, backup)
+	startTs, err := getBinlogSinceTs(folder, backup)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	endTs, err := configureEndTs(untilDT)
+	endTs, err := utility.ParseUntilTs(untilTs)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	dstDir, err := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)

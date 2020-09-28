@@ -5,7 +5,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/sqlserver"
 )
 
-const backupPushShortDescription = "Creates new backup and pushes it to storage"
+const backupPushShortDescription = "Creates new backup and pushes it to the storage"
 
 var backupPushDatabases []string
 var backupCompression bool

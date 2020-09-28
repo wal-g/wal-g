@@ -5,8 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path"
+	"sort"
 	"strings"
 	"time"
+
+	"github.com/wal-g/storages/storage"
 
 	_ "github.com/denisenkom/go-mssqldb"
 	"github.com/wal-g/tracelog"
@@ -15,6 +19,10 @@ import (
 )
 
 const AllDatabases = "ALL"
+
+const LogNamePrefix = "wal_"
+
+const TimeSQLServerFormat = "Jan 02, 2006 03:04 PM"
 
 var SystemDbnames = []string{
 	"master",
@@ -108,16 +116,64 @@ func quoteName(name string) string {
 	return "[" + strings.ReplaceAll(name, "]", "]]") + "]"
 }
 
-func generateBackupName() string {
+func generateDatabaseBackupName() string {
 	return utility.BackupNamePrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 }
 
-func getBackupUrl(backupName string) string {
+func getDatabaseBackupUrl(backupName string) string {
 	hostname, err := internal.GetRequiredSetting(internal.SQLServerBlobHostname)
 	if err != nil {
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
 	return fmt.Sprintf("https://%s/%s/%s", hostname, utility.BaseBackupPath, backupName)
+}
+
+func generateLogBackupName() string {
+	return LogNamePrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
+}
+
+func getLogBackupUrl(logBackupName string) string {
+	hostname, err := internal.GetRequiredSetting(internal.SQLServerBlobHostname)
+	if err != nil {
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
+	return fmt.Sprintf("https://%s/%s/%s", hostname, utility.WalPath, logBackupName)
+}
+
+func doesLogBackupContainDb(folder storage.Folder, logBakupName string, dbname string) (bool, error) {
+	f := folder.GetSubFolder(utility.WalPath).GetSubFolder(logBakupName)
+	_, dbDirs, err := f.ListFolder()
+	if err != nil {
+		return false, err
+	}
+	for _, dbDir := range dbDirs {
+		if dbname == path.Base(dbDir.GetPath()) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func getLogsSinceBackup(folder storage.Folder, backupName string, stopAt time.Time) ([]string, error) {
+	if !strings.HasPrefix(backupName, utility.BackupNamePrefix) {
+		return nil, fmt.Errorf("unexpected backup name: %s", backupName)
+	}
+	var logNames []string
+	startTs := backupName[len(utility.BackupNamePrefix):]
+	endTs := stopAt.Format(utility.BackupTimeFormat)
+	_, logBackups, err := folder.GetSubFolder(utility.WalPath).ListFolder()
+	if err != nil {
+		return nil, err
+	}
+	for _, logBackup := range logBackups {
+		name := path.Base(logBackup.GetPath())
+		logTs := name[len(LogNamePrefix):]
+		if logTs >= startTs && logTs <= endTs {
+			logNames = append(logNames, name)
+		}
+	}
+	sort.Strings(logNames)
+	return logNames, nil
 }
 
 func runParallel(f func(string) error, dbnames []string) error {
@@ -164,4 +220,15 @@ func uniq(src []string) []string {
 		}
 	}
 	return res
+}
+
+func convertPITRTime(untilDt string) (string, error) {
+	if untilDt == "" {
+		return "", nil
+	}
+	dt, err := time.Parse(time.RFC3339, untilDt)
+	if err != nil {
+		return "", err
+	}
+	return dt.Format(TimeSQLServerFormat), nil
 }

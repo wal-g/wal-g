@@ -49,14 +49,14 @@ func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 		tracelog.ErrorLogger.FatalOnError(err)
 		sentinel.Databases = uniq(append(sentinel.Databases, dbnames...))
 	} else {
-		backupName = generateBackupName()
+		backupName = generateDatabaseBackupName()
 		sentinel = &SentinelDto{
 			Server:         server,
 			Databases:      dbnames,
 			StartLocalTime: timeStart,
 		}
 	}
-	baseUrl := getBackupUrl(backupName)
+	baseUrl := getDatabaseBackupUrl(backupName)
 
 	err = runParallel(func(dbname string) error {
 		return backupSingleDatabase(ctx, db, baseUrl, dbname, compression)

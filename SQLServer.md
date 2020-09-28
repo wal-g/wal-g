@@ -43,8 +43,9 @@ You also need some configuration in SQLServer for wal-g to connect it.
     CREATE LOGIN [backupuser] WITH PASSWORD = 'backuppass1!';
     ALTER SERVER ROLE [sysadmin] ADD MEMBER [backupuser];
     CREATE CREDENTIAL [https://backup.local/basebackups_005]
-    WITH IDENTITY='SHARED ACCESS SIGNATURE', SECRET = 'does_not_matter'
-
+    WITH IDENTITY='SHARED ACCESS SIGNATURE', SECRET = 'does_not_matter';
+    CREATE CREDENTIAL [https://backup.local/wal_005]
+    WITH IDENTITY='SHARED ACCESS SIGNATURE', SECRET = 'does_not_matter';
     ```
 
 Usage

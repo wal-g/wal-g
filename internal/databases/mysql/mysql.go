@@ -5,13 +5,13 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"fmt"
-	"github.com/wal-g/storages/storage"
 	"io/ioutil"
-	"math"
 	"path"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/wal-g/storages/storage"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/wal-g/tracelog"
@@ -22,12 +22,6 @@ import (
 const BinlogPath = "binlog_" + utility.VersionStr + "/"
 
 const TimeMysqlFormat = "2006-01-02 15:04:05"
-
-// not really the maximal value, but high enough.
-// NOTE: can't use MaxInt64, due to time.Time implementation issues (it adds some value to it)
-var MaxTime = time.Unix(math.MaxInt64/2, 0)
-
-var MinTime = time.Unix(0, 0)
 
 func scanToMap(rows *sql.Rows, dst map[string]interface{}) error {
 	columns, err := rows.Columns()
@@ -162,20 +156,8 @@ func fetchLogs(folder storage.Folder, dstDir string, startTs time.Time, endTs ti
 	return nil
 }
 
-func configureEndTs(untilDt string) (time.Time, error) {
-	if untilDt != "" {
-		dt, err := time.Parse(time.RFC3339, untilDt)
-		if err != nil {
-			return time.Time{}, err
-		}
-		return dt, nil
-	}
-	// far future
-	return MaxTime, nil
-}
-
-func getBinlogStartTs(folder storage.Folder, backup *internal.Backup) (time.Time, error) {
-	startTs := MaxTime // far future
+func getBinlogSinceTs(folder storage.Folder, backup *internal.Backup) (time.Time, error) {
+	startTs := utility.MaxTime // far future
 	var streamSentinel StreamSentinelDto
 	err := internal.FetchStreamSentinel(backup, &streamSentinel)
 	if err != nil {
