@@ -468,6 +468,8 @@ github.com/wal-g/storages v0.0.0-20200827033816-72e6bf05d4be h1:OocQVZmvL4NX7x+f
 github.com/wal-g/storages v0.0.0-20200827033816-72e6bf05d4be/go.mod h1:72lBz6J7v8sB+Z3FbVQLWUrC294sHuqWybyg8ul3e0M=
 github.com/wal-g/storages v0.0.0-20200925123854-6410409dffec h1:8Y5TBzWd2Mq1AiJuawlJ4Cxd3DekoBz2kIXKR+AFqew=
 github.com/wal-g/storages v0.0.0-20200925123854-6410409dffec/go.mod h1:72lBz6J7v8sB+Z3FbVQLWUrC294sHuqWybyg8ul3e0M=
+github.com/wal-g/storages v0.0.0-20200929120806-0a1388ea9240 h1:neUIRZixhNE2pFS+ou7K7vfyvxSen6QIKsI9kMZ8YM4=
+github.com/wal-g/storages v0.0.0-20200929120806-0a1388ea9240/go.mod h1:72lBz6J7v8sB+Z3FbVQLWUrC294sHuqWybyg8ul3e0M=
 github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30 h1:LoTfXAgZzRKuYVjWhP8dTDLBX+EUiMeRrdF7MynJ1RU=
 github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30/go.mod h1:onYsyKxs/aN2SHYnSw/ciYSGOPPYNHxJjxKNRVzLwNY=
 github.com/willf/bitset v1.1.10 h1:NotGKqX0KwQ72NUzqrjZq5ipPNDQex9lo3WpaS8L2sc=
@@ -710,6 +712,8 @@ golang.org/x/tools v0.0.0-20200924224222-8d73f17870ce h1:XRr763sMfaUSNR4EsxbddvV
 golang.org/x/tools v0.0.0-20200924224222-8d73f17870ce/go.mod h1:z6u4i615ZeAfBE4XtMziQW1fSVJXACjjbWkB/mvPzlU=
 golang.org/x/tools v0.0.0-20200925150135-34b80a0a46ad h1:2MIdXOXYj26hsEudIYgvVlkEqkyD1S13W7CRzN3Bui4=
 golang.org/x/tools v0.0.0-20200925150135-34b80a0a46ad/go.mod h1:z6u4i615ZeAfBE4XtMziQW1fSVJXACjjbWkB/mvPzlU=
+golang.org/x/tools v0.0.0-20200928201943-a0ef9b62deab h1:CyH2SDm5ATQiX9gtbMYfvNNed97A9v+TJFnUX/fTaJY=
+golang.org/x/tools v0.0.0-20200928201943-a0ef9b62deab/go.mod h1:z6u4i615ZeAfBE4XtMziQW1fSVJXACjjbWkB/mvPzlU=
 golang.org/x/xerrors v0.0.0-20190410155217-1f06c39b4373/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 golang.org/x/xerrors v0.0.0-20190513163551-3ee3066db522/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7 h1:9zdDQZ7Thm29KFXgAX/+yaf3eVbP7djjWp/dXAppNCc=
