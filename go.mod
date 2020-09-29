@@ -50,12 +50,12 @@ require (
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.5.1
 	github.com/ulikunitz/xz v0.5.6
-	github.com/wal-g/storages v0.0.0-20200925123854-6410409dffec
+	github.com/wal-g/storages v0.0.0-20200929120806-0a1388ea9240
 	github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30
 	github.com/xdg/stringprep v1.0.1-0.20180714160509-73f8eece6fdc // indirect
 	go.mongodb.org/mongo-driver v1.3.4
 	golang.org/x/crypto v0.0.0-20200709230013-948cd5f35899
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	golang.org/x/tools v0.0.0-20200925150135-34b80a0a46ad // indirect
+	golang.org/x/tools v0.0.0-20200928201943-a0ef9b62deab // indirect
 )
