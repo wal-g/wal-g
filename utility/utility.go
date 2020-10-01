@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -49,8 +48,15 @@ const (
 )
 
 // not really the maximal value, but high enough.
-// NOTE: can't use MaxInt64, due to time.Time implementation issues (it adds some value to it)
-var MaxTime = time.Unix(math.MaxInt64/2, 0)
+var MaxTime time.Time
+
+func init() {
+	var err error
+	MaxTime, err = time.Parse(BackupTimeFormat, "99991231T235959Z")
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse MaxTime: %v", err))
+	}
+}
 
 var MinTime = time.Unix(0, 0)
 
