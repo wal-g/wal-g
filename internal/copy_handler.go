@@ -1,13 +1,11 @@
 package internal
 
 import (
-	"path"
-	"strings"
-	"sync"
-
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
+	"path"
+	"strings"
 )
 
 type CopyingInfo struct {
@@ -23,7 +21,7 @@ func HandleCopy(fromConfigFile string, toConfigFile string, backupName string, w
 	if fromError != nil || toError != nil {
 		return
 	}
-	infos, err := getCopyingInfoToCopy(backupName, from, to, withoutHistory)
+	infos, err := getCopyingInfo(backupName, from, to, withoutHistory)
 	tracelog.ErrorLogger.FatalOnError(err)
 	isSuccess, err := StartCopy(infos)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -33,50 +31,53 @@ func HandleCopy(fromConfigFile string, toConfigFile string, backupName string, w
 }
 
 func StartCopy(infos []CopyingInfo) (bool, error) {
-	var maxParallelJobsCount = 8 // TODO place for improvement
-	for i := 0; i < len(infos); i += maxParallelJobsCount {
-		errors := make(chan error)
-		wgDone := make(chan bool)
+	maxParallelJobsCount := 8 // TODO place for improvement
 
-		var lastIndex = utility.Min(i+maxParallelJobsCount, len(infos))
-		var infosToCopy = infos[i:lastIndex]
-		var wg sync.WaitGroup
-		for _, info := range infosToCopy {
-			wg.Add(1)
-			go copyObject(info, &wg, errors)
-		}
-		wg.Wait()
-		close(wgDone)
+	tickets := make(chan interface{}, maxParallelJobsCount)
 
-		select {
-		case <-wgDone:
-			break
-		case err := <-errors:
-			close(errors)
-			return false, err
-		}
+	for t := 0; t < maxParallelJobsCount; t++ {
+		tickets <- nil
 	}
+
+	errors := make(chan error)
+
+	for _, e := range infos {
+
+		// do we have any errs yet?
+		for len(errors) > 0 {
+			if err := <-errors; err != nil {
+				return false, err
+			}
+		}
+
+		// block here
+		_ = <-tickets
+
+		go func() {
+			errors <- copyObject(e)
+			tickets <- nil
+		}()
+	}
+
 	return true, nil
 }
 
-func copyObject(info CopyingInfo, wg *sync.WaitGroup, errors chan error) {
-	defer wg.Done()
+func copyObject(info CopyingInfo) error {
 	var objectName, from, to = info.Object.GetName(), info.From, info.To
 	var readCloser, err = from.ReadObject(objectName)
 	if err != nil {
-		errors <- err
-		return
+		return err
 	}
 	var filename = path.Join(from.GetPath(), objectName)
 	err = to.PutObject(filename, readCloser)
 	if err != nil {
-		errors <- err
-		return
+		return err
 	}
 	tracelog.InfoLogger.Printf("Copied '%s' from '%s' to '%s'.", objectName, from.GetPath(), to.GetPath())
+	return nil
 }
 
-func getCopyingInfoToCopy(backupName string, from storage.Folder, to storage.Folder, withoutHistory bool) ([]CopyingInfo, error) {
+func getCopyingInfo(backupName string, from storage.Folder, to storage.Folder, withoutHistory bool) ([]CopyingInfo, error) {
 	if backupName == "" {
 		tracelog.InfoLogger.Printf("Copy all backups and history.")
 		return GetAllCopyingInfo(from, to)
