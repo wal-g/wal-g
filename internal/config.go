@@ -142,6 +142,8 @@ var (
 		PgpKeySetting:                true,
 		PgpKeyPathSetting:            true,
 		PgpKeyPassphraseSetting:      true,
+		LibsodiumKeySetting:          true,
+		LibsodiumKeyPathSetting:      true,
 		TotalBgUploadedLimit:         true,
 		NameStreamCreateCmd:          true,
 		NameStreamRestoreCmd:         true,
