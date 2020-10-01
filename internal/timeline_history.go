@@ -27,17 +27,17 @@ import (
 type TimeLineHistFileRow struct {
 	TimeLineID uint32
 	StartLSN   pglogrepl.LSN
-	Comment	   string
+	Comment    string
 }
 
 // The TimeLineHistFile struct represents a TimeLineHistory file containing TimeLineHistFileRows.
-// Since TimeLineHistFileRows are only parsed 0 or 1 rimes, the data is only 
+// Since TimeLineHistFileRows are only parsed 0 or 1 rimes, the data is only
 // preserved as []byte and parsed to TimeLineHistFileRows when required.
 type TimeLineHistFile struct {
 	TimeLineID uint32
-	Filename string
-	data     []byte
-	readIndex int
+	Filename   string
+	data       []byte
+	readIndex  int
 }
 
 //NewTimeLineHistFile is a helper function to define a new TimeLineHistFile

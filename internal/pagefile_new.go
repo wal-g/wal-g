@@ -56,7 +56,7 @@ func RestoreMissingPages(base io.Reader, target ReadWriterAt) error {
 	}
 	// check if some extra pages left in base reader
 	if isEmpty := isTarReaderEmpty(base); !isEmpty {
-		tracelog.DebugLogger.Printf("Skipping pages after end of the local target %s, " +
+		tracelog.DebugLogger.Printf("Skipping pages after end of the local target %s, "+
 			"possibly the pagefile was truncated.\n", target.Name())
 	}
 	return nil

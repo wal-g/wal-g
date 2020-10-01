@@ -15,22 +15,22 @@ var useNewUnwrapImplementation = false
 // the result of single backup unwrap operation
 type UnwrapResult struct {
 	// completely restored files
-	completedFiles []string
+	completedFiles      []string
 	completedFilesMutex sync.Mutex
 	// for each created page file
 	// store count of blocks left to restore
-	createdPageFiles map[string]int64
+	createdPageFiles      map[string]int64
 	createdPageFilesMutex sync.Mutex
 	// for those page files to which the increment was applied
 	// store count of written increment blocks
-	writtenIncrementFiles map[string]int64
+	writtenIncrementFiles      map[string]int64
 	writtenIncrementFilesMutex sync.Mutex
 }
 
 func newUnwrapResult() *UnwrapResult {
-	return &UnwrapResult{make([]string,0),sync.Mutex{},
-		make(map[string]int64,0),sync.Mutex{},
-		make(map[string]int64,0),sync.Mutex{}}
+	return &UnwrapResult{make([]string, 0), sync.Mutex{},
+		make(map[string]int64, 0), sync.Mutex{},
+		make(map[string]int64, 0), sync.Mutex{}}
 }
 
 func checkDbDirectoryForUnwrapNew(dbDataDirectory string, sentinelDto BackupSentinelDto) error {

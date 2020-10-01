@@ -48,10 +48,10 @@ func (writer *WalVerifyTableOutputWriter) writeTable(result WalVerifyResult) {
 	tableWriter := table.NewWriter()
 	tableWriter.SetOutputMirror(writer.output)
 	defer tableWriter.Render()
-	tableWriter.AppendHeader(table.Row{"TLI", "Start",	"End", "Segments count", "Status"})
+	tableWriter.AppendHeader(table.Row{"TLI", "Start", "End", "Segments count", "Status"})
 
 	for _, row := range result.IntegrityScanResult {
-		tableWriter.AppendRow(table.Row{row.TimelineId , row.StartSegment, row.EndSegment, row.SegmentsCount, row.Status})
+		tableWriter.AppendRow(table.Row{row.TimelineId, row.StartSegment, row.EndSegment, row.SegmentsCount, row.Status})
 	}
 }
 

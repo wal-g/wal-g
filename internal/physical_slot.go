@@ -6,7 +6,7 @@ The data can be retrieved from Postgres with the queryRunner,
 and is consumed by the walReceiveHandler.
 */
 
-import(
+import (
 	"github.com/jackc/pglogrepl"
 	"github.com/pkg/errors"
 	"regexp"
@@ -36,7 +36,7 @@ func NewPhysicalSlot(name string, exists bool, active bool, restartLSN string) (
 }
 
 // ValidateSlotName validates pgSlotName to be a valid slot name
-func ValidateSlotName(pgSlotName string) (err error){
+func ValidateSlotName(pgSlotName string) (err error) {
 	// Check WALG_SLOTNAME env variable (can be any of [0-9A-Za-z_], and 1-63 characters long)
 	invalid, err := regexp.MatchString(`\W`, pgSlotName)
 	if err != nil {

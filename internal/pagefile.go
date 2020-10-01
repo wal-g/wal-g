@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	DatabasePageSize			= int64(walparser.BlockSize)
+	DatabasePageSize            = int64(walparser.BlockSize)
 	sizeofInt32                 = 4
 	sizeofInt16                 = 2
 	sizeofInt64                 = 8

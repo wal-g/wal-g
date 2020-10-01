@@ -25,7 +25,7 @@ type FileTarBall struct {
 }
 
 func (tarBall *FileTarBall) Name() string {
-	return "part_"+fmt.Sprintf("%0.3d", tarBall.number)+".tar.lz4"
+	return "part_" + fmt.Sprintf("%0.3d", tarBall.number) + ".tar.lz4"
 }
 
 // SetUp creates a new LZ4 writer, tar writer and file for

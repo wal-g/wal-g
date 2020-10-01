@@ -714,6 +714,8 @@ golang.org/x/tools v0.0.0-20200925150135-34b80a0a46ad h1:2MIdXOXYj26hsEudIYgvVlk
 golang.org/x/tools v0.0.0-20200925150135-34b80a0a46ad/go.mod h1:z6u4i615ZeAfBE4XtMziQW1fSVJXACjjbWkB/mvPzlU=
 golang.org/x/tools v0.0.0-20200928201943-a0ef9b62deab h1:CyH2SDm5ATQiX9gtbMYfvNNed97A9v+TJFnUX/fTaJY=
 golang.org/x/tools v0.0.0-20200928201943-a0ef9b62deab/go.mod h1:z6u4i615ZeAfBE4XtMziQW1fSVJXACjjbWkB/mvPzlU=
+golang.org/x/tools v0.0.0-20201001215343-4e032a7e1e88 h1:vo3O4Q0NrHISIyLT8a7Vgywj70jrJJXlmY0xrQ4Lx78=
+golang.org/x/tools v0.0.0-20201001215343-4e032a7e1e88/go.mod h1:z6u4i615ZeAfBE4XtMziQW1fSVJXACjjbWkB/mvPzlU=
 golang.org/x/xerrors v0.0.0-20190410155217-1f06c39b4373/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 golang.org/x/xerrors v0.0.0-20190513163551-3ee3066db522/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7 h1:9zdDQZ7Thm29KFXgAX/+yaf3eVbP7djjWp/dXAppNCc=

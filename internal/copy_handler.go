@@ -31,7 +31,7 @@ func HandleCopy(fromConfigFile string, toConfigFile string, backupName string, w
 }
 
 func StartCopy(infos []CopyingInfo) (bool, error) {
-	maxParallelJobsCount := 8 // TODO place for improvement
+	maxParallelJobsCount := 8
 
 	tickets := make(chan interface{}, maxParallelJobsCount)
 
@@ -41,7 +41,7 @@ func StartCopy(infos []CopyingInfo) (bool, error) {
 
 	errors := make(chan error)
 
-	for _, e := range infos {
+	for _, info := range infos {
 
 		// do we have any errs yet?
 		for len(errors) > 0 {
@@ -53,10 +53,10 @@ func StartCopy(infos []CopyingInfo) (bool, error) {
 		// block here
 		_ = <-tickets
 
-		go func() {
-			errors <- copyObject(e)
+		go func(info CopyingInfo) {
+			errors <- copyObject(info)
 			tickets <- nil
-		}()
+		}(info)
 	}
 
 	return true, nil

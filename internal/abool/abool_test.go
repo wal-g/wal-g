@@ -25,10 +25,10 @@
 package abool
 
 import (
-"math"
-"sync"
-"sync/atomic"
-"testing"
+	"math"
+	"sync"
+	"sync/atomic"
+	"testing"
 )
 
 func TestDefaultValue(t *testing.T) {
