@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 	"path"
 	"strings"
+	"sync"
 )
 
 type CopyingInfo struct {
@@ -39,9 +40,10 @@ func StartCopy(infos []CopyingInfo) (bool, error) {
 		tickets <- nil
 	}
 
-	errors := make(chan error)
+	errors := make(chan error, maxParallelJobsCount * 2)
+	var wg sync.WaitGroup
 
-	for _, info := range infos {
+	for i, info := range infos {
 
 		// do we have any errs yet?
 		for len(errors) > 0 {
@@ -52,12 +54,17 @@ func StartCopy(infos []CopyingInfo) (bool, error) {
 
 		// block here
 		_ = <-tickets
+		wg.Add(1)
 
 		go func(info CopyingInfo) {
-			errors <- copyObject(info)
+			defer wg.Done()
+			err := copyObject(info)
 			tickets <- nil
+			errors <- err
 		}(info)
 	}
+
+	wg.Wait()
 
 	return true, nil
 }
