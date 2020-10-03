@@ -29,38 +29,29 @@ type BackupSentinelDto struct {
 	UserData interface{} `json:"UserData,omitempty"`
 }
 
-func NewBackupSentinelDto(
-	backupStartLSN, backupFinishLSN uint64,
-	bc *BackupConfig,
-	pgVersion int,
-	tablespaceSpec *TablespaceSpec,
-	systemIdentifier *uint64,
-	uncompressedSize, compressedSize int64,
-	files *sync.Map,
-	tarFileSets TarFileSets,
-) *BackupSentinelDto {
-	sentinel := &BackupSentinelDto{
-		BackupStartLSN:   &backupStartLSN,
-		IncrementFromLSN: bc.previousBackupSentinelDto.BackupStartLSN,
-		PgVersion:        pgVersion,
-		TablespaceSpec:   tablespaceSpec,
+func NewBackupSentinelDto(bc *BackupHandler, tbsSpec *TablespaceSpec, tarFileSets TarFileSets) BackupSentinelDto {
+	sentinel := BackupSentinelDto{
+		BackupStartLSN:   &bc.curBackupInfo.startLSN,
+		IncrementFromLSN: bc.prevBackupInfo.sentinelDto.BackupStartLSN,
+		PgVersion:        bc.pgInfo.pgVersion,
+		TablespaceSpec:   tbsSpec,
 	}
-	if bc.previousBackupSentinelDto.BackupStartLSN != nil {
-		sentinel.IncrementFrom = &bc.previousBackupName
-		if bc.previousBackupSentinelDto.IsIncremental() {
-			sentinel.IncrementFullName = bc.previousBackupSentinelDto.IncrementFullName
+	if bc.prevBackupInfo.sentinelDto.BackupStartLSN != nil {
+		sentinel.IncrementFrom = &bc.prevBackupInfo.name
+		if bc.prevBackupInfo.sentinelDto.IsIncremental() {
+			sentinel.IncrementFullName = bc.prevBackupInfo.sentinelDto.IncrementFullName
 		} else {
-			sentinel.IncrementFullName = &bc.previousBackupName
+			sentinel.IncrementFullName = &bc.prevBackupInfo.name
 		}
-		sentinel.IncrementCount = &bc.incrementCount
+		sentinel.IncrementCount = &bc.curBackupInfo.incrementCount
 	}
 
-	sentinel.setFiles(files)
-	sentinel.BackupFinishLSN = &backupFinishLSN
-	sentinel.UserData = internal.UnmarshalSentinelUserData(bc.userData)
-	sentinel.SystemIdentifier = systemIdentifier
-	sentinel.UncompressedSize = uncompressedSize
-	sentinel.CompressedSize = compressedSize
+	sentinel.setFiles(bc.workers.bundle.GetFiles())
+	sentinel.BackupFinishLSN = &bc.curBackupInfo.endLSN
+	sentinel.UserData = internal.UnmarshalSentinelUserData(bc.arguments.userData)
+	sentinel.SystemIdentifier = bc.pgInfo.systemIdentifier
+	sentinel.UncompressedSize = bc.curBackupInfo.uncompressedSize
+	sentinel.CompressedSize = bc.curBackupInfo.compressedSize
 	sentinel.TarFileSets = tarFileSets
 	return sentinel
 }
@@ -97,7 +88,7 @@ func (dto *BackupSentinelDto) setFiles(p *sync.Map) {
 // TODO : unit tests
 // TODO : get rid of panic here
 // IsIncremental checks that sentinel represents delta backup
-func (dto *BackupSentinelDto) IsIncremental() bool {
+func (dto *BackupSentinelDto) IsIncremental() (isIncremental bool) {
 	// If we have increment base, we must have all the rest properties.
 	if dto.IncrementFrom != nil {
 		if dto.IncrementFromLSN == nil || dto.IncrementFullName == nil || dto.IncrementCount == nil {

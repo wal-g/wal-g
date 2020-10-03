@@ -62,8 +62,8 @@ func init() {
 // uploaded backups; in this case, pg_control is used as
 // the sentinel.
 type Bundle struct {
-	ArchiveDirectory string
-	Sentinel         *internal.Sentinel
+	Directory string
+	Sentinel  *internal.Sentinel
 
 	TarBallComposer TarBallComposer
 	TarBallQueue    *internal.TarBallQueue
@@ -82,23 +82,23 @@ type Bundle struct {
 
 // TODO: use DiskDataFolder
 func NewBundle(
-	archiveDirectory string, crypter crypto.Crypter,
+	directory string, crypter crypto.Crypter,
 	incrementFromLsn *uint64, incrementFromFiles internal.BackupFileList,
 	forceIncremental bool, tarSizeThreshold int64,
 ) *Bundle {
 	return &Bundle{
-		ArchiveDirectory:   archiveDirectory,
+		Directory:          directory,
 		Crypter:            crypter,
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
-		TablespaceSpec:     NewTablespaceSpec(archiveDirectory),
+		TablespaceSpec:     NewTablespaceSpec(directory),
 		forceIncremental:   forceIncremental,
 		TarSizeThreshold:   tarSizeThreshold,
 	}
 }
 
 func (bundle *Bundle) getFileRelPath(fileAbsPath string) string {
-	return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.ArchiveDirectory)
+	return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.Directory)
 }
 
 func (bundle *Bundle) StartQueue(tarBallMaker internal.TarBallMaker) error {

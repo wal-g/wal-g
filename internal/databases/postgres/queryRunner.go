@@ -185,7 +185,8 @@ func (queryRunner *PgQueryRunner) startBackup(backup string) (backupName string,
 		return "", "", false, "", errors.Wrap(err, "QueryRunner StartBackup: pg_start_backup() failed")
 	}
 
-	if err = conn.QueryRow("show data_directory").Scan(&dataDir); err != nil {
+	dataDir, err = queryRunner.GetDataDir()
+	if err != nil {
 		return "", "", false, "", errors.Wrap(err, "QueryRunner StartBackup: show data_directory failed")
 	}
 
@@ -359,6 +360,12 @@ func (queryRunner *PgQueryRunner) GetWalSegmentBytes() (segBlocks uint64, err er
 		segBlocks *= 8192
 	}
 	return
+}
+
+// GetDataDir reads the wals segment size (in bytes) and converts it to uint64
+// TODO: Unittest
+func (queryRunner *PgQueryRunner) GetDataDir() (dataDir string, err error) {
+	return queryRunner.GetParameter("data_directory")
 }
 
 // GetPhysicalSlotInfo reads information on a physical replication slot

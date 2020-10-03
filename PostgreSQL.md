@@ -208,9 +208,43 @@ When uploading backups to S3, the user should pass in the path containing the ba
 ```
 wal-g backup-push /backup/directory/path
 ```
+
 If backup is pushed from replication slave, WAL-G will control timeline of the server. In case of promotion to master or timeline switch, backup will be uploaded but not finalized, WAL-G will exit with an error. In this case logs will contain information necessary to finalize the backup. You can use backuped data if you clearly understand entangled risks.
 
 ``backup-push`` can also be run with the ``--permanent`` flag, which will mark the backup as permanent and prevent it from being removed when running ``delete``.
+
+#### Remote backup
+
+WAL-G backup-push allows for two data streaming options:
+
+1. Running directly on the database server as the postgres user, wal-g can read the database files from the filesystem. This option allows for high performance, and extra capabilities, like Delta backups.
+
+For uploading backups to S3 in streaming option 1, the user should pass in the path containing the backup started by Postgres as in:
+
+```
+wal-g backup-push /backup/directory/path
+```
+
+2. Alternatively, WAL-G can stream the backup data through the postgres BASE_BACKUP protocol. This allows WAL-G to stream the backup data through the tcp layer, allows to run remote, and allows WAL-G to run as a separate linux user. WAL-G does require a database connection with replication privilleges. Do note that the BASE_BACKUP protocol does not allow for multithreaded streaming, and that Delta backup currently is not implemented.
+
+To stream the backup data, leave out the data directory. And to set the hostname for the postgres server, you can use the environment variable PGHOST, or the WAL-G argument --pghost.
+
+```
+# Inline
+PGHOST=srv1 wal-g backup-push
+
+# Export
+export PGHOST=srv1
+wal-g backup-push
+
+# Use commandline option
+wal-g backup-push --pghost srv1
+```
+
+The remote backup option can also be used to:
+* Run Postgres on mutiple hosts (streaming replication), and backup with WAL-G using multihost configuration: ``wal-g backup-push --pghost srv1,srv2``
+* Run Postgres on a windows host and backup with WAL-G on a linux host: ``PGHOST=winsrv1 wal-g backup-push``
+* Schedule WAL-G as a Kubernetes CronJob
 
 #### Rating composer mode
 
