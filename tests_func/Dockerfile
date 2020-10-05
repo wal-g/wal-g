@@ -8,10 +8,12 @@ ARG WALG_REPO=${GOPATH}/src/github.com/wal-g/wal-g
 ENV MONGO_PACKAGE=${MONGO_PACKAGE} MONGO_REPO=${MONGO_REPO}
 ARG MONGO_MAJOR=4.2
 ARG MONGO_VERSION=4.2.3
+ARG MONGO_TOOLS_VERSION=100.1.1
 ENV TMP_DIR /var/tmp/wal-g
 ENV WALG_CONF_DIR /etc/wal-g/
 
-RUN echo "deb http://$MONGO_REPO/apt/ubuntu xenial/${MONGO_PACKAGE%-unstable}/$MONGO_MAJOR multiverse" | tee "/etc/apt/sources.list.d/${MONGO_PACKAGE%-unstable}.list"
+RUN echo "deb http://$MONGO_REPO/apt/ubuntu xenial/${MONGO_PACKAGE%-unstable}/4.4 multiverse" | tee "/etc/apt/sources.list.d/mongodb_4.4.list" && \
+    echo "deb http://$MONGO_REPO/apt/ubuntu xenial/${MONGO_PACKAGE%-unstable}/$MONGO_MAJOR multiverse" | tee "/etc/apt/sources.list.d/mongodb_${MONGO_MAJOR}.list"
 RUN apt-get update -qq && \
     apt-get install -y apt-transport-https tzdata && \
     mkdir -p /etc/apt/sources.list.d && \
@@ -23,7 +25,7 @@ RUN apt-get update -qq && \
     dpkg --configure mongodb-org-server && \
     apt-get install -yf && \
     apt-get install --allow-unauthenticated -y \
-        mongodb-org-tools=$MONGO_VERSION \
+        mongodb-database-tools=$MONGO_TOOLS_VERSION \
         mongodb-org-shell=$MONGO_VERSION && \
     rm -rf /var/lib/apt/lists/* /var/cache/debconf /var/lib/mongodb/* && \
     apt-get clean
