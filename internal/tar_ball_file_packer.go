@@ -46,7 +46,7 @@ type TarBallFilePackerOptions struct {
 
 func NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks bool) TarBallFilePackerOptions {
 	return TarBallFilePackerOptions{
-		verifyPageChecksums: verifyPageChecksums,
+		verifyPageChecksums:   verifyPageChecksums,
 		storeAllCorruptBlocks: storeAllCorruptBlocks,
 	}
 }

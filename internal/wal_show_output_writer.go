@@ -34,7 +34,7 @@ func (writer *WalShowJsonOutputWriter) Write(timelineInfos []*TimelineInfo) erro
 
 // WalShowTableOutputWriter writes the output in compact pretty table
 type WalShowTableOutputWriter struct {
-	output io.Writer
+	output         io.Writer
 	includeBackups bool
 }
 

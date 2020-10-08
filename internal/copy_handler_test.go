@@ -14,7 +14,7 @@ import (
 
 func TestStartCopy_WhenThereAreNoObjectsToCopy(t *testing.T) {
 	var infos = make([]internal.CopyingInfo, 0)
-	var isSuccess, err = internal.StartCopy(infos)
+	var isSuccess, err = internal.CopyInfos(infos)
 	assert.NoError(t, err)
 	assert.True(t, isSuccess)
 }
@@ -24,7 +24,7 @@ func TestStartCopy_WhenThereAreObjectsToCopy(t *testing.T) {
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	infos, err := internal.GetAllCopyingInfo(from, to)
 	assert.NoError(t, err)
-	isSuccess, err := internal.StartCopy(infos)
+	isSuccess, err := internal.CopyInfos(infos)
 	assert.NoError(t, err)
 	assert.True(t, isSuccess)
 

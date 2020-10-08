@@ -255,7 +255,7 @@ func TestWritingRegularIncrementToIncompleteFile(t *testing.T) {
 	mockContent, _ := ioutil.ReadFile(pagedFileName)
 	// all blocks after the second will be zero (missing) blocks
 	zeroBlocksStart := int64(2)
-	for i := zeroBlocksStart*internal.DatabasePageSize; i < int64(len(mockContent)); i++ {
+	for i := zeroBlocksStart * internal.DatabasePageSize; i < int64(len(mockContent)); i++ {
 		mockContent[i] = 0
 	}
 	mockFile := NewMockReadWriterAt(mockContent)
