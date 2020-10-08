@@ -43,7 +43,7 @@ func StartCopy(infos []CopyingInfo) (bool, error) {
 	errors := make(chan error, maxParallelJobsCount * 2)
 	var wg sync.WaitGroup
 
-	for i, info := range infos {
+	for _, info := range infos {
 
 		// do we have any errs yet?
 		for len(errors) > 0 {
