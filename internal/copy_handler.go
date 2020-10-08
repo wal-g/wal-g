@@ -24,14 +24,14 @@ func HandleCopy(fromConfigFile string, toConfigFile string, backupName string, w
 	}
 	infos, err := getCopyingInfo(backupName, from, to, withoutHistory)
 	tracelog.ErrorLogger.FatalOnError(err)
-	isSuccess, err := StartCopy(infos)
+	isSuccess, err := CopyInfos(infos)
 	tracelog.ErrorLogger.FatalOnError(err)
 	if isSuccess {
 		tracelog.InfoLogger.Println("Success copy.")
 	}
 }
 
-func StartCopy(infos []CopyingInfo) (bool, error) {
+func CopyInfos(infos []CopyingInfo) (bool, error) {
 	maxParallelJobsCount := 8
 
 	tickets := make(chan interface{}, maxParallelJobsCount)
@@ -65,6 +65,12 @@ func StartCopy(infos []CopyingInfo) (bool, error) {
 	}
 
 	wg.Wait()
+	
+	for len(errors) > 0 {
+		if err := <-errors; err != nil {
+			return false, err
+		}
+	}
 
 	return true, nil
 }
