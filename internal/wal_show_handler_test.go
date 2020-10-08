@@ -39,9 +39,9 @@ type TestTimelineSetup struct {
 // GetWalFilenames returns slice of existing wal segments filenames
 func (timelineSetup *TestTimelineSetup) GetWalFilenames() []string {
 	walFileSuffix := "." + lz4.FileExtension
-	filenamesWithExtension := make([]string,0, len(timelineSetup.existSegments))
+	filenamesWithExtension := make([]string, 0, len(timelineSetup.existSegments))
 	for _, name := range timelineSetup.existSegments {
-		filenamesWithExtension = append(filenamesWithExtension, name + walFileSuffix)
+		filenamesWithExtension = append(filenamesWithExtension, name+walFileSuffix)
 	}
 	return filenamesWithExtension
 }

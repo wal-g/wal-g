@@ -24,7 +24,7 @@ type FileTarInterpreter struct {
 	DBDataDirectory string
 	Sentinel        BackupSentinelDto
 	FilesToUnwrap   map[string]bool
-	UnwrapResult *UnwrapResult
+	UnwrapResult    *UnwrapResult
 
 	createNewIncrementalFiles bool
 }
@@ -33,7 +33,7 @@ func NewFileTarInterpreter(
 	dbDataDirectory string, sentinel BackupSentinelDto, filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
 ) *FileTarInterpreter {
 	return &FileTarInterpreter{dbDataDirectory, sentinel,
-		filesToUnwrap,newUnwrapResult(),createNewIncrementalFiles}
+		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles}
 }
 
 // TODO : unit tests

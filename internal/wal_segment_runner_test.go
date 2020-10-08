@@ -66,7 +66,7 @@ func TestWalSegmentRunner_SwitchTimelines(t *testing.T) {
 		},
 	}
 
-	expectedFoundSegmentsByTimeline := map[uint32][]internal.WalSegmentNo {
+	expectedFoundSegmentsByTimeline := map[uint32][]internal.WalSegmentNo{
 		1: {
 			1, 2, 3, 4,
 		},
@@ -76,7 +76,7 @@ func TestWalSegmentRunner_SwitchTimelines(t *testing.T) {
 	}
 
 	timelineSwitchMap := map[internal.WalSegmentNo]*internal.TimelineHistoryRecord{
-		5: internal.NewTimelineHistoryRecord(1, 5 * internal.WalSegmentSize + 1, ""),
+		5: internal.NewTimelineHistoryRecord(1, 5*internal.WalSegmentSize+1, ""),
 	}
 
 	testWalSegmentRunnerMultipleTimelines(t, stopSegmentNo, startSegment, timelineSwitchMap,
@@ -102,7 +102,7 @@ func TestWalSegmentRunner_SwitchTimelinesMissingSegments(t *testing.T) {
 		},
 	}
 
-	expectedFoundSegmentsByTimeline := map[uint32][]internal.WalSegmentNo {
+	expectedFoundSegmentsByTimeline := map[uint32][]internal.WalSegmentNo{
 		1: {
 			1, 3, 4,
 		},
@@ -112,7 +112,7 @@ func TestWalSegmentRunner_SwitchTimelinesMissingSegments(t *testing.T) {
 	}
 
 	timelineSwitchMap := map[internal.WalSegmentNo]*internal.TimelineHistoryRecord{
-		5: internal.NewTimelineHistoryRecord(1, 5 * internal.WalSegmentSize + 1, ""),
+		5: internal.NewTimelineHistoryRecord(1, 5*internal.WalSegmentSize+1, ""),
 	}
 
 	testWalSegmentRunnerMultipleTimelines(t, stopSegmentNo, startSegment, timelineSwitchMap,
@@ -149,7 +149,7 @@ func testWalSegmentRunnerSingleTimeline(t *testing.T, stopSegmentNo, startSegmen
 	testWalSegmentRunner(t, expectedFoundSegments, walSegmentRunner)
 }
 
-func testWalSegmentRunner(t *testing.T,	expectedFoundSegments map[internal.WalSegmentDescription]bool,
+func testWalSegmentRunner(t *testing.T, expectedFoundSegments map[internal.WalSegmentDescription]bool,
 	walSegmentRunner *internal.WalSegmentRunner) {
 
 	prevSegment := walSegmentRunner.Current()
@@ -181,7 +181,7 @@ SegmentRunnerLoop:
 		// check that we traverse segments sequentially
 		expectedNextNumber := prevSegment.Number - 1
 		assert.Equal(t, expectedNextNumber, nextSegment.Number)
-	
+
 		// add the encountered segment into outputSegments
 		outputSegments[nextSegment] = true
 		prevSegment = nextSegment
@@ -194,7 +194,7 @@ SegmentRunnerLoop:
 }
 
 func flattenSegmentsByTimelinesToSet(segmentsByTimeline map[uint32][]internal.WalSegmentNo) map[internal.WalSegmentDescription]bool {
-	segmentsSet := make(map[internal.WalSegmentDescription]bool,0)
+	segmentsSet := make(map[internal.WalSegmentDescription]bool, 0)
 	for timeline, segmentNumbers := range segmentsByTimeline {
 		for _, segmentNo := range segmentNumbers {
 			segment := internal.WalSegmentDescription{Number: segmentNo, Timeline: timeline}

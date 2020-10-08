@@ -21,8 +21,8 @@ func NewRatingTarBallComposerMaker(relFileStats RelFileStatistics,
 	filePackerOptions TarBallFilePackerOptions) (*RatingTarBallComposerMaker, error) {
 	bundleFiles := newStatBundleFiles(relFileStats)
 	return &RatingTarBallComposerMaker{
-		fileStats:   relFileStats,
-		bundleFiles: bundleFiles,
+		fileStats:         relFileStats,
+		bundleFiles:       bundleFiles,
 		filePackerOptions: filePackerOptions,
 	}, nil
 }

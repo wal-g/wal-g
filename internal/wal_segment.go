@@ -68,7 +68,7 @@ func NewWalSegment(timeline uint32, location pglogrepl.LSN, walSegmentBytes uint
 // a message that crosses the boundary between the two segments.
 func (seg *WalSegment) NextWalSegment() (*WalSegment, error) {
 	// Next on this timeline, but read rest of msg
-	if ! seg.isComplete() {
+	if !seg.isComplete() {
 		return nil, segmentError{
 			errors.Errorf("Cannot run NextWalSegment until isComplete")}
 	}
@@ -92,7 +92,7 @@ func (seg *WalSegment) NextWalSegment() (*WalSegment, error) {
 func (seg *WalSegment) Name() string {
 	// Example LSN -> Name:
 	// '0/2A33FE00' -> '00000001000000000000002A'
-	segID := uint64(seg.StartLSN)/uint64(seg.walSegmentBytes)
+	segID := uint64(seg.StartLSN) / uint64(seg.walSegmentBytes)
 	if seg.isComplete() {
 		return fmt.Sprintf("%08X%016X", seg.TimeLine, segID)
 	}
@@ -132,8 +132,8 @@ func (seg *WalSegment) processMessage(message pgproto3.BackendMessage) (ProcessM
 				messageOffset = seg.StartLSN - xld.WALStart
 			}
 			tracelog.DebugLogger.Println("XLogData =>", "WALStart", xld.WALStart, "WALEnd", walEnd,
-				"LenWALData", len(string(xld.WALData)), "ServerWALEnd", xld.ServerWALEnd, "messageOffset",  messageOffset)//, "ServerTime:", xld.ServerTime)
-			if seg.StartLSN + pglogrepl.LSN(seg.writeIndex) != (xld.WALStart + messageOffset) {
+				"LenWALData", len(string(xld.WALData)), "ServerWALEnd", xld.ServerWALEnd, "messageOffset", messageOffset) //, "ServerTime:", xld.ServerTime)
+			if seg.StartLSN+pglogrepl.LSN(seg.writeIndex) != (xld.WALStart + messageOffset) {
 				return ProcessMessageSegmentGap, segmentError{
 					errors.Errorf("WAL segment error: CopyData WALStart does not fit to segment writeIndex")}
 			}
@@ -146,7 +146,7 @@ func (seg *WalSegment) processMessage(message pgproto3.BackendMessage) (ProcessM
 	case *pgproto3.CopyDone:
 		return ProcessMessageCopyDone, nil
 	default:
-		return ProcessMessageUnknown,segmentError {errors.Errorf("Received unexpected message: %#v\n", msg)}
+		return ProcessMessageUnknown, segmentError{errors.Errorf("Received unexpected message: %#v\n", msg)}
 	}
 	return ProcessMessageOK, nil
 }
@@ -206,7 +206,7 @@ func (seg *WalSegment) Stream(conn *pgconn.PgConn, standbyMessageTimeout time.Du
 
 // isComplete is a helper function which returns true when all data is added
 func (seg *WalSegment) isComplete() bool {
-	if seg.StartLSN + pglogrepl.LSN(seg.writeIndex) >= seg.endLSN {
+	if seg.StartLSN+pglogrepl.LSN(seg.writeIndex) >= seg.endLSN {
 		return true
 	}
 	return false

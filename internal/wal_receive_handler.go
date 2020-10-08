@@ -80,7 +80,7 @@ func HandleWALReceive(uploader *WalUploader) {
 	segment = NewWalSegment(timeline, XLogPos, walSegmentBytes)
 	startReplication(conn, segment, slot.Name)
 	for {
-		streamResult, err := segment.Stream(conn, time.Second * streamTimeout)
+		streamResult, err := segment.Stream(conn, time.Second*streamTimeout)
 		tracelog.ErrorLogger.FatalOnError(err)
 		tracelog.DebugLogger.Printf("Succesfully received wal segment %s: ", segment.Name())
 
@@ -111,7 +111,7 @@ func HandleWALReceive(uploader *WalUploader) {
 	}
 }
 
-func getStartTimeline(conn *pgconn.PgConn, uploader *WalUploader, systemTimeline uint32, xLogPos pglogrepl.LSN)  (uint32, error){
+func getStartTimeline(conn *pgconn.PgConn, uploader *WalUploader, systemTimeline uint32, xLogPos pglogrepl.LSN) (uint32, error) {
 	if systemTimeline < 2 {
 		return 1, nil
 	}
