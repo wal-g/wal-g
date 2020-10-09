@@ -5,9 +5,17 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 	"path"
-	"strings"
 	"sync"
 )
+
+type Extractor interface {
+	ExtractSubfolder() error
+	GetBackupCopyingInfo(backup *Backup, from storage.Folder, to storage.Folder) ([]CopyingInfo, error)
+}
+
+type Copyer struct {
+	e Extractor
+}
 
 type CopyingInfo struct {
 	Object storage.Object
@@ -15,14 +23,20 @@ type CopyingInfo struct {
 	To     storage.Folder
 }
 
+func New(e Extractor) Copyer {
+	return Copyer{
+		e: e,
+	}
+}
+
 // HandleCopy copy specific or all backups from one storage to another
-func HandleCopy(fromConfigFile string, toConfigFile string, backupName string, withoutHistory bool) {
+func (c* Copyer) HandleCopy(fromConfigFile string, toConfigFile string, backupName string, withoutHistory bool) {
 	var from, fromError = ConfigureFolderFromConfig(fromConfigFile)
 	var to, toError = ConfigureFolderFromConfig(toConfigFile)
 	if fromError != nil || toError != nil {
 		return
 	}
-	infos, err := getCopyingInfo(backupName, from, to, withoutHistory)
+	infos, err := c.getCopyingInfo(backupName, from, to, withoutHistory)
 	tracelog.ErrorLogger.FatalOnError(err)
 	isSuccess, err := CopyInfos(infos)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -65,7 +79,7 @@ func CopyInfos(infos []CopyingInfo) (bool, error) {
 	}
 
 	wg.Wait()
-	
+
 	for len(errors) > 0 {
 		if err := <-errors; err != nil {
 			return false, err
@@ -90,7 +104,7 @@ func copyObject(info CopyingInfo) error {
 	return nil
 }
 
-func getCopyingInfo(backupName string, from storage.Folder, to storage.Folder, withoutHistory bool) ([]CopyingInfo, error) {
+func (c *Copyer) getCopyingInfo(backupName string, from storage.Folder, to storage.Folder, withoutHistory bool) ([]CopyingInfo, error) {
 	if backupName == "" {
 		tracelog.InfoLogger.Printf("Copy all backups and history.")
 		return GetAllCopyingInfo(from, to)
@@ -101,7 +115,7 @@ func getCopyingInfo(backupName string, from storage.Folder, to storage.Folder, w
 		return nil, err
 	}
 
-	infos, err := GetBackupCopyingInfo(backup, from, to)
+	infos, err := c.e.GetBackupCopyingInfo(backup, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -113,17 +127,6 @@ func getCopyingInfo(backupName string, from storage.Folder, to storage.Folder, w
 		infos = append(infos, history...)
 	}
 	return infos, nil
-}
-
-func GetBackupCopyingInfo(backup *Backup, from storage.Folder, to storage.Folder) ([]CopyingInfo, error) {
-	tracelog.InfoLogger.Print("Collecting backup files...")
-	var backupPrefix = path.Join(utility.BaseBackupPath, backup.Name)
-	var objects, err = storage.ListFolderRecursively(from)
-	if err != nil {
-		return nil, err
-	}
-	var hasBackupPrefix = func(object storage.Object) bool { return strings.HasPrefix(object.GetName(), backupPrefix) }
-	return BuildCopyingInfos(from, to, objects, hasBackupPrefix), nil
 }
 
 func GetHistoryCopyingInfo(backup *Backup, from storage.Folder, to storage.Folder) ([]CopyingInfo, error) {
