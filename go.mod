@@ -52,7 +52,7 @@ require (
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.5.1
 	github.com/ulikunitz/xz v0.5.6
-	github.com/wal-g/storages v0.0.0-20200929120806-0a1388ea9240
+	github.com/wal-g/storages v0.0.0-20201011172548-0f91ad34776e
 	github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30
 	github.com/xdg/stringprep v1.0.1-0.20180714160509-73f8eece6fdc // indirect
 	go.mongodb.org/mongo-driver v1.3.4
@@ -61,5 +61,3 @@ require (
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	golang.org/x/tools v0.0.0-20201008025239-9df69603baec // indirect
 )
-
-replace github.com/wal-g/storages => github.com/agneum/storages v0.0.0-20201011163314-595abe137314
