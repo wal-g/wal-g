@@ -8,6 +8,7 @@ import (
 
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -65,12 +66,12 @@ func (uploader *Uploader) finish() {
 // Clone creates similar Uploader with new WaitGroup
 func (uploader *Uploader) clone() *Uploader {
 	return &Uploader{
-		uploader.UploadingFolder,
-		uploader.Compressor,
-		&sync.WaitGroup{},
-		uploader.ArchiveStatusManager,
-		uploader.Failed,
-		uploader.tarSize,
+		UploadingFolder:      uploader.UploadingFolder,
+		Compressor:           uploader.Compressor,
+		waitGroup:            &sync.WaitGroup{},
+		ArchiveStatusManager: uploader.ArchiveStatusManager,
+		Failed:               uploader.Failed,
+		tarSize:              uploader.tarSize,
 	}
 }
 
