@@ -1,6 +1,7 @@
-package internal_test
+package postgres_test
 
 import (
+	"github.com/wal-g/wal-g/internal"
 	"path"
 	"strings"
 	"testing"
@@ -8,28 +9,27 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/copy"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/testtools"
 )
 
 func TestStartCopy_WhenThereAreNoObjectsToCopy(t *testing.T) {
-	var infos = make([]internal.CopyingInfo, 0)
-	var isSuccess, err = internal.CopyInfos(infos)
+	var infos = make([]copy.InfoProvider, 0)
+	var err = copy.Infos(infos)
 	assert.NoError(t, err)
-	assert.True(t, isSuccess)
 }
 
 func TestStartCopy_WhenThereAreObjectsToCopy(t *testing.T) {
 	var from = testtools.CreateMockStorageFolderWithPermanentBackups(t)
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
-	infos, err := internal.GetAllCopyingInfo(from, to)
+	infos, err := postgres.WildcardInfo(from, to)
 	assert.NoError(t, err)
-	isSuccess, err := internal.CopyInfos(infos)
+	err = copy.Infos(infos)
 	assert.NoError(t, err)
-	assert.True(t, isSuccess)
 
 	for _, info := range infos {
-		var filename = path.Join(from.GetPath(), info.Object.GetName())
+		var filename = path.Join(from.GetPath(), info.Obj.GetName())
 		var result, err = to.Exists(filename)
 		assert.NoError(t, err)
 		if !result {
@@ -43,7 +43,7 @@ func TestGetBackupCopyingInfo_WhenFolderIsEmpty(t *testing.T) {
 	var from = testtools.MakeDefaultInMemoryStorageFolder()
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var backup = internal.NewBackup(from, "base_000000010000000000000002")
-	var infos, err = internal.GetBackupCopyingInfo(backup, from, to)
+	var infos, err = postgres.BackupCopyingInfo(backup, from, to)
 	assert.NoError(t, err)
 	assert.Empty(t, infos)
 }
@@ -52,7 +52,7 @@ func TestGetBackupCopyingInfo_WhenFolderIsNotEmpty(t *testing.T) {
 	var from = testtools.CreateMockStorageFolderWithPermanentBackups(t)
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var backup = internal.NewBackup(from, "base_000000010000000000000002")
-	var infos, err = internal.GetBackupCopyingInfo(backup, from, to)
+	var infos, err = postgres.BackupCopyingInfo(backup, from, to)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(infos))
 	assert.NotEmpty(t, infos)
@@ -62,7 +62,7 @@ func TestGetHistoryCopyingInfo_WhenFolderIsEmpty(t *testing.T) {
 	var from = testtools.MakeDefaultInMemoryStorageFolder()
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var backup = internal.NewBackup(from, "base_000000010000000000000002")
-	var infos, err = internal.GetHistoryCopyingInfo(backup, from, to)
+	var infos, err = postgres.HistoryCopyingInfo(backup, from, to)
 	assert.NoError(t, err)
 	assert.Empty(t, infos)
 }
@@ -71,7 +71,7 @@ func TestGetHistoryCopyingInfo_WhenThereIsNoHistoryObjects(t *testing.T) {
 	var from = testtools.CreateMockStorageFolder()
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var backup = internal.NewBackup(from, "base_000000010000000000000002")
-	var infos, err = internal.GetHistoryCopyingInfo(backup, from, to)
+	var infos, err = postgres.HistoryCopyingInfo(backup, from, to)
 	assert.NoError(t, err)
 	assert.Empty(t, infos)
 }
@@ -79,7 +79,7 @@ func TestGetHistoryCopyingInfo_WhenThereIsNoHistoryObjects(t *testing.T) {
 func TestGetAllCopyingInfo_WhenFromFolderIsEmpty(t *testing.T) {
 	var from = testtools.MakeDefaultInMemoryStorageFolder()
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
-	var infos, err = internal.GetAllCopyingInfo(from, to)
+	var infos, err = postgres.WildcardInfo(from, to)
 	assert.NoError(t, err)
 	assert.Empty(t, infos)
 }
@@ -87,12 +87,12 @@ func TestGetAllCopyingInfo_WhenFromFolderIsEmpty(t *testing.T) {
 func TestGetAllCopyingInfo_WhenFromFolderIsNotEmpty(t *testing.T) {
 	var from = testtools.CreateMockStorageFolderWithPermanentBackups(t)
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
-	var infos, err = internal.GetAllCopyingInfo(from, to)
+	var infos, err = postgres.WildcardInfo(from, to)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, infos)
 
 	for _, info := range infos {
-		var result, err = from.Exists(info.Object.GetName())
+		var result, err = from.Exists(info.Obj.GetName())
 		assert.NoError(t, err)
 		assert.True(t, result)
 	}
@@ -101,7 +101,7 @@ func TestGetAllCopyingInfo_WhenFromFolderIsNotEmpty(t *testing.T) {
 func TestBuildCopyingInfos_WhenThereNoObjectsInFolder(t *testing.T) {
 	var from = testtools.MakeDefaultInMemoryStorageFolder()
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
-	var infos = internal.BuildCopyingInfos(from, to, make([]storage.Object, 0), func(object storage.Object) bool { return true })
+	var infos = copy.BuildCopyingInfos(from, to, make([]storage.Object, 0), func(object storage.Object) bool { return true })
 	assert.Empty(t, infos)
 }
 
@@ -110,7 +110,7 @@ func TestBuildCopyingInfos_WhenConditionIsJustFalse(t *testing.T) {
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	objects, err := storage.ListFolderRecursively(from)
 	assert.NoError(t, err)
-	var infos = internal.BuildCopyingInfos(from, to, objects, func(object storage.Object) bool { return false })
+	var infos = copy.BuildCopyingInfos(from, to, objects, func(object storage.Object) bool { return false })
 	assert.Empty(t, infos)
 }
 
@@ -130,9 +130,9 @@ func TestBuildCopyingInfos_WhenComplexCondition(t *testing.T) {
 
 	assert.NotZero(t, expectedCount)
 
-	var infos = internal.BuildCopyingInfos(from, to, objects, condition)
+	var infos = copy.BuildCopyingInfos(from, to, objects, condition)
 	assert.Equal(t, expectedCount, len(infos))
 	for _, info := range infos {
-		assert.True(t, condition(info.Object))
+		assert.True(t, condition(info.Obj))
 	}
 }

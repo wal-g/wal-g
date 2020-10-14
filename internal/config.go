@@ -487,7 +487,7 @@ func toFlagName(s string) string {
 	return strings.ReplaceAll(strings.ToLower(s), "_", "-")
 }
 
-func ConfigureFolderFromConfig(configFile string) (storage.Folder, error) {
+func FolderFromConfig(configFile string) (storage.Folder, error) {
 	var config = viper.New()
 	SetDefaultValues(config)
 	ReadConfigFromFile(config, configFile)

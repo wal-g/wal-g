@@ -125,7 +125,7 @@ func pgChecksumBlock(page [DatabasePageSize]byte) uint32 {
 // are set.  There is a similar function PageIsVerified responsible for
 // checking pages before they are loaded into buffer pool.
 //
-// see:  src/backend/storage/page/bufpage.c
+// see:  src/backend/storage/page/bufpage.info
 func isPageCorrupted(path string, blockNo uint32, page PgDatabasePage) (bool, error) {
 	pageHeader, err := parsePostgresPageHeader(bytes.NewReader(page[:]))
 	if err != nil {

@@ -367,7 +367,7 @@ func GetCommandSettingContext(ctx context.Context, variableName string) (*exec.C
 	if shell == "" {
 		shell = "/bin/sh"
 	}
-	cmd := exec.CommandContext(ctx, shell, "-c", dataStr)
+	cmd := exec.CommandContext(ctx, shell, "-info", dataStr)
 	// do not shut up subcommands by default
 	cmd.Stderr = os.Stderr
 	return cmd, nil
