@@ -15,7 +15,6 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
 	defer utility.LoggedClose(db, "")
 
 	binlogStart := getMySQLCurrentBinlogFile(db)
-	tracelog.DebugLogger.Println("Binlog start file", binlogStart)
 	timeStart := utility.TimeNowCrossPlatformLocal()
 
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
@@ -31,8 +30,14 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
 	}
 
 	binlogEnd := getMySQLCurrentBinlogFile(db)
-	tracelog.DebugLogger.Println("Binlog end file", binlogEnd)
-	sentinel := StreamSentinelDto{BinLogStart: binlogStart, BinLogEnd: binlogEnd, StartLocalTime: timeStart}
+	timeStop := utility.TimeNowCrossPlatformLocal()
+	sentinel := StreamSentinelDto{
+		BinLogStart:    binlogStart,
+		BinLogEnd:      binlogEnd,
+		StartLocalTime: timeStart,
+		StopLocalTime:  timeStop,
+	}
+	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel)
 
 	err = internal.UploadSentinel(uploader, &sentinel, fileName)
 	tracelog.ErrorLogger.FatalOnError(err)

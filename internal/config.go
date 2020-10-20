@@ -77,6 +77,7 @@ const (
 	MysqlBinlogReplayCmd       = "WALG_MYSQL_BINLOG_REPLAY_COMMAND"
 	MysqlBinlogDstSetting      = "WALG_MYSQL_BINLOG_DST"
 	MysqlBackupPrepareCmd      = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
+	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
 
 	GoMaxProcs = "GOMAXPROCS"
 
@@ -237,6 +238,7 @@ var (
 		MysqlBinlogReplayCmd:       true,
 		MysqlBinlogDstSetting:      true,
 		MysqlBackupPrepareCmd:      true,
+		MysqlTakeBinlogsFromMaster: true,
 
 		// GOLANG
 		GoMaxProcs: true,

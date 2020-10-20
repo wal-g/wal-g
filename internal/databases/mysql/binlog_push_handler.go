@@ -44,7 +44,7 @@ func HandleBinlogPush(uploader *internal.Uploader) {
 func getMySQLSortedBinlogs(db *sql.DB) ([]string, error) {
 	var result []string
 
-	currentBinlog := getMySQLCurrentBinlogFile(db)
+	currentBinlog := getMySQLCurrentBinlogFileLocal(db)
 
 	rows, err := db.Query("SHOW BINARY LOGS")
 	if err != nil {
@@ -78,7 +78,7 @@ func getMySQLBinlogsFolder(db *sql.DB) (string, error) {
 
 func tryArchiveBinLog(uploader *internal.Uploader, filename string, binLog string) error {
 	if binLog <= getLastArchivedBinlog() {
-		tracelog.InfoLogger.Printf("Binlog %v already archived\n", binLog)
+		tracelog.DebugLogger.Printf("Binlog %v already archived\n", binLog)
 		return nil
 	}
 	tracelog.InfoLogger.Printf("Archiving %v\n", binLog)
