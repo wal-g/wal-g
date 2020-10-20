@@ -61,6 +61,10 @@ Command to replay binlog on runing MySQL. Required for binlog-fetch command.
 
 To place binlogs in the specified directory during binlog-fetch or binlog-replay
 
+* `WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER`
+
+Set this variable to True if you are planning to take base backup from replica and binlog backup from master.
+If base and binlogs backups are taken from the same host, this variable should be left False (default).
 
 > **Operations with binlogs**: If you'd like to do binlog operations with wal-g don't forget to [activate the binary log](https://mariadb.com/kb/en/activating-the-binary-log/) by starting mysql/mariadb with [--log-bin](https://mariadb.com/kb/en/replication-and-binary-log-server-system-variables/#log_bin) and [--log-basename](https://mariadb.com/kb/en/mysqld-options/#-log-basename)=\[name\].
 

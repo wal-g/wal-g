@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"path"
@@ -40,7 +41,14 @@ func scanToMap(rows *sql.Rows, dst map[string]interface{}) error {
 	return rows.Scan(args...)
 }
 
-func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
+func isMaster(db *sql.DB) bool {
+	rows, err := db.Query("SHOW SLAVE STATUS")
+	tracelog.ErrorLogger.FatalOnError(err)
+	defer utility.LoggedClose(rows, "")
+	return !rows.Next()
+}
+
+func getMySQLCurrentBinlogFileLocal(db *sql.DB) (fileName string) {
 	rows, err := db.Query("SHOW MASTER STATUS")
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(rows, "")
@@ -52,6 +60,29 @@ func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
 	}
 	tracelog.ErrorLogger.Fatalf("Failed to obtain current binlog file")
 	return ""
+}
+
+func getMySQLCurrentBinlogFileFromMaster(db *sql.DB) (fileName string) {
+	rows, err := db.Query("SHOW SLAVE STATUS")
+	tracelog.ErrorLogger.FatalOnError(err)
+	defer utility.LoggedClose(rows, "")
+	var logFileName string
+	for rows.Next() {
+		err = scanToMap(rows, map[string]interface{}{"Relay_Master_Log_File": &logFileName})
+		tracelog.ErrorLogger.FatalOnError(err)
+		return logFileName
+	}
+	tracelog.ErrorLogger.Fatalf("Failed to obtain master's current binlog file")
+	return ""
+}
+
+func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
+	takeFromMaster, err := internal.GetBoolSettingDefault(internal.MysqlTakeBinlogsFromMaster, false)
+	tracelog.ErrorLogger.FatalOnError(err)
+	if takeFromMaster && !isMaster(db) {
+		return getMySQLCurrentBinlogFileFromMaster(db)
+	}
+	return getMySQLCurrentBinlogFileLocal(db)
 }
 
 func getMySQLConnection() (*sql.DB, error) {
@@ -118,9 +149,18 @@ func replaceHostInDatasourceName(datasourceName string, newHost string) string {
 }
 
 type StreamSentinelDto struct {
-	BinLogStart    string `json:"BinLogStart,omitempty"`
-	BinLogEnd      string `json:"BinLogEnd,omitempty"`
-	StartLocalTime time.Time
+	BinLogStart    string    `json:"BinLogStart,omitempty"`
+	BinLogEnd      string    `json:"BinLogEnd,omitempty"`
+	StartLocalTime time.Time `json:"StartLocalTime,omitempty"`
+	StopLocalTime  time.Time `json:"StopLocalTime,omitempty"`
+}
+
+func (s StreamSentinelDto) String() string {
+	b, err := json.Marshal(s)
+	if err != nil {
+		return "-"
+	}
+	return string(b)
 }
 
 type binlogHandler interface {
@@ -163,6 +203,8 @@ func getBinlogSinceTs(folder storage.Folder, backup *internal.Backup) (time.Time
 	if err != nil {
 		return time.Time{}, err
 	}
+	tracelog.InfoLogger.Printf("Backup sentinel: %s", streamSentinel)
+
 	// case when backup was uploaded before first binlog
 	sentinels, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
 	if err != nil {
@@ -170,7 +212,7 @@ func getBinlogSinceTs(folder storage.Folder, backup *internal.Backup) (time.Time
 	}
 	for _, sentinel := range sentinels {
 		if strings.HasPrefix(sentinel.GetName(), backup.Name) {
-			tracelog.InfoLogger.Printf("Backup sentinel: %s (%s)", sentinel.GetName(), sentinel.GetLastModified())
+			tracelog.InfoLogger.Printf("Backup sentinel file: %s (%s)", sentinel.GetName(), sentinel.GetLastModified())
 			if sentinel.GetLastModified().Before(startTs) {
 				startTs = sentinel.GetLastModified()
 			}
