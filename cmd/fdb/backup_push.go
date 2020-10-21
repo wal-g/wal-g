@@ -1,16 +1,15 @@
 package fdb
 
 import (
-	"github.com/wal-g/wal-g/internal/databases/fdb"
+	"context"
 	"os"
 	"syscall"
-	"context"
-
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/utility"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/fdb"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const BackupPushShortDescription = "Pushes backup to storage"

@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/wal-g/storages/storage"
 	"io/ioutil"
 	"sort"
 	"sync"
+
+	"github.com/wal-g/storages/storage"
 )
 
 const IndexFileName = "__blob_index.json"

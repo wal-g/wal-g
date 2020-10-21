@@ -8,13 +8,14 @@ wal-g receivewal reads wal from Postgres one wal segment at a time, and writes i
 import (
 	"context"
 	"fmt"
+	"io"
+	"time"
+
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-	"io"
-	"time"
 )
 
 type segmentError struct {

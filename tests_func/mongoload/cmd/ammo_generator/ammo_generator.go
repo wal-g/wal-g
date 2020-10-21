@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/wal-g/wal-g/tests_func/mongoload/internal"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/tests_func/mongoload/internal"
 )
 
 var Cmd = &cobra.Command{

@@ -3,11 +3,12 @@ package internal
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/wal-g/tracelog"
 	"io"
 	"io/ioutil"
 	"os"
 	"unsafe"
+
+	"github.com/wal-g/tracelog"
 )
 
 // This code is an adaptation of Postgres data page checksum calculation code written in Go.

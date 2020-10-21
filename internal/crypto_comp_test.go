@@ -12,10 +12,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wal-g/wal-g/internal/crypto"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal/compression/lzo"
+	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 )
 

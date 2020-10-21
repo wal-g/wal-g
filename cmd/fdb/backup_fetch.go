@@ -2,15 +2,14 @@ package fdb
 
 import (
 	"context"
-	"github.com/wal-g/wal-g/internal/databases/fdb"
 	"os"
 	"syscall"
 
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/utility"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/fdb"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const BackupFetchShortDescription = "Fetches desired backup from storage"

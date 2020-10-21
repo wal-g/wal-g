@@ -3,8 +3,9 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/jedib0t/go-pretty/table"
 	"io"
+
+	"github.com/jedib0t/go-pretty/table"
 )
 
 type WalVerifyOutputType int

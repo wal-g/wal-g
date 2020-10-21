@@ -2,11 +2,12 @@ package internal
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
-	"strconv"
 )
 
 type NoPostgresVersionError struct {

@@ -5,10 +5,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-
-	"github.com/wal-g/tracelog"
 )
 
 // Sequence represents serial archive route

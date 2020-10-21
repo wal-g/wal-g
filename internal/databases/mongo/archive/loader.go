@@ -8,14 +8,13 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"
-
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/tracelog"
 )
 
 var (

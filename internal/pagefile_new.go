@@ -7,11 +7,12 @@ package internal
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 	"io"
 	"io/ioutil"
 	"os"
+
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 )
 
 type ReadWriterAt interface {

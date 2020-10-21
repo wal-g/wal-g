@@ -5,6 +5,8 @@ import (
 	"os"
 	"syscall"
 
+	"github.com/spf13/cobra"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
@@ -15,9 +17,6 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/stats"
 	"github.com/wal-g/wal-g/internal/webserver"
 	"github.com/wal-g/wal-g/utility"
-
-	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 )
 
 // oplogPushCmd represents the continuous oplog archiving procedure

@@ -10,15 +10,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/wal-g/internal/walparser"
-	"github.com/wal-g/wal-g/utility"
-
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/storages/memory"
 	"github.com/wal-g/storages/s3"
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func MakeDefaultInMemoryStorageFolder() *memory.Folder {

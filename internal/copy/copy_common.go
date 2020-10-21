@@ -1,10 +1,11 @@
 package copy
 
 import (
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/tracelog"
 	"path"
 	"sync"
+
+	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 )
 
 type InfoProvider struct {

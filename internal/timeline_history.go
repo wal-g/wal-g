@@ -15,12 +15,13 @@ Furthermore it can be read as an IOReader (having a Name() and Read() function) 
 */
 
 import (
-	"github.com/jackc/pglogrepl"
 	"io"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/jackc/pglogrepl"
 )
 
 // The TimeLineHistFileRow struct represents one line in the TimeLineHistory file

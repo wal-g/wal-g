@@ -3,11 +3,10 @@ package mongo
 import (
 	"time"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-
-	"github.com/wal-g/tracelog"
 )
 
 type PurgeSettings struct {

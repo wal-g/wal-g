@@ -3,9 +3,10 @@ package internal
 import (
 	"archive/tar"
 	"context"
+	"os"
+
 	"github.com/wal-g/wal-g/internal/crypto"
 	"golang.org/x/sync/errgroup"
-	"os"
 )
 
 type RegularTarBallComposer struct {

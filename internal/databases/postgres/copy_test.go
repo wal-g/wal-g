@@ -1,7 +1,6 @@
 package postgres_test
 
 import (
-	"github.com/wal-g/wal-g/internal"
 	"path"
 	"strings"
 	"testing"
@@ -9,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/copy"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/testtools"

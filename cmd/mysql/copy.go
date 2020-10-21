@@ -2,15 +2,14 @@ package mysql
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	db "github.com/wal-g/wal-g/internal/databases/mysql"
 )
 
 const (
-	copyName                   = "copy"
-	copyBackupName = "backup"
-	copyAllName = "all"
-	backupCopyShortDescription = "copy specific or all backups"
+	copyName             = "copy"
+	copyBackupName       = "backup"
+	copyAllName          = "all"
+	copyShortDescription = "copy specific or all backups"
 
 	backupNameFlag        = "backup-name"
 	backupNameShorthand   = "b"
@@ -32,19 +31,19 @@ var (
 
 	copyCmd = &cobra.Command{
 		Use:   copyName,
-		Short: backupCopyShortDescription,
+		Short: copyShortDescription,
 	}
 
 	copyBackupCmd = &cobra.Command{
-		Use:   copyBackupName,
-		Args:  cobra.ExactArgs(0),
+		Use:  copyBackupName,
+		Args: cobra.ExactArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
 			db.HandleCopyBackup(fromConfigFile, toConfigFile, backupName)
 		},
 	}
 	copyAllCmd = &cobra.Command{
 		Use:   copyAllName,
-		Short: backupCopyShortDescription,
+		Short: copyShortDescription,
 		Args:  cobra.ExactArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
 			db.HandleCopyAll(fromConfigFile, toConfigFile)
@@ -52,39 +51,15 @@ var (
 	}
 )
 
-
 func init() {
 
-	copyCmd.Flags().StringVarP(&backupName, backupNameFlag, backupNameShorthand, "", backupNameDescription)
 	copyCmd.Flags().StringVarP(&toConfigFile, toFlag, toShorthand, "", toDescription)
+	copyCmd.Flags().StringVarP(&fromConfigFile, fromFlag, fromShorthand, "", fromDescription)
 
+	Cmd.AddCommand(copyCmd)
 
-	copyBackupCmd.Flags().StringVarP(&fromConfigFile, fromFlag, fromShorthand, "", fromDescription)
+	copyBackupCmd.Flags().StringVarP(&backupName, backupNameFlag, backupNameShorthand, "", backupNameDescription)
 
 	copyCmd.AddCommand(copyBackupCmd)
 	copyCmd.AddCommand(copyAllCmd)
-
-	for _, e := range []string{
-		toConfigFile,
-		fromConfigFile,
-		backupName,
-	} {
-		err := copyBackupCmd.MarkFlagRequired(e)
-		if err != nil {
-			tracelog.ErrorLogger.Printf("failed to init copy cmd %v", err)
-		}
-	}
-
-	for _, e := range []string{
-		toConfigFile,
-		fromConfigFile,
-	} {
-		err := copyBackupCmd.MarkFlagFilename(e)
-		if err != nil {
-			tracelog.ErrorLogger.Printf("failed to init copy cmd %v", err)
-		}
-	}
-
-	Cmd.AddCommand(copyBackupCmd)
 }
-

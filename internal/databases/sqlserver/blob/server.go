@@ -3,10 +3,6 @@ package blob
 import (
 	"context"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -15,6 +11,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 )
 
 const ProxyStartTimeout = 10 * time.Second

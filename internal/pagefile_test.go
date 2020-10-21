@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const (

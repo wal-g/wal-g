@@ -1,13 +1,14 @@
 package postgres
 
 import (
+	"path"
+	"strings"
+
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/copy"
 	"github.com/wal-g/wal-g/utility"
-	"path"
-	"strings"
 )
 
 // HandleCopy copy specific or all backups from one storage to another
