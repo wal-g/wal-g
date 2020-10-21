@@ -7,13 +7,15 @@ import (
 
 const (
 	copyName             = "copy"
-	copyBackupName       = "backup"
-	copyAllName          = "all"
 	copyShortDescription = "copy specific or all backups"
 
-	backupNameFlag        = "backup-name"
-	backupNameShorthand   = "b"
-	backupNameDescription = "Copy specific backup"
+	copyAllFlag             = "all"
+	copyAllSDescription = "copy all backups"
+	allShorthand   = "a"
+
+	backupNameFlag         = "backup"
+	backupShorthand        = "b"
+	backupShortDescription = "copy target backup"
 
 	fromFlag        = "from"
 	fromShorthand   = "f"
@@ -28,25 +30,18 @@ var (
 	backupName     string
 	fromConfigFile string
 	toConfigFile   string
+	all bool
 
 	copyCmd = &cobra.Command{
 		Use:   copyName,
 		Short: copyShortDescription,
-	}
-
-	copyBackupCmd = &cobra.Command{
-		Use:  copyBackupName,
-		Args: cobra.ExactArgs(0),
-		Run: func(cmd *cobra.Command, args []string) {
-			db.HandleCopyBackup(fromConfigFile, toConfigFile, backupName)
-		},
-	}
-	copyAllCmd = &cobra.Command{
-		Use:   copyAllName,
-		Short: copyShortDescription,
 		Args:  cobra.ExactArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
-			db.HandleCopyAll(fromConfigFile, toConfigFile)
+			if all {
+				db.HandleCopyAll(fromConfigFile, toConfigFile)
+				return
+			}
+			db.HandleCopyBackup(fromConfigFile, toConfigFile, backupName)
 		},
 	}
 )
@@ -55,11 +50,8 @@ func init() {
 
 	copyCmd.Flags().StringVarP(&toConfigFile, toFlag, toShorthand, "", toDescription)
 	copyCmd.Flags().StringVarP(&fromConfigFile, fromFlag, fromShorthand, "", fromDescription)
+	copyCmd.Flags().StringVarP(&backupName, backupNameFlag, backupShorthand, "", backupShortDescription)
+	copyCmd.Flags().BoolVarP(&all, copyAllFlag, allShorthand, false, copyAllSDescription)
 
 	Cmd.AddCommand(copyCmd)
-
-	copyBackupCmd.Flags().StringVarP(&backupName, backupNameFlag, backupNameShorthand, "", backupNameDescription)
-
-	copyCmd.AddCommand(copyBackupCmd)
-	copyCmd.AddCommand(copyAllCmd)
 }

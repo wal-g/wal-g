@@ -39,6 +39,7 @@ func HandleCopyAll(fromConfigFile string, toConfigFile string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Success copyed all backups\n")
 }
+
 func backupCopyingInfo(backupName string, from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
 	tracelog.InfoLogger.Printf("Handle backupname '%s'.", backupName)
 	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, from)
@@ -56,6 +57,7 @@ func backupCopyingInfo(backupName string, from storage.Folder, to storage.Folder
 	var hasBackupPrefix = func(object storage.Object) bool { return strings.HasPrefix(object.GetName(), backupPrefix) }
 	return copy.BuildCopyingInfos(from, to, objects, hasBackupPrefix), nil
 }
+
 func WildcardInfo(from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
 	objects, err := storage.ListFolderRecursively(from)
 	if err != nil {
