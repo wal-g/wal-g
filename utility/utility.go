@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -324,39 +323,6 @@ func (sh *SignalHandler) Close() error {
 	signal.Stop(sh.ch)
 	sh.cancel()
 	return nil
-}
-
-// WaitFirstError returns first error from given channels or nil
-func WaitFirstError(errs ...<-chan error) error {
-	errc := MergeErrors(errs...)
-	for err := range errc {
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// MergeErrors merges multiple channels of errors.
-func MergeErrors(cs ...<-chan error) <-chan error {
-	var wg sync.WaitGroup
-	out := make(chan error, len(cs))
-	output := func(c <-chan error) {
-		for n := range c {
-			out <- n
-		}
-		wg.Done()
-	}
-	wg.Add(len(cs))
-	for _, c := range cs {
-		go output(c)
-	}
-
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-	return out
 }
 
 func StartCommandWithStdoutStderr(cmd *exec.Cmd) (io.ReadCloser, *bytes.Buffer, error) {
