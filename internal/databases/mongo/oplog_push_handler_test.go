@@ -3,7 +3,6 @@ package mongo
 import (
 	"context"
 	"fmt"
-	"sync"
 	"testing"
 
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
@@ -26,7 +25,6 @@ type applierReturn struct {
 
 type oplogPushArgs struct {
 	ctx context.Context
-	wg  *sync.WaitGroup
 
 	fetcherReturn *fetcherReturn
 	applierReturn *applierReturn
@@ -49,7 +47,6 @@ func (tm *oplogPushMocks) AssertExpectations(t *testing.T) {
 func buildTestArgs() oplogPushArgs {
 	return oplogPushArgs{
 		ctx: context.TODO(),
-		wg:  &sync.WaitGroup{},
 
 		fetcherReturn: &fetcherReturn{make(chan *models.Oplog), make(chan error), nil},
 		applierReturn: &applierReturn{make(chan error), nil},
@@ -58,13 +55,13 @@ func buildTestArgs() oplogPushArgs {
 
 func prepareOplogPushMocks(args oplogPushArgs, mocks oplogPushMocks) {
 	if mocks.fetcher != nil {
-		mocks.fetcher.On("Fetch", mock.Anything, args.wg).
+		mocks.fetcher.On("Fetch", mock.Anything).
 			Return(args.fetcherReturn.outChan, args.fetcherReturn.errChan, args.fetcherReturn.err).
 			Once()
 	}
 
 	if mocks.applier != nil {
-		mocks.applier.On("Apply", mock.Anything, args.fetcherReturn.outChan, args.wg).
+		mocks.applier.On("Apply", mock.Anything, args.fetcherReturn.outChan).
 			Return(args.applierReturn.errChan, args.applierReturn.err).
 			Once()
 	}
@@ -94,17 +91,25 @@ func TestHandleOplogPush(t *testing.T) {
 			expectedErr: fmt.Errorf("applier ret err"),
 		},
 		{
-			name:        "fetcher returns error via error channel",
-			args:        buildTestArgs(),
-			mocks:       oplogPushMocks{&mocks.Fetcher{}, &mocks.Applier{}},
-			failErrChan: func(args oplogPushArgs) { args.fetcherReturn.errChan <- fmt.Errorf("fetcher chan err") },
+			name:  "fetcher returns error via error channel",
+			args:  buildTestArgs(),
+			mocks: oplogPushMocks{&mocks.Fetcher{}, &mocks.Applier{}},
+			failErrChan: func(args oplogPushArgs) {
+				args.fetcherReturn.errChan <- fmt.Errorf("fetcher chan err")
+				close(args.fetcherReturn.errChan)
+				close(args.applierReturn.errChan)
+			},
 			expectedErr: fmt.Errorf("fetcher chan err"),
 		},
 		{
-			name:        "applier returns error via error channel",
-			args:        buildTestArgs(),
-			mocks:       oplogPushMocks{&mocks.Fetcher{}, &mocks.Applier{}},
-			failErrChan: func(args oplogPushArgs) { args.fetcherReturn.errChan <- fmt.Errorf("applier chan err") },
+			name:  "applier returns error via error channel",
+			args:  buildTestArgs(),
+			mocks: oplogPushMocks{&mocks.Fetcher{}, &mocks.Applier{}},
+			failErrChan: func(args oplogPushArgs) {
+				args.applierReturn.errChan <- fmt.Errorf("applier chan err")
+				close(args.applierReturn.errChan)
+				close(args.fetcherReturn.errChan)
+			},
 			expectedErr: fmt.Errorf("applier chan err"),
 		},
 	}

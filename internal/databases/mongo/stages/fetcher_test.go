@@ -136,7 +136,6 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 		ctx   context.Context
 		from  models.Timestamp
 		until models.Timestamp
-		wg    *sync.WaitGroup
 	}
 	tests := []struct {
 		name     string
@@ -153,7 +152,6 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 				ctx:   context.TODO(),
 				from:  ops[0].TS,
 				until: ops[len(ops)-1].TS,
-				wg:    &sync.WaitGroup{},
 			},
 			wantOps:  ops[:len(ops)-1],
 			wantErrc: nil,
@@ -165,7 +163,6 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 				ctx:   context.TODO(),
 				from:  ops[0].TS,
 				until: ops[len(ops)-1].TS,
-				wg:    &sync.WaitGroup{},
 			},
 			wantOps:  ops[:len(ops)-1],
 			wantErrc: nil,
@@ -177,7 +174,6 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 				ctx:   context.TODO(),
 				from:  ops[1].TS,
 				until: ops[len(ops)-2].TS,
-				wg:    &sync.WaitGroup{},
 			},
 			wantOps:  ops[1 : len(ops)-2],
 			wantErrc: nil,
@@ -189,7 +185,6 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 				ctx:   context.TODO(),
 				from:  ops[0].TS,
 				until: models.Timestamp{TS: 1579002000, Inc: 1},
-				wg:    &sync.WaitGroup{},
 			},
 			wantOps: []*models.Oplog{},
 			wantErr: fmt.Errorf("fromTS '1579002001.1' must be less than untilTS '1579002000.1'"),
@@ -201,7 +196,6 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 				ctx:   context.TODO(),
 				from:  models.Timestamp{TS: 1579002000, Inc: 1},
 				until: ops[len(ops)-1].TS,
-				wg:    &sync.WaitGroup{},
 			},
 			wantOps:  []*models.Oplog{},
 			wantErrc: fmt.Errorf("'from' timestamp '1579002000.1' was not found in first archive: oplog_0.0_1579002006.1.br"),
@@ -213,7 +207,6 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 				ctx:   context.TODO(),
 				from:  ops[0].TS,
 				until: models.Timestamp{TS: 1579002099, Inc: 1},
-				wg:    &sync.WaitGroup{},
 			},
 			wantOps:  ops,
 			wantErrc: fmt.Errorf("restore sequence was fetched, but restore point '1579002099.1' is not reached"),
@@ -227,7 +220,7 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 				path:       tt.fields.path,
 			}
 
-			outc, errc, err := sf.FetchBetween(tt.args.ctx, tt.args.from, tt.args.until, tt.args.wg)
+			outc, errc, err := sf.FetchBetween(tt.args.ctx, tt.args.from, tt.args.until)
 			if tt.wantErr != nil {
 				assert.EqualError(t, err, tt.wantErr.Error())
 				return
@@ -373,7 +366,7 @@ func TestDBFetcher_Fetch(t *testing.T) {
 				lwInterval: time.Microsecond,
 			}
 
-			outc, errc, err := dbf.Fetch(tt.args.ctx, tt.args.wg)
+			outc, errc, err := dbf.Fetch(tt.args.ctx)
 			if tt.wantErr != nil {
 				assert.EqualError(t, err, tt.wantErr.Error())
 				return
@@ -405,7 +398,6 @@ func TestDBFetcher_FetchBson(t *testing.T) {
 	type args struct {
 		ctx  context.Context
 		from models.Timestamp
-		wg   *sync.WaitGroup
 	}
 	tests := []struct {
 		name         string
@@ -421,7 +413,6 @@ func TestDBFetcher_FetchBson(t *testing.T) {
 			args: args{
 				ctx:  context.TODO(),
 				from: models.Timestamp{TS: 1591288704, Inc: 73000},
-				wg:   &sync.WaitGroup{},
 			},
 			wantOpsCount: 5041,
 			wantErrc:     fmt.Errorf("oplog cursor error: EOF"),
@@ -441,7 +432,7 @@ func TestDBFetcher_FetchBson(t *testing.T) {
 				time.Microsecond,
 			)
 
-			outc, errc, err := dbf.Fetch(tt.args.ctx, tt.args.wg)
+			outc, errc, err := dbf.Fetch(tt.args.ctx)
 			if tt.wantErr != nil {
 				assert.EqualError(t, err, tt.wantErr.Error())
 				return

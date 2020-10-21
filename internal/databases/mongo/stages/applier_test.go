@@ -3,7 +3,6 @@ package stages
 import (
 	"context"
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 
@@ -24,7 +23,6 @@ func TestStorageApplier_Apply(t *testing.T) {
 	type args struct {
 		ctx    context.Context
 		oplogc chan *models.Oplog
-		wg     *sync.WaitGroup
 	}
 	tests := []struct {
 		name    string
@@ -55,7 +53,6 @@ func TestStorageApplier_Apply(t *testing.T) {
 			args: args{
 				ctx:    context.TODO(),
 				oplogc: make(chan *models.Oplog),
-				wg:     &sync.WaitGroup{},
 			},
 			ops: []*models.Oplog{
 				{
@@ -106,7 +103,6 @@ func TestStorageApplier_Apply(t *testing.T) {
 			args: args{
 				ctx:    context.TODO(),
 				oplogc: make(chan *models.Oplog),
-				wg:     &sync.WaitGroup{},
 			},
 			ops: []*models.Oplog{
 				{
@@ -147,7 +143,6 @@ func TestStorageApplier_Apply(t *testing.T) {
 			args: args{
 				ctx:    context.TODO(),
 				oplogc: make(chan *models.Oplog),
-				wg:     &sync.WaitGroup{},
 			},
 			ops: []*models.Oplog{
 				{
@@ -168,7 +163,7 @@ func TestStorageApplier_Apply(t *testing.T) {
 				timeout:  tt.fields.timeout,
 			}
 
-			errc, err := sa.Apply(tt.args.ctx, tt.args.oplogc, tt.args.wg)
+			errc, err := sa.Apply(tt.args.ctx, tt.args.oplogc)
 			assert.Nil(t, err)
 
 			for _, op := range tt.ops {

@@ -3,7 +3,6 @@ package stages
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
@@ -21,7 +20,7 @@ var (
 
 // Applier defines interface to apply given oplog records.
 type Applier interface {
-	Apply(context.Context, chan *models.Oplog, *sync.WaitGroup) (chan error, error)
+	Apply(context.Context, chan *models.Oplog) (chan error, error)
 }
 
 // DBApplier implements Applier interface for mongodb.
@@ -35,13 +34,11 @@ func NewGenericApplier(applier oplog.Applier) *GenericApplier {
 }
 
 // Apply runs working cycle that applies oplog records.
-func (dba *GenericApplier) Apply(ctx context.Context, ch chan *models.Oplog, wg *sync.WaitGroup) (chan error, error) {
+func (dba *GenericApplier) Apply(ctx context.Context, ch chan *models.Oplog) (chan error, error) {
 	errc := make(chan error)
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
-		defer func() { _ = dba.applier.Close(ctx) }()
 		defer close(errc)
+		defer func() { _ = dba.applier.Close(ctx) }()
 
 		for opr := range ch {
 			// we still pass oplog records in generic appliers by value
@@ -71,16 +68,14 @@ func NewStorageApplier(uploader archive.Uploader, buf Buffer, archiveAfterSize i
 }
 
 // Apply runs working cycle that sends oplog records to storage.
-func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan *models.Oplog, wg *sync.WaitGroup) (chan error, error) {
+func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan *models.Oplog) (chan error, error) {
 	archiveTimer := time.NewTimer(sa.timeout)
 	var lastKnownTS, batchStartTS models.Timestamp
 	restartBatch := true
 	batchDocs := 0
 	batchSize := 0
 	errc := make(chan error)
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
 		defer close(errc)
 		defer archiveTimer.Stop()
 		for oplogc != nil {

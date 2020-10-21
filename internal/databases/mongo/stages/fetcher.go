@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sync"
 	"time"
 
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
@@ -44,12 +43,12 @@ func (sgh *StorageGapHandler) HandleGap(from, until models.Timestamp, gapErr err
 // Fetcher defines interface to fetch oplog records.
 // TODO: FIX INTERFACE METHOD NAME AND SIGNATURE
 type Fetcher interface {
-	Fetch(context.Context, *sync.WaitGroup) (chan *models.Oplog, chan error, error)
+	Fetch(context.Context) (chan *models.Oplog, chan error, error)
 }
 
 // BetweenFetcher defines interface to fetch oplog records between given timestamps.
 type BetweenFetcher interface {
-	FetchBetween(context.Context, models.Timestamp, models.Timestamp, *sync.WaitGroup) (chan *models.Oplog, chan error, error)
+	FetchBetween(context.Context, models.Timestamp, models.Timestamp) (chan *models.Oplog, chan error, error)
 }
 
 // CursorMajFetcher implements Fetcher interface for mongodb
@@ -65,15 +64,12 @@ func NewCursorMajFetcher(m client.MongoDriver, cur client.OplogCursor, lwUpdateI
 }
 
 // Fetch returns channel of oplog records, channel is filled in background.
-// TODO: handle disconnects && stepdown
 // TODO: use sessions
 // TODO: use context.WithTimeout
-func (dbf *CursorMajFetcher) Fetch(ctx context.Context, wg *sync.WaitGroup) (oplogc chan *models.Oplog, errc chan error, err error) {
+func (dbf *CursorMajFetcher) Fetch(ctx context.Context) (oplogc chan *models.Oplog, errc chan error, err error) {
 	oplogc = make(chan *models.Oplog)
 	errc = make(chan error)
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
 		defer close(errc)
 		defer close(oplogc)
 
@@ -152,18 +148,16 @@ func NewStorageFetcher(downloader archive.Downloader, path archive.Sequence) *St
 }
 
 // FetchBetween returns channel of oplog records, channel is filled in background.
-func (sf *StorageFetcher) FetchBetween(ctx context.Context, from, until models.Timestamp, wg *sync.WaitGroup) (oplogc chan *models.Oplog, errc chan error, err error) {
+func (sf *StorageFetcher) FetchBetween(ctx context.Context, from, until models.Timestamp) (oplogc chan *models.Oplog, errc chan error, err error) {
 	if models.LessTS(until, from) {
 		return nil, nil, fmt.Errorf("fromTS '%s' must be less than untilTS '%s'", from, until)
 	}
 
 	data := make(chan *models.Oplog)
 	errc = make(chan error)
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
-		defer close(data)
 		defer close(errc)
+		defer close(data)
 
 		buf := NewCloserBuffer() // TODO: switch to streaming interface
 		path := sf.path
