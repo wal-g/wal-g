@@ -64,6 +64,19 @@ services:
       &&  mkdir -p /export/mysqlcopybackupto
       &&  /usr/bin/minio server /export'
 
+  s3-another:
+    image: minio/minio
+    container_name: wal-g_s32
+    ports:
+      - "9001:9001"
+    environment:
+      - "MINIO_ACCESS_KEY=AKIAIOSFODNN7EXAMPLEBUTANOHER"
+      - "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEYBUTANOTHERTOO"
+    entrypoint: sh
+    command: >
+      -c 'mkdir -p /export/fullbucket
+      &&  /usr/bin/minio server /export'
+
   ssh:
     build:
       dockerfile: docker/ssh/Dockerfile

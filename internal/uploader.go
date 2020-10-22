@@ -8,7 +8,6 @@ import (
 
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/utility"
 )

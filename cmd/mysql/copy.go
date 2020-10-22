@@ -9,9 +9,9 @@ const (
 	copyName             = "copy"
 	copyShortDescription = "copy specific or all backups"
 
-	copyAllFlag             = "all"
+	copyAllFlag         = "all"
 	copyAllSDescription = "copy all backups"
-	allShorthand   = "a"
+	allShorthand        = "a"
 
 	backupNameFlag         = "backup"
 	backupShorthand        = "b"
@@ -30,7 +30,7 @@ var (
 	backupName     string
 	fromConfigFile string
 	toConfigFile   string
-	all bool
+	all            bool
 
 	copyCmd = &cobra.Command{
 		Use:   copyName,
