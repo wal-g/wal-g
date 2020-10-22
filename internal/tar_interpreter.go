@@ -2,7 +2,6 @@ package internal
 
 import (
 	"archive/tar"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 // TarInterpreter behaves differently

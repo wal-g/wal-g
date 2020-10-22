@@ -3,11 +3,12 @@ package internal
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/wal-g/tracelog"
 	"io"
 	"io/ioutil"
 	"os"
 	"unsafe"
+
+	"github.com/wal-g/tracelog"
 )
 
 // This code is an adaptation of Postgres data page checksum calculation code written in Go.
@@ -125,7 +126,7 @@ func pgChecksumBlock(page [DatabasePageSize]byte) uint32 {
 // are set.  There is a similar function PageIsVerified responsible for
 // checking pages before they are loaded into buffer pool.
 //
-// see:  src/backend/storage/page/bufpage.c
+// see:  src/backend/storage/page/bufpage.info
 func isPageCorrupted(path string, blockNo uint32, page PgDatabasePage) (bool, error) {
 	pageHeader, err := parsePostgresPageHeader(bytes.NewReader(page[:]))
 	if err != nil {

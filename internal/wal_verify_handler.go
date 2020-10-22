@@ -3,11 +3,12 @@ package internal
 import (
 	"bytes"
 	"fmt"
+	"sort"
+
 	"github.com/jackc/pgx"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
-	"sort"
 )
 
 type WalStorageStatus int

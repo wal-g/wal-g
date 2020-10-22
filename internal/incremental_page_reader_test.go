@@ -7,13 +7,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/wal-g/wal-g/utility"
-
 	"github.com/RoaringBitmap/roaring"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/testtools"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func TestDeltaBitmapInitialize(t *testing.T) {

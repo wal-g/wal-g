@@ -8,11 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-
-	"github.com/wal-g/tracelog"
 	"go.mongodb.org/mongo-driver/bson"
 )
 

@@ -2,11 +2,12 @@ package internal
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
-	"strconv"
 )
 
 type NoPostgresVersionError struct {
@@ -221,10 +222,10 @@ func (queryRunner *PgQueryRunner) stopBackup() (label string, offsetMap string, 
 func (queryRunner *PgQueryRunner) BuildStatisticsQuery() (string, error) {
 	switch {
 	case queryRunner.Version >= 90000:
-		return "SELECT c.relfilenode, c.reltablespace, s.n_tup_ins, s.n_tup_upd, s.n_tup_del " +
-			"FROM pg_class c " +
+		return "SELECT info.relfilenode, info.reltablespace, s.n_tup_ins, s.n_tup_upd, s.n_tup_del " +
+			"FROM pg_class info " +
 			"LEFT OUTER JOIN pg_stat_all_tables s " +
-			"ON c.oid = s.relid " +
+			"ON info.oid = s.relid " +
 			"WHERE relfilenode != 0 " +
 			"AND n_tup_ins IS NOT NULL", nil
 	case queryRunner.Version == 0:

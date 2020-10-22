@@ -3,6 +3,10 @@ package internal_test
 import (
 	"bytes"
 	"fmt"
+	"sort"
+	"strings"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/storages/memory"
 	"github.com/wal-g/storages/storage"
@@ -10,9 +14,6 @@ import (
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/compression/lz4"
 	"github.com/wal-g/wal-g/utility"
-	"sort"
-	"strings"
-	"testing"
 )
 
 // MockWalShowOutputWriter is used to capture wal-show command output

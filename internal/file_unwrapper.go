@@ -2,10 +2,11 @@ package internal
 
 import (
 	"archive/tar"
-	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 	"io"
 	"os"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 )
 
 type FileUnwrapperType int

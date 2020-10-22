@@ -2,12 +2,13 @@ package internal
 
 import (
 	"archive/tar"
+	"os"
+	"sync"
+
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
-	"os"
-	"sync"
 )
 
 // BundleFiles represents the files in the backup that is going to be created

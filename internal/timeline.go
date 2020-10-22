@@ -51,7 +51,7 @@ const (
 
 const (
 	// WalSegmentSize is the size of one WAL file
-	WalSegmentSize = uint64(16 * 1024 * 1024) // xlog.c line 113ß
+	WalSegmentSize = uint64(16 * 1024 * 1024) // xlog.info line 113ß
 
 	walFileFormat         = "%08X%08X%08X" // xlog_internal.h line 155
 	walHistoryFileFormat  = "%08X.history"

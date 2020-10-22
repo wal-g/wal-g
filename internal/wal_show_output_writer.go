@@ -2,8 +2,9 @@ package internal
 
 import (
 	"encoding/json"
-	"github.com/jedib0t/go-pretty/table"
 	"io"
+
+	"github.com/jedib0t/go-pretty/table"
 )
 
 type WalShowOutputType int

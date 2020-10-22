@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-
-	"github.com/wal-g/tracelog"
 )
 
 func LoadBackups(downloader archive.Downloader) ([]models.Backup, error) {

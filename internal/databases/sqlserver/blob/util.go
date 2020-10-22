@@ -3,12 +3,13 @@ package blob
 import (
 	"bytes"
 	"errors"
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/tracelog"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 )
 
 var ErrNoLease = errors.New("no lease")

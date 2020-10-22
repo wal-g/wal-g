@@ -7,10 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wal-g/wal-g/tests_func/utils"
-
 	"github.com/mongodb/mongo-tools-common/db"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/tests_func/utils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"

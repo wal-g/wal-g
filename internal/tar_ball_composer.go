@@ -3,8 +3,9 @@ package internal
 import (
 	"archive/tar"
 	"errors"
-	"github.com/jackc/pgx"
 	"os"
+
+	"github.com/jackc/pgx"
 )
 
 // TarBallComposer is used to compose files into tarballs.

@@ -1,11 +1,12 @@
 package internal
 
 import (
-	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 )
 
 // temporary flag is used in tar interpreter to determine if it should use new unwrap logic

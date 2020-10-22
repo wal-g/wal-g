@@ -2,12 +2,13 @@ package sqlserver
 
 import (
 	"context"
+	"os"
+	"syscall"
+
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
 	"github.com/wal-g/wal-g/utility"
-	"os"
-	"syscall"
 )
 
 func RunProxy(folder storage.Folder) {

@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	mocks "github.com/wal-g/wal-g/internal/databases/mongo/archive/mocks"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-
+	mocks "github.com/wal-g/wal-g/internal/databases/mongo/archive/mocks"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 

@@ -6,12 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/wal-g/wal-g/internal"
 	mocks "github.com/wal-g/wal-g/internal/databases/mongo/archive/mocks"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 var (

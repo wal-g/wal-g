@@ -1,9 +1,10 @@
 package internal_test
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
-	"testing"
 )
 
 // TestWalSegmentRunner_AllExists tests the case when all segments exists
