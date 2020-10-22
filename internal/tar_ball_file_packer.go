@@ -4,15 +4,16 @@ import (
 	"archive/tar"
 	"context"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/errgroup"
-	"io"
-	"io/ioutil"
-	"os"
 )
 
 type SkippedFileError struct {

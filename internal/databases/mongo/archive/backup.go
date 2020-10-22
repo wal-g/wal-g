@@ -7,11 +7,10 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-
-	"github.com/wal-g/storages/storage"
 )
 
 // BackupInfoMarshalFunc defines sentinel unmarshal func

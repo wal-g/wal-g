@@ -1,11 +1,12 @@
 package internal
 
 import (
+	"io"
+	"path"
+
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/utility"
-	"io"
-	"path"
 )
 
 // WalUploader extends uploader with wal specific functionality.

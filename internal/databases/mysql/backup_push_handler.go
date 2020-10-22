@@ -1,10 +1,11 @@
 package mysql
 
 import (
+	"os/exec"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
-	"os/exec"
 )
 
 func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {

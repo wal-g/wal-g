@@ -8,7 +8,6 @@ import (
 
 	"github.com/wal-g/wal-g/tests_func/mongoload/internal"
 	"github.com/wal-g/wal-g/tests_func/mongoload/models"
-
 	"go.mongodb.org/mongo-driver/mongo"
 )
 

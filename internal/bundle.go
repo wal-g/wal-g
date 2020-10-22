@@ -3,6 +3,13 @@ package internal
 import (
 	"archive/tar"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+
 	"github.com/RoaringBitmap/roaring"
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
@@ -10,12 +17,6 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/utility"
-	"io"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
-	"sync"
 )
 
 const (

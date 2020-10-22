@@ -5,11 +5,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"math"
 	"os"
 	"time"
+
+	"github.com/wal-g/wal-g/utility"
 )
 
 var BinlogMagic = [...]byte{0xfe, 0x62, 0x69, 0x6e}

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os/exec"
 
@@ -78,13 +77,6 @@ func GetPgFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string) func(fol
 			tracelog.ErrorLogger.FatalfOnError(errMessege, err)
 		}
 		err = deltaFetchRecursionOld(backup.Name, folder, utility.ResolveSymlink(dbDataDirectory), spec, filesToUnwrap)
-		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
-	}
-}
-
-func GetStreamFetcher(writeCloser io.WriteCloser) func(folder storage.Folder, backup Backup) {
-	return func(folder storage.Folder, backup Backup) {
-		err := downloadAndDecompressStream(&backup, writeCloser)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 	}
 }

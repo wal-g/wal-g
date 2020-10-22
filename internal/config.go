@@ -7,13 +7,12 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/wal-g/wal-g/internal/webserver"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/webserver"
 )
 
 const (
@@ -489,7 +488,7 @@ func toFlagName(s string) string {
 	return strings.ReplaceAll(strings.ToLower(s), "_", "-")
 }
 
-func ConfigureFolderFromConfig(configFile string) (storage.Folder, error) {
+func FolderFromConfig(configFile string) (storage.Folder, error) {
 	var config = viper.New()
 	SetDefaultValues(config)
 	ReadConfigFromFile(config, configFile)

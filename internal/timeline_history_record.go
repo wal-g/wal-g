@@ -3,13 +3,14 @@ package internal
 import (
 	"bufio"
 	"fmt"
+	"io"
+	"regexp"
+	"strconv"
+
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
-	"io"
-	"regexp"
-	"strconv"
 )
 
 var walHistoryRecordRegexp *regexp.Regexp

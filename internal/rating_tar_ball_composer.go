@@ -3,12 +3,13 @@ package internal
 import (
 	"archive/tar"
 	"context"
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/crypto"
-	"golang.org/x/sync/errgroup"
 	"os"
 	"sort"
 	"sync"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/crypto"
+	"golang.org/x/sync/errgroup"
 )
 
 type RatingTarBallComposerMaker struct {

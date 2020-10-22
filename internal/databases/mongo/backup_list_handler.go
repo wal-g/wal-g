@@ -3,9 +3,8 @@ package mongo
 import (
 	"io"
 
-	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
-
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 )
 
 // HandleBackupsList prints current backups.

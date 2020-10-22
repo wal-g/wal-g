@@ -3,12 +3,11 @@ package mysql
 import (
 	"time"
 
-	"github.com/wal-g/wal-g/utility"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const fetchSinceFlagShortDescr = "backup name starting from which you want to fetch binlogs"

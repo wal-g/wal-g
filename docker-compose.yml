@@ -60,6 +60,8 @@ services:
       &&  mkdir -p /export/mongodeletebeforebucket
       &&  mkdir -p /export/mongodeleteretainbucket
       &&  mkdir -p /export/redisbucket
+      &&  mkdir -p /export/mysqlcopybackupfrom
+      &&  mkdir -p /export/mysqlcopybackupto
       &&  /usr/bin/minio server /export'
 
   ssh:

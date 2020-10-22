@@ -326,7 +326,7 @@ func shouldUnwrapTar(tarName string, sentinelDto BackupSentinelDto, filesToUnwra
 	return false
 }
 
-func getLastWalFilename(backup *Backup) (string, error) {
+func GetLastWalFilename(backup *Backup) (string, error) {
 	meta, err := backup.fetchMeta()
 	if err != nil {
 		tracelog.InfoLogger.Print("No meta found.")

@@ -10,13 +10,12 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/wal-g/wal-g/tests_func/helpers"
-	"github.com/wal-g/wal-g/tests_func/mongoload"
-	"github.com/wal-g/wal-g/tests_func/mongoload/models"
-
 	"github.com/DATA-DOG/godog/gherkin"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/tests_func/helpers"
+	"github.com/wal-g/wal-g/tests_func/mongoload"
+	"github.com/wal-g/wal-g/tests_func/mongoload/models"
 )
 
 type TestingfWrap func(format string, args ...interface{})

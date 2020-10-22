@@ -10,6 +10,7 @@ const (
 	CatchupFetchShortDescription = "Fetches an incremental backup from storage"
 	UseNewUnwrapDescription      = "Use the new implementation of catchup unwrap (beta)"
 )
+
 var useNewUnwrap bool
 
 // catchupFetchCmd represents the catchup-fetch command

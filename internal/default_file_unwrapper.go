@@ -2,9 +2,10 @@ package internal
 
 import (
 	"archive/tar"
-	"github.com/pkg/errors"
 	"io"
 	"os"
+
+	"github.com/pkg/errors"
 )
 
 // DefaultFileUnwrapper is used for default (backup-push) backups

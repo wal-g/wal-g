@@ -6,13 +6,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/wal-g/wal-g/tests_func/config"
-	"github.com/wal-g/wal-g/tests_func/helpers"
-	"github.com/wal-g/wal-g/tests_func/utils"
-
 	"github.com/DATA-DOG/godog"
 	"github.com/DATA-DOG/godog/gherkin"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/tests_func/config"
+	"github.com/wal-g/wal-g/tests_func/helpers"
+	"github.com/wal-g/wal-g/tests_func/utils"
 )
 
 var (

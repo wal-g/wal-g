@@ -2,12 +2,12 @@ package internal
 
 import (
 	"archive/tar"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 // TODO : unit tests

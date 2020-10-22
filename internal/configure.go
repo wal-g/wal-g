@@ -14,12 +14,11 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
-	"golang.org/x/time/rate"
-
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/awskms"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
+	"golang.org/x/time/rate"
 )
 
 const (
