@@ -10,6 +10,7 @@ for i in /tmp/tests/*; do
   echo
   echo "===== RUNNING $i ====="
   set -x
+  chmod a+x "$i"
   "$i"
   set +x
   echo "===== SUCCESS $i ====="

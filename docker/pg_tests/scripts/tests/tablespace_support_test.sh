@@ -84,7 +84,7 @@ PGDATABASE=postgres \
 PGHOST=/var/run/postgresql \
 WALG_FILE_PREFIX=file://localhost/tmp \
 WALG_LOG_DESTINATION=stderr \
-wal-g backup-fetch ${PGDATA} LATEST
+wal-g backup-fetch "${PGDATA}" LATEST
 
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& \
 AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE \
@@ -111,5 +111,3 @@ diff /tmp/dump1 /tmp/dump2
 diff -r /tmp/spaces_backup /tmp/spaces
 
 ../scripts/drop_pg.sh
-
-echo "Tablespaces work!!!"

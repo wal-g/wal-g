@@ -62,4 +62,3 @@ diff /tmp/dump9 /tmp/dumpLATEST
 rm ${TMP_CONFIG}
 echo $target_backup_name
 echo $FIRST
-echo "End to end delete test success!!!!!!"

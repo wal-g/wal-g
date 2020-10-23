@@ -50,4 +50,3 @@ fi
 diff /tmp/list_tail_before_delete /tmp/list_tail_after_delete
 /tmp/scripts/drop_pg.sh
 rm ${TMP_CONFIG}
-echo "Delete retain FIND_FULL success!!!!!!"

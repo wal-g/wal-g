@@ -46,4 +46,3 @@ fi
 diff /tmp/list_before_delete /tmp/list_after_delete
 /tmp/scripts/drop_pg.sh
 rm ${TMP_CONFIG}
-echo "Delete retain FULL success!!!!!!"

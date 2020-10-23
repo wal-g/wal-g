@@ -91,6 +91,9 @@ const (
 
 	EndpointSourceSetting = "S3_ENDPOINT_SOURCE"
 	EndpointPortSetting   = "S3_ENDPOINT_PORT"
+
+	AwsAccessKeyId     = "AWS_ACCESS_KEY_ID"
+	AwsSecretAccessKey = "AWS_SECRET_ACCESS_KEY"
 )
 
 var (
@@ -173,8 +176,8 @@ var (
 		// AWS s3
 		"WALG_S3_PREFIX":              true,
 		"WALE_S3_PREFIX":              true,
-		"AWS_ACCESS_KEY_ID":           true,
-		"AWS_SECRET_ACCESS_KEY":       true,
+		AwsAccessKeyId:                true,
+		AwsSecretAccessKey:            true,
 		"AWS_SESSION_TOKEN":           true,
 		"AWS_DEFAULT_REGION":          true,
 		"AWS_DEFAULT_OUTPUT":          true,
@@ -495,6 +498,7 @@ func FolderFromConfig(configFile string) (storage.Folder, error) {
 	CheckAllowedSettings(config)
 
 	var folder, err = ConfigureFolderForSpecificConfig(config)
+
 	if err != nil {
 		tracelog.ErrorLogger.Println("Failed configure folder according to config " + configFile)
 		tracelog.ErrorLogger.FatalError(err)

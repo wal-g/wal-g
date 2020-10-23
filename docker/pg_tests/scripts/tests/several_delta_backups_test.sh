@@ -56,4 +56,3 @@ psql -f scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
 diff /tmp/dump1 /tmp/dump2
 /tmp/scripts/drop_pg.sh
 rm ${TMP_CONFIG}
-echo "Several delta backup success!!!!!!"
