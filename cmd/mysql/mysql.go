@@ -2,11 +2,11 @@ package mysql
 
 import (
 	"fmt"
+	"github.com/wal-g/tracelog"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 )
 
@@ -23,7 +23,7 @@ var Cmd = &cobra.Command{
 	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "MySQL"}, "\t"),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		err := internal.AssertRequiredSettingsSet()
-		tracelog.ErrorLogger.FatalOnError(err)
+		tracelog.WarningLogger.PrintError(err)
 	},
 }
 

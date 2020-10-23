@@ -6,12 +6,11 @@ set -e -x
 export WALE_S3_PREFIX=s3://mysqlbinlogpushfetchbucket
 export WALG_MYSQL_BINLOG_DST=/tmp/binlogs
 
-
 mysqld --initialize --init-file=/etc/mysql/init.sql
 service mysql start
 
 # drop all before-dump binlogs, so SHOW BINNARY LOGS will show all binlogs we need to fetch
-current_binlog=`mysql -e "SHOW BINARY LOGS" | tail -n 1 | awk '{print $1}'`
+current_binlog=$(mysql -e "SHOW BINARY LOGS" | tail -n 1 | awk '{print $1}')
 mysql -e "PURGE BINARY LOGS TO '$current_binlog'";
 
 wal-g backup-push
@@ -27,8 +26,8 @@ mysql -e "FLUSH LOGS"
 wal-g binlog-push
 
 # last binlog waas not archived
-current_binlog=`mysql -e "SHOW BINARY LOGS" | tail -n 1 | awk '{print $1}'`
-mysql -N -e 'show binary logs' | awk '{print $1}' | grep -v $current_binlog > /tmp/proper_order
+current_binlog=$(mysql -e "SHOW BINARY LOGS" | tail -n 1 | awk '{print $1}')
+mysql -N -e 'show binary logs' | awk '{print $1}' | grep -v "$current_binlog" > /tmp/proper_order
 
 rm -rf /tmp/binlogs
 mkdir /tmp/binlogs
@@ -40,11 +39,11 @@ sleep 2
 wal-g binlog-fetch --since LATEST
 diff -u /tmp/proper_order /tmp/binlogs/binlogs_order
 while read -r binlog; do
-    test -f /tmp/binlogs/$binlog
-    ls -lah $MYSQLDATA/$binlog /tmp/binlogs/$binlog 
-    if ! cmp $MYSQLDATA/$binlog /tmp/binlogs/$binlog; then
-        mysqlbinlog -v $MYSQLDATA/$binlog > /tmp/proper.sql
-        mysqlbinlog -v /tmp/binlogs/$binlog > /tmp/fetched.sql
+    test -f /tmp/binlogs/"$binlog"
+    ls -lah "$MYSQLDATA"/"$binlog" /tmp/binlogs/"$binlog"
+    if ! cmp "$MYSQLDATA"/"$binlog" /tmp/binlogs/"$binlog"; then
+        mysqlbinlog -v "$MYSQLDATA"/"$binlog" > /tmp/proper.sql
+        mysqlbinlog -v /tmp/binlogs/"$binlog" > /tmp/fetched.sql
         diff -u /tmp/proper.sql /tmp/fetched.sql
     fi
 done < /tmp/binlogs/binlogs_order

@@ -53,4 +53,3 @@ then
 fi
 /tmp/scripts/drop_pg.sh
 rm ${TMP_CONFIG}
-echo "Delete before permanent full success!!!!!!"
