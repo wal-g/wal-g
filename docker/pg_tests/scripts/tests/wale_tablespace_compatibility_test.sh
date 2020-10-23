@@ -114,5 +114,3 @@ diff -r /tmp/spaces_backup /tmp/spaces
 
 ../scripts/drop_pg.sh
 rm -rf /tmp/conf_files
-
-echo "Tablespaces work!!!"

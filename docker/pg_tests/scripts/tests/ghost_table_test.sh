@@ -55,4 +55,3 @@ pg_dumpall -f /tmp/dump2
 diff /tmp/dump1 /tmp/dump2
 /tmp/scripts/drop_pg.sh
 rm ${TMP_CONFIG}
-echo "Ghost table backup success!!!!!!"

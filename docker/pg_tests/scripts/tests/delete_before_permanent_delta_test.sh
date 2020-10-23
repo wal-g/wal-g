@@ -423,5 +423,3 @@ diff /tmp/dump1 /tmp/dump2
 
 /tmp/scripts/drop_pg.sh
 
-
-echo "Delete before permanent delta success!!!!!!"

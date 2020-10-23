@@ -96,4 +96,3 @@ popd
 
 diff ${ALPHA_DUMP} ${BETA_DUMP}
 
-echo "Catchup test success"

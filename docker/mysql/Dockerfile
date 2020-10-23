@@ -17,6 +17,7 @@ COPY docker/mysql/client.cnf /root/.my.cnf
 COPY docker/mysql/client.cnf /etc/mysql/debian.cnf
 COPY docker/mysql/init.sql /etc/mysql/init.sql
 COPY docker/mysql/export_common.sh /usr/local/export_common.sh
+COPY docker/mysql/export_test_funcs.sh /usr/local/export_test_funcs.sh
 
 # append
 COPY docker/mysql/my.cnf /tmp/my.cnf
