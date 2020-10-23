@@ -23,7 +23,9 @@ var Cmd = &cobra.Command{
 	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "MySQL"}, "\t"),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		err := internal.AssertRequiredSettingsSet()
-		tracelog.WarningLogger.PrintError(err)
+		if err != nil {
+			tracelog.WarningLogger.PrintError(err)
+		}
 	},
 }
 
