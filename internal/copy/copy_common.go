@@ -1,7 +1,6 @@
 package copy
 
 import (
-	"path"
 	"sync"
 
 	"github.com/wal-g/storages/storage"
@@ -67,9 +66,7 @@ func (ch *InfoProvider) copyObject() error {
 		return err
 	}
 
-	var filename = path.Join(ch.From.GetPath(), objectName)
-
-	err = ch.To.PutObject(filename, readCloser)
+	err = ch.To.PutObject(objectName, readCloser)
 	if err != nil {
 		return err
 	}

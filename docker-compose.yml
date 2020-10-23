@@ -62,6 +62,7 @@ services:
       &&  mkdir -p /export/redisbucket
       &&  mkdir -p /export/mysqlcopybackupfrom
       &&  mkdir -p /export/mysqlcopybackupto
+      &&  mkdir -p /export/mysqlconfonly
       &&  /usr/bin/minio server /export'
 
   s3-another:
@@ -74,7 +75,7 @@ services:
       - "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEYBUTANOTHERTOO"
     entrypoint: sh
     command: >
-      -c 'mkdir -p /export/fullbucket
+      -c 'mkdir -p /export/mysqlcopybackupto
       &&  /usr/bin/minio server /export'
 
   ssh:
@@ -433,8 +434,10 @@ services:
       - docker/common/common_walg.env
     depends_on:
       - s3
+      - s3-another
     links:
       - s3
+      - s3-another
 
   mariadb:
     build:
