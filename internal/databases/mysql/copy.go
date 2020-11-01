@@ -12,13 +12,13 @@ import (
 )
 
 // HandleCopyBackup copy specific backups from one storage to another
-func HandleCopyBackup(fromConfigFile string, toConfigFile string, backupName string) {
+func HandleCopyBackup(fromConfigFile, toConfigFile, backupName, prefix string) {
 	var from, fromError = internal.FolderFromConfig(fromConfigFile)
 	var to, toError = internal.FolderFromConfig(toConfigFile)
 	if fromError != nil || toError != nil {
 		return
 	}
-	infos, err := backupCopyingInfo(backupName, from, to)
+	infos, err := backupCopyingInfo(backupName, prefix, from, to)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.ErrorLogger.FatalOnError(copy.Infos(infos))
@@ -40,7 +40,7 @@ func HandleCopyAll(fromConfigFile string, toConfigFile string) {
 	tracelog.InfoLogger.Printf("Success copyed all backups\n")
 }
 
-func backupCopyingInfo(backupName string, from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
+func backupCopyingInfo(backupName, prefix string, from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
 	tracelog.InfoLogger.Printf("Handle backupname '%s'.", backupName)
 	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, from)
 	if err != nil {
@@ -55,7 +55,9 @@ func backupCopyingInfo(backupName string, from storage.Folder, to storage.Folder
 	}
 
 	var hasBackupPrefix = func(object storage.Object) bool { return strings.HasPrefix(object.GetName(), backupPrefix) }
-	return copy.BuildCopyingInfos(from, to, objects, hasBackupPrefix), nil
+	return copy.BuildCopyingInfos(from, to, objects, hasBackupPrefix, func(object storage.Object) string {
+		return strings.Replace(object.GetName(), backup.Name, prefix+backup.Name, 1)
+	}), nil
 }
 
 func WildcardInfo(from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
@@ -64,5 +66,5 @@ func WildcardInfo(from storage.Folder, to storage.Folder) ([]copy.InfoProvider, 
 		return nil, err
 	}
 
-	return copy.BuildCopyingInfos(from, to, objects, func(object storage.Object) bool { return true }), nil
+	return copy.BuildCopyingInfos(from, to, objects, func(object storage.Object) bool { return true }, copy.NoopRenameFunc), nil
 }

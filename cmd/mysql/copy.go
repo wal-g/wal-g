@@ -24,10 +24,15 @@ const (
 	toFlag        = "to"
 	toShorthand   = "t"
 	toDescription = "Storage config to where should copy backup"
+
+	prefixFlag        = "add-prefix"
+	prefixShorthand   = "p"
+	prefixDescription = "add prefix to path"
 )
 
 var (
 	backupName     string
+	prefix         string
 	fromConfigFile string
 	toConfigFile   string
 	all            bool
@@ -41,7 +46,7 @@ var (
 				db.HandleCopyAll(fromConfigFile, toConfigFile)
 				return
 			}
-			db.HandleCopyBackup(fromConfigFile, toConfigFile, backupName)
+			db.HandleCopyBackup(fromConfigFile, toConfigFile, backupName, prefix)
 		},
 	}
 )
@@ -51,6 +56,7 @@ func init() {
 	copyCmd.Flags().StringVarP(&toConfigFile, toFlag, toShorthand, "", toDescription)
 	copyCmd.Flags().StringVarP(&fromConfigFile, fromFlag, fromShorthand, "", fromDescription)
 	copyCmd.Flags().StringVarP(&backupName, backupNameFlag, backupShorthand, "", backupShortDescription)
+	copyCmd.Flags().StringVarP(&prefix, prefixFlag, prefixShorthand, "", prefixDescription)
 	copyCmd.Flags().BoolVarP(&all, copyAllFlag, allShorthand, false, copyAllSDescription)
 
 	Cmd.AddCommand(copyCmd)

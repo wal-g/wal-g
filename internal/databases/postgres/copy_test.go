@@ -29,7 +29,7 @@ func TestStartCopy_WhenThereAreObjectsToCopy(t *testing.T) {
 	assert.NoError(t, err)
 
 	for _, info := range infos {
-		var filename = path.Join(from.GetPath(), info.Obj.GetName())
+		var filename = path.Join(from.GetPath(), info.SrcObj.GetName())
 		var result, err = to.Exists(filename)
 		assert.NoError(t, err)
 		if !result {
@@ -92,7 +92,7 @@ func TestGetAllCopyingInfo_WhenFromFolderIsNotEmpty(t *testing.T) {
 	assert.NotEmpty(t, infos)
 
 	for _, info := range infos {
-		var result, err = from.Exists(info.Obj.GetName())
+		var result, err = from.Exists(info.SrcObj.GetName())
 		assert.NoError(t, err)
 		assert.True(t, result)
 	}
@@ -101,7 +101,7 @@ func TestGetAllCopyingInfo_WhenFromFolderIsNotEmpty(t *testing.T) {
 func TestBuildCopyingInfos_WhenThereNoObjectsInFolder(t *testing.T) {
 	var from = testtools.MakeDefaultInMemoryStorageFolder()
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
-	var infos = copy.BuildCopyingInfos(from, to, make([]storage.Object, 0), func(object storage.Object) bool { return true })
+	var infos = copy.BuildCopyingInfos(from, to, make([]storage.Object, 0), func(object storage.Object) bool { return true }, copy.NoopRenameFunc)
 	assert.Empty(t, infos)
 }
 
@@ -110,7 +110,7 @@ func TestBuildCopyingInfos_WhenConditionIsJustFalse(t *testing.T) {
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	objects, err := storage.ListFolderRecursively(from)
 	assert.NoError(t, err)
-	var infos = copy.BuildCopyingInfos(from, to, objects, func(object storage.Object) bool { return false })
+	var infos = copy.BuildCopyingInfos(from, to, objects, func(object storage.Object) bool { return false }, copy.NoopRenameFunc)
 	assert.Empty(t, infos)
 }
 
@@ -130,9 +130,9 @@ func TestBuildCopyingInfos_WhenComplexCondition(t *testing.T) {
 
 	assert.NotZero(t, expectedCount)
 
-	var infos = copy.BuildCopyingInfos(from, to, objects, condition)
+	var infos = copy.BuildCopyingInfos(from, to, objects, condition, copy.NoopRenameFunc)
 	assert.Equal(t, expectedCount, len(infos))
 	for _, info := range infos {
-		assert.True(t, condition(info.Obj))
+		assert.True(t, condition(info.SrcObj))
 	}
 }
