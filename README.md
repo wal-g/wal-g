@@ -103,6 +103,10 @@ Default: 1 hour.
 
 Controls the trimming of extra slashes in paths. The default is `true`. To allow restoring from WAL-E archives on GCS, set it to `false` and keep double slashes in `WALG_GS_PREFIX` values.
 
+* `GCS_ENCRYPTION_KEY`
+
+To configure GCS Customer Supplied Encryption Key (CSEK) for client-side encryption and decryption. By default, Google-managed keys are used. CSEK must be a 32-byte AES-256 key, encoded in standard Base64.
+
 * `WALG_AZURE_BUFFER_SIZE` (e.g. `33554432`)
 
 Overrides the default `upload buffer size` of 67108864 bytes (64 MB). Note that the size of the buffer must be specified in bytes. Therefore, to use 32 MB sized buffers, this variable should be set to 33554432 bytes.
