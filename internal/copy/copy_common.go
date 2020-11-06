@@ -11,7 +11,8 @@ type InfoProvider struct {
 	From storage.Folder
 	To   storage.Folder
 
-	Obj storage.Object
+	SrcObj     storage.Object
+	targetName string
 }
 
 func Infos(chs []InfoProvider) error {
@@ -59,30 +60,37 @@ func Infos(chs []InfoProvider) error {
 }
 
 func (ch *InfoProvider) copyObject() error {
-	var objectName = ch.Obj.GetName()
 
-	readCloser, err := ch.From.ReadObject(objectName)
+	readCloser, err := ch.From.ReadObject(ch.SrcObj.GetName())
 	if err != nil {
 		return err
 	}
 
-	err = ch.To.PutObject(objectName, readCloser)
+	err = ch.To.PutObject(ch.targetName, readCloser)
 	if err != nil {
 		return err
 	}
 
-	tracelog.InfoLogger.Printf("Copied '%s' from '%s' to '%s'.", objectName, ch.From.GetPath(), ch.To.GetPath())
+	tracelog.InfoLogger.Printf("Copied '%s' from folder '%s' to '%s' in fodler '%s'.", ch.SrcObj.GetName(), ch.From.GetPath(), ch.targetName, ch.To.GetPath())
 	return nil
 }
 
+var NoopRenameFunc = func(o storage.Object) string {
+	if o == nil {
+		return ""
+	}
+	return o.GetName()
+}
+
 func BuildCopyingInfos(from storage.Folder, to storage.Folder, objects []storage.Object,
-	condition func(storage.Object) bool) (infos []InfoProvider) {
+	condition func(storage.Object) bool, renameFunc func(object storage.Object) string) (infos []InfoProvider) {
 	for _, object := range objects {
 		if condition(object) {
 			infos = append(infos, InfoProvider{
-				From: from,
-				To:   to,
-				Obj:  object,
+				From:       from,
+				To:         to,
+				SrcObj:     object,
+				targetName: renameFunc(object),
 			})
 		}
 	}
