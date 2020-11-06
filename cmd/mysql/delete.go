@@ -43,6 +43,13 @@ var deleteEverythingCmd = &cobra.Command{
 	Run:       runDeleteEverything,
 }
 
+var deleteTagretCmd = &cobra.Command{
+	Use:     internal.DeleteTargetUsageExample, // TODO : improve description
+	Example: internal.DeleteTargetExamples,
+	Args:    internal.DeleteTargetArgsValidator,
+	Run:     runDeleteTarget,
+}
+
 func runDeleteEverything(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -67,9 +74,28 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 	internal.HandleDeleteRetain(folder, args, confirmed, isFullBackup, GetLessFunc(folder))
 }
 
+func runDeleteTarget(cmd *cobra.Command, args []string) {
+	target := args[0]
+
+	folder, err := internal.ConfigureFolder()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	targetObj, err := internal.FindTarget(folder,
+		func(object1, object2 storage.Object) bool {
+			return false
+		},
+		func(object storage.Object) bool {
+			return object.GetName() == target
+		})
+
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	tracelog.ErrorLogger.FatalOnError(internal.HandleDeleteTargetBackup(folder, targetObj, confirmed, IsFullBackup))
+}
+
 func init() {
 	Cmd.AddCommand(deleteCmd)
-	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd)
+	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd, deleteTagretCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 

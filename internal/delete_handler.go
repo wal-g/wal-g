@@ -31,12 +31,15 @@ const (
 	DeleteBeforeExamples = `  before base_0123              keep everything after base_0123 including itself
   before FIND_FULL base_0123    keep everything after the base of base_0123`
 
+	DeleteTargetExamples = `  target backup-name               delete only backup "backup-name"`
+
 	DeleteEverythingExamples = `  everything                delete every backup only if there is no permanent backups
   everything FORCE          delete every backup include permanents`
 
 	DeleteEverythingUsageExample = "everything [FORCE]"
 	DeleteRetainUsageExample     = "retain [FULL|FIND_FULL] backup_count"
 	DeleteBeforeUsageExample     = "before [FIND_FULL] backup_name|timestamp"
+	DeleteTargetUsageExample     = "target backup_name"
 )
 
 var StringModifiers = []string{"FULL", "FIND_FULL"}
@@ -124,7 +127,7 @@ func FindTargetBeforeName(folder storage.Folder,
 	if choiceFunc == nil {
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete before'")
 	}
-	return findTarget(folder, greater, choiceFunc)
+	return FindTarget(folder, greater, choiceFunc)
 }
 
 func FindTargetBeforeTime(folder storage.Folder,
@@ -132,7 +135,7 @@ func FindTargetBeforeTime(folder storage.Folder,
 	isFullBackup func(object storage.Object) bool,
 	less func(object1, object2 storage.Object) bool) (storage.Object, error) {
 
-	potentialTarget, err := findTarget(folder, less, func(object storage.Object) bool {
+	potentialTarget, err := FindTarget(folder, less, func(object storage.Object) bool {
 		return timeLine.Before(object.GetLastModified()) || timeLine.Equal(object.GetLastModified())
 	})
 	if err != nil {
@@ -153,7 +156,7 @@ func FindTargetRetain(folder storage.Folder,
 	if choiceFunc == nil {
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete retain'")
 	}
-	return findTarget(folder, greater, choiceFunc)
+	return FindTarget(folder, greater, choiceFunc)
 }
 
 func FindTargetRetainAfterName(folder storage.Folder,
@@ -180,11 +183,11 @@ func FindTargetRetainAfterName(folder storage.Folder,
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete before'")
 	}
 
-	target1, err := findTarget(folder, greater, choiceFuncRetain)
+	target1, err := FindTarget(folder, greater, choiceFuncRetain)
 	if err != nil {
 		return nil, err
 	}
-	target2, err := findTarget(folder, less, choiceFuncAfterName)
+	target2, err := FindTarget(folder, less, choiceFuncAfterName)
 	if err != nil {
 		return nil, err
 	}
@@ -218,11 +221,11 @@ func FindTargetRetainAfterTime(folder storage.Folder,
 		}
 	}
 
-	target1, err := findTarget(folder, greater, choiceFuncRetain)
+	target1, err := FindTarget(folder, greater, choiceFuncRetain)
 	if err != nil {
 		return nil, err
 	}
-	target2, err := findTarget(folder, less, choiceFuncAfter)
+	target2, err := FindTarget(folder, less, choiceFuncAfter)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +237,7 @@ func FindTargetRetainAfterTime(folder storage.Folder,
 	}
 }
 
-func findTarget(folder storage.Folder,
+func FindTarget(folder storage.Folder,
 	compare func(object1, object2 storage.Object) bool,
 	isTarget func(object storage.Object) bool) (storage.Object, error) {
 
@@ -340,6 +343,20 @@ func DeleteBeforeTarget(folder storage.Folder, target storage.Object,
 	}
 	return storage.DeleteObjectsWhere(folder, confirmed, func(object storage.Object) bool {
 		return less(object, target) && !isPermanent(object.GetName(), permanentBackups, permanentWals)
+	})
+}
+
+func DeleteTarget(folder storage.Folder, target storage.Object,
+	confirmed bool,
+	isFullBackup func(object storage.Object) bool) error {
+
+	if !isFullBackup(target) {
+		errorMessage := "%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
+		return utility.NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
+	}
+	tracelog.InfoLogger.Println("Start delete")
+	return storage.DeleteObjectsWhere(folder, confirmed, func(object storage.Object) bool {
+		return object.GetName() == target.GetName()
 	})
 }
 
@@ -525,6 +542,12 @@ func DeleteRetainArgsValidator(cmd *cobra.Command, args []string) error {
 	}
 	return nil
 }
+func DeleteTargetArgsValidator(cmd *cobra.Command, args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("expected to get exacltly one argument: a backup name as target")
+	}
+	return nil
+}
 
 func DeleteRetainAfterArgsValidator(cmd *cobra.Command, args []string) error {
 	err := deleteArgsValidator(cmd, args, StringModifiers, 2, 3)
@@ -564,4 +587,10 @@ func deleteArgsValidator(cmd *cobra.Command, args, stringModifiers []string, min
 		}
 	}
 	return nil
+}
+
+func HandleDeleteTargetBackup(folder storage.Folder, target storage.Object, confirmed bool, isFullBackup func(folder storage.Folder, object storage.Object) bool) error {
+	return DeleteTarget(folder, target, confirmed, func(object storage.Object) bool {
+		return isFullBackup(folder, object)
+	})
 }
