@@ -97,7 +97,7 @@ func (err UnmarshallingError) Error() string {
 
 // TODO : unit tests
 func configureLimiters() {
-	if AllMoney {
+	if Turbo {
 		return
 	}
 	if viper.IsSet(DiskRateLimitSetting) {
@@ -329,7 +329,7 @@ func getMaxUploadQueue() (int, error) {
 }
 
 func getMaxUploadDiskConcurrency() (int, error) {
-	if AllMoney {
+	if Turbo {
 		return 4, nil
 	}
 	return GetMaxConcurrency(UploadDiskConcurrencySetting)

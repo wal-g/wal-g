@@ -263,7 +263,7 @@ var (
 		HttpExposeExpVar:         webserver.EnableExpVarEndpoints,
 		OplogPushStatsExposeHttp: nil,
 	}
-	AllMoney bool
+	Turbo bool
 )
 
 func isAllowedSetting(setting string, AllowedSettings map[string]bool) (exists bool) {
