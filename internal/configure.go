@@ -97,6 +97,9 @@ func (err UnmarshallingError) Error() string {
 
 // TODO : unit tests
 func configureLimiters() {
+	if AllMoney {
+		return
+	}
 	if viper.IsSet(DiskRateLimitSetting) {
 		diskLimit := viper.GetInt64(DiskRateLimitSetting)
 		DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
@@ -326,6 +329,9 @@ func getMaxUploadQueue() (int, error) {
 }
 
 func getMaxUploadDiskConcurrency() (int, error) {
+	if AllMoney {
+		return 4, nil
+	}
 	return GetMaxConcurrency(UploadDiskConcurrencySetting)
 }
 
