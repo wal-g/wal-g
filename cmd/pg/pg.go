@@ -2,6 +2,7 @@ package pg
 
 import (
 	"fmt"
+	"github.com/spf13/viper"
 	"os"
 	"strings"
 
@@ -25,6 +26,9 @@ var (
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			err := internal.AssertRequiredSettingsSet()
 			tracelog.ErrorLogger.FatalOnError(err)
+			if viper.IsSet(internal.PgWalSize) {
+				internal.SetWalSize(viper.GetUint64(internal.PgWalSize))
+			}
 		},
 	}
 )

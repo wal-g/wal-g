@@ -49,14 +49,21 @@ const (
 	hexadecimal     = 16
 )
 
-const (
+var (
 	// WalSegmentSize is the size of one WAL file
-	WalSegmentSize = uint64(16 * 1024 * 1024) // xlog.info line 113ß
-
-	walFileFormat         = "%08X%08X%08X" // xlog_internal.h line 155
-	walHistoryFileFormat  = "%08X.history"
+	WalSegmentSize        = uint64(16 * 1024 * 1024)
 	xLogSegmentsPerXLogId = 0x100000000 / WalSegmentSize // xlog_internal.h line 101
 )
+
+const (
+	walFileFormat        = "%08X%08X%08X" // xlog_internal.h line 155
+	walHistoryFileFormat = "%08X.history"
+)
+
+func SetWalSize(sizeMb uint64) {
+	WalSegmentSize = sizeMb * 1024 * 1024
+	xLogSegmentsPerXLogId = 0x100000000 / WalSegmentSize
+}
 
 // getWalFilename formats WAL file name using PostgreSQL connection. Essentially reads timeline of the server.
 func getWalFilename(lsn uint64, conn *pgx.Conn) (walFilename string, timeline uint32, err error) {
