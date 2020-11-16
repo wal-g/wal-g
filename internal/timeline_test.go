@@ -65,3 +65,17 @@ func TestParseWALFilename(t *testing.T) {
 	testParseWALFilenameCorrect(t, "10000000f0000000000000a0", 1<<28, 15<<36+10<<4)
 	testParseWALFilenameCorrect(t, "ffffffffffffffff000000ff", 1<<32-1, 1<<40-1)
 }
+
+func TestParseWALFilenameDifferentSize(t *testing.T) {
+	assert.Equal(t, WalSegmentSize, uint64(16*1024*1024))
+	SetWalSize(64)
+	assert.Equal(t, WalSegmentSize, uint64(64*1024*1024))
+	testParseWALFilenameError(t, "10000000f0000000000000a0")
+
+	testParseWALFilenameCorrect(t, "000000010000000000000001", 1, 1)
+	testParseWALFilenameCorrect(t, "000000100000000100000001", 1<<4, 4<<4+1)
+	testParseWALFilenameCorrect(t, "000000100000020000000030", 1<<4, 2<<14+3<<4)
+	testParseWALFilenameCorrect(t, "10000000f000000000000030", 1<<28, 15<<34+3<<4)
+	SetWalSize(16)
+	assert.Equal(t, WalSegmentSize, uint64(16*1024*1024))
+}

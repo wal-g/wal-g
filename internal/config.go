@@ -52,6 +52,7 @@ const (
 	PgDatabaseSetting            = "PGDATABASE"
 	PgSslModeSetting             = "PGSSLMODE"
 	PgSlotName                   = "WALG_SLOTNAME"
+	PgWalSize                    = "WALG_PG_WAL_SIZE"
 	TotalBgUploadedLimit         = "TOTAL_BG_UPLOADED_LIMIT"
 	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
 	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
@@ -118,6 +119,7 @@ var (
 		OplogArchiveTimeoutInterval:    "60s",
 		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
 		MongoDBLastWriteUpdateInterval: "3s",
+		PgWalSize:                      "16",
 		OplogPushStatsLoggingInterval:  "30s",
 		OplogPushStatsUpdateInterval:   "30s",
 		OplogPushWaitForBecomePrimary:  "false",
@@ -163,6 +165,7 @@ var (
 		PgDatabaseSetting: true,
 		PgSslModeSetting:  true,
 		PgSlotName:        true,
+		PgWalSize:         true,
 		"PGPASSFILE":      true,
 
 		// Swift
