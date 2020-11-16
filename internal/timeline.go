@@ -14,7 +14,7 @@ type BytesPerWalSegmentError struct {
 }
 
 func newBytesPerWalSegmentError() BytesPerWalSegmentError {
-	return BytesPerWalSegmentError{errors.New("bytes_per_wal_segment of the server does not match expected value")}
+	return BytesPerWalSegmentError{errors.New("bytes_per_wal_segment of the server does not match expected value, you may need to set WALG_PG_WAL_SIZE")}
 }
 
 func (err BytesPerWalSegmentError) Error() string {
