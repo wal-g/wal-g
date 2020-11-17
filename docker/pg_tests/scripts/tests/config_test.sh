@@ -33,7 +33,7 @@ pkill -9 postgres
 
 rm -rf "${PGDATA}"
 
-wal-g --config=${TMP_CONFIG} backup-fetch "${PGDATA}" LATEST
+wal-g --config=${TMP_CONFIG} --turbo backup-fetch "${PGDATA}" LATEST
 
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" > "${PGDATA}"/recovery.conf
 

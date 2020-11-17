@@ -36,7 +36,7 @@ NAME=$(wal-g backup-push --config=/root/conf.yaml 2>&1 | grep -oe 'stream_[0-9]*
 
 mysql_kill_and_clean_data
 
-wal-g backup-fetch "$NAME" --config=/root/conf.yaml --turbo
+wal-g backup-fetch "$NAME" --config=/root/conf.yaml
 
 chown -R mysql:mysql "$MYSQLDATA"
 service mysql start || (cat /var/log/mysql/error.log && false)
