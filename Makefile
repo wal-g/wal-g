@@ -11,6 +11,7 @@ TEST_FILES = $(wildcard test/*.go testtools/*.go)
 PKG := github.com/wal-g/wal-g
 COVERAGE_FILE := coverage.out
 TEST := "pg_tests"
+MYSQL_TEST := "mysql_tests"
 
 MONGO_MAJOR ?= "4.2"
 MONGO_VERSION ?= "4.2.8"
@@ -89,8 +90,8 @@ load_docker_common:
 	fi
 
 mysql_integration_test: load_docker_common
-	docker-compose build mysql mysql_tests
-	docker-compose up --exit-code-from mysql_tests mysql_tests
+	docker-compose build mysql $(MYSQL_TEST)
+	docker-compose up --exit-code-from $(MYSQL_TEST) $(MYSQL_TEST)
 
 mysql_clean:
 	(cd $(MAIN_MYSQL_PATH) && go clean)

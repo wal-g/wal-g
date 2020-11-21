@@ -78,14 +78,14 @@ func GetBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage 
 		return nil, nil, err
 	}
 
-	sortTimes := getBackupTimeSlices(backupObjects)
-	garbage = getGarbageFromPrefix(subFolders, sortTimes)
+	sortTimes := BackupTimeSlices(backupObjects)
+	garbage = GarbageFromPrefix(subFolders, sortTimes)
 
 	return sortTimes, garbage, nil
 }
 
 // TODO : unit tests
-func getBackupTimeSlices(backups []storage.Object) []BackupTime {
+func BackupTimeSlices(backups []storage.Object) []BackupTime {
 	sortTimes := make([]BackupTime, len(backups))
 	for i, object := range backups {
 		key := object.GetName()
@@ -102,7 +102,7 @@ func getBackupTimeSlices(backups []storage.Object) []BackupTime {
 }
 
 // TODO : unit tests
-func getGarbageFromPrefix(folders []storage.Folder, nonGarbage []BackupTime) []string {
+func GarbageFromPrefix(folders []storage.Folder, nonGarbage []BackupTime) []string {
 	garbage := make([]string, 0)
 	var keyFilter = make(map[string]string)
 	for _, k := range nonGarbage {
@@ -255,6 +255,45 @@ func FindTarget(folder storage.Folder,
 	}
 	return nil, nil
 }
+func FindTargetsInFolder(folder storage.Folder,
+	compare func(object1, object2 storage.Object) bool,
+	isTarget func(object storage.Object) bool) ([]storage.Object, error) {
+
+	objects, _, err := folder.ListFolder()
+	if err != nil {
+		return nil, err
+	}
+	
+	sort.Slice(objects, func(i, j int) bool {
+		return compare(objects[i], objects[j])
+	})
+	var ret []storage.Object
+
+	for _, object := range objects {
+		if isTarget(object) {
+			ret = append(ret, object)
+		}
+	}
+	return ret, nil
+}
+
+func FindTargets(folder storage.Folder,
+	filter func(object storage.Object) bool) ([]storage.Object, error) {
+
+	objects, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
+	if err != nil {
+		return nil, err
+	}
+
+	var ret []storage.Object
+
+	for _, object := range objects {
+		if filter(object) {
+			ret = append(ret, object)
+		}
+	}
+	return ret, nil
+}
 
 func getBeforeChoiceFunc(name string, modifier int,
 	isFullBackup func(object storage.Object) bool) func(object storage.Object) bool {
@@ -349,11 +388,12 @@ func DeleteBeforeTarget(folder storage.Folder, target storage.Object,
 func DeleteTarget(folder storage.Folder, target storage.Object,
 	confirmed bool,
 	isFullBackup func(object storage.Object) bool) error {
-
-	if !isFullBackup(target) {
-		errorMessage := "%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
-		return utility.NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
-	}
+	tracelog.InfoLogger.Println("!!%a", target)
+	//if !isFullBackup(target) {
+	//	errorMessage := "%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
+	//	return utility.NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
+	//}
+	//
 	tracelog.InfoLogger.Println("Start delete")
 	return storage.DeleteObjectsWhere(folder, confirmed, func(object storage.Object) bool {
 		return object.GetName() == target.GetName()
@@ -589,8 +629,8 @@ func deleteArgsValidator(cmd *cobra.Command, args, stringModifiers []string, min
 	return nil
 }
 
-func HandleDeleteTargetBackup(folder storage.Folder, target storage.Object, confirmed bool, isFullBackup func(folder storage.Folder, object storage.Object) bool) error {
+func HandleDeleteTarget(folder storage.Folder, target storage.Object, confirmed bool) error {
 	return DeleteTarget(folder, target, confirmed, func(object storage.Object) bool {
-		return isFullBackup(folder, object)
+		return true
 	})
 }

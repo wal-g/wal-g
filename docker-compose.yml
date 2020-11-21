@@ -438,7 +438,24 @@ services:
     links:
       - s3
       - s3-another
-
+  
+  mysql_delete_end_to_end_tests:
+    build:
+      dockerfile: docker/mysql_tests/Dockerfile_mysql_delete_end_to_end
+      context: .
+    security_opt:
+      - seccomp:unconfined
+    image: wal-g/mysql_tests
+    container_name: wal-g_mysql_tests
+    env_file:
+      - docker/common/common_walg.env
+    depends_on:
+      - s3
+      - s3-another
+    links:
+      - s3
+      - s3-another
+  
   mariadb:
     build:
       dockerfile: docker/mariadb/Dockerfile

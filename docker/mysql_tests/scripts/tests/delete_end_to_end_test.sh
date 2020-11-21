@@ -63,7 +63,7 @@ mysql -e "FLUSH LOGS"
 wal-g binlog-push
 sleep 1
 
-mysqldump sbtest > /tmp/dump_2.sql
+mysqldump sbtest > /tmp/dump_4.sql
 test "5" -eq "$(wal-g backup-list | wc -l)"
 FOURTH_BACKUP=$(wal-g backup-list | awk 'NR==5{print $1}')
 DT4=$(date3339)
@@ -87,7 +87,7 @@ diff -u /tmp/dump_2.sql /tmp/dump_2_restored.sql
 
 
 # delete second backup
-wal-g delete retain 1 --confirm
+wal-g delete retain 2 --confirm
 test "3" -eq "$(wal-g backup-list | wc -l)"
 
 
@@ -103,6 +103,7 @@ diff -u /tmp/dump_3.sql /tmp/dump_3_restored.sql
 
 # delete third backup
 wal-g delete target "$THIRD_BACKUP" --confirm
+wal-g backup-list
 test "2" -eq "$(wal-g backup-list | wc -l)"
 
 # test restore fourth backup

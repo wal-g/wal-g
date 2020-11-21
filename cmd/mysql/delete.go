@@ -80,17 +80,22 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	targetObj, err := internal.FindTarget(folder,
+	folder = folder.GetSubFolder(mysql.BinlogPath)
+
+	targetObj, err := internal.FindTargetsInFolder(folder,
 		func(object1, object2 storage.Object) bool {
 			return false
 		},
 		func(object storage.Object) bool {
-			return object.GetName() == target
+			return strings.Contains(object.GetName(), target)
 		})
 
 	tracelog.ErrorLogger.FatalOnError(err)
+	tracelog.InfoLogger.Printf("!!!!!!!!!!!!%s\n", targetObj)
 
-	tracelog.ErrorLogger.FatalOnError(internal.HandleDeleteTargetBackup(folder, targetObj, confirmed, IsFullBackup))
+	for _, t := range targetObj {
+		tracelog.ErrorLogger.FatalOnError(internal.HandleDeleteTarget(folder, t, confirmed))
+	}
 }
 
 func init() {
