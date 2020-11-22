@@ -3,6 +3,7 @@ package mysql
 import (
 	"fmt"
 	"path"
+	"regexp"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -14,6 +15,9 @@ import (
 )
 
 var confirmed = false
+
+const DeleteBinlogUsage =  "delete"
+const DeleteTargetVBackupUsage = "target-delete"
 
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
@@ -49,8 +53,8 @@ var (
 	MatchExact  = false
 )
 
-var deleteTargetCmd = &cobra.Command{
-	Use:     internal.DeleteTargetUsageExample, // TODO : improve description
+var deleteTargetBackupCmd = &cobra.Command{
+	Use:     "target-delete", // TODO : improve description
 	Example: internal.DeleteTargetExamples,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if err := internal.DeleteTargetArgsValidator(cmd, args); err != nil {
@@ -62,15 +66,40 @@ var deleteTargetCmd = &cobra.Command{
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		if MatchPrefix {
-			runDeleteTargets(cmd, args, func(object storage.Object, target string) bool {
-				return strings.HasPrefix(object.GetName(), target)
-			})
-		} else if MatchExact {
-			runDeleteTargets(cmd, args, func(object storage.Object, target string) bool {
-				return object.GetName() == target
-			})
+
+		folder, err := internal.ConfigureFolder()
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		target := args[0]
+
+		tracelog.ErrorLogger.FatalOnError(fmt.Errorf("delete target backup: failed due %v", runDeleteTargetBackups(folder, target)))
+	},
+}
+
+var deleteBinlogCmd = &cobra.Command{
+	Use:   DeleteBinlogUsage, // TODO : improve description
+	Args: func(cmd *cobra.Command, args []string) error {
+		if err := internal.DeleteTargetArgsValidator(cmd, args); err != nil {
+			return err
 		}
+		if MatchExact && MatchPrefix {
+			return fmt.Errorf("expected to get either match exact nor match prefix, but never both")
+		}
+		return nil
+	},
+
+	Run: func(cmd *cobra.Command, args []string) {
+
+		folder, err := internal.ConfigureFolder()
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		regex := args[0]
+		r, err := regexp.Compile(regex)
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		tracelog.ErrorLogger.FatalOnError(fmt.Errorf("delete target backup: failed due %v", runDeleteBinlogs(folder, func(name string) bool {
+			return r.MatchString(name)
+		})))
 	},
 }
 
@@ -98,48 +127,34 @@ func runDeleteRetain(_ *cobra.Command, args []string) {
 	internal.HandleDeleteRetain(folder, args, confirmed, isFullBackup, GetLessFunc(folder))
 }
 
-func runDeleteTargets(_ *cobra.Command, args []string, filter func(object storage.Object, target string) bool) {
-	target := args[0]
-
-	folder, err := internal.ConfigureFolder()
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	targets := make([]storage.Object, 0, 0)
-
-	for _, e := range []string{
-		mysql.BinlogPath,
-		utility.BaseBackupPath,
-	} {
-		targetsCurr, err := internal.FindTargets(folder.GetSubFolder(e), func(object storage.Object) bool {
-			return filter(object, target)
-		})
-		tracelog.ErrorLogger.FatalOnError(err)
-		targets = append(targets, targetsCurr...)
+func runDeleteTargetBackups(folder storage.Folder, name string) error {
+	b, err := internal.BackupByName(name, utility.BaseBackupPath, folder)
+	if err != nil {
+		return err
 	}
-
-	nameMp := make(map[string]bool)
-	for _, e := range targets {
-		nameMp[e.GetName()] = true
-	}
-	for _, e := range []string{
-		mysql.BinlogPath,
-		utility.BaseBackupPath,
-	} {
-		tracelog.ErrorLogger.FatalOnError(internal.DeleteTargets(folder.GetSubFolder(e), func(object storage.Object) bool {
-			if v, ok := nameMp[object.GetName()]; v && ok {
-				return true
-			}
-			return false
-		}, confirmed))
-	}
+	return b.Delete(confirmed)
 }
 
-func init() {
-	Cmd.AddCommand(deleteCmd)
-	deleteTargetCmd.Flags().BoolVarP(&MatchExact, "match-exact", "e", false, "")
-	deleteTargetCmd.Flags().BoolVarP(&MatchPrefix, "match-prefix", "p", false, "")
-	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd, deleteTargetCmd)
-	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
+
+func runDeleteBinlogs(folder storage.Folder, filter func(name string) bool) error {
+
+	mp := make(map[string]struct{})
+
+	targets, err := internal.FindTargets(folder.GetSubFolder(mysql.BinlogPath), func(object storage.Object) bool {
+		return filter(object.GetName())
+	})
+	tracelog.ErrorLogger.FatalOnError(err)
+	for _, e := range targets {
+		mp[e.GetName()] = struct{}{}
+	}
+
+	return internal.DeleteTargets(folder.GetSubFolder(
+		utility.BaseBackupPath), func(object storage.Object) bool {
+		if _, ok := mp[object.GetName()]; ok {
+			return true
+		}
+		return false
+	}, confirmed)
 }
 
 func IsFullBackup() bool {
@@ -188,4 +203,21 @@ func tryFetchBinlogName(folder storage.Folder, object storage.Object) (string, b
 		return "", false
 	}
 	return sentinel.BinLogStart, true
+}
+
+
+
+func init() {
+	Cmd.AddCommand(deleteCmd)
+
+	deleteTargetBackupCmd.Flags().BoolVarP(&MatchExact, "match-exact", "e", false, "")
+	deleteTargetBackupCmd.Flags().BoolVarP(&MatchPrefix, "match-prefix", "p", false, "")
+
+	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd)
+	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
+
+	backupCmd.AddCommand(deleteTargetBackupCmd)
+	deleteTargetBackupCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
+
+	binlogCmd.AddCommand(deleteBinlogCmd)
 }

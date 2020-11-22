@@ -51,29 +51,29 @@ func NewBackup(baseBackupFolder storage.Folder, name string) *Backup {
 	return &Backup{baseBackupFolder, name, nil}
 }
 
-// GetStopSentinelPath returns sentinel path.
-func (backup *Backup) GetStopSentinelPath() string {
-	return SentinelNameFromBackup(backup.Name)
+// StopSentinelPath returns sentinel path.
+func (b *Backup) StopSentinelPath() string {
+	return SentinelNameFromBackup(b.Name)
 }
 
-func (backup *Backup) getMetadataPath() string {
-	return backup.Name + "/" + utility.MetadataFileName
+func (b *Backup) MetadataPath() string {
+	return b.Name + "/" + utility.MetadataFileName
 }
 
-func (backup *Backup) getTarPartitionFolder() storage.Folder {
-	return backup.BaseBackupFolder.GetSubFolder(backup.Name + TarPartitionFolderName)
+func (b *Backup) TarPartitionFolder() storage.Folder {
+	return b.BaseBackupFolder.GetSubFolder(b.Name + TarPartitionFolderName)
 }
 
 // CheckExistence checks that the specified backup exists.
-func (backup *Backup) CheckExistence() (bool, error) {
-	return backup.BaseBackupFolder.Exists(backup.GetStopSentinelPath())
+func (b *Backup) CheckExistence() (bool, error) {
+	return b.BaseBackupFolder.Exists(b.StopSentinelPath())
 }
 
-func (backup *Backup) GetTarNames() ([]string, error) {
-	tarPartitionFolder := backup.getTarPartitionFolder()
+func (b *Backup) TarNames() ([]string, error) {
+	tarPartitionFolder := b.TarPartitionFolder()
 	objects, _, err := tarPartitionFolder.ListFolder()
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to list backup '%s' for deletion", backup.Name)
+		return nil, errors.Wrapf(err, "unable to list b '%s' for deletion", b.Name)
 	}
 	result := make([]string, len(objects))
 	for id, object := range objects {
@@ -82,12 +82,12 @@ func (backup *Backup) GetTarNames() ([]string, error) {
 	return result, nil
 }
 
-func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
-	if backup.SentinelDto != nil {
-		return *backup.SentinelDto, nil
+func (b *Backup) Sentinel() (BackupSentinelDto, error) {
+	if b.SentinelDto != nil {
+		return *b.SentinelDto, nil
 	}
 	sentinelDto := BackupSentinelDto{}
-	sentinelDtoData, err := backup.fetchSentinelData()
+	sentinelDtoData, err := b.fetchSentinelData()
 	if err != nil {
 		return sentinelDto, err
 	}
@@ -96,13 +96,13 @@ func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
 	if err != nil {
 		return sentinelDto, errors.Wrap(err, "failed to unmarshal sentinel")
 	}
-	backup.SentinelDto = &sentinelDto
+	b.SentinelDto = &sentinelDto
 	return sentinelDto, nil
 }
 
 // TODO : unit tests
-func (backup *Backup) fetchSentinelData() ([]byte, error) {
-	backupReaderMaker := newStorageReaderMaker(backup.BaseBackupFolder, backup.GetStopSentinelPath())
+func (b *Backup) fetchSentinelData() ([]byte, error) {
+	backupReaderMaker := NewStorageReaderMaker(b.BaseBackupFolder, b.StopSentinelPath())
 	backupReader, err := backupReaderMaker.Reader()
 	if err != nil {
 		return make([]byte, 0), err
@@ -114,9 +114,9 @@ func (backup *Backup) fetchSentinelData() ([]byte, error) {
 	return sentinelDtoData, nil
 }
 
-func (backup *Backup) fetchMeta() (ExtendedMetadataDto, error) {
+func (b *Backup) FetchMeta() (ExtendedMetadataDto, error) {
 	extendedMetadataDto := ExtendedMetadataDto{}
-	backupReaderMaker := newStorageReaderMaker(backup.BaseBackupFolder, backup.getMetadataPath())
+	backupReaderMaker := NewStorageReaderMaker(b.BaseBackupFolder, b.MetadataPath())
 	backupReader, err := backupReaderMaker.Reader()
 	if err != nil {
 		return extendedMetadataDto, err
@@ -189,7 +189,7 @@ func setTablespacePaths(spec TablespaceSpec) error {
 }
 
 // check that directory is empty before unwrap
-func (backup *Backup) unwrapToEmptyDirectory(
+func (b *Backup) unwrapToEmptyDirectory(
 	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
 ) error {
 	err := checkDbDirectoryForUnwrap(dbDataDirectory, sentinelDto)
@@ -197,22 +197,22 @@ func (backup *Backup) unwrapToEmptyDirectory(
 		return err
 	}
 
-	return backup.unwrapOld(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
+	return b.unwrapOld(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
 }
 
 // TODO : unit tests
 // Do the job of unpacking Backup object
-func (backup *Backup) unwrapOld(
+func (b *Backup) unwrapOld(
 	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
 ) error {
 	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
-	tarsToExtract, pgControlKey, err := backup.getTarsToExtract(sentinelDto, filesToUnwrap, false)
+	tarsToExtract, pgControlKey, err := b.TarsToExtract(sentinelDto, filesToUnwrap, false)
 	if err != nil {
 		return err
 	}
 
-	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of backup.
-	needPgControl := IsPgControlRequired(backup, sentinelDto)
+	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of b.
+	needPgControl := IsPgControlRequired(b, sentinelDto)
 
 	if pgControlKey == "" && needPgControl {
 		return newPgControlNotFoundError()
@@ -224,7 +224,7 @@ func (backup *Backup) unwrapOld(
 	}
 
 	if needPgControl {
-		err = ExtractAll(tarInterpreter, []ReaderMaker{newStorageReaderMaker(backup.getTarPartitionFolder(), pgControlKey)})
+		err = ExtractAll(tarInterpreter, []ReaderMaker{NewStorageReaderMaker(b.TarPartitionFolder(), pgControlKey)})
 		if err != nil {
 			return errors.Wrap(err, "failed to extract pg_control")
 		}
@@ -256,8 +256,8 @@ func isDirectoryEmpty(directoryPath string) (bool, error) {
 }
 
 // TODO : init tests
-func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, skipRedundantTars bool) (tarsToExtract []ReaderMaker, pgControlKey string, err error) {
-	tarNames, err := backup.GetTarNames()
+func (b *Backup) TarsToExtract(sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, skipRedundantTars bool) (tarsToExtract []ReaderMaker, pgControlKey string, err error) {
+	tarNames, err := b.TarNames()
 	if err != nil {
 		return nil, "", err
 	}
@@ -268,8 +268,8 @@ func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnw
 	for _, tarName := range tarNames {
 		// Separate the pg_control tarName from the others to
 		// extract it at the end, as to prevent server startup
-		// with incomplete backup restoration.  But only if it
-		// exists: it won't in the case of WAL-E backup
+		// with incomplete b restoration.  But only if it
+		// exists: it won't in the case of WAL-E b
 		// backwards compatibility.
 		if pgControlRe.MatchString(tarName) {
 			if pgControlKey != "" {
@@ -283,18 +283,18 @@ func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnw
 			continue
 		}
 
-		tarToExtract := newStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
+		tarToExtract := NewStorageReaderMaker(b.TarPartitionFolder(), tarName)
 		tarsToExtract = append(tarsToExtract, tarToExtract)
 	}
 	return
 }
 
-func (backup *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error) {
-	sentinelDto, err := backup.GetSentinel()
+func (b *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error) {
+	sentinelDto, err := b.Sentinel()
 	if err != nil {
 		return nil, err
 	}
-	if sentinelDto.Files == nil { // in case of WAL-E of old WAL-G backup
+	if sentinelDto.Files == nil { // in case of WAL-E of old WAL-G b
 		return UnwrapAll, nil
 	}
 	filesToUnwrap := make(map[string]bool)
@@ -325,7 +325,7 @@ func shouldUnwrapTar(tarName string, sentinelDto BackupSentinelDto, filesToUnwra
 }
 
 func GetLastWalFilename(backup *Backup) (string, error) {
-	meta, err := backup.fetchMeta()
+	meta, err := backup.FetchMeta()
 	if err != nil {
 		tracelog.InfoLogger.Print("No meta found.")
 		return "", err
@@ -337,4 +337,20 @@ func GetLastWalFilename(backup *Backup) (string, error) {
 	}
 	endWalSegmentNo := newWalSegmentNo(meta.FinishLsn - 1)
 	return endWalSegmentNo.getFilename(timelineId), nil
+}
+
+func (b *Backup) Delete(confirmed bool) error {
+	objects := make(map[string]struct{})
+
+	/* delete backup */
+	objects[b.Name] = struct{}{}
+	/* delete sentinel for this backup */
+	objects[SentinelNameFromBackup(b.Name)] = struct{}{}
+	/* delete meta for backup */
+	objects[b.MetadataPath()] = struct{}{}
+
+	return storage.DeleteObjectsWhere(b.BaseBackupFolder, confirmed, func(object1 storage.Object) bool {
+		_, ok := objects[object1.GetName()]
+		return ok
+	})
 }

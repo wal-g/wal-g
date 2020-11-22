@@ -102,7 +102,7 @@ mysqldump sbtest > /tmp/dump_3_restored.sql
 diff -u /tmp/dump_3.sql /tmp/dump_3_restored.sql
 
 # delete third backup
-wal-g delete target "$THIRD_BACKUP" --confirm
+wal-g delete target --match-exact "$THIRD_BACKUP" --confirm
 wal-g backup-list
 test "2" -eq "$(wal-g backup-list | wc -l)"
 

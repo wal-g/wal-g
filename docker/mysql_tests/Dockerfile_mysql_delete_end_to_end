@@ -24,4 +24,4 @@ RUN mkdir /root/testtools
 
 COPY docker/mysql_tests/scripts/ /tmp
 
-CMD /tmp/tests/delete_end_to_end_test.sh
+CMD /tmp/splitted-tests/delete_end_to_end_test.sh

@@ -23,7 +23,7 @@ func HandleLogRestore(backupName string, untilTs string, dbnames []string, noRec
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	backup, err := internal.BackupByName(backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	sentinel := new(SentinelDto)

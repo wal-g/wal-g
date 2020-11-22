@@ -112,7 +112,7 @@ func (uploader *Uploader) Upload(path string, content io.Reader) error {
 // UploadMultiple uploads multiple objects from the start of the slice,
 // returning the first error if any. Note that this operation is not atomic
 // TODO : unit tests
-func (uploader *Uploader) uploadMultiple(objects []UploadObject) error {
+func (uploader *Uploader) UploadMultiple(objects []UploadObject) error {
 	for _, object := range objects {
 		err := uploader.Upload(object.Path, object.Content)
 		if err != nil {

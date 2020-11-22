@@ -108,7 +108,10 @@ func HandleListAll(folder storage.Folder) error {
 	}
 
 	writer := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-	defer func() { _ = writer.Flush() }()
+	defer func() {
+		_ = writer.Flush()
+	}()
+
 	_, err = fmt.Fprintln(writer, "name\tlast_modified")
 	if err != nil {
 		return err

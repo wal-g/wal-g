@@ -65,7 +65,7 @@ func checkDbDirectoryForUnwrapNew(dbDataDirectory string, sentinelDto BackupSent
 
 // TODO : unit tests
 // Do the job of unpacking Backup object
-func (backup *Backup) unwrapNew(
+func (b *Backup) unwrapNew(
 	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool,
 	createIncrementalFiles, skipRedundantTars bool) (*UnwrapResult, error) {
 	useNewUnwrapImplementation = true
@@ -75,13 +75,13 @@ func (backup *Backup) unwrapNew(
 	}
 
 	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
-	tarsToExtract, pgControlKey, err := backup.getTarsToExtract(sentinelDto, filesToUnwrap, skipRedundantTars)
+	tarsToExtract, pgControlKey, err := b.TarsToExtract(sentinelDto, filesToUnwrap, skipRedundantTars)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of backup.
-	needPgControl := IsPgControlRequired(backup, sentinelDto)
+	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of b.
+	needPgControl := IsPgControlRequired(b, sentinelDto)
 
 	if pgControlKey == "" && needPgControl {
 		return nil, newPgControlNotFoundError()
@@ -89,8 +89,8 @@ func (backup *Backup) unwrapNew(
 
 	err = ExtractAll(tarInterpreter, tarsToExtract)
 	if _, ok := err.(NoFilesToExtractError); ok {
-		// in case of no tars to extract, just ignore this backup and proceed to the next
-		tracelog.InfoLogger.Println("Skipping backup: no useful files found.")
+		// in case of no tars to extract, just ignore this b and proceed to the next
+		tracelog.InfoLogger.Println("Skipping b: no useful files found.")
 		return tarInterpreter.UnwrapResult, nil
 	}
 	if err != nil {
@@ -98,7 +98,7 @@ func (backup *Backup) unwrapNew(
 	}
 
 	if needPgControl {
-		err = ExtractAll(tarInterpreter, []ReaderMaker{newStorageReaderMaker(backup.getTarPartitionFolder(), pgControlKey)})
+		err = ExtractAll(tarInterpreter, []ReaderMaker{NewStorageReaderMaker(b.TarPartitionFolder(), pgControlKey)})
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to extract pg_control")
 		}

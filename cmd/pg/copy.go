@@ -25,6 +25,11 @@ const (
 	withoutHistoryFlag        = "without-history"
 	withoutHistoryShorthand   = "w"
 	withoutHistoryDescription = "Copy backup without history"
+
+	overwriteFlag         = "force-overwrite"
+	overwriteSDescription = "force overwrite when copying files"
+	overwriteShorthand        = "z"
+
 )
 
 var (
@@ -32,6 +37,7 @@ var (
 	fromConfigFile string
 	toConfigFile   string
 	withoutHistory = false
+	forceOverrite = false
 
 	backupCopyCmd = &cobra.Command{
 		Use:   backupCopyUsage,
@@ -43,7 +49,7 @@ var (
 )
 
 func runBackupCopy(cmd *cobra.Command, args []string) {
-	postgres.HandleCopy(fromConfigFile, toConfigFile, backupName, withoutHistory)
+	postgres.HandleCopy(fromConfigFile, toConfigFile, backupName, withoutHistory, forceOverrite)
 }
 
 func init() {
@@ -51,8 +57,11 @@ func init() {
 
 	backupCopyCmd.Flags().StringVarP(&backupName, backupNameFlag, backupNameShorthand, "", backupNameDescription)
 	backupCopyCmd.Flags().StringVarP(&toConfigFile, toFlag, toShorthand, "", toDescription)
+
 	backupCopyCmd.Flags().StringVarP(&fromConfigFile, fromFlag, fromShorthand, "", fromDescription)
+
 	backupCopyCmd.Flags().BoolVarP(&withoutHistory, withoutHistoryFlag, withoutHistoryShorthand, false, withoutHistoryDescription)
+	backupCopyCmd.Flags().BoolVarP(&forceOverrite, overwriteFlag, overwriteShorthand, false, overwriteSDescription)
 
 	backupCopyCmd.MarkFlagFilename(toConfigFile)
 	backupCopyCmd.MarkFlagFilename(fromConfigFile)

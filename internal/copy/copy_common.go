@@ -1,6 +1,8 @@
 package copy
 
 import (
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/wal-g/storages/storage"
@@ -83,9 +85,26 @@ var NoopRenameFunc = func(o storage.Object) string {
 }
 
 func BuildCopyingInfos(from storage.Folder, to storage.Folder, objects []storage.Object,
-	condition func(storage.Object) bool, renameFunc func(object storage.Object) string) (infos []InfoProvider) {
+	condition func(storage.Object) bool, renameFunc func(object storage.Object) string, forceOverrite bool) (infos []InfoProvider) {
+
+	sort.Slice(objects, func(i, j int) bool {
+		// sort files in the order that guarantees that sentinel would be uploaded strictly after backup
+		if strings.Contains(objects[i].GetName(), "json") {
+			return false
+		}
+		if strings.Contains(objects[j].GetName(), "json") {
+			return false
+		}
+
+		return objects[i].GetName() < objects[j].GetName()
+	})
+
 	for _, object := range objects {
 		if condition(object) {
+			if exits, err := to.Exists(object.GetName()); !forceOverrite && exits && err == nil {
+				// do not overwrite files, if not explicitly requested to
+				continue
+			}
 			infos = append(infos, InfoProvider{
 				From:       from,
 				To:         to,

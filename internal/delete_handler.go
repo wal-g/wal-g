@@ -261,7 +261,7 @@ func FindTarget(folder storage.Folder,
 func FindTargets(folder storage.Folder,
 	filter func(object storage.Object) bool) ([]storage.Object, error) {
 
-	objects, _, err := folder.ListFolder()
+	objects, err := storage.ListFolderRecursively(folder)
 	if err != nil {
 		return nil, err
 	}
@@ -382,12 +382,12 @@ func PermanentObjects(folder storage.Folder) (map[string]bool, map[string]bool) 
 	permanentBackups := map[string]bool{}
 	permanentWals := map[string]bool{}
 	for _, backupTime := range backupTimes {
-		backup, err := GetBackupByName(backupTime.BackupName, utility.BaseBackupPath, folder)
+		backup, err := BackupByName(backupTime.BackupName, utility.BaseBackupPath, folder)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("failed to get backup by name with error %s, ignoring...", err.Error())
 			continue
 		}
-		meta, err := backup.fetchMeta()
+		meta, err := backup.FetchMeta()
 		if err != nil {
 			tracelog.ErrorLogger.Printf("failed to fetch backup meta for backup %s with error %s, ignoring...", backupTime.BackupName, err.Error())
 			continue

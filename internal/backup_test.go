@@ -85,7 +85,7 @@ func TestCheckExistenceWhenBackupNotExists(t *testing.T) {
 func TestGetTarNames(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
 	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_456")
-	tarNames, err := backup.GetTarNames()
+	tarNames, err := backup.TarNames()
 	assert.NoError(t, err)
 	assert.ElementsMatch(t, []string{"1", "2", "3"}, tarNames)
 }
@@ -93,7 +93,7 @@ func TestGetTarNames(t *testing.T) {
 func TestIsPgControlRequired(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
 	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_456")
-	dto, err := backup.GetSentinel()
+	dto, err := backup.Sentinel()
 	assert.NoError(t, err)
 	assert.True(t, internal.IsPgControlRequired(backup, dto))
 }
@@ -111,7 +111,7 @@ func TestFetchSentinel(t *testing.T) {
 	_ = folder.PutObject("base_789454598_backup_stop_sentinel.json", bytes.NewReader(expectedSentinelJson))
 	backup := internal.NewBackup(folder, "base_789454598")
 
-	actualSentinel, err := backup.GetSentinel()
+	actualSentinel, err := backup.Sentinel()
 
 	assert.NoError(t, err)
 	assert.Equal(t, expectedSentinel, actualSentinel)
@@ -121,7 +121,7 @@ func TestFetchSentinelReturnErrorWhenSentinelNotExist(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
 	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_78934085033849")
 
-	_, err := backup.GetSentinel()
+	_, err := backup.Sentinel()
 
 	assert.Error(t, err)
 }
@@ -131,7 +131,7 @@ func TestFetchSentinelReturnErrorWhenSentinelUnmarshallable(t *testing.T) {
 	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_000")
 	errorMessage := "failed to unmarshal sentinel"
 
-	_, err := backup.GetSentinel()
+	_, err := backup.Sentinel()
 
 	assert.Error(t, err)
 	assert.Equal(t, errorMessage, err.Error()[:len(errorMessage)])

@@ -9,7 +9,7 @@ import (
 )
 
 func HandleBackupFetch(folder storage.Folder, backupName string, restoreCmd *exec.Cmd, prepareCmd *exec.Cmd) {
-	internal.HandleBackupFetch(folder, backupName, internal.GetCommandStreamFetcher(restoreCmd))
+	internal.HandleBackupFetch(folder, backupName, internal.CommandStreamFetcher(restoreCmd))
 	if prepareCmd != nil {
 		err := prepareCmd.Run()
 		tracelog.ErrorLogger.FatalfOnError("failed to prepare fetched backup: %v", err)

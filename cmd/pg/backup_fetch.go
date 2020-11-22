@@ -37,7 +37,7 @@ var backupFetchCmd = &cobra.Command{
 		if reverseDeltaUnpack {
 			pgFetcher = internal.GetPgFetcherNew(args[0], fileMask, restoreSpec, skipRedundantTars)
 		} else {
-			pgFetcher = internal.GetPgFetcherOld(args[0], fileMask, restoreSpec)
+			pgFetcher = internal.PgFetcherOld(args[0], fileMask, restoreSpec)
 		}
 
 		internal.HandleBackupFetch(folder, args[1], pgFetcher)

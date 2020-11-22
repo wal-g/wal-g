@@ -12,7 +12,6 @@ PKG := github.com/wal-g/wal-g
 COVERAGE_FILE := coverage.out
 TEST := "pg_tests"
 MYSQL_TEST := "mysql_tests"
-
 MONGO_MAJOR ?= "4.2"
 MONGO_VERSION ?= "4.2.8"
 
@@ -72,6 +71,7 @@ pg_clean:
 pg_install: pg_build
 	mv $(MAIN_PG_PATH)/wal-g $(GOBIN)/wal-g
 
+mysql_base: install deps mysql_build lint unlink_brotli
 mysql_test: install deps mysql_build lint unlink_brotli mysql_integration_test
 
 mysql_build: $(CMD_FILES) $(PKG_FILES)
