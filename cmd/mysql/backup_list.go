@@ -7,6 +7,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"io"
 	"os"
 	"sort"
 	"text/tabwriter"
@@ -18,26 +19,36 @@ const backupListShortDescription = "Prints available backups"
 var (
 	listAll = false
 )
-//func MysqlHandleBackupList(folder storage.Folder) {
-//	getBackupsFunc := func() ([]internal.BackupTime, error) {
-//		return internal.getBackups(folder)
-//	}
-//	writeBackupListFunc := func(backups []internal.BackupTime) {
-//		internal.WriteBackupList(backups, os.Stdout)
-//	}
-//	logging := Logging{
-//		InfoLogger:  tracelog.InfoLogger,
-//		ErrorLogger: tracelog.ErrorLogger,
-//	}
-//
-//	HandleBackupList(getBackupsFunc, writeBackupListFunc, logging)
-//}
 
-func MysqlHandleBackupList(folder storage.Folder) {
+// TODO : unit tests
+func WriteBackupList(backups []internal.BackupTime, output io.Writer) {
+	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
+	defer func() {
+		_ = writer.Flush()
+	}()
 
+	_, _ = fmt.Fprintln(writer, "name\tlast_modified\twal_segment_backup_start")
+	for i := len(backups) - 1; i >= 0; i-- {
+		b := backups[i]
+		_, _ = fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v", b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName))
+	}
 }
 
+func HandleBackupList(folder storage.Folder) {
+	getBackupsFunc := func() ([]internal.BackupTime, error) {
+		return internal.Backups(folder)
+	}
+	writeBackupListFunc := func(backups []internal.BackupTime) {
+		WriteBackupList(backups, os.Stdout)
+	}
 
+	logging := internal.Logging{
+		InfoLogger:  tracelog.InfoLogger,
+		ErrorLogger: tracelog.ErrorLogger,
+	}
+
+	internal.HandleBackupList(getBackupsFunc, writeBackupListFunc, logging)
+}
 
 // backupListCmd represents the backupList command
 var backupListCmd = &cobra.Command{
@@ -48,15 +59,15 @@ var backupListCmd = &cobra.Command{
 		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
 		if listAll {
-			HandleListAll(folder)
-		} else {
-			internal.DefaultHandleBackupList(folder)
+			err := HandleListAll(folder)
+			if err != nil {
+				tracelog.ErrorLogger.FatalError(err)
+			}
+			return
 		}
+
+		HandleBackupList(folder)
 	},
-}
-type BinlogsTime struct {
-	Time       time.Time `json:"time"`
-	BinlogName string    `json:"binlog_name"`
 }
 
 // Strips the backup WAL file name.
@@ -64,12 +75,13 @@ func StripBinlogsName(path string) string {
 	return path
 }
 
-func BinlogTimeSlices(backups []storage.Object) []BinlogsTime {
-	sortTimes := make([]BinlogsTime, len(backups))
+func BinlogTimeSlices(backups []storage.Object) []mysql.BinlogsTime {
+	sortTimes := make([]mysql.BinlogsTime, len(backups))
 	for i, object := range backups {
-		key := object.GetName()
-		time := object.GetLastModified()
-		sortTimes[i] = BinlogsTime{time, StripBinlogsName(key)}
+		sortTimes[i] = mysql.BinlogsTime{
+			Time:       object.GetLastModified(),
+			BinlogName: StripBinlogsName(object.GetName()),
+		}
 	}
 	sort.Slice(sortTimes, func(i, j int) bool {
 		return sortTimes[i].Time.After(sortTimes[j].Time)
@@ -78,7 +90,7 @@ func BinlogTimeSlices(backups []storage.Object) []BinlogsTime {
 }
 
 // TODO : unit tests
-func Binlogs(folder storage.Folder) (backups []BinlogsTime, garbage []string, err error) {
+func binlogs(folder storage.Folder) (backups []mysql.BinlogsTime, garbage []string, err error) {
 	binlogsObjects, _, err := folder.GetSubFolder(mysql.BinlogPath).ListFolder()
 	if err != nil {
 		return nil, nil, err
@@ -89,24 +101,39 @@ func Binlogs(folder storage.Folder) (backups []BinlogsTime, garbage []string, er
 	return sortTimes, garbage, nil
 }
 
-func HandleListAll(folder storage.Folder) {
-	ba, _, _ := internal.GetBackupsAndGarbage(folder)
+func HandleListAll(folder storage.Folder) error {
+	ba, _, err := internal.BackupsAndGarbage(folder)
+	if err != nil {
+		return err
+	}
 
 	writer := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-	defer writer.Flush()
-	fmt.Fprintln(writer, "name\tlast_modified")
+	defer func() { _ = writer.Flush() }()
+	_, err = fmt.Fprintln(writer, "name\tlast_modified")
+	if err != nil {
+		return err
+	}
+
 	for i := len(ba) - 1; i >= 0; i-- {
 		b := ba[i]
-		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t", b.BackupName, b.Time.Format(time.RFC3339)))
+		_, err = fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t", b.BackupName, b.Time.Format(time.RFC3339)))
+		if err != nil {
+			return err
+		}
 	}
 
-	bi, _, _ := Binlogs(folder)
+	bi, _, err := binlogs(folder)
+	if err != nil {
+		return err
+	}
 
-	fmt.Fprintln(writer, "\n Binlogs section \n name\tlast_modified")
+	_, _ = fmt.Fprintln(writer, "\nBinlogs section \n\nName\tlast_modified")
 	for i := len(bi) - 1; i >= 0; i-- {
 		b := bi[i]
-		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t", b.BinlogName, b.Time.Format(time.RFC3339)))
+		_, _ = fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t", b.BinlogName, b.Time.Format(time.RFC3339)))
 	}
+
+	return nil
 }
 
 func init() {

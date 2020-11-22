@@ -70,7 +70,7 @@ func runDeleteRetainAfter(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	internal.HandleDeletaRetainAfter(folder, args, confirmed, isFullBackup, GetLessFunc(folder))
+	internal.HandleDeleteRetainAfter(folder, args, confirmed, isFullBackup, GetLessFunc(folder))
 }
 
 func isFullBackup(object storage.Object) bool {

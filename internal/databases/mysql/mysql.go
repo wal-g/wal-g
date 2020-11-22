@@ -23,6 +23,11 @@ const BinlogPath = "binlog_" + utility.VersionStr + "/"
 
 const TimeMysqlFormat = "2006-01-02 15:04:05"
 
+type BinlogsTime struct {
+	Time       time.Time `json:"time"`
+	BinlogName string    `json:"binlog_name"`
+}
+
 func scanToMap(rows *sql.Rows, dst map[string]interface{}) error {
 	columns, err := rows.Columns()
 	if err != nil {

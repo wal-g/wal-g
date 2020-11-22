@@ -48,7 +48,7 @@ var MaxTime = time.Unix(1<<63-62135596801, 999999999)
 
 // TODO : unit tests
 func getLatestBackupName(folder storage.Folder) (string, error) {
-	sortTimes, err := getBackups(folder)
+	sortTimes, err := Backups(folder)
 	if err != nil {
 		return "", err
 	}
@@ -57,9 +57,9 @@ func getLatestBackupName(folder storage.Folder) (string, error) {
 }
 
 // TODO : unit tests
-// getBackups receives backup descriptions and sorts them by time
-func getBackups(folder storage.Folder) (backups []BackupTime, err error) {
-	backups, _, err = GetBackupsAndGarbage(folder)
+// Backups receives backup descriptions and sorts them by time
+func Backups(folder storage.Folder) (backups []BackupTime, err error) {
+	backups, _, err = BackupsAndGarbage(folder)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func getBackups(folder storage.Folder) (backups []BackupTime, err error) {
 }
 
 // TODO : unit tests
-func GetBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage []string, err error) {
+func BackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage []string, err error) {
 	backupObjects, subFolders, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
 	if err != nil {
 		return nil, nil, err
@@ -92,8 +92,10 @@ func BackupTimeSlices(backups []storage.Object) []BackupTime {
 		if !strings.HasSuffix(key, utility.SentinelSuffix) {
 			continue
 		}
-		time := object.GetLastModified()
-		sortTimes[i] = BackupTime{utility.StripBackupName(key), time, utility.StripWalFileName(key)}
+		sortTimes[i] = BackupTime{
+			BackupName:  utility.StripBackupName(key),
+			Time:        object.GetLastModified(),
+			WalFileName: utility.StripWalFileName(key)}
 	}
 	sort.Slice(sortTimes, func(i, j int) bool {
 		return sortTimes[i].Time.After(sortTimes[j].Time)
@@ -255,32 +257,11 @@ func FindTarget(folder storage.Folder,
 	}
 	return nil, nil
 }
-func FindTargetsInFolder(folder storage.Folder,
-	compare func(object1, object2 storage.Object) bool,
-	isTarget func(object storage.Object) bool) ([]storage.Object, error) {
-
-	objects, _, err := folder.ListFolder()
-	if err != nil {
-		return nil, err
-	}
-	
-	sort.Slice(objects, func(i, j int) bool {
-		return compare(objects[i], objects[j])
-	})
-	var ret []storage.Object
-
-	for _, object := range objects {
-		if isTarget(object) {
-			ret = append(ret, object)
-		}
-	}
-	return ret, nil
-}
 
 func FindTargets(folder storage.Folder,
 	filter func(object storage.Object) bool) ([]storage.Object, error) {
 
-	objects, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
+	objects, _, err := folder.ListFolder()
 	if err != nil {
 		return nil, err
 	}
@@ -292,6 +273,7 @@ func FindTargets(folder storage.Folder,
 			ret = append(ret, object)
 		}
 	}
+
 	return ret, nil
 }
 
@@ -356,7 +338,7 @@ func DeleteEverything(folder storage.Folder,
 	if modifier == ForceDeleteModifier {
 		forceModifier = true
 	}
-	permanentBackups, permanentWals := getPermanentObjects(folder)
+	permanentBackups, permanentWals := PermanentObjects(folder)
 	if len(permanentBackups) > 0 && !forceModifier {
 		tracelog.ErrorLogger.Fatal(fmt.Sprintf("Found permanent objects: backups=%v, wals=%v\n", permanentBackups, permanentWals))
 	}
@@ -376,7 +358,7 @@ func DeleteBeforeTarget(folder storage.Folder, target storage.Object,
 		return utility.NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
 	}
 	tracelog.InfoLogger.Println("Start delete")
-	permanentBackups, permanentWals := getPermanentObjects(folder)
+	permanentBackups, permanentWals := PermanentObjects(folder)
 	if len(permanentBackups) > 0 {
 		tracelog.InfoLogger.Printf("Found permanent objects: backups=%v, wals=%v\n", permanentBackups, permanentWals)
 	}
@@ -385,24 +367,14 @@ func DeleteBeforeTarget(folder storage.Folder, target storage.Object,
 	})
 }
 
-func DeleteTarget(folder storage.Folder, target storage.Object,
-	confirmed bool,
-	isFullBackup func(object storage.Object) bool) error {
-	tracelog.InfoLogger.Println("!!%a", target)
-	//if !isFullBackup(target) {
-	//	errorMessage := "%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
-	//	return utility.NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
-	//}
-	//
+func DeleteTargets(folder storage.Folder, isTarget func(object storage.Object) bool, confirmed bool) error {
 	tracelog.InfoLogger.Println("Start delete")
-	return storage.DeleteObjectsWhere(folder, confirmed, func(object storage.Object) bool {
-		return object.GetName() == target.GetName()
-	})
+	return storage.DeleteObjectsWhere(folder, confirmed, isTarget)
 }
 
-func getPermanentObjects(folder storage.Folder) (map[string]bool, map[string]bool) {
+func PermanentObjects(folder storage.Folder) (map[string]bool, map[string]bool) {
 	tracelog.InfoLogger.Println("retrieving permanent objects")
-	backupTimes, err := getBackups(folder)
+	backupTimes, err := Backups(folder)
 	if err != nil {
 		return map[string]bool{}, map[string]bool{}
 	}
@@ -477,8 +449,8 @@ func HandleDeleteRetain(folder storage.Folder, args []string, confirmed bool,
 	isFullBackup func(object storage.Object) bool,
 	less func(object1, object2 storage.Object) bool) {
 
-	modifier, retantionStr := extractDeleteModifierFromArgs(args)
-	retentionCount, err := strconv.Atoi(retantionStr)
+	modifier, retentionStr := extractDeleteModifierFromArgs(args)
+	retentionCount, err := strconv.Atoi(retentionStr)
 	tracelog.ErrorLogger.FatalOnError(err)
 	greater := func(object1, object2 storage.Object) bool { return less(object2, object1) }
 	target, err := FindTargetRetain(folder, retentionCount, modifier, isFullBackup, greater)
@@ -491,7 +463,7 @@ func HandleDeleteRetain(folder storage.Folder, args []string, confirmed bool,
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func HandleDeletaRetainAfter(folder storage.Folder, args []string, confirmed bool,
+func HandleDeleteRetainAfter(folder storage.Folder, args []string, confirmed bool,
 	isFullBackup func(object storage.Object) bool,
 	less func(object1, object2 storage.Object) bool) {
 
@@ -546,8 +518,8 @@ func extractDeleteModifierFromArgs(args []string) (int, string) {
 	}
 }
 
-func DeleteBeforeArgsValidator(cmd *cobra.Command, args []string) error {
-	err := deleteArgsValidator(cmd, args, StringModifiers, 1, 2)
+func DeleteBeforeArgsValidator(_ *cobra.Command, args []string) error {
+	err := deleteArgsValidator(args, StringModifiers, 1, 2)
 	if err != nil {
 		return err
 	}
@@ -563,34 +535,34 @@ func DeleteBeforeArgsValidator(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func DeleteEverythingArgsValidator(cmd *cobra.Command, args []string) error {
-	err := deleteArgsValidator(cmd, args, StringModifiersDeleteEverything, 0, 1)
+func DeleteEverythingArgsValidator(_ *cobra.Command, args []string) error {
+	err := deleteArgsValidator(args, StringModifiersDeleteEverything, 0, 1)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func DeleteRetainArgsValidator(cmd *cobra.Command, args []string) error {
+func DeleteRetainArgsValidator(_ *cobra.Command, args []string) error {
 	_, retantionStr := extractDeleteModifierFromArgs(args)
 	retantionNumber, err := strconv.Atoi(retantionStr)
 	if err != nil {
-		return errors.Wrapf(err, "expected to get a number as retantion count, but got: '%s'", retantionStr)
+		return errors.Wrapf(err, "expected to get a number as retention count, but got: '%s'", retantionStr)
 	}
 	if retantionNumber <= 0 {
 		return fmt.Errorf("cannot retain less than one backup. Check out delete everything")
 	}
 	return nil
 }
-func DeleteTargetArgsValidator(cmd *cobra.Command, args []string) error {
+func DeleteTargetArgsValidator(_ *cobra.Command, args []string) error {
 	if len(args) != 1 {
-		return fmt.Errorf("expected to get exacltly one argument: a backup name as target")
+		return fmt.Errorf("expected to get exacltly one argument: a object name/pattern as target")
 	}
 	return nil
 }
 
 func DeleteRetainAfterArgsValidator(cmd *cobra.Command, args []string) error {
-	err := deleteArgsValidator(cmd, args, StringModifiers, 2, 3)
+	err := deleteArgsValidator(args, StringModifiers, 2, 3)
 	if err != nil {
 		return err
 	}
@@ -610,7 +582,7 @@ func DeleteRetainAfterArgsValidator(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func deleteArgsValidator(cmd *cobra.Command, args, stringModifiers []string, minArgs int, maxArgs int) error {
+func deleteArgsValidator(args, stringModifiers []string, minArgs, maxArgs int) error {
 	if len(args) < minArgs || len(args) > maxArgs {
 		return fmt.Errorf("accepts between %d and %d arg(s), received %d", minArgs, maxArgs, len(args))
 	}
@@ -627,10 +599,4 @@ func deleteArgsValidator(cmd *cobra.Command, args, stringModifiers []string, min
 		}
 	}
 	return nil
-}
-
-func HandleDeleteTarget(folder storage.Folder, target storage.Object, confirmed bool) error {
-	return DeleteTarget(folder, target, confirmed, func(object storage.Object) bool {
-		return true
-	})
 }

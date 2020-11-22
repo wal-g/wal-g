@@ -109,7 +109,7 @@ func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string
 		return nil, err
 	}
 
-	permanentBackups, _ := getPermanentObjects(folder)
+	permanentBackups, _ := PermanentObjects(folder)
 	//  del current backup from
 	delete(permanentBackups, getBackupNumber(backupName))
 
@@ -158,7 +158,7 @@ func backupHasPermanentInFuture(reverseLinks *map[string][]string, backupName st
 func getGraphFromBaseToIncrement(folder storage.Folder) (map[string][]string, error) {
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 
-	backups, err := getBackups(folder)
+	backups, err := Backups(folder)
 	if err != nil {
 		return nil, err
 	}

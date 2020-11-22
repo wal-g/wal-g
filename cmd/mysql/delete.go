@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"fmt"
 	"path"
 	"strings"
 
@@ -17,7 +18,7 @@ var confirmed = false
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
 	Use:   "delete", //for example "delete mysql before time"
-	Short: "Clears old backups and binlogs",
+	Short: "Clears old backups and binary logs",
 }
 
 var deleteBeforeCmd = &cobra.Command{
@@ -43,68 +44,105 @@ var deleteEverythingCmd = &cobra.Command{
 	Run:       runDeleteEverything,
 }
 
-var deleteTagretCmd = &cobra.Command{
+var (
+	MatchPrefix = false
+	MatchExact  = false
+)
+
+var deleteTargetCmd = &cobra.Command{
 	Use:     internal.DeleteTargetUsageExample, // TODO : improve description
 	Example: internal.DeleteTargetExamples,
-	Args:    internal.DeleteTargetArgsValidator,
-	Run:     runDeleteTarget,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if err := internal.DeleteTargetArgsValidator(cmd, args); err != nil {
+			return err
+		}
+		if MatchExact && MatchPrefix {
+			return fmt.Errorf("expected to get either match exact nor match prefix, but never both")
+		}
+		return nil
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		if MatchPrefix {
+			runDeleteTargets(cmd, args, func(object storage.Object, target string) bool {
+				return strings.HasPrefix(object.GetName(), target)
+			})
+		} else if MatchExact {
+			runDeleteTargets(cmd, args, func(object storage.Object, target string) bool {
+				return object.GetName() == target
+			})
+		}
+	},
 }
 
-func runDeleteEverything(cmd *cobra.Command, args []string) {
+func runDeleteEverything(_ *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 	internal.DeleteEverything(folder, confirmed, args)
 }
 
-func runDeleteBefore(cmd *cobra.Command, args []string) {
+func runDeleteBefore(_ *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 	isFullBackup := func(object storage.Object) bool {
-		return IsFullBackup(folder, object)
+		return IsFullBackup()
 	}
 	internal.HandleDeleteBefore(folder, args, confirmed, isFullBackup, GetLessFunc(folder))
 }
 
-func runDeleteRetain(cmd *cobra.Command, args []string) {
+func runDeleteRetain(_ *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 	isFullBackup := func(object storage.Object) bool {
-		return IsFullBackup(folder, object)
+		return IsFullBackup()
 	}
 	internal.HandleDeleteRetain(folder, args, confirmed, isFullBackup, GetLessFunc(folder))
 }
 
-func runDeleteTarget(cmd *cobra.Command, args []string) {
+func runDeleteTargets(_ *cobra.Command, args []string, filter func(object storage.Object, target string) bool) {
 	target := args[0]
 
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	folder = folder.GetSubFolder(mysql.BinlogPath)
+	targets := make([]storage.Object, 0, 0)
 
-	targetObj, err := internal.FindTargetsInFolder(folder,
-		func(object1, object2 storage.Object) bool {
-			return false
-		},
-		func(object storage.Object) bool {
-			return strings.Contains(object.GetName(), target)
+	for _, e := range []string{
+		mysql.BinlogPath,
+		utility.BaseBackupPath,
+	} {
+		targetsCurr, err := internal.FindTargets(folder.GetSubFolder(e), func(object storage.Object) bool {
+			return filter(object, target)
 		})
+		tracelog.ErrorLogger.FatalOnError(err)
+		targets = append(targets, targetsCurr...)
+	}
 
-	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.InfoLogger.Printf("!!!!!!!!!!!!%s\n", targetObj)
-
-	for _, t := range targetObj {
-		tracelog.ErrorLogger.FatalOnError(internal.HandleDeleteTarget(folder, t, confirmed))
+	nameMp := make(map[string]bool)
+	for _, e := range targets {
+		nameMp[e.GetName()] = true
+	}
+	for _, e := range []string{
+		mysql.BinlogPath,
+		utility.BaseBackupPath,
+	} {
+		tracelog.ErrorLogger.FatalOnError(internal.DeleteTargets(folder.GetSubFolder(e), func(object storage.Object) bool {
+			if v, ok := nameMp[object.GetName()]; v && ok {
+				return true
+			}
+			return false
+		}, confirmed))
 	}
 }
 
 func init() {
 	Cmd.AddCommand(deleteCmd)
-	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd, deleteTagretCmd)
+	deleteTargetCmd.Flags().BoolVarP(&MatchExact, "match-exact", "e", false, "")
+	deleteTargetCmd.Flags().BoolVarP(&MatchPrefix, "match-prefix", "p", false, "")
+	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd, deleteTargetCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 
-func IsFullBackup(folder storage.Folder, object storage.Object) bool {
+func IsFullBackup() bool {
 	return true
 }
 
