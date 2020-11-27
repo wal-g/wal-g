@@ -3,17 +3,15 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strconv"
-
 	"github.com/pkg/errors"
 	"github.com/wal-g/storages/fs"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"regexp"
 )
 
 const (
@@ -332,13 +330,11 @@ func GetLastWalFilename(backup *Backup) (string, error) {
 		tracelog.InfoLogger.Print("No meta found.")
 		return "", err
 	}
-	prefixLenght := len(utility.BackupNamePrefix)
-	timelineID64, err := strconv.ParseUint(backup.Name[prefixLenght:prefixLenght+8], hexadecimal, sizeofInt32bits)
+	timelineId, err := ParseTimelineFromBackupName(backup.Name)
 	if err != nil {
 		tracelog.InfoLogger.FatalError(err)
 		return "", err
 	}
-	timelineID := uint32(timelineID64)
 	endWalSegmentNo := newWalSegmentNo(meta.FinishLsn - 1)
-	return endWalSegmentNo.getFilename(timelineID), nil
+	return endWalSegmentNo.getFilename(timelineId), nil
 }

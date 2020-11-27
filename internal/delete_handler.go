@@ -364,17 +364,16 @@ func getPermanentObjects(folder storage.Folder) (map[string]bool, map[string]boo
 			continue
 		}
 		if meta.IsPermanent {
-			timelineID64, err := strconv.ParseUint(backupTime.BackupName[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+8], 0x10, sizeofInt32bits)
+			timelineId, err := ParseTimelineFromBackupName(backup.Name)
 			if err != nil {
 				tracelog.ErrorLogger.Printf("failed to parse backup timeline for backup %s with error %s, ignoring...", backupTime.BackupName, err.Error())
 				continue
 			}
-			timelineID := uint32(timelineID64)
 
 			startWalSegmentNo := newWalSegmentNo(meta.StartLsn - 1)
 			endWalSegmentNo := newWalSegmentNo(meta.FinishLsn - 1)
 			for walSegmentNo := startWalSegmentNo; walSegmentNo <= endWalSegmentNo; walSegmentNo = walSegmentNo.next() {
-				permanentWals[walSegmentNo.getFilename(timelineID)] = true
+				permanentWals[walSegmentNo.getFilename(timelineId)] = true
 			}
 			permanentBackups[backupTime.BackupName[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+24]] = true
 		}
