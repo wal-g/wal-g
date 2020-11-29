@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"github.com/wal-g/wal-g/utility"
 	"strconv"
 
 	"github.com/jackc/pgx"
@@ -30,6 +31,18 @@ func newIncorrectLogSegNoError(name string) IncorrectLogSegNoError {
 }
 
 func (err IncorrectLogSegNoError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
+type IncorrectBackupNameError struct {
+	error
+}
+
+func newIncorrectBackupNameError(name string) IncorrectBackupNameError {
+	return IncorrectBackupNameError{errors.Errorf("Incorrect backup name: %s", name)}
+}
+
+func (err IncorrectBackupNameError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
@@ -115,6 +128,18 @@ func ParseWALFilename(name string) (timelineID uint32, logSegNo uint64, err erro
 func isWalFilename(filename string) bool {
 	_, _, err := ParseWALFilename(filename)
 	return err == nil
+}
+
+func ParseTimelineFromBackupName(backupName string) (uint32, error) {
+	if len(backupName) == 0 {
+		return 0, newIncorrectBackupNameError(backupName)
+	}
+	prefixLength := len(utility.BackupNamePrefix)
+	timelineId64, err := strconv.ParseUint(backupName[prefixLength:prefixLength+8], hexadecimal, sizeofInt32bits)
+	if err != nil {
+		return 0, err
+	}
+	return uint32(timelineId64), nil
 }
 
 // GetNextWalFilename computes name of next WAL segment
