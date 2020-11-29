@@ -60,9 +60,6 @@ var deleteTargetBackupCmd = &cobra.Command{
 		if err := internal.DeleteTargetArgsValidator(cmd, args); err != nil {
 			return err
 		}
-		if MatchExact && MatchPrefix {
-			return fmt.Errorf("expected to get either match exact nor match prefix, but never both")
-		}
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
@@ -71,8 +68,9 @@ var deleteTargetBackupCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		target := args[0]
-
-		tracelog.ErrorLogger.FatalOnError(fmt.Errorf("delete target backup: failed due %v", runDeleteTargetBackups(folder, target)))
+		if err := runDeleteTargetBackups(folder, target); err != nil {
+			tracelog.ErrorLogger.FatalOnError(fmt.Errorf("delete target backup: failed due %v", ))
+		}
 	},
 }
 
@@ -97,9 +95,11 @@ var deleteBinlogCmd = &cobra.Command{
 		r, err := regexp.Compile(regex)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		tracelog.ErrorLogger.FatalOnError(fmt.Errorf("delete target backup: failed due %v", runDeleteBinlogs(folder, func(name string) bool {
+		if err := runDeleteBinlogs(folder, func(name string) bool {
 			return r.MatchString(name)
-		})))
+		}); err != nil {
+			tracelog.ErrorLogger.FatalOnError(fmt.Errorf("delete target backup: failed due %v", err))
+		}
 	},
 }
 
@@ -210,14 +210,14 @@ func tryFetchBinlogName(folder storage.Folder, object storage.Object) (string, b
 func init() {
 	Cmd.AddCommand(deleteCmd)
 
-	deleteTargetBackupCmd.Flags().BoolVarP(&MatchExact, "match-exact", "e", false, "")
-	deleteTargetBackupCmd.Flags().BoolVarP(&MatchPrefix, "match-prefix", "p", false, "")
-
 	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 
 	backupCmd.AddCommand(deleteTargetBackupCmd)
 	deleteTargetBackupCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
+
+	binlogCmd.Flags().BoolVarP(&MatchExact, "match-exact", "e", false, "")
+	binlogCmd.Flags().BoolVarP(&MatchPrefix, "match-prefix", "p", false, "")
 
 	binlogCmd.AddCommand(deleteBinlogCmd)
 }
