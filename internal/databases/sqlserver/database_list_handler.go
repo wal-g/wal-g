@@ -17,7 +17,7 @@ func HandleDatabaseList(backupName string) {
 	defer func() { _ = signalHandler.Close() }()
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	backup, err := internal.BackupByName(backupName, utility.BaseBackupPath, folder)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("can't find backup %s: %v", backupName, err)
 	}

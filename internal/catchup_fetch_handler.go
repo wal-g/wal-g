@@ -10,13 +10,13 @@ import (
 func HandleCatchupFetch(folder storage.Folder, dbDirectory, backupName string, useNewUnwrap bool) {
 	dbDirectory = utility.ResolveSymlink(dbDirectory)
 
-	backup, err := GetBackupByName(backupName, utility.CatchupPath, folder)
+	backup, err := BackupByName(backupName, utility.CatchupPath, folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed get backup by name: %v", err)
 
 	filesToUnwrap, err := backup.GetFilesToUnwrap("")
 	tracelog.ErrorLogger.FatalfOnError("Failed get files to unwrap from backup: %v", err)
 
-	sentinelDto, err := backup.GetSentinel()
+	sentinelDto, err := backup.Sentinel()
 	tracelog.ErrorLogger.FatalfOnError("Failed get backup sentinel: %v", err)
 
 	// testing the new unwrap implementation

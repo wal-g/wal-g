@@ -16,7 +16,7 @@ func markBackup(uploader *Uploader, folder storage.Folder, backupName string, to
 	metadataToUpload, err := GetMarkedBackupMetadataToUpload(folder, backupName, toPermanent)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get previous backups: %v", err)
 	tracelog.InfoLogger.Printf("Retrieved backups to be marked, marking: %v", metadataToUpload)
-	err = uploader.uploadMultiple(metadataToUpload)
+	err = uploader.UploadMultiple(metadataToUpload)
 	tracelog.ErrorLogger.FatalfOnError("Failed to mark previous backups: %v", err)
 }
 
@@ -35,7 +35,7 @@ func GetMarkedBackupMetadataToUpload(
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 
 	backup := NewBackup(baseBackupFolder, backupName)
-	meta, err := backup.fetchMeta()
+	meta, err := backup.FetchMeta()
 	if err != nil {
 		return nil, err
 	}
@@ -61,12 +61,12 @@ func getMarkedPermanentBackupMetadata(baseBackupFolder storage.Folder, backupNam
 
 	// retrieve current backup sentinel and meta
 	backup := NewBackup(baseBackupFolder, backupName)
-	sentinel, err := backup.GetSentinel()
+	sentinel, err := backup.Sentinel()
 	if err != nil {
 		return nil, err
 	}
 
-	meta, err := backup.fetchMeta()
+	meta, err := backup.FetchMeta()
 	if err != nil {
 		return nil, err
 	}
@@ -104,12 +104,12 @@ func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string
 	// retrieve current backup meta
 	backup := NewBackup(baseBackupFolder, backupName)
 
-	meta, err := backup.fetchMeta()
+	meta, err := backup.FetchMeta()
 	if err != nil {
 		return nil, err
 	}
 
-	permanentBackups, _ := getPermanentObjects(folder)
+	permanentBackups, _ := PermanentObjects(folder)
 	//  del current backup from
 	delete(permanentBackups, getBackupNumber(backupName))
 
@@ -158,7 +158,7 @@ func backupHasPermanentInFuture(reverseLinks *map[string][]string, backupName st
 func getGraphFromBaseToIncrement(folder storage.Folder) (map[string][]string, error) {
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 
-	backups, err := getBackups(folder)
+	backups, err := Backups(folder)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func getGraphFromBaseToIncrement(folder storage.Folder) (map[string][]string, er
 
 func getMetadataFromBackup(baseBackupFolder storage.Folder, backupName string) (incrementFrom string, isIncrement bool, err error) {
 	backup := NewBackup(baseBackupFolder, backupName)
-	sentinel, err := backup.GetSentinel()
+	sentinel, err := backup.Sentinel()
 	if err != nil {
 		return "", false, err
 	}

@@ -29,7 +29,7 @@ type Logging struct {
 
 func DefaultHandleBackupList(folder storage.Folder) {
 	getBackupsFunc := func() ([]BackupTime, error) {
-		return getBackups(folder)
+		return Backups(folder)
 	}
 	writeBackupListFunc := func(backups []BackupTime) {
 		WriteBackupList(backups, os.Stdout)
@@ -59,7 +59,7 @@ func HandleBackupList(
 
 // TODO : unit tests
 func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, detail bool) {
-	backups, err := getBackups(folder)
+	backups, err := Backups(folder)
 	if len(backups) == 0 {
 		tracelog.InfoLogger.Println("No backups found")
 		return
@@ -92,11 +92,11 @@ func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, de
 func getBackupDetails(folder storage.Folder, backups []BackupTime) ([]BackupDetail, error) {
 	backupDetails := make([]BackupDetail, len(backups))
 	for i := len(backups) - 1; i >= 0; i-- {
-		backup, err := GetBackupByName(backups[i].BackupName, utility.BaseBackupPath, folder)
+		backup, err := BackupByName(backups[i].BackupName, utility.BaseBackupPath, folder)
 		if err != nil {
 			return nil, err
 		} else {
-			metaData, err := backup.fetchMeta()
+			metaData, err := backup.FetchMeta()
 			if err != nil {
 				return nil, err
 			}

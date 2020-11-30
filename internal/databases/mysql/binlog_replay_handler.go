@@ -70,7 +70,7 @@ func (rh *replayHandler) handleBinlog(binlogPath string) error {
 }
 
 func HandleBinlogReplay(folder storage.Folder, backupName string, untilTs string) {
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	backup, err := internal.BackupByName(backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalfOnError("Unable to get backup %v", err)
 
 	startTs, err := getBinlogSinceTs(folder, backup)

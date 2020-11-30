@@ -225,7 +225,7 @@ func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanen
 			}
 		} else {
 			previousBackup := NewBackup(basebackupFolder, previousBackupName)
-			previousBackupSentinelDto, err = previousBackup.GetSentinel()
+			previousBackupSentinelDto, err = previousBackup.Sentinel()
 			tracelog.ErrorLogger.FatalOnError(err)
 			if previousBackupSentinelDto.IncrementCount != nil {
 				incrementCount = *previousBackupSentinelDto.IncrementCount + 1
@@ -245,7 +245,7 @@ func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanen
 					}
 
 					previousBackup := NewBackup(basebackupFolder, previousBackupName)
-					previousBackupSentinelDto, err = previousBackup.GetSentinel()
+					previousBackupSentinelDto, err = previousBackup.Sentinel()
 					tracelog.ErrorLogger.FatalOnError(err)
 				}
 				tracelog.InfoLogger.Printf("Delta backup from %v with LSN %x. \n", previousBackupName, *previousBackupSentinelDto.BackupStartLSN)

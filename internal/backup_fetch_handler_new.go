@@ -39,11 +39,11 @@ func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedu
 // TODO : unit tests
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
 func deltaFetchRecursionNew(cfg *FetchConfig) error {
-	backup, err := GetBackupByName(cfg.backupName, utility.BaseBackupPath, cfg.folder)
+	backup, err := BackupByName(cfg.backupName, utility.BaseBackupPath, cfg.folder)
 	if err != nil {
 		return err
 	}
-	sentinelDto, err := backup.GetSentinel()
+	sentinelDto, err := backup.Sentinel()
 	if err != nil {
 		return err
 	}

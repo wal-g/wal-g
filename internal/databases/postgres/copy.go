@@ -12,20 +12,20 @@ import (
 )
 
 // HandleCopy copy specific or all backups from one storage to another
-func HandleCopy(fromConfigFile string, toConfigFile string, backupName string, withoutHistory bool) {
+func HandleCopy(fromConfigFile, toConfigFile, backupName string, withoutHistory, forceOverrite bool) {
 	var from, fromError = internal.FolderFromConfig(fromConfigFile)
 	var to, toError = internal.FolderFromConfig(toConfigFile)
 	if fromError != nil || toError != nil {
 		return
 	}
-	infos, err := getCopyingInfos(backupName, from, to, withoutHistory)
+	infos, err := getCopyingInfos(backupName, from, to, withoutHistory, forceOverrite)
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = copy.Infos(infos)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Println("Success copy.")
 }
 
-func BackupCopyingInfo(backup *internal.Backup, from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
+func BackupCopyingInfo(backup *internal.Backup, from storage.Folder, to storage.Folder, forceOverrite bool) ([]copy.InfoProvider, error) {
 	tracelog.InfoLogger.Print("Collecting backup files...")
 	var backupPrefix = path.Join(utility.BaseBackupPath, backup.Name)
 
@@ -35,26 +35,26 @@ func BackupCopyingInfo(backup *internal.Backup, from storage.Folder, to storage.
 	}
 
 	var hasBackupPrefix = func(object storage.Object) bool { return strings.HasPrefix(object.GetName(), backupPrefix) }
-	return copy.BuildCopyingInfos(from, to, objects, hasBackupPrefix, copy.NoopRenameFunc), nil
+	return copy.BuildCopyingInfos(from, to, objects, hasBackupPrefix, copy.NoopRenameFunc, forceOverrite), nil
 }
 
-func getCopyingInfos(backupName string, from storage.Folder, to storage.Folder, withoutHistory bool) ([]copy.InfoProvider, error) {
+func getCopyingInfos(backupName string, from storage.Folder, to storage.Folder, withoutHistory, forceOverrite bool) ([]copy.InfoProvider, error) {
 	if backupName == "" {
 		tracelog.InfoLogger.Printf("Copy all backups and history.")
-		return WildcardInfo(from, to)
+		return WildcardInfo(from, to, forceOverrite)
 	}
 	tracelog.InfoLogger.Printf("Handle backupname '%s'.", backupName)
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, from)
+	backup, err := internal.BackupByName(backupName, utility.BaseBackupPath, from)
 	if err != nil {
 		return nil, err
 	}
 
-	infos, err := BackupCopyingInfo(backup, from, to)
+	infos, err := BackupCopyingInfo(backup, from, to, forceOverrite)
 	if err != nil {
 		return nil, err
 	}
 	if !withoutHistory {
-		var history, err = HistoryCopyingInfo(backup, from, to)
+		var history, err = HistoryCopyingInfo(backup, from, to, forceOverrite)
 		if err != nil {
 			return nil, err
 		}
@@ -63,7 +63,7 @@ func getCopyingInfos(backupName string, from storage.Folder, to storage.Folder, 
 	return infos, nil
 }
 
-func HistoryCopyingInfo(backup *internal.Backup, from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
+func HistoryCopyingInfo(backup *internal.Backup, from storage.Folder, to storage.Folder, forceOverrite bool) ([]copy.InfoProvider, error) {
 	tracelog.DebugLogger.Print("Collecting history files... ")
 
 	var fromWalFolder = from.GetSubFolder(utility.WalPath)
@@ -81,14 +81,14 @@ func HistoryCopyingInfo(backup *internal.Backup, from storage.Folder, to storage
 	}
 
 	var older = func(object storage.Object) bool { return lastWalFilename <= object.GetName() }
-	return copy.BuildCopyingInfos(fromWalFolder, to, objects, older, copy.NoopRenameFunc), nil
+	return copy.BuildCopyingInfos(fromWalFolder, to, objects, older, copy.NoopRenameFunc, forceOverrite), nil
 }
 
-func WildcardInfo(from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
+func WildcardInfo(from storage.Folder, to storage.Folder, forceOverrite bool) ([]copy.InfoProvider, error) {
 	objects, err := storage.ListFolderRecursively(from)
 	if err != nil {
 		return nil, err
 	}
 
-	return copy.BuildCopyingInfos(from, to, objects, func(object storage.Object) bool { return true }, copy.NoopRenameFunc), nil
+	return copy.BuildCopyingInfos(from, to, objects, func(object storage.Object) bool { return true }, copy.NoopRenameFunc, forceOverrite), nil
 }

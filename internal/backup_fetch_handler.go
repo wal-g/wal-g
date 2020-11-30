@@ -64,7 +64,7 @@ func readRestoreSpec(path string, spec *TablespaceSpec) (err error) {
 	return nil
 }
 
-func GetPgFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string) func(folder storage.Folder, backup Backup) {
+func PgFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string) func(folder storage.Folder, backup Backup) {
 	return func(folder storage.Folder, backup Backup) {
 		filesToUnwrap, err := backup.GetFilesToUnwrap(fileMask)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
@@ -81,7 +81,7 @@ func GetPgFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string) func(fol
 	}
 }
 
-func GetCommandStreamFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup Backup) {
+func CommandStreamFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup Backup) {
 	return func(folder storage.Folder, backup Backup) {
 		stdin, err := cmd.StdinPipe()
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
@@ -120,13 +120,13 @@ func StreamBackupToCommandStdin(cmd *exec.Cmd, backup *Backup) error {
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
 func HandleBackupFetch(folder storage.Folder, backupName string, fetcher func(folder storage.Folder, backup Backup)) {
 	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder,)\n", backupName)
-	backup, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	backup, err := BackupByName(backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 
 	fetcher(folder, *backup)
 }
 
-func GetBackupByName(backupName, subfolder string, folder storage.Folder) (*Backup, error) {
+func BackupByName(backupName, subfolder string, folder storage.Folder) (*Backup, error) {
 	baseBackupFolder := folder.GetSubFolder(subfolder)
 
 	var backup *Backup
@@ -169,11 +169,11 @@ func chooseTablespaceSpecification(sentinelDto BackupSentinelDto, spec *Tablespa
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
 func deltaFetchRecursionOld(backupName string, folder storage.Folder, dbDataDirectory string,
 	tablespaceSpec *TablespaceSpec, filesToUnwrap map[string]bool) error {
-	backup, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	backup, err := BackupByName(backupName, utility.BaseBackupPath, folder)
 	if err != nil {
 		return err
 	}
-	sentinelDto, err := backup.GetSentinel()
+	sentinelDto, err := backup.Sentinel()
 	if err != nil {
 		return err
 	}

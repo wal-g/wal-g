@@ -39,11 +39,13 @@ func Infos(chs []InfoProvider) error {
 		// block here
 		_ = <-tickets
 		wg.Add(1)
+		tracelog.InfoLogger.Printf("handling %s\n", ch.SrcObj.GetName())
 
 		go func(handler InfoProvider) {
 			defer wg.Done()
 			err := handler.copyObject()
 			tickets <- nil
+			tracelog.ErrorLogger.Printf("error while copying file %v\n", err)
 			errors <- err
 		}(ch)
 	}
@@ -83,9 +85,16 @@ var NoopRenameFunc = func(o storage.Object) string {
 }
 
 func BuildCopyingInfos(from storage.Folder, to storage.Folder, objects []storage.Object,
-	condition func(storage.Object) bool, renameFunc func(object storage.Object) string) (infos []InfoProvider) {
+	condition func(storage.Object) bool, renameFunc func(object storage.Object) string, forceOverrite bool) []InfoProvider {
+
+	infos := make([]InfoProvider, 0)
+
 	for _, object := range objects {
 		if condition(object) {
+			if exits, err := to.Exists(object.GetName()); !forceOverrite && exits && err == nil {
+				// do not overwrite files, if not explicitly requested to
+				continue
+			}
 			infos = append(infos, InfoProvider{
 				From:       from,
 				To:         to,
@@ -94,5 +103,6 @@ func BuildCopyingInfos(from storage.Folder, to storage.Folder, objects []storage
 			})
 		}
 	}
-	return
+
+	return infos
 }

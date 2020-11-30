@@ -91,7 +91,7 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) 
 			tracelog.ErrorLogger.Printf("upload: could not upload '%s'\n", path)
 			tracelog.ErrorLogger.Printf("%v\n", err)
 			err = pipeReader.Close()
-			tracelog.ErrorLogger.FatalfOnError("Failed to close pipe: %v", err)
+			tracelog.ErrorLogger.Printf("Failed to close pipe: %v", err)
 			tracelog.ErrorLogger.Fatalf("Unable to continue the backup process because of the loss of a part %d.\n", tarBall.partNumber)
 		}
 	}()

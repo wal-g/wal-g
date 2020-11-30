@@ -10,7 +10,7 @@ import (
 )
 
 func HandleBackupFetch(ctx context.Context, folder storage.Folder, backupName string, restoreCmd *exec.Cmd) error {
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	backup, err := internal.BackupByName(backupName, utility.BaseBackupPath, folder)
 	if err != nil {
 		return err
 	}
