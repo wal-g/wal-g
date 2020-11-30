@@ -25,7 +25,7 @@ var (
 	chattrI = false
 	// backupChattrCmd represents the backupMark command
 	backupChattrCmd = &cobra.Command{
-		Use:   "chattr",
+		Use:   "backup-chattr",
 		Short: BackupMarkShortDescription,
 		Long:  BackupMarkLongDescription,
 		Args:  cobra.ExactArgs(1),
@@ -41,6 +41,6 @@ var (
 
 func init() {
 	backupChattrCmd.Flags().BoolVarP(&chattrI, ImmutableFlag, "i", false, ImmutableDescription)
-	backupCmd.AddCommand(backupChattrCmd)
+	Cmd.AddCommand(backupChattrCmd)
 }
 

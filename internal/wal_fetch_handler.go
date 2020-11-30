@@ -45,7 +45,7 @@ func (err ArchiveNonExistenceError) Error() string {
 }
 
 // TODO : unit tests
-// HandleWALFetch is invoked to performa wal-g wal-fetch
+// HandleWALFetch is invoked to perform wal-g wal-fetch
 func HandleWALFetch(folder storage.Folder, walFileName string, location string, triggerPrefetch bool) {
 	tracelog.DebugLogger.Printf("HandleWALFetch(folder, %s, %s, %v)\n", walFileName, location, triggerPrefetch)
 	folder = folder.GetSubFolder(utility.WalPath)

@@ -16,8 +16,7 @@ import (
 
 var confirmed = false
 
-const DeleteBinlogUsage =  "delete"
-const DeleteTargetVBackupUsage = "target-delete"
+const DeleteBinlogUsage =  "binlog"
 
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
@@ -54,7 +53,7 @@ var (
 )
 
 var deleteTargetBackupCmd = &cobra.Command{
-	Use:     "target-delete", // TODO : improve description
+	Use:     "target-backup", // TODO : improve description
 	Example: internal.DeleteTargetExamples,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if err := internal.DeleteTargetArgsValidator(cmd, args); err != nil {
@@ -210,14 +209,13 @@ func tryFetchBinlogName(folder storage.Folder, object storage.Object) (string, b
 func init() {
 	Cmd.AddCommand(deleteCmd)
 
-	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd)
-	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
-
-	backupCmd.AddCommand(deleteTargetBackupCmd)
 	deleteTargetBackupCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 
-	binlogCmd.Flags().BoolVarP(&MatchExact, "match-exact", "e", false, "")
-	binlogCmd.Flags().BoolVarP(&MatchPrefix, "match-prefix", "p", false, "")
+	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd, deleteTargetBackupCmd)
+	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms objects deletion")
 
-	binlogCmd.AddCommand(deleteBinlogCmd)
+	deleteBinlogCmd.Flags().BoolVarP(&MatchExact, "match-exact", "e", false, "")
+	deleteBinlogCmd.Flags().BoolVarP(&MatchPrefix, "match-prefix", "p", false, "")
+
+	deleteCmd.AddCommand(deleteBinlogCmd)
 }

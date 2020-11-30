@@ -20,14 +20,14 @@ var (
 	listAll = false
 )
 
-// TODO : unit tests
-func WriteBackupList(backups []internal.BackupTime, output io.Writer) {
+// TODO : unit base_tests
+func writeBackupList(backups []internal.BackupTime, output io.Writer) {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer func() {
 		_ = writer.Flush()
 	}()
 
-	_, _ = fmt.Fprintln(writer, "name\tlast_modified\twal_segment_backup_start")
+	_, _ = fmt.Fprintln(writer, "backup_name\tlast_modified\tbinlog_name_start")
 	for i := len(backups) - 1; i >= 0; i-- {
 		b := backups[i]
 		_, _ = fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v", b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName))
@@ -39,7 +39,7 @@ func HandleBackupList(folder storage.Folder) {
 		return internal.Backups(folder)
 	}
 	writeBackupListFunc := func(backups []internal.BackupTime) {
-		WriteBackupList(backups, os.Stdout)
+		writeBackupList(backups, os.Stdout)
 	}
 
 	logging := internal.Logging{
@@ -48,6 +48,28 @@ func HandleBackupList(folder storage.Folder) {
 	}
 
 	internal.HandleBackupList(getBackupsFunc, writeBackupListFunc, logging)
+}
+
+func HandleBinlogList(folder storage.Folder) error {
+
+	bi, _, err := binlogs(folder)
+	if err != nil {
+		return err
+	}
+
+	writer := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+	defer func() {
+		_ = writer.Flush()
+	}()
+
+
+	_, _ = fmt.Fprintln(writer, "\nBinlogs section \n\nName\tlast_modified")
+	for i := len(bi) - 1; i >= 0; i-- {
+		b := bi[i]
+		_, _ = fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t", b.BinlogName, b.Time.Format(time.RFC3339)))
+	}
+
+	return nil
 }
 
 // backupListCmd represents the backupList command
@@ -89,7 +111,7 @@ func BinlogTimeSlices(backups []storage.Object) []mysql.BinlogsTime {
 	return sortTimes
 }
 
-// TODO : unit tests
+// TODO : unit base_tests
 func binlogs(folder storage.Folder) (backups []mysql.BinlogsTime, garbage []string, err error) {
 	binlogsObjects, _, err := folder.GetSubFolder(mysql.BinlogPath).ListFolder()
 	if err != nil {

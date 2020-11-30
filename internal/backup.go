@@ -339,7 +339,8 @@ func GetLastWalFilename(backup *Backup) (string, error) {
 	return endWalSegmentNo.getFilename(timelineId), nil
 }
 
-func (b *Backup) Delete(confirmed bool) error {
+// returns set of filename related to this backup
+func (b *Backup) BackupFilenames() map[string]struct{}{
 	objects := make(map[string]struct{})
 
 	/* delete backup */
@@ -348,6 +349,12 @@ func (b *Backup) Delete(confirmed bool) error {
 	objects[SentinelNameFromBackup(b.Name)] = struct{}{}
 	/* delete meta for backup */
 	objects[b.MetadataPath()] = struct{}{}
+
+	return objects
+}
+
+func (b *Backup) Delete(confirmed bool) error {
+	objects := b.BackupFilenames()
 
 	return storage.DeleteObjectsWhere(b.BaseBackupFolder, confirmed, func(object1 storage.Object) bool {
 		_, ok := objects[object1.GetName()]

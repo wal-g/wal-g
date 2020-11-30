@@ -205,7 +205,7 @@ func StripPrefixName(path string) string {
 	return name
 }
 
-// TODO : unit tests
+// TODO : unit base_tests
 var patternLSN = "[0-9A-F]{24}"
 var regexpLSN = regexp.MustCompile(patternLSN)
 

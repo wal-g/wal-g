@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	copyName             = "copy"
+	copyName             = "backup-copy"
 	copyShortDescription = "copy specific or all backups"
 
 	copyAllFlag         = "all"
@@ -68,6 +68,5 @@ func init() {
 	copyCmd.Flags().BoolVarP(&all, copyAllFlag, allShorthand, false, copyAllSDescription)
 	copyCmd.Flags().BoolVarP(&forceOverwrite, overwriteFlag, overwriteShorthand, false, overwriteSDescription)
 
-	backupCmd.AddCommand(copyCmd)
 	Cmd.AddCommand(copyCmd)
 }

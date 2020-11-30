@@ -1,8 +1,6 @@
 package copy
 
 import (
-	"sort"
-	"strings"
 	"sync"
 
 	"github.com/wal-g/storages/storage"
@@ -41,11 +39,13 @@ func Infos(chs []InfoProvider) error {
 		// block here
 		_ = <-tickets
 		wg.Add(1)
+		tracelog.InfoLogger.Printf("handling %s\n", ch.SrcObj.GetName())
 
 		go func(handler InfoProvider) {
 			defer wg.Done()
 			err := handler.copyObject()
 			tickets <- nil
+			tracelog.ErrorLogger.Printf("error while copying file %v\n", err)
 			errors <- err
 		}(ch)
 	}
@@ -85,19 +85,9 @@ var NoopRenameFunc = func(o storage.Object) string {
 }
 
 func BuildCopyingInfos(from storage.Folder, to storage.Folder, objects []storage.Object,
-	condition func(storage.Object) bool, renameFunc func(object storage.Object) string, forceOverrite bool) (infos []InfoProvider) {
+	condition func(storage.Object) bool, renameFunc func(object storage.Object) string, forceOverrite bool) []InfoProvider {
 
-	sort.Slice(objects, func(i, j int) bool {
-		// sort files in the order that guarantees that sentinel would be uploaded strictly after backup
-		if strings.Contains(objects[i].GetName(), "json") {
-			return false
-		}
-		if strings.Contains(objects[j].GetName(), "json") {
-			return false
-		}
-
-		return objects[i].GetName() < objects[j].GetName()
-	})
+	infos := make([]InfoProvider, 0)
 
 	for _, object := range objects {
 		if condition(object) {
@@ -113,5 +103,6 @@ func BuildCopyingInfos(from storage.Folder, to storage.Folder, objects []storage
 			})
 		}
 	}
-	return
+
+	return infos
 }

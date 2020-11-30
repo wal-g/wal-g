@@ -20,8 +20,9 @@ wal-g binlog-push
 sleep 1
 
 mysqldump sbtest > /tmp/dump_1.sql
-wal-g backup-list
-BINLOGS=$(wal-g binlog list | awk 'NR==2{print $1}')
+wal-g binlog-list
+BINLOGS=$(wal-g binlog-list | awk 'NR==2{print $1}')
+echo $BINLOGS
 
 
 

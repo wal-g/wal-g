@@ -423,14 +423,14 @@ services:
     image: wal-g/mysql
     container_name: wal-g_mysql
 
-  mysql_tests:
+  mysql_base_tests:
     build:
-      dockerfile: docker/mysql_tests/Dockerfile
+      dockerfile: docker/mysql_tests/Dockerfile_base
       context: .
     security_opt:
       - seccomp:unconfined
     image: wal-g/mysql_tests
-    container_name: wal-g_mysql_tests
+    container_name: wal-g_mysql_base_tests
     env_file:
       - docker/common/common_walg.env
     depends_on:
@@ -440,14 +440,29 @@ services:
       - s3
       - s3-another
   
-  mysql_delete_end_to_end_tests:
+  mysql_delete_tests:
     build:
-      dockerfile: docker/mysql_tests/Dockerfile_mysql_delete_end_to_end
+      dockerfile: docker/mysql_tests/Dockerfile_delete
       context: .
     security_opt:
       - seccomp:unconfined
     image: wal-g/mysql_tests
-    container_name: wal-g_mysql_tests
+    container_name: wal-g_mysql_delete_tests
+    env_file:
+      - docker/common/common_walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  mysql_copy_tests:
+    build:
+      dockerfile: docker/mysql_tests/Dockerfile_copy
+      context: .
+    security_opt:
+      - seccomp:unconfined
+    image: wal-g/mysql_tests
+    container_name: wal-g_mysql_copy_tests
     env_file:
       - docker/common/common_walg.env
     depends_on:

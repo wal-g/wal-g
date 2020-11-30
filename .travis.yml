@@ -108,10 +108,13 @@ jobs:
     - script: make mysql_base
       workspaces:
         use: image_cache
-    - script: make MYSQL_TEST=mysql_tests mysql_integration_test
+    - script: make MYSQL_TEST=mysql_base_tests mysql_integration_test
       workspaces:
         use: image_cache
-    - script: make MYSQL_TEST=mysql_delete_end_to_end_tests mysql_integration_test
+    - script: make MYSQL_TEST=mysql_delete_tests mysql_integration_test
+      workspaces:
+        use: image_cache
+    - script: make MYSQL_TEST=mysql_copy_tests mysql_integration_test
       workspaces:
         use: image_cache
     - script: make mongo_test

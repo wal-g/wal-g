@@ -101,8 +101,8 @@ wal-g binlog-replay --since "$THIRD_BACKUP" --until "$DT3"
 mysqldump sbtest > /tmp/dump_3_restored.sql
 diff -u /tmp/dump_3.sql /tmp/dump_3_restored.sql
 
-# delete third backup
-wal-g backup target-delete "$THIRD_BACKUP" --confirm
+# delete third backup using target backup delete
+wal-g delete target-backup "$THIRD_BACKUP" --confirm
 wal-g backup-list
 test "2" -eq "$(wal-g backup-list | wc -l)"
 

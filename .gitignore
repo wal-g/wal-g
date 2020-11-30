@@ -8,7 +8,7 @@ main/mysql/wal-g
 main/redis/wal-g
 main/mongo/wal-g
 
-# tests
+# base_tests
 test/testdata/00000*
 test/testdata/broken_wals/
 coverage.out

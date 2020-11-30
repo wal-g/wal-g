@@ -2,7 +2,6 @@ package internal
 
 import (
 	"io"
-	"os"
 	"path"
 
 	"github.com/wal-g/tracelog"
@@ -31,12 +30,6 @@ func (uploader *Uploader) PushStreamToDestination(stream io.Reader, dstPath stri
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
 
 	return err
-}
-
-// FileIsPiped Check if file is piped
-func FileIsPiped(stream *os.File) bool {
-	stat, _ := stream.Stat()
-	return (stat.Mode() & os.ModeCharDevice) == 0
 }
 
 func GetStreamName(backupName string, extension string) string {

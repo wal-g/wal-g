@@ -34,7 +34,7 @@ var (
 )
 
 func init() {
-	flag.BoolVar(&testOpts.test, testOptsPrefix+"test", true, "run tests")
+	flag.BoolVar(&testOpts.test, testOptsPrefix+"test", true, "run base_tests")
 	flag.BoolVar(&testOpts.stop, testOptsPrefix+"stop", true, "shutdown test environment")
 	flag.BoolVar(&testOpts.clean, testOptsPrefix+"clean", true, "delete test environment")
 	flag.BoolVar(&testOpts.debug, testOptsPrefix+"debug", false, "enable debug logging")

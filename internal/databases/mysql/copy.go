@@ -1,7 +1,6 @@
 package mysql
 
 import (
-	"path"
 	"strings"
 
 	"github.com/wal-g/storages/storage"
@@ -30,32 +29,41 @@ func HandleCopyBackup(fromConfigFile, toConfigFile, backupName, prefix string, f
 func HandleCopyAll(fromConfigFile, toConfigFile string, forceOverrite bool) {
 	var from, fromError = internal.FolderFromConfig(fromConfigFile)
 	var to, toError = internal.FolderFromConfig(toConfigFile)
+
 	if fromError != nil || toError != nil {
 		return
 	}
 	infos, err := WildcardInfo(from, to, forceOverrite)
+
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = copy.Infos(infos)
+
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Success copyed all backups\n")
 }
 
 func backupCopyingInfo(backupName, prefix string, from storage.Folder, to storage.Folder, forceOverrite bool) ([]copy.InfoProvider, error) {
 	tracelog.InfoLogger.Printf("Handle backupname '%s'.", backupName)
+
 	backup, err := internal.BackupByName(backupName, utility.BaseBackupPath, from)
 	if err != nil {
 		return nil, err
 	}
-	tracelog.InfoLogger.Print("Collecting backup files...")
-	var backupPrefix = path.Join(utility.BaseBackupPath, backup.Name)
+
 
 	objects, err := storage.ListFolderRecursively(from)
 	if err != nil {
 		return nil, err
 	}
 
-	var hasBackupPrefix = func(object storage.Object) bool { return strings.HasPrefix(object.GetName(), backupPrefix) }
-	return copy.BuildCopyingInfos(from, to, objects, hasBackupPrefix, func(object storage.Object) string {
+	tracelog.InfoLogger.Print("Collecting backup files to copy...")
+	copyFilenames := backup.BackupFilenames()
+	tracelog.InfoLogger.Printf("Collected: %s", copyFilenames)
+
+	return copy.BuildCopyingInfos(from, to, objects, func(object storage.Object) bool {
+		_, ok := copyFilenames[object.GetName()]
+		return ok
+	}, func(object storage.Object) string {
 		return strings.Replace(object.GetName(), backup.Name, prefix+backup.Name, 1)
 	}, forceOverrite), nil
 }
