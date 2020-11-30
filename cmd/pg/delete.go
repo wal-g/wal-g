@@ -12,9 +12,9 @@ import (
 )
 
 var confirmed = false
-var patternLSN = "[0-9A-F]{24}"
-var patternBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?", patternLSN)
-var regexpLSN = regexp.MustCompile(patternLSN)
+var patternTLILogSegNo = "[0-9A-F]{24}"
+var patternBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?", patternTLILogSegNo)
+var regexpWalFileName = regexp.MustCompile(patternTLILogSegNo)
 var regexpBackupName = regexp.MustCompile(patternBackupName)
 var maxCountOfLSN = 2
 
@@ -97,9 +97,16 @@ func postgresIsFullBackup(folder storage.Folder, object storage.Object) bool {
 }
 
 func tryFetchLSN(object storage.Object) (string, bool) {
-	foundLsn := regexpLSN.FindAllString(object.GetName(), maxCountOfLSN)
+	foundLsn := regexpWalFileName.FindAllString(object.GetName(), maxCountOfLSN)
 	if len(foundLsn) > 0 {
-		return regexpLSN.FindAllString(object.GetName(), maxCountOfLSN)[0], true
+		// Remove timeline id: Timeline is resetted during pg_upgrade. This still can cause problems
+		// with overlapping WALs, but at least will prevent us from deleting new backups
+		_, logSegNo, err := internal.ParseWALFilename(foundLsn[0])
+
+		if err != nil {
+			return "", false
+		}
+		return internal.FormatWALFileName(0, logSegNo), true
 	}
 	return "", false
 }

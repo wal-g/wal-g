@@ -28,7 +28,7 @@ func GetDeltaFilenameFor(walFilename string) (string, error) {
 		return "", err
 	}
 	deltaSegNo := logSegNo - (logSegNo % WalFileInDelta)
-	return toDeltaFilename(formatWALFileName(timeline, deltaSegNo)), nil
+	return toDeltaFilename(FormatWALFileName(timeline, deltaSegNo)), nil
 }
 
 func GetPositionInDelta(walFilename string) int {

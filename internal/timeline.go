@@ -90,7 +90,7 @@ func getWalFilename(lsn uint64, conn *pgx.Conn) (walFilename string, timeline ui
 	return walSegmentNo.getFilename(timeline), timeline, nil
 }
 
-func formatWALFileName(timeline uint32, logSegNo uint64) string {
+func FormatWALFileName(timeline uint32, logSegNo uint64) string {
 	return fmt.Sprintf(walFileFormat, timeline, logSegNo/xLogSegmentsPerXLogId, logSegNo%xLogSegmentsPerXLogId)
 }
 
@@ -149,7 +149,7 @@ func GetNextWalFilename(name string) (string, error) {
 		return "", err
 	}
 	logSegNo++
-	return formatWALFileName(uint32(timelineId), logSegNo), nil
+	return FormatWALFileName(uint32(timelineId), logSegNo), nil
 }
 
 func shouldPrefault(name string) (lsn uint64, shouldPrefault bool, timelineId uint32, err error) {
