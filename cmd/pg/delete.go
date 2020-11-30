@@ -79,11 +79,11 @@ func init() {
 
 // TODO: create postgres part and move it there, if it will be needed
 func postgresLess(object1 storage.Object, object2 storage.Object) bool {
-	lsn1, ok := tryFetchLSN(object1)
+	lsn1, ok := tryFetchLogSegNo(object1)
 	if !ok {
 		return false
 	}
-	lsn2, ok := tryFetchLSN(object2)
+	lsn2, ok := tryFetchLogSegNo(object2)
 	if !ok {
 		return false
 	}
@@ -96,7 +96,7 @@ func postgresIsFullBackup(folder storage.Folder, object storage.Object) bool {
 	return !sentinel.IsIncremental()
 }
 
-func tryFetchLSN(object storage.Object) (string, bool) {
+func tryFetchLogSegNo(object storage.Object) (uint64, bool) {
 	foundLsn := regexpWalFileName.FindAllString(object.GetName(), maxCountOfLSN)
 	if len(foundLsn) > 0 {
 		// Remove timeline id: Timeline is resetted during pg_upgrade. This still can cause problems
@@ -104,11 +104,11 @@ func tryFetchLSN(object storage.Object) (string, bool) {
 		_, logSegNo, err := internal.ParseWALFilename(foundLsn[0])
 
 		if err != nil {
-			return "", false
+			return 0, false
 		}
-		return internal.FormatWALFileName(0, logSegNo), true
+		return logSegNo, true
 	}
-	return "", false
+	return 0, false
 }
 
 func fetchBackupName(object storage.Object) string {
