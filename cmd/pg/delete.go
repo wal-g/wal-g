@@ -12,11 +12,8 @@ import (
 )
 
 var confirmed = false
-var patternTLILogSegNo = "[0-9A-F]{24}"
-var patternBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?", patternTLILogSegNo)
-var regexpWalFileName = regexp.MustCompile(patternTLILogSegNo)
+var patternBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?", internal.PatternTLILogSegNo)
 var regexpBackupName = regexp.MustCompile(patternBackupName)
-var maxCountOfLSN = 2
 
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
@@ -79,11 +76,11 @@ func init() {
 
 // TODO: create postgres part and move it there, if it will be needed
 func postgresLess(object1 storage.Object, object2 storage.Object) bool {
-	lsn1, ok := tryFetchLogSegNo(object1)
+	lsn1, ok := internal.TryFetchLogSegNo(object1.GetName())
 	if !ok {
 		return false
 	}
-	lsn2, ok := tryFetchLogSegNo(object2)
+	lsn2, ok := internal.TryFetchLogSegNo(object2.GetName())
 	if !ok {
 		return false
 	}
@@ -94,21 +91,6 @@ func postgresIsFullBackup(folder storage.Folder, object storage.Object) bool {
 	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), fetchBackupName(object))
 	sentinel, _ := backup.GetSentinel()
 	return !sentinel.IsIncremental()
-}
-
-func tryFetchLogSegNo(object storage.Object) (uint64, bool) {
-	foundLsn := regexpWalFileName.FindAllString(object.GetName(), maxCountOfLSN)
-	if len(foundLsn) > 0 {
-		// Remove timeline id: Timeline is resetted during pg_upgrade. This still can cause problems
-		// with overlapping WALs, but at least will prevent us from deleting new backups
-		_, logSegNo, err := internal.ParseWALFilename(foundLsn[0])
-
-		if err != nil {
-			return 0, false
-		}
-		return logSegNo, true
-	}
-	return 0, false
 }
 
 func fetchBackupName(object storage.Object) string {

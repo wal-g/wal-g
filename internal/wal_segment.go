@@ -94,9 +94,9 @@ func (seg *WalSegment) Name() string {
 	// '0/2A33FE00' -> '00000001000000000000002A'
 	segID := uint64(seg.StartLSN) / uint64(seg.walSegmentBytes)
 	if seg.isComplete() {
-		return FormatWALFileName(uint32(seg.TimeLine), segID)
+		return formatWALFileName(uint32(seg.TimeLine), segID)
 	}
-	return FormatWALFileName(uint32(seg.TimeLine), segID) + ".partial"
+	return formatWALFileName(uint32(seg.TimeLine), segID) + ".partial"
 }
 
 // processMessage is a method that processes a message from Postgres and copies its data into the right location of the wal segment.

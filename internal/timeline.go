@@ -3,12 +3,19 @@ package internal
 import (
 	"fmt"
 	"github.com/wal-g/wal-g/utility"
+	"regexp"
 	"strconv"
 
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 )
+
+const PatternTLILogSegNo = "[0-9A-F]{24}"
+
+var regexpWalFileName = regexp.MustCompile(PatternTLILogSegNo)
+
+const maxCountOfLSN = 2
 
 type BytesPerWalSegmentError struct {
 	error
@@ -90,7 +97,7 @@ func getWalFilename(lsn uint64, conn *pgx.Conn) (walFilename string, timeline ui
 	return walSegmentNo.getFilename(timeline), timeline, nil
 }
 
-func FormatWALFileName(timeline uint32, logSegNo uint64) string {
+func formatWALFileName(timeline uint32, logSegNo uint64) string {
 	return fmt.Sprintf(walFileFormat, timeline, logSegNo/xLogSegmentsPerXLogId, logSegNo%xLogSegmentsPerXLogId)
 }
 
@@ -125,6 +132,21 @@ func ParseWALFilename(name string) (timelineID uint32, logSegNo uint64, err erro
 	return
 }
 
+func TryFetchLogSegNo(objectName string) (uint64, bool) {
+	foundLsn := regexpWalFileName.FindAllString(objectName, maxCountOfLSN)
+	if len(foundLsn) > 0 {
+		// Remove timeline id: Timeline is resetted during pg_upgrade. This still can cause problems
+		// with overlapping WALs, but at least will prevent us from deleting new backups
+		_, logSegNo, err := ParseWALFilename(foundLsn[0])
+
+		if err != nil {
+			return 0, false
+		}
+		return logSegNo, true
+	}
+	return 0, false
+}
+
 func isWalFilename(filename string) bool {
 	_, _, err := ParseWALFilename(filename)
 	return err == nil
@@ -149,7 +171,7 @@ func GetNextWalFilename(name string) (string, error) {
 		return "", err
 	}
 	logSegNo++
-	return FormatWALFileName(uint32(timelineId), logSegNo), nil
+	return formatWALFileName(uint32(timelineId), logSegNo), nil
 }
 
 func shouldPrefault(name string) (lsn uint64, shouldPrefault bool, timelineId uint32, err error) {
