@@ -3,6 +3,7 @@ package internal
 import (
 	"bytes"
 	"fmt"
+	"github.com/pkg/errors"
 	"sort"
 
 	"github.com/jackc/pgx"
@@ -72,6 +73,18 @@ func newWalIntegrityScanSegmentSequence(sequence *WalSegmentsSequence,
 	}
 }
 
+type NoCorrectBackupFoundError struct {
+	error
+}
+
+func newNoCorrectBackupFoundError() NoCorrectBackupFoundError {
+	return NoCorrectBackupFoundError{errors.Errorf("Could not find any correct backup in storage")}
+}
+
+func (err NoCorrectBackupFoundError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
 // QueryCurrentWalSegment() gets start WAL segment from Postgres cluster
 func QueryCurrentWalSegment() WalSegmentDescription {
 	conn, err := Connect()
@@ -104,7 +117,14 @@ func HandleWalVerify(rootFolder storage.Folder, startWalSegment WalSegmentDescri
 	storageSegments := getSegmentsFromFiles(storageFileNames)
 	timelineSwitchMap, err := createTimelineSwitchMap(startWalSegment.Timeline, walFolder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to initialize timeline history map %v", err)
-	walSegmentRunner := NewWalSegmentRunner(startWalSegment, storageSegments, 1, timelineSwitchMap)
+
+	stopWalSegmentNo, err := getEarliestBackupStartSegmentNo(timelineSwitchMap, startWalSegment.Timeline, rootFolder)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Failed to detect earliest backup WAL segment no: '%v',"+
+			"will scan until the 000000010000000000000001 segment.\n", err)
+		stopWalSegmentNo = 1
+	}
+	walSegmentRunner := NewWalSegmentRunner(startWalSegment, storageSegments, stopWalSegmentNo, timelineSwitchMap)
 
 	// maxConcurrency is needed to determine max amount of missing WAL segments
 	// after the last found WAL segment which can be skipped ("uploading" segment sequence size)
@@ -210,6 +230,116 @@ func getCurrentTimeline(conn *pgx.Conn) (uint32, error) {
 		return 0, err
 	}
 	return timeline, nil
+}
+
+// getEarliestBackupStartSegmentNo returns the starting segmentNo of the earliest available correct backup
+func getEarliestBackupStartSegmentNo(timelineSwitchMap map[WalSegmentNo]*TimelineHistoryRecord,
+	currentTimeline uint32,
+	rootFolder storage.Folder) (WalSegmentNo, error) {
+	backups, err := getBackups(rootFolder)
+	if err != nil {
+		return 0, err
+	}
+
+	backupDetails, err := getBackupDetails(rootFolder, backups)
+	if err != nil {
+		return 0, err
+	}
+
+	// switchLsnByTimeline is used for fast lookup of the timeline switch LSN
+	switchLsnByTimeline := make(map[uint32]uint64, len(timelineSwitchMap))
+	for _, historyRecord := range timelineSwitchMap {
+		switchLsnByTimeline[historyRecord.timeline] = historyRecord.lsn
+	}
+	earliestBackup, err := findEarliestBackup(currentTimeline, backupDetails, switchLsnByTimeline)
+	if err != nil {
+		return 0, err
+	}
+
+	tracelog.InfoLogger.Printf("Detected earliest available backup: %s\n",
+		earliestBackup.BackupName)
+	return newWalSegmentNo(earliestBackup.StartLsn), nil
+}
+
+// findEarliestBackup finds earliest correct backup available in storage.
+func findEarliestBackup(
+	currentTimeline uint32,
+	backupDetails []BackupDetail,
+	switchLsnByTimeline map[uint32]uint64,
+) (*BackupDetail, error) {
+	var earliestBackup *BackupDetail
+	for _, backup := range backupDetails {
+		backupTimelineId, err := ParseTimelineFromBackupName(backup.BackupName)
+		if err != nil {
+			return nil, err
+		}
+
+		if ok := checkBackupIsCorrect(currentTimeline, backup.BackupName,
+			backupTimelineId, backup.StartLsn, switchLsnByTimeline); !ok {
+			continue
+		}
+
+		if earliestBackup == nil || earliestBackup.StartLsn > backup.StartLsn {
+			// create local variable so the reference won't break
+			newEarliestBackup := backup
+			earliestBackup = &newEarliestBackup
+		}
+	}
+	if earliestBackup == nil {
+		return nil, newNoCorrectBackupFoundError()
+	}
+	return earliestBackup, nil
+}
+
+// checkBackupIsCorrect checks that backup start LSN is valid.
+// Backup start LSN is considered valid if
+// it belongs to range [backup timeline start LSN, backup timeline end LSN]
+func checkBackupIsCorrect(
+	currentTimeline uint32,
+	backupName string,
+	backupTimeline uint32,
+	backupStartLsn uint64,
+	switchLsnByTimeline map[uint32]uint64,
+) bool {
+	// perform the check only if .history file exists
+	if len(switchLsnByTimeline) > 0 {
+		// if backup start LSN is less than timeline start LSN => incorrect backup
+		if backupTimeline > 1 {
+			backupTimelineStartLsn, ok := switchLsnByTimeline[backupTimeline-1]
+			if ok && backupStartLsn < backupTimelineStartLsn {
+				tracelog.WarningLogger.Printf(
+					"checkBackupIsCorrect: %s: backup start LSN %d "+
+						"is less than the backup timeline start LSN.\n",
+					backupName, backupStartLsn)
+				return false
+			}
+		}
+
+		// if backup belongs to the current timeline, skip the rest of the checks
+		if backupTimeline == currentTimeline {
+			return true
+		}
+
+		// if backup timeline is not present in current .history file => incorrect backup
+		timelineSwitchLsn, ok := switchLsnByTimeline[backupTimeline]
+		if !ok {
+			tracelog.WarningLogger.Printf(
+				"checkBackupIsCorrect: %s: backup timeline %d "+
+					"is not present in .history file and is not current.\n",
+				backupName, backupTimeline)
+			return false
+		}
+
+		// if backup start LSN is higher than switch LSN of the previous timeline => incorrect backup
+		if backupStartLsn >= timelineSwitchLsn {
+			tracelog.WarningLogger.Printf(
+				"checkBackupIsCorrect: %s: backup start LSN %d "+
+					"is higher than the backup timeline end LSN.\n",
+				backupName, backupStartLsn)
+			return false
+		}
+	}
+	return true
 }
 
 // marshalEnumToJSON is used to write the string enum representation
