@@ -29,7 +29,7 @@ type Logging struct {
 
 func DefaultHandleBackupList(folder storage.Folder) {
 	getBackupsFunc := func() ([]BackupTime, error) {
-		return getBackups(folder)
+		return GetBackups(folder)
 	}
 	writeBackupListFunc := func(backups []BackupTime) {
 		WriteBackupList(backups, os.Stdout)
@@ -59,7 +59,7 @@ func HandleBackupList(
 
 // TODO : unit tests
 func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, detail bool) {
-	backups, err := getBackups(folder)
+	backups, err := GetBackups(folder)
 	if len(backups) == 0 {
 		tracelog.InfoLogger.Println("No backups found")
 		return
@@ -67,7 +67,7 @@ func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, de
 	tracelog.ErrorLogger.FatalOnError(err)
 	// if details are requested we append content of metadata.json to each line
 	if detail {
-		backupDetails, err := getBackupDetails(folder, backups)
+		backupDetails, err := GetBackupsDetails(folder, backups)
 		tracelog.ErrorLogger.FatalOnError(err)
 		if json {
 			err = WriteAsJson(backupDetails, os.Stdout, pretty)
@@ -89,21 +89,29 @@ func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, de
 	}
 }
 
-func getBackupDetails(folder storage.Folder, backups []BackupTime) ([]BackupDetail, error) {
-	backupDetails := make([]BackupDetail, len(backups))
+func GetBackupsDetails(folder storage.Folder, backups []BackupTime) ([]BackupDetail, error) {
+	backupsDetails := make([]BackupDetail, 0, len(backups))
 	for i := len(backups) - 1; i >= 0; i-- {
-		backup, err := GetBackupByName(backups[i].BackupName, utility.BaseBackupPath, folder)
+		details, err := GetBackupDetails(folder, backups[i])
 		if err != nil {
 			return nil, err
-		} else {
-			metaData, err := backup.fetchMeta()
-			if err != nil {
-				return nil, err
-			}
-			backupDetails[i] = BackupDetail{backups[i], metaData}
 		}
+		backupsDetails = append(backupsDetails, details)
 	}
-	return backupDetails, nil
+	return backupsDetails, nil
+}
+
+func GetBackupDetails(folder storage.Folder, backupTime BackupTime) (BackupDetail, error) {
+	backup, err := GetBackupByName(backupTime.BackupName, utility.BaseBackupPath, folder)
+	if err != nil {
+		return BackupDetail{}, err
+	}
+
+	metaData, err := backup.fetchMeta()
+	if err != nil {
+		return BackupDetail{}, err
+	}
+	return BackupDetail{backupTime, metaData}, nil
 }
 
 // TODO : unit tests

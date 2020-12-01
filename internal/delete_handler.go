@@ -45,7 +45,7 @@ var MaxTime = time.Unix(1<<63-62135596801, 999999999)
 
 // TODO : unit tests
 func getLatestBackupName(folder storage.Folder) (string, error) {
-	sortTimes, err := getBackups(folder)
+	sortTimes, err := GetBackups(folder)
 	if err != nil {
 		return "", err
 	}
@@ -54,8 +54,8 @@ func getLatestBackupName(folder storage.Folder) (string, error) {
 }
 
 // TODO : unit tests
-// getBackups receives backup descriptions and sorts them by time
-func getBackups(folder storage.Folder) (backups []BackupTime, err error) {
+// GetBackups receives backup descriptions and sorts them by time
+func GetBackups(folder storage.Folder) (backups []BackupTime, err error) {
 	backups, _, err = GetBackupsAndGarbage(folder)
 	if err != nil {
 		return nil, err
@@ -357,7 +357,7 @@ func DeleteBeforeTarget(folder storage.Folder, target storage.Object,
 
 func getPermanentObjects(folder storage.Folder) (map[string]bool, map[string]bool) {
 	tracelog.InfoLogger.Println("retrieving permanent objects")
-	backupTimes, err := getBackups(folder)
+	backupTimes, err := GetBackups(folder)
 	if err != nil {
 		return map[string]bool{}, map[string]bool{}
 	}

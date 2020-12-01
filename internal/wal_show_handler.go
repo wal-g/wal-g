@@ -166,11 +166,11 @@ func groupSegmentsByTimelines(segments map[WalSegmentDescription]bool) (map[uint
 
 // addBackupsInfo adds info about available backups for each timeline
 func addBackupsInfo(timelineInfos []*TimelineInfo, rootFolder storage.Folder) ([]*TimelineInfo, error) {
-	backups, err := getBackups(rootFolder)
+	backups, err := GetBackups(rootFolder)
 	if err != nil {
 		return nil, err
 	}
-	backupDetails, err := getBackupDetails(rootFolder, backups)
+	backupDetails, err := GetBackupsDetails(rootFolder, backups)
 	if err != nil {
 		return nil, err
 	}
