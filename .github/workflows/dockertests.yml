@@ -1,0 +1,136 @@
+name: Docker tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CACHE_FOLDER: ~/docker-images-${{ github.sha }}
+  CACHE_FILE_UBUNTU: ~/docker-images-${{ github.sha }}/wal-g_ubuntu.tgz
+  CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tgz
+  CACHE_FILE_DOCKER_PREFIX: ~/docker-images-${{ github.sha }}/docker_prefix.tgz
+  IMAGE: wal-g/docker_prefix
+  IMAGE_UBUNTU: wal-g/ubuntu
+  IMAGE_GOLANG: wal-g/golang
+  IMAGES_ARTIFACT_NAME: docker-images-${{ github.sha }}
+  IMAGES_ARTIFACT_PATH: ~/docker-images-${{ github.sha }}
+
+jobs:
+  buildimages:
+    name: Build images
+    runs-on: ubuntu-16.04
+    steps:
+      - name: Install deps
+        run: sudo apt-get install liblzo2-dev
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.15
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Get dependencies
+        run: |
+          go get -v -t -d ./...
+          if [ -f Gopkg.toml ]; then
+           curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+           dep ensure
+          fi
+
+      # build images
+      - name: Build images
+        run: make pg_save_image
+
+      # upload images
+      - name: Upload images
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ env.IMAGES_ARTIFACT_NAME }}
+          path: |
+            ${{ env.CACHE_FILE_DOCKER_PREFIX }}
+            ${{ env.CACHE_FILE_UBUNTU }}
+            ${{ env.CACHE_FILE_GOLANG }}
+          retention-days: 1
+    env:
+      USE_LZO: 1
+
+  test:
+    name: test
+    runs-on: ubuntu-16.04
+    needs: [ buildimages ]
+    strategy:
+      matrix:
+        command: [ 'make TEST="pg_backup_mark_impermanent_test" pg_integration_test',
+                   'make TEST="pg_backup_mark_impermanent_test" pg_integration_test',
+                   'make TEST="pg_backup_mark_permanent_test" pg_integration_test',
+                   'make TEST="pg_config_test" pg_integration_test',
+                   'make TEST="pg_crypto_test" pg_integration_test',
+                   'make TEST="pg_delta_backup_wal_delta_test" pg_integration_test',
+                   'make TEST="pg_full_backup_test" pg_integration_test',
+                   'make TEST="pg_ssh_backup_test" pg_integration_test',
+                   'make TEST="pg_receive_wal_test" pg_integration_test',
+                   'make TEST="pg_full_backup_rating_composer_test" pg_integration_test',
+                   'make TEST="pg_delete_before_name_find_full_test" pg_integration_test',
+                   'make TEST="pg_delete_retain_full_test" pg_integration_test',
+                   'make TEST="pg_delete_before_time_find_full_test" pg_integration_test',
+                   'make TEST="pg_delete_without_confirm_test" pg_integration_test',
+                   'make TEST="pg_ghost_table_test" pg_integration_test',
+                   'make TEST="pg_delete_end_to_end_test" pg_integration_test',
+                   'make TEST="pg_delta_backup_fullscan_test" pg_integration_test',
+                   'make TEST="pg_several_delta_backups_test" pg_integration_test',
+                   'make TEST="pg_several_delta_backups_reverse_test" pg_integration_test',
+                   'make TEST="pg_delete_retain_find_full_test" pg_integration_test',
+                   'make TEST="pg_wale_compatibility_test" pg_integration_test',
+                   'make TEST="pg_delete_before_permanent_full_test" pg_integration_test',
+                   'make TEST="pg_delete_before_permanent_delta_test" pg_integration_test',
+                   'make mysql_test',
+                   'make mongo_test',
+                   'make MONGO_VERSION="4.4.0" MONGO_MAJOR="4.4" mongo_features',
+                   'make MONGO_VERSION="4.2.8" MONGO_MAJOR="4.2" mongo_features',
+                   'make MONGO_FEATURE="backup" MONGO_VERSION="4.0.19" MONGO_MAJOR="4.0" mongo_features',
+                   'make MONGO_FEATURE="backup" MONGO_VERSION="3.6.19" MONGO_MAJOR="3.6" mongo_features',
+                   'make redis_test',
+                   'make TEST="pg_wale_tablespace_compatibility_test" pg_integration_test',
+                   'make TEST="pg_tablespace_support_test" pg_integration_test',
+                   'make TEST="pg_wal_perftest" pg_integration_test',
+                   'make TEST="pg_backup_perftest" pg_integration_test',
+                   'make TEST="pg_catchup_test" pg_integration_test',
+        ]
+    steps:
+      - name: Install deps
+        run: sudo apt-get install liblzo2-dev
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.15
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Get dependencies
+        run: |
+          go get -v -t -d ./...
+          if [ -f Gopkg.toml ]; then
+           curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+           dep ensure
+          fi
+
+      # load docker images
+      - name: Download image
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.IMAGES_ARTIFACT_NAME }}
+          path: ${{ env.IMAGES_ARTIFACT_PATH }}
+
+      - name: Run test
+        run: ${{ matrix.command }}
+    env:
+      USE_LIBSODIUM: 1
+      USE_LZO: 1
