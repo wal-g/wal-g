@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
+	"time"
 )
 
 var confirmed = false
@@ -51,7 +52,9 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 	isFullBackup := func(object storage.Object) bool {
 		return IsFullBackup(folder, object)
 	}
-	internal.HandleDeleteBefore(folder, args, confirmed, isFullBackup, GetLessFunc(folder))
+	backups, err := internal.GetBackupSentinelObjects(folder)
+	tracelog.ErrorLogger.FatalOnError(err)
+	internal.HandleDeleteBefore(folder, backups, args, confirmed, isFullBackup, GetLessFunc(folder), getBackupTime)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
@@ -60,7 +63,9 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 	isFullBackup := func(object storage.Object) bool {
 		return IsFullBackup(folder, object)
 	}
-	internal.HandleDeleteRetain(folder, args, confirmed, isFullBackup, GetLessFunc(folder))
+	backups, err := internal.GetBackupSentinelObjects(folder)
+	tracelog.ErrorLogger.FatalOnError(err)
+	internal.HandleDeleteRetain(folder, backups, args, confirmed, isFullBackup, GetLessFunc(folder))
 }
 
 func init() {
@@ -82,4 +87,8 @@ func GetLessFunc(folder storage.Folder) func(object1, object2 storage.Object) bo
 		}
 		return time1 < time2
 	}
+}
+
+func getBackupTime(object storage.Object) time.Time {
+	return object.GetLastModified()
 }

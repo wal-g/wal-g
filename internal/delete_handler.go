@@ -53,6 +53,23 @@ func getLatestBackupName(folder storage.Folder) (string, error) {
 	return sortTimes[0].BackupName, nil
 }
 
+func GetBackupSentinelObjects(folder storage.Folder) ([]storage.Object, error) {
+	objects, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
+	if err != nil {
+		return nil, err
+	}
+
+	sentinelObjects := make([]storage.Object, 0, len(objects))
+	for _, object := range objects {
+		if !strings.HasSuffix(object.GetName(), utility.SentinelSuffix) {
+			continue
+		}
+		sentinelObjects = append(sentinelObjects, object)
+	}
+
+	return sentinelObjects, nil
+}
+
 // TODO : unit tests
 // GetBackups receives backup descriptions and sorts them by time
 func GetBackups(folder storage.Folder) (backups []BackupTime, err error) {
@@ -75,14 +92,14 @@ func GetBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage 
 		return nil, nil, err
 	}
 
-	sortTimes := getBackupTimeSlices(backupObjects)
+	sortTimes := GetBackupTimeSlices(backupObjects)
 	garbage = getGarbageFromPrefix(subFolders, sortTimes)
 
 	return sortTimes, garbage, nil
 }
 
 // TODO : unit tests
-func getBackupTimeSlices(backups []storage.Object) []BackupTime {
+func GetBackupTimeSlices(backups []storage.Object) []BackupTime {
 	sortTimes := make([]BackupTime, len(backups))
 	for i, object := range backups {
 		key := object.GetName()
@@ -115,7 +132,7 @@ func getGarbageFromPrefix(folders []storage.Folder, nonGarbage []BackupTime) []s
 	return garbage
 }
 
-func FindTargetBeforeName(folder storage.Folder,
+func FindTargetBeforeName(backups []storage.Object,
 	name string, modifier int,
 	isFullBackup func(object storage.Object) bool,
 	greater func(object1, object2 storage.Object) bool) (storage.Object, error) {
@@ -124,16 +141,19 @@ func FindTargetBeforeName(folder storage.Folder,
 	if choiceFunc == nil {
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete before'")
 	}
-	return findTarget(folder, greater, choiceFunc)
+	return findTarget(backups, greater, choiceFunc)
 }
 
-func FindTargetBeforeTime(folder storage.Folder,
+func FindTargetBeforeTime(backups []storage.Object,
 	timeLine time.Time, modifier int,
 	isFullBackup func(object storage.Object) bool,
-	less func(object1, object2 storage.Object) bool) (storage.Object, error) {
+	less func(object1, object2 storage.Object) bool,
+	getBackupTime func(backupObject storage.Object) time.Time,
+) (storage.Object, error) {
 
-	potentialTarget, err := findTarget(folder, less, func(object storage.Object) bool {
-		return timeLine.Before(object.GetLastModified()) || timeLine.Equal(object.GetLastModified())
+	potentialTarget, err := findTarget(backups, less, func(object storage.Object) bool {
+		backupTime := getBackupTime(object)
+		return timeLine.Before(backupTime) || timeLine.Equal(backupTime)
 	})
 	if err != nil {
 		return nil, err
@@ -145,10 +165,10 @@ func FindTargetBeforeTime(folder storage.Folder,
 	greater := func(object1, object2 storage.Object) bool {
 		return less(object2, object1)
 	}
-	return FindTargetBeforeName(folder, potentialTarget.GetName(), modifier, isFullBackup, greater)
+	return FindTargetBeforeName(backups, potentialTarget.GetName(), modifier, isFullBackup, greater)
 }
 
-func FindTargetRetain(folder storage.Folder,
+func FindTargetRetain(backups []storage.Object,
 	retentionCount, modifier int,
 	isFullBackup func(object storage.Object) bool,
 	greater func(object1, object2 storage.Object) bool) (storage.Object, error) {
@@ -157,10 +177,10 @@ func FindTargetRetain(folder storage.Folder,
 	if choiceFunc == nil {
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete retain'")
 	}
-	return findTarget(folder, greater, choiceFunc)
+	return findTarget(backups, greater, choiceFunc)
 }
 
-func FindTargetRetainAfterName(folder storage.Folder,
+func FindTargetRetainAfterName(backups []storage.Object,
 	retentionCount int, name string, modifier int,
 	isFullBackup func(object storage.Object) bool,
 	greater func(object1, object2 storage.Object) bool) (storage.Object, error) {
@@ -184,11 +204,11 @@ func FindTargetRetainAfterName(folder storage.Folder,
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete before'")
 	}
 
-	target1, err := findTarget(folder, greater, choiceFuncRetain)
+	target1, err := findTarget(backups, greater, choiceFuncRetain)
 	if err != nil {
 		return nil, err
 	}
-	target2, err := findTarget(folder, less, choiceFuncAfterName)
+	target2, err := findTarget(backups, less, choiceFuncAfterName)
 	if err != nil {
 		return nil, err
 	}
@@ -200,12 +220,14 @@ func FindTargetRetainAfterName(folder storage.Folder,
 	}
 }
 
-func FindTargetRetainAfterTime(folder storage.Folder,
+func FindTargetRetainAfterTime(backups []storage.Object,
 	retentionCount int,
 	timeLine time.Time,
 	modifier int,
 	isFullBackup func(object storage.Object) bool,
-	greater func(object1, object2 storage.Object) bool) (storage.Object, error) {
+	greater func(object1, object2 storage.Object) bool,
+	getBackupTime func(backupObject storage.Object) time.Time,
+) (storage.Object, error) {
 
 	less := func(object1, object2 storage.Object) bool { return greater(object2, object1) }
 
@@ -214,7 +236,8 @@ func FindTargetRetainAfterTime(folder storage.Folder,
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete retain'")
 	}
 	choiceFuncAfter := func(object storage.Object) bool {
-		timeCheck := timeLine.Before(object.GetLastModified()) || timeLine.Equal(object.GetLastModified())
+		backupTime := getBackupTime(object)
+		timeCheck := timeLine.Before(backupTime) || timeLine.Equal(backupTime)
 		if modifier == NoDeleteModifier {
 			return timeCheck
 		} else {
@@ -222,11 +245,11 @@ func FindTargetRetainAfterTime(folder storage.Folder,
 		}
 	}
 
-	target1, err := findTarget(folder, greater, choiceFuncRetain)
+	target1, err := findTarget(backups, greater, choiceFuncRetain)
 	if err != nil {
 		return nil, err
 	}
-	target2, err := findTarget(folder, less, choiceFuncAfter)
+	target2, err := findTarget(backups, less, choiceFuncAfter)
 	if err != nil {
 		return nil, err
 	}
@@ -246,14 +269,10 @@ func FindTargetRetainAfterTime(folder storage.Folder,
 	return target2, nil
 }
 
-func findTarget(folder storage.Folder,
+func findTarget(objects []storage.Object,
 	compare func(object1, object2 storage.Object) bool,
 	isTarget func(object storage.Object) bool) (storage.Object, error) {
 
-	objects, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
-	if err != nil {
-		return nil, err
-	}
 	sort.Slice(objects, func(i, j int) bool {
 		return compare(objects[i], objects[j])
 	})
@@ -406,18 +425,23 @@ func isPermanent(objectName string, permanentBackups map[string]bool, permanentW
 	return false
 }
 
-func HandleDeleteBefore(folder storage.Folder, args []string, confirmed bool,
+func HandleDeleteBefore(
+	folder storage.Folder,
+	backups []storage.Object,
+	args []string, confirmed bool,
 	isFullBackup func(object storage.Object) bool,
-	less func(object1, object2 storage.Object) bool) {
+	less func(object1, object2 storage.Object) bool,
+	getBackupTime func(backupObject storage.Object) time.Time,
+) {
 
 	modifier, beforeStr := extractDeleteModifierFromArgs(args)
 	timeLine, err := time.Parse(time.RFC3339, beforeStr)
 	var target storage.Object
 	if err == nil {
-		target, err = FindTargetBeforeTime(folder, timeLine, modifier, isFullBackup, less)
+		target, err = FindTargetBeforeTime(backups, timeLine, modifier, isFullBackup, less, getBackupTime)
 	} else {
 		greater := func(object1, object2 storage.Object) bool { return less(object2, object1) }
-		target, err = FindTargetBeforeName(folder, beforeStr, modifier, isFullBackup, greater)
+		target, err = FindTargetBeforeName(backups, beforeStr, modifier, isFullBackup, greater)
 	}
 	tracelog.ErrorLogger.FatalOnError(err)
 	if target == nil {
@@ -428,15 +452,19 @@ func HandleDeleteBefore(folder storage.Folder, args []string, confirmed bool,
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func HandleDeleteRetain(folder storage.Folder, args []string, confirmed bool,
+func HandleDeleteRetain(
+	folder storage.Folder,
+	backups []storage.Object,
+	args []string, confirmed bool,
 	isFullBackup func(object storage.Object) bool,
-	less func(object1, object2 storage.Object) bool) {
+	less func(object1, object2 storage.Object) bool,
+) {
 
 	modifier, retantionStr := extractDeleteModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retantionStr)
 	tracelog.ErrorLogger.FatalOnError(err)
 	greater := func(object1, object2 storage.Object) bool { return less(object2, object1) }
-	target, err := FindTargetRetain(folder, retentionCount, modifier, isFullBackup, greater)
+	target, err := FindTargetRetain(backups, retentionCount, modifier, isFullBackup, greater)
 	tracelog.ErrorLogger.FatalOnError(err)
 	if target == nil {
 		tracelog.InfoLogger.Printf("No backup found for deletion")
@@ -446,9 +474,14 @@ func HandleDeleteRetain(folder storage.Folder, args []string, confirmed bool,
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func HandleDeletaRetainAfter(folder storage.Folder, args []string, confirmed bool,
+func HandleDeletaRetainAfter(
+	folder storage.Folder,
+	backups []storage.Object,
+	args []string, confirmed bool,
 	isFullBackup func(object storage.Object) bool,
-	less func(object1, object2 storage.Object) bool) {
+	less func(object1, object2 storage.Object) bool,
+	getBackupTime func(backupObject storage.Object) time.Time,
+) {
 
 	modifier, retentionSir, afterStr := extractDeleteRetainModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionSir)
@@ -458,9 +491,9 @@ func HandleDeletaRetainAfter(folder storage.Folder, args []string, confirmed boo
 	greater := func(object1, object2 storage.Object) bool { return less(object2, object1) }
 	var target storage.Object
 	if err == nil {
-		target, err = FindTargetRetainAfterTime(folder, retentionCount, timeLine, modifier, isFullBackup, greater)
+		target, err = FindTargetRetainAfterTime(backups, retentionCount, timeLine, modifier, isFullBackup, greater, getBackupTime)
 	} else {
-		target, err = FindTargetRetainAfterName(folder, retentionCount, afterStr, modifier, isFullBackup, greater)
+		target, err = FindTargetRetainAfterName(backups, retentionCount, afterStr, modifier, isFullBackup, greater)
 	}
 	tracelog.ErrorLogger.FatalOnError(err)
 

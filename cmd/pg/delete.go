@@ -3,6 +3,7 @@ package pg
 import (
 	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/storages/storage"
@@ -49,7 +50,13 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 	isFullBackup := func(object storage.Object) bool {
 		return postgresIsFullBackup(folder, object)
 	}
-	internal.HandleDeleteBefore(folder, args, confirmed, isFullBackup, postgresLess)
+
+	backups, err := internal.GetBackupSentinelObjects(folder)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	lessFunc := postgresTimelineAndSegmentNoLess
+	backupTimeFunc := getBackupTime
+	internal.HandleDeleteBefore(folder, backups, args, confirmed, isFullBackup, lessFunc, backupTimeFunc)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
@@ -58,7 +65,12 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 	isFullBackup := func(object storage.Object) bool {
 		return postgresIsFullBackup(folder, object)
 	}
-	internal.HandleDeleteRetain(folder, args, confirmed, isFullBackup, postgresLess)
+
+	backups, err := internal.GetBackupSentinelObjects(folder)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	lessFunc := postgresTimelineAndSegmentNoLess
+	internal.HandleDeleteRetain(folder, backups, args, confirmed, isFullBackup, lessFunc)
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
@@ -95,4 +107,8 @@ func postgresIsFullBackup(folder storage.Folder, object storage.Object) bool {
 
 func fetchBackupName(object storage.Object) string {
 	return regexpBackupName.FindString(object.GetName())
+}
+
+func getBackupTime(backupObject storage.Object) time.Time {
+	return backupObject.GetLastModified()
 }

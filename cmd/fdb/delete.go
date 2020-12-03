@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
+	"time"
 )
 
 var confirmed = false
@@ -55,22 +56,25 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 func runDeleteBefore(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
-
-	internal.HandleDeleteBefore(folder, args, confirmed, isFullBackup, GetLessFunc(folder))
+	backups, err := internal.GetBackupSentinelObjects(folder)
+	tracelog.ErrorLogger.FatalOnError(err)
+	internal.HandleDeleteBefore(folder, backups, args, confirmed, isFullBackup, GetLessFunc(), getBackupTime)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
-
-	internal.HandleDeleteRetain(folder, args, confirmed, isFullBackup, GetLessFunc(folder))
+	backups, err := internal.GetBackupSentinelObjects(folder)
+	tracelog.ErrorLogger.FatalOnError(err)
+	internal.HandleDeleteRetain(folder, backups, args, confirmed, isFullBackup, GetLessFunc())
 }
 
 func runDeleteRetainAfter(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
-
-	internal.HandleDeletaRetainAfter(folder, args, confirmed, isFullBackup, GetLessFunc(folder))
+	backups, err := internal.GetBackupSentinelObjects(folder)
+	tracelog.ErrorLogger.FatalOnError(err)
+	internal.HandleDeletaRetainAfter(folder, backups, args, confirmed, isFullBackup, GetLessFunc(), getBackupTime)
 }
 
 func isFullBackup(object storage.Object) bool {
@@ -84,7 +88,7 @@ func init() {
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 
-func GetLessFunc(folder storage.Folder) func(object1, object2 storage.Object) bool {
+func GetLessFunc() func(object1, object2 storage.Object) bool {
 	return func(object1, object2 storage.Object) bool {
 		time1, ok1 := utility.TryFetchTimeRFC3999(object1.GetName())
 		time2, ok2 := utility.TryFetchTimeRFC3999(object2.GetName())
@@ -93,4 +97,8 @@ func GetLessFunc(folder storage.Folder) func(object1, object2 storage.Object) bo
 		}
 		return time1 < time2
 	}
+}
+
+func getBackupTime(object storage.Object) time.Time {
+	return object.GetLastModified()
 }
