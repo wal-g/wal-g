@@ -138,6 +138,10 @@ func FindTargetBeforeTime(folder storage.Folder,
 	if err != nil {
 		return nil, err
 	}
+	if potentialTarget == nil {
+		return nil, nil
+	}
+
 	greater := func(object1, object2 storage.Object) bool {
 		return less(object2, object1)
 	}
@@ -227,11 +231,19 @@ func FindTargetRetainAfterTime(folder storage.Folder,
 		return nil, err
 	}
 
-	if greater(target2, target1) {
-		return target1, nil
-	} else {
+	if target1 == nil {
 		return target2, nil
 	}
+	
+	if target2 == nil {
+		return target1, nil
+	}
+
+	if greater(target2, target1) {
+		return target1, nil
+	}
+
+	return target2, nil
 }
 
 func findTarget(folder storage.Folder,
