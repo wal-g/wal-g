@@ -36,11 +36,11 @@ echo "$NAME"
 wal-g backup-list --config=/root/from.yaml
 wal-g backup-list --config=/root/to.yaml
 
-wal-g copy --from=/root/from.yaml --to=/root/to.yaml --backup "$NAME"
+wal-g backup-copy --from=/root/from.yaml --to=/root/to.yaml --backup "$NAME" --add-prefix=custom
 
 mysql_kill_and_clean_data
 
-wal-g backup-fetch "$NAME" --config=/root/to.yaml
+wal-g backup-fetch "custom$NAME" --config=/root/to.yaml
 
 chown -R mysql:mysql "$MYSQLDATA"
 service mysql start || (cat /var/log/mysql/error.log && false)

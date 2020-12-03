@@ -11,7 +11,7 @@ TEST_FILES = $(wildcard test/*.go testtools/*.go)
 PKG := github.com/wal-g/wal-g
 COVERAGE_FILE := coverage.out
 TEST := "pg_tests"
-
+MYSQL_TEST := "mysql_tests"
 MONGO_MAJOR ?= "4.2"
 MONGO_VERSION ?= "4.2.8"
 
@@ -71,6 +71,7 @@ pg_clean:
 pg_install: pg_build
 	mv $(MAIN_PG_PATH)/wal-g $(GOBIN)/wal-g
 
+mysql_base: install deps mysql_build lint unlink_brotli
 mysql_test: install deps mysql_build lint unlink_brotli mysql_integration_test
 
 mysql_build: $(CMD_FILES) $(PKG_FILES)
@@ -88,9 +89,10 @@ load_docker_common:
 		docker load -i ${CACHE_FILE_GOLANG};\
 	fi
 
-mysql_integration_test: load_docker_common
-	docker-compose build mysql mysql_tests
-	docker-compose up --exit-code-from mysql_tests mysql_tests
+mysql_integration_test: install deps mysql_build lint unlink_brotli load_docker_common
+	./link_brotli.sh
+	docker-compose build mysql $(MYSQL_TEST)
+	docker-compose up --exit-code-from $(MYSQL_TEST) $(MYSQL_TEST)
 
 mysql_clean:
 	(cd $(MAIN_MYSQL_PATH) && go clean)
