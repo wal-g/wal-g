@@ -58,7 +58,6 @@ func GetBackupSentinelObjects(folder storage.Folder) ([]storage.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	sentinelObjects := make([]storage.Object, 0, len(objects))
 	for _, object := range objects {
 		if !strings.HasSuffix(object.GetName(), utility.SentinelSuffix) {
