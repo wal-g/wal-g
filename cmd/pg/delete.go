@@ -160,8 +160,8 @@ func getBackupStartTimeMap(folder storage.Folder, backups []storage.Object) (map
 	for _, backupTime := range backupTimes {
 		backupDetails, err := internal.GetBackupDetails(folder, backupTime)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Failed to get metadata of backup %s: %w",
-				backupTime.BackupName, err)
+			return nil, errors.Wrapf(err, "Failed to get metadata of backup %s",
+				backupTime.BackupName)
 		}
 		startTimeByBackupName[backupDetails.BackupName] = backupDetails.StartTime
 	}
