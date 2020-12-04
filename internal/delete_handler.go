@@ -256,7 +256,6 @@ func FindTargetRetainAfterTime(backups []storage.Object,
 	if target1 == nil {
 		return target2, nil
 	}
-	
 	if target2 == nil {
 		return target1, nil
 	}

@@ -2,11 +2,11 @@ package pg
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 )
