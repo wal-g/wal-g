@@ -3,6 +3,7 @@ package mysql
 import (
 	"path"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/storages/storage"
@@ -55,7 +56,9 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 	isFullBackup := func(object storage.Object) bool {
 		return IsFullBackup(folder, object)
 	}
-	internal.HandleDeleteBefore(folder, args, confirmed, isFullBackup, GetLessFunc(folder))
+	backups, err := internal.GetBackupSentinelObjects(folder)
+	tracelog.ErrorLogger.FatalOnError(err)
+	internal.HandleDeleteBefore(folder, backups, args, confirmed, isFullBackup, GetLessFunc(folder), getBackupTime)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
@@ -64,7 +67,9 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 	isFullBackup := func(object storage.Object) bool {
 		return IsFullBackup(folder, object)
 	}
-	internal.HandleDeleteRetain(folder, args, confirmed, isFullBackup, GetLessFunc(folder))
+	backups, err := internal.GetBackupSentinelObjects(folder)
+	tracelog.ErrorLogger.FatalOnError(err)
+	internal.HandleDeleteRetain(folder, backups, args, confirmed, isFullBackup, GetLessFunc(folder))
 }
 
 func init() {
@@ -119,4 +124,8 @@ func tryFetchBinlogName(folder storage.Folder, object storage.Object) (string, b
 		return "", false
 	}
 	return sentinel.BinLogStart, true
+}
+
+func getBackupTime(object storage.Object) time.Time {
+	return object.GetLastModified()
 }

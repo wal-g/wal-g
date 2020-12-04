@@ -22,9 +22,8 @@ func TestFindTargetBeforeName_ReturnsBackup_Without_Modifier(t *testing.T) {
 }
 
 func TestFindTargetBeforeName_ReturnsForbiddenActionError_With_FULL_Modifier(t *testing.T) {
-	controller := gomock.NewController(t)
-	defer controller.Finish()
-	_, err := internal.FindTargetBeforeName(mocks.NewMockFolder(controller), "",
+	_, backupObjects := createSimpleMockFolderWithoutBackups(t)
+	_, err := internal.FindTargetBeforeName(backupObjects, "",
 		internal.FullDeleteModifier, isFullBackup, greaterByName)
 	assert.Error(t, err)
 	assert.IsType(t, utility.ForbiddenActionError{}, err)
@@ -38,7 +37,9 @@ func TestFindTargetBeforeName_ReturnsFullBackup_With_FIND_FULL(t *testing.T) {
 
 func testFindTargetBeforeName(t *testing.T, expected, targetName string, modifier int) {
 	folder := testtools.CreateMockStorageFolderWithDeltaBackups(t)
-	target, err := internal.FindTargetBeforeName(folder, targetName, modifier, isFullBackup, greaterByName)
+	backupObjects, _ := getBackupObjects(folder)
+
+	target, err := internal.FindTargetBeforeName(backupObjects, targetName, modifier, isFullBackup, greaterByName)
 	assert.NoError(t, err)
 	assert.Equal(t, expected, target.GetName())
 }
@@ -60,8 +61,9 @@ func TestFindTargetRetain_With_FIND_FULL_Modifier(t *testing.T) {
 
 func testTargetRetain(t *testing.T, expectedName string, retentionCount, modifier int) {
 	mockFolder := createMockFolderWithTime(t, utility.TimeNowCrossPlatformLocal())
+	backupObjects, _ := getBackupObjects(mockFolder)
 
-	target, err := internal.FindTargetRetain(mockFolder, retentionCount, modifier, isFullBackup, greaterByTime)
+	target, err := internal.FindTargetRetain(backupObjects, retentionCount, modifier, isFullBackup, greaterByTime)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedName, target.GetName())
 }
@@ -144,16 +146,19 @@ func TestFindTargetRetainAfter_With_FIND_FULL_Modifier(t *testing.T) {
 func testTargetRetainAfterTime(t *testing.T, duration time.Duration, expectedName string, retentionCount, modifier int) {
 	baseTime := utility.TimeNowCrossPlatformLocal()
 	mockFolder := createMockFolderWithTime(t, baseTime)
+	backupObjects, _ := getBackupObjects(mockFolder)
 
-	target, err := internal.FindTargetRetainAfterTime(mockFolder, retentionCount, baseTime.Add(duration), modifier, isFullBackup, greaterByTime)
+	target, err := internal.FindTargetRetainAfterTime(backupObjects, retentionCount, baseTime.Add(duration), modifier,
+		isFullBackup, greaterByTime, getBackupTime)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedName, target.GetName())
 }
 
 func testTargetRetainAfterName(t *testing.T, name string, expectedName string, retentionCount, modifier int) {
 	mockFolder := createMockFolderWithTime(t, utility.TimeNowCrossPlatformLocal())
+	backupObjects, _ := getBackupObjects(mockFolder)
 
-	target, err := internal.FindTargetRetainAfterName(mockFolder, retentionCount, name, modifier, isFullBackup, greaterByTime)
+	target, err := internal.FindTargetRetainAfterName(backupObjects, retentionCount, name, modifier, isFullBackup, greaterByTime)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedName, target.GetName())
 }
@@ -181,9 +186,10 @@ func TestFindTargetBeforeTime_With_FIND_FULL_Modifier(t *testing.T) {
 func testFindTargetBeforeTime(t *testing.T, minute int, modifier int) (storage.Object, error) {
 	baseTime := utility.TimeNowCrossPlatformLocal()
 	mockFolder := createMockFolderWithTime(t, baseTime)
+	backupObjects, _ := getBackupObjects(mockFolder)
 
 	timeLine := baseTime.Add(time.Duration(minute * int(time.Minute)))
-	return internal.FindTargetBeforeTime(mockFolder, timeLine, modifier, isFullBackup, lessByTime)
+	return internal.FindTargetBeforeTime(backupObjects, timeLine, modifier, isFullBackup, lessByTime, getBackupTime)
 }
 
 func verifyThatExistBackupsAndWals(t *testing.T, expectBackupExistAfterDelete, expectWalExistAfterDelete map[string]bool, folder storage.Folder) {
@@ -276,6 +282,30 @@ func createMockFolderWithTime(t *testing.T, baseTime time.Time) *mocks.MockFolde
 	return mockFolder
 }
 
+func createSimpleMockFolderWithoutBackups(t *testing.T) (*mocks.MockFolder, []storage.Object) {
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+
+	objects := make([]storage.Object, 0)
+	mockBaseBackupFolder := mocks.NewMockFolder(controller)
+
+	mockBaseBackupFolder.
+		EXPECT().
+		ListFolder().
+		Return(objects, nil, nil).
+		AnyTimes()
+
+	mockFolder := mocks.NewMockFolder(controller)
+	mockFolder.
+		EXPECT().
+		GetSubFolder(utility.BaseBackupPath).
+		Return(mockBaseBackupFolder).
+		AnyTimes()
+
+	backupObjects, _ := getBackupObjects(mockFolder)
+	return mockFolder, backupObjects
+}
+
 func isFullBackup(object storage.Object) bool {
 	return !strings.Contains(object.GetName(), "D")
 }
@@ -290,4 +320,18 @@ func lessByTime(object1, object2 storage.Object) bool {
 
 func greaterByTime(object1, object2 storage.Object) bool {
 	return object1.GetLastModified().After(object2.GetLastModified())
+}
+
+func getBackupTime(object storage.Object) time.Time {
+	return object.GetLastModified()
+}
+
+// this function is the analog for internal.GetBackupSentinelObjects
+// but we don't use sentinel suffixes in the above tests so there is no sentinel suffix check
+func getBackupObjects(folder storage.Folder) ([]storage.Object, error) {
+	objects, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
+	if err != nil {
+		return nil, err
+	}
+	return objects, nil
 }

@@ -236,12 +236,12 @@ func getCurrentTimeline(conn *pgx.Conn) (uint32, error) {
 func getEarliestBackupStartSegmentNo(timelineSwitchMap map[WalSegmentNo]*TimelineHistoryRecord,
 	currentTimeline uint32,
 	rootFolder storage.Folder) (WalSegmentNo, error) {
-	backups, err := getBackups(rootFolder)
+	backups, err := GetBackups(rootFolder)
 	if err != nil {
 		return 0, err
 	}
 
-	backupDetails, err := getBackupDetails(rootFolder, backups)
+	backupDetails, err := GetBackupsDetails(rootFolder, backups)
 	if err != nil {
 		return 0, err
 	}

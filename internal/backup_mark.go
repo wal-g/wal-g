@@ -158,7 +158,7 @@ func backupHasPermanentInFuture(reverseLinks *map[string][]string, backupName st
 func getGraphFromBaseToIncrement(folder storage.Folder) (map[string][]string, error) {
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 
-	backups, err := getBackups(folder)
+	backups, err := GetBackups(folder)
 	if err != nil {
 		return nil, err
 	}
