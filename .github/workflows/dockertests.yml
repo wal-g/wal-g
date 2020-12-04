@@ -101,6 +101,8 @@ jobs:
                    'make TEST="pg_backup_perftest" pg_integration_test',
                    'make TEST="pg_catchup_test" pg_integration_test',
         ]
+      # do not cancel all tests if one failed
+      fail-fast: false
     steps:
       - name: Install deps
         run: sudo apt-get install liblzo2-dev
