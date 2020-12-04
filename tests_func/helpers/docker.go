@@ -321,7 +321,12 @@ func (inf *Infra) Shutdown() error {
 func (inf *Infra) callCompose(actions []string) error {
 	baseArgs := []string{"--file", inf.config, "-p", "test"}
 	baseArgs = append(baseArgs, actions...)
-	cmd := exec.CommandContext(inf.ctx, "docker-compose", baseArgs...)
+	// lookup the full path before exec.CommandContext call (fixes https://github.com/docker/compose/issues/1135)
+	fullPath, err := exec.LookPath("docker-compose")
+	if err != nil {
+		return err
+	}
+	cmd := exec.CommandContext(inf.ctx, fullPath, baseArgs...)
 	for _, line := range utils.EnvToList(inf.env) {
 		cmd.Env = append(cmd.Env, line)
 	}
