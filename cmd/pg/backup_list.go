@@ -35,7 +35,7 @@ var (
 )
 
 func init() {
-	Cmd.AddCommand(backupListCmd)
+	cmd.AddCommand(backupListCmd)
 
 	backupListCmd.Flags().BoolVar(&pretty, PrettyFlag, false, "Prints more readable output")
 	backupListCmd.Flags().BoolVar(&json, JsonFlag, false, "Prints output in json format")

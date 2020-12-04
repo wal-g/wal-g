@@ -33,5 +33,5 @@ func init() {
 		"List of databases to restore logs. All non-system databases from backup as default")
 	logRestoreCmd.PersistentFlags().BoolVarP(&logRestoreNoRecovery, "no-recovery", "n", false,
 		"Restore with NO_RECOVERY option")
-	Cmd.AddCommand(logRestoreCmd)
+	cmd.AddCommand(logRestoreCmd)
 }

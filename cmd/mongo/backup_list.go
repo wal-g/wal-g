@@ -28,6 +28,6 @@ var backupListCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(backupListCmd)
+	cmd.AddCommand(backupListCmd)
 	backupListCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose mode")
 }

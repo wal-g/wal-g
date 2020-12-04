@@ -51,5 +51,5 @@ func init() {
 		false, ReverseDeltaUnpackDescription)
 	backupFetchCmd.Flags().BoolVar(&skipRedundantTars, "skip-redundant-tars",
 		false, SkipRedundantTarsDescription)
-	Cmd.AddCommand(backupFetchCmd)
+	cmd.AddCommand(backupFetchCmd)
 }

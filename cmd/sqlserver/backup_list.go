@@ -21,5 +21,5 @@ var backupListCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(backupListCmd)
+	cmd.AddCommand(backupListCmd)
 }

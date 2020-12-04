@@ -40,6 +40,6 @@ var (
 )
 
 func init() {
-	Cmd.AddCommand(walVerifyCmd)
+	cmd.AddCommand(walVerifyCmd)
 	walVerifyCmd.Flags().BoolVar(&useJsonOutput, useJsonOutputFlag, false, useJsonOutputDescription)
 }

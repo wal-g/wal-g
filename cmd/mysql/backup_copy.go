@@ -59,5 +59,5 @@ func init() {
 	copyCmd.Flags().StringVarP(&prefix, prefixFlag, prefixShorthand, "", prefixDescription)
 	copyCmd.Flags().BoolVarP(&all, copyAllFlag, allShorthand, false, copyAllSDescription)
 
-	Cmd.AddCommand(copyCmd)
+	cmd.AddCommand(copyCmd)
 }

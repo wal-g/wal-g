@@ -37,5 +37,5 @@ var binlogFetchCmd = &cobra.Command{
 func init() {
 	binlogFetchCmd.PersistentFlags().StringVar(&fetchBackupName, "since", "LATEST", fetchSinceFlagShortDescr)
 	binlogFetchCmd.PersistentFlags().StringVar(&fetchUntilTs, "until", utility.TimeNowCrossPlatformUTC().Format(time.RFC3339), fetchUntilFlagShortDescr)
-	Cmd.AddCommand(binlogFetchCmd)
+	cmd.AddCommand(binlogFetchCmd)
 }

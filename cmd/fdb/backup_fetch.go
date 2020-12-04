@@ -35,5 +35,5 @@ var backupFetchCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(backupFetchCmd)
+	cmd.AddCommand(backupFetchCmd)
 }

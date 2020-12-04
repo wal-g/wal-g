@@ -63,7 +63,7 @@ func runPurge(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	Cmd.AddCommand(deleteCmd)
+	cmd.AddCommand(deleteCmd)
 	deleteCmd.Flags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 	deleteCmd.Flags().BoolVar(&purgeOplog, PurgeOplogFlag, false, "Purge oplog archives")
 	deleteCmd.Flags().BoolVar(&purgeGarbage, PurgeGarbageFlag, false, "Purge garbage in backup folder")

@@ -23,5 +23,5 @@ func init() {
 		"List of databases to log. All not-system databases as default")
 	logPushCmd.PersistentFlags().BoolVarP(&logCompression, "compression", "c", true,
 		"Use built-in log compression. Enabled by default")
-	Cmd.AddCommand(logPushCmd)
+	cmd.AddCommand(logPushCmd)
 }

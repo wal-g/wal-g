@@ -26,5 +26,5 @@ func init() {
 		"Update latest backup instead of creating new one")
 	backupPushCmd.PersistentFlags().BoolVarP(&backupCompression, "compression", "c", true,
 		"Use built-in backup compression. Enabled by default")
-	Cmd.AddCommand(backupPushCmd)
+	cmd.AddCommand(backupPushCmd)
 }

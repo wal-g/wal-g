@@ -82,7 +82,7 @@ func isFullBackup(object storage.Object) bool {
 }
 
 func init() {
-	Cmd.AddCommand(deleteCmd)
+	cmd.AddCommand(deleteCmd)
 	deleteRetainCmd.Flags().StringP("after", "a", "", "Set the time after which retain backups")
 	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")

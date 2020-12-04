@@ -22,5 +22,5 @@ var proxyCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(proxyCmd)
+	cmd.AddCommand(proxyCmd)
 }

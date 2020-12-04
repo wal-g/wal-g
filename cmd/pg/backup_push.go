@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	BackupPushShortDescription     = "Makes backup and uploads it to storage"
+	ackupPushShortDescription      = "Makes backup and uploads it to storage"
 	PermanentFlag                  = "permanent"
 	FullBackupFlag                 = "full"
 	VerifyPagesFlag                = "verify"
@@ -25,7 +25,7 @@ var (
 	// backupPushCmd represents the backupPush command
 	backupPushCmd = &cobra.Command{
 		Use:   "backup-push db_directory",
-		Short: BackupPushShortDescription, // TODO : improve description
+		Short: ackupPushShortDescription, // TODO : improve description
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			uploader, err := internal.ConfigureWalUploader()
@@ -48,7 +48,7 @@ var (
 )
 
 func init() {
-	Cmd.AddCommand(backupPushCmd)
+	cmd.AddCommand(backupPushCmd)
 
 	backupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes permanent backup")
 	backupPushCmd.Flags().BoolVarP(&fullBackup, FullBackupFlag, FullBackupShorthand, false, "Make full backup-push")

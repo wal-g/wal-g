@@ -84,5 +84,5 @@ var oplogReplayCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(oplogReplayCmd)
+	cmd.AddCommand(oplogReplayCmd)
 }

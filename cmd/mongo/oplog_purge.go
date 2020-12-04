@@ -47,6 +47,6 @@ func runOplogPurge(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	Cmd.AddCommand(oplogPurgeCmd)
+	cmd.AddCommand(oplogPurgeCmd)
 	oplogPurgeCmd.Flags().BoolVar(&confirmedOplogPurge, internal.ConfirmFlag, false, "Confirms oplog archives deletion")
 }

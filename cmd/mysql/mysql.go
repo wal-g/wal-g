@@ -17,7 +17,7 @@ var WalgVersion = "devel"
 var GitRevision = "devel"
 var BuildDate = "devel"
 
-var Cmd = &cobra.Command{
+var cmd = &cobra.Command{
 	Use:     "mysql",
 	Short:   ShortDescription, // TODO : improve description
 	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "MySQL"}, "\t"),
@@ -30,7 +30,7 @@ var Cmd = &cobra.Command{
 }
 
 func Execute() {
-	if err := Cmd.Execute(); err != nil {
+	if err := cmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -39,7 +39,7 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
-	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
-	Cmd.InitDefaultVersionFlag()
-	internal.AddConfigFlags(Cmd)
+	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
+	cmd.InitDefaultVersionFlag()
+	internal.AddConfigFlags(cmd)
 }

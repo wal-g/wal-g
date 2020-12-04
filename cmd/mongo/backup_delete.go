@@ -44,5 +44,5 @@ var backupDeleteCmd = &cobra.Command{
 
 func init() {
 	backupDeleteCmd.Flags().BoolVar(&confirmedBackupDelete, internal.ConfirmFlag, false, "Confirms backup deletion")
-	Cmd.AddCommand(backupDeleteCmd)
+	cmd.AddCommand(backupDeleteCmd)
 }

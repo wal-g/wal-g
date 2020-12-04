@@ -21,5 +21,5 @@ var walFetchCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(walFetchCmd)
+	cmd.AddCommand(walFetchCmd)
 }

@@ -29,5 +29,5 @@ var walPushCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(walPushCmd)
+	cmd.AddCommand(walPushCmd)
 }

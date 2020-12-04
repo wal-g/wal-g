@@ -31,5 +31,5 @@ func init() {
 	binlogReplayCmd.PersistentFlags().StringVar(&replayBackupName, "since", "LATEST", replaySinceFlagShortDescr)
 	binlogReplayCmd.PersistentFlags().StringVar(&replayUntilTs, "until",
 		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339), replayUntilFlagShortDescr)
-	Cmd.AddCommand(binlogReplayCmd)
+	cmd.AddCommand(binlogReplayCmd)
 }

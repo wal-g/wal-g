@@ -23,5 +23,5 @@ var walPrefetchCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(walPrefetchCmd)
+	cmd.AddCommand(walPrefetchCmd)
 }

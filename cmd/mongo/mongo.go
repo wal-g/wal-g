@@ -17,7 +17,7 @@ var WalgVersion = "devel"
 var GitRevision = "devel"
 var BuildDate = "devel"
 
-var Cmd = &cobra.Command{
+var cmd = &cobra.Command{
 	Use:     "wal-g",
 	Short:   DBShortDescription, // TODO : improve description
 	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "MongoDB"}, "\t"),
@@ -30,7 +30,7 @@ var Cmd = &cobra.Command{
 }
 
 func Execute() {
-	if err := Cmd.Execute(); err != nil {
+	if err := cmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -40,7 +40,7 @@ func init() {
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
 	internal.RequiredSettings[internal.MongoDBUriSetting] = true
-	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
-	Cmd.InitDefaultVersionFlag()
-	internal.AddConfigFlags(Cmd)
+	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
+	cmd.InitDefaultVersionFlag()
+	internal.AddConfigFlags(cmd)
 }
