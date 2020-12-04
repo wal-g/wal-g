@@ -58,7 +58,7 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	backups, err := internal.GetBackupSentinelObjects(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	internal.HandleDeleteBefore(folder, backups, args, confirmed, isFullBackup, GetLessFunc(), getBackupTime)
+	internal.HandleDeleteBefore(folder, backups, args, confirmed, isFullBackup, lessFunc(), getBackupTime)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
@@ -66,7 +66,7 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	backups, err := internal.GetBackupSentinelObjects(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	internal.HandleDeleteRetain(folder, backups, args, confirmed, isFullBackup, GetLessFunc())
+	internal.HandleDeleteRetain(folder, backups, args, confirmed, isFullBackup, lessFunc())
 }
 
 func runDeleteRetainAfter(cmd *cobra.Command, args []string) {
@@ -74,7 +74,7 @@ func runDeleteRetainAfter(cmd *cobra.Command, args []string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	backups, err := internal.GetBackupSentinelObjects(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	internal.HandleDeletaRetainAfter(folder, backups, args, confirmed, isFullBackup, GetLessFunc(), getBackupTime)
+	internal.HandleDeletaRetainAfter(folder, backups, args, confirmed, isFullBackup, lessFunc(), getBackupTime)
 }
 
 func isFullBackup(object storage.Object) bool {
@@ -88,7 +88,7 @@ func init() {
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 
-func GetLessFunc() func(object1, object2 storage.Object) bool {
+func lessFunc() func(object1, object2 storage.Object) bool {
 	return func(object1, object2 storage.Object) bool {
 		time1, ok1 := utility.TryFetchTimeRFC3999(object1.GetName())
 		time2, ok2 := utility.TryFetchTimeRFC3999(object2.GetName())

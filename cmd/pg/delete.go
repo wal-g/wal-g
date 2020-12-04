@@ -104,7 +104,7 @@ func tryMakeSentinelTimeFuncs(
 		return nil, nil, false
 	}
 
-	return GetLessFunc(startTimeByBackupName), GetBackupTimeFunc(startTimeByBackupName), true
+	return lessFunc(startTimeByBackupName), GetBackupTimeFunc(startTimeByBackupName), true
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
@@ -121,7 +121,7 @@ func init() {
 	deleteCmd.PersistentFlags().BoolVar(&useSentinelTime, UseSentinelTimeFlag, false, UseSentinelTimeDescription)
 }
 
-func GetLessFunc(startTimeByBackupName map[string]time.Time) func(storage.Object, storage.Object) bool {
+func lessFunc(startTimeByBackupName map[string]time.Time) func(storage.Object, storage.Object) bool {
 	return func(object1 storage.Object, object2 storage.Object) bool {
 		backupName1 := fetchBackupName(object1)
 		if backupName1 == "" {

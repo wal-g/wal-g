@@ -14,6 +14,6 @@ export WALG_MYSQL_BACKUP_PREPARE_COMMAND="xtrabackup --prepare --target-dir=${MY
 # shellcheck disable=SC2016
 export WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
 export WALG_MYSQL_BINLOG_DST=/tmp
-export WALG_LOG_LEVEL=DEVEL
+#export WALG_LOG_LEVEL=DEVEL
 
 . /usr/local/export_test_funcs.sh

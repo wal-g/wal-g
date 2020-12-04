@@ -435,10 +435,8 @@ services:
       - docker/common/common_walg.env
     depends_on:
       - s3
-      - s3-another
     links:
       - s3
-      - s3-another
   
   mysql_delete_tests:
     build:
@@ -467,8 +465,10 @@ services:
       - docker/common/common_walg.env
     depends_on:
       - s3
+      - s3-another
     links:
       - s3
+      - s3-another
 
   mariadb:
     build:

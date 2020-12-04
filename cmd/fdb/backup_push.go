@@ -12,12 +12,12 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-const BackupPushShortDescription = "Pushes backup to storage"
+const backupPushShortDescription = "Pushes backup to storage"
 
 // backupPushCmd represents the backupPush command
 var backupPushCmd = &cobra.Command{
 	Use:   "backup-push",
-	Short: BackupPushShortDescription,
+	Short: backupPushShortDescription,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})

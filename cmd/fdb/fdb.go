@@ -10,7 +10,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 )
 
-var DBShortDescription = "FoundationDB backup tool"
+var dbShortDescription = "FoundationDB backup tool"
 
 // These variables are here only to show current version. They are set in makefile during build process
 var WalgVersion = "devel"
@@ -19,7 +19,7 @@ var BuildDate = "devel"
 
 var Cmd = &cobra.Command{
 	Use:     "wal-g",
-	Short:   DBShortDescription, // TODO : improve description
+	Short:   dbShortDescription, // TODO : improve description
 	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "FoundationDB"}, "\t"),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		err := internal.AssertRequiredSettingsSet()
