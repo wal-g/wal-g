@@ -13,7 +13,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-const BackupDeleteShortDescription = "Deletes backup data from storage"
+const backupDeleteShortDescription = "Deletes backup data from storage"
 
 var (
 	confirmedBackupDelete bool
@@ -22,7 +22,7 @@ var (
 // backupDeleteCmd represents the backupDelete command
 var backupDeleteCmd = &cobra.Command{
 	Use:   "backup-delete <backup-name>",
-	Short: BackupDeleteShortDescription,
+	Short: backupDeleteShortDescription,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())

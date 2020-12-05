@@ -105,16 +105,6 @@ jobs:
     - script: make TEST="pg_delete_before_permanent_delta_test" pg_integration_test
       workspaces:
         use: image_cache
-    - script: make mysql_base
-      workspaces:
-        use: image_cache
-    - script: make MYSQL_TEST=mysql_base_tests mysql_integration_test
-      workspaces:
-        use: image_cache
-    - script: make MYSQL_TEST=mysql_delete_tests mysql_integration_test
-      workspaces:
-        use: image_cache
-    - script: make MYSQL_TEST=mysql_copy_tests mysql_integration_test
       workspaces:
         use: image_cache
     - script: make mongo_test

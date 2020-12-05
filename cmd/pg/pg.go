@@ -15,14 +15,14 @@ const WalgShortDescription = "PostgreSQL backup tool"
 
 var (
 	// These variables are here only to show current version. They are set in makefile during build process
-	WalgVersion = "devel"
-	GitRevision = "devel"
-	BuildDate   = "devel"
+	walgVersion = "devel"
+	gitRevision = "devel"
+	buildDate   = "devel"
 
 	cmd = &cobra.Command{
 		Use:     "wal-g",
 		Short:   WalgShortDescription, // TODO : improve short and long descriptions
-		Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "PostgreSQL"}, "\t"),
+		Version: strings.Join([]string{walgVersion, gitRevision, buildDate, "PostgreSQL"}, "\t"),
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			err := internal.AssertRequiredSettingsSet()
 			tracelog.ErrorLogger.FatalOnError(err)

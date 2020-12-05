@@ -9,15 +9,15 @@ import (
 
 const (
 	ackupPushShortDescription      = "Makes backup and uploads it to storage"
-	PermanentFlag                  = "permanent"
-	FullBackupFlag                 = "full"
-	VerifyPagesFlag                = "verify"
-	StoreAllCorruptBlocksFlag      = "store-all-corrupt"
+	permanentFlag                  = "permanent"
+	fullBackupFlag                 = "full"
+	verifyPagesFlag                = "verify"
+	storeAllCorruptBlocksFlag      = "store-all-corrupt"
 	UseRatingComposer              = "rating-composer"
-	PermanentShorthand             = "p"
-	FullBackupShorthand            = "f"
-	VerifyPagesShorthand           = "v"
-	StoreAllCorruptBlocksShorthand = "s"
+	permanentShorthand             = "p"
+	fullBackupShorthand            = "f"
+	verifyPagesShorthand           = "v"
+	storeAllCorruptBlocksShorthand = "s"
 	UseRatingComposerShortHand     = "r"
 )
 
@@ -50,10 +50,10 @@ var (
 func init() {
 	cmd.AddCommand(backupPushCmd)
 
-	backupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes permanent backup")
-	backupPushCmd.Flags().BoolVarP(&fullBackup, FullBackupFlag, FullBackupShorthand, false, "Make full backup-push")
-	backupPushCmd.Flags().BoolVarP(&verifyPageChecksums, VerifyPagesFlag, VerifyPagesShorthand, false, "Verify page checksums")
-	backupPushCmd.Flags().BoolVarP(&storeAllCorruptBlocks, StoreAllCorruptBlocksFlag, StoreAllCorruptBlocksShorthand,
+	backupPushCmd.Flags().BoolVarP(&permanent, permanentFlag, permanentShorthand, false, "Pushes permanent backup")
+	backupPushCmd.Flags().BoolVarP(&fullBackup, fullBackupFlag, fullBackupShorthand, false, "Make full backup-push")
+	backupPushCmd.Flags().BoolVarP(&verifyPageChecksums, verifyPagesFlag, verifyPagesShorthand, false, "Verify page checksums")
+	backupPushCmd.Flags().BoolVarP(&storeAllCorruptBlocks, storeAllCorruptBlocksFlag, storeAllCorruptBlocksShorthand,
 		false, "Store all corrupt blocks found during page checksum verification")
 	backupPushCmd.Flags().BoolVarP(&useRatingComposer, UseRatingComposer, UseRatingComposerShortHand, false, "Use rating tar composer (beta)")
 }
