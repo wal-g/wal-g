@@ -362,3 +362,10 @@ func ParseUntilTs(untilTs string) (time.Time, error) {
 	// far future
 	return MaxTime, nil
 }
+
+// MarshalEnumToString is used to write the string enum representation
+// instead of int enum value to JSON
+func MarshalEnumToString(enum fmt.Stringer) ([]byte, error) {
+	buffer := bytes.NewBufferString(enum.String())
+	return buffer.Bytes(), nil
+}

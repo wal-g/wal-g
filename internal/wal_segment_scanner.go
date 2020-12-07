@@ -1,5 +1,7 @@
 package internal
 
+import "github.com/wal-g/wal-g/utility"
+
 type ScannedSegmentStatus int
 
 const (
@@ -26,9 +28,9 @@ func (status ScannedSegmentStatus) String() string {
 	return [...]string{"", "MISSING_LOST", "MISSING_UPLOADING", "MISSING_DELAYED", "FOUND"}[status]
 }
 
-// MarshalJSON marshals the ScannedSegmentStatus enum as a quoted json string
-func (status ScannedSegmentStatus) MarshalJSON() ([]byte, error) {
-	return marshalEnumToJSON(status)
+// MarshalText marshals the ScannedSegmentStatus enum as a string
+func (status ScannedSegmentStatus) MarshalText() ([]byte, error) {
+	return utility.MarshalEnumToString(status)
 }
 
 // WalSegmentScanner is used to scan the WAL segments storage
