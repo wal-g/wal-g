@@ -9,14 +9,14 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 )
 
-const BackupListShortDescription = "Prints available backups"
+const backupListShortDescription = "Prints available backups"
 
 var verbose bool
 
 // backupListCmd represents the backupList command
 var backupListCmd = &cobra.Command{
 	Use:   "backup-list",
-	Short: BackupListShortDescription, // TODO : improve description
+	Short: backupListShortDescription, // TODO : improve description
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())

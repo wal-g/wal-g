@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	BackupListShortDescription = "Prints available backups"
+	backupListShortDescription = "Prints available backups"
 	PrettyFlag                 = "pretty"
 	JsonFlag                   = "json"
 	DetailFlag                 = "detail"
@@ -17,7 +17,7 @@ var (
 	// backupListCmd represents the backupList command
 	backupListCmd = &cobra.Command{
 		Use:   "backup-list",
-		Short: BackupListShortDescription, // TODO : improve description
+		Short: backupListShortDescription, // TODO : improve description
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			folder, err := internal.ConfigureFolder()
