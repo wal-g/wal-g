@@ -22,19 +22,34 @@ jobs:
     name: Build images
     runs-on: ubuntu-16.04
     steps:
+      # if this is a retry job, there should cached image artifact available
+      - name: Docker image artifacts caching
+        id: cache-images
+        uses: actions/cache@v2
+        with:
+          path: |
+            ${{ env.CACHE_FILE_DOCKER_PREFIX }}
+            ${{ env.CACHE_FILE_UBUNTU }}
+            ${{ env.CACHE_FILE_GOLANG }}
+          key: ${{ env.IMAGES_ARTIFACT_NAME }}
+
       - name: Install deps
+        if: steps.cache-images.outputs.cache-hit != 'true'
         run: sudo apt-get install liblzo2-dev
 
       - name: Set up Go 1.x
+        if: steps.cache-images.outputs.cache-hit != 'true'
         uses: actions/setup-go@v2
         with:
           go-version: ^1.15
         id: go
 
       - name: Check out code into the Go module directory
+        if: steps.cache-images.outputs.cache-hit != 'true'
         uses: actions/checkout@v2
 
       - name: Get dependencies
+        if: steps.cache-images.outputs.cache-hit != 'true'
         run: |
           go get -v -t -d ./...
           if [ -f Gopkg.toml ]; then
@@ -44,6 +59,7 @@ jobs:
 
       # build images
       - name: Build images
+        if: steps.cache-images.outputs.cache-hit != 'true'
         run: make pg_save_image
 
       # upload images
