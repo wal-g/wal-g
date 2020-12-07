@@ -17,11 +17,11 @@ test_receive_wal()
   sleep 1
   VERIFY_OUTPUT=$(mktemp)
   # Verify and store in temp file
-  wal-g --config=${TMP_CONFIG} wal-verify > "${VERIFY_OUTPUT}"
+  wal-g --config=${TMP_CONFIG} wal-verify integrity > "${VERIFY_OUTPUT}"
   /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w stop -m immediate
 
   # parse verify results
-  VERIFY_RESULT=$(awk 'BEGIN{FS=":"}$1~/WAL storage status/{print $2}' $VERIFY_OUTPUT)
+  VERIFY_RESULT=$(awk 'BEGIN{FS=":"}$1~/integrity check status/{print $2}' $VERIFY_OUTPUT)
 
   cat "${VERIFY_OUTPUT}"
 
