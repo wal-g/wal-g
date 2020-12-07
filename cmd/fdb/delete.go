@@ -1,12 +1,13 @@
 package fdb
 
 import (
+	"time"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
-	"time"
 )
 
 var confirmed = false
@@ -58,7 +59,7 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	backups, err := internal.GetBackupSentinelObjects(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	internal.HandleDeleteBefore(folder, backups, args, confirmed, isFullBackup, GetLessFunc(), getBackupTime)
+	internal.HandleDeleteBefore(folder, backups, args, confirmed, isFullBackup, makeLessFunc(), getBackupTime)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
@@ -66,7 +67,7 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	backups, err := internal.GetBackupSentinelObjects(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	internal.HandleDeleteRetain(folder, backups, args, confirmed, isFullBackup, GetLessFunc())
+	internal.HandleDeleteRetain(folder, backups, args, confirmed, isFullBackup, makeLessFunc())
 }
 
 func runDeleteRetainAfter(cmd *cobra.Command, args []string) {
@@ -74,7 +75,7 @@ func runDeleteRetainAfter(cmd *cobra.Command, args []string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	backups, err := internal.GetBackupSentinelObjects(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	internal.HandleDeletaRetainAfter(folder, backups, args, confirmed, isFullBackup, GetLessFunc(), getBackupTime)
+	internal.HandleDeletaRetainAfter(folder, backups, args, confirmed, isFullBackup, makeLessFunc(), getBackupTime)
 }
 
 func isFullBackup(object storage.Object) bool {
@@ -82,13 +83,13 @@ func isFullBackup(object storage.Object) bool {
 }
 
 func init() {
-	Cmd.AddCommand(deleteCmd)
+	cmd.AddCommand(deleteCmd)
 	deleteRetainCmd.Flags().StringP("after", "a", "", "Set the time after which retain backups")
 	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 
-func GetLessFunc() func(object1, object2 storage.Object) bool {
+func makeLessFunc() func(object1, object2 storage.Object) bool {
 	return func(object1, object2 storage.Object) bool {
 		time1, ok1 := utility.TryFetchTimeRFC3999(object1.GetName())
 		time2, ok2 := utility.TryFetchTimeRFC3999(object2.GetName())

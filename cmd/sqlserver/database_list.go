@@ -16,5 +16,5 @@ var databaseListCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(databaseListCmd)
+	cmd.AddCommand(databaseListCmd)
 }

@@ -54,35 +54,35 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 	isFullBackup := func(object storage.Object) bool {
-		return IsFullBackup(folder, object)
+		return IsFullBackup()
 	}
 	backups, err := internal.GetBackupSentinelObjects(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	internal.HandleDeleteBefore(folder, backups, args, confirmed, isFullBackup, GetLessFunc(folder), getBackupTime)
+	internal.HandleDeleteBefore(folder, backups, args, confirmed, isFullBackup, makeLessFunc(folder), getBackupTime)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 	isFullBackup := func(object storage.Object) bool {
-		return IsFullBackup(folder, object)
+		return IsFullBackup()
 	}
 	backups, err := internal.GetBackupSentinelObjects(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	internal.HandleDeleteRetain(folder, backups, args, confirmed, isFullBackup, GetLessFunc(folder))
+	internal.HandleDeleteRetain(folder, backups, args, confirmed, isFullBackup, makeLessFunc(folder))
 }
 
 func init() {
-	Cmd.AddCommand(deleteCmd)
+	cmd.AddCommand(deleteCmd)
 	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 
-func IsFullBackup(folder storage.Folder, object storage.Object) bool {
+func IsFullBackup() bool {
 	return true
 }
 
-func GetLessFunc(folder storage.Folder) func(object1, object2 storage.Object) bool {
+func makeLessFunc(folder storage.Folder) func(object1, object2 storage.Object) bool {
 	return func(object1, object2 storage.Object) bool {
 		time1, ok := utility.TryFetchTimeRFC3999(object1.GetName())
 		if !ok {

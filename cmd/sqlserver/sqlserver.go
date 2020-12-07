@@ -12,18 +12,18 @@ import (
 var ShortDescription = "SQLServer backup tool"
 
 // These variables are here only to show current version. They are set in makefile during build process
-var WalgVersion = "devel"
-var GitRevision = "devel"
-var BuildDate = "devel"
+var walgVersion = "devel"
+var gitRevision = "devel"
+var buildDate = "devel"
 
-var Cmd = &cobra.Command{
+var cmd = &cobra.Command{
 	Use:     "sqlserver",
 	Short:   ShortDescription,
-	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "SQLServer"}, "\t"),
+	Version: strings.Join([]string{walgVersion, gitRevision, buildDate, "SQLServer"}, "\t"),
 }
 
 func Execute() {
-	if err := Cmd.Execute(); err != nil {
+	if err := cmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -31,6 +31,6 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
-	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
-	Cmd.InitDefaultVersionFlag()
+	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
+	cmd.InitDefaultVersionFlag()
 }

@@ -47,7 +47,7 @@ func runBackupCopy(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	Cmd.AddCommand(backupCopyCmd)
+	cmd.AddCommand(backupCopyCmd)
 
 	backupCopyCmd.Flags().StringVarP(&backupName, backupNameFlag, backupNameShorthand, "", backupNameDescription)
 	backupCopyCmd.Flags().StringVarP(&toConfigFile, toFlag, toShorthand, "", toDescription)

@@ -27,5 +27,5 @@ var binlogPushCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(binlogPushCmd)
+	cmd.AddCommand(binlogPushCmd)
 }

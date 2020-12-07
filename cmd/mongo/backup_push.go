@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	BackupPushShortDescription = "Pushes backup to storage"
+	backupPushShortDescription = "Pushes backup to storage"
 	PermanentFlag              = "permanent"
 	PermanentShorthand         = "p"
 )
@@ -27,18 +27,18 @@ var (
 // backupPushCmd represents the backupPush command
 var backupPushCmd = &cobra.Command{
 	Use:   "backup-push",
-	Short: BackupPushShortDescription,
+	Short: backupPushShortDescription,
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		mongodbUrl, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
+		mongodbURL, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		// set up mongodb client and oplog fetcher
-		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl)
+		mongoClient, err := client.NewMongoClient(ctx, mongodbURL)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		uplProvider, err := internal.ConfigureUploader()
@@ -63,5 +63,5 @@ var backupPushCmd = &cobra.Command{
 
 func init() {
 	backupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes permanent backup")
-	Cmd.AddCommand(backupPushCmd)
+	cmd.AddCommand(backupPushCmd)
 }

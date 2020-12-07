@@ -54,9 +54,25 @@ THIRD_BACKUP=$(wal-g backup-list | awk 'NR==4{print $1}')
 DT3=$(date3339)
 
 
+
+# fourth backup
+sysbench --time=3 run
+wal-g backup-push
+sysbench --time=3 run
+mysql -e "FLUSH LOGS"
+wal-g binlog-push
+sleep 1
+
+mysqldump sbtest > /tmp/dump_4.sql
+test "5" -eq "$(wal-g backup-list | wc -l)"
+FOURTH_BACKUP=$(wal-g backup-list | awk 'NR==5{print $1}')
+DT4=$(date3339)
+
+
+
 # delete first backup
 wal-g delete before FIND_FULL "$SECOND_BACKUP" --confirm
-test "3" -eq "$(wal-g backup-list | wc -l)"
+test "4" -eq "$(wal-g backup-list | wc -l)"
 
 
 # test restore second
@@ -71,8 +87,8 @@ diff -u /tmp/dump_2.sql /tmp/dump_2_restored.sql
 
 
 # delete second backup
-wal-g delete retain 1 --confirm
-test "2" -eq "$(wal-g backup-list | wc -l)"
+wal-g delete retain 2 --confirm
+test "3" -eq "$(wal-g backup-list | wc -l)"
 
 
 # test restore third backup
@@ -84,3 +100,19 @@ mysql_set_gtid_purged
 wal-g binlog-replay --since "$THIRD_BACKUP" --until "$DT3"
 mysqldump sbtest > /tmp/dump_3_restored.sql
 diff -u /tmp/dump_3.sql /tmp/dump_3_restored.sql
+
+# delete third backup using target backup delete
+#wal-g delete target-backup "$THIRD_BACKUP" --confirm
+wal-g delete retain 1 --confirm
+wal-g backup-list
+test "2" -eq "$(wal-g backup-list | wc -l)"
+
+# test restore fourth backup
+mysql_kill_and_clean_data
+wal-g backup-fetch "$FOURTH_BACKUP"
+chown -R mysql:mysql "$MYSQLDATA"
+service mysql start || (cat /var/log/mysql/error.log && false)
+mysql_set_gtid_purged
+wal-g binlog-replay --since "$FOURTH_BACKUP" --until "$DT4"
+mysqldump sbtest > /tmp/dump_4_restored.sql
+diff -u /tmp/dump_4.sql /tmp/dump_4_restored.sql

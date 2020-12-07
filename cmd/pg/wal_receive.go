@@ -29,5 +29,5 @@ var walReceiveCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(walReceiveCmd)
+	cmd.AddCommand(walReceiveCmd)
 }

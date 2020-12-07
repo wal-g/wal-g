@@ -44,7 +44,7 @@ var (
 )
 
 func init() {
-	Cmd.AddCommand(walShowCmd)
+	cmd.AddCommand(walShowCmd)
 	walShowCmd.Flags().BoolVar(&detailedJsonOutput, detailedOutputFlag, false, detailedOutputDescription)
 	walShowCmd.Flags().BoolVar(&disableBackupsLookup, disableBackupsLookupFlag, false, disableBackupsLookupDescription)
 }

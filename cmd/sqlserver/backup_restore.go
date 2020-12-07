@@ -25,5 +25,5 @@ func init() {
 		"List of databases to restore. All non-system databases from backup as default")
 	backupRestoreCmd.PersistentFlags().BoolVarP(&restoreNoRecovery, "no-recovery", "n", false,
 		"Restore with NO_RECOVERY option")
-	Cmd.AddCommand(backupRestoreCmd)
+	cmd.AddCommand(backupRestoreCmd)
 }

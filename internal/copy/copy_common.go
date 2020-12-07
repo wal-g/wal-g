@@ -43,6 +43,7 @@ func Infos(chs []InfoProvider) error {
 		go func(handler InfoProvider) {
 			defer wg.Done()
 			err := handler.copyObject()
+			tracelog.DebugLogger.PrintOnError(err)
 			tickets <- nil
 			errors <- err
 		}(ch)
@@ -66,6 +67,8 @@ func (ch *InfoProvider) copyObject() error {
 		return err
 	}
 
+	tracelog.DebugLogger.Printf("fetched object %s reader\n", ch.SrcObj.GetName())
+
 	err = ch.To.PutObject(ch.targetName, readCloser)
 	if err != nil {
 		return err
@@ -83,15 +86,19 @@ var NoopRenameFunc = func(o storage.Object) string {
 }
 
 func BuildCopyingInfos(from storage.Folder, to storage.Folder, objects []storage.Object,
-	condition func(storage.Object) bool, renameFunc func(object storage.Object) string) (infos []InfoProvider) {
+	filter func(storage.Object) bool, renameFunc func(object storage.Object) string) (infos []InfoProvider) {
+
+	tracelog.DebugLogger.Println("processing copy infos filtering")
+
 	for _, object := range objects {
-		if condition(object) {
+		if filter(object) {
 			infos = append(infos, InfoProvider{
 				From:       from,
 				To:         to,
 				SrcObj:     object,
 				targetName: renameFunc(object),
 			})
+			tracelog.DebugLogger.Printf("add copy info %s-%s \n", object.GetName(), renameFunc(object))
 		}
 	}
 	return

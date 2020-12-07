@@ -29,5 +29,5 @@ var backupPushCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(backupPushCmd)
+	cmd.AddCommand(backupPushCmd)
 }

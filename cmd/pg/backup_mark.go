@@ -33,5 +33,5 @@ var (
 
 func init() {
 	backupMarkCmd.Flags().BoolVarP(&toImpermanent, ImpermanentFlag, "i", false, ImpermanentDescription)
-	Cmd.AddCommand(backupMarkCmd)
+	cmd.AddCommand(backupMarkCmd)
 }

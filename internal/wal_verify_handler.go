@@ -3,10 +3,10 @@ package internal
 import (
 	"bytes"
 	"fmt"
-	"github.com/pkg/errors"
 	"sort"
 
 	"github.com/jackc/pgx"
+	"github.com/pkg/errors"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"

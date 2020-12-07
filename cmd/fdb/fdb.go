@@ -10,17 +10,17 @@ import (
 	"github.com/wal-g/wal-g/internal"
 )
 
-var DBShortDescription = "FoundationDB backup tool"
+var dbShortDescription = "FoundationDB backup tool"
 
 // These variables are here only to show current version. They are set in makefile during build process
-var WalgVersion = "devel"
-var GitRevision = "devel"
-var BuildDate = "devel"
+var walgVersion = "devel"
+var gitRevision = "devel"
+var buildDate = "devel"
 
-var Cmd = &cobra.Command{
+var cmd = &cobra.Command{
 	Use:     "wal-g",
-	Short:   DBShortDescription, // TODO : improve description
-	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "FoundationDB"}, "\t"),
+	Short:   dbShortDescription, // TODO : improve description
+	Version: strings.Join([]string{walgVersion, gitRevision, buildDate, "FoundationDB"}, "\t"),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -28,7 +28,7 @@ var Cmd = &cobra.Command{
 }
 
 func Execute() {
-	if err := Cmd.Execute(); err != nil {
+	if err := cmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -37,7 +37,7 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
-	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
-	Cmd.InitDefaultVersionFlag()
-	internal.AddConfigFlags(Cmd)
+	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
+	cmd.InitDefaultVersionFlag()
+	internal.AddConfigFlags(cmd)
 }

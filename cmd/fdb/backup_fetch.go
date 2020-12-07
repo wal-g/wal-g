@@ -12,12 +12,12 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-const BackupFetchShortDescription = "Fetches desired backup from storage"
+const backupFetchShortDescription = "Fetches desired backup from storage"
 
 // backupFetchCmd represents the streamFetch command
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch backup-name",
-	Short: BackupFetchShortDescription,
+	Short: backupFetchShortDescription,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -35,5 +35,5 @@ var backupFetchCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(backupFetchCmd)
+	cmd.AddCommand(backupFetchCmd)
 }

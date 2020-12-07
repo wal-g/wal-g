@@ -2,10 +2,10 @@ package pg
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"regexp"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
@@ -104,7 +104,7 @@ func tryMakeSentinelTimeFuncs(
 		return nil, nil, false
 	}
 
-	return GetLessFunc(startTimeByBackupName), GetBackupTimeFunc(startTimeByBackupName), true
+	return makeLessFunc(startTimeByBackupName), GetBackupTimeFunc(startTimeByBackupName), true
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
@@ -114,14 +114,14 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	Cmd.AddCommand(deleteCmd)
+	cmd.AddCommand(deleteCmd)
 
 	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd, deleteEverythingCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 	deleteCmd.PersistentFlags().BoolVar(&useSentinelTime, UseSentinelTimeFlag, false, UseSentinelTimeDescription)
 }
 
-func GetLessFunc(startTimeByBackupName map[string]time.Time) func(storage.Object, storage.Object) bool {
+func makeLessFunc(startTimeByBackupName map[string]time.Time) func(storage.Object, storage.Object) bool {
 	return func(object1 storage.Object, object2 storage.Object) bool {
 		backupName1 := fetchBackupName(object1)
 		if backupName1 == "" {

@@ -129,5 +129,5 @@ func HandleOplogPushStatistics(ctx context.Context, sinceTS models.Timestamp, mo
 }
 
 func init() {
-	Cmd.AddCommand(oplogPushCmd)
+	cmd.AddCommand(oplogPushCmd)
 }

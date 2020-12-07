@@ -9,13 +9,13 @@ import (
 )
 
 const (
-	BackupFetchShortDescription = "Fetches a backup from storage"
-	MaskFlagDescription         = `Fetches only files which path relative to destination_directory
+	backupFetchShortDescription = "Fetches a backup from storage"
+	maskFlagDescription         = `Fetches only files which path relative to destination_directory
 matches given shell file pattern.
 For information about pattern syntax view: https://golang.org/pkg/path/filepath/#Match`
-	RestoreSpecDescription        = "Path to file containing tablespace restore specification"
-	ReverseDeltaUnpackDescription = "Unpack delta backups in reverse order (beta feature)"
-	SkipRedundantTarsDescription  = "Skip tars with no useful data (requires reverse delta unpack)"
+	restoreSpecDescription        = "Path to file containing tablespace restore specification"
+	reverseDeltaUnpackDescription = "Unpack delta backups in reverse order (beta feature)"
+	skipRedundantTarsDescription  = "Skip tars with no useful data (requires reverse delta unpack)"
 )
 
 var fileMask string
@@ -25,7 +25,7 @@ var skipRedundantTars bool
 
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch destination_directory backup_name",
-	Short: BackupFetchShortDescription, // TODO : improve description
+	Short: backupFetchShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
@@ -45,11 +45,11 @@ var backupFetchCmd = &cobra.Command{
 }
 
 func init() {
-	backupFetchCmd.Flags().StringVar(&fileMask, "mask", "", MaskFlagDescription)
-	backupFetchCmd.Flags().StringVar(&restoreSpec, "restore-spec", "", RestoreSpecDescription)
+	backupFetchCmd.Flags().StringVar(&fileMask, "mask", "", maskFlagDescription)
+	backupFetchCmd.Flags().StringVar(&restoreSpec, "restore-spec", "", restoreSpecDescription)
 	backupFetchCmd.Flags().BoolVar(&reverseDeltaUnpack, "reverse-unpack",
-		false, ReverseDeltaUnpackDescription)
+		false, reverseDeltaUnpackDescription)
 	backupFetchCmd.Flags().BoolVar(&skipRedundantTars, "skip-redundant-tars",
-		false, SkipRedundantTarsDescription)
-	Cmd.AddCommand(backupFetchCmd)
+		false, skipRedundantTarsDescription)
+	cmd.AddCommand(backupFetchCmd)
 }

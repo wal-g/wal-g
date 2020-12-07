@@ -88,7 +88,6 @@ jobs:
                    'make TEST="pg_wale_compatibility_test" pg_integration_test',
                    'make TEST="pg_delete_before_permanent_full_test" pg_integration_test',
                    'make TEST="pg_delete_before_permanent_delta_test" pg_integration_test',
-                   'make mysql_test',
                    'make mongo_test',
                    'make MONGO_VERSION="4.4.0" MONGO_MAJOR="4.4" mongo_features',
                    'make MONGO_VERSION="4.2.8" MONGO_MAJOR="4.2" mongo_features',
@@ -100,7 +99,10 @@ jobs:
                    'make TEST="pg_wal_perftest" pg_integration_test',
                    'make TEST="pg_backup_perftest" pg_integration_test',
                    'make TEST="pg_catchup_test" pg_integration_test',
-        ]
+                   'make MYSQL_TEST=mysql_base_tests mysql_integration_test',
+                   'make MYSQL_TEST=mysql_delete_tests mysql_integration_test',
+                   'make MYSQL_TEST=mysql_copy_tests mysql_integration_test',
+      ]
       # do not cancel all tests if one failed
       fail-fast: false
     steps:

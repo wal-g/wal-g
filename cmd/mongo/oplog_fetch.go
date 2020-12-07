@@ -60,7 +60,7 @@ var oplogFetchCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(oplogFetchCmd)
+	cmd.AddCommand(oplogFetchCmd)
 	oplogFetchCmd.PersistentFlags().StringVarP(
 		&format, "format", "f", "json", fmt.Sprintf("Valid values: json, bson, bson-raw"))
 

@@ -6,12 +6,12 @@ import (
 	"github.com/wal-g/wal-g/internal"
 )
 
-const BackupListShortDescription = "Prints available backups"
+const backupListShortDescription = "Prints available backups"
 
 // backupListCmd represents the backupList command
 var backupListCmd = &cobra.Command{
 	Use:   "backup-list",
-	Short: BackupListShortDescription,
+	Short: backupListShortDescription,
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
@@ -21,5 +21,5 @@ var backupListCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(backupListCmd)
+	cmd.AddCommand(backupListCmd)
 }
