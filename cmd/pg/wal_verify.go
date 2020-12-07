@@ -13,18 +13,20 @@ import (
 
 const (
 	WalVerifyUsage            = "wal-verify"
-	WalVerifyShortDescription = "Verify WAL storage folder. Available checks: integrity."
+	WalVerifyShortDescription = "Verify WAL storage folder. Available checks: integrity, timeline."
 	WalVerifyLongDescription  = "Run a set of specified checks to ensure WAL storage health."
 
 	useJsonOutputFlag        = "json"
 	useJsonOutputDescription = "Show output in JSON format."
 
 	checkIntegrityArg = "integrity"
+	checkTimelineArg  = "timeline"
 )
 
 var (
 	availableChecks = map[string]internal.WalVerifyCheckType{
 		checkIntegrityArg: internal.WalVerifyIntegrityCheck,
+		checkTimelineArg:  internal.WalVerifyTimelineCheck,
 	}
 	// walVerifyCmd represents the walVerify command
 	walVerifyCmd = &cobra.Command{

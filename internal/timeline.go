@@ -73,7 +73,12 @@ var (
 	// WalSegmentSize is the size of one WAL file
 	WalSegmentSize        = uint64(16 * 1024 * 1024)
 	xLogSegmentsPerXLogId = 0x100000000 / WalSegmentSize // xlog_internal.h line 101
+	walHistoryFileRegexp  *regexp.Regexp
 )
+
+func init() {
+	walHistoryFileRegexp = regexp.MustCompile("^([0-9a-fA-F]+)\\.history(\\.\\w+)?$")
+}
 
 const (
 	walFileFormat        = "%08X%08X%08X" // xlog_internal.h line 155
@@ -155,7 +160,11 @@ func ParseTimelineFromBackupName(backupName string) (uint32, error) {
 		return 0, newIncorrectBackupNameError(backupName)
 	}
 	prefixLength := len(utility.BackupNamePrefix)
-	timelineId64, err := strconv.ParseUint(backupName[prefixLength:prefixLength+8], hexadecimal, sizeofInt32bits)
+	return ParseTimelineFromString(backupName[prefixLength : prefixLength+8])
+}
+
+func ParseTimelineFromString(timelineString string) (uint32, error) {
+	timelineId64, err := strconv.ParseUint(timelineString, hexadecimal, sizeofInt32bits)
 	if err != nil {
 		return 0, err
 	}

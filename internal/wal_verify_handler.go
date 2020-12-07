@@ -13,10 +13,11 @@ type WalVerifyCheckType int
 
 const (
 	WalVerifyIntegrityCheck = iota + 1
+	WalVerifyTimelineCheck
 )
 
 func (status WalVerifyCheckType) String() string {
-	return [...]string{"", "integrity"}[status]
+	return [...]string{"", "integrity", "timeline"}[status]
 }
 
 func (status WalVerifyCheckType) MarshalText() (text []byte, err error) {
@@ -105,6 +106,8 @@ func BuildWalVerifyCheckRunner(
 	var checkRunner WalVerifyCheckRunner
 	var err error
 	switch checkType {
+	case WalVerifyTimelineCheck:
+		checkRunner, err = NewTimelineCheckRunner(rootFolder, currentWalSegment)
 	case WalVerifyIntegrityCheck:
 		checkRunner, err = NewIntegrityCheckRunner(rootFolder, currentWalSegment)
 	default:

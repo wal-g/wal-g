@@ -72,6 +72,8 @@ func newPrettyOutputReader(checkType WalVerifyCheckType, checkResult WalVerifyCh
 
 	var outputReader io.Reader
 	switch checkType {
+	case WalVerifyTimelineCheck:
+		outputReader = newTimelineCheckOutputReader(checkResult.Details.(TimelineCheckResult))
 	case WalVerifyIntegrityCheck:
 		outputReader = newIntegrityCheckOutputReader(checkResult.Details.([]*WalIntegrityScanSegmentSequence))
 	default:
@@ -95,6 +97,17 @@ func newIntegrityCheckOutputReader(result []*WalIntegrityScanSegmentSequence) io
 	for _, row := range result {
 		tableWriter.AppendRow(table.Row{row.TimelineId, row.StartSegment, row.EndSegment, row.SegmentsCount, row.Status})
 	}
+
+	return &outputBuffer
+}
+
+func newTimelineCheckOutputReader(result TimelineCheckResult) io.Reader {
+	var outputBuffer bytes.Buffer
+
+	outputBuffer.WriteString(fmt.Sprintf("Highest timeline found in storage: %d\n",
+		result.HighestStorageTimelineId))
+	outputBuffer.WriteString(fmt.Sprintf("Current cluster timeline: %d\n",
+		result.CurrentTimelineId))
 
 	return &outputBuffer
 }
