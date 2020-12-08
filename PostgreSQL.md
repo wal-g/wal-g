@@ -271,6 +271,54 @@ wal-g wal-verify integrity # perform only integrity check
 
 By default, `wal-verify` output is plaintext. To enable JSON output, add the `--json` flag.
 
+Example of the plaintext output:
+```
+[wal-verify] integrity check status: OK
+[wal-verify] integrity check details:
++-----+--------------------------+--------------------------+----------------+--------+
+| TLI | START                    | END                      | SEGMENTS COUNT | STATUS |
++-----+--------------------------+--------------------------+----------------+--------+
+|   3 | 00000003000000030000004D | 0000000300000004000000F0 |            420 |  FOUND |
+|   4 | 0000000400000004000000F1 | 000000040000000800000034 |            836 |  FOUND |
++-----+--------------------------+--------------------------+----------------+--------+
+[wal-verify] timeline check status: OK
+[wal-verify] timeline check details:
+Highest timeline found in storage: 4
+Current cluster timeline: 4
+```
+
+Example of the JSON output:
+```
+{
+   "integrity":{
+      "status":"OK",
+      "details":[
+         {
+            "timeline_id":3,
+            "start_segment":"00000003000000030000004D",
+            "end_segment":"0000000300000004000000F0",
+            "segments_count":420,
+            "status":"FOUND"
+         },
+         {
+            "timeline_id":4,
+            "start_segment":"0000000400000004000000F1",
+            "end_segment":"000000040000000800000034",
+            "segments_count":836,
+            "status":"FOUND"
+         }
+      ]
+   },
+   "timeline":{
+      "status":"OK",
+      "details":{
+         "current_timeline_id":4,
+         "highest_storage_timeline_id":4
+      }
+   }
+}
+```
+
 * ``wal-receive``
 
 Set environment variabe WALG_SLOTNAME to define the slot to be used (defaults to walg). The slot name can only consist of the following characters: [0-9A-Za-z_].
