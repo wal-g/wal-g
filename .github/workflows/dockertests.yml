@@ -14,16 +14,15 @@ env:
   IMAGE: wal-g/docker_prefix
   IMAGE_UBUNTU: wal-g/ubuntu
   IMAGE_GOLANG: wal-g/golang
-  IMAGES_ARTIFACT_NAME: docker-images-${{ github.sha }}
-  IMAGES_ARTIFACT_PATH: ~/docker-images-${{ github.sha }}
+  IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
 
 jobs:
   buildimages:
     name: Build images
     runs-on: ubuntu-16.04
     steps:
-      # if this is a retry job, there should cached image artifact available
-      - name: Docker image artifacts caching
+      #  use cache to pass docker images to the test jobs
+      - name: Docker images caching
         id: cache-images
         uses: actions/cache@v2
         with:
@@ -31,7 +30,7 @@ jobs:
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}
             ${{ env.CACHE_FILE_UBUNTU }}
             ${{ env.CACHE_FILE_GOLANG }}
-          key: ${{ env.IMAGES_ARTIFACT_NAME }}
+          key: ${{ env.IMAGES_CACHE_KEY }}
 
       - name: Install deps
         if: steps.cache-images.outputs.cache-hit != 'true'
@@ -61,17 +60,6 @@ jobs:
       - name: Build images
         if: steps.cache-images.outputs.cache-hit != 'true'
         run: make pg_save_image
-
-      # upload images
-      - name: Upload images
-        uses: actions/upload-artifact@v2
-        with:
-          name: ${{ env.IMAGES_ARTIFACT_NAME }}
-          path: |
-            ${{ env.CACHE_FILE_DOCKER_PREFIX }}
-            ${{ env.CACHE_FILE_UBUNTU }}
-            ${{ env.CACHE_FILE_GOLANG }}
-          retention-days: 1
     env:
       USE_LZO: 1
 
@@ -143,11 +131,21 @@ jobs:
           fi
 
       # load docker images
-      - name: Download image
-        uses: actions/download-artifact@v2
+      - name: Load docker images
+        id: cache-images
+        uses: actions/cache@v2
         with:
-          name: ${{ env.IMAGES_ARTIFACT_NAME }}
-          path: ${{ env.IMAGES_ARTIFACT_PATH }}
+          path: |
+            ${{ env.CACHE_FILE_DOCKER_PREFIX }}
+            ${{ env.CACHE_FILE_UBUNTU }}
+            ${{ env.CACHE_FILE_GOLANG }}
+          key: ${{ env.IMAGES_CACHE_KEY }}
+
+      - name: Fail if no cached images
+        if: steps.cache-images.outputs.cache-hit != 'true'
+        run: |
+          echo "Failed to fetch cached docker images. Will now exit..."
+          exit 1
 
       - name: Run test
         run: ${{ matrix.command }}
