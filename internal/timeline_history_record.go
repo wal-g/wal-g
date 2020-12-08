@@ -109,7 +109,8 @@ func parseHistoryFile(historyReader io.Reader) ([]*TimelineHistoryRecord, error)
 			return nil, err
 		}
 		if record == nil {
-			break
+			// skip any irrelevant rows (like comments)
+			continue
 		}
 		historyRecords = append(historyRecords, record)
 	}
