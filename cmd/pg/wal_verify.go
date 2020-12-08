@@ -50,8 +50,14 @@ var (
 )
 
 func parseChecks(checks []string) []internal.WalVerifyCheckType {
-	checkTypes := make([]internal.WalVerifyCheckType, 0, len(checks))
+	// filter the possible duplicates
+	uniqueChecks := make(map[string]bool)
 	for _, check := range checks {
+		uniqueChecks[check] = true
+	}
+
+	checkTypes := make([]internal.WalVerifyCheckType, 0, len(checks))
+	for check := range uniqueChecks {
 		checkType, ok := availableChecks[check]
 		if !ok {
 			tracelog.ErrorLogger.Fatalf("Check %s is not available.", check)
