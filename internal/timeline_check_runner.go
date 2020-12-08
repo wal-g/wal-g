@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -9,25 +8,20 @@ import (
 // TimelineCheckRunner is used to verify that the current timeline
 // is the highest among the storage timelines
 type TimelineCheckRunner struct {
-	currentTimeline  uint32
-	storageFileNames []string
+	currentTimeline    uint32
+	walFolderFilenames []string
 }
 
 func (check TimelineCheckRunner) Name() string {
 	return "TimelineCheck"
 }
 
-func NewTimelineCheckRunner(rootFolder storage.Folder, currentSegment WalSegmentDescription) (TimelineCheckRunner, error) {
-	walFolder := rootFolder.GetSubFolder(utility.WalPath)
-	storageFileNames, err := getFolderFilenames(walFolder)
-	if err != nil {
-		return TimelineCheckRunner{}, err
-	}
-	return TimelineCheckRunner{currentTimeline: currentSegment.Timeline, storageFileNames: storageFileNames}, nil
+func NewTimelineCheckRunner(walFolderFilenames []string, currentSegment WalSegmentDescription) (TimelineCheckRunner, error) {
+	return TimelineCheckRunner{currentTimeline: currentSegment.Timeline, walFolderFilenames: walFolderFilenames}, nil
 }
 
 func (check TimelineCheckRunner) Run() (WalVerifyCheckResult, error) {
-	highestTimeline := tryFindHighestTimelineId(check.storageFileNames)
+	highestTimeline := tryFindHighestTimelineId(check.walFolderFilenames)
 	return newTimelineCheckResult(check.currentTimeline, highestTimeline), nil
 }
 

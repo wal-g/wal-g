@@ -15,11 +15,15 @@ type IntegrityCheckRunner struct {
 	startWalSegment           WalSegmentDescription
 	stopWalSegmentNo          WalSegmentNo
 	uploadingSegmentRangeSize int
-	storageFileNames          []string
+	walFolderFilenames        []string
 	timelineSwitchMap         map[WalSegmentNo]*TimelineHistoryRecord
 }
 
-func NewIntegrityCheckRunner(rootFolder storage.Folder, currentWalSegment WalSegmentDescription) (IntegrityCheckRunner, error) {
+func NewIntegrityCheckRunner(
+	rootFolder storage.Folder,
+	walFolderFilenames []string,
+	currentWalSegment WalSegmentDescription,
+) (IntegrityCheckRunner, error) {
 	walFolder := rootFolder.GetSubFolder(utility.WalPath)
 
 	timelineSwitchMap, err := createTimelineSwitchMap(currentWalSegment.Timeline, walFolder)
@@ -41,22 +45,17 @@ func NewIntegrityCheckRunner(rootFolder storage.Folder, currentWalSegment WalSeg
 		return IntegrityCheckRunner{}, errors.Wrap(err, "Failed to resolve MaxUploadConcurrency")
 	}
 
-	storageFileNames, err := getFolderFilenames(walFolder)
-	if err != nil {
-		return IntegrityCheckRunner{}, errors.Wrap(err, "Failed to get WAL folder filenames")
-	}
-
 	return IntegrityCheckRunner{
 		startWalSegment:           currentWalSegment,
 		stopWalSegmentNo:          stopWalSegmentNo,
 		uploadingSegmentRangeSize: uploadingSegmentRangeSize,
-		storageFileNames:          storageFileNames,
+		walFolderFilenames:        walFolderFilenames,
 		timelineSwitchMap:         timelineSwitchMap,
 	}, nil
 }
 
 func (check IntegrityCheckRunner) Run() (WalVerifyCheckResult, error) {
-	storageSegments := getSegmentsFromFiles(check.storageFileNames)
+	storageSegments := getSegmentsFromFiles(check.walFolderFilenames)
 	walSegmentRunner := NewWalSegmentRunner(check.startWalSegment, storageSegments, check.stopWalSegmentNo, check.timelineSwitchMap)
 
 	segmentScanner := NewWalSegmentScanner(walSegmentRunner)
