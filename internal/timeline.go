@@ -71,13 +71,15 @@ const (
 
 var (
 	// WalSegmentSize is the size of one WAL file
-	WalSegmentSize        = uint64(16 * 1024 * 1024)
-	xLogSegmentsPerXLogId = 0x100000000 / WalSegmentSize // xlog_internal.h line 101
-	walHistoryFileRegexp  *regexp.Regexp
+	WalSegmentSize            = uint64(16 * 1024 * 1024)
+	xLogSegmentsPerXLogId     = 0x100000000 / WalSegmentSize // xlog_internal.h line 101
+	// .history file name regexp. For more details, see
+	// https://doxygen.postgresql.org/backend_2access_2transam_2timeline_8c_source.html
+	timelineHistoryFileRegexp *regexp.Regexp
 )
 
 func init() {
-	walHistoryFileRegexp = regexp.MustCompile("^([0-9a-fA-F]+)\\.history(\\.\\w+)?$")
+	timelineHistoryFileRegexp = regexp.MustCompile("^([0-9a-fA-F]+)\\.history(\\.\\w+)?$")
 }
 
 const (

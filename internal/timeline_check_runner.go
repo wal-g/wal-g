@@ -83,7 +83,7 @@ func tryParseTimelineId(fileName string) (timelineId uint32, success bool) {
 	}
 
 	// try to parse timeline id from .history file
-	matchResult := walHistoryFileRegexp.FindStringSubmatch(baseName)
+	matchResult := timelineHistoryFileRegexp.FindStringSubmatch(baseName)
 	if matchResult == nil || len(matchResult) < 2 {
 		return 0, false
 	}
