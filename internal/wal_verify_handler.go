@@ -16,12 +16,12 @@ const (
 	WalVerifyTimelineCheck
 )
 
-func (status WalVerifyCheckType) String() string {
-	return [...]string{"", "integrity", "timeline"}[status]
+func (checkType WalVerifyCheckType) String() string {
+	return [...]string{"", "integrity", "timeline"}[checkType]
 }
 
-func (status WalVerifyCheckType) MarshalText() (text []byte, err error) {
-	return utility.MarshalEnumToString(status)
+func (checkType WalVerifyCheckType) MarshalText() (text []byte, err error) {
+	return utility.MarshalEnumToString(checkType)
 }
 
 type UnknownWalVerifyCheckError struct {
