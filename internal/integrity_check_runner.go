@@ -55,7 +55,7 @@ func NewIntegrityCheckRunner(
 	stopWalSegmentNo, err := getEarliestBackupStartSegmentNo(timelineSwitchMap, currentWalSegment.Timeline, rootFolder)
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to detect earliest backup WAL segment no: '%v',"+
-			"will scan until the 000000010000000000000001 segment.\n", err)
+			"will scan until the 0000000X0000000000000001 segment.\n", err)
 		stopWalSegmentNo = 1
 	}
 
@@ -216,54 +216,54 @@ func getEarliestBackupStartSegmentNo(timelineSwitchMap map[WalSegmentNo]*Timelin
 		return 0, err
 	}
 
-	backupDetails, err := GetBackupsDetails(rootFolder, backups)
-	if err != nil {
-		return 0, err
-	}
-
-	// switchLsnByTimeline is used for fast lookup of the timeline switch LSN
-	switchLsnByTimeline := make(map[uint32]uint64, len(timelineSwitchMap))
+	// switchLsnBySegNo is used for fast lookup of the timeline switch segment
+	switchLsnBySegNo := make(map[uint32]WalSegmentNo, len(timelineSwitchMap))
 	for _, historyRecord := range timelineSwitchMap {
-		switchLsnByTimeline[historyRecord.timeline] = historyRecord.lsn
+		switchLsnBySegNo[historyRecord.timeline] = newWalSegmentNo(historyRecord.lsn)
 	}
-	earliestBackup, err := findEarliestBackup(currentTimeline, backupDetails, switchLsnByTimeline)
+	earliestBackup, earliestBackupSegNo, err :=
+		findEarliestBackup(currentTimeline, backups, switchLsnBySegNo)
 	if err != nil {
 		return 0, err
 	}
 
 	tracelog.InfoLogger.Printf("Detected earliest available backup: %s\n",
 		earliestBackup.BackupName)
-	return newWalSegmentNo(earliestBackup.StartLsn), nil
+	return earliestBackupSegNo, nil
 }
 
 // findEarliestBackup finds earliest correct backup available in storage.
 func findEarliestBackup(
 	currentTimeline uint32,
-	backupDetails []BackupDetail,
-	switchLsnByTimeline map[uint32]uint64,
-) (*BackupDetail, error) {
-	var earliestBackup *BackupDetail
+	backupDetails []BackupTime,
+	switchSegNoByTimeline map[uint32]WalSegmentNo,
+) (*BackupTime, WalSegmentNo, error) {
+	var earliestBackup *BackupTime
+	var earliestBackupSegNo WalSegmentNo
+
 	for _, backup := range backupDetails {
-		backupTimelineId, err := ParseTimelineFromBackupName(backup.BackupName)
+		backupTimelineId, backupLogSegNoInt, err := ParseWALFilename(backup.WalFileName)
+		backupLogSegNo := WalSegmentNo(backupLogSegNoInt)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 
 		if ok := checkBackupIsCorrect(currentTimeline, backup.BackupName,
-			backupTimelineId, backup.StartLsn, switchLsnByTimeline); !ok {
+			backupTimelineId, backupLogSegNo, switchSegNoByTimeline); !ok {
 			continue
 		}
 
-		if earliestBackup == nil || earliestBackup.StartLsn > backup.StartLsn {
+		if earliestBackup == nil || earliestBackupSegNo > backupLogSegNo {
 			// create local variable so the reference won't break
 			newEarliestBackup := backup
+			earliestBackupSegNo = backupLogSegNo
 			earliestBackup = &newEarliestBackup
 		}
 	}
 	if earliestBackup == nil {
-		return nil, newNoCorrectBackupFoundError()
+		return nil, 0, newNoCorrectBackupFoundError()
 	}
-	return earliestBackup, nil
+	return earliestBackup, earliestBackupSegNo, nil
 }
 
 // checkBackupIsCorrect checks that backup start LSN is valid.
@@ -273,19 +273,19 @@ func checkBackupIsCorrect(
 	currentTimeline uint32,
 	backupName string,
 	backupTimeline uint32,
-	backupStartLsn uint64,
-	switchLsnByTimeline map[uint32]uint64,
+	backupStartSegNo WalSegmentNo,
+	switchSegNoByTimeline map[uint32]WalSegmentNo,
 ) bool {
 	// perform the check only if .history file exists
-	if len(switchLsnByTimeline) > 0 {
-		// if backup start LSN is less than timeline start LSN => incorrect backup
+	if len(switchSegNoByTimeline) > 0 {
+		// if backup start segment is less than timeline start segment => incorrect backup
 		if backupTimeline > 1 {
-			backupTimelineStartLsn, ok := switchLsnByTimeline[backupTimeline-1]
-			if ok && backupStartLsn < backupTimelineStartLsn {
+			backupTimelineStartSegNo, ok := switchSegNoByTimeline[backupTimeline-1]
+			if ok && backupStartSegNo < backupTimelineStartSegNo {
 				tracelog.WarningLogger.Printf(
-					"checkBackupIsCorrect: %s: backup start LSN %d "+
-						"is less than the backup timeline start LSN.\n",
-					backupName, backupStartLsn)
+					"checkBackupIsCorrect: %s: backup start segment number %d "+
+						"is less than the backup timeline start segment number %d.\n",
+					backupName, backupStartSegNo, backupTimelineStartSegNo)
 				return false
 			}
 		}
@@ -296,7 +296,7 @@ func checkBackupIsCorrect(
 		}
 
 		// if backup timeline is not present in current .history file => incorrect backup
-		timelineSwitchLsn, ok := switchLsnByTimeline[backupTimeline]
+		timelineSwitchSegNo, ok := switchSegNoByTimeline[backupTimeline]
 		if !ok {
 			tracelog.WarningLogger.Printf(
 				"checkBackupIsCorrect: %s: backup timeline %d "+
@@ -305,12 +305,12 @@ func checkBackupIsCorrect(
 			return false
 		}
 
-		// if backup start LSN is higher than switch LSN of the previous timeline => incorrect backup
-		if backupStartLsn >= timelineSwitchLsn {
+		// if backup start segment is higher than switch segment of the previous timeline => incorrect backup
+		if backupStartSegNo >= timelineSwitchSegNo {
 			tracelog.WarningLogger.Printf(
-				"checkBackupIsCorrect: %s: backup start LSN %d "+
-					"is higher than the backup timeline end LSN.\n",
-				backupName, backupStartLsn)
+				"checkBackupIsCorrect: %s: backup start segment number %d "+
+					"should be less than the backup timeline end segment number %d.\n",
+				backupName, backupStartSegNo, timelineSwitchSegNo)
 			return false
 		}
 	}
