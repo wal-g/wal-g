@@ -1,9 +1,28 @@
 package internal
 
 import (
+	"bytes"
+	"fmt"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
+	"io"
 )
+
+type TimelineCheckDetails struct {
+	CurrentTimelineId        uint32 `json:"current_timeline_id"`
+	HighestStorageTimelineId uint32 `json:"highest_storage_timeline_id"`
+}
+
+func (details TimelineCheckDetails) NewPlainTextReader() (io.Reader, error) {
+	var outputBuffer bytes.Buffer
+
+	outputBuffer.WriteString(fmt.Sprintf("Highest timeline found in storage: %d\n",
+		details.HighestStorageTimelineId))
+	outputBuffer.WriteString(fmt.Sprintf("Current cluster timeline: %d\n",
+		details.CurrentTimelineId))
+
+	return &outputBuffer, nil
+}
 
 // TimelineCheckRunner is used to verify that the current timeline
 // is the highest among the storage timelines
@@ -29,11 +48,6 @@ func (check TimelineCheckRunner) Type() WalVerifyCheckType {
 	return WalVerifyTimelineCheck
 }
 
-type TimelineCheckResult struct {
-	CurrentTimelineId        uint32 `json:"current_timeline_id"`
-	HighestStorageTimelineId uint32 `json:"highest_storage_timeline_id"`
-}
-
 // newTimelineCheckResult check produces the WalVerifyCheckResult with status:
 // StatusOk if current timeline id matches the highest timeline id found in storage
 // StatusWarning if could not determine if current timeline matches the highest in storage
@@ -41,7 +55,7 @@ type TimelineCheckResult struct {
 func newTimelineCheckResult(currentTimeline, highestTimeline uint32) WalVerifyCheckResult {
 	result := WalVerifyCheckResult{
 		Status: StatusWarning,
-		Details: TimelineCheckResult{
+		Details: TimelineCheckDetails{
 			CurrentTimelineId:        currentTimeline,
 			HighestStorageTimelineId: highestTimeline,
 		},

@@ -7,6 +7,7 @@ import (
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
+	"io"
 )
 
 type WalVerifyCheckType int
@@ -61,8 +62,12 @@ type WalVerifyCheckRunner interface {
 
 // WalVerifyCheckResult contains the result of some WalVerifyCheckRunner run
 type WalVerifyCheckResult struct {
-	Status  WalVerifyCheckStatus `json:"status"`
-	Details interface{}          `json:"details"`
+	Status  WalVerifyCheckStatus  `json:"status"`
+	Details WalVerifyCheckDetails `json:"details"`
+}
+
+type WalVerifyCheckDetails interface {
+	NewPlainTextReader() (io.Reader, error) // used in plaintext output
 }
 
 type NoCorrectBackupFoundError struct {

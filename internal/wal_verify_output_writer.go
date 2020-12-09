@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-
-	"github.com/jedib0t/go-pretty/table"
 )
 
 type WalVerifyOutputType int
@@ -70,44 +68,13 @@ func newPrettyOutputReader(checkType WalVerifyCheckType, checkResult WalVerifyCh
 	outputBuffer.WriteString(fmt.Sprintf("[wal-verify] %s check status: %s\n", checkType, checkResult.Status))
 	outputBuffer.WriteString(fmt.Sprintf("[wal-verify] %s check details:\n", checkType))
 
-	var outputReader io.Reader
-	switch checkType {
-	case WalVerifyTimelineCheck:
-		outputReader = newTimelineCheckOutputReader(checkResult.Details.(TimelineCheckResult))
-	case WalVerifyIntegrityCheck:
-		outputReader = newIntegrityCheckOutputReader(checkResult.Details.([]*WalIntegrityScanSegmentSequence))
-	default:
-		return nil, NewUnknownWalVerifyCheckError(checkType)
+	checkDetails, err := checkResult.Details.NewPlainTextReader()
+	if err != nil {
+		return nil, err
 	}
-	_, err := io.Copy(&outputBuffer, outputReader)
+	_, err = io.Copy(&outputBuffer, checkDetails)
 	if err != nil {
 		return nil, err
 	}
 	return &outputBuffer, nil
-}
-
-func newIntegrityCheckOutputReader(result []*WalIntegrityScanSegmentSequence) io.Reader {
-	var outputBuffer bytes.Buffer
-
-	tableWriter := table.NewWriter()
-	tableWriter.SetOutputMirror(&outputBuffer)
-	defer tableWriter.Render()
-
-	tableWriter.AppendHeader(table.Row{"TLI", "Start", "End", "Segments count", "Status"})
-	for _, row := range result {
-		tableWriter.AppendRow(table.Row{row.TimelineId, row.StartSegment, row.EndSegment, row.SegmentsCount, row.Status})
-	}
-
-	return &outputBuffer
-}
-
-func newTimelineCheckOutputReader(result TimelineCheckResult) io.Reader {
-	var outputBuffer bytes.Buffer
-
-	outputBuffer.WriteString(fmt.Sprintf("Highest timeline found in storage: %d\n",
-		result.HighestStorageTimelineId))
-	outputBuffer.WriteString(fmt.Sprintf("Current cluster timeline: %d\n",
-		result.CurrentTimelineId))
-
-	return &outputBuffer
 }

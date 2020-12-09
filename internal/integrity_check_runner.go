@@ -1,12 +1,33 @@
 package internal
 
 import (
+	"bytes"
+	"github.com/jedib0t/go-pretty/table"
 	"github.com/pkg/errors"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
+	"io"
 	"sort"
 )
+
+type IntegrityCheckDetails []*IntegrityScanSegmentSequence
+
+func (sequences IntegrityCheckDetails) NewPlainTextReader() (io.Reader, error) {
+	var outputBuffer bytes.Buffer
+
+	tableWriter := table.NewWriter()
+	tableWriter.SetOutputMirror(&outputBuffer)
+	defer tableWriter.Render()
+
+	tableWriter.AppendHeader(table.Row{"TLI", "Start", "End", "Segments count", "Status"})
+	for _, row := range sequences {
+		tableWriter.AppendRow(table.Row{row.TimelineId,
+			row.StartSegment, row.EndSegment, row.SegmentsCount, row.Status})
+	}
+
+	return &outputBuffer, nil
+}
 
 // IntegrityCheckRunner queries the current cluster WAL segment and timeline
 // and travels through WAL segments in storage in reversed chronological order (starting from that segment)
@@ -80,10 +101,10 @@ func (check IntegrityCheckRunner) Type() WalVerifyCheckType {
 // StatusOk if there are no missing segments in storage
 // StatusWarning if storage contains some ProbablyUploading or ProbablyDelayed segments
 // StatusFailure if storage contains Lost segments
-func newWalIntegrityCheckResult(segmentSequences []*WalIntegrityScanSegmentSequence) WalVerifyCheckResult {
+func newWalIntegrityCheckResult(segmentSequences []*IntegrityScanSegmentSequence) WalVerifyCheckResult {
 	result := WalVerifyCheckResult{
 		Status:  StatusOk,
-		Details: segmentSequences,
+		Details: IntegrityCheckDetails(segmentSequences),
 	}
 	for _, row := range segmentSequences {
 		switch row.Status {
@@ -97,9 +118,9 @@ func newWalIntegrityCheckResult(segmentSequences []*WalIntegrityScanSegmentSeque
 	return result
 }
 
-// WalIntegrityScanSegmentSequence is a continuous sequence of segments
+// IntegrityScanSegmentSequence is a continuous sequence of segments
 // with the same timeline and Status
-type WalIntegrityScanSegmentSequence struct {
+type IntegrityScanSegmentSequence struct {
 	TimelineId    uint32               `json:"timeline_id"`
 	StartSegment  string               `json:"start_segment"`
 	EndSegment    string               `json:"end_segment"`
@@ -107,9 +128,9 @@ type WalIntegrityScanSegmentSequence struct {
 	Status        ScannedSegmentStatus `json:"status"`
 }
 
-func newWalIntegrityScanSegmentSequence(sequence *WalSegmentsSequence,
-	status ScannedSegmentStatus) *WalIntegrityScanSegmentSequence {
-	return &WalIntegrityScanSegmentSequence{
+func newIntegrityScanSegmentSequence(sequence *WalSegmentsSequence,
+	status ScannedSegmentStatus) *IntegrityScanSegmentSequence {
+	return &IntegrityScanSegmentSequence{
 		TimelineId:    sequence.timelineId,
 		StartSegment:  sequence.minSegmentNo.getFilename(sequence.timelineId),
 		EndSegment:    sequence.maxSegmentNo.getFilename(sequence.timelineId),
@@ -155,7 +176,7 @@ func runWalIntegrityScan(scanner *WalSegmentScanner, uploadingSegmentRangeSize i
 
 // collapseSegmentsByStatusAndTimeline collapses scanned segments
 // with the same timeline and Status into segment sequences to minify the output
-func collapseSegmentsByStatusAndTimeline(scannedSegments []ScannedSegmentDescription) ([]*WalIntegrityScanSegmentSequence, error) {
+func collapseSegmentsByStatusAndTimeline(scannedSegments []ScannedSegmentDescription) ([]*IntegrityScanSegmentSequence, error) {
 	if len(scannedSegments) == 0 {
 		return nil, nil
 	}
@@ -165,7 +186,7 @@ func collapseSegmentsByStatusAndTimeline(scannedSegments []ScannedSegmentDescrip
 		return scannedSegments[i].Number < scannedSegments[j].Number
 	})
 
-	segmentSequences := make([]*WalIntegrityScanSegmentSequence, 0)
+	segmentSequences := make([]*IntegrityScanSegmentSequence, 0)
 	currentSequence := NewSegmentsSequence(scannedSegments[0].Timeline, scannedSegments[0].Number)
 	currentStatus := scannedSegments[0].status
 
@@ -174,7 +195,7 @@ func collapseSegmentsByStatusAndTimeline(scannedSegments []ScannedSegmentDescrip
 
 		// switch to the new sequence on segment Status change or timeline id change
 		if segment.status != currentStatus || currentSequence.timelineId != segment.Timeline {
-			segmentSequences = append(segmentSequences, newWalIntegrityScanSegmentSequence(currentSequence, currentStatus))
+			segmentSequences = append(segmentSequences, newIntegrityScanSegmentSequence(currentSequence, currentStatus))
 			currentSequence = NewSegmentsSequence(segment.Timeline, segment.Number)
 			currentStatus = segment.status
 		} else {
@@ -182,7 +203,7 @@ func collapseSegmentsByStatusAndTimeline(scannedSegments []ScannedSegmentDescrip
 		}
 	}
 
-	segmentSequences = append(segmentSequences, newWalIntegrityScanSegmentSequence(currentSequence, currentStatus))
+	segmentSequences = append(segmentSequences, newIntegrityScanSegmentSequence(currentSequence, currentStatus))
 	return segmentSequences, nil
 }
 
