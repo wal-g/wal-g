@@ -157,21 +157,30 @@ func getLogsSinceBackup(folder storage.Folder, backupName string, stopAt time.Ti
 	if !strings.HasPrefix(backupName, utility.BackupNamePrefix) {
 		return nil, fmt.Errorf("unexpected backup name: %s", backupName)
 	}
-	var logNames []string
 	startTs := backupName[len(utility.BackupNamePrefix):]
 	endTs := stopAt.Format(utility.BackupTimeFormat)
 	_, logBackups, err := folder.GetSubFolder(utility.WalPath).ListFolder()
 	if err != nil {
 		return nil, err
 	}
+	var allLogNames []string
 	for _, logBackup := range logBackups {
-		name := path.Base(logBackup.GetPath())
+		allLogNames = append(allLogNames, path.Base(logBackup.GetPath()))
+	}
+	sort.Strings(allLogNames)
+
+	var logNames []string
+	for _, name := range allLogNames {
 		logTs := name[len(LogNamePrefix):]
-		if logTs >= startTs && logTs <= endTs {
-			logNames = append(logNames, name)
+		if logTs < startTs {
+			continue
+		}
+		logNames = append(logNames, name)
+		if logTs > endTs {
+			break
 		}
 	}
-	sort.Strings(logNames)
+
 	return logNames, nil
 }
 
