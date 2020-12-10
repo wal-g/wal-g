@@ -3,6 +3,7 @@ package internal
 import (
 	"bytes"
 	"fmt"
+	"github.com/wal-g/wal-g/internal/fsutil"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -24,7 +25,7 @@ func (err DeltaFileWriterNotFoundError) Error() string {
 }
 
 type DeltaFileManager struct {
-	dataFolder            DataFolder
+	dataFolder            fsutil.DataFolder
 	PartFiles             *LazyCache
 	DeltaFileWriters      *LazyCache
 	deltaFileWriterWaiter sync.WaitGroup
@@ -33,7 +34,7 @@ type DeltaFileManager struct {
 	canceledWaiter        sync.WaitGroup
 }
 
-func NewDeltaFileManager(dataFolder DataFolder) *DeltaFileManager {
+func NewDeltaFileManager(dataFolder fsutil.DataFolder) *DeltaFileManager {
 	manager := &DeltaFileManager{
 		dataFolder,
 		nil,
@@ -75,7 +76,7 @@ func (manager *DeltaFileManager) loadDeltaFileWriter(deltaFilename string) (delt
 	physicalDeltaFile, err := manager.dataFolder.OpenReadonlyFile(deltaFilename)
 	var deltaFile *DeltaFile
 	if err != nil {
-		if _, ok := err.(NoSuchFileError); !ok {
+		if _, ok := err.(fsutil.NoSuchFileError); !ok {
 			return nil, err
 		}
 		deltaFile, err = NewDeltaFile(walparser.NewWalParser())
@@ -109,7 +110,7 @@ func (manager *DeltaFileManager) loadPartFile(partFilename string) (*WalPartFile
 	physicalPartFile, err := manager.dataFolder.OpenReadonlyFile(partFilename)
 	var partFile *WalPartFile
 	if err != nil {
-		if _, ok := err.(NoSuchFileError); !ok {
+		if _, ok := err.(fsutil.NoSuchFileError); !ok {
 			return nil, err
 		}
 		partFile = NewWalPartFile()

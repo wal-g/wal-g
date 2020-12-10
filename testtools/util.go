@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"github.com/wal-g/wal-g/internal/fsutil"
 	"io"
 	"strings"
 	"testing"
@@ -36,7 +37,7 @@ func NewMockUploader(apiMultiErr, apiErr bool) *internal.Uploader {
 	)
 }
 
-func NewStoringMockUploader(storage *memory.Storage, deltaDataFolder internal.DataFolder) *internal.Uploader {
+func NewStoringMockUploader(storage *memory.Storage, deltaDataFolder fsutil.DataFolder) *internal.Uploader {
 	return internal.NewUploader(
 		&MockCompressor{},
 		memory.NewFolder("in_memory/", storage),

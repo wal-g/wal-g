@@ -3,6 +3,7 @@ package internal
 import (
 	"archive/tar"
 	"fmt"
+	"github.com/wal-g/wal-g/internal/fsutil"
 	"io"
 	"io/ioutil"
 	"os"
@@ -50,7 +51,7 @@ func HandleWALPrefetch(uploader *WalUploader, walFileName string, location strin
 		time.Sleep(10 * time.Millisecond) // ramp up in order
 	}
 
-	go CleanupPrefetchDirectories(walFileName, location, FileSystemCleaner{})
+	go CleanupPrefetchDirectories(walFileName, location, fsutil.FileSystemCleaner{})
 
 	waitGroup.Wait()
 }
@@ -68,7 +69,7 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 		return
 	}
 
-	archiveDirectory := uploader.DeltaFileManager.dataFolder.(*DiskDataFolder).path
+	archiveDirectory := uploader.DeltaFileManager.dataFolder.(*fsutil.DiskDataFolder).Path
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	bundle := NewBundle(archiveDirectory, nil, &prefaultStartLsn, nil,

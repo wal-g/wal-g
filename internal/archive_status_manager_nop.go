@@ -1,7 +1,9 @@
 package internal
 
+import "github.com/wal-g/wal-g/internal/fsutil"
+
 type NopASM struct {
-	folder DataFolder
+	folder fsutil.DataFolder
 }
 
 func NewNopASM() ArchiveStatusManager {

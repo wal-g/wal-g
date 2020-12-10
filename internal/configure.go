@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/wal-g/wal-g/internal/fsutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -169,13 +170,13 @@ func GetPgSlotName() (pgSlotName string) {
 }
 
 // TODO : unit tests
-func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err error) {
+func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder fsutil.DataFolder, err error) {
 	useWalDelta = viper.GetBool(UseWalDeltaSetting)
 	if !useWalDelta {
 		return
 	}
 	dataFolderPath := GetDataFolderPath()
-	deltaDataFolder, err = newDiskDataFolder(dataFolderPath)
+	deltaDataFolder, err = fsutil.NewDiskDataFolder(dataFolderPath)
 	if err != nil {
 		useWalDelta = false
 		tracelog.WarningLogger.Printf("can't use wal delta feature because can't open delta data folder '%s'"+
@@ -206,8 +207,8 @@ func getArchiveDataFolderPath() string {
 }
 
 // TODO : unit tests
-func ConfigureArchiveStatusManager() (DataFolder, error) {
-	return newDiskDataFolder(getArchiveDataFolderPath())
+func ConfigureArchiveStatusManager() (fsutil.DataFolder, error) {
+	return fsutil.NewDiskDataFolder(getArchiveDataFolderPath())
 }
 
 // ConfigureUploader connects to storage and creates an uploader. It makes sure

@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"context"
 	"fmt"
+	"github.com/wal-g/wal-g/internal/retriers"
 	"io"
 	"strings"
 	"sync"
@@ -146,7 +147,7 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 		return newNoFilesToExtractError()
 	}
 
-	retrier := newExponentialRetrier(MinExtractRetryWait, MaxExtractRetryWait)
+	retrier := retriers.NewExponentialRetrier(MinExtractRetryWait, MaxExtractRetryWait)
 	// Set maximum number of goroutines spun off by ExtractAll
 	downloadingConcurrency, err := getMaxDownloadConcurrency()
 	if err != nil {
@@ -163,7 +164,7 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 		}
 		currentRun = failed
 		if len(failed) > 0 {
-			retrier.retry()
+			retrier.Retry()
 		}
 	}
 	return nil

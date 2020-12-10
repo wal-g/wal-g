@@ -1,4 +1,4 @@
-package internal
+package retriers
 
 import "time"
 
@@ -7,11 +7,11 @@ type ExponentialRetrier struct {
 	sleepDurationBound time.Duration
 }
 
-func newExponentialRetrier(startSleepDuration, sleepDurationBound time.Duration) *ExponentialRetrier {
+func NewExponentialRetrier(startSleepDuration, sleepDurationBound time.Duration) *ExponentialRetrier {
 	return &ExponentialRetrier{startSleepDuration, sleepDurationBound}
 }
 
-func (retrier *ExponentialRetrier) retry() {
+func (retrier *ExponentialRetrier) Retry() {
 	time.Sleep(retrier.sleepDuration)
 	retrier.sleepDuration *= 2
 	if retrier.sleepDuration > retrier.sleepDurationBound {

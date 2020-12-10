@@ -1,10 +1,12 @@
 package internal
 
+import "github.com/wal-g/wal-g/internal/fsutil"
+
 type DataFolderASM struct {
-	folder DataFolder
+	folder fsutil.DataFolder
 }
 
-func NewDataFolderASM(folder DataFolder) DataFolderASM {
+func NewDataFolderASM(folder fsutil.DataFolder) DataFolderASM {
 	return DataFolderASM{
 		folder: folder,
 	}
