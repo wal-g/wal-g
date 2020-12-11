@@ -47,12 +47,12 @@ func (timelineSetup *TestTimelineSetup) GetWalFilenames() []string {
 	return filenamesWithExtension
 }
 
-// GetHistory returns .history file name and compressed contents
-func (timelineSetup *TestTimelineSetup) GetHistory() (string, *bytes.Buffer, error) {
+// newTimelineHistoryFile returns .history file name and compressed contents
+func newTimelineHistoryFile(contents string, timelineId uint32) (string, *bytes.Buffer, error) {
 	compressor := compression.Compressors[lz4.AlgorithmName]
 	var compressedData bytes.Buffer
 	compressingWriter := compressor.NewWriter(&compressedData)
-	_, err := utility.FastCopy(compressingWriter, strings.NewReader(timelineSetup.historyFileContents))
+	_, err := utility.FastCopy(compressingWriter, strings.NewReader(contents))
 	if err != nil {
 		return "", nil, err
 	}
@@ -61,7 +61,7 @@ func (timelineSetup *TestTimelineSetup) GetHistory() (string, *bytes.Buffer, err
 		return "", nil, err
 	}
 
-	return fmt.Sprintf("%08X.history."+lz4.FileExtension, timelineSetup.id), &compressedData, nil
+	return fmt.Sprintf("%08X.history."+lz4.FileExtension, timelineId), &compressedData, nil
 }
 
 // TestWalShow test series is used to test the HandleWalShow() functionality
@@ -135,10 +135,11 @@ func TestWalShow_SingleTimelineWithHistory(t *testing.T) {
 		historyFileContents: "1\t0/90400000\tbefore 2000-01-01 05:00:00+05\n\n",
 	}
 
-	historyFileName, historyContents, err := timelineSetup.GetHistory()
+	fileName, contents, err := newTimelineHistoryFile(
+		timelineSetup.historyFileContents, timelineSetup.id)
 	assert.NoError(t, err)
 
-	testSingleTimeline(t, timelineSetup, map[string]*bytes.Buffer{historyFileName: historyContents})
+	testSingleTimeline(t, timelineSetup, map[string]*bytes.Buffer{fileName: contents})
 }
 
 func TestWalShow_TwoTimelinesWithHistory(t *testing.T) {
@@ -169,11 +170,12 @@ func TestWalShow_TwoTimelinesWithHistory(t *testing.T) {
 		},
 	}
 
-	historyFileName, historyContents, err := timelineSetups[1].GetHistory()
+	fileName, contents, err := newTimelineHistoryFile(
+		timelineSetups[1].historyFileContents, timelineSetups[1].id)
 	assert.NoError(t, err)
 
 	testMultipleTimelines(t, timelineSetups, map[string]*bytes.Buffer{
-		historyFileName: historyContents,
+		fileName: contents,
 	})
 }
 
@@ -261,26 +263,31 @@ func verifySingleTimeline(t *testing.T, setup *TestTimelineSetup, timelineInfo *
 }
 
 // executeWalShow invokes the HandleWalShow() with fake storage filled with
-// provided wal segments and other wal folder files
+// provided wal segments and other folder files
 func executeWalShow(walFilenames []string, walFolderFiles map[string]*bytes.Buffer) []*internal.TimelineInfo {
-	for _, name := range walFilenames {
-		// we don't use the WAL file contents so let it be it empty inside
-		walFolderFiles[name] = new(bytes.Buffer)
-	}
-	folder := setupTestStorageFolder(walFolderFiles)
-	mockOutputWriter := &MockWalShowOutputWriter{}
+	rootFolder := setupTestStorageFolder()
+	walFolder := rootFolder.GetSubFolder(utility.WalPath)
+	putWalSegments(walFilenames, walFolder)
 
-	internal.HandleWalShow(folder, false, mockOutputWriter)
+	for name, content := range walFolderFiles {
+		_ = walFolder.PutObject(name, content)
+	}
+
+	mockOutputWriter := &MockWalShowOutputWriter{}
+	internal.HandleWalShow(rootFolder, false, mockOutputWriter)
 
 	return mockOutputWriter.timelineInfos
 }
 
-func setupTestStorageFolder(walFolderFiles map[string]*bytes.Buffer) storage.Folder {
-	memoryStorage := memory.NewStorage()
-	for name, content := range walFolderFiles {
-		memoryStorage.Store("in_memory/wal_005/"+name, *content)
+func putWalSegments(walFilenames []string, walFolder storage.Folder) {
+	for _, name := range walFilenames {
+		// we don't use the WAL file contents so let it be it empty inside
+		_ = walFolder.PutObject(name, new(bytes.Buffer))
 	}
+}
 
+func setupTestStorageFolder() storage.Folder {
+	memoryStorage := memory.NewStorage()
 	return memory.NewFolder("in_memory/", memoryStorage)
 }
 
