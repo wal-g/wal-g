@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/wal-g/wal-g/internal/fsutil"
+	"github.com/wal-g/wal-g/internal/limited"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -103,12 +104,12 @@ func configureLimiters() {
 	}
 	if viper.IsSet(DiskRateLimitSetting) {
 		diskLimit := viper.GetInt64(DiskRateLimitSetting)
-		DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
+		limited.DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 
 	if viper.IsSet(NetworkRateLimitSetting) {
 		netLimit := viper.GetInt64(NetworkRateLimitSetting)
-		NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
+		limited.NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 }
 

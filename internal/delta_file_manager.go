@@ -143,7 +143,7 @@ func (manager *DeltaFileManager) FlushPartFiles() (completedPartFiles map[string
 				tracelog.WarningLogger.Printf("Canceled delta file writing because of error: "+tracelog.GetErrorFormatter()+"\n", err)
 			}
 		} else {
-			err := saveToDataFolder(partFile, partFilename, manager.dataFolder)
+			err := fsutil.SaveToDataFolder(partFile, partFilename, manager.dataFolder)
 			if err != nil {
 				manager.CanceledDeltaFiles[deltaFilename] = true
 				tracelog.WarningLogger.Printf("Failed to save part file: '%s' because of error: '%v'\n", partFilename, err)
@@ -180,7 +180,7 @@ func (manager *DeltaFileManager) FlushDeltaFiles(uploader *Uploader, completedPa
 				}
 			}
 		} else {
-			err := saveToDataFolder(deltaFileWriter.DeltaFile, deltaFilename, manager.dataFolder)
+			err := fsutil.SaveToDataFolder(deltaFileWriter.DeltaFile, deltaFilename, manager.dataFolder)
 			if err != nil {
 				tracelog.WarningLogger.Printf("Failed to save delta file: '%s' because of error: '%v'\n", deltaFilename, err)
 			}

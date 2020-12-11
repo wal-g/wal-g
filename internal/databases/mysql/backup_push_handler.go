@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"github.com/wal-g/wal-g/internal/limited"
 	"os/exec"
 
 	"github.com/wal-g/tracelog"
@@ -21,7 +22,7 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
-	fileName, err := uploader.PushStream(internal.NewDiskLimitReader(stdout))
+	fileName, err := uploader.PushStream(limited.NewDiskLimitReader(stdout))
 	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
 
 	err = backupCmd.Wait()

@@ -1,4 +1,4 @@
-package retriers
+package internal
 
 import "time"
 

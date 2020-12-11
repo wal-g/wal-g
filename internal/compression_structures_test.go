@@ -3,6 +3,7 @@ package internal_test
 import (
 	"bytes"
 	"errors"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -30,7 +31,7 @@ var tests = []struct {
 func TestCascadeFileCloser(t *testing.T) {
 	for _, testCase := range tests {
 		b := &testtools.BufCloser{Buffer: bytes.NewBufferString(testCase.testString), Err: false}
-		lz := &internal.CascadeWriteCloser{
+		lz := &utility.CascadeWriteCloser{
 			WriteCloser: GetLz4Compressor().NewWriter(b),
 			Underlying:  b,
 		}
@@ -59,7 +60,7 @@ func TestCascadeFileCloser(t *testing.T) {
 
 func TestCascadeFileCloserError(t *testing.T) {
 	mock := &testtools.ErrorWriteCloser{}
-	lz := &internal.CascadeWriteCloser{
+	lz := &utility.CascadeWriteCloser{
 		WriteCloser: GetLz4Compressor().NewWriter(mock),
 		Underlying:  mock,
 	}

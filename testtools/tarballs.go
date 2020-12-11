@@ -4,13 +4,13 @@ import (
 	"archive/tar"
 	"bytes"
 	"fmt"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os"
 	"path/filepath"
 	"sync/atomic"
 
 	"github.com/pierrec/lz4"
-	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto"
 )
 
@@ -46,13 +46,13 @@ func (tarBall *FileTarBall) SetUp(crypter crypto.Crypter, names ...string) {
 				panic(err)
 			}
 
-			tarBall.writeCloser = &internal.CascadeWriteCloser{
+			tarBall.writeCloser = &utility.CascadeWriteCloser{
 				WriteCloser: lz4.NewWriter(file),
-				Underlying:  &internal.CascadeWriteCloser{WriteCloser: writeCloser, Underlying: file},
+				Underlying:  &utility.CascadeWriteCloser{WriteCloser: writeCloser, Underlying: file},
 			}
 		} else {
 			writeCloser = file
-			tarBall.writeCloser = &internal.CascadeWriteCloser{
+			tarBall.writeCloser = &utility.CascadeWriteCloser{
 				WriteCloser: lz4.NewWriter(file),
 				Underlying:  writeCloser,
 			}

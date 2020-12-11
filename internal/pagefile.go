@@ -13,6 +13,7 @@ package internal
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/wal-g/wal-g/internal/limited"
 	"io"
 	"os"
 	"path"
@@ -122,7 +123,7 @@ func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitma
 	}
 
 	fileReadSeekCloser := &ioextensions.ReadSeekCloserImpl{
-		Reader: NewDiskLimitReader(file),
+		Reader: limited.NewDiskLimitReader(file),
 		Seeker: file,
 		Closer: file,
 	}
@@ -142,7 +143,7 @@ func ReadIncrementLocations(filePath string, fileSize int64, lsn uint64) ([]walp
 	}
 
 	fileReadSeekCloser := &ioextensions.ReadSeekCloserImpl{
-		Reader: NewDiskLimitReader(file),
+		Reader: limited.NewDiskLimitReader(file),
 		Seeker: file,
 		Closer: file,
 	}

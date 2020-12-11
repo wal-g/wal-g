@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"context"
 	"fmt"
+	"github.com/wal-g/wal-g/internal/limited"
 	"io"
 	"io/ioutil"
 	"os"
@@ -180,7 +181,7 @@ func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string,
 	if err != nil {
 		return nil, errors.Wrapf(err, "startReadingFile: failed to open file '%s'\n", path)
 	}
-	diskLimitedFileReader := NewDiskLimitReader(file)
+	diskLimitedFileReader := limited.NewDiskLimitReader(file)
 	fileReader = &ioextensions.ReadCascadeCloser{
 		Reader: &io.LimitedReader{
 			R: io.MultiReader(diskLimitedFileReader, &ioextensions.ZeroReader{}),
