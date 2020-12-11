@@ -4,8 +4,6 @@ import (
 	"github.com/wal-g/wal-g/internal/walparser"
 )
 
-var TerminalLocation = *walparser.NewBlockLocation(0, 0, 0, 0)
-
 type WalDeltaRecorder struct {
 	blockLocationConsumer chan walparser.BlockLocation
 }

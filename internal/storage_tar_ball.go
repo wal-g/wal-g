@@ -3,7 +3,7 @@ package internal
 import (
 	"archive/tar"
 	"fmt"
-	"github.com/wal-g/wal-g/internal/limited"
+	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/utility"
 	"io"
 	"sync/atomic"
@@ -85,7 +85,7 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) 
 	go func() {
 		defer uploader.waitGroup.Done()
 
-		err := uploader.Upload(path, limited.NewNetworkLimitReader(pipeReader))
+		err := uploader.Upload(path, limiters.NewNetworkLimitReader(pipeReader))
 		if compressingError, ok := err.(CompressAndEncryptError); ok {
 			tracelog.ErrorLogger.Printf("could not upload '%s' due to compression error\n%+v\n", path, compressingError)
 		}

@@ -11,8 +11,6 @@ import (
 type BlockLocationReader struct {
 	underlying io.Reader
 }
-var TerminalLocation = *walparser.NewBlockLocation(0, 0, 0, 0)
-
 
 func NewBlockLocationReader(underlying io.Reader) *BlockLocationReader {
 	return &BlockLocationReader{underlying}
@@ -39,7 +37,7 @@ func ReadLocationsFrom(reader io.Reader) ([]walparser.BlockLocation, error) {
 	locations := make([]walparser.BlockLocation, 0)
 	for {
 		location, err := locationReader.ReadNextLocation()
-		if err != nil || *location == TerminalLocation {
+		if err != nil || *location == walparser.TerminalLocation {
 			if errors.Cause(err) == io.EOF {
 				err = nil
 			}

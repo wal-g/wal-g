@@ -1,8 +1,8 @@
-package limited_test
+package limiters_test
 
 import (
 	"bytes"
-	"github.com/wal-g/wal-g/internal/limited"
+	"github.com/wal-g/wal-g/internal/limiters"
 	"io"
 	"io/ioutil"
 	"testing"
@@ -27,17 +27,17 @@ func (r *fakeCloser) Close() error {
 }
 
 func TestLimiter(t *testing.T) {
-	limited.DiskLimiter = rate.NewLimiter(rate.Limit(10000), int(1024))
-	limited.NetworkLimiter = rate.NewLimiter(rate.Limit(10000), int(1024))
+	limiters.DiskLimiter = rate.NewLimiter(rate.Limit(10000), int(1024))
+	limiters.NetworkLimiter = rate.NewLimiter(rate.Limit(10000), int(1024))
 	defer func() {
-		limited.DiskLimiter = nil
-		limited.NetworkLimiter = nil
+		limiters.DiskLimiter = nil
+		limiters.NetworkLimiter = nil
 	}()
 	buffer := bytes.NewReader(make([]byte, 2000))
 	r := &fakeCloser{buffer}
 	start := utility.TimeNowCrossPlatformLocal()
 
-	reader := limited.NewDiskLimitReader(limited.NewNetworkLimitReader(r))
+	reader := limiters.NewDiskLimitReader(limiters.NewNetworkLimitReader(r))
 	_, err := ioutil.ReadAll(reader)
 	assert.NoError(t, err)
 	end := utility.TimeNowCrossPlatformLocal()

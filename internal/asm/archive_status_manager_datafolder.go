@@ -13,16 +13,16 @@ func NewDataFolderASM(folder fsutil.DataFolder) DataFolderASM {
 }
 
 func (asm DataFolderASM) IsWalAlreadyUploaded(walFilePath string) bool {
-	walFilePath = getOnlyWalName(walFilePath)
+	walFilePath = GetOnlyWalName(walFilePath)
 	return asm.folder.FileExists(walFilePath)
 }
 
 func (asm DataFolderASM) MarkWalUploaded(walFilePath string) error {
-	walFilePath = getOnlyWalName(walFilePath)
+	walFilePath = GetOnlyWalName(walFilePath)
 	return asm.folder.CreateFile(walFilePath)
 }
 
 func (asm DataFolderASM) UnmarkWalFile(walFilePath string) error {
-	walFilePath = getOnlyWalName(walFilePath)
+	walFilePath = GetOnlyWalName(walFilePath)
 	return asm.folder.DeleteFile(walFilePath)
 }

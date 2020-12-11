@@ -95,7 +95,7 @@ func queueTest(t *testing.T) {
 }
 
 func makeDeltaFile(locations []walparser.BlockLocation) ([]byte, error) {
-	locations = append(locations, internal.TerminalLocation)
+	locations = append(locations, walparser.TerminalLocation)
 	var data bytes.Buffer
 	compressor := compression.Compressors[lz4.AlgorithmName]
 	compressingWriter := compressor.NewWriter(&data)

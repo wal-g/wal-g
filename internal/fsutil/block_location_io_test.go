@@ -1,4 +1,4 @@
-package internal_test
+package fsutil_test
 
 import (
 	"bytes"

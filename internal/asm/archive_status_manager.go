@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func getOnlyWalName(filePath string) string {
+func GetOnlyWalName(filePath string) string {
 	filePath = filepath.Base(filePath)
 	return strings.TrimSuffix(filePath, filepath.Ext(filePath))
 }

@@ -66,7 +66,7 @@ func NewWalSegmentScanner(walSegmentRunner *WalSegmentRunner) *WalSegmentScanner
 // - Scanning the ScanSegmentsLimit of segments
 // - Finding the first segment which exists in WAL storage
 func (scanner *WalSegmentScanner) Scan(config SegmentScanConfig) error {
-	// scan may have a limited number of iterations, or may be unlimited
+	// scan may have a limiters number of iterations, or may be unlimited
 	for i := 0; config.UnlimitedScan || i < config.ScanSegmentsLimit; i++ {
 		currentSegment, err := scanner.walSegmentRunner.Next()
 		if err != nil {
