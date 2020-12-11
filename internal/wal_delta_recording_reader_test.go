@@ -2,6 +2,7 @@ package internal_test
 
 import (
 	"bytes"
+	"github.com/wal-g/wal-g/internal/fsutil"
 	"io/ioutil"
 	"os"
 	"path"
@@ -79,7 +80,7 @@ func TestRead_CorrectRecording(t *testing.T) {
 	assert.NoError(t, err)
 	manager.FlushFiles(nil)
 
-	locations, err := internal.ReadLocationsFrom((*dataFolder)[DeltaFilename])
+	locations, err := fsutil.ReadLocationsFrom((*dataFolder)[DeltaFilename])
 	assert.NoError(t, err)
 	assert.Len(t, locations, 1)
 	assert.Equal(t, RealLocation, locations[0])

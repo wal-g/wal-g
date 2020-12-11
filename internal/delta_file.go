@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"github.com/wal-g/wal-g/internal/fsutil"
 	"io"
 
 	"github.com/pkg/errors"
@@ -34,7 +35,7 @@ func NewDeltaFile(walParser *walparser.WalParser) (*DeltaFile, error) {
 }
 
 func (deltaFile *DeltaFile) Save(writer io.Writer) error {
-	err := WriteLocationsTo(writer, append(deltaFile.Locations, TerminalLocation))
+	err := fsutil.WriteLocationsTo(writer, append(deltaFile.Locations, fsutil.TerminalLocation))
 	if err != nil {
 		return err
 	}
@@ -42,7 +43,7 @@ func (deltaFile *DeltaFile) Save(writer io.Writer) error {
 }
 
 func LoadDeltaFile(reader io.Reader) (*DeltaFile, error) {
-	locations, err := ReadLocationsFrom(reader)
+	locations, err := fsutil.ReadLocationsFrom(reader)
 	if err != nil {
 		return nil, err
 	}

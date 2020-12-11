@@ -2,6 +2,7 @@ package internal_test
 
 import (
 	"bytes"
+	"github.com/wal-g/wal-g/internal/fsutil"
 	"testing"
 	"time"
 
@@ -98,7 +99,7 @@ func makeDeltaFile(locations []walparser.BlockLocation) ([]byte, error) {
 	var data bytes.Buffer
 	compressor := compression.Compressors[lz4.AlgorithmName]
 	compressingWriter := compressor.NewWriter(&data)
-	err := internal.WriteLocationsTo(compressingWriter, locations)
+	err := fsutil.WriteLocationsTo(compressingWriter, locations)
 	if err != nil {
 		return nil, err
 	}

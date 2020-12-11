@@ -107,10 +107,10 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) 
 			tracelog.ErrorLogger.Fatal("upload: encryption error ", err)
 		}
 
-		writerToCompress = &utility.CascadeWriteCloser{encryptedWriter, pipeWriter}
+		writerToCompress = &utility.CascadeWriteCloser{WriteCloser: encryptedWriter, Underlying: pipeWriter}
 	}
 
-	return &utility.CascadeWriteCloser{uploader.Compressor.NewWriter(writerToCompress), writerToCompress}
+	return &utility.CascadeWriteCloser{WriteCloser: uploader.Compressor.NewWriter(writerToCompress), Underlying: writerToCompress}
 }
 
 // Size accumulated in this tarball

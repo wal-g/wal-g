@@ -1,4 +1,4 @@
-package internal
+package fsutil
 
 import (
 	"io"
@@ -11,6 +11,8 @@ import (
 type BlockLocationReader struct {
 	underlying io.Reader
 }
+var TerminalLocation = *walparser.NewBlockLocation(0, 0, 0, 0)
+
 
 func NewBlockLocationReader(underlying io.Reader) *BlockLocationReader {
 	return &BlockLocationReader{underlying}

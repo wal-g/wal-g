@@ -16,11 +16,11 @@ type CascadeWriteCloser struct {
 
 // Close returns the first encountered error from closing
 // main or underlying writer.
-func (cascadeCloser *CascadeWriteCloser) Close() error {
-	err := cascadeCloser.WriteCloser.Close()
+func (cc *CascadeWriteCloser) Close() error {
+	err := cc.WriteCloser.Close()
 	if err != nil {
 		return errors.Wrap(err, "Close: failed to close main writer")
 	}
-	err = cascadeCloser.Underlying.Close()
+	err = cc.Underlying.Close()
 	return errors.Wrap(err, "Close: failed to close underlying writer")
 }

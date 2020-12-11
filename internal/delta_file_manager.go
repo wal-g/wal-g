@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/wal-g/wal-g/internal/fsutil"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -36,13 +37,9 @@ type DeltaFileManager struct {
 
 func NewDeltaFileManager(dataFolder fsutil.DataFolder) *DeltaFileManager {
 	manager := &DeltaFileManager{
-		dataFolder,
-		nil,
-		nil,
-		sync.WaitGroup{},
-		make(chan string),
-		make(map[string]bool),
-		sync.WaitGroup{},
+		dataFolder:            dataFolder,
+		canceledWalRecordings: make(chan string),
+		CanceledDeltaFiles:    make(map[string]bool),
 	}
 	manager.PartFiles = newLazyCache(func(partFilenameInterface interface{}) (partFile interface{}, err error) {
 		partFilename, ok := partFilenameInterface.(string)
@@ -174,7 +171,7 @@ func (manager *DeltaFileManager) FlushDeltaFiles(uploader *Uploader, completedPa
 			if err != nil {
 				tracelog.WarningLogger.Printf("Failed to upload delta file: '%s' because of saving error: '%v'\n", deltaFilename, err)
 			} else {
-				err = uploader.UploadFile(newNamedReaderImpl(&deltaFileData, deltaFilename))
+				err = uploader.UploadFile(ioextensions.NewNamedReaderImpl(&deltaFileData, deltaFilename))
 				if err != nil {
 					tracelog.WarningLogger.Printf("Failed to upload delta file: '%s' because of uploading error: '%v'\n", deltaFilename, err)
 				}

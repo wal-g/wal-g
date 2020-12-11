@@ -1,12 +1,12 @@
 package internal_test
 
 import (
+	"github.com/wal-g/wal-g/internal"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/storages/memory"
-	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/testtools"
 )

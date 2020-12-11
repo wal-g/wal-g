@@ -2,7 +2,6 @@ package internal
 
 import (
 	"fmt"
-
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 )

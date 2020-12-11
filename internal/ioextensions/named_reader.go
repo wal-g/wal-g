@@ -1,4 +1,4 @@
-package internal
+package ioextensions
 
 import "io"
 
@@ -16,6 +16,6 @@ func (reader *NamedReaderImpl) Name() string {
 	return reader.name
 }
 
-func newNamedReaderImpl(reader io.Reader, name string) *NamedReaderImpl {
+func NewNamedReaderImpl(reader io.Reader, name string) *NamedReaderImpl {
 	return &NamedReaderImpl{reader, name}
 }

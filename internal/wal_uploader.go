@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"io"
 	"path"
 
@@ -41,7 +42,7 @@ func (walUploader *WalUploader) clone() *WalUploader {
 }
 
 // TODO : unit tests
-func (walUploader *WalUploader) UploadWalFile(file NamedReader) error {
+func (walUploader *WalUploader) UploadWalFile(file ioextensions.NamedReader) error {
 	var walFileReader io.Reader
 
 	filename := path.Base(file.Name())
@@ -57,7 +58,7 @@ func (walUploader *WalUploader) UploadWalFile(file NamedReader) error {
 		walFileReader = file
 	}
 
-	return walUploader.UploadFile(newNamedReaderImpl(walFileReader, file.Name()))
+	return walUploader.UploadFile(ioextensions.NewNamedReaderImpl(walFileReader, file.Name()))
 }
 
 func (walUploader *WalUploader) FlushFiles() {

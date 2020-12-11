@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/internal"
 )
 
 func TestSaveLoadDeltaFile(t *testing.T) {
