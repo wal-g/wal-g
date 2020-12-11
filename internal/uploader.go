@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/wal-g/wal-g/internal/asm"
 	"io"
 	"path/filepath"
 	"sync"
@@ -27,7 +28,7 @@ type Uploader struct {
 	UploadingFolder      storage.Folder
 	Compressor           compression.Compressor
 	waitGroup            *sync.WaitGroup
-	ArchiveStatusManager ArchiveStatusManager
+	ArchiveStatusManager asm.ArchiveStatusManager
 	Failed               atomic.Value
 	tarSize              *int64
 }

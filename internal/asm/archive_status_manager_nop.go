@@ -1,4 +1,4 @@
-package internal
+package asm
 
 import "github.com/wal-g/wal-g/internal/fsutil"
 
@@ -10,14 +10,14 @@ func NewNopASM() ArchiveStatusManager {
 	return NopASM{}
 }
 
-func (asm NopASM) isWalAlreadyUploaded(walFilePath string) bool {
+func (asm NopASM) IsWalAlreadyUploaded(walFilePath string) bool {
 	return false
 }
 
-func (asm NopASM) markWalUploaded(walFilePath string) error {
+func (asm NopASM) MarkWalUploaded(walFilePath string) error {
 	return nil
 }
 
-func (asm NopASM) unmarkWalFile(walFilePath string) error {
+func (asm NopASM) UnmarkWalFile(walFilePath string) error {
 	return nil
 }

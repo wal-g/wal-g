@@ -177,7 +177,7 @@ func (b *BgUploader) processFiles(fileChan <-chan os.FileInfo) {
 // shouldSkipFile returns true when the file in question has either already been
 // uploaded or if the filename doesn't match the expected pattern
 func (b *BgUploader) shouldSkipFile(filename string) bool {
-	return !strings.HasSuffix(filename, readySuffix) || b.uploader.ArchiveStatusManager.isWalAlreadyUploaded(filename)
+	return !strings.HasSuffix(filename, readySuffix) || b.uploader.ArchiveStatusManager.IsWalAlreadyUploaded(filename)
 }
 
 // upload one WAL file. Returns true if the file was uploaded and false if the
@@ -190,7 +190,7 @@ func (b *BgUploader) upload(walStatusFilename string) bool {
 		return false
 	}
 
-	if err := b.uploader.ArchiveStatusManager.markWalUploaded(walFilename); err != nil {
+	if err := b.uploader.ArchiveStatusManager.MarkWalUploaded(walFilename); err != nil {
 		tracelog.ErrorLogger.Printf("Error marking wal file %s as uploaded: %v", walFilename, err)
 	}
 

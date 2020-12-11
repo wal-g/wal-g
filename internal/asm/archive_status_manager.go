@@ -1,4 +1,4 @@
-package internal
+package asm
 
 import (
 	"path/filepath"
@@ -11,7 +11,7 @@ func getOnlyWalName(filePath string) string {
 }
 
 type ArchiveStatusManager interface {
-	isWalAlreadyUploaded(string) bool
-	markWalUploaded(string) error
-	unmarkWalFile(string) error
+	IsWalAlreadyUploaded(string) bool
+	MarkWalUploaded(string) error
+	UnmarkWalFile(string) error
 }

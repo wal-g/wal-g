@@ -1,4 +1,4 @@
-package internal
+package asm
 
 import "github.com/wal-g/wal-g/internal/fsutil"
 
@@ -12,17 +12,17 @@ func NewDataFolderASM(folder fsutil.DataFolder) DataFolderASM {
 	}
 }
 
-func (asm DataFolderASM) isWalAlreadyUploaded(walFilePath string) bool {
+func (asm DataFolderASM) IsWalAlreadyUploaded(walFilePath string) bool {
 	walFilePath = getOnlyWalName(walFilePath)
 	return asm.folder.FileExists(walFilePath)
 }
 
-func (asm DataFolderASM) markWalUploaded(walFilePath string) error {
+func (asm DataFolderASM) MarkWalUploaded(walFilePath string) error {
 	walFilePath = getOnlyWalName(walFilePath)
 	return asm.folder.CreateFile(walFilePath)
 }
 
-func (asm DataFolderASM) unmarkWalFile(walFilePath string) error {
+func (asm DataFolderASM) UnmarkWalFile(walFilePath string) error {
 	walFilePath = getOnlyWalName(walFilePath)
 	return asm.folder.DeleteFile(walFilePath)
 }

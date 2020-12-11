@@ -2,6 +2,7 @@ package internal_test
 
 import (
 	"fmt"
+	"github.com/wal-g/wal-g/internal/asm"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -90,7 +91,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 
 			// Setup BgUploader
 			tu := testtools.NewMockWalUploader(false, false)
-			fakeASM := internal.NewFakeASM()
+			fakeASM := asm.NewFakeASM()
 			tu.ArchiveStatusManager = fakeASM
 			bu := internal.NewBgUploader(a, int32(tt.maxParallelism), int32(tt.maxNumFilesUploaded), tu, false)
 
@@ -105,7 +106,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 			// Check that at least the expected number of files were created
 			for i := 0; i < tt.wantNumFilesUploaded; i++ {
 				bname := testFilename(i)
-				wasUploaded := fakeASM.IsWalAlreadyUploaded(bname)
+				wasUploaded := fakeASM.WalAlreadyUploaded(bname)
 				assert.True(t, wasUploaded, bname+" was not marked as uploaded")
 			}
 
