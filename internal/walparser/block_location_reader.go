@@ -1,10 +1,9 @@
-package fsutil
+package walparser
 
 import (
 	"io"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 )
 
@@ -17,8 +16,8 @@ func NewBlockLocationReader(underlying io.Reader) *BlockLocationReader {
 }
 
 // ReadNextLocation returns any reader error wrapped with errors.Wrap
-func (reader *BlockLocationReader) ReadNextLocation() (*walparser.BlockLocation, error) {
-	var location walparser.BlockLocation
+func (reader *BlockLocationReader) ReadNextLocation() (*BlockLocation, error) {
+	var location BlockLocation
 	fields := []parsingutil.FieldToParse{
 		{Field: &location.RelationFileNode.SpcNode, Name: "SpcNode"},
 		{Field: &location.RelationFileNode.DBNode, Name: "DBNode"},
@@ -32,12 +31,12 @@ func (reader *BlockLocationReader) ReadNextLocation() (*walparser.BlockLocation,
 	return &location, nil
 }
 
-func ReadLocationsFrom(reader io.Reader) ([]walparser.BlockLocation, error) {
+func ReadLocationsFrom(reader io.Reader) ([]BlockLocation, error) {
 	locationReader := NewBlockLocationReader(reader)
-	locations := make([]walparser.BlockLocation, 0)
+	locations := make([]BlockLocation, 0)
 	for {
 		location, err := locationReader.ReadNextLocation()
-		if err != nil || *location == walparser.TerminalLocation {
+		if err != nil || *location == TerminalLocation {
 			if errors.Cause(err) == io.EOF {
 				err = nil
 			}

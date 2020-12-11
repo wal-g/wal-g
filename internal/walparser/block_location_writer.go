@@ -1,10 +1,8 @@
-package fsutil
+package walparser
 
 import (
 	"encoding/binary"
 	"io"
-
-	"github.com/wal-g/wal-g/internal/walparser"
 )
 
 type BlockLocationWriter struct {
@@ -15,7 +13,7 @@ func NewBlockLocationWriter(underlying io.Writer) *BlockLocationWriter {
 	return &BlockLocationWriter{underlying}
 }
 
-func (locationWriter *BlockLocationWriter) WriteLocation(location walparser.BlockLocation) error {
+func (locationWriter *BlockLocationWriter) WriteLocation(location BlockLocation) error {
 	numbersToWrite := []uint32{
 		uint32(location.RelationFileNode.SpcNode),
 		uint32(location.RelationFileNode.DBNode),
@@ -31,7 +29,7 @@ func (locationWriter *BlockLocationWriter) WriteLocation(location walparser.Bloc
 	return nil
 }
 
-func WriteLocationsTo(writer io.Writer, locations []walparser.BlockLocation) error {
+func WriteLocationsTo(writer io.Writer, locations []BlockLocation) error {
 	locationWriter := NewBlockLocationWriter(writer)
 	for _, location := range locations {
 		err := locationWriter.WriteLocation(location)

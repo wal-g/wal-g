@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
@@ -80,7 +79,7 @@ func TestRead_CorrectRecording(t *testing.T) {
 	assert.NoError(t, err)
 	manager.FlushFiles(nil)
 
-	locations, err := fsutil.ReadLocationsFrom((*dataFolder)[DeltaFilename])
+	locations, err := walparser.ReadLocationsFrom((*dataFolder)[DeltaFilename])
 	assert.NoError(t, err)
 	assert.Len(t, locations, 1)
 	assert.Equal(t, RealLocation, locations[0])

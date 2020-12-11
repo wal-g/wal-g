@@ -1,14 +1,12 @@
-package internal
+package walparser
 
 import (
 	"bytes"
 	"io"
-
-	"github.com/wal-g/wal-g/internal/walparser"
 )
 
-func ExtractBlockLocations(records []walparser.XLogRecord) []walparser.BlockLocation {
-	locations := make([]walparser.BlockLocation, 0)
+func ExtractBlockLocations(records []XLogRecord) []BlockLocation {
+	locations := make([]BlockLocation, 0)
 	for _, record := range records {
 		if record.IsZero() {
 			continue
@@ -21,9 +19,9 @@ func ExtractBlockLocations(records []walparser.XLogRecord) []walparser.BlockLoca
 }
 
 // TODO : unit tests
-func extractLocationsFromWalFile(parser *walparser.WalParser, walFile io.ReadCloser) ([]walparser.BlockLocation, error) {
-	pageReader := walparser.NewWalPageReader(walFile)
-	locations := make([]walparser.BlockLocation, 0)
+func ExtractLocationsFromWalFile(parser *WalParser, walFile io.ReadCloser) ([]BlockLocation, error) {
+	pageReader := NewWalPageReader(walFile)
+	locations := make([]BlockLocation, 0)
 	for {
 		data, err := pageReader.ReadPageData()
 		if err != nil {
@@ -35,8 +33,8 @@ func extractLocationsFromWalFile(parser *walparser.WalParser, walFile io.ReadClo
 		_, records, err := parser.ParseRecordsFromPage(bytes.NewReader(data))
 		switch err.(type) {
 		case nil:
-		case walparser.PartialPageError:
-		case walparser.ZeroPageError:
+		case PartialPageError:
+		case ZeroPageError:
 		default:
 			return nil, err
 		}

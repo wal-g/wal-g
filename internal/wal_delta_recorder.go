@@ -13,7 +13,7 @@ func NewWalDeltaRecorder(blockLocationConsumer chan walparser.BlockLocation) *Wa
 }
 
 func (recorder *WalDeltaRecorder) recordWalDelta(records []walparser.XLogRecord) {
-	locations := ExtractBlockLocations(records)
+	locations := walparser.ExtractBlockLocations(records)
 	for _, location := range locations {
 		recorder.blockLocationConsumer <- location
 	}

@@ -1,30 +1,29 @@
-package fsutil_test
+package walparser_test
 
 import (
 	"bytes"
+	"github.com/wal-g/wal-g/internal/walparser"
 	"io"
 	"testing"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal/fsutil"
-	"github.com/wal-g/wal-g/internal/walparser"
 )
 
-var locations = []walparser.BlockLocation{
-	*walparser.NewBlockLocation(1, 2, 3, 4),
-	*walparser.NewBlockLocation(5, 6, 7, 8),
+var locations = []BlockLocation{
+	*NewBlockLocation(1, 2, 3, 4),
+	*NewBlockLocation(5, 6, 7, 8),
 }
 
 func TestReadWrite(t *testing.T) {
 	var buf bytes.Buffer
-	writer := fsutil.NewBlockLocationWriter(&buf)
-	reader := fsutil.NewBlockLocationReader(&buf)
+	writer := walparser.NewBlockLocationWriter(&buf)
+	reader := walparser.NewBlockLocationReader(&buf)
 	for _, location := range locations {
 		err := writer.WriteLocation(location)
 		assert.NoError(t, err)
 	}
-	actualLocations := make([]walparser.BlockLocation, 0)
+	actualLocations := make([]BlockLocation, 0)
 	for {
 		location, err := reader.ReadNextLocation()
 		if errors.Cause(err) == io.EOF {
@@ -38,10 +37,10 @@ func TestReadWrite(t *testing.T) {
 
 func TestWriteLocationsTo(t *testing.T) {
 	var buf bytes.Buffer
-	err := fsutil.WriteLocationsTo(&buf, locations)
+	err := walparser.WriteLocationsTo(&buf, locations)
 	assert.NoError(t, err)
-	reader := fsutil.NewBlockLocationReader(&buf)
-	actualLocations := make([]walparser.BlockLocation, 0)
+	reader := walparser.NewBlockLocationReader(&buf)
+	actualLocations := make([]BlockLocation, 0)
 	for {
 		location, err := reader.ReadNextLocation()
 		if errors.Cause(err) == io.EOF {
@@ -55,9 +54,9 @@ func TestWriteLocationsTo(t *testing.T) {
 
 func TestReadLocationsFrom(t *testing.T) {
 	var buf bytes.Buffer
-	err := fsutil.WriteLocationsTo(&buf, locations)
+	err := walparser.WriteLocationsTo(&buf, locations)
 	assert.NoError(t, err)
-	actualLocations, err := fsutil.ReadLocationsFrom(&buf)
+	actualLocations, err := walparser.ReadLocationsFrom(&buf)
 	assert.NoError(t, err)
 	assert.Equal(t, locations, actualLocations)
 }

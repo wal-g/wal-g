@@ -6,7 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/walparser"
 )
 
@@ -35,7 +34,7 @@ func NewDeltaFile(walParser *walparser.WalParser) (*DeltaFile, error) {
 }
 
 func (deltaFile *DeltaFile) Save(writer io.Writer) error {
-	err := fsutil.WriteLocationsTo(writer, append(deltaFile.Locations, walparser.TerminalLocation))
+	err := walparser.WriteLocationsTo(writer, append(deltaFile.Locations, walparser.TerminalLocation))
 	if err != nil {
 		return err
 	}
@@ -43,7 +42,7 @@ func (deltaFile *DeltaFile) Save(writer io.Writer) error {
 }
 
 func LoadDeltaFile(reader io.Reader) (*DeltaFile, error) {
-	locations, err := fsutil.ReadLocationsFrom(reader)
+	locations, err := walparser.ReadLocationsFrom(reader)
 	if err != nil {
 		return nil, err
 	}

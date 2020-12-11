@@ -225,7 +225,7 @@ func (manager *DeltaFileManager) CombinePartFile(deltaFilename string, partFile 
 	if err != nil {
 		return err
 	}
-	locations := ExtractBlockLocations(records)
+	locations := walparser.ExtractBlockLocations(records)
 	for _, location := range locations {
 		deltaFileWriter.BlockLocationConsumer <- location
 	}
