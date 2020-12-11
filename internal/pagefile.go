@@ -13,7 +13,6 @@ package internal
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/wal-g/wal-g/internal/limiters"
 	"io"
 	"os"
 	"path"
@@ -24,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 	"github.com/wal-g/wal-g/utility"

@@ -2,12 +2,12 @@ package fsutil_test
 
 import (
 	"bytes"
-	"github.com/wal-g/wal-g/internal/fsutil"
 	"io"
 	"testing"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/walparser"
 )
 

@@ -2,7 +2,6 @@ package walparser
 
 var TerminalLocation = *NewBlockLocation(0, 0, 0, 0)
 
-
 type BlockLocation struct {
 	RelationFileNode RelFileNode
 	BlockNo          uint32

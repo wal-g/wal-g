@@ -3,7 +3,6 @@ package internal_test
 import (
 	"bytes"
 	"errors"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -14,6 +13,7 @@ import (
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/compression/lz4"
 	"github.com/wal-g/wal-g/testtools"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func GetLz4Compressor() compression.Compressor {

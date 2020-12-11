@@ -3,13 +3,13 @@ package internal
 import (
 	"context"
 	"fmt"
-	"github.com/wal-g/wal-g/internal/ioextensions"
 	"time"
 
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pglogrepl"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
 )
 

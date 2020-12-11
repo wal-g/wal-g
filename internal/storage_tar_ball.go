@@ -3,14 +3,14 @@ package internal
 import (
 	"archive/tar"
 	"fmt"
-	"github.com/wal-g/wal-g/internal/limiters"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"sync/atomic"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/limiters"
+	"github.com/wal-g/wal-g/utility"
 )
 
 // StorageTarBall represents a tar file that is

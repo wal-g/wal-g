@@ -1,10 +1,10 @@
 package asm_test
 
 import (
-	"github.com/wal-g/wal-g/internal/asm"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/asm"
 )
 
 type pair struct {

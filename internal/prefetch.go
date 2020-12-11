@@ -3,7 +3,6 @@ package internal
 import (
 	"archive/tar"
 	"fmt"
-	"github.com/wal-g/wal-g/internal/fsutil"
 	"io"
 	"io/ioutil"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/utility"
 )
 

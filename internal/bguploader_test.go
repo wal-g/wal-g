@@ -2,7 +2,6 @@ package internal_test
 
 import (
 	"fmt"
-	"github.com/wal-g/wal-g/internal/asm"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/asm"
 	"github.com/wal-g/wal-g/testtools"
 )
 

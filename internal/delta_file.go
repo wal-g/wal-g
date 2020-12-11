@@ -2,11 +2,11 @@ package internal
 
 import (
 	"fmt"
-	"github.com/wal-g/wal-g/internal/fsutil"
 	"io"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/walparser"
 )
 

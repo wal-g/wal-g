@@ -1,8 +1,6 @@
 package internal
 
 import (
-	"github.com/wal-g/wal-g/internal/asm"
-	"github.com/wal-g/wal-g/internal/ioextensions"
 	"io"
 	"path/filepath"
 	"sync"
@@ -10,7 +8,9 @@ import (
 
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/asm"
 	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
 )
 

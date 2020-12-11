@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"github.com/wal-g/wal-g/internal/fsutil"
 	"io"
 	"strings"
 	"testing"
@@ -17,6 +16,7 @@ import (
 	"github.com/wal-g/storages/s3"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/utility"
 )
