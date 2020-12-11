@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var locations = []BlockLocation{
-	*NewBlockLocation(1, 2, 3, 4),
-	*NewBlockLocation(5, 6, 7, 8),
+var locations = []walparser.BlockLocation{
+	*walparser.NewBlockLocation(1, 2, 3, 4),
+	*walparser.NewBlockLocation(5, 6, 7, 8),
 }
 
 func TestReadWrite(t *testing.T) {
@@ -23,7 +23,7 @@ func TestReadWrite(t *testing.T) {
 		err := writer.WriteLocation(location)
 		assert.NoError(t, err)
 	}
-	actualLocations := make([]BlockLocation, 0)
+	actualLocations := make([]walparser.BlockLocation, 0)
 	for {
 		location, err := reader.ReadNextLocation()
 		if errors.Cause(err) == io.EOF {
@@ -40,7 +40,7 @@ func TestWriteLocationsTo(t *testing.T) {
 	err := walparser.WriteLocationsTo(&buf, locations)
 	assert.NoError(t, err)
 	reader := walparser.NewBlockLocationReader(&buf)
-	actualLocations := make([]BlockLocation, 0)
+	actualLocations := make([]walparser.BlockLocation, 0)
 	for {
 		location, err := reader.ReadNextLocation()
 		if errors.Cause(err) == io.EOF {

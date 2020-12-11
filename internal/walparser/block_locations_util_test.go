@@ -10,7 +10,7 @@ import (
 
 func TestExtractBlockLocations(t *testing.T) {
 	record, _ := testtools.GetXLogRecordData()
-	expectedLocations := []BlockLocation{record.Blocks[0].Header.BlockLocation}
-	actualLocations := walparser.ExtractBlockLocations([]XLogRecord{record})
+	expectedLocations := []walparser.BlockLocation{record.Blocks[0].Header.BlockLocation}
+	actualLocations := walparser.ExtractBlockLocations([]walparser.XLogRecord{record})
 	assert.Equal(t, expectedLocations, actualLocations)
 }
