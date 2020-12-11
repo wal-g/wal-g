@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/asm"
 	"github.com/wal-g/wal-g/testtools"
 )
 
@@ -90,7 +91,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 
 			// Setup BgUploader
 			tu := testtools.NewMockWalUploader(false, false)
-			fakeASM := internal.NewFakeASM()
+			fakeASM := asm.NewFakeASM()
 			tu.ArchiveStatusManager = fakeASM
 			bu := internal.NewBgUploader(a, int32(tt.maxParallelism), int32(tt.maxNumFilesUploaded), tu, false)
 
@@ -105,7 +106,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 			// Check that at least the expected number of files were created
 			for i := 0; i < tt.wantNumFilesUploaded; i++ {
 				bname := testFilename(i)
-				wasUploaded := fakeASM.IsWalAlreadyUploaded(bname)
+				wasUploaded := fakeASM.WalAlreadyUploaded(bname)
 				assert.True(t, wasUploaded, bname+" was not marked as uploaded")
 			}
 

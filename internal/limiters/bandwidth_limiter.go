@@ -1,9 +1,8 @@
-package internal
+package limiters
 
 import (
 	"io"
 
-	"github.com/wal-g/wal-g/internal/limited"
 	"golang.org/x/time/rate"
 )
 
@@ -15,7 +14,7 @@ func NewNetworkLimitReader(r io.Reader) io.Reader {
 	if NetworkLimiter == nil {
 		return r
 	}
-	return limited.NewReader(r, NetworkLimiter)
+	return NewReader(r, NetworkLimiter)
 }
 
 // NewDiskLimitReader returns a reader that is rate limited by disk limiter
@@ -23,5 +22,5 @@ func NewDiskLimitReader(r io.Reader) io.Reader {
 	if DiskLimiter == nil {
 		return r
 	}
-	return limited.NewReader(r, DiskLimiter)
+	return NewReader(r, DiskLimiter)
 }

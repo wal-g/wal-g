@@ -5,7 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/fsutil"
 )
 
 type MockDataFolder map[string]*bytes.Buffer
@@ -42,7 +42,7 @@ func (folder *MockDataFolder) OpenReadonlyFile(filename string) (io.ReadCloser, 
 	if _, ok := (*folder)[filename]; ok {
 		return ioutil.NopCloser(bytes.NewReader((*folder)[filename].Bytes())), nil
 	} else {
-		return nil, internal.NewNoSuchFileError(filename)
+		return nil, fsutil.NewNoSuchFileError(filename)
 	}
 }
 

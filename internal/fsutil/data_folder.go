@@ -1,4 +1,4 @@
-package internal
+package fsutil
 
 import (
 	"fmt"

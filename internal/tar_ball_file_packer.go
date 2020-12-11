@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/errgroup"
 )
@@ -180,7 +181,7 @@ func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string,
 	if err != nil {
 		return nil, errors.Wrapf(err, "startReadingFile: failed to open file '%s'\n", path)
 	}
-	diskLimitedFileReader := NewDiskLimitReader(file)
+	diskLimitedFileReader := limiters.NewDiskLimitReader(file)
 	fileReader = &ioextensions.ReadCascadeCloser{
 		Reader: &io.LimitedReader{
 			R: io.MultiReader(diskLimitedFileReader, &ioextensions.ZeroReader{}),

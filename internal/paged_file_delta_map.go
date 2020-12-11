@@ -165,7 +165,7 @@ func (deltaMap *PagedFileDeltaMap) getLocationsFromWal(folder storage.Folder, fi
 	if err != nil {
 		return errors.Wrapf(err, "Error during wal segment'%s' downloading.", filename)
 	}
-	locations, err := extractLocationsFromWalFile(walParser, reader)
+	locations, err := walparser.ExtractLocationsFromWalFile(walParser, reader)
 	if err != nil {
 		return errors.Wrapf(err, "Error during extracting locations from wal segment: '%s'", filename)
 	}

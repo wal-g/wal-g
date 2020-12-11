@@ -1,17 +1,17 @@
-package internal
+package asm
 
 import (
 	"path/filepath"
 	"strings"
 )
 
-func getOnlyWalName(filePath string) string {
+func GetOnlyWalName(filePath string) string {
 	filePath = filepath.Base(filePath)
 	return strings.TrimSuffix(filePath, filepath.Ext(filePath))
 }
 
 type ArchiveStatusManager interface {
-	isWalAlreadyUploaded(string) bool
-	markWalUploaded(string) error
-	unmarkWalFile(string) error
+	IsWalAlreadyUploaded(string) bool
+	MarkWalUploaded(string) error
+	UnmarkWalFile(string) error
 }

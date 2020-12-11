@@ -34,7 +34,7 @@ func NewDeltaFile(walParser *walparser.WalParser) (*DeltaFile, error) {
 }
 
 func (deltaFile *DeltaFile) Save(writer io.Writer) error {
-	err := WriteLocationsTo(writer, append(deltaFile.Locations, TerminalLocation))
+	err := walparser.WriteLocationsTo(writer, append(deltaFile.Locations, walparser.TerminalLocation))
 	if err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ func (deltaFile *DeltaFile) Save(writer io.Writer) error {
 }
 
 func LoadDeltaFile(reader io.Reader) (*DeltaFile, error) {
-	locations, err := ReadLocationsFrom(reader)
+	locations, err := walparser.ReadLocationsFrom(reader)
 	if err != nil {
 		return nil, err
 	}

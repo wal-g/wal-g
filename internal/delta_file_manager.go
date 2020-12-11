@@ -7,6 +7,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/fsutil"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -24,7 +26,7 @@ func (err DeltaFileWriterNotFoundError) Error() string {
 }
 
 type DeltaFileManager struct {
-	dataFolder            DataFolder
+	dataFolder            fsutil.DataFolder
 	PartFiles             *LazyCache
 	DeltaFileWriters      *LazyCache
 	deltaFileWriterWaiter sync.WaitGroup
@@ -33,15 +35,11 @@ type DeltaFileManager struct {
 	canceledWaiter        sync.WaitGroup
 }
 
-func NewDeltaFileManager(dataFolder DataFolder) *DeltaFileManager {
+func NewDeltaFileManager(dataFolder fsutil.DataFolder) *DeltaFileManager {
 	manager := &DeltaFileManager{
-		dataFolder,
-		nil,
-		nil,
-		sync.WaitGroup{},
-		make(chan string),
-		make(map[string]bool),
-		sync.WaitGroup{},
+		dataFolder:            dataFolder,
+		canceledWalRecordings: make(chan string),
+		CanceledDeltaFiles:    make(map[string]bool),
 	}
 	manager.PartFiles = newLazyCache(func(partFilenameInterface interface{}) (partFile interface{}, err error) {
 		partFilename, ok := partFilenameInterface.(string)
@@ -75,7 +73,7 @@ func (manager *DeltaFileManager) loadDeltaFileWriter(deltaFilename string) (delt
 	physicalDeltaFile, err := manager.dataFolder.OpenReadonlyFile(deltaFilename)
 	var deltaFile *DeltaFile
 	if err != nil {
-		if _, ok := err.(NoSuchFileError); !ok {
+		if _, ok := err.(fsutil.NoSuchFileError); !ok {
 			return nil, err
 		}
 		deltaFile, err = NewDeltaFile(walparser.NewWalParser())
@@ -109,7 +107,7 @@ func (manager *DeltaFileManager) loadPartFile(partFilename string) (*WalPartFile
 	physicalPartFile, err := manager.dataFolder.OpenReadonlyFile(partFilename)
 	var partFile *WalPartFile
 	if err != nil {
-		if _, ok := err.(NoSuchFileError); !ok {
+		if _, ok := err.(fsutil.NoSuchFileError); !ok {
 			return nil, err
 		}
 		partFile = NewWalPartFile()
@@ -142,7 +140,7 @@ func (manager *DeltaFileManager) FlushPartFiles() (completedPartFiles map[string
 				tracelog.WarningLogger.Printf("Canceled delta file writing because of error: "+tracelog.GetErrorFormatter()+"\n", err)
 			}
 		} else {
-			err := saveToDataFolder(partFile, partFilename, manager.dataFolder)
+			err := fsutil.SaveToDataFolder(partFile, partFilename, manager.dataFolder)
 			if err != nil {
 				manager.CanceledDeltaFiles[deltaFilename] = true
 				tracelog.WarningLogger.Printf("Failed to save part file: '%s' because of error: '%v'\n", partFilename, err)
@@ -173,13 +171,13 @@ func (manager *DeltaFileManager) FlushDeltaFiles(uploader *Uploader, completedPa
 			if err != nil {
 				tracelog.WarningLogger.Printf("Failed to upload delta file: '%s' because of saving error: '%v'\n", deltaFilename, err)
 			} else {
-				err = uploader.UploadFile(newNamedReaderImpl(&deltaFileData, deltaFilename))
+				err = uploader.UploadFile(ioextensions.NewNamedReaderImpl(&deltaFileData, deltaFilename))
 				if err != nil {
 					tracelog.WarningLogger.Printf("Failed to upload delta file: '%s' because of uploading error: '%v'\n", deltaFilename, err)
 				}
 			}
 		} else {
-			err := saveToDataFolder(deltaFileWriter.DeltaFile, deltaFilename, manager.dataFolder)
+			err := fsutil.SaveToDataFolder(deltaFileWriter.DeltaFile, deltaFilename, manager.dataFolder)
 			if err != nil {
 				tracelog.WarningLogger.Printf("Failed to save delta file: '%s' because of error: '%v'\n", deltaFilename, err)
 			}
@@ -227,7 +225,7 @@ func (manager *DeltaFileManager) CombinePartFile(deltaFilename string, partFile 
 	if err != nil {
 		return err
 	}
-	locations := ExtractBlockLocations(records)
+	locations := walparser.ExtractBlockLocations(records)
 	for _, location := range locations {
 		deltaFileWriter.BlockLocationConsumer <- location
 	}

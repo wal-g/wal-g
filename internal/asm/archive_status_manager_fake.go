@@ -1,4 +1,4 @@
-package internal
+package asm
 
 import "sync"
 
@@ -15,26 +15,26 @@ func NewFakeASM() *FakeASM {
 	}
 }
 
-func (asm *FakeASM) isWalAlreadyUploaded(walFilePath string) bool {
+func (asm *FakeASM) IsWalAlreadyUploaded(walFilePath string) bool {
 	asm.mutex.Lock()
 	defer asm.mutex.Unlock()
 	isUploaded, ok := asm.uploaded[walFilePath]
 	return ok && isUploaded
 }
 
-// IsWalAlreadyUploaded is used for testing
-func (asm *FakeASM) IsWalAlreadyUploaded(walFilePath string) bool {
-	return asm.isWalAlreadyUploaded(walFilePath)
+// WalAlreadyUploaded is used for testing
+func (asm *FakeASM) WalAlreadyUploaded(walFilePath string) bool {
+	return asm.IsWalAlreadyUploaded(walFilePath)
 }
 
-func (asm *FakeASM) markWalUploaded(walFilePath string) error {
+func (asm *FakeASM) MarkWalUploaded(walFilePath string) error {
 	asm.mutex.Lock()
 	defer asm.mutex.Unlock()
 	asm.uploaded[walFilePath] = true
 	return nil
 }
 
-func (asm *FakeASM) unmarkWalFile(walFilePath string) error {
+func (asm *FakeASM) UnmarkWalFile(walFilePath string) error {
 	asm.mutex.Lock()
 	defer asm.mutex.Unlock()
 	asm.uploaded[walFilePath] = false

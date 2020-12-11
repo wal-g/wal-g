@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/asm"
 )
 
 const walReceiveShortDescription = "Receive WAL stream with postgres Streaming Replication Protocol and push to storage"
@@ -19,10 +20,10 @@ var walReceiveCmd = &cobra.Command{
 
 		archiveStatusManager, err := internal.ConfigureArchiveStatusManager()
 		if err == nil {
-			uploader.ArchiveStatusManager = internal.NewDataFolderASM(archiveStatusManager)
+			uploader.ArchiveStatusManager = asm.NewDataFolderASM(archiveStatusManager)
 		} else {
 			tracelog.ErrorLogger.PrintError(err)
-			uploader.ArchiveStatusManager = internal.NewNopASM()
+			uploader.ArchiveStatusManager = asm.NewNopASM()
 		}
 		internal.HandleWALReceive(uploader)
 	},

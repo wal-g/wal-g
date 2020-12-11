@@ -1,4 +1,4 @@
-package internal_test
+package limiters_test
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/time/rate"
 )
@@ -27,17 +27,17 @@ func (r *fakeCloser) Close() error {
 }
 
 func TestLimiter(t *testing.T) {
-	internal.DiskLimiter = rate.NewLimiter(rate.Limit(10000), int(1024))
-	internal.NetworkLimiter = rate.NewLimiter(rate.Limit(10000), int(1024))
+	limiters.DiskLimiter = rate.NewLimiter(rate.Limit(10000), int(1024))
+	limiters.NetworkLimiter = rate.NewLimiter(rate.Limit(10000), int(1024))
 	defer func() {
-		internal.DiskLimiter = nil
-		internal.NetworkLimiter = nil
+		limiters.DiskLimiter = nil
+		limiters.NetworkLimiter = nil
 	}()
 	buffer := bytes.NewReader(make([]byte, 2000))
 	r := &fakeCloser{buffer}
 	start := utility.TimeNowCrossPlatformLocal()
 
-	reader := internal.NewDiskLimitReader(internal.NewNetworkLimitReader(r))
+	reader := limiters.NewDiskLimitReader(limiters.NewNetworkLimitReader(r))
 	_, err := ioutil.ReadAll(reader)
 	assert.NoError(t, err)
 	end := utility.TimeNowCrossPlatformLocal()

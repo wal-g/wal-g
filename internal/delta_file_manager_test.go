@@ -163,7 +163,7 @@ func TestFlushPartFiles_CompleteFile(t *testing.T) {
 
 	close(deltaFileWriter.BlockLocationConsumer)
 	waitGroup.Wait()
-	locations := internal.ExtractBlockLocations([]walparser.XLogRecord{xLogRecord})
+	locations := walparser.ExtractBlockLocations([]walparser.XLogRecord{xLogRecord})
 	assert.Equal(t, locations, deltaFileWriter.DeltaFile.Locations)
 }
 
@@ -256,6 +256,6 @@ func TestCombinePartFile(t *testing.T) {
 
 	close(deltaFileWriter.BlockLocationConsumer)
 	waitGroup.Wait()
-	locations := internal.ExtractBlockLocations([]walparser.XLogRecord{xLogRecord})
+	locations := walparser.ExtractBlockLocations([]walparser.XLogRecord{xLogRecord})
 	assert.Equal(t, locations, deltaFileWriter.DeltaFile.Locations)
 }

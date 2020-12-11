@@ -18,6 +18,8 @@ import (
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/awskms"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
+	"github.com/wal-g/wal-g/internal/fsutil"
+	"github.com/wal-g/wal-g/internal/limiters"
 	"golang.org/x/time/rate"
 )
 
@@ -102,12 +104,12 @@ func configureLimiters() {
 	}
 	if viper.IsSet(DiskRateLimitSetting) {
 		diskLimit := viper.GetInt64(DiskRateLimitSetting)
-		DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
+		limiters.DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 
 	if viper.IsSet(NetworkRateLimitSetting) {
 		netLimit := viper.GetInt64(NetworkRateLimitSetting)
-		NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
+		limiters.NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 }
 
@@ -169,13 +171,13 @@ func GetPgSlotName() (pgSlotName string) {
 }
 
 // TODO : unit tests
-func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err error) {
+func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder fsutil.DataFolder, err error) {
 	useWalDelta = viper.GetBool(UseWalDeltaSetting)
 	if !useWalDelta {
 		return
 	}
 	dataFolderPath := GetDataFolderPath()
-	deltaDataFolder, err = newDiskDataFolder(dataFolderPath)
+	deltaDataFolder, err = fsutil.NewDiskDataFolder(dataFolderPath)
 	if err != nil {
 		useWalDelta = false
 		tracelog.WarningLogger.Printf("can't use wal delta feature because can't open delta data folder '%s'"+
@@ -206,8 +208,8 @@ func getArchiveDataFolderPath() string {
 }
 
 // TODO : unit tests
-func ConfigureArchiveStatusManager() (DataFolder, error) {
-	return newDiskDataFolder(getArchiveDataFolderPath())
+func ConfigureArchiveStatusManager() (fsutil.DataFolder, error) {
+	return fsutil.NewDiskDataFolder(getArchiveDataFolderPath())
 }
 
 // ConfigureUploader connects to storage and creates an uploader. It makes sure

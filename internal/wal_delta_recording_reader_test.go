@@ -79,7 +79,7 @@ func TestRead_CorrectRecording(t *testing.T) {
 	assert.NoError(t, err)
 	manager.FlushFiles(nil)
 
-	locations, err := internal.ReadLocationsFrom((*dataFolder)[DeltaFilename])
+	locations, err := walparser.ReadLocationsFrom((*dataFolder)[DeltaFilename])
 	assert.NoError(t, err)
 	assert.Len(t, locations, 1)
 	assert.Equal(t, RealLocation, locations[0])

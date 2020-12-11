@@ -1,14 +1,13 @@
-package internal_test
+package walparser_test
 
 import (
 	"bytes"
+	"github.com/wal-g/wal-g/internal/walparser"
 	"io"
 	"testing"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/walparser"
 )
 
 var locations = []walparser.BlockLocation{
@@ -18,8 +17,8 @@ var locations = []walparser.BlockLocation{
 
 func TestReadWrite(t *testing.T) {
 	var buf bytes.Buffer
-	writer := internal.NewBlockLocationWriter(&buf)
-	reader := internal.NewBlockLocationReader(&buf)
+	writer := walparser.NewBlockLocationWriter(&buf)
+	reader := walparser.NewBlockLocationReader(&buf)
 	for _, location := range locations {
 		err := writer.WriteLocation(location)
 		assert.NoError(t, err)
@@ -38,9 +37,9 @@ func TestReadWrite(t *testing.T) {
 
 func TestWriteLocationsTo(t *testing.T) {
 	var buf bytes.Buffer
-	err := internal.WriteLocationsTo(&buf, locations)
+	err := walparser.WriteLocationsTo(&buf, locations)
 	assert.NoError(t, err)
-	reader := internal.NewBlockLocationReader(&buf)
+	reader := walparser.NewBlockLocationReader(&buf)
 	actualLocations := make([]walparser.BlockLocation, 0)
 	for {
 		location, err := reader.ReadNextLocation()
@@ -55,9 +54,9 @@ func TestWriteLocationsTo(t *testing.T) {
 
 func TestReadLocationsFrom(t *testing.T) {
 	var buf bytes.Buffer
-	err := internal.WriteLocationsTo(&buf, locations)
+	err := walparser.WriteLocationsTo(&buf, locations)
 	assert.NoError(t, err)
-	actualLocations, err := internal.ReadLocationsFrom(&buf)
+	actualLocations, err := walparser.ReadLocationsFrom(&buf)
 	assert.NoError(t, err)
 	assert.Equal(t, locations, actualLocations)
 }

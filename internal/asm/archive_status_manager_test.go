@@ -1,9 +1,10 @@
-package internal
+package asm_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/asm"
 )
 
 type pair struct {
@@ -19,6 +20,6 @@ func TestGetOnlyWalName(t *testing.T) {
 	samples = append(samples, pair{"somedir/123456765.done", "123456765"})
 
 	for _, sample := range samples {
-		assert.Equal(t, sample.expectedResult, getOnlyWalName(sample.testData))
+		assert.Equal(t, sample.expectedResult, asm.GetOnlyWalName(sample.testData))
 	}
 }

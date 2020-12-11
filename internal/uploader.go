@@ -8,13 +8,15 @@ import (
 
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/asm"
 	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
 )
 
 type UploaderProvider interface {
 	Upload(path string, content io.Reader) error
-	UploadFile(file NamedReader) error
+	UploadFile(file ioextensions.NamedReader) error
 	PushStream(stream io.Reader) (string, error)
 	PushStreamToDestination(stream io.Reader, dstPath string) error
 	Compression() compression.Compressor
@@ -27,7 +29,7 @@ type Uploader struct {
 	UploadingFolder      storage.Folder
 	Compressor           compression.Compressor
 	waitGroup            *sync.WaitGroup
-	ArchiveStatusManager ArchiveStatusManager
+	ArchiveStatusManager asm.ArchiveStatusManager
 	Failed               atomic.Value
 	tarSize              *int64
 }
@@ -76,7 +78,7 @@ func (uploader *Uploader) clone() *Uploader {
 
 // TODO : unit tests
 // UploadFile compresses a file and uploads it.
-func (uploader *Uploader) UploadFile(file NamedReader) error {
+func (uploader *Uploader) UploadFile(file ioextensions.NamedReader) error {
 	compressedFile := CompressAndEncrypt(file, uploader.Compressor, ConfigureCrypter())
 	dstPath := utility.SanitizePath(filepath.Base(file.Name()) + "." + uploader.Compressor.FileExtension())
 

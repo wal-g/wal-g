@@ -65,15 +65,15 @@ func NewWalSegmentScanner(walSegmentRunner *WalSegmentRunner) *WalSegmentScanner
 // Also, it may be configured to stop after:
 // - Scanning the ScanSegmentsLimit of segments
 // - Finding the first segment which exists in WAL storage
-func (scanner *WalSegmentScanner) Scan(config SegmentScanConfig) error {
+func (sc *WalSegmentScanner) Scan(config SegmentScanConfig) error {
 	// scan may have a limited number of iterations, or may be unlimited
 	for i := 0; config.UnlimitedScan || i < config.ScanSegmentsLimit; i++ {
-		currentSegment, err := scanner.walSegmentRunner.Next()
+		currentSegment, err := sc.walSegmentRunner.Next()
 		if err != nil {
 			switch err := err.(type) {
 			case WalSegmentNotFoundError:
-				scanner.walSegmentRunner.ForceMoveNext()
-				scanner.AddScannedSegment(scanner.walSegmentRunner.Current(), config.MissingSegmentStatus)
+				sc.walSegmentRunner.ForceMoveNext()
+				sc.AddScannedSegment(sc.walSegmentRunner.Current(), config.MissingSegmentStatus)
 				continue
 			case ReachedStopSegmentError:
 				return nil
@@ -81,7 +81,7 @@ func (scanner *WalSegmentScanner) Scan(config SegmentScanConfig) error {
 				return err
 			}
 		}
-		scanner.AddScannedSegment(currentSegment, Found)
+		sc.AddScannedSegment(currentSegment, Found)
 		if config.StopOnFirstFoundSegment {
 			return nil
 		}
@@ -90,9 +90,9 @@ func (scanner *WalSegmentScanner) Scan(config SegmentScanConfig) error {
 }
 
 // GetMissingSegmentsDescriptions returns a slice containing WalSegmentDescription of each missing segment
-func (scanner *WalSegmentScanner) GetMissingSegmentsDescriptions() []WalSegmentDescription {
+func (sc *WalSegmentScanner) GetMissingSegmentsDescriptions() []WalSegmentDescription {
 	result := make([]WalSegmentDescription, 0)
-	for _, segment := range scanner.ScannedSegments {
+	for _, segment := range sc.ScannedSegments {
 		if segment.status != Found {
 			result = append(result, segment.WalSegmentDescription)
 		}
@@ -100,6 +100,6 @@ func (scanner *WalSegmentScanner) GetMissingSegmentsDescriptions() []WalSegmentD
 	return result
 }
 
-func (scanner *WalSegmentScanner) AddScannedSegment(description WalSegmentDescription, status ScannedSegmentStatus) {
-	scanner.ScannedSegments = append(scanner.ScannedSegments, newScannedSegmentDescription(description, status))
+func (sc *WalSegmentScanner) AddScannedSegment(description WalSegmentDescription, status ScannedSegmentStatus) {
+	sc.ScannedSegments = append(sc.ScannedSegments, newScannedSegmentDescription(description, status))
 }
