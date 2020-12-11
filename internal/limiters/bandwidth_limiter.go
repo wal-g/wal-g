@@ -9,7 +9,7 @@ import (
 var DiskLimiter *rate.Limiter
 var NetworkLimiter *rate.Limiter
 
-// NewNetworkLimitReader returns a reader that is rate limiters by network limiter
+// NewNetworkLimitReader returns a reader that is rate limited by network limiter
 func NewNetworkLimitReader(r io.Reader) io.Reader {
 	if NetworkLimiter == nil {
 		return r
@@ -17,7 +17,7 @@ func NewNetworkLimitReader(r io.Reader) io.Reader {
 	return NewReader(r, NetworkLimiter)
 }
 
-// NewDiskLimitReader returns a reader that is rate limiters by disk limiter
+// NewDiskLimitReader returns a reader that is rate limited by disk limiter
 func NewDiskLimitReader(r io.Reader) io.Reader {
 	if DiskLimiter == nil {
 		return r
