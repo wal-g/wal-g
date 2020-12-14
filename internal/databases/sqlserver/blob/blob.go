@@ -280,6 +280,7 @@ func (idx *Index) GetSections(rangeMin, rangeMax uint64) []Section {
 		if rangeMax < (block.Offset + block.CommittedSize - 1) {
 			limit = rangeMax - block.Offset + 1
 		}
+		limit -= offset
 		sections = append(sections, Section{
 			Path:   fmt.Sprintf("%s.%d", block.ID, block.CommittedRev),
 			Offset: offset,
