@@ -19,14 +19,14 @@ func init() {
 
 type WalVerifyTestSetup struct {
 	expectedIntegrityCheck internal.WalVerifyCheckResult
-	expectedTimelineCheck internal.WalVerifyCheckResult
+	expectedTimelineCheck  internal.WalVerifyCheckResult
 
 	// currentWalSegment represents the current cluster wal segment
 	currentWalSegment internal.WalSegmentDescription
 	// list of mock storage wal folder WAL segments
-	storageSegments   []string
+	storageSegments []string
 	// list of other mock storage files
-	storageFiles      map[string]*bytes.Buffer
+	storageFiles map[string]*bytes.Buffer
 }
 
 // MockWalVerifyOutputWriter is used to capture wal-verify command output
