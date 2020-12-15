@@ -237,12 +237,18 @@ Run series of checks to ensure that WAL segment storage is healthy. Available ch
 
 `integrity` - ensure that there is a consistent WAL segment history for the cluster so WAL-G can perform a PITR for the backup. Essentially, it checks that all of the WAL segments in the range `[oldest backup start segment, current cluster segment)` are available in storage. If no backups found, `[1, current cluster segment)` range will be scanned.
 
+![SegmentStatusIllustration](resources/wal_verify_segment_statuses.png)
+
 In `integrity` check output, there are four statuses of WAL segments:
 
 * `FOUND` segments are present in WAL storage
 * `MISSING_DELAYED` segments are not present in WAL storage, but probably Postgres did not try to archive them via `archive_command` yet
 * `MISSING_UPLOADING` segments are the segments which are not present in WAL storage, but looks like that they are in the process of uploading to storage
 * `MISSING_LOST` segments are not present in WAL storage and not `MISSING_UPLOADING` nor `MISSING_DELAYED`
+
+`ProbablyUploading` segments range size is taken from `WALG_UPLOAD_CONCURRENCY` setting.
+
+`ProbablyDelayed` segments range size is controlled via `WALG_INTEGRITY_MAX_DELAYED_WALS` setting.  
 
 Output consists of:
 1. Status of `integrity` check:
