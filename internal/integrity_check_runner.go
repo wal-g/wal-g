@@ -36,6 +36,7 @@ type IntegrityCheckRunner struct {
 	startWalSegment           WalSegmentDescription
 	stopWalSegmentNo          WalSegmentNo
 	uploadingSegmentRangeSize int
+	delayedSegmentRangeSize   int
 	walFolderFilenames        []string
 	timelineSwitchMap         map[WalSegmentNo]*TimelineHistoryRecord
 }
@@ -44,6 +45,8 @@ func NewIntegrityCheckRunner(
 	rootFolder storage.Folder,
 	walFolderFilenames []string,
 	currentWalSegment WalSegmentDescription,
+	uploadingSegmentRangeSize int,
+	delayedSegmentRangeSize int,
 ) (IntegrityCheckRunner, error) {
 	walFolder := rootFolder.GetSubFolder(utility.WalPath)
 
@@ -59,17 +62,11 @@ func NewIntegrityCheckRunner(
 		stopWalSegmentNo = 1
 	}
 
-	// uploadingSegmentRangeSize is needed to determine max amount of missing WAL segments
-	// after the last found WAL segment which can be marked as "uploading"
-	uploadingSegmentRangeSize, err := getMaxUploadConcurrency()
-	if err != nil {
-		return IntegrityCheckRunner{}, errors.Wrap(err, "Failed to resolve MaxUploadConcurrency")
-	}
-
 	return IntegrityCheckRunner{
 		startWalSegment:           currentWalSegment,
 		stopWalSegmentNo:          stopWalSegmentNo,
 		uploadingSegmentRangeSize: uploadingSegmentRangeSize,
+		delayedSegmentRangeSize:   delayedSegmentRangeSize,
 		walFolderFilenames:        walFolderFilenames,
 		timelineSwitchMap:         timelineSwitchMap,
 	}, nil
@@ -80,7 +77,7 @@ func (check IntegrityCheckRunner) Run() (WalVerifyCheckResult, error) {
 	walSegmentRunner := NewWalSegmentRunner(check.startWalSegment, storageSegments, check.stopWalSegmentNo, check.timelineSwitchMap)
 
 	segmentScanner := NewWalSegmentScanner(walSegmentRunner)
-	err := runWalIntegrityScan(segmentScanner, check.uploadingSegmentRangeSize)
+	err := runWalIntegrityScan(segmentScanner, check.uploadingSegmentRangeSize, check.delayedSegmentRangeSize)
 	if err != nil {
 		return WalVerifyCheckResult{}, err
 	}
@@ -147,10 +144,11 @@ func newIntegrityScanSegmentSequence(sequence *WalSegmentsSequence,
 // if found any missing segments it marks them as "missing, probably still uploading"
 // 3. Final scan without any limit (until stopSegment is reached),
 // all missing segments encountered in this scan are considered as "missing, lost"
-func runWalIntegrityScan(scanner *WalSegmentScanner, uploadingSegmentRangeSize int) error {
+func runWalIntegrityScan(scanner *WalSegmentScanner,
+	uploadingSegmentRangeSize, delayedSegmentRangeSize int) error {
 	// Run to the latest WAL segment available in storage, mark all missing segments as delayed
 	err := scanner.Scan(SegmentScanConfig{
-		UnlimitedScan:           true,
+		ScanSegmentsLimit:       delayedSegmentRangeSize,
 		StopOnFirstFoundSegment: true,
 		MissingSegmentStatus:    ProbablyDelayed,
 	})

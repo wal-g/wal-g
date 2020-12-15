@@ -3,7 +3,6 @@ package internal_test
 import (
 	"bytes"
 	"fmt"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
@@ -11,11 +10,10 @@ import (
 	"testing"
 )
 
-func init() {
-	// Set upload disk concurrency to non-zero value
-	// Please note: this setting affects wal-verify behavior
-	viper.Set(internal.UploadConcurrencySetting, "4")
-}
+// Please note: this settings affect wal-verify behavior
+// Read more in PostgreSQL.md
+const uploadingSegmentRangeSize = 4
+const delayedSegmentRangeSize = 3
 
 type WalVerifyTestSetup struct {
 	expectedIntegrityCheck internal.WalVerifyCheckResult
@@ -52,13 +50,27 @@ func TestWalVerify_EmptyStorage(t *testing.T) {
 	storageSegments := make([]string, 0, 0)
 
 	expectedIntegrityCheck := internal.WalVerifyCheckResult{
-		Status: internal.StatusWarning,
+		Status: internal.StatusFailure,
 		Details: internal.IntegrityCheckDetails{
 			{
 				TimelineId:    3,
 				StartSegment:  "000000030000000000000001",
+				EndSegment:    "000000030000000000000002",
+				SegmentsCount: 2,
+				Status:        internal.Lost,
+			},
+			{
+				TimelineId:    3,
+				StartSegment:  "000000030000000000000003",
+				EndSegment:    "000000030000000000000006",
+				SegmentsCount: 4, //uploadingSegmentRangeSize
+				Status:        internal.ProbablyUploading,
+			},
+			{
+				TimelineId:    3,
+				StartSegment:  "000000030000000000000007",
 				EndSegment:    "000000030000000000000009",
-				SegmentsCount: 9,
+				SegmentsCount: 3, //delayedSegmentRangeSize
 				Status:        internal.ProbablyDelayed,
 			},
 		},
@@ -97,13 +109,27 @@ func TestWalVerify_OnlyGarbageInStorage(t *testing.T) {
 	currentSegment, _ := internal.NewWalSegmentDescription(currentSegmentName)
 
 	expectedIntegrityCheck := internal.WalVerifyCheckResult{
-		Status: internal.StatusWarning,
+		Status: internal.StatusFailure,
 		Details: internal.IntegrityCheckDetails{
 			{
 				TimelineId:    3,
 				StartSegment:  "000000030000000000000001",
+				EndSegment:    "000000030000000000000002",
+				SegmentsCount: 2,
+				Status:        internal.Lost,
+			},
+			{
+				TimelineId:    3,
+				StartSegment:  "000000030000000000000003",
+				EndSegment:    "000000030000000000000006",
+				SegmentsCount: 4, //uploadingSegmentRangeSize
+				Status:        internal.ProbablyUploading,
+			},
+			{
+				TimelineId:    3,
+				StartSegment:  "000000030000000000000007",
 				EndSegment:    "000000030000000000000009",
-				SegmentsCount: 9,
+				SegmentsCount: 3, //delayedSegmentRangeSize
 				Status:        internal.ProbablyDelayed,
 			},
 		},
@@ -177,7 +203,7 @@ func TestWalVerify_SingleTimeline_SomeDelayed(t *testing.T) {
 		"000000050000000000000004",
 	}
 
-	currentSegmentName := "000000050000000000000019"
+	currentSegmentName := "000000050000000000000008"
 	currentSegment, _ := internal.NewWalSegmentDescription(currentSegmentName)
 
 	expectedIntegrityCheck := internal.WalVerifyCheckResult{
@@ -193,8 +219,8 @@ func TestWalVerify_SingleTimeline_SomeDelayed(t *testing.T) {
 			{
 				TimelineId:    5,
 				StartSegment:  "000000050000000000000005",
-				EndSegment:    "000000050000000000000018",
-				SegmentsCount: 20,
+				EndSegment:    "000000050000000000000007",
+				SegmentsCount: 3,
 				Status:        internal.ProbablyDelayed,
 			},
 		},
@@ -224,11 +250,18 @@ func TestWalVerify_TwoTimelines_Ok(t *testing.T) {
 		"000000050000000000000002",
 		"000000050000000000000003",
 		"000000050000000000000004",
-		"000000050000000000000005", // should not get into output
-		"000000050000000000000006", // should not get into output
-		"000000050000000000000007", // should not get into output
-		"000000050000000000000008", // should not get into output
-		"000000050000000000000009", // should not get into output
+
+		// These segments should be ignored
+		// because they have higher LSN
+		// than timeline switch LSN
+		// which is specified in the .history file below
+
+		"000000050000000000000005", // should be ignored
+		"000000050000000000000006", // should be ignored
+		"000000050000000000000007", // should be ignored
+		"000000050000000000000008", // should be ignored
+		"000000050000000000000009", // should be ignored
+
 		"000000060000000000000005",
 		"000000060000000000000006",
 		"000000060000000000000007",
@@ -414,11 +447,18 @@ func TestWalVerify_WalkUntilFirstBackup(t *testing.T) {
 		"000000050000000000000002",
 		"000000050000000000000003",
 		"000000050000000000000004",
-		"000000050000000000000005", // should not get into output
-		"000000050000000000000006", // should not get into output
-		"000000050000000000000007", // should not get into output
-		"000000050000000000000008", // should not get into output
-		"000000050000000000000009", // should not get into output
+
+		// These segments should be ignored
+		// because they have higher LSN
+		// than timeline switch LSN
+		// which is specified in the .history file below
+
+		"000000050000000000000005", // should be ignored
+		"000000050000000000000006", // should be ignored
+		"000000050000000000000007", // should be ignored
+		"000000050000000000000008", // should be ignored
+		"000000050000000000000009", // should be ignored
+
 		"000000060000000000000005",
 		"000000060000000000000006",
 		"000000060000000000000007",
@@ -430,6 +470,8 @@ func TestWalVerify_WalkUntilFirstBackup(t *testing.T) {
 	backupSentinelNames := []string{
 		// this backup should not be selected as the earliest,
 		// because it does not belong to the current timeline history
+		// since the timeline switch occurred
+		// at the 000000060000000000000005 WAL segment
 		utility.BackupNamePrefix + "000000050000000000000005" + utility.SentinelSuffix,
 		// this backup should not be selected as the earliest,
 		// because it is not
@@ -517,7 +559,8 @@ func executeWalVerify(
 	checkTypes := []internal.WalVerifyCheckType{
 		internal.WalVerifyTimelineCheck, internal.WalVerifyIntegrityCheck}
 
-	internal.HandleWalVerify(checkTypes, rootFolder, currentWalSegment, mockOutputWriter)
+	internal.HandleWalVerify(checkTypes, rootFolder, currentWalSegment, mockOutputWriter,
+		uploadingSegmentRangeSize, delayedSegmentRangeSize)
 
 	return mockOutputWriter.lastResult, mockOutputWriter.writeCallsCount
 }
