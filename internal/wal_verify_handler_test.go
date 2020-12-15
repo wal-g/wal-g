@@ -243,6 +243,77 @@ func TestWalVerify_SingleTimeline_SomeDelayed(t *testing.T) {
 	})
 }
 
+// check that wal-verify correctly marks uploading segments
+func TestWalVerify_SingleTimeline_SomeUploading(t *testing.T) {
+	storageSegments := []string{
+		"000000050000000000000001",
+		"000000050000000000000002",
+		"000000050000000000000003",
+		"000000050000000000000005",
+		"000000050000000000000007",
+	}
+
+	currentSegmentName := "000000050000000000000008"
+	currentSegment, _ := internal.NewWalSegmentDescription(currentSegmentName)
+
+	expectedIntegrityCheck := internal.WalVerifyCheckResult{
+		Status: internal.StatusWarning,
+		Details: internal.IntegrityCheckDetails{
+			{
+				TimelineId:    5,
+				StartSegment:  "000000050000000000000001",
+				EndSegment:    "000000050000000000000003",
+				SegmentsCount: 3,
+				Status:        internal.Found,
+			},
+			{
+				TimelineId:    5,
+				StartSegment:  "000000050000000000000004",
+				EndSegment:    "000000050000000000000004",
+				SegmentsCount: 1,
+				Status:        internal.ProbablyUploading,
+			},
+			{
+				TimelineId:    5,
+				StartSegment:  "000000050000000000000005",
+				EndSegment:    "000000050000000000000005",
+				SegmentsCount: 1,
+				Status:        internal.Found,
+			},
+			{
+				TimelineId:    5,
+				StartSegment:  "000000050000000000000006",
+				EndSegment:    "000000050000000000000006",
+				SegmentsCount: 1,
+				Status:        internal.ProbablyUploading,
+			},
+			{
+				TimelineId:    5,
+				StartSegment:  "000000050000000000000007",
+				EndSegment:    "000000050000000000000007",
+				SegmentsCount: 1,
+				Status:        internal.Found,
+			},
+		},
+	}
+
+	expectedTimelineCheck := internal.WalVerifyCheckResult{
+		Status: internal.StatusOk,
+		Details: internal.TimelineCheckDetails{
+			CurrentTimelineId:        currentSegment.Timeline,
+			HighestStorageTimelineId: currentSegment.Timeline,
+		},
+	}
+
+	testWalVerify(t, WalVerifyTestSetup{
+		expectedIntegrityCheck: expectedIntegrityCheck,
+		expectedTimelineCheck:  expectedTimelineCheck,
+		currentWalSegment:      currentSegment,
+		storageSegments:        storageSegments,
+		storageFiles:           make(map[string]*bytes.Buffer),
+	})
+}
+
 // check that wal-verify correctly follows timeline switches
 func TestWalVerify_TwoTimelines_Ok(t *testing.T) {
 	storageSegments := []string{
