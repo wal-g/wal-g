@@ -109,7 +109,7 @@ func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string
 		return nil, err
 	}
 
-	permanentBackups, _ := getPermanentObjects(folder)
+	permanentBackups, _ := GetPermanentObjects(folder)
 	//  del current backup from
 	delete(permanentBackups, getBackupNumber(backupName))
 
@@ -214,4 +214,17 @@ type BackupHasPermanentBackupInFutureError struct {
 
 func newBackupHasPermanentBackupInFutureError(backupName string) BackupHasPermanentBackupInFutureError {
 	return BackupHasPermanentBackupInFutureError{errors.Errorf("Can't mark backup '%s' as impermanent. There is permanent increment backup.", backupName)}
+}
+
+func IsPermanent(objectName string, permanentBackups, permanentWals map[string]bool) bool {
+	if objectName[:len(utility.WalPath)] == utility.WalPath {
+		wal := objectName[len(utility.WalPath) : len(utility.WalPath)+24]
+		return permanentWals[wal]
+	}
+	if objectName[:len(utility.BaseBackupPath)] == utility.BaseBackupPath {
+		backup := objectName[len(utility.BaseBackupPath)+len(utility.BackupNamePrefix) : len(utility.BaseBackupPath)+len(utility.BackupNamePrefix)+24]
+		return permanentBackups[backup]
+	}
+	// should not reach here, default to false
+	return false
 }

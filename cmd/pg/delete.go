@@ -52,65 +52,59 @@ var deleteEverythingCmd = &cobra.Command{
 func runDeleteBefore(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
-	isFullBackup := func(object storage.Object) bool {
-		return postgresIsFullBackup(folder, object)
+
+	permanentBackups, permanentWals := internal.GetPermanentObjects(folder)
+	if len(permanentBackups) > 0 {
+		tracelog.InfoLogger.Printf("Found permanent objects: backups=%v, wals=%v\n",
+			permanentBackups, permanentWals)
 	}
 
-	backups, err := internal.GetBackupSentinelObjects(folder)
+	deleteHandler, err := NewPostgresDeleteHandler(folder, permanentBackups, permanentWals)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	lessFunc := postgresTimelineAndSegmentNoLess
-	backupTimeFunc := getBackupTime
-	if newLessFunc, newTimeFunc, ok := tryMakeSentinelTimeFuncs(folder, backups); ok {
-		lessFunc, backupTimeFunc = newLessFunc, newTimeFunc
-	}
-
-	internal.HandleDeleteBefore(folder, backups, args, confirmed, isFullBackup, lessFunc, backupTimeFunc)
+	deleteHandler.HandleDeleteBefore(args, confirmed)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
-	isFullBackup := func(object storage.Object) bool {
-		return postgresIsFullBackup(folder, object)
+
+	permanentBackups, permanentWals := internal.GetPermanentObjects(folder)
+	if len(permanentBackups) > 0 {
+		tracelog.InfoLogger.Printf("Found permanent objects: backups=%v, wals=%v\n",
+			permanentBackups, permanentWals)
 	}
-	backups, err := internal.GetBackupSentinelObjects(folder)
+
+	deleteHandler, err := NewPostgresDeleteHandler(folder, permanentBackups, permanentWals)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	lessFunc := postgresTimelineAndSegmentNoLess
-	if newLessFunc, _, ok := tryMakeSentinelTimeFuncs(folder, backups); ok {
-		lessFunc = newLessFunc
-	}
-
-	internal.HandleDeleteRetain(folder, backups, args, confirmed, isFullBackup, lessFunc)
-}
-
-// tryMakeSentinelTimeFuncs tries to create sentinel time based functions for delete handler
-func tryMakeSentinelTimeFuncs(
-	folder storage.Folder,
-	backups []storage.Object,
-) (func(obj1, obj2 storage.Object) bool, func(obj storage.Object) time.Time, bool) {
-	if !useSentinelTime {
-		return nil, nil, false
-	}
-
-	// If all backups in storage have metadata, we will use backup start time from sentinel.
-	// Otherwise, for example in case when we are dealing with some ancient backup without
-	// metadata included, fall back to the default timeline and segment number comparator.
-	startTimeByBackupName, err := getBackupStartTimeMap(folder, backups)
-	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to get sentinel backup start times: %v,"+
-			" will fall back to timeline and segment number for ordering...\n", err)
-		return nil, nil, false
-	}
-
-	return makeLessFunc(startTimeByBackupName), GetBackupTimeFunc(startTimeByBackupName), true
+	deleteHandler.HandleDeleteRetain(args, confirmed)
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
-	internal.DeleteEverything(folder, confirmed, args)
+
+	forceModifier := false
+	modifier := internal.ExtractDeleteEverythingModifierFromArgs(args)
+	if modifier == internal.ForceDeleteModifier {
+		forceModifier = true
+	}
+
+	permanentBackups, permanentWals := internal.GetPermanentObjects(folder)
+	if len(permanentBackups) > 0 {
+		if !forceModifier {
+			tracelog.ErrorLogger.Fatalf("Found permanent objects: backups=%v, wals=%v\n",
+				permanentBackups, permanentWals)
+		}
+		tracelog.InfoLogger.Printf("Found permanent objects: backups=%v, wals=%v\n",
+			permanentBackups, permanentWals)
+	}
+
+	deleteHandler, err := NewPostgresDeleteHandler(folder, permanentBackups, permanentWals)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	deleteHandler.DeleteEverything(confirmed)
 }
 
 func init() {
@@ -119,6 +113,82 @@ func init() {
 	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd, deleteEverythingCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 	deleteCmd.PersistentFlags().BoolVar(&useSentinelTime, UseSentinelTimeFlag, false, UseSentinelTimeDescription)
+}
+
+func NewPostgresDeleteHandler(folder storage.Folder, permanentBackups, permanentWals map[string]bool,
+) (*internal.DeleteHandler, error) {
+	backups, err := internal.GetBackupSentinelObjects(folder)
+	if err != nil {
+		return nil, err
+	}
+
+	lessFunc := postgresTimelineAndSegmentNoLess
+	var startTimeByBackupName map[string]time.Time
+	if useSentinelTime {
+		// If all backups in storage have metadata, we will use backup start time from sentinel.
+		// Otherwise, for example in case when we are dealing with some ancient backup without
+		// metadata included, fall back to the default timeline and segment number comparator.
+		startTimeByBackupName, err = getBackupStartTimeMap(folder, backups)
+		if err != nil {
+			tracelog.WarningLogger.Printf("Failed to get sentinel backup start times: %v,"+
+				" will fall back to timeline and segment number for ordering...\n", err)
+		} else {
+			lessFunc = makeLessFunc(startTimeByBackupName)
+		}
+	}
+	postgresBackups := makePostgresBackupObjects(folder, backups, startTimeByBackupName)
+
+	deleteHandler := internal.NewDeleteHandler(
+		folder,
+		postgresBackups,
+		lessFunc,
+		makePostgresPermanentFunc(permanentBackups, permanentWals),
+	)
+
+	return deleteHandler, nil
+}
+
+func newPostgresBackupObject(isFullBackup bool, creationTime time.Time, object storage.Object) PostgresBackupObject {
+	return PostgresBackupObject{
+		Object:       object,
+		isFullBackup: isFullBackup,
+		creationTime: creationTime,
+	}
+}
+
+type PostgresBackupObject struct {
+	storage.Object
+	isFullBackup bool
+	creationTime time.Time
+}
+
+func (o PostgresBackupObject) IsFullBackup() bool {
+	return o.isFullBackup
+}
+
+func (o PostgresBackupObject) GetBackupTime() time.Time {
+	return o.creationTime
+}
+
+func makePostgresBackupObjects(folder storage.Folder, objects []storage.Object, startTimeByBackupName map[string]time.Time) []internal.BackupObject {
+	backupObjects := make([]internal.BackupObject, 0, len(objects))
+	for _, object := range objects {
+		postgresBackup := newPostgresBackupObject(
+			postgresIsFullBackup(folder, object), object.GetLastModified(), object)
+
+		if startTimeByBackupName != nil {
+			backupName := fetchBackupName(object)
+			postgresBackup.creationTime = startTimeByBackupName[backupName]
+		}
+		backupObjects = append(backupObjects, postgresBackup)
+	}
+	return backupObjects
+}
+
+func makePostgresPermanentFunc(permanentBackups, permanentWals map[string]bool) func(object storage.Object) bool {
+	return func(object storage.Object) bool {
+		return internal.IsPermanent(object.GetName(), permanentBackups, permanentWals)
+	}
 }
 
 func makeLessFunc(startTimeByBackupName map[string]time.Time) func(storage.Object, storage.Object) bool {
@@ -133,6 +203,7 @@ func makeLessFunc(startTimeByBackupName map[string]time.Time) func(storage.Objec
 		if backupName2 == "" {
 			return postgresSegmentNoLess(object1, object2)
 		}
+
 		startTime1, ok := startTimeByBackupName[backupName1]
 		if !ok {
 			return false
@@ -142,13 +213,6 @@ func makeLessFunc(startTimeByBackupName map[string]time.Time) func(storage.Objec
 			return false
 		}
 		return startTime1.Before(startTime2)
-	}
-}
-
-func GetBackupTimeFunc(startTimeByBackupName map[string]time.Time) func(storage.Object) time.Time {
-	return func(backupObject storage.Object) time.Time {
-		backupName := fetchBackupName(backupObject)
-		return startTimeByBackupName[backupName]
 	}
 }
 
@@ -202,8 +266,4 @@ func postgresIsFullBackup(folder storage.Folder, object storage.Object) bool {
 
 func fetchBackupName(object storage.Object) string {
 	return regexpBackupName.FindString(object.GetName())
-}
-
-func getBackupTime(backupObject storage.Object) time.Time {
-	return backupObject.GetLastModified()
 }

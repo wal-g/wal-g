@@ -45,31 +45,24 @@ var deleteEverythingCmd = &cobra.Command{
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
+	deleteHandler, err := newMySqlDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
-	internal.DeleteEverything(folder, confirmed, args)
+
+	deleteHandler.DeleteEverything(confirmed)
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
+	deleteHandler, err := newMySqlDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
-	isFullBackup := func(object storage.Object) bool {
-		return IsFullBackup()
-	}
-	backups, err := internal.GetBackupSentinelObjects(folder)
-	tracelog.ErrorLogger.FatalOnError(err)
-	internal.HandleDeleteBefore(folder, backups, args, confirmed, isFullBackup, makeLessFunc(folder), getBackupTime)
+
+	deleteHandler.HandleDeleteBefore(args, confirmed)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
+	deleteHandler, err := newMySqlDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
-	isFullBackup := func(object storage.Object) bool {
-		return IsFullBackup()
-	}
-	backups, err := internal.GetBackupSentinelObjects(folder)
-	tracelog.ErrorLogger.FatalOnError(err)
-	internal.HandleDeleteRetain(folder, backups, args, confirmed, isFullBackup, makeLessFunc(folder))
+
+	deleteHandler.HandleDeleteRetain(args, confirmed)
 }
 
 func init() {
@@ -78,8 +71,34 @@ func init() {
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 
-func IsFullBackup() bool {
+func newMySqlDeleteHandler() (*internal.DeleteHandler, error) {
+	folder, err := internal.ConfigureFolder()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	backups, err := internal.GetBackupSentinelObjects(folder)
+	if err != nil {
+		return nil, err
+	}
+
+	backupObjects := make([]internal.BackupObject, 0, len(backups))
+	for _, object := range backups {
+		backupObjects = append(backupObjects, MySqlBackupObject{object})
+	}
+
+	isPermanent := func(object storage.Object) bool { return true }
+	return internal.NewDeleteHandler(folder, backupObjects, makeLessFunc(folder), isPermanent), nil
+}
+
+type MySqlBackupObject struct {
+	storage.Object
+}
+
+func (o MySqlBackupObject) IsFullBackup() bool {
 	return true
+}
+
+func (o MySqlBackupObject) GetBackupTime() time.Time {
+	return o.Object.GetLastModified()
 }
 
 func makeLessFunc(folder storage.Folder) func(object1, object2 storage.Object) bool {
@@ -124,8 +143,4 @@ func tryFetchBinlogName(folder storage.Folder, object storage.Object) (string, b
 		return "", false
 	}
 	return sentinel.BinLogStart, true
-}
-
-func getBackupTime(object storage.Object) time.Time {
-	return object.GetLastModified()
 }
