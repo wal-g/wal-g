@@ -106,7 +106,7 @@ func newFdbDeleteHandler(folder storage.Folder) (*internal.DeleteHandler, error)
 		backupObjects = append(backupObjects, FdbBackupObject{object})
 	}
 
-	isPermanent := func(object storage.Object) bool { return true }
+	isPermanent := func(storage.Object) bool { return false }
 	return internal.NewDeleteHandler(folder, backupObjects, makeLessFunc(), isPermanent), nil
 }
 

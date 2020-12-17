@@ -42,21 +42,21 @@ var deleteEverythingCmd = &cobra.Command{
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
-	deleteHandler, err := newMySqlDeleteHandler()
+	deleteHandler, err := newSqlServerDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.DeleteEverything(confirmed)
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
-	deleteHandler, err := newMySqlDeleteHandler()
+	deleteHandler, err := newSqlServerDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteBefore(args, confirmed)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
-	deleteHandler, err := newMySqlDeleteHandler()
+	deleteHandler, err := newSqlServerDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteRetain(args, confirmed)
@@ -68,7 +68,7 @@ func init() {
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 
-func newMySqlDeleteHandler() (*internal.DeleteHandler, error) {
+func newSqlServerDeleteHandler() (*internal.DeleteHandler, error) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -82,7 +82,7 @@ func newMySqlDeleteHandler() (*internal.DeleteHandler, error) {
 		backupObjects = append(backupObjects, SqlServerBackupObject{object})
 	}
 
-	isPermanent := func(object storage.Object) bool { return true }
+	isPermanent := func(storage.Object) bool { return false }
 	return internal.NewDeleteHandler(folder, backupObjects, makeLessFunc(), isPermanent), nil
 }
 

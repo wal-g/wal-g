@@ -59,7 +59,7 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 			permanentBackups, permanentWals)
 	}
 
-	deleteHandler, err := NewPostgresDeleteHandler(folder, permanentBackups, permanentWals)
+	deleteHandler, err := newPostgresDeleteHandler(folder, permanentBackups, permanentWals)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteBefore(args, confirmed)
@@ -75,7 +75,7 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 			permanentBackups, permanentWals)
 	}
 
-	deleteHandler, err := NewPostgresDeleteHandler(folder, permanentBackups, permanentWals)
+	deleteHandler, err := newPostgresDeleteHandler(folder, permanentBackups, permanentWals)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteRetain(args, confirmed)
@@ -101,7 +101,7 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 			permanentBackups, permanentWals)
 	}
 
-	deleteHandler, err := NewPostgresDeleteHandler(folder, permanentBackups, permanentWals)
+	deleteHandler, err := newPostgresDeleteHandler(folder, permanentBackups, permanentWals)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.DeleteEverything(confirmed)
@@ -115,7 +115,7 @@ func init() {
 	deleteCmd.PersistentFlags().BoolVar(&useSentinelTime, UseSentinelTimeFlag, false, UseSentinelTimeDescription)
 }
 
-func NewPostgresDeleteHandler(folder storage.Folder, permanentBackups, permanentWals map[string]bool,
+func newPostgresDeleteHandler(folder storage.Folder, permanentBackups, permanentWals map[string]bool,
 ) (*internal.DeleteHandler, error) {
 	backups, err := internal.GetBackupSentinelObjects(folder)
 	if err != nil {
