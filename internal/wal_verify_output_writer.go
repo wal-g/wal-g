@@ -1,11 +1,10 @@
 package internal
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
-
-	"github.com/jedib0t/go-pretty/table"
 )
 
 type WalVerifyOutputType int
@@ -17,7 +16,7 @@ const (
 
 // WalVerifyOutputWriter writes the output of wal-verify command execution result
 type WalVerifyOutputWriter interface {
-	Write(result WalVerifyResult) error
+	Write(results map[WalVerifyCheckType]WalVerifyCheckResult) error
 }
 
 // WalVerifyJsonOutputWriter writes the detailed JSON output
@@ -25,8 +24,8 @@ type WalVerifyJsonOutputWriter struct {
 	output io.Writer
 }
 
-func (writer *WalVerifyJsonOutputWriter) Write(result WalVerifyResult) error {
-	bytes, err := json.Marshal(result)
+func (writer *WalVerifyJsonOutputWriter) Write(results map[WalVerifyCheckType]WalVerifyCheckResult) error {
+	bytes, err := json.Marshal(results)
 	if err != nil {
 		return err
 	}
@@ -39,21 +38,18 @@ type WalVerifyTableOutputWriter struct {
 	output io.Writer
 }
 
-func (writer *WalVerifyTableOutputWriter) Write(result WalVerifyResult) error {
-	writer.writeTable(result)
-	fmt.Println("WAL storage status: " + result.StorageStatus.String())
-	return nil
-}
-
-func (writer *WalVerifyTableOutputWriter) writeTable(result WalVerifyResult) {
-	tableWriter := table.NewWriter()
-	tableWriter.SetOutputMirror(writer.output)
-	defer tableWriter.Render()
-	tableWriter.AppendHeader(table.Row{"TLI", "Start", "End", "Segments count", "Status"})
-
-	for _, row := range result.IntegrityScanResult {
-		tableWriter.AppendRow(table.Row{row.TimelineId, row.StartSegment, row.EndSegment, row.SegmentsCount, row.Status})
+func (writer *WalVerifyTableOutputWriter) Write(result map[WalVerifyCheckType]WalVerifyCheckResult) error {
+	for checkType, checkResult := range result {
+		outputReader, err := newPrettyOutputReader(checkType, checkResult)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(writer.output, outputReader)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func NewWalVerifyOutputWriter(outputType WalVerifyOutputType, output io.Writer) WalVerifyOutputWriter {
@@ -65,4 +61,20 @@ func NewWalVerifyOutputWriter(outputType WalVerifyOutputType, output io.Writer) 
 	default:
 		return &WalVerifyJsonOutputWriter{output: output}
 	}
+}
+
+func newPrettyOutputReader(checkType WalVerifyCheckType, checkResult WalVerifyCheckResult) (io.Reader, error) {
+	var outputBuffer bytes.Buffer
+	outputBuffer.WriteString(fmt.Sprintf("[wal-verify] %s check status: %s\n", checkType, checkResult.Status))
+	outputBuffer.WriteString(fmt.Sprintf("[wal-verify] %s check details:\n", checkType))
+
+	checkDetails, err := checkResult.Details.NewPlainTextReader()
+	if err != nil {
+		return nil, err
+	}
+	_, err = io.Copy(&outputBuffer, checkDetails)
+	if err != nil {
+		return nil, err
+	}
+	return &outputBuffer, nil
 }

@@ -56,6 +56,7 @@ const (
 	TotalBgUploadedLimit         = "TOTAL_BG_UPLOADED_LIMIT"
 	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
 	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
+	MaxDelayedSegmentsCount      = "WALG_INTEGRITY_MAX_DELAYED_WALS"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
@@ -115,6 +116,7 @@ var (
 		VerifyPageChecksumsSetting:   "false",
 		StoreAllCorruptBlocksSetting: "false",
 		UseRatingComposerSetting:     "false",
+		MaxDelayedSegmentsCount:      "0",
 
 		OplogArchiveTimeoutInterval:    "60s",
 		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
@@ -155,6 +157,7 @@ var (
 		VerifyPageChecksumsSetting:   true,
 		StoreAllCorruptBlocksSetting: true,
 		UseRatingComposerSetting:     true,
+		MaxDelayedSegmentsCount:      true,
 
 		// Postgres
 		PgPortSetting:     true,

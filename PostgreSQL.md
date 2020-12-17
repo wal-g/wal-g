@@ -233,28 +233,97 @@ By default, `wal-show` output is plaintext table. For detailed JSON output, add 
 
 * ``wal-verify``
 
-Ensure that there is a consistent WAL segment history for the cluster so WAL-G can perform a PITR for the backup. `wal-verify` verifies that WAL-G has all the necessary WAL segments in storage up to the current cluster LSN.
+Run series of checks to ensure that WAL segment storage is healthy. Available checks:
 
-```
-wal-g wal-verify
-```
+`integrity` - ensure that there is a consistent WAL segment history for the cluster so WAL-G can perform a PITR for the backup. Essentially, it checks that all of the WAL segments in the range `[oldest backup start segment, current cluster segment)` are available in storage. If no backups found, `[1, current cluster segment)` range will be scanned.
 
-In `wal-verify` output, there are four statuses of WAL segments:
+![SegmentStatusIllustration](resources/wal_verify_segment_statuses.png)
+
+In `integrity` check output, there are four statuses of WAL segments:
 
 * `FOUND` segments are present in WAL storage
 * `MISSING_DELAYED` segments are not present in WAL storage, but probably Postgres did not try to archive them via `archive_command` yet
 * `MISSING_UPLOADING` segments are the segments which are not present in WAL storage, but looks like that they are in the process of uploading to storage
 * `MISSING_LOST` segments are not present in WAL storage and not `MISSING_UPLOADING` nor `MISSING_DELAYED`
 
-Output of wal-verify is the report which consists of two parts:
+`ProbablyUploading` segments range size is taken from `WALG_UPLOAD_CONCURRENCY` setting.
 
-1. WAL storage status:
+`ProbablyDelayed` segments range size is controlled via `WALG_INTEGRITY_MAX_DELAYED_WALS` setting.  
+
+Output consists of:
+1. Status of `integrity` check:
     * `OK` if there are no missing segments 
     * `WARNING` if there are some missing segments, but they are not `MISSING_LOST` 
     * `FAILURE` if there are some `MISSING_LOST` segments
 2. A list that shows WAL segments in chronological order grouped by timeline and status.
 
+`timeline` - check if the current cluster timeline is greater than or equal to any of the storage WAL segments timelines. This check is useful to detect split-brain conflicts. Please note that this check works correctly only if new storage created, or the existing one cleaned when restoring from the backup or performing `pg_upgrade`.
+
+Output consists of:
+1. Status of `timeline` check:
+    * `OK` if current timeline id matches the highest timeline id found in storage
+    * `WARNING` if could not determine if current timeline matches the highest in storage
+    * `FAILURE` if current timeline id is not equal to the highest timeline id found in storage
+2. Current timeline id.
+3. The highest timeline id found in WAL storage folder.
+
+Usage:
+``` bash
+wal-g wal-verify [space separated list of checks]
+# For example:
+wal-g wal-verify integrity timeline # perform integrity and timeline checks
+wal-g wal-verify integrity # perform only integrity check
+```
+
 By default, `wal-verify` output is plaintext. To enable JSON output, add the `--json` flag.
+
+Example of the plaintext output:
+```
+[wal-verify] integrity check status: OK
+[wal-verify] integrity check details:
++-----+--------------------------+--------------------------+----------------+--------+
+| TLI | START                    | END                      | SEGMENTS COUNT | STATUS |
++-----+--------------------------+--------------------------+----------------+--------+
+|   3 | 00000003000000030000004D | 0000000300000004000000F0 |            420 |  FOUND |
+|   4 | 0000000400000004000000F1 | 000000040000000800000034 |            836 |  FOUND |
++-----+--------------------------+--------------------------+----------------+--------+
+[wal-verify] timeline check status: OK
+[wal-verify] timeline check details:
+Highest timeline found in storage: 4
+Current cluster timeline: 4
+```
+
+Example of the JSON output:
+```
+{
+   "integrity":{
+      "status":"OK",
+      "details":[
+         {
+            "timeline_id":3,
+            "start_segment":"00000003000000030000004D",
+            "end_segment":"0000000300000004000000F0",
+            "segments_count":420,
+            "status":"FOUND"
+         },
+         {
+            "timeline_id":4,
+            "start_segment":"0000000400000004000000F1",
+            "end_segment":"000000040000000800000034",
+            "segments_count":836,
+            "status":"FOUND"
+         }
+      ]
+   },
+   "timeline":{
+      "status":"OK",
+      "details":{
+         "current_timeline_id":4,
+         "highest_storage_timeline_id":4
+      }
+   }
+}
+```
 
 * ``wal-receive``
 

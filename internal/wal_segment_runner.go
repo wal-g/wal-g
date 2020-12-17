@@ -39,6 +39,14 @@ type WalSegmentDescription struct {
 	Timeline uint32
 }
 
+func NewWalSegmentDescription(name string) (WalSegmentDescription, error) {
+	timeline, segmentNo, err := ParseWALFilename(name)
+	if err != nil {
+		return WalSegmentDescription{}, err
+	}
+	return WalSegmentDescription{Timeline: timeline, Number: WalSegmentNo(segmentNo)}, nil
+}
+
 func (desc WalSegmentDescription) GetFileName() string {
 	return desc.Number.getFilename(desc.Timeline)
 }
@@ -116,12 +124,11 @@ func getSegmentsFromFiles(filenames []string) map[WalSegmentDescription]bool {
 	walSegments := make(map[WalSegmentDescription]bool)
 	for _, filename := range filenames {
 		baseName := utility.TrimFileExtension(filename)
-		timeline, segmentNo, err := ParseWALFilename(baseName)
+		segment, err := NewWalSegmentDescription(baseName)
 		if _, ok := err.(NotWalFilenameError); ok {
 			// non-wal segment file, skip it
 			continue
 		}
-		segment := WalSegmentDescription{Timeline: timeline, Number: WalSegmentNo(segmentNo)}
 		walSegments[segment] = true
 	}
 	return walSegments
