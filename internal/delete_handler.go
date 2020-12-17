@@ -418,46 +418,6 @@ func getGarbageFromPrefix(folders []storage.Folder, nonGarbage []BackupTime) []s
 	return garbage
 }
 
-func GetPermanentObjects(folder storage.Folder) (map[string]bool, map[string]bool) {
-	tracelog.InfoLogger.Println("retrieving permanent objects")
-	backupTimes, err := GetBackups(folder)
-	if err != nil {
-		return map[string]bool{}, map[string]bool{}
-	}
-
-	permanentBackups := map[string]bool{}
-	permanentWals := map[string]bool{}
-	for _, backupTime := range backupTimes {
-		backup, err := GetBackupByName(backupTime.BackupName, utility.BaseBackupPath, folder)
-		if err != nil {
-			tracelog.ErrorLogger.Printf("failed to get backup by name with error %s, ignoring...", err.Error())
-			continue
-		}
-		meta, err := backup.fetchMeta()
-		if err != nil {
-			tracelog.ErrorLogger.Printf("failed to fetch backup meta for backup %s with error %s, ignoring...",
-				backupTime.BackupName, err.Error())
-			continue
-		}
-		if meta.IsPermanent {
-			timelineId, err := ParseTimelineFromBackupName(backup.Name)
-			if err != nil {
-				tracelog.ErrorLogger.Printf("failed to parse backup timeline for backup %s with error %s, ignoring...",
-					backupTime.BackupName, err.Error())
-				continue
-			}
-
-			startWalSegmentNo := newWalSegmentNo(meta.StartLsn - 1)
-			endWalSegmentNo := newWalSegmentNo(meta.FinishLsn - 1)
-			for walSegmentNo := startWalSegmentNo; walSegmentNo <= endWalSegmentNo; walSegmentNo = walSegmentNo.next() {
-				permanentWals[walSegmentNo.getFilename(timelineId)] = true
-			}
-			permanentBackups[backupTime.BackupName[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+24]] = true
-		}
-	}
-	return permanentBackups, permanentWals
-}
-
 func extractDeleteRetainModifierFromArgs(args []string) (int, string, string) {
 	if len(args) == 2 {
 		return NoDeleteModifier, args[0], args[1]
