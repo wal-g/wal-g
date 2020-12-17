@@ -51,21 +51,36 @@ type BackupObject interface {
 	GetBackupTime() time.Time
 }
 
+type DeleteHandlerOption func(h *DeleteHandler)
+
+func IsPermanentFunc(isPermanent func(storage.Object) bool) DeleteHandlerOption {
+	return func(h *DeleteHandler) {
+		h.isPermanent = isPermanent
+	}
+}
+
 func NewDeleteHandler(
 	folder storage.Folder,
 	backups []BackupObject,
 	less func(object1, object2 storage.Object) bool,
-	isPermanent func(object storage.Object) bool,
+	options ...DeleteHandlerOption,
 ) *DeleteHandler {
-	return &DeleteHandler{
+	deleteHandler := &DeleteHandler{
 		folder:  folder,
 		backups: backups,
 		less:    less,
 		greater: func(object1, object2 storage.Object) bool {
 			return less(object2, object1)
 		},
-		isPermanent: isPermanent,
+		// by default, all storage objects are impermanent
+		isPermanent: func(storage.Object) bool { return false },
 	}
+
+	for _, option := range options {
+		option(deleteHandler)
+	}
+
+	return deleteHandler
 }
 
 type DeleteHandler struct {

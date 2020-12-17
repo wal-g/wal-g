@@ -82,8 +82,7 @@ func newSqlServerDeleteHandler() (*internal.DeleteHandler, error) {
 		backupObjects = append(backupObjects, SqlServerBackupObject{object})
 	}
 
-	isPermanent := func(storage.Object) bool { return false }
-	return internal.NewDeleteHandler(folder, backupObjects, makeLessFunc(), isPermanent), nil
+	return internal.NewDeleteHandler(folder, backupObjects, makeLessFunc()), nil
 }
 
 type SqlServerBackupObject struct {

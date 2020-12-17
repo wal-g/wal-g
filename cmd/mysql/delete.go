@@ -85,8 +85,7 @@ func newMySqlDeleteHandler() (*internal.DeleteHandler, error) {
 		backupObjects = append(backupObjects, MySqlBackupObject{object})
 	}
 
-	isPermanent := func(storage.Object) bool { return false }
-	return internal.NewDeleteHandler(folder, backupObjects, makeLessFunc(folder), isPermanent), nil
+	return internal.NewDeleteHandler(folder, backupObjects, makeLessFunc(folder)), nil
 }
 
 type MySqlBackupObject struct {

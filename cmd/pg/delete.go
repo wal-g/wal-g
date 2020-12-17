@@ -142,7 +142,8 @@ func newPostgresDeleteHandler(folder storage.Folder, permanentBackups, permanent
 		folder,
 		postgresBackups,
 		lessFunc,
-		makePostgresPermanentFunc(permanentBackups, permanentWals),
+		internal.IsPermanentFunc(
+			makePostgresPermanentFunc(permanentBackups, permanentWals)),
 	)
 
 	return deleteHandler, nil
