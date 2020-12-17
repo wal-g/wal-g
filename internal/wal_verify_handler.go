@@ -108,7 +108,6 @@ func BuildWalVerifyCheckRunner(
 	rootFolder storage.Folder,
 	walFolderFilenames []string,
 	currentWalSegment WalSegmentDescription,
-	uploadingSegmentRangeSize, delayedSegmentRangeSize int,
 ) (WalVerifyCheckRunner, error) {
 	var checkRunner WalVerifyCheckRunner
 	var err error
@@ -116,8 +115,7 @@ func BuildWalVerifyCheckRunner(
 	case WalVerifyTimelineCheck:
 		checkRunner, err = NewTimelineCheckRunner(walFolderFilenames, currentWalSegment)
 	case WalVerifyIntegrityCheck:
-		checkRunner, err = NewIntegrityCheckRunner(rootFolder, walFolderFilenames, currentWalSegment,
-			uploadingSegmentRangeSize, delayedSegmentRangeSize)
+		checkRunner, err = NewIntegrityCheckRunner(rootFolder, walFolderFilenames, currentWalSegment)
 	default:
 		return nil, NewUnknownWalVerifyCheckError(checkType)
 	}
@@ -135,7 +133,6 @@ func HandleWalVerify(
 	rootFolder storage.Folder,
 	currentWalSegment WalSegmentDescription,
 	outputWriter WalVerifyOutputWriter,
-	uploadingSegmentRangeSize, delayedSegmentRangeSize int,
 ) {
 	checkResults := make(map[WalVerifyCheckType]WalVerifyCheckResult, len(checkTypes))
 
@@ -145,8 +142,7 @@ func HandleWalVerify(
 
 	for _, checkType := range checkTypes {
 		tracelog.InfoLogger.Printf("Building check runner: %s\n", checkType)
-		runner, err := BuildWalVerifyCheckRunner(checkType, rootFolder, walFolderFilenames, currentWalSegment,
-			uploadingSegmentRangeSize, delayedSegmentRangeSize)
+		runner, err := BuildWalVerifyCheckRunner(checkType, rootFolder, walFolderFilenames, currentWalSegment)
 		tracelog.ErrorLogger.FatalfOnError(
 			fmt.Sprintf("Failed to build check runner %s:", checkType), err)
 

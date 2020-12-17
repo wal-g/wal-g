@@ -3,6 +3,7 @@ package internal_test
 import (
 	"bytes"
 	"fmt"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
@@ -10,10 +11,13 @@ import (
 	"testing"
 )
 
-// Please note: this settings affect wal-verify behavior
-// Read more in PostgreSQL.md
-const uploadingSegmentRangeSize = 4
-const delayedSegmentRangeSize = 3
+func init() {
+	// this setting affects the ProbablyUploading segments range size
+	viper.Set(internal.UploadConcurrencySetting, "4")
+
+	// this setting controls the ProbablyDelayed segments range size
+	viper.Set(internal.MaxDelayedSegmentsCount, "3")
+}
 
 type WalVerifyTestSetup struct {
 	expectedIntegrityCheck internal.WalVerifyCheckResult
@@ -630,8 +634,7 @@ func executeWalVerify(
 	checkTypes := []internal.WalVerifyCheckType{
 		internal.WalVerifyTimelineCheck, internal.WalVerifyIntegrityCheck}
 
-	internal.HandleWalVerify(checkTypes, rootFolder, currentWalSegment, mockOutputWriter,
-		uploadingSegmentRangeSize, delayedSegmentRangeSize)
+	internal.HandleWalVerify(checkTypes, rootFolder, currentWalSegment, mockOutputWriter)
 
 	return mockOutputWriter.lastResult, mockOutputWriter.writeCallsCount
 }

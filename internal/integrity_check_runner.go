@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
@@ -45,8 +46,6 @@ func NewIntegrityCheckRunner(
 	rootFolder storage.Folder,
 	walFolderFilenames []string,
 	currentWalSegment WalSegmentDescription,
-	uploadingSegmentRangeSize int,
-	delayedSegmentRangeSize int,
 ) (IntegrityCheckRunner, error) {
 	walFolder := rootFolder.GetSubFolder(utility.WalPath)
 
@@ -62,11 +61,18 @@ func NewIntegrityCheckRunner(
 		stopWalSegmentNo = 1
 	}
 
+	// uploadingSegmentRangeSize is needed to determine max amount of missing WAL segments
+	// after the last found WAL segment which can be marked as "uploading"
+	uploadingSegmentRangeSize, err := getMaxUploadConcurrency()
+	if err != nil {
+		return IntegrityCheckRunner{}, errors.Wrap(err, "Failed to resolve MaxUploadConcurrency")
+	}
+
 	return IntegrityCheckRunner{
 		startWalSegment:           currentWalSegment,
 		stopWalSegmentNo:          stopWalSegmentNo,
 		uploadingSegmentRangeSize: uploadingSegmentRangeSize,
-		delayedSegmentRangeSize:   delayedSegmentRangeSize,
+		delayedSegmentRangeSize:   viper.GetInt(MaxDelayedSegmentsCount),
 		walFolderFilenames:        walFolderFilenames,
 		timelineSwitchMap:         timelineSwitchMap,
 	}, nil

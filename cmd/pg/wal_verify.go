@@ -3,7 +3,6 @@ package pg
 import (
 	"fmt"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	"os"
 	"strings"
 
@@ -45,13 +44,7 @@ var (
 			outputWriter := internal.NewWalVerifyOutputWriter(outputType, os.Stdout)
 			checkTypes := parseChecks(checks)
 
-			// following segment range sizes are used in integrity check
-			uploadingSegmentRangeSize, err := internal.GetMaxConcurrency(internal.UploadConcurrencySetting)
-			tracelog.ErrorLogger.FatalfOnError("Failed to resolve MaxUploadConcurrency: %v", err)
-			delayedSegmentRangeSize := viper.GetInt(internal.MaxDelayedSegmentsCount)
-
-			internal.HandleWalVerify(checkTypes, folder, internal.QueryCurrentWalSegment(), outputWriter,
-				uploadingSegmentRangeSize, delayedSegmentRangeSize)
+			internal.HandleWalVerify(checkTypes, folder, internal.QueryCurrentWalSegment(), outputWriter)
 		},
 	}
 	useJsonOutput bool
