@@ -109,7 +109,7 @@ func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string
 		return nil, err
 	}
 
-	permanentBackups, _ := getPermanentObjects(folder)
+	permanentBackups, _ := GetPermanentObjects(folder)
 	//  del current backup from
 	delete(permanentBackups, getBackupNumber(backupName))
 
@@ -214,4 +214,57 @@ type BackupHasPermanentBackupInFutureError struct {
 
 func newBackupHasPermanentBackupInFutureError(backupName string) BackupHasPermanentBackupInFutureError {
 	return BackupHasPermanentBackupInFutureError{errors.Errorf("Can't mark backup '%s' as impermanent. There is permanent increment backup.", backupName)}
+}
+
+func GetPermanentObjects(folder storage.Folder) (map[string]bool, map[string]bool) {
+	tracelog.InfoLogger.Println("retrieving permanent objects")
+	backupTimes, err := GetBackups(folder)
+	if err != nil {
+		return map[string]bool{}, map[string]bool{}
+	}
+
+	permanentBackups := map[string]bool{}
+	permanentWals := map[string]bool{}
+	for _, backupTime := range backupTimes {
+		backup, err := GetBackupByName(backupTime.BackupName, utility.BaseBackupPath, folder)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("failed to get backup by name with error %s, ignoring...", err.Error())
+			continue
+		}
+		meta, err := backup.fetchMeta()
+		if err != nil {
+			tracelog.ErrorLogger.Printf("failed to fetch backup meta for backup %s with error %s, ignoring...",
+				backupTime.BackupName, err.Error())
+			continue
+		}
+		if meta.IsPermanent {
+			timelineId, err := ParseTimelineFromBackupName(backup.Name)
+			if err != nil {
+				tracelog.ErrorLogger.Printf("failed to parse backup timeline for backup %s with error %s, ignoring...",
+					backupTime.BackupName, err.Error())
+				continue
+			}
+
+			startWalSegmentNo := newWalSegmentNo(meta.StartLsn - 1)
+			endWalSegmentNo := newWalSegmentNo(meta.FinishLsn - 1)
+			for walSegmentNo := startWalSegmentNo; walSegmentNo <= endWalSegmentNo; walSegmentNo = walSegmentNo.next() {
+				permanentWals[walSegmentNo.getFilename(timelineId)] = true
+			}
+			permanentBackups[backupTime.BackupName[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+24]] = true
+		}
+	}
+	return permanentBackups, permanentWals
+}
+
+func IsPermanent(objectName string, permanentBackups, permanentWals map[string]bool) bool {
+	if objectName[:len(utility.WalPath)] == utility.WalPath {
+		wal := objectName[len(utility.WalPath) : len(utility.WalPath)+24]
+		return permanentWals[wal]
+	}
+	if objectName[:len(utility.BaseBackupPath)] == utility.BaseBackupPath {
+		backup := objectName[len(utility.BaseBackupPath)+len(utility.BackupNamePrefix) : len(utility.BaseBackupPath)+len(utility.BackupNamePrefix)+24]
+		return permanentBackups[backup]
+	}
+	// should not reach here, default to false
+	return false
 }
