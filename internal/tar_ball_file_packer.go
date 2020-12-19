@@ -29,18 +29,6 @@ func (err SkippedFileError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-type IgnoredFileError struct {
-	error
-}
-
-func newIgnoredFileError(path string) IgnoredFileError {
-	return IgnoredFileError{errors.Errorf("File is ignored: %s\n", path)}
-}
-
-func (err IgnoredFileError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
 type TarBallFilePackerOptions struct {
 	verifyPageChecksums   bool
 	storeAllCorruptBlocks bool
@@ -86,11 +74,13 @@ func (p *TarBallFilePacker) UpdateDeltaMap(deltaMap PagedFileDeltaMap) {
 func (p *TarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall TarBall) error {
 	fileReadCloser, err := p.createFileReadCloser(cfi)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			// File was deleted before opening. We should ignore file here as if it did not exist.
+			return nil
+		}
 		switch err.(type) {
 		case SkippedFileError:
 			p.files.AddSkippedFile(cfi.header, cfi.fileInfo)
-			return nil
-		case IgnoredFileError:
 			return nil
 		default:
 			return err
@@ -141,10 +131,6 @@ func (p *TarBallFilePacker) createFileReadCloser(cfi *ComposeFileInfo) (io.ReadC
 			return nil, errors.Wrapf(err, "PackFileIntoTar: failed to find corresponding bitmap '%s'\n", cfi.path)
 		}
 		fileReadCloser, cfi.header.Size, err = ReadIncrementalFile(cfi.path, cfi.fileInfo.Size(), *p.incrementFromLsn, bitmap)
-		if os.IsNotExist(err) { // File was deleted before opening
-			// We should ignore file here as if it did not exist.
-			return nil, newIgnoredFileError(cfi.path)
-		}
 		switch err.(type) {
 		case nil:
 			fileReadCloser = &ioextensions.ReadCascadeCloser{
