@@ -179,6 +179,44 @@ func TestWalShow_TwoTimelinesWithHistory(t *testing.T) {
 	})
 }
 
+func TestWalShow_TwoTimelinesWithHistory_HighTLI(t *testing.T) {
+	timelineSetups := []*TestTimelineSetup{
+		{
+			existSegments: []string{
+				"00EEEEED000000000000008F",
+				"00EEEEED0000000000000090",
+				"00EEEEED0000000000000091",
+				"00EEEEED0000000000000092",
+			},
+			missingSegments: make([]string, 0),
+			id:              15658733,
+		},
+		{
+			existSegments: []string{
+				"00EEEEEE0000000000000090",
+				"00EEEEEE0000000000000091",
+				"00EEEEEE0000000000000092",
+			},
+			missingSegments: make([]string, 0),
+			// 15658734 is 0xEEEEEE (hex)
+			id:              15658734,
+			// parentId and switch point LSN match the .history file record
+			parentId: 15658733,
+			// 2420113408 is 0x90400000 (hex)
+			switchPointLsn:      2420113408,
+			historyFileContents: "15658733\t0/90400000\tbefore 2000-01-01 05:00:00+05\n\n",
+		},
+	}
+
+	fileName, contents, err := newTimelineHistoryFile(
+		timelineSetups[1].historyFileContents, timelineSetups[1].id)
+	assert.NoError(t, err)
+
+	testMultipleTimelines(t, timelineSetups, map[string]*bytes.Buffer{
+		fileName: contents,
+	})
+}
+
 func TestWalShow_MultipleTimelines(t *testing.T) {
 	timelineSetups := []*TestTimelineSetup{
 		// first timeline

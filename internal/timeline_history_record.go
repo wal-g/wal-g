@@ -49,7 +49,7 @@ func newHistoryRecordFromString(row string) (*TimelineHistoryRecord, error) {
 	if matchResult == nil || len(matchResult) < 4 {
 		return nil, nil
 	}
-	timeline, err := strconv.ParseUint(matchResult[1], 10, sizeofInt32)
+	timeline, err := strconv.ParseUint(matchResult[1], 10, sizeofInt32bits)
 	if err != nil {
 		return nil, err
 	}
