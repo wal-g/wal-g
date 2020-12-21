@@ -11,13 +11,10 @@ const (
 	BackupMarkShortDescription = "Marks a backup permanent or impermanent"
 	BackupMarkLongDescription  = `Marks a backup permanent by default, or impermanent when flag is provided.
 	Permanent backups are prevented from being removed when running delete.`
-	ImpermanentDescription = "Marks a backup impermanent"
-	ImpermanentFlagShortHand        = "i"
-	ImpermanentFlag        = "impermanent"
-
-
+	ImpermanentDescription     = "Marks a backup impermanent"
+	ImpermanentFlagShortHand   = "i"
+	ImpermanentFlag            = "impermanent"
 	backupMarkShortDescription = "mark permanent/impermanent target backup"
-
 )
 
 var (
@@ -34,7 +31,7 @@ var (
 		},
 	}
 	toImpermanent = false
-	name = ""
+	name          = ""
 )
 
 func init() {
@@ -42,4 +39,3 @@ func init() {
 	backupMarkCmd.Flags().StringVarP(&name, backupNameFlag, backupShorthand, "", backupMarkShortDescription)
 	cmd.AddCommand(backupMarkCmd)
 }
-

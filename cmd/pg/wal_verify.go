@@ -2,10 +2,10 @@ package pg
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"os"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"

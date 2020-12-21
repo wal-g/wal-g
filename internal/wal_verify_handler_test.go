@@ -3,12 +3,13 @@ package internal_test
 import (
 	"bytes"
 	"fmt"
+	"reflect"
+	"testing"
+
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
-	"reflect"
-	"testing"
 )
 
 func init() {

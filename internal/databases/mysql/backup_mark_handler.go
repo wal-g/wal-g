@@ -32,8 +32,6 @@ func markBackup(uploader *internal.Uploader, folder storage.Folder, backupName s
 	})
 	tracelog.ErrorLogger.FatalfOnError("Failed to mark previous backups: %v", err)
 }
-
-
 func NewMysqlMarkBackup() *internal.MarkHandler {
 	return &internal.MarkHandler{
 		Mark: markBackup,

@@ -1,15 +1,16 @@
 package mysql
 
 import (
+	"os"
+	"path"
+	"strings"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 	"github.com/wal-g/wal-g/utility"
-	"os"
-	"path"
-	"strings"
 )
 
 var confirmed = false
@@ -43,12 +44,26 @@ var deleteEverythingCmd = &cobra.Command{
 	Run:       runDeleteEverything,
 }
 
+type DeleteHandler struct {
+	*internal.DeleteHandler
+	permanentObjects map[string]bool
+}
+
 func runDeleteEverything(cmd *cobra.Command, args []string) {
 	deleteHandler, err := NewMySqlDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	if p := permanentObjects(deleteHandler.Folder); len(p) > 0 {
-		tracelog.InfoLogger.Printf("found permanent objects %s\n", p)
+	if p := deleteHandler.permanentObjects; len(p) > 0 {
+		tracelog.InfoLogger.Printf("found permanent objects %s\n", func() string {
+			ret := ""
+
+			for e := range p {
+				ret += e
+				ret += ","
+			}
+
+			return ret
+		}())
 		os.Exit(1)
 	}
 
@@ -74,7 +89,6 @@ func init() {
 	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
-
 
 func makeLessFunc(folder storage.Folder) func(object1, object2 storage.Object) bool {
 	return func(object1, object2 storage.Object) bool {
@@ -120,7 +134,6 @@ func tryFetchBinlogName(folder storage.Folder, object storage.Object) (string, b
 	return sentinel.BinLogStart, true
 }
 
-
 func permanentObjects(folder storage.Folder) map[string]bool {
 	tracelog.InfoLogger.Println("retrieving permanent objects")
 	backupTimes, err := internal.GetBackups(folder)
@@ -157,8 +170,7 @@ func IsPermanent(objectName string, permanentBackups map[string]bool) bool {
 	return true
 }
 
-
-func NewMySqlDeleteHandler() (*internal.DeleteHandler, error) {
+func NewMySqlDeleteHandler() (*DeleteHandler, error) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -175,9 +187,12 @@ func NewMySqlDeleteHandler() (*internal.DeleteHandler, error) {
 
 	permanentBackups := permanentObjects(folder)
 
-	return internal.NewDeleteHandler(folder, backupObjects, makeLessFunc(folder),
-		internal.IsPermanentFunc(func(object storage.Object) bool {
-			return IsPermanent(object.GetName(), permanentBackups)
-		}),
-	), nil
+	return &DeleteHandler{
+		DeleteHandler: internal.NewDeleteHandler(folder, backupObjects, makeLessFunc(folder),
+			internal.IsPermanentFunc(func(object storage.Object) bool {
+				return IsPermanent(object.GetName(), permanentBackups)
+			}),
+		),
+		permanentObjects: permanentBackups,
+	}, nil
 }

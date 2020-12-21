@@ -2,12 +2,12 @@ package walparser_test
 
 import (
 	"bytes"
-	"github.com/wal-g/wal-g/internal/walparser"
 	"io"
 	"testing"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/walparser"
 )
 
 var locations = []walparser.BlockLocation{

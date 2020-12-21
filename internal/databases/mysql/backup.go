@@ -1,8 +1,9 @@
 package mysql
 
 import (
-	"github.com/wal-g/storages/storage"
 	"time"
+
+	"github.com/wal-g/storages/storage"
 )
 
 type BackupObject struct {
@@ -16,4 +17,3 @@ func (o BackupObject) IsFullBackup() bool {
 func (o BackupObject) GetBackupTime() time.Time {
 	return o.Object.GetLastModified()
 }
-

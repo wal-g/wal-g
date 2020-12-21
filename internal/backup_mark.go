@@ -21,8 +21,6 @@ func markBackup(uploader *Uploader, folder storage.Folder, backupName string, to
 	err = uploader.UploadMultiple(metadataToUpload)
 	tracelog.ErrorLogger.FatalfOnError("Failed to mark previous backups: %v", err)
 }
-
-
 func NewPgMarkBackup() *MarkHandler {
 	return &MarkHandler{
 		Mark: markBackup,

@@ -2,7 +2,6 @@ package internal
 
 import (
 	"fmt"
-	"github.com/wal-g/tracelog"
 	"os"
 	"sort"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
