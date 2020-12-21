@@ -177,12 +177,12 @@ func setTablespacePaths(spec TablespaceSpec) error {
 	}
 	err := fs.NewFolder(basePrefix, TablespaceFolder).EnsureExists()
 	if err != nil {
-		return fmt.Errorf("Error creating pg_tblspc folder %v\n", err)
+		return fmt.Errorf("Error creating pg_tblspc Folder %v\n", err)
 	}
 	for _, location := range spec.tablespaceLocations() {
 		err := fs.NewFolder(location.Location, "").EnsureExists()
 		if err != nil {
-			return fmt.Errorf("Error creating folder for tablespace %v\n", err)
+			return fmt.Errorf("Error creating Folder for tablespace %v\n", err)
 		}
 		err = os.Symlink(location.Location, filepath.Join(basePrefix, location.Symlink))
 		if err != nil {

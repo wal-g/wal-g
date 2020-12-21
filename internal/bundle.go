@@ -210,7 +210,7 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 		return nil
 	}
 
-	// Resolve symlinks for tablespaces and save folder structure.
+	// Resolve symlinks for tablespaces and save Folder structure.
 	if filepath.Base(path) == TablespaceFolder {
 		tablespaceInfos, err := ioutil.ReadDir(path)
 		if err != nil {

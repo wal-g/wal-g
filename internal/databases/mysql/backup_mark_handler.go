@@ -14,10 +14,12 @@ func markBackup(uploader *internal.Uploader, folder storage.Folder, backupName s
 
 	meta, err := backup.FetchMeta()
 	if err != nil {
-		tracelog.WarningLogger.Println("failed to get prvious meta, creating new one")
+		tracelog.WarningLogger.Println("failed to get previous meta, creating new one")
 		meta = internal.ExtendedMetadataDto{
 			IsPermanent: toPermanent,
 		}
+	} else {
+		meta.IsPermanent = toPermanent
 	}
 
 	metadataUploadObject, err := internal.GetMetadataUploadObject(backup.Name, meta)

@@ -50,6 +50,7 @@ services:
       &&  mkdir -p /export/mysqlfullmysqldumpbucket
       &&  mkdir -p /export/mysqlbinlogpushfetchbucket
       &&  mkdir -p /export/mysqldeleteendtoendbucket
+      &&  mkdir -p /export/mysqlmarkbucket
       &&  mkdir -p /export/mysqlbinlogreplaybucket
       &&  mkdir -p /export/mysqlpitrxtrabackupbucket
       &&  mkdir -p /export/mysqlpitrmysqldumpbucket

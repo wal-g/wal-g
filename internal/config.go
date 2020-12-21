@@ -507,7 +507,7 @@ func FolderFromConfig(configFile string) (storage.Folder, error) {
 	var folder, err = ConfigureFolderForSpecificConfig(config)
 
 	if err != nil {
-		tracelog.ErrorLogger.Println("Failed configure folder according to config " + configFile)
+		tracelog.ErrorLogger.Println("Failed configure Folder according to config " + configFile)
 		tracelog.ErrorLogger.FatalError(err)
 	}
 	return folder, err

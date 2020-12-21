@@ -16,7 +16,7 @@ const (
 var BasePrefixMissingError = fmt.Errorf("Base prefix not set while working with tablespaces.\n")
 
 // The mandatory keys for this map are "base_prefix" and "tablespaces".
-// "base_prefix" contains Location of pg_data folder.
+// "base_prefix" contains Location of pg_data Folder.
 // "tablespaces" contains array of keys, which also happen to be names of tablespace folders.
 // The rest keys should be these names of tablespace folders and values should be TablespaceLocation structs.
 type TablespaceSpec struct {

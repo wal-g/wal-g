@@ -119,7 +119,7 @@ func TestIsTablespaceSymlink_NotActualPathSlash(t *testing.T) {
 
 func TestIsTablespaceSymlink_NotActualPathSubdirectory(t *testing.T) {
 	spec := setUpIsTablespaceSymlink(t)
-	assert.False(t, requireIsTablespaceSymlink(t, spec, "/home/ismirn0ff/space1/folder"))
+	assert.False(t, requireIsTablespaceSymlink(t, spec, "/home/ismirn0ff/space1/Folder"))
 }
 
 func TestIsTablespaceSymlink_NotPgTblspcRoot(t *testing.T) {
@@ -145,9 +145,9 @@ func TestMakeTablespaceSymlinkPath(t *testing.T) {
 
 	marshalAndUnmarshal(t, &spec)
 
-	path, err := spec.makeTablespaceSymlinkPath("/home/ismirn0ff/space1/folder")
+	path, err := spec.makeTablespaceSymlinkPath("/home/ismirn0ff/space1/Folder")
 	assert.NoError(t, err)
-	assert.Equal(t, "/psql/pg_tblspc/1/folder", path)
+	assert.Equal(t, "/psql/pg_tblspc/1/Folder", path)
 
 	path, err = spec.makeTablespaceSymlinkPath("/home/ismirn0ff/space1")
 	assert.NoError(t, err)

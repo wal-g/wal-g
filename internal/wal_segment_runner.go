@@ -107,7 +107,7 @@ func (r *WalSegmentRunner) getNextSegment() WalSegmentDescription {
 	return WalSegmentDescription{Timeline: nextTimeline, Number: nextSegmentNo}
 }
 
-// getFolderFilenames returns a set of filenames in provided storage folder
+// getFolderFilenames returns a set of filenames in provided storage Folder
 func getFolderFilenames(folder storage.Folder) ([]string, error) {
 	objects, _, err := folder.ListFolder()
 	if err != nil {
