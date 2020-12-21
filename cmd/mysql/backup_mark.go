@@ -27,7 +27,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			uploader, err := internal.ConfigureWalUploader()
 			tracelog.ErrorLogger.FatalOnError(err)
-			mysql.NewMysqlMarkBackup().HandleBackupMark(uploader.Uploader, name, !toImpermanent)
+			internal.HandleBackupMark(mysql.MarkBackup, uploader.Uploader, name, !toImpermanent)
 		},
 	}
 	toImpermanent = false

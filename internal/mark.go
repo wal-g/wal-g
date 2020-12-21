@@ -5,12 +5,10 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-type MarkHandler struct {
-	Mark func(uploader *Uploader, folder storage.Folder, backupName string, toPermanent bool)
-}
+type MarkFn func(uploader *Uploader, folder storage.Folder, backupName string, toPermanent bool)
 
-func (m *MarkHandler) HandleBackupMark(uploader *Uploader, backupName string, toPermanent bool) {
+func HandleBackupMark(f MarkFn, uploader *Uploader, backupName string, toPermanent bool) {
 	folder := uploader.UploadingFolder
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
-	m.Mark(uploader, folder, backupName, toPermanent)
+	f(uploader, folder, backupName, toPermanent)
 }

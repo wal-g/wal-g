@@ -1,7 +1,6 @@
 package mysql
 
 import (
-	"os"
 	"path"
 	"strings"
 
@@ -54,17 +53,15 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if p := deleteHandler.permanentObjects; len(p) > 0 {
-		tracelog.InfoLogger.Printf("found permanent objects %s\n", func() string {
-			ret := ""
+		tracelog.InfoLogger.Fatalf("found permanent objects %s\n", strings.Join(func() []string {
+			ret := make([]string, 0)
 
 			for e := range p {
-				ret += e
-				ret += ","
+				ret = append(ret, e)
 			}
 
 			return ret
-		}())
-		os.Exit(1)
+		}(), ","))
 	}
 
 	deleteHandler.DeleteEverything(confirmed)
@@ -166,8 +163,8 @@ func IsPermanent(objectName string, permanentBackups map[string]bool) bool {
 		backup := objectName[len(utility.BaseBackupPath) : len(utility.BaseBackupPath)+23]
 		return permanentBackups[backup]
 	}
-	// should not reach here, default to true
-	return true
+	// impermanent backup or binlogs
+	return false
 }
 
 func NewMySqlDeleteHandler() (*DeleteHandler, error) {

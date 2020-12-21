@@ -118,7 +118,7 @@ func (seq *WalSegmentsSequence) FindMissingSegments() ([]WalSegmentDescription, 
 func HandleWalShow(rootFolder storage.Folder, showBackups bool, outputWriter WalShowOutputWriter) {
 	walFolder := rootFolder.GetSubFolder(utility.WalPath)
 	filenames, err := getFolderFilenames(walFolder)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get the WAL Folder filenames %v\n", err)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get the WAL folder filenames %v\n", err)
 
 	walSegments := getSegmentsFromFiles(filenames)
 	segmentsByTimelines, err := groupSegmentsByTimelines(walSegments)

@@ -7,7 +7,7 @@ import (
 )
 
 // MarkBackup marks a backup as permanent or impermanent
-func markBackup(uploader *internal.Uploader, folder storage.Folder, backupName string, toPermanent bool) {
+func MarkBackup(uploader *internal.Uploader, folder storage.Folder, backupName string, toPermanent bool) {
 	tracelog.InfoLogger.Printf("Retrieving previous related backups to be marked: toPermanent=%t", toPermanent)
 
 	backup := internal.NewBackup(folder, backupName)
@@ -31,9 +31,4 @@ func markBackup(uploader *internal.Uploader, folder storage.Folder, backupName s
 		metadataUploadObject,
 	})
 	tracelog.ErrorLogger.FatalfOnError("Failed to mark previous backups: %v", err)
-}
-func NewMysqlMarkBackup() *internal.MarkHandler {
-	return &internal.MarkHandler{
-		Mark: markBackup,
-	}
 }

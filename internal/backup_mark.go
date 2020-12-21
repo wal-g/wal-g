@@ -11,7 +11,7 @@ import (
 )
 
 // MarkBackup marks a backup as permanent or impermanent
-func markBackup(uploader *Uploader, folder storage.Folder, backupName string, toPermanent bool) {
+func MarkBackup(uploader *Uploader, folder storage.Folder, backupName string, toPermanent bool) {
 	tracelog.InfoLogger.Printf("Retrieving previous related backups to be marked: toPermanent=%t", toPermanent)
 	metadataToUpload, err := GetMarkedBackupMetadataToUpload(folder, backupName, toPermanent)
 
@@ -20,11 +20,6 @@ func markBackup(uploader *Uploader, folder storage.Folder, backupName string, to
 
 	err = uploader.UploadMultiple(metadataToUpload)
 	tracelog.ErrorLogger.FatalfOnError("Failed to mark previous backups: %v", err)
-}
-func NewPgMarkBackup() *MarkHandler {
-	return &MarkHandler{
-		Mark: markBackup,
-	}
 }
 
 // GetMarkedBackupMetadataToUpload retrieves all previous permanent or
