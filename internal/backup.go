@@ -58,7 +58,7 @@ func (backup *Backup) GetStopSentinelPath() string {
 	return SentinelNameFromBackup(backup.Name)
 }
 
-func (backup *Backup) getMetadataPath() string {
+func (backup *Backup) GetMetadataPath() string {
 	return backup.Name + "/" + utility.MetadataFileName
 }
 
@@ -116,14 +116,16 @@ func (backup *Backup) fetchSentinelData() ([]byte, error) {
 	return sentinelDtoData, nil
 }
 
-func (backup *Backup) fetchMeta() (ExtendedMetadataDto, error) {
+func (backup *Backup) FetchMeta() (ExtendedMetadataDto, error) {
 	extendedMetadataDto := ExtendedMetadataDto{}
-	backupReaderMaker := newStorageReaderMaker(backup.BaseBackupFolder, backup.getMetadataPath())
+	backupReaderMaker := newStorageReaderMaker(backup.BaseBackupFolder, backup.GetMetadataPath())
+
 	backupReader, err := backupReaderMaker.Reader()
 	if err != nil {
 		return extendedMetadataDto, err
 	}
 	extendedMetadataDtoData, err := ioutil.ReadAll(backupReader)
+
 	if err != nil {
 		return extendedMetadataDto, errors.Wrap(err, "failed to fetch metadata")
 	}
@@ -327,7 +329,7 @@ func shouldUnwrapTar(tarName string, sentinelDto BackupSentinelDto, filesToUnwra
 }
 
 func GetLastWalFilename(backup *Backup) (string, error) {
-	meta, err := backup.fetchMeta()
+	meta, err := backup.FetchMeta()
 	if err != nil {
 		tracelog.InfoLogger.Print("No meta found.")
 		return "", err

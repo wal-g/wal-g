@@ -14,10 +14,19 @@ import (
 func markBackup(uploader *Uploader, folder storage.Folder, backupName string, toPermanent bool) {
 	tracelog.InfoLogger.Printf("Retrieving previous related backups to be marked: toPermanent=%t", toPermanent)
 	metadataToUpload, err := GetMarkedBackupMetadataToUpload(folder, backupName, toPermanent)
+
 	tracelog.ErrorLogger.FatalfOnError("Failed to get previous backups: %v", err)
 	tracelog.InfoLogger.Printf("Retrieved backups to be marked, marking: %v", metadataToUpload)
-	err = uploader.uploadMultiple(metadataToUpload)
+
+	err = uploader.UploadMultiple(metadataToUpload)
 	tracelog.ErrorLogger.FatalfOnError("Failed to mark previous backups: %v", err)
+}
+
+
+func NewPgMarkBackup() *MarkHandler {
+	return &MarkHandler{
+		Mark: markBackup,
+	}
 }
 
 // GetMarkedBackupMetadataToUpload retrieves all previous permanent or
@@ -35,7 +44,7 @@ func GetMarkedBackupMetadataToUpload(
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 
 	backup := NewBackup(baseBackupFolder, backupName)
-	meta, err := backup.fetchMeta()
+	meta, err := backup.FetchMeta()
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +75,7 @@ func getMarkedPermanentBackupMetadata(baseBackupFolder storage.Folder, backupNam
 		return nil, err
 	}
 
-	meta, err := backup.fetchMeta()
+	meta, err := backup.FetchMeta()
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +83,7 @@ func getMarkedPermanentBackupMetadata(baseBackupFolder storage.Folder, backupNam
 	// only return backups that we want to update
 	if !meta.IsPermanent {
 		meta.IsPermanent = true
-		metadataUploadObject, err := getMetadataUploadObject(backup.Name, meta)
+		metadataUploadObject, err := GetMetadataUploadObject(backup.Name, meta)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +113,7 @@ func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string
 	// retrieve current backup meta
 	backup := NewBackup(baseBackupFolder, backupName)
 
-	meta, err := backup.fetchMeta()
+	meta, err := backup.FetchMeta()
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +132,7 @@ func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string
 	}
 
 	meta.IsPermanent = false
-	metadataUploadObject, err := getMetadataUploadObject(backup.Name, meta)
+	metadataUploadObject, err := GetMetadataUploadObject(backup.Name, meta)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +199,7 @@ func getMetadataFromBackup(baseBackupFolder storage.Folder, backupName string) (
 	return *sentinel.IncrementFrom, true, nil
 }
 
-func getMetadataUploadObject(backupName string, meta ExtendedMetadataDto) (UploadObject, error) {
+func GetMetadataUploadObject(backupName string, meta ExtendedMetadataDto) (UploadObject, error) {
 	metaFilePath := storage.JoinPath(backupName, utility.MetadataFileName)
 	dtoBody, err := json.Marshal(meta)
 	if err != nil {
@@ -231,7 +240,7 @@ func GetPermanentObjects(folder storage.Folder) (map[string]bool, map[string]boo
 			tracelog.ErrorLogger.Printf("failed to get backup by name with error %s, ignoring...", err.Error())
 			continue
 		}
-		meta, err := backup.fetchMeta()
+		meta, err := backup.FetchMeta()
 		if err != nil {
 			tracelog.ErrorLogger.Printf("failed to fetch backup meta for backup %s with error %s, ignoring...",
 				backupTime.BackupName, err.Error())
