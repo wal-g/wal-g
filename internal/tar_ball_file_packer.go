@@ -29,6 +29,18 @@ func (err SkippedFileError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
+type IgnoredFileError struct {
+	error
+}
+
+func newIgnoredFileError(path, reason string) IgnoredFileError {
+	return IgnoredFileError{errors.Errorf("File is ignored: %s, reason: %s\n", path, reason)}
+}
+
+func (err IgnoredFileError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
 type TarBallFilePackerOptions struct {
 	verifyPageChecksums   bool
 	storeAllCorruptBlocks bool
@@ -74,15 +86,12 @@ func (p *TarBallFilePacker) UpdateDeltaMap(deltaMap PagedFileDeltaMap) {
 func (p *TarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall TarBall) error {
 	fileReadCloser, err := p.createFileReadCloser(cfi)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			// File was deleted before opening. We should ignore file here as if it did not exist.
-			tracelog.WarningLogger.Printf(
-				"%s does not exist, probably deleted during the backup creation\n", cfi.path)
-			return nil
-		}
 		switch err.(type) {
 		case SkippedFileError:
 			p.files.AddSkippedFile(cfi.header, cfi.fileInfo)
+			return nil
+		case IgnoredFileError:
+			tracelog.WarningLogger.Println(err)
 			return nil
 		default:
 			return err
@@ -133,6 +142,9 @@ func (p *TarBallFilePacker) createFileReadCloser(cfi *ComposeFileInfo) (io.ReadC
 			return nil, errors.Wrapf(err, "PackFileIntoTar: failed to find corresponding bitmap '%s'\n", cfi.path)
 		}
 		fileReadCloser, cfi.header.Size, err = ReadIncrementalFile(cfi.path, cfi.fileInfo.Size(), *p.incrementFromLsn, bitmap)
+		if errors.Is(err, os.ErrNotExist) { // File was deleted before opening. We should ignore file here as if it did not exist.
+			return nil,	newIgnoredFileError(cfi.path, "file does not exist, probably deleted during the backup creation")
+		}
 		switch err.(type) {
 		case nil:
 			fileReadCloser = &ioextensions.ReadCascadeCloser{
@@ -167,6 +179,10 @@ func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string,
 	fileInfoHeader.Size = info.Size()
 	file, err := os.Open(path)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			// File was deleted before opening. We should ignore file here as if it did not exist.
+			return nil,	newIgnoredFileError(path, "file does not exist, probably deleted during the backup creation")
+		}
 		return nil, errors.Wrapf(err, "startReadingFile: failed to open file '%s'\n", path)
 	}
 	diskLimitedFileReader := limiters.NewDiskLimitReader(file)
