@@ -76,6 +76,8 @@ func (p *TarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall TarBal
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			// File was deleted before opening. We should ignore file here as if it did not exist.
+			tracelog.WarningLogger.Printf(
+				"%s does not exist, probably deleted during the backup creation\n", cfi.path)
 			return nil
 		}
 		switch err.(type) {
