@@ -146,7 +146,7 @@ func (p *TarBallFilePacker) createFileReadCloser(cfi *ComposeFileInfo) (io.ReadC
 		}
 		fileReadCloser, cfi.header.Size, err = ReadIncrementalFile(cfi.path, cfi.fileInfo.Size(), *p.incrementFromLsn, bitmap)
 		if errors.Is(err, os.ErrNotExist) {
-			return nil,	newFileNotExistError(cfi.path)
+			return nil, newFileNotExistError(cfi.path)
 		}
 		switch err.(type) {
 		case nil:
@@ -183,7 +183,7 @@ func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string,
 	file, err := os.Open(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil,	newFileNotExistError(path)
+			return nil, newFileNotExistError(path)
 		}
 		return nil, errors.Wrapf(err, "startReadingFile: failed to open file '%s'\n", path)
 	}
