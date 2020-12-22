@@ -113,7 +113,7 @@ func (seq *WalSegmentsSequence) FindMissingSegments() ([]WalSegmentDescription, 
 	return walSegmentScanner.GetMissingSegmentsDescriptions(), nil
 }
 
-// HandleWalShow gets the list of files inside WAL Folder, detects the available WAL segments,
+// HandleWalShow gets the list of files inside WAL folder, detects the available WAL segments,
 // groups WAL segments by the timeline and shows detailed info about each timeline stored in storage
 func HandleWalShow(rootFolder storage.Folder, showBackups bool, outputWriter WalShowOutputWriter) {
 	walFolder := rootFolder.GetSubFolder(utility.WalPath)

@@ -180,7 +180,7 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder fsutil.DataFold
 	deltaDataFolder, err = fsutil.NewDiskDataFolder(dataFolderPath)
 	if err != nil {
 		useWalDelta = false
-		tracelog.WarningLogger.Printf("can't use wal delta feature because can't open delta data Folder '%s'"+
+		tracelog.WarningLogger.Printf("can't use wal delta feature because can't open delta data folder '%s'"+
 			" due to error: '%v'\n", dataFolderPath, err)
 		err = nil
 	}
@@ -256,7 +256,7 @@ func ConfigureWalUploader() (uploader *WalUploader, err error) {
 func ConfigureUploaderWithoutCompressMethod() (uploader *Uploader, err error) {
 	folder, err := ConfigureFolder()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure Folder")
+		return nil, errors.Wrap(err, "failed to configure folder")
 	}
 
 	uploader = NewUploader(nil, folder)
@@ -266,7 +266,7 @@ func ConfigureUploaderWithoutCompressMethod() (uploader *Uploader, err error) {
 func ConfigureWalUploaderWithoutCompressMethod() (uploader *WalUploader, err error) {
 	folder, err := ConfigureFolder()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure Folder")
+		return nil, errors.Wrap(err, "failed to configure folder")
 	}
 
 	useWalDelta, deltaDataFolder, err := configureWalDeltaUsage()

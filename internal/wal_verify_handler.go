@@ -137,7 +137,7 @@ func HandleWalVerify(
 ) {
 	checkResults := make(map[WalVerifyCheckType]WalVerifyCheckResult, len(checkTypes))
 
-	// pre-fetch WAL Folder filenames to reduce storage load
+	// pre-fetch WAL folder filenames to reduce storage load
 	walFolderFilenames, err := getFolderFilenames(rootFolder.GetSubFolder(utility.WalPath))
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch WAL Folder filenames: %v", err)
 

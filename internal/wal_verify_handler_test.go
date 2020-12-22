@@ -26,7 +26,7 @@ type WalVerifyTestSetup struct {
 
 	// currentWalSegment represents the current cluster wal segment
 	currentWalSegment internal.WalSegmentDescription
-	// list of mock storage wal Folder WAL segments
+	// list of mock storage wal folder WAL segments
 	storageSegments []string
 	// list of other mock storage files
 	storageFiles map[string]*bytes.Buffer
@@ -144,7 +144,7 @@ func TestWalVerify_OnlyGarbageInStorage(t *testing.T) {
 		Status: internal.StatusWarning,
 		Details: internal.TimelineCheckDetails{
 			CurrentTimelineId: currentSegment.Timeline,
-			// WAL storage Folder is empty so highest found timeline should be zero
+			// WAL storage folder is empty so highest found timeline should be zero
 			HighestStorageTimelineId: 0,
 		},
 	}
@@ -348,7 +348,7 @@ func TestWalVerify_TwoTimelines_Ok(t *testing.T) {
 	switchPointLsn := 5*internal.WalSegmentSize + 100
 	historyContents := fmt.Sprintf("%d\t0/%X\tsome comment...\n\n", 5, switchPointLsn)
 	historyName, historyFile, err := newTimelineHistoryFile(historyContents, 6)
-	// .history file should be stored in wal Folder
+	// .history file should be stored in wal folder
 	historyName = utility.WalPath + historyName
 	assert.NoError(t, err)
 
@@ -408,7 +408,7 @@ func TestWalVerify_TwoTimelines_SomeLost(t *testing.T) {
 	switchPointLsn := 5*internal.WalSegmentSize + 100
 	historyContents := fmt.Sprintf("%d\t0/%X\tsome comment...\n\n", 5, switchPointLsn)
 	historyName, historyFile, err := newTimelineHistoryFile(historyContents, 6)
-	// .history file should be stored in wal Folder
+	// .history file should be stored in wal folder
 	historyName = utility.WalPath + historyName
 	assert.NoError(t, err)
 
@@ -563,7 +563,7 @@ func TestWalVerify_WalkUntilFirstBackup(t *testing.T) {
 	switchPointLsn := 5*internal.WalSegmentSize + 100
 	historyInfo := fmt.Sprintf("%d\t0/%X\tsome comment...\n\n", 5, switchPointLsn)
 	historyName, historyFile, err := newTimelineHistoryFile(historyInfo, 6)
-	// .history file should be stored in wal Folder
+	// .history file should be stored in wal folder
 	historyName = utility.WalPath + historyName
 	assert.NoError(t, err)
 

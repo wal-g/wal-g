@@ -119,7 +119,7 @@ func TestIsTablespaceSymlink_NotActualPathSlash(t *testing.T) {
 
 func TestIsTablespaceSymlink_NotActualPathSubdirectory(t *testing.T) {
 	spec := setUpIsTablespaceSymlink(t)
-	assert.False(t, requireIsTablespaceSymlink(t, spec, "/home/ismirn0ff/space1/Folder"))
+	assert.False(t, requireIsTablespaceSymlink(t, spec, "/home/ismirn0ff/space1/folder"))
 }
 
 func TestIsTablespaceSymlink_NotPgTblspcRoot(t *testing.T) {

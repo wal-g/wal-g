@@ -301,7 +301,7 @@ func verifySingleTimeline(t *testing.T, setup *TestTimelineSetup, timelineInfo *
 }
 
 // executeWalShow invokes the HandleWalShow() with fake storage filled with
-// provided wal segments and other Folder files
+// provided wal segments and other folder files
 func executeWalShow(walFilenames []string, walFolderFiles map[string]*bytes.Buffer) []*internal.TimelineInfo {
 	rootFolder := setupTestStorageFolder()
 	walFolder := rootFolder.GetSubFolder(utility.WalPath)
