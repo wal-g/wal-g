@@ -37,3 +37,10 @@ wal-g backup-list
 wal-g backup-mark -b "$BACKUP" -i
 
 wal-g delete everything --confirm
+
+if wal-g backup-mark "noexitsstinfbackuonme"; then
+    echo '
+    backup name successfully marked not-exsting backup
+    '
+    exit 1
+fi

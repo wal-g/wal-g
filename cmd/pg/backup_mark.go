@@ -24,7 +24,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			uploader, err := internal.ConfigureWalUploader()
 			tracelog.ErrorLogger.FatalOnError(err)
-			internal.HandleBackupMark(internal.MarkBackup, uploader.Uploader, args[0], !toImpermanent)
+			internal.HandleBackupMark(uploader.Uploader, args[0], !toImpermanent)
 		},
 	}
 	toImpermanent = false

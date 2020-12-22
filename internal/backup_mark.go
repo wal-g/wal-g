@@ -10,8 +10,9 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-// MarkBackup marks a backup as permanent or impermanent
-func MarkBackup(uploader *Uploader, folder storage.Folder, backupName string, toPermanent bool) {
+// markBackup marks a backup as permanent or impermanent
+func markBackup(uploader *Uploader, folder storage.Folder, backupName string, toPermanent bool) {
+
 	tracelog.InfoLogger.Printf("Retrieving previous related backups to be marked: toPermanent=%t", toPermanent)
 	metadataToUpload, err := GetMarkedBackupMetadataToUpload(folder, backupName, toPermanent)
 
