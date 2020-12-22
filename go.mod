@@ -60,5 +60,5 @@ require (
 	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5 // indirect
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	golang.org/x/tools v0.0.0-20201211185031-d93e913c1a58 // indirect
+	golang.org/x/tools v0.0.0-20201221201019-196535612888 // indirect
 )

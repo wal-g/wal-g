@@ -3,9 +3,10 @@ package internal
 import (
 	"bytes"
 	"fmt"
+	"io"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
-	"io"
 )
 
 type TimelineCheckDetails struct {

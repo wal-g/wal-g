@@ -1,10 +1,10 @@
 package walparser_test
 
 import (
-	"github.com/wal-g/wal-g/internal/walparser"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/testtools"
 )
 

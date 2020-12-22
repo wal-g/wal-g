@@ -107,7 +107,7 @@ func GetBackupDetails(folder storage.Folder, backupTime BackupTime) (BackupDetai
 		return BackupDetail{}, err
 	}
 
-	metaData, err := backup.fetchMeta()
+	metaData, err := backup.FetchMeta()
 	if err != nil {
 		return BackupDetail{}, err
 	}

@@ -199,7 +199,7 @@ func TestWalShow_TwoTimelinesWithHistory_HighTLI(t *testing.T) {
 			},
 			missingSegments: make([]string, 0),
 			// 15658734 is 0xEEEEEE (hex)
-			id:              15658734,
+			id: 15658734,
 			// parentId and switch point LSN match the .history file record
 			parentId: 15658733,
 			// 2420113408 is 0x90400000 (hex)
