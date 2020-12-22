@@ -145,9 +145,9 @@ func TestMakeTablespaceSymlinkPath(t *testing.T) {
 
 	marshalAndUnmarshal(t, &spec)
 
-	path, err := spec.makeTablespaceSymlinkPath("/home/ismirn0ff/space1/Folder")
+	path, err := spec.makeTablespaceSymlinkPath("/home/ismirn0ff/space1/folder")
 	assert.NoError(t, err)
-	assert.Equal(t, "/psql/pg_tblspc/1/Folder", path)
+	assert.Equal(t, "/psql/pg_tblspc/1/folder", path)
 
 	path, err = spec.makeTablespaceSymlinkPath("/home/ismirn0ff/space1")
 	assert.NoError(t, err)

@@ -66,7 +66,7 @@ func NewDeleteHandler(
 	options ...DeleteHandlerOption,
 ) *DeleteHandler {
 	deleteHandler := &DeleteHandler{
-		Folder:  folder,
+		folder:  folder,
 		backups: backups,
 		less:    less,
 		greater: func(object1, object2 storage.Object) bool {
@@ -84,7 +84,7 @@ func NewDeleteHandler(
 }
 
 type DeleteHandler struct {
-	Folder  storage.Folder
+	folder  storage.Folder
 	backups []BackupObject
 
 	less    func(object1, object2 storage.Object) bool
@@ -262,7 +262,7 @@ func (h *DeleteHandler) FindTargetRetainAfterTime(retentionCount int, timeLine t
 
 func (h *DeleteHandler) DeleteEverything(confirmed bool) {
 	filter := func(object storage.Object) bool { return true }
-	err := storage.DeleteObjectsWhere(h.Folder, confirmed, filter)
+	err := storage.DeleteObjectsWhere(h.folder, confirmed, filter)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
@@ -274,7 +274,7 @@ func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) 
 	}
 	tracelog.InfoLogger.Println("Start delete")
 
-	return storage.DeleteObjectsWhere(h.Folder, confirmed, func(object storage.Object) bool {
+	return storage.DeleteObjectsWhere(h.folder, confirmed, func(object storage.Object) bool {
 		return h.less(object, target) && !h.isPermanent(object)
 	})
 }

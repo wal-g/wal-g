@@ -618,7 +618,7 @@ func testWalVerify(t *testing.T, setup WalVerifyTestSetup) {
 }
 
 // executeWalShow invokes the HandleWalVerify() with fake storage filled with
-// provided wal segments and other storage Folder files
+// provided wal segments and other storage folder files
 func executeWalVerify(
 	walFilenames []string,
 	storageFiles map[string]*bytes.Buffer,
