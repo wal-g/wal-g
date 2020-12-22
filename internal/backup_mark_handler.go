@@ -1,7 +1,7 @@
 package internal
 
 import (
-"github.com/wal-g/wal-g/utility"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func HandleBackupMark(uploader *Uploader, backupName string, toPermanent bool) {
