@@ -164,6 +164,12 @@ To configure AWS KMS key region for client-side encryption and decryption (i.e.,
 To configure the compression method used for backups. Possible options are: `lz4`, 'lzma', 'brotli'. The default method is `lz4`. LZ4 is the fastest method, but the compression ratio is bad.
 LZMA is way much slower. However, it compresses backups about 6 times better than LZ4. Brotli is a good trade-off between speed and compression ratio, which is about 3 times better than LZ4.
 
+* `S3_USE_LIST_OBJECTS_V1`
+
+By default, WAL-G uses [ListObjectsV2](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html) to fetch S3 storage folder listings.
+However, some S3-compatible storages may not support it.
+Set this setting to `true` to use [ListObjects](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjects.html) instead.
+
 **More options are available for the chosen database. See it in [Databases](#databases)**
 
 Usage

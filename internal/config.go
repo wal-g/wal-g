@@ -204,6 +204,7 @@ var (
 		"WALG_S3_MAX_PART_SIZE":       true,
 		"S3_ENDPOINT_SOURCE":          true,
 		"S3_ENDPOINT_PORT":            true,
+		"S3_USE_LIST_OBJECTS_V1":      true,
 
 		// Azure
 		"WALG_AZ_PREFIX":          true,
