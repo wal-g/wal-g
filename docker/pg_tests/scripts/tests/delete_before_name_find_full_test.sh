@@ -18,7 +18,7 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /tmp/scripts/wait_while_pg_not_ready.sh
 
-wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
+wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm --use-sentinel-time
 
 for i in 1 2 3 4
 do
@@ -34,7 +34,7 @@ wal-g --config=${TMP_CONFIG} backup-list
 lines_before_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
 wal-g --config=${TMP_CONFIG} backup-list | tail -n 2 > /tmp/list_tail_before_delete
 
-wal-g --config=${TMP_CONFIG} delete before FIND_FULL $backup_name --confirm
+wal-g --config=${TMP_CONFIG} delete before FIND_FULL $backup_name --confirm --use-sentinel-time
 
 wal-g --config=${TMP_CONFIG} backup-list
 lines_after_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`

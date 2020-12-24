@@ -19,7 +19,7 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /tmp/scripts/wait_while_pg_not_ready.sh
 
-wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
+wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm --use-sentinel-time
 
 # push first backup as permanent
 pgbench -i -s 1 postgres &
@@ -39,7 +39,7 @@ wal-g --config=${TMP_CONFIG} backup-list
 
 # delete all backups
 last_backup_name=`wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " "`
-wal-g --config=${TMP_CONFIG} delete before $last_backup_name --confirm
+wal-g --config=${TMP_CONFIG} delete before $last_backup_name --confirm --use-sentinel-time
 wal-g --config=${TMP_CONFIG} backup-list
 
 # check that permanent backup still exists
