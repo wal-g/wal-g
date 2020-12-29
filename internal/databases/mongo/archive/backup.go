@@ -2,6 +2,7 @@ package archive
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"text/tabwriter"
@@ -40,20 +41,28 @@ func NewTabbedBackupListing(minwidth, tabwidth, padding int, padchar byte, flags
 func (bl *TabbedBackupListing) Backups(backups []models.Backup, output io.Writer) error {
 	writer := tabwriter.NewWriter(output, bl.minwidth, bl.tabwidth, bl.padding, bl.padchar, bl.flags)
 
-	_, err := fmt.Fprintln(writer, "name\tfinish_local_time\tts_before\tts_after\tdata_size\tpermanent")
+	_, err := fmt.Fprintln(writer, "name\tfinish_local_time\tts_before\tts_after\tdata_size\tpermanent\tuser_data")
 	if err != nil {
 		return err
 	}
 	for i := len(backups) - 1; i >= 0; i-- {
 		b := backups[i]
+		var rawUserData []byte
+		rawUserData, err = json.Marshal(b.UserData)
+		if err != nil {
+			rawUserData = []byte("<marshall_error>")
+		}
+
 		_, err := fmt.Fprintf(writer,
-			"%v\t%v\t%v\t%v\t%d\t%v\n",
+			"%v\t%v\t%v\t%v\t%d\t%v\t%s\n",
 			b.BackupName,
 			b.FinishLocalTime.Format(time.RFC3339),
 			b.MongoMeta.Before.LastMajTS,
 			b.MongoMeta.After.LastMajTS,
 			b.DataSize,
-			b.Permanent)
+			b.Permanent,
+			rawUserData,
+		)
 		if err != nil {
 			return err
 		}
