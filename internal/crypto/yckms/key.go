@@ -113,7 +113,7 @@ func (key *ycSymmetricKey) GetEncryptedKey() []byte {
 
 func (key *ycSymmetricKey) ReadEncryptedKey(r io.Reader) error {
 	encryptedKey, err := deserializeEncryptedKey(r)
-	if err != nil {
+	if err == nil {
 		key.encryptedKey = encryptedKey
 	}
 	return err
