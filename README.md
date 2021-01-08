@@ -164,6 +164,14 @@ To configure AWS KMS key region for client-side encryption and decryption (i.e.,
 To configure the compression method used for backups. Possible options are: `lz4`, 'lzma', 'brotli'. The default method is `lz4`. LZ4 is the fastest method, but the compression ratio is bad.
 LZMA is way much slower. However, it compresses backups about 6 times better than LZ4. Brotli is a good trade-off between speed and compression ratio, which is about 3 times better than LZ4.
 
+* `YC_CSE_KMS_KEY_ID`
+
+To configure Yandex Cloud KMS key for client-side encryption and decryption. By default, no encryption is used.
+
+* `YC_SERVICE_ACCOUNT_KEY_FILE`
+
+To configure the name of a file containing private key of Yandex Cloud Service Account. If not set a token from the metadata service (http://169.254.169.254) will be used to make API calls to Yandex Cloud KMS. 
+
 **More options are available for the chosen database. See it in [Databases](#databases)**
 
 Usage
