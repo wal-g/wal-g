@@ -14,7 +14,7 @@ const (
 )
 
 type mockedSymmetricKey struct {
-	key []byte
+	key          []byte
 	encryptedKey []byte
 }
 
@@ -81,4 +81,3 @@ func TestYcCrypterEncryptionCycle(t *testing.T) {
 
 	assert.Equal(t, testSecretString, string(decryptedData), "Decrypted text not equal to plain text")
 }
-

@@ -23,4 +23,3 @@ func resolveCredentials(saFilePath string) ycsdk.Credentials {
 
 	return credentials
 }
-

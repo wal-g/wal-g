@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	magic = "yckms"
+	magic              = "yckms"
 	schemeVersion byte = 1
 )
 
@@ -32,11 +32,11 @@ type ycSymmetricKey struct {
 
 func serializeEncryptedKey(encryptedKey []byte) []byte {
 	/*
-	magic value "yckms"
-	scheme version (current version is 1)
-	uint64 - encrypted key len
-	encrypted key ...
-	 */
+		magic value "yckms"
+		scheme version (current version is 1)
+		uint64 - encrypted key len
+		encrypted key ...
+	*/
 
 	encryptedKeyLen := make([]byte, 8)
 	binary.LittleEndian.PutUint64(encryptedKeyLen, uint64(len(encryptedKey)))
@@ -47,7 +47,7 @@ func serializeEncryptedKey(encryptedKey []byte) []byte {
 }
 
 func deserializeEncryptedKey(r io.Reader) ([]byte, error) {
-	magicSchemeBytes := make([]byte, len(magic) + 1)
+	magicSchemeBytes := make([]byte, len(magic)+1)
 	_, err := r.Read(magicSchemeBytes)
 	if err != nil {
 		return nil, err
@@ -69,8 +69,8 @@ func deserializeEncryptedKey(r io.Reader) ([]byte, error) {
 
 	encryptedKeyLen := binary.LittleEndian.Uint64(encryptedKeyLenBytes)
 	/*
-	Sanity check
-	 */
+		Sanity check
+	*/
 	if encryptedKeyLen > 4096 {
 		return nil, errors.New("YC KMS: invalid size of the encrypted key")
 	}
