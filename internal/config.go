@@ -96,6 +96,9 @@ const (
 
 	AwsAccessKeyId     = "AWS_ACCESS_KEY_ID"
 	AwsSecretAccessKey = "AWS_SECRET_ACCESS_KEY"
+
+	YcKmsKeyIdSetting  = "YC_CSE_KMS_KEY_ID"
+	YcSaKeyFileSetting = "YC_SERVICE_ACCOUNT_KEY_FILE"
 )
 
 var (
@@ -216,6 +219,10 @@ var (
 		// GS
 		"WALG_GS_PREFIX":                 true,
 		"GOOGLE_APPLICATION_CREDENTIALS": true,
+
+		// Yandex Cloud
+		YcSaKeyFileSetting: true,
+		YcKmsKeyIdSetting:  true,
 
 		// SH
 		"WALG_SSH_PREFIX":      true,
