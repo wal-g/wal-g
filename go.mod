@@ -55,6 +55,8 @@ require (
 	github.com/wal-g/storages v0.0.0-20201214053810-2f4f68a084d2
 	github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30
 	github.com/xdg/stringprep v1.0.1-0.20180714160509-73f8eece6fdc // indirect
+	github.com/yandex-cloud/go-genproto v0.0.0-20201102102956-0c505728b6f0
+	github.com/yandex-cloud/go-sdk v0.0.0-20201109103511-a86298d3fea5
 	go.mongodb.org/mongo-driver v1.3.4
 	golang.org/x/crypto v0.0.0-20200709230013-948cd5f35899
 	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5 // indirect

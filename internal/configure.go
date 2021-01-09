@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/wal-g/wal-g/internal/crypto/yckms"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -307,6 +308,10 @@ func ConfigureCrypter() crypto.Crypter {
 
 	if viper.IsSet(CseKmsIDSetting) {
 		return awskms.CrypterFromKeyID(viper.GetString(CseKmsIDSetting), viper.GetString(CseKmsRegionSetting))
+	}
+
+	if viper.IsSet(YcKmsKeyIdSetting) {
+		return yckms.YcCrypterFromKeyIdAndCredential(viper.GetString(YcKmsKeyIdSetting), viper.GetString(YcSaKeyFileSetting))
 	}
 
 	if crypter := configureLibsodiumCrypter(); crypter != nil {
