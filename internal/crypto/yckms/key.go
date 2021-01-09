@@ -38,8 +38,8 @@ func serializeEncryptedKey(encryptedKey []byte) []byte {
 		encrypted key ...
 	*/
 
-	encryptedKeyLen := make([]byte, 8)
-	binary.LittleEndian.PutUint64(encryptedKeyLen, uint64(len(encryptedKey)))
+	encryptedKeyLen := make([]byte, 4)
+	binary.LittleEndian.PutUint32(encryptedKeyLen, uint32(len(encryptedKey)))
 	result := append([]byte(magic), schemeVersion)
 	result = append(result, encryptedKeyLen...)
 
@@ -61,13 +61,13 @@ func deserializeEncryptedKey(r io.Reader) ([]byte, error) {
 		return nil, errors.New("YC KMS: scheme version is not supported")
 	}
 
-	encryptedKeyLenBytes := make([]byte, 8)
+	encryptedKeyLenBytes := make([]byte, 4)
 	_, err = r.Read(encryptedKeyLenBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	encryptedKeyLen := binary.LittleEndian.Uint64(encryptedKeyLenBytes)
+	encryptedKeyLen := binary.LittleEndian.Uint32(encryptedKeyLenBytes)
 	/*
 		Sanity check
 	*/

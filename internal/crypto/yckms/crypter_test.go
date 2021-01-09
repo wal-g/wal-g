@@ -54,7 +54,7 @@ func (m *mockedSymmetricKey) CreateKey() error {
 
 func MockedYcCrypter() crypto.Crypter {
 	return &YcCrypter{
-		SymmetricKey: &mockedSymmetricKey{
+		symmetricKey: &mockedSymmetricKey{
 			key:          nil,
 			encryptedKey: nil,
 		},
