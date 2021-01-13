@@ -8,3 +8,6 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    allow:
+      - dependency-name: "github.com/wal-g/tracelog"
+      - dependency-name: "github.com/wal-g/storages"
