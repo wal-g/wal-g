@@ -43,6 +43,18 @@ var deleteEverythingCmd = &cobra.Command{
 	Run:       runDeleteEverything,
 }
 
+const (
+	DeleteTargetUsageExample = "target"
+	DeleteTargetExamples = ""
+)
+
+var deleteTargetCmd = &cobra.Command{
+	Use:       DeleteTargetUsageExample, // TODO : improve description
+	Example:   DeleteTargetExamples,
+	Args:      cobra.ExactArgs(1),
+	Run:       runDeleteTarget,
+}
+
 type DeleteHandler struct {
 	*internal.DeleteHandler
 	permanentObjects map[string]bool
@@ -66,6 +78,29 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 
 	deleteHandler.DeleteEverything(confirmed)
 }
+func (h *DeleteHandler) deleteTarget(bobj internal.BackupObject, confirmed bool) error {
+	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath), confirmed, func(object storage.Object) bool {
+		return strings.HasPrefix(object.GetName(), strings.TrimSuffix(bobj.GetName(), utility.SentinelSuffix))
+	})
+}
+
+
+func runDeleteTarget(cmd *cobra.Command, args []string) {
+	deleteHandler, err := NewMySqlDeleteHandler()
+	tracelog.ErrorLogger.FatalOnError(err)
+	bname := args[0] // backup name
+
+	for e := range deleteHandler.permanentObjects {
+		if e == bname {
+			tracelog.InfoLogger.Fatalf("unable to delete permanent backup %s\n", bname)
+		}
+	}
+	if bobj, err := deleteHandler.FindTargetByName(bname); err != nil {
+		tracelog.ErrorLogger.FatalfOnError("unable to delete target backup", err)
+	} else if err := deleteHandler.deleteTarget(bobj, confirmed); err != nil {
+		tracelog.ErrorLogger.FatalfOnError("unable to delete target backup", err)
+	}
+}
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
 	deleteHandler, err := NewMySqlDeleteHandler()
@@ -83,7 +118,7 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 
 func init() {
 	cmd.AddCommand(deleteCmd)
-	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd)
+	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd, deleteTargetCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 
