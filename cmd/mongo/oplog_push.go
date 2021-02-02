@@ -53,7 +53,7 @@ func init() {
 
 func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplogPushStatsArgs) error {
 	// set up storage client
-
+	tracelog.DebugLogger.Printf("starting oplog archiving with arguments: %+v", pushArgs)
 	uplProvider, err := internal.ConfigureUploader()
 	if err != nil {
 		return err
@@ -67,6 +67,7 @@ func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplo
 		return err
 	}
 
+	tracelog.DebugLogger.Printf("starting archiving stats with arguments: %+v", statsArgs)
 	uploadStatsUpdater, err := configureUploadStatsUpdater(ctx, models.Timestamp{}, mongoClient, statsArgs)
 	if err != nil {
 		return err
@@ -76,6 +77,7 @@ func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplo
 		if !pushArgs.primaryWait {
 			return err
 		}
+		tracelog.InfoLogger.Printf("Archiving is waiting for mongodb to become a primary")
 		if err = client.WaitForBecomePrimary(ctx, mongoClient, pushArgs.primaryWaitTimeout); err != nil {
 			return err
 		}
@@ -105,7 +107,7 @@ func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplo
 	*/
 
 	memoryBatchBuffer := stages.NewMemoryBuffer()
-	defer tracelog.ErrorLogger.PrintError(memoryBatchBuffer.Close())
+	defer tracelog.ErrorLogger.PrintOnError(memoryBatchBuffer.Close())
 
 	// set up storage archiver
 	oplogApplier := stages.NewStorageApplier(uploader, memoryBatchBuffer, pushArgs.archiveAfterSize, pushArgs.archiveTimeout, uploadStatsUpdater)
@@ -140,12 +142,12 @@ func buildOplogPushRunArgs() (args oplogPushRunArgs, err error) {
 		return
 	}
 
-	primaryWait, err := internal.GetBoolSettingDefault(internal.OplogPushWaitForBecomePrimary, false)
+	args.primaryWait, err = internal.GetBoolSettingDefault(internal.OplogPushWaitForBecomePrimary, false)
 	if err != nil {
 		return
 	}
 
-	if primaryWait {
+	if args.primaryWait {
 		args.primaryWaitTimeout, err = internal.GetDurationSetting(internal.OplogPushPrimaryCheckInterval)
 		if err != nil {
 			return
@@ -157,57 +159,56 @@ func buildOplogPushRunArgs() (args oplogPushRunArgs, err error) {
 }
 
 type oplogPushStatsArgs struct {
-	Enabled        bool
-	UpdateInterval time.Duration
-	LogInterval    time.Duration
-	Options        []stats.OplogPushStatsOption
-	ExposeHTTP     bool
-	HTTPPrefix     string
+	enabled        bool
+	updateInterval time.Duration
+	logInterval    time.Duration
+	exposeHTTP     bool
+	httpPrefix     string
 }
 
 func buildOplogPushStatsArgs() (args oplogPushStatsArgs, err error) {
-	args.Enabled, err = internal.GetBoolSettingDefault(internal.OplogPushStatsEnabled, false)
-	if err != nil || !args.Enabled {
+	args.enabled, err = internal.GetBoolSettingDefault(internal.OplogPushStatsEnabled, false)
+	if err != nil || !args.enabled {
 		return
 	}
 
-	args.UpdateInterval, err = internal.GetDurationSetting(internal.OplogPushStatsUpdateInterval)
+	args.updateInterval, err = internal.GetDurationSetting(internal.OplogPushStatsUpdateInterval)
 	if err != nil {
 		return
 	}
 
-	args.LogInterval, err = internal.GetDurationSetting(internal.OplogPushStatsLoggingInterval)
+	args.logInterval, err = internal.GetDurationSetting(internal.OplogPushStatsLoggingInterval)
 	if err != nil {
 		return
 	}
 
-	args.ExposeHTTP, err = internal.GetBoolSettingDefault(internal.OplogPushStatsExposeHttp, false)
-	args.HTTPPrefix = stats.DefaultOplogPushStatsPrefix
+	args.exposeHTTP, err = internal.GetBoolSettingDefault(internal.OplogPushStatsExposeHttp, false)
+	args.httpPrefix = stats.DefaultOplogPushStatsPrefix
 
 	return
 }
 
 // configureUploadStatsUpdater starts statistics updates and exposes if configured
 func configureUploadStatsUpdater(ctx context.Context, sinceTS models.Timestamp, mongoClient client.MongoDriver, args oplogPushStatsArgs) (stats.OplogUploadStatsUpdater, error) {
-	if !args.Enabled {
+	if !args.enabled {
 		return nil, nil
 	}
 
 	var opts []stats.OplogPushStatsOption
-	if args.LogInterval > 0 {
-		opts = append(opts, stats.EnableLogReport(args.LogInterval, tracelog.InfoLogger.Printf))
+	if args.logInterval > 0 {
+		opts = append(opts, stats.EnableLogReport(args.logInterval, tracelog.InfoLogger.Printf))
 	}
 
-	if args.ExposeHTTP {
-		opts = append(opts, stats.EnableHTTPHandler(args.HTTPPrefix, webserver.DefaultWebServer))
+	if args.exposeHTTP {
+		opts = append(opts, stats.EnableHTTPHandler(args.httpPrefix, webserver.DefaultWebServer))
 	}
 
 	uploadStats := stats.NewOplogUploadStats(sinceTS)
-	archivingStats := stats.NewOplogPushStats(uploadStats, mongoClient, args.Options...)
+	archivingStats := stats.NewOplogPushStats(ctx, uploadStats, mongoClient, opts...)
 	if err := archivingStats.Update(); err != nil {
 		return nil, err
 	}
-	go stats.RefreshWithInterval(ctx, args.UpdateInterval, archivingStats, tracelog.WarningLogger.Printf)
+	go stats.RefreshWithInterval(ctx, args.updateInterval, archivingStats, tracelog.WarningLogger.Printf)
 
 	return uploadStats, nil
 }

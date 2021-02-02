@@ -9,7 +9,7 @@ import (
 
 // HandleOplogPush starts oplog archiving process: fetch, validate, upload to storage.
 func HandleOplogPush(ctx context.Context, fetcher stages.Fetcher, applier stages.Applier) error {
-	errgrp := errgroup.Group{}
+	errgrp, ctx := errgroup.WithContext(ctx)
 	var errs []<-chan error
 
 	oplogc, errc, err := fetcher.Fetch(ctx)
