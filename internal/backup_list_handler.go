@@ -28,8 +28,12 @@ type Logging struct {
 }
 
 func DefaultHandleBackupList(folder storage.Folder) {
+	DefaultHandleBackupListWithTarget(folder, utility.BaseBackupPath)
+}
+
+func DefaultHandleBackupListWithTarget(folder storage.Folder, targetPath string) {
 	getBackupsFunc := func() ([]BackupTime, error) {
-		return GetBackups(folder)
+		return GetBackupsWithTarget(folder, targetPath)
 	}
 	writeBackupListFunc := func(backups []BackupTime) {
 		WriteBackupList(backups, os.Stdout)
@@ -57,9 +61,13 @@ func HandleBackupList(
 	writeBackupListFunc(backups)
 }
 
-// TODO : unit tests
 func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, detail bool) {
-	backups, err := GetBackups(folder)
+	HandleBackupListWithFlagsAndTarget(folder, pretty, json, detail, utility.BaseBackupPath)
+}
+
+// TODO : unit tests
+func HandleBackupListWithFlagsAndTarget(folder storage.Folder, pretty bool, json bool, detail bool, targetPath string) {
+	backups, err := GetBackupsWithTarget(folder, targetPath)
 	if len(backups) == 0 {
 		tracelog.InfoLogger.Println("No backups found")
 		return
@@ -90,9 +98,13 @@ func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, de
 }
 
 func GetBackupsDetails(folder storage.Folder, backups []BackupTime) ([]BackupDetail, error) {
+	return GetBackupsDetailsWithTarget(folder, backups, utility.BaseBackupPath)
+}
+
+func GetBackupsDetailsWithTarget(folder storage.Folder, backups []BackupTime, targetPath string) ([]BackupDetail, error) {
 	backupsDetails := make([]BackupDetail, 0, len(backups))
 	for i := len(backups) - 1; i >= 0; i-- {
-		details, err := GetBackupDetails(folder, backups[i])
+		details, err := GetBackupDetailsWithTarget(folder, backups[i], targetPath)
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +114,11 @@ func GetBackupsDetails(folder storage.Folder, backups []BackupTime) ([]BackupDet
 }
 
 func GetBackupDetails(folder storage.Folder, backupTime BackupTime) (BackupDetail, error) {
-	backup, err := GetBackupByName(backupTime.BackupName, utility.BaseBackupPath, folder)
+	return GetBackupDetailsWithTarget(folder, backupTime, utility.BaseBackupPath)
+}
+
+func GetBackupDetailsWithTarget(folder storage.Folder, backupTime BackupTime, targetPath string) (BackupDetail, error) {
+	backup, err := GetBackupByName(backupTime.BackupName, targetPath, folder)
 	if err != nil {
 		return BackupDetail{}, err
 	}
