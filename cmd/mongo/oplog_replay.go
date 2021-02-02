@@ -6,6 +6,8 @@ import (
 	"os"
 	"syscall"
 
+	"time"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -31,49 +33,82 @@ var oplogReplayCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		// resolve archiving settings
-		since, err := models.TimestampFromStr(args[0])
-		if err != nil {
-			return
-		}
-		until, err := models.TimestampFromStr(args[1])
+		replayArgs, err := buildOplogReplayRunArgs(args)
 		if err != nil {
 			return
 		}
 
-		// TODO: fix ugly config
-		ignoreErrCodes := make(map[string][]int32)
-		if ignoreErrCodesStr, ok := internal.GetSetting(internal.OplogReplayIgnoreErrorCodes); ok {
-			if err = json.Unmarshal([]byte(ignoreErrCodesStr), &ignoreErrCodes); err != nil {
-				return
-			}
-		}
-
-		mongodbUrl, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
-		if err != nil {
-			return
-		}
-
-		var mongoClientArgs []client.Option
-		oplogAlwaysUpsert, hasOplogAlwaysUpsert, err := internal.GetBoolSetting(internal.OplogReplayOplogAlwaysUpsert)
-		if err != nil {
-			return
-		}
-		if hasOplogAlwaysUpsert {
-			mongoClientArgs = append(mongoClientArgs, client.OplogAlwaysUpsert(oplogAlwaysUpsert))
-		}
-
-		if oplogApplicationMode, hasOplogApplicationMode := internal.GetSetting(internal.OplogReplayOplogApplicationMode); hasOplogApplicationMode {
-			mongoClientArgs = append(mongoClientArgs, client.OplogApplicationMode(client.OplogAppMode(oplogApplicationMode)))
-		}
-
-		err = runOplogReplay(ctx, since, until, mongodbUrl, mongoClientArgs, ignoreErrCodes)
+		err = runOplogReplay(ctx, replayArgs)
 	},
 }
 
-func runOplogReplay(ctx context.Context, since, until models.Timestamp, mongodbUrl string, mongoClientArgs []client.Option, ignoreErrCodes map[string][]int32) error {
+type oplogReplayRunArgs struct {
+	since models.Timestamp
+	until models.Timestamp
+
+	ignoreErrCodes map[string][]int32
+	mongodbUrl     string
+
+	oplogAlwaysUpsert    *bool
+	oplogApplicationMode *string
+
+	primaryWait        bool
+	primaryWaitTimeout time.Duration
+	lwUpdate           time.Duration
+}
+
+func buildOplogReplayRunArgs(cmdargs []string) (args oplogReplayRunArgs, err error) {
+	// resolve archiving settings
+	args.since, err = models.TimestampFromStr(cmdargs[0])
+	if err != nil {
+		return
+	}
+	args.until, err = models.TimestampFromStr(cmdargs[1])
+	if err != nil {
+		return
+	}
+
+	// TODO: fix ugly config
+	if ignoreErrCodesStr, ok := internal.GetSetting(internal.OplogReplayIgnoreErrorCodes); ok {
+		if err = json.Unmarshal([]byte(ignoreErrCodesStr), &args.ignoreErrCodes); err != nil {
+			return
+		}
+	}
+
+	args.mongodbUrl, err = internal.GetRequiredSetting(internal.MongoDBUriSetting)
+	if err != nil {
+		return
+	}
+
+	oplogAlwaysUpsert, hasOplogAlwaysUpsert, err := internal.GetBoolSetting(internal.OplogReplayOplogAlwaysUpsert)
+	if err != nil {
+		return
+	}
+	if hasOplogAlwaysUpsert {
+		args.oplogAlwaysUpsert = &oplogAlwaysUpsert
+	}
+
+	if oplogApplicationMode, hasOplogApplicationMode := internal.GetSetting(internal.OplogReplayOplogApplicationMode); hasOplogApplicationMode {
+		args.oplogApplicationMode = &oplogApplicationMode
+	}
+
+	return
+}
+
+func runOplogReplay(ctx context.Context, replayArgs oplogReplayRunArgs) error {
+	tracelog.DebugLogger.Printf("starting replay with arguments: %+v", replayArgs)
+
 	// set up mongodb client and oplog applier
-	mongoClient, err := client.NewMongoClient(ctx, mongodbUrl, mongoClientArgs...)
+	var mongoClientArgs []client.Option
+	if replayArgs.oplogAlwaysUpsert != nil {
+		mongoClientArgs = append(mongoClientArgs, client.OplogAlwaysUpsert(*replayArgs.oplogAlwaysUpsert))
+	}
+
+	if replayArgs.oplogApplicationMode != nil {
+		mongoClientArgs = append(mongoClientArgs, client.OplogApplicationMode(client.OplogAppMode(*replayArgs.oplogApplicationMode)))
+	}
+
+	mongoClient, err := client.NewMongoClient(ctx, replayArgs.mongodbUrl, mongoClientArgs...)
 	if err != nil {
 		return err
 	}
@@ -82,7 +117,7 @@ func runOplogReplay(ctx context.Context, since, until models.Timestamp, mongodbU
 		return err
 	}
 
-	dbApplier := oplog.NewDBApplier(mongoClient, false, ignoreErrCodes)
+	dbApplier := oplog.NewDBApplier(mongoClient, false, replayArgs.ignoreErrCodes)
 	oplogApplier := stages.NewGenericApplier(dbApplier)
 
 	// set up storage downloader client
@@ -95,7 +130,7 @@ func runOplogReplay(ctx context.Context, since, until models.Timestamp, mongodbU
 	if err != nil {
 		return err
 	}
-	path, err := archive.SequenceBetweenTS(archives, since, until)
+	path, err := archive.SequenceBetweenTS(archives, replayArgs.since, replayArgs.until)
 	if err != nil {
 		return err
 	}
@@ -104,7 +139,7 @@ func runOplogReplay(ctx context.Context, since, until models.Timestamp, mongodbU
 	oplogFetcher := stages.NewStorageFetcher(downloader, path)
 
 	// run worker cycle
-	return mongo.HandleOplogReplay(ctx, since, until, oplogFetcher, oplogApplier)
+	return mongo.HandleOplogReplay(ctx, replayArgs.since, replayArgs.until, oplogFetcher, oplogApplier)
 }
 
 func init() {

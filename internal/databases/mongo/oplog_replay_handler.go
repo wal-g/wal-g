@@ -10,7 +10,7 @@ import (
 
 // HandleOplogReplay starts oplog replay process: download from storage and apply to mongodb
 func HandleOplogReplay(ctx context.Context, since, until models.Timestamp, fetcher stages.BetweenFetcher, applier stages.Applier) error {
-	errgrp := errgroup.Group{}
+	errgrp, ctx := errgroup.WithContext(ctx)
 	var errs []<-chan error
 
 	oplogc, errc, err := fetcher.FetchBetween(ctx, since, until)
