@@ -9,7 +9,7 @@ on:
 jobs:
   unittest:
     name: all_unittests
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Install deps
         run: sudo apt-get install liblzo2-dev

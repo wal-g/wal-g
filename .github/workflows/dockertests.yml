@@ -19,7 +19,7 @@ env:
 jobs:
   buildimages:
     name: Build images
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-20.04
     steps:
       #  use cache to pass docker images to the test jobs
       - name: Docker images caching
