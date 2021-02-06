@@ -21,7 +21,7 @@ RUN apt-get update -qq && \
     apt-key update && \
     apt-get download --allow-unauthenticated mongodb-org-server=$MONGO_VERSION && \
     dpkg --unpack mongodb-org-server*.deb && \
-    sed -i '/systemctl daemon-reload/d' /var/lib/dpkg/info/mongodb-org-server.postinst && \
+    sed -i 's/systemctl daemon-reload/echo "SKIPPED: systemctl daemon-reload"/' /var/lib/dpkg/info/mongodb-org-server.postinst && \
     dpkg --configure mongodb-org-server && \
     apt-get install -yf && \
     apt-get install --allow-unauthenticated -y \

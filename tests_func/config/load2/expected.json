@@ -2,17 +2,19 @@
   "commands": {
     "succeeded": {
       "createIndexes": 3,
+      "drop": 2,
       "dropIndexes": 1,
       "renameCollection": 2,
-      "insert": 2,
-      "create": 1
+      "insert": 3,
+      "create": 3
     },
     "failed": {},
     "docs": {
       "createIndexes": 0,
+      "drop": 0,
       "dropIndexes": 0,
       "renameCollection": 0,
-      "insert": 2,
+      "insert": 3,
       "create": 0
     },
     "errors": {}
