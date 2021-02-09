@@ -223,7 +223,7 @@ func (idx *Index) GetBlockList(ltype string) *XBlockListOut {
 			}
 		}
 		sort.Slice(bl.UncommittedBlocks.Blocks, func(i, j int) bool {
-			return bl.UncommittedBlocks.Blocks[i].Name < bl.UncommittedBlocks.Blocks[i].Name
+			return bl.UncommittedBlocks.Blocks[i].Name < bl.UncommittedBlocks.Blocks[j].Name
 		})
 	}
 	return &bl
