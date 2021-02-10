@@ -92,12 +92,12 @@ func (writer *Writer) writeNextChunk(last bool) (err error) {
 	C.crypto_secretstream_xchacha20poly1305_push(
 		&writer.state,
 		(*C.uchar)(&writer.out[0]),
-		(*C.ulonglong)(&outLen),
+		&outLen,
 		(*C.uchar)(&writer.in[0]),
 		(C.ulonglong)(writer.inIdx),
 		(*C.uchar)(C.NULL),
 		(C.ulonglong)(0),
-		(C.uchar)(tag),
+		tag,
 	)
 
 	if _, err = writer.Writer.Write(writer.out[:int(outLen)]); err != nil {

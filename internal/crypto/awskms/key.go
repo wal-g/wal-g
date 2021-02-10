@@ -45,7 +45,12 @@ func (symmetricKey *SymmetricKey) Encrypt() error {
 		kmsConfig = kmsConfig.WithRegion(symmetricKey.Region)
 	}
 
-	svc := kms.New(session.New(), kmsConfig)
+	kmsSession, err := session.NewSession()
+	if err != nil {
+		return err
+	}
+
+	svc := kms.New(kmsSession, kmsConfig)
 
 	symmetricKey.mutex.RLock()
 	input := &kms.EncryptInput{
@@ -73,7 +78,12 @@ func (symmetricKey *SymmetricKey) Decrypt() error {
 		kmsConfig = kmsConfig.WithRegion(symmetricKey.Region)
 	}
 
-	svc := kms.New(session.New(), kmsConfig)
+	kmsSession, err := session.NewSession()
+	if err != nil {
+		return err
+	}
+
+	svc := kms.New(kmsSession, kmsConfig)
 
 	symmetricKey.mutex.RLock()
 	input := &kms.DecryptInput{
