@@ -1,0 +1,87 @@
+# This file contains all available configuration options
+# with their default values.
+
+# all available settings of specific linters
+linters-settings:
+  dupl:
+    threshold: 110
+  funlen:
+    lines: 100
+    statements: 50
+  gocritic:
+    enabled-tags:
+      - performance
+    disabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - style
+    settings:
+      hugeParam:
+        sizeThreshold: 170 # temporary, default is 80
+  gocyclo:
+    min-complexity: 15
+  govet:
+    check-shadowing: false
+  misspell:
+    locale: US
+
+linters:
+  # please, do not use `enable-all`: it's deprecated and will be removed soon.
+  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
+  disable-all: true
+  enable:
+    - bodyclose
+    - dupl
+    - errcheck
+    - funlen
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - govet
+    - ineffassign
+    - interfacer
+    - misspell
+    - nakedret
+    - scopelint
+    - staticcheck
+    - structcheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+  # temporarily disabled
+  #  - golint
+  #  - lll
+  #  - godox
+  #  - deadcode
+  #  - stylecheck
+  #  - gosimple
+  #  - whitespace
+  # don't enable:
+  # - gosec
+  # - gochecknoinits
+  # - asciicheck
+  # - gochecknoglobals
+  # - gocognit
+  # - godot
+  # - goerr113
+  # - maligned
+  # - nestif
+  # - prealloc
+  # - testpackage
+  # - wsl
+  # - depguard
+
+run:
+  skip-dirs:
+    - "cmd/redis"
+    - "internal/databases/redis"
+    - "tests_func"
+    - "tmp"
+    - "submodules"
+    - "testtools"
+  skip-files:
+    - ".*_test.go$"
