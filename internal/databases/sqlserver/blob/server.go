@@ -92,7 +92,7 @@ func (bs *Server) WaitReady(ctx context.Context, timeout time.Duration) error {
 		case <-t.C:
 			resp, _ := c.Head(url)
 			if resp != nil {
-				return nil
+				return resp.Body.Close()
 			}
 		case <-sctx.Done():
 			return fmt.Errorf("proxy not ready in %s", timeout)
@@ -263,7 +263,7 @@ func (bs *Server) HandleReleaseLease(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (bs *Server) checkLease(w http.ResponseWriter, req *http.Request, folder storage.Folder) error {
+func (bs *Server) checkLease(req *http.Request, folder storage.Folder) error {
 	lease, ok := bs.leases[folder.GetPath()]
 	if ok && lease.End.After(time.Now()) {
 		if lease.ID != req.Header.Get("X-Ms-Lease-Id") {
@@ -312,7 +312,7 @@ func (bs *Server) HandleBlockPut(w http.ResponseWriter, req *http.Request) {
 		bs.returnError(w, req, err)
 		return
 	}
-	if err := bs.checkLease(w, req, folder); err != nil {
+	if err := bs.checkLease(req, folder); err != nil {
 		bs.returnError(w, req, err)
 		return
 	}
@@ -358,7 +358,7 @@ func (bs *Server) HandleBlockListPut(w http.ResponseWriter, req *http.Request) {
 		bs.returnError(w, req, err)
 		return
 	}
-	if err := bs.checkLease(w, req, folder); err != nil {
+	if err := bs.checkLease(req, folder); err != nil {
 		bs.returnError(w, req, err)
 		return
 	}
@@ -406,7 +406,9 @@ func (bs *Server) HandleBlockListGet(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	w.Write(data)
+	if _, err = w.Write(data); err != nil {
+		bs.returnError(w, req, err)
+	}
 }
 
 // Index operations
@@ -444,7 +446,7 @@ func (bs *Server) HandleBlobGet(w http.ResponseWriter, req *http.Request) {
 		bs.returnError(w, req, err)
 		return
 	}
-	if err := bs.checkLease(w, req, folder); err != nil {
+	if err := bs.checkLease(req, folder); err != nil {
 		bs.returnError(w, req, err)
 		return
 	}
@@ -498,7 +500,7 @@ func (bs *Server) HandleBlobPut(w http.ResponseWriter, req *http.Request) {
 		bs.returnError(w, req, err)
 		return
 	}
-	if err := bs.checkLease(w, req, folder); err != nil {
+	if err := bs.checkLease(req, folder); err != nil {
 		bs.returnError(w, req, err)
 		return
 	}
@@ -534,7 +536,7 @@ func (bs *Server) HandleBlobPut(w http.ResponseWriter, req *http.Request) {
 
 func (bs *Server) HandleBlobDelete(w http.ResponseWriter, req *http.Request) {
 	folder := bs.getBlobFolder(req.URL.Path)
-	if err := bs.checkLease(w, req, folder); err != nil {
+	if err := bs.checkLease(req, folder); err != nil {
 		bs.returnError(w, req, err)
 		return
 	}

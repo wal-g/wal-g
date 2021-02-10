@@ -3,6 +3,7 @@ package sqlserver
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -13,6 +14,9 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
 	"github.com/wal-g/wal-g/utility"
 )
+
+const DatabaseBackupItem = "DATABASE"
+const LogBackupItem = "LOG"
 
 func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -59,7 +63,7 @@ func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 	baseUrl := getDatabaseBackupUrl(backupName)
 
 	err = runParallel(func(dbname string) error {
-		return backupSingleDatabase(ctx, db, baseUrl, dbname, compression)
+		return backupSingleItem(DatabaseBackupItem, ctx, db, baseUrl, dbname, compression)
 	}, dbnames)
 	tracelog.ErrorLogger.FatalfOnError("overall backup failed: %v", err)
 
@@ -71,19 +75,24 @@ func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 	tracelog.InfoLogger.Printf("backup finished")
 }
 
-func backupSingleDatabase(ctx context.Context, db *sql.DB, baseUrl string, dbname string, compression bool) error {
+func backupSingleItem(itemName string, ctx context.Context, db *sql.DB,
+	baseUrl string, dbname string, compression bool) error {
+	if itemName != DatabaseBackupItem && itemName != LogBackupItem {
+		return errors.New("unknown backup item")
+	}
+
 	backupUrl := fmt.Sprintf("%s/%s", baseUrl, url.QueryEscape(dbname))
-	sql := fmt.Sprintf("BACKUP DATABASE %s TO URL = '%s' WITH FORMAT", quoteName(dbname), backupUrl)
+	sql := fmt.Sprintf("BACKUP %s %s TO URL = '%s' WITH FORMAT", itemName, quoteName(dbname), backupUrl)
 	if compression {
 		sql += ", COMPRESSION"
 	}
-	tracelog.InfoLogger.Printf("starting backup database [%s] to %s", dbname, backupUrl)
+	tracelog.InfoLogger.Printf("starting backup database [%s] %s to %s", dbname, itemName, backupUrl)
 	tracelog.DebugLogger.Printf("SQL: %s", sql)
 	_, err := db.ExecContext(ctx, sql)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("database [%s] backup failed: %#v", dbname, err)
+		tracelog.ErrorLogger.Printf("database [%s] %s backup failed: %#v", dbname, itemName, err)
 	} else {
-		tracelog.InfoLogger.Printf("database [%s] backup successfully finished", dbname)
+		tracelog.InfoLogger.Printf("database [%s] %s backup successfully finished", dbname, itemName)
 	}
 	return err
 }
