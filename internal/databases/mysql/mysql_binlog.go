@@ -94,11 +94,11 @@ func (bl *BinlogReader) saveMagicAndHeaderEvent() error {
 	return err
 }
 
-func (bl *BinlogReader) readMagicAndHeaderEvent(buf []byte) (int, error) {
+func (bl *BinlogReader) readMagicAndHeaderEvent(buf []byte) int {
 	limit := minInt(len(bl.headerBuf), len(buf))
 	copy(buf, bl.headerBuf[:limit])
 	bl.headerBuf = bl.headerBuf[limit:]
-	return limit, nil
+	return limit
 }
 
 func (bl *BinlogReader) readEvent(buf []byte) (int, error) {
@@ -124,10 +124,10 @@ func (bl *BinlogReader) Read(buf []byte) (int, error) {
 	for offset < blen {
 		// pass magic and header event to client with first appropriate event
 		if bl.intervalEntered && len(bl.headerBuf) > 0 {
-			read, err := bl.readMagicAndHeaderEvent(buf[offset:])
+			read := bl.readMagicAndHeaderEvent(buf[offset:])
 			offset += read
-			if err != nil || len(bl.headerBuf) > 0 {
-				return offset, err
+			if len(bl.headerBuf) > 0 {
+				return offset, nil
 			}
 		}
 		// pass next event to client

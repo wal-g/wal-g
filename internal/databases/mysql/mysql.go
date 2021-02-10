@@ -86,6 +86,9 @@ func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
 
 func getMySQLConnection() (*sql.DB, error) {
 	datasourceName, err := internal.GetRequiredSetting(internal.MysqlDatasourceNameSetting)
+	if err != nil {
+		return nil, err
+	}
 	db, err := getMySqlConnectionFromDatasource(datasourceName)
 	if err != nil {
 		fallbackDatasourceName := replaceHostInDatasourceName(datasourceName, "localhost")
@@ -154,7 +157,7 @@ type StreamSentinelDto struct {
 	StopLocalTime  time.Time `json:"StopLocalTime,omitempty"`
 }
 
-func (s StreamSentinelDto) String() string {
+func (s *StreamSentinelDto) String() string {
 	b, err := json.Marshal(s)
 	if err != nil {
 		return "-"

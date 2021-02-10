@@ -6,6 +6,8 @@ import (
 	"path"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -49,8 +51,9 @@ func (rh *replayHandler) replayLog(binlogPath string) error {
 		return err
 	}
 	env := os.Environ()
-	env = append(env, fmt.Sprintf("%s=%s", "WALG_MYSQL_CURRENT_BINLOG", binlogPath))
-	env = append(env, fmt.Sprintf("%s=%s", "WALG_MYSQL_BINLOG_END_TS", rh.endTs))
+	env = append(env,
+		fmt.Sprintf("%s=%s", "WALG_MYSQL_CURRENT_BINLOG", binlogPath),
+		fmt.Sprintf("%s=%s", "WALG_MYSQL_BINLOG_END_TS", rh.endTs))
 	cmd.Env = env
 	return cmd.Run()
 }
@@ -70,16 +73,10 @@ func (rh *replayHandler) handleBinlog(binlogPath string) error {
 }
 
 func HandleBinlogReplay(folder storage.Folder, backupName string, untilTs string) {
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
-	tracelog.ErrorLogger.FatalfOnError("Unable to get backup %v", err)
-
-	startTs, err := getBinlogSinceTs(folder, backup)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	endTs, err := utility.ParseUntilTs(untilTs)
-	tracelog.ErrorLogger.FatalOnError(err)
-
 	dstDir, err := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	startTs, endTs, err := getTimestamps(folder, backupName, untilTs)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	handler := newReplayHandler(endTs)
@@ -90,4 +87,22 @@ func HandleBinlogReplay(folder storage.Folder, backupName string, untilTs string
 
 	err = handler.wait()
 	tracelog.ErrorLogger.FatalfOnError("Failed to apply binlogs: %v", err)
+}
+
+func getTimestamps(folder storage.Folder, backupName, untilTs string) (time.Time, time.Time, error) {
+	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	if err != nil {
+		return time.Time{}, time.Time{}, errors.Wrap(err, "Unable to get backup")
+	}
+
+	startTs, err := getBinlogSinceTs(folder, backup)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+
+	endTs, err := utility.ParseUntilTs(untilTs)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	return startTs, endTs, nil
 }
