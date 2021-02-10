@@ -87,7 +87,7 @@ func (tlh TimeLineHistFile) LSNToTimeLine(lsn pglogrepl.LSN) (uint32, error) {
 	})
 	for _, row := range rows {
 		if lsn < row.StartLSN {
-			return uint32(row.TimeLineID), nil
+			return row.TimeLineID, nil
 		}
 	}
 	return tlh.TimeLineID, nil

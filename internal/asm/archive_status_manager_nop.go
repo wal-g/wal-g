@@ -1,10 +1,6 @@
 package asm
 
-import "github.com/wal-g/wal-g/internal/fsutil"
-
-type NopASM struct {
-	folder fsutil.DataFolder
-}
+type NopASM struct{}
 
 func NewNopASM() ArchiveStatusManager {
 	return NopASM{}

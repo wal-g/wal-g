@@ -72,7 +72,7 @@ func calculateSum(checksum, value uint32) uint32 {
 // The checksum includes the block number (to detect the case where a page is
 // somehow moved to a different location), the page header (excluding the
 // checksum itself), and the page data.
-func pgChecksumPage(blockNo uint32, pageBytes [DatabasePageSize]byte) (uint16, error) {
+func pgChecksumPage(blockNo uint32, pageBytes *PgDatabasePage) uint16 {
 	// Set pd_checksum to zero, so that the checksum calculation
 	// isn't affected by the checksum stored on the page.
 	for i := PdChecksumOffset; i < PdChecksumOffset+PdChecksumLen; i++ {
@@ -85,14 +85,14 @@ func pgChecksumPage(blockNo uint32, pageBytes [DatabasePageSize]byte) (uint16, e
 
 	// Reduce to a uint16 (to fit in the pd_checksum field) with an offset of
 	// one. That avoids checksums of zero, which seems like a good idea.
-	return uint16((checksum % 65535) + 1), nil
+	return uint16((checksum % 65535) + 1)
 }
 
 // Block checksum algorithm. The page must be adequately aligned (at least on 4-byte boundary).
-func pgChecksumBlock(page [DatabasePageSize]byte) uint32 {
+func pgChecksumBlock(page *PgDatabasePage) uint32 {
 	// Initialize partial checksums to their corresponding offsets
 	sums := checksumBaseOffsets
-	var pageForChecksum = *(*PgChecksummablePage)(unsafe.Pointer(&page))
+	var pageForChecksum = *(*PgChecksummablePage)(unsafe.Pointer(page))
 	hashIterationsCount := DatabasePageSize / int64(NSums*sizeofInt32)
 
 	// main checksum calculation
@@ -127,7 +127,7 @@ func pgChecksumBlock(page [DatabasePageSize]byte) uint32 {
 // checking pages before they are loaded into buffer pool.
 //
 // see:  src/backend/storage/page/bufpage.info
-func isPageCorrupted(path string, blockNo uint32, page PgDatabasePage) (bool, error) {
+func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage) (bool, error) {
 	pageHeader, err := parsePostgresPageHeader(bytes.NewReader(page[:]))
 	if err != nil {
 		return false, err
@@ -149,7 +149,7 @@ func isPageCorrupted(path string, blockNo uint32, page PgDatabasePage) (bool, er
 		return false, nil
 	}
 
-	// calculating blkno needs to be aboslute so that subsequent segment files
+	// calculating blkno needs to be absolute so that subsequent segment files
 	// have the blkno calculated based on all segment files and not relative to
 	// the current segment file. see: https://goo.gl/qRTn46
 
@@ -163,10 +163,7 @@ func isPageCorrupted(path string, blockNo uint32, page PgDatabasePage) (bool, er
 	// into account any previous segment files.
 	segmentBlockOffset := uint32(relFileId * BlocksInRelFile)
 
-	checksum, err := pgChecksumPage(segmentBlockOffset+blockNo, page)
-	if err != nil {
-		return false, err
-	}
+	checksum := pgChecksumPage(segmentBlockOffset+blockNo, page)
 
 	corrupted := checksum != pageHeader.pdChecksum
 	if corrupted {
@@ -237,5 +234,5 @@ func verifySinglePage(path string, blockNo uint32, pageBlocks io.Reader) (bool, 
 	if err != nil {
 		return false, err
 	}
-	return isPageCorrupted(path, blockNo, page)
+	return isPageCorrupted(path, blockNo, &page)
 }

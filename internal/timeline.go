@@ -180,7 +180,7 @@ func GetNextWalFilename(name string) (string, error) {
 		return "", err
 	}
 	logSegNo++
-	return formatWALFileName(uint32(timelineId), logSegNo), nil
+	return formatWALFileName(timelineId, logSegNo), nil
 }
 
 func shouldPrefault(name string) (lsn uint64, shouldPrefault bool, timelineId uint32, err error) {

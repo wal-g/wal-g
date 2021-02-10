@@ -291,7 +291,7 @@ func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnw
 		tarToExtract := newStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
 		tarsToExtract = append(tarsToExtract, tarToExtract)
 	}
-	return
+	return tarsToExtract, pgControlKey, nil
 }
 
 func (backup *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error) {

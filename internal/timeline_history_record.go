@@ -71,6 +71,9 @@ func createTimelineSwitchMap(startTimeline uint32, walFolder storage.Folder) (ma
 		// return empty map if not found any history
 		return timeLineHistoryMap, nil
 	}
+	if err != nil {
+		return nil, err
+	}
 	// store records in a map for fast lookup by wal segment number
 	for _, record := range historyRecords {
 		walSegmentNo := newWalSegmentNo(record.lsn)

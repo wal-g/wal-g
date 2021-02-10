@@ -108,8 +108,9 @@ func newRelFileStatistics(conn *pgx.Conn) (RelFileStatistics, error) {
 	result := make(map[walparser.RelFileNode]PgRelationStat)
 	// CollectStatistics collects statistics for each relFileNode
 	for _, db := range databases {
+		dbName := db.name
 		databaseOption := func(c *pgx.ConnConfig) error {
-			c.Database = db.name
+			c.Database = dbName
 			return nil
 		}
 		dbConn, err := Connect(databaseOption)
@@ -122,7 +123,7 @@ func newRelFileStatistics(conn *pgx.Conn) (RelFileStatistics, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "CollectStatistics: Failed to build query runner.")
 		}
-		pgStatRows, err := queryRunner.getStatistics(&db)
+		pgStatRows, err := queryRunner.getStatistics(db)
 		if err != nil {
 			return nil, errors.Wrap(err, "CollectStatistics: Failed to collect statistics.")
 		}

@@ -76,7 +76,7 @@ func getMarkedPermanentBackupMetadata(baseBackupFolder storage.Folder, backupNam
 	// only return backups that we want to update
 	if !meta.IsPermanent {
 		meta.IsPermanent = true
-		metadataUploadObject, err := GetMetadataUploadObject(backup.Name, meta)
+		metadataUploadObject, err := GetMetadataUploadObject(backup.Name, &meta)
 		if err != nil {
 			return nil, err
 		}
@@ -125,7 +125,7 @@ func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string
 	}
 
 	meta.IsPermanent = false
-	metadataUploadObject, err := GetMetadataUploadObject(backup.Name, meta)
+	metadataUploadObject, err := GetMetadataUploadObject(backup.Name, &meta)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func getMetadataFromBackup(baseBackupFolder storage.Folder, backupName string) (
 	return *sentinel.IncrementFrom, true, nil
 }
 
-func GetMetadataUploadObject(backupName string, meta ExtendedMetadataDto) (UploadObject, error) {
+func GetMetadataUploadObject(backupName string, meta *ExtendedMetadataDto) (UploadObject, error) {
 	metaFilePath := storage.JoinPath(backupName, utility.MetadataFileName)
 	dtoBody, err := json.Marshal(meta)
 	if err != nil {

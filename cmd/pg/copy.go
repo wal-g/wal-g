@@ -54,8 +54,8 @@ func init() {
 	backupCopyCmd.Flags().StringVarP(&fromConfigFile, fromFlag, fromShorthand, "", fromDescription)
 	backupCopyCmd.Flags().BoolVarP(&withoutHistory, withoutHistoryFlag, withoutHistoryShorthand, false, withoutHistoryDescription)
 
-	backupCopyCmd.MarkFlagFilename(toConfigFile)
-	backupCopyCmd.MarkFlagFilename(fromConfigFile)
-	backupCopyCmd.MarkFlagRequired(toConfigFile)
-	backupCopyCmd.MarkFlagRequired(fromConfigFile)
+	_ = backupCopyCmd.MarkFlagFilename(toConfigFile)
+	_ = backupCopyCmd.MarkFlagFilename(fromConfigFile)
+	_ = backupCopyCmd.MarkFlagRequired(toConfigFile)
+	_ = backupCopyCmd.MarkFlagRequired(fromConfigFile)
 }

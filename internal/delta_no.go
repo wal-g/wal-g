@@ -19,12 +19,6 @@ func newDeltaNoFromFilename(filename string) (DeltaNo, error) {
 	return DeltaNo(no), err
 }
 
-func newDeltaNoFromFilenameNoError(filename string) DeltaNo {
-	filename = strings.TrimSuffix(filename, DeltaFilenameSuffix)
-	_, no, _ := ParseWALFilename(filename)
-	return DeltaNo(no)
-}
-
 func (deltaNo DeltaNo) next() DeltaNo {
 	return deltaNo.add(1)
 }

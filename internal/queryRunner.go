@@ -235,7 +235,7 @@ func (queryRunner *PgQueryRunner) BuildStatisticsQuery() (string, error) {
 }
 
 // getStatistics queries the relations statistics from database
-func (queryRunner *PgQueryRunner) getStatistics(dbInfo *PgDatabaseInfo) (map[walparser.RelFileNode]PgRelationStat, error) {
+func (queryRunner *PgQueryRunner) getStatistics(dbInfo PgDatabaseInfo) (map[walparser.RelFileNode]PgRelationStat, error) {
 	tracelog.InfoLogger.Println("Querying pg_stat_all_tables")
 	getStatQuery, err := queryRunner.BuildStatisticsQuery()
 	conn := queryRunner.connection

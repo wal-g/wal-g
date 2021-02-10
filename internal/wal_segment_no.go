@@ -15,11 +15,6 @@ func newWalSegmentNoFromFilename(filename string) (WalSegmentNo, error) {
 	return WalSegmentNo(no), err
 }
 
-func newWalSegmentNoFromFilenameNoError(filename string) WalSegmentNo {
-	_, no, _ := ParseWALFilename(filename)
-	return WalSegmentNo(no)
-}
-
 func (walSegmentNo WalSegmentNo) next() WalSegmentNo {
 	return walSegmentNo.add(1)
 }

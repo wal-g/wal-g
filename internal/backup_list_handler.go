@@ -168,8 +168,9 @@ func writePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer
 	writer.SetOutputMirror(output)
 	defer writer.Render()
 	writer.AppendHeader(table.Row{"#", "Name", "Last modified", "WAL segment backup start", "Start time", "Finish time", "Hostname", "Datadir", "PG Version", "Start LSN", "Finish LSN", "Permanent"})
-	for i, b := range backupDetails {
-		writer.AppendRow(table.Row{i, b.BackupName, b.Time.Format(time.RFC850), b.WalFileName, b.StartTime.Format(time.RFC850), b.FinishTime.Format(time.RFC850), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent})
+	for idx := range backupDetails {
+		b := &backupDetails[idx]
+		writer.AppendRow(table.Row{idx, b.BackupName, b.Time.Format(time.RFC850), b.WalFileName, b.StartTime.Format(time.RFC850), b.FinishTime.Format(time.RFC850), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent})
 	}
 }
 

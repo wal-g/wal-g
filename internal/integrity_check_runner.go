@@ -89,10 +89,7 @@ func (check IntegrityCheckRunner) Run() (WalVerifyCheckResult, error) {
 		return WalVerifyCheckResult{}, err
 	}
 
-	integrityScanSegmentSequences, err := collapseSegmentsByStatusAndTimeline(segmentScanner.ScannedSegments)
-	if err != nil {
-		return WalVerifyCheckResult{}, err
-	}
+	integrityScanSegmentSequences := collapseSegmentsByStatusAndTimeline(segmentScanner.ScannedSegments)
 
 	return newWalIntegrityCheckResult(integrityScanSegmentSequences), nil
 }
@@ -181,9 +178,9 @@ func runWalIntegrityScan(scanner *WalSegmentScanner,
 
 // collapseSegmentsByStatusAndTimeline collapses scanned segments
 // with the same timeline and Status into segment sequences to minify the output
-func collapseSegmentsByStatusAndTimeline(scannedSegments []ScannedSegmentDescription) ([]*IntegrityScanSegmentSequence, error) {
+func collapseSegmentsByStatusAndTimeline(scannedSegments []ScannedSegmentDescription) []*IntegrityScanSegmentSequence {
 	if len(scannedSegments) == 0 {
-		return nil, nil
+		return nil
 	}
 
 	// make sure that ScannedSegments are ordered
@@ -209,7 +206,7 @@ func collapseSegmentsByStatusAndTimeline(scannedSegments []ScannedSegmentDescrip
 	}
 
 	segmentSequences = append(segmentSequences, newIntegrityScanSegmentSequence(currentSequence, currentStatus))
-	return segmentSequences, nil
+	return segmentSequences
 }
 
 // getEarliestBackupStartSegmentNo returns the starting segmentNo of the earliest available correct backup

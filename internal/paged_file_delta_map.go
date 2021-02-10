@@ -142,7 +142,7 @@ func (deltaMap *PagedFileDeltaMap) getLocationsFromDeltas(folder storage.Folder,
 		if err != nil {
 			return err
 		}
-		tracelog.InfoLogger.Printf("Sucessfully downloaded delta file %s\n", filename)
+		tracelog.InfoLogger.Printf("Successfully downloaded delta file %s\n", filename)
 		deltaMap.AddLocationsToDelta(deltaFile.Locations)
 	}
 	return nil
@@ -155,7 +155,7 @@ func (deltaMap *PagedFileDeltaMap) getLocationsFromWals(folder storage.Folder, t
 		if err != nil {
 			return err
 		}
-		tracelog.InfoLogger.Printf("Sucessfully downloaded wal file %s\n", filename)
+		tracelog.InfoLogger.Printf("Successfully downloaded wal file %s\n", filename)
 	}
 	return nil
 }
