@@ -132,7 +132,6 @@ func (b *BgUploader) scanAndProcessFiles() {
 		case <-time.After(pollPauseDuration):
 		}
 	}
-
 }
 
 // processFiles reads from input channel and uploads relevant WAL files. Exits

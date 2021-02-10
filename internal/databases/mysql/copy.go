@@ -22,7 +22,6 @@ func HandleCopyBackup(fromConfigFile, toConfigFile, backupName, prefix string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.DebugLogger.Printf("copying files %s\n", strings.Join(func() []string {
-
 		ret := make([]string, 0)
 		for _, e := range infos {
 			ret = append(ret, e.SrcObj.GetName())

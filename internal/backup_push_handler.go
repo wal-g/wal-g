@@ -198,7 +198,6 @@ func createAndPushBackup(
 	}
 	// logging backup set name
 	tracelog.InfoLogger.Println("Wrote backup with name " + backupName)
-
 }
 
 // TODO : unit tests

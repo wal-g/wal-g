@@ -173,7 +173,7 @@ func (p *BytesPool) Put(b []byte) {
 	}
 }
 
-//FastCopy copies data from src to dst in blocks of CopiedBlockMaxSize bytes
+// FastCopy copies data from src to dst in blocks of CopiedBlockMaxSize bytes
 func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
 	n := int64(0)
 	buf := copyBytesPool.Get()

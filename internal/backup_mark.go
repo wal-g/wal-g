@@ -12,7 +12,6 @@ import (
 
 // markBackup marks a backup as permanent or impermanent
 func markBackup(uploader *Uploader, folder storage.Folder, backupName string, toPermanent bool) {
-
 	tracelog.InfoLogger.Printf("Retrieving previous related backups to be marked: toPermanent=%t", toPermanent)
 	metadataToUpload, err := GetMarkedBackupMetadataToUpload(folder, backupName, toPermanent)
 
@@ -133,7 +132,6 @@ func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string
 	backupMetadata := []UploadObject{metadataUploadObject}
 
 	return backupMetadata, nil
-
 }
 
 func getBackupNumber(backupName string) string {

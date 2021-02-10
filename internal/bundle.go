@@ -179,7 +179,6 @@ func (bundle *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName str
 		}
 	}
 	return "base_" + name, lsn, queryRunner.Version, dataDir, queryRunner.SystemIdentifier, nil
-
 }
 
 // TODO : unit tests

@@ -138,7 +138,6 @@ func GetBackupByName(backupName, subfolder string, folder storage.Folder) (*Back
 		tracelog.InfoLogger.Printf("LATEST backup is: '%s'\n", latest)
 
 		backup = NewBackup(baseBackupFolder, latest)
-
 	} else {
 		backup = NewBackup(baseBackupFolder, backupName)
 

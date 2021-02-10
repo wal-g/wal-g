@@ -73,7 +73,6 @@ func (queryRunner *PgQueryRunner) buildGetCurrentLsn() string {
 		return "SELECT pg_current_wal_lsn()"
 	}
 	return "SELECT pg_current_xlog_location()"
-
 }
 
 // BuildStartBackup formats a query that starts backup according to server features and version

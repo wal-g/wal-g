@@ -185,7 +185,6 @@ func (h *DeleteHandler) FindTargetRetain(retentionCount, modifier int) (BackupOb
 	return findTarget(h.backups, h.greater, choiceFunc)
 }
 
-
 func (h *DeleteHandler) FindTargetByName(bname string) (BackupObject, error) {
 	return findTarget(h.backups, h.greater, func(object BackupObject) bool {
 		return strings.HasPrefix(object.GetName(), bname)
@@ -194,7 +193,6 @@ func (h *DeleteHandler) FindTargetByName(bname string) (BackupObject, error) {
 
 func (h *DeleteHandler) FindTargetRetainAfterName(
 	retentionCount int, name string, modifier int) (BackupObject, error) {
-
 	choiceFuncRetain := getRetainChoiceFunc(retentionCount, modifier)
 	if choiceFuncRetain == nil {
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete before'")
