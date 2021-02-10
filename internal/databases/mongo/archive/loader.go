@@ -294,7 +294,8 @@ func NewStoragePurger(opts StorageSettings) (*StoragePurger, error) {
 // TODO: extract BackupLayout abstraction and provide DataPath(), SentinelPath(), Exists() methods
 func (sp *StoragePurger) DeleteBackups(backups []models.Backup) error {
 	keys := make([]string, 0, len(backups)*2)
-	for _, backup := range backups {
+	for idx := range backups {
+		backup := &backups[idx]
 		keys = append(keys, internal.SentinelNameFromBackup(backup.BackupName))
 
 		dataObjects, _, err := sp.backupsFolder.GetSubFolder(backup.BackupName).ListFolder()

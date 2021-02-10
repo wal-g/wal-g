@@ -227,7 +227,7 @@ func TestArchInBackup(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ArchInBackup(tt.args.arch, tt.args.backup)
+			got := ArchInBackup(tt.args.arch, &tt.args.backup)
 			assert.Equal(t, got, tt.want)
 		})
 	}
