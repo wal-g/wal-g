@@ -146,6 +146,10 @@ func (parser *WalParser) parsePage(reader io.Reader) (*XLogPage, error) {
 			return &XLogPage{Header: *pageHeader, PrevRecordTrailingData: remainingData}, nil
 		}
 	}
+	return readXLogPage(alignedReader, pageHeader, remainingData)
+}
+
+func readXLogPage(alignedReader *AlignedReader, pageHeader *XLogPageHeader, remainingData []byte) (*XLogPage, error) {
 	pageRecords := make([]XLogRecord, 0)
 	for {
 		recordData, wholeRecord, err := tryReadXLogRecordData(alignedReader)
