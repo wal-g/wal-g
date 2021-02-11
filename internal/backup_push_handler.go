@@ -10,6 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/jackc/pgx"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/storages/storage"
@@ -53,6 +55,20 @@ func (err BackupFromOtherBD) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
+type BackupConfig struct {
+	uploader                  *WalUploader
+	archiveDirectory          string
+	backupsFolder             string
+	previousBackupName        string
+	previousBackupSentinelDto BackupSentinelDto
+	isPermanent               bool
+	forceIncremental          bool
+	incrementCount            int
+	verifyPageChecksums       bool
+	storeAllCorruptBlocks     bool
+	tarBallComposerType       TarBallComposerType
+}
+
 // TODO : unit tests
 func getDeltaConfig() (maxDeltas int, fromFull bool) {
 	maxDeltas = viper.GetInt(DeltaMaxStepsSetting)
@@ -68,26 +84,18 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 	return
 }
 
-func createAndPushBackup(
-	uploader *WalUploader,
-	archiveDirectory, backupsFolder, previousBackupName string,
-	previousBackupSentinelDto BackupSentinelDto,
-	isPermanent, forceIncremental bool,
-	incrementCount int,
-	verifyPageChecksums, storeAllCorruptBlocks bool,
-	tarBallComposerType TarBallComposerType,
-) {
-	folder := uploader.UploadingFolder
-	uploader.UploadingFolder = folder.GetSubFolder(backupsFolder) // TODO: AB: this subfolder switch look ugly. I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
+func createAndPushBackup(bc *BackupConfig) {
+	folder := bc.uploader.UploadingFolder
+	bc.uploader.UploadingFolder = folder.GetSubFolder(bc.backupsFolder) // TODO: AB: this subfolder switch look ugly. I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
 
 	crypter := ConfigureCrypter()
-	bundle := NewBundle(archiveDirectory, crypter, previousBackupSentinelDto.BackupStartLSN,
-		previousBackupSentinelDto.Files, forceIncremental, viper.GetInt64(TarSizeThresholdSetting))
+	bundle := NewBundle(bc.archiveDirectory, crypter, bc.previousBackupSentinelDto.BackupStartLSN,
+		bc.previousBackupSentinelDto.Files, bc.forceIncremental, viper.GetInt64(TarSizeThresholdSetting))
 
 	var meta ExtendedMetadataDto
 	meta.StartTime = utility.TimeNowCrossPlatformUTC()
 	meta.Hostname, _ = os.Hostname()
-	meta.IsPermanent = isPermanent
+	meta.IsPermanent = bc.isPermanent
 
 	// Connect to postgres and start/finish a nonexclusive backup.
 	conn, err := Connect()
@@ -95,20 +103,20 @@ func createAndPushBackup(
 	backupName, backupStartLSN, pgVersion, dataDir, systemIdentifier, err := bundle.StartBackup(conn,
 		utility.CeilTimeUpToMicroseconds(time.Now()).String())
 	meta.DataDir = dataDir
-	if dataDir != archiveDirectory {
-		warning := fmt.Sprintf("Data directory '%s' is not equal to backup-push argument '%s'", dataDir, archiveDirectory)
+	if dataDir != bc.archiveDirectory {
+		warning := fmt.Sprintf("Data directory '%s' is not equal to backup-push argument '%s'", dataDir, bc.archiveDirectory)
 		tracelog.WarningLogger.Println(warning)
 	}
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	if len(previousBackupName) > 0 && previousBackupSentinelDto.BackupStartLSN != nil {
-		if *previousBackupSentinelDto.BackupFinishLSN > backupStartLSN {
-			tracelog.ErrorLogger.FatalOnError(newBackupFromFuture(previousBackupName))
+	if len(bc.previousBackupName) > 0 && bc.previousBackupSentinelDto.BackupStartLSN != nil {
+		if *bc.previousBackupSentinelDto.BackupFinishLSN > backupStartLSN {
+			tracelog.ErrorLogger.FatalOnError(newBackupFromFuture(bc.previousBackupName))
 		}
-		if previousBackupSentinelDto.SystemIdentifier != nil && systemIdentifier != nil && *systemIdentifier != *previousBackupSentinelDto.SystemIdentifier {
+		if bc.previousBackupSentinelDto.SystemIdentifier != nil && systemIdentifier != nil && *systemIdentifier != *bc.previousBackupSentinelDto.SystemIdentifier {
 			tracelog.ErrorLogger.FatalOnError(newBackupFromOtherBD())
 		}
-		if uploader.getUseWalDelta() {
+		if bc.uploader.getUseWalDelta() {
 			err = bundle.DownloadDeltaMap(folder.GetSubFolder(utility.WalPath), backupStartLSN)
 			if err == nil {
 				tracelog.InfoLogger.Println("Successfully loaded delta map, delta backup will be made with provided delta map")
@@ -116,88 +124,75 @@ func createAndPushBackup(
 				tracelog.WarningLogger.Printf("Error during loading delta map: '%v'. Fallback to full scan delta backup\n", err)
 			}
 		}
-		backupName = backupName + "_D_" + utility.StripWalFileName(previousBackupName)
+		backupName = backupName + "_D_" + utility.StripWalFileName(bc.previousBackupName)
 	}
 
-	// Start a new tar bundle, walk the archiveDirectory and upload everything there.
-	err = bundle.StartQueue(NewStorageTarBallMaker(backupName, uploader.Uploader))
-	tracelog.ErrorLogger.FatalOnError(err)
-	tarBallComposerMaker, err := NewTarBallComposerMaker(tarBallComposerType, conn,
-		NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks))
-	tracelog.ErrorLogger.FatalOnError(err)
-	err = bundle.SetupComposer(tarBallComposerMaker)
-	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.InfoLogger.Println("Walking ...")
-	err = filepath.Walk(archiveDirectory, bundle.HandleWalkedFSObject)
-	tracelog.ErrorLogger.FatalOnError(err)
-	tarFileSets, err := bundle.PackTarballs()
-	tracelog.ErrorLogger.FatalOnError(err)
-	err = bundle.FinishQueue()
-	tracelog.ErrorLogger.FatalOnError(err)
-	err = bundle.UploadPgControl(uploader.Compressor.FileExtension())
-	tracelog.ErrorLogger.FatalOnError(err)
-	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
-	labelFilesTarBallName, labelFilesList, finishLsn, err := bundle.uploadLabelFiles(conn)
-	tracelog.ErrorLogger.FatalOnError(err)
-	uncompressedSize := atomic.LoadInt64(bundle.TarBallQueue.AllTarballsSize)
-	compressedSize := atomic.LoadInt64(uploader.tarSize)
-	tarFileSets[labelFilesTarBallName] = append(tarFileSets[labelFilesTarBallName], labelFilesList...)
-	timelineChanged := bundle.checkTimelineChanged(conn)
-
-	// Wait for all uploads to finish.
-	uploader.finish()
-	if uploader.Failed.Load().(bool) {
-		tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", backupName)
-	}
-	if timelineChanged {
-		tracelog.ErrorLogger.Fatalf("Cannot finish backup because of changed timeline.")
-	}
+	uncompressedSize, compressedSize, finishLsn, tarFileSets := uploadBackup(bundle, bc, conn, backupName)
 
 	var tablespaceSpec *TablespaceSpec
 	if !bundle.TablespaceSpec.empty() {
 		tablespaceSpec = &bundle.TablespaceSpec
 	}
-	currentBackupSentinelDto := &BackupSentinelDto{
-		BackupStartLSN:   &backupStartLSN,
-		IncrementFromLSN: previousBackupSentinelDto.BackupStartLSN,
-		PgVersion:        pgVersion,
-		TablespaceSpec:   tablespaceSpec,
-	}
-	if previousBackupSentinelDto.BackupStartLSN != nil {
-		currentBackupSentinelDto.IncrementFrom = &previousBackupName
-		if previousBackupSentinelDto.IsIncremental() {
-			currentBackupSentinelDto.IncrementFullName = previousBackupSentinelDto.IncrementFullName
-		} else {
-			currentBackupSentinelDto.IncrementFullName = &previousBackupName
-		}
-		currentBackupSentinelDto.IncrementCount = &incrementCount
-	}
+	currentBackupSentinelDto := NewBackupSentinelDto(
+		backupStartLSN, finishLsn, bc, pgVersion, tablespaceSpec, systemIdentifier,
+		uncompressedSize, compressedSize, bundle.GetFiles(), tarFileSets)
 
-	currentBackupSentinelDto.setFiles(bundle.GetFiles())
-	currentBackupSentinelDto.BackupFinishLSN = &finishLsn
-	currentBackupSentinelDto.UserData = GetSentinelUserData()
-	currentBackupSentinelDto.SystemIdentifier = systemIdentifier
-	currentBackupSentinelDto.UncompressedSize = uncompressedSize
-	currentBackupSentinelDto.CompressedSize = compressedSize
-	currentBackupSentinelDto.TarFileSets = tarFileSets
 	// If pushing permanent delta backup, mark all previous backups permanent
 	// Do this before uploading current meta to ensure that backups are marked in increasing order
-	if isPermanent && currentBackupSentinelDto.IsIncremental() {
-		markBackup(uploader.Uploader, folder, previousBackupName, true)
+	if bc.isPermanent && currentBackupSentinelDto.IsIncremental() {
+		markBackup(bc.uploader.Uploader, folder, bc.previousBackupName, true)
 	}
 
-	err = uploadMetadata(uploader.Uploader, currentBackupSentinelDto, backupName, meta)
+	err = uploadMetadata(bc.uploader.Uploader, currentBackupSentinelDto, backupName, meta)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload metadata file for backup: %s %v", backupName, err)
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	err = UploadSentinel(uploader.Uploader, currentBackupSentinelDto, backupName)
+	err = UploadSentinel(bc.uploader.Uploader, currentBackupSentinelDto, backupName)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", backupName)
 		tracelog.ErrorLogger.FatalError(err)
 	}
 	// logging backup set name
 	tracelog.InfoLogger.Println("Wrote backup with name " + backupName)
+}
+
+func uploadBackup(
+	bundle *Bundle, bc *BackupConfig, conn *pgx.Conn, backupName string) (int64, int64, uint64, TarFileSets) {
+	// Start a new tar bundle, walk the archiveDirectory and upload everything there.
+	err := bundle.StartQueue(NewStorageTarBallMaker(backupName, bc.uploader.Uploader))
+	tracelog.ErrorLogger.FatalOnError(err)
+	tarBallComposerMaker, err := NewTarBallComposerMaker(bc.tarBallComposerType, conn,
+		NewTarBallFilePackerOptions(bc.verifyPageChecksums, bc.storeAllCorruptBlocks))
+	tracelog.ErrorLogger.FatalOnError(err)
+	err = bundle.SetupComposer(tarBallComposerMaker)
+	tracelog.ErrorLogger.FatalOnError(err)
+	tracelog.InfoLogger.Println("Walking ...")
+	err = filepath.Walk(bc.archiveDirectory, bundle.HandleWalkedFSObject)
+	tracelog.ErrorLogger.FatalOnError(err)
+	tarFileSets, err := bundle.PackTarballs()
+	tracelog.ErrorLogger.FatalOnError(err)
+	err = bundle.FinishQueue()
+	tracelog.ErrorLogger.FatalOnError(err)
+	err = bundle.UploadPgControl(bc.uploader.Compressor.FileExtension())
+	tracelog.ErrorLogger.FatalOnError(err)
+	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
+	labelFilesTarBallName, labelFilesList, finishLsn, err := bundle.uploadLabelFiles(conn)
+	tracelog.ErrorLogger.FatalOnError(err)
+	uncompressedSize := atomic.LoadInt64(bundle.TarBallQueue.AllTarballsSize)
+	compressedSize := atomic.LoadInt64(bc.uploader.tarSize)
+	tarFileSets[labelFilesTarBallName] = append(tarFileSets[labelFilesTarBallName], labelFilesList...)
+	timelineChanged := bundle.checkTimelineChanged(conn)
+
+	// Wait for all uploads to finish.
+	bc.uploader.finish()
+	if bc.uploader.Failed.Load().(bool) {
+		tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", backupName)
+	}
+	if timelineChanged {
+		tracelog.ErrorLogger.Fatalf("Cannot finish backup because of changed timeline.")
+	}
+	return uncompressedSize, compressedSize, finishLsn, tarFileSets
 }
 
 // TODO : unit tests
@@ -254,9 +249,20 @@ func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanen
 		tracelog.InfoLogger.Println("Doing full backup.")
 	}
 
-	createAndPushBackup(uploader, archiveDirectory, utility.BaseBackupPath, previousBackupName,
-		previousBackupSentinelDto, isPermanent, false, incrementCount, verifyPageChecksums,
-		storeAllCorruptBlocks, tarBallComposerType)
+	backupConfig := BackupConfig{
+		uploader:                  uploader,
+		archiveDirectory:          archiveDirectory,
+		backupsFolder:             utility.BaseBackupPath,
+		previousBackupName:        previousBackupName,
+		previousBackupSentinelDto: previousBackupSentinelDto,
+		isPermanent:               isPermanent,
+		forceIncremental:          false,
+		incrementCount:            incrementCount,
+		verifyPageChecksums:       verifyPageChecksums,
+		storeAllCorruptBlocks:     storeAllCorruptBlocks,
+		tarBallComposerType:       tarBallComposerType,
+	}
+	createAndPushBackup(&backupConfig)
 }
 
 // TODO : unit tests

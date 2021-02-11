@@ -27,6 +27,42 @@ type BackupSentinelDto struct {
 	UserData interface{} `json:"UserData,omitempty"`
 }
 
+func NewBackupSentinelDto(
+	backupStartLSN, backupFinishLSN uint64,
+	bc *BackupConfig,
+	pgVersion int,
+	tablespaceSpec *TablespaceSpec,
+	systemIdentifier *uint64,
+	uncompressedSize, compressedSize int64,
+	files *sync.Map,
+	tarFileSets TarFileSets,
+) *BackupSentinelDto {
+	sentinel := &BackupSentinelDto{
+		BackupStartLSN:   &backupStartLSN,
+		IncrementFromLSN: bc.previousBackupSentinelDto.BackupStartLSN,
+		PgVersion:        pgVersion,
+		TablespaceSpec:   tablespaceSpec,
+	}
+	if bc.previousBackupSentinelDto.BackupStartLSN != nil {
+		sentinel.IncrementFrom = &bc.previousBackupName
+		if bc.previousBackupSentinelDto.IsIncremental() {
+			sentinel.IncrementFullName = bc.previousBackupSentinelDto.IncrementFullName
+		} else {
+			sentinel.IncrementFullName = &bc.previousBackupName
+		}
+		sentinel.IncrementCount = &bc.incrementCount
+	}
+
+	sentinel.setFiles(files)
+	sentinel.BackupFinishLSN = &backupFinishLSN
+	sentinel.UserData = GetSentinelUserData()
+	sentinel.SystemIdentifier = systemIdentifier
+	sentinel.UncompressedSize = uncompressedSize
+	sentinel.CompressedSize = compressedSize
+	sentinel.TarFileSets = tarFileSets
+	return sentinel
+}
+
 // Extended metadata should describe backup in more details, but be small enough to be downloaded often
 type ExtendedMetadataDto struct {
 	StartTime        time.Time `json:"start_time"`
