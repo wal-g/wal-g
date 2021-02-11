@@ -25,7 +25,6 @@ test "2" -eq "$(wal-g backup-list | wc -l)"
 FIRST_BACKUP=$(wal-g backup-list | awk 'NR==2{print $1}')
 DT1=$(date3339)
 
-
 # second backup
 sysbench --time=3 run
 wal-g backup-push
@@ -52,7 +51,6 @@ mysqldump sbtest > /tmp/dump_3.sql
 test "4" -eq "$(wal-g backup-list | wc -l)"
 THIRD_BACKUP=$(wal-g backup-list | awk 'NR==4{print $1}')
 DT3=$(date3339)
-
 
 
 # fourth backup
@@ -102,8 +100,7 @@ mysqldump sbtest > /tmp/dump_3_restored.sql
 diff -u /tmp/dump_3.sql /tmp/dump_3_restored.sql
 
 # delete third backup using target backup delete
-#wal-g delete target-backup "$THIRD_BACKUP" --confirm
-wal-g delete retain 1 --confirm
+wal-g delete target "$THIRD_BACKUP" --confirm
 wal-g backup-list
 test "2" -eq "$(wal-g backup-list | wc -l)"
 

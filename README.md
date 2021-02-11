@@ -60,6 +60,8 @@ WAL-G determines Azure Storage credentials using [azure default credentials](htt
 
 You may set `AZURE_STORAGE_SAS_TOKEN` in lieu of `AZURE_STORAGE_ACCESS_KEY` to make use of [SAS tokens](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview).
 
+For deployments where Azure Storage is not under AzurePuplicCloud environment, WAL-G need to use different Azure Storage endpoint. You can use optional setting `AZURE_STORAGE_SAS_TOKEN` to select the correct Azure Storage endpoint. Available setting values:  `"AzurePublicCloud"`, `"AzureUSGovernmentCloud"`, `"AzureChinaCloud"`, `"AzureGermanCloud"`. If setting is omitted or has a value different to the ones defined here, WAL-G will default to the Azure Storage endpoint for AzurePublicCloud.
+
 WAL-G sets default upload buffer size to 64 Megabytes and uses 3 buffers by default. However, users can choose to override these values by setting optional environment variables.
 
 
@@ -169,6 +171,14 @@ LZMA is way much slower. However, it compresses backups about 6 times better tha
 By default, WAL-G uses [ListObjectsV2](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html) to fetch S3 storage folder listings.
 However, some S3-compatible storages may not support it.
 Set this setting to `true` to use [ListObjects](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjects.html) instead.
+
+* `YC_CSE_KMS_KEY_ID`
+
+To configure Yandex Cloud KMS key for client-side encryption and decryption. By default, no encryption is used.
+
+* `YC_SERVICE_ACCOUNT_KEY_FILE`
+
+To configure the name of a file containing private key of Yandex Cloud Service Account. If not set a token from the metadata service (http://169.254.169.254) will be used to make API calls to Yandex Cloud KMS. 
 
 **More options are available for the chosen database. See it in [Databases](#databases)**
 

@@ -96,6 +96,9 @@ const (
 
 	AwsAccessKeyId     = "AWS_ACCESS_KEY_ID"
 	AwsSecretAccessKey = "AWS_SECRET_ACCESS_KEY"
+
+	YcKmsKeyIdSetting  = "YC_CSE_KMS_KEY_ID"
+	YcSaKeyFileSetting = "YC_SERVICE_ACCOUNT_KEY_FILE"
 )
 
 var (
@@ -149,6 +152,8 @@ var (
 		PgpKeySetting:                true,
 		PgpKeyPathSetting:            true,
 		PgpKeyPassphraseSetting:      true,
+		LibsodiumKeySetting:          true,
+		LibsodiumKeyPathSetting:      true,
 		TotalBgUploadedLimit:         true,
 		NameStreamCreateCmd:          true,
 		NameStreamRestoreCmd:         true,
@@ -211,12 +216,17 @@ var (
 		"AZURE_STORAGE_ACCOUNT":   true,
 		"AZURE_STORAGE_KEY":       true,
 		"AZURE_STORAGE_SAS_TOKEN": true,
+		"AZURE_ENVIRONMENT_NAME":  true,
 		"WALG_AZURE_BUFFER_SIZE":  true,
 		"WALG_AZURE_MAX_BUFFERS":  true,
 
 		// GS
 		"WALG_GS_PREFIX":                 true,
 		"GOOGLE_APPLICATION_CREDENTIALS": true,
+
+		// Yandex Cloud
+		YcSaKeyFileSetting: true,
+		YcKmsKeyIdSetting:  true,
 
 		// SH
 		"WALG_SSH_PREFIX":      true,

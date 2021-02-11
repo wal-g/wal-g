@@ -373,7 +373,11 @@ func GetBackupSentinelObjects(folder storage.Folder) ([]storage.Object, error) {
 // TODO : unit tests
 // GetBackups receives backup descriptions and sorts them by time
 func GetBackups(folder storage.Folder) (backups []BackupTime, err error) {
-	backups, _, err = GetBackupsAndGarbage(folder)
+	return GetBackupsWithTarget(folder, utility.BaseBackupPath)
+}
+
+func GetBackupsWithTarget(folder storage.Folder, targetPath string) (backups []BackupTime, err error) {
+	backups, _, err = GetBackupsAndGarbageWithTarget(folder, targetPath)
 	if err != nil {
 		return nil, err
 	}
@@ -385,9 +389,13 @@ func GetBackups(folder storage.Folder) (backups []BackupTime, err error) {
 	return
 }
 
-// TODO : unit tests
 func GetBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage []string, err error) {
-	backupObjects, subFolders, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
+	return GetBackupsAndGarbageWithTarget(folder, utility.BaseBackupPath)
+}
+
+// TODO : unit tests
+func GetBackupsAndGarbageWithTarget(folder storage.Folder, targetPath string) (backups []BackupTime, garbage []string, err error) {
+	backupObjects, subFolders, err := folder.GetSubFolder(targetPath).ListFolder()
 	if err != nil {
 		return nil, nil, err
 	}

@@ -37,6 +37,8 @@ func GetLogsDstSettings(operationLogsDstEnvVariable string) (dstFolder string, e
 // TODO : unit tests
 // downloadAndDecompressStream downloads, decompresses and writes stream to stdout
 func downloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) error {
+	defer writeCloser.Close()
+	
 	for _, decompressor := range compression.Decompressors {
 		archiveReader, exists, err := TryDownloadFile(backup.BaseBackupFolder, GetStreamName(backup.Name, decompressor.FileExtension()))
 		if err != nil {

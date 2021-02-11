@@ -3,9 +3,14 @@
   {"op":"c", "db":"load2_db_1", "dc":{ "createIndexes": "coll_1", "indexes": [{"key": { "f1": 1 }, "name": "f1_1", "background": true}]}},
   {"op":"c", "db":"load2_db_1", "dc":{ "createIndexes": "coll_1", "indexes": [{"key": { "key1": 1, "key2": 1 }, "name": "key1_key2_uniq", "unique": true}]}},
   {"op":"c", "db":"load2_db_1", "dc":{ "dropIndexes": "coll_1", "index": "f1_1"}},
-  {"op":"c", "db":"admin", "dc": { "renameCollection": "load2_db_1.coll_1", "to": "load2_db_1.coll_2"}},
-  {"op":"c", "db":"admin", "dc": { "renameCollection": "load2_db_1.coll_2", "to": "load2_db_2.coll_2"}},
-  {"op":"c", "db":"load2_db_1", "dc": { "create": "coll_fr_capped", "collation": { "locale": "fr"}, "capped": true, "size": 65536 }},
-  {"op":"c", "db":"load2_db_1", "dc": { "insert": "coll_fr_capped", "documents": [{"iam": "capped", "key1": 1}]}},
-  {"op":"c", "db":"load2_db_1", "dc": { "insert": "coll_fr_capped", "documents": [{"iam": "capped too", "key2": 2}]}}
+  {"op":"c", "db":"admin", "dc":{ "renameCollection": "load2_db_1.coll_1", "to": "load2_db_1.coll_2"}},
+  {"op":"c", "db":"admin", "dc":{ "renameCollection": "load2_db_1.coll_2", "to": "load2_db_2.coll_2"}},
+  {"op":"c", "db":"load2_db_1", "dc":{ "create": "coll_fr_capped", "collation": { "locale": "fr"}, "capped": true, "size": 65536 }},
+  {"op":"c", "db":"load2_db_1", "dc":{ "insert": "coll_fr_capped", "documents": [{"iam": "capped", "key1": 1}]}},
+  {"op":"c", "db":"load2_db_1", "dc":{ "insert": "coll_fr_capped", "documents": [{"iam": "capped too", "key2": 2}]}},
+  {"op":"c", "db":"load2_db_1", "dc":{ "insert": "coll_1", "documents": [{"key1": 1, "key2": "val20"}]}},
+  {"op":"c", "db":"load2_db_1", "dc":{ "create" : "view_1", "viewOn" : "coll_1", "pipeline" : [{ "$project" : { "coll1_key1" : "key1" } }]}},
+  {"op":"c", "db":"load2_db_1", "dc":{ "create" : "view_2", "viewOn" : "coll_1", "pipeline" : [{ "$lookup": { "from": "coll_fr_capped", "localField": "key1", "foreignField": "key1", "as": "docs" } }, { "$project": { "docs._id": 1, "docs.key2": 1 }}] }},
+  {"op":"c", "db":"load2_db_1", "dc":{ "drop" : "view_1"}},
+  {"op":"c", "db":"load2_db_1", "dc":{ "drop": "coll_1"}}
 ]

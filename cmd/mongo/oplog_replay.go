@@ -6,6 +6,8 @@ import (
 	"os"
 	"syscall"
 
+	"time"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -24,63 +26,120 @@ var oplogReplayCmd = &cobra.Command{
 	Short: "Fetches oplog archives from storage and applies to database",
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+		defer func() { tracelog.ErrorLogger.FatalOnError(err) }()
+
 		ctx, cancel := context.WithCancel(context.Background())
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		// resolve archiving settings
-		since, err := models.TimestampFromStr(args[0])
-		tracelog.ErrorLogger.FatalOnError(err)
-		until, err := models.TimestampFromStr(args[1])
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		// TODO: fix ugly config
-		ignoreErrCodes := make(map[string][]int32)
-		if ignoreErrCodesStr, ok := internal.GetSetting(internal.OplogReplayIgnoreErrorCodes); ok {
-			err := json.Unmarshal([]byte(ignoreErrCodesStr), &ignoreErrCodes)
-			tracelog.ErrorLogger.FatalOnError(err)
+		replayArgs, err := buildOplogReplayRunArgs(args)
+		if err != nil {
+			return
 		}
 
-		mongodbUrl, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		var mongoClientArgs []client.Option
-		oplogAlwaysUpsert, hasOplogAlwaysUpsert, err := internal.GetBoolSetting(internal.OplogReplayOplogAlwaysUpsert)
-		tracelog.ErrorLogger.FatalOnError(err)
-		if hasOplogAlwaysUpsert {
-			mongoClientArgs = append(mongoClientArgs, client.OplogAlwaysUpsert(oplogAlwaysUpsert))
-		}
-
-		if oplogApplicationMode, hasOplogApplicationMode := internal.GetSetting(internal.OplogReplayOplogApplicationMode); hasOplogApplicationMode {
-			mongoClientArgs = append(mongoClientArgs, client.OplogApplicationMode(client.OplogAppMode(oplogApplicationMode)))
-		}
-
-		// set up mongodb client and oplog applier
-		mongoClient, err := client.NewMongoClient(ctx, mongodbUrl, mongoClientArgs...)
-		tracelog.ErrorLogger.FatalOnError(err)
-		err = mongoClient.EnsureIsMaster(ctx)
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		dbApplier := oplog.NewDBApplier(mongoClient, false, ignoreErrCodes)
-		oplogApplier := stages.NewGenericApplier(dbApplier)
-
-		// set up storage downloader client
-		downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		// discover archive sequence to replay
-		archives, err := downloader.ListOplogArchives()
-		tracelog.ErrorLogger.FatalOnError(err)
-		path, err := archive.SequenceBetweenTS(archives, since, until)
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		// setup storage fetcher
-		oplogFetcher := stages.NewStorageFetcher(downloader, path)
-
-		// run worker cycle
-		err = mongo.HandleOplogReplay(ctx, since, until, oplogFetcher, oplogApplier)
-		tracelog.ErrorLogger.FatalOnError(err)
+		err = runOplogReplay(ctx, replayArgs)
 	},
+}
+
+type oplogReplayRunArgs struct {
+	since models.Timestamp
+	until models.Timestamp
+
+	ignoreErrCodes map[string][]int32
+	mongodbUrl     string
+
+	oplogAlwaysUpsert    *bool
+	oplogApplicationMode *string
+
+	primaryWait        bool
+	primaryWaitTimeout time.Duration
+	lwUpdate           time.Duration
+}
+
+func buildOplogReplayRunArgs(cmdargs []string) (args oplogReplayRunArgs, err error) {
+	// resolve archiving settings
+	args.since, err = models.TimestampFromStr(cmdargs[0])
+	if err != nil {
+		return
+	}
+	args.until, err = models.TimestampFromStr(cmdargs[1])
+	if err != nil {
+		return
+	}
+
+	// TODO: fix ugly config
+	if ignoreErrCodesStr, ok := internal.GetSetting(internal.OplogReplayIgnoreErrorCodes); ok {
+		if err = json.Unmarshal([]byte(ignoreErrCodesStr), &args.ignoreErrCodes); err != nil {
+			return
+		}
+	}
+
+	args.mongodbUrl, err = internal.GetRequiredSetting(internal.MongoDBUriSetting)
+	if err != nil {
+		return
+	}
+
+	oplogAlwaysUpsert, hasOplogAlwaysUpsert, err := internal.GetBoolSetting(internal.OplogReplayOplogAlwaysUpsert)
+	if err != nil {
+		return
+	}
+	if hasOplogAlwaysUpsert {
+		args.oplogAlwaysUpsert = &oplogAlwaysUpsert
+	}
+
+	if oplogApplicationMode, hasOplogApplicationMode := internal.GetSetting(internal.OplogReplayOplogApplicationMode); hasOplogApplicationMode {
+		args.oplogApplicationMode = &oplogApplicationMode
+	}
+
+	return
+}
+
+func runOplogReplay(ctx context.Context, replayArgs oplogReplayRunArgs) error {
+	tracelog.DebugLogger.Printf("starting replay with arguments: %+v", replayArgs)
+
+	// set up mongodb client and oplog applier
+	var mongoClientArgs []client.Option
+	if replayArgs.oplogAlwaysUpsert != nil {
+		mongoClientArgs = append(mongoClientArgs, client.OplogAlwaysUpsert(*replayArgs.oplogAlwaysUpsert))
+	}
+
+	if replayArgs.oplogApplicationMode != nil {
+		mongoClientArgs = append(mongoClientArgs, client.OplogApplicationMode(client.OplogAppMode(*replayArgs.oplogApplicationMode)))
+	}
+
+	mongoClient, err := client.NewMongoClient(ctx, replayArgs.mongodbUrl, mongoClientArgs...)
+	if err != nil {
+		return err
+	}
+
+	if err = mongoClient.EnsureIsMaster(ctx); err != nil {
+		return err
+	}
+
+	dbApplier := oplog.NewDBApplier(mongoClient, false, replayArgs.ignoreErrCodes)
+	oplogApplier := stages.NewGenericApplier(dbApplier)
+
+	// set up storage downloader client
+	downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
+	if err != nil {
+		return err
+	}
+	// discover archive sequence to replay
+	archives, err := downloader.ListOplogArchives()
+	if err != nil {
+		return err
+	}
+	path, err := archive.SequenceBetweenTS(archives, replayArgs.since, replayArgs.until)
+	if err != nil {
+		return err
+	}
+
+	// setup storage fetcher
+	oplogFetcher := stages.NewStorageFetcher(downloader, path)
+
+	// run worker cycle
+	return mongo.HandleOplogReplay(ctx, replayArgs.since, replayArgs.until, oplogFetcher, oplogApplier)
 }
 
 func init() {

@@ -133,11 +133,6 @@ func (ap *DBApplier) shouldSkip(op, ns string) error {
 		return fmt.Errorf("config database op")
 	}
 
-	// temporary skip view creation due to mongodb bug
-	if strings.HasSuffix(ns, "system.views") {
-		return fmt.Errorf("view op")
-	}
-
 	return nil
 }
 

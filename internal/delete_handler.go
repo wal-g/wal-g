@@ -42,6 +42,7 @@ const (
 var StringModifiers = []string{"FULL", "FIND_FULL"}
 var StringModifiersDeleteEverything = []string{"FORCE"}
 var MaxTime = time.Unix(1<<63-62135596801, 999999999)
+var errNotFound = errors.New("not found")
 
 // BackupObject represents
 // the backup sentinel object uploaded on storage
@@ -66,7 +67,7 @@ func NewDeleteHandler(
 	options ...DeleteHandlerOption,
 ) *DeleteHandler {
 	deleteHandler := &DeleteHandler{
-		folder:  folder,
+		Folder:  folder,
 		backups: backups,
 		less:    less,
 		greater: func(object1, object2 storage.Object) bool {
@@ -84,7 +85,7 @@ func NewDeleteHandler(
 }
 
 type DeleteHandler struct {
-	folder  storage.Folder
+	Folder  storage.Folder
 	backups []BackupObject
 
 	less    func(object1, object2 storage.Object) bool
@@ -166,7 +167,7 @@ func (h *DeleteHandler) FindTargetBeforeTime(timeLine time.Time, modifier int) (
 		backupTime := object.GetBackupTime()
 		return timeLine.Before(backupTime) || timeLine.Equal(backupTime)
 	})
-	if err != nil {
+	if err != nil && err != errNotFound {
 		return nil, err
 	}
 	if potentialTarget == nil {
@@ -182,6 +183,13 @@ func (h *DeleteHandler) FindTargetRetain(retentionCount, modifier int) (BackupOb
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete retain'")
 	}
 	return findTarget(h.backups, h.greater, choiceFunc)
+}
+
+
+func (h *DeleteHandler) FindTargetByName(bname string) (BackupObject, error) {
+	return findTarget(h.backups, h.greater, func(object BackupObject) bool {
+		return strings.HasPrefix(object.GetName(), bname)
+	})
 }
 
 func (h *DeleteHandler) FindTargetRetainAfterName(
@@ -205,11 +213,11 @@ func (h *DeleteHandler) FindTargetRetainAfterName(
 	}
 
 	target1, err := findTarget(h.backups, h.greater, choiceFuncRetain)
-	if err != nil {
+	if err != nil && err != errNotFound {
 		return nil, err
 	}
 	target2, err := findTarget(h.backups, h.less, choiceFuncAfterName)
-	if err != nil {
+	if err != nil && err != errNotFound {
 		return nil, err
 	}
 
@@ -238,11 +246,11 @@ func (h *DeleteHandler) FindTargetRetainAfterTime(retentionCount int, timeLine t
 	}
 
 	target1, err := findTarget(h.backups, h.greater, choiceFuncRetain)
-	if err != nil {
+	if err != nil && err != errNotFound {
 		return nil, err
 	}
 	target2, err := findTarget(h.backups, h.less, choiceFuncAfter)
-	if err != nil {
+	if err != nil && err != errNotFound {
 		return nil, err
 	}
 
@@ -262,7 +270,7 @@ func (h *DeleteHandler) FindTargetRetainAfterTime(retentionCount int, timeLine t
 
 func (h *DeleteHandler) DeleteEverything(confirmed bool) {
 	filter := func(object storage.Object) bool { return true }
-	err := storage.DeleteObjectsWhere(h.folder, confirmed, filter)
+	err := storage.DeleteObjectsWhere(h.Folder, confirmed, filter)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
@@ -274,7 +282,7 @@ func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) 
 	}
 	tracelog.InfoLogger.Println("Start delete")
 
-	return storage.DeleteObjectsWhere(h.folder, confirmed, func(object storage.Object) bool {
+	return storage.DeleteObjectsWhere(h.Folder, confirmed, func(object storage.Object) bool {
 		return h.less(object, target) && !h.isPermanent(object)
 	})
 }
@@ -287,11 +295,12 @@ func findTarget(objects []BackupObject,
 		return compare(objects[i], objects[j])
 	})
 	for _, object := range objects {
+		tracelog.DebugLogger.Printf("processing %s\n", object.GetName())
 		if isTarget(object) {
 			return object, nil
 		}
 	}
-	return nil, nil
+	return nil, errNotFound
 }
 
 func getBeforeChoiceFunc(name string, modifier int) func(object BackupObject) bool {
