@@ -215,6 +215,7 @@ var (
 		"AZURE_STORAGE_ACCOUNT":   true,
 		"AZURE_STORAGE_KEY":       true,
 		"AZURE_STORAGE_SAS_TOKEN": true,
+		"AZURE_ENVIRONMENT_NAME":  true,
 		"WALG_AZURE_BUFFER_SIZE":  true,
 		"WALG_AZURE_MAX_BUFFERS":  true,
 
