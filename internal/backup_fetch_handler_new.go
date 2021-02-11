@@ -47,7 +47,7 @@ func deltaFetchRecursionNew(cfg *FetchConfig) error {
 	if err != nil {
 		return err
 	}
-	chooseTablespaceSpecification(sentinelDto, cfg.tablespaceSpec)
+	cfg.tablespaceSpec = chooseTablespaceSpecification(sentinelDto, cfg.tablespaceSpec)
 
 	if sentinelDto.IsIncremental() {
 		tracelog.InfoLogger.Printf("Delta %v at LSN %x \n", cfg.backupName, *(sentinelDto.BackupStartLSN))
