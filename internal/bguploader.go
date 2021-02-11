@@ -95,11 +95,11 @@ func (b *BgUploader) Start() {
 }
 
 // Stop pipeline. Stop can be safely called concurrently and repeatedly.
-func (b *BgUploader) Stop() {
+func (b *BgUploader) Stop() error {
 	// Send signal to stop scanning for and uploading new files
 	b.cancelFunc()
 	// Wait for all running uploads
-	b.workerCountSem.Acquire(context.TODO(), int64(b.maxParallelWorkers))
+	return b.workerCountSem.Acquire(context.TODO(), int64(b.maxParallelWorkers))
 }
 
 // scanAndProcessFiles scans directory for WAL segments and attempts to upload them. It

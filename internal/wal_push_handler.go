@@ -51,7 +51,9 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 	err = uploadWALFile(uploader, walFilePath, bgUploader.preventWalOverwrite)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	bgUploader.Stop()
+	err = bgUploader.Stop()
+	tracelog.ErrorLogger.FatalOnError(err)
+
 	if uploader.getUseWalDelta() {
 		uploader.FlushFiles()
 	}

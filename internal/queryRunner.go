@@ -192,7 +192,10 @@ func (queryRunner *PgQueryRunner) stopBackup() (label string, offsetMap string, 
 	if err != nil {
 		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: transaction begin failed")
 	}
-	defer tx.Rollback()
+	defer func() {
+		// ignore the possible error, it's ok
+		_ = tx.Rollback()
+	}()
 
 	_, err = tx.Exec("SET statement_timeout=0;")
 	if err != nil {

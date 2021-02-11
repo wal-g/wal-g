@@ -49,7 +49,8 @@ func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
 	_, err := reader.Read(encryptedSymmetricKey)
 	tracelog.ErrorLogger.FatalfOnError("Can't read encryption key from archive file header: %v", err)
 
-	crypter.SymmetricKey.SetEncryptedKey(encryptedSymmetricKey)
+	err = crypter.SymmetricKey.SetEncryptedKey(encryptedSymmetricKey)
+	tracelog.ErrorLogger.FatalfOnError("Can't set encrypted key: %v", err)
 
 	err = crypter.SymmetricKey.Decrypt()
 	tracelog.ErrorLogger.FatalfOnError("Can't decrypt symmetric key: %v", err)

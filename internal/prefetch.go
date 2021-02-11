@@ -204,17 +204,19 @@ func prefetchFile(location string, folder storage.Folder, walFileName string, wa
 	}
 
 	tracelog.InfoLogger.Println("WAL-prefetch file: ", walFileName)
-	os.MkdirAll(runningLocation, 0755)
+	err := os.MkdirAll(runningLocation, 0755)
+	tracelog.ErrorLogger.PrintOnError(err)
 
-	err := DownloadWALFileTo(folder, walFileName, oldPath)
-	tracelog.ErrorLogger.FatalOnError(err)
+	err = DownloadWALFileTo(folder, walFileName, oldPath)
+	tracelog.ErrorLogger.PrintOnError(err)
 
 	_, errO = os.Stat(oldPath)
 	_, errN = os.Stat(newPath)
 	if errO == nil && os.IsNotExist(errN) {
-		os.Rename(oldPath, newPath)
+		err = os.Rename(oldPath, newPath)
+		tracelog.ErrorLogger.PrintOnError(err)
 	} else {
-		os.Remove(oldPath) // error is ignored
+		_ = os.Remove(oldPath) // error is ignored
 	}
 }
 
