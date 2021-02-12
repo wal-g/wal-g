@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"net/url"
 	"os"
 	"syscall"
 
@@ -33,6 +32,10 @@ func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 	bs, err := blob.NewServer(folder)
 	tracelog.ErrorLogger.FatalfOnError("proxy create error: %v", err)
 
+	lock, err := bs.AcquireLock()
+	tracelog.ErrorLogger.FatalOnError(err)
+	defer lock.Unlock()
+
 	err = bs.RunBackground(ctx, cancel)
 	tracelog.ErrorLogger.FatalfOnError("proxy run error: %v", err)
 
@@ -56,10 +59,8 @@ func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 			StartLocalTime: timeStart,
 		}
 	}
-	baseUrl := getDatabaseBackupUrl(backupName)
-
 	err = runParallel(func(dbname string) error {
-		return backupSingleDatabase(ctx, db, baseUrl, dbname, compression)
+		return backupSingleDatabase(ctx, db, backupName, dbname, compression)
 	}, dbnames)
 	tracelog.ErrorLogger.FatalfOnError("overall backup failed: %v", err)
 
@@ -71,15 +72,22 @@ func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 	tracelog.InfoLogger.Printf("backup finished")
 }
 
-func backupSingleDatabase(ctx context.Context, db *sql.DB, baseUrl string, dbname string, compression bool) error {
-	backupUrl := fmt.Sprintf("%s/%s", baseUrl, url.QueryEscape(dbname))
-	sql := fmt.Sprintf("BACKUP DATABASE %s TO URL = '%s' WITH FORMAT", quoteName(dbname), backupUrl)
+func backupSingleDatabase(ctx context.Context, db *sql.DB, backupName string, dbname string, compression bool) error {
+	baseUrl := getDatabaseBackupUrl(backupName, dbname)
+	size, blobCount, err := estimateDbSize(db, dbname)
+	if err != nil {
+		return err
+	}
+	tracelog.InfoLogger.Printf("database [%s] size is %d, required blob count %d", dbname, size, blobCount)
+	urls := buildBackupUrls(baseUrl, blobCount)
+	sql := fmt.Sprintf("BACKUP DATABASE %s TO %s", quoteName(dbname), urls)
+	sql += fmt.Sprintf(" WITH FORMAT, MAXTRANSFERSIZE=%d", MaxTransferSize)
 	if compression {
 		sql += ", COMPRESSION"
 	}
-	tracelog.InfoLogger.Printf("starting backup database [%s] to %s", dbname, backupUrl)
+	tracelog.InfoLogger.Printf("starting backup database [%s] to %s", dbname, urls)
 	tracelog.DebugLogger.Printf("SQL: %s", sql)
-	_, err := db.ExecContext(ctx, sql)
+	_, err = db.ExecContext(ctx, sql)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("database [%s] backup failed: %#v", dbname, err)
 	} else {

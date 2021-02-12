@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go v1.34.3
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/cyberdelia/lzo v0.0.0-20171006181345-d85071271a6f
-	github.com/denisenkom/go-mssqldb v0.0.0-20200428022330-06a60b6afbbc
+	github.com/denisenkom/go-mssqldb v0.9.0
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/docker v1.13.1
 	github.com/docker/go-connections v0.4.0 // indirect
@@ -20,11 +20,13 @@ require (
 	github.com/go-openapi/strfmt v0.19.4 // indirect
 	github.com/go-redis/redis v6.15.6+incompatible
 	github.com/go-sql-driver/mysql v1.5.0
+	github.com/gofrs/flock v0.8.0
 	github.com/gofrs/uuid v3.2.0+incompatible // indirect
 	github.com/golang/mock v1.4.3
 	github.com/golang/snappy v0.0.2-0.20190904063534-ff6b7dc882cf // indirect
 	github.com/google/brotli v1.0.7
 	github.com/google/uuid v1.1.1
+	github.com/hashicorp/golang-lru v0.5.1
 	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
 	github.com/jackc/pgconn v1.6.5-0.20200823013804-5db484908cf7
 	github.com/jackc/pglogrepl v0.0.0-20200831220807-35832f1993fb
@@ -62,5 +64,5 @@ require (
 	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5 // indirect
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	golang.org/x/tools v0.1.0 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 )

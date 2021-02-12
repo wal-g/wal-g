@@ -89,6 +89,7 @@ const (
 	SQLServerBlobHostname     = "SQLSERVER_BLOB_HOSTNAME"
 	SQLServerBlobCertFile     = "SQLSERVER_BLOB_CERT_FILE"
 	SQLServerBlobKeyFile      = "SQLSERVER_BLOB_KEY_FILE"
+	SQLServerBlobLockFile     = "SQLSERVER_BLOB_LOCK_FILE"
 	SQLServerConnectionString = "SQLSERVER_CONNECTION_STRING"
 
 	EndpointSourceSetting = "S3_ENDPOINT_SOURCE"

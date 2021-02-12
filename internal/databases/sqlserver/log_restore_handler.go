@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"net/url"
 	"os"
 	"syscall"
 	"time"
+
+	"github.com/wal-g/storages/storage"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -39,6 +40,10 @@ func HandleLogRestore(backupName string, untilTs string, dbnames []string, noRec
 	bs, err := blob.NewServer(folder)
 	tracelog.ErrorLogger.FatalfOnError("proxy create error: %v", err)
 
+	lock, err := bs.AcquireLock()
+	tracelog.ErrorLogger.FatalOnError(err)
+	defer lock.Unlock()
+
 	err = bs.RunBackground(ctx, cancel)
 	tracelog.ErrorLogger.FatalfOnError("proxy run error: %v", err)
 
@@ -61,8 +66,7 @@ func HandleLogRestore(backupName string, untilTs string, dbnames []string, noRec
 					logBackupName, dbname)
 				continue
 			}
-			baseUrl := getLogBackupUrl(logBackupName)
-			err = restoreSingleLog(ctx, db, baseUrl, dbname, stopAt)
+			err = restoreSingleLog(ctx, db, folder, logBackupName, dbname, stopAt)
 			if err != nil {
 				return err
 			}
@@ -77,13 +81,19 @@ func HandleLogRestore(backupName string, untilTs string, dbnames []string, noRec
 	tracelog.InfoLogger.Printf("log restore finished")
 }
 
-func restoreSingleLog(ctx context.Context, db *sql.DB, baseUrl string, dbname string, stopAt time.Time) error {
-	backupUrl := fmt.Sprintf("%s/%s", baseUrl, url.QueryEscape(dbname))
-	sql := fmt.Sprintf("RESTORE LOG %s FROM URL = '%s' WITH NORECOVERY, STOPAT = '%s'",
-		quoteName(dbname), backupUrl, stopAt.Format(TimeSQLServerFormat))
-	tracelog.InfoLogger.Printf("starting restore database [%s] log from %s", dbname, backupUrl)
+func restoreSingleLog(ctx context.Context, db *sql.DB, folder storage.Folder, logBackupName string, dbname string, stopAt time.Time) error {
+	baseUrl := getLogBackupUrl(logBackupName, dbname)
+	basePath := getLogBackupPath(logBackupName, dbname)
+	blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
+	if err != nil {
+		return err
+	}
+	urls := buildRestoreUrls(baseUrl, blobs)
+	sql := fmt.Sprintf("RESTORE LOG %s FROM %s WITH NORECOVERY, STOPAT = '%s'",
+		quoteName(dbname), urls, stopAt.Format(TimeSQLServerFormat))
+	tracelog.InfoLogger.Printf("starting restore database [%s] log from %s", dbname, urls)
 	tracelog.DebugLogger.Printf("SQL: %s", sql)
-	_, err := db.ExecContext(ctx, sql)
+	_, err = db.ExecContext(ctx, sql)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("database [%s] log restore failed: %v", dbname, err)
 	} else {
