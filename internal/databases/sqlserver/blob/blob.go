@@ -4,14 +4,22 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"sort"
 	"sync"
+
+	lru "github.com/hashicorp/golang-lru"
+	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/storages/storage"
 )
 
 const IndexFileName = "__blob_index.json"
+
+const CacheItemsPerBlob = 3
+
+const MaxCacheBlockSize = 16 * 1024 * 1024 // 16M
 
 type Index struct {
 	sync.Mutex
@@ -21,6 +29,7 @@ type Index struct {
 	icache    map[string]*Block // cache by id's
 	ocache    []*Block          // cache by offset, ordered, only committed
 	srequests chan chan error
+	readCache *lru.Cache
 }
 
 type Block struct {
@@ -33,16 +42,22 @@ type Block struct {
 }
 
 type Section struct {
-	Path   string
-	Offset uint64
-	Limit  uint64
+	Path      string
+	Offset    uint64
+	Limit     uint64
+	BlockSize uint64
 }
 
 func NewIndex(f storage.Folder) *Index {
+	c, err := lru.New(CacheItemsPerBlob)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create lru cache: %v", err))
+	}
 	idx := &Index{
 		folder:    f,
 		icache:    make(map[string]*Block),
 		srequests: make(chan chan error, 100),
+		readCache: c,
 	}
 	go idx.saver()
 	return idx
@@ -198,6 +213,8 @@ func (idx *Index) PutBlockList(xblocklist *XBlockListIn) ([]string, error) {
 			}
 		}
 	}
+
+	idx.readCache.Purge()
 	return garbage, nil
 }
 
@@ -282,10 +299,45 @@ func (idx *Index) GetSections(rangeMin, rangeMax uint64) []Section {
 		}
 		limit -= offset
 		sections = append(sections, Section{
-			Path:   fmt.Sprintf("%s.%d", block.ID, block.CommittedRev),
-			Offset: offset,
-			Limit:  limit,
+			Path:      fmt.Sprintf("%s.%d", block.ID, block.CommittedRev),
+			Offset:    offset,
+			Limit:     limit,
+			BlockSize: block.CommittedSize,
 		})
 	}
 	return sections
+}
+
+func (idx *Index) GetCachedReader(folder storage.Folder, s Section) (io.ReadCloser, error) {
+	key := folder.GetPath() + s.Path
+	if s.BlockSize > MaxCacheBlockSize {
+		tracelog.DebugLogger.Printf("READ_OBJ: %s %d", key, s.BlockSize)
+		return folder.ReadObject(s.Path)
+	}
+	var buf []byte
+	if b, ok := idx.readCache.Get(key); ok {
+		tracelog.DebugLogger.Printf("READ_CACHE: %s %d", key, s.BlockSize)
+		buf = b.([]byte)
+	} else {
+		tracelog.DebugLogger.Printf("READ_OBJ: %s %d", key, s.BlockSize)
+		rc, err := folder.ReadObject(s.Path)
+		if err != nil {
+			return nil, err
+		}
+		defer rc.Close()
+		buf = make([]byte, s.BlockSize)
+		_, err = io.ReadFull(rc, buf)
+		if err != nil {
+			return nil, err
+		}
+		tracelog.DebugLogger.Printf("ADD_CACHE: %s %d", key, s.BlockSize)
+		idx.readCache.Add(key, buf)
+	}
+	return ioutil.NopCloser(bytes.NewReader(buf)), nil
+}
+
+func (idx *Index) debugBlocks() {
+	for i, b := range idx.ocache {
+		tracelog.DebugLogger.Printf("BLK %05d %s\t %020d %08d", i, b.ID, b.Offset, b.CommittedSize)
+	}
 }

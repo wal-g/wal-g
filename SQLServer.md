@@ -31,6 +31,7 @@ Your wal-g.yaml config for SQLServer than may look like
     WALG_FILE_PREFIX: "C:/backup"
     SQLSERVER_BLOB_CERT_FILE: "C:/Path/To/cert.pem"
     SQLSERVER_BLOB_KEY_FILE:  "C:/Path/To/key.pem"
+    SQLSERVER_BLOB_LOCK_FILE: "C:/ProgramData/wal-g.lock"
     SQLSERVER_BLOB_HOSTNAME:  "backup.local"
     SQLSERVER_CONNECTION_STRING: "sqlserver://backupuser:backuppass1!@localhost:1433/instance"
     ```

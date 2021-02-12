@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"net/url"
 	"os"
 	"syscall"
+
+	"github.com/wal-g/storages/storage"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -38,14 +39,17 @@ func HandleBackupRestore(backupName string, dbnames []string, noRecovery bool) {
 	bs, err := blob.NewServer(folder)
 	tracelog.ErrorLogger.FatalfOnError("proxy create error: %v", err)
 
+	lock, err := bs.AcquireLock()
+	tracelog.ErrorLogger.FatalOnError(err)
+	defer lock.Unlock()
+
 	err = bs.RunBackground(ctx, cancel)
 	tracelog.ErrorLogger.FatalfOnError("proxy run error: %v", err)
 
 	backupName = backup.Name
-	baseUrl := getDatabaseBackupUrl(backupName)
 
 	err = runParallel(func(dbname string) error {
-		err := restoreSingleDatabase(ctx, db, baseUrl, dbname)
+		err := restoreSingleDatabase(ctx, db, folder, backupName, dbname)
 		if err != nil {
 			return err
 		}
@@ -59,12 +63,18 @@ func HandleBackupRestore(backupName string, dbnames []string, noRecovery bool) {
 	tracelog.InfoLogger.Printf("restore finished")
 }
 
-func restoreSingleDatabase(ctx context.Context, db *sql.DB, baseUrl string, dbname string) error {
-	backupUrl := fmt.Sprintf("%s/%s", baseUrl, url.QueryEscape(dbname))
-	sql := fmt.Sprintf("RESTORE DATABASE %s FROM URL = '%s' WITH REPLACE, NORECOVERY", quoteName(dbname), backupUrl)
-	tracelog.InfoLogger.Printf("starting restore database [%s] from %s", dbname, backupUrl)
+func restoreSingleDatabase(ctx context.Context, db *sql.DB, folder storage.Folder, backupName string, dbname string) error {
+	baseUrl := getDatabaseBackupUrl(backupName, dbname)
+	basePath := getDatabaseBackupPath(backupName, dbname)
+	blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
+	if err != nil {
+		return err
+	}
+	urls := buildRestoreUrls(baseUrl, blobs)
+	sql := fmt.Sprintf("RESTORE DATABASE %s FROM %s WITH REPLACE, NORECOVERY", quoteName(dbname), urls)
+	tracelog.InfoLogger.Printf("starting restore database [%s] from %s", dbname, urls)
 	tracelog.DebugLogger.Printf("SQL: %s", sql)
-	_, err := db.ExecContext(ctx, sql)
+	_, err = db.ExecContext(ctx, sql)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("database [%s] restore failed: %v", dbname, err)
 	} else {

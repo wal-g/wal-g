@@ -12,6 +12,9 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/xerrors"
+
+	"github.com/gofrs/flock"
 	"github.com/google/uuid"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
@@ -20,15 +23,18 @@ import (
 
 const ProxyStartTimeout = 10 * time.Second
 
+const ReqIDHeader = "X-Ms-Request-Id"
+
 type Server struct {
-	sync.Mutex
-	folder   storage.Folder
-	certFile string
-	keyFile  string
-	endpoint string
-	server   http.Server
-	indexes  map[string]*Index
-	leases   map[string]*Lease
+	folder       storage.Folder
+	certFile     string
+	keyFile      string
+	endpoint     string
+	server       http.Server
+	indexes      map[string]*Index
+	indexesMutex sync.Mutex
+	leases       map[string]Lease
+	leasesMutex  sync.Mutex
 }
 
 func NewServer(folder storage.Folder) (*Server, error) {
@@ -50,7 +56,7 @@ func NewServer(folder storage.Folder) (*Server, error) {
 	bs.endpoint = fmt.Sprintf("%s:%d", hostname, 443)
 	bs.server = http.Server{Addr: bs.endpoint, Handler: bs}
 	bs.indexes = make(map[string]*Index)
-	bs.leases = make(map[string]*Lease)
+	bs.leases = make(map[string]Lease)
 	return bs, nil
 }
 
@@ -113,6 +119,9 @@ func (bs *Server) Shutdown() error {
 
 func (bs *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if _, ok := internal.GetSetting(internal.SQLServerBlobKeyFile); ok {
+		if req.Header.Get(ReqIDHeader) == "" {
+			req.Header.Set(ReqIDHeader, uuid.New().String())
+		}
 		b, _ := httputil.DumpRequest(req, false)
 		tracelog.DebugLogger.Println(string(b))
 		bs.ServeHTTP2(&DebugResponseWriter{w}, req)
@@ -127,7 +136,7 @@ func (bs *Server) ServeHTTP2(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Length", "0")
 	w.Header().Set("X-Ms-Version", "2014-02-14")
 	w.Header().Set("X-Ms-Blob-Type", "BlockBlob")
-	w.Header().Set("X-Ms-Request-Id", uuid.New().String())
+	w.Header().Set(ReqIDHeader, req.Header.Get(ReqIDHeader))
 	w.Header().Set("Accept-Ranges", "bytes")
 	if err := req.ParseForm(); err != nil {
 		tracelog.WarningLogger.Printf("blob proxy: failed to parse form: %v", err)
@@ -184,14 +193,16 @@ func (bs *Server) HandleAcquireLease(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	folder := bs.getBlobFolder(req.URL.Path)
+	bs.leasesMutex.Lock()
 	lease, ok := bs.leases[folder.GetPath()]
 	if !ok || lease.End.Before(time.Now()) {
-		lease = &Lease{
+		lease = Lease{
 			ID:  leaseId,
 			End: time.Now().Add(time.Duration(leaseDuration * int(time.Second))),
 		}
 		bs.leases[folder.GetPath()] = lease
 	}
+	bs.leasesMutex.Unlock()
 	if lease.ID == leaseId {
 		w.Header().Set("X-Ms-Lease-Id", leaseId)
 		w.WriteHeader(http.StatusCreated)
@@ -216,12 +227,16 @@ func (bs *Server) HandleRenewLease(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	folder := bs.getBlobFolder(req.URL.Path)
+	bs.leasesMutex.Lock()
 	lease, ok := bs.leases[folder.GetPath()]
 	if !ok || lease.ID != leaseId {
+		bs.leasesMutex.Unlock()
 		w.WriteHeader(http.StatusPreconditionFailed)
 		return
 	}
 	lease.End = time.Now().Add(time.Duration(leaseDuration * int(time.Second)))
+	bs.leases[folder.GetPath()] = lease
+	bs.leasesMutex.Unlock()
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -237,13 +252,16 @@ func (bs *Server) HandleChangeLease(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	folder := bs.getBlobFolder(req.URL.Path)
+	bs.leasesMutex.Lock()
 	lease, ok := bs.leases[folder.GetPath()]
 	if !ok || lease.ID != leaseId {
+		bs.leasesMutex.Unlock()
 		w.WriteHeader(http.StatusPreconditionFailed)
 		return
 	}
-
 	lease.ID = newLeaseId
+	bs.leases[folder.GetPath()] = lease
+	bs.leasesMutex.Unlock()
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -254,17 +272,22 @@ func (bs *Server) HandleReleaseLease(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	folder := bs.getBlobFolder(req.URL.Path)
+	bs.leasesMutex.Lock()
 	lease, ok := bs.leases[folder.GetPath()]
 	if !ok || lease.ID != leaseId {
+		bs.leasesMutex.Unlock()
 		w.WriteHeader(http.StatusPreconditionFailed)
 		return
 	}
 	delete(bs.leases, folder.GetPath())
+	bs.leasesMutex.Unlock()
 	w.WriteHeader(http.StatusOK)
 }
 
 func (bs *Server) checkLease(w http.ResponseWriter, req *http.Request, folder storage.Folder) error {
+	bs.leasesMutex.Lock()
 	lease, ok := bs.leases[folder.GetPath()]
+	bs.leasesMutex.Unlock()
 	if ok && lease.End.After(time.Now()) {
 		if lease.ID != req.Header.Get("X-Ms-Lease-Id") {
 			return ErrNoLease
@@ -274,7 +297,9 @@ func (bs *Server) checkLease(w http.ResponseWriter, req *http.Request, folder st
 }
 
 func (bs *Server) setLeaseHeaders(w http.ResponseWriter, req *http.Request, folder storage.Folder) {
+	bs.leasesMutex.Lock()
 	lease, ok := bs.leases[folder.GetPath()]
+	bs.leasesMutex.Unlock()
 	if !ok {
 		w.Header().Set("X-Ms-Lease-State", "Available")
 		return
@@ -474,6 +499,8 @@ func (bs *Server) HandleBlobGet(w http.ResponseWriter, req *http.Request) {
 
 	sections := idx.GetSections(rangeMin, rangeMax)
 	for _, s := range sections {
+		// TODO: enable cache
+		// r, err := idx.GetCachedReader(folder, s)
 		r, err := folder.ReadObject(s.Path)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("proxy: failed to read object from storage: %v", err)
@@ -544,8 +571,8 @@ func (bs *Server) HandleBlobDelete(w http.ResponseWriter, req *http.Request) {
 	for _, p := range parts[:len(parts)-1] {
 		upperFolder = upperFolder.GetSubFolder(p)
 	}
-	bs.Lock()
-	defer bs.Unlock()
+	bs.indexesMutex.Lock()
+	defer bs.indexesMutex.Unlock()
 	err := upperFolder.DeleteObjects([]string{blob})
 	if err != nil {
 		bs.returnError(w, req, err)
@@ -579,8 +606,8 @@ func (bs *Server) getBlobFolder(path string) storage.Folder {
 }
 
 func (bs *Server) loadBlobIndex(folder storage.Folder) (*Index, error) {
-	bs.Lock()
-	defer bs.Unlock()
+	bs.indexesMutex.Lock()
+	defer bs.indexesMutex.Unlock()
 	path := folder.GetPath()
 	if idx, ok := bs.indexes[path]; ok {
 		return idx, nil
@@ -626,4 +653,17 @@ func (bs *Server) parseBytesRange(req *http.Request) (uint64, uint64, error) {
 		return 0, 0, err
 	}
 	return rangeMin, rangeMax, nil
+}
+
+func (bs *Server) AcquireLock() (*flock.Flock, error) {
+	path, err := internal.GetRequiredSetting(internal.SQLServerBlobLockFile)
+	if err != nil {
+		return nil, err
+	}
+	lock := flock.New(path)
+	locked, err := lock.TryLock()
+	if err != nil || !locked {
+		return nil, xerrors.Errorf("failed to lock %s, another instance running ?", path)
+	}
+	return lock, nil
 }
