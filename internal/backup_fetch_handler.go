@@ -153,15 +153,14 @@ func GetBackupByName(backupName, subfolder string, folder storage.Folder) (*Back
 }
 
 // If specified - choose specified, else choose from latest sentinelDto
-func chooseTablespaceSpecification(sentinelDto BackupSentinelDto, spec *TablespaceSpec) *TablespaceSpec {
+func chooseTablespaceSpecification(sentinelDtoSpec, spec *TablespaceSpec) *TablespaceSpec {
+	// spec is preferred over sentinelDtoSpec.TablespaceSpec if it is non-nil
 	if spec != nil {
 		return spec
-	} else {
-		if sentinelDto.TablespaceSpec == nil {
-			return &TablespaceSpec{}
-		}
-		return sentinelDto.TablespaceSpec
+	} else if sentinelDtoSpec == nil {
+		return &TablespaceSpec{}
 	}
+	return sentinelDtoSpec
 }
 
 // TODO : unit tests
@@ -176,7 +175,8 @@ func deltaFetchRecursionOld(backupName string, folder storage.Folder, dbDataDire
 	if err != nil {
 		return err
 	}
-	tablespaceSpec = chooseTablespaceSpecification(sentinelDto, tablespaceSpec)
+	tablespaceSpec = chooseTablespaceSpecification(sentinelDto.TablespaceSpec, tablespaceSpec)
+	sentinelDto.TablespaceSpec = tablespaceSpec
 
 	if sentinelDto.IsIncremental() {
 		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n", *(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN))
