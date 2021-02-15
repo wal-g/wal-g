@@ -131,6 +131,7 @@ func (idx *Index) PutBlock(id string, size uint64) string {
 	return fmt.Sprintf("%s.%d", block.ID, block.UploadedRev)
 }
 
+// nolint: gocyclo
 func (idx *Index) PutBlockList(xblocklist *XBlockListIn) ([]string, error) {
 	idx.Lock()
 	defer idx.Unlock()
@@ -147,9 +148,39 @@ func (idx *Index) PutBlockList(xblocklist *XBlockListIn) ([]string, error) {
 		}
 		block.Offset = size
 		newBlocks = append(newBlocks, block)
-		err := checkBlockMode(block, xb, &garbage)
-		if err != nil {
-			return nil, err
+		switch xb.Mode {
+		case BlockCommitted:
+			if block.CommittedRev == 0 {
+				return nil, fmt.Errorf("proxy: blocklist operation block %s is not committed", xb.ID)
+			}
+			if block.UploadedRev != 0 {
+				block.UploadedRev = 0
+				block.UploadedSize = 0
+				garbage = append(garbage, fmt.Sprintf("%s.%d", xb.ID, block.UploadedRev))
+			}
+		case BlockUncommitted:
+			if block.UploadedRev == 0 {
+				return nil, fmt.Errorf("proxy: blocklist operation block %s is not committed", xb.ID)
+			}
+			if block.CommittedRev != 0 {
+				garbage = append(garbage, fmt.Sprintf("%s.%d", xb.ID, block.CommittedRev))
+			}
+			block.CommittedRev = block.UploadedRev
+			block.CommittedSize = block.UploadedSize
+			block.UploadedRev = 0
+			block.UploadedSize = 0
+		case BlockLatest:
+			if block.UploadedRev != 0 {
+				if block.CommittedRev != 0 {
+					garbage = append(garbage, fmt.Sprintf("%s.%d", xb.ID, block.CommittedRev))
+				}
+				block.CommittedRev = block.UploadedRev
+				block.CommittedSize = block.UploadedSize
+				block.UploadedRev = 0
+				block.UploadedSize = 0
+			}
+		default:
+			panic(fmt.Sprintf("unexpected block mode: %s", xb.Mode))
 		}
 		size += block.CommittedSize
 	}
@@ -169,44 +200,6 @@ func (idx *Index) PutBlockList(xblocklist *XBlockListIn) ([]string, error) {
 		}
 	}
 	return garbage, nil
-}
-
-func checkBlockMode(block *Block, xb XBlockIn, garbage *[]string) error {
-	switch xb.Mode {
-	case BlockCommitted:
-		if block.CommittedRev == 0 {
-			return fmt.Errorf("proxy: blocklist operation block %s is not committed", xb.ID)
-		}
-		if block.UploadedRev != 0 {
-			block.UploadedRev = 0
-			block.UploadedSize = 0
-			*garbage = append(*garbage, fmt.Sprintf("%s.%d", xb.ID, block.UploadedRev))
-		}
-	case BlockUncommitted:
-		if block.UploadedRev == 0 {
-			return fmt.Errorf("proxy: blocklist operation block %s is not committed", xb.ID)
-		}
-		if block.CommittedRev != 0 {
-			*garbage = append(*garbage, fmt.Sprintf("%s.%d", xb.ID, block.CommittedRev))
-		}
-		block.CommittedRev = block.UploadedRev
-		block.CommittedSize = block.UploadedSize
-		block.UploadedRev = 0
-		block.UploadedSize = 0
-	case BlockLatest:
-		if block.UploadedRev != 0 {
-			if block.CommittedRev != 0 {
-				*garbage = append(*garbage, fmt.Sprintf("%s.%d", xb.ID, block.CommittedRev))
-			}
-			block.CommittedRev = block.UploadedRev
-			block.CommittedSize = block.UploadedSize
-			block.UploadedRev = 0
-			block.UploadedSize = 0
-		}
-	default:
-		panic(fmt.Sprintf("unexpected block mode: %s", xb.Mode))
-	}
-	return nil
 }
 
 func (idx *Index) GetBlockList(ltype string) *XBlockListOut {
