@@ -2,6 +2,9 @@ package sqlserver
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
+	"net/url"
 	"os"
 	"syscall"
 
@@ -36,9 +39,26 @@ func HandleLogPush(dbnames []string, compression bool) {
 	logBackupName := generateLogBackupName()
 	baseUrl := getLogBackupUrl(logBackupName)
 	err = runParallel(func(dbname string) error {
-		return backupSingleItem(LogBackupItem, ctx, db, baseUrl, dbname, compression)
+		return backupSingleLog(ctx, db, baseUrl, dbname, compression)
 	}, dbnames)
 	tracelog.ErrorLogger.FatalfOnError("overall log backup failed: %v", err)
 
 	tracelog.InfoLogger.Printf("log backup finished")
+}
+
+func backupSingleLog(ctx context.Context, db *sql.DB, baseUrl string, dbname string, compression bool) error {
+	backupUrl := fmt.Sprintf("%s/%s", baseUrl, url.QueryEscape(dbname))
+	sql := fmt.Sprintf("BACKUP LOG %s TO URL = '%s' WITH FORMAT", quoteName(dbname), backupUrl)
+	if compression {
+		sql += ", COMPRESSION"
+	}
+	tracelog.InfoLogger.Printf("starting backup database [%s] log to %s", dbname, backupUrl)
+	tracelog.DebugLogger.Printf("SQL: %s", sql)
+	_, err := db.ExecContext(ctx, sql)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("database [%s] log backup failed: %#v", dbname, err)
+	} else {
+		tracelog.InfoLogger.Printf("database [%s] log backup successfully finished", dbname)
+	}
+	return err
 }
