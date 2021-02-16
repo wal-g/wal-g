@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"net/url"
 	"path"
 	"sort"
 	"strings"
@@ -14,6 +16,7 @@ import (
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -22,6 +25,14 @@ const AllDatabases = "ALL"
 const LogNamePrefix = "wal_"
 
 const TimeSQLServerFormat = "Jan 02, 2006 03:04 PM"
+
+const MaxTransferSize = 4 * 1024 * 1024
+
+const MaxBlocksPerBlob = 25000 // 50000 actually, but we need some safety margin
+
+const MaxBlobSize = MaxTransferSize * MaxBlocksPerBlob
+
+const BlobNamePrefix = "blob_"
 
 var SystemDbnames = []string{
 	"master",
@@ -94,7 +105,7 @@ func getDatabasesToRestore(sentinel *SentinelDto, dbnames []string) ([]string, e
 }
 
 func listDatabases(db *sql.DB) ([]string, error) {
-	rows, err := db.Query("SELECT NAME FROM SYS.DATABASES WHERE NAME != 'tempdb'")
+	rows, err := db.Query("SELECT name FROM SYS.DATABASES WHERE name != 'tempdb'")
 	if err != nil {
 		return nil, err
 	}
@@ -111,6 +122,63 @@ func listDatabases(db *sql.DB) ([]string, error) {
 	return names, nil
 }
 
+func estimateSize(db *sql.DB, query string, args ...interface{}) (int64, int, error) {
+	var size int64
+	row := db.QueryRow(query, args...)
+	err := row.Scan(&size)
+	if err != nil {
+		return 0, 0, err
+	}
+	blobCount := int(math.Ceil(float64(size) / float64(MaxBlobSize)))
+	return size, blobCount, nil
+}
+
+func estimateDbSize(db *sql.DB, dbname string) (int64, int, error) {
+	query := fmt.Sprintf(`
+		USE %s; 
+		SELECT (SELECT used_log_space_in_bytes FROM sys.dm_db_log_space_usage) 
+			 + (SELECT allocated_extent_page_count*8*1024 FROM sys.dm_db_file_space_usage)
+		USE master;
+	`, quoteName(dbname))
+	return estimateSize(db, query)
+}
+
+func estimateLogSize(db *sql.DB, dbname string) (int64, int, error) {
+	query := fmt.Sprintf(`
+		USE %s; 
+		SELECT log_space_in_bytes_since_last_backup FROM sys.dm_db_log_space_usage; 
+		USE master;
+	`, quoteName(dbname))
+	return estimateSize(db, query)
+}
+
+func buildBackupUrls(baseUrl string, blobCount int) string {
+	res := ""
+	for i := 0; i < blobCount; i++ {
+		if i > 0 {
+			res += ", "
+		}
+		blobName := fmt.Sprintf("%s%03d", BlobNamePrefix, i)
+		res += fmt.Sprintf("URL = '%s/%s'", baseUrl, blobName)
+	}
+	return res
+}
+
+func buildRestoreUrls(baseUrl string, blobNames []string) string {
+	if len(blobNames) == 0 {
+		// old-style single blob backup
+		return fmt.Sprintf("URL = '%s'", baseUrl)
+	}
+	res := ""
+	for i, blobName := range blobNames {
+		if i > 0 {
+			res += ", "
+		}
+		res += fmt.Sprintf("URL = '%s/%s'", baseUrl, blobName)
+	}
+	return res
+}
+
 func quoteName(name string) string {
 	return "[" + strings.ReplaceAll(name, "]", "]]") + "]"
 }
@@ -119,24 +187,36 @@ func generateDatabaseBackupName() string {
 	return utility.BackupNamePrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 }
 
-func getDatabaseBackupUrl(backupName string) string {
+func getDatabaseBackupPath(backupName, dbname string) string {
+	return path.Join(utility.BaseBackupPath, backupName, dbname)
+}
+
+func getDatabaseBackupUrl(backupName, dbname string) string {
 	hostname, err := internal.GetRequiredSetting(internal.SQLServerBlobHostname)
 	if err != nil {
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
-	return fmt.Sprintf("https://%s/%s/%s", hostname, utility.BaseBackupPath, backupName)
+	backupName = url.QueryEscape(backupName)
+	dbname = url.QueryEscape(dbname)
+	return fmt.Sprintf("https://%s/%s", hostname, getDatabaseBackupPath(backupName, dbname))
 }
 
 func generateLogBackupName() string {
 	return LogNamePrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 }
 
-func getLogBackupUrl(logBackupName string) string {
+func getLogBackupPath(logBackupName, dbname string) string {
+	return path.Join(utility.WalPath, logBackupName, dbname)
+}
+
+func getLogBackupUrl(logBackupName, dbname string) string {
 	hostname, err := internal.GetRequiredSetting(internal.SQLServerBlobHostname)
 	if err != nil {
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
-	return fmt.Sprintf("https://%s/%s/%s", hostname, utility.WalPath, logBackupName)
+	logBackupName = url.QueryEscape(logBackupName)
+	dbname = url.QueryEscape(dbname)
+	return fmt.Sprintf("https://%s/%s", hostname, getLogBackupPath(logBackupName, dbname))
 }
 
 func doesLogBackupContainDb(folder storage.Folder, logBakupName string, dbname string) (bool, error) {
@@ -151,6 +231,30 @@ func doesLogBackupContainDb(folder storage.Folder, logBakupName string, dbname s
 		}
 	}
 	return false, nil
+}
+
+func listBackupBlobs(folder storage.Folder) ([]string, error) {
+	ok, err := folder.Exists(blob.IndexFileName)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		// old-style single blob backup
+		return nil, nil
+	}
+	_, blobDirs, err := folder.ListFolder()
+	if err != nil {
+		return nil, err
+	}
+	var blobs []string
+	for _, blobDir := range blobDirs {
+		name := path.Base(blobDir.GetPath())
+		if strings.HasPrefix(name, BlobNamePrefix) {
+			blobs = append(blobs, name)
+		}
+	}
+	sort.Strings(blobs)
+	return blobs, nil
 }
 
 func getLogsSinceBackup(folder storage.Folder, backupName string, stopAt time.Time) ([]string, error) {

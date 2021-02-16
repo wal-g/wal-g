@@ -17,6 +17,9 @@ func RunProxy(folder storage.Folder) {
 	defer func() { _ = signalHandler.Close() }()
 	bs, err := blob.NewServer(folder)
 	tracelog.ErrorLogger.FatalfOnError("proxy create error: %v", err)
+	lock, err := bs.AcquireLock()
+	tracelog.ErrorLogger.FatalOnError(err)
+	defer lock.Unlock()
 	err = bs.Run(ctx)
 	tracelog.ErrorLogger.FatalfOnError("proxy run error: %v", err)
 }

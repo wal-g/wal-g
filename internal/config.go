@@ -89,6 +89,7 @@ const (
 	SQLServerBlobHostname     = "SQLSERVER_BLOB_HOSTNAME"
 	SQLServerBlobCertFile     = "SQLSERVER_BLOB_CERT_FILE"
 	SQLServerBlobKeyFile      = "SQLSERVER_BLOB_KEY_FILE"
+	SQLServerBlobLockFile     = "SQLSERVER_BLOB_LOCK_FILE"
 	SQLServerConnectionString = "SQLSERVER_CONNECTION_STRING"
 
 	EndpointSourceSetting = "S3_ENDPOINT_SOURCE"
@@ -209,12 +210,14 @@ var (
 		"WALG_S3_MAX_PART_SIZE":       true,
 		"S3_ENDPOINT_SOURCE":          true,
 		"S3_ENDPOINT_PORT":            true,
+		"S3_USE_LIST_OBJECTS_V1":      true,
 
 		// Azure
 		"WALG_AZ_PREFIX":          true,
 		"AZURE_STORAGE_ACCOUNT":   true,
 		"AZURE_STORAGE_KEY":       true,
 		"AZURE_STORAGE_SAS_TOKEN": true,
+		"AZURE_ENVIRONMENT_NAME":  true,
 		"WALG_AZURE_BUFFER_SIZE":  true,
 		"WALG_AZURE_MAX_BUFFERS":  true,
 

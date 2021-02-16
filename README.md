@@ -60,6 +60,8 @@ WAL-G determines Azure Storage credentials using [azure default credentials](htt
 
 You may set `AZURE_STORAGE_SAS_TOKEN` in lieu of `AZURE_STORAGE_ACCESS_KEY` to make use of [SAS tokens](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview).
 
+For deployments where Azure Storage is not under AzurePuplicCloud environment, WAL-G need to use different Azure Storage endpoint. You can use optional setting `AZURE_STORAGE_SAS_TOKEN` to select the correct Azure Storage endpoint. Available setting values:  `"AzurePublicCloud"`, `"AzureUSGovernmentCloud"`, `"AzureChinaCloud"`, `"AzureGermanCloud"`. If setting is omitted or has a value different to the ones defined here, WAL-G will default to the Azure Storage endpoint for AzurePublicCloud.
+
 WAL-G sets default upload buffer size to 64 Megabytes and uses 3 buffers by default. However, users can choose to override these values by setting optional environment variables.
 
 
@@ -163,6 +165,12 @@ To configure AWS KMS key region for client-side encryption and decryption (i.e.,
 
 To configure the compression method used for backups. Possible options are: `lz4`, 'lzma', 'brotli'. The default method is `lz4`. LZ4 is the fastest method, but the compression ratio is bad.
 LZMA is way much slower. However, it compresses backups about 6 times better than LZ4. Brotli is a good trade-off between speed and compression ratio, which is about 3 times better than LZ4.
+
+* `S3_USE_LIST_OBJECTS_V1`
+
+By default, WAL-G uses [ListObjectsV2](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html) to fetch S3 storage folder listings.
+However, some S3-compatible storages may not support it.
+Set this setting to `true` to use [ListObjects](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjects.html) instead.
 
 * `YC_CSE_KMS_KEY_ID`
 
