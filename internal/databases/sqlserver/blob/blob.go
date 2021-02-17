@@ -337,6 +337,7 @@ func (idx *Index) GetCachedReader(folder storage.Folder, s Section) (io.ReadClos
 	return ioutil.NopCloser(bytes.NewReader(buf)), nil
 }
 
+// nolint: unused
 func (idx *Index) debugBlocks() {
 	for i, b := range idx.ocache {
 		tracelog.DebugLogger.Printf("BLK %05d %s\t %020d %08d", i, b.ID, b.Offset, b.CommittedSize)
