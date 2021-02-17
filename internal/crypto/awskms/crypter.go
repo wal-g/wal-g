@@ -49,7 +49,8 @@ func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
 	_, err := reader.Read(encryptedSymmetricKey)
 	tracelog.ErrorLogger.FatalfOnError("Can't read encryption key from archive file header: %v", err)
 
-	crypter.SymmetricKey.SetEncryptedKey(encryptedSymmetricKey)
+	err = crypter.SymmetricKey.SetEncryptedKey(encryptedSymmetricKey)
+	tracelog.ErrorLogger.FatalfOnError("Can't set encrypted key: %v", err)
 
 	err = crypter.SymmetricKey.Decrypt()
 	tracelog.ErrorLogger.FatalfOnError("Can't decrypt symmetric key: %v", err)
@@ -58,6 +59,6 @@ func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
 }
 
 // CrypterFromKeyID creates AWS KMS Crypter with given KMS Key ID
-func CrypterFromKeyID(CseKmsID string, CseKmsRegion string) crypto.Crypter {
-	return &Crypter{SymmetricKey: NewSymmetricKey(CseKmsID, 32, 184, CseKmsRegion)}
+func CrypterFromKeyID(CseKmsId string, CseKmsRegion string) crypto.Crypter {
+	return &Crypter{SymmetricKey: NewSymmetricKey(CseKmsId, 32, 184, CseKmsRegion)}
 }

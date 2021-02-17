@@ -52,7 +52,6 @@ var (
 )
 
 func init() {
-
 	copyCmd.Flags().StringVarP(&toConfigFile, toFlag, toShorthand, "", toDescription)
 	copyCmd.Flags().StringVarP(&fromConfigFile, fromFlag, fromShorthand, "", fromDescription)
 	copyCmd.Flags().StringVarP(&backupName, backupNameFlag, backupShorthand, "", backupShortDescription)

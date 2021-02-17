@@ -100,8 +100,8 @@ func (reader *Reader) readNextChunk() (err error) {
 	returnCode := C.crypto_secretstream_xchacha20poly1305_pull(
 		&reader.state,
 		(*C.uchar)(&reader.out[0]),
-		(*C.ulonglong)(&outLen),
-		(*C.uchar)(&tag),
+		&outLen,
+		&tag,
 		(*C.uchar)(&reader.in[0]),
 		(C.ulonglong)(n),
 		(*C.uchar)(C.NULL),
@@ -123,5 +123,5 @@ func (reader *Reader) readNextChunk() (err error) {
 	reader.outIdx = 0
 	reader.outLen = int(outLen)
 
-	return
+	return err
 }

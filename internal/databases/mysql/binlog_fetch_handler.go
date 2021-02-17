@@ -8,7 +8,6 @@ import (
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/utility"
 )
 
 type indexHandler struct {
@@ -43,16 +42,10 @@ func (ih *indexHandler) createIndexFile() error {
 }
 
 func HandleBinlogFetch(folder storage.Folder, backupName string, untilTs string) {
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
-	tracelog.ErrorLogger.FatalfOnError("Unable to get backup %v", err)
-
-	startTs, err := getBinlogSinceTs(folder, backup)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	endTs, err := utility.ParseUntilTs(untilTs)
-	tracelog.ErrorLogger.FatalOnError(err)
-
 	dstDir, err := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	startTs, endTs, err := getTimestamps(folder, backupName, untilTs)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	handler := newIndexHandler(dstDir)

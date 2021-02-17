@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+
 	//"io/ioutil"
 	"strings"
 	"unicode/utf16"

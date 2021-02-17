@@ -162,7 +162,7 @@ func writePage(target ReadWriterAt, blockNo int64, content io.Reader, overwrite 
 }
 
 // check if page is missing (block of zeros) in local file
-func checkIfMissingPage(target ReadWriterAt, blockNo int64) (bool, error) {
+func checkIfMissingPage(target io.ReaderAt, blockNo int64) (bool, error) {
 	emptyPageHeader := make([]byte, headerSize)
 	pageHeader := make([]byte, headerSize)
 	_, err := target.ReadAt(pageHeader, blockNo*DatabasePageSize)

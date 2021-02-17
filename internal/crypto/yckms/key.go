@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"io"
+
 	"github.com/yandex-cloud/go-genproto/yandex/cloud/kms/v1"
 	ycsdk "github.com/yandex-cloud/go-sdk"
-	"io"
 )
 
 const (

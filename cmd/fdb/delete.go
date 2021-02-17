@@ -33,9 +33,9 @@ var deleteRetainCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		afterValue, _ := cmd.Flags().GetString("after")
 		if afterValue == "" {
-			runDeleteRetain(cmd, args)
+			runDeleteRetain(args)
 		} else {
-			runDeleteRetainAfter(cmd, append(args, afterValue))
+			runDeleteRetainAfter(append(args, afterValue))
 		}
 	},
 }
@@ -68,7 +68,7 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 	deleteHandler.HandleDeleteBefore(args, confirmed)
 }
 
-func runDeleteRetain(cmd *cobra.Command, args []string) {
+func runDeleteRetain(args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -78,7 +78,7 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 	deleteHandler.HandleDeleteRetain(args, confirmed)
 }
 
-func runDeleteRetainAfter(cmd *cobra.Command, args []string) {
+func runDeleteRetainAfter(args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 

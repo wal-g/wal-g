@@ -14,7 +14,7 @@ type streamSentinelDto struct {
 	StartLocalTime time.Time
 }
 
-func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
+func HandleBackupPush(uploader internal.UploaderProvider, backupCmd *exec.Cmd) {
 	timeStart := utility.TimeNowCrossPlatformLocal()
 
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)

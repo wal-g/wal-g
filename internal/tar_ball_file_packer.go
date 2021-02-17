@@ -160,7 +160,7 @@ func (p *TarBallFilePacker) createFileReadCloser(cfi *ComposeFileInfo) (io.ReadC
 		case InvalidBlockError: // fallback to full file backup
 			tracelog.WarningLogger.Printf("failed to read file '%s' as incremented\n", cfi.header.Name)
 			cfi.isIncremented = false
-			fileReadCloser, err = startReadingFile(cfi.header, cfi.fileInfo, cfi.path, fileReadCloser)
+			fileReadCloser, err = startReadingFile(cfi.header, cfi.fileInfo, cfi.path)
 			if err != nil {
 				return nil, err
 			}
@@ -169,7 +169,7 @@ func (p *TarBallFilePacker) createFileReadCloser(cfi *ComposeFileInfo) (io.ReadC
 		}
 	} else {
 		var err error
-		fileReadCloser, err = startReadingFile(cfi.header, cfi.fileInfo, cfi.path, fileReadCloser)
+		fileReadCloser, err = startReadingFile(cfi.header, cfi.fileInfo, cfi.path)
 		if err != nil {
 			return nil, err
 		}
@@ -178,7 +178,7 @@ func (p *TarBallFilePacker) createFileReadCloser(cfi *ComposeFileInfo) (io.ReadC
 }
 
 // TODO : unit tests
-func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string, fileReader io.ReadCloser) (io.ReadCloser, error) {
+func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string) (io.ReadCloser, error) {
 	fileInfoHeader.Size = info.Size()
 	file, err := os.Open(path)
 	if err != nil {
@@ -188,7 +188,7 @@ func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string,
 		return nil, errors.Wrapf(err, "startReadingFile: failed to open file '%s'\n", path)
 	}
 	diskLimitedFileReader := limiters.NewDiskLimitReader(file)
-	fileReader = &ioextensions.ReadCascadeCloser{
+	fileReader := &ioextensions.ReadCascadeCloser{
 		Reader: &io.LimitedReader{
 			R: io.MultiReader(diskLimitedFileReader, &ioextensions.ZeroReader{}),
 			N: fileInfoHeader.Size,

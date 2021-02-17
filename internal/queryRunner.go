@@ -73,7 +73,6 @@ func (queryRunner *PgQueryRunner) buildGetCurrentLsn() string {
 		return "SELECT pg_current_wal_lsn()"
 	}
 	return "SELECT pg_current_xlog_location()"
-
 }
 
 // BuildStartBackup formats a query that starts backup according to server features and version
@@ -193,7 +192,10 @@ func (queryRunner *PgQueryRunner) stopBackup() (label string, offsetMap string, 
 	if err != nil {
 		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: transaction begin failed")
 	}
-	defer tx.Rollback()
+	defer func() {
+		// ignore the possible error, it's ok
+		_ = tx.Rollback()
+	}()
 
 	_, err = tx.Exec("SET statement_timeout=0;")
 	if err != nil {
@@ -236,7 +238,7 @@ func (queryRunner *PgQueryRunner) BuildStatisticsQuery() (string, error) {
 }
 
 // getStatistics queries the relations statistics from database
-func (queryRunner *PgQueryRunner) getStatistics(dbInfo *PgDatabaseInfo) (map[walparser.RelFileNode]PgRelationStat, error) {
+func (queryRunner *PgQueryRunner) getStatistics(dbInfo PgDatabaseInfo) (map[walparser.RelFileNode]PgRelationStat, error) {
 	tracelog.InfoLogger.Println("Querying pg_stat_all_tables")
 	getStatQuery, err := queryRunner.BuildStatisticsQuery()
 	conn := queryRunner.connection

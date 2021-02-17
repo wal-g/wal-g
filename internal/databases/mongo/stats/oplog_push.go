@@ -196,7 +196,6 @@ func (st *OplogPushStats) RunLogging(logInterval time.Duration, logger logFunc) 
 				report.majTS.TS-report.archivedTS.TS)
 		default:
 			logger("OplogPushStatus: unknown status '%s'", report.status)
-
 		}
 	}
 }

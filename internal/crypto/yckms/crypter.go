@@ -3,12 +3,13 @@ package yckms
 import (
 	"bufio"
 	"context"
+	"io"
+
 	"github.com/minio/sio"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	ycsdk "github.com/yandex-cloud/go-sdk"
-	"io"
 )
 
 type YcCrypter struct {

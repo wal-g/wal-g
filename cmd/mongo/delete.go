@@ -59,7 +59,6 @@ func runPurge(cmd *cobra.Command, args []string) {
 
 	err = mongo.HandlePurge(downloader, purger, opts...)
 	tracelog.ErrorLogger.FatalOnError(err)
-
 }
 
 func init() {

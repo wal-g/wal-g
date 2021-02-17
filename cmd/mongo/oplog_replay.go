@@ -6,8 +6,6 @@ import (
 	"os"
 	"syscall"
 
-	"time"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -51,10 +49,6 @@ type oplogReplayRunArgs struct {
 
 	oplogAlwaysUpsert    *bool
 	oplogApplicationMode *string
-
-	primaryWait        bool
-	primaryWaitTimeout time.Duration
-	lwUpdate           time.Duration
 }
 
 func buildOplogReplayRunArgs(cmdargs []string) (args oplogReplayRunArgs, err error) {
@@ -92,7 +86,7 @@ func buildOplogReplayRunArgs(cmdargs []string) (args oplogReplayRunArgs, err err
 		args.oplogApplicationMode = &oplogApplicationMode
 	}
 
-	return
+	return args, nil
 }
 
 func runOplogReplay(ctx context.Context, replayArgs oplogReplayRunArgs) error {

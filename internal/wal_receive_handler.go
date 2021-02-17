@@ -84,7 +84,7 @@ func HandleWALReceive(uploader *WalUploader) {
 	for {
 		streamResult, err := segment.Stream(conn, time.Second*streamTimeout)
 		tracelog.ErrorLogger.FatalOnError(err)
-		tracelog.DebugLogger.Printf("Succesfully received wal segment %s: ", segment.Name())
+		tracelog.DebugLogger.Printf("Successfully received wal segment %s: ", segment.Name())
 
 		switch streamResult {
 		case ProcessMessageOK:

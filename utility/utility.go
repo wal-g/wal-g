@@ -29,6 +29,16 @@ func LoggedClose(c io.Closer, errmsg string) {
 	}
 }
 
+func LoggedSync(file *os.File, errmsg string) {
+	err := file.Sync()
+	if errmsg == "" {
+		errmsg = "Problem with file sync"
+	}
+	if err != nil {
+		tracelog.ErrorLogger.Printf("%s: %v", errmsg, err)
+	}
+}
+
 const (
 	VersionStr       = "005"
 	BaseBackupPath   = "basebackups_" + VersionStr + "/"
@@ -173,7 +183,7 @@ func (p *BytesPool) Put(b []byte) {
 	}
 }
 
-//FastCopy copies data from src to dst in blocks of CopiedBlockMaxSize bytes
+// FastCopy copies data from src to dst in blocks of CopiedBlockMaxSize bytes
 func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
 	n := int64(0)
 	buf := copyBytesPool.Get()

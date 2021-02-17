@@ -90,6 +90,7 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 	err = filepath.Walk(archiveDirectory, bundle.prefaultWalkedFSObject)
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = bundle.FinishQueue()
+	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 // TODO : unit tests
@@ -203,17 +204,19 @@ func prefetchFile(location string, folder storage.Folder, walFileName string, wa
 	}
 
 	tracelog.InfoLogger.Println("WAL-prefetch file: ", walFileName)
-	os.MkdirAll(runningLocation, 0755)
+	err := os.MkdirAll(runningLocation, 0755)
+	tracelog.ErrorLogger.PrintOnError(err)
 
-	err := DownloadWALFileTo(folder, walFileName, oldPath)
-	tracelog.ErrorLogger.FatalOnError(err)
+	err = DownloadWALFileTo(folder, walFileName, oldPath)
+	tracelog.ErrorLogger.PrintOnError(err)
 
 	_, errO = os.Stat(oldPath)
 	_, errN = os.Stat(newPath)
 	if errO == nil && os.IsNotExist(errN) {
-		os.Rename(oldPath, newPath)
+		err = os.Rename(oldPath, newPath)
+		tracelog.ErrorLogger.PrintOnError(err)
 	} else {
-		os.Remove(oldPath) // error is ignored
+		_ = os.Remove(oldPath) // error is ignored
 	}
 }
 
@@ -238,8 +241,9 @@ func forkPrefetch(walFileName string, location string) {
 	}
 	cmd := exec.Command(os.Args[0], "wal-prefetch", walFileName, location)
 	env := os.Environ()
-	env = append(env, fmt.Sprintf("%s=%s", "S3_ENDPOINT_PORT", EndpointPortSetting))
-	env = append(env, fmt.Sprintf("%s=%s", "S3_ENDPOINT_SOURCE", EndpointSourceSetting))
+	env = append(env,
+		fmt.Sprintf("%s=%s", "S3_ENDPOINT_PORT", EndpointPortSetting),
+		fmt.Sprintf("%s=%s", "S3_ENDPOINT_SOURCE", EndpointSourceSetting))
 	cmd.Env = env
 	err = cmd.Start()
 

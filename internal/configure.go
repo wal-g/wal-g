@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/wal-g/wal-g/internal/crypto/yckms"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/wal-g/wal-g/internal/crypto/yckms"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -131,10 +132,7 @@ func ConfigureFolderForSpecificConfig(config *viper.Viper) (storage.Folder, erro
 			prefix = adapter.prefixPreprocessor(prefix)
 		}
 
-		settings, err := adapter.loadSettings(config)
-		if err != nil {
-			return nil, err
-		}
+		settings := adapter.loadSettings(config)
 		return adapter.configureFolder(prefix, settings)
 	}
 	return nil, newUnconfiguredStorageError(skippedPrefixes)

@@ -21,10 +21,19 @@ func HandleCatchupPush(uploader *WalUploader, archiveDirectory string, fromLSN u
 
 	extendExcludedFiles()
 
-	createAndPushBackup(
-		uploader,
-		archiveDirectory, utility.CatchupPath,
-		"", fakePreviousBackupSentinelDto,
-		false, true, 0,
-		false, false, RegularComposer)
+	backupConfig := BackupConfig{
+		uploader:                  uploader,
+		archiveDirectory:          archiveDirectory,
+		backupsFolder:             utility.CatchupPath,
+		previousBackupName:        "",
+		previousBackupSentinelDto: fakePreviousBackupSentinelDto,
+		isPermanent:               false,
+		forceIncremental:          true,
+		incrementCount:            0,
+		verifyPageChecksums:       false,
+		storeAllCorruptBlocks:     false,
+		tarBallComposerType:       RegularComposer,
+	}
+
+	createAndPushBackup(&backupConfig)
 }

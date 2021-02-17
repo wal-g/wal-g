@@ -185,7 +185,6 @@ func (h *DeleteHandler) FindTargetRetain(retentionCount, modifier int) (BackupOb
 	return findTarget(h.backups, h.greater, choiceFunc)
 }
 
-
 func (h *DeleteHandler) FindTargetByName(bname string) (BackupObject, error) {
 	return findTarget(h.backups, h.greater, func(object BackupObject) bool {
 		return strings.HasPrefix(object.GetName(), bname)
@@ -194,7 +193,6 @@ func (h *DeleteHandler) FindTargetByName(bname string) (BackupObject, error) {
 
 func (h *DeleteHandler) FindTargetRetainAfterName(
 	retentionCount int, name string, modifier int) (BackupObject, error) {
-
 	choiceFuncRetain := getRetainChoiceFunc(retentionCount, modifier)
 	if choiceFuncRetain == nil {
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete before'")
@@ -379,7 +377,7 @@ func extractDeleteModifierFromArgs(args []string) (int, string) {
 }
 
 func DeleteBeforeArgsValidator(cmd *cobra.Command, args []string) error {
-	err := deleteArgsValidator(cmd, args, StringModifiers, 1, 2)
+	err := deleteArgsValidator(args, StringModifiers, 1, 2)
 	if err != nil {
 		return err
 	}
@@ -396,7 +394,7 @@ func DeleteBeforeArgsValidator(cmd *cobra.Command, args []string) error {
 }
 
 func DeleteEverythingArgsValidator(cmd *cobra.Command, args []string) error {
-	return deleteArgsValidator(cmd, args, StringModifiersDeleteEverything, 0, 1)
+	return deleteArgsValidator(args, StringModifiersDeleteEverything, 0, 1)
 }
 
 func DeleteRetainArgsValidator(cmd *cobra.Command, args []string) error {
@@ -412,7 +410,7 @@ func DeleteRetainArgsValidator(cmd *cobra.Command, args []string) error {
 }
 
 func DeleteRetainAfterArgsValidator(cmd *cobra.Command, args []string) error {
-	err := deleteArgsValidator(cmd, args, StringModifiers, 2, 3)
+	err := deleteArgsValidator(args, StringModifiers, 2, 3)
 	if err != nil {
 		return err
 	}
@@ -432,7 +430,7 @@ func DeleteRetainAfterArgsValidator(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func deleteArgsValidator(cmd *cobra.Command, args, stringModifiers []string, minArgs int, maxArgs int) error {
+func deleteArgsValidator(args, stringModifiers []string, minArgs int, maxArgs int) error {
 	if len(args) < minArgs || len(args) > maxArgs {
 		return fmt.Errorf("accepts between %d and %d arg(s), received %d", minArgs, maxArgs, len(args))
 	}

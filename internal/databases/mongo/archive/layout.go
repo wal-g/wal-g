@@ -77,8 +77,8 @@ func BackupNamesFromBackupTimes(backups []internal.BackupTime) []string {
 // BackupNamesFromBackups forms list of backup names from Backups
 func BackupNamesFromBackups(backups []models.Backup) []string {
 	names := make([]string, 0, len(backups))
-	for _, b := range backups {
-		names = append(names, b.BackupName)
+	for idx := range backups {
+		names = append(names, backups[idx].BackupName)
 	}
 	return names
 }
@@ -151,7 +151,7 @@ func SplitPurgingOplogArchivesByTS(archives []models.Archive, purgeBeforeTS mode
 //OldestBackupAfterTime returns last backup after given time.
 func OldestBackupAfterTime(backups []models.Backup, after time.Time) (models.Backup, error) {
 	if len(backups) <= 0 {
-		return models.Backup{}, fmt.Errorf("empty backup list recieved")
+		return models.Backup{}, fmt.Errorf("empty backup list received")
 	}
 	retainAfterTS := after.Unix()
 

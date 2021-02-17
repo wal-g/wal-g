@@ -45,14 +45,14 @@ var deleteEverythingCmd = &cobra.Command{
 
 const (
 	DeleteTargetUsageExample = "target"
-	DeleteTargetExamples = ""
+	DeleteTargetExamples     = ""
 )
 
 var deleteTargetCmd = &cobra.Command{
-	Use:       DeleteTargetUsageExample, // TODO : improve description
-	Example:   DeleteTargetExamples,
-	Args:      cobra.ExactArgs(1),
-	Run:       runDeleteTarget,
+	Use:     DeleteTargetUsageExample, // TODO : improve description
+	Example: DeleteTargetExamples,
+	Args:    cobra.ExactArgs(1),
+	Run:     runDeleteTarget,
 }
 
 type DeleteHandler struct {
@@ -83,7 +83,6 @@ func (h *DeleteHandler) deleteTarget(bobj internal.BackupObject, confirmed bool)
 		return strings.HasPrefix(object.GetName(), strings.TrimSuffix(bobj.GetName(), utility.SentinelSuffix))
 	})
 }
-
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
 	deleteHandler, err := NewMySqlDeleteHandler()

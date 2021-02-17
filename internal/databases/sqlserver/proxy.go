@@ -19,7 +19,7 @@ func RunProxy(folder storage.Folder) {
 	tracelog.ErrorLogger.FatalfOnError("proxy create error: %v", err)
 	lock, err := bs.AcquireLock()
 	tracelog.ErrorLogger.FatalOnError(err)
-	defer lock.Unlock()
+	defer tracelog.ErrorLogger.FatalOnError(lock.Unlock())
 	err = bs.Run(ctx)
 	tracelog.ErrorLogger.FatalfOnError("proxy run error: %v", err)
 }

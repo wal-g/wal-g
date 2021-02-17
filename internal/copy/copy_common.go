@@ -28,7 +28,6 @@ func Infos(chs []InfoProvider) error {
 	var wg sync.WaitGroup
 
 	for _, ch := range chs {
-
 		// do we have any errs yet?
 		for len(errors) > 0 {
 			if err := <-errors; err != nil {
@@ -37,7 +36,7 @@ func Infos(chs []InfoProvider) error {
 		}
 
 		// block here
-		_ = <-tickets
+		<-tickets
 		wg.Add(1)
 
 		go func(handler InfoProvider) {
@@ -61,7 +60,6 @@ func Infos(chs []InfoProvider) error {
 }
 
 func (ch *InfoProvider) copyObject() error {
-
 	readCloser, err := ch.From.ReadObject(ch.SrcObj.GetName())
 	if err != nil {
 		return err
@@ -87,7 +85,6 @@ var NoopRenameFunc = func(o storage.Object) string {
 
 func BuildCopyingInfos(from storage.Folder, to storage.Folder, objects []storage.Object,
 	filter func(storage.Object) bool, renameFunc func(object storage.Object) string) (infos []InfoProvider) {
-
 	tracelog.DebugLogger.Println("processing copy infos filtering")
 
 	for _, object := range objects {

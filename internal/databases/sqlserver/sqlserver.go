@@ -333,14 +333,3 @@ func uniq(src []string) []string {
 	}
 	return res
 }
-
-func convertPITRTime(untilDt string) (string, error) {
-	if untilDt == "" {
-		return "", nil
-	}
-	dt, err := time.Parse(time.RFC3339, untilDt)
-	if err != nil {
-		return "", err
-	}
-	return dt.Format(TimeSQLServerFormat), nil
-}

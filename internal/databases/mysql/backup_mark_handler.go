@@ -30,7 +30,7 @@ func MarkBackup(uploader *internal.Uploader, backupName string, toPermanent bool
 		meta.IsPermanent = toPermanent
 	}
 
-	metadataUploadObject, err := internal.GetMetadataUploadObject(backup.Name, meta)
+	metadataUploadObject, err := internal.GetMetadataUploadObject(backup.Name, &meta)
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("Failed to mark previous backups: %v", err)
 	}

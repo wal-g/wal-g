@@ -20,7 +20,7 @@ type StorageAdapter struct {
 	prefixPreprocessor func(string) string
 }
 
-func (adapter *StorageAdapter) loadSettings(config *viper.Viper) (map[string]string, error) {
+func (adapter *StorageAdapter) loadSettings(config *viper.Viper) map[string]string {
 	settings := make(map[string]string)
 
 	for _, settingName := range adapter.settingNames {
@@ -40,7 +40,7 @@ func (adapter *StorageAdapter) loadSettings(config *viper.Viper) (map[string]str
 			settings[settingName] = settingValue
 		}
 	}
-	return settings, nil
+	return settings
 }
 
 func preprocessFilePrefix(prefix string) string {

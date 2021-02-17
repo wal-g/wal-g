@@ -32,7 +32,6 @@ import (
 const (
 	DatabasePageSize            = int64(walparser.BlockSize)
 	sizeofInt32                 = 4
-	sizeofInt16                 = 2
 	sizeofInt64                 = 8
 	SignatureMagicNumber byte   = 0x55
 	invalidLsn           uint64 = 0
@@ -109,7 +108,7 @@ func isPagedFile(info os.FileInfo, filePath string) bool {
 	if info.IsDir() ||
 		((!strings.Contains(filePath, DefaultTablespace)) && (!strings.Contains(filePath, NonDefaultTablespace))) ||
 		info.Size() == 0 ||
-		info.Size()%int64(DatabasePageSize) != 0 ||
+		info.Size()%DatabasePageSize != 0 ||
 		!pagedFilenameRegexp.MatchString(path.Base(filePath)) {
 		return false
 	}
@@ -205,7 +204,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrement
 		return errors.Wrap(err, "can't open file to increment")
 	}
 	defer utility.LoggedClose(file, "")
-	defer file.Sync()
+	defer utility.LoggedSync(file, "")
 
 	err = file.Truncate(int64(fileSize))
 	if err != nil {
@@ -220,7 +219,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrement
 			return err
 		}
 
-		_, err = file.WriteAt(page, int64(blockNo)*int64(DatabasePageSize))
+		_, err = file.WriteAt(page, int64(blockNo)*DatabasePageSize)
 		if err != nil {
 			return err
 		}

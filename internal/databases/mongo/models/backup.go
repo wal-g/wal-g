@@ -39,7 +39,7 @@ func FirstOverlappingBackupForArch(arch Archive, backups []Backup) Backup {
 	var backup Backup
 	for j := range backups {
 		backup = backups[j]
-		if ArchInBackup(arch, backup) {
+		if ArchInBackup(arch, &backup) {
 			return backup
 		}
 	}
@@ -47,7 +47,7 @@ func FirstOverlappingBackupForArch(arch Archive, backups []Backup) Backup {
 }
 
 // ArchInBackup checks if archive and given backup overlaps each over.
-func ArchInBackup(arch Archive, backup Backup) bool {
+func ArchInBackup(arch Archive, backup *Backup) bool {
 	backupStart := backup.MongoMeta.Before.LastMajTS
 	backupEnd := backup.MongoMeta.After.LastMajTS
 	return TimestampInInterval(arch.Start, backupStart, backupEnd) || TimestampInInterval(arch.End, backupStart, backupEnd) ||

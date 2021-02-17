@@ -63,5 +63,4 @@ func init() {
 	cmd.AddCommand(oplogFetchCmd)
 	oplogFetchCmd.PersistentFlags().StringVarP(
 		&format, "format", "f", "json", fmt.Sprintf("Valid values: json, bson, bson-raw"))
-
 }

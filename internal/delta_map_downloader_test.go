@@ -5,12 +5,12 @@ import (
 )
 
 func TestGetDeltaRange(t *testing.T) {
-	deltaNo000000010000011100000000 := newDeltaNoFromFilenameNoError("000000010000011100000000")
+	deltaNo000000010000011100000000, _ := newDeltaNoFromFilename("000000010000011100000000")
 	deltaNo000000010000011100000010 := deltaNo000000010000011100000000.next()
 	deltaNo000000010000011100000020 := deltaNo000000010000011100000010.next()
 	deltaNo000000010000011100000030 := deltaNo000000010000011100000020.next()
 
-	walSegNo000000010000011100000014 := newWalSegmentNoFromFilenameNoError("000000010000011100000014")
+	walSegNo000000010000011100000014, _ := newWalSegmentNoFromFilename("000000010000011100000014")
 	walSegNo000000010000011100000015 := walSegNo000000010000011100000014.next()
 	walSegNo000000010000011100000009 := deltaNo000000010000011100000010.firstWalSegmentNo().previous()
 	type args struct {
@@ -86,7 +86,7 @@ func TestGetDeltaRange(t *testing.T) {
 }
 
 func TestGetWalSegmentRange(t *testing.T) {
-	deltaNo000000010000011100000009 := newDeltaNoFromFilenameNoError("000000010000011100000009")
+	deltaNo000000010000011100000009, _ := newDeltaNoFromFilename("000000010000011100000009")
 	type args struct {
 		firstNotUsedDeltaNo DeltaNo
 		firstNotUsedLsn     uint64
