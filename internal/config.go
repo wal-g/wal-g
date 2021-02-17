@@ -272,6 +272,7 @@ var (
 		SQLServerBlobHostname:     true,
 		SQLServerBlobCertFile:     true,
 		SQLServerBlobKeyFile:      true,
+		SQLServerBlobLockFile:     true,
 		SQLServerConnectionString: true,
 	}
 

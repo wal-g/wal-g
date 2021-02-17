@@ -148,7 +148,7 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 
 	retrier := NewExponentialRetrier(MinExtractRetryWait, MaxExtractRetryWait)
 	// Set maximum number of goroutines spun off by ExtractAll
-	downloadingConcurrency, err := getMaxDownloadConcurrency()
+	downloadingConcurrency, err := GetMaxDownloadConcurrency()
 	if err != nil {
 		return err
 	}

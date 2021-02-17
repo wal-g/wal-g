@@ -39,7 +39,7 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
 
-	concurrency, err := getMaxUploadConcurrency()
+	concurrency, err := GetMaxUploadConcurrency()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	totalBgUploadedLimit := viper.GetInt32(TotalBgUploadedLimit)
