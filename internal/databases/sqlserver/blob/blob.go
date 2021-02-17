@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"sort"
 	"sync"
+	"time"
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/wal-g/tracelog"
@@ -21,6 +22,8 @@ const CacheItemsPerBlob = 3
 
 const MaxCacheBlockSize = 16 * 1024 * 1024 // 16M
 
+const BgSaveInterval = 30 * time.Second
+
 type Index struct {
 	sync.Mutex
 	folder    storage.Folder
@@ -28,7 +31,7 @@ type Index struct {
 	Blocks    []*Block          `json:"blocks"`
 	icache    map[string]*Block // cache by id's
 	ocache    []*Block          // cache by offset, ordered, only committed
-	srequests chan chan error
+	needSave  bool
 	readCache *lru.Cache
 }
 
@@ -56,7 +59,6 @@ func NewIndex(f storage.Folder) *Index {
 	idx := &Index{
 		folder:    f,
 		icache:    make(map[string]*Block),
-		srequests: make(chan chan error, 100),
 		readCache: c,
 	}
 	go idx.saver()
@@ -101,34 +103,32 @@ func (idx *Index) buildCache() {
 }
 
 func (idx *Index) saver() {
-	for {
-		requests := make([]chan error, 0, 10)
-		// get next save request
-		req := <-idx.srequests
-		requests = append(requests, req)
-		// and other pending
-		select {
-		case req := <-idx.srequests:
-			requests = append(requests, req)
-		default:
-			break
-		}
+	for range time.NewTicker(BgSaveInterval).C {
 		idx.Lock()
-		data, err := json.Marshal(idx)
+		needSave := idx.needSave
+		idx.needSave = false
 		idx.Unlock()
-		if err == nil {
-			err = idx.folder.PutObject(IndexFileName, bytes.NewBuffer(data))
-		}
-		for _, req := range requests {
-			req <- err
+		if needSave {
+			err := idx.Save()
+			tracelog.ErrorLogger.PrintOnError(err)
 		}
 	}
 }
 
 func (idx *Index) Save() error {
-	req := make(chan error, 1)
-	idx.srequests <- req
-	return <-req
+	idx.Lock()
+	data, err := json.Marshal(idx)
+	idx.Unlock()
+	if err == nil {
+		err = idx.folder.PutObject(IndexFileName, bytes.NewBuffer(data))
+	}
+	return err
+}
+
+func (idx *Index) SaveDelayed() {
+	idx.Lock()
+	idx.needSave = true
+	idx.Unlock()
 }
 
 func (idx *Index) PutBlock(id string, size uint64) string {

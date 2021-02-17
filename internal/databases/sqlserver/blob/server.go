@@ -25,6 +25,8 @@ const ProxyStartTimeout = 10 * time.Second
 
 const ReqIDHeader = "X-Ms-Request-Id"
 
+const DefaultConcurency = 8
+
 type Server struct {
 	folder       storage.Folder
 	certFile     string
@@ -35,6 +37,8 @@ type Server struct {
 	indexesMutex sync.Mutex
 	leases       map[string]Lease
 	leasesMutex  sync.Mutex
+	downloadSem  chan struct{}
+	uploadSem    chan struct{}
 }
 
 func NewServer(folder storage.Folder) (*Server, error) {
@@ -53,6 +57,16 @@ func NewServer(folder storage.Folder) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	downloadConcurency, err := internal.GetMaxDownloadConcurrency()
+	if err != nil {
+		downloadConcurency = DefaultConcurency
+	}
+	bs.downloadSem = make(chan struct{}, downloadConcurency)
+	uploadConcurency, err := internal.GetMaxUploadConcurrency()
+	if err != nil {
+		uploadConcurency = DefaultConcurency
+	}
+	bs.uploadSem = make(chan struct{}, uploadConcurency)
 	bs.endpoint = fmt.Sprintf("%s:%d", hostname, 443)
 	bs.server = http.Server{Addr: bs.endpoint, Handler: bs}
 	bs.indexes = make(map[string]*Index)
@@ -349,18 +363,15 @@ func (bs *Server) HandleBlockPut(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	filename := idx.PutBlock(blockId, blockSize)
+	bs.uploadSem <- struct{}{}
 	err = folder.PutObject(filename, req.Body)
+	<-bs.uploadSem
 	req.Body.Close()
 	if err != nil {
 		bs.returnError(w, req, err)
 		return
 	}
-	// TODO: delayed write ?
-	err = idx.Save()
-	if err != nil {
-		bs.returnError(w, req, err)
-		return
-	}
+	idx.SaveDelayed()
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -502,7 +513,9 @@ func (bs *Server) HandleBlobGet(w http.ResponseWriter, req *http.Request) {
 	for _, s := range sections {
 		// TODO: enable cache
 		// r, err := idx.GetCachedReader(folder, s)
+		bs.downloadSem <- struct{}{}
 		r, err := folder.ReadObject(s.Path)
+		<-bs.downloadSem
 		if err != nil {
 			tracelog.ErrorLogger.Printf("proxy: failed to read object from storage: %v", err)
 			break

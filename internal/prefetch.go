@@ -28,7 +28,7 @@ func HandleWALPrefetch(uploader *WalUploader, walFileName string, location strin
 	var fileName = walFileName
 	location = path.Dir(location)
 	waitGroup := &sync.WaitGroup{}
-	concurrency, err := getMaxDownloadConcurrency()
+	concurrency, err := GetMaxDownloadConcurrency()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	for i := 0; i < concurrency; i++ {
@@ -230,7 +230,7 @@ func getPrefetchLocations(location string, walFileName string) (prefetchLocation
 
 // TODO : unit tests
 func forkPrefetch(walFileName string, location string) {
-	concurrency, err := getMaxDownloadConcurrency()
+	concurrency, err := GetMaxDownloadConcurrency()
 	if err != nil {
 		tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err)
 	}

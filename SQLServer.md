@@ -34,6 +34,9 @@ Your wal-g.yaml config for SQLServer than may look like
     SQLSERVER_BLOB_LOCK_FILE: "C:/ProgramData/wal-g.lock"
     SQLSERVER_BLOB_HOSTNAME:  "backup.local"
     SQLSERVER_CONNECTION_STRING: "sqlserver://backupuser:backuppass1!@localhost:1433/instance"
+
+    WALG_UPLOAD_CONCURRENCY:   8  # how many block upload requests handle concurrently
+    WALG_DOWNLOAD_CONCURRENCY: 8  # how many block read requests handle concurrently 
     ```
 
 Of course, you may use any wal-g storage instead of FILE
@@ -48,6 +51,17 @@ You also need some configuration in SQLServer for wal-g to connect it.
     CREATE CREDENTIAL [https://backup.local/wal_005]
     WITH IDENTITY='SHARED ACCESS SIGNATURE', SECRET = 'does_not_matter';
     ```
+
+S3 Configuration
+-------------
+
+SQLServer backups/restores database by 4MB blocks (MAXTRANSFERSIZE).
+As we upload every block as a separate file to S3, it makes sense to set S3 part size to the smalles possible value (5MB) to prevent overuse of memory:
+
+    ```
+    WALG_S3_MAX_PART_SIZE: 5242880 # 5MB
+    ```
+
 
 Usage
 -----

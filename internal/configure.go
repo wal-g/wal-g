@@ -319,11 +319,11 @@ func ConfigureCrypter() crypto.Crypter {
 	return nil
 }
 
-func getMaxDownloadConcurrency() (int, error) {
+func GetMaxDownloadConcurrency() (int, error) {
 	return GetMaxConcurrency(DownloadConcurrencySetting)
 }
 
-func getMaxUploadConcurrency() (int, error) {
+func GetMaxUploadConcurrency() (int, error) {
 	return GetMaxConcurrency(UploadConcurrencySetting)
 }
 
