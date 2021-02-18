@@ -53,7 +53,7 @@ require (
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.5.1
 	github.com/ulikunitz/xz v0.5.6
-	github.com/wal-g/storages v0.0.0-20210203163358-7327f4ab96a8
+	github.com/wal-g/storages v0.0.0-20210218090605-534397353a97
 	github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30
 	github.com/xdg/stringprep v1.0.1-0.20180714160509-73f8eece6fdc // indirect
 	github.com/yandex-cloud/go-genproto v0.0.0-20201102102956-0c505728b6f0
