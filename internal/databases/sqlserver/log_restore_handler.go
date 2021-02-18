@@ -42,7 +42,7 @@ func HandleLogRestore(backupName string, untilTs string, dbnames []string, noRec
 
 	lock, err := bs.AcquireLock()
 	tracelog.ErrorLogger.FatalOnError(err)
-	defer tracelog.ErrorLogger.FatalOnError(lock.Unlock())
+	defer func() { tracelog.ErrorLogger.PrintOnError(lock.Unlock()) }()
 
 	err = bs.RunBackground(ctx, cancel)
 	tracelog.ErrorLogger.FatalfOnError("proxy run error: %v", err)
