@@ -14,6 +14,7 @@ TEST := "pg_tests"
 MYSQL_TEST := "mysql_tests"
 MONGO_MAJOR ?= "4.2"
 MONGO_VERSION ?= "4.2.8"
+GOLANGCI_LINT_VERSION ?= "v1.37.0"
 
 BUILD_TAGS:=brotli
 
@@ -25,16 +26,16 @@ ifdef USE_LZO
 	BUILD_TAGS:=$(BUILD_TAGS) lzo
 endif
 
-.PHONY: unittest fmt lint install clean
+.PHONY: unittest fmt lint clean
 
-test: install deps lint unittest pg_build mysql_build redis_build mongo_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test
+test: deps unittest pg_build mysql_build redis_build mongo_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test
 
-pg_test: install deps pg_build lint unlink_brotli pg_integration_test
+pg_test: deps pg_build unlink_brotli pg_integration_test
 
 pg_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_PG_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/pg.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/pg.WalgVersion=`git tag -l --points-at HEAD`")
 
-install_and_build_pg: install deps pg_build
+install_and_build_pg: deps pg_build
 
 pg_build_image:
 	docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix
@@ -58,7 +59,7 @@ pg_integration_test:
 	docker-compose build $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
 
-all_unittests: install deps lint unittest
+all_unittests: deps unittest
 
 pg_int_tests_only:
 	docker-compose build pg_tests
@@ -71,8 +72,8 @@ pg_clean:
 pg_install: pg_build
 	mv $(MAIN_PG_PATH)/wal-g $(GOBIN)/wal-g
 
-mysql_base: install deps mysql_build lint unlink_brotli
-mysql_test: install deps mysql_build lint unlink_brotli mysql_integration_test
+mysql_base: deps mysql_build unlink_brotli
+mysql_test: deps mysql_build unlink_brotli mysql_integration_test
 
 mysql_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_MYSQL_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mysql.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mysql.WalgVersion=`git tag -l --points-at HEAD`")
@@ -89,7 +90,7 @@ load_docker_common:
 		docker load -i ${CACHE_FILE_GOLANG};\
 	fi
 
-mysql_integration_test: install deps mysql_build lint unlink_brotli load_docker_common
+mysql_integration_test: deps mysql_build unlink_brotli load_docker_common
 	./link_brotli.sh
 	docker-compose build mysql $(MYSQL_TEST)
 	docker-compose up --exit-code-from $(MYSQL_TEST) $(MYSQL_TEST)
@@ -101,13 +102,13 @@ mysql_clean:
 mysql_install: mysql_build
 	mv $(MAIN_MYSQL_PATH)/wal-g $(GOBIN)/wal-g
 
-mariadb_test: install deps mysql_build lint unlink_brotli mariadb_integration_test
+mariadb_test: deps mysql_build unlink_brotli mariadb_integration_test
 
 mariadb_integration_test: load_docker_common
 	docker-compose build mariadb mariadb_tests
 	docker-compose up --exit-code-from mariadb_tests mariadb_tests
 
-mongo_test: install deps mongo_build lint unlink_brotli
+mongo_test: deps mongo_build unlink_brotli
 
 mongo_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_MONGO_PATH) && go build $(BUILD_ARGS) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mongo.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mongo.WalgVersion=`git tag -l --points-at HEAD`")
@@ -135,7 +136,7 @@ fdb_integration_test: load_docker_common
 	docker-compose build fdb_tests
 	docker-compose up --force-recreate --renew-anon-volumes --exit-code-from fdb_tests fdb_tests
 
-redis_test: install deps redis_build lint unlink_brotli redis_integration_test
+redis_test: deps redis_build unlink_brotli redis_integration_test
 
 redis_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_REDIS_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.BuildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.GitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/redis.WalgVersion=`git tag -l --points-at HEAD`")
@@ -173,8 +174,15 @@ coverage:
 fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 	gofmt -s -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 
-lint: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
-	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs golint
+lint:
+	@#Linux (has sudo)
+	@if [ "$(shell command -v golangci-lint)" = "" ]; then curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s $(GOLANGCI_LINT_VERSION) && sudo cp ./bin/golangci-lint $(go env GOPATH)/bin/; fi;
+	@#Github Actions
+	@if [ "$(shell command -v golangci-lint)" = "" ] && [ "$(GITHUB_WORKFLOW)" != "" ]; then curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sudo sh -s -- -b $(go env GOPATH)/bin $(GOLANGCI_LINT_VERSION); fi;
+	@#MacOS (brew)
+	@if [ "$(shell command -v golangci-lint)" = "" ] && [ "$(shell command -v brew)" != "" ]; then brew install golangci-lint; fi;
+	@echo "running golangci-lint..."
+	@golangci-lint run
 
 deps: go_deps link_external_deps
 
@@ -190,7 +198,7 @@ link_external_deps: link_brotli link_libsodium
 unlink_external_deps: unlink_brotli unlink_libsodium
 
 install:
-	go get -u golang.org/x/lint/golint
+	@echo "Nothing to be done. Use pg_install/mysql_install/mongo_install/fdb_install/... instead."
 
 link_brotli:
 	./link_brotli.sh
