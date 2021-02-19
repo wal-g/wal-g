@@ -107,7 +107,7 @@ func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplo
 	*/
 
 	memoryBatchBuffer := stages.NewMemoryBuffer()
-	defer tracelog.ErrorLogger.PrintOnError(memoryBatchBuffer.Close())
+	defer func() { tracelog.ErrorLogger.PrintOnError(memoryBatchBuffer.Close()) }()
 
 	// set up storage archiver
 	oplogApplier := stages.NewStorageApplier(uploader, memoryBatchBuffer, pushArgs.archiveAfterSize, pushArgs.archiveTimeout, uploadStatsUpdater)
