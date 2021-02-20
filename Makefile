@@ -175,14 +175,18 @@ fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 	gofmt -s -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 
 lint:
-	@#Linux (has sudo)
-	@if [ "$(shell command -v golangci-lint)" = "" ]; then curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s $(GOLANGCI_LINT_VERSION) && sudo cp ./bin/golangci-lint $(go env GOPATH)/bin/; fi;
 	@#Github Actions
 	@if [ "$(shell command -v golangci-lint)" = "" ] && [ "$(GITHUB_WORKFLOW)" != "" ]; then curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sudo sh -s -- -b $(go env GOPATH)/bin $(GOLANGCI_LINT_VERSION); fi;
 	@#MacOS (brew)
 	@if [ "$(shell command -v golangci-lint)" = "" ] && [ "$(shell command -v brew)" != "" ]; then brew install golangci-lint; fi;
+	@#Linux (has sudo)
+	@if [ "$(shell command -v golangci-lint)" = "" ]; then curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s $(GOLANGCI_LINT_VERSION) && sudo cp ./bin/golangci-lint $(go env GOPATH)/bin/; fi;
 	@echo "running golangci-lint..."
 	@golangci-lint run
+
+docker_lint:
+	docker build -t wal-g/lint - < docker/lint/Dockerfile
+	docker run --rm -v `pwd`:/app wal-g/lint golangci-lint run -v
 
 deps: go_deps link_external_deps
 
