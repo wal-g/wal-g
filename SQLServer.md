@@ -100,12 +100,14 @@ wal-g backup-restore backup_name
 wal-g backup-restore LATEST
 wal-g backup-restore backup_name -d db1
 wal-g backup-restore backup_name -d db1 -n
+wal-g backup-restore backup_name -d db1_copy -f db1
 ```
 
 Restores several databases from backup.
 You can specify particular `backup_name` or use `LATEST` alias for the last backup.
 You can specify which databases to restore via `-d` flag.
 You can restore all (including system) databases using `-d ALL` flag.
+You can restore database with new name (create copy of database) using flag `-f` (`--from`)
 By default it will restore all non-system databases found in backup.
 
 

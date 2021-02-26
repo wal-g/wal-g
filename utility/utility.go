@@ -3,6 +3,7 @@ package utility
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -378,4 +379,21 @@ func ParseUntilTs(untilTs string) (time.Time, error) {
 func MarshalEnumToString(enum fmt.Stringer) ([]byte, error) {
 	buffer := bytes.NewBufferString(enum.String())
 	return buffer.Bytes(), nil
+}
+
+func ScanToMap(rows *sql.Rows, dst map[string]interface{}) error {
+	columns, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+	args := make([]interface{}, len(columns))
+	var garbage interface{}
+	for i, field := range columns {
+		if v, ok := dst[field]; ok {
+			args[i] = v
+		} else {
+			args[i] = &garbage
+		}
+	}
+	return rows.Scan(args...)
 }

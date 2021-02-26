@@ -54,7 +54,7 @@ func getMySQLSortedBinlogs(db *sql.DB) ([]string, error) {
 	for rows.Next() {
 		var logFinName string
 		var size uint64
-		err = scanToMap(rows, map[string]interface{}{"Log_name": &logFinName, "File_size": &size})
+		err = utility.ScanToMap(rows, map[string]interface{}{"Log_name": &logFinName, "File_size": &size})
 		if err != nil {
 			return nil, err
 		}

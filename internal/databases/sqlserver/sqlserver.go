@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/url"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -43,7 +44,8 @@ var SystemDbnames = []string{
 type SentinelDto struct {
 	Server         string
 	Databases      []string
-	StartLocalTime time.Time
+	StartLocalTime time.Time `json:"StartLocalTime,omitempty"`
+	StopLocalTime  time.Time `json:"StopLocalTime,omitempty"`
 }
 
 func (s *SentinelDto) String() string {
@@ -52,6 +54,13 @@ func (s *SentinelDto) String() string {
 		panic(err)
 	}
 	return string(b)
+}
+
+type DatabaseFile struct {
+	LogicalName  string
+	PhysicalName string
+	Type         string
+	FileID       int
 }
 
 func getSQLServerConnection() (*sql.DB, error) {
@@ -89,19 +98,33 @@ func getDatabasesToBackup(db *sql.DB, dbnames []string) ([]string, error) {
 	}
 }
 
-func getDatabasesToRestore(sentinel *SentinelDto, dbnames []string) ([]string, error) {
+func getDatabasesToRestore(sentinel *SentinelDto, dbnames []string, fromnames []string) ([]string, []string, error) {
 	switch {
-	case len(dbnames) == 1 && dbnames[0] == AllDatabases:
-		return sentinel.Databases, nil
-	case len(dbnames) > 0:
-		missing := exclude(dbnames, sentinel.Databases)
-		if len(missing) > 0 {
-			return nil, fmt.Errorf("databases %v were not found in backup", missing)
+	case len(dbnames) == 0:
+		if len(fromnames) != 0 {
+			return nil, nil, fmt.Errorf("--from param should be omitted when --databases is empty")
 		}
-		return dbnames, nil
+		dbnames = exclude(sentinel.Databases, SystemDbnames)
+		fromnames = dbnames
+	case len(dbnames) == 1 && dbnames[0] == AllDatabases:
+		if len(fromnames) != 0 {
+			return nil, nil, fmt.Errorf("--from param should be omitted when --databases %s", AllDatabases)
+		}
+		dbnames = sentinel.Databases
+		fromnames = dbnames
 	default:
-		return exclude(sentinel.Databases, SystemDbnames), nil
+		if len(fromnames) == 0 {
+			fromnames = dbnames
+		}
+		if len(fromnames) != len(dbnames) {
+			return nil, nil, fmt.Errorf("--from list length should match --databases list length")
+		}
+		missing := exclude(fromnames, sentinel.Databases)
+		if len(missing) > 0 {
+			return nil, nil, fmt.Errorf("databases %v were not found in backup", missing)
+		}
 	}
+	return dbnames, fromnames, nil
 }
 
 func listDatabases(db *sql.DB) ([]string, error) {
@@ -136,8 +159,8 @@ func estimateSize(db *sql.DB, query string, args ...interface{}) (int64, int, er
 func estimateDbSize(db *sql.DB, dbname string) (int64, int, error) {
 	query := fmt.Sprintf(`
 		USE %s; 
-		SELECT (SELECT used_log_space_in_bytes FROM sys.dm_db_log_space_usage) 
-			 + (SELECT allocated_extent_page_count*8*1024 FROM sys.dm_db_file_space_usage)
+		SELECT (SELECT SUM(used_log_space_in_bytes) FROM sys.dm_db_log_space_usage) 
+			 + (SELECT SUM(allocated_extent_page_count)*8*1024 FROM sys.dm_db_file_space_usage)
 		USE master;
 	`, quoteName(dbname))
 	return estimateSize(db, query)
@@ -146,10 +169,34 @@ func estimateDbSize(db *sql.DB, dbname string) (int64, int, error) {
 func estimateLogSize(db *sql.DB, dbname string) (int64, int, error) {
 	query := fmt.Sprintf(`
 		USE %s; 
-		SELECT log_space_in_bytes_since_last_backup FROM sys.dm_db_log_space_usage; 
+		SELECT SUM(log_space_in_bytes_since_last_backup) FROM sys.dm_db_log_space_usage; 
 		USE master;
 	`, quoteName(dbname))
 	return estimateSize(db, query)
+}
+
+func listDatabaseFiles(db *sql.DB, urls string) ([]DatabaseFile, error) {
+	var res []DatabaseFile
+	query := fmt.Sprintf("RESTORE FILELISTONLY FROM %s", urls)
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var dbf DatabaseFile
+		err = utility.ScanToMap(rows, map[string]interface{}{
+			"LogicalName":  &dbf.LogicalName,
+			"PhysicalName": &dbf.PhysicalName,
+			"Type":         &dbf.Type,
+			"FileId":       &dbf.FileID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, dbf)
+	}
+	return res, nil
 }
 
 func buildBackupUrls(baseUrl string, blobCount int) string {
@@ -179,8 +226,52 @@ func buildRestoreUrls(baseUrl string, blobNames []string) string {
 	return res
 }
 
+func buildPhysicalFileMove(files []DatabaseFile, dbname string) (string, error) {
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].FileID < files[j].FileID
+	})
+	res := ""
+	dataFileCnt := 0
+	logFileCnt := 0
+	for _, file := range files {
+		var newName string
+		switch file.Type {
+		case "D":
+			suffix := ""
+			if dataFileCnt > 0 {
+				suffix = fmt.Sprintf("_%d", dataFileCnt)
+			}
+			dataFileCnt++
+			ext := ".mdf"
+			if file.FileID > 1 {
+				ext = ".ndf"
+			}
+			newName = dbname + suffix + ext
+		case "L":
+			suffix := "_log"
+			if logFileCnt > 0 {
+				suffix = fmt.Sprintf("_log_%d", logFileCnt)
+			}
+			logFileCnt++
+			newName = dbname + suffix + ".ldf"
+		default:
+			return "", fmt.Errorf("unexpected backup file type: '%s'", file.Type)
+		}
+		newPhysicalName := filepath.Join(filepath.Dir(file.PhysicalName), newName)
+		if res != "" {
+			res += ", "
+		}
+		res += fmt.Sprintf("MOVE %s TO %s", quoteValue(file.LogicalName), quoteValue(newPhysicalName))
+	}
+	return res, nil
+}
+
 func quoteName(name string) string {
 	return "[" + strings.ReplaceAll(name, "]", "]]") + "]"
+}
+
+func quoteValue(val string) string {
+	return "'" + strings.ReplaceAll(val, "'", "''") + "'"
 }
 
 func generateDatabaseBackupName() string {
@@ -288,15 +379,15 @@ func getLogsSinceBackup(folder storage.Folder, backupName string, stopAt time.Ti
 	return logNames, nil
 }
 
-func runParallel(f func(string) error, dbnames []string) error {
-	errs := make(chan error, len(dbnames))
-	for _, dbname := range dbnames {
-		go func(dbname string) {
-			errs <- f(dbname)
-		}(dbname)
+func runParallel(f func(int) error, cnt int) error {
+	errs := make(chan error, cnt)
+	for i := 0; i < cnt; i++ {
+		go func(i int) {
+			errs <- f(i)
+		}(i)
 	}
 	var errStr string
-	for i := 0; i < len(dbnames); i++ {
+	for i := 0; i < cnt; i++ {
 		err := <-errs
 		if err != nil {
 			errStr += err.Error() + "\n"

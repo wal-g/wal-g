@@ -59,11 +59,12 @@ func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 			StartLocalTime: timeStart,
 		}
 	}
-	err = runParallel(func(dbname string) error {
-		return backupSingleDatabase(ctx, db, backupName, dbname, compression)
-	}, dbnames)
+	err = runParallel(func(i int) error {
+		return backupSingleDatabase(ctx, db, backupName, dbnames[i], compression)
+	}, len(dbnames))
 	tracelog.ErrorLogger.FatalfOnError("overall backup failed: %v", err)
 
+	sentinel.StopLocalTime = utility.TimeNowCrossPlatformLocal()
 	uploader := internal.NewUploader(nil, folder.GetSubFolder(utility.BaseBackupPath))
 	tracelog.InfoLogger.Printf("uploading sentinel: %s", sentinel)
 	err = internal.UploadSentinel(uploader, sentinel, backupName)

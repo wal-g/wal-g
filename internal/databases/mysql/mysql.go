@@ -23,23 +23,6 @@ const BinlogPath = "binlog_" + utility.VersionStr + "/"
 
 const TimeMysqlFormat = "2006-01-02 15:04:05"
 
-func scanToMap(rows *sql.Rows, dst map[string]interface{}) error {
-	columns, err := rows.Columns()
-	if err != nil {
-		return err
-	}
-	args := make([]interface{}, len(columns))
-	var garbage interface{}
-	for i, field := range columns {
-		if v, ok := dst[field]; ok {
-			args[i] = v
-		} else {
-			args[i] = &garbage
-		}
-	}
-	return rows.Scan(args...)
-}
-
 func isMaster(db *sql.DB) bool {
 	rows, err := db.Query("SHOW SLAVE STATUS")
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -53,7 +36,7 @@ func getMySQLCurrentBinlogFileLocal(db *sql.DB) (fileName string) {
 	defer utility.LoggedClose(rows, "")
 	var logFileName string
 	for rows.Next() {
-		err = scanToMap(rows, map[string]interface{}{"File": &logFileName})
+		err = utility.ScanToMap(rows, map[string]interface{}{"File": &logFileName})
 		tracelog.ErrorLogger.FatalOnError(err)
 		return logFileName
 	}
@@ -67,7 +50,7 @@ func getMySQLCurrentBinlogFileFromMaster(db *sql.DB) (fileName string) {
 	defer utility.LoggedClose(rows, "")
 	var logFileName string
 	for rows.Next() {
-		err = scanToMap(rows, map[string]interface{}{"Relay_Master_Log_File": &logFileName})
+		err = utility.ScanToMap(rows, map[string]interface{}{"Relay_Master_Log_File": &logFileName})
 		tracelog.ErrorLogger.FatalOnError(err)
 		return logFileName
 	}
