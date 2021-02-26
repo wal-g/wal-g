@@ -91,7 +91,7 @@ type RatingTarBallComposer struct {
 	tarSizeThreshold uint64
 
 	deltaMap         PagedFileDeltaMap
-	deltaMapMutex    sync.Mutex
+	deltaMapMutex    sync.RWMutex
 	deltaMapComplete bool
 
 	errorGroup *errgroup.Group
@@ -265,6 +265,8 @@ func (c *RatingTarBallComposer) getExpectedFileSize(cfi *ComposeFileInfo) (uint6
 			return 0, err
 		}
 	}
+	c.deltaMapMutex.RLock()
+	defer c.deltaMapMutex.RUnlock()
 	bitmap, err := c.deltaMap.GetDeltaBitmapFor(cfi.path)
 	if _, ok := err.(NoBitmapFoundError); ok {
 		// this file has changed after the start of backup and will be skipped
