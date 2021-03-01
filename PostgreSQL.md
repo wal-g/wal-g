@@ -144,6 +144,11 @@ WAL-G can also fetch the latest backup using:
 wal-g backup-fetch ~/extract/to/here LATEST
 ```
 
+WAL-G can fetch the backup with specific UserData (stored in backup metadata) using the `--target-user-data` flag or `WALG_FETCH_TARGET_USER_DATA` variable:
+```
+wal-g backup-fetch /path --target-user-data "{ \"x\": [3], \"y\": 4 }"
+```
+
 #### Reverse delta unpack
 
 Beta feature: WAL-G can unpack delta backups in reverse order to improve fetch efficiency.
@@ -196,6 +201,19 @@ To activate this feature, do one of the following:
 
 ```
 wal-g backup-push /path --rating-composer
+```
+
+#### Create delta from specific backup
+When creating delta backup, WAL-G uses the latest backup as the base by default. This behaviour can be changed via following flags:
+
+* `--delta-from-name` flag or `WALG_DELTA_FROM_NAME` environment variable to choose the backup with specified name as the base for the delta backup
+
+* `--delta-from-user-data` flag or `WALG_DELTA_FROM_USER_DATA` environment variable to choose the backup with specified UserData as the base for the delta backup
+
+Examples:
+```
+wal-g backup-push /path --delta-from-name base_000000010000000100000072_D_000000010000000100000063
+wal-g backup-push /path --delta-from-user-data "{ \"x\": [3], \"y\": 4 }"
 ```
 
 * ``wal-fetch``
