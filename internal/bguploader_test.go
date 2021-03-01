@@ -85,7 +85,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 			// Use generated data to test uploading WAL.
 			dir, a := setupArchiveStatus(t, "")
 			for i := 0; i < tt.numFilesOnDisk; i++ {
-				addTestDataFile(t, dir, i)
+				addTestDataFile(t, dir, fmt.Sprint(i))
 			}
 			defer cleanup(t, dir)
 
@@ -105,7 +105,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 
 			// Check that at least the expected number of files were created
 			for i := 0; i < tt.wantNumFilesUploaded; i++ {
-				bname := testFilename(i)
+				bname := testFilename(fmt.Sprint(i))
 				wasUploaded := fakeASM.WalAlreadyUploaded(bname)
 				assert.True(t, wasUploaded, bname+" was not marked as uploaded")
 			}
@@ -154,7 +154,7 @@ func setupArchiveStatus(t *testing.T, dir string) (string, string) {
 	return testDir, a
 }
 
-func addTestDataFile(t *testing.T, dir string, i int) {
+func addTestDataFile(t *testing.T, dir string, i string) {
 	bname := testFilename(i)
 	b := filepath.Join(dir, bname)
 
@@ -176,8 +176,8 @@ func addTestDataFile(t *testing.T, dir string, i int) {
 	}
 }
 
-func testFilename(i int) string {
-	return fmt.Sprintf("B%010d", i)
+func testFilename(i string) string {
+	return fmt.Sprintf("%08d%08d%08s", 1, 1, i)
 }
 
 func cleanup(t *testing.T, dir string) {

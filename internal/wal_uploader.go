@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/wal-g/tracelog"
 	"io"
 	"path"
 
@@ -58,7 +59,13 @@ func (walUploader *WalUploader) UploadWalFile(file ioextensions.NamedReader) err
 		walFileReader = file
 	}
 
-	return walUploader.UploadFile(ioextensions.NewNamedReaderImpl(walFileReader, file.Name()))
+	err := walUploader.UploadFile(ioextensions.NewNamedReaderImpl(walFileReader, file.Name()))
+	if err == nil {
+		if err := walUploader.ArchiveStatusManager.MarkWalUploaded(filename); err != nil {
+			tracelog.ErrorLogger.Printf("Error marking wal file %s as uploaded: %v", filename, err)
+		}
+	}
+	return err
 }
 
 func (walUploader *WalUploader) FlushFiles() {
