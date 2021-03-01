@@ -15,7 +15,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupRestore(backupName string, dbnames []string, noRecovery bool) {
+func HandleBackupRestore(backupName string, dbnames []string, fromnames []string, noRecovery bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 	defer func() { _ = signalHandler.Close() }()
@@ -33,7 +33,7 @@ func HandleBackupRestore(backupName string, dbnames []string, noRecovery bool) {
 	db, err := getSQLServerConnection()
 	tracelog.ErrorLogger.FatalfOnError("failed to connect to SQLServer: %v", err)
 
-	dbnames, err = getDatabasesToRestore(sentinel, dbnames)
+	dbnames, fromnames, err = getDatabasesToRestore(sentinel, dbnames, fromnames)
 	tracelog.ErrorLogger.FatalfOnError("failed to list databases to restore: %v", err)
 
 	bs, err := blob.NewServer(folder)
@@ -48,8 +48,10 @@ func HandleBackupRestore(backupName string, dbnames []string, noRecovery bool) {
 
 	backupName = backup.Name
 
-	err = runParallel(func(dbname string) error {
-		err := restoreSingleDatabase(ctx, db, folder, backupName, dbname)
+	err = runParallel(func(i int) error {
+		dbname := dbnames[i]
+		fromname := fromnames[i]
+		err := restoreSingleDatabase(ctx, db, folder, backupName, dbname, fromname)
 		if err != nil {
 			return err
 		}
@@ -57,21 +59,32 @@ func HandleBackupRestore(backupName string, dbnames []string, noRecovery bool) {
 			return recoverSingleDatabase(ctx, db, dbname)
 		}
 		return nil
-	}, dbnames)
+	}, len(dbnames))
 	tracelog.ErrorLogger.FatalfOnError("overall restore failed: %v", err)
 
 	tracelog.InfoLogger.Printf("restore finished")
 }
 
-func restoreSingleDatabase(ctx context.Context, db *sql.DB, folder storage.Folder, backupName string, dbname string) error {
-	baseUrl := getDatabaseBackupUrl(backupName, dbname)
-	basePath := getDatabaseBackupPath(backupName, dbname)
+func restoreSingleDatabase(ctx context.Context, db *sql.DB, folder storage.Folder, backupName string, dbname string, fromName string) error {
+	baseUrl := getDatabaseBackupUrl(backupName, fromName)
+	basePath := getDatabaseBackupPath(backupName, fromName)
 	blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
 	if err != nil {
 		return err
 	}
 	urls := buildRestoreUrls(baseUrl, blobs)
 	sql := fmt.Sprintf("RESTORE DATABASE %s FROM %s WITH REPLACE, NORECOVERY", quoteName(dbname), urls)
+	if dbname != fromName {
+		files, err := listDatabaseFiles(db, urls)
+		if err != nil {
+			return err
+		}
+		move, err := buildPhysicalFileMove(files, dbname)
+		if err != nil {
+			return err
+		}
+		sql += ", " + move
+	}
 	tracelog.InfoLogger.Printf("starting restore database [%s] from %s", dbname, urls)
 	tracelog.DebugLogger.Printf("SQL: %s", sql)
 	_, err = db.ExecContext(ctx, sql)

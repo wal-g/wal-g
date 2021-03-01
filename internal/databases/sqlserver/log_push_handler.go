@@ -40,9 +40,9 @@ func HandleLogPush(dbnames []string, compression bool) {
 	tracelog.ErrorLogger.FatalfOnError("proxy run error: %v", err)
 
 	logBackupName := generateLogBackupName()
-	err = runParallel(func(dbname string) error {
-		return backupSingleLog(ctx, db, logBackupName, dbname, compression)
-	}, dbnames)
+	err = runParallel(func(i int) error {
+		return backupSingleLog(ctx, db, logBackupName, dbnames[i], compression)
+	}, len(dbnames))
 	tracelog.ErrorLogger.FatalfOnError("overall log backup failed: %v", err)
 
 	tracelog.InfoLogger.Printf("log backup finished")

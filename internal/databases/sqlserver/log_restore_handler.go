@@ -16,7 +16,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleLogRestore(backupName string, untilTs string, dbnames []string, noRecovery bool) {
+func HandleLogRestore(backupName string, untilTs string, dbnames []string, fromnames []string, noRecovery bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 	defer func() { _ = signalHandler.Close() }()
@@ -34,7 +34,7 @@ func HandleLogRestore(backupName string, untilTs string, dbnames []string, noRec
 	db, err := getSQLServerConnection()
 	tracelog.ErrorLogger.FatalfOnError("failed to connect to SQLServer: %v", err)
 
-	dbnames, err = getDatabasesToRestore(sentinel, dbnames)
+	dbnames, fromnames, err = getDatabasesToRestore(sentinel, dbnames, fromnames)
 	tracelog.ErrorLogger.FatalfOnError("failed to list databases to restore logs: %v", err)
 
 	bs, err := blob.NewServer(folder)
@@ -53,9 +53,11 @@ func HandleLogRestore(backupName string, untilTs string, dbnames []string, noRec
 	logs, err := getLogsSinceBackup(folder, backup.Name, stopAt)
 	tracelog.ErrorLogger.FatalfOnError("failed to list log backups: %v", err)
 
-	err = runParallel(func(dbname string) error {
+	err = runParallel(func(i int) error {
+		dbname := dbnames[i]
+		fromname := fromnames[i]
 		for _, logBackupName := range logs {
-			ok, err := doesLogBackupContainDb(folder, logBackupName, dbname)
+			ok, err := doesLogBackupContainDb(folder, logBackupName, fromname)
 			if err != nil {
 				return err
 			}
@@ -63,10 +65,10 @@ func HandleLogRestore(backupName string, untilTs string, dbnames []string, noRec
 				// some log backup may not contain particular database in case
 				// it was created or dropped between base backups
 				tracelog.WarningLogger.Printf("log backup %s does not contains logs for database %s",
-					logBackupName, dbname)
+					logBackupName, fromname)
 				continue
 			}
-			err = restoreSingleLog(ctx, db, folder, logBackupName, dbname, stopAt)
+			err = restoreSingleLog(ctx, db, folder, logBackupName, dbname, fromname, stopAt)
 			if err != nil {
 				return err
 			}
@@ -75,15 +77,15 @@ func HandleLogRestore(backupName string, untilTs string, dbnames []string, noRec
 			return recoverSingleDatabase(ctx, db, dbname)
 		}
 		return nil
-	}, dbnames)
+	}, len(dbnames))
 	tracelog.ErrorLogger.FatalfOnError("overall log restore failed: %v", err)
 
 	tracelog.InfoLogger.Printf("log restore finished")
 }
 
-func restoreSingleLog(ctx context.Context, db *sql.DB, folder storage.Folder, logBackupName string, dbname string, stopAt time.Time) error {
-	baseUrl := getLogBackupUrl(logBackupName, dbname)
-	basePath := getLogBackupPath(logBackupName, dbname)
+func restoreSingleLog(ctx context.Context, db *sql.DB, folder storage.Folder, logBackupName string, dbname string, fromname string, stopAt time.Time) error {
+	baseUrl := getLogBackupUrl(logBackupName, fromname)
+	basePath := getLogBackupPath(logBackupName, fromname)
 	blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
 	if err != nil {
 		return err
