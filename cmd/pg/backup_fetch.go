@@ -2,6 +2,7 @@ package pg
 
 import (
 	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -30,7 +31,7 @@ var targetUserData string
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch destination_directory [backup_name OR target-* flag]",
 	Short: backupFetchShortDescription, // TODO : improve description
-	Args:  cobra.RangeArgs(1,2),
+	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
 		if targetUserData == "" {
 			targetUserData = viper.GetString(internal.TargetUserDataSetting)

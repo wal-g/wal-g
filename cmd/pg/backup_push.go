@@ -2,6 +2,7 @@ package pg
 
 import (
 	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -10,15 +11,15 @@ import (
 )
 
 const (
-	backupPushShortDescription     = "Makes backup and uploads it to storage"
+	backupPushShortDescription = "Makes backup and uploads it to storage"
 
-	permanentFlag                  = "permanent"
-	fullBackupFlag                 = "full"
-	verifyPagesFlag                = "verify"
-	storeAllCorruptBlocksFlag      = "store-all-corrupt"
-	useRatingComposerFlag          = "rating-composer"
-	deltaFromUserDataFlag          = "delta-from-user-data"
-	deltaFromNameFlag              = "delta-from-name"
+	permanentFlag             = "permanent"
+	fullBackupFlag            = "full"
+	verifyPagesFlag           = "verify"
+	storeAllCorruptBlocksFlag = "store-all-corrupt"
+	useRatingComposerFlag     = "rating-composer"
+	deltaFromUserDataFlag     = "delta-from-user-data"
+	deltaFromNameFlag         = "delta-from-name"
 
 	permanentShorthand             = "p"
 	fullBackupShorthand            = "f"

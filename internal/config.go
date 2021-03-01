@@ -169,7 +169,7 @@ var (
 		MaxDelayedSegmentsCount:      true,
 		DeltaFromNameSetting:         true,
 		DeltaFromUserDataSetting:     true,
-		TargetUserDataSetting:		  true,
+		TargetUserDataSetting:        true,
 
 		// Postgres
 		PgPortSetting:     true,

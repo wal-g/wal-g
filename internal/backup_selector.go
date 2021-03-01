@@ -3,12 +3,13 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
-	"reflect"
-	"strings"
 )
 
 // Select the name of storage backup chosen according to the internal rules
@@ -53,7 +54,7 @@ func (s UserDataBackupSelector) Select(folder storage.Folder) (string, error) {
 // Find backup with UserData exactly matching the provided one
 func findBackupByUserData(userData interface{}, folder storage.Folder) (BackupDetail, error) {
 	foundBackups, err := searchBackupDetails(
-		func (d BackupDetail) bool {
+		func(d BackupDetail) bool {
 			return reflect.DeepEqual(userData, d.UserData)
 		}, folder)
 	if err != nil {
@@ -66,8 +67,8 @@ func findBackupByUserData(userData interface{}, folder storage.Folder) (BackupDe
 
 	if len(foundBackups) > 1 {
 		var backupNames []string
-		for _, b := range foundBackups {
-			backupNames = append(backupNames, b.BackupName)
+		for idx := range foundBackups {
+			backupNames = append(backupNames, foundBackups[idx].BackupName)
 		}
 		return BackupDetail{}, fmt.Errorf("too many backups (%d) found with specified UserData: %s\n",
 			len(backupNames), strings.Join(backupNames, " "))
@@ -77,7 +78,7 @@ func findBackupByUserData(userData interface{}, folder storage.Folder) (BackupDe
 }
 
 // Search backups in storage using specified criteria
-func searchBackupDetails(criteria func (BackupDetail) bool, folder storage.Folder) ([]BackupDetail, error) {
+func searchBackupDetails(criteria func(BackupDetail) bool, folder storage.Folder) ([]BackupDetail, error) {
 	backups, err := GetBackupSentinelObjects(folder)
 	if err != nil {
 		return nil, err

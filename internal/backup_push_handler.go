@@ -210,7 +210,7 @@ func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanen
 
 	folder := uploader.UploadingFolder
 	basebackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	if maxDeltas > 0 && !isFullBackup  {
+	if maxDeltas > 0 && !isFullBackup {
 		previousBackupName, err = deltaBaseSelector.Select(folder)
 		if err != nil {
 			if _, ok := err.(NoBackupsFoundError); ok {
