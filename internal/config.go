@@ -33,6 +33,8 @@ const (
 	VerifyPageChecksumsSetting   = "WALG_VERIFY_PAGE_CHECKSUMS"
 	StoreAllCorruptBlocksSetting = "WALG_STORE_ALL_CORRUPT_BLOCKS"
 	UseRatingComposerSetting     = "WALG_USE_RATING_COMPOSER"
+	DeltaFromNameSetting         = "WALG_DELTA_FROM_NAME"
+	DeltaFromUserDataSetting     = "WALG_DELTA_FROM_USER_DATA"
 	LogLevelSetting              = "WALG_LOG_LEVEL"
 	TarSizeThresholdSetting      = "WALG_TAR_SIZE_THRESHOLD"
 	CseKmsIDSetting              = "WALG_CSE_KMS_ID"
@@ -164,6 +166,8 @@ var (
 		StoreAllCorruptBlocksSetting: true,
 		UseRatingComposerSetting:     true,
 		MaxDelayedSegmentsCount:      true,
+		DeltaFromNameSetting:         true,
+		DeltaFromUserDataSetting:     true,
 
 		// Postgres
 		PgPortSetting:     true,
