@@ -139,7 +139,7 @@ Sample metadata file (000000020000000300000071.json)
     }
 }
 ```
-If not specified it will fallback to default setting(no wal metadata generation)
+If the parameter value is NOMETADATA or not specified  it will fallback to default setting (no wal metadata generation)
 
 Usage
 -----
