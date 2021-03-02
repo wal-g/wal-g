@@ -204,7 +204,7 @@ wal-g backup-push /path --rating-composer
 ```
 
 #### Create delta from specific backup
-When creating delta backup, WAL-G uses the latest backup as the base by default. This behaviour can be changed via following flags:
+When creating delta backup (`WALG_DELTA_MAX_STEPS` > 0), WAL-G uses the latest backup as the base by default. This behaviour can be changed via following flags:
 
 * `--delta-from-name` flag or `WALG_DELTA_FROM_NAME` environment variable to choose the backup with specified name as the base for the delta backup
 
@@ -214,6 +214,23 @@ Examples:
 ```
 wal-g backup-push /path --delta-from-name base_000000010000000100000072_D_000000010000000100000063
 wal-g backup-push /path --delta-from-user-data "{ \"x\": [3], \"y\": 4 }"
+```
+
+When using the above flags in combination with `WALG_DELTA_ORIGIN` setting, `WALG_DELTA_ORIGIN` logic applies to the specified backup. For example:
+```
+list of backups in storage:
+base_000000010000000100000040  # full backup
+base_000000010000000100000046_D_000000010000000100000040  # 1st delta
+base_000000010000000100000061_D_000000010000000100000046  # 2nd delta
+base_000000010000000100000070  # full backup
+
+export WALG_DELTA_ORIGIN=LATEST_FULL
+wal-g backup-push /path --delta-from-name base_000000010000000100000046_D_000000010000000100000040
+
+wal-g logs:
+INFO: Selecting the backup with name base_000000010000000100000046_D_000000010000000100000040 as the base for the current delta backup...
+INFO: Delta will be made from full backup.
+INFO: Delta backup from base_000000010000000100000040 with LSN 140000060.
 ```
 
 * ``wal-fetch``
