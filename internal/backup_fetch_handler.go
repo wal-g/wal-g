@@ -118,7 +118,9 @@ func StreamBackupToCommandStdin(cmd *exec.Cmd, backup *Backup) error {
 
 // TODO : unit tests
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
-func HandleBackupFetch(folder storage.Folder, backupName string, fetcher func(folder storage.Folder, backup Backup)) {
+func HandleBackupFetch(folder storage.Folder, targetBackupSelector BackupSelector, fetcher func(folder storage.Folder, backup Backup)) {
+	backupName, err := targetBackupSelector.Select(folder)
+	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder,)\n", backupName)
 	backup, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)

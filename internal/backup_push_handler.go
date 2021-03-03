@@ -198,7 +198,8 @@ func uploadBackup(
 // TODO : unit tests
 // HandleBackupPush is invoked to perform a wal-g backup-push
 func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanent, isFullBackup,
-	verifyPageChecksums, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType) {
+	verifyPageChecksums, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
+	deltaBaseSelector BackupSelector) {
 	archiveDirectory = utility.ResolveSymlink(archiveDirectory)
 	maxDeltas, fromFull := getDeltaConfig()
 	checkPgVersionAndPgControl(archiveDirectory)
@@ -210,7 +211,7 @@ func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanen
 	folder := uploader.UploadingFolder
 	basebackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	if maxDeltas > 0 && !isFullBackup {
-		previousBackupName, err = getLatestBackupName(folder)
+		previousBackupName, err = deltaBaseSelector.Select(folder)
 		if err != nil {
 			if _, ok := err.(NoBackupsFoundError); ok {
 				tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
