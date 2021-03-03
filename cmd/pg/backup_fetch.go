@@ -19,7 +19,7 @@ For information about pattern syntax view: https://golang.org/pkg/path/filepath/
 	restoreSpecDescription        = "Path to file containing tablespace restore specification"
 	reverseDeltaUnpackDescription = "Unpack delta backups in reverse order (beta feature)"
 	skipRedundantTarsDescription  = "Skip tars with no useful data (requires reverse delta unpack)"
-	targetUserDataDescription     = "Fetch storage backup which has the specified UserData"
+	targetUserDataDescription     = "Fetch storage backup which has the specified user data"
 )
 
 var fileMask string
@@ -71,7 +71,7 @@ func createTargetBackupSelector(cmd *cobra.Command, args []string) (internal.Bac
 		return internal.NewBackupNameSelector(args[1])
 
 	case len(args) == 1 && targetUserData != "":
-		tracelog.InfoLogger.Println("Fetching the backup with the specified UserData...")
+		tracelog.InfoLogger.Println("Fetching the backup with the specified user data...")
 		return internal.NewUserDataBackupSelector(targetUserData)
 
 	default:

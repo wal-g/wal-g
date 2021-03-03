@@ -208,7 +208,7 @@ When creating delta backup (`WALG_DELTA_MAX_STEPS` > 0), WAL-G uses the latest b
 
 * `--delta-from-name` flag or `WALG_DELTA_FROM_NAME` environment variable to choose the backup with specified name as the base for the delta backup
 
-* `--delta-from-user-data` flag or `WALG_DELTA_FROM_USER_DATA` environment variable to choose the backup with specified UserData as the base for the delta backup
+* `--delta-from-user-data` flag or `WALG_DELTA_FROM_USER_DATA` environment variable to choose the backup with specified user data as the base for the delta backup
 
 Examples:
 ```
