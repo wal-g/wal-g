@@ -29,7 +29,7 @@ var skipRedundantTars bool
 var targetUserData string
 
 var backupFetchCmd = &cobra.Command{
-	Use:   "backup-fetch destination_directory [backup_name OR target-* flag]",
+	Use:   "backup-fetch destination_directory [backup_name | --target-user-data <data>]",
 	Short: backupFetchShortDescription, // TODO : improve description
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
