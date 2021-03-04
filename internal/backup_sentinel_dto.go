@@ -55,7 +55,7 @@ func NewBackupSentinelDto(
 
 	sentinel.setFiles(files)
 	sentinel.BackupFinishLSN = &backupFinishLSN
-	sentinel.UserData = GetSentinelUserData()
+	sentinel.UserData = UnmarshalSentinelUserData(bc.userData)
 	sentinel.SystemIdentifier = systemIdentifier
 	sentinel.UncompressedSize = uncompressedSize
 	sentinel.CompressedSize = compressedSize

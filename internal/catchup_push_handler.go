@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/spf13/viper"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -33,6 +34,7 @@ func HandleCatchupPush(uploader *WalUploader, archiveDirectory string, fromLSN u
 		verifyPageChecksums:       false,
 		storeAllCorruptBlocks:     false,
 		tarBallComposerType:       RegularComposer,
+		userData:                  viper.GetString(SentinelUserDataSetting),
 	}
 
 	createAndPushBackup(&backupConfig)
