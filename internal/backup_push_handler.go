@@ -67,6 +67,7 @@ type BackupConfig struct {
 	verifyPageChecksums       bool
 	storeAllCorruptBlocks     bool
 	tarBallComposerType       TarBallComposerType
+	userData                  string
 }
 
 // TODO : unit tests
@@ -199,7 +200,7 @@ func uploadBackup(
 // HandleBackupPush is invoked to perform a wal-g backup-push
 func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanent, isFullBackup,
 	verifyPageChecksums, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
-	deltaBaseSelector BackupSelector) {
+	deltaBaseSelector BackupSelector, userData string) {
 	archiveDirectory = utility.ResolveSymlink(archiveDirectory)
 	maxDeltas, fromFull := getDeltaConfig()
 	checkPgVersionAndPgControl(archiveDirectory)
@@ -262,6 +263,7 @@ func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanen
 		verifyPageChecksums:       verifyPageChecksums,
 		storeAllCorruptBlocks:     storeAllCorruptBlocks,
 		tarBallComposerType:       tarBallComposerType,
+		userData:                  userData,
 	}
 	createAndPushBackup(&backupConfig)
 }

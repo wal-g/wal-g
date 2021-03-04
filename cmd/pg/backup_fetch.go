@@ -72,7 +72,7 @@ func createTargetBackupSelector(cmd *cobra.Command, args []string) (internal.Bac
 
 	case len(args) == 1 && targetUserData != "":
 		tracelog.InfoLogger.Println("Fetching the backup with the specified user data...")
-		return internal.NewUserDataBackupSelector(targetUserData)
+		return internal.NewUserDataBackupSelector(targetUserData), nil
 
 	default:
 		err = errors.New("Insufficient arguments.")

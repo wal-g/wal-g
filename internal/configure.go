@@ -351,14 +351,24 @@ func GetMaxConcurrency(concurrencyType string) (int, error) {
 
 func GetSentinelUserData() interface{} {
 	dataStr, ok := GetSetting(SentinelUserDataSetting)
-	if !ok || len(dataStr) == 0 {
+	if !ok {
 		return nil
 	}
+	return UnmarshalSentinelUserData(dataStr)
+}
+
+func UnmarshalSentinelUserData(userDataStr string) interface{} {
+	if len(userDataStr) == 0 {
+		return nil
+	}
+
 	var out interface{}
-	err := json.Unmarshal([]byte(dataStr), &out)
+	err := json.Unmarshal([]byte(userDataStr), &out)
 	if err != nil {
-		tracelog.WarningLogger.PrintError(newUnmarshallingError(SentinelUserDataSetting, err))
-		return dataStr
+		tracelog.WarningLogger.Printf(
+			"Failed to read the user data as a JSON object, will read as a raw string instead: %s",
+			newUnmarshallingError(userDataStr, err))
+		return userDataStr
 	}
 	return out
 }

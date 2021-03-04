@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -34,13 +33,8 @@ type UserDataBackupSelector struct {
 	userData interface{}
 }
 
-func NewUserDataBackupSelector(userDataRaw string) (UserDataBackupSelector, error) {
-	var userData interface{}
-	err := json.Unmarshal([]byte(userDataRaw), &userData)
-	if err != nil {
-		return UserDataBackupSelector{}, errors.Wrapf(err, "failed to unmarshal the target UserData")
-	}
-	return UserDataBackupSelector{userData: userData}, nil
+func NewUserDataBackupSelector(userDataRaw string) UserDataBackupSelector {
+	return UserDataBackupSelector{userData: UnmarshalSentinelUserData(userDataRaw)}
 }
 
 func (s UserDataBackupSelector) Select(folder storage.Folder) (string, error) {
