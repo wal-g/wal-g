@@ -211,7 +211,7 @@ func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanen
 	if isFullBackup {
 		tracelog.InfoLogger.Println("Doing full backup.")
 	} else {
-		previousBackupName, previousBackupSentinelDto, incrementCount = configureDeltaBackup(uploader.UploadingFolder, deltaBaseSelector)
+		previousBackupName, previousBackupSentinelDto, incrementCount = configureDeltaBackup(uploader.UploadingFolder, deltaBaseSelector, isPermanent)
 	}
 
 	backupConfig := BackupConfig{
@@ -231,7 +231,8 @@ func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanen
 	createAndPushBackup(&backupConfig)
 }
 
-func configureDeltaBackup(folder storage.Folder, deltaBaseSelector BackupSelector) (string, BackupSentinelDto, int) {
+func configureDeltaBackup(folder storage.Folder, deltaBaseSelector BackupSelector, isPermanent bool,
+) (string, BackupSentinelDto, int) {
 	maxDeltas, fromFull := getDeltaConfig()
 	if maxDeltas == 0 {
 		return "", BackupSentinelDto{}, 0
@@ -264,6 +265,18 @@ func configureDeltaBackup(folder storage.Folder, deltaBaseSelector BackupSelecto
 	if previousBackupSentinelDto.BackupStartLSN == nil {
 		tracelog.InfoLogger.Println("LATEST backup was made without support for delta feature. " +
 			"Fallback to full backup with LSN marker for future deltas.")
+		return "", BackupSentinelDto{}, 0
+	}
+
+	previousBackupMeta, err := previousBackup.FetchMeta()
+	if err != nil {
+		tracelog.InfoLogger.Printf(
+			"Failed to get previous backup metadata: %s. Doing full backup.\n", err.Error())
+		return "", BackupSentinelDto{}, 0
+	}
+
+	if !isPermanent && !fromFull && previousBackupMeta.IsPermanent {
+		tracelog.InfoLogger.Println("Can't do a delta backup from permanent backup. Doing full backup.")
 		return "", BackupSentinelDto{}, 0
 	}
 
