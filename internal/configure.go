@@ -365,7 +365,9 @@ func UnmarshalSentinelUserData(userDataStr string) interface{} {
 	var out interface{}
 	err := json.Unmarshal([]byte(userDataStr), &out)
 	if err != nil {
-		tracelog.WarningLogger.PrintError(newUnmarshallingError(SentinelUserDataSetting, err))
+		tracelog.WarningLogger.Printf(
+			"Failed to read the user data as a JSON object, will read as a raw string instead: %s",
+			newUnmarshallingError(userDataStr, err))
 		return userDataStr
 	}
 	return out
