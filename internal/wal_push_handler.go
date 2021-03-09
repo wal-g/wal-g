@@ -27,10 +27,10 @@ const (
 	WalNoMetadataLevel         = "NOMETADATA"
 )
 
-var WalMetadataLevels = []string{WalBulkMetadataLevel, WalIndividualMetadataLevel}
+var WalMetadataLevels = []string{WalBulkMetadataLevel, WalIndividualMetadataLevel, WalNoMetadataLevel}
 
 type WalMetadataDescription struct {
-	CreateTime     time.Time `json:"created_time"`
+	CreatedTime    time.Time `json:"created_time"`
 	DatetimeFormat string    `json:"date_fmt"`
 }
 
@@ -80,11 +80,12 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 	bgUploader.Start()
 	err = uploadWALFile(uploader, walFilePath, bgUploader.preventWalOverwrite)
 	tracelog.ErrorLogger.FatalOnError(err)
-	if err == nil && (viper.IsSet(UploadWalMetadata) || viper.GetString(UploadWalMetadata) == WalNoMetadataLevel) {
+	if err == nil && viper.GetString(UploadWalMetadata) == WalBulkMetadataLevel && walFilePath[len(walFilePath)-1:] == "F" {
 		// Creating consolidated wal metadata only for bulk option
-		if viper.GetString(UploadWalMetadata) == WalBulkMetadataLevel && walFilePath[len(walFilePath)-1:] == "F" {
-			walMetadataBulkUploader(uploader, walFilePath)
-		}
+		// Checking if the walfile name ends with "F" (last file in the series) and consolidating all the metadata together.
+		// For example, All the metadata for the files in the series 000000030000000800000010, 000000030000000800000011 to 00000003000000080000001F
+		// will be consolidated together and single  file 00000003000000080000001.json will be created.
+		uploadBulkMetadata(uploader, walFilePath)
 	}
 
 	err = bgUploader.Stop()
@@ -95,7 +96,7 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 	}
 } //
 
-func walMetadataBulkUploader(uploader *WalUploader, walFilePath string) {
+func uploadBulkMetadata(uploader *WalUploader, walFilePath string) {
 
 	walMetadataFolder := fs.NewFolder(getArchiveDataFolderPath(), "")
 	walFileName := filepath.Base(walFilePath)
@@ -141,7 +142,7 @@ func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrit
 		return errors.Wrapf(err, "upload: could not open '%s'\n", walFilePath)
 	}
 	err = uploader.UploadWalFile(walFile)
-	if err == nil && (viper.IsSet(UploadWalMetadata) || viper.GetString(UploadWalMetadata) == WalNoMetadataLevel) {
+	if err == nil && viper.GetString(UploadWalMetadata) != WalNoMetadataLevel {
 		err = uploadWALMetadataFile(uploader, walFilePath)
 		if err != nil {
 			return errors.Wrapf(err, "Failed to upload metadata file")
@@ -154,21 +155,21 @@ func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrit
 func uploadWALMetadataFile(uploader *WalUploader, walFilePath string) error {
 	err := checkWalMetadataLevel(viper.GetString(UploadWalMetadata))
 	if err != nil {
-		return errors.Wrapf(err, "Incorrect wal metadta level")
+		return errors.Wrapf(err, "Incorrect wal metadata level")
 	}
 	fileStat, err := os.Stat(walFilePath)
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not stat wal file'%s'\n", walFilePath)
 	}
 	var walMetadata WalMetadataDescription
-	walMetadataS := make(map[string]WalMetadataDescription)
+	walMetadataMap := make(map[string]WalMetadataDescription)
 	walName := fileStat.Name()
 	walMetadataName := walName + ".json"
-	walMetadata.CreateTime = fileStat.ModTime().UTC()
+	walMetadata.CreatedTime = fileStat.ModTime().UTC()
 	walMetadata.DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
-	walMetadataS[walName] = walMetadata
+	walMetadataMap[walName] = walMetadata
 
-	dtoBody, err := json.Marshal(walMetadataS)
+	dtoBody, err := json.Marshal(walMetadataMap)
 	if err != nil {
 		return errors.Wrapf(err, "Unable to marshal walmetadata")
 	}

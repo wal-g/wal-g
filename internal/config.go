@@ -114,6 +114,7 @@ var (
 		UploadDiskConcurrencySetting: "1",
 		UploadQueueSetting:           "2",
 		PreventWalOverwriteSetting:   "false",
+		UploadWalMetadata:            "NOMETADATA",
 		DeltaMaxStepsSetting:         "0",
 		CompressionMethodSetting:     "lz4",
 		UseWalDeltaSetting:           "false",

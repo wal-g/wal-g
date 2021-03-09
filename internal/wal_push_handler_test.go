@@ -24,6 +24,7 @@ func generateAndUploadWalFile(t *testing.T, fileFormat string) (internal.WalUplo
 }
 
 func TestHandleWALPush(t *testing.T) {
+	viper.Set(internal.UploadWalMetadata, "NOMETADATA")
 	_, fakeASM, dir, testFileName := generateAndUploadWalFile(t, "1")
 	defer cleanup(t, dir)
 	wasUploaded := fakeASM.WalAlreadyUploaded(testFileName)
@@ -43,5 +44,13 @@ func TestWalMetadataBulkUploader(t *testing.T) {
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "F")
 	defer cleanup(t, dir)
 	_, err := uploader.UploadingFolder.ReadObject(testFileName[0:len(testFileName)-1] + ".json")
+	assert.NoError(t, err)
+}
+
+func TestWalMetadataNoUploader(t *testing.T) {
+	viper.Set(internal.UploadWalMetadata, "NOMETADATA")
+	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "1")
+	defer cleanup(t, dir)
+	_, err := uploader.UploadingFolder.ReadObject(testFileName + ".json")
 	assert.NoError(t, err)
 }
