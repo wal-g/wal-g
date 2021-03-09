@@ -1,6 +1,9 @@
 package pg
 
 import (
+	"fmt"
+
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
@@ -8,24 +11,29 @@ import (
 )
 
 const (
-	ackupPushShortDescription      = "Makes backup and uploads it to storage"
-	permanentFlag                  = "permanent"
-	fullBackupFlag                 = "full"
-	verifyPagesFlag                = "verify"
-	storeAllCorruptBlocksFlag      = "store-all-corrupt"
-	UseRatingComposer              = "rating-composer"
+	backupPushShortDescription = "Makes backup and uploads it to storage"
+
+	permanentFlag             = "permanent"
+	fullBackupFlag            = "full"
+	verifyPagesFlag           = "verify"
+	storeAllCorruptBlocksFlag = "store-all-corrupt"
+	useRatingComposerFlag     = "rating-composer"
+	deltaFromUserDataFlag     = "delta-from-user-data"
+	deltaFromNameFlag         = "delta-from-name"
+	addUserDataFlag           = "add-user-data"
+
 	permanentShorthand             = "p"
 	fullBackupShorthand            = "f"
 	verifyPagesShorthand           = "v"
 	storeAllCorruptBlocksShorthand = "s"
-	UseRatingComposerShortHand     = "r"
+	useRatingComposerShorthand     = "r"
 )
 
 var (
 	// backupPushCmd represents the backupPush command
 	backupPushCmd = &cobra.Command{
 		Use:   "backup-push db_directory",
-		Short: ackupPushShortDescription, // TODO : improve description
+		Short: backupPushShortDescription, // TODO : improve description
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			uploader, err := internal.ConfigureWalUploader()
@@ -37,7 +45,21 @@ var (
 			if useRatingComposer {
 				tarBallComposerType = internal.RatingComposer
 			}
-			internal.HandleBackupPush(uploader, args[0], permanent, fullBackup, verifyPageChecksums, storeAllCorruptBlocks, tarBallComposerType)
+			if deltaFromName == "" {
+				deltaFromName = viper.GetString(internal.DeltaFromNameSetting)
+			}
+			if deltaFromUserData == "" {
+				deltaFromUserData = viper.GetString(internal.DeltaFromUserDataSetting)
+			}
+			deltaBaseSelector, err := createDeltaBaseSelector(cmd, deltaFromName, deltaFromUserData)
+			tracelog.ErrorLogger.FatalOnError(err)
+
+			if userData == "" {
+				userData = viper.GetString(internal.SentinelUserDataSetting)
+			}
+
+			internal.HandleBackupPush(uploader, args[0], permanent, fullBackup, verifyPageChecksums,
+				storeAllCorruptBlocks, tarBallComposerType, deltaBaseSelector, userData)
 		},
 	}
 	permanent             = false
@@ -45,7 +67,33 @@ var (
 	verifyPageChecksums   = false
 	storeAllCorruptBlocks = false
 	useRatingComposer     = false
+	deltaFromName         = ""
+	deltaFromUserData     = ""
+	userData              = ""
 )
+
+// create the BackupSelector for delta backup base according to the provided flags
+func createDeltaBaseSelector(cmd *cobra.Command, targetBackupName, targetUserData string) (internal.BackupSelector, error) {
+	switch {
+	case targetUserData != "" && targetBackupName != "":
+		fmt.Println(cmd.UsageString())
+		return nil, errors.New("Only one delta target should be specified.")
+
+	case targetBackupName != "":
+		tracelog.InfoLogger.Printf("Selecting the backup with name %s as the base for the current delta backup...\n",
+			targetBackupName)
+		return internal.NewBackupNameSelector(targetBackupName)
+
+	case targetUserData != "":
+		tracelog.InfoLogger.Println(
+			"Selecting the backup with specified user data as the base for the current delta backup...")
+		return internal.NewUserDataBackupSelector(targetUserData), nil
+
+	default:
+		tracelog.InfoLogger.Println("Selecting the latest backup as the base for the current delta backup...")
+		return internal.NewLatestBackupSelector(), nil
+	}
+}
 
 func init() {
 	cmd.AddCommand(backupPushCmd)
@@ -55,5 +103,8 @@ func init() {
 	backupPushCmd.Flags().BoolVarP(&verifyPageChecksums, verifyPagesFlag, verifyPagesShorthand, false, "Verify page checksums")
 	backupPushCmd.Flags().BoolVarP(&storeAllCorruptBlocks, storeAllCorruptBlocksFlag, storeAllCorruptBlocksShorthand,
 		false, "Store all corrupt blocks found during page checksum verification")
-	backupPushCmd.Flags().BoolVarP(&useRatingComposer, UseRatingComposer, UseRatingComposerShortHand, false, "Use rating tar composer (beta)")
+	backupPushCmd.Flags().BoolVarP(&useRatingComposer, useRatingComposerFlag, useRatingComposerShorthand, false, "Use rating tar composer (beta)")
+	backupPushCmd.Flags().StringVar(&deltaFromName, deltaFromNameFlag, "", "Select the backup specified by name as the target for the delta backup")
+	backupPushCmd.Flags().StringVar(&deltaFromUserData, deltaFromUserDataFlag, "", "Select the backup specified by UserData as the target for the delta backup")
+	backupPushCmd.Flags().StringVar(&userData, addUserDataFlag, "", "Write the provided user data to the backup sentinel and metadata files.")
 }

@@ -25,7 +25,7 @@ const AllDatabases = "ALL"
 
 const LogNamePrefix = "wal_"
 
-const TimeSQLServerFormat = "Jan 02, 2006 03:04 PM"
+const TimeSQLServerFormat = "Jan 02, 2006 03:04:05 PM"
 
 const MaxTransferSize = 4 * 1024 * 1024
 

@@ -29,8 +29,9 @@ var backupFetchCmd = &cobra.Command{
 
 		restoreCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamRestoreCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
-
-		fdb.HandleBackupFetch(ctx, folder, args[0], restoreCmd)
+		targetBackupSelector, err := internal.NewBackupNameSelector(args[0])
+		tracelog.ErrorLogger.FatalOnError(err)
+		fdb.HandleBackupFetch(ctx, folder, targetBackupSelector, restoreCmd)
 	},
 }
 

@@ -25,7 +25,9 @@ var backupFetchCmd = &cobra.Command{
 		restoreCmd, err := internal.GetCommandSetting(internal.NameStreamRestoreCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
 		prepareCmd, _ := internal.GetCommandSetting(internal.MysqlBackupPrepareCmd)
-		mysql.HandleBackupFetch(folder, args[0], restoreCmd, prepareCmd)
+		targetBackupSelector, err := internal.NewBackupNameSelector(args[0])
+		tracelog.ErrorLogger.FatalOnError(err)
+		mysql.HandleBackupFetch(folder, targetBackupSelector, restoreCmd, prepareCmd)
 	},
 }
 
