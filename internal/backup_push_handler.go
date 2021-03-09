@@ -202,53 +202,16 @@ func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanen
 	verifyPageChecksums, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
 	deltaBaseSelector BackupSelector, userData string) {
 	archiveDirectory = utility.ResolveSymlink(archiveDirectory)
-	maxDeltas, fromFull := getDeltaConfig()
 	checkPgVersionAndPgControl(archiveDirectory)
-	var err error
+
 	var previousBackupSentinelDto BackupSentinelDto
 	var previousBackupName string
-	incrementCount := 1
+	var incrementCount int
 
-	folder := uploader.UploadingFolder
-	basebackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	if maxDeltas > 0 && !isFullBackup {
-		previousBackupName, err = deltaBaseSelector.Select(folder)
-		if err != nil {
-			if _, ok := err.(NoBackupsFoundError); ok {
-				tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
-			} else {
-				tracelog.ErrorLogger.FatalError(err)
-			}
-		} else {
-			previousBackup := NewBackup(basebackupFolder, previousBackupName)
-			previousBackupSentinelDto, err = previousBackup.GetSentinel()
-			tracelog.ErrorLogger.FatalOnError(err)
-			if previousBackupSentinelDto.IncrementCount != nil {
-				incrementCount = *previousBackupSentinelDto.IncrementCount + 1
-			}
-
-			if incrementCount > maxDeltas {
-				tracelog.InfoLogger.Println("Reached max delta steps. Doing full backup.")
-				previousBackupSentinelDto = BackupSentinelDto{}
-			} else if previousBackupSentinelDto.BackupStartLSN == nil {
-				tracelog.InfoLogger.Println("LATEST backup was made without support for delta feature. Fallback to full backup with LSN marker for future deltas.")
-			} else {
-				if fromFull {
-					tracelog.InfoLogger.Println("Delta will be made from full backup.")
-
-					if previousBackupSentinelDto.IncrementFullName != nil {
-						previousBackupName = *previousBackupSentinelDto.IncrementFullName
-					}
-
-					previousBackup := NewBackup(basebackupFolder, previousBackupName)
-					previousBackupSentinelDto, err = previousBackup.GetSentinel()
-					tracelog.ErrorLogger.FatalOnError(err)
-				}
-				tracelog.InfoLogger.Printf("Delta backup from %v with LSN %x. \n", previousBackupName, *previousBackupSentinelDto.BackupStartLSN)
-			}
-		}
-	} else {
+	if isFullBackup {
 		tracelog.InfoLogger.Println("Doing full backup.")
+	} else {
+		previousBackupName, previousBackupSentinelDto, incrementCount = configureDeltaBackup(uploader.UploadingFolder, deltaBaseSelector, isPermanent)
 	}
 
 	backupConfig := BackupConfig{
@@ -266,6 +229,70 @@ func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanen
 		userData:                  userData,
 	}
 	createAndPushBackup(&backupConfig)
+}
+
+func configureDeltaBackup(folder storage.Folder, deltaBaseSelector BackupSelector, isPermanent bool,
+) (string, BackupSentinelDto, int) {
+	maxDeltas, fromFull := getDeltaConfig()
+	if maxDeltas == 0 {
+		return "", BackupSentinelDto{}, 0
+	}
+
+	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
+	previousBackupName, err := deltaBaseSelector.Select(folder)
+	if err != nil {
+		if _, ok := err.(NoBackupsFoundError); ok {
+			tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
+			return "", BackupSentinelDto{}, 0
+		}
+		tracelog.ErrorLogger.FatalError(err)
+	}
+
+	previousBackup := NewBackup(baseBackupFolder, previousBackupName)
+	previousBackupSentinelDto, err := previousBackup.GetSentinel()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	incrementCount := 1
+	if previousBackupSentinelDto.IncrementCount != nil {
+		incrementCount = *previousBackupSentinelDto.IncrementCount + 1
+	}
+
+	if incrementCount > maxDeltas {
+		tracelog.InfoLogger.Println("Reached max delta steps. Doing full backup.")
+		return "", BackupSentinelDto{}, 0
+	}
+
+	if previousBackupSentinelDto.BackupStartLSN == nil {
+		tracelog.InfoLogger.Println("LATEST backup was made without support for delta feature. " +
+			"Fallback to full backup with LSN marker for future deltas.")
+		return "", BackupSentinelDto{}, 0
+	}
+
+	previousBackupMeta, err := previousBackup.FetchMeta()
+	if err != nil {
+		tracelog.InfoLogger.Printf(
+			"Failed to get previous backup metadata: %s. Doing full backup.\n", err.Error())
+		return "", BackupSentinelDto{}, 0
+	}
+
+	if !isPermanent && !fromFull && previousBackupMeta.IsPermanent {
+		tracelog.InfoLogger.Println("Can't do a delta backup from permanent backup. Doing full backup.")
+		return "", BackupSentinelDto{}, 0
+	}
+
+	if fromFull {
+		tracelog.InfoLogger.Println("Delta will be made from full backup.")
+
+		if previousBackupSentinelDto.IncrementFullName != nil {
+			previousBackupName = *previousBackupSentinelDto.IncrementFullName
+		}
+
+		previousBackup := NewBackup(baseBackupFolder, previousBackupName)
+		previousBackupSentinelDto, err = previousBackup.GetSentinel()
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
+	tracelog.InfoLogger.Printf("Delta backup from %v with LSN %x. \n", previousBackupName, *previousBackupSentinelDto.BackupStartLSN)
+	return previousBackupName, previousBackupSentinelDto, incrementCount
 }
 
 // TODO : unit tests
