@@ -78,7 +78,10 @@ func searchBackupDetails(criteria func(BackupDetail) bool, folder storage.Folder
 		return nil, err
 	}
 
-	backupTimes := GetBackupTimeSlices(backups)
+	backupTimes, err := GetBackupTimeSlices(backups, folder, ModifyTime)
+	if err != nil {
+		return nil, err
+	}
 	foundBackups := make([]BackupDetail, 0)
 
 	for _, backupTime := range backupTimes {

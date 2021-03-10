@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
@@ -219,16 +218,13 @@ func makeLessFunc(startTimeByBackupName map[string]time.Time) func(storage.Objec
 
 // getBackupStartTimeMap returns a map for a fast lookup of the backup start time by the backup name
 func getBackupStartTimeMap(folder storage.Folder, backups []storage.Object) (map[string]time.Time, error) {
-	backupTimes := internal.GetBackupTimeSlices(backups)
+	backupTimes, err := internal.GetBackupTimeSlices(backups, folder, internal.CreationTime)
+	if err != nil {
+		return nil, err
+	}
 	startTimeByBackupName := make(map[string]time.Time, len(backups))
-
 	for _, backupTime := range backupTimes {
-		backupDetails, err := internal.GetBackupDetails(folder, backupTime)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Failed to get metadata of backup %s",
-				backupTime.BackupName)
-		}
-		startTimeByBackupName[backupDetails.BackupName] = backupDetails.StartTime
+		startTimeByBackupName[backupTime.BackupName] = backupTime.Time
 	}
 	return startTimeByBackupName, nil
 }
