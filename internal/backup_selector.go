@@ -78,13 +78,13 @@ func searchBackupDetails(criteria func(BackupDetail) bool, folder storage.Folder
 		return nil, err
 	}
 
-	backupTimes, err := GetBackupTimeSlices(backups, folder, ModifyTime)
+	backupTimes, err := GetBackupTimeSlices(backups, folder, ModificationTime)
 	if err != nil {
 		return nil, err
 	}
 	foundBackups := make([]BackupDetail, 0)
 
-	for _, backupTime := range backupTimes {
+	for _, backupTime := range backupTimes.Data {
 		backupDetails, err := GetBackupDetails(folder, backupTime)
 		if err != nil {
 			tracelog.WarningLogger.Printf("Failed to get metadata of backup %s, error: %s\n",

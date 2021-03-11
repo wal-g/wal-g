@@ -223,7 +223,7 @@ func getBackupStartTimeMap(folder storage.Folder, backups []storage.Object) (map
 		return nil, err
 	}
 	startTimeByBackupName := make(map[string]time.Time, len(backups))
-	for _, backupTime := range backupTimes {
+	for _, backupTime := range backupTimes.Data {
 		startTimeByBackupName[backupTime.BackupName] = backupTime.Time
 	}
 	return startTimeByBackupName, nil

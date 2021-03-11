@@ -32,10 +32,10 @@ func DefaultHandleBackupList(folder storage.Folder) {
 }
 
 func DefaultHandleBackupListWithTarget(folder storage.Folder, targetPath string) {
-	getBackupsFunc := func() ([]BackupTime, error) {
+	getBackupsFunc := func() (BackupTimeSlice, error) {
 		return GetBackupsWithTarget(folder, targetPath)
 	}
-	writeBackupListFunc := func(backups []BackupTime) {
+	writeBackupListFunc := func(backups BackupTimeSlice) {
 		WriteBackupList(backups, os.Stdout)
 	}
 	logging := Logging{
@@ -47,12 +47,12 @@ func DefaultHandleBackupListWithTarget(folder storage.Folder, targetPath string)
 }
 
 func HandleBackupList(
-	getBackupsFunc func() ([]BackupTime, error),
-	writeBackupListFunc func([]BackupTime),
+	getBackupsFunc func() (BackupTimeSlice, error),
+	writeBackupListFunc func(BackupTimeSlice),
 	logging Logging,
 ) {
 	backups, err := getBackupsFunc()
-	if len(backups) == 0 {
+	if len(backups.Data) == 0 {
 		logging.InfoLogger.Println("No backups found")
 		return
 	}
@@ -67,8 +67,8 @@ func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, de
 
 // TODO : unit tests
 func HandleBackupListWithFlagsAndTarget(folder storage.Folder, pretty bool, json bool, detail bool, targetPath string) {
-	backups, err := GetBackupsWithTarget(folder, targetPath)
-	if len(backups) == 0 {
+	backups, err := GetBackupsWithTargetOrdered(folder, CreationTime, targetPath)
+	if len(backups.Data) == 0 {
 		tracelog.InfoLogger.Println("No backups found")
 		return
 	}
@@ -97,20 +97,20 @@ func HandleBackupListWithFlagsAndTarget(folder storage.Folder, pretty bool, json
 	}
 }
 
-func GetBackupsDetails(folder storage.Folder, backups []BackupTime) ([]BackupDetail, error) {
+func GetBackupsDetails(folder storage.Folder, backups BackupTimeSlice) (BackupDetailSlice, error) {
 	return GetBackupsDetailsWithTarget(folder, backups, utility.BaseBackupPath)
 }
 
-func GetBackupsDetailsWithTarget(folder storage.Folder, backups []BackupTime, targetPath string) ([]BackupDetail, error) {
-	backupsDetails := make([]BackupDetail, 0, len(backups))
-	for i := len(backups) - 1; i >= 0; i-- {
-		details, err := GetBackupDetailsWithTarget(folder, backups[i], targetPath)
+func GetBackupsDetailsWithTarget(folder storage.Folder, backups BackupTimeSlice, targetPath string) (BackupDetailSlice, error) {
+	backupsDetails := make([]BackupDetail, 0, len(backups.Data))
+	for i := len(backups.Data) - 1; i >= 0; i-- {
+		details, err := GetBackupDetailsWithTarget(folder, backups.Data[i], targetPath)
 		if err != nil {
-			return nil, err
+			return BackupDetailSlice{nil, NoData}, err
 		}
 		backupsDetails = append(backupsDetails, details)
 	}
-	return backupsDetails, nil
+	return BackupDetailSlice{backupsDetails, backups.TimeDenotation} , nil
 }
 
 func GetBackupDetails(folder storage.Folder, backupTime BackupTime) (BackupDetail, error) {
@@ -131,45 +131,73 @@ func GetBackupDetailsWithTarget(folder storage.Folder, backupTime BackupTime, ta
 }
 
 // TODO : unit tests
-func WriteBackupList(backups []BackupTime, output io.Writer) {
+func WriteBackupList(backups BackupTimeSlice, output io.Writer) {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
-	fmt.Fprintln(writer, "name\tlast_modified\twal_segment_backup_start")
-	for i := len(backups) - 1; i >= 0; i-- {
-		b := backups[i]
+	orderColumnName := ""
+	if backups.TimeDenotation == ModificationTime {
+		orderColumnName = "last_modified"
+
+	} else {
+		orderColumnName = "last_created"
+	}
+	fmt.Fprintln(writer, "name\t"+orderColumnName+"\twal_segment_backup_start")
+	for i := len(backups.Data) - 1; i >= 0; i-- {
+		b := backups.Data[i]
 		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v", b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName))
 	}
 }
 
 // TODO : unit tests
-func writeBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
+func writeBackupListDetails(backupDetails BackupDetailSlice, output io.Writer) {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
-	fmt.Fprintln(writer, "name\tlast_modified\twal_segment_backup_start\tstart_time\tfinish_time\thostname\tdata_dir\tpg_version\tstart_lsn\tfinish_lsn\tis_permanent")
-	for i := len(backupDetails) - 1; i >= 0; i-- {
-		b := backupDetails[i]
+	orderColumnName := ""
+	if backupDetails.TimeDenotation == ModificationTime {
+		orderColumnName = "last_modified"
+
+	} else {
+		orderColumnName = "last_created"
+	}
+	fmt.Fprintln(writer, "name\t"+orderColumnName+"\twal_segment_backup_start\tstart_time\tfinish_time\thostname\tdata_dir\tpg_version\tstart_lsn\tfinish_lsn\tis_permanent")
+	for i := len(backupDetails.Data) - 1; i >= 0; i-- {
+		b := backupDetails.Data[i]
 		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v", b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName, b.StartTime.Format(time.RFC850), b.FinishTime.Format(time.RFC850), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent))
 	}
 }
 
-func WritePrettyBackupList(backups []BackupTime, output io.Writer) {
+func WritePrettyBackupList(backups BackupTimeSlice, output io.Writer) {
 	writer := table.NewWriter()
 	writer.SetOutputMirror(output)
 	defer writer.Render()
-	writer.AppendHeader(table.Row{"#", "Name", "Last modified", "WAL segment backup start"})
-	for i, b := range backups {
+	orderColumnName := ""
+	if backups.TimeDenotation == ModificationTime {
+		orderColumnName = "Last modified"
+
+	} else {
+		orderColumnName = "Last created"
+	}
+	writer.AppendHeader(table.Row{"#", "Name", orderColumnName, "WAL segment backup start"})
+	for i, b := range backups.Data {
 		writer.AppendRow(table.Row{i, b.BackupName, b.Time.Format(time.RFC850), b.WalFileName})
 	}
 }
 
 // TODO : unit tests
-func writePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
+func writePrettyBackupListDetails(backupDetails BackupDetailSlice, output io.Writer) {
 	writer := table.NewWriter()
 	writer.SetOutputMirror(output)
 	defer writer.Render()
-	writer.AppendHeader(table.Row{"#", "Name", "Last modified", "WAL segment backup start", "Start time", "Finish time", "Hostname", "Datadir", "PG Version", "Start LSN", "Finish LSN", "Permanent"})
-	for idx := range backupDetails {
-		b := &backupDetails[idx]
+	orderColumnName := ""
+	if backupDetails.TimeDenotation == ModificationTime {
+		orderColumnName = "Last modified"
+
+	} else {
+		orderColumnName = "Last created"
+	}
+	writer.AppendHeader(table.Row{"#", "Name", orderColumnName, "WAL segment backup start", "Start time", "Finish time", "Hostname", "Datadir", "PG Version", "Start LSN", "Finish LSN", "Permanent"})
+	for idx := range backupDetails.Data {
+		b := &backupDetails.Data[idx]
 		writer.AppendRow(table.Row{idx, b.BackupName, b.Time.Format(time.RFC850), b.WalFileName, b.StartTime.Format(time.RFC850), b.FinishTime.Format(time.RFC850), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent})
 	}
 }

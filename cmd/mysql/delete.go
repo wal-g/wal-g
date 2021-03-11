@@ -173,7 +173,7 @@ func permanentObjects(folder storage.Folder) map[string]bool {
 	}
 
 	permanentBackups := map[string]bool{}
-	for _, backupTime := range backupTimes {
+	for _, backupTime := range backupTimes.Data {
 		backup, err := internal.GetBackupByName(backupTime.BackupName, utility.BaseBackupPath, folder)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("failed to get backup by name with error %s, ignoring...", err.Error())

@@ -224,7 +224,7 @@ func getEarliestBackupStartSegmentNo(timelineSwitchMap map[WalSegmentNo]*Timelin
 		switchLsnBySegNo[historyRecord.timeline] = newWalSegmentNo(historyRecord.lsn)
 	}
 	earliestBackup, earliestBackupSegNo, err :=
-		findEarliestBackup(currentTimeline, backups, switchLsnBySegNo)
+		findEarliestBackup(currentTimeline, backups.Data, switchLsnBySegNo)
 	if err != nil {
 		return 0, err
 	}
