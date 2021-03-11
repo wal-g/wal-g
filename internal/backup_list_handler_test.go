@@ -16,25 +16,28 @@ type someError struct {
 }
 
 func TestHandleBackupListWriteBackups(t *testing.T) {
-	backups := []internal.BackupTime{
-		{
-			BackupName:  "backup000",
-			Time:        time.Time{},
-			WalFileName: "wallName0",
+	backups := internal.BackupTimeSlice{
+		[]internal.BackupTime{
+			{
+				BackupName:  "backup000",
+				Time:        time.Time{},
+				WalFileName: "wallName0",
+			},
+			{
+				BackupName:  "backup001",
+				Time:        time.Time{},
+				WalFileName: "wallName1",
+			},
 		},
-		{
-			BackupName:  "backup001",
-			Time:        time.Time{},
-			WalFileName: "wallName1",
-		},
+		internal.ModificationTime,
 	}
 
-	getBackupsFunc := func() ([]internal.BackupTime, error) {
+	getBackupsFunc := func() (internal.BackupTimeSlice, error) {
 		return backups, nil
 	}
 	writeBackupListCallsCount := 0
-	var writeBackupListCallArgs []internal.BackupTime
-	writeBackupListFunc := func(backups []internal.BackupTime) {
+	var writeBackupListCallArgs internal.BackupTimeSlice
+	writeBackupListFunc := func(backups internal.BackupTimeSlice) {
 		writeBackupListCallsCount++
 		writeBackupListCallArgs = backups
 	}
@@ -64,10 +67,10 @@ func TestHandleBackupListLogError(t *testing.T) {
 		},
 	}
 	someErrorInstance := someError{errors.New("some error")}
-	getBackupsFunc := func() ([]internal.BackupTime, error) {
-		return backups, someErrorInstance
+	getBackupsFunc := func() (internal.BackupTimeSlice, error) {
+		return internal.BackupTimeSlice{backups, internal.ModificationTime}, someErrorInstance
 	}
-	writeBackupListFunc := func(backups []internal.BackupTime) {}
+	writeBackupListFunc := func(backups internal.BackupTimeSlice) {}
 	infoLogger, errorLogger := testtools.MockLoggers()
 
 	internal.HandleBackupList(
@@ -81,10 +84,10 @@ func TestHandleBackupListLogError(t *testing.T) {
 }
 
 func TestHandleBackupListLogNoBackups(t *testing.T) {
-	getBackupsFunc := func() ([]internal.BackupTime, error) {
-		return []internal.BackupTime{}, nil
+	getBackupsFunc := func() (internal.BackupTimeSlice, error) {
+		return internal.BackupTimeSlice{nil, internal.NoData}, nil
 	}
-	writeBackupListFunc := func(backups []internal.BackupTime) {}
+	writeBackupListFunc := func(backups internal.BackupTimeSlice) {}
 	infoLogger, errorLogger := testtools.MockLoggers()
 
 	internal.HandleBackupList(
@@ -120,7 +123,7 @@ func TestWritePrettyBackupList_LongColumnsValues(t *testing.T) {
 	}
 
 	b := bytes.Buffer{}
-	internal.WritePrettyBackupList(backups, &b)
+	internal.WritePrettyBackupList(internal.BackupTimeSlice{backups, internal.ModificationTime}, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
@@ -147,7 +150,7 @@ func TestWritePrettyBackupList_ShortColumnsValues(t *testing.T) {
 	}
 
 	b := bytes.Buffer{}
-	internal.WritePrettyBackupList(backups, &b)
+	internal.WritePrettyBackupList(internal.BackupTimeSlice{backups, internal.ModificationTime}, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
@@ -161,7 +164,7 @@ func TestWritePrettyBackupList_WriteNoBackupList(t *testing.T) {
 	backups := make([]internal.BackupTime, 0)
 
 	b := bytes.Buffer{}
-	internal.WritePrettyBackupList(backups, &b)
+	internal.WritePrettyBackupList(internal.BackupTimeSlice{backups, internal.ModificationTime}, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
@@ -190,7 +193,7 @@ func TestWritePrettyBackupList_EmptyColumnsValues(t *testing.T) {
 	}
 
 	b := bytes.Buffer{}
-	internal.WritePrettyBackupList(backups, &b)
+	internal.WritePrettyBackupList(internal.BackupTimeSlice{backups, internal.ModificationTime}, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }

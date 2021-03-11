@@ -41,7 +41,7 @@ func TestBackupListCorrectOutput(t *testing.T) {
 		"base_123 2019-04-25T14:48:00Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n"
 
 	buf := new(bytes.Buffer)
-	internal.WriteBackupList(backups, buf)
+	internal.WriteBackupList(internal.BackupTimeSlice{backups, internal.ModificationTime}, buf)
 	assert.Equal(t, buf.String(), expected)
 }
 
@@ -55,7 +55,7 @@ func TestBackupListCorrectPrettyOutput(t *testing.T) {
 		"+---+----------+----------------------------------+--------------------------+\n"
 
 	buf := new(bytes.Buffer)
-	internal.WritePrettyBackupList(backups, buf)
+	internal.WritePrettyBackupList(internal.BackupTimeSlice{backups, internal.ModificationTime}, buf)
 	assert.Equal(t, buf.String(), expected)
 }
 
