@@ -54,3 +54,12 @@ func TestWalMetadataNoUploader(t *testing.T) {
 	_, err := uploader.UploadingFolder.ReadObject(testFileName + ".json")
 	assert.Error(t, err)
 }
+
+func TestWalMetadataBulkUploaderUploadConcurrency(t *testing.T) {
+	viper.Set(internal.UploadWalMetadata, "BULK")
+	viper.Set(internal.UploadConcurrencySetting,10)
+	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "F")
+	defer cleanup(t, dir)
+	_, err := uploader.UploadingFolder.ReadObject(testFileName[0:len(testFileName)-1] + ".json")
+	assert.NoError(t, err)
+}

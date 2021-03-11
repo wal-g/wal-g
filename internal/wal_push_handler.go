@@ -58,16 +58,18 @@ func (err CantOverwriteWalFileError) Error() string {
 // TODO : unit tests
 // HandleWALPush is invoked to perform wal-g wal-push
 func HandleWALPush(uploader *WalUploader, walFilePath string) {
+	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
 	if uploader.ArchiveStatusManager.IsWalAlreadyUploaded(walFilePath) {
 		err := uploader.ArchiveStatusManager.UnmarkWalFile(walFilePath)
 
 		if err != nil {
 			tracelog.ErrorLogger.Printf("unmark wal-g status for %s file failed due following error %+v", walFilePath, err)
 		}
+		if viper.GetString(UploadWalMetadata) == WalBulkMetadataLevel && walFilePath[len(walFilePath)-1:] == "F" {
+			uploadBulkMetadata(uploader, walFilePath)
+		}
 		return
 	}
-
-	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
 
 	concurrency, err := GetMaxUploadConcurrency()
 	tracelog.ErrorLogger.FatalOnError(err)
