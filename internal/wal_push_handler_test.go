@@ -16,7 +16,7 @@ func generateAndUploadWalFile(t *testing.T, fileFormat string) (internal.WalUplo
 	dir, _ := setupArchiveStatus(t, "")
 	addTestDataFile(t, dir, fileFormat)
 	testFileName := testFilename(fileFormat)
-	uploader := testtools.NewMockWalUploader(false, false)
+	uploader := testtools.NewMockWalDirUploader(false, false)
 	fakeASM := asm.NewFakeASM()
 	uploader.ArchiveStatusManager = fakeASM
 	internal.HandleWALPush(uploader, filepath.Join(dir, testFileName))
@@ -52,5 +52,5 @@ func TestWalMetadataNoUploader(t *testing.T) {
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "1")
 	defer cleanup(t, dir)
 	_, err := uploader.UploadingFolder.ReadObject(testFileName + ".json")
-	assert.NoError(t, err)
+	assert.Error(t, err)
 }

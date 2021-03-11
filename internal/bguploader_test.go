@@ -2,6 +2,7 @@ package internal_test
 
 import (
 	"fmt"
+	"github.com/spf13/viper"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -78,6 +79,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 		},
 	}
 
+	viper.Set(internal.UploadWalMetadata, "NOMETADATA")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			defer cleanup(t, internal.GetDataFolderPath())

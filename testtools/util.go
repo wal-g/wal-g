@@ -53,6 +53,19 @@ func NewMockWalUploader(apiMultiErr, apiErr bool) *internal.WalUploader {
 	)
 }
 
+func CreateMockStorageWalFolder() storage.Folder {
+	var folder = MakeDefaultInMemoryStorageFolder()
+	return folder.GetSubFolder(utility.BaseBackupPath)
+}
+
+func NewMockWalDirUploader(apiMultiErr, apiErr bool) *internal.WalUploader {
+	return internal.NewWalUploader(
+		&MockCompressor{},
+		CreateMockStorageWalFolder(),
+		nil,
+	)
+}
+
 func CreateMockStorageFolder() storage.Folder {
 	var folder = MakeDefaultInMemoryStorageFolder()
 	subFolder := folder.GetSubFolder(utility.BaseBackupPath)
