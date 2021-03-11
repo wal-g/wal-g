@@ -74,6 +74,9 @@ To configure how many concurrency streams to use during backup uploading, use `W
 
 To configure how many concurrency streams are reading disk during ```backup-push```. By default, WAL-G uses 1 stream.
 
+* `TOTAL_BG_UPLOADED_LIMIT` (e.g. `1024`)
+Overrides the default `number of WAL files to upload during one scan`. By default, at most 32 WAL files will be uploaded.
+
 * `WALG_SENTINEL_USER_DATA`
 
 This setting allows backup automation tools to add extra information to JSON sentinel file during ```backup-push```. This setting can be used e.g. to give user-defined names to backups.
