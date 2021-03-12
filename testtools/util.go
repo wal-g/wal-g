@@ -55,7 +55,7 @@ func NewMockWalUploader(apiMultiErr, apiErr bool) *internal.WalUploader {
 
 func CreateMockStorageWalFolder() storage.Folder {
 	var folder = MakeDefaultInMemoryStorageFolder()
-	return folder.GetSubFolder(utility.BaseBackupPath)
+	return folder.GetSubFolder(utility.WalPath)
 }
 
 func NewMockWalDirUploader(apiMultiErr, apiErr bool) *internal.WalUploader {

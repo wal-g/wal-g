@@ -23,7 +23,8 @@ func generateAndUploadWalFile(t *testing.T, fileFormat string) (internal.WalUplo
 	return *uploader, fakeASM, dir, testFileName
 }
 
-func TestHandleWALPush(t *testing.T) {
+
+func TestWalPush_HandleWALPush(t *testing.T) {
 	viper.Set(internal.UploadWalMetadata, "NOMETADATA")
 	_, fakeASM, dir, testFileName := generateAndUploadWalFile(t, "1")
 	defer cleanup(t, dir)
@@ -31,7 +32,7 @@ func TestHandleWALPush(t *testing.T) {
 	assert.True(t, wasUploaded, testFileName+" was not marked as uploaded")
 }
 
-func TestWalMetadataIndividualUploader(t *testing.T) {
+func TestWalPush_IndividualMetadataUploader(t *testing.T) {
 	viper.Set(internal.UploadWalMetadata, "INDIVIDUAL")
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "1")
 	defer cleanup(t, dir)
@@ -39,7 +40,7 @@ func TestWalMetadataIndividualUploader(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestWalMetadataBulkUploader(t *testing.T) {
+func TestWalPush_BulkMetadataUploader(t *testing.T) {
 	viper.Set(internal.UploadWalMetadata, "BULK")
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "F")
 	defer cleanup(t, dir)
@@ -47,7 +48,7 @@ func TestWalMetadataBulkUploader(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestWalMetadataNoUploader(t *testing.T) {
+func TestWalPush_NoMetataNoUploader(t *testing.T) {
 	viper.Set(internal.UploadWalMetadata, "NOMETADATA")
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "1")
 	defer cleanup(t, dir)
@@ -55,9 +56,9 @@ func TestWalMetadataNoUploader(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestWalMetadataBulkUploaderUploadConcurrency(t *testing.T) {
+func TestWalPush_BulkMetadataUploaderWithUploadConcurrency(t *testing.T) {
 	viper.Set(internal.UploadWalMetadata, "BULK")
-	viper.Set(internal.UploadConcurrencySetting,10)
+	viper.Set(internal.UploadConcurrencySetting,4)
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "F")
 	defer cleanup(t, dir)
 	_, err := uploader.UploadingFolder.ReadObject(testFileName[0:len(testFileName)-1] + ".json")
