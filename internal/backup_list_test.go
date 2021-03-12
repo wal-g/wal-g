@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/testtools"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func TestBackupListFindsBackups(t *testing.T) {
@@ -94,4 +95,19 @@ func TestBackupListCorrectPrettyJsonOutput(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, unmarshaledBackups, backups)
 	assert.Equal(t, buf.String(), expectedString)
+}
+
+func TestBackupListCreationTimeOrdering(t *testing.T) {
+	const expected = "" +
+	"name                                                     last_created         wal_segment_backup_start\n" +
+	"base_000000010000000000000006_D_000000010000000000000004 2018-04-25T14:48:00Z 000000010000000000000006\n" +
+	"base_000000010000000000000002                            2019-04-25T14:48:00Z 000000010000000000000002\n" +
+	"base_000000010000000000000004_D_000000010000000000000002 2020-04-25T14:48:00Z 000000010000000000000004\n"
+	folder := testtools.CreateMockStorageFolderWithPermanentBackups(t, testtools.BackupNamesCreationTime, testtools.WalNames)
+	backups, err := internal.GetBackupsWithTargetOrdered(folder, internal.CreationTime, utility.BaseBackupPath)
+	assert.NoError(t, err)
+	buf := new(bytes.Buffer)
+	internal.WriteBackupList(backups, buf)
+	assert.Equal(t, buf.String(), expected)
+
 }

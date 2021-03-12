@@ -93,42 +93,57 @@ func CreateMockStorageFolderWithDeltaBackups(t *testing.T) storage.Folder {
 	return folder
 }
 
-func CreateMockStorageFolderWithPermanentBackups(t *testing.T) storage.Folder {
+var EmptyData = map[string]interface{}{}
+
+var BackupNamesDefault = map[string]interface{}{
+	"base_000000010000000000000002": map[string]interface{}{
+		"start_time":   utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
+		"finish_time":  utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
+		"hostname":     "",
+		"data_dir":     "",
+		"pg_version":   0,
+		"start_lsn":    16777216, // logSegNo = 1
+		"finish_lsn":   33554432, // logSegNo = 2
+		"is_permanent": true,
+	},
+	"base_000000010000000000000004_D_000000010000000000000002": map[string]interface{}{
+		"start_time":   utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
+		"finish_time":  utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
+		"hostname":     "",
+		"data_dir":     "",
+		"pg_version":   0,
+		"start_lsn":    16777217, // logSegNo = 1
+		"finish_lsn":   33554433, // logSegNo = 2
+		"is_permanent": true,
+	},
+	"base_000000010000000000000006_D_000000010000000000000004": EmptyData,
+}
+
+var BackupNamesCreationTime = map[string]interface{}{
+	"base_000000010000000000000002": map[string]interface{}{
+		"start_time":   time.Date(2019, 4, 25, 14, 48, 0, 0, time.UTC),
+	},
+	"base_000000010000000000000004_D_000000010000000000000002": map[string]interface{}{
+		"start_time":   time.Date(2020, 4, 25, 14, 48, 0, 0, time.UTC),
+	},
+	"base_000000010000000000000006_D_000000010000000000000004": map[string]interface{}{
+		"start_time":   time.Date(2018, 4, 25, 14, 48, 0, 0, time.UTC),
+	},
+}
+
+var WalNames = map[string]interface{}{
+	"000000010000000000000001": EmptyData,
+	"000000010000000000000002": EmptyData,
+	"000000010000000000000003": EmptyData,
+}
+
+func CreateMockStorageFolderWithPermanentBackups(t *testing.T, backupNames map[string]interface{}, walNames map[string]interface{}) storage.Folder {
 	folder := MakeDefaultInMemoryStorageFolder()
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	walBackupFolder := folder.GetSubFolder(utility.WalPath)
-	emptyData := map[string]interface{}{}
-	backupNames := map[string]interface{}{
-		"base_000000010000000000000002": map[string]interface{}{
-			"start_time":   utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
-			"finish_time":  utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
-			"hostname":     "",
-			"data_dir":     "",
-			"pg_version":   0,
-			"start_lsn":    16777216, // logSegNo = 1
-			"finish_lsn":   33554432, // logSegNo = 2
-			"is_permanent": true,
-		},
-		"base_000000010000000000000004_D_000000010000000000000002": map[string]interface{}{
-			"start_time":   utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
-			"finish_time":  utility.TimeNowCrossPlatformLocal().Format(time.RFC3339),
-			"hostname":     "",
-			"data_dir":     "",
-			"pg_version":   0,
-			"start_lsn":    16777217, // logSegNo = 1
-			"finish_lsn":   33554433, // logSegNo = 2
-			"is_permanent": true,
-		},
-		"base_000000010000000000000006_D_000000010000000000000004": emptyData,
-	}
-	walNames := map[string]interface{}{
-		"000000010000000000000001": emptyData,
-		"000000010000000000000002": emptyData,
-		"000000010000000000000003": emptyData,
-	}
 	for backupName, metadata := range backupNames {
 		// empty sentinel
-		empty, err := json.Marshal(&emptyData)
+		empty, err := json.Marshal(&EmptyData)
 		assert.NoError(t, err)
 		sentinelString := string(empty)
 		err = baseBackupFolder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader(sentinelString))
