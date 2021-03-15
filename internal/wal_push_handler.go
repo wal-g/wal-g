@@ -65,9 +65,7 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 		if err != nil {
 			tracelog.ErrorLogger.Printf("unmark wal-g status for %s file failed due following error %+v", walFilePath, err)
 		}
-		if viper.GetString(UploadWalMetadata) == WalBulkMetadataLevel && walFilePath[len(walFilePath)-1:] == "F" {
-			uploadBulkMetadata(uploader, walFilePath)
-		}
+		uploadBulkMetadata(uploader, walFilePath)
 		return
 	}
 
@@ -82,13 +80,7 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 	bgUploader.Start()
 	err = uploadWALFile(uploader, walFilePath, bgUploader.preventWalOverwrite)
 	tracelog.ErrorLogger.FatalOnError(err)
-	if err == nil && viper.GetString(UploadWalMetadata) == WalBulkMetadataLevel && walFilePath[len(walFilePath)-1:] == "F" {
-		// Creating consolidated wal metadata only for bulk option
-		// Checking if the walfile name ends with "F" (last file in the series) and consolidating all the metadata together.
-		// For example, All the metadata for the files in the series 000000030000000800000010, 000000030000000800000011 to 00000003000000080000001F
-		// will be consolidated together and single  file 00000003000000080000001.json will be created.
-		uploadBulkMetadata(uploader, walFilePath)
-	}
+	uploadBulkMetadata(uploader, walFilePath)
 
 	err = bgUploader.Stop()
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -99,6 +91,14 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 } //
 
 func uploadBulkMetadata(uploader *WalUploader, walFilePath string) {
+
+	// Creating consolidated wal metadata only for bulk option
+	// Checking if the walfile name ends with "F" (last file in the series) and consolidating all the metadata together.
+	// For example, All the metadata for the files in the series 000000030000000800000010, 000000030000000800000011 to 00000003000000080000001F
+	// will be consolidated together and single  file 00000003000000080000001.json will be created.
+	if viper.GetString(UploadWalMetadata) != WalBulkMetadataLevel || walFilePath[len(walFilePath)-1:] != "F" {
+		return
+	}
 
 	walMetadataFolder := fs.NewFolder(getArchiveDataFolderPath(), "")
 	walFileName := filepath.Base(walFilePath)
