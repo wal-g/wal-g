@@ -60,6 +60,9 @@ type BgUploader struct {
 	// started tracks filenames of ongoing and complete uploads to avoid
 	// repeating work
 	started map[string]struct{}
+
+	// WAL name where we started.
+	firstWalName string
 }
 
 // NewBgUploader creates a new BgUploader which looks for WAL files adjacent to
@@ -67,7 +70,8 @@ type BgUploader struct {
 // and total work done by this BgUploader respectively.
 func NewBgUploader(walFilePath string, maxParallelWorkers int32, maxNumUploaded int32, uploader *WalUploader, preventWalOverwrite bool) *BgUploader {
 	started := make(map[string]struct{})
-	started[filepath.Base(walFilePath)+readySuffix] = struct{}{}
+	firstWalName := filepath.Base(walFilePath)
+	started[firstWalName+readySuffix] = struct{}{}
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	return &BgUploader{
 		dir:                 filepath.Dir(walFilePath),
@@ -81,6 +85,7 @@ func NewBgUploader(walFilePath string, maxParallelWorkers int32, maxNumUploaded 
 		numUploaded:        0,
 		maxNumUploaded:     maxNumUploaded,
 		started:            started,
+		firstWalName:       firstWalName,
 	}
 }
 
@@ -108,6 +113,25 @@ func (b *BgUploader) scanAndProcessFiles() {
 	fileChan := make(chan os.FileInfo)
 	defer close(fileChan)
 	go b.processFiles(fileChan)
+
+	walName := b.firstWalName
+
+	for i := int32(0); i < b.maxNumUploaded; i++ {
+		var err error
+		walName, err = GetNextWalFilename(walName)
+		if err != nil {
+			break
+		}
+		stat, err := os.Stat(filepath.Join(b.dir, archiveStatusDir, walName+readySuffix))
+		if err != nil {
+			break
+		}
+		select {
+		case <-b.ctx.Done():
+			return
+		case fileChan <- stat:
+		}
+	}
 
 	for {
 		files, err := ioutil.ReadDir(filepath.Join(b.dir, archiveStatusDir))
