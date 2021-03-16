@@ -116,7 +116,7 @@ func (b *BgUploader) scanAndProcessFiles() {
 
 	walName := b.firstWalName
 
-	for i := int32(0); i < b.maxNumUploaded ; i++ {
+	for i := int32(0); i < b.maxNumUploaded; i++ {
 		var err error
 		walName, err = GetNextWalFilename(walName)
 		if err != nil {
