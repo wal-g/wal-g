@@ -1,8 +1,18 @@
 package internal
 
 import (
+	"bytes"
+	"encoding/json"
 	"io"
+	"io/ioutil"
+	"os"
 	"path"
+	"path/filepath"
+	"time"
+
+	"github.com/pkg/errors"
+	"github.com/spf13/viper"
+	"github.com/wal-g/storages/fs"
 
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
@@ -15,6 +25,32 @@ import (
 type WalUploader struct {
 	*Uploader
 	*DeltaFileManager
+}
+
+const (
+	WalBulkMetadataLevel       = "BULK"
+	WalIndividualMetadataLevel = "INDIVIDUAL"
+	WalNoMetadataLevel         = "NOMETADATA"
+)
+
+var WalMetadataLevels = []string{WalBulkMetadataLevel, WalIndividualMetadataLevel, WalNoMetadataLevel}
+
+type WalMetadataDescription struct {
+	CreatedTime    time.Time `json:"created_time"`
+	DatetimeFormat string    `json:"date_fmt"`
+}
+
+func checkWalMetadataLevel(walMetadataLevel string) error {
+	isCorrect := false
+	for _, level := range WalMetadataLevels {
+		if walMetadataLevel == level {
+			isCorrect = true
+		}
+	}
+	if !isCorrect {
+		return errors.Errorf("got incorrect Wal metadata  level: '%s', expected one of: '%v'", walMetadataLevel, WalMetadataLevels)
+	}
+	return nil
 }
 
 func (walUploader *WalUploader) getUseWalDelta() (useWalDelta bool) {
@@ -64,10 +100,80 @@ func (walUploader *WalUploader) UploadWalFile(file ioextensions.NamedReader) err
 		if err := walUploader.ArchiveStatusManager.MarkWalUploaded(filename); err != nil {
 			tracelog.ErrorLogger.Printf("Error marking wal file %s as uploaded: %v", filename, err)
 		}
+		if viper.GetString(UploadWalMetadata) != WalNoMetadataLevel {
+			err = uploadWALMetadataFile(walUploader, filepath.Join(getWalFolderPath(), filename))
+		}
 	}
 	return err
 }
 
 func (walUploader *WalUploader) FlushFiles() {
 	walUploader.DeltaFileManager.FlushFiles(walUploader.Uploader)
+}
+
+func uploadWALMetadataFile(uploader *WalUploader, walFilePath string) error {
+	err := checkWalMetadataLevel(viper.GetString(UploadWalMetadata))
+	if err != nil {
+		return errors.Wrapf(err, "Incorrect wal metadata level")
+	}
+	fileStat, err := os.Stat(walFilePath)
+	if err != nil {
+		return errors.Wrapf(err, "upload: could not stat wal file'%s'\n", walFilePath)
+	}
+	var walMetadata WalMetadataDescription
+	walMetadataMap := make(map[string]WalMetadataDescription)
+	walName := fileStat.Name()
+	walMetadataName := walName + ".json"
+	walMetadata.CreatedTime = fileStat.ModTime().UTC()
+	walMetadata.DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
+	walMetadataMap[walName] = walMetadata
+
+	dtoBody, err := json.Marshal(walMetadataMap)
+	if err != nil {
+		return errors.Wrapf(err, "Unable to marshal walmetadata")
+	}
+	if viper.GetString(UploadWalMetadata) == WalBulkMetadataLevel {
+		walMetadataFolder := fs.NewFolder(getArchiveDataFolderPath(), "")
+		err = walMetadataFolder.PutObject(walMetadataName, bytes.NewReader(dtoBody))
+	} else {
+		err = uploader.Upload(walMetadataName, bytes.NewReader(dtoBody))
+	}
+	return errors.Wrapf(err, "upload: could not Upload metadata'%s'\n", walFilePath)
+}
+
+func uploadBulkMetadata(uploader *WalUploader, walFilePath string) {
+
+	// Creating consolidated wal metadata only for bulk option
+	// Checking if the walfile name ends with "F" (last file in the series) and consolidating all the metadata together.
+	// For example, All the metadata for the files in the series 000000030000000800000010, 000000030000000800000011 to 00000003000000080000001F
+	// will be consolidated together and single  file 00000003000000080000001.json will be created.
+	if viper.GetString(UploadWalMetadata) != WalBulkMetadataLevel || walFilePath[len(walFilePath)-1:] != "F" {
+		return
+	}
+	walMetadataFolder := fs.NewFolder(getArchiveDataFolderPath(), "")
+	walFileName := filepath.Base(walFilePath)
+	walSearchString := walFileName[0 : len(walFileName)-1]
+	walMetadataFiles, _ := filepath.Glob(walMetadataFolder.GetFilePath("") + "/" + walSearchString + "*.json")
+
+	walMetadata := make(map[string]WalMetadataDescription)
+	walMetadataArray := make(map[string]WalMetadataDescription)
+
+	for _, walMetadataFile := range walMetadataFiles {
+		file, _ := ioutil.ReadFile(walMetadataFile)
+		err := json.Unmarshal(file, &walMetadata)
+		if err == nil {
+			for k := range walMetadata {
+				walMetadataArray[k] = walMetadata[k]
+			}
+		}
+	}
+	dtoBody, _ := json.Marshal(walMetadataArray)
+	_ = uploader.Upload(walSearchString+".json", bytes.NewReader(dtoBody))
+	//Deleting the temporary metadata files created
+	for _, walMetadataFile := range walMetadataFiles {
+		err := os.Remove(walMetadataFile)
+		if err != nil {
+			tracelog.InfoLogger.Printf("Unable to remove walmetadata file %s", walMetadataFile)
+		}
+	}
 }

@@ -86,8 +86,9 @@ func TestBackgroundWALUpload(t *testing.T) {
 
 			// Use generated data to test uploading WAL.
 			dir, a := setupArchiveStatus(t, "")
+			dirName := filepath.Join(dir, "pg_wal")
 			for i := 0; i < tt.numFilesOnDisk; i++ {
-				addTestDataFile(t, dir, fmt.Sprint(i))
+				addTestDataFile(t, dirName, fmt.Sprint(i))
 			}
 			defer cleanup(t, dir)
 
@@ -139,12 +140,11 @@ func setupArchiveStatus(t *testing.T, dir string) (string, string) {
 		}
 	}
 
-	err = os.MkdirAll(filepath.Join(testDir, "archive_status"), 0700)
+	err = os.MkdirAll(filepath.Join(testDir, "pg_wal", "archive_status"), 0700)
 	if err != nil {
 		t.Log(err)
 	}
-
-	a := filepath.Join(testDir, "A")
+	a := filepath.Join(testDir, "pg_wal", "A")
 	file, err := os.Create(a)
 	if err != nil {
 		t.Log(err)

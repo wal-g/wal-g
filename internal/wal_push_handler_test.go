@@ -12,14 +12,16 @@ import (
 )
 
 func generateAndUploadWalFile(t *testing.T, fileFormat string) (internal.WalUploader, *asm.FakeASM, string, string) {
-	defer cleanup(t, internal.GetDataFolderPath())
 	dir, _ := setupArchiveStatus(t, "")
-	addTestDataFile(t, dir, fileFormat)
+	dirName := filepath.Join(dir,"pg_wal")
+    defer cleanup(t, dir)
+	addTestDataFile(t, dirName, fileFormat)
+	viper.Set(internal.PgDataSetting, dir)
 	testFileName := testFilename(fileFormat)
 	uploader := testtools.NewMockWalDirUploader(false, false)
 	fakeASM := asm.NewFakeASM()
 	uploader.ArchiveStatusManager = fakeASM
-	internal.HandleWALPush(uploader, filepath.Join(dir, testFileName))
+	internal.HandleWALPush(uploader, filepath.Join(dirName, testFileName))
 	return *uploader, fakeASM, dir, testFileName
 }
 
