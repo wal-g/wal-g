@@ -26,29 +26,29 @@ var times = []struct {
 	input internal.BackupTime
 }{
 	{internal.BackupTime{
-		BackupName:  "second",
-		Time:        time.Date(2017, 2, 2, 30, 48, 39, 651387233, time.UTC),
-		WalFileName: "",
+		BackupName:       "second",
+		ModificationTime: time.Date(2017, 2, 2, 30, 48, 39, 651387233, time.UTC),
+		WalFileName:      "",
 	}},
 	{internal.BackupTime{
-		BackupName:  "fourth",
-		Time:        time.Date(2009, 2, 27, 20, 8, 33, 651387235, time.UTC),
-		WalFileName: "",
+		BackupName:       "fourth",
+		ModificationTime: time.Date(2009, 2, 27, 20, 8, 33, 651387235, time.UTC),
+		WalFileName:      "",
 	}},
 	{internal.BackupTime{
-		BackupName:  "fifth",
-		Time:        time.Date(2008, 11, 20, 16, 34, 58, 651387232, time.UTC),
-		WalFileName: "",
+		BackupName:       "fifth",
+		ModificationTime: time.Date(2008, 11, 20, 16, 34, 58, 651387232, time.UTC),
+		WalFileName:      "",
 	}},
 	{internal.BackupTime{
-		BackupName:  "first",
-		Time:        time.Date(2020, 11, 31, 20, 3, 58, 651387237, time.UTC),
-		WalFileName: "",
+		BackupName:       "first",
+		ModificationTime: time.Date(2020, 11, 31, 20, 3, 58, 651387237, time.UTC),
+		WalFileName:      "",
 	}},
 	{internal.BackupTime{
-		BackupName:  "third",
-		Time:        time.Date(2009, 3, 13, 4, 2, 42, 651387234, time.UTC),
-		WalFileName: "",
+		BackupName:       "third",
+		ModificationTime: time.Date(2009, 3, 13, 4, 2, 42, 651387234, time.UTC),
+		WalFileName:      "",
 	}},
 }
 
@@ -61,7 +61,7 @@ func TestSortLatestTime(t *testing.T) {
 	}
 
 	sort.Slice(sortTimes, func(i, j int) bool {
-		return sortTimes[i].Time.After(sortTimes[j].Time)
+		return sortTimes[i].ModificationTime.After(sortTimes[j].ModificationTime)
 	})
 
 	for i, val := range sortTimes {

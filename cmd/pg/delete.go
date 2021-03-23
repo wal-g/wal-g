@@ -219,7 +219,7 @@ func makeLessFunc(startTimeByBackupName map[string]time.Time) func(storage.Objec
 
 // getBackupStartTimeMap returns a map for a fast lookup of the backup start time by the backup name
 func getBackupStartTimeMap(folder storage.Folder, backups []storage.Object) (map[string]time.Time, error) {
-	backupTimes := internal.GetBackupTimeSlices(backups)
+	backupTimes := internal.GetBackupTimeSlices(backups, folder)
 	startTimeByBackupName := make(map[string]time.Time, len(backups))
 
 	for _, backupTime := range backupTimes {

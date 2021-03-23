@@ -117,27 +117,42 @@ func GetBackupDetails(folder storage.Folder, backupTime BackupTime) (BackupDetai
 	return GetBackupDetailsWithTarget(folder, backupTime, utility.BaseBackupPath)
 }
 
-func GetBackupDetailsWithTarget(folder storage.Folder, backupTime BackupTime, targetPath string) (BackupDetail, error) {
-	backup, err := GetBackupByName(backupTime.BackupName, targetPath, folder)
+func GetBackupMetaData(folder storage.Folder, backupName string, targetPath string) (ExtendedMetadataDto, error) {
+	backup, err := GetBackupByName(backupName, targetPath, folder)
 	if err != nil {
-		return BackupDetail{}, err
+		return ExtendedMetadataDto{}, err
 	}
 
 	metaData, err := backup.FetchMeta()
+	if err != nil {
+		return ExtendedMetadataDto{}, err
+	}
+	return metaData, nil
+}
+
+func GetBackupDetailsWithTarget(folder storage.Folder, backupTime BackupTime, targetPath string) (BackupDetail, error) {
+	metaData, err := GetBackupMetaData(folder, backupTime.BackupName, targetPath)
 	if err != nil {
 		return BackupDetail{}, err
 	}
 	return BackupDetail{backupTime, metaData}, nil
 }
 
+func GetTimeForPrint(backupTime time.Time) string {
+	if backupTime.IsZero() {
+		return "-"
+	}
+	return backupTime.Format(time.RFC850)
+}
+
 // TODO : unit tests
 func WriteBackupList(backups []BackupTime, output io.Writer) {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
-	fmt.Fprintln(writer, "name\tlast_modified\twal_segment_backup_start")
+	fmt.Fprintln(writer, "name\tcreated\tmodified\twal_segment_backup_start")
 	for i := len(backups) - 1; i >= 0; i-- {
 		b := backups[i]
-		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v", b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName))
+		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v\t%v", b.BackupName, GetTimeForPrint(b.CreationTime), GetTimeForPrint(b.ModificationTime), b.WalFileName))
 	}
 }
 
@@ -145,10 +160,10 @@ func WriteBackupList(backups []BackupTime, output io.Writer) {
 func writeBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
-	fmt.Fprintln(writer, "name\tlast_modified\twal_segment_backup_start\tstart_time\tfinish_time\thostname\tdata_dir\tpg_version\tstart_lsn\tfinish_lsn\tis_permanent")
+	fmt.Fprintln(writer, "name\tcreated\tmodified\twal_segment_backup_start\tstart_time\tfinish_time\thostname\tdata_dir\tpg_version\tstart_lsn\tfinish_lsn\tis_permanent")
 	for i := len(backupDetails) - 1; i >= 0; i-- {
 		b := backupDetails[i]
-		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v", b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName, b.StartTime.Format(time.RFC850), b.FinishTime.Format(time.RFC850), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent))
+		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v", b.BackupName, GetTimeForPrint(b.CreationTime), GetTimeForPrint(b.ModificationTime), b.WalFileName, GetTimeForPrint(b.StartTime), GetTimeForPrint(b.FinishTime), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent))
 	}
 }
 
@@ -156,9 +171,9 @@ func WritePrettyBackupList(backups []BackupTime, output io.Writer) {
 	writer := table.NewWriter()
 	writer.SetOutputMirror(output)
 	defer writer.Render()
-	writer.AppendHeader(table.Row{"#", "Name", "Last modified", "WAL segment backup start"})
+	writer.AppendHeader(table.Row{"#", "Name", "Created", "Modified", "WAL segment backup start"})
 	for i, b := range backups {
-		writer.AppendRow(table.Row{i, b.BackupName, b.Time.Format(time.RFC850), b.WalFileName})
+		writer.AppendRow(table.Row{i, b.BackupName, GetTimeForPrint(b.CreationTime), GetTimeForPrint(b.ModificationTime), b.WalFileName})
 	}
 }
 
@@ -167,10 +182,10 @@ func writePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer
 	writer := table.NewWriter()
 	writer.SetOutputMirror(output)
 	defer writer.Render()
-	writer.AppendHeader(table.Row{"#", "Name", "Last modified", "WAL segment backup start", "Start time", "Finish time", "Hostname", "Datadir", "PG Version", "Start LSN", "Finish LSN", "Permanent"})
+	writer.AppendHeader(table.Row{"#", "Name", "Created", "Modified", "WAL segment backup start", "Start time", "Finish time", "Hostname", "Datadir", "PG Version", "Start LSN", "Finish LSN", "Permanent"})
 	for idx := range backupDetails {
 		b := &backupDetails[idx]
-		writer.AppendRow(table.Row{idx, b.BackupName, b.Time.Format(time.RFC850), b.WalFileName, b.StartTime.Format(time.RFC850), b.FinishTime.Format(time.RFC850), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent})
+		writer.AppendRow(table.Row{idx, b.BackupName, GetTimeForPrint(b.CreationTime), GetTimeForPrint(b.ModificationTime), b.WalFileName, GetTimeForPrint(b.StartTime), GetTimeForPrint(b.FinishTime), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent})
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/storages/fs"
@@ -400,27 +401,39 @@ func GetBackupsAndGarbageWithTarget(folder storage.Folder, targetPath string) (b
 		return nil, nil, err
 	}
 
-	sortTimes := GetBackupTimeSlices(backupObjects)
+	sortTimes := GetBackupTimeSlices(backupObjects, folder)
 	garbage = getGarbageFromPrefix(subFolders, sortTimes)
 
 	return sortTimes, garbage, nil
 }
 
 // TODO : unit tests
-func GetBackupTimeSlices(backups []storage.Object) []BackupTime {
+func GetBackupTimeSlices(backups []storage.Object, folder storage.Folder) []BackupTime {
 	sortTimes := make([]BackupTime, len(backups))
+	sortByCreationTime := true
 	for i, object := range backups {
 		key := object.GetName()
 		if !strings.HasSuffix(key, utility.SentinelSuffix) {
 			continue
 		}
-		time := object.GetLastModified()
-		sortTimes[i] = BackupTime{utility.StripBackupName(key), time,
-			utility.StripWalFileName(key)}
+		metaData, err := GetBackupMetaData(folder, key, utility.BaseBackupPath)
+		var creationTime time.Time = time.Time{}
+		if err == nil {
+			creationTime = metaData.StartTime
+		} else {
+			sortByCreationTime = false
+		}
+		sortTimes[i] = BackupTime{utility.StripBackupName(key), creationTime, object.GetLastModified(), utility.StripWalFileName(key)}
 	}
-	sort.Slice(sortTimes, func(i, j int) bool {
-		return sortTimes[i].Time.After(sortTimes[j].Time)
-	})
+	if sortByCreationTime {
+		sort.Slice(sortTimes, func(i, j int) bool {
+			return sortTimes[i].CreationTime.After(sortTimes[j].CreationTime)
+		})
+	} else {
+		sort.Slice(sortTimes, func(i, j int) bool {
+			return sortTimes[i].ModificationTime.After(sortTimes[j].ModificationTime)
+		})
+	}
 	return sortTimes
 }
 

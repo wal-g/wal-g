@@ -18,14 +18,14 @@ type someError struct {
 func TestHandleBackupListWriteBackups(t *testing.T) {
 	backups := []internal.BackupTime{
 		{
-			BackupName:  "backup000",
-			Time:        time.Time{},
-			WalFileName: "wallName0",
+			BackupName:       "backup000",
+			ModificationTime: time.Time{},
+			WalFileName:      "wallName0",
 		},
 		{
-			BackupName:  "backup001",
-			Time:        time.Time{},
-			WalFileName: "wallName1",
+			BackupName:       "backup001",
+			ModificationTime: time.Time{},
+			WalFileName:      "wallName1",
 		},
 	}
 
@@ -53,14 +53,14 @@ func TestHandleBackupListWriteBackups(t *testing.T) {
 func TestHandleBackupListLogError(t *testing.T) {
 	backups := []internal.BackupTime{
 		{
-			BackupName:  "backup000",
-			Time:        time.Time{},
-			WalFileName: "wallName0",
+			BackupName:       "backup000",
+			ModificationTime: time.Time{},
+			WalFileName:      "wallName0",
 		},
 		{
-			BackupName:  "backup001",
-			Time:        time.Time{},
-			WalFileName: "wallName1",
+			BackupName:       "backup001",
+			ModificationTime: time.Time{},
+			WalFileName:      "wallName1",
 		},
 	}
 	someErrorInstance := someError{errors.New("some error")}
@@ -99,23 +99,24 @@ func TestHandleBackupListLogNoBackups(t *testing.T) {
 }
 
 func TestWritePrettyBackupList_LongColumnsValues(t *testing.T) {
-	expectedRes := `+---+-----------+--------------------------------+-----------------------------------+
-| # | NAME      | LAST MODIFIED                  | WAL SEGMENT BACKUP START          |
-+---+-----------+--------------------------------+-----------------------------------+
-| 0 | backup000 | Monday, 01-Jan-01 00:00:00 UTC | veryVeryVeryVeryVeryLongWallName0 |
-| 1 | backup001 | Monday, 01-Jan-01 00:00:00 UTC | veryVeryVeryVeryVeryLongWallName1 |
-+---+-----------+--------------------------------+-----------------------------------+
+	expectedRes :=
+`+---+-----------+---------+----------+-----------------------------------+
+| # | NAME      | CREATED | MODIFIED | WAL SEGMENT BACKUP START          |
++---+-----------+---------+----------+-----------------------------------+
+| 0 | backup000 | -       | -        | veryVeryVeryVeryVeryLongWallName0 |
+| 1 | backup001 | -       | -        | veryVeryVeryVeryVeryLongWallName1 |
++---+-----------+---------+----------+-----------------------------------+
 `
 	backups := []internal.BackupTime{
 		{
-			BackupName:  "backup000",
-			Time:        time.Time{},
-			WalFileName: "veryVeryVeryVeryVeryLongWallName0",
+			BackupName:       "backup000",
+			ModificationTime: time.Time{},
+			WalFileName:      "veryVeryVeryVeryVeryLongWallName0",
 		},
 		{
-			BackupName:  "backup001",
-			Time:        time.Time{},
-			WalFileName: "veryVeryVeryVeryVeryLongWallName1",
+			BackupName:       "backup001",
+			ModificationTime: time.Time{},
+			WalFileName:      "veryVeryVeryVeryVeryLongWallName1",
 		},
 	}
 
@@ -126,23 +127,24 @@ func TestWritePrettyBackupList_LongColumnsValues(t *testing.T) {
 }
 
 func TestWritePrettyBackupList_ShortColumnsValues(t *testing.T) {
-	expectedRes := `+---+------+--------------------------------+--------------------------+
-| # | NAME | LAST MODIFIED                  | WAL SEGMENT BACKUP START |
-+---+------+--------------------------------+--------------------------+
-| 0 | b0   | Monday, 01-Jan-01 00:00:00 UTC | shortWallName0           |
-| 1 | b1   | Monday, 01-Jan-01 00:00:00 UTC | shortWallName1           |
-+---+------+--------------------------------+--------------------------+
+	expectedRes :=
+`+---+------+---------+----------+--------------------------+
+| # | NAME | CREATED | MODIFIED | WAL SEGMENT BACKUP START |
++---+------+---------+----------+--------------------------+
+| 0 | b0   | -       | -        | shortWallName0           |
+| 1 | b1   | -       | -        | shortWallName1           |
++---+------+---------+----------+--------------------------+
 `
 	backups := []internal.BackupTime{
 		{
-			BackupName:  "b0",
-			Time:        time.Time{},
-			WalFileName: "shortWallName0",
+			BackupName:       "b0",
+			ModificationTime: time.Time{},
+			WalFileName:      "shortWallName0",
 		},
 		{
-			BackupName:  "b1",
-			Time:        time.Time{},
-			WalFileName: "shortWallName1",
+			BackupName:       "b1",
+			ModificationTime: time.Time{},
+			WalFileName:      "shortWallName1",
 		},
 	}
 
@@ -153,10 +155,11 @@ func TestWritePrettyBackupList_ShortColumnsValues(t *testing.T) {
 }
 
 func TestWritePrettyBackupList_WriteNoBackupList(t *testing.T) {
-	expectedRes := `+---+------+---------------+--------------------------+
-| # | NAME | LAST MODIFIED | WAL SEGMENT BACKUP START |
-+---+------+---------------+--------------------------+
-+---+------+---------------+--------------------------+
+	expectedRes :=
+`+---+------+---------+----------+--------------------------+
+| # | NAME | CREATED | MODIFIED | WAL SEGMENT BACKUP START |
++---+------+---------+----------+--------------------------+
++---+------+---------+----------+--------------------------+
 `
 	backups := make([]internal.BackupTime, 0)
 
@@ -167,25 +170,26 @@ func TestWritePrettyBackupList_WriteNoBackupList(t *testing.T) {
 }
 
 func TestWritePrettyBackupList_EmptyColumnsValues(t *testing.T) {
-	expectedRes := `+---+------+--------------------------------+--------------------------+
-| # | NAME | LAST MODIFIED                  | WAL SEGMENT BACKUP START |
-+---+------+--------------------------------+--------------------------+
-| 0 |      | Monday, 01-Jan-01 00:00:00 UTC | shortWallName0           |
-| 1 | b1   | Monday, 01-Jan-01 00:00:00 UTC |                          |
-| 2 |      | Monday, 01-Jan-01 00:00:00 UTC |                          |
-+---+------+--------------------------------+--------------------------+
+	expectedRes :=
+`+---+------+---------+----------+--------------------------+
+| # | NAME | CREATED | MODIFIED | WAL SEGMENT BACKUP START |
++---+------+---------+----------+--------------------------+
+| 0 |      | -       | -        | shortWallName0           |
+| 1 | b1   | -       | -        |                          |
+| 2 |      | -       | -        |                          |
++---+------+---------+----------+--------------------------+
 `
 	backups := []internal.BackupTime{
 		{
-			Time:        time.Time{},
+			ModificationTime:        time.Time{},
 			WalFileName: "shortWallName0",
 		},
 		{
 			BackupName: "b1",
-			Time:       time.Time{},
+			ModificationTime:       time.Time{},
 		},
 		{
-			Time: time.Time{},
+			ModificationTime: time.Time{},
 		},
 	}
 
