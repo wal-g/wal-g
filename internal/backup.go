@@ -30,32 +30,6 @@ var UtilityFilePaths = map[string]bool{
 	TablespaceMapFilename: true,
 }
 
-type NoBackupOrderError struct {
-	error
-}
-
-func NewNoBackupOrderError() NoBackupOrderError {
-	return NoBackupOrderError{errors.New("Non-existent BackupOrder")}
-}
-
-func (err NoBackupOrderError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), errors.New("Non-existent BackupOrder"))
-}
-
-type FailedMetadataError struct {
-	backupName string
-	innerErr   error
-}
-
-func NewFailedMetadataError(backupName string, innerErr error) FailedMetadataError {
-	return FailedMetadataError{backupName, innerErr}
-}
-
-func (err FailedMetadataError) Error() string {
-	return "Failed to get metadata of backup " + err.backupName +
-		fmt.Sprintf(tracelog.GetErrorFormatter(), err.innerErr)
-}
-
 type NoBackupsFoundError struct {
 	error
 }
@@ -377,7 +351,7 @@ func getLatestBackupName(folder storage.Folder) (string, error) {
 		return "", err
 	}
 
-	return sortTimes.Data[0].BackupName, nil
+	return sortTimes[0].BackupName, nil
 }
 
 func GetBackupSentinelObjects(folder storage.Folder) ([]storage.Object, error) {
@@ -398,65 +372,43 @@ func GetBackupSentinelObjects(folder storage.Folder) ([]storage.Object, error) {
 
 // TODO : unit tests
 // GetBackups receives backup descriptions and sorts them by time
-func GetBackups(folder storage.Folder) (backups BackupTimeSlice, err error) {
+func GetBackups(folder storage.Folder) (backups []BackupTime, err error) {
 	return GetBackupsWithTarget(folder, utility.BaseBackupPath)
 }
 
-func GetBackupsWithTarget(folder storage.Folder, targetPath string) (backups BackupTimeSlice, err error) {
+func GetBackupsWithTarget(folder storage.Folder, targetPath string) (backups []BackupTime, err error) {
 	backups, _, err = GetBackupsAndGarbageWithTarget(folder, targetPath)
 	if err != nil {
-		return BackupTimeSlice{nil, NoData}, err
+		return nil, err
 	}
 
-	count := len(backups.Data)
+	count := len(backups)
 	if count == 0 {
-		return BackupTimeSlice{nil, NoData}, NewNoBackupsFoundError()
+		return nil, NewNoBackupsFoundError()
 	}
 	return
 }
 
-func GetBackupsWithTargetOrdered(folder storage.Folder, order BackupTimeDenotation, targetPath string) (BackupTimeSlice, error) {
-	backupObjects, _, err := folder.GetSubFolder(targetPath).ListFolder()
-	if err != nil {
-		return BackupTimeSlice{nil, NoData}, err
-	}
-	sortTimes, err := GetBackupTimeSlices(backupObjects, folder, order)
-	switch err.(type) {
-	case FailedMetadataError:
-		sortTimes, err = GetBackupTimeSlices(backupObjects, folder, ModificationTime)
-	}
-	if err != nil {
-		return BackupTimeSlice{nil, NoData}, err
-	}
-	return sortTimes, nil
-}
-
-func GetBackupsAndGarbage(folder storage.Folder) (backups BackupTimeSlice, garbage []string, err error) {
+func GetBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage []string, err error) {
 	return GetBackupsAndGarbageWithTarget(folder, utility.BaseBackupPath)
 }
 
 // TODO : unit tests
-func GetBackupsAndGarbageWithTarget(folder storage.Folder, targetPath string) (backups BackupTimeSlice, garbage []string, err error) {
+func GetBackupsAndGarbageWithTarget(folder storage.Folder, targetPath string) (backups []BackupTime, garbage []string, err error) {
 	backupObjects, subFolders, err := folder.GetSubFolder(targetPath).ListFolder()
 	if err != nil {
-		return BackupTimeSlice{nil, NoData}, nil, err
+		return nil, nil, err
 	}
 
-	sortTimes, err := GetBackupTimeSlices(backupObjects, folder, ModificationTime)
-	if err != nil {
-		return BackupTimeSlice{nil, NoData}, nil, err
-	}
-	garbage = getGarbageFromPrefix(subFolders, sortTimes.Data)
+	sortTimes := GetBackupTimeSlices(backupObjects)
+	garbage = getGarbageFromPrefix(subFolders, sortTimes)
 
 	return sortTimes, garbage, nil
 }
 
 // TODO : unit tests
-func GetBackupTimeSlices(backups []storage.Object, folder storage.Folder, order BackupTimeDenotation) (BackupTimeSlice, error) {
+func GetBackupTimeSlices(backups []storage.Object) []BackupTime {
 	sortTimes := make([]BackupTime, len(backups))
-	if order != CreationTime && order != ModificationTime {
-		return BackupTimeSlice{nil, NoData}, NewNoBackupOrderError()
-	}
 	for i, object := range backups {
 		key := object.GetName()
 		if !strings.HasSuffix(key, utility.SentinelSuffix) {
@@ -465,18 +417,11 @@ func GetBackupTimeSlices(backups []storage.Object, folder storage.Folder, order 
 		time := object.GetLastModified()
 		sortTimes[i] = BackupTime{utility.StripBackupName(key), time,
 			utility.StripWalFileName(key)}
-		if order == CreationTime {
-			backupDetails, err := GetBackupDetails(folder, sortTimes[i])
-			if err != nil {
-				return BackupTimeSlice{nil, NoData}, NewFailedMetadataError(key, err)
-			}
-			sortTimes[i].Time = backupDetails.StartTime
-		}
 	}
 	sort.Slice(sortTimes, func(i, j int) bool {
 		return sortTimes[i].Time.After(sortTimes[j].Time)
 	})
-	return BackupTimeSlice{sortTimes, order}, nil
+	return sortTimes
 }
 
 // TODO : unit tests

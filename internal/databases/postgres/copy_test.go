@@ -21,7 +21,7 @@ func TestStartCopy_WhenThereAreNoObjectsToCopy(t *testing.T) {
 }
 
 func TestStartCopy_WhenThereAreObjectsToCopy(t *testing.T) {
-	var from = testtools.CreateMockStorageFolderWithPermanentBackups(t, testtools.BackupNamesDefault, testtools.WalNames)
+	var from = testtools.CreateMockStorageFolderWithPermanentBackups(t)
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	infos, err := postgres.WildcardInfo(from, to)
 	assert.NoError(t, err)
@@ -49,7 +49,7 @@ func TestGetBackupCopyingInfo_WhenFolderIsEmpty(t *testing.T) {
 }
 
 func TestGetBackupCopyingInfo_WhenFolderIsNotEmpty(t *testing.T) {
-	var from = testtools.CreateMockStorageFolderWithPermanentBackups(t, testtools.BackupNamesDefault, testtools.WalNames)
+	var from = testtools.CreateMockStorageFolderWithPermanentBackups(t)
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var backup = internal.NewBackup(from, "base_000000010000000000000002")
 	var infos, err = postgres.BackupCopyingInfo(backup, from, to)
@@ -85,7 +85,7 @@ func TestGetAllCopyingInfo_WhenFromFolderIsEmpty(t *testing.T) {
 }
 
 func TestGetAllCopyingInfo_WhenFromFolderIsNotEmpty(t *testing.T) {
-	var from = testtools.CreateMockStorageFolderWithPermanentBackups(t, testtools.BackupNamesDefault, testtools.WalNames)
+	var from = testtools.CreateMockStorageFolderWithPermanentBackups(t)
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var infos, err = postgres.WildcardInfo(from, to)
 	assert.NoError(t, err)

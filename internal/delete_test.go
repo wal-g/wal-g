@@ -225,7 +225,7 @@ func verifyThatExistBackupsAndWals(t *testing.T, expectBackupExistAfterDelete, e
 }
 
 func TestDeleteBeforeTargetWithPermanentBackups(t *testing.T) {
-	folder := testtools.CreateMockStorageFolderWithPermanentBackups(t, testtools.BackupNamesDefault, testtools.WalNames)
+	folder := testtools.CreateMockStorageFolderWithPermanentBackups(t)
 
 	expectBackupExistBeforeDelete := map[string]bool{
 		"base_000000010000000000000002":                            true,

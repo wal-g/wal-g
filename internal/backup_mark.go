@@ -165,7 +165,7 @@ func getGraphFromBaseToIncrement(folder storage.Folder) (map[string][]string, er
 	}
 
 	reverseLinks := make(map[string][]string)
-	for _, b := range backups.Data {
+	for _, b := range backups {
 		incrementFrom, isIncrement, err := getMetadataFromBackup(baseBackupFolder, b.BackupName)
 		if err != nil {
 			return nil, err
@@ -226,7 +226,7 @@ func GetPermanentObjects(folder storage.Folder) (map[string]bool, map[string]boo
 
 	permanentBackups := map[string]bool{}
 	permanentWals := map[string]bool{}
-	for _, backupTime := range backupTimes.Data {
+	for _, backupTime := range backupTimes {
 		backup, err := GetBackupByName(backupTime.BackupName, utility.BaseBackupPath, folder)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("failed to get backup by name with error %s, ignoring...", err.Error())

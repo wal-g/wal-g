@@ -113,8 +113,7 @@ func (sd *StorageDownloader) LoadBackups(names []string) ([]models.Backup, error
 
 //ListBackups lists backups in folder
 func (sd *StorageDownloader) ListBackups() ([]internal.BackupTime, []string, error) {
-	backups, garbage, err := internal.GetBackupsAndGarbage(sd.rootFolder)
-	return backups.Data, garbage, err
+	return internal.GetBackupsAndGarbage(sd.rootFolder)
 }
 
 // DownloadOplogArchive downloads, decompresses and decrypts (if needed) oplog archive.

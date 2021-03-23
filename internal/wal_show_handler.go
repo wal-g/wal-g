@@ -174,7 +174,7 @@ func addBackupsInfo(timelineInfos []*TimelineInfo, rootFolder storage.Folder) ([
 		return nil, err
 	}
 	for _, info := range timelineInfos {
-		info.Backups, err = getBackupsInRange(info.StartSegment, info.EndSegment, info.Id, backupDetails.Data)
+		info.Backups, err = getBackupsInRange(info.StartSegment, info.EndSegment, info.Id, backupDetails)
 		if err != nil {
 			return nil, err
 		}
