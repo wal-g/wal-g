@@ -23,6 +23,7 @@ const (
 	SentinelUserDataSetting      = "WALG_SENTINEL_USER_DATA"
 	PreventWalOverwriteSetting   = "WALG_PREVENT_WAL_OVERWRITE"
 	UploadWalMetadata            = "WALG_UPLOAD_WAL_METADATA"
+	WalReceiveMetadataPath       = "WALG_RECEIVE_BULKMETADATA_PATH"
 	DeltaMaxStepsSetting         = "WALG_DELTA_MAX_STEPS"
 	DeltaOriginSetting           = "WALG_DELTA_ORIGIN"
 	CompressionMethodSetting     = "WALG_COMPRESSION_METHOD"
@@ -146,6 +147,7 @@ var (
 		SentinelUserDataSetting:      true,
 		PreventWalOverwriteSetting:   true,
 		UploadWalMetadata:            true,
+		WalReceiveMetadataPath:       true,
 		DeltaMaxStepsSetting:         true,
 		DeltaOriginSetting:           true,
 		CompressionMethodSetting:     true,

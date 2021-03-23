@@ -156,6 +156,21 @@ func getWalFolderPath() string {
 	return DefaultDataFolderPath
 }
 
+func getRelativeWalFolderPath() string {
+
+	dataFolderPath := filepath.Join("pg_wal")
+	if _, err := os.Stat(dataFolderPath); err == nil {
+		return dataFolderPath
+	}
+
+	dataFolderPath = filepath.Join("pg_xlog")
+	if _, err := os.Stat(dataFolderPath); err == nil {
+		return dataFolderPath
+	}
+
+	return DefaultDataFolderPath
+}
+
 func GetDataFolderPath() string {
 	return filepath.Join(getWalFolderPath(), "walg_data")
 }
@@ -204,6 +219,10 @@ func ConfigureLogging() error {
 
 func getArchiveDataFolderPath() string {
 	return filepath.Join(GetDataFolderPath(), "walg_archive_status")
+}
+
+func getRelativeArchiveDataFolderPath() string {
+	return filepath.Join(getRelativeWalFolderPath(), "walg_data", "walg_archive_status")
 }
 
 // TODO : unit tests

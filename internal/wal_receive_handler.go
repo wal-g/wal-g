@@ -3,7 +3,6 @@ package internal
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"github.com/jackc/pgconn"
@@ -92,7 +91,6 @@ func HandleWALReceive(uploader *WalUploader) {
 			// segment is a regular segemnt. Write, and create a new for this timeline.
 			err = uploader.UploadWalFile(ioextensions.NewNamedReaderImpl(segment, segment.Name()))
 			tracelog.ErrorLogger.FatalOnError(err)
-			uploadBulkMetadata(uploader, filepath.Join(getWalFolderPath(), segment.Name()))
 			XLogPos = segment.endLSN
 			segment, err = segment.NextWalSegment()
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -107,7 +105,6 @@ func HandleWALReceive(uploader *WalUploader) {
 			tracelog.ErrorLogger.FatalOnError(err)
 			err = uploader.UploadWalFile(ioextensions.NewNamedReaderImpl(tlh, tlh.Name()))
 			tracelog.ErrorLogger.FatalOnError(err)
-			uploadBulkMetadata(uploader, filepath.Join(getWalFolderPath(), segment.Name()))
 			segment = NewWalSegment(timeline, XLogPos, walSegmentBytes)
 			startReplication(conn, segment, slot.Name)
 		default:

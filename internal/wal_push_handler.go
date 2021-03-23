@@ -35,7 +35,7 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 		if err != nil {
 			tracelog.ErrorLogger.Printf("unmark wal-g status for %s file failed due following error %+v", walFilePath, err)
 		}
-		uploadBulkMetadata(uploader, walFilePath)
+		_ = uploadBulkMetadata(uploader, filepath.Join(getRelativeArchiveDataFolderPath(), filepath.Base(walFilePath)))
 		return
 	}
 
@@ -50,7 +50,7 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 	bgUploader.Start()
 	err = uploadWALFile(uploader, walFilePath, bgUploader.preventWalOverwrite)
 	tracelog.ErrorLogger.FatalOnError(err)
-	uploadBulkMetadata(uploader, walFilePath)
+	_ = uploadBulkMetadata(uploader, filepath.Join(getRelativeArchiveDataFolderPath(), filepath.Base(walFilePath)))
 
 	err = bgUploader.Stop()
 	tracelog.ErrorLogger.FatalOnError(err)

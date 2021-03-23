@@ -142,7 +142,12 @@ Sample metadata file (000000020000000300000071.json)
     }
 }
 ```
-If the parameter value is NOMETADATA or not specified  it will fallback to default setting (no wal metadata generation)
+If the parameter value is NOMETADATA or not specified, it will fallback to default setting (no wal metadata generation)
+
+* `WALG_RECEIVE_BULKMETADATA_PATH`
+
+Temporary location of wal metadata files, when the wal files are streamed through wal-receive command. This parameter is effective only for the BULK WAL metadata option (WALG_UPLOAD_WAL_METADATA=BULK)
+
 
 Usage
 -----
