@@ -36,9 +36,9 @@ var backups = []internal.BackupTime{
 
 func TestBackupListCorrectOutput(t *testing.T) {
 	const expected = "" +
-		"name     created modified                         wal_segment_backup_start\n" +
-		"base_456 -       Thursday, 05-Jul-18 01:01:50 UTC ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
-		"base_123 -       Thursday, 25-Apr-19 14:48:00 UTC ZZZZZZZZZZZZZZZZZZZZZZZZ\n"
+		"name     created modified             wal_segment_backup_start\n" +
+		"base_456 -       2018-07-05T01:01:50Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
+		"base_123 -       2019-04-25T14:48:00Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n"
 
 	buf := new(bytes.Buffer)
 	internal.WriteBackupList(backups, buf)

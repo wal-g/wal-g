@@ -138,11 +138,19 @@ func GetBackupDetailsWithTarget(folder storage.Folder, backupTime BackupTime, ta
 	return BackupDetail{backupTime, metaData}, nil
 }
 
-func GetTimeForPrint(backupTime time.Time) string {
+func FormatTimeInner(backupTime time.Time, timeFormat string) string {
 	if backupTime.IsZero() {
 		return "-"
 	}
-	return backupTime.Format(time.RFC850)
+	return backupTime.Format(timeFormat)
+}
+
+func FormatTime(backupTime time.Time) string {
+	return FormatTimeInner(backupTime, time.RFC3339)
+}
+
+func PrettyFormatTime(backupTime time.Time) string {
+	return FormatTimeInner(backupTime, time.RFC850)
 }
 
 // TODO : unit tests
@@ -152,7 +160,7 @@ func WriteBackupList(backups []BackupTime, output io.Writer) {
 	fmt.Fprintln(writer, "name\tcreated\tmodified\twal_segment_backup_start")
 	for i := len(backups) - 1; i >= 0; i-- {
 		b := backups[i]
-		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v\t%v", b.BackupName, GetTimeForPrint(b.CreationTime), GetTimeForPrint(b.ModificationTime), b.WalFileName))
+		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v\t%v", b.BackupName, FormatTime(b.CreationTime), FormatTime(b.ModificationTime), b.WalFileName))
 	}
 }
 
@@ -163,7 +171,7 @@ func writeBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
 	fmt.Fprintln(writer, "name\tcreated\tmodified\twal_segment_backup_start\tstart_time\tfinish_time\thostname\tdata_dir\tpg_version\tstart_lsn\tfinish_lsn\tis_permanent")
 	for i := len(backupDetails) - 1; i >= 0; i-- {
 		b := backupDetails[i]
-		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v", b.BackupName, GetTimeForPrint(b.CreationTime), GetTimeForPrint(b.ModificationTime), b.WalFileName, GetTimeForPrint(b.StartTime), GetTimeForPrint(b.FinishTime), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent))
+		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v", b.BackupName, FormatTime(b.CreationTime), FormatTime(b.ModificationTime), b.WalFileName, FormatTime(b.StartTime), FormatTime(b.FinishTime), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent))
 	}
 }
 
@@ -173,7 +181,7 @@ func WritePrettyBackupList(backups []BackupTime, output io.Writer) {
 	defer writer.Render()
 	writer.AppendHeader(table.Row{"#", "Name", "Created", "Modified", "WAL segment backup start"})
 	for i, b := range backups {
-		writer.AppendRow(table.Row{i, b.BackupName, GetTimeForPrint(b.CreationTime), GetTimeForPrint(b.ModificationTime), b.WalFileName})
+		writer.AppendRow(table.Row{i, b.BackupName, PrettyFormatTime(b.CreationTime), PrettyFormatTime(b.ModificationTime), b.WalFileName})
 	}
 }
 
@@ -185,7 +193,7 @@ func writePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer
 	writer.AppendHeader(table.Row{"#", "Name", "Created", "Modified", "WAL segment backup start", "Start time", "Finish time", "Hostname", "Datadir", "PG Version", "Start LSN", "Finish LSN", "Permanent"})
 	for idx := range backupDetails {
 		b := &backupDetails[idx]
-		writer.AppendRow(table.Row{idx, b.BackupName, GetTimeForPrint(b.CreationTime), GetTimeForPrint(b.ModificationTime), b.WalFileName, GetTimeForPrint(b.StartTime), GetTimeForPrint(b.FinishTime), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent})
+		writer.AppendRow(table.Row{idx, b.BackupName, PrettyFormatTime(b.CreationTime), PrettyFormatTime(b.ModificationTime), b.WalFileName, PrettyFormatTime(b.StartTime), PrettyFormatTime(b.FinishTime), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent})
 	}
 }
 

@@ -18,6 +18,13 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+type BackupTimeSlicesOder int
+
+const (
+	ByCreationTime BackupTimeSlicesOder = iota
+	ByModificationTime
+)
+
 const (
 	TarPartitionFolderName = "/tar_partitions/"
 	PgControlPath          = "/global/pg_control"
@@ -407,10 +414,9 @@ func GetBackupsAndGarbageWithTarget(folder storage.Folder, targetPath string) (b
 	return sortTimes, garbage, nil
 }
 
-// TODO : unit tests
-func GetBackupTimeSlices(backups []storage.Object, folder storage.Folder) []BackupTime {
+func GetBackupTimeSlicesUnsorted(backups []storage.Object, folder storage.Folder) ([]BackupTime, BackupTimeSlicesOder) {
 	sortTimes := make([]BackupTime, len(backups))
-	sortByCreationTime := true
+	sortOrder := ByCreationTime
 	for i, object := range backups {
 		key := object.GetName()
 		if !strings.HasSuffix(key, utility.SentinelSuffix) {
@@ -421,19 +427,29 @@ func GetBackupTimeSlices(backups []storage.Object, folder storage.Folder) []Back
 		if err == nil {
 			creationTime = metaData.StartTime
 		} else {
-			sortByCreationTime = false
+			sortOrder = ByModificationTime
 		}
 		sortTimes[i] = BackupTime{utility.StripBackupName(key), creationTime, object.GetLastModified(), utility.StripWalFileName(key)}
 	}
-	if sortByCreationTime {
-		sort.Slice(sortTimes, func(i, j int) bool {
-			return sortTimes[i].CreationTime.After(sortTimes[j].CreationTime)
+	return sortTimes, sortOrder
+}
+
+func SortBackupTimeSlices(backupsSlices *[]BackupTime, sortOrder BackupTimeSlicesOder) {
+	if sortOrder == ByCreationTime {
+		sort.Slice(*backupsSlices, func(i, j int) bool {
+			return (*backupsSlices)[i].CreationTime.After((*backupsSlices)[j].CreationTime)
 		})
 	} else {
-		sort.Slice(sortTimes, func(i, j int) bool {
-			return sortTimes[i].ModificationTime.After(sortTimes[j].ModificationTime)
+		sort.Slice(*backupsSlices, func(i, j int) bool {
+			return (*backupsSlices)[i].ModificationTime.After((*backupsSlices)[j].ModificationTime)
 		})
 	}
+}
+
+// TODO : unit tests
+func GetBackupTimeSlices(backups []storage.Object, folder storage.Folder) []BackupTime {
+	sortTimes, sortOrder := GetBackupTimeSlicesUnsorted(backups, folder)
+	SortBackupTimeSlices(&sortTimes, sortOrder)
 	return sortTimes
 }
 
