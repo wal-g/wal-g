@@ -59,6 +59,39 @@ func TestBackupListCorrectPrettyOutput(t *testing.T) {
 	assert.Equal(t, buf.String(), expected)
 }
 
+var backupsWithMetaData = []internal.BackupTime{
+	{
+		BackupName:       "base_123",
+		CreationTime:     time.Date(2019, 4, 25, 14, 48, 0, 0, time.UTC),
+		ModificationTime: time.Date(2021, 12, 2, 12, 52, 0, 1, time.UTC),
+		WalFileName:      "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+	},
+	{
+		BackupName:       "base_456",
+		CreationTime:     time.Date(2018, 7, 5, 1, 1, 50, 0, time.UTC),
+		ModificationTime: time.Date(2022, 8, 9, 2, 1, 10, 0, time.UTC),
+		WalFileName:      "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+	},
+	{
+		BackupName:       "base_789",
+		CreationTime:     time.Date(2020, 6, 4, 2, 3, 32, 0, time.UTC),
+		ModificationTime: time.Date(2020, 5, 1, 2, 3, 41, 0, time.UTC),
+		WalFileName:      "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+	},
+}
+
+func TestBackupListCorrectCreationTimeOutput(t *testing.T) {
+	const expected = "" +
+	"name     created              modified             wal_segment_backup_start\n" +
+	"base_789 2020-06-04T02:03:32Z 2020-05-01T02:03:41Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
+	"base_456 2018-07-05T01:01:50Z 2022-08-09T02:01:10Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
+	"base_123 2019-04-25T14:48:00Z 2021-12-02T12:52:00Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n"
+
+	buf := new(bytes.Buffer)
+	internal.WriteBackupList(backupsWithMetaData, buf)
+	assert.Equal(t, buf.String(), expected)
+}
+
 func TestBackupListCorrectJsonOutput(t *testing.T) {
 	var actual []internal.BackupTime
 	buf := new(bytes.Buffer)
