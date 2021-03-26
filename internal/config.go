@@ -60,6 +60,7 @@ const (
 	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
 	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
 	MaxDelayedSegmentsCount      = "WALG_INTEGRITY_MAX_DELAYED_WALS"
+	PrefetchDir                  = "WALG_PREFETCH_DIR"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
@@ -182,6 +183,7 @@ var (
 		PgSlotName:        true,
 		PgWalSize:         true,
 		"PGPASSFILE":      true,
+		PrefetchDir:       true,
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,

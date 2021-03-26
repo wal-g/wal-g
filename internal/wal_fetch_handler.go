@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"github.com/spf13/viper"
 	"io"
 	"io/ioutil"
 	"os"
@@ -51,7 +52,11 @@ func HandleWALFetch(folder storage.Folder, walFileName string, location string, 
 	folder = folder.GetSubFolder(utility.WalPath)
 	location = utility.ResolveSymlink(location)
 	if triggerPrefetch {
-		defer forkPrefetch(walFileName, location)
+		prefetchLocation := location
+		if viper.IsSet(PrefetchDir) {
+			prefetchLocation = viper.GetString(PrefetchDir)
+		}
+		defer forkPrefetch(walFileName, prefetchLocation)
 	}
 
 	_, _, running, prefetched := getPrefetchLocations(path.Dir(location), walFileName)

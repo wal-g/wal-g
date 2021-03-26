@@ -66,6 +66,11 @@ Concurrency values can be configured using:
 
 To configure how many goroutines to use during ```backup-fetch``` and ```wal-fetch```, use `WALG_DOWNLOAD_CONCURRENCY`. By default, WAL-G uses the minimum of the number of files to extract and 10.
 
+* `WALG_PREFETCH_DIR`
+
+By default WAL prefetch is storing prefetched data in pg_wal directory. This ensures that WAL can be easily moved from prefetch location to actual WAL consumption directory. But it may have negative consequences if you use it with pg_rewind in PostgreSQL 13.
+PostgreSQL 13 is able to invoke restore_command during pg_rewind. Prefetched WAL can generate false failure of pg_rewind. To avoid it you can either turn off prefetch during rewind (set WALG_DOWNLOAD_CONCURRENCY = 1) or place wal prefetch folder outside PGDATA. For details see [this pgsql-hackers thread](https://postgr.es/m/CAFh8B=kW8yY3yzA1=-w8BT90ejDoELhU+zho7F7k4J6D_6oPFA@mail.gmail.com).
+
 * `WALG_UPLOAD_CONCURRENCY`
 
 To configure how many concurrency streams to use during backup uploading, use `WALG_UPLOAD_CONCURRENCY`. By default, WAL-G uses 16 streams.
