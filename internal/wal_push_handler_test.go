@@ -11,10 +11,15 @@ import (
 	"github.com/wal-g/wal-g/testtools"
 )
 
+func init() {
+	internal.InitConfig()
+	internal.Configure()
+}
+
 func generateAndUploadWalFile(t *testing.T, fileFormat string) (internal.WalUploader, *asm.FakeASM, string, string) {
 	dir, _ := setupArchiveStatus(t, "")
-	dirName := filepath.Join(dir,"pg_wal")
-    defer cleanup(t, dir)
+	dirName := filepath.Join(dir, "pg_wal")
+	defer cleanup(t, dir)
 	addTestDataFile(t, dirName, fileFormat)
 	viper.Set(internal.PgDataSetting, dir)
 	testFileName := testFilename(fileFormat)
@@ -25,17 +30,16 @@ func generateAndUploadWalFile(t *testing.T, fileFormat string) (internal.WalUplo
 	return *uploader, fakeASM, dir, testFileName
 }
 
-
 func TestWalPush_HandleWALPush(t *testing.T) {
-	viper.Set(internal.UploadWalMetadata, "NOMETADATA")
-	_, fakeASM, dir, testFileName := generateAndUploadWalFile(t, "1")
+	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "1")
 	defer cleanup(t, dir)
-	wasUploaded := fakeASM.WalAlreadyUploaded(testFileName)
-	assert.True(t, wasUploaded, testFileName+" was not marked as uploaded")
+	// ".mock" suffix is the MockCompressor file extension
+	_, err := uploader.UploadingFolder.ReadObject(testFileName + ".mock")
+	assert.NoError(t, err)
 }
 
 func TestWalPush_IndividualMetadataUploader(t *testing.T) {
-	viper.Set(internal.UploadWalMetadata, "INDIVIDUAL")
+	viper.Set(internal.UploadWalMetadata, internal.WalIndividualMetadataLevel)
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "1")
 	defer cleanup(t, dir)
 	_, err := uploader.UploadingFolder.ReadObject(testFileName + ".json")
@@ -43,7 +47,7 @@ func TestWalPush_IndividualMetadataUploader(t *testing.T) {
 }
 
 func TestWalPush_BulkMetadataUploader(t *testing.T) {
-	viper.Set(internal.UploadWalMetadata, "BULK")
+	viper.Set(internal.UploadWalMetadata, internal.WalBulkMetadataLevel)
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "F")
 	defer cleanup(t, dir)
 	_, err := uploader.UploadingFolder.ReadObject(testFileName[0:len(testFileName)-1] + ".json")
@@ -51,7 +55,7 @@ func TestWalPush_BulkMetadataUploader(t *testing.T) {
 }
 
 func TestWalPush_NoMetataNoUploader(t *testing.T) {
-	viper.Set(internal.UploadWalMetadata, "NOMETADATA")
+	viper.Set(internal.UploadWalMetadata, internal.WalNoMetadataLevel)
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "1")
 	defer cleanup(t, dir)
 	_, err := uploader.UploadingFolder.ReadObject(testFileName + ".json")
@@ -59,8 +63,8 @@ func TestWalPush_NoMetataNoUploader(t *testing.T) {
 }
 
 func TestWalPush_BulkMetadataUploaderWithUploadConcurrency(t *testing.T) {
-	viper.Set(internal.UploadWalMetadata, "BULK")
-	viper.Set(internal.UploadConcurrencySetting,4)
+	viper.Set(internal.UploadWalMetadata, internal.WalBulkMetadataLevel)
+	viper.Set(internal.UploadConcurrencySetting, 4)
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "F")
 	defer cleanup(t, dir)
 	_, err := uploader.UploadingFolder.ReadObject(testFileName[0:len(testFileName)-1] + ".json")
