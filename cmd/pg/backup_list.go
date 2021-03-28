@@ -5,6 +5,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const (
@@ -24,9 +25,9 @@ var (
 			folder, err := internal.ConfigureFolder()
 			tracelog.ErrorLogger.FatalOnError(err)
 			if pretty || json || detail {
-				postgres.HandleBackupListWithFlags(folder, pretty, json, detail)
+				postgres.HandleBackupListWithFlags(folder.GetSubFolder(utility.BaseBackupPath), pretty, json, detail)
 			} else {
-				internal.DefaultHandleBackupList(folder)
+				internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath))
 			}
 		},
 	}

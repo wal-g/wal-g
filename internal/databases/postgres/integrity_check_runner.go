@@ -218,7 +218,7 @@ func collapseSegmentsByStatusAndTimeline(scannedSegments []ScannedSegmentDescrip
 func getEarliestBackupStartSegmentNo(timelineSwitchMap map[WalSegmentNo]*TimelineHistoryRecord,
 	currentTimeline uint32,
 	rootFolder storage.Folder) (WalSegmentNo, error) {
-	backups, err := internal.GetBackups(rootFolder)
+	backups, err := internal.GetBackups(rootFolder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return 0, err
 	}

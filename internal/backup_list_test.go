@@ -3,6 +3,8 @@ package internal_test
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/utility"
 	"testing"
 	"time"
 
@@ -13,7 +15,12 @@ import (
 
 func TestBackupListFindsBackups(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
-	internal.DefaultHandleBackupList(folder)
+	internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath))
+}
+
+func TestBackupListFlagsFindsBackups(t *testing.T) {
+	folder := testtools.CreateMockStorageFolder()
+	postgres.HandleBackupListWithFlags(folder.GetSubFolder(utility.BaseBackupPath), true, false, false)
 }
 
 var backups = []internal.BackupTime{

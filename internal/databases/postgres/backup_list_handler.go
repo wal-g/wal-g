@@ -11,16 +11,11 @@ import (
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, detail bool) {
-	HandleBackupListWithFlagsAndTarget(folder, pretty, json, detail, utility.BaseBackupPath)
-}
-
 // TODO : unit tests
-func HandleBackupListWithFlagsAndTarget(folder storage.Folder, pretty bool, json bool, detail bool, targetPath string) {
-	backups, err := internal.GetBackupsWithTarget(folder, targetPath)
+func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, detail bool) {
+	backups, err := internal.GetBackups(folder)
 	if len(backups) == 0 {
 		tracelog.InfoLogger.Println("No backups found")
 		return
@@ -52,13 +47,9 @@ func HandleBackupListWithFlagsAndTarget(folder storage.Folder, pretty bool, json
 }
 
 func GetBackupsDetails(folder storage.Folder, backups []internal.BackupTime) ([]BackupDetail, error) {
-	return GetBackupsDetailsWithTarget(folder, backups, utility.BaseBackupPath)
-}
-
-func GetBackupsDetailsWithTarget(folder storage.Folder, backups []internal.BackupTime, targetPath string) ([]BackupDetail, error) {
 	backupsDetails := make([]BackupDetail, 0, len(backups))
 	for i := len(backups) - 1; i >= 0; i-- {
-		details, err := GetBackupDetailsWithTarget(folder, backups[i], targetPath)
+		details, err := GetBackupDetails(folder, backups[i])
 		if err != nil {
 			return nil, err
 		}
@@ -68,11 +59,7 @@ func GetBackupsDetailsWithTarget(folder storage.Folder, backups []internal.Backu
 }
 
 func GetBackupDetails(folder storage.Folder, backupTime internal.BackupTime) (BackupDetail, error) {
-	return GetBackupDetailsWithTarget(folder, backupTime, utility.BaseBackupPath)
-}
-
-func GetBackupDetailsWithTarget(folder storage.Folder, backupTime internal.BackupTime, targetPath string) (BackupDetail, error) {
-	backup := NewBackup(folder.GetSubFolder(targetPath), backupTime.BackupName)
+	backup := NewBackup(folder, backupTime.BackupName)
 
 	metaData, err := backup.FetchMeta()
 	if err != nil {

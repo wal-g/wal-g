@@ -22,9 +22,9 @@ var (
 			folder, err := internal.ConfigureFolder()
 			tracelog.ErrorLogger.FatalOnError(err)
 			if pretty || json || detail {
-				postgres.HandleBackupListWithFlagsAndTarget(folder, pretty, json, detail, utility.CatchupPath)
+				postgres.HandleBackupListWithFlags(folder.GetSubFolder(utility.CatchupPath), pretty, json, detail)
 			} else {
-				internal.DefaultHandleBackupListWithTarget(folder, utility.CatchupPath)
+				internal.DefaultHandleBackupList(folder.GetSubFolder(utility.CatchupPath))
 			}
 		},
 	}
