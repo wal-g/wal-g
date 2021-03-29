@@ -20,7 +20,7 @@ type TestPostgresBackupObject struct {
 }
 
 func (o TestPostgresBackupObject) GetBackupName() string {
-	return utility.StripBackupName(o.GetName())
+	return utility.StripRightmostBackupName(o.GetName())
 }
 
 func (o TestPostgresBackupObject) GetBaseBackupName() string {

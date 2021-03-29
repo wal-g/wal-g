@@ -15,7 +15,7 @@ type DefaultBackupObject struct {
 }
 
 func (o DefaultBackupObject) GetBackupName() string {
-	return utility.StripBackupName(o.GetName())
+	return utility.StripRightmostBackupName(o.GetName())
 }
 
 func (o DefaultBackupObject) GetBaseBackupName() string {

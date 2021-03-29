@@ -415,7 +415,7 @@ func GetBackupTimeSlices(backups []storage.Object) []BackupTime {
 			continue
 		}
 		time := object.GetLastModified()
-		sortTimes[i] = BackupTime{utility.StripBackupName(key), time,
+		sortTimes[i] = BackupTime{utility.StripRightmostBackupName(key), time,
 			utility.StripWalFileName(key)}
 	}
 	sort.Slice(sortTimes, func(i, j int) bool {
