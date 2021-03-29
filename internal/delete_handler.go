@@ -343,8 +343,28 @@ func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool) er
 // This might need some improvements in the future.
 func (h *DeleteHandler) findRelatedBackups(target BackupObject) []BackupObject {
 	relatedBackups := make([]BackupObject, 0)
+
+	var related func(target BackupObject, other BackupObject) bool
+	if target.IsFullBackup() {
+		related = func(target BackupObject, other BackupObject) bool {
+			// remove base backup
+			isBaseBackup := target.GetBackupName() == other.GetBackupName()
+			// remove all increments from the target backup too
+			isIncrement := target.GetBackupName() == other.GetBaseBackupName()
+			return isBaseBackup || isIncrement
+		}
+	} else {
+		related = func(target BackupObject, other BackupObject) bool {
+			// remove base backup
+			isBaseBackup := target.GetBaseBackupName() == other.GetBackupName()
+			// remove all other increments from the target base backup
+			hasCommonBaseBackup := target.GetBaseBackupName() == other.GetBaseBackupName()
+			return isBaseBackup || hasCommonBaseBackup
+		}
+	}
+
 	for _, backup := range h.backups {
-		if backup.GetBaseBackupName() == target.GetBaseBackupName() {
+		if related(target, backup) {
 			relatedBackups = append(relatedBackups, backup)
 		}
 	}

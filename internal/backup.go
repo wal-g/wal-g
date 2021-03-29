@@ -444,6 +444,6 @@ func getGarbageFromPrefix(folders []storage.Folder, nonGarbage []BackupTime) []s
 	return garbage
 }
 
-func FetchBackupName(object storage.Object) string {
+func FetchPgBackupName(object storage.Object) string {
 	return regexpPgBackupName.FindString(object.GetName())
 }

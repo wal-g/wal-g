@@ -180,13 +180,13 @@ func newPostgresDeleteHandler(folder storage.Folder, permanentBackups, permanent
 	return deleteHandler, nil
 }
 
-func newPostgresBackupObject(incrementFrom string, isFullBackup bool, creationTime time.Time, object storage.Object) PostgresBackupObject {
+func newPostgresBackupObject(incrementBase string, isFullBackup bool, creationTime time.Time, object storage.Object) PostgresBackupObject {
 	return PostgresBackupObject{
 		Object:         object,
 		isFullBackup:   isFullBackup,
-		baseBackupName: incrementFrom,
+		baseBackupName: incrementBase,
 		creationTime:   creationTime,
-		BackupName:     internal.FetchBackupName(object),
+		BackupName:     internal.FetchPgBackupName(object),
 	}
 }
 
@@ -219,12 +219,12 @@ func makePostgresBackupObjects(
 ) ([]internal.BackupObject, error) {
 	backupObjects := make([]internal.BackupObject, 0, len(objects))
 	for _, object := range objects {
-		incrementFrom, isIncremented, err := postgresGetIncrementInfo(folder, object)
+		incrementBase, isFullBackup, err := postgresGetIncrementInfo(folder, object)
 		if err != nil {
 			return nil, err
 		}
 		postgresBackup := newPostgresBackupObject(
-			incrementFrom, !isIncremented, object.GetLastModified(), object)
+			incrementBase, isFullBackup, object.GetLastModified(), object)
 
 		if startTimeByBackupName != nil {
 			postgresBackup.creationTime = startTimeByBackupName[postgresBackup.BackupName]
@@ -242,13 +242,13 @@ func makePostgresPermanentFunc(permanentBackups, permanentWals map[string]bool) 
 
 func makeLessFunc(startTimeByBackupName map[string]time.Time) func(storage.Object, storage.Object) bool {
 	return func(object1 storage.Object, object2 storage.Object) bool {
-		backupName1 := internal.FetchBackupName(object1)
+		backupName1 := internal.FetchPgBackupName(object1)
 		if backupName1 == "" {
 			// we can't compare non-backup storage objects (probably WAL segments) by start time,
 			// so use the segment number comparator instead
 			return postgresSegmentNoLess(object1, object2)
 		}
-		backupName2 := internal.FetchBackupName(object2)
+		backupName2 := internal.FetchPgBackupName(object2)
 		if backupName2 == "" {
 			return postgresSegmentNoLess(object1, object2)
 		}
@@ -308,12 +308,16 @@ func postgresTimelineAndSegmentNoLess(object1 storage.Object, object2 storage.Ob
 }
 
 func postgresGetIncrementInfo(folder storage.Folder, object storage.Object) (string, bool, error) {
-	incrementFrom, isIncrement, err := internal.GetMetadataFromBackup(
-		folder.GetSubFolder(utility.BaseBackupPath), internal.FetchBackupName(object))
+	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), internal.FetchPgBackupName(object))
+	sentinel, err := backup.GetSentinel()
 	if err != nil {
-		return "", false, err
+		return "", true, err
 	}
-	return incrementFrom, isIncrement, nil
+	if !sentinel.IsIncremental() {
+		return "", true, nil
+	}
+
+	return *sentinel.IncrementFullName, false, nil
 }
 
 // create the BackupSelector to select the backup to delete
