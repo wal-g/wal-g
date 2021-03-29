@@ -1,9 +1,10 @@
 package internal
 
 import (
+	"time"
+
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/utility"
-	"time"
 )
 
 func NewDefaultBackupObject(object storage.Object) BackupObject {

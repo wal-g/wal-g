@@ -2,7 +2,6 @@ package pg
 
 import (
 	"fmt"
-	"regexp"
 	"time"
 
 	"github.com/pkg/errors"
@@ -18,8 +17,8 @@ const UseSentinelTimeDescription = "Use backup creation time from sentinel for b
 
 var confirmed = false
 var useSentinelTime = false
-var patternBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?", internal.PatternTimelineAndLogSegNo)
-var regexpBackupName = regexp.MustCompile(patternBackupName)
+var deleteTargetUserData = ""
+var findFullBackup = false
 
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
@@ -47,6 +46,13 @@ var deleteEverythingCmd = &cobra.Command{
 	ValidArgs: internal.StringModifiersDeleteEverything,
 	Args:      internal.DeleteEverythingArgsValidator,
 	Run:       runDeleteEverything,
+}
+
+var deleteSingleCmd = &cobra.Command{
+	Use:     internal.DeleteTargetUsageExample, // TODO : improve description
+	Example: internal.DeleteTargetExamples,
+	Args:    cobra.RangeArgs(0, 1),
+	Run:     runDeleteTarget,
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
@@ -107,10 +113,32 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 	deleteHandler.DeleteEverything(confirmed)
 }
 
+func runDeleteTarget(cmd *cobra.Command, args []string) {
+	folder, err := internal.ConfigureFolder()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	permanentBackups, permanentWals := internal.GetPermanentObjects(folder)
+	if len(permanentBackups) > 0 {
+		tracelog.InfoLogger.Printf("Found permanent objects: backups=%v, wals=%v\n",
+			permanentBackups, permanentWals)
+	}
+
+	deleteHandler, err := newPostgresDeleteHandler(folder, permanentBackups, permanentWals)
+	tracelog.ErrorLogger.FatalOnError(err)
+	targetBackupSelector, err := createTargetDeleteBackupSelector(cmd, args, deleteTargetUserData)
+	tracelog.ErrorLogger.FatalOnError(err)
+	deleteHandler.HandleDeleteTarget(targetBackupSelector, confirmed, findFullBackup)
+}
+
 func init() {
 	cmd.AddCommand(deleteCmd)
 
-	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd, deleteEverythingCmd)
+	deleteSingleCmd.Flags().StringVar(
+		&deleteTargetUserData, internal.DeleteTargetUserDataFlag, "", internal.DeleteTargetUserDataDescription)
+	deleteSingleCmd.Flags().BoolVar(
+		&findFullBackup, internal.FindFullBackupFlag, false, internal.FindFullBackupDescription)
+
+	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd, deleteEverythingCmd, deleteSingleCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 	deleteCmd.PersistentFlags().BoolVar(&useSentinelTime, UseSentinelTimeFlag, false, UseSentinelTimeDescription)
 }
@@ -214,13 +242,13 @@ func makePostgresPermanentFunc(permanentBackups, permanentWals map[string]bool) 
 
 func makeLessFunc(startTimeByBackupName map[string]time.Time) func(storage.Object, storage.Object) bool {
 	return func(object1 storage.Object, object2 storage.Object) bool {
-		backupName1 := fetchBackupName(object1)
+		backupName1 := internal.FetchBackupName(object1)
 		if backupName1 == "" {
 			// we can't compare non-backup storage objects (probably WAL segments) by start time,
 			// so use the segment number comparator instead
 			return postgresSegmentNoLess(object1, object2)
 		}
-		backupName2 := fetchBackupName(object2)
+		backupName2 := internal.FetchBackupName(object2)
 		if backupName2 == "" {
 			return postgresSegmentNoLess(object1, object2)
 		}
@@ -286,4 +314,19 @@ func postgresGetIncrementInfo(folder storage.Folder, object storage.Object) (str
 		return "", false, err
 	}
 	return incrementFrom, isIncrement, nil
+}
+
+// create the BackupSelector to select the backup to delete
+func createTargetDeleteBackupSelector(cmd *cobra.Command, args []string, targetUserData string) (internal.BackupSelector, error) {
+	targetName := ""
+	if len(args) > 0 {
+		targetName = args[0]
+	}
+
+	backupSelector, err := internal.NewTargetBackupSelector(targetUserData, targetName)
+	if err != nil {
+		fmt.Println(cmd.UsageString())
+		return nil, err
+	}
+	return backupSelector, nil
 }

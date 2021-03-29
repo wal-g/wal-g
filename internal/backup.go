@@ -30,6 +30,9 @@ var UtilityFilePaths = map[string]bool{
 	TablespaceMapFilename: true,
 }
 
+var patternPgBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?", PatternTimelineAndLogSegNo)
+var regexpPgBackupName = regexp.MustCompile(patternPgBackupName)
+
 type NoBackupsFoundError struct {
 	error
 }
@@ -439,4 +442,8 @@ func getGarbageFromPrefix(folders []storage.Folder, nonGarbage []BackupTime) []s
 		garbage = append(garbage, backupName)
 	}
 	return garbage
+}
+
+func FetchBackupName(object storage.Object) string {
+	return regexpPgBackupName.FindString(object.GetName())
 }
