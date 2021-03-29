@@ -48,8 +48,11 @@ var errNotFound = errors.New("not found")
 // the backup sentinel object uploaded on storage
 type BackupObject interface {
 	storage.Object
-	IsFullBackup() bool
 	GetBackupTime() time.Time
+	GetBackupName() string
+
+	IsFullBackup() bool
+	GetBaseBackupName() string
 }
 
 type DeleteHandlerOption func(h *DeleteHandler)

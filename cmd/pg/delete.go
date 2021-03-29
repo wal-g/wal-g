@@ -136,7 +136,10 @@ func newPostgresDeleteHandler(folder storage.Folder, permanentBackups, permanent
 			lessFunc = makeLessFunc(startTimeByBackupName)
 		}
 	}
-	postgresBackups := makePostgresBackupObjects(folder, backups, startTimeByBackupName)
+	postgresBackups, err := makePostgresBackupObjects(folder, backups, startTimeByBackupName)
+	if err != nil {
+		return nil, err
+	}
 
 	deleteHandler := internal.NewDeleteHandler(
 		folder,
@@ -149,41 +152,58 @@ func newPostgresDeleteHandler(folder storage.Folder, permanentBackups, permanent
 	return deleteHandler, nil
 }
 
-func newPostgresBackupObject(isFullBackup bool, creationTime time.Time, object storage.Object) PostgresBackupObject {
+func newPostgresBackupObject(incrementFrom string, isFullBackup bool, creationTime time.Time, object storage.Object) PostgresBackupObject {
 	return PostgresBackupObject{
-		Object:       object,
-		isFullBackup: isFullBackup,
-		creationTime: creationTime,
+		Object:         object,
+		isFullBackup:   isFullBackup,
+		baseBackupName: incrementFrom,
+		creationTime:   creationTime,
+		BackupName:     internal.FetchBackupName(object),
 	}
 }
 
 type PostgresBackupObject struct {
 	storage.Object
-	isFullBackup bool
-	creationTime time.Time
+	BackupName     string
+	isFullBackup   bool
+	baseBackupName string
+	creationTime   time.Time
 }
 
 func (o PostgresBackupObject) IsFullBackup() bool {
 	return o.isFullBackup
 }
 
+func (o PostgresBackupObject) GetBaseBackupName() string {
+	return o.baseBackupName
+}
+
 func (o PostgresBackupObject) GetBackupTime() time.Time {
 	return o.creationTime
 }
 
-func makePostgresBackupObjects(folder storage.Folder, objects []storage.Object, startTimeByBackupName map[string]time.Time) []internal.BackupObject {
+func (o PostgresBackupObject) GetBackupName() string {
+	return o.BackupName
+}
+
+func makePostgresBackupObjects(
+	folder storage.Folder, objects []storage.Object, startTimeByBackupName map[string]time.Time,
+) ([]internal.BackupObject, error) {
 	backupObjects := make([]internal.BackupObject, 0, len(objects))
 	for _, object := range objects {
+		incrementFrom, isIncremented, err := postgresGetIncrementInfo(folder, object)
+		if err != nil {
+			return nil, err
+		}
 		postgresBackup := newPostgresBackupObject(
-			postgresIsFullBackup(folder, object), object.GetLastModified(), object)
+			incrementFrom, !isIncremented, object.GetLastModified(), object)
 
 		if startTimeByBackupName != nil {
-			backupName := fetchBackupName(object)
-			postgresBackup.creationTime = startTimeByBackupName[backupName]
+			postgresBackup.creationTime = startTimeByBackupName[postgresBackup.BackupName]
 		}
 		backupObjects = append(backupObjects, postgresBackup)
 	}
-	return backupObjects
+	return backupObjects, nil
 }
 
 func makePostgresPermanentFunc(permanentBackups, permanentWals map[string]bool) func(object storage.Object) bool {
@@ -259,12 +279,11 @@ func postgresTimelineAndSegmentNoLess(object1 storage.Object, object2 storage.Ob
 	return tl1 < tl2 || tl1 == tl2 && segNo1 < segNo2
 }
 
-func postgresIsFullBackup(folder storage.Folder, object storage.Object) bool {
-	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), fetchBackupName(object))
-	sentinel, _ := backup.GetSentinel()
-	return !sentinel.IsIncremental()
-}
-
-func fetchBackupName(object storage.Object) string {
-	return regexpBackupName.FindString(object.GetName())
+func postgresGetIncrementInfo(folder storage.Folder, object storage.Object) (string, bool, error) {
+	incrementFrom, isIncrement, err := internal.GetMetadataFromBackup(
+		folder.GetSubFolder(utility.BaseBackupPath), internal.FetchBackupName(object))
+	if err != nil {
+		return "", false, err
+	}
+	return incrementFrom, isIncrement, nil
 }

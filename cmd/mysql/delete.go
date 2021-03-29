@@ -212,7 +212,7 @@ func NewMySqlDeleteHandler() (*DeleteHandler, error) {
 
 	backupObjects := make([]internal.BackupObject, 0, len(backups))
 	for _, object := range backups {
-		b := mysql.BackupObject{Object: object}
+		b := internal.NewDefaultBackupObject(object)
 		backupObjects = append(backupObjects, b)
 	}
 
