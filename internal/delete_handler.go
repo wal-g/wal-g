@@ -34,22 +34,34 @@ const (
 	DeleteEverythingExamples = `  everything                delete every backup only if there is no permanent backups
   everything FORCE          delete every backup include permanents`
 
+	DeleteTargetExamples = `  target base_0000000100000000000000C4	delete base backup by name
+  target --target-user-data "{ \"x\": [3], \"y\": 4 }"	delete backup specified by user data
+  target base_0000000100000000000000C9_D_0000000100000000000000C4 --find-full	delete delta backup and all related delta backups`
+
 	DeleteEverythingUsageExample = "everything [FORCE]"
 	DeleteRetainUsageExample     = "retain [FULL|FIND_FULL] backup_count"
 	DeleteBeforeUsageExample     = "before [FIND_FULL] backup_name|timestamp"
+	DeleteTargetUsageExample     = "target backup_name | --target-user-data <data>"
+
+	DeleteTargetUserDataFlag        = "target-user-data"
+	DeleteTargetUserDataDescription = "delete storage backup which has the specified user data"
+	FindFullBackupFlag              = "find-full"
+	FindFullBackupDescription       = "find full backup if delta is provided"
 )
 
 var StringModifiers = []string{"FULL", "FIND_FULL"}
 var StringModifiersDeleteEverything = []string{"FORCE"}
-var MaxTime = time.Unix(1<<63-62135596801, 999999999)
 var errNotFound = errors.New("not found")
 
 // BackupObject represents
 // the backup sentinel object uploaded on storage
 type BackupObject interface {
 	storage.Object
-	IsFullBackup() bool
 	GetBackupTime() time.Time
+	GetBackupName() string
+
+	IsFullBackup() bool
+	GetBaseBackupName() string
 }
 
 type DeleteHandlerOption func(h *DeleteHandler)
@@ -151,6 +163,33 @@ func (h *DeleteHandler) HandleDeleteRetainAfter(args []string, confirmed bool) {
 	}
 
 	err = h.DeleteBeforeTarget(target, confirmed)
+	tracelog.ErrorLogger.FatalOnError(err)
+}
+
+func (h *DeleteHandler) HandleDeleteTarget(targetSelector BackupSelector, confirmed, findFull bool) {
+	targetName, err := targetSelector.Select(h.Folder)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	var target BackupObject
+	for idx := range h.backups {
+		if h.backups[idx].GetBackupName() == targetName {
+			target = h.backups[idx]
+			break
+		}
+	}
+
+	if target == nil {
+		tracelog.InfoLogger.Printf("No backup found for deletion")
+		os.Exit(0)
+	}
+
+	if !target.IsFullBackup() && !findFull {
+		errorMessage := "%v is incremental and it cannot be deleted. Consider adding the --%s flag."
+		tracelog.ErrorLogger.FatalError(utility.NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName(), FindFullBackupFlag)))
+	}
+
+	backupsToDelete := h.findRelatedBackups(target)
+	err = h.DeleteTargets(backupsToDelete, confirmed)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
@@ -283,6 +322,53 @@ func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) 
 	return storage.DeleteObjectsWhere(h.Folder, confirmed, func(object storage.Object) bool {
 		return h.less(object, target) && !h.isPermanent(object)
 	})
+}
+
+func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool) error {
+	backupNamesToDelete := make(map[string]bool)
+	for _, target := range targets {
+		if h.isPermanent(target) {
+			tracelog.ErrorLogger.Fatalf("Unable to delete permanent backup %s\n", target.GetName())
+		}
+		backupNamesToDelete[target.GetBackupName()] = true
+	}
+
+	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath), confirmed, func(object storage.Object) bool {
+		return backupNamesToDelete[utility.StripLeftmostBackupName(object.GetName())] && !h.isPermanent(object)
+	})
+}
+
+// Find all backups related to the target.
+// Currently, all delta backups with the same base backup are related.
+// This might need some improvements in the future.
+func (h *DeleteHandler) findRelatedBackups(target BackupObject) []BackupObject {
+	relatedBackups := make([]BackupObject, 0)
+
+	var related func(target BackupObject, other BackupObject) bool
+	if target.IsFullBackup() {
+		related = func(target BackupObject, other BackupObject) bool {
+			// remove base backup
+			isBaseBackup := target.GetBackupName() == other.GetBackupName()
+			// remove all increments from the target backup too
+			isIncrement := target.GetBackupName() == other.GetBaseBackupName()
+			return isBaseBackup || isIncrement
+		}
+	} else {
+		related = func(target BackupObject, other BackupObject) bool {
+			// remove base backup
+			isBaseBackup := target.GetBaseBackupName() == other.GetBackupName()
+			// remove all other increments from the target base backup
+			hasCommonBaseBackup := target.GetBaseBackupName() == other.GetBaseBackupName()
+			return isBaseBackup || hasCommonBaseBackup
+		}
+	}
+
+	for _, backup := range h.backups {
+		if related(target, backup) {
+			relatedBackups = append(relatedBackups, backup)
+		}
+	}
+	return relatedBackups
 }
 
 func findTarget(objects []BackupObject,

@@ -109,3 +109,27 @@ func (s BackupNameSelector) Select(folder storage.Folder) (string, error) {
 	}
 	return s.backupName, nil
 }
+
+func NewTargetBackupSelector(targetUserData, targetName string) (BackupSelector, error) {
+	var err error
+	switch {
+	case targetName != "" && targetUserData != "":
+		err = errors.New("Incorrect arguments. Specify target backup name OR target userdata, not both.")
+
+	case targetName == LatestString:
+		tracelog.InfoLogger.Printf("Selecting the latest backup...\n")
+		return NewLatestBackupSelector(), nil
+
+	case targetName != "":
+		tracelog.InfoLogger.Printf("Selecting the backup with name %s...\n", targetName)
+		return NewBackupNameSelector(targetName)
+
+	case targetUserData != "":
+		tracelog.InfoLogger.Println("Selecting the backup with the specified user data...")
+		return NewUserDataBackupSelector(targetUserData), nil
+
+	default:
+		err = errors.New("Insufficient arguments.")
+	}
+	return nil, err
+}
