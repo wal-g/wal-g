@@ -60,8 +60,10 @@ type BackupObject interface {
 	GetBackupTime() time.Time
 	GetBackupName() string
 
+	// TODO: move increment info into separate struct (in backup.go)
 	IsFullBackup() bool
 	GetBaseBackupName() string
+	GetIncrementFromName() string
 }
 
 type DeleteHandlerOption func(h *DeleteHandler)
@@ -183,12 +185,15 @@ func (h *DeleteHandler) HandleDeleteTarget(targetSelector BackupSelector, confir
 		os.Exit(0)
 	}
 
-	if !target.IsFullBackup() && !findFull {
-		errorMessage := "%v is incremental and it cannot be deleted. Consider adding the --%s flag."
-		tracelog.ErrorLogger.FatalError(utility.NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName(), FindFullBackupFlag)))
+	var backupsToDelete []BackupObject
+	if findFull {
+		// delete all backups with the same base backup as the target
+		backupsToDelete = h.findRelatedBackups(target)
+	} else {
+		// delete all dependant backups
+		backupsToDelete = h.findDependantBackups(target)
 	}
 
-	backupsToDelete := h.findRelatedBackups(target)
 	err = h.DeleteTargets(backupsToDelete, confirmed)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
@@ -339,8 +344,7 @@ func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool) er
 }
 
 // Find all backups related to the target.
-// Currently, all delta backups with the same base backup are related.
-// This might need some improvements in the future.
+// All delta backups with the same base backup are considered as related.
 func (h *DeleteHandler) findRelatedBackups(target BackupObject) []BackupObject {
 	relatedBackups := make([]BackupObject, 0)
 
@@ -368,6 +372,33 @@ func (h *DeleteHandler) findRelatedBackups(target BackupObject) []BackupObject {
 			relatedBackups = append(relatedBackups, backup)
 		}
 	}
+	return relatedBackups
+}
+
+// Find all backups dependant on the target.
+// All delta backups which have the target as the ancestor in increment chain
+// are considered as dependant.
+func (h *DeleteHandler) findDependantBackups(target BackupObject) []BackupObject {
+	relatedBackups := make([]BackupObject, 0)
+
+	incrementsByBackup := make(map[string][]BackupObject)
+	for _, backup := range h.backups {
+		if !backup.IsFullBackup() {
+			incrementFrom := backup.GetIncrementFromName()
+			incrementsByBackup[incrementFrom] = append(incrementsByBackup[incrementFrom], backup)
+		}
+	}
+
+	queue := []BackupObject{target}
+	var curr BackupObject
+	for len(queue) > 0 {
+		curr, queue = queue[0], queue[1:]
+		relatedBackups = append(relatedBackups, curr)
+		for _, backup := range incrementsByBackup[curr.GetBackupName()] {
+			queue = append(queue, backup)
+		}
+	}
+
 	return relatedBackups
 }
 

@@ -23,6 +23,10 @@ func (o DefaultBackupObject) GetBaseBackupName() string {
 	return o.GetBackupName()
 }
 
+func (o DefaultBackupObject) GetIncrementFromName() string {
+	return o.GetBackupName()
+}
+
 func (o DefaultBackupObject) IsFullBackup() bool {
 	return true
 }

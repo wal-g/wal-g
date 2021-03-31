@@ -180,22 +180,25 @@ func newPostgresDeleteHandler(folder storage.Folder, permanentBackups, permanent
 	return deleteHandler, nil
 }
 
-func newPostgresBackupObject(incrementBase string, isFullBackup bool, creationTime time.Time, object storage.Object) PostgresBackupObject {
+func newPostgresBackupObject(incrementBase, incrementFrom string,
+	isFullBackup bool, creationTime time.Time, object storage.Object) PostgresBackupObject {
 	return PostgresBackupObject{
-		Object:         object,
-		isFullBackup:   isFullBackup,
-		baseBackupName: incrementBase,
-		creationTime:   creationTime,
-		BackupName:     internal.FetchPgBackupName(object),
+		Object:            object,
+		isFullBackup:      isFullBackup,
+		baseBackupName:    incrementBase,
+		incrementFromName: incrementFrom,
+		creationTime:      creationTime,
+		BackupName:        internal.FetchPgBackupName(object),
 	}
 }
 
 type PostgresBackupObject struct {
 	storage.Object
-	BackupName     string
-	isFullBackup   bool
-	baseBackupName string
-	creationTime   time.Time
+	BackupName        string
+	isFullBackup      bool
+	baseBackupName    string
+	incrementFromName string
+	creationTime      time.Time
 }
 
 func (o PostgresBackupObject) IsFullBackup() bool {
@@ -214,17 +217,21 @@ func (o PostgresBackupObject) GetBackupName() string {
 	return o.BackupName
 }
 
+func (o PostgresBackupObject) GetIncrementFromName() string {
+	return o.incrementFromName
+}
+
 func makePostgresBackupObjects(
 	folder storage.Folder, objects []storage.Object, startTimeByBackupName map[string]time.Time,
 ) ([]internal.BackupObject, error) {
 	backupObjects := make([]internal.BackupObject, 0, len(objects))
 	for _, object := range objects {
-		incrementBase, isFullBackup, err := postgresGetIncrementInfo(folder, object)
+		incrementBase, incrementFrom, isFullBackup, err := postgresGetIncrementInfo(folder, object)
 		if err != nil {
 			return nil, err
 		}
 		postgresBackup := newPostgresBackupObject(
-			incrementBase, isFullBackup, object.GetLastModified(), object)
+			incrementBase, incrementFrom, isFullBackup, object.GetLastModified(), object)
 
 		if startTimeByBackupName != nil {
 			postgresBackup.creationTime = startTimeByBackupName[postgresBackup.BackupName]
@@ -307,17 +314,17 @@ func postgresTimelineAndSegmentNoLess(object1 storage.Object, object2 storage.Ob
 	return tl1 < tl2 || tl1 == tl2 && segNo1 < segNo2
 }
 
-func postgresGetIncrementInfo(folder storage.Folder, object storage.Object) (string, bool, error) {
+func postgresGetIncrementInfo(folder storage.Folder, object storage.Object) (string, string, bool, error) {
 	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), internal.FetchPgBackupName(object))
 	sentinel, err := backup.GetSentinel()
 	if err != nil {
-		return "", true, err
+		return "", "", true, err
 	}
 	if !sentinel.IsIncremental() {
-		return "", true, nil
+		return "", "", true, nil
 	}
 
-	return *sentinel.IncrementFullName, false, nil
+	return *sentinel.IncrementFullName, *sentinel.IncrementFrom, false, nil
 }
 
 // create the BackupSelector to select the backup to delete
