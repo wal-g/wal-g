@@ -36,22 +36,23 @@ const (
 
 	DeleteTargetExamples = `  target base_0000000100000000000000C4	delete base backup by name
   target --target-user-data "{ \"x\": [3], \"y\": 4 }"	delete backup specified by user data
-  target base_0000000100000000000000C9_D_0000000100000000000000C4 --find-full	delete delta backup and all related delta backups`
+  target base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all dependant delta backups
+  target FIND_FULL base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all delta backups with the same base backup
+`
 
 	DeleteEverythingUsageExample = "everything [FORCE]"
 	DeleteRetainUsageExample     = "retain [FULL|FIND_FULL] backup_count"
 	DeleteBeforeUsageExample     = "before [FIND_FULL] backup_name|timestamp"
-	DeleteTargetUsageExample     = "target backup_name | --target-user-data <data>"
+	DeleteTargetUsageExample     = "target [FIND_FULL] backup_name | --target-user-data <data>"
 
 	DeleteTargetUserDataFlag        = "target-user-data"
 	DeleteTargetUserDataDescription = "delete storage backup which has the specified user data"
-	FindFullBackupFlag              = "find-full"
-	FindFullBackupDescription       = "find full backup if delta is provided"
 )
 
 var StringModifiers = []string{"FULL", "FIND_FULL"}
 var StringModifiersDeleteEverything = []string{"FORCE"}
 var errNotFound = errors.New("not found")
+var errIncorrectArguments = errors.New("incorrect arguments")
 
 // BackupObject represents
 // the backup sentinel object uploaded on storage
@@ -484,6 +485,14 @@ func ExtractDeleteEverythingModifierFromArgs(args []string) int {
 	return ForceDeleteModifier
 }
 
+func ExtractDeleteTargetModifierFromArgs(args []string) int {
+	if len(args) >= 1 && args[0] == StringModifiers[1] {
+		return FindFullDeleteModifier
+	}
+
+	return NoDeleteModifier
+}
+
 func extractDeleteModifierFromArgs(args []string) (int, string) {
 	if len(args) == 1 {
 		return NoDeleteModifier, args[0]
@@ -508,6 +517,25 @@ func DeleteBeforeArgsValidator(cmd *cobra.Command, args []string) error {
 		}
 	}
 	return nil
+}
+
+func DeleteTargetArgsValidator(cmd *cobra.Command, args []string) error {
+	err := cobra.RangeArgs(0, 2)(cmd, args)
+	if err != nil {
+		return err
+	}
+
+	switch {
+	case len(args) == 0 && !cmd.Flags().Changed(DeleteTargetUserDataFlag):
+		// allow 0 arguments only when target user data flag is set
+		return errIncorrectArguments
+
+	case len(args) == 2 && args[0] != StringModifiers[1]:
+		return errIncorrectArguments
+
+	default:
+		return nil
+	}
 }
 
 func DeleteEverythingArgsValidator(cmd *cobra.Command, args []string) error {

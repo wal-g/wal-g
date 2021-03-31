@@ -18,7 +18,6 @@ const UseSentinelTimeDescription = "Use backup creation time from sentinel for b
 var confirmed = false
 var useSentinelTime = false
 var deleteTargetUserData = ""
-var findFullBackup = false
 
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
@@ -48,10 +47,10 @@ var deleteEverythingCmd = &cobra.Command{
 	Run:       runDeleteEverything,
 }
 
-var deleteSingleCmd = &cobra.Command{
+var deleteTargetCmd = &cobra.Command{
 	Use:     internal.DeleteTargetUsageExample, // TODO : improve description
 	Example: internal.DeleteTargetExamples,
-	Args:    cobra.RangeArgs(0, 1),
+	Args:    internal.DeleteTargetArgsValidator,
 	Run:     runDeleteTarget,
 }
 
@@ -123,6 +122,14 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 			permanentBackups, permanentWals)
 	}
 
+	findFullBackup := false
+	modifier := internal.ExtractDeleteTargetModifierFromArgs(args)
+	if modifier == internal.FindFullDeleteModifier {
+		findFullBackup = true
+		// remove the extracted modifier from args
+		args = args[1:]
+	}
+
 	deleteHandler, err := newPostgresDeleteHandler(folder, permanentBackups, permanentWals)
 	tracelog.ErrorLogger.FatalOnError(err)
 	targetBackupSelector, err := createTargetDeleteBackupSelector(cmd, args, deleteTargetUserData)
@@ -133,12 +140,10 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 func init() {
 	cmd.AddCommand(deleteCmd)
 
-	deleteSingleCmd.Flags().StringVar(
+	deleteTargetCmd.Flags().StringVar(
 		&deleteTargetUserData, internal.DeleteTargetUserDataFlag, "", internal.DeleteTargetUserDataDescription)
-	deleteSingleCmd.Flags().BoolVar(
-		&findFullBackup, internal.FindFullBackupFlag, false, internal.FindFullBackupDescription)
 
-	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd, deleteEverythingCmd, deleteSingleCmd)
+	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd, deleteEverythingCmd, deleteTargetCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 	deleteCmd.PersistentFlags().BoolVar(&useSentinelTime, UseSentinelTimeFlag, false, UseSentinelTimeDescription)
 }
