@@ -369,7 +369,7 @@ func (bundle *Bundle) uploadLabelFiles(conn *pgx.Conn) (string, []string, uint64
 		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: failed to parse finish LSN")
 	}
 
-	if queryRunner.Version < 90600 {
+	if !queryRunner.IsTablespaceMapExists() {
 		return "", nil, lsn, nil
 	}
 
