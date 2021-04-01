@@ -2,6 +2,7 @@ package internal_test
 
 import (
 	"fmt"
+	"github.com/spf13/viper"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -78,14 +79,16 @@ func TestBackgroundWALUpload(t *testing.T) {
 		},
 	}
 
+	viper.Set(internal.UploadWalMetadata, "NOMETADATA")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			defer cleanup(t, internal.GetDataFolderPath())
 
 			// Use generated data to test uploading WAL.
 			dir, a := setupArchiveStatus(t, "")
+			dirName := filepath.Join(dir, "pg_wal")
 			for i := 0; i < tt.numFilesOnDisk; i++ {
-				addTestDataFile(t, dir, i)
+				addTestDataFile(t, dirName, fmt.Sprint(i))
 			}
 			defer cleanup(t, dir)
 
@@ -105,7 +108,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 
 			// Check that at least the expected number of files were created
 			for i := 0; i < tt.wantNumFilesUploaded; i++ {
-				bname := testFilename(i)
+				bname := testFilename(fmt.Sprint(i))
 				wasUploaded := fakeASM.WalAlreadyUploaded(bname)
 				assert.True(t, wasUploaded, bname+" was not marked as uploaded")
 			}
@@ -137,12 +140,11 @@ func setupArchiveStatus(t *testing.T, dir string) (string, string) {
 		}
 	}
 
-	err = os.MkdirAll(filepath.Join(testDir, "archive_status"), 0700)
+	err = os.MkdirAll(filepath.Join(testDir, "pg_wal", "archive_status"), 0700)
 	if err != nil {
 		t.Log(err)
 	}
-
-	a := filepath.Join(testDir, "A")
+	a := filepath.Join(testDir, "pg_wal", "A")
 	file, err := os.Create(a)
 	if err != nil {
 		t.Log(err)
@@ -154,7 +156,7 @@ func setupArchiveStatus(t *testing.T, dir string) (string, string) {
 	return testDir, a
 }
 
-func addTestDataFile(t *testing.T, dir string, i int) {
+func addTestDataFile(t *testing.T, dir string, i string) {
 	bname := testFilename(i)
 	b := filepath.Join(dir, bname)
 
@@ -176,8 +178,8 @@ func addTestDataFile(t *testing.T, dir string, i int) {
 	}
 }
 
-func testFilename(i int) string {
-	return fmt.Sprintf("B%010d", i)
+func testFilename(i string) string {
+	return fmt.Sprintf("%08d%08d%08s", 1, 1, i)
 }
 
 func cleanup(t *testing.T, dir string) {

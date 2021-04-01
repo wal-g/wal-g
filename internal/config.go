@@ -22,6 +22,7 @@ const (
 	UploadQueueSetting           = "WALG_UPLOAD_QUEUE"
 	SentinelUserDataSetting      = "WALG_SENTINEL_USER_DATA"
 	PreventWalOverwriteSetting   = "WALG_PREVENT_WAL_OVERWRITE"
+	UploadWalMetadata            = "WALG_UPLOAD_WAL_METADATA"
 	DeltaMaxStepsSetting         = "WALG_DELTA_MAX_STEPS"
 	DeltaOriginSetting           = "WALG_DELTA_ORIGIN"
 	CompressionMethodSetting     = "WALG_COMPRESSION_METHOD"
@@ -114,6 +115,7 @@ var (
 		UploadDiskConcurrencySetting: "1",
 		UploadQueueSetting:           "2",
 		PreventWalOverwriteSetting:   "false",
+		UploadWalMetadata:            "NOMETADATA",
 		DeltaMaxStepsSetting:         "0",
 		CompressionMethodSetting:     "lz4",
 		UseWalDeltaSetting:           "false",
@@ -144,6 +146,7 @@ var (
 		UploadQueueSetting:           true,
 		SentinelUserDataSetting:      true,
 		PreventWalOverwriteSetting:   true,
+		UploadWalMetadata:            true,
 		DeltaMaxStepsSetting:         true,
 		DeltaOriginSetting:           true,
 		CompressionMethodSetting:     true,

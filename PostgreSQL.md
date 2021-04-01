@@ -135,6 +135,20 @@ To configure the size of one backup bundle (in bytes). Smaller size causes granu
 
 To configure the wal segment size if different from the postgres default of 16 MB
 
+* `WALG_UPLOAD_WAL_METADATA`
+
+To upload metadata related to wal files. `WALG_UPLOAD_WAL_METADATA` can be INDIVIDUAL (generates metadata for all the wal logs) or BULK( generates metadata for set of wal files) 
+Sample metadata file (000000020000000300000071.json)
+```
+{
+    "000000020000000300000071": {
+    "created_time": "2021-02-23T00:51:14.195209969Z",
+    "date_fmt": "%Y-%m-%dT%H:%M:%S.%fZ"
+    }
+}
+```
+If the parameter value is NOMETADATA or not specified, it will fallback to default setting (no wal metadata generation)
+
 Usage
 -----
 
