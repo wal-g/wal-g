@@ -28,6 +28,7 @@ func cleanupPrefetchDirectory(directory string, timelineId uint32, logSegNo uint
 	files, err := cleaner.GetFiles(directory)
 	if err != nil {
 		tracelog.WarningLogger.Println("WAL-prefetch cleanup failed, : ", err, " cannot enumerate files in dir: ", directory)
+		return
 	}
 
 	for _, f := range files {
