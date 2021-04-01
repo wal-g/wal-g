@@ -291,6 +291,17 @@ services:
     links:
       - s3
 
+  pg_delete_target_delta_find_full_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_target_delta_find_full_test
+      context: .
+    image: wal-g/delete_target_delta_find_full_test
+    container_name: wal-g_pg_delete_target_delta_find_full_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   pg_ghost_table_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_ghost_table_test
