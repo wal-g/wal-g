@@ -27,6 +27,10 @@ func (o TestPostgresBackupObject) GetBaseBackupName() string {
 	return o.GetBackupName()
 }
 
+func (o TestPostgresBackupObject) GetIncrementFromName() string {
+	return o.GetBackupName()
+}
+
 func (o TestPostgresBackupObject) IsFullBackup() bool {
 	// this function is only valid for test cases,
 	// since arbitrary WAL file name may contain the "D" symbol

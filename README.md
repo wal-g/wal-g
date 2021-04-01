@@ -198,7 +198,7 @@ Lists names and creation time of available backups.
 
 Is used to delete backups and WALs before them. By default ``delete`` will perform a dry run. If you want to execute deletion, you have to add ``--confirm`` flag at the end of the command. Backups marked as permanent will not be deleted.
 
-``delete`` can operate in three modes: ``retain``, ``before`` and ``everything``.
+``delete`` can operate in four modes: ``retain``, ``before``, ``everything`` and ``target``.
 
 ``retain`` [FULL|FIND_FULL] %number% [--after %name|time%]
 
@@ -210,6 +210,10 @@ $number$ the most recent backups and backups made after %name|time% (including).
 If `FIND_FULL` is specified, WAL-G will calculate minimum backup needed to keep all deltas alive. If FIND_FULL is not specified and call can produce orphaned deltas - the call will fail with the list.
 
 ``everything`` [FORCE]
+
+``target`` [FIND_FULL] %name% | --target-user-data %data% will delete the backup specified by name or user data.
+
+(Only in Postgres) By default, if delta backup is provided as the target, WAL-G will also delete all the dependant delta backups. If `FIND_FULL` is specified, WAL-G will delete all backups with the same base backup as the target.
 
 Examples:
 
@@ -228,6 +232,14 @@ Examples:
 ``before base_000010000123123123`` will fail if `base_000010000123123123` is delta
 
 ``before FIND_FULL base_000010000123123123`` will keep everything after base of base_000010000123123123
+
+``target base_0000000100000000000000C9`` delete the base backup and all dependant delta backups
+
+``  target --target-user-data "{ \"x\": [3], \"y\": 4 }"`` 	delete backup specified by user data
+
+``target base_0000000100000000000000C9_D_0000000100000000000000C4``	delete delta backup and all dependant delta backups
+
+``target FIND_FULL base_0000000100000000000000C9_D_0000000100000000000000C4`` delete delta backup and all delta backups with the same base backup
 
 **More commands are available for the chosen database engine. See it in [Databases](#databases)**
 
