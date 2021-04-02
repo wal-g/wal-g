@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/storages/memory"
 	"github.com/wal-g/storages/s3"
@@ -18,7 +20,19 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/test/mocks"
 	"github.com/wal-g/wal-g/utility"
+)
+
+type DataFilling int
+
+const (
+	CreationTimeGaps DataFilling = iota
+	NoCreationTime
+	ModificationTimeGaps
+	NoModificationTime
+	CreationAndModificationTimeGaps
+	NoTimeGaps
 )
 
 func MakeDefaultInMemoryStorageFolder() *memory.Folder {
@@ -66,6 +80,100 @@ func CreateMockStorageFolder() storage.Folder {
 	subFolder.PutObject("base_456/tar_partitions/2", &bytes.Buffer{})
 	subFolder.PutObject("base_456/tar_partitions/3", &bytes.Buffer{})
 	return folder
+}
+
+func find(source []int, value int) bool {
+	for _, item := range source {
+		if item == value {
+			return true
+		}
+	}
+	return false
+}
+
+func CreateMockStorageFolderWithTimeMetadata(t *testing.T, dataFilling DataFilling) storage.Folder {
+
+
+	backupsCount := 3
+	creationTimeYears := []int{1997, 1999, 1998}
+	modificationTimeYears := []int{2018, 2017, 2020}
+
+	backupsName := make([]string, backupsCount)
+	for i := 0; i < backupsCount; i++ {
+		backupsName[i] = "base_" + strconv.Itoa(i)
+	}
+
+	var creationTimeGaps []int
+	if dataFilling == CreationTimeGaps {
+		creationTimeGaps = []int{0, 1}
+	} else if dataFilling == NoCreationTime {
+		creationTimeGaps = []int{0, 1, 2}
+	}
+	var modificationTimeGaps []int
+	if dataFilling == ModificationTimeGaps {
+		modificationTimeGaps = []int{0, 1}
+	} else if dataFilling == NoModificationTime {
+		modificationTimeGaps = []int{0, 1, 2}
+	}
+	if dataFilling == CreationAndModificationTimeGaps {
+		creationTimeGaps = []int{1}
+		modificationTimeGaps = []int{2}
+	}
+	assert.True(t, backupsCount >= len(modificationTimeGaps))
+	assert.True(t, backupsCount >= len(creationTimeGaps))
+
+	objects := make([]storage.Object, backupsCount)
+	for i := 0; i < backupsCount; i++ {
+		var timeData time.Time
+		if find(modificationTimeGaps, i) {
+			timeData = time.Time{}
+		} else {
+			timeData = time.Date(modificationTimeYears[i], time.January, 1, 1, 1, 1, 1, time.UTC)
+		}
+		objects[i] = storage.NewLocalObject(backupsName[i]+utility.SentinelSuffix, timeData, 0)
+	}
+
+	// since mockFolder has PutObject method, this will be used
+	folder := MakeDefaultInMemoryStorageFolder().GetSubFolder(utility.BaseBackupPath)
+
+	for i := 0; i < backupsCount; i++ {
+		var timeData time.Time
+		if find(creationTimeGaps, i) {
+			timeData = time.Time{}
+		} else {
+			timeData = time.Date(creationTimeYears[i], time.January, 1, 1, 1, 1, 1, time.UTC)
+		}
+		metadata := map[string]interface{}{"start_time": timeData}
+		bytesMetadata, err := json.Marshal(&metadata)
+		assert.NoError(t, err)
+		folder.PutObject(backupsName[i]+"/"+utility.MetadataFileName, strings.NewReader(string(bytesMetadata)))
+	}
+
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+
+	mockBaseBackupFolder := mocks.NewMockFolder(controller)
+
+	mockBaseBackupFolder.
+		EXPECT().
+		ListFolder().
+		Return(objects, nil, nil).
+		AnyTimes()
+
+	for i := 0; i < backupsCount; i++ {
+		mockBaseBackupFolder.EXPECT().Exists(backupsName[i]+utility.SentinelSuffix).Return(true, nil).AnyTimes()
+		currentMetadataPath := backupsName[i] + "/" + utility.MetadataFileName
+		mockBaseBackupFolder.EXPECT().ReadObject(currentMetadataPath).Return(folder.ReadObject(currentMetadataPath)).AnyTimes()
+	}
+
+	mockFolder := mocks.NewMockFolder(controller)
+
+	mockFolder.
+		EXPECT().
+		GetSubFolder(utility.BaseBackupPath).
+		Return(mockBaseBackupFolder).
+		AnyTimes()
+	return mockFolder
 }
 
 func CreateMockStorageFolderWithDeltaBackups(t *testing.T) storage.Folder {
