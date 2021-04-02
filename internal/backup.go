@@ -422,9 +422,9 @@ func GetBackupTimeSlicesUnsorted(backups []storage.Object, folder storage.Folder
 		if !strings.HasSuffix(key, utility.SentinelSuffix) {
 			continue
 		}
-		metaData, err := GetBackupMetaData(folder, key, utility.BaseBackupPath)
+		metaData, err := GetBackupMetaData(folder, utility.StripBackupName(key), utility.BaseBackupPath)
 		var creationTime time.Time = time.Time{}
-		if err == nil {
+		if (err == nil && metaData.StartTime != time.Time{}) {
 			creationTime = metaData.StartTime
 		} else {
 			sortOrder = ByModificationTime

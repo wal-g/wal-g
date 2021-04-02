@@ -158,7 +158,7 @@ func WriteBackupList(backups []BackupTime, output io.Writer) {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
 	fmt.Fprintln(writer, "name\tcreated\tmodified\twal_segment_backup_start")
-	for i := len(backups) - 1; i >= 0; i-- {
+	for i := 0; i < len(backups); i++ {
 		b := backups[i]
 		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v\t%v", b.BackupName, FormatTime(b.CreationTime), FormatTime(b.ModificationTime), b.WalFileName))
 	}
@@ -169,7 +169,7 @@ func writeBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
 	fmt.Fprintln(writer, "name\tcreated\tmodified\twal_segment_backup_start\tstart_time\tfinish_time\thostname\tdata_dir\tpg_version\tstart_lsn\tfinish_lsn\tis_permanent")
-	for i := len(backupDetails) - 1; i >= 0; i-- {
+	for i := 0; i < len(backupDetails); i++ {
 		b := backupDetails[i]
 		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v", b.BackupName, FormatTime(b.CreationTime), FormatTime(b.ModificationTime), b.WalFileName, FormatTime(b.StartTime), FormatTime(b.FinishTime), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent))
 	}
