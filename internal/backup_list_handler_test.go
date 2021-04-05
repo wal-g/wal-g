@@ -194,3 +194,87 @@ func TestWritePrettyBackupList_EmptyColumnsValues(t *testing.T) {
 
 	assert.Equal(t, expectedRes, b.String())
 }
+
+func TestWriteBackupList_NoBackups(t *testing.T) {
+	expectedRes := "name last_modified wal_segment_backup_start\n"
+	backups := make([]internal.BackupTime, 0)
+
+	b := bytes.Buffer{}
+	internal.WriteBackupList(backups, &b)
+
+	assert.Equal(t, expectedRes, b.String())
+}
+
+func TestWriteBackupList_EmptyColumnsValues(t *testing.T) {
+	expectedRes := `name last_modified        wal_segment_backup_start
+     0001-01-01T00:00:00Z 
+b1   0001-01-01T00:00:00Z 
+     0001-01-01T00:00:00Z shortWallName0
+`
+	backups := []internal.BackupTime{
+		{
+			Time:        time.Time{},
+			WalFileName: "shortWallName0",
+		},
+		{
+			BackupName: "b1",
+			Time:       time.Time{},
+		},
+		{
+			Time: time.Time{},
+		},
+	}
+
+	b := bytes.Buffer{}
+	internal.WriteBackupList(backups, &b)
+
+	assert.Equal(t, expectedRes, b.String())
+}
+
+func TestWriteBackupList_ShortColumnsValues(t *testing.T) {
+	expectedRes := `name last_modified        wal_segment_backup_start
+b1   0001-01-01T00:00:00Z shortWallName1
+b0   0001-01-01T00:00:00Z shortWallName0
+`
+	backups := []internal.BackupTime{
+		{
+			BackupName:  "b0",
+			Time:        time.Time{},
+			WalFileName: "shortWallName0",
+		},
+		{
+			BackupName:  "b1",
+			Time:        time.Time{},
+			WalFileName: "shortWallName1",
+		},
+	}
+
+	b := bytes.Buffer{}
+	internal.WriteBackupList(backups, &b)
+
+	assert.Equal(t, expectedRes, b.String())
+}
+
+func TestWriteBackupList_LongColumnsValues(t *testing.T) {
+	expectedRes := `name      last_modified        wal_segment_backup_start
+backup001 0001-01-01T00:00:00Z veryVeryVeryVeryVeryLongWallName1
+backup000 0001-01-01T00:00:00Z veryVeryVeryVeryVeryLongWallName0
+`
+	backups := []internal.BackupTime{
+		{
+			BackupName:  "backup000",
+			Time:        time.Time{},
+			WalFileName: "veryVeryVeryVeryVeryLongWallName0",
+		},
+		{
+			BackupName:  "backup001",
+			Time:        time.Time{},
+			WalFileName: "veryVeryVeryVeryVeryLongWallName1",
+		},
+	}
+
+	b := bytes.Buffer{}
+	internal.WriteBackupList(backups, &b)
+
+	assert.Equal(t, expectedRes, b.String())
+}
