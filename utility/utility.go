@@ -204,10 +204,20 @@ func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
 	}
 }
 
-func StripBackupName(path string) string {
+func StripRightmostBackupName(path string) string {
+	path = strings.Trim(path, "/")
 	all := strings.SplitAfter(path, "/")
-	name := strings.Split(all[len(all)-1], "_backup")[0]
-	return name
+	return stripBackupSuffix(all[len(all)-1])
+}
+
+func StripLeftmostBackupName(path string) string {
+	path = strings.Trim(path, "/")
+	all := strings.Split(path, "/")
+	return stripBackupSuffix(all[0])
+}
+
+func stripBackupSuffix(pathValue string) string {
+	return strings.Split(pathValue, "_backup")[0]
 }
 
 func StripPrefixName(path string) string {

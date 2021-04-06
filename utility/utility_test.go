@@ -106,7 +106,7 @@ func TestCreateFileWith_ExistenceError(t *testing.T) {
 	os.Remove(CreateFileWithPath)
 }
 
-func TestStripBackupName(t *testing.T) {
+func TestStripRightmostBackupName(t *testing.T) {
 	var testCases = []struct {
 		input    string
 		expected string
@@ -120,7 +120,7 @@ func TestStripBackupName(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		actual := utility.StripBackupName(testCase.input)
+		actual := utility.StripRightmostBackupName(testCase.input)
 		assert.Equal(t, testCase.expected, actual)
 	}
 }
@@ -141,6 +141,29 @@ func TestStripPrefixName(t *testing.T) {
 
 	for _, testCase := range testCases {
 		actual := utility.StripPrefixName(testCase.input)
+		assert.Equal(t, testCase.expected, actual)
+	}
+}
+
+func TestStripLeftmostBackupName(t *testing.T) {
+	var testCases = []struct {
+		input string
+		expected string
+	}{
+		{"stream_20210329T125616Z/metadata.json", "stream_20210329T125616Z"},
+		{"/stream_20210329T125616Z/metadata.json", "stream_20210329T125616Z"},
+		{"stream_20210329T125616Z_backup_stop_sentinel.json", "stream_20210329T125616Z"},
+		{"/stream_20210329T125616Z_backup_stop_sentinel.json", "stream_20210329T125616Z"},
+		{"/stream_20210329T125616Z/random_folder/random_subfolder/random_file", "stream_20210329T125616Z"},
+		{"/stream_20210329T125616Z/random_folder/random_subfolder/random_file", "stream_20210329T125616Z"},
+		{"base_0000000100000000000000C4/tar_partitions/part_001.tar.lz4", "base_0000000100000000000000C4"},
+		{"base_0000000100000000000000C4_backup_stop_sentinel.json", "base_0000000100000000000000C4"},
+		{"base_0000000100000000000000C9_D_0000000100000000000000C4", "base_0000000100000000000000C9_D_0000000100000000000000C4"},
+		{"/stream_20210329T125616Z/random_folder/random_backup/random_file", "stream_20210329T125616Z"},
+	}
+
+	for _, testCase := range testCases {
+		actual := utility.StripLeftmostBackupName(testCase.input)
 		assert.Equal(t, testCase.expected, actual)
 	}
 }

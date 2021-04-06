@@ -150,17 +150,16 @@ func getWalFolderPath() string {
 	if !viper.IsSet(PgDataSetting) {
 		return DefaultDataFolderPath
 	}
-	pgdata := viper.GetString(PgDataSetting)
-	dataFolderPath := filepath.Join(pgdata, "pg_wal")
-	if _, err := os.Stat(dataFolderPath); err == nil {
-		return dataFolderPath
-	}
+	return getRelativeWalFolderPath(viper.GetString(PgDataSetting))
+}
 
-	dataFolderPath = filepath.Join(pgdata, "pg_xlog")
-	if _, err := os.Stat(dataFolderPath); err == nil {
-		return dataFolderPath
+func getRelativeWalFolderPath(pgdata string) string {
+	for _, walDir := range []string{"pg_wal", "pg_xlog"} {
+		dataFolderPath := filepath.Join(pgdata, walDir)
+		if _, err := os.Stat(dataFolderPath); err == nil {
+			return dataFolderPath
+		}
 	}
-
 	return DefaultDataFolderPath
 }
 
@@ -212,6 +211,10 @@ func ConfigureLogging() error {
 
 func getArchiveDataFolderPath() string {
 	return filepath.Join(GetDataFolderPath(), "walg_archive_status")
+}
+
+func getRelativeArchiveDataFolderPath() string {
+	return filepath.Join(getRelativeWalFolderPath(""), "walg_data", "walg_archive_status")
 }
 
 // TODO : unit tests

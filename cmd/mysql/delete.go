@@ -78,29 +78,16 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 
 	deleteHandler.DeleteEverything(confirmed)
 }
-func (h *DeleteHandler) deleteTarget(bobj internal.BackupObject, confirmed bool) error {
-	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath),
-		confirmed,
-		func(object storage.Object) bool {
-		return strings.HasPrefix(object.GetName(), strings.TrimSuffix(bobj.GetName(), utility.SentinelSuffix))
-	})
-}
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
 	deleteHandler, err := NewMySQLDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
-	bname := args[0] // backup name
 
-	for e := range deleteHandler.permanentObjects {
-		if e == bname {
-			tracelog.InfoLogger.Fatalf("unable to delete permanent backup %s\n", bname)
-		}
-	}
-	if bobj, err := deleteHandler.FindTargetByName(bname); err != nil {
-		tracelog.ErrorLogger.FatalfOnError("unable to delete target backup", err)
-	} else if err := deleteHandler.deleteTarget(bobj, confirmed); err != nil {
-		tracelog.ErrorLogger.FatalfOnError("unable to delete target backup", err)
-	}
+	bname := args[0]                                             // backup name
+	backupSelector, err := internal.NewBackupNameSelector(bname) //todo: add selection by userdata
+	tracelog.ErrorLogger.PrintOnError(err)
+
+	deleteHandler.HandleDeleteTarget(backupSelector, confirmed, false)
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
@@ -214,7 +201,7 @@ func NewMySQLDeleteHandler() (*DeleteHandler, error) {
 
 	backupObjects := make([]internal.BackupObject, 0, len(backups))
 	for _, object := range backups {
-		b := mysql.BackupObject{Object: object}
+		b := internal.NewDefaultBackupObject(object)
 		backupObjects = append(backupObjects, b)
 	}
 

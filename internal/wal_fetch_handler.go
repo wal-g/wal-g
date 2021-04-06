@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/spf13/viper"
 	"io"
 	"io/ioutil"
 	"os"
@@ -12,6 +11,8 @@ import (
 	"path"
 	"path/filepath"
 	"time"
+
+	"github.com/spf13/viper"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/storages/storage"

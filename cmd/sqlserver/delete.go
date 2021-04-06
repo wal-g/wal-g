@@ -1,8 +1,6 @@
 package sqlserver
 
 import (
-	"time"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
@@ -79,22 +77,10 @@ func newSqlServerDeleteHandler() (*internal.DeleteHandler, error) {
 
 	backupObjects := make([]internal.BackupObject, 0, len(backups))
 	for _, object := range backups {
-		backupObjects = append(backupObjects, SqlServerBackupObject{object})
+		backupObjects = append(backupObjects, internal.NewDefaultBackupObject(object))
 	}
 
 	return internal.NewDeleteHandler(folder, backupObjects, makeLessFunc()), nil
-}
-
-type SqlServerBackupObject struct {
-	storage.Object
-}
-
-func (o SqlServerBackupObject) IsFullBackup() bool {
-	return true
-}
-
-func (o SqlServerBackupObject) GetBackupTime() time.Time {
-	return o.Object.GetLastModified()
 }
 
 func makeLessFunc() func(object1, object2 storage.Object) bool {

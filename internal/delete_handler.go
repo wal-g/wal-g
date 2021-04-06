@@ -34,22 +34,37 @@ const (
 	DeleteEverythingExamples = `  everything                delete every backup only if there is no permanent backups
   everything FORCE          delete every backup include permanents`
 
+	DeleteTargetExamples = `  target base_0000000100000000000000C4	delete base backup by name
+  target --target-user-data "{ \"x\": [3], \"y\": 4 }"	delete backup specified by user data
+  target base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all dependant delta backups
+  target FIND_FULL base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all delta backups with the same base backup
+`
+
 	DeleteEverythingUsageExample = "everything [FORCE]"
 	DeleteRetainUsageExample     = "retain [FULL|FIND_FULL] backup_count"
 	DeleteBeforeUsageExample     = "before [FIND_FULL] backup_name|timestamp"
+	DeleteTargetUsageExample     = "target [FIND_FULL] backup_name | --target-user-data <data>"
+
+	DeleteTargetUserDataFlag        = "target-user-data"
+	DeleteTargetUserDataDescription = "delete storage backup which has the specified user data"
 )
 
 var StringModifiers = []string{"FULL", "FIND_FULL"}
 var StringModifiersDeleteEverything = []string{"FORCE"}
-var MaxTime = time.Unix(1<<63-62135596801, 999999999)
 var errNotFound = errors.New("not found")
+var errIncorrectArguments = errors.New("incorrect arguments")
 
 // BackupObject represents
 // the backup sentinel object uploaded on storage
 type BackupObject interface {
 	storage.Object
-	IsFullBackup() bool
 	GetBackupTime() time.Time
+	GetBackupName() string
+
+	// TODO: move increment info into separate struct (in backup.go)
+	IsFullBackup() bool
+	GetBaseBackupName() string
+	GetIncrementFromName() string
 }
 
 type DeleteHandlerOption func(h *DeleteHandler)
@@ -150,6 +165,36 @@ func (h *DeleteHandler) HandleDeleteRetainAfter(args []string, confirmed bool) {
 	}
 
 	err = h.DeleteBeforeTarget(target, confirmed)
+	tracelog.ErrorLogger.FatalOnError(err)
+}
+
+func (h *DeleteHandler) HandleDeleteTarget(targetSelector BackupSelector, confirmed, findFull bool) {
+	targetName, err := targetSelector.Select(h.Folder)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	var target BackupObject
+	for idx := range h.backups {
+		if h.backups[idx].GetBackupName() == targetName {
+			target = h.backups[idx]
+			break
+		}
+	}
+
+	if target == nil {
+		tracelog.InfoLogger.Printf("No backup found for deletion")
+		os.Exit(0)
+	}
+
+	var backupsToDelete []BackupObject
+	if findFull {
+		// delete all backups with the same base backup as the target
+		backupsToDelete = h.findRelatedBackups(target)
+	} else {
+		// delete all dependant backups
+		backupsToDelete = h.findDependantBackups(target)
+	}
+
+	err = h.DeleteTargets(backupsToDelete, confirmed)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
@@ -279,6 +324,79 @@ func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) 
 	})
 }
 
+func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool) error {
+	backupNamesToDelete := make(map[string]bool)
+	for _, target := range targets {
+		if h.isPermanent(target) {
+			tracelog.ErrorLogger.Fatalf("Unable to delete permanent backup %s\n", target.GetName())
+		}
+		backupNamesToDelete[target.GetBackupName()] = true
+	}
+
+	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath), confirmed, func(object storage.Object) bool {
+		return backupNamesToDelete[utility.StripLeftmostBackupName(object.GetName())] && !h.isPermanent(object)
+	})
+}
+
+// Find all backups related to the target.
+// All delta backups with the same base backup are considered as related.
+func (h *DeleteHandler) findRelatedBackups(target BackupObject) []BackupObject {
+	relatedBackups := make([]BackupObject, 0)
+
+	var related func(target BackupObject, other BackupObject) bool
+	if target.IsFullBackup() {
+		related = func(target BackupObject, other BackupObject) bool {
+			// remove base backup
+			isBaseBackup := target.GetBackupName() == other.GetBackupName()
+			// remove all increments from the target backup too
+			isIncrement := target.GetBackupName() == other.GetBaseBackupName()
+			return isBaseBackup || isIncrement
+		}
+	} else {
+		related = func(target BackupObject, other BackupObject) bool {
+			// remove base backup
+			isBaseBackup := target.GetBaseBackupName() == other.GetBackupName()
+			// remove all other increments from the target base backup
+			hasCommonBaseBackup := target.GetBaseBackupName() == other.GetBaseBackupName()
+			return isBaseBackup || hasCommonBaseBackup
+		}
+	}
+
+	for _, backup := range h.backups {
+		if related(target, backup) {
+			relatedBackups = append(relatedBackups, backup)
+		}
+	}
+	return relatedBackups
+}
+
+// Find all backups dependant on the target.
+// All delta backups which have the target as the ancestor in increment chain
+// are considered as dependant.
+func (h *DeleteHandler) findDependantBackups(target BackupObject) []BackupObject {
+	relatedBackups := make([]BackupObject, 0)
+
+	incrementsByBackup := make(map[string][]BackupObject)
+	for _, backup := range h.backups {
+		if !backup.IsFullBackup() {
+			incrementFrom := backup.GetIncrementFromName()
+			incrementsByBackup[incrementFrom] = append(incrementsByBackup[incrementFrom], backup)
+		}
+	}
+
+	queue := []BackupObject{target}
+	var curr BackupObject
+	for len(queue) > 0 {
+		curr, queue = queue[0], queue[1:]
+		relatedBackups = append(relatedBackups, curr)
+		for _, backup := range incrementsByBackup[curr.GetBackupName()] {
+			queue = append(queue, backup)
+		}
+	}
+
+	return relatedBackups
+}
+
 func findTarget(objects []BackupObject,
 	compare func(object1, object2 storage.Object) bool,
 	isTarget func(object BackupObject) bool) (BackupObject, error) {
@@ -357,6 +475,14 @@ func ExtractDeleteEverythingModifierFromArgs(args []string) int {
 	return ForceDeleteModifier
 }
 
+func ExtractDeleteTargetModifierFromArgs(args []string) int {
+	if len(args) >= 1 && args[0] == StringModifiers[1] {
+		return FindFullDeleteModifier
+	}
+
+	return NoDeleteModifier
+}
+
 func extractDeleteModifierFromArgs(args []string) (int, string) {
 	if len(args) == 1 {
 		return NoDeleteModifier, args[0]
@@ -381,6 +507,25 @@ func DeleteBeforeArgsValidator(cmd *cobra.Command, args []string) error {
 		}
 	}
 	return nil
+}
+
+func DeleteTargetArgsValidator(cmd *cobra.Command, args []string) error {
+	err := cobra.RangeArgs(0, 2)(cmd, args)
+	if err != nil {
+		return err
+	}
+
+	switch {
+	case len(args) == 0 && !cmd.Flags().Changed(DeleteTargetUserDataFlag):
+		// allow 0 arguments only when target user data flag is set
+		return errIncorrectArguments
+
+	case len(args) == 2 && args[0] != StringModifiers[1]:
+		return errIncorrectArguments
+
+	default:
+		return nil
+	}
 }
 
 func DeleteEverythingArgsValidator(cmd *cobra.Command, args []string) error {

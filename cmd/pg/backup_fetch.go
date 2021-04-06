@@ -3,7 +3,6 @@ package pg
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/storages/storage"
@@ -26,17 +25,17 @@ var fileMask string
 var restoreSpec string
 var reverseDeltaUnpack bool
 var skipRedundantTars bool
-var targetUserData string
+var fetchTargetUserData string
 
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch destination_directory [backup_name | --target-user-data <data>]",
 	Short: backupFetchShortDescription, // TODO : improve description
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
-		if targetUserData == "" {
-			targetUserData = viper.GetString(internal.TargetUserDataSetting)
+		if fetchTargetUserData == "" {
+			fetchTargetUserData = viper.GetString(internal.FetchTargetUserDataSetting)
 		}
-		targetBackupSelector, err := createTargetBackupSelector(cmd, args)
+		targetBackupSelector, err := createTargetFetchBackupSelector(cmd, args, fetchTargetUserData)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		folder, err := internal.ConfigureFolder()
@@ -56,29 +55,18 @@ var backupFetchCmd = &cobra.Command{
 }
 
 // create the BackupSelector to select the backup to fetch
-func createTargetBackupSelector(cmd *cobra.Command, args []string) (internal.BackupSelector, error) {
-	var err error
-	switch {
-	case len(args) == 2 && targetUserData != "":
-		err = errors.New("incorrect arguments. Specify backup_name OR target flag, not both")
-
-	case len(args) == 2 && args[1] == internal.LatestString:
-		tracelog.InfoLogger.Printf("Fetching the latest backup...\n")
-		return internal.NewLatestBackupSelector(), nil
-
-	case len(args) == 2:
-		tracelog.InfoLogger.Printf("Fetching the backup with name %s...\n", args[1])
-		return internal.NewBackupNameSelector(args[1])
-
-	case len(args) == 1 && targetUserData != "":
-		tracelog.InfoLogger.Println("Fetching the backup with the specified user data...")
-		return internal.NewUserDataBackupSelector(targetUserData), nil
-
-	default:
-		err = errors.New("insufficient arguments")
+func createTargetFetchBackupSelector(cmd *cobra.Command, args []string, targetUserData string) (internal.BackupSelector, error) {
+	targetName := ""
+	if len(args) >= 2 {
+		targetName = args[1]
 	}
-	fmt.Println(cmd.UsageString())
-	return nil, err
+
+	backupSelector, err := internal.NewTargetBackupSelector(targetUserData, targetName)
+	if err != nil {
+		fmt.Println(cmd.UsageString())
+		return nil, err
+	}
+	return backupSelector, nil
 }
 
 func init() {
@@ -88,7 +76,7 @@ func init() {
 		false, reverseDeltaUnpackDescription)
 	backupFetchCmd.Flags().BoolVar(&skipRedundantTars, "skip-redundant-tars",
 		false, skipRedundantTarsDescription)
-	backupFetchCmd.Flags().StringVar(&targetUserData, "target-user-data",
+	backupFetchCmd.Flags().StringVar(&fetchTargetUserData, "target-user-data",
 		"", targetUserDataDescription)
 	cmd.AddCommand(backupFetchCmd)
 }

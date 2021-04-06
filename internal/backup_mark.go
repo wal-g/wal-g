@@ -167,7 +167,7 @@ func getGraphFromBaseToIncrement(folder storage.Folder) (map[string][]string, er
 
 	reverseLinks := make(map[string][]string)
 	for _, b := range backups {
-		incrementFrom, isIncrement, err := getMetadataFromBackup(baseBackupFolder, b.BackupName)
+		incrementFrom, isIncrement, err := GetMetadataFromBackup(baseBackupFolder, b.BackupName)
 		if err != nil {
 			return nil, err
 		}
@@ -180,8 +180,8 @@ func getGraphFromBaseToIncrement(folder storage.Folder) (map[string][]string, er
 	return reverseLinks, nil
 }
 
-func getMetadataFromBackup(baseBackupFolder storage.Folder,
-	backupName string) (incrementFrom string, isIncrement bool, err error) {
+func GetMetadataFromBackup(baseBackupFolder storage.Folder,
+	 backupName string) (incrementFrom string, isIncrement bool, err error) {
 	backup := NewBackup(baseBackupFolder, backupName)
 	sentinel, err := backup.GetSentinel()
 	if err != nil {

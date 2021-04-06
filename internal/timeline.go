@@ -121,20 +121,17 @@ func ParseWALFilename(name string) (timelineID uint32, logSegNo uint64, err erro
 		err = newNotWalFilenameError(name)
 		return
 	}
-	timelineID64, err0 := strconv.ParseUint(name[0:8], 0x10, sizeofInt32bits)
+	timelineID64, err := strconv.ParseUint(name[0:8], 0x10, sizeofInt32bits)
 	timelineID = uint32(timelineID64)
-	if err0 != nil {
-		err = err0
+	if err != nil {
 		return
 	}
-	logSegNoHi, err0 := strconv.ParseUint(name[8:16], 0x10, sizeofInt32bits)
-	if err0 != nil {
-		err = err0
+	logSegNoHi, err := strconv.ParseUint(name[8:16], 0x10, sizeofInt32bits)
+	if err != nil {
 		return
 	}
-	logSegNoLo, err0 := strconv.ParseUint(name[16:24], 0x10, sizeofInt32bits)
-	if err0 != nil {
-		err = err0
+	logSegNoLo, err := strconv.ParseUint(name[16:24], 0x10, sizeofInt32bits)
+	if err != nil {
 		return
 	}
 	if logSegNoLo >= xLogSegmentsPerXLogID {
@@ -151,10 +148,9 @@ func TryFetchTimelineAndLogSegNo(objectName string) (uint32, uint64, bool) {
 	if len(foundLsn) > 0 {
 		timelineID, logSegNo, err := ParseWALFilename(foundLsn[0])
 
-		if err != nil {
-			return 0, 0, false
+		if err == nil {
+			return timelineID, logSegNo, true
 		}
-		return timelineID, logSegNo, true
 	}
 	return 0, 0, false
 }
