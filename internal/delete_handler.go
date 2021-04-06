@@ -131,7 +131,6 @@ func (h *DeleteHandler) HandleDeleteRetain(args []string, confirmed bool) {
 }
 
 func (h *DeleteHandler) HandleDeleteRetainAfter(args []string, confirmed bool) {
-
 	modifier, retentionSir, afterStr := extractDeleteRetainModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionSir)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -202,9 +201,8 @@ func (h *DeleteHandler) FindTargetRetainAfterName(
 		meetName = meetName || strings.HasPrefix(object.GetName(), name)
 		if modifier == NoDeleteModifier {
 			return meetName
-		} else {
-			return meetName && object.IsFullBackup()
 		}
+		return meetName && object.IsFullBackup()
 	}
 	if choiceFuncAfterName == nil {
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete before'")
@@ -221,14 +219,12 @@ func (h *DeleteHandler) FindTargetRetainAfterName(
 
 	if h.greater(target2, target1) {
 		return target1, nil
-	} else {
-		return target2, nil
 	}
+	return target2, nil
 }
 
 func (h *DeleteHandler) FindTargetRetainAfterTime(retentionCount int, timeLine time.Time, modifier int,
 ) (BackupObject, error) {
-
 	choiceFuncRetain := getRetainChoiceFunc(retentionCount, modifier)
 	if choiceFuncRetain == nil {
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete retain'")
@@ -238,9 +234,8 @@ func (h *DeleteHandler) FindTargetRetainAfterTime(retentionCount int, timeLine t
 		timeCheck := timeLine.Before(backupTime) || timeLine.Equal(backupTime)
 		if modifier == NoDeleteModifier {
 			return timeCheck
-		} else {
-			return timeCheck && object.IsFullBackup()
 		}
+		return timeCheck && object.IsFullBackup()
 	}
 
 	target1, err := findTarget(h.backups, h.greater, choiceFuncRetain)
@@ -273,7 +268,6 @@ func (h *DeleteHandler) DeleteEverything(confirmed bool) {
 }
 
 func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) error {
-
 	if !target.IsFullBackup() {
 		errorMessage := "%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
 		return utility.NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
@@ -288,7 +282,6 @@ func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) 
 func findTarget(objects []BackupObject,
 	compare func(object1, object2 storage.Object) bool,
 	isTarget func(object BackupObject) bool) (BackupObject, error) {
-
 	sort.Slice(objects, func(i, j int) bool {
 		return compare(objects[i], objects[j])
 	})
@@ -318,16 +311,13 @@ func getBeforeChoiceFunc(name string, modifier int) func(object BackupObject) bo
 }
 
 func getRetainChoiceFunc(retentionCount, modifier int) func(object BackupObject) bool {
-
 	count := 0
 	switch modifier {
 	case NoDeleteModifier:
 		return func(object BackupObject) bool {
 			count++
-			if count == retentionCount {
-				return true
-			}
-			return false
+
+			return count == retentionCount
 		}
 	case FullDeleteModifier:
 		return func(object BackupObject) bool {

@@ -15,7 +15,10 @@ type RawMongoOp struct {
 	Cmd json.RawMessage `json:"dc,omitempty"`
 }
 
-func ReadRawStage(ctx context.Context, r io.Reader, size int, wg *sync.WaitGroup) (<-chan RawMongoOp, <-chan error, error) {
+func ReadRawStage(ctx context.Context,
+	r io.Reader,
+	size int,
+	wg *sync.WaitGroup) (<-chan RawMongoOp, <-chan error, error) {
 	cmds := make(chan RawMongoOp, size)
 	errc := make(chan error, 1)
 	dec := json.NewDecoder(r)

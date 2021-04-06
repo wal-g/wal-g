@@ -49,7 +49,9 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 	}
 
 	if archiveMode != "on" && archiveMode != "always" {
-		tracelog.WarningLogger.Println("It seems your archive_mode is not enabled. This will cause inconsistent backup. Please consider configuring WAL archiving.")
+		tracelog.WarningLogger.Println(
+			"It seems your archive_mode is not enabled. This will cause inconsistent backup. " +
+				"Please consider configuring WAL archiving.")
 	} else {
 		var archiveCommand string
 
@@ -60,7 +62,9 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 		}
 
 		if len(archiveCommand) == 0 || archiveCommand == "(disabled)" {
-			tracelog.WarningLogger.Println("It seems your archive_command is not configured. This will cause inconsistent backup. Please consider configuring WAL archiving.")
+			tracelog.WarningLogger.Println(
+				"It seems your archive_command is not configured. This will cause inconsistent backup." +
+					" Please consider configuring WAL archiving.")
 		}
 	}
 

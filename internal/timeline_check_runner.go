@@ -10,17 +10,17 @@ import (
 )
 
 type TimelineCheckDetails struct {
-	CurrentTimelineId        uint32 `json:"current_timeline_id"`
-	HighestStorageTimelineId uint32 `json:"highest_storage_timeline_id"`
+	CurrentTimelineID        uint32 `json:"current_timeline_id"`
+	HighestStorageTimelineID uint32 `json:"highest_storage_timeline_id"`
 }
 
 func (details TimelineCheckDetails) NewPlainTextReader() (io.Reader, error) {
 	var outputBuffer bytes.Buffer
 
 	outputBuffer.WriteString(fmt.Sprintf("Highest timeline found in storage: %d\n",
-		details.HighestStorageTimelineId))
+		details.HighestStorageTimelineID))
 	outputBuffer.WriteString(fmt.Sprintf("Current cluster timeline: %d\n",
-		details.CurrentTimelineId))
+		details.CurrentTimelineID))
 
 	return &outputBuffer, nil
 }
@@ -36,12 +36,13 @@ func (check TimelineCheckRunner) Name() string {
 	return "TimelineCheck"
 }
 
-func NewTimelineCheckRunner(walFolderFilenames []string, currentSegment WalSegmentDescription) (TimelineCheckRunner, error) {
+func NewTimelineCheckRunner(walFolderFilenames []string,
+	currentSegment WalSegmentDescription) (TimelineCheckRunner, error) {
 	return TimelineCheckRunner{currentTimeline: currentSegment.Timeline, walFolderFilenames: walFolderFilenames}, nil
 }
 
 func (check TimelineCheckRunner) Run() (WalVerifyCheckResult, error) {
-	highestTimeline := tryFindHighestTimelineId(check.walFolderFilenames)
+	highestTimeline := tryFindHighestTimelineID(check.walFolderFilenames)
 	return newTimelineCheckResult(check.currentTimeline, highestTimeline), nil
 }
 
@@ -57,8 +58,8 @@ func newTimelineCheckResult(currentTimeline, highestTimeline uint32) WalVerifyCh
 	result := WalVerifyCheckResult{
 		Status: StatusWarning,
 		Details: TimelineCheckDetails{
-			CurrentTimelineId:        currentTimeline,
-			HighestStorageTimelineId: highestTimeline,
+			CurrentTimelineID:        currentTimeline,
+			HighestStorageTimelineID: highestTimeline,
 		},
 	}
 	if highestTimeline > 0 {
@@ -72,9 +73,9 @@ func newTimelineCheckResult(currentTimeline, highestTimeline uint32) WalVerifyCh
 }
 
 // TODO: Unit tests
-func tryFindHighestTimelineId(filenames []string) (highestTimelineId uint32) {
+func tryFindHighestTimelineID(filenames []string) (highestTimelineID uint32) {
 	for _, name := range filenames {
-		fileTimeline, ok := tryParseTimelineId(name)
+		fileTimeline, ok := tryParseTimelineID(name)
 		if !ok {
 			tracelog.WarningLogger.Printf(
 				"Could not parse the timeline Id from %s. Skipping...",
@@ -82,14 +83,14 @@ func tryFindHighestTimelineId(filenames []string) (highestTimelineId uint32) {
 			continue
 		}
 
-		if highestTimelineId < fileTimeline {
-			highestTimelineId = fileTimeline
+		if highestTimelineID < fileTimeline {
+			highestTimelineID = fileTimeline
 		}
 	}
-	return highestTimelineId
+	return highestTimelineID
 }
 
-func tryParseTimelineId(fileName string) (timelineId uint32, success bool) {
+func tryParseTimelineID(fileName string) (timelineID uint32, success bool) {
 	// try to parse timeline id from WAL segment file
 	baseName := utility.TrimFileExtension(fileName)
 	fileTimeline, _, err := ParseWALFilename(baseName)

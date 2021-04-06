@@ -11,7 +11,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-// "wi" at the head stands for "wal-g increment"
+// IncrementFileHeader "wi" at the head stands for "wal-g increment"
 // format version "1", signature magic number
 var IncrementFileHeader = []byte{'w', 'i', '1', SignatureMagicNumber}
 
@@ -141,7 +141,6 @@ func (pageReader *IncrementalPageReader) WriteDiffMapToHeader(headerWriter io.Wr
 	for _, blockNo := range pageReader.Blocks {
 		_ = binary.Write(headerWriter, binary.LittleEndian, blockNo)
 	}
-	return
 }
 
 // SelectNewValidPage checks whether page is valid and if it so, then blockNo is appended to Blocks list

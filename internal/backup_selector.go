@@ -64,7 +64,7 @@ func findBackupByUserData(userData interface{}, folder storage.Folder) (BackupDe
 		for idx := range foundBackups {
 			backupNames = append(backupNames, foundBackups[idx].BackupName)
 		}
-		return BackupDetail{}, fmt.Errorf("too many backups (%d) found with specified user data: %s\n",
+		return BackupDetail{}, fmt.Errorf("too many backups (%d) found with specified user data: %s",
 			len(backupNames), strings.Join(backupNames, " "))
 	}
 

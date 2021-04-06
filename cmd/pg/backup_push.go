@@ -73,11 +73,12 @@ var (
 )
 
 // create the BackupSelector for delta backup base according to the provided flags
-func createDeltaBaseSelector(cmd *cobra.Command, targetBackupName, targetUserData string) (internal.BackupSelector, error) {
+func createDeltaBaseSelector(cmd *cobra.Command,
+	targetBackupName, targetUserData string) (internal.BackupSelector, error) {
 	switch {
 	case targetUserData != "" && targetBackupName != "":
 		fmt.Println(cmd.UsageString())
-		return nil, errors.New("Only one delta target should be specified.")
+		return nil, errors.New("only one delta target should be specified")
 
 	case targetBackupName != "":
 		tracelog.InfoLogger.Printf("Selecting the backup with name %s as the base for the current delta backup...\n",
@@ -98,13 +99,20 @@ func createDeltaBaseSelector(cmd *cobra.Command, targetBackupName, targetUserDat
 func init() {
 	cmd.AddCommand(backupPushCmd)
 
-	backupPushCmd.Flags().BoolVarP(&permanent, permanentFlag, permanentShorthand, false, "Pushes permanent backup")
-	backupPushCmd.Flags().BoolVarP(&fullBackup, fullBackupFlag, fullBackupShorthand, false, "Make full backup-push")
-	backupPushCmd.Flags().BoolVarP(&verifyPageChecksums, verifyPagesFlag, verifyPagesShorthand, false, "Verify page checksums")
+	backupPushCmd.Flags().BoolVarP(&permanent, permanentFlag, permanentShorthand,
+		false, "Pushes permanent backup")
+	backupPushCmd.Flags().BoolVarP(&fullBackup, fullBackupFlag, fullBackupShorthand,
+		false, "Make full backup-push")
+	backupPushCmd.Flags().BoolVarP(&verifyPageChecksums, verifyPagesFlag, verifyPagesShorthand,
+		false, "Verify page checksums")
 	backupPushCmd.Flags().BoolVarP(&storeAllCorruptBlocks, storeAllCorruptBlocksFlag, storeAllCorruptBlocksShorthand,
 		false, "Store all corrupt blocks found during page checksum verification")
-	backupPushCmd.Flags().BoolVarP(&useRatingComposer, useRatingComposerFlag, useRatingComposerShorthand, false, "Use rating tar composer (beta)")
-	backupPushCmd.Flags().StringVar(&deltaFromName, deltaFromNameFlag, "", "Select the backup specified by name as the target for the delta backup")
-	backupPushCmd.Flags().StringVar(&deltaFromUserData, deltaFromUserDataFlag, "", "Select the backup specified by UserData as the target for the delta backup")
-	backupPushCmd.Flags().StringVar(&userData, addUserDataFlag, "", "Write the provided user data to the backup sentinel and metadata files.")
+	backupPushCmd.Flags().BoolVarP(&useRatingComposer, useRatingComposerFlag, useRatingComposerShorthand,
+		false, "Use rating tar composer (beta)")
+	backupPushCmd.Flags().StringVar(&deltaFromName, deltaFromNameFlag,
+		"", "Select the backup specified by name as the target for the delta backup")
+	backupPushCmd.Flags().StringVar(&deltaFromUserData, deltaFromUserDataFlag,
+		"", "Select the backup specified by UserData as the target for the delta backup")
+	backupPushCmd.Flags().StringVar(&userData, addUserDataFlag,
+		"", "Write the provided user data to the backup sentinel and metadata files.")
 }

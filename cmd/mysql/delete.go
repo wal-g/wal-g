@@ -61,7 +61,7 @@ type DeleteHandler struct {
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
-	deleteHandler, err := NewMySqlDeleteHandler()
+	deleteHandler, err := NewMySQLDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if p := deleteHandler.permanentObjects; len(p) > 0 {
@@ -79,13 +79,15 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 	deleteHandler.DeleteEverything(confirmed)
 }
 func (h *DeleteHandler) deleteTarget(bobj internal.BackupObject, confirmed bool) error {
-	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath), confirmed, func(object storage.Object) bool {
+	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath),
+		confirmed,
+		func(object storage.Object) bool {
 		return strings.HasPrefix(object.GetName(), strings.TrimSuffix(bobj.GetName(), utility.SentinelSuffix))
 	})
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
-	deleteHandler, err := NewMySqlDeleteHandler()
+	deleteHandler, err := NewMySQLDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 	bname := args[0] // backup name
 
@@ -102,14 +104,14 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
-	deleteHandler, err := NewMySqlDeleteHandler()
+	deleteHandler, err := NewMySQLDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteBefore(args, confirmed)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
-	deleteHandler, err := NewMySqlDeleteHandler()
+	deleteHandler, err := NewMySQLDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteRetain(args, confirmed)
@@ -201,7 +203,7 @@ func IsPermanent(objectName string, permanentBackups map[string]bool) bool {
 	return false
 }
 
-func NewMySqlDeleteHandler() (*DeleteHandler, error) {
+func NewMySQLDeleteHandler() (*DeleteHandler, error) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 

@@ -60,7 +60,7 @@ func createTargetBackupSelector(cmd *cobra.Command, args []string) (internal.Bac
 	var err error
 	switch {
 	case len(args) == 2 && targetUserData != "":
-		err = errors.New("Incorrect arguments. Specify backup_name OR target flag, not both.")
+		err = errors.New("incorrect arguments. Specify backup_name OR target flag, not both")
 
 	case len(args) == 2 && args[1] == internal.LatestString:
 		tracelog.InfoLogger.Printf("Fetching the latest backup...\n")
@@ -75,7 +75,7 @@ func createTargetBackupSelector(cmd *cobra.Command, args []string) (internal.Bac
 		return internal.NewUserDataBackupSelector(targetUserData), nil
 
 	default:
-		err = errors.New("Insufficient arguments.")
+		err = errors.New("insufficient arguments")
 	}
 	fmt.Println(cmd.UsageString())
 	return nil, err

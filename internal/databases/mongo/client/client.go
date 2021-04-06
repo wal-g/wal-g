@@ -214,7 +214,7 @@ func (mc *MongoClient) CreateIndexes(ctx context.Context, dbName, collName strin
 	}
 
 	if err := mc.c.Database(dbName).RunCommand(ctx, rawCommand).Err(); err != nil {
-		return fmt.Errorf("createIndexes command %q failed: %w\n", rawCommand, err)
+		return fmt.Errorf("createIndexes command %q failed: %w", rawCommand, err)
 	}
 
 	return nil

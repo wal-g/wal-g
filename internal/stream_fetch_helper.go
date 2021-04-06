@@ -40,7 +40,9 @@ func downloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) err
 	defer writeCloser.Close()
 
 	for _, decompressor := range compression.Decompressors {
-		archiveReader, exists, err := TryDownloadFile(backup.BaseBackupFolder, GetStreamName(backup.Name, decompressor.FileExtension()))
+		archiveReader,
+		exists,
+		err := TryDownloadFile(backup.BaseBackupFolder, GetStreamName(backup.Name, decompressor.FileExtension()))
 		if err != nil {
 			return err
 		}
@@ -79,7 +81,7 @@ func DownloadFile(folder storage.Folder, filename, ext string, writeCloser io.Wr
 		return err
 	}
 	if !exists {
-		return fmt.Errorf("File '%s' does not exist.\n", filename)
+		return fmt.Errorf("file '%s' does not exist", filename)
 	}
 
 	err = DecompressDecryptBytes(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)

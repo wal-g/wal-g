@@ -23,7 +23,7 @@ func RandSeq(n int) string {
 type opConfig struct {
 	Op      string            `json:"op"`
 	Cnt     int               `json:"cnt"`
-	DbName  string            `json:"db"`
+	DBName  string            `json:"db"`
 	ColName string            `json:"cl"`
 	Cmds    []json.RawMessage `json:"dc"`
 	Adv     json.RawMessage   `json:"adv"`
@@ -127,7 +127,7 @@ var processOp = map[string]func(config opConfig) (string, error){
 
 		id++
 		return fmt.Sprintf(`{"op":"c", "db":"%s", "id": %d, "dc":{"insert":"%s", "documents": %s}}`,
-			config.DbName, id, config.ColName, docsGen()), nil
+			config.DBName, id, config.ColName, docsGen()), nil
 
 	},
 	"delete": func(config opConfig) (string, error) {
@@ -145,7 +145,7 @@ var processOp = map[string]func(config opConfig) (string, error){
 
 		id++
 		return fmt.Sprintf(`{"op":"c", "db":"%s", "id": %d, "dc":{"delete":"%s", "deletes": %s}}`,
-			config.DbName, id, config.ColName, delsGen()), nil
+			config.DBName, id, config.ColName, delsGen()), nil
 	},
 	"sleep": func(config opConfig) (string, error) {
 		var adv advSleep
@@ -158,7 +158,7 @@ var processOp = map[string]func(config opConfig) (string, error){
 		}
 		id++
 		return fmt.Sprintf(`{"op":"sleep", "db":"%s", "cl": "%s", "id": %d, "time": %f}`,
-			config.DbName, config.ColName, id, adv.Time), nil
+			config.DBName, config.ColName, id, adv.Time), nil
 	},
 }
 
@@ -216,14 +216,14 @@ func generateOp(writer io.Writer, config opConfig, lastComma bool) error {
 }
 
 func generateAmmo(config ammoConfig, w io.Writer) error {
-	_, err := w.Write([]byte("[\n"))
+	_, _ = w.Write([]byte("[\n"))
 	for i, opConfig := range config.OpConfig {
-		err = generateOp(w, opConfig, i != len(config.OpConfig)-1)
+		err := generateOp(w, opConfig, i != len(config.OpConfig)-1)
 		if err != nil {
 			return fmt.Errorf("cannot generate patron %s: %v", config.PatronName, err)
 		}
 	}
-	_, err = w.Write([]byte("]\n"))
+	_, _ = w.Write([]byte("]\n"))
 	return nil
 }
 

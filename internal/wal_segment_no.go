@@ -36,5 +36,7 @@ func (walSegmentNo WalSegmentNo) firstLsn() uint64 {
 }
 
 func (walSegmentNo WalSegmentNo) getFilename(timeline uint32) string {
-	return fmt.Sprintf(walFileFormat, timeline, uint64(walSegmentNo)/xLogSegmentsPerXLogId, uint64(walSegmentNo)%xLogSegmentsPerXLogId)
+	return fmt.Sprintf(walFileFormat,
+		timeline, uint64(walSegmentNo)/xLogSegmentsPerXLogID,
+		uint64(walSegmentNo)%xLogSegmentsPerXLogID)
 }

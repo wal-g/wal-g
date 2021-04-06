@@ -96,15 +96,14 @@ func (err UnexpectedTarDataError) Error() string {
 var pagedFilenameRegexp *regexp.Regexp
 
 func init() {
-	pagedFilenameRegexp = regexp.MustCompile("^(\\d+)([.]\\d+)?$")
+	pagedFilenameRegexp = regexp.MustCompile(`^(\d+)([.]\d+)?$`)
 }
 
 // TODO : unit tests
 // isPagedFile checks basic expectations for paged file
 func isPagedFile(info os.FileInfo, filePath string) bool {
-
 	// For details on which file is paged see
-	// https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
+	//nolint:lll    // https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
 	if info.IsDir() ||
 		((!strings.Contains(filePath, DefaultTablespace)) && (!strings.Contains(filePath, NonDefaultTablespace))) ||
 		info.Size() == 0 ||
@@ -115,7 +114,10 @@ func isPagedFile(info os.FileInfo, filePath string) bool {
 	return true
 }
 
-func ReadIncrementalFile(filePath string, fileSize int64, lsn uint64, deltaBitmap *roaring.Bitmap) (fileReader io.ReadCloser, size int64, err error) {
+func ReadIncrementalFile(filePath string,
+	fileSize int64,
+	lsn uint64,
+	deltaBitmap *roaring.Bitmap) (fileReader io.ReadCloser, size int64, err error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, 0, err
@@ -161,7 +163,8 @@ func convertBlocksToLocations(filePath string, blocks []uint32) ([]walparser.Blo
 	}
 	locations := make([]walparser.BlockLocation, 0, len(blocks))
 	for _, blockNo := range blocks {
-		locations = append(locations, *walparser.NewBlockLocation(relFileNode.SpcNode, relFileNode.DBNode, relFileNode.RelNode, blockNo))
+		locations = append(locations, *walparser.NewBlockLocation(relFileNode.SpcNode,
+			relFileNode.DBNode, relFileNode.RelNode, blockNo))
 	}
 	return locations, nil
 }

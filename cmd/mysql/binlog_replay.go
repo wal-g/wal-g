@@ -14,7 +14,7 @@ const replaySinceFlagShortDescr = "backup name starting from which you want to f
 const replayUntilFlagShortDescr = "time in RFC3339 for PITR"
 
 var replayBackupName string
-var replayUntilTs string
+var replayUntilTS string
 
 var binlogReplayCmd = &cobra.Command{
 	Use:   "binlog-replay",
@@ -23,13 +23,13 @@ var binlogReplayCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
-		mysql.HandleBinlogReplay(folder, replayBackupName, replayUntilTs)
+		mysql.HandleBinlogReplay(folder, replayBackupName, replayUntilTS)
 	},
 }
 
 func init() {
 	binlogReplayCmd.PersistentFlags().StringVar(&replayBackupName, "since", "LATEST", replaySinceFlagShortDescr)
-	binlogReplayCmd.PersistentFlags().StringVar(&replayUntilTs, "until",
+	binlogReplayCmd.PersistentFlags().StringVar(&replayUntilTS, "until",
 		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339), replayUntilFlagShortDescr)
 	cmd.AddCommand(binlogReplayCmd)
 }

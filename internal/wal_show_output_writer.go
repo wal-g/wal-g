@@ -11,7 +11,7 @@ type WalShowOutputType int
 
 const (
 	TableOutput WalShowOutputType = iota + 1
-	JsonOutput
+	JSONOutput
 )
 
 // WalShowOutputWriter writes the output of wal-show command execution result
@@ -20,11 +20,11 @@ type WalShowOutputWriter interface {
 }
 
 // WalShowJsonOutputWriter writes the detailed JSON output
-type WalShowJsonOutputWriter struct {
+type WalShowJSONOutputWriter struct {
 	output io.Writer
 }
 
-func (writer *WalShowJsonOutputWriter) Write(timelineInfos []*TimelineInfo) error {
+func (writer *WalShowJSONOutputWriter) Write(timelineInfos []*TimelineInfo) error {
 	bytes, err := json.Marshal(timelineInfos)
 	if err != nil {
 		return err
@@ -52,7 +52,7 @@ func (writer *WalShowTableOutputWriter) Write(timelineInfos []*TimelineInfo) err
 	tableWriter.AppendHeader(header)
 
 	for _, tl := range timelineInfos {
-		row := table.Row{tl.Id, tl.ParentId, tl.SwitchPointLsn, tl.StartSegment,
+		row := table.Row{tl.ID, tl.ParentID, tl.SwitchPointLsn, tl.StartSegment,
 			tl.EndSegment, tl.SegmentRangeSize, tl.SegmentsCount, tl.Status}
 		if writer.includeBackups {
 			row = append(row, len(tl.Backups))
@@ -67,8 +67,8 @@ func NewWalShowOutputWriter(outputType WalShowOutputType, output io.Writer, incl
 	switch outputType {
 	case TableOutput:
 		return &WalShowTableOutputWriter{output: output, includeBackups: includeBackups}
-	case JsonOutput:
-		return &WalShowJsonOutputWriter{output: output}
+	case JSONOutput:
+		return &WalShowJSONOutputWriter{output: output}
 	default:
 		return &WalShowTableOutputWriter{output: output, includeBackups: includeBackups}
 	}

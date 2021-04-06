@@ -24,7 +24,7 @@ func (sequences IntegrityCheckDetails) NewPlainTextReader() (io.Reader, error) {
 
 	tableWriter.AppendHeader(table.Row{"TLI", "Start", "End", "Segments count", "Status"})
 	for _, row := range sequences {
-		tableWriter.AppendRow(table.Row{row.TimelineId,
+		tableWriter.AppendRow(table.Row{row.TimelineID,
 			row.StartSegment, row.EndSegment, row.SegmentsCount, row.Status})
 	}
 
@@ -81,7 +81,10 @@ func NewIntegrityCheckRunner(
 
 func (check IntegrityCheckRunner) Run() (WalVerifyCheckResult, error) {
 	storageSegments := getSegmentsFromFiles(check.walFolderFilenames)
-	walSegmentRunner := NewWalSegmentRunner(check.startWalSegment, storageSegments, check.stopWalSegmentNo, check.timelineSwitchMap)
+	walSegmentRunner := NewWalSegmentRunner(check.startWalSegment,
+		storageSegments,
+		check.stopWalSegmentNo,
+		check.timelineSwitchMap)
 
 	segmentScanner := NewWalSegmentScanner(walSegmentRunner)
 	err := runWalIntegrityScan(segmentScanner, check.uploadingSegmentRangeSize, check.delayedSegmentRangeSize)
@@ -122,7 +125,7 @@ func newWalIntegrityCheckResult(segmentSequences []*IntegrityScanSegmentSequence
 // IntegrityScanSegmentSequence is a continuous sequence of segments
 // with the same timeline and Status
 type IntegrityScanSegmentSequence struct {
-	TimelineId    uint32               `json:"timeline_id"`
+	TimelineID    uint32               `json:"timeline_id"`
 	StartSegment  string               `json:"start_segment"`
 	EndSegment    string               `json:"end_segment"`
 	SegmentsCount int                  `json:"segments_count"`
@@ -132,9 +135,9 @@ type IntegrityScanSegmentSequence struct {
 func newIntegrityScanSegmentSequence(sequence *WalSegmentsSequence,
 	status ScannedSegmentStatus) *IntegrityScanSegmentSequence {
 	return &IntegrityScanSegmentSequence{
-		TimelineId:    sequence.timelineId,
-		StartSegment:  sequence.minSegmentNo.getFilename(sequence.timelineId),
-		EndSegment:    sequence.maxSegmentNo.getFilename(sequence.timelineId),
+		TimelineID:    sequence.timelineID,
+		StartSegment:  sequence.minSegmentNo.getFilename(sequence.timelineID),
+		EndSegment:    sequence.maxSegmentNo.getFilename(sequence.timelineID),
 		Status:        status,
 		SegmentsCount: len(sequence.walSegmentNumbers),
 	}
@@ -196,7 +199,7 @@ func collapseSegmentsByStatusAndTimeline(scannedSegments []ScannedSegmentDescrip
 		segment := scannedSegments[i]
 
 		// switch to the new sequence on segment Status change or timeline id change
-		if segment.status != currentStatus || currentSequence.timelineId != segment.Timeline {
+		if segment.status != currentStatus || currentSequence.timelineID != segment.Timeline {
 			segmentSequences = append(segmentSequences, newIntegrityScanSegmentSequence(currentSequence, currentStatus))
 			currentSequence = NewSegmentsSequence(segment.Timeline, segment.Number)
 			currentStatus = segment.status
@@ -244,14 +247,14 @@ func findEarliestBackup(
 	var earliestBackupSegNo WalSegmentNo
 
 	for _, backup := range backupDetails {
-		backupTimelineId, backupLogSegNoInt, err := ParseWALFilename(backup.WalFileName)
+		backupTimelineID, backupLogSegNoInt, err := ParseWALFilename(backup.WalFileName)
 		backupLogSegNo := WalSegmentNo(backupLogSegNoInt)
 		if err != nil {
 			return nil, 0, err
 		}
 
 		if ok := checkBackupIsCorrect(currentTimeline, backup.BackupName,
-			backupTimelineId, backupLogSegNo, switchSegNoByTimeline); !ok {
+			backupTimelineID, backupLogSegNo, switchSegNoByTimeline); !ok {
 			continue
 		}
 

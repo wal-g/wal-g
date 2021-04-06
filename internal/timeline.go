@@ -22,7 +22,10 @@ type BytesPerWalSegmentError struct {
 }
 
 func newBytesPerWalSegmentError() BytesPerWalSegmentError {
-	return BytesPerWalSegmentError{errors.New("bytes_per_wal_segment of the server does not match expected value, you may need to set WALG_PG_WAL_SIZE")}
+	return BytesPerWalSegmentError{
+		errors.New(
+			"bytes_per_wal_segment of the server does not match expected value," +
+				" you may need to set WALG_PG_WAL_SIZE")}
 }
 
 func (err BytesPerWalSegmentError) Error() string {
@@ -57,7 +60,11 @@ func readTimeline(conn *pgx.Conn) (timeline uint32, err error) {
 	var bytesPerWalSegment uint32
 
 	// TODO: Check if this logic can be moved to queryRunner or abstracted away somehow
-	err = conn.QueryRow("select timeline_id, bytes_per_wal_segment from pg_control_checkpoint(), pg_control_init()").Scan(&timeline, &bytesPerWalSegment)
+	err = conn.QueryRow(
+		"select timeline_id, " +
+			"bytes_per_wal_segment " +
+			"from pg_control_checkpoint(), " +
+			"pg_control_init()").Scan(&timeline, &bytesPerWalSegment)
 	if err == nil && uint64(bytesPerWalSegment) != WalSegmentSize {
 		return 0, newBytesPerWalSegmentError()
 	}
@@ -72,14 +79,14 @@ const (
 var (
 	// WalSegmentSize is the size of one WAL file
 	WalSegmentSize        = uint64(16 * 1024 * 1024)
-	xLogSegmentsPerXLogId = 0x100000000 / WalSegmentSize // xlog_internal.h line 101
+	xLogSegmentsPerXLogID = 0x100000000 / WalSegmentSize // xlog_internal.h line 101
 	// .history file name regexp. For more details, see
 	// https://doxygen.postgresql.org/backend_2access_2transam_2timeline_8c_source.html
 	timelineHistoryFileRegexp *regexp.Regexp
 )
 
 func init() {
-	timelineHistoryFileRegexp = regexp.MustCompile("^([0-9a-fA-F]+)\\.history(\\.\\w+)?$")
+	timelineHistoryFileRegexp = regexp.MustCompile(`^([0-9a-fA-F]+)\.history(\.\w+)?$`)
 }
 
 const (
@@ -89,7 +96,7 @@ const (
 
 func SetWalSize(sizeMb uint64) {
 	WalSegmentSize = sizeMb * 1024 * 1024
-	xLogSegmentsPerXLogId = 0x100000000 / WalSegmentSize
+	xLogSegmentsPerXLogID = 0x100000000 / WalSegmentSize
 }
 
 // getWalFilename formats WAL file name using PostgreSQL connection. Essentially reads timeline of the server.
@@ -105,7 +112,7 @@ func getWalFilename(lsn uint64, conn *pgx.Conn) (walFilename string, timeline ui
 }
 
 func formatWALFileName(timeline uint32, logSegNo uint64) string {
-	return fmt.Sprintf(walFileFormat, timeline, logSegNo/xLogSegmentsPerXLogId, logSegNo%xLogSegmentsPerXLogId)
+	return fmt.Sprintf(walFileFormat, timeline, logSegNo/xLogSegmentsPerXLogID, logSegNo%xLogSegmentsPerXLogID)
 }
 
 // ParseWALFilename extracts numeric parts from WAL file name
@@ -130,24 +137,24 @@ func ParseWALFilename(name string) (timelineID uint32, logSegNo uint64, err erro
 		err = err0
 		return
 	}
-	if logSegNoLo >= xLogSegmentsPerXLogId {
+	if logSegNoLo >= xLogSegmentsPerXLogID {
 		err = newIncorrectLogSegNoError(name)
 		return
 	}
 
-	logSegNo = logSegNoHi*xLogSegmentsPerXLogId + logSegNoLo
+	logSegNo = logSegNoHi*xLogSegmentsPerXLogID + logSegNoLo
 	return
 }
 
 func TryFetchTimelineAndLogSegNo(objectName string) (uint32, uint64, bool) {
 	foundLsn := regexpTimelineAndLogSegNo.FindAllString(objectName, maxCountOfLSN)
 	if len(foundLsn) > 0 {
-		timelineId, logSegNo, err := ParseWALFilename(foundLsn[0])
+		timelineID, logSegNo, err := ParseWALFilename(foundLsn[0])
 
 		if err != nil {
 			return 0, 0, false
 		}
-		return timelineId, logSegNo, true
+		return timelineID, logSegNo, true
 	}
 	return 0, 0, false
 }
@@ -166,25 +173,25 @@ func ParseTimelineFromBackupName(backupName string) (uint32, error) {
 }
 
 func ParseTimelineFromString(timelineString string) (uint32, error) {
-	timelineId64, err := strconv.ParseUint(timelineString, hexadecimal, sizeofInt32bits)
+	timelineID64, err := strconv.ParseUint(timelineString, hexadecimal, sizeofInt32bits)
 	if err != nil {
 		return 0, err
 	}
-	return uint32(timelineId64), nil
+	return uint32(timelineID64), nil
 }
 
 // GetNextWalFilename computes name of next WAL segment
 func GetNextWalFilename(name string) (string, error) {
-	timelineId, logSegNo, err := ParseWALFilename(name)
+	timelineID, logSegNo, err := ParseWALFilename(name)
 	if err != nil {
 		return "", err
 	}
 	logSegNo++
-	return formatWALFileName(timelineId, logSegNo), nil
+	return formatWALFileName(timelineID, logSegNo), nil
 }
 
-func shouldPrefault(name string) (lsn uint64, shouldPrefault bool, timelineId uint32, err error) {
-	timelineId, logSegNo, err := ParseWALFilename(name)
+func shouldPrefault(name string) (lsn uint64, shouldPrefault bool, timelineID uint32, err error) {
+	timelineID, logSegNo, err := ParseWALFilename(name)
 	if err != nil {
 		return 0, false, 0, err
 	}
@@ -193,5 +200,5 @@ func shouldPrefault(name string) (lsn uint64, shouldPrefault bool, timelineId ui
 	}
 	logSegNo += WalFileInDelta
 
-	return logSegNo * WalSegmentSize, true, timelineId, nil
+	return logSegNo * WalSegmentSize, true, timelineID, nil
 }

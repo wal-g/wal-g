@@ -44,7 +44,9 @@ type UnconfiguredStorageError struct {
 }
 
 func newUnconfiguredStorageError(storagePrefixVariants []string) UnconfiguredStorageError {
-	return UnconfiguredStorageError{errors.Errorf("No storage is configured now, please set one of following settings: %v", storagePrefixVariants)}
+	return UnconfiguredStorageError{
+		errors.Errorf("No storage is configured now, please set one of following settings: %v",
+			storagePrefixVariants)}
 }
 
 func (err UnconfiguredStorageError) Error() string {
@@ -56,7 +58,9 @@ type UnknownCompressionMethodError struct {
 }
 
 func newUnknownCompressionMethodError() UnknownCompressionMethodError {
-	return UnknownCompressionMethodError{errors.Errorf("Unknown compression method, supported methods are: %v", compression.CompressingAlgorithms)}
+	return UnknownCompressionMethodError{
+		errors.Errorf("Unknown compression method, supported methods are: %v",
+			compression.CompressingAlgorithms)}
 }
 
 func (err UnknownCompressionMethodError) Error() string {
@@ -80,7 +84,9 @@ type InvalidConcurrencyValueError struct {
 }
 
 func newInvalidConcurrencyValueError(concurrencyType string, value int) InvalidConcurrencyValueError {
-	return InvalidConcurrencyValueError{errors.Errorf("%v value is expected to be positive but is: %v", concurrencyType, value)}
+	return InvalidConcurrencyValueError{
+		errors.Errorf("%v value is expected to be positive but is: %v",
+			concurrencyType, value)}
 }
 
 func (err InvalidConcurrencyValueError) Error() string {
@@ -106,12 +112,14 @@ func configureLimiters() {
 	}
 	if viper.IsSet(DiskRateLimitSetting) {
 		diskLimit := viper.GetInt64(DiskRateLimitSetting)
-		limiters.DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
+		limiters.DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit),
+			int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 
 	if viper.IsSet(NetworkRateLimitSetting) {
 		netLimit := viper.GetInt64(NetworkRateLimitSetting)
-		limiters.NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
+		limiters.NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit),
+			int(netLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 }
 
@@ -308,8 +316,8 @@ func ConfigureCrypter() crypto.Crypter {
 		return awskms.CrypterFromKeyID(viper.GetString(CseKmsIDSetting), viper.GetString(CseKmsRegionSetting))
 	}
 
-	if viper.IsSet(YcKmsKeyIdSetting) {
-		return yckms.YcCrypterFromKeyIdAndCredential(viper.GetString(YcKmsKeyIdSetting), viper.GetString(YcSaKeyFileSetting))
+	if viper.IsSet(YcKmsKeyIDSetting) {
+		return yckms.YcCrypterFromKeyIDAndCredential(viper.GetString(YcKmsKeyIDSetting), viper.GetString(YcSaKeyFileSetting))
 	}
 
 	if crypter := configureLibsodiumCrypter(); crypter != nil {
@@ -401,7 +409,9 @@ func GetOplogArchiveAfterSize() (int, error) {
 	oplogArchiveAfterSizeStr, _ := GetSetting(OplogArchiveAfterSize)
 	oplogArchiveAfterSize, err := strconv.Atoi(oplogArchiveAfterSizeStr)
 	if err != nil {
-		return 0, fmt.Errorf("integer expected for %s setting but given '%s': %w", OplogArchiveAfterSize, oplogArchiveAfterSizeStr, err)
+		return 0,
+		fmt.Errorf("integer expected for %s setting but given '%s': %w",
+			OplogArchiveAfterSize, oplogArchiveAfterSizeStr, err)
 	}
 	return oplogArchiveAfterSize, nil
 }

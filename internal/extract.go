@@ -153,8 +153,7 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 		return err
 	}
 	for currentRun := files; len(currentRun) > 0; {
-		var failed []ReaderMaker
-		failed = tryExtractFiles(currentRun, tarInterpreter, downloadingConcurrency)
+		failed := tryExtractFiles(currentRun, tarInterpreter, downloadingConcurrency)
 		if downloadingConcurrency > 1 {
 			downloadingConcurrency /= 2
 		} else if len(failed) == len(currentRun) {
@@ -170,7 +169,9 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 }
 
 // TODO : unit tests
-func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloadingConcurrency int) (failed []ReaderMaker) {
+func tryExtractFiles(files []ReaderMaker,
+	tarInterpreter TarInterpreter,
+	downloadingConcurrency int) (failed []ReaderMaker) {
 	downloadingContext := context.TODO()
 	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
 	crypter := ConfigureCrypter()

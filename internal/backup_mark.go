@@ -53,9 +53,8 @@ func GetMarkedBackupMetadataToUpload(
 
 	if toPermanent {
 		return getMarkedPermanentBackupMetadata(baseBackupFolder, backupName)
-	} else {
-		return getMarkedImpermanentBackupMetadata(folder, backupName)
 	}
+	return getMarkedImpermanentBackupMetadata(folder, backupName)
 }
 
 func getMarkedPermanentBackupMetadata(baseBackupFolder storage.Folder, backupName string) ([]UploadObject, error) {
@@ -139,7 +138,9 @@ func getBackupNumber(backupName string) string {
 }
 
 //backup has permanent in future only when one of the next backups is permanent
-func backupHasPermanentInFuture(reverseLinks *map[string][]string, backupName string, permanentBackups *map[string]bool) bool {
+func backupHasPermanentInFuture(reverseLinks *map[string][]string,
+	backupName string,
+	permanentBackups *map[string]bool) bool {
 	//if there is no next backups
 	if _, ok := (*reverseLinks)[backupName]; !ok {
 		return false
@@ -179,7 +180,8 @@ func getGraphFromBaseToIncrement(folder storage.Folder) (map[string][]string, er
 	return reverseLinks, nil
 }
 
-func getMetadataFromBackup(baseBackupFolder storage.Folder, backupName string) (incrementFrom string, isIncrement bool, err error) {
+func getMetadataFromBackup(baseBackupFolder storage.Folder,
+	backupName string) (incrementFrom string, isIncrement bool, err error) {
 	backup := NewBackup(baseBackupFolder, backupName)
 	sentinel, err := backup.GetSentinel()
 	if err != nil {
@@ -205,7 +207,8 @@ type BackupAlreadyThisTypePermanentError struct {
 }
 
 //raise when user try make permanent/impermanent already permanent/impermanent backup,
-func newBackupAlreadyThisTypePermanentError(backupName string, permanentType string) BackupAlreadyThisTypePermanentError {
+func newBackupAlreadyThisTypePermanentError(backupName string,
+	permanentType string) BackupAlreadyThisTypePermanentError {
 	return BackupAlreadyThisTypePermanentError{errors.Errorf("Backup '%s' is already %s.", backupName, permanentType)}
 }
 
@@ -214,7 +217,9 @@ type BackupHasPermanentBackupInFutureError struct {
 }
 
 func newBackupHasPermanentBackupInFutureError(backupName string) BackupHasPermanentBackupInFutureError {
-	return BackupHasPermanentBackupInFutureError{errors.Errorf("Can't mark backup '%s' as impermanent. There is permanent increment backup.", backupName)}
+	return BackupHasPermanentBackupInFutureError{
+		errors.Errorf("Can't mark backup '%s' as impermanent. There is permanent increment backup.",
+			backupName)}
 }
 
 func GetPermanentObjects(folder storage.Folder) (map[string]bool, map[string]bool) {
@@ -239,7 +244,7 @@ func GetPermanentObjects(folder storage.Folder) (map[string]bool, map[string]boo
 			continue
 		}
 		if meta.IsPermanent {
-			timelineId, err := ParseTimelineFromBackupName(backup.Name)
+			timelineID, err := ParseTimelineFromBackupName(backup.Name)
 			if err != nil {
 				tracelog.ErrorLogger.Printf("failed to parse backup timeline for backup %s with error %s, ignoring...",
 					backupTime.BackupName, err.Error())
@@ -249,7 +254,7 @@ func GetPermanentObjects(folder storage.Folder) (map[string]bool, map[string]boo
 			startWalSegmentNo := newWalSegmentNo(meta.StartLsn - 1)
 			endWalSegmentNo := newWalSegmentNo(meta.FinishLsn - 1)
 			for walSegmentNo := startWalSegmentNo; walSegmentNo <= endWalSegmentNo; walSegmentNo = walSegmentNo.next() {
-				permanentWals[walSegmentNo.getFilename(timelineId)] = true
+				permanentWals[walSegmentNo.getFilename(timelineID)] = true
 			}
 			permanentBackups[backupTime.BackupName[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+24]] = true
 		}
@@ -263,7 +268,9 @@ func IsPermanent(objectName string, permanentBackups, permanentWals map[string]b
 		return permanentWals[wal]
 	}
 	if objectName[:len(utility.BaseBackupPath)] == utility.BaseBackupPath {
-		backup := objectName[len(utility.BaseBackupPath)+len(utility.BackupNamePrefix) : len(utility.BaseBackupPath)+len(utility.BackupNamePrefix)+24]
+		var startIndex = len(utility.BaseBackupPath)+len(utility.BackupNamePrefix)
+		var endIndex = len(utility.BaseBackupPath)+len(utility.BackupNamePrefix)+24
+		backup := objectName[startIndex : endIndex]
 		return permanentBackups[backup]
 	}
 	// should not reach here, default to false

@@ -9,7 +9,7 @@ import (
 const (
 	backupListShortDescription = "Prints available backups"
 	PrettyFlag                 = "pretty"
-	JsonFlag                   = "json"
+	JSONFlag                   = "json"
 	DetailFlag                 = "detail"
 )
 
@@ -38,6 +38,6 @@ func init() {
 	cmd.AddCommand(backupListCmd)
 
 	backupListCmd.Flags().BoolVar(&pretty, PrettyFlag, false, "Prints more readable output")
-	backupListCmd.Flags().BoolVar(&json, JsonFlag, false, "Prints output in json format")
+	backupListCmd.Flags().BoolVar(&json, JSONFlag, false, "Prints output in json format")
 	backupListCmd.Flags().BoolVar(&detail, DetailFlag, false, "Prints extra backup details")
 }

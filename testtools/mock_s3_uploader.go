@@ -26,18 +26,19 @@ func (err mockMultiFailureError) Error() string {
 
 // Mock out uploader client for S3. Includes these methods:
 // Upload(*UploadInput, ...func(*s3manager.Uploader))
-type mockS3Uploader struct {
+type MockS3Uploader struct {
 	s3manageriface.UploaderAPI
 	multiErr bool
 	err      bool
 	storage  *memory.Storage
 }
 
-func NewMockS3Uploader(multiErr, err bool, storage *memory.Storage) *mockS3Uploader {
-	return &mockS3Uploader{multiErr: multiErr, err: err, storage: storage}
+func NewMockS3Uploader(multiErr, err bool, storage *memory.Storage) *MockS3Uploader {
+	return &MockS3Uploader{multiErr: multiErr, err: err, storage: storage}
 }
 
-func (uploader *mockS3Uploader) Upload(input *s3manager.UploadInput, f ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error) {
+func (uploader *MockS3Uploader) Upload(input *s3manager.UploadInput,
+	f ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error) {
 	if uploader.err {
 		return nil, awserr.New("UploadFailed", "mock Upload error", nil)
 	}

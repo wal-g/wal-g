@@ -39,13 +39,13 @@ func HandleWALPrefetch(uploader *WalUploader, walFileName string, location strin
 		waitGroup.Add(1)
 		go prefetchFile(location, folder, fileName, waitGroup)
 
-		prefaultStartLsn, shouldPrefault, timelineId, err := shouldPrefault(fileName)
+		prefaultStartLsn, shouldPrefault, timelineID, err := shouldPrefault(fileName)
 		if err != nil {
 			tracelog.ErrorLogger.Println("ShouldPrefault failed: ", err, " file: ", fileName)
 		}
 		if shouldPrefault {
 			waitGroup.Add(1)
-			go prefaultData(prefaultStartLsn, timelineId, waitGroup, uploader)
+			go prefaultData(prefaultStartLsn, timelineID, waitGroup, uploader)
 		}
 
 		time.Sleep(10 * time.Millisecond) // ramp up in order
@@ -57,7 +57,7 @@ func HandleWALPrefetch(uploader *WalUploader, walFileName string, location strin
 }
 
 // TODO : unit tests
-func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.WaitGroup, uploader *WalUploader) {
+func prefaultData(prefaultStartLsn uint64, timelineID uint32, waitGroup *sync.WaitGroup, uploader *WalUploader) {
 	defer func() {
 		if r := recover(); r != nil {
 			tracelog.ErrorLogger.Println("Prefault unsuccessful ", prefaultStartLsn)
@@ -74,8 +74,9 @@ func prefaultData(prefaultStartLsn uint64, timelineId uint32, waitGroup *sync.Wa
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	bundle := NewBundle(archiveDirectory, nil, &prefaultStartLsn, nil,
 		false, viper.GetInt64(TarSizeThresholdSetting))
-	bundle.Timeline = timelineId
-	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(utility.WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
+	bundle.Timeline = timelineID
+	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(utility.WalPath),
+		prefaultStartLsn+WalSegmentSize*WalFileInDelta)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Error during loading delta map: '%+v'.", err)
 		return
@@ -220,7 +221,11 @@ func prefetchFile(location string, folder storage.Folder, walFileName string, wa
 	}
 }
 
-func getPrefetchLocations(location string, walFileName string) (prefetchLocation string, runningLocation string, runningFile string, fetchedFile string) {
+func getPrefetchLocations(location string,
+	walFileName string) (prefetchLocation string,
+						runningLocation string,
+						runningFile string,
+						fetchedFile string) {
 	prefetchLocation = path.Join(location, ".wal-g", "prefetch")
 	runningLocation = path.Join(prefetchLocation, "running")
 	oldPath := path.Join(runningLocation, walFileName)

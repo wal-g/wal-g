@@ -32,19 +32,19 @@ var (
 			folder, err := internal.ConfigureFolder()
 			tracelog.ErrorLogger.FatalOnError(err)
 			outputType := internal.TableOutput
-			if detailedJsonOutput {
-				outputType = internal.JsonOutput
+			if detailedJSONOutput {
+				outputType = internal.JSONOutput
 			}
 			outputWriter := internal.NewWalShowOutputWriter(outputType, os.Stdout, !disableBackupsLookup)
 			internal.HandleWalShow(folder, !disableBackupsLookup, outputWriter)
 		},
 	}
-	detailedJsonOutput   bool
+	detailedJSONOutput   bool
 	disableBackupsLookup bool
 )
 
 func init() {
 	cmd.AddCommand(walShowCmd)
-	walShowCmd.Flags().BoolVar(&detailedJsonOutput, detailedOutputFlag, false, detailedOutputDescription)
+	walShowCmd.Flags().BoolVar(&detailedJSONOutput, detailedOutputFlag, false, detailedOutputDescription)
 	walShowCmd.Flags().BoolVar(&disableBackupsLookup, disableBackupsLookupFlag, false, disableBackupsLookupDescription)
 }

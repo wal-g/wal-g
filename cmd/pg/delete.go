@@ -171,7 +171,9 @@ func (o PostgresBackupObject) GetBackupTime() time.Time {
 	return o.creationTime
 }
 
-func makePostgresBackupObjects(folder storage.Folder, objects []storage.Object, startTimeByBackupName map[string]time.Time) []internal.BackupObject {
+func makePostgresBackupObjects(folder storage.Folder,
+	objects []storage.Object,
+	startTimeByBackupName map[string]time.Time) []internal.BackupObject {
 	backupObjects := make([]internal.BackupObject, 0, len(objects))
 	for _, object := range objects {
 		postgresBackup := newPostgresBackupObject(

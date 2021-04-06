@@ -38,7 +38,10 @@ func BackupCopyingInfo(backup *internal.Backup, from storage.Folder, to storage.
 	return copy.BuildCopyingInfos(from, to, objects, hasBackupPrefix, copy.NoopRenameFunc), nil
 }
 
-func getCopyingInfos(backupName string, from storage.Folder, to storage.Folder, withoutHistory bool) ([]copy.InfoProvider, error) {
+func getCopyingInfos(backupName string,
+	from storage.Folder,
+	to storage.Folder,
+	withoutHistory bool) ([]copy.InfoProvider, error) {
 	if backupName == "" {
 		tracelog.InfoLogger.Printf("Copy all backups and history.")
 		return WildcardInfo(from, to)
@@ -90,5 +93,10 @@ func WildcardInfo(from storage.Folder, to storage.Folder) ([]copy.InfoProvider, 
 		return nil, err
 	}
 
-	return copy.BuildCopyingInfos(from, to, objects, func(object storage.Object) bool { return true }, copy.NoopRenameFunc), nil
+	return copy.BuildCopyingInfos(from,
+		to,
+		objects,
+		func(object storage.Object) bool { return true },
+		copy.NoopRenameFunc),
+		nil
 }

@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/wal-g/wal-g/tests_func/mongoload/cmd/ammo_generator"
+	"github.com/wal-g/wal-g/tests_func/mongoload/cmd/ammoGenerator"
 )
 
 func main() {
-	ammo_generator.Execute()
+	ammoGenerator.Execute()
 }

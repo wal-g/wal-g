@@ -81,11 +81,17 @@ func (queryRunner *PgQueryRunner) BuildStartBackup() (string, error) {
 	// where pg_start_backup() will fail on standby anyway
 	switch {
 	case queryRunner.Version >= 100000:
-		return "SELECT case when pg_is_in_recovery() then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn", nil
+		return "SELECT case when pg_is_in_recovery()" +
+			" then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery()" +
+			" FROM pg_start_backup($1, true, false) lsn", nil
 	case queryRunner.Version >= 90600:
-		return "SELECT case when pg_is_in_recovery() then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn", nil
+		return "SELECT case when pg_is_in_recovery() " +
+			"then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery()" +
+			" FROM pg_start_backup($1, true, false) lsn", nil
 	case queryRunner.Version >= 90000:
-		return "SELECT case when pg_is_in_recovery() then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true) lsn", nil
+		return "SELECT case when pg_is_in_recovery() " +
+			"then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery()" +
+			" FROM pg_start_backup($1, true) lsn", nil
 	case queryRunner.Version == 0:
 		return "", newNoPostgresVersionError()
 	default:
@@ -99,7 +105,9 @@ func (queryRunner *PgQueryRunner) BuildStopBackup() (string, error) {
 	case queryRunner.Version >= 90600:
 		return "SELECT labelfile, spcmapfile, lsn FROM pg_stop_backup(false)", nil
 	case queryRunner.Version >= 90000:
-		return "SELECT (pg_xlogfile_name_offset(lsn)).file_name, lpad((pg_xlogfile_name_offset(lsn)).file_offset::text, 8, '0') AS file_offset, lsn::text FROM pg_stop_backup() lsn", nil
+		return "SELECT (pg_xlogfile_name_offset(lsn)).file_name," +
+			" lpad((pg_xlogfile_name_offset(lsn)).file_offset::text, 8, '0') AS file_offset, lsn::text " +
+			"FROM pg_stop_backup() lsn", nil
 	case queryRunner.Version == 0:
 		return "", newNoPostgresVersionError()
 	default:
@@ -164,7 +172,8 @@ func (queryRunner *PgQueryRunner) getSystemIdentifier() (err error) {
 }
 
 // StartBackup informs the database that we are starting copy of cluster contents
-func (queryRunner *PgQueryRunner) startBackup(backup string) (backupName string, lsnString string, inRecovery bool, dataDir string, err error) {
+func (queryRunner *PgQueryRunner) startBackup(backup string) (backupName string,
+	lsnString string, inRecovery bool, dataDir string, err error) {
 	tracelog.InfoLogger.Println("Calling pg_start_backup()")
 	startBackupQuery, err := queryRunner.BuildStartBackup()
 	conn := queryRunner.connection
@@ -238,7 +247,8 @@ func (queryRunner *PgQueryRunner) BuildStatisticsQuery() (string, error) {
 }
 
 // getStatistics queries the relations statistics from database
-func (queryRunner *PgQueryRunner) getStatistics(dbInfo PgDatabaseInfo) (map[walparser.RelFileNode]PgRelationStat, error) {
+func (queryRunner *PgQueryRunner) getStatistics(
+	dbInfo PgDatabaseInfo) (map[walparser.RelFileNode]PgRelationStat, error) {
 	tracelog.InfoLogger.Println("Querying pg_stat_all_tables")
 	getStatQuery, err := queryRunner.BuildStatisticsQuery()
 	conn := queryRunner.connection
@@ -255,14 +265,14 @@ func (queryRunner *PgQueryRunner) getStatistics(dbInfo PgDatabaseInfo) (map[walp
 	relationsStats := make(map[walparser.RelFileNode]PgRelationStat)
 	for rows.Next() {
 		var relationStat PgRelationStat
-		var relFileNodeId uint32
+		var relFileNodeID uint32
 		var spcNode uint32
-		if err := rows.Scan(&relFileNodeId, &spcNode, &relationStat.insertedTuplesCount, &relationStat.updatedTuplesCount,
+		if err := rows.Scan(&relFileNodeID, &spcNode, &relationStat.insertedTuplesCount, &relationStat.updatedTuplesCount,
 			&relationStat.deletedTuplesCount); err != nil {
 			tracelog.WarningLogger.Printf("GetStatistics:  %v\n", err.Error())
 		}
 		relFileNode := walparser.RelFileNode{DBNode: dbInfo.oid,
-			RelNode: walparser.Oid(relFileNodeId), SpcNode: walparser.Oid(spcNode)}
+			RelNode: walparser.Oid(relFileNodeID), SpcNode: walparser.Oid(spcNode)}
 		// if tablespace id is zero, use the default database tablespace id
 		if relFileNode.SpcNode == walparser.Oid(0) {
 			relFileNode.SpcNode = dbInfo.tblSpcOid
@@ -292,13 +302,13 @@ func (queryRunner *PgQueryRunner) BuildGetDatabasesQuery() (string, error) {
 // getDatabaseInfos fetches a list of all databases in cluster which are allowed to connect
 func (queryRunner *PgQueryRunner) getDatabaseInfos() ([]PgDatabaseInfo, error) {
 	tracelog.InfoLogger.Println("Querying pg_database")
-	getDbInfoQuery, err := queryRunner.BuildGetDatabasesQuery()
+	getDBInfoQuery, err := queryRunner.BuildGetDatabasesQuery()
 	conn := queryRunner.connection
 	if err != nil {
 		return nil, errors.Wrap(err, "QueryRunner GetDatabases: Building db names query failed")
 	}
 
-	rows, err := conn.Query(getDbInfoQuery)
+	rows, err := conn.Query(getDBInfoQuery)
 	if err != nil {
 		return nil, errors.Wrap(err, "QueryRunner GetDatabases: pg_database query failed")
 	}

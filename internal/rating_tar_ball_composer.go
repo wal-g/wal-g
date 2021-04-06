@@ -30,7 +30,8 @@ func NewRatingTarBallComposerMaker(relFileStats RelFileStatistics,
 
 func (maker *RatingTarBallComposerMaker) Make(bundle *Bundle) (TarBallComposer, error) {
 	composeRatingEvaluator := NewDefaultComposeRatingEvaluator(bundle.IncrementFromFiles)
-	filePacker := newTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, maker.bundleFiles, maker.filePackerOptions)
+	filePacker := newTarBallFilePacker(bundle.DeltaMap,
+		bundle.IncrementFromLsn, maker.bundleFiles, maker.filePackerOptions)
 	return NewRatingTarBallComposer(uint64(bundle.TarSizeThreshold),
 		composeRatingEvaluator,
 		bundle.IncrementFromLsn,
@@ -100,8 +101,8 @@ type RatingTarBallComposer struct {
 func NewRatingTarBallComposer(
 	tarSizeThreshold uint64, updateRatingEvaluator ComposeRatingEvaluator,
 	incrementBaseLsn *uint64, deltaMap PagedFileDeltaMap, tarBallQueue *TarBallQueue,
-	crypter crypto.Crypter, fileStats RelFileStatistics, bundleFiles BundleFiles, packer *TarBallFilePacker) (*RatingTarBallComposer, error) {
-
+	crypter crypto.Crypter, fileStats RelFileStatistics,
+	bundleFiles BundleFiles, packer *TarBallFilePacker) (*RatingTarBallComposer, error) {
 	errorGroup, _ := errgroup.WithContext(context.Background())
 	deltaMapComplete := true
 	if deltaMap == nil {
@@ -168,7 +169,7 @@ func (c *RatingTarBallComposer) PackTarballs() (TarFileSets, error) {
 		return nil, err
 	}
 
-	tarFileSets := make(map[string][]string, 0)
+	tarFileSets := make(map[string][]string)
 	tarFileSets[headersTarName] = headersNames
 
 	for _, tarFilesCollection := range tarFilesCollections {
@@ -279,7 +280,8 @@ func (c *RatingTarBallComposer) getExpectedFileSize(cfi *ComposeFileInfo) (uint6
 	incrementBlocksCount := bitmap.GetCardinality()
 	// expected header size =
 	// length(IncrementFileHeader) + sizeOf(fileSize) + sizeOf(diffBlockCount) + sizeOf(blockNo)*incrementBlocksCount
-	incrementHeaderSize := uint64(len(IncrementFileHeader)) + sizeofInt64 + sizeofInt32 + (incrementBlocksCount * sizeofInt32)
+	incrementHeaderSize := uint64(len(IncrementFileHeader)) +
+		sizeofInt64 + sizeofInt32 + (incrementBlocksCount * sizeofInt32)
 	incrementPageDataSize := incrementBlocksCount * uint64(DatabasePageSize)
 	return incrementHeaderSize + incrementPageDataSize, nil
 }

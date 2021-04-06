@@ -62,7 +62,11 @@ type StorageApplier struct {
 
 // NewStorageApplier builds StorageApplier.
 // TODO: switch to functional options
-func NewStorageApplier(uploader archive.Uploader, buf Buffer, archiveAfterSize int, archiveTimeout time.Duration, statsUpdater stats.OplogUploadStatsUpdater) *StorageApplier {
+func NewStorageApplier(uploader archive.Uploader,
+	buf Buffer,
+	archiveAfterSize int,
+	archiveTimeout time.Duration,
+	statsUpdater stats.OplogUploadStatsUpdater) *StorageApplier {
 	return &StorageApplier{uploader, buf, archiveAfterSize, archiveTimeout, statsUpdater}
 }
 

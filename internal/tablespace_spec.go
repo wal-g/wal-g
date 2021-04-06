@@ -13,7 +13,7 @@ const (
 	Tablespaces = "tablespaces"
 )
 
-var BasePrefixMissingError = fmt.Errorf("Base prefix not set while working with tablespaces.\n")
+var ErrorBasePrefixMissing = fmt.Errorf("base prefix not set while working with tablespaces")
 
 // The mandatory keys for this map are "base_prefix" and "tablespaces".
 // "base_prefix" contains Location of pg_data folder.
@@ -100,14 +100,14 @@ func (spec *TablespaceSpec) addTablespace(symlinkName string, actualLocation str
 func (spec *TablespaceSpec) makeTablespaceSymlinkPath(path string) (string, error) {
 	basePrefix, ok := spec.BasePrefix()
 	if !ok {
-		return "", BasePrefixMissingError
+		return "", ErrorBasePrefixMissing
 	}
 	if utility.IsInDirectory(path, basePrefix) {
 		return path, nil
 	}
 	location, ok := spec.findTablespaceLocation(path)
 	if !ok {
-		return path, fmt.Errorf("Tablespace at path %s wasn't found.\n", path)
+		return path, fmt.Errorf("tablespace at path %s wasn't found", path)
 	}
 	path = filepath.Join(basePrefix, location.Symlink, utility.GetSubdirectoryRelativePath(path, location.Location))
 	return path, nil
@@ -116,7 +116,7 @@ func (spec *TablespaceSpec) makeTablespaceSymlinkPath(path string) (string, erro
 func (spec *TablespaceSpec) isTablespaceSymlink(path string) (bool, error) {
 	basePrefix, ok := spec.BasePrefix()
 	if !ok {
-		return false, BasePrefixMissingError
+		return false, ErrorBasePrefixMissing
 	}
 
 	for _, location := range spec.tablespaceLocations() {
@@ -136,7 +136,7 @@ func (spec *TablespaceSpec) UnmarshalJSON(b []byte) error {
 
 	basePrefix, ok := jsonAsMap[BasePrefix].(string)
 	if !ok {
-		return BasePrefixMissingError
+		return ErrorBasePrefixMissing
 	}
 	spec.setBasePrefix(basePrefix)
 
@@ -151,7 +151,7 @@ func (spec *TablespaceSpec) UnmarshalJSON(b []byte) error {
 	for _, symlinkName := range spec.tablespaceNames {
 		specMap, ok := jsonAsMap[symlinkName].(map[string]interface{})
 		if !ok {
-			return fmt.Errorf("Bad json structure. Couldn't find entry for symlink %s.\n", symlinkName)
+			return fmt.Errorf("bad json structure. Couldn't find entry for symlink %s", symlinkName)
 		}
 		location := TablespaceLocation{specMap["loc"].(string), specMap["link"].(string)}
 		spec.tablespaceLocationMap[symlinkName] = location
@@ -164,7 +164,7 @@ func (spec *TablespaceSpec) MarshalJSON() ([]byte, error) {
 	toMarshal := make(map[string]interface{})
 	basePrefix, ok := spec.BasePrefix()
 	if !ok {
-		return nil, BasePrefixMissingError
+		return nil, ErrorBasePrefixMissing
 	}
 	toMarshal[BasePrefix] = basePrefix
 	toMarshal[Tablespaces] = spec.TablespaceNames()

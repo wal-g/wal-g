@@ -33,6 +33,6 @@ func init() {
 	cmd.AddCommand(catchupListCmd)
 
 	catchupListCmd.Flags().BoolVar(&pretty, PrettyFlag, false, "Prints more readable output")
-	catchupListCmd.Flags().BoolVar(&json, JsonFlag, false, "Prints output in json format")
+	catchupListCmd.Flags().BoolVar(&json, JSONFlag, false, "Prints output in json format")
 	catchupListCmd.Flags().BoolVar(&detail, DetailFlag, false, "Prints extra backup details")
 }

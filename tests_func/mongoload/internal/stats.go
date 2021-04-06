@@ -27,8 +27,8 @@ func CollectStat(opInfoCh <-chan OpInfo) models.LoadStat {
 	for opInfo := range opInfoCh {
 		updateStatWithMongoOpLog(&stat.CmdStat, opInfo)
 		if opInfo.opName == "transaction" {
-			for _, cmdLog := range opInfo.subcmds {
-				updateStatWithMongoOpLog(&stat.TxnStat, cmdLog)
+			for key := range opInfo.subcmds {
+				updateStatWithMongoOpLog(&stat.TxnStat, opInfo.subcmds[key])
 			}
 		}
 	}

@@ -1,7 +1,8 @@
 package internal
 
 /*
-This module can represent a Timeline History file which can be retrieved from Postgres using the TIMELINEHISTORY SQL command.
+This module can represent a Timeline History file which can be
+retrieved from Postgres using the TIMELINEHISTORY SQL command.
 A Timeline History file belongs to a timeline (which also will be the last Row in the file), and contains multiple rows.
 Each row describes at what LSN that timeline came to be.
 
@@ -10,7 +11,8 @@ Example history file:
 
 2	0/2A3400E8	no recovery target specified
 
-By storing the Timeline History file in this object, it can easilly be searched for the timeline that a specific LSN belongs too.
+By storing the Timeline History file in this object,
+it can easilly be searched for the timeline that a specific LSN belongs too.
 Furthermore it can be read as an IOReader (having a Name() and Read() function) to easilly writeout by the WalUploader.
 */
 
@@ -50,7 +52,7 @@ func NewTimeLineHistFile(timelineid uint32, filename string, body []byte) (TimeL
 // rows parses the data ([]byte) from a TimeLineHistFile and returns the TimeLineHistFileRows that are contained.
 func (tlh TimeLineHistFile) rows() ([]TimeLineHistFileRow, error) {
 	var rows []TimeLineHistFileRow
-	r := regexp.MustCompile("[^\\s]+")
+	r := regexp.MustCompile(`[^\s]+`)
 	for _, row := range strings.Split(string(tlh.data), "\n") {
 		// Remove comments and split by one or more whitespace characters
 		// FindAllStrings removes front spaces, and returns up to 3 cols.

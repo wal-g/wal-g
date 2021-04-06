@@ -30,11 +30,11 @@ type UnwrapResult struct {
 
 func newUnwrapResult() *UnwrapResult {
 	return &UnwrapResult{make([]string, 0), sync.Mutex{},
-		make(map[string]int64, 0), sync.Mutex{},
-		make(map[string]int64, 0), sync.Mutex{}}
+		make(map[string]int64), sync.Mutex{},
+		make(map[string]int64), sync.Mutex{}}
 }
 
-func checkDbDirectoryForUnwrapNew(dbDataDirectory string, sentinelDto BackupSentinelDto) error {
+func checkDBDirectoryForUnwrapNew(dbDataDirectory string, sentinelDto BackupSentinelDto) error {
 	tracelog.DebugLogger.Println("DB data directory before applying backup:")
 	_ = filepath.Walk(dbDataDirectory,
 		func(path string, info os.FileInfo, err error) error {
@@ -69,7 +69,7 @@ func (backup *Backup) unwrapNew(
 	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool,
 	createIncrementalFiles, skipRedundantTars bool) (*UnwrapResult, error) {
 	useNewUnwrapImplementation = true
-	err := checkDbDirectoryForUnwrapNew(dbDataDirectory, sentinelDto)
+	err := checkDBDirectoryForUnwrapNew(dbDataDirectory, sentinelDto)
 	if err != nil {
 		return nil, err
 	}

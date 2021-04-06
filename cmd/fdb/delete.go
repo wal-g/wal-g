@@ -103,7 +103,7 @@ func newFdbDeleteHandler(folder storage.Folder) (*internal.DeleteHandler, error)
 
 	backupObjects := make([]internal.BackupObject, 0, len(backups))
 	for _, object := range backups {
-		backupObjects = append(backupObjects, FdbBackupObject{object})
+		backupObjects = append(backupObjects, BackupObject{object})
 	}
 
 	return internal.NewDeleteHandler(folder, backupObjects, makeLessFunc()), nil
@@ -120,14 +120,14 @@ func makeLessFunc() func(object1, object2 storage.Object) bool {
 	}
 }
 
-type FdbBackupObject struct {
+type BackupObject struct {
 	storage.Object
 }
 
-func (o FdbBackupObject) IsFullBackup() bool {
+func (o BackupObject) IsFullBackup() bool {
 	return true
 }
 
-func (o FdbBackupObject) GetBackupTime() time.Time {
+func (o BackupObject) GetBackupTime() time.Time {
 	return o.Object.GetLastModified()
 }

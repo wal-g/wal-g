@@ -50,8 +50,10 @@ func FirstOverlappingBackupForArch(arch Archive, backups []Backup) Backup {
 func ArchInBackup(arch Archive, backup *Backup) bool {
 	backupStart := backup.MongoMeta.Before.LastMajTS
 	backupEnd := backup.MongoMeta.After.LastMajTS
-	return TimestampInInterval(arch.Start, backupStart, backupEnd) || TimestampInInterval(arch.End, backupStart, backupEnd) ||
-		TimestampInInterval(backupStart, arch.Start, arch.End) || TimestampInInterval(backupEnd, arch.Start, arch.End)
+	return TimestampInInterval(arch.Start, backupStart, backupEnd) ||
+		TimestampInInterval(arch.End, backupStart, backupEnd) ||
+		TimestampInInterval(backupStart, arch.Start, arch.End) ||
+		TimestampInInterval(backupEnd, arch.Start, arch.End)
 }
 
 // TimestampInInterval checks if timestamp is in given interval.

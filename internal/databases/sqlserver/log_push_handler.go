@@ -49,13 +49,13 @@ func HandleLogPush(dbnames []string, compression bool) {
 }
 
 func backupSingleLog(ctx context.Context, db *sql.DB, backupName string, dbname string, compression bool) error {
-	baseUrl := getLogBackupUrl(backupName, dbname)
+	baseURL := getLogBackupURL(backupName, dbname)
 	size, blobCount, err := estimateLogSize(db, dbname)
 	if err != nil {
 		return err
 	}
 	tracelog.InfoLogger.Printf("database [%s] log size is %d, required blob count %d", dbname, size, blobCount)
-	urls := buildBackupUrls(baseUrl, blobCount)
+	urls := buildBackupUrls(baseURL, blobCount)
 	sql := fmt.Sprintf("BACKUP LOG %s TO %s", quoteName(dbname), urls)
 	sql += fmt.Sprintf(" WITH FORMAT, MAXTRANSFERSIZE=%d", MaxTransferSize)
 	if compression {

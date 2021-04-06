@@ -58,21 +58,21 @@ func TestWalVerify_EmptyStorage(t *testing.T) {
 		Status: internal.StatusFailure,
 		Details: internal.IntegrityCheckDetails{
 			{
-				TimelineId:    3,
+				TimelineID:    3,
 				StartSegment:  "000000030000000000000001",
 				EndSegment:    "000000030000000000000002",
 				SegmentsCount: 2,
 				Status:        internal.Lost,
 			},
 			{
-				TimelineId:    3,
+				TimelineID:    3,
 				StartSegment:  "000000030000000000000003",
 				EndSegment:    "000000030000000000000006",
 				SegmentsCount: 4, //uploadingSegmentRangeSize
 				Status:        internal.ProbablyUploading,
 			},
 			{
-				TimelineId:    3,
+				TimelineID:    3,
 				StartSegment:  "000000030000000000000007",
 				EndSegment:    "000000030000000000000009",
 				SegmentsCount: 3, //delayedSegmentRangeSize
@@ -84,8 +84,8 @@ func TestWalVerify_EmptyStorage(t *testing.T) {
 	expectedTimelineCheck := internal.WalVerifyCheckResult{
 		Status: internal.StatusWarning,
 		Details: internal.TimelineCheckDetails{
-			CurrentTimelineId:        currentSegment.Timeline,
-			HighestStorageTimelineId: 0,
+			CurrentTimelineID:        currentSegment.Timeline,
+			HighestStorageTimelineID: 0,
 		},
 	}
 
@@ -117,21 +117,21 @@ func TestWalVerify_OnlyGarbageInStorage(t *testing.T) {
 		Status: internal.StatusFailure,
 		Details: internal.IntegrityCheckDetails{
 			{
-				TimelineId:    3,
+				TimelineID:    3,
 				StartSegment:  "000000030000000000000001",
 				EndSegment:    "000000030000000000000002",
 				SegmentsCount: 2,
 				Status:        internal.Lost,
 			},
 			{
-				TimelineId:    3,
+				TimelineID:    3,
 				StartSegment:  "000000030000000000000003",
 				EndSegment:    "000000030000000000000006",
 				SegmentsCount: 4, //uploadingSegmentRangeSize
 				Status:        internal.ProbablyUploading,
 			},
 			{
-				TimelineId:    3,
+				TimelineID:    3,
 				StartSegment:  "000000030000000000000007",
 				EndSegment:    "000000030000000000000009",
 				SegmentsCount: 3, //delayedSegmentRangeSize
@@ -143,9 +143,9 @@ func TestWalVerify_OnlyGarbageInStorage(t *testing.T) {
 	expectedTimelineCheck := internal.WalVerifyCheckResult{
 		Status: internal.StatusWarning,
 		Details: internal.TimelineCheckDetails{
-			CurrentTimelineId: currentSegment.Timeline,
+			CurrentTimelineID: currentSegment.Timeline,
 			// WAL storage folder is empty so highest found timeline should be zero
-			HighestStorageTimelineId: 0,
+			HighestStorageTimelineID: 0,
 		},
 	}
 
@@ -173,7 +173,7 @@ func TestWalVerify_SingleTimeline_Ok(t *testing.T) {
 		Status: internal.StatusOk,
 		Details: internal.IntegrityCheckDetails{
 			{
-				TimelineId:    5,
+				TimelineID:    5,
 				StartSegment:  "000000050000000000000001",
 				EndSegment:    "000000050000000000000004",
 				SegmentsCount: 4,
@@ -185,8 +185,8 @@ func TestWalVerify_SingleTimeline_Ok(t *testing.T) {
 	expectedTimelineCheck := internal.WalVerifyCheckResult{
 		Status: internal.StatusOk,
 		Details: internal.TimelineCheckDetails{
-			CurrentTimelineId:        currentSegment.Timeline,
-			HighestStorageTimelineId: currentSegment.Timeline,
+			CurrentTimelineID:        currentSegment.Timeline,
+			HighestStorageTimelineID: currentSegment.Timeline,
 		},
 	}
 
@@ -215,14 +215,14 @@ func TestWalVerify_SingleTimeline_SomeDelayed(t *testing.T) {
 		Status: internal.StatusWarning,
 		Details: internal.IntegrityCheckDetails{
 			{
-				TimelineId:    5,
+				TimelineID:    5,
 				StartSegment:  "000000050000000000000001",
 				EndSegment:    "000000050000000000000004",
 				SegmentsCount: 4,
 				Status:        internal.Found,
 			},
 			{
-				TimelineId:    5,
+				TimelineID:    5,
 				StartSegment:  "000000050000000000000005",
 				EndSegment:    "000000050000000000000007",
 				SegmentsCount: 3,
@@ -234,8 +234,8 @@ func TestWalVerify_SingleTimeline_SomeDelayed(t *testing.T) {
 	expectedTimelineCheck := internal.WalVerifyCheckResult{
 		Status: internal.StatusOk,
 		Details: internal.TimelineCheckDetails{
-			CurrentTimelineId:        currentSegment.Timeline,
-			HighestStorageTimelineId: currentSegment.Timeline,
+			CurrentTimelineID:        currentSegment.Timeline,
+			HighestStorageTimelineID: currentSegment.Timeline,
 		},
 	}
 
@@ -265,35 +265,35 @@ func TestWalVerify_SingleTimeline_SomeUploading(t *testing.T) {
 		Status: internal.StatusWarning,
 		Details: internal.IntegrityCheckDetails{
 			{
-				TimelineId:    5,
+				TimelineID:    5,
 				StartSegment:  "000000050000000000000001",
 				EndSegment:    "000000050000000000000003",
 				SegmentsCount: 3,
 				Status:        internal.Found,
 			},
 			{
-				TimelineId:    5,
+				TimelineID:    5,
 				StartSegment:  "000000050000000000000004",
 				EndSegment:    "000000050000000000000004",
 				SegmentsCount: 1,
 				Status:        internal.ProbablyUploading,
 			},
 			{
-				TimelineId:    5,
+				TimelineID:    5,
 				StartSegment:  "000000050000000000000005",
 				EndSegment:    "000000050000000000000005",
 				SegmentsCount: 1,
 				Status:        internal.Found,
 			},
 			{
-				TimelineId:    5,
+				TimelineID:    5,
 				StartSegment:  "000000050000000000000006",
 				EndSegment:    "000000050000000000000006",
 				SegmentsCount: 1,
 				Status:        internal.ProbablyUploading,
 			},
 			{
-				TimelineId:    5,
+				TimelineID:    5,
 				StartSegment:  "000000050000000000000007",
 				EndSegment:    "000000050000000000000007",
 				SegmentsCount: 1,
@@ -305,8 +305,8 @@ func TestWalVerify_SingleTimeline_SomeUploading(t *testing.T) {
 	expectedTimelineCheck := internal.WalVerifyCheckResult{
 		Status: internal.StatusOk,
 		Details: internal.TimelineCheckDetails{
-			CurrentTimelineId:        currentSegment.Timeline,
-			HighestStorageTimelineId: currentSegment.Timeline,
+			CurrentTimelineID:        currentSegment.Timeline,
+			HighestStorageTimelineID: currentSegment.Timeline,
 		},
 	}
 
@@ -359,14 +359,14 @@ func TestWalVerify_TwoTimelines_Ok(t *testing.T) {
 		Status: internal.StatusOk,
 		Details: internal.IntegrityCheckDetails{
 			{
-				TimelineId:    5,
+				TimelineID:    5,
 				StartSegment:  "000000050000000000000001",
 				EndSegment:    "000000050000000000000004",
 				SegmentsCount: 4,
 				Status:        internal.Found,
 			},
 			{
-				TimelineId:    6,
+				TimelineID:    6,
 				StartSegment:  "000000060000000000000005",
 				EndSegment:    "000000060000000000000008",
 				SegmentsCount: 4,
@@ -378,8 +378,8 @@ func TestWalVerify_TwoTimelines_Ok(t *testing.T) {
 	expectedTimelineCheck := internal.WalVerifyCheckResult{
 		Status: internal.StatusOk,
 		Details: internal.TimelineCheckDetails{
-			CurrentTimelineId:        currentSegment.Timeline,
-			HighestStorageTimelineId: currentSegment.Timeline,
+			CurrentTimelineID:        currentSegment.Timeline,
+			HighestStorageTimelineID: currentSegment.Timeline,
 		},
 	}
 
@@ -419,35 +419,35 @@ func TestWalVerify_TwoTimelines_SomeLost(t *testing.T) {
 		Status: internal.StatusFailure,
 		Details: internal.IntegrityCheckDetails{
 			{
-				TimelineId:    5,
+				TimelineID:    5,
 				StartSegment:  "000000050000000000000001",
 				EndSegment:    "000000050000000000000002",
 				SegmentsCount: 2,
 				Status:        internal.Found,
 			},
 			{
-				TimelineId:    5,
+				TimelineID:    5,
 				StartSegment:  "000000050000000000000003",
 				EndSegment:    "000000050000000000000003",
 				SegmentsCount: 1,
 				Status:        internal.Lost,
 			},
 			{
-				TimelineId:    5,
+				TimelineID:    5,
 				StartSegment:  "000000050000000000000004",
 				EndSegment:    "000000050000000000000004",
 				SegmentsCount: 1,
 				Status:        internal.Found,
 			},
 			{
-				TimelineId:    6,
+				TimelineID:    6,
 				StartSegment:  "000000060000000000000005",
 				EndSegment:    "000000060000000000000006",
 				SegmentsCount: 2,
 				Status:        internal.ProbablyUploading,
 			},
 			{
-				TimelineId:    6,
+				TimelineID:    6,
 				StartSegment:  "000000060000000000000007",
 				EndSegment:    "000000060000000000000008",
 				SegmentsCount: 2,
@@ -459,8 +459,8 @@ func TestWalVerify_TwoTimelines_SomeLost(t *testing.T) {
 	expectedTimelineCheck := internal.WalVerifyCheckResult{
 		Status: internal.StatusOk,
 		Details: internal.TimelineCheckDetails{
-			CurrentTimelineId:        currentSegment.Timeline,
-			HighestStorageTimelineId: currentSegment.Timeline,
+			CurrentTimelineID:        currentSegment.Timeline,
+			HighestStorageTimelineID: currentSegment.Timeline,
 		},
 	}
 
@@ -490,7 +490,7 @@ func TestWalVerify_HigherTimelineExists(t *testing.T) {
 		Status: internal.StatusOk,
 		Details: internal.IntegrityCheckDetails{
 			{
-				TimelineId:    5,
+				TimelineID:    5,
 				StartSegment:  "000000050000000000000001",
 				EndSegment:    "000000050000000000000004",
 				SegmentsCount: 4,
@@ -502,8 +502,8 @@ func TestWalVerify_HigherTimelineExists(t *testing.T) {
 	expectedTimelineCheck := internal.WalVerifyCheckResult{
 		Status: internal.StatusFailure,
 		Details: internal.TimelineCheckDetails{
-			CurrentTimelineId:        currentSegment.Timeline,
-			HighestStorageTimelineId: 7,
+			CurrentTimelineID:        currentSegment.Timeline,
+			HighestStorageTimelineID: 7,
 		},
 	}
 
@@ -576,7 +576,7 @@ func TestWalVerify_WalkUntilFirstBackup(t *testing.T) {
 		Status: internal.StatusOk,
 		Details: internal.IntegrityCheckDetails{
 			{
-				TimelineId:    6,
+				TimelineID:    6,
 				StartSegment:  "000000060000000000000006",
 				EndSegment:    "000000060000000000000008",
 				SegmentsCount: 3,
@@ -588,8 +588,8 @@ func TestWalVerify_WalkUntilFirstBackup(t *testing.T) {
 	expectedTimelineCheck := internal.WalVerifyCheckResult{
 		Status: internal.StatusOk,
 		Details: internal.TimelineCheckDetails{
-			CurrentTimelineId:        currentSegment.Timeline,
-			HighestStorageTimelineId: currentSegment.Timeline,
+			CurrentTimelineID:        currentSegment.Timeline,
+			HighestStorageTimelineID: currentSegment.Timeline,
 		},
 	}
 

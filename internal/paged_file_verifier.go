@@ -154,14 +154,14 @@ func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage) (bool, e
 	// the current segment file. see: https://goo.gl/qRTn46
 
 	// Number of current segment
-	relFileId, err := GetRelFileIdFrom(path)
+	relFileID, err := GetRelFileIDFrom(path)
 	if err != nil {
 		return false, err
 	}
 
 	// segmentBlockOffset is the absolute blockNumber of the block when taking
 	// into account any previous segment files.
-	segmentBlockOffset := uint32(relFileId * BlocksInRelFile)
+	segmentBlockOffset := uint32(relFileID * BlocksInRelFile)
 
 	checksum := pgChecksumPage(segmentBlockOffset+blockNo, page)
 

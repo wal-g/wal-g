@@ -36,7 +36,9 @@ type WalDeltaRecordingReader struct {
 	canParsePreviousRecordTail bool
 }
 
-func NewWalDeltaRecordingReader(walFileReader io.Reader, walFilename string, manager *DeltaFileManager) (*WalDeltaRecordingReader, error) {
+func NewWalDeltaRecordingReader(walFileReader io.Reader,
+	walFilename string,
+	manager *DeltaFileManager) (*WalDeltaRecordingReader, error) {
 	walParser, recorder, partRecorder, err := tryOpenParserAndRecorders(walFilename, manager)
 	if err != nil {
 		return nil, err
@@ -110,7 +112,8 @@ func (reader *WalDeltaRecordingReader) RecordBlockLocationsFromPage() error {
 	return nil
 }
 
-func tryOpenParserAndRecorders(walFilename string, manager *DeltaFileManager) (*walparser.WalParser, *WalDeltaRecorder, *WalPartRecorder, error) {
+func tryOpenParserAndRecorders(walFilename string,
+	manager *DeltaFileManager) (*walparser.WalParser, *WalDeltaRecorder, *WalPartRecorder, error) {
 	walParser := walparser.NewWalParser()
 	deltaFilename, err := GetDeltaFilenameFor(walFilename)
 	if err != nil {

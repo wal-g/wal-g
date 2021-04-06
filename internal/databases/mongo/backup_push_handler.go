@@ -9,7 +9,10 @@ import (
 )
 
 // HandleBackupPush starts backup procedure.
-func HandleBackupPush(uploader archive.Uploader, metaProvider archive.MongoMetaProvider, permanent bool, backupCmd *exec.Cmd) error {
+func HandleBackupPush(uploader archive.Uploader,
+	metaProvider archive.MongoMetaProvider,
+	permanent bool,
+	backupCmd *exec.Cmd) error {
 	if err := metaProvider.Init(permanent); err != nil {
 		return fmt.Errorf("can not initiate meta provider: %+v", err)
 	}
