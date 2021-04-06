@@ -1,4 +1,4 @@
-package ammoGenerator
+package ammogenerator
 
 import (
 	"fmt"

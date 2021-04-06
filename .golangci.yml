@@ -86,3 +86,9 @@ run:
     - "testtools"
   skip-files:
     - ".*_test.go$"
+
+severity:
+  rules:
+    - linters:
+      - godox
+      severity: info
