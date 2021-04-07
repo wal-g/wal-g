@@ -136,6 +136,17 @@ services:
     links:
       - s3
 
+  pg_backup_mark_permanent_no_error_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_backup_mark_permanent_no_error_test
+      context: .
+    image: wal-g/backup_mark_permanent_no_error_test
+    container_name: wal-g_pg_backup_mark_permanent_no_error_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   pg_backup_mark_impermanent_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_backup_mark_impermanent_test
