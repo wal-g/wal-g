@@ -124,14 +124,17 @@ func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string
 		return nil, newBackupHasPermanentBackupInFutureError(backupName)
 	}
 
-	meta.IsPermanent = false
-	metadataUploadObject, err := GetMetadataUploadObject(backup.Name, &meta)
-	if err != nil {
-		return nil, err
+	metadataToUpload := make([]UploadObject,0)
+	if meta.IsPermanent {
+		meta.IsPermanent = false
+		metadataUploadObject, err := GetMetadataUploadObject(backup.Name, &meta)
+		if err != nil {
+			return nil, err
+		}
+		metadataToUpload = append(metadataToUpload, metadataUploadObject)
 	}
-	backupMetadata := []UploadObject{metadataUploadObject}
 
-	return backupMetadata, nil
+	return metadataToUpload, nil
 }
 
 func getBackupNumber(backupName string) string {
