@@ -73,13 +73,13 @@ func (u *WalMetadataUploader) UploadWalMetadata(walFileName string, createdTime 
 }
 
 func (u *WalMetadataUploader) uploadBulkMetadataFile(walFileName string, uploader *Uploader) error {
-
 	// Creating consolidated wal metadata only for bulk option
-	// Checking if the walfile name ends with "F" (last file in the series) and consolidating all the metadata together.
-	// For example, All the metadata for the files in the series 000000030000000800000010, 000000030000000800000011 to 00000003000000080000001F
+	// Checking if the walfile name ends with "F" (last file in the series) and consolidating all 
+	// the metadata together.
+	// For example, All the metadata for the files in the series 000000030000000800000010,
+	//  000000030000000800000011 to 00000003000000080000001F
 	// will be consolidated together and single  file 00000003000000080000001.json will be created.
 	// Parameter isSourceWalPush will identify if the source of the file is from wal-push or from wal-receive.
-
 	if walFileName[len(walFileName)-1:] != "F" {
 		return nil
 	}
@@ -130,7 +130,8 @@ func checkWalMetadataLevel(walMetadataLevel string) error {
 		}
 	}
 	if !isCorrect {
-		return errors.Errorf("got incorrect Wal metadata  level: '%s', expected one of: '%v'", walMetadataLevel, WalMetadataLevels)
+		return errors.Errorf("got incorrect Wal metadata  level: '%s', expected one of: '%v'", 
+		walMetadataLevel, WalMetadataLevels)
 	}
 	return nil
 }

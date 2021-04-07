@@ -11,7 +11,7 @@ import (
 const logRestoreShortDescription = "Restores log from the storage"
 
 var logRestoreBackupName string
-var logRestoreUntilTs string
+var logRestoreUntilTS string
 var logRestoreDatabases []string
 var logRestoreFrom []string
 var logRestoreNoRecovery bool
@@ -21,14 +21,14 @@ var logRestoreCmd = &cobra.Command{
 	Short: logRestoreShortDescription,
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		sqlserver.HandleLogRestore(logRestoreBackupName, logRestoreUntilTs, logRestoreDatabases, logRestoreFrom, logRestoreNoRecovery)
+		sqlserver.HandleLogRestore(logRestoreBackupName, logRestoreUntilTS, logRestoreDatabases, logRestoreFrom, logRestoreNoRecovery)
 	},
 }
 
 func init() {
 	logRestoreCmd.PersistentFlags().StringVar(&logRestoreBackupName, "since", "LATEST",
 		"backup name starting from which you want to restore logs")
-	logRestoreCmd.PersistentFlags().StringVar(&logRestoreUntilTs, "until",
+	logRestoreCmd.PersistentFlags().StringVar(&logRestoreUntilTS, "until",
 		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339), "time in RFC3339 for PITR")
 	logRestoreCmd.PersistentFlags().StringSliceVarP(&logRestoreDatabases, "databases", "d", []string{},
 		"List of databases to restore logs. All non-system databases from backup as default")

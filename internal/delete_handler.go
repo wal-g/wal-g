@@ -31,13 +31,16 @@ const (
 	DeleteBeforeExamples = `  before base_0123              keep everything after base_0123 including itself
   before FIND_FULL base_0123    keep everything after the base of base_0123`
 
-	DeleteEverythingExamples = `  everything                delete every backup only if there is no permanent backups
+	DeleteEverythingExamples = `  everything                
+	delete every backup only if there is no permanent backups
   everything FORCE          delete every backup include permanents`
 
 	DeleteTargetExamples = `  target base_0000000100000000000000C4	delete base backup by name
   target --target-user-data "{ \"x\": [3], \"y\": 4 }"	delete backup specified by user data
-  target base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all dependant delta backups
-  target FIND_FULL base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all delta backups with the same base backup
+  target base_0000000100000000000000C9_D_0000000100000000000000C4	
+  delete delta backup and all dependant delta backups
+  target FIND_FULL base_0000000100000000000000C9_D_0000000100000000000000C4	
+  delete delta backup and all delta backups with the same base backup
 `
 
 	DeleteEverythingUsageExample = "everything [FORCE]"
@@ -333,7 +336,8 @@ func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool) er
 		backupNamesToDelete[target.GetBackupName()] = true
 	}
 
-	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath), confirmed, func(object storage.Object) bool {
+	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath),
+	 confirmed, func(object storage.Object) bool {
 		return backupNamesToDelete[utility.StripLeftmostBackupName(object.GetName())] && !h.isPermanent(object)
 	})
 }
@@ -389,11 +393,8 @@ func (h *DeleteHandler) findDependantBackups(target BackupObject) []BackupObject
 	for len(queue) > 0 {
 		curr, queue = queue[0], queue[1:]
 		relatedBackups = append(relatedBackups, curr)
-		for _, backup := range incrementsByBackup[curr.GetBackupName()] {
-			queue = append(queue, backup)
-		}
+		queue = append(queue, incrementsByBackup[curr.GetBackupName()]...)
 	}
-
 	return relatedBackups
 }
 

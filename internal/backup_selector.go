@@ -114,7 +114,7 @@ func NewTargetBackupSelector(targetUserData, targetName string) (BackupSelector,
 	var err error
 	switch {
 	case targetName != "" && targetUserData != "":
-		err = errors.New("Incorrect arguments. Specify target backup name OR target userdata, not both.")
+		err = errors.New("incorrect arguments. Specify target backup name OR target userdata, not both")
 
 	case targetName == LatestString:
 		tracelog.InfoLogger.Printf("Selecting the latest backup...\n")
@@ -129,7 +129,7 @@ func NewTargetBackupSelector(targetUserData, targetName string) (BackupSelector,
 		return NewUserDataBackupSelector(targetUserData), nil
 
 	default:
-		err = errors.New("Insufficient arguments.")
+		err = errors.New("insufficient arguments")
 	}
 	return nil, err
 }

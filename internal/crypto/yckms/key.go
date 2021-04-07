@@ -136,9 +136,9 @@ func (key *ycSymmetricKey) CreateKey() error {
 	return nil
 }
 
-func YcSymmetricKeyFromKeyIDAndSdk(keyId string, sdk *ycsdk.SDK) ycSymmetricKeyInterface {
+func YcSymmetricKeyFromKeyIDAndSdk(keyID string, sdk *ycsdk.SDK) ycSymmetricKeyInterface {
 	return &ycSymmetricKey{
-		keyID:        keyId,
+		keyID:        keyID,
 		key:          nil,
 		encryptedKey: nil,
 		sdk:          sdk,
