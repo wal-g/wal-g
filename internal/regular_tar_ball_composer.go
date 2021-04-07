@@ -16,6 +16,7 @@ type RegularTarBallComposer struct {
 	files         *RegularBundleFiles
 	tarFileSets   TarFileSets
 	errorGroup    *errgroup.Group
+	ctx           context.Context
 }
 
 func NewRegularTarBallComposer(
@@ -24,7 +25,7 @@ func NewRegularTarBallComposer(
 	files *RegularBundleFiles,
 	crypter crypto.Crypter,
 ) *RegularTarBallComposer {
-	errorGroup, _ := errgroup.WithContext(context.Background())
+	errorGroup, ctx := errgroup.WithContext(context.Background())
 	return &RegularTarBallComposer{
 		tarBallQueue:  tarBallQueue,
 		tarFilePacker: tarBallFilePacker,
@@ -32,6 +33,7 @@ func NewRegularTarBallComposer(
 		files:         files,
 		tarFileSets:   make(TarFileSets),
 		errorGroup:    errorGroup,
+		ctx:           ctx,
 	}
 }
 
@@ -50,7 +52,10 @@ func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (TarBallComposer,
 }
 
 func (c *RegularTarBallComposer) AddFile(info *ComposeFileInfo) {
-	tarBall := c.tarBallQueue.Deque()
+	tarBall, err := c.tarBallQueue.DequeCtx(c.ctx)
+	if err != nil {
+		return
+	}
 	tarBall.SetUp(c.crypter)
 	c.tarFileSets[tarBall.Name()] = append(c.tarFileSets[tarBall.Name()], info.header.Name)
 	c.errorGroup.Go(func() error {
@@ -63,7 +68,10 @@ func (c *RegularTarBallComposer) AddFile(info *ComposeFileInfo) {
 }
 
 func (c *RegularTarBallComposer) AddHeader(fileInfoHeader *tar.Header, info os.FileInfo) error {
-	tarBall := c.tarBallQueue.Deque()
+	tarBall, err := c.tarBallQueue.DequeCtx(c.ctx)
+	if err != nil {
+		return c.errorGroup.Wait()
+	}
 	tarBall.SetUp(c.crypter)
 	defer c.tarBallQueue.EnqueueBack(tarBall)
 	c.tarFileSets[tarBall.Name()] = append(c.tarFileSets[tarBall.Name()], fileInfoHeader.Name)
