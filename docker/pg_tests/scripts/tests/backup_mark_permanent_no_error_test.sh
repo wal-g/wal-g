@@ -58,24 +58,4 @@ pgbench -i -s 1 postgres &
 sleep 1
 wal-g --config=${TMP_CONFIG} backup-push "${PGDATA}" --permanent
 
-# save backup-list output before delete
-lines_before_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
-wal-g --config=${TMP_CONFIG} backup-list > /tmp/list_before_delete
-
-# try to delete all backups
-last_backup_name=$(wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " ")
-wal-g --config=${TMP_CONFIG} delete before "$last_backup_name" --confirm
-wal-g --config=${TMP_CONFIG} backup-list
-
-lines_after_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
-wal-g --config=${TMP_CONFIG} backup-list > /tmp/list_after_delete
-
-if [ $(($lines_before_delete)) -ne $lines_after_delete ];
-then
-    echo $(($lines_before_delete)) > /tmp/before_delete
-    echo $lines_after_delete > /tmp/after_delete
-    echo "Wrong number of deleted lines"
-    diff /tmp/before_delete /tmp/after_delete
-fi
-
 /tmp/scripts/drop_pg.sh
