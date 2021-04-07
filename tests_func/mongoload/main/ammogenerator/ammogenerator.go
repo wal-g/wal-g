@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	ammoGenerator.Execute()
+	ammogenerator.Execute()
 }
