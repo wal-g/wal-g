@@ -41,8 +41,8 @@ last_backup_name=`wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 
 wal-g --config=${TMP_CONFIG} backup-mark "$last_backup_name"
 
 # both should be true (is_permanent: true)
-first_backup_status=$(wal-g --config=${TMP_CONFIG} backup-list --detail | awk 'NR==2 {print $1}' | egrep -o -e "true" -e "false")
-last_backup_status=$(wal-g --config=${TMP_CONFIG} backup-list --detail | awk 'END {print $1}' | egrep -o -e "true" -e "false")
+first_backup_status=$(wal-g --config=${TMP_CONFIG} backup-list --detail | awk 'NR==2 {print $0}' | egrep -o -e "true" -e "false")
+last_backup_status=$(wal-g --config=${TMP_CONFIG} backup-list --detail | awk 'END {print $0}' | egrep -o -e "true" -e "false")
 
 if [ $first_backup_status != $last_backup_status ];
 then
