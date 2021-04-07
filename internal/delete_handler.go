@@ -337,9 +337,9 @@ func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool) er
 	}
 
 	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath),
-	 confirmed, func(object storage.Object) bool {
-		return backupNamesToDelete[utility.StripLeftmostBackupName(object.GetName())] && !h.isPermanent(object)
-	})
+		confirmed, func(object storage.Object) bool {
+			return backupNamesToDelete[utility.StripLeftmostBackupName(object.GetName())] && !h.isPermanent(object)
+		})
 }
 
 // Find all backups related to the target.

@@ -22,8 +22,8 @@ func NewInconsistentBlockImageHoleStateError(holeOffset uint16,
 	imageLength uint16,
 	hasHole bool) InconsistentBlockImageHoleStateError {
 	return InconsistentBlockImageHoleStateError{errors.Errorf(
-		"block image hole state is inconsistent: " +
-			"holeOffset is: %v, holeLength is: %v, " +
+		"block image hole state is inconsistent: "+
+			"holeOffset is: %v, holeLength is: %v, "+
 			"imageLength is: %v, while hasHole is: %v",
 		holeOffset, holeLength, imageLength, hasHole)}
 }
@@ -40,9 +40,9 @@ func NewInconsistentBlockImageLengthError(hasHole bool,
 	isCompressed bool,
 	length uint16) InconsistentBlockImageLengthError {
 	return InconsistentBlockImageLengthError{
-		errors.Errorf("block image has invalid state: " +
-			"hasHole: %v, " +
-			"isCompressed: %v, " +
+		errors.Errorf("block image has invalid state: "+
+			"hasHole: %v, "+
+			"isCompressed: %v, "+
 			"imageLength: %v",
 			hasHole,
 			isCompressed,

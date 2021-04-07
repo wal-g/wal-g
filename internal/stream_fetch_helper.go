@@ -41,8 +41,8 @@ func downloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) err
 
 	for _, decompressor := range compression.Decompressors {
 		archiveReader,
-		exists,
-		err := TryDownloadFile(backup.BaseBackupFolder, GetStreamName(backup.Name, decompressor.FileExtension()))
+			exists,
+			err := TryDownloadFile(backup.BaseBackupFolder, GetStreamName(backup.Name, decompressor.FileExtension()))
 		if err != nil {
 			return err
 		}

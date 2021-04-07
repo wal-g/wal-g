@@ -79,8 +79,8 @@ func NewStorageDownloader(opts StorageSettings) (*StorageDownloader, error) {
 		return nil, err
 	}
 	return &StorageDownloader{rootFolder: folder,
-		oplogsFolder: folder.GetSubFolder(opts.oplogsPath),
-		backupsFolder: folder.GetSubFolder(opts.backupsPath)},
+			oplogsFolder:  folder.GetSubFolder(opts.oplogsPath),
+			backupsFolder: folder.GetSubFolder(opts.backupsPath)},
 		nil
 }
 

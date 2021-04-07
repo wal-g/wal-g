@@ -61,9 +61,9 @@ func readTimeline(conn *pgx.Conn) (timeline uint32, err error) {
 
 	// TODO: Check if this logic can be moved to queryRunner or abstracted away somehow
 	err = conn.QueryRow(
-		"select timeline_id, " +
-			"bytes_per_wal_segment " +
-			"from pg_control_checkpoint(), " +
+		"select timeline_id, "+
+			"bytes_per_wal_segment "+
+			"from pg_control_checkpoint(), "+
 			"pg_control_init()").Scan(&timeline, &bytesPerWalSegment)
 	if err == nil && uint64(bytesPerWalSegment) != WalSegmentSize {
 		return 0, newBytesPerWalSegmentError()

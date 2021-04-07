@@ -413,8 +413,8 @@ func GetOplogArchiveAfterSize() (int, error) {
 	oplogArchiveAfterSize, err := strconv.Atoi(oplogArchiveAfterSizeStr)
 	if err != nil {
 		return 0,
-		fmt.Errorf("integer expected for %s setting but given '%s': %w",
-			OplogArchiveAfterSize, oplogArchiveAfterSizeStr, err)
+			fmt.Errorf("integer expected for %s setting but given '%s': %w",
+				OplogArchiveAfterSize, oplogArchiveAfterSizeStr, err)
 	}
 	return oplogArchiveAfterSize, nil
 }

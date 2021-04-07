@@ -94,9 +94,9 @@ func WildcardInfo(from storage.Folder, to storage.Folder) ([]copy.InfoProvider, 
 	}
 
 	return copy.BuildCopyingInfos(from,
-		to,
-		objects,
-		func(object storage.Object) bool { return true },
-		copy.NoopRenameFunc),
+			to,
+			objects,
+			func(object storage.Object) bool { return true },
+			copy.NoopRenameFunc),
 		nil
 }

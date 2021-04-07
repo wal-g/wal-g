@@ -103,8 +103,8 @@ func getMySQLConnectionFromDatasource(datasourceName string) (*sql.DB, error) {
 		}
 		if strings.Contains(datasourceName, "?tls=") || strings.Contains(datasourceName, "&tls=") {
 			return nil,
-			fmt.Errorf("mySQL datasource string contains tls option. It can't be used with %v option",
-				internal.MysqlSslCaSetting)
+				fmt.Errorf("mySQL datasource string contains tls option. It can't be used with %v option",
+					internal.MysqlSslCaSetting)
 		}
 		if strings.Contains(datasourceName, "?") {
 			datasourceName += "&tls=custom"

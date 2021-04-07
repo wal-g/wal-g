@@ -147,7 +147,7 @@ func TestStripPrefixName(t *testing.T) {
 
 func TestStripLeftmostBackupName(t *testing.T) {
 	var testCases = []struct {
-		input string
+		input    string
 		expected string
 	}{
 		{"stream_20210329T125616Z/metadata.json", "stream_20210329T125616Z"},

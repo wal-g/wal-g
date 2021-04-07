@@ -223,9 +223,9 @@ func prefetchFile(location string, folder storage.Folder, walFileName string, wa
 
 func getPrefetchLocations(location string,
 	walFileName string) (prefetchLocation string,
-						runningLocation string,
-						runningFile string,
-						fetchedFile string) {
+	runningLocation string,
+	runningFile string,
+	fetchedFile string) {
 	prefetchLocation = path.Join(location, ".wal-g", "prefetch")
 	runningLocation = path.Join(prefetchLocation, "running")
 	oldPath := path.Join(runningLocation, walFileName)

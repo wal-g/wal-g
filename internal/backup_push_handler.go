@@ -215,8 +215,8 @@ func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanen
 		tracelog.InfoLogger.Println("Doing full backup.")
 	} else {
 		previousBackupName,
-		previousBackupSentinelDto,
-		incrementCount = configureDeltaBackup(uploader.UploadingFolder, deltaBaseSelector, isPermanent)
+			previousBackupSentinelDto,
+			incrementCount = configureDeltaBackup(uploader.UploadingFolder, deltaBaseSelector, isPermanent)
 	}
 
 	backupConfig := BackupConfig{

@@ -82,8 +82,7 @@ func buildOplogReplayRunArgs(cmdargs []string) (args oplogReplayRunArgs, err err
 		args.oplogAlwaysUpsert = &oplogAlwaysUpsert
 	}
 
-	if oplogApplicationMode, hasOplogApplicationMode := internal.GetSetting(internal.OplogReplayOplogApplicationMode)
-	hasOplogApplicationMode {
+	if oplogApplicationMode, hasOplogApplicationMode := internal.GetSetting(internal.OplogReplayOplogApplicationMode); hasOplogApplicationMode {
 		args.oplogApplicationMode = &oplogApplicationMode
 	}
 

@@ -157,6 +157,6 @@ func (symmetricKey *SymmetricKey) GetKeyLen() int {
 func NewSymmetricKey(kmsKeyID string, keyLen int, encryptedKeyLen int, kmsRegion string) *SymmetricKey {
 	return &SymmetricKey{SymmetricKeyLen: keyLen,
 		EncryptedSymmetricKeyLen: encryptedKeyLen,
-		KeyID: kmsKeyID,
-		Region: kmsRegion}
+		KeyID:                    kmsKeyID,
+		Region:                   kmsRegion}
 }

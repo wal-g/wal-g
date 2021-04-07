@@ -148,20 +148,20 @@ func writeBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
 	_, _ = fmt.Fprintln(writer,
-		"name\t" +
-		"last_modified\t" +
-		"wal_segment_backup_start\t" +
-		"start_time\t" +
-		"finish_time\t" +
-		"hostname\t" +
-		"data_dir\t" +
-		"pg_version\t" +
-		"start_lsn\t" +
-		"finish_lsn\t" +
-		"is_permanent")
+		"name\t"+
+			"last_modified\t"+
+			"wal_segment_backup_start\t"+
+			"start_time\t"+
+			"finish_time\t"+
+			"hostname\t"+
+			"data_dir\t"+
+			"pg_version\t"+
+			"start_lsn\t"+
+			"finish_lsn\t"+
+			"is_permanent")
 	for i := len(backupDetails) - 1; i >= 0; i-- {
 		b := backupDetails[i]
-		_, _ = fmt.Fprintf(writer,"%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
+		_, _ = fmt.Fprintf(writer, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
 			b.BackupName,
 			b.Time.Format(time.RFC3339),
 			b.WalFileName,

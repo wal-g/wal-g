@@ -138,9 +138,9 @@ func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
 			return true
 		}
 
-// Per discussion in
-//nolint:lll    // https://www.postgresql.org/message-id/flat/BF2AD4A8-E7F5-486F-92C8-A6959040DEB6%40yandex-team.ru#BF2AD4A8-E7F5-486F-92C8-A6959040DEB6@yandex-team.ru
-// Following check is the very pessimistic approach on replica backup invalidation
+		// Per discussion in
+		//nolint:lll    // https://www.postgresql.org/message-id/flat/BF2AD4A8-E7F5-486F-92C8-A6959040DEB6%40yandex-team.ru#BF2AD4A8-E7F5-486F-92C8-A6959040DEB6@yandex-team.ru
+		// Following check is the very pessimistic approach on replica backup invalidation
 		if timeline != bundle.Timeline {
 			tracelog.ErrorLogger.Printf("Timeline has changed since backup start. Sentinel for the backup will not be uploaded.")
 			return true
@@ -277,9 +277,9 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 		// It is important to take MTime before ReadIncrementalFile()
 		time := info.ModTime()
 
-// We do not rely here on monotonic time, instead we backup file if MTime changed somehow
-// For details see
-//nolint:lll    // https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
+		// We do not rely here on monotonic time, instead we backup file if MTime changed somehow
+		// For details see
+		//nolint:lll    // https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
 
 		if (wasInBase || bundle.forceIncremental) && (time.Equal(baseFile.MTime)) {
 			// File was not changed since previous backup

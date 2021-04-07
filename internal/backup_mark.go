@@ -181,7 +181,7 @@ func getGraphFromBaseToIncrement(folder storage.Folder) (map[string][]string, er
 }
 
 func GetMetadataFromBackup(baseBackupFolder storage.Folder,
-	 backupName string) (incrementFrom string, isIncrement bool, err error) {
+	backupName string) (incrementFrom string, isIncrement bool, err error) {
 	backup := NewBackup(baseBackupFolder, backupName)
 	sentinel, err := backup.GetSentinel()
 	if err != nil {
@@ -268,9 +268,9 @@ func IsPermanent(objectName string, permanentBackups, permanentWals map[string]b
 		return permanentWals[wal]
 	}
 	if objectName[:len(utility.BaseBackupPath)] == utility.BaseBackupPath {
-		var startIndex = len(utility.BaseBackupPath)+len(utility.BackupNamePrefix)
-		var endIndex = len(utility.BaseBackupPath)+len(utility.BackupNamePrefix)+24
-		backup := objectName[startIndex : endIndex]
+		var startIndex = len(utility.BaseBackupPath) + len(utility.BackupNamePrefix)
+		var endIndex = len(utility.BaseBackupPath) + len(utility.BackupNamePrefix) + 24
+		backup := objectName[startIndex:endIndex]
 		return permanentBackups[backup]
 	}
 	// should not reach here, default to false

@@ -50,12 +50,12 @@ func NewDeltaFileManager(dataFolder fsutil.DataFolder) *DeltaFileManager {
 	})
 	manager.DeltaFileWriters = newLazyCache(
 		func(deltaFilenameInterface interface{}) (deltaFileWriter interface{}, err error) {
-		deltaFilename, ok := deltaFilenameInterface.(string)
-		if !ok {
-			return nil, newWrongTypeError("string")
-		}
-		return manager.loadDeltaFileWriter(deltaFilename)
-	})
+			deltaFilename, ok := deltaFilenameInterface.(string)
+			if !ok {
+				return nil, newWrongTypeError("string")
+			}
+			return manager.loadDeltaFileWriter(deltaFilename)
+		})
 	manager.canceledWaiter.Add(1)
 	go manager.collectCanceledDeltaFiles()
 	return manager
