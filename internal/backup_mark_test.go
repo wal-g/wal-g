@@ -189,7 +189,7 @@ func TestGetBackupMetadataToUpload_tryToMarkAlreadyMarkedBackup(t *testing.T) {
 	expectUploadObjectLen := 0
 	expectUploadObjectPaths := map[int]string{}
 
-	testGetBackupMetadataToUpload(backups, true, true, toMark, expectUploadObjectLen, expectUploadObjectPaths, t)
+	testGetBackupMetadataToUpload(backups, true, false, toMark, expectUploadObjectLen, expectUploadObjectPaths, t)
 }
 
 func TestGetBackupMetadataToUpload_tryToUnmarkAlreadyUnmarkedBackup(t *testing.T) {
@@ -207,7 +207,7 @@ func TestGetBackupMetadataToUpload_tryToUnmarkAlreadyUnmarkedBackup(t *testing.T
 	expectUploadObjectLen := 0
 	expectUploadObjectPaths := map[int]string{}
 
-	testGetBackupMetadataToUpload(backups, false, true, toMark, expectUploadObjectLen, expectUploadObjectPaths, t)
+	testGetBackupMetadataToUpload(backups, false, false, toMark, expectUploadObjectLen, expectUploadObjectPaths, t)
 }
 
 func TestGetBackupMetadataToUpload_tryToUnmarkBackupWithMarkedIncrementBackups(t *testing.T) {
@@ -261,7 +261,7 @@ func testGetBackupMetadataToUpload(
 	uploadObjects, err := internal.GetMarkedBackupMetadataToUpload(folder, toMark, toPermanent)
 	if !isErrorExpect {
 		assert.NoError(t, err)
-		assert.Equal(t, len(uploadObjects), expectUploadObjectLen)
+		assert.Equal(t, expectUploadObjectLen, len(uploadObjects))
 		for idx, path := range expectUploadObjectPaths {
 			assert.Equal(t, uploadObjects[idx].Path, path)
 		}
