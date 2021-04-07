@@ -56,6 +56,9 @@ func (c *RegularTarBallComposer) AddFile(info *ComposeFileInfo) {
 	c.errorGroup.Go(func() error {
 		err := c.tarFilePacker.PackFileIntoTar(info, tarBall)
 		if err != nil {
+			// put it back otherwise another Dequeu will block and the user
+			// might never see the error because of a deadlock there.
+			c.tarBallQueue.EnqueueBack(tarBall)
 			return err
 		}
 		return c.tarBallQueue.CheckSizeAndEnqueueBack(tarBall)
