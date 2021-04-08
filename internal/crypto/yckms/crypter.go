@@ -13,7 +13,7 @@ import (
 )
 
 type YcCrypter struct {
-	symmetricKey ycSymmetricKeyInterface
+	symmetricKey YcSymmetricKeyInterface
 }
 
 func (crypter *YcCrypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {

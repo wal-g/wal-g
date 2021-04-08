@@ -301,7 +301,9 @@ func (inf *Infra) Setup() error {
 }
 
 func (inf *Infra) RecreateContainers() error {
-	if err := inf.callCompose([]string{"--verbose", "--log-level", "WARNING", "down", "--volumes", "--timeout", "0"}); err != nil {
+	if err := inf.callCompose([]string{"--verbose",
+		"--log-level", "WARNING", "down", "--volumes", "--timeout", "0"});
+	err != nil {
 		return err
 	}
 	return inf.callCompose([]string{"--verbose", "--log-level", "WARNING", "up", "--detach"})

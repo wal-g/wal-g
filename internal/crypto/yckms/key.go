@@ -15,7 +15,7 @@ const (
 	schemeVersion byte = 1
 )
 
-type ycSymmetricKeyInterface interface {
+type YcSymmetricKeyInterface interface {
 	GetKey() []byte
 	Decrypt() error
 	GetEncryptedKey() []byte
@@ -136,7 +136,7 @@ func (key *ycSymmetricKey) CreateKey() error {
 	return nil
 }
 
-func YcSymmetricKeyFromKeyIDAndSdk(keyID string, sdk *ycsdk.SDK) ycSymmetricKeyInterface {
+func YcSymmetricKeyFromKeyIDAndSdk(keyID string, sdk *ycsdk.SDK) YcSymmetricKeyInterface {
 	return &ycSymmetricKey{
 		keyID:        keyID,
 		key:          nil,

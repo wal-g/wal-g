@@ -168,7 +168,9 @@ func (mc *MongoCtl) connect(creds *AuthCreds) (*mongo.Client, error) {
 		auth = fmt.Sprintf("%s:%s@", creds.Username, creds.Password)
 		dbase = creds.Database
 	}
-	uri := fmt.Sprintf("mongodb://%s%s:%d/%s?connect=direct&w=majority&socketTimeoutMS=3000&connectTimeoutMS=3000", auth, mc.expHost, mc.expPort, dbase)
+	uri := fmt.Sprintf("mongodb://%s%s:%d/%s" +
+		"?connect=direct&w=majority&socketTimeoutMS=3000&connectTimeoutMS=3000",
+		auth, mc.expHost, mc.expPort, dbase)
 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
 	if err != nil {
 		return nil, fmt.Errorf("can not create mongo client: %v", err)
@@ -380,7 +382,9 @@ func (mc *MongoCtl) InitReplSet() error {
 	if im.SetName != "" {
 		return nil
 	}
-	_, err = mc.runCmd([]string{"mongo", "--host", "localhost", "--quiet", "--norc", "--port", "27018", "--eval", "rs.initiate()"})
+	_, err = mc.runCmd([]string{"mongo",
+		"--host", "localhost", "--quiet", "--norc",
+		"--port", "27018", "--eval", "rs.initiate()"})
 	time.Sleep(3 * time.Second) // TODO: wait until rs initiated
 
 	return err

@@ -21,7 +21,8 @@ var logRestoreCmd = &cobra.Command{
 	Short: logRestoreShortDescription,
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		sqlserver.HandleLogRestore(logRestoreBackupName, logRestoreUntilTS, logRestoreDatabases, logRestoreFrom, logRestoreNoRecovery)
+		sqlserver.HandleLogRestore(logRestoreBackupName,
+			logRestoreUntilTS, logRestoreDatabases, logRestoreFrom, logRestoreNoRecovery)
 	},
 }
 
