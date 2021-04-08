@@ -92,4 +92,5 @@ severity:
   rules:
     - linters:
       - godox
+      - deadcode
       severity: info

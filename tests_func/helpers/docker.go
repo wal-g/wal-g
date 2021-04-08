@@ -87,7 +87,8 @@ func RunCommandStrict(ctx context.Context, container string, command []string) (
 
 }
 
-func RunCommand(ctx context.Context, container string, cmd []string, setters ...RunOption) (ExecResult, error) {
+func RunCommand(ctx context.Context,
+	container string, cmd []string, setters ...RunOption) (ExecResult, error) {
 	args := &RunOptions{}
 	for _, setter := range setters {
 		setter(args)
@@ -274,7 +275,8 @@ type Infra struct {
 	baseImage BaseImage
 }
 
-func NewInfra(ctx context.Context, config string, env map[string]string, net string, base BaseImage) *Infra {
+func NewInfra(ctx context.Context,
+	config string, env map[string]string, net string, base BaseImage) *Infra {
 	return &Infra{
 		ctx:       ctx,
 		config:    config,
@@ -293,7 +295,8 @@ func (inf *Infra) Setup() error {
 		return fmt.Errorf("can not build base image: %v", err)
 	}
 
-	if err := inf.callCompose([]string{"--verbose", "--log-level", "WARNING", "build"}); err != nil {
+	if err := inf.callCompose([]string{"--verbose",
+		"--log-level", "WARNING", "build"}); err != nil {
 		return fmt.Errorf("can not build images: %v", err)
 	}
 
@@ -302,15 +305,15 @@ func (inf *Infra) Setup() error {
 
 func (inf *Infra) RecreateContainers() error {
 	if err := inf.callCompose([]string{"--verbose",
-		"--log-level", "WARNING", "down", "--volumes", "--timeout", "0"});
-	err != nil {
+		"--log-level", "WARNING", "down", "--volumes", "--timeout", "0"}); err != nil {
 		return err
 	}
 	return inf.callCompose([]string{"--verbose", "--log-level", "WARNING", "up", "--detach"})
 }
 
 func (inf *Infra) Shutdown() error {
-	if err := inf.callCompose([]string{"down", "--rmi", "local", "--remove-orphans", "--timeout", "0"}); err != nil {
+	if err := inf.callCompose([]string{"down",
+		"--rmi", "local", "--remove-orphans", "--timeout", "0"}); err != nil {
 		return fmt.Errorf("can not shutdown containers: %v", err)
 	}
 
@@ -323,7 +326,8 @@ func (inf *Infra) Shutdown() error {
 func (inf *Infra) callCompose(actions []string) error {
 	baseArgs := []string{"--file", inf.config, "-p", "test"}
 	baseArgs = append(baseArgs, actions...)
-	// lookup the full path before exec.CommandContext call (fixes https://github.com/docker/compose/issues/1135)
+	// lookup the full path before exec.CommandContext call
+	// (fixes https://github.com/docker/compose/issues/1135)
 	fullPath, err := exec.LookPath("docker-compose")
 	if err != nil {
 		return err

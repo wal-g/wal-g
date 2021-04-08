@@ -213,7 +213,7 @@ type BackupAlreadyThisTypePermanentError struct {
 func newBackupAlreadyThisTypePermanentError(backupName string,
 	permanentType string) BackupAlreadyThisTypePermanentError {
 	return BackupAlreadyThisTypePermanentError{errors.Errorf("Backup '%s' is already %s.",
-                                                           backupName, permanentType)}
+		backupName, permanentType)}
 }
 
 type BackupHasPermanentBackupInFutureError struct {

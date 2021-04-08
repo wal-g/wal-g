@@ -74,12 +74,12 @@ func CreateMockStorageFolder() storage.Folder {
 	subFolder.PutObject("base_456_backup_stop_sentinel.json", strings.NewReader("{}")) //nolint:errcheck
 	subFolder.PutObject("base_000_backup_stop_sentinel.json", &bytes.Buffer{})         //nolint:errcheck// last put
 	// not a sentinel
-	subFolder.PutObject("base_123312", &bytes.Buffer{})                                //nolint:errcheck
-	subFolder.PutObject("base_321/nop", &bytes.Buffer{})                               //nolint:errcheck
-	subFolder.PutObject("folder123/nop", &bytes.Buffer{})                              //nolint:errcheck
-	subFolder.PutObject("base_456/tar_partitions/1", &bytes.Buffer{})                  //nolint:errcheck
-	subFolder.PutObject("base_456/tar_partitions/2", &bytes.Buffer{})                  //nolint:errcheck
-	subFolder.PutObject("base_456/tar_partitions/3", &bytes.Buffer{})                  //nolint:errcheck
+	subFolder.PutObject("base_123312", &bytes.Buffer{})               //nolint:errcheck
+	subFolder.PutObject("base_321/nop", &bytes.Buffer{})              //nolint:errcheck
+	subFolder.PutObject("folder123/nop", &bytes.Buffer{})             //nolint:errcheck
+	subFolder.PutObject("base_456/tar_partitions/1", &bytes.Buffer{}) //nolint:errcheck
+	subFolder.PutObject("base_456/tar_partitions/2", &bytes.Buffer{}) //nolint:errcheck
+	subFolder.PutObject("base_456/tar_partitions/3", &bytes.Buffer{}) //nolint:errcheck
 	return folder
 }
 

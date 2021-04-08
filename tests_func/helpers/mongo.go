@@ -168,7 +168,7 @@ func (mc *MongoCtl) connect(creds *AuthCreds) (*mongo.Client, error) {
 		auth = fmt.Sprintf("%s:%s@", creds.Username, creds.Password)
 		dbase = creds.Database
 	}
-	uri := fmt.Sprintf("mongodb://%s%s:%d/%s" +
+	uri := fmt.Sprintf("mongodb://%s%s:%d/%s"+
 		"?connect=direct&w=majority&socketTimeoutMS=3000&connectTimeoutMS=3000",
 		auth, mc.expHost, mc.expPort, dbase)
 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
