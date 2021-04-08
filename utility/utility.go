@@ -187,21 +187,10 @@ func (p *BytesPool) Put(b []byte) {
 
 // FastCopy copies data from src to dst in blocks of CopiedBlockMaxSize bytes
 func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
-	n := int64(0)
 	buf := copyBytesPool.Get()
 	defer copyBytesPool.Put(buf)
 
-	for {
-		m, readingErr := src.Read(buf)
-		if readingErr != nil && readingErr != io.EOF {
-			return n, readingErr
-		}
-		m, writingErr := dst.Write(buf[:m])
-		n += int64(m)
-		if writingErr != nil || readingErr == io.EOF {
-			return n, writingErr
-		}
-	}
+	return io.CopyBuffer(dst, src, buf)
 }
 
 func StripRightmostBackupName(path string) string {

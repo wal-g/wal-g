@@ -48,7 +48,7 @@ func GetMarkedBackupMetadataToUpload(
 		if !meta.IsPermanent {
 			permanentType = "impermanent"
 		}
-		return nil, newBackupAlreadyThisTypePermanentError(backupName, permanentType)
+		tracelog.WarningLogger.Printf("Backup %s is already marked as %s, ignoring...", backupName, permanentType)
 	}
 
 	if toPermanent {
@@ -123,14 +123,17 @@ func getMarkedImpermanentBackupMetadata(folder storage.Folder, backupName string
 		return nil, newBackupHasPermanentBackupInFutureError(backupName)
 	}
 
-	meta.IsPermanent = false
-	metadataUploadObject, err := GetMetadataUploadObject(backup.Name, &meta)
-	if err != nil {
-		return nil, err
+	metadataToUpload := make([]UploadObject, 0)
+	if meta.IsPermanent {
+		meta.IsPermanent = false
+		metadataUploadObject, err := GetMetadataUploadObject(backup.Name, &meta)
+		if err != nil {
+			return nil, err
+		}
+		metadataToUpload = append(metadataToUpload, metadataUploadObject)
 	}
-	backupMetadata := []UploadObject{metadataUploadObject}
 
-	return backupMetadata, nil
+	return metadataToUpload, nil
 }
 
 func getBackupNumber(backupName string) string {
@@ -202,14 +205,11 @@ func GetMetadataUploadObject(backupName string, meta *ExtendedMetadataDto) (Uplo
 	return UploadObject{metaFilePath, bytes.NewReader(dtoBody)}, nil
 }
 
-type BackupAlreadyThisTypePermanentError struct {
-	error
-}
-
 //raise when user try make permanent/impermanent already permanent/impermanent backup,
 func newBackupAlreadyThisTypePermanentError(backupName string,
 	permanentType string) BackupAlreadyThisTypePermanentError {
-	return BackupAlreadyThisTypePermanentError{errors.Errorf("Backup '%s' is already %s.", backupName, permanentType)}
+	return BackupAlreadyThisTypePermanentError{errors.Errorf("Backup '%s' is already %s.",
+                                                           backupName, permanentType)}
 }
 
 type BackupHasPermanentBackupInFutureError struct {
