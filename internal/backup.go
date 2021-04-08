@@ -414,7 +414,20 @@ func GetBackupsAndGarbageWithTarget(folder storage.Folder, targetPath string) (b
 	return sortTimes, garbage, nil
 }
 
-func GetBackupTimeSlicesUnsorted(backups []storage.Object, folder storage.Folder) ([]BackupTime, BackupTimeSlicesOder) {
+func SortBackupTimeSlices(backupsSlices *[]BackupTime, sortOrder BackupTimeSlicesOder) {
+	if sortOrder == ByCreationTime {
+		sort.Slice(*backupsSlices, func(i, j int) bool {
+			return (*backupsSlices)[i].CreationTime.After((*backupsSlices)[j].CreationTime)
+		})
+	} else {
+		sort.Slice(*backupsSlices, func(i, j int) bool {
+			return (*backupsSlices)[i].ModificationTime.After((*backupsSlices)[j].ModificationTime)
+		})
+	}
+}
+
+// TODO : unit tests
+func GetBackupTimeSlices(backups []storage.Object, folder storage.Folder) []BackupTime {
 	sortTimes := make([]BackupTime, len(backups))
 	sortOrder := ByCreationTime
 	for i, object := range backups {
@@ -431,24 +444,6 @@ func GetBackupTimeSlicesUnsorted(backups []storage.Object, folder storage.Folder
 		}
 		sortTimes[i] = BackupTime{utility.StripBackupName(key), creationTime, object.GetLastModified(), utility.StripWalFileName(key)}
 	}
-	return sortTimes, sortOrder
-}
-
-func SortBackupTimeSlices(backupsSlices *[]BackupTime, sortOrder BackupTimeSlicesOder) {
-	if sortOrder == ByCreationTime {
-		sort.Slice(*backupsSlices, func(i, j int) bool {
-			return (*backupsSlices)[i].CreationTime.After((*backupsSlices)[j].CreationTime)
-		})
-	} else {
-		sort.Slice(*backupsSlices, func(i, j int) bool {
-			return (*backupsSlices)[i].ModificationTime.After((*backupsSlices)[j].ModificationTime)
-		})
-	}
-}
-
-// TODO : unit tests
-func GetBackupTimeSlices(backups []storage.Object, folder storage.Folder) []BackupTime {
-	sortTimes, sortOrder := GetBackupTimeSlicesUnsorted(backups, folder)
 	SortBackupTimeSlices(&sortTimes, sortOrder)
 	return sortTimes
 }
