@@ -15,6 +15,47 @@ type someError struct {
 	error
 }
 
+var shortBackups = []internal.BackupTime{
+	{
+		BackupName:  "b0",
+		Time:        time.Time{},
+		WalFileName: "shortWallName0",
+	},
+	{
+		BackupName:  "b1",
+		Time:        time.Time{},
+		WalFileName: "shortWallName1",
+	},
+}
+
+var longBackups = []internal.BackupTime{
+	{
+		BackupName:  "backup000",
+		Time:        time.Time{},
+		WalFileName: "veryVeryVeryVeryVeryLongWallName0",
+	},
+	{
+		BackupName:  "backup001",
+		Time:        time.Time{},
+		WalFileName: "veryVeryVeryVeryVeryLongWallName1",
+	},
+}
+
+var emptyColonsBackups = []internal.BackupTime{
+	{
+		Time:        time.Time{},
+		WalFileName: "shortWallName0",
+	},
+	{
+		BackupName: "b1",
+		Time:       time.Time{},
+	},
+	{
+		Time: time.Time{},
+	},
+}
+
+
 func TestHandleBackupListWriteBackups(t *testing.T) {
 	backups := []internal.BackupTime{
 		{
@@ -106,21 +147,8 @@ func TestWritePrettyBackupList_LongColumnsValues(t *testing.T) {
 | 1 | backup001 | Monday, 01-Jan-01 00:00:00 UTC | veryVeryVeryVeryVeryLongWallName1 |
 +---+-----------+--------------------------------+-----------------------------------+
 `
-	backups := []internal.BackupTime{
-		{
-			BackupName:  "backup000",
-			Time:        time.Time{},
-			WalFileName: "veryVeryVeryVeryVeryLongWallName0",
-		},
-		{
-			BackupName:  "backup001",
-			Time:        time.Time{},
-			WalFileName: "veryVeryVeryVeryVeryLongWallName1",
-		},
-	}
-
 	b := bytes.Buffer{}
-	internal.WritePrettyBackupList(backups, &b)
+	internal.WritePrettyBackupList(longBackups, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
@@ -133,21 +161,8 @@ func TestWritePrettyBackupList_ShortColumnsValues(t *testing.T) {
 | 1 | b1   | Monday, 01-Jan-01 00:00:00 UTC | shortWallName1           |
 +---+------+--------------------------------+--------------------------+
 `
-	backups := []internal.BackupTime{
-		{
-			BackupName:  "b0",
-			Time:        time.Time{},
-			WalFileName: "shortWallName0",
-		},
-		{
-			BackupName:  "b1",
-			Time:        time.Time{},
-			WalFileName: "shortWallName1",
-		},
-	}
-
 	b := bytes.Buffer{}
-	internal.WritePrettyBackupList(backups, &b)
+	internal.WritePrettyBackupList(shortBackups, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
@@ -175,22 +190,8 @@ func TestWritePrettyBackupList_EmptyColumnsValues(t *testing.T) {
 | 2 |      | Monday, 01-Jan-01 00:00:00 UTC |                          |
 +---+------+--------------------------------+--------------------------+
 `
-	backups := []internal.BackupTime{
-		{
-			Time:        time.Time{},
-			WalFileName: "shortWallName0",
-		},
-		{
-			BackupName: "b1",
-			Time:       time.Time{},
-		},
-		{
-			Time: time.Time{},
-		},
-	}
-
 	b := bytes.Buffer{}
-	internal.WritePrettyBackupList(backups, &b)
+	internal.WritePrettyBackupList(emptyColonsBackups, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
@@ -211,22 +212,8 @@ func TestWriteBackupList_EmptyColumnsValues(t *testing.T) {
 b1   0001-01-01T00:00:00Z 
      0001-01-01T00:00:00Z shortWallName0
 `
-	backups := []internal.BackupTime{
-		{
-			Time:        time.Time{},
-			WalFileName: "shortWallName0",
-		},
-		{
-			BackupName: "b1",
-			Time:       time.Time{},
-		},
-		{
-			Time: time.Time{},
-		},
-	}
-
 	b := bytes.Buffer{}
-	internal.WriteBackupList(backups, &b)
+	internal.WriteBackupList(emptyColonsBackups, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
@@ -236,21 +223,8 @@ func TestWriteBackupList_ShortColumnsValues(t *testing.T) {
 b1   0001-01-01T00:00:00Z shortWallName1
 b0   0001-01-01T00:00:00Z shortWallName0
 `
-	backups := []internal.BackupTime{
-		{
-			BackupName:  "b0",
-			Time:        time.Time{},
-			WalFileName: "shortWallName0",
-		},
-		{
-			BackupName:  "b1",
-			Time:        time.Time{},
-			WalFileName: "shortWallName1",
-		},
-	}
-
 	b := bytes.Buffer{}
-	internal.WriteBackupList(backups, &b)
+	internal.WriteBackupList(shortBackups, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
@@ -260,21 +234,8 @@ func TestWriteBackupList_LongColumnsValues(t *testing.T) {
 backup001 0001-01-01T00:00:00Z veryVeryVeryVeryVeryLongWallName1
 backup000 0001-01-01T00:00:00Z veryVeryVeryVeryVeryLongWallName0
 `
-	backups := []internal.BackupTime{
-		{
-			BackupName:  "backup000",
-			Time:        time.Time{},
-			WalFileName: "veryVeryVeryVeryVeryLongWallName0",
-		},
-		{
-			BackupName:  "backup001",
-			Time:        time.Time{},
-			WalFileName: "veryVeryVeryVeryVeryLongWallName1",
-		},
-	}
-
 	b := bytes.Buffer{}
-	internal.WriteBackupList(backups, &b)
+	internal.WriteBackupList(longBackups, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
