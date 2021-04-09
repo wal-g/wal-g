@@ -130,7 +130,6 @@ func GetBackupDetailsWithTarget(folder storage.Folder, backupTime BackupTime, ta
 	return BackupDetail{backupTime, metaData}, nil
 }
 
-// TODO : unit tests
 func WriteBackupList(backups []BackupTime, output io.Writer) {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
