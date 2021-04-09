@@ -205,7 +205,6 @@ func GetMetadataUploadObject(backupName string, meta *ExtendedMetadataDto) (Uplo
 	return UploadObject{metaFilePath, bytes.NewReader(dtoBody)}, nil
 }
 
-
 type BackupHasPermanentBackupInFutureError struct {
 	error
 }
