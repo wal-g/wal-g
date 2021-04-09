@@ -51,12 +51,12 @@ linters:
     - typecheck
     - unconvert
     - unparam
-  #  - unused
+    - unused
     - varcheck
     - golint
     - lll
   # - godox
-  # - deadcode
+    - deadcode
     - stylecheck
     - gosimple
     - whitespace
