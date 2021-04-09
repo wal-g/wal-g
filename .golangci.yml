@@ -51,7 +51,7 @@ linters:
     - typecheck
     - unconvert
     - unparam
-    - unused
+  #  - unused
     - varcheck
     - golint
     - lll
