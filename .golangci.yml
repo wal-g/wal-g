@@ -55,7 +55,7 @@ linters:
     - varcheck
     - golint
     - lll
-    - godox
+  # - godox
     - deadcode
     - stylecheck
     - gosimple

@@ -205,17 +205,6 @@ func GetMetadataUploadObject(backupName string, meta *ExtendedMetadataDto) (Uplo
 	return UploadObject{metaFilePath, bytes.NewReader(dtoBody)}, nil
 }
 
-type BackupAlreadyThisTypePermanentError struct {
-	error
-}
-
-//raise when user try make permanent/impermanent already permanent/impermanent backup,
-func newBackupAlreadyThisTypePermanentError(backupName string,
-	permanentType string) BackupAlreadyThisTypePermanentError {
-	return BackupAlreadyThisTypePermanentError{errors.Errorf("Backup '%s' is already %s.",
-		backupName, permanentType)}
-}
-
 type BackupHasPermanentBackupInFutureError struct {
 	error
 }
