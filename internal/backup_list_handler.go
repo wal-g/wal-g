@@ -83,7 +83,8 @@ func HandleBackupListWithFlagsAndTarget(folder storage.Folder, pretty bool, json
 		} else if pretty {
 			writePrettyBackupListDetails(backupDetails, os.Stdout)
 		} else {
-			writeBackupListDetails(backupDetails, os.Stdout)
+			err = writeBackupListDetails(backupDetails, os.Stdout)
+			tracelog.ErrorLogger.FatalOnError(err)
 		}
 	} else {
 		if json {
