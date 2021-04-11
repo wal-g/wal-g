@@ -14,9 +14,7 @@ type NotEnoughDataToShrinkError struct {
 
 func NewNotEnoughDataToShrinkError(dataRemained int, toShrink int) error {
 	return NotEnoughDataToShrinkError{
-		errors.Errorf("not enough data to shrink: dataRemained: %v, toShrink: %v",
-			dataRemained,
-			toShrink)}
+		errors.Errorf("not enough data to shrink: dataRemained: %v, toShrink: %v", dataRemained, toShrink)}
 }
 
 func (err NotEnoughDataToShrinkError) Error() string {

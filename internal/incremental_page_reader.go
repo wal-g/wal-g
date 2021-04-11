@@ -11,7 +11,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-// IncrementFileHeader "wi" at the head stands for "wal-g increment"
+// IncrementFileHeader contains "wi" at the head which stands for "wal-g increment"
 // format version "1", signature magic number
 var IncrementFileHeader = []byte{'w', 'i', '1', SignatureMagicNumber}
 

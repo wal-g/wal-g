@@ -295,8 +295,8 @@ func (inf *Infra) Setup() error {
 		return fmt.Errorf("can not build base image: %v", err)
 	}
 
-	if err := inf.callCompose([]string{"--verbose",
-		"--log-level", "WARNING", "build"}); err != nil {
+	actions := []string{"--verbose", "--log-level", "WARNING", "build"}
+	if err := inf.callCompose(actions); err != nil {
 		return fmt.Errorf("can not build images: %v", err)
 	}
 
@@ -304,16 +304,16 @@ func (inf *Infra) Setup() error {
 }
 
 func (inf *Infra) RecreateContainers() error {
-	if err := inf.callCompose([]string{"--verbose",
-		"--log-level", "WARNING", "down", "--volumes", "--timeout", "0"}); err != nil {
+	actions := []string{"--verbose", "--log-level", "WARNING", "down", "--volumes", "--timeout", "0"}
+	if err := inf.callCompose(actions); err != nil {
 		return err
 	}
 	return inf.callCompose([]string{"--verbose", "--log-level", "WARNING", "up", "--detach"})
 }
 
 func (inf *Infra) Shutdown() error {
-	if err := inf.callCompose([]string{"down",
-		"--rmi", "local", "--remove-orphans", "--timeout", "0"}); err != nil {
+	actions := []string{"down", "--rmi", "local", "--remove-orphans", "--timeout", "0"}
+	if err := inf.callCompose(actions); err != nil {
 		return fmt.Errorf("can not shutdown containers: %v", err)
 	}
 

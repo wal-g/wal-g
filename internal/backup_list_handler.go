@@ -144,24 +144,16 @@ func WriteBackupList(backups []BackupTime, output io.Writer) {
 }
 
 // TODO : unit tests
-func writeBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
+func writeBackupListDetails(backupDetails []BackupDetail, output io.Writer) error {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
-	_, _ = fmt.Fprintln(writer,
-		"name\t"+
-			"last_modified\t"+
-			"wal_segment_backup_start\t"+
-			"start_time\t"+
-			"finish_time\t"+
-			"hostname\t"+
-			"data_dir\t"+
-			"pg_version\t"+
-			"start_lsn\t"+
-			"finish_lsn\t"+
-			"is_permanent")
+	_, err := fmt.Fprintln(writer, "name\tlast_modified\twal_segment_backup_start\tstart_time\tfinish_time\thostname\tdata_dir\tpg_version\tstart_lsn\tfinish_lsn\tis_permanent") //nolint:lll
+	if err != nil {
+		return err
+	}
 	for i := len(backupDetails) - 1; i >= 0; i-- {
 		b := backupDetails[i]
-		_, _ = fmt.Fprintf(writer, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
+		_, err = fmt.Fprintf(writer, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
 			b.BackupName,
 			b.Time.Format(time.RFC3339),
 			b.WalFileName,
@@ -173,7 +165,11 @@ func writeBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
 			b.StartLsn,
 			b.FinishLsn,
 			b.IsPermanent)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func WritePrettyBackupList(backups []BackupTime, output io.Writer) {
@@ -191,18 +187,7 @@ func writePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer
 	writer := table.NewWriter()
 	writer.SetOutputMirror(output)
 	defer writer.Render()
-	writer.AppendHeader(table.Row{"#",
-		"Name",
-		"Last modified",
-		"WAL segment backup start",
-		"Start time",
-		"Finish time",
-		"Hostname",
-		"Datadir",
-		"PG Version",
-		"Start LSN",
-		"Finish LSN",
-		"Permanent"})
+	writer.AppendHeader(table.Row{"#", "Name", "Last modified", "WAL segment backup start", "Start time", "Finish time", "Hostname", "Datadir", "PG Version", "Start LSN", "Finish LSN", "Permanent"}) //nolint:lll
 	for idx := range backupDetails {
 		b := &backupDetails[idx]
 		writer.AppendRow(table.Row{idx, b.BackupName, b.Time.Format(time.RFC850),

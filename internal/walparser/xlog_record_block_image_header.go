@@ -41,12 +41,8 @@ func NewInconsistentBlockImageLengthError(hasHole bool,
 	length uint16) InconsistentBlockImageLengthError {
 	return InconsistentBlockImageLengthError{
 		errors.Errorf("block image has invalid state: "+
-			"hasHole: %v, "+
-			"isCompressed: %v, "+
-			"imageLength: %v",
-			hasHole,
-			isCompressed,
-			length),
+			"hasHole: %v, isCompressed: %v, imageLength: %v",
+			hasHole, isCompressed, length),
 	}
 }
 
