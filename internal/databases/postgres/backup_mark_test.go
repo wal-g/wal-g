@@ -1,9 +1,11 @@
-package internal_test
+package postgres_test
 
 import (
 	"bytes"
 	"encoding/json"
 	"testing"
+
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
@@ -12,25 +14,25 @@ import (
 )
 
 type backupInfo map[string]struct {
-	meta     internal.ExtendedMetadataDto
-	sentinel internal.BackupSentinelDto
+	meta     postgres.ExtendedMetadataDto
+	sentinel postgres.BackupSentinelDto
 }
 
 func TestGetBackupMetadataToUpload_markSeveralBackups(t *testing.T) {
 	backups := backupInfo{
 		"base_000000010000000000000002": {
-			meta: internal.ExtendedMetadataDto{
+			meta: postgres.ExtendedMetadataDto{
 				IsPermanent: false,
 			},
-			sentinel: internal.BackupSentinelDto{
+			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom: nil,
 			},
 		},
 		"base_000000010000000000000004_D_000000010000000000000002": {
-			meta: internal.ExtendedMetadataDto{
+			meta: postgres.ExtendedMetadataDto{
 				IsPermanent: false,
 			},
-			sentinel: internal.BackupSentinelDto{
+			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom:     func(s string) *string { return &s }("base_000000010000000000000002"),
 				IncrementFromLSN:  func(i uint64) *uint64 { return &i }(1),
 				IncrementFullName: func(s string) *string { return &s }(""),
@@ -38,10 +40,10 @@ func TestGetBackupMetadataToUpload_markSeveralBackups(t *testing.T) {
 			},
 		},
 		"base_000000010000000000000006_D_000000010000000000000004": {
-			meta: internal.ExtendedMetadataDto{
+			meta: postgres.ExtendedMetadataDto{
 				IsPermanent: false,
 			},
-			sentinel: internal.BackupSentinelDto{
+			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom:     func(s string) *string { return &s }("base_000000010000000000000004_D_000000010000000000000002"),
 				IncrementFromLSN:  func(i uint64) *uint64 { return &i }(1),
 				IncrementFullName: func(s string) *string { return &s }(""),
@@ -50,31 +52,31 @@ func TestGetBackupMetadataToUpload_markSeveralBackups(t *testing.T) {
 		},
 	}
 	toMark := "base_000000010000000000000006_D_000000010000000000000004"
-	expectUploadObjectLen := 3
-	expectUploadObjectPaths := map[int]string{
-		0: "base_000000010000000000000002" + "/" + utility.MetadataFileName,
-		1: "base_000000010000000000000004_D_000000010000000000000002" + "/" + utility.MetadataFileName,
-		2: "base_000000010000000000000006_D_000000010000000000000004" + "/" + utility.MetadataFileName,
+	expectBackupsToMarkLen := 3
+	expectBackupsToMark := map[int]string{
+		0: "base_000000010000000000000002",
+		1: "base_000000010000000000000004_D_000000010000000000000002",
+		2: "base_000000010000000000000006_D_000000010000000000000004",
 	}
 
-	testGetBackupMetadataToUpload(backups, true, false, toMark, expectUploadObjectLen, expectUploadObjectPaths, t)
+	testGetBackupMetadataToUpload(backups, true, false, toMark, expectBackupsToMarkLen, expectBackupsToMark, t)
 }
 
 func TestGetBackupMetadataToUpload_markOneBackup(t *testing.T) {
 	backups := backupInfo{
 		"base_000000010000000000000002": {
-			meta: internal.ExtendedMetadataDto{
+			meta: postgres.ExtendedMetadataDto{
 				IsPermanent: true,
 			},
-			sentinel: internal.BackupSentinelDto{
+			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom: nil,
 			},
 		},
 		"base_000000010000000000000004_D_000000010000000000000002": {
-			meta: internal.ExtendedMetadataDto{
+			meta: postgres.ExtendedMetadataDto{
 				IsPermanent: true,
 			},
-			sentinel: internal.BackupSentinelDto{
+			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom:     func(s string) *string { return &s }("base_000000010000000000000002"),
 				IncrementFromLSN:  func(i uint64) *uint64 { return &i }(1),
 				IncrementFullName: func(s string) *string { return &s }(""),
@@ -82,10 +84,10 @@ func TestGetBackupMetadataToUpload_markOneBackup(t *testing.T) {
 			},
 		},
 		"base_000000010000000000000006_D_000000010000000000000004": {
-			meta: internal.ExtendedMetadataDto{
+			meta: postgres.ExtendedMetadataDto{
 				IsPermanent: false,
 			},
-			sentinel: internal.BackupSentinelDto{
+			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom:     func(s string) *string { return &s }("base_000000010000000000000004_D_000000010000000000000002"),
 				IncrementFromLSN:  func(i uint64) *uint64 { return &i }(1),
 				IncrementFullName: func(s string) *string { return &s }(""),
@@ -94,28 +96,28 @@ func TestGetBackupMetadataToUpload_markOneBackup(t *testing.T) {
 		},
 	}
 	toMark := "base_000000010000000000000006_D_000000010000000000000004"
-	expectUploadObjectLen := 1
-	expectUploadObjectPaths := map[int]string{
-		0: "base_000000010000000000000006_D_000000010000000000000004" + "/" + utility.MetadataFileName,
+	expectBackupsToMarkLen := 1
+	expectBackupsToMark := map[int]string{
+		0: "base_000000010000000000000006_D_000000010000000000000004",
 	}
-	testGetBackupMetadataToUpload(backups, true, false, toMark, expectUploadObjectLen, expectUploadObjectPaths, t)
+	testGetBackupMetadataToUpload(backups, true, false, toMark, expectBackupsToMarkLen, expectBackupsToMark, t)
 }
 
 func TestGetBackupMetadataToUpload_unmarkOneBackupWithIncrementBackups(t *testing.T) {
 	backups := backupInfo{
 		"base_000000010000000000000002": {
-			meta: internal.ExtendedMetadataDto{
+			meta: postgres.ExtendedMetadataDto{
 				IsPermanent: true,
 			},
-			sentinel: internal.BackupSentinelDto{
+			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom: nil,
 			},
 		},
 		"base_000000010000000000000004_D_000000010000000000000002": {
-			meta: internal.ExtendedMetadataDto{
+			meta: postgres.ExtendedMetadataDto{
 				IsPermanent: false,
 			},
-			sentinel: internal.BackupSentinelDto{
+			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom:     func(s string) *string { return &s }("base_000000010000000000000002"),
 				IncrementFromLSN:  func(i uint64) *uint64 { return &i }(1),
 				IncrementFullName: func(s string) *string { return &s }(""),
@@ -123,10 +125,10 @@ func TestGetBackupMetadataToUpload_unmarkOneBackupWithIncrementBackups(t *testin
 			},
 		},
 		"base_000000010000000000000006_D_000000010000000000000004": {
-			meta: internal.ExtendedMetadataDto{
+			meta: postgres.ExtendedMetadataDto{
 				IsPermanent: false,
 			},
-			sentinel: internal.BackupSentinelDto{
+			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom:     func(s string) *string { return &s }("base_000000010000000000000004_D_000000010000000000000002"),
 				IncrementFromLSN:  func(i uint64) *uint64 { return &i }(1),
 				IncrementFullName: func(s string) *string { return &s }(""),
@@ -135,29 +137,29 @@ func TestGetBackupMetadataToUpload_unmarkOneBackupWithIncrementBackups(t *testin
 		},
 	}
 	toMark := "base_000000010000000000000002"
-	expectUploadObjectLen := 1
-	expectUploadObjectPaths := map[int]string{
-		0: "base_000000010000000000000002" + "/" + utility.MetadataFileName,
+	expectBackupsToMarkLen := 1
+	expectBackupsToMark := map[int]string{
+		0: "base_000000010000000000000002",
 	}
 
-	testGetBackupMetadataToUpload(backups, false, false, toMark, expectUploadObjectLen, expectUploadObjectPaths, t)
+	testGetBackupMetadataToUpload(backups, false, false, toMark, expectBackupsToMarkLen, expectBackupsToMark, t)
 }
 
 func TestGetBackupMetadataToUpload_unmarkOneBackupWithoutIncrementBackups(t *testing.T) {
 	backups := backupInfo{
 		"base_000000010000000000000002": {
-			meta: internal.ExtendedMetadataDto{
+			meta: postgres.ExtendedMetadataDto{
 				IsPermanent: true,
 			},
-			sentinel: internal.BackupSentinelDto{
+			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom: nil,
 			},
 		},
 		"base_000000010000000000000004_D_000000010000000000000002": {
-			meta: internal.ExtendedMetadataDto{
+			meta: postgres.ExtendedMetadataDto{
 				IsPermanent: true,
 			},
-			sentinel: internal.BackupSentinelDto{
+			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom:     func(s string) *string { return &s }("base_000000010000000000000002"),
 				IncrementFromLSN:  func(i uint64) *uint64 { return &i }(1),
 				IncrementFullName: func(s string) *string { return &s }(""),
@@ -166,65 +168,65 @@ func TestGetBackupMetadataToUpload_unmarkOneBackupWithoutIncrementBackups(t *tes
 		},
 	}
 	toMark := "base_000000010000000000000004_D_000000010000000000000002"
-	expectUploadObjectLen := 1
-	expectUploadObjectPaths := map[int]string{
-		0: "base_000000010000000000000004_D_000000010000000000000002" + "/" + utility.MetadataFileName,
+	expectBackupsToMarkLen := 1
+	expectBackupsToMark := map[int]string{
+		0: "base_000000010000000000000004_D_000000010000000000000002",
 	}
 
-	testGetBackupMetadataToUpload(backups, false, false, toMark, expectUploadObjectLen, expectUploadObjectPaths, t)
+	testGetBackupMetadataToUpload(backups, false, false, toMark, expectBackupsToMarkLen, expectBackupsToMark, t)
 }
 
 func TestGetBackupMetadataToUpload_tryToMarkAlreadyMarkedBackup(t *testing.T) {
 	backups := backupInfo{
 		"base_000000010000000000000002": {
-			meta: internal.ExtendedMetadataDto{
+			meta: postgres.ExtendedMetadataDto{
 				IsPermanent: true,
 			},
-			sentinel: internal.BackupSentinelDto{
+			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom: nil,
 			},
 		},
 	}
 	toMark := "base_000000010000000000000002"
-	expectUploadObjectLen := 0
-	expectUploadObjectPaths := map[int]string{}
+	expectBackupsToMarkLen := 0
+	expectBackupsToMark := map[int]string{}
 
-	testGetBackupMetadataToUpload(backups, true, false, toMark, expectUploadObjectLen, expectUploadObjectPaths, t)
+	testGetBackupMetadataToUpload(backups, true, false, toMark, expectBackupsToMarkLen, expectBackupsToMark, t)
 }
 
 func TestGetBackupMetadataToUpload_tryToUnmarkAlreadyUnmarkedBackup(t *testing.T) {
 	backups := backupInfo{
 		"base_000000010000000000000002": {
-			meta: internal.ExtendedMetadataDto{
+			meta: postgres.ExtendedMetadataDto{
 				IsPermanent: false,
 			},
-			sentinel: internal.BackupSentinelDto{
+			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom: nil,
 			},
 		},
 	}
 	toMark := "base_000000010000000000000002"
-	expectUploadObjectLen := 0
-	expectUploadObjectPaths := map[int]string{}
+	expectBackupsToMarkLen := 0
+	expectBackupsToMark := map[int]string{}
 
-	testGetBackupMetadataToUpload(backups, false, false, toMark, expectUploadObjectLen, expectUploadObjectPaths, t)
+	testGetBackupMetadataToUpload(backups, false, false, toMark, expectBackupsToMarkLen, expectBackupsToMark, t)
 }
 
 func TestGetBackupMetadataToUpload_tryToUnmarkBackupWithMarkedIncrementBackups(t *testing.T) {
 	backups := backupInfo{
 		"base_000000010000000000000002": {
-			meta: internal.ExtendedMetadataDto{
+			meta: postgres.ExtendedMetadataDto{
 				IsPermanent: true,
 			},
-			sentinel: internal.BackupSentinelDto{
+			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom: nil,
 			},
 		},
 		"base_000000010000000000000004_D_000000010000000000000002": {
-			meta: internal.ExtendedMetadataDto{
+			meta: postgres.ExtendedMetadataDto{
 				IsPermanent: true,
 			},
-			sentinel: internal.BackupSentinelDto{
+			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom:     func(s string) *string { return &s }("base_000000010000000000000002"),
 				IncrementFromLSN:  func(i uint64) *uint64 { return &i }(1),
 				IncrementFullName: func(s string) *string { return &s }(""),
@@ -233,9 +235,9 @@ func TestGetBackupMetadataToUpload_tryToUnmarkBackupWithMarkedIncrementBackups(t
 		},
 	}
 	toMark := "base_000000010000000000000002"
-	expectUploadObjectLen := 0
-	expectUploadObjectPaths := map[int]string{}
-	testGetBackupMetadataToUpload(backups, false, true, toMark, expectUploadObjectLen, expectUploadObjectPaths, t)
+	expectBackupsToMarkLen := 0
+	expectBackupsToMark := map[int]string{}
+	testGetBackupMetadataToUpload(backups, false, true, toMark, expectBackupsToMarkLen, expectBackupsToMark, t)
 }
 
 func testGetBackupMetadataToUpload(
@@ -243,8 +245,8 @@ func testGetBackupMetadataToUpload(
 	toPermanent,
 	isErrorExpect bool,
 	toMark string,
-	expectUploadObjectLen int,
-	expectUploadObjectPaths map[int]string,
+	expectBackupsToMarkLen int,
+	expectBackupsToMark map[int]string,
 	t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
@@ -258,12 +260,14 @@ func testGetBackupMetadataToUpload(
 		err = baseBackupFolder.PutObject(backupName+"/"+utility.MetadataFileName, bytes.NewReader(metaBytes))
 		assert.NoError(t, err)
 	}
-	uploadObjects, err := internal.GetMarkedBackupMetadataToUpload(folder, toMark, toPermanent)
+	markHandler := internal.NewBackupMarkHandler(postgres.NewGenericMetaInteractor(), folder)
+	backupsToMark, err := markHandler.GetBackupsToMark(toMark, toPermanent)
+
 	if !isErrorExpect {
 		assert.NoError(t, err)
-		assert.Equal(t, expectUploadObjectLen, len(uploadObjects))
-		for idx, path := range expectUploadObjectPaths {
-			assert.Equal(t, uploadObjects[idx].Path, path)
+		assert.Equal(t, expectBackupsToMarkLen, len(backupsToMark))
+		for idx, name := range expectBackupsToMark {
+			assert.Equal(t, backupsToMark[idx], name)
 		}
 	} else {
 		assert.Error(t, err)
