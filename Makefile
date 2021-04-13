@@ -164,6 +164,7 @@ unittest:
 	fi
 	go test -v $(TEST_MODIFIER) ./internal/databases/mysql
 	go test -v $(TEST_MODIFIER) ./internal/databases/mongo/...
+	go test -v $(TEST_MODIFIER) ./internal/databases/postgres
 	go test -v $(TEST_MODIFIER) ./internal/walparser/
 	go test -v $(TEST_MODIFIER) ./utility
 

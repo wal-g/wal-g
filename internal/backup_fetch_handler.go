@@ -2,18 +2,15 @@ package internal
 
 import (
 	"bytes"
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
+		"fmt"
 	"os/exec"
+
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/utility"
 )
-
-const LatestString = "LATEST"
 
 type BackupNonExistenceError struct {
 	error
@@ -25,60 +22,6 @@ func NewBackupNonExistenceError(backupName string) BackupNonExistenceError {
 
 func (err BackupNonExistenceError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
-type NonEmptyDBDataDirectoryError struct {
-	error
-}
-
-func newNonEmptyDBDataDirectoryError(dbDataDirectory string) NonEmptyDBDataDirectoryError {
-	return NonEmptyDBDataDirectoryError{errors.Errorf("Directory %v for delta base must be empty", dbDataDirectory)}
-}
-
-func (err NonEmptyDBDataDirectoryError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
-type PgControlNotFoundError struct {
-	error
-}
-
-func newPgControlNotFoundError() PgControlNotFoundError {
-	return PgControlNotFoundError{errors.Errorf("Expect pg_control archive, but not found")}
-}
-
-func (err PgControlNotFoundError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
-func readRestoreSpec(path string, spec *TablespaceSpec) (err error) {
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("unable to read file: %v", err)
-	}
-	err = json.Unmarshal(data, spec)
-	if err != nil {
-		return fmt.Errorf("unable to unmarshal json: %v\n Full json data:\n %s", err, data)
-	}
-
-	return nil
-}
-
-func GetPgFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string) func(folder storage.Folder, backup Backup) {
-	return func(folder storage.Folder, backup Backup) {
-		filesToUnwrap, err := backup.GetFilesToUnwrap(fileMask)
-		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
-
-		var spec *TablespaceSpec
-		if restoreSpecPath != "" {
-			spec = &TablespaceSpec{}
-			err := readRestoreSpec(restoreSpecPath, spec)
-			errMessege := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
-			tracelog.ErrorLogger.FatalfOnError(errMessege, err)
-		}
-		err = deltaFetchRecursionOld(backup.Name, folder, utility.ResolveSymlink(dbDataDirectory), spec, filesToUnwrap)
-		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
-	}
 }
 
 func GetCommandStreamFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup Backup) {

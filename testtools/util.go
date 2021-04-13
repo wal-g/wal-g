@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/stretchr/testify/assert"
@@ -44,9 +47,9 @@ func NewStoringMockUploader(storage *memory.Storage, deltaDataFolder fsutil.Data
 	)
 }
 
-func NewMockWalUploader(apiMultiErr, apiErr bool) *internal.WalUploader {
+func NewMockWalUploader(apiMultiErr, apiErr bool) *postgres.WalUploader {
 	s3Uploader := MakeDefaultUploader(NewMockS3Uploader(apiMultiErr, apiErr, nil))
-	return internal.NewWalUploader(
+	return postgres.NewWalUploader(
 		&MockCompressor{},
 		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), "bucket/", "server/", false),
 		nil,
@@ -58,8 +61,8 @@ func CreateMockStorageWalFolder() storage.Folder {
 	return folder.GetSubFolder(utility.WalPath)
 }
 
-func NewMockWalDirUploader(apiMultiErr, apiErr bool) *internal.WalUploader {
-	return internal.NewWalUploader(
+func NewMockWalDirUploader(apiMultiErr, apiErr bool) *postgres.WalUploader {
+	return postgres.NewWalUploader(
 		&MockCompressor{},
 		CreateMockStorageWalFolder(),
 		nil,
@@ -296,4 +299,11 @@ func (ew ErrorWriteCloser) Write(p []byte) (int, error) {
 
 func (ew ErrorWriteCloser) Close() error {
 	return ErrorMockClose
+}
+
+func Cleanup(t *testing.T, dir string) {
+	err := os.RemoveAll(dir)
+	if err != nil {
+		t.Log("temporary data directory was not deleted ", err)
+	}
 }

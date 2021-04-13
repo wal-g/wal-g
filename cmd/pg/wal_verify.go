@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/wal-g/wal-g/internal/databases/postgres"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
@@ -24,9 +26,9 @@ const (
 )
 
 var (
-	availableChecks = map[string]internal.WalVerifyCheckType{
-		checkIntegrityArg: internal.WalVerifyIntegrityCheck,
-		checkTimelineArg:  internal.WalVerifyTimelineCheck,
+	availableChecks = map[string]postgres.WalVerifyCheckType{
+		checkIntegrityArg: postgres.WalVerifyIntegrityCheck,
+		checkTimelineArg:  postgres.WalVerifyTimelineCheck,
 	}
 	// walVerifyCmd represents the walVerify command
 	walVerifyCmd = &cobra.Command{
@@ -37,27 +39,27 @@ var (
 		Run: func(cmd *cobra.Command, checks []string) {
 			folder, err := internal.ConfigureFolder()
 			tracelog.ErrorLogger.FatalOnError(err)
-			outputType := internal.WalVerifyTableOutput
+			outputType := postgres.WalVerifyTableOutput
 			if useJSONOutput {
-				outputType = internal.WalVerifyJSONOutput
+				outputType = postgres.WalVerifyJSONOutput
 			}
-			outputWriter := internal.NewWalVerifyOutputWriter(outputType, os.Stdout)
+			outputWriter := postgres.NewWalVerifyOutputWriter(outputType, os.Stdout)
 			checkTypes := parseChecks(checks)
 
-			internal.HandleWalVerify(checkTypes, folder, internal.QueryCurrentWalSegment(), outputWriter)
+			postgres.HandleWalVerify(checkTypes, folder, postgres.QueryCurrentWalSegment(), outputWriter)
 		},
 	}
 	useJSONOutput bool
 )
 
-func parseChecks(checks []string) []internal.WalVerifyCheckType {
+func parseChecks(checks []string) []postgres.WalVerifyCheckType {
 	// filter the possible duplicates
 	uniqueChecks := make(map[string]bool)
 	for _, check := range checks {
 		uniqueChecks[check] = true
 	}
 
-	checkTypes := make([]internal.WalVerifyCheckType, 0, len(checks))
+	checkTypes := make([]postgres.WalVerifyCheckType, 0, len(checks))
 	for check := range uniqueChecks {
 		checkType, ok := availableChecks[check]
 		if !ok {

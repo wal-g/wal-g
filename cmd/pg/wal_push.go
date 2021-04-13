@@ -5,6 +5,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/asm"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 const WalPushShortDescription = "Uploads a WAL file to storage"
@@ -15,7 +16,7 @@ var walPushCmd = &cobra.Command{
 	Short: WalPushShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		uploader, err := internal.ConfigureWalUploader()
+		uploader, err := postgres.ConfigureWalUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		archiveStatusManager, err := internal.ConfigureArchiveStatusManager()
@@ -25,7 +26,7 @@ var walPushCmd = &cobra.Command{
 			tracelog.ErrorLogger.PrintError(err)
 			uploader.ArchiveStatusManager = asm.NewNopASM()
 		}
-		internal.HandleWALPush(uploader, args[0])
+		postgres.HandleWALPush(uploader, args[0])
 	},
 }
 

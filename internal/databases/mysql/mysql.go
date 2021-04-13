@@ -164,7 +164,7 @@ func fetchLogs(folder storage.Folder, dstDir string, startTS time.Time, endTS ti
 		binlogName := utility.TrimFileExtension(logFile.GetName())
 		binlogPath := path.Join(dstDir, binlogName)
 		tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
-		if err = internal.DownloadWALFileTo(logFolder, binlogName, binlogPath); err != nil {
+		if err = internal.DownloadFileTo(logFolder, binlogName, binlogPath); err != nil {
 			tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
 			return err
 		}

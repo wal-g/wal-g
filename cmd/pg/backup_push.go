@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
@@ -36,14 +38,14 @@ var (
 		Short: backupPushShortDescription, // TODO : improve description
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			uploader, err := internal.ConfigureWalUploader()
+			uploader, err := postgres.ConfigureWalUploader()
 			tracelog.ErrorLogger.FatalOnError(err)
 			verifyPageChecksums = verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting)
 			storeAllCorruptBlocks = storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting)
-			tarBallComposerType := internal.RegularComposer
+			tarBallComposerType := postgres.RegularComposer
 			useRatingComposer = useRatingComposer || viper.GetBool(internal.UseRatingComposerSetting)
 			if useRatingComposer {
-				tarBallComposerType = internal.RatingComposer
+				tarBallComposerType = postgres.RatingComposer
 			}
 			if deltaFromName == "" {
 				deltaFromName = viper.GetString(internal.DeltaFromNameSetting)
@@ -58,7 +60,7 @@ var (
 				userData = viper.GetString(internal.SentinelUserDataSetting)
 			}
 
-			internal.HandleBackupPush(uploader, args[0], permanent, fullBackup, verifyPageChecksums,
+			postgres.HandleBackupPush(uploader, args[0], permanent, fullBackup, verifyPageChecksums,
 				storeAllCorruptBlocks, tarBallComposerType, deltaBaseSelector, userData)
 		},
 	}
@@ -88,7 +90,7 @@ func createDeltaBaseSelector(cmd *cobra.Command,
 	case targetUserData != "":
 		tracelog.InfoLogger.Println(
 			"Selecting the backup with specified user data as the base for the current delta backup...")
-		return internal.NewUserDataBackupSelector(targetUserData), nil
+		return internal.NewUserDataBackupSelector(targetUserData, postgres.NewGenericMetaFetcher()), nil
 
 	default:
 		tracelog.InfoLogger.Println("Selecting the latest backup as the base for the current delta backup...")
