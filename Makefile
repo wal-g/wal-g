@@ -174,6 +174,9 @@ coverage:
 fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 	gofmt -s -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 
+goimports: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
+	goimports -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
+
 lint:
 	@#Github Actions
 	@if [ "$(shell command -v golangci-lint)" = "" ] && [ "$(GITHUB_WORKFLOW)" != "" ]; then curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sudo sh -s -- -b $(go env GOPATH)/bin $(GOLANGCI_LINT_VERSION); fi;
