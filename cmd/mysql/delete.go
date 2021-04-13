@@ -146,7 +146,7 @@ func tryFetchBinlogName(folder storage.Folder, object storage.Object) (string, b
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	backup := internal.NewBackup(baseBackupFolder, name)
 	var sentinel mysql.StreamSentinelDto
-	err := internal.FetchStreamSentinel(backup, &sentinel)
+	err := backup.FetchSentinel(&sentinel)
 	if err != nil {
 		tracelog.InfoLogger.Println("Fail to fetch stream sentinel " + name)
 		return "", false
