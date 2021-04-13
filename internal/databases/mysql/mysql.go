@@ -140,6 +140,14 @@ type StreamSentinelDto struct {
 	BinLogEnd      string    `json:"BinLogEnd,omitempty"`
 	StartLocalTime time.Time `json:"StartLocalTime,omitempty"`
 	StopLocalTime  time.Time `json:"StopLocalTime,omitempty"`
+
+	UncompressedSize int64  `json:"UncompressedSize,omitempty"`
+	CompressedSize   int64  `json:"CompressedSize,omitempty"`
+	Hostname         string `json:"Hostname,omitempty"`
+
+	IsPermanent bool        `json:"IsPermanent,omitempty"`
+	UserData    interface{} `json:"UserData,omitempty"`
+	//todo: add other fields from internal.GenericMetadata
 }
 
 func (s *StreamSentinelDto) String() string {
@@ -190,7 +198,7 @@ func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time,
 	if err != nil {
 		return time.Time{}, err
 	}
-	tracelog.InfoLogger.Printf("Backup sentinel: %s", streamSentinel)
+	tracelog.InfoLogger.Printf("Backup sentinel: %s", streamSentinel.String())
 
 	// case when backup was uploaded before first binlog
 	sentinels, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
