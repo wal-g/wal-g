@@ -163,12 +163,8 @@ func permanentObjects(folder storage.Folder) map[string]bool {
 
 	permanentBackups := map[string]bool{}
 	for _, backupTime := range backupTimes {
-		backup, err := internal.GetBackupByName(backupTime.BackupName, utility.BaseBackupPath, folder)
-		if err != nil {
-			tracelog.ErrorLogger.Printf("failed to get backup by name with error %s, ignoring...", err.Error())
-			continue
-		}
-		meta, err := backup.FetchMeta()
+		meta, err := mysql.NewGenericMetaFetcher().Fetch(
+			backupTime.BackupName, folder.GetSubFolder(utility.BaseBackupPath))
 		if err != nil {
 			tracelog.ErrorLogger.Printf("failed to fetch backup meta for backup %s with error %s, ignoring...",
 				backupTime.BackupName, err.Error())

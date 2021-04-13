@@ -25,7 +25,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			uploader, err := postgres.ConfigureWalUploader()
 			tracelog.ErrorLogger.FatalOnError(err)
-			internal.HandleBackupMark(uploader.Uploader, args[0], !toImpermanent)
+			internal.HandleBackupMark(uploader.Uploader, args[0], !toImpermanent, postgres.NewGenericMetaInteractor())
 		},
 	}
 	toImpermanent = false

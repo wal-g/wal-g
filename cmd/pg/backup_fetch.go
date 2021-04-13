@@ -64,7 +64,7 @@ func createTargetFetchBackupSelector(cmd *cobra.Command,
 		targetName = args[1]
 	}
 
-	backupSelector, err := internal.NewTargetBackupSelector(targetUserData, targetName)
+	backupSelector, err := internal.NewTargetBackupSelector(targetUserData, targetName, postgres.NewGenericMetaFetcher())
 	if err != nil {
 		fmt.Println(cmd.UsageString())
 		return nil, err
