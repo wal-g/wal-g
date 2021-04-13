@@ -79,26 +79,26 @@ func (deltaMap *PagedFileDeltaMap) GetDeltaBitmapFor(filePath string) (*roaring.
 		return nil, newNoBitmapFoundError()
 	}
 	bitmap := (*deltaMap)[*relFileNode].Clone()
-	relFileId, err := GetRelFileIdFrom(filePath)
+	relFileID, err := GetRelFileIDFrom(filePath)
 	if err != nil {
 		return nil, err
 	}
-	return SelectRelFileBlocks(bitmap, relFileId), nil
+	return SelectRelFileBlocks(bitmap, relFileID), nil
 }
 
-func SelectRelFileBlocks(bitmap *roaring.Bitmap, relFileId int) *roaring.Bitmap {
+func SelectRelFileBlocks(bitmap *roaring.Bitmap, relFileID int) *roaring.Bitmap {
 	relFileBitmap := roaring.New()
-	relFileBitmap.AddRange(uint64(relFileId*BlocksInRelFile), uint64((relFileId+1)*BlocksInRelFile))
+	relFileBitmap.AddRange(uint64(relFileID*BlocksInRelFile), uint64((relFileID+1)*BlocksInRelFile))
 	bitmap.And(relFileBitmap)
 	shiftedBitmap := roaring.New()
 	it := bitmap.Iterator()
 	for it.HasNext() {
-		shiftedBitmap.Add(it.Next() - uint32(relFileId*BlocksInRelFile))
+		shiftedBitmap.Add(it.Next() - uint32(relFileID*BlocksInRelFile))
 	}
 	return shiftedBitmap
 }
 
-func GetRelFileIdFrom(filePath string) (int, error) {
+func GetRelFileIDFrom(filePath string) (int, error) {
 	filename := path.Base(filePath)
 	match := pagedFilenameRegexp.FindStringSubmatch(filename)
 	if match[2] == "" {
@@ -123,19 +123,26 @@ func GetRelFileNodeFrom(filePath string) (*walparser.RelFileNode, error) {
 		return nil, errors.Wrapf(err, "GetRelFileNodeFrom: can't get dbNode from: '%s'", filePath)
 	}
 	if strings.Contains(filePath, DefaultTablespace) { // base
-		return &walparser.RelFileNode{SpcNode: DefaultSpcNode, DBNode: walparser.Oid(dbNode), RelNode: walparser.Oid(relNode)}, nil
+		return &walparser.RelFileNode{SpcNode: DefaultSpcNode,
+			DBNode:  walparser.Oid(dbNode),
+			RelNode: walparser.Oid(relNode)}, nil
 	} else if strings.Contains(filePath, NonDefaultTablespace) { // pg_tblspc
 		spcNode, err := strconv.Atoi(folderPathParts[len(folderPathParts)-3])
 		if err != nil {
 			return nil, err
 		}
-		return &walparser.RelFileNode{SpcNode: walparser.Oid(spcNode), DBNode: walparser.Oid(dbNode), RelNode: walparser.Oid(relNode)}, nil
+		return &walparser.RelFileNode{SpcNode: walparser.Oid(spcNode),
+			DBNode:  walparser.Oid(dbNode),
+			RelNode: walparser.Oid(relNode)}, nil
 	} else {
 		return nil, newUnknownTableSpaceError()
 	}
 }
 
-func (deltaMap *PagedFileDeltaMap) getLocationsFromDeltas(folder storage.Folder, timeline uint32, first, last DeltaNo) error {
+func (deltaMap *PagedFileDeltaMap) getLocationsFromDeltas(folder storage.Folder,
+	timeline uint32,
+	first,
+	last DeltaNo) error {
 	for deltaNo := first; deltaNo < last; deltaNo = deltaNo.next() {
 		filename := deltaNo.getFilename(timeline)
 		deltaFile, err := getDeltaFile(folder, filename)
@@ -148,7 +155,11 @@ func (deltaMap *PagedFileDeltaMap) getLocationsFromDeltas(folder storage.Folder,
 	return nil
 }
 
-func (deltaMap *PagedFileDeltaMap) getLocationsFromWals(folder storage.Folder, timeline uint32, first, last WalSegmentNo, walParser *walparser.WalParser) error {
+func (deltaMap *PagedFileDeltaMap) getLocationsFromWals(folder storage.Folder,
+	timeline uint32,
+	first,
+	last WalSegmentNo,
+	walParser *walparser.WalParser) error {
 	for walSegmentNo := first; walSegmentNo < last; walSegmentNo = walSegmentNo.next() {
 		filename := walSegmentNo.getFilename(timeline)
 		err := deltaMap.getLocationsFromWal(folder, filename, walParser)
@@ -160,7 +171,9 @@ func (deltaMap *PagedFileDeltaMap) getLocationsFromWals(folder storage.Folder, t
 	return nil
 }
 
-func (deltaMap *PagedFileDeltaMap) getLocationsFromWal(folder storage.Folder, filename string, walParser *walparser.WalParser) error {
+func (deltaMap *PagedFileDeltaMap) getLocationsFromWal(folder storage.Folder,
+	filename string,
+	walParser *walparser.WalParser) error {
 	reader, err := DownloadAndDecompressStorageFile(folder, filename)
 	if err != nil {
 		return errors.Wrapf(err, "Error during wal segment'%s' downloading.", filename)

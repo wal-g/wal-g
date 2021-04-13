@@ -27,15 +27,15 @@ func (err BackupNonExistenceError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-type NonEmptyDbDataDirectoryError struct {
+type NonEmptyDBDataDirectoryError struct {
 	error
 }
 
-func newNonEmptyDbDataDirectoryError(dbDataDirectory string) NonEmptyDbDataDirectoryError {
-	return NonEmptyDbDataDirectoryError{errors.Errorf("Directory %v for delta base must be empty", dbDataDirectory)}
+func newNonEmptyDBDataDirectoryError(dbDataDirectory string) NonEmptyDBDataDirectoryError {
+	return NonEmptyDBDataDirectoryError{errors.Errorf("Directory %v for delta base must be empty", dbDataDirectory)}
 }
 
-func (err NonEmptyDbDataDirectoryError) Error() string {
+func (err NonEmptyDBDataDirectoryError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
@@ -54,11 +54,11 @@ func (err PgControlNotFoundError) Error() string {
 func readRestoreSpec(path string, spec *TablespaceSpec) (err error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("Unable to read file: %v\n", err)
+		return fmt.Errorf("unable to read file: %v", err)
 	}
 	err = json.Unmarshal(data, spec)
 	if err != nil {
-		return fmt.Errorf("Unable to unmarshal json: %v\n Full json data:\n %s", err, data)
+		return fmt.Errorf("unable to unmarshal json: %v\n Full json data:\n %s", err, data)
 	}
 
 	return nil
@@ -103,22 +103,24 @@ func GetCommandStreamFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup B
 func StreamBackupToCommandStdin(cmd *exec.Cmd, backup *Backup) error {
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return fmt.Errorf("Failed to fetch backup: %v\n", err)
+		return fmt.Errorf("failed to fetch backup: %v", err)
 	}
 	err = cmd.Start()
 	if err != nil {
-		return fmt.Errorf("Failed to start command: %v\n", err)
+		return fmt.Errorf("failed to start command: %v", err)
 	}
 	err = downloadAndDecompressStream(backup, stdin)
 	if err != nil {
-		return fmt.Errorf("Failed to download and decompress stream: %v\n", err)
+		return fmt.Errorf("failed to download and decompress stream: %v", err)
 	}
 	return cmd.Wait()
 }
 
 // TODO : unit tests
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
-func HandleBackupFetch(folder storage.Folder, targetBackupSelector BackupSelector, fetcher func(folder storage.Folder, backup Backup)) {
+func HandleBackupFetch(folder storage.Folder,
+	targetBackupSelector BackupSelector,
+	fetcher func(folder storage.Folder, backup Backup)) {
 	backupName, err := targetBackupSelector.Select(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder,)\n", backupName)
@@ -181,7 +183,9 @@ func deltaFetchRecursionOld(backupName string, folder storage.Folder, dbDataDire
 	sentinelDto.TablespaceSpec = tablespaceSpec
 
 	if sentinelDto.IsIncremental() {
-		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n", *(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN))
+		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n",
+			*(sentinelDto.IncrementFrom),
+			*(sentinelDto.IncrementFromLSN))
 		baseFilesToUnwrap, err := GetBaseFilesToUnwrap(sentinelDto.Files, filesToUnwrap)
 		if err != nil {
 			return err
@@ -190,13 +194,16 @@ func deltaFetchRecursionOld(backupName string, folder storage.Folder, dbDataDire
 		if err != nil {
 			return err
 		}
-		tracelog.InfoLogger.Printf("%v fetched. Upgrading from LSN %x to LSN %x \n", *(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN), *(sentinelDto.BackupStartLSN))
+		tracelog.InfoLogger.Printf("%v fetched. Upgrading from LSN %x to LSN %x \n",
+			*(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN),
+			*(sentinelDto.BackupStartLSN))
 	}
 
 	return backup.unwrapToEmptyDirectory(dbDataDirectory, sentinelDto, filesToUnwrap, false)
 }
 
-func GetBaseFilesToUnwrap(backupFileStates BackupFileList, currentFilesToUnwrap map[string]bool) (map[string]bool, error) {
+func GetBaseFilesToUnwrap(backupFileStates BackupFileList,
+	currentFilesToUnwrap map[string]bool) (map[string]bool, error) {
 	baseFilesToUnwrap := make(map[string]bool)
 	for file := range currentFilesToUnwrap {
 		fileDescription, hasDescription := backupFileStates[file]

@@ -11,7 +11,7 @@ type WalVerifyOutputType int
 
 const (
 	WalVerifyTableOutput WalVerifyOutputType = iota + 1
-	WalVerifyJsonOutput
+	WalVerifyJSONOutput
 )
 
 // WalVerifyOutputWriter writes the output of wal-verify command execution result
@@ -20,11 +20,11 @@ type WalVerifyOutputWriter interface {
 }
 
 // WalVerifyJsonOutputWriter writes the detailed JSON output
-type WalVerifyJsonOutputWriter struct {
+type WalVerifyJSONOutputWriter struct {
 	output io.Writer
 }
 
-func (writer *WalVerifyJsonOutputWriter) Write(results map[WalVerifyCheckType]WalVerifyCheckResult) error {
+func (writer *WalVerifyJSONOutputWriter) Write(results map[WalVerifyCheckType]WalVerifyCheckResult) error {
 	bytes, err := json.Marshal(results)
 	if err != nil {
 		return err
@@ -56,10 +56,10 @@ func NewWalVerifyOutputWriter(outputType WalVerifyOutputType, output io.Writer) 
 	switch outputType {
 	case WalVerifyTableOutput:
 		return &WalVerifyTableOutputWriter{output: output}
-	case WalVerifyJsonOutput:
-		return &WalVerifyJsonOutputWriter{output: output}
+	case WalVerifyJSONOutput:
+		return &WalVerifyJSONOutputWriter{output: output}
 	default:
-		return &WalVerifyJsonOutputWriter{output: output}
+		return &WalVerifyJSONOutputWriter{output: output}
 	}
 }
 

@@ -139,7 +139,7 @@ func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
 		}
 
 		// Per discussion in
-		// https://www.postgresql.org/message-id/flat/BF2AD4A8-E7F5-486F-92C8-A6959040DEB6%40yandex-team.ru#BF2AD4A8-E7F5-486F-92C8-A6959040DEB6@yandex-team.ru
+		//nolint:lll    // https://www.postgresql.org/message-id/flat/BF2AD4A8-E7F5-486F-92C8-A6959040DEB6%40yandex-team.ru#BF2AD4A8-E7F5-486F-92C8-A6959040DEB6@yandex-team.ru
 		// Following check is the very pessimistic approach on replica backup invalidation
 		if timeline != bundle.Timeline {
 			tracelog.ErrorLogger.Printf("Timeline has changed since backup start. Sentinel for the backup will not be uploaded.")
@@ -154,7 +154,8 @@ func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
 // `backup_label` and `tablespace_map` contents are not immediately written to
 // a file but returned instead. Returns empty string and an error if backup
 // fails.
-func (bundle *Bundle) StartBackup(conn *pgx.Conn, backup string) (backupName string, lsn uint64, version int, dataDir string, systemIdentifier *uint64, err error) {
+func (bundle *Bundle) StartBackup(conn *pgx.Conn,
+	backup string) (backupName string, lsn uint64, version int, dataDir string, systemIdentifier *uint64, err error) {
 	var name, lsnStr string
 	queryRunner, err := newPgQueryRunner(conn)
 	if err != nil {
@@ -202,11 +203,11 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 
 	path, err = bundle.TablespaceSpec.makeTablespaceSymlinkPath(path)
 	if err != nil {
-		return fmt.Errorf("Could not make symlink path for location %s. %v\n", path, err)
+		return fmt.Errorf("could not make symlink path for location %s. %v", path, err)
 	}
 	isSymlink, err := bundle.TablespaceSpec.isTablespaceSymlink(path)
 	if err != nil {
-		return fmt.Errorf("Could not check whether path %s is symlink or not. %v\n", path, err)
+		return fmt.Errorf("could not check whether path %s is symlink or not. %v", path, err)
 	}
 	if isSymlink {
 		return nil
@@ -216,19 +217,19 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 	if filepath.Base(path) == TablespaceFolder {
 		tablespaceInfos, err := ioutil.ReadDir(path)
 		if err != nil {
-			return fmt.Errorf("Could not read directory structure in %s: %v\n", TablespaceFolder, err)
+			return fmt.Errorf("could not read directory structure in %s: %v", TablespaceFolder, err)
 		}
 		for _, tablespaceInfo := range tablespaceInfos {
 			if (tablespaceInfo.Mode() & os.ModeSymlink) != 0 {
 				symlinkName := tablespaceInfo.Name()
 				actualPath, err := os.Readlink(filepath.Join(path, symlinkName))
 				if err != nil {
-					return fmt.Errorf("Could not read symlink for tablespace %v\n", err)
+					return fmt.Errorf("could not read symlink for tablespace %v", err)
 				}
 				bundle.TablespaceSpec.addTablespace(symlinkName, actualPath)
 				err = filepath.Walk(actualPath, bundle.HandleWalkedFSObject)
 				if err != nil {
-					return fmt.Errorf("Could not walk tablespace symlink tree error %v\n", err)
+					return fmt.Errorf("could not walk tablespace symlink tree error %v", err)
 				}
 			}
 		}
@@ -278,7 +279,7 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 
 		// We do not rely here on monotonic time, instead we backup file if MTime changed somehow
 		// For details see
-		// https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
+		//nolint:lll    // https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
 
 		if (wasInBase || bundle.forceIncremental) && (time.Equal(baseFile.MTime)) {
 			// File was not changed since previous backup

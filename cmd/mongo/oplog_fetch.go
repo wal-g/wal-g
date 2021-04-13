@@ -2,7 +2,6 @@ package mongo
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"syscall"
 
@@ -62,5 +61,5 @@ var oplogFetchCmd = &cobra.Command{
 func init() {
 	cmd.AddCommand(oplogFetchCmd)
 	oplogFetchCmd.PersistentFlags().StringVarP(
-		&format, "format", "f", "json", fmt.Sprintf("Valid values: json, bson, bson-raw"))
+		&format, "format", "f", "json", "Valid values: json, bson, bson-raw")
 }

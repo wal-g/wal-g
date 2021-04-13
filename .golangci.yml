@@ -3,6 +3,7 @@
 
 # all available settings of specific linters
 linters-settings:
+  modules-download-mode: vendor
   dupl:
     threshold: 400
   funlen:
@@ -52,14 +53,13 @@ linters:
     - unparam
     - unused
     - varcheck
-  # temporarily disabled
-  #  - golint
-  #  - lll
-  #  - godox
-  #  - deadcode
-  #  - stylecheck
-  #  - gosimple
-  #  - whitespace
+    - golint
+    - lll
+  # - godox
+    - deadcode
+    - stylecheck
+    - gosimple
+    - whitespace
   # don't enable:
   # - gosec
   # - gochecknoinits
@@ -86,3 +86,11 @@ run:
     - "testtools"
   skip-files:
     - ".*_test.go$"
+
+severity:
+  default-severity: error
+  rules:
+    - linters:
+      - godox
+      - deadcode
+      severity: info

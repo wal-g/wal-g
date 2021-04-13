@@ -15,8 +15,8 @@ const (
 
 // TimelineInfo contains information about some timeline in storage
 type TimelineInfo struct {
-	Id               uint32          `json:"id"`
-	ParentId         uint32          `json:"parent_id"`
+	ID               uint32          `json:"id"`
+	ParentID         uint32          `json:"parent_id"`
 	SwitchPointLsn   uint64          `json:"switch_point_lsn"`
 	StartSegment     string          `json:"start_segment"`
 	EndSegment       string          `json:"end_segment"`
@@ -29,9 +29,9 @@ type TimelineInfo struct {
 
 func NewTimelineInfo(walSegments *WalSegmentsSequence, historyRecords []*TimelineHistoryRecord) (*TimelineInfo, error) {
 	timelineInfo := &TimelineInfo{
-		Id:               walSegments.timelineId,
-		StartSegment:     walSegments.minSegmentNo.getFilename(walSegments.timelineId),
-		EndSegment:       walSegments.maxSegmentNo.getFilename(walSegments.timelineId),
+		ID:               walSegments.timelineID,
+		StartSegment:     walSegments.minSegmentNo.getFilename(walSegments.timelineID),
+		EndSegment:       walSegments.maxSegmentNo.getFilename(walSegments.timelineID),
 		SegmentsCount:    len(walSegments.walSegmentNumbers),
 		SegmentRangeSize: uint64(walSegments.maxSegmentNo-walSegments.minSegmentNo) + 1,
 		Status:           TimelineOkStatus,
@@ -53,7 +53,7 @@ func NewTimelineInfo(walSegments *WalSegmentsSequence, historyRecords []*Timelin
 	// set parent timeline id and timeline switch LSN if have .history record available
 	if len(historyRecords) > 0 {
 		switchHistoryRecord := historyRecords[len(historyRecords)-1]
-		timelineInfo.ParentId = switchHistoryRecord.timeline
+		timelineInfo.ParentID = switchHistoryRecord.timeline
 		timelineInfo.SwitchPointLsn = switchHistoryRecord.lsn
 	}
 	return timelineInfo, nil
@@ -61,7 +61,7 @@ func NewTimelineInfo(walSegments *WalSegmentsSequence, historyRecords []*Timelin
 
 // WalSegmentsSequence represents some collection of wal segments with the same timeline
 type WalSegmentsSequence struct {
-	timelineId        uint32
+	timelineID        uint32
 	walSegmentNumbers map[WalSegmentNo]bool
 	minSegmentNo      WalSegmentNo
 	maxSegmentNo      WalSegmentNo
@@ -72,7 +72,7 @@ func NewSegmentsSequence(id uint32, segmentNo WalSegmentNo) *WalSegmentsSequence
 	walSegmentNumbers[segmentNo] = true
 
 	return &WalSegmentsSequence{
-		timelineId:        id,
+		timelineID:        id,
 		walSegmentNumbers: walSegmentNumbers,
 		minSegmentNo:      segmentNo,
 		maxSegmentNo:      segmentNo,
@@ -92,11 +92,11 @@ func (seq *WalSegmentsSequence) AddWalSegmentNo(number WalSegmentNo) {
 
 // FindMissingSegments finds missing segments in range [minSegmentNo, maxSegmentNo]
 func (seq *WalSegmentsSequence) FindMissingSegments() ([]WalSegmentDescription, error) {
-	startWalSegment := WalSegmentDescription{Number: seq.maxSegmentNo, Timeline: seq.timelineId}
+	startWalSegment := WalSegmentDescription{Number: seq.maxSegmentNo, Timeline: seq.timelineID}
 
 	walSegments := make(map[WalSegmentDescription]bool, len(seq.walSegmentNumbers))
 	for number := range seq.walSegmentNumbers {
-		segment := WalSegmentDescription{Number: number, Timeline: seq.timelineId}
+		segment := WalSegmentDescription{Number: number, Timeline: seq.timelineID}
 		walSegments[segment] = true
 	}
 
@@ -125,7 +125,7 @@ func HandleWalShow(rootFolder storage.Folder, showBackups bool, outputWriter Wal
 
 	timelineInfos := make([]*TimelineInfo, 0, len(segmentsByTimelines))
 	for _, segmentsSequence := range segmentsByTimelines {
-		historyRecords, err := getTimeLineHistoryRecords(segmentsSequence.timelineId, walFolder)
+		historyRecords, err := getTimeLineHistoryRecords(segmentsSequence.timelineID, walFolder)
 		if err != nil {
 			if _, ok := err.(HistoryFileNotFoundError); !ok {
 				tracelog.ErrorLogger.Fatalf("Error while loading .history file %v\n", err)
@@ -144,7 +144,7 @@ func HandleWalShow(rootFolder storage.Folder, showBackups bool, outputWriter Wal
 
 	// order timelines by ID
 	sort.Slice(timelineInfos, func(i, j int) bool {
-		return timelineInfos[i].Id < timelineInfos[j].Id
+		return timelineInfos[i].ID < timelineInfos[j].ID
 	})
 
 	err = outputWriter.Write(timelineInfos)
@@ -174,7 +174,7 @@ func addBackupsInfo(timelineInfos []*TimelineInfo, rootFolder storage.Folder) ([
 		return nil, err
 	}
 	for _, info := range timelineInfos {
-		info.Backups, err = getBackupsInRange(info.StartSegment, info.EndSegment, info.Id, backupDetails)
+		info.Backups, err = getBackupsInRange(info.StartSegment, info.EndSegment, info.ID, backupDetails)
 		if err != nil {
 			return nil, err
 		}

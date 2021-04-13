@@ -51,11 +51,11 @@ func saveWalParts(parts []WalPart, writer io.Writer) error {
 
 func LoadWalPart(reader io.Reader) (*WalPart, error) {
 	var dataType WalPartDataType
-	var partId uint8
+	var partID uint8
 	var dataLen uint32
 	err := parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
 		{Field: &dataType, Name: "part data type"},
-		{Field: &partId, Name: "part number"},
+		{Field: &partID, Name: "part number"},
 		{Field: &dataLen, Name: "part data len"},
 	}, reader)
 	if err != nil {
@@ -66,5 +66,5 @@ func LoadWalPart(reader io.Reader) (*WalPart, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &WalPart{dataType, partId, data}, nil
+	return &WalPart{dataType, partID, data}, nil
 }

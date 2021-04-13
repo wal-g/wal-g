@@ -24,7 +24,6 @@ func (adapter *StorageAdapter) loadSettings(config *viper.Viper) map[string]stri
 	settings := make(map[string]string)
 
 	for _, settingName := range adapter.settingNames {
-
 		settingValue := config.GetString(settingName)
 		if len(settingValue) > 0 {
 			settings[settingName] = settingValue

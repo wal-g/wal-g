@@ -10,13 +10,13 @@ import (
 )
 
 func TestGetRelFileIdFrom_ZeroId(t *testing.T) {
-	relFileId, err := internal.GetRelFileIdFrom("~/DemoDb/base/16384/2668")
+	relFileId, err := internal.GetRelFileIDFrom("~/DemoDb/base/16384/2668")
 	assert.NoError(t, err)
 	assert.Equal(t, 0, relFileId)
 }
 
 func TestGetRelFileIdFrom_NonZeroId(t *testing.T) {
-	relFileId, err := internal.GetRelFileIdFrom("~/DemoDb/base/16384/2668.3")
+	relFileId, err := internal.GetRelFileIDFrom("~/DemoDb/base/16384/2668.3")
 	assert.NoError(t, err)
 	assert.Equal(t, 3, relFileId)
 }

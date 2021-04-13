@@ -37,7 +37,9 @@ func NewFileTarInterpreter(
 }
 
 // TODO : unit tests
-func (tarInterpreter *FileTarInterpreter) unwrapRegularFileOld(fileReader io.Reader, fileInfo *tar.Header, targetPath string) error {
+func (tarInterpreter *FileTarInterpreter) unwrapRegularFileOld(fileReader io.Reader,
+	fileInfo *tar.Header,
+	targetPath string) error {
 	if tarInterpreter.FilesToUnwrap != nil {
 		if _, ok := tarInterpreter.FilesToUnwrap[fileInfo.Name]; !ok {
 			// don't have to unwrap it this time

@@ -39,7 +39,7 @@ func minInt(i, j int) int {
 type BinlogEventHeader struct {
 	Timestamp   uint32
 	TypeCode    uint8
-	ServerId    uint32
+	ServerID    uint32
 	EventLength uint32
 }
 
@@ -50,15 +50,15 @@ func ParseEventHeader(buf []byte) (header BinlogEventHeader) {
 	le := binary.LittleEndian
 	header.Timestamp = le.Uint32(buf[0:])
 	header.TypeCode = buf[4]
-	header.ServerId = le.Uint32(buf[5:])
+	header.ServerID = le.Uint32(buf[5:])
 	header.EventLength = le.Uint32(buf[9:])
 	return header
 }
 
 type BinlogReader struct {
 	reader          *bufio.Reader
-	startTs         uint32
-	endTs           uint32
+	startTS         uint32
+	endTS           uint32
 	headerBuf       []byte
 	headerSaved     bool
 	intervalEntered bool
@@ -66,11 +66,11 @@ type BinlogReader struct {
 	tail            int
 }
 
-func NewBinlogReader(reader io.Reader, startTs time.Time, endTs time.Time) *BinlogReader {
+func NewBinlogReader(reader io.Reader, startTS time.Time, endTS time.Time) *BinlogReader {
 	return &BinlogReader{
 		reader:  bufio.NewReaderSize(reader, 10*utility.Mebibyte),
-		startTs: time2uint32(startTs),
-		endTs:   time2uint32(endTs),
+		startTS: time2uint32(startTS),
+		endTS:   time2uint32(endTS),
 	}
 }
 
@@ -146,7 +146,7 @@ func (bl *BinlogReader) Read(buf []byte) (int, error) {
 		}
 		header := ParseEventHeader(hbuf)
 		evlen := int(header.EventLength)
-		if header.Timestamp < bl.startTs {
+		if header.Timestamp < bl.startTS {
 			_, err := bl.reader.Discard(evlen)
 			if err != nil {
 				return offset, err
@@ -154,7 +154,7 @@ func (bl *BinlogReader) Read(buf []byte) (int, error) {
 			continue
 		}
 		bl.intervalEntered = true
-		if header.Timestamp >= bl.endTs {
+		if header.Timestamp >= bl.endTS {
 			bl.intervalLeft = true
 			return offset, io.EOF
 		}
@@ -179,7 +179,7 @@ func GetBinlogStartTimestamp(path string) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, err
 	}
-	if bytes.Compare(BinlogMagic[:], buf[:BinlogMagicLength]) != 0 {
+	if !bytes.Equal(BinlogMagic[:], buf[:BinlogMagicLength]) {
 		return time.Time{}, fmt.Errorf("incorrect binlog magic: %v", buf[:BinlogMagicLength])
 	}
 	header := ParseEventHeader(buf[BinlogMagicLength:])

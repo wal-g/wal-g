@@ -58,7 +58,9 @@ type CursorMajFetcher struct {
 }
 
 // NewCursorMajFetcher builds CursorMajFetcher with given args.
-func NewCursorMajFetcher(m client.MongoDriver, cur client.OplogCursor, lwUpdateInterval time.Duration) *CursorMajFetcher {
+func NewCursorMajFetcher(m client.MongoDriver,
+	cur client.OplogCursor,
+	lwUpdateInterval time.Duration) *CursorMajFetcher {
 	return &CursorMajFetcher{m, cur, lwUpdateInterval}
 }
 
@@ -147,7 +149,9 @@ func NewStorageFetcher(downloader archive.Downloader, path archive.Sequence) *St
 }
 
 // FetchBetween returns channel of oplog records, channel is filled in background.
-func (sf *StorageFetcher) FetchBetween(ctx context.Context, from, until models.Timestamp) (oplogc chan *models.Oplog, errc chan error, err error) {
+func (sf *StorageFetcher) FetchBetween(ctx context.Context,
+	from,
+	until models.Timestamp) (oplogc chan *models.Oplog, errc chan error, err error) {
 	if models.LessTS(until, from) {
 		return nil, nil, fmt.Errorf("fromTS '%s' must be less than untilTS '%s'", from, until)
 	}

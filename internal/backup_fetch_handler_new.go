@@ -8,7 +8,10 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedundantTars bool) func(folder storage.Folder, backup Backup) {
+func GetPgFetcherNew(dbDataDirectory,
+	fileMask,
+	restoreSpecPath string,
+	skipRedundantTars bool) func(folder storage.Folder, backup Backup) {
 	return func(folder storage.Folder, backup Backup) {
 		filesToUnwrap, err := backup.GetFilesToUnwrap(fileMask)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
@@ -27,7 +30,7 @@ func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedu
 
 		if !isEmpty {
 			tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n",
-				newNonEmptyDbDataDirectoryError(dbDataDirectory))
+				newNonEmptyDBDataDirectoryError(dbDataDirectory))
 		}
 		config := NewFetchConfig(backup.Name,
 			utility.ResolveSymlink(dbDataDirectory), folder, spec, filesToUnwrap, skipRedundantTars)

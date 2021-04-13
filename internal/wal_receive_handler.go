@@ -119,7 +119,10 @@ func HandleWALReceive(uploader *WalUploader) {
 	}
 }
 
-func getStartTimeline(conn *pgconn.PgConn, uploader *WalUploader, systemTimeline uint32, xLogPos pglogrepl.LSN) (uint32, error) {
+func getStartTimeline(conn *pgconn.PgConn,
+	uploader *WalUploader,
+	systemTimeline uint32,
+	xLogPos pglogrepl.LSN) (uint32, error) {
 	if systemTimeline < 2 {
 		return 1, nil
 	}

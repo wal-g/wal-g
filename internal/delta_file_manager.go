@@ -48,13 +48,14 @@ func NewDeltaFileManager(dataFolder fsutil.DataFolder) *DeltaFileManager {
 		}
 		return manager.loadPartFile(partFilename)
 	})
-	manager.DeltaFileWriters = newLazyCache(func(deltaFilenameInterface interface{}) (deltaFileWriter interface{}, err error) {
-		deltaFilename, ok := deltaFilenameInterface.(string)
-		if !ok {
-			return nil, newWrongTypeError("string")
-		}
-		return manager.loadDeltaFileWriter(deltaFilename)
-	})
+	manager.DeltaFileWriters = newLazyCache(
+		func(deltaFilenameInterface interface{}) (deltaFileWriter interface{}, err error) {
+			deltaFilename, ok := deltaFilenameInterface.(string)
+			if !ok {
+				return nil, newWrongTypeError("string")
+			}
+			return manager.loadDeltaFileWriter(deltaFilename)
+		})
 	manager.canceledWaiter.Add(1)
 	go manager.collectCanceledDeltaFiles()
 	return manager
@@ -69,7 +70,8 @@ func (manager *DeltaFileManager) GetBlockLocationConsumer(deltaFilename string) 
 }
 
 // TODO : unit tests
-func (manager *DeltaFileManager) loadDeltaFileWriter(deltaFilename string) (deltaFileWriter *DeltaFileChanWriter, err error) {
+func (manager *DeltaFileManager) loadDeltaFileWriter(
+	deltaFilename string) (deltaFileWriter *DeltaFileChanWriter, err error) {
 	physicalDeltaFile, err := manager.dataFolder.OpenReadonlyFile(deltaFilename)
 	var deltaFile *DeltaFile
 	if err != nil {
@@ -137,7 +139,9 @@ func (manager *DeltaFileManager) FlushPartFiles() (completedPartFiles map[string
 			err := manager.CombinePartFile(deltaFilename, partFile)
 			if err != nil {
 				manager.CanceledDeltaFiles[deltaFilename] = true
-				tracelog.WarningLogger.Printf("Canceled delta file writing because of error: "+tracelog.GetErrorFormatter()+"\n", err)
+				tracelog.WarningLogger.Printf(
+					"Canceled delta file writing because of error: "+tracelog.GetErrorFormatter()+"\n",
+					err)
 			}
 		} else {
 			err := fsutil.SaveToDataFolder(partFile, partFilename, manager.dataFolder)
@@ -169,11 +173,15 @@ func (manager *DeltaFileManager) FlushDeltaFiles(uploader *Uploader, completedPa
 			var deltaFileData bytes.Buffer
 			err := deltaFileWriter.DeltaFile.Save(&deltaFileData)
 			if err != nil {
-				tracelog.WarningLogger.Printf("Failed to upload delta file: '%s' because of saving error: '%v'\n", deltaFilename, err)
+				tracelog.WarningLogger.Printf(
+					"Failed to upload delta file: '%s' because of saving error: '%v'\n",
+					deltaFilename, err)
 			} else {
 				err = uploader.UploadFile(ioextensions.NewNamedReaderImpl(&deltaFileData, deltaFilename))
 				if err != nil {
-					tracelog.WarningLogger.Printf("Failed to upload delta file: '%s' because of uploading error: '%v'\n", deltaFilename, err)
+					tracelog.WarningLogger.Printf(
+						"Failed to upload delta file: '%s' because of uploading error: '%v'\n",
+						deltaFilename, err)
 				}
 			}
 		} else {

@@ -16,8 +16,8 @@ const (
 	WalVerifyShortDescription = "Verify WAL storage folder. Available checks: integrity, timeline."
 	WalVerifyLongDescription  = "Run a set of specified checks to ensure WAL storage health."
 
-	useJsonOutputFlag        = "json"
-	useJsonOutputDescription = "Show output in JSON format."
+	useJSONOutputFlag        = "json"
+	useJSONOutputDescription = "Show output in JSON format."
 
 	checkIntegrityArg = "integrity"
 	checkTimelineArg  = "timeline"
@@ -38,8 +38,8 @@ var (
 			folder, err := internal.ConfigureFolder()
 			tracelog.ErrorLogger.FatalOnError(err)
 			outputType := internal.WalVerifyTableOutput
-			if useJsonOutput {
-				outputType = internal.WalVerifyJsonOutput
+			if useJSONOutput {
+				outputType = internal.WalVerifyJSONOutput
 			}
 			outputWriter := internal.NewWalVerifyOutputWriter(outputType, os.Stdout)
 			checkTypes := parseChecks(checks)
@@ -47,7 +47,7 @@ var (
 			internal.HandleWalVerify(checkTypes, folder, internal.QueryCurrentWalSegment(), outputWriter)
 		},
 	}
-	useJsonOutput bool
+	useJSONOutput bool
 )
 
 func parseChecks(checks []string) []internal.WalVerifyCheckType {
@@ -87,5 +87,5 @@ func checkArgs(cmd *cobra.Command, args []string) error {
 
 func init() {
 	cmd.AddCommand(walVerifyCmd)
-	walVerifyCmd.Flags().BoolVar(&useJsonOutput, useJsonOutputFlag, false, useJsonOutputDescription)
+	walVerifyCmd.Flags().BoolVar(&useJSONOutput, useJSONOutputFlag, false, useJSONOutputDescription)
 }

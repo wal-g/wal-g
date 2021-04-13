@@ -20,7 +20,8 @@ type ScannedSegmentDescription struct {
 	status ScannedSegmentStatus
 }
 
-func newScannedSegmentDescription(description WalSegmentDescription, status ScannedSegmentStatus) ScannedSegmentDescription {
+func newScannedSegmentDescription(description WalSegmentDescription,
+	status ScannedSegmentStatus) ScannedSegmentDescription {
 	return ScannedSegmentDescription{description, status}
 }
 

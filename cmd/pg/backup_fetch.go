@@ -55,7 +55,8 @@ var backupFetchCmd = &cobra.Command{
 }
 
 // create the BackupSelector to select the backup to fetch
-func createTargetFetchBackupSelector(cmd *cobra.Command, args []string, targetUserData string) (internal.BackupSelector, error) {
+func createTargetFetchBackupSelector(cmd *cobra.Command,
+	args []string, targetUserData string) (internal.BackupSelector, error) {
 	targetName := ""
 	if len(args) >= 2 {
 		targetName = args[1]

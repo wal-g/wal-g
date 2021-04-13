@@ -138,14 +138,14 @@ func (backup *Backup) FetchMeta() (ExtendedMetadataDto, error) {
 	return extendedMetadataDto, errors.Wrap(err, "failed to unmarshal metadata")
 }
 
-func checkDbDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentinelDto) error {
+func checkDBDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentinelDto) error {
 	if !sentinelDto.IsIncremental() {
 		isEmpty, err := isDirectoryEmpty(dbDataDirectory)
 		if err != nil {
 			return err
 		}
 		if !isEmpty {
-			return newNonEmptyDbDataDirectoryError(dbDataDirectory)
+			return newNonEmptyDBDataDirectoryError(dbDataDirectory)
 		}
 	} else {
 		tracelog.DebugLogger.Println("DB data directory before increment:")
@@ -177,20 +177,20 @@ func checkDbDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentine
 func setTablespacePaths(spec TablespaceSpec) error {
 	basePrefix, ok := spec.BasePrefix()
 	if !ok {
-		return fmt.Errorf("Tablespace specification base path is not set\n")
+		return fmt.Errorf("tablespace specification base path is not set")
 	}
 	err := fs.NewFolder(basePrefix, TablespaceFolder).EnsureExists()
 	if err != nil {
-		return fmt.Errorf("Error creating pg_tblspc folder %v\n", err)
+		return fmt.Errorf("error creating pg_tblspc folder %v", err)
 	}
 	for _, location := range spec.tablespaceLocations() {
 		err := fs.NewFolder(location.Location, "").EnsureExists()
 		if err != nil {
-			return fmt.Errorf("Error creating folder for tablespace %v\n", err)
+			return fmt.Errorf("error creating folder for tablespace %v", err)
 		}
 		err = os.Symlink(location.Location, filepath.Join(basePrefix, location.Symlink))
 		if err != nil {
-			return fmt.Errorf("Error creating tablespace symkink %v\n", err)
+			return fmt.Errorf("error creating tablespace symkink %v", err)
 		}
 	}
 	return nil
@@ -200,7 +200,7 @@ func setTablespacePaths(spec TablespaceSpec) error {
 func (backup *Backup) unwrapToEmptyDirectory(
 	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
 ) error {
-	err := checkDbDirectoryForUnwrap(dbDataDirectory, sentinelDto)
+	err := checkDBDirectoryForUnwrap(dbDataDirectory, sentinelDto)
 	if err != nil {
 		return err
 	}
@@ -264,7 +264,9 @@ func isDirectoryEmpty(directoryPath string) (bool, error) {
 }
 
 // TODO : init tests
-func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, skipRedundantTars bool) (tarsToExtract []ReaderMaker, pgControlKey string, err error) {
+func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto,
+	filesToUnwrap map[string]bool,
+	skipRedundantTars bool) (tarsToExtract []ReaderMaker, pgControlKey string, err error) {
 	tarNames, err := backup.GetTarNames()
 	if err != nil {
 		return nil, "", err
@@ -338,13 +340,13 @@ func GetLastWalFilename(backup *Backup) (string, error) {
 		tracelog.InfoLogger.Print("No meta found.")
 		return "", err
 	}
-	timelineId, err := ParseTimelineFromBackupName(backup.Name)
+	timelineID, err := ParseTimelineFromBackupName(backup.Name)
 	if err != nil {
 		tracelog.InfoLogger.FatalError(err)
 		return "", err
 	}
 	endWalSegmentNo := newWalSegmentNo(meta.FinishLsn - 1)
-	return endWalSegmentNo.getFilename(timelineId), nil
+	return endWalSegmentNo.getFilename(timelineID), nil
 }
 
 // TODO : unit tests
@@ -397,7 +399,8 @@ func GetBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage 
 }
 
 // TODO : unit tests
-func GetBackupsAndGarbageWithTarget(folder storage.Folder, targetPath string) (backups []BackupTime, garbage []string, err error) {
+func GetBackupsAndGarbageWithTarget(folder storage.Folder,
+	targetPath string) (backups []BackupTime, garbage []string, err error) {
 	backupObjects, subFolders, err := folder.GetSubFolder(targetPath).ListFolder()
 	if err != nil {
 		return nil, nil, err

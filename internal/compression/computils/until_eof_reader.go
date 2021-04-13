@@ -7,7 +7,7 @@ type UntilEOFReader struct {
 	isEOF      bool
 }
 
-func NewUntilEofReader(underlying io.Reader) *UntilEOFReader {
+func NewUntilEOFReader(underlying io.Reader) *UntilEOFReader {
 	return &UntilEOFReader{underlying, false}
 }
 

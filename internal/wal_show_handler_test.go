@@ -255,7 +255,7 @@ func testMultipleTimelines(t *testing.T, timelineSetups []*TestTimelineSetup, wa
 	timelineInfos := executeWalShow(walFilenames, walFolderFiles)
 
 	sort.Slice(timelineInfos, func(i, j int) bool {
-		return timelineInfos[i].Id < timelineInfos[j].Id
+		return timelineInfos[i].ID < timelineInfos[j].ID
 	})
 	sort.Slice(timelineSetups, func(i, j int) bool {
 		return timelineSetups[i].id < timelineSetups[j].id
@@ -281,8 +281,8 @@ func verifySingleTimeline(t *testing.T, setup *TestTimelineSetup, timelineInfo *
 	}
 
 	expectedTimelineInfo := internal.TimelineInfo{
-		Id:               setup.id,
-		ParentId:         setup.parentId,
+		ID:               setup.id,
+		ParentID:         setup.parentId,
 		SwitchPointLsn:   setup.switchPointLsn,
 		StartSegment:     setup.existSegments[0],
 		EndSegment:       setup.existSegments[len(setup.existSegments)-1],

@@ -18,7 +18,7 @@ import (
 var timelineHistoryRecordRegexp *regexp.Regexp
 
 func init() {
-	timelineHistoryRecordRegexp = regexp.MustCompile("^(\\d+)\\t(.+)\\t(.+)$")
+	timelineHistoryRecordRegexp = regexp.MustCompile(`^(\d+)\t(.+)\t(.+)$`)
 }
 
 type HistoryFileNotFoundError struct {
@@ -64,8 +64,9 @@ func newHistoryRecordFromString(row string) (*TimelineHistoryRecord, error) {
 // createTimelineSwitchMap creates a map to lookup the TimelineHistoryRecords of .history file
 // by WalSegmentNo. So we can use this map to do a fast lookup
 // and check if there was a timeline switch on the provided segment number.
-func createTimelineSwitchMap(startTimeline uint32, walFolder storage.Folder) (map[WalSegmentNo]*TimelineHistoryRecord, error) {
-	timeLineHistoryMap := make(map[WalSegmentNo]*TimelineHistoryRecord, 0)
+func createTimelineSwitchMap(startTimeline uint32,
+	walFolder storage.Folder) (map[WalSegmentNo]*TimelineHistoryRecord, error) {
+	timeLineHistoryMap := make(map[WalSegmentNo]*TimelineHistoryRecord)
 	historyRecords, err := getTimeLineHistoryRecords(startTimeline, walFolder)
 	if _, ok := err.(HistoryFileNotFoundError); ok {
 		// return empty map if not found any history

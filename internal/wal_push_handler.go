@@ -18,7 +18,9 @@ type CantOverwriteWalFileError struct {
 }
 
 func newCantOverwriteWalFileError(walFilePath string) CantOverwriteWalFileError {
-	return CantOverwriteWalFileError{errors.Errorf("WAL file '%s' already archived, contents differ, unable to overwrite", walFilePath)}
+	return CantOverwriteWalFileError{
+		errors.Errorf("WAL file '%s' already archived, contents differ, unable to overwrite",
+			walFilePath)}
 }
 
 func (err CantOverwriteWalFileError) Error() string {
@@ -103,8 +105,7 @@ func checkWALOverwrite(uploader *WalUploader, walFilePath string) (overwriteAtte
 
 	if !bytes.Equal(archived, localBytes) {
 		return true, newCantOverwriteWalFileError(walFilePath)
-	} else {
-		tracelog.InfoLogger.Printf("WAL file '%s' already archived with equal content, skipping", walFilePath)
-		return true, nil
 	}
+	tracelog.InfoLogger.Printf("WAL file '%s' already archived with equal content, skipping", walFilePath)
+	return true, nil
 }

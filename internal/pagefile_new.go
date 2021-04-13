@@ -88,7 +88,7 @@ func CreateFileFromIncrement(increment io.Reader, target ReadWriterAt) (int64, e
 			if err != nil {
 				return 0, err
 			}
-			missingBlockCount -= 1
+			missingBlockCount--
 		} else {
 			_, err = target.WriteAt(emptyPage, i*DatabasePageSize)
 			if err != nil {

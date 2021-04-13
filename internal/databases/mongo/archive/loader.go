@@ -78,7 +78,10 @@ func NewStorageDownloader(opts StorageSettings) (*StorageDownloader, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &StorageDownloader{rootFolder: folder, oplogsFolder: folder.GetSubFolder(opts.oplogsPath), backupsFolder: folder.GetSubFolder(opts.backupsPath)}, nil
+	return &StorageDownloader{rootFolder: folder,
+			oplogsFolder:  folder.GetSubFolder(opts.oplogsPath),
+			backupsFolder: folder.GetSubFolder(opts.backupsPath)},
+		nil
 }
 
 // BackupMeta downloads sentinel contents.
@@ -287,7 +290,8 @@ func NewStoragePurger(opts StorageSettings) (*StoragePurger, error) {
 		return nil, err
 	}
 
-	return &StoragePurger{oplogsFolder: folder.GetSubFolder(opts.oplogsPath), backupsFolder: folder.GetSubFolder(opts.backupsPath)}, nil
+	return &StoragePurger{oplogsFolder: folder.GetSubFolder(opts.oplogsPath),
+		backupsFolder: folder.GetSubFolder(opts.backupsPath)}, nil
 }
 
 // DeleteBackups purges given backups files

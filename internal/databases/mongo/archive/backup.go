@@ -105,7 +105,9 @@ type MongoMetaDBProvider struct {
 	permanent bool
 }
 
-func NewBackupMetaMongoProvider(ctx context.Context, mc client.MongoDriver, folder storage.Folder) *MongoMetaDBProvider {
+func NewBackupMetaMongoProvider(ctx context.Context,
+	mc client.MongoDriver,
+	folder storage.Folder) *MongoMetaDBProvider {
 	return &MongoMetaDBProvider{ctx: ctx, client: mc, folder: folder}
 }
 

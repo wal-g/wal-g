@@ -87,8 +87,9 @@ func getDeltaConfig() (maxDeltas int, fromFull bool) {
 
 func createAndPushBackup(bc *BackupConfig) {
 	folder := bc.uploader.UploadingFolder
-	bc.uploader.UploadingFolder = folder.GetSubFolder(bc.backupsFolder) // TODO: AB: this subfolder switch look ugly. I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
-
+	// TODO: AB: this subfolder switch look ugly.
+	// I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
+	bc.uploader.UploadingFolder = folder.GetSubFolder(bc.backupsFolder)
 	crypter := ConfigureCrypter()
 	bundle := NewBundle(bc.archiveDirectory, crypter, bc.previousBackupSentinelDto.BackupStartLSN,
 		bc.previousBackupSentinelDto.Files, bc.forceIncremental, viper.GetInt64(TarSizeThresholdSetting))
@@ -114,7 +115,9 @@ func createAndPushBackup(bc *BackupConfig) {
 		if *bc.previousBackupSentinelDto.BackupFinishLSN > backupStartLSN {
 			tracelog.ErrorLogger.FatalOnError(newBackupFromFuture(bc.previousBackupName))
 		}
-		if bc.previousBackupSentinelDto.SystemIdentifier != nil && systemIdentifier != nil && *systemIdentifier != *bc.previousBackupSentinelDto.SystemIdentifier {
+		if bc.previousBackupSentinelDto.SystemIdentifier != nil &&
+			systemIdentifier != nil &&
+			*systemIdentifier != *bc.previousBackupSentinelDto.SystemIdentifier {
 			tracelog.ErrorLogger.FatalOnError(newBackupFromOtherBD())
 		}
 		if bc.uploader.getUseWalDelta() {
@@ -211,7 +214,9 @@ func HandleBackupPush(uploader *WalUploader, archiveDirectory string, isPermanen
 	if isFullBackup {
 		tracelog.InfoLogger.Println("Doing full backup.")
 	} else {
-		previousBackupName, previousBackupSentinelDto, incrementCount = configureDeltaBackup(uploader.UploadingFolder, deltaBaseSelector, isPermanent)
+		previousBackupName,
+			previousBackupSentinelDto,
+			incrementCount = configureDeltaBackup(uploader.UploadingFolder, deltaBaseSelector, isPermanent)
 	}
 
 	backupConfig := BackupConfig{
@@ -291,12 +296,15 @@ func configureDeltaBackup(folder storage.Folder, deltaBaseSelector BackupSelecto
 		previousBackupSentinelDto, err = previousBackup.GetSentinel()
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
-	tracelog.InfoLogger.Printf("Delta backup from %v with LSN %x. \n", previousBackupName, *previousBackupSentinelDto.BackupStartLSN)
+	tracelog.InfoLogger.Printf("Delta backup from %v with LSN %x. \n",
+		previousBackupName, *previousBackupSentinelDto.BackupStartLSN)
 	return previousBackupName, previousBackupSentinelDto, incrementCount
 }
 
 // TODO : unit tests
-func uploadMetadata(uploader *Uploader, sentinelDto *BackupSentinelDto, backupName string, meta ExtendedMetadataDto) error {
+func uploadMetadata(uploader *Uploader,
+	sentinelDto *BackupSentinelDto,
+	backupName string, meta ExtendedMetadataDto) error {
 	// BackupSentinelDto struct allows nil field for backward compatiobility
 	// We do not expect here nil dto since it is new dto to upload
 	meta.DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -335,7 +343,9 @@ func SentinelNameFromBackup(backupName string) string {
 
 func checkPgVersionAndPgControl(archiveDirectory string) {
 	_, err := ioutil.ReadFile(filepath.Join(archiveDirectory, PgControlPath))
-	tracelog.ErrorLogger.FatalfOnError("It looks like you are trying to backup not pg_data. PgControl file not found: %v\n", err)
+	tracelog.ErrorLogger.FatalfOnError(
+		"It looks like you are trying to backup not pg_data. PgControl file not found: %v\n", err)
 	_, err = ioutil.ReadFile(filepath.Join(archiveDirectory, "PG_VERSION"))
-	tracelog.ErrorLogger.FatalfOnError("It looks like you are trying to backup not pg_data. PG_VERSION file not found: %v\n", err)
+	tracelog.ErrorLogger.FatalfOnError(
+		"It looks like you are trying to backup not pg_data. PG_VERSION file not found: %v\n", err)
 }

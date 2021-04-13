@@ -2,7 +2,8 @@ package internal
 
 /*
 This object represents a wal segment. A wal segment is a memory location that holds all wal for a wal file.
-wal-g receivewal reads wal from Postgres one wal segment at a time, and writes it out using the WalUploader before reading the next wal segment.
+wal-g receivewal reads wal from Postgres one wal segment at a time,
+and writes it out using the WalUploader before reading the next wal segment.
 */
 
 import (
@@ -33,7 +34,8 @@ type WalSegment struct {
 	lastMsg         *pgproto3.BackendMessage
 }
 
-// The ProcessMessageResult is an enum representing possible results from the methods processing the messages as received from Postgres into the wal segment.
+// The ProcessMessageResult is an enum representing possible results from the methods
+// processing the messages as received from Postgres into the wal segment.
 type ProcessMessageResult int
 
 // These are the multiple results that the methods can return
@@ -74,7 +76,8 @@ func (seg *WalSegment) NextWalSegment() (*WalSegment, error) {
 	}
 	nextSegment := NewWalSegment(seg.TimeLine, seg.endLSN, seg.walSegmentBytes)
 	if seg.lastMsg != nil {
-		// Apparaently the last message crossed the border between the two segments, so lets have it processed into the next segment too.
+		// Apparaently the last message crossed the border between the two segments,
+		// so lets have it processed into the next segment too.
 		result, err := nextSegment.processMessage(*seg.lastMsg)
 		if err != nil {
 			return nil, err
@@ -99,7 +102,8 @@ func (seg *WalSegment) Name() string {
 	return formatWALFileName(seg.TimeLine, segID) + ".partial"
 }
 
-// processMessage is a method that processes a message from Postgres and copies its data into the right location of the wal segment.
+// processMessage is a method that processes a message from Postgres and copies its data
+// into the right location of the wal segment.
 func (seg *WalSegment) processMessage(message pgproto3.BackendMessage) (ProcessMessageResult, error) {
 	var messageOffset pglogrepl.LSN
 	switch msg := message.(type) {
@@ -108,7 +112,9 @@ func (seg *WalSegment) processMessage(message pgproto3.BackendMessage) (ProcessM
 		case pglogrepl.PrimaryKeepaliveMessageByteID:
 			pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(msg.Data[1:])
 			tracelog.ErrorLogger.FatalOnError(err)
-			tracelog.DebugLogger.Println("Primary Keepalive Message =>", "ServerWALEnd:", pkm.ServerWALEnd, "ServerTime:", pkm.ServerTime, "ReplyRequested:", pkm.ReplyRequested)
+			tracelog.DebugLogger.Println("Primary Keepalive Message =>",
+				"ServerWALEnd:", pkm.ServerWALEnd, "ServerTime:", pkm.ServerTime,
+				"ReplyRequested:", pkm.ReplyRequested)
 
 			if pkm.ReplyRequested {
 				return ProcessMessageReplyRequested, nil
@@ -132,7 +138,8 @@ func (seg *WalSegment) processMessage(message pgproto3.BackendMessage) (ProcessM
 				messageOffset = seg.StartLSN - xld.WALStart
 			}
 			tracelog.DebugLogger.Println("XLogData =>", "WALStart", xld.WALStart, "WALEnd", walEnd,
-				"LenWALData", len(string(xld.WALData)), "ServerWALEnd", xld.ServerWALEnd, "messageOffset", messageOffset) //, "ServerTime:", xld.ServerTime)
+				"LenWALData", len(string(xld.WALData)), "ServerWALEnd", xld.ServerWALEnd,
+				"messageOffset", messageOffset) //, "ServerTime:", xld.ServerTime)
 			if seg.StartLSN+pglogrepl.LSN(seg.writeIndex) != (xld.WALStart + messageOffset) {
 				return ProcessMessageSegmentGap, segmentError{
 					errors.Errorf("WAL segment error: CopyData WALStart does not fit to segment writeIndex")}
@@ -161,7 +168,9 @@ func (seg *WalSegment) Stream(conn *pgconn.PgConn, standbyMessageTimeout time.Du
 	nextStandbyMessageDeadline := time.Now()
 	for {
 		if time.Now().After(nextStandbyMessageDeadline) {
-			err = pglogrepl.SendStandbyStatusUpdate(context.Background(), conn, pglogrepl.StandbyStatusUpdate{WALWritePosition: seg.StartLSN})
+			err = pglogrepl.SendStandbyStatusUpdate(context.Background(),
+				conn,
+				pglogrepl.StandbyStatusUpdate{WALWritePosition: seg.StartLSN})
 			tracelog.ErrorLogger.FatalOnError(err)
 			tracelog.DebugLogger.Println("Sent Standby status message")
 			nextStandbyMessageDeadline = time.Now().Add(standbyMessageTimeout)
@@ -206,10 +215,7 @@ func (seg *WalSegment) Stream(conn *pgconn.PgConn, standbyMessageTimeout time.Du
 
 // isComplete is a helper function which returns true when all data is added
 func (seg *WalSegment) isComplete() bool {
-	if seg.StartLSN+pglogrepl.LSN(seg.writeIndex) >= seg.endLSN {
-		return true
-	}
-	return false
+	return seg.StartLSN+pglogrepl.LSN(seg.writeIndex) >= seg.endLSN
 }
 
 // Read is what makes the WalSegment an io.Reader, which can be handled by WalUploader.UploadWalFile to write to a file.

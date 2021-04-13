@@ -44,7 +44,9 @@ func ValidateSlotName(pgSlotName string) (err error) {
 		return
 	}
 	if len(pgSlotName) > 63 || invalid {
-		err = genericWalReceiveError{errors.Errorf("Slot name (%s) can only contain 1-63 word characters ([0-9A-Za-z_])", pgSlotName)}
+		err = genericWalReceiveError{
+			errors.Errorf("Slot name (%s) can only contain 1-63 word characters ([0-9A-Za-z_])",
+				pgSlotName)}
 	}
 	return
 }

@@ -11,7 +11,9 @@ import (
 )
 
 // TODO : unit tests
-func (tarInterpreter *FileTarInterpreter) unwrapRegularFileNew(fileReader io.Reader, header *tar.Header, targetPath string) error {
+func (tarInterpreter *FileTarInterpreter) unwrapRegularFileNew(fileReader io.Reader,
+	header *tar.Header,
+	targetPath string) error {
 	if tarInterpreter.FilesToUnwrap != nil {
 		if _, ok := tarInterpreter.FilesToUnwrap[header.Name]; !ok {
 			// don't have to unwrap it this time
@@ -76,7 +78,7 @@ func getLocalFileInfo(targetPath string) (fileInfo os.FileInfo, err error) {
 		return nil, err
 	}
 	if info.IsDir() {
-		return nil, errors.New("Requested file is directory. Aborting.")
+		return nil, errors.New("requested file is directory. Aborting")
 	}
 	return info, nil
 }
