@@ -102,7 +102,7 @@ func (h *BackupMarkHandler) getBackupsToMarkImpermanent(backupName string) ([]st
 
 	permanentBackups := GetPermanentBackups(h.storageRootFolder, h.metaInteractor)
 	//  del current backup from
-	delete(permanentBackups, getBackupNumber(backupName))
+	delete(permanentBackups, backupName)
 
 	reverseLinks, err := h.getGraphFromBaseToIncrement()
 	if err != nil {
@@ -116,10 +116,6 @@ func (h *BackupMarkHandler) getBackupsToMarkImpermanent(backupName string) ([]st
 	return []string{meta.BackupName}, nil
 }
 
-func getBackupNumber(backupName string) string {
-	return backupName[len(utility.BackupNamePrefix) : len(utility.BackupNamePrefix)+24]
-}
-
 //backup has permanent in future only when one of the next backups is permanent
 func backupHasPermanentInFuture(reverseLinks *map[string][]string,
 	backupName string,
@@ -131,7 +127,7 @@ func backupHasPermanentInFuture(reverseLinks *map[string][]string,
 
 	//if one of the next backups is permanent
 	for _, b := range (*reverseLinks)[backupName] {
-		if _, ok := (*permanentBackups)[getBackupNumber(b)]; ok {
+		if _, ok := (*permanentBackups)[b]; ok {
 			return true
 		}
 	}
@@ -204,7 +200,7 @@ func GetPermanentBackups(folder storage.Folder, metaFetcher GenericMetaFetcher) 
 			continue
 		}
 		if meta.IsPermanent {
-			permanentBackups[backupTime.BackupName[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+24]] = true
+			permanentBackups[backupTime.BackupName] = true
 		}
 	}
 	return permanentBackups

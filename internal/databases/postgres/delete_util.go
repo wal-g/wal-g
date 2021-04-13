@@ -37,7 +37,7 @@ func GetPermanentBackupsAndWals(folder storage.Folder) (map[string]bool, map[str
 			for walSegmentNo := startWalSegmentNo; walSegmentNo <= endWalSegmentNo; walSegmentNo = walSegmentNo.next() {
 				permanentWals[walSegmentNo.getFilename(timelineId)] = true
 			}
-			permanentBackups[backupTime.BackupName[len(utility.BackupNamePrefix):len(utility.BackupNamePrefix)+24]] = true
+			permanentBackups[backupTime.BackupName] = true
 		}
 	}
 	return permanentBackups, permanentWals
@@ -49,7 +49,7 @@ func IsPermanent(objectName string, permanentBackups, permanentWals map[string]b
 		return permanentWals[wal]
 	}
 	if objectName[:len(utility.BaseBackupPath)] == utility.BaseBackupPath {
-		backup := objectName[len(utility.BaseBackupPath)+len(utility.BackupNamePrefix) : len(utility.BaseBackupPath)+len(utility.BackupNamePrefix)+24]
+		backup := utility.StripLeftmostBackupName(objectName[len(utility.BaseBackupPath):])
 		return permanentBackups[backup]
 	}
 	// should not reach here, default to false
