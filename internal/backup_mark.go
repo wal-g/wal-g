@@ -113,6 +113,10 @@ func (h *BackupMarkHandler) getBackupsToMarkImpermanent(backupName string) ([]st
 		return nil, newBackupHasPermanentBackupInFutureError(backupName)
 	}
 
+	if !meta.IsPermanent {
+		return []string{}, nil
+	}
+
 	return []string{meta.BackupName}, nil
 }
 

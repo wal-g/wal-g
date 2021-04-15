@@ -76,7 +76,7 @@ func prefaultData(prefaultStartLsn uint64, timelineID uint32, waitGroup *sync.Wa
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	bundle := NewBundle(archiveDirectory, nil, &prefaultStartLsn, nil,
 		false, viper.GetInt64(internal.TarSizeThresholdSetting))
-	bundle.Timeline = timelineId
+	bundle.Timeline = timelineID
 	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(utility.WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Error during loading delta map: '%+v'.", err)

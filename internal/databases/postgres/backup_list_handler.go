@@ -31,7 +31,7 @@ func HandleBackupListWithFlagsAndTarget(folder storage.Folder, pretty bool, json
 		backupDetails, err := GetBackupsDetails(folder, backups)
 		tracelog.ErrorLogger.FatalOnError(err)
 		if json {
-			err = internal.WriteAsJson(backupDetails, os.Stdout, pretty)
+			err = internal.WriteAsJSON(backupDetails, os.Stdout, pretty)
 			tracelog.ErrorLogger.FatalOnError(err)
 		} else if pretty {
 			writePrettyBackupListDetails(backupDetails, os.Stdout)
@@ -40,7 +40,7 @@ func HandleBackupListWithFlagsAndTarget(folder storage.Folder, pretty bool, json
 		}
 	} else {
 		if json {
-			err = internal.WriteAsJson(backups, os.Stdout, pretty)
+			err = internal.WriteAsJSON(backups, os.Stdout, pretty)
 			tracelog.ErrorLogger.FatalOnError(err)
 		} else if pretty {
 			internal.WritePrettyBackupList(backups, os.Stdout)
