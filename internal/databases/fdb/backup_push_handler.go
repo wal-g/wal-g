@@ -4,8 +4,6 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
@@ -33,6 +31,6 @@ func HandleBackupPush(uploader internal.UploaderProvider, backupCmd *exec.Cmd) {
 
 	sentinel := streamSentinelDto{StartLocalTime: timeStart}
 
-	err = postgres.UploadSentinel(uploader, &sentinel, fileName)
+	err = internal.UploadSentinel(uploader, &sentinel, fileName)
 	tracelog.ErrorLogger.FatalOnError(err)
 }

@@ -21,18 +21,6 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-type SentinelMarshallingError struct {
-	error
-}
-
-func newSentinelMarshallingError(sentinelName string, err error) SentinelMarshallingError {
-	return SentinelMarshallingError{errors.Wrapf(err, "Failed to marshall sentinel file: '%s'", sentinelName)}
-}
-
-func (err SentinelMarshallingError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
 type BackupFromFuture struct {
 	error
 }
@@ -155,7 +143,7 @@ func createAndPushBackup(bc *BackupConfig) {
 		tracelog.ErrorLogger.Printf("Failed to upload metadata file for backup: %s %v", backupName, err)
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	err = UploadSentinel(bc.uploader.Uploader, currentBackupSentinelDto, backupName)
+	err = internal.UploadSentinel(bc.uploader.Uploader, currentBackupSentinelDto, backupName)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", backupName)
 		tracelog.ErrorLogger.FatalError(err)
@@ -321,21 +309,9 @@ func uploadMetadata(uploader *internal.Uploader, sentinelDto *BackupSentinelDto,
 	metaFile := storage.JoinPath(backupName, utility.MetadataFileName)
 	dtoBody, err := json.Marshal(meta)
 	if err != nil {
-		return newSentinelMarshallingError(metaFile, err)
+		return internal.NewSentinelMarshallingError(metaFile, err)
 	}
 	return uploader.Upload(metaFile, bytes.NewReader(dtoBody))
-}
-
-// TODO : unit tests
-func UploadSentinel(uploader internal.UploaderProvider, sentinelDto interface{}, backupName string) error {
-	sentinelName := internal.SentinelNameFromBackup(backupName)
-
-	dtoBody, err := json.Marshal(sentinelDto)
-	if err != nil {
-		return newSentinelMarshallingError(sentinelName, err)
-	}
-
-	return uploader.Upload(sentinelName, bytes.NewReader(dtoBody))
 }
 
 func checkPgVersionAndPgControl(archiveDirectory string) {

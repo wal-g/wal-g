@@ -3,6 +3,7 @@ package internal
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 
 	"github.com/pkg/errors"
@@ -10,6 +11,18 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
+
+type SentinelMarshallingError struct {
+	error
+}
+
+func NewSentinelMarshallingError(sentinelName string, err error) SentinelMarshallingError {
+	return SentinelMarshallingError{errors.Wrapf(err, "Failed to marshall sentinel file: '%s'", sentinelName)}
+}
+
+func (err SentinelMarshallingError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
 
 // Backup provides basic functionality
 // to fetch backup-related information from storage
@@ -133,4 +146,16 @@ func GetBackupByName(backupName, subfolder string, folder storage.Folder) (Backu
 		}
 	}
 	return backup, nil
+}
+
+// TODO : unit tests
+func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupName string) error {
+	sentinelName := SentinelNameFromBackup(backupName)
+
+	dtoBody, err := json.Marshal(sentinelDto)
+	if err != nil {
+		return NewSentinelMarshallingError(sentinelName, err)
+	}
+
+	return uploader.Upload(sentinelName, bytes.NewReader(dtoBody))
 }

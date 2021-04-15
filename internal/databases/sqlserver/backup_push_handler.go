@@ -7,8 +7,6 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
@@ -69,7 +67,7 @@ func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 	sentinel.StopLocalTime = utility.TimeNowCrossPlatformLocal()
 	uploader := internal.NewUploader(nil, folder.GetSubFolder(utility.BaseBackupPath))
 	tracelog.InfoLogger.Printf("uploading sentinel: %s", sentinel)
-	err = postgres.UploadSentinel(uploader, sentinel, backupName)
+	err = internal.UploadSentinel(uploader, sentinel, backupName)
 	tracelog.ErrorLogger.FatalfOnError("failed to save sentinel: %v", err)
 
 	tracelog.InfoLogger.Printf("backup finished")

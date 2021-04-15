@@ -4,8 +4,6 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/limiters"
@@ -54,6 +52,6 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
 	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())
 
-	err = postgres.UploadSentinel(uploader, &sentinel, fileName)
+	err = internal.UploadSentinel(uploader, &sentinel, fileName)
 	tracelog.ErrorLogger.FatalOnError(err)
 }

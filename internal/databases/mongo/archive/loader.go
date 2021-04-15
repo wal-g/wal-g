@@ -8,8 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -273,7 +271,7 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaPro
 		DataSize:        meta.DataSize,
 		Permanent:       meta.Permanent,
 	}
-	if err := postgres.UploadSentinel(su.UploaderProvider, backupSentinel, backupName); err != nil {
+	if err := internal.UploadSentinel(su.UploaderProvider, backupSentinel, backupName); err != nil {
 		return fmt.Errorf("can not upload sentinel: %+v", err)
 	}
 	return nil
