@@ -55,7 +55,6 @@ var emptyColonsBackups = []internal.BackupTime{
 	},
 }
 
-
 func TestHandleBackupListWriteBackups(t *testing.T) {
 	backups := []internal.BackupTime{
 		{

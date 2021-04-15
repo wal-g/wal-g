@@ -58,9 +58,8 @@ func (h *BackupMarkHandler) GetBackupsToMark(backupName string, toPermanent bool
 
 	if toPermanent {
 		return h.getBackupsToMarkPermanent(backupName)
-	} else {
-		return h.getBackupsToMarkImpermanent(backupName)
 	}
+	return h.getBackupsToMarkImpermanent(backupName)
 }
 
 func (h *BackupMarkHandler) getBackupsToMarkPermanent(backupName string) ([]string, error) {

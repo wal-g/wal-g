@@ -81,7 +81,6 @@ func WritePrettyBackupList(backups []BackupTime, output io.Writer) {
 	}
 }
 
-
 func WriteAsJSON(data interface{}, output io.Writer, pretty bool) error {
 	var bytes []byte
 	var err error

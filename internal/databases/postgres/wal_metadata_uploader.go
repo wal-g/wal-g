@@ -75,7 +75,6 @@ func (u *WalMetadataUploader) UploadWalMetadata(walFileName string, createdTime 
 }
 
 func (u *WalMetadataUploader) uploadBulkMetadataFile(walFileName string, uploader *internal.Uploader) error {
-
 	// Creating consolidated wal metadata only for bulk option
 	// Checking if the walfile name ends with "F" (last file in the series) and consolidating all
 	// the metadata together.

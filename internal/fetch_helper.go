@@ -39,7 +39,7 @@ func DownloadFile(folder storage.Folder, filename, ext string, writeCloser io.Wr
 		return err
 	}
 	if !exists {
-		return fmt.Errorf("File '%s' does not exist.\n", filename)
+		return fmt.Errorf("file '%s' does not exist", filename)
 	}
 
 	err = DecompressDecryptBytes(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)

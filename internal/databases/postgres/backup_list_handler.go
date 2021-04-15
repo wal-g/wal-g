@@ -36,7 +36,8 @@ func HandleBackupListWithFlagsAndTarget(folder storage.Folder, pretty bool, json
 		} else if pretty {
 			writePrettyBackupListDetails(backupDetails, os.Stdout)
 		} else {
-			writeBackupListDetails(backupDetails, os.Stdout)
+			err = writeBackupListDetails(backupDetails, os.Stdout)
+			tracelog.ErrorLogger.FatalOnError(err)
 		}
 	} else {
 		if json {
@@ -81,14 +82,22 @@ func GetBackupDetailsWithTarget(folder storage.Folder, backupTime internal.Backu
 }
 
 // TODO : unit tests
-func writeBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
+func writeBackupListDetails(backupDetails []BackupDetail, output io.Writer) error {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
-	fmt.Fprintln(writer, "name\tlast_modified\twal_segment_backup_start\tstart_time\tfinish_time\thostname\tdata_dir\tpg_version\tstart_lsn\tfinish_lsn\tis_permanent")
+	_, err := fmt.Fprintln(writer, "name\tlast_modified\twal_segment_backup_start\tstart_time\tfinish_time\thostname\tdata_dir\tpg_version\tstart_lsn\tfinish_lsn\tis_permanent") //nolint:lll
+	if err != nil {
+		return err
+	}
 	for i := len(backupDetails) - 1; i >= 0; i-- {
 		b := backupDetails[i]
-		fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v", b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName, b.StartTime.Format(time.RFC850), b.FinishTime.Format(time.RFC850), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent))
+		_, err = fmt.Fprintf(writer, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v",
+			b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName, b.StartTime.Format(time.RFC850), b.FinishTime.Format(time.RFC850), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent) //nolint:lll
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // TODO : unit tests
@@ -96,9 +105,9 @@ func writePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer
 	writer := table.NewWriter()
 	writer.SetOutputMirror(output)
 	defer writer.Render()
-	writer.AppendHeader(table.Row{"#", "Name", "Last modified", "WAL segment backup start", "Start time", "Finish time", "Hostname", "Datadir", "PG Version", "Start LSN", "Finish LSN", "Permanent"})
+	writer.AppendHeader(table.Row{"#", "Name", "Last modified", "WAL segment backup start", "Start time", "Finish time", "Hostname", "Datadir", "PG Version", "Start LSN", "Finish LSN", "Permanent"}) //nolint:lll
 	for idx := range backupDetails {
 		b := &backupDetails[idx]
-		writer.AppendRow(table.Row{idx, b.BackupName, b.Time.Format(time.RFC850), b.WalFileName, b.StartTime.Format(time.RFC850), b.FinishTime.Format(time.RFC850), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent})
+		writer.AppendRow(table.Row{idx, b.BackupName, b.Time.Format(time.RFC850), b.WalFileName, b.StartTime.Format(time.RFC850), b.FinishTime.Format(time.RFC850), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent}) //nolint:lll
 	}
 }

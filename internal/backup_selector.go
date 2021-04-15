@@ -70,7 +70,7 @@ func (s UserDataBackupSelector) findBackupByUserData(userData interface{}, folde
 		for idx := range foundBackups {
 			backupNames = append(backupNames, foundBackups[idx].BackupName)
 		}
-		return "", fmt.Errorf("too many backups (%d) found with specified user data: %s\n",
+		return "", fmt.Errorf("too many backups (%d) found with specified user data: %s",
 			len(backupNames), strings.Join(backupNames, " "))
 	}
 

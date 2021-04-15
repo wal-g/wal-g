@@ -102,8 +102,8 @@ type RatingTarBallComposer struct {
 func NewRatingTarBallComposer(
 	tarSizeThreshold uint64, updateRatingEvaluator internal.ComposeRatingEvaluator,
 	incrementBaseLsn *uint64, deltaMap PagedFileDeltaMap, tarBallQueue *internal.TarBallQueue,
-	crypter crypto.Crypter, fileStats RelFileStatistics, bundleFiles BundleFiles, packer *TarBallFilePacker) (*RatingTarBallComposer, error) {
-
+	crypter crypto.Crypter, fileStats RelFileStatistics, bundleFiles BundleFiles, packer *TarBallFilePacker,
+) (*RatingTarBallComposer, error) {
 	errorGroup, _ := errgroup.WithContext(context.Background())
 	deltaMapComplete := true
 	if deltaMap == nil {

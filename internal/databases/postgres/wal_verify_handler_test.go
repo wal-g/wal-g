@@ -304,7 +304,6 @@ func TestWalVerify_SingleTimeline_SomeUploading(t *testing.T) {
 		},
 	}
 
-
 	expectedTimelineCheck := postgres.WalVerifyCheckResult{
 		Status: postgres.StatusOk,
 		Details: postgres.TimelineCheckDetails{

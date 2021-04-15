@@ -6,7 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 )
 
-type PostgresPageHeader struct {
+type PageHeader struct {
 	pdLsnH            uint32
 	pdLsnL            uint32
 	pdChecksum        uint16
@@ -17,11 +17,11 @@ type PostgresPageHeader struct {
 	pdPageSizeVersion uint16
 }
 
-func (header *PostgresPageHeader) lsn() uint64 {
+func (header *PageHeader) lsn() uint64 {
 	return ((uint64(header.pdLsnH)) << 32) + uint64(header.pdLsnL)
 }
 
-func (header *PostgresPageHeader) isValid() bool {
+func (header *PageHeader) isValid() bool {
 	return !((header.pdFlags&validFlags) != header.pdFlags ||
 		header.pdLower < headerSize ||
 		header.pdLower > header.pdUpper ||
@@ -31,13 +31,13 @@ func (header *PostgresPageHeader) isValid() bool {
 		int64(header.pdPageSizeVersion) != DatabasePageSize+layoutVersion)
 }
 
-func (header *PostgresPageHeader) isNew() bool {
+func (header *PageHeader) isNew() bool {
 	return header.pdUpper == 0 // #define PageIsNew(page) (((PageHeader) (page))->pd_upper == 0) in bufpage.h
 }
 
 // ParsePostgresPageHeader reads information from PostgreSQL page header. Exported for test reasons.
-func parsePostgresPageHeader(reader io.Reader) (*PostgresPageHeader, error) {
-	pageHeader := PostgresPageHeader{}
+func parsePostgresPageHeader(reader io.Reader) (*PageHeader, error) {
+	pageHeader := PageHeader{}
 	fields := []parsingutil.FieldToParse{
 		{Field: &pageHeader.pdLsnH, Name: "pdLsnH"},
 		{Field: &pageHeader.pdLsnL, Name: "pdLsnL"},

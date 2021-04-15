@@ -12,15 +12,15 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-type NonEmptyDbDataDirectoryError struct {
+type NonEmptyDBDataDirectoryError struct {
 	error
 }
 
-func NewNonEmptyDbDataDirectoryError(dbDataDirectory string) NonEmptyDbDataDirectoryError {
-	return NonEmptyDbDataDirectoryError{errors.Errorf("Directory %v for delta base must be empty", dbDataDirectory)}
+func NewNonEmptyDBDataDirectoryError(dbDataDirectory string) NonEmptyDBDataDirectoryError {
+	return NonEmptyDBDataDirectoryError{errors.Errorf("Directory %v for delta base must be empty", dbDataDirectory)}
 }
 
-func (err NonEmptyDbDataDirectoryError) Error() string {
+func (err NonEmptyDBDataDirectoryError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
@@ -39,11 +39,11 @@ func (err PgControlNotFoundError) Error() string {
 func readRestoreSpec(path string, spec *TablespaceSpec) (err error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("Unable to read file: %v\n", err)
+		return fmt.Errorf("unable to read file: %v", err)
 	}
 	err = json.Unmarshal(data, spec)
 	if err != nil {
-		return fmt.Errorf("Unable to unmarshal json: %v\n Full json data:\n %s", err, data)
+		return fmt.Errorf("unable to unmarshal json: %v\n Full json data:\n %s", err, data)
 	}
 
 	return nil
@@ -82,7 +82,8 @@ func deltaFetchRecursionOld(backupName string, folder storage.Folder, dbDataDire
 		if err != nil {
 			return err
 		}
-		tracelog.InfoLogger.Printf("%v fetched. Upgrading from LSN %x to LSN %x \n", *(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN), *(sentinelDto.BackupStartLSN))
+		tracelog.InfoLogger.Printf("%v fetched. Upgrading from LSN %x to LSN %x \n",
+			*(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN), *(sentinelDto.BackupStartLSN))
 	}
 
 	return backup.unwrapToEmptyDirectory(dbDataDirectory, sentinelDto, filesToUnwrap, false)

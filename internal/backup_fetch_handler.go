@@ -2,7 +2,7 @@ package internal
 
 import (
 	"bytes"
-		"fmt"
+	"fmt"
 	"os/exec"
 
 	"github.com/wal-g/wal-g/utility"
