@@ -32,15 +32,15 @@ func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folde
 	}
 
 	return internal.GenericMetadata{
-		BackupName:            backupName,
-		UncompressedSize:      meta.UncompressedSize,
-		CompressedSize:        meta.CompressedSize,
-		Hostname:              meta.Hostname,
-		StartTime:             meta.StartTime,
-		FinishTime:            meta.FinishTime,
-		IsPermanent:           meta.IsPermanent,
-		FetchIncrementDetails: makeFetchIncrementDetails(backup),
-		UserData:              meta.UserData,
+		BackupName:       backupName,
+		UncompressedSize: meta.UncompressedSize,
+		CompressedSize:   meta.CompressedSize,
+		Hostname:         meta.Hostname,
+		StartTime:        meta.StartTime,
+		FinishTime:       meta.FinishTime,
+		IsPermanent:      meta.IsPermanent,
+		IncrementDetails: NewIncrementDetailsFetcher(backup),
+		UserData:         meta.UserData,
 	}, nil
 }
 
@@ -81,26 +81,23 @@ func modifyBackupMetadata(backupName string, backupFolder storage.Folder, modifi
 	return nil
 }
 
-func makeFetchIncrementDetails(backup Backup) func() (bool, internal.IncrementDetails, error) {
-	var sentinel *BackupSentinelDto
+type IncrementDetailsFetcher struct {
+	backup Backup
+}
 
-	return func() (bool, internal.IncrementDetails, error) {
-		if sentinel == nil {
-			var err error
-			_, err = backup.GetSentinel()
-			if err != nil {
-				return false, internal.IncrementDetails{}, err
-			}
-			sentinel = backup.SentinelDto
-		}
+func NewIncrementDetailsFetcher(backup Backup) *IncrementDetailsFetcher {
+	return &IncrementDetailsFetcher{backup: backup}
+}
 
-		if sentinel.IsIncremental() {
-			return true, internal.IncrementDetails{
-				IncrementFrom:     *sentinel.IncrementFrom,
-				IncrementFullName: *sentinel.IncrementFullName,
-				IncrementCount:    *sentinel.IncrementCount,
-			}, nil
-		}
-		return false, internal.IncrementDetails{}, nil
+func (idf *IncrementDetailsFetcher) Fetch() (bool, internal.IncrementDetails, error) {
+	sentinel, err := idf.backup.GetSentinel()
+	if err != nil || !sentinel.IsIncremental() {
+		return false, internal.IncrementDetails{}, err
 	}
+
+	return true, internal.IncrementDetails{
+		IncrementFrom:     *sentinel.IncrementFrom,
+		IncrementFullName: *sentinel.IncrementFullName,
+		IncrementCount:    *sentinel.IncrementCount,
+	}, nil
 }

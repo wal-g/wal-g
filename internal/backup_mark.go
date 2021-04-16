@@ -74,7 +74,7 @@ func (h *BackupMarkHandler) getBackupsToMarkPermanent(backupName string) ([]stri
 		backupsToMark = append(backupsToMark, meta.BackupName)
 	}
 
-	isIncremental, incrementDetails, err := meta.FetchIncrementDetails()
+	isIncremental, incrementDetails, err := meta.IncrementDetails.Fetch()
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func (h *BackupMarkHandler) getMetadataFromBackup(backupName string) (incrementF
 		return "", false, err
 	}
 
-	isIncremental, incrementDetails, err := meta.FetchIncrementDetails()
+	isIncremental, incrementDetails, err := meta.IncrementDetails.Fetch()
 	if err != nil {
 		return "", false, err
 	}
