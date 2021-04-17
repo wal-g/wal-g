@@ -211,7 +211,6 @@ func NewStorageUploader(upl internal.UploaderProvider) *StorageUploader {
 }
 
 // UploadOplogArchive compresses a stream and uploads it with given archive name.
-// TODO: test if upload content is readerAtSeeker
 func (su *StorageUploader) UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error {
 	arch, err := models.NewArchive(firstTS, lastTS, su.Compression().FileExtension(), models.ArchiveTypeOplog)
 	if err != nil {
