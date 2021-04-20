@@ -34,8 +34,10 @@ func GetCommandStreamFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup B
 		tracelog.ErrorLogger.FatalfOnError("Failed to start restore command: %v\n", err)
 		err = downloadAndDecompressStream(backup, stdin)
 		cmdErr := cmd.Wait()
-		if cmdErr != nil {
+		if err != nil || cmdErr != nil {
 			tracelog.ErrorLogger.Printf("Restore command output:\n%s", stderr.String())
+		}
+		if cmdErr != nil {
 			err = cmdErr
 		}
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)

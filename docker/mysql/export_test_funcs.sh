@@ -2,6 +2,7 @@
 
 # test tools
 mysql_kill_and_clean_data() {
+    service mysql stop || true
     kill -9 "$(pidof mysqld)" || true
     rm -rf "${MYSQLDATA}"/*
     rm -rf "${MYSQLDATA}"/.tmp
