@@ -1,1 +1,10 @@
-site_name: My Docs
+site_name: WAL-G
+nav:
+    - Overview: index.md
+    - Foundation DB: FoundationDB.md
+    - Mongo DB: MongoDB.md
+    - MySQL: MySQL.md
+    - PostgreSQL: PostgreSQL.md
+    - SQLServer: SQLServer.md
+    - Windows: Windows.md
+theme: readthedocs
