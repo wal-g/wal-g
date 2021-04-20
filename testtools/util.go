@@ -92,8 +92,6 @@ func find(source []int, value int) bool {
 }
 
 func CreateMockStorageFolderWithTimeMetadata(t *testing.T, dataFilling DataFilling) storage.Folder {
-
-
 	backupsCount := 3
 	creationTimeYears := []int{1997, 1999, 1998}
 	modificationTimeYears := []int{2018, 2017, 2020}
@@ -102,7 +100,7 @@ func CreateMockStorageFolderWithTimeMetadata(t *testing.T, dataFilling DataFilli
 	for i := 0; i < backupsCount; i++ {
 		backupsName[i] = "base_" + strconv.Itoa(i)
 	}
-
+	//creationTimeGaps stores indexes of the records to be left blank
 	var creationTimeGaps []int
 	if dataFilling == CreationTimeGaps {
 		creationTimeGaps = []int{0, 1}
@@ -133,7 +131,7 @@ func CreateMockStorageFolderWithTimeMetadata(t *testing.T, dataFilling DataFilli
 		objects[i] = storage.NewLocalObject(backupsName[i]+utility.SentinelSuffix, timeData, 0)
 	}
 
-	// since mockFolder has PutObject method, this will be used
+	//since mockFolder has PutObject method, this will be used
 	folder := MakeDefaultInMemoryStorageFolder().GetSubFolder(utility.BaseBackupPath)
 
 	for i := 0; i < backupsCount; i++ {

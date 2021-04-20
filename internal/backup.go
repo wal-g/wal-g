@@ -18,10 +18,10 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-type BackupTimeSlicesOder int
+type BackupTimeSlicesOrder int
 
 const (
-	ByCreationTime BackupTimeSlicesOder = iota
+	ByCreationTime BackupTimeSlicesOrder = iota
 	ByModificationTime
 )
 
@@ -414,7 +414,7 @@ func GetBackupsAndGarbageWithTarget(folder storage.Folder, targetPath string) (b
 	return sortTimes, garbage, nil
 }
 
-func SortBackupTimeSlices(backupsSlices *[]BackupTime, sortOrder BackupTimeSlicesOder) {
+func SortBackupTimeSlices(backupsSlices *[]BackupTime, sortOrder BackupTimeSlicesOrder) {
 	if sortOrder == ByCreationTime {
 		sort.Slice(*backupsSlices, func(i, j int) bool {
 			return (*backupsSlices)[i].CreationTime.After((*backupsSlices)[j].CreationTime)
