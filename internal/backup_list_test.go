@@ -16,11 +16,6 @@ func TestBackupListFindsBackups(t *testing.T) {
 	internal.DefaultHandleBackupList(folder)
 }
 
-func TestBackupListFlagsFindsBackups(t *testing.T) {
-	folder := testtools.CreateMockStorageFolder()
-	internal.HandleBackupListWithFlags(folder, true, false, false)
-}
-
 var backups = []internal.BackupTime{
 	{
 		BackupName:  "base_123",

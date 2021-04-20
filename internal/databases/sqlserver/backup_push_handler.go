@@ -48,7 +48,7 @@ func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 		tracelog.ErrorLogger.FatalfOnError("can't find latest backup: %v", err)
 		backupName = backup.Name
 		sentinel = new(SentinelDto)
-		err = internal.FetchStreamSentinel(backup, sentinel)
+		err = backup.FetchSentinel(&sentinel)
 		tracelog.ErrorLogger.FatalOnError(err)
 		sentinel.Databases = uniq(append(sentinel.Databases, dbnames...))
 	} else {

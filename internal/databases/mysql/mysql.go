@@ -140,6 +140,14 @@ type StreamSentinelDto struct {
 	BinLogEnd      string    `json:"BinLogEnd,omitempty"`
 	StartLocalTime time.Time `json:"StartLocalTime,omitempty"`
 	StopLocalTime  time.Time `json:"StopLocalTime,omitempty"`
+
+	UncompressedSize int64  `json:"UncompressedSize,omitempty"`
+	CompressedSize   int64  `json:"CompressedSize,omitempty"`
+	Hostname         string `json:"Hostname,omitempty"`
+
+	IsPermanent bool        `json:"IsPermanent,omitempty"`
+	UserData    interface{} `json:"UserData,omitempty"`
+	//todo: add other fields from internal.GenericMetadata
 }
 
 func (s *StreamSentinelDto) String() string {
@@ -164,7 +172,7 @@ func fetchLogs(folder storage.Folder, dstDir string, startTS time.Time, endTS ti
 		binlogName := utility.TrimFileExtension(logFile.GetName())
 		binlogPath := path.Join(dstDir, binlogName)
 		tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
-		if err = internal.DownloadWALFileTo(logFolder, binlogName, binlogPath); err != nil {
+		if err = internal.DownloadFileTo(logFolder, binlogName, binlogPath); err != nil {
 			tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
 			return err
 		}
@@ -183,14 +191,14 @@ func fetchLogs(folder storage.Folder, dstDir string, startTS time.Time, endTS ti
 	return nil
 }
 
-func getBinlogSinceTS(folder storage.Folder, backup *internal.Backup) (time.Time, error) {
+func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time, error) {
 	startTS := utility.MaxTime // far future
 	var streamSentinel StreamSentinelDto
-	err := internal.FetchStreamSentinel(backup, &streamSentinel)
+	err := backup.FetchSentinel(&streamSentinel)
 	if err != nil {
 		return time.Time{}, err
 	}
-	tracelog.InfoLogger.Printf("Backup sentinel: %s", streamSentinel)
+	tracelog.InfoLogger.Printf("Backup sentinel: %s", streamSentinel.String())
 
 	// case when backup was uploaded before first binlog
 	sentinels, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()

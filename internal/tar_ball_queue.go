@@ -24,7 +24,7 @@ type TarBallQueue struct {
 	LastCreatedTarball TarBall
 }
 
-func newTarBallQueue(tarSizeThreshold int64, tarBallMaker TarBallMaker) *TarBallQueue {
+func NewTarBallQueue(tarSizeThreshold int64, tarBallMaker TarBallMaker) *TarBallQueue {
 	return &TarBallQueue{
 		TarSizeThreshold: tarSizeThreshold,
 		TarBallMaker:     tarBallMaker,
@@ -38,7 +38,7 @@ func (tarQueue *TarBallQueue) StartQueue() error {
 		panic("Trying to start already started Queue")
 	}
 	var err error
-	tarQueue.parallelTarballs, err = getMaxUploadDiskConcurrency()
+	tarQueue.parallelTarballs, err = GetMaxUploadDiskConcurrency()
 	if err != nil {
 		return err
 	}

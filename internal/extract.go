@@ -55,6 +55,12 @@ func (err UnsupportedFileTypeError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
+// TarInterpreter behaves differently
+// for different file types.
+type TarInterpreter interface {
+	Interpret(reader io.Reader, header *tar.Header) error
+}
+
 // EmptyWriteIgnorer handles 0 byte write in LZ4 package
 // to stop pipe reader/writer from blocking.
 type EmptyWriteIgnorer struct {

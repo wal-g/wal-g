@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 const (
@@ -23,7 +24,7 @@ var (
 			folder, err := internal.ConfigureFolder()
 			tracelog.ErrorLogger.FatalOnError(err)
 			if pretty || json || detail {
-				internal.HandleBackupListWithFlags(folder, pretty, json, detail)
+				postgres.HandleBackupListWithFlags(folder, pretty, json, detail)
 			} else {
 				internal.DefaultHandleBackupList(folder)
 			}

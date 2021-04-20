@@ -88,7 +88,7 @@ func NewStorageDownloader(opts StorageSettings) (*StorageDownloader, error) {
 func (sd *StorageDownloader) BackupMeta(name string) (models.Backup, error) {
 	backup := internal.NewBackup(sd.backupsFolder, name)
 	var sentinel models.Backup
-	err := internal.FetchStreamSentinel(backup, &sentinel)
+	err := backup.FetchSentinel(&sentinel)
 	if err != nil {
 		return models.Backup{}, fmt.Errorf("can not fetch stream sentinel: %w", err)
 	}

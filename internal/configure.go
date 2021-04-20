@@ -26,7 +26,8 @@ import (
 )
 
 const (
-	DefaultDataBurstRateLimit = 8 * DatabasePageSize
+	pgDefaultDatabasePageSize = 8192
+	DefaultDataBurstRateLimit = 8 * pgDefaultDatabasePageSize
 	DefaultDataFolderPath     = "/tmp"
 	WaleFileHost              = "file://localhost"
 )
@@ -177,24 +178,7 @@ func GetPgSlotName() (pgSlotName string) {
 }
 
 // TODO : unit tests
-func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder fsutil.DataFolder, err error) {
-	useWalDelta = viper.GetBool(UseWalDeltaSetting)
-	if !useWalDelta {
-		return
-	}
-	dataFolderPath := GetDataFolderPath()
-	deltaDataFolder, err = fsutil.NewDiskDataFolder(dataFolderPath)
-	if err != nil {
-		useWalDelta = false
-		tracelog.WarningLogger.Printf("can't use wal delta feature because can't open delta data folder '%s'"+
-			" due to error: '%v'\n", dataFolderPath, err)
-		err = nil
-	}
-	return
-}
-
-// TODO : unit tests
-func configureCompressor() (compression.Compressor, error) {
+func ConfigureCompressor() (compression.Compressor, error) {
 	compressionMethod := viper.GetString(CompressionMethodSetting)
 	if _, ok := compression.Compressors[compressionMethod]; !ok {
 		return nil, newUnknownCompressionMethodError()
@@ -213,7 +197,7 @@ func getArchiveDataFolderPath() string {
 	return filepath.Join(GetDataFolderPath(), "walg_archive_status")
 }
 
-func getRelativeArchiveDataFolderPath() string {
+func GetRelativeArchiveDataFolderPath() string {
 	return filepath.Join(getRelativeWalFolderPath(""), "walg_data", "walg_archive_status")
 }
 
@@ -233,33 +217,12 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 
 	folder := uploader.UploadingFolder
 
-	compressor, err := configureCompressor()
+	compressor, err := ConfigureCompressor()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure compression")
 	}
 
 	uploader = NewUploader(compressor, folder)
-	return uploader, err
-}
-
-// ConfigureWalUploader connects to storage and creates an uploader. It makes sure
-// that a valid session has started; if invalid, returns AWS error
-// and `<nil>` values.
-func ConfigureWalUploader() (uploader *WalUploader, err error) {
-	uploader, err = ConfigureWalUploaderWithoutCompressMethod()
-	if err != nil {
-		return nil, err
-	}
-
-	folder := uploader.UploadingFolder
-	deltaFileManager := uploader.DeltaFileManager
-
-	compressor, err := configureCompressor()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure compression")
-	}
-
-	uploader = NewWalUploader(compressor, folder, deltaFileManager)
 	return uploader, err
 }
 
@@ -270,26 +233,6 @@ func ConfigureUploaderWithoutCompressMethod() (uploader *Uploader, err error) {
 	}
 
 	uploader = NewUploader(nil, folder)
-	return uploader, err
-}
-
-func ConfigureWalUploaderWithoutCompressMethod() (uploader *WalUploader, err error) {
-	folder, err := ConfigureFolder()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure folder")
-	}
-
-	useWalDelta, deltaDataFolder, err := configureWalDeltaUsage()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure WAL Delta usage")
-	}
-
-	var deltaFileManager *DeltaFileManager = nil
-	if useWalDelta {
-		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
-	}
-
-	uploader = NewWalUploader(nil, folder, deltaFileManager)
 	return uploader, err
 }
 
@@ -344,7 +287,7 @@ func getMaxUploadQueue() (int, error) {
 	return GetMaxConcurrency(UploadQueueSetting)
 }
 
-func getMaxUploadDiskConcurrency() (int, error) {
+func GetMaxUploadDiskConcurrency() (int, error) {
 	if Turbo {
 		return 4, nil
 	}

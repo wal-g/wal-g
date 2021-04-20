@@ -44,7 +44,7 @@ func (tarBallMaker *NOPTarBallMaker) Make(inheritState bool) TarBall {
 	}
 }
 
-func newNopTarBallMaker() TarBallMaker {
+func NewNopTarBallMaker() TarBallMaker {
 	size := int64(0)
 	return &NOPTarBallMaker{0, &size}
 }

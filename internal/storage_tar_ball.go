@@ -13,6 +13,8 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+const TarPartitionFolderName = "/tar_partitions/"
+
 // StorageTarBall represents a tar file that is
 // going to be uploaded to storage.
 type StorageTarBall struct {

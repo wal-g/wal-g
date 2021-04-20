@@ -28,7 +28,7 @@ func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromn
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	sentinel := new(SentinelDto)
-	err = internal.FetchStreamSentinel(backup, sentinel)
+	err = backup.FetchSentinel(&sentinel)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	db, err := getSQLServerConnection()
