@@ -1,4 +1,4 @@
-## WAL-G for MongoDB
+# WAL-G for MongoDB
 
 **Interface of MongoDB features is currently unstable**
 
@@ -32,41 +32,41 @@ make mongo_install
 Configuration
 -------------
 
-#### `WALG_STREAM_CREATE_COMMAND`
+### `WALG_STREAM_CREATE_COMMAND`
 
 Command to create MongoDB backup, should return backup as single stream to STDOUT. Required for backup procedure.
 
-#### `WALG_STREAM_RESTORE_COMMAND`
+### `WALG_STREAM_RESTORE_COMMAND`
 
 Command to unpack MongoDB backup, should take backup (created by `WALG_STREAM_CREATE_COMMAND`) 
 to STDIN and push it to MongoDB instance. Required for restore procedure.
 
-#### `MONGODB_URI`
+### `MONGODB_URI`
 
 URI used to connect to a MongoDB instance. Required for backup and oplog archiving procedure.
 
-#### `OPLOG_ARCHIVE_AFTER_SIZE`
+### `OPLOG_ARCHIVE_AFTER_SIZE`
 
 Oplog archive batch in bytes which triggers upload to storage.
 
-#### `OPLOG_ARCHIVE_TIMEOUT_INTERVAL`
+### `OPLOG_ARCHIVE_TIMEOUT_INTERVAL`
 
 Time interval (passed since previous upload) to trigger upload to storage.
 
 Format: [golang duration string](https://golang.org/pkg/time/#ParseDuration).
 
-#### `MONGODB_LAST_WRITE_UPDATE_INTERVAL`
+### `MONGODB_LAST_WRITE_UPDATE_INTERVAL`
 
 Interval to update the latest majority optime. wal-g archives only majority committed operations.
 Format: [golang duration string](https://golang.org/pkg/time/#ParseDuration).
 
 
-#### `OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY`
+### `OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY`
 
 Wait for primary and start archiving or exit immediately. 
 Archiving works only on primary, but it's useful to run wal-g on all replicaset nodes with `OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY: true` to handle replica set elections. Then new primary will catch up archiving after elections.
 
-#### `OPLOG_PITR_DISCOVERY_INTERVAL`
+### `OPLOG_PITR_DISCOVERY_INTERVAL`
 
 Defines the longest possible point-in-time recovery period.
 It's lasts from starting timestamp of the oldest backup (within `OPLOG_PITR_DISCOVERY_INTERVAL`) until now. 
@@ -75,20 +75,20 @@ Setting is used by oplog archives [purging](#oplog-purge).
 Format: [golang duration string](https://golang.org/pkg/time/#ParseDuration).
 
 
-#### `OPLOG_PUSH_STATS_ENABLED`
+### `OPLOG_PUSH_STATS_ENABLED`
 
 Enables statistics collecting of oplog archiving procedure.
 
-#### `OPLOG_PUSH_STATS_UPDATE_INTERVAL`
+### `OPLOG_PUSH_STATS_UPDATE_INTERVAL`
 
 Interval to update oplog archiving statistics. Disabled if reset to 0.
 
-#### `OPLOG_PUSH_STATS_LOGGING_INTERVAL`
+### `OPLOG_PUSH_STATS_LOGGING_INTERVAL`
 
 Interval to log oplog archiving statistics. Disabled if reset to 0.
 Format: [golang duration string](https://golang.org/pkg/time/#ParseDuration).
 
-#### `OPLOG_PUSH_STATS_EXPOSE_HTTP`
+### `OPLOG_PUSH_STATS_EXPOSE_HTTP`
 
 Exposes http-handler with oplog archiving statistics: `stats/oplog_push`.
 HTTP-server listens `HTTP_LISTEN` port (default: 8090).
@@ -99,7 +99,7 @@ Usage
 
 WAL-G mongodb extension currently supports these commands:
 
-#### ``backup-push``
+### ``backup-push``
 
 Creates new backup and send it to storage.
 
@@ -109,7 +109,7 @@ Runs `WALG_STREAM_CREATE_COMMAND` to create backup.
 wal-g backup-push
 ```
 
-#### `backup-list`
+### `backup-list`
 
 Lists currently available backups in storage.
 
@@ -117,7 +117,7 @@ Lists currently available backups in storage.
 wal-g backup-list
 ```
 
-#### `backup-fetch`
+### `backup-fetch`
 
 Fetches backup from storage and restores passes data to `WALG_STREAM_RESTORE_COMMAND` to restore backup.
 
@@ -127,7 +127,7 @@ User should specify the name of the backup to fetch.
 wal-g backup-fetch example_backup
 ```
 
-#### `backup-show`
+### `backup-show`
 
 Fetches backup metadata from storage to STDOUT.
 
@@ -165,7 +165,7 @@ User should specify the name of the backup to show.
        "StartLocalTime": "2020-10-28T01:48:23.121314+03:00"
 }
 ```
-#### `backup-delete`
+### `backup-delete`
 
 Deletes backup from storage.
 
@@ -181,7 +181,7 @@ Perform delete
 wal-g backup-delete example_backup --confirm
 ```
 
-#### `oplog-push`
+### `oplog-push`
 
 Fetches oplog from mongodb instance (`MONGODB_URI`) and uploads to storage.
 
@@ -197,7 +197,7 @@ wal-g oplog-push
 
 Note: archiving works only on primary, but you can run it on any replicaset node using config option `OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY: true`.
 
-#### `oplog-replay`
+### `oplog-replay`
 
 Fetches oplog archives from storage and applies to mongodb instance (`MONGODB_URI`)
 
@@ -208,14 +208,14 @@ SINCE is included and UNTIL is NOT.
 wal-g oplog-replay 1593554109.1 1593559109.1
 ```
 
-##### Common constraints:
+### Common constraints:
 
 - SINCE: operation timestamp before full backup started.
 - UNTIL: operation timestamp after backup finished.
 
 Use `MongoMeta.Before.LastMajTS` and `MongoMeta.After.LastMajTS` fields from backup [metadata](#backup-show).
 
-#### `oplog-fetch`
+### `oplog-fetch`
 
 Fetches oplog archives from storage and passes to STDOUT.
 
@@ -228,7 +228,7 @@ Supported formats to output: `json`, `bson`, `bson-raw`
 wal-g oplog-fetch 1593554109.1 1593559109.1 --format json
 ```
 
-#### `oplog-purge`
+### `oplog-purge`
 
 Purges outdated oplog archives from storage. Clean-up will retain:
 - oplog archives in [PITR interval](#oplog_pitr_discovery_interval)

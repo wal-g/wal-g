@@ -1,4 +1,4 @@
-## WAL-G for FoundationDB
+# WAL-G for FoundationDB
 
 **Work in progress**
 
@@ -32,7 +32,7 @@ make fdb_install
 Usage
 -----
 
-* ``backup-fetch``
+### ``backup-fetch``
 
 Command for sending backup from storage to stream in order to restore it in the database.
 
@@ -49,7 +49,7 @@ WAL-G can also fetch the latest backup using:
 wal-g backup-fetch LATEST
 ```
 
-* ``backup-push``
+### ``backup-push``
 
 Command for compressing, encrypting and sending backup from stream to storage.
 

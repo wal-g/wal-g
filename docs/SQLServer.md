@@ -1,3 +1,5 @@
+# SQL Server
+
 WAL-G facilitates SQLServer backups by emulating Azure Blob storage,
 allowing You to backup database to URL with standard BACKUP/RESTORE commands.
 
@@ -68,7 +70,7 @@ Usage
 
 WAL-G SQLServer extension currently supports these commands:
 
-* ``proxy``
+### ``proxy``
 
 ```
 wal-g proxy
@@ -80,7 +82,7 @@ While proxy is running, you are able to any BACKUP/RESTORE TO/FROM URL commands 
 Proxy intended for debug/manual backups only, it rely on user to maintain proper backups folder structure.
 For simple backup/restore process please consider using `backup-push` and `backup-restore` commands.
 
-* ``backup-push``
+### ``backup-push``
 
 ```
 wal-g backup-push
@@ -93,7 +95,7 @@ You can specify which databases to backup via `-d` flag.
 You can backup all (including system) databases using `-d ALL` flag.
 By default it will backup all non-system databases.
 
-* ``backup-restore``
+### ``backup-restore``
 
 ```
 wal-g backup-restore backup_name
@@ -111,13 +113,13 @@ You can restore database with new name (create copy of database) using flag `-f`
 By default it will restore all non-system databases found in backup.
 
 
-* ``backup-list``
+### ``backup-list``
 
 ```
 wal-g backup-list
 ```
 
-* ``delete``
+### ``delete``
 
 ```
 wal-g delete retain 3
