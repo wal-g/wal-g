@@ -11,7 +11,9 @@ import (
 )
 
 // ResolveStartingTS fetches last-known folder TS or initiates first run from last-known mongoClient TS
-func ResolveStartingTS(ctx context.Context, downloader archive.Downloader, mongoClient client.MongoDriver) (models.Timestamp, error) {
+func ResolveStartingTS(ctx context.Context,
+	downloader archive.Downloader,
+	mongoClient client.MongoDriver) (models.Timestamp, error) {
 	since, err := downloader.LastKnownArchiveTS()
 	if err != nil {
 		return models.Timestamp{}, fmt.Errorf("can not fetch last-known storage timestamp: %+v", err)
@@ -31,7 +33,10 @@ func ResolveStartingTS(ctx context.Context, downloader archive.Downloader, mongo
 }
 
 // BuildCursorFromTS finds point to resume archiving or _restarts_ procedure from newest oplog document
-func BuildCursorFromTS(ctx context.Context, since models.Timestamp, uploader archive.Uploader, mongoClient client.MongoDriver) (oplogCursor client.OplogCursor, fromTS models.Timestamp, err error) {
+func BuildCursorFromTS(ctx context.Context,
+	since models.Timestamp,
+	uploader archive.Uploader,
+	mongoClient client.MongoDriver) (oplogCursor client.OplogCursor, fromTS models.Timestamp, err error) {
 	oplogCursor, err = mongoClient.TailOplogFrom(ctx, since)
 	if err != nil {
 		return nil, models.Timestamp{}, fmt.Errorf("can not build oplog cursor from ts '%s': %+v", since, err)

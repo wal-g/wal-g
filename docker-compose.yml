@@ -46,6 +46,7 @@ services:
       &&  mkdir -p /export/deletebeforepermanentdeltabucket
       &&  mkdir -p /export/deletewithoutconfirm
       &&  mkdir -p /export/deleteendtoendbucket
+      &&  mkdir -p /export/deletetargetbucket
       &&  mkdir -p /export/mysqlfullxtrabackupbucket
       &&  mkdir -p /export/mysqlfullmysqldumpbucket
       &&  mkdir -p /export/mysqlbinlogpushfetchbucket
@@ -130,6 +131,17 @@ services:
       context: .
     image: wal-g/backup_mark_permanent_test
     container_name: wal-g_pg_backup_mark_permanent_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_backup_mark_permanent_no_error_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_backup_mark_permanent_no_error_test
+      context: .
+    image: wal-g/backup_mark_permanent_no_error_test
+    container_name: wal-g_pg_backup_mark_permanent_no_error_test
     depends_on:
       - s3
     links:
@@ -263,6 +275,39 @@ services:
       context: .
     image: wal-g/delete_without_confirm_test
     container_name: wal-g_pg_delete_without_confirm_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_delete_target_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_target_test
+      context: .
+    image: wal-g/delete_target_test
+    container_name: wal-g_pg_delete_target_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_delete_target_delta_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_target_delta_test
+      context: .
+    image: wal-g/delete_target_delta_test
+    container_name: wal-g_pg_delete_target_delta_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_delete_target_delta_find_full_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_target_delta_find_full_test
+      context: .
+    image: wal-g/delete_target_delta_find_full_test
+    container_name: wal-g_pg_delete_target_delta_find_full_test
     depends_on:
       - s3
     links:

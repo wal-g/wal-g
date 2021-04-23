@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 
@@ -23,7 +24,7 @@ type TarBallQueue struct {
 	LastCreatedTarball TarBall
 }
 
-func newTarBallQueue(tarSizeThreshold int64, tarBallMaker TarBallMaker) *TarBallQueue {
+func NewTarBallQueue(tarSizeThreshold int64, tarBallMaker TarBallMaker) *TarBallQueue {
 	return &TarBallQueue{
 		TarSizeThreshold: tarSizeThreshold,
 		TarBallMaker:     tarBallMaker,
@@ -37,7 +38,7 @@ func (tarQueue *TarBallQueue) StartQueue() error {
 		panic("Trying to start already started Queue")
 	}
 	var err error
-	tarQueue.parallelTarballs, err = getMaxUploadDiskConcurrency()
+	tarQueue.parallelTarballs, err = GetMaxUploadDiskConcurrency()
 	if err != nil {
 		return err
 	}
@@ -57,11 +58,25 @@ func (tarQueue *TarBallQueue) StartQueue() error {
 	return nil
 }
 
-func (tarQueue *TarBallQueue) Deque() TarBall {
+// DequeCtx returns a TarBall from the queue. If the context finishes before it
+// can do so, it returns the result of ctx.Err().
+func (tarQueue *TarBallQueue) DequeCtx(ctx context.Context) (TarBall, error) {
 	if tarQueue.started.IsNotSet() {
 		panic("Trying to deque from not started Queue")
 	}
-	return <-tarQueue.tarsToFillQueue
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case tarball := <-tarQueue.tarsToFillQueue:
+		return tarball, nil
+	}
+}
+
+func (tarQueue *TarBallQueue) Deque() TarBall {
+	// The error can be ignored, since context.Background will never finish, so
+	// DequeCtx will never return an error.
+	tarball, _ := tarQueue.DequeCtx(context.Background())
+	return tarball
 }
 
 func (tarQueue *TarBallQueue) FinishQueue() error {

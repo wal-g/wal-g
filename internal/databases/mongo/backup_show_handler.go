@@ -8,7 +8,10 @@ import (
 )
 
 // HandleBackupPush prints sentinel contents.
-func HandleBackupShow(downloader archive.Downloader, backup string, marshaller archive.BackupInfoMarshalFunc, output io.Writer) error {
+func HandleBackupShow(downloader archive.Downloader,
+	backup string,
+	marshaller archive.BackupInfoMarshalFunc,
+	output io.Writer) error {
 	sentinel, err := downloader.BackupMeta(backup)
 	if err != nil {
 		return err

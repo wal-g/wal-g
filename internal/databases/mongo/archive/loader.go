@@ -78,14 +78,17 @@ func NewStorageDownloader(opts StorageSettings) (*StorageDownloader, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &StorageDownloader{rootFolder: folder, oplogsFolder: folder.GetSubFolder(opts.oplogsPath), backupsFolder: folder.GetSubFolder(opts.backupsPath)}, nil
+	return &StorageDownloader{rootFolder: folder,
+			oplogsFolder:  folder.GetSubFolder(opts.oplogsPath),
+			backupsFolder: folder.GetSubFolder(opts.backupsPath)},
+		nil
 }
 
 // BackupMeta downloads sentinel contents.
 func (sd *StorageDownloader) BackupMeta(name string) (models.Backup, error) {
 	backup := internal.NewBackup(sd.backupsFolder, name)
 	var sentinel models.Backup
-	err := internal.FetchStreamSentinel(backup, &sentinel)
+	err := backup.FetchSentinel(&sentinel)
 	if err != nil {
 		return models.Backup{}, fmt.Errorf("can not fetch stream sentinel: %w", err)
 	}
@@ -208,7 +211,6 @@ func NewStorageUploader(upl internal.UploaderProvider) *StorageUploader {
 }
 
 // UploadOplogArchive compresses a stream and uploads it with given archive name.
-// TODO: test if upload content is readerAtSeeker
 func (su *StorageUploader) UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error {
 	arch, err := models.NewArchive(firstTS, lastTS, su.Compression().FileExtension(), models.ArchiveTypeOplog)
 	if err != nil {
@@ -287,7 +289,8 @@ func NewStoragePurger(opts StorageSettings) (*StoragePurger, error) {
 		return nil, err
 	}
 
-	return &StoragePurger{oplogsFolder: folder.GetSubFolder(opts.oplogsPath), backupsFolder: folder.GetSubFolder(opts.backupsPath)}, nil
+	return &StoragePurger{oplogsFolder: folder.GetSubFolder(opts.oplogsPath),
+		backupsFolder: folder.GetSubFolder(opts.backupsPath)}, nil
 }
 
 // DeleteBackups purges given backups files

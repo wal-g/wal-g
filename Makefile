@@ -5,7 +5,7 @@ MAIN_REDIS_PATH := main/redis
 MAIN_MONGO_PATH := main/mongo
 MAIN_FDB_PATH := main/fdb
 DOCKER_COMMON := golang ubuntu s3
-CMD_FILES = $(wildcard wal-g/*.go)
+CMD_FILES = $(wildcard cmd/**/*.go)
 PKG_FILES = $(wildcard internal/**/*.go internal/**/**/*.go internal/*.go)
 TEST_FILES = $(wildcard test/*.go testtools/*.go)
 PKG := github.com/wal-g/wal-g
@@ -164,6 +164,7 @@ unittest:
 	fi
 	go test -v $(TEST_MODIFIER) ./internal/databases/mysql
 	go test -v $(TEST_MODIFIER) ./internal/databases/mongo/...
+	go test -v $(TEST_MODIFIER) ./internal/databases/postgres
 	go test -v $(TEST_MODIFIER) ./internal/walparser/
 	go test -v $(TEST_MODIFIER) ./utility
 
@@ -173,6 +174,9 @@ coverage:
 
 fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 	gofmt -s -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
+
+goimports: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
+	goimports -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 
 lint:
 	@#Github Actions

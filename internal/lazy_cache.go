@@ -12,7 +12,7 @@ type WrongTypeError struct {
 	error
 }
 
-func newWrongTypeError(desiredType string) WrongTypeError {
+func NewWrongTypeError(desiredType string) WrongTypeError {
 	return WrongTypeError{errors.Errorf("expected to get '%s', but not found one", desiredType)}
 }
 
@@ -26,7 +26,7 @@ type LazyCache struct {
 	cacheMutex sync.Mutex
 }
 
-func newLazyCache(load func(key interface{}) (value interface{}, err error)) *LazyCache {
+func NewLazyCache(load func(key interface{}) (value interface{}, err error)) *LazyCache {
 	return &LazyCache{
 		make(map[interface{}]interface{}),
 		load,

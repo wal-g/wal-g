@@ -26,7 +26,8 @@ import (
 )
 
 const (
-	DefaultDataBurstRateLimit = 8 * DatabasePageSize
+	pgDefaultDatabasePageSize = 8192
+	DefaultDataBurstRateLimit = 8 * pgDefaultDatabasePageSize
 	DefaultDataFolderPath     = "/tmp"
 	WaleFileHost              = "file://localhost"
 )
@@ -44,7 +45,9 @@ type UnconfiguredStorageError struct {
 }
 
 func newUnconfiguredStorageError(storagePrefixVariants []string) UnconfiguredStorageError {
-	return UnconfiguredStorageError{errors.Errorf("No storage is configured now, please set one of following settings: %v", storagePrefixVariants)}
+	return UnconfiguredStorageError{
+		errors.Errorf("No storage is configured now, please set one of following settings: %v",
+			storagePrefixVariants)}
 }
 
 func (err UnconfiguredStorageError) Error() string {
@@ -56,7 +59,9 @@ type UnknownCompressionMethodError struct {
 }
 
 func newUnknownCompressionMethodError() UnknownCompressionMethodError {
-	return UnknownCompressionMethodError{errors.Errorf("Unknown compression method, supported methods are: %v", compression.CompressingAlgorithms)}
+	return UnknownCompressionMethodError{
+		errors.Errorf("Unknown compression method, supported methods are: %v",
+			compression.CompressingAlgorithms)}
 }
 
 func (err UnknownCompressionMethodError) Error() string {
@@ -80,7 +85,9 @@ type InvalidConcurrencyValueError struct {
 }
 
 func newInvalidConcurrencyValueError(concurrencyType string, value int) InvalidConcurrencyValueError {
-	return InvalidConcurrencyValueError{errors.Errorf("%v value is expected to be positive but is: %v", concurrencyType, value)}
+	return InvalidConcurrencyValueError{
+		errors.Errorf("%v value is expected to be positive but is: %v",
+			concurrencyType, value)}
 }
 
 func (err InvalidConcurrencyValueError) Error() string {
@@ -106,12 +113,14 @@ func configureLimiters() {
 	}
 	if viper.IsSet(DiskRateLimitSetting) {
 		diskLimit := viper.GetInt64(DiskRateLimitSetting)
-		limiters.DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
+		limiters.DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit),
+			int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 
 	if viper.IsSet(NetworkRateLimitSetting) {
 		netLimit := viper.GetInt64(NetworkRateLimitSetting)
-		limiters.NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
+		limiters.NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit),
+			int(netLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 }
 
@@ -142,17 +151,16 @@ func getWalFolderPath() string {
 	if !viper.IsSet(PgDataSetting) {
 		return DefaultDataFolderPath
 	}
-	pgdata := viper.GetString(PgDataSetting)
-	dataFolderPath := filepath.Join(pgdata, "pg_wal")
-	if _, err := os.Stat(dataFolderPath); err == nil {
-		return dataFolderPath
-	}
+	return getRelativeWalFolderPath(viper.GetString(PgDataSetting))
+}
 
-	dataFolderPath = filepath.Join(pgdata, "pg_xlog")
-	if _, err := os.Stat(dataFolderPath); err == nil {
-		return dataFolderPath
+func getRelativeWalFolderPath(pgdata string) string {
+	for _, walDir := range []string{"pg_wal", "pg_xlog"} {
+		dataFolderPath := filepath.Join(pgdata, walDir)
+		if _, err := os.Stat(dataFolderPath); err == nil {
+			return dataFolderPath
+		}
 	}
-
 	return DefaultDataFolderPath
 }
 
@@ -170,24 +178,7 @@ func GetPgSlotName() (pgSlotName string) {
 }
 
 // TODO : unit tests
-func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder fsutil.DataFolder, err error) {
-	useWalDelta = viper.GetBool(UseWalDeltaSetting)
-	if !useWalDelta {
-		return
-	}
-	dataFolderPath := GetDataFolderPath()
-	deltaDataFolder, err = fsutil.NewDiskDataFolder(dataFolderPath)
-	if err != nil {
-		useWalDelta = false
-		tracelog.WarningLogger.Printf("can't use wal delta feature because can't open delta data folder '%s'"+
-			" due to error: '%v'\n", dataFolderPath, err)
-		err = nil
-	}
-	return
-}
-
-// TODO : unit tests
-func configureCompressor() (compression.Compressor, error) {
+func ConfigureCompressor() (compression.Compressor, error) {
 	compressionMethod := viper.GetString(CompressionMethodSetting)
 	if _, ok := compression.Compressors[compressionMethod]; !ok {
 		return nil, newUnknownCompressionMethodError()
@@ -206,6 +197,10 @@ func getArchiveDataFolderPath() string {
 	return filepath.Join(GetDataFolderPath(), "walg_archive_status")
 }
 
+func GetRelativeArchiveDataFolderPath() string {
+	return filepath.Join(getRelativeWalFolderPath(""), "walg_data", "walg_archive_status")
+}
+
 // TODO : unit tests
 func ConfigureArchiveStatusManager() (fsutil.DataFolder, error) {
 	return fsutil.NewDiskDataFolder(getArchiveDataFolderPath())
@@ -222,33 +217,12 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 
 	folder := uploader.UploadingFolder
 
-	compressor, err := configureCompressor()
+	compressor, err := ConfigureCompressor()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure compression")
 	}
 
 	uploader = NewUploader(compressor, folder)
-	return uploader, err
-}
-
-// ConfigureWalUploader connects to storage and creates an uploader. It makes sure
-// that a valid session has started; if invalid, returns AWS error
-// and `<nil>` values.
-func ConfigureWalUploader() (uploader *WalUploader, err error) {
-	uploader, err = ConfigureWalUploaderWithoutCompressMethod()
-	if err != nil {
-		return nil, err
-	}
-
-	folder := uploader.UploadingFolder
-	deltaFileManager := uploader.DeltaFileManager
-
-	compressor, err := configureCompressor()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure compression")
-	}
-
-	uploader = NewWalUploader(compressor, folder, deltaFileManager)
 	return uploader, err
 }
 
@@ -259,26 +233,6 @@ func ConfigureUploaderWithoutCompressMethod() (uploader *Uploader, err error) {
 	}
 
 	uploader = NewUploader(nil, folder)
-	return uploader, err
-}
-
-func ConfigureWalUploaderWithoutCompressMethod() (uploader *WalUploader, err error) {
-	folder, err := ConfigureFolder()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure folder")
-	}
-
-	useWalDelta, deltaDataFolder, err := configureWalDeltaUsage()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure WAL Delta usage")
-	}
-
-	var deltaFileManager *DeltaFileManager = nil
-	if useWalDelta {
-		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
-	}
-
-	uploader = NewWalUploader(nil, folder, deltaFileManager)
 	return uploader, err
 }
 
@@ -308,8 +262,8 @@ func ConfigureCrypter() crypto.Crypter {
 		return awskms.CrypterFromKeyID(viper.GetString(CseKmsIDSetting), viper.GetString(CseKmsRegionSetting))
 	}
 
-	if viper.IsSet(YcKmsKeyIdSetting) {
-		return yckms.YcCrypterFromKeyIdAndCredential(viper.GetString(YcKmsKeyIdSetting), viper.GetString(YcSaKeyFileSetting))
+	if viper.IsSet(YcKmsKeyIDSetting) {
+		return yckms.YcCrypterFromKeyIDAndCredential(viper.GetString(YcKmsKeyIDSetting), viper.GetString(YcSaKeyFileSetting))
 	}
 
 	if crypter := configureLibsodiumCrypter(); crypter != nil {
@@ -333,7 +287,7 @@ func getMaxUploadQueue() (int, error) {
 	return GetMaxConcurrency(UploadQueueSetting)
 }
 
-func getMaxUploadDiskConcurrency() (int, error) {
+func GetMaxUploadDiskConcurrency() (int, error) {
 	if Turbo {
 		return 4, nil
 	}
@@ -401,7 +355,9 @@ func GetOplogArchiveAfterSize() (int, error) {
 	oplogArchiveAfterSizeStr, _ := GetSetting(OplogArchiveAfterSize)
 	oplogArchiveAfterSize, err := strconv.Atoi(oplogArchiveAfterSizeStr)
 	if err != nil {
-		return 0, fmt.Errorf("integer expected for %s setting but given '%s': %w", OplogArchiveAfterSize, oplogArchiveAfterSizeStr, err)
+		return 0,
+			fmt.Errorf("integer expected for %s setting but given '%s': %w",
+				OplogArchiveAfterSize, oplogArchiveAfterSizeStr, err)
 	}
 	return oplogArchiveAfterSize, nil
 }

@@ -27,7 +27,7 @@ func HandleBackupRestore(backupName string, dbnames []string, fromnames []string
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	sentinel := new(SentinelDto)
-	err = internal.FetchStreamSentinel(backup, sentinel)
+	err = backup.FetchSentinel(&sentinel)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	db, err := getSQLServerConnection()
@@ -65,14 +65,19 @@ func HandleBackupRestore(backupName string, dbnames []string, fromnames []string
 	tracelog.InfoLogger.Printf("restore finished")
 }
 
-func restoreSingleDatabase(ctx context.Context, db *sql.DB, folder storage.Folder, backupName string, dbname string, fromName string) error {
-	baseUrl := getDatabaseBackupUrl(backupName, fromName)
+func restoreSingleDatabase(ctx context.Context,
+	db *sql.DB,
+	folder storage.Folder,
+	backupName string,
+	dbname string,
+	fromName string) error {
+	baseURL := getDatabaseBackupURL(backupName, fromName)
 	basePath := getDatabaseBackupPath(backupName, fromName)
 	blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
 	if err != nil {
 		return err
 	}
-	urls := buildRestoreUrls(baseUrl, blobs)
+	urls := buildRestoreUrls(baseURL, blobs)
 	sql := fmt.Sprintf("RESTORE DATABASE %s FROM %s WITH REPLACE, NORECOVERY", quoteName(dbname), urls)
 	if dbname != fromName {
 		files, err := listDatabaseFiles(db, urls)

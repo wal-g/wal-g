@@ -61,7 +61,7 @@ type DeleteHandler struct {
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
-	deleteHandler, err := NewMySqlDeleteHandler()
+	deleteHandler, err := NewMySQLDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if p := deleteHandler.permanentObjects; len(p) > 0 {
@@ -78,38 +78,27 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 
 	deleteHandler.DeleteEverything(confirmed)
 }
-func (h *DeleteHandler) deleteTarget(bobj internal.BackupObject, confirmed bool) error {
-	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath), confirmed, func(object storage.Object) bool {
-		return strings.HasPrefix(object.GetName(), strings.TrimSuffix(bobj.GetName(), utility.SentinelSuffix))
-	})
-}
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
-	deleteHandler, err := NewMySqlDeleteHandler()
+	deleteHandler, err := NewMySQLDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
-	bname := args[0] // backup name
 
-	for e := range deleteHandler.permanentObjects {
-		if e == bname {
-			tracelog.InfoLogger.Fatalf("unable to delete permanent backup %s\n", bname)
-		}
-	}
-	if bobj, err := deleteHandler.FindTargetByName(bname); err != nil {
-		tracelog.ErrorLogger.FatalfOnError("unable to delete target backup", err)
-	} else if err := deleteHandler.deleteTarget(bobj, confirmed); err != nil {
-		tracelog.ErrorLogger.FatalfOnError("unable to delete target backup", err)
-	}
+	bname := args[0]                                             // backup name
+	backupSelector, err := internal.NewBackupNameSelector(bname) //todo: add selection by userdata
+	tracelog.ErrorLogger.PrintOnError(err)
+
+	deleteHandler.HandleDeleteTarget(backupSelector, confirmed, false)
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
-	deleteHandler, err := NewMySqlDeleteHandler()
+	deleteHandler, err := NewMySQLDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteBefore(args, confirmed)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
-	deleteHandler, err := NewMySqlDeleteHandler()
+	deleteHandler, err := NewMySQLDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteRetain(args, confirmed)
@@ -157,7 +146,7 @@ func tryFetchBinlogName(folder storage.Folder, object storage.Object) (string, b
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	backup := internal.NewBackup(baseBackupFolder, name)
 	var sentinel mysql.StreamSentinelDto
-	err := internal.FetchStreamSentinel(backup, &sentinel)
+	err := backup.FetchSentinel(&sentinel)
 	if err != nil {
 		tracelog.InfoLogger.Println("Fail to fetch stream sentinel " + name)
 		return "", false
@@ -174,12 +163,8 @@ func permanentObjects(folder storage.Folder) map[string]bool {
 
 	permanentBackups := map[string]bool{}
 	for _, backupTime := range backupTimes {
-		backup, err := internal.GetBackupByName(backupTime.BackupName, utility.BaseBackupPath, folder)
-		if err != nil {
-			tracelog.ErrorLogger.Printf("failed to get backup by name with error %s, ignoring...", err.Error())
-			continue
-		}
-		meta, err := backup.FetchMeta()
+		meta, err := mysql.NewGenericMetaFetcher().Fetch(
+			backupTime.BackupName, folder.GetSubFolder(utility.BaseBackupPath))
 		if err != nil {
 			tracelog.ErrorLogger.Printf("failed to fetch backup meta for backup %s with error %s, ignoring...",
 				backupTime.BackupName, err.Error())
@@ -201,7 +186,7 @@ func IsPermanent(objectName string, permanentBackups map[string]bool) bool {
 	return false
 }
 
-func NewMySqlDeleteHandler() (*DeleteHandler, error) {
+func NewMySQLDeleteHandler() (*DeleteHandler, error) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -212,7 +197,7 @@ func NewMySqlDeleteHandler() (*DeleteHandler, error) {
 
 	backupObjects := make([]internal.BackupObject, 0, len(backups))
 	for _, object := range backups {
-		b := mysql.BackupObject{Object: object}
+		b := internal.NewDefaultBackupObject(object)
 		backupObjects = append(backupObjects, b)
 	}
 

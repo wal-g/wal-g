@@ -62,7 +62,7 @@ func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplo
 	uploader := archive.NewStorageUploader(uplProvider)
 
 	// set up mongodb client and oplog fetcher
-	mongoClient, err := client.NewMongoClient(ctx, pushArgs.mongodbUrl)
+	mongoClient, err := client.NewMongoClient(ctx, pushArgs.mongodbURL)
 	if err != nil {
 		return err
 	}
@@ -110,7 +110,11 @@ func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplo
 	defer func() { tracelog.ErrorLogger.PrintOnError(memoryBatchBuffer.Close()) }()
 
 	// set up storage archiver
-	oplogApplier := stages.NewStorageApplier(uploader, memoryBatchBuffer, pushArgs.archiveAfterSize, pushArgs.archiveTimeout, uploadStatsUpdater)
+	oplogApplier := stages.NewStorageApplier(uploader,
+		memoryBatchBuffer,
+		pushArgs.archiveAfterSize,
+		pushArgs.archiveTimeout,
+		uploadStatsUpdater)
 	oplogFetcher := stages.NewCursorMajFetcher(mongoClient, oplogCursor, pushArgs.lwUpdate)
 
 	// run working cycle
@@ -120,7 +124,7 @@ func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplo
 type oplogPushRunArgs struct {
 	archiveAfterSize   int
 	archiveTimeout     time.Duration
-	mongodbUrl         string
+	mongodbURL         string
 	primaryWait        bool
 	primaryWaitTimeout time.Duration
 	lwUpdate           time.Duration
@@ -137,7 +141,7 @@ func buildOplogPushRunArgs() (args oplogPushRunArgs, err error) {
 		return
 	}
 
-	args.mongodbUrl, err = internal.GetRequiredSetting(internal.MongoDBUriSetting)
+	args.mongodbURL, err = internal.GetRequiredSetting(internal.MongoDBUriSetting)
 	if err != nil {
 		return
 	}
@@ -182,14 +186,17 @@ func buildOplogPushStatsArgs() (args oplogPushStatsArgs, err error) {
 		return
 	}
 
-	args.exposeHTTP, err = internal.GetBoolSettingDefault(internal.OplogPushStatsExposeHttp, false)
+	args.exposeHTTP, err = internal.GetBoolSettingDefault(internal.OplogPushStatsExposeHTTP, false)
 	args.httpPrefix = stats.DefaultOplogPushStatsPrefix
 
 	return
 }
 
 // configureUploadStatsUpdater starts statistics updates and exposes if configured
-func configureUploadStatsUpdater(ctx context.Context, sinceTS models.Timestamp, mongoClient client.MongoDriver, args oplogPushStatsArgs) (stats.OplogUploadStatsUpdater, error) {
+func configureUploadStatsUpdater(ctx context.Context,
+	sinceTS models.Timestamp,
+	mongoClient client.MongoDriver,
+	args oplogPushStatsArgs) (stats.OplogUploadStatsUpdater, error) {
 	if !args.enabled {
 		return nil, nil
 	}

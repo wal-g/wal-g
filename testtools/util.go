@@ -7,9 +7,12 @@ import (
 	"errors"
 	"io"
 	"strconv"
+	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/golang/mock/gomock"
@@ -58,27 +61,42 @@ func NewStoringMockUploader(storage *memory.Storage, deltaDataFolder fsutil.Data
 	)
 }
 
-func NewMockWalUploader(apiMultiErr, apiErr bool) *internal.WalUploader {
+func NewMockWalUploader(apiMultiErr, apiErr bool) *postgres.WalUploader {
 	s3Uploader := MakeDefaultUploader(NewMockS3Uploader(apiMultiErr, apiErr, nil))
-	return internal.NewWalUploader(
+	return postgres.NewWalUploader(
 		&MockCompressor{},
 		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), "bucket/", "server/", false),
 		nil,
 	)
 }
 
+func CreateMockStorageWalFolder() storage.Folder {
+	var folder = MakeDefaultInMemoryStorageFolder()
+	return folder.GetSubFolder(utility.WalPath)
+}
+
+func NewMockWalDirUploader(apiMultiErr, apiErr bool) *postgres.WalUploader {
+	return postgres.NewWalUploader(
+		&MockCompressor{},
+		CreateMockStorageWalFolder(),
+		nil,
+	)
+}
+
+/*nolint:errcheck*/
 func CreateMockStorageFolder() storage.Folder {
 	var folder = MakeDefaultInMemoryStorageFolder()
 	subFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	subFolder.PutObject("base_123_backup_stop_sentinel.json", &bytes.Buffer{})
-	subFolder.PutObject("base_456_backup_stop_sentinel.json", strings.NewReader("{}"))
-	subFolder.PutObject("base_000_backup_stop_sentinel.json", &bytes.Buffer{}) // last put
-	subFolder.PutObject("base_123312", &bytes.Buffer{})                        // not a sentinel
-	subFolder.PutObject("base_321/nop", &bytes.Buffer{})
-	subFolder.PutObject("folder123/nop", &bytes.Buffer{})
-	subFolder.PutObject("base_456/tar_partitions/1", &bytes.Buffer{})
-	subFolder.PutObject("base_456/tar_partitions/2", &bytes.Buffer{})
-	subFolder.PutObject("base_456/tar_partitions/3", &bytes.Buffer{})
+	subFolder.PutObject("base_123_backup_stop_sentinel.json", &bytes.Buffer{})         //nolint:errcheck
+	subFolder.PutObject("base_456_backup_stop_sentinel.json", strings.NewReader("{}")) //nolint:errcheck
+	subFolder.PutObject("base_000_backup_stop_sentinel.json", &bytes.Buffer{})         //nolint:errcheck// last put
+	// not a sentinel
+	subFolder.PutObject("base_123312", &bytes.Buffer{})               //nolint:errcheck
+	subFolder.PutObject("base_321/nop", &bytes.Buffer{})              //nolint:errcheck
+	subFolder.PutObject("folder123/nop", &bytes.Buffer{})             //nolint:errcheck
+	subFolder.PutObject("base_456/tar_partitions/1", &bytes.Buffer{}) //nolint:errcheck
+	subFolder.PutObject("base_456/tar_partitions/2", &bytes.Buffer{}) //nolint:errcheck
+	subFolder.PutObject("base_456/tar_partitions/3", &bytes.Buffer{}) //nolint:errcheck
 	return folder
 }
 
@@ -91,7 +109,7 @@ func find(source []int, value int) bool {
 	return false
 }
 
-func CreateMockStorageFolderWithTimeMetadata(t *testing.T, dataFilling DataFilling) storage.Folder {
+func CreatePostgresMockStorageFolderWithTimeMetadata(t *testing.T, dataFilling DataFilling) storage.Folder {
 	backupsCount := 3
 	creationTimeYears := []int{1997, 1999, 1998}
 	modificationTimeYears := []int{2018, 2017, 2020}
@@ -141,6 +159,9 @@ func CreateMockStorageFolderWithTimeMetadata(t *testing.T, dataFilling DataFilli
 		} else {
 			timeData = time.Date(creationTimeYears[i], time.January, 1, 1, 1, 1, 1, time.UTC)
 		}
+		bytesSentinel, err := json.Marshal(&objects[i])
+		folder.PutObject(backupsName[i]+utility.SentinelSuffix, strings.NewReader(string(bytesSentinel)))
+		assert.NoError(t, err)
 		metadata := map[string]interface{}{"start_time": timeData}
 		bytesMetadata, err := json.Marshal(&metadata)
 		assert.NoError(t, err)
@@ -159,9 +180,11 @@ func CreateMockStorageFolderWithTimeMetadata(t *testing.T, dataFilling DataFilli
 		AnyTimes()
 
 	for i := 0; i < backupsCount; i++ {
-		mockBaseBackupFolder.EXPECT().Exists(backupsName[i]+utility.SentinelSuffix).Return(true, nil).AnyTimes()
+		currentSentinelPath := backupsName[i]+utility.SentinelSuffix
+		mockBaseBackupFolder.EXPECT().Exists(currentSentinelPath).Return(true, nil).AnyTimes()
 		currentMetadataPath := backupsName[i] + "/" + utility.MetadataFileName
 		mockBaseBackupFolder.EXPECT().ReadObject(currentMetadataPath).Return(folder.ReadObject(currentMetadataPath)).AnyTimes()
+		mockBaseBackupFolder.EXPECT().ReadObject(currentSentinelPath).Return(folder.ReadObject(currentSentinelPath)).AnyTimes()
 	}
 
 	mockFolder := mocks.NewMockFolder(controller)
@@ -189,8 +212,8 @@ func CreateMockStorageFolderWithDeltaBackups(t *testing.T) storage.Folder {
 		"base_000000010000000000000005_D_000000010000000000000003": sentinelData,
 		"base_000000010000000000000007":                            emptySentinelData,
 		"base_000000010000000000000009_D_000000010000000000000007": sentinelData}
-	for backupName, sentinelD := range backupNames {
-		bytesSentinel, err := json.Marshal(&sentinelD)
+	for backupName := range backupNames {
+		bytesSentinel, err := json.Marshal(backupNames[backupName])
 		assert.NoError(t, err)
 		sentinelString := string(bytesSentinel)
 		err = subFolder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader(sentinelString))
@@ -232,7 +255,7 @@ func CreateMockStorageFolderWithPermanentBackups(t *testing.T) storage.Folder {
 		"000000010000000000000002": emptyData,
 		"000000010000000000000003": emptyData,
 	}
-	for backupName, metadata := range backupNames {
+	for backupName := range backupNames {
 		// empty sentinel
 		empty, err := json.Marshal(&emptyData)
 		assert.NoError(t, err)
@@ -241,14 +264,14 @@ func CreateMockStorageFolderWithPermanentBackups(t *testing.T) storage.Folder {
 
 		// metadata
 		assert.NoError(t, err)
-		bytesMetadata, err := json.Marshal(&metadata)
+		bytesMetadata, err := json.Marshal(backupNames[backupName])
 		assert.NoError(t, err)
 		metadataString := string(bytesMetadata)
 		err = baseBackupFolder.PutObject(backupName+"/"+utility.MetadataFileName, strings.NewReader(metadataString))
 		assert.NoError(t, err)
 	}
-	for walName, data := range walNames {
-		bytes, err := json.Marshal(&data)
+	for walName := range walNames {
+		bytes, err := json.Marshal(walNames[walName])
 		assert.NoError(t, err)
 		walString := string(bytes)
 		err = walBackupFolder.PutObject(walName+".lz4", strings.NewReader(walString))
@@ -290,7 +313,8 @@ func GetXLogRecordData() (walparser.XLogRecord, []byte) {
 		0x00, 0x00, 0x15, 0x40, 0x00, 0x00, 0xe4, 0x18, 0x00, 0x00,
 		0xff, 0x04,
 	}
-	data = utility.ConcatByteSlices(utility.ConcatByteSlices(utility.ConcatByteSlices(data, imageData), blockData), mainData)
+	data = utility.ConcatByteSlices(utility.ConcatByteSlices(utility.ConcatByteSlices(data, imageData), blockData),
+		mainData)
 	recordHeader := walparser.XLogRecordHeader{
 		TotalRecordLength: uint32(walparser.XLogRecordHeaderSize + len(data)),
 		XactID:            0x00000243,
@@ -346,16 +370,16 @@ func (seeker *NopSeeker) Seek(offset int64, whence int) (int64, error) {
 	return 0, nil
 }
 
-var MockCloseError = errors.New("mock close: close error")
-var MockReadError = errors.New("mock reader: read error")
-var MockWriteError = errors.New("mock writer: write error")
+var ErrorMockClose = errors.New("mock close: close error")
+var ErrorMockRead = errors.New("mock reader: read error")
+var ErrorMockWrite = errors.New("mock writer: write error")
 
 //ErrorWriter struct implements io.Writer interface.
 //Its Write method returns zero and non-nil error on every call
 type ErrorWriter struct{}
 
 func (w ErrorWriter) Write(b []byte) (int, error) {
-	return 0, MockWriteError
+	return 0, ErrorMockWrite
 }
 
 //ErrorReader struct implements io.Reader interface.
@@ -363,7 +387,7 @@ func (w ErrorWriter) Write(b []byte) (int, error) {
 type ErrorReader struct{}
 
 func (r ErrorReader) Read(b []byte) (int, error) {
-	return 0, MockReadError
+	return 0, ErrorMockRead
 }
 
 type BufCloser struct {
@@ -373,7 +397,7 @@ type BufCloser struct {
 
 func (w *BufCloser) Close() error {
 	if w.Err {
-		return MockCloseError
+		return ErrorMockClose
 	}
 	return nil
 }
@@ -381,9 +405,16 @@ func (w *BufCloser) Close() error {
 type ErrorWriteCloser struct{}
 
 func (ew ErrorWriteCloser) Write(p []byte) (int, error) {
-	return -1, MockWriteError
+	return -1, ErrorMockWrite
 }
 
 func (ew ErrorWriteCloser) Close() error {
-	return MockCloseError
+	return ErrorMockClose
+}
+
+func Cleanup(t *testing.T, dir string) {
+	err := os.RemoveAll(dir)
+	if err != nil {
+		t.Log("temporary data directory was not deleted ", err)
+	}
 }

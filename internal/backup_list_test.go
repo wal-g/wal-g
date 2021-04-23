@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
@@ -15,21 +16,25 @@ func TestBackupListFindsBackups(t *testing.T) {
 	internal.DefaultHandleBackupList(folder)
 }
 
-func TestBackupListFlagsFindsBackups(t *testing.T) {
-	folder := testtools.CreateMockStorageFolder()
-	internal.HandleBackupListWithFlags(folder, true, false, false)
+var backups = []internal.BackupTime{
+	{
+		BackupName:  "base_123",
+		Time:        time.Date(2019, 4, 25, 14, 48, 0, 0, time.UTC),
+		WalFileName: "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+	},
+	{
+		BackupName:  "base_456",
+		Time:        time.Date(2018, 7, 5, 1, 1, 50, 0, time.UTC),
+		WalFileName: "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+	},
 }
 
 func TestBackupListCorrectOutput(t *testing.T) {
 	const expected = "" +
-		"name   created modified             wal_segment_backup_start\n" +
-		"base_2 -       2020-01-01T01:01:01Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
-		"base_0 -       2018-01-01T01:01:01Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
-		"base_1 -       2017-01-01T01:01:01Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n"
+		"name     last_modified        wal_segment_backup_start\n" +
+		"base_456 2018-07-05T01:01:50Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
+		"base_123 2019-04-25T14:48:00Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n"
 
-	folder := testtools.CreateMockStorageFolderWithTimeMetadata(t, testtools.NoCreationTime)
-	backups, err := internal.GetBackups(folder)
-	assert.NoError(t, err)
 	buf := new(bytes.Buffer)
 	internal.WriteBackupList(backups, buf)
 	assert.Equal(t, buf.String(), expected)
@@ -37,96 +42,23 @@ func TestBackupListCorrectOutput(t *testing.T) {
 
 func TestBackupListCorrectPrettyOutput(t *testing.T) {
 	const expected = "" +
-		"+---+--------+---------+-----------------------------------+--------------------------+\n" +
-		"| # | NAME   | CREATED | MODIFIED                          | WAL SEGMENT BACKUP START |\n" +
-		"+---+--------+---------+-----------------------------------+--------------------------+\n" +
-		"| 0 | base_2 | -       | Wednesday, 01-Jan-20 01:01:01 UTC | ZZZZZZZZZZZZZZZZZZZZZZZZ |\n" +
-		"| 1 | base_0 | -       | Monday, 01-Jan-18 01:01:01 UTC    | ZZZZZZZZZZZZZZZZZZZZZZZZ |\n" +
-		"| 2 | base_1 | -       | Sunday, 01-Jan-17 01:01:01 UTC    | ZZZZZZZZZZZZZZZZZZZZZZZZ |\n" +
-		"+---+--------+---------+-----------------------------------+--------------------------+\n"
+		"+---+----------+----------------------------------+--------------------------+\n" +
+		"| # | NAME     | LAST MODIFIED                    | WAL SEGMENT BACKUP START |\n" +
+		"+---+----------+----------------------------------+--------------------------+\n" +
+		"| 0 | base_123 | Thursday, 25-Apr-19 14:48:00 UTC | ZZZZZZZZZZZZZZZZZZZZZZZZ |\n" +
+		"| 1 | base_456 | Thursday, 05-Jul-18 01:01:50 UTC | ZZZZZZZZZZZZZZZZZZZZZZZZ |\n" +
+		"+---+----------+----------------------------------+--------------------------+\n"
 
-	folder := testtools.CreateMockStorageFolderWithTimeMetadata(t, testtools.NoCreationTime)
-	backups, err := internal.GetBackups(folder)
-	assert.NoError(t, err)
 	buf := new(bytes.Buffer)
 	internal.WritePrettyBackupList(backups, buf)
 	assert.Equal(t, buf.String(), expected)
 }
 
-func TestBackupListCorrectOrderingCreationTimeGaps(t *testing.T) {
-	const expected = "" +
-		"name   created              modified             wal_segment_backup_start\n" +
-		"base_2 1998-01-01T01:01:01Z 2020-01-01T01:01:01Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
-		"base_0 -                    2018-01-01T01:01:01Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
-		"base_1 -                    2017-01-01T01:01:01Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n"
-
-	folder := testtools.CreateMockStorageFolderWithTimeMetadata(t, testtools.CreationTimeGaps)
-	backups, err := internal.GetBackups(folder)
-	assert.NoError(t, err)
-
-	buf := new(bytes.Buffer)
-	internal.WriteBackupList(backups, buf)
-	assert.Equal(t, buf.String(), expected)
-}
-
-func TestBackupListCorrectOrderingModificationTimeGaps(t *testing.T) {
-	const expected = "" +
-		"name   created              modified             wal_segment_backup_start\n" +
-		"base_1 1999-01-01T01:01:01Z -                    ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
-		"base_2 1998-01-01T01:01:01Z 2020-01-01T01:01:01Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
-		"base_0 1997-01-01T01:01:01Z -                    ZZZZZZZZZZZZZZZZZZZZZZZZ\n"
-
-	folder := testtools.CreateMockStorageFolderWithTimeMetadata(t, testtools.ModificationTimeGaps)
-	backups, err := internal.GetBackups(folder)
-	assert.NoError(t, err)
-
-	buf := new(bytes.Buffer)
-	internal.WriteBackupList(backups, buf)
-	assert.Equal(t, buf.String(), expected)
-}
-
-func TestBackupListCorrectOrderingNoTimeGaps(t *testing.T) {
-	const expected = "" +
-		"name   created              modified             wal_segment_backup_start\n" +
-		"base_1 1999-01-01T01:01:01Z 2017-01-01T01:01:01Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
-		"base_2 1998-01-01T01:01:01Z 2020-01-01T01:01:01Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
-		"base_0 1997-01-01T01:01:01Z 2018-01-01T01:01:01Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n"
-
-	folder := testtools.CreateMockStorageFolderWithTimeMetadata(t, testtools.NoTimeGaps)
-	backups, err := internal.GetBackups(folder)
-	assert.NoError(t, err)
-
-	buf := new(bytes.Buffer)
-	internal.WriteBackupList(backups, buf)
-	assert.Equal(t, buf.String(), expected)
-}
-
-func TestBackupListCorrectOrderingTimeGaps(t *testing.T) {
-	const expected = "" +
-		"name   created              modified             wal_segment_backup_start\n" +
-		"base_0 1997-01-01T01:01:01Z 2018-01-01T01:01:01Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
-		"base_1 -                    2017-01-01T01:01:01Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
-		"base_2 1998-01-01T01:01:01Z -                    ZZZZZZZZZZZZZZZZZZZZZZZZ\n"
-
-	folder := testtools.CreateMockStorageFolderWithTimeMetadata(t, testtools.CreationAndModificationTimeGaps)
-	backups, err := internal.GetBackups(folder)
-	assert.NoError(t, err)
-
-	buf := new(bytes.Buffer)
-	internal.WriteBackupList(backups, buf)
-	assert.Equal(t, buf.String(), expected)
-}
-
-
 func TestBackupListCorrectJsonOutput(t *testing.T) {
-	folder := testtools.CreateMockStorageFolderWithTimeMetadata(t, testtools.NoCreationTime)
-	backups, err := internal.GetBackups(folder)
-	assert.NoError(t, err)
-
 	var actual []internal.BackupTime
 	buf := new(bytes.Buffer)
 
-	err = internal.WriteAsJson(backups, buf, false)
+	err := internal.WriteAsJSON(backups, buf, false)
 	assert.NoError(t, err)
 	err = json.Unmarshal(buf.Bytes(), &actual)
 
@@ -137,32 +69,20 @@ func TestBackupListCorrectJsonOutput(t *testing.T) {
 func TestBackupListCorrectPrettyJsonOutput(t *testing.T) {
 	const expectedString = "[\n" +
 		"    {\n" +
-		"        \"backup_name\": \"base_2\",\n" +
-		"        \"creation_time\": \"0001-01-01T00:00:00Z\",\n" +
-		"        \"modification_time\": \"2020-01-01T01:01:01.000000001Z\",\n" +
+		"        \"backup_name\": \"base_123\",\n" +
+		"        \"time\": \"2019-04-25T14:48:00Z\",\n" +
 		"        \"wal_file_name\": \"ZZZZZZZZZZZZZZZZZZZZZZZZ\"\n" +
 		"    },\n" +
 		"    {\n" +
-		"        \"backup_name\": \"base_0\",\n" +
-		"        \"creation_time\": \"0001-01-01T00:00:00Z\",\n" +
-		"        \"modification_time\": \"2018-01-01T01:01:01.000000001Z\",\n" +
-		"        \"wal_file_name\": \"ZZZZZZZZZZZZZZZZZZZZZZZZ\"\n" +
-		"    },\n" +
-		"    {\n" +
-		"        \"backup_name\": \"base_1\",\n" +
-		"        \"creation_time\": \"0001-01-01T00:00:00Z\",\n" +
-		"        \"modification_time\": \"2017-01-01T01:01:01.000000001Z\",\n" +
+		"        \"backup_name\": \"base_456\",\n" +
+		"        \"time\": \"2018-07-05T01:01:50Z\",\n" +
 		"        \"wal_file_name\": \"ZZZZZZZZZZZZZZZZZZZZZZZZ\"\n" +
 		"    }\n" +
 		"]"
-
-	folder := testtools.CreateMockStorageFolderWithTimeMetadata(t, testtools.NoCreationTime)
 	var unmarshaledBackups []internal.BackupTime
-	backups, err := internal.GetBackups(folder)
-	assert.NoError(t, err)
 	buf := new(bytes.Buffer)
 
-	err = internal.WriteAsJson(backups, buf, true)
+	err := internal.WriteAsJSON(backups, buf, true)
 	assert.NoError(t, err)
 	err = json.Unmarshal(buf.Bytes(), &unmarshaledBackups)
 

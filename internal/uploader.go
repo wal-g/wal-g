@@ -31,7 +31,7 @@ type Uploader struct {
 	waitGroup            *sync.WaitGroup
 	ArchiveStatusManager asm.ArchiveStatusManager
 	Failed               atomic.Value
-	tarSize              *int64
+	TarSize              *int64
 }
 
 // UploadObject
@@ -49,15 +49,15 @@ func NewUploader(
 		UploadingFolder: uploadingLocation,
 		Compressor:      compressor,
 		waitGroup:       &sync.WaitGroup{},
-		tarSize:         &size,
+		TarSize:         &size,
 	}
 	uploader.Failed.Store(false)
 	return uploader
 }
 
-// finish waits for all waiting parts to be uploaded. If an error occurs,
+// Finish waits for all waiting parts to be uploaded. If an error occurs,
 // prints alert to stderr.
-func (uploader *Uploader) finish() {
+func (uploader *Uploader) Finish() {
 	uploader.waitGroup.Wait()
 	if uploader.Failed.Load().(bool) {
 		tracelog.ErrorLogger.Printf("WAL-G could not complete upload.\n")
@@ -65,14 +65,14 @@ func (uploader *Uploader) finish() {
 }
 
 // Clone creates similar Uploader with new WaitGroup
-func (uploader *Uploader) clone() *Uploader {
+func (uploader *Uploader) Clone() *Uploader {
 	return &Uploader{
 		UploadingFolder:      uploader.UploadingFolder,
 		Compressor:           uploader.Compressor,
 		waitGroup:            &sync.WaitGroup{},
 		ArchiveStatusManager: uploader.ArchiveStatusManager,
 		Failed:               uploader.Failed,
-		tarSize:              uploader.tarSize,
+		TarSize:              uploader.TarSize,
 	}
 }
 
@@ -89,7 +89,7 @@ func (uploader *Uploader) UploadFile(file ioextensions.NamedReader) error {
 
 // DisableSizeTracking stops bandwidth tracking
 func (uploader *Uploader) DisableSizeTracking() {
-	uploader.tarSize = nil
+	uploader.TarSize = nil
 }
 
 // Compression returns configured compressor
@@ -99,8 +99,8 @@ func (uploader *Uploader) Compression() compression.Compressor {
 
 // TODO : unit tests
 func (uploader *Uploader) Upload(path string, content io.Reader) error {
-	if uploader.tarSize != nil {
-		content = &WithSizeReader{content, uploader.tarSize}
+	if uploader.TarSize != nil {
+		content = &WithSizeReader{content, uploader.TarSize}
 	}
 	err := uploader.UploadingFolder.PutObject(path, content)
 	if err == nil {

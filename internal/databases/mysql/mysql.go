@@ -72,20 +72,20 @@ func getMySQLConnection() (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	db, err := getMySqlConnectionFromDatasource(datasourceName)
+	db, err := getMySQLConnectionFromDatasource(datasourceName)
 	if err != nil {
 		fallbackDatasourceName := replaceHostInDatasourceName(datasourceName, "localhost")
 		if fallbackDatasourceName != datasourceName {
 			tracelog.ErrorLogger.Println(err.Error())
 			tracelog.ErrorLogger.Println("Failed to connect using provided host, trying localhost")
 
-			db, err = getMySqlConnectionFromDatasource(datasourceName)
+			db, err = getMySQLConnectionFromDatasource(datasourceName)
 		}
 	}
 	return db, err
 }
 
-func getMySqlConnectionFromDatasource(datasourceName string) (*sql.DB, error) {
+func getMySQLConnectionFromDatasource(datasourceName string) (*sql.DB, error) {
 	if caFile, ok := internal.GetSetting(internal.MysqlSslCaSetting); ok {
 		rootCertPool := x509.NewCertPool()
 		pem, err := ioutil.ReadFile(caFile)
@@ -93,7 +93,7 @@ func getMySqlConnectionFromDatasource(datasourceName string) (*sql.DB, error) {
 			return nil, err
 		}
 		if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
-			return nil, fmt.Errorf("Failed to load certificate from %s", caFile)
+			return nil, fmt.Errorf("failed to load certificate from %s", caFile)
 		}
 		err = mysql.RegisterTLSConfig("custom", &tls.Config{
 			RootCAs: rootCertPool,
@@ -102,7 +102,9 @@ func getMySqlConnectionFromDatasource(datasourceName string) (*sql.DB, error) {
 			return nil, err
 		}
 		if strings.Contains(datasourceName, "?tls=") || strings.Contains(datasourceName, "&tls=") {
-			return nil, fmt.Errorf("MySQL datasource string contains tls option. It can't be used with %v option", internal.MysqlSslCaSetting)
+			return nil,
+				fmt.Errorf("mySQL datasource string contains tls option. It can't be used with %v option",
+					internal.MysqlSslCaSetting)
 		}
 		if strings.Contains(datasourceName, "?") {
 			datasourceName += "&tls=custom"
@@ -138,6 +140,14 @@ type StreamSentinelDto struct {
 	BinLogEnd      string    `json:"BinLogEnd,omitempty"`
 	StartLocalTime time.Time `json:"StartLocalTime,omitempty"`
 	StopLocalTime  time.Time `json:"StopLocalTime,omitempty"`
+
+	UncompressedSize int64  `json:"UncompressedSize,omitempty"`
+	CompressedSize   int64  `json:"CompressedSize,omitempty"`
+	Hostname         string `json:"Hostname,omitempty"`
+
+	IsPermanent bool        `json:"IsPermanent,omitempty"`
+	UserData    interface{} `json:"UserData,omitempty"`
+	//todo: add other fields from internal.GenericMetadata
 }
 
 func (s *StreamSentinelDto) String() string {
@@ -152,9 +162,9 @@ type binlogHandler interface {
 	handleBinlog(binlogPath string) error
 }
 
-func fetchLogs(folder storage.Folder, dstDir string, startTs time.Time, endTs time.Time, handler binlogHandler) error {
+func fetchLogs(folder storage.Folder, dstDir string, startTS time.Time, endTS time.Time, handler binlogHandler) error {
 	logFolder := folder.GetSubFolder(BinlogPath)
-	logsToFetch, err := getLogsCoveringInterval(logFolder, startTs)
+	logsToFetch, err := getLogsCoveringInterval(logFolder, startTS)
 	if err != nil {
 		return err
 	}
@@ -162,7 +172,7 @@ func fetchLogs(folder storage.Folder, dstDir string, startTs time.Time, endTs ti
 		binlogName := utility.TrimFileExtension(logFile.GetName())
 		binlogPath := path.Join(dstDir, binlogName)
 		tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
-		if err = internal.DownloadWALFileTo(logFolder, binlogName, binlogPath); err != nil {
+		if err = internal.DownloadFileTo(logFolder, binlogName, binlogPath); err != nil {
 			tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
 			return err
 		}
@@ -174,21 +184,21 @@ func fetchLogs(folder storage.Folder, dstDir string, startTs time.Time, endTs ti
 		if err != nil {
 			return err
 		}
-		if timestamp.After(endTs) {
+		if timestamp.After(endTS) {
 			break
 		}
 	}
 	return nil
 }
 
-func getBinlogSinceTs(folder storage.Folder, backup *internal.Backup) (time.Time, error) {
-	startTs := utility.MaxTime // far future
+func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time, error) {
+	startTS := utility.MaxTime // far future
 	var streamSentinel StreamSentinelDto
-	err := internal.FetchStreamSentinel(backup, &streamSentinel)
+	err := backup.FetchSentinel(&streamSentinel)
 	if err != nil {
 		return time.Time{}, err
 	}
-	tracelog.InfoLogger.Printf("Backup sentinel: %s", streamSentinel)
+	tracelog.InfoLogger.Printf("Backup sentinel: %s", streamSentinel.String())
 
 	// case when backup was uploaded before first binlog
 	sentinels, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
@@ -198,8 +208,8 @@ func getBinlogSinceTs(folder storage.Folder, backup *internal.Backup) (time.Time
 	for _, sentinel := range sentinels {
 		if strings.HasPrefix(sentinel.GetName(), backup.Name) {
 			tracelog.InfoLogger.Printf("Backup sentinel file: %s (%s)", sentinel.GetName(), sentinel.GetLastModified())
-			if sentinel.GetLastModified().Before(startTs) {
-				startTs = sentinel.GetLastModified()
+			if sentinel.GetLastModified().Before(startTS) {
+				startTS = sentinel.GetLastModified()
 			}
 		}
 	}
@@ -211,12 +221,12 @@ func getBinlogSinceTs(folder storage.Folder, backup *internal.Backup) (time.Time
 	for _, binlog := range binlogs {
 		if strings.HasPrefix(binlog.GetName(), streamSentinel.BinLogStart) {
 			tracelog.InfoLogger.Printf("Backup start binlog: %s (%s)", binlog.GetName(), binlog.GetLastModified())
-			if binlog.GetLastModified().Before(startTs) {
-				startTs = binlog.GetLastModified()
+			if binlog.GetLastModified().Before(startTS) {
+				startTS = binlog.GetLastModified()
 			}
 		}
 	}
-	return startTs, nil
+	return startTS, nil
 }
 
 // getLogsCoveringInterval lists the operation logs that cover the interval

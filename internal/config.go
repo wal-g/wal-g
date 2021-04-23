@@ -22,6 +22,7 @@ const (
 	UploadQueueSetting           = "WALG_UPLOAD_QUEUE"
 	SentinelUserDataSetting      = "WALG_SENTINEL_USER_DATA"
 	PreventWalOverwriteSetting   = "WALG_PREVENT_WAL_OVERWRITE"
+	UploadWalMetadata            = "WALG_UPLOAD_WAL_METADATA"
 	DeltaMaxStepsSetting         = "WALG_DELTA_MAX_STEPS"
 	DeltaOriginSetting           = "WALG_DELTA_ORIGIN"
 	CompressionMethodSetting     = "WALG_COMPRESSION_METHOD"
@@ -35,7 +36,7 @@ const (
 	UseRatingComposerSetting     = "WALG_USE_RATING_COMPOSER"
 	DeltaFromNameSetting         = "WALG_DELTA_FROM_NAME"
 	DeltaFromUserDataSetting     = "WALG_DELTA_FROM_USER_DATA"
-	TargetUserDataSetting        = "WALG_FETCH_TARGET_USER_DATA"
+	FetchTargetUserDataSetting   = "WALG_FETCH_TARGET_USER_DATA"
 	LogLevelSetting              = "WALG_LOG_LEVEL"
 	TarSizeThresholdSetting      = "WALG_TAR_SIZE_THRESHOLD"
 	CseKmsIDSetting              = "WALG_CSE_KMS_ID"
@@ -60,6 +61,7 @@ const (
 	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
 	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
 	MaxDelayedSegmentsCount      = "WALG_INTEGRITY_MAX_DELAYED_WALS"
+	PrefetchDir                  = "WALG_PREFETCH_DIR"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
@@ -69,7 +71,7 @@ const (
 	OplogPushStatsEnabled           = "OPLOG_PUSH_STATS_ENABLED"
 	OplogPushStatsLoggingInterval   = "OPLOG_PUSH_STATS_LOGGING_INTERVAL"
 	OplogPushStatsUpdateInterval    = "OPLOG_PUSH_STATS_UPDATE_INTERVAL"
-	OplogPushStatsExposeHttp        = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
+	OplogPushStatsExposeHTTP        = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
 	OplogPushWaitForBecomePrimary   = "OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY"
 	OplogPushPrimaryCheckInterval   = "OPLOG_PUSH_PRIMARY_CHECK_INTERVAL"
 	OplogReplayOplogAlwaysUpsert    = "OPLOG_REPLAY_OPLOG_ALWAYS_UPSERT"
@@ -85,9 +87,9 @@ const (
 
 	GoMaxProcs = "GOMAXPROCS"
 
-	HttpListen       = "HTTP_LISTEN"
-	HttpExposePprof  = "HTTP_EXPOSE_PPROF"
-	HttpExposeExpVar = "HTTP_EXPOSE_EXPVAR"
+	HTTPListen       = "HTTP_LISTEN"
+	HTTPExposePprof  = "HTTP_EXPOSE_PPROF"
+	HTTPExposeExpVar = "HTTP_EXPOSE_EXPVAR"
 
 	SQLServerBlobHostname     = "SQLSERVER_BLOB_HOSTNAME"
 	SQLServerBlobCertFile     = "SQLSERVER_BLOB_CERT_FILE"
@@ -98,10 +100,10 @@ const (
 	EndpointSourceSetting = "S3_ENDPOINT_SOURCE"
 	EndpointPortSetting   = "S3_ENDPOINT_PORT"
 
-	AwsAccessKeyId     = "AWS_ACCESS_KEY_ID"
+	AwsAccessKeyID     = "AWS_ACCESS_KEY_ID"
 	AwsSecretAccessKey = "AWS_SECRET_ACCESS_KEY"
 
-	YcKmsKeyIdSetting  = "YC_CSE_KMS_KEY_ID"
+	YcKmsKeyIDSetting  = "YC_CSE_KMS_KEY_ID"
 	YcSaKeyFileSetting = "YC_SERVICE_ACCOUNT_KEY_FILE"
 )
 
@@ -113,6 +115,7 @@ var (
 		UploadDiskConcurrencySetting: "1",
 		UploadQueueSetting:           "2",
 		PreventWalOverwriteSetting:   "false",
+		UploadWalMetadata:            "NOMETADATA",
 		DeltaMaxStepsSetting:         "0",
 		CompressionMethodSetting:     "lz4",
 		UseWalDeltaSetting:           "false",
@@ -143,6 +146,7 @@ var (
 		UploadQueueSetting:           true,
 		SentinelUserDataSetting:      true,
 		PreventWalOverwriteSetting:   true,
+		UploadWalMetadata:            true,
 		DeltaMaxStepsSetting:         true,
 		DeltaOriginSetting:           true,
 		CompressionMethodSetting:     true,
@@ -169,7 +173,7 @@ var (
 		MaxDelayedSegmentsCount:      true,
 		DeltaFromNameSetting:         true,
 		DeltaFromUserDataSetting:     true,
-		TargetUserDataSetting:        true,
+		FetchTargetUserDataSetting:   true,
 
 		// Postgres
 		PgPortSetting:     true,
@@ -182,6 +186,7 @@ var (
 		PgSlotName:        true,
 		PgWalSize:         true,
 		"PGPASSFILE":      true,
+		PrefetchDir:       true,
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,
@@ -194,7 +199,7 @@ var (
 		// AWS s3
 		"WALG_S3_PREFIX":              true,
 		"WALE_S3_PREFIX":              true,
-		AwsAccessKeyId:                true,
+		AwsAccessKeyID:                true,
 		AwsSecretAccessKey:            true,
 		"AWS_SESSION_TOKEN":           true,
 		"AWS_DEFAULT_REGION":          true,
@@ -233,7 +238,7 @@ var (
 
 		// Yandex Cloud
 		YcSaKeyFileSetting: true,
-		YcKmsKeyIdSetting:  true,
+		YcKmsKeyIDSetting:  true,
 
 		// SH
 		"WALG_SSH_PREFIX":      true,
@@ -253,7 +258,7 @@ var (
 		OplogPushStatsEnabled:          true,
 		OplogPushStatsLoggingInterval:  true,
 		OplogPushStatsUpdateInterval:   true,
-		OplogPushStatsExposeHttp:       true,
+		OplogPushStatsExposeHTTP:       true,
 		OplogPushWaitForBecomePrimary:  true,
 		OplogPushPrimaryCheckInterval:  true,
 		OplogPITRDiscoveryInterval:     true,
@@ -270,9 +275,9 @@ var (
 		GoMaxProcs: true,
 
 		// Web server
-		HttpListen:       true,
-		HttpExposePprof:  true,
-		HttpExposeExpVar: true,
+		HTTPListen:       true,
+		HTTPExposePprof:  true,
+		HTTPExposeExpVar: true,
 
 		// SQLServer
 		SQLServerBlobHostname:     true,
@@ -283,10 +288,10 @@ var (
 	}
 
 	RequiredSettings       = make(map[string]bool)
-	HttpSettingExposeFuncs = map[string]func(webserver.WebServer){
-		HttpExposePprof:          webserver.EnablePprofEndpoints,
-		HttpExposeExpVar:         webserver.EnableExpVarEndpoints,
-		OplogPushStatsExposeHttp: nil,
+	HTTPSettingExposeFuncs = map[string]func(webserver.WebServer){
+		HTTPExposePprof:          webserver.EnablePprofEndpoints,
+		HTTPExposeExpVar:         webserver.EnableExpVarEndpoints,
+		OplogPushStatsExposeHTTP: nil,
 	}
 	Turbo bool
 )
@@ -354,7 +359,7 @@ func Configure() {
 // ConfigureAndRunDefaultWebServer configures and runs web server
 func ConfigureAndRunDefaultWebServer() error {
 	var ws webserver.WebServer
-	httpListenAddr, httpListen := GetSetting(HttpListen)
+	httpListenAddr, httpListen := GetSetting(HTTPListen)
 	if httpListen {
 		ws = webserver.NewSimpleWebServer(httpListenAddr)
 		if err := ws.Serve(); err != nil {
@@ -364,7 +369,7 @@ func ConfigureAndRunDefaultWebServer() error {
 			return err
 		}
 	}
-	for setting, registerFunc := range HttpSettingExposeFuncs {
+	for setting, registerFunc := range HTTPSettingExposeFuncs {
 		enabled, err := GetBoolSettingDefault(setting, false)
 		if err != nil {
 			return err
@@ -373,7 +378,7 @@ func ConfigureAndRunDefaultWebServer() error {
 			continue
 		}
 		if !httpListen {
-			return fmt.Errorf("%s failed: %s is not set", setting, HttpListen)
+			return fmt.Errorf("%s failed: %s is not set", setting, HTTPListen)
 		}
 		if registerFunc == nil {
 			continue

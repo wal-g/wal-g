@@ -66,6 +66,11 @@ Concurrency values can be configured using:
 
 To configure how many goroutines to use during ```backup-fetch``` and ```wal-fetch```, use `WALG_DOWNLOAD_CONCURRENCY`. By default, WAL-G uses the minimum of the number of files to extract and 10.
 
+* `WALG_PREFETCH_DIR`
+
+By default WAL prefetch is storing prefetched data in pg_wal directory. This ensures that WAL can be easily moved from prefetch location to actual WAL consumption directory. But it may have negative consequences if you use it with pg_rewind in PostgreSQL 13.
+PostgreSQL 13 is able to invoke restore_command during pg_rewind. Prefetched WAL can generate false failure of pg_rewind. To avoid it you can either turn off prefetch during rewind (set WALG_DOWNLOAD_CONCURRENCY = 1) or place wal prefetch folder outside PGDATA. For details see [this pgsql-hackers thread](https://postgr.es/m/CAFh8B=kW8yY3yzA1=-w8BT90ejDoELhU+zho7F7k4J6D_6oPFA@mail.gmail.com).
+
 * `WALG_UPLOAD_CONCURRENCY`
 
 To configure how many concurrency streams to use during backup uploading, use `WALG_UPLOAD_CONCURRENCY`. By default, WAL-G uses 16 streams.
@@ -73,6 +78,9 @@ To configure how many concurrency streams to use during backup uploading, use `W
 * `WALG_UPLOAD_DISK_CONCURRENCY`
 
 To configure how many concurrency streams are reading disk during ```backup-push```. By default, WAL-G uses 1 stream.
+
+* `TOTAL_BG_UPLOADED_LIMIT` (e.g. `1024`)
+Overrides the default `number of WAL files to upload during one scan`. By default, at most 32 WAL files will be uploaded.
 
 * `WALG_SENTINEL_USER_DATA`
 
@@ -126,6 +134,20 @@ To configure the size of one backup bundle (in bytes). Smaller size causes granu
 * `WALG_PG_WAL_SIZE`
 
 To configure the wal segment size if different from the postgres default of 16 MB
+
+* `WALG_UPLOAD_WAL_METADATA`
+
+To upload metadata related to wal files. `WALG_UPLOAD_WAL_METADATA` can be INDIVIDUAL (generates metadata for all the wal logs) or BULK( generates metadata for set of wal files) 
+Sample metadata file (000000020000000300000071.json)
+```
+{
+    "000000020000000300000071": {
+    "created_time": "2021-02-23T00:51:14.195209969Z",
+    "date_fmt": "%Y-%m-%dT%H:%M:%S.%fZ"
+    }
+}
+```
+If the parameter value is NOMETADATA or not specified, it will fallback to default setting (no wal metadata generation)
 
 Usage
 -----

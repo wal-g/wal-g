@@ -47,9 +47,8 @@ func (b *XBlockIn) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 		case xml.EndElement:
 			if t2.Name.Local == name {
 				return nil
-			} else {
-				return fmt.Errorf("unexpected closing block tag: %v", t2.Name.Local)
 			}
+			return fmt.Errorf("unexpected closing block tag: %v", t2.Name.Local)
 		case xml.ProcInst:
 		case xml.Comment:
 		case xml.Directive:
@@ -93,9 +92,8 @@ func (bl *XBlockListIn) UnmarshalXML(d *xml.Decoder, start xml.StartElement) err
 		case xml.EndElement:
 			if t2.Name.Local == BlockListTag {
 				return nil
-			} else {
-				return fmt.Errorf("unexpected closing blocklist tag: %v", t2.Name.Local)
 			}
+			return fmt.Errorf("unexpected closing blocklist tag: %v", t2.Name.Local)
 		case xml.CharData:
 		case xml.ProcInst:
 		case xml.Comment:

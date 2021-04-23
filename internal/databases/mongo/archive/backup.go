@@ -75,12 +75,12 @@ func (bl *TabbedBackupListing) Names(backups []internal.BackupTime, output io.Wr
 	writer := tabwriter.NewWriter(output, bl.minwidth, bl.tabwidth, bl.padding, bl.padchar, bl.flags)
 
 	// wal_segment_backup_start for backward compatibility
-	if _, err := fmt.Fprintln(writer, "name\tcreated\tmodified\twal_segment_backup_start"); err != nil {
+	if _, err := fmt.Fprintln(writer, "name\tlast_modified\twal_segment_backup_start"); err != nil {
 		return err
 	}
 	for i := len(backups) - 1; i >= 0; i-- {
 		b := backups[i]
-		_, err := fmt.Fprintf(writer, "%v\t%v\t%v\t%v\n", b.BackupName, b.CreationTime.Format(time.RFC3339), b.ModificationTime.Format(time.RFC3339), b.WalFileName)
+		_, err := fmt.Fprintf(writer, "%v\t%v\t%v\n", b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName)
 		if err != nil {
 			return err
 		}
@@ -105,7 +105,9 @@ type MongoMetaDBProvider struct {
 	permanent bool
 }
 
-func NewBackupMetaMongoProvider(ctx context.Context, mc client.MongoDriver, folder storage.Folder) *MongoMetaDBProvider {
+func NewBackupMetaMongoProvider(ctx context.Context,
+	mc client.MongoDriver,
+	folder storage.Folder) *MongoMetaDBProvider {
 	return &MongoMetaDBProvider{ctx: ctx, client: mc, folder: folder}
 }
 

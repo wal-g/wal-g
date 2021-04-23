@@ -6,5 +6,5 @@ import "os"
 // directory.
 type Sentinel struct {
 	Info os.FileInfo
-	path string
+	Path string
 }

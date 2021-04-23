@@ -34,7 +34,7 @@ func TestReadXLogRecordBlockHeader(t *testing.T) {
 	header, lastRelFileNode, err := readXLogRecordBlockHeader(nil, 0, &maxReadBlockId, &reader)
 	assert.NoError(t, err)
 	assert.Equal(t, *lastRelFileNode, header.BlockLocation.RelationFileNode)
-	assert.Equal(t, header.BlockId, uint8(0))
+	assert.Equal(t, header.BlockID, uint8(0))
 	assert.Equal(t, header.ForkFlags, uint8(0x10))
 	assert.Equal(t, header.DataLength, uint16(0x0000))
 	assert.Equal(t, header.ImageHeader.ImageLength, uint16(0x1cd4))
@@ -142,7 +142,7 @@ func TestReadXLogRecordBlockHeaderPart_MultipleBlocks(t *testing.T) {
 	assert.Equal(t, record.MainDataLen, expectedMainDataLen)
 	assert.Equal(t, len(record.Blocks), 1)
 	header := record.Blocks[0].Header
-	assert.Equal(t, header.BlockId, uint8(0))
+	assert.Equal(t, header.BlockID, uint8(0))
 	assert.Equal(t, header.ForkFlags, uint8(0x10))
 	assert.Equal(t, header.DataLength, uint16(0x0000))
 	assert.Equal(t, header.ImageHeader.ImageLength, expectedImageLength)
@@ -239,7 +239,7 @@ func TestReadXLogRecordBody(t *testing.T) {
 	assert.Equal(t, record.MainDataLen, expectedMainDataLen)
 	assert.Equal(t, len(record.Blocks), 1)
 	header := record.Blocks[0].Header
-	assert.Equal(t, header.BlockId, uint8(0))
+	assert.Equal(t, header.BlockID, uint8(0))
 	assert.Equal(t, header.ForkFlags, uint8(0x30))
 	assert.Equal(t, header.DataLength, uint16(0x0003))
 	assert.Equal(t, header.ImageHeader.ImageLength, expectedImageLength)

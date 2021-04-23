@@ -45,7 +45,7 @@ type oplogReplayRunArgs struct {
 	until models.Timestamp
 
 	ignoreErrCodes map[string][]int32
-	mongodbUrl     string
+	mongodbURL     string
 
 	oplogAlwaysUpsert    *bool
 	oplogApplicationMode *string
@@ -69,7 +69,7 @@ func buildOplogReplayRunArgs(cmdargs []string) (args oplogReplayRunArgs, err err
 		}
 	}
 
-	args.mongodbUrl, err = internal.GetRequiredSetting(internal.MongoDBUriSetting)
+	args.mongodbURL, err = internal.GetRequiredSetting(internal.MongoDBUriSetting)
 	if err != nil {
 		return
 	}
@@ -82,7 +82,8 @@ func buildOplogReplayRunArgs(cmdargs []string) (args oplogReplayRunArgs, err err
 		args.oplogAlwaysUpsert = &oplogAlwaysUpsert
 	}
 
-	if oplogApplicationMode, hasOplogApplicationMode := internal.GetSetting(internal.OplogReplayOplogApplicationMode); hasOplogApplicationMode {
+	if oplogApplicationMode, hasOplogApplicationMode := internal.GetSetting(
+		internal.OplogReplayOplogApplicationMode); hasOplogApplicationMode {
 		args.oplogApplicationMode = &oplogApplicationMode
 	}
 
@@ -99,10 +100,11 @@ func runOplogReplay(ctx context.Context, replayArgs oplogReplayRunArgs) error {
 	}
 
 	if replayArgs.oplogApplicationMode != nil {
-		mongoClientArgs = append(mongoClientArgs, client.OplogApplicationMode(client.OplogAppMode(*replayArgs.oplogApplicationMode)))
+		mongoClientArgs = append(mongoClientArgs,
+			client.OplogApplicationMode(client.OplogAppMode(*replayArgs.oplogApplicationMode)))
 	}
 
-	mongoClient, err := client.NewMongoClient(ctx, replayArgs.mongodbUrl, mongoClientArgs...)
+	mongoClient, err := client.NewMongoClient(ctx, replayArgs.mongodbURL, mongoClientArgs...)
 	if err != nil {
 		return err
 	}

@@ -15,7 +15,9 @@ type ZeroPageHeaderError struct {
 }
 
 func NewZeroPageHeaderError() error {
-	return ZeroPageHeaderError{errors.New("page header contains only zeroes, maybe it is a part .partial file or this page follow WAL-switch record")}
+	return ZeroPageHeaderError{
+		errors.New("page header contains only zeroes, " +
+			"maybe it is a part .partial file or this page follow WAL-switch record")}
 }
 
 func (err ZeroPageHeaderError) Error() string {

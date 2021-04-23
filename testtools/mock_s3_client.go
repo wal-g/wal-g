@@ -16,17 +16,18 @@ import (
 // ListObjects(*ListObjectsV2Input)
 // GetObject(*GetObjectInput)
 // HeadObject(*HeadObjectInput)
-type mockS3Client struct {
+type MockS3Client struct {
 	s3iface.S3API
 	err      bool
 	notFound bool
 }
 
-func NewMockS3Client(err, notFound bool) *mockS3Client {
-	return &mockS3Client{err: err, notFound: notFound}
+func NewMockS3Client(err, notFound bool) *MockS3Client {
+	return &MockS3Client{err: err, notFound: notFound}
 }
 
-func (client *mockS3Client) ListObjectsV2Pages(input *s3.ListObjectsV2Input, callback func(*s3.ListObjectsV2Output, bool) bool) error {
+func (client *MockS3Client) ListObjectsV2Pages(input *s3.ListObjectsV2Input,
+	callback func(*s3.ListObjectsV2Output, bool) bool) error {
 	if client.err {
 		return awserr.New("MockListObjects", "mock ListObjects errors", nil)
 	}
@@ -41,7 +42,7 @@ func (client *mockS3Client) ListObjectsV2Pages(input *s3.ListObjectsV2Input, cal
 	return nil
 }
 
-func (client *mockS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error) {
+func (client *MockS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error) {
 	if client.err {
 		return nil, awserr.New("MockGetObject", "mock GetObject error", nil)
 	}
@@ -53,7 +54,7 @@ func (client *mockS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOu
 	return output, nil
 }
 
-func (client *mockS3Client) HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjectOutput, error) {
+func (client *MockS3Client) HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjectOutput, error) {
 	if client.err {
 		return nil, awserr.New("MockHeadObject", "mock HeadObject error", nil)
 	} else if client.notFound {
