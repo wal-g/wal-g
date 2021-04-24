@@ -1,8 +1,11 @@
 package postgres
 
 import (
+	"os"
 	"sync"
 	"time"
+
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/wal-g/wal-g/internal"
 )
@@ -29,29 +32,28 @@ type BackupSentinelDto struct {
 	UserData interface{} `json:"UserData,omitempty"`
 }
 
-func NewBackupSentinelDto(bc *BackupHandler, tbsSpec *TablespaceSpec, tarFileSets TarFileSets) BackupSentinelDto {
+func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec, tarFileSets TarFileSets) BackupSentinelDto {
 	sentinel := BackupSentinelDto{
-		BackupStartLSN:   &bc.curBackupInfo.startLSN,
-		IncrementFromLSN: bc.prevBackupInfo.sentinelDto.BackupStartLSN,
-		PgVersion:        bc.pgInfo.pgVersion,
+		BackupStartLSN:   &bh.curBackupInfo.startLSN,
+		IncrementFromLSN: bh.prevBackupInfo.sentinelDto.BackupStartLSN,
+		PgVersion:        bh.pgInfo.pgVersion,
 		TablespaceSpec:   tbsSpec,
 	}
-	if bc.prevBackupInfo.sentinelDto.BackupStartLSN != nil {
-		sentinel.IncrementFrom = &bc.prevBackupInfo.name
-		if bc.prevBackupInfo.sentinelDto.IsIncremental() {
-			sentinel.IncrementFullName = bc.prevBackupInfo.sentinelDto.IncrementFullName
+	if bh.prevBackupInfo.sentinelDto.BackupStartLSN != nil {
+		sentinel.IncrementFrom = &bh.prevBackupInfo.name
+		if bh.prevBackupInfo.sentinelDto.IsIncremental() {
+			sentinel.IncrementFullName = bh.prevBackupInfo.sentinelDto.IncrementFullName
 		} else {
-			sentinel.IncrementFullName = &bc.prevBackupInfo.name
+			sentinel.IncrementFullName = &bh.prevBackupInfo.name
 		}
-		sentinel.IncrementCount = &bc.curBackupInfo.incrementCount
+		sentinel.IncrementCount = &bh.curBackupInfo.incrementCount
 	}
 
-	sentinel.setFiles(bc.workers.bundle.GetFiles())
-	sentinel.BackupFinishLSN = &bc.curBackupInfo.endLSN
-	sentinel.UserData = internal.UnmarshalSentinelUserData(bc.arguments.userData)
-	sentinel.SystemIdentifier = bc.pgInfo.systemIdentifier
-	sentinel.UncompressedSize = bc.curBackupInfo.uncompressedSize
-	sentinel.CompressedSize = bc.curBackupInfo.compressedSize
+	sentinel.BackupFinishLSN = &bh.curBackupInfo.endLSN
+	sentinel.UserData = internal.UnmarshalSentinelUserData(bh.arguments.userData)
+	sentinel.SystemIdentifier = bh.pgInfo.systemIdentifier
+	sentinel.UncompressedSize = bh.curBackupInfo.uncompressedSize
+	sentinel.CompressedSize = bh.curBackupInfo.compressedSize
 	sentinel.TarFileSets = tarFileSets
 	return sentinel
 }
@@ -73,6 +75,30 @@ type ExtendedMetadataDto struct {
 	CompressedSize   int64 `json:"compressed_size"`
 
 	UserData interface{} `json:"user_data,omitempty"`
+}
+
+func NewExtendedMetadataDto(isPermanent bool, dataDir string, startTime time.Time) (meta ExtendedMetadataDto, err error) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return meta, err
+	}
+	meta.DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
+	meta.StartTime = startTime
+	meta.Hostname = hostname
+	meta.IsPermanent = isPermanent
+	meta.DataDir = dataDir
+	return meta, err
+}
+
+func (meta *ExtendedMetadataDto) updateFromSentinel(sentinelDto BackupSentinelDto) {
+	meta.FinishTime = utility.TimeNowCrossPlatformUTC()
+	meta.StartLsn = *sentinelDto.BackupStartLSN
+	meta.FinishLsn = *sentinelDto.BackupFinishLSN
+	meta.PgVersion = sentinelDto.PgVersion
+	meta.SystemIdentifier = sentinelDto.SystemIdentifier
+	meta.UserData = sentinelDto.UserData
+	meta.UncompressedSize = sentinelDto.UncompressedSize
+	meta.CompressedSize = sentinelDto.CompressedSize
 }
 
 func (dto *BackupSentinelDto) setFiles(p *sync.Map) {
