@@ -256,13 +256,13 @@ If `FIND_FULL` is specified, WAL-G will calculate minimum backup needed to keep 
 Databases
 -----------
 ### PostgreSQL
-[Information about installing, configuration and usage](https://github.com/wal-g/wal-g/blob/master/PostgreSQL.md)
+[Information about installing, configuration and usage](PostgreSQL.md)
 
 ### MySQL/MariaDB
-[Information about installing, configuration and usage](https://github.com/wal-g/wal-g/blob/master/MySQL.md)
+[Information about installing, configuration and usage](MySQL.md)
 
 ### Mongo
-[Information about installing, configuration and usage](https://github.com/wal-g/wal-g/blob/master/MongoDB.md)
+[Information about installing, configuration and usage](MongoDB.md)
 
 Development
 -----------
@@ -286,7 +286,7 @@ make coverage
 This command generates `coverage.out` file and opens HTML representation of the coverage.
 ### Development on Windows
 
-[Information about installing and usage](https://github.com/wal-g/wal-g/blob/master/Windows.md)
+[Information about installing and usage](Windows.md)
 
 
 Authors
