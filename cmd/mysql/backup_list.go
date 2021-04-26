@@ -5,22 +5,41 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
+	"github.com/wal-g/wal-g/internal/databases/mysql"
 )
 
-const backupListShortDescription = "Prints available backups"
+const (
+	backupListShortDescription = "Prints available backups"
+	PrettyFlag                 = "pretty"
+	JSONFlag                   = "json"
+	DetailFlag                 = "detail"
+)
 
-// backupListCmd represents the backupList command
-var backupListCmd = &cobra.Command{
-	Use:   "backup-list",
-	Short: backupListShortDescription,
-	Args:  cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		folder, err := internal.ConfigureFolder()
-		tracelog.ErrorLogger.FatalOnError(err)
-		internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath), false, false)
-	},
-}
+var (
+	// backupListCmd represents the backupList command
+	backupListCmd = &cobra.Command{
+		Use:   "backup-list",
+		Short: backupListShortDescription,
+		Args:  cobra.NoArgs,
+		Run: func(cmd *cobra.Command, args []string) {
+			folder, err := internal.ConfigureFolder()
+			tracelog.ErrorLogger.FatalOnError(err)
+			if detail {
+				mysql.HandleDetailedBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, json)
+			} else {
+				internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, json)
+			}
+		},
+	}
+	json   = false
+	pretty = false
+	detail = false
+)
 
 func init() {
 	cmd.AddCommand(backupListCmd)
+
+	backupListCmd.Flags().BoolVar(&pretty, PrettyFlag, false, "Prints more readable output")
+	backupListCmd.Flags().BoolVar(&json, JSONFlag, false, "Prints output in json format")
+	backupListCmd.Flags().BoolVar(&detail, DetailFlag, false, "Prints extra backup details")
 }
