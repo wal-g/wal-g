@@ -24,10 +24,10 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			folder, err := internal.ConfigureFolder()
 			tracelog.ErrorLogger.FatalOnError(err)
-			if pretty || json || detail {
-				postgres.HandleBackupListWithFlags(folder.GetSubFolder(utility.BaseBackupPath), pretty, json, detail)
+			if detail {
+				postgres.HandleDetailedBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, json)
 			} else {
-				internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath))
+				internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, json)
 			}
 		},
 	}

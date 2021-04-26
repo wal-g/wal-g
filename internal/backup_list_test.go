@@ -15,12 +15,7 @@ import (
 
 func TestBackupListFindsBackups(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
-	internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath))
-}
-
-func TestBackupListFlagsFindsBackups(t *testing.T) {
-	folder := testtools.CreateMockStorageFolder()
-	postgres.HandleBackupListWithFlags(folder.GetSubFolder(utility.BaseBackupPath), true, false, false)
+	internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath), false, false)
 }
 
 var backups = []internal.BackupTime{
