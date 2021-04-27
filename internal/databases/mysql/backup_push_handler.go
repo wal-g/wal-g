@@ -10,7 +10,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
+func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPermanent bool) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 
 	db, err := getMySQLConnection()
@@ -49,6 +49,7 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
 		Hostname:         hostname,
 		CompressedSize:   *uploader.TarSize,
 		UncompressedSize: uncompressedSize,
+		IsPermanent:      isPermanent,
 	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())
 
