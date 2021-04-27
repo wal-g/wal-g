@@ -31,7 +31,7 @@ type BackupDetail struct {
 	Hostname         string `json:"hostname,omitempty"`
 
 	IsPermanent bool        `json:"is_permanent"`
-	UserData    interface{} `json:"user_data"`
+	UserData    interface{} `json:"user_data,omitempty"`
 }
 
 func NewBackupDetail(backupTime internal.BackupTime, sentinel StreamSentinelDto) BackupDetail {
