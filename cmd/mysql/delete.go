@@ -1,7 +1,6 @@
 package mysql
 
 import (
-	"path"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -114,44 +113,14 @@ func makeLessFunc(folder storage.Folder) func(object1, object2 storage.Object) b
 	return func(object1, object2 storage.Object) bool {
 		time1, ok := utility.TryFetchTimeRFC3999(object1.GetName())
 		if !ok {
-			return binlogLess(folder, object1, object2)
+			time1 = object1.GetLastModified().Format(utility.BackupTimeFormat)
 		}
 		time2, ok := utility.TryFetchTimeRFC3999(object2.GetName())
 		if !ok {
-			return binlogLess(folder, object1, object2)
+			time2 = object2.GetLastModified().Format(utility.BackupTimeFormat)
 		}
 		return time1 < time2
 	}
-}
-
-func binlogLess(folder storage.Folder, object1, object2 storage.Object) bool {
-	binlogName1, ok := tryFetchBinlogName(folder, object1)
-	if !ok {
-		return false
-	}
-	binlogName2, ok := tryFetchBinlogName(folder, object2)
-	if !ok {
-		return false
-	}
-	return binlogName1 < binlogName2
-}
-
-func tryFetchBinlogName(folder storage.Folder, object storage.Object) (string, bool) {
-	name := object.GetName()
-	if strings.HasPrefix(name, mysql.BinlogPath) {
-		_, name = path.Split(name)
-		return name, true
-	}
-	name = strings.Replace(name, utility.SentinelSuffix, "", 1)
-	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	backup := internal.NewBackup(baseBackupFolder, name)
-	var sentinel mysql.StreamSentinelDto
-	err := backup.FetchSentinel(&sentinel)
-	if err != nil {
-		tracelog.InfoLogger.Println("Fail to fetch stream sentinel " + name)
-		return "", false
-	}
-	return sentinel.BinLogStart, true
 }
 
 func permanentObjects(folder storage.Folder) map[string]bool {
