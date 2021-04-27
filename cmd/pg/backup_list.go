@@ -39,6 +39,8 @@ var (
 func init() {
 	cmd.AddCommand(backupListCmd)
 
+	// TODO: Merge similar backup-list functionality
+	// to avoid code duplication in command handlers
 	backupListCmd.Flags().BoolVar(&pretty, PrettyFlag, false, "Prints more readable output")
 	backupListCmd.Flags().BoolVar(&json, JSONFlag, false, "Prints output in json format")
 	backupListCmd.Flags().BoolVar(&detail, DetailFlag, false, "Prints extra backup details")
