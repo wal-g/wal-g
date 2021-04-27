@@ -1,5 +1,7 @@
 package internal
 
+// 'Sentinel' mean a 'file' with meta/external-info about backup (in some cases)
+
 import (
 	"bytes"
 	"encoding/json"
