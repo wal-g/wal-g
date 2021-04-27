@@ -1,7 +1,5 @@
 package internal
 
-// 'Sentinel' mean a 'file' with meta/external-info about backup (in some cases)
-
 import (
 	"bytes"
 	"encoding/json"
@@ -14,6 +12,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+//region errors
 type SentinelMarshallingError struct {
 	error
 }
@@ -26,8 +25,19 @@ func (err SentinelMarshallingError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
+//endregion
+
 // Backup provides basic functionality
 // to fetch backup-related information from storage
+//
+// WAL-G stores information about single backup in the following files:
+//
+// Sentinel file - contains useful information, such as backup start time, backup size, etc.
+// see FetchSentinel, UploadSentinel
+//
+// Metadata file (only in Postgres) - Postgres sentinel files can be quite large (> 1GB),
+// so the metadata file is useful for the quick fetch of backup-related information.
+// see FetchMetadata, UploadMetadata
 type Backup struct {
 	Name string
 	// base backup folder or catchup backup folder
