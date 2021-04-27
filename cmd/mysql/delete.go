@@ -62,20 +62,7 @@ type DeleteHandler struct {
 func runDeleteEverything(cmd *cobra.Command, args []string) {
 	deleteHandler, err := NewMySQLDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
-
-	if p := deleteHandler.permanentObjects; len(p) > 0 {
-		tracelog.InfoLogger.Fatalf("found permanent objects %s\n", strings.Join(func() []string {
-			ret := make([]string, 0)
-
-			for e := range p {
-				ret = append(ret, e)
-			}
-
-			return ret
-		}(), ","))
-	}
-
-	deleteHandler.DeleteEverything(confirmed)
+	deleteHandler.HandleDeleteEverything(args, deleteHandler.permanentObjects, confirmed)
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
