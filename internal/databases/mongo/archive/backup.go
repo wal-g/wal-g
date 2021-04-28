@@ -12,6 +12,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/utility"
 )
 
 // BackupInfoMarshalFunc defines sentinel unmarshal func
@@ -91,7 +92,7 @@ func (bl *TabbedBackupListing) Names(backups []internal.BackupTime, output io.Wr
 
 // MongoMetaProvider defines interface to collect backup mongo
 type MongoMetaProvider interface {
-	Init(permanent bool) error
+	Init() error
 	Finalize(backupName string) error
 	Meta() models.BackupMeta
 }
@@ -105,15 +106,27 @@ type MongoMetaDBProvider struct {
 	permanent bool
 }
 
-func NewBackupMetaMongoProvider(ctx context.Context,
-	mc client.MongoDriver,
-	folder storage.Folder) *MongoMetaDBProvider {
-	return &MongoMetaDBProvider{ctx: ctx, client: mc, folder: folder}
+func (m *MongoMetaDBProvider) MetaInfo() interface{} {
+	meta := m.Meta()
+	backupSentinel := &models.Backup{
+		StartLocalTime:  meta.StartTime,
+		FinishLocalTime: meta.FinishTime,
+		UserData:        meta.User,
+		MongoMeta:       meta.Mongo,
+		DataSize:        meta.DataSize,
+		Permanent:       meta.Permanent,
+	}
+	return backupSentinel
 }
 
-func (m *MongoMetaDBProvider) Init(permanent bool) error {
-	m.permanent = permanent
+func NewBackupMetaMongoProvider(ctx context.Context,
+	mc client.MongoDriver,
+	folder storage.Folder,
+	permanent bool) internal.MetaProvider {
+	return &MongoMetaDBProvider{ctx: ctx, client: mc, folder: folder, permanent: permanent}
+}
 
+func (m *MongoMetaDBProvider) Init() error {
 	lastTS, lastMajTS, err := m.client.LastWriteTS(m.ctx)
 	if err != nil {
 		return fmt.Errorf("can not initialize backup mongo")
@@ -121,6 +134,13 @@ func (m *MongoMetaDBProvider) Init(permanent bool) error {
 	m.mongo.Before = models.NodeMeta{
 		LastTS:    lastTS,
 		LastMajTS: lastMajTS,
+	}
+
+	m.meta = models.BackupMeta{
+		StartTime: utility.TimeNowCrossPlatformLocal(),
+		Mongo:     m.mongo,
+		Permanent: m.permanent,
+		User:      internal.GetSentinelUserData(),
 	}
 	return nil
 }
@@ -139,12 +159,8 @@ func (m *MongoMetaDBProvider) Finalize(backupName string) error {
 		LastTS:    lastTS,
 		LastMajTS: lastMajTS,
 	}
-	m.meta = models.BackupMeta{
-		Mongo:     m.mongo,
-		DataSize:  dataSize,
-		Permanent: m.permanent,
-		User:      internal.GetSentinelUserData(),
-	}
+	m.meta.FinishTime = utility.TimeNowCrossPlatformLocal()
+	m.meta.DataSize = dataSize
 	return nil
 }
 
