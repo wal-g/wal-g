@@ -206,7 +206,7 @@ type StorageUploader struct {
 
 // NewStorageUploader builds mongodb uploader.
 func NewStorageUploader(upl internal.UploaderProvider) *StorageUploader {
-	upl.DisableSizeTracking()
+	upl.DisableSizeTracking() // providing io.ReaderAt+io.ReadSeeker to s3 upload enables buffer pool usage
 	return &StorageUploader{upl, internal.ConfigureCrypter(), &bytes.Buffer{}}
 }
 
