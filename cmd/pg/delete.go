@@ -285,7 +285,7 @@ func getBackupStartTimeMap(folder storage.Folder, backups []storage.Object) (map
 	startTimeByBackupName := make(map[string]time.Time, len(backups))
 
 	for _, backupTime := range backupTimes {
-		backupDetails, err := postgres.GetBackupDetails(folder, backupTime)
+		backupDetails, err := postgres.GetBackupDetails(folder.GetSubFolder(utility.BaseBackupPath), backupTime)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Failed to get metadata of backup %s",
 				backupTime.BackupName)

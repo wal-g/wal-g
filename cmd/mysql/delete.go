@@ -156,7 +156,7 @@ func tryFetchBinlogName(folder storage.Folder, object storage.Object) (string, b
 
 func permanentObjects(folder storage.Folder) map[string]bool {
 	tracelog.InfoLogger.Println("retrieving permanent objects")
-	backupTimes, err := internal.GetBackups(folder)
+	backupTimes, err := internal.GetBackups(folder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return map[string]bool{}
 	}

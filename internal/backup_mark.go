@@ -99,7 +99,7 @@ func (h *BackupMarkHandler) getBackupsToMarkImpermanent(backupName string) ([]st
 		return nil, err
 	}
 
-	permanentBackups := GetPermanentBackups(h.storageRootFolder, h.metaInteractor)
+	permanentBackups := GetPermanentBackups(h.baseBackupFolder, h.metaInteractor)
 	//  del current backup from
 	delete(permanentBackups, backupName)
 
@@ -140,7 +140,7 @@ func backupHasPermanentInFuture(reverseLinks *map[string][]string,
 
 //return graph where nodes - backup names, edges - links from base backups to increment backups
 func (h *BackupMarkHandler) getGraphFromBaseToIncrement() (map[string][]string, error) {
-	backups, err := GetBackups(h.storageRootFolder)
+	backups, err := GetBackups(h.baseBackupFolder)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func GetPermanentBackups(folder storage.Folder, metaFetcher GenericMetaFetcher) 
 
 	permanentBackups := map[string]bool{}
 	for _, backupTime := range backupTimes {
-		meta, err := metaFetcher.Fetch(backupTime.BackupName, folder.GetSubFolder(utility.BaseBackupPath))
+		meta, err := metaFetcher.Fetch(backupTime.BackupName, folder)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("failed to fetch backup meta for backup %s with error %s, ignoring...",
 				backupTime.BackupName, err.Error())
