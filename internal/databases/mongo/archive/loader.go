@@ -23,16 +23,11 @@ var (
 	_ = []Purger{&StoragePurger{}}
 )
 
-// ErrWaiter
-type ErrWaiter interface {
-	Wait() error
-}
-
 // Uploader defines interface to store mongodb backups and oplog archives
 type Uploader interface {
 	UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error // TODO: rename firstTS
 	UploadGapArchive(err error, firstTS, lastTS models.Timestamp) error
-	UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider MongoMetaProvider) error
+	UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaProvider MongoMetaProvider) error
 }
 
 // Downloader defines interface to fetch mongodb oplog archives
@@ -192,7 +187,7 @@ func (d *DiscardUploader) UploadGapArchive(err error, firstTS, lastTS models.Tim
 }
 
 // UploadBackup is not implemented yet
-func (d *DiscardUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider MongoMetaProvider) error {
+func (d *DiscardUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaProvider MongoMetaProvider) error {
 	panic("implement me")
 }
 
@@ -200,7 +195,7 @@ func (d *DiscardUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaProv
 // is NOT thread-safe
 type StorageUploader struct {
 	internal.UploaderProvider
-	crypter crypto.Crypter
+	crypter crypto.Crypter // usages only in UploadOplogArchive
 	buf     *bytes.Buffer
 }
 
@@ -246,7 +241,7 @@ func (su *StorageUploader) UploadGapArchive(archErr error, firstTS, lastTS model
 }
 
 // UploadBackup compresses a stream and uploads it.
-func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider MongoMetaProvider) error {
+func (su *StorageUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaProvider MongoMetaProvider) error {
 	timeStart := utility.TimeNowCrossPlatformLocal()
 	backupName, err := su.PushStream(stream)
 	if err != nil {

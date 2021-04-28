@@ -171,3 +171,7 @@ func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupNa
 
 	return uploader.Upload(sentinelName, bytes.NewReader(dtoBody))
 }
+
+type ErrWaiter interface {
+	Wait() error
+}
