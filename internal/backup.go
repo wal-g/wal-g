@@ -175,3 +175,9 @@ func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupNa
 type ErrWaiter interface {
 	Wait() error
 }
+
+type MetaProvider interface {
+	Init() error
+	Finalize(backupName string) error
+	MetaInfo() interface{}
+}
