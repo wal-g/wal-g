@@ -23,7 +23,7 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
-	uncompressedSize := int64(0)
+	uncompressedSize := int64(0) // TODO use uploader.originalSize
 	streamReader := internal.NewWithSizeReader(limiters.NewDiskLimitReader(stdout), &uncompressedSize)
 	fileName, err := uploader.PushStream(streamReader)
 	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
