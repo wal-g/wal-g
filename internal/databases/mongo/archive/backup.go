@@ -126,7 +126,7 @@ func (m *MongoMetaDBProvider) Init(permanent bool) error {
 }
 
 func (m *MongoMetaDBProvider) Finalize(backupName string) error {
-	dataSize, err := FolderSize(m.folder, backupName)
+	dataSize, err := internal.FolderSize(m.folder, backupName)
 	if err != nil {
 		return fmt.Errorf("can not get backup size: %+v", err)
 	}
@@ -150,16 +150,4 @@ func (m *MongoMetaDBProvider) Finalize(backupName string) error {
 
 func (m *MongoMetaDBProvider) Meta() models.BackupMeta {
 	return m.meta
-}
-
-func FolderSize(folder storage.Folder, path string) (int64, error) {
-	dataObjects, _, err := folder.GetSubFolder(path).ListFolder()
-	if err != nil {
-		return 0, err
-	}
-	var size int64
-	for _, obj := range dataObjects {
-		size += obj.GetSize()
-	}
-	return size, nil
 }
