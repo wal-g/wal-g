@@ -167,7 +167,7 @@ func (bb *StreamingBaseBackup) Upload(uploader *WalUploader) (err error) {
 func (bb *StreamingBaseBackup) BackupName() string {
 	// Example base_00000001000000000000006A
 	// For now this is hardcoded to wal segments of 16MB, which is probably fine in all cases for backup path
-	segID := uint64(bb.StartLSN) / uint64(16777216)
+	segID := uint64(bb.StartLSN) / WalSegmentSize
 	return fmt.Sprintf("base_%08X%016X", bb.TimeLine, segID)
 }
 

@@ -23,18 +23,6 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-type sentinelMarshallingError struct {
-	error
-}
-
-func newSentinelMarshallingError(sentinelName string, err error) sentinelMarshallingError {
-	return sentinelMarshallingError{errors.Wrapf(err, "Failed to marshall sentinel file: '%s'", sentinelName)}
-}
-
-func (err sentinelMarshallingError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
 type backupFromFuture struct {
 	error
 }
@@ -73,17 +61,21 @@ type BackupArguments struct {
 	deltaBaseSelector     internal.BackupSelector
 }
 
-// BackupInfo holds all information that is harvest during the backup process
-type BackupInfo struct {
+// CurBackupInfo holds all information that is harvest during the backup process
+type CurBackupInfo struct {
 	name             string
-	sentinelDto      BackupSentinelDto
-	meta             ExtendedMetadataDto
 	startTime        time.Time
 	startLSN         uint64
 	endLSN           uint64
 	uncompressedSize int64
 	compressedSize   int64
 	incrementCount   int
+}
+
+// PrevBackupInfo holds all information that is harvest during the backup process
+type PrevBackupInfo struct {
+	name        string
+	sentinelDto BackupSentinelDto
 }
 
 // BackupWorkers holds the external objects that the handler uses to get the backup data / write the backup data
@@ -102,8 +94,8 @@ type BackupPgInfo struct {
 
 // BackupHandler is the main struct which is handling the backup process
 type BackupHandler struct {
-	curBackupInfo  BackupInfo
-	prevBackupInfo BackupInfo
+	curBackupInfo  CurBackupInfo
+	prevBackupInfo PrevBackupInfo
 	arguments      BackupArguments
 	workers        BackupWorkers
 	pgInfo         BackupPgInfo
@@ -159,9 +151,9 @@ func (bh *BackupHandler) createAndPushBackup() {
 	tracelog.ErrorLogger.FatalOnError(err)
 	bh.handleDeltaBackup(folder)
 	tarFileSets := bh.uploadBackup()
-	bh.setupDTO(tarFileSets)
-	bh.markBackups(folder)
-	bh.uploadMetadata()
+	sentinelDto := bh.setupDTO(tarFileSets)
+	bh.markBackups(folder, sentinelDto)
+	bh.uploadMetadata(sentinelDto)
 
 	// logging backup set name
 	tracelog.InfoLogger.Printf("Wrote backup with name %s", bh.curBackupInfo.name)
@@ -216,19 +208,20 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
 	}
 }
 
-func (bh *BackupHandler) setupDTO(tarFileSets TarFileSets) {
+func (bh *BackupHandler) setupDTO(tarFileSets TarFileSets) (sentinelDto BackupSentinelDto) {
 	var tablespaceSpec *TablespaceSpec
 	if !bh.workers.bundle.TablespaceSpec.empty() {
 		tablespaceSpec = &bh.workers.bundle.TablespaceSpec
 	}
-	bh.curBackupInfo.sentinelDto = NewBackupSentinelDto(bh, tablespaceSpec, tarFileSets)
-	bh.curBackupInfo.sentinelDto.setFiles(bh.workers.bundle.GetFiles())
+	sentinelDto = NewBackupSentinelDto(bh, tablespaceSpec, tarFileSets)
+	sentinelDto.setFiles(bh.workers.bundle.GetFiles())
+	return sentinelDto
 }
 
-func (bh *BackupHandler) markBackups(folder storage.Folder) {
+func (bh *BackupHandler) markBackups(folder storage.Folder, sentinelDto BackupSentinelDto) {
 	// If pushing permanent delta backup, mark all previous backups permanent
 	// Do this before uploading current meta to ensure that backups are marked in increasing order
-	if bh.arguments.isPermanent && bh.curBackupInfo.sentinelDto.IsIncremental() {
+	if bh.arguments.isPermanent && sentinelDto.IsIncremental() {
 		markBackupHandler := internal.NewBackupMarkHandler(NewGenericMetaInteractor(), folder)
 		markBackupHandler.MarkBackup(bh.prevBackupInfo.name, true)
 	}
@@ -348,24 +341,23 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	bh.curBackupInfo.uncompressedSize = baseBackup.UncompressedSize
 	bh.curBackupInfo.compressedSize, err = bh.workers.uploader.UploadedDataSize()
 	tracelog.ErrorLogger.FatalOnError(err)
-
-	bh.curBackupInfo.sentinelDto = NewBackupSentinelDto(bh, baseBackup.GetTablespaceSpec(), TarFileSets{})
-	bh.curBackupInfo.sentinelDto.Files = baseBackup.Files
+	sentinelDto := NewBackupSentinelDto(bh, baseBackup.GetTablespaceSpec(), TarFileSets{})
+	sentinelDto.Files = baseBackup.Files
 	bh.curBackupInfo.name = baseBackup.BackupName()
 	tracelog.InfoLogger.Println("Uploading metadata")
-	bh.uploadMetadata()
+	bh.uploadMetadata(sentinelDto)
 	// logging backup set name
 	tracelog.InfoLogger.Printf("Wrote backup with name %s", bh.curBackupInfo.name)
 }
 
-func (bh *BackupHandler) uploadMetadata() {
+func (bh *BackupHandler) uploadMetadata(sentinelDto BackupSentinelDto) {
 	curBackupName := bh.curBackupInfo.name
-	err := bh.uploadExtendedMetadata()
+	err := bh.uploadExtendedMetadata(sentinelDto)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload metadata file for backup: %s %v", curBackupName, err)
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	err = internal.UploadSentinel(bh.workers.uploader, bh.curBackupInfo.sentinelDto, bh.curBackupInfo.name)
+	err = internal.UploadSentinel(bh.workers.uploader, sentinelDto, bh.curBackupInfo.name)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", curBackupName)
 		tracelog.ErrorLogger.FatalError(err)
@@ -437,28 +429,6 @@ func (bh *BackupHandler) runRemoteBackup() *StreamingBaseBackup {
 	err = conn.Close(context.Background())
 	tracelog.ErrorLogger.FatalOnError(err)
 	return baseBackup
-}
-
-func (bc *BackupHandler) updateMetaData(startLSN uint64, bb *StreamingBaseBackup) {
-	backupFinishLSN := uint64(bb.EndLSN)
-	compressedSize, err := bc.workers.uploader.UploadedDataSize()
-	tracelog.ErrorLogger.FatalOnError(err)
-	bc.curBackupInfo.sentinelDto = BackupSentinelDto{
-		BackupStartLSN:   &startLSN,
-		PgVersion:        bc.pgInfo.pgVersion,
-		BackupFinishLSN:  &backupFinishLSN,
-		TablespaceSpec:   bb.GetTablespaceSpec(),
-		UserData:         internal.GetSentinelUserData(),
-		SystemIdentifier: &startLSN,
-		UncompressedSize: bb.UncompressedSize,
-		CompressedSize:   compressedSize,
-		Files:            bb.Files,
-	}
-	meta := &bc.curBackupInfo.meta
-	meta.SystemIdentifier = &startLSN
-	meta.FinishLsn = uint64(bb.EndLSN)
-	meta.FinishTime = utility.TimeNowCrossPlatformUTC()
-	bc.curBackupInfo.name = bb.BackupName()
 }
 
 func getPgServerInfo() (pgInfo BackupPgInfo, err error) {
@@ -573,18 +543,18 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 }
 
 // TODO : unit tests
-func (bh *BackupHandler) uploadExtendedMetadata() (err error) {
-	bh.curBackupInfo.meta, err = NewExtendedMetadataDto(bh.arguments.isPermanent, bh.pgInfo.pgDataDirectory,
+func (bh *BackupHandler) uploadExtendedMetadata(sentinelDto BackupSentinelDto) (err error) {
+	meta, err := NewExtendedMetadataDto(bh.arguments.isPermanent, bh.pgInfo.pgDataDirectory,
 		bh.curBackupInfo.startTime)
 	if err != nil {
 		return err
 	}
-	bh.curBackupInfo.meta.updateFromSentinel(bh.curBackupInfo.sentinelDto)
+	meta.updateFromSentinel(sentinelDto)
 
 	metaFile := storage.JoinPath(bh.curBackupInfo.name, utility.MetadataFileName)
-	dtoBody, err := json.Marshal(bh.curBackupInfo.meta)
+	dtoBody, err := json.Marshal(meta)
 	if err != nil {
-		return newSentinelMarshallingError(metaFile, err)
+		return internal.NewSentinelMarshallingError(metaFile, err)
 	}
 	tracelog.DebugLogger.Printf("Uploading metadata file (%s):\n%s", metaFile, dtoBody)
 	return bh.workers.uploader.Upload(metaFile, bytes.NewReader(dtoBody))
