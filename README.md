@@ -3,7 +3,7 @@
 ![Unit-tests-status](https://github.com/wal-g/wal-g/workflows/Unit%20tests/badge.svg)
 [![Go Report Card](https://goreportcard.com/badge/github.com/wal-g/wal-g)](https://goreportcard.com/report/github.com/wal-g/wal-g)
 
-Full documentation can be found at ["wal-g.readthedocs.io"](wal-g.readthedocs.io)
+[Full documentation can be found here](https://wal-g.readthedocs.io)
 
 WAL-G is an archival restoration tool for Postgres(beta for MySQL, MariaDB, and MongoDB)
 
