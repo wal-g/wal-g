@@ -32,6 +32,7 @@ type Uploader struct {
 	ArchiveStatusManager asm.ArchiveStatusManager
 	Failed               atomic.Value
 	TarSize              *int64
+	OriginalSize         *int64
 }
 
 // UploadObject
@@ -44,12 +45,12 @@ func NewUploader(
 	compressor compression.Compressor,
 	uploadingLocation storage.Folder,
 ) *Uploader {
-	size := int64(0)
 	uploader := &Uploader{
 		UploadingFolder: uploadingLocation,
 		Compressor:      compressor,
 		waitGroup:       &sync.WaitGroup{},
-		TarSize:         &size,
+		TarSize:         new(int64),
+		OriginalSize:    new(int64),
 	}
 	uploader.Failed.Store(false)
 	return uploader
@@ -73,14 +74,21 @@ func (uploader *Uploader) Clone() *Uploader {
 		ArchiveStatusManager: uploader.ArchiveStatusManager,
 		Failed:               uploader.Failed,
 		TarSize:              uploader.TarSize,
+		OriginalSize:         uploader.OriginalSize,
 	}
 }
 
 // TODO : unit tests
 // UploadFile compresses a file and uploads it.
 func (uploader *Uploader) UploadFile(file ioextensions.NamedReader) error {
-	compressedFile := CompressAndEncrypt(file, uploader.Compressor, ConfigureCrypter())
-	dstPath := utility.SanitizePath(filepath.Base(file.Name()) + "." + uploader.Compressor.FileExtension())
+	filename := file.Name()
+
+	fileReader := file.(io.Reader)
+	if uploader.OriginalSize != nil {
+		fileReader = NewWithSizeReader(fileReader, uploader.OriginalSize)
+	}
+	compressedFile := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter())
+	dstPath := utility.SanitizePath(filepath.Base(filename) + "." + uploader.Compressor.FileExtension())
 
 	err := uploader.Upload(dstPath, compressedFile)
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
@@ -90,6 +98,7 @@ func (uploader *Uploader) UploadFile(file ioextensions.NamedReader) error {
 // DisableSizeTracking stops bandwidth tracking
 func (uploader *Uploader) DisableSizeTracking() {
 	uploader.TarSize = nil
+	uploader.OriginalSize = nil
 }
 
 // Compression returns configured compressor
@@ -100,7 +109,7 @@ func (uploader *Uploader) Compression() compression.Compressor {
 // TODO : unit tests
 func (uploader *Uploader) Upload(path string, content io.Reader) error {
 	if uploader.TarSize != nil {
-		content = &WithSizeReader{content, uploader.TarSize}
+		content = NewWithSizeReader(content, uploader.TarSize)
 	}
 	err := uploader.UploadingFolder.PutObject(path, content)
 	if err == nil {
