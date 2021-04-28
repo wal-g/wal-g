@@ -32,36 +32,36 @@ make mysql_install
 Configuration
 -------------
 
-### `WALG_MYSQL_DATASOURCE_NAME`
+* `WALG_MYSQL_DATASOURCE_NAME`
 
 To configure the connection string for MySQL. Required. Format ```user:password@host/dbname```
 
-### `WALG_MYSQL_SSL_CA`
+* `WALG_MYSQL_SSL_CA`
 
 To use SSL, a path to file with certificates should be set to this variable.
 
-###  `WALG_STREAM_CREATE_COMMAND`
+*  `WALG_STREAM_CREATE_COMMAND`
 
 Command to create MySQL backup, should return backup as single stream to STDOUT. Requried.
 
-###  `WALG_STREAM_RESTORE_COMMAND`
+*  `WALG_STREAM_RESTORE_COMMAND`
 
 Command to unpack MySQL backup, should take backup (created by `WALG_STREAM_CREATE_COMMAND`) 
 to STDIN and unpack it to MySQL datadir. Required.
 
-### `WALG_MYSQL_BACKUP_PREPARE_COMMAND`
+* `WALG_MYSQL_BACKUP_PREPARE_COMMAND`
 
 Command to prepare MySQL backup after restoring. Optional. Needed for xtrabackup case.
 
-### `WALG_MYSQL_BINLOG_REPLAY_COMMAND`
+* `WALG_MYSQL_BINLOG_REPLAY_COMMAND`
 
 Command to replay binlog on runing MySQL. Required for binlog-fetch command.
 
-### `WALG_MYSQL_BINLOG_DST`
+* `WALG_MYSQL_BINLOG_DST`
 
 To place binlogs in the specified directory during binlog-fetch or binlog-replay
 
-### `WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER`
+* `WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER`
 
 Set this variable to True if you are planning to take base backup from replica and binlog backup from master.
 If base and binlogs backups are taken from the same host, this variable should be left False (default).
