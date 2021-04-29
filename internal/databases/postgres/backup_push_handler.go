@@ -175,9 +175,8 @@ func uploadBackup(
 	labelFilesTarBallName, labelFilesList, finishLsn, err := bundle.uploadLabelFiles(conn)
 	tracelog.ErrorLogger.FatalOnError(err)
 	uncompressedSize := atomic.LoadInt64(bundle.TarBallQueue.AllTarballsSize)
-	rawSize, err := bc.uploader.UploadedDataSize()
+	compressedSize, err := bc.uploader.UploadedDataSize()
 	tracelog.ErrorLogger.FatalOnError(err)
-	compressedSize := atomic.LoadInt64(&rawSize)
 	tarFileSets[labelFilesTarBallName] = append(tarFileSets[labelFilesTarBallName], labelFilesList...)
 	timelineChanged := bundle.checkTimelineChanged(conn)
 
