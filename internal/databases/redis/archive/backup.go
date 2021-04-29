@@ -22,7 +22,7 @@ type Backup struct {
 	BackupSize      int64       `json:"BackupSize,omitempty"`
 }
 
-// BackupMeta includes mongodb and storage metadata
+// BackupMeta stores the data needed to create a Backup json object
 type BackupMeta struct {
 	DataSize       int64
 	CompressedSize int64
