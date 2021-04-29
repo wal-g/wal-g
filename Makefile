@@ -93,7 +93,7 @@ load_docker_common:
 mysql_integration_test: deps mysql_build unlink_brotli load_docker_common
 	./link_brotli.sh
 	docker-compose build mysql $(MYSQL_TEST)
-	docker-compose up --exit-code-from $(MYSQL_TEST) $(MYSQL_TEST)
+	docker-compose up --force-recreate --exit-code-from $(MYSQL_TEST) $(MYSQL_TEST)
 
 mysql_clean:
 	(cd $(MAIN_MYSQL_PATH) && go clean)
@@ -106,7 +106,7 @@ mariadb_test: deps mysql_build unlink_brotli mariadb_integration_test
 
 mariadb_integration_test: load_docker_common
 	docker-compose build mariadb mariadb_tests
-	docker-compose up --exit-code-from mariadb_tests mariadb_tests
+	docker-compose up --force-recreate --exit-code-from mariadb_tests mariadb_tests
 
 mongo_test: deps mongo_build unlink_brotli
 
