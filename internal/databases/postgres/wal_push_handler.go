@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/wal-g/wal-g/internal"
@@ -49,11 +50,15 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 
 	totalBgUploadedLimit := viper.GetInt32(internal.TotalBgUploadedLimit)
 	preventWalOverwrite := viper.GetBool(internal.PreventWalOverwriteSetting)
+	ReadyRename := viper.GetBool(internal.PGReadyRename)
 
-	bgUploader := NewBgUploader(walFilePath, int32(concurrency-1), totalBgUploadedLimit-1, uploader, preventWalOverwrite)
+	bgUploader := NewBgUploader(walFilePath, int32(concurrency-1), totalBgUploadedLimit-1, uploader, preventWalOverwrite, ReadyRename)
 	// Look for new WALs while doing main upload
 	bgUploader.Start()
-	err = uploadWALFile(uploader, walFilePath, bgUploader.preventWalOverwrite)
+
+	// do not rename the status file for the first WAL segment in a batch
+	// to avoid flooding the PostgreSQL logs with unnecessary warnings
+	err = uploadWALFile(uploader, walFilePath, bgUploader.preventWalOverwrite, false)
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = uploadLocalWalMetadata(walFilePath, uploader.Uploader)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -68,7 +73,7 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 
 // TODO : unit tests
 // uploadWALFile from FS to the cloud
-func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrite bool) error {
+func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrite bool, ReadyRename bool) error {
 	if preventWalOverwrite {
 		overwriteAttempt, err := checkWALOverwrite(uploader, walFilePath)
 		if overwriteAttempt {
@@ -82,7 +87,24 @@ func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrit
 		return errors.Wrapf(err, "upload: could not open '%s'\n", walFilePath)
 	}
 	err = uploader.UploadWalFile(walFile)
-	return errors.Wrapf(err, "upload: could not Upload '%s'\n", walFilePath)
+
+	if err != nil {
+		return errors.Wrapf(err, "upload: could not Upload '%s'\n", walFilePath)
+	}
+
+	// rename WAL status file ".ready" to ".done" if requiested
+	if ReadyRename && err == nil {
+
+		var WALFileName = filepath.Base(walFilePath)
+		var ReadyPath = path.Join(getWalFolderPath(), "archive_status", WALFileName+".ready")
+		var DonePath = path.Join(getWalFolderPath(), "archive_status", WALFileName+".done")
+
+		// error here is not a fatal thing
+		err = os.Rename(ReadyPath, DonePath)
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
+
+	return nil
 }
 
 // TODO : unit tests
