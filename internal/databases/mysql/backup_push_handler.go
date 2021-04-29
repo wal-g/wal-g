@@ -23,9 +23,7 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
-	uncompressedSize := int64(0) // TODO use uploader.originalSize
-	streamReader := internal.NewWithSizeReader(limiters.NewDiskLimitReader(stdout), &uncompressedSize)
-	fileName, err := uploader.PushStream(streamReader)
+	fileName, err := uploader.PushStream(limiters.NewDiskLimitReader(stdout))
 	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
 
 	err = backupCmd.Wait()
@@ -47,8 +45,8 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 		StartLocalTime:   timeStart,
 		StopLocalTime:    timeStop,
 		Hostname:         hostname,
-		CompressedSize:   *uploader.TarSize,
-		UncompressedSize: uncompressedSize,
+		CompressedSize:   *uploader.GetBackupSize(),
+		UncompressedSize: *uploader.GetDataSize(),
 		IsPermanent:      isPermanent,
 	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())

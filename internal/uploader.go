@@ -21,6 +21,8 @@ type UploaderProvider interface {
 	PushStreamToDestination(stream io.Reader, dstPath string) error
 	Compression() compression.Compressor
 	DisableSizeTracking()
+	GetBackupSize() *int64
+	GetDataSize() *int64
 }
 
 // Uploader contains fields associated with uploading tarballs.
@@ -31,8 +33,8 @@ type Uploader struct {
 	waitGroup            *sync.WaitGroup
 	ArchiveStatusManager asm.ArchiveStatusManager
 	Failed               atomic.Value
-	TarSize              *int64
-	OriginalSize         *int64
+	tarSize              *int64
+	dataSize             *int64
 }
 
 // UploadObject
@@ -49,11 +51,21 @@ func NewUploader(
 		UploadingFolder: uploadingLocation,
 		Compressor:      compressor,
 		waitGroup:       &sync.WaitGroup{},
-		TarSize:         new(int64),
-		OriginalSize:    new(int64),
+		tarSize:         new(int64),
+		dataSize:        new(int64),
 	}
 	uploader.Failed.Store(false)
 	return uploader
+}
+
+// GetBackupSize returns nil when SizeTracking disabled see DisableSizeTracking
+func (uploader *Uploader) GetBackupSize() *int64 {
+	return uploader.tarSize
+}
+
+// GetDataSize returns nil when SizeTracking disabled see DisableSizeTracking
+func (uploader *Uploader) GetDataSize() *int64 {
+	return uploader.dataSize
 }
 
 // Finish waits for all waiting parts to be uploaded. If an error occurs,
@@ -73,8 +85,8 @@ func (uploader *Uploader) Clone() *Uploader {
 		waitGroup:            &sync.WaitGroup{},
 		ArchiveStatusManager: uploader.ArchiveStatusManager,
 		Failed:               uploader.Failed,
-		TarSize:              uploader.TarSize,
-		OriginalSize:         uploader.OriginalSize,
+		tarSize:              uploader.tarSize,
+		dataSize:             uploader.dataSize,
 	}
 }
 
@@ -84,8 +96,8 @@ func (uploader *Uploader) UploadFile(file ioextensions.NamedReader) error {
 	filename := file.Name()
 
 	fileReader := file.(io.Reader)
-	if uploader.OriginalSize != nil {
-		fileReader = NewWithSizeReader(fileReader, uploader.OriginalSize)
+	if uploader.dataSize != nil {
+		fileReader = NewWithSizeReader(fileReader, uploader.dataSize)
 	}
 	compressedFile := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter())
 	dstPath := utility.SanitizePath(filepath.Base(filename) + "." + uploader.Compressor.FileExtension())
@@ -97,8 +109,8 @@ func (uploader *Uploader) UploadFile(file ioextensions.NamedReader) error {
 
 // DisableSizeTracking stops bandwidth tracking
 func (uploader *Uploader) DisableSizeTracking() {
-	uploader.TarSize = nil
-	uploader.OriginalSize = nil
+	uploader.tarSize = nil
+	uploader.dataSize = nil
 }
 
 // Compression returns configured compressor
@@ -108,8 +120,8 @@ func (uploader *Uploader) Compression() compression.Compressor {
 
 // TODO : unit tests
 func (uploader *Uploader) Upload(path string, content io.Reader) error {
-	if uploader.TarSize != nil {
-		content = NewWithSizeReader(content, uploader.TarSize)
+	if uploader.tarSize != nil {
+		content = NewWithSizeReader(content, uploader.tarSize)
 	}
 	err := uploader.UploadingFolder.PutObject(path, content)
 	if err == nil {
