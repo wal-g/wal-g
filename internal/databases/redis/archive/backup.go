@@ -32,15 +32,15 @@ type BackupMeta struct {
 	FinishTime     time.Time
 }
 
-type RedisMetaDBProvider struct {
+type RedisMetaConstructor struct {
 	ctx       context.Context
 	folder    storage.Folder
 	meta      BackupMeta
 	permanent bool
 }
 
-// Init - required for internal.MetaProvider
-func (m *RedisMetaDBProvider) Init() error {
+// Init - required for internal.MetaConstructor
+func (m *RedisMetaConstructor) Init() error {
 	m.meta = BackupMeta{
 		Permanent: m.permanent,
 		User:      internal.GetSentinelUserData(),
@@ -49,7 +49,7 @@ func (m *RedisMetaDBProvider) Init() error {
 	return nil
 }
 
-func (m *RedisMetaDBProvider) MetaInfo() interface{} {
+func (m *RedisMetaConstructor) MetaInfo() interface{} {
 	meta := m.meta
 	return &Backup{
 		Permanent:       meta.Permanent,
@@ -59,13 +59,13 @@ func (m *RedisMetaDBProvider) MetaInfo() interface{} {
 	}
 }
 
-func (m *RedisMetaDBProvider) Finalize(backupName string) error {
+func (m *RedisMetaConstructor) Finalize(backupName string) error {
 	m.meta.FinishTime = utility.TimeNowCrossPlatformLocal()
 	return nil
 }
 
-func NewBackupMetaRedisProvider(ctx context.Context, folder storage.Folder, permanent bool) internal.MetaProvider {
-	return &RedisMetaDBProvider{ctx: ctx, folder: folder, permanent: permanent}
+func NewBackupRedisMetaConstructor(ctx context.Context, folder storage.Folder, permanent bool) internal.MetaConstructor {
+	return &RedisMetaConstructor{ctx: ctx, folder: folder, permanent: permanent}
 }
 
 type StorageUploader struct {
@@ -78,8 +78,8 @@ func NewRedisStorageUploader(upl *internal.Uploader) *StorageUploader {
 }
 
 // UploadBackup compresses a stream and uploads it, and uploads meta info
-func (su *StorageUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaProvider internal.MetaProvider) error {
-	err := metaProvider.Init()
+func (su *StorageUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error {
+	err := metaConstructor.Init()
 	if err != nil {
 		return fmt.Errorf("can not init meta provider: %+v", err)
 	}
@@ -93,11 +93,11 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter
 		return fmt.Errorf("backup command failed: %+v", err)
 	}
 
-	if err := metaProvider.Finalize(dstPath); err != nil {
+	if err := metaConstructor.Finalize(dstPath); err != nil {
 		return fmt.Errorf("can not finalize meta provider: %+v", err)
 	}
 
-	backupSentinelInfo := metaProvider.MetaInfo()
+	backupSentinelInfo := metaConstructor.MetaInfo()
 
 	uploadedSize, uploadedErr := su.UploadedDataSize()
 	rawSize, rawErr := su.RawDataSize()

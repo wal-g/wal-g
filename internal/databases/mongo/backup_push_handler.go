@@ -11,9 +11,9 @@ import (
 
 // HandleBackupPush starts backup procedure.
 func HandleBackupPush(uploader archive.Uploader,
-	metaProvider internal.MetaProvider,
+	metaConstructor internal.MetaConstructor,
 	backupCmd *exec.Cmd) error {
-	if err := metaProvider.Init(); err != nil {
+	if err := metaConstructor.Init(); err != nil {
 		return fmt.Errorf("can not initiate meta provider: %+v", err)
 	}
 
@@ -22,5 +22,5 @@ func HandleBackupPush(uploader archive.Uploader,
 		return fmt.Errorf("can not start backup command: %+v", err)
 	}
 
-	return uploader.UploadBackup(stdout, backupCmd, metaProvider)
+	return uploader.UploadBackup(stdout, backupCmd, metaConstructor)
 }
