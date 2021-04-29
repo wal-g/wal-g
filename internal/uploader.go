@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"io"
 	"path/filepath"
 	"sync"
@@ -14,6 +15,8 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+var ErrorSizeTrackingDisabled = fmt.Errorf("size tracking disabled by DisableSizeTracking method")
+
 type UploaderProvider interface {
 	Upload(path string, content io.Reader) error
 	UploadFile(file ioextensions.NamedReader) error
@@ -21,8 +24,8 @@ type UploaderProvider interface {
 	PushStreamToDestination(stream io.Reader, dstPath string) error
 	Compression() compression.Compressor
 	DisableSizeTracking()
-	GetBackupSize() *int64
-	GetDataSize() *int64
+	UploadedDataSize() (int64, error)
+	RawDataSize() (int64, error)
 }
 
 // Uploader contains fields associated with uploading tarballs.
@@ -59,13 +62,19 @@ func NewUploader(
 }
 
 // GetBackupSize returns nil when SizeTracking disabled see DisableSizeTracking
-func (uploader *Uploader) GetBackupSize() *int64 {
-	return uploader.tarSize
+func (uploader *Uploader) UploadedDataSize() (int64, error) {
+	if uploader.tarSize == nil {
+		return 0, ErrorSizeTrackingDisabled
+	}
+	return *uploader.tarSize, nil
 }
 
 // GetDataSize returns nil when SizeTracking disabled see DisableSizeTracking
-func (uploader *Uploader) GetDataSize() *int64 {
-	return uploader.dataSize
+func (uploader *Uploader) RawDataSize() (int64, error) {
+	if uploader.dataSize == nil {
+		return 0, ErrorSizeTrackingDisabled
+	}
+	return *uploader.dataSize, nil
 }
 
 // Finish waits for all waiting parts to be uploaded. If an error occurs,
