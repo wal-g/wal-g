@@ -23,16 +23,11 @@ var (
 	_ = []Purger{&StoragePurger{}}
 )
 
-// ErrWaiter
-type ErrWaiter interface {
-	Wait() error
-}
-
 // Uploader defines interface to store mongodb backups and oplog archives
 type Uploader interface {
 	UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error // TODO: rename firstTS
 	UploadGapArchive(err error, firstTS, lastTS models.Timestamp) error
-	UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider MongoMetaProvider) error
+	UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error
 }
 
 // Downloader defines interface to fetch mongodb oplog archives
@@ -78,14 +73,17 @@ func NewStorageDownloader(opts StorageSettings) (*StorageDownloader, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &StorageDownloader{rootFolder: folder, oplogsFolder: folder.GetSubFolder(opts.oplogsPath), backupsFolder: folder.GetSubFolder(opts.backupsPath)}, nil
+	return &StorageDownloader{rootFolder: folder,
+			oplogsFolder:  folder.GetSubFolder(opts.oplogsPath),
+			backupsFolder: folder.GetSubFolder(opts.backupsPath)},
+		nil
 }
 
 // BackupMeta downloads sentinel contents.
 func (sd *StorageDownloader) BackupMeta(name string) (models.Backup, error) {
 	backup := internal.NewBackup(sd.backupsFolder, name)
 	var sentinel models.Backup
-	err := internal.FetchStreamSentinel(backup, &sentinel)
+	err := backup.FetchSentinel(&sentinel)
 	if err != nil {
 		return models.Backup{}, fmt.Errorf("can not fetch stream sentinel: %w", err)
 	}
@@ -113,7 +111,7 @@ func (sd *StorageDownloader) LoadBackups(names []string) ([]models.Backup, error
 
 //ListBackups lists backups in folder
 func (sd *StorageDownloader) ListBackups() ([]internal.BackupTime, []string, error) {
-	return internal.GetBackupsAndGarbage(sd.rootFolder)
+	return internal.GetBackupsAndGarbage(sd.backupsFolder)
 }
 
 // DownloadOplogArchive downloads, decompresses and decrypts (if needed) oplog archive.
@@ -189,7 +187,7 @@ func (d *DiscardUploader) UploadGapArchive(err error, firstTS, lastTS models.Tim
 }
 
 // UploadBackup is not implemented yet
-func (d *DiscardUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider MongoMetaProvider) error {
+func (d *DiscardUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error {
 	panic("implement me")
 }
 
@@ -197,18 +195,17 @@ func (d *DiscardUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaProv
 // is NOT thread-safe
 type StorageUploader struct {
 	internal.UploaderProvider
-	crypter crypto.Crypter
+	crypter crypto.Crypter // usages only in UploadOplogArchive
 	buf     *bytes.Buffer
 }
 
 // NewStorageUploader builds mongodb uploader.
 func NewStorageUploader(upl internal.UploaderProvider) *StorageUploader {
-	upl.DisableSizeTracking()
+	upl.DisableSizeTracking() // providing io.ReaderAt+io.ReadSeeker to s3 upload enables buffer pool usage
 	return &StorageUploader{upl, internal.ConfigureCrypter(), &bytes.Buffer{}}
 }
 
 // UploadOplogArchive compresses a stream and uploads it with given archive name.
-// TODO: test if upload content is readerAtSeeker
 func (su *StorageUploader) UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error {
 	arch, err := models.NewArchive(firstTS, lastTS, su.Compression().FileExtension(), models.ArchiveTypeOplog)
 	if err != nil {
@@ -244,14 +241,17 @@ func (su *StorageUploader) UploadGapArchive(archErr error, firstTS, lastTS model
 }
 
 // UploadBackup compresses a stream and uploads it.
-func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider MongoMetaProvider) error {
-	timeStart := utility.TimeNowCrossPlatformLocal()
+func (su *StorageUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error {
+	err := metaConstructor.Init()
+	if err != nil {
+		return fmt.Errorf("can not init meta provider: %+v", err)
+	}
 	backupName, err := su.PushStream(stream)
 	if err != nil {
 		return fmt.Errorf("can not push stream: %+v", err)
 	}
 
-	if err := metaProvider.Finalize(backupName); err != nil {
+	if err := metaConstructor.Finalize(backupName); err != nil {
 		return fmt.Errorf("can not finalize meta provider: %+v", err)
 	}
 
@@ -259,15 +259,7 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaPro
 		return fmt.Errorf("backup command failed: %+v", err)
 	}
 
-	meta := metaProvider.Meta()
-	backupSentinel := &models.Backup{
-		StartLocalTime:  timeStart,
-		FinishLocalTime: utility.TimeNowCrossPlatformLocal(),
-		UserData:        meta.User,
-		MongoMeta:       meta.Mongo,
-		DataSize:        meta.DataSize,
-		Permanent:       meta.Permanent,
-	}
+	backupSentinel := metaConstructor.MetaInfo()
 	if err := internal.UploadSentinel(su.UploaderProvider, backupSentinel, backupName); err != nil {
 		return fmt.Errorf("can not upload sentinel: %+v", err)
 	}
@@ -287,7 +279,8 @@ func NewStoragePurger(opts StorageSettings) (*StoragePurger, error) {
 		return nil, err
 	}
 
-	return &StoragePurger{oplogsFolder: folder.GetSubFolder(opts.oplogsPath), backupsFolder: folder.GetSubFolder(opts.backupsPath)}, nil
+	return &StoragePurger{oplogsFolder: folder.GetSubFolder(opts.oplogsPath),
+		backupsFolder: folder.GetSubFolder(opts.backupsPath)}, nil
 }
 
 // DeleteBackups purges given backups files

@@ -1,6 +1,8 @@
 package mysql
 
 import (
+	"fmt"
+	"os"
 	"os/exec"
 
 	"github.com/wal-g/tracelog"
@@ -9,7 +11,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
+func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPermanent bool) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 
 	db, err := getMySQLConnection()
@@ -33,13 +35,29 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
 
 	binlogEnd := getMySQLCurrentBinlogFile(db)
 	timeStop := utility.TimeNowCrossPlatformLocal()
-	sentinel := StreamSentinelDto{
-		BinLogStart:    binlogStart,
-		BinLogEnd:      binlogEnd,
-		StartLocalTime: timeStart,
-		StopLocalTime:  timeStop,
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = ""
+		tracelog.WarningLogger.Printf("Failed to obtain the OS hostname for the backup sentinel\n")
 	}
-	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel)
+
+	uploadedSize, err := uploader.UploadedDataSize()
+	tracelog.ErrorLogger.PrintOnError(fmt.Errorf("failed to calc uploaded data size: %v", err))
+
+	rawSize, err := uploader.RawDataSize()
+	tracelog.ErrorLogger.PrintOnError(fmt.Errorf("failed to calc raw data size: %v", err))
+
+	sentinel := StreamSentinelDto{
+		BinLogStart:      binlogStart,
+		BinLogEnd:        binlogEnd,
+		StartLocalTime:   timeStart,
+		StopLocalTime:    timeStop,
+		Hostname:         hostname,
+		CompressedSize:   uploadedSize,
+		UncompressedSize: rawSize,
+		IsPermanent:      isPermanent,
+	}
+	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())
 
 	err = internal.UploadSentinel(uploader, &sentinel, fileName)
 	tracelog.ErrorLogger.FatalOnError(err)

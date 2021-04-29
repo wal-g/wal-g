@@ -13,6 +13,8 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+const TarPartitionFolderName = "/tar_partitions/"
+
 // StorageTarBall represents a tar file that is
 // going to be uploaded to storage.
 type StorageTarBall struct {
@@ -94,7 +96,9 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) 
 			tracelog.ErrorLogger.Printf("%v\n", err)
 			err = pipeReader.Close()
 			tracelog.ErrorLogger.FatalfOnError("Failed to close pipe: %v", err)
-			tracelog.ErrorLogger.Fatalf("Unable to continue the backup process because of the loss of a part %d.\n", tarBall.partNumber)
+			tracelog.ErrorLogger.Fatalf(
+				"Unable to continue the backup process because of the loss of a part %d.\n",
+				tarBall.partNumber)
 		}
 	}()
 
@@ -110,7 +114,8 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) 
 		writerToCompress = &utility.CascadeWriteCloser{WriteCloser: encryptedWriter, Underlying: pipeWriter}
 	}
 
-	return &utility.CascadeWriteCloser{WriteCloser: uploader.Compressor.NewWriter(writerToCompress), Underlying: writerToCompress}
+	return &utility.CascadeWriteCloser{WriteCloser: uploader.Compressor.NewWriter(writerToCompress),
+		Underlying: writerToCompress}
 }
 
 // Size accumulated in this tarball

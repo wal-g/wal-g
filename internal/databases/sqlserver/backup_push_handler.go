@@ -48,7 +48,7 @@ func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 		tracelog.ErrorLogger.FatalfOnError("can't find latest backup: %v", err)
 		backupName = backup.Name
 		sentinel = new(SentinelDto)
-		err = internal.FetchStreamSentinel(backup, sentinel)
+		err = backup.FetchSentinel(&sentinel)
 		tracelog.ErrorLogger.FatalOnError(err)
 		sentinel.Databases = uniq(append(sentinel.Databases, dbnames...))
 	} else {
@@ -74,13 +74,13 @@ func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 }
 
 func backupSingleDatabase(ctx context.Context, db *sql.DB, backupName string, dbname string, compression bool) error {
-	baseUrl := getDatabaseBackupUrl(backupName, dbname)
-	size, blobCount, err := estimateDbSize(db, dbname)
+	baseURL := getDatabaseBackupURL(backupName, dbname)
+	size, blobCount, err := estimateDBSize(db, dbname)
 	if err != nil {
 		return err
 	}
 	tracelog.InfoLogger.Printf("database [%s] size is %d, required blob count %d", dbname, size, blobCount)
-	urls := buildBackupUrls(baseUrl, blobCount)
+	urls := buildBackupUrls(baseURL, blobCount)
 	sql := fmt.Sprintf("BACKUP DATABASE %s TO %s", quoteName(dbname), urls)
 	sql += fmt.Sprintf(" WITH FORMAT, MAXTRANSFERSIZE=%d", MaxTransferSize)
 	if compression {

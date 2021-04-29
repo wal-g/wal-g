@@ -4,12 +4,14 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const (
 	backupListShortDescription = "Prints available backups"
 	PrettyFlag                 = "pretty"
-	JsonFlag                   = "json"
+	JSONFlag                   = "json"
 	DetailFlag                 = "detail"
 )
 
@@ -23,9 +25,9 @@ var (
 			folder, err := internal.ConfigureFolder()
 			tracelog.ErrorLogger.FatalOnError(err)
 			if pretty || json || detail {
-				internal.HandleBackupListWithFlags(folder, pretty, json, detail)
+				postgres.HandleBackupListWithFlags(folder.GetSubFolder(utility.BaseBackupPath), pretty, json, detail)
 			} else {
-				internal.DefaultHandleBackupList(folder)
+				internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath))
 			}
 		},
 	}
@@ -38,6 +40,6 @@ func init() {
 	cmd.AddCommand(backupListCmd)
 
 	backupListCmd.Flags().BoolVar(&pretty, PrettyFlag, false, "Prints more readable output")
-	backupListCmd.Flags().BoolVar(&json, JsonFlag, false, "Prints output in json format")
+	backupListCmd.Flags().BoolVar(&json, JSONFlag, false, "Prints output in json format")
 	backupListCmd.Flags().BoolVar(&detail, DetailFlag, false, "Prints extra backup details")
 }

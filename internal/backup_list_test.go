@@ -3,6 +3,8 @@ package internal_test
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/utility"
 	"testing"
 	"time"
 
@@ -13,12 +15,12 @@ import (
 
 func TestBackupListFindsBackups(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
-	internal.DefaultHandleBackupList(folder)
+	internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath))
 }
 
 func TestBackupListFlagsFindsBackups(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
-	internal.HandleBackupListWithFlags(folder, true, false, false)
+	postgres.HandleBackupListWithFlags(folder.GetSubFolder(utility.BaseBackupPath), true, false, false)
 }
 
 var backups = []internal.BackupTime{
@@ -63,7 +65,7 @@ func TestBackupListCorrectJsonOutput(t *testing.T) {
 	var actual []internal.BackupTime
 	buf := new(bytes.Buffer)
 
-	err := internal.WriteAsJson(backups, buf, false)
+	err := internal.WriteAsJSON(backups, buf, false)
 	assert.NoError(t, err)
 	err = json.Unmarshal(buf.Bytes(), &actual)
 
@@ -87,7 +89,7 @@ func TestBackupListCorrectPrettyJsonOutput(t *testing.T) {
 	var unmarshaledBackups []internal.BackupTime
 	buf := new(bytes.Buffer)
 
-	err := internal.WriteAsJson(backups, buf, true)
+	err := internal.WriteAsJSON(backups, buf, true)
 	assert.NoError(t, err)
 	err = json.Unmarshal(buf.Bytes(), &unmarshaledBackups)
 

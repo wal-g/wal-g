@@ -41,17 +41,17 @@ func (ih *indexHandler) createIndexFile() error {
 	return nil
 }
 
-func HandleBinlogFetch(folder storage.Folder, backupName string, untilTs string) {
+func HandleBinlogFetch(folder storage.Folder, backupName string, untilTS string) {
 	dstDir, err := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	startTs, endTs, err := getTimestamps(folder, backupName, untilTs)
+	startTS, endTS, err := getTimestamps(folder, backupName, untilTS)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	handler := newIndexHandler(dstDir)
 
-	tracelog.InfoLogger.Printf("Fetching binlogs since %s until %s", startTs, endTs)
-	err = fetchLogs(folder, dstDir, startTs, endTs, handler)
+	tracelog.InfoLogger.Printf("Fetching binlogs since %s until %s", startTS, endTS)
+	err = fetchLogs(folder, dstDir, startTS, endTS, false, handler)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch binlogs: %v", err)
 
 	err = handler.createIndexFile()

@@ -141,6 +141,10 @@ User may also specify time in  RFC3339 format until which should be fetched (use
 Binlogs are temporarily save in `WALG_MYSQL_BINLOG_DST` folder.
 Replay command gets name of binlog to replay via environment variable `WALG_MYSQL_CURRENT_BINLOG` and stop-date via `WALG_MYSQL_BINLOG_END_TS`, which are set for each invocation.
 
+When `--live-replay` specified WAL-G will be checking for newly uploaded binlogs after each iteration of binlog replay.
+This flag may be useful for huge databases - it prevents users from getting replica that cannot replicate master due too binlog rotation.
+WAL-G won't block in waiting for new binlogs, it will exit as soon as one of the following events happen: no new binlog uploaded during previous iteration or requested PITR reached.
+
 ```
 wal-g binlog-replay --since "backupname"
 ```
@@ -151,6 +155,10 @@ wal-g binlog-replay --since "backupname" --until "2006-01-02T15:04:05Z07:00"
 or
 ```
 wal-g binlog-replay --since LATEST --until "2006-01-02T15:04:05Z07:00"
+```
+
+```
+wal-g binlog-replay --since LATEST --until "2006-01-02T15:04:05Z07:00" --live-replay
 ```
 
 Typical configurations

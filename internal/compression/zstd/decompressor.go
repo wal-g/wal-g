@@ -12,7 +12,7 @@ import (
 type Decompressor struct{}
 
 func (decompressor Decompressor) Decompress(dst io.Writer, src io.Reader) error {
-	zstdReader := zstd.NewReader(computils.NewUntilEofReader(src))
+	zstdReader := zstd.NewReader(computils.NewUntilEOFReader(src))
 	_, err := utility.FastCopy(dst, zstdReader)
 	if err != nil {
 		return errors.Wrap(err, "DecompressZstd: zstd write failed")

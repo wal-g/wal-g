@@ -5,7 +5,7 @@ package archivemocks
 import (
 	io "io"
 
-	archive "github.com/wal-g/wal-g/internal/databases/mongo/archive"
+	internal "github.com/wal-g/wal-g/internal"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -17,13 +17,13 @@ type Uploader struct {
 	mock.Mock
 }
 
-// UploadBackup provides a mock function with given fields: stream, cmd, metaProvider
-func (_m *Uploader) UploadBackup(stream io.Reader, cmd archive.ErrWaiter, metaProvider archive.MongoMetaProvider) error {
-	ret := _m.Called(stream, cmd, metaProvider)
+// UploadBackup provides a mock function with given fields: stream, cmd, metaConstructor
+func (_m *Uploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error {
+	ret := _m.Called(stream, cmd, metaConstructor)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(io.Reader, archive.ErrWaiter, archive.MongoMetaProvider) error); ok {
-		r0 = rf(stream, cmd, metaProvider)
+	if rf, ok := ret.Get(0).(func(io.Reader, internal.ErrWaiter, internal.MetaConstructor) error); ok {
+		r0 = rf(stream, cmd, metaConstructor)
 	} else {
 		r0 = ret.Error(0)
 	}

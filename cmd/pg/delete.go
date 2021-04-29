@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/wal-g/wal-g/internal/databases/postgres"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/wal-g/storages/storage"
@@ -58,7 +60,7 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	permanentBackups, permanentWals := internal.GetPermanentObjects(folder)
+	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
 	if len(permanentBackups) > 0 {
 		tracelog.InfoLogger.Printf("Found permanent objects: backups=%v, wals=%v\n",
 			permanentBackups, permanentWals)
@@ -74,7 +76,7 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	permanentBackups, permanentWals := internal.GetPermanentObjects(folder)
+	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
 	if len(permanentBackups) > 0 {
 		tracelog.InfoLogger.Printf("Found permanent objects: backups=%v, wals=%v\n",
 			permanentBackups, permanentWals)
@@ -96,7 +98,7 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 		forceModifier = true
 	}
 
-	permanentBackups, permanentWals := internal.GetPermanentObjects(folder)
+	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
 	if len(permanentBackups) > 0 {
 		if !forceModifier {
 			tracelog.ErrorLogger.Fatalf("Found permanent objects: backups=%v, wals=%v\n",
@@ -116,7 +118,7 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	permanentBackups, permanentWals := internal.GetPermanentObjects(folder)
+	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
 	if len(permanentBackups) > 0 {
 		tracelog.InfoLogger.Printf("Found permanent objects: backups=%v, wals=%v\n",
 			permanentBackups, permanentWals)
@@ -193,7 +195,7 @@ func newPostgresBackupObject(incrementBase, incrementFrom string,
 		baseBackupName:    incrementBase,
 		incrementFromName: incrementFrom,
 		creationTime:      creationTime,
-		BackupName:        internal.FetchPgBackupName(object),
+		BackupName:        postgres.FetchPgBackupName(object),
 	}
 }
 
@@ -248,19 +250,19 @@ func makePostgresBackupObjects(
 
 func makePostgresPermanentFunc(permanentBackups, permanentWals map[string]bool) func(object storage.Object) bool {
 	return func(object storage.Object) bool {
-		return internal.IsPermanent(object.GetName(), permanentBackups, permanentWals)
+		return postgres.IsPermanent(object.GetName(), permanentBackups, permanentWals)
 	}
 }
 
 func makeLessFunc(startTimeByBackupName map[string]time.Time) func(storage.Object, storage.Object) bool {
 	return func(object1 storage.Object, object2 storage.Object) bool {
-		backupName1 := internal.FetchPgBackupName(object1)
+		backupName1 := postgres.FetchPgBackupName(object1)
 		if backupName1 == "" {
 			// we can't compare non-backup storage objects (probably WAL segments) by start time,
 			// so use the segment number comparator instead
 			return postgresSegmentNoLess(object1, object2)
 		}
-		backupName2 := internal.FetchPgBackupName(object2)
+		backupName2 := postgres.FetchPgBackupName(object2)
 		if backupName2 == "" {
 			return postgresSegmentNoLess(object1, object2)
 		}
@@ -283,7 +285,7 @@ func getBackupStartTimeMap(folder storage.Folder, backups []storage.Object) (map
 	startTimeByBackupName := make(map[string]time.Time, len(backups))
 
 	for _, backupTime := range backupTimes {
-		backupDetails, err := internal.GetBackupDetails(folder, backupTime)
+		backupDetails, err := postgres.GetBackupDetails(folder.GetSubFolder(utility.BaseBackupPath), backupTime)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Failed to get metadata of backup %s",
 				backupTime.BackupName)
@@ -295,11 +297,11 @@ func getBackupStartTimeMap(folder storage.Folder, backups []storage.Object) (map
 
 // TODO: create postgres part and move it there, if it will be needed
 func postgresSegmentNoLess(object1 storage.Object, object2 storage.Object) bool {
-	_, segmentNumber1, ok := internal.TryFetchTimelineAndLogSegNo(object1.GetName())
+	_, segmentNumber1, ok := postgres.TryFetchTimelineAndLogSegNo(object1.GetName())
 	if !ok {
 		return false
 	}
-	_, segmentNumber2, ok := internal.TryFetchTimelineAndLogSegNo(object2.GetName())
+	_, segmentNumber2, ok := postgres.TryFetchTimelineAndLogSegNo(object2.GetName())
 	if !ok {
 		return false
 	}
@@ -308,11 +310,11 @@ func postgresSegmentNoLess(object1 storage.Object, object2 storage.Object) bool 
 
 // TODO: create postgres part and move it there, if it will be needed
 func postgresTimelineAndSegmentNoLess(object1 storage.Object, object2 storage.Object) bool {
-	tl1, segNo1, ok := internal.TryFetchTimelineAndLogSegNo(object1.GetName())
+	tl1, segNo1, ok := postgres.TryFetchTimelineAndLogSegNo(object1.GetName())
 	if !ok {
 		return false
 	}
-	tl2, segNo2, ok := internal.TryFetchTimelineAndLogSegNo(object2.GetName())
+	tl2, segNo2, ok := postgres.TryFetchTimelineAndLogSegNo(object2.GetName())
 	if !ok {
 		return false
 	}
@@ -320,7 +322,7 @@ func postgresTimelineAndSegmentNoLess(object1 storage.Object, object2 storage.Ob
 }
 
 func postgresGetIncrementInfo(folder storage.Folder, object storage.Object) (string, string, bool, error) {
-	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), internal.FetchPgBackupName(object))
+	backup := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), postgres.FetchPgBackupName(object))
 	sentinel, err := backup.GetSentinel()
 	if err != nil {
 		return "", "", true, err
@@ -333,13 +335,14 @@ func postgresGetIncrementInfo(folder storage.Folder, object storage.Object) (str
 }
 
 // create the BackupSelector to select the backup to delete
-func createTargetDeleteBackupSelector(cmd *cobra.Command, args []string, targetUserData string) (internal.BackupSelector, error) {
+func createTargetDeleteBackupSelector(cmd *cobra.Command,
+	args []string, targetUserData string) (internal.BackupSelector, error) {
 	targetName := ""
 	if len(args) > 0 {
 		targetName = args[0]
 	}
 
-	backupSelector, err := internal.NewTargetBackupSelector(targetUserData, targetName)
+	backupSelector, err := internal.NewTargetBackupSelector(targetUserData, targetName, postgres.NewGenericMetaFetcher())
 	if err != nil {
 		fmt.Println(cmd.UsageString())
 		return nil, err

@@ -99,7 +99,9 @@ func LastKnownInBackupTS(backups []models.Backup) (models.Timestamp, error) {
 }
 
 // SplitPurgingBackups partitions backups to delete and retain
-func SplitPurgingBackups(backups []models.Backup, retainCount *int, retainAfter *time.Time) (purge, retain []models.Backup, err error) {
+func SplitPurgingBackups(backups []models.Backup,
+	retainCount *int,
+	retainAfter *time.Time) (purge, retain []models.Backup, err error) {
 	sort.Slice(backups, func(i, j int) bool {
 		return backups[i].StartLocalTime.After(backups[j].StartLocalTime)
 	})
@@ -178,7 +180,9 @@ func OldestBackupAfterTime(backups []models.Backup, after time.Time) (models.Bac
 }
 
 // SelectPurgingOplogArchives builds archive list to be deleted.
-func SelectPurgingOplogArchives(archives []models.Archive, backups []models.Backup, retainAfterTS *models.Timestamp) []models.Archive {
+func SelectPurgingOplogArchives(archives []models.Archive,
+	backups []models.Backup,
+	retainAfterTS *models.Timestamp) []models.Archive {
 	var purgeArchives []models.Archive
 	var arch models.Archive
 	var emptyBackup models.Backup
@@ -187,13 +191,15 @@ func SelectPurgingOplogArchives(archives []models.Archive, backups []models.Back
 
 		// retain if arch is in pitr period
 		if retainAfterTS != nil && models.LessTS(*retainAfterTS, arch.End) { // TODO: check ts is set
-			tracelog.DebugLogger.Printf("Keeping oplog archive due to retain timestamp (%+v): %s", retainAfterTS, arch.Filename())
+			tracelog.DebugLogger.Printf(
+				"Keeping oplog archive due to retain timestamp (%+v): %s", retainAfterTS, arch.Filename())
 			continue
 		}
 
 		// retain if arch is part of backup
 		if backup := models.FirstOverlappingBackupForArch(arch, backups); backup != emptyBackup {
-			tracelog.DebugLogger.Printf("Keeping oplog archive due to overlapping with backup (%+v): %s", backup, arch.Filename())
+			tracelog.DebugLogger.Printf(
+				"Keeping oplog archive due to overlapping with backup (%+v): %s", backup, arch.Filename())
 			continue
 		}
 		purgeArchives = append(purgeArchives, arch)

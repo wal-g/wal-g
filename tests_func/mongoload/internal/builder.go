@@ -36,7 +36,10 @@ func NewOpInfo(opName string, id int, timeStart time.Time, timeEnd time.Time, er
 	}
 }
 
-func BuildStage(ctx context.Context, cli *mongo.Client, roc <-chan RawMongoOp, wg *sync.WaitGroup) (<-chan ExecFunc, <-chan error) {
+func BuildStage(ctx context.Context,
+	cli *mongo.Client,
+	roc <-chan RawMongoOp,
+	wg *sync.WaitGroup) (<-chan ExecFunc, <-chan error) {
 	cmds := make(chan ExecFunc, cap(roc))
 	errc := make(chan error, 1)
 

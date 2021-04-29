@@ -12,6 +12,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/utility"
 )
 
 // BackupInfoMarshalFunc defines sentinel unmarshal func
@@ -89,14 +90,7 @@ func (bl *TabbedBackupListing) Names(backups []internal.BackupTime, output io.Wr
 	return writer.Flush()
 }
 
-// MongoMetaProvider defines interface to collect backup mongo
-type MongoMetaProvider interface {
-	Init(permanent bool) error
-	Finalize(backupName string) error
-	Meta() models.BackupMeta
-}
-
-type MongoMetaDBProvider struct {
+type MongoMetaConstructor struct {
 	ctx       context.Context
 	client    client.MongoDriver
 	folder    storage.Folder
@@ -105,13 +99,27 @@ type MongoMetaDBProvider struct {
 	permanent bool
 }
 
-func NewBackupMetaMongoProvider(ctx context.Context, mc client.MongoDriver, folder storage.Folder) *MongoMetaDBProvider {
-	return &MongoMetaDBProvider{ctx: ctx, client: mc, folder: folder}
+func (m *MongoMetaConstructor) MetaInfo() interface{} {
+	meta := m.Meta()
+	backupSentinel := &models.Backup{
+		StartLocalTime:  meta.StartTime,
+		FinishLocalTime: meta.FinishTime,
+		UserData:        meta.User,
+		MongoMeta:       meta.Mongo,
+		DataSize:        meta.DataSize,
+		Permanent:       meta.Permanent,
+	}
+	return backupSentinel
 }
 
-func (m *MongoMetaDBProvider) Init(permanent bool) error {
-	m.permanent = permanent
+func NewBackupMongoMetaConstructor(ctx context.Context,
+	mc client.MongoDriver,
+	folder storage.Folder,
+	permanent bool) internal.MetaConstructor {
+	return &MongoMetaConstructor{ctx: ctx, client: mc, folder: folder, permanent: permanent}
+}
 
+func (m *MongoMetaConstructor) Init() error {
 	lastTS, lastMajTS, err := m.client.LastWriteTS(m.ctx)
 	if err != nil {
 		return fmt.Errorf("can not initialize backup mongo")
@@ -120,11 +128,18 @@ func (m *MongoMetaDBProvider) Init(permanent bool) error {
 		LastTS:    lastTS,
 		LastMajTS: lastMajTS,
 	}
+
+	m.meta = models.BackupMeta{
+		StartTime: utility.TimeNowCrossPlatformLocal(),
+		Mongo:     m.mongo,
+		Permanent: m.permanent,
+		User:      internal.GetSentinelUserData(),
+	}
 	return nil
 }
 
-func (m *MongoMetaDBProvider) Finalize(backupName string) error {
-	dataSize, err := FolderSize(m.folder, backupName)
+func (m *MongoMetaConstructor) Finalize(backupName string) error {
+	dataSize, err := internal.FolderSize(m.folder, backupName)
 	if err != nil {
 		return fmt.Errorf("can not get backup size: %+v", err)
 	}
@@ -137,27 +152,11 @@ func (m *MongoMetaDBProvider) Finalize(backupName string) error {
 		LastTS:    lastTS,
 		LastMajTS: lastMajTS,
 	}
-	m.meta = models.BackupMeta{
-		Mongo:     m.mongo,
-		DataSize:  dataSize,
-		Permanent: m.permanent,
-		User:      internal.GetSentinelUserData(),
-	}
+	m.meta.FinishTime = utility.TimeNowCrossPlatformLocal()
+	m.meta.DataSize = dataSize
 	return nil
 }
 
-func (m *MongoMetaDBProvider) Meta() models.BackupMeta {
+func (m *MongoMetaConstructor) Meta() models.BackupMeta {
 	return m.meta
-}
-
-func FolderSize(folder storage.Folder, path string) (int64, error) {
-	dataObjects, _, err := folder.GetSubFolder(path).ListFolder()
-	if err != nil {
-		return 0, err
-	}
-	var size int64
-	for _, obj := range dataObjects {
-		size += obj.GetSize()
-	}
-	return size, nil
 }

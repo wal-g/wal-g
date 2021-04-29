@@ -13,7 +13,7 @@ import (
 type Decompressor struct{}
 
 func (decompressor Decompressor) Decompress(dst io.Writer, src io.Reader) error {
-	brotliReader := cbrotli.NewReader(computils.NewUntilEofReader(src))
+	brotliReader := cbrotli.NewReader(computils.NewUntilEOFReader(src))
 	defer utility.LoggedClose(brotliReader, "")
 	_, err := utility.FastCopy(dst, brotliReader)
 	return err
