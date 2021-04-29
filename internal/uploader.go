@@ -61,20 +61,20 @@ func NewUploader(
 	return uploader
 }
 
-// GetBackupSize returns nil when SizeTracking disabled see DisableSizeTracking
+// UploadedDataSize returns 0 and error when SizeTracking disabled (see DisableSizeTracking)
 func (uploader *Uploader) UploadedDataSize() (int64, error) {
 	if uploader.tarSize == nil {
 		return 0, ErrorSizeTrackingDisabled
 	}
-	return *uploader.tarSize, nil
+	return atomic.LoadInt64(uploader.tarSize), nil
 }
 
-// GetDataSize returns nil when SizeTracking disabled see DisableSizeTracking
+// RawDataSize returns 0 and error when SizeTracking disabled (see DisableSizeTracking)
 func (uploader *Uploader) RawDataSize() (int64, error) {
 	if uploader.dataSize == nil {
 		return 0, ErrorSizeTrackingDisabled
 	}
-	return *uploader.dataSize, nil
+	return atomic.LoadInt64(uploader.dataSize), nil
 }
 
 // Finish waits for all waiting parts to be uploaded. If an error occurs,
