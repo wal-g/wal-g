@@ -99,10 +99,16 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter
 
 	backupSentinelInfo := metaProvider.MetaInfo()
 
+	uploadedSize, uploadedErr := su.UploadedDataSize()
+	rawSize, rawErr := su.RawDataSize()
+	if uploadedErr != nil || rawErr != nil {
+		return fmt.Errorf("can not calc backup size: %+v", rawErr)
+	}
+
 	backup := backupSentinelInfo.(*Backup)
-	backup.BackupSize = *su.GetBackupSize()
+	backup.BackupSize = uploadedSize
 	backup.BackupName = dstPath
-	backup.DataSize = *su.GetDataSize()
+	backup.DataSize = rawSize
 	if err := internal.UploadSentinel(su, backupSentinelInfo, dstPath); err != nil {
 		return fmt.Errorf("can not upload sentinel: %+v", err)
 	}

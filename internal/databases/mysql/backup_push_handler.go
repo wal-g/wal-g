@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 
@@ -39,14 +40,21 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 		hostname = ""
 		tracelog.WarningLogger.Printf("Failed to obtain the OS hostname for the backup sentinel\n")
 	}
+
+	uploadedSize, err := uploader.UploadedDataSize()
+	tracelog.ErrorLogger.PrintOnError(fmt.Errorf("failed to calc uploaded data size: %v", err))
+
+	rawSize, err := uploader.RawDataSize()
+	tracelog.ErrorLogger.PrintOnError(fmt.Errorf("failed to calc raw data size: %v", err))
+
 	sentinel := StreamSentinelDto{
 		BinLogStart:      binlogStart,
 		BinLogEnd:        binlogEnd,
 		StartLocalTime:   timeStart,
 		StopLocalTime:    timeStop,
 		Hostname:         hostname,
-		CompressedSize:   *uploader.GetBackupSize(),
-		UncompressedSize: *uploader.GetDataSize(),
+		CompressedSize:   uploadedSize,
+		UncompressedSize: rawSize,
 		IsPermanent:      isPermanent,
 	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())
