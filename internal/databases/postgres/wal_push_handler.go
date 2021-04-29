@@ -92,7 +92,7 @@ func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrit
 		return errors.Wrapf(err, "upload: could not Upload '%s'\n", walFilePath)
 	}
 
-	// rename WAL status file ".ready" to ".done" if requiested
+	// rename WAL status file ".ready" to ".done" if requested
 	if ReadyRename && err == nil {
 
 		var WALFileName = filepath.Base(walFilePath)
