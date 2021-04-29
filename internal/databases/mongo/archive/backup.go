@@ -90,14 +90,7 @@ func (bl *TabbedBackupListing) Names(backups []internal.BackupTime, output io.Wr
 	return writer.Flush()
 }
 
-// MongoMetaProvider defines interface to collect backup mongo
-type MongoMetaProvider interface {
-	Init() error
-	Finalize(backupName string) error
-	Meta() models.BackupMeta
-}
-
-type MongoMetaDBProvider struct {
+type MongoMetaConstructor struct {
 	ctx       context.Context
 	client    client.MongoDriver
 	folder    storage.Folder
@@ -106,7 +99,7 @@ type MongoMetaDBProvider struct {
 	permanent bool
 }
 
-func (m *MongoMetaDBProvider) MetaInfo() interface{} {
+func (m *MongoMetaConstructor) MetaInfo() interface{} {
 	meta := m.Meta()
 	backupSentinel := &models.Backup{
 		StartLocalTime:  meta.StartTime,
@@ -119,14 +112,14 @@ func (m *MongoMetaDBProvider) MetaInfo() interface{} {
 	return backupSentinel
 }
 
-func NewBackupMetaMongoProvider(ctx context.Context,
+func NewBackupMongoMetaConstructor(ctx context.Context,
 	mc client.MongoDriver,
 	folder storage.Folder,
-	permanent bool) internal.MetaProvider {
-	return &MongoMetaDBProvider{ctx: ctx, client: mc, folder: folder, permanent: permanent}
+	permanent bool) internal.MetaConstructor {
+	return &MongoMetaConstructor{ctx: ctx, client: mc, folder: folder, permanent: permanent}
 }
 
-func (m *MongoMetaDBProvider) Init() error {
+func (m *MongoMetaConstructor) Init() error {
 	lastTS, lastMajTS, err := m.client.LastWriteTS(m.ctx)
 	if err != nil {
 		return fmt.Errorf("can not initialize backup mongo")
@@ -145,7 +138,7 @@ func (m *MongoMetaDBProvider) Init() error {
 	return nil
 }
 
-func (m *MongoMetaDBProvider) Finalize(backupName string) error {
+func (m *MongoMetaConstructor) Finalize(backupName string) error {
 	dataSize, err := internal.FolderSize(m.folder, backupName)
 	if err != nil {
 		return fmt.Errorf("can not get backup size: %+v", err)
@@ -164,6 +157,6 @@ func (m *MongoMetaDBProvider) Finalize(backupName string) error {
 	return nil
 }
 
-func (m *MongoMetaDBProvider) Meta() models.BackupMeta {
+func (m *MongoMetaConstructor) Meta() models.BackupMeta {
 	return m.meta
 }

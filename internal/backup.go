@@ -176,7 +176,10 @@ type ErrWaiter interface {
 	Wait() error
 }
 
-type MetaProvider interface {
+// MetaConstructor - interface that helps with building meta-info about backup and generate MetaInfo
+// see MongoMetaConstructor
+// see RedisMetaConstructor
+type MetaConstructor interface {
 	Init() error
 	Finalize(backupName string) error
 	MetaInfo() interface{}

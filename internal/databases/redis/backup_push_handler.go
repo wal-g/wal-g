@@ -9,11 +9,11 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, metaProvider internal.MetaProvider) error {
+func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, metaConstructor internal.MetaConstructor) error {
 	stdout, err := utility.StartCommandWithStdoutPipe(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
 	redisUploader := archive.NewRedisStorageUploader(uploader)
 
-	return redisUploader.UploadBackup(stdout, backupCmd, metaProvider)
+	return redisUploader.UploadBackup(stdout, backupCmd, metaConstructor)
 }

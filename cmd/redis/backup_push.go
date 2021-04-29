@@ -42,9 +42,9 @@ var backupPushCmd = &cobra.Command{
 		backupCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamCreateCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
 		backupCmd.Stderr = os.Stderr
-		metaProvider := archive.NewBackupMetaRedisProvider(ctx, uploader.UploadingFolder, permanent)
+		metaConstructor := archive.NewBackupRedisMetaConstructor(ctx, uploader.UploadingFolder, permanent)
 
-		err = redis.HandleBackupPush(uploader, backupCmd, metaProvider)
+		err = redis.HandleBackupPush(uploader, backupCmd, metaConstructor)
 		tracelog.ErrorLogger.FatalfOnError("Backup creation failed: %v", err)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
