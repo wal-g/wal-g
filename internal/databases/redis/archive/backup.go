@@ -19,7 +19,7 @@ type Backup struct {
 	UserData        interface{} `json:"UserData,omitempty"`
 	Permanent       bool        `json:"Permanent"`
 	DataSize        int64       `json:"DataSize,omitempty"`
-	StorageSize     int64       `json:"StorageSize,omitempty"`
+	BackupSize      int64       `json:"BackupSize,omitempty"`
 }
 
 // BackupMeta includes mongodb and storage metadata
@@ -69,7 +69,7 @@ func NewBackupMetaRedisProvider(ctx context.Context, folder storage.Folder, perm
 }
 
 type StorageUploader struct {
-	*internal.Uploader
+	internal.UploaderProvider
 }
 
 // NewRedisStorageUploader builds redis uploader, that also push metadata
@@ -97,13 +97,13 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter
 		return fmt.Errorf("can not finalize meta provider: %+v", err)
 	}
 
-	backupSentinel := metaProvider.MetaInfo()
+	backupSentinelInfo := metaProvider.MetaInfo()
 
-	backup := backupSentinel.(*Backup)
-	backup.StorageSize = *su.TarSize
+	backup := backupSentinelInfo.(*Backup)
+	backup.BackupSize = *su.GetBackupSize()
 	backup.BackupName = dstPath
-	backup.DataSize = *su.OriginalSize
-	if err := internal.UploadSentinel(su.Uploader, backupSentinel, dstPath); err != nil {
+	backup.DataSize = *su.GetDataSize()
+	if err := internal.UploadSentinel(su, backupSentinelInfo, dstPath); err != nil {
 		return fmt.Errorf("can not upload sentinel: %+v", err)
 	}
 	return nil
