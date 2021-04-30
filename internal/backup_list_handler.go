@@ -26,12 +26,20 @@ type Logging struct {
 	ErrorLogger ErrorLogger
 }
 
-func DefaultHandleBackupList(folder storage.Folder) {
+func DefaultHandleBackupList(folder storage.Folder, pretty, json bool) {
 	getBackupsFunc := func() ([]BackupTime, error) {
 		return GetBackups(folder)
 	}
 	writeBackupListFunc := func(backups []BackupTime) {
-		WriteBackupList(backups, os.Stdout)
+		switch {
+		case json:
+			err := WriteAsJSON(backups, os.Stdout, pretty)
+			tracelog.ErrorLogger.FatalOnError(err)
+		case pretty:
+			WritePrettyBackupList(backups, os.Stdout)
+		default:
+			WriteBackupList(backups, os.Stdout)
+		}
 	}
 	logging := Logging{
 		InfoLogger:  tracelog.InfoLogger,
