@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 
 	"github.com/wal-g/wal-g/internal"
@@ -50,9 +49,9 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 
 	totalBgUploadedLimit := viper.GetInt32(internal.TotalBgUploadedLimit)
 	preventWalOverwrite := viper.GetBool(internal.PreventWalOverwriteSetting)
-	ReadyRename := viper.GetBool(internal.PGReadyRename)
+	readyRename := viper.GetBool(internal.PGReadyRename)
 
-	bgUploader := NewBgUploader(walFilePath, int32(concurrency-1), totalBgUploadedLimit-1, uploader, preventWalOverwrite, ReadyRename)
+	bgUploader := NewBgUploader(walFilePath, int32(concurrency-1), totalBgUploadedLimit-1, uploader, preventWalOverwrite, readyRename)
 	// Look for new WALs while doing main upload
 	bgUploader.Start()
 
@@ -95,13 +94,13 @@ func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrit
 	// rename WAL status file ".ready" to ".done" if requested
 	if ReadyRename && err == nil {
 
-		var WALFileName = filepath.Base(walFilePath)
-		var ReadyPath = path.Join(getWalFolderPath(), "archive_status", WALFileName+".ready")
-		var DonePath = path.Join(getWalFolderPath(), "archive_status", WALFileName+".done")
+		var wALFileName = filepath.Base(walFilePath)
+		var readyPath = filepath.Join(internal.GetPGArchiveStatusFolderPath(), wALFileName+".ready")
+		var donePath = filepath.Join(internal.GetPGArchiveStatusFolderPath(), wALFileName+".done")
 
-		// error here is not a fatal thing
-		err = os.Rename(ReadyPath, DonePath)
-		tracelog.ErrorLogger.FatalOnError(err)
+		// error here is not a fatal thing, just a bit more work for the next wal-push
+		err = os.Rename(readyPath, donePath)
+		tracelog.ErrorLogger.PrintOnError(err)
 	}
 
 	return nil

@@ -36,7 +36,7 @@ type BgUploader struct {
 	uploader *WalUploader
 
 	preventWalOverwrite bool
-	ReadyRename         bool
+	readyRename         bool
 
 	// ctx signals internals to keep/stop enqueueing more uploads
 	ctx context.Context
@@ -74,7 +74,7 @@ func NewBgUploader(walFilePath string,
 	maxNumUploaded int32,
 	uploader *WalUploader,
 	preventWalOverwrite bool,
-	ReadyRename bool) *BgUploader {
+	readyRename bool) *BgUploader {
 	started := make(map[string]struct{})
 	firstWalName := filepath.Base(walFilePath)
 	started[firstWalName+readySuffix] = struct{}{}
@@ -83,7 +83,7 @@ func NewBgUploader(walFilePath string,
 		dir:                 filepath.Dir(walFilePath),
 		uploader:            uploader,
 		preventWalOverwrite: preventWalOverwrite,
-		ReadyRename:         ReadyRename,
+		readyRename:         readyRename,
 
 		ctx:                ctx,
 		cancelFunc:         cancelFunc,
@@ -214,7 +214,7 @@ func (b *BgUploader) shouldSkipFile(filename string) bool {
 // upload failed.
 func (b *BgUploader) upload(walStatusFilename string) bool {
 	walFilename := strings.TrimSuffix(walStatusFilename, readySuffix)
-	err := uploadWALFile(b.uploader.clone(), filepath.Join(b.dir, walFilename), b.preventWalOverwrite, b.ReadyRename)
+	err := uploadWALFile(b.uploader.clone(), filepath.Join(b.dir, walFilename), b.preventWalOverwrite, b.readyRename)
 	if err != nil {
 		tracelog.ErrorLogger.Print("Error of background uploader: ", err)
 		return false
