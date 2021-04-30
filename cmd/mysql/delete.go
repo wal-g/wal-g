@@ -1,8 +1,6 @@
 package mysql
 
 import (
-	"strings"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
