@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"archive/tar"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -245,12 +244,14 @@ func forkPrefetch(walFileName string, location string) {
 		concurrency == 1 {
 		return // There will be nothing ot prefetch anyway
 	}
-	cmd := exec.Command(os.Args[0], "wal-prefetch", walFileName, location)
-	env := os.Environ()
-	env = append(env,
-		fmt.Sprintf("%s=%s", "S3_ENDPOINT_PORT", internal.EndpointPortSetting),
-		fmt.Sprintf("%s=%s", "S3_ENDPOINT_SOURCE", internal.EndpointSourceSetting))
-	cmd.Env = env
+	prefetchArgs := []string{"wal-prefetch", walFileName, location}
+	if internal.CfgFile != "" {
+		prefetchArgs = append(prefetchArgs, "--config", internal.CfgFile)
+	}
+	cmd := exec.Command(os.Args[0], prefetchArgs...)
+	cmd.Env = os.Environ()
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	err = cmd.Start()
 
 	if err != nil {
