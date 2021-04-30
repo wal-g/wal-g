@@ -3,7 +3,6 @@ package internal_test
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/utility"
 	"testing"
 	"time"
