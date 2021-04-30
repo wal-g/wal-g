@@ -41,4 +41,4 @@ fi
 wal-g delete everything FORCE --confirm
 
 # check that we don't have any backups left after delete
-test "1" -eq "$(wal-g backup-list | wc -l)"
+test "0" -eq "$(wal-g backup-list | wc -l)"
