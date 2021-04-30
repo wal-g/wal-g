@@ -251,8 +251,14 @@ Databases
 ### MySQL/MariaDB
 [Information about installing, configuration and usage](https://github.com/wal-g/wal-g/blob/master/MySQL.md)
 
+### SQLServer
+[Information about installing, configuration and usage](https://github.com/wal-g/wal-g/blob/master/SQLServer.md)
+
 ### Mongo
 [Information about installing, configuration and usage](https://github.com/wal-g/wal-g/blob/master/MongoDB.md)
+
+### FoundationDB [Work in progress]
+[Information about installing, configuration and usage](https://github.com/wal-g/wal-g/blob/master/FoundationDB.md)
 
 Development
 -----------
