@@ -72,7 +72,7 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 
 // TODO : unit tests
 // uploadWALFile from FS to the cloud
-func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrite bool, ReadyRename bool) error {
+func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrite bool, readyRename bool) error {
 	if preventWalOverwrite {
 		overwriteAttempt, err := checkWALOverwrite(uploader, walFilePath)
 		if overwriteAttempt {
@@ -92,7 +92,7 @@ func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrit
 	}
 
 	// rename WAL status file ".ready" to ".done" if requested
-	if ReadyRename && err == nil {
+	if readyRename && err == nil {
 
 		var wALFileName = filepath.Base(walFilePath)
 		var readyPath = filepath.Join(internal.GetPGArchiveStatusFolderPath(), wALFileName+".ready")
