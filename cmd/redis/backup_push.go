@@ -1,4 +1,4 @@
-package mongo
+package redis
 
 import (
 	"context"
@@ -8,20 +8,19 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/mongo"
-	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
-	"github.com/wal-g/wal-g/internal/databases/mongo/client"
+	"github.com/wal-g/wal-g/internal/databases/redis"
+	"github.com/wal-g/wal-g/internal/databases/redis/archive"
 	"github.com/wal-g/wal-g/utility"
-)
-
-const (
-	backupPushShortDescription = "Pushes backup to storage"
-	PermanentFlag              = "permanent"
-	PermanentShorthand         = "p"
 )
 
 var (
 	permanent = false
+)
+
+const (
+	backupPushShortDescription = "Makes backup and uploads it to storage"
+	PermanentFlag              = "permanent"
+	PermanentShorthand         = "p"
 )
 
 // backupPushCmd represents the backupPush command
@@ -34,24 +33,18 @@ var backupPushCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		mongodbURL, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
+		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		// set up mongodb client and oplog fetcher
-		mongoClient, err := client.NewMongoClient(ctx, mongodbURL)
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		uplProvider, err := internal.ConfigureUploader()
-		tracelog.ErrorLogger.FatalOnError(err)
-		uplProvider.UploadingFolder = uplProvider.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
+		// Configure folder
+		uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 
 		backupCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamCreateCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
 		backupCmd.Stderr = os.Stderr
-		uploader := archive.NewStorageUploader(uplProvider)
-		metaConstructor := archive.NewBackupMongoMetaConstructor(ctx, mongoClient, uplProvider.UploadingFolder, permanent)
+		metaConstructor := archive.NewBackupRedisMetaConstructor(ctx, uploader.UploadingFolder, permanent)
 
-		err = mongo.HandleBackupPush(uploader, metaConstructor, backupCmd)
+		err = redis.HandleBackupPush(uploader, backupCmd, metaConstructor)
 		tracelog.ErrorLogger.FatalfOnError("Backup creation failed: %v", err)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
@@ -62,6 +55,7 @@ var backupPushCmd = &cobra.Command{
 }
 
 func init() {
-	backupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes permanent backup")
+	backupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes backup with 'permanent' flag")
 	cmd.AddCommand(backupPushCmd)
 }
+

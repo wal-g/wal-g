@@ -27,7 +27,7 @@ func NewLatestBackupSelector() LatestBackupSelector {
 }
 
 func (s LatestBackupSelector) Select(folder storage.Folder) (string, error) {
-	return GetLatestBackupName(folder)
+	return GetLatestBackupName(folder.GetSubFolder(utility.BaseBackupPath))
 }
 
 // Select backup which has the provided user data

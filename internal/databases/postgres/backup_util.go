@@ -2,11 +2,9 @@ package postgres
 
 import (
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/wal-g/utility"
 	"github.com/wal-g/wal-g/internal"
 )
 
@@ -17,89 +15,42 @@ const (
 	ByModificationTime
 )
 
-// TODO : unit tests
-// GetBackups receives backup descriptions and sorts them by time
-func GetBackups(folder storage.Folder) (backups []BackupTime, err error) {
-	return GetBackupsWithTarget(folder, utility.BaseBackupPath)
-}
-
-func GetBackupsWithTarget(folder storage.Folder, targetPath string) (backups []BackupTime, err error) {
-	backups, _, err = GetBackupsAndGarbageWithTarget(folder, targetPath)
-	if err != nil {
-		return nil, err
-	}
-
-	count := len(backups)
-	if count == 0 {
-		return nil, internal.NewNoBackupsFoundError()
-	}
-	return
-}
-
-func GetBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage []string, err error) {
-	return GetBackupsAndGarbageWithTarget(folder, utility.BaseBackupPath)
-}
-
-// TODO : unit tests
-func GetBackupsAndGarbageWithTarget(folder storage.Folder, targetPath string) (backups []BackupTime, garbage []string, err error) {
-	backupObjects, subFolders, err := folder.GetSubFolder(targetPath).ListFolder()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	sortTimes := GetBackupTimeSlices(backupObjects, folder)
-	garbage = getGarbageFromPrefix(subFolders, sortTimes)
-
-	return sortTimes, garbage, nil
-}
-
-func SortBackupTimeSlices(backupsSlices *[]BackupTime, sortOrder BackupTimeSlicesOrder) {
-	if sortOrder == ByCreationTime {
-		sort.Slice(*backupsSlices, func(i, j int) bool {
-			return (*backupsSlices)[i].CreationTime.After((*backupsSlices)[j].CreationTime)
-		})
-	} else {
-		sort.Slice(*backupsSlices, func(i, j int) bool {
-			return (*backupsSlices)[i].ModificationTime.After((*backupsSlices)[j].ModificationTime)
-		})
-	}
-}
-
-// TODO : unit tests
-func GetBackupTimeSlices(backups []storage.Object, folder storage.Folder) []BackupTime {
-	sortTimes := make([]BackupTime, len(backups))
-	sortOrder := ByCreationTime
-	for i, object := range backups {
-		key := object.GetName()
-		if !strings.HasSuffix(key, utility.SentinelSuffix) {
-			continue
+func GetBackupsDetails(folder storage.Folder, backups []internal.BackupTime) ([]BackupDetail, error) {
+	backupsDetails := make([]BackupDetail, 0, len(backups))
+	for i := len(backups) - 1; i >= 0; i-- {
+		details, err := GetBackupDetails(folder, backups[i])
+		if err != nil {
+			return nil, err
 		}
-		metaData, err := GetBackupMetaData(folder, utility.StripRightmostBackupName(key), utility.BaseBackupPath)
-		var creationTime time.Time = time.Time{}
-		if (err == nil && metaData.StartTime != time.Time{}) {
-			creationTime = metaData.StartTime
-		} else {
+		backupsDetails = append(backupsDetails, details)
+	}
+	return backupsDetails, nil
+}
+
+func GetBackupDetails(folder storage.Folder, backupTime internal.BackupTime) (BackupDetail, error) {
+	backup := NewBackup(folder, backupTime.BackupName)
+
+	metaData, err := backup.FetchMeta()
+	if err != nil {
+		return BackupDetail{}, err
+	}
+	return BackupDetail{backupTime, metaData}, nil
+}
+
+func SortBackupDetails(backupDetails []BackupDetail) {
+	sortOrder := ByCreationTime
+	for i := 0; i < len(backupDetails); i++ {
+		if (backupDetails[i].ExtendedMetadataDto == ExtendedMetadataDto{} || backupDetails[i].StartTime == time.Time{}) {
 			sortOrder = ByModificationTime
 		}
-		sortTimes[i] = BackupTime{utility.StripRightmostBackupName(key), creationTime, object.GetLastModified(), utility.StripWalFileName(key)}
 	}
-	SortBackupTimeSlices(&sortTimes, sortOrder)
-	return sortTimes
-}
-
-// TODO : unit tests
-func getGarbageFromPrefix(folders []storage.Folder, nonGarbage []BackupTime) []string {
-	garbage := make([]string, 0)
-	var keyFilter = make(map[string]string)
-	for _, k := range nonGarbage {
-		keyFilter[k.BackupName] = k.BackupName
+	if sortOrder == ByCreationTime {
+		sort.Slice(backupDetails, func(i, j int) bool {
+			return backupDetails[i].StartTime.After(backupDetails[j].StartTime)
+		})
+	} else {
+		sort.Slice(backupDetails, func(i, j int) bool {
+			return backupDetails[i].Time.After(backupDetails[j].Time)
+		})
 	}
-	for _, folder := range folders {
-		backupName := utility.StripPrefixName(folder.GetPath())
-		if _, ok := keyFilter[backupName]; ok {
-			continue
-		}
-		garbage = append(garbage, backupName)
-	}
-	return garbage
 }

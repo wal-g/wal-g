@@ -186,15 +186,7 @@ func CreatePostgresMockStorageFolderWithTimeMetadata(t *testing.T, dataFilling D
 		mockBaseBackupFolder.EXPECT().ReadObject(currentMetadataPath).Return(folder.ReadObject(currentMetadataPath)).AnyTimes()
 		mockBaseBackupFolder.EXPECT().ReadObject(currentSentinelPath).Return(folder.ReadObject(currentSentinelPath)).AnyTimes()
 	}
-
-	mockFolder := mocks.NewMockFolder(controller)
-
-	mockFolder.
-		EXPECT().
-		GetSubFolder(utility.BaseBackupPath).
-		Return(mockBaseBackupFolder).
-		AnyTimes()
-	return mockFolder
+	return mockBaseBackupFolder
 }
 
 func CreateMockStorageFolderWithDeltaBackups(t *testing.T) storage.Folder {

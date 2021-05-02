@@ -4,9 +4,8 @@ import (
 	"context"
 	"os/exec"
 
-	"github.com/wal-g/wal-g/internal"
-
 	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
 )
 

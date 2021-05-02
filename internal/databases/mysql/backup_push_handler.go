@@ -10,7 +10,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
+func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPermanent bool) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 
 	db, err := getMySQLConnection()
@@ -23,9 +23,7 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
-	uncompressedSize := int64(0)
-	streamReader := internal.NewWithSizeReader(limiters.NewDiskLimitReader(stdout), &uncompressedSize)
-	fileName, err := uploader.PushStream(streamReader)
+	fileName, err := uploader.PushStream(limiters.NewDiskLimitReader(stdout))
 	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
 
 	err = backupCmd.Wait()
@@ -41,14 +39,26 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
 		hostname = ""
 		tracelog.WarningLogger.Printf("Failed to obtain the OS hostname for the backup sentinel\n")
 	}
+
+	uploadedSize, err := uploader.UploadedDataSize()
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to calc uploaded data size: %v", err)
+	}
+
+	rawSize, err := uploader.RawDataSize()
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to calc raw data size: %v", err)
+	}
+
 	sentinel := StreamSentinelDto{
 		BinLogStart:      binlogStart,
 		BinLogEnd:        binlogEnd,
 		StartLocalTime:   timeStart,
 		StopLocalTime:    timeStop,
 		Hostname:         hostname,
-		CompressedSize:   *uploader.TarSize,
-		UncompressedSize: uncompressedSize,
+		CompressedSize:   uploadedSize,
+		UncompressedSize: rawSize,
+		IsPermanent:      isPermanent,
 	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())
 

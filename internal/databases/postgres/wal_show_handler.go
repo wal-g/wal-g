@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
+	"github.com/wal-g/wal-g/internal"
 )
 
 const (
@@ -165,11 +166,15 @@ func groupSegmentsByTimelines(segments map[WalSegmentDescription]bool) map[uint3
 
 // addBackupsInfo adds info about available backups for each timeline
 func addBackupsInfo(timelineInfos []*TimelineInfo, rootFolder storage.Folder) ([]*TimelineInfo, error) {
-	backups, err := GetBackups(rootFolder)
+	backups, err := internal.GetBackups(rootFolder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
+		if _, ok := err.(internal.NoBackupsFoundError); ok {
+			tracelog.InfoLogger.Println("No backups found in storage.")
+			return timelineInfos, nil
+		}
 		return nil, err
 	}
-	backupDetails, err := GetBackupsDetails(rootFolder, backups)
+	backupDetails, err := GetBackupsDetails(rootFolder.GetSubFolder(utility.BaseBackupPath), backups)
 	if err != nil {
 		return nil, err
 	}

@@ -51,10 +51,13 @@ services:
       &&  mkdir -p /export/mysqlfullmysqldumpbucket
       &&  mkdir -p /export/mysqlbinlogpushfetchbucket
       &&  mkdir -p /export/mysqldeleteendtoendbucket
+      &&  mkdir -p /export/mysqldeleteeverythingpermanent
       &&  mkdir -p /export/mysqlmarkbucket
       &&  mkdir -p /export/mysqlbinlogreplaybucket
       &&  mkdir -p /export/mysqlpitrxtrabackupbucket
       &&  mkdir -p /export/mysqlpitrmysqldumpbucket
+      &&  mkdir -p /export/mysqllivereplay
+      &&  mkdir -p /export/mysqlpermanentbackupbucket
       &&  mkdir -p /export/mariadbfullmysqldumpbucket
       &&  mkdir -p /export/mariadbfullmariabackupbucket
       &&  mkdir -p /export/mongostreampushbucket

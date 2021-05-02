@@ -3,6 +3,7 @@ package internal_test
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/wal-g/wal-g/utility"
 	"testing"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 
 func TestBackupListFindsBackups(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
-	internal.DefaultHandleBackupList(folder)
+	internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath), false, false)
 }
 
 var backups = []internal.BackupTime{
@@ -31,9 +32,9 @@ var backups = []internal.BackupTime{
 
 func TestBackupListCorrectOutput(t *testing.T) {
 	const expected = "" +
-		"name     last_modified        wal_segment_backup_start\n" +
-		"base_456 2018-07-05T01:01:50Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
-		"base_123 2019-04-25T14:48:00Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n"
+		"name     modified             wal_segment_backup_start\n" +
+		"base_123 2019-04-25T14:48:00Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
+		"base_456 2018-07-05T01:01:50Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n"
 
 	buf := new(bytes.Buffer)
 	internal.WriteBackupList(backups, buf)
@@ -43,7 +44,7 @@ func TestBackupListCorrectOutput(t *testing.T) {
 func TestBackupListCorrectPrettyOutput(t *testing.T) {
 	const expected = "" +
 		"+---+----------+----------------------------------+--------------------------+\n" +
-		"| # | NAME     | LAST MODIFIED                    | WAL SEGMENT BACKUP START |\n" +
+		"| # | NAME     | MODIFIED                         | WAL SEGMENT BACKUP START |\n" +
 		"+---+----------+----------------------------------+--------------------------+\n" +
 		"| 0 | base_123 | Thursday, 25-Apr-19 14:48:00 UTC | ZZZZZZZZZZZZZZZZZZZZZZZZ |\n" +
 		"| 1 | base_456 | Thursday, 05-Jul-18 01:01:50 UTC | ZZZZZZZZZZZZZZZZZZZZZZZZ |\n" +

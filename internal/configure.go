@@ -129,6 +129,10 @@ func ConfigureFolder() (storage.Folder, error) {
 	return ConfigureFolderForSpecificConfig(viper.GetViper())
 }
 
+// TODO: something with that
+// when provided multiple 'keys' in the config,
+// this function will always return only one concrete 'folder'.
+// Chosen folder depends only on 'StorageAdapters' order
 func ConfigureFolderForSpecificConfig(config *viper.Viper) (storage.Folder, error) {
 	skippedPrefixes := make([]string, 0)
 	for _, adapter := range StorageAdapters {

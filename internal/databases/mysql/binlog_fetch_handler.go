@@ -51,7 +51,7 @@ func HandleBinlogFetch(folder storage.Folder, backupName string, untilTS string)
 	handler := newIndexHandler(dstDir)
 
 	tracelog.InfoLogger.Printf("Fetching binlogs since %s until %s", startTS, endTS)
-	err = fetchLogs(folder, dstDir, startTS, endTS, handler)
+	err = fetchLogs(folder, dstDir, startTS, endTS, false, handler)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch binlogs: %v", err)
 
 	err = handler.createIndexFile()
