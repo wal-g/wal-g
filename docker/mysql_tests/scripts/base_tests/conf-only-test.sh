@@ -32,7 +32,7 @@ service mysql start
 mysql mysql -e 'create table testt1(i int)'
 
 export NAME
-NAME=$(wal-g backup-push --config=/root/conf.yaml 2>&1 | grep -oe 'stream_[0-9]*T[0-9]*Z')
+NAME=$(wal-g backup-push --config=/root/conf.yaml 2>&1 | grep -oe 'stream_[0-9]*T[0-9]*Z' | sort -u)
 
 mysql_kill_and_clean_data
 
