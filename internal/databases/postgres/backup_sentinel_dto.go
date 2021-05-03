@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/wal-g/wal-g/internal"
@@ -77,21 +78,20 @@ type ExtendedMetadataDto struct {
 	UserData interface{} `json:"user_data,omitempty"`
 }
 
-func NewExtendedMetadataDto(isPermanent bool, dataDir string, startTime time.Time) (meta ExtendedMetadataDto, err error) {
+func NewExtendedMetadataDto(isPermanent bool, dataDir string, startTime time.Time,
+	sentinelDto BackupSentinelDto) (meta ExtendedMetadataDto) {
 	hostname, err := os.Hostname()
 	if err != nil {
-		return meta, err
+		tracelog.WarningLogger.Printf("Failed to fetch the hostname for metadata, leaving empty: %v", err)
 	}
 	meta.DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
 	meta.StartTime = startTime
+	meta.FinishTime = utility.TimeNowCrossPlatformUTC()
 	meta.Hostname = hostname
 	meta.IsPermanent = isPermanent
 	meta.DataDir = dataDir
-	return meta, err
-}
 
-func (meta *ExtendedMetadataDto) updateFromSentinel(sentinelDto BackupSentinelDto) {
-	meta.FinishTime = utility.TimeNowCrossPlatformUTC()
+	// set the matching fields from sentinel
 	meta.StartLsn = *sentinelDto.BackupStartLSN
 	meta.FinishLsn = *sentinelDto.BackupFinishLSN
 	meta.PgVersion = sentinelDto.PgVersion
@@ -99,6 +99,7 @@ func (meta *ExtendedMetadataDto) updateFromSentinel(sentinelDto BackupSentinelDt
 	meta.UserData = sentinelDto.UserData
 	meta.UncompressedSize = sentinelDto.UncompressedSize
 	meta.CompressedSize = sentinelDto.CompressedSize
+	return meta
 }
 
 func (dto *BackupSentinelDto) setFiles(p *sync.Map) {

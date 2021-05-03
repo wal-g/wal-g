@@ -544,12 +544,8 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 
 // TODO : unit tests
 func (bh *BackupHandler) uploadExtendedMetadata(sentinelDto BackupSentinelDto) (err error) {
-	meta, err := NewExtendedMetadataDto(bh.arguments.isPermanent, bh.pgInfo.pgDataDirectory,
-		bh.curBackupInfo.startTime)
-	if err != nil {
-		return err
-	}
-	meta.updateFromSentinel(sentinelDto)
+	meta := NewExtendedMetadataDto(bh.arguments.isPermanent, bh.pgInfo.pgDataDirectory,
+		bh.curBackupInfo.startTime, sentinelDto)
 
 	metaFile := storage.JoinPath(bh.curBackupInfo.name, utility.MetadataFileName)
 	dtoBody, err := json.Marshal(meta)
