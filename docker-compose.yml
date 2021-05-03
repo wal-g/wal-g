@@ -31,6 +31,7 @@ services:
       -c 'mkdir -p /export/fullbucket
       &&  mkdir -p /export/fullratingcomposerbucket
       &&  mkdir -p /export/fullscandeltabucket
+      &&  mkdir -p /export/remotebucket
       &&  mkdir -p /export/cryptobucket
       &&  mkdir -p /export/waldeltabucket
       &&  mkdir -p /export/ghostbucket
@@ -51,6 +52,7 @@ services:
       &&  mkdir -p /export/mysqlfullmysqldumpbucket
       &&  mkdir -p /export/mysqlbinlogpushfetchbucket
       &&  mkdir -p /export/mysqldeleteendtoendbucket
+      &&  mkdir -p /export/mysqldeleteeverythingpermanent
       &&  mkdir -p /export/mysqlmarkbucket
       &&  mkdir -p /export/mysqlbinlogreplaybucket
       &&  mkdir -p /export/mysqlpitrxtrabackupbucket
@@ -222,6 +224,17 @@ services:
       context: .
     image: wal-g/full_backup_test
     container_name: wal-g_pg_full_backup_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_remote_backup_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_remote_backup_test
+      context: .
+    image: wal-g/remote_backup_test
+    container_name: wal-g_pg_remote_backup_test
     depends_on:
       - s3
     links:

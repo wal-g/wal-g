@@ -3,6 +3,8 @@ package pg
 import (
 	"fmt"
 
+	"github.com/wal-g/wal-g/utility"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 
@@ -36,13 +38,18 @@ var (
 	backupPushCmd = &cobra.Command{
 		Use:   "backup-push db_directory",
 		Short: backupPushShortDescription, // TODO : improve description
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			uploader, err := postgres.ConfigureWalUploader()
-			tracelog.ErrorLogger.FatalOnError(err)
+			var dataDirectory string
+
+			if len(args) > 0 {
+				dataDirectory = args[0]
+			}
+
 			verifyPageChecksums = verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting)
 			storeAllCorruptBlocks = storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting)
 			tarBallComposerType := postgres.RegularComposer
+
 			useRatingComposer = useRatingComposer || viper.GetBool(internal.UseRatingComposerSetting)
 			if useRatingComposer {
 				tarBallComposerType = postgres.RatingComposer
@@ -59,9 +66,14 @@ var (
 			if userData == "" {
 				userData = viper.GetString(internal.SentinelUserDataSetting)
 			}
+			arguments := postgres.NewBackupArguments(dataDirectory, utility.BaseBackupPath,
+				permanent, verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting),
+				fullBackup, storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting),
+				tarBallComposerType, deltaBaseSelector, userData)
 
-			postgres.HandleBackupPush(uploader, args[0], permanent, fullBackup, verifyPageChecksums,
-				storeAllCorruptBlocks, tarBallComposerType, deltaBaseSelector, userData)
+			backupHandler, err := postgres.NewBackupHandler(arguments)
+			tracelog.ErrorLogger.FatalOnError(err)
+			backupHandler.HandleBackupPush()
 		},
 	}
 	permanent             = false

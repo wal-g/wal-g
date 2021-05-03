@@ -27,7 +27,7 @@ wal-g delete everything FORCE --confirm --config=/root/from.yaml
 wal-g delete everything FORCE --confirm --config=/root/to.yaml
 
 export NAME
-NAME=$(wal-g backup-push --config=/root/from.yaml 2>&1 | grep -oe 'stream_[0-9]*T[0-9]*Z')
+NAME=$(wal-g backup-push --config=/root/from.yaml 2>&1 | grep -oe 'stream_[0-9]*T[0-9]*Z' | sort -u)
 
 sleep 1
 

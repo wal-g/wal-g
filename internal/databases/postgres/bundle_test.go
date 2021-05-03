@@ -30,7 +30,7 @@ func TestEmptyBundleQueue(t *testing.T) {
 	internal.Configure()
 
 	bundle := &postgres.Bundle{
-		ArchiveDirectory: "",
+		Directory:        "",
 		TarSizeThreshold: 100,
 	}
 
@@ -60,7 +60,7 @@ func TestBundleQueueLowConcurrency(t *testing.T) {
 
 func queueTest(t *testing.T) {
 	bundle := &postgres.Bundle{
-		ArchiveDirectory: "",
+		Directory:        "",
 		TarSizeThreshold: 100,
 	}
 	uploader := testtools.NewMockUploader(false, false)

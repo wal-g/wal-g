@@ -261,8 +261,16 @@ Databases
 ### MySQL/MariaDB
 [Information about installing, configuration and usage](MySQL.md)
 
+### SQLServer
+[Information about installing, configuration and usage](SQLServer.md)
+
 ### Mongo
 [Information about installing, configuration and usage](MongoDB.md)
+
+### FoundationDB [Work in progress]
+[Information about installing, configuration and usage](FoundationDB.md)
+
+
 
 Development
 -----------
