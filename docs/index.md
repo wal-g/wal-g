@@ -27,7 +27,7 @@ A precompiled binary for Linux AMD 64 of the latest version of WAL-G can be obta
 
 To decompress the binary, use:
 
-```
+```plaintext
 tar -zxvf wal-g.linux-amd64.tar.gz
 mv wal-g /usr/local/bin/
 ```
@@ -138,7 +138,7 @@ Overrides the default `maximum number of upload buffers`. By default, at most 3 
 
 ***Example: Using Minio.io S3-compatible storage***
 
-```
+```plaintext
 AWS_ACCESS_KEY_ID: "<minio-key>"
 AWS_SECRET_ACCESS_KEY: "<minio-secret>"
 WALG_S3_PREFIX: "s3://my-minio-bucket/sub-dir"
@@ -272,7 +272,7 @@ It is specified for your type of [database](#databases).
 ### Testing
 
 WAL-G relies heavily on unit tests. These tests do not require S3 configuration as the upload/download parts are tested using mocked objects. Unit tests can be run using
-```
+```plaintext
 make unittest
 ```
 For more information on testing, please consult [test](test), [testtools](testtools) and `unittest` section in [Makefile](Makefile).
@@ -280,7 +280,7 @@ For more information on testing, please consult [test](test), [testtools](testto
 WAL-G will perform a round-trip compression/decompression test that generates a directory for data (e.g. data...), compressed files (e.g. compressed), and extracted files (e.g. extracted). These directories will only get cleaned up if the files in the original data directory match the files in the extracted one.
 
 Test coverage can be obtained using:
-```
+```plaintext
 make coverage
 ```
 This command generates `coverage.out` file and opens HTML representation of the coverage.

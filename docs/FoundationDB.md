@@ -13,7 +13,7 @@ Optional:
 
 - To build with libsodium, just set `USE_LIBSODIUM` environment variable.
 - To build with lzo decompressor, just set `USE_LZO` environment variable.
-```
+```plaintext
 go get github.com/wal-g/wal-g
 cd $GOPATH/src/github.com/wal-g/wal-g
 make install
@@ -21,7 +21,7 @@ make deps
 make fdb_build
 ```
 Users can also install WAL-G by using `make install`. Specifying the GOBIN environment variable before installing allows the user to specify the installation location. On default, `make install` puts the compiled binary in `go/bin`.
-```
+```plaintext
 export GOBIN=/usr/local/bin
 cd $GOPATH/src/github.com/wal-g/wal-g
 make install
@@ -36,7 +36,7 @@ Usage
 
 Command for sending backup from storage to stream in order to restore it in the database.
 
-```
+```plaintext
 wal-g backup-fetch example_backup
 ```
 
@@ -45,7 +45,7 @@ Variable _WALG_STREAM_RESTORE_COMMAND_ is required for use backup-fetch
 
 WAL-G can also fetch the latest backup using:
 
-```
+```plaintext
 wal-g backup-fetch LATEST
 ```
 
@@ -53,7 +53,7 @@ wal-g backup-fetch LATEST
 
 Command for compressing, encrypting and sending backup from stream to storage.
 
-```
+```plaintext
 wal-g backup-push
 ```
 
