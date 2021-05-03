@@ -72,7 +72,7 @@ func (rh *replayHandler) handleBinlog(binlogPath string) error {
 	}
 }
 
-func HandleBinlogReplay(folder storage.Folder, backupName string, untilTS string, liveReplay bool) {
+func HandleBinlogReplay(folder storage.Folder, backupName string, untilTS string) {
 	dstDir, err := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -82,7 +82,7 @@ func HandleBinlogReplay(folder storage.Folder, backupName string, untilTS string
 	handler := newReplayHandler(endTS)
 
 	tracelog.InfoLogger.Printf("Fetching binlogs since %s until %s", startTS, endTS)
-	err = fetchLogs(folder, dstDir, startTS, endTS, liveReplay, handler)
+	err = fetchLogs(folder, dstDir, startTS, endTS, handler)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch binlogs: %v", err)
 
 	err = handler.wait()

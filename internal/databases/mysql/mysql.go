@@ -162,7 +162,7 @@ type binlogHandler interface {
 	handleBinlog(binlogPath string) error
 }
 
-func fetchLogs(folder storage.Folder, dstDir string, startTS time.Time, endTS time.Time, liveReplay bool, handler binlogHandler) error {
+func fetchLogs(folder storage.Folder, dstDir string, startTS time.Time, endTS time.Time, handler binlogHandler) error {
 	logFolder := folder.GetSubFolder(BinlogPath)
 	includeStart := true
 outer:
@@ -193,7 +193,7 @@ outer:
 				break outer
 			}
 		}
-		if len(logsToFetch) == 0 || !liveReplay {
+		if len(logsToFetch) == 0 {
 			break
 		}
 	}

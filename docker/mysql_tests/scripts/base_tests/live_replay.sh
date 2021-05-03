@@ -23,7 +23,7 @@ wal-g binlog-push
 done
 sleep 1
 
-wal-g binlog-replay --until "2030-01-01T00:00:00.000000000+00:00" --live-replay &
+wal-g binlog-replay --until "2030-01-01T00:00:00.000000000+00:00" &
 
 while [ ! -f "/tmp/mysql-bin.000001.ok" ]; do sleep 1; done
 
