@@ -65,7 +65,6 @@ func (backup *Backup) SentinelExists() (bool, error) {
 	return backup.Folder.Exists(backup.getStopSentinelPath())
 }
 
-// TODO : unit tests
 func (backup *Backup) FetchSentinel(sentinelDto interface{}) error {
 	sentinelDtoData, err := backup.fetchStorageBytes(backup.getStopSentinelPath())
 	if err != nil {
