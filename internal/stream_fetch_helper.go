@@ -60,7 +60,7 @@ func downloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) err
 
 // TODO : unit tests
 func FetchStreamSentinel(backup *Backup, sentinelDto interface{}) error {
-	sentinelDtoData, err := backup.fetchSentinelData()
+	sentinelDtoData, err := backup.FetchSentinelData()
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch sentinel")
 	}

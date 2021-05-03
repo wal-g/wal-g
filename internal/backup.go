@@ -93,7 +93,7 @@ func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
 		return *backup.SentinelDto, nil
 	}
 	sentinelDto := BackupSentinelDto{}
-	sentinelDtoData, err := backup.fetchSentinelData()
+	sentinelDtoData, err := backup.FetchSentinelData()
 	if err != nil {
 		return sentinelDto, err
 	}
@@ -106,9 +106,8 @@ func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
 	return sentinelDto, nil
 }
 
-// TODO : unit tests
-func (backup *Backup) fetchSentinelData() ([]byte, error) {
-	backupReaderMaker := newStorageReaderMaker(backup.BaseBackupFolder, backup.GetStopSentinelPath())
+func (backup *Backup) FetchSentinelData() ([]byte, error) {
+	backupReaderMaker := NewStorageReaderMaker(backup.BaseBackupFolder, backup.GetStopSentinelPath())
 	backupReader, err := backupReaderMaker.Reader()
 	if err != nil {
 		return make([]byte, 0), err
@@ -122,7 +121,7 @@ func (backup *Backup) fetchSentinelData() ([]byte, error) {
 
 func (backup *Backup) FetchMeta() (ExtendedMetadataDto, error) {
 	extendedMetadataDto := ExtendedMetadataDto{}
-	backupReaderMaker := newStorageReaderMaker(backup.BaseBackupFolder, backup.GetMetadataPath())
+	backupReaderMaker := NewStorageReaderMaker(backup.BaseBackupFolder, backup.GetMetadataPath())
 
 	backupReader, err := backupReaderMaker.Reader()
 	if err != nil {
@@ -232,7 +231,7 @@ func (backup *Backup) unwrapOld(
 	}
 
 	if needPgControl {
-		err = ExtractAll(tarInterpreter, []ReaderMaker{newStorageReaderMaker(backup.getTarPartitionFolder(), pgControlKey)})
+		err = ExtractAll(tarInterpreter, []ReaderMaker{NewStorageReaderMaker(backup.getTarPartitionFolder(), pgControlKey)})
 		if err != nil {
 			return errors.Wrap(err, "failed to extract pg_control")
 		}
@@ -291,7 +290,7 @@ func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnw
 			continue
 		}
 
-		tarToExtract := newStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
+		tarToExtract := NewStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
 		tarsToExtract = append(tarsToExtract, tarToExtract)
 	}
 	return tarsToExtract, pgControlKey, nil

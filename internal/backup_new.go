@@ -98,7 +98,7 @@ func (backup *Backup) unwrapNew(
 	}
 
 	if needPgControl {
-		err = ExtractAll(tarInterpreter, []ReaderMaker{newStorageReaderMaker(backup.getTarPartitionFolder(), pgControlKey)})
+		err = ExtractAll(tarInterpreter, []ReaderMaker{NewStorageReaderMaker(backup.getTarPartitionFolder(), pgControlKey)})
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to extract pg_control")
 		}

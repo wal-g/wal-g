@@ -136,3 +136,32 @@ func TestFetchSentinelReturnErrorWhenSentinelUnmarshallable(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, errorMessage, err.Error()[:len(errorMessage)])
 }
+
+func TestFetchSentinelData(t *testing.T) {
+	folder := testtools.CreateMockStorageFolder()
+	backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_000")
+	sentinelDtoData, err := backup.FetchSentinelData()
+
+	assert.NoError(t, err)
+	assert.NotNil(t, sentinelDtoData)
+}
+
+func TestFetchSentinelWithData(t *testing.T){
+	folder := testtools.CreateMockStorageFolder()
+	subFolder := folder.GetSubFolder(utility.BaseBackupPath)
+	subFolder.PutObject("base_123_backup_stop_sentinel.json", bytes.NewBuffer([]byte("go gopher")))
+	backup := internal.NewBackup(subFolder, "base_123")
+	sentinelDtoData, err := backup.FetchSentinelData()
+
+	assert.NoError(t, err)
+	assert.Equal(t, []byte("go gopher"), sentinelDtoData)
+}
+
+func TestFetchSentinelDataReturnErrorWhenReaderRaiseError(t *testing.T) {
+	folder := testtools.CreateMockStorageFolder()
+	backup := internal.NewBackup(folder.GetSubFolder("DOES_NOT_EXIST_PATH"), "base_3434g")
+	sentinelDtoData, err := backup.FetchSentinelData()
+
+	assert.Equal(t, make([]byte, 0), sentinelDtoData)
+	assert.Error(t, err)
+}
