@@ -58,4 +58,3 @@ func init() {
 	backupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes backup with 'permanent' flag")
 	cmd.AddCommand(backupPushCmd)
 }
-

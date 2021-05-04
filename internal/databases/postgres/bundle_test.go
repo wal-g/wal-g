@@ -26,6 +26,7 @@ var BundleTestLocations = []walparser.BlockLocation{
 }
 
 func TestEmptyBundleQueue(t *testing.T) {
+	internal.ConfigureSettings(internal.PG)
 	internal.InitConfig()
 	internal.Configure()
 
