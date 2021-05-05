@@ -78,7 +78,7 @@ WAL-G mysql extension currently supports these commands:
 
 Creates new backup and send it to storage. Runs `WALG_STREAM_CREATE_COMMAND` to create backup.
 
-```plaintext
+```bash
 wal-g backup-push
 ```
 
@@ -86,7 +86,7 @@ wal-g backup-push
 
 Lists currently available backups in storage
 
-```plaintext
+```bash
 wal-g backup-list
 ```
 
@@ -96,13 +96,13 @@ Fetches backup from storage and restores it to datadir.
 Runs `WALG_STREAM_RESTORE_COMMAND` to restore backup.
 User should specify the name of the backup to fetch.
 
-```plaintext
+```bash
 wal-g backup-fetch example_backup
 ```
 
 WAL-G can also fetch the latest backup using:
 
-```plaintext
+```bash
 wal-g backup-fetch  LATEST
 ```
 
@@ -110,7 +110,7 @@ wal-g backup-fetch  LATEST
 
 Sends (not yet archived) binlogs to storage. Typically run in CRON.
 
-```plaintext
+```bash
 wal-g binlog-push
 ```
 
@@ -121,15 +121,15 @@ User should specify the name of the backup starting with which to fetch an binlo
 User may also specify time in  RFC3339 format until which should be fetched (used for PITR).
 User have to replay binlogs manually in that case.
 
-```plaintext
+```bash
 wal-g binlog-fetch --since "backupname"
 ```
 or
-```plaintext
+```bash
 wal-g binlog-fetch --since "backupname" --until "2006-01-02T15:04:05Z07:00"
 ```
 or
-```plaintext
+```bash
 wal-g binlog-fetch --since LATEST --until "2006-01-02T15:04:05Z07:00"
 ```
 
@@ -145,19 +145,19 @@ When `--live-replay` specified WAL-G will be checking for newly uploaded binlogs
 This flag may be useful for huge databases - it prevents users from getting replica that cannot replicate master due too binlog rotation.
 WAL-G won't block in waiting for new binlogs, it will exit as soon as one of the following events happen: no new binlog uploaded during previous iteration or requested PITR reached.
 
-```plaintext
+```bash
 wal-g binlog-replay --since "backupname"
 ```
 or
-```plaintext
+```bash
 wal-g binlog-replay --since "backupname" --until "2006-01-02T15:04:05Z07:00"
 ```
 or
-```plaintext
+```bash
 wal-g binlog-replay --since LATEST --until "2006-01-02T15:04:05Z07:00"
 ```
 
-```plaintext
+```bash
 wal-g binlog-replay --since LATEST --until "2006-01-02T15:04:05Z07:00" --live-replay
 ```
 
@@ -169,7 +169,7 @@ Typical configurations
 
 It's recommended to use wal-g with xtrabackup tool in case of MySQL for creating lock-less backups.
 Here's typical wal-g configuration for that case:
-```plaintext
+```bash
  WALG_MYSQL_DATASOURCE_NAME=user:pass@tcp(localhost:3306)/mysql                                                                                                                                      
  WALG_STREAM_CREATE_COMMAND="xtrabackup --backup --stream=xbstream --datadir=/var/lib/mysql"                                                                                                                               
  WALG_STREAM_RESTORE_COMMAND="xbstream -x -C /var/lib/mysql"                                                                                                                       
@@ -183,12 +183,12 @@ Restore procedure is a bit tricky:
 * fetch and prepare desired backup using `wal-g backup-fetch "backup_name"`
 * start mysql
 * in case of you have replication and GTID enabled: set mysql GTID_PURGED variable to value from `/var/lib/mysql/xtrabackup_binlog_info`, using
-```plaintext
+```bash
 gtids=$(tr -d '\n' < /var/lib/mysql/xtrabackup_binlog_info | awk '{print $3}')
 mysql -e "RESET MASTER; SET @@GLOBAL.GTID_PURGED='$gtids';"
 ```
 * for PITR, replay binlogs with
-```plaintext
+```bash
 wal-g binlog-replay --since "backup_name" --until "2006-01-02T15:04:05Z07:00"
 ```
 
@@ -199,7 +199,7 @@ It's possible to use wal-g with standard mysqldump/mysql tools.
 In that case MySQL mysql backup is a plain SQL script.
 Here's typical wal-g configuration for that case:
 
-```plaintext
+```bash
  WALG_MYSQL_DATASOURCE_NAME=user:pass@localhost/mysql                                                                                                               
  WALG_STREAM_CREATE_COMMAND="mysqldump --all-databases --single-transaction --set-gtid-purged=ON"                                                                                                                               
  WALG_STREAM_RESTORE_COMMAND="mysql"
@@ -215,7 +215,7 @@ Restore procedure is straightforward:
 
 It's recommended to use wal-g with `mariabackup` tool in case of MariaDB for creating lock-less backups.
 Here's typical wal-g configuration for that case:
-```plaintext
+```bash
  WALG_MYSQL_DATASOURCE_NAME=user:pass@tcp(localhost:3305)/mysql                                                                                                                                      
  WALG_STREAM_CREATE_COMMAND="mariabackup --backup --stream=xbstream --datadir=/var/lib/mysql"                                                                                                                               
  WALG_STREAM_RESTORE_COMMAND="mbstream -x -C /var/lib/mysql"                                                                                                                       
@@ -230,7 +230,7 @@ For the restore procedure you have to do similar things to [what the offical doc
 * after the previous step you might have to fix file permissions: `chown -R mysql:mysql /var/lib/mysql`
 * in case of restoring for a replication slave you can follow the [official docs](https://mariadb.com/kb/en/setting-up-a-replication-slave-with-mariabackup/#gtids)
 * for PITR, replay binlogs with
-```plaintext
+```bash
 wal-g binlog-replay --since "backup_name" --until "2006-01-02T15:04:05Z07:00"
 ```
 * start mariadb

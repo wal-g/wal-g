@@ -36,7 +36,7 @@ Usage
 
 Command for sending backup from storage to stream in order to restore it in the database.
 
-```plaintext
+```bash
 wal-g backup-fetch example_backup
 ```
 
@@ -45,7 +45,7 @@ Variable _WALG_STREAM_RESTORE_COMMAND_ is required for use backup-fetch
 
 WAL-G can also fetch the latest backup using:
 
-```plaintext
+```bash
 wal-g backup-fetch LATEST
 ```
 
@@ -53,7 +53,7 @@ wal-g backup-fetch LATEST
 
 Command for compressing, encrypting and sending backup from stream to storage.
 
-```plaintext
+```bash
 wal-g backup-push
 ```
 

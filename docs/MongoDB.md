@@ -105,7 +105,7 @@ Creates new backup and send it to storage.
 
 Runs `WALG_STREAM_CREATE_COMMAND` to create backup.
 
-```plaintext
+```bash
 wal-g backup-push
 ```
 
@@ -113,7 +113,7 @@ wal-g backup-push
 
 Lists currently available backups in storage.
 
-```plaintext
+```bash
 wal-g backup-list
 ```
 
@@ -123,7 +123,7 @@ Fetches backup from storage and restores passes data to `WALG_STREAM_RESTORE_COM
 
 User should specify the name of the backup to fetch.
 
-```plaintext
+```bash
 wal-g backup-fetch example_backup
 ```
 
@@ -133,7 +133,7 @@ Fetches backup metadata from storage to STDOUT.
 
 User should specify the name of the backup to show.
 
-```plaintext
+```bash
 # wal-g backup-show stream_20201027T224823Z
 {
        "BackupName": "stream_20201027T224823Z",
@@ -172,12 +172,12 @@ Deletes backup from storage.
 User should specify the name of the backup to delete.
 
 Dry-run
-```plaintext
+```bash
 wal-g backup-delete example_backup
 ```
 
 Perform delete
-```plaintext
+```bash
 wal-g backup-delete example_backup --confirm
 ```
 
@@ -191,7 +191,7 @@ wal-g forces upload when,
 
 Archiving collects writes if optime is readable by majority reads. Optime is updated every `MONGODB_LAST_WRITE_UPDATE_INTERVAL`.
 
-```plaintext
+```bash
 wal-g oplog-push
 ```
 
@@ -204,7 +204,7 @@ Fetches oplog archives from storage and applies to mongodb instance (`MONGODB_UR
 User should specify SINCE and UNTIL boundaries (format: `timestamp.inc`, eg `1593554809.32`). Both of them should exist in storage.
 SINCE is included and UNTIL is NOT.
 
-```plaintext
+```bash
 wal-g oplog-replay 1593554109.1 1593559109.1
 ```
 
@@ -224,7 +224,7 @@ SINCE is included and UNTIL is NOT.
 
 Supported formats to output: `json`, `bson`, `bson-raw`
 
-```plaintext
+```bash
 wal-g oplog-fetch 1593554109.1 1593559109.1 --format json
 ```
 
@@ -235,12 +235,12 @@ Purges outdated oplog archives from storage. Clean-up will retain:
 - oplog archives within backup creation period
 
 Dry-run
-```plaintext
+```bash
 wal-g oplog-purge
 ```
 
 Perform clean-up
-```plaintext
+```bash
 wal-g oplog-purge --confirm
 ```
 
@@ -250,7 +250,7 @@ Typical configurations
 ### Full backup/restore only
 
 Here's typical wal-g configuration for that case:
-```plaintext
+```bash
 MONGODB_URI:                 'mongodb://user:password@localhost:27018/?authSource=admin&connect=direct&socketTimeoutMS=60000&connectTimeoutMS=10000&tls=true'
 WALG_STREAM_CREATE_COMMAND:  'mongodump --archive --oplog --uri="mongodb://user:password@localhost:27018/?authSource=admin&connectTimeoutMS=10000&tls=true"'
 WALG_STREAM_RESTORE_COMMAND: 'mongorestore --archive --oplogReplay --uri="mongodb://user:password@localhost:27018/?authSource=admin&connectTimeoutMS=10000&tls=true"'
@@ -261,7 +261,7 @@ You may also add `--drop` option to restore command. This option drops the colle
 ### Continuous archiving and point-in-time recovery 
 
 Here's typical wal-g configuration for that case:
-```plaintext
+```bash
 # Used to fetch oplog documents
 MONGODB_URI:                 'mongodb://user:password@localhost:27018/?authSource=admin&connect=direct&socketTimeoutMS=60000&connectTimeoutMS=10000&tls=true'
 
@@ -291,7 +291,7 @@ WALG_STREAM_RESTORE_COMMAND: 'mongorestore --archive --uri="mongodb://user:passw
 ### How to restore backup to point in time
 
 Suppose you want to restore your cluster to `2020-10-28T12:11:10+03:00`.
-```plaintext
+```bash
 # wal-g backup-list -v
 name                    finish_local_time         ts_before     ts_after      data_size   permanent
 stream_20201025T222118Z 2020-10-26T01:50:17+03:00 1603664478.21 1603666217.6  18521875261 false
@@ -299,10 +299,10 @@ stream_20201026T220833Z 2020-10-27T01:37:42+03:00 1603750113.39 1603751861.6  18
 stream_20201027T224823Z 2020-10-28T02:08:55+03:00 1603838903.4  1603840135.34 18952713762 false
 ```
 Pick the closest backup and restore it (don't forget about [constraints](#common-constraints)):
-```plaintext
+```bash
 # wal-g backup-fetch stream_20201027T224823Z
 ```
 Replay oplog from backup `ts_before` to `2020-10-28T12:11:10+03:00`:
-```plaintext
+```bash
 # wal-g oplog-replay 1603838903.4 1603876270.1
 ```

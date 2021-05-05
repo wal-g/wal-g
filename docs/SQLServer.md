@@ -19,7 +19,7 @@ So you need to:
 * create and import self-signed certificate for `backup.local` domain
 * create SQLServer login, able to backup/restore any desired database
 * create SQLServer credential for URL `https://backup.local/folder/`
-```plaintext
+```bash
 CREATE CREDENTIAL [https://backup.local/folder]
 WITH IDENTITY='SHARED ACCESS SIGNATURE', SECRET = 'does_not_matter'
 ```
@@ -27,7 +27,7 @@ Configuration
 -------------
 
 Your wal-g.yaml config for SQLServer than may look like
-```plaintext
+```bash
 WALG_FILE_PREFIX: "C:/backup"
 SQLSERVER_BLOB_CERT_FILE: "C:/Path/To/cert.pem"
 SQLSERVER_BLOB_KEY_FILE:  "C:/Path/To/key.pem"
@@ -42,7 +42,7 @@ WALG_DOWNLOAD_CONCURRENCY: 8  # how many block read requests handle concurrently
 Of course, you may use any wal-g storage instead of FILE
 
 You also need some configuration in SQLServer for wal-g to connect it.
-```plaintext
+```bash
 CREATE LOGIN [backupuser] WITH PASSWORD = 'backuppass1!';
 ALTER SERVER ROLE [sysadmin] ADD MEMBER [backupuser];
 CREATE CREDENTIAL [https://backup.local/basebackups_005]
@@ -56,7 +56,7 @@ S3 Configuration
 
 SQLServer backups/restores database by 4MB blocks (MAXTRANSFERSIZE).
 As we upload every block as a separate file to S3, it makes sense to set S3 part size to the smalles possible value (5MB) to prevent overuse of memory:
-```plaintext
+```bash
 WALG_S3_MAX_PART_SIZE: 5242880 # 5MB
 ```
 
@@ -68,7 +68,7 @@ WAL-G SQLServer extension currently supports these commands:
 
 ### ``proxy``
 
-```plaintext
+```bash
 wal-g proxy
 ```
 
@@ -80,7 +80,7 @@ For simple backup/restore process please consider using `backup-push` and `backu
 
 ### ``backup-push``
 
-```plaintext
+```bash
 wal-g backup-push
 wal-g backup-push -d db1 -d db2
 wal-g backup-push -d ALL
@@ -93,7 +93,7 @@ By default it will backup all non-system databases.
 
 ### ``backup-restore``
 
-```plaintext
+```bash
 wal-g backup-restore backup_name
 wal-g backup-restore LATEST
 wal-g backup-restore backup_name -d db1
@@ -111,13 +111,13 @@ By default it will restore all non-system databases found in backup.
 
 ### ``backup-list``
 
-```plaintext
+```bash
 wal-g backup-list
 ```
 
 ### ``delete``
 
-```plaintext
+```bash
 wal-g delete retain 3
 wal-g delete before backup_name
 wal-g delete everything
