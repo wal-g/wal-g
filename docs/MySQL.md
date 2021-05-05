@@ -138,12 +138,9 @@ wal-g binlog-fetch --since LATEST --until "2006-01-02T15:04:05Z07:00"
 Fetches binlogs from storage and passes them to `WALG_MYSQL_BINLOG_REPLAY_COMMAND` to replay on running MySQL server.
 User should specify the name of the backup starting with which to fetch an binlog.
 User may also specify time in  RFC3339 format until which should be fetched (used for PITR).
+If `until` timestamp is in the future, wal-g will search for newly uploaded binlogs until no new found.
 Binlogs are temporarily save in `WALG_MYSQL_BINLOG_DST` folder.
 Replay command gets name of binlog to replay via environment variable `WALG_MYSQL_CURRENT_BINLOG` and stop-date via `WALG_MYSQL_BINLOG_END_TS`, which are set for each invocation.
-
-When `--live-replay` specified WAL-G will be checking for newly uploaded binlogs after each iteration of binlog replay.
-This flag may be useful for huge databases - it prevents users from getting replica that cannot replicate master due too binlog rotation.
-WAL-G won't block in waiting for new binlogs, it will exit as soon as one of the following events happen: no new binlog uploaded during previous iteration or requested PITR reached.
 
 ```bash
 wal-g binlog-replay --since "backupname"
@@ -157,9 +154,6 @@ or
 wal-g binlog-replay --since LATEST --until "2006-01-02T15:04:05Z07:00"
 ```
 
-```bash
-wal-g binlog-replay --since LATEST --until "2006-01-02T15:04:05Z07:00" --live-replay
-```
 
 Typical configurations
 -----
