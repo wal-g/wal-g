@@ -1,6 +1,6 @@
 site_name: WAL-G
 nav:
-    - Overview: index.md
+    - Overview: README.md
     - Foundation DB: FoundationDB.md
     - Mongo DB: MongoDB.md
     - MySQL: MySQL.md
