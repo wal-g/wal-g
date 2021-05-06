@@ -128,6 +128,29 @@ func checkWALFileMagic(prefetched string) error {
 	return nil
 }
 
+// DownloadFileWithoutExtension downloads, decompresses and decrypts writes to stdout
+func DownloadFileWithoutDecompressor(backup *Backup, writeCloser io.WriteCloser) error {
+	defer writeCloser.Close()
+
+	for _, decompressor := range compression.Decompressors {
+		archiveReader, exists, err := TryDownloadFile(backup.BaseBackupFolder, backup.Name)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			continue
+		}
+
+		err = DecompressDecryptBytes(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
+		if err != nil {
+			return err
+		}
+		utility.LoggedClose(writeCloser, "")
+		return nil
+	}
+	return newArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))
+}
+
 func TryDownloadFile(folder storage.Folder, path string) (walFileReader io.ReadCloser, exists bool, err error) {
 	walFileReader, err = folder.ReadObject(path)
 	if err == nil {
