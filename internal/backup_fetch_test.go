@@ -12,6 +12,7 @@ import (
 )
 
 func init() {
+	internal.ConfigureSettings("")
 	internal.InitConfig()
 	internal.Configure()
 }
