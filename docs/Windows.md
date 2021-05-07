@@ -1,6 +1,8 @@
-## Building Windows executable on Linux
+# WAL-G for Windows
 
-See here for available GOOS and GOARCH values.
+Building Windows executable on Linux
+
+## See here for available GOOS and GOARCH values.
 -----------
 
 Go version >= 1.5
@@ -14,8 +16,6 @@ Since Go version 1.5 cross-compiling of pure Go executables has become very easy
 * make sqlserver_build
 
 * mv main/sqlserver/wal-g{,.exe}
-
-## WAL-G for Windows
 
 Development on Windows
 -----------

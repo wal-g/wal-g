@@ -1,4 +1,4 @@
-## WAL-G for PostgreSQL
+# WAL-G for PostgreSQL
 
 You can use wal-g as a tool for making encrypted, compressed PostgreSQL backups(full and incremental) and push/fetch them to/from storage without saving it on your filesystem.
 
@@ -7,12 +7,12 @@ Development
 ### Installing
 
 Prepare on Ubuntu:
-```
+```plaintext
 sudo apt-get install liblzo2-dev
 ```
 
 Prepare on Mac OS:
-```
+``` plaintext
 # brew command is Homebrew for Mac OS
 brew install cmake
 export USE_LIBSODIUM="true" # since we're linking libsodium later
@@ -28,7 +28,7 @@ Optional:
 
 - To build with libsodium, just set `USE_LIBSODIUM` environment variable.
 - To build with lzo decompressor, just set `USE_LZO` environment variable.
-```
+```plaintext
 go get github.com/wal-g/wal-g
 cd $GOPATH/src/github.com/wal-g/wal-g
 make install
@@ -38,7 +38,7 @@ make pg_build
 
 Users can also install WAL-G by using `make install`. Specifying the GOBIN environment variable before installing allows the user to specify the installation location. On default, `make install` puts the compiled binary in `go/bin`.
 
-```
+```plaintext
 export GOBIN=/usr/local/bin
 cd $GOPATH/src/github.com/wal-g/wal-g
 make install
@@ -139,7 +139,7 @@ To configure the wal segment size if different from the postgres default of 16 M
 
 To upload metadata related to wal files. `WALG_UPLOAD_WAL_METADATA` can be INDIVIDUAL (generates metadata for all the wal logs) or BULK( generates metadata for set of wal files) 
 Sample metadata file (000000020000000300000071.json)
-```
+```bash
 {
     "000000020000000300000071": {
     "created_time": "2021-02-23T00:51:14.195209969Z",
@@ -152,22 +152,22 @@ If the parameter value is NOMETADATA or not specified, it will fallback to defau
 Usage
 -----
 
-* ``backup-fetch``
+### ``backup-fetch``
 
 When fetching base backups, the user should pass in the name of the backup and a path to a directory to extract to. If this directory does not exist, WAL-G will create it and any dependent subdirectories.
 
-```
+```bash
 wal-g backup-fetch ~/extract/to/here example-backup
 ```
 
 WAL-G can also fetch the latest backup using:
 
-```
+```bash
 wal-g backup-fetch ~/extract/to/here LATEST
 ```
 
 WAL-G can fetch the backup with specific UserData (stored in backup metadata) using the `--target-user-data` flag or `WALG_FETCH_TARGET_USER_DATA` variable:
-```
+```bash
 wal-g backup-fetch /path --target-user-data "{ \"x\": [3], \"y\": 4 }"
 ```
 
@@ -181,7 +181,7 @@ To activate this feature, do one of the following:
 
 * set the `WALG_USE_REVERSE_UNPACK`environment variable
 * add the --reverse-unpack flag
-```
+```bash
 wal-g backup-fetch /path LATEST --reverse-unpack
 ```
 
@@ -197,15 +197,15 @@ Since this feature involves both backup creation and restore process, in order t
 * set the `WALG_USE_REVERSE_UNPACK` and `WALG_SKIP_REDUNDANT_TARS` environment variables
 * add the `--reverse-unpack` and `--skip-redundant-tars` flags
 
-```  
+```bash  
 wal-g backup-fetch /path LATEST --reverse-unpack --skip-redundant-tars
 ```
 
-* ``backup-push``
+### ``backup-push``
 
 When uploading backups to S3, the user should pass in the path containing the backup started by Postgres as in:
 
-```
+```bash
 wal-g backup-push /backup/directory/path
 ```
 
@@ -221,7 +221,7 @@ WAL-G backup-push allows for two data streaming options:
 
 For uploading backups to S3 in streaming option 1, the user should pass in the path containing the backup started by Postgres as in:
 
-```
+```bash
 wal-g backup-push /backup/directory/path
 ```
 
@@ -229,7 +229,7 @@ wal-g backup-push /backup/directory/path
 
 To stream the backup data, leave out the data directory. And to set the hostname for the postgres server, you can use the environment variable PGHOST, or the WAL-G argument --pghost.
 
-```
+```bash
 # Inline
 PGHOST=srv1 wal-g backup-push
 
@@ -255,7 +255,7 @@ To activate this feature, do one of the following:
 * set the `WALG_USE_RATING_COMPOSER`environment variable
 * add the --rating-composer flag
 
-```
+```bash
 wal-g backup-push /path --rating-composer
 ```
 
@@ -267,13 +267,13 @@ When creating delta backup (`WALG_DELTA_MAX_STEPS` > 0), WAL-G uses the latest b
 * `--delta-from-user-data` flag or `WALG_DELTA_FROM_USER_DATA` environment variable to choose the backup with specified user data as the base for the delta backup
 
 Examples:
-```
+```bash
 wal-g backup-push /path --delta-from-name base_000000010000000100000072_D_000000010000000100000063
 wal-g backup-push /path --delta-from-user-data "{ \"x\": [3], \"y\": 4 }"
 ```
 
 When using the above flags in combination with `WALG_DELTA_ORIGIN` setting, `WALG_DELTA_ORIGIN` logic applies to the specified backup. For example:
-```
+```bash
 list of backups in storage:
 base_000000010000000100000040  # full backup
 base_000000010000000100000046_D_000000010000000100000040  # 1st delta
@@ -289,32 +289,32 @@ INFO: Delta will be made from full backup.
 INFO: Delta backup from base_000000010000000100000040 with LSN 140000060.
 ```
 
-* ``wal-fetch``
+### ``wal-fetch``
 
 When fetching WAL archives from S3, the user should pass in the archive name and the name of the file to download to. This file should not exist as WAL-G will create it for you.
 
 WAL-G will also prefetch WAL files ahead of asked WAL file. These files will be cached in `./.wal-g/prefetch` directory. Cache files older than recently asked WAL file will be deleted from the cache, to prevent cache bloat. If the file is requested with `wal-fetch` this will also remove it from cache, but trigger fulfilment of cache with new file.
 
-```
+```bash
 wal-g wal-fetch example-archive new-file-name
 ```
 
-* ``wal-push``
+### ``wal-push``
 
 When uploading WAL archives to S3, the user should pass in the absolute path to where the archive is located.
 
-```
+```bash
 wal-g wal-push /path/to/archive
 ```
 
-* ``wal-show``
+### ``wal-show``
 
 Show information about the WAL storage folder. `wal-show` shows all WAL segment timelines available in storage, displays the available backups for them, and checks them for missing segments.
 
 * if there are no gaps (missing segments) in the range, final status is `OK`
 * if there are some missing segments found, final status is `LOST_SEGMENTS`
 
-```
+```bash
 wal-g wal-show
 ```
 
@@ -322,7 +322,7 @@ By default, `wal-show` shows available backups for each timeline. To turn it off
 
 By default, `wal-show` output is plaintext table. For detailed JSON output, add the `--detailed-json` flag.
 
-* ``wal-verify``
+### ``wal-verify``
 
 Run series of checks to ensure that WAL segment storage is healthy. Available checks:
 
@@ -359,7 +359,7 @@ Output consists of:
 3. The highest timeline id found in WAL storage folder.
 
 Usage:
-``` bash
+```bash
 wal-g wal-verify [space separated list of checks]
 # For example:
 wal-g wal-verify integrity timeline # perform integrity and timeline checks
@@ -369,7 +369,7 @@ wal-g wal-verify integrity # perform only integrity check
 By default, `wal-verify` output is plaintext. To enable JSON output, add the `--json` flag.
 
 Example of the plaintext output:
-```
+```bash
 [wal-verify] integrity check status: OK
 [wal-verify] integrity check details:
 +-----+--------------------------+--------------------------+----------------+--------+
@@ -385,7 +385,7 @@ Current cluster timeline: 4
 ```
 
 Example of the JSON output:
-```
+```bash
 {
    "integrity":{
       "status":"OK",
@@ -416,26 +416,26 @@ Example of the JSON output:
 }
 ```
 
-* ``wal-receive``
+### ``wal-receive``
 
 Set environment variabe WALG_SLOTNAME to define the slot to be used (defaults to walg). The slot name can only consist of the following characters: [0-9A-Za-z_].
 When uploading WAL archives to S3, the user should pass in the absolute path to where the archive is located.
 
-```
+```bash
 wal-g wal-receive
 ```
 
 
-* ``backup-mark``
+### ``backup-mark``
 
 Backups can be marked as permanent to prevent them from being removed when running ``delete``. Backup permanence can be altered via this command by passing in the name of the backup (retrievable via `wal-g backup-list --pretty --detail --json`), which will mark the named backup and all previous related backups as permanent. The reverse is also possible by providing the `-i` flag.
 
-```
+```bash
 wal-g backup-mark example-backup -i
 ```
 
 
-* ``catchup-push``
+### ``catchup-push``
 
 To create an catchup incremental backup, the user should pass the path to the master Postgres directory and the LSN of the replica
 for which the backup is created.
@@ -450,7 +450,7 @@ wal-g catchup-push /path/to/master/postgres --from-lsn replica_lsn
 ```
 
 
-* ``catchup-fetch``
+### ``catchup-fetch``
 
 To accept catchup incremental backup created by `catchup-push`, the user should pass the path to the replica Postgres
 directory and name of the backup.
@@ -460,7 +460,7 @@ wal-g catchup-fetch /path/to/replica/postgres backup_name
 ```
 
 
-* ``copy``
+### ``copy``
 
 This command will help to change the storage and move the set of backups there or write the backups on magnetic tape. For example, `wal-g copy --from=config_from.json --to=config_to.json` will copy all backups.
 
