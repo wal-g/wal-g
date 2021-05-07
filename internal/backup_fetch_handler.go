@@ -126,9 +126,9 @@ func BackupToCommandStdin(cmd *exec.Cmd, backup *Backup) error {
 	if err != nil {
 		return fmt.Errorf("Failed to start command: %v\n", err)
 	}
-	err = DownloadFileWithoutDecompressor(backup, stdin)
+	err = downloadAndDecompressDataFile(backup, stdin)
 	if err != nil {
-		return fmt.Errorf("Failed to download and decompress file: %v\n", err)
+		return fmt.Errorf("Failed to download and decompress data file: %v\n", err)
 	}
 	return cmd.Wait()
 }

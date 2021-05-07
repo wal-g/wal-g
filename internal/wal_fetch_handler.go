@@ -128,8 +128,8 @@ func checkWALFileMagic(prefetched string) error {
 	return nil
 }
 
-// DownloadFileWithoutExtension downloads, decompresses and decrypts writes to stdout
-func DownloadFileWithoutDecompressor(backup *Backup, writeCloser io.WriteCloser) error {
+// downloadAndDecompressDataFile downloads, decompresses and writes data file to stdout
+func downloadAndDecompressDataFile(backup *Backup, writeCloser io.WriteCloser) error {
 	defer writeCloser.Close()
 
 	for _, decompressor := range compression.Decompressors {
