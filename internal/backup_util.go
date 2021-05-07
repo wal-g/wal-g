@@ -23,7 +23,6 @@ func (err NoBackupsFoundError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-// TODO : unit tests
 func GetLatestBackupName(folder storage.Folder) (string, error) {
 	sortTimes, err := GetBackups(folder)
 	if err != nil {
