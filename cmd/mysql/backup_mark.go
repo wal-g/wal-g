@@ -35,7 +35,11 @@ var (
 )
 
 func init() {
-	backupMarkCmd.Flags().BoolVarP(&toImpermanent, ImpermanentFlag, ImpermanentFlagShortHand, false, ImpermanentDescription)
+	backupMarkCmd.Flags().BoolVarP(&toImpermanent,
+		ImpermanentFlag,
+		ImpermanentFlagShortHand,
+		false,
+		ImpermanentDescription)
 	backupMarkCmd.Flags().StringVarP(&name, backupNameFlag, backupShorthand, "", backupMarkShortDescription)
 	cmd.AddCommand(backupMarkCmd)
 }

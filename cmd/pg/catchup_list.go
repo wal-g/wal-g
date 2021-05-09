@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -20,10 +21,10 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			folder, err := internal.ConfigureFolder()
 			tracelog.ErrorLogger.FatalOnError(err)
-			if pretty || json || detail {
-				internal.HandleBackupListWithFlagsAndTarget(folder, pretty, json, detail, utility.CatchupPath)
+			if detail {
+				postgres.HandleDetailedBackupList(folder.GetSubFolder(utility.CatchupPath), pretty, json)
 			} else {
-				internal.DefaultHandleBackupListWithTarget(folder, utility.CatchupPath)
+				internal.DefaultHandleBackupList(folder.GetSubFolder(utility.CatchupPath), pretty, json)
 			}
 		},
 	}
@@ -33,6 +34,6 @@ func init() {
 	cmd.AddCommand(catchupListCmd)
 
 	catchupListCmd.Flags().BoolVar(&pretty, PrettyFlag, false, "Prints more readable output")
-	catchupListCmd.Flags().BoolVar(&json, JsonFlag, false, "Prints output in json format")
+	catchupListCmd.Flags().BoolVar(&json, JSONFlag, false, "Prints output in json format")
 	catchupListCmd.Flags().BoolVar(&detail, DetailFlag, false, "Prints extra backup details")
 }

@@ -16,7 +16,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleLogRestore(backupName string, untilTs string, dbnames []string, fromnames []string, noRecovery bool) {
+func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromnames []string, noRecovery bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 	defer func() { _ = signalHandler.Close() }()
@@ -28,7 +28,7 @@ func HandleLogRestore(backupName string, untilTs string, dbnames []string, fromn
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	sentinel := new(SentinelDto)
-	err = internal.FetchStreamSentinel(backup, sentinel)
+	err = backup.FetchSentinel(&sentinel)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	db, err := getSQLServerConnection()
@@ -47,7 +47,7 @@ func HandleLogRestore(backupName string, untilTs string, dbnames []string, fromn
 	err = bs.RunBackground(ctx, cancel)
 	tracelog.ErrorLogger.FatalfOnError("proxy run error: %v", err)
 
-	stopAt, err := utility.ParseUntilTs(untilTs)
+	stopAt, err := utility.ParseUntilTS(untilTS)
 	tracelog.ErrorLogger.FatalfOnError("invalid util timestamp: %v", err)
 
 	logs, err := getLogsSinceBackup(folder, backup.Name, stopAt)
@@ -57,7 +57,7 @@ func HandleLogRestore(backupName string, untilTs string, dbnames []string, fromn
 		dbname := dbnames[i]
 		fromname := fromnames[i]
 		for _, logBackupName := range logs {
-			ok, err := doesLogBackupContainDb(folder, logBackupName, fromname)
+			ok, err := doesLogBackupContainDB(folder, logBackupName, fromname)
 			if err != nil {
 				return err
 			}
@@ -83,14 +83,20 @@ func HandleLogRestore(backupName string, untilTs string, dbnames []string, fromn
 	tracelog.InfoLogger.Printf("log restore finished")
 }
 
-func restoreSingleLog(ctx context.Context, db *sql.DB, folder storage.Folder, logBackupName string, dbname string, fromname string, stopAt time.Time) error {
-	baseUrl := getLogBackupUrl(logBackupName, fromname)
+func restoreSingleLog(ctx context.Context,
+	db *sql.DB,
+	folder storage.Folder,
+	logBackupName string,
+	dbname string,
+	fromname string,
+	stopAt time.Time) error {
+	baseURL := getLogBackupURL(logBackupName, fromname)
 	basePath := getLogBackupPath(logBackupName, fromname)
 	blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
 	if err != nil {
 		return err
 	}
-	urls := buildRestoreUrls(baseUrl, blobs)
+	urls := buildRestoreUrls(baseURL, blobs)
 	sql := fmt.Sprintf("RESTORE LOG %s FROM %s WITH NORECOVERY, STOPAT = '%s'",
 		quoteName(dbname), urls, stopAt.Format(TimeSQLServerFormat))
 	tracelog.InfoLogger.Printf("starting restore database [%s] log from %s", dbname, urls)

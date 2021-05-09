@@ -37,6 +37,7 @@ func Execute() {
 }
 
 func init() {
+	internal.ConfigureSettings(internal.REDIS)
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
 	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")

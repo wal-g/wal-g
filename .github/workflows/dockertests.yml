@@ -25,7 +25,7 @@ jobs:
       #  use cache to pass docker images to the test jobs
       - name: Docker images caching
         id: cache-images
-        uses: actions/cache@v2.1.4
+        uses: actions/cache@v2.1.5
         with:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}
@@ -77,6 +77,7 @@ jobs:
                    'make TEST="pg_crypto_test" pg_integration_test',
                    'make TEST="pg_delta_backup_wal_delta_test" pg_integration_test',
                    'make TEST="pg_full_backup_test" pg_integration_test',
+                   'make TEST="pg_remote_backup_test" pg_integration_test',
                    'make TEST="pg_ssh_backup_test" pg_integration_test',
                    'make TEST="pg_receive_wal_test" pg_integration_test',
                    'make TEST="pg_full_backup_rating_composer_test" pg_integration_test',
@@ -138,7 +139,7 @@ jobs:
       # load docker images
       - name: Load docker images
         id: cache-images
-        uses: actions/cache@v2.1.4
+        uses: actions/cache@v2.1.5
         with:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}

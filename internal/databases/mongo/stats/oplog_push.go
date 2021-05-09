@@ -126,7 +126,10 @@ func EnableHTTPHandler(httpPattern string, srv webserver.WebServer) OplogPushSta
 }
 
 // NewOplogPushStats builds OplogPushStats
-func NewOplogPushStats(ctx context.Context, opRep OplogArchivedStatsReporter, mc client.MongoDriver, opts ...OplogPushStatsOption) *OplogPushStats {
+func NewOplogPushStats(ctx context.Context,
+	opRep OplogArchivedStatsReporter,
+	mc client.MongoDriver,
+	opts ...OplogPushStatsOption) *OplogPushStats {
 	st := &OplogPushStats{
 		ctx:      ctx,
 		uploader: opRep,

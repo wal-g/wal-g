@@ -55,7 +55,7 @@ func CreateTar(w io.Writer, r *io.LimitedReader) {
 
 	hdr := &tar.Header{
 		Name: strconv.Itoa(int(counter)),
-		Size: int64(r.N),
+		Size: r.N,
 		Mode: 0600,
 	}
 

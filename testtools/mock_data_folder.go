@@ -39,11 +39,11 @@ func (folder *MockDataFolder) IsEmpty() bool {
 }
 
 func (folder *MockDataFolder) OpenReadonlyFile(filename string) (io.ReadCloser, error) {
-	if _, ok := (*folder)[filename]; ok {
+	_, ok := (*folder)[filename]
+	if ok {
 		return ioutil.NopCloser(bytes.NewReader((*folder)[filename].Bytes())), nil
-	} else {
-		return nil, fsutil.NewNoSuchFileError(filename)
 	}
+	return nil, fsutil.NewNoSuchFileError(filename)
 }
 
 func (folder *MockDataFolder) OpenWriteOnlyFile(filename string) (io.WriteCloser, error) {

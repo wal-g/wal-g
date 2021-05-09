@@ -8,7 +8,10 @@ import (
 	"github.com/wal-g/wal-g/internal"
 )
 
-func HandleBackupFetch(folder storage.Folder, targetBackupSelector internal.BackupSelector, restoreCmd *exec.Cmd, prepareCmd *exec.Cmd) {
+func HandleBackupFetch(folder storage.Folder,
+	targetBackupSelector internal.BackupSelector,
+	restoreCmd *exec.Cmd,
+	prepareCmd *exec.Cmd) {
 	internal.HandleBackupFetch(folder, targetBackupSelector, internal.GetCommandStreamFetcher(restoreCmd))
 	if prepareCmd != nil {
 		err := prepareCmd.Run()

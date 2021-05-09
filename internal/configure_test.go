@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/wal-g/wal-g/testtools"
+
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
@@ -77,7 +79,7 @@ func TestGetDataFolderPath_FolderNotExist(t *testing.T) {
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(internal.DefaultDataFolderPath, "walg_data"), actual)
-	cleanup(t, parentDir)
+	testtools.Cleanup(t, parentDir)
 }
 
 func TestGetDataFolderPath_Wal(t *testing.T) {
@@ -88,7 +90,7 @@ func TestGetDataFolderPath_Wal(t *testing.T) {
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(parentDir, "pg_wal", "walg_data"), actual)
-	cleanup(t, parentDir)
+	testtools.Cleanup(t, parentDir)
 }
 
 func TestGetDataFolderPath_Xlog(t *testing.T) {
@@ -99,7 +101,7 @@ func TestGetDataFolderPath_Xlog(t *testing.T) {
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(parentDir, "pg_xlog", "walg_data"), actual)
-	cleanup(t, parentDir)
+	testtools.Cleanup(t, parentDir)
 }
 
 func TestGetDataFolderPath_WalIgnoreXlog(t *testing.T) {
@@ -113,7 +115,7 @@ func TestGetDataFolderPath_WalIgnoreXlog(t *testing.T) {
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(parentDir, "pg_wal", "walg_data"), actual)
-	cleanup(t, parentDir)
+	testtools.Cleanup(t, parentDir)
 }
 
 func TestConfigureLogging_WhenLogLevelSettingIsNotSet(t *testing.T) {

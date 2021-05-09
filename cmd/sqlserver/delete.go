@@ -40,21 +40,21 @@ var deleteEverythingCmd = &cobra.Command{
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
-	deleteHandler, err := newSqlServerDeleteHandler()
+	deleteHandler, err := newSQLServerDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.DeleteEverything(confirmed)
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
-	deleteHandler, err := newSqlServerDeleteHandler()
+	deleteHandler, err := newSQLServerDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteBefore(args, confirmed)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
-	deleteHandler, err := newSqlServerDeleteHandler()
+	deleteHandler, err := newSQLServerDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteRetain(args, confirmed)
@@ -66,7 +66,7 @@ func init() {
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 
-func newSqlServerDeleteHandler() (*internal.DeleteHandler, error) {
+func newSQLServerDeleteHandler() (*internal.DeleteHandler, error) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 

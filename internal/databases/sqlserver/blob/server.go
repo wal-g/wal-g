@@ -193,9 +193,9 @@ func (bs *Server) HandleLease(w http.ResponseWriter, req *http.Request) {
 }
 
 func (bs *Server) HandleAcquireLease(w http.ResponseWriter, req *http.Request) {
-	leaseId := req.Header.Get("X-Ms-Proposed-Lease-Id")
-	if leaseId == "" {
-		leaseId = uuid.New().String()
+	leaseID := req.Header.Get("X-Ms-Proposed-Lease-Id")
+	if leaseID == "" {
+		leaseID = uuid.New().String()
 	}
 	leaseDurationStr := req.Header.Get("X-Ms-Lease-Duration")
 	if leaseDurationStr == "" {
@@ -211,14 +211,14 @@ func (bs *Server) HandleAcquireLease(w http.ResponseWriter, req *http.Request) {
 	lease, ok := bs.leases[folder.GetPath()]
 	if !ok || lease.End.Before(time.Now()) {
 		lease = Lease{
-			ID:  leaseId,
+			ID:  leaseID,
 			End: time.Now().Add(time.Duration(leaseDuration * int(time.Second))),
 		}
 		bs.leases[folder.GetPath()] = lease
 	}
 	bs.leasesMutex.Unlock()
-	if lease.ID == leaseId {
-		w.Header().Set("X-Ms-Lease-Id", leaseId)
+	if lease.ID == leaseID {
+		w.Header().Set("X-Ms-Lease-Id", leaseID)
 		w.WriteHeader(http.StatusCreated)
 	} else {
 		w.WriteHeader(http.StatusPreconditionFailed)
@@ -226,8 +226,8 @@ func (bs *Server) HandleAcquireLease(w http.ResponseWriter, req *http.Request) {
 }
 
 func (bs *Server) HandleRenewLease(w http.ResponseWriter, req *http.Request) {
-	leaseId := req.Header.Get("X-Ms-Lease-Id")
-	if leaseId == "" {
+	leaseID := req.Header.Get("X-Ms-Lease-Id")
+	if leaseID == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -243,7 +243,7 @@ func (bs *Server) HandleRenewLease(w http.ResponseWriter, req *http.Request) {
 	folder := bs.getBlobFolder(req.URL.Path)
 	bs.leasesMutex.Lock()
 	lease, ok := bs.leases[folder.GetPath()]
-	if !ok || lease.ID != leaseId {
+	if !ok || lease.ID != leaseID {
 		bs.leasesMutex.Unlock()
 		w.WriteHeader(http.StatusPreconditionFailed)
 		return
@@ -255,40 +255,40 @@ func (bs *Server) HandleRenewLease(w http.ResponseWriter, req *http.Request) {
 }
 
 func (bs *Server) HandleChangeLease(w http.ResponseWriter, req *http.Request) {
-	leaseId := req.Header.Get("X-Ms-Lease-Id")
-	if leaseId == "" {
+	leaseID := req.Header.Get("X-Ms-Lease-Id")
+	if leaseID == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	newLeaseId := req.Header.Get("X-Ms-Proposed-Lease-Id")
-	if newLeaseId == "" {
+	newLeaseID := req.Header.Get("X-Ms-Proposed-Lease-Id")
+	if newLeaseID == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	folder := bs.getBlobFolder(req.URL.Path)
 	bs.leasesMutex.Lock()
 	lease, ok := bs.leases[folder.GetPath()]
-	if !ok || lease.ID != leaseId {
+	if !ok || lease.ID != leaseID {
 		bs.leasesMutex.Unlock()
 		w.WriteHeader(http.StatusPreconditionFailed)
 		return
 	}
-	lease.ID = newLeaseId
+	lease.ID = newLeaseID
 	bs.leases[folder.GetPath()] = lease
 	bs.leasesMutex.Unlock()
 	w.WriteHeader(http.StatusOK)
 }
 
 func (bs *Server) HandleReleaseLease(w http.ResponseWriter, req *http.Request) {
-	leaseId := req.Header.Get("X-Ms-Lease-Id")
-	if leaseId == "" {
+	leaseID := req.Header.Get("X-Ms-Lease-Id")
+	if leaseID == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	folder := bs.getBlobFolder(req.URL.Path)
 	bs.leasesMutex.Lock()
 	lease, ok := bs.leases[folder.GetPath()]
-	if !ok || lease.ID != leaseId {
+	if !ok || lease.ID != leaseID {
 		bs.leasesMutex.Unlock()
 		w.WriteHeader(http.StatusPreconditionFailed)
 		return
@@ -355,14 +355,14 @@ func (bs *Server) HandleBlockPut(w http.ResponseWriter, req *http.Request) {
 		bs.returnError(w, req, err)
 		return
 	}
-	blockId := strings.TrimSpace(req.Form.Get("blockid"))
+	blockID := strings.TrimSpace(req.Form.Get("blockid"))
 	blockSizeStr := req.Header.Get("Content-Length")
 	blockSize, err := strconv.ParseUint(blockSizeStr, 10, 64)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	filename := idx.PutBlock(blockId, blockSize)
+	filename := idx.PutBlock(blockID, blockSize)
 	bs.uploadSem <- struct{}{}
 	err = folder.PutObject(filename, req.Body)
 	<-bs.uploadSem
