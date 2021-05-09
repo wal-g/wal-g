@@ -16,6 +16,13 @@ import (
 )
 
 const (
+	PG        = "PG"
+	SQLSERVER = "SQLSERVER"
+	MYSQL     = "MYSQL"
+	REDIS     = "REDIS"
+	FDB       = "FDB"
+	MONGO     = "MONGO"
+
 	DownloadConcurrencySetting   = "WALG_DOWNLOAD_CONCURRENCY"
 	UploadConcurrencySetting     = "WALG_UPLOAD_CONCURRENCY"
 	UploadDiskConcurrencySetting = "WALG_UPLOAD_DISK_CONCURRENCY"
@@ -71,7 +78,7 @@ const (
 	OplogPushStatsEnabled           = "OPLOG_PUSH_STATS_ENABLED"
 	OplogPushStatsLoggingInterval   = "OPLOG_PUSH_STATS_LOGGING_INTERVAL"
 	OplogPushStatsUpdateInterval    = "OPLOG_PUSH_STATS_UPDATE_INTERVAL"
-	OplogPushStatsExposeHttp        = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
+	OplogPushStatsExposeHTTP        = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
 	OplogPushWaitForBecomePrimary   = "OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY"
 	OplogPushPrimaryCheckInterval   = "OPLOG_PUSH_PRIMARY_CHECK_INTERVAL"
 	OplogReplayOplogAlwaysUpsert    = "OPLOG_REPLAY_OPLOG_ALWAYS_UPSERT"
@@ -87,9 +94,9 @@ const (
 
 	GoMaxProcs = "GOMAXPROCS"
 
-	HttpListen       = "HTTP_LISTEN"
-	HttpExposePprof  = "HTTP_EXPOSE_PPROF"
-	HttpExposeExpVar = "HTTP_EXPOSE_EXPVAR"
+	HTTPListen       = "HTTP_LISTEN"
+	HTTPExposePprof  = "HTTP_EXPOSE_PPROF"
+	HTTPExposeExpVar = "HTTP_EXPOSE_EXPVAR"
 
 	SQLServerBlobHostname     = "SQLSERVER_BLOB_HOSTNAME"
 	SQLServerBlobCertFile     = "SQLSERVER_BLOB_CERT_FILE"
@@ -100,16 +107,18 @@ const (
 	EndpointSourceSetting = "S3_ENDPOINT_SOURCE"
 	EndpointPortSetting   = "S3_ENDPOINT_PORT"
 
-	AwsAccessKeyId     = "AWS_ACCESS_KEY_ID"
+	AwsAccessKeyID     = "AWS_ACCESS_KEY_ID"
 	AwsSecretAccessKey = "AWS_SECRET_ACCESS_KEY"
 
-	YcKmsKeyIdSetting  = "YC_CSE_KMS_KEY_ID"
+	YcKmsKeyIDSetting  = "YC_CSE_KMS_KEY_ID"
 	YcSaKeyFileSetting = "YC_SERVICE_ACCOUNT_KEY_FILE"
 )
 
 var (
 	CfgFile             string
-	defaultConfigValues = map[string]string{
+	defaultConfigValues map[string]string
+
+	commonDefaultConfigValues = map[string]string{
 		DownloadConcurrencySetting:   "10",
 		UploadConcurrencySetting:     "16",
 		UploadDiskConcurrencySetting: "1",
@@ -127,18 +136,25 @@ var (
 		StoreAllCorruptBlocksSetting: "false",
 		UseRatingComposerSetting:     "false",
 		MaxDelayedSegmentsCount:      "0",
+	}
 
-		OplogArchiveTimeoutInterval:    "60s",
-		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
-		MongoDBLastWriteUpdateInterval: "3s",
-		PgWalSize:                      "16",
+	MongoDefaultSettings = map[string]string{
 		OplogPushStatsLoggingInterval:  "30s",
 		OplogPushStatsUpdateInterval:   "30s",
 		OplogPushWaitForBecomePrimary:  "false",
 		OplogPushPrimaryCheckInterval:  "30s",
+		OplogArchiveTimeoutInterval:    "60s",
+		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
+		MongoDBLastWriteUpdateInterval: "3s",
 	}
 
-	AllowedSettings = map[string]bool{
+	PGDefaultSettings = map[string]string{
+		PgWalSize: "16",
+	}
+
+	AllowedSettings map[string]bool
+
+	CommonAllowedSettings = map[string]bool{
 		// WAL-G core
 		DownloadConcurrencySetting:   true,
 		UploadConcurrencySetting:     true,
@@ -175,19 +191,6 @@ var (
 		DeltaFromUserDataSetting:     true,
 		FetchTargetUserDataSetting:   true,
 
-		// Postgres
-		PgPortSetting:     true,
-		PgUserSetting:     true,
-		PgHostSetting:     true,
-		PgDataSetting:     true,
-		PgPasswordSetting: true,
-		PgDatabaseSetting: true,
-		PgSslModeSetting:  true,
-		PgSlotName:        true,
-		PgWalSize:         true,
-		"PGPASSFILE":      true,
-		PrefetchDir:       true,
-
 		// Swift
 		"WALG_SWIFT_PREFIX": true,
 		"OS_AUTH_URL":       true,
@@ -199,7 +202,7 @@ var (
 		// AWS s3
 		"WALG_S3_PREFIX":              true,
 		"WALE_S3_PREFIX":              true,
-		AwsAccessKeyId:                true,
+		AwsAccessKeyID:                true,
 		AwsSecretAccessKey:            true,
 		"AWS_SESSION_TOKEN":           true,
 		"AWS_DEFAULT_REGION":          true,
@@ -238,7 +241,7 @@ var (
 
 		// Yandex Cloud
 		YcSaKeyFileSetting: true,
-		YcKmsKeyIdSetting:  true,
+		YcKmsKeyIDSetting:  true,
 
 		// SH
 		"WALG_SSH_PREFIX":      true,
@@ -250,6 +253,31 @@ var (
 		//File
 		"WALG_FILE_PREFIX": true,
 
+		// GOLANG
+		GoMaxProcs: true,
+
+		// Web server
+		HTTPListen:       true,
+		HTTPExposePprof:  true,
+		HTTPExposeExpVar: true,
+	}
+
+	PGAllowedSettings = map[string]bool{
+		// Postgres
+		PgPortSetting:     true,
+		PgUserSetting:     true,
+		PgHostSetting:     true,
+		PgDataSetting:     true,
+		PgPasswordSetting: true,
+		PgDatabaseSetting: true,
+		PgSslModeSetting:  true,
+		PgSlotName:        true,
+		PgWalSize:         true,
+		"PGPASSFILE":      true,
+		PrefetchDir:       true,
+	}
+
+	MongoAllowedSettings = map[string]bool{
 		// MongoDB
 		MongoDBUriSetting:              true,
 		MongoDBLastWriteUpdateInterval: true,
@@ -258,27 +286,13 @@ var (
 		OplogPushStatsEnabled:          true,
 		OplogPushStatsLoggingInterval:  true,
 		OplogPushStatsUpdateInterval:   true,
-		OplogPushStatsExposeHttp:       true,
+		OplogPushStatsExposeHTTP:       true,
 		OplogPushWaitForBecomePrimary:  true,
 		OplogPushPrimaryCheckInterval:  true,
 		OplogPITRDiscoveryInterval:     true,
+	}
 
-		// MySQL
-		MysqlDatasourceNameSetting: true,
-		MysqlSslCaSetting:          true,
-		MysqlBinlogReplayCmd:       true,
-		MysqlBinlogDstSetting:      true,
-		MysqlBackupPrepareCmd:      true,
-		MysqlTakeBinlogsFromMaster: true,
-
-		// GOLANG
-		GoMaxProcs: true,
-
-		// Web server
-		HttpListen:       true,
-		HttpExposePprof:  true,
-		HttpExposeExpVar: true,
-
+	SQLServerAllowedSettings = map[string]bool{
 		// SQLServer
 		SQLServerBlobHostname:     true,
 		SQLServerBlobCertFile:     true,
@@ -287,14 +301,67 @@ var (
 		SQLServerConnectionString: true,
 	}
 
+	MysqlAllowedSettings = map[string]bool{
+		// MySQL
+		MysqlDatasourceNameSetting: true,
+		MysqlSslCaSetting:          true,
+		MysqlBinlogReplayCmd:       true,
+		MysqlBinlogDstSetting:      true,
+		MysqlBackupPrepareCmd:      true,
+		MysqlTakeBinlogsFromMaster: true,
+	}
+
 	RequiredSettings       = make(map[string]bool)
-	HttpSettingExposeFuncs = map[string]func(webserver.WebServer){
-		HttpExposePprof:          webserver.EnablePprofEndpoints,
-		HttpExposeExpVar:         webserver.EnableExpVarEndpoints,
-		OplogPushStatsExposeHttp: nil,
+	HTTPSettingExposeFuncs = map[string]func(webserver.WebServer){
+		HTTPExposePprof:          webserver.EnablePprofEndpoints,
+		HTTPExposeExpVar:         webserver.EnableExpVarEndpoints,
+		OplogPushStatsExposeHTTP: nil,
 	}
 	Turbo bool
 )
+
+func ConfigureSettings(currentType string) {
+	if len(defaultConfigValues) == 0 {
+		defaultConfigValues = commonDefaultConfigValues
+		dbSpecificDefaultSettings := map[string]string{}
+		switch currentType {
+		case PG:
+			dbSpecificDefaultSettings = PGDefaultSettings
+		case MONGO:
+			dbSpecificDefaultSettings = MongoDefaultSettings
+		}
+
+		for k, v := range dbSpecificDefaultSettings {
+			defaultConfigValues[k] = v
+		}
+	}
+
+	if len(AllowedSettings) == 0 {
+		AllowedSettings = CommonAllowedSettings
+		dbSpecificSettings := map[string]bool{}
+		switch currentType {
+		case PG:
+			dbSpecificSettings = PGAllowedSettings
+		case MONGO:
+			dbSpecificSettings = MongoAllowedSettings
+		case MYSQL:
+			dbSpecificSettings = MysqlAllowedSettings
+		case SQLSERVER:
+			dbSpecificSettings = SQLServerAllowedSettings
+		}
+
+		for k, v := range dbSpecificSettings {
+			AllowedSettings[k] = v
+		}
+
+		for _, adapter := range StorageAdapters {
+			for _, setting := range adapter.settingNames {
+				AllowedSettings[setting] = true
+			}
+			AllowedSettings["WALG_"+adapter.prefixName] = true
+		}
+	}
+}
 
 func isAllowedSetting(setting string, AllowedSettings map[string]bool) (exists bool) {
 	_, exists = AllowedSettings[setting]
@@ -347,19 +414,12 @@ func Configure() {
 	}
 
 	configureLimiters()
-
-	for _, adapter := range StorageAdapters {
-		for _, setting := range adapter.settingNames {
-			AllowedSettings[setting] = true
-		}
-		AllowedSettings["WALG_"+adapter.prefixName] = true
-	}
 }
 
 // ConfigureAndRunDefaultWebServer configures and runs web server
 func ConfigureAndRunDefaultWebServer() error {
 	var ws webserver.WebServer
-	httpListenAddr, httpListen := GetSetting(HttpListen)
+	httpListenAddr, httpListen := GetSetting(HTTPListen)
 	if httpListen {
 		ws = webserver.NewSimpleWebServer(httpListenAddr)
 		if err := ws.Serve(); err != nil {
@@ -369,7 +429,7 @@ func ConfigureAndRunDefaultWebServer() error {
 			return err
 		}
 	}
-	for setting, registerFunc := range HttpSettingExposeFuncs {
+	for setting, registerFunc := range HTTPSettingExposeFuncs {
 		enabled, err := GetBoolSettingDefault(setting, false)
 		if err != nil {
 			return err
@@ -378,7 +438,7 @@ func ConfigureAndRunDefaultWebServer() error {
 			continue
 		}
 		if !httpListen {
-			return fmt.Errorf("%s failed: %s is not set", setting, HttpListen)
+			return fmt.Errorf("%s failed: %s is not set", setting, HTTPListen)
 		}
 		if registerFunc == nil {
 			continue

@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/wal-g/wal-g/internal/databases/postgres"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
@@ -27,7 +29,7 @@ var (
 			err := internal.AssertRequiredSettingsSet()
 			tracelog.ErrorLogger.FatalOnError(err)
 			if viper.IsSet(internal.PgWalSize) {
-				internal.SetWalSize(viper.GetUint64(internal.PgWalSize))
+				postgres.SetWalSize(viper.GetUint64(internal.PgWalSize))
 			}
 		},
 	}
@@ -43,6 +45,7 @@ func Execute() {
 }
 
 func init() {
+	internal.ConfigureSettings(internal.PG)
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
 	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")

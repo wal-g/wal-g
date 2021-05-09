@@ -4,17 +4,24 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
 )
+
+func init() {
+	internal.ConfigureSettings("")
+	internal.InitConfig()
+	internal.Configure()
+}
 
 func TestGetBackupByName_Latest(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
 	backup, err := internal.GetBackupByName(internal.LatestString, utility.BaseBackupPath, folder)
 	assert.NoError(t, err)
-	assert.Equal(t, folder.GetSubFolder(utility.BaseBackupPath), backup.BaseBackupFolder)
+	assert.Equal(t, folder.GetSubFolder(utility.BaseBackupPath), backup.Folder)
 	assert.Equal(t, "base_000", backup.Name)
 }
 
@@ -30,7 +37,7 @@ func TestGetBackupByName_Exists(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
 	backup, err := internal.GetBackupByName("base_123", utility.BaseBackupPath, folder)
 	assert.NoError(t, err)
-	assert.Equal(t, folder.GetSubFolder(utility.BaseBackupPath), backup.BaseBackupFolder)
+	assert.Equal(t, folder.GetSubFolder(utility.BaseBackupPath), backup.Folder)
 	assert.Equal(t, "base_123", backup.Name)
 }
 

@@ -2,11 +2,12 @@ package yckms
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal/crypto"
 	"io"
 	"io/ioutil"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/crypto"
 )
 
 const (

@@ -12,6 +12,7 @@ import (
 
 const Filename1 = "file"
 const Filename2 = "file_2"
+
 var cleaner = fsutil.FileSystemCleaner{}
 
 func TestGetFiles_DirectoryNotExist(t *testing.T) {
@@ -108,12 +109,12 @@ func createTempFolder(t *testing.T, path string) string {
 	return dir
 }
 
-func createTempFile(t *testing.T, directory string, name string)  {
+func createTempFile(t *testing.T, directory string, name string) {
 	err := ioutil.WriteFile(filepath.Join(directory, name), []byte{}, 0700)
 	check(t, err)
 }
 
-func check(t *testing.T, err error){
+func check(t *testing.T, err error) {
 	if err != nil {
 		t.Log(err)
 	}

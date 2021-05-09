@@ -14,7 +14,7 @@ import (
 )
 
 type StorageAdapter struct {
-	prefixName         string
+	prefixName         string // actually this is an env key suffix, but all names contains '_PREFIX' word at the end, see StorageAdapters
 	settingNames       []string
 	configureFolder    func(string, map[string]string) (storage.Folder, error)
 	prefixPreprocessor func(string) string
@@ -24,7 +24,6 @@ func (adapter *StorageAdapter) loadSettings(config *viper.Viper) map[string]stri
 	settings := make(map[string]string)
 
 	for _, settingName := range adapter.settingNames {
-
 		settingValue := config.GetString(settingName)
 		if len(settingValue) > 0 {
 			settings[settingName] = settingValue

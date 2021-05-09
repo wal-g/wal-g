@@ -55,6 +55,12 @@ func (err UnsupportedFileTypeError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
+// TarInterpreter behaves differently
+// for different file types.
+type TarInterpreter interface {
+	Interpret(reader io.Reader, header *tar.Header) error
+}
+
 // EmptyWriteIgnorer handles 0 byte write in LZ4 package
 // to stop pipe reader/writer from blocking.
 type EmptyWriteIgnorer struct {
@@ -153,8 +159,7 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 		return err
 	}
 	for currentRun := files; len(currentRun) > 0; {
-		var failed []ReaderMaker
-		failed = tryExtractFiles(currentRun, tarInterpreter, downloadingConcurrency)
+		failed := tryExtractFiles(currentRun, tarInterpreter, downloadingConcurrency)
 		if downloadingConcurrency > 1 {
 			downloadingConcurrency /= 2
 		} else if len(failed) == len(currentRun) {
@@ -170,7 +175,9 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 }
 
 // TODO : unit tests
-func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloadingConcurrency int) (failed []ReaderMaker) {
+func tryExtractFiles(files []ReaderMaker,
+	tarInterpreter TarInterpreter,
+	downloadingConcurrency int) (failed []ReaderMaker) {
 	downloadingContext := context.TODO()
 	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
 	crypter := ConfigureCrypter()

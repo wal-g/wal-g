@@ -3,6 +3,8 @@ package pg
 import (
 	"fmt"
 
+	"github.com/wal-g/wal-g/internal/databases/postgres"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/storages/storage"
@@ -45,9 +47,9 @@ var backupFetchCmd = &cobra.Command{
 		reverseDeltaUnpack = reverseDeltaUnpack || viper.GetBool(internal.UseReverseUnpackSetting)
 		skipRedundantTars = skipRedundantTars || viper.GetBool(internal.SkipRedundantTarsSetting)
 		if reverseDeltaUnpack {
-			pgFetcher = internal.GetPgFetcherNew(args[0], fileMask, restoreSpec, skipRedundantTars)
+			pgFetcher = postgres.GetPgFetcherNew(args[0], fileMask, restoreSpec, skipRedundantTars)
 		} else {
-			pgFetcher = internal.GetPgFetcherOld(args[0], fileMask, restoreSpec)
+			pgFetcher = postgres.GetPgFetcherOld(args[0], fileMask, restoreSpec)
 		}
 
 		internal.HandleBackupFetch(folder, targetBackupSelector, pgFetcher)
@@ -55,13 +57,14 @@ var backupFetchCmd = &cobra.Command{
 }
 
 // create the BackupSelector to select the backup to fetch
-func createTargetFetchBackupSelector(cmd *cobra.Command, args []string, targetUserData string) (internal.BackupSelector, error) {
+func createTargetFetchBackupSelector(cmd *cobra.Command,
+	args []string, targetUserData string) (internal.BackupSelector, error) {
 	targetName := ""
 	if len(args) >= 2 {
 		targetName = args[1]
 	}
 
-	backupSelector, err := internal.NewTargetBackupSelector(targetUserData, targetName)
+	backupSelector, err := internal.NewTargetBackupSelector(targetUserData, targetName, postgres.NewGenericMetaFetcher())
 	if err != nil {
 		fmt.Println(cmd.UsageString())
 		return nil, err

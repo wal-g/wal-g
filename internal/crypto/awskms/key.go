@@ -155,5 +155,8 @@ func (symmetricKey *SymmetricKey) GetKeyLen() int {
 
 // NewSymmetricKey creates new symmetric AWS KMS key object
 func NewSymmetricKey(kmsKeyID string, keyLen int, encryptedKeyLen int, kmsRegion string) *SymmetricKey {
-	return &SymmetricKey{SymmetricKeyLen: keyLen, EncryptedSymmetricKeyLen: encryptedKeyLen, KeyID: kmsKeyID, Region: kmsRegion}
+	return &SymmetricKey{SymmetricKeyLen: keyLen,
+		EncryptedSymmetricKeyLen: encryptedKeyLen,
+		KeyID:                    kmsKeyID,
+		Region:                   kmsRegion}
 }

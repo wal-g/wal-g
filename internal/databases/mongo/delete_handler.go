@@ -91,7 +91,10 @@ func HandlePurge(downloader archive.Downloader, purger archive.Purger, setters .
 }
 
 // HandleBackupsPurge delete backups according to settings
-func HandleBackupsPurge(backupTimes []internal.BackupTime, downloader archive.Downloader, purger archive.Purger, opts PurgeSettings) (purge, retain []models.Backup, err error) {
+func HandleBackupsPurge(backupTimes []internal.BackupTime,
+	downloader archive.Downloader,
+	purger archive.Purger,
+	opts PurgeSettings) (purge, retain []models.Backup, err error) {
 	if len(backupTimes) == 0 { // TODO: refactor && support oplog purge even if backups do not exist
 		tracelog.InfoLogger.Println("No backups found")
 		return []models.Backup{}, []models.Backup{}, nil

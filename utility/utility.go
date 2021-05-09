@@ -57,7 +57,7 @@ const (
 	Mebibyte               = 1024 * 1024
 )
 
-// not really the maximal value, but high enough.
+// MaxTime not really the maximal value, but high enough.
 var MaxTime time.Time
 
 func init() {
@@ -115,7 +115,8 @@ func IsInDirectory(path, directoryPath string) bool {
 	if err != nil {
 		return false
 	}
-	return relativePath == "." || NormalizePath(NormalizePath(directoryPath)+PathSeparator+relativePath) == NormalizePath(path)
+	return relativePath == "." ||
+		NormalizePath(NormalizePath(directoryPath)+PathSeparator+relativePath) == NormalizePath(path)
 }
 
 func PathsEqual(path1, path2 string) bool {
@@ -361,9 +362,9 @@ func StartCommandWithStdoutPipe(cmd *exec.Cmd) (io.ReadCloser, error) {
 	return stdout, err
 }
 
-func ParseUntilTs(untilTs string) (time.Time, error) {
-	if untilTs != "" {
-		dt, err := time.Parse(time.RFC3339, untilTs)
+func ParseUntilTS(untilTS string) (time.Time, error) {
+	if untilTS != "" {
+		dt, err := time.Parse(time.RFC3339, untilTS)
 		if err != nil {
 			return time.Time{}, err
 		}

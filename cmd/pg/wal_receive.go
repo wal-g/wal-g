@@ -5,6 +5,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/asm"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 const walReceiveShortDescription = "Receive WAL stream with postgres Streaming Replication Protocol and push to storage"
@@ -15,7 +16,7 @@ var walReceiveCmd = &cobra.Command{
 	Short: walReceiveShortDescription,
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		uploader, err := internal.ConfigureWalUploader()
+		uploader, err := postgres.ConfigureWalUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		archiveStatusManager, err := internal.ConfigureArchiveStatusManager()
@@ -25,7 +26,7 @@ var walReceiveCmd = &cobra.Command{
 			tracelog.ErrorLogger.PrintError(err)
 			uploader.ArchiveStatusManager = asm.NewNopASM()
 		}
-		internal.HandleWALReceive(uploader)
+		postgres.HandleWALReceive(uploader)
 	},
 }
 
