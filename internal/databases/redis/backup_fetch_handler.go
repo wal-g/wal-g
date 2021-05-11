@@ -14,5 +14,5 @@ func HandleBackupFetch(ctx context.Context, folder storage.Folder, backupName st
 	if err != nil {
 		return err
 	}
-	return internal.BackupToCommandStdin(restoreCmd, backup)
+	return internal.StreamBackupToCommandStdin(restoreCmd, backup)
 }
