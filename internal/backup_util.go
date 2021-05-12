@@ -77,7 +77,6 @@ func GetBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage 
 	return sortTimes, garbage, nil
 }
 
-// TODO : unit tests
 func GetBackupTimeSlices(backups []storage.Object) []BackupTime {
 	sortTimes := make([]BackupTime, 0)
 	for _, object := range backups {
