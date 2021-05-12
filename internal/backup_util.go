@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/storages/storage"
@@ -13,6 +14,12 @@ import (
 
 type NoBackupsFoundError struct {
 	error
+}
+
+type TimedBackup interface {
+	Name() string
+	StartTime() time.Time
+	IsPermanent() bool
 }
 
 func NewNoBackupsFoundError() NoBackupsFoundError {
@@ -141,4 +148,42 @@ func FolderSize(folder storage.Folder, path string) (int64, error) {
 		size += obj.GetSize()
 	}
 	return size, nil
+}
+
+// SplitPurgingBackups partitions backups to delete and retain
+func SplitPurgingBackups(backups []TimedBackup,
+	retainCount *int,
+	retainAfter *time.Time) (purge, retain []TimedBackup, err error) {
+	sort.Slice(backups, func(i, j int) bool {
+		b1 := backups[i]
+		b2 := backups[j]
+		return b1.StartTime().After(b2.StartTime())
+	})
+
+	var backup TimedBackup
+	retainedCount := 0
+	for i := range backups {
+		backup = backups[i]
+		if backup.IsPermanent() {
+			tracelog.DebugLogger.Printf("Preserving backup due to keep permanent policy: %s", backup.Name())
+			retain = append(retain, backup)
+			continue
+		}
+
+		if retainCount != nil && retainedCount < *retainCount { // TODO: fix condition, use func args
+			retainedCount++
+			tracelog.DebugLogger.Printf("Preserving backup due to retain count policy [%d/%d]: %s",
+				retainedCount, *retainCount, backup.Name())
+			retain = append(retain, backup)
+			continue
+		}
+
+		if retainAfter != nil && backup.StartTime().After(*retainAfter) { // TODO: fix condition, use func args
+			tracelog.DebugLogger.Printf("Preserving backup due to retain time policy: %s", backup.Name())
+			retain = append(retain, backup)
+			continue
+		}
+		purge = append(purge, backup)
+	}
+	return purge, retain, nil
 }

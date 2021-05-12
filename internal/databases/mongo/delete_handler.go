@@ -105,7 +105,12 @@ func HandleBackupsPurge(backupTimes []internal.BackupTime,
 		return nil, nil, err
 	}
 
-	purge, retain, err = archive.SplitPurgingBackups(backups, opts.retainCount, opts.retainAfter)
+	timedBackups := archive.MongoModelToTimedBackup(backups)
+
+	purgeBackups, retainBackups, err := internal.SplitPurgingBackups(timedBackups, opts.retainCount, opts.retainAfter)
+	purge = archive.TimedBackupToMongoModel(purgeBackups)
+	retain = archive.TimedBackupToMongoModel(retainBackups)
+
 	if err != nil {
 		return nil, nil, err
 	}

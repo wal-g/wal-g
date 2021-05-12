@@ -2,7 +2,6 @@ package archive
 
 import (
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/wal-g/tracelog"
@@ -98,40 +97,26 @@ func LastKnownInBackupTS(backups []models.Backup) (models.Timestamp, error) {
 	return minTS, nil
 }
 
-// SplitPurgingBackups partitions backups to delete and retain
-func SplitPurgingBackups(backups []models.Backup,
-	retainCount *int,
-	retainAfter *time.Time) (purge, retain []models.Backup, err error) {
-	sort.Slice(backups, func(i, j int) bool {
-		return backups[i].StartLocalTime.After(backups[j].StartLocalTime)
-	})
-
-	var backup models.Backup
-	retainedCount := 0
-	for i := range backups {
-		backup = backups[i]
-		if backup.Permanent {
-			tracelog.DebugLogger.Printf("Preserving backup due to keep permanent policy: %s", backup.BackupName)
-			retain = append(retain, backup)
-			continue
-		}
-
-		if retainCount != nil && retainedCount < *retainCount { // TODO: fix condition, use func args
-			retainedCount++
-			tracelog.DebugLogger.Printf("Preserving backup due to retain count policy [%d/%d]: %s",
-				retainedCount, *retainCount, backup.BackupName)
-			retain = append(retain, backup)
-			continue
-		}
-
-		if retainAfter != nil && backup.StartLocalTime.After(*retainAfter) { // TODO: fix condition, use func args
-			tracelog.DebugLogger.Printf("Preserving backup due to retain time policy: %s", backup.BackupName)
-			retain = append(retain, backup)
-			continue
-		}
-		purge = append(purge, backup)
+func TimedBackupToMongoModel(backups []internal.TimedBackup) []models.Backup {
+	if backups == nil {
+		return nil
 	}
-	return purge, retain, nil
+	result := make([]models.Backup, len(backups))
+	for i := range backups {
+		result[i] = backups[i].(models.Backup)
+	}
+	return result
+}
+
+func MongoModelToTimedBackup(backups []models.Backup) []internal.TimedBackup {
+	if backups == nil {
+		return nil
+	}
+	result := make([]internal.TimedBackup, len(backups))
+	for i := range backups {
+		result[i] = backups[i]
+	}
+	return result
 }
 
 // SplitPurgingOplogArchivesByTS returns archives with start_maj_ts < purgeBeforeTS.

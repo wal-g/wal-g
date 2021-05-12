@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
@@ -594,7 +595,10 @@ func TestSplitPurgingBackups(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotPurge, gotRetain, err := SplitPurgingBackups(tt.args.backups, tt.args.retainCount, tt.args.retainAfter)
+			backups := MongoModelToTimedBackup(tt.args.backups)
+			gotPurgeTimed, gotRetainTimed, err := internal.SplitPurgingBackups(backups, tt.args.retainCount, tt.args.retainAfter)
+			gotPurge := TimedBackupToMongoModel(gotPurgeTimed)
+			gotRetain := TimedBackupToMongoModel(gotRetainTimed)
 
 			if tt.err != nil {
 				assert.EqualError(t, err, tt.err.Error())
