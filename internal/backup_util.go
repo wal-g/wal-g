@@ -77,17 +77,17 @@ func GetBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage 
 	return sortTimes, garbage, nil
 }
 
-// TODO : unit tests
 func GetBackupTimeSlices(backups []storage.Object) []BackupTime {
-	sortTimes := make([]BackupTime, len(backups))
-	for i, object := range backups {
+	sortTimes := make([]BackupTime, 0)
+	for _, object := range backups {
 		key := object.GetName()
 		if !strings.HasSuffix(key, utility.SentinelSuffix) {
 			continue
 		}
 		time := object.GetLastModified()
-		sortTimes[i] = BackupTime{utility.StripRightmostBackupName(key), time,
+		backup := BackupTime{utility.StripRightmostBackupName(key), time,
 			utility.StripWalFileName(key)}
+		sortTimes = append(sortTimes, backup)
 	}
 	sort.Slice(sortTimes, func(i, j int) bool {
 		return sortTimes[i].Time.After(sortTimes[j].Time)
