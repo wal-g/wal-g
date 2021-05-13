@@ -26,12 +26,13 @@ type UploaderProvider interface {
 // Uploader contains fields associated with uploading tarballs.
 // Multiple tarballs can share one uploader.
 type Uploader struct {
-	UploadingFolder      storage.Folder
-	Compressor           compression.Compressor
-	waitGroup            *sync.WaitGroup
-	ArchiveStatusManager asm.ArchiveStatusManager
-	Failed               atomic.Value
-	TarSize              *int64
+	UploadingFolder        storage.Folder
+	Compressor             compression.Compressor
+	waitGroup              *sync.WaitGroup
+	ArchiveStatusManager   asm.ArchiveStatusManager
+	PGArchiveStatusManager asm.ArchiveStatusManager
+	Failed                 atomic.Value
+	TarSize                *int64
 }
 
 // UploadObject

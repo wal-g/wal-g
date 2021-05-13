@@ -93,13 +93,8 @@ func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrit
 
 	// rename WAL status file ".ready" to ".done" if requested
 	if readyRename && err == nil {
-
-		var wALFileName = filepath.Base(walFilePath)
-		var readyPath = filepath.Join(internal.GetPGArchiveStatusFolderPath(), wALFileName+".ready")
-		var donePath = filepath.Join(internal.GetPGArchiveStatusFolderPath(), wALFileName+".done")
-
+		err := uploader.PGArchiveStatusManager.RenameReady(walFilePath)
 		// error here is not a fatal thing, just a bit more work for the next wal-push
-		err = os.Rename(readyPath, donePath)
 		tracelog.ErrorLogger.PrintOnError(err)
 	}
 

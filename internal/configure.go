@@ -197,7 +197,7 @@ func ConfigureLogging() error {
 	return nil
 }
 
-func GetPGArchiveStatusFolderPath() string {
+func getPGArchiveStatusFolderPath() string {
 	return filepath.Join(GetDataFolderPath(), "archive_status")
 }
 
@@ -212,6 +212,10 @@ func GetRelativeArchiveDataFolderPath() string {
 // TODO : unit tests
 func ConfigureArchiveStatusManager() (fsutil.DataFolder, error) {
 	return fsutil.NewDiskDataFolder(getArchiveDataFolderPath())
+}
+
+func ConfigurePGArchiveStatusManager() (fsutil.DataFolder, error) {
+	return fsutil.ExistingDiskDataFolder(getPGArchiveStatusFolderPath())
 }
 
 // ConfigureUploader connects to storage and creates an uploader. It makes sure
