@@ -27,7 +27,6 @@ var binlogFetchCmd = &cobra.Command{
 		mysql.HandleBinlogFetch(folder, fetchBackupName, fetchUntilTS)
 	},
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		internal.RequiredSettings[internal.MysqlBinlogReplayCmd] = true
 		internal.RequiredSettings[internal.MysqlBinlogDstSetting] = true
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)

@@ -171,3 +171,16 @@ func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupNa
 
 	return uploader.Upload(sentinelName, bytes.NewReader(dtoBody))
 }
+
+type ErrWaiter interface {
+	Wait() error
+}
+
+// MetaConstructor - interface that helps with building meta-info about backup and generate MetaInfo
+// see MongoMetaConstructor
+// see RedisMetaConstructor
+type MetaConstructor interface {
+	Init() error
+	Finalize(backupName string) error
+	MetaInfo() interface{}
+}

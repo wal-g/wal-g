@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"github.com/spf13/viper"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -13,9 +14,8 @@ func extendExcludedFiles() {
 }
 
 // HandleCatchupPush is invoked to perform a wal-g catchup-push
-func HandleCatchupPush(uploader *WalUploader, archiveDirectory string, fromLSN uint64) {
-	archiveDirectory = utility.ResolveSymlink(archiveDirectory)
-	checkPgVersionAndPgControl(archiveDirectory)
+func HandleCatchupPush(pgDataDirectory string, fromLSN uint64) {
+	pgDataDirectory = utility.ResolveSymlink(pgDataDirectory)
 
 	fakePreviousBackupSentinelDto := BackupSentinelDto{
 		BackupStartLSN: &fromLSN,
@@ -23,20 +23,19 @@ func HandleCatchupPush(uploader *WalUploader, archiveDirectory string, fromLSN u
 
 	extendExcludedFiles()
 
-	backupConfig := BackupConfig{
-		uploader:                  uploader,
-		archiveDirectory:          archiveDirectory,
-		backupsFolder:             utility.CatchupPath,
-		previousBackupName:        "",
-		previousBackupSentinelDto: fakePreviousBackupSentinelDto,
-		isPermanent:               false,
-		forceIncremental:          true,
-		incrementCount:            0,
-		verifyPageChecksums:       false,
-		storeAllCorruptBlocks:     false,
-		tarBallComposerType:       RegularComposer,
-		userData:                  viper.GetString(internal.SentinelUserDataSetting),
+	backupArguments := BackupArguments{
+		isPermanent:         false,
+		verifyPageChecksums: false,
+		pgDataDirectory:     pgDataDirectory,
+		forceIncremental:    true,
+		backupsFolder:       utility.CatchupPath,
+		tarBallComposerType: RegularComposer,
+		userData:            viper.GetString(internal.SentinelUserDataSetting),
 	}
-
-	createAndPushBackup(&backupConfig)
+	backupConfig, err := NewBackupHandler(backupArguments)
+	tracelog.ErrorLogger.FatalOnError(err)
+	backupConfig.checkPgVersionAndPgControl()
+	backupConfig.prevBackupInfo.sentinelDto = fakePreviousBackupSentinelDto
+	backupConfig.curBackupInfo.startLSN = fromLSN
+	backupConfig.createAndPushBackup()
 }

@@ -77,17 +77,17 @@ func GetBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage 
 	return sortTimes, garbage, nil
 }
 
-// TODO : unit tests
 func GetBackupTimeSlices(backups []storage.Object) []BackupTime {
-	sortTimes := make([]BackupTime, len(backups))
-	for i, object := range backups {
+	sortTimes := make([]BackupTime, 0)
+	for _, object := range backups {
 		key := object.GetName()
 		if !strings.HasSuffix(key, utility.SentinelSuffix) {
 			continue
 		}
 		time := object.GetLastModified()
-		sortTimes[i] = BackupTime{utility.StripRightmostBackupName(key), time,
+		backup := BackupTime{utility.StripRightmostBackupName(key), time,
 			utility.StripWalFileName(key)}
+		sortTimes = append(sortTimes, backup)
 	}
 	sort.Slice(sortTimes, func(i, j int) bool {
 		return sortTimes[i].Time.After(sortTimes[j].Time)
@@ -129,4 +129,16 @@ func UnwrapLatestModifier(backupName string, folder storage.Folder) (string, err
 	}
 	tracelog.InfoLogger.Printf("LATEST backup is: '%s'\n", latest)
 	return latest, nil
+}
+
+func FolderSize(folder storage.Folder, path string) (int64, error) {
+	dataObjects, _, err := folder.GetSubFolder(path).ListFolder()
+	if err != nil {
+		return 0, err
+	}
+	var size int64
+	for _, obj := range dataObjects {
+		size += obj.GetSize()
+	}
+	return size, nil
 }

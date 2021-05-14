@@ -23,16 +23,11 @@ var (
 	_ = []Purger{&StoragePurger{}}
 )
 
-// ErrWaiter
-type ErrWaiter interface {
-	Wait() error
-}
-
 // Uploader defines interface to store mongodb backups and oplog archives
 type Uploader interface {
 	UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error // TODO: rename firstTS
 	UploadGapArchive(err error, firstTS, lastTS models.Timestamp) error
-	UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider MongoMetaProvider) error
+	UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error
 }
 
 // Downloader defines interface to fetch mongodb oplog archives
@@ -192,7 +187,7 @@ func (d *DiscardUploader) UploadGapArchive(err error, firstTS, lastTS models.Tim
 }
 
 // UploadBackup is not implemented yet
-func (d *DiscardUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider MongoMetaProvider) error {
+func (d *DiscardUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error {
 	panic("implement me")
 }
 
@@ -200,7 +195,7 @@ func (d *DiscardUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaProv
 // is NOT thread-safe
 type StorageUploader struct {
 	internal.UploaderProvider
-	crypter crypto.Crypter
+	crypter crypto.Crypter // usages only in UploadOplogArchive
 	buf     *bytes.Buffer
 }
 
@@ -246,14 +241,17 @@ func (su *StorageUploader) UploadGapArchive(archErr error, firstTS, lastTS model
 }
 
 // UploadBackup compresses a stream and uploads it.
-func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaProvider MongoMetaProvider) error {
-	timeStart := utility.TimeNowCrossPlatformLocal()
+func (su *StorageUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error {
+	err := metaConstructor.Init()
+	if err != nil {
+		return fmt.Errorf("can not init meta provider: %+v", err)
+	}
 	backupName, err := su.PushStream(stream)
 	if err != nil {
 		return fmt.Errorf("can not push stream: %+v", err)
 	}
 
-	if err := metaProvider.Finalize(backupName); err != nil {
+	if err := metaConstructor.Finalize(backupName); err != nil {
 		return fmt.Errorf("can not finalize meta provider: %+v", err)
 	}
 
@@ -261,15 +259,7 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd ErrWaiter, metaPro
 		return fmt.Errorf("backup command failed: %+v", err)
 	}
 
-	meta := metaProvider.Meta()
-	backupSentinel := &models.Backup{
-		StartLocalTime:  timeStart,
-		FinishLocalTime: utility.TimeNowCrossPlatformLocal(),
-		UserData:        meta.User,
-		MongoMeta:       meta.Mongo,
-		DataSize:        meta.DataSize,
-		Permanent:       meta.Permanent,
-	}
+	backupSentinel := metaConstructor.MetaInfo()
 	if err := internal.UploadSentinel(su.UploaderProvider, backupSentinel, backupName); err != nil {
 		return fmt.Errorf("can not upload sentinel: %+v", err)
 	}

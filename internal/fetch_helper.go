@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"os/user"
 	"path/filepath"
 
@@ -172,10 +173,21 @@ func DownloadAndDecompressStorageFile(folder storage.Folder, fileName string) (i
 // TODO : unit tests
 // DownloadFileTo downloads a file and writes it to local file
 func DownloadFileTo(folder storage.Folder, fileName string, dstPath string) error {
-	reader, err := DownloadAndDecompressStorageFile(folder, fileName)
+	// Create file as soon as possible. It may be important due to race condition in wal-prefetch for PG.
+	file, err := os.OpenFile(dstPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
 	if err != nil {
 		return err
 	}
+
+	reader, err := DownloadAndDecompressStorageFile(folder, fileName)
+	if err != nil {
+		// We could not start upload - remove the file totally.
+		_ = os.Remove(dstPath)
+		return err
+	}
 	defer utility.LoggedClose(reader, "")
-	return ioextensions.CreateFileWith(dstPath, reader)
+
+	_, err = utility.FastCopy(file, reader)
+	// In case of error we may have some content within file. Leave it alone.
+	return err
 }

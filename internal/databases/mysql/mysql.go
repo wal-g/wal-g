@@ -164,27 +164,36 @@ type binlogHandler interface {
 
 func fetchLogs(folder storage.Folder, dstDir string, startTS time.Time, endTS time.Time, handler binlogHandler) error {
 	logFolder := folder.GetSubFolder(BinlogPath)
-	logsToFetch, err := getLogsCoveringInterval(logFolder, startTS)
-	if err != nil {
-		return err
-	}
-	for _, logFile := range logsToFetch {
-		binlogName := utility.TrimFileExtension(logFile.GetName())
-		binlogPath := path.Join(dstDir, binlogName)
-		tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
-		if err = internal.DownloadFileTo(logFolder, binlogName, binlogPath); err != nil {
-			tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
-			return err
-		}
-		timestamp, err := GetBinlogStartTimestamp(binlogPath)
+	includeStart := true
+outer:
+	for {
+		logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, includeStart)
+		includeStart = false
 		if err != nil {
 			return err
 		}
-		err = handler.handleBinlog(binlogPath)
-		if err != nil {
-			return err
+		for _, logFile := range logsToFetch {
+			startTS = logFile.GetLastModified()
+			binlogName := utility.TrimFileExtension(logFile.GetName())
+			binlogPath := path.Join(dstDir, binlogName)
+			tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
+			if err = internal.DownloadFileTo(logFolder, binlogName, binlogPath); err != nil {
+				tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
+				return err
+			}
+			timestamp, err := GetBinlogStartTimestamp(binlogPath)
+			if err != nil {
+				return err
+			}
+			err = handler.handleBinlog(binlogPath)
+			if err != nil {
+				return err
+			}
+			if timestamp.After(endTS) {
+				break outer
+			}
 		}
-		if timestamp.After(endTS) {
+		if len(logsToFetch) == 0 {
 			break
 		}
 	}
@@ -230,7 +239,7 @@ func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time,
 }
 
 // getLogsCoveringInterval lists the operation logs that cover the interval
-func getLogsCoveringInterval(folder storage.Folder, start time.Time) ([]storage.Object, error) {
+func getLogsCoveringInterval(folder storage.Folder, start time.Time, includeStart bool) ([]storage.Object, error) {
 	logFiles, _, err := folder.ListFolder()
 	if err != nil {
 		return nil, err
@@ -240,7 +249,7 @@ func getLogsCoveringInterval(folder storage.Folder, start time.Time) ([]storage.
 	})
 	var logsToFetch []storage.Object
 	for _, logFile := range logFiles {
-		if start.Before(logFile.GetLastModified()) || start.Equal(logFile.GetLastModified()) {
+		if start.Before(logFile.GetLastModified()) || includeStart && start.Equal(logFile.GetLastModified()) {
 			logsToFetch = append(logsToFetch, logFile)
 		}
 	}

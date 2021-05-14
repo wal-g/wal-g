@@ -14,7 +14,7 @@ import (
 )
 
 // TODO : unit tests
-func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, detail bool) {
+func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 	backups, err := internal.GetBackups(folder)
 	if len(backups) == 0 {
 		tracelog.InfoLogger.Println("No backups found")
@@ -22,28 +22,19 @@ func HandleBackupListWithFlags(folder storage.Folder, pretty bool, json bool, de
 	}
 	tracelog.ErrorLogger.FatalOnError(err)
 	// if details are requested we append content of metadata.json to each line
-	if detail {
-		backupDetails, err := GetBackupsDetails(folder, backups)
-		tracelog.ErrorLogger.FatalOnError(err)
-		if json {
-			err = internal.WriteAsJSON(backupDetails, os.Stdout, pretty)
-			tracelog.ErrorLogger.FatalOnError(err)
-		} else if pretty {
-			writePrettyBackupListDetails(backupDetails, os.Stdout)
-		} else {
-			err = writeBackupListDetails(backupDetails, os.Stdout)
-			tracelog.ErrorLogger.FatalOnError(err)
-		}
-	} else {
-		if json {
-			err = internal.WriteAsJSON(backups, os.Stdout, pretty)
-			tracelog.ErrorLogger.FatalOnError(err)
-		} else if pretty {
-			internal.WritePrettyBackupList(backups, os.Stdout)
-		} else {
-			internal.WriteBackupList(backups, os.Stdout)
-		}
+
+	backupDetails, err := GetBackupsDetails(folder, backups)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	switch {
+	case json:
+		err = internal.WriteAsJSON(backupDetails, os.Stdout, pretty)
+	case pretty:
+		writePrettyBackupListDetails(backupDetails, os.Stdout)
+	default:
+		err = writeBackupListDetails(backupDetails, os.Stdout)
 	}
+	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 func GetBackupsDetails(folder storage.Folder, backups []internal.BackupTime) ([]BackupDetail, error) {

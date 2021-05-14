@@ -198,6 +198,22 @@ func (h *DeleteHandler) HandleDeleteTarget(targetSelector BackupSelector, confir
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
+func (h *DeleteHandler) HandleDeleteEverything(args []string, permanentBackups map[string]bool, confirmed bool) {
+	forceModifier := false
+	modifier := ExtractDeleteEverythingModifierFromArgs(args)
+	if modifier == ForceDeleteModifier {
+		forceModifier = true
+	}
+
+	if len(permanentBackups) > 0 {
+		if !forceModifier {
+			tracelog.ErrorLogger.Fatalf("Found permanent backups=%v\n", permanentBackups)
+		}
+		tracelog.InfoLogger.Printf("Found permanent backups=%v\n", permanentBackups)
+	}
+	h.DeleteEverything(confirmed)
+}
+
 func (h *DeleteHandler) FindTargetBeforeName(name string, modifier int) (BackupObject, error) {
 	choiceFunc := getBeforeChoiceFunc(name, modifier)
 	if choiceFunc == nil {

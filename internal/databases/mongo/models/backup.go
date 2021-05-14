@@ -27,10 +27,12 @@ type MongoMeta struct {
 
 // BackupMeta includes mongodb and storage metadata
 type BackupMeta struct {
-	Mongo     MongoMeta
-	DataSize  int64
-	Permanent bool
-	User      interface{}
+	Mongo      MongoMeta
+	DataSize   int64
+	Permanent  bool
+	User       interface{}
+	StartTime  time.Time
+	FinishTime time.Time
 }
 
 // FirstOverlappingBackupForArch checks if archive overlaps any backup from given list.
