@@ -34,15 +34,17 @@ func (b Backup) IsPermanent() bool {
 	return b.Permanent
 }
 
-func TimedBackupToRedisModel(backups []internal.TimedBackup) []Backup {
-	if backups == nil {
-		return nil
+func SplitRedisBackups(backups []Backup, purgeBackups, retainBackups map[string]bool) (purge, retain []Backup) {
+	for _, backup := range backups {
+		if purgeBackups[backup.Name()] {
+			purge = append(purge, backup)
+			continue
+		}
+		if retainBackups[backup.Name()] {
+			retain = append(retain, backup)
+		}
 	}
-	result := make([]Backup, len(backups))
-	for i := range backups {
-		result[i] = backups[i].(Backup)
-	}
-	return result
+	return purge, retain
 }
 
 func RedisModelToTimedBackup(backups []Backup) []internal.TimedBackup {

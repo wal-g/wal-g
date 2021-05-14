@@ -2,7 +2,6 @@ package redis
 
 import (
 	"fmt"
-	"path"
 	"sort"
 	"time"
 
@@ -77,7 +76,7 @@ func HandlePurge(backupsPath string, setters ...PurgeOption) error {
 	if opts.purgeGarbage {
 		tracelog.InfoLogger.Printf("Garbage prefixes in backups folder: %v", garbage)
 		if !opts.dryRun {
-			if err := DeleteGarbage(backupFolder, garbage); err != nil {
+			if err := internal.DeleteGarbage(backupFolder, garbage); err != nil {
 				return err
 			}
 		}
@@ -102,17 +101,21 @@ func HandleBackupsDelete(backupTimes []internal.BackupTime,
 
 	timedBackup := archive.RedisModelToTimedBackup(backups)
 
+	internal.SortTimedBackup(timedBackup)
 	purgeBackups, retainBackups, err := internal.SplitPurgingBackups(timedBackup, opts.retainCount, opts.retainAfter)
-	purge = archive.TimedBackupToRedisModel(purgeBackups)
-	retain = archive.TimedBackupToRedisModel(retainBackups)
 	if err != nil {
 		return nil, nil, err
 	}
-	tracelog.InfoLogger.Printf("Backups selected to be deleted: %v", BackupNamesFromBackups(purge))
+
+	purge, retain = archive.SplitRedisBackups(backups, purgeBackups, retainBackups)
+
+	purgeFiles := BackupNamesFromBackups(purge)
+
+	tracelog.InfoLogger.Printf("Backups selected to be deleted: %v", purgeFiles)
 	tracelog.InfoLogger.Printf("Backups selected to be retained: %v", BackupNamesFromBackups(retain))
 
 	if !opts.dryRun {
-		if err := DeleteBackups(folder, purge); err != nil {
+		if err := internal.DeleteBackups(folder, purgeFiles); err != nil {
 			return nil, nil, err
 		}
 		tracelog.InfoLogger.Printf("Backups were purged: deleted: %d, retained: %v", len(purge), len(retain))
@@ -156,46 +159,6 @@ func BackupNamesFromBackupTimes(backups []internal.BackupTime) []string {
 		names = append(names, b.BackupName)
 	}
 	return names
-}
-
-// DeleteGarbage purges given garbage keys
-func DeleteGarbage(folder storage.Folder, garbage []string) error {
-	var keys []string
-	for _, prefix := range garbage {
-		garbageObjects, _, err := folder.GetSubFolder(prefix).ListFolder()
-		if err != nil {
-			return err
-		}
-		for _, obj := range garbageObjects {
-			keys = append(keys, path.Join(prefix, obj.GetName()))
-		}
-	}
-	tracelog.DebugLogger.Printf("Garbage keys will be deleted: %+v\n", keys)
-	return folder.DeleteObjects(keys)
-}
-
-// DeleteBackups purges given backups files
-// TODO: extract BackupLayout abstraction and provide DataPath(), SentinelPath(), Exists() methods
-func DeleteBackups(folder storage.Folder, backups []archive.Backup) error {
-	keys := make([]string, 0, len(backups)*2)
-	for idx := range backups {
-		backup := &backups[idx]
-		keys = append(keys, internal.SentinelNameFromBackup(backup.BackupName))
-
-		dataObjects, _, err := folder.GetSubFolder(backup.BackupName).ListFolder()
-		if err != nil {
-			return err
-		}
-		for _, obj := range dataObjects {
-			keys = append(keys, path.Join(backup.BackupName, obj.GetName()))
-		}
-	}
-
-	tracelog.DebugLogger.Printf("Backup keys will be deleted: %+v\n", keys)
-	if err := folder.DeleteObjects(keys); err != nil {
-		return err
-	}
-	return nil
 }
 
 // BackupNamesFromBackups forms list of backup names from Backups

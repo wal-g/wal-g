@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -20,6 +21,14 @@ type TimedBackup interface {
 	Name() string
 	StartTime() time.Time
 	IsPermanent() bool
+}
+
+func SortTimedBackup(backups []TimedBackup) {
+	sort.Slice(backups, func(i, j int) bool {
+		b1 := backups[i]
+		b2 := backups[j]
+		return b1.StartTime().After(b2.StartTime())
+	})
 }
 
 func NewNoBackupsFoundError() NoBackupsFoundError {
@@ -153,20 +162,16 @@ func FolderSize(folder storage.Folder, path string) (int64, error) {
 // SplitPurgingBackups partitions backups to delete and retain
 func SplitPurgingBackups(backups []TimedBackup,
 	retainCount *int,
-	retainAfter *time.Time) (purge, retain []TimedBackup, err error) {
-	sort.Slice(backups, func(i, j int) bool {
-		b1 := backups[i]
-		b2 := backups[j]
-		return b1.StartTime().After(b2.StartTime())
-	})
+	retainAfter *time.Time) (purge, retain map[string]bool, err error) {
+	retain = make(map[string]bool)
+	purge = make(map[string]bool)
 
-	var backup TimedBackup
 	retainedCount := 0
 	for i := range backups {
-		backup = backups[i]
+		backup := backups[i]
 		if backup.IsPermanent() {
 			tracelog.DebugLogger.Printf("Preserving backup due to keep permanent policy: %s", backup.Name())
-			retain = append(retain, backup)
+			retain[backup.Name()] = true
 			continue
 		}
 
@@ -174,16 +179,56 @@ func SplitPurgingBackups(backups []TimedBackup,
 			retainedCount++
 			tracelog.DebugLogger.Printf("Preserving backup due to retain count policy [%d/%d]: %s",
 				retainedCount, *retainCount, backup.Name())
-			retain = append(retain, backup)
+			retain[backup.Name()] = true
 			continue
 		}
 
 		if retainAfter != nil && backup.StartTime().After(*retainAfter) { // TODO: fix condition, use func args
 			tracelog.DebugLogger.Printf("Preserving backup due to retain time policy: %s", backup.Name())
-			retain = append(retain, backup)
+			retain[backup.Name()] = true
 			continue
 		}
-		purge = append(purge, backup)
+		purge[backup.Name()] = true
 	}
 	return purge, retain, nil
+}
+
+// DeleteGarbage purges given garbage keys
+func DeleteGarbage(folder storage.Folder, garbage []string) error {
+	var keys []string
+	for _, prefix := range garbage {
+		garbageObjects, _, err := folder.GetSubFolder(prefix).ListFolder()
+		if err != nil {
+			return err
+		}
+		for _, obj := range garbageObjects {
+			keys = append(keys, path.Join(prefix, obj.GetName()))
+		}
+	}
+	tracelog.DebugLogger.Printf("Garbage keys will be deleted: %+v\n", keys)
+	return folder.DeleteObjects(keys)
+}
+
+// DeleteBackups purges given backups files
+// TODO: extract BackupLayout abstraction and provide DataPath(), SentinelPath(), Exists() methods
+func DeleteBackups(folder storage.Folder, backups []string) error {
+	keys := make([]string, 0, len(backups)*2)
+	for i := range backups {
+		backupName := backups[i]
+		keys = append(keys, SentinelNameFromBackup(backupName))
+
+		dataObjects, _, err := folder.GetSubFolder(backupName).ListFolder()
+		if err != nil {
+			return err
+		}
+		for _, obj := range dataObjects {
+			keys = append(keys, path.Join(backupName, obj.GetName()))
+		}
+	}
+
+	tracelog.DebugLogger.Printf("Backup keys will be deleted: %+v\n", keys)
+	if err := folder.DeleteObjects(keys); err != nil {
+		return err
+	}
+	return nil
 }

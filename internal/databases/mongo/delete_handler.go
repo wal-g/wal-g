@@ -107,13 +107,14 @@ func HandleBackupsPurge(backupTimes []internal.BackupTime,
 
 	timedBackups := archive.MongoModelToTimedBackup(backups)
 
+	internal.SortTimedBackup(timedBackups)
 	purgeBackups, retainBackups, err := internal.SplitPurgingBackups(timedBackups, opts.retainCount, opts.retainAfter)
-	purge = archive.TimedBackupToMongoModel(purgeBackups)
-	retain = archive.TimedBackupToMongoModel(retainBackups)
 
 	if err != nil {
 		return nil, nil, err
 	}
+
+	purge, retain = archive.SplitMongoBackups(backups, purgeBackups, retainBackups)
 	tracelog.InfoLogger.Printf("Backups selected to be deleted: %v", archive.BackupNamesFromBackups(purge))
 	tracelog.InfoLogger.Printf("Backups selected to be retained: %v", archive.BackupNamesFromBackups(retain))
 
