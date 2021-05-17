@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"path"
 	"sort"
 	"strings"
 
@@ -286,41 +285,13 @@ func NewStoragePurger(opts StorageSettings) (*StoragePurger, error) {
 // DeleteBackups purges given backups files
 // TODO: extract BackupLayout abstraction and provide DataPath(), SentinelPath(), Exists() methods
 func (sp *StoragePurger) DeleteBackups(backups []models.Backup) error {
-	keys := make([]string, 0, len(backups)*2)
-	for idx := range backups {
-		backup := &backups[idx]
-		keys = append(keys, internal.SentinelNameFromBackup(backup.BackupName))
-
-		dataObjects, _, err := sp.backupsFolder.GetSubFolder(backup.BackupName).ListFolder()
-		if err != nil {
-			return err
-		}
-		for _, obj := range dataObjects {
-			keys = append(keys, path.Join(backup.BackupName, obj.GetName()))
-		}
-	}
-
-	tracelog.DebugLogger.Printf("Backup keys will be deleted: %+v\n", keys)
-	if err := sp.backupsFolder.DeleteObjects(keys); err != nil {
-		return err
-	}
-	return nil
+	backupNames := BackupNamesFromBackups(backups)
+	return internal.DeleteBackups(sp.backupsFolder, backupNames)
 }
 
 // DeleteGarbage purges given garbage keys
 func (sp *StoragePurger) DeleteGarbage(garbage []string) error {
-	var keys []string
-	for _, prefix := range garbage {
-		garbageObjects, _, err := sp.backupsFolder.GetSubFolder(prefix).ListFolder()
-		if err != nil {
-			return err
-		}
-		for _, obj := range garbageObjects {
-			keys = append(keys, path.Join(prefix, obj.GetName()))
-		}
-	}
-	tracelog.DebugLogger.Printf("Garbage keys will be deleted: %+v\n", keys)
-	return sp.backupsFolder.DeleteObjects(keys)
+	return internal.DeleteGarbage(sp.backupsFolder, garbage)
 }
 
 // DeleteOplogArchives purges given oplogs files
