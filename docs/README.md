@@ -305,7 +305,7 @@ Authors
 * [Katie Li](https://github.com/katie31)
 * [Daniel Farina](https://github.com/fdr)
 
-See also the list of [contributors](CONTRIBUTORS) who participated in this project.
+See also the list of [contributors](Contributors.md) who participated in this project.
 
 License
 -------
