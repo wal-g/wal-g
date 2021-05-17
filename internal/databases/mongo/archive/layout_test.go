@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
@@ -382,23 +383,34 @@ func TestLastKnownInBackupTS(t *testing.T) {
 }
 
 var (
+	MockBackup1 = models.Backup{BackupName: "back1", StartLocalTime: time.Unix(1579000500, 0), FinishLocalTime: time.Unix(1579000550, 0)}
+	MockBackup2 = models.Backup{BackupName: "back2", StartLocalTime: time.Unix(1579000300, 0), FinishLocalTime: time.Unix(1579000400, 0)}
+	MockBackup3 = models.Backup{BackupName: "back3", StartLocalTime: time.Unix(1579000300, 0), FinishLocalTime: time.Unix(1579000400, 0)}
+	MockBackup4 = models.Backup{BackupName: "back4", StartLocalTime: time.Unix(1579000200, 0), FinishLocalTime: time.Unix(1579000250, 0)}
+	MockBackup5 = models.Backup{BackupName: "back5", StartLocalTime: time.Unix(1579000100, 0), FinishLocalTime: time.Unix(1579000101, 0)}
+	MockBackup6 = models.Backup{BackupName: "back6", StartLocalTime: time.Unix(1579000001, 0), FinishLocalTime: time.Unix(1579000001, 0)}
+	MockBackup7 = models.Backup{BackupName: "back7", StartLocalTime: time.Unix(1579000001, 0), FinishLocalTime: time.Unix(1579000001, 0)}
+
+	MockBackup5Perm = models.Backup{BackupName: "perm5", StartLocalTime: time.Unix(1579000100, 0), FinishLocalTime: time.Unix(1579000101, 0), Permanent: true}
+	MockBackup8Perm = models.Backup{BackupName: "perm8", StartLocalTime: time.Unix(1579000000, 0), FinishLocalTime: time.Unix(1579000001, 0), Permanent: true}
+
 	SplitBackups = []models.Backup{
-		{StartLocalTime: time.Unix(1579000500, 0), FinishLocalTime: time.Unix(1579000550, 0)},
-		{StartLocalTime: time.Unix(1579000300, 0), FinishLocalTime: time.Unix(1579000400, 0)},
-		{StartLocalTime: time.Unix(1579000300, 0), FinishLocalTime: time.Unix(1579000400, 0)},
-		{StartLocalTime: time.Unix(1579000200, 0), FinishLocalTime: time.Unix(1579000250, 0)},
-		{StartLocalTime: time.Unix(1579000100, 0), FinishLocalTime: time.Unix(1579000101, 0)},
-		{StartLocalTime: time.Unix(1579000001, 0), FinishLocalTime: time.Unix(1579000001, 0)},
+		MockBackup1,
+		MockBackup2,
+		MockBackup3,
+		MockBackup4,
+		MockBackup5,
+		MockBackup6,
 	}
 	SplitBackupsPermanent = []models.Backup{
-		{StartLocalTime: time.Unix(1579000500, 0), FinishLocalTime: time.Unix(1579000550, 0)},
-		{StartLocalTime: time.Unix(1579000300, 0), FinishLocalTime: time.Unix(1579000400, 0)},
-		{StartLocalTime: time.Unix(1579000300, 0), FinishLocalTime: time.Unix(1579000400, 0)},
-		{StartLocalTime: time.Unix(1579000200, 0), FinishLocalTime: time.Unix(1579000250, 0)},
-		{StartLocalTime: time.Unix(1579000100, 0), FinishLocalTime: time.Unix(1579000101, 0), Permanent: true},
-		{StartLocalTime: time.Unix(1579000001, 0), FinishLocalTime: time.Unix(1579000001, 0)},
-		{StartLocalTime: time.Unix(1579000001, 0), FinishLocalTime: time.Unix(1579000001, 0)},
-		{StartLocalTime: time.Unix(1579000000, 0), FinishLocalTime: time.Unix(1579000001, 0), Permanent: true},
+		MockBackup1,
+		MockBackup2,
+		MockBackup3,
+		MockBackup4,
+		MockBackup5Perm,
+		MockBackup6,
+		MockBackup7,
+		MockBackup8Perm,
 	}
 )
 
@@ -578,29 +590,32 @@ func TestSplitPurgingBackups(t *testing.T) {
 				retainAfter: TimePtr(SplitBackups[3].StartLocalTime.Add(time.Second)),
 			},
 			wantPurge: []models.Backup{
-				{StartLocalTime: time.Unix(1579000200, 0), FinishLocalTime: time.Unix(1579000250, 0)},
-				{StartLocalTime: time.Unix(1579000001, 0), FinishLocalTime: time.Unix(1579000001, 0)},
-				{StartLocalTime: time.Unix(1579000001, 0), FinishLocalTime: time.Unix(1579000001, 0)},
+				MockBackup4,
+				MockBackup6,
+				MockBackup7,
 			},
 			wantRetain: []models.Backup{
-				{StartLocalTime: time.Unix(1579000500, 0), FinishLocalTime: time.Unix(1579000550, 0)},
-				{StartLocalTime: time.Unix(1579000300, 0), FinishLocalTime: time.Unix(1579000400, 0)},
-				{StartLocalTime: time.Unix(1579000300, 0), FinishLocalTime: time.Unix(1579000400, 0)},
-				{StartLocalTime: time.Unix(1579000100, 0), FinishLocalTime: time.Unix(1579000101, 0), Permanent: true},
-				{StartLocalTime: time.Unix(1579000000, 0), FinishLocalTime: time.Unix(1579000001, 0), Permanent: true},
+				MockBackup1,
+				MockBackup2,
+				MockBackup3,
+				MockBackup5Perm,
+				MockBackup8Perm,
 			},
 			err: nil,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotPurge, gotRetain, err := SplitPurgingBackups(tt.args.backups, tt.args.retainCount, tt.args.retainAfter)
-
+			backups := MongoModelToTimedBackup(tt.args.backups)
+			internal.SortTimedBackup(backups)
+			purgeList, retainList, err := internal.SplitPurgingBackups(backups, tt.args.retainCount, tt.args.retainAfter)
 			if tt.err != nil {
 				assert.EqualError(t, err, tt.err.Error())
 			} else {
 				assert.Nil(t, err)
 			}
+
+			gotPurge, gotRetain := SplitMongoBackups(tt.args.backups, purgeList, retainList)
 
 			assert.Equal(t, tt.wantPurge, gotPurge, "wrong purge list")
 			assert.Equal(t, tt.wantRetain, gotRetain, "wrong retain list")
@@ -718,9 +733,9 @@ func TestOldestBackupAfterTime(t *testing.T) {
 			name: "backups_wrong_sorting",
 			want: models.Backup{},
 			args: args{[]models.Backup{
-				{StartLocalTime: time.Unix(1579000200, 0), FinishLocalTime: time.Unix(1579000300, 0)},
-				{StartLocalTime: time.Unix(1579000300, 0), FinishLocalTime: time.Unix(1579000400, 0)},
-				{StartLocalTime: time.Unix(1579000500, 0), FinishLocalTime: time.Unix(1579000550, 0)},
+				{BackupName: "wrong1", StartLocalTime: time.Unix(1579000200, 0), FinishLocalTime: time.Unix(1579000300, 0)},
+				MockBackup2,
+				MockBackup1,
 			}, time.Unix(157800001, 0)},
 			wantErr: fmt.Errorf("backups are not sorted by finish time"),
 		},
