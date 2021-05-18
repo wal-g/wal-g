@@ -7,7 +7,7 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/wal-g/wal-g/tests_func/config"
+	"github.com/wal-g/wal-g/tests_func/mongodb/config"
 	"github.com/wal-g/wal-g/tests_func/utils"
 )
 

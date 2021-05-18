@@ -310,15 +310,19 @@ func (tctx *TestContext) enableAuth(host string) error {
 	return mc.EnableAuth()
 }
 
-func (tctx *TestContext) loadMongodbOpsFromConfig(host string, loadId string) error {
+func (tctx *TestContext) getMongoConfigPath(loadId, filename string) string {
+	// Mongo configs stored in "mongodb/config"
+	return path.Join("mongodb", "config", loadId, filename)
+}
 
-	ammoFile, err := os.Open(path.Join("config", loadId, "config.json"))
+func (tctx *TestContext) loadMongodbOpsFromConfig(host string, loadId string) error {
+	ammoFile, err := os.Open(tctx.getMongoConfigPath(loadId, "config.json"))
 	if err != nil {
 		return err
 	}
 	defer func() { _ = ammoFile.Close() }()
 
-	expectedFile, err := os.Open(path.Join("config", loadId, "expected.json"))
+	expectedFile, err := os.Open(tctx.getMongoConfigPath(loadId, "expected.json"))
 	if err != nil {
 		return err
 	}

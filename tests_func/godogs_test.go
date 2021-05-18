@@ -8,7 +8,7 @@ import (
 	"github.com/DATA-DOG/godog"
 	"github.com/DATA-DOG/godog/colors"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/tests_func/config"
+	"github.com/wal-g/wal-g/tests_func/mongodb/config"
 )
 
 type TestOpts struct {
