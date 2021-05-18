@@ -57,7 +57,7 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 
 	// do not rename the status file for the first WAL segment in a batch
 	// to avoid flooding the PostgreSQL logs with unnecessary warnings
-	err = uploadWALFile(uploader, walFilePath, bgUploader.preventWalOverwrite, false)
+	err = uploadWALFile(uploader, walFilePath, bgUploader.preventWalOverwrite)
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = uploadLocalWalMetadata(walFilePath, uploader.Uploader)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -72,7 +72,7 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 
 // TODO : unit tests
 // uploadWALFile from FS to the cloud
-func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrite bool, readyRename bool) error {
+func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrite bool) error {
 	if preventWalOverwrite {
 		overwriteAttempt, err := checkWALOverwrite(uploader, walFilePath)
 		if overwriteAttempt {
@@ -89,13 +89,6 @@ func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrit
 
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not Upload '%s'\n", walFilePath)
-	}
-
-	// rename WAL status file ".ready" to ".done" if requested
-	if readyRename && err == nil {
-		err := uploader.PGArchiveStatusManager.RenameReady(walFilePath)
-		// error here is not a fatal thing, just a bit more work for the next wal-push
-		tracelog.ErrorLogger.PrintOnError(err)
 	}
 
 	return nil

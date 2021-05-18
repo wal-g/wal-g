@@ -27,7 +27,6 @@ func (asm DataFolderASM) UnmarkWalFile(walFilePath string) error {
 	return asm.folder.DeleteFile(walFilePath)
 }
 
-func (asm DataFolderASM) RenameReady(walFilePath string) error {
-	walFileName := GetOnlyWalName(walFilePath)
+func (asm DataFolderASM) RenameReady(walFileName string) error {
 	return asm.folder.RenameFile(walFileName+".ready", walFileName+".done")
 }

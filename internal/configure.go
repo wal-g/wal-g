@@ -198,7 +198,7 @@ func ConfigureLogging() error {
 }
 
 func getPGArchiveStatusFolderPath() string {
-	return filepath.Join(GetDataFolderPath(), "archive_status")
+	return filepath.Join(getWalFolderPath(), "archive_status")
 }
 
 func getArchiveDataFolderPath() string {

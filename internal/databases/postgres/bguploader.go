@@ -214,7 +214,7 @@ func (b *BgUploader) shouldSkipFile(filename string) bool {
 // upload failed.
 func (b *BgUploader) upload(walStatusFilename string) bool {
 	walFilename := strings.TrimSuffix(walStatusFilename, readySuffix)
-	err := uploadWALFile(b.uploader.clone(), filepath.Join(b.dir, walFilename), b.preventWalOverwrite, b.readyRename)
+	err := uploadWALFile(b.uploader.clone(), filepath.Join(b.dir, walFilename), b.preventWalOverwrite)
 	if err != nil {
 		tracelog.ErrorLogger.Print("Error of background uploader: ", err)
 		return false
@@ -222,6 +222,13 @@ func (b *BgUploader) upload(walStatusFilename string) bool {
 
 	if err := b.uploader.ArchiveStatusManager.MarkWalUploaded(walFilename); err != nil {
 		tracelog.ErrorLogger.Printf("Error marking wal file %s as uploaded: %v", walFilename, err)
+	}
+
+	// rename WAL status file ".ready" to ".done" if requested
+	if b.readyRename && err == nil {
+		err := b.uploader.PGArchiveStatusManager.RenameReady(walFilename)
+		// error here is not a fatal thing, just a bit more work for the next wal-push
+		tracelog.ErrorLogger.PrintOnError(err)
 	}
 
 	return true
