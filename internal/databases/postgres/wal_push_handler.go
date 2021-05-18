@@ -55,8 +55,6 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 	// Look for new WALs while doing main upload
 	bgUploader.Start()
 
-	// do not rename the status file for the first WAL segment in a batch
-	// to avoid flooding the PostgreSQL logs with unnecessary warnings
 	err = uploadWALFile(uploader, walFilePath, bgUploader.preventWalOverwrite)
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = uploadLocalWalMetadata(walFilePath, uploader.Uploader)
@@ -86,12 +84,7 @@ func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrit
 		return errors.Wrapf(err, "upload: could not open '%s'\n", walFilePath)
 	}
 	err = uploader.UploadWalFile(walFile)
-
-	if err != nil {
-		return errors.Wrapf(err, "upload: could not Upload '%s'\n", walFilePath)
-	}
-
-	return nil
+	return errors.Wrapf(err, "upload: could not Upload '%s'\n", walFilePath)
 }
 
 // TODO : unit tests
