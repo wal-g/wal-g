@@ -138,7 +138,7 @@ func ConfigureFolderForSpecificConfig(config *viper.Viper) (storage.Folder, erro
 	return nil, newUnconfiguredStorageError(skippedPrefixes)
 }
 
-func GetWalFolderPath() string {
+func getWalFolderPath() string {
 	if !viper.IsSet(PgDataSetting) {
 		return DefaultDataFolderPath
 	}
@@ -157,7 +157,7 @@ func GetWalFolderPath() string {
 }
 
 func GetDataFolderPath() string {
-	return filepath.Join(GetWalFolderPath(), "walg_data")
+	return filepath.Join(getWalFolderPath(), "walg_data")
 }
 
 // GetPgSlotName reads the slot name from the environment

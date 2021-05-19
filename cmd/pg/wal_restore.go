@@ -2,6 +2,7 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/wal-g/storages/fs"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 )
@@ -18,11 +19,13 @@ var walRestoreCmd = &cobra.Command{
 	Short: WalRestoreShortDescription,
 	Long:  WalRestoreLongDescription,
 	Run: func(cmd *cobra.Command, checks []string) {
-		walDirectory := internal.GetWalFolderPath()
+		localDir := internal.GetPgDataFolderPath()
+		localFolder, err := fs.ConfigureFolder(localDir, nil)
+		tracelog.ErrorLogger.FatalfOnError("Error on configure local folder %v\n", err)
 		externalFolder, err := internal.ConfigureFolder()
-		tracelog.ErrorLogger.FatalOnError(err)
+		tracelog.ErrorLogger.FatalfOnError("Error on configure external folder %v\n", err)
 
-		internal.HandleWALRestore(externalFolder, walDirectory)
+		internal.HandleWALRestore(externalFolder, localFolder)
 	},
 }
 

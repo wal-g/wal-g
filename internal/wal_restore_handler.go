@@ -1,10 +1,13 @@
 package internal
 
 import (
+	"errors"
+	"github.com/spf13/viper"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
-	"io/ioutil"
+	"os"
+	"path/filepath"
 	"sort"
 )
 
@@ -26,21 +29,26 @@ func (p WalSegmentNumbers) Less(i, j int) bool { return p[i] > p[j] }
 func (p WalSegmentNumbers) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 // HandleWALRestore is invoked to perform wal-g wal-restore
-func HandleWALRestore(extFolder storage.Folder, intWalDirectoryPath string) {
-	extWalFolder := extFolder.GetSubFolder(utility.WalPath)
-	extFolderFilenames, err := getFolderFilenames(extWalFolder)
+func HandleWALRestore(externalFolder storage.Folder, localFolder storage.Folder) {
+	externalHistoryRecs, err := getTimeLineHistoryRecords(1, externalFolder)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get the external WAL history records %v\n", err)
+	localHistoryRecs, err := getTimeLineHistoryRecords(1, localFolder)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get the local WAL history records %v\n", err)
+
+	lastCommonWALNo, err := findLastCommonSegmentNo(externalHistoryRecs, localHistoryRecs)
+	tracelog.ErrorLogger.FatalfOnError("Failed to find last common segment number: %v\n", err)
+
+	externalWALFolder := externalFolder.GetSubFolder(utility.WalPath)
+	extFolderFilenames, err := getFolderFilenames(externalWALFolder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get the WAL external folder filenames %v\n", err)
+	externalWALs := getSegmentsFromFiles(extFolderFilenames)
+	externalWALsByTimelines := groupSegmentsByTimelines(externalWALs)
 
-	extWalSegments := getSegmentsFromFiles(extFolderFilenames)
-	extSegmentsByTimelines := groupSegmentsByTimelines(extWalSegments)
+	walDirName, err := getWALDirName()
+	tracelog.ErrorLogger.FatalfOnError("Failed to get the WAL directory name: %v\n", err)
+	localWALFolder := localFolder.GetSubFolder(walDirName)
 
-	intFolderFilenames, err := getDirectoryFilenames(intWalDirectoryPath)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get the WAL internal folder filenames %v\n", err)
-
-	intWalSegments := getSegmentsFromFiles(intFolderFilenames)
-	intSegmentsByTimelines := groupSegmentsByTimelines(intWalSegments)
-
-	filenamesToRestore, err := getFilenamesToRestore(extSegmentsByTimelines, intSegmentsByTimelines)
+	filenamesToRestore, err := getFilenamesToRestore(externalWALsByTimelines, lastCommonWALNo)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get the needed to restore WAL filenames %v\n", err)
 
 	if len(filenamesToRestore) == 0 {
@@ -49,7 +57,7 @@ func HandleWALRestore(extFolder storage.Folder, intWalDirectoryPath string) {
 	}
 
 	for _, walFilename := range filenamesToRestore {
-		if err = DownloadWALFileTo(extFolder, walFilename, intWalDirectoryPath); err != nil {
+		if err = DownloadWALFileTo(externalFolder, walFilename, localWALFolder.GetPath()); err != nil {
 			tracelog.ErrorLogger.Printf("Failed to download WAL file %v\n", walFilename)
 		} else {
 			tracelog.InfoLogger.Printf("Successfully download WAL file %v\n", walFilename)
@@ -57,37 +65,43 @@ func HandleWALRestore(extFolder storage.Folder, intWalDirectoryPath string) {
 	}
 }
 
-func getFilenamesToRestore(extSegmentsByTl, intSegmentsByTl map[uint32]*WalSegmentsSequence) (filenames []string, err error) {
-	extSortTimelines := getSortTimelines(extSegmentsByTl)
-	intSortTimelines := getSortTimelines(intSegmentsByTl)
-
-	if extSortTimelines[len(extSortTimelines)-1] < intSortTimelines[len(intSortTimelines)-1] {
-		return
-	}
-
+func getFilenamesToRestore(externalWALsByTimeline map[uint32]*WalSegmentsSequence,
+	lastCommonSegmentNo WalSegmentNo) (filenames []string, err error) {
 	// MaxUint64
 	currentSegmentNo := uint64(1<<64 - 1)
+	extSortedTimelines := getSortedTimelines(externalWALsByTimeline)
 
-	for _, timeline := range extSortTimelines {
-		if timeline < intSortTimelines[len(intSortTimelines)-1] {
-			return
-		}
-		segmentNums := getSortWalSegmentNumbers(extSegmentsByTl[timeline].walSegmentNumbers)
+	for _, timeline := range extSortedTimelines {
+		segmentNums := getSortWalSegmentNumbers(externalWALsByTimeline[timeline].walSegmentNumbers)
 		for _, segmentNum := range segmentNums {
 			if currentSegmentNo > uint64(segmentNum) {
 				continue
 			}
-			if intSegmentsByTl[timeline] == nil || !intSegmentsByTl[timeline].walSegmentNumbers[segmentNum] {
-				filenames = append(filenames, segmentNum.getFilename(timeline))
-			}
+			filenames = append(filenames, segmentNum.getFilename(timeline))
 			currentSegmentNo = uint64(segmentNum)
+			if segmentNum <= lastCommonSegmentNo {
+				return
+			}
 		}
 	}
 
 	return
 }
 
-func getSortTimelines(segmentsByTimeline map[uint32]*WalSegmentsSequence) (timelines []uint32) {
+func findLastCommonSegmentNo(external, local []*TimelineHistoryRecord) (WalSegmentNo, error) {
+	var i int
+	for i = range external {
+		if external[i].lsn != local[i].lsn || external[i].timeline != local[i].timeline {
+			break
+		}
+	}
+	if i > 0 {
+		return newWalSegmentNo(external[i-1].lsn), nil
+	}
+	return 0, errors.New("no common ancestors")
+}
+
+func getSortedTimelines(segmentsByTimeline map[uint32]*WalSegmentsSequence) (timelines []uint32) {
 	for timeline := range segmentsByTimeline {
 		timelines = append(timelines, timeline)
 	}
@@ -103,15 +117,23 @@ func getSortWalSegmentNumbers(walSegmentNumbers map[WalSegmentNo]bool) (result [
 	return
 }
 
-func getDirectoryFilenames(directory string) ([]string, error) {
-	filesInfo, err := ioutil.ReadDir(directory)
-	if err != nil {
-		return nil, err
+func GetPgDataFolderPath() string {
+	if !viper.IsSet(PgDataSetting) {
+		return DefaultDataFolderPath
+	}
+	return viper.GetString(PgDataSetting)
+}
+
+func getWALDirName() (string, error) {
+	pgData := viper.GetString(PgDataSetting)
+	dataFolderPath := filepath.Join(pgData, "pg_wal")
+	if _, err := os.Stat(dataFolderPath); err == nil {
+		return "pg_wal", nil
 	}
 
-	filenames := make([]string, 0)
-	for _, fileInfo := range filesInfo {
-		filenames = append(filenames, fileInfo.Name())
+	dataFolderPath = filepath.Join(pgData, "pg_xlog")
+	if _, err := os.Stat(dataFolderPath); err == nil {
+		return "pg_xlog", nil
 	}
-	return filenames, nil
+	return "", errors.New("directory for WAL files doesn't exist in " + pgData)
 }
