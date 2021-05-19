@@ -8,7 +8,7 @@ var Env = map[string]string{
 	"DOCKER_IP4_SUBNET":  "10.%s.0/24",
 	"DOCKER_IP6_SUBNET":  "fd00:dead:beef:%s::/96",
 
-	"COMPOSE_FILE":       "docker-compose.yml",
+	"COMPOSE_FILE":       "mongodb-docker-compose.yml",
 	"TEST_ID":            "13",
 	"TEST_CLEANUP_DELAY": "60",
 
