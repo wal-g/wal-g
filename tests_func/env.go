@@ -16,22 +16,31 @@ func EnvExists(path string) bool {
 	return err == nil
 }
 
-func SetupEnv(envFilePath, stagingDir string) error {
-	if err := os.Mkdir(stagingDir, 0755); err != nil {
-		return fmt.Errorf("can not create staging dir: %v", err)
+func SetupEnv(envFilePath, stagingDir string) (map[string]string, error) {
+	x, r :=os.Getwd()
+	var perm os.FileMode = 0755
+
+	fmt.Printf("MEGAENV: %+v %v: mkdir stagingDir %v\n",x,r, stagingDir)
+	if _, err := os.Stat(stagingDir); err == nil {
+		err = os.Chmod(stagingDir, perm)
+		if err != nil {
+			return nil, fmt.Errorf("can not chmod staging dir: %v", err)
+		}
+	} else if err := os.Mkdir(stagingDir, perm); err != nil {
+		return nil, fmt.Errorf("can not create staging dir: %v", err)
 	}
 	env := utils.MergeEnvs(config.Env, DynConf(config.Env))
 	file, err := os.OpenFile(envFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
-		return fmt.Errorf("can not open env file for writing: %v", err)
+		return nil, fmt.Errorf("can not open env file for writing: %v", err)
 	}
 	defer func() { _ = file.Close() }()
 
 	if err := utils.WriteEnv(env, file); err != nil {
-		return fmt.Errorf("can not write to env file: %v", err)
+		return nil, fmt.Errorf("can not write to env file: %v", err)
 	}
 
-	return nil
+	return env, nil
 }
 
 func ReadEnv(path string) (map[string]string, error) {

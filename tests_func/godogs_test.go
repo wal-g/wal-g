@@ -2,6 +2,7 @@ package functests
 
 import (
 	"flag"
+	"github.com/wal-g/wal-g/tests_func/utils"
 	"os"
 	"testing"
 
@@ -16,6 +17,7 @@ type TestOpts struct {
 	clean bool
 	stop  bool
 	debug bool
+	featurePrefix string
 }
 
 const (
@@ -38,6 +40,7 @@ func init() {
 	flag.BoolVar(&testOpts.stop, testOptsPrefix+"stop", true, "shutdown test environment")
 	flag.BoolVar(&testOpts.clean, testOptsPrefix+"clean", true, "delete test environment")
 	flag.BoolVar(&testOpts.debug, testOptsPrefix+"debug", false, "enable debug logging")
+	flag.StringVar(&testOpts.featurePrefix, testOptsPrefix+"featurePrefix", "", "features prefix")
 	godog.BindFlags("godog.", flag.CommandLine, &godogOpts)
 }
 
@@ -50,10 +53,32 @@ func TestMain(m *testing.M) {
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
 
+	stagingPath := config.Env["STAGING_DIR"]
 	envFilePath := config.Env["ENV_FILE"]
+	newEnv := !EnvExists(envFilePath)
+	env := map[string]string{}
+	var err error
+	if newEnv {
+		env, err = SetupEnv(envFilePath, stagingPath)
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
+	env = utils.MergeEnvs(utils.ParseEnvLines(os.Environ()), env)
 
-	tctx, err := NewTestContext()
+	if newEnv {
+		err := SetupStaging(env["IMAGES_DIR"], env["STAGING_DIR"])
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
+
+	foundFeatures, err := scanFeatureDirs(testOpts.featurePrefix)
 	tracelog.ErrorLogger.FatalOnError(err)
+
+	if len(foundFeatures) == 0 {
+		tracelog.ErrorLogger.Fatalln("No features found")
+	}
+
+	tctx, err := NewTestContext(foundFeatures)
+	tracelog.ErrorLogger.FatalOnError(err)
+	tctx.Env = env
 
 	if testOpts.test {
 		godogOpts.Paths = tctx.Features
@@ -70,14 +95,6 @@ func TestMain(m *testing.M) {
 		}
 	}
 
-	if !EnvExists(envFilePath) {
-		tracelog.ErrorLogger.Fatalln("Environment file is not found: ", envFilePath)
-	}
-
-	env, err := ReadEnv(envFilePath)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	tctx.Env = env
 	tctx.Infra = InfraFromTestContext(tctx)
 
 	if testOpts.stop {

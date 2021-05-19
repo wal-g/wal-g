@@ -3,7 +3,10 @@ package functests
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/DATA-DOG/godog"
@@ -14,11 +17,9 @@ import (
 	"github.com/wal-g/wal-g/tests_func/utils"
 )
 
-var (
-	featureFiles = map[string]string{
-		"backup": "features/check_mongodb_backup.feature",
-		"pitr":   "features/check_mongodb_pitr.feature",
-	}
+const (
+	featuresDir = "features"
+	featureExt = ".feature"
 )
 
 func (tctx *TestContext) ContainerFQDN(name string) string {
@@ -86,13 +87,12 @@ type TestContext struct {
 	Features []string
 }
 
-func NewTestContext() (*TestContext, error) {
+func NewTestContext(foundFeatures map[string]string) (*TestContext, error) {
 	environ := utils.ParseEnvLines(os.Environ())
-
-	features := utils.GetMapValues(featureFiles)
-	requestedFeature := environ["MONGO_FEATURE"]
+	features := utils.GetMapValues(foundFeatures)
+	requestedFeature := environ["FEATURE"]
 	if requestedFeature != "" {
-		feature, ok := featureFiles[requestedFeature]
+		feature, ok := foundFeatures[requestedFeature]
 		if !ok {
 			return nil, fmt.Errorf("requested feature is not found: %s", requestedFeature)
 		}
@@ -134,27 +134,9 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 	})
 
 	s.BeforeSuite(func() {
-		stagingPath := config.Env["STAGING_DIR"]
-		envFilePath := config.Env["ENV_FILE"]
-		newEnv := !EnvExists(envFilePath)
-		if newEnv {
-			err := SetupEnv(envFilePath, stagingPath)
-			tracelog.ErrorLogger.FatalOnError(err)
-		}
-
-		env, err := ReadEnv(envFilePath)
-		tracelog.ErrorLogger.FatalOnError(err)
-		tctx.Env = utils.MergeEnvs(utils.ParseEnvLines(os.Environ()), env)
 		tctx.Infra = InfraFromTestContext(tctx)
-
-		if newEnv {
-			err := SetupStaging(tctx.Env["IMAGES_DIR"], tctx.Env["STAGING_DIR"])
-			tracelog.ErrorLogger.FatalOnError(err)
-		}
-
-		err = tctx.Infra.Setup()
+		err := tctx.Infra.Setup()
 		tracelog.ErrorLogger.FatalOnError(err)
-
 	})
 
 	s.Step(`^a configured s3 on ([^\s]*)$`, tctx.configureS3)
@@ -186,4 +168,27 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 	s.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*)$`, tctx.replayOplog)
 
 	s.Step(`we sleep ([^\s]*)$`, tctx.sleep)
+}
+
+func scanFeatureDirs(featurePrefix string) (map[string]string, error) {
+	files, err := ioutil.ReadDir(featuresDir)
+	if err != nil {
+		return nil, err
+	}
+
+	foundFeatures := make(map[string]string)
+	for _, f := range files {
+		filename := f.Name()
+
+		if featurePrefix != "" && !strings.HasPrefix(filename, featurePrefix) {
+			continue // skip feature
+		}
+
+		if strings.HasSuffix(filename, featureExt) {
+			featureName := filename[0:len(filename)-len(featureExt)]
+			foundFeatures[featureName] = path.Join(featuresDir, f.Name())
+		}
+	}
+
+	return foundFeatures, nil
 }
