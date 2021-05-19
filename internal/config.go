@@ -69,6 +69,7 @@ const (
 	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
 	MaxDelayedSegmentsCount      = "WALG_INTEGRITY_MAX_DELAYED_WALS"
 	PrefetchDir                  = "WALG_PREFETCH_DIR"
+	PgReadyRename                = "PG_READY_RENAME"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
@@ -275,6 +276,7 @@ var (
 		PgWalSize:         true,
 		"PGPASSFILE":      true,
 		PrefetchDir:       true,
+		PgReadyRename:     true,
 	}
 
 	MongoAllowedSettings = map[string]bool{
