@@ -1,6 +1,7 @@
 site_name: WAL-G
 nav:
     - Overview: README.md
+    - Storages: STORAGES.md
     - Foundation DB: FoundationDB.md
     - Mongo DB: MongoDB.md
     - MySQL: MySQL.md

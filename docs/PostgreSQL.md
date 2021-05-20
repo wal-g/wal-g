@@ -90,33 +90,6 @@ This setting allows backup automation tools to add extra information to JSON sen
 
 If this setting is specified, during ```wal-push``` WAL-G will check the existence of WAL before uploading it. If the different file is already archived under the same name, WAL-G will return the non-zero exit code to prevent PostgreSQL from removing WAL.
 
-* `WALG_LIBSODIUM_KEY`
-
-To configure encryption and decryption with libsodium. WAL-G uses an [algorithm](https://download.libsodium.org/doc/secret-key_cryptography/secretstream#algorithm) that only requires a secret key.
-
-* `WALG_LIBSODIUM_KEY_PATH`
-
-Similar to `WALG_LIBSODIUM_KEY`, but value is the path to the key on file system. The file content will be trimmed from whitespace characters.
-
-* `WALG_GPG_KEY_ID`  (alternative form `WALE_GPG_KEY_ID`) ⚠️ **DEPRECATED**
-
-To configure GPG key for encryption and decryption. By default, no encryption is used. Public keyring is cached in the file "/.walg_key_cache".
-
-* `WALG_PGP_KEY`
-
-To configure encryption and decryption with OpenPGP standard. You can join multiline key using `\n` symbols into one line (mostly used in case of daemontools and envdir).
-Set *private key* value, when you need to execute ```wal-fetch``` or ```backup-fetch``` command.
-Set *public key* value, when you need to execute ```wal-push``` or ```backup-push``` command.
-Keep in mind that the *private key* also contains the *public key*.
-
-* `WALG_PGP_KEY_PATH`
-
-Similar to `WALG_PGP_KEY`, but value is the path to the key on file system.
-
-* `WALG_PGP_KEY_PASSPHRASE`
-
-If your *private key* is encrypted with a *passphrase*, you should set *passphrase* for decrypt.
-
 * `WALG_DELTA_MAX_STEPS`
 
 Delta-backup is the difference between previously taken backup and present state. `WALG_DELTA_MAX_STEPS` determines how many delta backups can be between full backups. Defaults to 0.
