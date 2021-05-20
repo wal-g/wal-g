@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/tests_func/mongoload"
-	"github.com/wal-g/wal-g/tests_func/mongoload/internal"
+	"github.com/wal-g/wal-g/tests_func/mongodb/mongoload"
+	"github.com/wal-g/wal-g/tests_func/mongodb/mongoload/internal"
 )
 
 var ammoFile string

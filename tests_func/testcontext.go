@@ -3,22 +3,22 @@ package functests
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/DATA-DOG/godog"
 	"github.com/DATA-DOG/godog/gherkin"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/tests_func/config"
 	"github.com/wal-g/wal-g/tests_func/helpers"
 	"github.com/wal-g/wal-g/tests_func/utils"
 )
 
-var (
-	featureFiles = map[string]string{
-		"backup": "features/check_mongodb_backup.feature",
-		"pitr":   "features/check_mongodb_pitr.feature",
-	}
+const (
+	featuresDir = "features"
+	featureExt = ".feature"
 )
 
 func (tctx *TestContext) ContainerFQDN(name string) string {
@@ -78,33 +78,28 @@ type MongoVersion struct {
 }
 
 type TestContext struct {
-	Infra    *helpers.Infra
-	Env      map[string]string
-	Context  context.Context
-	AuxData  AuxData
-	Version  MongoVersion
-	Features []string
+	EnvFilePath string
+	Database    string
+	Infra       *helpers.Infra
+	Env         map[string]string
+	Context     context.Context
+	AuxData     AuxData
+	Version     MongoVersion
+	Features    []string
 }
 
-func NewTestContext() (*TestContext, error) {
+func NewTestContext(envFilePath, database string, env, features map[string]string) (*TestContext, error) {
+	featuresList := utils.GetMapValues(features)
 	environ := utils.ParseEnvLines(os.Environ())
-
-	features := utils.GetMapValues(featureFiles)
-	requestedFeature := environ["MONGO_FEATURE"]
-	if requestedFeature != "" {
-		feature, ok := featureFiles[requestedFeature]
-		if !ok {
-			return nil, fmt.Errorf("requested feature is not found: %s", requestedFeature)
-		}
-		features = []string{feature}
-	}
-
 	return &TestContext{
+		EnvFilePath: envFilePath,
+		Database: database,
 		Context: context.Background(),
 		Version: MongoVersion{
 			Major: environ["MONGO_MAJOR"],
 			Full:  environ["MONGO_VERSION"]},
-		Features: features}, nil
+		Features: featuresList,
+		Env: env}, nil
 }
 
 func (tctx *TestContext) StopEnv() error {
@@ -117,7 +112,9 @@ func (tctx *TestContext) CleanEnv() error {
 	//	log.Fatalln(err)
 	//}
 
-	return os.RemoveAll(config.Env["STAGING_DIR"])
+	envFilePath := tctx.EnvFilePath
+	stagingPath := path.Dir(envFilePath)
+	return os.RemoveAll(stagingPath)
 }
 
 func (tctx *TestContext) setupSuites(s *godog.Suite) {
@@ -133,29 +130,7 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 		}
 	})
 
-	s.BeforeSuite(func() {
-		stagingPath := config.Env["STAGING_DIR"]
-		envFilePath := config.Env["ENV_FILE"]
-		newEnv := !EnvExists(envFilePath)
-		if newEnv {
-			err := SetupEnv(envFilePath, stagingPath)
-			tracelog.ErrorLogger.FatalOnError(err)
-		}
-
-		env, err := ReadEnv(envFilePath)
-		tracelog.ErrorLogger.FatalOnError(err)
-		tctx.Env = utils.MergeEnvs(utils.ParseEnvLines(os.Environ()), env)
-		tctx.Infra = InfraFromTestContext(tctx)
-
-		if newEnv {
-			err := SetupStaging(tctx.Env["IMAGES_DIR"], tctx.Env["STAGING_DIR"])
-			tracelog.ErrorLogger.FatalOnError(err)
-		}
-
-		err = tctx.Infra.Setup()
-		tracelog.ErrorLogger.FatalOnError(err)
-
-	})
+	s.BeforeSuite(tctx.LoadEnv)
 
 	s.Step(`^a configured s3 on ([^\s]*)$`, tctx.configureS3)
 	s.Step(`^at least one oplog archive exists in storage$`, tctx.oplogArchiveIsNotEmpty)
@@ -186,4 +161,61 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 	s.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*)$`, tctx.replayOplog)
 
 	s.Step(`we sleep ([^\s]*)$`, tctx.sleep)
+}
+
+func (tctx *TestContext) LoadEnv() {
+	env := tctx.Env
+	var err error
+	if env == nil {
+		env, err = ReadEnv(tctx.EnvFilePath)
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
+
+	// mix os.environ to our database params
+	tctx.Env = utils.MergeEnvs(utils.ParseEnvLines(os.Environ()), env)
+
+	tctx.Infra = InfraFromTestContext(tctx)
+	err = tctx.Infra.Setup()
+	tracelog.ErrorLogger.FatalOnError(err)
+}
+
+func scanFeatureDirs(dbName, featurePrefix string) (map[string]string, error) {
+	dir := path.Join(featuresDir, dbName)
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	environ := utils.ParseEnvLines(os.Environ())
+	requestedFeature := environ["FEATURE"]
+	if requestedFeature != "" {
+		found := false
+		for _, f := range files {
+			filename := f.Name()
+			if filename == requestedFeature + featureExt {
+				files = []os.FileInfo{f}
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("requested feature is not found: %s", requestedFeature)
+		}
+	}
+
+	foundFeatures := make(map[string]string)
+	for _, f := range files {
+		filename := f.Name()
+
+		if featurePrefix != "" && !strings.HasPrefix(filename, featurePrefix) {
+			continue // skip feature
+		}
+
+		if strings.HasSuffix(filename, featureExt) {
+			featureName := filename[0:len(filename)-len(featureExt)]
+			foundFeatures[featureName] = path.Join(dir, f.Name())
+		}
+	}
+
+	return foundFeatures, nil
 }

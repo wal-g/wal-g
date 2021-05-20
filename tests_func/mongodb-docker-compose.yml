@@ -20,6 +20,7 @@ services:
             - ${ENV_FILE}
     mongodb01:
         build:
+            dockerfile: ${DOCKER_FILE}
             context: .
             args:
                 - MONGO_MAJOR=${MONGO_MAJOR}
@@ -42,6 +43,7 @@ services:
             - ${ENV_FILE}
     mongodb02:
         build:
+            dockerfile: ${DOCKER_FILE}
             context: .
             args:
                 - MONGO_MAJOR=${MONGO_MAJOR}

@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/helpers"
-	"github.com/wal-g/wal-g/tests_func/mongoload"
-	"github.com/wal-g/wal-g/tests_func/mongoload/models"
+	"github.com/wal-g/wal-g/tests_func/mongodb/mongoload"
+	"github.com/wal-g/wal-g/tests_func/mongodb/mongoload/models"
 )
 
 type TestingfWrap func(format string, args ...interface{})
@@ -310,15 +310,19 @@ func (tctx *TestContext) enableAuth(host string) error {
 	return mc.EnableAuth()
 }
 
-func (tctx *TestContext) loadMongodbOpsFromConfig(host string, loadId string) error {
+func (tctx *TestContext) getMongoConfigPath(loadId, filename string) string {
+	// Mongo configs stored in "mongodb/config"
+	return path.Join("mongodb", "config", loadId, filename)
+}
 
-	ammoFile, err := os.Open(path.Join("config", loadId, "config.json"))
+func (tctx *TestContext) loadMongodbOpsFromConfig(host string, loadId string) error {
+	ammoFile, err := os.Open(tctx.getMongoConfigPath(loadId, "config.json"))
 	if err != nil {
 		return err
 	}
 	defer func() { _ = ammoFile.Close() }()
 
-	expectedFile, err := os.Open(path.Join("config", loadId, "expected.json"))
+	expectedFile, err := os.Open(tctx.getMongoConfigPath(loadId, "expected.json"))
 	if err != nil {
 		return err
 	}

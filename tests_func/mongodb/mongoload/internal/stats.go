@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/wal-g/wal-g/tests_func/mongoload/models"
+	"github.com/wal-g/wal-g/tests_func/mongodb/mongoload/models"
 )
 
 func updateStatWithMongoOpLog(stat *models.OpsStat, log OpInfo) {

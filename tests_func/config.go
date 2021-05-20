@@ -1,16 +1,14 @@
-package config
+package functests
 
 var Env = map[string]string{
-	"STAGING_DIR":        "staging",
-	"ENV_FILE":           "staging/env.file",
 	"IMAGES_DIR":         "images",
 	"DOCKER_BRIDGE_NAME": "walg-func-test",
 	"DOCKER_IP4_SUBNET":  "10.%s.0/24",
 	"DOCKER_IP6_SUBNET":  "fd00:dead:beef:%s::/96",
 
-	"COMPOSE_FILE":       "docker-compose.yml",
-	"TEST_ID":            "13",
-	"TEST_CLEANUP_DELAY": "60",
+	"COMPOSE_FILE_SUFFIX": "-docker-compose.yml",
+	"TEST_ID":             "13",
+	"TEST_CLEANUP_DELAY":  "60",
 
 	"WALG_S3_PREFIX":   "s3://dbaas/mongodb-backup/test_uuid/test_mongodb",
 	"WALG_CLIENT_PATH": "/usr/bin/wal-g",
