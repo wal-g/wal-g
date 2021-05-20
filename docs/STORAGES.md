@@ -101,8 +101,15 @@ For deployments where Azure Storage is not under AzurePuplicCloud environment, W
 
 WAL-G sets default upload buffer size to 64 Megabytes and uses 3 buffers by default. However, users can choose to override these values by setting optional environment variables.
 
+* `WALG_AZURE_BUFFER_SIZE`
+  (e.g. `33554432`)
 
+Overrides the default `upload buffer size` of 67108864 bytes (64 MB). Note that the size of the buffer must be specified in bytes. Therefore, to use 32 MB sized buffers, this variable should be set to 33554432 bytes.
 
+* `WALG_AZURE_MAX_BUFFERS`
+  (e.g. `5`)
+
+Overrides the default `maximum number of upload buffers`. By default, at most 3 buffers are used concurrently.
 
 Swift
 -----------
@@ -129,18 +136,6 @@ To store backups via ssh, WAL-G requires that these variables be set:
 * `SSH_PORT` ssh connection port
 * `SSH_USERNAME` connect with username
 * `SSH_PASSWORD` connect with password
-
-**Optional variables**
-
-* `WALG_AZURE_BUFFER_SIZE`
-(e.g. `33554432`)
-
-Overrides the default `upload buffer size` of 67108864 bytes (64 MB). Note that the size of the buffer must be specified in bytes. Therefore, to use 32 MB sized buffers, this variable should be set to 33554432 bytes.
-
-* `WALG_AZURE_MAX_BUFFERS`
-(e.g. `5`)
-
-Overrides the default `maximum number of upload buffers`. By default, at most 3 buffers are used concurrently.
 
 Examples
 -----------
