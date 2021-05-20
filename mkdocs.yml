@@ -7,5 +7,5 @@ nav:
     - PostgreSQL: PostgreSQL.md
     - SQLServer: SQLServer.md
     - Windows: Windows.md
-    - Contributors: Contributors.md
+    - Contributors: CONTRIBUTORS.md
 theme: readthedocs
