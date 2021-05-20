@@ -13,7 +13,6 @@ import (
 	"github.com/DATA-DOG/godog/gherkin"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/helpers"
-	"github.com/wal-g/wal-g/tests_func/mongodb/config"
 	"github.com/wal-g/wal-g/tests_func/utils"
 )
 
@@ -79,32 +78,28 @@ type MongoVersion struct {
 }
 
 type TestContext struct {
-	Infra    *helpers.Infra
-	Env      map[string]string
-	Context  context.Context
-	AuxData  AuxData
-	Version  MongoVersion
-	Features []string
+	EnvFilePath string
+	Database    string
+	Infra       *helpers.Infra
+	Env         map[string]string
+	Context     context.Context
+	AuxData     AuxData
+	Version     MongoVersion
+	Features    []string
 }
 
-func NewTestContext(foundFeatures map[string]string) (*TestContext, error) {
+func NewTestContext(envFilePath, database string, env, features map[string]string) (*TestContext, error) {
+	featuresList := utils.GetMapValues(features)
 	environ := utils.ParseEnvLines(os.Environ())
-	features := utils.GetMapValues(foundFeatures)
-	requestedFeature := environ["FEATURE"]
-	if requestedFeature != "" {
-		feature, ok := foundFeatures[requestedFeature]
-		if !ok {
-			return nil, fmt.Errorf("requested feature is not found: %s", requestedFeature)
-		}
-		features = []string{feature}
-	}
-
 	return &TestContext{
+		EnvFilePath: envFilePath,
+		Database: database,
 		Context: context.Background(),
 		Version: MongoVersion{
 			Major: environ["MONGO_MAJOR"],
 			Full:  environ["MONGO_VERSION"]},
-		Features: features}, nil
+		Features: featuresList,
+		Env: env}, nil
 }
 
 func (tctx *TestContext) StopEnv() error {
@@ -117,7 +112,9 @@ func (tctx *TestContext) CleanEnv() error {
 	//	log.Fatalln(err)
 	//}
 
-	return os.RemoveAll(config.Env["STAGING_DIR"])
+	envFilePath := tctx.EnvFilePath
+	stagingPath := path.Dir(envFilePath)
+	return os.RemoveAll(stagingPath)
 }
 
 func (tctx *TestContext) setupSuites(s *godog.Suite) {
@@ -133,11 +130,7 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 		}
 	})
 
-	s.BeforeSuite(func() {
-		tctx.Infra = InfraFromTestContext(tctx)
-		err := tctx.Infra.Setup()
-		tracelog.ErrorLogger.FatalOnError(err)
-	})
+	s.BeforeSuite(tctx.LoadEnv)
 
 	s.Step(`^a configured s3 on ([^\s]*)$`, tctx.configureS3)
 	s.Step(`^at least one oplog archive exists in storage$`, tctx.oplogArchiveIsNotEmpty)
@@ -170,10 +163,44 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 	s.Step(`we sleep ([^\s]*)$`, tctx.sleep)
 }
 
-func scanFeatureDirs(featurePrefix string) (map[string]string, error) {
-	files, err := ioutil.ReadDir(featuresDir)
+func (tctx *TestContext) LoadEnv() {
+	env := tctx.Env
+	var err error
+	if env == nil {
+		env, err = ReadEnv(tctx.EnvFilePath)
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
+
+	// mix os.environ to our database params
+	tctx.Env = utils.MergeEnvs(utils.ParseEnvLines(os.Environ()), env)
+
+	tctx.Infra = InfraFromTestContext(tctx)
+	err = tctx.Infra.Setup()
+	tracelog.ErrorLogger.FatalOnError(err)
+}
+
+func scanFeatureDirs(dbName, featurePrefix string) (map[string]string, error) {
+	dir := path.Join(featuresDir, dbName)
+	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, err
+	}
+
+	environ := utils.ParseEnvLines(os.Environ())
+	requestedFeature := environ["FEATURE"]
+	if requestedFeature != "" {
+		found := false
+		for _, f := range files {
+			filename := f.Name()
+			if filename == requestedFeature + featureExt {
+				files = []os.FileInfo{f}
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("requested feature is not found: %s", requestedFeature)
+		}
 	}
 
 	foundFeatures := make(map[string]string)
@@ -186,7 +213,7 @@ func scanFeatureDirs(featurePrefix string) (map[string]string, error) {
 
 		if strings.HasSuffix(filename, featureExt) {
 			featureName := filename[0:len(filename)-len(featureExt)]
-			foundFeatures[featureName] = path.Join(featuresDir, f.Name())
+			foundFeatures[featureName] = path.Join(dir, f.Name())
 		}
 	}
 
