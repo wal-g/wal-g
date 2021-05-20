@@ -2,8 +2,9 @@
 ![Docker-tests-status](https://github.com/wal-g/wal-g/workflows/Docker%20tests/badge.svg)
 ![Unit-tests-status](https://github.com/wal-g/wal-g/workflows/Unit%20tests/badge.svg)
 [![Go Report Card](https://goreportcard.com/badge/github.com/wal-g/wal-g)](https://goreportcard.com/report/github.com/wal-g/wal-g)
+[![Documentation Status](https://readthedocs.org/projects/wal-g/badge/?version=latest)](https://wal-g.readthedocs.io/?badge=latest)
 
-[Full documentation can be found here](https://wal-g.readthedocs.io)
+[This documentation is also available at wal-g.readthedocs.io](https://wal-g.readthedocs.io)
 
 WAL-G is an archival restoration tool for Postgres(beta for MySQL, MariaDB, and MongoDB)
 
@@ -83,11 +84,11 @@ Similar to `WALG_PGP_KEY`, but value is the path to the key on file system.
 
 If your *private key* is encrypted with a *passphrase*, you should set *passphrase* for decrypt.
 
+### Database-specific options 
+**More options are available for the chosen database. See it in [Databases](#databases)**
 
 Usage
 -----
-
-**More options are available for the chosen database. See it in [Databases](#databases)**
 
 WAL-G currently supports these commands for all type of databases:
 
