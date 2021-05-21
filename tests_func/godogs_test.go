@@ -74,6 +74,7 @@ func TestMain(m *testing.M) {
 	Env["ENV_FILE"] = envFilePath // set ENV_FILE for docker-compose
 	Env["DOCKER_FILE"] = "Dockerfile." + database
 	Env["COMPOSE_FILE"] = database + Env["COMPOSE_FILE_SUFFIX"]
+	tracelog.DebugLogger.Printf("Database name %s\nEnv: %s\n", database, Env)
 
 	newEnv := !EnvExists(envFilePath)
 

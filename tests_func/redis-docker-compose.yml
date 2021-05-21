@@ -18,48 +18,46 @@ services:
             - ./images/minio/config:/config:rw
         env_file:
             - ${ENV_FILE}
-    mongodb01:
+    redis01:
         build:
             dockerfile: ${DOCKER_FILE}
             context: .
             args:
-                - MONGO_MAJOR=${MONGO_MAJOR}
-                - MONGO_VERSION=${MONGO_VERSION}
-        container_name: mongodb01.test_net_${TEST_ID}
+                - REDIS_VERSION=${REDIS_VERSION}
+        container_name: redis01.test_net_${TEST_ID}
         domainname: test_net_${TEST_ID}
         external_links:
             - minio01.test_net_${TEST_ID}:minio
-        hostname: mongodb01
-        image: mongodb:test_net_${TEST_ID}
+        hostname: redis01
+        image: redis:test_net_${TEST_ID}
         networks:
             - test_net
         ports:
-            - ${MONGO_EXPOSE_MONGOD}
+            - ${REDIS_EXPOSE_PORT}
             - ${EXPOSE_SSH_PORT}
         tmpfs: /var/run
         volumes:
-            - ./images/mongodb/config:/config:ro
+            - ./images/redis/config:/config:ro
         env_file:
             - ${ENV_FILE}
-    mongodb02:
+    redis02:
         build:
             dockerfile: ${DOCKER_FILE}
             context: .
             args:
-                - MONGO_MAJOR=${MONGO_MAJOR}
-                - MONGO_VERSION=${MONGO_VERSION}
-        container_name: mongodb02.test_net_${TEST_ID}
+                - REDIS_VERSION=${REDIS_VERSION}
+        container_name: redis02.test_net_${TEST_ID}
         domainname: test_net_${TEST_ID}
         external_links:
             - minio01.test_net_${TEST_ID}:minio
-        hostname: mongodb02
-        image: mongodb:test_net_${TEST_ID}
+        hostname: redis02
+        image: redis:test_net_${TEST_ID}
         networks:
             - test_net
         ports:
-            - ${MONGO_EXPOSE_MONGOD}
+            - ${REDIS_EXPOSE_PORT}
             - ${EXPOSE_SSH_PORT}
         tmpfs: /var/run
         volumes:
-            - ./images/mongodb/config:/config:ro
+            - ./images/redis/config:/config:ro
 version: '2'

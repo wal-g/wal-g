@@ -13,7 +13,7 @@ Feature: MongoDB PITR backups check
 
   Scenario: First backup was done successfully
     Given mongodb01 has test mongodb data test1
-    When we create mongodb01 backup
+    When we create mongodb01 mongo-backup
     Then we got 1 backup entries of mongodb01
 
 
@@ -24,7 +24,7 @@ Feature: MongoDB PITR backups check
 
 
   Scenario: Second backup was done successfully
-    When we create mongodb01 backup
+    When we create mongodb01 mongo-backup
     Then we got 2 backup entries of mongodb01
 
 

@@ -14,22 +14,22 @@ Feature: MongoDB backups check
 
   Scenario: Backups were done successfully
     When mongodb01 has test mongodb data test1
-    And we create mongodb01 backup
+    And we create mongodb01 mongo-backup
     Then we got 1 backup entries of mongodb01
 
     When mongodb01 has test mongodb data test2
-    And we create mongodb01 backup
+    And we create mongodb01 mongo-backup
     Then we got 2 backup entries of mongodb01
 
     When mongodb01 has test mongodb data test3
-    And we create mongodb01 backup
+    And we create mongodb01 mongo-backup
     Then we got 3 backup entries of mongodb01
 
     When mongodb01 has test mongodb data test4
-    And we create mongodb01 backup
+    And we create mongodb01 mongo-backup
     Then we got 4 backup entries of mongodb01
 
-    When we put empty backup via minio01
+    When we put empty backup via minio01 to mongodump.archive
     Then we got 4 backup entries of mongodb01
 
   Scenario: Backups purged successfully
@@ -52,7 +52,7 @@ Feature: MongoDB backups check
 
   Scenario: Fifth backup was done successfully
     Given mongodb01 has test mongodb data test5
-    When we create mongodb01 backup
+    When we create mongodb01 mongo-backup
     Then we got 4 backup entries of mongodb01
 
   Scenario: Forth and first backup were deleted successfully
