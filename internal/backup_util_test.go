@@ -59,7 +59,7 @@ func TestGetBackupTimeSlices_OrderCheck(t *testing.T) {
 func TestGetGarbageFromPrefix(t *testing.T) {
 	backupNames := []string{"backup", "garbage", "garbage_0"}
 	folders := make([]storage.Folder, 0)
-	nonGarbage := []internal.BackupTime{{"backup", time.Now(), "some_postfix.json"}}
+	nonGarbage := []internal.BackupTime{{"backup", time.Now(), "ZZZZZZZZZZZZZZZZZZZZZZZZ"}}
 
 	for _, prefix := range backupNames {
 		folders = append(folders, memory.NewFolder(prefix, memory.NewStorage()))
