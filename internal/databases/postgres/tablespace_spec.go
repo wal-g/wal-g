@@ -53,7 +53,7 @@ func (spec *TablespaceSpec) length() int {
 	return len(spec.TablespaceNames())
 }
 
-func (spec *TablespaceSpec) empty() bool {
+func (spec *TablespaceSpec) Empty() bool {
 	return spec.length() == 0
 }
 

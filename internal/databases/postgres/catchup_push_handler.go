@@ -35,7 +35,7 @@ func HandleCatchupPush(pgDataDirectory string, fromLSN uint64) {
 	backupConfig, err := NewBackupHandler(backupArguments)
 	tracelog.ErrorLogger.FatalOnError(err)
 	backupConfig.checkPgVersionAndPgControl()
-	backupConfig.prevBackupInfo.sentinelDto = fakePreviousBackupSentinelDto
-	backupConfig.curBackupInfo.startLSN = fromLSN
+	backupConfig.prevBackupInfo.SentinelDto = fakePreviousBackupSentinelDto
+	backupConfig.curBackupInfo.StartLSN = fromLSN
 	backupConfig.createAndPushBackup()
 }

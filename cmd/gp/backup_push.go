@@ -1,17 +1,15 @@
-package pg
+package gp
 
 import (
-	"fmt"
-
-	"github.com/wal-g/wal-g/utility"
-
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/cmd/pg"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/utility"
+	"strconv"
 )
 
 const (
@@ -36,16 +34,19 @@ const (
 var (
 	// backupPushCmd represents the backupPush command
 	backupPushCmd = &cobra.Command{
-		Use:   "backup-push db_directory",
-		Short: backupPushShortDescription, // TODO : improve description
-		Args:  cobra.MaximumNArgs(1),
+		Use:   "backup-push",
+		Short: backupPushShortDescription,
 		Run: func(cmd *cobra.Command, args []string) {
-			var dataDirectory string
+			var dataDirectories []string
 
 			if len(args) > 0 {
-				dataDirectory = args[0]
-			}
+				segmentNumber, err := strconv.Atoi(args[0])
+				tracelog.ErrorLogger.FatalOnError(err)
 
+				if len(args) > segmentNumber+1 {
+					dataDirectories = args[1 : segmentNumber+2]
+				}
+			}
 			verifyPageChecksums = verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting)
 			storeAllCorruptBlocks = storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting)
 			tarBallComposerType := postgres.RegularComposer
@@ -60,18 +61,19 @@ var (
 			if deltaFromUserData == "" {
 				deltaFromUserData = viper.GetString(internal.DeltaFromUserDataSetting)
 			}
-			deltaBaseSelector, err := CreateDeltaBaseSelector(cmd, deltaFromName, deltaFromUserData)
+			deltaBaseSelector, err := pg.CreateDeltaBaseSelector(cmd, deltaFromName, deltaFromUserData)
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			if userData == "" {
 				userData = viper.GetString(internal.SentinelUserDataSetting)
 			}
-			arguments := postgres.NewBackupArguments(dataDirectory, utility.BaseBackupPath,
+
+			arguments := greenplum.NewBackupArguments(dataDirectories,
+				utility.BaseBackupPath,
 				permanent, verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting),
 				fullBackup, storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting),
 				tarBallComposerType, deltaBaseSelector, userData)
-
-			backupHandler, err := postgres.NewBackupHandler(arguments)
+			backupHandler, err := greenplum.NewBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
 			backupHandler.HandleBackupPush()
 		},
@@ -83,32 +85,8 @@ var (
 	useRatingComposer     = false
 	deltaFromName         = ""
 	deltaFromUserData     = ""
-	userData              = ""
+	userData           = ""
 )
-
-// create the BackupSelector for delta backup base according to the provided flags
-func CreateDeltaBaseSelector(cmd *cobra.Command,
-	targetBackupName, targetUserData string) (internal.BackupSelector, error) {
-	switch {
-	case targetUserData != "" && targetBackupName != "":
-		fmt.Println(cmd.UsageString())
-		return nil, errors.New("only one delta target should be specified")
-
-	case targetBackupName != "":
-		tracelog.InfoLogger.Printf("Selecting the backup with name %s as the base for the current delta backup...\n",
-			targetBackupName)
-		return internal.NewBackupNameSelector(targetBackupName)
-
-	case targetUserData != "":
-		tracelog.InfoLogger.Println(
-			"Selecting the backup with specified user data as the base for the current delta backup...")
-		return internal.NewUserDataBackupSelector(targetUserData, postgres.NewGenericMetaFetcher()), nil
-
-	default:
-		tracelog.InfoLogger.Println("Selecting the latest backup as the base for the current delta backup...")
-		return internal.NewLatestBackupSelector(), nil
-	}
-}
 
 func init() {
 	cmd.AddCommand(backupPushCmd)

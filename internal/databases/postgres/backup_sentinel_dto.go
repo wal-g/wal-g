@@ -35,26 +35,53 @@ type BackupSentinelDto struct {
 
 func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec, tarFileSets TarFileSets) BackupSentinelDto {
 	sentinel := BackupSentinelDto{
-		BackupStartLSN:   &bh.curBackupInfo.startLSN,
-		IncrementFromLSN: bh.prevBackupInfo.sentinelDto.BackupStartLSN,
-		PgVersion:        bh.pgInfo.pgVersion,
+		BackupStartLSN:   &bh.curBackupInfo.StartLSN,
+		IncrementFromLSN: bh.prevBackupInfo.SentinelDto.BackupStartLSN,
+		PgVersion:        bh.pgInfo.PgVersion,
 		TablespaceSpec:   tbsSpec,
 	}
-	if bh.prevBackupInfo.sentinelDto.BackupStartLSN != nil {
-		sentinel.IncrementFrom = &bh.prevBackupInfo.name
-		if bh.prevBackupInfo.sentinelDto.IsIncremental() {
-			sentinel.IncrementFullName = bh.prevBackupInfo.sentinelDto.IncrementFullName
+	if bh.prevBackupInfo.SentinelDto.BackupStartLSN != nil {
+		sentinel.IncrementFrom = &bh.prevBackupInfo.Name
+		if bh.prevBackupInfo.SentinelDto.IsIncremental() {
+			sentinel.IncrementFullName = bh.prevBackupInfo.SentinelDto.IncrementFullName
 		} else {
-			sentinel.IncrementFullName = &bh.prevBackupInfo.name
+			sentinel.IncrementFullName = &bh.prevBackupInfo.Name
 		}
 		sentinel.IncrementCount = &bh.curBackupInfo.incrementCount
 	}
 
-	sentinel.BackupFinishLSN = &bh.curBackupInfo.endLSN
+	sentinel.BackupFinishLSN = &bh.curBackupInfo.EndLSN
 	sentinel.UserData = internal.UnmarshalSentinelUserData(bh.arguments.userData)
-	sentinel.SystemIdentifier = bh.pgInfo.systemIdentifier
-	sentinel.UncompressedSize = bh.curBackupInfo.uncompressedSize
-	sentinel.CompressedSize = bh.curBackupInfo.compressedSize
+	sentinel.SystemIdentifier = bh.pgInfo.SystemIdentifier
+	sentinel.UncompressedSize = bh.curBackupInfo.UncompressedSize
+	sentinel.CompressedSize = bh.curBackupInfo.CompressedSize
+	sentinel.TarFileSets = tarFileSets
+	return sentinel
+}
+
+func NewSentinelDto(curBackupInfo CurBackupInfo, prevBackupInfo PrevBackupInfo, pgInfo BackupPgInfo,
+	userData string, tbsSpec *TablespaceSpec, tarFileSets TarFileSets) BackupSentinelDto {
+	sentinel := BackupSentinelDto{
+		BackupStartLSN:   &curBackupInfo.StartLSN,
+		IncrementFromLSN: prevBackupInfo.SentinelDto.BackupStartLSN,
+		PgVersion:        pgInfo.PgVersion,
+		TablespaceSpec:   tbsSpec,
+	}
+	if prevBackupInfo.SentinelDto.BackupStartLSN != nil {
+		sentinel.IncrementFrom = &prevBackupInfo.Name
+		if prevBackupInfo.SentinelDto.IsIncremental() {
+			sentinel.IncrementFullName = prevBackupInfo.SentinelDto.IncrementFullName
+		} else {
+			sentinel.IncrementFullName = &prevBackupInfo.Name
+		}
+		sentinel.IncrementCount = &curBackupInfo.incrementCount
+	}
+
+	sentinel.BackupFinishLSN = &curBackupInfo.EndLSN
+	sentinel.UserData = internal.UnmarshalSentinelUserData(userData)
+	sentinel.SystemIdentifier = pgInfo.SystemIdentifier
+	sentinel.UncompressedSize = curBackupInfo.UncompressedSize
+	sentinel.CompressedSize = curBackupInfo.CompressedSize
 	sentinel.TarFileSets = tarFileSets
 	return sentinel
 }
@@ -102,7 +129,7 @@ func NewExtendedMetadataDto(isPermanent bool, dataDir string, startTime time.Tim
 	return meta
 }
 
-func (dto *BackupSentinelDto) setFiles(p *sync.Map) {
+func (dto *BackupSentinelDto) SetFiles(p *sync.Map) {
 	dto.Files = make(internal.BackupFileList)
 	p.Range(func(k, v interface{}) bool {
 		key := k.(string)

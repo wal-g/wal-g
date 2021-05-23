@@ -133,8 +133,8 @@ func (bundle *Bundle) getIncrementBaseFiles() internal.BackupFileList {
 }
 
 // TODO : unit tests
-// checkTimelineChanged compares timelines of pg_backup_start() and pg_backup_stop()
-func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
+// CheckTimelineChanged compares timelines of pg_backup_start() and pg_backup_stop()
+func (bundle *Bundle) CheckTimelineChanged(conn *pgx.Conn) bool {
 	if bundle.Replica {
 		timeline, err := readTimeline(conn)
 		if err != nil {
@@ -161,7 +161,7 @@ func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
 func (bundle *Bundle) StartBackup(conn *pgx.Conn,
 	backup string) (backupName string, lsn uint64, err error) {
 	var name, lsnStr string
-	queryRunner, err := newPgQueryRunner(conn)
+	queryRunner, err := NewPgQueryRunner(conn)
 	if err != nil {
 		return "", 0, errors.Wrap(err, "StartBackup: Failed to build query runner.")
 	}
@@ -359,8 +359,8 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 // TODO : unit tests
 // UploadLabelFiles creates the `backup_label` and `tablespace_map` files by stopping the backup
 // and uploads them to S3.
-func (bundle *Bundle) uploadLabelFiles(conn *pgx.Conn) (string, []string, uint64, error) {
-	queryRunner, err := newPgQueryRunner(conn)
+func (bundle *Bundle) UploadLabelFiles(conn *pgx.Conn) (string, []string, uint64, error) {
+	queryRunner, err := NewPgQueryRunner(conn)
 	if err != nil {
 		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: Failed to build query runner.")
 	}
@@ -437,4 +437,64 @@ func (bundle *Bundle) PackTarballs() (TarFileSets, error) {
 
 func (bundle *Bundle) GetFiles() *sync.Map {
 	return bundle.TarBallComposer.GetFiles().GetUnderlyingMap()
+}
+
+func (bundle *Bundle) StartBackupForGreenplumSegments(conn *pgx.Conn,
+	inRecovery bool, lsnStr string, name string) (backupName string, lsn uint64, err error) {
+	bundle.Replica = inRecovery
+	lsn, err = pgx.ParseLSN(lsnStr)
+	if err != nil {
+		return "", 0, err
+	}
+
+	if bundle.Replica {
+		name, bundle.Timeline, err = getWalFilename(lsn, conn)
+		if err != nil {
+			return "", 0, err
+		}
+	} else {
+		bundle.Timeline, err = readTimeline(conn)
+		if err != nil {
+			tracelog.WarningLogger.Printf("Couldn't get current timeline because of error: '%v'\n", err)
+		}
+	}
+	return "base_" + name, lsn, nil
+}
+
+func (bundle *Bundle) UploadLabelFilesForGreenplumSegment(label string, lsn uint64, offsetMap string) (string, []string, uint64, error) {
+	tarBall := bundle.NewTarBall(false)
+	tarBall.SetUp(bundle.Crypter)
+
+	labelHeader := &tar.Header{
+		Name:     BackupLabelFilename,
+		Mode:     int64(0600),
+		Size:     int64(len(label)),
+		Typeflag: tar.TypeReg,
+	}
+
+	_, err := internal.PackFileTo(tarBall, labelHeader, strings.NewReader(label))
+	if err != nil {
+		return "", nil, 0, errors.Wrapf(err, "UploadLabelFiles: failed to put %s to tar", labelHeader.Name)
+	}
+	tracelog.InfoLogger.Println(labelHeader.Name)
+
+	offsetMapHeader := &tar.Header{
+		Name:     TablespaceMapFilename,
+		Mode:     int64(0600),
+		Size:     int64(len(offsetMap)),
+		Typeflag: tar.TypeReg,
+	}
+
+	_, err = internal.PackFileTo(tarBall, offsetMapHeader, strings.NewReader(offsetMap))
+	if err != nil {
+		return "", nil, 0, errors.Wrapf(err, "UploadLabelFiles: failed to put %s to tar", offsetMapHeader.Name)
+	}
+	tracelog.InfoLogger.Println(offsetMapHeader.Name)
+
+	err = bundle.TarBallQueue.CloseTarball(tarBall)
+	if err != nil {
+		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: failed to close tarball")
+	}
+
+	return tarBall.Name(), []string{TablespaceMapFilename, BackupLabelFilename}, lsn, nil
 }

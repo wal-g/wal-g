@@ -116,7 +116,7 @@ func (queryRunner *PgQueryRunner) BuildStopBackup() (string, error) {
 }
 
 // NewPgQueryRunner builds QueryRunner from available connection
-func newPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
+func NewPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
 	r := &PgQueryRunner{connection: conn}
 	err := r.getVersion()
 	if err != nil {
@@ -384,4 +384,202 @@ func (queryRunner *PgQueryRunner) GetPhysicalSlotInfo(slotName string) (Physical
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) IsTablespaceMapExists() bool {
 	return queryRunner.Version >= 90600
+}
+
+type GpSegmentInfo struct {
+	Port int
+	Host string
+}
+
+// Build
+func (queryRunner *PgQueryRunner) buildCreateRestorePoint(restorePointName string) string {
+	return fmt.Sprintf("SELECT gp_create_restore_point('%s')", restorePointName)
+}
+
+// Get
+func (queryRunner *PgQueryRunner) CreateRestorePoint(restorePointName string) (lsnStrings []string, err error) {
+	conn := queryRunner.connection
+	rows, err := conn.Query(queryRunner.buildCreateRestorePoint(restorePointName))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	lsnStrings = make([]string, 0)
+	for rows.Next() {
+		var lsn string
+
+		if err := rows.Scan(&lsn); err != nil {
+			tracelog.WarningLogger.Printf("CreateRestorePoint:  %v\n", err.Error())
+		}
+		lsnStrings = append(lsnStrings, lsn)
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+	return lsnStrings, nil
+}
+
+// BuildStartBackup formats a query that starts backup according to server features and version
+func (queryRunner *PgQueryRunner) buildStartBackupForGreenplumSegments() (string, error) {
+	queryStartBackup, err := queryRunner.BuildStartBackup()
+	if err != nil {
+		return "", errors.Wrap(err, "QueryRunner StartBackupForGreenplum: Building start backup query failed")
+	}
+	return fmt.Sprintf("CREATE OR REPLACE FUNCTION start_backup_on_all_segments() "+
+		"RETURNS TABLE (backup text, lsn pg_lsn, in_recovery bool) AS $$%s$$ "+
+		"LANGUAGE SQL EXECUTE ON ALL SEGMENTS", queryStartBackup), nil
+}
+
+// StartBackup informs the database that we are starting copy of cluster contents
+func (queryRunner *PgQueryRunner) StartBackupForGreenplumSegments(backup string) (backupNames []string,
+	lsnStrings []string, inRecoveryValues []bool, err error) {
+	tracelog.InfoLogger.Println("Calling pg_start_backup()")
+	startBackupQuery, err := queryRunner.BuildStartBackup()
+	conn := queryRunner.connection
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "QueryRunner StartBackupForGreenplumSegments: Building start backup query failed")
+	}
+
+	_, err = conn.Query(startBackupQuery, backup)
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "QueryRunner StartBackupForGreenplumSegments: pg_start_backup() failed")
+	}
+	rows, err := conn.Query("SELECT * FROM start_backup_on_all_segments()")
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "QueryRunner StartBackupForGreenplumSegments: start_backup_on_all_segments() failed")
+	}
+	defer rows.Close()
+	backupNames = make([]string, 0)
+	lsnStrings = make([]string, 0)
+	inRecoveryValues = make([]bool, 0)
+	for rows.Next() {
+		var name string
+		var lsn string
+		var inRecovery bool
+
+		if err := rows.Scan(&name, &lsn, &inRecovery); err != nil {
+			tracelog.WarningLogger.Printf("StartBackupForGreenplumSegments:  %v\n", err.Error())
+		}
+		lsnStrings = append(lsnStrings, lsn)
+		backupNames = append(lsnStrings, name)
+		inRecoveryValues = append(inRecoveryValues, inRecovery)
+	}
+
+	if rows.Err() != nil {
+		return nil, nil, nil, rows.Err()
+	}
+	return backupNames, lsnStrings, inRecoveryValues, nil
+}
+
+func (queryRunner *PgQueryRunner) GetSegmentVersions() (versions []int, err error) {
+	conn := queryRunner.connection
+
+	_, err = conn.Query(fmt.Sprintf("CREATE OR REPLACE FUNCTION get_version_on_all_segments() "+
+		"RETURNS TABLE (version int) AS $$%s$$ "+
+		"LANGUAGE SQL EXECUTE ON ALL SEGMENTS", queryRunner.buildGetVersion()))
+	if err != nil {
+		return nil, err
+	}
+	rows, err := conn.Query("SELECT * FROM get_version_on_all_segments()")
+	if err != nil {
+		return nil, errors.Wrap(err, "GetSegmentVersions: getting Postgres version failed")
+	}
+	defer rows.Close()
+	versions = make([]int, 0)
+	for rows.Next() {
+		var version int
+		if err := rows.Scan(&version); err != nil {
+			tracelog.WarningLogger.Printf("GetSegmentVersions:  %v\n", err.Error())
+		}
+		versions = append(versions, version)
+	}
+
+	return versions, nil
+}
+
+func (queryRunner *PgQueryRunner) GetSegmentSystemIdentifiers() (systemIdentifiers []*uint64, err error) {
+	conn := queryRunner.connection
+	_, err = conn.Query(fmt.Sprintf("CREATE OR REPLACE FUNCTION get_system_id_on_all_segments() "+
+		"RETURNS TABLE (version BIGINT) AS $$%s$$ "+
+		"LANGUAGE SQL EXECUTE ON ALL SEGMENTS", queryRunner.buildGetSystemIdentifier()))
+
+	rows, err := conn.Query("SELECT * FROM get_system_id_on_all_segments()")
+	if err != nil {
+		return nil, errors.Wrap(err, "GetSegmentSystemIdentifiers: failed")
+	}
+	defer rows.Close()
+	systemIdentifiers = make([]*uint64, 0)
+	for rows.Next() {
+		var id *uint64
+		if err := rows.Scan(&id); err != nil {
+			tracelog.WarningLogger.Printf("GetSegmentSystemIdentifiers:  %v\n", err.Error())
+		}
+		systemIdentifiers = append(systemIdentifiers, id)
+	}
+	return systemIdentifiers, nil
+}
+
+func (queryRunner *PgQueryRunner) GetSegmentDataDir() (dataDirs []string, err error) {
+	conn := queryRunner.connection
+	_, err = conn.Query(fmt.Sprintf("CREATE OR REPLACE FUNCTION get_data_directory_on_all_segments() "+
+		"RETURNS TABLE (version text) AS $$%s$$ "+
+		"LANGUAGE SQL EXECUTE ON ALL SEGMENTS", queryRunner.buildGetParameter()), "data_directory")
+
+	rows, err := conn.Query("SELECT * FROM get_data_directory_on_all_segments()")
+	if err != nil {
+		return nil, errors.Wrap(err, "GetSegmentDataDir: failed")
+	}
+	defer rows.Close()
+	dataDirs = make([]string, 0)
+	for rows.Next() {
+		var dataDir string
+		if err := rows.Scan(&dataDir); err != nil {
+			tracelog.WarningLogger.Printf("GetSegmentSystemIdentifiers:  %v\n", err.Error())
+		}
+		dataDirs = append(dataDirs, dataDir)
+	}
+	return dataDirs, nil
+}
+
+// StopBackup informs the database that copy is over
+func (queryRunner *PgQueryRunner) StopBackupForGreenplumSegments() (labels []string, offsetMaps []string, lsnStrs []string, err error) {
+	tracelog.InfoLogger.Println("Calling pg_stop_backup()")
+	stopBackupQuery, err := queryRunner.BuildStopBackup()
+	conn := queryRunner.connection
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "QueryRunner StopBackupForGreenplumSegments: Building stop backup query failed")
+	}
+
+	_, err = conn.Query(fmt.Sprintf("CREATE OR REPLACE FUNCTION stop_backup_on_all_segments() "+
+		"RETURNS TABLE (labelfile text, spcmapfile text, lsn pg_lsn) AS $$%s$$ "+
+		"LANGUAGE SQL EXECUTE ON ALL SEGMENTS", stopBackupQuery))
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "QueryRunner StopBackupForGreenplumSegments: pg_stop_backup() failed")
+	}
+	rows, err := conn.Query("SELECT * FROM stop_backup_on_all_segments()")
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "QueryRunner StopBackupForGreenplumSegments: stop_backup_on_all_segments() failed")
+	}
+	defer rows.Close()
+	labels = make([]string, 0)
+	offsetMaps = make([]string, 0)
+	lsnStrs = make([]string, 0)
+	for rows.Next() {
+		var label string
+		var offsetMap string
+		var lsn string
+
+		if err := rows.Scan(&label, &offsetMap, &lsn); err != nil {
+			tracelog.WarningLogger.Printf("StopBackupForGreenplumSegments:  %v\n", err.Error())
+		}
+		labels = append(labels, label)
+		offsetMaps = append(offsetMaps, offsetMap)
+		lsnStrs = append(lsnStrs, lsn)
+	}
+
+	if rows.Err() != nil {
+		return nil, nil, nil, rows.Err()
+	}
+	return labels, offsetMaps, lsnStrs, nil
 }

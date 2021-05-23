@@ -55,7 +55,7 @@ func checkDBDirectoryForUnwrapNew(dbDataDirectory string, sentinelDto BackupSent
 		}
 	}
 
-	if sentinelDto.TablespaceSpec != nil && !sentinelDto.TablespaceSpec.empty() {
+	if sentinelDto.TablespaceSpec != nil && !sentinelDto.TablespaceSpec.Empty() {
 		err := setTablespacePaths(*sentinelDto.TablespaceSpec)
 		if err != nil {
 			return err
