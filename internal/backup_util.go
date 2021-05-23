@@ -88,7 +88,7 @@ func GetBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage 
 	}
 
 	sortTimes := GetBackupTimeSlices(backupObjects)
-	garbage = getGarbageFromPrefix(subFolders, sortTimes)
+	garbage = GetGarbageFromPrefix(subFolders, sortTimes)
 
 	return sortTimes, garbage, nil
 }
@@ -111,8 +111,7 @@ func GetBackupTimeSlices(backups []storage.Object) []BackupTime {
 	return sortTimes
 }
 
-// TODO : unit tests
-func getGarbageFromPrefix(folders []storage.Folder, nonGarbage []BackupTime) []string {
+func GetGarbageFromPrefix(folders []storage.Folder, nonGarbage []BackupTime) []string {
 	garbage := make([]string, 0)
 	var keyFilter = make(map[string]string)
 	for _, k := range nonGarbage {
