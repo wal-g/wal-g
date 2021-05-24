@@ -2,6 +2,7 @@ package functests
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/helpers"
@@ -48,11 +49,35 @@ func (tctx *TestContext) createRedisBackup(host string) error {
 	if err != nil {
 		return nil
 	}
-	tracelog.DebugLogger.Println("Push reids backup")
+
+	beforeBackupTime, err := helpers.TimeInContainer(tctx.Context, rc.Host())
+	if err != nil {
+		return err
+	}
+
+	passed := beforeBackupTime.Sub(tctx.PreviousBackupTime)
+	if passed < time.Second {
+		cmd := []string{"sleep", "1"}
+		if _, err := helpers.RunCommandStrict(tctx.Context, host, cmd); err != nil {
+			return err
+		}
+	}
+
+	tracelog.DebugLogger.Println("Push redis backup")
 	backupId, err := rc.PushBackup()
 	if err != nil {
 		return err
 	}
+	time.Sleep(1 * time.Second)
 	tracelog.DebugLogger.Println("Backup created: ", backupId)
 	return nil
+}
+
+func (tctx *TestContext) weDeleteRedisBackupsRetainViaRedis(backupsRetain int, host string) error {
+	rc, err := GetRedisCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+
+	return rc.PurgeRetain(backupsRetain)
 }

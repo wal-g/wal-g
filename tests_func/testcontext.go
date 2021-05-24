@@ -72,7 +72,6 @@ type AuxData struct {
 	CreatedBackupNames []string
 	NometaBackupNames  []string
 	OplogPushEnabled   bool
-	PreviousBackupTime time.Time
 }
 
 type MongoVersion struct {
@@ -81,14 +80,15 @@ type MongoVersion struct {
 }
 
 type TestContext struct {
-	EnvFilePath string
-	Database    string
-	Infra       *helpers.Infra
-	Env         map[string]string
-	Context     context.Context
-	AuxData     AuxData
-	Version     MongoVersion
-	Features    []string
+	EnvFilePath        string
+	Database           string
+	Infra              *helpers.Infra
+	Env                map[string]string
+	Context            context.Context
+	AuxData            AuxData
+	Version            MongoVersion
+	Features           []string
+	PreviousBackupTime time.Time
 }
 
 func NewTestContext(envFilePath, database string, env, features map[string]string) (*TestContext, error) {
@@ -127,7 +127,7 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 		tctx.AuxData.OplogPushEnabled = false
 		tctx.AuxData.Timestamps = make(map[string]helpers.OpTimestamp)
 		tctx.AuxData.Snapshots = make(map[string][]helpers.NsSnapshot)
-		tctx.AuxData.PreviousBackupTime = time.Unix(0, 0)
+		tctx.PreviousBackupTime = time.Unix(0, 0)
 		if err := tctx.Infra.RecreateContainers(); err != nil {
 			tracelog.ErrorLogger.Fatalln(err)
 		}
@@ -151,7 +151,7 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 	s.Step(`^we save ([^\s]*) data "([^"]*)"$`, tctx.saveMongoSnapshot)
 
 	s.Step(`^we create ([^\s]*) mongo-backup$`, tctx.createMongoBackup)
-	s.Step(`^we delete backups retain (\d+) via ([^\s]*)$`, tctx.purgeBackupRetain)
+	s.Step(`^we delete mongo backups retain (\d+) via ([^\s]*)$`, tctx.purgeBackupRetain)
 	s.Step(`^at least one oplog archive exists in storage$`, tctx.oplogArchiveIsNotEmpty)
 	s.Step(`^we purge oplog archives via ([^\s]*)$`, tctx.purgeOplogArchives)
 	s.Step(`^we restore #(\d+) backup to ([^\s]*)$`, tctx.restoreBackupToMongodb)
@@ -169,6 +169,7 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 	s.Step(`^a working redis on ([^\s]*)$`, tctx.isWorkingRedis)
 	s.Step(`^([^\s]*) has test redis data test(\d+)$`, tctx.redisHasTestRedisDataTest)
 	s.Step(`^we create ([^\s]*) redis-backup$`, tctx.createRedisBackup)
+	s.Step(`^we delete redis backups retain (\d+) via ([^\s]*)$`, tctx.weDeleteRedisBackupsRetainViaRedis)
 }
 
 func (tctx *TestContext) LoadEnv() {

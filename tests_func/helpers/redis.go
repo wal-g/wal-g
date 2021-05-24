@@ -7,6 +7,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"math/rand"
 	"strconv"
+	"time"
 )
 
 type RedisCtl struct {
@@ -40,6 +41,10 @@ func NewRedisCtl(ctx context.Context, host string, port int, password, binPath, 
 
 func (rc *RedisCtl) Addr() string {
 	return rc.Options().Addr
+}
+
+func (rc *RedisCtl) Host() string {
+	return rc.host
 }
 
 type Strings struct {
@@ -82,4 +87,13 @@ func (w *RedisCtl) runCmd(run []string) (ExecResult, error) {
 
 	exc, err := RunCommandStrict(w.ctx, w.host, command)
 	return exc, err
+}
+
+func (w *RedisCtl) PurgeRetain(keepNumber int) error {
+	_, err := w.runCmd([]string{
+		"delete",
+		"--retain-count", strconv.Itoa(keepNumber),
+		"--retain-after", time.Now().Format("2006-01-02T15:04:05Z"),
+		"--confirm"})
+	return err
 }

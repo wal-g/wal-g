@@ -33,12 +33,12 @@ Feature: MongoDB backups check
     Then we got 4 backup entries of mongodb01
 
   Scenario: Backups purged successfully
-    When we delete backups retain 3 via mongodb01
+    When we delete mongo backups retain 3 via mongodb01
     Then we got 3 backup entries of mongodb01
     And we check if empty backups were purged via minio01
 
   Scenario: Second purge does not delete backups
-    When we delete backups retain 3 via mongodb01
+    When we delete mongo backups retain 3 via mongodb01
     Then we got 3 backup entries of mongodb01
 
   Scenario: Last backup restored successfully

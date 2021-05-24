@@ -46,7 +46,7 @@ func (tctx *TestContext) createMongoBackup(container string) error {
 		return err
 	}
 
-	passed := beforeBackupTime.Sub(tctx.AuxData.PreviousBackupTime)
+	passed := beforeBackupTime.Sub(tctx.PreviousBackupTime)
 	if passed < time.Second {
 		cmd := []string{"sleep", "1"}
 		if _, err := helpers.RunCommandStrict(tctx.Context, host, cmd); err != nil {
@@ -66,7 +66,7 @@ func (tctx *TestContext) createMongoBackup(container string) error {
 		return err
 	}
 
-	tctx.AuxData.PreviousBackupTime = afterBackupTime
+	tctx.PreviousBackupTime = afterBackupTime
 	tctx.AuxData.CreatedBackupNames = append(tctx.AuxData.CreatedBackupNames, backupId)
 	return nil
 }
