@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	EnvDirPerm os.FileMode = 0755
+	EnvDirPerm  os.FileMode = 0755
 	EnvFilePerv os.FileMode = 0644
 )
 

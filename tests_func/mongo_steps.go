@@ -3,19 +3,20 @@ package functests
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/helpers"
 	"github.com/wal-g/wal-g/tests_func/mongodb/mongoload"
 	"github.com/wal-g/wal-g/tests_func/mongodb/mongoload/models"
-	"io/ioutil"
-	"os"
 )
 
 func (tctx *TestContext) oplogArchiveIsNotEmpty() error {
 	s3 := S3StorageFromTestContext(tctx, tctx.S3Host())
 
-	return helpers.Retry(tctx.Context, 10, func() error {
+	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
 		archives, err := s3.Archives()
 		if err != nil {
 			return err
@@ -26,7 +27,6 @@ func (tctx *TestContext) oplogArchiveIsNotEmpty() error {
 		return nil
 	})
 }
-
 
 func (tctx *TestContext) testEqualMongodbDataAtHosts(host1, host2 string) error {
 	mc1, err := MongoCtlFromTestContext(tctx, host1)
@@ -60,7 +60,6 @@ func (tctx *TestContext) testEqualMongodbDataAtHosts(host1, host2 string) error 
 
 	return nil
 }
-
 
 func (tctx *TestContext) loadMongodbOpsFromConfig(host string, loadId string) error {
 	ammoFile, err := os.Open(tctx.getMongoLoadFile(loadId, "config.json"))
@@ -112,7 +111,7 @@ func (tctx *TestContext) loadMongodbOpsFromConfig(host string, loadId string) er
 		return err
 	}
 
-	return helpers.Retry(tctx.Context, 10, func() error {
+	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
 		tsMaj, err := mc.LastMajTS()
 		if err != nil {
 			return err
@@ -132,16 +131,16 @@ func (tctx *TestContext) fillMongodbWithTestData(host string, testId int) error 
 		return err
 	}
 
-	return mc.WriteTestData(fmt.Sprintf("test%02d", testId))
+	dbCount, tablesCount, rowsCount := 2, 2, 3
+	return mc.WriteTestData(fmt.Sprintf("test%02d", testId), dbCount, tablesCount, rowsCount)
 }
-
 
 func (tctx *TestContext) testMongoConnect(host string) error {
 	mc, err := MongoCtlFromTestContext(tctx, host)
 	if err != nil {
 		return err
 	}
-	return helpers.Retry(tctx.Context, 10, func() error {
+	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
 		conn, err := mc.Connect(nil)
 		if err != nil {
 			return err
@@ -153,14 +152,13 @@ func (tctx *TestContext) testMongoConnect(host string) error {
 	})
 }
 
-
 func (tctx *TestContext) initiateReplSet(host string) error {
 	mc, err := MongoCtlFromTestContext(tctx, host)
 	if err != nil {
 		return err
 	}
 
-	if err := helpers.Retry(tctx.Context, 10, mc.InitReplSet); err != nil {
+	if err := helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, mc.InitReplSet); err != nil {
 		return err
 	}
 
@@ -173,7 +171,7 @@ func (tctx *TestContext) isMongoPrimary(host string) error {
 		return err
 	}
 
-	return helpers.Retry(tctx.Context, 10, func() error {
+	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
 		isMaster, err := mc.IsMaster()
 		if err != nil {
 			return err
@@ -192,7 +190,6 @@ func (tctx *TestContext) mongoEnableAuth(host string) error {
 	}
 	return mc.EnableAuth()
 }
-
 
 func (tctx *TestContext) purgeMongoDataDir(host string) error {
 	mc, err := MongoCtlFromTestContext(tctx, host)
@@ -231,7 +228,6 @@ func (tctx *TestContext) saveOplogTimestamp(host, timestampId string) error {
 	return nil
 }
 
-
 func (tctx *TestContext) enableOplogPush(container string) error {
 	if tctx.AuxData.OplogPushEnabled {
 		return nil
@@ -249,7 +245,6 @@ func (tctx *TestContext) purgeOplogArchives(container string) error {
 	walg := WalgUtilFromTestContext(tctx, container)
 	return walg.OplogPurge()
 }
-
 
 func (tctx *TestContext) restoreBackupToMongodb(backupNum int, container string) error {
 	walg := WalgUtilFromTestContext(tctx, container)

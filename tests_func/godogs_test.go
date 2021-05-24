@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 	"path"
+	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/godog"
@@ -74,6 +75,7 @@ func TestMain(m *testing.M) {
 	Env["ENV_FILE"] = envFilePath // set ENV_FILE for docker-compose
 	Env["DOCKER_FILE"] = "Dockerfile." + database
 	Env["COMPOSE_FILE"] = database + Env["COMPOSE_FILE_SUFFIX"]
+	Env["WALG_S3_PREFIX"] = strings.Replace(Env["WALG_S3_PREFIX"], "DBNAME", database, -1)
 	tracelog.DebugLogger.Printf("Database name %s\nEnv: %s\n", database, Env)
 
 	newEnv := !EnvExists(envFilePath)

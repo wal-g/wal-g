@@ -2,14 +2,19 @@
 FROM walg-func-test-base
 
 ARG WALG_REPO=${GOPATH}/src/github.com/wal-g/wal-g
-ARG REDIS_VERSION=5.0.8
+ARG REDIS_VERSION=6.0.8
 ENV REDIS_DOWNLOAD_URL http://download.redis.io/releases/redis-$REDIS_VERSION.tar.gz
 
 ENV TMP_DIR /var/tmp/wal-g
 ENV WALG_CONF_DIR /etc/wal-g/
 
+ENV USER redis
+ENV GROUP redis
+ENV USERGROUP $USER:$GROUP
+ENV HOME /home/$USER
+
 # add our user and group first to make sure their IDs get assigned consistently, regardless of whatever dependencies get added
-RUN groupadd -r -g 999 redis && useradd -r -g redis -u 999 redis
+RUN groupadd -r -g 999 $USER && useradd -r -g $GROUP -u 999 $USER
 
 RUN set -eux; \
 	\
@@ -63,7 +68,7 @@ RUN set -eux; \
 	redis-cli --version; \
 	redis-server --version
 
-RUN mkdir -p /data && chown redis:redis /data
+RUN mkdir -p /data && chown $USERGROUP /data
 VOLUME /data
 WORKDIR /data
 
@@ -79,6 +84,9 @@ RUN apt-get update -qq && \
 RUN mkdir -p /var/log/wal-g/ ${TMP_DIR} && \
     ln --force -s /config/supervisor/conf.d/redis.conf /etc/supervisor/conf.d/redis.conf && \
     mkdir -p ${WALG_REPO} ${WALG_CONF_DIR} && \
+    mkdir -p $HOME/.gnupg && touch $HOME/.gnupg/gpg.conf && \
+    chmod -R 700 $HOME/.gnupg && chown $USERGROUP -R $HOME/.gnupg && \
+    ln --force -s /config/wal-g-${REDIS_VERSION}.json ${WALG_CONF_DIR}/wal-g.json && \
     ln --force -s /config/gpg-key.armor ${WALG_CONF_DIR}/gpg-key.armor
 
 COPY staging/wal-g ${WALG_REPO}/

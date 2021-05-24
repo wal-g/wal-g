@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,7 +19,9 @@ import (
 
 const (
 	featuresDir = "features"
-	featureExt = ".feature"
+	featureExt  = ".feature"
+
+	MAX_RETRIES_COUNT = 10
 )
 
 func (tctx *TestContext) ContainerFQDN(name string) string {
@@ -93,13 +96,13 @@ func NewTestContext(envFilePath, database string, env, features map[string]strin
 	environ := utils.ParseEnvLines(os.Environ())
 	return &TestContext{
 		EnvFilePath: envFilePath,
-		Database: database,
-		Context: context.Background(),
+		Database:    database,
+		Context:     context.Background(),
 		Version: MongoVersion{
 			Major: environ["MONGO_MAJOR"],
 			Full:  environ["MONGO_VERSION"]},
 		Features: featuresList,
-		Env: env}, nil
+		Env:      env}, nil
 }
 
 func (tctx *TestContext) StopEnv() error {
@@ -165,7 +168,7 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 
 	s.Step(`^a working redis on ([^\s]*)$`, tctx.isWorkingRedis)
 	s.Step(`^([^\s]*) has test redis data test(\d+)$`, tctx.redisHasTestRedisDataTest)
-	s.Step(`^we create redis(\d+) backup$`, weCreateRedisBackup)
+	s.Step(`^we create ([^\s]*) redis-backup$`, tctx.createRedisBackup)
 }
 
 func (tctx *TestContext) LoadEnv() {
@@ -197,7 +200,7 @@ func scanFeatureDirs(dbName, featurePrefix string) (map[string]string, error) {
 		found := false
 		for _, f := range files {
 			filename := f.Name()
-			if filename == requestedFeature + featureExt {
+			if filename == requestedFeature+featureExt {
 				files = []os.FileInfo{f}
 				found = true
 				break
@@ -217,10 +220,26 @@ func scanFeatureDirs(dbName, featurePrefix string) (map[string]string, error) {
 		}
 
 		if strings.HasSuffix(filename, featureExt) {
-			featureName := filename[0:len(filename)-len(featureExt)]
+			featureName := filename[0 : len(filename)-len(featureExt)]
 			foundFeatures[featureName] = path.Join(dir, f.Name())
 		}
 	}
 
 	return foundFeatures, nil
+}
+
+func GetRedisCtlFromTestContext(tctx *TestContext, hostName string) (*helpers.RedisCtl, error) {
+	host := tctx.ContainerFQDN(hostName)
+	port, err := strconv.Atoi(tctx.Env["REDIS_EXPOSE_PORT"])
+	if err != nil {
+		return nil, err
+	}
+	return helpers.NewRedisCtl(
+		tctx.Context,
+		host,
+		port,
+		tctx.Env["REDIS_PASSWORD"],
+		tctx.Env["WALG_CLIENT_PATH"],
+		tctx.Env["WALG_CONF_PATH"],
+	)
 }

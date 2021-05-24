@@ -8,5 +8,5 @@ Feature: Redis backups check
 
   Scenario: Backups were done successfully
     When redis01 has test redis data test1
-    And we create redis01 backup
+    And we create redis01 redis-backup
     Then we got 1 backup entries of redis01
