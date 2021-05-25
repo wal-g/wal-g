@@ -6,7 +6,7 @@
   "AWS_S3_FORCE_PATH_STYLE": "true",
 
   "WALG_STREAM_CREATE_COMMAND": "redis-cli --rdb /dev/stdout",
-  "WALG_STREAM_RESTORE_COMMAND": "echo",
+  "WALG_STREAM_RESTORE_COMMAND": "cat > /data/dump.rdb",
 
   "WALG_SENTINEL_USER_DATA":    "{\"key\": \"value\"}",
 

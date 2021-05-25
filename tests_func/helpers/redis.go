@@ -81,16 +81,16 @@ func (rc *RedisCtl) PushBackup() (string, error) {
 	return BackupNameFromCreate(exec.Combined()), nil
 }
 
-func (w *RedisCtl) runCmd(run []string) (ExecResult, error) {
-	command := []string{w.binPath, "--config", w.confPath}
+func (rc *RedisCtl) runCmd(run []string) (ExecResult, error) {
+	command := []string{rc.binPath, "--config", rc.confPath}
 	command = append(command, run...)
 
-	exc, err := RunCommandStrict(w.ctx, w.host, command)
+	exc, err := RunCommandStrict(rc.ctx, rc.host, command)
 	return exc, err
 }
 
-func (w *RedisCtl) PurgeRetain(keepNumber int) error {
-	_, err := w.runCmd([]string{
+func (rc *RedisCtl) PurgeRetain(keepNumber int) error {
+	_, err := rc.runCmd([]string{
 		"delete",
 		"--retain-count", strconv.Itoa(keepNumber),
 		"--retain-after", time.Now().Format("2006-01-02T15:04:05Z"),

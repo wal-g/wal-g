@@ -73,11 +73,10 @@ VOLUME /data
 WORKDIR /data
 
 RUN apt-get update -qq && \
-    apt-get install -y apt-transport-https python-dev python-setuptools python-pip tzdata && \
+    apt-get install -y apt-transport-https && \
     mkdir -p /etc/apt/sources.list.d && \
     apt-get update -qq && \
     apt-key update && \
-    pip install wheel && pip install rdbtools python-lzf && \
     rm -rf /var/lib/apt/lists/* /var/cache/debconf && \
     apt-get clean
 

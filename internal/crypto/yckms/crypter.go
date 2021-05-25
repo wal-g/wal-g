@@ -16,6 +16,10 @@ type YcCrypter struct {
 	symmetricKey YcSymmetricKeyInterface
 }
 
+func (crypter *YcCrypter) Name() string {
+	return "YcKMC/Crypter"
+}
+
 func (crypter *YcCrypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	if crypter.symmetricKey.GetKey() == nil {
 		err := crypter.symmetricKey.CreateKey()

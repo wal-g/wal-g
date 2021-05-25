@@ -88,7 +88,7 @@ func (tctx *TestContext) purgeBackupRetain(retainCount int, container string) er
 	return walg.PurgeRetain(retainCount)
 }
 
-func (tctx *TestContext) deleteBackup(backupNum int, container string) error {
+func (tctx *TestContext) deleteMongoBackup(backupNum int, container string) error {
 	walg := WalgUtilFromTestContext(tctx, container)
 	backups, err := walg.Backups()
 	if err != nil {

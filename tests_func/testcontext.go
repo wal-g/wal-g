@@ -159,7 +159,7 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 	s.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*)$`, tctx.replayOplog)
 
 	s.Step(`^we got (\d+) backup entries of ([^\s]*)$`, tctx.checkBackupsCount)
-	s.Step(`^we delete backup #(\d+) via ([^\s]*)$`, tctx.deleteBackup)
+	s.Step(`^we delete mongo backup #(\d+) via ([^\s]*)$`, tctx.deleteMongoBackup)
 	s.Step(`^we ensure ([^\s]*) #(\d+) backup metadata contains$`, tctx.backupMetadataContains)
 	s.Step(`^we put empty backup via ([^\s]*) to ([^\s]*)$`, tctx.putEmptyBackupViaMinio)
 	s.Step(`^we check if empty backups were purged via ([^\s]*)$`, tctx.testEmptyBackupsViaMinio)
@@ -170,6 +170,8 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 	s.Step(`^([^\s]*) has test redis data test(\d+)$`, tctx.redisHasTestRedisDataTest)
 	s.Step(`^we create ([^\s]*) redis-backup$`, tctx.createRedisBackup)
 	s.Step(`^we delete redis backups retain (\d+) via ([^\s]*)$`, tctx.weDeleteRedisBackupsRetainViaRedis)
+	s.Step(`^we restart redis-server at ([^\s]*)$`, tctx.weRestartRedisServerAt)
+	s.Step(`^we got same redis data at ([^\s]*) ([^\s]*)$`, tctx.testEqualRedisDataAtHosts)
 }
 
 func (tctx *TestContext) LoadEnv() {

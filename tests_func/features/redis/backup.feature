@@ -34,3 +34,23 @@ Feature: Redis backups check
   Scenario: Second purge does not delete backups
     When we delete redis backups retain 3 via redis01
     Then we got 3 backup entries of redis01
+
+  Scenario: Last backup restored successfully
+    When we restore #2 backup to redis02
+    And we restart redis-server at redis02
+    And a working redis on redis02
+    Then we got same redis data at redis01 redis02
+
+  Scenario: Pre-last backup restored successfully
+    When we restore #1 backup to redis01
+    And we restore #1 backup to redis02
+    And we restart redis-server at redis01
+    And we restart redis-server at redis02
+    And a working redis on redis01
+    And a working redis on redis02
+    Then we got same redis data at redis01 redis02
+
+  Scenario: Fifth backup was done successfully
+    Given redis01 has test redis data test5
+    When we create redis01 redis-backup
+    Then we got 4 backup entries of redis01

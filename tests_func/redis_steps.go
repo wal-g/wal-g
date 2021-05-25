@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/helpers"
+	"github.com/wal-g/wal-g/tests_func/utils"
 )
 
 func (tctx *TestContext) isWorkingRedis(hostName string) error {
@@ -80,4 +82,70 @@ func (tctx *TestContext) weDeleteRedisBackupsRetainViaRedis(backupsRetain int, h
 	}
 
 	return rc.PurgeRetain(backupsRetain)
+}
+
+func (tctx *TestContext) weRestartRedisServerAt(host string) error {
+	rc, err := GetRedisCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+	cmd := rc.ShutdownNoSave()
+	if cmd.Err() != nil {
+		return cmd.Err()
+	}
+	return nil
+}
+
+func (tctx *TestContext) testEqualRedisDataAtHosts(host1, host2 string) error {
+	rc1, err := GetRedisCtlFromTestContext(tctx, host1)
+	if err != nil {
+		return err
+	}
+
+	rc2, err := GetRedisCtlFromTestContext(tctx, host2)
+	if err != nil {
+		return err
+	}
+
+	dbsize1 := rc1.DBSize()
+	if dbsize1.Err() != nil {
+		return errors.Wrapf(dbsize1.Err(), "Host %s doesn't return 'dbsize'", host1)
+	}
+	dbsize2 := rc2.DBSize()
+	if dbsize2.Err() != nil {
+		return errors.Wrapf(dbsize1.Err(), "Host %s doesn't return 'dbsize'", host2)
+	}
+	if dbsize1.Val() != dbsize2.Val() {
+		return fmt.Errorf("hosts %s and %s have not equal keys count %d != %d", host1, host2, dbsize1.Val(), dbsize2.Val())
+	}
+
+	keys1 := rc1.Keys("*")
+	if keys1.Err() != nil {
+		return keys1.Err()
+	}
+
+	keys2 := rc2.Keys("*")
+	if keys2.Err() != nil {
+		return keys2.Err()
+	}
+
+	if !utils.IsArraysEqual(keys1.Val(), keys2.Val()) {
+		return fmt.Errorf("keys from redis1/redis2 aren't equal")
+	}
+	values1 := rc1.MGet(keys1.Val()...)
+	values2 := rc1.MGet(keys2.Val()...)
+	vals1 := make([]string, len(values1.Val()))
+	vals2 := make([]string, len(values1.Val()))
+
+	for i, val := range values1.Val() {
+		vals1[i] = val.(string)
+	}
+
+	for i, val := range values2.Val() {
+		vals2[i] = val.(string)
+	}
+	if !utils.IsArraysEqual(vals1, vals2) {
+		return fmt.Errorf("values from redis1/redis2 aren't equal")
+	}
+	return nil
 }
