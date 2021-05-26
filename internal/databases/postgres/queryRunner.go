@@ -460,10 +460,22 @@ func (queryRunner *PgQueryRunner) GetGreenplumSegmentsInfo(semVer semver.Version
 	defer rows.Close()
 	segments = make([]cluster.SegConfig, 0)
 	for rows.Next() {
-		var segment cluster.SegConfig
-
-		if err := rows.Scan(&segment); err != nil {
+		var dbId int
+		var contentId int
+		var role string
+		var port int
+		var hostname string
+		var dataDir string
+		if err := rows.Scan(&dbId, &contentId, &role, &port, &hostname, &dataDir); err != nil {
 			tracelog.WarningLogger.Printf("GetGreenplumSegmentsInfo:  %v\n", err.Error())
+		}
+		segment := cluster.SegConfig {
+			DbID: dbId,
+			ContentID: contentId,
+			Role: role,
+			Port: port,
+			Hostname: hostname,
+			DataDir: dataDir,
 		}
 		segments = append(segments, segment)
 	}
