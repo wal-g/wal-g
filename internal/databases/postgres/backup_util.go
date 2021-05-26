@@ -46,11 +46,11 @@ func SortBackupDetails(backupDetails []BackupDetail) {
 	}
 	if sortOrder == ByCreationTime {
 		sort.Slice(backupDetails, func(i, j int) bool {
-			return backupDetails[i].StartTime.After(backupDetails[j].StartTime)
+			return backupDetails[i].StartTime.Before(backupDetails[j].StartTime)
 		})
 	} else {
 		sort.Slice(backupDetails, func(i, j int) bool {
-			return backupDetails[i].Time.After(backupDetails[j].Time)
+			return backupDetails[i].Time.Before(backupDetails[j].Time)
 		})
 	}
 }

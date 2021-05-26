@@ -30,6 +30,7 @@ func DefaultHandleBackupList(folder storage.Folder, pretty, json bool) {
 		return GetBackups(folder)
 	}
 	writeBackupListFunc := func(backups []BackupTime) {
+		SortBackupTimeSlices(backups)
 		switch {
 		case json:
 			err := WriteAsJSON(backups, os.Stdout, pretty)
@@ -67,9 +68,8 @@ func WriteBackupList(backups []BackupTime, output io.Writer) {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
 	fmt.Fprintln(writer, "name\tmodified\twal_segment_backup_start")
-	for i := 0; i < len(backups); i++ {
-		b := backups[i]
-		_, _ = fmt.Fprintf(writer, "%v\t%v\t%v\n", b.BackupName, FormatTime(b.Time), b.WalFileName)
+	for _, b := range backups {
+		fmt.Fprintf(writer, "%v\t%v\t%v\n", b.BackupName, FormatTime(b.Time), b.WalFileName)
 	}
 }
 

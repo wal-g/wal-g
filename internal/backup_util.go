@@ -25,12 +25,13 @@ func (err NoBackupsFoundError) Error() string {
 
 // TODO : unit tests
 func GetLatestBackupName(folder storage.Folder) (string, error) {
-	sortTimes, err := GetBackups(folder)
+	backupTimes, err := GetBackups(folder)
+	SortBackupTimeSlices(backupTimes)
 	if err != nil {
 		return "", err
 	}
 
-	return sortTimes[0].BackupName, nil
+	return backupTimes[len(backupTimes)-1].BackupName, nil
 }
 
 func GetBackupSentinelObjects(folder storage.Folder) ([]storage.Object, error) {
@@ -79,20 +80,23 @@ func GetBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage 
 
 // TODO : unit tests
 func GetBackupTimeSlices(backups []storage.Object) []BackupTime {
-	sortTimes := make([]BackupTime, len(backups))
-	for i, object := range backups {
+	backupTimes := make([]BackupTime, 0)
+	for _, object := range backups {
 		key := object.GetName()
 		if !strings.HasSuffix(key, utility.SentinelSuffix) {
 			continue
 		}
 		time := object.GetLastModified()
-		sortTimes[i] = BackupTime{utility.StripRightmostBackupName(key), time,
-			utility.StripWalFileName(key)}
+		backupTimes = append(backupTimes, BackupTime{utility.StripRightmostBackupName(key), time,
+			utility.StripWalFileName(key)})
 	}
-	sort.Slice(sortTimes, func(i, j int) bool {
-		return sortTimes[i].Time.After(sortTimes[j].Time)
+	return backupTimes
+}
+
+func SortBackupTimeSlices(backupTimes []BackupTime) {
+	sort.Slice(backupTimes, func(i, j int) bool {
+		return backupTimes[i].Time.Before(backupTimes[j].Time)
 	})
-	return sortTimes
 }
 
 // TODO : unit tests
