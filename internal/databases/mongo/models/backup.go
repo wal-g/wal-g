@@ -13,6 +13,18 @@ type Backup struct {
 	DataSize        int64       `json:"DataSize,omitempty"`
 }
 
+func (b Backup) Name() string {
+	return b.BackupName
+}
+
+func (b Backup) StartTime() time.Time {
+	return b.StartLocalTime
+}
+
+func (b Backup) IsPermanent() bool {
+	return b.Permanent
+}
+
 // NodeMeta represents MongoDB node metadata
 type NodeMeta struct {
 	LastTS    Timestamp `json:"LastTS,omitempty"`

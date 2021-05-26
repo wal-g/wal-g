@@ -17,7 +17,7 @@ import (
 
 const (
 	// Sets standbyMessageTimeout in Streaming Replication Protocol.
-	streamTimeout = 10
+	StandbyMessageTimeout = time.Second * 10
 )
 
 /*
@@ -84,7 +84,7 @@ func HandleWALReceive(uploader *WalUploader) {
 	segment = NewWalSegment(timeline, XLogPos, walSegmentBytes)
 	startReplication(conn, segment, slot.Name)
 	for {
-		streamResult, err := segment.Stream(conn, time.Second*streamTimeout)
+		streamResult, err := segment.Stream(conn, StandbyMessageTimeout)
 		tracelog.ErrorLogger.FatalOnError(err)
 		tracelog.DebugLogger.Printf("Successfully received wal segment %s: ", segment.Name())
 

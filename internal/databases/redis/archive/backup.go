@@ -22,6 +22,42 @@ type Backup struct {
 	BackupSize      int64       `json:"BackupSize,omitempty"`
 }
 
+func (b Backup) Name() string {
+	return b.BackupName
+}
+
+func (b Backup) StartTime() time.Time {
+	return b.StartLocalTime
+}
+
+func (b Backup) IsPermanent() bool {
+	return b.Permanent
+}
+
+func SplitRedisBackups(backups []Backup, purgeBackups, retainBackups map[string]bool) (purge, retain []Backup) {
+	for _, backup := range backups {
+		if purgeBackups[backup.Name()] {
+			purge = append(purge, backup)
+			continue
+		}
+		if retainBackups[backup.Name()] {
+			retain = append(retain, backup)
+		}
+	}
+	return purge, retain
+}
+
+func RedisModelToTimedBackup(backups []Backup) []internal.TimedBackup {
+	if backups == nil {
+		return nil
+	}
+	result := make([]internal.TimedBackup, len(backups))
+	for i := range backups {
+		result[i] = backups[i]
+	}
+	return result
+}
+
 // BackupMeta stores the data needed to create a Backup json object
 type BackupMeta struct {
 	DataSize       int64

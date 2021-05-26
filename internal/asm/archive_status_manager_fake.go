@@ -40,3 +40,7 @@ func (asm *FakeASM) UnmarkWalFile(walFilePath string) error {
 	asm.uploaded[walFilePath] = false
 	return nil
 }
+
+func (asm *FakeASM) RenameReady(walFilePath string) error {
+	return nil
+}

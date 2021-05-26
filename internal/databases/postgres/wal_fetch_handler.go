@@ -46,6 +46,8 @@ func HandleWALFetch(folder storage.Folder, walFileName string, location string, 
 	_, _, running, prefetched := getPrefetchLocations(path.Dir(location), walFileName)
 	seenSize := int64(-1)
 
+	sizeStallInterations := 0
+	maxSizeStallTerations := 100
 	for {
 		if stat, err := os.Stat(prefetched); err == nil {
 			if stat.Size() != int64(WalSegmentSize) {
@@ -71,21 +73,26 @@ func HandleWALFetch(folder storage.Folder, walFileName string, location string, 
 		// We have race condition here, if running is renamed here, but it's OK
 
 		if runStat, err := os.Stat(running); err == nil {
-			observedSize := runStat.Size() // If there is no progress in 50 ms - start downloading myself
+			observedSize := runStat.Size() // If there is no progress in 200 ms (100 iterations for 2ms)- start downloading myself
 			if observedSize <= seenSize {
-				defer func() {
-					_ = os.Remove(running) // we try to clean up and ignore here any error
-					_ = os.Remove(prefetched)
-				}()
-				break
+				sizeStallInterations++
+				if sizeStallInterations >= maxSizeStallTerations {
+					defer func() {
+						_ = os.Remove(running) // we try to clean up and ignore here any error
+						_ = os.Remove(prefetched)
+					}()
+					break
+				}
+			} else {
+				sizeStallInterations = 0
+				seenSize = observedSize
 			}
-			seenSize = observedSize
 		} else if os.IsNotExist(err) {
 			break // Normal startup path
 		} else {
 			break // Abnormal path. Permission denied etc. Yes, I know that previous 'else' can be eliminated.
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(2 * time.Millisecond)
 	}
 
 	err := internal.DownloadFileTo(folder, walFileName, location)
