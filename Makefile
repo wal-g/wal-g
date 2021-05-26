@@ -4,6 +4,7 @@ MAIN_SQLSERVER_PATH := main/sqlserver
 MAIN_REDIS_PATH := main/redis
 MAIN_MONGO_PATH := main/mongo
 MAIN_FDB_PATH := main/fdb
+MAIN_GP_PATH := main/gp
 DOCKER_COMMON := golang ubuntu s3
 CMD_FILES = $(wildcard cmd/**/*.go)
 PKG_FILES = $(wildcard internal/**/*.go internal/**/**/*.go internal/*.go)
@@ -152,6 +153,16 @@ redis_clean:
 redis_install: redis_build
 	mv $(MAIN_REDIS_PATH)/wal-g $(GOBIN)/wal-g
 
+gp_build: $(CMD_FILES) $(PKG_FILES)
+	(cd $(MAIN_GP_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/gp.walgVersion=`git tag -l --points-at HEAD`")
+
+gp_clean:
+	(cd $(MAIN_GP_PATH) && go clean)
+	./cleanup.sh
+
+gp_install: gp_build
+	mv $(MAIN_GP_PATH)/wal-g $(GOBIN)/wal-g
+
 unittest:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet
 	go test -v $(TEST_MODIFIER) ./internal/
@@ -206,7 +217,7 @@ link_external_deps: link_brotli link_libsodium
 unlink_external_deps: unlink_brotli unlink_libsodium
 
 install:
-	@echo "Nothing to be done. Use pg_install/mysql_install/mongo_install/fdb_install/... instead."
+	@echo "Nothing to be done. Use pg_install/mysql_install/mongo_install/fdb_install/gp_install... instead."
 
 link_brotli:
 	./link_brotli.sh

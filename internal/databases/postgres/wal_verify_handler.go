@@ -88,7 +88,7 @@ func QueryCurrentWalSegment() WalSegmentDescription {
 	conn, err := Connect()
 	tracelog.ErrorLogger.FatalfOnError("Failed to establish a connection to Postgres cluster %v", err)
 
-	queryRunner, err := newPgQueryRunner(conn)
+	queryRunner, err := NewPgQueryRunner(conn)
 	tracelog.ErrorLogger.FatalfOnError("Failed to initialize PgQueryRunner %v", err)
 
 	currentSegmentNo, err := getCurrentWalSegmentNo(queryRunner)

@@ -59,6 +59,7 @@ type BackupArguments struct {
 	pgDataDirectory       string
 	isFullBackup          bool
 	deltaBaseSelector     internal.BackupSelector
+	backupNamePrefix      string
 }
 
 // CurBackupInfo holds all information that is harvest during the backup process
@@ -174,7 +175,7 @@ func (bh *BackupHandler) startBackup() (err error) {
 		return
 	}
 	bh.curBackupInfo.startLSN = backupStartLSN
-	bh.curBackupInfo.name = backupName
+	bh.curBackupInfo.name = bh.arguments.backupNamePrefix + "_" + backupName
 	tracelog.DebugLogger.Printf("Backup name: %s\nBackup start LSN: %d", backupName, backupStartLSN)
 
 	return
@@ -343,7 +344,7 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	tracelog.ErrorLogger.FatalOnError(err)
 	sentinelDto := NewBackupSentinelDto(bh, baseBackup.GetTablespaceSpec(), TarFileSets{})
 	sentinelDto.Files = baseBackup.Files
-	bh.curBackupInfo.name = baseBackup.BackupName()
+	bh.curBackupInfo.name = bh.arguments.backupNamePrefix + "_" + baseBackup.BackupName()
 	tracelog.InfoLogger.Println("Uploading metadata")
 	bh.uploadMetadata(sentinelDto)
 	// logging backup set name
@@ -439,7 +440,7 @@ func getPgServerInfo() (pgInfo BackupPgInfo, err error) {
 		return pgInfo, err
 	}
 
-	queryRunner, err := newPgQueryRunner(tmpConn)
+	queryRunner, err := NewPgQueryRunner(tmpConn)
 	if err != nil {
 		return pgInfo, err
 	}

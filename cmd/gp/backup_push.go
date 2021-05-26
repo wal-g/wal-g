@@ -1,12 +1,7 @@
-package pg
+package gp
 
 import (
-	"fmt"
-
-	"github.com/wal-g/wal-g/utility"
-
-	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/databases/greenplum"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -25,7 +20,6 @@ const (
 	deltaFromUserDataFlag     = "delta-from-user-data"
 	deltaFromNameFlag         = "delta-from-name"
 	addUserDataFlag           = "add-user-data"
-	backupNamePrefixFlag      = "backup-name-prefix"
 
 	permanentShorthand             = "p"
 	fullBackupShorthand            = "f"
@@ -49,33 +43,26 @@ var (
 
 			verifyPageChecksums = verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting)
 			storeAllCorruptBlocks = storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting)
-			tarBallComposerType := postgres.RegularComposer
 
 			useRatingComposer = useRatingComposer || viper.GetBool(internal.UseRatingComposerSetting)
-			if useRatingComposer {
-				tarBallComposerType = postgres.RatingComposer
-			}
+
 			if deltaFromName == "" {
 				deltaFromName = viper.GetString(internal.DeltaFromNameSetting)
 			}
 			if deltaFromUserData == "" {
 				deltaFromUserData = viper.GetString(internal.DeltaFromUserDataSetting)
 			}
-			deltaBaseSelector, err := createDeltaBaseSelector(cmd, deltaFromName, deltaFromUserData)
-			tracelog.ErrorLogger.FatalOnError(err)
 
 			if userData == "" {
 				userData = viper.GetString(internal.SentinelUserDataSetting)
 			}
-			if backupNamePrefix == "" {
-				backupNamePrefix = viper.GetString(internal.BackupNamePrefixSetting)
-			}
-			arguments := postgres.NewBackupArguments(dataDirectory, utility.BaseBackupPath,
+			tracelog.InfoLogger.Print("check1")
+			arguments := greenplum.NewBackupArguments(dataDirectory,
 				permanent, verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting),
 				fullBackup, storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting),
-				tarBallComposerType, deltaBaseSelector, userData)
+				useRatingComposer, deltaFromUserData, deltaFromName, userData)
 
-			backupHandler, err := postgres.NewBackupHandler(arguments)
+			backupHandler, err := greenplum.NewBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
 			backupHandler.HandleBackupPush()
 		},
@@ -88,32 +75,7 @@ var (
 	deltaFromName         = ""
 	deltaFromUserData     = ""
 	userData              = ""
-	backupNamePrefix      = ""
 )
-
-// create the BackupSelector for delta backup base according to the provided flags
-func createDeltaBaseSelector(cmd *cobra.Command,
-	targetBackupName, targetUserData string) (internal.BackupSelector, error) {
-	switch {
-	case targetUserData != "" && targetBackupName != "":
-		fmt.Println(cmd.UsageString())
-		return nil, errors.New("only one delta target should be specified")
-
-	case targetBackupName != "":
-		tracelog.InfoLogger.Printf("Selecting the backup with name %s as the base for the current delta backup...\n",
-			targetBackupName)
-		return internal.NewBackupNameSelector(targetBackupName)
-
-	case targetUserData != "":
-		tracelog.InfoLogger.Println(
-			"Selecting the backup with specified user data as the base for the current delta backup...")
-		return internal.NewUserDataBackupSelector(targetUserData, postgres.NewGenericMetaFetcher()), nil
-
-	default:
-		tracelog.InfoLogger.Println("Selecting the latest backup as the base for the current delta backup...")
-		return internal.NewLatestBackupSelector(), nil
-	}
-}
 
 func init() {
 	cmd.AddCommand(backupPushCmd)
@@ -134,6 +96,4 @@ func init() {
 		"", "Select the backup specified by UserData as the target for the delta backup")
 	backupPushCmd.Flags().StringVar(&userData, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
-	backupPushCmd.Flags().StringVar(&backupNamePrefix, backupNamePrefixFlag,
-		"", "Add the specified prefix to the backup name")
 }

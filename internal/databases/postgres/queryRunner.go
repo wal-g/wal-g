@@ -2,6 +2,9 @@ package postgres
 
 import (
 	"fmt"
+	"github.com/blang/semver"
+	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/greenplum-db/gp-common-go-libs/dbconn"
 	"strconv"
 
 	"github.com/jackc/pgx"
@@ -116,7 +119,7 @@ func (queryRunner *PgQueryRunner) BuildStopBackup() (string, error) {
 }
 
 // NewPgQueryRunner builds QueryRunner from available connection
-func newPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
+func NewPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
 	r := &PgQueryRunner{connection: conn}
 	err := r.getVersion()
 	if err != nil {
@@ -384,4 +387,99 @@ func (queryRunner *PgQueryRunner) GetPhysicalSlotInfo(slotName string) (Physical
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) IsTablespaceMapExists() bool {
 	return queryRunner.Version >= 90600
+}
+
+// BuildCreateGreenplumRestorePoint formats a query to create a restore point for Greenplum
+func (queryRunner *PgQueryRunner) buildCreateGreenplumRestorePoint(restorePointName string) string {
+	return fmt.Sprintf("SELECT gp_create_restore_point('%s')", restorePointName)
+}
+
+// CreateGreenplumRestorePoint creates a restore point for Greenplum
+func (queryRunner *PgQueryRunner) CreateGreenplumRestorePoint(restorePointName string) (lsnStrings []string, err error) {
+	conn := queryRunner.connection
+	rows, err := conn.Query(queryRunner.buildCreateGreenplumRestorePoint(restorePointName))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	lsnStrings = make([]string, 0)
+	for rows.Next() {
+		var lsn string
+
+		if err := rows.Scan(&lsn); err != nil {
+			tracelog.WarningLogger.Printf("CreateGreenplumRestorePoint:  %v\n", err.Error())
+		}
+		lsnStrings = append(lsnStrings, lsn)
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+	return lsnStrings, nil
+}
+
+// BuildGetGreenplumSegmentsInfo formats a query to retrieve information about Greenplum segments
+func (queryRunner *PgQueryRunner) buildGetGreenplumSegmentsInfo(semVer semver.Version) string {
+	validRange := dbconn.StringToSemVerRange("<6")
+	if validRange(semVer) {
+		return `
+SELECT
+	s.dbid,
+	s.content as contentid,
+	s.role,
+	s.port,
+	s.hostname,
+	e.fselocation as datadir
+FROM gp_segment_configuration s
+JOIN pg_filespace_entry e ON s.dbid = e.fsedbid
+JOIN pg_filespace f ON e.fsefsoid = f.oid
+WHERE s.role = 'p' AND f.fsname = 'pg_system'
+ORDER BY s.content, s.role DESC;`
+	} else {
+		return `
+SELECT
+	dbid,
+	content as contentid,
+	role,
+	port,
+	hostname,
+	datadir
+FROM gp_segment_configuration
+WHERE role = 'p'
+ORDER BY content, role DESC;`
+	}
+}
+
+// Get information about Greenplum segments
+func (queryRunner *PgQueryRunner) GetGreenplumSegmentsInfo(semVer semver.Version) (segments []cluster.SegConfig, err error) {
+	conn := queryRunner.connection
+	rows, err := conn.Query(queryRunner.buildGetGreenplumSegmentsInfo(semVer))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	segments = make([]cluster.SegConfig, 0)
+	for rows.Next() {
+		var segment cluster.SegConfig
+
+		if err := rows.Scan(&segment); err != nil {
+			tracelog.WarningLogger.Printf("GetGreenplumSegmentsInfo:  %v\n", err.Error())
+		}
+		segments = append(segments, segment)
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+	return segments, nil
+}
+
+// Get Greenplum version
+func (queryRunner *PgQueryRunner) GetGreenplumVersion() (version string, err error) {
+	conn := queryRunner.connection
+	err = conn.QueryRow("SELECT pg_catalog.version()").Scan(&version)
+	if err != nil {
+		return "", err
+	}
+	return version, nil
 }
