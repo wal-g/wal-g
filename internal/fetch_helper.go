@@ -35,6 +35,7 @@ func DownloadFile(folder storage.Folder, filename, ext string, writeCloser io.Wr
 	if decompressor == nil {
 		return fmt.Errorf("decompressor for extension '%s' was not found", ext)
 	}
+	tracelog.DebugLogger.Printf("Found decompressor for %s", decompressor.FileExtension())
 	archiveReader, exists, err := TryDownloadFile(folder, filename)
 	if err != nil {
 		return err
@@ -67,18 +68,25 @@ func TryDownloadFile(folder storage.Folder, path string) (walFileReader io.ReadC
 func DecompressDecryptBytes(dst io.Writer, archiveReader io.ReadCloser, decompressor compression.Decompressor) error {
 	crypter := ConfigureCrypter()
 	if crypter != nil {
+		tracelog.DebugLogger.Printf("Selected crypter: %s", crypter.Name())
+
 		reader, err := crypter.Decrypt(archiveReader)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to init decrypt reader: %w", err)
 		}
 		archiveReader = ioextensions.ReadCascadeCloser{
 			Reader: reader,
 			Closer: archiveReader,
 		}
+	} else {
+		tracelog.DebugLogger.Printf("No crypter has been selected")
 	}
 
 	err := decompressor.Decompress(dst, archiveReader)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to decompress archive reader: %w", err)
+	}
+	return nil
 }
 
 // CachedDecompressor is the file extension describing decompressor

@@ -15,6 +15,10 @@ type Crypter struct {
 	SymmetricKey crypto.SymmetricKey
 }
 
+func (crypter *Crypter) Name() string {
+	return "AWK_KMS/Crypter"
+}
+
 // Encrypt creates encryption writer from ordinary writer
 func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	if len(crypter.SymmetricKey.GetKey()) == 0 {

@@ -93,6 +93,8 @@ const (
 	MysqlBackupPrepareCmd      = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
 	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
 
+	RedisPassword = "WALG_REDIS_PASSWORD"
+
 	GoMaxProcs = "GOMAXPROCS"
 
 	HTTPListen       = "HTTP_LISTEN"
@@ -313,6 +315,11 @@ var (
 		MysqlTakeBinlogsFromMaster: true,
 	}
 
+	RedisAllowedSettings = map[string]bool{
+		// Redis
+		RedisPassword: true,
+	}
+
 	RequiredSettings       = make(map[string]bool)
 	HTTPSettingExposeFuncs = map[string]func(webserver.WebServer){
 		HTTPExposePprof:          webserver.EnablePprofEndpoints,
@@ -350,6 +357,8 @@ func ConfigureSettings(currentType string) {
 			dbSpecificSettings = MysqlAllowedSettings
 		case SQLSERVER:
 			dbSpecificSettings = SQLServerAllowedSettings
+		case REDIS:
+			dbSpecificSettings = RedisAllowedSettings
 		}
 
 		for k, v := range dbSpecificSettings {
