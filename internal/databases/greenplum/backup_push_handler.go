@@ -46,8 +46,9 @@ type BackupHandler struct {
 }
 
 func (bh *BackupHandler) buildCommand(contentID int) string {
-	command := fmt.Sprintf("wal-g backup-push %s --backup-name-prefix %s_seg%d",
-		bh.globalCluster.ByContent[contentID][0].DataDir, bh.curBackupInfo.backupName, contentID)
+	segment := bh.globalCluster.ByContent[contentID][0]
+	command := fmt.Sprintf("export PGPORT=%d && wal-g backup-push %s --backup-name-prefix %s_seg%d",
+		segment.Port, segment.DataDir, bh.curBackupInfo.backupName, contentID)
 	if bh.arguments.isPermanent {
 		command += " --permanent"
 	}
