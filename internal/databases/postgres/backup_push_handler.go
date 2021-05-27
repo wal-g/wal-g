@@ -175,7 +175,10 @@ func (bh *BackupHandler) startBackup() (err error) {
 		return
 	}
 	bh.curBackupInfo.startLSN = backupStartLSN
-	bh.curBackupInfo.name = bh.arguments.backupNamePrefix + "_" + backupName
+	bh.curBackupInfo.name = backupName
+	if bh.arguments.backupNamePrefix != "" {
+		bh.curBackupInfo.name = bh.arguments.backupNamePrefix + "_" + bh.curBackupInfo.name
+	}
 	tracelog.DebugLogger.Printf("Backup name: %s\nBackup start LSN: %d", backupName, backupStartLSN)
 
 	return
@@ -344,8 +347,11 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	tracelog.ErrorLogger.FatalOnError(err)
 	sentinelDto := NewBackupSentinelDto(bh, baseBackup.GetTablespaceSpec(), TarFileSets{})
 	sentinelDto.Files = baseBackup.Files
-	bh.curBackupInfo.name = bh.arguments.backupNamePrefix + "_" + baseBackup.BackupName()
-	tracelog.InfoLogger.Println("Uploading metadata")
+	bh.curBackupInfo.name = baseBackup.BackupName()
+	if bh.arguments.backupNamePrefix != "" {
+		bh.curBackupInfo.name = bh.arguments.backupNamePrefix + "_" + bh.curBackupInfo.name
+	}
+		tracelog.InfoLogger.Println("Uploading metadata")
 	bh.uploadMetadata(sentinelDto)
 	// logging backup set name
 	tracelog.InfoLogger.Printf("Wrote backup with name %s", bh.curBackupInfo.name)

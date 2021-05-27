@@ -46,7 +46,7 @@ type BackupHandler struct {
 }
 
 func (bh *BackupHandler) buildCommand(contentID int) string {
-	command := fmt.Sprintf("wal-g backup-push %s --backup-name-prefix  %s_seg%d",
+	command := fmt.Sprintf("wal-g backup-push %s --backup-name-prefix %s_seg%d",
 		bh.globalCluster.ByContent[contentID][0].DataDir, bh.curBackupInfo.backupName, contentID)
 	if bh.arguments.isPermanent {
 		command += " --permanent"
@@ -99,7 +99,7 @@ func (bh *BackupHandler) HandleBackupPush() {
 			return bh.buildCommand(contentID)
 		})
 	bh.globalCluster.CheckClusterError(remoteOutput, "Unable to run wal-g", func(contentID int) string {
-		return fmt.Sprintf("Unable to run wal-g on segment with contentID %d", contentID)
+		return "Unable to run wal-g"
 	})
 	err := bh.connect()
 	tracelog.ErrorLogger.FatalOnError(err)
