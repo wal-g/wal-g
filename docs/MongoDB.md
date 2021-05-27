@@ -20,7 +20,7 @@ make install
 make deps
 make mongo_build
 ```
-Users can also install WAL-G by using `make mongo_install`. Specifying the GOBIN environment variable before installing allows the user to specify the installation location. On default, `make install` puts the compiled binary in `go/bin`.
+Users can also install WAL-G by using `make mongo_install`. Specifying the GOBIN environment variable before installing allows the user to specify the installation location. On default, `make mongo_install` puts the compiled binary in `go/bin`.
 ```plaintext
 export GOBIN=/usr/local/bin
 cd $GOPATH/src/github.com/wal-g/wal-g
