@@ -162,13 +162,14 @@ Databases
 ### SQLServer
 [Information about installing, configuration and usage](SQLServer.md)
 
-### Mongo
+### Mongo [Beta]
 [Information about installing, configuration and usage](MongoDB.md)
 
 ### FoundationDB [Work in progress]
 [Information about installing, configuration and usage](FoundationDB.md)
 
-
+### Redis [Beta]
+[Information about installing, configuration and usage](Redis.md)
 
 Development
 -----------
