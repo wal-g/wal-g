@@ -391,7 +391,7 @@ func (queryRunner *PgQueryRunner) IsTablespaceMapExists() bool {
 
 // BuildCreateGreenplumRestorePoint formats a query to create a restore point for Greenplum
 func (queryRunner *PgQueryRunner) buildCreateGreenplumRestorePoint(restorePointName string) string {
-	return fmt.Sprintf("SELECT gp_create_restore_point('%s')", restorePointName)
+	return fmt.Sprintf("SELECT (gp_create_restore_point('%s'))::text", restorePointName)
 }
 
 // CreateGreenplumRestorePoint creates a restore point for Greenplum
@@ -425,11 +425,11 @@ func (queryRunner *PgQueryRunner) buildGetGreenplumSegmentsInfo(semVer semver.Ve
 		return `
 SELECT
 	s.dbid,
-	s.content as contentid,
-	s.role,
+	s.content,
+	s.role::text,
 	s.port,
 	s.hostname,
-	e.fselocation as datadir
+	e.fselocation
 FROM gp_segment_configuration s
 JOIN pg_filespace_entry e ON s.dbid = e.fsedbid
 JOIN pg_filespace f ON e.fsefsoid = f.oid
@@ -439,8 +439,8 @@ ORDER BY s.content, s.role DESC;`
 		return `
 SELECT
 	dbid,
-	content as contentid,
-	role,
+	content,
+	role::text,
 	port,
 	hostname,
 	datadir

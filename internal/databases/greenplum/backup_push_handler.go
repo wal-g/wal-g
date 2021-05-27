@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/blang/semver"
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/jackc/pgx"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
@@ -45,7 +46,6 @@ type BackupHandler struct {
 }
 
 func (bh *BackupHandler) buildCommand(contentID int) string {
-
 	command := fmt.Sprintf("wal-g backup-push %s --backup-name-prefix  %s_seg%d",
 		bh.globalCluster.ByContent[contentID][0].DataDir, bh.curBackupInfo.backupName, contentID)
 	if bh.arguments.isPermanent {
@@ -92,6 +92,8 @@ func (bh *BackupHandler) HandleBackupPush() {
 	bh.workers.Uploader.UploadingFolder = folder.GetSubFolder(utility.BaseBackupPath)
 	bh.curBackupInfo.backupName = "backup" + time.Now().Format("20060102150405")
 	tracelog.InfoLogger.Print("check2")
+
+	gplog.InitializeLogging("wal-g", "")
 	remoteOutput := bh.globalCluster.GenerateAndExecuteCommand("Running wal-g",
 		cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
 		func(contentID int) string {
