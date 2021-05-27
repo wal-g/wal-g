@@ -48,16 +48,16 @@ jobs:
         run: make ${{ matrix.db }}_build
 
       - name: Rename WAL-G binary
-        run: mv main/${{ matrix.db }}/wal-g main/wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
+        run: mv main/${{ matrix.db }}/wal-g wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
 
       - name: Compress WAL-G binary
-        run: tar -zcvf wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz main/wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
+        run: tar -zcvf wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
 
       - name: Upload WAL-G binary
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            main/wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
+            wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
             wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
