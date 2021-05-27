@@ -57,3 +57,5 @@ jobs:
             wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      USE_LZO: 1
