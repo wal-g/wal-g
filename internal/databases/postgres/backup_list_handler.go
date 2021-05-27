@@ -25,7 +25,7 @@ func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 	backupDetails, err := GetBackupsDetails(folder, backups)
 	tracelog.ErrorLogger.FatalOnError(err)
 	SortBackupDetails(backupDetails)
-	
+
 	switch {
 	case json:
 		err = internal.WriteAsJSON(backupDetails, os.Stdout, pretty)
@@ -41,18 +41,18 @@ func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 func WriteBackupListDetails(backupDetails []BackupDetail, output io.Writer) error {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
-	_, err := fmt.Fprintln(writer, "name\tmodified\twal_segment_backup_start\t" +
-								   "start_time\tfinish_time\thostname\tdata_dir\t" +
-								   "pg_version\tstart_lsn\tfinish_lsn\tis_permanent")
+	_, err := fmt.Fprintln(writer, "name\tmodified\twal_segment_backup_start\t"+
+		"start_time\tfinish_time\thostname\tdata_dir\t"+
+		"pg_version\tstart_lsn\tfinish_lsn\tis_permanent")
 	if err != nil {
 		return err
 	}
 	for i := 0; i < len(backupDetails); i++ {
 		b := backupDetails[i]
-		_, err = fmt.Fprintln(writer, fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v",
-					b.BackupName, internal.FormatTime(b.Time), b.WalFileName,
-					internal.FormatTime(b.StartTime), internal.FormatTime(b.FinishTime), b.Hostname,
-					b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent))
+		_, err = fmt.Fprintf(writer, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
+			b.BackupName, internal.FormatTime(b.Time), b.WalFileName,
+			internal.FormatTime(b.StartTime), internal.FormatTime(b.FinishTime), b.Hostname,
+			b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent)
 		if err != nil {
 			return err
 		}
@@ -66,13 +66,13 @@ func WritePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer
 	writer.SetOutputMirror(output)
 	defer writer.Render()
 	writer.AppendHeader(table.Row{"#", "Name", "Modified", "WAL segment backup start",
-								  "Start time", "Finish time",
-								  "Hostname", "Datadir", "PG Version", "Start LSN", "Finish LSN", "Permanent"})
+		"Start time", "Finish time",
+		"Hostname", "Datadir", "PG Version", "Start LSN", "Finish LSN", "Permanent"})
 	for idx := range backupDetails {
 		b := &backupDetails[idx]
 		writer.AppendRow(
 			table.Row{idx, b.BackupName, internal.PrettyFormatTime(b.Time), b.WalFileName,
-					  internal.PrettyFormatTime(b.StartTime), internal.PrettyFormatTime(b.FinishTime),
-					  b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent})
+				internal.PrettyFormatTime(b.StartTime), internal.PrettyFormatTime(b.FinishTime),
+				b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent})
 	}
 }

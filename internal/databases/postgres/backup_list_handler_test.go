@@ -10,10 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type someError struct {
-	error
-}
-
 var shortBackups = []postgres.BackupDetail{
 	{
 		internal.BackupTime{
