@@ -91,7 +91,6 @@ func (bh *BackupHandler) HandleBackupPush() {
 	folder := bh.workers.Uploader.UploadingFolder
 	bh.workers.Uploader.UploadingFolder = folder.GetSubFolder(utility.BaseBackupPath)
 	bh.curBackupInfo.backupName = "backup" + time.Now().Format("20060102150405")
-	tracelog.InfoLogger.Print("check2")
 
 	gplog.InitializeLogging("wal-g", "")
 	remoteOutput := bh.globalCluster.GenerateAndExecuteCommand("Running wal-g",
@@ -102,12 +101,10 @@ func (bh *BackupHandler) HandleBackupPush() {
 	bh.globalCluster.CheckClusterError(remoteOutput, "Unable to run wal-g", func(contentID int) string {
 		return fmt.Sprintf("Unable to run wal-g on segment with contentID %d", contentID)
 	})
-	tracelog.InfoLogger.Print("check3")
 	err := bh.connect()
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = bh.createRestorePoint(bh.curBackupInfo.backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.InfoLogger.Print("check4")
 	err = bh.extractPgBackupNames(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
 	sentinelDto := NewBackupSentinelDto(bh.curBackupInfo)
@@ -116,7 +113,6 @@ func (bh *BackupHandler) HandleBackupPush() {
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", bh.curBackupInfo.backupName)
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	tracelog.InfoLogger.Print("check5")
 }
 
 func (bh *BackupHandler) extractPgBackupNames(folder storage.Folder) (err error) {

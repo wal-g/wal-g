@@ -56,7 +56,6 @@ var (
 			if userData == "" {
 				userData = viper.GetString(internal.SentinelUserDataSetting)
 			}
-			tracelog.InfoLogger.Print("check1")
 			arguments := greenplum.NewBackupArguments(dataDirectory,
 				permanent, verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting),
 				fullBackup, storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting),
