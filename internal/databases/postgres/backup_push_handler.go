@@ -105,7 +105,7 @@ type BackupHandler struct {
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
 func NewBackupArguments(pgDataDirectory string, backupsFolder string, isPermanent bool, verifyPageChecksums bool,
 	isFullBackup bool, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
-	deltaBaseSelector internal.BackupSelector, userData string) BackupArguments {
+	deltaBaseSelector internal.BackupSelector, userData string, backupNamePrefix string) BackupArguments {
 	return BackupArguments{
 		pgDataDirectory:       pgDataDirectory,
 		backupsFolder:         backupsFolder,
@@ -116,6 +116,7 @@ func NewBackupArguments(pgDataDirectory string, backupsFolder string, isPermanen
 		tarBallComposerType:   tarBallComposerType,
 		deltaBaseSelector:     deltaBaseSelector,
 		userData:              userData,
+		backupNamePrefix:      backupNamePrefix,
 	}
 }
 

@@ -44,7 +44,6 @@ const (
 	UseRatingComposerSetting     = "WALG_USE_RATING_COMPOSER"
 	DeltaFromNameSetting         = "WALG_DELTA_FROM_NAME"
 	DeltaFromUserDataSetting     = "WALG_DELTA_FROM_USER_DATA"
-	BackupNamePrefixSetting      = "WALG_BACKUP_NAME_PREFIX"
 	FetchTargetUserDataSetting   = "WALG_FETCH_TARGET_USER_DATA"
 	LogLevelSetting              = "WALG_LOG_LEVEL"
 	TarSizeThresholdSetting      = "WALG_TAR_SIZE_THRESHOLD"
@@ -193,7 +192,6 @@ var (
 		DeltaFromNameSetting:         true,
 		DeltaFromUserDataSetting:     true,
 		FetchTargetUserDataSetting:   true,
-		BackupNamePrefixSetting:      true,
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,

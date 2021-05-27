@@ -67,13 +67,10 @@ var (
 			if userData == "" {
 				userData = viper.GetString(internal.SentinelUserDataSetting)
 			}
-			if backupNamePrefix == "" {
-				backupNamePrefix = viper.GetString(internal.BackupNamePrefixSetting)
-			}
 			arguments := postgres.NewBackupArguments(dataDirectory, utility.BaseBackupPath,
 				permanent, verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting),
 				fullBackup, storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting),
-				tarBallComposerType, deltaBaseSelector, userData)
+				tarBallComposerType, deltaBaseSelector, userData, backupNamePrefix)
 
 			backupHandler, err := postgres.NewBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
