@@ -6,7 +6,6 @@ import (
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/jackc/pgx"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -106,7 +105,7 @@ func (bh *BackupHandler) HandleBackupPush() {
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = bh.createRestorePoint(bh.curBackupInfo.backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
-	err = bh.extractPgBackupNames(folder)
+	err = bh.extractPgBackupNames()
 	tracelog.ErrorLogger.FatalOnError(err)
 	sentinelDto := NewBackupSentinelDto(bh.curBackupInfo)
 	err = internal.UploadSentinel(bh.workers.Uploader, sentinelDto, bh.curBackupInfo.backupName)
@@ -116,9 +115,9 @@ func (bh *BackupHandler) HandleBackupPush() {
 	}
 }
 
-func (bh *BackupHandler) extractPgBackupNames(folder storage.Folder) (err error) {
+func (bh *BackupHandler) extractPgBackupNames() (err error) {
 	backupNames := make([]string, 0)
-	objects, _, err := folder.ListFolder()
+	objects, _, err := bh.workers.Uploader.UploadingFolder.ListFolder()
 	if err != nil {
 		return err
 	}
