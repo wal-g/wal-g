@@ -26,7 +26,10 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 	}
 	conn, err := pgx.Connect(config)
 	if err != nil {
-		if config.Host != "localhost" {
+		config.RuntimeParams["gp_role"]="utility"
+		conn, err = pgx.Connect(config)
+
+		if err != nil && config.Host != "localhost" {
 			tracelog.ErrorLogger.Println(err.Error())
 			tracelog.ErrorLogger.Println("Failed to connect using provided PGHOST and PGPORT, trying localhost:5432")
 			config.Host = "localhost"
