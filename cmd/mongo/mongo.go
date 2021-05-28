@@ -39,6 +39,7 @@ func Execute() {
 }
 
 func init() {
+	internal.ConfigureSettings(internal.MONGO)
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
 	internal.RequiredSettings[internal.MongoDBUriSetting] = true

@@ -42,6 +42,7 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 		t.Errorf("upload: Expected error 'UnconfiguredStorageError' but got %s", err)
 	}
 	assert.Nil(t, uploader)
+	internal.ConfigureSettings("")
 	internal.InitConfig()
 	internal.Configure()
 	viper.Set("AWS_ACCESS_KEY_ID", "aws_access_key_id")

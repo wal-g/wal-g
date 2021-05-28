@@ -17,3 +17,7 @@ func (asm NopASM) MarkWalUploaded(walFilePath string) error {
 func (asm NopASM) UnmarkWalFile(walFilePath string) error {
 	return nil
 }
+
+func (asm NopASM) RenameReady(walFilePath string) error {
+	return nil
+}

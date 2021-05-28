@@ -32,6 +32,10 @@ type Crypter struct {
 	mutex sync.RWMutex
 }
 
+func (crypter *Crypter) Name() string {
+	return "Libsodium"
+}
+
 // CrypterFromKey creates Crypter from key
 func CrypterFromKey(key string) crypto.Crypter {
 	return &Crypter{Key: key}

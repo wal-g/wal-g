@@ -14,4 +14,5 @@ type ArchiveStatusManager interface {
 	IsWalAlreadyUploaded(string) bool
 	MarkWalUploaded(string) error
 	UnmarkWalFile(string) error
+	RenameReady(string) error
 }

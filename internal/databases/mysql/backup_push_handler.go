@@ -1,7 +1,6 @@
 package mysql
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 
@@ -11,7 +10,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPermanent bool) {
+func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPermanent bool, userData string) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 
 	db, err := getMySQLConnection()
@@ -42,10 +41,14 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 	}
 
 	uploadedSize, err := uploader.UploadedDataSize()
-	tracelog.ErrorLogger.PrintOnError(fmt.Errorf("failed to calc uploaded data size: %v", err))
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to calc uploaded data size: %v", err)
+	}
 
 	rawSize, err := uploader.RawDataSize()
-	tracelog.ErrorLogger.PrintOnError(fmt.Errorf("failed to calc raw data size: %v", err))
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to calc raw data size: %v", err)
+	}
 
 	sentinel := StreamSentinelDto{
 		BinLogStart:      binlogStart,
@@ -56,6 +59,7 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 		CompressedSize:   uploadedSize,
 		UncompressedSize: rawSize,
 		IsPermanent:      isPermanent,
+		UserData:         userData,
 	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())
 

@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
@@ -11,6 +12,7 @@ const (
 	backupPushShortDescription = "Creates new backup and pushes it to storage"
 	permanentFlag              = "permanent"
 	permanentShorthand         = "p"
+	addUserDataFlag            = "add-user-data"
 )
 
 var (
@@ -29,10 +31,16 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 			backupCmd, err := internal.GetCommandSetting(internal.NameStreamCreateCmd)
 			tracelog.ErrorLogger.FatalOnError(err)
-			mysql.HandleBackupPush(uploader, backupCmd, permanent)
+
+			if userData == "" {
+				userData = viper.GetString(internal.SentinelUserDataSetting)
+			}
+
+			mysql.HandleBackupPush(uploader, backupCmd, permanent, userData)
 		},
 	}
 	permanent = false
+	userData  = ""
 )
 
 func init() {
@@ -42,4 +50,6 @@ func init() {
 	// to avoid code duplication in command handlers
 	backupPushCmd.Flags().BoolVarP(&permanent, permanentFlag, permanentShorthand,
 		false, "Pushes permanent backup")
+	backupPushCmd.Flags().StringVar(&userData, addUserDataFlag,
+		"", "Write the provided user data to the backup sentinel and metadata files.")
 }

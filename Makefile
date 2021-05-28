@@ -11,10 +11,11 @@ TEST_FILES = $(wildcard test/*.go testtools/*.go)
 PKG := github.com/wal-g/wal-g
 COVERAGE_FILE := coverage.out
 TEST := "pg_tests"
-MYSQL_TEST := "mysql_tests"
+MYSQL_TEST := "mysql_base_tests"
 MONGO_MAJOR ?= "4.2"
 MONGO_VERSION ?= "4.2.8"
 GOLANGCI_LINT_VERSION ?= "v1.37.0"
+REDIS_VERSION ?= "5.0.8"
 
 BUILD_TAGS:=brotli
 
@@ -119,11 +120,11 @@ mongo_install: mongo_build
 mongo_features:
 	set -e
 	make go_deps
-	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -v -count=1 -timeout 20m  -tf.test=true -tf.debug=false -tf.clean=true -tf.stop=true
+	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -v -count=1 -timeout 20m  -tf.test=true -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=mongodb
 
 clean_mongo_features:
 	set -e
-	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -v -count=1  -timeout 5m -tf.test=false -tf.debug=false -tf.clean=true -tf.stop=true
+	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -v -count=1  -timeout 5m -tf.test=false -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=mongodb
 
 fdb_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_FDB_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w")
@@ -152,21 +153,31 @@ redis_clean:
 redis_install: redis_build
 	mv $(MAIN_REDIS_PATH)/wal-g $(GOBIN)/wal-g
 
+redis_features:
+	set -e
+	make go_deps
+	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1 -timeout 20m  -tf.test=true -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=redis
+
+clean_redis_features:
+	set -e
+	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1  -timeout 5m -tf.test=false -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=redis
+
+
 unittest:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet
-	go test -v $(TEST_MODIFIER) ./internal/
-	go test -v $(TEST_MODIFIER) ./internal/compression/
-	go test -v $(TEST_MODIFIER) ./internal/crypto/openpgp/
-	go test -v $(TEST_MODIFIER) ./internal/crypto/awskms/
-	go test -v $(TEST_MODIFIER) ./internal/abool
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/compression/
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/crypto/openpgp/
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/crypto/awskms/
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/abool
 	@if [ ! -z "${USE_LIBSODIUM}" ]; then\
-		go test -v $(TEST_MODIFIER) -tags libsodium ./internal/crypto/libsodium/;\
+		go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/crypto/libsodium/;\
 	fi
-	go test -v $(TEST_MODIFIER) ./internal/databases/mysql
-	go test -v $(TEST_MODIFIER) ./internal/databases/mongo/...
-	go test -v $(TEST_MODIFIER) ./internal/databases/postgres
-	go test -v $(TEST_MODIFIER) ./internal/walparser/
-	go test -v $(TEST_MODIFIER) ./utility
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/databases/mysql
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/databases/mongo/...
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/databases/postgres
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/walparser/
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./utility
 
 coverage:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go test -v $(TEST_MODIFIER) -coverprofile=$(COVERAGE_FILE) | grep -v 'no test files'

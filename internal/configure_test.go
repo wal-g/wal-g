@@ -44,7 +44,6 @@ func TestGetMaxConcurrency_ValidKeyAndInvalidValue(t *testing.T) {
 }
 
 func TestGetSentinelUserData(t *testing.T) {
-
 	viper.Set(internal.SentinelUserDataSetting, "1.0")
 
 	data := internal.GetSentinelUserData()
@@ -74,38 +73,41 @@ func TestGetDataFolderPath_Default(t *testing.T) {
 
 func TestGetDataFolderPath_FolderNotExist(t *testing.T) {
 	parentDir := prepareDataFolder(t, "someOtherFolder")
+	defer testtools.Cleanup(t, parentDir)
+
 	viper.Set(internal.PgDataSetting, parentDir)
 
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(internal.DefaultDataFolderPath, "walg_data"), actual)
-	testtools.Cleanup(t, parentDir)
 }
 
 func TestGetDataFolderPath_Wal(t *testing.T) {
 	parentDir := prepareDataFolder(t, "pg_wal")
+	defer testtools.Cleanup(t, parentDir)
 
 	viper.Set(internal.PgDataSetting, parentDir)
 
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(parentDir, "pg_wal", "walg_data"), actual)
-	testtools.Cleanup(t, parentDir)
 }
 
 func TestGetDataFolderPath_Xlog(t *testing.T) {
 	parentDir := prepareDataFolder(t, "pg_xlog")
+	defer testtools.Cleanup(t, parentDir)
 
 	viper.Set(internal.PgDataSetting, parentDir)
 
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(parentDir, "pg_xlog", "walg_data"), actual)
-	testtools.Cleanup(t, parentDir)
 }
 
 func TestGetDataFolderPath_WalIgnoreXlog(t *testing.T) {
 	parentDir := prepareDataFolder(t, "pg_xlog")
+	defer testtools.Cleanup(t, parentDir)
+
 	err := os.Mkdir(filepath.Join(parentDir, "pg_wal"), 0700)
 	if err != nil {
 		t.Log(err)
@@ -115,7 +117,6 @@ func TestGetDataFolderPath_WalIgnoreXlog(t *testing.T) {
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(parentDir, "pg_wal", "walg_data"), actual)
-	testtools.Cleanup(t, parentDir)
 }
 
 func TestConfigureLogging_WhenLogLevelSettingIsNotSet(t *testing.T) {
@@ -124,6 +125,8 @@ func TestConfigureLogging_WhenLogLevelSettingIsNotSet(t *testing.T) {
 
 func TestConfigureLogging_WhenLogLevelSettingIsSet(t *testing.T) {
 	parentDir := prepareDataFolder(t, "someOtherFolder")
+	defer testtools.Cleanup(t, parentDir)
+
 	viper.Set(internal.LogLevelSetting, parentDir)
 	err := internal.ConfigureLogging()
 
