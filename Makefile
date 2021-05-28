@@ -165,19 +165,19 @@ clean_redis_features:
 
 unittest:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet
-	go test -v $(TEST_MODIFIER) ./internal/
-	go test -v $(TEST_MODIFIER) ./internal/compression/
-	go test -v $(TEST_MODIFIER) ./internal/crypto/openpgp/
-	go test -v $(TEST_MODIFIER) ./internal/crypto/awskms/
-	go test -v $(TEST_MODIFIER) ./internal/abool
+	go test -v $(TEST_MODIFIER) -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/
+	go test -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/compression/
+	go test -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/crypto/openpgp/
+	go test -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/crypto/awskms/
+	go test -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/abool
 	@if [ ! -z "${USE_LIBSODIUM}" ]; then\
-		go test -v $(TEST_MODIFIER) -tags libsodium ./internal/crypto/libsodium/;\
+		go test -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/crypto/libsodium/;\
 	fi
-	go test -v $(TEST_MODIFIER) ./internal/databases/mysql
-	go test -v $(TEST_MODIFIER) ./internal/databases/mongo/...
-	go test -v $(TEST_MODIFIER) ./internal/databases/postgres
-	go test -v $(TEST_MODIFIER) ./internal/walparser/
-	go test -v $(TEST_MODIFIER) ./utility
+	go test -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/databases/mysql
+	go test -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/databases/mongo/...
+	go test -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/databases/postgres
+	go test -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/walparser/
+	go test -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./utility
 
 coverage:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go test -v $(TEST_MODIFIER) -coverprofile=$(COVERAGE_FILE) | grep -v 'no test files'
