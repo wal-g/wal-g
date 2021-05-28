@@ -34,10 +34,6 @@ func init() {
 	waleGpgKey = string(waleGpgKeyBytes)
 }
 
-func noPassphrase() (string, bool) {
-	return "", false
-}
-
 // This test extracts WAL-E-encrypted WAL, decrypts it by external
 // GPG, compares result with OpenGPG decryption and invokes Lzop
 // decompression to check integrity. Test will leave gpg key
