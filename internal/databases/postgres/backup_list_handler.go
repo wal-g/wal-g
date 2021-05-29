@@ -48,10 +48,8 @@ func WriteBackupListDetails(backupDetails []BackupDetail, output io.Writer) erro
 	}
 	for i := 0; i < len(backupDetails); i++ {
 		b := backupDetails[i]
-		_, err = fmt.Fprintf(writer, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
-			b.BackupName, internal.FormatTime(b.Time), b.WalFileName,
-			internal.FormatTime(b.StartTime), internal.FormatTime(b.FinishTime), b.Hostname,
-			b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent)
+		//nolint:lll
+		_, err = fmt.Fprintf(writer, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n", b.BackupName, internal.FormatTime(b.Time), b.WalFileName, internal.FormatTime(b.StartTime), internal.FormatTime(b.FinishTime), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent)
 		if err != nil {
 			return err
 		}
@@ -64,9 +62,8 @@ func WritePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer
 	writer := table.NewWriter()
 	writer.SetOutputMirror(output)
 	defer writer.Render()
-	writer.AppendHeader(table.Row{"#", "Name", "Modified", "WAL segment backup start",
-		"Start time", "Finish time",
-		"Hostname", "Datadir", "PG Version", "Start LSN", "Finish LSN", "Permanent"})
+	//nolint:lll
+	writer.AppendHeader(table.Row{"#", "Name", "Modified", "WAL segment backup start", "Start time", "Finish time", "Hostname", "Datadir", "PG Version", "Start LSN", "Finish LSN", "Permanent"})
 	for idx := range backupDetails {
 		b := &backupDetails[idx]
 		writer.AppendRow(
