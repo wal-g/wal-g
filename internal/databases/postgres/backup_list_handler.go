@@ -41,9 +41,8 @@ func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 func WriteBackupListDetails(backupDetails []BackupDetail, output io.Writer) error {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
-	_, err := fmt.Fprintln(writer, "name\tmodified\twal_segment_backup_start\t"+
-		"start_time\tfinish_time\thostname\tdata_dir\t"+
-		"pg_version\tstart_lsn\tfinish_lsn\tis_permanent")
+	//nolint:lll
+	_, err := fmt.Fprintln(writer, "name\tmodified\twal_segment_backup_start\tstart_time\tfinish_time\thostname\tdata_dir\tpg_version\tstart_lsn\tfinish_lsn\tis_permanent")
 	if err != nil {
 		return err
 	}
