@@ -97,7 +97,7 @@ func GetBackupTimeSlices(backups []storage.Object) []BackupTime {
 	sortTimes := make([]BackupTime, 0)
 	for _, object := range backups {
 		key := object.GetName()
-		if !strings.HasSuffix(key, utility.SentinelSuffix) {
+		if !strings.HasSuffix(key, utility.SentinelSuffix) || !strings.Contains(key, utility.BackupNamePrefix) {
 			continue
 		}
 		time := object.GetLastModified()

@@ -90,7 +90,7 @@ func (bh *BackupHandler) buildCommand(contentID int) string {
 func (bh *BackupHandler) HandleBackupPush() {
 	folder := bh.workers.Uploader.UploadingFolder
 	bh.workers.Uploader.UploadingFolder = folder.GetSubFolder(utility.BaseBackupPath)
-	bh.curBackupInfo.backupName = "backup" + time.Now().Format("20060102150405")
+	bh.curBackupInfo.backupName = "backup" + time.Now().Format(utility.BackupTimeFormat)
 
 	gplog.InitializeLogging("wal-g", "")
 	remoteOutput := bh.globalCluster.GenerateAndExecuteCommand("Running wal-g",

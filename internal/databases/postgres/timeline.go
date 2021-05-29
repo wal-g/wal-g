@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
@@ -162,7 +163,8 @@ func ParseTimelineFromBackupName(backupName string) (uint32, error) {
 		return 0, newIncorrectBackupNameError(backupName)
 	}
 	prefixLength := len(utility.BackupNamePrefix)
-	return ParseTimelineFromString(backupName[prefixLength : prefixLength+8])
+	prefixIndex := strings.LastIndex(backupName, utility.BackupNamePrefix)
+	return ParseTimelineFromString(backupName[prefixIndex+prefixLength : prefixIndex+prefixLength+8])
 }
 
 func ParseTimelineFromString(timelineString string) (uint32, error) {
