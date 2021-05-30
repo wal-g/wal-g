@@ -352,7 +352,7 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	if bh.arguments.backupNamePrefix != "" {
 		bh.curBackupInfo.name = bh.arguments.backupNamePrefix + "_" + bh.curBackupInfo.name
 	}
-		tracelog.InfoLogger.Println("Uploading metadata")
+	tracelog.InfoLogger.Println("Uploading metadata")
 	bh.uploadMetadata(sentinelDto)
 	// logging backup set name
 	tracelog.InfoLogger.Printf("Wrote backup with name %s", bh.curBackupInfo.name)

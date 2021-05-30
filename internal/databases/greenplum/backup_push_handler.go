@@ -84,6 +84,7 @@ func (bh *BackupHandler) buildCommand(contentID int) string {
 	if bh.arguments.userData != "" {
 		command += " --add-user-data " + bh.arguments.userData
 	}
+	tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, command)
 	return command
 }
 
@@ -92,6 +93,7 @@ func (bh *BackupHandler) HandleBackupPush() {
 	bh.workers.Uploader.UploadingFolder = folder.GetSubFolder(utility.BaseBackupPath)
 	bh.curBackupInfo.backupName = "backup" + time.Now().Format(utility.BackupTimeFormat)
 
+	tracelog.InfoLogger.Println("Running wal-g on segments")
 	gplog.InitializeLogging("wal-g", "")
 	remoteOutput := bh.globalCluster.GenerateAndExecuteCommand("Running wal-g",
 		cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
@@ -101,13 +103,16 @@ func (bh *BackupHandler) HandleBackupPush() {
 	bh.globalCluster.CheckClusterError(remoteOutput, "Unable to run wal-g", func(contentID int) string {
 		return "Unable to run wal-g"
 	})
+
 	err := bh.connect()
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = bh.createRestorePoint(bh.curBackupInfo.backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
+
 	err = bh.extractPgBackupNames()
 	tracelog.ErrorLogger.FatalOnError(err)
 	sentinelDto := NewBackupSentinelDto(bh.curBackupInfo)
+	tracelog.InfoLogger.Println("Uploading sentinel file")
 	err = internal.UploadSentinel(bh.workers.Uploader, sentinelDto, bh.curBackupInfo.backupName)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", bh.curBackupInfo.backupName)
@@ -135,7 +140,7 @@ func (bh *BackupHandler) extractPgBackupNames() (err error) {
 }
 
 func (bh *BackupHandler) connect() (err error) {
-	tracelog.DebugLogger.Println("Connecting to Postgres.")
+	tracelog.DebugLogger.Println("Connecting to Greenplum master.")
 	bh.workers.Conn, err = postgres.Connect()
 	if err != nil {
 		return
@@ -144,6 +149,7 @@ func (bh *BackupHandler) connect() (err error) {
 }
 
 func (bh *BackupHandler) createRestorePoint(restorePointName string) (err error) {
+	tracelog.InfoLogger.Printf("Creating restore point with name %s", restorePointName)
 	queryRunner, err := postgres.NewPgQueryRunner(bh.workers.Conn)
 	if err != nil {
 		return
@@ -168,6 +174,7 @@ func getGpCluster() (globalCluster *cluster.Cluster, err error) {
 	if err != nil {
 		return globalCluster, err
 	}
+	tracelog.DebugLogger.Printf("Greenplum version: %s", versionStr)
 	versionStart := strings.Index(versionStr, "(Greenplum Database ") + len("(Greenplum Database ")
 	versionEnd := strings.Index(versionStr, ")")
 	versionStr = versionStr[versionStart:versionEnd]
