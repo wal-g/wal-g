@@ -323,10 +323,7 @@ func isEmpty(t *testing.T, path string) bool {
 	}
 	defer utility.LoggedClose(f, "")
 	_, err = f.Readdirnames(1)
-	if err == io.EOF {
-		return true
-	}
-	return false
+	return err == io.EOF
 }
 
 func TestWalk_RegularComposer(t *testing.T) {
@@ -420,7 +417,7 @@ func setupTestTarBallComposerMaker(useRatingComposer bool) postgres.TarBallCompo
 	if !useRatingComposer {
 		return postgres.NewRegularTarBallComposerMaker(filePackOptions)
 	}
-	relFileStats := make(postgres.RelFileStatistics, 0)
+	relFileStats := make(postgres.RelFileStatistics)
 	composerMaker, _ := postgres.NewRatingTarBallComposerMaker(relFileStats, filePackOptions)
 	return composerMaker
 }

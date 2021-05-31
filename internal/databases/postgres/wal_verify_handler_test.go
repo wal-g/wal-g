@@ -53,8 +53,8 @@ func TestWalVerify_EmptyStorage(t *testing.T) {
 	currentSegmentName := "00000003000000000000000A"
 	currentSegment, _ := postgres.NewWalSegmentDescription(currentSegmentName)
 
-	storageFiles := make(map[string]*bytes.Buffer, 0)
-	storageSegments := make([]string, 0, 0)
+	storageFiles := make(map[string]*bytes.Buffer)
+	storageSegments := make([]string, 0)
 
 	expectedIntegrityCheck := postgres.WalVerifyCheckResult{
 		Status: postgres.StatusFailure,

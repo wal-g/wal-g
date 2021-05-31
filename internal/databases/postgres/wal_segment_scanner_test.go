@@ -106,7 +106,7 @@ func createWalSegmentScanner(timelineId uint32, stopSegmentNo, startSegmentNo po
 	lostSegmentNumbers map[postgres.WalSegmentNo]bool) *postgres.WalSegmentScanner {
 	startWalSegment := postgres.WalSegmentDescription{Number: startSegmentNo, Timeline: timelineId}
 
-	walSegments := make(map[postgres.WalSegmentDescription]bool, 0)
+	walSegments := make(map[postgres.WalSegmentDescription]bool)
 	for i := stopSegmentNo; i < startSegmentNo; i++ {
 		// if this segment number is not in lost set, add it
 		if _, exists := lostSegmentNumbers[i]; !exists {
