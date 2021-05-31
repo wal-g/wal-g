@@ -4,6 +4,7 @@ MAIN_SQLSERVER_PATH := main/sqlserver
 MAIN_REDIS_PATH := main/redis
 MAIN_MONGO_PATH := main/mongo
 MAIN_FDB_PATH := main/fdb
+MAIN_CLICKHOUSE_PATH := main/clickhouse
 DOCKER_COMMON := golang ubuntu s3
 CMD_FILES = $(wildcard cmd/**/*.go)
 PKG_FILES = $(wildcard internal/**/*.go internal/**/**/*.go internal/*.go)
@@ -161,6 +162,12 @@ redis_features:
 clean_redis_features:
 	set -e
 	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1  -timeout 5m -tf.test=false -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=redis
+
+clickhouse_build: $(CMD_FILES) $(PKG_FILES)
+	(cd $(MAIN_CLICKHOUSE_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w")
+
+clickhouse_install: clickhouse_build
+	mv $(MAIN_CLICKHOUSE_PATH)/wal-g $(GOBIN)/wal-g
 
 
 unittest:
