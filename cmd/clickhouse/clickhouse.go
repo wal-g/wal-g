@@ -37,7 +37,7 @@ func Execute() {
 }
 
 func init() {
-	internal.ConfigureSettings(internal.FDB)
+	internal.ConfigureSettings(internal.CLICKHOUSE)
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
 	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")

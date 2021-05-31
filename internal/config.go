@@ -16,12 +16,13 @@ import (
 )
 
 const (
-	PG        = "PG"
-	SQLSERVER = "SQLSERVER"
-	MYSQL     = "MYSQL"
-	REDIS     = "REDIS"
-	FDB       = "FDB"
-	MONGO     = "MONGO"
+	PG         = "PG"
+	SQLSERVER  = "SQLSERVER"
+	MYSQL      = "MYSQL"
+	REDIS      = "REDIS"
+	FDB        = "FDB"
+	MONGO      = "MONGO"
+	CLICKHOUSE = "CLICKHOUSE"
 
 	DownloadConcurrencySetting   = "WALG_DOWNLOAD_CONCURRENCY"
 	UploadConcurrencySetting     = "WALG_UPLOAD_CONCURRENCY"
