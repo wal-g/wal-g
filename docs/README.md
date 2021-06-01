@@ -6,9 +6,9 @@
 
 [This documentation is also available at wal-g.readthedocs.io](https://wal-g.readthedocs.io)
 
-WAL-G is an archival restoration tool for Postgres(beta for MySQL, MariaDB, and MongoDB)
+WAL-G is an archival restoration tool for PostgreSQL, MySQL/MariaDB, and MS SQL Server (beta for MongoDB and Redis).
 
-WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4, LZMA, or Brotli compression, multiple processors, and non-exclusive base backups for Postgres. More information on the design and implementation of WAL-G can be found on the Citus Data blog post ["Introducing WAL-G by Citus: Faster Disaster Recovery for Postgres"](https://www.citusdata.com/blog/2017/08/18/introducing-wal-g-faster-restores-for-postgres/).
+WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4, LZMA, or Brotli compression, multiple processors, and non-exclusive base backups for Postgres. More information on the original design and implementation of WAL-G can be found on the Citus Data blog post ["Introducing WAL-G by Citus: Faster Disaster Recovery for Postgres"](https://www.citusdata.com/blog/2017/08/18/introducing-wal-g-faster-restores-for-postgres/).
 
 **Table of Contents**
 - [Installation](#installation)
@@ -21,7 +21,7 @@ WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4
     - [Development on windows](#development-on-windows)
 - [Authors](#authors)
 - [License](#license)
-- [Acknowledgements](#acknowledgements)
+- [Acknowledgments](#acknowledgments)
 - [Chat](#chat)
 
 Installation
@@ -72,8 +72,8 @@ To configure GPG key for encryption and decryption. By default, no encryption is
 * `WALG_PGP_KEY`
 
 To configure encryption and decryption with OpenPGP standard. You can join multiline key using `\n` symbols into one line (mostly used in case of daemontools and envdir).
-Set *private key* value, when you need to execute ```wal-fetch``` or ```backup-fetch``` command.
-Set *public key* value, when you need to execute ```wal-push``` or ```backup-push``` command.
+Set *private key* value when you need to execute ```wal-fetch``` or ```backup-fetch``` command.
+Set *public key* value when you need to execute ```wal-push``` or ```backup-push``` command.
 Keep in mind that the *private key* also contains the *public key*.
 
 * `WALG_PGP_KEY_PATH`
@@ -100,22 +100,22 @@ Lists names and creation time of available backups.
 
 ``--json`` flag prints list in JSON format, pretty-printed if combined with ``--pretty``
 
-``--detail`` flag prints extra backup details, pretty-printed if combined with ``--pretty`` , json-encoded if combined with ``--json``
+``--detail`` flag prints extra backup details, pretty-printed if combined with ``--pretty``, json-encoded if combined with ``--json``
 
 ### ``delete``
 
-Is used to delete backups and WALs before them. By default ``delete`` will perform a dry run. If you want to execute deletion, you have to add ``--confirm`` flag at the end of the command. Backups marked as permanent will not be deleted.
+Is used to delete backups and WALs before them. By default, ``delete`` will perform a dry run. If you want to execute deletion, you have to add ``--confirm`` flag at the end of the command. Backups marked as permanent will not be deleted.
 
 ``delete`` can operate in four modes: ``retain``, ``before``, ``everything`` and ``target``.
 
 ``retain`` [FULL|FIND_FULL] %number% [--after %name|time%]
 
-if FULL is specified keep $number% full backups and everything in the middle. If with --after flag is used keep
-$number$ the most recent backups and backups made after %name|time% (including).
+if ``FULL`` is specified, keep ``%number%`` full backups and everything in the middle. If with ``--after`` flag is used keep
+$number$ the most recent backups and backups made after ``%name|time%`` (including).
 
 ``before`` [FIND_FULL] %name%
 
-If `FIND_FULL` is specified, WAL-G will calculate minimum backup needed to keep all deltas alive. If FIND_FULL is not specified and call can produce orphaned deltas - the call will fail with the list.
+If `FIND_FULL` is specified, WAL-G will calculate minimum backup needed to keep all deltas alive. If ``FIND_FULL`` is not specified, and call can produce orphaned deltas, the call will fail with the list.
 
 ``everything`` [FORCE]
 
@@ -184,7 +184,7 @@ make unittest
 ```
 For more information on testing, please consult [test](test), [testtools](testtools) and `unittest` section in [Makefile](Makefile).
 
-WAL-G will perform a round-trip compression/decompression test that generates a directory for data (e.g. data...), compressed files (e.g. compressed), and extracted files (e.g. extracted). These directories will only get cleaned up if the files in the original data directory match the files in the extracted one.
+WAL-G will perform a round-trip compression/decompression test that generates a directory for data (e.g., data...), compressed files (e.g., compressed), and extracted files (e.g., extracted). These directories will only get cleaned up if the files in the original data directory match the files in the extracted one.
 
 Test coverage can be obtained using:
 ```bash
@@ -213,10 +213,10 @@ Acknowledgments
 ----------------
 WAL-G would not have happened without the support of [Citus Data](https://www.citusdata.com/)
 
-WAL-G came into existence as a result of the collaboration between a summer engineering intern at Citus, Katie Li, and Daniel Farina, the original author of WAL-E, who currently serves as a principal engineer on the Citus Cloud team. Citus Data also has an [open source extension to Postgres](https://github.com/citusdata) that distributes database queries horizontally to deliver scale and performance.
+WAL-G came into existence as a result of the collaboration between a summer engineering intern at Citus, Katie Li, and Daniel Farina, the original author of WAL-E, who currently serves as a principal engineer on the Citus Cloud team. Citus Data also has an [open-source extension to Postgres](https://github.com/citusdata) that distributes database queries horizontally to deliver scale and performance.
 
 WAL-G development is supported by [Yandex Cloud](https://cloud.yandex.com)
 
 Chat
 ----
-We have a [Slack group](https://postgresteam.slack.com/messages/CA25P48P2) and [Telegram chat](https://t.me/joinchat/C03q9FOwa7GgIIW5CwfjrQ) to discuss WAL-G usage and development. To join PostgreSQL slack use [invite app](https://postgres-slack.herokuapp.com).
+We have a [Slack group](https://postgresteam.slack.com/messages/CA25P48P2) and [Telegram chat](https://t.me/joinchat/C03q9FOwa7GgIIW5CwfjrQ) to discuss WAL-G usage and development. To join PostgreSQL slack, use [invite app](https://postgres-slack.herokuapp.com).
