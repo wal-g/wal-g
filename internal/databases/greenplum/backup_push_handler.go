@@ -67,7 +67,7 @@ func (bh *BackupHandler) buildCommand(contentID int) string {
 		command += " --delta-from-user-data " + bh.arguments.deltaFromUserData
 	}
 	if bh.arguments.deltaFromName != "" {
-		backup := internal.NewBackup(bh.workers.Uploader.UploadingFolder, bh.curBackupInfo.backupName)
+		backup := internal.NewBackup(bh.workers.Uploader.UploadingFolder, bh.arguments.deltaFromName)
 		sentinelDto := BackupSentinelDto{}
 		err := backup.FetchSentinel(&sentinelDto)
 		tracelog.ErrorLogger.FatalOnError(err)

@@ -363,7 +363,9 @@ func (queryRunner *PgQueryRunner) GetWalSegmentBytes() (segBlocks uint64, err er
 // GetDataDir reads the wals segment size (in bytes) and converts it to uint64
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) GetDataDir() (dataDir string, err error) {
-	return queryRunner.GetParameter("data_directory")
+	conn := queryRunner.connection
+	err = conn.QueryRow("show data_directory").Scan(&dataDir)
+	return dataDir, err
 }
 
 // GetPhysicalSlotInfo reads information on a physical replication slot
