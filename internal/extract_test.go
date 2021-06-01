@@ -37,7 +37,7 @@ func generateRandomBytes() []byte {
 	sb := testtools.NewStrideByteReader(4)
 	lr := &io.LimitedReader{
 		R: sb,
-		N: int64(64),
+		N: int64(1024),
 	}
 	b, _ := ioutil.ReadAll(lr)
 	return b
