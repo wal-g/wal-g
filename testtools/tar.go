@@ -28,7 +28,7 @@ func (tarInterpreter *BufferTarInterpreter) Interpret(reader io.Reader, header *
 	return nil
 }
 
-// Extracts data (possibly from multiple sources concurrently) and stores them in dictionary.
+// Extracts data (possibly from multiple sources concurrently) and stores it in dictionary.
 // Used for testing purposes only.
 type ConcurrentConcatBufferTarInterpreter struct {
 	Out map[string][]byte
