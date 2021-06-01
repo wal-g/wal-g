@@ -142,17 +142,15 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 	return newUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
 }
 
-// TODO : unit tests
 // ExtractAll Handles all files passed in. Supports `.lzo`, `.lz4`, `.lzma`, and `.tar`.
 // File type `.nop` is used for testing purposes. Each file is extracted
 // in its own goroutine and ExtractAll will wait for all goroutines to finish.
-// Returns the first error encountered.
+// Retries unsuccessful attempts log2(MaxConcurrency) times, dividing concurrency by two each time.
 func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 	if len(files) == 0 {
 		return newNoFilesToExtractError()
 	}
 
-	retrier := NewExponentialRetrier(MinExtractRetryWait, MaxExtractRetryWait)
 	// Set maximum number of goroutines spun off by ExtractAll
 	downloadingConcurrency, err := GetMaxDownloadConcurrency()
 	if err != nil {
@@ -167,10 +165,8 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 				strings.Join(readerMakersToFilePaths(failed), "\n"))
 		}
 		currentRun = failed
-		if len(failed) > 0 {
-			retrier.Retry()
-		}
 	}
+
 	return nil
 }
 

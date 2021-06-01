@@ -1,9 +1,12 @@
 package internal_test
 
 import (
+	"bufio"
 	"bytes"
 	"io"
 	"io/ioutil"
+	"os"
+	"strconv"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -11,6 +14,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/testtools"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const (
@@ -57,15 +61,133 @@ func TestTar(t *testing.T) {
 	assert.Equalf(t, bCopy, buf.Out, "extract: Unbundled tar output does not match input.")
 }
 
-//func TestExtractAll(t *testing.T) {
-//	os.Setenv("WALE_GPG_KEY_ID", "3C19717A2B308DF0")
-//	os.Setenv("WALG_DOWNLOAD_CONCURRENCY", "1")
-//	defer os.Unsetenv("WALE_GPG_KEY_ID")
-//	defer os.Unsetenv("WALG_DOWNLOAD_CONCURRENCY")
-//	readerMaker := &testtools.FileReaderMaker{Key: "testdata/part_009.tar.zst"}
-//	err := internal.ExtractAll(&testtools.NOPTarInterpreter{}, []internal.ReaderMaker {readerMaker})
-//	assert.NoError(t, err)
-//}
+func TestExtractAll_empty(t *testing.T) {
+	os.Setenv("WALG_DOWNLOAD_CONCURRENCY", "1")
+	defer os.Unsetenv("WALG_DOWNLOAD_CONCURRENCY")
+	err := internal.ExtractAll(&testtools.NOPTarInterpreter{}, []internal.ReaderMaker {})
+	assert.Error(t, err)
+}
+
+func TestExtractAll_fileDoesntExist(t *testing.T) {
+	os.Setenv("WALG_DOWNLOAD_CONCURRENCY", "1")
+	defer os.Unsetenv("WALG_DOWNLOAD_CONCURRENCY")
+	readerMaker := &testtools.FileReaderMaker{Key: "testdata/booba.tar"}
+	err := internal.ExtractAll(&testtools.NOPTarInterpreter{}, []internal.ReaderMaker {readerMaker})
+	assert.Error(t, err)
+}
+
+func generateRandomBytes() []byte {
+	sb := testtools.NewStrideByteReader(4)
+	lr := &io.LimitedReader{
+		R: sb,
+		N: int64(64),
+	}
+	b, _ := ioutil.ReadAll(lr)
+	return b
+}
+
+func makeTar() (BufferReaderMaker, []byte) {
+	b := generateRandomBytes()
+	bCopy := make([]byte, len(b))
+	copy(bCopy, b)
+
+	r, w := io.Pipe()
+	go func() {
+		bw := bufio.NewWriterSize(w, 4)
+
+		defer utility.LoggedClose(w, "")
+		defer func() {
+			if err := bw.Flush(); err != nil {
+				panic(err)
+			}
+		}()
+
+		testtools.CreateTar(bw, &io.LimitedReader{
+			R: bytes.NewBuffer(b),
+			N: int64(len(b)),
+		})
+
+	}()
+	tarContents := &bytes.Buffer{}
+	io.Copy(tarContents, r)
+
+	return BufferReaderMaker{tarContents, "/usr/local.tar"}, bCopy
+}
+
+func TestExtractAll_simpleTar(t *testing.T){
+	os.Setenv("WALG_DOWNLOAD_CONCURRENCY", "1")
+	defer os.Unsetenv("WALG_DOWNLOAD_CONCURRENCY")
+
+	brm, b := makeTar()
+
+	buf := &testtools.BufferTarInterpreter{}
+	files := []internal.ReaderMaker{&brm}
+
+	err := internal.ExtractAll(buf, files)
+	if err != nil {
+		t.Log(err)
+	}
+
+	assert.Equalf(t, b, buf.Out, "ExtractAll: Output does not match input.")
+}
+
+func TestExtractAll_multipleTars(t *testing.T) {
+	os.Setenv("WALG_DOWNLOAD_CONCURRENCY", "1")
+	defer os.Unsetenv("WALG_DOWNLOAD_CONCURRENCY")
+
+	fileAmount := 3
+	bufs := [][]byte {}
+	brms := []internal.ReaderMaker{}
+
+	for i := 0; i < fileAmount; i++{
+		brm, b := makeTar()
+		bufs = append(bufs, b)
+		brms = append(brms, &brm)
+	}
+
+	buf := testtools.NewConcurrentConcatBufferTarInterpreter()
+
+	err := internal.ExtractAll(buf, brms)
+	if err != nil {
+		t.Log(err)
+	}
+
+	for i := 0; i < fileAmount; i++ {
+		assert.Equal(t, 0, bytes.Compare(bufs[i], buf.Out[strconv.Itoa(i + 1)]), "Some of outputs do not match input")
+	}
+
+	t.Log(bufs)
+	t.Log(buf.Out)
+}
+
+func TestExtractAll_multipleConcurrentTars(t *testing.T) {
+	os.Setenv("WALG_DOWNLOAD_CONCURRENCY", "4")
+	defer os.Unsetenv("WALG_DOWNLOAD_CONCURRENCY")
+
+	fileAmount := 24
+	bufs := [][]byte {}
+	brms := []internal.ReaderMaker{}
+
+	for i := 0; i < fileAmount; i++{
+		brm, b := makeTar()
+		bufs = append(bufs, b)
+		brms = append(brms, &brm)
+	}
+
+	buf := testtools.NewConcurrentConcatBufferTarInterpreter()
+
+	err := internal.ExtractAll(buf, brms)
+	if err != nil {
+		t.Log(err)
+	}
+
+	for i := 0; i < fileAmount; i++ {
+		assert.Equal(t, 0, bytes.Compare(bufs[i], buf.Out[strconv.Itoa(i + 1)]), "Some of outputs do not match input")
+	}
+
+	t.Log(bufs)
+	t.Log(buf.Out)
+}
 
 func noPassphrase() (string, bool) {
 	return "", false
