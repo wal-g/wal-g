@@ -2,16 +2,16 @@ package internal
 
 import "time"
 
-type ExponentialRetrier struct {
+type ExponentialSleeper struct {
 	sleepDuration      time.Duration
 	sleepDurationBound time.Duration
 }
 
-func NewExponentialRetrier(startSleepDuration, sleepDurationBound time.Duration) *ExponentialRetrier {
-	return &ExponentialRetrier{startSleepDuration, sleepDurationBound}
+func NewExponentialSleeper(startSleepDuration, sleepDurationBound time.Duration) *ExponentialSleeper {
+	return &ExponentialSleeper{startSleepDuration, sleepDurationBound}
 }
 
-func (retrier *ExponentialRetrier) Retry() {
+func (retrier *ExponentialSleeper) Sleep() {
 	time.Sleep(retrier.sleepDuration)
 	retrier.sleepDuration *= 2
 	if retrier.sleepDuration > retrier.sleepDurationBound {

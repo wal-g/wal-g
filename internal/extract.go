@@ -151,6 +151,8 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 		return newNoFilesToExtractError()
 	}
 
+	retrier := NewExponentialSleeper(MinExtractRetryWait, MaxExtractRetryWait)
+
 	// Set maximum number of goroutines spun off by ExtractAll
 	downloadingConcurrency, err := GetMaxDownloadConcurrency()
 	if err != nil {
@@ -165,6 +167,9 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 				strings.Join(readerMakersToFilePaths(failed), "\n"))
 		}
 		currentRun = failed
+		if len(failed) > 0 {
+			retrier.Sleep()
+		}
 	}
 
 	return nil
