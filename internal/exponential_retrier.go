@@ -11,10 +11,10 @@ func NewExponentialSleeper(startSleepDuration, sleepDurationBound time.Duration)
 	return &ExponentialSleeper{startSleepDuration, sleepDurationBound}
 }
 
-func (retrier *ExponentialSleeper) Sleep() {
-	time.Sleep(retrier.sleepDuration)
-	retrier.sleepDuration *= 2
-	if retrier.sleepDuration > retrier.sleepDurationBound {
-		retrier.sleepDuration = retrier.sleepDurationBound
+func (sleeper *ExponentialSleeper) Sleep() {
+	time.Sleep(sleeper.sleepDuration)
+	sleeper.sleepDuration *= 2
+	if sleeper.sleepDuration > sleeper.sleepDurationBound {
+		sleeper.sleepDuration = sleeper.sleepDurationBound
 	}
 }
