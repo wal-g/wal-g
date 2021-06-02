@@ -110,11 +110,8 @@ func TestExtractAll_multipleTars(t *testing.T) {
 	}
 
 	for i := 0; i < fileAmount; i++ {
-		assert.Equal(t, 0, bytes.Compare(bufs[i], buf.Out[strconv.Itoa(i + 1)]), "Some of outputs do not match input")
+		assert.Equal(t, bufs[i], buf.Out[strconv.Itoa(i + 1)], "Some of outputs do not match input")
 	}
-
-	t.Log(bufs)
-	t.Log(buf.Out)
 }
 
 func TestExtractAll_multipleConcurrentTars(t *testing.T) {
@@ -139,11 +136,8 @@ func TestExtractAll_multipleConcurrentTars(t *testing.T) {
 	}
 
 	for i := 0; i < fileAmount; i++ {
-		assert.Equal(t, 0, bytes.Compare(bufs[i], buf.Out[strconv.Itoa(i + 1)]), "Some of outputs do not match input")
+		assert.Equal(t, bufs[i], buf.Out[strconv.Itoa(i + 1)], "Some of outputs do not match input")
 	}
-
-	t.Log(bufs)
-	t.Log(buf.Out)
 }
 
 func noPassphrase() (string, bool) {
