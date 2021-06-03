@@ -19,6 +19,9 @@ import (
 
 const (
 	PrivateKeyFilePath = "../test/testdata/waleGpgKey"
+	randomBytesAmount = 1024
+	seed = 4
+	minBufferSize = 1024
 )
 
 func TestExtractAll_noFilesProvided(t *testing.T) {
@@ -34,10 +37,10 @@ func TestExtractAll_fileDoesntExist(t *testing.T) {
 }
 
 func generateRandomBytes() []byte {
-	sb := testtools.NewStrideByteReader(4)
+	sb := testtools.NewStrideByteReader(seed)
 	lr := &io.LimitedReader{
 		R: sb,
-		N: int64(1024),
+		N: int64(randomBytesAmount),
 	}
 	b, _ := ioutil.ReadAll(lr)
 	return b
@@ -50,7 +53,7 @@ func makeTar() (BufferReaderMaker, []byte) {
 
 	r, w := io.Pipe()
 	go func() {
-		bw := bufio.NewWriterSize(w, 4)
+		bw := bufio.NewWriterSize(w, minBufferSize)
 
 		defer utility.LoggedClose(w, "")
 		defer func() {
