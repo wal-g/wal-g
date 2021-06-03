@@ -31,6 +31,10 @@ func TestExtractAll_noFilesProvided(t *testing.T) {
 }
 
 func TestExtractAll_fileDoesntExist(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping long-running test.")
+	}
+
 	readerMaker := &testtools.FileReaderMaker{Key: "testdata/booba.tar"}
 	err := internal.ExtractAll(&testtools.NOPTarInterpreter{}, []internal.ReaderMaker {readerMaker})
 	assert.Error(t, err)
@@ -46,7 +50,7 @@ func generateRandomBytes() []byte {
 	return b
 }
 
-func makeTar() (BufferReaderMaker, []byte) {
+func makeTar(name string) (BufferReaderMaker, []byte) {
 	b := generateRandomBytes()
 	bCopy := make([]byte, len(b))
 	copy(bCopy, b)
@@ -62,10 +66,10 @@ func makeTar() (BufferReaderMaker, []byte) {
 			}
 		}()
 
-		testtools.CreateTar(bw, &io.LimitedReader{
+		testtools.CreateNamedTar(bw, &io.LimitedReader{
 			R: bytes.NewBuffer(b),
 			N: int64(len(b)),
-		})
+		}, name)
 
 	}()
 	tarContents := &bytes.Buffer{}
@@ -75,10 +79,10 @@ func makeTar() (BufferReaderMaker, []byte) {
 }
 
 func TestExtractAll_simpleTar(t *testing.T){
-	os.Setenv("WALG_DOWNLOAD_CONCURRENCY", "1")
-	defer os.Unsetenv("WALG_DOWNLOAD_CONCURRENCY")
+	os.Setenv(internal.DownloadConcurrencySetting, "1")
+	defer os.Unsetenv(internal.DownloadConcurrencySetting)
 
-	brm, b := makeTar()
+	brm, b := makeTar("booba")
 
 	buf := &testtools.BufferTarInterpreter{}
 	files := []internal.ReaderMaker{&brm}
@@ -92,15 +96,16 @@ func TestExtractAll_simpleTar(t *testing.T){
 }
 
 func TestExtractAll_multipleTars(t *testing.T) {
-	os.Setenv("WALG_DOWNLOAD_CONCURRENCY", "1")
-	defer os.Unsetenv("WALG_DOWNLOAD_CONCURRENCY")
+	internal.GetMaxDownloadConcurrency()
+	os.Setenv(internal.DownloadConcurrencySetting, "1")
+	defer os.Unsetenv(internal.DownloadConcurrencySetting)
 
 	fileAmount := 3
 	bufs := [][]byte {}
 	brms := []internal.ReaderMaker{}
 
 	for i := 0; i < fileAmount; i++{
-		brm, b := makeTar()
+		brm, b := makeTar(strconv.Itoa(i))
 		bufs = append(bufs, b)
 		brms = append(brms, &brm)
 	}
@@ -113,20 +118,20 @@ func TestExtractAll_multipleTars(t *testing.T) {
 	}
 
 	for i := 0; i < fileAmount; i++ {
-		assert.Equal(t, bufs[i], buf.Out[strconv.Itoa(i + 1)], "Some of outputs do not match input")
+		assert.Equal(t, bufs[i], buf.Out[strconv.Itoa(i)], "Some of outputs do not match input")
 	}
 }
 
 func TestExtractAll_multipleConcurrentTars(t *testing.T) {
-	os.Setenv("WALG_DOWNLOAD_CONCURRENCY", "4")
-	defer os.Unsetenv("WALG_DOWNLOAD_CONCURRENCY")
+	os.Setenv(internal.DownloadConcurrencySetting, "4")
+	defer os.Unsetenv(internal.DownloadConcurrencySetting)
 
 	fileAmount := 24
 	bufs := [][]byte {}
 	brms := []internal.ReaderMaker{}
 
 	for i := 0; i < fileAmount; i++{
-		brm, b := makeTar()
+		brm, b := makeTar(strconv.Itoa(i))
 		bufs = append(bufs, b)
 		brms = append(brms, &brm)
 	}
@@ -139,7 +144,7 @@ func TestExtractAll_multipleConcurrentTars(t *testing.T) {
 	}
 
 	for i := 0; i < fileAmount; i++ {
-		assert.Equal(t, bufs[i], buf.Out[strconv.Itoa(i + 1)], "Some of outputs do not match input")
+		assert.Equal(t, bufs[i], buf.Out[strconv.Itoa(i)], "Some of outputs do not match input")
 	}
 }
 

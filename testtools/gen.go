@@ -51,10 +51,18 @@ func CreateTar(w io.Writer, r *io.LimitedReader) {
 	// defer TimeTrack(time.Now(), "CREATE TAR")
 	tmp := atomic.AddInt32(&counter, 1)
 	_ = tmp
+	
+	CreateNamedTar(w, r, strconv.Itoa(int(counter)))
+}
+
+func CreateNamedTar(w io.Writer, r *io.LimitedReader, name string) {
+	// defer TimeTrack(time.Now(), "CREATE TAR")
+	tmp := atomic.AddInt32(&counter, 1)
+	_ = tmp
 	tw := tar.NewWriter(w)
 
 	hdr := &tar.Header{
-		Name: strconv.Itoa(int(counter)),
+		Name: name,
 		Size: r.N,
 		Mode: 0600,
 	}
