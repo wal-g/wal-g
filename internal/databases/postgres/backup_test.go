@@ -161,7 +161,7 @@ func TestGetLatestBackupNameNoBackupsInFolder(t *testing.T) {
 	assert.Equal(t, backupName, "")
 }
 
-func TestGetLastBackupNameWithGarbage(t *testing.T)  {
+func TestGetLastBackupNameWithGarbage(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
 	subFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	latestBackup, err := internal.GetLatestBackupName(subFolder)

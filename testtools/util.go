@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"strconv"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -180,7 +180,7 @@ func CreatePostgresMockStorageFolderWithTimeMetadata(t *testing.T, dataFilling D
 		AnyTimes()
 
 	for i := 0; i < backupsCount; i++ {
-		currentSentinelPath := backupsName[i]+utility.SentinelSuffix
+		currentSentinelPath := backupsName[i] + utility.SentinelSuffix
 		mockBaseBackupFolder.EXPECT().Exists(currentSentinelPath).Return(true, nil).AnyTimes()
 		currentMetadataPath := backupsName[i] + "/" + utility.MetadataFileName
 		mockBaseBackupFolder.EXPECT().ReadObject(currentMetadataPath).Return(folder.ReadObject(currentMetadataPath)).AnyTimes()

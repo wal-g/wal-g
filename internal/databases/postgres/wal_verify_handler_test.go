@@ -549,7 +549,7 @@ func TestWalVerify_WalkUntilFirstBackup(t *testing.T) {
 
 	// there are a couple of mock backups in storage, but only one
 	// should be selected as the first one
-	backupsWalNames := map[string]postgres.ExtendedMetadataDto {
+	backupsWalNames := map[string]postgres.ExtendedMetadataDto{
 		// INCORRECT: this backup should not be selected as the earliest,
 		// because it does not belong to the current timeline history
 		// since the timeline switch occurred

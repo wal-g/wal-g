@@ -253,23 +253,22 @@ func findEarliestBackup(
 	var earliestBackup *BackupDetail
 	var earliestBackupSegNo WalSegmentNo
 
-	for _, backup := range backupDetails {
-		backupTimelineID, backupLogSegNoInt, err := ParseWALFilename(backup.WalFileName)
+	for i := range backupDetails {
+		currBackup := &backupDetails[i]
+		backupTimelineID, backupLogSegNoInt, err := ParseWALFilename(currBackup.WalFileName)
 		backupLogSegNo := WalSegmentNo(backupLogSegNoInt)
 		if err != nil {
 			return nil, 0, err
 		}
 
-		if ok := checkBackupIsCorrect(currentTimeline, backup,
+		if ok := checkBackupIsCorrect(currentTimeline, currBackup,
 			backupTimelineID, backupLogSegNo, switchSegNoByTimeline); !ok {
 			continue
 		}
 
 		if earliestBackup == nil || earliestBackupSegNo > backupLogSegNo {
-			// create local variable so the reference won't break
-			newEarliestBackup := backup
 			earliestBackupSegNo = backupLogSegNo
-			earliestBackup = &newEarliestBackup
+			earliestBackup = currBackup
 		}
 	}
 	if earliestBackup == nil {
@@ -286,7 +285,7 @@ func findEarliestBackup(
 // it belongs to range [backup timeline start LSN, backup timeline end LSN]
 func checkBackupIsCorrect(
 	currentTimeline uint32,
-	backupDetail BackupDetail,
+	backupDetail *BackupDetail,
 	backupTimeline uint32,
 	backupStartSegNo WalSegmentNo,
 	switchSegNoByTimeline map[uint32]WalSegmentNo,
@@ -332,7 +331,7 @@ func checkBackupIsCorrect(
 		// if backup is permanent, it is not eligible for wal-verify to be selected as the left border
 		if backupDetail.IsPermanent {
 			tracelog.WarningLogger.Printf(
-				"checkBackupIsCorrect: %s: backup is permanent, it is not eligible to be selected " +
+				"checkBackupIsCorrect: %s: backup is permanent, it is not eligible to be selected "+
 					"as the earliest backup for wal-verify.\n", backupDetail.BackupName)
 			return false
 		}
