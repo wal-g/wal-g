@@ -292,6 +292,14 @@ func checkBackupIsCorrect(
 ) bool {
 	// perform the check only if .history file exists
 	if len(switchSegNoByTimeline) > 0 {
+		// if backup is permanent, it is not eligible for wal-verify to be selected as the left border
+		if backupDetail.IsPermanent {
+			tracelog.WarningLogger.Printf(
+				"checkBackupIsCorrect: %s: backup is permanent, it is not eligible to be selected "+
+					"as the earliest backup for wal-verify.\n", backupDetail.BackupName)
+			return false
+		}
+
 		// if backup start segment is less than timeline start segment => incorrect backup
 		if backupTimeline > 1 {
 			backupTimelineStartSegNo, ok := switchSegNoByTimeline[backupTimeline-1]
@@ -325,14 +333,6 @@ func checkBackupIsCorrect(
 				"checkBackupIsCorrect: %s: backup start segment number %d "+
 					"should be less than the backup timeline end segment number %d.\n",
 				backupDetail.BackupName, backupStartSegNo, timelineSwitchSegNo)
-			return false
-		}
-
-		// if backup is permanent, it is not eligible for wal-verify to be selected as the left border
-		if backupDetail.IsPermanent {
-			tracelog.WarningLogger.Printf(
-				"checkBackupIsCorrect: %s: backup is permanent, it is not eligible to be selected "+
-					"as the earliest backup for wal-verify.\n", backupDetail.BackupName)
 			return false
 		}
 	}
