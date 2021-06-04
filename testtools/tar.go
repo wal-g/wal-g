@@ -31,10 +31,10 @@ func (tarInterpreter *BufferTarInterpreter) Interpret(reader io.Reader, header *
 // Used for testing purposes only.
 type ConcurrentConcatBufferTarInterpreter struct {
 	Out map[string][]byte
-	mu sync.Mutex
+	mu  sync.Mutex
 }
 
-func NewConcurrentConcatBufferTarInterpreter() *ConcurrentConcatBufferTarInterpreter{
+func NewConcurrentConcatBufferTarInterpreter() *ConcurrentConcatBufferTarInterpreter {
 	ccbti := new(ConcurrentConcatBufferTarInterpreter)
 	ccbti.Out = make(map[string][]byte)
 	return ccbti
@@ -51,7 +51,6 @@ func (tarInterpreter *ConcurrentConcatBufferTarInterpreter) Interpret(reader io.
 	tarInterpreter.mu.Lock()
 	tarInterpreter.Out[header.Name] = out
 	tarInterpreter.mu.Unlock()
-
 
 	return nil
 }

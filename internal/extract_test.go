@@ -19,9 +19,9 @@ import (
 
 const (
 	PrivateKeyFilePath = "../test/testdata/waleGpgKey"
-	randomBytesAmount = 1024
-	seed = 4
-	minBufferSize = 1024
+	randomBytesAmount  = 1024
+	seed               = 4
+	minBufferSize      = 1024
 )
 
 func TestExtractAll_noFilesProvided(t *testing.T) {
@@ -32,7 +32,7 @@ func TestExtractAll_noFilesProvided(t *testing.T) {
 
 func TestExtractAll_fileDoesntExist(t *testing.T) {
 	readerMaker := &testtools.FileReaderMaker{Key: "testdata/booba.tar"}
-	err := internal.ExtractAllWithSleeper(&testtools.NOPTarInterpreter{}, []internal.ReaderMaker {readerMaker}, NOPSleeper{})
+	err := internal.ExtractAllWithSleeper(&testtools.NOPTarInterpreter{}, []internal.ReaderMaker{readerMaker}, NOPSleeper{})
 	assert.Error(t, err)
 }
 
@@ -74,7 +74,7 @@ func makeTar(name string) (BufferReaderMaker, []byte) {
 	return BufferReaderMaker{tarContents, "/usr/local.tar"}, bCopy
 }
 
-func TestExtractAll_simpleTar(t *testing.T){
+func TestExtractAll_simpleTar(t *testing.T) {
 	os.Setenv(internal.DownloadConcurrencySetting, "1")
 	defer os.Unsetenv(internal.DownloadConcurrencySetting)
 
@@ -97,10 +97,10 @@ func TestExtractAll_multipleTars(t *testing.T) {
 	defer os.Unsetenv(internal.DownloadConcurrencySetting)
 
 	fileAmount := 3
-	bufs := [][]byte {}
+	bufs := [][]byte{}
 	brms := []internal.ReaderMaker{}
 
-	for i := 0; i < fileAmount; i++{
+	for i := 0; i < fileAmount; i++ {
 		brm, b := makeTar(strconv.Itoa(i))
 		bufs = append(bufs, b)
 		brms = append(brms, &brm)
@@ -123,10 +123,10 @@ func TestExtractAll_multipleConcurrentTars(t *testing.T) {
 	defer os.Unsetenv(internal.DownloadConcurrencySetting)
 
 	fileAmount := 24
-	bufs := [][]byte {}
+	bufs := [][]byte{}
 	brms := []internal.ReaderMaker{}
 
-	for i := 0; i < fileAmount; i++{
+	for i := 0; i < fileAmount; i++ {
 		brm, b := makeTar(strconv.Itoa(i))
 		bufs = append(bufs, b)
 		brms = append(brms, &brm)
@@ -293,6 +293,6 @@ type BufferReaderMaker struct {
 func (b *BufferReaderMaker) Reader() (io.ReadCloser, error) { return ioutil.NopCloser(b.Buf), nil }
 func (b *BufferReaderMaker) Path() string                   { return b.Key }
 
-type NOPSleeper struct {}
+type NOPSleeper struct{}
 
 func (s NOPSleeper) Sleep() {}

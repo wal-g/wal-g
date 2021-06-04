@@ -150,7 +150,7 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 	return ExtractAllWithSleeper(tarInterpreter, files, NewExponentialSleeper(MinExtractRetryWait, MaxExtractRetryWait))
 }
 
-func ExtractAllWithSleeper(tarInterpreter TarInterpreter, files[] ReaderMaker, sleeper Sleeper) error {
+func ExtractAllWithSleeper(tarInterpreter TarInterpreter, files []ReaderMaker, sleeper Sleeper) error {
 	if len(files) == 0 {
 		return newNoFilesToExtractError()
 	}

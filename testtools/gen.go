@@ -50,7 +50,7 @@ func (sb *StrideByteReader) Read(p []byte) (int, error) {
 func CreateTar(w io.Writer, r *io.LimitedReader) {
 	tmp := atomic.AddInt32(&counter, 1)
 	_ = tmp
-	
+
 	CreateNamedTar(w, r, strconv.Itoa(int(counter)))
 }
 
