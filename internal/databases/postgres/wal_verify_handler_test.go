@@ -2,9 +2,11 @@ package postgres_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 
@@ -545,21 +547,25 @@ func TestWalVerify_WalkUntilFirstBackup(t *testing.T) {
 
 	storageFiles := make(map[string]*bytes.Buffer, 4)
 
-	backupSentinelNames := []string{
-		// this backup should not be selected as the earliest,
+	// there are a couple of mock backups in storage, but only one
+	// should be selected as the first one
+	backupsWalNames := map[string]postgres.ExtendedMetadataDto{
+		// INCORRECT: this backup should not be selected as the earliest,
 		// because it does not belong to the current timeline history
 		// since the timeline switch occurred
 		// at the 000000060000000000000005 WAL segment
-		utility.BackupNamePrefix + "000000050000000000000005" + utility.SentinelSuffix,
-		// this backup should not be selected as the earliest,
-		// because it is not
-		utility.BackupNamePrefix + "000000060000000000000007" + utility.SentinelSuffix,
-		// this backup should be selected as the earliest
-		utility.BackupNamePrefix + "000000060000000000000006" + utility.SentinelSuffix,
+		"000000050000000000000005": newMockExtendedMetadataDto(false),
+		// INCORRECT: this backup should not be selected as the earliest, because it is not the earliest one
+		"000000060000000000000007": newMockExtendedMetadataDto(false),
+		// OK: this backup should be selected as the earliest
+		"000000060000000000000006": newMockExtendedMetadataDto(false),
+		// INCORRECT: backup has been created before the timeline switch LSN
+		"000000060000000000000002": newMockExtendedMetadataDto(false),
+		// INCORRECT: backup is marked permanent
+		"000000050000000000000003": newMockExtendedMetadataDto(true),
 	}
-	for _, name := range backupSentinelNames {
-		storageFiles[utility.BaseBackupPath+name] = new(bytes.Buffer)
-	}
+
+	addMockBackupsStorageFiles(backupsWalNames, storageFiles)
 
 	// set switch point to somewhere in the 5th segment
 	switchPointLsn := 5*postgres.WalSegmentSize + 100
@@ -602,6 +608,16 @@ func TestWalVerify_WalkUntilFirstBackup(t *testing.T) {
 		storageSegments:        storageSegments,
 		storageFiles:           storageFiles,
 	})
+}
+
+func addMockBackupsStorageFiles(backups map[string]postgres.ExtendedMetadataDto, storageFiles map[string]*bytes.Buffer) {
+	for name, meta := range backups {
+		// sentinel
+		storageFiles[utility.BaseBackupPath+utility.BackupNamePrefix+name+utility.SentinelSuffix] = new(bytes.Buffer)
+		// metadata
+		metaBytes, _ := json.Marshal(meta)
+		storageFiles[utility.BaseBackupPath+utility.BackupNamePrefix+name+"/"+utility.MetadataFileName] = bytes.NewBuffer(metaBytes)
+	}
 }
 
 func testWalVerify(t *testing.T, setup WalVerifyTestSetup) {
@@ -656,5 +672,24 @@ func compareResults(
 
 		assert.True(t, reflect.DeepEqual(expected[checkType].Details, checkResult.Details),
 			"Result details don't match the expected values")
+	}
+}
+
+func newMockExtendedMetadataDto(isPermanent bool) postgres.ExtendedMetadataDto {
+	// currently we do not need any fields except the isPermanent
+	return postgres.ExtendedMetadataDto{
+		StartTime:        time.Now(),
+		FinishTime:       time.Now().Add(time.Second),
+		DatetimeFormat:   postgres.MetadataDatetimeFormat,
+		Hostname:         "test_host",
+		DataDir:          "",
+		PgVersion:        10000,
+		StartLsn:         0,
+		FinishLsn:        0,
+		IsPermanent:      isPermanent,
+		SystemIdentifier: nil,
+		UncompressedSize: 0,
+		CompressedSize:   0,
+		UserData:         nil,
 	}
 }

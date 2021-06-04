@@ -140,11 +140,11 @@ func TestHandleBackupListLogNoBackups(t *testing.T) {
 
 func TestWritePrettyBackupList_LongColumnsValues(t *testing.T) {
 	expectedRes := "+---+-----------+----------+-----------------------------------+\n" +
-				   "| # | NAME      | MODIFIED | WAL SEGMENT BACKUP START          |\n" +
-				   "+---+-----------+----------+-----------------------------------+\n" +
-				   "| 0 | backup000 | -        | veryVeryVeryVeryVeryLongWallName0 |\n" +
-				   "| 1 | backup001 | -        | veryVeryVeryVeryVeryLongWallName1 |\n" +
-				   "+---+-----------+----------+-----------------------------------+\n"
+		"| # | NAME      | MODIFIED | WAL SEGMENT BACKUP START          |\n" +
+		"+---+-----------+----------+-----------------------------------+\n" +
+		"| 0 | backup000 | -        | veryVeryVeryVeryVeryLongWallName0 |\n" +
+		"| 1 | backup001 | -        | veryVeryVeryVeryVeryLongWallName1 |\n" +
+		"+---+-----------+----------+-----------------------------------+\n"
 
 	b := bytes.Buffer{}
 	internal.WritePrettyBackupList(longBackups, &b)
@@ -154,11 +154,11 @@ func TestWritePrettyBackupList_LongColumnsValues(t *testing.T) {
 
 func TestWritePrettyBackupList_ShortColumnsValues(t *testing.T) {
 	expectedRes := "+---+------+----------+--------------------------+\n" +
-				   "| # | NAME | MODIFIED | WAL SEGMENT BACKUP START |\n" +
-				   "+---+------+----------+--------------------------+\n" +
-				   "| 0 | b0   | -        | shortWallName0           |\n" +
-				   "| 1 | b1   | -        | shortWallName1           |\n" +
-				   "+---+------+----------+--------------------------+\n"
+		"| # | NAME | MODIFIED | WAL SEGMENT BACKUP START |\n" +
+		"+---+------+----------+--------------------------+\n" +
+		"| 0 | b0   | -        | shortWallName0           |\n" +
+		"| 1 | b1   | -        | shortWallName1           |\n" +
+		"+---+------+----------+--------------------------+\n"
 
 	b := bytes.Buffer{}
 	internal.WritePrettyBackupList(shortBackups, &b)
@@ -168,9 +168,9 @@ func TestWritePrettyBackupList_ShortColumnsValues(t *testing.T) {
 
 func TestWritePrettyBackupList_WriteNoBackupList(t *testing.T) {
 	expectedRes := "+---+------+----------+--------------------------+\n" +
-				   "| # | NAME | MODIFIED | WAL SEGMENT BACKUP START |\n" +
-				   "+---+------+----------+--------------------------+\n" +
-				   "+---+------+----------+--------------------------+\n"
+		"| # | NAME | MODIFIED | WAL SEGMENT BACKUP START |\n" +
+		"+---+------+----------+--------------------------+\n" +
+		"+---+------+----------+--------------------------+\n"
 
 	backups := make([]internal.BackupTime, 0)
 
@@ -182,12 +182,12 @@ func TestWritePrettyBackupList_WriteNoBackupList(t *testing.T) {
 
 func TestWritePrettyBackupList_EmptyColumnsValues(t *testing.T) {
 	expectedRes := "+---+------+----------+--------------------------+\n" +
-				   "| # | NAME | MODIFIED | WAL SEGMENT BACKUP START |\n" +
-				   "+---+------+----------+--------------------------+\n" +
-				   "| 0 |      | -        | shortWallName0           |\n" +
-				   "| 1 | b1   | -        |                          |\n" +
-				   "| 2 |      | -        |                          |\n" +
-				   "+---+------+----------+--------------------------+\n"
+		"| # | NAME | MODIFIED | WAL SEGMENT BACKUP START |\n" +
+		"+---+------+----------+--------------------------+\n" +
+		"| 0 |      | -        | shortWallName0           |\n" +
+		"| 1 | b1   | -        |                          |\n" +
+		"| 2 |      | -        |                          |\n" +
+		"+---+------+----------+--------------------------+\n"
 
 	b := bytes.Buffer{}
 	internal.WritePrettyBackupList(emptyColonsBackups, &b)
@@ -207,9 +207,9 @@ func TestWriteBackupList_NoBackups(t *testing.T) {
 
 func TestWriteBackupList_EmptyColumnsValues(t *testing.T) {
 	expectedRes := "name modified wal_segment_backup_start\n" +
-				   "     -        shortWallName0\n" +
-				   "b1   -        \n" +
-				   "     -        \n"
+		"     -        shortWallName0\n" +
+		"b1   -        \n" +
+		"     -        \n"
 
 	b := bytes.Buffer{}
 	internal.WriteBackupList(emptyColonsBackups, &b)
@@ -219,8 +219,8 @@ func TestWriteBackupList_EmptyColumnsValues(t *testing.T) {
 
 func TestWriteBackupList_ShortColumnsValues(t *testing.T) {
 	expectedRes := "name modified wal_segment_backup_start\n" +
-				   "b0   -        shortWallName0\n" +
-				   "b1   -        shortWallName1\n"
+		"b0   -        shortWallName0\n" +
+		"b1   -        shortWallName1\n"
 	b := bytes.Buffer{}
 	internal.WriteBackupList(shortBackups, &b)
 
@@ -229,8 +229,8 @@ func TestWriteBackupList_ShortColumnsValues(t *testing.T) {
 
 func TestWriteBackupList_LongColumnsValues(t *testing.T) {
 	expectedRes := "name      modified wal_segment_backup_start\n" +
-                   "backup000 -        veryVeryVeryVeryVeryLongWallName0\n" +
-                   "backup001 -        veryVeryVeryVeryVeryLongWallName1\n"
+		"backup000 -        veryVeryVeryVeryVeryLongWallName0\n" +
+		"backup001 -        veryVeryVeryVeryVeryLongWallName1\n"
 	b := bytes.Buffer{}
 	internal.WriteBackupList(longBackups, &b)
 

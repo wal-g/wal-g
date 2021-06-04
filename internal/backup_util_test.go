@@ -52,7 +52,7 @@ func TestGetBackupTimeSlices_OrderCheck(t *testing.T) {
 
 	result := internal.GetBackupTimeSlices(objects)
 	internal.SortBackupTimeSlices(result)
-	
+
 	assert.Equalf(t, 2, len(result), "GetBackupTimeSlices returned wrong count of backup: something wrong")
 	assert.True(t, result[0].BackupName == testStreamBackup.BackupName+".1", "GetBackupTimeSlices returned bad time ordering: "+testStreamBackup.BackupName+".1 should be first, because second was added earlier")
 	assert.True(t, result[0].Time.Before(result[1].Time), "GetBackupTimeSlices returned bad time ordering: order should be Ascending")
