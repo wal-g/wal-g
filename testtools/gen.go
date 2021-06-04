@@ -48,7 +48,6 @@ func (sb *StrideByteReader) Read(p []byte) (int, error) {
 // CreateTar creates a new tarball from the passed in reader
 // and writes to a destination writer.
 func CreateTar(w io.Writer, r *io.LimitedReader) {
-	// defer TimeTrack(time.Now(), "CREATE TAR")
 	tmp := atomic.AddInt32(&counter, 1)
 	_ = tmp
 	
@@ -56,7 +55,6 @@ func CreateTar(w io.Writer, r *io.LimitedReader) {
 }
 
 func CreateNamedTar(w io.Writer, r *io.LimitedReader, name string) {
-	// defer TimeTrack(time.Now(), "CREATE TAR")
 	tmp := atomic.AddInt32(&counter, 1)
 	_ = tmp
 	tw := tar.NewWriter(w)
