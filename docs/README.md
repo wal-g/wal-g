@@ -171,6 +171,9 @@ Databases
 ### Redis [Beta]
 [Information about installing, configuration and usage](Redis.md)
 
+### ClickHouse [Work in progress]
+[Information about installing, configuration and usage](ClickHouse.md)
+
 Development
 -----------
 ### Installing
