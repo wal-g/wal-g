@@ -22,7 +22,7 @@ type LogsCache struct {
 	LastArchivedBinlog string `json:"LastArchivedBinlog"`
 }
 
-func HandleBinlogPush(uploader *internal.Uploader) {
+func HandleBinlogPush(uploader *internal.Uploader, untilBinlog string) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(BinlogPath)
 
 	db, err := getMySQLConnection()
@@ -32,7 +32,7 @@ func HandleBinlogPush(uploader *internal.Uploader) {
 	binlogsFolder, err := getMySQLBinlogsFolder(db)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	binlogs, err := getMySQLSortedBinlogs(db)
+	binlogs, err := getMySQLSortedBinlogs(db, untilBinlog)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	for _, binLog := range binlogs {
@@ -41,10 +41,12 @@ func HandleBinlogPush(uploader *internal.Uploader) {
 	}
 }
 
-func getMySQLSortedBinlogs(db *sql.DB) ([]string, error) {
+func getMySQLSortedBinlogs(db *sql.DB, untilBinlog string) ([]string, error) {
 	var result []string
 
-	currentBinlog := getMySQLCurrentBinlogFileLocal(db)
+	if untilBinlog == "" {
+		untilBinlog = getMySQLCurrentBinlogFileLocal(db)
+	}
 
 	rows, err := db.Query("SHOW BINARY LOGS")
 	if err != nil {
@@ -58,7 +60,7 @@ func getMySQLSortedBinlogs(db *sql.DB) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		if logFinName < currentBinlog {
+		if logFinName < untilBinlog {
 			result = append(result, logFinName)
 		}
 	}
