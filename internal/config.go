@@ -96,6 +96,9 @@ const (
 
 	RedisPassword = "WALG_REDIS_PASSWORD"
 
+	ClickHouseBackupPath = "WALG_CLICKHOUSE_BACKUP_PATH"
+	ClickHouseCreateBackup = "WALG_CLICKHOUSE_CREATE_BACKUP"
+
 	GoMaxProcs = "GOMAXPROCS"
 
 	HTTPListen       = "HTTP_LISTEN"
@@ -154,6 +157,10 @@ var (
 
 	PGDefaultSettings = map[string]string{
 		PgWalSize: "16",
+	}
+
+	ClickHouseDefaultSettings = map[string]string{
+		ClickHouseBackupPath: "/var/lib/clickhouse/backup",
 	}
 
 	AllowedSettings map[string]bool
@@ -321,6 +328,12 @@ var (
 		RedisPassword: true,
 	}
 
+	ClickHouseAllowedSettings = map[string]bool{
+		// ClickHouse
+		ClickHouseBackupPath: true,
+		ClickHouseCreateBackup: true,
+	}
+
 	RequiredSettings       = make(map[string]bool)
 	HTTPSettingExposeFuncs = map[string]func(webserver.WebServer){
 		HTTPExposePprof:          webserver.EnablePprofEndpoints,
@@ -339,6 +352,8 @@ func ConfigureSettings(currentType string) {
 			dbSpecificDefaultSettings = PGDefaultSettings
 		case MONGO:
 			dbSpecificDefaultSettings = MongoDefaultSettings
+		case CLICKHOUSE:
+			dbSpecificDefaultSettings = ClickHouseDefaultSettings
 		}
 
 		for k, v := range dbSpecificDefaultSettings {
@@ -360,6 +375,8 @@ func ConfigureSettings(currentType string) {
 			dbSpecificSettings = SQLServerAllowedSettings
 		case REDIS:
 			dbSpecificSettings = RedisAllowedSettings
+		case CLICKHOUSE:
+			dbSpecificSettings = ClickHouseAllowedSettings
 		}
 
 		for k, v := range dbSpecificSettings {

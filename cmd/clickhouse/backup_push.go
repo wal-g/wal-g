@@ -26,12 +26,12 @@ var backupPushCmd = &cobra.Command{
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		backupCmd, err := internal.GetCommandSetting(internal.NameStreamCreateCmd)
+		backupCmd, err := internal.GetCommandSetting(internal.ClickHouseCreateBackup)
 		tracelog.ErrorLogger.FatalOnError(err)
 		clickhouse.HandleBackupPush(uploader, backupCmd)
 	},
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		internal.RequiredSettings[internal.NameStreamCreateCmd] = true
+		internal.RequiredSettings[internal.ClickHouseCreateBackup] = true
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
