@@ -53,8 +53,8 @@ func appendBackupNameToCommand(backupCmd *exec.Cmd, backupName string) {
 
 func getBackupFilePaths(backupFolder string) ([]string, error) {
 	var filePaths []string
-	err := filepath.WalkDir(backupFolder,
-		func(path string, info os.DirEntry, err error) error {
+	err := filepath.Walk(backupFolder,
+		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
