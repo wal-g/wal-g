@@ -28,13 +28,22 @@ Installation
 ----------
 A precompiled binary for Linux AMD 64 of the latest version of WAL-G can be obtained under the [Releases tab](https://github.com/wal-g/wal-g/releases).
 
+Binary name has the following format: `wal-g-DBNAME-OSNAME`, where `DBNAME` stands for the name of the database (for example pg, mysql), `OSNAME` stands for the name of the operating system used for building the binary.
+
 To decompress the binary, use:
 
 ```plaintext
-tar -zxvf wal-g.linux-amd64.tar.gz
-mv wal-g /usr/local/bin/
+tar -zxvf wal-g-DBNAME-OSNAME-amd64.tar.gz
+mv wal-g-DBNAME-OSNAME-amd64 /usr/local/bin/wal-g
 ```
-For other incompatible systems, please consult the [Development](#development) section for more information.
+
+For example, for Postgres and Ubuntu 18.04:
+```plaintext
+tar -zxvf wal-g-pg-ubuntu-18.04-amd64.tar.gz
+mv wal-g-pg-ubuntu-18.04-amd64 /usr/local/bin/wal-g
+```
+
+For other systems, please consult the [Development](#development) section for more information.
 
 Configuration
 -------------
