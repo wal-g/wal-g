@@ -62,5 +62,5 @@ Typical configurations
 
 ```bash
  WALG_CLICKHOUSE_BACKUP_PATH="/var/lib/clickhouse/backup"                                                                                                                                   
- WALG_STREAM_CREATE_COMMAND="clickhouse-backup create"                                                                                                                               
+ WALG_CLICKHOUSE_CREATE_BACKUP="clickhouse-backup create"                                                                                                                               
 ```
