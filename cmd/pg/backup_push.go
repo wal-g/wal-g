@@ -54,6 +54,9 @@ var (
 			if useRatingComposer {
 				tarBallComposerType = postgres.RatingComposer
 			}
+			// if useCopyComposer && fullBackup {
+			// 	tarBallComposerType = postgres.CopyComposer
+			// }
 			if deltaFromName == "" {
 				deltaFromName = viper.GetString(internal.DeltaFromNameSetting)
 			}
@@ -81,6 +84,7 @@ var (
 	verifyPageChecksums   = false
 	storeAllCorruptBlocks = false
 	useRatingComposer     = false
+	// useCopyComposer       = true
 	deltaFromName         = ""
 	deltaFromUserData     = ""
 	userData              = ""
