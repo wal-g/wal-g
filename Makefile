@@ -30,7 +30,7 @@ endif
 
 .PHONY: unittest fmt lint clean
 
-test: deps unittest pg_build mysql_build redis_build mongo_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test
+test: deps unittest pg_build mysql_build redis_build mongo_build clickhouse_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test clickhouse_integration_test
 
 pg_test: deps pg_build unlink_brotli pg_integration_test
 
@@ -163,12 +163,18 @@ clean_redis_features:
 	set -e
 	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1  -timeout 5m -tf.test=false -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=redis
 
+clickhouse_test: deps clickhouse_build unlink_brotli clickhouse_integration_test
+
 clickhouse_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_CLICKHOUSE_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w")
 
 clickhouse_install: clickhouse_build
 	mv $(MAIN_CLICKHOUSE_PATH)/wal-g $(GOBIN)/wal-g
 
+clickhouse_integration_test: load_docker_common
+	./link_brotli.sh
+	docker-compose build clickhouse clickhouse_tests
+	docker-compose up --force-recreate --renew-anon-volumes --exit-code-from clickhouse_tests clickhouse_tests
 
 unittest:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet

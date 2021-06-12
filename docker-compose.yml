@@ -601,3 +601,19 @@ services:
       - s3
     links:
       - s3
+
+  clickhouse:
+    build:
+      dockerfile: docker/clickhouse/Dockerfile
+      context: .
+    image: wal-g/clickhouse
+    container_name: wal-g_clickhouse
+
+  clickhouse_tests:
+    build:
+      dockerfile: docker/clickhouse_tests/Dockerfile
+      context: .
+    image: wal-g/clickhouse_tests
+    container_name: wal-g_clickhouse_tests
+    env_file:
+      - docker/common/common_walg.env

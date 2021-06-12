@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -19,9 +20,14 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
 
 	backupName := getBackupName()
 	appendBackupNameToCommand(backupCmd, backupName)
-	_, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
+	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
+	backup_output, err := ioutil.ReadAll(stdout)
+	if err != nil {
+		tracelog.ErrorLogger.Fatalf("failed reading from backup stdout: %v", err)
+	}
 	if err := backupCmd.Wait(); err != nil {
-		tracelog.ErrorLogger.Printf("backup command output:\n%s", stderr.String())
+		tracelog.ErrorLogger.Printf("backup command output:\n%s", backup_output)
+		tracelog.ErrorLogger.Printf("backup command stderr:\n%s", stderr.String())
 		tracelog.ErrorLogger.Fatalf("failed to run backup: %v", err)
 	}
 
