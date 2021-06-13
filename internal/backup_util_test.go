@@ -45,15 +45,17 @@ func TestGetBackupTimeSlices_List(t *testing.T) {
 func TestGetBackupTimeSlices_OrderCheck(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 	_ = folder.PutObject(testStreamBackup.BackupName+".1"+utility.SentinelSuffix, &bytes.Buffer{})
+	time.Sleep(time.Second)
 	_ = folder.PutObject(testStreamBackup.BackupName+".2"+utility.SentinelSuffix, &bytes.Buffer{})
 
 	objects, _, _ := folder.ListFolder()
 
 	result := internal.GetBackupTimeSlices(objects)
+	internal.SortBackupTimeSlices(result)
 
 	assert.Equalf(t, 2, len(result), "GetBackupTimeSlices returned wrong count of backup: something wrong")
-	assert.True(t, result[0].BackupName == testStreamBackup.BackupName+".2", "GetBackupTimeSlices returned bad time ordering: Second file should be first, because second was added last")
-	assert.True(t, result[0].Time.After(result[1].Time), "GetBackupTimeSlices returned bad time ordering: order should be Descending")
+	assert.True(t, result[0].BackupName == testStreamBackup.BackupName+".1", "GetBackupTimeSlices returned bad time ordering: "+testStreamBackup.BackupName+".1 should be first, because second was added earlier")
+	assert.True(t, result[0].Time.Before(result[1].Time), "GetBackupTimeSlices returned bad time ordering: order should be Ascending")
 }
 
 func TestGetGarbageFromPrefix(t *testing.T) {

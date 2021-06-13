@@ -28,7 +28,7 @@ func TestIsDirectoryEmpty_ReturnsTrue_WhenDirectoryIsEmpty(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.Remove(dir)
 
-	actual, err := isDirectoryEmpty(dir)
+	actual, _ := isDirectoryEmpty(dir)
 
 	assert.True(t, actual)
 }
@@ -42,7 +42,7 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenOneFileIsInDirectory(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.Remove(file.Name())
 
-	actual, err := isDirectoryEmpty(dir)
+	actual, _ := isDirectoryEmpty(dir)
 
 	assert.False(t, actual)
 }
@@ -58,7 +58,7 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenSeveralFilesAreInDirectory(t *testing
 		defer os.Remove(file.Name())
 	}
 
-	actual, err := isDirectoryEmpty(dir)
+	actual, _ := isDirectoryEmpty(dir)
 
 	assert.False(t, actual)
 }
@@ -72,7 +72,7 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenNestedDirectoryIsInDirectory(t *testi
 	assert.NoError(t, err)
 	defer os.Remove(nested)
 
-	actual, err := isDirectoryEmpty(dir)
+	actual, _ := isDirectoryEmpty(dir)
 
 	assert.False(t, actual)
 }
@@ -84,7 +84,7 @@ func TestIsDirectoryEmpty_ReturnsTrue_WhenDirectoryDoesntExist(t *testing.T) {
 	err = os.Remove(dir)
 	assert.NoError(t, err)
 
-	actual, err := isDirectoryEmpty(dir)
+	actual, _ := isDirectoryEmpty(dir)
 
 	assert.True(t, actual)
 }

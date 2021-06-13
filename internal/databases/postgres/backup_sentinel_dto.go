@@ -11,6 +11,8 @@ import (
 	"github.com/wal-g/wal-g/internal"
 )
 
+const MetadataDatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
+
 // BackupSentinelDto describes file structure of json sentinel
 type BackupSentinelDto struct {
 	BackupStartLSN    *uint64 `json:"LSN"`
@@ -84,7 +86,7 @@ func NewExtendedMetadataDto(isPermanent bool, dataDir string, startTime time.Tim
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to fetch the hostname for metadata, leaving empty: %v", err)
 	}
-	meta.DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
+	meta.DatetimeFormat = MetadataDatetimeFormat
 	meta.StartTime = startTime
 	meta.FinishTime = utility.TimeNowCrossPlatformUTC()
 	meta.Hostname = hostname

@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"syscall"
 
@@ -28,6 +29,11 @@ var backupFetchCmd = &cobra.Command{
 
 		restoreCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamRestoreCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
+
+		redisPassword, ok := internal.GetSetting(internal.RedisPassword)
+		if ok && redisPassword != "" { // special hack for redis-cli
+			restoreCmd.Env = append(restoreCmd.Env, fmt.Sprintf("REDISCLI_AUTH=%s", redisPassword))
+		}
 		restoreCmd.Stdout = os.Stdout
 		restoreCmd.Stderr = os.Stderr
 

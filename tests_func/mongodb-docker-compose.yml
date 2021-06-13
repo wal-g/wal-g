@@ -35,7 +35,7 @@ services:
             - test_net
         ports:
             - ${MONGO_EXPOSE_MONGOD}
-            - ${MONGO_EXPOSE_SSH}
+            - ${EXPOSE_SSH_PORT}
         tmpfs: /var/run
         volumes:
             - ./images/mongodb/config:/config:ro
@@ -58,7 +58,7 @@ services:
             - test_net
         ports:
             - ${MONGO_EXPOSE_MONGOD}
-            - ${MONGO_EXPOSE_SSH}
+            - ${EXPOSE_SSH_PORT}
         tmpfs: /var/run
         volumes:
             - ./images/mongodb/config:/config:ro

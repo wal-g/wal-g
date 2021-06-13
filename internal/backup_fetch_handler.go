@@ -50,15 +50,23 @@ func StreamBackupToCommandStdin(cmd *exec.Cmd, backup Backup) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch backup: %v", err)
 	}
+	tracelog.DebugLogger.Printf("Running command: %s", cmd.Args)
 	err = cmd.Start()
 	if err != nil {
 		return fmt.Errorf("failed to start command: %v", err)
 	}
 	err = downloadAndDecompressStream(backup, stdin)
 	if err != nil {
-		return fmt.Errorf("failed to download and decompress stream: %v", err)
+		return errors.Wrap(err, "failed to download and decompress stream")
 	}
-	return cmd.Wait()
+	err = cmd.Wait()
+	if err != nil {
+		return err
+	}
+	if cmd.ProcessState != nil && !cmd.ProcessState.Success() {
+		return fmt.Errorf("command exited with non-zero code: %d", cmd.ProcessState.ExitCode())
+	}
+	return nil
 }
 
 // TODO : unit tests

@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,7 +19,9 @@ import (
 
 const (
 	featuresDir = "features"
-	featureExt = ".feature"
+	featureExt  = ".feature"
+
+	MAX_RETRIES_COUNT = 10
 )
 
 func (tctx *TestContext) ContainerFQDN(name string) string {
@@ -69,7 +72,6 @@ type AuxData struct {
 	CreatedBackupNames []string
 	NometaBackupNames  []string
 	OplogPushEnabled   bool
-	PreviousBackupTime time.Time
 }
 
 type MongoVersion struct {
@@ -78,14 +80,15 @@ type MongoVersion struct {
 }
 
 type TestContext struct {
-	EnvFilePath string
-	Database    string
-	Infra       *helpers.Infra
-	Env         map[string]string
-	Context     context.Context
-	AuxData     AuxData
-	Version     MongoVersion
-	Features    []string
+	EnvFilePath        string
+	Database           string
+	Infra              *helpers.Infra
+	Env                map[string]string
+	Context            context.Context
+	AuxData            AuxData
+	Version            MongoVersion
+	Features           []string
+	PreviousBackupTime time.Time
 }
 
 func NewTestContext(envFilePath, database string, env, features map[string]string) (*TestContext, error) {
@@ -93,13 +96,13 @@ func NewTestContext(envFilePath, database string, env, features map[string]strin
 	environ := utils.ParseEnvLines(os.Environ())
 	return &TestContext{
 		EnvFilePath: envFilePath,
-		Database: database,
-		Context: context.Background(),
+		Database:    database,
+		Context:     context.Background(),
 		Version: MongoVersion{
 			Major: environ["MONGO_MAJOR"],
 			Full:  environ["MONGO_VERSION"]},
 		Features: featuresList,
-		Env: env}, nil
+		Env:      env}, nil
 }
 
 func (tctx *TestContext) StopEnv() error {
@@ -124,7 +127,7 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 		tctx.AuxData.OplogPushEnabled = false
 		tctx.AuxData.Timestamps = make(map[string]helpers.OpTimestamp)
 		tctx.AuxData.Snapshots = make(map[string][]helpers.NsSnapshot)
-		tctx.AuxData.PreviousBackupTime = time.Unix(0, 0)
+		tctx.PreviousBackupTime = time.Unix(0, 0)
 		if err := tctx.Infra.RecreateContainers(); err != nil {
 			tracelog.ErrorLogger.Fatalln(err)
 		}
@@ -133,34 +136,42 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 	s.BeforeSuite(tctx.LoadEnv)
 
 	s.Step(`^a configured s3 on ([^\s]*)$`, tctx.configureS3)
-	s.Step(`^at least one oplog archive exists in storage$`, tctx.oplogArchiveIsNotEmpty)
 
 	s.Step(`^a working mongodb on ([^\s]*)$`, tctx.testMongoConnect)
 	s.Step(`^mongodb replset initialized on ([^\s]*)$`, tctx.initiateReplSet)
-	s.Step(`^mongodb role is primary on ([^\s]*)$`, tctx.isPrimary)
-	s.Step(`^mongodb auth initialized on ([^\s]*)$`, tctx.enableAuth)
-	s.Step(`^([^\s]*) has no data$`, tctx.purgeDataDir)
+	s.Step(`^mongodb role is primary on ([^\s]*)$`, tctx.isMongoPrimary)
+	s.Step(`^mongodb auth initialized on ([^\s]*)$`, tctx.mongoEnableAuth)
+	s.Step(`^([^\s]*) has no data$`, tctx.purgeMongoDataDir)
 
 	s.Step(`we save last oplog timestamp on ([^\s]*) to "([^"]*)"`, tctx.saveOplogTimestamp)
 	s.Step(`^([^\s]*) has test mongodb data test(\d+)$`, tctx.fillMongodbWithTestData)
 	s.Step(`^([^\s]*) has been loaded with "([^"]*)"$`, tctx.loadMongodbOpsFromConfig)
 	s.Step(`^we got same mongodb data at ([^\s]*) ([^\s]*)$`, tctx.testEqualMongodbDataAtHosts)
 	s.Step(`^we have same data in "([^"]*)" and "([^"]*)"$`, tctx.sameDataCheck)
-	s.Step(`^we save ([^\s]*) data "([^"]*)"$`, tctx.saveSnapshot)
+	s.Step(`^we save ([^\s]*) data "([^"]*)"$`, tctx.saveMongoSnapshot)
 
-	s.Step(`^we create ([^\s]*) backup$`, tctx.createBackup)
-	s.Step(`^we got (\d+) backup entries of ([^\s]*)$`, tctx.checkBackupsCount)
-	s.Step(`^we put empty backup via ([^\s]*)$`, tctx.putEmptyBackupViaMinio)
-	s.Step(`^we delete backups retain (\d+) via ([^\s]*)$`, tctx.purgeBackupRetain)
-	s.Step(`^we delete backup #(\d+) via ([^\s]*)$`, tctx.deleteBackup)
+	s.Step(`^we create ([^\s]*) mongo-backup$`, tctx.createMongoBackup)
+	s.Step(`^we delete mongo backups retain (\d+) via ([^\s]*)$`, tctx.purgeBackupRetain)
+	s.Step(`^at least one oplog archive exists in storage$`, tctx.oplogArchiveIsNotEmpty)
 	s.Step(`^we purge oplog archives via ([^\s]*)$`, tctx.purgeOplogArchives)
-	s.Step(`^we check if empty backups were purged via ([^\s]*)$`, tctx.testEmptyBackupsViaMinio)
 	s.Step(`^we restore #(\d+) backup to ([^\s]*)$`, tctx.restoreBackupToMongodb)
-	s.Step(`^we ensure ([^\s]*) #(\d+) backup metadata contains$`, tctx.backupMetadataContains)
 	s.Step(`^oplog archiving is enabled on ([^\s]*)$`, tctx.enableOplogPush)
 	s.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*)$`, tctx.replayOplog)
 
+	s.Step(`^we got (\d+) backup entries of ([^\s]*)$`, tctx.checkBackupsCount)
+	s.Step(`^we delete mongo backup #(\d+) via ([^\s]*)$`, tctx.deleteMongoBackup)
+	s.Step(`^we ensure ([^\s]*) #(\d+) backup metadata contains$`, tctx.backupMetadataContains)
+	s.Step(`^we put empty backup via ([^\s]*) to ([^\s]*)$`, tctx.putEmptyBackupViaMinio)
+	s.Step(`^we check if empty backups were purged via ([^\s]*)$`, tctx.testEmptyBackupsViaMinio)
+
 	s.Step(`we sleep ([^\s]*)$`, tctx.sleep)
+
+	s.Step(`^a working redis on ([^\s]*)$`, tctx.isWorkingRedis)
+	s.Step(`^([^\s]*) has test redis data test(\d+)$`, tctx.redisHasTestRedisDataTest)
+	s.Step(`^we create ([^\s]*) redis-backup$`, tctx.createRedisBackup)
+	s.Step(`^we delete redis backups retain (\d+) via ([^\s]*)$`, tctx.weDeleteRedisBackupsRetainViaRedis)
+	s.Step(`^we restart redis-server at ([^\s]*)$`, tctx.weRestartRedisServerAt)
+	s.Step(`^we got same redis data at ([^\s]*) ([^\s]*)$`, tctx.testEqualRedisDataAtHosts)
 }
 
 func (tctx *TestContext) LoadEnv() {
@@ -192,7 +203,7 @@ func scanFeatureDirs(dbName, featurePrefix string) (map[string]string, error) {
 		found := false
 		for _, f := range files {
 			filename := f.Name()
-			if filename == requestedFeature + featureExt {
+			if filename == requestedFeature+featureExt {
 				files = []os.FileInfo{f}
 				found = true
 				break
@@ -212,10 +223,26 @@ func scanFeatureDirs(dbName, featurePrefix string) (map[string]string, error) {
 		}
 
 		if strings.HasSuffix(filename, featureExt) {
-			featureName := filename[0:len(filename)-len(featureExt)]
+			featureName := filename[0 : len(filename)-len(featureExt)]
 			foundFeatures[featureName] = path.Join(dir, f.Name())
 		}
 	}
 
 	return foundFeatures, nil
+}
+
+func GetRedisCtlFromTestContext(tctx *TestContext, hostName string) (*helpers.RedisCtl, error) {
+	host := tctx.ContainerFQDN(hostName)
+	port, err := strconv.Atoi(tctx.Env["REDIS_EXPOSE_PORT"])
+	if err != nil {
+		return nil, err
+	}
+	return helpers.NewRedisCtl(
+		tctx.Context,
+		host,
+		port,
+		tctx.Env["REDIS_PASSWORD"],
+		tctx.Env["WALG_CLIENT_PATH"],
+		tctx.Env["WALG_CONF_PATH"],
+	)
 }

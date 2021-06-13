@@ -22,7 +22,7 @@ func GetSettingWithLocalDefault(key string, defaultValue string) string {
 func _() *redis.Client {
 	redisAddr := GetSettingWithLocalDefault("WALG_REDIS_HOST", "localhost")
 	redisPort := GetSettingWithLocalDefault("WALG_REDIS_PORT", "6379")
-	redisPassword := GetSettingWithLocalDefault("WALG_REDIS_PASSWORD", "") // no password set
+	redisPassword := GetSettingWithLocalDefault(internal.RedisPassword, "") // no password set
 	redisDBStr, ok := internal.GetSetting("WALG_REDIS_DB")
 	redisDB := 0 // use default DB
 	if ok {

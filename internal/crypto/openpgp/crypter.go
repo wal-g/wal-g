@@ -35,6 +35,10 @@ type Crypter struct {
 	mutex sync.RWMutex
 }
 
+func (crypter *Crypter) Name() string {
+	return "Opengpg/Crypter"
+}
+
 // CrypterFromKey creates Crypter from armored key.
 func CrypterFromKey(armoredKey string, loadPassphrase func() (string, bool)) crypto.Crypter {
 	return &Crypter{ArmoredKey: armoredKey, IsUseArmoredKey: true, loadPassphrase: loadPassphrase}

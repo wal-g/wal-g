@@ -125,6 +125,7 @@ func (w *WalgUtil) FetchBackupByNum(backupNum int) error {
 		return fmt.Errorf("only %d backups exists, backup #%d is not found", len(backups), backupNum)
 	}
 	_, err = w.runCmd([]string{"backup-fetch", backups[backupNum]})
+	//time.Sleep(5 * time.Minute)
 	return err
 }
 
