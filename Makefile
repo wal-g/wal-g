@@ -29,7 +29,7 @@ endif
 
 .PHONY: unittest fmt lint clean
 
-test: deps unittest pg_build mysql_build redis_build mongo_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test
+test: deps unittest pg_build mysql_build redis_build mongo_build gp_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test gp_integration_test
 
 pg_test: deps pg_build unlink_brotli pg_integration_test
 
@@ -162,6 +162,12 @@ gp_clean:
 
 gp_install: gp_build
 	mv $(MAIN_GP_PATH)/wal-g $(GOBIN)/wal-g
+
+gp_test: deps gp_build unlink_brotli gp_integration_test
+
+gp_integration_test: load_docker_common
+	docker-compose build gp gp_tests
+	docker-compose up --exit-code-from gp_tests gp_tests
 
 unittest:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet

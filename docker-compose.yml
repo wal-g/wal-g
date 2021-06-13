@@ -601,3 +601,21 @@ services:
       - s3
     links:
       - s3
+
+  gp:
+    build:
+      dockerfile: docker/gp/Dockerfile
+      context: .
+    image: wal-g/gp
+    container_name: wal-g_gp
+
+  gp_tests:
+    build:
+      dockerfile: docker/gp_tests/Dockerfile
+      context: .
+    image: wal-g/gp_tests
+    container_name: wal-g_gp_tests
+    env_file:
+      - docker/common/common_walg.env
+    depends_on:
+      - gp
