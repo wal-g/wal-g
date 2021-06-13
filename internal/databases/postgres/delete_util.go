@@ -9,7 +9,7 @@ import (
 
 func GetPermanentBackupsAndWals(folder storage.Folder) (map[string]bool, map[string]bool) {
 	tracelog.InfoLogger.Println("retrieving permanent objects")
-	backupTimes, err := internal.GetBackups(folder)
+	backupTimes, err := internal.GetBackups(folder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return map[string]bool{}, map[string]bool{}
 	}

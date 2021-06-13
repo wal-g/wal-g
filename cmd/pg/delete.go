@@ -92,26 +92,12 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	forceModifier := false
-	modifier := internal.ExtractDeleteEverythingModifierFromArgs(args)
-	if modifier == internal.ForceDeleteModifier {
-		forceModifier = true
-	}
-
 	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
-	if len(permanentBackups) > 0 {
-		if !forceModifier {
-			tracelog.ErrorLogger.Fatalf("Found permanent objects: backups=%v, wals=%v\n",
-				permanentBackups, permanentWals)
-		}
-		tracelog.InfoLogger.Printf("Found permanent objects: backups=%v, wals=%v\n",
-			permanentBackups, permanentWals)
-	}
 
 	deleteHandler, err := newPostgresDeleteHandler(folder, permanentBackups, permanentWals)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.DeleteEverything(confirmed)
+	deleteHandler.HandleDeleteEverything(args, permanentBackups, confirmed)
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
@@ -285,7 +271,7 @@ func getBackupStartTimeMap(folder storage.Folder, backups []storage.Object) (map
 	startTimeByBackupName := make(map[string]time.Time, len(backups))
 
 	for _, backupTime := range backupTimes {
-		backupDetails, err := postgres.GetBackupDetails(folder, backupTime)
+		backupDetails, err := postgres.GetBackupDetails(folder.GetSubFolder(utility.BaseBackupPath), backupTime)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Failed to get metadata of backup %s",
 				backupTime.BackupName)

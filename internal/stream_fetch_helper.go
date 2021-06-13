@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -35,23 +37,23 @@ func GetLogsDstSettings(operationLogsDstEnvVariable string) (dstFolder string, e
 // TODO : unit tests
 // downloadAndDecompressStream downloads, decompresses and writes stream to stdout
 func downloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) error {
-	defer writeCloser.Close()
+	defer utility.LoggedClose(writeCloser, "")
 
 	for _, decompressor := range compression.Decompressors {
 		archiveReader, exists, err := TryDownloadFile(
 			backup.Folder, GetStreamName(backup.Name, decompressor.FileExtension()))
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to dowload file")
 		}
 		if !exists {
 			continue
 		}
 
+		tracelog.DebugLogger.Printf("Found file: %s.%s", backup.Name, decompressor.FileExtension())
 		err = DecompressDecryptBytes(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to decompress and decrypt file")
 		}
-		utility.LoggedClose(writeCloser, "")
 		return nil
 	}
 	return newArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))

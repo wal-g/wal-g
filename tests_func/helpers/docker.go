@@ -332,6 +332,7 @@ func (inf *Infra) callCompose(actions []string) error {
 	if err != nil {
 		return err
 	}
+	tracelog.DebugLogger.Printf("Running command %s: with args %v", fullPath, baseArgs)
 	cmd := exec.CommandContext(inf.ctx, fullPath, baseArgs...)
 	for _, line := range utils.EnvToList(inf.env) {
 		cmd.Env = append(cmd.Env, line)

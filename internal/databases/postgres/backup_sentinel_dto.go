@@ -1,11 +1,17 @@
 package postgres
 
 import (
+	"os"
 	"sync"
 	"time"
 
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/utility"
+
 	"github.com/wal-g/wal-g/internal"
 )
+
+const MetadataDatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 // BackupSentinelDto describes file structure of json sentinel
 type BackupSentinelDto struct {
@@ -29,38 +35,28 @@ type BackupSentinelDto struct {
 	UserData interface{} `json:"UserData,omitempty"`
 }
 
-func NewBackupSentinelDto(
-	backupStartLSN, backupFinishLSN uint64,
-	bc *BackupConfig,
-	pgVersion int,
-	tablespaceSpec *TablespaceSpec,
-	systemIdentifier *uint64,
-	uncompressedSize, compressedSize int64,
-	files *sync.Map,
-	tarFileSets TarFileSets,
-) *BackupSentinelDto {
-	sentinel := &BackupSentinelDto{
-		BackupStartLSN:   &backupStartLSN,
-		IncrementFromLSN: bc.previousBackupSentinelDto.BackupStartLSN,
-		PgVersion:        pgVersion,
-		TablespaceSpec:   tablespaceSpec,
+func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec, tarFileSets TarFileSets) BackupSentinelDto {
+	sentinel := BackupSentinelDto{
+		BackupStartLSN:   &bh.curBackupInfo.startLSN,
+		IncrementFromLSN: bh.prevBackupInfo.sentinelDto.BackupStartLSN,
+		PgVersion:        bh.pgInfo.pgVersion,
+		TablespaceSpec:   tbsSpec,
 	}
-	if bc.previousBackupSentinelDto.BackupStartLSN != nil {
-		sentinel.IncrementFrom = &bc.previousBackupName
-		if bc.previousBackupSentinelDto.IsIncremental() {
-			sentinel.IncrementFullName = bc.previousBackupSentinelDto.IncrementFullName
+	if bh.prevBackupInfo.sentinelDto.BackupStartLSN != nil {
+		sentinel.IncrementFrom = &bh.prevBackupInfo.name
+		if bh.prevBackupInfo.sentinelDto.IsIncremental() {
+			sentinel.IncrementFullName = bh.prevBackupInfo.sentinelDto.IncrementFullName
 		} else {
-			sentinel.IncrementFullName = &bc.previousBackupName
+			sentinel.IncrementFullName = &bh.prevBackupInfo.name
 		}
-		sentinel.IncrementCount = &bc.incrementCount
+		sentinel.IncrementCount = &bh.curBackupInfo.incrementCount
 	}
 
-	sentinel.setFiles(files)
-	sentinel.BackupFinishLSN = &backupFinishLSN
-	sentinel.UserData = internal.UnmarshalSentinelUserData(bc.userData)
-	sentinel.SystemIdentifier = systemIdentifier
-	sentinel.UncompressedSize = uncompressedSize
-	sentinel.CompressedSize = compressedSize
+	sentinel.BackupFinishLSN = &bh.curBackupInfo.endLSN
+	sentinel.UserData = internal.UnmarshalSentinelUserData(bh.arguments.userData)
+	sentinel.SystemIdentifier = bh.pgInfo.systemIdentifier
+	sentinel.UncompressedSize = bh.curBackupInfo.uncompressedSize
+	sentinel.CompressedSize = bh.curBackupInfo.compressedSize
 	sentinel.TarFileSets = tarFileSets
 	return sentinel
 }
@@ -84,6 +80,30 @@ type ExtendedMetadataDto struct {
 	UserData interface{} `json:"user_data,omitempty"`
 }
 
+func NewExtendedMetadataDto(isPermanent bool, dataDir string, startTime time.Time,
+	sentinelDto BackupSentinelDto) (meta ExtendedMetadataDto) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		tracelog.WarningLogger.Printf("Failed to fetch the hostname for metadata, leaving empty: %v", err)
+	}
+	meta.DatetimeFormat = MetadataDatetimeFormat
+	meta.StartTime = startTime
+	meta.FinishTime = utility.TimeNowCrossPlatformUTC()
+	meta.Hostname = hostname
+	meta.IsPermanent = isPermanent
+	meta.DataDir = dataDir
+
+	// set the matching fields from sentinel
+	meta.StartLsn = *sentinelDto.BackupStartLSN
+	meta.FinishLsn = *sentinelDto.BackupFinishLSN
+	meta.PgVersion = sentinelDto.PgVersion
+	meta.SystemIdentifier = sentinelDto.SystemIdentifier
+	meta.UserData = sentinelDto.UserData
+	meta.UncompressedSize = sentinelDto.UncompressedSize
+	meta.CompressedSize = sentinelDto.CompressedSize
+	return meta
+}
+
 func (dto *BackupSentinelDto) setFiles(p *sync.Map) {
 	dto.Files = make(internal.BackupFileList)
 	p.Range(func(k, v interface{}) bool {
@@ -97,7 +117,7 @@ func (dto *BackupSentinelDto) setFiles(p *sync.Map) {
 // TODO : unit tests
 // TODO : get rid of panic here
 // IsIncremental checks that sentinel represents delta backup
-func (dto *BackupSentinelDto) IsIncremental() bool {
+func (dto *BackupSentinelDto) IsIncremental() (isIncremental bool) {
 	// If we have increment base, we must have all the rest properties.
 	if dto.IncrementFrom != nil {
 		if dto.IncrementFromLSN == nil || dto.IncrementFullName == nil || dto.IncrementCount == nil {

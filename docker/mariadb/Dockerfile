@@ -5,7 +5,7 @@ ENV MYSQLDATA /var/lib/mysql
 
 # fixme: the package of MariaDB 10.4 doesn't work in this environement because it's not being added to the services.
 RUN apt-get update && \
-    apt-get install --yes --no-install-recommends --no-install-suggests software-properties-common dirmngr gnupg2 curl && \
+    apt-get install --yes --no-install-recommends --no-install-suggests software-properties-common dirmngr gnupg2 curl apt-transport-https && \
     curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | /bin/bash -s -- --mariadb-server-version="mariadb-10.3" && \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install --yes \

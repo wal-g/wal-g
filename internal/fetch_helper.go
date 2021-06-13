@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"os/user"
 	"path/filepath"
 
@@ -34,6 +35,7 @@ func DownloadFile(folder storage.Folder, filename, ext string, writeCloser io.Wr
 	if decompressor == nil {
 		return fmt.Errorf("decompressor for extension '%s' was not found", ext)
 	}
+	tracelog.DebugLogger.Printf("Found decompressor for %s", decompressor.FileExtension())
 	archiveReader, exists, err := TryDownloadFile(folder, filename)
 	if err != nil {
 		return err
@@ -66,18 +68,25 @@ func TryDownloadFile(folder storage.Folder, path string) (walFileReader io.ReadC
 func DecompressDecryptBytes(dst io.Writer, archiveReader io.ReadCloser, decompressor compression.Decompressor) error {
 	crypter := ConfigureCrypter()
 	if crypter != nil {
+		tracelog.DebugLogger.Printf("Selected crypter: %s", crypter.Name())
+
 		reader, err := crypter.Decrypt(archiveReader)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to init decrypt reader: %w", err)
 		}
 		archiveReader = ioextensions.ReadCascadeCloser{
 			Reader: reader,
 			Closer: archiveReader,
 		}
+	} else {
+		tracelog.DebugLogger.Printf("No crypter has been selected")
 	}
 
 	err := decompressor.Decompress(dst, archiveReader)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to decompress archive reader: %w", err)
+	}
+	return nil
 }
 
 // CachedDecompressor is the file extension describing decompressor
@@ -172,10 +181,21 @@ func DownloadAndDecompressStorageFile(folder storage.Folder, fileName string) (i
 // TODO : unit tests
 // DownloadFileTo downloads a file and writes it to local file
 func DownloadFileTo(folder storage.Folder, fileName string, dstPath string) error {
-	reader, err := DownloadAndDecompressStorageFile(folder, fileName)
+	// Create file as soon as possible. It may be important due to race condition in wal-prefetch for PG.
+	file, err := os.OpenFile(dstPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
 	if err != nil {
 		return err
 	}
+
+	reader, err := DownloadAndDecompressStorageFile(folder, fileName)
+	if err != nil {
+		// We could not start upload - remove the file totally.
+		_ = os.Remove(dstPath)
+		return err
+	}
 	defer utility.LoggedClose(reader, "")
-	return ioextensions.CreateFileWith(dstPath, reader)
+
+	_, err = utility.FastCopy(file, reader)
+	// In case of error we may have some content within file. Leave it alone.
+	return err
 }

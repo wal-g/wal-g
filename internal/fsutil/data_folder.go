@@ -28,4 +28,5 @@ type DataFolder interface {
 	FileExists(filename string) bool
 	DeleteFile(filename string) error
 	CreateFile(filename string) error
+	RenameFile(oldFileName string, newFileName string) error
 }

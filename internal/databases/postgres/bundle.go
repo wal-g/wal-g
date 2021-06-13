@@ -62,8 +62,8 @@ func init() {
 // uploaded backups; in this case, pg_control is used as
 // the sentinel.
 type Bundle struct {
-	ArchiveDirectory string
-	Sentinel         *internal.Sentinel
+	Directory string
+	Sentinel  *internal.Sentinel
 
 	TarBallComposer TarBallComposer
 	TarBallQueue    *internal.TarBallQueue
@@ -82,23 +82,23 @@ type Bundle struct {
 
 // TODO: use DiskDataFolder
 func NewBundle(
-	archiveDirectory string, crypter crypto.Crypter,
+	directory string, crypter crypto.Crypter,
 	incrementFromLsn *uint64, incrementFromFiles internal.BackupFileList,
 	forceIncremental bool, tarSizeThreshold int64,
 ) *Bundle {
 	return &Bundle{
-		ArchiveDirectory:   archiveDirectory,
+		Directory:          directory,
 		Crypter:            crypter,
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
-		TablespaceSpec:     NewTablespaceSpec(archiveDirectory),
+		TablespaceSpec:     NewTablespaceSpec(directory),
 		forceIncremental:   forceIncremental,
 		TarSizeThreshold:   tarSizeThreshold,
 	}
 }
 
 func (bundle *Bundle) getFileRelPath(fileAbsPath string) string {
-	return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.ArchiveDirectory)
+	return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.Directory)
 }
 
 func (bundle *Bundle) StartQueue(tarBallMaker internal.TarBallMaker) error {
@@ -159,26 +159,26 @@ func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
 // a file but returned instead. Returns empty string and an error if backup
 // fails.
 func (bundle *Bundle) StartBackup(conn *pgx.Conn,
-	backup string) (backupName string, lsn uint64, version int, dataDir string, systemIdentifier *uint64, err error) {
+	backup string) (backupName string, lsn uint64, err error) {
 	var name, lsnStr string
 	queryRunner, err := newPgQueryRunner(conn)
 	if err != nil {
-		return "", 0, 0, "", nil, errors.Wrap(err, "StartBackup: Failed to build query runner.")
+		return "", 0, errors.Wrap(err, "StartBackup: Failed to build query runner.")
 	}
-	name, lsnStr, bundle.Replica, dataDir, err = queryRunner.startBackup(backup)
+	name, lsnStr, bundle.Replica, err = queryRunner.startBackup(backup)
 
 	if err != nil {
-		return "", 0, queryRunner.Version, "", queryRunner.SystemIdentifier, err
+		return "", 0, err
 	}
 	lsn, err = pgx.ParseLSN(lsnStr)
 	if err != nil {
-		return "", 0, queryRunner.Version, "", queryRunner.SystemIdentifier, err
+		return "", 0, err
 	}
 
 	if bundle.Replica {
 		name, bundle.Timeline, err = getWalFilename(lsn, conn)
 		if err != nil {
-			return "", 0, queryRunner.Version, "", queryRunner.SystemIdentifier, err
+			return "", 0, err
 		}
 	} else {
 		bundle.Timeline, err = readTimeline(conn)
@@ -186,7 +186,7 @@ func (bundle *Bundle) StartBackup(conn *pgx.Conn,
 			tracelog.WarningLogger.Printf("Couldn't get current timeline because of error: '%v'\n", err)
 		}
 	}
-	return "base_" + name, lsn, queryRunner.Version, dataDir, queryRunner.SystemIdentifier, nil
+	return "base_" + name, lsn, nil
 }
 
 // TODO : unit tests

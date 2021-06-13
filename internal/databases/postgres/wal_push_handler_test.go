@@ -14,6 +14,7 @@ import (
 )
 
 func init() {
+	internal.ConfigureSettings(internal.PG)
 	internal.InitConfig()
 	internal.Configure()
 }

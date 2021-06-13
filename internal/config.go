@@ -16,6 +16,13 @@ import (
 )
 
 const (
+	PG        = "PG"
+	SQLSERVER = "SQLSERVER"
+	MYSQL     = "MYSQL"
+	REDIS     = "REDIS"
+	FDB       = "FDB"
+	MONGO     = "MONGO"
+
 	DownloadConcurrencySetting   = "WALG_DOWNLOAD_CONCURRENCY"
 	UploadConcurrencySetting     = "WALG_UPLOAD_CONCURRENCY"
 	UploadDiskConcurrencySetting = "WALG_UPLOAD_DISK_CONCURRENCY"
@@ -62,6 +69,7 @@ const (
 	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
 	MaxDelayedSegmentsCount      = "WALG_INTEGRITY_MAX_DELAYED_WALS"
 	PrefetchDir                  = "WALG_PREFETCH_DIR"
+	PgReadyRename                = "PG_READY_RENAME"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
@@ -87,6 +95,8 @@ const (
 	MysqlUsePartialBackupPush  = "WALG_MYSQL_USE_PARTIAL_BACKUP_PUSH"
 	MysqlPartialBackupFileSize = "WALG_MYSQL_PARTIAL_BACKUP_FILE_SIZE"
 
+	RedisPassword = "WALG_REDIS_PASSWORD"
+
 	GoMaxProcs = "GOMAXPROCS"
 
 	HTTPListen       = "HTTP_LISTEN"
@@ -111,7 +121,9 @@ const (
 
 var (
 	CfgFile             string
-	defaultConfigValues = map[string]string{
+	defaultConfigValues map[string]string
+
+	commonDefaultConfigValues = map[string]string{
 		DownloadConcurrencySetting:   "10",
 		UploadConcurrencySetting:     "16",
 		UploadDiskConcurrencySetting: "1",
@@ -131,18 +143,25 @@ var (
 		MaxDelayedSegmentsCount:      "0",
 		MysqlUsePartialBackupPush:    "false",
 		MysqlPartialBackupFileSize:   "10737418240", // 10 * (1 << 30)
+	}
 
-		OplogArchiveTimeoutInterval:    "60s",
-		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
-		MongoDBLastWriteUpdateInterval: "3s",
-		PgWalSize:                      "16",
+	MongoDefaultSettings = map[string]string{
 		OplogPushStatsLoggingInterval:  "30s",
 		OplogPushStatsUpdateInterval:   "30s",
 		OplogPushWaitForBecomePrimary:  "false",
 		OplogPushPrimaryCheckInterval:  "30s",
+		OplogArchiveTimeoutInterval:    "60s",
+		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
+		MongoDBLastWriteUpdateInterval: "3s",
 	}
 
-	AllowedSettings = map[string]bool{
+	PGDefaultSettings = map[string]string{
+		PgWalSize: "16",
+	}
+
+	AllowedSettings map[string]bool
+
+	CommonAllowedSettings = map[string]bool{
 		// WAL-G core
 		DownloadConcurrencySetting:   true,
 		UploadConcurrencySetting:     true,
@@ -178,19 +197,6 @@ var (
 		DeltaFromNameSetting:         true,
 		DeltaFromUserDataSetting:     true,
 		FetchTargetUserDataSetting:   true,
-
-		// Postgres
-		PgPortSetting:     true,
-		PgUserSetting:     true,
-		PgHostSetting:     true,
-		PgDataSetting:     true,
-		PgPasswordSetting: true,
-		PgDatabaseSetting: true,
-		PgSslModeSetting:  true,
-		PgSlotName:        true,
-		PgWalSize:         true,
-		"PGPASSFILE":      true,
-		PrefetchDir:       true,
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,
@@ -254,6 +260,32 @@ var (
 		//File
 		"WALG_FILE_PREFIX": true,
 
+		// GOLANG
+		GoMaxProcs: true,
+
+		// Web server
+		HTTPListen:       true,
+		HTTPExposePprof:  true,
+		HTTPExposeExpVar: true,
+	}
+
+	PGAllowedSettings = map[string]bool{
+		// Postgres
+		PgPortSetting:     true,
+		PgUserSetting:     true,
+		PgHostSetting:     true,
+		PgDataSetting:     true,
+		PgPasswordSetting: true,
+		PgDatabaseSetting: true,
+		PgSslModeSetting:  true,
+		PgSlotName:        true,
+		PgWalSize:         true,
+		"PGPASSFILE":      true,
+		PrefetchDir:       true,
+		PgReadyRename:     true,
+	}
+
+	MongoAllowedSettings = map[string]bool{
 		// MongoDB
 		MongoDBUriSetting:              true,
 		MongoDBLastWriteUpdateInterval: true,
@@ -266,7 +298,18 @@ var (
 		OplogPushWaitForBecomePrimary:  true,
 		OplogPushPrimaryCheckInterval:  true,
 		OplogPITRDiscoveryInterval:     true,
+	}
 
+	SQLServerAllowedSettings = map[string]bool{
+		// SQLServer
+		SQLServerBlobHostname:     true,
+		SQLServerBlobCertFile:     true,
+		SQLServerBlobKeyFile:      true,
+		SQLServerBlobLockFile:     true,
+		SQLServerConnectionString: true,
+	}
+
+	MysqlAllowedSettings = map[string]bool{
 		// MySQL
 		MysqlDatasourceNameSetting: true,
 		MysqlSslCaSetting:          true,
@@ -276,21 +319,11 @@ var (
 		MysqlTakeBinlogsFromMaster: true,
 		MysqlUsePartialBackupPush:  true,
 		MysqlPartialBackupFileSize: true,
+	}
 
-		// GOLANG
-		GoMaxProcs: true,
-
-		// Web server
-		HTTPListen:       true,
-		HTTPExposePprof:  true,
-		HTTPExposeExpVar: true,
-
-		// SQLServer
-		SQLServerBlobHostname:     true,
-		SQLServerBlobCertFile:     true,
-		SQLServerBlobKeyFile:      true,
-		SQLServerBlobLockFile:     true,
-		SQLServerConnectionString: true,
+	RedisAllowedSettings = map[string]bool{
+		// Redis
+		RedisPassword: true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
@@ -301,6 +334,51 @@ var (
 	}
 	Turbo bool
 )
+
+func ConfigureSettings(currentType string) {
+	if len(defaultConfigValues) == 0 {
+		defaultConfigValues = commonDefaultConfigValues
+		dbSpecificDefaultSettings := map[string]string{}
+		switch currentType {
+		case PG:
+			dbSpecificDefaultSettings = PGDefaultSettings
+		case MONGO:
+			dbSpecificDefaultSettings = MongoDefaultSettings
+		}
+
+		for k, v := range dbSpecificDefaultSettings {
+			defaultConfigValues[k] = v
+		}
+	}
+
+	if len(AllowedSettings) == 0 {
+		AllowedSettings = CommonAllowedSettings
+		dbSpecificSettings := map[string]bool{}
+		switch currentType {
+		case PG:
+			dbSpecificSettings = PGAllowedSettings
+		case MONGO:
+			dbSpecificSettings = MongoAllowedSettings
+		case MYSQL:
+			dbSpecificSettings = MysqlAllowedSettings
+		case SQLSERVER:
+			dbSpecificSettings = SQLServerAllowedSettings
+		case REDIS:
+			dbSpecificSettings = RedisAllowedSettings
+		}
+
+		for k, v := range dbSpecificSettings {
+			AllowedSettings[k] = v
+		}
+
+		for _, adapter := range StorageAdapters {
+			for _, setting := range adapter.settingNames {
+				AllowedSettings[setting] = true
+			}
+			AllowedSettings["WALG_"+adapter.prefixName] = true
+		}
+	}
+}
 
 func isAllowedSetting(setting string, AllowedSettings map[string]bool) (exists bool) {
 	_, exists = AllowedSettings[setting]
@@ -353,13 +431,6 @@ func Configure() {
 	}
 
 	configureLimiters()
-
-	for _, adapter := range StorageAdapters {
-		for _, setting := range adapter.settingNames {
-			AllowedSettings[setting] = true
-		}
-		AllowedSettings["WALG_"+adapter.prefixName] = true
-	}
 }
 
 // ConfigureAndRunDefaultWebServer configures and runs web server
