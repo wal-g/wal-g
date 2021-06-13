@@ -13,7 +13,7 @@ type BackupSentinelDto struct {
 	CompressedSize   int64  `json:"CompressedSize,omitempty"`
 	Hostname         string `json:"Hostname,omitempty"`
 
-	IsPermanent bool        `json:"IsPermanent,omitempty"`
+	IsPermanent bool `json:"IsPermanent,omitempty"`
 }
 
 func (s *BackupSentinelDto) String() string {

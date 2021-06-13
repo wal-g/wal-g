@@ -39,8 +39,8 @@ var (
 			internal.RequiredSettings[internal.ClickHouseCreateBackup] = true
 			err := internal.AssertRequiredSettingsSet()
 			tracelog.ErrorLogger.FatalOnError(err)
-	},
-}
+		},
+	}
 	permanent = false
 )
 

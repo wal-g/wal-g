@@ -31,18 +31,17 @@ type Bundle struct {
 	TarBallComposer TarBallComposer
 	TarBallQueue    *internal.TarBallQueue
 
-	Crypter            crypto.Crypter
-	Timeline           uint32
+	Crypter  crypto.Crypter
+	Timeline uint32
 
 	TarSizeThreshold int64
 }
 
-
-func NewBundle(directory string, crypter crypto.Crypter, tarSizeThreshold int64, ) *Bundle {
+func NewBundle(directory string, crypter crypto.Crypter, tarSizeThreshold int64) *Bundle {
 	return &Bundle{
-		Directory:          directory,
-		Crypter:            crypter,
-		TarSizeThreshold:   tarSizeThreshold,
+		Directory:        directory,
+		Crypter:          crypter,
+		TarSizeThreshold: tarSizeThreshold,
 	}
 }
 

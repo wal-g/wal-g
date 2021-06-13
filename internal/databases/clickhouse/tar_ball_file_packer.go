@@ -32,12 +32,12 @@ func (err FileNotExistError) Error() string {
 
 // TarBallFilePacker is used to pack bundle file into tarball.
 type TarBallFilePacker struct {
-	files            BundleFiles
+	files BundleFiles
 }
 
 func newTarBallFilePacker(files BundleFiles) *TarBallFilePacker {
 	return &TarBallFilePacker{
-		files:            files,
+		files: files,
 	}
 }
 

@@ -13,9 +13,9 @@ type TarBallComposer interface {
 
 // ComposeFileInfo holds data which is required to pack a file to some tarball
 type ComposeFileInfo struct {
-	path          string
-	fileInfo      os.FileInfo
-	header        *tar.Header
+	path     string
+	fileInfo os.FileInfo
+	header   *tar.Header
 }
 
 type TarFileSets map[string][]string
@@ -29,7 +29,6 @@ type TarBallComposerMaker interface {
 	Make(bundle *Bundle) (TarBallComposer, error)
 }
 
-func NewTarBallComposerMaker() (TarBallComposerMaker) {
+func NewTarBallComposerMaker() TarBallComposerMaker {
 	return &RegularTarBallComposerMaker{}
 }
-

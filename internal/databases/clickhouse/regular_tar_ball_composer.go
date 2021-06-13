@@ -69,4 +69,3 @@ func (c *RegularTarBallComposer) PackTarballs() (TarFileSets, error) {
 	}
 	return c.tarFileSets, nil
 }
-
