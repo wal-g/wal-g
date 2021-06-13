@@ -61,13 +61,13 @@ func downloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 
 func downloadAndDecompressStreamParts(backup Backup, writeCloser io.WriteCloser, fileNames []string) error {
 	defer writeCloser.Close()
-	decompressor := compression.FindDecompressor(filepath.Ext(fileNames[0]))
+	decompressor := compression.FindDecompressor(filepath.Ext(fileNames[0])[1:])
 	if decompressor == nil {
 		return newUnknownCompressionMethodError()
 	}
 	for _, fileName := range fileNames {
 		archiveReader, exists, err := TryDownloadFile(
-			backup.Folder, GetStreamName(fileName, decompressor.FileExtension()))
+			backup.Folder, fileName)
 		if err != nil {
 			return err
 		}

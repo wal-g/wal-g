@@ -142,7 +142,7 @@ var (
 		UseRatingComposerSetting:     "false",
 		MaxDelayedSegmentsCount:      "0",
 		MysqlUsePartialBackupPush:    "false",
-		MysqlPartialBackupFileSize:   "10737418240", // 10 * (1 << 30)
+		MysqlPartialBackupFileSize:   "104857600", // 100 << 20
 	}
 
 	MongoDefaultSettings = map[string]string{

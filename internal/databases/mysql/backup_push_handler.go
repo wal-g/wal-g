@@ -69,7 +69,7 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 		IsPermanent:      isPermanent,
 		UserData:         userData,
 		FileNames:        fileNames,
-}
+	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())
 
 	err = internal.UploadSentinel(uploader, &sentinel, fileName)
