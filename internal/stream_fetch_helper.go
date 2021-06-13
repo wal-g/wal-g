@@ -60,7 +60,8 @@ func downloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 }
 
 func downloadAndDecompressStreamParts(backup Backup, writeCloser io.WriteCloser, fileNames []string) error {
-	defer writeCloser.Close()
+	defer utility.LoggedClose(writeCloser, "")
+
 	decompressor := compression.FindDecompressor(filepath.Ext(fileNames[0])[1:])
 	if decompressor == nil {
 		return newUnknownCompressionMethodError()
@@ -72,13 +73,13 @@ func downloadAndDecompressStreamParts(backup Backup, writeCloser io.WriteCloser,
 			return err
 		}
 		if !exists {
-			return newArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))
+			return newArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", fileName))
 		}
+		tracelog.DebugLogger.Printf("Found file: %s", fileName)
 		err = DecompressDecryptBytes(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
 		if err != nil {
 			return err
 		}
 	}
-	utility.LoggedClose(writeCloser, "")
 	return nil
 }

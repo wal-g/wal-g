@@ -1,13 +1,12 @@
 package internal
 
 import (
-	"github.com/spf13/viper"
-	"github.com/wal-g/wal-g/internal/limiters"
 	"io"
 	"os"
 	"path"
 	"strconv"
 
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -30,16 +29,16 @@ func (uploader *Uploader) PushStreamParts(stream io.Reader) (string, []string, e
 	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 	var files []string
 	maxFileSize := viper.GetInt64(MysqlPartialBackupFileSize)
-	for i := 1;; i += 1  {
+	for i := 1; ; i += 1 {
 		uncompressedSize := int64(0)
-		dstPath := GetStreamName(backupName + "_" + strconv.Itoa(i), uploader.Compressor.FileExtension())
-		reader := limiters.NewDiskLimitReader(io.LimitReader(stream, maxFileSize))
+		dstPath := GetStreamName(backupName+"_"+strconv.Itoa(i), uploader.Compressor.FileExtension())
+		reader := io.LimitReader(stream, maxFileSize)
 		err := uploader.PushStreamToDestination(NewWithSizeReader(reader, &uncompressedSize), dstPath)
 		files = append(files, dstPath)
 		if err != nil {
 			return "", nil, err
 		}
-		if uncompressedSize < maxFileSize{
+		if uncompressedSize < maxFileSize {
 			break
 		}
 	}
