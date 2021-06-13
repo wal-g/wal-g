@@ -13,6 +13,18 @@ type Backup struct {
 	DataSize        int64       `json:"DataSize,omitempty"`
 }
 
+func (b Backup) Name() string {
+	return b.BackupName
+}
+
+func (b Backup) StartTime() time.Time {
+	return b.StartLocalTime
+}
+
+func (b Backup) IsPermanent() bool {
+	return b.Permanent
+}
+
 // NodeMeta represents MongoDB node metadata
 type NodeMeta struct {
 	LastTS    Timestamp `json:"LastTS,omitempty"`
@@ -27,10 +39,12 @@ type MongoMeta struct {
 
 // BackupMeta includes mongodb and storage metadata
 type BackupMeta struct {
-	Mongo     MongoMeta
-	DataSize  int64
-	Permanent bool
-	User      interface{}
+	Mongo      MongoMeta
+	DataSize   int64
+	Permanent  bool
+	User       interface{}
+	StartTime  time.Time
+	FinishTime time.Time
 }
 
 // FirstOverlappingBackupForArch checks if archive overlaps any backup from given list.

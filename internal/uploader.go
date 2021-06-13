@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"io"
 	"path/filepath"
 	"sync"
@@ -14,6 +15,8 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+var ErrorSizeTrackingDisabled = fmt.Errorf("size tracking disabled by DisableSizeTracking method")
+
 type UploaderProvider interface {
 	Upload(path string, content io.Reader) error
 	UploadFile(file ioextensions.NamedReader) error
@@ -21,17 +24,21 @@ type UploaderProvider interface {
 	PushStreamToDestination(stream io.Reader, dstPath string) error
 	Compression() compression.Compressor
 	DisableSizeTracking()
+	UploadedDataSize() (int64, error)
+	RawDataSize() (int64, error)
 }
 
 // Uploader contains fields associated with uploading tarballs.
 // Multiple tarballs can share one uploader.
 type Uploader struct {
-	UploadingFolder      storage.Folder
-	Compressor           compression.Compressor
-	waitGroup            *sync.WaitGroup
-	ArchiveStatusManager asm.ArchiveStatusManager
-	Failed               atomic.Value
-	TarSize              *int64
+	UploadingFolder        storage.Folder
+	Compressor             compression.Compressor
+	waitGroup              *sync.WaitGroup
+	ArchiveStatusManager   asm.ArchiveStatusManager
+	PGArchiveStatusManager asm.ArchiveStatusManager
+	Failed                 atomic.Value
+	tarSize                *int64
+	dataSize               *int64
 }
 
 // UploadObject
@@ -44,15 +51,31 @@ func NewUploader(
 	compressor compression.Compressor,
 	uploadingLocation storage.Folder,
 ) *Uploader {
-	size := int64(0)
 	uploader := &Uploader{
 		UploadingFolder: uploadingLocation,
 		Compressor:      compressor,
 		waitGroup:       &sync.WaitGroup{},
-		TarSize:         &size,
+		tarSize:         new(int64),
+		dataSize:        new(int64),
 	}
 	uploader.Failed.Store(false)
 	return uploader
+}
+
+// UploadedDataSize returns 0 and error when SizeTracking disabled (see DisableSizeTracking)
+func (uploader *Uploader) UploadedDataSize() (int64, error) {
+	if uploader.tarSize == nil {
+		return 0, ErrorSizeTrackingDisabled
+	}
+	return atomic.LoadInt64(uploader.tarSize), nil
+}
+
+// RawDataSize returns 0 and error when SizeTracking disabled (see DisableSizeTracking)
+func (uploader *Uploader) RawDataSize() (int64, error) {
+	if uploader.dataSize == nil {
+		return 0, ErrorSizeTrackingDisabled
+	}
+	return atomic.LoadInt64(uploader.dataSize), nil
 }
 
 // Finish waits for all waiting parts to be uploaded. If an error occurs,
@@ -72,15 +95,22 @@ func (uploader *Uploader) Clone() *Uploader {
 		waitGroup:            &sync.WaitGroup{},
 		ArchiveStatusManager: uploader.ArchiveStatusManager,
 		Failed:               uploader.Failed,
-		TarSize:              uploader.TarSize,
+		tarSize:              uploader.tarSize,
+		dataSize:             uploader.dataSize,
 	}
 }
 
 // TODO : unit tests
 // UploadFile compresses a file and uploads it.
 func (uploader *Uploader) UploadFile(file ioextensions.NamedReader) error {
-	compressedFile := CompressAndEncrypt(file, uploader.Compressor, ConfigureCrypter())
-	dstPath := utility.SanitizePath(filepath.Base(file.Name()) + "." + uploader.Compressor.FileExtension())
+	filename := file.Name()
+
+	fileReader := file.(io.Reader)
+	if uploader.dataSize != nil {
+		fileReader = NewWithSizeReader(fileReader, uploader.dataSize)
+	}
+	compressedFile := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter())
+	dstPath := utility.SanitizePath(filepath.Base(filename) + "." + uploader.Compressor.FileExtension())
 
 	err := uploader.Upload(dstPath, compressedFile)
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
@@ -89,7 +119,8 @@ func (uploader *Uploader) UploadFile(file ioextensions.NamedReader) error {
 
 // DisableSizeTracking stops bandwidth tracking
 func (uploader *Uploader) DisableSizeTracking() {
-	uploader.TarSize = nil
+	uploader.tarSize = nil
+	uploader.dataSize = nil
 }
 
 // Compression returns configured compressor
@@ -99,8 +130,8 @@ func (uploader *Uploader) Compression() compression.Compressor {
 
 // TODO : unit tests
 func (uploader *Uploader) Upload(path string, content io.Reader) error {
-	if uploader.TarSize != nil {
-		content = &WithSizeReader{content, uploader.TarSize}
+	if uploader.tarSize != nil {
+		content = NewWithSizeReader(content, uploader.tarSize)
 	}
 	err := uploader.UploadingFolder.PutObject(path, content)
 	if err == nil {

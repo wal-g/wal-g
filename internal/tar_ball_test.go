@@ -16,6 +16,7 @@ import (
 // Tests S3 get and set methods.
 func TestS3TarBall(t *testing.T) {
 	tarSizeThreshold := int64(10)
+
 	tarBallMaker := internal.NewStorageTarBallMaker("test", testtools.NewMockUploader(false, false))
 
 	tarBallQueue := internal.NewTarBallQueue(tarSizeThreshold, tarBallMaker)

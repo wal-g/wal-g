@@ -6,6 +6,13 @@ import (
 	"github.com/wal-g/storages/storage"
 )
 
+// GenericMetadata allows to obtain some basic information
+// about existing backup in storage. It is useful when
+// creating a functionality that is common to all databases,
+// for example backup-list or backup-mark.
+//
+// To support the GenericMetadata in some particular database,
+// one should write its own GenericMetaFetcher and GenericMetaSetter.
 type GenericMetadata struct {
 	BackupName       string
 	UncompressedSize int64
@@ -22,11 +29,10 @@ type GenericMetadata struct {
 	IncrementDetails IncrementDetailsFetcher
 
 	UserData interface{}
-
-	//todo: consider adding
-	//SystemIdentifier *uint64
 }
 
+// IncrementDetails is useful to fetch information about
+// dependencies of some incremental backup
 type IncrementDetails struct {
 	IncrementFrom     string
 	IncrementFullName string
@@ -34,9 +40,11 @@ type IncrementDetails struct {
 }
 
 type IncrementDetailsFetcher interface {
-	Fetch() (bool, IncrementDetails, error)
+	Fetch() (isIncremental bool, details IncrementDetails, err error)
 }
 
+// GenericMetaInteractor is a combination of GenericMetaFetcher
+// and GenericMetaSetter. It can be useful when need both.
 type GenericMetaInteractor interface {
 	GenericMetaFetcher
 	GenericMetaSetter

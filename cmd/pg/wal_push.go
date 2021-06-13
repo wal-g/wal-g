@@ -26,6 +26,15 @@ var walPushCmd = &cobra.Command{
 			tracelog.ErrorLogger.PrintError(err)
 			uploader.ArchiveStatusManager = asm.NewNopASM()
 		}
+
+		PGArchiveStatusManager, err := internal.ConfigurePGArchiveStatusManager()
+		if err == nil {
+			uploader.PGArchiveStatusManager = asm.NewDataFolderASM(PGArchiveStatusManager)
+		} else {
+			tracelog.ErrorLogger.PrintError(err)
+			uploader.PGArchiveStatusManager = asm.NewNopASM()
+		}
+
 		postgres.HandleWALPush(uploader, args[0])
 	},
 }

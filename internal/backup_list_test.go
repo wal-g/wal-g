@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wal-g/wal-g/utility"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/testtools"
@@ -13,7 +15,7 @@ import (
 
 func TestBackupListFindsBackups(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
-	internal.DefaultHandleBackupList(folder)
+	internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath), false, false)
 }
 
 var backups = []internal.BackupTime{
@@ -31,11 +33,12 @@ var backups = []internal.BackupTime{
 
 func TestBackupListCorrectOutput(t *testing.T) {
 	const expected = "" +
-		"name     last_modified        wal_segment_backup_start\n" +
+		"name     modified             wal_segment_backup_start\n" +
 		"base_456 2018-07-05T01:01:50Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
 		"base_123 2019-04-25T14:48:00Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n"
 
 	buf := new(bytes.Buffer)
+	internal.SortBackupTimeSlices(backups)
 	internal.WriteBackupList(backups, buf)
 	assert.Equal(t, buf.String(), expected)
 }
@@ -43,13 +46,14 @@ func TestBackupListCorrectOutput(t *testing.T) {
 func TestBackupListCorrectPrettyOutput(t *testing.T) {
 	const expected = "" +
 		"+---+----------+----------------------------------+--------------------------+\n" +
-		"| # | NAME     | LAST MODIFIED                    | WAL SEGMENT BACKUP START |\n" +
+		"| # | NAME     | MODIFIED                         | WAL SEGMENT BACKUP START |\n" +
 		"+---+----------+----------------------------------+--------------------------+\n" +
-		"| 0 | base_123 | Thursday, 25-Apr-19 14:48:00 UTC | ZZZZZZZZZZZZZZZZZZZZZZZZ |\n" +
-		"| 1 | base_456 | Thursday, 05-Jul-18 01:01:50 UTC | ZZZZZZZZZZZZZZZZZZZZZZZZ |\n" +
+		"| 0 | base_456 | Thursday, 05-Jul-18 01:01:50 UTC | ZZZZZZZZZZZZZZZZZZZZZZZZ |\n" +
+		"| 1 | base_123 | Thursday, 25-Apr-19 14:48:00 UTC | ZZZZZZZZZZZZZZZZZZZZZZZZ |\n" +
 		"+---+----------+----------------------------------+--------------------------+\n"
 
 	buf := new(bytes.Buffer)
+	internal.SortBackupTimeSlices(backups)
 	internal.WritePrettyBackupList(backups, buf)
 	assert.Equal(t, buf.String(), expected)
 }
@@ -69,19 +73,20 @@ func TestBackupListCorrectJsonOutput(t *testing.T) {
 func TestBackupListCorrectPrettyJsonOutput(t *testing.T) {
 	const expectedString = "[\n" +
 		"    {\n" +
-		"        \"backup_name\": \"base_123\",\n" +
-		"        \"time\": \"2019-04-25T14:48:00Z\",\n" +
+		"        \"backup_name\": \"base_456\",\n" +
+		"        \"time\": \"2018-07-05T01:01:50Z\",\n" +
 		"        \"wal_file_name\": \"ZZZZZZZZZZZZZZZZZZZZZZZZ\"\n" +
 		"    },\n" +
 		"    {\n" +
-		"        \"backup_name\": \"base_456\",\n" +
-		"        \"time\": \"2018-07-05T01:01:50Z\",\n" +
+		"        \"backup_name\": \"base_123\",\n" +
+		"        \"time\": \"2019-04-25T14:48:00Z\",\n" +
 		"        \"wal_file_name\": \"ZZZZZZZZZZZZZZZZZZZZZZZZ\"\n" +
 		"    }\n" +
 		"]"
 	var unmarshaledBackups []internal.BackupTime
 	buf := new(bytes.Buffer)
 
+	internal.SortBackupTimeSlices(backups)
 	err := internal.WriteAsJSON(backups, buf, true)
 	assert.NoError(t, err)
 	err = json.Unmarshal(buf.Bytes(), &unmarshaledBackups)

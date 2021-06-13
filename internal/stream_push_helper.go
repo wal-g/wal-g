@@ -50,6 +50,9 @@ func (uploader *Uploader) PushStreamParts(stream io.Reader) (string, []string, e
 // TODO : unit tests
 // PushStreamToDestination compresses a stream and push it to specifyed destination
 func (uploader *Uploader) PushStreamToDestination(stream io.Reader, dstPath string) error {
+	if uploader.dataSize != nil {
+		stream = NewWithSizeReader(stream, uploader.dataSize)
+	}
 	compressed := CompressAndEncrypt(stream, uploader.Compressor, ConfigureCrypter())
 	err := uploader.Upload(dstPath, compressed)
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)

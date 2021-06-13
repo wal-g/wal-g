@@ -129,6 +129,10 @@ func ConfigureFolder() (storage.Folder, error) {
 	return ConfigureFolderForSpecificConfig(viper.GetViper())
 }
 
+// TODO: something with that
+// when provided multiple 'keys' in the config,
+// this function will always return only one concrete 'folder'.
+// Chosen folder depends only on 'StorageAdapters' order
 func ConfigureFolderForSpecificConfig(config *viper.Viper) (storage.Folder, error) {
 	skippedPrefixes := make([]string, 0)
 	for _, adapter := range StorageAdapters {
@@ -193,6 +197,10 @@ func ConfigureLogging() error {
 	return nil
 }
 
+func getPGArchiveStatusFolderPath() string {
+	return filepath.Join(getWalFolderPath(), "archive_status")
+}
+
 func getArchiveDataFolderPath() string {
 	return filepath.Join(GetDataFolderPath(), "walg_archive_status")
 }
@@ -204,6 +212,10 @@ func GetRelativeArchiveDataFolderPath() string {
 // TODO : unit tests
 func ConfigureArchiveStatusManager() (fsutil.DataFolder, error) {
 	return fsutil.NewDiskDataFolder(getArchiveDataFolderPath())
+}
+
+func ConfigurePGArchiveStatusManager() (fsutil.DataFolder, error) {
+	return fsutil.ExistingDiskDataFolder(getPGArchiveStatusFolderPath())
 }
 
 // ConfigureUploader connects to storage and creates an uploader. It makes sure

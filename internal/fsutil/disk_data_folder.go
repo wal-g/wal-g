@@ -18,6 +18,10 @@ func NewDiskDataFolder(folderPath string) (*DiskDataFolder, error) {
 	return &DiskDataFolder{folderPath}, nil
 }
 
+func ExistingDiskDataFolder(folderPath string) (*DiskDataFolder, error) {
+	return &DiskDataFolder{folderPath}, nil
+}
+
 func (folder *DiskDataFolder) OpenReadonlyFile(filename string) (io.ReadCloser, error) {
 	filePath := filepath.Join(folder.Path, filename)
 	file, err := os.Open(filePath)
@@ -60,4 +64,10 @@ func (folder *DiskDataFolder) CreateFile(filename string) error {
 func (folder *DiskDataFolder) DeleteFile(filename string) error {
 	filePath := filepath.Join(folder.Path, filename)
 	return os.Remove(filePath)
+}
+
+func (folder *DiskDataFolder) RenameFile(oldFileName string, newFileName string) error {
+	oldPath := filepath.Join(folder.Path, oldFileName)
+	newPath := filepath.Join(folder.Path, newFileName)
+	return os.Rename(oldPath, newPath)
 }

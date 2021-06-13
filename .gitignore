@@ -3,6 +3,8 @@ vendor/
 .idea/
 
 # bin
+main/fdb/wal-g
+main/sqlserver/wal-g
 main/pg/wal-g
 main/mysql/wal-g
 main/redis/wal-g
