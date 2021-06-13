@@ -9,14 +9,20 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/utility"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/utility"
+
+	"github.com/spf13/viper"
 )
 
-func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
-	backupFolderRootPath, _ := internal.GetSetting(internal.ClickHouseBackupPath)
+func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPermanent bool) {
+	backupFolderRootPath, ok := internal.GetSetting(internal.ClickHouseBackupPath)
+	if !ok {
+		backupFolderRootPath = "/var/lib/clickhouse/backup"
+	}
+
+	timeStart := utility.TimeNowCrossPlatformLocal()
 
 	backupName := getBackupName()
 	appendBackupNameToCommand(backupCmd, backupName)
@@ -31,17 +37,11 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
 		tracelog.ErrorLogger.Fatalf("failed to run backup: %v", err)
 	}
 
-	backupFolderPath := path.Join(backupFolderRootPath, backupName)
-	filePaths, err := getBackupFilePaths(backupFolderPath)
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("failed to get backup filepaths: %v", err)
-	}
+	uploadBackup(uploader, backupName, path.Join(backupFolderRootPath, backupName))
 
-	for _, filePath := range filePaths {
-		err = uploadBackupFile(uploader, backupFolderRootPath, filePath)
-		if err != nil {
-			tracelog.ErrorLogger.Fatalf("failed to push file: %v", err)
-		}
+	err = uploadSentinel(uploader, timeStart, backupName, isPermanent)
+	if err != nil {
+		tracelog.ErrorLogger.FatalOnError(err)
 	}
 }
 
@@ -57,41 +57,65 @@ func appendBackupNameToCommand(backupCmd *exec.Cmd, backupName string) {
 	backupCmd.Args[lastIndex] = fmt.Sprintf("%s %s", backupCmd.Args[lastIndex], backupName)
 }
 
-func getBackupFilePaths(backupFolder string) ([]string, error) {
-	var filePaths []string
-	err := filepath.Walk(backupFolder,
-		func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if !info.IsDir() {
-				filePaths = append(filePaths, path)
-			}
-			return nil
-	})
-	return filePaths, err
+func uploadBackup(uploader *internal.Uploader, backupName string, backupDirectory string) TarFileSets {
+	bundle := NewBundle(backupDirectory, internal.ConfigureCrypter(), viper.GetInt64(internal.TarSizeThresholdSetting))
+
+	// Start a new tar bundle, walk the backupDirectory and upload everything there.
+	tracelog.InfoLogger.Println("Starting a new tar bundle")
+	err := bundle.StartQueue(internal.NewStorageTarBallMaker(backupName, uploader))
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	tarBallComposerMaker := NewTarBallComposerMaker()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	err = bundle.SetupComposer(tarBallComposerMaker)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	tracelog.InfoLogger.Println("Walking ...")
+	err = filepath.Walk(backupDirectory, bundle.HandleWalkedFSObject)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	tracelog.InfoLogger.Println("Packing ...")
+	tarFileSets, err := bundle.PackTarballs()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	tracelog.DebugLogger.Println("Finishing queue ...")
+	err = bundle.FinishQueue()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	uploader.Finish()
+
+	return tarFileSets
 }
 
-func uploadBackupFile(uploader *internal.Uploader, basePath string, filePath string) error {
-	file, err := os.Open(filePath)
+func uploadSentinel(uploader *internal.Uploader, timeStart time.Time, backupName string, isPermanent bool) error {
+	timeStop := utility.TimeNowCrossPlatformLocal()
+	hostname, err := os.Hostname()
 	if err != nil {
-		return err
-	}
-	defer utility.LoggedClose(file, "")
-
-	rootFolder := uploader.UploadingFolder
-	defer func() { uploader.UploadingFolder = rootFolder }()
-	relativeFilePath, err := filepath.Rel(basePath, filePath)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get relative path: %s", filePath)
-	}
-	dst, filename := filepath.Split(relativeFilePath)
-	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(dst)
-
-	err = uploader.UploadFile(file)
-	if err != nil {
-		return errors.Wrapf(err, "upload: could not upload '%s'\n", filename)
+		hostname = ""
+		tracelog.WarningLogger.Printf("Failed to obtain the OS hostname for the backup sentinel\n")
 	}
 
-	return nil
+	uploadedSize, err := uploader.UploadedDataSize()
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to calc uploaded data size: %v", err)
+	}
+
+	rawSize, err := uploader.RawDataSize()
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to calc raw data size: %v", err)
+	}
+
+	sentinel := BackupSentinelDto {
+		StartLocalTime:   timeStart,
+		StopLocalTime:    timeStop,
+		Hostname:         hostname,
+		CompressedSize:   uploadedSize,
+		UncompressedSize: rawSize,
+		IsPermanent:      isPermanent,
+	}
+
+	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())
+
+	return internal.UploadSentinel(uploader, &sentinel, backupName)
 }
