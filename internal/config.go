@@ -159,10 +159,6 @@ var (
 		PgWalSize: "16",
 	}
 
-	ClickHouseDefaultSettings = map[string]string{
-		ClickHouseBackupPath: "/var/lib/clickhouse/backup",
-	}
-
 	AllowedSettings map[string]bool
 
 	CommonAllowedSettings = map[string]bool{
@@ -352,8 +348,6 @@ func ConfigureSettings(currentType string) {
 			dbSpecificDefaultSettings = PGDefaultSettings
 		case MONGO:
 			dbSpecificDefaultSettings = MongoDefaultSettings
-		case CLICKHOUSE:
-			dbSpecificDefaultSettings = ClickHouseDefaultSettings
 		}
 
 		for k, v := range dbSpecificDefaultSettings {

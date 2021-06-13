@@ -20,6 +20,7 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 	backupFolderRootPath, ok := internal.GetSetting(internal.ClickHouseBackupPath)
 	if !ok {
 		backupFolderRootPath = "/var/lib/clickhouse/backup"
+		tracelog.InfoLogger.Printf("%s is not set. Looking for backup in %s", internal.ClickHouseBackupPath, backupFolderRootPath)
 	}
 
 	timeStart := utility.TimeNowCrossPlatformLocal()
