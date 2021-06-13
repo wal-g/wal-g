@@ -42,6 +42,24 @@ func GetCommandStreamFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup B
 	}
 }
 
+func GetCommandStreamFetcherParts(cmd *exec.Cmd) func(folder storage.Folder, backup Backup, fileNames []string) {
+	return func(folder storage.Folder, backup Backup, fileNames []string) {
+		stdin, err := cmd.StdinPipe()
+		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+		stderr := &bytes.Buffer{}
+		cmd.Stderr = stderr
+		err = cmd.Start()
+		tracelog.ErrorLogger.FatalfOnError("Failed to start restore command: %v\n", err)
+		err = downloadAndDecompressStreamParts(backup, stdin, fileNames)
+		cmdErr := cmd.Wait()
+		if cmdErr != nil {
+			tracelog.ErrorLogger.Printf("Restore command output:\n%s", stderr.String())
+			err = cmdErr
+		}
+		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+	}
+}
+
 // StreamBackupToCommandStdin downloads and decompresses backup stream to cmd stdin.
 func StreamBackupToCommandStdin(cmd *exec.Cmd, backup Backup) error {
 	stdin, err := cmd.StdinPipe()
@@ -71,4 +89,14 @@ func HandleBackupFetch(folder storage.Folder,
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 
 	fetcher(folder, backup)
+}
+
+func GetBackup(folder storage.Folder,
+	targetBackupSelector BackupSelector) Backup {
+	backupName, err := targetBackupSelector.Select(folder)
+	tracelog.ErrorLogger.FatalOnError(err)
+	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder,)\n", backupName)
+	backup, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+	return backup
 }

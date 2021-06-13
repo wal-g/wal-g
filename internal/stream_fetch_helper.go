@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"time"
 
 	"github.com/wal-g/wal-g/internal/compression"
@@ -54,4 +55,28 @@ func downloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 		return nil
 	}
 	return newArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))
+}
+
+func downloadAndDecompressStreamParts(backup Backup, writeCloser io.WriteCloser, fileNames []string) error {
+	defer writeCloser.Close()
+	decompressor := compression.FindDecompressor(filepath.Ext(fileNames[0]))
+	if decompressor == nil {
+		return newUnknownCompressionMethodError()
+	}
+	for _, fileName := range fileNames {
+		archiveReader, exists, err := TryDownloadFile(
+			backup.Folder, GetStreamName(fileName, decompressor.FileExtension()))
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return newArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))
+		}
+		err = DecompressDecryptBytes(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
+		if err != nil {
+			return err
+		}
+	}
+	utility.LoggedClose(writeCloser, "")
+	return nil
 }
