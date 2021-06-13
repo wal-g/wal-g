@@ -96,7 +96,7 @@ const (
 
 	RedisPassword = "WALG_REDIS_PASSWORD"
 
-	ClickHouseBackupPath = "WALG_CLICKHOUSE_BACKUP_PATH"
+	ClickHouseBackupPath   = "WALG_CLICKHOUSE_BACKUP_PATH"
 	ClickHouseCreateBackup = "WALG_CLICKHOUSE_CREATE_BACKUP"
 
 	GoMaxProcs = "GOMAXPROCS"
@@ -330,7 +330,7 @@ var (
 
 	ClickHouseAllowedSettings = map[string]bool{
 		// ClickHouse
-		ClickHouseBackupPath: true,
+		ClickHouseBackupPath:   true,
 		ClickHouseCreateBackup: true,
 	}
 
