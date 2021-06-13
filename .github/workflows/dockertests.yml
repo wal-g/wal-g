@@ -116,6 +116,7 @@ jobs:
                    'make MYSQL_TEST=mysql_base_tests mysql_integration_test',
                    'make MYSQL_TEST=mysql_delete_tests mysql_integration_test',
                    'make MYSQL_TEST=mysql_copy_tests mysql_integration_test',
+                   'make clickhouse_test',
       ]
       # do not cancel all tests if one failed
       fail-fast: false
