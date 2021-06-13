@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"github.com/spf13/viper"
 	"os"
 	"os/exec"
 
@@ -25,7 +26,13 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
 
 	uncompressedSize := int64(0)
 	streamReader := internal.NewWithSizeReader(limiters.NewDiskLimitReader(stdout), &uncompressedSize)
-	fileName, err := uploader.PushStream(streamReader)
+	var fileName string
+	var fileNames []string
+	if viper.GetBool(internal.MysqlUsePartialBackupPush) {
+		fileName, fileNames, err = uploader.PushStreamParts(streamReader)
+	} else {
+		fileName, err = uploader.PushStream(streamReader)
+	}
 	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
 
 	err = backupCmd.Wait()
@@ -49,6 +56,7 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd) {
 		Hostname:         hostname,
 		CompressedSize:   *uploader.TarSize,
 		UncompressedSize: uncompressedSize,
+		FileNames:        fileNames,
 	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())
 

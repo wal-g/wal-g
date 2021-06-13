@@ -144,6 +144,7 @@ type StreamSentinelDto struct {
 	UncompressedSize int64  `json:"UncompressedSize,omitempty"`
 	CompressedSize   int64  `json:"CompressedSize,omitempty"`
 	Hostname         string `json:"Hostname,omitempty"`
+	FileNames        []string `json:"FileNames,omitempty"`
 
 	IsPermanent bool        `json:"IsPermanent,omitempty"`
 	UserData    interface{} `json:"UserData,omitempty"`

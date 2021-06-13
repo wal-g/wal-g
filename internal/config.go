@@ -84,6 +84,8 @@ const (
 	MysqlBinlogDstSetting      = "WALG_MYSQL_BINLOG_DST"
 	MysqlBackupPrepareCmd      = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
 	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
+	MysqlUsePartialBackupPush  = "WALG_MYSQL_USE_PARTIAL_BACKUP_PUSH"
+	MysqlPartialBackupFileSize = "WALG_MYSQL_PARTIAL_BACKUP_FILE_SIZE"
 
 	GoMaxProcs = "GOMAXPROCS"
 
@@ -127,6 +129,8 @@ var (
 		StoreAllCorruptBlocksSetting: "false",
 		UseRatingComposerSetting:     "false",
 		MaxDelayedSegmentsCount:      "0",
+		MysqlUsePartialBackupPush:    "false",
+		MysqlPartialBackupFileSize:   "10737418240", // 10 * (1 << 30)
 
 		OplogArchiveTimeoutInterval:    "60s",
 		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
@@ -270,6 +274,8 @@ var (
 		MysqlBinlogDstSetting:      true,
 		MysqlBackupPrepareCmd:      true,
 		MysqlTakeBinlogsFromMaster: true,
+		MysqlUsePartialBackupPush:  true,
+		MysqlPartialBackupFileSize: true,
 
 		// GOLANG
 		GoMaxProcs: true,
