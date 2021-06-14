@@ -136,7 +136,7 @@ func testWalSegmentRunnerMultipleTimelines(t *testing.T, stopSegmentNo postgres.
 func testWalSegmentRunnerSingleTimeline(t *testing.T, stopSegmentNo, startSegmentNo postgres.WalSegmentNo,
 	timelineId uint32, missingSegments map[postgres.WalSegmentNo]bool) {
 
-	expectedFoundSegments := make(map[postgres.WalSegmentDescription]bool, 0)
+	expectedFoundSegments := make(map[postgres.WalSegmentDescription]bool)
 	for i := stopSegmentNo; i < startSegmentNo; i++ {
 		// do not add wal segment if it in missing segments set
 		if _, ok := missingSegments[i]; !ok {
@@ -196,7 +196,7 @@ SegmentRunnerLoop:
 }
 
 func flattenSegmentsByTimelinesToSet(segmentsByTimeline map[uint32][]postgres.WalSegmentNo) map[postgres.WalSegmentDescription]bool {
-	segmentsSet := make(map[postgres.WalSegmentDescription]bool, 0)
+	segmentsSet := make(map[postgres.WalSegmentDescription]bool)
 	for timeline, segmentNumbers := range segmentsByTimeline {
 		for _, segmentNo := range segmentNumbers {
 			segment := postgres.WalSegmentDescription{Number: segmentNo, Timeline: timeline}

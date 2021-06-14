@@ -1,0 +1,63 @@
+networks:
+    test_net:
+        external:
+            name: test_net_${TEST_ID}
+services:
+    minio01:
+        build: staging/images/minio
+        container_name: minio01.test_net_${TEST_ID}
+        domainname: test_net_${TEST_ID}
+        hostname: minio01
+        image: minio:test_net_${TEST_ID}
+        networks:
+            - test_net
+        ports:
+            - ${S3_PORT}
+        tmpfs: /var/run
+        volumes:
+            - ./images/minio/config:/config:rw
+        env_file:
+            - ${ENV_FILE}
+    redis01:
+        build:
+            dockerfile: ${DOCKER_FILE}
+            context: .
+            args:
+                - REDIS_VERSION=${REDIS_VERSION}
+        container_name: redis01.test_net_${TEST_ID}
+        domainname: test_net_${TEST_ID}
+        external_links:
+            - minio01.test_net_${TEST_ID}:minio
+        hostname: redis01
+        image: redis:test_net_${TEST_ID}
+        networks:
+            - test_net
+        ports:
+            - ${REDIS_EXPOSE_PORT}
+            - ${EXPOSE_SSH_PORT}
+        tmpfs: /var/run
+        volumes:
+            - ./images/redis/config:/config:ro
+        env_file:
+            - ${ENV_FILE}
+    redis02:
+        build:
+            dockerfile: ${DOCKER_FILE}
+            context: .
+            args:
+                - REDIS_VERSION=${REDIS_VERSION}
+        container_name: redis02.test_net_${TEST_ID}
+        domainname: test_net_${TEST_ID}
+        external_links:
+            - minio01.test_net_${TEST_ID}:minio
+        hostname: redis02
+        image: redis:test_net_${TEST_ID}
+        networks:
+            - test_net
+        ports:
+            - ${REDIS_EXPOSE_PORT}
+            - ${EXPOSE_SSH_PORT}
+        tmpfs: /var/run
+        volumes:
+            - ./images/redis/config:/config:ro
+version: '2'

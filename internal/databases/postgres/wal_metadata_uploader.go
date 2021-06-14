@@ -54,7 +54,7 @@ func (u *WalMetadataUploader) UploadWalMetadata(walFileName string, createdTime 
 	var walMetadata WalMetadataDescription
 	walMetadataMap := make(map[string]WalMetadataDescription)
 	walMetadataName := walFileName + ".json"
-	walMetadata.DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
+	walMetadata.DatetimeFormat = MetadataDatetimeFormat
 	walMetadata.CreatedTime = createdTime
 	walMetadataMap[walFileName] = walMetadata
 

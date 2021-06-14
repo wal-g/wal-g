@@ -154,7 +154,7 @@ func TestMakeTablespaceSymlinkPath(t *testing.T) {
 	assert.Equal(t, "/psql/pg_tblspc/1", path)
 
 	// Invalid path
-	path, err = spec.makeTablespaceSymlinkPath("/home/ismirn0ff/")
+	_, err = spec.makeTablespaceSymlinkPath("/home/ismirn0ff/")
 	assert.Error(t, err)
 
 	// usual postgres path

@@ -16,6 +16,7 @@ MYSQL_TEST := "mysql_base_tests"
 MONGO_MAJOR ?= "4.2"
 MONGO_VERSION ?= "4.2.8"
 GOLANGCI_LINT_VERSION ?= "v1.37.0"
+REDIS_VERSION ?= "5.0.8"
 
 BUILD_TAGS:=brotli
 
@@ -153,6 +154,15 @@ redis_clean:
 redis_install: redis_build
 	mv $(MAIN_REDIS_PATH)/wal-g $(GOBIN)/wal-g
 
+redis_features:
+	set -e
+	make go_deps
+	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1 -timeout 20m  -tf.test=true -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=redis
+
+clean_redis_features:
+	set -e
+	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1  -timeout 5m -tf.test=false -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=redis
+
 gp_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_GP_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/gp.walgVersion=`git tag -l --points-at HEAD`")
 
@@ -171,19 +181,19 @@ gp_integration_test: load_docker_common
 
 unittest:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet
-	go test -v $(TEST_MODIFIER) ./internal/
-	go test -v $(TEST_MODIFIER) ./internal/compression/
-	go test -v $(TEST_MODIFIER) ./internal/crypto/openpgp/
-	go test -v $(TEST_MODIFIER) ./internal/crypto/awskms/
-	go test -v $(TEST_MODIFIER) ./internal/abool
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/compression/
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/crypto/openpgp/
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/crypto/awskms/
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/abool
 	@if [ ! -z "${USE_LIBSODIUM}" ]; then\
-		go test -v $(TEST_MODIFIER) -tags libsodium ./internal/crypto/libsodium/;\
+		go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/crypto/libsodium/;\
 	fi
-	go test -v $(TEST_MODIFIER) ./internal/databases/mysql
-	go test -v $(TEST_MODIFIER) ./internal/databases/mongo/...
-	go test -v $(TEST_MODIFIER) ./internal/databases/postgres
-	go test -v $(TEST_MODIFIER) ./internal/walparser/
-	go test -v $(TEST_MODIFIER) ./utility
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/databases/mysql
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/databases/mongo/...
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/databases/postgres
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/walparser/
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./utility
 
 coverage:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go test -v $(TEST_MODIFIER) -coverprofile=$(COVERAGE_FILE) | grep -v 'no test files'

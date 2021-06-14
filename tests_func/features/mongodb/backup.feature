@@ -14,31 +14,31 @@ Feature: MongoDB backups check
 
   Scenario: Backups were done successfully
     When mongodb01 has test mongodb data test1
-    And we create mongodb01 backup
+    And we create mongodb01 mongo-backup
     Then we got 1 backup entries of mongodb01
 
     When mongodb01 has test mongodb data test2
-    And we create mongodb01 backup
+    And we create mongodb01 mongo-backup
     Then we got 2 backup entries of mongodb01
 
     When mongodb01 has test mongodb data test3
-    And we create mongodb01 backup
+    And we create mongodb01 mongo-backup
     Then we got 3 backup entries of mongodb01
 
     When mongodb01 has test mongodb data test4
-    And we create mongodb01 backup
+    And we create mongodb01 mongo-backup
     Then we got 4 backup entries of mongodb01
 
-    When we put empty backup via minio01
+    When we put empty backup via minio01 to mongodump.archive
     Then we got 4 backup entries of mongodb01
 
   Scenario: Backups purged successfully
-    When we delete backups retain 3 via mongodb01
+    When we delete mongo backups retain 3 via mongodb01
     Then we got 3 backup entries of mongodb01
     And we check if empty backups were purged via minio01
 
   Scenario: Second purge does not delete backups
-    When we delete backups retain 3 via mongodb01
+    When we delete mongo backups retain 3 via mongodb01
     Then we got 3 backup entries of mongodb01
 
   Scenario: Last backup restored successfully
@@ -52,12 +52,12 @@ Feature: MongoDB backups check
 
   Scenario: Fifth backup was done successfully
     Given mongodb01 has test mongodb data test5
-    When we create mongodb01 backup
+    When we create mongodb01 mongo-backup
     Then we got 4 backup entries of mongodb01
 
   Scenario: Forth and first backup were deleted successfully
-    When we delete backup #3 via mongodb01
+    When we delete mongo backup #3 via mongodb01
     Then we got 3 backup entries of mongodb01
-    When we delete backup #0 via mongodb01
+    When we delete mongo backup #0 via mongodb01
     Then we got 2 backup entries of mongodb01
     When we purge oplog archives via mongodb01
