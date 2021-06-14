@@ -6,6 +6,7 @@ type BackupSentinelDto struct {
 	BackupNames  *[]string `json:"BackupNames,omitempty"`
 }
 
+// NewBackupSentinelDto returns new BackupSentinelDto instance
 func NewBackupSentinelDto(curBackupInfo CurBackupInfo) BackupSentinelDto {
 	sentinel := BackupSentinelDto{
 		RestorePoint: &curBackupInfo.backupName,

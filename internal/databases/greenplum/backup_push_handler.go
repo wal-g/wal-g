@@ -2,6 +2,10 @@ package greenplum
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/blang/semver"
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
@@ -10,11 +14,9 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/utility"
-	"regexp"
-	"strings"
-	"time"
 )
 
+// BackupArguments holds all arguments parsed from cmd to this handler class
 type BackupArguments struct {
 	isPermanent           bool
 	verifyPageChecksums   bool
@@ -27,16 +29,19 @@ type BackupArguments struct {
 	deltaFromName         string
 }
 
+// BackupWorkers holds the external objects that the handler uses to get the backup data / write the backup data
 type BackupWorkers struct {
 	Uploader *internal.Uploader
 	Conn     *pgx.Conn
 }
 
+// CurBackupInfo holds all information that is harvest during the backup process
 type CurBackupInfo struct {
 	backupName    string
 	pgBackupNames []string
 }
 
+// BackupHandler is the main struct which is handling the backup process
 type BackupHandler struct {
 	arguments     BackupArguments
 	workers       BackupWorkers
@@ -88,6 +93,7 @@ func (bh *BackupHandler) buildCommand(contentID int) string {
 	return command
 }
 
+// HandleBackupPush handles the backup being read from filesystem and being pushed to the repository
 func (bh *BackupHandler) HandleBackupPush() {
 	folder := bh.workers.Uploader.UploadingFolder
 	bh.workers.Uploader.UploadingFolder = folder.GetSubFolder(utility.BaseBackupPath)

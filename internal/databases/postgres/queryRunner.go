@@ -2,10 +2,11 @@ package postgres
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/blang/semver"
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/greenplum-db/gp-common-go-libs/dbconn"
-	"strconv"
 
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
@@ -441,8 +442,8 @@ JOIN pg_filespace_entry e ON s.dbid = e.fsedbid
 JOIN pg_filespace f ON e.fsefsoid = f.oid
 WHERE s.role = 'p' AND f.fsname = 'pg_system'
 ORDER BY s.content, s.role DESC;`
-	} else {
-		return `
+	}
+	return `
 SELECT
 	dbid,
 	content,
@@ -453,10 +454,9 @@ SELECT
 FROM gp_segment_configuration
 WHERE role = 'p'
 ORDER BY content, role DESC;`
-	}
 }
 
-// Get information about Greenplum segments
+// GetGreenplumSegmentsInfo returns the information about Greenplum segments
 func (queryRunner *PgQueryRunner) GetGreenplumSegmentsInfo(semVer semver.Version) (segments []cluster.SegConfig, err error) {
 	conn := queryRunner.connection
 	rows, err := conn.Query(queryRunner.buildGetGreenplumSegmentsInfo(semVer))
@@ -466,22 +466,22 @@ func (queryRunner *PgQueryRunner) GetGreenplumSegmentsInfo(semVer semver.Version
 	defer rows.Close()
 	segments = make([]cluster.SegConfig, 0)
 	for rows.Next() {
-		var dbId int
-		var contentId int
+		var dbID int
+		var contentID int
 		var role string
 		var port int
 		var hostname string
 		var dataDir string
-		if err := rows.Scan(&dbId, &contentId, &role, &port, &hostname, &dataDir); err != nil {
+		if err := rows.Scan(&dbID, &contentID, &role, &port, &hostname, &dataDir); err != nil {
 			tracelog.WarningLogger.Printf("GetGreenplumSegmentsInfo:  %v\n", err.Error())
 		}
-		segment := cluster.SegConfig {
-			DbID: dbId,
-			ContentID: contentId,
-			Role: role,
-			Port: port,
-			Hostname: hostname,
-			DataDir: dataDir,
+		segment := cluster.SegConfig{
+			DbID:      dbID,
+			ContentID: contentID,
+			Role:      role,
+			Port:      port,
+			Hostname:  hostname,
+			DataDir:   dataDir,
 		}
 		segments = append(segments, segment)
 	}
@@ -492,7 +492,7 @@ func (queryRunner *PgQueryRunner) GetGreenplumSegmentsInfo(semVer semver.Version
 	return segments, nil
 }
 
-// Get Greenplum version
+// GetGreenplumVersion returns Greenplum version
 func (queryRunner *PgQueryRunner) GetGreenplumVersion() (version string, err error) {
 	conn := queryRunner.connection
 	err = conn.QueryRow("SELECT pg_catalog.version()").Scan(&version)
