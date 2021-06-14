@@ -27,14 +27,15 @@ type ComposeFileInfo struct {
 	wasInBase     bool
 	header        *tar.Header
 	isIncremented bool
+	isChanged     bool
 }
 
 type TarFileSets map[string][]string
 
 func NewComposeFileInfo(path string, fileInfo os.FileInfo, wasInBase, isIncremented bool,
-	header *tar.Header) *ComposeFileInfo {
+	header *tar.Header, isChanged bool) *ComposeFileInfo {
 	return &ComposeFileInfo{path: path, fileInfo: fileInfo,
-		wasInBase: wasInBase, header: header, isIncremented: isIncremented}
+		wasInBase: wasInBase, header: header, isIncremented: isIncremented, isChanged: isChanged}
 }
 
 type TarBallComposerType int
