@@ -70,9 +70,17 @@ func (queryRunner *PgQueryRunner) buildGetVersion() string {
 // BuildGetCurrentLSN formats a query to get cluster LSN
 func (queryRunner *PgQueryRunner) buildGetCurrentLsn() string {
 	if queryRunner.Version >= 100000 {
-		return "SELECT pg_current_wal_lsn()"
+		return "SELECT CASE " +
+			"WHEN pg_is_in_recovery() " +
+			"THEN pg_last_wal_receive_lsn() " +
+			"ELSE pg_current_wal_lsn() " +
+			"END"
 	}
-	return "SELECT pg_current_xlog_location()"
+	return "SELECT CASE " +
+		"WHEN pg_is_in_recovery() " +
+		"THEN pg_last_xlog_receive_location() " +
+		"ELSE pg_current_xlog_location() " +
+		"END"
 }
 
 // BuildStartBackup formats a query that starts backup according to server features and version
