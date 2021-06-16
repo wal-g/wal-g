@@ -97,6 +97,8 @@ func QueryCurrentWalSegment() WalSegmentDescription {
 	currentTimeline, err := getCurrentTimeline(conn)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get current timeline %v", err)
 
+	tracelog.InfoLogger.Printf("Current WAL segment: %s\n", currentSegmentNo.getFilename(currentTimeline))
+
 	err = conn.Close()
 	tracelog.WarningLogger.PrintOnError(err)
 
