@@ -67,7 +67,7 @@ func downloadAndDecompressStreamParts(backup Backup, writeCloser io.WriteCloser,
 	if decompressor == nil {
 		return newUnknownCompressionMethodError()
 	}
-	filesCh := make(chan FileResult, viper.GetInt(MysqlPrefetchedFilesCount) + 1)
+	filesCh := make(chan FileResult, viper.GetInt(MysqlPrefetchedFilesCount))
 	go TryDownloadFiles(backup.Folder, fileNames, filesCh)
 	for _, fileName := range fileNames {
 		file := <-filesCh

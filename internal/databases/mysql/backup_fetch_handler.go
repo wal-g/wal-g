@@ -13,17 +13,21 @@ func HandleBackupFetch(folder storage.Folder,
 	restoreCmd *exec.Cmd,
 	prepareCmd *exec.Cmd) {
 
-	backup := internal.GetBackup(folder, targetBackupSelector)
-	var sentinel StreamSentinelDto
-	err := backup.FetchSentinel(&sentinel)
+	backup, err := internal.SelectBackup(folder, targetBackupSelector)
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("Fail to fetch backup sentinel: %v", err)
 	}
-	if sentinel.FileNames == nil || len(sentinel.FileNames) == 0 {
-		internal.GetCommandStreamFetcher(restoreCmd)(folder, backup)
-	} else {
-		internal.GetCommandStreamFetcherParts(restoreCmd)(folder, backup, sentinel.FileNames)
+	var sentinel StreamSentinelDto
+	err = backup.FetchSentinel(&sentinel)
+	if err != nil {
+		tracelog.ErrorLogger.FatalfOnError("Fail to fetch backup sentinel: %v", err)
 	}
+	if len(sentinel.FileNames) == 0 {
+		err = internal.FetchBackupPartsToStdin(restoreCmd, backup)
+	} else {
+		err = internal.FetchFullBackupToStdin(restoreCmd, backup, sentinel.FileNames)
+	}
+	tracelog.ErrorLogger.FatalfOnError("Fail to fetch backup sentinel: %v", err)
 
 	if prepareCmd != nil {
 		err := prepareCmd.Run()
