@@ -53,7 +53,7 @@ require (
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.6.1
 	github.com/ulikunitz/xz v0.5.6
-	github.com/wal-g/storages v0.0.0-20210218090605-534397353a97
+	github.com/wal-g/storages v0.0.0-20210318125035-031eee79518c //v0.0.0-20210218090605-534397353a97
 	github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
 	github.com/xdg/stringprep v1.0.1-0.20180714160509-73f8eece6fdc // indirect
@@ -66,3 +66,5 @@ require (
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 )
+
+replace github.com/wal-g/storages => github.com/slesarev-hub/storages v0.0.0-20210616094537-23e7932a2a55
