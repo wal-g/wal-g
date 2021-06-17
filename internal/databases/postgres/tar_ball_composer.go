@@ -52,7 +52,7 @@ type TarBallComposerMaker interface {
 }
 
 func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn,
-	folder storage.Folder,
+	folder storage.Folder, newBackupName string,
 	filePackOptions TarBallFilePackerOptions) (TarBallComposerMaker, error) {
 	switch composerType {
 	case RegularComposer:
@@ -65,17 +65,18 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn,
 		return NewRatingTarBallComposerMaker(relFileStats, filePackOptions)
 	case CopyComposer:
 		previousBackupName, err := internal.GetLatestBackupName(folder)
-		if errors.Is(err, internal.NewNoBackupsFoundError()) {
+		if err != nil {
 			return NewRegularTarBallComposerMaker(filePackOptions), nil
 		}
 		tracelog.ErrorLogger.PanicOnError(err)
 		previousBackup := NewBackup(folder, previousBackupName)
 		prevBackupSentinelDto, err := previousBackup.GetSentinel()
 		tracelog.ErrorLogger.PanicOnError(err)
-		previousBackupName = *prevBackupSentinelDto.IncrementFullName
-		previousBackup = NewBackup(folder, previousBackupName)
-		
-		return NewCopyTarBallComposerMaker(previousBackup), nil
+		if prevBackupSentinelDto.IncrementFullName != nil {
+			previousBackupName = *prevBackupSentinelDto.IncrementFullName
+			previousBackup = NewBackup(folder, previousBackupName)	
+		}	
+		return NewCopyTarBallComposerMaker(previousBackup, newBackupName, filePackOptions), nil
 	default:
 		return nil, errors.New("NewTarBallComposerMaker: Unknown TarBallComposerType")
 	}

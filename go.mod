@@ -67,4 +67,4 @@ require (
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 )
 
-replace github.com/wal-g/storages => github.com/slesarev-hub/storages v0.0.0-20210616094537-23e7932a2a55
+replace github.com/wal-g/storages => github.com/slesarev-hub/storages v0.0.0-20210616180710-f709c4ac97aa
