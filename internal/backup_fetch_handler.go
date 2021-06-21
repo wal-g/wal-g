@@ -24,19 +24,19 @@ func (err BackupNonExistenceError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-func FetchBackupPartsToStdin(cmd *exec.Cmd, backup Backup) error {
-	return FetchBackupToStdin(cmd, backup, downloadAndDecompressStream)
+func StreamBackupPartsToStdin(cmd *exec.Cmd, backup Backup) error {
+	return StreamBackupToStdin(cmd, backup, downloadAndDecompressStream)
 }
 
-func FetchFullBackupToStdin(cmd *exec.Cmd, backup Backup, fileNames []string) error {
-	return FetchBackupToStdin(cmd,
+func StreamFullBackupToStdin(cmd *exec.Cmd, backup Backup, fileNames []string, fetchedFilesCnt int) error {
+	return StreamBackupToStdin(cmd,
 		backup,
 		func(backup Backup, closer io.WriteCloser) error {
-			return downloadAndDecompressStreamParts(backup, closer, fileNames)
+			return downloadAndDecompressStreamParts(backup, closer, fileNames, fetchedFilesCnt)
 		})
 }
 
-func FetchBackupToStdin(cmd *exec.Cmd,
+func StreamBackupToStdin(cmd *exec.Cmd,
 	backup Backup, backupLoader func(backup1 Backup, closer io.WriteCloser) error) error {
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -45,7 +45,9 @@ func FetchBackupToStdin(cmd *exec.Cmd,
 	stderr := &bytes.Buffer{}
 	cmd.Stderr = stderr
 	err = cmd.Start()
-	tracelog.ErrorLogger.FatalfOnError("Failed to start restore command: %v\n", err)
+	if err != nil {
+		return err
+	}
 	err = backupLoader(backup, stdin)
 	cmdErr := cmd.Wait()
 	if err != nil || cmdErr != nil {

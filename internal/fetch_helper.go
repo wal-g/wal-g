@@ -22,9 +22,9 @@ type ArchiveNonExistenceError struct {
 }
 
 type FileResult struct {
-	walFileResult io.ReadCloser
-	exists bool
-	err error
+	readCloser io.ReadCloser
+	exists     bool
+	err        error
 }
 
 func newArchiveNonExistenceError(archiveName string) ArchiveNonExistenceError {

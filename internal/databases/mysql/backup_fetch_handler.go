@@ -3,6 +3,7 @@ package mysql
 import (
 	"os/exec"
 
+	"github.com/spf13/viper"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -23,9 +24,10 @@ func HandleBackupFetch(folder storage.Folder,
 		tracelog.ErrorLogger.FatalfOnError("Fail to fetch backup sentinel: %v", err)
 	}
 	if len(sentinel.FileNames) == 0 {
-		err = internal.FetchBackupPartsToStdin(restoreCmd, backup)
+		err = internal.StreamBackupPartsToStdin(restoreCmd, backup)
 	} else {
-		err = internal.FetchFullBackupToStdin(restoreCmd, backup, sentinel.FileNames)
+		prefetchedFilesCnt := viper.GetInt(internal.MysqlPrefetchedFilesCount)
+		err = internal.StreamFullBackupToStdin(restoreCmd, backup, sentinel.FileNames, prefetchedFilesCnt)
 	}
 	tracelog.ErrorLogger.FatalfOnError("Fail to fetch backup sentinel: %v", err)
 

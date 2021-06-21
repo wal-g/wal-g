@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/utility"
@@ -60,14 +59,15 @@ func downloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 	return newArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))
 }
 
-func downloadAndDecompressStreamParts(backup Backup, writeCloser io.WriteCloser, fileNames []string) error {
+func downloadAndDecompressStreamParts(backup Backup, writeCloser io.WriteCloser,
+	fileNames []string, fetchedFilesCnt int) error {
 	defer utility.LoggedClose(writeCloser, "")
 
 	decompressor := compression.FindDecompressor(filepath.Ext(fileNames[0])[1:])
 	if decompressor == nil {
 		return newUnknownCompressionMethodError()
 	}
-	filesCh := make(chan FileResult, viper.GetInt(MysqlPrefetchedFilesCount))
+	filesCh := make(chan FileResult, fetchedFilesCnt)
 	go TryDownloadFiles(backup.Folder, fileNames, filesCh)
 	for _, fileName := range fileNames {
 		file := <-filesCh
@@ -78,7 +78,7 @@ func downloadAndDecompressStreamParts(backup Backup, writeCloser io.WriteCloser,
 			return newArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", fileName))
 		}
 		tracelog.DebugLogger.Printf("Found file: %s", fileName)
-		err := DecompressDecryptBytes(&EmptyWriteIgnorer{WriteCloser: writeCloser}, file.walFileResult, decompressor)
+		err := DecompressDecryptBytes(&EmptyWriteIgnorer{WriteCloser: writeCloser}, file.readCloser, decompressor)
 		if err != nil {
 			return err
 		}

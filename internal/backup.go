@@ -166,7 +166,7 @@ func SelectBackup(folder storage.Folder,
 	if err != nil {
 		return Backup{}, err
 	}
-	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder,)\n", backupName)
+	tracelog.DebugLogger.Printf("SelectBackup(%s, folder,)\n", backupName)
 	return GetBackupByName(backupName, utility.BaseBackupPath, folder)
 }
 
