@@ -29,7 +29,7 @@ func (uploader *Uploader) PushStreamParts(stream io.Reader) (string, []string, e
 	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 	var files []string
 	maxFileSize := viper.GetInt64(MysqlPartialBackupFileSize)
-	for i := 1; ; i += 1 {
+	for i := 1; ; i++ {
 		uncompressedSize := int64(0)
 		dstPath := GetStreamName(backupName+"_"+strconv.Itoa(i), uploader.Compressor.FileExtension())
 		reader := io.LimitReader(stream, maxFileSize)

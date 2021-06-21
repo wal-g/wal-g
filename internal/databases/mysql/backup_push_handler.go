@@ -1,10 +1,10 @@
 package mysql
 
 import (
-	"github.com/spf13/viper"
 	"os"
 	"os/exec"
 
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/limiters"
