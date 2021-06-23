@@ -45,7 +45,7 @@ func HandleBinlogFetch(folder storage.Folder, backupName string, untilTS string)
 	dstDir, err := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	startTS, endTS, err := getTimestamps(folder, backupName, untilTS)
+	startTS, _, endTS, err := getTimestamps(folder, backupName, untilTS)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	handler := newIndexHandler(dstDir)

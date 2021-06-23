@@ -17,13 +17,15 @@ import (
 const binlogFetchAhead = 2
 
 type replayHandler struct {
-	logCh chan string
-	errCh chan error
-	endTS string
+	logCh   chan string
+	errCh   chan error
+	startTS string
+	endTS   string
 }
 
-func newReplayHandler(endTS time.Time) *replayHandler {
+func newReplayHandler(startTS time.Time, endTS time.Time) *replayHandler {
 	rh := new(replayHandler)
+	rh.startTS = startTS.Local().Format(TimeMysqlFormat)
 	rh.endTS = endTS.Local().Format(TimeMysqlFormat)
 	rh.logCh = make(chan string, binlogFetchAhead)
 	rh.errCh = make(chan error, 1)
@@ -53,6 +55,7 @@ func (rh *replayHandler) replayLog(binlogPath string) error {
 	env := os.Environ()
 	env = append(env,
 		fmt.Sprintf("%s=%s", "WALG_MYSQL_CURRENT_BINLOG", binlogPath),
+		fmt.Sprintf("%s=%s", "WALG_MYSQL_BINLOG_START_TS", rh.startTS),
 		fmt.Sprintf("%s=%s", "WALG_MYSQL_BINLOG_END_TS", rh.endTS))
 	cmd.Env = env
 	return cmd.Run()
@@ -76,10 +79,10 @@ func HandleBinlogReplay(folder storage.Folder, backupName string, untilTS string
 	dstDir, err := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	startTS, endTS, err := getTimestamps(folder, backupName, untilTS)
+	startTS, replayTS, endTS, err := getTimestamps(folder, backupName, untilTS)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	handler := newReplayHandler(endTS)
+	handler := newReplayHandler(replayTS, endTS)
 
 	tracelog.InfoLogger.Printf("Fetching binlogs since %s until %s", startTS, endTS)
 	err = fetchLogs(folder, dstDir, startTS, endTS, handler)
@@ -89,20 +92,20 @@ func HandleBinlogReplay(folder storage.Folder, backupName string, untilTS string
 	tracelog.ErrorLogger.FatalfOnError("Failed to apply binlogs: %v", err)
 }
 
-func getTimestamps(folder storage.Folder, backupName, untilTS string) (time.Time, time.Time, error) {
+func getTimestamps(folder storage.Folder, backupName, untilTS string) (time.Time, time.Time, time.Time, error) {
 	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	if err != nil {
-		return time.Time{}, time.Time{}, errors.Wrap(err, "Unable to get backup")
+		return time.Time{}, time.Time{}, time.Time{}, errors.Wrap(err, "Unable to get backup")
 	}
 
-	startTS, err := getBinlogSinceTS(folder, backup)
+	startTS, replayTS, err := getBinlogSinceAndReplayTS(folder, backup)
 	if err != nil {
-		return time.Time{}, time.Time{}, err
+		return time.Time{}, time.Time{}, time.Time{}, err
 	}
 
 	endTS, err := utility.ParseUntilTS(untilTS)
 	if err != nil {
-		return time.Time{}, time.Time{}, err
+		return time.Time{}, time.Time{}, time.Time{}, err
 	}
-	return startTS, endTS, nil
+	return startTS, replayTS, endTS, nil
 }

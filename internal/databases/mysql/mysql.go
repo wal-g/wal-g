@@ -200,32 +200,35 @@ outer:
 	return nil
 }
 
-func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time, error) {
-	startTS := utility.MaxTime // far future
-	var streamSentinel StreamSentinelDto
+func getBinlogSinceAndReplayTS(folder storage.Folder, backup internal.Backup) (time.Time, time.Time, error) {
+	var (
+		startTS        time.Time
+		replayTS       time.Time
+		streamSentinel StreamSentinelDto
+	)
 	err := backup.FetchSentinel(&streamSentinel)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, time.Time{}, err
 	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", streamSentinel.String())
+	replayTS = streamSentinel.StartLocalTime
 
 	// case when backup was uploaded before first binlog
 	sentinels, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, time.Time{}, err
 	}
 	for _, sentinel := range sentinels {
 		if strings.HasPrefix(sentinel.GetName(), backup.Name) {
 			tracelog.InfoLogger.Printf("Backup sentinel file: %s (%s)", sentinel.GetName(), sentinel.GetLastModified())
-			if sentinel.GetLastModified().Before(startTS) {
-				startTS = sentinel.GetLastModified()
-			}
+			startTS = sentinel.GetLastModified()
+			break
 		}
 	}
 	// case when binlog was uploaded before backup
 	binlogs, _, err := folder.GetSubFolder(BinlogPath).ListFolder()
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, time.Time{}, err
 	}
 	for _, binlog := range binlogs {
 		if strings.HasPrefix(binlog.GetName(), streamSentinel.BinLogStart) {
@@ -235,7 +238,7 @@ func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time,
 			}
 		}
 	}
-	return startTS, nil
+	return startTS, replayTS, nil
 }
 
 // getLogsCoveringInterval lists the operation logs that cover the interval
