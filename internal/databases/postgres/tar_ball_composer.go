@@ -27,15 +27,14 @@ type ComposeFileInfo struct {
 	wasInBase     bool
 	header        *tar.Header
 	isIncremented bool
-	isChanged     bool
 }
 
 type TarFileSets map[string][]string
 
 func NewComposeFileInfo(path string, fileInfo os.FileInfo, wasInBase, isIncremented bool,
-	header *tar.Header, isChanged bool) *ComposeFileInfo {
+	header *tar.Header) *ComposeFileInfo {
 	return &ComposeFileInfo{path: path, fileInfo: fileInfo,
-		wasInBase: wasInBase, header: header, isIncremented: isIncremented, isChanged: isChanged}
+		wasInBase: wasInBase, header: header, isIncremented: isIncremented}
 }
 
 type TarBallComposerType int
@@ -75,6 +74,7 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn,
 		if prevBackupSentinelDto.IncrementFullName != nil {
 			previousBackupName = *prevBackupSentinelDto.IncrementFullName
 			previousBackup = NewBackup(folder, previousBackupName)	
+			previousBackup.GetSentinel()
 		}	
 		return NewCopyTarBallComposerMaker(previousBackup, newBackupName, filePackOptions), nil
 	default:

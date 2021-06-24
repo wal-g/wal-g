@@ -293,7 +293,7 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 		}
 		incrementBaseLsn := bundle.getIncrementBaseLsn()
 		isIncremented := incrementBaseLsn != nil && (wasInBase || bundle.forceIncremental) && isPagedFile(info, path)
-		bundle.TarBallComposer.AddFile(NewComposeFileInfo(path, info, wasInBase, isIncremented, fileInfoHeader, wasInBase && time.Equal(baseFile.MTime)))
+		bundle.TarBallComposer.AddFile(NewComposeFileInfo(path, info, wasInBase, isIncremented, fileInfoHeader))
 	} else {
 		err := bundle.TarBallComposer.AddHeader(fileInfoHeader, info)
 		if err != nil {
