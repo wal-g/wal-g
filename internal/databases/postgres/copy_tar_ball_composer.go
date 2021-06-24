@@ -42,7 +42,6 @@ type CopyTarBallComposer struct {
 	prevBackup             Backup
 	newBackupName          string
 	tarFileSets            TarFileSets
-	copiedTarFileSets      TarFileSets
 	tarUnchangedFilesCount map[string]int
 	prevFileTar            map[string]string
 	prevTarFileSets        TarFileSets
@@ -85,7 +84,6 @@ func NewCopyTarBallComposer(
 		prevBackup:             prevBackup,
 		newBackupName:          newBackupName,
 		tarFileSets:            make(TarFileSets),
-		copiedTarFileSets:      make(TarFileSets),
 		tarUnchangedFilesCount: tarUnchangedFilesCount,
 		prevFileTar:            prevFileTar,
 		prevTarFileSets:        prevTarFileSets,
@@ -162,10 +160,10 @@ func (c *CopyTarBallComposer) copyTar(tarName string) {
 	for _, fileName := range c.prevTarFileSets[tarName] {
 		if _, exists := c.fileInfo[fileName]; exists {
 			c.fileInfo[fileName].status = processed
-			c.copiedTarFileSets[tarName] = append(c.copiedTarFileSets[tarName], fileName)
+			c.tarFileSets[tarName] = append(c.tarFileSets[tarName], fileName)
 		} else if _, exists := c.headerInfos[fileName]; exists {
 			c.headerInfos[fileName].status = processed
-			c.copiedTarFileSets[tarName] = append(c.copiedTarFileSets[tarName], fileName)
+			c.tarFileSets[tarName] = append(c.tarFileSets[tarName], fileName)
 		}
 	}
 }
@@ -200,34 +198,27 @@ func (c *CopyTarBallComposer) PackTarballs() (TarFileSets, error) {
 		file := c.fileInfo[fileName]
 		if file.status == possibleCopy {
 			c.copyTar(c.prevFileTar[fileName])
-			file.status = processed
 		}
 	}
 	for headerName := range c.headerInfos {
 		header := c.headerInfos[headerName]
 		if header.status == possibleCopy {
 			c.copyTar(c.prevFileTar[headerName])
-			header.status = processed
 		}
 	}
 
-	tarExpectedSize := int64(0)
 	var tarBall internal.TarBall = nil
 	for fileName := range c.fileInfo {
 		file := c.fileInfo[fileName]
-		fileSize := file.info.fileInfo.Size()
 		if file.status == doNotCopy || file.status == fromNew {
-			if tarExpectedSize+fileSize > c.tarBallQueue.TarSizeThreshold || tarBall == nil {
-				tarBall = c.getTarBall()
-			}
+			tarBall = c.getTarBall()
 			c.errorGroup.Go(func() error {
 				err := c.tarFilePacker.PackFileIntoTar(file.info, tarBall)
 				if err != nil {
 					return err
 				}
-				return nil
+				return c.tarBallQueue.CheckSizeAndEnqueueBack(tarBall)
 			})
-			tarExpectedSize += fileSize
 			c.tarFileSets[tarBall.Name()] = append(c.tarFileSets[tarBall.Name()], fileName)
 			file.status = processed
 		}
@@ -235,15 +226,11 @@ func (c *CopyTarBallComposer) PackTarballs() (TarFileSets, error) {
 
 	for headerName := range c.headerInfos {
 		header := c.headerInfos[headerName]
-		headerSize := header.info.Size()
 		if header.status == doNotCopy || header.status == fromNew {
-			if tarExpectedSize+headerSize > c.tarBallQueue.TarSizeThreshold {
-				tarBall = c.tarBallQueue.Deque()
-				tarBall.SetUp(c.crypter)
-			}
+			tarBall = c.getTarBall()
 			tarBall.TarWriter().WriteHeader(header.fileInfoHeader)
-			tarExpectedSize += headerSize
 			c.tarFileSets[tarBall.Name()] = append(c.tarFileSets[tarBall.Name()], headerName)
+			c.tarBallQueue.EnqueueBack(tarBall)
 		}
 		header.status = processed
 	}
