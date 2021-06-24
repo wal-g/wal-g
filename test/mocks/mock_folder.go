@@ -36,17 +36,17 @@ func (m *MockFolder) EXPECT() *MockFolderMockRecorder {
 }
 
 // CopyObject mocks base method.
-func (m *MockFolder) CopyObject(arg0, arg1 string) error {
+func (m *MockFolder) CopyObject(arg0, arg1, arg2 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CopyObject", arg0, arg1)
+	ret := m.ctrl.Call(m, "CopyObject", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CopyObject indicates an expected call of CopyObject.
-func (mr *MockFolderMockRecorder) CopyObject(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockFolderMockRecorder) CopyObject(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CopyObject", reflect.TypeOf((*MockFolder)(nil).CopyObject), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CopyObject", reflect.TypeOf((*MockFolder)(nil).CopyObject), arg0, arg1, arg2)
 }
 
 // DeleteObjects mocks base method.
