@@ -4,7 +4,8 @@ import (
 	"archive/tar"
 	"context"
 	"os"
-
+	
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/utility"
@@ -152,11 +153,13 @@ func (c *CopyTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.FileIn
 }
 
 func (c *CopyTarBallComposer) copyTar(tarName string) {
+	tracelog.InfoLogger.Printf("Copying %s ...\n", tarName)
 	c.prevBackup.Folder.CopyObject(
 		utility.BaseBackupPath,
 		c.prevBackup.Name+internal.TarPartitionFolderName+tarName,
 		c.newBackupName+internal.TarPartitionFolderName+tarName)
 	c.copiedTars[tarName] = true
+	c.tarBallQueue.TarBallMaker.AddCopiedTarName(tarName)
 	for _, fileName := range c.prevTarFileSets[tarName] {
 		if _, exists := c.fileInfo[fileName]; exists {
 			c.fileInfo[fileName].status = processed
@@ -171,17 +174,10 @@ func (c *CopyTarBallComposer) copyTar(tarName string) {
 func (c *CopyTarBallComposer) getTarBall() internal.TarBall {
 	tarBall := c.tarBallQueue.Deque()
 	tarBall.SetUp(c.crypter)
-	_, exists := c.copiedTars[tarBall.Name()]
-	for exists {
-		c.tarBallQueue.SkipTarBall(tarBall)
-		tarBall = c.tarBallQueue.Deque()
-		tarBall.SetUp(c.crypter)
-		_, exists = c.copiedTars[tarBall.Name()]
-	}
 	return tarBall
 }
 
-func (c *CopyTarBallComposer) PackTarballs() (TarFileSets, error) {
+func (c *CopyTarBallComposer) copyUnchangedTars() {
 	for tarName, cnt := range c.tarUnchangedFilesCount {
 		if cnt != 0 {
 			for _, fileName := range c.prevTarFileSets[tarName] {
@@ -206,6 +202,10 @@ func (c *CopyTarBallComposer) PackTarballs() (TarFileSets, error) {
 			c.copyTar(c.prevFileTar[headerName])
 		}
 	}
+}
+
+func (c *CopyTarBallComposer) PackTarballs() (TarFileSets, error) {
+	c.copyUnchangedTars()	
 
 	var tarBall internal.TarBall = nil
 	for fileName := range c.fileInfo {

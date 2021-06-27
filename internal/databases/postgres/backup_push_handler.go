@@ -231,7 +231,11 @@ func (bh *BackupHandler) uploadBackup() TarFileSets {
 	bundle := bh.workers.bundle
 	// Start a new tar bundle, walk the pgDataDirectory and upload everything there.
 	tracelog.InfoLogger.Println("Starting a new tar bundle")
-	err := bundle.StartQueue(internal.NewStorageTarBallMaker(bh.curBackupInfo.name, bh.workers.uploader.Uploader))
+	useTarNameResolver := false
+	if bh.arguments.tarBallComposerType == CopyComposer {
+		useTarNameResolver = true
+	}
+	err := bundle.StartQueue(internal.NewStorageTarBallMaker(bh.curBackupInfo.name, useTarNameResolver, bh.workers.uploader.Uploader))
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tarBallComposerMaker, err := NewTarBallComposerMaker(bh.arguments.tarBallComposerType, bh.workers.conn,
