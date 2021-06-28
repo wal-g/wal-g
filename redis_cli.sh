@@ -10,8 +10,10 @@ FILENAME=$(mktemp --suffix=redis-cli-stderr)
 redis-cli $@ --rdb - 2>$FILENAME
 exit_code=$?
 cat $FILENAME >&2
-rm $FILENAME
+grep "Fail to fsync" $FILENAME | grep -q "Invalid argument"
+FAILED=$?
+rm $FILENAME;
 if [[ $exit_code -ne 0 ]] ; then
-	grep "Fail to fsync" $FILENAME | grep -q "Invalid argument" || exit $exit_code
+    test 0 -eq $FAILED || exit $exit_code
 fi
 exit 0
