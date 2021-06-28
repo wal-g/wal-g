@@ -15,7 +15,8 @@ type DatabaseOptions struct {
 
 type BackupInfo struct {
 	Id         int    `json:"Id"`
-	Size       uint64 `json:"Size"`
+	RawSize    uint64 `json:"RawSize"`
+	BackupSize uint64 `json:"BackupSize"`
 	Timestamp  int64  `json:"Timestamp"`
 	BackupName string `json:"BackupName"`
 }
@@ -83,7 +84,7 @@ func (be *C.rocksdb_backup_engine_t) CreateBackup(db *C.rocksdb_t) (backupInfo B
 	info := be.GetBackupEngineInfo()
 	latestBackupIndex := info.getBackupsCount() - 1
 
-	return BackupInfo{info.getBackupId(latestBackupIndex), info.getBackupSize(latestBackupIndex), info.getBackupTimestamp(latestBackupIndex), ""}, nil
+	return BackupInfo{info.getBackupId(latestBackupIndex), 0, 0, info.getBackupTimestamp(latestBackupIndex), ""}, nil
 }
 
 func (be *C.rocksdb_backup_engine_t) RestoreBackup(dbOptions DatabaseOptions, backupId int) error {
@@ -91,7 +92,7 @@ func (be *C.rocksdb_backup_engine_t) RestoreBackup(dbOptions DatabaseOptions, ba
 	dbPathC := C.CString(dbOptions.DbPath)
 	walDirC := C.CString(dbOptions.WalPath)
 	var errC *C.char = nil
-	C.rocksdb_backup_engine_restore_db_from_backup(be, dbPathC, walDirC, restoreOptions, C.uint(backupId), &errC)
+	C.rocksdb_backup_engine_restore_db_from_backup(be, dbPathC, walDirC, restoreOptions, C.uint(uint(backupId)), &errC)
 	C.rocksdb_restore_options_destroy(restoreOptions)
 	if errC != nil {
 		return errors.New(C.GoString(errC))

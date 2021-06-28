@@ -6,7 +6,9 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/utility"
 )
 
 // Creates backup of Database with dbOptions to Uploader subfolder
@@ -15,7 +17,8 @@ func HandleBackupPush(uploader *internal.Uploader, dbOptions DatabaseOptions) er
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(tempDir)
+	tracelog.DebugLogger.Println("Temporaly backup to ", tempDir)
+	//defer os.RemoveAll(tempDir)
 
 	var backupInfo BackupInfo
 	if backupInfo, err = saveBackupToLocalDirectory(tempDir, dbOptions); err != nil {
@@ -27,11 +30,24 @@ func HandleBackupPush(uploader *internal.Uploader, dbOptions DatabaseOptions) er
 		return err
 	}
 
-	backupName, err := uploader.PushStream(&buffer)
-	if err != nil {
+	backupName := utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
+
+	if err = uploader.UploadingFolder.PutObject(backupName, &buffer); err != nil {
 		return err
 	}
+	tracelog.InfoLogger.Println("Saved backup with name ", backupName)
 	backupInfo.BackupName = backupName
+
+	rawSize, err := uploader.RawDataSize()
+	if err != nil {
+		tracelog.WarningLogger.PrintError(err)
+	}
+	backupInfo.RawSize = uint64(rawSize)
+	uploadedSize, err := uploader.UploadedDataSize()
+	if err != nil {
+		tracelog.WarningLogger.PrintError(err)
+	}
+	backupInfo.BackupSize = uint64(uploadedSize)
 
 	return internal.UploadSentinel(uploader, backupInfo, backupName)
 }
