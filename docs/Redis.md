@@ -116,6 +116,11 @@ Typical configurations
 
 Here's typical wal-g configuration for that case:
 ```bash
-WALG_STREAM_CREATE_COMMAND:  'redis-cli --rdb /dev/stdout'
+WALG_STREAM_CREATE_COMMAND:  'redis_cli --rdb /dev/stdout'
 WALG_STREAM_RESTORE_COMMAND: 'cat > /var/lib/redis/dump.rdb'
 ```
+
+### Why we made redis_cli.sh
+redis-cli fails with error when redis version >= 6.2, so we made this workaround
+
+If you use redis >= 6.2, use [redis_cli.sh](https://github.com/wal-g/wal-g/blob/master/redis_cli.sh) and replace redis-cli in WALG_STREAM_CREATE_COMMAND
