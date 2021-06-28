@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/user"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -423,7 +424,9 @@ func Configure() {
 
 	// Show all ENV vars in DEVEL Logging Mode
 	tracelog.DebugLogger.Println("--- COMPILED ENVIRONMENT VARS ---")
-	for _, pair := range os.Environ() {
+	env := os.Environ()
+	sort.Strings(env)
+	for _, pair := range env {
 		tracelog.DebugLogger.Println(pair)
 	}
 

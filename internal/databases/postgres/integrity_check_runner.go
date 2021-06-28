@@ -290,16 +290,16 @@ func checkBackupIsCorrect(
 	backupStartSegNo WalSegmentNo,
 	switchSegNoByTimeline map[uint32]WalSegmentNo,
 ) bool {
+	// if backup is permanent, it is not eligible for wal-verify to be selected as the left border
+	if backupDetail.IsPermanent {
+		tracelog.WarningLogger.Printf(
+			"checkBackupIsCorrect: %s: backup is permanent, it is not eligible to be selected "+
+				"as the earliest backup for wal-verify.\n", backupDetail.BackupName)
+		return false
+	}
+
 	// perform the check only if .history file exists
 	if len(switchSegNoByTimeline) > 0 {
-		// if backup is permanent, it is not eligible for wal-verify to be selected as the left border
-		if backupDetail.IsPermanent {
-			tracelog.WarningLogger.Printf(
-				"checkBackupIsCorrect: %s: backup is permanent, it is not eligible to be selected "+
-					"as the earliest backup for wal-verify.\n", backupDetail.BackupName)
-			return false
-		}
-
 		// if backup start segment is less than timeline start segment => incorrect backup
 		if backupTimeline > 1 {
 			backupTimelineStartSegNo, ok := switchSegNoByTimeline[backupTimeline-1]
