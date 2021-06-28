@@ -25,7 +25,7 @@ func HandleBackupFetch(uploader *internal.Uploader, dbOptions DatabaseOptions, r
 		return err
 	}
 	tracelog.DebugLogger.Println("Temp directory to store backup is ", tempDir)
-	//defer os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir)
 
 	folder = folder.GetSubFolder(utility.BaseBackupPath)
 	reader, err := folder.ReadObject(backup.Name)

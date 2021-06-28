@@ -4,6 +4,7 @@ MAIN_SQLSERVER_PATH := main/sqlserver
 MAIN_REDIS_PATH := main/redis
 MAIN_MONGO_PATH := main/mongo
 MAIN_FDB_PATH := main/fdb
+MAIN_ROCKSDB_PATH := main/rocksdb
 DOCKER_COMMON := golang ubuntu s3
 CMD_FILES = $(wildcard cmd/**/*.go)
 PKG_FILES = $(wildcard internal/**/*.go internal/**/**/*.go internal/*.go)
@@ -157,6 +158,10 @@ redis_features:
 	set -e
 	make go_deps
 	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1 -timeout 20m  -tf.test=true -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=redis
+
+rocksdb_build:
+	./link_rocksdb.sh
+	(cd $(MAIN_ROCKSDB_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w")
 
 clean_redis_features:
 	set -e

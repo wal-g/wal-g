@@ -18,7 +18,7 @@ func HandleBackupPush(uploader *internal.Uploader, dbOptions DatabaseOptions) er
 		return err
 	}
 	tracelog.DebugLogger.Println("Temporaly backup to ", tempDir)
-	//defer os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir)
 
 	var backupInfo BackupInfo
 	if backupInfo, err = saveBackupToLocalDirectory(tempDir, dbOptions); err != nil {
