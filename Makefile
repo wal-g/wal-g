@@ -212,6 +212,10 @@ deps: go_deps link_external_deps
 
 go_deps:
 	git submodule update --init
+
+	mkdir -p tmp/rocksdb
+	cp -rf internal/databases/rocksdb/* tmp/rocksdb/
+
 	go mod vendor
 ifdef USE_LZO
 	sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' vendor/github.com/cyberdelia/lzo/lzo.go
