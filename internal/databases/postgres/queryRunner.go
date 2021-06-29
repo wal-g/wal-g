@@ -4,10 +4,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/blang/semver"
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
-	"github.com/greenplum-db/gp-common-go-libs/dbconn"
-
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -61,7 +57,7 @@ type PgRelationStat struct {
 
 // PgQueryRunner is implementation for controlling PostgreSQL 9.0+
 type PgQueryRunner struct {
-	connection       *pgx.Conn
+	Connection       *pgx.Conn
 	Version          int
 	SystemIdentifier *uint64
 }
@@ -121,7 +117,7 @@ func (queryRunner *PgQueryRunner) BuildStopBackup() (string, error) {
 
 // NewPgQueryRunner builds QueryRunner from available connection
 func NewPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
-	r := &PgQueryRunner{connection: conn}
+	r := &PgQueryRunner{Connection: conn}
 	err := r.getVersion()
 	if err != nil {
 		return nil, err
@@ -154,14 +150,14 @@ func (queryRunner *PgQueryRunner) buildGetPhysicalSlotInfo() string {
 
 // Retrieve PostgreSQL numeric version
 func (queryRunner *PgQueryRunner) getVersion() (err error) {
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 	err = conn.QueryRow(queryRunner.buildGetVersion()).Scan(&queryRunner.Version)
 	return errors.Wrap(err, "GetVersion: getting Postgres version failed")
 }
 
 // Get current LSN of cluster
 func (queryRunner *PgQueryRunner) getCurrentLsn() (lsn string, err error) {
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 	err = conn.QueryRow(queryRunner.buildGetCurrentLsn()).Scan(&lsn)
 	if err != nil {
 		return "", errors.Wrap(err, "GetCurrentLsn: getting current LSN of the cluster failed")
@@ -174,7 +170,7 @@ func (queryRunner *PgQueryRunner) getSystemIdentifier() (err error) {
 		tracelog.WarningLogger.Println("GetSystemIdentifier: Unable to get system identifier")
 		return nil
 	}
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 	err = conn.QueryRow(queryRunner.buildGetSystemIdentifier()).Scan(&queryRunner.SystemIdentifier)
 	return errors.Wrap(err, "System Identifier: getting identifier of DB failed")
 }
@@ -184,7 +180,7 @@ func (queryRunner *PgQueryRunner) startBackup(backup string) (backupName string,
 	lsnString string, inRecovery bool, err error) {
 	tracelog.InfoLogger.Println("Calling pg_start_backup()")
 	startBackupQuery, err := queryRunner.BuildStartBackup()
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 	if err != nil {
 		return "", "", false, errors.Wrap(err, "QueryRunner StartBackup: Building start backup query failed")
 	}
@@ -199,7 +195,7 @@ func (queryRunner *PgQueryRunner) startBackup(backup string) (backupName string,
 // StopBackup informs the database that copy is over
 func (queryRunner *PgQueryRunner) stopBackup() (label string, offsetMap string, lsnStr string, err error) {
 	tracelog.InfoLogger.Println("Calling pg_stop_backup()")
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 
 	tx, err := conn.Begin()
 	if err != nil {
@@ -255,7 +251,7 @@ func (queryRunner *PgQueryRunner) getStatistics(
 	dbInfo PgDatabaseInfo) (map[walparser.RelFileNode]PgRelationStat, error) {
 	tracelog.InfoLogger.Println("Querying pg_stat_all_tables")
 	getStatQuery, err := queryRunner.BuildStatisticsQuery()
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 	if err != nil {
 		return nil, errors.Wrap(err, "QueryRunner GetStatistics: Building get statistics query failed")
 	}
@@ -307,7 +303,7 @@ func (queryRunner *PgQueryRunner) BuildGetDatabasesQuery() (string, error) {
 func (queryRunner *PgQueryRunner) getDatabaseInfos() ([]PgDatabaseInfo, error) {
 	tracelog.InfoLogger.Println("Querying pg_database")
 	getDBInfoQuery, err := queryRunner.BuildGetDatabasesQuery()
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 	if err != nil {
 		return nil, errors.Wrap(err, "QueryRunner GetDatabases: Building db names query failed")
 	}
@@ -342,7 +338,7 @@ func (queryRunner *PgQueryRunner) getDatabaseInfos() ([]PgDatabaseInfo, error) {
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) GetParameter(parameterName string) (string, error) {
 	var value string
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 	err := conn.QueryRow(queryRunner.buildGetParameter(), parameterName).Scan(&value)
 	return value, err
 }
@@ -368,7 +364,7 @@ func (queryRunner *PgQueryRunner) GetWalSegmentBytes() (segBlocks uint64, err er
 // GetDataDir reads the wals segment size (in bytes) and converts it to uint64
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) GetDataDir() (dataDir string, err error) {
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 	err = conn.QueryRow("show data_directory").Scan(&dataDir)
 	return dataDir, err
 }
@@ -379,7 +375,7 @@ func (queryRunner *PgQueryRunner) GetPhysicalSlotInfo(slotName string) (Physical
 	var active bool
 	var restartLSN string
 
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 	err := conn.QueryRow(queryRunner.buildGetPhysicalSlotInfo(), slotName).Scan(&active, &restartLSN)
 	if err == pgx.ErrNoRows {
 		// slot does not exist.
@@ -394,110 +390,4 @@ func (queryRunner *PgQueryRunner) GetPhysicalSlotInfo(slotName string) (Physical
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) IsTablespaceMapExists() bool {
 	return queryRunner.Version >= 90600
-}
-
-// BuildCreateGreenplumRestorePoint formats a query to create a restore point for Greenplum
-func (queryRunner *PgQueryRunner) buildCreateGreenplumRestorePoint(restorePointName string) string {
-	return fmt.Sprintf("SELECT (gp_create_restore_point('%s'))::text", restorePointName)
-}
-
-// CreateGreenplumRestorePoint creates a restore point for Greenplum
-func (queryRunner *PgQueryRunner) CreateGreenplumRestorePoint(restorePointName string) (lsnStrings []string, err error) {
-	conn := queryRunner.connection
-	rows, err := conn.Query(queryRunner.buildCreateGreenplumRestorePoint(restorePointName))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	lsnStrings = make([]string, 0)
-	for rows.Next() {
-		var lsn string
-
-		if err := rows.Scan(&lsn); err != nil {
-			tracelog.WarningLogger.Printf("CreateGreenplumRestorePoint:  %v\n", err.Error())
-		}
-		lsnStrings = append(lsnStrings, lsn)
-	}
-
-	if rows.Err() != nil {
-		return nil, rows.Err()
-	}
-	return lsnStrings, nil
-}
-
-// BuildGetGreenplumSegmentsInfo formats a query to retrieve information about Greenplum segments
-func (queryRunner *PgQueryRunner) buildGetGreenplumSegmentsInfo(semVer semver.Version) string {
-	validRange := dbconn.StringToSemVerRange("<6")
-	if validRange(semVer) {
-		return `
-SELECT
-	s.dbid,
-	s.content,
-	s.role::text,
-	s.port,
-	s.hostname,
-	e.fselocation
-FROM gp_segment_configuration s
-JOIN pg_filespace_entry e ON s.dbid = e.fsedbid
-JOIN pg_filespace f ON e.fsefsoid = f.oid
-WHERE s.role = 'p' AND f.fsname = 'pg_system'
-ORDER BY s.content, s.role DESC;`
-	}
-	return `
-SELECT
-	dbid,
-	content,
-	role::text,
-	port,
-	hostname,
-	datadir
-FROM gp_segment_configuration
-WHERE role = 'p'
-ORDER BY content, role DESC;`
-}
-
-// GetGreenplumSegmentsInfo returns the information about Greenplum segments
-func (queryRunner *PgQueryRunner) GetGreenplumSegmentsInfo(semVer semver.Version) (segments []cluster.SegConfig, err error) {
-	conn := queryRunner.connection
-	rows, err := conn.Query(queryRunner.buildGetGreenplumSegmentsInfo(semVer))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	segments = make([]cluster.SegConfig, 0)
-	for rows.Next() {
-		var dbID int
-		var contentID int
-		var role string
-		var port int
-		var hostname string
-		var dataDir string
-		if err := rows.Scan(&dbID, &contentID, &role, &port, &hostname, &dataDir); err != nil {
-			tracelog.WarningLogger.Printf("GetGreenplumSegmentsInfo:  %v\n", err.Error())
-		}
-		segment := cluster.SegConfig{
-			DbID:      dbID,
-			ContentID: contentID,
-			Role:      role,
-			Port:      port,
-			Hostname:  hostname,
-			DataDir:   dataDir,
-		}
-		segments = append(segments, segment)
-	}
-
-	if rows.Err() != nil {
-		return nil, rows.Err()
-	}
-	return segments, nil
-}
-
-// GetGreenplumVersion returns Greenplum version
-func (queryRunner *PgQueryRunner) GetGreenplumVersion() (version string, err error) {
-	conn := queryRunner.connection
-	err = conn.QueryRow("SELECT pg_catalog.version()").Scan(&version)
-	if err != nil {
-		return "", err
-	}
-	return version, nil
 }

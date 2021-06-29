@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/jedib0t/go-pretty/table"
@@ -12,14 +13,26 @@ import (
 	"github.com/wal-g/wal-g/internal"
 )
 
+func filterGreenplumBackups(backups []internal.BackupTime) (pgBackups []internal.BackupTime) {
+	pgBackups = make([]internal.BackupTime, 0)
+	for _, backup := range backups {
+		if strings.Contains(backup.BackupName, "base_") {
+			pgBackups = append(pgBackups, backup)
+		}
+	}
+	return pgBackups
+}
+
 // TODO : unit tests
 func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 	backups, err := internal.GetBackups(folder)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	backups = filterGreenplumBackups(backups)
 	if len(backups) == 0 {
 		tracelog.InfoLogger.Println("No backups found")
 		return
 	}
-	tracelog.ErrorLogger.FatalOnError(err)
 	// if details are requested we append content of metadata.json to each line
 
 	backupDetails, err := GetBackupsDetails(folder, backups)

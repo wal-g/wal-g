@@ -156,7 +156,7 @@ func (bh *BackupHandler) connect() (err error) {
 
 func (bh *BackupHandler) createRestorePoint(restorePointName string) (err error) {
 	tracelog.InfoLogger.Printf("Creating restore point with name %s", restorePointName)
-	queryRunner, err := postgres.NewPgQueryRunner(bh.workers.Conn)
+	queryRunner, err := NewPgQueryRunner(bh.workers.Conn)
 	if err != nil {
 		return
 	}
@@ -171,7 +171,7 @@ func getGpCluster() (globalCluster *cluster.Cluster, err error) {
 		return globalCluster, err
 	}
 
-	queryRunner, err := postgres.NewPgQueryRunner(tmpConn)
+	queryRunner, err := NewPgQueryRunner(tmpConn)
 	if err != nil {
 		return globalCluster, err
 	}

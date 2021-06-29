@@ -26,13 +26,7 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 	}
 	conn, err := pgx.Connect(config)
 	if err != nil {
-		config.RuntimeParams["gp_role"] = "utility"
-		conn, err = pgx.Connect(config)
-
-		if err != nil {
-			config.RuntimeParams["gp_session_role"] = "utility"
-			conn, err = pgx.Connect(config)
-		}
+		conn, err = tryConnectToGpSegment(config)
 
 		if err != nil && config.Host != "localhost" {
 			tracelog.ErrorLogger.Println(err.Error())
@@ -77,4 +71,15 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 	}
 
 	return conn, nil
+}
+
+func tryConnectToGpSegment(config pgx.ConnConfig) (*pgx.Conn, error) {
+	config.RuntimeParams["gp_role"] = "utility"
+	conn, err := pgx.Connect(config)
+
+	if err != nil {
+		config.RuntimeParams["gp_session_role"] = "utility"
+		conn, err = pgx.Connect(config)
+	}
+	return conn, err
 }
