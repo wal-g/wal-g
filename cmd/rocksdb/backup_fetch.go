@@ -7,7 +7,7 @@ import (
 	"github.com/wal-g/wal-g/tmp/rocksdb"
 )
 
-const backupFetchShortDescription = "Restores backup to database"
+const backupFetchShortDescription = "Restores backup to directory that does not exist"
 
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch database_path backup_name",
@@ -21,10 +21,10 @@ var backupFetchCmd = &cobra.Command{
 			walDirectory = dbPath
 		}
 
-		uploader, err := internal.ConfigureUploader()
+		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = rocksdb.HandleBackupFetch(uploader, rocksdb.NewDatabaseOptions(dbPath, walDirectory), rocksdb.NewRestoreOptions(backup_name, true))
+		err = rocksdb.HandleBackupFetch(folder, rocksdb.NewDatabaseOptions(dbPath, walDirectory), rocksdb.NewRestoreOptions(backup_name))
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

@@ -14,7 +14,6 @@ type DatabaseOptions struct {
 }
 
 type BackupInfo struct {
-	Id         int    `json:"Id"`
 	RawSize    uint64 `json:"RawSize"`
 	BackupSize uint64 `json:"BackupSize"`
 	Timestamp  int64  `json:"Timestamp"`
@@ -22,18 +21,15 @@ type BackupInfo struct {
 }
 
 type RestoreOptions struct {
-	BackupName         string
-	CreateDbIfNotExist bool
+	BackupName string
 }
-
-type BackupEngine *C.rocksdb_backup_engine_t
 
 func NewDatabaseOptions(dbPath string, walDirectory string) DatabaseOptions {
 	return DatabaseOptions{dbPath, walDirectory}
 }
 
-func NewRestoreOptions(backupName string, createDbIfNotExist bool) RestoreOptions {
-	return RestoreOptions{backupName, createDbIfNotExist}
+func NewRestoreOptions(backupName string) RestoreOptions {
+	return RestoreOptions{backupName}
 }
 
 func OpenDatabase(dbOptions DatabaseOptions) (db *C.rocksdb_t, err error) {
@@ -49,74 +45,30 @@ func OpenDatabase(dbOptions DatabaseOptions) (db *C.rocksdb_t, err error) {
 	return
 }
 
-func OpenBackupEngine(backupEngineDirectory string, createIfNotExists bool) (be *C.rocksdb_backup_engine_t, err error) {
-	bePathC := C.CString(backupEngineDirectory)
-	options := C.rocksdb_options_create()
-	if createIfNotExists {
-		C.rocksdb_options_set_create_if_missing(options, 1)
-	}
+func (db *C.rocksdb_t) CreateCheckpointObject() (*C.rocksdb_checkpoint_t, error) {
 	var cErr *C.char = nil
-
-	be = C.rocksdb_backup_engine_open(options, bePathC, &cErr)
-	C.rocksdb_options_destroy(options)
+	checkpoint := C.rocksdb_checkpoint_object_create(db, &cErr)
 	if cErr != nil {
-		err = errors.New(C.GoString(cErr))
+		return nil, errors.New(C.GoString(cErr))
 	}
-	return
+
+	return checkpoint, nil
 }
 
-func (db *C.rocksdb_t) CloseDb() {
-	C.rocksdb_close(db)
-}
-
-func (be *C.rocksdb_backup_engine_t) CloseBackupEngine() {
-	C.rocksdb_backup_engine_close(be)
-}
-
-func (be *C.rocksdb_backup_engine_t) CreateBackup(db *C.rocksdb_t) (backupInfo BackupInfo, err error) {
+func (checkpoint *C.rocksdb_checkpoint_t) CreateCheckpoint(checkpointPath string, size int) error {
 	var cErr *C.char = nil
-	C.rocksdb_backup_engine_create_new_backup(be, db, &cErr)
+	C.rocksdb_checkpoint_create(checkpoint, C.CString(checkpointPath), C.size_t(size), &cErr)
 	if cErr != nil {
-		err = errors.New(C.GoString(cErr))
-		return
-	}
-
-	info := be.GetBackupEngineInfo()
-	latestBackupIndex := info.getBackupsCount() - 1
-
-	return BackupInfo{info.getBackupId(latestBackupIndex), 0, 0, info.getBackupTimestamp(latestBackupIndex), ""}, nil
-}
-
-func (be *C.rocksdb_backup_engine_t) RestoreBackup(dbOptions DatabaseOptions, backupId int) error {
-	restoreOptions := C.rocksdb_restore_options_create()
-	dbPathC := C.CString(dbOptions.DbPath)
-	walDirC := C.CString(dbOptions.WalPath)
-	var errC *C.char = nil
-	C.rocksdb_backup_engine_restore_db_from_backup(be, dbPathC, walDirC, restoreOptions, C.uint(uint(backupId)), &errC)
-	C.rocksdb_restore_options_destroy(restoreOptions)
-	if errC != nil {
-		return errors.New(C.GoString(errC))
+		return errors.New(C.GoString(cErr))
 	}
 
 	return nil
 }
 
-func (be *C.rocksdb_backup_engine_t) GetBackupEngineInfo() *C.rocksdb_backup_engine_info_t {
-	return C.rocksdb_backup_engine_get_backup_info(be)
+func (chkpnt *C.rocksdb_checkpoint_t) DestroyCheckpointObject() {
+	C.rocksdb_checkpoint_object_destroy(chkpnt)
 }
 
-func (info *C.rocksdb_backup_engine_info_t) getBackupId(index int) int {
-	return int(C.rocksdb_backup_engine_info_backup_id(info, C.int(index)))
-}
-
-func (info *C.rocksdb_backup_engine_info_t) getBackupsCount() int {
-	return int(C.rocksdb_backup_engine_info_count(info))
-}
-
-func (info *C.rocksdb_backup_engine_info_t) getBackupSize(index int) uint64 {
-	return uint64(C.rocksdb_backup_engine_info_size(info, C.int(index)))
-}
-
-func (info *C.rocksdb_backup_engine_info_t) getBackupTimestamp(index int) int64 {
-	return int64(C.rocksdb_backup_engine_info_timestamp(info, C.int(index)))
+func (db *C.rocksdb_t) CloseDb() {
+	C.rocksdb_close(db)
 }
