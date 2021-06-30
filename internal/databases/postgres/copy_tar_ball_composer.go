@@ -161,12 +161,14 @@ func (c *CopyTarBallComposer) copyTar(tarName string) {
 	c.copiedTars[tarName] = true
 	c.tarBallQueue.TarBallMaker.AddCopiedTarName(tarName)
 	for _, fileName := range c.prevTarFileSets[tarName] {
-		if _, exists := c.fileInfo[fileName]; exists {
-			c.fileInfo[fileName].status = processed
+		if file, exists := c.fileInfo[fileName]; exists {
+			file.status = processed
 			c.tarFileSets[tarName] = append(c.tarFileSets[tarName], fileName)
-		} else if _, exists := c.headerInfos[fileName]; exists {
-			c.headerInfos[fileName].status = processed
+			c.files.AddFile(file.info.header, file.info.fileInfo, file.info.isIncremented)
+		} else if header, exists := c.headerInfos[fileName]; exists {
+			header.status = processed
 			c.tarFileSets[tarName] = append(c.tarFileSets[tarName], fileName)
+			c.files.AddFile(header.fileInfoHeader, header.info, false)
 		}
 	}
 }
@@ -230,6 +232,7 @@ func (c *CopyTarBallComposer) PackTarballs() (TarFileSets, error) {
 			tarBall = c.getTarBall()
 			tarBall.TarWriter().WriteHeader(header.fileInfoHeader)
 			c.tarFileSets[tarBall.Name()] = append(c.tarFileSets[tarBall.Name()], headerName)
+			c.files.AddFile(header.fileInfoHeader, header.info, false)
 			c.tarBallQueue.EnqueueBack(tarBall)
 		}
 		header.status = processed
