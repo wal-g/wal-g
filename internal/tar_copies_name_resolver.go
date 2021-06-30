@@ -40,5 +40,6 @@ func (r *TarCopiesNameResolver) ResolveByPart(part int, fileExtention string) st
 		copied = r.copiedTarNames[name]
 	}
 	r.tarPartIds[part] = r.currTarId
+	r.currTarId += 1
 	return name
 }
