@@ -51,7 +51,7 @@ jobs:
         run: mv main/${{ matrix.db }}/wal-g wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
 
       - name: Compress WAL-G binary
-        run: tar -zcvf wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
+        run: tar --owner=0 --group=0 -zcvf wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
 
       - name: Upload WAL-G binary
         uses: softprops/action-gh-release@v1
