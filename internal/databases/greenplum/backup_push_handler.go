@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -18,15 +19,33 @@ import (
 
 // BackupArguments holds all arguments parsed from cmd to this handler class
 type BackupArguments struct {
-	isPermanent           bool
-	verifyPageChecksums   bool
-	storeAllCorruptBlocks bool
-	userData              string
-	pgDataDirectory       string
-	isFullBackup          bool
-	useRatingComposer     bool
-	deltaFromUserData     string
-	deltaFromName         string
+	isPermanent          bool
+	userData             string
+	segmentDataDirectory string
+	segmentFwdArgs       []SegmentFwdArg
+}
+
+type SegmentUserData struct {
+	ContentId int `json:"content_id"`
+}
+
+func NewSegmentUserData(contentId int) SegmentUserData {
+	return SegmentUserData{ContentId: contentId}
+}
+
+func (d SegmentUserData) String() string {
+	b, err := json.Marshal(d)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
+}
+
+// SegmentFwdArg describes the specific WAL-G
+// arguments that is going to be forwarded to the segments
+type SegmentFwdArg struct {
+	Name  string
+	Value string
 }
 
 // BackupWorkers holds the external objects that the handler uses to get the backup data / write the backup data
@@ -51,44 +70,13 @@ type BackupHandler struct {
 
 func (bh *BackupHandler) buildCommand(contentID int) string {
 	segment := bh.globalCluster.ByContent[contentID][0]
-	command := fmt.Sprintf("export PGPORT=%d && wal-g backup-push %s --backup-name-prefix %s_seg%d",
-		segment.Port, segment.DataDir, bh.curBackupInfo.backupName, contentID)
-	if bh.arguments.isPermanent {
-		command += " --permanent"
-	}
-	if bh.arguments.verifyPageChecksums {
-		command += " --verify"
-	}
-	if bh.arguments.isFullBackup {
-		command += " --full"
-	}
-	if bh.arguments.storeAllCorruptBlocks {
-		command += "--store-all-corrupt"
-	}
-	if bh.arguments.useRatingComposer {
-		command += " --rating-composer"
-	}
-	if bh.arguments.deltaFromUserData != "" {
-		command += " --delta-from-user-data " + bh.arguments.deltaFromUserData
-	}
-	if bh.arguments.deltaFromName != "" {
-		backup := internal.NewBackup(bh.workers.Uploader.UploadingFolder, bh.arguments.deltaFromName)
-		sentinelDto := BackupSentinelDto{}
-		err := backup.FetchSentinel(&sentinelDto)
-		tracelog.ErrorLogger.FatalOnError(err)
-		pgBackupName := regexp.MustCompile(fmt.Sprintf("^%s_seg%d_", bh.arguments.deltaFromName, contentID))
+	command := fmt.Sprintf("export PGPORT=%d && wal-g backup-push %s --add-user-data %s",
+		segment.Port, segment.DataDir, NewSegmentUserData(contentID).String())
 
-		for _, name := range *sentinelDto.BackupNames {
-			matchedBackupName := pgBackupName.FindString(name)
-			if matchedBackupName != "" {
-				command += " --delta-from-name " + matchedBackupName
-				break
-			}
-		}
+	for _, arg := range bh.arguments.segmentFwdArgs {
+		command += fmt.Sprintf(" --%s=%s", arg.Name, arg.Value)
 	}
-	if bh.arguments.userData != "" {
-		command += " --add-user-data " + bh.arguments.userData
-	}
+
 	tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, command)
 	return command
 }
@@ -222,18 +210,11 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 }
 
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
-func NewBackupArguments(pgDataDirectory string, isPermanent bool, verifyPageChecksums bool, isFullBackup bool,
-	storeAllCorruptBlocks bool, useRatingComposer bool, deltaFromUserData string, deltaFromName string,
-	userData string) BackupArguments {
+func NewBackupArguments(segmentDataDirectory string, isPermanent bool, userData string, fwdArgs []SegmentFwdArg) BackupArguments {
 	return BackupArguments{
-		isPermanent:           isPermanent,
-		verifyPageChecksums:   verifyPageChecksums,
-		storeAllCorruptBlocks: storeAllCorruptBlocks,
-		userData:              userData,
-		pgDataDirectory:       pgDataDirectory,
-		isFullBackup:          isFullBackup,
-		useRatingComposer:     useRatingComposer,
-		deltaFromUserData:     deltaFromUserData,
-		deltaFromName:         deltaFromName,
+		isPermanent:          isPermanent,
+		userData:             userData,
+		segmentDataDirectory: segmentDataDirectory,
+		segmentFwdArgs:       fwdArgs,
 	}
 }
