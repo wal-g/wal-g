@@ -17,9 +17,9 @@ test_copy_composer()
   pgbench -i -s 5 postgres
   pg_dumpall -f /tmp/dump1
   
-  wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --full
+  wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
-  wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --full --copy-composer  
+  wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --copy-composer  
   
   /tmp/scripts/drop_pg.sh
 

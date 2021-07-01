@@ -41,6 +41,7 @@ const (
 	VerifyPageChecksumsSetting   = "WALG_VERIFY_PAGE_CHECKSUMS"
 	StoreAllCorruptBlocksSetting = "WALG_STORE_ALL_CORRUPT_BLOCKS"
 	UseRatingComposerSetting     = "WALG_USE_RATING_COMPOSER"
+	UseCopyComposerSetting       = "WALG_USE_COPY_COMPOSER"
 	DeltaFromNameSetting         = "WALG_DELTA_FROM_NAME"
 	DeltaFromUserDataSetting     = "WALG_DELTA_FROM_USER_DATA"
 	FetchTargetUserDataSetting   = "WALG_FETCH_TARGET_USER_DATA"
@@ -138,6 +139,7 @@ var (
 		VerifyPageChecksumsSetting:   "false",
 		StoreAllCorruptBlocksSetting: "false",
 		UseRatingComposerSetting:     "false",
+		UseCopyComposerSetting:       "false",
 		MaxDelayedSegmentsCount:      "0",
 	}
 
@@ -189,6 +191,7 @@ var (
 		VerifyPageChecksumsSetting:   true,
 		StoreAllCorruptBlocksSetting: true,
 		UseRatingComposerSetting:     true,
+		UseCopyComposerSetting:       false,
 		MaxDelayedSegmentsCount:      true,
 		DeltaFromNameSetting:         true,
 		DeltaFromUserDataSetting:     true,
