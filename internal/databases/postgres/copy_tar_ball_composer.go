@@ -15,7 +15,7 @@ import (
 type copyStatus int
 
 const (
-	possibleCopy copyStatus = iota
+	possibleCopy copyStatus = iota // Mark files in previous tarball when it unclear whether tarball could be copied
 	doNotCopy
 	fromNew
 	processed
