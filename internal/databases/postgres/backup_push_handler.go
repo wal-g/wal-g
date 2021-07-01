@@ -105,7 +105,7 @@ type BackupHandler struct {
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
 func NewBackupArguments(pgDataDirectory string, backupsFolder string, isPermanent bool, verifyPageChecksums bool,
 	isFullBackup bool, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
-	deltaBaseSelector internal.BackupSelector, userData string, backupNamePrefix string) BackupArguments {
+	deltaBaseSelector internal.BackupSelector, userData string) BackupArguments {
 	return BackupArguments{
 		pgDataDirectory:       pgDataDirectory,
 		backupsFolder:         backupsFolder,
@@ -116,7 +116,6 @@ func NewBackupArguments(pgDataDirectory string, backupsFolder string, isPermanen
 		tarBallComposerType:   tarBallComposerType,
 		deltaBaseSelector:     deltaBaseSelector,
 		userData:              userData,
-		backupNamePrefix:      backupNamePrefix,
 	}
 }
 
@@ -177,9 +176,6 @@ func (bh *BackupHandler) startBackup() (err error) {
 	}
 	bh.curBackupInfo.startLSN = backupStartLSN
 	bh.curBackupInfo.name = backupName
-	if bh.arguments.backupNamePrefix != "" {
-		bh.curBackupInfo.name = bh.arguments.backupNamePrefix + "_" + bh.curBackupInfo.name
-	}
 	tracelog.DebugLogger.Printf("Backup name: %s\nBackup start LSN: %d", backupName, backupStartLSN)
 
 	return
@@ -349,9 +345,6 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	sentinelDto := NewBackupSentinelDto(bh, baseBackup.GetTablespaceSpec(), TarFileSets{})
 	sentinelDto.Files = baseBackup.Files
 	bh.curBackupInfo.name = baseBackup.BackupName()
-	if bh.arguments.backupNamePrefix != "" {
-		bh.curBackupInfo.name = bh.arguments.backupNamePrefix + "_" + bh.curBackupInfo.name
-	}
 	tracelog.InfoLogger.Println("Uploading metadata")
 	bh.uploadMetadata(sentinelDto)
 	// logging backup set name

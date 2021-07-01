@@ -25,7 +25,6 @@ const (
 	deltaFromUserDataFlag     = "delta-from-user-data"
 	deltaFromNameFlag         = "delta-from-name"
 	addUserDataFlag           = "add-user-data"
-	backupNamePrefixFlag      = "backup-name-prefix"
 
 	permanentShorthand             = "p"
 	fullBackupShorthand            = "f"
@@ -70,7 +69,7 @@ var (
 			arguments := postgres.NewBackupArguments(dataDirectory, utility.BaseBackupPath,
 				permanent, verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting),
 				fullBackup, storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting),
-				tarBallComposerType, deltaBaseSelector, userData, backupNamePrefix)
+				tarBallComposerType, deltaBaseSelector, userData)
 
 			backupHandler, err := postgres.NewBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -85,7 +84,6 @@ var (
 	deltaFromName         = ""
 	deltaFromUserData     = ""
 	userData              = ""
-	backupNamePrefix      = ""
 )
 
 // create the BackupSelector for delta backup base according to the provided flags
@@ -131,6 +129,4 @@ func init() {
 		"", "Select the backup specified by UserData as the target for the delta backup")
 	backupPushCmd.Flags().StringVar(&userData, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
-	backupPushCmd.Flags().StringVar(&backupNamePrefix, backupNamePrefixFlag,
-		"", "Add the specified prefix to the backup name")
 }

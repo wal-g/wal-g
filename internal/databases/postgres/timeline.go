@@ -2,14 +2,12 @@ package postgres
 
 import (
 	"fmt"
-	"regexp"
-	"strconv"
-	"strings"
-
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
+	"regexp"
+	"strconv"
 )
 
 const PatternTimelineAndLogSegNo = "[0-9A-F]{24}"
@@ -163,8 +161,7 @@ func ParseTimelineFromBackupName(backupName string) (uint32, error) {
 		return 0, newIncorrectBackupNameError(backupName)
 	}
 	prefixLength := len(utility.BackupNamePrefix)
-	prefixIndex := strings.LastIndex(backupName, utility.BackupNamePrefix)
-	return ParseTimelineFromString(backupName[prefixIndex+prefixLength : prefixIndex+prefixLength+8])
+	return ParseTimelineFromString(backupName[prefixLength : prefixLength+8])
 }
 
 func ParseTimelineFromString(timelineString string) (uint32, error) {
