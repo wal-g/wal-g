@@ -1,11 +1,11 @@
 package rocksdb
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -26,32 +26,10 @@ func HandleBackupPush(uploader *internal.Uploader, dbOptions DatabaseOptions) er
 		return err
 	}
 
-	var buffer bytes.Buffer
-	if err = packDirectory(tempDir, &buffer); err != nil {
-		return err
-	}
-
-	backupInfo := BackupInfo{}
-	backupInfo.Timestamp = utility.TimeNowCrossPlatformUTC().Unix()
 	backupName := utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
-	if err = uploader.UploadingFolder.PutObject(backupName, &buffer); err != nil {
-		return err
-	}
-	tracelog.InfoLogger.Println("Saved backup with name ", backupName)
-	backupInfo.BackupName = backupName
+	uploadBackup(uploader, backupName, tempDir)
 
-	rawSize, err := uploader.RawDataSize()
-	if err != nil {
-		tracelog.WarningLogger.PrintError(err)
-	}
-	backupInfo.RawSize = uint64(rawSize)
-	uploadedSize, err := uploader.UploadedDataSize()
-	if err != nil {
-		tracelog.WarningLogger.PrintError(err)
-	}
-	backupInfo.BackupSize = uint64(uploadedSize)
-
-	return internal.UploadSentinel(uploader, backupInfo, backupName)
+	return internal.UploadSentinel(uploader, generateBackupInfo(uploader, backupName), backupName)
 }
 
 func saveBackupToLocalDirectory(checkpointPath string, dbOptions DatabaseOptions) error {
@@ -68,4 +46,52 @@ func saveBackupToLocalDirectory(checkpointPath string, dbOptions DatabaseOptions
 	defer checkpoint.DestroyCheckpointObject()
 
 	return checkpoint.CreateCheckpoint(checkpointPath, 100)
+}
+
+func uploadBackup(uploader *internal.Uploader, backupName string, backupDirectory string) (TarFileSets, error) {
+	bundle := NewBundle(backupDirectory, internal.ConfigureCrypter(), viper.GetInt64(internal.TarSizeThresholdSetting))
+
+	// Start a new tar bundle, walk the backupDirectory and upload everything there.
+	tracelog.InfoLogger.Println("Starting a new tar bundle")
+	if err := bundle.StartQueue(internal.NewStorageTarBallMaker(backupName, uploader)); err != nil {
+		return nil, err
+	}
+
+	tarBallComposerMaker := NewTarBallComposerMaker()
+
+	if err := bundle.SetupComposer(tarBallComposerMaker); err != nil {
+		return nil, err
+	}
+
+	tracelog.InfoLogger.Println("Walking ...")
+	if err := filepath.Walk(backupDirectory, bundle.HandleWalkedFSObject); err != nil {
+		return nil, err
+	}
+
+	tracelog.InfoLogger.Println("Packing ...")
+	var tarFileSets TarFileSets
+	var err error
+	if tarFileSets, err = bundle.PackTarballs(); err != nil {
+		return nil, err
+	}
+
+	tracelog.DebugLogger.Println("Finishing queue ...")
+	if err = bundle.FinishQueue(); err != nil {
+		return nil, err
+	}
+
+	uploader.Finish()
+
+	return tarFileSets, nil
+}
+
+func generateBackupInfo(uploader *internal.Uploader, backupName string) BackupInfo {
+	rawSize, _ := uploader.RawDataSize()
+	backupSize, _ := uploader.UploadedDataSize()
+	return BackupInfo{
+		uint64(rawSize),
+		uint64(backupSize),
+		utility.TimeNowCrossPlatformUTC().Unix(),
+		backupName,
+	}
 }

@@ -5,63 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 )
-
-func packDirectory(path string, buf io.Writer) error {
-	// ensure the src actually exists before trying to tar it
-	if _, err := os.Stat(path); err != nil {
-		return err
-	}
-
-	tw := tar.NewWriter(buf)
-	defer tw.Close()
-
-	// walk path
-	return filepath.Walk(path, func(file string, fi os.FileInfo, err error) error {
-
-		// return on any error
-		if err != nil {
-			return err
-		}
-
-		// create a new dir/file header
-		header, err := tar.FileInfoHeader(fi, fi.Name())
-		if err != nil {
-			return err
-		}
-
-		// update the name to correctly reflect the desired destination when untaring
-		header.Name = strings.TrimPrefix(strings.Replace(file, path, "", -1), string(filepath.Separator))
-
-		// write the header
-		if err := tw.WriteHeader(header); err != nil {
-			return err
-		}
-
-		// return on non-regular files (thanks to [kumo](https://medium.com/@komuw/just-like-you-did-fbdd7df829d3) for this suggested update)
-		if !fi.Mode().IsRegular() {
-			return nil
-		}
-
-		// open files for taring
-		f, err := os.Open(file)
-		if err != nil {
-			return err
-		}
-
-		// copy file data into tar writer
-		if _, err := io.Copy(tw, f); err != nil {
-			return err
-		}
-
-		// manually close here after each file operation; defering would cause each file close
-		// to wait until all operations have completed.
-		f.Close()
-
-		return nil
-	})
-}
 
 func unpackStreamToDirectory(path string, reader io.Reader) (err error) {
 	tr := tar.NewReader(reader)
