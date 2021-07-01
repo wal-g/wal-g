@@ -2,12 +2,13 @@ package postgres
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
+
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
-	"regexp"
-	"strconv"
 )
 
 const PatternTimelineAndLogSegNo = "[0-9A-F]{24}"

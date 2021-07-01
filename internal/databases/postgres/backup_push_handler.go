@@ -59,7 +59,6 @@ type BackupArguments struct {
 	pgDataDirectory       string
 	isFullBackup          bool
 	deltaBaseSelector     internal.BackupSelector
-	backupNamePrefix      string
 }
 
 // CurBackupInfo holds all information that is harvest during the backup process

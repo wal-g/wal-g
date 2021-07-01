@@ -19,18 +19,17 @@ import (
 
 // BackupArguments holds all arguments parsed from cmd to this handler class
 type BackupArguments struct {
-	isPermanent          bool
-	userData             string
-	segmentDataDirectory string
-	segmentFwdArgs       []SegmentFwdArg
+	isPermanent    bool
+	userData       string
+	segmentFwdArgs []SegmentFwdArg
 }
 
 type SegmentUserData struct {
-	ContentId int `json:"content_id"`
+	ContentID int `json:"content_id"`
 }
 
-func NewSegmentUserData(contentId int) SegmentUserData {
-	return SegmentUserData{ContentId: contentId}
+func NewSegmentUserData(contentID int) SegmentUserData {
+	return SegmentUserData{ContentID: contentID}
 }
 
 func (d SegmentUserData) String() string {
@@ -70,7 +69,7 @@ type BackupHandler struct {
 
 func (bh *BackupHandler) buildCommand(contentID int) string {
 	segment := bh.globalCluster.ByContent[contentID][0]
-	command := fmt.Sprintf("export PGPORT=%d && wal-g backup-push %s --add-user-data %s",
+	command := fmt.Sprintf("PGPORT=%d wal-g backup-push %s --add-user-data %s",
 		segment.Port, segment.DataDir, NewSegmentUserData(contentID).String())
 
 	for _, arg := range bh.arguments.segmentFwdArgs {
@@ -107,6 +106,7 @@ func (bh *BackupHandler) HandleBackupPush() {
 	tracelog.ErrorLogger.FatalOnError(err)
 	sentinelDto := NewBackupSentinelDto(bh.curBackupInfo)
 	tracelog.InfoLogger.Println("Uploading sentinel file")
+	tracelog.DebugLogger.Println(sentinelDto.String())
 	err = internal.UploadSentinel(bh.workers.Uploader, sentinelDto, bh.curBackupInfo.backupName)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", bh.curBackupInfo.backupName)
@@ -210,11 +210,10 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 }
 
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
-func NewBackupArguments(segmentDataDirectory string, isPermanent bool, userData string, fwdArgs []SegmentFwdArg) BackupArguments {
+func NewBackupArguments(isPermanent bool, userData string, fwdArgs []SegmentFwdArg) BackupArguments {
 	return BackupArguments{
-		isPermanent:          isPermanent,
-		userData:             userData,
-		segmentDataDirectory: segmentDataDirectory,
-		segmentFwdArgs:       fwdArgs,
+		isPermanent:    isPermanent,
+		userData:       userData,
+		segmentFwdArgs: fwdArgs,
 	}
 }

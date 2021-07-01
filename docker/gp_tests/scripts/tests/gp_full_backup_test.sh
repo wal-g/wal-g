@@ -2,6 +2,7 @@
 set -e -x
 
 export WALG_FILE_PREFIX='/tmp/wal-g-test-data'
+export WALG_LOG_LEVEL=DEVEL
 
 /home/gpadmin/run_greenplum.sh
 

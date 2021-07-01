@@ -1,8 +1,9 @@
 package gp
 
 import (
-	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"strconv"
+
+	"github.com/wal-g/wal-g/internal/databases/greenplum"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -32,15 +33,13 @@ var (
 	backupPushCmd = &cobra.Command{
 		Use:   "backup-push db_directory",
 		Short: backupPushShortDescription, // TODO : improve description
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			dataDirectory := args[0]
-
 			if userData == "" {
 				userData = viper.GetString(internal.SentinelUserDataSetting)
 			}
 
-			arguments := greenplum.NewBackupArguments(dataDirectory, permanent, userData, prepareSegmentFwdArgs())
+			arguments := greenplum.NewBackupArguments(permanent, userData, prepareSegmentFwdArgs())
 			backupHandler, err := greenplum.NewBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
 			backupHandler.HandleBackupPush()
@@ -63,10 +62,10 @@ func prepareSegmentFwdArgs() []greenplum.SegmentFwdArg {
 	useRatingComposer = useRatingComposer || viper.GetBool(internal.UseRatingComposerSetting)
 
 	return []greenplum.SegmentFwdArg{
-		{fullBackupFlag, strconv.FormatBool(fullBackup)},
-		{verifyPagesFlag, strconv.FormatBool(verifyPageChecksums)},
-		{storeAllCorruptBlocksFlag, strconv.FormatBool(storeAllCorruptBlocks)},
-		{useRatingComposerFlag, strconv.FormatBool(useRatingComposer)},
+		{Name: fullBackupFlag, Value: strconv.FormatBool(fullBackup)},
+		{Name: verifyPagesFlag, Value: strconv.FormatBool(verifyPageChecksums)},
+		{Name: storeAllCorruptBlocksFlag, Value: strconv.FormatBool(storeAllCorruptBlocks)},
+		{Name: useRatingComposerFlag, Value: strconv.FormatBool(useRatingComposer)},
 	}
 }
 
