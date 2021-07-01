@@ -10,6 +10,6 @@ sleep 10
 
 mkdir $WALG_FILE_PREFIX
 
-gp_wal-g backup-push /usr/local/gpdb_src/gpAux/gpdemo/datadirs/qddir/demoDataDir-1
+wal-g-gp backup-push /usr/local/gpdb_src/gpAux/gpdemo/datadirs/qddir/demoDataDir-1
 
 echo "Greenplum backup-push test was successful"

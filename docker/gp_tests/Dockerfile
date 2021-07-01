@@ -30,7 +30,7 @@ FROM wal-g/gp:latest
 
 USER root
 
-COPY --from=build /go/src/github.com/wal-g/wal-g/main/gp/wal-g /usr/bin/gp_wal-g
+COPY --from=build /go/src/github.com/wal-g/wal-g/main/gp/wal-g /usr/bin/wal-g-gp
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/pg/wal-g /usr/bin
 
 COPY docker/gp_tests/scripts/ /tmp
