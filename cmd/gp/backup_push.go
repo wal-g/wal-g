@@ -20,18 +20,20 @@ const (
 	storeAllCorruptBlocksFlag = "store-all-corrupt"
 	useRatingComposerFlag     = "rating-composer"
 	addUserDataFlag           = "add-user-data"
+	segmentCfgPathFlag        = "segment-cfg-path"
 
 	permanentShorthand             = "p"
 	fullBackupShorthand            = "f"
 	verifyPagesShorthand           = "v"
 	storeAllCorruptBlocksShorthand = "s"
 	useRatingComposerShorthand     = "r"
+	segmentCfgPathShorthand        = "c"
 )
 
 var (
 	// backupPushCmd represents the backupPush command
 	backupPushCmd = &cobra.Command{
-		Use:   "backup-push db_directory",
+		Use:   "backup-push",
 		Short: backupPushShortDescription, // TODO : improve description
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -39,23 +41,25 @@ var (
 				userData = viper.GetString(internal.SentinelUserDataSetting)
 			}
 
-			arguments := greenplum.NewBackupArguments(permanent, userData, prepareSegmentFwdArgs())
+			arguments := greenplum.NewBackupArguments(permanent, userData, prepareSegmentFwdArgs(), segmentCfgPath)
 			backupHandler, err := greenplum.NewBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
 			backupHandler.HandleBackupPush()
 		},
 	}
-	permanent = false
-	userData  = ""
+	permanent      = false
+	userData       = ""
+	segmentCfgPath = ""
 
 	// as for now, WAL-G will simply forward these arguments to the segments
-	// todo: handle delta-from-Name and delta-from-userdata
+	// todo: handle delta-from-name and delta-from-userdata
 	fullBackup            = false
 	verifyPageChecksums   = false
 	storeAllCorruptBlocks = false
 	useRatingComposer     = false
 )
 
+// prepare arguments that are going to be forwarded to segments
 func prepareSegmentFwdArgs() []greenplum.SegmentFwdArg {
 	verifyPageChecksums = verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting)
 	storeAllCorruptBlocks = storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting)
@@ -84,4 +88,7 @@ func init() {
 		false, "Use rating tar composer (beta)")
 	backupPushCmd.Flags().StringVar(&userData, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
+	backupPushCmd.Flags().StringVarP(&segmentCfgPath, segmentCfgPathFlag, segmentCfgPathShorthand,
+		"", "Path to the segment WAL-G configuration file (must be the same on all segments).")
+	_ = backupPushCmd.MarkFlagRequired(segmentCfgPathFlag)
 }

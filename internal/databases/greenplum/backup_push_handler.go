@@ -3,7 +3,9 @@ package greenplum
 import (
 	"encoding/json"
 	"fmt"
+	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,6 +24,7 @@ type BackupArguments struct {
 	isPermanent    bool
 	userData       string
 	segmentFwdArgs []SegmentFwdArg
+	segmentCfgPath string
 }
 
 type SegmentUserData struct {
@@ -32,12 +35,14 @@ func NewSegmentUserData(contentID int) SegmentUserData {
 	return SegmentUserData{ContentID: contentID}
 }
 
-func (d SegmentUserData) String() string {
-	b, err := json.Marshal(d)
+// QuotedString will do json.Marshal-ing followed by quoting in order to escape special control characters
+// in the resulting JSON so it can be transferred as the cmdline argument to a segment
+func (d SegmentUserData) QuotedString() string {
+	unescapedJson, err := json.Marshal(d)
 	if err != nil {
 		panic(err)
 	}
-	return string(b)
+	return strconv.Quote(string(unescapedJson))
 }
 
 // SegmentFwdArg describes the specific WAL-G
@@ -69,15 +74,22 @@ type BackupHandler struct {
 
 func (bh *BackupHandler) buildCommand(contentID int) string {
 	segment := bh.globalCluster.ByContent[contentID][0]
-	command := fmt.Sprintf("PGPORT=%d wal-g backup-push %s --add-user-data %s",
-		segment.Port, segment.DataDir, NewSegmentUserData(contentID).String())
-
-	for _, arg := range bh.arguments.segmentFwdArgs {
-		command += fmt.Sprintf(" --%s=%s", arg.Name, arg.Value)
+	cmd := []string{
+		"WALG_LOG_LEVEL=DEVEL",
+		fmt.Sprintf("PGPORT=%d", segment.Port),
+		"wal-g",
+		fmt.Sprintf("backup-push %s", segment.DataDir),
+		fmt.Sprintf("--add-user-data=%s", NewSegmentUserData(contentID).QuotedString()),
+		fmt.Sprintf("--config=%s", bh.formatConfigPath(contentID)),
 	}
 
-	tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, command)
-	return command
+	for _, arg := range bh.arguments.segmentFwdArgs {
+		cmd = append(cmd, fmt.Sprintf("--%s=%s", arg.Name, arg.Value))
+	}
+
+	cmdLine := strings.Join(cmd, " ")
+	tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmdLine)
+	return cmdLine
 }
 
 // HandleBackupPush handles the backup being read from filesystem and being pushed to the repository
@@ -152,6 +164,11 @@ func (bh *BackupHandler) createRestorePoint(restorePointName string) (err error)
 	return
 }
 
+func (bh *BackupHandler) formatConfigPath(contentID int) string {
+	configName := fmt.Sprintf("wal-g-seg%s.yaml", strconv.Itoa(contentID))
+	return path.Join(bh.arguments.segmentCfgPath, configName)
+}
+
 func getGpCluster() (globalCluster *cluster.Cluster, err error) {
 	tracelog.DebugLogger.Println("Initializing tmp connection to read Greenplum info")
 	tmpConn, err := postgres.Connect()
@@ -210,10 +227,11 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 }
 
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
-func NewBackupArguments(isPermanent bool, userData string, fwdArgs []SegmentFwdArg) BackupArguments {
+func NewBackupArguments(isPermanent bool, userData string, fwdArgs []SegmentFwdArg, segmentCfgPath string) BackupArguments {
 	return BackupArguments{
 		isPermanent:    isPermanent,
 		userData:       userData,
+		segmentCfgPath: segmentCfgPath,
 		segmentFwdArgs: fwdArgs,
 	}
 }
