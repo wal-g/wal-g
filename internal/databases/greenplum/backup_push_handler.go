@@ -109,6 +109,10 @@ func (bh *BackupHandler) HandleBackupPush() {
 		return "Unable to run wal-g"
 	})
 
+	for _, command := range remoteOutput.Commands {
+		tracelog.DebugLogger.Printf("WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
+	}
+
 	err := bh.connect()
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = bh.createRestorePoint(bh.curBackupInfo.backupName)
