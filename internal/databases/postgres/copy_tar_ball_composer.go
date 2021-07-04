@@ -116,12 +116,14 @@ func (maker *CopyTarBallComposerMaker) Make(bundle *Bundle) (TarBallComposer, er
 func (c *CopyTarBallComposer) AddFile(info *ComposeFileInfo) {
 	var fileName = info.header.Name
 	var currFile = fileInfo{}
-	if !c.prevBackup.SentinelDto.Files[fileName].MTime.Equal(info.header.ModTime) {
-		c.tarUnchangedFilesCount[c.prevFileTar[fileName]] = -1
-		currFile.status = doNotCopy
-	} else if _, exists := c.prevFileTar[fileName]; exists {
-		c.tarUnchangedFilesCount[c.prevFileTar[fileName]] -= 1
-		currFile.status = possibleCopy
+	if _, exists := c.prevFileTar[fileName]; exists {
+		if !c.prevBackup.SentinelDto.Files[fileName].MTime.Equal(info.header.ModTime) {
+			c.tarUnchangedFilesCount[c.prevFileTar[fileName]] = -1
+			currFile.status = doNotCopy
+		} else { 
+			c.tarUnchangedFilesCount[c.prevFileTar[fileName]] -= 1
+			currFile.status = possibleCopy
+		}
 	} else {
 		currFile.status = fromNew
 	}
@@ -132,12 +134,14 @@ func (c *CopyTarBallComposer) AddFile(info *ComposeFileInfo) {
 func (c *CopyTarBallComposer) AddHeader(fileInfoHeader *tar.Header, info os.FileInfo) error {
 	var fileName = fileInfoHeader.Name
 	var currHeader = headerInfo{}
-	if !c.prevBackup.SentinelDto.Files[fileName].MTime.Equal(info.ModTime()) {
-		c.tarUnchangedFilesCount[c.prevFileTar[fileName]] = -1
-		currHeader.status = doNotCopy
-	} else if _, exists := c.prevFileTar[fileName]; exists {
-		c.tarUnchangedFilesCount[c.prevFileTar[fileName]] -= 1
-		currHeader.status = possibleCopy
+	if _, exists := c.prevFileTar[fileName]; exists {
+		if !c.prevBackup.SentinelDto.Files[fileName].MTime.Equal(info.ModTime()) {
+			c.tarUnchangedFilesCount[c.prevFileTar[fileName]] = -1
+			currHeader.status = doNotCopy
+		} else { 
+			c.tarUnchangedFilesCount[c.prevFileTar[fileName]] -= 1
+			currHeader.status = possibleCopy
+		}
 	} else {
 		currHeader.status = fromNew
 	}
