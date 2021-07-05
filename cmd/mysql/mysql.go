@@ -43,6 +43,7 @@ func init() {
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
 	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
+	cmd.PersistentFlags().BoolVarP(&internal.Turbo, "turbo", "", false, "Ignore all kinds of throttling defined in config")
 	cmd.InitDefaultVersionFlag()
 	internal.AddConfigFlags(cmd)
 }
