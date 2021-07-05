@@ -17,12 +17,13 @@ import (
 )
 
 const (
-	PG        = "PG"
-	SQLSERVER = "SQLSERVER"
-	MYSQL     = "MYSQL"
-	REDIS     = "REDIS"
-	FDB       = "FDB"
-	MONGO     = "MONGO"
+	PG         = "PG"
+	SQLSERVER  = "SQLSERVER"
+	MYSQL      = "MYSQL"
+	REDIS      = "REDIS"
+	FDB        = "FDB"
+	MONGO      = "MONGO"
+	CLICKHOUSE = "CLICKHOUSE"
 
 	DownloadConcurrencySetting   = "WALG_DOWNLOAD_CONCURRENCY"
 	UploadConcurrencySetting     = "WALG_UPLOAD_CONCURRENCY"
@@ -95,6 +96,9 @@ const (
 	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
 
 	RedisPassword = "WALG_REDIS_PASSWORD"
+
+	ClickHouseBackupPath   = "WALG_CLICKHOUSE_BACKUP_PATH"
+	ClickHouseCreateBackup = "WALG_CLICKHOUSE_CREATE_BACKUP"
 
 	GoMaxProcs = "GOMAXPROCS"
 
@@ -321,6 +325,12 @@ var (
 		RedisPassword: true,
 	}
 
+	ClickHouseAllowedSettings = map[string]bool{
+		// ClickHouse
+		ClickHouseBackupPath:   true,
+		ClickHouseCreateBackup: true,
+	}
+
 	RequiredSettings       = make(map[string]bool)
 	HTTPSettingExposeFuncs = map[string]func(webserver.WebServer){
 		HTTPExposePprof:          webserver.EnablePprofEndpoints,
@@ -360,6 +370,8 @@ func ConfigureSettings(currentType string) {
 			dbSpecificSettings = SQLServerAllowedSettings
 		case REDIS:
 			dbSpecificSettings = RedisAllowedSettings
+		case CLICKHOUSE:
+			dbSpecificSettings = ClickHouseAllowedSettings
 		}
 
 		for k, v := range dbSpecificSettings {
