@@ -34,6 +34,7 @@ const (
 	DeltaMaxStepsSetting         = "WALG_DELTA_MAX_STEPS"
 	DeltaOriginSetting           = "WALG_DELTA_ORIGIN"
 	CompressionMethodSetting     = "WALG_COMPRESSION_METHOD"
+	StoragePrefixSetting         = "WALG_STORAGE_PREFIX"
 	DiskRateLimitSetting         = "WALG_DISK_RATE_LIMIT"
 	NetworkRateLimitSetting      = "WALG_NETWORK_RATE_LIMIT"
 	UseWalDeltaSetting           = "WALG_USE_WAL_DELTA"
@@ -131,6 +132,7 @@ var (
 		UploadWalMetadata:            "NOMETADATA",
 		DeltaMaxStepsSetting:         "0",
 		CompressionMethodSetting:     "lz4",
+		StoragePrefixSetting:         "",
 		UseWalDeltaSetting:           "false",
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
 		TotalBgUploadedLimit:         "32",
@@ -170,6 +172,7 @@ var (
 		DeltaMaxStepsSetting:         true,
 		DeltaOriginSetting:           true,
 		CompressionMethodSetting:     true,
+		StoragePrefixSetting:         true,
 		DiskRateLimitSetting:         true,
 		NetworkRateLimitSetting:      true,
 		UseWalDeltaSetting:           true,

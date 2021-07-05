@@ -41,6 +41,7 @@ func init() {
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
 	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
+	_ = cmd.MarkFlagRequired("config") // config is required for Greenplum WAL-G
 	cmd.InitDefaultVersionFlag()
 	internal.AddConfigFlags(cmd)
 }

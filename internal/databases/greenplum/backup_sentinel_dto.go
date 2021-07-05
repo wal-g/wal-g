@@ -4,8 +4,8 @@ import "encoding/json"
 
 // BackupSentinelDto describes file structure of json sentinel
 type BackupSentinelDto struct {
-	RestorePoint *string   `json:"RestorePoint,omitempty"`
-	BackupNames  *[]string `json:"BackupNames,omitempty"`
+	RestorePoint      *string        `json:"RestorePoint,omitempty"`
+	BackupIdentifiers map[int]string `json:"BackupIDs,omitempty"`
 }
 
 func (s *BackupSentinelDto) String() string {
@@ -19,8 +19,8 @@ func (s *BackupSentinelDto) String() string {
 // NewBackupSentinelDto returns new BackupSentinelDto instance
 func NewBackupSentinelDto(curBackupInfo CurBackupInfo) BackupSentinelDto {
 	sentinel := BackupSentinelDto{
-		RestorePoint: &curBackupInfo.backupName,
-		BackupNames:  &curBackupInfo.pgBackupNames,
+		RestorePoint:      &curBackupInfo.backupName,
+		BackupIdentifiers: curBackupInfo.backupIdByContentId,
 	}
 	return sentinel
 }

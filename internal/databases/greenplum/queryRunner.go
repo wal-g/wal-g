@@ -16,8 +16,8 @@ type GpQueryRunner struct {
 	pgQueryRunner *postgres.PgQueryRunner
 }
 
-// NewPgQueryRunner builds QueryRunner from available connection
-func NewPgQueryRunner(conn *pgx.Conn) (*GpQueryRunner, error) {
+// NewGpQueryRunner builds QueryRunner from available connection
+func NewGpQueryRunner(conn *pgx.Conn) (*GpQueryRunner, error) {
 	pgQueryRunner, err := postgres.NewPgQueryRunner(conn)
 	if err != nil {
 		return nil, err

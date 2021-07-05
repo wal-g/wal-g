@@ -20,14 +20,12 @@ const (
 	storeAllCorruptBlocksFlag = "store-all-corrupt"
 	useRatingComposerFlag     = "rating-composer"
 	addUserDataFlag           = "add-user-data"
-	segmentCfgPathFlag        = "segment-cfg-path"
 
 	permanentShorthand             = "p"
 	fullBackupShorthand            = "f"
 	verifyPagesShorthand           = "v"
 	storeAllCorruptBlocksShorthand = "s"
 	useRatingComposerShorthand     = "r"
-	segmentCfgPathShorthand        = "c"
 )
 
 var (
@@ -41,15 +39,14 @@ var (
 				userData = viper.GetString(internal.SentinelUserDataSetting)
 			}
 
-			arguments := greenplum.NewBackupArguments(permanent, userData, prepareSegmentFwdArgs(), segmentCfgPath)
+			arguments := greenplum.NewBackupArguments(permanent, userData, prepareSegmentFwdArgs())
 			backupHandler, err := greenplum.NewBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
 			backupHandler.HandleBackupPush()
 		},
 	}
-	permanent      = false
-	userData       = ""
-	segmentCfgPath = ""
+	permanent = false
+	userData  = ""
 
 	// as for now, WAL-G will simply forward these arguments to the segments
 	// todo: handle delta-from-name and delta-from-userdata
@@ -67,9 +64,6 @@ func prepareSegmentFwdArgs() []greenplum.SegmentFwdArg {
 
 	return []greenplum.SegmentFwdArg{
 		{Name: fullBackupFlag, Value: strconv.FormatBool(fullBackup)},
-		{Name: verifyPagesFlag, Value: strconv.FormatBool(verifyPageChecksums)},
-		{Name: storeAllCorruptBlocksFlag, Value: strconv.FormatBool(storeAllCorruptBlocks)},
-		{Name: useRatingComposerFlag, Value: strconv.FormatBool(useRatingComposer)},
 	}
 }
 
@@ -88,7 +82,4 @@ func init() {
 		false, "Use rating tar composer (beta)")
 	backupPushCmd.Flags().StringVar(&userData, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
-	backupPushCmd.Flags().StringVarP(&segmentCfgPath, segmentCfgPathFlag, segmentCfgPathShorthand,
-		"", "Path to the segment WAL-G configuration file (must be the same on all segments).")
-	_ = backupPushCmd.MarkFlagRequired(segmentCfgPathFlag)
 }
