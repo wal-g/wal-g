@@ -20,7 +20,7 @@ func (s *BackupSentinelDto) String() string {
 func NewBackupSentinelDto(curBackupInfo CurBackupInfo) BackupSentinelDto {
 	sentinel := BackupSentinelDto{
 		RestorePoint:      &curBackupInfo.backupName,
-		BackupIdentifiers: curBackupInfo.backupIdByContentId,
+		BackupIdentifiers: curBackupInfo.backupIDByContentID,
 	}
 	return sentinel
 }

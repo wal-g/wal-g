@@ -61,7 +61,7 @@ type BackupWorkers struct {
 // CurBackupInfo holds all information that is harvest during the backup process
 type CurBackupInfo struct {
 	backupName          string
-	backupIdByContentId map[int]string
+	backupIDByContentID map[int]string
 }
 
 // BackupHandler is the main struct which is handling the backup process
@@ -75,7 +75,7 @@ type BackupHandler struct {
 func (bh *BackupHandler) buildCommand(contentID int) string {
 	segment := bh.globalCluster.ByContent[contentID][0]
 	segUserData := NewSegmentUserData()
-	bh.curBackupInfo.backupIdByContentId[contentID] = segUserData.ID
+	bh.curBackupInfo.backupIDByContentID[contentID] = segUserData.ID
 	cmd := []string{
 		"WALG_LOG_LEVEL=DEVEL",
 		fmt.Sprintf("PGPORT=%d", segment.Port),
@@ -202,6 +202,9 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 			Uploader: uploader,
 		},
 		globalCluster: globalCluster,
+		curBackupInfo: CurBackupInfo{
+			backupIDByContentID: make(map[int]string),
+		},
 	}
 	return bh, err
 }

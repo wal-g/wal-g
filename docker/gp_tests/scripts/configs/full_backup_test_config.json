@@ -1,0 +1,4 @@
+"WALE_S3_PREFIX": "s3://gpfullbucket",
+"WALG_DELTA_MAX_STEPS": "6",
+"WALG_PGP_KEY_PATH": "/tmp/PGP_KEY",
+"WALG_LOG_LEVEL": "DEVEL"

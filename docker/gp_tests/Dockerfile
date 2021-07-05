@@ -30,10 +30,18 @@ FROM wal-g/gp:latest
 
 USER root
 
+COPY docker/pg/PGP_KEY /tmp/PGP_KEY
+COPY docker/pg/gpg.conf /home/gpadmin/.gnupg/gpg.conf
+COPY docker/pg/gpg-agent.conf /home/gpadmin/.gnupg/gpg-agent.conf
+
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/gp/wal-g /usr/bin/wal-g-gp
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/pg/wal-g /usr/bin
 
 COPY docker/gp_tests/scripts/ /tmp
+COPY docker/pg_tests/scripts/scripts/ /tmp/pg_scripts
+
+RUN chmod 777 /tmp/configs/
+
 RUN /bin/bash -c 'sudo chmod +x -R /tmp/tests; chmod +x /tmp/run_integration_tests.sh'
 
 CMD su gpadmin bash -c '/tmp/run_integration_tests.sh'
