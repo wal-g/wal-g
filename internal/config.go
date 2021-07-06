@@ -133,7 +133,6 @@ var (
 		UploadWalMetadata:            "NOMETADATA",
 		DeltaMaxStepsSetting:         "0",
 		CompressionMethodSetting:     "lz4",
-		StoragePrefixSetting:         "",
 		UseWalDeltaSetting:           "false",
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
 		TotalBgUploadedLimit:         "32",

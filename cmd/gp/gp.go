@@ -50,5 +50,11 @@ func init() {
 	// wrap the Postgres command so it can be used in the same binary
 	wrappedPgCmd := pg.Cmd
 	wrappedPgCmd.Use = "pg"
+	wrappedPreRun := wrappedPgCmd.PersistentPreRun
+	wrappedPgCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		// storage prefix setting is required in order to get the corresponding segment subfolder
+		internal.RequiredSettings[internal.StoragePrefixSetting] = true
+		wrappedPreRun(cmd, args)
+	}
 	cmd.AddCommand(wrappedPgCmd)
 }
