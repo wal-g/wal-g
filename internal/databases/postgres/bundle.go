@@ -161,7 +161,7 @@ func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
 func (bundle *Bundle) StartBackup(conn *pgx.Conn,
 	backup string) (backupName string, lsn uint64, err error) {
 	var name, lsnStr string
-	queryRunner, err := newPgQueryRunner(conn)
+	queryRunner, err := NewPgQueryRunner(conn)
 	if err != nil {
 		return "", 0, errors.Wrap(err, "StartBackup: Failed to build query runner.")
 	}
@@ -360,7 +360,7 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 // UploadLabelFiles creates the `backup_label` and `tablespace_map` files by stopping the backup
 // and uploads them to S3.
 func (bundle *Bundle) uploadLabelFiles(conn *pgx.Conn) (string, []string, uint64, error) {
-	queryRunner, err := newPgQueryRunner(conn)
+	queryRunner, err := NewPgQueryRunner(conn)
 	if err != nil {
 		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: Failed to build query runner.")
 	}

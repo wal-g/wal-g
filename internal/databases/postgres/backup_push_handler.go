@@ -439,7 +439,7 @@ func getPgServerInfo() (pgInfo BackupPgInfo, err error) {
 		return pgInfo, err
 	}
 
-	queryRunner, err := newPgQueryRunner(tmpConn)
+	queryRunner, err := NewPgQueryRunner(tmpConn)
 	if err != nil {
 		return pgInfo, err
 	}

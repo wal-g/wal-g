@@ -4,6 +4,7 @@ MAIN_SQLSERVER_PATH := main/sqlserver
 MAIN_REDIS_PATH := main/redis
 MAIN_MONGO_PATH := main/mongo
 MAIN_FDB_PATH := main/fdb
+MAIN_GP_PATH := main/gp
 DOCKER_COMMON := golang ubuntu s3
 CMD_FILES = $(wildcard cmd/**/*.go)
 PKG_FILES = $(wildcard internal/**/*.go internal/**/**/*.go internal/*.go)
@@ -29,7 +30,7 @@ endif
 
 .PHONY: unittest fmt lint clean
 
-test: deps unittest pg_build mysql_build redis_build mongo_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test
+test: deps unittest pg_build mysql_build redis_build mongo_build gp_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test gp_integration_test
 
 pg_test: deps pg_build unlink_brotli pg_integration_test
 
@@ -162,6 +163,21 @@ clean_redis_features:
 	set -e
 	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1  -timeout 5m -tf.test=false -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=redis
 
+gp_build: $(CMD_FILES) $(PKG_FILES)
+	(cd $(MAIN_GP_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/gp.walgVersion=`git tag -l --points-at HEAD`")
+
+gp_clean:
+	(cd $(MAIN_GP_PATH) && go clean)
+	./cleanup.sh
+
+gp_install: gp_build
+	mv $(MAIN_GP_PATH)/wal-g $(GOBIN)/wal-g
+
+gp_test: deps gp_build unlink_brotli gp_integration_test
+
+gp_integration_test: load_docker_common
+	docker-compose build gp gp_tests
+	docker-compose up --exit-code-from gp_tests gp_tests
 
 unittest:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet
@@ -217,7 +233,7 @@ link_external_deps: link_brotli link_libsodium
 unlink_external_deps: unlink_brotli unlink_libsodium
 
 install:
-	@echo "Nothing to be done. Use pg_install/mysql_install/mongo_install/fdb_install/... instead."
+	@echo "Nothing to be done. Use pg_install/mysql_install/mongo_install/fdb_install/gp_install... instead."
 
 link_brotli:
 	./link_brotli.sh

@@ -57,7 +57,7 @@ type PgRelationStat struct {
 
 // PgQueryRunner is implementation for controlling PostgreSQL 9.0+
 type PgQueryRunner struct {
-	connection       *pgx.Conn
+	Connection       *pgx.Conn
 	Version          int
 	SystemIdentifier *uint64
 }
@@ -124,8 +124,8 @@ func (queryRunner *PgQueryRunner) BuildStopBackup() (string, error) {
 }
 
 // NewPgQueryRunner builds QueryRunner from available connection
-func newPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
-	r := &PgQueryRunner{connection: conn}
+func NewPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
+	r := &PgQueryRunner{Connection: conn}
 	err := r.getVersion()
 	if err != nil {
 		return nil, err
@@ -158,14 +158,14 @@ func (queryRunner *PgQueryRunner) buildGetPhysicalSlotInfo() string {
 
 // Retrieve PostgreSQL numeric version
 func (queryRunner *PgQueryRunner) getVersion() (err error) {
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 	err = conn.QueryRow(queryRunner.buildGetVersion()).Scan(&queryRunner.Version)
 	return errors.Wrap(err, "GetVersion: getting Postgres version failed")
 }
 
 // Get current LSN of cluster
 func (queryRunner *PgQueryRunner) getCurrentLsn() (lsn string, err error) {
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 	err = conn.QueryRow(queryRunner.buildGetCurrentLsn()).Scan(&lsn)
 	if err != nil {
 		return "", errors.Wrap(err, "GetCurrentLsn: getting current LSN of the cluster failed")
@@ -174,7 +174,11 @@ func (queryRunner *PgQueryRunner) getCurrentLsn() (lsn string, err error) {
 }
 
 func (queryRunner *PgQueryRunner) getSystemIdentifier() (err error) {
-	conn := queryRunner.connection
+	if queryRunner.Version < 90600 {
+		tracelog.WarningLogger.Println("GetSystemIdentifier: Unable to get system identifier")
+		return nil
+	}
+	conn := queryRunner.Connection
 	err = conn.QueryRow(queryRunner.buildGetSystemIdentifier()).Scan(&queryRunner.SystemIdentifier)
 	return errors.Wrap(err, "System Identifier: getting identifier of DB failed")
 }
@@ -184,7 +188,7 @@ func (queryRunner *PgQueryRunner) startBackup(backup string) (backupName string,
 	lsnString string, inRecovery bool, err error) {
 	tracelog.InfoLogger.Println("Calling pg_start_backup()")
 	startBackupQuery, err := queryRunner.BuildStartBackup()
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 	if err != nil {
 		return "", "", false, errors.Wrap(err, "QueryRunner StartBackup: Building start backup query failed")
 	}
@@ -199,7 +203,7 @@ func (queryRunner *PgQueryRunner) startBackup(backup string) (backupName string,
 // StopBackup informs the database that copy is over
 func (queryRunner *PgQueryRunner) stopBackup() (label string, offsetMap string, lsnStr string, err error) {
 	tracelog.InfoLogger.Println("Calling pg_stop_backup()")
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 
 	tx, err := conn.Begin()
 	if err != nil {
@@ -255,7 +259,7 @@ func (queryRunner *PgQueryRunner) getStatistics(
 	dbInfo PgDatabaseInfo) (map[walparser.RelFileNode]PgRelationStat, error) {
 	tracelog.InfoLogger.Println("Querying pg_stat_all_tables")
 	getStatQuery, err := queryRunner.BuildStatisticsQuery()
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 	if err != nil {
 		return nil, errors.Wrap(err, "QueryRunner GetStatistics: Building get statistics query failed")
 	}
@@ -307,7 +311,7 @@ func (queryRunner *PgQueryRunner) BuildGetDatabasesQuery() (string, error) {
 func (queryRunner *PgQueryRunner) getDatabaseInfos() ([]PgDatabaseInfo, error) {
 	tracelog.InfoLogger.Println("Querying pg_database")
 	getDBInfoQuery, err := queryRunner.BuildGetDatabasesQuery()
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 	if err != nil {
 		return nil, errors.Wrap(err, "QueryRunner GetDatabases: Building db names query failed")
 	}
@@ -342,7 +346,7 @@ func (queryRunner *PgQueryRunner) getDatabaseInfos() ([]PgDatabaseInfo, error) {
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) GetParameter(parameterName string) (string, error) {
 	var value string
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 	err := conn.QueryRow(queryRunner.buildGetParameter(), parameterName).Scan(&value)
 	return value, err
 }
@@ -368,7 +372,9 @@ func (queryRunner *PgQueryRunner) GetWalSegmentBytes() (segBlocks uint64, err er
 // GetDataDir reads the wals segment size (in bytes) and converts it to uint64
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) GetDataDir() (dataDir string, err error) {
-	return queryRunner.GetParameter("data_directory")
+	conn := queryRunner.Connection
+	err = conn.QueryRow("show data_directory").Scan(&dataDir)
+	return dataDir, err
 }
 
 // GetPhysicalSlotInfo reads information on a physical replication slot
@@ -377,7 +383,7 @@ func (queryRunner *PgQueryRunner) GetPhysicalSlotInfo(slotName string) (Physical
 	var active bool
 	var restartLSN string
 
-	conn := queryRunner.connection
+	conn := queryRunner.Connection
 	err := conn.QueryRow(queryRunner.buildGetPhysicalSlotInfo(), slotName).Scan(&active, &restartLSN)
 	if err == pgx.ErrNoRows {
 		// slot does not exist.

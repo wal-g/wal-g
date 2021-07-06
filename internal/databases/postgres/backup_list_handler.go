@@ -15,11 +15,13 @@ import (
 // TODO : unit tests
 func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 	backups, err := internal.GetBackups(folder)
+
 	if len(backups) == 0 {
 		tracelog.InfoLogger.Println("No backups found")
 		return
 	}
 	tracelog.ErrorLogger.FatalOnError(err)
+
 	// if details are requested we append content of metadata.json to each line
 
 	backupDetails, err := GetBackupsDetails(folder, backups)
