@@ -31,7 +31,7 @@ var (
 )
 
 func init() {
-	cmd.AddCommand(catchupListCmd)
+	Cmd.AddCommand(catchupListCmd)
 
 	catchupListCmd.Flags().BoolVar(&pretty, PrettyFlag, false, "Prints more readable output")
 	catchupListCmd.Flags().BoolVar(&json, JSONFlag, false, "Prints output in json format")

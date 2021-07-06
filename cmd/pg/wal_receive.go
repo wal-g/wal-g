@@ -31,5 +31,5 @@ var walReceiveCmd = &cobra.Command{
 }
 
 func init() {
-	cmd.AddCommand(walReceiveCmd)
+	Cmd.AddCommand(walReceiveCmd)
 }

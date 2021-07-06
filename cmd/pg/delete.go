@@ -126,7 +126,7 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	cmd.AddCommand(deleteCmd)
+	Cmd.AddCommand(deleteCmd)
 
 	deleteTargetCmd.Flags().StringVar(
 		&deleteTargetUserData, internal.DeleteTargetUserDataFlag, "", internal.DeleteTargetUserDataDescription)

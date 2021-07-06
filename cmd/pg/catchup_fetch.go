@@ -29,5 +29,5 @@ var catchupFetchCmd = &cobra.Command{
 func init() {
 	catchupFetchCmd.Flags().BoolVar(&useNewUnwrap, "use-new-unwrap",
 		false, UseNewUnwrapDescription)
-	cmd.AddCommand(catchupFetchCmd)
+	Cmd.AddCommand(catchupFetchCmd)
 }
