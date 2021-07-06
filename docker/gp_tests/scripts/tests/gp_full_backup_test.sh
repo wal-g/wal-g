@@ -14,6 +14,6 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 source /usr/local/gpdb_src/gpAux/gpdemo/gpdemo-env.sh && /usr/local/gpdb_src/bin/createdb
 sleep 10
 
-wal-g-gp backup-push --config=${TMP_CONFIG}
+wal-g backup-push --config=${TMP_CONFIG}
 
 echo "Greenplum backup-push test was successful"

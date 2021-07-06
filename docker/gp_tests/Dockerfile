@@ -21,11 +21,6 @@ RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
 
 RUN make gp_build
 
-RUN cd main/pg && \
-    go build -mod vendor -tags brotli -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
-
-RUN make pg_build
-
 FROM wal-g/gp:latest
 
 USER root
@@ -34,8 +29,7 @@ COPY docker/pg/PGP_KEY /tmp/PGP_KEY
 COPY docker/pg/gpg.conf /home/gpadmin/.gnupg/gpg.conf
 COPY docker/pg/gpg-agent.conf /home/gpadmin/.gnupg/gpg-agent.conf
 
-COPY --from=build /go/src/github.com/wal-g/wal-g/main/gp/wal-g /usr/bin/wal-g-gp
-COPY --from=build /go/src/github.com/wal-g/wal-g/main/pg/wal-g /usr/bin
+COPY --from=build /go/src/github.com/wal-g/wal-g/main/gp/wal-g /usr/bin/
 
 COPY docker/gp_tests/scripts/ /tmp
 COPY docker/pg_tests/scripts/scripts/ /tmp/pg_scripts
