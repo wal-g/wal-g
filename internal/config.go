@@ -356,6 +356,9 @@ func ConfigureSettings(currentType string) {
 		switch currentType {
 		case PG:
 			dbSpecificSettings = PGAllowedSettings
+		case GP:
+			// as of now, GP specific settings are identical to PG
+			dbSpecificSettings = PGAllowedSettings
 		case MONGO:
 			dbSpecificSettings = MongoAllowedSettings
 		case MYSQL:

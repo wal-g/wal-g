@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/wal-g/wal-g/cmd/pg"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -44,4 +46,9 @@ func init() {
 	_ = cmd.MarkFlagRequired("config") // config is required for Greenplum WAL-G
 	cmd.InitDefaultVersionFlag()
 	internal.AddConfigFlags(cmd)
+
+	// wrap the Postgres command so it can be used in the same binary
+	wrappedPgCmd := pg.Cmd
+	wrappedPgCmd.Use = "pg"
+	cmd.AddCommand(wrappedPgCmd)
 }
