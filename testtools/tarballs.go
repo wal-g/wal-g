@@ -25,7 +25,15 @@ type FileTarBall struct {
 }
 
 func (tarBall *FileTarBall) Name() string {
-	return "part_" + fmt.Sprintf("%0.3d", tarBall.number) + ".tar.lz4"
+	return "part_" + fmt.Sprintf("%0.3d", tarBall.number) + ".tar." + tarBall.FileExtension()
+}
+
+func (tarBall *FileTarBall) Id() int {
+	return tarBall.number
+}
+
+func (tarBall *FileTarBall) FileExtension() string {
+	return "lz4"
 }
 
 // SetUp creates a new LZ4 writer, tar writer and file for
@@ -89,6 +97,14 @@ type BufferTarBall struct {
 
 func (tarBall *BufferTarBall) Name() string {
 	return "BufferTarBall"
+}
+
+func (tarBall *BufferTarBall) Id() int {
+	return tarBall.number
+}
+
+func (tarBall *BufferTarBall) FileExtension() string {
+	return ""
 }
 
 func (tarBall *BufferTarBall) SetUp(crypter crypto.Crypter, args ...string) {
