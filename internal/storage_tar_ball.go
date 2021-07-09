@@ -25,17 +25,12 @@ type StorageTarBall struct {
 	tarWriter    *tar.Writer
 	uploader     *Uploader
 	name         string
+	resolver     *TarCopiesNameResolver
 }
 
 func (tarBall *StorageTarBall) Name() string {
 	return tarBall.name
 }
-
-func (tarBall *StorageTarBall) Id() int {
-	return tarBall.partNumber
-}
-
-func (tarBall *StorageTarBall) FileExtension() string { return tarBall.uploader.Compressor.FileExtension() }
 
 // SetUp creates a new tar writer and starts upload to storage.
 // Upload will block until the tar file is finished writing.
@@ -43,10 +38,18 @@ func (tarBall *StorageTarBall) FileExtension() string { return tarBall.uploader.
 // the form `part_....tar.[Compressor file extension]`.
 func (tarBall *StorageTarBall) SetUp(crypter crypto.Crypter, names ...string) {
 	if tarBall.tarWriter == nil {
-		if len(names) > 0 {
-			tarBall.name = names[0]
+		if tarBall.resolver != nil {
+			if len(names) > 0 {
+				tarBall.name = tarBall.resolver.ResolveByName(names[0])
+			} else {
+				tarBall.name = tarBall.resolver.ResolveByPart(tarBall.partNumber, tarBall.uploader.Compressor.FileExtension())
+			}	
 		} else {
-			tarBall.name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partNumber, tarBall.FileExtension())
+			if len(names) > 0 {
+				tarBall.name = names[0]
+			} else {
+				tarBall.name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partNumber, tarBall.uploader.Compressor.FileExtension())
+			}
 		}
 		writeCloser := tarBall.startUpload(tarBall.name, crypter)
 

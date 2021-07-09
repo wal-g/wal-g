@@ -1,4 +1,4 @@
-package postgres
+package internal
 
 import (
 	"fmt"
@@ -22,7 +22,14 @@ func (r *TarCopiesNameResolver) AddCopiedTar(tarName string) {
 	r.copiedTarNames[tarName] = true
 }
 
-func (r *TarCopiesNameResolver) ResolveId(part int, fileExtention string) string {
+func (r *TarCopiesNameResolver) ResolveByName(name string) string {
+	if copied := r.copiedTarNames[name];copied {
+		panic("Tar with this name already exists")
+	}
+	return name
+}
+
+func (r *TarCopiesNameResolver) ResolveByPart(part int, fileExtention string) string {
 	if id, exists := r.tarPartIds[part];exists {
 		return r.defaultName(id, fileExtention)
 	}

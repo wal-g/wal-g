@@ -49,7 +49,6 @@ type CopyTarBallComposer struct {
 	fileInfo               map[string]*fileInfo
 	headerInfos            map[string]*headerInfo
 	copiedTars             map[string]bool
-	nameResolver           TarCopiesNameResolver
 }
 
 type CopyTarBallComposerMaker struct {
@@ -164,7 +163,7 @@ func (c *CopyTarBallComposer) copyTar(tarName string) {
 		c.prevBackup.Name+internal.TarPartitionFolderName+tarName,
 		c.newBackupName+internal.TarPartitionFolderName+tarName)
 	c.copiedTars[tarName] = true
-	c.nameResolver.AddCopiedTar(tarName)
+	c.tarBallQueue.TarBallMaker.AddCopiedTarName(tarName)
 	for _, fileName := range c.prevTarFileSets[tarName] {
 		if file, exists := c.fileInfo[fileName]; exists {
 			file.status = processed
@@ -180,7 +179,7 @@ func (c *CopyTarBallComposer) copyTar(tarName string) {
 
 func (c *CopyTarBallComposer) getTarBall() internal.TarBall {
 	tarBall := c.tarBallQueue.Deque()
-	tarBall.SetUp(c.crypter, c.nameResolver.ResolveId(tarBall.Id(), tarBall.FileExtension()))
+	tarBall.SetUp(c.crypter)
 	return tarBall
 }
 

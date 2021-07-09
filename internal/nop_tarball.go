@@ -26,8 +26,6 @@ func (tarBall *NOPTarBall) Size() int64            { return atomic.LoadInt64(tar
 func (tarBall *NOPTarBall) AddSize(i int64)        { atomic.AddInt64(tarBall.partSize, i) }
 func (tarBall *NOPTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
 func (tarBall *NOPTarBall) AwaitUploads()          {}
-func (tarBall *NOPTarBall) Id() int                { return tarBall.number }
-func (tarBall *NOPTarBall) FileExtension() string  { return "" }
 
 // NOPTarBallMaker creates a new NOPTarBall. Used
 // for testing purposes.
@@ -44,6 +42,10 @@ func (tarBallMaker *NOPTarBallMaker) Make(inheritState bool) TarBall {
 		partSize:  tarBallMaker.partSize,
 		tarWriter: tar.NewWriter(ioutil.Discard),
 	}
+}
+
+func (tarBallMaker *NOPTarBallMaker) AddCopiedTarName(tarName string) {
+	panic("AddCopiedTarName is not implemented for NOPTarBallMaker")
 }
 
 func NewNopTarBallMaker() TarBallMaker {
