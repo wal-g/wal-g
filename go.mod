@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go v1.34.28
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/cyberdelia/lzo v0.0.0-20171006181345-d85071271a6f
-	github.com/denisenkom/go-mssqldb v0.9.0 // indirect
+	github.com/denisenkom/go-mssqldb v0.9.0
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/docker v1.13.1
 	github.com/docker/go-connections v0.4.0 // indirect
