@@ -3,6 +3,7 @@ package mysql
 import (
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -18,7 +19,7 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 	defer utility.LoggedClose(db, "")
 
 	binlogStart := getMySQLCurrentBinlogFile(db)
-	timeStart := utility.TimeNowCrossPlatformLocal()
+	timeStart := utility.TimeNowCrossPlatformLocal().Format(time.RFC3339)
 
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
@@ -33,7 +34,7 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 	}
 
 	binlogEnd := getMySQLCurrentBinlogFile(db)
-	timeStop := utility.TimeNowCrossPlatformLocal()
+	timeStop := utility.TimeNowCrossPlatformLocal().Format(time.RFC3339)
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = ""
