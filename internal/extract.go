@@ -215,7 +215,7 @@ func tryExtractFiles(files []ReaderMaker,
 		}()
 	}
 
-	err := downloadingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency * 2))
+	err := downloadingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency*2))
 	if err != nil {
 		tracelog.ErrorLogger.Println(err)
 		return files //Should never happen, but if we are asked to cancel - consider all files unfinished
