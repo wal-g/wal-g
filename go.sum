@@ -488,6 +488,8 @@ github.com/wal-g/storages v0.0.0-20210218090605-534397353a97 h1:uxEPUxTkXzKsdmRm
 github.com/wal-g/storages v0.0.0-20210218090605-534397353a97/go.mod h1:aX4DYAj9f53Q9t522Rp8g48sDPw6ogiPtzhjJQJJKTc=
 github.com/wal-g/storages v0.0.0-20210514021605-dffa2d187dbd h1:K4umszz64Fcd3tlxBBfqSCjbyH4yTYDO96NT0pdmZF0=
 github.com/wal-g/storages v0.0.0-20210514021605-dffa2d187dbd/go.mod h1:aX4DYAj9f53Q9t522Rp8g48sDPw6ogiPtzhjJQJJKTc=
+github.com/wal-g/storages v0.0.0-20210721132221-d885ccc3753d h1:8WCcLAm0yGCtN8gW5hUmaKcWqcYUtqvEXmDfrjE14fU=
+github.com/wal-g/storages v0.0.0-20210721132221-d885ccc3753d/go.mod h1:aX4DYAj9f53Q9t522Rp8g48sDPw6ogiPtzhjJQJJKTc=
 github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30 h1:LoTfXAgZzRKuYVjWhP8dTDLBX+EUiMeRrdF7MynJ1RU=
 github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30/go.mod h1:onYsyKxs/aN2SHYnSw/ciYSGOPPYNHxJjxKNRVzLwNY=
 github.com/willf/bitset v1.1.10 h1:NotGKqX0KwQ72NUzqrjZq5ipPNDQex9lo3WpaS8L2sc=
