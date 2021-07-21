@@ -182,17 +182,18 @@ func tryExtractFiles(files []ReaderMaker,
 	tarInterpreter TarInterpreter,
 	downloadingConcurrency int) (failed []ReaderMaker) {
 	downloadingContext := context.TODO()
-	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
+	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency * 2))
 	crypter := ConfigureCrypter()
 	isFailed := sync.Map{}
 
 	for _, file := range files {
-		_ = downloadingSemaphore.Acquire(downloadingContext, 1)
+		_ = downloadingSemaphore.Acquire(downloadingContext, 2)
 		fileClosure := file
 
 		extractingReader, pipeWriter := io.Pipe()
 		decompressingWriter := &EmptyWriteIgnorer{pipeWriter}
 		go func() {
+			defer downloadingSemaphore.Release(1)
 			err := DecryptAndDecompressTar(decompressingWriter, fileClosure, crypter)
 			utility.LoggedClose(decompressingWriter, "")
 			tracelog.InfoLogger.Printf("Finished decompression of %s", fileClosure.Path())
@@ -214,7 +215,11 @@ func tryExtractFiles(files []ReaderMaker,
 		}()
 	}
 
-	_ = downloadingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency))
+	err := downloadingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency * 2))
+	if err != nil {
+		tracelog.ErrorLogger.Println(err)
+		return files //Should never happen, but if we are asked to cancel - consider all files unfinished
+	}
 	isFailed.Range(func(failedFile, _ interface{}) bool {
 		failed = append(failed, failedFile.(ReaderMaker))
 		return true
