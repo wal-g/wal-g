@@ -125,7 +125,7 @@ func newRelFileStatistics(conn *pgx.Conn) (RelFileStatistics, error) {
 			continue
 		}
 
-		queryRunner, err := newPgQueryRunner(dbConn)
+		queryRunner, err := NewPgQueryRunner(dbConn)
 		if err != nil {
 			return nil, errors.Wrap(err, "CollectStatistics: Failed to build query runner.")
 		}
@@ -143,7 +143,7 @@ func newRelFileStatistics(conn *pgx.Conn) (RelFileStatistics, error) {
 }
 
 func getDatabaseInfos(conn *pgx.Conn) ([]PgDatabaseInfo, error) {
-	queryRunner, err := newPgQueryRunner(conn)
+	queryRunner, err := NewPgQueryRunner(conn)
 	if err != nil {
 		return nil, errors.Wrap(err, "getDatabaseInfos: Failed to build query runner.")
 	}

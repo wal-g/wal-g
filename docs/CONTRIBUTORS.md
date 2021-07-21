@@ -21,3 +21,4 @@
 - Vladimir Leskov <vladimirlesk@yandex-team.ru>
 - Will Glynn <will@willglynn.com>
 - Andrey Dudin <dudin.andrey@gmail.com>
+- Daniil Zakhlystov <main@usernamedt.me>

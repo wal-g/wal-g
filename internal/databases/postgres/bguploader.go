@@ -36,6 +36,7 @@ type BgUploader struct {
 	uploader *WalUploader
 
 	preventWalOverwrite bool
+	readyRename         bool
 
 	// ctx signals internals to keep/stop enqueueing more uploads
 	ctx context.Context
@@ -72,7 +73,8 @@ func NewBgUploader(walFilePath string,
 	maxParallelWorkers int32,
 	maxNumUploaded int32,
 	uploader *WalUploader,
-	preventWalOverwrite bool) *BgUploader {
+	preventWalOverwrite bool,
+	readyRename bool) *BgUploader {
 	started := make(map[string]struct{})
 	firstWalName := filepath.Base(walFilePath)
 	started[firstWalName+readySuffix] = struct{}{}
@@ -81,6 +83,7 @@ func NewBgUploader(walFilePath string,
 		dir:                 filepath.Dir(walFilePath),
 		uploader:            uploader,
 		preventWalOverwrite: preventWalOverwrite,
+		readyRename:         readyRename,
 
 		ctx:                ctx,
 		cancelFunc:         cancelFunc,
@@ -219,6 +222,13 @@ func (b *BgUploader) upload(walStatusFilename string) bool {
 
 	if err := b.uploader.ArchiveStatusManager.MarkWalUploaded(walFilename); err != nil {
 		tracelog.ErrorLogger.Printf("Error marking wal file %s as uploaded: %v", walFilename, err)
+	}
+
+	// rename WAL status file ".ready" to ".done" if requested
+	if b.readyRename && err == nil {
+		err := b.uploader.PGArchiveStatusManager.RenameReady(walFilename)
+		// error here is not a fatal thing, just a bit more work for the next wal-push
+		tracelog.ErrorLogger.PrintOnError(err)
 	}
 
 	return true

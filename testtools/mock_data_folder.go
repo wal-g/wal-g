@@ -51,3 +51,7 @@ func (folder *MockDataFolder) OpenWriteOnlyFile(filename string) (io.WriteCloser
 	(*folder)[filename] = file
 	return &ReadWriteNopCloser{file}, nil
 }
+
+func (folder *MockDataFolder) RenameFile(oldFilename string, newFilename string) error {
+	return nil
+}

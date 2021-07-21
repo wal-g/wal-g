@@ -70,6 +70,8 @@ services:
       &&  mkdir -p /export/mysqlcopybackupto
       &&  mkdir -p /export/mysqlconfonly
       &&  mkdir -p /export/mysqldeletebinlogs
+      &&  mkdir -p /export/archivereadyrename
+      &&  mkdir -p /export/gpfullbucket
       &&  /usr/bin/minio server /export'
 
   s3-another:
@@ -113,6 +115,17 @@ services:
       context: .
     image: wal-g/docker_prefix
     container_name: wal-g_pg_docker_prefix
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_ready_rename_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_archiving_ready_rename_test
+      context: .
+    image: wal-g/archiving_ready_rename_test
+    container_name: archiving_ready_rename_test
     depends_on:
       - s3
     links:
@@ -586,6 +599,27 @@ services:
     env_file:
       - docker/common/common_walg.env
     depends_on:
+      - s3
+    links:
+      - s3
+
+  gp:
+    build:
+      dockerfile: docker/gp/Dockerfile
+      context: .
+    image: wal-g/gp
+    container_name: wal-g_gp
+
+  gp_tests:
+    build:
+      dockerfile: docker/gp_tests/Dockerfile
+      context: .
+    image: wal-g/gp_tests
+    container_name: wal-g_gp_tests
+    env_file:
+      - docker/common/common_walg.env
+    depends_on:
+      - gp
       - s3
     links:
       - s3

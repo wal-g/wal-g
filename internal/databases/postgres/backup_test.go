@@ -138,3 +138,34 @@ func TestFetchSentinelReturnErrorWhenSentinelUnmarshallable(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, errorMessage, err.Error()[:len(errorMessage)])
 }
+
+func TestGetLatestBackupName(t *testing.T) {
+	var folder = testtools.MakeDefaultInMemoryStorageFolder()
+	backupNames := []string{"base_123", "base_456", "base000"}
+	for _, nameBackupPrefix := range backupNames {
+		nameBackup := nameBackupPrefix + utility.SentinelSuffix
+		folder.PutObject(nameBackup, &bytes.Buffer{})
+
+		latestBackup, err := internal.GetLatestBackupName(folder)
+		assert.NoError(t, err)
+		assert.Equal(t, nameBackupPrefix, latestBackup)
+	}
+}
+
+func TestGetLatestBackupNameNoBackupsInFolder(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
+	backupName, err := internal.GetLatestBackupName(baseBackupFolder)
+
+	assert.Error(t, err, internal.NoBackupsFoundError{})
+	assert.Equal(t, backupName, "")
+}
+
+func TestGetLastBackupNameWithGarbage(t *testing.T) {
+	folder := testtools.CreateMockStorageFolder()
+	subFolder := folder.GetSubFolder(utility.BaseBackupPath)
+	latestBackup, err := internal.GetLatestBackupName(subFolder)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "base_000", latestBackup)
+}

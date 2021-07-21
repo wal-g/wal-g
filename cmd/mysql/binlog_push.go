@@ -9,6 +9,8 @@ import (
 
 const binlogPushShortDescription = ""
 
+var untilBinlog string
+
 // binlogPushCmd represents the cron command
 var binlogPushCmd = &cobra.Command{
 	Use:   "binlog-push",
@@ -17,7 +19,7 @@ var binlogPushCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
-		mysql.HandleBinlogPush(uploader)
+		mysql.HandleBinlogPush(uploader, untilBinlog)
 	},
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		internal.RequiredSettings[internal.MysqlDatasourceNameSetting] = true
@@ -28,4 +30,5 @@ var binlogPushCmd = &cobra.Command{
 
 func init() {
 	cmd.AddCommand(binlogPushCmd)
+	binlogPushCmd.Flags().StringVar(&untilBinlog, "until", "", "binlog file name to stop at. Current active by default")
 }

@@ -1,11 +1,12 @@
 site_name: WAL-G
 nav:
     - Overview: README.md
+    - Storages: STORAGES.md
     - Foundation DB: FoundationDB.md
     - Mongo DB: MongoDB.md
     - MySQL: MySQL.md
     - PostgreSQL: PostgreSQL.md
     - SQLServer: SQLServer.md
     - Windows: Windows.md
-    - Contributors: Contributors.md
+    - Contributors: CONTRIBUTORS.md
 theme: readthedocs

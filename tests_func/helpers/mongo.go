@@ -182,18 +182,19 @@ func (mc *MongoCtl) connect(creds *AuthCreds) (*mongo.Client, error) {
 	return client, nil
 }
 
-func (mc *MongoCtl) WriteTestData(mark string) error {
+func (mc *MongoCtl) WriteTestData(mark string, dbCount, tablesCount, docsCount int) error {
 	conn, err := mc.AdminConnect()
 	if err != nil {
 		return err
 	}
-	docsCount := 3
-	for _, dbName := range []string{"test_db_01", "test_db_02"} {
-		for _, tableName := range []string{"test_table_01", "test_table_02"} {
+	for dbId := 1; dbId <= dbCount; dbId++ {
+		for tableId := 1; tableId <= tablesCount; tableId++ {
 			var rows []interface{}
 			for k := 1; k <= docsCount; k++ {
 				rows = append(rows, generateRecord(k, 5, mark))
 			}
+			dbName := fmt.Sprintf("test_db_%02d", dbId)
+			tableName := fmt.Sprintf("test_table_%02d", tableId)
 			if _, err := conn.Database(dbName).Collection(tableName).InsertMany(mc.ctx, rows); err != nil {
 				return err
 			}

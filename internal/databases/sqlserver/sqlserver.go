@@ -127,7 +127,7 @@ func getDatabasesToRestore(sentinel *SentinelDto, dbnames []string, fromnames []
 }
 
 func listDatabases(db *sql.DB) ([]string, error) {
-	rows, err := db.Query("SELECT name FROM SYS.DATABASES WHERE name != 'tempdb'")
+	rows, err := db.Query("SELECT name FROM sys.databases WHERE name != 'tempdb'")
 	if err != nil {
 		return nil, err
 	}

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/user"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -22,6 +23,7 @@ const (
 	REDIS     = "REDIS"
 	FDB       = "FDB"
 	MONGO     = "MONGO"
+	GP        = "GP"
 
 	DownloadConcurrencySetting   = "WALG_DOWNLOAD_CONCURRENCY"
 	UploadConcurrencySetting     = "WALG_UPLOAD_CONCURRENCY"
@@ -33,6 +35,7 @@ const (
 	DeltaMaxStepsSetting         = "WALG_DELTA_MAX_STEPS"
 	DeltaOriginSetting           = "WALG_DELTA_ORIGIN"
 	CompressionMethodSetting     = "WALG_COMPRESSION_METHOD"
+	StoragePrefixSetting         = "WALG_STORAGE_PREFIX"
 	DiskRateLimitSetting         = "WALG_DISK_RATE_LIMIT"
 	NetworkRateLimitSetting      = "WALG_NETWORK_RATE_LIMIT"
 	UseWalDeltaSetting           = "WALG_USE_WAL_DELTA"
@@ -69,6 +72,7 @@ const (
 	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
 	MaxDelayedSegmentsCount      = "WALG_INTEGRITY_MAX_DELAYED_WALS"
 	PrefetchDir                  = "WALG_PREFETCH_DIR"
+	PgReadyRename                = "PG_READY_RENAME"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
@@ -91,6 +95,8 @@ const (
 	MysqlBinlogDstSetting      = "WALG_MYSQL_BINLOG_DST"
 	MysqlBackupPrepareCmd      = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
 	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
+
+	RedisPassword = "WALG_REDIS_PASSWORD"
 
 	GoMaxProcs = "GOMAXPROCS"
 
@@ -127,6 +133,7 @@ var (
 		UploadWalMetadata:            "NOMETADATA",
 		DeltaMaxStepsSetting:         "0",
 		CompressionMethodSetting:     "lz4",
+		StoragePrefixSetting:         "",
 		UseWalDeltaSetting:           "false",
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
 		TotalBgUploadedLimit:         "32",
@@ -166,6 +173,7 @@ var (
 		DeltaMaxStepsSetting:         true,
 		DeltaOriginSetting:           true,
 		CompressionMethodSetting:     true,
+		StoragePrefixSetting:         true,
 		DiskRateLimitSetting:         true,
 		NetworkRateLimitSetting:      true,
 		UseWalDeltaSetting:           true,
@@ -276,6 +284,7 @@ var (
 		PgWalSize:         true,
 		"PGPASSFILE":      true,
 		PrefetchDir:       true,
+		PgReadyRename:     true,
 	}
 
 	MongoAllowedSettings = map[string]bool{
@@ -310,6 +319,11 @@ var (
 		MysqlBinlogDstSetting:      true,
 		MysqlBackupPrepareCmd:      true,
 		MysqlTakeBinlogsFromMaster: true,
+	}
+
+	RedisAllowedSettings = map[string]bool{
+		// Redis
+		RedisPassword: true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
@@ -349,6 +363,8 @@ func ConfigureSettings(currentType string) {
 			dbSpecificSettings = MysqlAllowedSettings
 		case SQLSERVER:
 			dbSpecificSettings = SQLServerAllowedSettings
+		case REDIS:
+			dbSpecificSettings = RedisAllowedSettings
 		}
 
 		for k, v := range dbSpecificSettings {
@@ -410,7 +426,9 @@ func Configure() {
 
 	// Show all ENV vars in DEVEL Logging Mode
 	tracelog.DebugLogger.Println("--- COMPILED ENVIRONMENT VARS ---")
-	for _, pair := range os.Environ() {
+	env := os.Environ()
+	sort.Strings(env)
+	for _, pair := range env {
 		tracelog.DebugLogger.Println(pair)
 	}
 

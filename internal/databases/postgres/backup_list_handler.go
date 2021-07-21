@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"text/tabwriter"
-	"time"
 
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/wal-g/storages/storage"
@@ -16,61 +15,43 @@ import (
 // TODO : unit tests
 func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 	backups, err := internal.GetBackups(folder)
+
 	if len(backups) == 0 {
 		tracelog.InfoLogger.Println("No backups found")
 		return
 	}
 	tracelog.ErrorLogger.FatalOnError(err)
+
 	// if details are requested we append content of metadata.json to each line
 
 	backupDetails, err := GetBackupsDetails(folder, backups)
 	tracelog.ErrorLogger.FatalOnError(err)
+	SortBackupDetails(backupDetails)
 
 	switch {
 	case json:
 		err = internal.WriteAsJSON(backupDetails, os.Stdout, pretty)
 	case pretty:
-		writePrettyBackupListDetails(backupDetails, os.Stdout)
+		WritePrettyBackupListDetails(backupDetails, os.Stdout)
 	default:
-		err = writeBackupListDetails(backupDetails, os.Stdout)
+		err = WriteBackupListDetails(backupDetails, os.Stdout)
 	}
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func GetBackupsDetails(folder storage.Folder, backups []internal.BackupTime) ([]BackupDetail, error) {
-	backupsDetails := make([]BackupDetail, 0, len(backups))
-	for i := len(backups) - 1; i >= 0; i-- {
-		details, err := GetBackupDetails(folder, backups[i])
-		if err != nil {
-			return nil, err
-		}
-		backupsDetails = append(backupsDetails, details)
-	}
-	return backupsDetails, nil
-}
-
-func GetBackupDetails(folder storage.Folder, backupTime internal.BackupTime) (BackupDetail, error) {
-	backup := NewBackup(folder, backupTime.BackupName)
-
-	metaData, err := backup.FetchMeta()
-	if err != nil {
-		return BackupDetail{}, err
-	}
-	return BackupDetail{backupTime, metaData}, nil
-}
-
 // TODO : unit tests
-func writeBackupListDetails(backupDetails []BackupDetail, output io.Writer) error {
+func WriteBackupListDetails(backupDetails []BackupDetail, output io.Writer) error {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
-	_, err := fmt.Fprintln(writer, "name\tlast_modified\twal_segment_backup_start\tstart_time\tfinish_time\thostname\tdata_dir\tpg_version\tstart_lsn\tfinish_lsn\tis_permanent") //nolint:lll
+	//nolint:lll
+	_, err := fmt.Fprintln(writer, "name\tmodified\twal_segment_backup_start\tstart_time\tfinish_time\thostname\tdata_dir\tpg_version\tstart_lsn\tfinish_lsn\tis_permanent")
 	if err != nil {
 		return err
 	}
-	for i := len(backupDetails) - 1; i >= 0; i-- {
+	for i := 0; i < len(backupDetails); i++ {
 		b := backupDetails[i]
-		_, err = fmt.Fprintf(writer, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v",
-			b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName, b.StartTime.Format(time.RFC850), b.FinishTime.Format(time.RFC850), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent) //nolint:lll
+		//nolint:lll
+		_, err = fmt.Fprintf(writer, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n", b.BackupName, internal.FormatTime(b.Time), b.WalFileName, internal.FormatTime(b.StartTime), internal.FormatTime(b.FinishTime), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent)
 		if err != nil {
 			return err
 		}
@@ -79,13 +60,17 @@ func writeBackupListDetails(backupDetails []BackupDetail, output io.Writer) erro
 }
 
 // TODO : unit tests
-func writePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
+func WritePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
 	writer := table.NewWriter()
 	writer.SetOutputMirror(output)
 	defer writer.Render()
-	writer.AppendHeader(table.Row{"#", "Name", "Last modified", "WAL segment backup start", "Start time", "Finish time", "Hostname", "Datadir", "PG Version", "Start LSN", "Finish LSN", "Permanent"}) //nolint:lll
+	//nolint:lll
+	writer.AppendHeader(table.Row{"#", "Name", "Modified", "WAL segment backup start", "Start time", "Finish time", "Hostname", "Datadir", "PG Version", "Start LSN", "Finish LSN", "Permanent"})
 	for idx := range backupDetails {
 		b := &backupDetails[idx]
-		writer.AppendRow(table.Row{idx, b.BackupName, b.Time.Format(time.RFC850), b.WalFileName, b.StartTime.Format(time.RFC850), b.FinishTime.Format(time.RFC850), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent}) //nolint:lll
+		writer.AppendRow(
+			table.Row{idx, b.BackupName, internal.PrettyFormatTime(b.Time), b.WalFileName,
+				internal.PrettyFormatTime(b.StartTime), internal.PrettyFormatTime(b.FinishTime),
+				b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent})
 	}
 }

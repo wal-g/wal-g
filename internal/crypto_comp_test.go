@@ -34,17 +34,11 @@ func init() {
 	waleGpgKey = string(waleGpgKeyBytes)
 }
 
-func noPassphrase() (string, bool) {
-	return "", false
-}
-
 // This test extracts WAL-E-encrypted WAL, decrypts it by external
 // GPG, compares result with OpenGPG decryption and invokes Lzop
 // decompression to check integrity. Test will leave gpg key
 // "walg-server-test" installed.
 func TestDecryptWALElzo(t *testing.T) {
-	t.Skip("This test has gpg side effects and was skipped. If you want to run it - comment skip line in crypto_compt_test.go")
-
 	crypter := openpgp.CrypterFromKey(waleGpgKey, noPassphrase)
 	f, err := os.Open(waleWALfilename)
 	assert.NoError(t, err)
@@ -95,7 +89,6 @@ func installTestKeyToExternalGPG(t *testing.T) *exec.Cmd {
 
 // Test will leave gpg key "walg-server-test" installed.
 func TestOpenGPGandExternalGPGCompatibility(t *testing.T) {
-	t.Skip("This test has gpg side effects and was skipped. If you want to run it - comment skip line in crypto_compt_test.go")
 
 	installTestKeyToExternalGPG(t)
 
@@ -128,8 +121,7 @@ type ExternalGPGCrypter struct {
 }
 
 func (c *ExternalGPGCrypter) Encrypt(reader io.Reader) ([]byte, error) {
-	cmd := exec.Command("gpg", "-e", "-z", "0", "-r", gpgKeyID)
-
+	cmd := exec.Command("gpg", "-e", "-z", "0", "-r", gpgKeyID, "--trust-model", "always")
 	cmd.Stdin = reader
 
 	return cmd.Output()

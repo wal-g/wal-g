@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"syscall"
 
@@ -41,11 +42,16 @@ var backupPushCmd = &cobra.Command{
 
 		backupCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamCreateCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
+
+		redisPassword, ok := internal.GetSetting(internal.RedisPassword)
+		if ok && redisPassword != "" { // special hack for redis-cli
+			backupCmd.Env = append(backupCmd.Env, fmt.Sprintf("REDISCLI_AUTH=%s", redisPassword))
+		}
 		backupCmd.Stderr = os.Stderr
 		metaConstructor := archive.NewBackupRedisMetaConstructor(ctx, uploader.UploadingFolder, permanent)
 
 		err = redis.HandleBackupPush(uploader, backupCmd, metaConstructor)
-		tracelog.ErrorLogger.FatalfOnError("Backup creation failed: %v", err)
+		tracelog.ErrorLogger.FatalfOnError("Redis backup creation failed: %v", err)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
 		internal.RequiredSettings[internal.NameStreamCreateCmd] = true
