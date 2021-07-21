@@ -27,6 +27,7 @@ func TestGetMaxConcurrency_ValidKey(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, 100, actual)
+	resetToDefaults()
 }
 
 func TestGetMaxConcurrency_ValidKeyAndNegativeValue(t *testing.T) {
@@ -34,6 +35,7 @@ func TestGetMaxConcurrency_ValidKeyAndNegativeValue(t *testing.T) {
 	_, err := internal.GetMaxConcurrency(internal.UploadConcurrencySetting)
 
 	assert.Error(t, err)
+	resetToDefaults()
 }
 
 func TestGetMaxConcurrency_ValidKeyAndInvalidValue(t *testing.T) {
@@ -41,6 +43,7 @@ func TestGetMaxConcurrency_ValidKeyAndInvalidValue(t *testing.T) {
 	_, err := internal.GetMaxConcurrency(internal.UploadConcurrencySetting)
 
 	assert.Error(t, err)
+	resetToDefaults()
 }
 
 func TestGetSentinelUserData(t *testing.T) {
@@ -61,6 +64,7 @@ func TestGetSentinelUserData(t *testing.T) {
 	data = internal.GetSentinelUserData()
 	t.Log(data)
 	assert.NotNilf(t, data, "Unable to parse WALG_SENTINEL_USER_DATA")
+	resetToDefaults()
 }
 
 func TestGetDataFolderPath_Default(t *testing.T) {
@@ -69,6 +73,7 @@ func TestGetDataFolderPath_Default(t *testing.T) {
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(internal.DefaultDataFolderPath, "walg_data"), actual)
+	resetToDefaults()
 }
 
 func TestGetDataFolderPath_FolderNotExist(t *testing.T) {
@@ -80,6 +85,7 @@ func TestGetDataFolderPath_FolderNotExist(t *testing.T) {
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(internal.DefaultDataFolderPath, "walg_data"), actual)
+	resetToDefaults()
 }
 
 func TestGetDataFolderPath_Wal(t *testing.T) {
@@ -91,6 +97,7 @@ func TestGetDataFolderPath_Wal(t *testing.T) {
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(parentDir, "pg_wal", "walg_data"), actual)
+	resetToDefaults()
 }
 
 func TestGetDataFolderPath_Xlog(t *testing.T) {
@@ -102,6 +109,7 @@ func TestGetDataFolderPath_Xlog(t *testing.T) {
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(parentDir, "pg_xlog", "walg_data"), actual)
+	resetToDefaults()
 }
 
 func TestGetDataFolderPath_WalIgnoreXlog(t *testing.T) {
@@ -117,6 +125,7 @@ func TestGetDataFolderPath_WalIgnoreXlog(t *testing.T) {
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(parentDir, "pg_wal", "walg_data"), actual)
+	resetToDefaults()
 }
 
 func TestConfigureLogging_WhenLogLevelSettingIsNotSet(t *testing.T) {
@@ -131,6 +140,7 @@ func TestConfigureLogging_WhenLogLevelSettingIsSet(t *testing.T) {
 	err := internal.ConfigureLogging()
 
 	assert.Error(t, tracelog.UpdateLogLevel(viper.GetString(internal.LogLevelSetting)), err)
+	resetToDefaults()
 }
 
 func prepareDataFolder(t *testing.T, name string) string {
@@ -149,4 +159,11 @@ func prepareDataFolder(t *testing.T, name string) string {
 	}
 	fmt.Println(dir)
 	return dir
+}
+
+func resetToDefaults() {
+	viper.Reset()
+	internal.ConfigureSettings(internal.PG)
+	internal.InitConfig()
+	internal.Configure()
 }
