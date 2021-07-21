@@ -131,6 +131,7 @@ func TestConfigureLogging_WhenLogLevelSettingIsSet(t *testing.T) {
 	err := internal.ConfigureLogging()
 
 	assert.Error(t, tracelog.UpdateLogLevel(viper.GetString(internal.LogLevelSetting)), err)
+	viper.Reset()
 }
 
 func prepareDataFolder(t *testing.T, name string) string {
