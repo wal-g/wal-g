@@ -226,6 +226,7 @@ var (
 		"WALG_S3_CA_CERT_FILE":        true,
 		"WALG_S3_STORAGE_CLASS":       true,
 		"WALG_S3_SSE":                 true,
+		"WALG_S3_SSE_C":               true,
 		"WALG_S3_SSE_KMS_ID":          true,
 		"WALG_CSE_KMS_ID":             true,
 		"WALG_CSE_KMS_REGION":         true,
