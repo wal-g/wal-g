@@ -182,12 +182,22 @@ func tryExtractFiles(files []ReaderMaker,
 	tarInterpreter TarInterpreter,
 	downloadingConcurrency int) (failed []ReaderMaker) {
 	downloadingContext := context.TODO()
-	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency * 2))
+	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
+	writingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
 	crypter := ConfigureCrypter()
 	isFailed := sync.Map{}
 
 	for _, file := range files {
-		_ = downloadingSemaphore.Acquire(downloadingContext, 2)
+		err := downloadingSemaphore.Acquire(downloadingContext, 1)
+		if err != nil {
+			tracelog.ErrorLogger.Println(err)
+			return files //Should never happen, but if we are asked to cancel - consider all files unfinished
+		}
+		err = writingSemaphore.Acquire(downloadingContext, 1)
+		if err != nil {
+			tracelog.ErrorLogger.Println(err)
+			return files //Should never happen, but if we are asked to cancel - consider all files unfinished
+		}
 		fileClosure := file
 
 		extractingReader, pipeWriter := io.Pipe()
@@ -203,7 +213,7 @@ func tryExtractFiles(files []ReaderMaker,
 			}
 		}()
 		go func() {
-			defer downloadingSemaphore.Release(1)
+			defer writingSemaphore.Release(1)
 			err := extractOne(tarInterpreter, extractingReader)
 			err = errors.Wrapf(err, "Extraction error in %s", fileClosure.Path())
 			utility.LoggedClose(extractingReader, "")
@@ -215,11 +225,17 @@ func tryExtractFiles(files []ReaderMaker,
 		}()
 	}
 
-	err := downloadingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency*2))
+	err := downloadingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency))
 	if err != nil {
 		tracelog.ErrorLogger.Println(err)
 		return files //Should never happen, but if we are asked to cancel - consider all files unfinished
 	}
+	err = writingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency))
+	if err != nil {
+		tracelog.ErrorLogger.Println(err)
+		return files
+	}
+
 	isFailed.Range(func(failedFile, _ interface{}) bool {
 		failed = append(failed, failedFile.(ReaderMaker))
 		return true
