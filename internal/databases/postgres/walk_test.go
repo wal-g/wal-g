@@ -330,14 +330,18 @@ func isEmpty(t *testing.T, path string) bool {
 }
 
 func TestWalk_RegularComposer(t *testing.T) {
-	testWalk(t, false)
+	testWalk(t, postgres.RegularComposer)
 }
 
 func TestWalk_RatingComposer(t *testing.T) {
-	testWalk(t, true)
+	testWalk(t, postgres.RatingComposer)
 }
 
-func testWalk(t *testing.T, useRatingComposer bool) {
+func TestWalk_CopyComposer(t *testing.T) {
+	testWalk(t, postgres.CopyComposer)
+}
+
+func testWalk(t *testing.T, composer postgres.TarBallComposerType) {
 	// Generate random data and write to tmp dir `data...`.
 	data := generateData(t)
 	tarSizeThreshold := int64(10)
@@ -359,7 +363,7 @@ func testWalk(t *testing.T, useRatingComposer bool) {
 		t.Log(err)
 	}
 
-	err = bundle.SetupComposer(setupTestTarBallComposerMaker(useRatingComposer))
+	err = bundle.SetupComposer(setupTestTarBallComposerMaker(composer))
 	if err != nil {
 		t.Log(err)
 	}
@@ -415,12 +419,14 @@ func testWalk(t *testing.T, useRatingComposer bool) {
 	}
 }
 
-func setupTestTarBallComposerMaker(useRatingComposer bool) postgres.TarBallComposerMaker {
+func setupTestTarBallComposerMaker(composer postgres.TarBallComposerType) postgres.TarBallComposerMaker {
 	filePackOptions := postgres.NewTarBallFilePackerOptions(false, false)
-	if !useRatingComposer {
+	if composer == postgres.RegularComposer {
 		return postgres.NewRegularTarBallComposerMaker(filePackOptions)
+	} else if composer == postgres.RatingComposer {
+		relFileStats := make(postgres.RelFileStatistics)
+		composerMaker, _ := postgres.NewRatingTarBallComposerMaker(relFileStats, filePackOptions)
+		return composerMaker
 	}
-	relFileStats := make(postgres.RelFileStatistics, 0)
-	composerMaker, _ := postgres.NewRatingTarBallComposerMaker(relFileStats, filePackOptions)
-	return composerMaker
+	return postgres.NewCopyTarBallComposerMaker(postgres.Backup{SentinelDto: &postgres.BackupSentinelDto{}}, "mockName", filePackOptions)
 }
