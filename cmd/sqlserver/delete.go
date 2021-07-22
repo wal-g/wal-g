@@ -2,9 +2,9 @@ package sqlserver
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 

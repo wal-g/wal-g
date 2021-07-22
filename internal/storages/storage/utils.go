@@ -1,9 +1,10 @@
 package storage
 
 import (
-	"github.com/pkg/errors"
 	"net/url"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 func JoinPath(elem ...string) string {
@@ -24,7 +25,7 @@ func AddDelimiterToPath(path string) string {
 
 // TODO : unit tests
 func GetPathFromPrefix(prefix string) (bucket, server string, err error) {
-	bucket, server, err = ParsePrefixAsURL(prefix);
+	bucket, server, err = ParsePrefixAsURL(prefix)
 	if err != nil {
 		return "", "", err
 	}

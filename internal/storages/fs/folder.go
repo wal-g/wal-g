@@ -1,12 +1,13 @@
 package fs
 
 import (
-	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/tracelog"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
+
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 )
 
 const dirDefaultMode = 0755

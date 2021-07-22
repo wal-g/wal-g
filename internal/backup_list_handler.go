@@ -8,8 +8,8 @@ import (
 	"text/tabwriter"
 
 	"github.com/jedib0t/go-pretty/table"
-	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 )
 
 type InfoLogger interface {

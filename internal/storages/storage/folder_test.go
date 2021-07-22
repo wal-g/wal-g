@@ -2,11 +2,12 @@ package storage_test
 
 import (
 	"bytes"
+	"strings"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal/storages/memory"
 	"github.com/wal-g/wal-g/internal/storages/storage"
-	"strings"
-	"testing"
 )
 
 func TestListFolderRecursively(t *testing.T) {

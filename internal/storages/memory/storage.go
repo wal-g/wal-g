@@ -18,7 +18,7 @@ func CeilTimeUpToMicroseconds(timeToCeil time.Time) time.Time {
 type TimeStampedData struct {
 	Data      bytes.Buffer
 	Timestamp time.Time
-	Size 	  int
+	Size      int
 }
 
 func TimeStampData(data bytes.Buffer) TimeStampedData {

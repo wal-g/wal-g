@@ -1,12 +1,13 @@
 package fs
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal/storages/storage"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 )
 
 func TestFSFolder(t *testing.T) {

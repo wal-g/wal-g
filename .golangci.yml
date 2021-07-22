@@ -86,6 +86,7 @@ run:
     - "tmp"
     - "submodules"
     - "testtools"
+    - "internal/storages"
   skip-files:
     - ".*_test.go$"
 

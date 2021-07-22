@@ -1,28 +1,29 @@
 package sh
 
 import (
-	"github.com/pkg/sftp"
-	"github.com/wal-g/wal-g/internal/storages/storage"
-	"github.com/wal-g/tracelog"
-	"golang.org/x/crypto/ssh"
 	"bufio"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
-	"fmt"
 	"path/filepath"
+
+	"github.com/pkg/sftp"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/storages/storage"
+	"golang.org/x/crypto/ssh"
 )
 
 type Folder struct {
 	client SftpClient
-	path string
+	path   string
 }
 
 const (
-	Port = "SSH_PORT"
-	Password = "SSH_PASSWORD"
-	Username = "SSH_USERNAME"
-	PrivateKeyPath = "SSH_PRIVATE_KEY_PATH"
+	Port              = "SSH_PORT"
+	Password          = "SSH_PASSWORD"
+	Username          = "SSH_USERNAME"
+	PrivateKeyPath    = "SSH_PRIVATE_KEY_PATH"
 	defaultBufferSize = 64 * 1024 * 1024
 )
 
@@ -31,7 +32,7 @@ var SettingsList = []string{
 	Password,
 	Username,
 	PrivateKeyPath,
-};
+}
 
 func NewFolderError(err error, format string, args ...interface{}) storage.Error {
 	return storage.NewError(err, "SSH", format, args...)
@@ -73,8 +74,8 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 	}
 
 	config := &ssh.ClientConfig{
-		User: user,
-		Auth: authMethods,
+		User:            user,
+		Auth:            authMethods,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
@@ -95,7 +96,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 }
 
 // TODO close ssh and sftp connection
-func closeConnection(client io.Closer)  {
+func closeConnection(client io.Closer) {
 	err := client.Close()
 	if err != nil {
 		tracelog.WarningLogger.FatalOnError(err)
@@ -146,7 +147,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	return
 }
 
-func (folder *Folder) DeleteObjects(objectRelativePaths []string) error { 
+func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	client := folder.client
 
 	for _, relativePath := range objectRelativePaths {
@@ -171,7 +172,7 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	return nil
 }
 
-func (folder *Folder) Exists(objectRelativePath string) (bool, error)  {
+func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 	path := filepath.Join(folder.path, objectRelativePath)
 	_, err := folder.client.Stat(path)
 
@@ -217,7 +218,7 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	err := client.Mkdir(dirPath)
 	if err != nil {
 		return NewFolderError(
-			err, "Fail to create directory '%s'", 
+			err, "Fail to create directory '%s'",
 			dirPath,
 		)
 	}
@@ -225,7 +226,7 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	file, err := client.CreateFile(absolutePath)
 	if err != nil {
 		return NewFolderError(
-			err, "Fail to create file '%s'", 
+			err, "Fail to create file '%s'",
 			absolutePath,
 		)
 	}
@@ -237,7 +238,7 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 			tracelog.InfoLogger.Println("Error during closing failed upload ", closerErr)
 		}
 		return NewFolderError(
-			err, "Fail write content to file '%s'", 
+			err, "Fail write content to file '%s'",
 			absolutePath,
 		)
 	}

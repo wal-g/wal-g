@@ -1,9 +1,10 @@
 package sh
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal/storages/storage"
-	"testing"
 )
 
 func TestSHFolder(t *testing.T) {

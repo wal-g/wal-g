@@ -1,9 +1,10 @@
 package sh
 
 import (
-	"github.com/pkg/sftp"
 	"io"
 	"os"
+
+	"github.com/pkg/sftp"
 )
 
 type SftpClient interface {
@@ -37,4 +38,3 @@ func (client *extendedSftpClient) Mkdir(path string) error {
 func extend(client *sftp.Client) *extendedSftpClient {
 	return &extendedSftpClient{client}
 }
-

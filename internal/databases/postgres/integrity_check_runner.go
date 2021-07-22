@@ -10,8 +10,8 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 

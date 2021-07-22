@@ -5,7 +5,7 @@ import "time"
 type LocalObject struct {
 	name         string
 	lastModified time.Time
-	size 		 int64
+	size         int64
 }
 
 func NewLocalObject(name string, lastModified time.Time, size int64) *LocalObject {

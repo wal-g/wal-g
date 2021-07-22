@@ -1,10 +1,11 @@
 package storage
 
 import (
-	"github.com/wal-g/tracelog"
 	"io"
 	"path"
 	"strings"
+
+	"github.com/wal-g/tracelog"
 )
 
 type Folder interface {
