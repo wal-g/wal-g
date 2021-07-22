@@ -48,7 +48,6 @@ type CopyTarBallComposer struct {
 	prevTarFileSets        TarFileSets
 	fileInfo               map[string]*fileInfo
 	headerInfos            map[string]*headerInfo
-	copiedTars             map[string]bool
 }
 
 type CopyTarBallComposerMaker struct {
@@ -90,7 +89,6 @@ func NewCopyTarBallComposer(
 		prevTarFileSets:        prevTarFileSets,
 		fileInfo:               make(map[string]*fileInfo),
 		headerInfos:            make(map[string]*headerInfo),
-		copiedTars:             make(map[string]bool),
 	}
 }
 
@@ -98,12 +96,16 @@ func (maker *CopyTarBallComposerMaker) Make(bundle *Bundle) (TarBallComposer, er
 	prevFileTar := make(map[string]string)
 	prevTarFileSets := make(map[string][]string)
 	tarUnchangedFilesCount := make(map[string]int)
-	for tarName, fileSet := range maker.previousBackup.SentinelDto.TarFileSets {
-		for _, fileName := range fileSet {
-			prevFileTar[fileName] = tarName
-			prevTarFileSets[tarName] = append(prevTarFileSets[tarName], fileName)
-		}
-		tarUnchangedFilesCount[tarName] = len(fileSet)
+	if maker.previousBackup.SentinelDto != nil {
+		for tarName, fileSet := range maker.previousBackup.SentinelDto.TarFileSets {
+			for _, fileName := range fileSet {
+				prevFileTar[fileName] = tarName
+				prevTarFileSets[tarName] = append(prevTarFileSets[tarName], fileName)
+			}
+			tarUnchangedFilesCount[tarName] = len(fileSet)
+		}	
+	} else {
+		tracelog.DebugLogger.Panic("No SentinelDto in previous backup")
 	}
 	files := &RegularBundleFiles{}
 	tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap,
@@ -120,7 +122,7 @@ func (c *CopyTarBallComposer) AddFile(info *ComposeFileInfo) {
 		if !c.prevBackup.SentinelDto.Files[fileName].MTime.Equal(info.header.ModTime) {
 			c.tarUnchangedFilesCount[c.prevFileTar[fileName]] = -1
 			currFile.status = doNotCopy
-		} else { 
+		} else {
 			c.tarUnchangedFilesCount[c.prevFileTar[fileName]] -= 1
 			currFile.status = possibleCopy
 		}
@@ -138,7 +140,7 @@ func (c *CopyTarBallComposer) AddHeader(fileInfoHeader *tar.Header, info os.File
 		if !c.prevBackup.SentinelDto.Files[fileName].MTime.Equal(info.ModTime()) {
 			c.tarUnchangedFilesCount[c.prevFileTar[fileName]] = -1
 			currHeader.status = doNotCopy
-		} else { 
+		} else {
 			c.tarUnchangedFilesCount[c.prevFileTar[fileName]] -= 1
 			currHeader.status = possibleCopy
 		}
@@ -158,12 +160,16 @@ func (c *CopyTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.FileIn
 
 func (c *CopyTarBallComposer) copyTar(tarName string) {
 	tracelog.InfoLogger.Printf("Copying %s ...\n", tarName)
+	var newTarName string
+	if tarName[:5] == "copy_" {
+		newTarName = c.newBackupName+internal.TarPartitionFolderName+tarName
+	} else {
+		newTarName = c.newBackupName+internal.TarPartitionFolderName+"copy_"+tarName
+	}
 	c.prevBackup.Folder.CopyObject(
 		utility.BaseBackupPath,
 		c.prevBackup.Name+internal.TarPartitionFolderName+tarName,
-		c.newBackupName+internal.TarPartitionFolderName+tarName)
-	c.copiedTars[tarName] = true
-	c.tarBallQueue.TarBallMaker.AddCopiedTarName(tarName)
+		newTarName)
 	for _, fileName := range c.prevTarFileSets[tarName] {
 		if file, exists := c.fileInfo[fileName]; exists {
 			file.status = processed
@@ -211,7 +217,7 @@ func (c *CopyTarBallComposer) copyUnchangedTars() {
 }
 
 func (c *CopyTarBallComposer) PackTarballs() (TarFileSets, error) {
-	c.copyUnchangedTars()	
+	c.copyUnchangedTars()
 
 	var tarBall internal.TarBall = nil
 	for fileName := range c.fileInfo {
