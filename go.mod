@@ -3,6 +3,9 @@ module github.com/wal-g/wal-g
 go 1.13
 
 require (
+	cloud.google.com/go/storage v1.8.0
+	github.com/Azure/azure-storage-blob-go v0.8.0
+	github.com/Azure/go-autorest/autorest v0.11.17
 	github.com/DATA-DOG/godog v0.7.14-0.20190529133509-96731eaefa46
 	github.com/DataDog/zstd v1.4.4
 	github.com/Microsoft/go-winio v0.4.14 // indirect
@@ -29,24 +32,23 @@ require (
 	github.com/google/uuid v1.1.1
 	github.com/greenplum-db/gp-common-go-libs v1.0.4
 	github.com/hashicorp/golang-lru v0.5.1
-	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
 	github.com/jackc/pgconn v1.6.5-0.20200823013804-5db484908cf7
 	github.com/jackc/pglogrepl v0.0.0-20210109153808-a78a685a0bff
 	github.com/jackc/pgproto3/v2 v2.0.7
 	github.com/jackc/pgx v3.6.0+incompatible
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/jessevdk/go-flags v1.4.0 // indirect
-	github.com/kisielk/errcheck v1.2.0 // indirect
-	github.com/lib/pq v1.3.0 // indirect
 	github.com/magiconair/properties v1.8.1
 	github.com/mattn/go-runewidth v0.0.8 // indirect
 	github.com/minio/sio v0.2.0
 	github.com/mongodb/mongo-tools-common v2.0.1+incompatible
+	github.com/ncw/swift v1.0.49
 	github.com/onsi/gomega v1.8.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
 	github.com/pierrec/lz4 v0.0.0-20170519170625-5a3d2245f97f
 	github.com/pierrec/xxHash v0.1.5 // indirect
 	github.com/pkg/errors v0.9.1
+	github.com/pkg/sftp v1.11.0
 	github.com/shopspring/decimal v0.0.0-20200227202807-02e2044944cc // indirect
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cobra v0.0.5
@@ -54,10 +56,7 @@ require (
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.6.1
 	github.com/ulikunitz/xz v0.5.6
-	github.com/wal-g/storages v0.0.0-20210721132221-d885ccc3753d
 	github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30
-	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
-	github.com/xdg/stringprep v1.0.1-0.20180714160509-73f8eece6fdc // indirect
 	github.com/yandex-cloud/go-genproto v0.0.0-20201102102956-0c505728b6f0
 	github.com/yandex-cloud/go-sdk v0.0.0-20201109103511-a86298d3fea5
 	go.mongodb.org/mongo-driver v1.5.1
@@ -66,4 +65,5 @@ require (
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
+	google.golang.org/api v0.28.0
 )
