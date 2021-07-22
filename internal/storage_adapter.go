@@ -4,13 +4,13 @@ import (
 	"strings"
 
 	"github.com/spf13/viper"
-	"github.com/wal-g/storages/azure"
-	"github.com/wal-g/storages/fs"
-	"github.com/wal-g/storages/gcs"
-	"github.com/wal-g/storages/s3"
-	"github.com/wal-g/storages/sh"
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/storages/swift"
+	"github.com/wal-g/wal-g/internal/storages/azure"
+	"github.com/wal-g/wal-g/internal/storages/fs"
+	"github.com/wal-g/wal-g/internal/storages/gcs"
+	"github.com/wal-g/wal-g/internal/storages/s3"
+	"github.com/wal-g/wal-g/internal/storages/sh"
+	"github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/wal-g/wal-g/internal/storages/swift"
 )
 
 type StorageAdapter struct {

@@ -2,7 +2,7 @@ package sh
 
 import (
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"testing"
 )
 

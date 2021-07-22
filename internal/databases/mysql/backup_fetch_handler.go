@@ -3,7 +3,7 @@ package mysql
 import (
 	"os/exec"
 
-	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 )

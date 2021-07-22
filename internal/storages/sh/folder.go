@@ -2,7 +2,7 @@ package sh
 
 import (
 	"github.com/pkg/sftp"
-	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"github.com/wal-g/tracelog"
 	"golang.org/x/crypto/ssh"
 	"bufio"

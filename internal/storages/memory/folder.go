@@ -3,7 +3,7 @@ package memory
 import (
 	"bytes"
 	"github.com/pkg/errors"
-	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/wal-g/internal/storages/storage"
 	"io"
 	"io/ioutil"
 	"path/filepath"
