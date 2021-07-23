@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	storage "github.com/wal-g/storages/storage"
+	storage "github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 // MockFolder is a mock of Folder interface

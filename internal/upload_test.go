@@ -36,7 +36,7 @@ func TestConfigureDeepBucket(t *testing.T) {
 
 func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer string) {
 	// Test empty environment variables
-	os.Unsetenv("WALE_S3_PREFIX");
+	os.Unsetenv("WALE_S3_PREFIX")
 	uploader, err := internal.ConfigureUploader()
 	if _, ok := (errors.Cause(err)).(internal.UnconfiguredStorageError); !ok {
 		t.Errorf("upload: Expected error 'UnconfiguredStorageError' but got %s", err)

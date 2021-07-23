@@ -2,8 +2,8 @@ package mysql
 
 import (
 	"github.com/pkg/errors"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 type GenericMetaInteractor struct {
