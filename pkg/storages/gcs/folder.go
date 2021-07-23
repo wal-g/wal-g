@@ -344,6 +344,10 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	return nil
 }
 
+func (folder *Folder) CopyObject(baseBackupPath string, objectRelativePath string, dstObject string) error {
+	return NewError(nil, "Not implemented")
+}
+
 func (folder *Folder) joinPath(one string, another string) string {
 	if folder.normalizePrefix {
 		return storage.JoinPath(one, another)

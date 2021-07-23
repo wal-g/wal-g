@@ -211,6 +211,10 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	return nil
 }
 
+func (folder *Folder) CopyObject(baseBackupPath string, objectRelativePath string, dstObject string) error {
+	return NewFolderError(nil, "Not implemented")
+}
+
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	for _, objectRelativePath := range objectRelativePaths {
 		//Delete blob using blobURL obtained from full path to blob

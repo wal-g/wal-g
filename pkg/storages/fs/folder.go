@@ -122,6 +122,10 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	return nil
 }
 
+func (folder *Folder) CopyObject(baseBackupPath string, objectRelativePath string, dstObject string) error {
+	return NewError(nil, "Not implemented")
+}
+
 func OpenFileWithDir(filePath string) (*os.File, error) {
 	file, err := os.Create(filePath)
 	if os.IsNotExist(err) {
