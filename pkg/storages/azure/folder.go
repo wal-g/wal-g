@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/Azure/go-autorest/autorest/azure"

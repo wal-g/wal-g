@@ -18,7 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const ProxyStartTimeout = 10 * time.Second

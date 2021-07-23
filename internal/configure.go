@@ -21,7 +21,7 @@ import (
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/limiters"
-	"github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"golang.org/x/time/rate"
 )
 

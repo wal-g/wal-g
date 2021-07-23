@@ -5,7 +5,7 @@ import (
 	"os/exec"
 
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/storages/storage"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 func HandleBackupFetch(ctx context.Context,
