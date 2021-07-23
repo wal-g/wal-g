@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -127,7 +127,7 @@ func getDatabasesToRestore(sentinel *SentinelDto, dbnames []string, fromnames []
 }
 
 func listDatabases(db *sql.DB) ([]string, error) {
-	rows, err := db.Query("SELECT name FROM SYS.DATABASES WHERE name != 'tempdb'")
+	rows, err := db.Query("SELECT name FROM sys.databases WHERE name != 'tempdb'")
 	if err != nil {
 		return nil, err
 	}

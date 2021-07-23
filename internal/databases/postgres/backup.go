@@ -7,10 +7,10 @@ import (
 	"regexp"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/storages/fs"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/storages/fs"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -50,6 +50,20 @@ func NewBackup(baseBackupFolder storage.Folder, name string) Backup {
 
 func (backup *Backup) getTarPartitionFolder() storage.Folder {
 	return backup.Folder.GetSubFolder(backup.Name + internal.TarPartitionFolderName)
+}
+
+func GetBackupByName(backupName, subfolder string, folder storage.Folder) (Backup, error) {
+	defaultBackup, err := internal.GetBackupByName(backupName, subfolder, folder)
+	if err != nil {
+		return Backup{}, err
+	}
+	backup := Backup{defaultBackup, nil}
+
+	_, err = backup.GetSentinel()
+	if err != nil {
+		return Backup{}, err
+	}
+	return backup, nil
 }
 
 func (backup *Backup) GetTarNames() ([]string, error) {

@@ -13,8 +13,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"github.com/wal-g/storages/fs"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/fs"
 )
 
 const (
@@ -54,7 +54,7 @@ func (u *WalMetadataUploader) UploadWalMetadata(walFileName string, createdTime 
 	var walMetadata WalMetadataDescription
 	walMetadataMap := make(map[string]WalMetadataDescription)
 	walMetadataName := walFileName + ".json"
-	walMetadata.DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
+	walMetadata.DatetimeFormat = MetadataDatetimeFormat
 	walMetadata.CreatedTime = createdTime
 	walMetadataMap[walFileName] = walMetadata
 

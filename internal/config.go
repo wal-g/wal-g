@@ -5,14 +5,15 @@ import (
 	"os"
 	"os/user"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/webserver"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const (
@@ -22,6 +23,7 @@ const (
 	REDIS     = "REDIS"
 	FDB       = "FDB"
 	MONGO     = "MONGO"
+	GP        = "GP"
 
 	DownloadConcurrencySetting   = "WALG_DOWNLOAD_CONCURRENCY"
 	UploadConcurrencySetting     = "WALG_UPLOAD_CONCURRENCY"
@@ -33,6 +35,7 @@ const (
 	DeltaMaxStepsSetting         = "WALG_DELTA_MAX_STEPS"
 	DeltaOriginSetting           = "WALG_DELTA_ORIGIN"
 	CompressionMethodSetting     = "WALG_COMPRESSION_METHOD"
+	StoragePrefixSetting         = "WALG_STORAGE_PREFIX"
 	DiskRateLimitSetting         = "WALG_DISK_RATE_LIMIT"
 	NetworkRateLimitSetting      = "WALG_NETWORK_RATE_LIMIT"
 	UseWalDeltaSetting           = "WALG_USE_WAL_DELTA"
@@ -131,6 +134,7 @@ var (
 		UploadWalMetadata:            "NOMETADATA",
 		DeltaMaxStepsSetting:         "0",
 		CompressionMethodSetting:     "lz4",
+		StoragePrefixSetting:         "",
 		UseWalDeltaSetting:           "false",
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
 		TotalBgUploadedLimit:         "32",
@@ -171,6 +175,7 @@ var (
 		DeltaMaxStepsSetting:         true,
 		DeltaOriginSetting:           true,
 		CompressionMethodSetting:     true,
+		StoragePrefixSetting:         true,
 		DiskRateLimitSetting:         true,
 		NetworkRateLimitSetting:      true,
 		UseWalDeltaSetting:           true,
@@ -224,6 +229,7 @@ var (
 		"WALG_S3_CA_CERT_FILE":        true,
 		"WALG_S3_STORAGE_CLASS":       true,
 		"WALG_S3_SSE":                 true,
+		"WALG_S3_SSE_C":               true,
 		"WALG_S3_SSE_KMS_ID":          true,
 		"WALG_CSE_KMS_ID":             true,
 		"WALG_CSE_KMS_REGION":         true,
@@ -423,7 +429,9 @@ func Configure() {
 
 	// Show all ENV vars in DEVEL Logging Mode
 	tracelog.DebugLogger.Println("--- COMPILED ENVIRONMENT VARS ---")
-	for _, pair := range os.Environ() {
+	env := os.Environ()
+	sort.Strings(env)
+	for _, pair := range env {
 		tracelog.DebugLogger.Println(pair)
 	}
 

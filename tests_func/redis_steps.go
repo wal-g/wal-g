@@ -129,6 +129,10 @@ func (tctx *TestContext) testEqualRedisDataAtHosts(host1, host2 string) error {
 		return keys2.Err()
 	}
 
+	if len(keys1.Val()) == 0 || len(keys2.Val()) == 0 {
+		return fmt.Errorf("keys1 or keys2 is empty - broken backup")
+	}
+
 	if !utils.IsArraysEqual(keys1.Val(), keys2.Val()) {
 		return fmt.Errorf("keys from redis1/redis2 aren't equal")
 	}

@@ -6,8 +6,8 @@ import (
 
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -88,7 +88,7 @@ func QueryCurrentWalSegment() WalSegmentDescription {
 	conn, err := Connect()
 	tracelog.ErrorLogger.FatalfOnError("Failed to establish a connection to Postgres cluster %v", err)
 
-	queryRunner, err := newPgQueryRunner(conn)
+	queryRunner, err := NewPgQueryRunner(conn)
 	tracelog.ErrorLogger.FatalfOnError("Failed to initialize PgQueryRunner %v", err)
 
 	currentSegmentNo, err := getCurrentWalSegmentNo(queryRunner)
@@ -96,6 +96,8 @@ func QueryCurrentWalSegment() WalSegmentDescription {
 
 	currentTimeline, err := getCurrentTimeline(conn)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get current timeline %v", err)
+
+	tracelog.InfoLogger.Printf("Current WAL segment: %s\n", currentSegmentNo.getFilename(currentTimeline))
 
 	err = conn.Close()
 	tracelog.WarningLogger.PrintOnError(err)

@@ -14,7 +14,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
@@ -22,6 +21,7 @@ import (
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/limiters"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"golang.org/x/time/rate"
 )
 
@@ -126,7 +126,20 @@ func configureLimiters() {
 
 // TODO : unit tests
 func ConfigureFolder() (storage.Folder, error) {
-	return ConfigureFolderForSpecificConfig(viper.GetViper())
+	folder, err := ConfigureFolderForSpecificConfig(viper.GetViper())
+	if err != nil {
+		return nil, err
+	}
+
+	return ConfigureStoragePrefix(folder), nil
+}
+
+func ConfigureStoragePrefix(folder storage.Folder) storage.Folder {
+	prefix := viper.GetString(StoragePrefixSetting)
+	if prefix != "" {
+		folder = folder.GetSubFolder(prefix)
+	}
+	return folder
 }
 
 // TODO: something with that

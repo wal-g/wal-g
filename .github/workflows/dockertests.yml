@@ -25,7 +25,7 @@ jobs:
       #  use cache to pass docker images to the test jobs
       - name: Docker images caching
         id: cache-images
-        uses: actions/cache@v2.1.5
+        uses: actions/cache@v2.1.6
         with:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}
@@ -107,8 +107,10 @@ jobs:
                    'make redis_test',
                    'make REDIS_VERSION="5.0.8" redis_features',
                    'make REDIS_VERSION="6.0.8" redis_features',
+                   'make REDIS_VERSION="6.2.4" redis_features',
                    'make FEATURE="backup" REDIS_VERSION="5.0.8" redis_features',
                    'make FEATURE="backup" REDIS_VERSION="6.0.8" redis_features',
+                   'make FEATURE="backup" REDIS_VERSION="6.2.4" redis_features',
                    'make TEST="pg_wale_tablespace_compatibility_test" pg_integration_test',
                    'make TEST="pg_tablespace_support_test" pg_integration_test',
                    'make TEST="pg_wal_perftest" pg_integration_test',
@@ -117,6 +119,7 @@ jobs:
                    'make MYSQL_TEST=mysql_base_tests mysql_integration_test',
                    'make MYSQL_TEST=mysql_delete_tests mysql_integration_test',
                    'make MYSQL_TEST=mysql_copy_tests mysql_integration_test',
+                   'make gp_test',
       ]
       # do not cancel all tests if one failed
       fail-fast: false
@@ -144,7 +147,7 @@ jobs:
       # load docker images
       - name: Load docker images
         id: cache-images
-        uses: actions/cache@v2.1.5
+        uses: actions/cache@v2.1.6
         with:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}

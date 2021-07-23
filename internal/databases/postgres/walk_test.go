@@ -323,10 +323,7 @@ func isEmpty(t *testing.T, path string) bool {
 	}
 	defer utility.LoggedClose(f, "")
 	_, err = f.Readdirnames(1)
-	if err == io.EOF {
-		return true
-	}
-	return false
+	return err == io.EOF
 }
 
 func TestWalk_RegularComposer(t *testing.T) {
