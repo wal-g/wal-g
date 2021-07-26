@@ -183,6 +183,24 @@ func (tctx *TestContext) isMongoPrimary(host string) error {
 	})
 }
 
+func (tctx *TestContext) mongoInit(host string) error {
+	if err := tctx.testMongoConnect(host); err != nil {
+		return err
+	}
+	if err := tctx.initiateReplSet(host); err != nil {
+		return err
+	}
+	if err := tctx.isMongoPrimary(host); err != nil {
+		return err
+	}
+	if err := tctx.mongoEnableAuth(host); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+
 func (tctx *TestContext) mongoEnableAuth(host string) error {
 	mc, err := MongoCtlFromTestContext(tctx, host)
 	if err != nil {
