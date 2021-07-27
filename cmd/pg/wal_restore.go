@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	WalRestoreUsage            = "wal-restore"
+	WalRestoreUsage            = "wal-restore target-pgdata source-pgdata"
 	WalRestoreShortDescription = "Restores WAL segments from storage."
 	WalRestoreLongDescription  = "Restores the missing WAL segments that will be needed to perform pg_rewind with storage."
 )
@@ -18,14 +18,15 @@ var walRestoreCmd = &cobra.Command{
 	Use:   WalRestoreUsage,
 	Short: WalRestoreShortDescription,
 	Long:  WalRestoreLongDescription,
-	Run: func(cmd *cobra.Command, checks []string) {
-		localDir := internal.GetPgDataFolderPath()
-		localFolder, err := fs.ConfigureFolder(localDir, nil)
-		tracelog.ErrorLogger.FatalfOnError("Error on configure local folder %v\n", err)
-		externalFolder, err := internal.ConfigureFolder()
+	Run: func(cmd *cobra.Command, args []string) {
+		targetFolder, err := fs.ConfigureFolder(args[0], nil)
+		tracelog.ErrorLogger.FatalfOnError("Error on configure target folder %v\n", err)
+		sourceFolder, err := fs.ConfigureFolder(args[1], nil)
+		tracelog.ErrorLogger.FatalfOnError("Error on configure source folder %v\n", err)
+		cloudFolder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalfOnError("Error on configure external folder %v\n", err)
 
-		internal.HandleWALRestore(externalFolder, localFolder)
+		internal.HandleWALRestore(targetFolder, sourceFolder, cloudFolder)
 	},
 }
 
