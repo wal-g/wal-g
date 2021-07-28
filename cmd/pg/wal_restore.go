@@ -18,6 +18,7 @@ var walRestoreCmd = &cobra.Command{
 	Use:   WalRestoreUsage,
 	Short: WalRestoreShortDescription,
 	Long:  WalRestoreLongDescription,
+	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		targetFolder, err := fs.ConfigureFolder(args[0], nil)
 		tracelog.ErrorLogger.FatalfOnError("Error on configure target folder %v\n", err)
