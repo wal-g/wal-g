@@ -2,7 +2,7 @@
 // Source: /home/alexander/projects/wal-g/pkg/storages/storage/folder.go
 
 // Package mock_storage is a generated GoMock package.
-package mock_storage
+package mocks
 
 import (
 	io "io"

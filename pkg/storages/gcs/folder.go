@@ -339,7 +339,7 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 		return NewError(err, "Failed to compose temporary chunks into an object")
 	}
 
-	tracelog.DebugLogger.Printf("Put %v done\n", name)source cont
+	tracelog.DebugLogger.Printf("Put %v done\n", name)
 
 	return nil
 }
@@ -387,6 +387,8 @@ func fillBuffer(r io.Reader, b []byte) (int, error) {
 		if err != nil {
 			break
 		}
+	}
+
 	return offset, err
 }
 

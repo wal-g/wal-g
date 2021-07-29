@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/testtools"
