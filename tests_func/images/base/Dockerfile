@@ -1,8 +1,8 @@
 # vim:set ft=dockerfile:
-FROM ubuntu:xenial
+FROM ubuntu:bionic
 
 ENV DEBIAN_FRONTEND noninteractive
-ENV LANG en_US.utf8 
+ENV LANG en_US.utf8
 
 # Configure apt and locale
 COPY ./config/apt/ /var/lib/dist/config/apt
@@ -21,7 +21,7 @@ RUN cp --force --recursive --verbose \
     openssl git openssh-client openssh-server \
     build-essential cmake \
     netcat-openbsd iputils-ping \
-    net-tools dnsutils \
+    net-tools dnsutils gnupg \
     nginx nginx-full nginx-common \
 	&& rm -rf /var/lib/apt/lists/*
 

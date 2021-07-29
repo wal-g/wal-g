@@ -141,6 +141,7 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 	s.Step(`^mongodb replset initialized on ([^\s]*)$`, tctx.initiateReplSet)
 	s.Step(`^mongodb role is primary on ([^\s]*)$`, tctx.isMongoPrimary)
 	s.Step(`^mongodb auth initialized on ([^\s]*)$`, tctx.mongoEnableAuth)
+	s.Step(`^mongodb initialized on ([^\s]*)$`, tctx.mongoInit)
 	s.Step(`^([^\s]*) has no data$`, tctx.purgeMongoDataDir)
 
 	s.Step(`we save last oplog timestamp on ([^\s]*) to "([^"]*)"`, tctx.saveOplogTimestamp)
