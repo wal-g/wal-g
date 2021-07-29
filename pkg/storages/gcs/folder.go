@@ -339,12 +339,12 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 		return NewError(err, "Failed to compose temporary chunks into an object")
 	}
 
-	tracelog.DebugLogger.Printf("Put %v done\n", name)
+	tracelog.DebugLogger.Printf("Put %v done\n", name)source cont
 
 	return nil
 }
 
-func (folder *Folder) CopyObject(baseBackupPath string, objectRelativePath string, dstObject string) error {
+func (folder *Folder) CopyObject(srcRelativePath string, dstRelativePath string) error {
 	return NewError(nil, "Not implemented")
 }
 
@@ -387,8 +387,6 @@ func fillBuffer(r io.Reader, b []byte) (int, error) {
 		if err != nil {
 			break
 		}
-	}
-
 	return offset, err
 }
 

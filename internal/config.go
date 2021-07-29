@@ -196,7 +196,7 @@ var (
 		VerifyPageChecksumsSetting:   true,
 		StoreAllCorruptBlocksSetting: true,
 		UseRatingComposerSetting:     true,
-		UseCopyComposerSetting:       false,
+		UseCopyComposerSetting:       true,
 		MaxDelayedSegmentsCount:      true,
 		DeltaFromNameSetting:         true,
 		DeltaFromUserDataSetting:     true,

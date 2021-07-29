@@ -7,7 +7,6 @@ import (
 
 	"github.com/jackc/pgx"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 )
 
@@ -65,12 +64,13 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn,
 	case CopyComposer:
 		previousBackupName, err := internal.GetLatestBackupName(folder)
 		if err != nil {
-			return NewRegularTarBallComposerMaker(filePackOptions), nil
+			return nil, err
 		}
-		tracelog.ErrorLogger.PanicOnError(err)
 		previousBackup := NewBackup(folder, previousBackupName)
 		prevBackupSentinelDto, err := previousBackup.GetSentinel()
-		tracelog.ErrorLogger.PanicOnError(err)
+		if err != nil {
+			return nil, err
+		}
 		if prevBackupSentinelDto.IncrementFullName != nil {
 			previousBackupName = *prevBackupSentinelDto.IncrementFullName
 			previousBackup = NewBackup(folder, previousBackupName)	

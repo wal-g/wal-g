@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
-
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/testtools"
@@ -418,12 +418,17 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType) {
 
 func setupTestTarBallComposerMaker(composer postgres.TarBallComposerType) postgres.TarBallComposerMaker {
 	filePackOptions := postgres.NewTarBallFilePackerOptions(false, false)
-	if composer == postgres.RegularComposer {
+	switch composer {
+	case postgres.RegularComposer:
 		return postgres.NewRegularTarBallComposerMaker(filePackOptions)
-	} else if composer == postgres.RatingComposer {
+	case postgres.RatingComposer:
 		relFileStats := make(postgres.RelFileStatistics)
 		composerMaker, _ := postgres.NewRatingTarBallComposerMaker(relFileStats, filePackOptions)
 		return composerMaker
+	case postgres.CopyComposer:
+		mockBackup := postgres.Backup{SentinelDto: &postgres.BackupSentinelDto{}}
+		return postgres.NewCopyTarBallComposerMaker(mockBackup, "mockName", filePackOptions)
+	default:
+		return nil
 	}
-	return postgres.NewCopyTarBallComposerMaker(postgres.Backup{SentinelDto: &postgres.BackupSentinelDto{}}, "mockName", filePackOptions)
 }

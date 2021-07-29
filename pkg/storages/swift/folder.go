@@ -145,7 +145,7 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	return nil
 }
 
-func (folder *Folder) CopyObject(baseBackupPath string, objectRelativePath string, dstObject string) error {
+func (folder *Folder) CopyObject(srcRelativePath string, dstRelativePath string) error {
 	return NewError(nil, "Not implemented")
 }
 

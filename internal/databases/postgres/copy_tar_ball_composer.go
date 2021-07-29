@@ -4,11 +4,12 @@ import (
 	"archive/tar"
 	"context"
 	"os"
-	
+	"strconv"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto"
-	"github.com/wal-g/wal-g/utility"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -40,6 +41,7 @@ type CopyTarBallComposer struct {
 	ctx           context.Context
 	errorGroup    *errgroup.Group
 
+	copyCount              int
 	prevBackup             Backup
 	newBackupName          string
 	tarFileSets            TarFileSets
@@ -81,6 +83,7 @@ func NewCopyTarBallComposer(
 		files:                  files,
 		ctx:                    ctx,
 		errorGroup:             errorGroup,
+		copyCount:              0,
 		prevBackup:             prevBackup,
 		newBackupName:          newBackupName,
 		tarFileSets:            make(TarFileSets),
@@ -103,9 +106,9 @@ func (maker *CopyTarBallComposerMaker) Make(bundle *Bundle) (TarBallComposer, er
 				prevTarFileSets[tarName] = append(prevTarFileSets[tarName], fileName)
 			}
 			tarUnchangedFilesCount[tarName] = len(fileSet)
-		}	
+		}
 	} else {
-		tracelog.DebugLogger.Panic("No SentinelDto in previous backup")
+		return nil, errors.New("No SentinelDto in previous backup")
 	}
 	files := &RegularBundleFiles{}
 	tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap,
@@ -160,16 +163,9 @@ func (c *CopyTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.FileIn
 
 func (c *CopyTarBallComposer) copyTar(tarName string) {
 	tracelog.InfoLogger.Printf("Copying %s ...\n", tarName)
-	var newTarName string
-	if tarName[:5] == "copy_" {
-		newTarName = c.newBackupName+internal.TarPartitionFolderName+tarName
-	} else {
-		newTarName = c.newBackupName+internal.TarPartitionFolderName+"copy_"+tarName
-	}
-	c.prevBackup.Folder.CopyObject(
-		utility.BaseBackupPath,
-		c.prevBackup.Name+internal.TarPartitionFolderName+tarName,
-		newTarName)
+	newTarName := "copy_" + strconv.Itoa(c.copyCount)
+	c.copyCount++
+	c.prevBackup.Folder.CopyObject(c.prevBackup.Name+internal.TarPartitionFolderName+tarName, newTarName)
 	for _, fileName := range c.prevTarFileSets[tarName] {
 		if file, exists := c.fileInfo[fileName]; exists {
 			file.status = processed

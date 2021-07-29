@@ -18,13 +18,13 @@ const TarPartitionFolderName = "/tar_partitions/"
 // StorageTarBall represents a tar file that is
 // going to be uploaded to storage.
 type StorageTarBall struct {
-	backupName   string
-	partNumber   int
-	partSize     *int64
-	writeCloser  io.Closer
-	tarWriter    *tar.Writer
-	uploader     *Uploader
-	name         string
+	backupName  string
+	partNumber  int
+	partSize    *int64
+	writeCloser io.Closer
+	tarWriter   *tar.Writer
+	uploader    *Uploader
+	name        string
 }
 
 func (tarBall *StorageTarBall) Name() string {
