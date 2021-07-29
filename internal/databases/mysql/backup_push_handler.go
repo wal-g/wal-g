@@ -59,7 +59,7 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 		CompressedSize:   uploadedSize,
 		UncompressedSize: rawSize,
 		IsPermanent:      isPermanent,
-		UserData:         userData,
+		UserData:         internal.UnmarshalSentinelUserData(userData),
 	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())
 
