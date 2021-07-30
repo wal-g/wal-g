@@ -79,7 +79,7 @@ func (bh *BackupHandler) buildCommand(contentID int) string {
 	cmd := []string{
 		"WALG_LOG_LEVEL=DEVEL",
 		fmt.Sprintf("PGPORT=%d", segment.Port),
-		"wal-g",
+		"wal-g pg",
 		fmt.Sprintf("backup-push %s", segment.DataDir),
 		fmt.Sprintf("--walg-storage-prefix=%d", segment.ContentID),
 		fmt.Sprintf("--add-user-data=%s", segUserData.QuotedString()),

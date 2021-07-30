@@ -133,7 +133,6 @@ var (
 		UploadWalMetadata:            "NOMETADATA",
 		DeltaMaxStepsSetting:         "0",
 		CompressionMethodSetting:     "lz4",
-		StoragePrefixSetting:         "",
 		UseWalDeltaSetting:           "false",
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
 		TotalBgUploadedLimit:         "32",
@@ -356,6 +355,9 @@ func ConfigureSettings(currentType string) {
 		dbSpecificSettings := map[string]bool{}
 		switch currentType {
 		case PG:
+			dbSpecificSettings = PGAllowedSettings
+		case GP:
+			// as of now, GP specific settings are identical to PG
 			dbSpecificSettings = PGAllowedSettings
 		case MONGO:
 			dbSpecificSettings = MongoAllowedSettings

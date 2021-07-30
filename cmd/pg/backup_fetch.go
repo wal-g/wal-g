@@ -81,5 +81,5 @@ func init() {
 		false, skipRedundantTarsDescription)
 	backupFetchCmd.Flags().StringVar(&fetchTargetUserData, "target-user-data",
 		"", targetUserDataDescription)
-	cmd.AddCommand(backupFetchCmd)
+	Cmd.AddCommand(backupFetchCmd)
 }

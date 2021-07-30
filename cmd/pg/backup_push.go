@@ -111,7 +111,7 @@ func createDeltaBaseSelector(cmd *cobra.Command,
 }
 
 func init() {
-	cmd.AddCommand(backupPushCmd)
+	Cmd.AddCommand(backupPushCmd)
 
 	backupPushCmd.Flags().BoolVarP(&permanent, permanentFlag, permanentShorthand,
 		false, "Pushes permanent backup")
