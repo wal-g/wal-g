@@ -4,12 +4,14 @@ import (
 	"archive/tar"
 	"context"
 	"os"
+	"path"
 	"strconv"
+	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto"
-	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -163,9 +165,13 @@ func (c *CopyTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.FileIn
 
 func (c *CopyTarBallComposer) copyTar(tarName string) {
 	tracelog.InfoLogger.Printf("Copying %s ...\n", tarName)
-	newTarName := "copy_" + strconv.Itoa(c.copyCount)
+	splitTarName := strings.Split(tarName, ".")
+	fileExtension := splitTarName[len(splitTarName)-1]
+	newTarName := "copy_" + strconv.Itoa(c.copyCount) + ".tar." + fileExtension 
 	c.copyCount++
-	c.prevBackup.Folder.CopyObject(c.prevBackup.Name+internal.TarPartitionFolderName+tarName, newTarName)
+	srcPath := path.Join(c.prevBackup.Name, internal.TarPartitionFolderName, tarName)
+	dstPath := path.Join(c.newBackupName, internal.TarPartitionFolderName, newTarName)
+	c.prevBackup.Folder.CopyObject(srcPath, dstPath)
 	for _, fileName := range c.prevTarFileSets[tarName] {
 		if file, exists := c.fileInfo[fileName]; exists {
 			file.status = processed
