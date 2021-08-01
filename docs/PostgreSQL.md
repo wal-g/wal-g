@@ -232,6 +232,19 @@ To activate this feature, do one of the following:
 wal-g backup-push /path --rating-composer
 ```
 
+#### Copy composer mode
+
+In the rating composer mode, WAL-G does full backup and copies unchanged tar files from previous full backup. In case when there are no previous full backup, `regular` composer is used.
+
+To activate this feature, do one of the following:
+
+* set the `WALG_USE_COPY_COMPOSER`environment variable
+* add the --copy-composer flag
+
+```bash
+wal-g backup-push /path --copy-composer
+```
+
 #### Create delta from specific backup
 When creating delta backup (`WALG_DELTA_MAX_STEPS` > 0), WAL-G uses the latest backup as the base by default. This behaviour can be changed via following flags:
 
