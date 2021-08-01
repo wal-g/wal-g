@@ -6,8 +6,8 @@ import (
 	"os"
 
 	"github.com/jackc/pgx"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 // TarBallComposer is used to compose files into tarballs.
@@ -73,9 +73,12 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn,
 		}
 		if prevBackupSentinelDto.IncrementFullName != nil {
 			previousBackupName = *prevBackupSentinelDto.IncrementFullName
-			previousBackup = NewBackup(folder, previousBackupName)	
-			previousBackup.GetSentinel()
-		}	
+			previousBackup = NewBackup(folder, previousBackupName)
+			_, err = previousBackup.GetSentinel()
+			if err != nil {
+				return nil, err
+			}
+		}
 		return NewCopyTarBallComposerMaker(previousBackup, newBackupName, filePackOptions), nil
 	default:
 		return nil, errors.New("NewTarBallComposerMaker: Unknown TarBallComposerType")
