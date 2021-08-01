@@ -252,6 +252,6 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	return nil
 }
 
-func (folder *Folder) CopyObject(srcRelativePath string, dstRelativePath string) error {
+func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	return NewFolderError(nil, "Not implemented")
 }

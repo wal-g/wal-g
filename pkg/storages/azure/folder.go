@@ -211,16 +211,16 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	return nil
 }
 
-func (folder *Folder) CopyObject(srcRelativePath string, dstRelativePath string) error {
-	if exists, err := folder.Exists(srcRelativePath); !exists {
+func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
+	if exists, err := folder.Exists(srcPath); !exists {
 		if err == nil {
 			return NewFolderError(nil, "object do not exists")
 		} else {
 			return err
 		}
 	}
-	dst := storage.JoinPath(folder.path, dstRelativePath)
-	source := folder.containerURL.NewBlockBlobURL(storage.JoinPath(folder.path, srcRelativePath))
+	dst := storage.JoinPath(folder.path, dstPath)
+	source := folder.containerURL.NewBlockBlobURL(storage.JoinPath(folder.path, srcPath))
 	blobURL := folder.containerURL.NewBlockBlobURL(dst)
 	_, err := blobURL.StartCopyFromURL(context.Background(), source.URL(), nil, azblob.ModifiedAccessConditions{}, azblob.BlobAccessConditions{})
 	return err
