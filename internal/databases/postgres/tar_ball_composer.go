@@ -64,7 +64,7 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn,
 	case CopyComposer:
 		previousBackupName, err := internal.GetLatestBackupName(folder)
 		if err != nil {
-			return nil, err
+			return NewRegularTarBallComposerMaker(filePackOptions), nil
 		}
 		previousBackup := NewBackup(folder, previousBackupName)
 		prevBackupSentinelDto, err := previousBackup.GetSentinel()
