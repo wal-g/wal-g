@@ -56,6 +56,13 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 	err = data.Close()
 	assert.NoError(t, err)
 
+	err = sub1.CopyObject("file1", "file2")
+	assert.NoError(t, err)
+	sublist, subFolders, err = sub1.ListFolder()
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(subFolders))
+	assert.Equal(t, -1, len(sublist))
+	
 	err = sub1.DeleteObjects([]string{"file1"})
 	assert.NoError(t, err)
 	err = storageFolder.DeleteObjects([]string{"Sub1"})

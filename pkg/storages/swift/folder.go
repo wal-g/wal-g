@@ -24,6 +24,10 @@ func NewError(err error, format string, args ...interface{}) storage.Error {
 	return storage.NewError(err, "Swift", format, args...)
 }
 
+func NewFolderError(err error, format string, args ...interface{}) storage.Error {
+	return storage.NewError(err, "Swift", format, args...)
+}
+
 func NewFolder(connection *swift.Connection, container swift.Container, path string) *Folder {
 	return &Folder{connection, container, path}
 }
@@ -146,7 +150,15 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 }
 
 func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
-	return NewError(nil, "Not implemented")
+	if exists, err := folder.Exists(srcPath); !exists {
+		if err == nil {
+			return NewFolderError(nil, "object does not exist")
+		} else {
+			return err
+		}
+	}
+	_, err := folder.connection.ObjectCopy(folder.path, srcPath, folder.path, dstPath, nil)
+	return err
 }
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
