@@ -491,15 +491,7 @@ func InitConfig() {
 	ReadConfigFromFile(globalViper, CfgFile)
 	CheckAllowedSettings(globalViper)
 
-	// Set compiled config to ENV.
-	// Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
-	for k, v := range viper.AllSettings() {
-		val, ok := v.(string)
-		if ok {
-			err := bindToEnv(k, val)
-			tracelog.ErrorLogger.FatalOnError(err)
-		}
-	}
+	bindConfigToEnv(globalViper)
 }
 
 // ReadConfigFromFile read config to the viper instance
@@ -603,11 +595,14 @@ func toFlagName(s string) string {
 	return strings.ReplaceAll(strings.ToLower(s), "_", "-")
 }
 
+// FolderFromConfig prefers the config parameters instead of the current environment variables
 func FolderFromConfig(configFile string) (storage.Folder, error) {
 	var config = viper.New()
 	SetDefaultValues(config)
 	ReadConfigFromFile(config, configFile)
 	CheckAllowedSettings(config)
+
+	bindConfigToEnv(config)
 
 	var folder, err = ConfigureFolderForSpecificConfig(config)
 
@@ -616,4 +611,16 @@ func FolderFromConfig(configFile string) (storage.Folder, error) {
 		tracelog.ErrorLogger.FatalError(err)
 	}
 	return folder, err
+}
+
+// Set the compiled config to ENV.
+// Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
+func bindConfigToEnv(globalViper *viper.Viper) {
+	for k, v := range globalViper.AllSettings() {
+		val, ok := v.(string)
+		if ok {
+			err := bindToEnv(k, val)
+			tracelog.ErrorLogger.FatalOnError(err)
+		}
+	}
 }
