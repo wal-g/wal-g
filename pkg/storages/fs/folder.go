@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -24,6 +25,10 @@ type Folder struct {
 
 func NewFolder(rootPath string, subPath string) *Folder {
 	return &Folder{rootPath, subPath}
+}
+
+func NewFolderError(err error, format string, args ...interface{}) storage.Error {
+	return storage.NewError(err, "GCS", format, args...)
 }
 
 func ConfigureFolder(path string, settings map[string]string) (storage.Folder, error) {
@@ -123,7 +128,20 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 }
 
 func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
-	return NewError(nil, "Not implemented")
+	src := path.Join(folder.rootPath, srcPath)
+	srcStat, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	if !srcStat.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", srcPath)
+	}
+	file, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	err = folder.PutObject(dstPath, file)
+	return err
 }
 
 func OpenFileWithDir(filePath string) (*os.File, error) {
