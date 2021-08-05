@@ -234,7 +234,7 @@ wal-g backup-push /path --rating-composer
 
 #### Copy composer mode
 
-In the rating composer mode, WAL-G does full backup and copies unchanged tar files from previous full backup. In case when there are no previous full backup, `regular` composer is used.
+In the copy composer mode, WAL-G does full backup and copies unchanged tar files from previous full backup. In case when there are no previous full backup, `regular` composer is used.
 
 To activate this feature, do one of the following:
 
