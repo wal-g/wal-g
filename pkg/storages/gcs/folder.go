@@ -52,7 +52,6 @@ func NewError(err error, format string, args ...interface{}) storage.Error {
 	return storage.NewError(err, "GCS", format, args...)
 }
 
-
 func NewFolderError(err error, format string, args ...interface{}) storage.Error {
 	return storage.NewError(err, "GCS", format, args...)
 }
@@ -353,7 +352,7 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	if exists, err := folder.Exists(srcPath); !exists {
 		if err == nil {
-			return NewFolderError(nil, "object does not exist")
+			return errors.New("object does not exist")
 		} else {
 			return err
 		}

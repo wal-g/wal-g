@@ -214,7 +214,7 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	if exists, err := folder.Exists(srcPath); !exists {
 		if err == nil {
-			return NewFolderError(nil, "object do not exists")
+			return errors.New("object do not exists")
 		} else {
 			return err
 		}
