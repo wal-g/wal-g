@@ -2,6 +2,10 @@ package greenplum
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/blang/semver"
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
@@ -32,27 +36,35 @@ func (queryRunner *GpQueryRunner) buildCreateGreenplumRestorePoint(restorePointN
 }
 
 // CreateGreenplumRestorePoint creates a restore point
-func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(restorePointName string) (lsnStrings []string, err error) {
+func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(restorePointName string) (restoreLSNs map[int]string, err error) {
 	conn := queryRunner.pgQueryRunner.Connection
 	rows, err := conn.Query(queryRunner.buildCreateGreenplumRestorePoint(restorePointName))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	lsnStrings = make([]string, 0)
+	restoreLSNs = make(map[int]string)
+	restorePointPattern := regexp.MustCompile(`(-?\d+),([0-9A-F]+/[0-9A-F]+)`)
 	for rows.Next() {
-		var lsn string
-
-		if err := rows.Scan(&lsn); err != nil {
+		var row string
+		if err := rows.Scan(&row); err != nil {
 			tracelog.WarningLogger.Printf("CreateGreenplumRestorePoint:  %v\n", err.Error())
 		}
-		lsnStrings = append(lsnStrings, lsn)
+		match := restorePointPattern.FindStringSubmatch(row)
+		if match == nil {
+			return nil, fmt.Errorf("failed to parse CreateGreenplumRestorePoint output row: %s", row)
+		}
+		contentID, err := strconv.Atoi(match[1])
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to parse the contentID value (%s)", match[1])
+		}
+		restoreLSNs[contentID] = match[2]
 	}
 
 	if rows.Err() != nil {
 		return nil, rows.Err()
 	}
-	return lsnStrings, nil
+	return restoreLSNs, nil
 }
 
 // BuildGetGreenplumSegmentsInfo formats a query to retrieve information about segments
