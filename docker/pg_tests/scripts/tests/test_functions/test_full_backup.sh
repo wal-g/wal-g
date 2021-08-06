@@ -36,6 +36,21 @@ test_full_backup()
   echo "Full backup success!!!!!!"
 
   # Also we test here WAL overwrite prevention as a part of regular backup functionality
+  # First test that .history files prevent overwrite even if WALG_PREVENT_WAL_OVERWRITE is false
+
+  export WALG_PREVENT_WAL_OVERWRITE=false
+
+  echo test > ${PGDATA}/pg_wal/test_file.history
+  wal-g --config=${TMP_CONFIG} wal-push ${PGDATA}/pg_wal/test_file.history
+  wal-g --config=${TMP_CONFIG} wal-push ${PGDATA}/pg_wal/test_file.history
+
+  echo test1 > ${PGDATA}/pg_wal/test_file.history
+  wal-g --config=${TMP_CONFIG} wal-push ${PGDATA}/pg_wal/test_file && EXIT_STATUS=$? || EXIT_STATUS=$?
+
+  if [ "$EXIT_STATUS" -eq 0 ] ; then
+      echo "Error: Duplicate .history with different content was pushed"
+      exit 1
+  fi
 
   export WALG_PREVENT_WAL_OVERWRITE=true
 
