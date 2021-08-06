@@ -63,9 +63,12 @@ var (
 			deltaBaseSelector, err := createDeltaBaseSelector(cmd, deltaFromName, deltaFromUserData)
 			tracelog.ErrorLogger.FatalOnError(err)
 
-			if userData == "" {
-				userData = viper.GetString(internal.SentinelUserDataSetting)
+			if userDataRaw == "" {
+				userDataRaw = viper.GetString(internal.SentinelUserDataSetting)
 			}
+			userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
+			tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
+
 			arguments := postgres.NewBackupArguments(dataDirectory, utility.BaseBackupPath,
 				permanent, verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting),
 				fullBackup, storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting),
@@ -83,7 +86,7 @@ var (
 	useRatingComposer     = false
 	deltaFromName         = ""
 	deltaFromUserData     = ""
-	userData              = ""
+	userDataRaw           = ""
 )
 
 // create the BackupSelector for delta backup base according to the provided flags
@@ -102,7 +105,7 @@ func createDeltaBaseSelector(cmd *cobra.Command,
 	case targetUserData != "":
 		tracelog.InfoLogger.Println(
 			"Selecting the backup with specified user data as the base for the current delta backup...")
-		return internal.NewUserDataBackupSelector(targetUserData, postgres.NewGenericMetaFetcher()), nil
+		return internal.NewUserDataBackupSelector(targetUserData, postgres.NewGenericMetaFetcher())
 
 	default:
 		tracelog.InfoLogger.Println("Selecting the latest backup as the base for the current delta backup...")
@@ -127,6 +130,6 @@ func init() {
 		"", "Select the backup specified by name as the target for the delta backup")
 	backupPushCmd.Flags().StringVar(&deltaFromUserData, deltaFromUserDataFlag,
 		"", "Select the backup specified by UserData as the target for the delta backup")
-	backupPushCmd.Flags().StringVar(&userData, addUserDataFlag,
+	backupPushCmd.Flags().StringVar(&userDataRaw, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
 }

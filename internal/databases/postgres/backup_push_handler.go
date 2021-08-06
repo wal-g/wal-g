@@ -53,7 +53,7 @@ type BackupArguments struct {
 	verifyPageChecksums   bool
 	storeAllCorruptBlocks bool
 	tarBallComposerType   TarBallComposerType
-	userData              string
+	userData              interface{}
 	forceIncremental      bool
 	backupsFolder         string
 	pgDataDirectory       string
@@ -104,7 +104,7 @@ type BackupHandler struct {
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
 func NewBackupArguments(pgDataDirectory string, backupsFolder string, isPermanent bool, verifyPageChecksums bool,
 	isFullBackup bool, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
-	deltaBaseSelector internal.BackupSelector, userData string) BackupArguments {
+	deltaBaseSelector internal.BackupSelector, userData interface{}) BackupArguments {
 	return BackupArguments{
 		pgDataDirectory:       pgDataDirectory,
 		backupsFolder:         backupsFolder,

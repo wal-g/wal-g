@@ -10,7 +10,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPermanent bool, userData string) {
+func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPermanent bool, userDataRaw string) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 
 	db, err := getMySQLConnection()
@@ -49,6 +49,9 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to calc raw data size: %v", err)
 	}
+
+	userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
+	tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
 	sentinel := StreamSentinelDto{
 		BinLogStart:      binlogStart,

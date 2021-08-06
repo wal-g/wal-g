@@ -8,6 +8,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
@@ -129,11 +131,16 @@ func (m *MongoMetaConstructor) Init() error {
 		LastMajTS: lastMajTS,
 	}
 
+	userData, err := internal.GetSentinelUserData()
+	if err != nil {
+		return errors.Wrap(err, "failed to unmarshal the provided UserData")
+	}
+
 	m.meta = models.BackupMeta{
 		StartTime: utility.TimeNowCrossPlatformLocal(),
 		Mongo:     m.mongo,
 		Permanent: m.permanent,
-		User:      internal.GetSentinelUserData(),
+		User:      userData,
 	}
 	return nil
 }

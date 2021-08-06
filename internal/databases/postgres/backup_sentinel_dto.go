@@ -53,7 +53,7 @@ func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec, tarFileSet
 	}
 
 	sentinel.BackupFinishLSN = &bh.curBackupInfo.endLSN
-	sentinel.UserData = internal.UnmarshalSentinelUserData(bh.arguments.userData)
+	sentinel.UserData = bh.arguments.userData
 	sentinel.SystemIdentifier = bh.pgInfo.systemIdentifier
 	sentinel.UncompressedSize = bh.curBackupInfo.uncompressedSize
 	sentinel.CompressedSize = bh.curBackupInfo.compressedSize

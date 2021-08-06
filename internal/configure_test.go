@@ -49,21 +49,31 @@ func TestGetMaxConcurrency_ValidKeyAndInvalidValue(t *testing.T) {
 func TestGetSentinelUserData(t *testing.T) {
 	viper.Set(internal.SentinelUserDataSetting, "1.0")
 
-	data := internal.GetSentinelUserData()
+	data, err := internal.GetSentinelUserData()
+	assert.NoError(t, err)
 	t.Log(data)
 	assert.Equalf(t, 1.0, data.(float64), "Unable to parse WALG_SENTINEL_USER_DATA")
 
 	viper.Set(internal.SentinelUserDataSetting, "\"1\"")
 
-	data = internal.GetSentinelUserData()
+	data, err = internal.GetSentinelUserData()
+	assert.NoError(t, err)
 	t.Log(data)
 	assert.Equalf(t, "1", data.(string), "Unable to parse WALG_SENTINEL_USER_DATA")
 
 	viper.Set(internal.SentinelUserDataSetting, `{"x":123,"y":["asdasd",123]}`)
 
-	data = internal.GetSentinelUserData()
+	data, err = internal.GetSentinelUserData()
+	assert.NoError(t, err)
 	t.Log(data)
 	assert.NotNilf(t, data, "Unable to parse WALG_SENTINEL_USER_DATA")
+
+	viper.Set(internal.SentinelUserDataSetting, `"x",1`)
+
+	data, err = internal.GetSentinelUserData()
+	assert.Error(t, err, "Should fail on the invalid user data")
+	t.Log(err)
+	assert.Nil(t, data)
 	resetToDefaults()
 }
 
