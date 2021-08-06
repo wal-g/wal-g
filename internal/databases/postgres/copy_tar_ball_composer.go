@@ -181,11 +181,11 @@ func (c *CopyTarBallComposer) copyTar(tarName string) error {
 	for _, fileName := range c.prevTarFileSets[tarName] {
 		if file, exists := c.fileInfo[fileName]; exists {
 			file.status = processed
-			c.tarFileSets[tarName] = append(c.tarFileSets[tarName], fileName)
+			c.tarFileSets[newTarName] = append(c.tarFileSets[newTarName], fileName)
 			c.files.AddFile(file.info.header, file.info.fileInfo, file.info.isIncremented)
 		} else if header, exists := c.headerInfos[fileName]; exists {
 			header.status = processed
-			c.tarFileSets[tarName] = append(c.tarFileSets[tarName], fileName)
+			c.tarFileSets[newTarName] = append(c.tarFileSets[newTarName], fileName)
 			c.files.AddFile(header.fileInfoHeader, header.info, false)
 		}
 	}
