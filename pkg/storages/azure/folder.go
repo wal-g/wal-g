@@ -68,6 +68,11 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		if accountToken, usingToken = settings[SasTokenSetting]; !usingToken {
 			return nil, NewCredentialError(AccessKeySetting)
 		}
+
+		// Tokens may or may not begin with ?, normalize these cases
+		if !strings.HasPrefix(accountToken, "?") {
+			accountToken = "?" + accountToken
+		}
 	}
 	if environmentName, ok = settings[EnvironmentName]; !ok {
 		environmentName = defaultEnvName
