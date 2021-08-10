@@ -2,6 +2,7 @@ package greenplum
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
@@ -25,9 +26,10 @@ type ClusterRestoreConfig struct {
 type FetchHandler struct {
 	cluster             *cluster.Cluster
 	backupIDByContentID map[int]string
+	backup              internal.Backup
 }
 
-func NewFetchHandler(sentinel BackupSentinelDto, restoreCfg ClusterRestoreConfig) *FetchHandler {
+func NewFetchHandler(backup internal.Backup, sentinel BackupSentinelDto, restoreCfg ClusterRestoreConfig) *FetchHandler {
 	backupIDByContentID := make(map[int]string)
 	segmentConfigs := make([]cluster.SegConfig, 0)
 
@@ -58,14 +60,16 @@ func NewFetchHandler(sentinel BackupSentinelDto, restoreCfg ClusterRestoreConfig
 	return &FetchHandler{
 		cluster:             globalCluster,
 		backupIDByContentID: backupIDByContentID,
+		backup:              backup,
 	}
 }
 
 func (fh *FetchHandler) Fetch() error {
+	tracelog.InfoLogger.Println("Running wal-g on segments and master...")
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Running wal-g",
 		cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
 		func(contentID int) string {
-			return fh.buildCommand(contentID)
+			return fh.buildFetchCommand(contentID)
 		})
 
 	fh.cluster.CheckClusterError(remoteOutput, "Unable to run wal-g", func(contentID int) string {
@@ -75,10 +79,69 @@ func (fh *FetchHandler) Fetch() error {
 	for _, command := range remoteOutput.Commands {
 		tracelog.DebugLogger.Printf("WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
 	}
+
+	tracelog.InfoLogger.Println("Updating pg_hba configs on segments...")
+	err := fh.updatePgHbaOnSegments()
+	if err != nil {
+		return err
+	}
+	tracelog.InfoLogger.Println("Creating recovery.conf files...")
+	return fh.createRecoveryConfigs()
+}
+
+func (fh *FetchHandler) updatePgHbaOnSegments() error {
+	pgHbaMaker := NewPgHbaMaker(fh.cluster.ByContent)
+	fileContents, err := pgHbaMaker.Make()
+	if err != nil {
+		return err
+	}
+
+	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Updating pg_hba on segments",
+		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS,
+		func(contentID int) string {
+			segment := fh.cluster.ByContent[contentID][0]
+			pathToHba := path.Join(segment.DataDir, "pg_hba.conf")
+
+			cmd := fmt.Sprintf("cat > %s << EOF\n%s\nEOF", pathToHba, fileContents)
+			tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
+			return cmd
+		})
+
+	fh.cluster.CheckClusterError(remoteOutput, "Unable to update pg_hba", func(contentID int) string {
+		return fmt.Sprintf("Unable to update pg_hba on segment %d", contentID)
+	})
+
+	for _, command := range remoteOutput.Commands {
+		tracelog.DebugLogger.Printf("Update pg_hba output (segment %d):\n%s\n", command.Content, command.Stderr)
+	}
 	return nil
 }
 
-func (fh *FetchHandler) buildCommand(contentID int) string {
+func (fh *FetchHandler) createRecoveryConfigs() error {
+	restoreCfgMaker := NewRecoveryConfigMaker("/usr/bin/wal-g", internal.CfgFile, fh.backup.Name)
+
+	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Creating recovery.conf on segments and master",
+		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_MASTER,
+		func(contentID int) string {
+			segment := fh.cluster.ByContent[contentID][0]
+			pathToRestore := path.Join(segment.DataDir, "recovery.conf")
+			fileContents := restoreCfgMaker.Make(contentID)
+			cmd := fmt.Sprintf("cat > %s << EOF\n%s\nEOF", pathToRestore, fileContents)
+			tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
+			return cmd
+		})
+
+	fh.cluster.CheckClusterError(remoteOutput, "Unable to create recovery.conf", func(contentID int) string {
+		return fmt.Sprintf("Unable to create recovery.conf on segment %d", contentID)
+	})
+
+	for _, command := range remoteOutput.Commands {
+		tracelog.DebugLogger.Printf("Create recovery.conf output (segment %d):\n%s\n", command.Content, command.Stderr)
+	}
+	return nil
+}
+
+func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 	segment := fh.cluster.ByContent[contentID][0]
 	backupID, ok := fh.backupIDByContentID[contentID]
 	if !ok {
@@ -108,7 +171,7 @@ func NewGreenplumBackupFetcher(restoreCfg ClusterRestoreConfig) func(folder stor
 		err := backup.FetchSentinel(&sentinel)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = NewFetchHandler(sentinel, restoreCfg).Fetch()
+		err = NewFetchHandler(backup, sentinel, restoreCfg).Fetch()
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
 }
