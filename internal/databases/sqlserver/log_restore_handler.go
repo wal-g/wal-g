@@ -68,9 +68,12 @@ func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromn
 					logBackupName, fromname)
 				continue
 			}
-			err = restoreSingleLog(ctx, db, folder, logBackupName, dbname, fromname, stopAt)
+			isLastOne, err := restoreSingleLog(ctx, db, folder, logBackupName, dbname, fromname, stopAt)
 			if err != nil {
 				return err
+			}
+			if isLastOne {
+				break
 			}
 		}
 		if !noRecovery {
@@ -89,16 +92,30 @@ func restoreSingleLog(ctx context.Context,
 	logBackupName string,
 	dbname string,
 	fromname string,
-	stopAt time.Time) error {
+	stopAt time.Time,
+) (bool, error) {
+	var isLastOne bool
 	baseURL := getLogBackupURL(logBackupName, fromname)
 	basePath := getLogBackupPath(logBackupName, fromname)
 	blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
 	if err != nil {
-		return err
+		return isLastOne, err
 	}
 	urls := buildRestoreUrls(baseURL, blobs)
-	sql := fmt.Sprintf("RESTORE LOG %s FROM %s WITH NORECOVERY, STOPAT = '%s'",
-		quoteName(dbname), urls, stopAt.Format(TimeSQLServerFormat))
+
+	logBackupFileMetadata, err := ListBackupProperties(db, urls, logBackupName)
+	if err != nil {
+		return isLastOne, err
+	}
+	var sql string
+	if logBackupFileMetadata[0].BackupFinishDate.Before(stopAt) {
+		sql = fmt.Sprintf("RESTORE LOG %s FROM %s WITH NORECOVERY",
+			quoteName(dbname), urls)
+	} else {
+		sql = fmt.Sprintf("RESTORE LOG %s FROM %s WITH NORECOVERY, STOPAT = '%s'",
+			quoteName(dbname), urls, stopAt.Format(TimeSQLServerFormat))
+		isLastOne = true
+	}
 	tracelog.InfoLogger.Printf("starting restore database [%s] log from %s", dbname, urls)
 	tracelog.DebugLogger.Printf("SQL: %s", sql)
 	_, err = db.ExecContext(ctx, sql)
@@ -107,5 +124,5 @@ func restoreSingleLog(ctx context.Context,
 	} else {
 		tracelog.InfoLogger.Printf("database [%s] log restore succefully finished", dbname)
 	}
-	return err
+	return isLastOne, err
 }
