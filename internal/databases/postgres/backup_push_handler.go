@@ -312,7 +312,7 @@ func (bh *BackupHandler) HandleBackupPush() {
 	}
 
 	if utility.ResolveSymlink(bh.arguments.pgDataDirectory) != bh.pgInfo.pgDataDirectory {
-		tracelog.ErrorLogger.Panicf("Data directory read from Postgres (%s) is different then as parsed (%s).",
+		tracelog.ErrorLogger.Panicf("Data directory read from Postgres (%s) is different than as parsed (%s).",
 			bh.arguments.pgDataDirectory, bh.pgInfo.pgDataDirectory)
 	}
 	bh.checkPgVersionAndPgControl()

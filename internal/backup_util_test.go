@@ -39,7 +39,7 @@ func TestGetBackupTimeSlices_List(t *testing.T) {
 
 	assert.Equalf(t, 1, len(result), "GetBackupTimeSlices returned wrong count of backup: something wrong")
 	assert.Equalf(t, testStreamBackup.BackupName, result[0].BackupName, "GetBackupTimeSlices returned strange name")
-	assert.True(t, testStreamBackup.Time.Before(result[0].Time), "GetBackupTimeSlices returned bad time: storage time less then mock time")
+	assert.True(t, testStreamBackup.Time.Before(result[0].Time), "GetBackupTimeSlices returned bad time: storage time less than mock time")
 }
 
 func TestGetBackupTimeSlices_OrderCheck(t *testing.T) {
