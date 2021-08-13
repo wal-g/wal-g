@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/wal-g/wal-g/cmd/dh"
+
 	"github.com/wal-g/wal-g/cmd/pg"
 
 	"github.com/spf13/cobra"
@@ -57,4 +59,7 @@ func init() {
 		wrappedPreRun(cmd, args)
 	}
 	cmd.AddCommand(wrappedPgCmd)
+
+	// Dirty hands tool
+	cmd.AddCommand(dh.DirtyHandsCmd)
 }

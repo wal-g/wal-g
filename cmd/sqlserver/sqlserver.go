@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/wal-g/wal-g/cmd/dh"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/wal-g/internal"
 )
@@ -36,4 +38,7 @@ func init() {
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 	cmd.InitDefaultVersionFlag()
+
+	// Dirty hands tool
+	cmd.AddCommand(dh.DirtyHandsCmd)
 }

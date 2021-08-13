@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/wal-g/wal-g/cmd/dh"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -46,4 +48,7 @@ func init() {
 	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
 	cmd.InitDefaultVersionFlag()
 	internal.AddConfigFlags(cmd)
+
+	// Dirty hands tool
+	cmd.AddCommand(dh.DirtyHandsCmd)
 }
