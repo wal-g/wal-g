@@ -5,8 +5,9 @@ import (
 	"path"
 	"strings"
 
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
+
+	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -32,9 +33,13 @@ type FetchHandler struct {
 func NewFetchHandler(backup internal.Backup, sentinel BackupSentinelDto, restoreCfg ClusterRestoreConfig) *FetchHandler {
 	backupIDByContentID := make(map[int]string)
 	segmentConfigs := make([]cluster.SegConfig, 0)
+	gplog.InitializeLogging("wal-g", "")
 
 	for _, segMeta := range sentinel.Segments {
+		// currently, WAL-G does not restore the mirrors
 		if segMeta.Role == Primary {
+			// update the segment config from the metadata with the
+			// Hostname, Port and DataDir specified in the restore config
 			backupIDByContentID[segMeta.ContentID] = segMeta.BackupID
 			segmentCfg := segMeta.ToSegConfig()
 			segRestoreCfg, ok := restoreCfg.Segments[segMeta.ContentID]
@@ -47,12 +52,10 @@ func NewFetchHandler(backup internal.Backup, sentinel BackupSentinelDto, restore
 			segmentCfg.DataDir = segRestoreCfg.DataDir
 			segmentConfigs = append(segmentConfigs, segmentCfg)
 		} else {
-			// currently, WAL-G does not restore the mirrors
 			tracelog.WarningLogger.Printf(
 				"Skipping non-primary segment: DatabaseID %d, Hostname %s, DataDir: %s\n", segMeta.DatabaseID, segMeta.Hostname, segMeta.DataDir)
 		}
 	}
-	gplog.InitializeLogging("wal-g", "")
 
 	globalCluster := cluster.NewCluster(segmentConfigs)
 	tracelog.DebugLogger.Printf("cluster %v\n", globalCluster)
@@ -66,6 +69,8 @@ func NewFetchHandler(backup internal.Backup, sentinel BackupSentinelDto, restore
 
 func (fh *FetchHandler) Fetch() error {
 	tracelog.InfoLogger.Println("Running wal-g on segments and master...")
+
+	// Run WAL-G to restore the each segment as a single Postgres instance
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Running wal-g",
 		cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
 		func(contentID int) string {
@@ -81,7 +86,7 @@ func (fh *FetchHandler) Fetch() error {
 	}
 
 	tracelog.InfoLogger.Println("Updating pg_hba configs on segments...")
-	err := fh.updatePgHbaOnSegments()
+	err := fh.createPgHbaOnSegments()
 	if err != nil {
 		return err
 	}
@@ -89,7 +94,9 @@ func (fh *FetchHandler) Fetch() error {
 	return fh.createRecoveryConfigs()
 }
 
-func (fh *FetchHandler) updatePgHbaOnSegments() error {
+// createPgHbaOnSegments generates and uploads the correct pg_hba.conf
+// files to each segment instance (except the master) so they can communicate correctly
+func (fh *FetchHandler) createPgHbaOnSegments() error {
 	pgHbaMaker := NewPgHbaMaker(fh.cluster.ByContent)
 	fileContents, err := pgHbaMaker.Make()
 	if err != nil {
@@ -117,6 +124,9 @@ func (fh *FetchHandler) updatePgHbaOnSegments() error {
 	return nil
 }
 
+// createRecoveryConfigs generates and uploads the correct recovery.conf
+// files to each segment instance (including master) so they can recover correctly
+// during the database startup
 func (fh *FetchHandler) createRecoveryConfigs() error {
 	restoreCfgMaker := NewRecoveryConfigMaker("/usr/bin/wal-g", internal.CfgFile, fh.backup.Name)
 
@@ -141,12 +151,14 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 	return nil
 }
 
+// buildFetchCommand creates the WAL-G command to restore the segment with
+// the provided contentID
 func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 	segment := fh.cluster.ByContent[contentID][0]
 	backupID, ok := fh.backupIDByContentID[contentID]
 	if !ok {
 		// this should never happen
-		tracelog.ErrorLogger.Fatalf("Failed to load backup id by content id")
+		tracelog.ErrorLogger.Fatalf("Failed to load backup id by content id %d", contentID)
 	}
 
 	segUserData := NewSegmentUserDataFromID(backupID)

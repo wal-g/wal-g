@@ -8,8 +8,7 @@ import (
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 )
 
-const pgHbaTemplate = `
-# TYPE  DATABASE        USER            ADDRESS                 METHOD
+const PgHbaTemplate = `# TYPE  DATABASE        USER            ADDRESS                 METHOD
 
 # "local" is for Unix domain socket connections only
 local   all             all                                     trust
@@ -34,14 +33,14 @@ type PgHbaMaker struct {
 }
 
 func (m PgHbaMaker) Make() (string, error) {
-	pgHbaRows := []string{pgHbaTemplate}
+	pgHbaRows := []string{PgHbaTemplate}
 
 	masters, ok := m.segments[-1]
 	if !ok {
 		return "", errors.New("failed to make pg_hba: no master segment exists")
 	}
 
-	// add entries for both master primary and standby hosts
+	// add entries for both mdw and mdws hosts
 	for _, cfg := range masters {
 		row := fmt.Sprintf("host    all             all             %s              trust", cfg.Hostname)
 		pgHbaRows = append(pgHbaRows, row)
@@ -51,7 +50,7 @@ func (m PgHbaMaker) Make() (string, error) {
 	for _, configs := range m.segments {
 		for _, config := range configs {
 			if config.ContentID == -1 {
-				break // we are not interested in mdw segments
+				break // we are not interested in mdw/mdws segments
 			}
 
 			if SegmentRole(config.Role) == Primary {
@@ -61,7 +60,7 @@ func (m PgHbaMaker) Make() (string, error) {
 	}
 
 	writtenHosts := make(map[string]bool)
-	// add entries for sdwN primary segments (w/o master hosts)
+	// add entries for sdwN primary segments (w/o mdw/mdws hosts)
 	for _, primary := range primarySegments {
 		if writtenHosts[primary.Hostname] {
 			continue // do not write duplicate entries
@@ -75,7 +74,7 @@ func (m PgHbaMaker) Make() (string, error) {
 	pgHbaRows = append(pgHbaRows, "host    replication     gpadmin         samehost                trust")
 
 	writtenHosts = make(map[string]bool)
-	// add entries for sdwN primary segments (w/o master hosts)
+	// add replication entries for sdwN primary segments (w/o mdw/mdws hosts)
 	for _, primary := range primarySegments {
 		if writtenHosts[primary.Hostname] {
 			continue // do not write duplicate entries
