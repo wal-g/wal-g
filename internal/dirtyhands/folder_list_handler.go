@@ -21,12 +21,12 @@ func HandleFolderList(folder storage.Folder) {
 func WriteObjectsList(objects []storage.Object, output io.Writer) error {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
-	_, err := fmt.Fprintln(writer, "name\tlast modified\tsize")
+	_, err := fmt.Fprintln(writer, "size\tlast modified\tname")
 	if err != nil {
 		return err
 	}
 	for _, o := range objects {
-		_, err = fmt.Fprintf(writer, "%s\t%s\t%d\n", o.GetName(), o.GetLastModified(), o.GetSize())
+		_, err = fmt.Fprintf(writer, "%d\t%s\t%s\n", o.GetSize(), o.GetLastModified(), o.GetName())
 		if err != nil {
 			return err
 		}
