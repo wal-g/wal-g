@@ -10,6 +10,9 @@ RUN apt-get update && \
     python3-pip \
     git \
     pv \
+    wget \
+    gnupg \
+    lsb-release \
     htop \
     nano \
     liblzo2-2 \
