@@ -1,17 +1,17 @@
-package dh
+package st
 
 import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/dirtyhands"
+	"github.com/wal-g/wal-g/internal/storagetools"
 )
 
 const folderListShortDescription = "Prints objects in the provided storage folder"
 
 // folderListCmd represents the folderList command
 var folderListCmd = &cobra.Command{
-	Use:   "folder-list [relative folder path]",
+	Use:   "ls [relative folder path]",
 	Short: folderListShortDescription,
 	Args:  cobra.RangeArgs(0, 1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -22,10 +22,10 @@ var folderListCmd = &cobra.Command{
 			folder = folder.GetSubFolder(args[0])
 		}
 
-		dirtyhands.HandleFolderList(folder)
+		storagetools.HandleFolderList(folder)
 	},
 }
 
 func init() {
-	DirtyHandsCmd.AddCommand(folderListCmd)
+	StorageToolsCmd.AddCommand(folderListCmd)
 }

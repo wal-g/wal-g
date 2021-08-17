@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wal-g/wal-g/cmd/dh"
+	"github.com/wal-g/wal-g/cmd/st"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 
@@ -56,6 +56,6 @@ func configureCommand() {
 	Cmd.InitDefaultVersionFlag()
 	internal.AddConfigFlags(Cmd)
 
-	// Dirty hands tool
-	Cmd.AddCommand(dh.DirtyHandsCmd)
+	// Storage tools
+	Cmd.AddCommand(st.StorageToolsCmd)
 }

@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wal-g/wal-g/cmd/dh"
+	"github.com/wal-g/wal-g/cmd/st"
 
 	"github.com/wal-g/wal-g/cmd/pg"
 
@@ -60,6 +60,6 @@ func init() {
 	}
 	cmd.AddCommand(wrappedPgCmd)
 
-	// Dirty hands tool
-	cmd.AddCommand(dh.DirtyHandsCmd)
+	// Storage tools
+	cmd.AddCommand(st.StorageToolsCmd)
 }

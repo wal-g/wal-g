@@ -1,4 +1,4 @@
-package dirtyhands
+package storagetools
 
 import (
 	"fmt"

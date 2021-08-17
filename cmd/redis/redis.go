@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wal-g/wal-g/cmd/dh"
+	"github.com/wal-g/wal-g/cmd/st"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
@@ -46,6 +46,6 @@ func init() {
 	cmd.InitDefaultVersionFlag()
 	internal.AddConfigFlags(cmd)
 
-	// Dirty hands tool
-	cmd.AddCommand(dh.DirtyHandsCmd)
+	// Storage tools
+	cmd.AddCommand(st.StorageToolsCmd)
 }
