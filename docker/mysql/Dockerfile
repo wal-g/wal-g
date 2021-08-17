@@ -7,7 +7,7 @@ RUN apt-get update && \
     curl \
     mysql-server \
     mysql-client \
-    percona-xtrabackup
+    percona-xtrabackup-24
 
 
 RUN curl -s https://packagecloud.io/install/repositories/akopytov/sysbench/script.deb.sh | bash && apt -y install sysbench
