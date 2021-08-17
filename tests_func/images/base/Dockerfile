@@ -1,5 +1,5 @@
 # vim:set ft=dockerfile:
-FROM ubuntu:bionic
+FROM ubuntu:20.04
 
 ENV DEBIAN_FRONTEND noninteractive
 ENV LANG en_US.utf8
