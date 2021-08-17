@@ -7,7 +7,8 @@ RUN apt-get update && \
     pinentry-qt \
     time \
     bc \
-    jq
+    jq \
+    pkg-config
 
 WORKDIR /usr/local
 RUN git clone https://github.com/greenplum-db/gpdb.git gpdb_src
