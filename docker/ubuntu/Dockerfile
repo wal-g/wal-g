@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM ubuntu:18.04
 
 ENV DEBIAN_FRONTEND noninteractive
 ENV TERM xterm-256color
@@ -11,6 +11,7 @@ RUN apt-get update && \
     git \
     pv \
     wget \
+    curl \
     gnupg \
     lsb-release \
     htop \
