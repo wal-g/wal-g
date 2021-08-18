@@ -233,7 +233,7 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	dst := storage.JoinPath(folder.path, dstPath)
 	source := folder.containerURL.NewBlockBlobURL(storage.JoinPath(folder.path, srcPath))
 	blobURL := folder.containerURL.NewBlockBlobURL(dst)
-	_, err := blobURL.StartCopyFromURL(context.Background(), source.URL(), nil, azblob.ModifiedAccessConditions{}, azblob.BlobAccessConditions{})
+	_, err := blobURL.StartCopyFromURL(context.Background(), source.URL(), nil, azblob.ModifiedAccessConditions{}, azblob.BlobAccessConditions{}, azblob.AccessTierHot, nil)
 	return err
 }
 
