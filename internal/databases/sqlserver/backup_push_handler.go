@@ -61,7 +61,7 @@ func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 	}
 	err = runParallel(func(i int) error {
 		return backupSingleDatabase(ctx, db, backupName, dbnames[i], compression)
-	}, len(dbnames))
+	}, len(dbnames), getDBConcurrency())
 	tracelog.ErrorLogger.FatalfOnError("overall backup failed: %v", err)
 
 	sentinel.StopLocalTime = utility.TimeNowCrossPlatformLocal()

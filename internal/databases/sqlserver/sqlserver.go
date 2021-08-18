@@ -378,10 +378,16 @@ func getLogsSinceBackup(folder storage.Folder, backupName string, stopAt time.Ti
 	return logNames, nil
 }
 
-func runParallel(f func(int) error, cnt int) error {
+func runParallel(f func(int) error, cnt int, concurrency int) error {
+	if concurrency <= 0 {
+		concurrency = cnt
+	}
+	sem := make(chan struct{}, concurrency)
 	errs := make(chan error, cnt)
 	for i := 0; i < cnt; i++ {
 		go func(i int) {
+			sem <- struct{}{}
+			defer func() { <-sem }()
 			errs <- f(i)
 		}(i)
 	}
@@ -396,6 +402,16 @@ func runParallel(f func(int) error, cnt int) error {
 		return errors.New(errStr)
 	}
 	return nil
+}
+
+func getDBConcurrency() int {
+	concurrency, err := internal.GetMaxConcurrency(internal.SQLServerDBConcurrency)
+	if err != nil {
+		tracelog.WarningLogger.Printf("config error: %v", err)
+		tracelog.WarningLogger.Printf("using default db concurrency: %d", blob.DefaultConcurrency)
+		return blob.DefaultConcurrency
+	}
+	return concurrency
 }
 
 func exclude(src, excl []string) []string {
