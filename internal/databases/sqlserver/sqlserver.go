@@ -423,3 +423,57 @@ func uniq(src []string) []string {
 	}
 	return res
 }
+
+type BackupProperties struct {
+	BackupType        int
+	DatabaseName      string
+	FirstLSN          string
+	LastLSN           string
+	CheckpointLSN     string
+	DatabaseBackupLSN string
+	BackupStartDate   time.Time
+	BackupFinishDate  time.Time
+	HasBulkLoggedData bool
+	IsSnapshot        bool
+	IsReadOnly        bool
+	IsSingleUser      bool
+	BackupURL         string
+	BackupFile        string
+}
+
+func ListBackupProperties(db *sql.DB, urls string, logBackupName string) ([]*BackupProperties, error) {
+	var res []*BackupProperties
+	query := fmt.Sprintf("RESTORE HEADERONLY FROM %s", urls)
+	rows, err := db.Query(query)
+	if err != nil {
+		return res, err
+	}
+	defer rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var dbf BackupProperties
+		err = utility.ScanToMap(rows, map[string]interface{}{
+			"BackupType":        &dbf.BackupType,
+			"DatabaseName":      &dbf.DatabaseName,
+			"FirstLSN":          &dbf.FirstLSN,
+			"LastLSN":           &dbf.LastLSN,
+			"CheckpointLSN":     &dbf.CheckpointLSN,
+			"DatabaseBackupLSN": &dbf.DatabaseBackupLSN,
+			"BackupStartDate":   &dbf.BackupStartDate,
+			"BackupFinishDate":  &dbf.BackupFinishDate,
+			"HasBulkLoggedData": &dbf.HasBulkLoggedData,
+			"IsSnapshot":        &dbf.IsSnapshot,
+			"IsReadOnly":        &dbf.IsReadOnly,
+			"IsSingleUser":      &dbf.IsSingleUser,
+		})
+		if err != nil {
+			return nil, err
+		}
+		dbf.BackupURL = urls
+		dbf.BackupFile = logBackupName
+		res = append(res, &dbf)
+	}
+	return res, nil
+}

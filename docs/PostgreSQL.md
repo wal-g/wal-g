@@ -84,7 +84,7 @@ Overrides the default `number of WAL files to upload during one scan`. By defaul
 
 * `WALG_SENTINEL_USER_DATA`
 
-This setting allows backup automation tools to add extra information to JSON sentinel file during ```backup-push```. This setting can be used e.g. to give user-defined names to backups.
+This setting allows backup automation tools to add extra information to JSON sentinel file during ```backup-push```. This setting can be used e.g. to give user-defined names to backups. Note: UserData must be a valid JSON string.
 
 * `WALG_PREVENT_WAL_OVERWRITE`
 

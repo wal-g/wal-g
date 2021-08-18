@@ -35,6 +35,10 @@ func NewSegmentUserData() SegmentUserData {
 	return SegmentUserData{ID: uuid.New().String()}
 }
 
+func NewSegmentUserDataFromID(backupID string) SegmentUserData {
+	return SegmentUserData{ID: backupID}
+}
+
 // QuotedString will do json.Marshal-ing followed by quoting in order to escape special control characters
 // in the resulting JSON so it can be transferred as the cmdline argument to a segment
 func (d SegmentUserData) QuotedString() string {
@@ -60,8 +64,8 @@ type BackupWorkers struct {
 
 // CurBackupInfo holds all information that is harvest during the backup process
 type CurBackupInfo struct {
-	backupName          string
-	backupIDByContentID map[int]string
+	backupName     string
+	segmentBackups map[string]*cluster.SegConfig
 }
 
 // BackupHandler is the main struct which is handling the backup process
@@ -75,11 +79,11 @@ type BackupHandler struct {
 func (bh *BackupHandler) buildCommand(contentID int) string {
 	segment := bh.globalCluster.ByContent[contentID][0]
 	segUserData := NewSegmentUserData()
-	bh.curBackupInfo.backupIDByContentID[contentID] = segUserData.ID
+	bh.curBackupInfo.segmentBackups[segUserData.ID] = segment
 	cmd := []string{
 		"WALG_LOG_LEVEL=DEVEL",
 		fmt.Sprintf("PGPORT=%d", segment.Port),
-		"wal-g",
+		"wal-g pg",
 		fmt.Sprintf("backup-push %s", segment.DataDir),
 		fmt.Sprintf("--walg-storage-prefix=%d", segment.ContentID),
 		fmt.Sprintf("--add-user-data=%s", segUserData.QuotedString()),
@@ -116,10 +120,10 @@ func (bh *BackupHandler) HandleBackupPush() {
 
 	err := bh.connect()
 	tracelog.ErrorLogger.FatalOnError(err)
-	err = bh.createRestorePoint(bh.curBackupInfo.backupName)
+	restoreLSNs, err := bh.createRestorePoint(bh.curBackupInfo.backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	sentinelDto := NewBackupSentinelDto(bh.curBackupInfo)
+	sentinelDto := NewBackupSentinelDto(bh.curBackupInfo, restoreLSNs)
 	tracelog.InfoLogger.Println("Uploading sentinel file")
 	tracelog.DebugLogger.Println(sentinelDto.String())
 	err = internal.UploadSentinel(bh.workers.Uploader, sentinelDto, bh.curBackupInfo.backupName)
@@ -139,14 +143,17 @@ func (bh *BackupHandler) connect() (err error) {
 	return
 }
 
-func (bh *BackupHandler) createRestorePoint(restorePointName string) (err error) {
+func (bh *BackupHandler) createRestorePoint(restorePointName string) (restoreLSNs map[int]string, err error) {
 	tracelog.InfoLogger.Printf("Creating restore point with name %s", restorePointName)
 	queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
 	if err != nil {
 		return
 	}
-	_, err = queryRunner.CreateGreenplumRestorePoint(restorePointName)
-	return
+	restoreLSNs, err = queryRunner.CreateGreenplumRestorePoint(restorePointName)
+	if err != nil {
+		return nil, err
+	}
+	return restoreLSNs, nil
 }
 
 func getGpCluster() (globalCluster *cluster.Cluster, err error) {
@@ -191,6 +198,8 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 	if err != nil {
 		return bh, err
 	}
+	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
+
 	globalCluster, err := getGpCluster()
 	if err != nil {
 		return bh, err
@@ -203,7 +212,7 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 		},
 		globalCluster: globalCluster,
 		curBackupInfo: CurBackupInfo{
-			backupIDByContentID: make(map[int]string),
+			segmentBackups: make(map[string]*cluster.SegConfig),
 		},
 	}
 	return bh, err

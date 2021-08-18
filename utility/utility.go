@@ -128,7 +128,7 @@ func ResolveSymlink(path string) string {
 	resolve, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		// TODO: Consider descriptive panic here and other checks
-		// Directory may be absent et c.
+		// Directory may be absent etc.
 		return path
 	}
 	return resolve

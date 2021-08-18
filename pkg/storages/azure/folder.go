@@ -68,6 +68,11 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		if accountToken, usingToken = settings[SasTokenSetting]; !usingToken {
 			return nil, NewCredentialError(AccessKeySetting)
 		}
+
+		// Tokens may or may not begin with ?, normalize these cases
+		if !strings.HasPrefix(accountToken, "?") {
+			accountToken = "?" + accountToken
+		}
 	}
 	if environmentName, ok = settings[EnvironmentName]; !ok {
 		environmentName = defaultEnvName
@@ -94,7 +99,13 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		tryTimeout = defaultTryTimeout
 	}
 
-	pipeLine := azblob.NewPipeline(credential, azblob.PipelineOptions{Retry: azblob.RetryOptions{TryTimeout: time.Duration(tryTimeout) * time.Minute}})
+	pipeLine := azblob.NewPipeline(
+		credential,
+		azblob.PipelineOptions{
+			Retry: azblob.RetryOptions{TryTimeout: time.Duration(tryTimeout) * time.Minute},
+			RequestLog: azblob.RequestLogOptions{SyslogDisabled: true},
+		},
+	)
 	containerName, path, err := storage.GetPathFromPrefix(prefix)
 	if err != nil {
 		return nil, NewFolderError(err, "Unable to create container")
@@ -133,7 +144,7 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 	path := storage.JoinPath(folder.path, objectRelativePath)
 	ctx := context.Background()
 	blobURL := folder.containerURL.NewBlockBlobURL(path)
-	_, err := blobURL.GetProperties(ctx, azblob.BlobAccessConditions{})
+	_, err := blobURL.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
 	if stgErr, ok := err.(azblob.StorageError); ok && stgErr.ServiceCode() == azblob.ServiceCodeBlobNotFound {
 		return false, nil
 	}
@@ -184,7 +195,7 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	//Download blob using blobURL obtained from full path to blob
 	path := storage.JoinPath(folder.path, objectRelativePath)
 	blobURL := folder.containerURL.NewBlockBlobURL(path)
-	downloadResponse, err := blobURL.Download(context.Background(), 0, 0, azblob.BlobAccessConditions{}, false)
+	downloadResponse, err := blobURL.Download(context.Background(), 0, 0, azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
 	if stgErr, ok := err.(azblob.StorageError); ok && stgErr.ServiceCode() == azblob.ServiceCodeBlobNotFound {
 		return nil, storage.NewObjectNotFoundError(path)
 	}

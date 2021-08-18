@@ -62,4 +62,6 @@ services:
         tmpfs: /var/run
         volumes:
             - ./images/mongodb/config:/config:ro
+        env_file:
+            - ${ENV_FILE}
 version: '2'

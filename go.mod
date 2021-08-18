@@ -4,8 +4,8 @@ go 1.13
 
 require (
 	cloud.google.com/go/storage v1.8.0
-	github.com/Azure/azure-storage-blob-go v0.8.0
-	github.com/Azure/go-autorest/autorest v0.11.17
+	github.com/Azure/azure-storage-blob-go v0.14.0
+	github.com/Azure/go-autorest/autorest v0.11.19
 	github.com/DATA-DOG/godog v0.7.14-0.20190529133509-96731eaefa46
 	github.com/DataDog/zstd v1.4.4
 	github.com/Microsoft/go-winio v0.4.14 // indirect
@@ -29,7 +29,7 @@ require (
 	github.com/golang/mock v1.4.3
 	github.com/golang/snappy v0.0.2-0.20190904063534-ff6b7dc882cf // indirect
 	github.com/google/brotli v1.0.7
-	github.com/google/uuid v1.1.1
+	github.com/google/uuid v1.2.0
 	github.com/greenplum-db/gp-common-go-libs v1.0.4
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/jackc/pgconn v1.6.5-0.20200823013804-5db484908cf7
@@ -55,7 +55,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.6.1
-	github.com/ulikunitz/xz v0.5.6
+	github.com/ulikunitz/xz v0.5.8
 	github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30
 	github.com/yandex-cloud/go-genproto v0.0.0-20201102102956-0c505728b6f0
 	github.com/yandex-cloud/go-sdk v0.0.0-20201109103511-a86298d3fea5

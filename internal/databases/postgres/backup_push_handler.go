@@ -53,7 +53,7 @@ type BackupArguments struct {
 	verifyPageChecksums   bool
 	storeAllCorruptBlocks bool
 	tarBallComposerType   TarBallComposerType
-	userData              string
+	userData              interface{}
 	forceIncremental      bool
 	backupsFolder         string
 	pgDataDirectory       string
@@ -104,7 +104,7 @@ type BackupHandler struct {
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
 func NewBackupArguments(pgDataDirectory string, backupsFolder string, isPermanent bool, verifyPageChecksums bool,
 	isFullBackup bool, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
-	deltaBaseSelector internal.BackupSelector, userData string) BackupArguments {
+	deltaBaseSelector internal.BackupSelector, userData interface{}) BackupArguments {
 	return BackupArguments{
 		pgDataDirectory:       pgDataDirectory,
 		backupsFolder:         backupsFolder,
@@ -313,7 +313,7 @@ func (bh *BackupHandler) HandleBackupPush() {
 	}
 
 	if utility.ResolveSymlink(bh.arguments.pgDataDirectory) != bh.pgInfo.pgDataDirectory {
-		tracelog.ErrorLogger.Panicf("Data directory read from Postgres (%s) is different then as parsed (%s).",
+		tracelog.ErrorLogger.Panicf("Data directory read from Postgres (%s) is different than as parsed (%s).",
 			bh.arguments.pgDataDirectory, bh.pgInfo.pgDataDirectory)
 	}
 	bh.checkPgVersionAndPgControl()
@@ -449,6 +449,7 @@ func getPgServerInfo() (pgInfo BackupPgInfo, err error) {
 	if err != nil {
 		return pgInfo, err
 	}
+	pgInfo.pgDataDirectory = utility.ResolveSymlink(pgInfo.pgDataDirectory)
 	tracelog.DebugLogger.Printf("Datadir: %s", pgInfo.pgDataDirectory)
 
 	err = queryRunner.getVersion()

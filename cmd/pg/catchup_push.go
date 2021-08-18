@@ -23,7 +23,7 @@ var (
 )
 
 func init() {
-	cmd.AddCommand(catchupPushCmd)
+	Cmd.AddCommand(catchupPushCmd)
 
 	catchupPushCmd.Flags().Uint64Var(&fromLSN, "from-lsn", 0, "LSN to start incremental backup")
 }

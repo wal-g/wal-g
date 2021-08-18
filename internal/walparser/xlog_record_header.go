@@ -39,7 +39,7 @@ type InvalidXLogRecordResourceManagerIDError struct {
 
 func NewInvalidXLogRecordResourceManagerIDError(resourceManagerID uint8) InvalidXLogRecordResourceManagerIDError {
 	return InvalidXLogRecordResourceManagerIDError{
-		errors.Errorf("resource manager id is invalid: %v, while it should be less then: %v",
+		errors.Errorf("resource manager id is invalid: %v, while it should be less than: %v",
 			resourceManagerID, RmNextFreeID),
 	}
 }

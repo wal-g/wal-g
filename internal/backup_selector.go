@@ -37,11 +37,15 @@ type UserDataBackupSelector struct {
 	metaFetcher GenericMetaFetcher
 }
 
-func NewUserDataBackupSelector(userDataRaw string, metaFetcher GenericMetaFetcher) UserDataBackupSelector {
-	return UserDataBackupSelector{
-		userData:    UnmarshalSentinelUserData(userDataRaw),
-		metaFetcher: metaFetcher,
+func NewUserDataBackupSelector(userDataRaw string, metaFetcher GenericMetaFetcher) (UserDataBackupSelector, error) {
+	userData, err := UnmarshalSentinelUserData(userDataRaw)
+	if err != nil {
+		return UserDataBackupSelector{}, err
 	}
+	return UserDataBackupSelector{
+		userData:    userData,
+		metaFetcher: metaFetcher,
+	}, nil
 }
 
 func (s UserDataBackupSelector) Select(folder storage.Folder) (string, error) {
@@ -137,7 +141,7 @@ func NewTargetBackupSelector(targetUserData, targetName string, metaFetcher Gene
 
 	case targetUserData != "":
 		tracelog.InfoLogger.Println("Selecting the backup with the specified user data...")
-		return NewUserDataBackupSelector(targetUserData, metaFetcher), nil
+		return NewUserDataBackupSelector(targetUserData, metaFetcher)
 
 	default:
 		err = errors.New("insufficient arguments")
