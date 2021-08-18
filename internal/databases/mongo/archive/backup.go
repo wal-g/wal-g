@@ -97,7 +97,6 @@ type MongoMetaConstructor struct {
 	client    client.MongoDriver
 	folder    storage.Folder
 	meta      models.BackupMeta
-	mongo     models.MongoMeta
 	permanent bool
 }
 
@@ -126,10 +125,6 @@ func (m *MongoMetaConstructor) Init() error {
 	if err != nil {
 		return fmt.Errorf("can not initialize backup mongo")
 	}
-	m.mongo.Before = models.NodeMeta{
-		LastTS:    lastTS,
-		LastMajTS: lastMajTS,
-	}
 
 	userData, err := internal.GetSentinelUserData()
 	if err != nil {
@@ -138,9 +133,14 @@ func (m *MongoMetaConstructor) Init() error {
 
 	m.meta = models.BackupMeta{
 		StartTime: utility.TimeNowCrossPlatformLocal(),
-		Mongo:     m.mongo,
 		Permanent: m.permanent,
 		User:      userData,
+		Mongo: models.MongoMeta{
+			Before: models.NodeMeta{
+				LastTS:    lastTS,
+				LastMajTS: lastMajTS,
+			},
+		},
 	}
 	return nil
 }
@@ -155,7 +155,7 @@ func (m *MongoMetaConstructor) Finalize(backupName string) error {
 	if err != nil {
 		return fmt.Errorf("can not finalize backup mongo")
 	}
-	m.mongo.After = models.NodeMeta{
+	m.meta.Mongo.After = models.NodeMeta{
 		LastTS:    lastTS,
 		LastMajTS: lastMajTS,
 	}
