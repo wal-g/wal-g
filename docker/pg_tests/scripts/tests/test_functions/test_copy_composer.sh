@@ -14,15 +14,15 @@ test_copy_composer()
 
   wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
-  pgbench -i -s 100 postgres
+  pgbench -i -s 100
 
   wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
-  pgbench -t 20
+  pgbench
 
   pg_dumpall -f /tmp/dump1
 
-  wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --copy-composer  
+  wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
   /tmp/scripts/drop_pg.sh
 

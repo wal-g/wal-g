@@ -128,7 +128,6 @@ func (c *CopyTarBallComposer) AddFile(info *ComposeFileInfo) {
 	var currFile = fileInfo{}
 	if _, exists := c.prevFileTar[fileName]; exists {
 		if !c.prevBackup.SentinelDto.Files[fileName].MTime.Equal(info.header.ModTime) {
-			c.tarUnchangedFilesCount[c.prevFileTar[fileName]]--
 			currFile.status = doNotCopy
 		} else {
 			c.tarUnchangedFilesCount[c.prevFileTar[fileName]]--
@@ -146,7 +145,6 @@ func (c *CopyTarBallComposer) AddHeader(fileInfoHeader *tar.Header, info os.File
 	var currHeader = headerInfo{}
 	if _, exists := c.prevFileTar[fileName]; exists {
 		if !c.prevBackup.SentinelDto.Files[fileName].MTime.Equal(info.ModTime()) {
-			c.tarUnchangedFilesCount[c.prevFileTar[fileName]]--
 			currHeader.status = doNotCopy
 		} else {
 			c.tarUnchangedFilesCount[c.prevFileTar[fileName]]--
