@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/wal-g/wal-g/cmd/st"
+
 	"github.com/wal-g/wal-g/cmd/pg"
 
 	"github.com/spf13/cobra"
@@ -57,4 +59,7 @@ func init() {
 		wrappedPreRun(cmd, args)
 	}
 	cmd.AddCommand(wrappedPgCmd)
+
+	// Storage tools
+	cmd.AddCommand(st.StorageToolsCmd)
 }

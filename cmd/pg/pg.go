@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/wal-g/wal-g/cmd/st"
+
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 
 	"github.com/spf13/cobra"
@@ -53,4 +55,7 @@ func configureCommand() {
 	Cmd.PersistentFlags().BoolVarP(&internal.Turbo, "turbo", "", false, "Ignore all kinds of throttling defined in config")
 	Cmd.InitDefaultVersionFlag()
 	internal.AddConfigFlags(Cmd)
+
+	// Storage tools
+	Cmd.AddCommand(st.StorageToolsCmd)
 }

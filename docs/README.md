@@ -158,6 +158,18 @@ If `FIND_FULL` is specified, WAL-G will calculate minimum backup needed to keep 
 
 ``target FIND_FULL base_0000000100000000000000C9_D_0000000100000000000000C4`` delete delta backup and all delta backups with the same base backup
 
+## Storage tools (danger zone)
+Storage tools allow interacting with the configured storage. Be aware that these commands can do potentially harmful operations and make sure that you know what you're doing.
+
+### ``ls``
+Prints listing of the objects in the provided storage folder.
+
+Examples:
+
+``wal-g dh ls`` get listing with all objects in the configured storage.
+
+``wal-g dh ls some_folder/some_subfolder`` get listing with all objects in the provided storage path.
+
 **More commands are available for the chosen database engine. See it in [Databases](#databases)**
 
 Databases
