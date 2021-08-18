@@ -1,4 +1,4 @@
-FROM golang:latest
+FROM golang:1.16
 
 ENV DEBIAN_FRONTEND noninteractive
 ENV TERM xterm-256color
