@@ -9,10 +9,11 @@ import (
 	"os/user"
 	"path/filepath"
 
+	"github.com/wal-g/wal-g/internal/ioextensions"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
-	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -66,27 +67,37 @@ func TryDownloadFile(folder storage.Folder, path string) (walFileReader io.ReadC
 
 // TODO : unit tests
 func DecompressDecryptBytes(dst io.Writer, archiveReader io.ReadCloser, decompressor compression.Decompressor) error {
-	crypter := ConfigureCrypter()
-	if crypter != nil {
-		tracelog.DebugLogger.Printf("Selected crypter: %s", crypter.Name())
-
-		reader, err := crypter.Decrypt(archiveReader)
-		if err != nil {
-			return fmt.Errorf("failed to init decrypt reader: %w", err)
-		}
-		archiveReader = ioextensions.ReadCascadeCloser{
-			Reader: reader,
-			Closer: archiveReader,
-		}
-	} else {
-		tracelog.DebugLogger.Printf("No crypter has been selected")
+	decryptReadCloser, err := DecryptBytes(archiveReader)
+	if err != nil {
+		return err
 	}
 
-	err := decompressor.Decompress(dst, archiveReader)
+	err = decompressor.Decompress(dst, decryptReadCloser)
 	if err != nil {
 		return fmt.Errorf("failed to decompress archive reader: %w", err)
 	}
 	return nil
+}
+
+func DecryptBytes(archiveReader io.ReadCloser) (io.ReadCloser, error) {
+	crypter := ConfigureCrypter()
+	if crypter == nil {
+		tracelog.DebugLogger.Printf("No crypter has been selected")
+		return archiveReader, nil
+	}
+
+	tracelog.DebugLogger.Printf("Selected crypter: %s", crypter.Name())
+
+	decryptReader, err := crypter.Decrypt(archiveReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init decrypt reader: %w", err)
+	}
+	decryptReadCloser := ioextensions.ReadCascadeCloser{
+		Reader: decryptReader,
+		Closer: archiveReader,
+	}
+
+	return decryptReadCloser, nil
 }
 
 // CachedDecompressor is the file extension describing decompressor
