@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -26,7 +27,7 @@ func NewError(err error, format string, args ...interface{}) storage.Error {
 }
 
 func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
-	_, exists := folder.Storage.Load(folder.path + objectRelativePath)
+	_, exists := folder.Storage.Load(path.Join(folder.path, objectRelativePath))
 	return exists, nil
 }
 
@@ -51,7 +52,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	})
 	subFolderNames.Range(func(iName, _ interface{}) bool {
 		name := iName.(string)
-		subFolders = append(subFolders, NewFolder(folder.path+name+"/", folder.Storage))
+		subFolders = append(subFolders, NewFolder(path.Join(folder.path, name)+"/", folder.Storage))
 		return true
 	})
 	return
@@ -65,11 +66,11 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 }
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
-	return NewFolder(folder.path+subFolderRelativePath, folder.Storage)
+	return NewFolder(path.Join(folder.path, subFolderRelativePath) + "/", folder.Storage)
 }
 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
-	objectAbsPath := folder.path + objectRelativePath
+	objectAbsPath := path.Join(folder.path, objectRelativePath)
 	object, exists := folder.Storage.Load(objectAbsPath)
 	if !exists {
 		return nil, storage.NewObjectNotFoundError(objectAbsPath)
@@ -79,7 +80,7 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 
 func (folder *Folder) PutObject(name string, content io.Reader) error {
 	data, err := ioutil.ReadAll(content)
-	objectPath := folder.path + name
+	objectPath := path.Join(folder.path, name)
 	if err != nil {
 		return errors.Wrapf(err, "failed to put '%s' in memory storage", objectPath)
 	}
@@ -88,5 +89,20 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 }
 
 func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
-	return errors.New("Not implemented")
+	if exists, err := folder.Exists(srcPath); !exists {
+		if err == nil {
+			return errors.New("object does not exist")
+		} else {
+			return err
+		}
+	}
+	file, err := folder.ReadObject(srcPath)
+	if err != nil {
+		return err
+	}
+	err = folder.PutObject(dstPath, file)
+	if err != nil {
+		return err
+	}
+	return nil
 }
