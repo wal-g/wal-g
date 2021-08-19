@@ -159,16 +159,37 @@ If `FIND_FULL` is specified, WAL-G will calculate minimum backup needed to keep 
 ``target FIND_FULL base_0000000100000000000000C9_D_0000000100000000000000C4`` delete delta backup and all delta backups with the same base backup
 
 ## Storage tools (danger zone)
-Storage tools allow interacting with the configured storage. Be aware that these commands can do potentially harmful operations and make sure that you know what you're doing.
+`wal-g st` command series allows interacting with the configured storage. Be aware that these commands can do potentially harmful operations and make sure that you know what you're doing.
 
 ### ``ls``
 Prints listing of the objects in the provided storage folder.
 
-Examples:
+``wal-g st ls`` get listing with all objects in the configured storage.
 
-``wal-g dh ls`` get listing with all objects in the configured storage.
+``wal-g st ls some_folder/some_subfolder`` get listing with all objects in the provided storage path.
 
-``wal-g dh ls some_folder/some_subfolder`` get listing with all objects in the provided storage path.
+### ``get``
+Download the specified storage object. It has 3 different download modes:
+
+1. `raw` (default) - download the remote object as it is (no decryption/decompression)
+2. `decrypt` - download and decrypt the remote object
+3. `decompress` - download, decrypt and decompress the remote object
+
+To specify the download mode, add the `-m [mode]` flag.
+
+``wal-g st get path/to/remote_file path/to/local_file`` download the file from storage.
+
+``wal-g st get path/to/remote_file path/to/local_file -m decrypt`` download and decrypt the file from storage.
+
+### ``rm``
+Remove the specified storage object.
+
+``wal-g st rm path/to/remote_file`` remove the file from storage.
+
+### ``put``
+Upload the specified file to the storage. 
+
+``wal-g st put path/to/local_file path/to/remote_file`` upload the local file to storage.
 
 **More commands are available for the chosen database engine. See it in [Databases](#databases)**
 
