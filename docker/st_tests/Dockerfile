@@ -4,8 +4,7 @@ WORKDIR /go/src/github.com/wal-g/wal-g
 
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests \
-    liblzo2-dev \
-    brotli
+    liblzo2-dev
 
 RUN ls
 
@@ -25,6 +24,8 @@ RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
     go build -mod vendor -race -o wal-g -tags "brotli lzo" -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 
 FROM wal-g/ubuntu:latest
+
+RUN apt-get update && apt-get install --yes --no-install-recommends --no-install-suggests brotli
 
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/pg/wal-g /usr/bin
 

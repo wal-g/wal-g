@@ -35,6 +35,6 @@ var noDecompress bool
 
 func init() {
 	StorageToolsCmd.AddCommand(getObjectCmd)
-	getObjectCmd.Flags().BoolVar(&noDecrypt, noDecryptFlag, false, "Do not noDecrypt the object")
-	getObjectCmd.Flags().BoolVar(&noDecompress, noDecompressFlag, false, "Do not noDecompress the object")
+	getObjectCmd.Flags().BoolVar(&noDecrypt, noDecryptFlag, false, "Do not decrypt the object")
+	getObjectCmd.Flags().BoolVar(&noDecompress, noDecompressFlag, false, "Do not decompress the object")
 }
