@@ -5,14 +5,16 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/crypto"
+
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/ioextensions"
 )
 
-func HandlePutObject(localPath, dstPath string, uploader *internal.Uploader, overwrite bool) {
+func HandlePutObject(localPath, dstPath string, uploader *internal.Uploader, overwrite, encrypt, compress bool) {
 	checkOverwrite(dstPath, uploader, overwrite)
 
 	fileReadCloser := openLocalFile(localPath)
@@ -25,7 +27,7 @@ func HandlePutObject(localPath, dstPath string, uploader *internal.Uploader, ove
 	}
 
 	fileName := utility.SanitizePath(filepath.Base(dstPath))
-	err := uploader.UploadFile(ioextensions.NewNamedReaderImpl(fileReadCloser, fileName))
+	err := uploadFile(fileName, fileReadCloser, uploader, encrypt, compress)
 	tracelog.ErrorLogger.FatalfOnError("Failed to upload: %v", err)
 }
 
@@ -48,4 +50,20 @@ func openLocalFile(localPath string) io.ReadCloser {
 	}
 
 	return localFile
+}
+
+func uploadFile(name string, content io.Reader, uploader *internal.Uploader, encrypt, compress bool) error {
+	var crypter crypto.Crypter
+	if encrypt {
+		crypter = internal.ConfigureCrypter()
+	}
+
+	var compressor compression.Compressor
+	if compress && uploader.Compressor != nil {
+		compressor = uploader.Compressor
+		name += "." + uploader.Compressor.FileExtension()
+	}
+
+	uploadContents := internal.CompressAndEncrypt(content, compressor, crypter)
+	return uploader.Upload(name, uploadContents)
 }

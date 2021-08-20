@@ -10,6 +10,8 @@ import (
 const (
 	putObjectShortDescription = "Upload the specified file to the storage"
 
+	noEncryptFlag      = "no-encrypt"
+	noCompressFlag     = "no-compress"
 	overwriteFlag      = "force"
 	overwriteShorthand = "f"
 )
@@ -26,14 +28,18 @@ var putObjectCmd = &cobra.Command{
 		localPath := args[0]
 		dstPath := args[1]
 
-		storagetools.HandlePutObject(localPath, dstPath, uploader, overwrite)
+		storagetools.HandlePutObject(localPath, dstPath, uploader, overwrite, !noEncrypt, !noCompress)
 	},
 }
 
+var noEncrypt bool
+var noCompress bool
 var overwrite bool
 
 func init() {
 	StorageToolsCmd.AddCommand(putObjectCmd)
+	putObjectCmd.Flags().BoolVar(&noEncrypt, noEncryptFlag, false, "Do not encrypt the object")
+	putObjectCmd.Flags().BoolVar(&noCompress, noCompressFlag, false, "Do not compress the object")
 	putObjectCmd.Flags().BoolVarP(&overwrite, overwriteFlag, overwriteShorthand,
 		false, "Overwrite the existing object")
 }

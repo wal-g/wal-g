@@ -30,15 +30,25 @@ wal-g st get testfolder/testfile.br fetched_testfile
 
 # Downloaded file should be identical to the original one
 diff testfile fetched_testfile
+rm fetched_testfile
 
 # WAL-G should be able to download the uploaded file without decompression
 wal-g st get testfolder/testfile.br uncompressed_testfile.br --no-decompress
 
 brotli --decompress uncompressed_testfile.br
 diff testfile uncompressed_testfile
+rm uncompressed_testfile
 
 # WAL-G should be able to delete the uploaded file
 wal-g st rm testfolder/testfile.br
 
 # Should get empty storage after file removal
 test "1" -eq "$(wal-g st ls | wc -l)"
+
+# Should upload the file uncompressed without error
+wal-g st put testfile testfolder/testfile --no-compress
+
+# Should download the file uncompressed without error
+wal-g st get testfolder/testfile uncompressed_file --no-decompress
+
+diff testfile uncompressed_file
