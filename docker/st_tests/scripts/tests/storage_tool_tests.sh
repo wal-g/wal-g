@@ -31,6 +31,12 @@ wal-g st get testfolder/testfile.br fetched_testfile
 # Downloaded file should be identical to the original one
 diff testfile fetched_testfile
 
+# WAL-G should be able to download the uploaded file without decompression
+wal-g st get testfolder/testfile.br uncompressed_testfile.br --no-decompress
+
+brotli --decompress uncompressed_testfile.br
+diff testfile uncompressed_testfile
+
 # WAL-G should be able to delete the uploaded file
 wal-g st rm testfolder/testfile.br
 
