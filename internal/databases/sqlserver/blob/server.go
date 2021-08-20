@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -25,7 +26,7 @@ const ProxyStartTimeout = 10 * time.Second
 
 const ReqIDHeader = "X-Ms-Request-Id"
 
-const DefaultConcurency = 8
+const DefaultConcurrency = 8
 
 type Server struct {
 	folder       storage.Folder
@@ -57,16 +58,16 @@ func NewServer(folder storage.Folder) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	downloadConcurency, err := internal.GetMaxDownloadConcurrency()
+	downloadConcurrency, err := internal.GetMaxDownloadConcurrency()
 	if err != nil {
-		downloadConcurency = DefaultConcurency
+		downloadConcurrency = DefaultConcurrency
 	}
-	bs.downloadSem = make(chan struct{}, downloadConcurency)
-	uploadConcurency, err := internal.GetMaxUploadConcurrency()
+	bs.downloadSem = make(chan struct{}, downloadConcurrency)
+	uploadConcurrency, err := internal.GetMaxUploadConcurrency()
 	if err != nil {
-		uploadConcurency = DefaultConcurency
+		uploadConcurrency = DefaultConcurrency
 	}
-	bs.uploadSem = make(chan struct{}, uploadConcurency)
+	bs.uploadSem = make(chan struct{}, uploadConcurrency)
 	bs.endpoint = fmt.Sprintf("%s:%d", hostname, 443)
 	bs.server = http.Server{Addr: bs.endpoint, Handler: bs}
 	bs.indexes = make(map[string]*Index)
@@ -145,6 +146,13 @@ func (bs *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (bs *Server) ServeHTTP2(w http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if err := recover(); err != nil {
+			debug.PrintStack()
+			tracelog.ErrorLogger.Printf("proxy server goroutine panic: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}()
 	// default headers
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Length", "0")

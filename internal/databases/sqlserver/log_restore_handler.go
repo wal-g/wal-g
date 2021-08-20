@@ -80,7 +80,7 @@ func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromn
 			return recoverSingleDatabase(ctx, db, dbname)
 		}
 		return nil
-	}, len(dbnames))
+	}, len(dbnames), getDBConcurrency())
 	tracelog.ErrorLogger.FatalfOnError("overall log restore failed: %v", err)
 
 	tracelog.InfoLogger.Printf("log restore finished")
