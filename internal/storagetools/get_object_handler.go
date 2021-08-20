@@ -67,7 +67,8 @@ func downloadObject(objectPath string, folder storage.Folder, fileWriter io.Writ
 		}
 
 		tracelog.WarningLogger.Printf(
-			"decompressor for extension '%s' was not found, will download uncompressed", fileExt)
+			"decompressor for extension '%s' was not found (supported methods: %v), will download uncompressed",
+			fileExt, compression.CompressingAlgorithms)
 	}
 
 	_, err = utility.FastCopy(fileWriter, objReadCloser)
