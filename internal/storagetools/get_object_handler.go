@@ -20,10 +20,13 @@ func HandleGetObject(objectPath, dstPath string, folder storage.Folder, decrypt,
 
 	dstFile, err := os.OpenFile(targetPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0640)
 	tracelog.ErrorLogger.FatalfOnError("Failed to open the destination file: %v", err)
-	defer dstFile.Close()
 
 	err = downloadObject(objectPath, folder, dstFile, decrypt, decompress)
-	tracelog.ErrorLogger.FatalfOnError("Failed to download the file: %v", err)
+	dstFile.Close()
+	if err != nil {
+		os.Remove(targetPath)
+		tracelog.ErrorLogger.Fatalf("Failed to download the file: %v", err)
+	}
 }
 
 func getTargetFilePath(dstPath string, fileName string) (string, error) {
