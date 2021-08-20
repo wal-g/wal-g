@@ -1,8 +1,6 @@
 package st
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -12,8 +10,8 @@ import (
 const (
 	getObjectShortDescription = "Download the specified storage object"
 
-	downloadModeFlag      = "mode"
-	downloadModeShorthand = "m"
+	noDecryptFlag    = "no-decrypt"
+	noDecompressFlag = "no-decompress"
 )
 
 // getObjectCmd represents the getObject command
@@ -28,30 +26,15 @@ var getObjectCmd = &cobra.Command{
 		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		mode, err := ParseDownloadMode(downloadModeRaw)
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		storagetools.HandleGetObject(objectPath, dstPath, folder, mode)
+		storagetools.HandleGetObject(objectPath, dstPath, folder, !noDecrypt, !noDecompress)
 	},
 }
 
-var downloadModeRaw string
-
-func ParseDownloadMode(mode string) (storagetools.DownloadMode, error) {
-	switch mode {
-	case "raw":
-		return storagetools.DownloadRaw, nil
-	case "decrypt":
-		return storagetools.DownloadDecrypt, nil
-	case "decompress":
-		return storagetools.DownloadDecompress, nil
-	default:
-		return "", fmt.Errorf("unknown download mode: %s", mode)
-	}
-}
+var noDecrypt bool
+var noDecompress bool
 
 func init() {
 	StorageToolsCmd.AddCommand(getObjectCmd)
-	getObjectCmd.Flags().StringVarP(&downloadModeRaw, downloadModeFlag, downloadModeShorthand,
-		"raw", "Download mode: raw/decrypt/decompress")
+	getObjectCmd.Flags().BoolVar(&noDecrypt, noDecryptFlag, false, "Do not noDecrypt the object")
+	getObjectCmd.Flags().BoolVar(&noDecompress, noDecompressFlag, false, "Do not noDecompress the object")
 }

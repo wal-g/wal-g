@@ -26,7 +26,7 @@ wal-g st ls
 test "2" -eq "$(wal-g st ls | wc -l)"
 
 # WAL-G should be able to download the uploaded file
-wal-g st get -m decompress testfolder/testfile.br fetched_testfile
+wal-g st get testfolder/testfile.br fetched_testfile
 
 # Downloaded file should be identical to the original one
 diff testfile fetched_testfile

@@ -13,24 +13,16 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-type DownloadMode string
-
-const (
-	DownloadRaw        DownloadMode = "raw"
-	DownloadDecompress DownloadMode = "decompress"
-	DownloadDecrypt    DownloadMode = "decrypt"
-)
-
-func HandleGetObject(objectPath, dstPath string, folder storage.Folder, mode DownloadMode) {
+func HandleGetObject(objectPath, dstPath string, folder storage.Folder, decrypt, decompress bool) {
 	fileName := path.Base(objectPath)
 	targetPath, err := getTargetFilePath(dstPath, fileName)
 	tracelog.ErrorLogger.FatalfOnError("Failed to determine the destination path: %v", err)
 
-	dstFile, err := os.OpenFile(targetPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
+	dstFile, err := os.OpenFile(targetPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0640)
 	tracelog.ErrorLogger.FatalfOnError("Failed to open the destination file: %v", err)
 	defer dstFile.Close()
 
-	err = downloadObject(objectPath, folder, mode, dstFile)
+	err = downloadObject(objectPath, folder, dstFile, decrypt, decompress)
 	tracelog.ErrorLogger.FatalfOnError("Failed to download the file: %v", err)
 }
 
@@ -51,55 +43,33 @@ func getTargetFilePath(dstPath string, fileName string) (string, error) {
 	return dstPath, nil
 }
 
-func downloadObject(objectPath string, folder storage.Folder, mode DownloadMode, fileWriter io.WriteCloser) error {
-	switch mode {
-	case DownloadDecrypt:
-		return decryptDownload(objectPath, folder, fileWriter)
-
-	case DownloadDecompress:
-		return decompressDownload(objectPath, folder, fileWriter)
-
-	default:
-		return rawDownload(objectPath, folder, fileWriter)
-	}
-}
-
-func rawDownload(objectPath string, folder storage.Folder, dstWriter io.Writer) error {
-	fileReadCloser, err := folder.ReadObject(objectPath)
+func downloadObject(objectPath string, folder storage.Folder, fileWriter io.Writer, decrypt, decompress bool) error {
+	objReadCloser, err := folder.ReadObject(objectPath)
 	if err != nil {
 		return err
 	}
-	defer fileReadCloser.Close()
+	origReadCloser := objReadCloser
+	defer origReadCloser.Close()
 
-	_, err = utility.FastCopy(dstWriter, fileReadCloser)
-	return err
-}
+	if decrypt {
+		objReadCloser, err = internal.DecryptBytes(objReadCloser)
+		if err != nil {
+			return err
+		}
+	}
 
-func decompressDownload(objectPath string, folder storage.Folder, dstWriter io.WriteCloser) error {
-	fileName := path.Base(objectPath)
-	fileExt := path.Ext(fileName)
+	if decompress {
+		fileName := path.Base(objectPath)
+		fileExt := path.Ext(fileName)
+		decompressor := compression.FindDecompressor(fileExt)
+		if decompressor != nil {
+			return decompressor.Decompress(fileWriter, objReadCloser)
+		}
 
-	decompressor := compression.FindDecompressor(fileExt)
-	if decompressor == nil {
 		tracelog.WarningLogger.Printf(
 			"decompressor for extension '%s' was not found, will download uncompressed", fileExt)
-		return rawDownload(objectPath, folder, dstWriter)
 	}
 
-	return internal.DownloadFile(folder, objectPath, fileExt, dstWriter)
-}
-
-func decryptDownload(objectPath string, folder storage.Folder, dstWriter io.Writer) error {
-	rawFileReadCloser, err := folder.ReadObject(objectPath)
-	if err != nil {
-		return err
-	}
-	defer rawFileReadCloser.Close()
-
-	fileReadCloser, err := internal.DecryptBytes(rawFileReadCloser)
-	if err != nil {
-		return err
-	}
-	_, err = utility.FastCopy(dstWriter, fileReadCloser)
+	_, err = utility.FastCopy(fileWriter, objReadCloser)
 	return err
 }
