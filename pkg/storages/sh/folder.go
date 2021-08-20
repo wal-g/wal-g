@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"errors"
 
 	"github.com/pkg/sftp"
 	"github.com/wal-g/tracelog"
@@ -248,6 +249,25 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 			err, "Fail write close file '%s'",
 			absolutePath,
 		)
+	}
+	return nil
+}
+
+func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
+	if exists, err := folder.Exists(srcPath); !exists {
+		if err == nil {
+			return errors.New("object does not exist")
+		} else {
+			return err
+		}
+	}
+	file, err := folder.ReadObject(srcPath)
+	if err != nil {
+		return err
+	}
+	err = folder.PutObject(dstPath, file)
+	if err != nil {
+		return err
 	}
 	return nil
 }

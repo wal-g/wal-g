@@ -2,6 +2,7 @@ package s3
 
 import (
 	"io"
+	"path"
 	"strconv"
 	"strings"
 
@@ -148,6 +149,24 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 
 func (folder *Folder) PutObject(name string, content io.Reader) error {
 	return folder.uploader.upload(*folder.Bucket, folder.Path+name, content)
+}
+
+func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
+	if exists, err := folder.Exists(srcPath); !exists {
+		if err == nil {
+			return errors.New("object does not exist")
+		} else {
+			return err
+		}
+	}
+	source := path.Join(*folder.Bucket, folder.Path, srcPath)
+	dst := path.Join(folder.Path, dstPath)
+	input := &s3.CopyObjectInput{CopySource: &source, Bucket: folder.Bucket, Key: &dst}
+	_, err := folder.S3API.CopyObject(input)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {

@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"errors"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -21,6 +22,10 @@ var SettingList = []string{
 }
 
 func NewError(err error, format string, args ...interface{}) storage.Error {
+	return storage.NewError(err, "Swift", format, args...)
+}
+
+func NewFolderError(err error, format string, args ...interface{}) storage.Error {
 	return storage.NewError(err, "Swift", format, args...)
 }
 
@@ -143,6 +148,18 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 		//Object stored successfully
 	}
 	return nil
+}
+
+func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
+	if exists, err := folder.Exists(srcPath); !exists {
+		if err == nil {
+			return errors.New("object does not exist")
+		} else {
+			return err
+		}
+	}
+	_, err := folder.connection.ObjectCopy(folder.path, srcPath, folder.path, dstPath, nil)
+	return err
 }
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
