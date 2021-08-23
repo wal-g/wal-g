@@ -441,7 +441,7 @@ type BackupProperties struct {
 	BackupFile        string
 }
 
-func ListBackupProperties(db *sql.DB, urls string, logBackupName string) ([]*BackupProperties, error) {
+func ListBackupProperties(db *sql.DB, urls string, backupName string) ([]*BackupProperties, error) {
 	var res []*BackupProperties
 	query := fmt.Sprintf("RESTORE HEADERONLY FROM %s", urls)
 	rows, err := db.Query(query)
@@ -472,7 +472,7 @@ func ListBackupProperties(db *sql.DB, urls string, logBackupName string) ([]*Bac
 			return nil, err
 		}
 		dbf.BackupURL = urls
-		dbf.BackupFile = logBackupName
+		dbf.BackupFile = backupName
 		res = append(res, &dbf)
 	}
 	return res, nil

@@ -56,6 +56,24 @@ func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromn
 	err = runParallel(func(i int) error {
 		dbname := dbnames[i]
 		fromname := fromnames[i]
+		baseURL := getDatabaseBackupURL(backupName, fromname)
+		basePath := getDatabaseBackupPath(backupName, fromname)
+		blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
+		if err != nil {
+			return err
+		}
+		urls := buildRestoreUrls(baseURL, blobs)
+		backup_metadata, err := ListBackupProperties(db, urls, baseURL)
+		if err != nil {
+			return err
+		}
+		var dbbackup_metadata *BackupProperties
+		for _, dbbackup_metadata = range backup_metadata {
+			if dbbackup_metadata.DatabaseName == fromname {
+				break
+			}
+		}
+		prevBackupFinishdate := dbbackup_metadata.BackupFinishDate
 		for _, logBackupName := range logs {
 			ok, err := doesLogBackupContainDB(folder, logBackupName, fromname)
 			if err != nil {
@@ -68,13 +86,14 @@ func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromn
 					logBackupName, fromname)
 				continue
 			}
-			isLastOne, err := restoreSingleLog(ctx, db, folder, logBackupName, dbname, fromname, stopAt)
+			isLastOne, CurrentBackupFinishdate, err := restoreSingleLog(ctx, db, folder, logBackupName, dbname, fromname, stopAt, prevBackupFinishdate)
 			if err != nil {
 				return err
 			}
 			if isLastOne {
 				break
 			}
+			prevBackupFinishdate = CurrentBackupFinishdate
 		}
 		if !noRecovery {
 			return recoverSingleDatabase(ctx, db, dbname)
@@ -93,19 +112,24 @@ func restoreSingleLog(ctx context.Context,
 	dbname string,
 	fromname string,
 	stopAt time.Time,
-) (bool, error) {
+	prevBackupFinishDate time.Time,
+) (bool, time.Time, error) {
 	var isLastOne bool
 	baseURL := getLogBackupURL(logBackupName, fromname)
 	basePath := getLogBackupPath(logBackupName, fromname)
 	blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
 	if err != nil {
-		return isLastOne, err
+		return isLastOne, prevBackupFinishDate, err
 	}
 	urls := buildRestoreUrls(baseURL, blobs)
 
 	logBackupFileMetadata, err := ListBackupProperties(db, urls, logBackupName)
 	if err != nil {
-		return isLastOne, err
+		return isLastOne, prevBackupFinishDate, err
+	}
+	if !prevBackupFinishDate.Before(stopAt) {
+		tracelog.InfoLogger.Printf("Log Restore operation is inapplicable. STOPAT point left behind.")
+		return true, prevBackupFinishDate, err
 	}
 	var sql string
 	if logBackupFileMetadata[0].BackupFinishDate.Before(stopAt) {
@@ -124,5 +148,5 @@ func restoreSingleLog(ctx context.Context,
 	} else {
 		tracelog.InfoLogger.Printf("database [%s] log restore succefully finished", dbname)
 	}
-	return isLastOne, err
+	return isLastOne, logBackupFileMetadata[0].BackupFinishDate, err
 }
