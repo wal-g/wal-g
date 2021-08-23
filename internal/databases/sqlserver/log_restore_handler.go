@@ -63,17 +63,17 @@ func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromn
 			return err
 		}
 		urls := buildRestoreUrls(baseURL, blobs)
-		backup_metadata, err := ListBackupProperties(db, urls, baseURL)
+		backupMetadata, err := ListBackupProperties(db, urls, baseURL)
 		if err != nil {
 			return err
 		}
-		var dbbackup_metadata *BackupProperties
-		for _, dbbackup_metadata = range backup_metadata {
-			if dbbackup_metadata.DatabaseName == fromname {
+		var dbBackupMetadata *BackupProperties
+		for _, dbBackupMetadata = range backupMetadata {
+			if dbBackupMetadata.DatabaseName == fromname {
 				break
 			}
 		}
-		prevBackupFinishdate := dbbackup_metadata.BackupFinishDate
+		prevBackupFinishdate := dbBackupMetadata.BackupFinishDate
 		for _, logBackupName := range logs {
 			ok, err := doesLogBackupContainDB(folder, logBackupName, fromname)
 			if err != nil {
@@ -86,7 +86,14 @@ func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromn
 					logBackupName, fromname)
 				continue
 			}
-			isLastOne, CurrentBackupFinishdate, err := restoreSingleLog(ctx, db, folder, logBackupName, dbname, fromname, stopAt, prevBackupFinishdate)
+			isLastOne, CurrentBackupFinishdate, err := restoreSingleLog(ctx,
+				db,
+				folder,
+				logBackupName,
+				dbname,
+				fromname,
+				stopAt,
+				prevBackupFinishdate)
 			if err != nil {
 				return err
 			}
