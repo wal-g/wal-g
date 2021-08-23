@@ -59,7 +59,7 @@ func HandleBackupRestore(backupName string, dbnames []string, fromnames []string
 			return recoverSingleDatabase(ctx, db, dbname)
 		}
 		return nil
-	}, len(dbnames))
+	}, len(dbnames), getDBConcurrency())
 	tracelog.ErrorLogger.FatalfOnError("overall restore failed: %v", err)
 
 	tracelog.InfoLogger.Printf("restore finished")

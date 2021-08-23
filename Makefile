@@ -179,6 +179,12 @@ gp_integration_test: load_docker_common
 	docker-compose build gp gp_tests
 	docker-compose up --exit-code-from gp_tests gp_tests
 
+st_test: deps pg_build unlink_brotli st_integration_test
+
+st_integration_test: load_docker_common
+	docker-compose build st_tests
+	docker-compose up --exit-code-from st_tests st_tests
+
 unittest:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet
 	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/

@@ -158,19 +158,48 @@ If `FIND_FULL` is specified, WAL-G will calculate minimum backup needed to keep 
 
 ``target FIND_FULL base_0000000100000000000000C9_D_0000000100000000000000C4`` delete delta backup and all delta backups with the same base backup
 
+**More commands are available for the chosen database engine. See it in [Databases](#databases)**
+
 ## Storage tools (danger zone)
-Storage tools allow interacting with the configured storage. Be aware that these commands can do potentially harmful operations and make sure that you know what you're doing.
+`wal-g st` command series allows interacting with the configured storage. Be aware that these commands can do potentially harmful operations and make sure that you know what you're doing.
 
 ### ``ls``
 Prints listing of the objects in the provided storage folder.
 
+``wal-g st ls`` get listing with all objects in the configured storage.
+
+``wal-g st ls some_folder/some_subfolder`` get listing with all objects in the provided storage path.
+
+### ``get``
+Download the specified storage object. By default, the command will try to apply the decompression and decryption (if configured).
+
+Flags:
+1. Add `--no-decompress` to download the remote object without decompression
+2. Add `--no-decrypt` to download the remote object without decryption
+
 Examples:
 
-``wal-g dh ls`` get listing with all objects in the configured storage.
+``wal-g st get path/to/remote_file path/to/local_file`` download the file from storage.
 
-``wal-g dh ls some_folder/some_subfolder`` get listing with all objects in the provided storage path.
+``wal-g st get path/to/remote_file path/to/local_file --no-decrypt`` download the file from storage without decryption.
 
-**More commands are available for the chosen database engine. See it in [Databases](#databases)**
+### ``rm``
+Remove the specified storage object.
+
+Example:
+
+``wal-g st rm path/to/remote_file`` remove the file from storage.
+
+### ``put``
+Upload the specified file to the storage. By default, the command will try to apply the compression and encryption (if configured).
+
+Flags:
+1. Add `--no-compress` to upload the object without compression
+2. Add `--no-encrypt` to upload the object without encryption
+
+Example:
+
+``wal-g st put path/to/local_file path/to/remote_file`` upload the local file to storage.
 
 Databases
 -----------

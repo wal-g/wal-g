@@ -73,6 +73,7 @@ services:
       &&  mkdir -p /export/mysqldeletebinlogs
       &&  mkdir -p /export/archivereadyrename
       &&  mkdir -p /export/gpfullbucket
+      &&  mkdir -p /export/storagetoolsbucket
       &&  /usr/bin/minio server /export'
 
   s3-another:
@@ -632,6 +633,19 @@ services:
       - docker/common/common_walg.env
     depends_on:
       - gp
+      - s3
+    links:
+      - s3
+
+  st_tests:
+    build:
+      dockerfile: docker/st_tests/Dockerfile
+      context: .
+    image: wal-g/st_tests
+    container_name: wal-g_st_tests
+    env_file:
+      - docker/common/common_walg.env
+    depends_on:
       - s3
     links:
       - s3

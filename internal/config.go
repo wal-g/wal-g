@@ -110,6 +110,7 @@ const (
 	SQLServerBlobKeyFile      = "SQLSERVER_BLOB_KEY_FILE"
 	SQLServerBlobLockFile     = "SQLSERVER_BLOB_LOCK_FILE"
 	SQLServerConnectionString = "SQLSERVER_CONNECTION_STRING"
+	SQLServerDBConcurrency    = "SQLSERVER_DB_CONCURRENCY"
 
 	EndpointSourceSetting = "S3_ENDPOINT_SOURCE"
 	EndpointPortSetting   = "S3_ENDPOINT_PORT"
@@ -154,6 +155,10 @@ var (
 		OplogArchiveTimeoutInterval:    "60s",
 		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
 		MongoDBLastWriteUpdateInterval: "3s",
+	}
+
+	SQLServerDefaultSettings = map[string]string{
+		SQLServerDBConcurrency: "10",
 	}
 
 	PGDefaultSettings = map[string]string{
@@ -311,6 +316,7 @@ var (
 		SQLServerBlobKeyFile:      true,
 		SQLServerBlobLockFile:     true,
 		SQLServerConnectionString: true,
+		SQLServerDBConcurrency:    true,
 	}
 
 	MysqlAllowedSettings = map[string]bool{
@@ -337,6 +343,7 @@ var (
 	Turbo bool
 )
 
+// nolint: gocyclo
 func ConfigureSettings(currentType string) {
 	if len(defaultConfigValues) == 0 {
 		defaultConfigValues = commonDefaultConfigValues
@@ -346,6 +353,8 @@ func ConfigureSettings(currentType string) {
 			dbSpecificDefaultSettings = PGDefaultSettings
 		case MONGO:
 			dbSpecificDefaultSettings = MongoDefaultSettings
+		case SQLSERVER:
+			dbSpecificDefaultSettings = SQLServerDefaultSettings
 		}
 
 		for k, v := range dbSpecificDefaultSettings {
