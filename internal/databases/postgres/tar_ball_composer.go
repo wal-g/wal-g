@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 
+	"github.com/wal-g/tracelog"
+
 	"github.com/jackc/pgx"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -64,6 +66,9 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn,
 	case CopyComposer:
 		previousBackupName, err := internal.GetLatestBackupName(folder)
 		if err != nil {
+			tracelog.InfoLogger.Printf(
+				"Failed to init the CopyComposer, will use the RegularComposer instead:"+
+					" couldn't get the previous backup name: %v", err)
 			return NewRegularTarBallComposerMaker(filePackOptions), nil
 		}
 		previousBackup := NewBackup(folder, previousBackupName)
