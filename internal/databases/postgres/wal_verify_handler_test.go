@@ -59,7 +59,7 @@ func TestWalVerify_EmptyStorage(t *testing.T) {
 	storageSegments := make([]string, 0)
 
 	expectedIntegrityCheck := postgres.WalVerifyCheckResult{
-		Status: postgres.StatusFailure,
+		Status: postgres.StatusWarning,
 		Details: postgres.IntegrityCheckDetails{
 			{
 				TimelineID:    3,
@@ -118,7 +118,7 @@ func TestWalVerify_OnlyGarbageInStorage(t *testing.T) {
 	currentSegment, _ := postgres.NewWalSegmentDescription(currentSegmentName)
 
 	expectedIntegrityCheck := postgres.WalVerifyCheckResult{
-		Status: postgres.StatusFailure,
+		Status: postgres.StatusWarning,
 		Details: postgres.IntegrityCheckDetails{
 			{
 				TimelineID:    3,
