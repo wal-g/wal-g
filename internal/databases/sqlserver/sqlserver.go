@@ -441,7 +441,12 @@ type BackupProperties struct {
 	BackupFile        string
 }
 
-func GetBackupProperties(db *sql.DB, folder storage.Folder, logBackup bool, backupName string, databaseName string) ([]*BackupProperties, error) {
+func GetBackupProperties(db *sql.DB,
+	folder storage.Folder,
+	logBackup bool,
+	backupName string,
+	databaseName string,
+) ([]*BackupProperties, error) {
 	var res []*BackupProperties
 	var baseURL string
 	var basePath string
