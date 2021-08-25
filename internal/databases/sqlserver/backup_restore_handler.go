@@ -79,8 +79,8 @@ func restoreSingleDatabase(ctx context.Context,
 	}
 	urls := buildRestoreUrls(baseURL, blobs)
 	sql := fmt.Sprintf(`IF EXISTS (SELECT 1 FROM sys.databases WHERE name = '%s')
-		ALTER DATABASE %s SET SINGLE_USER WITH ROLLBACK IMMEDIATE
-		RESTORE DATABASE %s FROM %s WITH REPLACE, NORECOVERY`,
+		ALTER DATABASE %s SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+		RESTORE DATABASE %s FROM %s WITH REPLACE, NORECOVERY;`,
 		dbname, quoteName(dbname), quoteName(dbname), urls)
 	if dbname != fromName {
 		files, err := listDatabaseFiles(db, urls)
