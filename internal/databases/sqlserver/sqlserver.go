@@ -457,8 +457,27 @@ type BackupProperties struct {
 	BackupFile        string
 }
 
-func ListBackupProperties(db *sql.DB, urls string, logBackupName string) ([]*BackupProperties, error) {
+func GetBackupProperties(db *sql.DB,
+	folder storage.Folder,
+	logBackup bool,
+	backupName string,
+	databaseName string,
+) ([]*BackupProperties, error) {
 	var res []*BackupProperties
+	var baseURL string
+	var basePath string
+	if logBackup {
+		baseURL = getLogBackupURL(backupName, databaseName)
+		basePath = getLogBackupPath(backupName, databaseName)
+	} else {
+		baseURL = getDatabaseBackupURL(backupName, databaseName)
+		basePath = getDatabaseBackupPath(backupName, databaseName)
+	}
+	blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
+	if err != nil {
+		return res, err
+	}
+	urls := buildRestoreUrls(baseURL, blobs)
 	query := fmt.Sprintf("RESTORE HEADERONLY FROM %s", urls)
 	rows, err := db.Query(query)
 	if err != nil {
@@ -488,7 +507,7 @@ func ListBackupProperties(db *sql.DB, urls string, logBackupName string) ([]*Bac
 			return nil, err
 		}
 		dbf.BackupURL = urls
-		dbf.BackupFile = logBackupName
+		dbf.BackupFile = backupName
 		res = append(res, &dbf)
 	}
 	return res, nil
