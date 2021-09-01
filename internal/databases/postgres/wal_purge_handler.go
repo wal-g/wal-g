@@ -37,7 +37,6 @@ func findOldestNonPermanentBackup(
 		return currBackup, nil
 	}
 
-	tracelog.WarningLogger.Printf("Could not find any non-permanent backups in storage.")
 	return nil, internal.NewNoBackupsFoundError()
 }
 
@@ -45,6 +44,10 @@ func findOldestNonPermanentBackup(
 func HandleWalPurge(folder storage.Folder, deleteHandler *internal.DeleteHandler, confirm bool) error {
 	oldestBackup, err := findOldestNonPermanentBackup(folder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
+		if _, ok := err.(internal.NoBackupsFoundError); ok {
+			tracelog.InfoLogger.Println("Couldn't find any non-permanent backups in storage. Not doing anything.")
+			return nil
+		}
 		return err
 	}
 
