@@ -128,7 +128,7 @@ If `FIND_FULL` is specified, WAL-G will calculate minimum backup needed to keep 
 
 ``everything`` [FORCE]
 
-``target`` [FIND_FULL] %name% | --target-user-data %data% will delete the backup specified by name or user data.
+``target`` [FIND_FULL] %name% | --target-user-data %data% will delete the backup specified by name or user data. Unlike other delete commands, this command does not delete any archived WALs.
 
 (Only in Postgres) By default, if delta backup is provided as the target, WAL-G will also delete all the dependant delta backups. If `FIND_FULL` is specified, WAL-G will delete all backups with the same base backup as the target.
 

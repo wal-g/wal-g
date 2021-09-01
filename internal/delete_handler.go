@@ -329,6 +329,10 @@ func (h *DeleteHandler) DeleteEverything(confirmed bool) {
 }
 
 func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) error {
+	return h.DeleteBeforeTargetWhere(target, confirmed, func(storage.Object) bool { return true })
+}
+
+func (h *DeleteHandler) DeleteBeforeTargetWhere(target BackupObject, confirmed bool, selector func(object storage.Object) bool) error {
 	if !target.IsFullBackup() {
 		errorMessage := "%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
 		return utility.NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
@@ -336,7 +340,7 @@ func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) 
 	tracelog.InfoLogger.Println("Start delete")
 
 	return storage.DeleteObjectsWhere(h.Folder, confirmed, func(object storage.Object) bool {
-		return h.less(object, target) && !h.isPermanent(object)
+		return selector(object) && h.less(object, target) && !h.isPermanent(object)
 	})
 }
 
