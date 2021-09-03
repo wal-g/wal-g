@@ -456,3 +456,12 @@ Flags:
 - `-f, --from string` Storage config from where should copy backup
 - `-t, --to string` Storage config to where should copy backup
 - `-w, --without-history` Copy backup without history (wal files)
+
+### ``wal-purge``
+
+Purges outdated WAL archives from storage. Will remove all WAL archives before the earliest non-permanent backup.
+
+Usage:
+```bash
+wal-g wal-purge
+```
