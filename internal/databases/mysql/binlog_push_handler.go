@@ -3,6 +3,8 @@ package mysql
 import (
 	"database/sql"
 	"encoding/json"
+	"github.com/go-mysql-org/go-mysql/mysql"
+	"github.com/go-mysql-org/go-mysql/replication"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -20,9 +22,11 @@ const BinlogCacheFileName = ".walg_mysql_binlogs_cache"
 
 type LogsCache struct {
 	LastArchivedBinlog string `json:"LastArchivedBinlog"`
+	GTIDArchived       string `json:"gtid_archived"`
 }
 
-func HandleBinlogPush(uploader *internal.Uploader, untilBinlog string) {
+func HandleBinlogPush(uploader *internal.Uploader, untilBinlog string, checkGTIDs bool) {
+	rootFolder := uploader.UploadingFolder
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(BinlogPath)
 
 	db, err := getMySQLConnection()
@@ -32,21 +36,74 @@ func HandleBinlogPush(uploader *internal.Uploader, untilBinlog string) {
 	binlogsFolder, err := getMySQLBinlogsFolder(db)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	binlogs, err := getMySQLSortedBinlogs(db, untilBinlog)
+	binlogs, err := getMySQLSortedBinlogs(db)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	for _, binLog := range binlogs {
-		err = tryArchiveBinLog(uploader, path.Join(binlogsFolder, binLog), binLog)
-		tracelog.ErrorLogger.FatalOnError(err)
-	}
-}
-
-func getMySQLSortedBinlogs(db *sql.DB, untilBinlog string) ([]string, error) {
-	var result []string
-
-	if untilBinlog == "" {
+	if untilBinlog == "" || untilBinlog > getMySQLCurrentBinlogFileLocal(db) {
 		untilBinlog = getMySQLCurrentBinlogFileLocal(db)
 	}
+
+	var binlogSentinelDto MySQLBinlogSentinelDto
+	err = FetchBinlogSentinel(rootFolder, &binlogSentinelDto)
+	// copy MySQLBinlogSentinel to cache:
+	cache := getCache()
+	cache.GTIDArchived = binlogSentinelDto.GTIDArchived
+
+	for i := 0; i < len(binlogs)-1; i++ { // last binlog file is skipped
+		binLog := binlogs[i]
+		nextBinLog := binlogs[i+1]
+
+		tracelog.InfoLogger.Printf("Testing... %v\n", binLog)
+
+		if binLog <= cache.LastArchivedBinlog {
+			tracelog.DebugLogger.Printf("Binlog %v already archived (filename check)\n", binLog)
+			continue
+		}
+
+		if binLog >= untilBinlog {
+			continue
+		}
+
+		var nextPreviousGTIDs mysql.GTIDSet
+		if checkGTIDs && nextBinLog != "" {
+			// nextPreviousGTIDs is 'GTIDs_executed in the current binary log file'
+			nextPreviousGTIDs, err = peekPreviousGTIDs(path.Join(binlogsFolder, nextBinLog))
+			if err != nil {
+				tracelog.DebugLogger.Printf("cannot extract PREVIOUS_GTIDS event from binlog %s\n", binLog)
+				// continue uploading even when we cannot parse next binlog
+			}
+			uploadedGTIDs, err := mysql.ParseMysqlGTIDSet(cache.GTIDArchived)
+			if err != nil {
+				tracelog.DebugLogger.Printf("cannot extract set of uploaded binlgos from cache\n")
+				// continue uploading even when we cannot read uploadedGTIDs
+			}
+			// when we know that _next_ binlog's PreviousGTID already uploaded we can safely skip _current_ binlog
+			if uploadedGTIDs.String() != "" && uploadedGTIDs.Contain(nextPreviousGTIDs) {
+				tracelog.DebugLogger.Printf("Binlog %v already archived (GTID check)\n", binLog)
+				continue
+			}
+		}
+
+		err = archiveBinLog(uploader, binlogsFolder, binLog)
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		cache.LastArchivedBinlog = binLog
+		if nextPreviousGTIDs != nil {
+			cache.GTIDArchived = nextPreviousGTIDs.String()
+		}
+		putCache(cache)
+	}
+
+	// Write Binlog Sentinel
+	binlogSentinelDto.GTIDArchived = cache.GTIDArchived
+
+	tracelog.InfoLogger.Printf("Binlog sentinel: %s", binlogSentinelDto.String())
+	err = UploadBinlgoSentinel(rootFolder, &binlogSentinelDto)
+	tracelog.ErrorLogger.FatalOnError(err)
+}
+
+func getMySQLSortedBinlogs(db *sql.DB) ([]string, error) {
+	var result []string
 
 	rows, err := db.Query("SHOW BINARY LOGS")
 	if err != nil {
@@ -60,9 +117,7 @@ func getMySQLSortedBinlogs(db *sql.DB, untilBinlog string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		if logFinName < untilBinlog {
-			result = append(result, logFinName)
-		}
+		result = append(result, logFinName)
 	}
 	sort.Strings(result)
 	return result, nil
@@ -78,13 +133,10 @@ func getMySQLBinlogsFolder(db *sql.DB) (string, error) {
 	return path.Dir(logBinBasename), nil
 }
 
-func tryArchiveBinLog(uploader *internal.Uploader, filename string, binLog string) error {
-	if binLog <= getLastArchivedBinlog() {
-		tracelog.DebugLogger.Printf("Binlog %v already archived\n", binLog)
-		return nil
-	}
+func archiveBinLog(uploader *internal.Uploader, dataDir string, binLog string) error {
 	tracelog.InfoLogger.Printf("Archiving %v\n", binLog)
 
+	filename := path.Join(dataDir, binLog)
 	walFile, err := os.Open(filename)
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not open '%s'\n", filename)
@@ -95,11 +147,10 @@ func tryArchiveBinLog(uploader *internal.Uploader, filename string, binLog strin
 		return errors.Wrapf(err, "upload: could not upload '%s'\n", filename)
 	}
 
-	setLastArchivedBinlog(binLog)
 	return nil
 }
 
-func getLastArchivedBinlog() string {
+func getCache() LogsCache {
 	var cache LogsCache
 	var cacheFilename string
 
@@ -111,7 +162,7 @@ func getLastArchivedBinlog() string {
 		if err == nil {
 			err = json.Unmarshal(file, &cache)
 			if err == nil {
-				return cache.LastArchivedBinlog
+				return cache
 			}
 		}
 	}
@@ -120,28 +171,20 @@ func getLastArchivedBinlog() string {
 	} else {
 		tracelog.ErrorLogger.Printf("%+v\n", err)
 	}
-	return ""
+	return LogsCache{}
 }
 
-func setLastArchivedBinlog(binlogFileName string) {
-	var cache LogsCache
+func putCache(cache LogsCache) {
 	var cacheFilename string
 
 	usr, err := user.Current()
-	if err == nil {
-		cacheFilename = filepath.Join(usr.HomeDir, BinlogCacheFileName)
-		var file []byte
-		file, err = ioutil.ReadFile(cacheFilename)
-		// here we ignore whatever error can occur
-		if err == nil {
-			_ = json.Unmarshal(file, &cache)
-		}
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to get current user homedir: %v\n", err)
 	}
+	cacheFilename = filepath.Join(usr.HomeDir, BinlogCacheFileName)
 	if err != nil && !os.IsNotExist(err) {
 		tracelog.ErrorLogger.Printf("Failed to read MySQL binlog cache file: %v\n", err)
 	}
-
-	cache.LastArchivedBinlog = binlogFileName
 
 	marshal, err := json.Marshal(&cache)
 	if err == nil && len(cacheFilename) > 0 {
@@ -150,4 +193,30 @@ func setLastArchivedBinlog(binlogFileName string) {
 			tracelog.ErrorLogger.Printf("Failed to write MySQL binlog cache file: %v\n", err)
 		}
 	}
+}
+
+func peekPreviousGTIDs(filename string) (mysql.GTIDSet, error) {
+	previousGTID := &replication.PreviousGTIDsEvent{}
+
+	parser := replication.NewBinlogParser()
+	parser.SetFlavor("mysql")
+	parser.SetVerifyChecksum(false) // the faster, the better
+	parser.SetRawMode(true)         // choose events to parse manually
+	err := parser.ParseFile(filename, 0, func(event *replication.BinlogEvent) error {
+		if event.Header.EventType == replication.PREVIOUS_GTIDS_EVENT {
+			err := previousGTID.Decode(event.RawData[19:])
+			if err != nil {
+				return err
+			}
+			return shallowReadFinished
+		}
+		return nil
+	})
+
+	if err != nil && err != shallowReadFinished {
+		result, _ := mysql.ParseMysqlGTIDSet("")
+		return result, errors.Wrapf(err, "binlog-push: could not parse binlog file '%s'\n", filename)
+	}
+
+	return mysql.ParseMysqlGTIDSet(previousGTID.GTIDSets)
 }

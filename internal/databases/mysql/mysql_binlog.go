@@ -4,8 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
+	"github.com/go-mysql-org/go-mysql/mysql"
+	uuid "github.com/satori/go.uuid"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"io"
+	"io/ioutil"
 	"math"
 	"os"
 	"time"
@@ -184,4 +190,87 @@ func GetBinlogStartTimestamp(path string) (time.Time, error) {
 	}
 	header := ParseEventHeader(buf[BinlogMagicLength:])
 	return time.Unix(int64(header.Timestamp), 0), nil
+}
+
+type gtidSet struct {
+	// SID -> SET(intervals)
+	data map[uuid.UUID]mysql.IntervalSlice
+}
+
+func newGtidSet() gtidSet {
+	return gtidSet{
+		data: make(map[uuid.UUID]mysql.IntervalSlice, 0),
+	}
+}
+
+func (g *gtidSet) append(sid uuid.UUID, gno int64) {
+	intervals, ok := g.data[sid]
+	if !ok {
+		g.data[sid] = mysql.IntervalSlice{}
+		intervals = g.data[sid]
+	}
+	if intervals.Len() != 0 {
+		// Optimization: highly likely that this event is just next event in current interval:
+		interval := intervals[len(intervals)-1]
+		if gno == interval.Stop+1 {
+			interval.Stop = interval.Stop + 1
+			intervals[len(intervals)-1] = interval
+			return
+		}
+	}
+
+	intervals = append(intervals, mysql.Interval{Start: gno, Stop: gno + 1})
+	g.data[sid] = intervals.Normalize()
+}
+
+func (g *gtidSet) ToString() string {
+	result := ""
+	for sid, intervals := range g.data {
+		if len(result) != 0 {
+			result = result + ","
+		}
+		result = result + sid.String()
+		for _, interval := range intervals {
+			result = result + ":" + interval.String()
+		}
+	}
+	return result
+}
+
+const BinlogSentinelPath = "binlog_sentinel_" + utility.VersionStr + ".json"
+
+type MySQLBinlogSentinelDto struct {
+	GTIDArchived string `json:"gtid_archived"`
+}
+
+func (dto *MySQLBinlogSentinelDto) String() string {
+	result, _ := json.Marshal(dto)
+	return string(result)
+}
+
+func FetchBinlogSentinel(folder storage.Folder, sentinelDto interface{}) error {
+	reader, err := folder.ReadObject(BinlogSentinelPath)
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+	data, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(data, sentinelDto)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func UploadBinlgoSentinel(folder storage.Folder, sentinelDto interface{}) error {
+	sentinelName := BinlogSentinelPath
+	dtoBody, err := json.Marshal(sentinelDto)
+	if err != nil {
+		return internal.NewSentinelMarshallingError(sentinelName, err)
+	}
+
+	return folder.PutObject(sentinelName, bytes.NewReader(dtoBody))
 }

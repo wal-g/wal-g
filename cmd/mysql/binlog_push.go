@@ -19,7 +19,7 @@ var binlogPushCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
-		mysql.HandleBinlogPush(uploader, untilBinlog)
+		mysql.HandleBinlogPush(uploader, untilBinlog, checkGTIDs)
 	},
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		internal.RequiredSettings[internal.MysqlDatasourceNameSetting] = true
@@ -28,7 +28,10 @@ var binlogPushCmd = &cobra.Command{
 	},
 }
 
+var checkGTIDs bool
+
 func init() {
 	cmd.AddCommand(binlogPushCmd)
 	binlogPushCmd.Flags().StringVar(&untilBinlog, "until", "", "binlog file name to stop at. Current active by default")
+	binlogPushCmd.Flags().BoolVar(&checkGTIDs, "check-gtids", false, "[EXPEREMENTAL AND DANGEROUS] Decide whether binlog should be uploaded by looking at binlog GTIDs")
 }

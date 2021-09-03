@@ -7,7 +7,7 @@ require (
 	github.com/Azure/azure-storage-blob-go v0.14.0
 	github.com/Azure/go-autorest/autorest v0.11.19
 	github.com/DATA-DOG/godog v0.7.14-0.20190529133509-96731eaefa46
-	github.com/DataDog/zstd v1.4.4
+	github.com/DataDog/zstd v1.4.4 // indirect
 	github.com/Microsoft/go-winio v0.4.14 // indirect
 	github.com/RoaringBitmap/roaring v0.4.21
 	github.com/aws/aws-sdk-go v1.34.28
@@ -20,6 +20,7 @@ require (
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/glycerine/go-unsnap-stream v0.0.0-20190901134440-81cf024a9e0a // indirect
+	github.com/go-mysql-org/go-mysql v1.3.0
 	github.com/go-openapi/errors v0.19.3 // indirect
 	github.com/go-openapi/strfmt v0.19.4 // indirect
 	github.com/go-redis/redis v6.15.6+incompatible
@@ -28,7 +29,7 @@ require (
 	github.com/gofrs/uuid v3.2.0+incompatible // indirect
 	github.com/golang/mock v1.4.3
 	github.com/golang/snappy v0.0.2-0.20190904063534-ff6b7dc882cf // indirect
-	github.com/google/brotli v1.0.7
+	github.com/google/brotli v1.0.7 // indirect
 	github.com/google/uuid v1.2.0
 	github.com/greenplum-db/gp-common-go-libs v1.0.4
 	github.com/hashicorp/golang-lru v0.5.1
@@ -49,6 +50,7 @@ require (
 	github.com/pierrec/xxHash v0.1.5 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.11.0
+	github.com/satori/go.uuid v1.2.0
 	github.com/shopspring/decimal v0.0.0-20200227202807-02e2044944cc // indirect
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cobra v0.0.5
