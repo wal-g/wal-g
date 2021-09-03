@@ -241,6 +241,7 @@ var (
 		"S3_ENDPOINT_SOURCE":          true,
 		"S3_ENDPOINT_PORT":            true,
 		"S3_USE_LIST_OBJECTS_V1":      true,
+		"S3_RANGE_BATCH_SIZE":         true,
 
 		// Azure
 		"WALG_AZ_PREFIX":          true,

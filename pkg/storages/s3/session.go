@@ -91,12 +91,7 @@ func getDefaultConfig(settings map[string]string) *aws.Config {
 
 	if logLevel, ok := settings[LogLevel]; ok {
 		config = config.WithLogLevel(func(s string) aws.LogLevelType {
-			switch s {
-			case "DEVEL":
-				return aws.LogDebug
-			default:
-				return aws.LogOff
-			}
+			return aws.LogDebug
 		}(logLevel))
 	}
 
