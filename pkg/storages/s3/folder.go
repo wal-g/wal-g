@@ -206,6 +206,7 @@ func (reader *s3Reader) ReadToCache() error {
 	var object *s3.GetObjectOutput = nil
 	var err error = nil
 	for {
+		tracelog.DebugLogger.Printf("GetObject range %d-%d", from, to)
 		object, err = reader.getObjectRange(from, to)
 		if err == nil {
 			break
@@ -323,7 +324,7 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 		return nil, errors.Wrapf(err, "failed to read object: '%s' from S3", objectPath)
 	}
 
-	rangeBatchSize := int64(1024)
+	rangeBatchSize := int64(10 * 1024)
 	if batchSize, ok := folder.settings[RangeBatchSize]; ok {
 		if iBatchSize, err := strconv.Atoi(batchSize); err == nil {
 			rangeBatchSize = int64(iBatchSize)

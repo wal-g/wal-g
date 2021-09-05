@@ -7,4 +7,5 @@
 "AWS_ENDPOINT": "http://s3:9000",
 "PGDATABASE": "postgres",
 "AWS_S3_FORCE_PATH_STYLE": "true",
-"WALG_COMPRESSION_METHOD": "brotli"
+"WALG_COMPRESSION_METHOD": "brotli",
+"WALG_LOG_LEVEL": "DEVEL"
