@@ -1,10 +1,9 @@
 package s3
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"github.com/wal-g/tracelog"
+	"hash/fnv"
 	"io"
 	"path"
 	"strconv"
@@ -44,6 +43,9 @@ const (
 	UseListObjectsV1         = "S3_USE_LIST_OBJECTS_V1"
 	RangeBatchEnabled        = "S3_RANGE_BATCH_ENABLED"
 	RangeQueriesMaxRetries   = "S3_RANGE_MAX_RETRIES"
+
+	RangeBatchEnabledDefault      = true
+	RangeQueriesMaxRetriesDefault = 10
 )
 
 var (
@@ -71,6 +73,7 @@ var (
 		RangeBatchEnabled,
 		RangeQueriesMaxRetries,
 	}
+	S3BufferCounter = 0
 )
 
 func NewFolderError(err error, format string, args ...interface{}) storage.Error {
@@ -175,7 +178,7 @@ type s3Reader struct {
 	maxRetries    int32
 	objectPath    string
 	storageCursor int64
-	id            string
+	id            string // id useful for logs, cause its shorter than filename
 }
 
 func (reader *s3Reader) getObjectRange(from, to int64) (*s3.GetObjectOutput, error) {
@@ -196,7 +199,7 @@ func (reader *s3Reader) getObjectRange(from, to int64) (*s3.GetObjectOutput, err
 func (reader *s3Reader) Read(p []byte) (n int, err error) {
 	tracelog.DebugLogger.Printf("s3Reader [%s] Read to buffer [%d] bytes", reader.id, len(p))
 	reconnect := false
-	if reader.storageCursor == 0 {
+	if reader.lastBody == nil { // initial connect
 		reconnect = true
 	}
 	for {
@@ -208,8 +211,9 @@ func (reader *s3Reader) Read(p []byte) (n int, err error) {
 				return 0, connErr
 			}
 		}
+
 		n, err = reader.lastBody.Read(p)
-		tracelog.DebugLogger.Printf("s3Reader read %d, err %s", n, err)
+		tracelog.DebugLogger.Printf("s3Reader [%s] read %d, err %s", reader.id, n, err)
 		if err != nil && err != io.EOF {
 			reconnect = true
 			continue
@@ -222,7 +226,7 @@ func (reader *s3Reader) Read(p []byte) (n int, err error) {
 
 func (reader *s3Reader) reconnect() error {
 	failed := int32(0)
-	backoffSleepDuration := 0.1 * 1000 * time.Millisecond
+	backoffSleepDuration := 0.25 * 1000 * time.Millisecond
 	sleepMultiplier := 1
 
 	for  {
@@ -237,9 +241,11 @@ func (reader *s3Reader) reconnect() error {
 			sleepMultiplier *= 2
 			continue
 		}
-		err = reader.lastBody.Close()
-		if err != nil {
-			return errors.Wrap(err, "s3Reader We have problems with closing prev connection, smth strange")
+		if reader.lastBody != nil {
+			err = reader.lastBody.Close()
+			if err != nil {
+				return errors.Wrap(err, "s3Reader We have problems with closing prev connection, smth strange")
+			}
 		}
 		reader.lastBody = object.Body
 		tracelog.DebugLogger.Printf("s3Reader [%s] reconnect succeeded", reader.id)
@@ -252,12 +258,23 @@ func (reader *s3Reader) Close() (err error) {
 	return reader.lastBody.Close()
 }
 
-func NewS3Reader(innerReader io.ReadCloser, objectPath string, maxRetries int32, folder *Folder) *s3Reader {
-	md5sum := md5.Sum([]byte(objectPath))
-	id := hex.EncodeToString(md5sum[:])
-	tracelog.DebugLogger.Printf("Init s3reader id %s , path %s", id, objectPath)
-	return &s3Reader{lastBody: innerReader, objectPath: objectPath,
-		maxRetries: int32(maxRetries), folder: folder, id: id}
+func NewS3Reader(objectPath string, maxRetries int32, folder *Folder) *s3Reader {
+	S3BufferCounter++
+	reader := &s3Reader{objectPath: objectPath, maxRetries: maxRetries,
+		folder: folder, id: getId(objectPath, S3BufferCounter)}
+
+	tracelog.DebugLogger.Printf("Init s3reader id %s path %s", reader.id, objectPath)
+	return reader
+}
+
+func getId(objectPath string, counter int) string {
+	hash := fnv.New32a()
+	_, err := hash.Write([]byte(objectPath))
+	if err != nil {
+		tracelog.ErrorLogger.Println("Fatal, can't write buffer to hash")
+		return "<INVALID HASH>"
+	}
+	return fmt.Sprintf("%x_%d", hash.Sum32(), counter)
 }
 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
@@ -275,7 +292,18 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 		return nil, errors.Wrapf(err, "failed to read object: '%s' from S3", objectPath)
 	}
 
-	rangeEnabled := true
+	rangeEnabled, maxRetries := folder.getReaderSettings()
+
+	reader := object.Body
+	if rangeEnabled {
+		_ = object.Body.Close() // we don't need it anymore
+		reader = NewS3Reader(objectPath, int32(maxRetries), folder)
+	}
+	return reader, nil
+}
+
+func (folder *Folder) getReaderSettings() (rangeEnabled bool, maxRetries int) {
+	rangeEnabled = RangeBatchEnabledDefault
 	if rangeBatch, ok := folder.settings[RangeBatchEnabled]; ok {
 		if rangeBatch == "true" {
 			rangeEnabled = true
@@ -284,18 +312,14 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 		}
 	}
 
-	maxRetries := 3
+	maxRetries = RangeQueriesMaxRetriesDefault
 	if maxRetriesRaw, ok := folder.settings[RangeQueriesMaxRetries]; ok {
 		if maxRetriesInt, err := strconv.Atoi(maxRetriesRaw); err == nil {
 			maxRetries = maxRetriesInt
 		}
 	}
 
-	reader := object.Body
-	if rangeEnabled {
-		reader = NewS3Reader(object.Body, objectPath, int32(maxRetries), folder)
-	}
-	return reader, nil
+	return rangeEnabled, maxRetries
 }
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
