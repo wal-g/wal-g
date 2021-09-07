@@ -1,12 +1,15 @@
 package s3
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"github.com/wal-g/tracelog"
 	"io"
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -39,7 +42,7 @@ const (
 	EndpointPortSetting      = "S3_ENDPOINT_PORT"
 	LogLevel                 = "S3_LOG_LEVEL"
 	UseListObjectsV1         = "S3_USE_LIST_OBJECTS_V1"
-	RangeBatchSize           = "S3_RANGE_BATCH_SIZE"
+	RangeBatchEnabled        = "S3_RANGE_BATCH_ENABLED"
 	RangeQueriesMaxRetries   = "S3_RANGE_MAX_RETRIES"
 )
 
@@ -65,7 +68,7 @@ var (
 		s3CertFile,
 		MaxPartSize,
 		UseListObjectsV1,
-		RangeBatchSize,
+		RangeBatchEnabled,
 		RangeQueriesMaxRetries,
 	}
 )
@@ -91,12 +94,12 @@ type Folder struct {
 
 func NewFolder(uploader Uploader, s3API s3iface.S3API, settings map[string]string, bucket, path string, useListObjectsV1 bool) *Folder {
 	return &Folder{
-		uploader:         uploader,
-		S3API:            s3API,
-		settings: 		  settings,
-		Bucket:           aws.String(bucket),
-		Path:             storage.AddDelimiterToPath(path),
-		useListObjectsV1: useListObjectsV1,
+		uploader:			uploader,
+		S3API:				s3API,
+		settings:			settings,
+		Bucket:				aws.String(bucket),
+		Path:				storage.AddDelimiterToPath(path),
+		useListObjectsV1:	useListObjectsV1,
 	}
 }
 
@@ -167,146 +170,94 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 }
 
 type s3Reader struct {
-	folder          *Folder
-	contentLength   int64
-	maxRetries      int32
-	objectPath      string
-	storageCursor   int64
-	cache           []byte
-	cacheReset      bool
-	cacheCursor     int64
-	cacheSize       int64
-	cacheSizeReaded int64
+	lastBody      io.ReadCloser
+	folder        *Folder
+	maxRetries    int32
+	objectPath    string
+	storageCursor int64
+	id            string
 }
 
 func (reader *s3Reader) getObjectRange(from, to int64) (*s3.GetObjectOutput, error) {
-	bytesRange := fmt.Sprintf("bytes=%d-%d", from, to)
+	bytesRange := fmt.Sprintf("bytes=%d-", from)
+	if to != 0 {
+		bytesRange += strconv.Itoa(int(to))
+	}
 	input := &s3.GetObjectInput{
 		Bucket: reader.folder.Bucket,
 		Key:    aws.String(reader.objectPath),
 		Range:  aws.String(bytesRange),
 	}
-	tracelog.DebugLogger.Printf("GetObject %s with range %s", reader.objectPath, bytesRange)
+	tracelog.DebugLogger.Printf("GetObject [%s] with range %s", reader.id, bytesRange)
 	return reader.folder.S3API.GetObject(input)
 }
 
-func (reader *s3Reader) ReadToCache() error {
-	// we try to take one more bit, I'm trying to avoid EOF in Range requests
-	//if reader.storageCursor >= reader.contentLength {
-	//	return io.EOF
-	//}
-	end := reader.storageCursor + reader.cacheSize + 1
-	if end >= reader.contentLength {
-		end = reader.contentLength
-	}
-	from := reader.storageCursor
-	to := end - 1
-
-	retryCounter := int32(0)
-	var object *s3.GetObjectOutput = nil
-	var err error = nil
-	for {
-		tracelog.DebugLogger.Printf("GetObject range %d-%d", from, to)
-		object, err = reader.getObjectRange(from, to)
-		if err == nil {
-			break
-		}
-
-		tracelog.DebugLogger.Printf("GetObject returned error %s", err)
-
-		retryCounter++
-		if retryCounter >= reader.maxRetries {
-			return errors.Wrapf(err, "Failed get range %d-%d", from, to)
-		}
-	}
-
-	defer func() { _ = object.Body.Close() }()
-
-	if reader.cache == nil {
-		reader.cache = make([]byte, reader.cacheSize)
-	}
-	for i := range reader.cache {
-		reader.cache[i] = 0
-	}
-
-	reader.cacheSizeReaded = 0
-
-	isEof := false
-	var err1 error = nil
-	num := 0
-	for reader.cacheSizeReaded < reader.cacheSize && !isEof {
-		num, err1 = object.Body.Read(reader.cache[reader.cacheSizeReaded:])
-		tracelog.DebugLogger.Printf("GetObject read cache [readed %d] num %d: %s", reader.cacheSizeReaded, num, err1)
-		if err1 != nil && err1 != io.EOF {
-			return err1
-		}
-		isEof = err1 == io.EOF
-		if num > 0 {
-			reader.cacheSizeReaded += int64(num)
-			reader.storageCursor += int64(num)
-		}
-	}
-	return err1
-}
-
-func (reader *s3Reader) copyBuf(p []byte, from int) int {
-	size:= int64(len(p[from:]))
-	readTo := reader.cacheCursor + size
-	if readTo > reader.cacheSizeReaded {
-		readTo = reader.cacheSizeReaded
-	}
-	n := copy(p[from:], reader.cache[reader.cacheCursor:readTo])
-	reader.cacheCursor = readTo
-
-	if reader.cacheCursor >= reader.cacheSizeReaded {
-		reader.cacheReset = true
-	}
-	return n
-}
-
-func (reader *s3Reader) refillCache() error {
-	var cacheError error = nil
-	if reader.cacheReset || reader.cache == nil {
-		reader.cacheReset = false
-		reader.cacheCursor = 0
-		cacheError = reader.ReadToCache()
-		if cacheError != nil && cacheError != io.EOF {
-			return cacheError
-
-		}
-	}
-	return cacheError
-}
 
 func (reader *s3Reader) Read(p []byte) (n int, err error) {
-	totalRead := 0
-	err = reader.refillCache()
-	if err != nil && err != io.EOF {
-		return 0, err
+	tracelog.DebugLogger.Printf("s3Reader [%s] Read to buffer [%d] bytes", reader.id, len(p))
+	reconnect := false
+	if reader.storageCursor == 0 {
+		reconnect = true
 	}
-
-	i := reader.copyBuf(p, 0)
-	totalRead += i
-	tracelog.DebugLogger.Printf("GetObject1 read %d / %d -> len(%d)", totalRead, reader.contentLength, len(p))
-	for totalRead < len(p) && err != io.EOF {
-		err = reader.refillCache()
-		if err != nil && err != io.EOF {
-			return totalRead, err
+	for {
+		if reconnect {
+			reconnect = false
+			connErr := reader.reconnect()
+			if connErr != nil {
+				tracelog.DebugLogger.Printf("s3Reader [%s] reconnect failed %s", reader.id, connErr)
+				return 0, connErr
+			}
 		}
+		n, err = reader.lastBody.Read(p)
+		tracelog.DebugLogger.Printf("s3Reader read %d, err %s", n, err)
+		if err != nil && err != io.EOF {
+			reconnect = true
+			continue
+		}
+		reader.storageCursor += int64(n)
+		tracelog.DebugLogger.Printf("s3Reader [%s] success read", reader.id)
+		return n, err
+	}
+}
 
-		i := reader.copyBuf(p, totalRead)
-		totalRead += i
-		tracelog.DebugLogger.Printf("GetObject2 read %d / %d -> len(%d)", totalRead, reader.contentLength, len(p))
+func (reader *s3Reader) reconnect() error {
+	failed := int32(0)
+	backoffSleepDuration := 0.1 * 1000 * time.Millisecond
+	sleepMultiplier := 1
+
+	for  {
+		object, err := reader.getObjectRange(reader.storageCursor, 0)
+		if err != nil {
+			failed += 1
+			tracelog.DebugLogger.Printf("s3Reader [%s] reconnect failed: %s", reader.id, err)
+			if failed >= reader.maxRetries {
+				return errors.Wrap(err, "s3Reader Too much reconnecting retries")
+			}
+			time.Sleep(time.Duration(sleepMultiplier) * backoffSleepDuration)
+			sleepMultiplier *= 2
+			continue
+		}
+		err = reader.lastBody.Close()
+		if err != nil {
+			return errors.Wrap(err, "s3Reader We have problems with closing prev connection, smth strange")
+		}
+		reader.lastBody = object.Body
+		tracelog.DebugLogger.Printf("s3Reader [%s] reconnect succeeded", reader.id)
+		break
 	}
-	err = nil
-	if  reader.cacheCursor >= reader.cacheSizeReaded && reader.storageCursor >= reader.contentLength {
-		err = io.EOF
-	}
-	return totalRead, err
+	return nil
 }
 
 func (reader *s3Reader) Close() (err error) {
-	return nil
+	return reader.lastBody.Close()
+}
+
+func NewS3Reader(innerReader io.ReadCloser, objectPath string, maxRetries int32, folder *Folder) *s3Reader {
+	md5sum := md5.Sum([]byte(objectPath))
+	id := hex.EncodeToString(md5sum[:])
+	tracelog.DebugLogger.Printf("Init s3reader id %s , path %s", id, objectPath)
+	return &s3Reader{lastBody: innerReader, objectPath: objectPath,
+		maxRetries: int32(maxRetries), folder: folder, id: id}
 }
 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
@@ -324,10 +275,12 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 		return nil, errors.Wrapf(err, "failed to read object: '%s' from S3", objectPath)
 	}
 
-	rangeBatchSize := int64(10 * 1024)
-	if batchSize, ok := folder.settings[RangeBatchSize]; ok {
-		if iBatchSize, err := strconv.Atoi(batchSize); err == nil {
-			rangeBatchSize = int64(iBatchSize)
+	rangeEnabled := true
+	if rangeBatch, ok := folder.settings[RangeBatchEnabled]; ok {
+		if rangeBatch == "true" {
+			rangeEnabled = true
+		} else {
+			rangeEnabled = false
 		}
 	}
 
@@ -339,9 +292,8 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	}
 
 	reader := object.Body
-	if object.ContentLength != nil { // contenttype json doesn't have ContentLength
-		reader = &s3Reader{objectPath: objectPath, cacheSize: rangeBatchSize,
-			contentLength: *object.ContentLength, maxRetries: int32(maxRetries), folder: folder}
+	if rangeEnabled {
+		reader = NewS3Reader(object.Body, objectPath, int32(maxRetries), folder)
 	}
 	return reader, nil
 }
