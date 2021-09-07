@@ -44,8 +44,9 @@ const (
 	RangeBatchEnabled        = "S3_RANGE_BATCH_ENABLED"
 	RangeQueriesMaxRetries   = "S3_RANGE_MAX_RETRIES"
 
-	RangeBatchEnabledDefault      = true
+
 	RangeQueriesMaxRetriesDefault = 10
+	RangeBatchEnabledDefault      = false
 )
 
 var (
