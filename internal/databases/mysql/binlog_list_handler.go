@@ -2,6 +2,10 @@ package mysql
 
 import (
 	"fmt"
+	"io"
+	"os"
+	"path"
+
 	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/pkg/errors"
@@ -9,12 +13,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
-	"io"
-	"os"
-	"path"
 )
-
-var shallowReadFinished = fmt.Errorf("minimal amount of data found")
 
 type BinlogInfo struct {
 	Name    string `json:"name"`
@@ -52,6 +51,7 @@ func HandleBinlogList(local, shallow, pretty, json bool) {
 
 func listBinLog(filename string, binLog string, shallow bool) (BinlogInfo, error) {
 	result := BinlogInfo{}
+	var found bool
 
 	gtidSet := newGtidSet()
 
@@ -71,7 +71,8 @@ func listBinLog(filename string, binLog string, shallow bool) (BinlogInfo, error
 			// GNO - 8 byte integer
 			gtidSet.append(uuid.FromBytesOrNil(e.SID), e.GNO)
 			if shallow {
-				return shallowReadFinished
+				found = true
+				return fmt.Errorf("shallow file read finished")
 			}
 			tracelog.WarningLogger.Printf("GTID_EVENT %+v", e)
 
@@ -97,7 +98,7 @@ func listBinLog(filename string, binLog string, shallow bool) (BinlogInfo, error
 		return nil
 	})
 
-	if err != nil && err != shallowReadFinished {
+	if err != nil && !found {
 		return result, errors.Wrapf(err, "binlog-list: could not parse file '%s'\n", filename)
 	}
 

@@ -6,15 +6,16 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/go-mysql-org/go-mysql/mysql"
-	uuid "github.com/satori/go.uuid"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"io"
 	"io/ioutil"
 	"math"
 	"os"
 	"time"
+
+	"github.com/go-mysql-org/go-mysql/mysql"
+	uuid "github.com/satori/go.uuid"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/wal-g/wal-g/utility"
 )
@@ -199,7 +200,7 @@ type gtidSet struct {
 
 func newGtidSet() gtidSet {
 	return gtidSet{
-		data: make(map[uuid.UUID]mysql.IntervalSlice, 0),
+		data: make(map[uuid.UUID]mysql.IntervalSlice),
 	}
 }
 
@@ -239,11 +240,11 @@ func (g *gtidSet) ToString() string {
 
 const BinlogSentinelPath = "binlog_sentinel_" + utility.VersionStr + ".json"
 
-type MySQLBinlogSentinelDto struct {
+type BinlogSentinelDto struct {
 	GTIDArchived string `json:"gtid_archived"`
 }
 
-func (dto *MySQLBinlogSentinelDto) String() string {
+func (dto *BinlogSentinelDto) String() string {
 	result, _ := json.Marshal(dto)
 	return string(result)
 }

@@ -3,14 +3,16 @@ package mysql
 import (
 	"database/sql"
 	"encoding/json"
-	"github.com/go-mysql-org/go-mysql/mysql"
-	"github.com/go-mysql-org/go-mysql/replication"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/user"
 	"path"
 	"path/filepath"
 	"sort"
+
+	"github.com/go-mysql-org/go-mysql/mysql"
+	"github.com/go-mysql-org/go-mysql/replication"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -25,6 +27,7 @@ type LogsCache struct {
 	GTIDArchived       string `json:"gtid_archived"`
 }
 
+//gocyclo:ignore
 func HandleBinlogPush(uploader *internal.Uploader, untilBinlog string, checkGTIDs bool) {
 	rootFolder := uploader.UploadingFolder
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(BinlogPath)
@@ -43,15 +46,20 @@ func HandleBinlogPush(uploader *internal.Uploader, untilBinlog string, checkGTID
 		untilBinlog = getMySQLCurrentBinlogFileLocal(db)
 	}
 
-	var binlogSentinelDto MySQLBinlogSentinelDto
+	var binlogSentinelDto BinlogSentinelDto
 	err = FetchBinlogSentinel(rootFolder, &binlogSentinelDto)
 	// copy MySQLBinlogSentinel to cache:
 	cache := getCache()
-	cache.GTIDArchived = binlogSentinelDto.GTIDArchived
+	if err == nil && binlogSentinelDto.GTIDArchived != "" {
+		cache.GTIDArchived = binlogSentinelDto.GTIDArchived
+	}
 
-	for i := 0; i < len(binlogs)-1; i++ { // last binlog file is skipped
+	for i := 0; i < len(binlogs); i++ {
 		binLog := binlogs[i]
-		nextBinLog := binlogs[i+1]
+		nextBinLog := ""
+		if i < len(binlogs)-1 {
+			nextBinLog = binlogs[i+1]
+		}
 
 		tracelog.InfoLogger.Printf("Testing... %v\n", binLog)
 
@@ -65,22 +73,23 @@ func HandleBinlogPush(uploader *internal.Uploader, untilBinlog string, checkGTID
 		}
 
 		var nextPreviousGTIDs mysql.GTIDSet
-		if checkGTIDs && nextBinLog != "" {
+		if nextBinLog != "" {
 			// nextPreviousGTIDs is 'GTIDs_executed in the current binary log file'
 			nextPreviousGTIDs, err = peekPreviousGTIDs(path.Join(binlogsFolder, nextBinLog))
 			if err != nil {
-				tracelog.DebugLogger.Printf("cannot extract PREVIOUS_GTIDS event from binlog %s\n", binLog)
+				tracelog.InfoLogger.Printf("cannot extract PREVIOUS_GTIDS event from binlog %s\n", binLog)
 				// continue uploading even when we cannot parse next binlog
 			}
 			uploadedGTIDs, err := mysql.ParseMysqlGTIDSet(cache.GTIDArchived)
 			if err != nil {
 				tracelog.DebugLogger.Printf("cannot extract set of uploaded binlgos from cache\n")
 				// continue uploading even when we cannot read uploadedGTIDs
-			}
-			// when we know that _next_ binlog's PreviousGTID already uploaded we can safely skip _current_ binlog
-			if uploadedGTIDs.String() != "" && uploadedGTIDs.Contain(nextPreviousGTIDs) {
-				tracelog.DebugLogger.Printf("Binlog %v already archived (GTID check)\n", binLog)
-				continue
+			} else if checkGTIDs {
+				// when we know that _next_ binlog's PreviousGTID already uploaded we can safely skip _current_ binlog
+				if uploadedGTIDs.String() != "" && uploadedGTIDs.Contain(nextPreviousGTIDs) {
+					tracelog.InfoLogger.Printf("Binlog %v already archived (GTID check)\n", binLog)
+					continue
+				}
 			}
 		}
 
@@ -196,6 +205,7 @@ func putCache(cache LogsCache) {
 }
 
 func peekPreviousGTIDs(filename string) (mysql.GTIDSet, error) {
+	var found bool
 	previousGTID := &replication.PreviousGTIDsEvent{}
 
 	parser := replication.NewBinlogParser()
@@ -208,12 +218,13 @@ func peekPreviousGTIDs(filename string) (mysql.GTIDSet, error) {
 			if err != nil {
 				return err
 			}
-			return shallowReadFinished
+			found = true
+			return fmt.Errorf("shallow file read finished")
 		}
 		return nil
 	})
 
-	if err != nil && err != shallowReadFinished {
+	if err != nil && !found {
 		result, _ := mysql.ParseMysqlGTIDSet("")
 		return result, errors.Wrapf(err, "binlog-push: could not parse binlog file '%s'\n", filename)
 	}
