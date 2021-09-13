@@ -41,13 +41,11 @@ const (
 	RangeBatchEnabled        = "S3_RANGE_BATCH_ENABLED"
 	RangeQueriesMaxRetries   = "S3_RANGE_MAX_RETRIES"
 
+	RangeBatchEnabledDefault = false
 
-	RangeBatchEnabledDefault      = false
-
-	RangeMaxRetries = 10
+	RangeMaxRetries         = 10
 	RangeQueryMinRetryDelay = 30 * time.Millisecond
 	RangeQueryMaxRetryDelay = 300 * time.Second
-
 )
 
 var (
@@ -75,7 +73,6 @@ var (
 		RangeBatchEnabled,
 		RangeQueriesMaxRetries,
 	}
-	S3BufferCounter = 0
 )
 
 func NewFolderError(err error, format string, args ...interface{}) storage.Error {
@@ -99,12 +96,12 @@ type Folder struct {
 
 func NewFolder(uploader Uploader, s3API s3iface.S3API, settings map[string]string, bucket, path string, useListObjectsV1 bool) *Folder {
 	return &Folder{
-		uploader:			uploader,
-		S3API:				s3API,
-		settings:			settings,
-		Bucket:				aws.String(bucket),
-		Path:				storage.AddDelimiterToPath(path),
-		useListObjectsV1:	useListObjectsV1,
+		uploader:         uploader,
+		S3API:            s3API,
+		settings:         settings,
+		Bucket:           aws.String(bucket),
+		Path:             storage.AddDelimiterToPath(path),
+		useListObjectsV1: useListObjectsV1,
 	}
 }
 

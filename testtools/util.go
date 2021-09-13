@@ -50,7 +50,7 @@ func NewMockUploader(apiMultiErr, apiErr bool) *internal.Uploader {
 	s3Uploader := MakeDefaultUploader(NewMockS3Uploader(apiMultiErr, apiErr, nil))
 	return internal.NewUploader(
 		&MockCompressor{},
-		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), map[string]string{},"bucket/", "server/", false),
+		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), map[string]string{}, "bucket/", "server/", false),
 	)
 }
 
@@ -65,7 +65,7 @@ func NewMockWalUploader(apiMultiErr, apiErr bool) *postgres.WalUploader {
 	s3Uploader := MakeDefaultUploader(NewMockS3Uploader(apiMultiErr, apiErr, nil))
 	return postgres.NewWalUploader(
 		&MockCompressor{},
-		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), map[string]string{},"bucket/", "server/", false),
+		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), map[string]string{}, "bucket/", "server/", false),
 		nil,
 	)
 }
