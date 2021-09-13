@@ -49,7 +49,7 @@ func (reader *s3Reader) getObjectRange(from, to int64) (*s3.GetObjectOutput, err
 func (reader *s3Reader) Read(p []byte) (n int, err error) {
 	reader.debugLog("Read to buffer [%d] bytes", len(p))
 	reconnect := false
-	if reader.lastBody == nil { // initial connect
+	if reader.lastBody == nil { // initial connect, if lastBody wasn't provided
 		reconnect = true
 	}
 	for {
@@ -137,11 +137,11 @@ func (reader *s3Reader) Close() (err error) {
 	return reader.lastBody.Close()
 }
 
-func NewS3Reader(objectPath string, retriesCount int, folder *Folder,
+func NewS3Reader(body io.ReadCloser, objectPath string, retriesCount int, folder *Folder,
 	minRetryDelay, maxRetryDelay time.Duration) *s3Reader {
 
 	DebugLogBufferCounter++
-	reader := &s3Reader{objectPath: objectPath, maxRetries: retriesCount, logDebugId: getHash(objectPath, DebugLogBufferCounter),
+	reader := &s3Reader{lastBody: body, objectPath: objectPath, maxRetries: retriesCount, logDebugId: getHash(objectPath, DebugLogBufferCounter),
 		folder: folder, minRetryDelay: minRetryDelay, maxRetryDelay: maxRetryDelay}
 
 	reader.debugLog("Init s3reader path %s", objectPath)

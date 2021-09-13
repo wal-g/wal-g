@@ -190,8 +190,7 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 
 	reader := object.Body
 	if rangeEnabled {
-		_ = object.Body.Close() // we don't need it anymore
-		reader = NewS3Reader(objectPath, maxRetries, folder, minRetryDelay, maxRetryDelay)
+		reader = NewS3Reader(object.Body, objectPath, maxRetries, folder, minRetryDelay, maxRetryDelay)
 	}
 	return reader, nil
 }
