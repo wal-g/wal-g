@@ -24,9 +24,6 @@ func getDeltaMap(folder storage.Folder,
 		return deltaMap, errors.Wrapf(err, "Error during fetch locations from delta files.\n")
 	}
 
-	tracelog.InfoLogger.Printf("UsedDelta %s NotUsedDelta %s: %s",
-		firstUsedDeltaNo.getFilename(timeline), firstNotUsedDeltaNo.getFilename(timeline),
-		firstNotUsedDeltaNo.previous().getFilename(timeline))
 	// Handle last delta file separately for fetch locations and walParser from it
 	lastDeltaFile, err := getDeltaFile(folder, firstNotUsedDeltaNo.previous().getFilename(timeline))
 	if err != nil {
