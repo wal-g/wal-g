@@ -199,7 +199,7 @@ func (folder *Folder) getReaderSettings() (rangeEnabled bool, retriesCount int,
 	minRetryDelay, maxRetryDelay time.Duration) {
 	rangeEnabled = RangeBatchEnabledDefault
 	if rangeBatch, ok := folder.settings[RangeBatchEnabled]; ok {
-		if rangeBatch == "true" {
+		if strings.TrimSpace(strings.ToLower(rangeBatch)) == "true" {
 			rangeEnabled = true
 		} else {
 			rangeEnabled = false
