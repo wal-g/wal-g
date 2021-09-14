@@ -53,6 +53,7 @@ func NewSegmentMetadata(backupID string, segCfg cluster.SegConfig, restoreLSN st
 type BackupSentinelDto struct {
 	RestorePoint *string           `json:"restore_point,omitempty"`
 	Segments     []SegmentMetadata `json:"segments,omitempty"`
+	UserData     interface{}       `json:"user_data,omitempty"`
 }
 
 func (s *BackupSentinelDto) String() string {
@@ -64,10 +65,11 @@ func (s *BackupSentinelDto) String() string {
 }
 
 // NewBackupSentinelDto returns new BackupSentinelDto instance
-func NewBackupSentinelDto(curBackupInfo CurBackupInfo, restoreLSNs map[int]string) BackupSentinelDto {
+func NewBackupSentinelDto(curBackupInfo CurBackupInfo, restoreLSNs map[int]string, userData interface{}) BackupSentinelDto {
 	sentinel := BackupSentinelDto{
 		RestorePoint: &curBackupInfo.backupName,
 		Segments:     make([]SegmentMetadata, 0, len(curBackupInfo.segmentBackups)),
+		UserData:     userData,
 	}
 
 	for backupID, cfg := range curBackupInfo.segmentBackups {
