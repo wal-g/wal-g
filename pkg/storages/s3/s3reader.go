@@ -116,6 +116,9 @@ func (reader *s3Reader) reconnect() error {
 	return nil
 }
 
+// THIS COde stolen from s3 lib, from vendor/github.com/aws/aws-sdk-go/aws/client/default_retryer.go
+// func (d DefaultRetryer) RetryRules( .. ) time.Duration
+// this calculate sleep duration (jitter and exponential backoff)
 func (reader *s3Reader) getIncrSleep(retryCount int) time.Duration {
 	minDelay := reader.minRetryDelay
 	maxDelay := reader.maxRetryDelay
@@ -151,7 +154,7 @@ func NewS3Reader(body io.ReadCloser, objectPath string, retriesCount int, folder
 func getHash(objectPath string, id int) string {
 	hash := fnv.New32a()
 	_, err := hash.Write([]byte(objectPath))
-	tracelog.ErrorLogger.FatalfOnError("Fatal, can't write buffer to hash", err)
+	tracelog.ErrorLogger.FatalfOnError("Fatal, can't write buffer to hash %v", err)
 
 	return fmt.Sprintf("%x_%d", hash.Sum32(), id)
 }
