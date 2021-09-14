@@ -35,9 +35,11 @@ var (
 		Short: backupPushShortDescription, // TODO : improve description
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			if userData == "" {
-				userData = viper.GetString(internal.SentinelUserDataSetting)
+			if userDataRaw == "" {
+				userDataRaw = viper.GetString(internal.SentinelUserDataSetting)
 			}
+			userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
+			tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
 			arguments := greenplum.NewBackupArguments(permanent, userData, prepareSegmentFwdArgs())
 			backupHandler, err := greenplum.NewBackupHandler(arguments)
@@ -45,8 +47,8 @@ var (
 			backupHandler.HandleBackupPush()
 		},
 	}
-	permanent = false
-	userData  = ""
+	permanent   = false
+	userDataRaw = ""
 
 	// as for now, WAL-G will simply forward these arguments to the segments
 	// todo: handle delta-from-name and delta-from-userdata
@@ -80,6 +82,6 @@ func init() {
 		false, "Store all corrupt blocks found during page checksum verification")
 	backupPushCmd.Flags().BoolVarP(&useRatingComposer, useRatingComposerFlag, useRatingComposerShorthand,
 		false, "Use rating tar composer (beta)")
-	backupPushCmd.Flags().StringVar(&userData, addUserDataFlag,
+	backupPushCmd.Flags().StringVar(&userDataRaw, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
 }
