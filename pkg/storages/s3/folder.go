@@ -42,10 +42,9 @@ const (
 	RangeQueriesMaxRetries   = "S3_RANGE_MAX_RETRIES"
 
 	RangeBatchEnabledDefault = false
-
-	RangeMaxRetries         = 10
-	RangeQueryMinRetryDelay = 30 * time.Millisecond
-	RangeQueryMaxRetryDelay = 300 * time.Second
+	RangeMaxRetriesDefault   = 10
+	RangeQueryMinRetryDelay  = 30 * time.Millisecond
+	RangeQueryMaxRetryDelay  = 300 * time.Second
 )
 
 var (
@@ -206,7 +205,7 @@ func (folder *Folder) getReaderSettings() (rangeEnabled bool, retriesCount int,
 		}
 	}
 
-	retriesCount = RangeMaxRetries
+	retriesCount = RangeMaxRetriesDefault
 	if maxRetriesRaw, ok := folder.settings[RangeQueriesMaxRetries]; ok {
 		if maxRetriesInt, err := strconv.Atoi(maxRetriesRaw); err == nil {
 			retriesCount = maxRetriesInt
