@@ -66,7 +66,7 @@ jobs:
 
   test:
     name: test
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-20.04
     needs: [ buildimages ]
     strategy:
       matrix:
