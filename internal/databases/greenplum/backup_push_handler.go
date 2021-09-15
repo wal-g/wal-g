@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/google/uuid"
 
 	"github.com/blang/semver"
@@ -39,14 +41,18 @@ func NewSegmentUserDataFromID(backupID string) SegmentUserData {
 	return SegmentUserData{ID: backupID}
 }
 
-// QuotedString will do json.Marshal-ing followed by quoting in order to escape special control characters
-// in the resulting JSON so it can be transferred as the cmdline argument to a segment
-func (d SegmentUserData) QuotedString() string {
+func (d SegmentUserData) String() string {
 	b, err := json.Marshal(d)
 	if err != nil {
 		panic(err)
 	}
-	return strconv.Quote(string(b))
+	return string(b)
+}
+
+// QuotedString will do json.Marshal-ing followed by quoting in order to escape special control characters
+// in the resulting JSON so it can be transferred as the cmdline argument to a segment
+func (d SegmentUserData) QuotedString() string {
+	return strconv.Quote(d.String())
 }
 
 // SegmentFwdArg describes the specific WAL-G
@@ -64,8 +70,12 @@ type BackupWorkers struct {
 
 // CurBackupInfo holds all information that is harvest during the backup process
 type CurBackupInfo struct {
-	backupName     string
-	segmentBackups map[string]*cluster.SegConfig
+	backupName       string
+	segmentBackups   map[string]*cluster.SegConfig
+	startTime        time.Time
+	systemIdentifier *uint64
+	gpVersion        semver.Version
+	segmentsMetadata map[string]postgres.ExtendedMetadataDto
 }
 
 // BackupHandler is the main struct which is handling the backup process
@@ -102,6 +112,7 @@ func (bh *BackupHandler) buildCommand(contentID int) string {
 // HandleBackupPush handles the backup being read from filesystem and being pushed to the repository
 func (bh *BackupHandler) HandleBackupPush() {
 	bh.curBackupInfo.backupName = "backup_" + time.Now().Format(utility.BackupTimeFormat)
+	bh.curBackupInfo.startTime = utility.TimeNowCrossPlatformUTC()
 
 	tracelog.InfoLogger.Println("Running wal-g on segments")
 	gplog.InitializeLogging("wal-g", "")
@@ -123,15 +134,25 @@ func (bh *BackupHandler) HandleBackupPush() {
 	restoreLSNs, err := bh.createRestorePoint(bh.curBackupInfo.backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	sentinelDto := NewBackupSentinelDto(bh.curBackupInfo, restoreLSNs, bh.arguments.userData)
-	tracelog.InfoLogger.Println("Uploading sentinel file")
-	tracelog.InfoLogger.Println(sentinelDto.String())
-	err = internal.UploadSentinel(bh.workers.Uploader, sentinelDto, bh.curBackupInfo.backupName)
+	bh.curBackupInfo.segmentsMetadata, err = bh.fetchSegmentBackupsMetadata()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	sentinelDto := NewBackupSentinelDto(bh.curBackupInfo, restoreLSNs, bh.arguments.userData, bh.arguments.isPermanent)
+	err = bh.uploadSentinel(sentinelDto)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", bh.curBackupInfo.backupName)
 		tracelog.ErrorLogger.FatalError(err)
 	}
 	tracelog.InfoLogger.Printf("Backup %s successfully created", bh.curBackupInfo.backupName)
+}
+
+func (bh *BackupHandler) uploadSentinel(sentinelDto BackupSentinelDto) (err error) {
+	tracelog.InfoLogger.Println("Uploading sentinel file")
+	tracelog.InfoLogger.Println(sentinelDto.String())
+
+	sentinelUploader := bh.workers.Uploader
+	sentinelUploader.UploadingFolder = sentinelUploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
+	return internal.UploadSentinel(sentinelUploader, sentinelDto, bh.curBackupInfo.backupName)
 }
 
 func (bh *BackupHandler) connect() (err error) {
@@ -156,21 +177,21 @@ func (bh *BackupHandler) createRestorePoint(restorePointName string) (restoreLSN
 	return restoreLSNs, nil
 }
 
-func getGpCluster() (globalCluster *cluster.Cluster, err error) {
+func getGpClusterInfo() (globalCluster *cluster.Cluster, version semver.Version, systemIdentifier *uint64, err error) {
 	tracelog.DebugLogger.Println("Initializing tmp connection to read Greenplum info")
 	tmpConn, err := postgres.Connect()
 	if err != nil {
-		return globalCluster, err
+		return globalCluster, semver.Version{}, nil, err
 	}
 
 	queryRunner, err := NewGpQueryRunner(tmpConn)
 	if err != nil {
-		return globalCluster, err
+		return globalCluster, semver.Version{}, nil, err
 	}
 
 	versionStr, err := queryRunner.GetGreenplumVersion()
 	if err != nil {
-		return globalCluster, err
+		return globalCluster, semver.Version{}, nil, err
 	}
 	tracelog.DebugLogger.Printf("Greenplum version: %s", versionStr)
 	versionStart := strings.Index(versionStr, "(Greenplum Database ") + len("(Greenplum Database ")
@@ -180,16 +201,16 @@ func getGpCluster() (globalCluster *cluster.Cluster, err error) {
 	threeDigitVersion := pattern.FindStringSubmatch(versionStr)[0]
 	semVer, err := semver.Make(threeDigitVersion)
 	if err != nil {
-		return globalCluster, err
+		return globalCluster, semver.Version{}, nil, err
 	}
 
 	segConfigs, err := queryRunner.GetGreenplumSegmentsInfo(semVer)
 	if err != nil {
-		return globalCluster, err
+		return globalCluster, semver.Version{}, nil, err
 	}
 	globalCluster = cluster.NewCluster(segConfigs)
 
-	return globalCluster, nil
+	return globalCluster, semVer, queryRunner.pgQueryRunner.SystemIdentifier, nil
 }
 
 // NewBackupHandler returns a backup handler object, which can handle the backup
@@ -198,9 +219,8 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 	if err != nil {
 		return bh, err
 	}
-	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 
-	globalCluster, err := getGpCluster()
+	globalCluster, version, systemIdentifier, err := getGpClusterInfo()
 	if err != nil {
 		return bh, err
 	}
@@ -212,7 +232,9 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 		},
 		globalCluster: globalCluster,
 		curBackupInfo: CurBackupInfo{
-			segmentBackups: make(map[string]*cluster.SegConfig),
+			segmentBackups:   make(map[string]*cluster.SegConfig),
+			gpVersion:        version,
+			systemIdentifier: systemIdentifier,
 		},
 	}
 	return bh, err
@@ -225,4 +247,34 @@ func NewBackupArguments(isPermanent bool, userData interface{}, fwdArgs []Segmen
 		userData:       userData,
 		segmentFwdArgs: fwdArgs,
 	}
+}
+
+func (bh *BackupHandler) fetchSegmentBackupsMetadata() (map[string]postgres.ExtendedMetadataDto, error) {
+	metadata := make(map[string]postgres.ExtendedMetadataDto)
+	for backupID, segCfg := range bh.curBackupInfo.segmentBackups {
+		selector, err := internal.NewUserDataBackupSelector(NewSegmentUserDataFromID(backupID).String(), postgres.NewGenericMetaFetcher())
+		if err != nil {
+			return nil, err
+		}
+		segBackupsFolder := bh.workers.Uploader.UploadingFolder.GetSubFolder(strconv.Itoa(segCfg.ContentID))
+
+		backupName, err := selector.Select(segBackupsFolder)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Failed to select matching backup for id %s from subfolder %s", backupID, segBackupsFolder.GetPath())
+		}
+		backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, segBackupsFolder)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Failed to get %s backup from subfolder %s", backupName, segBackupsFolder.GetPath())
+		}
+
+		var meta postgres.ExtendedMetadataDto
+		err = backup.FetchMetadata(&meta)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Failed to get %s backup metadata from subfolder %s", backupName, segBackupsFolder.GetPath())
+		}
+
+		metadata[backupID] = meta
+	}
+
+	return metadata, nil
 }
