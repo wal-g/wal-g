@@ -19,7 +19,7 @@ services:
     container_name: wal-g_ubuntu
 
   s3:
-    image: minio/minio:RELEASE.2019-01-31T00-31-19Z
+    image: minio/minio:RELEASE.2021-06-07T21-40-51Z
     container_name: wal-g_s3
     hostname: s3
     ports:
@@ -79,7 +79,7 @@ services:
       &&  /usr/bin/minio server /export'
 
   s3-another:
-    image: minio/minio:RELEASE.2019-01-31T00-31-19Z
+    image: minio/minio:RELEASE.2021-06-07T21-40-51Z
     container_name: wal-g_s32
     ports:
       - "9001:9001"
