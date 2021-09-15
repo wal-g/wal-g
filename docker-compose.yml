@@ -21,6 +21,7 @@ services:
   s3:
     image: minio/minio
     container_name: wal-g_s3
+    hostname: s3
     ports:
       - "9000:9000"
     environment:
