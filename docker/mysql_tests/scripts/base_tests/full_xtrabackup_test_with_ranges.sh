@@ -3,7 +3,7 @@ set -e -x
 
 . /usr/local/export_common.sh
 
-export WALE_S3_PREFIX=s3://mysqlfullxtrabackupbucketwithranges
+export WALE_S3_PREFIX=s3://mysqlfullxtrabackupwithrangesbucket
 
 
 mysqld --initialize --init-file=/etc/mysql/init.sql
