@@ -16,7 +16,7 @@ RUN ./gpdb_src/concourse/scripts/setup_gpadmin_user.bash
 
 WORKDIR /usr/local/gpdb_src
 RUN locale-gen en_US.utf8
-RUN ./README.Ubuntu.bash
+RUN sed -i 's/apt-get install/DEBIAN_FRONTEND=noninteractive apt-get install/g' README.Ubuntu.bash && ./README.Ubuntu.bash
 
 WORKDIR /usr/local/gpdb_src
 RUN ./configure --with-perl --with-python --with-libxml --with-gssapi --prefix=/usr/local/gpdb_src > /dev/nul && \

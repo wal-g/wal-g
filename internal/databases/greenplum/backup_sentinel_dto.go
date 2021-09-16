@@ -2,6 +2,11 @@ package greenplum
 
 import (
 	"encoding/json"
+	"os"
+	"time"
+
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 )
@@ -54,6 +59,16 @@ type BackupSentinelDto struct {
 	RestorePoint *string           `json:"restore_point,omitempty"`
 	Segments     []SegmentMetadata `json:"segments,omitempty"`
 	UserData     interface{}       `json:"user_data,omitempty"`
+
+	StartTime        time.Time `json:"start_time"`
+	FinishTime       time.Time `json:"finish_time"`
+	Hostname         string    `json:"hostname"`
+	GpVersion        string    `json:"gp_version"`
+	IsPermanent      bool      `json:"is_permanent"`
+	SystemIdentifier *uint64   `json:"system_identifier"`
+
+	UncompressedSize int64 `json:"uncompressed_size"`
+	CompressedSize   int64 `json:"compressed_size"`
 }
 
 func (s *BackupSentinelDto) String() string {
@@ -65,14 +80,31 @@ func (s *BackupSentinelDto) String() string {
 }
 
 // NewBackupSentinelDto returns new BackupSentinelDto instance
-func NewBackupSentinelDto(curBackupInfo CurBackupInfo, restoreLSNs map[int]string, userData interface{}) BackupSentinelDto {
-	sentinel := BackupSentinelDto{
-		RestorePoint: &curBackupInfo.backupName,
-		Segments:     make([]SegmentMetadata, 0, len(curBackupInfo.segmentBackups)),
-		UserData:     userData,
+func NewBackupSentinelDto(currBackupInfo CurrBackupInfo, restoreLSNs map[int]string, userData interface{},
+	isPermanent bool) BackupSentinelDto {
+	hostname, err := os.Hostname()
+	if err != nil {
+		tracelog.WarningLogger.Printf("Failed to fetch the hostname for metadata, leaving empty: %v", err)
 	}
 
-	for backupID, cfg := range curBackupInfo.segmentBackups {
+	sentinel := BackupSentinelDto{
+		RestorePoint:     &currBackupInfo.backupName,
+		Segments:         make([]SegmentMetadata, 0, len(currBackupInfo.segmentBackups)),
+		UserData:         userData,
+		StartTime:        currBackupInfo.startTime,
+		FinishTime:       utility.TimeNowCrossPlatformUTC(),
+		Hostname:         hostname,
+		GpVersion:        currBackupInfo.gpVersion.String(),
+		IsPermanent:      isPermanent,
+		SystemIdentifier: currBackupInfo.systemIdentifier,
+	}
+
+	for idx := range currBackupInfo.segmentsMetadata {
+		sentinel.CompressedSize += currBackupInfo.segmentsMetadata[idx].CompressedSize
+		sentinel.UncompressedSize += currBackupInfo.segmentsMetadata[idx].UncompressedSize
+	}
+
+	for backupID, cfg := range currBackupInfo.segmentBackups {
 		restoreLSN := restoreLSNs[cfg.ContentID]
 		sentinel.Segments = append(sentinel.Segments, NewSegmentMetadata(backupID, *cfg, restoreLSN))
 	}
