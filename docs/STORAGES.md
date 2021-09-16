@@ -45,7 +45,15 @@ To configure AWS KMS key for client-side encryption and decryption. By default, 
 
 * `WALG_CSE_KMS_REGION`
 
-To configure AWS KMS key region for client-side encryption and decryption (i.e., `eu-west-1`).
+To configure AWS KMS key for client-side encryption and decryption. By default, no encryption is used. (AWS_REGION or WALG_CSE_KMS_REGION required to be set when using AWS KMS key client-side encryption)
+
+* `WALG_S3_RANGE_BATCH_ENABLED`
+
+Set to TRUE to allow wal-g in case of network problems to continue downloading from the point that was already downloaded using HTTP Range query. This option is useful when download big files more than few hours.
+
+* `WALG_S3_RANGE_MAX_RETRIES`
+
+If `WALG_S3_RANGE_BATCH_ENABLED` enabled, wal-g will try to reconnect N times, by default 10 times
 
 * `S3_USE_LIST_OBJECTS_V1`
 
