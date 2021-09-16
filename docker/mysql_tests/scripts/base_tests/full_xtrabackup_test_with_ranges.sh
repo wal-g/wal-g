@@ -3,7 +3,9 @@ set -e -x
 
 . /usr/local/export_common.sh
 
+export WALG_LOG_LEVEL=DEVEL
 export WALE_S3_PREFIX=s3://mysqlfullxtrabackupwithrangesbucket
+export WALG_S3_RANGE_BATCH_ENABLED=true
 
 
 mysqld --initialize --init-file=/etc/mysql/init.sql
@@ -22,7 +24,6 @@ wal-g backup-push
 
 mysql_kill_and_clean_data
 
-export S3_RANGE_BATCH_ENABLED=true
 wal-g backup-fetch LATEST
 
 chown -R mysql:mysql $MYSQLDATA
