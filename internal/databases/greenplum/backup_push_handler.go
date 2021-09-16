@@ -68,8 +68,8 @@ type BackupWorkers struct {
 	Conn     *pgx.Conn
 }
 
-// CurBackupInfo holds all information that is harvest during the backup process
-type CurBackupInfo struct {
+// CurrBackupInfo holds all information that is harvest during the backup process
+type CurrBackupInfo struct {
 	backupName       string
 	segmentBackups   map[string]*cluster.SegConfig
 	startTime        time.Time
@@ -80,16 +80,16 @@ type CurBackupInfo struct {
 
 // BackupHandler is the main struct which is handling the backup process
 type BackupHandler struct {
-	arguments     BackupArguments
-	workers       BackupWorkers
-	globalCluster *cluster.Cluster
-	curBackupInfo CurBackupInfo
+	arguments      BackupArguments
+	workers        BackupWorkers
+	globalCluster  *cluster.Cluster
+	currBackupInfo CurrBackupInfo
 }
 
 func (bh *BackupHandler) buildCommand(contentID int) string {
 	segment := bh.globalCluster.ByContent[contentID][0]
 	segUserData := NewSegmentUserData()
-	bh.curBackupInfo.segmentBackups[segUserData.ID] = segment
+	bh.currBackupInfo.segmentBackups[segUserData.ID] = segment
 	cmd := []string{
 		"WALG_LOG_LEVEL=DEVEL",
 		fmt.Sprintf("PGPORT=%d", segment.Port),
@@ -111,8 +111,8 @@ func (bh *BackupHandler) buildCommand(contentID int) string {
 
 // HandleBackupPush handles the backup being read from filesystem and being pushed to the repository
 func (bh *BackupHandler) HandleBackupPush() {
-	bh.curBackupInfo.backupName = "backup_" + time.Now().Format(utility.BackupTimeFormat)
-	bh.curBackupInfo.startTime = utility.TimeNowCrossPlatformUTC()
+	bh.currBackupInfo.backupName = "backup_" + time.Now().Format(utility.BackupTimeFormat)
+	bh.currBackupInfo.startTime = utility.TimeNowCrossPlatformUTC()
 
 	tracelog.InfoLogger.Println("Running wal-g on segments")
 	gplog.InitializeLogging("wal-g", "")
@@ -131,19 +131,19 @@ func (bh *BackupHandler) HandleBackupPush() {
 
 	err := bh.connect()
 	tracelog.ErrorLogger.FatalOnError(err)
-	restoreLSNs, err := bh.createRestorePoint(bh.curBackupInfo.backupName)
+	restoreLSNs, err := bh.createRestorePoint(bh.currBackupInfo.backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	bh.curBackupInfo.segmentsMetadata, err = bh.fetchSegmentBackupsMetadata()
+	bh.currBackupInfo.segmentsMetadata, err = bh.fetchSegmentBackupsMetadata()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	sentinelDto := NewBackupSentinelDto(bh.curBackupInfo, restoreLSNs, bh.arguments.userData, bh.arguments.isPermanent)
+	sentinelDto := NewBackupSentinelDto(bh.currBackupInfo, restoreLSNs, bh.arguments.userData, bh.arguments.isPermanent)
 	err = bh.uploadSentinel(sentinelDto)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", bh.curBackupInfo.backupName)
+		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", bh.currBackupInfo.backupName)
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	tracelog.InfoLogger.Printf("Backup %s successfully created", bh.curBackupInfo.backupName)
+	tracelog.InfoLogger.Printf("Backup %s successfully created", bh.currBackupInfo.backupName)
 }
 
 func (bh *BackupHandler) uploadSentinel(sentinelDto BackupSentinelDto) (err error) {
@@ -152,7 +152,7 @@ func (bh *BackupHandler) uploadSentinel(sentinelDto BackupSentinelDto) (err erro
 
 	sentinelUploader := bh.workers.Uploader
 	sentinelUploader.UploadingFolder = sentinelUploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
-	return internal.UploadSentinel(sentinelUploader, sentinelDto, bh.curBackupInfo.backupName)
+	return internal.UploadSentinel(sentinelUploader, sentinelDto, bh.currBackupInfo.backupName)
 }
 
 func (bh *BackupHandler) connect() (err error) {
@@ -231,7 +231,7 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 			Uploader: uploader,
 		},
 		globalCluster: globalCluster,
-		curBackupInfo: CurBackupInfo{
+		currBackupInfo: CurrBackupInfo{
 			segmentBackups:   make(map[string]*cluster.SegConfig),
 			gpVersion:        version,
 			systemIdentifier: systemIdentifier,
@@ -251,7 +251,7 @@ func NewBackupArguments(isPermanent bool, userData interface{}, fwdArgs []Segmen
 
 func (bh *BackupHandler) fetchSegmentBackupsMetadata() (map[string]postgres.ExtendedMetadataDto, error) {
 	metadata := make(map[string]postgres.ExtendedMetadataDto)
-	for backupID, segCfg := range bh.curBackupInfo.segmentBackups {
+	for backupID, segCfg := range bh.currBackupInfo.segmentBackups {
 		selector, err := internal.NewUserDataBackupSelector(NewSegmentUserDataFromID(backupID).String(), postgres.NewGenericMetaFetcher())
 		if err != nil {
 			return nil, err

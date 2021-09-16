@@ -80,7 +80,7 @@ func (s *BackupSentinelDto) String() string {
 }
 
 // NewBackupSentinelDto returns new BackupSentinelDto instance
-func NewBackupSentinelDto(curBackupInfo CurBackupInfo, restoreLSNs map[int]string, userData interface{},
+func NewBackupSentinelDto(currBackupInfo CurrBackupInfo, restoreLSNs map[int]string, userData interface{},
 	isPermanent bool) BackupSentinelDto {
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -88,23 +88,23 @@ func NewBackupSentinelDto(curBackupInfo CurBackupInfo, restoreLSNs map[int]strin
 	}
 
 	sentinel := BackupSentinelDto{
-		RestorePoint:     &curBackupInfo.backupName,
-		Segments:         make([]SegmentMetadata, 0, len(curBackupInfo.segmentBackups)),
+		RestorePoint:     &currBackupInfo.backupName,
+		Segments:         make([]SegmentMetadata, 0, len(currBackupInfo.segmentBackups)),
 		UserData:         userData,
-		StartTime:        curBackupInfo.startTime,
+		StartTime:        currBackupInfo.startTime,
 		FinishTime:       utility.TimeNowCrossPlatformUTC(),
 		Hostname:         hostname,
-		GpVersion:        curBackupInfo.gpVersion.String(),
+		GpVersion:        currBackupInfo.gpVersion.String(),
 		IsPermanent:      isPermanent,
-		SystemIdentifier: curBackupInfo.systemIdentifier,
+		SystemIdentifier: currBackupInfo.systemIdentifier,
 	}
 
-	for idx := range curBackupInfo.segmentsMetadata {
-		sentinel.CompressedSize += curBackupInfo.segmentsMetadata[idx].CompressedSize
-		sentinel.UncompressedSize += curBackupInfo.segmentsMetadata[idx].UncompressedSize
+	for idx := range currBackupInfo.segmentsMetadata {
+		sentinel.CompressedSize += currBackupInfo.segmentsMetadata[idx].CompressedSize
+		sentinel.UncompressedSize += currBackupInfo.segmentsMetadata[idx].UncompressedSize
 	}
 
-	for backupID, cfg := range curBackupInfo.segmentBackups {
+	for backupID, cfg := range currBackupInfo.segmentBackups {
 		restoreLSN := restoreLSNs[cfg.ContentID]
 		sentinel.Segments = append(sentinel.Segments, NewSegmentMetadata(backupID, *cfg, restoreLSN))
 	}
