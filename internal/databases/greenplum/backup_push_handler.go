@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/google/uuid"
 
 	"github.com/blang/semver"
@@ -91,7 +89,6 @@ func (bh *BackupHandler) buildCommand(contentID int) string {
 	segUserData := NewSegmentUserData()
 	bh.currBackupInfo.segmentBackups[segUserData.ID] = segment
 	cmd := []string{
-		"WALG_LOG_LEVEL=DEVEL",
 		fmt.Sprintf("PGPORT=%d", segment.Port),
 		"wal-g pg",
 		fmt.Sprintf("backup-push %s", segment.DataDir),
@@ -251,30 +248,60 @@ func NewBackupArguments(isPermanent bool, userData interface{}, fwdArgs []Segmen
 
 func (bh *BackupHandler) fetchSegmentBackupsMetadata() (map[string]postgres.ExtendedMetadataDto, error) {
 	metadata := make(map[string]postgres.ExtendedMetadataDto)
-	for backupID, segCfg := range bh.currBackupInfo.segmentBackups {
-		selector, err := internal.NewUserDataBackupSelector(NewSegmentUserDataFromID(backupID).String(), postgres.NewGenericMetaFetcher())
-		if err != nil {
-			return nil, err
-		}
-		segBackupsFolder := bh.workers.Uploader.UploadingFolder.GetSubFolder(strconv.Itoa(segCfg.ContentID))
 
-		backupName, err := selector.Select(segBackupsFolder)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Failed to select matching backup for id %s from subfolder %s", backupID, segBackupsFolder.GetPath())
-		}
-		backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, segBackupsFolder)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Failed to get %s backup from subfolder %s", backupName, segBackupsFolder.GetPath())
-		}
+	backupIDs := make([]string, 0)
+	for backupID := range bh.currBackupInfo.segmentBackups {
+		backupIDs = append(backupIDs, backupID)
+	}
 
-		var meta postgres.ExtendedMetadataDto
-		err = backup.FetchMetadata(&meta)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Failed to get %s backup metadata from subfolder %s", backupName, segBackupsFolder.GetPath())
-		}
+	i := 0
+	minFetchMetaRetryWait := 5 * time.Second
+	maxFetchMetaRetryWait := time.Minute
+	sleeper := internal.NewExponentialSleeper(minFetchMetaRetryWait, maxFetchMetaRetryWait)
+	retryCount := 0
+	maxRetryCount := 5
 
-		metadata[backupID] = meta
+	for i < len(backupIDs) {
+		meta, err := bh.fetchSingleMetadata(backupIDs[i], bh.currBackupInfo.segmentBackups[backupIDs[i]])
+		if err != nil {
+			// Due to the potentially large number of segments, a large number of ListObjects() requests can be produced instantly.
+			// Instead of failing immediately, sleep and retry a couple of times.
+			if retryCount < maxRetryCount {
+				retryCount++
+				sleeper.Sleep()
+				continue
+			}
+
+			return nil, fmt.Errorf("failed to download the segment backup %s metadata (tried %d times): %w",
+				backupIDs[i], retryCount, err)
+		}
+		metadata[backupIDs[i]] = *meta
+		retryCount = 0
+		i++
 	}
 
 	return metadata, nil
+}
+
+func (bh *BackupHandler) fetchSingleMetadata(backupID string, segCfg *cluster.SegConfig) (*postgres.ExtendedMetadataDto, error) {
+	selector, err := internal.NewUserDataBackupSelector(NewSegmentUserDataFromID(backupID).String(), postgres.NewGenericMetaFetcher())
+	if err != nil {
+		return nil, err
+	}
+	segBackupsFolder := bh.workers.Uploader.UploadingFolder.GetSubFolder(strconv.Itoa(segCfg.ContentID))
+
+	backupName, err := selector.Select(segBackupsFolder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select matching backup for id %s from subfolder %s: %w", backupID, segBackupsFolder.GetPath(), err)
+	}
+
+	backup := internal.NewBackup(segBackupsFolder.GetSubFolder(utility.BaseBackupPath), backupName)
+
+	var meta postgres.ExtendedMetadataDto
+	err = backup.FetchMetadata(&meta)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get %s backup metadata from subfolder %s: %w", backupName, segBackupsFolder.GetPath(), err)
+	}
+
+	return &meta, nil
 }
