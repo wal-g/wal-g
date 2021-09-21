@@ -12,7 +12,6 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -37,15 +36,9 @@ func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromn
 	dbnames, fromnames, err = getDatabasesToRestore(sentinel, dbnames, fromnames)
 	tracelog.ErrorLogger.FatalfOnError("failed to list databases to restore logs: %v", err)
 
-	bs, err := blob.NewServer(folder)
-	tracelog.ErrorLogger.FatalfOnError("proxy create error: %v", err)
-
-	lock, err := bs.AcquireLock()
+	lock, err := RunOrReuseProxy(ctx, cancel, folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	defer func() { tracelog.ErrorLogger.PrintOnError(lock.Unlock()) }()
-
-	err = bs.RunBackground(ctx, cancel)
-	tracelog.ErrorLogger.FatalfOnError("proxy run error: %v", err)
+	defer lock.Close()
 
 	stopAt, err := utility.ParseUntilTS(untilTS)
 	tracelog.ErrorLogger.FatalfOnError("invalid util timestamp: %v", err)

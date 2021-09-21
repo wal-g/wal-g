@@ -111,6 +111,7 @@ const (
 	SQLServerBlobLockFile     = "SQLSERVER_BLOB_LOCK_FILE"
 	SQLServerConnectionString = "SQLSERVER_CONNECTION_STRING"
 	SQLServerDBConcurrency    = "SQLSERVER_DB_CONCURRENCY"
+	SQLServerReuseProxy       = "SQLSERVER_REUSE_PROXY"
 
 	EndpointSourceSetting = "S3_ENDPOINT_SOURCE"
 	EndpointPortSetting   = "S3_ENDPOINT_PORT"
@@ -317,6 +318,7 @@ var (
 		SQLServerBlobLockFile:     true,
 		SQLServerConnectionString: true,
 		SQLServerDBConcurrency:    true,
+		SQLServerReuseProxy:       true,
 	}
 
 	MysqlAllowedSettings = map[string]bool{

@@ -122,3 +122,12 @@ wal-g delete retain 3
 wal-g delete before backup_name
 wal-g delete everything
 ```
+
+Proxy as Service
+-----------------
+By default any wal-g command, like backup-push, runs proxy in background for the duration of the command.
+Alternatively wal-g commands may use proxy started as system service.
+In order to do this you need to start `wal-g proxy` as system service (or daemon on linux) and add following config options:
+```bash
+SQLSERVER_REUSE_PROXY: True
+```
