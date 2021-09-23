@@ -3,12 +3,13 @@ package internal
 import (
 	"errors"
 	"fmt"
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/tracelog"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 )
 
 // HandleWALRestore is invoked to perform wal-g wal-restore
