@@ -2,8 +2,10 @@ package internal
 
 import (
 	"encoding/binary"
-	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 	"io"
+	"os"
+	"path"
 )
 
 // PgControlData represents data contained in pg_control file
@@ -14,24 +16,37 @@ type PgControlData struct {
 }
 
 // ExtractPgControl extract pg_control data of cluster by storage
-func ExtractPgControl(folder storage.Folder) (*PgControlData, error) {
-	reader, err := folder.ReadObject(PgControlPath)
+func ExtractPgControl(folder string) (*PgControlData, error) {
+	pgControlReadCloser, err := os.Open(path.Join(folder, PgControlPath))
 	if err != nil {
 		return nil, err
 	}
-	return extractPgControlData(reader)
+
+	result, err := extractPgControlData(pgControlReadCloser)
+	if err != nil {
+		closeErr := pgControlReadCloser.Close()
+		tracelog.WarningLogger.Printf("Error on closing pg_control file: %v\n", closeErr)
+		return nil, err
+	}
+
+	err = pgControlReadCloser.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
-func extractPgControlData(reader io.Reader) (*PgControlData, error) {
-	bytes := make([]byte, 0)
+func extractPgControlData(pgControlReader io.Reader) (*PgControlData, error) {
+	bytes := make([]byte, 8192)
 
-	n, err := reader.Read(bytes)
+	n, err := pgControlReader.Read(bytes)
 	if err != nil || n < 8192 {
 		return nil, err
 	}
 
-	systemId := binary.LittleEndian.Uint64(bytes[0:7])
-	currentTl := binary.LittleEndian.Uint32(bytes[48:51])
+	systemId := binary.LittleEndian.Uint64(bytes[0:8])
+	currentTl := binary.LittleEndian.Uint32(bytes[48:52])
 
 	// Parse bytes from pg_control file and share this data
 	return &PgControlData{

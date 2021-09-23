@@ -1,0 +1,3 @@
+FROM wal-g/docker_prefix:latest
+
+CMD su - postgres /tmp/tests/restore_test.sh

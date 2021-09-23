@@ -2,19 +2,21 @@ package internal
 
 import (
 	"errors"
-	"github.com/spf13/viper"
+	"fmt"
 	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 )
 
 // HandleWALRestore is invoked to perform wal-g wal-restore
-func HandleWALRestore(targetFolder, sourceFolder, cloudFolder storage.Folder) {
-	targetPgData, err := ExtractPgControl(targetFolder)
+func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder) {
+	targetPgData, err := ExtractPgControl(targetPath)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get pg data on target cluster: %v\n", err)
 
-	sourcePgData, err := ExtractPgControl(sourceFolder)
+	sourcePgData, err := ExtractPgControl(sourcePath)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get pg data on source cluster: %v\n", err)
 
 	if targetPgData.GetSystemIdentifier() != sourcePgData.GetSystemIdentifier() {
@@ -24,23 +26,23 @@ func HandleWALRestore(targetFolder, sourceFolder, cloudFolder storage.Folder) {
 		tracelog.ErrorLogger.Fatal("Current timelines of target and source clusters are equal\n")
 	}
 
-	tgtHistoryRecords, err := getTimeLineHistoryRecords(targetPgData.GetCurrentTimeline(), targetFolder)
+	tgtHistoryRecords, err := getLocalTimelineHistoryRecords(targetPgData.GetCurrentTimeline(), targetPath)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on target cluster: %v\n", err)
 
-	srcHistoryRecords, err := getTimeLineHistoryRecords(sourcePgData.GetCurrentTimeline(), sourceFolder)
+	srcHistoryRecords, err := getLocalTimelineHistoryRecords(sourcePgData.GetCurrentTimeline(), sourcePath)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on source cluster: %v\n", err)
 
 	lastWalSegmentNo, lastCommonTl, err := FindLastCommonPoint(tgtHistoryRecords, srcHistoryRecords)
 	tracelog.ErrorLogger.FatalfOnError("Failed to find last common point: %v\n", err)
 
-	walDir, err := getWalDirName()
+	sourceWalDir, err := getWalDirName(sourcePath)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL directory name: %v\n", err)
-	walFolder := sourceFolder.GetSubFolder(walDir)
-	folderFilenames, err := getFolderFilenames(walFolder)
+
+	folderFilenames, err := getDirectoryFilenames(sourceWalDir)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL filenames: %v\n", err)
+
 	wals := getSegmentsFromFiles(folderFilenames)
 	walsByTls := groupSegmentsByTimelines(wals)
-
 	filenamesToRestore, err := GetMissingWals(lastWalSegmentNo, lastCommonTl,
 		sourcePgData.GetCurrentTimeline(), historiesSliceToMap(srcHistoryRecords), walsByTls)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get missing source WALs: %v\n", err)
@@ -52,7 +54,7 @@ func HandleWALRestore(targetFolder, sourceFolder, cloudFolder storage.Folder) {
 
 	tracelog.ErrorLogger.FatalfOnError("Failed to get the WAL directory name: %v\n", err)
 	for _, walFilename := range filenamesToRestore {
-		if err = DownloadWALFileTo(cloudFolder, walFilename, sourceFolder.GetSubFolder(walDir).GetPath()); err != nil {
+		if err = DownloadWALFileTo(cloudFolder, walFilename, sourceWalDir); err != nil {
 			tracelog.ErrorLogger.Printf("Failed to download WAL file %v\n", walFilename)
 		} else {
 			tracelog.InfoLogger.Printf("Successfully download WAL file %v\n", walFilename)
@@ -139,16 +141,54 @@ LOOP:
 	return result, nil
 }
 
-func getWalDirName() (string, error) {
-	pgData := viper.GetString(PgDataSetting)
+// getLocalTimelineHistoryRecords gets timeline history records from local wals
+func getLocalTimelineHistoryRecords(startTimeline uint32, pathToWal string) ([]*TimelineHistoryRecord, error) {
+	historyReadCloser, err := getLocalHistoryFile(startTimeline, pathToWal)
+	if err != nil {
+		return nil, err
+	}
+	historyRecords, err := parseHistoryFile(historyReadCloser)
+	if err != nil {
+		return nil, err
+	}
+	err = historyReadCloser.Close()
+	if err != nil {
+		return nil, err
+	}
+	return historyRecords, nil
+}
+
+// getDirectoryFilenames returns slice of filenames in directory by path
+func getDirectoryFilenames(path string) ([]string, error) {
+	result := make([]string, 0)
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range files {
+		result = append(result, f.Name())
+	}
+	return result, nil
+}
+
+func getLocalHistoryFile(timeline uint32, pathToWal string) (io.ReadCloser, error) {
+	historyFileName := fmt.Sprintf(walHistoryFileFormat, timeline)
+	readCloser, err := os.Open(filepath.Join(pathToWal, historyFileName))
+	if err != nil {
+		return nil, err
+	}
+	return readCloser, nil
+}
+
+func getWalDirName(pgData string) (string, error) {
 	dataFolderPath := filepath.Join(pgData, "pg_wal")
 	if _, err := os.Stat(dataFolderPath); err == nil {
-		return "pg_wal", nil
+		return dataFolderPath, nil
 	}
 
 	dataFolderPath = filepath.Join(pgData, "pg_xlog")
 	if _, err := os.Stat(dataFolderPath); err == nil {
-		return "pg_xlog", nil
+		return dataFolderPath, nil
 	}
-	return "", errors.New("directory for WAL files doesn't exist in " + pgData + ". Set PGDATA in config correctly")
+	return "", errors.New("directory for WAL files doesn't exist in " + pgData)
 }
