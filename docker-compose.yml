@@ -76,6 +76,12 @@ services:
       &&  mkdir -p /export/mysqldeletebinlogs
       &&  mkdir -p /export/archivereadyrename
       &&  mkdir -p /export/gpfullbucket
+      &&  mkdir -p /export/gpdeletewithoutconfirm
+      &&  mkdir -p /export/gpdeleteretainbucket
+      &&  mkdir -p /export/gpdeleteendtoendbucket
+      &&  mkdir -p /export/gpdeletebeforepermanentbucket
+      &&  mkdir -p /export/gpdeletebeforenamebucket
+      &&  mkdir -p /export/gpdeletebeforetimebucket
       &&  mkdir -p /export/storagetoolsbucket
       &&  /usr/bin/minio server /export'
 
@@ -643,8 +649,6 @@ services:
       context: .
     image: wal-g/gp_tests
     container_name: wal-g_gp_tests
-    env_file:
-      - docker/common/common_walg.env
     depends_on:
       - gp
       - s3

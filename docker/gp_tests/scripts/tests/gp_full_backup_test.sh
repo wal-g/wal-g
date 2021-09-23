@@ -8,10 +8,9 @@ cat ${CONFIG_FILE} > ${TMP_CONFIG}
 echo "," >> ${TMP_CONFIG}
 cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 /tmp/pg_scripts/wrap_config_file.sh ${TMP_CONFIG}
+source /tmp/tests/test_functions/util.sh
 
-/home/gpadmin/run_greenplum.sh
-
-source /usr/local/gpdb_src/gpAux/gpdemo/gpdemo-env.sh && /usr/local/gpdb_src/bin/createdb
+bootstrap_gp_cluster
 sleep 10
 
 wal-g backup-push --config=${TMP_CONFIG}

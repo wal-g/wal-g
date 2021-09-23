@@ -20,6 +20,11 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+const (
+	BackupNamePrefix = "backup_"
+	BackupNameLength = 23 // len(BackupNamePrefix) + len(utility.BackupTimeFormat)
+)
+
 // BackupArguments holds all arguments parsed from cmd to this handler class
 type BackupArguments struct {
 	isPermanent    bool
@@ -102,13 +107,13 @@ func (bh *BackupHandler) buildCommand(contentID int) string {
 	}
 
 	cmdLine := strings.Join(cmd, " ")
-	tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmdLine)
+	tracelog.InfoLogger.Printf("Command to run on segment %d: %s", contentID, cmdLine)
 	return cmdLine
 }
 
 // HandleBackupPush handles the backup being read from filesystem and being pushed to the repository
 func (bh *BackupHandler) HandleBackupPush() {
-	bh.currBackupInfo.backupName = "backup_" + time.Now().Format(utility.BackupTimeFormat)
+	bh.currBackupInfo.backupName = BackupNamePrefix + time.Now().Format(utility.BackupTimeFormat)
 	bh.currBackupInfo.startTime = utility.TimeNowCrossPlatformUTC()
 
 	tracelog.InfoLogger.Println("Running wal-g on segments")
@@ -123,7 +128,7 @@ func (bh *BackupHandler) HandleBackupPush() {
 	})
 
 	for _, command := range remoteOutput.Commands {
-		tracelog.DebugLogger.Printf("WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
+		tracelog.InfoLogger.Printf("WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
 	}
 
 	err := bh.connect()
@@ -153,7 +158,7 @@ func (bh *BackupHandler) uploadSentinel(sentinelDto BackupSentinelDto) (err erro
 }
 
 func (bh *BackupHandler) connect() (err error) {
-	tracelog.DebugLogger.Println("Connecting to Greenplum master.")
+	tracelog.InfoLogger.Println("Connecting to Greenplum master.")
 	bh.workers.Conn, err = postgres.Connect()
 	if err != nil {
 		return
@@ -175,7 +180,7 @@ func (bh *BackupHandler) createRestorePoint(restorePointName string) (restoreLSN
 }
 
 func getGpClusterInfo() (globalCluster *cluster.Cluster, version semver.Version, systemIdentifier *uint64, err error) {
-	tracelog.DebugLogger.Println("Initializing tmp connection to read Greenplum info")
+	tracelog.InfoLogger.Println("Initializing tmp connection to read Greenplum info")
 	tmpConn, err := postgres.Connect()
 	if err != nil {
 		return globalCluster, semver.Version{}, nil, err
@@ -190,7 +195,7 @@ func getGpClusterInfo() (globalCluster *cluster.Cluster, version semver.Version,
 	if err != nil {
 		return globalCluster, semver.Version{}, nil, err
 	}
-	tracelog.DebugLogger.Printf("Greenplum version: %s", versionStr)
+	tracelog.InfoLogger.Printf("Greenplum version: %s", versionStr)
 	versionStart := strings.Index(versionStr, "(Greenplum Database ") + len("(Greenplum Database ")
 	versionEnd := strings.Index(versionStr, ")")
 	versionStr = versionStr[versionStart:versionEnd]
@@ -284,23 +289,17 @@ func (bh *BackupHandler) fetchSegmentBackupsMetadata() (map[string]postgres.Exte
 }
 
 func (bh *BackupHandler) fetchSingleMetadata(backupID string, segCfg *cluster.SegConfig) (*postgres.ExtendedMetadataDto, error) {
-	selector, err := internal.NewUserDataBackupSelector(NewSegmentUserDataFromID(backupID).String(), postgres.NewGenericMetaFetcher())
+	// Actually, this is not a real completed backup. It is only used to fetch the segment metadata
+	currentBackup := NewBackup(bh.workers.Uploader.UploadingFolder, bh.currBackupInfo.backupName)
+
+	pgBackup, err := currentBackup.GetSegmentBackup(backupID, segCfg.ContentID)
 	if err != nil {
 		return nil, err
 	}
-	segBackupsFolder := bh.workers.Uploader.UploadingFolder.GetSubFolder(strconv.Itoa(segCfg.ContentID))
 
-	backupName, err := selector.Select(segBackupsFolder)
+	meta, err := pgBackup.FetchMeta()
 	if err != nil {
-		return nil, fmt.Errorf("failed to select matching backup for id %s from subfolder %s: %w", backupID, segBackupsFolder.GetPath(), err)
-	}
-
-	backup := internal.NewBackup(segBackupsFolder.GetSubFolder(utility.BaseBackupPath), backupName)
-
-	var meta postgres.ExtendedMetadataDto
-	err = backup.FetchMetadata(&meta)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get %s backup metadata from subfolder %s: %w", backupName, segBackupsFolder.GetPath(), err)
+		return nil, err
 	}
 
 	return &meta, nil
