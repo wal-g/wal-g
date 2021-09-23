@@ -66,6 +66,7 @@ func prepareSegmentFwdArgs() []greenplum.SegmentFwdArg {
 
 	return []greenplum.SegmentFwdArg{
 		{Name: fullBackupFlag, Value: strconv.FormatBool(fullBackup)},
+		{Name: permanentFlag, Value: strconv.FormatBool(permanent)},
 	}
 }
 

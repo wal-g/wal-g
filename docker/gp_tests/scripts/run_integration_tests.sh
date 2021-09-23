@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e -x
 
+/home/gpadmin/run_greenplum.sh
+
 pushd /tmp
 for i in tests/*.sh; do
   echo
