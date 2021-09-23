@@ -163,7 +163,6 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 
 	segUserData := NewSegmentUserDataFromID(backupID)
 	cmd := []string{
-		"WALG_LOG_LEVEL=DEVEL",
 		fmt.Sprintf("PGPORT=%d", segment.Port),
 		"wal-g pg",
 		fmt.Sprintf("backup-fetch %s", segment.DataDir),
