@@ -76,24 +76,7 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	findFullBackup := false
-	modifier := internal.ExtractDeleteTargetModifierFromArgs(args)
-	if modifier == internal.FindFullDeleteModifier {
-		findFullBackup = true
-		// remove the extracted modifier from args
-		args = args[1:]
-	}
-
-	deleteHandler, err := greenplum.NewDeleteHandler(folder)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	targetBackupSelector, err := internal.CreateTargetDeleteBackupSelector(cmd, args, deleteTargetUserData, greenplum.NewGenericMetaFetcher())
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	deleteHandler.HandleDeleteTarget(targetBackupSelector, confirmed, findFullBackup)
+	tracelog.ErrorLogger.Fatalf("wal-g delete target is not supported for greenplum (yet)")
 }
 
 func init() {
