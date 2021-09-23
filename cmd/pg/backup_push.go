@@ -107,7 +107,7 @@ func createDeltaBaseSelector(cmd *cobra.Command,
 	case targetBackupName != "":
 		tracelog.InfoLogger.Printf("Selecting the backup with name %s as the base for the current delta backup...\n",
 			targetBackupName)
-		return internal.NewBackupNameSelector(targetBackupName)
+		return internal.NewBackupNameSelector(targetBackupName, true)
 
 	case targetUserData != "":
 		tracelog.InfoLogger.Println(

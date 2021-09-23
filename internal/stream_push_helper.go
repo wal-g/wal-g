@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	StreamPrefix = "stream_"
+	StreamPrefix           = "stream_"
+	StreamBackupNameLength = 23 // len(StreamPrefix) + len(utility.BackupTimeFormat)
 )
 
 // TODO : unit tests
