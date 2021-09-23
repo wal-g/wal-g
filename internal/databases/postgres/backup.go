@@ -52,20 +52,6 @@ func (backup *Backup) getTarPartitionFolder() storage.Folder {
 	return backup.Folder.GetSubFolder(backup.Name + internal.TarPartitionFolderName)
 }
 
-func GetBackupByName(backupName, subfolder string, folder storage.Folder) (Backup, error) {
-	defaultBackup, err := internal.GetBackupByName(backupName, subfolder, folder)
-	if err != nil {
-		return Backup{}, err
-	}
-	backup := Backup{defaultBackup, nil}
-
-	_, err = backup.GetSentinel()
-	if err != nil {
-		return Backup{}, err
-	}
-	return backup, nil
-}
-
 func (backup *Backup) GetTarNames() ([]string, error) {
 	tarPartitionFolder := backup.getTarPartitionFolder()
 	objects, _, err := tarPartitionFolder.ListFolder()

@@ -40,6 +40,10 @@ func GetPermanentBackupsAndWals(folder storage.Folder) (map[string]bool, map[str
 			permanentBackups[backupTime.BackupName] = true
 		}
 	}
+	if len(permanentBackups) > 0 {
+		tracelog.InfoLogger.Printf("Found permanent objects: backups=%v, wals=%v\n",
+			permanentBackups, permanentWals)
+	}
 	return permanentBackups, permanentWals
 }
 
