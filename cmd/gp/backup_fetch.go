@@ -45,7 +45,8 @@ var backupFetchCmd = &cobra.Command{
 		err = json.Unmarshal(file, &restoreCfg)
 		tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided restore config file: %v", err)
 
-		internal.HandleBackupFetch(folder, targetBackupSelector, greenplum.NewGreenplumBackupFetcher(restoreCfg))
+		logsDir := viper.GetString(internal.GPLogsDirectory)
+		internal.HandleBackupFetch(folder, targetBackupSelector, greenplum.NewGreenplumBackupFetcher(restoreCfg, logsDir))
 	},
 }
 

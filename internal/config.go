@@ -99,6 +99,8 @@ const (
 
 	RedisPassword = "WALG_REDIS_PASSWORD"
 
+	GPLogsDirectory = "WALG_GP_LOGS_DIR"
+
 	GoMaxProcs = "GOMAXPROCS"
 
 	HTTPListen       = "HTTP_LISTEN"
@@ -163,6 +165,10 @@ var (
 
 	PGDefaultSettings = map[string]string{
 		PgWalSize: "16",
+	}
+
+	GPDefaultSettings = map[string]string{
+		GPLogsDirectory: "",
 	}
 
 	AllowedSettings map[string]bool
@@ -336,6 +342,10 @@ var (
 		RedisPassword: true,
 	}
 
+	GPAllowedSettings = map[string]bool{
+		GPLogsDirectory: true,
+	}
+
 	RequiredSettings       = make(map[string]bool)
 	HTTPSettingExposeFuncs = map[string]func(webserver.WebServer){
 		HTTPExposePprof:          webserver.EnablePprofEndpoints,
@@ -357,6 +367,8 @@ func ConfigureSettings(currentType string) {
 			dbSpecificDefaultSettings = MongoDefaultSettings
 		case SQLSERVER:
 			dbSpecificDefaultSettings = SQLServerDefaultSettings
+		case GP:
+			dbSpecificDefaultSettings = GPDefaultSettings
 		}
 
 		for k, v := range dbSpecificDefaultSettings {
@@ -371,8 +383,10 @@ func ConfigureSettings(currentType string) {
 		case PG:
 			dbSpecificSettings = PGAllowedSettings
 		case GP:
-			// as of now, GP specific settings are identical to PG
-			dbSpecificSettings = PGAllowedSettings
+			for setting := range PGAllowedSettings {
+				GPAllowedSettings[setting] = true
+			}
+			dbSpecificSettings = GPAllowedSettings
 		case MONGO:
 			dbSpecificSettings = MongoAllowedSettings
 		case MYSQL:

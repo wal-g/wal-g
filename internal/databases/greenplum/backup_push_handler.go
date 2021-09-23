@@ -30,6 +30,7 @@ type BackupArguments struct {
 	isPermanent    bool
 	userData       interface{}
 	segmentFwdArgs []SegmentFwdArg
+	logsDir        string
 }
 
 type SegmentUserData struct {
@@ -117,7 +118,7 @@ func (bh *BackupHandler) HandleBackupPush() {
 	bh.currBackupInfo.startTime = utility.TimeNowCrossPlatformUTC()
 
 	tracelog.InfoLogger.Println("Running wal-g on segments")
-	gplog.InitializeLogging("wal-g", "")
+	gplog.InitializeLogging("wal-g", bh.arguments.logsDir)
 	remoteOutput := bh.globalCluster.GenerateAndExecuteCommand("Running wal-g",
 		cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
 		func(contentID int) string {
@@ -243,11 +244,12 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 }
 
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
-func NewBackupArguments(isPermanent bool, userData interface{}, fwdArgs []SegmentFwdArg) BackupArguments {
+func NewBackupArguments(isPermanent bool, userData interface{}, fwdArgs []SegmentFwdArg, logsDir string) BackupArguments {
 	return BackupArguments{
 		isPermanent:    isPermanent,
 		userData:       userData,
 		segmentFwdArgs: fwdArgs,
+		logsDir:        logsDir,
 	}
 }
 
