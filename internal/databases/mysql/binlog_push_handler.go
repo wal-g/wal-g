@@ -24,7 +24,7 @@ const BinlogCacheFileName = ".walg_mysql_binlogs_cache"
 
 type LogsCache struct {
 	LastArchivedBinlog string `json:"LastArchivedBinlog"`
-	GTIDArchived       string `json:"gtid_archived"`
+	GTIDArchived       string `json:"GtidArchived"`
 }
 
 //gocyclo:ignore
@@ -54,60 +54,50 @@ func HandleBinlogPush(uploader *internal.Uploader, untilBinlog string, checkGTID
 		cache.GTIDArchived = binlogSentinelDto.GTIDArchived
 	}
 
+	var filters []statefulBinlogFilter
+	filters = append(filters, &untilBinlogFilter{Until: untilBinlog})
+	filters = append(filters, &archivedBinlogFilter{})
+	if checkGTIDs {
+		flavor := getFlavor(db)
+		if flavor == "" {
+			flavor = mysql.MySQLFlavor
+		}
+		filters = append(filters, &gtidFilter{BinlogsFolder: binlogsFolder, Flavour: flavor})
+	}
+	for _, filter := range filters {
+		filter.init(cache)
+	}
+
+outer:
 	for i := 0; i < len(binlogs); i++ {
 		binLog := binlogs[i]
-		nextBinLog := ""
-		if i < len(binlogs)-1 {
-			nextBinLog = binlogs[i+1]
-		}
 
 		tracelog.InfoLogger.Printf("Testing... %v\n", binLog)
-
-		if binLog <= cache.LastArchivedBinlog {
-			tracelog.DebugLogger.Printf("Binlog %v already archived (filename check)\n", binLog)
-			continue
-		}
-
-		if binLog >= untilBinlog {
-			continue
-		}
-
-		var nextPreviousGTIDs mysql.GTIDSet
-		if nextBinLog != "" {
-			// nextPreviousGTIDs is 'GTIDs_executed in the current binary log file'
-			nextPreviousGTIDs, err = peekPreviousGTIDs(path.Join(binlogsFolder, nextBinLog))
-			if err != nil {
-				tracelog.InfoLogger.Printf("cannot extract PREVIOUS_GTIDS event from binlog %s\n", binLog)
-				// continue uploading even when we cannot parse next binlog
+		for _, filter := range filters {
+			nextBinLog := ""
+			if i < len(binlogs)-1 {
+				nextBinLog = binlogs[i+1]
 			}
-			uploadedGTIDs, err := mysql.ParseMysqlGTIDSet(cache.GTIDArchived)
-			if err != nil {
-				tracelog.DebugLogger.Printf("cannot extract set of uploaded binlgos from cache\n")
-				// continue uploading even when we cannot read uploadedGTIDs
-			} else if checkGTIDs {
-				// when we know that _next_ binlog's PreviousGTID already uploaded we can safely skip _current_ binlog
-				if uploadedGTIDs.String() != "" && uploadedGTIDs.Contain(nextPreviousGTIDs) {
-					tracelog.InfoLogger.Printf("Binlog %v already archived (GTID check)\n", binLog)
-					continue
-				}
+			if !filter.test(binLog, nextBinLog) {
+				tracelog.DebugLogger.Printf("Skip binlog %v (%s check)\n", binLog, filter.name())
+				continue outer
 			}
 		}
 
+		// Upload binlogs:
 		err = archiveBinLog(uploader, binlogsFolder, binLog)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		cache.LastArchivedBinlog = binLog
-		if nextPreviousGTIDs != nil {
-			cache.GTIDArchived = nextPreviousGTIDs.String()
+		for _, filter := range filters {
+			filter.onUpload(&cache)
 		}
 		putCache(cache)
 	}
 
 	// Write Binlog Sentinel
 	binlogSentinelDto.GTIDArchived = cache.GTIDArchived
-
-	tracelog.InfoLogger.Printf("Binlog sentinel: %s", binlogSentinelDto.String())
-	err = UploadBinlgoSentinel(rootFolder, &binlogSentinelDto)
+	tracelog.InfoLogger.Printf("Binlog sentinel: %s, cache: %+v", binlogSentinelDto.String(), cache)
+	err = UploadBinlogSentinel(rootFolder, &binlogSentinelDto)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
@@ -185,7 +175,6 @@ func getCache() LogsCache {
 
 func putCache(cache LogsCache) {
 	var cacheFilename string
-
 	usr, err := user.Current()
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to get current user homedir: %v\n", err)
@@ -204,17 +193,105 @@ func putCache(cache LogsCache) {
 	}
 }
 
-func peekPreviousGTIDs(filename string) (mysql.GTIDSet, error) {
+type statefulBinlogFilter interface {
+	name() string
+	init(LogsCache)
+	onUpload(*LogsCache)
+	test(binlog, nextBinlog string) bool
+}
+
+type untilBinlogFilter struct {
+	Until string
+}
+
+var _ statefulBinlogFilter = &untilBinlogFilter{}
+
+func (u *untilBinlogFilter) init(LogsCache) {}
+func (u *untilBinlogFilter) name() string {
+	return "until"
+}
+func (u *untilBinlogFilter) onUpload(*LogsCache) {}
+func (u *untilBinlogFilter) test(binlog, _ string) bool {
+	return binlog < u.Until
+}
+
+type archivedBinlogFilter struct {
+	lastArchived string
+	lastTested   string
+}
+
+var _ statefulBinlogFilter = &archivedBinlogFilter{}
+
+func (u *archivedBinlogFilter) init(data LogsCache) {
+	u.lastTested = data.LastArchivedBinlog
+	u.lastArchived = data.LastArchivedBinlog
+}
+func (u *archivedBinlogFilter) name() string {
+	return "archived binlog"
+}
+func (u *archivedBinlogFilter) onUpload(data *LogsCache) {
+	data.LastArchivedBinlog = u.lastTested
+}
+func (u *archivedBinlogFilter) test(binlog, _ string) bool {
+	if binlog > u.lastArchived {
+		u.lastTested = binlog
+		return true
+	}
+	return false
+}
+
+type gtidFilter struct {
+	BinlogsFolder string
+	Flavour       string
+	gtidArchived  string
+	lastGtidSeen  string
+}
+
+var _ statefulBinlogFilter = &gtidFilter{}
+
+func (u *gtidFilter) init(data LogsCache) {
+	u.lastGtidSeen = data.GTIDArchived
+	u.gtidArchived = data.GTIDArchived
+}
+func (u *gtidFilter) name() string {
+	return "gtid"
+}
+func (u *gtidFilter) onUpload(data *LogsCache) {
+	data.GTIDArchived = u.lastGtidSeen
+}
+func (u *gtidFilter) test(binlog, nextBinlog string) bool {
+	// nextPreviousGTIDs is 'GTIDs_executed in the current binary log file'
+	nextPreviousGTIDs, err := peekPreviousGTIDs(path.Join(u.BinlogsFolder, nextBinlog), u.Flavour)
+	if err != nil {
+		tracelog.InfoLogger.Printf("cannot extract PREVIOUS_GTIDS event from binlog %s\n", binlog)
+		// continue uploading even when we cannot parse next binlog
+	}
+	uploadedGTIDs, err := mysql.ParseMysqlGTIDSet(u.gtidArchived)
+	if err != nil {
+		tracelog.DebugLogger.Printf("cannot extract set of uploaded binlgos from cache\n")
+		// continue uploading even when we cannot read uploadedGTIDs
+	} else {
+		// when we know that _next_ binlog's PreviousGTID already uploaded we can safely skip _current_ binlog
+		if uploadedGTIDs.String() != "" && uploadedGTIDs.Contain(nextPreviousGTIDs) {
+			tracelog.InfoLogger.Printf("Binlog %v already archived (%s check)\n", binlog, u.name())
+			return false
+		}
+	}
+	u.lastGtidSeen = nextPreviousGTIDs.String()
+	return true
+}
+
+func peekPreviousGTIDs(filename string, flavour string) (mysql.GTIDSet, error) {
 	var found bool
 	previousGTID := &replication.PreviousGTIDsEvent{}
 
 	parser := replication.NewBinlogParser()
-	parser.SetFlavor("mysql")
+	parser.SetFlavor(flavour)
 	parser.SetVerifyChecksum(false) // the faster, the better
 	parser.SetRawMode(true)         // choose events to parse manually
 	err := parser.ParseFile(filename, 0, func(event *replication.BinlogEvent) error {
 		if event.Header.EventType == replication.PREVIOUS_GTIDS_EVENT {
-			err := previousGTID.Decode(event.RawData[19:])
+			err := previousGTID.Decode(event.RawData[replication.EventHeaderSize:])
 			if err != nil {
 				return err
 			}

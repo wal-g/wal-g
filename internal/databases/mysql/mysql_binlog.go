@@ -241,7 +241,7 @@ func (g *gtidSet) ToString() string {
 const BinlogSentinelPath = "binlog_sentinel_" + utility.VersionStr + ".json"
 
 type BinlogSentinelDto struct {
-	GTIDArchived string `json:"gtid_archived"`
+	GTIDArchived string `json:"GtidArchived"`
 }
 
 func (dto *BinlogSentinelDto) String() string {
@@ -266,7 +266,7 @@ func FetchBinlogSentinel(folder storage.Folder, sentinelDto interface{}) error {
 	return nil
 }
 
-func UploadBinlgoSentinel(folder storage.Folder, sentinelDto interface{}) error {
+func UploadBinlogSentinel(folder storage.Folder, sentinelDto interface{}) error {
 	sentinelName := BinlogSentinelPath
 	dtoBody, err := json.Marshal(sentinelDto)
 	if err != nil {

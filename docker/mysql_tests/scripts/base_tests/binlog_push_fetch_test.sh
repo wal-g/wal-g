@@ -55,7 +55,7 @@ sysbench --time=1 run && mysql -e "FLUSH LOGS"
 sysbench --time=1 run && mysql -e "FLUSH LOGS"
 current_uuid=$(mysql -Nse "SELECT @@server_uuid" | awk '{print $1}')
 current_sentinel=$(s3cmd get "${WALE_S3_PREFIX}/binlog_sentinel_005.json" - )
-echo "{\"gtid_archived\":\"${current_uuid}:1-999999\"}" | s3cmd put - "${WALE_S3_PREFIX}/binlog_sentinel_005.json"
+echo "{\"GtidArchived\":\"${current_uuid}:1-999999\"}" | s3cmd put - "${WALE_S3_PREFIX}/binlog_sentinel_005.json"
 binlogs_cnt1=$(s3cmd ls "${WALE_S3_PREFIX}/binlog_005/" | wc -l )
 wal-g binlog-push --check-gtids
 binlogs_cnt2=$(s3cmd ls "${WALE_S3_PREFIX}/binlog_005/" | wc -l )
