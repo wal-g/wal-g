@@ -3,8 +3,8 @@ package copy
 import (
 	"sync"
 
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 type InfoProvider struct {
@@ -72,7 +72,9 @@ func (ch *InfoProvider) copyObject() error {
 		return err
 	}
 
-	tracelog.InfoLogger.Printf("Copied '%s' from folder '%s' to '%s' in fodler '%s'.", ch.SrcObj.GetName(), ch.From.GetPath(), ch.targetName, ch.To.GetPath())
+	tracelog.InfoLogger.Printf(
+		"Copied '%s' from folder '%s' to '%s' in fodler '%s'.",
+		ch.SrcObj.GetName(), ch.From.GetPath(), ch.targetName, ch.To.GetPath())
 	return nil
 }
 

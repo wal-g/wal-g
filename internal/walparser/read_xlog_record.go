@@ -102,7 +102,9 @@ func readXLogRecordBlockImageHeader(reader io.Reader) (*XLogRecordBlockImageHead
 	return &blockImageHeader, nil
 }
 
-func readBlockLocation(blockHasSameRel bool, lastRelFileNode *RelFileNode, reader io.Reader) (location *BlockLocation, err error) {
+func readBlockLocation(blockHasSameRel bool,
+	lastRelFileNode *RelFileNode,
+	reader io.Reader) (location *BlockLocation, err error) {
 	var relFileNode *RelFileNode
 	if blockHasSameRel {
 		if lastRelFileNode == nil {
@@ -125,15 +127,15 @@ func readBlockLocation(blockHasSameRel bool, lastRelFileNode *RelFileNode, reade
 }
 
 func readXLogRecordBlockHeader(lastRelFileNode *RelFileNode,
-	blockId uint8, maxReadBlockId *int, reader *ShrinkableReader) (*XLogRecordBlockHeader, *RelFileNode, error) {
-	if blockId > XlrMaxBlockId {
-		return nil, nil, NewInvalidRecordBlockIdError(blockId)
+	blockID uint8, maxReadBlockID *int, reader *ShrinkableReader) (*XLogRecordBlockHeader, *RelFileNode, error) {
+	if blockID > XlrMaxBlockID {
+		return nil, nil, NewInvalidRecordBlockIDError(blockID)
 	}
-	blockHeader := NewXLogRecordBlockHeader(blockId)
-	if int(blockHeader.BlockId) <= *maxReadBlockId {
-		return nil, nil, NewOutOfOrderBlockIdError(int(blockHeader.BlockId), *maxReadBlockId)
+	blockHeader := NewXLogRecordBlockHeader(blockID)
+	if int(blockHeader.BlockID) <= *maxReadBlockID {
+		return nil, nil, NewOutOfOrderBlockIDError(int(blockHeader.BlockID), *maxReadBlockID)
 	}
-	*maxReadBlockId = int(blockHeader.BlockId)
+	*maxReadBlockID = int(blockHeader.BlockID)
 
 	err := parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
 		{Field: &blockHeader.ForkFlags, Name: "forkFlags"},
@@ -174,16 +176,16 @@ func readXLogRecordBlockHeader(lastRelFileNode *RelFileNode,
 
 func readXLogRecordBlockHeaderPart(record *XLogRecord, reader io.Reader) error {
 	var lastRelFileNode *RelFileNode = nil
-	maxReadBlockId := -1
+	maxReadBlockID := -1
 	headerReader := &ShrinkableReader{reader, int(record.Header.TotalRecordLength - XLogRecordHeaderSize)}
 	for headerReader.dataRemained > 0 {
-		var blockId uint8
-		err := parsingutil.NewFieldToParse(&blockId, "blockId").ParseFrom(headerReader)
+		var blockID uint8
+		err := parsingutil.NewFieldToParse(&blockID, "blockId").ParseFrom(headerReader)
 		if err != nil {
 			return err
 		}
-		switch blockId {
-		case XlrBlockIdDataShort:
+		switch blockID {
+		case XlrBlockIDDataShort:
 			var mainDataLen uint8
 			err := parsingutil.NewFieldToParse(&mainDataLen, "mainDataLen8").ParseFrom(headerReader)
 			if err != nil {
@@ -194,7 +196,7 @@ func readXLogRecordBlockHeaderPart(record *XLogRecord, reader io.Reader) error {
 			if err != nil {
 				return err
 			}
-		case XlrBlockIdDataLong:
+		case XlrBlockIDDataLong:
 			err := parsingutil.NewFieldToParse(&record.MainDataLen, "mainDataLen32").ParseFrom(headerReader)
 			if err != nil {
 				return err
@@ -203,7 +205,7 @@ func readXLogRecordBlockHeaderPart(record *XLogRecord, reader io.Reader) error {
 			if err != nil {
 				return err
 			}
-		case XlrBlockIdOrigin:
+		case XlrBlockIDOrigin:
 			err := parsingutil.NewFieldToParse(&record.Origin, "origin").ParseFrom(headerReader)
 			if err != nil {
 				return err
@@ -211,7 +213,7 @@ func readXLogRecordBlockHeaderPart(record *XLogRecord, reader io.Reader) error {
 		default:
 			var blockHeader *XLogRecordBlockHeader
 			blockHeader, lastRelFileNode, err = readXLogRecordBlockHeader(
-				lastRelFileNode, blockId, &maxReadBlockId, headerReader)
+				lastRelFileNode, blockID, &maxReadBlockID, headerReader)
 			if err != nil {
 				return err
 			}

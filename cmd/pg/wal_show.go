@@ -3,6 +3,8 @@ package pg
 import (
 	"os"
 
+	"github.com/wal-g/wal-g/internal/databases/postgres"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -31,20 +33,20 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			folder, err := internal.ConfigureFolder()
 			tracelog.ErrorLogger.FatalOnError(err)
-			outputType := internal.TableOutput
-			if detailedJsonOutput {
-				outputType = internal.JsonOutput
+			outputType := postgres.TableOutput
+			if detailedJSONOutput {
+				outputType = postgres.JSONOutput
 			}
-			outputWriter := internal.NewWalShowOutputWriter(outputType, os.Stdout, !disableBackupsLookup)
-			internal.HandleWalShow(folder, !disableBackupsLookup, outputWriter)
+			outputWriter := postgres.NewWalShowOutputWriter(outputType, os.Stdout, !disableBackupsLookup)
+			postgres.HandleWalShow(folder, !disableBackupsLookup, outputWriter)
 		},
 	}
-	detailedJsonOutput   bool
+	detailedJSONOutput   bool
 	disableBackupsLookup bool
 )
 
 func init() {
-	cmd.AddCommand(walShowCmd)
-	walShowCmd.Flags().BoolVar(&detailedJsonOutput, detailedOutputFlag, false, detailedOutputDescription)
+	Cmd.AddCommand(walShowCmd)
+	walShowCmd.Flags().BoolVar(&detailedJSONOutput, detailedOutputFlag, false, detailedOutputDescription)
 	walShowCmd.Flags().BoolVar(&disableBackupsLookup, disableBackupsLookupFlag, false, disableBackupsLookupDescription)
 }

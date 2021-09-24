@@ -5,6 +5,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/wal-g/wal-g/cmd/st"
+
+	"github.com/wal-g/wal-g/internal/databases/postgres"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
@@ -19,7 +23,7 @@ var (
 	gitRevision = "devel"
 	buildDate   = "devel"
 
-	cmd = &cobra.Command{
+	Cmd = &cobra.Command{
 		Use:     "wal-g",
 		Short:   WalgShortDescription, // TODO : improve short and long descriptions
 		Version: strings.Join([]string{walgVersion, gitRevision, buildDate, "PostgreSQL"}, "\t"),
@@ -27,7 +31,7 @@ var (
 			err := internal.AssertRequiredSettingsSet()
 			tracelog.ErrorLogger.FatalOnError(err)
 			if viper.IsSet(internal.PgWalSize) {
-				internal.SetWalSize(viper.GetUint64(internal.PgWalSize))
+				postgres.SetWalSize(viper.GetUint64(internal.PgWalSize))
 			}
 		},
 	}
@@ -36,17 +40,22 @@ var (
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the PgCmd.
 func Execute() {
-	if err := cmd.Execute(); err != nil {
+	configureCommand()
+	if err := Cmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 }
 
-func init() {
+func configureCommand() {
+	internal.ConfigureSettings(internal.PG)
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
-	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
-	cmd.PersistentFlags().BoolVarP(&internal.Turbo, "turbo", "", false, "Ignore all kinds of throttling defined in config")
-	cmd.InitDefaultVersionFlag()
-	internal.AddConfigFlags(cmd)
+	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
+	Cmd.PersistentFlags().BoolVarP(&internal.Turbo, "turbo", "", false, "Ignore all kinds of throttling defined in config")
+	Cmd.InitDefaultVersionFlag()
+	internal.AddConfigFlags(Cmd)
+
+	// Storage tools
+	Cmd.AddCommand(st.StorageToolsCmd)
 }

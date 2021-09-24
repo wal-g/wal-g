@@ -10,8 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -31,25 +31,40 @@ const (
 	DeleteBeforeExamples = `  before base_0123              keep everything after base_0123 including itself
   before FIND_FULL base_0123    keep everything after the base of base_0123`
 
-	DeleteEverythingExamples = `  everything                delete every backup only if there is no permanent backups
+	DeleteEverythingExamples = `  everything                
+	delete every backup only if there is no permanent backups
   everything FORCE          delete every backup include permanents`
+
+	DeleteTargetExamples = `  target base_0000000100000000000000C4	delete base backup by name
+  target --target-user-data "{ \"x\": [3], \"y\": 4 }"	delete backup specified by user data
+  target base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all dependant delta backups 
+  target FIND_FULL base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all delta backups with the same base backup`  //nolint:lll
 
 	DeleteEverythingUsageExample = "everything [FORCE]"
 	DeleteRetainUsageExample     = "retain [FULL|FIND_FULL] backup_count"
 	DeleteBeforeUsageExample     = "before [FIND_FULL] backup_name|timestamp"
+	DeleteTargetUsageExample     = "target [FIND_FULL] backup_name | --target-user-data <data>"
+
+	DeleteTargetUserDataFlag        = "target-user-data"
+	DeleteTargetUserDataDescription = "delete storage backup which has the specified user data"
 )
 
 var StringModifiers = []string{"FULL", "FIND_FULL"}
 var StringModifiersDeleteEverything = []string{"FORCE"}
-var MaxTime = time.Unix(1<<63-62135596801, 999999999)
 var errNotFound = errors.New("not found")
+var errIncorrectArguments = errors.New("incorrect arguments")
 
 // BackupObject represents
 // the backup sentinel object uploaded on storage
 type BackupObject interface {
 	storage.Object
-	IsFullBackup() bool
 	GetBackupTime() time.Time
+	GetBackupName() string
+
+	// TODO: move increment info into separate struct (in backup.go)
+	IsFullBackup() bool
+	GetBaseBackupName() string
+	GetIncrementFromName() string
 }
 
 type DeleteHandlerOption func(h *DeleteHandler)
@@ -57,6 +72,12 @@ type DeleteHandlerOption func(h *DeleteHandler)
 func IsPermanentFunc(isPermanent func(storage.Object) bool) DeleteHandlerOption {
 	return func(h *DeleteHandler) {
 		h.isPermanent = isPermanent
+	}
+}
+
+func IsIgnoredFunc(isIgnored func(storage.Object) bool) DeleteHandlerOption {
+	return func(h *DeleteHandler) {
+		h.isIgnored = isIgnored
 	}
 }
 
@@ -75,6 +96,8 @@ func NewDeleteHandler(
 		},
 		// by default, all storage objects are impermanent
 		isPermanent: func(storage.Object) bool { return false },
+		// by default, all storage objects are not ignored
+		isIgnored: func(storage.Object) bool { return false },
 	}
 
 	for _, option := range options {
@@ -92,19 +115,13 @@ type DeleteHandler struct {
 	greater func(object1, object2 storage.Object) bool
 
 	isPermanent func(object storage.Object) bool
+	isIgnored   func(object storage.Object) bool
 }
 
 func (h *DeleteHandler) HandleDeleteBefore(args []string, confirmed bool) {
-	modifier, beforeStr := extractDeleteModifierFromArgs(args)
+	modifier, beforeStr := ExtractDeleteModifierFromArgs(args)
 
-	var target BackupObject
-	timeLine, err := time.Parse(time.RFC3339, beforeStr)
-	if err == nil {
-		target, err = h.FindTargetBeforeTime(timeLine, modifier)
-	} else {
-		target, err = h.FindTargetBeforeName(beforeStr, modifier)
-	}
-
+	target, err := h.FindTargetBefore(beforeStr, modifier)
 	tracelog.ErrorLogger.FatalOnError(err)
 	if target == nil {
 		tracelog.InfoLogger.Printf("No backup found for deletion")
@@ -116,7 +133,7 @@ func (h *DeleteHandler) HandleDeleteBefore(args []string, confirmed bool) {
 }
 
 func (h *DeleteHandler) HandleDeleteRetain(args []string, confirmed bool) {
-	modifier, retentionStr := extractDeleteModifierFromArgs(args)
+	modifier, retentionStr := ExtractDeleteModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionStr)
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -131,18 +148,11 @@ func (h *DeleteHandler) HandleDeleteRetain(args []string, confirmed bool) {
 }
 
 func (h *DeleteHandler) HandleDeleteRetainAfter(args []string, confirmed bool) {
-
-	modifier, retentionSir, afterStr := extractDeleteRetainModifierFromArgs(args)
+	modifier, retentionSir, afterStr := ExtractDeleteRetainAfterModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionSir)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	var target BackupObject
-	timeLine, err := time.Parse(time.RFC3339, afterStr)
-	if err == nil {
-		target, err = h.FindTargetRetainAfterTime(retentionCount, timeLine, modifier)
-	} else {
-		target, err = h.FindTargetRetainAfterName(retentionCount, afterStr, modifier)
-	}
+	target, err := h.FindTargetRetainAfter(retentionCount, afterStr, modifier)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if target == nil {
@@ -152,6 +162,61 @@ func (h *DeleteHandler) HandleDeleteRetainAfter(args []string, confirmed bool) {
 
 	err = h.DeleteBeforeTarget(target, confirmed)
 	tracelog.ErrorLogger.FatalOnError(err)
+}
+
+func (h *DeleteHandler) HandleDeleteTarget(targetSelector BackupSelector, confirmed, findFull bool) {
+	targetName, err := targetSelector.Select(h.Folder)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	var target BackupObject
+	for idx := range h.backups {
+		if h.backups[idx].GetBackupName() == targetName {
+			target = h.backups[idx]
+			break
+		}
+	}
+
+	if target == nil {
+		tracelog.InfoLogger.Printf("No backup found for deletion")
+		os.Exit(0)
+	}
+
+	var backupsToDelete []BackupObject
+	if findFull {
+		// delete all backups with the same base backup as the target
+		backupsToDelete = h.findRelatedBackups(target)
+	} else {
+		// delete all dependant backups
+		backupsToDelete = h.findDependantBackups(target)
+	}
+
+	err = h.DeleteTargets(backupsToDelete, confirmed)
+	tracelog.ErrorLogger.FatalOnError(err)
+}
+
+func (h *DeleteHandler) HandleDeleteEverything(args []string, permanentBackups map[string]bool, confirmed bool) {
+	forceModifier := false
+	modifier := ExtractDeleteEverythingModifierFromArgs(args)
+	if modifier == ForceDeleteModifier {
+		forceModifier = true
+	}
+
+	if len(permanentBackups) > 0 {
+		if !forceModifier {
+			tracelog.ErrorLogger.Fatalf("Found permanent backups=%v\n", permanentBackups)
+		}
+		tracelog.InfoLogger.Printf("Found permanent backups=%v\n", permanentBackups)
+	}
+	h.DeleteEverything(confirmed)
+}
+
+func (h *DeleteHandler) FindTargetBefore(beforeStr string, modifier int) (BackupObject, error) {
+	timeLine, err := time.Parse(time.RFC3339, beforeStr)
+	if err == nil {
+		return h.FindTargetBeforeTime(timeLine, modifier)
+	}
+
+	return h.FindTargetBeforeName(beforeStr, modifier)
 }
 
 func (h *DeleteHandler) FindTargetBeforeName(name string, modifier int) (BackupObject, error) {
@@ -191,6 +256,15 @@ func (h *DeleteHandler) FindTargetByName(bname string) (BackupObject, error) {
 	})
 }
 
+func (h *DeleteHandler) FindTargetRetainAfter(retentionCount int, afterStr string, modifier int) (BackupObject, error) {
+	timeLine, err := time.Parse(time.RFC3339, afterStr)
+	if err == nil {
+		return h.FindTargetRetainAfterTime(retentionCount, timeLine, modifier)
+	}
+
+	return h.FindTargetRetainAfterName(retentionCount, afterStr, modifier)
+}
+
 func (h *DeleteHandler) FindTargetRetainAfterName(
 	retentionCount int, name string, modifier int) (BackupObject, error) {
 	choiceFuncRetain := getRetainChoiceFunc(retentionCount, modifier)
@@ -202,9 +276,8 @@ func (h *DeleteHandler) FindTargetRetainAfterName(
 		meetName = meetName || strings.HasPrefix(object.GetName(), name)
 		if modifier == NoDeleteModifier {
 			return meetName
-		} else {
-			return meetName && object.IsFullBackup()
 		}
+		return meetName && object.IsFullBackup()
 	}
 	if choiceFuncAfterName == nil {
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete before'")
@@ -221,14 +294,12 @@ func (h *DeleteHandler) FindTargetRetainAfterName(
 
 	if h.greater(target2, target1) {
 		return target1, nil
-	} else {
-		return target2, nil
 	}
+	return target2, nil
 }
 
 func (h *DeleteHandler) FindTargetRetainAfterTime(retentionCount int, timeLine time.Time, modifier int,
 ) (BackupObject, error) {
-
 	choiceFuncRetain := getRetainChoiceFunc(retentionCount, modifier)
 	if choiceFuncRetain == nil {
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete retain'")
@@ -238,9 +309,8 @@ func (h *DeleteHandler) FindTargetRetainAfterTime(retentionCount int, timeLine t
 		timeCheck := timeLine.Before(backupTime) || timeLine.Equal(backupTime)
 		if modifier == NoDeleteModifier {
 			return timeCheck
-		} else {
-			return timeCheck && object.IsFullBackup()
 		}
+		return timeCheck && object.IsFullBackup()
 	}
 
 	target1, err := findTarget(h.backups, h.greater, choiceFuncRetain)
@@ -273,7 +343,10 @@ func (h *DeleteHandler) DeleteEverything(confirmed bool) {
 }
 
 func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) error {
+	return h.DeleteBeforeTargetWhere(target, confirmed, func(storage.Object) bool { return true })
+}
 
+func (h *DeleteHandler) DeleteBeforeTargetWhere(target BackupObject, confirmed bool, selector func(object storage.Object) bool) error {
 	if !target.IsFullBackup() {
 		errorMessage := "%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
 		return utility.NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
@@ -281,14 +354,84 @@ func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) 
 	tracelog.InfoLogger.Println("Start delete")
 
 	return storage.DeleteObjectsWhere(h.Folder, confirmed, func(object storage.Object) bool {
-		return h.less(object, target) && !h.isPermanent(object)
+		return selector(object) && h.less(object, target) && !h.isPermanent(object) && !h.isIgnored(object)
 	})
+}
+
+func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool) error {
+	backupNamesToDelete := make(map[string]bool)
+	for _, target := range targets {
+		if h.isPermanent(target) {
+			tracelog.ErrorLogger.Fatalf("Unable to delete permanent backup %s\n", target.GetName())
+		}
+		backupNamesToDelete[target.GetBackupName()] = true
+	}
+
+	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath),
+		confirmed, func(object storage.Object) bool {
+			return backupNamesToDelete[utility.StripLeftmostBackupName(object.GetName())] && !h.isPermanent(object) && !h.isIgnored(object)
+		})
+}
+
+// Find all backups related to the target.
+// All delta backups with the same base backup are considered as related.
+func (h *DeleteHandler) findRelatedBackups(target BackupObject) []BackupObject {
+	relatedBackups := make([]BackupObject, 0)
+
+	var related func(target BackupObject, other BackupObject) bool
+	if target.IsFullBackup() {
+		related = func(target BackupObject, other BackupObject) bool {
+			// remove base backup
+			isBaseBackup := target.GetBackupName() == other.GetBackupName()
+			// remove all increments from the target backup too
+			isIncrement := target.GetBackupName() == other.GetBaseBackupName()
+			return isBaseBackup || isIncrement
+		}
+	} else {
+		related = func(target BackupObject, other BackupObject) bool {
+			// remove base backup
+			isBaseBackup := target.GetBaseBackupName() == other.GetBackupName()
+			// remove all other increments from the target base backup
+			hasCommonBaseBackup := target.GetBaseBackupName() == other.GetBaseBackupName()
+			return isBaseBackup || hasCommonBaseBackup
+		}
+	}
+
+	for _, backup := range h.backups {
+		if related(target, backup) {
+			relatedBackups = append(relatedBackups, backup)
+		}
+	}
+	return relatedBackups
+}
+
+// Find all backups dependant on the target.
+// All delta backups which have the target as the ancestor in increment chain
+// are considered as dependant.
+func (h *DeleteHandler) findDependantBackups(target BackupObject) []BackupObject {
+	relatedBackups := make([]BackupObject, 0)
+
+	incrementsByBackup := make(map[string][]BackupObject)
+	for _, backup := range h.backups {
+		if !backup.IsFullBackup() {
+			incrementFrom := backup.GetIncrementFromName()
+			incrementsByBackup[incrementFrom] = append(incrementsByBackup[incrementFrom], backup)
+		}
+	}
+
+	queue := []BackupObject{target}
+	var curr BackupObject
+	for len(queue) > 0 {
+		curr, queue = queue[0], queue[1:]
+		relatedBackups = append(relatedBackups, curr)
+		queue = append(queue, incrementsByBackup[curr.GetBackupName()]...)
+	}
+	return relatedBackups
 }
 
 func findTarget(objects []BackupObject,
 	compare func(object1, object2 storage.Object) bool,
 	isTarget func(object BackupObject) bool) (BackupObject, error) {
-
 	sort.Slice(objects, func(i, j int) bool {
 		return compare(objects[i], objects[j])
 	})
@@ -318,16 +461,13 @@ func getBeforeChoiceFunc(name string, modifier int) func(object BackupObject) bo
 }
 
 func getRetainChoiceFunc(retentionCount, modifier int) func(object BackupObject) bool {
-
 	count := 0
 	switch modifier {
 	case NoDeleteModifier:
 		return func(object BackupObject) bool {
 			count++
-			if count == retentionCount {
-				return true
-			}
-			return false
+
+			return count == retentionCount
 		}
 	case FullDeleteModifier:
 		return func(object BackupObject) bool {
@@ -351,7 +491,8 @@ func getRetainChoiceFunc(retentionCount, modifier int) func(object BackupObject)
 	return nil
 }
 
-func extractDeleteRetainModifierFromArgs(args []string) (int, string, string) {
+// ExtractDeleteRetainAfterModifierFromArgs extracts the args for the "delete retain --after" command
+func ExtractDeleteRetainAfterModifierFromArgs(args []string) (int, string, string) {
 	if len(args) == 2 {
 		return NoDeleteModifier, args[0], args[1]
 	} else if args[0] == StringModifiers[0] {
@@ -360,6 +501,7 @@ func extractDeleteRetainModifierFromArgs(args []string) (int, string, string) {
 	return FindFullDeleteModifier, args[1], args[2]
 }
 
+// ExtractDeleteEverythingModifierFromArgs extracts the args for the "delete everything" command
 func ExtractDeleteEverythingModifierFromArgs(args []string) int {
 	if len(args) == 0 {
 		return NoDeleteModifier
@@ -367,7 +509,17 @@ func ExtractDeleteEverythingModifierFromArgs(args []string) int {
 	return ForceDeleteModifier
 }
 
-func extractDeleteModifierFromArgs(args []string) (int, string) {
+// ExtractDeleteTargetModifierFromArgs extracts the args for the "delete target" command
+func ExtractDeleteTargetModifierFromArgs(args []string) int {
+	if len(args) >= 1 && args[0] == StringModifiers[1] {
+		return FindFullDeleteModifier
+	}
+
+	return NoDeleteModifier
+}
+
+// ExtractDeleteModifierFromArgs extracts the delete modifier the "delete retain"/"delete before" commands
+func ExtractDeleteModifierFromArgs(args []string) (int, string) {
 	if len(args) == 1 {
 		return NoDeleteModifier, args[0]
 	} else if args[0] == StringModifiers[0] {
@@ -381,7 +533,7 @@ func DeleteBeforeArgsValidator(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	modifier, beforeStr := extractDeleteModifierFromArgs(args)
+	modifier, beforeStr := ExtractDeleteModifierFromArgs(args)
 	if modifier == FullDeleteModifier {
 		return fmt.Errorf("unsupported moodifier for delete before command")
 	}
@@ -393,12 +545,31 @@ func DeleteBeforeArgsValidator(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func DeleteTargetArgsValidator(cmd *cobra.Command, args []string) error {
+	err := cobra.RangeArgs(0, 2)(cmd, args)
+	if err != nil {
+		return err
+	}
+
+	switch {
+	case len(args) == 0 && !cmd.Flags().Changed(DeleteTargetUserDataFlag):
+		// allow 0 arguments only when target user data flag is set
+		return errIncorrectArguments
+
+	case len(args) == 2 && args[0] != StringModifiers[1]:
+		return errIncorrectArguments
+
+	default:
+		return nil
+	}
+}
+
 func DeleteEverythingArgsValidator(cmd *cobra.Command, args []string) error {
 	return deleteArgsValidator(args, StringModifiersDeleteEverything, 0, 1)
 }
 
 func DeleteRetainArgsValidator(cmd *cobra.Command, args []string) error {
-	_, retentionStr := extractDeleteModifierFromArgs(args)
+	_, retentionStr := ExtractDeleteModifierFromArgs(args)
 	retentionNumber, err := strconv.Atoi(retentionStr)
 	if err != nil {
 		return errors.Wrapf(err, "expected to get a number as retantion count, but got: '%s'", retentionStr)
@@ -414,7 +585,7 @@ func DeleteRetainAfterArgsValidator(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	_, retentionStr, afterStr := extractDeleteRetainModifierFromArgs(args)
+	_, retentionStr, afterStr := ExtractDeleteRetainAfterModifierFromArgs(args)
 	retentionNumber, err := strconv.Atoi(retentionStr)
 	if err != nil {
 		return errors.Wrapf(err, "expected to get a number as retantion count, but got: '%s'", retentionStr)

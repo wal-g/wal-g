@@ -3,10 +3,13 @@ vendor/
 .idea/
 
 # bin
+main/fdb/wal-g
+main/sqlserver/wal-g
 main/pg/wal-g
 main/mysql/wal-g
 main/redis/wal-g
 main/mongo/wal-g
+main/gp/wal-g
 
 # tests
 test/testdata/00000*

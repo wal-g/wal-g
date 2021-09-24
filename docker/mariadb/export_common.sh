@@ -9,6 +9,7 @@ export WALG_MYSQL_BACKUP_PREPARE_COMMAND="mariabackup --prepare --target-dir=${M
 
 # test tools
 mariadb_kill_and_clean_data() {
+    service mysql stop || true
     kill -9 `pidof mysqld` || true
     rm -rf "${MYSQLDATA}"/*
     rm -rf /root/.walg_mysql_binlogs_cache

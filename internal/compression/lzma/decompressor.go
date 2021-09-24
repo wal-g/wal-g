@@ -12,7 +12,7 @@ import (
 type Decompressor struct{}
 
 func (decompressor Decompressor) Decompress(dst io.Writer, src io.Reader) error {
-	lzReader, err := lzma.NewReader(computils.NewUntilEofReader(src))
+	lzReader, err := lzma.NewReader(computils.NewUntilEOFReader(src))
 	if err != nil {
 		return errors.Wrap(err, "DecompressLzma: lzma reader creation failed")
 	}

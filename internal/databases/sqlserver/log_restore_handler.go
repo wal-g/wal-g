@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -16,7 +16,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleLogRestore(backupName string, untilTs string, dbnames []string, fromnames []string, noRecovery bool) {
+func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromnames []string, noRecovery bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 	defer func() { _ = signalHandler.Close() }()
@@ -28,7 +28,7 @@ func HandleLogRestore(backupName string, untilTs string, dbnames []string, fromn
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	sentinel := new(SentinelDto)
-	err = internal.FetchStreamSentinel(backup, sentinel)
+	err = backup.FetchSentinel(&sentinel)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	db, err := getSQLServerConnection()
@@ -47,7 +47,7 @@ func HandleLogRestore(backupName string, untilTs string, dbnames []string, fromn
 	err = bs.RunBackground(ctx, cancel)
 	tracelog.ErrorLogger.FatalfOnError("proxy run error: %v", err)
 
-	stopAt, err := utility.ParseUntilTs(untilTs)
+	stopAt, err := utility.ParseUntilTS(untilTS)
 	tracelog.ErrorLogger.FatalfOnError("invalid util timestamp: %v", err)
 
 	logs, err := getLogsSinceBackup(folder, backup.Name, stopAt)
@@ -56,8 +56,22 @@ func HandleLogRestore(backupName string, untilTs string, dbnames []string, fromn
 	err = runParallel(func(i int) error {
 		dbname := dbnames[i]
 		fromname := fromnames[i]
+		if err != nil {
+			return err
+		}
+		backupMetadata, err := GetBackupProperties(db, folder, false, backupName, fromname)
+		if err != nil {
+			return err
+		}
+		var dbBackupProperties *BackupProperties
+		for _, dbBackupProperties = range backupMetadata {
+			if dbBackupProperties.DatabaseName == fromname {
+				break
+			}
+		}
+		prevBackupFinishdate := dbBackupProperties.BackupFinishDate
 		for _, logBackupName := range logs {
-			ok, err := doesLogBackupContainDb(folder, logBackupName, fromname)
+			ok, err := doesLogBackupContainDB(folder, logBackupName, fromname)
 			if err != nil {
 				return err
 			}
@@ -68,31 +82,66 @@ func HandleLogRestore(backupName string, untilTs string, dbnames []string, fromn
 					logBackupName, fromname)
 				continue
 			}
-			err = restoreSingleLog(ctx, db, folder, logBackupName, dbname, fromname, stopAt)
-			if err != nil {
-				return err
+			if prevBackupFinishdate.Before(stopAt) {
+				CurrentBackupFinishdate, err := restoreSingleLog(ctx,
+					db,
+					folder,
+					logBackupName,
+					dbname,
+					fromname,
+					stopAt,
+					prevBackupFinishdate)
+				if err != nil {
+					return err
+				}
+				prevBackupFinishdate = CurrentBackupFinishdate
+			} else {
+				break
 			}
 		}
 		if !noRecovery {
 			return recoverSingleDatabase(ctx, db, dbname)
 		}
 		return nil
-	}, len(dbnames))
+	}, len(dbnames), getDBConcurrency())
 	tracelog.ErrorLogger.FatalfOnError("overall log restore failed: %v", err)
 
 	tracelog.InfoLogger.Printf("log restore finished")
 }
 
-func restoreSingleLog(ctx context.Context, db *sql.DB, folder storage.Folder, logBackupName string, dbname string, fromname string, stopAt time.Time) error {
-	baseUrl := getLogBackupUrl(logBackupName, fromname)
+func restoreSingleLog(ctx context.Context,
+	db *sql.DB,
+	folder storage.Folder,
+	logBackupName string,
+	dbname string,
+	fromname string,
+	stopAt time.Time,
+	prevBackupFinishDate time.Time,
+) (time.Time, error) {
+	baseURL := getLogBackupURL(logBackupName, fromname)
 	basePath := getLogBackupPath(logBackupName, fromname)
 	blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
 	if err != nil {
-		return err
+		return prevBackupFinishDate, err
 	}
-	urls := buildRestoreUrls(baseUrl, blobs)
-	sql := fmt.Sprintf("RESTORE LOG %s FROM %s WITH NORECOVERY, STOPAT = '%s'",
-		quoteName(dbname), urls, stopAt.Format(TimeSQLServerFormat))
+	urls := buildRestoreUrls(baseURL, blobs)
+
+	logBackupFileProperties, err := GetBackupProperties(db, folder, true, logBackupName, fromname)
+	if err != nil {
+		return prevBackupFinishDate, err
+	}
+	if !prevBackupFinishDate.Before(stopAt) {
+		tracelog.InfoLogger.Printf("Log Restore operation is inapplicable. STOPAT point left behind.")
+		return prevBackupFinishDate, err
+	}
+	var sql string
+	if logBackupFileProperties[0].BackupFinishDate.Before(stopAt) {
+		sql = fmt.Sprintf("RESTORE LOG %s FROM %s WITH NORECOVERY",
+			quoteName(dbname), urls)
+	} else {
+		sql = fmt.Sprintf("RESTORE LOG %s FROM %s WITH NORECOVERY, STOPAT = '%s'",
+			quoteName(dbname), urls, stopAt.Format(TimeSQLServerFormat))
+	}
 	tracelog.InfoLogger.Printf("starting restore database [%s] log from %s", dbname, urls)
 	tracelog.DebugLogger.Printf("SQL: %s", sql)
 	_, err = db.ExecContext(ctx, sql)
@@ -101,5 +150,5 @@ func restoreSingleLog(ctx context.Context, db *sql.DB, folder storage.Folder, lo
 	} else {
 		tracelog.InfoLogger.Printf("database [%s] log restore succefully finished", dbname)
 	}
-	return err
+	return logBackupFileProperties[0].BackupFinishDate, err
 }

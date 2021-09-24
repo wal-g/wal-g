@@ -13,11 +13,10 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/denisenkom/go-mssqldb"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -128,7 +127,7 @@ func getDatabasesToRestore(sentinel *SentinelDto, dbnames []string, fromnames []
 }
 
 func listDatabases(db *sql.DB) ([]string, error) {
-	rows, err := db.Query("SELECT name FROM SYS.DATABASES WHERE name != 'tempdb'")
+	rows, err := db.Query("SELECT name FROM sys.databases WHERE name != 'tempdb'")
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +155,7 @@ func estimateSize(db *sql.DB, query string, args ...interface{}) (int64, int, er
 	return size, blobCount, nil
 }
 
-func estimateDbSize(db *sql.DB, dbname string) (int64, int, error) {
+func estimateDBSize(db *sql.DB, dbname string) (int64, int, error) {
 	query := fmt.Sprintf(`
 		USE %s; 
 		SELECT (SELECT SUM(used_log_space_in_bytes) FROM sys.dm_db_log_space_usage) 
@@ -199,29 +198,29 @@ func listDatabaseFiles(db *sql.DB, urls string) ([]DatabaseFile, error) {
 	return res, nil
 }
 
-func buildBackupUrls(baseUrl string, blobCount int) string {
+func buildBackupUrls(baseURL string, blobCount int) string {
 	res := ""
 	for i := 0; i < blobCount; i++ {
 		if i > 0 {
 			res += ", "
 		}
 		blobName := fmt.Sprintf("%s%03d", BlobNamePrefix, i)
-		res += fmt.Sprintf("URL = '%s/%s'", baseUrl, blobName)
+		res += fmt.Sprintf("URL = '%s/%s'", baseURL, blobName)
 	}
 	return res
 }
 
-func buildRestoreUrls(baseUrl string, blobNames []string) string {
+func buildRestoreUrls(baseURL string, blobNames []string) string {
 	if len(blobNames) == 0 {
 		// old-style single blob backup
-		return fmt.Sprintf("URL = '%s'", baseUrl)
+		return fmt.Sprintf("URL = '%s'", baseURL)
 	}
 	res := ""
 	for i, blobName := range blobNames {
 		if i > 0 {
 			res += ", "
 		}
-		res += fmt.Sprintf("URL = '%s/%s'", baseUrl, blobName)
+		res += fmt.Sprintf("URL = '%s/%s'", baseURL, blobName)
 	}
 	return res
 }
@@ -282,7 +281,7 @@ func getDatabaseBackupPath(backupName, dbname string) string {
 	return path.Join(utility.BaseBackupPath, backupName, dbname)
 }
 
-func getDatabaseBackupUrl(backupName, dbname string) string {
+func getDatabaseBackupURL(backupName, dbname string) string {
 	hostname, err := internal.GetRequiredSetting(internal.SQLServerBlobHostname)
 	if err != nil {
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -300,7 +299,7 @@ func getLogBackupPath(logBackupName, dbname string) string {
 	return path.Join(utility.WalPath, logBackupName, dbname)
 }
 
-func getLogBackupUrl(logBackupName, dbname string) string {
+func getLogBackupURL(logBackupName, dbname string) string {
 	hostname, err := internal.GetRequiredSetting(internal.SQLServerBlobHostname)
 	if err != nil {
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -310,7 +309,7 @@ func getLogBackupUrl(logBackupName, dbname string) string {
 	return fmt.Sprintf("https://%s/%s", hostname, getLogBackupPath(logBackupName, dbname))
 }
 
-func doesLogBackupContainDb(folder storage.Folder, logBakupName string, dbname string) (bool, error) {
+func doesLogBackupContainDB(folder storage.Folder, logBakupName string, dbname string) (bool, error) {
 	f := folder.GetSubFolder(utility.WalPath).GetSubFolder(logBakupName)
 	_, dbDirs, err := f.ListFolder()
 	if err != nil {
@@ -352,8 +351,8 @@ func getLogsSinceBackup(folder storage.Folder, backupName string, stopAt time.Ti
 	if !strings.HasPrefix(backupName, utility.BackupNamePrefix) {
 		return nil, fmt.Errorf("unexpected backup name: %s", backupName)
 	}
-	startTs := backupName[len(utility.BackupNamePrefix):]
-	endTs := stopAt.Format(utility.BackupTimeFormat)
+	startTS := backupName[len(utility.BackupNamePrefix):]
+	endTS := stopAt.Format(utility.BackupTimeFormat)
 	_, logBackups, err := folder.GetSubFolder(utility.WalPath).ListFolder()
 	if err != nil {
 		return nil, err
@@ -366,12 +365,12 @@ func getLogsSinceBackup(folder storage.Folder, backupName string, stopAt time.Ti
 
 	var logNames []string
 	for _, name := range allLogNames {
-		logTs := name[len(LogNamePrefix):]
-		if logTs < startTs {
+		logTS := name[len(LogNamePrefix):]
+		if logTS < startTS {
 			continue
 		}
 		logNames = append(logNames, name)
-		if logTs > endTs {
+		if logTS > endTS {
 			break
 		}
 	}
@@ -379,10 +378,16 @@ func getLogsSinceBackup(folder storage.Folder, backupName string, stopAt time.Ti
 	return logNames, nil
 }
 
-func runParallel(f func(int) error, cnt int) error {
+func runParallel(f func(int) error, cnt int, concurrency int) error {
+	if concurrency <= 0 {
+		concurrency = cnt
+	}
+	sem := make(chan struct{}, concurrency)
 	errs := make(chan error, cnt)
 	for i := 0; i < cnt; i++ {
 		go func(i int) {
+			sem <- struct{}{}
+			defer func() { <-sem }()
 			errs <- f(i)
 		}(i)
 	}
@@ -397,6 +402,16 @@ func runParallel(f func(int) error, cnt int) error {
 		return errors.New(errStr)
 	}
 	return nil
+}
+
+func getDBConcurrency() int {
+	concurrency, err := internal.GetMaxConcurrency(internal.SQLServerDBConcurrency)
+	if err != nil {
+		tracelog.WarningLogger.Printf("config error: %v", err)
+		tracelog.WarningLogger.Printf("using default db concurrency: %d", blob.DefaultConcurrency)
+		return blob.DefaultConcurrency
+	}
+	return concurrency
 }
 
 func exclude(src, excl []string) []string {
@@ -423,4 +438,77 @@ func uniq(src []string) []string {
 		}
 	}
 	return res
+}
+
+type BackupProperties struct {
+	BackupType        int
+	DatabaseName      string
+	FirstLSN          string
+	LastLSN           string
+	CheckpointLSN     string
+	DatabaseBackupLSN string
+	BackupStartDate   time.Time
+	BackupFinishDate  time.Time
+	HasBulkLoggedData bool
+	IsSnapshot        bool
+	IsReadOnly        bool
+	IsSingleUser      bool
+	BackupURL         string
+	BackupFile        string
+}
+
+func GetBackupProperties(db *sql.DB,
+	folder storage.Folder,
+	logBackup bool,
+	backupName string,
+	databaseName string,
+) ([]*BackupProperties, error) {
+	var res []*BackupProperties
+	var baseURL string
+	var basePath string
+	if logBackup {
+		baseURL = getLogBackupURL(backupName, databaseName)
+		basePath = getLogBackupPath(backupName, databaseName)
+	} else {
+		baseURL = getDatabaseBackupURL(backupName, databaseName)
+		basePath = getDatabaseBackupPath(backupName, databaseName)
+	}
+	blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
+	if err != nil {
+		return res, err
+	}
+	urls := buildRestoreUrls(baseURL, blobs)
+	query := fmt.Sprintf("RESTORE HEADERONLY FROM %s", urls)
+	rows, err := db.Query(query)
+	if err != nil {
+		return res, err
+	}
+	defer rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var dbf BackupProperties
+		err = utility.ScanToMap(rows, map[string]interface{}{
+			"BackupType":        &dbf.BackupType,
+			"DatabaseName":      &dbf.DatabaseName,
+			"FirstLSN":          &dbf.FirstLSN,
+			"LastLSN":           &dbf.LastLSN,
+			"CheckpointLSN":     &dbf.CheckpointLSN,
+			"DatabaseBackupLSN": &dbf.DatabaseBackupLSN,
+			"BackupStartDate":   &dbf.BackupStartDate,
+			"BackupFinishDate":  &dbf.BackupFinishDate,
+			"HasBulkLoggedData": &dbf.HasBulkLoggedData,
+			"IsSnapshot":        &dbf.IsSnapshot,
+			"IsReadOnly":        &dbf.IsReadOnly,
+			"IsSingleUser":      &dbf.IsSingleUser,
+		})
+		if err != nil {
+			return nil, err
+		}
+		dbf.BackupURL = urls
+		dbf.BackupFile = backupName
+		res = append(res, &dbf)
+	}
+	return res, nil
 }

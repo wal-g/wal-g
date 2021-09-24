@@ -15,6 +15,10 @@ type Crypter struct {
 	SymmetricKey crypto.SymmetricKey
 }
 
+func (crypter *Crypter) Name() string {
+	return "AWK_KMS/Crypter"
+}
+
 // Encrypt creates encryption writer from ordinary writer
 func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	if len(crypter.SymmetricKey.GetKey()) == 0 {
@@ -59,6 +63,6 @@ func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
 }
 
 // CrypterFromKeyID creates AWS KMS Crypter with given KMS Key ID
-func CrypterFromKeyID(CseKmsId string, CseKmsRegion string) crypto.Crypter {
-	return &Crypter{SymmetricKey: NewSymmetricKey(CseKmsId, 32, 184, CseKmsRegion)}
+func CrypterFromKeyID(CseKmsID string, CseKmsRegion string) crypto.Crypter {
+	return &Crypter{SymmetricKey: NewSymmetricKey(CseKmsID, 32, 184, CseKmsRegion)}
 }

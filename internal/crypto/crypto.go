@@ -30,7 +30,7 @@ const GpgBin = "gpg"
 
 // CachedKey is the data transfer object describing format of key ring cache
 type CachedKey struct {
-	KeyId string `json:"keyId"`
+	KeyID string `json:"keyId"`
 	Body  []byte `json:"body"`
 }
 
@@ -48,7 +48,7 @@ func GetPubRingArmor(keyID string) ([]byte, error) {
 		if err == nil {
 			err = json.Unmarshal(file, &cache)
 			tracelog.ErrorLogger.PrintOnError(err)
-			if err == nil && cache.KeyId == keyID && len(cache.Body) > 0 { // don't return an empty cached value
+			if err == nil && cache.KeyID == keyID && len(cache.Body) > 0 { // don't return an empty cached value
 				return cache.Body, nil
 			}
 		}
@@ -65,7 +65,7 @@ func GetPubRingArmor(keyID string) ([]byte, error) {
 		return nil, NewGpgKeyExportError(strings.TrimSpace(stderr.String()))
 	}
 
-	cache.KeyId = keyID
+	cache.KeyID = keyID
 	cache.Body = out
 	marshal, err := json.Marshal(&cache)
 	if err == nil && len(cacheFilename) > 0 {

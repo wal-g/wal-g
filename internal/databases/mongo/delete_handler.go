@@ -91,7 +91,10 @@ func HandlePurge(downloader archive.Downloader, purger archive.Purger, setters .
 }
 
 // HandleBackupsPurge delete backups according to settings
-func HandleBackupsPurge(backupTimes []internal.BackupTime, downloader archive.Downloader, purger archive.Purger, opts PurgeSettings) (purge, retain []models.Backup, err error) {
+func HandleBackupsPurge(backupTimes []internal.BackupTime,
+	downloader archive.Downloader,
+	purger archive.Purger,
+	opts PurgeSettings) (purge, retain []models.Backup, err error) {
 	if len(backupTimes) == 0 { // TODO: refactor && support oplog purge even if backups do not exist
 		tracelog.InfoLogger.Println("No backups found")
 		return []models.Backup{}, []models.Backup{}, nil
@@ -102,10 +105,16 @@ func HandleBackupsPurge(backupTimes []internal.BackupTime, downloader archive.Do
 		return nil, nil, err
 	}
 
-	purge, retain, err = archive.SplitPurgingBackups(backups, opts.retainCount, opts.retainAfter)
+	timedBackups := archive.MongoModelToTimedBackup(backups)
+
+	internal.SortTimedBackup(timedBackups)
+	purgeBackups, retainBackups, err := internal.SplitPurgingBackups(timedBackups, opts.retainCount, opts.retainAfter)
+
 	if err != nil {
 		return nil, nil, err
 	}
+
+	purge, retain = archive.SplitMongoBackups(backups, purgeBackups, retainBackups)
 	tracelog.InfoLogger.Printf("Backups selected to be deleted: %v", archive.BackupNamesFromBackups(purge))
 	tracelog.InfoLogger.Printf("Backups selected to be retained: %v", archive.BackupNamesFromBackups(retain))
 

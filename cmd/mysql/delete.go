@@ -1,14 +1,11 @@
 package mysql
 
 import (
-	"path"
-	"strings"
-
 	"github.com/spf13/cobra"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -61,55 +58,31 @@ type DeleteHandler struct {
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
-	deleteHandler, err := NewMySqlDeleteHandler()
+	deleteHandler, err := NewMySQLDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
-
-	if p := deleteHandler.permanentObjects; len(p) > 0 {
-		tracelog.InfoLogger.Fatalf("found permanent objects %s\n", strings.Join(func() []string {
-			ret := make([]string, 0)
-
-			for e := range p {
-				ret = append(ret, e)
-			}
-
-			return ret
-		}(), ","))
-	}
-
-	deleteHandler.DeleteEverything(confirmed)
-}
-func (h *DeleteHandler) deleteTarget(bobj internal.BackupObject, confirmed bool) error {
-	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath), confirmed, func(object storage.Object) bool {
-		return strings.HasPrefix(object.GetName(), strings.TrimSuffix(bobj.GetName(), utility.SentinelSuffix))
-	})
+	deleteHandler.HandleDeleteEverything(args, deleteHandler.permanentObjects, confirmed)
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
-	deleteHandler, err := NewMySqlDeleteHandler()
+	deleteHandler, err := NewMySQLDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
-	bname := args[0] // backup name
 
-	for e := range deleteHandler.permanentObjects {
-		if e == bname {
-			tracelog.InfoLogger.Fatalf("unable to delete permanent backup %s\n", bname)
-		}
-	}
-	if bobj, err := deleteHandler.FindTargetByName(bname); err != nil {
-		tracelog.ErrorLogger.FatalfOnError("unable to delete target backup", err)
-	} else if err := deleteHandler.deleteTarget(bobj, confirmed); err != nil {
-		tracelog.ErrorLogger.FatalfOnError("unable to delete target backup", err)
-	}
+	bname := args[0]                                                   // backup name
+	backupSelector, err := internal.NewBackupNameSelector(bname, true) //todo: add selection by userdata
+	tracelog.ErrorLogger.PrintOnError(err)
+
+	deleteHandler.HandleDeleteTarget(backupSelector, confirmed, false)
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
-	deleteHandler, err := NewMySqlDeleteHandler()
+	deleteHandler, err := NewMySQLDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteBefore(args, confirmed)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
-	deleteHandler, err := NewMySqlDeleteHandler()
+	deleteHandler, err := NewMySQLDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteRetain(args, confirmed)
@@ -125,103 +98,29 @@ func makeLessFunc(folder storage.Folder) func(object1, object2 storage.Object) b
 	return func(object1, object2 storage.Object) bool {
 		time1, ok := utility.TryFetchTimeRFC3999(object1.GetName())
 		if !ok {
-			return binlogLess(folder, object1, object2)
+			time1 = object1.GetLastModified().Format(utility.BackupTimeFormat)
 		}
 		time2, ok := utility.TryFetchTimeRFC3999(object2.GetName())
 		if !ok {
-			return binlogLess(folder, object1, object2)
+			time2 = object2.GetLastModified().Format(utility.BackupTimeFormat)
 		}
 		return time1 < time2
 	}
 }
 
-func binlogLess(folder storage.Folder, object1, object2 storage.Object) bool {
-	binlogName1, ok := tryFetchBinlogName(folder, object1)
-	if !ok {
-		return false
-	}
-	binlogName2, ok := tryFetchBinlogName(folder, object2)
-	if !ok {
-		return false
-	}
-	return binlogName1 < binlogName2
-}
-
-func tryFetchBinlogName(folder storage.Folder, object storage.Object) (string, bool) {
-	name := object.GetName()
-	if strings.HasPrefix(name, mysql.BinlogPath) {
-		_, name = path.Split(name)
-		return name, true
-	}
-	name = strings.Replace(name, utility.SentinelSuffix, "", 1)
-	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	backup := internal.NewBackup(baseBackupFolder, name)
-	var sentinel mysql.StreamSentinelDto
-	err := internal.FetchStreamSentinel(backup, &sentinel)
-	if err != nil {
-		tracelog.InfoLogger.Println("Fail to fetch stream sentinel " + name)
-		return "", false
-	}
-	return sentinel.BinLogStart, true
-}
-
-func permanentObjects(folder storage.Folder) map[string]bool {
-	tracelog.InfoLogger.Println("retrieving permanent objects")
-	backupTimes, err := internal.GetBackups(folder)
-	if err != nil {
-		return map[string]bool{}
-	}
-
-	permanentBackups := map[string]bool{}
-	for _, backupTime := range backupTimes {
-		backup, err := internal.GetBackupByName(backupTime.BackupName, utility.BaseBackupPath, folder)
-		if err != nil {
-			tracelog.ErrorLogger.Printf("failed to get backup by name with error %s, ignoring...", err.Error())
-			continue
-		}
-		meta, err := backup.FetchMeta()
-		if err != nil {
-			tracelog.ErrorLogger.Printf("failed to fetch backup meta for backup %s with error %s, ignoring...",
-				backupTime.BackupName, err.Error())
-			continue
-		}
-		if meta.IsPermanent {
-			permanentBackups[backupTime.BackupName] = true
-		}
-	}
-	return permanentBackups
-}
-
-func IsPermanent(objectName string, permanentBackups map[string]bool) bool {
-	if objectName[:len(utility.BaseBackupPath)] == utility.BaseBackupPath {
-		backup := objectName[len(utility.BaseBackupPath) : len(utility.BaseBackupPath)+23]
-		return permanentBackups[backup]
-	}
-	// impermanent backup or binlogs
-	return false
-}
-
-func NewMySqlDeleteHandler() (*DeleteHandler, error) {
+func NewMySQLDeleteHandler() (*DeleteHandler, error) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	backups, err := internal.GetBackupSentinelObjects(folder)
-	if err != nil {
-		return nil, err
-	}
+	backupObjects, err := internal.FindBackupObjects(folder)
+	tracelog.ErrorLogger.FatalOnError(err)
 
-	backupObjects := make([]internal.BackupObject, 0, len(backups))
-	for _, object := range backups {
-		b := mysql.BackupObject{Object: object}
-		backupObjects = append(backupObjects, b)
-	}
-
-	permanentBackups := permanentObjects(folder)
+	permanentBackups := internal.FindPermanentBackups(folder, mysql.NewGenericMetaFetcher())
 
 	return &DeleteHandler{
 		DeleteHandler: internal.NewDeleteHandler(folder, backupObjects, makeLessFunc(folder),
 			internal.IsPermanentFunc(func(object storage.Object) bool {
-				return IsPermanent(object.GetName(), permanentBackups)
+				return internal.IsPermanent(object.GetName(), permanentBackups, internal.StreamBackupNameLength)
 			}),
 		),
 		permanentObjects: permanentBackups,

@@ -33,7 +33,10 @@ var deleteCmd = &cobra.Command{
 }
 
 func runPurge(cmd *cobra.Command, args []string) {
-	opts := []mongo.PurgeOption{mongo.PurgeDryRun(!confirmed), mongo.PurgeOplog(purgeOplog), mongo.PurgeGarbage(purgeGarbage)}
+	opts := []mongo.PurgeOption{
+		mongo.PurgeDryRun(!confirmed),
+		mongo.PurgeOplog(purgeOplog),
+		mongo.PurgeGarbage(purgeGarbage)}
 	if cmd.Flags().Changed(retainAfterFlag) {
 		retainAfterTime, err := time.Parse(time.RFC3339, retainAfter)
 		tracelog.ErrorLogger.FatalfOnError("Can not parse retain time: %v", err)

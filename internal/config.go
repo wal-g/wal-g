@@ -5,26 +5,37 @@ import (
 	"os"
 	"os/user"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/webserver"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const (
+	PG        = "PG"
+	SQLSERVER = "SQLSERVER"
+	MYSQL     = "MYSQL"
+	REDIS     = "REDIS"
+	FDB       = "FDB"
+	MONGO     = "MONGO"
+	GP        = "GP"
+
 	DownloadConcurrencySetting   = "WALG_DOWNLOAD_CONCURRENCY"
 	UploadConcurrencySetting     = "WALG_UPLOAD_CONCURRENCY"
 	UploadDiskConcurrencySetting = "WALG_UPLOAD_DISK_CONCURRENCY"
 	UploadQueueSetting           = "WALG_UPLOAD_QUEUE"
 	SentinelUserDataSetting      = "WALG_SENTINEL_USER_DATA"
 	PreventWalOverwriteSetting   = "WALG_PREVENT_WAL_OVERWRITE"
+	UploadWalMetadata            = "WALG_UPLOAD_WAL_METADATA"
 	DeltaMaxStepsSetting         = "WALG_DELTA_MAX_STEPS"
 	DeltaOriginSetting           = "WALG_DELTA_ORIGIN"
 	CompressionMethodSetting     = "WALG_COMPRESSION_METHOD"
+	StoragePrefixSetting         = "WALG_STORAGE_PREFIX"
 	DiskRateLimitSetting         = "WALG_DISK_RATE_LIMIT"
 	NetworkRateLimitSetting      = "WALG_NETWORK_RATE_LIMIT"
 	UseWalDeltaSetting           = "WALG_USE_WAL_DELTA"
@@ -33,9 +44,10 @@ const (
 	VerifyPageChecksumsSetting   = "WALG_VERIFY_PAGE_CHECKSUMS"
 	StoreAllCorruptBlocksSetting = "WALG_STORE_ALL_CORRUPT_BLOCKS"
 	UseRatingComposerSetting     = "WALG_USE_RATING_COMPOSER"
+	UseCopyComposerSetting       = "WALG_USE_COPY_COMPOSER"
 	DeltaFromNameSetting         = "WALG_DELTA_FROM_NAME"
 	DeltaFromUserDataSetting     = "WALG_DELTA_FROM_USER_DATA"
-	TargetUserDataSetting        = "WALG_FETCH_TARGET_USER_DATA"
+	FetchTargetUserDataSetting   = "WALG_FETCH_TARGET_USER_DATA"
 	LogLevelSetting              = "WALG_LOG_LEVEL"
 	TarSizeThresholdSetting      = "WALG_TAR_SIZE_THRESHOLD"
 	CseKmsIDSetting              = "WALG_CSE_KMS_ID"
@@ -60,6 +72,8 @@ const (
 	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
 	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
 	MaxDelayedSegmentsCount      = "WALG_INTEGRITY_MAX_DELAYED_WALS"
+	PrefetchDir                  = "WALG_PREFETCH_DIR"
+	PgReadyRename                = "PG_READY_RENAME"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
@@ -69,7 +83,7 @@ const (
 	OplogPushStatsEnabled           = "OPLOG_PUSH_STATS_ENABLED"
 	OplogPushStatsLoggingInterval   = "OPLOG_PUSH_STATS_LOGGING_INTERVAL"
 	OplogPushStatsUpdateInterval    = "OPLOG_PUSH_STATS_UPDATE_INTERVAL"
-	OplogPushStatsExposeHttp        = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
+	OplogPushStatsExposeHTTP        = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
 	OplogPushWaitForBecomePrimary   = "OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY"
 	OplogPushPrimaryCheckInterval   = "OPLOG_PUSH_PRIMARY_CHECK_INTERVAL"
 	OplogReplayOplogAlwaysUpsert    = "OPLOG_REPLAY_OPLOG_ALWAYS_UPSERT"
@@ -83,36 +97,42 @@ const (
 	MysqlBackupPrepareCmd      = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
 	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
 
+	RedisPassword = "WALG_REDIS_PASSWORD"
+
 	GoMaxProcs = "GOMAXPROCS"
 
-	HttpListen       = "HTTP_LISTEN"
-	HttpExposePprof  = "HTTP_EXPOSE_PPROF"
-	HttpExposeExpVar = "HTTP_EXPOSE_EXPVAR"
+	HTTPListen       = "HTTP_LISTEN"
+	HTTPExposePprof  = "HTTP_EXPOSE_PPROF"
+	HTTPExposeExpVar = "HTTP_EXPOSE_EXPVAR"
 
 	SQLServerBlobHostname     = "SQLSERVER_BLOB_HOSTNAME"
 	SQLServerBlobCertFile     = "SQLSERVER_BLOB_CERT_FILE"
 	SQLServerBlobKeyFile      = "SQLSERVER_BLOB_KEY_FILE"
 	SQLServerBlobLockFile     = "SQLSERVER_BLOB_LOCK_FILE"
 	SQLServerConnectionString = "SQLSERVER_CONNECTION_STRING"
+	SQLServerDBConcurrency    = "SQLSERVER_DB_CONCURRENCY"
 
 	EndpointSourceSetting = "S3_ENDPOINT_SOURCE"
 	EndpointPortSetting   = "S3_ENDPOINT_PORT"
 
-	AwsAccessKeyId     = "AWS_ACCESS_KEY_ID"
+	AwsAccessKeyID     = "AWS_ACCESS_KEY_ID"
 	AwsSecretAccessKey = "AWS_SECRET_ACCESS_KEY"
 
-	YcKmsKeyIdSetting  = "YC_CSE_KMS_KEY_ID"
+	YcKmsKeyIDSetting  = "YC_CSE_KMS_KEY_ID"
 	YcSaKeyFileSetting = "YC_SERVICE_ACCOUNT_KEY_FILE"
 )
 
 var (
 	CfgFile             string
-	defaultConfigValues = map[string]string{
+	defaultConfigValues map[string]string
+
+	commonDefaultConfigValues = map[string]string{
 		DownloadConcurrencySetting:   "10",
 		UploadConcurrencySetting:     "16",
 		UploadDiskConcurrencySetting: "1",
 		UploadQueueSetting:           "2",
 		PreventWalOverwriteSetting:   "false",
+		UploadWalMetadata:            "NOMETADATA",
 		DeltaMaxStepsSetting:         "0",
 		CompressionMethodSetting:     "lz4",
 		UseWalDeltaSetting:           "false",
@@ -123,19 +143,31 @@ var (
 		VerifyPageChecksumsSetting:   "false",
 		StoreAllCorruptBlocksSetting: "false",
 		UseRatingComposerSetting:     "false",
+		UseCopyComposerSetting:       "false",
 		MaxDelayedSegmentsCount:      "0",
+	}
 
-		OplogArchiveTimeoutInterval:    "60s",
-		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
-		MongoDBLastWriteUpdateInterval: "3s",
-		PgWalSize:                      "16",
+	MongoDefaultSettings = map[string]string{
 		OplogPushStatsLoggingInterval:  "30s",
 		OplogPushStatsUpdateInterval:   "30s",
 		OplogPushWaitForBecomePrimary:  "false",
 		OplogPushPrimaryCheckInterval:  "30s",
+		OplogArchiveTimeoutInterval:    "60s",
+		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
+		MongoDBLastWriteUpdateInterval: "3s",
 	}
 
-	AllowedSettings = map[string]bool{
+	SQLServerDefaultSettings = map[string]string{
+		SQLServerDBConcurrency: "10",
+	}
+
+	PGDefaultSettings = map[string]string{
+		PgWalSize: "16",
+	}
+
+	AllowedSettings map[string]bool
+
+	CommonAllowedSettings = map[string]bool{
 		// WAL-G core
 		DownloadConcurrencySetting:   true,
 		UploadConcurrencySetting:     true,
@@ -143,9 +175,11 @@ var (
 		UploadQueueSetting:           true,
 		SentinelUserDataSetting:      true,
 		PreventWalOverwriteSetting:   true,
+		UploadWalMetadata:            true,
 		DeltaMaxStepsSetting:         true,
 		DeltaOriginSetting:           true,
 		CompressionMethodSetting:     true,
+		StoragePrefixSetting:         true,
 		DiskRateLimitSetting:         true,
 		NetworkRateLimitSetting:      true,
 		UseWalDeltaSetting:           true,
@@ -166,22 +200,11 @@ var (
 		VerifyPageChecksumsSetting:   true,
 		StoreAllCorruptBlocksSetting: true,
 		UseRatingComposerSetting:     true,
+		UseCopyComposerSetting:       true,
 		MaxDelayedSegmentsCount:      true,
 		DeltaFromNameSetting:         true,
 		DeltaFromUserDataSetting:     true,
-		TargetUserDataSetting:        true,
-
-		// Postgres
-		PgPortSetting:     true,
-		PgUserSetting:     true,
-		PgHostSetting:     true,
-		PgDataSetting:     true,
-		PgPasswordSetting: true,
-		PgDatabaseSetting: true,
-		PgSslModeSetting:  true,
-		PgSlotName:        true,
-		PgWalSize:         true,
-		"PGPASSFILE":      true,
+		FetchTargetUserDataSetting:   true,
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,
@@ -194,7 +217,7 @@ var (
 		// AWS s3
 		"WALG_S3_PREFIX":              true,
 		"WALE_S3_PREFIX":              true,
-		AwsAccessKeyId:                true,
+		AwsAccessKeyID:                true,
 		AwsSecretAccessKey:            true,
 		"AWS_SESSION_TOKEN":           true,
 		"AWS_DEFAULT_REGION":          true,
@@ -210,6 +233,7 @@ var (
 		"WALG_S3_CA_CERT_FILE":        true,
 		"WALG_S3_STORAGE_CLASS":       true,
 		"WALG_S3_SSE":                 true,
+		"WALG_S3_SSE_C":               true,
 		"WALG_S3_SSE_KMS_ID":          true,
 		"WALG_CSE_KMS_ID":             true,
 		"WALG_CSE_KMS_REGION":         true,
@@ -217,6 +241,8 @@ var (
 		"S3_ENDPOINT_SOURCE":          true,
 		"S3_ENDPOINT_PORT":            true,
 		"S3_USE_LIST_OBJECTS_V1":      true,
+		"S3_RANGE_BATCH_ENABLED":      true,
+		"S3_RANGE_MAX_RETRIES":        true,
 
 		// Azure
 		"WALG_AZ_PREFIX":          true,
@@ -233,7 +259,7 @@ var (
 
 		// Yandex Cloud
 		YcSaKeyFileSetting: true,
-		YcKmsKeyIdSetting:  true,
+		YcKmsKeyIDSetting:  true,
 
 		// SH
 		"WALG_SSH_PREFIX":      true,
@@ -245,6 +271,32 @@ var (
 		//File
 		"WALG_FILE_PREFIX": true,
 
+		// GOLANG
+		GoMaxProcs: true,
+
+		// Web server
+		HTTPListen:       true,
+		HTTPExposePprof:  true,
+		HTTPExposeExpVar: true,
+	}
+
+	PGAllowedSettings = map[string]bool{
+		// Postgres
+		PgPortSetting:     true,
+		PgUserSetting:     true,
+		PgHostSetting:     true,
+		PgDataSetting:     true,
+		PgPasswordSetting: true,
+		PgDatabaseSetting: true,
+		PgSslModeSetting:  true,
+		PgSlotName:        true,
+		PgWalSize:         true,
+		"PGPASSFILE":      true,
+		PrefetchDir:       true,
+		PgReadyRename:     true,
+	}
+
+	MongoAllowedSettings = map[string]bool{
 		// MongoDB
 		MongoDBUriSetting:              true,
 		MongoDBLastWriteUpdateInterval: true,
@@ -253,11 +305,23 @@ var (
 		OplogPushStatsEnabled:          true,
 		OplogPushStatsLoggingInterval:  true,
 		OplogPushStatsUpdateInterval:   true,
-		OplogPushStatsExposeHttp:       true,
+		OplogPushStatsExposeHTTP:       true,
 		OplogPushWaitForBecomePrimary:  true,
 		OplogPushPrimaryCheckInterval:  true,
 		OplogPITRDiscoveryInterval:     true,
+	}
 
+	SQLServerAllowedSettings = map[string]bool{
+		// SQLServer
+		SQLServerBlobHostname:     true,
+		SQLServerBlobCertFile:     true,
+		SQLServerBlobKeyFile:      true,
+		SQLServerBlobLockFile:     true,
+		SQLServerConnectionString: true,
+		SQLServerDBConcurrency:    true,
+	}
+
+	MysqlAllowedSettings = map[string]bool{
 		// MySQL
 		MysqlDatasourceNameSetting: true,
 		MysqlSslCaSetting:          true,
@@ -265,31 +329,72 @@ var (
 		MysqlBinlogDstSetting:      true,
 		MysqlBackupPrepareCmd:      true,
 		MysqlTakeBinlogsFromMaster: true,
+	}
 
-		// GOLANG
-		GoMaxProcs: true,
-
-		// Web server
-		HttpListen:       true,
-		HttpExposePprof:  true,
-		HttpExposeExpVar: true,
-
-		// SQLServer
-		SQLServerBlobHostname:     true,
-		SQLServerBlobCertFile:     true,
-		SQLServerBlobKeyFile:      true,
-		SQLServerBlobLockFile:     true,
-		SQLServerConnectionString: true,
+	RedisAllowedSettings = map[string]bool{
+		// Redis
+		RedisPassword: true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
-	HttpSettingExposeFuncs = map[string]func(webserver.WebServer){
-		HttpExposePprof:          webserver.EnablePprofEndpoints,
-		HttpExposeExpVar:         webserver.EnableExpVarEndpoints,
-		OplogPushStatsExposeHttp: nil,
+	HTTPSettingExposeFuncs = map[string]func(webserver.WebServer){
+		HTTPExposePprof:          webserver.EnablePprofEndpoints,
+		HTTPExposeExpVar:         webserver.EnableExpVarEndpoints,
+		OplogPushStatsExposeHTTP: nil,
 	}
 	Turbo bool
 )
+
+// nolint: gocyclo
+func ConfigureSettings(currentType string) {
+	if len(defaultConfigValues) == 0 {
+		defaultConfigValues = commonDefaultConfigValues
+		dbSpecificDefaultSettings := map[string]string{}
+		switch currentType {
+		case PG:
+			dbSpecificDefaultSettings = PGDefaultSettings
+		case MONGO:
+			dbSpecificDefaultSettings = MongoDefaultSettings
+		case SQLSERVER:
+			dbSpecificDefaultSettings = SQLServerDefaultSettings
+		}
+
+		for k, v := range dbSpecificDefaultSettings {
+			defaultConfigValues[k] = v
+		}
+	}
+
+	if len(AllowedSettings) == 0 {
+		AllowedSettings = CommonAllowedSettings
+		dbSpecificSettings := map[string]bool{}
+		switch currentType {
+		case PG:
+			dbSpecificSettings = PGAllowedSettings
+		case GP:
+			// as of now, GP specific settings are identical to PG
+			dbSpecificSettings = PGAllowedSettings
+		case MONGO:
+			dbSpecificSettings = MongoAllowedSettings
+		case MYSQL:
+			dbSpecificSettings = MysqlAllowedSettings
+		case SQLSERVER:
+			dbSpecificSettings = SQLServerAllowedSettings
+		case REDIS:
+			dbSpecificSettings = RedisAllowedSettings
+		}
+
+		for k, v := range dbSpecificSettings {
+			AllowedSettings[k] = v
+		}
+
+		for _, adapter := range StorageAdapters {
+			for _, setting := range adapter.settingNames {
+				AllowedSettings[setting] = true
+			}
+			AllowedSettings["WALG_"+adapter.prefixName] = true
+		}
+	}
+}
 
 func isAllowedSetting(setting string, AllowedSettings map[string]bool) (exists bool) {
 	_, exists = AllowedSettings[setting]
@@ -337,24 +442,19 @@ func Configure() {
 
 	// Show all ENV vars in DEVEL Logging Mode
 	tracelog.DebugLogger.Println("--- COMPILED ENVIRONMENT VARS ---")
-	for _, pair := range os.Environ() {
+	env := os.Environ()
+	sort.Strings(env)
+	for _, pair := range env {
 		tracelog.DebugLogger.Println(pair)
 	}
 
 	configureLimiters()
-
-	for _, adapter := range StorageAdapters {
-		for _, setting := range adapter.settingNames {
-			AllowedSettings[setting] = true
-		}
-		AllowedSettings["WALG_"+adapter.prefixName] = true
-	}
 }
 
 // ConfigureAndRunDefaultWebServer configures and runs web server
 func ConfigureAndRunDefaultWebServer() error {
 	var ws webserver.WebServer
-	httpListenAddr, httpListen := GetSetting(HttpListen)
+	httpListenAddr, httpListen := GetSetting(HTTPListen)
 	if httpListen {
 		ws = webserver.NewSimpleWebServer(httpListenAddr)
 		if err := ws.Serve(); err != nil {
@@ -364,7 +464,7 @@ func ConfigureAndRunDefaultWebServer() error {
 			return err
 		}
 	}
-	for setting, registerFunc := range HttpSettingExposeFuncs {
+	for setting, registerFunc := range HTTPSettingExposeFuncs {
 		enabled, err := GetBoolSettingDefault(setting, false)
 		if err != nil {
 			return err
@@ -373,7 +473,7 @@ func ConfigureAndRunDefaultWebServer() error {
 			continue
 		}
 		if !httpListen {
-			return fmt.Errorf("%s failed: %s is not set", setting, HttpListen)
+			return fmt.Errorf("%s failed: %s is not set", setting, HTTPListen)
 		}
 		if registerFunc == nil {
 			continue
@@ -405,15 +505,7 @@ func InitConfig() {
 	ReadConfigFromFile(globalViper, CfgFile)
 	CheckAllowedSettings(globalViper)
 
-	// Set compiled config to ENV.
-	// Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
-	for k, v := range viper.AllSettings() {
-		val, ok := v.(string)
-		if ok {
-			err := bindToEnv(k, val)
-			tracelog.ErrorLogger.FatalOnError(err)
-		}
-	}
+	bindConfigToEnv(globalViper)
 }
 
 // ReadConfigFromFile read config to the viper instance
@@ -517,11 +609,14 @@ func toFlagName(s string) string {
 	return strings.ReplaceAll(strings.ToLower(s), "_", "-")
 }
 
+// FolderFromConfig prefers the config parameters instead of the current environment variables
 func FolderFromConfig(configFile string) (storage.Folder, error) {
 	var config = viper.New()
 	SetDefaultValues(config)
 	ReadConfigFromFile(config, configFile)
 	CheckAllowedSettings(config)
+
+	bindConfigToEnv(config)
 
 	var folder, err = ConfigureFolderForSpecificConfig(config)
 
@@ -530,4 +625,16 @@ func FolderFromConfig(configFile string) (storage.Folder, error) {
 		tracelog.ErrorLogger.FatalError(err)
 	}
 	return folder, err
+}
+
+// Set the compiled config to ENV.
+// Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
+func bindConfigToEnv(globalViper *viper.Viper) {
+	for k, v := range globalViper.AllSettings() {
+		val, ok := v.(string)
+		if ok {
+			err := bindToEnv(k, val)
+			tracelog.ErrorLogger.FatalOnError(err)
+		}
+	}
 }

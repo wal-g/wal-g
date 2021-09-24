@@ -55,6 +55,12 @@ func (err UnsupportedFileTypeError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
+// TarInterpreter behaves differently
+// for different file types.
+type TarInterpreter interface {
+	Interpret(reader io.Reader, header *tar.Header) error
+}
+
 // EmptyWriteIgnorer handles 0 byte write in LZ4 package
 // to stop pipe reader/writer from blocking.
 type EmptyWriteIgnorer struct {
@@ -136,25 +142,26 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 	return newUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
 }
 
-// TODO : unit tests
 // ExtractAll Handles all files passed in. Supports `.lzo`, `.lz4`, `.lzma`, and `.tar`.
 // File type `.nop` is used for testing purposes. Each file is extracted
 // in its own goroutine and ExtractAll will wait for all goroutines to finish.
-// Returns the first error encountered.
+// Retries unsuccessful attempts log2(MaxConcurrency) times, dividing concurrency by two each time.
 func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
+	return ExtractAllWithSleeper(tarInterpreter, files, NewExponentialSleeper(MinExtractRetryWait, MaxExtractRetryWait))
+}
+
+func ExtractAllWithSleeper(tarInterpreter TarInterpreter, files []ReaderMaker, sleeper Sleeper) error {
 	if len(files) == 0 {
 		return newNoFilesToExtractError()
 	}
 
-	retrier := NewExponentialRetrier(MinExtractRetryWait, MaxExtractRetryWait)
 	// Set maximum number of goroutines spun off by ExtractAll
 	downloadingConcurrency, err := GetMaxDownloadConcurrency()
 	if err != nil {
 		return err
 	}
 	for currentRun := files; len(currentRun) > 0; {
-		var failed []ReaderMaker
-		failed = tryExtractFiles(currentRun, tarInterpreter, downloadingConcurrency)
+		failed := tryExtractFiles(currentRun, tarInterpreter, downloadingConcurrency)
 		if downloadingConcurrency > 1 {
 			downloadingConcurrency /= 2
 		} else if len(failed) == len(currentRun) {
@@ -163,26 +170,40 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 		}
 		currentRun = failed
 		if len(failed) > 0 {
-			retrier.Retry()
+			sleeper.Sleep()
 		}
 	}
+
 	return nil
 }
 
 // TODO : unit tests
-func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloadingConcurrency int) (failed []ReaderMaker) {
+func tryExtractFiles(files []ReaderMaker,
+	tarInterpreter TarInterpreter,
+	downloadingConcurrency int) (failed []ReaderMaker) {
 	downloadingContext := context.TODO()
 	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
+	writingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
 	crypter := ConfigureCrypter()
 	isFailed := sync.Map{}
 
 	for _, file := range files {
-		_ = downloadingSemaphore.Acquire(downloadingContext, 1)
+		err := downloadingSemaphore.Acquire(downloadingContext, 1)
+		if err != nil {
+			tracelog.ErrorLogger.Println(err)
+			return files //Should never happen, but if we are asked to cancel - consider all files unfinished
+		}
+		err = writingSemaphore.Acquire(downloadingContext, 1)
+		if err != nil {
+			tracelog.ErrorLogger.Println(err)
+			return files //Should never happen, but if we are asked to cancel - consider all files unfinished
+		}
 		fileClosure := file
 
 		extractingReader, pipeWriter := io.Pipe()
 		decompressingWriter := &EmptyWriteIgnorer{pipeWriter}
 		go func() {
+			defer downloadingSemaphore.Release(1)
 			err := DecryptAndDecompressTar(decompressingWriter, fileClosure, crypter)
 			utility.LoggedClose(decompressingWriter, "")
 			tracelog.InfoLogger.Printf("Finished decompression of %s", fileClosure.Path())
@@ -192,7 +213,7 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 			}
 		}()
 		go func() {
-			defer downloadingSemaphore.Release(1)
+			defer writingSemaphore.Release(1)
 			err := extractOne(tarInterpreter, extractingReader)
 			err = errors.Wrapf(err, "Extraction error in %s", fileClosure.Path())
 			utility.LoggedClose(extractingReader, "")
@@ -204,7 +225,17 @@ func tryExtractFiles(files []ReaderMaker, tarInterpreter TarInterpreter, downloa
 		}()
 	}
 
-	_ = downloadingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency))
+	err := downloadingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency))
+	if err != nil {
+		tracelog.ErrorLogger.Println(err)
+		return files //Should never happen, but if we are asked to cancel - consider all files unfinished
+	}
+	err = writingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency))
+	if err != nil {
+		tracelog.ErrorLogger.Println(err)
+		return files
+	}
+
 	isFailed.Range(func(failedFile, _ interface{}) bool {
 		failed = append(failed, failedFile.(ReaderMaker))
 		return true

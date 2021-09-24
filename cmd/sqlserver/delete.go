@@ -1,12 +1,10 @@
 package sqlserver
 
 import (
-	"time"
-
 	"github.com/spf13/cobra"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -42,21 +40,21 @@ var deleteEverythingCmd = &cobra.Command{
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
-	deleteHandler, err := newSqlServerDeleteHandler()
+	deleteHandler, err := newSQLServerDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.DeleteEverything(confirmed)
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
-	deleteHandler, err := newSqlServerDeleteHandler()
+	deleteHandler, err := newSQLServerDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteBefore(args, confirmed)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
-	deleteHandler, err := newSqlServerDeleteHandler()
+	deleteHandler, err := newSQLServerDeleteHandler()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteRetain(args, confirmed)
@@ -68,7 +66,7 @@ func init() {
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 
-func newSqlServerDeleteHandler() (*internal.DeleteHandler, error) {
+func newSQLServerDeleteHandler() (*internal.DeleteHandler, error) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -79,22 +77,10 @@ func newSqlServerDeleteHandler() (*internal.DeleteHandler, error) {
 
 	backupObjects := make([]internal.BackupObject, 0, len(backups))
 	for _, object := range backups {
-		backupObjects = append(backupObjects, SqlServerBackupObject{object})
+		backupObjects = append(backupObjects, internal.NewDefaultBackupObject(object))
 	}
 
 	return internal.NewDeleteHandler(folder, backupObjects, makeLessFunc()), nil
-}
-
-type SqlServerBackupObject struct {
-	storage.Object
-}
-
-func (o SqlServerBackupObject) IsFullBackup() bool {
-	return true
-}
-
-func (o SqlServerBackupObject) GetBackupTime() time.Time {
-	return o.Object.GetLastModified()
 }
 
 func makeLessFunc() func(object1, object2 storage.Object) bool {

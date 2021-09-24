@@ -3,7 +3,7 @@ package internal
 import (
 	"io"
 
-	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 // StorageReaderMaker creates readers for downloading from storage
@@ -12,7 +12,7 @@ type StorageReaderMaker struct {
 	RelativePath string
 }
 
-func newStorageReaderMaker(folder storage.Folder, relativePath string) *StorageReaderMaker {
+func NewStorageReaderMaker(folder storage.Folder, relativePath string) *StorageReaderMaker {
 	return &StorageReaderMaker{folder, relativePath}
 }
 

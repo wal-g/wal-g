@@ -8,7 +8,8 @@ import (
 const (
 	backupCopyUsage            = "copy"
 	backupCopyShortDescription = "copy specific or all backups"
-	backupCopyLongDescription  = "Copy backup(s) from one storage to another according to configs (with history by default)"
+	backupCopyLongDescription  = "Copy backup(s) from one storage to another according to configs " +
+		"(with history by default)"
 
 	backupNameFlag        = "backup-name"
 	backupNameShorthand   = "b"
@@ -47,12 +48,16 @@ func runBackupCopy(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	cmd.AddCommand(backupCopyCmd)
+	Cmd.AddCommand(backupCopyCmd)
 
 	backupCopyCmd.Flags().StringVarP(&backupName, backupNameFlag, backupNameShorthand, "", backupNameDescription)
 	backupCopyCmd.Flags().StringVarP(&toConfigFile, toFlag, toShorthand, "", toDescription)
 	backupCopyCmd.Flags().StringVarP(&fromConfigFile, fromFlag, fromShorthand, "", fromDescription)
-	backupCopyCmd.Flags().BoolVarP(&withoutHistory, withoutHistoryFlag, withoutHistoryShorthand, false, withoutHistoryDescription)
+	backupCopyCmd.Flags().BoolVarP(&withoutHistory,
+		withoutHistoryFlag,
+		withoutHistoryShorthand,
+		false,
+		withoutHistoryDescription)
 
 	_ = backupCopyCmd.MarkFlagFilename(toConfigFile)
 	_ = backupCopyCmd.MarkFlagFilename(fromConfigFile)

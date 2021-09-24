@@ -13,6 +13,18 @@ type Backup struct {
 	DataSize        int64       `json:"DataSize,omitempty"`
 }
 
+func (b Backup) Name() string {
+	return b.BackupName
+}
+
+func (b Backup) StartTime() time.Time {
+	return b.StartLocalTime
+}
+
+func (b Backup) IsPermanent() bool {
+	return b.Permanent
+}
+
 // NodeMeta represents MongoDB node metadata
 type NodeMeta struct {
 	LastTS    Timestamp `json:"LastTS,omitempty"`
@@ -27,10 +39,12 @@ type MongoMeta struct {
 
 // BackupMeta includes mongodb and storage metadata
 type BackupMeta struct {
-	Mongo     MongoMeta
-	DataSize  int64
-	Permanent bool
-	User      interface{}
+	Mongo      MongoMeta
+	DataSize   int64
+	Permanent  bool
+	User       interface{}
+	StartTime  time.Time
+	FinishTime time.Time
 }
 
 // FirstOverlappingBackupForArch checks if archive overlaps any backup from given list.
@@ -50,8 +64,10 @@ func FirstOverlappingBackupForArch(arch Archive, backups []Backup) Backup {
 func ArchInBackup(arch Archive, backup *Backup) bool {
 	backupStart := backup.MongoMeta.Before.LastMajTS
 	backupEnd := backup.MongoMeta.After.LastMajTS
-	return TimestampInInterval(arch.Start, backupStart, backupEnd) || TimestampInInterval(arch.End, backupStart, backupEnd) ||
-		TimestampInInterval(backupStart, arch.Start, arch.End) || TimestampInInterval(backupEnd, arch.Start, arch.End)
+	return TimestampInInterval(arch.Start, backupStart, backupEnd) ||
+		TimestampInInterval(arch.End, backupStart, backupEnd) ||
+		TimestampInInterval(backupStart, arch.Start, arch.End) ||
+		TimestampInInterval(backupEnd, arch.Start, arch.End)
 }
 
 // TimestampInInterval checks if timestamp is in given interval.

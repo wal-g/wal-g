@@ -4,9 +4,9 @@ test_full_backup()
   TMP_CONFIG=$1
   /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
-  echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
-  echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${TMP_CONFIG} wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
-  echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
+  echo "archive_mode = on" >> ${PGDATA}/postgresql.conf
+  echo "archive_command = '/usr/bin/timeout 600 wal-g --config=${TMP_CONFIG} wal-push %p'" >> ${PGDATA}/postgresql.conf
+  echo "archive_timeout = 600" >> ${PGDATA}/postgresql.conf
 
   /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 
@@ -23,7 +23,7 @@ test_full_backup()
 
   wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST
 
-  echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
+  echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
 
   /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
   /tmp/scripts/wait_while_pg_not_ready.sh
@@ -36,6 +36,21 @@ test_full_backup()
   echo "Full backup success!!!!!!"
 
   # Also we test here WAL overwrite prevention as a part of regular backup functionality
+  # First test that .history files prevent overwrite even if WALG_PREVENT_WAL_OVERWRITE is false
+
+  export WALG_PREVENT_WAL_OVERWRITE=false
+
+  echo test > ${PGDATA}/pg_wal/test_file.history
+  wal-g --config=${TMP_CONFIG} wal-push ${PGDATA}/pg_wal/test_file.history
+  wal-g --config=${TMP_CONFIG} wal-push ${PGDATA}/pg_wal/test_file.history
+
+  echo test1 > ${PGDATA}/pg_wal/test_file.history
+  wal-g --config=${TMP_CONFIG} wal-push ${PGDATA}/pg_wal/test_file && EXIT_STATUS=$? || EXIT_STATUS=$?
+
+  if [ "$EXIT_STATUS" -eq 0 ] ; then
+      echo "Error: Duplicate .history with different content was pushed"
+      exit 1
+  fi
 
   export WALG_PREVENT_WAL_OVERWRITE=true
 

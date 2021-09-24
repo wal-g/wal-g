@@ -13,7 +13,11 @@ import (
 )
 
 type YcCrypter struct {
-	symmetricKey ycSymmetricKeyInterface
+	symmetricKey YcSymmetricKeyInterface
+}
+
+func (crypter *YcCrypter) Name() string {
+	return "YcKMC/Crypter"
 }
 
 func (crypter *YcCrypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
@@ -30,7 +34,8 @@ func (crypter *YcCrypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 		return nil, err
 	}
 
-	encryptedWriter, err := sio.EncryptWriter(bufferedWriter, sio.Config{Key: crypter.symmetricKey.GetKey(), CipherSuites: []byte{sio.AES_256_GCM}})
+	encryptedWriter, err := sio.EncryptWriter(bufferedWriter,
+		sio.Config{Key: crypter.symmetricKey.GetKey(), CipherSuites: []byte{sio.AES_256_GCM}})
 
 	if err != nil {
 		tracelog.ErrorLogger.Printf("YC KMS can't create encrypted writer: %v", err)
@@ -50,12 +55,12 @@ func (crypter *YcCrypter) Decrypt(reader io.Reader) (io.Reader, error) {
 	return sio.DecryptReader(reader, sio.Config{Key: crypter.symmetricKey.GetKey(), CipherSuites: []byte{sio.AES_256_GCM}})
 }
 
-func YcCrypterFromKeyIdAndCredential(keyId string, saFilePath string) crypto.Crypter {
+func YcCrypterFromKeyIDAndCredential(keyID string, saFilePath string) crypto.Crypter {
 	credentials := resolveCredentials(saFilePath)
 	sdk, err := ycsdk.Build(context.Background(), ycsdk.Config{
 		Credentials: credentials,
 	})
 	tracelog.ErrorLogger.FatalfOnError("Can't initialize yc sdk: %v", err)
 
-	return &YcCrypter{symmetricKey: YcSymmetricKeyFromKeyIdAndSdk(keyId, sdk)}
+	return &YcCrypter{symmetricKey: YcSymmetricKeyFromKeyIDAndSdk(keyID, sdk)}
 }

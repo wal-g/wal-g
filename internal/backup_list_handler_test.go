@@ -15,6 +15,46 @@ type someError struct {
 	error
 }
 
+var shortBackups = []internal.BackupTime{
+	{
+		BackupName:  "b0",
+		Time:        time.Time{},
+		WalFileName: "shortWallName0",
+	},
+	{
+		BackupName:  "b1",
+		Time:        time.Time{},
+		WalFileName: "shortWallName1",
+	},
+}
+
+var longBackups = []internal.BackupTime{
+	{
+		BackupName:  "backup000",
+		Time:        time.Time{},
+		WalFileName: "veryVeryVeryVeryVeryLongWallName0",
+	},
+	{
+		BackupName:  "backup001",
+		Time:        time.Time{},
+		WalFileName: "veryVeryVeryVeryVeryLongWallName1",
+	},
+}
+
+var emptyColonsBackups = []internal.BackupTime{
+	{
+		Time:        time.Time{},
+		WalFileName: "shortWallName0",
+	},
+	{
+		BackupName: "b1",
+		Time:       time.Time{},
+	},
+	{
+		Time: time.Time{},
+	},
+}
+
 func TestHandleBackupListWriteBackups(t *testing.T) {
 	backups := []internal.BackupTime{
 		{
@@ -99,65 +139,39 @@ func TestHandleBackupListLogNoBackups(t *testing.T) {
 }
 
 func TestWritePrettyBackupList_LongColumnsValues(t *testing.T) {
-	expectedRes := `+---+-----------+--------------------------------+-----------------------------------+
-| # | NAME      | LAST MODIFIED                  | WAL SEGMENT BACKUP START          |
-+---+-----------+--------------------------------+-----------------------------------+
-| 0 | backup000 | Monday, 01-Jan-01 00:00:00 UTC | veryVeryVeryVeryVeryLongWallName0 |
-| 1 | backup001 | Monday, 01-Jan-01 00:00:00 UTC | veryVeryVeryVeryVeryLongWallName1 |
-+---+-----------+--------------------------------+-----------------------------------+
-`
-	backups := []internal.BackupTime{
-		{
-			BackupName:  "backup000",
-			Time:        time.Time{},
-			WalFileName: "veryVeryVeryVeryVeryLongWallName0",
-		},
-		{
-			BackupName:  "backup001",
-			Time:        time.Time{},
-			WalFileName: "veryVeryVeryVeryVeryLongWallName1",
-		},
-	}
+	expectedRes := "+---+-----------+----------+-----------------------------------+\n" +
+		"| # | NAME      | MODIFIED | WAL SEGMENT BACKUP START          |\n" +
+		"+---+-----------+----------+-----------------------------------+\n" +
+		"| 0 | backup000 | -        | veryVeryVeryVeryVeryLongWallName0 |\n" +
+		"| 1 | backup001 | -        | veryVeryVeryVeryVeryLongWallName1 |\n" +
+		"+---+-----------+----------+-----------------------------------+\n"
 
 	b := bytes.Buffer{}
-	internal.WritePrettyBackupList(backups, &b)
+	internal.WritePrettyBackupList(longBackups, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
 
 func TestWritePrettyBackupList_ShortColumnsValues(t *testing.T) {
-	expectedRes := `+---+------+--------------------------------+--------------------------+
-| # | NAME | LAST MODIFIED                  | WAL SEGMENT BACKUP START |
-+---+------+--------------------------------+--------------------------+
-| 0 | b0   | Monday, 01-Jan-01 00:00:00 UTC | shortWallName0           |
-| 1 | b1   | Monday, 01-Jan-01 00:00:00 UTC | shortWallName1           |
-+---+------+--------------------------------+--------------------------+
-`
-	backups := []internal.BackupTime{
-		{
-			BackupName:  "b0",
-			Time:        time.Time{},
-			WalFileName: "shortWallName0",
-		},
-		{
-			BackupName:  "b1",
-			Time:        time.Time{},
-			WalFileName: "shortWallName1",
-		},
-	}
+	expectedRes := "+---+------+----------+--------------------------+\n" +
+		"| # | NAME | MODIFIED | WAL SEGMENT BACKUP START |\n" +
+		"+---+------+----------+--------------------------+\n" +
+		"| 0 | b0   | -        | shortWallName0           |\n" +
+		"| 1 | b1   | -        | shortWallName1           |\n" +
+		"+---+------+----------+--------------------------+\n"
 
 	b := bytes.Buffer{}
-	internal.WritePrettyBackupList(backups, &b)
+	internal.WritePrettyBackupList(shortBackups, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
 
 func TestWritePrettyBackupList_WriteNoBackupList(t *testing.T) {
-	expectedRes := `+---+------+---------------+--------------------------+
-| # | NAME | LAST MODIFIED | WAL SEGMENT BACKUP START |
-+---+------+---------------+--------------------------+
-+---+------+---------------+--------------------------+
-`
+	expectedRes := "+---+------+----------+--------------------------+\n" +
+		"| # | NAME | MODIFIED | WAL SEGMENT BACKUP START |\n" +
+		"+---+------+----------+--------------------------+\n" +
+		"+---+------+----------+--------------------------+\n"
+
 	backups := make([]internal.BackupTime, 0)
 
 	b := bytes.Buffer{}
@@ -167,30 +181,58 @@ func TestWritePrettyBackupList_WriteNoBackupList(t *testing.T) {
 }
 
 func TestWritePrettyBackupList_EmptyColumnsValues(t *testing.T) {
-	expectedRes := `+---+------+--------------------------------+--------------------------+
-| # | NAME | LAST MODIFIED                  | WAL SEGMENT BACKUP START |
-+---+------+--------------------------------+--------------------------+
-| 0 |      | Monday, 01-Jan-01 00:00:00 UTC | shortWallName0           |
-| 1 | b1   | Monday, 01-Jan-01 00:00:00 UTC |                          |
-| 2 |      | Monday, 01-Jan-01 00:00:00 UTC |                          |
-+---+------+--------------------------------+--------------------------+
-`
-	backups := []internal.BackupTime{
-		{
-			Time:        time.Time{},
-			WalFileName: "shortWallName0",
-		},
-		{
-			BackupName: "b1",
-			Time:       time.Time{},
-		},
-		{
-			Time: time.Time{},
-		},
-	}
+	expectedRes := "+---+------+----------+--------------------------+\n" +
+		"| # | NAME | MODIFIED | WAL SEGMENT BACKUP START |\n" +
+		"+---+------+----------+--------------------------+\n" +
+		"| 0 |      | -        | shortWallName0           |\n" +
+		"| 1 | b1   | -        |                          |\n" +
+		"| 2 |      | -        |                          |\n" +
+		"+---+------+----------+--------------------------+\n"
 
 	b := bytes.Buffer{}
-	internal.WritePrettyBackupList(backups, &b)
+	internal.WritePrettyBackupList(emptyColonsBackups, &b)
+
+	assert.Equal(t, expectedRes, b.String())
+}
+
+func TestWriteBackupList_NoBackups(t *testing.T) {
+	expectedRes := "name modified wal_segment_backup_start\n"
+	backups := make([]internal.BackupTime, 0)
+
+	b := bytes.Buffer{}
+	internal.WriteBackupList(backups, &b)
+
+	assert.Equal(t, expectedRes, b.String())
+}
+
+func TestWriteBackupList_EmptyColumnsValues(t *testing.T) {
+	expectedRes := "name modified wal_segment_backup_start\n" +
+		"     -        shortWallName0\n" +
+		"b1   -        \n" +
+		"     -        \n"
+
+	b := bytes.Buffer{}
+	internal.WriteBackupList(emptyColonsBackups, &b)
+
+	assert.Equal(t, expectedRes, b.String())
+}
+
+func TestWriteBackupList_ShortColumnsValues(t *testing.T) {
+	expectedRes := "name modified wal_segment_backup_start\n" +
+		"b0   -        shortWallName0\n" +
+		"b1   -        shortWallName1\n"
+	b := bytes.Buffer{}
+	internal.WriteBackupList(shortBackups, &b)
+
+	assert.Equal(t, expectedRes, b.String())
+}
+
+func TestWriteBackupList_LongColumnsValues(t *testing.T) {
+	expectedRes := "name      modified wal_segment_backup_start\n" +
+		"backup000 -        veryVeryVeryVeryVeryLongWallName0\n" +
+		"backup001 -        veryVeryVeryVeryVeryLongWallName1\n"
+	b := bytes.Buffer{}
+	internal.WriteBackupList(longBackups, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }

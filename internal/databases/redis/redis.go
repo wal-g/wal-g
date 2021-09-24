@@ -18,20 +18,22 @@ func GetSettingWithLocalDefault(key string, defaultValue string) string {
 	return defaultValue
 }
 
-func getRedisConnection() *redis.Client {
+//getRedisConnection
+func _() *redis.Client {
 	redisAddr := GetSettingWithLocalDefault("WALG_REDIS_HOST", "localhost")
 	redisPort := GetSettingWithLocalDefault("WALG_REDIS_PORT", "6379")
-	redisPassword := GetSettingWithLocalDefault("WALG_REDIS_PASSWORD", "") // no password set
-	redisDbStr, ok := internal.GetSetting("WALG_REDIS_DB")
-	redisDb := 0 // use default DB
+	redisPassword := GetSettingWithLocalDefault(internal.RedisPassword, "") // no password set
+	redisDBStr, ok := internal.GetSetting("WALG_REDIS_DB")
+	redisDB := 0 // use default DB
 	if ok {
-		redisDbValue, err := strconv.Atoi(redisDbStr) // DISCUSS: could redisDb changed on success without additional variable redisDbValue?
+		redisDBValue, err := strconv.Atoi(redisDBStr)
+		// DISCUSS: could redisDB changed on success without additional variable redisDBValue?
 		tracelog.ErrorLogger.FatalOnError(err)
-		redisDb = redisDbValue
+		redisDB = redisDBValue
 	}
 	return redis.NewClient(&redis.Options{
 		Addr:     redisAddr + ":" + redisPort,
 		Password: redisPassword,
-		DB:       redisDb,
+		DB:       redisDB,
 	})
 }

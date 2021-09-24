@@ -3,6 +3,7 @@
 
 # all available settings of specific linters
 linters-settings:
+  modules-download-mode: vendor
   dupl:
     threshold: 400
   funlen:
@@ -25,6 +26,8 @@ linters-settings:
     check-shadowing: false
   misspell:
     locale: US
+  lll:
+    line-length: 140
 
 linters:
   # please, do not use `enable-all`: it's deprecated and will be removed soon.
@@ -52,14 +55,13 @@ linters:
     - unparam
     - unused
     - varcheck
-  # temporarily disabled
-  #  - golint
-  #  - lll
-  #  - godox
-  #  - deadcode
-  #  - stylecheck
-  #  - gosimple
-  #  - whitespace
+    - golint
+    - lll
+  # - godox
+    - deadcode
+    - stylecheck
+    - gosimple
+    - whitespace
   # don't enable:
   # - gosec
   # - gochecknoinits
@@ -84,5 +86,14 @@ run:
     - "tmp"
     - "submodules"
     - "testtools"
+    - "pkg/storages"
   skip-files:
     - ".*_test.go$"
+
+severity:
+  default-severity: error
+  rules:
+    - linters:
+      - godox
+      - deadcode
+      severity: info

@@ -1,12 +1,10 @@
 package fdb
 
 import (
-	"time"
-
 	"github.com/spf13/cobra"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -103,7 +101,7 @@ func newFdbDeleteHandler(folder storage.Folder) (*internal.DeleteHandler, error)
 
 	backupObjects := make([]internal.BackupObject, 0, len(backups))
 	for _, object := range backups {
-		backupObjects = append(backupObjects, FdbBackupObject{object})
+		backupObjects = append(backupObjects, internal.NewDefaultBackupObject(object))
 	}
 
 	return internal.NewDeleteHandler(folder, backupObjects, makeLessFunc()), nil
@@ -118,16 +116,4 @@ func makeLessFunc() func(object1, object2 storage.Object) bool {
 		}
 		return time1 < time2
 	}
-}
-
-type FdbBackupObject struct {
-	storage.Object
-}
-
-func (o FdbBackupObject) IsFullBackup() bool {
-	return true
-}
-
-func (o FdbBackupObject) GetBackupTime() time.Time {
-	return o.Object.GetLastModified()
 }
