@@ -182,7 +182,7 @@ func (bh *BackupHandler) checkPrerequisites() (err error) {
 	if len(isInBackupSegments) > 0 {
 		return fmt.Errorf("backup is already in progress on one or more segments: %v", isInBackupSegments)
 	}
-
+	tracelog.InfoLogger.Printf("No running backups were found")
 	tracelog.InfoLogger.Printf("Checking backup prerequisites: OK")
 	return nil
 }
