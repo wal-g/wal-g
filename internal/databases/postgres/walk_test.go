@@ -326,18 +326,22 @@ func isEmpty(t *testing.T, path string) bool {
 }
 
 func TestWalk_RegularComposer(t *testing.T) {
-	testWalk(t, postgres.RegularComposer)
+	testWalk(t, postgres.RegularComposer, false)
+}
+
+func TestWalk_RegularComposerReduceMemoryUsage(t *testing.T) {
+	testWalk(t, postgres.RegularComposer, true)
 }
 
 func TestWalk_RatingComposer(t *testing.T) {
-	testWalk(t, postgres.RatingComposer)
+	testWalk(t, postgres.RatingComposer, false)
 }
 
 func TestWalk_CopyComposer(t *testing.T) {
-	testWalk(t, postgres.CopyComposer)
+	testWalk(t, postgres.CopyComposer, false)
 }
 
-func testWalk(t *testing.T, composer postgres.TarBallComposerType) {
+func testWalk(t *testing.T, composer postgres.TarBallComposerType, reduceMemoryUsage bool) {
 	// Generate random data and write to tmp dir `data...`.
 	data := generateData(t)
 	tarSizeThreshold := int64(10)
@@ -359,7 +363,7 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType) {
 		t.Log(err)
 	}
 
-	err = bundle.SetupComposer(setupTestTarBallComposerMaker(composer))
+	err = bundle.SetupComposer(setupTestTarBallComposerMaker(composer, reduceMemoryUsage))
 	if err != nil {
 		t.Log(err)
 	}
@@ -369,9 +373,21 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType) {
 	if err != nil {
 		t.Log(err)
 	}
-	_, err = bundle.PackTarballs()
+	tarFileSets, err := bundle.PackTarballs()
 	if err != nil {
 		t.Log(err)
+	}
+
+	backupFileList := postgres.MakeBackupFileList(bundle.GetFiles())
+
+	if reduceMemoryUsage {
+		// Test tarFileSets is not tracked
+		assert.True(t, len(tarFileSets.GetFiles()) == 0)
+		// Test BackupFileList is not tracked
+		assert.True(t, len(backupFileList) == 0)
+	} else {
+		assert.True(t, len(tarFileSets.GetFiles()) > 0)
+		assert.True(t, len(backupFileList) > 0)
 	}
 
 	err = bundle.FinishQueue()
@@ -415,11 +431,15 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType) {
 	}
 }
 
-func setupTestTarBallComposerMaker(composer postgres.TarBallComposerType) postgres.TarBallComposerMaker {
+func setupTestTarBallComposerMaker(composer postgres.TarBallComposerType, reduceMemoryUsage bool) postgres.TarBallComposerMaker {
 	filePackOptions := postgres.NewTarBallFilePackerOptions(false, false)
 	switch composer {
 	case postgres.RegularComposer:
-		return postgres.NewRegularTarBallComposerMaker(filePackOptions)
+		if reduceMemoryUsage {
+			return postgres.NewRegularTarBallComposerMaker(filePackOptions, &postgres.NopBundleFiles{}, postgres.NewNopTarFileSets())
+		} else {
+			return postgres.NewRegularTarBallComposerMaker(filePackOptions, &postgres.RegularBundleFiles{}, postgres.NewRegularTarFileSets())
+		}
 	case postgres.RatingComposer:
 		relFileStats := make(postgres.RelFileStatistics)
 		composerMaker, _ := postgres.NewRatingTarBallComposerMaker(relFileStats, filePackOptions)

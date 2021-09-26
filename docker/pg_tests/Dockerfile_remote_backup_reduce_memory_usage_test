@@ -1,0 +1,3 @@
+FROM wal-g/docker_prefix:latest
+
+CMD su postgres -c "/tmp/tests/remote_backup_reduce_memory_usage_test.sh"

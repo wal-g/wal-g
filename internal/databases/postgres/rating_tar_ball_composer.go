@@ -170,14 +170,14 @@ func (c *RatingTarBallComposer) PackTarballs() (TarFileSets, error) {
 		return nil, err
 	}
 
-	tarFileSets := make(map[string][]string)
-	tarFileSets[headersTarName] = headersNames
+	tarFileSets := NewRegularTarFileSets()
+	tarFileSets.AddFiles(headersTarName, headersNames)
 
 	for _, tarFilesCollection := range tarFilesCollections {
 		tarBall := c.tarBallQueue.Deque()
 		tarBall.SetUp(c.crypter)
 		for _, composeFileInfo := range tarFilesCollection.files {
-			tarFileSets[tarBall.Name()] = append(tarFileSets[tarBall.Name()], composeFileInfo.header.Name)
+			tarFileSets.AddFile(tarBall.Name(), composeFileInfo.header.Name)
 		}
 		// tarFilesCollection closure
 		tarFilesCollectionLocal := tarFilesCollection

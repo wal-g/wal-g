@@ -32,8 +32,10 @@ services:
       -c 'mkdir -p /export/fullbucket
       &&  mkdir -p /export/fullratingcomposerbucket
       &&  mkdir -p /export/fullcopycomposerbucket
+      &&  mkdir -p /export/fullreducememoryusagebucket
       &&  mkdir -p /export/fullscandeltabucket
       &&  mkdir -p /export/remotebucket
+      &&  mkdir -p /export/remotereducememoryusagebucket
       &&  mkdir -p /export/cryptobucket
       &&  mkdir -p /export/waldeltabucket
       &&  mkdir -p /export/ghostbucket
@@ -276,6 +278,17 @@ services:
     links:
       - s3
 
+  pg_remote_backup_reduce_memory_usage_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_remote_backup_reduce_memory_usage_test
+      context: .
+    image: wal-g/remote_backup_reduce_memory_usage_test
+    container_name: wal-g_pg_remote_backup_reduce_memory_usage_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   pg_ssh_backup_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_ssh_backup_test
@@ -299,7 +312,7 @@ services:
       - s3
 
   pg_full_backup_copy_composer_test:
-    build:  
+    build:
       dockerfile: docker/pg_tests/Dockerfile_full_backup_copy_composer_test
       context: .
     image: wal-g/full_backup_copy_composer_test
@@ -315,6 +328,17 @@ services:
       context: .
     image: wal-g/full_backup_rating_composer_test
     container_name: wal-g_pg_full_backup_rating_composer_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_full_backup_reduce_memory_usage_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_reduce_memory_usage_test
+      context: .
+    image: wal-g/full_backup_reduce_memory_usage_test
+    container_name: wal-g_pg_full_backup_reduce_memory_usage_test
     depends_on:
       - s3
     links:

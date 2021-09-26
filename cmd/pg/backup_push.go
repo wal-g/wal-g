@@ -26,6 +26,7 @@ const (
 	deltaFromUserDataFlag     = "delta-from-user-data"
 	deltaFromNameFlag         = "delta-from-name"
 	addUserDataFlag           = "add-user-data"
+	reduceMemoryUsageFlag     = "reduce-memory-usage"
 
 	permanentShorthand             = "p"
 	fullBackupShorthand            = "f"
@@ -56,7 +57,8 @@ var (
 			if useRatingComposer {
 				tarBallComposerType = postgres.RatingComposer
 			}
-			if useCopyComposer || viper.GetBool(internal.UseCopyComposerSetting) {
+			useCopyComposer = useCopyComposer || viper.GetBool(internal.UseCopyComposerSetting)
+			if useCopyComposer {
 				fullBackup = true
 				tarBallComposerType = postgres.CopyComposer
 			}
@@ -66,19 +68,33 @@ var (
 			if deltaFromUserData == "" {
 				deltaFromUserData = viper.GetString(internal.DeltaFromUserDataSetting)
 			}
-			deltaBaseSelector, err := createDeltaBaseSelector(cmd, deltaFromName, deltaFromUserData)
-			tracelog.ErrorLogger.FatalOnError(err)
-
 			if userDataRaw == "" {
 				userDataRaw = viper.GetString(internal.SentinelUserDataSetting)
 			}
+			reduceMemoryUsage = reduceMemoryUsage || viper.GetBool(internal.ReduceMemoryUsageSetting)
+			if reduceMemoryUsage {
+				if useRatingComposer || useCopyComposer {
+					tracelog.ErrorLogger.Fatalf(
+						"%s option cannot be used with %s, %s options",
+						reduceMemoryUsageFlag, useRatingComposerFlag, useCopyComposerFlag)
+				}
+				if deltaFromName != "" || deltaFromUserData != "" || userDataRaw != "" {
+					tracelog.ErrorLogger.Fatalf(
+						"%s option cannot be used with %s, %s, %s options",
+						reduceMemoryUsageFlag, deltaFromNameFlag, deltaFromUserDataFlag, addUserDataFlag)
+				}
+			}
+
+			deltaBaseSelector, err := createDeltaBaseSelector(cmd, deltaFromName, deltaFromUserData)
+			tracelog.ErrorLogger.FatalOnError(err)
+
 			userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
 			tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
 			arguments := postgres.NewBackupArguments(dataDirectory, utility.BaseBackupPath,
 				permanent, verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting),
 				fullBackup, storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting),
-				tarBallComposerType, deltaBaseSelector, userData)
+				tarBallComposerType, deltaBaseSelector, userData, reduceMemoryUsage)
 
 			backupHandler, err := postgres.NewBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -94,6 +110,7 @@ var (
 	deltaFromName         = ""
 	deltaFromUserData     = ""
 	userDataRaw           = ""
+	reduceMemoryUsage     = false
 )
 
 // create the BackupSelector for delta backup base according to the provided flags
@@ -141,4 +158,6 @@ func init() {
 		"", "Select the backup specified by UserData as the target for the delta backup")
 	backupPushCmd.Flags().StringVar(&userDataRaw, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
+	backupPushCmd.Flags().BoolVar(&reduceMemoryUsage, reduceMemoryUsageFlag,
+		false, "Reduce memory usage by not tracking sentinel and metadata files")
 }

@@ -343,7 +343,9 @@ func (backup *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error)
 	if err != nil {
 		return nil, err
 	}
-	if filesMeta.Files == nil { // in case of WAL-E of old WAL-G backup
+	// in case of WAL-E of old WAL-G backup -or-
+	// base backup created with WALG_REDUCE_MEMORY_USAGE
+	if len(filesMeta.Files) == 0 {
 		return UnwrapAll, nil
 	}
 	filesToUnwrap := make(map[string]bool)
@@ -357,6 +359,7 @@ func (backup *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error)
 }
 
 func shouldUnwrapTar(tarName string, filesMeta FilesMetadataDto, filesToUnwrap map[string]bool) bool {
+	// in case of base backup created with WALG_REDUCE_MEMORY_USAGE
 	if len(filesMeta.TarFileSets) == 0 {
 		return true
 	}

@@ -59,6 +59,7 @@ type BackupArguments struct {
 	pgDataDirectory       string
 	isFullBackup          bool
 	deltaBaseSelector     internal.BackupSelector
+	reduceMemoryUsage     bool
 }
 
 // CurBackupInfo holds all information that is harvest during the backup process
@@ -105,7 +106,7 @@ type BackupHandler struct {
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
 func NewBackupArguments(pgDataDirectory string, backupsFolder string, isPermanent bool, verifyPageChecksums bool,
 	isFullBackup bool, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
-	deltaBaseSelector internal.BackupSelector, userData interface{}) BackupArguments {
+	deltaBaseSelector internal.BackupSelector, userData interface{}, reduceMemoryUsage bool) BackupArguments {
 	return BackupArguments{
 		pgDataDirectory:       pgDataDirectory,
 		backupsFolder:         backupsFolder,
@@ -116,6 +117,7 @@ func NewBackupArguments(pgDataDirectory string, backupsFolder string, isPermanen
 		tarBallComposerType:   tarBallComposerType,
 		deltaBaseSelector:     deltaBaseSelector,
 		userData:              userData,
+		reduceMemoryUsage:     reduceMemoryUsage,
 	}
 }
 
@@ -238,7 +240,8 @@ func (bh *BackupHandler) uploadBackup() TarFileSets {
 
 	tarBallComposerMaker, err := NewTarBallComposerMaker(bh.arguments.tarBallComposerType, bh.workers.conn,
 		bh.workers.uploader.UploadingFolder, bh.curBackupInfo.name,
-		NewTarBallFilePackerOptions(bh.arguments.verifyPageChecksums, bh.arguments.storeAllCorruptBlocks))
+		NewTarBallFilePackerOptions(bh.arguments.verifyPageChecksums, bh.arguments.storeAllCorruptBlocks),
+		bh.arguments.reduceMemoryUsage)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	err = bundle.SetupComposer(tarBallComposerMaker)
@@ -268,7 +271,7 @@ func (bh *BackupHandler) uploadBackup() TarFileSets {
 	bh.curBackupInfo.uncompressedSize = atomic.LoadInt64(bundle.TarBallQueue.AllTarballsSize)
 	bh.curBackupInfo.compressedSize, err = bh.workers.uploader.UploadedDataSize()
 	tracelog.ErrorLogger.FatalOnError(err)
-	tarFileSets[labelFilesTarBallName] = append(tarFileSets[labelFilesTarBallName], labelFilesList...)
+	tarFileSets.AddFiles(labelFilesTarBallName, labelFilesList)
 	timelineChanged := bundle.checkTimelineChanged(bh.workers.conn)
 	tracelog.DebugLogger.Printf("Labelfiles tarball name: %s", labelFilesTarBallName)
 	tracelog.DebugLogger.Printf("Number of label files: %d", len(labelFilesList))
@@ -335,6 +338,13 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	uploader := *bh.workers.uploader
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	tracelog.DebugLogger.Printf("Uploading folder: %s", uploader.UploadingFolder)
+
+	var tarFileSets TarFileSets
+	if bh.arguments.reduceMemoryUsage {
+		tarFileSets = NewNopTarFileSets()
+	} else {
+		tarFileSets = NewRegularTarFileSets()
+	}
 
 	baseBackup := bh.runRemoteBackup()
 	tracelog.InfoLogger.Println("Updating metadata")
@@ -420,12 +430,18 @@ func (bh *BackupHandler) runRemoteBackup() *StreamingBaseBackup {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	baseBackup := NewStreamingBaseBackup(bh.pgInfo.pgDataDirectory, viper.GetInt64(internal.TarSizeThresholdSetting), conn)
+	var bundleFiles BundleFiles
+	if bh.arguments.reduceMemoryUsage {
+		bundleFiles = &NopBundleFiles{}
+	} else {
+		bundleFiles = &RegularBundleFiles{}
+	}
 	tracelog.InfoLogger.Println("Starting remote backup")
 	err = baseBackup.Start(bh.arguments.verifyPageChecksums, diskLimit)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Streaming remote backup")
-	err = baseBackup.Upload(bh.workers.uploader)
+	err = baseBackup.Upload(bh.workers.uploader, bundleFiles)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Finishing backup")
