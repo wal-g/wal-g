@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
+	flavors "github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-sql-driver/mysql"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
-	flavors "github.com/go-mysql-org/go-mysql/mysql"
 )
 
 const BinlogPath = "binlog_" + utility.VersionStr + "/"
@@ -31,22 +31,25 @@ func isMaster(db *sql.DB) bool {
 	return !rows.Next()
 }
 
-func getFlavor(db *sql.DB) string {
+func getFlavor(db *sql.DB) (string, error) {
 	rows, err := db.Query("SELECT @@version")
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(rows, "")
 	if rows.Next() {
 		var versionComment string
-		rows.Scan(&versionComment)
+		err = rows.Scan(&versionComment)
+		if err != nil {
+			return "", err
+		}
 		// example: '10.6.4-MariaDB-1:10.6.4+maria~focal'
 		if strings.Contains(versionComment, "MariaDB") {
-			return flavors.MariaDBFlavor
+			return flavors.MariaDBFlavor, nil
 		}
 		// It is possible to distinguish Percona & MySQL by checking 'version_comment',
 		// however usually we can expect that there is no difference between these distributions
-		return flavors.MySQLFlavor
+		return flavors.MySQLFlavor, nil
 	}
-	return ""
+	return "", nil
 }
 
 func getMySQLCurrentBinlogFileLocal(db *sql.DB) (fileName string) {

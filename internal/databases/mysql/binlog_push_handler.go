@@ -55,14 +55,13 @@ func HandleBinlogPush(uploader *internal.Uploader, untilBinlog string, checkGTID
 	}
 
 	var filters []statefulBinlogFilter
-	filters = append(filters, &untilBinlogFilter{Until: untilBinlog})
-	filters = append(filters, &archivedBinlogFilter{})
+	filters = append(filters, &untilBinlogFilter{Until: untilBinlog}, &archivedBinlogFilter{})
 	if checkGTIDs {
-		flavor := getFlavor(db)
-		if flavor == "" {
+		flavor, err := getFlavor(db)
+		if flavor == "" || err != nil {
 			flavor = mysql.MySQLFlavor
 		}
-		filters = append(filters, &gtidFilter{BinlogsFolder: binlogsFolder, Flavour: flavor})
+		filters = append(filters, &gtidFilter{BinlogsFolder: binlogsFolder, Flavor: flavor})
 	}
 	for _, filter := range filters {
 		filter.init(cache)
@@ -242,7 +241,7 @@ func (u *archivedBinlogFilter) test(binlog, _ string) bool {
 
 type gtidFilter struct {
 	BinlogsFolder string
-	Flavour       string
+	Flavor        string
 	gtidArchived  string
 	lastGtidSeen  string
 }
@@ -261,7 +260,7 @@ func (u *gtidFilter) onUpload(data *LogsCache) {
 }
 func (u *gtidFilter) test(binlog, nextBinlog string) bool {
 	// nextPreviousGTIDs is 'GTIDs_executed in the current binary log file'
-	nextPreviousGTIDs, err := peekPreviousGTIDs(path.Join(u.BinlogsFolder, nextBinlog), u.Flavour)
+	nextPreviousGTIDs, err := peekPreviousGTIDs(path.Join(u.BinlogsFolder, nextBinlog), u.Flavor)
 	if err != nil {
 		tracelog.InfoLogger.Printf("cannot extract PREVIOUS_GTIDS event from binlog %s\n", binlog)
 		// continue uploading even when we cannot parse next binlog
@@ -281,12 +280,12 @@ func (u *gtidFilter) test(binlog, nextBinlog string) bool {
 	return true
 }
 
-func peekPreviousGTIDs(filename string, flavour string) (mysql.GTIDSet, error) {
+func peekPreviousGTIDs(filename string, flavor string) (mysql.GTIDSet, error) {
 	var found bool
 	previousGTID := &replication.PreviousGTIDsEvent{}
 
 	parser := replication.NewBinlogParser()
-	parser.SetFlavor(flavour)
+	parser.SetFlavor(flavor)
 	parser.SetVerifyChecksum(false) // the faster, the better
 	parser.SetRawMode(true)         // choose events to parse manually
 	err := parser.ParseFile(filename, 0, func(event *replication.BinlogEvent) error {
