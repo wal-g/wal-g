@@ -143,3 +143,38 @@ func (queryRunner *GpQueryRunner) GetGreenplumVersion() (version string, err err
 	}
 	return version, nil
 }
+
+// BuildIsInBackup formats a query to retrieve information about running backups
+func (queryRunner *GpQueryRunner) buildIsInBackup() string {
+	return `
+SELECT pg_is_in_backup(), gp_segment_id FROM gp_dist_random('gp_id')
+UNION ALL
+SELECT pg_is_in_backup(), -1;
+`
+}
+
+// IsInBackup check if there is backup running
+func (queryRunner *GpQueryRunner) IsInBackup() (isInBackupByContentID map[int]bool, err error) {
+	conn := queryRunner.pgQueryRunner.Connection
+
+	rows, err := conn.Query(queryRunner.buildIsInBackup())
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner IsInBackup: query failed")
+	}
+
+	defer rows.Close()
+	results := make(map[int]bool)
+	for rows.Next() {
+		var contentID int
+		var isInBackup bool
+		if err := rows.Scan(&isInBackup, &contentID); err != nil {
+			tracelog.WarningLogger.Printf("QueryRunner IsInBackup:  %v\n", err.Error())
+		}
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	return results, nil
+}

@@ -90,7 +90,7 @@ type BackupHandler struct {
 	currBackupInfo CurrBackupInfo
 }
 
-func (bh *BackupHandler) buildCommand(contentID int) string {
+func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 	segment := bh.globalCluster.ByContent[contentID][0]
 	segUserData := NewSegmentUserData()
 	bh.currBackupInfo.segmentBackups[segUserData.ID] = segment
@@ -116,13 +116,19 @@ func (bh *BackupHandler) buildCommand(contentID int) string {
 func (bh *BackupHandler) HandleBackupPush() {
 	bh.currBackupInfo.backupName = BackupNamePrefix + time.Now().Format(utility.BackupTimeFormat)
 	bh.currBackupInfo.startTime = utility.TimeNowCrossPlatformUTC()
+	gplog.InitializeLogging("wal-g", bh.arguments.logsDir)
+
+	err := bh.connect()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	err = bh.checkPrerequisites()
+	tracelog.ErrorLogger.FatalfOnError("Backup prerequisites check failed: %v\n", err)
 
 	tracelog.InfoLogger.Println("Running wal-g on segments")
-	gplog.InitializeLogging("wal-g", bh.arguments.logsDir)
 	remoteOutput := bh.globalCluster.GenerateAndExecuteCommand("Running wal-g",
 		cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
 		func(contentID int) string {
-			return bh.buildCommand(contentID)
+			return bh.buildBackupPushCommand(contentID)
 		})
 	bh.globalCluster.CheckClusterError(remoteOutput, "Unable to run wal-g", func(contentID int) string {
 		return "Unable to run wal-g"
@@ -132,8 +138,6 @@ func (bh *BackupHandler) HandleBackupPush() {
 		tracelog.InfoLogger.Printf("WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
 	}
 
-	err := bh.connect()
-	tracelog.ErrorLogger.FatalOnError(err)
 	restoreLSNs, err := bh.createRestorePoint(bh.currBackupInfo.backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -147,6 +151,40 @@ func (bh *BackupHandler) HandleBackupPush() {
 		tracelog.ErrorLogger.FatalError(err)
 	}
 	tracelog.InfoLogger.Printf("Backup %s successfully created", bh.currBackupInfo.backupName)
+}
+
+func (bh *BackupHandler) checkPrerequisites() (err error) {
+	tracelog.InfoLogger.Println("Checking backup prerequisites")
+
+	if bh.currBackupInfo.gpVersion.Major >= 7 {
+		// GP7+ allows the non-exclusive backups
+		tracelog.InfoLogger.Println("Checking backup prerequisites: OK")
+		return nil
+	}
+
+	tracelog.InfoLogger.Println("Checking for the existing running backup...")
+	queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
+	if err != nil {
+		return
+	}
+	backupStatuses, err := queryRunner.IsInBackup()
+	if err != nil {
+		return err
+	}
+
+	isInBackupSegments := make([]int, 0)
+	for contentID, isInBackup := range backupStatuses {
+		if isInBackup {
+			isInBackupSegments = append(isInBackupSegments, contentID)
+		}
+	}
+
+	if len(isInBackupSegments) > 0 {
+		return fmt.Errorf("backup is already in progress on one or more segments: %v", isInBackupSegments)
+	}
+	tracelog.InfoLogger.Printf("No running backups were found")
+	tracelog.InfoLogger.Printf("Checking backup prerequisites: OK")
+	return nil
 }
 
 func (bh *BackupHandler) uploadSentinel(sentinelDto BackupSentinelDto) (err error) {
