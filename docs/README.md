@@ -166,7 +166,9 @@ If `FIND_FULL` is specified, WAL-G will calculate minimum backup needed to keep 
 ### ``ls``
 Prints listing of the objects in the provided storage folder.
 
-``wal-g st ls`` get listing with all objects in the configured storage.
+``wal-g st ls`` get listing with all objects and folders in the configured storage.
+
+``wal-g st ls -r`` get recursive listing with all objects in the configured storage.
 
 ``wal-g st ls some_folder/some_subfolder`` get listing with all objects in the provided storage path.
 
