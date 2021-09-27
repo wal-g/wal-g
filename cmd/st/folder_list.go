@@ -8,6 +8,8 @@ import (
 )
 
 const folderListShortDescription = "Prints objects in the provided storage folder"
+const recursiveFlag = "recursive"
+const recursiveShortHand = "r"
 
 // folderListCmd represents the folderList command
 var folderListCmd = &cobra.Command{
@@ -22,10 +24,13 @@ var folderListCmd = &cobra.Command{
 			folder = folder.GetSubFolder(args[0])
 		}
 
-		storagetools.HandleFolderList(folder)
+		storagetools.HandleFolderList(folder, recursive)
 	},
 }
 
+var recursive bool
+
 func init() {
+	folderListCmd.Flags().BoolVarP(&recursive, recursiveFlag, recursiveShortHand, false, "List folder recursively")
 	StorageToolsCmd.AddCommand(folderListCmd)
 }
