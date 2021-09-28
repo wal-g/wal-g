@@ -8,6 +8,7 @@ require (
 	github.com/Azure/go-autorest/autorest v0.11.19
 	github.com/DATA-DOG/godog v0.7.14-0.20190529133509-96731eaefa46
 	github.com/DataDog/zstd v1.4.4 // indirect
+	github.com/EinKrebs/json v0.1.0
 	github.com/Microsoft/go-winio v0.4.14 // indirect
 	github.com/RoaringBitmap/roaring v0.4.21
 	github.com/aws/aws-sdk-go v1.34.28
@@ -56,7 +57,7 @@ require (
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/viper v1.6.1
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/testify v1.7.0
 	github.com/ulikunitz/xz v0.5.8
 	github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30
 	github.com/yandex-cloud/go-genproto v0.0.0-20201102102956-0c505728b6f0
