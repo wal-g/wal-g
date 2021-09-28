@@ -102,7 +102,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 	pipeLine := azblob.NewPipeline(
 		credential,
 		azblob.PipelineOptions{
-			Retry: azblob.RetryOptions{TryTimeout: time.Duration(tryTimeout) * time.Minute},
+			Retry:      azblob.RetryOptions{TryTimeout: time.Duration(tryTimeout) * time.Minute},
 			RequestLog: azblob.RequestLogOptions{SyslogDisabled: true},
 		},
 	)

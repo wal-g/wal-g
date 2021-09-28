@@ -2,12 +2,13 @@ package internal
 
 import (
 	"fmt"
+	"io"
+
 	einJSON "github.com/EinKrebs/json"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
-	"io"
 )
 
 //region errors
@@ -96,7 +97,7 @@ func (backup *Backup) UploadMetadata(metadataDto interface{}) error {
 		if err != nil {
 			_ = w.CloseWithError(err)
 		}
-	} ()
+	}()
 	return backup.Folder.PutObject(metaFilePath, r)
 }
 
@@ -108,7 +109,7 @@ func (backup *Backup) UploadSentinel(sentinelDto interface{}) error {
 		if err != nil {
 			_ = w.CloseWithError(err)
 		}
-	} ()
+	}()
 	return backup.Folder.PutObject(sentinelPath, r)
 }
 
@@ -166,7 +167,7 @@ func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupNa
 		if err != nil {
 			_ = w.CloseWithError(NewSentinelMarshallingError(sentinelName, err))
 		}
-	} ()
+	}()
 
 	return uploader.Upload(sentinelName, r)
 }
