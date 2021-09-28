@@ -74,7 +74,7 @@ func (backup *Backup) FetchSentinel(sentinelDto interface{}) error {
 }
 
 // TODO : unit tests
-func (backup *Backup) FetchMetadataStream(metadataDto interface{}) error {
+func (backup *Backup) FetchMetadata(metadataDto interface{}) error {
 	sentinelDtoData, err := backup.fetchStorageStream(backup.getMetadataPath())
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch metadata")
