@@ -89,14 +89,13 @@ func (backup *Backup) FetchSentinel(sentinelDto interface{}) error {
 		}
 		err = einJSON.Unmarshal(sentinelDtoData, sentinelDto)
 		return errors.Wrap(err, "failed to unmarshal sentinel")
-	} else {
-		sentinelDtoData, err := backup.fetchStorageBytes(backup.getStopSentinelPath())
-		if err != nil {
-			return errors.Wrap(err, "failed to fetch sentinel")
-		}
-		err = json.Unmarshal(sentinelDtoData, sentinelDto)
-		return errors.Wrap(err, "failed to unmarshal sentinel")
 	}
+	sentinelDtoData, err := backup.fetchStorageBytes(backup.getStopSentinelPath())
+	if err != nil {
+		return errors.Wrap(err, "failed to fetch sentinel")
+	}
+	err = json.Unmarshal(sentinelDtoData, sentinelDto)
+	return errors.Wrap(err, "failed to unmarshal sentinel")
 }
 
 // TODO : unit tests
@@ -108,14 +107,13 @@ func (backup *Backup) FetchMetadata(metadataDto interface{}) error {
 		}
 		err = einJSON.Unmarshal(sentinelDtoData, metadataDto)
 		return errors.Wrap(err, "failed to unmarshal metadata")
-	} else {
-		sentinelDtoData, err := backup.fetchStorageBytes(backup.getMetadataPath())
-		if err != nil {
-			return errors.Wrap(err, "failed to fetch metadata")
-		}
-		err = json.Unmarshal(sentinelDtoData, metadataDto)
-		return errors.Wrap(err, "failed to unmarshal metadata")
 	}
+	sentinelDtoData, err := backup.fetchStorageBytes(backup.getMetadataPath())
+	if err != nil {
+		return errors.Wrap(err, "failed to fetch metadata")
+	}
+	err = json.Unmarshal(sentinelDtoData, metadataDto)
+	return errors.Wrap(err, "failed to unmarshal metadata")
 }
 
 func (backup *Backup) fetchStorageStream(path string) (io.ReadCloser, error) {
@@ -134,13 +132,12 @@ func (backup *Backup) UploadMetadata(metadataDto interface{}) error {
 			}
 		}()
 		return backup.Folder.PutObject(metaFilePath, r)
-	} else {
-		dtoBody, err := json.Marshal(metadataDto)
-		if err != nil {
-			return err
-		}
-		return backup.Folder.PutObject(metaFilePath, bytes.NewReader(dtoBody))
 	}
+	dtoBody, err := json.Marshal(metadataDto)
+	if err != nil {
+		return err
+	}
+	return backup.Folder.PutObject(metaFilePath, bytes.NewReader(dtoBody))
 }
 
 func (backup *Backup) UploadSentinel(sentinelDto interface{}) error {
@@ -154,13 +151,12 @@ func (backup *Backup) UploadSentinel(sentinelDto interface{}) error {
 			}
 		}()
 		return backup.Folder.PutObject(sentinelPath, r)
-	} else {
-		dtoBody, err := json.Marshal(sentinelDto)
-		if err != nil {
-			return err
-		}
-		return backup.Folder.PutObject(sentinelPath, bytes.NewReader(dtoBody))
 	}
+	dtoBody, err := json.Marshal(sentinelDto)
+	if err != nil {
+		return err
+	}
+	return backup.Folder.PutObject(sentinelPath, bytes.NewReader(dtoBody))
 }
 
 func (backup *Backup) CheckExistence() (bool, error) {
@@ -221,14 +217,13 @@ func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupNa
 		}()
 
 		return uploader.Upload(sentinelName, r)
-	} else {
-		dtoBody, err := json.Marshal(sentinelDto)
-		if err != nil {
-			return NewSentinelMarshallingError(sentinelName, err)
-		}
-
-		return uploader.Upload(sentinelName, bytes.NewReader(dtoBody))
 	}
+	dtoBody, err := json.Marshal(sentinelDto)
+	if err != nil {
+		return NewSentinelMarshallingError(sentinelName, err)
+	}
+
+	return uploader.Upload(sentinelName, bytes.NewReader(dtoBody))
 }
 
 type ErrWaiter interface {
