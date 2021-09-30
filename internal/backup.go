@@ -9,6 +9,7 @@ import (
 
 	einJSON "github.com/EinKrebs/json"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -82,7 +83,7 @@ func (backup *Backup) fetchStorageBytes(path string) ([]byte, error) {
 
 // TODO : unit tests
 func (backup *Backup) FetchSentinel(sentinelDto interface{}) error {
-	if CommonAllowedSettings[UseSerializedJSONSetting] {
+	if viper.GetBool(UseSerializedJSONSetting) {
 		sentinelDtoData, err := backup.fetchStorageStream(backup.getStopSentinelPath())
 		if err != nil {
 			return errors.Wrap(err, "failed to fetch sentinel")
@@ -100,7 +101,7 @@ func (backup *Backup) FetchSentinel(sentinelDto interface{}) error {
 
 // TODO : unit tests
 func (backup *Backup) FetchMetadata(metadataDto interface{}) error {
-	if CommonAllowedSettings[UseSerializedJSONSetting] {
+	if viper.GetBool(UseSerializedJSONSetting) {
 		sentinelDtoData, err := backup.fetchStorageStream(backup.getMetadataPath())
 		if err != nil {
 			return errors.Wrap(err, "failed to fetch metadata")
@@ -123,7 +124,7 @@ func (backup *Backup) fetchStorageStream(path string) (io.ReadCloser, error) {
 
 func (backup *Backup) UploadMetadata(metadataDto interface{}) error {
 	metaFilePath := backup.getMetadataPath()
-	if CommonAllowedSettings[UseSerializedJSONSetting] {
+	if viper.GetBool(UseSerializedJSONSetting) {
 		r, w := io.Pipe()
 		go func() {
 			err := einJSON.Marshal(metadataDto, w)
@@ -142,7 +143,7 @@ func (backup *Backup) UploadMetadata(metadataDto interface{}) error {
 
 func (backup *Backup) UploadSentinel(sentinelDto interface{}) error {
 	sentinelPath := backup.getStopSentinelPath()
-	if CommonAllowedSettings[UseSerializedJSONSetting] {
+	if viper.GetBool(UseSerializedJSONSetting) {
 		r, w := io.Pipe()
 		go func() {
 			err := einJSON.Marshal(sentinelDto, w)
@@ -207,7 +208,7 @@ func GetBackupByName(backupName, subfolder string, folder storage.Folder) (Backu
 func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupName string) error {
 	sentinelName := SentinelNameFromBackup(backupName)
 
-	if CommonAllowedSettings[UseSerializedJSONSetting] {
+	if viper.GetBool(UseSerializedJSONSetting) {
 		r, w := io.Pipe()
 		go func() {
 			err := einJSON.Marshal(sentinelDto, w)

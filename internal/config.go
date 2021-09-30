@@ -192,7 +192,6 @@ var (
 		DiskRateLimitSetting:         true,
 		NetworkRateLimitSetting:      true,
 		UseWalDeltaSetting:           true,
-		UseSerializedJSONSetting:     false,
 		LogLevelSetting:              true,
 		TarSizeThresholdSetting:      true,
 		"WALG_" + GpgKeyIDSetting:    true,
