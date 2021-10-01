@@ -8,7 +8,7 @@ require (
 	github.com/Azure/go-autorest/autorest v0.11.19
 	github.com/DATA-DOG/godog v0.7.14-0.20190529133509-96731eaefa46
 	github.com/DataDog/zstd v1.4.4 // indirect
-	github.com/EinKrebs/json v0.1.0
+	github.com/EinKrebs/json v0.2.0
 	github.com/Microsoft/go-winio v0.4.14 // indirect
 	github.com/RoaringBitmap/roaring v0.4.21
 	github.com/aws/aws-sdk-go v1.34.28
