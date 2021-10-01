@@ -150,6 +150,7 @@ var (
 		UseRatingComposerSetting:     "false",
 		UseCopyComposerSetting:       "false",
 		MaxDelayedSegmentsCount:      "0",
+		UseSerializedJSONSetting:     "false",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -214,6 +215,7 @@ var (
 		DeltaFromNameSetting:         true,
 		DeltaFromUserDataSetting:     true,
 		FetchTargetUserDataSetting:   true,
+		UseSerializedJSONSetting:     true,
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,
