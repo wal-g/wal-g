@@ -1,11 +1,12 @@
-package internal
+package postgres
 
 import (
 	"encoding/binary"
-	"github.com/wal-g/tracelog"
 	"io"
 	"os"
 	"path"
+
+	"github.com/wal-g/tracelog"
 )
 
 // PgControlData represents data contained in pg_control file
@@ -45,13 +46,13 @@ func extractPgControlData(pgControlReader io.Reader) (*PgControlData, error) {
 		return nil, err
 	}
 
-	systemId := binary.LittleEndian.Uint64(bytes[0:8])
-	currentTl := binary.LittleEndian.Uint32(bytes[48:52])
+	systemID := binary.LittleEndian.Uint64(bytes[0:8])
+	currentTimeline := binary.LittleEndian.Uint32(bytes[48:52])
 
 	// Parse bytes from pg_control file and share this data
 	return &PgControlData{
-		systemIdentifier: systemId,
-		currentTimeline:  currentTl,
+		systemIdentifier: systemID,
+		currentTimeline:  currentTimeline,
 	}, nil
 }
 

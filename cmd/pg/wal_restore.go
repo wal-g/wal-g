@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 const (
@@ -19,13 +20,12 @@ var walRestoreCmd = &cobra.Command{
 	Long:  WalRestoreLongDescription,
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		cloudFolder, err := internal.ConfigureFolder()
+		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalfOnError("Error on configure external folder %v\n", err)
-
-		internal.HandleWALRestore(args[0], args[1], cloudFolder)
+		postgres.HandleWALRestore(args[0], args[1], folder)
 	},
 }
 
 func init() {
-	cmd.AddCommand(walRestoreCmd)
+	Cmd.AddCommand(walRestoreCmd)
 }

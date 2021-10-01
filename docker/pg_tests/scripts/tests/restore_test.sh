@@ -18,8 +18,6 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 
 # init alpha cluster
 /usr/lib/postgresql/10/bin/initdb ${PGDATA_ALPHA}
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_ALPHA} -w start
-PGDATA=${PGDATA_ALPHA} /tmp/scripts/wait_while_pg_not_ready.sh
 
 # preparation for replication
 pushd ${PGDATA_ALPHA}
@@ -27,8 +25,10 @@ psql -c "CREATE ROLE repl WITH REPLICATION PASSWORD 'password' LOGIN;"
 echo "host  replication  repl              127.0.0.1/32  md5" >> pg_hba.conf
 echo "wal_level = replica" >> postgresql.conf
 echo "wal_keep_segments = 100" >> postgresql.conf
-echo "max_wal_senders = 4" >> postgresql.conf
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_ALPHA} -w restart
+echo "max_wal_senders = 2" >> postgresql.conf
+echo "hot_standby = on" >> postgresql.conf
+echo "listen_addresses = 'localhost'" >> postgresql.conf
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_ALPHA} -w start
 PGDATA=${PGDATA_ALPHA} /tmp/scripts/wait_while_pg_not_ready.sh
 popd
 
@@ -46,53 +46,35 @@ EOF
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w start
 popd
 
-# I AM HERE!!!!!!!!!! Try this on local (check script) and end this!
-
 # fill database postgres
-pgbench -i -s 15 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
-
-LSN=`psql -c "SELECT pg_current_wal_lsn() - '0/0'::pg_lsn;" | grep -E '[0-9]+' | head -1`
+pgbench -i -s 10   -h 127.0.0.1 -p ${ALPHA_PORT} postgres
 
 #                                               db       table            conn_port    row_count
 /tmp/scripts/wait_while_replication_complete.sh postgres pgbench_accounts ${BETA_PORT} 1500000 # 15 * 100000, 15 is value of -s in pgbench
 # script above waits only one table, so just in case sleep
 sleep 5
 
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_ALPHA} --mode smart -w stop
+sleep 5
+
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w promote
+
+pgbench -i -s 10 -h 127.0.0.1 -p ${BETA_PORT} postgres
+
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} --mode smart -w stop
 sleep 5
 
-# change database postgres and dump database
-pgbench -i -s 10 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
-/usr/lib/postgresql/10/bin/pg_dump -h 127.0.0.1 -p ${ALPHA_PORT} -f ${ALPHA_DUMP} postgres
+WAL_TO_DELETE_NAME="00000002000000000000000A"
+DELETED_WAL="${PGDATA}/pg_wal/${WAL_TO_DELETE_NAME}"
+WAL_TO_DELETE_DIR="${PGDATA}/pg_wal/temp"
+WAL_TO_DELETE="${WAL_TO_DELETE_DIR}/${WAL_TO_DELETE_NAME}"
 
-wal-g --config=${TMP_CONFIG} catchup-push ${PGDATA_ALPHA} --from-lsn ${LSN} 2>/tmp/stderr 1>/tmp/stdout
+cp ${DELETED_WAL} ${WAL_TO_DELETE_DIR}
+
+rm ${DELETED_WAL}
+
+wal-g --config=${TMP_CONFIG} wal-restore ${PGDATA_ALPHA} ${PGDATA_BETA} 2>/tmp/stderr 1>/tmp/stdout
 cat /tmp/stderr /tmp/stdout
 
-BACKUP_NAME=`grep -oE 'base_.*' /tmp/stderr`
-
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_ALPHA} -w stop
-sleep 5
-
-wal-g --config=${TMP_CONFIG} catchup-fetch ${PGDATA_BETA} $BACKUP_NAME
-
-# rename recovery.conf to don't care about wals and remove backup_label
-pushd ${PGDATA_BETA}
-mv recovery.conf{,.bak}
-rm backup_label
-/usr/lib/postgresql/10/bin/pg_resetwal -f .
-popd
-
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w start
-sleep 5
-
-/usr/lib/postgresql/10/bin/pg_dump -h 127.0.0.1 -p ${BETA_PORT} -f ${BETA_DUMP} postgres
-
-# return recovery.conf and start master to be sure replication works
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_ALPHA} -w start
-pushd ${PGDATA_BETA}
-mv recovery.conf{.bak,}
-popd
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w restart
-
-diff ${ALPHA_DUMP} ${BETA_DUMP}
+diff ${DELETED_WAL} ${WAL_TO_DELETE}
 

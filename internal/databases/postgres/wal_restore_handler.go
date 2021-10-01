@@ -1,4 +1,4 @@
-package internal
+package postgres
 
 import (
 	"errors"
@@ -8,9 +8,28 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/wal-g/internal"
+
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
+
+type TimelineWithSegmentNo struct {
+	timeline  uint32
+	segmentNo uint64
+}
+
+func NewTimelineWithSegmentNo(tl uint32, seg uint64) *TimelineWithSegmentNo {
+	return &TimelineWithSegmentNo{timeline: tl, segmentNo: seg}
+}
+
+func NewTimelineWithSegmentNoBy(record *TimelineHistoryRecord) *TimelineWithSegmentNo {
+	return NewTimelineWithSegmentNo(record.timeline, getSegmentNoFromLsn(record.lsn))
+}
+
+func getSegmentNoFromLsn(lsn uint64) uint64 {
+	return lsn / WalSegmentSize
+}
 
 // HandleWALRestore is invoked to perform wal-g wal-restore
 func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder) {
@@ -27,36 +46,40 @@ func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder)
 		tracelog.ErrorLogger.Fatal("Current timelines of target and source clusters are equal\n")
 	}
 
-	tgtHistoryRecords, err := getLocalTimelineHistoryRecords(targetPgData.GetCurrentTimeline(), targetPath)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on target cluster: %v\n", err)
-
-	srcHistoryRecords, err := getLocalTimelineHistoryRecords(sourcePgData.GetCurrentTimeline(), sourcePath)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on source cluster: %v\n", err)
-
-	lastWalSegmentNo, lastCommonTl, err := FindLastCommonPoint(tgtHistoryRecords, srcHistoryRecords)
-	tracelog.ErrorLogger.FatalfOnError("Failed to find last common point: %v\n", err)
-
+	targetWalDir, err := getWalDirName(targetPath)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL directory name: %v\n", err)
 	sourceWalDir, err := getWalDirName(sourcePath)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL directory name: %v\n", err)
+
+	tgtHistoryRecords, err := getLocalTimelineHistoryRecords(targetPgData.GetCurrentTimeline(), targetWalDir)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on target cluster: %v\n", err)
+	srcHistoryRecords, err := getLocalTimelineHistoryRecords(sourcePgData.GetCurrentTimeline(), sourceWalDir)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on source cluster: %v\n", err)
+
+	lastCommonLsn, lastCommonTl, err := FindLastCommonPoint(tgtHistoryRecords, srcHistoryRecords)
+	tracelog.ErrorLogger.FatalfOnError("Failed to find last common point: %v\n", err)
+
+	srcTimelineWithSegNo := transformTimelineHistoryRecords(srcHistoryRecords)
+	mapOfSrcTimelineWithSegNo := timelineWithSegmentNoSliceToMap(srcTimelineWithSegNo)
 
 	folderFilenames, err := getDirectoryFilenames(sourceWalDir)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL filenames: %v\n", err)
 
-	wals := getSegmentsFromFiles(folderFilenames)
-	walsByTls := groupSegmentsByTimelines(wals)
-	filenamesToRestore, err := GetMissingWals(lastWalSegmentNo, lastCommonTl,
-		sourcePgData.GetCurrentTimeline(), historiesSliceToMap(srcHistoryRecords), walsByTls)
+	walsByTimelines := groupSegmentsByTimelines(getSegmentsFromFiles(folderFilenames))
+
+	filenamesToRestore, err := GetMissingWals(
+		getSegmentNoFromLsn(lastCommonLsn), lastCommonTl,
+		sourcePgData.GetCurrentTimeline(), mapOfSrcTimelineWithSegNo, walsByTimelines)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get missing source WALs: %v\n", err)
 
 	if len(filenamesToRestore) == 0 {
-		tracelog.InfoLogger.Print("No WAL files to restore")
+		tracelog.InfoLogger.Println("No WAL files to restore")
 		return
 	}
 
-	tracelog.ErrorLogger.FatalfOnError("Failed to get the WAL directory name: %v\n", err)
 	for _, walFilename := range filenamesToRestore {
-		if err = DownloadWALFileTo(cloudFolder, walFilename, sourceWalDir); err != nil {
-			tracelog.ErrorLogger.Printf("Failed to download WAL file %v\n", walFilename)
+		if err = internal.DownloadFileTo(cloudFolder, walFilename, sourceWalDir); err != nil {
+			tracelog.ErrorLogger.Printf("Failed to download WAL file %v: %v\n", walFilename, err)
 		} else {
 			tracelog.InfoLogger.Printf("Successfully download WAL file %v\n", walFilename)
 		}
@@ -98,52 +121,41 @@ func FindLastCommonPoint(target, source []*TimelineHistoryRecord) (uint64, uint3
 	return currentLsn, currentTimeline, nil
 }
 
-func uint64Min(a, b uint64) uint64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// historiesSliceToMap creates a map where key is timeline and value is lsn where timeline begins
-func historiesSliceToMap(slice []*TimelineHistoryRecord) map[uint32]*TimelineHistoryRecord {
-	result := make(map[uint32]*TimelineHistoryRecord)
-	for _, history := range slice {
-		result[history.timeline+1] = history
-	}
-	result[1] = NewTimelineHistoryRecord(1, 1, "")
-	return result
-}
-
 // GetMissingWals collect the slice of WAL filenames by last LSN, last timeline,
 // current timeline, history records and folder
-func GetMissingWals(lastLsn uint64, lastTimeline uint32, currentTimeline uint32,
-	historyRecords map[uint32]*TimelineHistoryRecord, walsByTls map[uint32]*WalSegmentsSequence,
+func GetMissingWals(
+	lastSeg uint64, lastTl uint32, currentTl uint32,
+	tlToSeg map[uint32]*TimelineWithSegmentNo,
+	walsByTimelines map[uint32]*WalSegmentsSequence,
 ) ([]string, error) {
 	result := make([]string, 0)
+	currentSeg := uint64(walsByTimelines[currentTl].maxSegmentNo)
 
-	lsn := uint64(walsByTls[currentTimeline].maxSegmentNo)
-	tl := currentTimeline
 LOOP:
-	for ; tl >= lastTimeline; tl-- {
-		walSeq, ok := walsByTls[tl]
-		for ; lsn >= historyRecords[tl].lsn; lsn-- {
-			if !ok || !walSeq.walSegmentNumbers[WalSegmentNo(lsn)] {
-				result = append(result, WalSegmentNo(lsn).getFilename(tl))
+	for ; currentTl >= lastTl; currentTl-- {
+		// Get wal segment sequence for current timeline
+		walSegSeq, ok := walsByTimelines[currentTl]
+
+		// Iterate over wal segment sequence for current timeline
+		for ; currentSeg >= tlToSeg[currentTl].segmentNo; currentSeg-- {
+			// Making sure that this wal segment sequence is correct and check for existing segment
+			if !ok || !walSegSeq.walSegmentNumbers[WalSegmentNo(currentSeg)] {
+				result = append(result, WalSegmentNo(currentSeg).getFilename(currentTl))
 			}
-			if lsn == lastLsn {
+
+			if currentSeg == lastSeg {
 				break LOOP
 			}
 		}
 	}
-	if tl != lastTimeline {
-		return nil, errors.New("unexpected state: last timeline has no estimated")
-	}
 	return result, nil
 }
 
-// getLocalTimelineHistoryRecords gets timeline history records from local wals
+// getLocalTimelineHistoryRecords gets timeline history records from local wal history files
 func getLocalTimelineHistoryRecords(startTimeline uint32, pathToWal string) ([]*TimelineHistoryRecord, error) {
+	if startTimeline == 1 {
+		return make([]*TimelineHistoryRecord, 0), nil
+	}
 	historyReadCloser, err := getLocalHistoryFile(startTimeline, pathToWal)
 	if err != nil {
 		return nil, err
@@ -157,6 +169,29 @@ func getLocalTimelineHistoryRecords(startTimeline uint32, pathToWal string) ([]*
 		return nil, err
 	}
 	return historyRecords, nil
+}
+
+// transformTimelineHistoryRecords transforms slice of TimelineHistoryRecord to TimelineWithSegmentNo for
+// a comfortable iteration over the wal records
+func transformTimelineHistoryRecords(records []*TimelineHistoryRecord) []*TimelineWithSegmentNo {
+	result := make([]*TimelineWithSegmentNo, 0, len(records))
+	for _, record := range records {
+		result = append(result, NewTimelineWithSegmentNoBy(record))
+	}
+	return result
+}
+
+// timelineWithSegmentNoSliceToMap creates a map where key is timeline and value is lsn where timeline begins
+func timelineWithSegmentNoSliceToMap(slice []*TimelineWithSegmentNo) map[uint32]*TimelineWithSegmentNo {
+	result := make(map[uint32]*TimelineWithSegmentNo)
+	for _, el := range slice {
+		result[el.timeline+1] = el
+	}
+	result[1] = &TimelineWithSegmentNo{
+		timeline:  0,
+		segmentNo: 1,
+	}
+	return result
 }
 
 // getDirectoryFilenames returns slice of filenames in directory by path
@@ -192,4 +227,11 @@ func getWalDirName(pgData string) (string, error) {
 		return dataFolderPath, nil
 	}
 	return "", errors.New("directory for WAL files doesn't exist in " + pgData)
+}
+
+func uint64Min(a, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+	return b
 }
