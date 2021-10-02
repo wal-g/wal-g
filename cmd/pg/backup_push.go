@@ -26,7 +26,7 @@ const (
 	deltaFromUserDataFlag     = "delta-from-user-data"
 	deltaFromNameFlag         = "delta-from-name"
 	addUserDataFlag           = "add-user-data"
-	reduceMemoryUsageFlag     = "reduce-memory-usage"
+	withoutFilesMetadataFlag  = "without-files-metadata"
 
 	permanentShorthand             = "p"
 	fullBackupShorthand            = "f"
@@ -71,17 +71,17 @@ var (
 			if userDataRaw == "" {
 				userDataRaw = viper.GetString(internal.SentinelUserDataSetting)
 			}
-			reduceMemoryUsage = reduceMemoryUsage || viper.GetBool(internal.ReduceMemoryUsageSetting)
-			if reduceMemoryUsage {
+			withoutFilesMetadata = withoutFilesMetadata || viper.GetBool(internal.WithoutFilesMetadataSetting)
+			if withoutFilesMetadata {
 				if useRatingComposer || useCopyComposer {
 					tracelog.ErrorLogger.Fatalf(
 						"%s option cannot be used with %s, %s options",
-						reduceMemoryUsageFlag, useRatingComposerFlag, useCopyComposerFlag)
+						withoutFilesMetadataFlag, useRatingComposerFlag, useCopyComposerFlag)
 				}
 				if deltaFromName != "" || deltaFromUserData != "" || userDataRaw != "" {
 					tracelog.ErrorLogger.Fatalf(
 						"%s option cannot be used with %s, %s, %s options",
-						reduceMemoryUsageFlag, deltaFromNameFlag, deltaFromUserDataFlag, addUserDataFlag)
+						withoutFilesMetadataFlag, deltaFromNameFlag, deltaFromUserDataFlag, addUserDataFlag)
 				}
 			}
 
@@ -94,7 +94,7 @@ var (
 			arguments := postgres.NewBackupArguments(dataDirectory, utility.BaseBackupPath,
 				permanent, verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting),
 				fullBackup, storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting),
-				tarBallComposerType, deltaBaseSelector, userData, reduceMemoryUsage)
+				tarBallComposerType, deltaBaseSelector, userData, withoutFilesMetadata)
 
 			backupHandler, err := postgres.NewBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -110,7 +110,7 @@ var (
 	deltaFromName         = ""
 	deltaFromUserData     = ""
 	userDataRaw           = ""
-	reduceMemoryUsage     = false
+	withoutFilesMetadata  = false
 )
 
 // create the BackupSelector for delta backup base according to the provided flags
@@ -158,6 +158,6 @@ func init() {
 		"", "Select the backup specified by UserData as the target for the delta backup")
 	backupPushCmd.Flags().StringVar(&userDataRaw, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
-	backupPushCmd.Flags().BoolVar(&reduceMemoryUsage, reduceMemoryUsageFlag,
-		false, "Reduce memory usage by not tracking sentinel and metadata files")
+	backupPushCmd.Flags().BoolVar(&withoutFilesMetadata, withoutFilesMetadataFlag,
+		false, "Do not track files metadata, significantly reducing memory usage")
 }

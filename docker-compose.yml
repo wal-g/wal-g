@@ -32,10 +32,10 @@ services:
       -c 'mkdir -p /export/fullbucket
       &&  mkdir -p /export/fullratingcomposerbucket
       &&  mkdir -p /export/fullcopycomposerbucket
-      &&  mkdir -p /export/fullreducememoryusagebucket
+      &&  mkdir -p /export/fullwithoutfilesmetadatabucket
       &&  mkdir -p /export/fullscandeltabucket
       &&  mkdir -p /export/remotebucket
-      &&  mkdir -p /export/remotereducememoryusagebucket
+      &&  mkdir -p /export/remotewithoutfilesmetadatabucket
       &&  mkdir -p /export/cryptobucket
       &&  mkdir -p /export/waldeltabucket
       &&  mkdir -p /export/ghostbucket
@@ -278,12 +278,12 @@ services:
     links:
       - s3
 
-  pg_remote_backup_reduce_memory_usage_test:
+  pg_remote_backup_without_files_metadata_test:
     build:
-      dockerfile: docker/pg_tests/Dockerfile_remote_backup_reduce_memory_usage_test
+      dockerfile: docker/pg_tests/Dockerfile_remote_backup_without_files_metadata_test
       context: .
-    image: wal-g/remote_backup_reduce_memory_usage_test
-    container_name: wal-g_pg_remote_backup_reduce_memory_usage_test
+    image: wal-g/remote_backup_without_files_metadata_test
+    container_name: wal-g_pg_remote_backup_without_files_metadata_test
     depends_on:
       - s3
     links:
@@ -333,12 +333,12 @@ services:
     links:
       - s3
 
-  pg_full_backup_reduce_memory_usage_test:
+  pg_full_backup_without_files_metadata_test:
     build:
-      dockerfile: docker/pg_tests/Dockerfile_full_backup_reduce_memory_usage_test
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_without_files_metadata_test
       context: .
-    image: wal-g/full_backup_reduce_memory_usage_test
-    container_name: wal-g_pg_full_backup_reduce_memory_usage_test
+    image: wal-g/full_backup_without_files_metadata_test
+    container_name: wal-g_pg_full_backup_without_files_metadata_test
     depends_on:
       - s3
     links:

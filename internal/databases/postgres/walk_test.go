@@ -329,7 +329,7 @@ func TestWalk_RegularComposer(t *testing.T) {
 	testWalk(t, postgres.RegularComposer, false)
 }
 
-func TestWalk_RegularComposerReduceMemoryUsage(t *testing.T) {
+func TestWalk_RegularComposerWithoutFilesMetadata(t *testing.T) {
 	testWalk(t, postgres.RegularComposer, true)
 }
 
@@ -341,7 +341,7 @@ func TestWalk_CopyComposer(t *testing.T) {
 	testWalk(t, postgres.CopyComposer, false)
 }
 
-func testWalk(t *testing.T, composer postgres.TarBallComposerType, reduceMemoryUsage bool) {
+func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesMetadata bool) {
 	// Generate random data and write to tmp dir `data...`.
 	data := generateData(t)
 	tarSizeThreshold := int64(10)
@@ -363,7 +363,7 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, reduceMemoryU
 		t.Log(err)
 	}
 
-	err = bundle.SetupComposer(setupTestTarBallComposerMaker(composer, reduceMemoryUsage))
+	err = bundle.SetupComposer(setupTestTarBallComposerMaker(composer, withoutFilesMetadata))
 	if err != nil {
 		t.Log(err)
 	}
@@ -380,7 +380,7 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, reduceMemoryU
 
 	backupFileList := postgres.MakeBackupFileList(bundle.GetFiles())
 
-	if reduceMemoryUsage {
+	if withoutFilesMetadata {
 		// Test tarFileSets is not tracked
 		assert.True(t, len(tarFileSets.GetFiles()) == 0)
 		// Test BackupFileList is not tracked
@@ -431,11 +431,11 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, reduceMemoryU
 	}
 }
 
-func setupTestTarBallComposerMaker(composer postgres.TarBallComposerType, reduceMemoryUsage bool) postgres.TarBallComposerMaker {
+func setupTestTarBallComposerMaker(composer postgres.TarBallComposerType, withoutFilesMetadata bool) postgres.TarBallComposerMaker {
 	filePackOptions := postgres.NewTarBallFilePackerOptions(false, false)
 	switch composer {
 	case postgres.RegularComposer:
-		if reduceMemoryUsage {
+		if withoutFilesMetadata {
 			return postgres.NewRegularTarBallComposerMaker(filePackOptions, &postgres.NopBundleFiles{}, postgres.NewNopTarFileSets())
 		} else {
 			return postgres.NewRegularTarBallComposerMaker(filePackOptions, &postgres.RegularBundleFiles{}, postgres.NewRegularTarFileSets())

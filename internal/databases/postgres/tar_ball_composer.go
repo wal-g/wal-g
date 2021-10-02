@@ -51,10 +51,10 @@ type TarBallComposerMaker interface {
 
 func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn, folder storage.Folder,
 	newBackupName string, filePackOptions TarBallFilePackerOptions,
-	reduceMemoryUsage bool) (TarBallComposerMaker, error) {
+	withoutFilesMetadata bool) (TarBallComposerMaker, error) {
 	switch composerType {
 	case RegularComposer:
-		if reduceMemoryUsage {
+		if withoutFilesMetadata {
 			return NewRegularTarBallComposerMaker(filePackOptions, &NopBundleFiles{}, NewNopTarFileSets()), nil
 		}
 		return NewRegularTarBallComposerMaker(filePackOptions, &RegularBundleFiles{}, NewRegularTarFileSets()), nil

@@ -59,7 +59,7 @@ type BackupArguments struct {
 	pgDataDirectory       string
 	isFullBackup          bool
 	deltaBaseSelector     internal.BackupSelector
-	reduceMemoryUsage     bool
+	withoutFilesMetadata  bool
 }
 
 // CurBackupInfo holds all information that is harvest during the backup process
@@ -106,7 +106,7 @@ type BackupHandler struct {
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
 func NewBackupArguments(pgDataDirectory string, backupsFolder string, isPermanent bool, verifyPageChecksums bool,
 	isFullBackup bool, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
-	deltaBaseSelector internal.BackupSelector, userData interface{}, reduceMemoryUsage bool) BackupArguments {
+	deltaBaseSelector internal.BackupSelector, userData interface{}, withoutFilesMetadata bool) BackupArguments {
 	return BackupArguments{
 		pgDataDirectory:       pgDataDirectory,
 		backupsFolder:         backupsFolder,
@@ -117,7 +117,7 @@ func NewBackupArguments(pgDataDirectory string, backupsFolder string, isPermanen
 		tarBallComposerType:   tarBallComposerType,
 		deltaBaseSelector:     deltaBaseSelector,
 		userData:              userData,
-		reduceMemoryUsage:     reduceMemoryUsage,
+		withoutFilesMetadata:  withoutFilesMetadata,
 	}
 }
 
@@ -241,7 +241,7 @@ func (bh *BackupHandler) uploadBackup() TarFileSets {
 	tarBallComposerMaker, err := NewTarBallComposerMaker(bh.arguments.tarBallComposerType, bh.workers.conn,
 		bh.workers.uploader.UploadingFolder, bh.curBackupInfo.name,
 		NewTarBallFilePackerOptions(bh.arguments.verifyPageChecksums, bh.arguments.storeAllCorruptBlocks),
-		bh.arguments.reduceMemoryUsage)
+		bh.arguments.withoutFilesMetadata)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	err = bundle.SetupComposer(tarBallComposerMaker)
@@ -340,7 +340,7 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	tracelog.DebugLogger.Printf("Uploading folder: %s", uploader.UploadingFolder)
 
 	var tarFileSets TarFileSets
-	if bh.arguments.reduceMemoryUsage {
+	if bh.arguments.withoutFilesMetadata {
 		tarFileSets = NewNopTarFileSets()
 	} else {
 		tarFileSets = NewRegularTarFileSets()
@@ -431,7 +431,7 @@ func (bh *BackupHandler) runRemoteBackup() *StreamingBaseBackup {
 
 	baseBackup := NewStreamingBaseBackup(bh.pgInfo.pgDataDirectory, viper.GetInt64(internal.TarSizeThresholdSetting), conn)
 	var bundleFiles BundleFiles
-	if bh.arguments.reduceMemoryUsage {
+	if bh.arguments.withoutFilesMetadata {
 		bundleFiles = &NopBundleFiles{}
 	} else {
 		bundleFiles = &RegularBundleFiles{}

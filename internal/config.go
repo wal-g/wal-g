@@ -46,7 +46,7 @@ const (
 	StoreAllCorruptBlocksSetting = "WALG_STORE_ALL_CORRUPT_BLOCKS"
 	UseRatingComposerSetting     = "WALG_USE_RATING_COMPOSER"
 	UseCopyComposerSetting       = "WALG_USE_COPY_COMPOSER"
-	ReduceMemoryUsageSetting     = "WALG_REDUCE_MEMORY_USAGE"
+	WithoutFilesMetadataSetting  = "WALG_WITHOUT_FILES_METADATA"
 	DeltaFromNameSetting         = "WALG_DELTA_FROM_NAME"
 	DeltaFromUserDataSetting     = "WALG_DELTA_FROM_USER_DATA"
 	FetchTargetUserDataSetting   = "WALG_FETCH_TARGET_USER_DATA"
@@ -155,7 +155,7 @@ var (
 		StoreAllCorruptBlocksSetting: "false",
 		UseRatingComposerSetting:     "false",
 		UseCopyComposerSetting:       "false",
-		ReduceMemoryUsageSetting:     "false",
+		WithoutFilesMetadataSetting:  "false",
 		MaxDelayedSegmentsCount:      "0",
 		SerializerTypeSetting:        "json_default",
 	}
@@ -224,7 +224,7 @@ var (
 		StoreAllCorruptBlocksSetting: true,
 		UseRatingComposerSetting:     true,
 		UseCopyComposerSetting:       true,
-		ReduceMemoryUsageSetting:     true,
+		WithoutFilesMetadataSetting:  true,
 		MaxDelayedSegmentsCount:      true,
 		DeltaFromNameSetting:         true,
 		DeltaFromUserDataSetting:     true,

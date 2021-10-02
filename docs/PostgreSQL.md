@@ -249,11 +249,11 @@ To activate this feature, do one of the following:
 wal-g backup-push /path --copy-composer
 ```
 
-#### Reduce Memory Usage
+#### Backup without metadata
 
 By default, WAL-G tracks metadata of the files backed up. If millions of files are backed up (typically in case of hundreds of databases and thousands of tables in each database), tracking this metadata alone would require GBs of memory.
 
-If `--reduce-memory-usage` or `WALG_REDUCE_MEMORY_USAGE` is enabled, WAL-G does not track metadata of the files backed up. This significantly reduces the memory usage on instances with `> 100k` files.
+If `--without-files-metadata` or `WALG_WITHOUT_FILES_METADATA` is enabled, WAL-G does not track metadata of the files backed up. This significantly reduces the memory usage on instances with `> 100k` files.
 
 Limitations
 
@@ -262,11 +262,11 @@ Limitations
 
 To activate this feature, do one of the following:
 
-* set the `WALG_REDUCE_MEMORY_USAGE`environment variable
-* add the --reduce-memory-usage flag
+* set the `WALG_WITHOUT_FILES_METADATA`environment variable
+* add the `--without-files-metadata` flag
 
 ```bash
-wal-g backup-push /path --reduce-memory-usage
+wal-g backup-push /path --without-files-metadata
 ```
 
 #### Create delta from specific backup
