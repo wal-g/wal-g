@@ -523,6 +523,17 @@ services:
     links:
       - s3
 
+  pg_restore_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_restore_test
+      context: .
+    image: wal-g/restore_test
+    container_name: wal-g_pg_restore_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   mysql:
     build:
       dockerfile: docker/mysql/Dockerfile

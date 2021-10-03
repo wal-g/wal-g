@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/wal-g/wal-g/internal"
@@ -43,7 +44,7 @@ func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder)
 		tracelog.ErrorLogger.Fatal("System identifiers of target and source clusters are not equal\n")
 	}
 	if targetPgData.GetCurrentTimeline() == sourcePgData.GetCurrentTimeline() {
-		tracelog.ErrorLogger.Fatal("Current timelines of target and source clusters are equal\n")
+		tracelog.ErrorLogger.Fatal("Latest checkpoint timelines of target and source clusters are equal\n")
 	}
 
 	targetWalDir, err := getWalDirName(targetPath)
@@ -76,9 +77,10 @@ func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder)
 		tracelog.InfoLogger.Println("No WAL files to restore")
 		return
 	}
+	tracelog.InfoLogger.Printf("WAL files to restore: %v", filenamesToRestore)
 
 	for _, walFilename := range filenamesToRestore {
-		if err = internal.DownloadFileTo(cloudFolder, walFilename, sourceWalDir); err != nil {
+		if err = internal.DownloadFileTo(cloudFolder, walFilename, path.Join(sourceWalDir, walFilename)); err != nil {
 			tracelog.ErrorLogger.Printf("Failed to download WAL file %v: %v\n", walFilename, err)
 		} else {
 			tracelog.InfoLogger.Printf("Successfully download WAL file %v\n", walFilename)
