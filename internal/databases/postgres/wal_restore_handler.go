@@ -3,6 +3,7 @@ package postgres
 import (
 	"errors"
 	"fmt"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/ioutil"
 	"os"
@@ -34,6 +35,8 @@ func getSegmentNoFromLsn(lsn uint64) uint64 {
 
 // HandleWALRestore is invoked to perform wal-g wal-restore
 func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder) {
+	cloudFolder = cloudFolder.GetSubFolder(utility.WalPath)
+
 	targetPgData, err := ExtractPgControl(targetPath)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get pg data on target cluster: %v\n", err)
 
@@ -78,9 +81,9 @@ func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder)
 		return
 	}
 	tracelog.InfoLogger.Printf("WAL files to restore: %v", filenamesToRestore)
-
 	for _, walFilename := range filenamesToRestore {
-		if err = internal.DownloadFileTo(cloudFolder, walFilename, path.Join(sourceWalDir, walFilename)); err != nil {
+		location := utility.ResolveSymlink(path.Join(sourceWalDir, walFilename))
+		if err = internal.DownloadFileTo(cloudFolder, walFilename, location); err != nil {
 			tracelog.ErrorLogger.Printf("Failed to download WAL file %v: %v\n", walFilename, err)
 		} else {
 			tracelog.InfoLogger.Printf("Successfully download WAL file %v\n", walFilename)
