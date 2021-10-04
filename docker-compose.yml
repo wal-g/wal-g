@@ -83,6 +83,7 @@ services:
       &&  mkdir -p /export/gpdeletebeforenamebucket
       &&  mkdir -p /export/gpdeletebeforetimebucket
       &&  mkdir -p /export/storagetoolsbucket
+      &&  mkdir -p /export/restorebucket
       &&  /usr/bin/minio server /export'
 
   s3-another:
