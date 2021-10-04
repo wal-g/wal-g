@@ -113,6 +113,12 @@ rm ${DELETED_WAL}
 
 sleep 3
 
+export WALE_S3_PREFIX=s3://restorebucket
+
+wal-g st ls -r
+
+sleep 3
+
 timeout 30 wal-g --config=${TMP_CONFIG} wal-restore ${PGDATA_ALPHA} ${PGDATA_BETA}
 
 cat ${DELETED_WAL}
