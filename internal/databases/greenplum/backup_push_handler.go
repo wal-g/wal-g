@@ -135,6 +135,8 @@ func (bh *BackupHandler) HandleBackupPush() {
 	}, true)
 
 	if remoteOutput.NumErrors > 0 {
+		tracelog.InfoLogger.Printf("Encountered one or more errors during the backup-push. See %s for a complete list of errors.",
+			gplog.GetLogFilePath())
 		// handle the backup failure and exit
 		err := bh.handleBackupError()
 		if err != nil {
