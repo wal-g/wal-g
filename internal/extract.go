@@ -74,6 +74,27 @@ func (e EmptyWriteIgnorer) Write(p []byte) (int, error) {
 	return e.WriteCloser.Write(p)
 }
 
+type DevNullWriter struct {
+	io.WriteCloser
+	statPrinter sync.Once
+	totalBytes  int64
+}
+
+func (e *DevNullWriter) Write(p []byte) (int, error) {
+	e.statPrinter.Do(func() {
+		go func() {
+			for {
+				time.Sleep(1 * time.Second)
+				tracelog.ErrorLogger.Printf("/dev/null size %d", e.totalBytes)
+			}
+		}()
+	})
+	e.totalBytes += int64(len(p))
+	return len(p), nil
+}
+
+var _ io.Writer = &DevNullWriter{}
+
 // TODO : unit tests
 // Extract exactly one tar bundle.
 func extractOne(tarInterpreter TarInterpreter, source io.Reader) error {

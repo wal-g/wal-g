@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"github.com/spf13/viper"
 	"os"
 	"os/exec"
 
@@ -23,8 +24,16 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
-	fileName, err := uploader.PushStream(limiters.NewDiskLimitReader(stdout))
-	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
+	var partitions = viper.GetInt("WAL_G_STREAM_SPLITTER_PARTITIONS")
+	var blockSize = viper.GetSizeInBytes("WAL_G_STREAM_SPLITTER_BLOCK_SIZE")
+	var fileName string
+	if partitions == 1 {
+		fileName, err = uploader.PushStream(limiters.NewDiskLimitReader(stdout))
+		tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
+	} else {
+		fileName, err = uploader.SplitAndPushStream(limiters.NewDiskLimitReader(stdout), partitions, int(blockSize))
+		tracelog.ErrorLogger.FatalfOnError("failed to split and push backup: %v", err)
+	}
 
 	err = backupCmd.Wait()
 	if err != nil {

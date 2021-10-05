@@ -40,6 +40,7 @@ const (
 	UseListObjectsV1         = "S3_USE_LIST_OBJECTS_V1"
 	RangeBatchEnabled        = "S3_RANGE_BATCH_ENABLED"
 	RangeQueriesMaxRetries   = "S3_RANGE_MAX_RETRIES"
+	FetchConcurrencyFactor   = "S3_FETCH_CONCURRENCY_FACTOR"
 	// MaxRetriesSetting limits retries during interaction with S3
 	MaxRetriesSetting = "S3_MAX_RETRIES"
 
@@ -51,6 +52,8 @@ const (
 )
 
 var (
+	// MaxRetries limit upload and download retries during interaction with S3
+	MaxRetries  = 15
 	SettingList = []string{
 		EndpointPortSetting,
 		EndpointSetting,
@@ -72,6 +75,7 @@ var (
 		UseListObjectsV1,
 		RangeBatchEnabled,
 		RangeQueriesMaxRetries,
+		FetchConcurrencyFactor,
 		MaxRetriesSetting,
 	}
 )
@@ -187,17 +191,20 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 		return nil, errors.Wrapf(err, "failed to read object: '%s' from S3", objectPath)
 	}
 
-	rangeEnabled, maxRetries, minRetryDelay, maxRetryDelay := folder.getReaderSettings()
+	rangeEnabled, maxRetries, minRetryDelay, maxRetryDelay, concurrencyFactor := folder.getReaderSettings()
 
 	reader := object.Body
 	if rangeEnabled {
-		reader = NewS3Reader(object.Body, objectPath, maxRetries, folder, minRetryDelay, maxRetryDelay)
+		if concurrencyFactor > 1 {
+			reader = NewS3ConcurrentReader(objectPath, maxRetries, folder, minRetryDelay, maxRetryDelay, *object.ContentLength, concurrencyFactor)
+		} else {
+			reader = NewS3Reader(object.Body, objectPath, maxRetries, folder, minRetryDelay, maxRetryDelay)
+		}
 	}
 	return reader, nil
 }
 
-func (folder *Folder) getReaderSettings() (rangeEnabled bool, retriesCount int,
-	minRetryDelay, maxRetryDelay time.Duration) {
+func (folder *Folder) getReaderSettings() (rangeEnabled bool, retriesCount int, minRetryDelay, maxRetryDelay time.Duration, concurrencyFactor int) {
 	rangeEnabled = RangeBatchEnabledDefault
 	if rangeBatch, ok := folder.settings[RangeBatchEnabled]; ok {
 		if strings.TrimSpace(strings.ToLower(rangeBatch)) == "true" {
@@ -221,7 +228,15 @@ func (folder *Folder) getReaderSettings() (rangeEnabled bool, retriesCount int,
 		maxRetryDelay = RangeQueryMaxRetryDelay
 	}
 
-	return rangeEnabled, retriesCount, minRetryDelay, maxRetryDelay
+	concurrencyFactor = 1
+	if fetchConcurrency, ok := folder.settings[FetchConcurrencyFactor]; ok {
+		fetchConcurrency = strings.TrimSpace(strings.ToLower(fetchConcurrency))
+		if val, err := strconv.Atoi(fetchConcurrency); err == nil {
+			concurrencyFactor = val
+		}
+	}
+
+	return rangeEnabled, retriesCount, minRetryDelay, maxRetryDelay, concurrencyFactor
 }
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {

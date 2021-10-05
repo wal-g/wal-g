@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"fmt"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"io"
 	"os"
 	"path"
@@ -25,6 +27,38 @@ func (uploader *Uploader) PushStream(stream io.Reader) (string, error) {
 }
 
 // TODO : unit tests
+// SplitAndPushStream - splits stream to blocks of 1Mb, then puts it in `partitions` streams that are compressed
+// and pushed to storage
+// returns `;` separated list of files
+func (uploader *Uploader) SplitAndPushStream(stream io.Reader, partitions int, blockSize int) (string, error) {
+	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
+
+	var readers = storage.SplitReader(stream, partitions, blockSize)
+
+	errCh := make(chan error)
+	defer close(errCh)
+	for i := 0; i < partitions; i++ {
+		dstPath := GetPartitionedStreamName(backupName, uploader.Compressor.FileExtension(), i)
+		tracelog.InfoLogger.Printf("Uploading... %v", dstPath)
+		go func(reader io.Reader) {
+			errCh <- uploader.PushStreamToDestination(reader, dstPath)
+		}(readers[i])
+	}
+
+	// Wait for upload finished:
+	var lastErr error
+	for i := 0; i < partitions; i++ {
+		err := <-errCh
+		if err != nil {
+			tracelog.WarningLogger.Printf("Failed to upload part of backup: %v", err)
+			lastErr = err
+		}
+	}
+
+	return backupName, lastErr
+}
+
+// TODO : unit tests
 // PushStreamToDestination compresses a stream and push it to specifyed destination
 func (uploader *Uploader) PushStreamToDestination(stream io.Reader, dstPath string) error {
 	if uploader.dataSize != nil {
@@ -45,4 +79,8 @@ func FileIsPiped(stream *os.File) bool {
 
 func GetStreamName(backupName string, extension string) string {
 	return utility.SanitizePath(path.Join(backupName, "stream.")) + extension
+}
+
+func GetPartitionedStreamName(backupName string, extension string, parts int) string {
+	return fmt.Sprintf("%s.%s_%04d", utility.SanitizePath(path.Join(backupName, "stream")), extension, parts)
 }

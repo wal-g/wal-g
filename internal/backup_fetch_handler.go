@@ -3,6 +3,7 @@ package internal
 import (
 	"bytes"
 	"fmt"
+	"github.com/spf13/viper"
 	"os/exec"
 
 	"github.com/wal-g/tracelog"
@@ -32,7 +33,15 @@ func GetCommandStreamFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup B
 		cmd.Stderr = stderr
 		err = cmd.Start()
 		tracelog.ErrorLogger.FatalfOnError("Failed to start restore command: %v\n", err)
-		err = downloadAndDecompressStream(backup, stdin)
+
+		var partitions = viper.GetInt("WAL_G_STREAM_SPLITTER_PARTITIONS")
+		var blockSize = viper.GetSizeInBytes("WAL_G_STREAM_SPLITTER_BLOCK_SIZE")
+		if partitions == 1 {
+			err = downloadAndDecompressStream(backup, stdin)
+		} else {
+			err = downloadAndDecompressSplittedStream(backup, partitions, int(blockSize), stdin)
+		}
+
 		cmdErr := cmd.Wait()
 		if err != nil || cmdErr != nil {
 			tracelog.ErrorLogger.Printf("Restore command output:\n%s", stderr.String())

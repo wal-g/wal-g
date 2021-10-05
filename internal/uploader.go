@@ -134,12 +134,12 @@ func (uploader *Uploader) Upload(path string, content io.Reader) error {
 		content = NewWithSizeReader(content, uploader.tarSize)
 	}
 	err := uploader.UploadingFolder.PutObject(path, content)
-	if err == nil {
-		return nil
+	if err != nil {
+		uploader.Failed.Store(true)
+		tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"\n", err)
+		return err
 	}
-	uploader.Failed.Store(true)
-	tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"\n", err)
-	return err
+	return nil
 }
 
 // UploadMultiple uploads multiple objects from the start of the slice,
