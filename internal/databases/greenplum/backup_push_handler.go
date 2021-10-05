@@ -135,14 +135,13 @@ func (bh *BackupHandler) HandleBackupPush() {
 	}, true)
 
 	if remoteOutput.NumErrors > 0 {
-		tracelog.InfoLogger.Printf("Encountered one or more errors during the backup-push. See %s for a complete list of errors.",
-			gplog.GetLogFilePath())
 		// handle the backup failure and exit
 		err := bh.handleBackupError()
 		if err != nil {
 			tracelog.WarningLogger.Printf("Non-critical error during terminating of the failed backup: %v", err)
 		}
-		return
+		tracelog.InfoLogger.Fatalf("Encountered one or more errors during the backup-push. See %s for a complete list of errors.",
+			gplog.GetLogFilePath())
 	}
 
 	for _, command := range remoteOutput.Commands {
