@@ -207,6 +207,11 @@ func (bh *BackupHandler) connect() (err error) {
 
 func (bh *BackupHandler) createRestorePoint(restorePointName string) (restoreLSNs map[int]string, err error) {
 	tracelog.InfoLogger.Printf("Creating restore point with name %s", restorePointName)
+	if !bh.workers.Conn.IsAlive() {
+		tracelog.InfoLogger.Printf("Looks like the connection to the greenplum master is dead, reconnecting...")
+		tracelog.ErrorLogger.FatalOnError(bh.connect())
+	}
+
 	queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
 	if err != nil {
 		return
