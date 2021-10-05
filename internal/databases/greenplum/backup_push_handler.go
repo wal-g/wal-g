@@ -132,7 +132,17 @@ func (bh *BackupHandler) HandleBackupPush() {
 		})
 	bh.globalCluster.CheckClusterError(remoteOutput, "Unable to run wal-g", func(contentID int) string {
 		return "Unable to run wal-g"
-	})
+	}, true)
+
+	if remoteOutput.NumErrors > 0 {
+		// handle the backup failure and exit
+		err := bh.handleBackupError()
+		if err != nil {
+			tracelog.WarningLogger.Printf("Non-critical error during terminating of the failed backup: %v", err)
+		}
+		tracelog.InfoLogger.Fatalf("Encountered one or more errors during the backup-push. See %s for a complete list of errors.",
+			gplog.GetLogFilePath())
+	}
 
 	for _, command := range remoteOutput.Commands {
 		tracelog.InfoLogger.Printf("WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
@@ -187,6 +197,22 @@ func (bh *BackupHandler) checkPrerequisites() (err error) {
 	return nil
 }
 
+func (bh *BackupHandler) handleBackupError() error {
+	// Abort the non-finished exclusive backups on the segments.
+	// WAL-G in GP7+ uses the non-exclusive backups, that are terminated on connection close, so this is unnecessary.
+	if bh.currBackupInfo.gpVersion.Major < 7 {
+		tracelog.InfoLogger.Println("Terminating the running exclusive backups...")
+		bh.checkConn()
+		queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
+		if err != nil {
+			return err
+		}
+		return queryRunner.AbortBackup()
+	}
+
+	return nil
+}
+
 func (bh *BackupHandler) uploadSentinel(sentinelDto BackupSentinelDto) (err error) {
 	tracelog.InfoLogger.Println("Uploading sentinel file")
 	tracelog.InfoLogger.Println(sentinelDto.String())
@@ -205,13 +231,16 @@ func (bh *BackupHandler) connect() (err error) {
 	return
 }
 
-func (bh *BackupHandler) createRestorePoint(restorePointName string) (restoreLSNs map[int]string, err error) {
-	tracelog.InfoLogger.Printf("Creating restore point with name %s", restorePointName)
+func (bh *BackupHandler) checkConn() {
 	if !bh.workers.Conn.IsAlive() {
 		tracelog.InfoLogger.Printf("Looks like the connection to the greenplum master is dead, reconnecting...")
 		tracelog.ErrorLogger.FatalOnError(bh.connect())
 	}
+}
 
+func (bh *BackupHandler) createRestorePoint(restorePointName string) (restoreLSNs map[int]string, err error) {
+	tracelog.InfoLogger.Printf("Creating restore point with name %s", restorePointName)
+	bh.checkConn()
 	queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
 	if err != nil {
 		return

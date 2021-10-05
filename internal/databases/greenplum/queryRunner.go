@@ -153,6 +153,16 @@ SELECT pg_is_in_backup(), -1;
 `
 }
 
+// buildAbortBackupSegments aborts the running backup on the segments
+func (queryRunner *GpQueryRunner) buildAbortBackupSegments() string {
+	return `SELECT pg_stop_backup(), gp_segment_id FROM gp_dist_random('gp_id');`
+}
+
+// buildAbortBackupSegments aborts the running backup on the master instance
+func (queryRunner *GpQueryRunner) buildAbortBackupMaster() string {
+	return `SELECT pg_stop_backup();`
+}
+
 // IsInBackup check if there is backup running
 func (queryRunner *GpQueryRunner) IsInBackup() (isInBackupByContentID map[int]bool, err error) {
 	conn := queryRunner.pgQueryRunner.Connection
@@ -170,6 +180,7 @@ func (queryRunner *GpQueryRunner) IsInBackup() (isInBackupByContentID map[int]bo
 		if err := rows.Scan(&isInBackup, &contentID); err != nil {
 			tracelog.WarningLogger.Printf("QueryRunner IsInBackup:  %v\n", err.Error())
 		}
+		results[contentID] = isInBackup
 	}
 
 	if rows.Err() != nil {
@@ -177,4 +188,33 @@ func (queryRunner *GpQueryRunner) IsInBackup() (isInBackupByContentID map[int]bo
 	}
 
 	return results, nil
+}
+
+// AbortBackup stops the backup process on all segments
+func (queryRunner *GpQueryRunner) AbortBackup() (err error) {
+	tracelog.InfoLogger.Println("Calling pg_stop_backup() on all segments...")
+	conn := queryRunner.pgQueryRunner.Connection
+
+	errs := make([]error, 0)
+	_, err = conn.Exec("SET statement_timeout=0;")
+	if err != nil {
+		errs = append(errs, errors.Wrap(err, "QueryRunner AbortBackup: failed setting statement timeout in transaction"))
+	}
+
+	_, err = conn.Exec(queryRunner.buildAbortBackupSegments())
+	if err != nil {
+		errs = append(errs, errors.Wrap(err, "QueryRunner IsInBackup: segment backups stop error"))
+	}
+
+	_, err = conn.Exec(queryRunner.buildAbortBackupMaster())
+	if err != nil {
+		errs = append(errs, errors.Wrap(err, "QueryRunner IsInBackup: master backup stop error"))
+	}
+
+	var finalErr error
+	for i := range errs {
+		finalErr = errors.Wrap(finalErr, errs[i].Error())
+	}
+
+	return finalErr
 }
