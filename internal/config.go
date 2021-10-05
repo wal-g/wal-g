@@ -96,6 +96,7 @@ const (
 	MysqlBinlogDstSetting      = "WALG_MYSQL_BINLOG_DST"
 	MysqlBackupPrepareCmd      = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
 	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
+	MysqlCheckGTIDs            = "WALG_MYSQL_CHECK_GTIDS"
 
 	RedisPassword = "WALG_REDIS_PASSWORD"
 
@@ -337,6 +338,7 @@ var (
 		MysqlBinlogDstSetting:      true,
 		MysqlBackupPrepareCmd:      true,
 		MysqlTakeBinlogsFromMaster: true,
+		MysqlCheckGTIDs:            true,
 	}
 
 	RedisAllowedSettings = map[string]bool{

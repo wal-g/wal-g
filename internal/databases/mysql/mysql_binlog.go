@@ -4,11 +4,16 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math"
 	"os"
 	"time"
+
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/wal-g/wal-g/utility"
 )
@@ -184,4 +189,42 @@ func GetBinlogStartTimestamp(path string) (time.Time, error) {
 	}
 	header := ParseEventHeader(buf[BinlogMagicLength:])
 	return time.Unix(int64(header.Timestamp), 0), nil
+}
+
+const BinlogSentinelPath = "binlog_sentinel_" + utility.VersionStr + ".json"
+
+type BinlogSentinelDto struct {
+	GTIDArchived string `json:"GtidArchived"`
+}
+
+func (dto *BinlogSentinelDto) String() string {
+	result, _ := json.Marshal(dto)
+	return string(result)
+}
+
+func FetchBinlogSentinel(folder storage.Folder, sentinelDto interface{}) error {
+	reader, err := folder.ReadObject(BinlogSentinelPath)
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+	data, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(data, sentinelDto)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func UploadBinlogSentinel(folder storage.Folder, sentinelDto interface{}) error {
+	sentinelName := BinlogSentinelPath
+	dtoBody, err := json.Marshal(sentinelDto)
+	if err != nil {
+		return internal.NewSentinelMarshallingError(sentinelName, err)
+	}
+
+	return folder.PutObject(sentinelName, bytes.NewReader(dtoBody))
 }
