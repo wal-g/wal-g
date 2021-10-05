@@ -275,6 +275,26 @@ INFO: Delta will be made from full backup.
 INFO: Delta backup from base_000000010000000100000040 with LSN 140000060.
 ```
 
+#### Pages checksum verification
+To enable verification of the page checksums during the backup-push, use the `--verify` flag or set the `WALG_VERIFY_PAGE_CHECKSUMS` env variable. If found any, corrupted block numbers (currently no more than 10 of them) will be recorded to the backup sentinel json, for example:
+```json
+...
+"/base/13690/13535": {
+"IsSkipped": true,
+"MTime": "2020-08-20T21:02:56.690095409+05:00",
+"IsIncremented": false
+},
+"/base/16384/16397": {
+"CorruptBlocks": [
+1
+],
+"IsIncremented": false,
+"IsSkipped": false,
+"MTime": "2020-08-21T19:09:52.966149937+05:00"
+},
+...
+```
+
 ### ``wal-fetch``
 
 When fetching WAL archives from S3, the user should pass in the archive name and the name of the file to download to. This file should not exist as WAL-G will create it for you.
