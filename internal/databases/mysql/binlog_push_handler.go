@@ -71,7 +71,7 @@ outer:
 	for i := 0; i < len(binlogs); i++ {
 		binLog := binlogs[i]
 
-		tracelog.InfoLogger.Printf("Testing... %v\n", binLog)
+		tracelog.DebugLogger.Printf("Testing... %v\n", binLog)
 		for _, filter := range filters {
 			nextBinLog := ""
 			if i < len(binlogs)-1 {
