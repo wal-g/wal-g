@@ -59,7 +59,7 @@ func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromn
 		if err != nil {
 			return err
 		}
-		backupMetadata, err := GetBackupProperties(db, folder, false, backupName, fromname)
+		backupMetadata, err := GetBackupProperties(db, folder, false, backup.Name, fromname)
 		if err != nil {
 			return err
 		}
