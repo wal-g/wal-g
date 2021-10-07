@@ -118,11 +118,10 @@ func (bh *BackupHandler) HandleBackupPush() {
 	bh.currBackupInfo.startTime = utility.TimeNowCrossPlatformUTC()
 	gplog.InitializeLogging("wal-g", bh.arguments.logsDir)
 
-	err := bh.connect()
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	err = bh.checkPrerequisites()
+	tracelog.ErrorLogger.FatalOnError(bh.connect())
+	err := bh.checkPrerequisites()
 	tracelog.ErrorLogger.FatalfOnError("Backup prerequisites check failed: %v\n", err)
+	bh.disconnect()
 
 	tracelog.InfoLogger.Println("Running wal-g on segments")
 	remoteOutput := bh.globalCluster.GenerateAndExecuteCommand("Running wal-g",
@@ -133,6 +132,9 @@ func (bh *BackupHandler) HandleBackupPush() {
 	bh.globalCluster.CheckClusterError(remoteOutput, "Unable to run wal-g", func(contentID int) string {
 		return "Unable to run wal-g"
 	}, true)
+
+	tracelog.ErrorLogger.FatalfOnError("Failed to connect to the greenplum master: %v",
+		bh.connect())
 
 	if remoteOutput.NumErrors > 0 {
 		// handle the backup failure and exit
@@ -161,6 +163,7 @@ func (bh *BackupHandler) HandleBackupPush() {
 		tracelog.ErrorLogger.FatalError(err)
 	}
 	tracelog.InfoLogger.Printf("Backup %s successfully created", bh.currBackupInfo.backupName)
+	bh.disconnect()
 }
 
 func (bh *BackupHandler) checkPrerequisites() (err error) {
@@ -202,7 +205,6 @@ func (bh *BackupHandler) handleBackupError() error {
 	// WAL-G in GP7+ uses the non-exclusive backups, that are terminated on connection close, so this is unnecessary.
 	if bh.currBackupInfo.gpVersion.Major < 7 {
 		tracelog.InfoLogger.Println("Terminating the running exclusive backups...")
-		bh.checkConn()
 		queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
 		if err != nil {
 			return err
@@ -231,16 +233,16 @@ func (bh *BackupHandler) connect() (err error) {
 	return
 }
 
-func (bh *BackupHandler) checkConn() {
-	if !bh.workers.Conn.IsAlive() {
-		tracelog.InfoLogger.Printf("Looks like the connection to the greenplum master is dead, reconnecting...")
-		tracelog.ErrorLogger.FatalOnError(bh.connect())
+func (bh *BackupHandler) disconnect() {
+	tracelog.InfoLogger.Println("Disconnecting from the Greenplum master.")
+	err := bh.workers.Conn.Close()
+	if err != nil {
+		tracelog.WarningLogger.Printf("Failed to disconnect: %v", err)
 	}
 }
 
 func (bh *BackupHandler) createRestorePoint(restorePointName string) (restoreLSNs map[int]string, err error) {
 	tracelog.InfoLogger.Printf("Creating restore point with name %s", restorePointName)
-	bh.checkConn()
 	queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
 	if err != nil {
 		return
