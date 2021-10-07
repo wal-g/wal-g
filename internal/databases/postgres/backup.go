@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	PgControlPath = "/global/pg_control"
+	PgControlPath     = "/global/pg_control"
+	FilesMetadataName = "files_metadata.json"
 )
 
 var UnwrapAll map[string]bool = nil
@@ -33,7 +34,8 @@ var regexpPgBackupName = regexp.MustCompile(patternPgBackupName)
 // generated and uploaded by WAL-G.
 type Backup struct {
 	internal.Backup
-	SentinelDto *BackupSentinelDto // used for storage query caching
+	SentinelDto      *BackupSentinelDto // used for storage query caching
+	FilesMetadataDto *FilesMetadataDto
 }
 
 func ToPgBackup(source internal.Backup) (output Backup) {
@@ -69,14 +71,54 @@ func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
 	if backup.SentinelDto != nil {
 		return *backup.SentinelDto, nil
 	}
-	sentinelDto := BackupSentinelDto{}
-	err := backup.FetchSentinel(&sentinelDto)
+
+	// this utility struct is used for compatibility reasons, since
+	// previous WAL-G versions used to store the FilesMetadataDto in the sentinel json
+	sentinelWithFilesMetadata := struct {
+		BackupSentinelDto
+		FilesMetadataDto
+	}{}
+
+	err := backup.FetchSentinel(&sentinelWithFilesMetadata)
 	if err != nil {
-		return sentinelDto, err
+		return BackupSentinelDto{}, err
 	}
 
-	backup.SentinelDto = &sentinelDto
-	return sentinelDto, nil
+	backup.SentinelDto = &sentinelWithFilesMetadata.BackupSentinelDto
+
+	// if sentinel actually contains the FilesMetadata, save it too
+	if sentinelWithFilesMetadata.Files != nil {
+		backup.FilesMetadataDto = &sentinelWithFilesMetadata.FilesMetadataDto
+	}
+	return sentinelWithFilesMetadata.BackupSentinelDto, nil
+}
+
+func (backup *Backup) GetSentinelAndFilesMetadata() (BackupSentinelDto, FilesMetadataDto, error) {
+	sentinel, err := backup.GetSentinel()
+	if err != nil {
+		return BackupSentinelDto{}, FilesMetadataDto{}, err
+	}
+
+	filesMetadata, err := backup.GetFilesMetadata()
+	if err != nil {
+		return BackupSentinelDto{}, FilesMetadataDto{}, err
+	}
+	return sentinel, filesMetadata, nil
+}
+
+func (backup *Backup) GetFilesMetadata() (FilesMetadataDto, error) {
+	if backup.FilesMetadataDto != nil {
+		return *backup.FilesMetadataDto, nil
+	}
+
+	var filesMetadata FilesMetadataDto
+	err := backup.FetchDto(filesMetadata, getFilesMetadataPath(backup.Name))
+	if err != nil {
+		return FilesMetadataDto{}, errors.Wrap(err, "failed to fetch files metadata")
+	}
+
+	backup.FilesMetadataDto = &filesMetadata
+	return filesMetadata, nil
 }
 
 func (backup *Backup) FetchMeta() (ExtendedMetadataDto, error) {
@@ -89,7 +131,12 @@ func (backup *Backup) FetchMeta() (ExtendedMetadataDto, error) {
 	return extendedMetadataDto, nil
 }
 
-func checkDBDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentinelDto) error {
+// getFilesMetadataPath returns files metadata storage path.
+func getFilesMetadataPath(backupName string) string {
+	return backupName + "/" + FilesMetadataName
+}
+
+func checkDBDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentinelDto, filesMeta FilesMetadataDto) error {
 	if !sentinelDto.IsIncremental() {
 		isEmpty, err := isDirectoryEmpty(dbDataDirectory)
 		if err != nil {
@@ -108,7 +155,7 @@ func checkDBDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentine
 				return nil
 			})
 
-		for fileName, fileDescription := range sentinelDto.Files {
+		for fileName, fileDescription := range filesMeta.Files {
 			if fileDescription.IsSkipped {
 				tracelog.DebugLogger.Printf("Skipped file %v\n", fileName)
 			}
@@ -149,23 +196,25 @@ func setTablespacePaths(spec TablespaceSpec) error {
 
 // check that directory is empty before unwrap
 func (backup *Backup) unwrapToEmptyDirectory(
-	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
+	dbDataDirectory string, sentinelDto BackupSentinelDto,
+	filesMeta FilesMetadataDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
 ) error {
-	err := checkDBDirectoryForUnwrap(dbDataDirectory, sentinelDto)
+	err := checkDBDirectoryForUnwrap(dbDataDirectory, sentinelDto, filesMeta)
 	if err != nil {
 		return err
 	}
 
-	return backup.unwrapOld(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
+	return backup.unwrapOld(dbDataDirectory, sentinelDto, filesMeta, filesToUnwrap, createIncrementalFiles)
 }
 
 // TODO : unit tests
 // Do the job of unpacking Backup object
 func (backup *Backup) unwrapOld(
-	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
+	dbDataDirectory string, sentinelDto BackupSentinelDto,
+	filesMeta FilesMetadataDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
 ) error {
-	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
-	tarsToExtract, pgControlKey, err := backup.getTarsToExtract(sentinelDto, filesToUnwrap, false)
+	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesMeta, filesToUnwrap, createIncrementalFiles)
+	tarsToExtract, pgControlKey, err := backup.getTarsToExtract(filesMeta, filesToUnwrap, false)
 	if err != nil {
 		return err
 	}
@@ -216,7 +265,7 @@ func isDirectoryEmpty(directoryPath string) (bool, error) {
 }
 
 // TODO : init tests
-func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool,
+func (backup *Backup) getTarsToExtract(filesMeta FilesMetadataDto, filesToUnwrap map[string]bool,
 	skipRedundantTars bool) (tarsToExtract []internal.ReaderMaker, pgControlKey string, err error) {
 	tarNames, err := backup.GetTarNames()
 	if err != nil {
@@ -240,7 +289,7 @@ func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnw
 			continue
 		}
 
-		if skipRedundantTars && !shouldUnwrapTar(tarName, sentinelDto, filesToUnwrap) {
+		if skipRedundantTars && !shouldUnwrapTar(tarName, filesMeta, filesToUnwrap) {
 			continue
 		}
 
@@ -251,15 +300,15 @@ func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnw
 }
 
 func (backup *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error) {
-	sentinelDto, err := backup.GetSentinel()
+	filesMeta, err := backup.GetFilesMetadata()
 	if err != nil {
 		return nil, err
 	}
-	if sentinelDto.Files == nil { // in case of WAL-E of old WAL-G backup
+	if filesMeta.Files == nil { // in case of WAL-E of old WAL-G backup
 		return UnwrapAll, nil
 	}
 	filesToUnwrap := make(map[string]bool)
-	for file := range sentinelDto.Files {
+	for file := range filesMeta.Files {
 		filesToUnwrap[file] = true
 	}
 	for utilityFilePath := range UtilityFilePaths {
@@ -268,12 +317,12 @@ func (backup *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error)
 	return utility.SelectMatchingFiles(fileMask, filesToUnwrap)
 }
 
-func shouldUnwrapTar(tarName string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool) bool {
-	if len(sentinelDto.TarFileSets) == 0 {
+func shouldUnwrapTar(tarName string, filesMeta FilesMetadataDto, filesToUnwrap map[string]bool) bool {
+	if len(filesMeta.TarFileSets) == 0 {
 		return true
 	}
 
-	tarFiles := sentinelDto.TarFileSets[tarName]
+	tarFiles := filesMeta.TarFileSets[tarName]
 
 	for _, file := range tarFiles {
 		if filesToUnwrap[file] {

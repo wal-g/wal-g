@@ -65,16 +65,16 @@ func (backup *Backup) SentinelExists() (bool, error) {
 
 // TODO : unit tests
 func (backup *Backup) FetchSentinel(sentinelDto interface{}) error {
-	return backup.fetchDto(sentinelDto, backup.getStopSentinelPath())
+	return backup.FetchDto(sentinelDto, backup.getStopSentinelPath())
 }
 
 // TODO : unit tests
 func (backup *Backup) FetchMetadata(metadataDto interface{}) error {
-	return backup.fetchDto(metadataDto, backup.getMetadataPath())
+	return backup.FetchDto(metadataDto, backup.getMetadataPath())
 }
 
-// fetchDto gets data from path and de-serializes it to given object
-func (backup *Backup) fetchDto(dto interface{}, path string) error {
+// FetchDto gets data from path and de-serializes it to given object
+func (backup *Backup) FetchDto(dto interface{}, path string) error {
 	reader, err := backup.fetchStorageStream(path)
 	if err != nil {
 		return err

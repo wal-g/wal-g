@@ -164,7 +164,7 @@ func extract(t *testing.T, dir string) string {
 
 	outDir := filepath.Join(filepath.Dir(dir), "extracted")
 
-	ft := postgres.NewFileTarInterpreter(outDir, postgres.BackupSentinelDto{}, map[string]bool{
+	ft := postgres.NewFileTarInterpreter(outDir, postgres.BackupSentinelDto{}, postgres.FilesMetadataDto{}, map[string]bool{
 		"/1":                 true,
 		"/2":                 true,
 		"/3":                 true,
@@ -425,7 +425,7 @@ func setupTestTarBallComposerMaker(composer postgres.TarBallComposerType) postgr
 		composerMaker, _ := postgres.NewRatingTarBallComposerMaker(relFileStats, filePackOptions)
 		return composerMaker
 	case postgres.CopyComposer:
-		mockBackup := postgres.Backup{SentinelDto: &postgres.BackupSentinelDto{}}
+		mockBackup := getMockBackupFromFiles(nil)
 		return postgres.NewCopyTarBallComposerMaker(mockBackup, "mockName", filePackOptions)
 	default:
 		return nil

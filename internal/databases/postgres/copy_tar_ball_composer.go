@@ -77,7 +77,7 @@ func NewCopyTarBallComposer(
 	prevTarFileSets TarFileSets,
 ) (*CopyTarBallComposer, error) {
 	errorGroup, ctx := errgroup.WithContext(context.Background())
-	_, err := prevBackup.GetSentinel()
+	_, _, err := prevBackup.GetSentinelAndFilesMetadata()
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (maker *CopyTarBallComposerMaker) Make(bundle *Bundle) (TarBallComposer, er
 	prevTarFileSets := make(map[string][]string)
 	tarUnchangedFilesCount := make(map[string]int)
 	if maker.previousBackup.SentinelDto != nil {
-		for tarName, fileSet := range maker.previousBackup.SentinelDto.TarFileSets {
+		for tarName, fileSet := range maker.previousBackup.FilesMetadataDto.TarFileSets {
 			for _, fileName := range fileSet {
 				prevFileTar[fileName] = tarName
 				prevTarFileSets[tarName] = append(prevTarFileSets[tarName], fileName)
@@ -127,7 +127,7 @@ func (c *CopyTarBallComposer) AddFile(info *ComposeFileInfo) {
 	var fileName = info.header.Name
 	var currFile = fileInfo{}
 	if _, exists := c.prevFileTar[fileName]; exists {
-		if !c.prevBackup.SentinelDto.Files[fileName].MTime.Equal(info.header.ModTime) {
+		if !c.prevBackup.FilesMetadataDto.Files[fileName].MTime.Equal(info.header.ModTime) {
 			currFile.status = doNotCopy
 		} else {
 			c.tarUnchangedFilesCount[c.prevFileTar[fileName]]--
@@ -144,7 +144,7 @@ func (c *CopyTarBallComposer) AddHeader(fileInfoHeader *tar.Header, info os.File
 	var fileName = fileInfoHeader.Name
 	var currHeader = headerInfo{}
 	if _, exists := c.prevFileTar[fileName]; exists {
-		if !c.prevBackup.SentinelDto.Files[fileName].MTime.Equal(info.ModTime()) {
+		if !c.prevBackup.FilesMetadataDto.Files[fileName].MTime.Equal(info.ModTime()) {
 			currHeader.status = doNotCopy
 		} else {
 			c.tarUnchangedFilesCount[c.prevFileTar[fileName]]--

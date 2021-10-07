@@ -21,9 +21,6 @@ type BackupSentinelDto struct {
 	IncrementFullName *string `json:"DeltaFullName,omitempty"`
 	IncrementCount    *int    `json:"DeltaCount,omitempty"`
 
-	Files       internal.BackupFileList `json:"Files"`
-	TarFileSets TarFileSets             `json:"TarFileSets"`
-
 	PgVersion        int     `json:"PgVersion"`
 	BackupFinishLSN  *uint64 `json:"FinishLSN"`
 	SystemIdentifier *uint64 `json:"SystemIdentifier,omitempty"`
@@ -35,7 +32,7 @@ type BackupSentinelDto struct {
 	UserData interface{} `json:"UserData,omitempty"`
 }
 
-func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec, tarFileSets TarFileSets) BackupSentinelDto {
+func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec) BackupSentinelDto {
 	sentinel := BackupSentinelDto{
 		BackupStartLSN:   &bh.curBackupInfo.startLSN,
 		IncrementFromLSN: bh.prevBackupInfo.sentinelDto.BackupStartLSN,
@@ -57,7 +54,6 @@ func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec, tarFileSet
 	sentinel.SystemIdentifier = bh.pgInfo.systemIdentifier
 	sentinel.UncompressedSize = bh.curBackupInfo.uncompressedSize
 	sentinel.CompressedSize = bh.curBackupInfo.compressedSize
-	sentinel.TarFileSets = tarFileSets
 	return sentinel
 }
 
@@ -104,16 +100,6 @@ func NewExtendedMetadataDto(isPermanent bool, dataDir string, startTime time.Tim
 	return meta
 }
 
-func (dto *BackupSentinelDto) setFiles(p *sync.Map) {
-	dto.Files = make(internal.BackupFileList)
-	p.Range(func(k, v interface{}) bool {
-		key := k.(string)
-		description := v.(internal.BackupFileDescription)
-		dto.Files[key] = description
-		return true
-	})
-}
-
 // TODO : unit tests
 // TODO : get rid of panic here
 // IsIncremental checks that sentinel represents delta backup
@@ -125,4 +111,25 @@ func (dto *BackupSentinelDto) IsIncremental() (isIncremental bool) {
 		}
 	}
 	return dto.IncrementFrom != nil
+}
+
+// FilesMetadataDto contains the information about the backup files.
+// It can be pretty large on some databases, sometimes more than 1GB
+type FilesMetadataDto struct {
+	Files       internal.BackupFileList `json:"Files,omitempty"`
+	TarFileSets TarFileSets             `json:"TarFileSets,omitempty"`
+}
+
+func NewFilesMetadataDto(files internal.BackupFileList, tarFileSets TarFileSets) FilesMetadataDto {
+	return FilesMetadataDto{TarFileSets: tarFileSets, Files: files}
+}
+
+func (dto *FilesMetadataDto) setFiles(p *sync.Map) {
+	dto.Files = make(internal.BackupFileList)
+	p.Range(func(k, v interface{}) bool {
+		key := k.(string)
+		description := v.(internal.BackupFileDescription)
+		dto.Files[key] = description
+		return true
+	})
 }

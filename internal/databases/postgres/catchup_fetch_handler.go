@@ -18,14 +18,14 @@ func HandleCatchupFetch(folder storage.Folder, dbDirectory, backupName string, u
 	filesToUnwrap, err := pgBackup.GetFilesToUnwrap("")
 	tracelog.ErrorLogger.FatalfOnError("Failed get files to unwrap from backup: %v", err)
 
-	sentinelDto, err := pgBackup.GetSentinel()
+	sentinelDto, filesMetaDto, err := pgBackup.GetSentinelAndFilesMetadata()
 	tracelog.ErrorLogger.FatalfOnError("Failed get backup sentinel: %v", err)
 
 	// testing the new unwrap implementation
 	if useNewUnwrap {
-		_, err = pgBackup.unwrapNew(dbDirectory, sentinelDto, filesToUnwrap, true, false)
+		_, err = pgBackup.unwrapNew(dbDirectory, sentinelDto, filesMetaDto, filesToUnwrap, true, false)
 	} else {
-		err = pgBackup.unwrapOld(dbDirectory, sentinelDto, filesToUnwrap, true)
+		err = pgBackup.unwrapOld(dbDirectory, sentinelDto, filesMetaDto, filesToUnwrap, true)
 	}
 
 	tracelog.ErrorLogger.FatalfOnError("Failed unwrap backup: %v", err)

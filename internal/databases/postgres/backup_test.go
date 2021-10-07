@@ -16,9 +16,8 @@ import (
 
 func getMockBackupFromFiles(files internal.BackupFileList) postgres.Backup {
 	return postgres.Backup{
-		SentinelDto: &postgres.BackupSentinelDto{
-			Files: files,
-		},
+		SentinelDto:      &postgres.BackupSentinelDto{},
+		FilesMetadataDto: &postgres.FilesMetadataDto{Files: files},
 	}
 }
 

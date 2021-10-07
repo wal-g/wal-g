@@ -55,7 +55,7 @@ func getLocalFile(targetPath string, header *tar.Header) (localFile *os.File, is
 
 // get file unwrapper for file depending on backup type
 func getFileUnwrapper(tarInterpreter *FileTarInterpreter, header *tar.Header, targetPath string) IBackupFileUnwrapper {
-	fileDescription, haveFileDescription := tarInterpreter.Sentinel.Files[header.Name]
+	fileDescription, haveFileDescription := tarInterpreter.FilesMetadata.Files[header.Name]
 	isIncremented := haveFileDescription && fileDescription.IsIncremented
 	var isPageFile bool
 	if localFileInfo, _ := getLocalFileInfo(targetPath); localFileInfo != nil {

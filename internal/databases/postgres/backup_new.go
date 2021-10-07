@@ -36,7 +36,7 @@ func newUnwrapResult() *UnwrapResult {
 		make(map[string]int64), sync.Mutex{}}
 }
 
-func checkDBDirectoryForUnwrapNew(dbDataDirectory string, sentinelDto BackupSentinelDto) error {
+func checkDBDirectoryForUnwrapNew(dbDataDirectory string, sentinelDto BackupSentinelDto, filesMetaDto FilesMetadataDto) error {
 	tracelog.DebugLogger.Println("DB data directory before applying backup:")
 	_ = filepath.Walk(dbDataDirectory,
 		func(path string, info os.FileInfo, err error) error {
@@ -49,7 +49,7 @@ func checkDBDirectoryForUnwrapNew(dbDataDirectory string, sentinelDto BackupSent
 			return nil
 		})
 
-	for fileName, fileDescription := range sentinelDto.Files {
+	for fileName, fileDescription := range filesMetaDto.Files {
 		if fileDescription.IsSkipped {
 			tracelog.DebugLogger.Printf("Skipped file %v\n", fileName)
 		}
@@ -68,16 +68,16 @@ func checkDBDirectoryForUnwrapNew(dbDataDirectory string, sentinelDto BackupSent
 // TODO : unit tests
 // Do the job of unpacking Backup object
 func (backup *Backup) unwrapNew(
-	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool,
+	dbDataDirectory string, sentinelDto BackupSentinelDto, filesMetaDto FilesMetadataDto, filesToUnwrap map[string]bool,
 	createIncrementalFiles, skipRedundantTars bool) (*UnwrapResult, error) {
 	useNewUnwrapImplementation = true
-	err := checkDBDirectoryForUnwrapNew(dbDataDirectory, sentinelDto)
+	err := checkDBDirectoryForUnwrapNew(dbDataDirectory, sentinelDto, filesMetaDto)
 	if err != nil {
 		return nil, err
 	}
 
-	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
-	tarsToExtract, pgControlKey, err := backup.getTarsToExtract(sentinelDto, filesToUnwrap, skipRedundantTars)
+	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesMetaDto, filesToUnwrap, createIncrementalFiles)
+	tarsToExtract, pgControlKey, err := backup.getTarsToExtract(filesMetaDto, filesToUnwrap, skipRedundantTars)
 	if err != nil {
 		return nil, err
 	}

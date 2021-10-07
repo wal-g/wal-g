@@ -72,14 +72,14 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn,
 			return NewRegularTarBallComposerMaker(filePackOptions), nil
 		}
 		previousBackup := NewBackup(folder, previousBackupName)
-		prevBackupSentinelDto, err := previousBackup.GetSentinel()
+		prevBackupSentinelDto, _, err := previousBackup.GetSentinelAndFilesMetadata()
 		if err != nil {
 			return nil, err
 		}
 		if prevBackupSentinelDto.IncrementFullName != nil {
 			previousBackupName = *prevBackupSentinelDto.IncrementFullName
 			previousBackup = NewBackup(folder, previousBackupName)
-			_, err = previousBackup.GetSentinel()
+			_, _, err = previousBackup.GetSentinelAndFilesMetadata()
 			if err != nil {
 				return nil, err
 			}
