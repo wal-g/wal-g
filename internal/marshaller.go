@@ -12,14 +12,14 @@ type DtoMarshallerType int
 
 const (
 	RegularJsonMarshaller  DtoMarshallerType = iota + 1
-	StreamedJsonMarshaller DtoMarshallerType = iota + 2
+	StreamedJsonMarshaller
 )
 
 type DtoUnmarshallerType int
 
 const (
 	RegularJsonUnmarshaller DtoUnmarshallerType = iota + 1
-	StreamedJsonUnmarshaller DtoUnmarshallerType = iota + 2
+	StreamedJsonUnmarshaller
 )
 
 type DtoMarshaller interface {
