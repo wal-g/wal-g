@@ -22,17 +22,9 @@ const (
 	StreamedJSONSerializer DtoSerializerType = "json_streamed"
 )
 
-type DtoMarshaller interface {
-	Marshal(dto interface{}) (io.Reader, error)
-}
-
-type DtoUnmarshaller interface {
-	Unmarshal(reader io.Reader, dto interface{}) error
-}
-
 type DtoSerializer interface {
-	DtoMarshaller
-	DtoUnmarshaller
+	Marshal(dto interface{}) (io.Reader, error)
+	Unmarshal(reader io.Reader, dto interface{}) error
 }
 
 func NewDtoSerializer() (DtoSerializer, error) {
