@@ -3,17 +3,16 @@ package postgres
 import (
 	"errors"
 	"fmt"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 
-	"github.com/wal-g/wal-g/internal"
-
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 )
 
 type TimelineWithSegmentNo struct {
@@ -29,51 +28,47 @@ func NewTimelineWithSegmentNoBy(record *TimelineHistoryRecord) *TimelineWithSegm
 	return NewTimelineWithSegmentNo(record.timeline, getSegmentNoFromLsn(record.lsn))
 }
 
-func getSegmentNoFromLsn(lsn uint64) uint64 {
-	return lsn / WalSegmentSize
-}
-
 // HandleWALRestore is invoked to perform wal-g wal-restore
 func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder) {
 	cloudFolder = cloudFolder.GetSubFolder(utility.WalPath)
 
-	targetPgData, err := ExtractPgControl(targetPath)
+	sourcePgData, err := ExtractPgControl(sourcePath)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get pg data on target cluster: %v\n", err)
 
-	sourcePgData, err := ExtractPgControl(sourcePath)
+	targetPgData, err := ExtractPgControl(targetPath)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get pg data on source cluster: %v\n", err)
 
-	if targetPgData.GetSystemIdentifier() != sourcePgData.GetSystemIdentifier() {
+	if sourcePgData.GetSystemIdentifier() != targetPgData.GetSystemIdentifier() {
 		tracelog.ErrorLogger.Fatal("System identifiers of target and source clusters are not equal\n")
 	}
-	if targetPgData.GetCurrentTimeline() == sourcePgData.GetCurrentTimeline() {
+	if sourcePgData.GetCurrentTimeline() == targetPgData.GetCurrentTimeline() {
 		tracelog.ErrorLogger.Fatal("Latest checkpoint timelines of target and source clusters are equal\n")
 	}
 
-	targetWalDir, err := getWalDirName(targetPath)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL directory name: %v\n", err)
 	sourceWalDir, err := getWalDirName(sourcePath)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL directory name: %v\n", err)
+	targetWalDir, err := getWalDirName(targetPath)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL directory name: %v\n", err)
 
-	tgtHistoryRecords, err := getLocalTimelineHistoryRecords(targetPgData.GetCurrentTimeline(), targetWalDir)
+	sourceHistoryRecords, err := getLocalTimelineHistoryRecords(sourcePgData.GetCurrentTimeline(), sourceWalDir)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on target cluster: %v\n", err)
-	srcHistoryRecords, err := getLocalTimelineHistoryRecords(sourcePgData.GetCurrentTimeline(), sourceWalDir)
+	targetHistoryRecords, err := getLocalTimelineHistoryRecords(targetPgData.GetCurrentTimeline(), targetWalDir)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on source cluster: %v\n", err)
 
-	lastCommonLsn, lastCommonTl, err := FindLastCommonPoint(tgtHistoryRecords, srcHistoryRecords)
+	lastCommonLsn, lastCommonTl, err := FindLastCommonPoint(sourceHistoryRecords, targetHistoryRecords)
 	tracelog.ErrorLogger.FatalfOnError("Failed to find last common point: %v\n", err)
 
-	srcTimelineWithSegNo := transformTimelineHistoryRecords(srcHistoryRecords)
-	mapOfSrcTimelineWithSegNo := timelineWithSegmentNoSliceToMap(srcTimelineWithSegNo)
+	targetTimelineWithSegNo := transformTimelineHistoryRecords(targetHistoryRecords)
+	mapOfTargetTimelineWithSegNo := timelineWithSegmentNoSliceToMap(targetTimelineWithSegNo)
 
-	folderFilenames, err := getDirectoryFilenames(sourceWalDir)
+	folderFilenames, err := getDirectoryFilenames(targetWalDir)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL filenames: %v\n", err)
 
 	walsByTimelines := groupSegmentsByTimelines(getSegmentsFromFiles(folderFilenames))
 
 	filenamesToRestore, err := GetMissingWals(
 		getSegmentNoFromLsn(lastCommonLsn), lastCommonTl,
-		sourcePgData.GetCurrentTimeline(), mapOfSrcTimelineWithSegNo, walsByTimelines)
+		targetPgData.GetCurrentTimeline(), mapOfTargetTimelineWithSegNo, walsByTimelines)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get missing source WALs: %v\n", err)
 
 	if len(filenamesToRestore) == 0 {
@@ -82,7 +77,7 @@ func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder)
 	}
 	tracelog.InfoLogger.Printf("WAL files to restore: %v", filenamesToRestore)
 	for _, walFilename := range filenamesToRestore {
-		location := utility.ResolveSymlink(path.Join(sourceWalDir, walFilename))
+		location := utility.ResolveSymlink(path.Join(targetWalDir, walFilename))
 		if err = internal.DownloadFileTo(cloudFolder, walFilename, location); err != nil {
 			tracelog.ErrorLogger.Printf("Failed to download WAL file %v: %v\n", walFilename, err)
 		} else {
@@ -93,33 +88,33 @@ func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder)
 
 // FindLastCommonPoint get the last common LSN and timeline between two slices of
 // history records. Nil input is not handle
-func FindLastCommonPoint(target, source []*TimelineHistoryRecord) (uint64, uint32, error) {
+func FindLastCommonPoint(source, target []*TimelineHistoryRecord) (uint64, uint32, error) {
 	currentLsn := uint64(1)
 	currentTimeline := uint32(1)
 
-	if len(target) == len(source) {
+	if len(source) == len(target) {
 		return currentLsn, currentTimeline, errors.New("two clusters on the same timeline")
 	}
 
-	if len(target) == 0 {
-		currentLsn = source[0].lsn
-		currentTimeline = source[0].timeline
-	}
 	if len(source) == 0 {
 		currentLsn = target[0].lsn
 		currentTimeline = target[0].timeline
 	}
-	for i, tgtRecord := range target {
-		if len(source) <= i {
+	if len(target) == 0 {
+		currentLsn = source[0].lsn
+		currentTimeline = source[0].timeline
+	}
+	for i, srcRecord := range source {
+		if len(target) <= i {
 			break
 		}
 
-		if tgtRecord.lsn == source[i].lsn {
-			currentLsn = tgtRecord.lsn
-			currentTimeline = tgtRecord.timeline
+		if srcRecord.lsn == target[i].lsn {
+			currentLsn = srcRecord.lsn
+			currentTimeline = srcRecord.timeline
 		} else {
-			currentLsn = uint64Min(tgtRecord.lsn, source[i].lsn)
-			currentTimeline = tgtRecord.timeline
+			currentLsn = uint64Min(srcRecord.lsn, target[i].lsn)
+			currentTimeline = srcRecord.timeline
 			break
 		}
 	}

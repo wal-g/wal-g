@@ -1,3 +1,0 @@
-"WALG_DELTA_MAX_STEPS": "0",
-"WALE_S3_PREFIX": "s3://restorebucket",
-"WALG_USE_WAL_DELTA": "true"

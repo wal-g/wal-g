@@ -83,7 +83,7 @@ services:
       &&  mkdir -p /export/gpdeletebeforenamebucket
       &&  mkdir -p /export/gpdeletebeforetimebucket
       &&  mkdir -p /export/storagetoolsbucket
-      &&  mkdir -p /export/restorebucket
+      &&  mkdir -p /export/walrestorebucket
       &&  /usr/bin/minio server /export'
 
   s3-another:
@@ -526,7 +526,7 @@ services:
 
   pg_restore_test:
     build:
-      dockerfile: docker/pg_tests/Dockerfile_restore_test
+      dockerfile: docker/pg_tests/Dockerfile_wal_restore_test
       context: .
     image: wal-g/restore_test
     container_name: wal-g_pg_restore_test
