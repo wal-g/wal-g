@@ -11,15 +11,15 @@ import (
 type DtoMarshallerType int
 
 const (
-	RegularJsonMarshaller  DtoMarshallerType = iota + 1
-	StreamedJsonMarshaller
+	RegularJSONMarshaller DtoMarshallerType = iota + 1
+	StreamedJSONMarshaller
 )
 
 type DtoUnmarshallerType int
 
 const (
-	RegularJsonUnmarshaller DtoUnmarshallerType = iota + 1
-	StreamedJsonUnmarshaller
+	RegularJSONUnmarshaller DtoUnmarshallerType = iota + 1
+	StreamedJSONUnmarshaller
 )
 
 type DtoMarshaller interface {
@@ -30,12 +30,12 @@ type DtoUnmarshaller interface {
 	Unmarshal(reader io.Reader, dto interface{}) error
 }
 
-var _ DtoMarshaller = RegularJson{}
-var _ DtoUnmarshaller = RegularJson{}
+var _ DtoMarshaller = RegularJSON{}
+var _ DtoUnmarshaller = RegularJSON{}
 
-type RegularJson struct {}
+type RegularJSON struct{}
 
-func (r RegularJson) Marshal(dto interface{}) (io.Reader, error) {
+func (r RegularJSON) Marshal(dto interface{}) (io.Reader, error) {
 	data, err := json.Marshal(dto)
 	if err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func (r RegularJson) Marshal(dto interface{}) (io.Reader, error) {
 	return bytes.NewReader(data), nil
 }
 
-func (r RegularJson) Unmarshal(reader io.Reader, dto interface{}) error {
+func (r RegularJSON) Unmarshal(reader io.Reader, dto interface{}) error {
 	data, err := io.ReadAll(reader)
 	if err != nil {
 		return err
@@ -51,12 +51,12 @@ func (r RegularJson) Unmarshal(reader io.Reader, dto interface{}) error {
 	return json.Unmarshal(data, dto)
 }
 
-var _ DtoMarshaller = StreamedJson{}
-var _ DtoUnmarshaller = StreamedJson{}
+var _ DtoMarshaller = StreamedJSON{}
+var _ DtoUnmarshaller = StreamedJSON{}
 
-type StreamedJson struct {}
+type StreamedJSON struct{}
 
-func (s StreamedJson) Marshal(dto interface{}) (io.Reader, error) {
+func (s StreamedJSON) Marshal(dto interface{}) (io.Reader, error) {
 	r, w := io.Pipe()
 	go func() {
 		if err := einJson.Marshal(dto, w); err != nil {
@@ -66,7 +66,6 @@ func (s StreamedJson) Marshal(dto interface{}) (io.Reader, error) {
 	return r, nil
 }
 
-func (s StreamedJson) Unmarshal(reader io.Reader, dto interface{}) error {
+func (s StreamedJSON) Unmarshal(reader io.Reader, dto interface{}) error {
 	return einJson.Unmarshal(reader, dto)
 }
-

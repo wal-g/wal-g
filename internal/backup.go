@@ -3,7 +3,6 @@ package internal
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -13,8 +12,8 @@ import (
 )
 
 var (
-	unknownMarshaller = fmt.Errorf("undefined dto marshaller type")
-	unknownUnmarshaller = fmt.Errorf("undefined dto unmarshaller type")
+	errUnknownMarshaller   = fmt.Errorf("undefined dto marshaller type")
+	errUnknownUnmarshaller = fmt.Errorf("undefined dto unmarshaller type")
 )
 
 //region errors
@@ -70,19 +69,6 @@ func (backup *Backup) SentinelExists() (bool, error) {
 	return backup.Folder.Exists(backup.getStopSentinelPath())
 }
 
-func (backup *Backup) fetchStorageBytes(path string) ([]byte, error) {
-	backupReaderMaker := NewStorageReaderMaker(backup.Folder, path)
-	backupReader, err := backupReaderMaker.Reader()
-	if err != nil {
-		return make([]byte, 0), err
-	}
-	metadata, err := ioutil.ReadAll(backupReader)
-	if err != nil {
-		return nil, err
-	}
-	return metadata, nil
-}
-
 // TODO : unit tests
 func (backup *Backup) FetchSentinel(sentinelDto interface{}) error {
 	return backup.fetchDto(sentinelDto, backup.getStopSentinelPath())
@@ -101,12 +87,12 @@ func (backup *Backup) fetchDto(dto interface{}, path string) error {
 	}
 	var unmarshaller DtoUnmarshaller
 	switch DtoUnmarshallerType(viper.GetInt(UnmarshallerTypeSetting)) {
-	case RegularJsonUnmarshaller:
-		unmarshaller = RegularJson{}
-	case StreamedJsonUnmarshaller:
-		unmarshaller = StreamedJson{}
+	case RegularJSONUnmarshaller:
+		unmarshaller = RegularJSON{}
+	case StreamedJSONUnmarshaller:
+		unmarshaller = StreamedJSON{}
 	default:
-		return unknownUnmarshaller
+		return errUnknownUnmarshaller
 	}
 	return errors.Wrap(unmarshaller.Unmarshal(reader, dto), fmt.Sprintf("failed to fetch dto from %s", path))
 }
@@ -128,12 +114,12 @@ func (backup *Backup) UploadSentinel(sentinelDto interface{}) error {
 func (backup *Backup) uploadDto(dto interface{}, path string) error {
 	var marshaller DtoMarshaller
 	switch DtoMarshallerType(viper.GetInt(MarshallerTypeSetting)) {
-	case RegularJsonMarshaller:
-		marshaller = RegularJson{}
-	case StreamedJsonMarshaller:
-		marshaller = StreamedJson{}
+	case RegularJSONMarshaller:
+		marshaller = RegularJSON{}
+	case StreamedJSONMarshaller:
+		marshaller = StreamedJSON{}
 	default:
-		return unknownMarshaller
+		return errUnknownMarshaller
 	}
 	r, err := marshaller.Marshal(dto)
 	if err != nil {
@@ -192,12 +178,12 @@ func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupNa
 
 	var marshaller DtoMarshaller
 	switch DtoMarshallerType(viper.GetInt(MarshallerTypeSetting)) {
-	case RegularJsonMarshaller:
-		marshaller = RegularJson{}
-	case StreamedJsonMarshaller:
-		marshaller = StreamedJson{}
+	case RegularJSONMarshaller:
+		marshaller = RegularJSON{}
+	case StreamedJSONMarshaller:
+		marshaller = StreamedJSON{}
 	default:
-		return unknownMarshaller
+		return errUnknownMarshaller
 	}
 	r, err := marshaller.Marshal(sentinelDto)
 	if err != nil {
