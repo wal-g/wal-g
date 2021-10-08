@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"io/ioutil"
 
-	einJson "github.com/EinKrebs/json"
+	einJSON "github.com/EinKrebs/json"
 )
 
 type DtoMarshallerType int
@@ -44,7 +45,7 @@ func (r RegularJSON) Marshal(dto interface{}) (io.Reader, error) {
 }
 
 func (r RegularJSON) Unmarshal(reader io.Reader, dto interface{}) error {
-	data, err := io.ReadAll(reader)
+	data, err := ioutil.ReadAll(reader)
 	if err != nil {
 		return err
 	}
@@ -59,7 +60,7 @@ type StreamedJSON struct{}
 func (s StreamedJSON) Marshal(dto interface{}) (io.Reader, error) {
 	r, w := io.Pipe()
 	go func() {
-		if err := einJson.Marshal(dto, w); err != nil {
+		if err := einJSON.Marshal(dto, w); err != nil {
 			_ = w.CloseWithError(err)
 		}
 	}()
@@ -67,5 +68,5 @@ func (s StreamedJSON) Marshal(dto interface{}) (io.Reader, error) {
 }
 
 func (s StreamedJSON) Unmarshal(reader io.Reader, dto interface{}) error {
-	return einJson.Unmarshal(reader, dto)
+	return einJSON.Unmarshal(reader, dto)
 }
