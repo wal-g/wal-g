@@ -5,15 +5,9 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
-)
-
-var (
-	errUnknownMarshaller   = fmt.Errorf("undefined dto marshaller type")
-	errUnknownUnmarshaller = fmt.Errorf("undefined dto unmarshaller type")
 )
 
 //region errors
@@ -85,14 +79,9 @@ func (backup *Backup) fetchDto(dto interface{}, path string) error {
 	if err != nil {
 		return err
 	}
-	var unmarshaller DtoUnmarshaller
-	switch DtoUnmarshallerType(viper.GetInt(UnmarshallerTypeSetting)) {
-	case RegularJSONUnmarshaller:
-		unmarshaller = RegularJSON{}
-	case StreamedJSONUnmarshaller:
-		unmarshaller = StreamedJSON{}
-	default:
-		return errUnknownUnmarshaller
+	unmarshaller, err := NewDtoSerializer()
+	if err != nil {
+		return err
 	}
 	return errors.Wrap(unmarshaller.Unmarshal(reader, dto), fmt.Sprintf("failed to fetch dto from %s", path))
 }
@@ -112,14 +101,9 @@ func (backup *Backup) UploadSentinel(sentinelDto interface{}) error {
 
 // uploadDto serializes given object to JSON and puts it to path
 func (backup *Backup) uploadDto(dto interface{}, path string) error {
-	var marshaller DtoMarshaller
-	switch DtoMarshallerType(viper.GetInt(MarshallerTypeSetting)) {
-	case RegularJSONMarshaller:
-		marshaller = RegularJSON{}
-	case StreamedJSONMarshaller:
-		marshaller = StreamedJSON{}
-	default:
-		return errUnknownMarshaller
+	marshaller, err := NewDtoSerializer()
+	if err != nil {
+		return err
 	}
 	r, err := marshaller.Marshal(dto)
 	if err != nil {
@@ -176,14 +160,9 @@ func GetBackupByName(backupName, subfolder string, folder storage.Folder) (Backu
 func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupName string) error {
 	sentinelName := SentinelNameFromBackup(backupName)
 
-	var marshaller DtoMarshaller
-	switch DtoMarshallerType(viper.GetInt(MarshallerTypeSetting)) {
-	case RegularJSONMarshaller:
-		marshaller = RegularJSON{}
-	case StreamedJSONMarshaller:
-		marshaller = StreamedJSON{}
-	default:
-		return errUnknownMarshaller
+	marshaller, err := NewDtoSerializer()
+	if err != nil {
+		return err
 	}
 	r, err := marshaller.Marshal(sentinelDto)
 	if err != nil {

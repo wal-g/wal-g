@@ -3,24 +3,23 @@ package internal
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"github.com/spf13/viper"
 	"io"
 	"io/ioutil"
 
 	einJSON "github.com/EinKrebs/json"
 )
 
-type DtoMarshallerType int
-
-const (
-	RegularJSONMarshaller DtoMarshallerType = iota + 1
-	StreamedJSONMarshaller
+var (
+	errUnknownSerializer = fmt.Errorf("undefined dto serializer type")
 )
 
-type DtoUnmarshallerType int
+type DtoSerializerType string
 
 const (
-	RegularJSONUnmarshaller DtoUnmarshallerType = iota + 1
-	StreamedJSONUnmarshaller
+	RegularJSONSerializer  DtoSerializerType = "json_default"
+	StreamedJSONSerializer DtoSerializerType = "json_streamed"
 )
 
 type DtoMarshaller interface {
@@ -31,8 +30,23 @@ type DtoUnmarshaller interface {
 	Unmarshal(reader io.Reader, dto interface{}) error
 }
 
-var _ DtoMarshaller = RegularJSON{}
-var _ DtoUnmarshaller = RegularJSON{}
+type DtoSerializer interface {
+	DtoMarshaller
+	DtoUnmarshaller
+}
+
+func NewDtoSerializer() (DtoSerializer, error) {
+	switch DtoSerializerType(viper.GetString(SerializerTypeSetting)) {
+	case RegularJSONSerializer:
+		return RegularJSON{}, nil
+	case StreamedJSONSerializer:
+		return StreamedJSON{}, nil
+	default:
+		return nil, errUnknownSerializer
+	}
+}
+
+var _ DtoSerializer = RegularJSON{}
 
 type RegularJSON struct{}
 
@@ -52,8 +66,7 @@ func (r RegularJSON) Unmarshal(reader io.Reader, dto interface{}) error {
 	return json.Unmarshal(data, dto)
 }
 
-var _ DtoMarshaller = StreamedJSON{}
-var _ DtoUnmarshaller = StreamedJSON{}
+var _ DtoSerializer = StreamedJSON{}
 
 type StreamedJSON struct{}
 
