@@ -254,12 +254,12 @@ services:
     links:
       - s3
 
-  pg_full_backup_serialized_test:
+  pg_full_backup_streamed_test:
     build:
-      dockerfile: docker/pg_tests/Dockerfile_full_backup_serialized_test
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_streamed_test
       context: .
-    image: wal-g/full_backup_serialized_test
-    container_name: wal-g_pg_full_backup_serialized_test
+    image: wal-g/full_backup_streamed_test
+    container_name: wal-g_pg_full_backup_streamed_test
     depends_on:
       - s3
     links:

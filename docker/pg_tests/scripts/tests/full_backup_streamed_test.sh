@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e -x
-CONFIG_FILE="/tmp/configs/full_backup_serialized_test_config.json"
+CONFIG_FILE="/tmp/configs/full_backup_streamed_test_config.json"
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
 cat ${CONFIG_FILE} > ${TMP_CONFIG}
