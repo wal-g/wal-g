@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/wal-g/tracelog"
 	"io"
 	"io/ioutil"
 
 	einJSON "github.com/EinKrebs/json"
 	"github.com/spf13/viper"
+	"github.com/wal-g/tracelog"
 )
 
 type UnknownSerializerTypeError struct {
