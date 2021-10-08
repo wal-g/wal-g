@@ -83,38 +83,29 @@ func (backup *Backup) fetchStorageBytes(path string) ([]byte, error) {
 
 // TODO : unit tests
 func (backup *Backup) FetchSentinel(sentinelDto interface{}) error {
-	if viper.GetBool(UseStreamedJSONSetting) {
-		sentinelDtoData, err := backup.fetchStorageStream(backup.getStopSentinelPath())
-		if err != nil {
-			return errors.Wrap(err, "failed to fetch sentinel")
-		}
-		err = einJSON.Unmarshal(sentinelDtoData, sentinelDto)
-		return errors.Wrap(err, "failed to unmarshal sentinel")
-	}
-	sentinelDtoData, err := backup.fetchStorageBytes(backup.getStopSentinelPath())
-	if err != nil {
-		return errors.Wrap(err, "failed to fetch sentinel")
-	}
-	err = json.Unmarshal(sentinelDtoData, sentinelDto)
-	return errors.Wrap(err, "failed to unmarshal sentinel")
+	return backup.fetchDto(sentinelDto, backup.getStopSentinelPath())
 }
 
 // TODO : unit tests
 func (backup *Backup) FetchMetadata(metadataDto interface{}) error {
+	return backup.fetchDto(metadataDto, backup.getMetadataPath())
+}
+
+func (backup *Backup) fetchDto(dto interface{}, path string) error {
 	if viper.GetBool(UseStreamedJSONSetting) {
-		sentinelDtoData, err := backup.fetchStorageStream(backup.getMetadataPath())
+		sentinelDtoData, err := backup.fetchStorageStream(path)
 		if err != nil {
-			return errors.Wrap(err, "failed to fetch metadata")
+			return errors.Wrap(err, fmt.Sprintf("failed to fetch stream from %s", path))
 		}
-		err = einJSON.Unmarshal(sentinelDtoData, metadataDto)
-		return errors.Wrap(err, "failed to unmarshal metadata")
+		err = einJSON.Unmarshal(sentinelDtoData, dto)
+		return errors.Wrap(err, fmt.Sprintf("failed to unmarshal dto from %s", path))
 	}
-	sentinelDtoData, err := backup.fetchStorageBytes(backup.getMetadataPath())
+	sentinelDtoData, err := backup.fetchStorageBytes(path)
 	if err != nil {
-		return errors.Wrap(err, "failed to fetch metadata")
+		return errors.Wrap(err, fmt.Sprintf("failed to fetch data from %s", path))
 	}
-	err = json.Unmarshal(sentinelDtoData, metadataDto)
-	return errors.Wrap(err, "failed to unmarshal metadata")
+	err = json.Unmarshal(sentinelDtoData, dto)
+	return errors.Wrap(err, fmt.Sprintf("failed to unmarshal dto from %s", path))
 }
 
 func (backup *Backup) fetchStorageStream(path string) (io.ReadCloser, error) {
@@ -123,41 +114,29 @@ func (backup *Backup) fetchStorageStream(path string) (io.ReadCloser, error) {
 }
 
 func (backup *Backup) UploadMetadata(metadataDto interface{}) error {
-	metaFilePath := backup.getMetadataPath()
-	if viper.GetBool(UseStreamedJSONSetting) {
-		r, w := io.Pipe()
-		go func() {
-			err := einJSON.Marshal(metadataDto, w)
-			if err != nil {
-				_ = w.CloseWithError(err)
-			}
-		}()
-		return backup.Folder.PutObject(metaFilePath, r)
-	}
-	dtoBody, err := json.Marshal(metadataDto)
-	if err != nil {
-		return err
-	}
-	return backup.Folder.PutObject(metaFilePath, bytes.NewReader(dtoBody))
+	return backup.uploadDto(metadataDto, backup.getMetadataPath())
 }
 
 func (backup *Backup) UploadSentinel(sentinelDto interface{}) error {
-	sentinelPath := backup.getStopSentinelPath()
+	return backup.uploadDto(sentinelDto, backup.getStopSentinelPath())
+}
+
+func (backup *Backup) uploadDto(dto interface{}, path string) error {
 	if viper.GetBool(UseStreamedJSONSetting) {
 		r, w := io.Pipe()
 		go func() {
-			err := einJSON.Marshal(sentinelDto, w)
+			err := einJSON.Marshal(dto, w)
 			if err != nil {
 				_ = w.CloseWithError(err)
 			}
 		}()
-		return backup.Folder.PutObject(sentinelPath, r)
+		return backup.Folder.PutObject(path, r)
 	}
-	dtoBody, err := json.Marshal(sentinelDto)
+	dtoBody, err := json.Marshal(dto)
 	if err != nil {
 		return err
 	}
-	return backup.Folder.PutObject(sentinelPath, bytes.NewReader(dtoBody))
+	return backup.Folder.PutObject(path, bytes.NewReader(dtoBody))
 }
 
 func (backup *Backup) CheckExistence() (bool, error) {
