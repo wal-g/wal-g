@@ -1,18 +1,20 @@
 package internal
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 
-	einJSON "github.com/EinKrebs/json"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
+)
+
+var (
+	unknownMarshaller = fmt.Errorf("undefined dto marshaller type")
+	unknownUnmarshaller = fmt.Errorf("undefined dto unmarshaller type")
 )
 
 //region errors
@@ -93,20 +95,20 @@ func (backup *Backup) FetchMetadata(metadataDto interface{}) error {
 
 // fetchDto gets data from path and de-serializes it to given object
 func (backup *Backup) fetchDto(dto interface{}, path string) error {
-	if viper.GetBool(UseStreamedJSONSetting) {
-		sentinelDtoData, err := backup.fetchStorageStream(path)
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to fetch stream from %s", path))
-		}
-		err = einJSON.Unmarshal(sentinelDtoData, dto)
-		return errors.Wrap(err, fmt.Sprintf("failed to unmarshal dto from %s", path))
-	}
-	sentinelDtoData, err := backup.fetchStorageBytes(path)
+	reader, err := backup.fetchStorageStream(path)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to fetch data from %s", path))
+		return err
 	}
-	err = json.Unmarshal(sentinelDtoData, dto)
-	return errors.Wrap(err, fmt.Sprintf("failed to unmarshal dto from %s", path))
+	var unmarshaller DtoUnmarshaller
+	switch DtoUnmarshallerType(viper.GetInt(UnmarshallerTypeSetting)) {
+	case RegularJsonUnmarshaller:
+		unmarshaller = RegularJson{}
+	case StreamedJsonUnmarshaller:
+		unmarshaller = StreamedJson{}
+	default:
+		return unknownUnmarshaller
+	}
+	return errors.Wrap(unmarshaller.Unmarshal(reader, dto), fmt.Sprintf("failed to fetch dto from %s", path))
 }
 
 func (backup *Backup) fetchStorageStream(path string) (io.ReadCloser, error) {
@@ -124,21 +126,20 @@ func (backup *Backup) UploadSentinel(sentinelDto interface{}) error {
 
 // uploadDto serializes given object to JSON and puts it to path
 func (backup *Backup) uploadDto(dto interface{}, path string) error {
-	if viper.GetBool(UseStreamedJSONSetting) {
-		r, w := io.Pipe()
-		go func() {
-			err := einJSON.Marshal(dto, w)
-			if err != nil {
-				_ = w.CloseWithError(err)
-			}
-		}()
-		return backup.Folder.PutObject(path, r)
+	var marshaller DtoMarshaller
+	switch DtoMarshallerType(viper.GetInt(MarshallerTypeSetting)) {
+	case RegularJsonMarshaller:
+		marshaller = RegularJson{}
+	case StreamedJsonMarshaller:
+		marshaller = StreamedJson{}
+	default:
+		return unknownMarshaller
 	}
-	dtoBody, err := json.Marshal(dto)
+	r, err := marshaller.Marshal(dto)
 	if err != nil {
 		return err
 	}
-	return backup.Folder.PutObject(path, bytes.NewReader(dtoBody))
+	return backup.Folder.PutObject(path, r)
 }
 
 func (backup *Backup) CheckExistence() (bool, error) {
@@ -189,23 +190,21 @@ func GetBackupByName(backupName, subfolder string, folder storage.Folder) (Backu
 func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupName string) error {
 	sentinelName := SentinelNameFromBackup(backupName)
 
-	if viper.GetBool(UseStreamedJSONSetting) {
-		r, w := io.Pipe()
-		go func() {
-			err := einJSON.Marshal(sentinelDto, w)
-			if err != nil {
-				_ = w.CloseWithError(NewSentinelMarshallingError(sentinelName, err))
-			}
-		}()
-
-		return uploader.Upload(sentinelName, r)
+	var marshaller DtoMarshaller
+	switch DtoMarshallerType(viper.GetInt(MarshallerTypeSetting)) {
+	case RegularJsonMarshaller:
+		marshaller = RegularJson{}
+	case StreamedJsonMarshaller:
+		marshaller = StreamedJson{}
+	default:
+		return unknownMarshaller
 	}
-	dtoBody, err := json.Marshal(sentinelDto)
+	r, err := marshaller.Marshal(sentinelDto)
 	if err != nil {
-		return NewSentinelMarshallingError(sentinelName, err)
+		return err
 	}
 
-	return uploader.Upload(sentinelName, bytes.NewReader(dtoBody))
+	return uploader.Upload(sentinelName, r)
 }
 
 type ErrWaiter interface {
