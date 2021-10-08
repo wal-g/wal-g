@@ -133,7 +133,7 @@ func TestFetchSentinelReturnErrorWhenSentinelUnmarshallable(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
 	backupName := "base_000"
 	backup := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), backupName)
-	errorMessage := fmt.Sprintf("failed to unmarshal dto from %s", backupName+ utility.SentinelSuffix)
+	errorMessage := fmt.Sprintf("failed to fetch dto from %s", backupName+ utility.SentinelSuffix)
 
 	_, err := backup.GetSentinel()
 
