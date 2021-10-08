@@ -73,8 +73,8 @@ const (
 	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
 	MaxDelayedSegmentsCount      = "WALG_INTEGRITY_MAX_DELAYED_WALS"
 	PrefetchDir                  = "WALG_PREFETCH_DIR"
-	PgReadyRename          = "PG_READY_RENAME"
-	UseStreamedJSONSetting = "WALG_USE_STREAMED_JSON"
+	PgReadyRename                = "PG_READY_RENAME"
+	UseStreamedJSONSetting       = "WALG_USE_STREAMED_JSON"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
