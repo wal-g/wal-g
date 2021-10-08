@@ -74,7 +74,7 @@ const (
 	MaxDelayedSegmentsCount      = "WALG_INTEGRITY_MAX_DELAYED_WALS"
 	PrefetchDir                  = "WALG_PREFETCH_DIR"
 	PgReadyRename                = "PG_READY_RENAME"
-	SerializerTypeSetting = "WALG_SERIALIZER_TYPE"
+	SerializerTypeSetting        = "WALG_SERIALIZER_TYPE"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"

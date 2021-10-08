@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/spf13/viper"
 	"io"
 	"io/ioutil"
 
 	einJSON "github.com/EinKrebs/json"
+	"github.com/spf13/viper"
 )
 
 var (
