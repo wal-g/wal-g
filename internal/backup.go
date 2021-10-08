@@ -91,6 +91,7 @@ func (backup *Backup) FetchMetadata(metadataDto interface{}) error {
 	return backup.fetchDto(metadataDto, backup.getMetadataPath())
 }
 
+// fetchDto gets data from path and de-serializes it to given object
 func (backup *Backup) fetchDto(dto interface{}, path string) error {
 	if viper.GetBool(UseStreamedJSONSetting) {
 		sentinelDtoData, err := backup.fetchStorageStream(path)
@@ -121,6 +122,7 @@ func (backup *Backup) UploadSentinel(sentinelDto interface{}) error {
 	return backup.uploadDto(sentinelDto, backup.getStopSentinelPath())
 }
 
+// uploadDto serializes given object to JSON and puts it to path
 func (backup *Backup) uploadDto(dto interface{}, path string) error {
 	if viper.GetBool(UseStreamedJSONSetting) {
 		r, w := io.Pipe()
