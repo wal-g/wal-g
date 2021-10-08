@@ -73,8 +73,8 @@ const (
 	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
 	MaxDelayedSegmentsCount      = "WALG_INTEGRITY_MAX_DELAYED_WALS"
 	PrefetchDir                  = "WALG_PREFETCH_DIR"
-	PgReadyRename                = "PG_READY_RENAME"
-	UseSerializedJSONSetting     = "WALG_USE_SERIALIZED_JSON"
+	PgReadyRename          = "PG_READY_RENAME"
+	UseStreamedJSONSetting = "WALG_USE_STREAMED_JSON"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
@@ -150,7 +150,7 @@ var (
 		UseRatingComposerSetting:     "false",
 		UseCopyComposerSetting:       "false",
 		MaxDelayedSegmentsCount:      "0",
-		UseSerializedJSONSetting:     "false",
+		UseStreamedJSONSetting:       "false",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -215,7 +215,7 @@ var (
 		DeltaFromNameSetting:         true,
 		DeltaFromUserDataSetting:     true,
 		FetchTargetUserDataSetting:   true,
-		UseSerializedJSONSetting:     true,
+		UseStreamedJSONSetting:       true,
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,

@@ -83,7 +83,7 @@ func (backup *Backup) fetchStorageBytes(path string) ([]byte, error) {
 
 // TODO : unit tests
 func (backup *Backup) FetchSentinel(sentinelDto interface{}) error {
-	if viper.GetBool(UseSerializedJSONSetting) {
+	if viper.GetBool(UseStreamedJSONSetting) {
 		sentinelDtoData, err := backup.fetchStorageStream(backup.getStopSentinelPath())
 		if err != nil {
 			return errors.Wrap(err, "failed to fetch sentinel")
@@ -101,7 +101,7 @@ func (backup *Backup) FetchSentinel(sentinelDto interface{}) error {
 
 // TODO : unit tests
 func (backup *Backup) FetchMetadata(metadataDto interface{}) error {
-	if viper.GetBool(UseSerializedJSONSetting) {
+	if viper.GetBool(UseStreamedJSONSetting) {
 		sentinelDtoData, err := backup.fetchStorageStream(backup.getMetadataPath())
 		if err != nil {
 			return errors.Wrap(err, "failed to fetch metadata")
@@ -124,7 +124,7 @@ func (backup *Backup) fetchStorageStream(path string) (io.ReadCloser, error) {
 
 func (backup *Backup) UploadMetadata(metadataDto interface{}) error {
 	metaFilePath := backup.getMetadataPath()
-	if viper.GetBool(UseSerializedJSONSetting) {
+	if viper.GetBool(UseStreamedJSONSetting) {
 		r, w := io.Pipe()
 		go func() {
 			err := einJSON.Marshal(metadataDto, w)
@@ -143,7 +143,7 @@ func (backup *Backup) UploadMetadata(metadataDto interface{}) error {
 
 func (backup *Backup) UploadSentinel(sentinelDto interface{}) error {
 	sentinelPath := backup.getStopSentinelPath()
-	if viper.GetBool(UseSerializedJSONSetting) {
+	if viper.GetBool(UseStreamedJSONSetting) {
 		r, w := io.Pipe()
 		go func() {
 			err := einJSON.Marshal(sentinelDto, w)
@@ -208,7 +208,7 @@ func GetBackupByName(backupName, subfolder string, folder storage.Folder) (Backu
 func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupName string) error {
 	sentinelName := SentinelNameFromBackup(backupName)
 
-	if viper.GetBool(UseSerializedJSONSetting) {
+	if viper.GetBool(UseStreamedJSONSetting) {
 		r, w := io.Pipe()
 		go func() {
 			err := einJSON.Marshal(sentinelDto, w)
