@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/wal-g/tracelog"
 	"io"
 	"io/ioutil"
 
@@ -11,9 +12,17 @@ import (
 	"github.com/spf13/viper"
 )
 
-var (
-	errUnknownSerializer = fmt.Errorf("undefined dto serializer type")
-)
+type UnknownSerializerTypeError struct {
+	error
+}
+
+func NewUnknownSerializerTypeError(serializerType DtoSerializerType) UnknownSerializerTypeError {
+	return UnknownSerializerTypeError{fmt.Errorf("undefined dto serializer type: %s", serializerType)}
+}
+
+func (err UnknownSerializerTypeError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
 
 type DtoSerializerType string
 
@@ -28,13 +37,13 @@ type DtoSerializer interface {
 }
 
 func NewDtoSerializer() (DtoSerializer, error) {
-	switch DtoSerializerType(viper.GetString(SerializerTypeSetting)) {
+	switch t := DtoSerializerType(viper.GetString(SerializerTypeSetting)); t {
 	case RegularJSONSerializer:
 		return RegularJSON{}, nil
 	case StreamedJSONSerializer:
 		return StreamedJSON{}, nil
 	default:
-		return nil, errUnknownSerializer
+		return nil, NewUnknownSerializerTypeError(t)
 	}
 }
 
