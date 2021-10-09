@@ -24,7 +24,7 @@ cd ${PGDATA_ALPHA}
 echo "host  replication  repl              127.0.0.1/32  md5" >> pg_hba.conf
 {
   echo "wal_level = replica"
-  echo "wal_keep_segments = 100"
+  echo "wal_keep_segments = 3"
   echo "max_wal_senders = 2"
   echo "hot_standby = on"
   echo "listen_addresses = 'localhost'"
@@ -49,6 +49,8 @@ psql -c "CREATE ROLE repl WITH REPLICATION PASSWORD 'password' LOGIN;"
 cd ${PGDATA_BETA}
 {
   echo "wal_log_hints = on"
+  echo "max_wal_size = 32MB"
+  echo "min_wal_size = 32MB"
 
   echo "port = ${BETA_PORT}"
   echo "hot_standby = on"
@@ -79,19 +81,15 @@ sleep 7
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w promote
 
-pgbench -i -s 10 -h 127.0.0.1 -p ${BETA_PORT} postgres
+pgbench -i -s 20 -h 127.0.0.1 -p ${BETA_PORT} postgres
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -m fast -W stop
-sleep 3
+sleep 10
 
 # for more info to log
 ls "${PGDATA_BETA}/pg_wal"
 
-rm "${PGDATA_BETA}/pg_wal/00000002000000000000000C"
-rm "${PGDATA_BETA}/pg_wal/00000002000000000000000D"
-rm "${PGDATA_BETA}/pg_wal/00000002000000000000000E"
-
 timeout 30 wal-g --config=${TMP_CONFIG} wal-restore ${PGDATA_BETA} ${PGDATA_ALPHA}
-sleep 3
+sleep 10
 
 /usr/lib/postgresql/10/bin/pg_rewind -D ${PGDATA_BETA} --source-pgdata=${PGDATA_ALPHA}
