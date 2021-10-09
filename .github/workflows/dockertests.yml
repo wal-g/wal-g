@@ -70,7 +70,7 @@ jobs:
     needs: [ buildimages ]
     strategy:
       matrix:
-        command: [ 'make TEST="pg_backup_mark_impermanent_test" pg_integration_test',
+        command: [ 'make TEST="pg_ready_rename_test" pg_integration_test',
                    'make TEST="pg_backup_mark_impermanent_test" pg_integration_test',
                    'make TEST="pg_backup_mark_permanent_test" pg_integration_test',
                    'make TEST="pg_config_test" pg_integration_test',
