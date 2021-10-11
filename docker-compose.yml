@@ -76,6 +76,7 @@ services:
       &&  mkdir -p /export/mysqldeletebinlogs
       &&  mkdir -p /export/archivereadyrename
       &&  mkdir -p /export/gpfullbucket
+      &&  mkdir -p /export/gpfullserializedbucket
       &&  mkdir -p /export/gpdeletewithoutconfirm
       &&  mkdir -p /export/gpdeleteretainbucket
       &&  mkdir -p /export/gpdeleteendtoendbucket
@@ -248,6 +249,17 @@ services:
       context: .
     image: wal-g/full_backup_test
     container_name: wal-g_pg_full_backup_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_full_backup_streamed_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_streamed_test
+      context: .
+    image: wal-g/full_backup_streamed_test
+    container_name: wal-g_pg_full_backup_streamed_test
     depends_on:
       - s3
     links:

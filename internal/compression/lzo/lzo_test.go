@@ -1,3 +1,4 @@
+//go:build lzo
 // +build lzo
 
 package lzo

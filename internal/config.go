@@ -74,6 +74,7 @@ const (
 	MaxDelayedSegmentsCount      = "WALG_INTEGRITY_MAX_DELAYED_WALS"
 	PrefetchDir                  = "WALG_PREFETCH_DIR"
 	PgReadyRename                = "PG_READY_RENAME"
+	SerializerTypeSetting        = "WALG_SERIALIZER_TYPE"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
@@ -149,6 +150,7 @@ var (
 		UseRatingComposerSetting:     "false",
 		UseCopyComposerSetting:       "false",
 		MaxDelayedSegmentsCount:      "0",
+		SerializerTypeSetting:        "json_default",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -213,6 +215,7 @@ var (
 		DeltaFromNameSetting:         true,
 		DeltaFromUserDataSetting:     true,
 		FetchTargetUserDataSetting:   true,
+		SerializerTypeSetting:        true,
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,

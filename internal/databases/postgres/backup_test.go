@@ -3,6 +3,7 @@ package postgres_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -130,8 +131,9 @@ func TestFetchSentinelReturnErrorWhenSentinelNotExist(t *testing.T) {
 
 func TestFetchSentinelReturnErrorWhenSentinelUnmarshallable(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
-	backup := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_000")
-	errorMessage := "failed to unmarshal sentinel"
+	backupName := "base_000"
+	backup := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), backupName)
+	errorMessage := fmt.Sprintf("failed to fetch dto from %s", backupName+utility.SentinelSuffix)
 
 	_, err := backup.GetSentinel()
 

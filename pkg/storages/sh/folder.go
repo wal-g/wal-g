@@ -2,12 +2,12 @@ package sh
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"errors"
 
 	"github.com/pkg/sftp"
 	"github.com/wal-g/tracelog"

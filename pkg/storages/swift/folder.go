@@ -1,11 +1,11 @@
 package swift
 
 import (
+	"errors"
 	"io"
 	"io/ioutil"
 	"os"
 	"strings"
-	"errors"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"

@@ -1,3 +1,4 @@
+//go:build libsodium
 // +build libsodium
 
 package libsodium
