@@ -1,0 +1,38 @@
+name: fmt-goimports
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+env:
+  GO_VERSION: 1.17
+
+jobs:
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+        id: go
+
+      - name: Install deps
+        run: sudo apt-get install liblzo2-dev brotli libsodium-dev
+
+      - uses: actions/checkout@v2
+      - name: fmt
+        run: make fmt
+  goimports:
+    name: Goimports
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/checkout@v2
+
+      - name: Goimports
+        run: make goimports
