@@ -7,8 +7,8 @@ import (
 	"io"
 	"io/ioutil"
 
-	einJSON "github.com/EinKrebs/json"
 	"github.com/spf13/viper"
+	streamJSON "github.com/wal-g/json"
 	"github.com/wal-g/tracelog"
 )
 
@@ -75,7 +75,7 @@ type StreamedJSON struct{}
 func (s StreamedJSON) Marshal(dto interface{}) (io.Reader, error) {
 	r, w := io.Pipe()
 	go func() {
-		if err := einJSON.Marshal(dto, w); err != nil {
+		if err := streamJSON.Marshal(dto, w); err != nil {
 			_ = w.CloseWithError(err)
 		}
 	}()
@@ -83,5 +83,5 @@ func (s StreamedJSON) Marshal(dto interface{}) (io.Reader, error) {
 }
 
 func (s StreamedJSON) Unmarshal(reader io.Reader, dto interface{}) error {
-	return einJSON.Unmarshal(reader, dto)
+	return streamJSON.Unmarshal(reader, dto)
 }
