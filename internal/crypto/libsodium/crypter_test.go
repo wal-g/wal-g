@@ -4,6 +4,7 @@
 package libsodium
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -15,10 +16,14 @@ import (
 
 const (
 	keyPath = "./testdata/testKey"
-	testKey = "TEST_LIBSODIUM_KEY"
+	testKey = "TEST_LIBSODIUM_KEY_______"
 )
 
 func MockCrypterFromKey() *Crypter {
+	if len(testKey) < 25 {
+		panic(fmt.Errorf("libsodium key length must not be less than 25, got %v", len(testKey)))
+	}
+
 	return CrypterFromKey(testKey).(*Crypter)
 }
 
