@@ -220,10 +220,10 @@ fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 	gofmt -s -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 
 goimports: install-tools $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
-	goimports -w -local github.com/wal-g/wal-g $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
+	goimports -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 
 lint: install-tools
-	golangci-lint run --allow-parallel-runners
+	golangci-lint run --allow-parallel-runners ./...
 
 docker_lint:
 	docker build -t wal-g/lint - < docker/lint/Dockerfile
