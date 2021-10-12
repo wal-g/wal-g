@@ -11,7 +11,11 @@ import (
 
 func configureLibsodiumCrypter() crypto.Crypter {
 	if viper.IsSet(LibsodiumKeySetting) {
-		return libsodium.CrypterFromKey(viper.GetString(LibsodiumKeySetting))
+		crypter, err := libsodium.CrypterFromKey(viper.GetString(LibsodiumKeySetting))
+		if err != nil {
+			panic(err)
+		}
+		return crypter
 	}
 
 	if viper.IsSet(LibsodiumKeyPathSetting) {

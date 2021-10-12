@@ -6,6 +6,7 @@ package libsodium
 import "C"
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -37,8 +38,12 @@ func (crypter *Crypter) Name() string {
 }
 
 // CrypterFromKey creates Crypter from key
-func CrypterFromKey(key string) crypto.Crypter {
-	return &Crypter{Key: key}
+func CrypterFromKey(key string) (crypto.Crypter, error) {
+	if len(key) < 25 {
+		return nil, newErrShortKey(len(key))
+	}
+
+	return &Crypter{Key: key}, nil
 }
 
 // CrypterFromKeyPath creates Crypter from key path
@@ -97,4 +102,20 @@ func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
 	}
 
 	return NewReader(reader, []byte(crypter.Key)), nil
+}
+
+var _ error = &ErrShortKey{}
+
+type ErrShortKey struct {
+	keyLength int
+}
+
+func (e ErrShortKey) Error() string {
+	return fmt.Sprintf("key length must not be less than 25, got %v", e.keyLength)
+}
+
+func newErrShortKey(keyLength int) *ErrShortKey {
+	return &ErrShortKey{
+		keyLength: keyLength,
+	}
 }
