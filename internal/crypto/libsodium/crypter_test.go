@@ -4,11 +4,12 @@
 package libsodium
 
 import (
-	"github.com/stretchr/testify/require"
 	"io"
 	"io/ioutil"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal/crypto"

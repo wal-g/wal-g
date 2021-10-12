@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	chunkSize = 8192
+	chunkSize        = 8192
 	minimalKeyLength = 25
 )
 
