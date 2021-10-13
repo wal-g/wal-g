@@ -566,7 +566,7 @@ func SetDefaultValues(config *viper.Viper) {
 
 func setGoMaxProcs() {
 	gomaxprocs := viper.GetInt(GoMaxProcs)
-	if gomaxprocs > 0 {
+	if !Turbo && gomaxprocs > 0 {
 		runtime.GOMAXPROCS(gomaxprocs)
 	}
 }
