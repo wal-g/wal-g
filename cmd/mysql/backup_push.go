@@ -20,7 +20,7 @@ var (
 	backupPushCmd = &cobra.Command{
 		Use:   "backup-push",
 		Short: backupPushShortDescription,
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		PreRun: func(cmd *cobra.Command, args []string) {
 			internal.RequiredSettings[internal.NameStreamCreateCmd] = true
 			internal.RequiredSettings[internal.MysqlDatasourceNameSetting] = true
 			err := internal.AssertRequiredSettingsSet()
