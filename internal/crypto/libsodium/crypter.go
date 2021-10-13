@@ -17,7 +17,8 @@ import (
 )
 
 const (
-	chunkSize = 8192
+	chunkSize        = 8192
+	minimalKeyLength = 25
 )
 
 // libsodium should always be initialised
@@ -39,7 +40,7 @@ func (crypter *Crypter) Name() string {
 
 // CrypterFromKey creates Crypter from key
 func CrypterFromKey(key string) (crypto.Crypter, error) {
-	if len(key) < 25 {
+	if len(key) < minimalKeyLength {
 		return nil, newErrShortKey(len(key))
 	}
 
@@ -111,7 +112,7 @@ type ErrShortKey struct {
 }
 
 func (e ErrShortKey) Error() string {
-	return fmt.Sprintf("key length must not be less than 25, got %v", e.keyLength)
+	return fmt.Sprintf("key length must not be less than %v, got %v", minimalKeyLength, e.keyLength)
 }
 
 func newErrShortKey(keyLength int) *ErrShortKey {
