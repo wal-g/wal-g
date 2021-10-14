@@ -47,7 +47,6 @@ func (reader *s3Reader) getObjectRange(from, to int64) (*s3.GetObjectOutput, err
 }
 
 func (reader *s3Reader) Read(p []byte) (n int, err error) {
-	reader.debugLog("Read to buffer [%d] bytes", len(p))
 	reconnect := false
 	if reader.lastBody == nil { // initial connect, if lastBody wasn't provided
 		reconnect = true
@@ -63,13 +62,12 @@ func (reader *s3Reader) Read(p []byte) (n int, err error) {
 		}
 
 		n, err = reader.lastBody.Read(p)
-		reader.debugLog("read %d, err %s", n, err)
 		if err != nil && err != io.EOF {
+			reader.debugLog("read(%d) to cursor(%d) failed: %+v", n, reader.storageCursor, err)
 			reconnect = true
 			continue
 		}
 		reader.storageCursor += int64(n)
-		reader.debugLog("success read")
 		return n, err
 	}
 }
