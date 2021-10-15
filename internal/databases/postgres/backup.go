@@ -112,7 +112,7 @@ func (backup *Backup) GetFilesMetadata() (FilesMetadataDto, error) {
 	}
 
 	var filesMetadata FilesMetadataDto
-	err := backup.FetchDto(filesMetadata, getFilesMetadataPath(backup.Name))
+	err := backup.FetchDto(&filesMetadata, getFilesMetadataPath(backup.Name))
 	if err != nil {
 		// double-check that this is not V2 backup
 		sentinel, err2 := backup.getSentinelV2()
@@ -122,8 +122,10 @@ func (backup *Backup) GetFilesMetadata() (FilesMetadataDto, error) {
 				"tried to fetch backup files metadata but received an error: %v", err2, err)
 		}
 		if sentinel.Version >= 2 {
+			// if sentinel has a version >= 2 files_metadata.json is a must
 			return FilesMetadataDto{}, fmt.Errorf("failed to fetch files metadata: %w", err)
 		}
+
 		// it is OK to have missing files metadata because old WAL-G versions and WAL-E did not track it
 		tracelog.WarningLogger.Printf(
 			"Could not fetch any files metadata. Do you restore old or WAL-E backup? err: %v", err)
