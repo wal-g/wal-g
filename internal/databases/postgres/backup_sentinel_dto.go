@@ -133,3 +133,31 @@ func (dto *FilesMetadataDto) setFiles(p *sync.Map) {
 		return true
 	})
 }
+
+// BackupSentinelDtoV2 is the future version of the backup sentinel.
+// Basically, it is a union of BackupSentinelDto and ExtendedMetadataDto.
+// Currently, WAL-G only uploads it, but use as the regular BackupSentinelDto.
+// WAL-G will switch to the BackupSentinelDtoV2 in the next major release.
+type BackupSentinelDtoV2 struct {
+	BackupSentinelDto
+	Version        int       `json:"Version"`
+	StartTime      time.Time `json:"StartTime"`
+	FinishTime     time.Time `json:"FinishTime"`
+	DatetimeFormat string    `json:"DateFmt"`
+	Hostname       string    `json:"Hostname"`
+	DataDir        string    `json:"DataDir"`
+	IsPermanent    bool      `json:"IsPermanent"`
+}
+
+func NewBackupSentinelDtoV2(sentinel BackupSentinelDto, meta ExtendedMetadataDto) BackupSentinelDtoV2 {
+	return BackupSentinelDtoV2{
+		BackupSentinelDto: sentinel,
+		Version:           2,
+		StartTime:         meta.StartTime,
+		FinishTime:        meta.FinishTime,
+		DatetimeFormat:    meta.DatetimeFormat,
+		Hostname:          meta.Hostname,
+		DataDir:           meta.DataDir,
+		IsPermanent:       meta.IsPermanent,
+	}
+}

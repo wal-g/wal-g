@@ -355,7 +355,10 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 
 func (bh *BackupHandler) uploadMetadata(sentinelDto BackupSentinelDto, filesMetaDto FilesMetadataDto) {
 	curBackupName := bh.curBackupInfo.name
-	err := bh.uploadExtendedMetadata(sentinelDto)
+	meta := NewExtendedMetadataDto(bh.arguments.isPermanent, bh.pgInfo.pgDataDirectory,
+		bh.curBackupInfo.startTime, sentinelDto)
+
+	err := bh.uploadExtendedMetadata(meta)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to upload metadata file for backup %s: %v", curBackupName, err)
 	}
@@ -363,7 +366,7 @@ func (bh *BackupHandler) uploadMetadata(sentinelDto BackupSentinelDto, filesMeta
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to upload files metadata for backup %s: %v", curBackupName, err)
 	}
-	err = internal.UploadSentinel(bh.workers.uploader, sentinelDto, bh.curBackupInfo.name)
+	err = internal.UploadSentinel(bh.workers.uploader, NewBackupSentinelDtoV2(sentinelDto, meta), bh.curBackupInfo.name)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to upload sentinel file for backup %s: %v", curBackupName, err)
 	}
@@ -550,10 +553,7 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 }
 
 // TODO : unit tests
-func (bh *BackupHandler) uploadExtendedMetadata(sentinelDto BackupSentinelDto) (err error) {
-	meta := NewExtendedMetadataDto(bh.arguments.isPermanent, bh.pgInfo.pgDataDirectory,
-		bh.curBackupInfo.startTime, sentinelDto)
-
+func (bh *BackupHandler) uploadExtendedMetadata(meta ExtendedMetadataDto) (err error) {
 	metaFile := storage.JoinPath(bh.curBackupInfo.name, utility.MetadataFileName)
 	dtoBody, err := json.Marshal(meta)
 	if err != nil {
