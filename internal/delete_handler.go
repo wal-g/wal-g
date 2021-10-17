@@ -247,7 +247,11 @@ func (h *DeleteHandler) FindTargetRetain(retentionCount, modifier int) (BackupOb
 	if choiceFunc == nil {
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete retain'")
 	}
-	return findTarget(h.backups, h.greater, choiceFunc)
+	target, err := findTarget(h.backups, h.greater, choiceFunc)
+	if err != nil && err != errNotFound {
+		return nil, err
+	}
+	return target, nil
 }
 
 func (h *DeleteHandler) FindTargetByName(bname string) (BackupObject, error) {
