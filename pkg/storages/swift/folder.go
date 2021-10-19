@@ -101,6 +101,9 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 			} else {
 				//It is a storage object name
 				obj, _, err := folder.connection.Object(folder.container.Name, objectName)
+				if err == swift.ObjectNotFound {
+					continue
+				}
 				if err != nil {
 					return nil, err
 				}
