@@ -65,7 +65,7 @@ func chooseTablespaceSpecification(sentinelDtoSpec, spec *TablespaceSpec) *Table
 func deltaFetchRecursionOld(backupName string, folder storage.Folder, dbDataDirectory string,
 	tablespaceSpec *TablespaceSpec, filesToUnwrap map[string]bool) error {
 	backup := NewBackup(folder.GetSubFolder(utility.BaseBackupPath), backupName)
-	sentinelDto, err := backup.GetSentinel()
+	sentinelDto, filesMetaDto, err := backup.GetSentinelAndFilesMetadata()
 	if err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func deltaFetchRecursionOld(backupName string, folder storage.Folder, dbDataDire
 
 	if sentinelDto.IsIncremental() {
 		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n", *(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN))
-		baseFilesToUnwrap, err := GetBaseFilesToUnwrap(sentinelDto.Files, filesToUnwrap)
+		baseFilesToUnwrap, err := GetBaseFilesToUnwrap(filesMetaDto.Files, filesToUnwrap)
 		if err != nil {
 			return err
 		}
@@ -86,7 +86,7 @@ func deltaFetchRecursionOld(backupName string, folder storage.Folder, dbDataDire
 			*(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN), *(sentinelDto.BackupStartLSN))
 	}
 
-	return backup.unwrapToEmptyDirectory(dbDataDirectory, sentinelDto, filesToUnwrap, false)
+	return backup.unwrapToEmptyDirectory(dbDataDirectory, sentinelDto, filesMetaDto, filesToUnwrap, false)
 }
 
 func GetPgFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string) func(rootFolder storage.Folder, backup internal.Backup) {

@@ -17,6 +17,7 @@ import (
 type FileTarInterpreter struct {
 	DBDataDirectory string
 	Sentinel        BackupSentinelDto
+	FilesMetadata   FilesMetadataDto
 	FilesToUnwrap   map[string]bool
 	UnwrapResult    *UnwrapResult
 
@@ -24,9 +25,10 @@ type FileTarInterpreter struct {
 }
 
 func NewFileTarInterpreter(
-	dbDataDirectory string, sentinel BackupSentinelDto, filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
+	dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
+	filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
 ) *FileTarInterpreter {
-	return &FileTarInterpreter{dbDataDirectory, sentinel,
+	return &FileTarInterpreter{dbDataDirectory, sentinel, filesMetadata,
 		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles}
 }
 
@@ -41,7 +43,7 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFileOld(fileReader io.Rea
 			return nil
 		}
 	}
-	fileDescription, haveFileDescription := tarInterpreter.Sentinel.Files[fileInfo.Name]
+	fileDescription, haveFileDescription := tarInterpreter.FilesMetadata.Files[fileInfo.Name]
 
 	// If this file is incremental we use it's base version from incremental path
 	if haveFileDescription && tarInterpreter.Sentinel.IsIncremental() && fileDescription.IsIncremented {

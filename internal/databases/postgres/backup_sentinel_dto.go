@@ -16,13 +16,10 @@ const MetadataDatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
 // BackupSentinelDto describes file structure of json sentinel
 type BackupSentinelDto struct {
 	BackupStartLSN    *uint64 `json:"LSN"`
-	IncrementFromLSN  *uint64 `json:"DeltaFromLSN,omitempty"`
+	IncrementFromLSN  *uint64 `json:"DeltaLSN,omitempty"`
 	IncrementFrom     *string `json:"DeltaFrom,omitempty"`
 	IncrementFullName *string `json:"DeltaFullName,omitempty"`
 	IncrementCount    *int    `json:"DeltaCount,omitempty"`
-
-	Files       internal.BackupFileList `json:"Files"`
-	TarFileSets TarFileSets             `json:"TarFileSets"`
 
 	PgVersion        int     `json:"PgVersion"`
 	BackupFinishLSN  *uint64 `json:"FinishLSN"`
@@ -35,7 +32,7 @@ type BackupSentinelDto struct {
 	UserData interface{} `json:"UserData,omitempty"`
 }
 
-func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec, tarFileSets TarFileSets) BackupSentinelDto {
+func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec) BackupSentinelDto {
 	sentinel := BackupSentinelDto{
 		BackupStartLSN:   &bh.curBackupInfo.startLSN,
 		IncrementFromLSN: bh.prevBackupInfo.sentinelDto.BackupStartLSN,
@@ -57,7 +54,6 @@ func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec, tarFileSet
 	sentinel.SystemIdentifier = bh.pgInfo.systemIdentifier
 	sentinel.UncompressedSize = bh.curBackupInfo.uncompressedSize
 	sentinel.CompressedSize = bh.curBackupInfo.compressedSize
-	sentinel.TarFileSets = tarFileSets
 	return sentinel
 }
 
@@ -104,16 +100,6 @@ func NewExtendedMetadataDto(isPermanent bool, dataDir string, startTime time.Tim
 	return meta
 }
 
-func (dto *BackupSentinelDto) setFiles(p *sync.Map) {
-	dto.Files = make(internal.BackupFileList)
-	p.Range(func(k, v interface{}) bool {
-		key := k.(string)
-		description := v.(internal.BackupFileDescription)
-		dto.Files[key] = description
-		return true
-	})
-}
-
 // TODO : unit tests
 // TODO : get rid of panic here
 // IsIncremental checks that sentinel represents delta backup
@@ -125,4 +111,58 @@ func (dto *BackupSentinelDto) IsIncremental() (isIncremental bool) {
 		}
 	}
 	return dto.IncrementFrom != nil
+}
+
+// FilesMetadataDto contains the information about the backup files.
+// It can be pretty large on some databases, sometimes more than 1GB
+type FilesMetadataDto struct {
+	Files       internal.BackupFileList `json:"Files,omitempty"`
+	TarFileSets TarFileSets             `json:"TarFileSets,omitempty"`
+}
+
+func NewFilesMetadataDto(files internal.BackupFileList, tarFileSets TarFileSets) FilesMetadataDto {
+	return FilesMetadataDto{TarFileSets: tarFileSets, Files: files}
+}
+
+func (dto *FilesMetadataDto) setFiles(p *sync.Map) {
+	dto.Files = make(internal.BackupFileList)
+	p.Range(func(k, v interface{}) bool {
+		key := k.(string)
+		description := v.(internal.BackupFileDescription)
+		dto.Files[key] = description
+		return true
+	})
+}
+
+// BackupSentinelDtoV2 is the future version of the backup sentinel.
+// Basically, it is a union of BackupSentinelDto and ExtendedMetadataDto.
+// Currently, WAL-G only uploads it, but use as the regular BackupSentinelDto.
+// WAL-G will switch to the BackupSentinelDtoV2 in the next major release.
+type BackupSentinelDtoV2 struct {
+	BackupSentinelDto
+	Version        int       `json:"Version"`
+	StartTime      time.Time `json:"StartTime"`
+	FinishTime     time.Time `json:"FinishTime"`
+	DatetimeFormat string    `json:"DateFmt"`
+	Hostname       string    `json:"Hostname"`
+	DataDir        string    `json:"DataDir"`
+	IsPermanent    bool      `json:"IsPermanent"`
+}
+
+func NewBackupSentinelDtoV2(sentinel BackupSentinelDto, meta ExtendedMetadataDto) BackupSentinelDtoV2 {
+	return BackupSentinelDtoV2{
+		BackupSentinelDto: sentinel,
+		Version:           2,
+		StartTime:         meta.StartTime,
+		FinishTime:        meta.FinishTime,
+		DatetimeFormat:    meta.DatetimeFormat,
+		Hostname:          meta.Hostname,
+		DataDir:           meta.DataDir,
+		IsPermanent:       meta.IsPermanent,
+	}
+}
+
+type DeprecatedSentinelFields struct {
+	FilesMetadataDto
+	DeltaFromLSN *uint64 `json:"DeltaFromLSN,omitempty"`
 }
