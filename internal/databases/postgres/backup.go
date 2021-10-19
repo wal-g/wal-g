@@ -73,24 +73,44 @@ func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
 	}
 
 	// this utility struct is used for compatibility reasons, since
-	// previous WAL-G versions used to store the FilesMetadataDto in the sentinel json
-	sentinelWithFilesMetadata := struct {
+	// previous WAL-G versions used to store the FilesMetadataDto in the s json
+	s := struct {
 		BackupSentinelDto
-		FilesMetadataDto
+		DeprecatedSentinelFields
 	}{}
 
-	err := backup.FetchSentinel(&sentinelWithFilesMetadata)
+	err := backup.FetchSentinel(&s)
 	if err != nil {
 		return BackupSentinelDto{}, err
 	}
 
-	backup.SentinelDto = &sentinelWithFilesMetadata.BackupSentinelDto
-
-	// if sentinel actually contains the FilesMetadata, save it too
-	if sentinelWithFilesMetadata.Files != nil {
-		backup.FilesMetadataDto = &sentinelWithFilesMetadata.FilesMetadataDto
+	err = backup.readDeprecatedFields(s.DeprecatedSentinelFields)
+	if err != nil {
+		return BackupSentinelDto{}, err
 	}
-	return sentinelWithFilesMetadata.BackupSentinelDto, nil
+
+	backup.SentinelDto = &s.BackupSentinelDto
+
+	return s.BackupSentinelDto, nil
+}
+
+// TODO : unit tests
+func (backup *Backup) readDeprecatedFields(fields DeprecatedSentinelFields) error {
+	if backup.SentinelDto == nil {
+		return fmt.Errorf("can't read deprecated fields: backup sentinel is not fetched")
+	}
+
+	// old versions of WAL-G used to store the FilesMetadata in the BackupSentinelDto
+	if fields.Files != nil {
+		backup.FilesMetadataDto = &fields.FilesMetadataDto
+	}
+
+	// old versions of WAL-G used to have DeltaFromLSN field instead of the DeltaLSN
+	if fields.DeltaFromLSN != nil {
+		backup.SentinelDto.IncrementFromLSN = fields.DeltaFromLSN
+	}
+
+	return nil
 }
 
 func (backup *Backup) GetSentinelAndFilesMetadata() (BackupSentinelDto, FilesMetadataDto, error) {
@@ -106,6 +126,7 @@ func (backup *Backup) GetSentinelAndFilesMetadata() (BackupSentinelDto, FilesMet
 	return sentinel, filesMetadata, nil
 }
 
+// TODO : unit tests
 func (backup *Backup) GetFilesMetadata() (FilesMetadataDto, error) {
 	if backup.FilesMetadataDto != nil {
 		return *backup.FilesMetadataDto, nil

@@ -16,7 +16,7 @@ const MetadataDatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
 // BackupSentinelDto describes file structure of json sentinel
 type BackupSentinelDto struct {
 	BackupStartLSN    *uint64 `json:"LSN"`
-	IncrementFromLSN  *uint64 `json:"DeltaFromLSN,omitempty"`
+	IncrementFromLSN  *uint64 `json:"DeltaLSN,omitempty"`
 	IncrementFrom     *string `json:"DeltaFrom,omitempty"`
 	IncrementFullName *string `json:"DeltaFullName,omitempty"`
 	IncrementCount    *int    `json:"DeltaCount,omitempty"`
@@ -160,4 +160,9 @@ func NewBackupSentinelDtoV2(sentinel BackupSentinelDto, meta ExtendedMetadataDto
 		DataDir:           meta.DataDir,
 		IsPermanent:       meta.IsPermanent,
 	}
+}
+
+type DeprecatedSentinelFields struct {
+	FilesMetadataDto
+	DeltaFromLSN *uint64 `json:"DeltaFromLSN,omitempty"`
 }
