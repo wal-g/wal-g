@@ -84,12 +84,12 @@ func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
 		return BackupSentinelDto{}, err
 	}
 
+	backup.SentinelDto = &s.BackupSentinelDto
+
 	err = backup.readDeprecatedFields(s.DeprecatedSentinelFields)
 	if err != nil {
 		return BackupSentinelDto{}, err
 	}
-
-	backup.SentinelDto = &s.BackupSentinelDto
 
 	return s.BackupSentinelDto, nil
 }
