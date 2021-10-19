@@ -27,11 +27,14 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 	var partitions = viper.GetInt("WAL_G_STREAM_SPLITTER_PARTITIONS")
 	var blockSize = viper.GetSizeInBytes("WAL_G_STREAM_SPLITTER_BLOCK_SIZE")
 	var fileName string
+	var backupType string
 	if partitions == 1 {
 		fileName, err = uploader.PushStream(limiters.NewDiskLimitReader(stdout))
+		backupType = SplitMergeStreamBackup
 		tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
 	} else {
 		fileName, err = uploader.SplitAndPushStream(limiters.NewDiskLimitReader(stdout), partitions, int(blockSize))
+		backupType = SingleStreamStreamBackup
 		tracelog.ErrorLogger.FatalfOnError("failed to split and push backup: %v", err)
 	}
 
@@ -72,6 +75,9 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 		UncompressedSize: rawSize,
 		IsPermanent:      isPermanent,
 		UserData:         userData,
+		Type:             backupType,
+		Partitions:       partitions,
+		BLockSize:        blockSize,
 	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())
 

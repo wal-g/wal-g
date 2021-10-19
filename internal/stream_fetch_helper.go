@@ -37,7 +37,7 @@ func GetLogsDstSettings(operationLogsDstEnvVariable string) (dstFolder string, e
 
 // TODO : unit tests
 // downloadAndDecompressStream downloads, decompresses and writes stream to stdout
-func downloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) error {
+func DownloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) error {
 	defer utility.LoggedClose(writeCloser, "")
 
 	for _, decompressor := range compression.Decompressors {
@@ -60,71 +60,70 @@ func downloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 }
 
 // TODO : unit tests
-// downloadAndDecompressStream downloads, decompresses and writes stream to stdout
-func downloadAndDecompressSplittedStream(backup Backup, partitions int, blockSize int, writeCloser io.WriteCloser) error {
+// DownloadAndDecompressStream downloads, decompresses and writes stream to stdout
+func DownloadAndDecompressSplittedStream(backup Backup, partitions int, blockSize int, extension string, writeCloser io.WriteCloser) error {
 	defer utility.LoggedClose(writeCloser, "")
 
-	for _, decompressor := range compression.Decompressors {
-		_, exists, err := TryDownloadFile(backup.Folder, GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), 0))
-		if err != nil {
-			return errors.Wrapf(err, "failed to dowload file")
-		}
-		if !exists {
-			continue
-		}
-
-		allErrors := make([]chan error, 0)
-		writers, done := storage.MergeWriter(EmptyWriteIgnorer{WriteCloser: writeCloser}, partitions, blockSize)
-
-		for i := 0; i < partitions; i++ {
-			fileName := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), i)
-			errCh := make(chan error)
-			allErrors = append(allErrors, errCh)
-
-			go func(fileName string, errCh chan error, writer io.WriteCloser) {
-				archiveReader, _, _ := TryDownloadFile(backup.Folder, fileName)
-
-				tracelog.DebugLogger.Printf("Found files: %s", fileName)
-
-				decryptReadCloser, err := DecryptBytes(archiveReader)
-				if err != nil {
-					errCh <- fmt.Errorf("failed to decrypt file: %v", err)
-					return
-				}
-
-				asyncDecryptReadCloser := readahead.NewReadCloser(decryptReadCloser)
-
-				err = decompressor.Decompress(writer, asyncDecryptReadCloser)
-				if err != nil {
-					errCh <- fmt.Errorf("failed to decompress archive reader: %w", err)
-					return
-				}
-				err = writer.Close()
-				errCh <- err
-			}(fileName, errCh, writers[i])
-		}
-
-		var lastErr error
-		for _, ch := range allErrors {
-			select {
-			case err = <-ch:
-				{
-					if err != nil {
-						tracelog.ErrorLogger.Printf("%v", err)
-						lastErr = err
-					}
-				}
-			case err = <-done:
-				{
-					return err
-				}
-			}
-		}
-
-		// wait
-		<-done
-
-		return lastErr
+	decompressor := compression.GetDecompressor(extension)
+	if decompressor == nil {
+		return fmt.Errorf("decompressor for file type '%s' not found", extension)
 	}
-	return newArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))
+
+	allErrors := make([]chan error, 0)
+	writers, done := storage.MergeWriter(EmptyWriteIgnorer{WriteCloser: writeCloser}, partitions, blockSize)
+
+	for i := 0; i < partitions; i++ {
+		fileName := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), i)
+		errCh := make(chan error)
+		allErrors = append(allErrors, errCh)
+
+		go func(fileName string, errCh chan error, writer io.WriteCloser) {
+			archiveReader, exists, err := TryDownloadFile(backup.Folder, fileName)
+			if err != nil {
+				writer.Close()
+				errCh <- errors.Wrapf(err, "failed to dowload file")
+				return
+			}
+			if !exists {
+				errCh <- writer.Close()
+				return
+			}
+
+			tracelog.DebugLogger.Printf("Found files: %s", fileName)
+
+			decryptReadCloser, err := DecryptBytes(archiveReader)
+			if err != nil {
+				errCh <- fmt.Errorf("failed to decrypt file: %v", err)
+				return
+			}
+
+			asyncDecryptReadCloser := readahead.NewReadCloser(decryptReadCloser)
+
+			err = decompressor.Decompress(writer, asyncDecryptReadCloser)
+			if err != nil {
+				errCh <- fmt.Errorf("failed to decompress archive reader: %w", err)
+				return
+			}
+			err = writer.Close()
+			errCh <- err
+		}(fileName, errCh, writers[i])
+	}
+
+	var lastErr error
+	for _, ch := range allErrors {
+		select {
+		case err := <-ch:
+			if err != nil {
+				tracelog.ErrorLogger.Printf("%v", err)
+				lastErr = err
+			}
+		case err := <-done:
+			return err
+		}
+	}
+
+	// wait
+	<-done
+
+	return lastErr
 }

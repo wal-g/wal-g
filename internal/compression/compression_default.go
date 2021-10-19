@@ -21,3 +21,12 @@ var Decompressors = []Decompressor{
 	lzma.Decompressor{},
 	zstd.Decompressor{},
 }
+
+func GetDecompressor(extension string) Decompressor {
+	for _, decompressor := range Decompressors {
+		if decompressor.FileExtension() == extension {
+			return decompressor
+		}
+	}
+	return nil
+}

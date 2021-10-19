@@ -3,7 +3,7 @@ package internal
 import (
 	"bytes"
 	"fmt"
-	"github.com/spf13/viper"
+	"io"
 	"os/exec"
 
 	"github.com/wal-g/tracelog"
@@ -17,6 +17,8 @@ type BackupNonExistenceError struct {
 	error
 }
 
+type StreamFeature = func(backup Backup, writeCloser io.WriteCloser) error
+
 func NewBackupNonExistenceError(backupName string) BackupNonExistenceError {
 	return BackupNonExistenceError{errors.Errorf("Backup '%s' does not exist.", backupName)}
 }
@@ -25,7 +27,7 @@ func (err BackupNonExistenceError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-func GetCommandStreamFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup Backup) {
+func GetCommandStreamFetcher(cmd *exec.Cmd, fetcher StreamFeature) func(folder storage.Folder, backup Backup) {
 	return func(folder storage.Folder, backup Backup) {
 		stdin, err := cmd.StdinPipe()
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
@@ -34,13 +36,7 @@ func GetCommandStreamFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup B
 		err = cmd.Start()
 		tracelog.ErrorLogger.FatalfOnError("Failed to start restore command: %v\n", err)
 
-		var partitions = viper.GetInt("WAL_G_STREAM_SPLITTER_PARTITIONS")
-		var blockSize = viper.GetSizeInBytes("WAL_G_STREAM_SPLITTER_BLOCK_SIZE")
-		if partitions == 1 {
-			err = downloadAndDecompressStream(backup, stdin)
-		} else {
-			err = downloadAndDecompressSplittedStream(backup, partitions, int(blockSize), stdin)
-		}
+		err = fetcher(backup, stdin)
 
 		cmdErr := cmd.Wait()
 		if err != nil || cmdErr != nil {
@@ -67,7 +63,7 @@ func StreamBackupToCommandStdin(cmd *exec.Cmd, backup Backup) error {
 	if err != nil {
 		return fmt.Errorf("failed to start command: %v", err)
 	}
-	err = downloadAndDecompressStream(backup, stdin)
+	err = DownloadAndDecompressStream(backup, stdin)
 	if err != nil {
 		return errors.Wrap(err, "failed to download and decompress stream")
 	}
