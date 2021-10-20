@@ -3,12 +3,13 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/klauspost/readahead"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
+
+	"github.com/klauspost/readahead"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"

@@ -36,7 +36,10 @@ var (
 				userData = viper.GetString(internal.SentinelUserDataSetting)
 			}
 
-			mysql.HandleBackupPush(uploader, backupCmd, permanent, userData)
+			var partitions = viper.GetInt(internal.StreamSplitterPartitions)
+			var blockSize = viper.GetSizeInBytes(internal.StreamSplitterBlockSize)
+
+			mysql.HandleBackupPush(uploader, backupCmd, permanent, userData, partitions, blockSize)
 		},
 	}
 	permanent = false

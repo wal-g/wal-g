@@ -1,9 +1,10 @@
 package mysql
 
 import (
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"os/exec"
+
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"

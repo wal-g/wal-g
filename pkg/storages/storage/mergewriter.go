@@ -70,27 +70,27 @@ func MergeWriter(sink io.Writer, parts int, blockSize int) ([]io.WriteCloser, <-
 			closed := 0
 			for i, ch := range channels {
 				block, ok := <-ch
-				//tracelog.DebugLogger.Printf("MergeWriter. #%d read: %d bytes", i, len(block))
 				if !ok {
 					tracelog.DebugLogger.Printf("MergeWriter. #%d closed", i)
 					closed++
 					continue
 				}
-				wbytes, err := sink.Write(block) // FIXME: handle return values!
-				if wbytes != len(block) {
-					tracelog.ErrorLogger.Fatalf("%d / %d bytes written", wbytes, len(block))
+				rbytes := len(block)
+				wbytes, err := sink.Write(block)
+				if wbytes != rbytes {
+					tracelog.ErrorLogger.Printf("%d / %d bytes written due to %v", wbytes, rbytes, err)
 				}
 				if err != nil {
-					tracelog.ErrorLogger.Printf("%v", err)
+					tracelog.ErrorLogger.Printf("MergeWriter error: %v", err)
 					done <- err
+					close(done)
 					return
 				}
-				//tracelog.DebugLogger.Printf("MergeWriter. bytes written: %d", wbytes)
 			}
 
 			if closed == len(channels) {
 				tracelog.DebugLogger.Printf("MergeWriter: success")
-				done <- nil
+				close(done)
 				return
 			}
 		}

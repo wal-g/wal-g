@@ -1,7 +1,6 @@
 package mysql
 
 import (
-	"github.com/spf13/viper"
 	"os"
 	"os/exec"
 
@@ -11,7 +10,8 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPermanent bool, userDataRaw string) {
+func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPermanent bool, userDataRaw string,
+	partitions int, blockSize uint) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 
 	db, err := getMySQLConnection()
@@ -24,11 +24,9 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
-	var partitions = viper.GetInt("WAL_G_STREAM_SPLITTER_PARTITIONS")
-	var blockSize = viper.GetSizeInBytes("WAL_G_STREAM_SPLITTER_BLOCK_SIZE")
 	var fileName string
 	var backupType string
-	if partitions == 1 {
+	if partitions == 0 || partitions == 1 {
 		fileName, err = uploader.PushStream(limiters.NewDiskLimitReader(stdout))
 		backupType = SplitMergeStreamBackup
 		tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
@@ -55,6 +53,13 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 	uploadedSize, err := uploader.UploadedDataSize()
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to calc uploaded data size: %v", err)
+	}
+	// handle tiny backups:
+	if partitions > 1 && uploadedSize < int64(blockSize)*int64(partitions) {
+		partitions = int(uploadedSize / int64(blockSize))
+		if uploadedSize%int64(blockSize) != 0 {
+			partitions++
+		}
 	}
 
 	rawSize, err := uploader.RawDataSize()

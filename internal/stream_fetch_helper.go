@@ -2,12 +2,12 @@ package internal
 
 import (
 	"fmt"
-	"github.com/klauspost/readahead"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"io"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/klauspost/readahead"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/utility"
@@ -43,7 +43,7 @@ func DownloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 	for _, decompressor := range compression.Decompressors {
 		archiveReader, exists, err := TryDownloadFile(backup.Folder, GetStreamName(backup.Name, decompressor.FileExtension()))
 		if err != nil {
-			return errors.Wrapf(err, "failed to dowload file")
+			return fmt.Errorf("failed to dowload file: %w", err)
 		}
 		if !exists {
 			continue
@@ -52,7 +52,7 @@ func DownloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 		tracelog.DebugLogger.Printf("Found file: %s.%s", backup.Name, decompressor.FileExtension())
 		err = DecompressDecryptBytes(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
 		if err != nil {
-			return errors.Wrapf(err, "failed to decompress and decrypt file")
+			return fmt.Errorf("failed to decompress and decrypt file: %w", err)
 		}
 		return nil
 	}
@@ -69,34 +69,37 @@ func DownloadAndDecompressSplittedStream(backup Backup, partitions int, blockSiz
 		return fmt.Errorf("decompressor for file type '%s' not found", extension)
 	}
 
-	allErrors := make([]chan error, 0)
+	errorsPerWorker := make([]chan error, 0)
 	writers, done := storage.MergeWriter(EmptyWriteIgnorer{WriteCloser: writeCloser}, partitions, blockSize)
 
 	for i := 0; i < partitions; i++ {
 		fileName := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), i)
 		errCh := make(chan error)
-		allErrors = append(allErrors, errCh)
+		errorsPerWorker = append(errorsPerWorker, errCh)
 
 		go func(fileName string, errCh chan error, writer io.WriteCloser) {
+			defer close(errCh)
+
 			archiveReader, exists, err := TryDownloadFile(backup.Folder, fileName)
 			if err != nil {
-				writer.Close()
-				errCh <- errors.Wrapf(err, "failed to dowload file")
+				tracelog.ErrorLogger.PrintOnError(writer.Close())
+				errCh <- fmt.Errorf("failed to dowload file: %w", err)
 				return
 			}
 			if !exists {
 				errCh <- writer.Close()
 				return
 			}
-
 			tracelog.DebugLogger.Printf("Found files: %s", fileName)
 
 			decryptReadCloser, err := DecryptBytes(archiveReader)
 			if err != nil {
-				errCh <- fmt.Errorf("failed to decrypt file: %v", err)
+				errCh <- fmt.Errorf("failed to decrypt file: %w", err)
 				return
 			}
 
+			// readahead will start separate goroutine that puts CPU-heavy operations (Decrypt and Decompress) into
+			// different goroutines
 			asyncDecryptReadCloser := readahead.NewReadCloser(decryptReadCloser)
 
 			err = decompressor.Decompress(writer, asyncDecryptReadCloser)
@@ -104,26 +107,29 @@ func DownloadAndDecompressSplittedStream(backup Backup, partitions int, blockSiz
 				errCh <- fmt.Errorf("failed to decompress archive reader: %w", err)
 				return
 			}
-			err = writer.Close()
-			errCh <- err
+			errCh <- writer.Close()
 		}(fileName, errCh, writers[i])
 	}
 
 	var lastErr error
-	for _, ch := range allErrors {
+	for _, ch := range errorsPerWorker {
 		select {
 		case err := <-ch:
+			tracelog.ErrorLogger.PrintOnError(err)
 			if err != nil {
-				tracelog.ErrorLogger.Printf("%v", err)
 				lastErr = err
 			}
 		case err := <-done:
+			tracelog.ErrorLogger.PrintOnError(err)
 			return err
 		}
 	}
 
-	// wait
-	<-done
+	// wait until MergeWriter flushes its caches
+	err := <-done
+	if err != nil && lastErr == nil {
+		lastErr = err
+	}
 
 	return lastErr
 }

@@ -77,6 +77,8 @@ const (
 	PrefetchDir                  = "WALG_PREFETCH_DIR"
 	PgReadyRename                = "PG_READY_RENAME"
 	SerializerTypeSetting        = "WALG_SERIALIZER_TYPE"
+	StreamSplitterPartitions     = "WAL_G_STREAM_SPLITTER_PARTITIONS"
+	StreamSplitterBlockSize      = "WAL_G_STREAM_SPLITTER_BLOCK_SIZE"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
@@ -347,6 +349,8 @@ var (
 		MysqlBackupPrepareCmd:      true,
 		MysqlTakeBinlogsFromMaster: true,
 		MysqlCheckGTIDs:            true,
+		StreamSplitterPartitions:   true,
+		StreamSplitterBlockSize:    true,
 	}
 
 	RedisAllowedSettings = map[string]bool{
