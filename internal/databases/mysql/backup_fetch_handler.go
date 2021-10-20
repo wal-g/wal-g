@@ -38,6 +38,7 @@ func HandleBackupFetch(folder storage.Folder,
 	}
 }
 
+//nolint:gocritic,hugeParam,unparam
 func getBackupFetcher(backup internal.Backup, sentinel StreamSentinelDto) internal.StreamFeature {
 	switch sentinel.Type {
 	case SplitMergeStreamBackup:

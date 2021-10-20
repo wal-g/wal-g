@@ -28,11 +28,11 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 	var backupType string
 	if partitions == 0 || partitions == 1 {
 		fileName, err = uploader.PushStream(limiters.NewDiskLimitReader(stdout))
-		backupType = SplitMergeStreamBackup
+		backupType = SingleStreamStreamBackup
 		tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
 	} else {
 		fileName, err = uploader.SplitAndPushStream(limiters.NewDiskLimitReader(stdout), partitions, int(blockSize))
-		backupType = SingleStreamStreamBackup
+		backupType = SplitMergeStreamBackup
 		tracelog.ErrorLogger.FatalfOnError("failed to split and push backup: %v", err)
 	}
 
@@ -81,6 +81,7 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 		IsPermanent:      isPermanent,
 		UserData:         userData,
 		Type:             backupType,
+		Compression:      uploader.Compressor.FileExtension(),
 		Partitions:       partitions,
 		BLockSize:        blockSize,
 	}
