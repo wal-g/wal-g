@@ -23,7 +23,7 @@ func SplitReader(reader io.Reader, parts int, blockSize int) []io.Reader {
 			if bytes != 0 {
 				channels[idx] <- block[0:bytes]
 				if bytes != blockSize {
-					tracelog.ErrorLogger.Printf("SplitReader. #%d send: %d / %d bytes", idx, bytes, blockSize)
+					tracelog.InfoLogger.Printf("SplitReader. #%d send: %d / %d bytes", idx, bytes, blockSize)
 				}
 			}
 			if err == io.ErrUnexpectedEOF || err == io.EOF {

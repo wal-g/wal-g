@@ -14,7 +14,7 @@ import (
 //               └─> copy data per 42 bytes  ─>┘
 func TestSplitMerge(t *testing.T) {
 	const blockSize = 128
-	const dataSize = 115249 + 123456 // some prime number
+	const dataSize = 115249 // some prime number
 	var bufSizes = []int{1, blockSize + 1, blockSize - 1, 2*blockSize + 1, 4, 8, 15, 16, 23, 42}
 	var partitions = len(bufSizes)
 
