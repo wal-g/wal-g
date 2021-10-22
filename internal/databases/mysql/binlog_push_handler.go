@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"bufio"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -102,20 +103,22 @@ outer:
 
 func getMySQLSortedBinlogs(db *sql.DB) ([]string, error) {
 	var result []string
-
-	rows, err := db.Query("SHOW BINARY LOGS")
+	// SHOW BINARY LOGS acquire binlog mutex and may hang while mysql is committing huge transactions
+	// so we read binlog index from the disk with no locking
+	row := db.QueryRow("SELECT @@log_bin_index")
+	var binlogIndex string
+	err := row.Scan(&binlogIndex)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query mysql variable: %w", err)
 	}
-	defer utility.LoggedClose(rows, "")
-	for rows.Next() {
-		var logFinName string
-		var size uint64
-		err = utility.ScanToMap(rows, map[string]interface{}{"Log_name": &logFinName, "File_size": &size})
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, logFinName)
+	fh, err := os.Open(binlogIndex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open binlog index: %w", err)
+	}
+	s := bufio.NewScanner(fh)
+	for s.Scan() {
+		binlog := path.Base(s.Text())
+		result = append(result, binlog)
 	}
 	sort.Strings(result)
 	return result, nil
