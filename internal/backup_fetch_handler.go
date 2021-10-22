@@ -17,7 +17,7 @@ type BackupNonExistenceError struct {
 	error
 }
 
-type StreamFeature = func(backup Backup, writeCloser io.WriteCloser) error
+type StreamFetcher = func(backup Backup, writeCloser io.WriteCloser) error
 
 func NewBackupNonExistenceError(backupName string) BackupNonExistenceError {
 	return BackupNonExistenceError{errors.Errorf("Backup '%s' does not exist.", backupName)}
@@ -27,7 +27,7 @@ func (err BackupNonExistenceError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-func GetCommandStreamFetcher(cmd *exec.Cmd, fetcher StreamFeature) func(folder storage.Folder, backup Backup) {
+func GetCommandStreamFetcher(cmd *exec.Cmd, fetcher StreamFetcher) func(folder storage.Folder, backup Backup) {
 	return func(folder storage.Folder, backup Backup) {
 		stdin, err := cmd.StdinPipe()
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)

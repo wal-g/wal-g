@@ -2,7 +2,6 @@ package s3
 
 import (
 	"fmt"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"hash/fnv"
 	"io"
 	"math"
@@ -30,15 +29,10 @@ type s3Reader struct {
 	maxRetryDelay time.Duration
 	minRetryDelay time.Duration
 	reconnectId   int
-	to            int64
 	logDebugId    string // hash from filename and logDebugId - unique logDebugId used only for debug
 }
 
 func (reader *s3Reader) getObjectRange(from, to int64) (*s3.GetObjectOutput, error) {
-	// FIXME: use ' ?partNumber=N' ??
-	// Typical sizes for byte-range requests are 8 MB or 16 MB. If objects are PUT using a multipart upload,
-	// it’s a good practice to GET them in the same part sizes (or at least aligned to part boundaries) for
-	// best performance. GET requests can directly address individual parts; for example, GET ?partNumber=N.
 	bytesRange := fmt.Sprintf("bytes=%d-", from)
 	if to != 0 {
 		bytesRange += strconv.Itoa(int(to))
@@ -77,7 +71,6 @@ func (reader *s3Reader) Read(p []byte) (n int, err error) {
 		return n, err
 	}
 }
-
 func (reader *s3Reader) getDebugLogLine(format string, v ...interface{}) string {
 	prefix := fmt.Sprintf("s3Reader [%s] ", reader.logDebugId)
 	message := fmt.Sprintf(format, v...)
@@ -93,7 +86,7 @@ func (reader *s3Reader) reconnect() error {
 
 	for {
 		reader.reconnectId++
-		object, err := reader.getObjectRange(reader.storageCursor, reader.to)
+		object, err := reader.getObjectRange(reader.storageCursor, 0)
 		if err != nil {
 			failed += 1
 			reader.debugLog("reconnect failed [%d/%d]: %s", failed, reader.maxRetries, err)
@@ -149,87 +142,11 @@ func NewS3Reader(body io.ReadCloser, objectPath string, retriesCount int, folder
 	minRetryDelay, maxRetryDelay time.Duration) *s3Reader {
 
 	DebugLogBufferCounter++
-	reader := &s3Reader{
-		lastBody:      body,
-		objectPath:    objectPath,
-		maxRetries:    retriesCount,
-		logDebugId:    getHash(objectPath, DebugLogBufferCounter),
-		folder:        folder,
-		minRetryDelay: minRetryDelay,
-		maxRetryDelay: maxRetryDelay,
-	}
+	reader := &s3Reader{lastBody: body, objectPath: objectPath, maxRetries: retriesCount, logDebugId: getHash(objectPath, DebugLogBufferCounter),
+		folder: folder, minRetryDelay: minRetryDelay, maxRetryDelay: maxRetryDelay}
 
 	reader.debugLog("Init s3reader path %s", objectPath)
 	return reader
-}
-
-func NewS3RangeReader(objectPath string, retriesCount int, folder *Folder,
-	minRetryDelay, maxRetryDelay time.Duration, offset, size int64) *s3Reader {
-	DebugLogBufferCounter++
-	reader := &s3Reader{
-		objectPath:    objectPath,
-		maxRetries:    retriesCount,
-		logDebugId:    getHash(objectPath, DebugLogBufferCounter),
-		folder:        folder,
-		minRetryDelay: minRetryDelay,
-		maxRetryDelay: maxRetryDelay,
-		storageCursor: offset,            // aka from
-		to:            offset + size - 1, // rfc2616: the byte positions specified are inclusive.
-		// Byte offsets start at zero.
-	}
-
-	reader.debugLog("Init s3reader path %s", objectPath)
-	return reader
-}
-
-func NewS3ConcurrentReader(objectPath string, retriesCount int, folder *Folder, minRetryDelay, maxRetryDelay time.Duration, totalSize int64, concurrencyFactor int) io.ReadCloser {
-	in := make(chan storage.Runnable, 0)
-	out := make(chan []byte, 0)
-	storage.Process(in, out, concurrencyFactor)
-
-	go func() {
-		// generate Readers:
-		chunkSize := int64(64 * 1024 * 1024)
-		chunksCnt := int(totalSize / chunkSize)
-		if totalSize%chunkSize != 0 {
-			chunksCnt = chunksCnt + 1
-		}
-		for i := 0; i < chunksCnt; i++ {
-			i := i // save `i` to function closure
-			in <- func() []byte {
-				DebugLogBufferCounter++ // FIXME: WTF?
-				reader := NewS3RangeReader(objectPath, retriesCount, folder, minRetryDelay, maxRetryDelay,
-					int64(i)*chunkSize, chunkSize)
-
-				data, err := _ReadAll(reader, int(chunkSize))
-				tracelog.ErrorLogger.Printf("NewS3ConcurrentReader range read finished: %d-%d", int64(i)*chunkSize, reader.to)
-				if err != nil {
-					tracelog.ErrorLogger.Printf("%v", err)
-				}
-				return data
-			}
-		}
-		close(in)
-	}()
-	return storage.NewChannelReader(out)
-}
-
-func _ReadAll(r io.Reader, initSize int) ([]byte, error) {
-	b := make([]byte, 0, initSize)
-	for {
-		if len(b) == cap(b) {
-			// Add more capacity (let append pick how much).
-			b = append(b, 0)[:len(b)]
-		}
-		n, err := r.Read(b[len(b):cap(b)])
-		b = b[:len(b)+n]
-		if err != nil {
-			if err == io.EOF {
-				err = nil
-			}
-			return b, err
-		}
-	}
 }
 
 func getHash(objectPath string, id int) string {

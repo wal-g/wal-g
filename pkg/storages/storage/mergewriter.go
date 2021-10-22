@@ -5,49 +5,45 @@ import (
 	"io"
 )
 
-type ChannelWriter struct {
+type channelWriter struct {
 	ch        chan []byte
 	block     []byte
 	offset    int
 	blockSize int
 }
 
-var _ io.WriteCloser = &ChannelWriter{}
+var _ io.WriteCloser = &channelWriter{}
 
-func (mw *ChannelWriter) Write(data []byte) (int, error) {
+func (cw *channelWriter) Write(data []byte) (int, error) {
 	dataOffset := 0
 
 	for {
-		bytes := copy(mw.block[mw.offset:], data[dataOffset:])
-		mw.offset += bytes
+		bytes := copy(cw.block[cw.offset:], data[dataOffset:])
+		cw.offset += bytes
 		dataOffset += bytes
 
-		if mw.offset == len(mw.block) {
-			//tracelog.DebugLogger.Printf("ChannelWriter. WRITE %d bytes", len(mw.block))
-
-			mw.ch <- mw.block
-			mw.block = make([]byte, mw.blockSize)
-			mw.offset = 0
+		if cw.offset == len(cw.block) {
+			cw.ch <- cw.block
+			cw.block = make([]byte, cw.blockSize)
+			cw.offset = 0
 		}
 		if dataOffset == len(data) {
 			return len(data), nil
 
 		}
 	}
-
 }
 
-func (mw *ChannelWriter) Close() error {
-	if mw.offset < len(mw.block) && mw.offset > 0 {
-		// tracelog.DebugLogger.Printf("ChannelWriter. WRITE %d bytes [on close]", mw.offset)
-		mw.ch <- mw.block[:mw.offset]
+func (cw *channelWriter) Close() error {
+	if cw.offset < len(cw.block) && cw.offset > 0 {
+		cw.ch <- cw.block[:cw.offset]
 	}
-	close(mw.ch)
+	close(cw.ch)
 	return nil
 }
 
 func NewChannelWriter(ch chan []byte, blockSize int) io.WriteCloser {
-	return &ChannelWriter{
+	return &channelWriter{
 		ch:        ch,
 		block:     make([]byte, blockSize),
 		blockSize: blockSize,

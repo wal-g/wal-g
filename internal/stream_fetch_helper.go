@@ -64,7 +64,7 @@ func DownloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 func DownloadAndDecompressSplittedStream(backup Backup, partitions int, blockSize int, extension string, writeCloser io.WriteCloser) error {
 	defer utility.LoggedClose(writeCloser, "")
 
-	decompressor := compression.GetDecompressor(extension)
+	decompressor := compression.FindDecompressor(extension)
 	if decompressor == nil {
 		return fmt.Errorf("decompressor for file type '%s' not found", extension)
 	}
