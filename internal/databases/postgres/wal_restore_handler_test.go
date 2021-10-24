@@ -17,7 +17,7 @@ func TestFindLastCommonPoint_SameTimeline(t *testing.T) {
 		postgres.NewTimelineHistoryRecord(1, 8, ""),
 		postgres.NewTimelineHistoryRecord(2, 20, ""),
 	}
-	_, _, err := postgres.FindLastCommonPoint(source, target)
+	_, _, err := postgres.FindLastCommonPoint(target, source)
 	assert.Error(t, err)
 }
 
@@ -27,7 +27,7 @@ func TestFindLastCommonPoint_OneOnTheFirstTimeline(t *testing.T) {
 		postgres.NewTimelineHistoryRecord(wantTimeline, wantLsn, ""),
 	}
 	source := []*postgres.TimelineHistoryRecord{}
-	lastLsn, lastTimeline, err := postgres.FindLastCommonPoint(source, target)
+	lastLsn, lastTimeline, err := postgres.FindLastCommonPoint(target, source)
 	assert.Nil(t, err)
 	assert.Equal(t, wantLsn, lastLsn)
 	assert.Equal(t, wantTimeline, lastTimeline)
@@ -39,7 +39,7 @@ func TestFindLastCommonPoint_OneOnTheFirstTimelineMirror(t *testing.T) {
 	source := []*postgres.TimelineHistoryRecord{
 		postgres.NewTimelineHistoryRecord(wantTimeline, wantLsn, ""),
 	}
-	lastLsn, lastTimeline, err := postgres.FindLastCommonPoint(source, target)
+	lastLsn, lastTimeline, err := postgres.FindLastCommonPoint(target, source)
 	assert.Nil(t, err)
 	assert.Equal(t, wantLsn, lastLsn)
 	assert.Equal(t, wantTimeline, lastTimeline)
@@ -56,7 +56,7 @@ func TestFindLastCommonPoint_FirstRandomCase(t *testing.T) {
 		postgres.NewTimelineHistoryRecord(1, 5, ""),
 		postgres.NewTimelineHistoryRecord(wantTimeline, wantLsn, ""),
 	}
-	lastLsn, lastTimeline, err := postgres.FindLastCommonPoint(source, target)
+	lastLsn, lastTimeline, err := postgres.FindLastCommonPoint(target, source)
 	assert.Nil(t, err)
 	assert.Equal(t, wantLsn, lastLsn)
 	assert.Equal(t, wantTimeline, lastTimeline)
@@ -75,7 +75,7 @@ func TestFindLastCommonPoint_SecondRandomCase(t *testing.T) {
 		postgres.NewTimelineHistoryRecord(2, 16, ""),
 		postgres.NewTimelineHistoryRecord(wantTimeline, wantLsn, ""),
 	}
-	lastLsn, lastTimeline, err := postgres.FindLastCommonPoint(source, target)
+	lastLsn, lastTimeline, err := postgres.FindLastCommonPoint(target, source)
 	assert.Nil(t, err)
 	assert.Equal(t, wantLsn, lastLsn)
 	assert.Equal(t, wantTimeline, lastTimeline)
@@ -94,7 +94,7 @@ func TestFindLastCommonPoint_ThirdRandomCase(t *testing.T) {
 		postgres.NewTimelineHistoryRecord(2, 9, ""),
 		postgres.NewTimelineHistoryRecord(3, 30, ""),
 	}
-	lastLsn, lastTimeline, err := postgres.FindLastCommonPoint(source, target)
+	lastLsn, lastTimeline, err := postgres.FindLastCommonPoint(target, source)
 	assert.Nil(t, err)
 	assert.Equal(t, wantLsn, lastLsn)
 	assert.Equal(t, wantTimeline, lastTimeline)
@@ -115,7 +115,7 @@ func TestFindLastCommonPoint_FourthRandomCase(t *testing.T) {
 		postgres.NewTimelineHistoryRecord(3, 30, ""),
 		postgres.NewTimelineHistoryRecord(4, 36, ""),
 	}
-	lastLsn, lastTimeline, err := postgres.FindLastCommonPoint(source, target)
+	lastLsn, lastTimeline, err := postgres.FindLastCommonPoint(target, source)
 	assert.Nil(t, err)
 	assert.Equal(t, wantLsn, lastLsn)
 	assert.Equal(t, wantTimeline, lastTimeline)
@@ -136,7 +136,7 @@ func TestFindLastCommonPoint_FifthRandomCase(t *testing.T) {
 		postgres.NewTimelineHistoryRecord(3, 30, ""),
 		postgres.NewTimelineHistoryRecord(wantTimeline, wantLsn, ""),
 	}
-	lastLsn, lastTimeline, err := postgres.FindLastCommonPoint(source, target)
+	lastLsn, lastTimeline, err := postgres.FindLastCommonPoint(target, source)
 	assert.Nil(t, err)
 	assert.Equal(t, wantLsn, lastLsn)
 	assert.Equal(t, wantTimeline, lastTimeline)

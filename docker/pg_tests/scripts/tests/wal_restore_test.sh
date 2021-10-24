@@ -86,10 +86,18 @@ pgbench -i -s 20 -h 127.0.0.1 -p ${BETA_PORT} postgres
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -m fast -W stop
 sleep 10
 
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_ALPHA} -w start
+PGDATA=${PGDATA_ALPHA} /tmp/scripts/wait_while_pg_not_ready.sh
+
+pgbench -i -s 5 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
+
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_ALPHA} -m fast -W stop
+sleep 10
+
 # for more info to log
 ls "${PGDATA_BETA}/pg_wal"
 
-timeout 30 wal-g --config=${TMP_CONFIG} wal-restore ${PGDATA_BETA} ${PGDATA_ALPHA}
+timeout 30 wal-g --config=${TMP_CONFIG} wal-restore ${PGDATA_ALPHA} ${PGDATA_BETA}
 sleep 10
 
-/usr/lib/postgresql/10/bin/pg_rewind -D ${PGDATA_BETA} --source-pgdata=${PGDATA_ALPHA}
+/usr/lib/postgresql/10/bin/pg_rewind -D ${PGDATA_ALPHA} --source-pgdata=${PGDATA_BETA}

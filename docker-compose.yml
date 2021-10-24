@@ -524,12 +524,12 @@ services:
     links:
       - s3
 
-  pg_restore_test:
+  pg_wal_restore_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_wal_restore_test
       context: .
-    image: wal-g/restore_test
-    container_name: wal-g_pg_restore_test
+    image: wal-g/wal_restore_test
+    container_name: wal-g_pg_wal_restore_test
     depends_on:
       - s3
     links:

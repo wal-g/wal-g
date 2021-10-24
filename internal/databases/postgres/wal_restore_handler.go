@@ -32,43 +32,43 @@ func NewTimelineWithSegmentNoBy(record *TimelineHistoryRecord) *TimelineWithSegm
 func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder) {
 	cloudFolder = cloudFolder.GetSubFolder(utility.WalPath)
 
-	sourcePgData, err := ExtractPgControl(sourcePath)
+	targetPgData, err := ExtractPgControl(targetPath)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get pg data on target cluster: %v\n", err)
 
-	targetPgData, err := ExtractPgControl(targetPath)
+	sourcePgData, err := ExtractPgControl(sourcePath)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get pg data on source cluster: %v\n", err)
 
-	if sourcePgData.GetSystemIdentifier() != targetPgData.GetSystemIdentifier() {
+	if targetPgData.GetSystemIdentifier() != sourcePgData.GetSystemIdentifier() {
 		tracelog.ErrorLogger.Fatal("System identifiers of target and source clusters are not equal\n")
 	}
-	if sourcePgData.GetCurrentTimeline() == targetPgData.GetCurrentTimeline() {
+	if targetPgData.GetCurrentTimeline() == sourcePgData.GetCurrentTimeline() {
 		tracelog.ErrorLogger.Fatal("Latest checkpoint timelines of target and source clusters are equal\n")
 	}
 
-	sourceWalDir, err := getWalDirName(sourcePath)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL directory name: %v\n", err)
 	targetWalDir, err := getWalDirName(targetPath)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL directory name: %v\n", err)
+	sourceWalDir, err := getWalDirName(sourcePath)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL directory name: %v\n", err)
 
-	sourceHistoryRecords, err := getLocalTimelineHistoryRecords(sourcePgData.GetCurrentTimeline(), sourceWalDir)
+	tgtHistoryRecords, err := getLocalTimelineHistoryRecords(targetPgData.GetCurrentTimeline(), targetWalDir)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on target cluster: %v\n", err)
-	targetHistoryRecords, err := getLocalTimelineHistoryRecords(targetPgData.GetCurrentTimeline(), targetWalDir)
+	srcHistoryRecords, err := getLocalTimelineHistoryRecords(sourcePgData.GetCurrentTimeline(), sourceWalDir)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on source cluster: %v\n", err)
 
-	lastCommonLsn, lastCommonTl, err := FindLastCommonPoint(sourceHistoryRecords, targetHistoryRecords)
+	lastCommonLsn, lastCommonTl, err := FindLastCommonPoint(tgtHistoryRecords, srcHistoryRecords)
 	tracelog.ErrorLogger.FatalfOnError("Failed to find last common point: %v\n", err)
 
-	targetTimelineWithSegNo := transformTimelineHistoryRecords(targetHistoryRecords)
-	mapOfTargetTimelineWithSegNo := timelineWithSegmentNoSliceToMap(targetTimelineWithSegNo)
+	srcTimelineWithSegNo := transformTimelineHistoryRecords(srcHistoryRecords)
+	mapOfSrcTimelineWithSegNo := timelineWithSegmentNoSliceToMap(srcTimelineWithSegNo)
 
-	folderFilenames, err := getDirectoryFilenames(targetWalDir)
+	folderFilenames, err := getDirectoryFilenames(sourceWalDir)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL filenames: %v\n", err)
 
 	walsByTimelines := groupSegmentsByTimelines(getSegmentsFromFiles(folderFilenames))
 
 	filenamesToRestore, err := GetMissingWals(
 		getSegmentNoFromLsn(lastCommonLsn), lastCommonTl,
-		targetPgData.GetCurrentTimeline(), mapOfTargetTimelineWithSegNo, walsByTimelines)
+		sourcePgData.GetCurrentTimeline(), mapOfSrcTimelineWithSegNo, walsByTimelines)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get missing source WALs: %v\n", err)
 
 	if len(filenamesToRestore) == 0 {
@@ -77,7 +77,7 @@ func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder)
 	}
 	tracelog.InfoLogger.Printf("WAL files to restore: %v", filenamesToRestore)
 	for _, walFilename := range filenamesToRestore {
-		location := utility.ResolveSymlink(path.Join(targetWalDir, walFilename))
+		location := utility.ResolveSymlink(path.Join(sourceWalDir, walFilename))
 		if err = internal.DownloadFileTo(cloudFolder, walFilename, location); err != nil {
 			tracelog.ErrorLogger.Printf("Failed to download WAL file %v: %v\n", walFilename, err)
 		} else {
@@ -88,33 +88,33 @@ func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder)
 
 // FindLastCommonPoint get the last common LSN and timeline between two slices of
 // history records. Nil input is not handle
-func FindLastCommonPoint(source, target []*TimelineHistoryRecord) (uint64, uint32, error) {
+func FindLastCommonPoint(target, source []*TimelineHistoryRecord) (uint64, uint32, error) {
 	currentLsn := uint64(1)
 	currentTimeline := uint32(1)
 
-	if len(source) == len(target) {
+	if len(target) == len(source) {
 		return currentLsn, currentTimeline, errors.New("two clusters on the same timeline")
 	}
 
-	if len(source) == 0 {
-		currentLsn = target[0].lsn
-		currentTimeline = target[0].timeline
-	}
 	if len(target) == 0 {
 		currentLsn = source[0].lsn
 		currentTimeline = source[0].timeline
 	}
-	for i, srcRecord := range source {
-		if len(target) <= i {
+	if len(source) == 0 {
+		currentLsn = target[0].lsn
+		currentTimeline = target[0].timeline
+	}
+	for i, tgtRecord := range target {
+		if len(source) <= i {
 			break
 		}
 
-		if srcRecord.lsn == target[i].lsn {
-			currentLsn = srcRecord.lsn
-			currentTimeline = srcRecord.timeline
+		if tgtRecord.lsn == source[i].lsn {
+			currentLsn = tgtRecord.lsn
+			currentTimeline = tgtRecord.timeline
 		} else {
-			currentLsn = uint64Min(srcRecord.lsn, target[i].lsn)
-			currentTimeline = srcRecord.timeline
+			currentLsn = uint64Min(tgtRecord.lsn, source[i].lsn)
+			currentTimeline = tgtRecord.timeline
 			break
 		}
 	}
