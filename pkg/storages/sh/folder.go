@@ -91,6 +91,8 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		return nil, NewFolderError(err, "Fail connect via sftp. Address: %s", address)
 	}
 
+	path = storage.AddDelimiterToPath(path)
+
 	return &Folder{
 		extend(sftpClient), path,
 	}, nil
