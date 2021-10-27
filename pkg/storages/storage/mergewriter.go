@@ -56,7 +56,7 @@ func MergeWriter(sink io.Writer, parts int, blockSize int) ([]io.WriteCloser, <-
 	done := make(chan error)
 
 	for i := 0; i < parts; i++ {
-		channels = append(channels, make(chan []byte, 10)) // buffered channel
+		channels = append(channels, make(chan []byte, 0))
 		result = append(result, NewChannelWriter(channels[i], blockSize))
 	}
 
