@@ -5,7 +5,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/klauspost/readahead"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/wal-g/tracelog"
@@ -98,11 +97,7 @@ func DownloadAndDecompressSplittedStream(backup Backup, partitions int, blockSiz
 				return
 			}
 
-			// readahead will start separate goroutine that puts CPU-heavy operations (Decrypt and Decompress) into
-			// different goroutines
-			asyncDecryptReadCloser := readahead.NewReadCloser(decryptReadCloser)
-
-			err = decompressor.Decompress(writer, asyncDecryptReadCloser)
+			err = decompressor.Decompress(writer, decryptReadCloser)
 			if err != nil {
 				errCh <- fmt.Errorf("failed to decompress archive reader: %w", err)
 				return

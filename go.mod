@@ -97,7 +97,6 @@ require (
 	github.com/jmoiron/sqlx v1.3.3 // indirect
 	github.com/jstemmer/go-junit-report v0.9.1 // indirect
 	github.com/klauspost/compress v1.9.5 // indirect
-	github.com/klauspost/readahead v1.3.1
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/mattn/go-runewidth v0.0.8 // indirect
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
