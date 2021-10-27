@@ -5,7 +5,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/pkg/storages/splitmerge"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
@@ -69,7 +69,7 @@ func DownloadAndDecompressSplittedStream(backup Backup, partitions int, blockSiz
 	}
 
 	errorsPerWorker := make([]chan error, 0)
-	writers, done := storage.MergeWriter(EmptyWriteIgnorer{WriteCloser: writeCloser}, partitions, blockSize)
+	writers, done := splitmerge.MergeWriter(EmptyWriteIgnorer{WriteCloser: writeCloser}, partitions, blockSize)
 
 	for i := 0; i < partitions; i++ {
 		fileName := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), i)

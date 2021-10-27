@@ -1,4 +1,4 @@
-package storage
+package splitmerge
 
 import (
 	"io"
@@ -25,7 +25,6 @@ func (cr *channelReader) Read(dst []byte) (n int, err error) {
 		if cr.offset >= len(cr.data) {
 			cr.data, cr.ok = <-cr.in
 			cr.offset = 0
-			//tracelog.InfoLogger.Printf("ChannelReader took new block of size=%d", len(cr.data))
 		}
 		if !cr.ok {
 			//tracelog.InfoLogger.Printf("ChannelReader read finished [EOF]")

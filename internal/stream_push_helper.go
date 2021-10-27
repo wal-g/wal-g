@@ -6,7 +6,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/pkg/storages/splitmerge"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
@@ -34,7 +34,7 @@ func (uploader *Uploader) PushStream(stream io.Reader) (string, error) {
 func (uploader *Uploader) SplitAndPushStream(stream io.Reader, partitions int, blockSize int) (string, error) {
 	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 
-	var readers = storage.SplitReader(stream, partitions, blockSize)
+	var readers = splitmerge.SplitReader(stream, partitions, blockSize)
 
 	errCh := make(chan error)
 	defer close(errCh)

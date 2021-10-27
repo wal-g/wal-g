@@ -1,4 +1,4 @@
-package storage
+package splitmerge
 
 import (
 	"github.com/wal-g/tracelog"
@@ -10,7 +10,7 @@ func SplitReader(reader io.Reader, parts int, blockSize int) []io.Reader {
 	channels := make([]chan []byte, 0)
 
 	for i := 0; i < parts; i++ {
-		channels = append(channels, make(chan []byte, 0))
+		channels = append(channels, make(chan []byte, 0)) // buffered channel
 		result = append(result, NewChannelReader(channels[i]))
 	}
 

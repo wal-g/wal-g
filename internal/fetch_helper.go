@@ -9,8 +9,6 @@ import (
 	"os/user"
 	"path/filepath"
 
-	"github.com/klauspost/readahead"
-
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
@@ -73,9 +71,7 @@ func DecompressDecryptBytes(dst io.Writer, archiveReader io.ReadCloser, decompre
 		return err
 	}
 
-	asyncDecryptReadCloser := readahead.NewReadCloser(decryptReadCloser)
-
-	err = decompressor.Decompress(dst, asyncDecryptReadCloser)
+	err = decompressor.Decompress(dst, decryptReadCloser)
 	if err != nil {
 		return fmt.Errorf("failed to decompress archive reader: %w", err)
 	}
