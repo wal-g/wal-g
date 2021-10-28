@@ -87,7 +87,7 @@ func getDefaultConfig(settings map[string]string) *aws.Config {
 	// most services. If you want to implement custom retry logic, you can implement the
 	// request.Retryer interface.
 	config := defaults.Get().Config.WithRegion(settings[RegionSetting])
-	config = request.WithRetryer(config, client.DefaultRetryer{NumMaxRetries: MaxRetries})
+	config = request.WithRetryer(config, NewConnResetRetryer(client.DefaultRetryer{NumMaxRetries: MaxRetries}))
 
 	if logLevel, ok := settings[LogLevel]; ok {
 		config = config.WithLogLevel(func(s string) aws.LogLevelType {
