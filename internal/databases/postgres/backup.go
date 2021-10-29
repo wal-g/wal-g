@@ -119,32 +119,24 @@ func (backup *Backup) GetSentinelAndFilesMetadata() (BackupSentinelDto, FilesMet
 		return BackupSentinelDto{}, FilesMetadataDto{}, err
 	}
 
-	filesMetadata, err := backup.GetFilesMetadata()
-	if err != nil {
-		return BackupSentinelDto{}, FilesMetadataDto{}, err
-	}
-	return sentinel, filesMetadata, nil
-}
-
-// TODO : unit tests
-func (backup *Backup) GetFilesMetadata() (FilesMetadataDto, error) {
+	// FilesMetadataDto might be already fetched
 	if backup.FilesMetadataDto != nil {
-		return *backup.FilesMetadataDto, nil
+		return sentinel, *backup.FilesMetadataDto, nil
 	}
 
 	var filesMetadata FilesMetadataDto
-	err := backup.FetchDto(&filesMetadata, getFilesMetadataPath(backup.Name))
+	err = backup.FetchDto(&filesMetadata, getFilesMetadataPath(backup.Name))
 	if err != nil {
 		// double-check that this is not V2 backup
-		sentinel, err2 := backup.getSentinelV2()
+		sentinelV2, err2 := backup.getSentinelV2()
 		// there should be no error since old sentinel can be read as V2
 		if err2 != nil {
-			return FilesMetadataDto{}, fmt.Errorf("failed to fetch backup sentinel for version-check: %v, "+
+			return BackupSentinelDto{}, FilesMetadataDto{}, fmt.Errorf("failed to fetch backup sentinel for version-check: %v, "+
 				"tried to fetch backup files metadata but received an error: %v", err2, err)
 		}
-		if sentinel.Version >= 2 {
+		if sentinelV2.Version >= 2 {
 			// if sentinel has a version >= 2 files_metadata.json is a must
-			return FilesMetadataDto{}, fmt.Errorf("failed to fetch files metadata: %w", err)
+			return BackupSentinelDto{}, FilesMetadataDto{}, fmt.Errorf("failed to fetch files metadata: %w", err)
 		}
 
 		// it is OK to have missing files metadata because old WAL-G versions and WAL-E did not track it
@@ -154,7 +146,7 @@ func (backup *Backup) GetFilesMetadata() (FilesMetadataDto, error) {
 	}
 
 	backup.FilesMetadataDto = &filesMetadata
-	return filesMetadata, nil
+	return sentinel, filesMetadata, nil
 }
 
 func (backup *Backup) getSentinelV2() (BackupSentinelDtoV2, error) {
@@ -347,7 +339,7 @@ func (backup *Backup) getTarsToExtract(filesMeta FilesMetadataDto, filesToUnwrap
 }
 
 func (backup *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error) {
-	filesMeta, err := backup.GetFilesMetadata()
+	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
 	if err != nil {
 		return nil, err
 	}

@@ -548,7 +548,7 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 		*prevBackupSentinelDto.BackupStartLSN)
 	bh.prevBackupInfo.name = previousBackupName
 	bh.prevBackupInfo.sentinelDto = prevBackupSentinelDto
-	bh.prevBackupInfo.filesMetadataDto, err = previousBackup.GetFilesMetadata()
+	_, bh.prevBackupInfo.filesMetadataDto, err = previousBackup.GetSentinelAndFilesMetadata()
 	return err
 }
 
