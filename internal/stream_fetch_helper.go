@@ -106,7 +106,7 @@ func DownloadAndDecompressSplittedStream(backup Backup, partitions int, blockSiz
 	for _, ch := range errorsPerWorker {
 		err := <-ch
 		tracelog.ErrorLogger.PrintOnError(err)
-		if err != nil {
+		if (lastErr == nil && err != nil) || (lastErr == io.ErrShortWrite && err != io.ErrShortWrite) {
 			lastErr = err
 		}
 	}
