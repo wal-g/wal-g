@@ -1,9 +1,12 @@
 package splitmerge
 
 import (
+	"fmt"
 	"io"
 )
 
+// channelReader provider io.ReadCloser interface on top of `in` chan []byte
+// i.e. it reads byte buffers from channel and returns it when Read() is called
 type channelReader struct {
 	in     <-chan []byte
 	data   []byte
@@ -44,7 +47,7 @@ func (cr *channelReader) Read(dst []byte) (n int, err error) {
 
 func (cr *channelReader) Close() error {
 	if cr.ok && len(cr.data) > cr.offset {
-		panic("Not all data has been read")
+		return fmt.Errorf("channelReader: not all data have been read")
 	}
 	return nil
 }

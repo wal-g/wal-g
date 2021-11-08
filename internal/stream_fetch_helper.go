@@ -69,7 +69,7 @@ func DownloadAndDecompressSplittedStream(backup Backup, partitions int, blockSiz
 	}
 
 	errorsPerWorker := make([]chan error, 0)
-	writers, done := splitmerge.MergeWriter(EmptyWriteIgnorer{WriteCloser: writeCloser}, partitions, blockSize)
+	writers := splitmerge.MergeWriter(EmptyWriteIgnorer{WriteCloser: writeCloser}, partitions, blockSize)
 
 	for i := 0; i < partitions; i++ {
 		fileName := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), i)
@@ -87,19 +87,15 @@ func DownloadAndDecompressSplittedStream(backup Backup, partitions int, blockSiz
 			}
 			if !exists {
 				errCh <- writer.Close()
+				tracelog.InfoLogger.PrintOnError(writer.Close())
 				return
 			}
 			tracelog.DebugLogger.Printf("Found files: %s", fileName)
 
-			decryptReadCloser, err := DecryptBytes(archiveReader)
+			err = DecompressDecryptBytes(writer, archiveReader, decompressor)
 			if err != nil {
-				errCh <- fmt.Errorf("failed to decrypt file: %w", err)
-				return
-			}
-
-			err = decompressor.Decompress(writer, decryptReadCloser)
-			if err != nil {
-				errCh <- fmt.Errorf("failed to decompress archive reader: %w", err)
+				errCh <- fmt.Errorf("failed to decompress/decrypt file: %w", err)
+				tracelog.ErrorLogger.PrintOnError(writer.Close())
 				return
 			}
 			errCh <- writer.Close()
@@ -108,22 +104,11 @@ func DownloadAndDecompressSplittedStream(backup Backup, partitions int, blockSiz
 
 	var lastErr error
 	for _, ch := range errorsPerWorker {
-		select {
-		case err := <-ch:
-			tracelog.ErrorLogger.PrintOnError(err)
-			if err != nil {
-				lastErr = err
-			}
-		case err := <-done:
-			tracelog.ErrorLogger.PrintOnError(err)
-			return err
+		err := <-ch
+		tracelog.ErrorLogger.PrintOnError(err)
+		if err != nil {
+			lastErr = err
 		}
-	}
-
-	// wait until MergeWriter flushes its caches
-	err := <-done
-	if err != nil && lastErr == nil {
-		lastErr = err
 	}
 
 	return lastErr

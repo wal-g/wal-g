@@ -10,7 +10,7 @@ func SplitReader(reader io.Reader, parts int, blockSize int) []io.Reader {
 	channels := make([]chan []byte, 0)
 
 	for i := 0; i < parts; i++ {
-		channels = append(channels, make(chan []byte, 0)) // buffered channel
+		channels = append(channels, make(chan []byte, 0))
 		result = append(result, NewChannelReader(channels[i]))
 	}
 
