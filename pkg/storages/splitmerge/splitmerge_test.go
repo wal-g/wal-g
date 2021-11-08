@@ -25,32 +25,36 @@ func TestSplitMerge(t *testing.T) {
 
 	// out:
 	var sink bytes.Buffer
-	writers, done := MergeWriter(&sink, partitions, blockSize)
+	writers := MergeWriter(&sink, partitions, blockSize)
 
 	errCh := make(chan error)
 	defer close(errCh)
 	for i := 0; i < partitions; i++ {
 		go func(idx int, reader io.Reader, writer io.WriteCloser, buffSize int) {
 			defer writer.Close()
+			// read _all_ data first and only then send it to MergeWriter:
+			allData, err := io.ReadAll(reader)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			
+			offset := 0
 			for {
 				data := make([]byte, buffSize, buffSize)
-				rbytes, rerr := reader.Read(data)
+				rbytes := copy(data, allData[offset:])
+				offset += rbytes
 				//tracelog.InfoLogger.Printf("goroutine #%d: %d bytes fetched, err=%v", idx, rbytes, rerr)
-				if rbytes > 0 {
-					_, werr := writer.Write(data[:rbytes])
-					if werr != nil {
-						errCh <- werr
-						return
-					} else {
-						//tracelog.InfoLogger.Printf("goroutine #%d: %d bytes copied", idx, rbytes)
-					}
-				}
-				if rerr == io.EOF {
+				if rbytes == 0 {
 					errCh <- nil
 					return
-				} else if rerr != nil {
-					errCh <- rerr
+				}
+				_, werr := writer.Write(data[:rbytes])
+				if werr != nil {
+					errCh <- werr
 					return
+				} else {
+					//tracelog.InfoLogger.Printf("goroutine #%d: %d bytes copied", idx, rbytes)
 				}
 			}
 		}(i, readers[i], writers[i], bufSizes[i%len(bufSizes)])
@@ -61,9 +65,7 @@ func TestSplitMerge(t *testing.T) {
 		err := <-errCh
 		assert.NoError(t, err)
 	}
-
-	assert.NoError(t, <-done)
-
+	
 	fmt.Printf("%d\n", len(inputData))
 	fmt.Printf("%d\n", sink.Len())
 
