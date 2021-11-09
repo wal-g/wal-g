@@ -61,6 +61,12 @@ By default, WAL-G uses [ListObjectsV2](https://docs.aws.amazon.com/AmazonS3/late
 However, some S3-compatible storages may not support it.
 Set this setting to `true` to use [ListObjects](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjects.html) instead.
 
+* `S3_MULTI_CLOUD_COMPATIBLE_DELETE`
+
+By default, WAL-G uses multiple object delete [operation](https://docs.aws.amazon.com/sdk-for-go/api/service/s3/#S3.DeleteObjects) which is not compatible with Google, AliCloud and Oracle cloud S3-compatible protocol.
+Set this setting ot `true` to use [DeleteObject](https://docs.aws.amazon.com/sdk-for-go/api/service/s3/#S3.DeleteObject) instead.
+Note! That this would impact performance and can face API rate limitation and price increase on operations amount.
+
 GCS
 -----------
 To store backups in Google Cloud Storage, WAL-G requires that this variable be set:
