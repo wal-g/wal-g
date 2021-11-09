@@ -19,28 +19,28 @@ const (
 	NotFoundAWSErrorCode  = "NotFound"
 	NoSuchKeyAWSErrorCode = "NoSuchKey"
 
-	EndpointSetting          		= "AWS_ENDPOINT"
-	RegionSetting            		= "AWS_REGION"
-	ForcePathStyleSetting    		= "AWS_S3_FORCE_PATH_STYLE"
-	AccessKeyIdSetting       		= "AWS_ACCESS_KEY_ID"
-	AccessKeySetting         		= "AWS_ACCESS_KEY"
-	SecretAccessKeySetting   		= "AWS_SECRET_ACCESS_KEY"
-	SecretKeySetting         		= "AWS_SECRET_KEY"
-	SessionTokenSetting      		= "AWS_SESSION_TOKEN"
-	SseSetting               		= "S3_SSE"
-	SseCSetting              		= "S3_SSE_C"
-	SseKmsIdSetting          		= "S3_SSE_KMS_ID"
-	StorageClassSetting     		= "S3_STORAGE_CLASS"
-	UploadConcurrencySetting 		= "UPLOAD_CONCURRENCY"
-	s3CertFile               		= "S3_CA_CERT_FILE"
-	MaxPartSize              		= "S3_MAX_PART_SIZE"
-	EndpointSourceSetting    		= "S3_ENDPOINT_SOURCE"
-	EndpointPortSetting      		= "S3_ENDPOINT_PORT"
-	LogLevel                 		= "S3_LOG_LEVEL"
-	UseListObjectsV1         		= "S3_USE_LIST_OBJECTS_V1"
-	UseMultiCloudCompatibleDelete 	= "S3_MULTI_CLOUD_COMPATIBLE_DELETE"
-	RangeBatchEnabled        		= "S3_RANGE_BATCH_ENABLED"
-	RangeQueriesMaxRetries   		= "S3_RANGE_MAX_RETRIES"
+	EndpointSetting               = "AWS_ENDPOINT"
+	RegionSetting                 = "AWS_REGION"
+	ForcePathStyleSetting         = "AWS_S3_FORCE_PATH_STYLE"
+	AccessKeyIdSetting            = "AWS_ACCESS_KEY_ID"
+	AccessKeySetting              = "AWS_ACCESS_KEY"
+	SecretAccessKeySetting        = "AWS_SECRET_ACCESS_KEY"
+	SecretKeySetting              = "AWS_SECRET_KEY"
+	SessionTokenSetting           = "AWS_SESSION_TOKEN"
+	SseSetting                    = "S3_SSE"
+	SseCSetting                   = "S3_SSE_C"
+	SseKmsIdSetting               = "S3_SSE_KMS_ID"
+	StorageClassSetting           = "S3_STORAGE_CLASS"
+	UploadConcurrencySetting      = "UPLOAD_CONCURRENCY"
+	s3CertFile                    = "S3_CA_CERT_FILE"
+	MaxPartSize                   = "S3_MAX_PART_SIZE"
+	EndpointSourceSetting         = "S3_ENDPOINT_SOURCE"
+	EndpointPortSetting           = "S3_ENDPOINT_PORT"
+	LogLevel                      = "S3_LOG_LEVEL"
+	UseListObjectsV1              = "S3_USE_LIST_OBJECTS_V1"
+	UseMultiCloudCompatibleDelete = "S3_MULTI_CLOUD_COMPATIBLE_DELETE"
+	RangeBatchEnabled             = "S3_RANGE_BATCH_ENABLED"
+	RangeQueriesMaxRetries        = "S3_RANGE_MAX_RETRIES"
 
 	RangeBatchEnabledDefault = false
 	RangeMaxRetriesDefault   = 10
@@ -91,19 +91,19 @@ type Folder struct {
 	Path     string
 	settings map[string]string
 
-	useListObjectsV1 bool
+	useListObjectsV1              bool
 	useMultiCloudCompatibleDelete bool
 }
 
 func NewFolder(uploader Uploader, s3API s3iface.S3API, settings map[string]string, bucket, path string,
 	useListObjectsV1 bool, useMultiCloudCompatibleDelete bool) *Folder {
 	return &Folder{
-		uploader:         uploader,
-		S3API:            s3API,
-		settings:         settings,
-		Bucket:           aws.String(bucket),
-		Path:             storage.AddDelimiterToPath(path),
-		useListObjectsV1: useListObjectsV1,
+		uploader:                      uploader,
+		S3API:                         s3API,
+		settings:                      settings,
+		Bucket:                        aws.String(bucket),
+		Path:                          storage.AddDelimiterToPath(path),
+		useListObjectsV1:              useListObjectsV1,
 		useMultiCloudCompatibleDelete: useMultiCloudCompatibleDelete,
 	}
 }
@@ -317,14 +317,13 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 		if folder.useMultiCloudCompatibleDelete {
 			for _, key := range input.Delete.Objects {
 				_, err := folder.S3API.DeleteObject(
-					&s3.DeleteObjectInput{Bucket: folder.Bucket, Key: key.Key,
-				})
+					&s3.DeleteObjectInput{Bucket: folder.Bucket, Key: key.Key})
 
 				if err != nil {
 					return DeleteObjectsError(err, part)
 				}
 			}
-		}else{
+		} else {
 			_, err := folder.S3API.DeleteObjects(input)
 			if err != nil {
 				return DeleteObjectsError(err, part)
