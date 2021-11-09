@@ -246,7 +246,7 @@ var (
 		"WALG_S3_SSE":                 		true,
 		"WALG_S3_SSE_C":               		true,
 		"WALG_S3_SSE_KMS_ID":          		true,
-		"WALG_CSE_KMS_ID":            		true,
+		"WALG_CSE_KMS_ID":					true,
 		"WALG_CSE_KMS_REGION":         		true,
 		"WALG_S3_MAX_PART_SIZE":       		true,
 		"S3_ENDPOINT_SOURCE":          		true,
