@@ -104,6 +104,10 @@ To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not e
 
 To configure the size of one backup bundle (in bytes). Smaller size causes granularity and more optimal, faster recovering. It also increases the number of storage requests, so it can costs you much money. Default size is 1 GB (`1 << 30 - 1` bytes).
 
+* `WALG_TAR_DISABLE_FSYNC`
+
+Disable calling fsync after writing files when extracting tar files.
+
 * `WALG_PG_WAL_SIZE`
 
 To configure the wal segment size if different from the postgres default of 16 MB

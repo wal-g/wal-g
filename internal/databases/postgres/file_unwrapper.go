@@ -62,8 +62,8 @@ type BackupFileOptions struct {
 }
 
 type IBackupFileUnwrapper interface {
-	UnwrapNewFile(reader io.Reader, header *tar.Header, file *os.File) (*FileUnwrapResult, error)
-	UnwrapExistingFile(reader io.Reader, header *tar.Header, file *os.File) (*FileUnwrapResult, error)
+	UnwrapNewFile(reader io.Reader, header *tar.Header, file *os.File, fsync bool) (*FileUnwrapResult, error)
+	UnwrapExistingFile(reader io.Reader, header *tar.Header, file *os.File, fsync bool) (*FileUnwrapResult, error)
 }
 
 type BackupFileUnwrapper struct {
@@ -81,7 +81,7 @@ func (u *BackupFileUnwrapper) clearLocalFile(file *os.File) error {
 }
 
 // write file from reader to local file
-func (u *BackupFileUnwrapper) writeLocalFile(fileReader io.Reader, header *tar.Header, localFile *os.File) error {
+func (u *BackupFileUnwrapper) writeLocalFile(fileReader io.Reader, header *tar.Header, localFile *os.File, fsync bool) error {
 	_, err := io.Copy(localFile, fileReader)
 	if err != nil {
 		err1 := localFile.Close()
@@ -102,6 +102,10 @@ func (u *BackupFileUnwrapper) writeLocalFile(fileReader io.Reader, header *tar.H
 		return errors.Wrap(err, "Interpret: chmod failed")
 	}
 
-	err = localFile.Sync()
-	return errors.Wrap(err, "Interpret: fsync failed")
+	if fsync {
+		err = localFile.Sync()
+		return errors.Wrap(err, "Interpret: fsync failed")
+	}
+
+	return nil
 }

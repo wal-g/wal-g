@@ -14,7 +14,7 @@ type DefaultFileUnwrapper struct {
 }
 
 func (u *DefaultFileUnwrapper) UnwrapNewFile(reader io.Reader, header *tar.Header,
-	file *os.File) (*FileUnwrapResult, error) {
+	file *os.File, fsync bool) (*FileUnwrapResult, error) {
 	if u.options.isIncremented {
 		targetReadWriterAt, err := NewReadWriterAtFrom(file)
 		if err != nil {
@@ -26,7 +26,7 @@ func (u *DefaultFileUnwrapper) UnwrapNewFile(reader io.Reader, header *tar.Heade
 		}
 		return NewCreatedFromIncrementResult(missingBlockCount), nil
 	}
-	err := u.writeLocalFile(reader, header, file)
+	err := u.writeLocalFile(reader, header, file, fsync)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func (u *DefaultFileUnwrapper) UnwrapNewFile(reader io.Reader, header *tar.Heade
 }
 
 func (u *DefaultFileUnwrapper) UnwrapExistingFile(reader io.Reader, header *tar.Header,
-	file *os.File) (*FileUnwrapResult, error) {
+	file *os.File, fsync bool) (*FileUnwrapResult, error) {
 	targetReadWriterAt, err := NewReadWriterAtFrom(file)
 	if err != nil {
 		return nil, err
