@@ -107,7 +107,6 @@ func isPagedFile(info os.FileInfo, filePath string) bool {
 	if info.IsDir() ||
 		((!strings.Contains(filePath, DefaultTablespace)) && (!strings.Contains(filePath, NonDefaultTablespace))) ||
 		info.Size() == 0 ||
-		info.Size()%DatabasePageSize != 0 ||
 		!pagedFilenameRegexp.MatchString(path.Base(filePath)) {
 		return false
 	}
