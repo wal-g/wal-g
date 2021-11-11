@@ -28,7 +28,11 @@ func NewLatestBackupSelector() LatestBackupSelector {
 }
 
 func (s LatestBackupSelector) Select(folder storage.Folder) (string, error) {
-	return GetLatestBackupName(folder.GetSubFolder(utility.BaseBackupPath))
+	backupName, err := GetLatestBackupName(folder.GetSubFolder(utility.BaseBackupPath))
+	if err == nil {
+		tracelog.InfoLogger.Printf("LATEST backup is: '%s'\n", backupName)
+	}
+	return backupName, err
 }
 
 // Select backup which has the provided user data
