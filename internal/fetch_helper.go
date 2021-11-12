@@ -197,6 +197,7 @@ func DownloadFileTo(folder storage.Folder, fileName string, dstPath string) erro
 	if err != nil {
 		return err
 	}
+	defer utility.LoggedClose(file, "")
 
 	reader, err := DownloadAndDecompressStorageFile(folder, fileName)
 	if err != nil {
