@@ -63,6 +63,7 @@ jobs:
         run: make pg_save_image
     env:
       USE_LZO: 1
+      USE_BROTLI: 1
 
   test:
     name: test
@@ -170,3 +171,4 @@ jobs:
     env:
       USE_LIBSODIUM: 1
       USE_LZO: 1
+      USE_BROTLI: 1

@@ -72,3 +72,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
       USE_LZO: 1
+      USE_BROTLI: 1

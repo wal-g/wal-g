@@ -40,5 +40,6 @@ jobs:
         env:
           USE_LIBSODIUM: 1
           USE_LZO: 1
+          USE_BROTLI: 1
           TEST_MODIFIER: -race
 
