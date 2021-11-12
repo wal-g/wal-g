@@ -256,13 +256,13 @@ var (
 		"S3_RANGE_MAX_RETRIES":        true,
 
 		// Azure
-		"WALG_AZ_PREFIX":          true,
-		"AZURE_STORAGE_ACCOUNT":   true,
-		"AZURE_STORAGE_KEY":       true,
-		"AZURE_STORAGE_SAS_TOKEN": true,
-		"AZURE_ENVIRONMENT_NAME":  true,
-		"WALG_AZURE_BUFFER_SIZE":  true,
-		"WALG_AZURE_MAX_BUFFERS":  true,
+		"WALG_AZ_PREFIX":           true,
+		"AZURE_STORAGE_ACCOUNT":    true,
+		"AZURE_STORAGE_ACCESS_KEY": true,
+		"AZURE_STORAGE_SAS_TOKEN":  true,
+		"AZURE_ENVIRONMENT_NAME":   true,
+		"WALG_AZURE_BUFFER_SIZE":   true,
+		"WALG_AZURE_MAX_BUFFERS":   true,
 
 		// GS
 		"WALG_GS_PREFIX":                 true,
