@@ -82,6 +82,6 @@ func GetStreamName(backupName string, extension string) string {
 	return utility.SanitizePath(path.Join(backupName, "stream.")) + extension
 }
 
-func GetPartitionedStreamName(backupName string, extension string, parts int) string {
-	return fmt.Sprintf("%s_%04d.%s", utility.SanitizePath(path.Join(backupName, "part")), parts, extension)
+func GetPartitionedStreamName(backupName string, extension string, partIdx int) string {
+	return fmt.Sprintf("%s_%04d.%s", utility.SanitizePath(path.Join(backupName, "part")), partIdx, extension)
 }

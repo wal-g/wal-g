@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"io"
+	"path"
 	"time"
 
 	"github.com/wal-g/wal-g/pkg/storages/splitmerge"
@@ -60,12 +61,18 @@ func DownloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 
 // TODO : unit tests
 // DownloadAndDecompressStream downloads, decompresses and writes stream to stdout
-func DownloadAndDecompressSplittedStream(backup Backup, partitions int, blockSize int, extension string, writeCloser io.WriteCloser) error {
+func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension string, writeCloser io.WriteCloser) error {
 	defer utility.LoggedClose(writeCloser, "")
 
 	decompressor := compression.FindDecompressor(extension)
 	if decompressor == nil {
 		return fmt.Errorf("decompressor for file type '%s' not found", extension)
+	}
+
+	// detect number of partitions. For tiny backups it may not be equal to WALG_STREAM_SPLITTER_PARTITIONS
+	partitions, err := detectPartitionsCount(backup, decompressor)
+	if err != nil {
+		return err
 	}
 
 	errorsPerWorker := make([]chan error, 0)
@@ -112,4 +119,37 @@ func DownloadAndDecompressSplittedStream(backup Backup, partitions int, blockSiz
 	}
 
 	return lastErr
+}
+
+func detectPartitionsCount(backup Backup, decompressor compression.Decompressor) (int, error) {
+	// list all files in backup folder:
+	files, _, err := backup.Folder.GetSubFolder(backup.Name).ListFolder()
+	if err != nil {
+		return -1, fmt.Errorf("cannot list files in backup folder '%s' due to: %w", backup.Folder.GetPath(), err)
+	}
+
+	// prepare lookup table:
+	fileNames := make(map[string]bool)
+	for _, file := range files {
+		filePath := path.Join(backup.Name, file.GetName())
+		fileNames[filePath] = true
+	}
+
+	// find all backups:
+	partitions := 0
+	for {
+		nextPartition := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), partitions)
+		if fileNames[nextPartition] {
+			partitions++
+			tracelog.DebugLogger.Printf("partition %s found in backup folder", nextPartition)
+		} else {
+			break
+		}
+	}
+
+	if partitions == 0 {
+		return -1, fmt.Errorf("no backup partitions found in backup folder '%s'", backup.Folder.GetPath())
+	}
+
+	return partitions, nil
 }

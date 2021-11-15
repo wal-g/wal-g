@@ -54,13 +54,6 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to calc uploaded data size: %v", err)
 	}
-	// handle tiny backups:
-	if partitions > 1 && uploadedSize < int64(blockSize)*int64(partitions) {
-		partitions = int(uploadedSize / int64(blockSize))
-		if uploadedSize%int64(blockSize) != 0 {
-			partitions++
-		}
-	}
 
 	rawSize, err := uploader.RawDataSize()
 	if err != nil {
@@ -82,7 +75,6 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 		UserData:         userData,
 		Type:             backupType,
 		Compression:      uploader.Compressor.FileExtension(),
-		Partitions:       partitions,
 		BLockSize:        blockSize,
 	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())

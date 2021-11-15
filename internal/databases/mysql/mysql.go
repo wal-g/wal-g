@@ -178,8 +178,7 @@ type StreamSentinelDto struct {
 	Type        string `json:"Type,omitempty"`
 	Compression string `json:"Compression,omitempty"`
 	// SplitMerge:
-	Partitions int  `json:"Partitions,omitempty"`
-	BLockSize  uint `json:"BLockSize,omitempty"`
+	BLockSize uint `json:"BLockSize,omitempty"`
 
 	//todo: add other fields from internal.GenericMetadata
 }

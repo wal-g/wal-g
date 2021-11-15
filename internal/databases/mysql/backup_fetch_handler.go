@@ -42,11 +42,10 @@ func HandleBackupFetch(folder storage.Folder,
 func getBackupFetcher(backup internal.Backup, sentinel StreamSentinelDto) internal.StreamFetcher {
 	switch sentinel.Type {
 	case SplitMergeStreamBackup:
-		var partitions = sentinel.Partitions
 		var blockSize = sentinel.BLockSize
 		var compression = sentinel.Compression
 		return func(backup internal.Backup, writer io.WriteCloser) error {
-			return internal.DownloadAndDecompressSplittedStream(backup, partitions, int(blockSize), compression, writer)
+			return internal.DownloadAndDecompressSplittedStream(backup, int(blockSize), compression, writer)
 		}
 	case SingleStreamStreamBackup, "":
 		return internal.DownloadAndDecompressStream
