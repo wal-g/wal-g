@@ -48,9 +48,16 @@ func DownloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 		if !exists {
 			continue
 		}
-
 		tracelog.DebugLogger.Printf("Found file: %s.%s", backup.Name, decompressor.FileExtension())
-		err = DecompressDecryptBytes(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
+		defer utility.LoggedClose(archiveReader, "")
+
+		decompressedReader, err := DecompressDecryptBytes(archiveReader, decompressor)
+		if err != nil {
+			return fmt.Errorf("failed to decompress and decrypt file: %w", err)
+		}
+		defer utility.LoggedClose(decompressedReader, "")
+
+		_, err = utility.FastCopy(&EmptyWriteIgnorer{WriteCloser: writeCloser}, decompressedReader)
 		if err != nil {
 			return fmt.Errorf("failed to decompress and decrypt file: %w", err)
 		}
@@ -85,11 +92,10 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 
 		go func(fileName string, errCh chan error, writer io.WriteCloser) {
 			defer close(errCh)
-
 			archiveReader, exists, err := TryDownloadFile(backup.Folder, fileName)
 			if err != nil {
 				tracelog.ErrorLogger.PrintOnError(writer.Close())
-				errCh <- fmt.Errorf("failed to dowload file: %w", err)
+				errCh <- fmt.Errorf("failed to dowload file %v: %w", fileName, err)
 				return
 			}
 			if !exists {
@@ -97,11 +103,17 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 				tracelog.InfoLogger.PrintOnError(writer.Close())
 				return
 			}
-			tracelog.DebugLogger.Printf("Found files: %s", fileName)
-
-			err = DecompressDecryptBytes(writer, archiveReader, decompressor)
+			tracelog.DebugLogger.Printf("Found file: %s", fileName)
+			decompressedReader, err := DecompressDecryptBytes(archiveReader, decompressor)
 			if err != nil {
-				errCh <- fmt.Errorf("failed to decompress/decrypt file: %w", err)
+				errCh <- fmt.Errorf("failed to decompress/decrypt file %v: %w", fileName, err)
+				tracelog.ErrorLogger.PrintOnError(writer.Close())
+				return
+			}
+			defer utility.LoggedClose(decompressedReader, "")
+			_, err = utility.FastCopy(writer, decompressedReader)
+			if err != nil {
+				errCh <- fmt.Errorf("failed to decompress/decrypt file %v: %w", fileName, err)
 				tracelog.ErrorLogger.PrintOnError(writer.Close())
 				return
 			}

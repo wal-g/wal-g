@@ -59,9 +59,11 @@ func TestDecryptWALElzo(t *testing.T) {
 
 	assert.Equalf(t, bytes1, bytes2, "Decryption result differ")
 
-	buffer := bytes.Buffer{}
 	decompressor := lzo.Decompressor{}
-	err = decompressor.Decompress(&buffer, bytes.NewReader(bytes1))
+	dr, err := decompressor.Decompress(bytes.NewReader(bytes1))
+	assert.NoError(t, err)
+	defer dr.Close()
+	_, err = io.ReadAll(dr)
 	assert.NoError(t, err)
 
 	/* Unfortunately, we cannot quietly uninstall test keyring. This is why this test is not executed by default.
