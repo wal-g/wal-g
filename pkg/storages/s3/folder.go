@@ -19,27 +19,28 @@ const (
 	NotFoundAWSErrorCode  = "NotFound"
 	NoSuchKeyAWSErrorCode = "NoSuchKey"
 
-	EndpointSetting          = "AWS_ENDPOINT"
-	RegionSetting            = "AWS_REGION"
-	ForcePathStyleSetting    = "AWS_S3_FORCE_PATH_STYLE"
-	AccessKeyIdSetting       = "AWS_ACCESS_KEY_ID"
-	AccessKeySetting         = "AWS_ACCESS_KEY"
-	SecretAccessKeySetting   = "AWS_SECRET_ACCESS_KEY"
-	SecretKeySetting         = "AWS_SECRET_KEY"
-	SessionTokenSetting      = "AWS_SESSION_TOKEN"
-	SseSetting               = "S3_SSE"
-	SseCSetting              = "S3_SSE_C"
-	SseKmsIdSetting          = "S3_SSE_KMS_ID"
-	StorageClassSetting      = "S3_STORAGE_CLASS"
-	UploadConcurrencySetting = "UPLOAD_CONCURRENCY"
-	s3CertFile               = "S3_CA_CERT_FILE"
-	MaxPartSize              = "S3_MAX_PART_SIZE"
-	EndpointSourceSetting    = "S3_ENDPOINT_SOURCE"
-	EndpointPortSetting      = "S3_ENDPOINT_PORT"
-	LogLevel                 = "S3_LOG_LEVEL"
-	UseListObjectsV1         = "S3_USE_LIST_OBJECTS_V1"
-	RangeBatchEnabled        = "S3_RANGE_BATCH_ENABLED"
-	RangeQueriesMaxRetries   = "S3_RANGE_MAX_RETRIES"
+	EndpointSetting               = "AWS_ENDPOINT"
+	RegionSetting                 = "AWS_REGION"
+	ForcePathStyleSetting         = "AWS_S3_FORCE_PATH_STYLE"
+	AccessKeyIdSetting            = "AWS_ACCESS_KEY_ID"
+	AccessKeySetting              = "AWS_ACCESS_KEY"
+	SecretAccessKeySetting        = "AWS_SECRET_ACCESS_KEY"
+	SecretKeySetting              = "AWS_SECRET_KEY"
+	SessionTokenSetting           = "AWS_SESSION_TOKEN"
+	SseSetting                    = "S3_SSE"
+	SseCSetting                   = "S3_SSE_C"
+	SseKmsIdSetting               = "S3_SSE_KMS_ID"
+	StorageClassSetting           = "S3_STORAGE_CLASS"
+	UploadConcurrencySetting      = "UPLOAD_CONCURRENCY"
+	s3CertFile                    = "S3_CA_CERT_FILE"
+	MaxPartSize                   = "S3_MAX_PART_SIZE"
+	EndpointSourceSetting         = "S3_ENDPOINT_SOURCE"
+	EndpointPortSetting           = "S3_ENDPOINT_PORT"
+	LogLevel                      = "S3_LOG_LEVEL"
+	UseListObjectsV1              = "S3_USE_LIST_OBJECTS_V1"
+	UseMultiCloudCompatibleDelete = "S3_MULTI_CLOUD_COMPATIBLE_DELETE"
+	RangeBatchEnabled             = "S3_RANGE_BATCH_ENABLED"
+	RangeQueriesMaxRetries        = "S3_RANGE_MAX_RETRIES"
 
 	RangeBatchEnabledDefault = false
 	RangeMaxRetriesDefault   = 10
@@ -90,17 +91,20 @@ type Folder struct {
 	Path     string
 	settings map[string]string
 
-	useListObjectsV1 bool
+	useListObjectsV1              bool
+	useMultiCloudCompatibleDelete bool
 }
 
-func NewFolder(uploader Uploader, s3API s3iface.S3API, settings map[string]string, bucket, path string, useListObjectsV1 bool) *Folder {
+func NewFolder(uploader Uploader, s3API s3iface.S3API, settings map[string]string, bucket, path string,
+	useListObjectsV1 bool, useMultiCloudCompatibleDelete bool) *Folder {
 	return &Folder{
-		uploader:         uploader,
-		S3API:            s3API,
-		settings:         settings,
-		Bucket:           aws.String(bucket),
-		Path:             storage.AddDelimiterToPath(path),
-		useListObjectsV1: useListObjectsV1,
+		uploader:                      uploader,
+		S3API:                         s3API,
+		settings:                      settings,
+		Bucket:                        aws.String(bucket),
+		Path:                          storage.AddDelimiterToPath(path),
+		useListObjectsV1:              useListObjectsV1,
+		useMultiCloudCompatibleDelete: useMultiCloudCompatibleDelete,
 	}
 }
 
@@ -125,8 +129,16 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 			return nil, NewFolderError(err, "Invalid s3 list objects version setting")
 		}
 	}
+	useMultiCloudCompatibleDelete := false
+	if strUseMultiCloudCompatibleDelete, ok := settings[UseMultiCloudCompatibleDelete]; ok {
+		useMultiCloudCompatibleDelete, err = strconv.ParseBool(strUseMultiCloudCompatibleDelete)
+		if err != nil {
+			return nil, NewFolderError(err, "Invalid s3 multi cloud compatible delete setting")
+		}
+	}
 
-	folder := NewFolder(*uploader, client, settings, bucket, storagePath, useListObjectsV1)
+	folder := NewFolder(*uploader, client, settings, bucket, storagePath,
+		useListObjectsV1, useMultiCloudCompatibleDelete)
 
 	return folder, nil
 }
@@ -224,7 +236,8 @@ func (folder *Folder) getReaderSettings() (rangeEnabled bool, retriesCount int,
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 	subFolder := NewFolder(folder.uploader, folder.S3API, folder.settings, *folder.Bucket,
-		storage.JoinPath(folder.Path, subFolderRelativePath)+"/", folder.useListObjectsV1)
+		storage.JoinPath(folder.Path, subFolderRelativePath)+"/",
+		folder.useListObjectsV1, folder.useMultiCloudCompatibleDelete)
 	return subFolder
 }
 
@@ -236,7 +249,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	listFunc := func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) {
 		for _, prefix := range commonPrefixes {
 			subFolder := NewFolder(folder.uploader, folder.S3API, folder.settings, *folder.Bucket,
-				*prefix.Prefix, folder.useListObjectsV1)
+				*prefix.Prefix, folder.useListObjectsV1, folder.useMultiCloudCompatibleDelete)
 			subFolders = append(subFolders, subFolder)
 		}
 		for _, object := range contents {
@@ -291,15 +304,30 @@ func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string,
 	})
 }
 
+func DeleteObjectsError(err error, part []string) error {
+	return errors.Wrapf(err, "failed to delete s3 object: '%s'", part)
+}
+
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	parts := partitionStrings(objectRelativePaths, 1000)
 	for _, part := range parts {
 		input := &s3.DeleteObjectsInput{Bucket: folder.Bucket, Delete: &s3.Delete{
 			Objects: folder.partitionToObjects(part),
 		}}
-		_, err := folder.S3API.DeleteObjects(input)
-		if err != nil {
-			return errors.Wrapf(err, "failed to delete s3 object: '%s'", part)
+		if folder.useMultiCloudCompatibleDelete {
+			for _, key := range input.Delete.Objects {
+				_, err := folder.S3API.DeleteObject(
+					&s3.DeleteObjectInput{Bucket: folder.Bucket, Key: key.Key})
+
+				if err != nil {
+					return DeleteObjectsError(err, part)
+				}
+			}
+		} else {
+			_, err := folder.S3API.DeleteObjects(input)
+			if err != nil {
+				return DeleteObjectsError(err, part)
+			}
 		}
 	}
 	return nil
