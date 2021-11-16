@@ -75,6 +75,10 @@ func DecompressDecryptBytes(archiveReader io.Reader, decompressor compression.De
 	if err != nil {
 		return nil, err
 	}
+	if decompressor == nil {
+		tracelog.DebugLogger.Printf("No decompressor has been selected")
+		return ioutil.NopCloser(decryptReader), nil
+	}
 	return decompressor.Decompress(decryptReader)
 }
 
