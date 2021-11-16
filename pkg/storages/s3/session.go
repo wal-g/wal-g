@@ -82,12 +82,12 @@ func setupReqProxy(endpointSource, port string) *string {
 	return nil
 }
 
-func getDefaultConfig(settings map[string]string) *aws.Config {
+func getDefaultConfig(settings map[string]string, maxRetries int) *aws.Config {
 	// DefaultRetryer implements basic retry logic using exponential backoff for
 	// most services. If you want to implement custom retry logic, you can implement the
 	// request.Retryer interface.
 	config := defaults.Get().Config.WithRegion(settings[RegionSetting])
-	config = request.WithRetryer(config, NewConnResetRetryer(client.DefaultRetryer{NumMaxRetries: MaxRetries}))
+	config = request.WithRetryer(config, NewConnResetRetryer(client.DefaultRetryer{NumMaxRetries: maxRetries}))
 
 	if logLevel, ok := settings[LogLevel]; ok {
 		config = config.WithLogLevel(func(s string) aws.LogLevelType {
@@ -108,8 +108,17 @@ func getDefaultConfig(settings map[string]string) *aws.Config {
 
 // TODO : unit tests
 func createSession(bucket string, settings map[string]string) (*session.Session, error) {
-	config := getDefaultConfig(settings)
-	config.MaxRetries = &MaxRetries
+	maxRetriesCount := MaxRetriesDefault
+	if maxRetriesRaw, ok := settings[MaxRetriesSetting]; ok {
+		maxRetriesInt, err := strconv.Atoi(maxRetriesRaw)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to parse %s", MaxRetriesSetting)
+		}
+
+		maxRetriesCount = maxRetriesInt
+	}
+	config := getDefaultConfig(settings, maxRetriesCount)
+	config.MaxRetries = aws.Int(maxRetriesCount)
 	if _, err := config.Credentials.Get(); err != nil {
 		return nil, errors.Wrapf(err, "failed to get AWS credentials; please specify %s and %s", AccessKeyIdSetting, SecretAccessKeySetting)
 	}
