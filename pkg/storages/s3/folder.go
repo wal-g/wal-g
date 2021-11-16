@@ -72,6 +72,7 @@ var (
 		UseListObjectsV1,
 		RangeBatchEnabled,
 		RangeQueriesMaxRetries,
+		MaxRetriesSetting,
 	}
 )
 
