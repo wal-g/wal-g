@@ -40,16 +40,17 @@ const (
 	UseListObjectsV1         = "S3_USE_LIST_OBJECTS_V1"
 	RangeBatchEnabled        = "S3_RANGE_BATCH_ENABLED"
 	RangeQueriesMaxRetries   = "S3_RANGE_MAX_RETRIES"
+	// MaxRetriesSetting limits retries during interaction with S3
+	MaxRetriesSetting = "S3_MAX_RETRIES"
 
 	RangeBatchEnabledDefault = false
 	RangeMaxRetriesDefault   = 10
 	RangeQueryMinRetryDelay  = 30 * time.Millisecond
 	RangeQueryMaxRetryDelay  = 300 * time.Second
+	MaxRetriesDefault        = 15
 )
 
 var (
-	// MaxRetries limit upload and download retries during interaction with S3
-	MaxRetries  = 15
 	SettingList = []string{
 		EndpointPortSetting,
 		EndpointSetting,
@@ -71,6 +72,7 @@ var (
 		UseListObjectsV1,
 		RangeBatchEnabled,
 		RangeQueriesMaxRetries,
+		MaxRetriesSetting,
 	}
 )
 
