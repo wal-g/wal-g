@@ -154,7 +154,7 @@ redis_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_REDIS_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/redis.walgVersion=`git tag -l --points-at HEAD`")
 
 redis_integration_test: load_docker_common
-	docker-compose build redis redis_tests
+	docker-compose build --build-arg build_tags="$(BUILD_TAGS)" --build-arg use_brotli=$(USE_BROTLI) --build-arg use_libsodium=$(USE_LIBSODIUM) --build-arg use_lzo=$(USE_LZO) --build-arg walg_compression_method=$(WALG_COMPRESSION_METHOD) $(DOCKER_COMMON) redis redis_tests
 	docker-compose up --exit-code-from redis_tests redis_tests
 
 redis_clean:
@@ -186,7 +186,7 @@ gp_install: gp_build
 gp_test: deps gp_build unlink_brotli gp_integration_test
 
 gp_integration_test: load_docker_common
-	docker-compose build gp gp_tests
+	docker-compose build --build-arg build_tags="$(BUILD_TAGS)" --build-arg use_brotli=$(USE_BROTLI) --build-arg use_libsodium=$(USE_LIBSODIUM) --build-arg use_lzo=$(USE_LZO) --build-arg walg_compression_method=$(WALG_COMPRESSION_METHOD) $(DOCKER_COMMON) gp gp_tests
 	docker-compose up --exit-code-from gp_tests gp_tests
 
 st_test: deps pg_build unlink_brotli st_integration_test
