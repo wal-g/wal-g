@@ -66,7 +66,7 @@ pg_integration_test:
 	else\
 		docker load -i ${CACHE_FILE_DOCKER_PREFIX};\
 	fi
-	docker-compose build --build-arg build_tags=$(BUILD_TAGS) --build-arg use_brotli=$(USE_BROTLI) --build-arg use_libsodium=$(USE_LIBSODIUM) --build-arg use_lzo=$(USE_LZO) --build-arg walg_compression_method=$(WALG_COMPRESSION_METHOD) $(TEST)
+	docker-compose build --build-arg build_tags="$(BUILD_TAGS)" --build-arg use_brotli=$(USE_BROTLI) --build-arg use_libsodium=$(USE_LIBSODIUM) --build-arg use_lzo=$(USE_LZO) --build-arg walg_compression_method=$(WALG_COMPRESSION_METHOD) $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
 
 all_unittests: deps unittest
