@@ -30,13 +30,15 @@ func LoggedClose(c io.Closer, errmsg string) {
 	}
 }
 
-func LoggedSync(file *os.File, errmsg string) {
-	err := file.Sync()
-	if errmsg == "" {
-		errmsg = "Problem with file sync"
-	}
-	if err != nil {
-		tracelog.ErrorLogger.Printf("%s: %v", errmsg, err)
+func LoggedSync(file *os.File, errmsg string, fsync bool) {
+	if fsync {
+		err := file.Sync()
+		if errmsg == "" {
+			errmsg = "Problem with file sync"
+		}
+		if err != nil {
+			tracelog.ErrorLogger.Printf("%s: %v", errmsg, err)
+		}
 	}
 }
 

@@ -13,7 +13,8 @@ import (
 // TODO : unit tests
 func (tarInterpreter *FileTarInterpreter) unwrapRegularFileNew(fileReader io.Reader,
 	header *tar.Header,
-	targetPath string) error {
+	targetPath string,
+	fsync bool) error {
 	if tarInterpreter.FilesToUnwrap != nil {
 		if _, ok := tarInterpreter.FilesToUnwrap[header.Name]; !ok {
 			// don't have to unwrap it this time
@@ -27,13 +28,13 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFileNew(fileReader io.Rea
 		return err
 	}
 	defer utility.LoggedClose(localFile, "")
-	defer utility.LoggedSync(localFile, "")
+	defer utility.LoggedSync(localFile, "", fsync)
 	var unwrapResult *FileUnwrapResult
 	var unwrapError error
 	if isNewFile {
-		unwrapResult, unwrapError = fileUnwrapper.UnwrapNewFile(fileReader, header, localFile)
+		unwrapResult, unwrapError = fileUnwrapper.UnwrapNewFile(fileReader, header, localFile, fsync)
 	} else {
-		unwrapResult, unwrapError = fileUnwrapper.UnwrapExistingFile(fileReader, header, localFile)
+		unwrapResult, unwrapError = fileUnwrapper.UnwrapExistingFile(fileReader, header, localFile, fsync)
 	}
 	if unwrapError != nil {
 		return unwrapError
