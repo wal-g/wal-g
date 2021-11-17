@@ -101,6 +101,8 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 			} else {
 				//It is a storage object name
 				obj, _, err := folder.connection.Object(folder.container.Name, objectName)
+				// Some files can disappear during ListFolder execution - they can be deleted by another process
+				// for example. We can ignore that and return only files that really exist.
 				if err == swift.ObjectNotFound {
 					continue
 				}
