@@ -14,6 +14,8 @@ COPY main/ main/
 COPY utility/ utility/
 COPY Makefile Makefile
 
+ARG use_brotli
+ARG walg_compression_method
 
 RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
         vendor/github.com/google/brotli/go/cbrotli/cgo.go && \
