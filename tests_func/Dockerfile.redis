@@ -93,6 +93,6 @@ COPY staging/wal-g/redis_cli.sh /usr/bin/redis_cli.sh
 
 WORKDIR ${WALG_REPO}
 
-RUN make link_external_deps
+RUN USE_BROTLI=1 make link_external_deps
 RUN make BUILD_ARGS=-race redis_build && \
     cp main/redis/wal-g /usr/bin/wal-g
