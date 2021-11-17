@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wal-g/wal-g/cmd/st"
+	"github.com/wal-g/wal-g/cmd/common"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/wal-g/internal"
@@ -34,11 +34,5 @@ func Execute() {
 }
 
 func init() {
-	internal.ConfigureSettings(internal.SQLSERVER)
-	cobra.OnInitialize(internal.InitConfig, internal.Configure)
-	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
-	cmd.InitDefaultVersionFlag()
-
-	// Storage tools
-	cmd.AddCommand(st.StorageToolsCmd)
+	common.Init(cmd, internal.SQLSERVER)
 }

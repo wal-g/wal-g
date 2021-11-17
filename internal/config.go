@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/webserver"
@@ -506,6 +507,7 @@ func ConfigureAndRunDefaultWebServer() error {
 }
 
 func AddConfigFlags(Cmd *cobra.Command) {
+	cfgFlags := &pflag.FlagSet{}
 	for k := range AllowedSettings {
 		flagName := toFlagName(k)
 		isRequired, exist := RequiredSettings[k]
@@ -514,9 +516,12 @@ func AddConfigFlags(Cmd *cobra.Command) {
 			flagUsage = "Required, can be set though this flag or " + k + " variable"
 		}
 
-		Cmd.PersistentFlags().String(flagName, "", flagUsage)
-		_ = viper.BindPFlag(k, Cmd.PersistentFlags().Lookup(flagName))
+		cfgFlags.String(flagName, "", flagUsage)
+		_ = viper.BindPFlag(k, cfgFlags.Lookup(flagName))
 	}
+	cfgFlags.VisitAll(func(f *pflag.Flag) { f.Hidden = true })
+
+	Cmd.PersistentFlags().AddFlagSet(cfgFlags)
 }
 
 // InitConfig reads config file and ENV variables if set.
