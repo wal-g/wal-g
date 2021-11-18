@@ -47,7 +47,8 @@ func init() {
 	filesToExclude := []string{
 		"log", "pg_log", "pg_xlog", "pg_wal", // Directories
 		"pgsql_tmp", "postgresql.auto.conf.tmp", "postmaster.pid", "postmaster.opts", "recovery.conf", // Files
-		"pg_dynshmem", "pg_notify", "pg_replslot", "pg_serial", "pg_stat_tmp", "pg_snapshots", "pg_subtrans", // Directories
+		"pg_dynshmem", "pg_notify", "pg_replslot", "pg_serial", "pg_stat_tmp", "pg_snapshots", "pg_subtrans", "pg_xact", "pg_commit_ts", // Directories
+		"pg_multixact/offsets", "pg_multixact/members", // Directories
 	}
 
 	for _, filename := range filesToExclude {
