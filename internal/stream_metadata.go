@@ -3,7 +3,10 @@ package internal
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
+
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/wal-g/tracelog"
 )
@@ -23,6 +26,10 @@ type BackupStreamMetadata struct {
 func GetBackupStreamFetcher(backup Backup) (StreamFetcher, error) {
 	var metadata BackupStreamMetadata
 	err := backup.FetchMetadata(&metadata)
+	var test storage.ObjectNotFoundError
+	if errors.As(err, &test) {
+		return DownloadAndDecompressStream, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -31,9 +38,6 @@ func GetBackupStreamFetcher(backup Backup) (StreamFetcher, error) {
 	case SplitMergeStreamBackup:
 		var blockSize = metadata.BlockSize
 		var compression = metadata.Compression
-		if metadata.Partitions <= 1 {
-			return DownloadAndDecompressStream, nil
-		}
 		return func(backup Backup, writer io.WriteCloser) error {
 			return DownloadAndDecompressSplittedStream(backup, int(blockSize), compression, writer)
 		}, nil
