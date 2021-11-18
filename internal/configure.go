@@ -261,6 +261,24 @@ func ConfigureUploaderWithoutCompressMethod() (uploader *Uploader, err error) {
 	return uploader, err
 }
 
+func ConfigureSplitUploader() (uploader UploaderProvider, err error) {
+	folder, err := ConfigureFolder()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure folder")
+	}
+
+	compressor, err := ConfigureCompressor()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure compression")
+	}
+
+	var partitions = viper.GetInt(StreamSplitterPartitions)
+	var blockSize = viper.GetSizeInBytes(StreamSplitterBlockSize)
+
+	uploader = NewSplitStreamUploader(compressor, folder, partitions, int(blockSize))
+	return uploader, err
+}
+
 // ConfigureCrypter uses environment variables to create and configure a crypter.
 // In case no configuration in environment variables found, return `<nil>` value.
 func ConfigureCrypter() crypto.Crypter {

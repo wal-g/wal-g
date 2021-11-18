@@ -157,11 +157,6 @@ func replaceHostInDatasourceName(datasourceName string, newHost string) string {
 	return userData + "@" + newHost + "/" + dbNameAndParams
 }
 
-const (
-	SplitMergeStreamBackup   = "SPLIT_MERGE_STREAM_BACKUP"
-	SingleStreamStreamBackup = "STREAM_BACKUP"
-)
-
 type StreamSentinelDto struct {
 	BinLogStart    string    `json:"BinLogStart,omitempty"`
 	BinLogEnd      string    `json:"BinLogEnd,omitempty"`
@@ -174,11 +169,6 @@ type StreamSentinelDto struct {
 
 	IsPermanent bool        `json:"IsPermanent,omitempty"`
 	UserData    interface{} `json:"UserData,omitempty"`
-
-	Type        string `json:"Type,omitempty"`
-	Compression string `json:"Compression,omitempty"`
-	// SplitMerge:
-	BLockSize uint `json:"BLockSize,omitempty"`
 
 	//todo: add other fields from internal.GenericMetadata
 }

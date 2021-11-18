@@ -27,7 +27,8 @@ func (err BackupNonExistenceError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-func GetCommandStreamFetcher(cmd *exec.Cmd, fetcher StreamFetcher) func(folder storage.Folder, backup Backup) {
+// GetBackupToCommandFetcher returns function that copies all bytes from backup to cmd's stdin
+func GetBackupToCommandFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup Backup) {
 	return func(folder storage.Folder, backup Backup) {
 		stdin, err := cmd.StdinPipe()
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
@@ -35,6 +36,9 @@ func GetCommandStreamFetcher(cmd *exec.Cmd, fetcher StreamFetcher) func(folder s
 		cmd.Stderr = stderr
 		err = cmd.Start()
 		tracelog.ErrorLogger.FatalfOnError("Failed to start restore command: %v\n", err)
+
+		fetcher, err := GetBackupStreamFetcher(backup)
+		tracelog.ErrorLogger.FatalfOnError("Failed to detect backup format: %v\n", err)
 
 		err = fetcher(backup, stdin)
 
@@ -84,7 +88,7 @@ func HandleBackupFetch(folder storage.Folder,
 	fetcher func(folder storage.Folder, backup Backup)) {
 	backupName, err := targetBackupSelector.Select(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder,)\n", backupName)
+	tracelog.DebugLogger.Printf("HandleBackupFetch(%s)\n", backupName)
 	backup, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 

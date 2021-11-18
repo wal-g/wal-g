@@ -10,10 +10,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPermanent bool, userDataRaw string,
-	partitions int, blockSize uint) {
-	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
-
+func HandleBackupPush(uploader internal.UploaderProvider, backupCmd *exec.Cmd, isPermanent bool, userDataRaw string) {
 	db, err := getMySQLConnection()
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(db, "")
@@ -24,17 +21,8 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
-	var fileName string
-	var backupType string
-	if partitions == 0 || partitions == 1 {
-		fileName, err = uploader.PushStream(limiters.NewDiskLimitReader(stdout))
-		backupType = SingleStreamStreamBackup
-		tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
-	} else {
-		fileName, err = uploader.SplitAndPushStream(limiters.NewDiskLimitReader(stdout), partitions, int(blockSize))
-		backupType = SplitMergeStreamBackup
-		tracelog.ErrorLogger.FatalfOnError("failed to split and push backup: %v", err)
-	}
+	fileName, err := uploader.PushStream(limiters.NewDiskLimitReader(stdout))
+	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
 
 	err = backupCmd.Wait()
 	if err != nil {
@@ -73,9 +61,6 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 		UncompressedSize: rawSize,
 		IsPermanent:      isPermanent,
 		UserData:         userData,
-		Type:             backupType,
-		Compression:      uploader.Compressor.FileExtension(),
-		BLockSize:        blockSize,
 	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())
 

@@ -134,6 +134,10 @@ func SentinelNameFromBackup(backupName string) string {
 	return backupName + utility.SentinelSuffix
 }
 
+func MetadataNameFromBackup(backupName string) string {
+	return backupName + "/" + utility.MetadataFileName
+}
+
 // UnwrapLatestModifier checks if LATEST is provided instead of backupName
 // if so, replaces it with the name of the latest backup
 func UnwrapLatestModifier(backupName string, folder storage.Folder) (string, error) {

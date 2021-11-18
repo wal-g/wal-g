@@ -1,10 +1,7 @@
 package mysql
 
 import (
-	"io"
 	"os/exec"
-
-	"github.com/wal-g/wal-g/utility"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -15,41 +12,11 @@ func HandleBackupFetch(folder storage.Folder,
 	targetBackupSelector internal.BackupSelector,
 	restoreCmd *exec.Cmd,
 	prepareCmd *exec.Cmd) {
-	backupName, err := targetBackupSelector.Select(folder)
-	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.DebugLogger.Printf("HandleBackupFetch(%s)\n", backupName)
-
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
-	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
-
-	// Fetch Sentinel
-	var sentinel StreamSentinelDto
-	err = backup.FetchSentinel(&sentinel)
-	tracelog.ErrorLogger.FatalfOnError("Failed to fetch sentinel: %v\n", err)
-
-	// Fetch Backup
-	streamFetcher := internal.GetCommandStreamFetcher(restoreCmd, getBackupFetcher(backup, sentinel))
-	streamFetcher(folder, backup)
+	internal.HandleBackupFetch(folder, targetBackupSelector, internal.GetBackupToCommandFetcher(restoreCmd))
 
 	// Prepare Backup
 	if prepareCmd != nil {
 		err := prepareCmd.Run()
 		tracelog.ErrorLogger.FatalfOnError("failed to prepare fetched backup: %v", err)
 	}
-}
-
-//nolint:gocritic,hugeParam,unparam
-func getBackupFetcher(backup internal.Backup, sentinel StreamSentinelDto) internal.StreamFetcher {
-	switch sentinel.Type {
-	case SplitMergeStreamBackup:
-		var blockSize = sentinel.BLockSize
-		var compression = sentinel.Compression
-		return func(backup internal.Backup, writer io.WriteCloser) error {
-			return internal.DownloadAndDecompressSplittedStream(backup, int(blockSize), compression, writer)
-		}
-	case SingleStreamStreamBackup, "":
-		return internal.DownloadAndDecompressStream
-	}
-	tracelog.ErrorLogger.Fatalf("Unknown backup type %s", sentinel.Type)
-	return nil // unreachable
 }

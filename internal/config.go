@@ -166,6 +166,7 @@ var (
 		OplogArchiveTimeoutInterval:    "60s",
 		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
 		MongoDBLastWriteUpdateInterval: "3s",
+		StreamSplitterBlockSize:        "1073741824",
 	}
 
 	MysqlDefaultSettings = map[string]string{
@@ -331,6 +332,8 @@ var (
 		OplogPushWaitForBecomePrimary:  true,
 		OplogPushPrimaryCheckInterval:  true,
 		OplogPITRDiscoveryInterval:     true,
+		StreamSplitterBlockSize:        true,
+		StreamSplitterPartitions:       true,
 	}
 
 	SQLServerAllowedSettings = map[string]bool{

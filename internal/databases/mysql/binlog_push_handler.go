@@ -29,9 +29,9 @@ type LogsCache struct {
 }
 
 //gocyclo:ignore
-func HandleBinlogPush(uploader *internal.Uploader, untilBinlog string, checkGTIDs bool) {
-	rootFolder := uploader.UploadingFolder
-	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(BinlogPath)
+func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, checkGTIDs bool) {
+	rootFolder := uploader.GetFolder()
+	uploader.ChangeDirectory(BinlogPath)
 
 	db, err := getMySQLConnection()
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -134,7 +134,7 @@ func getMySQLBinlogsFolder(db *sql.DB) (string, error) {
 	return path.Dir(logBinBasename), nil
 }
 
-func archiveBinLog(uploader *internal.Uploader, dataDir string, binLog string) error {
+func archiveBinLog(uploader internal.UploaderProvider, dataDir string, binLog string) error {
 	tracelog.InfoLogger.Printf("Archiving %v\n", binLog)
 
 	filename := path.Join(dataDir, binLog)

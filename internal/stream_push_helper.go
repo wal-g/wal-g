@@ -28,17 +28,17 @@ func (uploader *Uploader) PushStream(stream io.Reader) (string, error) {
 }
 
 // TODO : unit tests
-// SplitAndPushStream - splits stream to blocks of 1Mb, then puts it in `partitions` streams that are compressed
-// and pushed to storage
-// returns `;` separated list of files
-func (uploader *Uploader) SplitAndPushStream(stream io.Reader, partitions int, blockSize int) (string, error) {
+// returns backup_prefix
+// (Note: individual parition names are built by adding '_0000.br' suffix)
+func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error) {
 	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 
-	var readers = splitmerge.SplitReader(stream, partitions, blockSize)
+	// Upload Stream:
+	var readers = splitmerge.SplitReader(stream, uploader.partitions, uploader.blockSize)
 
 	errCh := make(chan error)
 	defer close(errCh)
-	for i := 0; i < partitions; i++ {
+	for i := 0; i < uploader.partitions; i++ {
 		dstPath := GetPartitionedStreamName(backupName, uploader.Compressor.FileExtension(), i)
 		tracelog.InfoLogger.Printf("Uploading... %v", dstPath)
 		go func(reader io.Reader) {
@@ -48,15 +48,29 @@ func (uploader *Uploader) SplitAndPushStream(stream io.Reader, partitions int, b
 
 	// Wait for upload finished:
 	var lastErr error
-	for i := 0; i < partitions; i++ {
+	for i := 0; i < uploader.partitions; i++ {
 		err := <-errCh
 		if err != nil {
 			tracelog.WarningLogger.Printf("Failed to upload part of backup: %v", err)
 			lastErr = err
 		}
 	}
+	if lastErr != nil {
+		return backupName, lastErr
+	}
 
-	return backupName, lastErr
+	// Upload StreamMetadata
+	meta := BackupStreamMetadata{
+		Type:        SplitMergeStreamBackup,
+		Partitions:  uint(uploader.partitions),
+		BlockSize:   uint(uploader.blockSize),
+		Compression: uploader.Compressor.FileExtension(),
+	}
+	uploaderClone := uploader.Clone()
+	uploaderClone.DisableSizeTracking() // don't count metadata.json in backup size
+	err := UploadBackupStreamMetadata(uploader, meta, backupName)
+
+	return backupName, err
 }
 
 // TODO : unit tests
