@@ -27,7 +27,7 @@ type UploaderProvider interface {
 	UploadedDataSize() (int64, error)
 	RawDataSize() (int64, error)
 	ChangeDirectory(relativePath string)
-	GetFolder() storage.Folder
+	Folder() storage.Folder
 }
 
 // Uploader contains fields associated with uploading tarballs.
@@ -201,7 +201,7 @@ func (uploader *Uploader) ChangeDirectory(relativePath string) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(relativePath)
 }
 
-func (uploader *Uploader) GetFolder() storage.Folder {
+func (uploader *Uploader) Folder() storage.Folder {
 	return uploader.UploadingFolder
 }
 

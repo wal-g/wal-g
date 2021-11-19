@@ -30,7 +30,7 @@ type LogsCache struct {
 
 //gocyclo:ignore
 func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, checkGTIDs bool) {
-	rootFolder := uploader.GetFolder()
+	rootFolder := uploader.Folder()
 	uploader.ChangeDirectory(BinlogPath)
 
 	db, err := getMySQLConnection()

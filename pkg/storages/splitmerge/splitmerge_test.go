@@ -7,6 +7,8 @@ import (
 	"io"
 	"math/rand"
 	"testing"
+	"golang.org/x/sync/errgroup"
+
 )
 
 //               ┌─> copy data per 1 byte    ─>┐
@@ -27,16 +29,19 @@ func TestSplitMerge(t *testing.T) {
 	var sink bytes.Buffer
 	writers := MergeWriter(&sink, partitions, blockSize)
 
-	errCh := make(chan error)
-	defer close(errCh)
+	errGroup := new(errgroup.Group)
 	for i := 0; i < partitions; i++ {
-		go func(idx int, reader io.Reader, writer io.WriteCloser, buffSize int) {
+		//idx := i
+		reader := readers[i]
+		writer := writers[i]
+		buffSize:= bufSizes[i%len(bufSizes)]
+		
+		errGroup.Go(func() error {
 			defer writer.Close()
 			// read _all_ data first and only then send it to MergeWriter:
 			allData, err := io.ReadAll(reader)
 			if err != nil {
-				errCh <- err
-				return
+				return err
 			}
 			
 			offset := 0
@@ -46,25 +51,20 @@ func TestSplitMerge(t *testing.T) {
 				offset += rbytes
 				//tracelog.InfoLogger.Printf("goroutine #%d: %d bytes fetched, err=%v", idx, rbytes, rerr)
 				if rbytes == 0 {
-					errCh <- nil
-					return
+					return nil
 				}
 				_, werr := writer.Write(data[:rbytes])
 				if werr != nil {
-					errCh <- werr
-					return
+					return werr
 				} else {
 					//tracelog.InfoLogger.Printf("goroutine #%d: %d bytes copied", idx, rbytes)
 				}
 			}
-		}(i, readers[i], writers[i], bufSizes[i%len(bufSizes)])
+		})
 	}
 
 	// Wait for upload finished:
-	for i := 0; i < partitions; i++ {
-		err := <-errCh
-		assert.NoError(t, err)
-	}
+	assert.NoError(t, errGroup.Wait())
 	
 	fmt.Printf("%d\n", len(inputData))
 	fmt.Printf("%d\n", sink.Len())

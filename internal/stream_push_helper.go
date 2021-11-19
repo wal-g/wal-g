@@ -6,6 +6,8 @@ import (
 	"os"
 	"path"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/wal-g/wal-g/pkg/storages/splitmerge"
 
 	"github.com/wal-g/tracelog"
@@ -36,27 +38,20 @@ func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error
 	// Upload Stream:
 	var readers = splitmerge.SplitReader(stream, uploader.partitions, uploader.blockSize)
 
-	errCh := make(chan error)
-	defer close(errCh)
+	errGroup := new(errgroup.Group)
 	for i := 0; i < uploader.partitions; i++ {
+		reader := readers[i]
 		dstPath := GetPartitionedStreamName(backupName, uploader.Compressor.FileExtension(), i)
 		tracelog.InfoLogger.Printf("Uploading... %v", dstPath)
-		go func(reader io.Reader) {
-			errCh <- uploader.PushStreamToDestination(reader, dstPath)
-		}(readers[i])
+		errGroup.Go(func() error {
+			return uploader.PushStreamToDestination(reader, dstPath)
+		})
 	}
 
 	// Wait for upload finished:
-	var lastErr error
-	for i := 0; i < uploader.partitions; i++ {
-		err := <-errCh
-		if err != nil {
-			tracelog.WarningLogger.Printf("Failed to upload part of backup: %v", err)
-			lastErr = err
-		}
-	}
-	if lastErr != nil {
-		return backupName, lastErr
+	if err := errGroup.Wait(); err != nil {
+		tracelog.WarningLogger.Printf("Failed to upload part of backup: %v", err)
+		return backupName, err
 	}
 
 	// Upload StreamMetadata
