@@ -184,12 +184,12 @@ type binlogHandler interface {
 	handleBinlog(binlogPath string) error
 }
 
-func fetchLogs(folder storage.Folder, dstDir string, startTS time.Time, endTS time.Time, handler binlogHandler) error {
+func fetchLogs(folder storage.Folder, dstDir string, startTS, endTS, endBinlogTS time.Time, handler binlogHandler) error {
 	logFolder := folder.GetSubFolder(BinlogPath)
 	includeStart := true
 outer:
 	for {
-		logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, includeStart)
+		logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, includeStart, endBinlogTS)
 		includeStart = false
 		if err != nil {
 			return err
@@ -261,7 +261,7 @@ func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time,
 }
 
 // getLogsCoveringInterval lists the operation logs that cover the interval
-func getLogsCoveringInterval(folder storage.Folder, start time.Time, includeStart bool) ([]storage.Object, error) {
+func getLogsCoveringInterval(folder storage.Folder, start time.Time, includeStart bool, endBinlogTS time.Time) ([]storage.Object, error) {
 	logFiles, _, err := folder.ListFolder()
 	if err != nil {
 		return nil, err
@@ -271,6 +271,9 @@ func getLogsCoveringInterval(folder storage.Folder, start time.Time, includeStar
 	})
 	var logsToFetch []storage.Object
 	for _, logFile := range logFiles {
+		if logFile.GetLastModified().After(endBinlogTS) {
+			continue // don't fetch binlogs from future
+		}
 		if start.Before(logFile.GetLastModified()) || includeStart && start.Equal(logFile.GetLastModified()) {
 			logsToFetch = append(logsToFetch, logFile)
 		}

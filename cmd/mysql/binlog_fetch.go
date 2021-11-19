@@ -12,9 +12,12 @@ import (
 
 const fetchSinceFlagShortDescr = "backup name starting from which you want to fetch binlogs"
 const fetchUntilFlagShortDescr = "time in RFC3339 for PITR"
+const fetchUntilBinlogLastModifiedFlagShortDescr = "time in RFC3339 that is used to prevent wal-g from replaying" +
+	" binlogs that was created/modified after this time"
 
 var fetchBackupName string
 var fetchUntilTS string
+var fetchUntilBinlogLastModifiedTS string
 
 // binlogPushCmd represents the cron command
 var binlogFetchCmd = &cobra.Command{
@@ -24,7 +27,7 @@ var binlogFetchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
-		mysql.HandleBinlogFetch(folder, fetchBackupName, fetchUntilTS)
+		mysql.HandleBinlogFetch(folder, fetchBackupName, fetchUntilTS, fetchUntilBinlogLastModifiedTS)
 	},
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		internal.RequiredSettings[internal.MysqlBinlogDstSetting] = true
@@ -39,5 +42,9 @@ func init() {
 		"until",
 		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339),
 		fetchUntilFlagShortDescr)
+	binlogReplayCmd.PersistentFlags().StringVar(&fetchUntilBinlogLastModifiedTS,
+		"until-binlog-last-modified-time",
+		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339),
+		fetchUntilBinlogLastModifiedFlagShortDescr)
 	cmd.AddCommand(binlogFetchCmd)
 }
