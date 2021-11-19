@@ -40,6 +40,6 @@ func init() {
 	binlogReplayCmd.PersistentFlags().StringVar(&replayUntilTS, "until",
 		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339), replayUntilFlagShortDescr)
 	binlogReplayCmd.PersistentFlags().StringVar(&replayUntilBinlogLastModifiedTS, "until-binlog-last-modified-time",
-		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339), replayUntilBinlogLastModifiedFlagShortDescr)
+		"", replayUntilBinlogLastModifiedFlagShortDescr)
 	cmd.AddCommand(binlogReplayCmd)
 }

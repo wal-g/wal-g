@@ -44,7 +44,7 @@ func init() {
 		fetchUntilFlagShortDescr)
 	binlogFetchCmd.PersistentFlags().StringVar(&fetchUntilBinlogLastModifiedTS,
 		"until-binlog-last-modified-time",
-		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339),
+		"",
 		fetchUntilBinlogLastModifiedFlagShortDescr)
 	cmd.AddCommand(binlogFetchCmd)
 }
