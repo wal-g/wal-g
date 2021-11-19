@@ -42,7 +42,7 @@ func init() {
 		"until",
 		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339),
 		fetchUntilFlagShortDescr)
-	binlogReplayCmd.PersistentFlags().StringVar(&fetchUntilBinlogLastModifiedTS,
+	binlogFetchCmd.PersistentFlags().StringVar(&fetchUntilBinlogLastModifiedTS,
 		"until-binlog-last-modified-time",
 		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339),
 		fetchUntilBinlogLastModifiedFlagShortDescr)
