@@ -3,12 +3,12 @@ package splitmerge
 import (
 	"bytes"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"math/rand"
 	"testing"
-	"golang.org/x/sync/errgroup"
 
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/sync/errgroup"
 )
 
 //               ┌─> copy data per 1 byte    ─>┐
@@ -34,8 +34,8 @@ func TestSplitMerge(t *testing.T) {
 		//idx := i
 		reader := readers[i]
 		writer := writers[i]
-		buffSize:= bufSizes[i%len(bufSizes)]
-		
+		buffSize := bufSizes[i%len(bufSizes)]
+
 		errGroup.Go(func() error {
 			defer writer.Close()
 			// read _all_ data first and only then send it to MergeWriter:
@@ -43,7 +43,7 @@ func TestSplitMerge(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			
+
 			offset := 0
 			for {
 				data := make([]byte, buffSize, buffSize)
@@ -65,7 +65,7 @@ func TestSplitMerge(t *testing.T) {
 
 	// Wait for upload finished:
 	assert.NoError(t, errGroup.Wait())
-	
+
 	fmt.Printf("%d\n", len(inputData))
 	fmt.Printf("%d\n", sink.Len())
 

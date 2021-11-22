@@ -1,8 +1,9 @@
 package splitmerge
 
 import (
-	"github.com/wal-g/tracelog"
 	"io"
+
+	"github.com/wal-g/tracelog"
 )
 
 // MergeWriter returns list of WriteCloser-s
