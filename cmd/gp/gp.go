@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wal-g/wal-g/cmd/st"
+	"github.com/wal-g/wal-g/cmd/common"
 
 	"github.com/wal-g/wal-g/cmd/pg"
 
@@ -41,13 +41,9 @@ func Execute() {
 }
 
 func init() {
-	internal.ConfigureSettings(internal.GP)
-	cobra.OnInitialize(internal.InitConfig, internal.Configure)
+	common.Init(cmd, internal.GP)
 
-	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
 	_ = cmd.MarkFlagRequired("config") // config is required for Greenplum WAL-G
-	cmd.InitDefaultVersionFlag()
-	internal.AddConfigFlags(cmd)
 
 	// wrap the Postgres command so it can be used in the same binary
 	wrappedPgCmd := pg.Cmd
@@ -59,7 +55,4 @@ func init() {
 		wrappedPreRun(cmd, args)
 	}
 	cmd.AddCommand(wrappedPgCmd)
-
-	// Storage tools
-	cmd.AddCommand(st.StorageToolsCmd)
 }

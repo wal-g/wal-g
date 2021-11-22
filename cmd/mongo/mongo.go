@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wal-g/wal-g/cmd/st"
+	"github.com/wal-g/wal-g/cmd/common"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
@@ -41,14 +41,7 @@ func Execute() {
 }
 
 func init() {
-	internal.ConfigureSettings(internal.MONGO)
-	cobra.OnInitialize(internal.InitConfig, internal.Configure)
+	common.Init(cmd, internal.MONGO)
 
 	internal.RequiredSettings[internal.MongoDBUriSetting] = true
-	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
-	cmd.InitDefaultVersionFlag()
-	internal.AddConfigFlags(cmd)
-
-	// Storage tools
-	cmd.AddCommand(st.StorageToolsCmd)
 }
