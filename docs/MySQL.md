@@ -140,6 +140,13 @@ or
 wal-g binlog-fetch --since LATEST --until "2006-01-02T15:04:05Z07:00"
 ```
 
+You can stop wal-g from fetching newly created/modified binlogs by specifying `--until-binlog-last-modified-time` option.
+This may be useful to achieve exact clones of the same database in scenarios when new binlogs are uploaded concurrently whith your restore process.
+
+```bash
+wal-g binlog-replay --since LATEST --until "2006-01-02T15:04:05Z07:00" --until-binlog-last-modified-time "2006-01-02T15:04:05Z07:00"
+```
+
 ### ``binlog-replay``
 
 Fetches binlogs from storage and passes them to `WALG_MYSQL_BINLOG_REPLAY_COMMAND` to replay on running MySQL server.
@@ -161,6 +168,12 @@ or
 wal-g binlog-replay --since LATEST --until "2006-01-02T15:04:05Z07:00"
 ```
 
+You can stop wal-g from applying newly created/modified  binlogs by specifying `--until-binlog-last-modified-time` option.
+This may be useful to achieve exact clones of the same database in scenarios when new binlogs are uploaded concurrently whith your restore process.
+
+```bash
+wal-g binlog-replay --since LATEST --until "2006-01-02T15:04:05Z07:00" --until-binlog-last-modified-time "2006-01-02T15:04:05Z07:00"
+```
 
 Typical configurations
 -----
