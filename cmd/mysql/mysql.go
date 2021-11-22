@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wal-g/wal-g/cmd/st"
+	"github.com/wal-g/wal-g/cmd/common"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
@@ -41,14 +41,6 @@ func Execute() {
 }
 
 func init() {
-	internal.ConfigureSettings(internal.MYSQL)
-	cobra.OnInitialize(internal.InitConfig, internal.Configure)
-
-	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
+	common.Init(cmd, internal.MYSQL)
 	cmd.PersistentFlags().BoolVarP(&internal.Turbo, "turbo", "", false, "Ignore all kinds of throttling defined in config")
-	cmd.InitDefaultVersionFlag()
-	internal.AddConfigFlags(cmd)
-
-	// Storage tools
-	cmd.AddCommand(st.StorageToolsCmd)
 }
