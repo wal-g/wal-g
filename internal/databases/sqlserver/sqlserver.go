@@ -554,12 +554,11 @@ func RunOrReuseProxy(ctx context.Context, cancel context.CancelFunc, folder stor
 }
 
 func GetDBRestoreLSN(db *sql.DB, databaseName string) (int64, error) {
-	query := fmt.Sprintf(`SELECT MAX(redo_start_lsn) 
-							FROM sys.master_files
-							WHERE database_id=DB_ID('%s') 
-							`, databaseName)
+	query := `SELECT MAX(redo_start_lsn) 
+        FROM sys.master_files
+        WHERE database_id=DB_ID(@dbname) `
 	var res int64
-	if err := db.QueryRow(query).Scan(&res); err != nil {
+	if err := db.QueryRow(query, sql.Named("dbname", databaseName)).Scan(&res); err != nil {
 		return 0, err
 	}
 	return res, nil
