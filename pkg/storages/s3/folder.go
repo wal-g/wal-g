@@ -51,6 +51,8 @@ const (
 )
 
 var (
+	// MaxRetries limit upload and download retries during interaction with S3
+	MaxRetries  = 15
 	SettingList = []string{
 		EndpointPortSetting,
 		EndpointSetting,
@@ -196,8 +198,7 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	return reader, nil
 }
 
-func (folder *Folder) getReaderSettings() (rangeEnabled bool, retriesCount int,
-	minRetryDelay, maxRetryDelay time.Duration) {
+func (folder *Folder) getReaderSettings() (rangeEnabled bool, retriesCount int, minRetryDelay, maxRetryDelay time.Duration) {
 	rangeEnabled = RangeBatchEnabledDefault
 	if rangeBatch, ok := folder.settings[RangeBatchEnabled]; ok {
 		if strings.TrimSpace(strings.ToLower(rangeBatch)) == "true" {

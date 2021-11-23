@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const (
@@ -27,7 +28,8 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			uploader, err := internal.ConfigureUploader()
+			uploader, err := internal.ConfigureSplitUploader()
+			uploader.ChangeDirectory(utility.BaseBackupPath)
 			tracelog.ErrorLogger.FatalOnError(err)
 			backupCmd, err := internal.GetCommandSetting(internal.NameStreamCreateCmd)
 			tracelog.ErrorLogger.FatalOnError(err)

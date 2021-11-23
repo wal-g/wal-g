@@ -77,6 +77,8 @@ const (
 	PrefetchDir                  = "WALG_PREFETCH_DIR"
 	PgReadyRename                = "PG_READY_RENAME"
 	SerializerTypeSetting        = "WALG_SERIALIZER_TYPE"
+	StreamSplitterPartitions     = "WALG_STREAM_SPLITTER_PARTITIONS"
+	StreamSplitterBlockSize      = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
@@ -164,6 +166,11 @@ var (
 		OplogArchiveTimeoutInterval:    "60s",
 		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
 		MongoDBLastWriteUpdateInterval: "3s",
+		StreamSplitterBlockSize:        "1048576",
+	}
+
+	MysqlDefaultSettings = map[string]string{
+		StreamSplitterBlockSize: "1048576",
 	}
 
 	SQLServerDefaultSettings = map[string]string{
@@ -325,6 +332,8 @@ var (
 		OplogPushWaitForBecomePrimary:  true,
 		OplogPushPrimaryCheckInterval:  true,
 		OplogPITRDiscoveryInterval:     true,
+		StreamSplitterBlockSize:        true,
+		StreamSplitterPartitions:       true,
 	}
 
 	SQLServerAllowedSettings = map[string]bool{
@@ -347,6 +356,8 @@ var (
 		MysqlBackupPrepareCmd:      true,
 		MysqlTakeBinlogsFromMaster: true,
 		MysqlCheckGTIDs:            true,
+		StreamSplitterPartitions:   true,
+		StreamSplitterBlockSize:    true,
 	}
 
 	RedisAllowedSettings = map[string]bool{
@@ -377,6 +388,8 @@ func ConfigureSettings(currentType string) {
 			dbSpecificDefaultSettings = PGDefaultSettings
 		case MONGO:
 			dbSpecificDefaultSettings = MongoDefaultSettings
+		case MYSQL:
+			dbSpecificDefaultSettings = MysqlDefaultSettings
 		case SQLSERVER:
 			dbSpecificDefaultSettings = SQLServerDefaultSettings
 		case GP:

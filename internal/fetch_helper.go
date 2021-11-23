@@ -9,11 +9,10 @@ import (
 	"os/user"
 	"path/filepath"
 
-	"github.com/wal-g/wal-g/internal/ioextensions"
-
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -53,8 +52,8 @@ func DownloadFile(folder storage.Folder, filename, ext string, writeCloser io.Wr
 	return nil
 }
 
-func TryDownloadFile(folder storage.Folder, path string) (walFileReader io.ReadCloser, exists bool, err error) {
-	walFileReader, err = folder.ReadObject(path)
+func TryDownloadFile(folder storage.Folder, path string) (fileReader io.ReadCloser, exists bool, err error) {
+	fileReader, err = folder.ReadObject(path)
 	if err == nil {
 		exists = true
 		return

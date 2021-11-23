@@ -169,6 +169,7 @@ type StreamSentinelDto struct {
 
 	IsPermanent bool        `json:"IsPermanent,omitempty"`
 	UserData    interface{} `json:"UserData,omitempty"`
+
 	//todo: add other fields from internal.GenericMetadata
 }
 
