@@ -70,6 +70,7 @@ var (
 		s3CertFile,
 		MaxPartSize,
 		UseListObjectsV1,
+		LogLevel,
 		RangeBatchEnabled,
 		RangeQueriesMaxRetries,
 		MaxRetriesSetting,
