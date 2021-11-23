@@ -55,6 +55,7 @@ const (
 	CompressedBlockMaxSize = 20 << 20
 	CopiedBlockMaxSize     = CompressedBlockMaxSize
 	MetadataFileName       = "metadata.json"
+	StreamMetadataFileName = "stream_metadata.json"
 	PathSeparator          = string(os.PathSeparator)
 	Mebibyte               = 1024 * 1024
 )
