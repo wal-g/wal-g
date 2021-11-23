@@ -166,11 +166,11 @@ var (
 		OplogArchiveTimeoutInterval:    "60s",
 		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
 		MongoDBLastWriteUpdateInterval: "3s",
-		StreamSplitterBlockSize:        "1073741824",
+		StreamSplitterBlockSize:        "1048576",
 	}
 
 	MysqlDefaultSettings = map[string]string{
-		StreamSplitterBlockSize: "1073741824",
+		StreamSplitterBlockSize: "1048576",
 	}
 
 	SQLServerDefaultSettings = map[string]string{
