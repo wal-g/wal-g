@@ -574,7 +574,7 @@ func IsLogAlreadyApplied(db *sql.DB, databaseName string, logBackupFilePropertie
 	if err != nil {
 		return false, err
 	}
-	if dbRestoreLSN <= lastLSN {
+	if dbRestoreLSN < lastLSN {
 		return false, nil
 	}
 	return true, nil
