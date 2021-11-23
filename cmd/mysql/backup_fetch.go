@@ -19,7 +19,7 @@ var (
 		Use:   "backup-fetch backup-name",
 		Short: backupFetchShortDescription,
 		Args:  cobra.RangeArgs(0, 1),
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		PreRun: func(cmd *cobra.Command, args []string) {
 			internal.RequiredSettings[internal.NameStreamRestoreCmd] = true
 			err := internal.AssertRequiredSettingsSet()
 			tracelog.ErrorLogger.FatalOnError(err)

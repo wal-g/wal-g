@@ -28,6 +28,8 @@ var cmd = &cobra.Command{
 		if err != nil {
 			tracelog.WarningLogger.PrintError(err)
 		}
+		err = internal.ConfigureAndRunDefaultWebServer()
+		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
 
