@@ -51,11 +51,11 @@ func downloadObject(objectPath string, folder storage.Folder, fileWriter io.Writ
 	if err != nil {
 		return err
 	}
-	origReadCloser := objReadCloser
-	defer origReadCloser.Close()
+	defer objReadCloser.Close()
+	var objReader io.Reader = objReadCloser
 
 	if decrypt {
-		objReadCloser, err = internal.DecryptBytes(objReadCloser)
+		objReader, err = internal.DecryptBytes(objReader)
 		if err != nil {
 			return err
 		}
@@ -65,15 +65,20 @@ func downloadObject(objectPath string, folder storage.Folder, fileWriter io.Writ
 		fileName := path.Base(objectPath)
 		fileExt := path.Ext(fileName)
 		decompressor := compression.FindDecompressor(fileExt)
-		if decompressor != nil {
-			return decompressor.Decompress(fileWriter, objReadCloser)
+		if decompressor == nil {
+			tracelog.WarningLogger.Printf(
+				"decompressor for extension '%s' was not found (supported methods: %v), will download uncompressed",
+				fileExt, compression.CompressingAlgorithms)
+		} else {
+			decrypterObjReadCloser, err := decompressor.Decompress(objReader)
+			if err != nil {
+				return err
+			}
+			defer decrypterObjReadCloser.Close()
+			objReader = decrypterObjReadCloser
 		}
-
-		tracelog.WarningLogger.Printf(
-			"decompressor for extension '%s' was not found (supported methods: %v), will download uncompressed",
-			fileExt, compression.CompressingAlgorithms)
 	}
 
-	_, err = utility.FastCopy(fileWriter, objReadCloser)
+	_, err = utility.FastCopy(fileWriter, objReader)
 	return err
 }
