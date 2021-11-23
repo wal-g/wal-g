@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -550,4 +551,30 @@ func RunOrReuseProxy(ctx context.Context, cancel context.CancelFunc, folder stor
 		return nil, xerrors.Errorf("proxy run error: %v", err)
 	}
 	return &LockWrapper{lock}, nil
+}
+
+func GetDBRestoreLSN(db *sql.DB, databaseName string) (int64, error) {
+	query := `SELECT MAX(redo_start_lsn) 
+        FROM sys.master_files
+        WHERE database_id=DB_ID(@dbname) `
+	var res int64
+	if err := db.QueryRow(query, sql.Named("dbname", databaseName)).Scan(&res); err != nil {
+		return 0, err
+	}
+	return res, nil
+}
+
+func IsLogAlreadyApplied(db *sql.DB, databaseName string, logBackupFileProperties *BackupProperties) (bool, error) {
+	lastLSN, err := strconv.ParseInt(logBackupFileProperties.LastLSN, 10, 64)
+	if err != nil {
+		return false, err
+	}
+	dbRestoreLSN, err := GetDBRestoreLSN(db, databaseName)
+	if err != nil {
+		return false, err
+	}
+	if dbRestoreLSN < lastLSN {
+		return false, nil
+	}
+	return true, nil
 }

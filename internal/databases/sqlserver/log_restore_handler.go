@@ -123,6 +123,14 @@ func restoreSingleLog(ctx context.Context,
 	if err != nil {
 		return prevBackupFinishDate, err
 	}
+	applied, err := IsLogAlreadyApplied(db, dbname, logBackupFileProperties[0])
+	if err != nil {
+		return prevBackupFinishDate, err
+	}
+	if applied {
+		tracelog.InfoLogger.Printf("Skipping %s, log had already been applied", urls)
+		return logBackupFileProperties[0].BackupFinishDate, err
+	}
 	if !prevBackupFinishDate.Before(stopAt) {
 		tracelog.InfoLogger.Printf("Log Restore operation is inapplicable. STOPAT point left behind.")
 		return prevBackupFinishDate, err
