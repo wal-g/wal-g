@@ -176,7 +176,7 @@ func (c *CopyTarBallComposer) copyTar(tarName string) error {
 	if err != nil {
 		return err
 	}
-	for _, fileName := range c.prevTarFileSets.GetFiles()[tarName] {
+	for _, fileName := range c.prevTarFileSets.Get()[tarName] {
 		if file, exists := c.fileInfo[fileName]; exists {
 			file.status = processed
 			c.tarFileSets.AddFile(newTarName, fileName)
@@ -199,7 +199,7 @@ func (c *CopyTarBallComposer) getTarBall() internal.TarBall {
 func (c *CopyTarBallComposer) copyUnchangedTars() error {
 	for tarName, cnt := range c.tarUnchangedFilesCount {
 		if cnt != 0 {
-			for _, fileName := range c.prevTarFileSets.GetFiles()[tarName] {
+			for _, fileName := range c.prevTarFileSets.Get()[tarName] {
 				if _, exists := c.fileInfo[fileName]; exists {
 					c.fileInfo[fileName].status = doNotCopy
 				} else if _, exists := c.headerInfos[fileName]; exists {

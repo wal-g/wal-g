@@ -73,6 +73,7 @@ var (
 			}
 			withoutFilesMetadata = withoutFilesMetadata || viper.GetBool(internal.WithoutFilesMetadataSetting)
 			if withoutFilesMetadata {
+				// files metadata tracking is required for delta backups and copy/rating composers
 				if useRatingComposer || useCopyComposer {
 					tracelog.ErrorLogger.Fatalf(
 						"%s option cannot be used with %s, %s options",
@@ -83,6 +84,8 @@ var (
 						"%s option cannot be used with %s, %s, %s options",
 						withoutFilesMetadataFlag, deltaFromNameFlag, deltaFromUserDataFlag, addUserDataFlag)
 				}
+				tracelog.InfoLogger.Print("Files metadata tracking is disabled")
+				fullBackup = true
 			}
 
 			deltaBaseSelector, err := createDeltaBaseSelector(cmd, deltaFromName, deltaFromUserData)
@@ -132,7 +135,6 @@ func createDeltaBaseSelector(cmd *cobra.Command,
 		return internal.NewUserDataBackupSelector(targetUserData, postgres.NewGenericMetaFetcher())
 
 	default:
-		tracelog.InfoLogger.Println("Selecting the latest backup as the base for the current delta backup...")
 		return internal.NewLatestBackupSelector(), nil
 	}
 }

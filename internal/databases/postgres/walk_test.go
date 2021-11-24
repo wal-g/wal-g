@@ -378,16 +378,20 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesM
 		t.Log(err)
 	}
 
-	backupFileList := postgres.MakeBackupFileList(bundle.GetFiles())
+	backupFileListEmpty := true
+	bundle.GetFiles().Range(func(key, value interface{}) bool {
+		backupFileListEmpty = false
+		return false
+	})
 
 	if withoutFilesMetadata {
 		// Test tarFileSets is not tracked
-		assert.True(t, len(tarFileSets.GetFiles()) == 0)
+		assert.True(t, len(tarFileSets.Get()) == 0)
 		// Test BackupFileList is not tracked
-		assert.True(t, len(backupFileList) == 0)
+		assert.True(t, backupFileListEmpty)
 	} else {
-		assert.True(t, len(tarFileSets.GetFiles()) > 0)
-		assert.True(t, len(backupFileList) > 0)
+		assert.True(t, len(tarFileSets.Get()) > 0)
+		assert.False(t, backupFileListEmpty)
 	}
 
 	err = bundle.FinishQueue()

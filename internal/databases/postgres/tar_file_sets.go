@@ -3,29 +3,25 @@ package postgres
 type TarFileSets interface {
 	AddFile(name string, file string)
 	AddFiles(name string, files []string)
-	GetFiles() map[string][]string
+	Get() map[string][]string
 }
 
-type RegularTarFileSets struct {
-	files map[string][]string
-}
+type RegularTarFileSets map[string][]string
 
 func NewRegularTarFileSets() *RegularTarFileSets {
-	return &RegularTarFileSets{
-		files: make(map[string][]string),
-	}
+	return &RegularTarFileSets{}
 }
 
 func (tarFileSets *RegularTarFileSets) AddFile(name string, file string) {
-	tarFileSets.files[name] = append(tarFileSets.files[name], file)
+	(*tarFileSets)[name] = append((*tarFileSets)[name], file)
 }
 
 func (tarFileSets *RegularTarFileSets) AddFiles(name string, files []string) {
-	tarFileSets.files[name] = append(tarFileSets.files[name], files...)
+	(*tarFileSets)[name] = append((*tarFileSets)[name], files...)
 }
 
-func (tarFileSets *RegularTarFileSets) GetFiles() map[string][]string {
-	return tarFileSets.files
+func (tarFileSets *RegularTarFileSets) Get() map[string][]string {
+	return *tarFileSets
 }
 
 type NopTarFileSets struct {
@@ -41,6 +37,6 @@ func (tarFileSets *NopTarFileSets) AddFile(name string, file string) {
 func (tarFileSets *NopTarFileSets) AddFiles(name string, files []string) {
 }
 
-func (tarFileSets *NopTarFileSets) GetFiles() map[string][]string {
+func (tarFileSets *NopTarFileSets) Get() map[string][]string {
 	return make(map[string][]string)
 }

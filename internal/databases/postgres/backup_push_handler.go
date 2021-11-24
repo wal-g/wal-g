@@ -218,7 +218,7 @@ func (bh *BackupHandler) setupDTO(tarFileSets TarFileSets) (sentinelDto BackupSe
 	}
 	sentinelDto = NewBackupSentinelDto(bh, tablespaceSpec)
 	filesMeta.setFiles(bh.workers.bundle.GetFiles())
-	filesMeta.TarFileSets = tarFileSets
+	filesMeta.TarFileSets = tarFileSets.Get()
 	return sentinelDto, filesMeta
 }
 
@@ -355,7 +355,7 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	bh.curBackupInfo.compressedSize, err = bh.workers.uploader.UploadedDataSize()
 	tracelog.ErrorLogger.FatalOnError(err)
 	sentinelDto := NewBackupSentinelDto(bh, baseBackup.GetTablespaceSpec())
-	filesMetadataDto := NewFilesMetadataDto(baseBackup.Files, TarFileSets{})
+	filesMetadataDto := NewFilesMetadataDto(baseBackup.Files, tarFileSets)
 	bh.curBackupInfo.name = baseBackup.BackupName()
 	tracelog.InfoLogger.Println("Uploading metadata")
 	bh.uploadMetadata(sentinelDto, filesMetadataDto)
@@ -580,6 +580,11 @@ func (bh *BackupHandler) uploadExtendedMetadata(meta ExtendedMetadataDto) (err e
 }
 
 func (bh *BackupHandler) uploadFilesMetadata(filesMetaDto FilesMetadataDto) (err error) {
+	if bh.arguments.withoutFilesMetadata {
+		tracelog.InfoLogger.Printf("Files metadata tracking is disabled, will not upload the %s", FilesMetadataName)
+		return nil
+	}
+
 	dtoBody, err := json.Marshal(filesMetaDto)
 	if err != nil {
 		return err

@@ -125,6 +125,14 @@ func (backup *Backup) GetSentinelAndFilesMetadata() (BackupSentinelDto, FilesMet
 	}
 
 	var filesMetadata FilesMetadataDto
+
+	// skip the files metadata fetch if backup was taken without it
+	if sentinel.FilesMetadataDisabled {
+		tracelog.InfoLogger.Printf("Files metadata tracking was disabled, skipping the download of %s", FilesMetadataName)
+		backup.FilesMetadataDto = &filesMetadata
+		return sentinel, filesMetadata, nil
+	}
+
 	err = backup.FetchDto(&filesMetadata, getFilesMetadataPath(backup.Name))
 	if err != nil {
 		// double-check that this is not V2 backup
