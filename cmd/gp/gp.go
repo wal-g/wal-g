@@ -55,4 +55,11 @@ func init() {
 		wrappedPreRun(cmd, args)
 	}
 	cmd.AddCommand(wrappedPgCmd)
+
+	// Add the hidden prefetch command to the root command since there is no "pg" prefix in the WAL-G prefetch fork logic
+	pg.WalPrefetchCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		internal.RequiredSettings[internal.StoragePrefixSetting] = true
+		tracelog.ErrorLogger.FatalOnError(internal.AssertRequiredSettingsSet())
+	}
+	cmd.AddCommand(pg.WalPrefetchCmd)
 }
