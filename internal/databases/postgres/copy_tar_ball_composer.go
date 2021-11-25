@@ -91,7 +91,7 @@ func NewCopyTarBallComposer(
 		copyCount:              0,
 		prevBackup:             prevBackup,
 		newBackupName:          newBackupName,
-		tarFileSets:            make(TarFileSets),
+		tarFileSets:            NewRegularTarFileSets(),
 		tarUnchangedFilesCount: tarUnchangedFilesCount,
 		prevFileTar:            prevFileTar,
 		prevTarFileSets:        prevTarFileSets,
@@ -102,13 +102,13 @@ func NewCopyTarBallComposer(
 
 func (maker *CopyTarBallComposerMaker) Make(bundle *Bundle) (TarBallComposer, error) {
 	prevFileTar := make(map[string]string)
-	prevTarFileSets := make(map[string][]string)
+	prevTarFileSets := NewRegularTarFileSets()
 	tarUnchangedFilesCount := make(map[string]int)
 	if maker.previousBackup.SentinelDto != nil {
 		for tarName, fileSet := range maker.previousBackup.FilesMetadataDto.TarFileSets {
 			for _, fileName := range fileSet {
 				prevFileTar[fileName] = tarName
-				prevTarFileSets[tarName] = append(prevTarFileSets[tarName], fileName)
+				prevTarFileSets.AddFile(tarName, fileName)
 			}
 			tarUnchangedFilesCount[tarName] = len(fileSet)
 		}
@@ -176,14 +176,14 @@ func (c *CopyTarBallComposer) copyTar(tarName string) error {
 	if err != nil {
 		return err
 	}
-	for _, fileName := range c.prevTarFileSets[tarName] {
+	for _, fileName := range c.prevTarFileSets.Get()[tarName] {
 		if file, exists := c.fileInfo[fileName]; exists {
 			file.status = processed
-			c.tarFileSets[newTarName] = append(c.tarFileSets[newTarName], fileName)
+			c.tarFileSets.AddFile(newTarName, fileName)
 			c.files.AddFile(file.info.header, file.info.fileInfo, file.info.isIncremented)
 		} else if header, exists := c.headerInfos[fileName]; exists {
 			header.status = processed
-			c.tarFileSets[newTarName] = append(c.tarFileSets[newTarName], fileName)
+			c.tarFileSets.AddFile(newTarName, fileName)
 			c.files.AddFile(header.fileInfoHeader, header.info, false)
 		}
 	}
@@ -199,7 +199,7 @@ func (c *CopyTarBallComposer) getTarBall() internal.TarBall {
 func (c *CopyTarBallComposer) copyUnchangedTars() error {
 	for tarName, cnt := range c.tarUnchangedFilesCount {
 		if cnt != 0 {
-			for _, fileName := range c.prevTarFileSets[tarName] {
+			for _, fileName := range c.prevTarFileSets.Get()[tarName] {
 				if _, exists := c.fileInfo[fileName]; exists {
 					c.fileInfo[fileName].status = doNotCopy
 				} else if _, exists := c.headerInfos[fileName]; exists {
@@ -247,7 +247,7 @@ func (c *CopyTarBallComposer) PackTarballs() (TarFileSets, error) {
 				}
 				return c.tarBallQueue.CheckSizeAndEnqueueBack(tarBall)
 			})
-			c.tarFileSets[tarBall.Name()] = append(c.tarFileSets[tarBall.Name()], fileName)
+			c.tarFileSets.AddFile(tarBall.Name(), fileName)
 			file.status = processed
 		}
 	}
@@ -260,7 +260,7 @@ func (c *CopyTarBallComposer) PackTarballs() (TarFileSets, error) {
 			if err != nil {
 				return nil, err
 			}
-			c.tarFileSets[tarBall.Name()] = append(c.tarFileSets[tarBall.Name()], headerName)
+			c.tarFileSets.AddFile(tarBall.Name(), headerName)
 			c.files.AddFile(header.fileInfoHeader, header.info, false)
 			c.tarBallQueue.EnqueueBack(tarBall)
 		}

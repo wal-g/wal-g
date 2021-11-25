@@ -59,6 +59,7 @@ type BackupArguments struct {
 	pgDataDirectory       string
 	isFullBackup          bool
 	deltaBaseSelector     internal.BackupSelector
+	withoutFilesMetadata  bool
 }
 
 // CurBackupInfo holds all information that is harvest during the backup process
@@ -105,7 +106,7 @@ type BackupHandler struct {
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
 func NewBackupArguments(pgDataDirectory string, backupsFolder string, isPermanent bool, verifyPageChecksums bool,
 	isFullBackup bool, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
-	deltaBaseSelector internal.BackupSelector, userData interface{}) BackupArguments {
+	deltaBaseSelector internal.BackupSelector, userData interface{}, withoutFilesMetadata bool) BackupArguments {
 	return BackupArguments{
 		pgDataDirectory:       pgDataDirectory,
 		backupsFolder:         backupsFolder,
@@ -116,6 +117,7 @@ func NewBackupArguments(pgDataDirectory string, backupsFolder string, isPermanen
 		tarBallComposerType:   tarBallComposerType,
 		deltaBaseSelector:     deltaBaseSelector,
 		userData:              userData,
+		withoutFilesMetadata:  withoutFilesMetadata,
 	}
 }
 
@@ -216,7 +218,7 @@ func (bh *BackupHandler) setupDTO(tarFileSets TarFileSets) (sentinelDto BackupSe
 	}
 	sentinelDto = NewBackupSentinelDto(bh, tablespaceSpec)
 	filesMeta.setFiles(bh.workers.bundle.GetFiles())
-	filesMeta.TarFileSets = tarFileSets
+	filesMeta.TarFileSets = tarFileSets.Get()
 	return sentinelDto, filesMeta
 }
 
@@ -238,7 +240,8 @@ func (bh *BackupHandler) uploadBackup() TarFileSets {
 
 	tarBallComposerMaker, err := NewTarBallComposerMaker(bh.arguments.tarBallComposerType, bh.workers.conn,
 		bh.workers.uploader.UploadingFolder, bh.curBackupInfo.name,
-		NewTarBallFilePackerOptions(bh.arguments.verifyPageChecksums, bh.arguments.storeAllCorruptBlocks))
+		NewTarBallFilePackerOptions(bh.arguments.verifyPageChecksums, bh.arguments.storeAllCorruptBlocks),
+		bh.arguments.withoutFilesMetadata)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	err = bundle.SetupComposer(tarBallComposerMaker)
@@ -268,7 +271,7 @@ func (bh *BackupHandler) uploadBackup() TarFileSets {
 	bh.curBackupInfo.uncompressedSize = atomic.LoadInt64(bundle.TarBallQueue.AllTarballsSize)
 	bh.curBackupInfo.compressedSize, err = bh.workers.uploader.UploadedDataSize()
 	tracelog.ErrorLogger.FatalOnError(err)
-	tarFileSets[labelFilesTarBallName] = append(tarFileSets[labelFilesTarBallName], labelFilesList...)
+	tarFileSets.AddFiles(labelFilesTarBallName, labelFilesList)
 	timelineChanged := bundle.checkTimelineChanged(bh.workers.conn)
 	tracelog.DebugLogger.Printf("Labelfiles tarball name: %s", labelFilesTarBallName)
 	tracelog.DebugLogger.Printf("Number of label files: %d", len(labelFilesList))
@@ -336,6 +339,13 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	tracelog.DebugLogger.Printf("Uploading folder: %s", uploader.UploadingFolder)
 
+	var tarFileSets TarFileSets
+	if bh.arguments.withoutFilesMetadata {
+		tarFileSets = NewNopTarFileSets()
+	} else {
+		tarFileSets = NewRegularTarFileSets()
+	}
+
 	baseBackup := bh.runRemoteBackup()
 	tracelog.InfoLogger.Println("Updating metadata")
 	bh.curBackupInfo.startLSN = uint64(baseBackup.StartLSN)
@@ -345,7 +355,7 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	bh.curBackupInfo.compressedSize, err = bh.workers.uploader.UploadedDataSize()
 	tracelog.ErrorLogger.FatalOnError(err)
 	sentinelDto := NewBackupSentinelDto(bh, baseBackup.GetTablespaceSpec())
-	filesMetadataDto := NewFilesMetadataDto(baseBackup.Files, TarFileSets{})
+	filesMetadataDto := NewFilesMetadataDto(baseBackup.Files, tarFileSets)
 	bh.curBackupInfo.name = baseBackup.BackupName()
 	tracelog.InfoLogger.Println("Uploading metadata")
 	bh.uploadMetadata(sentinelDto, filesMetadataDto)
@@ -420,12 +430,18 @@ func (bh *BackupHandler) runRemoteBackup() *StreamingBaseBackup {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	baseBackup := NewStreamingBaseBackup(bh.pgInfo.pgDataDirectory, viper.GetInt64(internal.TarSizeThresholdSetting), conn)
+	var bundleFiles BundleFiles
+	if bh.arguments.withoutFilesMetadata {
+		bundleFiles = &NopBundleFiles{}
+	} else {
+		bundleFiles = &RegularBundleFiles{}
+	}
 	tracelog.InfoLogger.Println("Starting remote backup")
 	err = baseBackup.Start(bh.arguments.verifyPageChecksums, diskLimit)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Streaming remote backup")
-	err = baseBackup.Upload(bh.workers.uploader)
+	err = baseBackup.Upload(bh.workers.uploader, bundleFiles)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Finishing backup")
@@ -564,6 +580,11 @@ func (bh *BackupHandler) uploadExtendedMetadata(meta ExtendedMetadataDto) (err e
 }
 
 func (bh *BackupHandler) uploadFilesMetadata(filesMetaDto FilesMetadataDto) (err error) {
+	if bh.arguments.withoutFilesMetadata {
+		tracelog.InfoLogger.Printf("Files metadata tracking is disabled, will not upload the %s", FilesMetadataName)
+		return nil
+	}
+
 	dtoBody, err := json.Marshal(filesMetaDto)
 	if err != nil {
 		return err

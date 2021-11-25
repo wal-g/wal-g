@@ -42,11 +42,11 @@ func TestGetFilesToUnwrap_SkippedFile(t *testing.T) {
 	assert.Contains(t, files, testtools.SkippedPath)
 }
 
-func TestGetFilesToUnwrap_UtilityFiles(t *testing.T) {
+func TestGetFilesToUnwrap_UnwrapAll(t *testing.T) {
 	backup := getMockBackupFromFiles(testtools.NewBackupFileListBuilder().Build())
 
 	files, _ := backup.GetFilesToUnwrap("")
-	assert.Equal(t, postgres.UtilityFilePaths, files)
+	assert.True(t, files == nil)
 }
 
 func TestGetFilesToUnwrap_NoMoreFiles(t *testing.T) {

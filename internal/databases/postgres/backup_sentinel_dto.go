@@ -30,6 +30,8 @@ type BackupSentinelDto struct {
 	TablespaceSpec   *TablespaceSpec `json:"Spec"`
 
 	UserData interface{} `json:"UserData,omitempty"`
+
+	FilesMetadataDisabled bool `json:"FilesMetadataDisabled,omitempty"`
 }
 
 func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec) BackupSentinelDto {
@@ -54,6 +56,7 @@ func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec) BackupSent
 	sentinel.SystemIdentifier = bh.pgInfo.systemIdentifier
 	sentinel.UncompressedSize = bh.curBackupInfo.uncompressedSize
 	sentinel.CompressedSize = bh.curBackupInfo.compressedSize
+	sentinel.FilesMetadataDisabled = bh.arguments.withoutFilesMetadata
 	return sentinel
 }
 
@@ -117,11 +120,11 @@ func (dto *BackupSentinelDto) IsIncremental() (isIncremental bool) {
 // It can be pretty large on some databases, sometimes more than 1GB
 type FilesMetadataDto struct {
 	Files       internal.BackupFileList `json:"Files,omitempty"`
-	TarFileSets TarFileSets             `json:"TarFileSets,omitempty"`
+	TarFileSets map[string][]string     `json:"TarFileSets,omitempty"`
 }
 
 func NewFilesMetadataDto(files internal.BackupFileList, tarFileSets TarFileSets) FilesMetadataDto {
-	return FilesMetadataDto{TarFileSets: tarFileSets, Files: files}
+	return FilesMetadataDto{TarFileSets: tarFileSets.Get(), Files: files}
 }
 
 func (dto *FilesMetadataDto) setFiles(p *sync.Map) {

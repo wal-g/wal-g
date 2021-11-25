@@ -249,6 +249,26 @@ To activate this feature, do one of the following:
 wal-g backup-push /path --copy-composer
 ```
 
+#### Backup without metadata
+
+By default, WAL-G tracks metadata of the files backed up. If millions of files are backed up (typically in case of hundreds of databases and thousands of tables in each database), tracking this metadata alone would require GBs of memory.
+
+If `--without-files-metadata` or `WALG_WITHOUT_FILES_METADATA` is enabled, WAL-G does not track metadata of the files backed up. This significantly reduces the memory usage on instances with `> 100k` files.
+
+Limitations
+
+* Cannot be used with `rating-composer`, `copy-composer`
+* Cannot be used with `delta-from-user-data`, `delta-from-name`, `add-user-data`
+
+To activate this feature, do one of the following:
+
+* set the `WALG_WITHOUT_FILES_METADATA`environment variable
+* add the `--without-files-metadata` flag
+
+```bash
+wal-g backup-push /path --without-files-metadata
+```
+
 #### Create delta from specific backup
 When creating delta backup (`WALG_DELTA_MAX_STEPS` > 0), WAL-G uses the latest backup as the base by default. This behaviour can be changed via following flags:
 

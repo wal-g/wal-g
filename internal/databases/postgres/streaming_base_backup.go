@@ -124,10 +124,10 @@ func (bb *StreamingBaseBackup) nextTbs() (err error) {
 }
 
 // Upload will read all tar files from Postgres, and use the uploader to upload to the backup location
-func (bb *StreamingBaseBackup) Upload(uploader *WalUploader) (err error) {
+func (bb *StreamingBaseBackup) Upload(uploader *WalUploader, bundleFiles BundleFiles) (err error) {
 	// Upload the tar
 	bb.uploader = uploader
-	bb.streamer = NewTarballStreamer(bb, bb.maxTarSize)
+	bb.streamer = NewTarballStreamer(bb, bb.maxTarSize, bundleFiles)
 	for {
 		tbsTar := ioextensions.NewNamedReaderImpl(bb.streamer, bb.FileName())
 		compressedFile := internal.CompressAndEncrypt(tbsTar, bb.uploader.Compressor, internal.ConfigureCrypter())
@@ -144,9 +144,12 @@ func (bb *StreamingBaseBackup) Upload(uploader *WalUploader) (err error) {
 	}
 
 	// Update file info
-	for fileName, file := range bb.streamer.Files {
-		bb.Files[fileName] = file
-	}
+	bb.streamer.Files.GetUnderlyingMap().Range(func(k, v interface{}) bool {
+		fileName := k.(string)
+		description := v.(internal.BackupFileDescription)
+		bb.Files[fileName] = description
+		return true
+	})
 
 	// Upload the extra tar
 	if len(bb.streamer.Tee) > 0 {
