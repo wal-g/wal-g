@@ -185,6 +185,7 @@ var (
 
 	GPDefaultSettings = map[string]string{
 		GPLogsDirectory: "",
+		PgWalSize:       "64",
 	}
 
 	AllowedSettings map[string]bool
