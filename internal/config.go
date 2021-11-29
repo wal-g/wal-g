@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/webserver"
@@ -45,11 +46,13 @@ const (
 	StoreAllCorruptBlocksSetting = "WALG_STORE_ALL_CORRUPT_BLOCKS"
 	UseRatingComposerSetting     = "WALG_USE_RATING_COMPOSER"
 	UseCopyComposerSetting       = "WALG_USE_COPY_COMPOSER"
+	WithoutFilesMetadataSetting  = "WALG_WITHOUT_FILES_METADATA"
 	DeltaFromNameSetting         = "WALG_DELTA_FROM_NAME"
 	DeltaFromUserDataSetting     = "WALG_DELTA_FROM_USER_DATA"
 	FetchTargetUserDataSetting   = "WALG_FETCH_TARGET_USER_DATA"
 	LogLevelSetting              = "WALG_LOG_LEVEL"
 	TarSizeThresholdSetting      = "WALG_TAR_SIZE_THRESHOLD"
+	TarDisableFsyncSetting       = "WALG_TAR_DISABLE_FSYNC"
 	CseKmsIDSetting              = "WALG_CSE_KMS_ID"
 	CseKmsRegionSetting          = "WALG_CSE_KMS_REGION"
 	LibsodiumKeySetting          = "WALG_LIBSODIUM_KEY"
@@ -75,6 +78,9 @@ const (
 	MaxDelayedSegmentsCount      = "WALG_INTEGRITY_MAX_DELAYED_WALS"
 	PrefetchDir                  = "WALG_PREFETCH_DIR"
 	PgReadyRename                = "PG_READY_RENAME"
+	SerializerTypeSetting        = "WALG_SERIALIZER_TYPE"
+	StreamSplitterPartitions     = "WALG_STREAM_SPLITTER_PARTITIONS"
+	StreamSplitterBlockSize      = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
@@ -97,8 +103,11 @@ const (
 	MysqlBinlogDstSetting      = "WALG_MYSQL_BINLOG_DST"
 	MysqlBackupPrepareCmd      = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
 	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
+	MysqlCheckGTIDs            = "WALG_MYSQL_CHECK_GTIDS"
 
 	RedisPassword = "WALG_REDIS_PASSWORD"
+
+	GPLogsDirectory = "WALG_GP_LOGS_DIR"
 
 	GoMaxProcs = "GOMAXPROCS"
 
@@ -112,6 +121,7 @@ const (
 	SQLServerBlobLockFile     = "SQLSERVER_BLOB_LOCK_FILE"
 	SQLServerConnectionString = "SQLSERVER_CONNECTION_STRING"
 	SQLServerDBConcurrency    = "SQLSERVER_DB_CONCURRENCY"
+	SQLServerReuseProxy       = "SQLSERVER_REUSE_PROXY"
 
 	EndpointSourceSetting = "S3_ENDPOINT_SOURCE"
 	EndpointPortSetting   = "S3_ENDPOINT_PORT"
@@ -138,6 +148,7 @@ var (
 		CompressionMethodSetting:     "lz4",
 		UseWalDeltaSetting:           "false",
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
+		TarDisableFsyncSetting:       "false",
 		TotalBgUploadedLimit:         "32",
 		UseReverseUnpackSetting:      "false",
 		SkipRedundantTarsSetting:     "false",
@@ -145,7 +156,10 @@ var (
 		StoreAllCorruptBlocksSetting: "false",
 		UseRatingComposerSetting:     "false",
 		UseCopyComposerSetting:       "false",
+		WithoutFilesMetadataSetting:  "false",
 		MaxDelayedSegmentsCount:      "0",
+		SerializerTypeSetting:        "json_default",
+		LibsodiumKeyTransform:        "none",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -156,6 +170,11 @@ var (
 		OplogArchiveTimeoutInterval:    "60s",
 		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
 		MongoDBLastWriteUpdateInterval: "3s",
+		StreamSplitterBlockSize:        "1048576",
+	}
+
+	MysqlDefaultSettings = map[string]string{
+		StreamSplitterBlockSize: "1048576",
 	}
 
 	SQLServerDefaultSettings = map[string]string{
@@ -164,6 +183,11 @@ var (
 
 	PGDefaultSettings = map[string]string{
 		PgWalSize: "16",
+	}
+
+	GPDefaultSettings = map[string]string{
+		GPLogsDirectory: "",
+		PgWalSize:       "64",
 	}
 
 	AllowedSettings map[string]bool
@@ -186,6 +210,7 @@ var (
 		UseWalDeltaSetting:           true,
 		LogLevelSetting:              true,
 		TarSizeThresholdSetting:      true,
+		TarDisableFsyncSetting:       true,
 		"WALG_" + GpgKeyIDSetting:    true,
 		"WALE_" + GpgKeyIDSetting:    true,
 		PgpKeySetting:                true,
@@ -203,10 +228,12 @@ var (
 		StoreAllCorruptBlocksSetting: true,
 		UseRatingComposerSetting:     true,
 		UseCopyComposerSetting:       true,
+		WithoutFilesMetadataSetting:  true,
 		MaxDelayedSegmentsCount:      true,
 		DeltaFromNameSetting:         true,
 		DeltaFromUserDataSetting:     true,
 		FetchTargetUserDataSetting:   true,
+		SerializerTypeSetting:        true,
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,
@@ -243,15 +270,19 @@ var (
 		"S3_ENDPOINT_SOURCE":          true,
 		"S3_ENDPOINT_PORT":            true,
 		"S3_USE_LIST_OBJECTS_V1":      true,
+		"S3_LOG_LEVEL":                true,
+		"S3_RANGE_BATCH_ENABLED":      true,
+		"S3_RANGE_MAX_RETRIES":        true,
+		"S3_MAX_RETRIES":              true,
 
 		// Azure
-		"WALG_AZ_PREFIX":          true,
-		"AZURE_STORAGE_ACCOUNT":   true,
-		"AZURE_STORAGE_KEY":       true,
-		"AZURE_STORAGE_SAS_TOKEN": true,
-		"AZURE_ENVIRONMENT_NAME":  true,
-		"WALG_AZURE_BUFFER_SIZE":  true,
-		"WALG_AZURE_MAX_BUFFERS":  true,
+		"WALG_AZ_PREFIX":           true,
+		"AZURE_STORAGE_ACCOUNT":    true,
+		"AZURE_STORAGE_ACCESS_KEY": true,
+		"AZURE_STORAGE_SAS_TOKEN":  true,
+		"AZURE_ENVIRONMENT_NAME":   true,
+		"WALG_AZURE_BUFFER_SIZE":   true,
+		"WALG_AZURE_MAX_BUFFERS":   true,
 
 		// GS
 		"WALG_GS_PREFIX":                 true,
@@ -309,6 +340,8 @@ var (
 		OplogPushWaitForBecomePrimary:  true,
 		OplogPushPrimaryCheckInterval:  true,
 		OplogPITRDiscoveryInterval:     true,
+		StreamSplitterBlockSize:        true,
+		StreamSplitterPartitions:       true,
 	}
 
 	SQLServerAllowedSettings = map[string]bool{
@@ -319,6 +352,7 @@ var (
 		SQLServerBlobLockFile:     true,
 		SQLServerConnectionString: true,
 		SQLServerDBConcurrency:    true,
+		SQLServerReuseProxy:       true,
 	}
 
 	MysqlAllowedSettings = map[string]bool{
@@ -329,11 +363,18 @@ var (
 		MysqlBinlogDstSetting:      true,
 		MysqlBackupPrepareCmd:      true,
 		MysqlTakeBinlogsFromMaster: true,
+		MysqlCheckGTIDs:            true,
+		StreamSplitterPartitions:   true,
+		StreamSplitterBlockSize:    true,
 	}
 
 	RedisAllowedSettings = map[string]bool{
 		// Redis
 		RedisPassword: true,
+	}
+
+	GPAllowedSettings = map[string]bool{
+		GPLogsDirectory: true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
@@ -355,8 +396,12 @@ func ConfigureSettings(currentType string) {
 			dbSpecificDefaultSettings = PGDefaultSettings
 		case MONGO:
 			dbSpecificDefaultSettings = MongoDefaultSettings
+		case MYSQL:
+			dbSpecificDefaultSettings = MysqlDefaultSettings
 		case SQLSERVER:
 			dbSpecificDefaultSettings = SQLServerDefaultSettings
+		case GP:
+			dbSpecificDefaultSettings = GPDefaultSettings
 		}
 
 		for k, v := range dbSpecificDefaultSettings {
@@ -371,8 +416,10 @@ func ConfigureSettings(currentType string) {
 		case PG:
 			dbSpecificSettings = PGAllowedSettings
 		case GP:
-			// as of now, GP specific settings are identical to PG
-			dbSpecificSettings = PGAllowedSettings
+			for setting := range PGAllowedSettings {
+				GPAllowedSettings[setting] = true
+			}
+			dbSpecificSettings = GPAllowedSettings
 		case MONGO:
 			dbSpecificSettings = MongoAllowedSettings
 		case MYSQL:
@@ -484,6 +531,7 @@ func ConfigureAndRunDefaultWebServer() error {
 }
 
 func AddConfigFlags(Cmd *cobra.Command) {
+	cfgFlags := &pflag.FlagSet{}
 	for k := range AllowedSettings {
 		flagName := toFlagName(k)
 		isRequired, exist := RequiredSettings[k]
@@ -492,9 +540,12 @@ func AddConfigFlags(Cmd *cobra.Command) {
 			flagUsage = "Required, can be set though this flag or " + k + " variable"
 		}
 
-		Cmd.PersistentFlags().String(flagName, "", flagUsage)
-		_ = viper.BindPFlag(k, Cmd.PersistentFlags().Lookup(flagName))
+		cfgFlags.String(flagName, "", flagUsage)
+		_ = viper.BindPFlag(k, cfgFlags.Lookup(flagName))
 	}
+	cfgFlags.VisitAll(func(f *pflag.Flag) { f.Hidden = true })
+
+	Cmd.PersistentFlags().AddFlagSet(cfgFlags)
 }
 
 // InitConfig reads config file and ENV variables if set.
@@ -545,7 +596,7 @@ func SetDefaultValues(config *viper.Viper) {
 
 func setGoMaxProcs() {
 	gomaxprocs := viper.GetInt(GoMaxProcs)
-	if gomaxprocs > 0 {
+	if !Turbo && gomaxprocs > 0 {
 		runtime.GOMAXPROCS(gomaxprocs)
 	}
 }

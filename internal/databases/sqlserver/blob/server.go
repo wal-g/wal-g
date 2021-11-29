@@ -129,6 +129,15 @@ func (bs *Server) Shutdown() error {
 	if err != nil {
 		tracelog.ErrorLogger.Printf("proxy shutdown error: %v", err)
 	}
+	bs.indexesMutex.Lock()
+	defer bs.indexesMutex.Unlock()
+	for _, idx := range bs.indexes {
+		err2 := idx.Save()
+		if err2 != nil {
+			tracelog.ErrorLogger.Printf("proxy shutdown index save error: %v", err2)
+			err = err2
+		}
+	}
 	return err
 }
 
@@ -677,7 +686,7 @@ func (bs *Server) parseBytesRange(req *http.Request) (uint64, uint64, error) {
 	return rangeMin, rangeMax, nil
 }
 
-func (bs *Server) AcquireLock() (*flock.Flock, error) {
+func (bs *Server) AcquireLock() (io.Closer, error) {
 	path, err := internal.GetRequiredSetting(internal.SQLServerBlobLockFile)
 	if err != nil {
 		return nil, err

@@ -45,13 +45,25 @@ To configure AWS KMS key for client-side encryption and decryption. By default, 
 
 * `WALG_CSE_KMS_REGION`
 
-To configure AWS KMS key region for client-side encryption and decryption (i.e., `eu-west-1`).
+To configure AWS KMS key for client-side encryption and decryption. By default, no encryption is used. (AWS_REGION or WALG_CSE_KMS_REGION required to be set when using AWS KMS key client-side encryption)
 
-* `S3_USE_LIST_OBJECTS_V1`
+* `WALG_S3_RANGE_BATCH_ENABLED`
+
+Set to TRUE to allow wal-g in case of network problems to continue downloading from the point that was already downloaded using HTTP Range query. This option is useful when download big files more than few hours.
+
+* `WALG_S3_RANGE_MAX_RETRIES`
+
+If `WALG_S3_RANGE_BATCH_ENABLED` enabled, wal-g will try to reconnect N times, by default 10 times
+
+* `WALG_S3_USE_LIST_OBJECTS_V1`
 
 By default, WAL-G uses [ListObjectsV2](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html) to fetch S3 storage folder listings.
 However, some S3-compatible storages may not support it.
 Set this setting to `true` to use [ListObjects](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjects.html) instead.
+
+* `WALG_S3_MAX_RETRIES`
+
+Overrides the default request retry limit while interacting with S3. Default is 15.
 
 GCS
 -----------

@@ -9,11 +9,10 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleLogPush(dbnames []string, compression bool) {
+func HandleLogPush(dbnames []string, compression bool, norecovery bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 	defer func() { _ = signalHandler.Close() }()
@@ -29,26 +28,20 @@ func HandleLogPush(dbnames []string, compression bool) {
 
 	tracelog.ErrorLogger.FatalfOnError("failed to list databases to backup: %v", err)
 
-	bs, err := blob.NewServer(folder)
-	tracelog.ErrorLogger.FatalfOnError("proxy create error: %v", err)
-
-	lock, err := bs.AcquireLock()
+	lock, err := RunOrReuseProxy(ctx, cancel, folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	defer func() { tracelog.ErrorLogger.PrintOnError(lock.Unlock()) }()
-
-	err = bs.RunBackground(ctx, cancel)
-	tracelog.ErrorLogger.FatalfOnError("proxy run error: %v", err)
+	defer lock.Close()
 
 	logBackupName := generateLogBackupName()
 	err = runParallel(func(i int) error {
-		return backupSingleLog(ctx, db, logBackupName, dbnames[i], compression)
+		return backupSingleLog(ctx, db, logBackupName, dbnames[i], compression, norecovery)
 	}, len(dbnames), getDBConcurrency())
 	tracelog.ErrorLogger.FatalfOnError("overall log backup failed: %v", err)
 
 	tracelog.InfoLogger.Printf("log backup finished")
 }
 
-func backupSingleLog(ctx context.Context, db *sql.DB, backupName string, dbname string, compression bool) error {
+func backupSingleLog(ctx context.Context, db *sql.DB, backupName string, dbname string, compression bool, noRecovery bool) error {
 	baseURL := getLogBackupURL(backupName, dbname)
 	size, blobCount, err := estimateLogSize(db, dbname)
 	if err != nil {
@@ -60,6 +53,9 @@ func backupSingleLog(ctx context.Context, db *sql.DB, backupName string, dbname 
 	sql += fmt.Sprintf(" WITH FORMAT, MAXTRANSFERSIZE=%d", MaxTransferSize)
 	if compression {
 		sql += ", COMPRESSION"
+	}
+	if noRecovery {
+		sql += ", NORECOVERY"
 	}
 	tracelog.InfoLogger.Printf("starting backup database [%s] log to %s", dbname, urls)
 	tracelog.DebugLogger.Printf("SQL: %s", sql)

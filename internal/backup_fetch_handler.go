@@ -3,6 +3,7 @@ package internal
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os/exec"
 
 	"github.com/wal-g/tracelog"
@@ -16,6 +17,8 @@ type BackupNonExistenceError struct {
 	error
 }
 
+type StreamFetcher = func(backup Backup, writeCloser io.WriteCloser) error
+
 func NewBackupNonExistenceError(backupName string) BackupNonExistenceError {
 	return BackupNonExistenceError{errors.Errorf("Backup '%s' does not exist.", backupName)}
 }
@@ -24,7 +27,8 @@ func (err BackupNonExistenceError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-func GetCommandStreamFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup Backup) {
+// GetBackupToCommandFetcher returns function that copies all bytes from backup to cmd's stdin
+func GetBackupToCommandFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup Backup) {
 	return func(folder storage.Folder, backup Backup) {
 		stdin, err := cmd.StdinPipe()
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
@@ -32,12 +36,20 @@ func GetCommandStreamFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup B
 		cmd.Stderr = stderr
 		err = cmd.Start()
 		tracelog.ErrorLogger.FatalfOnError("Failed to start restore command: %v\n", err)
-		err = downloadAndDecompressStream(backup, stdin)
+
+		fetcher, err := GetBackupStreamFetcher(backup)
+		tracelog.ErrorLogger.FatalfOnError("Failed to detect backup format: %v\n", err)
+
+		err = fetcher(backup, stdin)
+
 		cmdErr := cmd.Wait()
 		if err != nil || cmdErr != nil {
 			tracelog.ErrorLogger.Printf("Restore command output:\n%s", stderr.String())
 		}
 		if cmdErr != nil {
+			if err != nil {
+				tracelog.ErrorLogger.Printf("Failed to fetch backup: %v\n", err)
+			}
 			err = cmdErr
 		}
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
@@ -55,7 +67,7 @@ func StreamBackupToCommandStdin(cmd *exec.Cmd, backup Backup) error {
 	if err != nil {
 		return fmt.Errorf("failed to start command: %v", err)
 	}
-	err = downloadAndDecompressStream(backup, stdin)
+	err = DownloadAndDecompressStream(backup, stdin)
 	if err != nil {
 		return errors.Wrap(err, "failed to download and decompress stream")
 	}
@@ -76,7 +88,7 @@ func HandleBackupFetch(folder storage.Folder,
 	fetcher func(folder storage.Folder, backup Backup)) {
 	backupName, err := targetBackupSelector.Select(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.DebugLogger.Printf("HandleBackupFetch(%s, folder,)\n", backupName)
+	tracelog.DebugLogger.Printf("HandleBackupFetch(%s)\n", backupName)
 	backup, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 

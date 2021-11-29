@@ -30,10 +30,10 @@ type FetchHandler struct {
 	backup              internal.Backup
 }
 
-func NewFetchHandler(backup internal.Backup, sentinel BackupSentinelDto, restoreCfg ClusterRestoreConfig) *FetchHandler {
+func NewFetchHandler(backup internal.Backup, sentinel BackupSentinelDto, restoreCfg ClusterRestoreConfig, logsDir string) *FetchHandler {
 	backupIDByContentID := make(map[int]string)
 	segmentConfigs := make([]cluster.SegConfig, 0)
-	gplog.InitializeLogging("wal-g", "")
+	gplog.InitializeLogging("wal-g", logsDir)
 
 	for _, segMeta := range sentinel.Segments {
 		// currently, WAL-G does not restore the mirrors
@@ -163,7 +163,6 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 
 	segUserData := NewSegmentUserDataFromID(backupID)
 	cmd := []string{
-		"WALG_LOG_LEVEL=DEVEL",
 		fmt.Sprintf("PGPORT=%d", segment.Port),
 		"wal-g pg",
 		fmt.Sprintf("backup-fetch %s", segment.DataDir),
@@ -177,13 +176,13 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 	return cmdLine
 }
 
-func NewGreenplumBackupFetcher(restoreCfg ClusterRestoreConfig) func(folder storage.Folder, backup internal.Backup) {
+func NewGreenplumBackupFetcher(restoreCfg ClusterRestoreConfig, logsDir string) func(folder storage.Folder, backup internal.Backup) {
 	return func(folder storage.Folder, backup internal.Backup) {
 		var sentinel BackupSentinelDto
 		err := backup.FetchSentinel(&sentinel)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = NewFetchHandler(backup, sentinel, restoreCfg).Fetch()
+		err = NewFetchHandler(backup, sentinel, restoreCfg, logsDir).Fetch()
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
 }

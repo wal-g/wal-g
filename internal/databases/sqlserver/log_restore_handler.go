@@ -12,7 +12,6 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -37,15 +36,9 @@ func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromn
 	dbnames, fromnames, err = getDatabasesToRestore(sentinel, dbnames, fromnames)
 	tracelog.ErrorLogger.FatalfOnError("failed to list databases to restore logs: %v", err)
 
-	bs, err := blob.NewServer(folder)
-	tracelog.ErrorLogger.FatalfOnError("proxy create error: %v", err)
-
-	lock, err := bs.AcquireLock()
+	lock, err := RunOrReuseProxy(ctx, cancel, folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	defer func() { tracelog.ErrorLogger.PrintOnError(lock.Unlock()) }()
-
-	err = bs.RunBackground(ctx, cancel)
-	tracelog.ErrorLogger.FatalfOnError("proxy run error: %v", err)
+	defer lock.Close()
 
 	stopAt, err := utility.ParseUntilTS(untilTS)
 	tracelog.ErrorLogger.FatalfOnError("invalid util timestamp: %v", err)
@@ -59,7 +52,7 @@ func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromn
 		if err != nil {
 			return err
 		}
-		backupMetadata, err := GetBackupProperties(db, folder, false, backupName, fromname)
+		backupMetadata, err := GetBackupProperties(db, folder, false, backup.Name, fromname)
 		if err != nil {
 			return err
 		}
@@ -129,6 +122,14 @@ func restoreSingleLog(ctx context.Context,
 	logBackupFileProperties, err := GetBackupProperties(db, folder, true, logBackupName, fromname)
 	if err != nil {
 		return prevBackupFinishDate, err
+	}
+	applied, err := IsLogAlreadyApplied(db, dbname, logBackupFileProperties[0])
+	if err != nil {
+		return prevBackupFinishDate, err
+	}
+	if applied {
+		tracelog.InfoLogger.Printf("Skipping %s, log had already been applied", urls)
+		return logBackupFileProperties[0].BackupFinishDate, err
 	}
 	if !prevBackupFinishDate.Before(stopAt) {
 		tracelog.InfoLogger.Printf("Log Restore operation is inapplicable. STOPAT point left behind.")

@@ -5,6 +5,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -37,6 +38,16 @@ const (
 	EndpointPortSetting      = "S3_ENDPOINT_PORT"
 	LogLevel                 = "S3_LOG_LEVEL"
 	UseListObjectsV1         = "S3_USE_LIST_OBJECTS_V1"
+	RangeBatchEnabled        = "S3_RANGE_BATCH_ENABLED"
+	RangeQueriesMaxRetries   = "S3_RANGE_MAX_RETRIES"
+	// MaxRetriesSetting limits retries during interaction with S3
+	MaxRetriesSetting = "S3_MAX_RETRIES"
+
+	RangeBatchEnabledDefault = false
+	RangeMaxRetriesDefault   = 10
+	RangeQueryMinRetryDelay  = 30 * time.Millisecond
+	RangeQueryMaxRetryDelay  = 300 * time.Second
+	MaxRetriesDefault        = 15
 )
 
 var (
@@ -61,17 +72,12 @@ var (
 		s3CertFile,
 		MaxPartSize,
 		UseListObjectsV1,
+		LogLevel,
+		RangeBatchEnabled,
+		RangeQueriesMaxRetries,
+		MaxRetriesSetting,
 	}
 )
-
-func getFirstSettingOf(settings map[string]string, keys []string) string {
-	for _, key := range keys {
-		if value, ok := settings[key]; ok {
-			return value
-		}
-	}
-	return ""
-}
 
 func NewFolderError(err error, format string, args ...interface{}) storage.Error {
 	return storage.NewError(err, "S3", format, args...)
@@ -92,10 +98,11 @@ type Folder struct {
 	useListObjectsV1 bool
 }
 
-func NewFolder(uploader Uploader, s3API s3iface.S3API, bucket, path string, useListObjectsV1 bool) *Folder {
+func NewFolder(uploader Uploader, s3API s3iface.S3API, settings map[string]string, bucket, path string, useListObjectsV1 bool) *Folder {
 	return &Folder{
 		uploader:         uploader,
 		S3API:            s3API,
+		settings:         settings,
 		Bucket:           aws.String(bucket),
 		Path:             storage.AddDelimiterToPath(path),
 		useListObjectsV1: useListObjectsV1,
@@ -103,7 +110,7 @@ func NewFolder(uploader Uploader, s3API s3iface.S3API, bucket, path string, useL
 }
 
 func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
-	bucket, path, err := storage.GetPathFromPrefix(prefix)
+	bucket, storagePath, err := storage.GetPathFromPrefix(prefix)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure S3 path")
 	}
@@ -124,8 +131,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		}
 	}
 
-	folder := NewFolder(*uploader, client, bucket, path, useListObjectsV1)
-	folder.settings = settings
+	folder := NewFolder(*uploader, client, settings, bucket, storagePath, useListObjectsV1)
 
 	return folder, nil
 }
@@ -183,12 +189,47 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 		}
 		return nil, errors.Wrapf(err, "failed to read object: '%s' from S3", objectPath)
 	}
-	return object.Body, nil
+
+	rangeEnabled, maxRetries, minRetryDelay, maxRetryDelay := folder.getReaderSettings()
+
+	reader := object.Body
+	if rangeEnabled {
+		reader = NewS3Reader(object.Body, objectPath, maxRetries, folder, minRetryDelay, maxRetryDelay)
+	}
+	return reader, nil
+}
+
+func (folder *Folder) getReaderSettings() (rangeEnabled bool, retriesCount int, minRetryDelay, maxRetryDelay time.Duration) {
+	rangeEnabled = RangeBatchEnabledDefault
+	if rangeBatch, ok := folder.settings[RangeBatchEnabled]; ok {
+		if strings.TrimSpace(strings.ToLower(rangeBatch)) == "true" {
+			rangeEnabled = true
+		} else {
+			rangeEnabled = false
+		}
+	}
+
+	retriesCount = RangeMaxRetriesDefault
+	if maxRetriesRaw, ok := folder.settings[RangeQueriesMaxRetries]; ok {
+		if maxRetriesInt, err := strconv.Atoi(maxRetriesRaw); err == nil {
+			retriesCount = maxRetriesInt
+		}
+	}
+
+	if minRetryDelay == 0 {
+		minRetryDelay = RangeQueryMinRetryDelay
+	}
+	if maxRetryDelay == 0 {
+		maxRetryDelay = RangeQueryMaxRetryDelay
+	}
+
+	return rangeEnabled, retriesCount, minRetryDelay, maxRetryDelay
 }
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
-	return NewFolder(folder.uploader, folder.S3API, *folder.Bucket,
+	subFolder := NewFolder(folder.uploader, folder.S3API, folder.settings, *folder.Bucket,
 		storage.JoinPath(folder.Path, subFolderRelativePath)+"/", folder.useListObjectsV1)
+	return subFolder
 }
 
 func (folder *Folder) GetPath() string {
@@ -198,8 +239,9 @@ func (folder *Folder) GetPath() string {
 func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
 	listFunc := func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) {
 		for _, prefix := range commonPrefixes {
-			subFolders = append(subFolders, NewFolder(folder.uploader, folder.S3API, *folder.Bucket,
-				*prefix.Prefix, folder.useListObjectsV1))
+			subFolder := NewFolder(folder.uploader, folder.S3API, folder.settings, *folder.Bucket,
+				*prefix.Prefix, folder.useListObjectsV1)
+			subFolders = append(subFolders, subFolder)
 		}
 		for _, object := range contents {
 			// Some storages return root tar_partitions folder as a Key.

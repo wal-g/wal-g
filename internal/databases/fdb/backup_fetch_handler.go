@@ -12,5 +12,5 @@ func HandleBackupFetch(ctx context.Context,
 	folder storage.Folder,
 	targetBackupSelector internal.BackupSelector,
 	restoreCmd *exec.Cmd) {
-	internal.HandleBackupFetch(folder, targetBackupSelector, internal.GetCommandStreamFetcher(restoreCmd))
+	internal.HandleBackupFetch(folder, targetBackupSelector, internal.GetBackupToCommandFetcher(restoreCmd))
 }

@@ -9,7 +9,6 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -29,15 +28,9 @@ func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 
 	tracelog.ErrorLogger.FatalfOnError("failed to list databases to backup: %v", err)
 
-	bs, err := blob.NewServer(folder)
-	tracelog.ErrorLogger.FatalfOnError("proxy create error: %v", err)
-
-	lock, err := bs.AcquireLock()
+	lock, err := RunOrReuseProxy(ctx, cancel, folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	defer func() { tracelog.ErrorLogger.PrintOnError(lock.Unlock()) }()
-
-	err = bs.RunBackground(ctx, cancel)
-	tracelog.ErrorLogger.FatalfOnError("proxy run error: %v", err)
+	defer lock.Close()
 
 	server, _ := os.Hostname()
 	timeStart := utility.TimeNowCrossPlatformLocal()

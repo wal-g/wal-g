@@ -1,10 +1,13 @@
 package azure
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -12,7 +15,9 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
-	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/pkg/errors"
 )
@@ -26,9 +31,9 @@ const (
 	MaxBuffersSetting = "AZURE_MAX_BUFFERS"
 	TryTimeoutSetting = "AZURE_TRY_TIMEOUT"
 	minBufferSize     = 1024
-	defaultBufferSize = 64 * 1024 * 1024
+	defaultBufferSize = 8 * 1024 * 1024
 	minBuffers        = 1
-	defaultBuffers    = 3
+	defaultBuffers    = 4
 	defaultTryTimeout = 5
 	defaultEnvName    = "AzurePublicCloud"
 )
@@ -53,9 +58,17 @@ func NewCredentialError(settingName string) storage.Error {
 
 func NewFolder(
 	uploadStreamToBlockBlobOptions azblob.UploadStreamToBlockBlobOptions,
-	containerURL azblob.ContainerURL,
+	containerClient azblob.ContainerClient,
+	credential azcore.Credential,
+	timeout time.Duration,
 	path string) *Folder {
-	return &Folder{uploadStreamToBlockBlobOptions, containerURL, path}
+	return &Folder{
+		uploadStreamToBlockBlobOptions,
+		containerClient,
+		credential,
+		timeout,
+		path,
+	}
 }
 
 func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
@@ -78,10 +91,10 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		environmentName = defaultEnvName
 	}
 
-	var credential azblob.Credential
+	var credential azcore.Credential
 	var err error
 	if usingToken {
-		credential = azblob.NewAnonymousCredential()
+		credential = azcore.NewAnonymousCredential()
 	} else {
 		credential, err = azblob.NewSharedKeyCredential(accountName, accountKey)
 		if err != nil {
@@ -99,13 +112,6 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		tryTimeout = defaultTryTimeout
 	}
 
-	pipeLine := azblob.NewPipeline(
-		credential,
-		azblob.PipelineOptions{
-			Retry: azblob.RetryOptions{TryTimeout: time.Duration(tryTimeout) * time.Minute},
-			RequestLog: azblob.RequestLogOptions{SyslogDisabled: true},
-		},
-	)
 	containerName, path, err := storage.GetPathFromPrefix(prefix)
 	if err != nil {
 		return nil, NewFolderError(err, "Unable to create container")
@@ -113,26 +119,36 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 
 	storageEndpointSuffix := getStorageEndpointSuffix(environmentName)
 
-	var serviceURL *url.URL
+	var containerUrlString string
 	if usingToken {
-		serviceURL, err = url.Parse(fmt.Sprintf("https://%s.blob.%s/%s%s", accountName, storageEndpointSuffix, containerName, accountToken))
+		containerUrlString = fmt.Sprintf("https://%s.blob.%s/%s%s", accountName, storageEndpointSuffix, containerName, accountToken)
+		_, err = url.Parse(containerUrlString)
 		if err != nil {
 			return nil, NewFolderError(err, "Unable to parse service URL with SAS token")
 		}
 	} else {
-		serviceURL, err = url.Parse(fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName))
+		containerUrlString = fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
+		_, err = url.Parse(containerUrlString)
 		if err != nil {
 			return nil, NewFolderError(err, "Unable to parse service URL")
 		}
 	}
-	containerURL := azblob.NewContainerURL(*serviceURL, pipeLine)
+	timeout := time.Duration(tryTimeout) * time.Minute
+	containerClient, err := azblob.NewContainerClient(containerUrlString, credential, &azblob.ClientOptions{
+		Retry: policy.RetryOptions{TryTimeout: timeout},
+	})
+	if err != nil {
+		return nil, NewFolderError(err, "Unable to create service client")
+	}
 	path = storage.AddDelimiterToPath(path)
-	return NewFolder(getUploadStreamToBlockBlobOptions(settings), containerURL, path), nil
+	return NewFolder(getUploadStreamToBlockBlobOptions(settings), containerClient, credential, timeout, path), nil
 }
 
 type Folder struct {
 	uploadStreamToBlockBlobOptions azblob.UploadStreamToBlockBlobOptions
-	containerURL                   azblob.ContainerURL
+	containerClient                azblob.ContainerClient
+	credential                     azcore.Credential
+	timeout                        time.Duration
 	path                           string
 }
 
@@ -143,9 +159,10 @@ func (folder *Folder) GetPath() string {
 func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 	path := storage.JoinPath(folder.path, objectRelativePath)
 	ctx := context.Background()
-	blobURL := folder.containerURL.NewBlockBlobURL(path)
-	_, err := blobURL.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	if stgErr, ok := err.(azblob.StorageError); ok && stgErr.ServiceCode() == azblob.ServiceCodeBlobNotFound {
+	blobClient := folder.containerClient.NewBlockBlobClient(path)
+	_, err := blobClient.GetProperties(ctx, &azblob.GetBlobPropertiesOptions{})
+	var stgErr *azblob.StorageError;
+	if err != nil && errors.As(err, &stgErr) && stgErr.ErrorCode == azblob.StorageErrorCodeBlobNotFound {
 		return false, nil
 	}
 	if err != nil {
@@ -155,29 +172,32 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 }
 
 func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
-	//Marker is used for segmented iteration.
-	for marker := (azblob.Marker{}); marker.NotDone(); {
-
-		blobs, err := folder.containerURL.ListBlobsHierarchySegment(context.Background(), marker, "/", azblob.ListBlobsSegmentOptions{Prefix: folder.path})
+	blobPager := folder.containerClient.ListBlobsHierarchy("/", &azblob.ContainerListBlobHierarchySegmentOptions{Prefix: &folder.path})
+	for blobPager.NextPage(context.Background()) {
+		blobs := blobPager.PageResponse()
 		if err != nil {
 			return nil, nil, NewFolderError(err, "Unable to iterate %v", folder.path)
 		}
 		//add blobs to the list of storage objects
 		for _, blob := range blobs.Segment.BlobItems {
-			objName := strings.TrimPrefix(blob.Name, folder.path)
-			updated := time.Time(blob.Properties.LastModified)
+			objName := strings.TrimPrefix(*blob.Name, folder.path)
+			updated := time.Time(*blob.Properties.LastModified)
 
 			objects = append(objects, storage.NewLocalObject(objName, updated, *blob.Properties.ContentLength))
 		}
 
-		marker = blobs.NextMarker
 		//Get subFolder names
 		blobPrefixes := blobs.Segment.BlobPrefixes
 		//add subFolders to the list of storage folders
 		for _, blobPrefix := range blobPrefixes {
-			subFolderPath := blobPrefix.Name
+			subFolderPath := *blobPrefix.Name
 
-			subFolders = append(subFolders, NewFolder(folder.uploadStreamToBlockBlobOptions, folder.containerURL, subFolderPath))
+			subFolders = append(subFolders, NewFolder(
+				folder.uploadStreamToBlockBlobOptions,
+				folder.containerClient,
+				folder.credential,
+				folder.timeout,
+				subFolderPath))
 		}
 
 	}
@@ -187,33 +207,183 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 	return NewFolder(
 		folder.uploadStreamToBlockBlobOptions,
-		folder.containerURL,
+		folder.containerClient,
+		folder.credential,
+		folder.timeout,
 		storage.AddDelimiterToPath(storage.JoinPath(folder.path, subFolderRelativePath)))
 }
 
-func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
-	//Download blob using blobURL obtained from full path to blob
-	path := storage.JoinPath(folder.path, objectRelativePath)
-	blobURL := folder.containerURL.NewBlockBlobURL(path)
-	downloadResponse, err := blobURL.Download(context.Background(), 0, 0, azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
-	if stgErr, ok := err.(azblob.StorageError); ok && stgErr.ServiceCode() == azblob.ServiceCodeBlobNotFound {
-		return nil, storage.NewObjectNotFoundError(path)
+// From https://github.com/Azure/azure-sdk-for-go/blob/main/sdk/storage/azblob/zc_shared_policy_shared_key_credential.go
+func buildStringToSign(c *azblob.SharedKeyCredential, req *http.Request) (string, error) {
+	// https://docs.microsoft.com/en-us/rest/api/storageservices/authentication-for-the-azure-storage-services
+	headers := req.Header
+	contentLength := headers.Get("Content-Length")
+	if contentLength == "0" {
+		contentLength = ""
 	}
+
+	canonicalizedResource, err := buildCanonicalizedResource(c, req.URL)
+	if err != nil {
+		return "", err
+	}
+
+	stringToSign := strings.Join([]string{
+		req.Method,
+		headers.Get("Content-Encoding"),
+		headers.Get("Content-Language"),
+		contentLength,
+		headers.Get("Content-MD5"),
+		headers.Get("Content-Type"),
+		"", // Empty date because x-ms-date is expected (as per web page above)
+		headers.Get("If-Modified-Since"),
+		headers.Get("If-Match"),
+		headers.Get("If-None-Match"),
+		headers.Get("If-Unmodified-Since"),
+		headers.Get("Range"),
+		buildCanonicalizedHeader(c, headers),
+		canonicalizedResource,
+	}, "\n")
+	return stringToSign, nil
+}
+
+func buildCanonicalizedHeader(c *azblob.SharedKeyCredential, headers http.Header) string {
+	cm := map[string][]string{}
+	for k, v := range headers {
+		headerName := strings.TrimSpace(strings.ToLower(k))
+		if strings.HasPrefix(headerName, "x-ms-") {
+			cm[headerName] = v // NOTE: the value must not have any whitespace around it.
+		}
+	}
+	if len(cm) == 0 {
+		return ""
+	}
+
+	keys := make([]string, 0, len(cm))
+	for key := range cm {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	ch := bytes.NewBufferString("")
+	for i, key := range keys {
+		if i > 0 {
+			ch.WriteRune('\n')
+		}
+		ch.WriteString(key)
+		ch.WriteRune(':')
+		ch.WriteString(strings.Join(cm[key], ","))
+	}
+	return ch.String()
+}
+
+func buildCanonicalizedResource(c *azblob.SharedKeyCredential, u *url.URL) (string, error) {
+	// https://docs.microsoft.com/en-us/rest/api/storageservices/authentication-for-the-azure-storage-services
+	cr := bytes.NewBufferString("/")
+	cr.WriteString(c.AccountName())
+
+	if len(u.Path) > 0 {
+		// Any portion of the CanonicalizedResource string that is derived from
+		// the resource's URI should be encoded exactly as it is in the URI.
+		// -- https://msdn.microsoft.com/en-gb/library/azure/dd179428.aspx
+		cr.WriteString(u.EscapedPath())
+	} else {
+		// a slash is required to indicate the root path
+		cr.WriteString("/")
+	}
+
+	// params is a map[string][]string; param name is key; params values is []string
+	params, err := url.ParseQuery(u.RawQuery) // Returns URL decoded values
+	if err != nil {
+		return "", fmt.Errorf("failed to parse query params: %w", err)
+	}
+
+	if len(params) > 0 { // There is at least 1 query parameter
+		var paramNames []string // We use this to sort the parameter key names
+		for paramName := range params {
+			paramNames = append(paramNames, paramName) // paramNames must be lowercase
+		}
+		sort.Strings(paramNames)
+
+		for _, paramName := range paramNames {
+			paramValues := params[paramName]
+			sort.Strings(paramValues)
+
+			// Join the sorted key values separated by ','
+			// Then prepend "keyName:"; then add this string to the buffer
+			cr.WriteString("\n" + paramName + ":" + strings.Join(paramValues, ","))
+		}
+	}
+	return cr.String(), nil
+}
+// End from https://github.com/Azure/azure-sdk-for-go/blob/main/sdk/storage/azblob/zc_shared_policy_shared_key_credential.go
+
+func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
+	path := storage.JoinPath(folder.path, objectRelativePath)
+	blobClient := folder.containerClient.NewBlobClient(path)
+	httpClient := &http.Client{ Timeout: folder.timeout }
+
+	req, err := http.NewRequest("GET", blobClient.URL(), nil)
+	if err != nil {
+		return nil, NewFolderError(err, "Unable to download blob %s.", path)
+	}
+
+	if cred, ok := folder.credential.(*azblob.SharedKeyCredential); ok {
+		// Shared Key auth involves signing each request
+		if d := req.Header.Get("x-ms-data"); d == "" {
+			req.Header.Set("x-ms-date", time.Now().UTC().Format(http.TimeFormat))
+		}
+		stringToSign, stringErr := buildStringToSign(cred, req)
+		if stringErr != nil {
+			return nil, NewFolderError(stringErr, "Unable to sign request to sign blob %s.", path)
+		}
+		signature, sigErr := cred.ComputeHMACSHA256(stringToSign)
+		if sigErr != nil {
+			return nil, NewFolderError(sigErr, "Unable to sign request to sign blob %s.", path)
+		}
+		req.Header.Set("Authorization", strings.Join([]string{"SharedKey ", cred.AccountName(), ":", signature}, ""))
+	}
+
+	resp, err := httpClient.Do(req)
 
 	if err != nil {
 		return nil, NewFolderError(err, "Unable to download blob %s.", path)
 	}
-	//retrieve and return the downloaded content
-	content := downloadResponse.Body(azblob.RetryReaderOptions{})
-	return content, nil
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		resp.Body.Close()
+		if resp.StatusCode == 404 {
+			return nil, storage.NewObjectNotFoundError(path)
+		} else {
+			return nil, NewFolderError(errors.New(resp.Status), "Unable to download blob %s.", path)
+		}
+	}
+
+	return resp.Body, nil
+}
+
+// blobClient.UploadStreamToBlockBlob only requires an io.Reader
+// See https://github.com/Azure/azure-sdk-for-go/pull/15958
+type FakeIoReadSeekCloser struct {
+	reader io.Reader
+}
+
+func (ioReader FakeIoReadSeekCloser) Read(p []byte) (n int, err error) {
+	return ioReader.reader.Read(p)
+}
+
+func (ioReader FakeIoReadSeekCloser) Seek(offset int64, whence int) (int64, error) {
+	return 0, errors.New("FakeIoReadSeekCloser received Seek, only handles Read")
+}
+
+func (ioReader FakeIoReadSeekCloser) Close() error {
+	return errors.New("FakeIoReadSeekCloser received Close, only handles Read")
 }
 
 func (folder *Folder) PutObject(name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
 	//Upload content to a block blob using full path
 	path := storage.JoinPath(folder.path, name)
-	blobURL := folder.containerURL.NewBlockBlobURL(path)
-	_, err := azblob.UploadStreamToBlockBlob(context.Background(), content, blobURL, folder.uploadStreamToBlockBlobOptions)
+	blobClient := folder.containerClient.NewBlockBlobClient(path)
+	_, err := blobClient.UploadStreamToBlockBlob(context.Background(), FakeIoReadSeekCloser{reader:content}, folder.uploadStreamToBlockBlobOptions)
 	if err != nil {
 		return NewFolderError(err, "Unable to upload blob %v", name)
 	}
@@ -230,21 +400,21 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 			return err
 		}
 	}
-	dst := storage.JoinPath(folder.path, dstPath)
-	source := folder.containerURL.NewBlockBlobURL(storage.JoinPath(folder.path, srcPath))
-	blobURL := folder.containerURL.NewBlockBlobURL(dst)
-	_, err := blobURL.StartCopyFromURL(context.Background(), source.URL(), nil, azblob.ModifiedAccessConditions{}, azblob.BlobAccessConditions{}, azblob.AccessTierHot, nil)
+	srcClient := folder.containerClient.NewBlockBlobClient(srcPath)
+	dstClient := folder.containerClient.NewBlockBlobClient(dstPath)
+	_, err := dstClient.StartCopyFromURL(context.Background(), srcClient.URL(), &azblob.StartCopyBlobOptions{Tier: azblob.AccessTierHot.ToPtr()})
 	return err
 }
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	for _, objectRelativePath := range objectRelativePaths {
-		//Delete blob using blobURL obtained from full path to blob
+		//Delete blob using blobClient obtained from full path to blob
 		path := storage.JoinPath(folder.path, objectRelativePath)
-		blobURL := folder.containerURL.NewBlockBlobURL(path)
+		blobClient := folder.containerClient.NewBlockBlobClient(path)
 		tracelog.DebugLogger.Printf("Delete %v\n", path)
-		_, err := blobURL.Delete(context.Background(), azblob.DeleteSnapshotsOptionInclude, azblob.BlobAccessConditions{})
-		if stgErr, ok := err.(azblob.StorageError); ok && stgErr.ServiceCode() == azblob.ServiceCodeBlobNotFound {
+		_, err := blobClient.Delete(context.Background(), &azblob.DeleteBlobOptions{DeleteSnapshots: azblob.DeleteSnapshotsOptionTypeInclude.ToPtr()})
+		var stgErr *azblob.StorageError;
+		if err != nil && errors.As(err, &stgErr) && stgErr.ErrorCode == azblob.StorageErrorCodeBlobNotFound {
 			continue
 		}
 		if err != nil {

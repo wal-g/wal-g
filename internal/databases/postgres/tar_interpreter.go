@@ -9,7 +9,9 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -17,6 +19,7 @@ import (
 type FileTarInterpreter struct {
 	DBDataDirectory string
 	Sentinel        BackupSentinelDto
+	FilesMetadata   FilesMetadataDto
 	FilesToUnwrap   map[string]bool
 	UnwrapResult    *UnwrapResult
 
@@ -24,16 +27,18 @@ type FileTarInterpreter struct {
 }
 
 func NewFileTarInterpreter(
-	dbDataDirectory string, sentinel BackupSentinelDto, filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
+	dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
+	filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
 ) *FileTarInterpreter {
-	return &FileTarInterpreter{dbDataDirectory, sentinel,
+	return &FileTarInterpreter{dbDataDirectory, sentinel, filesMetadata,
 		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles}
 }
 
 // TODO : unit tests
 func (tarInterpreter *FileTarInterpreter) unwrapRegularFileOld(fileReader io.Reader,
 	fileInfo *tar.Header,
-	targetPath string) error {
+	targetPath string,
+	fsync bool) error {
 	if tarInterpreter.FilesToUnwrap != nil {
 		if _, ok := tarInterpreter.FilesToUnwrap[fileInfo.Name]; !ok {
 			// don't have to unwrap it this time
@@ -41,11 +46,11 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFileOld(fileReader io.Rea
 			return nil
 		}
 	}
-	fileDescription, haveFileDescription := tarInterpreter.Sentinel.Files[fileInfo.Name]
+	fileDescription, haveFileDescription := tarInterpreter.FilesMetadata.Files[fileInfo.Name]
 
 	// If this file is incremental we use it's base version from incremental path
 	if haveFileDescription && tarInterpreter.Sentinel.IsIncremental() && fileDescription.IsIncremented {
-		err := ApplyFileIncrement(targetPath, fileReader, tarInterpreter.createNewIncrementalFiles)
+		err := ApplyFileIncrement(targetPath, fileReader, tarInterpreter.createNewIncrementalFiles, fsync)
 		return errors.Wrapf(err, "Interpret: failed to apply increment for '%s'", targetPath)
 	}
 	err := PrepareDirs(fileInfo.Name, targetPath)
@@ -76,8 +81,12 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFileOld(fileReader io.Rea
 		return errors.Wrap(err, "Interpret: chmod failed")
 	}
 
-	err = file.Sync()
-	return errors.Wrap(err, "Interpret: fsync failed")
+	if fsync {
+		err = file.Sync()
+		return errors.Wrap(err, "Interpret: fsync failed")
+	}
+
+	return nil
 }
 
 // Interpret extracts a tar file to disk and creates needed directories.
@@ -86,13 +95,14 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFileOld(fileReader io.Rea
 func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileInfo *tar.Header) error {
 	tracelog.DebugLogger.Println("Interpreting: ", fileInfo.Name)
 	targetPath := path.Join(tarInterpreter.DBDataDirectory, fileInfo.Name)
+	fsync := !viper.GetBool(internal.TarDisableFsyncSetting)
 	switch fileInfo.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
 		// temporary switch to determine if new unwrap logic should be used
 		if useNewUnwrapImplementation {
-			return tarInterpreter.unwrapRegularFileNew(fileReader, fileInfo, targetPath)
+			return tarInterpreter.unwrapRegularFileNew(fileReader, fileInfo, targetPath, fsync)
 		}
-		return tarInterpreter.unwrapRegularFileOld(fileReader, fileInfo, targetPath)
+		return tarInterpreter.unwrapRegularFileOld(fileReader, fileInfo, targetPath, fsync)
 	case tar.TypeDir:
 		err := os.MkdirAll(targetPath, 0755)
 		if err != nil {

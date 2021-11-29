@@ -6,10 +6,10 @@ import (
 	"io"
 	"io/ioutil"
 	"math/rand"
+	"path"
 	"strconv"
 	"strings"
 	"time"
-	"path"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -359,7 +359,7 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	}
 	source := path.Join(folder.path, srcPath)
 	dst := path.Join(folder.path, dstPath)
-	
+
 	ctx := context.Background()
 	_, err := folder.bucket.Object(dst).CopierFrom(folder.bucket.Object(source)).Run(ctx)
 	return err

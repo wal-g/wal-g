@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	flavors "github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-sql-driver/mysql"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -28,6 +29,27 @@ func isMaster(db *sql.DB) bool {
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(rows, "")
 	return !rows.Next()
+}
+
+func getFlavor(db *sql.DB) (string, error) {
+	rows, err := db.Query("SELECT @@version")
+	tracelog.ErrorLogger.FatalOnError(err)
+	defer utility.LoggedClose(rows, "")
+	if rows.Next() {
+		var versionComment string
+		err = rows.Scan(&versionComment)
+		if err != nil {
+			return "", err
+		}
+		// example: '10.6.4-MariaDB-1:10.6.4+maria~focal'
+		if strings.Contains(versionComment, "MariaDB") {
+			return flavors.MariaDBFlavor, nil
+		}
+		// It is possible to distinguish Percona & MySQL by checking 'version_comment',
+		// however usually we can expect that there is no difference between these distributions
+		return flavors.MySQLFlavor, nil
+	}
+	return "", nil
 }
 
 func getMySQLCurrentBinlogFileLocal(db *sql.DB) (fileName string) {
@@ -147,6 +169,7 @@ type StreamSentinelDto struct {
 
 	IsPermanent bool        `json:"IsPermanent,omitempty"`
 	UserData    interface{} `json:"UserData,omitempty"`
+
 	//todo: add other fields from internal.GenericMetadata
 }
 
@@ -162,12 +185,12 @@ type binlogHandler interface {
 	handleBinlog(binlogPath string) error
 }
 
-func fetchLogs(folder storage.Folder, dstDir string, startTS time.Time, endTS time.Time, handler binlogHandler) error {
+func fetchLogs(folder storage.Folder, dstDir string, startTS, endTS, endBinlogTS time.Time, handler binlogHandler) error {
 	logFolder := folder.GetSubFolder(BinlogPath)
 	includeStart := true
 outer:
 	for {
-		logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, includeStart)
+		logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, includeStart, endBinlogTS)
 		includeStart = false
 		if err != nil {
 			return err
@@ -239,7 +262,7 @@ func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time,
 }
 
 // getLogsCoveringInterval lists the operation logs that cover the interval
-func getLogsCoveringInterval(folder storage.Folder, start time.Time, includeStart bool) ([]storage.Object, error) {
+func getLogsCoveringInterval(folder storage.Folder, start time.Time, includeStart bool, endBinlogTS time.Time) ([]storage.Object, error) {
 	logFiles, _, err := folder.ListFolder()
 	if err != nil {
 		return nil, err
@@ -249,6 +272,9 @@ func getLogsCoveringInterval(folder storage.Folder, start time.Time, includeStar
 	})
 	var logsToFetch []storage.Object
 	for _, logFile := range logFiles {
+		if logFile.GetLastModified().After(endBinlogTS) {
+			continue // don't fetch binlogs from future
+		}
 		if start.Before(logFile.GetLastModified()) || includeStart && start.Equal(logFile.GetLastModified()) {
 			logsToFetch = append(logsToFetch, logFile)
 		}

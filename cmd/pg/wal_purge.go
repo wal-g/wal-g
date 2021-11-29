@@ -23,12 +23,8 @@ func runWalPurge(cmd *cobra.Command, args []string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
-	if len(permanentBackups) > 0 {
-		tracelog.InfoLogger.Printf("Found permanent objects: backups=%v, wals=%v\n",
-			permanentBackups, permanentWals)
-	}
 
-	deleteHandler, err := newPostgresDeleteHandler(folder, permanentBackups, permanentWals)
+	deleteHandler, err := postgres.NewDeleteHandler(folder, permanentBackups, permanentWals, true)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	err = postgres.HandleWalPurge(folder, deleteHandler, confirmedWalPurge)

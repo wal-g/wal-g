@@ -1,3 +1,4 @@
+//go:build libsodium
 // +build libsodium
 
 package libsodium
@@ -8,17 +9,23 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal/crypto"
 )
 
 const (
 	keyPath = "./testdata/testKey"
-	testKey = "TEST_LIBSODIUM_KEY"
+	testKey = "TEST_LIBSODIUM_KEY_______"
 )
 
-func MockCrypterFromKey() *Crypter {
-	return CrypterFromKey(testKey).(*Crypter)
+func MockCrypterFromKey() (*Crypter, error) {
+	cr, err := CrypterFromKey(testKey)
+	if err != nil {
+		return nil, err
+	}
+	return cr.(*Crypter), err
 }
 
 func MockCrypterFromKeyPath() *Crypter {
@@ -26,7 +33,9 @@ func MockCrypterFromKeyPath() *Crypter {
 }
 
 func TestMockCrypterFromKey(t *testing.T) {
-	assert.NoError(t, MockCrypterFromKey().setup(), "setup Crypter from key error")
+	cr, err := MockCrypterFromKey()
+	require.NoError(t, err)
+	assert.NoError(t, cr.setup(), "setup Crypter from key error")
 }
 
 func TestMockCrypterFromKeyPath(t *testing.T) {
@@ -34,7 +43,19 @@ func TestMockCrypterFromKeyPath(t *testing.T) {
 }
 
 func TestMockCrypterFromKey_ShouldReturnErrorOnEmptyKey(t *testing.T) {
-	assert.Error(t, CrypterFromKey("").(*Crypter).setup(), "no error on empty key")
+	tests := map[string]struct {
+		key string
+	}{
+		"empty": {key: ""},
+		"short": {key: "short_key"},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := CrypterFromKey(test.key)
+			assert.Error(t, err, "no error on short key")
+		})
+	}
 }
 
 func TestMockCrypterFromKeyPath_ShouldReturnErrorOnNonExistentFile(t *testing.T) {
@@ -63,7 +84,9 @@ func EncryptionCycle(t *testing.T, crypter crypto.Crypter) {
 }
 
 func TestEncryptionCycleFromKey(t *testing.T) {
-	EncryptionCycle(t, MockCrypterFromKey())
+	cr, err := MockCrypterFromKey()
+	require.NoError(t, err)
+	EncryptionCycle(t, cr)
 }
 
 func TestEncryptionCycleFromKeyPath(t *testing.T) {

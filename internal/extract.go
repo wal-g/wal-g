@@ -13,7 +13,6 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
-	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/semaphore"
 )
@@ -74,6 +73,27 @@ func (e EmptyWriteIgnorer) Write(p []byte) (int, error) {
 	return e.WriteCloser.Write(p)
 }
 
+type DevNullWriter struct {
+	io.WriteCloser
+	statPrinter sync.Once
+	totalBytes  int64
+}
+
+func (e *DevNullWriter) Write(p []byte) (int, error) {
+	e.statPrinter.Do(func() {
+		go func() {
+			for {
+				time.Sleep(1 * time.Second)
+				tracelog.ErrorLogger.Printf("/dev/null size %d", e.totalBytes)
+			}
+		}()
+	})
+	e.totalBytes += int64(len(p))
+	return len(p), nil
+}
+
+var _ io.Writer = &DevNullWriter{}
+
 // TODO : unit tests
 // Extract exactly one tar bundle.
 func extractOne(tarInterpreter TarInterpreter, source io.Reader) error {
@@ -106,40 +126,45 @@ func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter 
 		return errors.Wrap(err, "DecryptAndDecompressTar: failed to create new reader")
 	}
 	defer utility.LoggedClose(readCloser, "")
+	var reader io.Reader = readCloser
 
 	if crypter != nil {
-		var reader io.Reader
-		reader, err = crypter.Decrypt(readCloser)
+		reader, err = crypter.Decrypt(reader)
 		if err != nil {
 			return errors.Wrap(err, "DecryptAndDecompressTar: decrypt failed")
-		}
-		readCloser = ioextensions.ReadCascadeCloser{
-			Reader: reader,
-			Closer: readCloser,
 		}
 	}
 
 	fileExtension := utility.GetFileExtension(readerMaker.Path())
 	if fileExtension == "tar" {
-		_, err = io.Copy(writer, readCloser)
+		_, err = utility.FastCopy(writer, reader)
 		return errors.Wrap(err, "DecryptAndDecompressTar: tar extract failed")
 	}
 
-	for _, decompressor := range compression.Decompressors {
-		if fileExtension != decompressor.FileExtension() {
-			continue
-		}
-		err = decompressor.Decompress(writer, readCloser)
-		if err == nil {
-			return nil
-		}
+	decompressor := compression.FindDecompressor(fileExtension)
+	if decompressor == nil {
+		return newUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
+	}
+
+	decompressedReadCloser, err := decompressor.Decompress(reader)
+	if err != nil {
+		decompressionError := newDecompressionError(err)
+		return errors.Wrapf(decompressionError,
+			"DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?",
+			decompressor.FileExtension())
+	}
+	defer utility.LoggedClose(decompressedReadCloser, "")
+	reader = decompressedReadCloser
+
+	_, err = utility.FastCopy(writer, reader)
+	if err != nil {
 		decompressionError := newDecompressionError(err)
 		return errors.Wrapf(decompressionError,
 			"DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?",
 			decompressor.FileExtension())
 	}
 
-	return newUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
+	return nil
 }
 
 // ExtractAll Handles all files passed in. Supports `.lzo`, `.lz4`, `.lzma`, and `.tar`.
@@ -214,9 +239,12 @@ func tryExtractFiles(files []ReaderMaker,
 		}()
 		go func() {
 			defer writingSemaphore.Release(1)
+			defer utility.LoggedClose(extractingReader, "")
 			err := extractOne(tarInterpreter, extractingReader)
+			if err == nil {
+				err = readTrailingZeros(extractingReader)
+			}
 			err = errors.Wrapf(err, "Extraction error in %s", fileClosure.Path())
-			utility.LoggedClose(extractingReader, "")
 			tracelog.InfoLogger.Printf("Finished extraction of %s", fileClosure.Path())
 			if err != nil {
 				isFailed.Store(fileClosure, true)
@@ -241,4 +269,28 @@ func tryExtractFiles(files []ReaderMaker,
 		return true
 	})
 	return failed
+}
+
+func readTrailingZeros(r io.Reader) error {
+	// on first iteration we read small chunk
+	// in most cases we will return fast without memory allocation
+	b := make([]byte, 1024)
+	for {
+		n, err := r.Read(b)
+		if n > 0 {
+			if !utility.AllZero(b[:n]) {
+				return io.ErrClosedPipe
+			}
+		}
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+		if len(b) < utility.CompressedBlockMaxSize {
+			// but if we found zeroes, allocate large buffer to speed up reading
+			b = make([]byte, utility.CompressedBlockMaxSize)
+		}
+	}
 }

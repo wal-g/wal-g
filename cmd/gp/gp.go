@@ -5,7 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wal-g/wal-g/cmd/st"
+	"github.com/spf13/viper"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
+
+	"github.com/wal-g/wal-g/cmd/common"
 
 	"github.com/wal-g/wal-g/cmd/pg"
 
@@ -26,6 +29,8 @@ var cmd = &cobra.Command{
 	Short:   dbShortDescription, // TODO : improve description
 	Version: strings.Join([]string{walgVersion, gitRevision, buildDate, "GreenplumDB"}, "\t"),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Greenplum uses the 64MB WAL segment size by default
+		postgres.SetWalSize(viper.GetUint64(internal.PgWalSize))
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
@@ -41,13 +46,9 @@ func Execute() {
 }
 
 func init() {
-	internal.ConfigureSettings(internal.GP)
-	cobra.OnInitialize(internal.InitConfig, internal.Configure)
+	common.Init(cmd, internal.GP)
 
-	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
 	_ = cmd.MarkFlagRequired("config") // config is required for Greenplum WAL-G
-	cmd.InitDefaultVersionFlag()
-	internal.AddConfigFlags(cmd)
 
 	// wrap the Postgres command so it can be used in the same binary
 	wrappedPgCmd := pg.Cmd
@@ -60,6 +61,10 @@ func init() {
 	}
 	cmd.AddCommand(wrappedPgCmd)
 
-	// Storage tools
-	cmd.AddCommand(st.StorageToolsCmd)
+	// Add the hidden prefetch command to the root command since there is no "pg" prefix in the WAL-G prefetch fork logic
+	pg.WalPrefetchCmd.PreRun = func(cmd *cobra.Command, args []string) {
+		internal.RequiredSettings[internal.StoragePrefixSetting] = true
+		tracelog.ErrorLogger.FatalOnError(internal.AssertRequiredSettingsSet())
+	}
+	cmd.AddCommand(pg.WalPrefetchCmd)
 }

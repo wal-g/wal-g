@@ -1,17 +1,22 @@
 package sqlserver
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net/url"
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/xerrors"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -511,4 +516,65 @@ func GetBackupProperties(db *sql.DB,
 		res = append(res, &dbf)
 	}
 	return res, nil
+}
+
+type LockWrapper struct {
+	c io.Closer
+}
+
+func (lw LockWrapper) Close() {
+	if lw.c != nil {
+		tracelog.ErrorLogger.PrintOnError(lw.c.Close())
+	}
+}
+
+func RunOrReuseProxy(ctx context.Context, cancel context.CancelFunc, folder storage.Folder) (*LockWrapper, error) {
+	bs, err := blob.NewServer(folder)
+	if err != nil {
+		return nil, xerrors.Errorf("proxy create error: %v", err)
+	}
+	reuse, _, err := internal.GetBoolSetting(internal.SQLServerReuseProxy)
+	if err != nil {
+		return nil, err
+	}
+	if reuse {
+		return &LockWrapper{nil}, bs.WaitReady(ctx, blob.ProxyStartTimeout)
+	}
+	lock, err := bs.AcquireLock()
+	if err != nil {
+		return nil, err
+	}
+
+	err = bs.RunBackground(ctx, cancel)
+	if err != nil {
+		tracelog.ErrorLogger.PrintOnError(lock.Close())
+		return nil, xerrors.Errorf("proxy run error: %v", err)
+	}
+	return &LockWrapper{lock}, nil
+}
+
+func GetDBRestoreLSN(db *sql.DB, databaseName string) (int64, error) {
+	query := `SELECT MAX(redo_start_lsn) 
+        FROM sys.master_files
+        WHERE database_id=DB_ID(@dbname) `
+	var res int64
+	if err := db.QueryRow(query, sql.Named("dbname", databaseName)).Scan(&res); err != nil {
+		return 0, err
+	}
+	return res, nil
+}
+
+func IsLogAlreadyApplied(db *sql.DB, databaseName string, logBackupFileProperties *BackupProperties) (bool, error) {
+	lastLSN, err := strconv.ParseInt(logBackupFileProperties.LastLSN, 10, 64)
+	if err != nil {
+		return false, err
+	}
+	dbRestoreLSN, err := GetDBRestoreLSN(db, databaseName)
+	if err != nil {
+		return false, err
+	}
+	if dbRestoreLSN < lastLSN {
+		return false, nil
+	}
+	return true, nil
 }

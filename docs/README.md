@@ -68,7 +68,7 @@ To configure the name of a file containing private key of Yandex Cloud Service A
 
 * `WALG_LIBSODIUM_KEY`
 
-To configure encryption and decryption with libsodium. WAL-G uses an [algorithm](https://download.libsodium.org/doc/secret-key_cryptography/secretstream#algorithm) that only requires a secret key. libsodium keys are fixed-size keys of 32 bytes. To generate a key, you can something like `openssl rand -hex 32` (set `WALG_LIBSODIUM_KEY_TRANSFORM` to `hex`) or `openssl rand -base64 32` (set `WALG_LIBSODIUM_KEY_TRANSFORM` to `base64`). Because environemnt variables and cli arguments are prone to accidental leaks, you might want to consider using the `WALG_LOBSIDUM_KEY_PATH` option instead.
+To configure encryption and decryption with libsodium. WAL-G uses an [algorithm](https://download.libsodium.org/doc/secret-key_cryptography/secretstream#algorithm) that only requires a secret key. libsodium keys are fixed-size keys of 32 bytes. For optimal cryptographic security, it is recommened to use a random 32 byte key. To generate a random key, you can something like `openssl rand -hex 32` (set `WALG_LIBSODIUM_KEY_TRANSFORM` to `hex`) or `openssl rand -base64 32` (set `WALG_LIBSODIUM_KEY_TRANSFORM` to `base64`).
 
 * `WALG_LIBSODIUM_KEY_PATH`
 
@@ -76,7 +76,8 @@ Similar to `WALG_LIBSODIUM_KEY`, but value is the path to the key on file system
 
 * `WALG_LIBSODIUM_KEY_TRANSFORM`
 
-The transform that will be applied to the key. Usually `base64` or `hex`. `rpad-zero` can be used to zero-pad short keys without warnings.
+The transform that will be applied to the `WALG_LIBSODIUM_KEY` to get the required 32 byte key. Supported transformations are `base64`, `hex` or `none` (default).
+The option `none` exists for backwards compatbility, the user input will be converted to 32 byte either via truncation or by zero-padding.
 
 * `WALG_GPG_KEY_ID`  (alternative form `WALE_GPG_KEY_ID`) ⚠️ **DEPRECATED**
 
@@ -170,7 +171,9 @@ If `FIND_FULL` is specified, WAL-G will calculate minimum backup needed to keep 
 ### ``ls``
 Prints listing of the objects in the provided storage folder.
 
-``wal-g st ls`` get listing with all objects in the configured storage.
+``wal-g st ls`` get listing with all objects and folders in the configured storage.
+
+``wal-g st ls -r`` get recursive listing with all objects in the configured storage.
 
 ``wal-g st ls some_folder/some_subfolder`` get listing with all objects in the provided storage path.
 

@@ -2,12 +2,12 @@ package sh
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"errors"
 
 	"github.com/pkg/sftp"
 	"github.com/wal-g/tracelog"
@@ -90,6 +90,8 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 	if err != nil {
 		return nil, NewFolderError(err, "Fail connect via sftp. Address: %s", address)
 	}
+
+	path = storage.AddDelimiterToPath(path)
 
 	return &Folder{
 		extend(sftpClient), path,

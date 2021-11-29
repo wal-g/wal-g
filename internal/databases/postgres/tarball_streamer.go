@@ -75,15 +75,15 @@ type TarballStreamer struct {
 	// list of remaps, remapping input file names to output file names
 	Remaps TarballStreamerRemaps
 	// list of processed files
-	Files internal.BackupFileList
+	Files BundleFiles
 }
 
-func NewTarballStreamer(input io.Reader, maxTarSize int64) (streamer *TarballStreamer) {
+func NewTarballStreamer(input io.Reader, maxTarSize int64, bundleFiles BundleFiles) (streamer *TarballStreamer) {
 	streamer = &TarballStreamer{
 		maxTarSize: maxTarSize,
 		inputTar:   tar.NewReader(input),
 		inputBuf:   make([]byte, ioBufSize),
-		Files:      make(internal.BackupFileList),
+		Files:      bundleFiles,
 		outputIo:   &(bytes.Buffer{}),
 	}
 	streamer.TeeIo = &(bytes.Buffer{})
@@ -148,7 +148,7 @@ func (streamer *TarballStreamer) addFile() (err error) {
 	if !streamer.curHeader.FileInfo().IsDir() {
 		filePath := streamer.curHeader.Name
 		filePath = strings.TrimPrefix(filePath, "./")
-		streamer.Files[filePath] = internal.BackupFileDescription{MTime: streamer.curHeader.ModTime}
+		streamer.Files.AddFileDescription(filePath, internal.BackupFileDescription{MTime: streamer.curHeader.ModTime})
 		streamer.tarFileReadIndex += streamer.curHeader.Size
 	}
 	return nil

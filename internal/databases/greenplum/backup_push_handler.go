@@ -20,11 +20,17 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+const (
+	BackupNamePrefix = "backup_"
+	BackupNameLength = 23 // len(BackupNamePrefix) + len(utility.BackupTimeFormat)
+)
+
 // BackupArguments holds all arguments parsed from cmd to this handler class
 type BackupArguments struct {
 	isPermanent    bool
-	userData       string
+	userData       interface{}
 	segmentFwdArgs []SegmentFwdArg
+	logsDir        string
 }
 
 type SegmentUserData struct {
@@ -39,14 +45,18 @@ func NewSegmentUserDataFromID(backupID string) SegmentUserData {
 	return SegmentUserData{ID: backupID}
 }
 
-// QuotedString will do json.Marshal-ing followed by quoting in order to escape special control characters
-// in the resulting JSON so it can be transferred as the cmdline argument to a segment
-func (d SegmentUserData) QuotedString() string {
+func (d SegmentUserData) String() string {
 	b, err := json.Marshal(d)
 	if err != nil {
 		panic(err)
 	}
-	return strconv.Quote(string(b))
+	return string(b)
+}
+
+// QuotedString will do json.Marshal-ing followed by quoting in order to escape special control characters
+// in the resulting JSON so it can be transferred as the cmdline argument to a segment
+func (d SegmentUserData) QuotedString() string {
+	return strconv.Quote(d.String())
 }
 
 // SegmentFwdArg describes the specific WAL-G
@@ -62,26 +72,29 @@ type BackupWorkers struct {
 	Conn     *pgx.Conn
 }
 
-// CurBackupInfo holds all information that is harvest during the backup process
-type CurBackupInfo struct {
-	backupName     string
-	segmentBackups map[string]*cluster.SegConfig
+// CurrBackupInfo holds all information that is harvest during the backup process
+type CurrBackupInfo struct {
+	backupName       string
+	segmentBackups   map[string]*cluster.SegConfig
+	startTime        time.Time
+	systemIdentifier *uint64
+	gpVersion        semver.Version
+	segmentsMetadata map[string]PgSegmentMetaDto
 }
 
 // BackupHandler is the main struct which is handling the backup process
 type BackupHandler struct {
-	arguments     BackupArguments
-	workers       BackupWorkers
-	globalCluster *cluster.Cluster
-	curBackupInfo CurBackupInfo
+	arguments      BackupArguments
+	workers        BackupWorkers
+	globalCluster  *cluster.Cluster
+	currBackupInfo CurrBackupInfo
 }
 
-func (bh *BackupHandler) buildCommand(contentID int) string {
+func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 	segment := bh.globalCluster.ByContent[contentID][0]
 	segUserData := NewSegmentUserData()
-	bh.curBackupInfo.segmentBackups[segUserData.ID] = segment
+	bh.currBackupInfo.segmentBackups[segUserData.ID] = segment
 	cmd := []string{
-		"WALG_LOG_LEVEL=DEVEL",
 		fmt.Sprintf("PGPORT=%d", segment.Port),
 		"wal-g pg",
 		fmt.Sprintf("backup-push %s", segment.DataDir),
@@ -95,52 +108,137 @@ func (bh *BackupHandler) buildCommand(contentID int) string {
 	}
 
 	cmdLine := strings.Join(cmd, " ")
-	tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmdLine)
+	tracelog.InfoLogger.Printf("Command to run on segment %d: %s", contentID, cmdLine)
 	return cmdLine
 }
 
 // HandleBackupPush handles the backup being read from filesystem and being pushed to the repository
 func (bh *BackupHandler) HandleBackupPush() {
-	bh.curBackupInfo.backupName = "backup_" + time.Now().Format(utility.BackupTimeFormat)
+	bh.currBackupInfo.backupName = BackupNamePrefix + time.Now().Format(utility.BackupTimeFormat)
+	bh.currBackupInfo.startTime = utility.TimeNowCrossPlatformUTC()
+	gplog.InitializeLogging("wal-g", bh.arguments.logsDir)
+
+	tracelog.ErrorLogger.FatalOnError(bh.connect())
+	err := bh.checkPrerequisites()
+	tracelog.ErrorLogger.FatalfOnError("Backup prerequisites check failed: %v\n", err)
+	bh.disconnect()
 
 	tracelog.InfoLogger.Println("Running wal-g on segments")
-	gplog.InitializeLogging("wal-g", "")
 	remoteOutput := bh.globalCluster.GenerateAndExecuteCommand("Running wal-g",
 		cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
 		func(contentID int) string {
-			return bh.buildCommand(contentID)
+			return bh.buildBackupPushCommand(contentID)
 		})
 	bh.globalCluster.CheckClusterError(remoteOutput, "Unable to run wal-g", func(contentID int) string {
 		return "Unable to run wal-g"
-	})
+	}, true)
+
+	tracelog.ErrorLogger.FatalfOnError("Failed to connect to the greenplum master: %v",
+		bh.connect())
+
+	if remoteOutput.NumErrors > 0 {
+		// handle the backup failure and exit
+		err := bh.handleBackupError()
+		if err != nil {
+			tracelog.WarningLogger.Printf("Non-critical error during terminating of the failed backup: %v", err)
+		}
+		tracelog.InfoLogger.Fatalf("Encountered one or more errors during the backup-push. See %s for a complete list of errors.",
+			gplog.GetLogFilePath())
+	}
 
 	for _, command := range remoteOutput.Commands {
-		tracelog.DebugLogger.Printf("WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
+		tracelog.InfoLogger.Printf("WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
 	}
 
-	err := bh.connect()
-	tracelog.ErrorLogger.FatalOnError(err)
-	restoreLSNs, err := bh.createRestorePoint(bh.curBackupInfo.backupName)
+	restoreLSNs, err := bh.createRestorePoint(bh.currBackupInfo.backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	sentinelDto := NewBackupSentinelDto(bh.curBackupInfo, restoreLSNs)
-	tracelog.InfoLogger.Println("Uploading sentinel file")
-	tracelog.DebugLogger.Println(sentinelDto.String())
-	err = internal.UploadSentinel(bh.workers.Uploader, sentinelDto, bh.curBackupInfo.backupName)
+	bh.currBackupInfo.segmentsMetadata, err = bh.fetchSegmentBackupsMetadata()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	sentinelDto := NewBackupSentinelDto(bh.currBackupInfo, restoreLSNs, bh.arguments.userData, bh.arguments.isPermanent)
+	err = bh.uploadSentinel(sentinelDto)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", bh.curBackupInfo.backupName)
+		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", bh.currBackupInfo.backupName)
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	tracelog.InfoLogger.Printf("Backup %s successfully created", bh.curBackupInfo.backupName)
+	tracelog.InfoLogger.Printf("Backup %s successfully created", bh.currBackupInfo.backupName)
+	bh.disconnect()
+}
+
+func (bh *BackupHandler) checkPrerequisites() (err error) {
+	tracelog.InfoLogger.Println("Checking backup prerequisites")
+
+	if bh.currBackupInfo.gpVersion.Major >= 7 {
+		// GP7+ allows the non-exclusive backups
+		tracelog.InfoLogger.Println("Checking backup prerequisites: OK")
+		return nil
+	}
+
+	tracelog.InfoLogger.Println("Checking for the existing running backup...")
+	queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
+	if err != nil {
+		return
+	}
+	backupStatuses, err := queryRunner.IsInBackup()
+	if err != nil {
+		return err
+	}
+
+	isInBackupSegments := make([]int, 0)
+	for contentID, isInBackup := range backupStatuses {
+		if isInBackup {
+			isInBackupSegments = append(isInBackupSegments, contentID)
+		}
+	}
+
+	if len(isInBackupSegments) > 0 {
+		return fmt.Errorf("backup is already in progress on one or more segments: %v", isInBackupSegments)
+	}
+	tracelog.InfoLogger.Printf("No running backups were found")
+	tracelog.InfoLogger.Printf("Checking backup prerequisites: OK")
+	return nil
+}
+
+func (bh *BackupHandler) handleBackupError() error {
+	// Abort the non-finished exclusive backups on the segments.
+	// WAL-G in GP7+ uses the non-exclusive backups, that are terminated on connection close, so this is unnecessary.
+	if bh.currBackupInfo.gpVersion.Major < 7 {
+		tracelog.InfoLogger.Println("Terminating the running exclusive backups...")
+		queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
+		if err != nil {
+			return err
+		}
+		return queryRunner.AbortBackup()
+	}
+
+	return nil
+}
+
+func (bh *BackupHandler) uploadSentinel(sentinelDto BackupSentinelDto) (err error) {
+	tracelog.InfoLogger.Println("Uploading sentinel file")
+	tracelog.InfoLogger.Println(sentinelDto.String())
+
+	sentinelUploader := bh.workers.Uploader
+	sentinelUploader.UploadingFolder = sentinelUploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
+	return internal.UploadSentinel(sentinelUploader, sentinelDto, bh.currBackupInfo.backupName)
 }
 
 func (bh *BackupHandler) connect() (err error) {
-	tracelog.DebugLogger.Println("Connecting to Greenplum master.")
+	tracelog.InfoLogger.Println("Connecting to Greenplum master.")
 	bh.workers.Conn, err = postgres.Connect()
 	if err != nil {
 		return
 	}
 	return
+}
+
+func (bh *BackupHandler) disconnect() {
+	tracelog.InfoLogger.Println("Disconnecting from the Greenplum master.")
+	err := bh.workers.Conn.Close()
+	if err != nil {
+		tracelog.WarningLogger.Printf("Failed to disconnect: %v", err)
+	}
 }
 
 func (bh *BackupHandler) createRestorePoint(restorePointName string) (restoreLSNs map[int]string, err error) {
@@ -156,23 +254,23 @@ func (bh *BackupHandler) createRestorePoint(restorePointName string) (restoreLSN
 	return restoreLSNs, nil
 }
 
-func getGpCluster() (globalCluster *cluster.Cluster, err error) {
-	tracelog.DebugLogger.Println("Initializing tmp connection to read Greenplum info")
+func getGpClusterInfo() (globalCluster *cluster.Cluster, version semver.Version, systemIdentifier *uint64, err error) {
+	tracelog.InfoLogger.Println("Initializing tmp connection to read Greenplum info")
 	tmpConn, err := postgres.Connect()
 	if err != nil {
-		return globalCluster, err
+		return globalCluster, semver.Version{}, nil, err
 	}
 
 	queryRunner, err := NewGpQueryRunner(tmpConn)
 	if err != nil {
-		return globalCluster, err
+		return globalCluster, semver.Version{}, nil, err
 	}
 
 	versionStr, err := queryRunner.GetGreenplumVersion()
 	if err != nil {
-		return globalCluster, err
+		return globalCluster, semver.Version{}, nil, err
 	}
-	tracelog.DebugLogger.Printf("Greenplum version: %s", versionStr)
+	tracelog.InfoLogger.Printf("Greenplum version: %s", versionStr)
 	versionStart := strings.Index(versionStr, "(Greenplum Database ") + len("(Greenplum Database ")
 	versionEnd := strings.Index(versionStr, ")")
 	versionStr = versionStr[versionStart:versionEnd]
@@ -180,16 +278,16 @@ func getGpCluster() (globalCluster *cluster.Cluster, err error) {
 	threeDigitVersion := pattern.FindStringSubmatch(versionStr)[0]
 	semVer, err := semver.Make(threeDigitVersion)
 	if err != nil {
-		return globalCluster, err
+		return globalCluster, semver.Version{}, nil, err
 	}
 
 	segConfigs, err := queryRunner.GetGreenplumSegmentsInfo(semVer)
 	if err != nil {
-		return globalCluster, err
+		return globalCluster, semver.Version{}, nil, err
 	}
 	globalCluster = cluster.NewCluster(segConfigs)
 
-	return globalCluster, nil
+	return globalCluster, semVer, queryRunner.pgQueryRunner.SystemIdentifier, nil
 }
 
 // NewBackupHandler returns a backup handler object, which can handle the backup
@@ -198,9 +296,8 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 	if err != nil {
 		return bh, err
 	}
-	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 
-	globalCluster, err := getGpCluster()
+	globalCluster, version, systemIdentifier, err := getGpClusterInfo()
 	if err != nil {
 		return bh, err
 	}
@@ -211,18 +308,79 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 			Uploader: uploader,
 		},
 		globalCluster: globalCluster,
-		curBackupInfo: CurBackupInfo{
-			segmentBackups: make(map[string]*cluster.SegConfig),
+		currBackupInfo: CurrBackupInfo{
+			segmentBackups:   make(map[string]*cluster.SegConfig),
+			gpVersion:        version,
+			systemIdentifier: systemIdentifier,
 		},
 	}
 	return bh, err
 }
 
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
-func NewBackupArguments(isPermanent bool, userData string, fwdArgs []SegmentFwdArg) BackupArguments {
+func NewBackupArguments(isPermanent bool, userData interface{}, fwdArgs []SegmentFwdArg, logsDir string) BackupArguments {
 	return BackupArguments{
 		isPermanent:    isPermanent,
 		userData:       userData,
 		segmentFwdArgs: fwdArgs,
+		logsDir:        logsDir,
 	}
+}
+
+func (bh *BackupHandler) fetchSegmentBackupsMetadata() (map[string]PgSegmentMetaDto, error) {
+	metadata := make(map[string]PgSegmentMetaDto)
+
+	backupIDs := make([]string, 0)
+	for backupID := range bh.currBackupInfo.segmentBackups {
+		backupIDs = append(backupIDs, backupID)
+	}
+
+	i := 0
+	minFetchMetaRetryWait := 5 * time.Second
+	maxFetchMetaRetryWait := time.Minute
+	sleeper := internal.NewExponentialSleeper(minFetchMetaRetryWait, maxFetchMetaRetryWait)
+	retryCount := 0
+	maxRetryCount := 5
+
+	for i < len(backupIDs) {
+		meta, err := bh.fetchSingleMetadata(backupIDs[i], bh.currBackupInfo.segmentBackups[backupIDs[i]])
+		if err != nil {
+			// Due to the potentially large number of segments, a large number of ListObjects() requests can be produced instantly.
+			// Instead of failing immediately, sleep and retry a couple of times.
+			if retryCount < maxRetryCount {
+				retryCount++
+				sleeper.Sleep()
+				continue
+			}
+
+			return nil, fmt.Errorf("failed to download the segment backup %s metadata (tried %d times): %w",
+				backupIDs[i], retryCount, err)
+		}
+		metadata[backupIDs[i]] = *meta
+		retryCount = 0
+		i++
+	}
+
+	return metadata, nil
+}
+
+func (bh *BackupHandler) fetchSingleMetadata(backupID string, segCfg *cluster.SegConfig) (*PgSegmentMetaDto, error) {
+	// Actually, this is not a real completed backup. It is only used to fetch the segment metadata
+	currentBackup := NewBackup(bh.workers.Uploader.UploadingFolder, bh.currBackupInfo.backupName)
+
+	pgBackup, err := currentBackup.GetSegmentBackup(backupID, segCfg.ContentID)
+	if err != nil {
+		return nil, err
+	}
+
+	meta := PgSegmentMetaDto{
+		BackupName: pgBackup.Name,
+	}
+
+	meta.ExtendedMetadataDto, err = pgBackup.FetchMeta()
+	if err != nil {
+		return nil, err
+	}
+
+	return &meta, nil
 }

@@ -19,8 +19,9 @@ services:
     container_name: wal-g_ubuntu
 
   s3:
-    image: minio/minio
+    image: minio/minio:RELEASE.2021-06-07T21-40-51Z
     container_name: wal-g_s3
+    hostname: s3
     ports:
       - "9000:9000"
     environment:
@@ -31,8 +32,10 @@ services:
       -c 'mkdir -p /export/fullbucket
       &&  mkdir -p /export/fullratingcomposerbucket
       &&  mkdir -p /export/fullcopycomposerbucket
+      &&  mkdir -p /export/fullwithoutfilesmetadatabucket
       &&  mkdir -p /export/fullscandeltabucket
       &&  mkdir -p /export/remotebucket
+      &&  mkdir -p /export/remotewithoutfilesmetadatabucket
       &&  mkdir -p /export/cryptobucket
       &&  mkdir -p /export/waldeltabucket
       &&  mkdir -p /export/ghostbucket
@@ -51,6 +54,7 @@ services:
       &&  mkdir -p /export/deletetargetbucket
       &&  mkdir -p /export/walpurgebucket
       &&  mkdir -p /export/mysqlfullxtrabackupbucket
+      &&  mkdir -p /export/mysqlfullxtrabackupwithrangesbucket
       &&  mkdir -p /export/mysqlfullmysqldumpbucket
       &&  mkdir -p /export/mysqlbinlogpushfetchbucket
       &&  mkdir -p /export/mysqldeleteendtoendbucket
@@ -74,11 +78,18 @@ services:
       &&  mkdir -p /export/mysqldeletebinlogs
       &&  mkdir -p /export/archivereadyrename
       &&  mkdir -p /export/gpfullbucket
+      &&  mkdir -p /export/gpfullserializedbucket
+      &&  mkdir -p /export/gpdeletewithoutconfirm
+      &&  mkdir -p /export/gpdeleteretainbucket
+      &&  mkdir -p /export/gpdeleteendtoendbucket
+      &&  mkdir -p /export/gpdeletebeforepermanentbucket
+      &&  mkdir -p /export/gpdeletebeforenamebucket
+      &&  mkdir -p /export/gpdeletebeforetimebucket
       &&  mkdir -p /export/storagetoolsbucket
       &&  /usr/bin/minio server /export'
 
   s3-another:
-    image: minio/minio
+    image: minio/minio:RELEASE.2021-06-07T21-40-51Z
     container_name: wal-g_s32
     ports:
       - "9001:9001"
@@ -245,12 +256,34 @@ services:
     links:
       - s3
 
+  pg_full_backup_streamed_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_streamed_test
+      context: .
+    image: wal-g/full_backup_streamed_test
+    container_name: wal-g_pg_full_backup_streamed_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   pg_remote_backup_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_remote_backup_test
       context: .
     image: wal-g/remote_backup_test
     container_name: wal-g_pg_remote_backup_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_remote_backup_without_files_metadata_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_remote_backup_without_files_metadata_test
+      context: .
+    image: wal-g/remote_backup_without_files_metadata_test
+    container_name: wal-g_pg_remote_backup_without_files_metadata_test
     depends_on:
       - s3
     links:
@@ -279,7 +312,7 @@ services:
       - s3
 
   pg_full_backup_copy_composer_test:
-    build:  
+    build:
       dockerfile: docker/pg_tests/Dockerfile_full_backup_copy_composer_test
       context: .
     image: wal-g/full_backup_copy_composer_test
@@ -295,6 +328,17 @@ services:
       context: .
     image: wal-g/full_backup_rating_composer_test
     container_name: wal-g_pg_full_backup_rating_composer_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_full_backup_without_files_metadata_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_without_files_metadata_test
+      context: .
+    image: wal-g/full_backup_without_files_metadata_test
+    container_name: wal-g_pg_full_backup_without_files_metadata_test
     depends_on:
       - s3
     links:
@@ -641,8 +685,6 @@ services:
       context: .
     image: wal-g/gp_tests
     container_name: wal-g_gp_tests
-    env_file:
-      - docker/common/common_walg.env
     depends_on:
       - gp
       - s3

@@ -25,7 +25,7 @@ var backupPushCmd = &cobra.Command{
 
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
-		uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
+		uploader.ChangeDirectory(utility.BaseBackupPath)
 
 		backupCmd, err := internal.GetCommandSetting(internal.NameStreamCreateCmd)
 		tracelog.ErrorLogger.FatalOnError(err)

@@ -135,7 +135,8 @@ func TestHandleBackupListLogNoBackups(t *testing.T) {
 
 	assert.Equal(t, 1, infoLogger.Stats.PrintLnCallsCount)
 	assert.Equal(t, "No backups found", infoLogger.Stats.PrintMsg)
-	assert.Equal(t, 0, errorLogger.Stats.FatalOnErrorCallsCount)
+	assert.Equal(t, 1, errorLogger.Stats.FatalOnErrorCallsCount)
+	assert.Equal(t, nil, errorLogger.Stats.Err)
 }
 
 func TestWritePrettyBackupList_LongColumnsValues(t *testing.T) {
