@@ -52,6 +52,10 @@ var backupFetchCmd = &cobra.Command{
 
 		logsDir := viper.GetString(internal.GPLogsDirectory)
 
+		if len(*fetchContentIds) > 0 {
+			tracelog.InfoLogger.Printf("Will perform fetch operations only on the specified segments: %v", *fetchContentIds)
+		}
+
 		fetchMode, err := greenplum.NewBackupFetchMode(fetchModeStr)
 		tracelog.ErrorLogger.FatalOnError(err)
 
