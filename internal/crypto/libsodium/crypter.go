@@ -35,8 +35,7 @@ type Crypter struct {
 	KeyPath      string
 	KeyTransform string
 
-	setupErr error
-	once     sync.Once
+	mutex sync.RWMutex
 }
 
 func (crypter *Crypter) Name() string {
@@ -53,20 +52,31 @@ func CrypterFromKeyPath(path string, keyTransform string) crypto.Crypter {
 	return &Crypter{KeyPath: path, KeyTransform: keyTransform}
 }
 
-func (crypter *Crypter) internalSetup() {
+func (crypter *Crypter) setup() (err error) {
+	crypter.mutex.RLock()
+	if crypter.key != nil {
+		crypter.mutex.RUnlock()
+		return nil
+	}
+	crypter.mutex.RUnlock()
+
+	crypter.mutex.Lock()
+	defer crypter.mutex.Unlock()
+
+	if crypter.key != nil {
+		return nil
+	}
+
 	if crypter.KeyInline == "" && crypter.KeyPath == "" {
-		crypter.setupErr = errors.New("libsodium Crypter: must have a key or key path")
-		return
+		return errors.New("libsodium Crypter: must have a key or key path")
 	}
 
 	keyString := crypter.KeyInline
 	if keyString == "" {
 		// read from file
-		var keyFileContents []byte
 		keyFileContents, err := ioutil.ReadFile(crypter.KeyPath)
 		if err != nil {
-			crypter.setupErr = fmt.Errorf("libsodium Crypter: unable to read key from file: %v", err)
-			return
+			return fmt.Errorf("libsodium Crypter: unable to read key from file: %v", err)
 		}
 
 		keyString = strings.TrimSpace(string(keyFileContents))
@@ -74,16 +84,11 @@ func (crypter *Crypter) internalSetup() {
 
 	key, err := keyTransform(keyString, crypter.KeyTransform, libsodiumKeybytes)
 	if err != nil {
-		crypter.setupErr = fmt.Errorf("libsodium Crypter: during key transform: %v", err)
-		return
+		return fmt.Errorf("libsodium Crypter: during key transform: %v", err)
 	}
 
 	crypter.key = key
-}
-
-func (crypter *Crypter) setup() (err error) {
-	crypter.once.Do(crypter.internalSetup)
-	return crypter.setupErr
+	return nil
 }
 
 // Encrypt creates encryption writer from ordinary writer
