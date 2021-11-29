@@ -19,10 +19,12 @@ const (
 	backupFetchShortDescription  = "Fetches a backup from storage"
 	targetUserDataDescription    = "Fetch storage backup which has the specified user data"
 	restoreConfigPathDescription = "Path to the cluster restore configuration"
+	fetchContentIdsDescription   = "If set, WAL-G will fetch only the specified segments"
 )
 
 var fetchTargetUserData string
 var restoreConfigPath string
+var fetchContentIds *[]int
 
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch [backup_name | --target-user-data <data>]",
@@ -46,7 +48,7 @@ var backupFetchCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided restore config file: %v", err)
 
 		logsDir := viper.GetString(internal.GPLogsDirectory)
-		internal.HandleBackupFetch(folder, targetBackupSelector, greenplum.NewGreenplumBackupFetcher(restoreCfg, logsDir))
+		internal.HandleBackupFetch(folder, targetBackupSelector, greenplum.NewGreenplumBackupFetcher(restoreCfg, logsDir, *fetchContentIds))
 	},
 }
 
@@ -71,6 +73,7 @@ func init() {
 		"", targetUserDataDescription)
 	backupFetchCmd.Flags().StringVar(&restoreConfigPath, "restore-config",
 		"", restoreConfigPathDescription)
+	fetchContentIds = backupFetchCmd.Flags().IntSlice("content-ids", []int{}, fetchContentIdsDescription)
 	_ = backupFetchCmd.MarkFlagRequired("restore-config")
 
 	cmd.AddCommand(backupFetchCmd)
