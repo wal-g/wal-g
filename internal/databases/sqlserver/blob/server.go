@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/crypto"
 	"golang.org/x/xerrors"
 
 	"github.com/gofrs/flock"
@@ -40,6 +42,11 @@ type Server struct {
 	leasesMutex  sync.Mutex
 	downloadSem  chan struct{}
 	uploadSem    chan struct{}
+	compression  string
+	compressor   compression.Compressor
+	decompressor compression.Decompressor
+	encryption   string
+	crypter      crypto.Crypter
 }
 
 func NewServer(folder storage.Folder) (*Server, error) {
@@ -72,6 +79,21 @@ func NewServer(folder storage.Folder) (*Server, error) {
 	bs.server = http.Server{Addr: bs.endpoint, Handler: bs}
 	bs.indexes = make(map[string]*Index)
 	bs.leases = make(map[string]Lease)
+	compressor, err := internal.ConfigureCompressor()
+	if err != nil {
+		if _, ok := err.(internal.UnknownCompressionMethodError); !ok || !UseBuiltinCompression() {
+			return nil, err
+		}
+	}
+	if compressor != nil {
+		bs.compression = compressor.FileExtension()
+		bs.compressor = compressor
+		bs.decompressor = compression.FindDecompressor(bs.compression)
+	}
+	bs.crypter = internal.ConfigureCrypter()
+	if bs.crypter != nil {
+		bs.encryption = bs.crypter.Name()
+	}
 	return bs, nil
 }
 
@@ -372,6 +394,9 @@ func (bs *Server) HandleBlockPut(w http.ResponseWriter, req *http.Request) {
 		bs.returnError(w, req, err)
 		return
 	}
+	if err := bs.validateBlobCompressionEncryption(idx); err != nil {
+		bs.returnError(w, req, err)
+	}
 	blockID := strings.TrimSpace(req.Form.Get("blockid"))
 	blockSizeStr := req.Header.Get("Content-Length")
 	blockSize, err := strconv.ParseUint(blockSizeStr, 10, 64)
@@ -381,7 +406,7 @@ func (bs *Server) HandleBlockPut(w http.ResponseWriter, req *http.Request) {
 	}
 	filename := idx.PutBlock(blockID, blockSize)
 	bs.uploadSem <- struct{}{}
-	err = folder.PutObject(filename, req.Body)
+	err = folder.PutObject(filename, internal.CompressAndEncrypt(req.Body, bs.compressor, bs.crypter))
 	<-bs.uploadSem
 	req.Body.Close()
 	if err != nil {
@@ -502,6 +527,14 @@ func (bs *Server) HandleBlobGet(w http.ResponseWriter, req *http.Request) {
 		bs.returnError(w, req, err)
 		return
 	}
+	if idx.Compression != "" || idx.Encryption != "" {
+		err = bs.validateBlobCompressionEncryption(idx)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("proxy: misconfiguration: %v", err)
+			bs.returnError(w, req, err)
+			return
+		}
+	}
 
 	rangeMin := uint64(0)
 	rangeMax := idx.Size - 1
@@ -537,6 +570,13 @@ func (bs *Server) HandleBlobGet(w http.ResponseWriter, req *http.Request) {
 			tracelog.ErrorLogger.Printf("proxy: failed to read object from storage: %v", err)
 			break
 		}
+		if idx.Compression != "" || idx.Encryption != "" {
+			r, err = internal.DecompressDecryptBytes(r, bs.decompressor)
+			if err != nil {
+				tracelog.ErrorLogger.Printf("proxy: failed to decompress / decrypt bytes: %v", err)
+				break
+			}
+		}
 		r2 := io.LimitReader(NewSkipReader(r, s.Offset), int64(s.Limit))
 		_, err = io.Copy(w, r2)
 		r.Close()
@@ -552,6 +592,8 @@ func (bs *Server) HandleBlobPut(w http.ResponseWriter, req *http.Request) {
 	idx, err := bs.loadBlobIndex(folder)
 	if err == ErrNotFound {
 		idx = NewIndex(folder)
+		idx.Compression = bs.compression
+		idx.Encryption = bs.encryption
 	} else if err != nil {
 		bs.returnError(w, req, err)
 		return
@@ -569,7 +611,8 @@ func (bs *Server) HandleBlobPut(w http.ResponseWriter, req *http.Request) {
 	garbage := idx.Clear()
 	if blobSize > 0 {
 		name := idx.PutBlock("data", blobSize)
-		err := folder.PutObject(name, req.Body)
+		encryptedReader := internal.CompressAndEncrypt(req.Body, bs.compressor, bs.crypter)
+		err := folder.PutObject(name, encryptedReader)
 		req.Body.Close()
 		if err != nil {
 			bs.returnError(w, req, err)
@@ -697,4 +740,14 @@ func (bs *Server) AcquireLock() (io.Closer, error) {
 		return nil, xerrors.Errorf("failed to lock %s, another instance running ?", path)
 	}
 	return lock, nil
+}
+
+func (bs *Server) validateBlobCompressionEncryption(idx *Index) error {
+	if idx.Encryption != bs.encryption {
+		return fmt.Errorf("blob encryption (%s) does not match configured (%s)", idx.Encryption, bs.encryption)
+	}
+	if idx.Compression != bs.compression {
+		return fmt.Errorf("blob compression (%s) does not match configured (%s)", idx.Compression, bs.compression)
+	}
+	return nil
 }
