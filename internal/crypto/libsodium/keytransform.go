@@ -82,14 +82,14 @@ func keyTransformLegacy(userInput string, displayWarning bool) ([]byte, error) {
 
 	if len(userInput) > libsodiumKeybytes {
 		if displayWarning {
-			tracelog.WarningLogger.Println("libsodium keys must be exactly %d bytes, your key exceeds that length and will be truncated", libsodiumKeybytes)
+			tracelog.WarningLogger.Printf("libsodium keys must be exactly %d bytes, your key exceeds that length and will be truncated", libsodiumKeybytes)
 		}
 		return []byte(userInput[:libsodiumKeybytes]), nil
 	}
 
 	if len(userInput) < libsodiumKeybytes {
 		if displayWarning {
-			tracelog.WarningLogger.Println("libsodium keys must be exactly %d bytes, your key will be padded to the right with zero bytes", libsodiumKeybytes)
+			tracelog.WarningLogger.Printf("libsodium keys must be exactly %d bytes, your key will be padded to the right with zero bytes", libsodiumKeybytes)
 		}
 		buf := make([]byte, libsodiumKeybytes)
 		copy(buf[:libsodiumKeybytes], userInput)
