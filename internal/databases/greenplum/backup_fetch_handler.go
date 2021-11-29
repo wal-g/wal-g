@@ -5,6 +5,8 @@ import (
 	"path"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
@@ -12,6 +14,27 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
+
+type BackupFetchMode string
+
+const (
+	DefaultFetchMode BackupFetchMode = "default"
+	UnpackFetchMode  BackupFetchMode = "unpack"
+	PrepareFetchMode BackupFetchMode = "prepare"
+)
+
+func NewBackupFetchMode(mode string) (BackupFetchMode, error) {
+	switch mode {
+	case string(DefaultFetchMode):
+		return DefaultFetchMode, nil
+	case string(UnpackFetchMode):
+		return UnpackFetchMode, nil
+	case string(PrepareFetchMode):
+		return PrepareFetchMode, nil
+	default:
+		return "", errors.Errorf("unknown backup fetch mode: %s", mode)
+	}
+}
 
 type SegmentRestoreConfig struct {
 	Hostname string `json:"hostname"`
@@ -29,12 +52,13 @@ type FetchHandler struct {
 	backupIDByContentID map[int]string
 	backup              internal.Backup
 	contentIDsToFetch   map[int]bool
+	fetchMode           BackupFetchMode
 }
 
 func NewFetchHandler(
 	backup internal.Backup, sentinel BackupSentinelDto,
 	restoreCfg ClusterRestoreConfig, logsDir string,
-	fetchContentIds []int,
+	fetchContentIds []int, mode BackupFetchMode,
 ) *FetchHandler {
 	backupIDByContentID := make(map[int]string)
 	segmentConfigs := make([]cluster.SegConfig, 0)
@@ -70,6 +94,7 @@ func NewFetchHandler(
 		backupIDByContentID: backupIDByContentID,
 		backup:              backup,
 		contentIDsToFetch:   prepareContentIDsToFetch(fetchContentIds, segmentConfigs),
+		fetchMode:           mode,
 	}
 }
 
@@ -91,7 +116,19 @@ func prepareContentIDsToFetch(fetchContentIds []int, segmentConfigs []cluster.Se
 }
 
 func (fh *FetchHandler) Fetch() error {
-	tracelog.InfoLogger.Println("Running wal-g on segments and master...")
+	if fh.fetchMode == DefaultFetchMode || fh.fetchMode == UnpackFetchMode {
+		fh.Unpack()
+	}
+
+	if fh.fetchMode == DefaultFetchMode || fh.fetchMode == PrepareFetchMode {
+		return fh.Prepare()
+	}
+
+	return nil
+}
+
+func (fh *FetchHandler) Unpack() {
+	tracelog.InfoLogger.Println("[Unpack] Running wal-g on segments and master...")
 
 	// Run WAL-G to restore the each segment as a single Postgres instance
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Running wal-g",
@@ -105,15 +142,17 @@ func (fh *FetchHandler) Fetch() error {
 	})
 
 	for _, command := range remoteOutput.Commands {
-		tracelog.DebugLogger.Printf("WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
+		tracelog.DebugLogger.Printf("[Unpack] WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
 	}
+}
 
-	tracelog.InfoLogger.Println("Updating pg_hba configs on segments...")
+func (fh *FetchHandler) Prepare() error {
+	tracelog.InfoLogger.Println("[Prepare] Updating pg_hba configs on segments...")
 	err := fh.createPgHbaOnSegments()
 	if err != nil {
 		return err
 	}
-	tracelog.InfoLogger.Println("Creating recovery.conf files...")
+	tracelog.InfoLogger.Println("[Prepare] Creating recovery.conf files...")
 	return fh.createRecoveryConfigs()
 }
 
@@ -211,14 +250,14 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 	return cmdLine
 }
 
-func NewGreenplumBackupFetcher(restoreCfg ClusterRestoreConfig, logsDir string, fetchContentIds []int,
+func NewGreenplumBackupFetcher(restoreCfg ClusterRestoreConfig, logsDir string, fetchContentIds []int, mode BackupFetchMode,
 ) func(folder storage.Folder, backup internal.Backup) {
 	return func(folder storage.Folder, backup internal.Backup) {
 		var sentinel BackupSentinelDto
 		err := backup.FetchSentinel(&sentinel)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = NewFetchHandler(backup, sentinel, restoreCfg, logsDir, fetchContentIds).Fetch()
+		err = NewFetchHandler(backup, sentinel, restoreCfg, logsDir, fetchContentIds, mode).Fetch()
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
 }
