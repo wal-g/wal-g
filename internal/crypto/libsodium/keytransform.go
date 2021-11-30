@@ -19,18 +19,15 @@ var keyTransformReg = []keyTransformRegEntry{
 }
 
 func keyTransform(userInput string, transformType string, expectedLen int) ([]byte, error) {
-	var err error
-	var decoded []byte
-
 	for _, entry := range keyTransformReg {
 		if entry.typ == transformType {
-			decoded, err = entry.fun(userInput)
+			decoded, err := entry.fun(userInput)
 			if err != nil {
 				return nil, err
 			}
 
-			if len(decoded) != libsodiumKeybytes {
-				return nil, fmt.Errorf("key must be exactly %d bytes (got %d bytes)", libsodiumKeybytes, len(decoded))
+			if len(decoded) != expectedLen {
+				return nil, fmt.Errorf("key must be exactly %d bytes (got %d bytes)", expectedLen, len(decoded))
 			}
 
 			return decoded, nil
