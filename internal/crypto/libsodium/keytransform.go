@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
-
-	"github.com/wal-g/tracelog"
 )
 
 type keyTransformRegEntry struct {
@@ -17,7 +15,7 @@ type keyTransformRegEntry struct {
 var keyTransformReg = []keyTransformRegEntry{
 	{typ: "base64", fun: keyTransformBase64},
 	{typ: "hex", fun: keyTransformHex},
-	{typ: "none", fun: func(userInput string) ([]byte, error) { return keyTransformLegacy(userInput, true) }},
+	{typ: "none", fun: keyTransformNone},
 }
 
 func keyTransform(userInput string, transformType string, expectedLen int) ([]byte, error) {
@@ -75,22 +73,16 @@ func keyTransformHex(userInput string) ([]byte, error) {
 }
 
 // Mimics the behaviour of older versions of wal-g.
-func keyTransformLegacy(userInput string, displayWarning bool) ([]byte, error) {
+func keyTransformNone(userInput string) ([]byte, error) {
 	if len(userInput) < minimalKeyLength {
 		return nil, newErrShortKey(len(userInput))
 	}
 
 	if len(userInput) > libsodiumKeybytes {
-		if displayWarning {
-			tracelog.WarningLogger.Printf("libsodium keys must be exactly %d bytes, your key exceeds that length and will be truncated", libsodiumKeybytes)
-		}
 		return []byte(userInput[:libsodiumKeybytes]), nil
 	}
 
 	if len(userInput) < libsodiumKeybytes {
-		if displayWarning {
-			tracelog.WarningLogger.Printf("libsodium keys must be exactly %d bytes, your key will be padded to the right with zero bytes", libsodiumKeybytes)
-		}
 		buf := make([]byte, libsodiumKeybytes)
 		copy(buf[:libsodiumKeybytes], userInput)
 		return buf, nil
