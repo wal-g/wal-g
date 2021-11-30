@@ -5,6 +5,8 @@ import (
 	"path"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
@@ -12,6 +14,27 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
+
+type BackupFetchMode string
+
+const (
+	DefaultFetchMode BackupFetchMode = "default"
+	UnpackFetchMode  BackupFetchMode = "unpack"
+	PrepareFetchMode BackupFetchMode = "prepare"
+)
+
+func NewBackupFetchMode(mode string) (BackupFetchMode, error) {
+	switch mode {
+	case string(DefaultFetchMode):
+		return DefaultFetchMode, nil
+	case string(UnpackFetchMode):
+		return UnpackFetchMode, nil
+	case string(PrepareFetchMode):
+		return PrepareFetchMode, nil
+	default:
+		return "", errors.Errorf("unknown backup fetch mode: %s", mode)
+	}
+}
 
 type SegmentRestoreConfig struct {
 	Hostname string `json:"hostname"`
@@ -28,9 +51,15 @@ type FetchHandler struct {
 	cluster             *cluster.Cluster
 	backupIDByContentID map[int]string
 	backup              internal.Backup
+	contentIDsToFetch   map[int]bool
+	fetchMode           BackupFetchMode
 }
 
-func NewFetchHandler(backup internal.Backup, sentinel BackupSentinelDto, restoreCfg ClusterRestoreConfig, logsDir string) *FetchHandler {
+func NewFetchHandler(
+	backup internal.Backup, sentinel BackupSentinelDto,
+	restoreCfg ClusterRestoreConfig, logsDir string,
+	fetchContentIds []int, mode BackupFetchMode,
+) *FetchHandler {
 	backupIDByContentID := make(map[int]string)
 	segmentConfigs := make([]cluster.SegConfig, 0)
 	gplog.InitializeLogging("wal-g", logsDir)
@@ -64,11 +93,42 @@ func NewFetchHandler(backup internal.Backup, sentinel BackupSentinelDto, restore
 		cluster:             globalCluster,
 		backupIDByContentID: backupIDByContentID,
 		backup:              backup,
+		contentIDsToFetch:   prepareContentIDsToFetch(fetchContentIds, segmentConfigs),
+		fetchMode:           mode,
 	}
 }
 
+func prepareContentIDsToFetch(fetchContentIds []int, segmentConfigs []cluster.SegConfig) map[int]bool {
+	contentIDsToFetch := make(map[int]bool)
+
+	// if user set the specific content IDs, use only them, otherwise fetch all
+	if len(fetchContentIds) > 0 {
+		for _, id := range fetchContentIds {
+			contentIDsToFetch[id] = true
+		}
+	} else {
+		for _, cfg := range segmentConfigs {
+			contentIDsToFetch[cfg.ContentID] = true
+		}
+	}
+
+	return contentIDsToFetch
+}
+
 func (fh *FetchHandler) Fetch() error {
-	tracelog.InfoLogger.Println("Running wal-g on segments and master...")
+	if fh.fetchMode == DefaultFetchMode || fh.fetchMode == UnpackFetchMode {
+		fh.Unpack()
+	}
+
+	if fh.fetchMode == DefaultFetchMode || fh.fetchMode == PrepareFetchMode {
+		return fh.Prepare()
+	}
+
+	return nil
+}
+
+func (fh *FetchHandler) Unpack() {
+	tracelog.InfoLogger.Println("[Unpack] Running wal-g on segments and master...")
 
 	// Run WAL-G to restore the each segment as a single Postgres instance
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Running wal-g",
@@ -82,15 +142,17 @@ func (fh *FetchHandler) Fetch() error {
 	})
 
 	for _, command := range remoteOutput.Commands {
-		tracelog.DebugLogger.Printf("WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
+		tracelog.DebugLogger.Printf("[Unpack] WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
 	}
+}
 
-	tracelog.InfoLogger.Println("Updating pg_hba configs on segments...")
+func (fh *FetchHandler) Prepare() error {
+	tracelog.InfoLogger.Println("[Prepare] Updating pg_hba configs on segments...")
 	err := fh.createPgHbaOnSegments()
 	if err != nil {
 		return err
 	}
-	tracelog.InfoLogger.Println("Creating recovery.conf files...")
+	tracelog.InfoLogger.Println("[Prepare] Creating recovery.conf files...")
 	return fh.createRecoveryConfigs()
 }
 
@@ -106,6 +168,10 @@ func (fh *FetchHandler) createPgHbaOnSegments() error {
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Updating pg_hba on segments",
 		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS,
 		func(contentID int) string {
+			if !fh.contentIDsToFetch[contentID] {
+				return newSkippedSegmentMsg(contentID)
+			}
+
 			segment := fh.cluster.ByContent[contentID][0]
 			pathToHba := path.Join(segment.DataDir, "pg_hba.conf")
 
@@ -133,6 +199,10 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Creating recovery.conf on segments and master",
 		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_MASTER,
 		func(contentID int) string {
+			if !fh.contentIDsToFetch[contentID] {
+				return newSkippedSegmentMsg(contentID)
+			}
+
 			segment := fh.cluster.ByContent[contentID][0]
 			pathToRestore := path.Join(segment.DataDir, "recovery.conf")
 			fileContents := restoreCfgMaker.Make(contentID)
@@ -154,6 +224,10 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 // buildFetchCommand creates the WAL-G command to restore the segment with
 // the provided contentID
 func (fh *FetchHandler) buildFetchCommand(contentID int) string {
+	if !fh.contentIDsToFetch[contentID] {
+		return newSkippedSegmentMsg(contentID)
+	}
+
 	segment := fh.cluster.ByContent[contentID][0]
 	backupID, ok := fh.backupIDByContentID[contentID]
 	if !ok {
@@ -176,13 +250,18 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 	return cmdLine
 }
 
-func NewGreenplumBackupFetcher(restoreCfg ClusterRestoreConfig, logsDir string) func(folder storage.Folder, backup internal.Backup) {
+func NewGreenplumBackupFetcher(restoreCfg ClusterRestoreConfig, logsDir string, fetchContentIds []int, mode BackupFetchMode,
+) func(folder storage.Folder, backup internal.Backup) {
 	return func(folder storage.Folder, backup internal.Backup) {
 		var sentinel BackupSentinelDto
 		err := backup.FetchSentinel(&sentinel)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = NewFetchHandler(backup, sentinel, restoreCfg, logsDir).Fetch()
+		err = NewFetchHandler(backup, sentinel, restoreCfg, logsDir, fetchContentIds, mode).Fetch()
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
+}
+
+func newSkippedSegmentMsg(contentID int) string {
+	return fmt.Sprintf("echo 'skipping contentID %d: disabled in config'", contentID)
 }
