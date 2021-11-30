@@ -26,13 +26,15 @@ const BgSaveInterval = 30 * time.Second
 
 type Index struct {
 	sync.Mutex
-	folder    storage.Folder
-	Size      uint64            `json:"size"`
-	Blocks    []*Block          `json:"blocks"`
-	icache    map[string]*Block // cache by id's
-	ocache    []*Block          // cache by offset, ordered, only committed
-	needSave  bool
-	readCache *lru.Cache
+	folder      storage.Folder
+	Size        uint64            `json:"size"`
+	Blocks      []*Block          `json:"blocks"`
+	Compression string            `json:"compression"`
+	Encryption  string            `json:"encryption"`
+	icache      map[string]*Block // cache by id's
+	ocache      []*Block          // cache by offset, ordered, only committed
+	needSave    bool
+	readCache   *lru.Cache
 }
 
 type Block struct {
