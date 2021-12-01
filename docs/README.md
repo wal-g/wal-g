@@ -185,6 +185,19 @@ Examples:
 
 ``wal-g st get path/to/remote_file path/to/local_file --no-decrypt`` download the file from storage without decryption.
 
+### ``cat``
+Show the specified storage object to STDOUT. 
+By default, the command will NOT try to decompress and decrypt it.
+Useful for getting sentinels and other meta-information files.
+
+Flags:
+1. Add `--decompress` to decompress source file
+2. Add `--decrypt` to decrypt source file
+
+Examples:
+
+``wal-g st cat path/to/remote_file.json`` show `remote_file.json`
+
 ### ``rm``
 Remove the specified storage object.
 
