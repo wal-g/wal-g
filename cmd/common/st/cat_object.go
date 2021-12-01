@@ -14,7 +14,7 @@ const (
 	decompressFlag = "decompress"
 )
 
-// getObjectCmd represents the getObject command
+// catObjectCmd represents the catObject command
 var catObjectCmd = &cobra.Command{
 	Use:   "cat relative_object_path",
 	Short: catObjectShortDescription,
