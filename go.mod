@@ -34,7 +34,7 @@ require (
 	github.com/minio/sio v0.2.0
 	github.com/mongodb/mongo-tools-common v2.0.1+incompatible
 	github.com/ncw/swift v1.0.49
-	github.com/pierrec/lz4 v0.0.0-20170519170625-5a3d2245f97f
+	github.com/pierrec/lz4/v4 v4.1.11
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.11.0
 	github.com/spf13/cobra v0.0.5
