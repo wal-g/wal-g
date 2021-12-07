@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/wal-g/wal-g/internal/databases/greenplum"
+
 	"github.com/spf13/viper"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 
@@ -45,23 +47,28 @@ func Execute() {
 	}
 }
 
+var SegContentID string
+
 func init() {
 	common.Init(cmd, internal.GP)
 
 	_ = cmd.MarkFlagRequired("config") // config is required for Greenplum WAL-G
-
 	// wrap the Postgres command so it can be used in the same binary
 	wrappedPgCmd := pg.Cmd
-	wrappedPgCmd.Use = "pg"
+	wrappedPgCmd.Use = "seg"
 	wrappedPreRun := wrappedPgCmd.PersistentPreRun
 	wrappedPgCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		// storage prefix setting is required in order to get the corresponding segment subfolder
-		internal.RequiredSettings[internal.StoragePrefixSetting] = true
+		// segment content ID is required in order to get the corresponding segment subfolder
+		contentID, err := greenplum.ConfigureSegContentID(SegContentID)
+		tracelog.ErrorLogger.FatalOnError(err)
+		greenplum.SetSegmentStoragePrefix(contentID)
 		wrappedPreRun(cmd, args)
 	}
+	wrappedPgCmd.PersistentFlags().StringVar(&SegContentID, "content-id", "", "segment content ID")
 	cmd.AddCommand(wrappedPgCmd)
 
-	// Add the hidden prefetch command to the root command since there is no "pg" prefix in the WAL-G prefetch fork logic
+	// Add the hidden prefetch command to the root command
+	// since WAL-G prefetch fork logic does not know anything about the "wal-g seg" subcommand
 	pg.WalPrefetchCmd.PreRun = func(cmd *cobra.Command, args []string) {
 		internal.RequiredSettings[internal.StoragePrefixSetting] = true
 		tracelog.ErrorLogger.FatalOnError(internal.AssertRequiredSettingsSet())

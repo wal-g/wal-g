@@ -107,6 +107,7 @@ const (
 	RedisPassword = "WALG_REDIS_PASSWORD"
 
 	GPLogsDirectory = "WALG_GP_LOGS_DIR"
+	GPSegContentID  = "WALG_GP_SEG_CONTENT_ID"
 
 	GoMaxProcs = "GOMAXPROCS"
 
@@ -372,6 +373,7 @@ var (
 
 	GPAllowedSettings = map[string]bool{
 		GPLogsDirectory: true,
+		GPSegContentID:  true,
 	}
 
 	RequiredSettings       = make(map[string]bool)

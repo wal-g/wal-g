@@ -10,7 +10,8 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 source /tmp/tests/test_functions/util.sh
 
 bootstrap_gp_cluster
-sleep 10
+sleep 3
+setup_wal_archiving
 
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 

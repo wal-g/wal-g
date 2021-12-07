@@ -57,7 +57,7 @@ type FetchHandler struct {
 
 func NewFetchHandler(
 	backup internal.Backup, sentinel BackupSentinelDto,
-	restoreCfg ClusterRestoreConfig, logsDir string,
+	segCfgMaker SegConfigMaker, logsDir string,
 	fetchContentIds []int, mode BackupFetchMode,
 ) *FetchHandler {
 	backupIDByContentID := make(map[int]string)
@@ -70,15 +70,9 @@ func NewFetchHandler(
 			// update the segment config from the metadata with the
 			// Hostname, Port and DataDir specified in the restore config
 			backupIDByContentID[segMeta.ContentID] = segMeta.BackupID
-			segmentCfg := segMeta.ToSegConfig()
-			segRestoreCfg, ok := restoreCfg.Segments[segMeta.ContentID]
-			if !ok {
-				tracelog.ErrorLogger.Fatalf(
-					"Could not find content ID %d in the provided restore configuration", segMeta.ContentID)
-			}
-			segmentCfg.Hostname = segRestoreCfg.Hostname
-			segmentCfg.Port = segRestoreCfg.Port
-			segmentCfg.DataDir = segRestoreCfg.DataDir
+			segmentCfg, err := segCfgMaker.Make(segMeta)
+			tracelog.ErrorLogger.FatalOnError(err)
+
 			segmentConfigs = append(segmentConfigs, segmentCfg)
 		} else {
 			tracelog.WarningLogger.Printf(
@@ -238,9 +232,9 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 	segUserData := NewSegmentUserDataFromID(backupID)
 	cmd := []string{
 		fmt.Sprintf("PGPORT=%d", segment.Port),
-		"wal-g pg",
+		"wal-g seg",
 		fmt.Sprintf("backup-fetch %s", segment.DataDir),
-		fmt.Sprintf("--walg-storage-prefix=%d", segment.ContentID),
+		fmt.Sprintf("--content-id=%d", segment.ContentID),
 		fmt.Sprintf("--target-user-data=%s", segUserData.QuotedString()),
 		fmt.Sprintf("--config=%s", internal.CfgFile),
 	}
@@ -250,14 +244,17 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 	return cmdLine
 }
 
-func NewGreenplumBackupFetcher(restoreCfg ClusterRestoreConfig, logsDir string, fetchContentIds []int, mode BackupFetchMode,
+func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsDir string, fetchContentIds []int, mode BackupFetchMode,
 ) func(folder storage.Folder, backup internal.Backup) {
 	return func(folder storage.Folder, backup internal.Backup) {
 		var sentinel BackupSentinelDto
 		err := backup.FetchSentinel(&sentinel)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = NewFetchHandler(backup, sentinel, restoreCfg, logsDir, fetchContentIds, mode).Fetch()
+		segCfgMaker, err := NewSegConfigMaker(restoreCfgPath, inPlaceRestore)
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		err = NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIds, mode).Fetch()
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
 }

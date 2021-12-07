@@ -114,7 +114,8 @@ func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject, confirm
 	for i := range sentinel.Segments {
 		meta := &sentinel.Segments[i]
 		tracelog.InfoLogger.Printf("Processing segment %d (backupId=%s)\n", meta.ContentID, meta.BackupID)
-		segFolder := GetSegmentFolder(h.Folder, meta.ContentID)
+
+		segFolder := h.Folder.GetSubFolder(FormatSegmentStoragePrefix(meta.ContentID))
 		permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(segFolder)
 
 		segDeleteHandler, err := postgres.NewDeleteHandler(segFolder, permanentBackups, permanentWals, true)
