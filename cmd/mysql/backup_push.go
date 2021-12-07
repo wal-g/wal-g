@@ -29,8 +29,9 @@ var (
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			uploader, err := internal.ConfigureSplitUploader()
-			uploader.ChangeDirectory(utility.BaseBackupPath)
 			tracelog.ErrorLogger.FatalOnError(err)
+			folder := uploader.Folder()
+			uploader.ChangeDirectory(utility.BaseBackupPath)
 			backupCmd, err := internal.GetCommandSetting(internal.NameStreamCreateCmd)
 			tracelog.ErrorLogger.FatalOnError(err)
 
@@ -38,7 +39,7 @@ var (
 				userData = viper.GetString(internal.SentinelUserDataSetting)
 			}
 
-			mysql.HandleBackupPush(uploader, backupCmd, permanent, userData)
+			mysql.HandleBackupPush(folder, uploader, backupCmd, permanent, userData)
 		},
 	}
 	permanent = false
