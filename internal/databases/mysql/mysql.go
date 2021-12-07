@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wal-g/wal-g/internal/compression"
+
 	flavors "github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-sql-driver/mysql"
 	"github.com/wal-g/tracelog"
@@ -23,13 +25,6 @@ import (
 const BinlogPath = "binlog_" + utility.VersionStr + "/"
 
 const TimeMysqlFormat = "2006-01-02 15:04:05"
-
-func isMaster(db *sql.DB) bool {
-	rows, err := db.Query("SHOW SLAVE STATUS")
-	tracelog.ErrorLogger.FatalOnError(err)
-	defer utility.LoggedClose(rows, "")
-	return !rows.Next()
-}
 
 func getFlavor(db *sql.DB) (string, error) {
 	rows, err := db.Query("SELECT @@version")
@@ -66,27 +61,23 @@ func getMySQLCurrentBinlogFileLocal(db *sql.DB) (fileName string) {
 	return ""
 }
 
-func getMySQLCurrentBinlogFileFromMaster(db *sql.DB) (fileName string) {
-	rows, err := db.Query("SHOW SLAVE STATUS")
-	tracelog.ErrorLogger.FatalOnError(err)
-	defer utility.LoggedClose(rows, "")
-	var logFileName string
-	for rows.Next() {
-		err = utility.ScanToMap(rows, map[string]interface{}{"Relay_Master_Log_File": &logFileName})
-		tracelog.ErrorLogger.FatalOnError(err)
-		return logFileName
+func getLastUploadedBinlog(folder storage.Folder) (string, error) {
+	logFiles, _, err := folder.GetSubFolder(BinlogPath).ListFolder()
+	if err != nil {
+		return "", err
 	}
-	tracelog.ErrorLogger.Fatalf("Failed to obtain master's current binlog file")
-	return ""
-}
-
-func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
-	takeFromMaster, err := internal.GetBoolSettingDefault(internal.MysqlTakeBinlogsFromMaster, false)
-	tracelog.ErrorLogger.FatalOnError(err)
-	if takeFromMaster && !isMaster(db) {
-		return getMySQLCurrentBinlogFileFromMaster(db)
+	sort.Slice(logFiles, func(i, j int) bool {
+		return logFiles[i].GetLastModified().Before(logFiles[j].GetLastModified())
+	})
+	if len(logFiles) == 0 {
+		return "", nil
 	}
-	return getMySQLCurrentBinlogFileLocal(db)
+	name := logFiles[len(logFiles)-1].GetName()
+	if ext := path.Ext(name); compression.FindDecompressor(ext) != nil {
+		// remove archive extension (like .br)
+		name = strings.TrimSuffix(name, ext)
+	}
+	return name, nil
 }
 
 func getMySQLConnection() (*sql.DB, error) {
@@ -158,7 +149,9 @@ func replaceHostInDatasourceName(datasourceName string, newHost string) string {
 }
 
 type StreamSentinelDto struct {
-	BinLogStart    string    `json:"BinLogStart,omitempty"`
+	BinLogStart string `json:"BinLogStart,omitempty"`
+	// BinLogEnd field is for debug purpose only.
+	// As we can not guarantee that transactions in BinLogEnd file happened before or after backup
 	BinLogEnd      string    `json:"BinLogEnd,omitempty"`
 	StartLocalTime time.Time `json:"StartLocalTime,omitempty"`
 	StopLocalTime  time.Time `json:"StopLocalTime,omitempty"`
