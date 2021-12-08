@@ -37,7 +37,7 @@ grep -i 'archived write-ahead log file' /var/lib/postgresql/10/main/log/postgres
 
 count=$(grep -c 'archived write-ahead log file' /var/lib/postgresql/10/main/log/postgresql.log)
 
-if [ "${count}" != '1' ]; then
+if [ "${count}" = '0' ]; then
     exit 1
 fi
 
