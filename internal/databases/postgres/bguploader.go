@@ -220,7 +220,8 @@ func (b *BgUploader) upload(walStatusFilename string) bool {
 		return false
 	}
 
-	if err := b.uploader.ArchiveStatusManager.MarkWalUploaded(walFilename); err != nil {
+	err = b.uploader.ArchiveStatusManager.MarkWalUploaded(walFilename)
+	if err != nil {
 		tracelog.ErrorLogger.Printf("Error marking wal file %s as uploaded: %v", walFilename, err)
 	}
 
