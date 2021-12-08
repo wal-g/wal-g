@@ -2,7 +2,6 @@ package greenplum
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -50,7 +49,7 @@ func (backup *Backup) GetSegmentBackup(backupID string, contentID int) (*postgre
 	if err != nil {
 		return nil, err
 	}
-	segBackupsFolder := backup.rootFolder.GetSubFolder(strconv.Itoa(contentID))
+	segBackupsFolder := backup.rootFolder.GetSubFolder(FormatSegmentStoragePrefix(contentID))
 
 	backupName, err := selector.Select(segBackupsFolder)
 	if err != nil {
@@ -59,8 +58,4 @@ func (backup *Backup) GetSegmentBackup(backupID string, contentID int) (*postgre
 
 	segmentBackup := postgres.NewBackup(segBackupsFolder.GetSubFolder(utility.BaseBackupPath), backupName)
 	return &segmentBackup, nil
-}
-
-func GetSegmentFolder(backupFolder storage.Folder, contentID int) storage.Folder {
-	return backupFolder.GetSubFolder(strconv.Itoa(contentID))
 }

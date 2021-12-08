@@ -21,7 +21,7 @@ type RecoveryConfigMaker struct {
 
 func (m RecoveryConfigMaker) Make(contentID int) string {
 	restoreCmd := fmt.Sprintf(
-		"restore_command = '%s pg wal-fetch \"%%f\" \"%%p\" --walg-storage-prefix=%d --config %s'",
+		"restore_command = '%s seg wal-fetch \"%%f\" \"%%p\" --content-id=%d --config %s'",
 		m.walgBinaryPath, contentID, m.cfgPath)
 	recoveryTarget := fmt.Sprintf("recovery_target_name = '%s'", m.recoveryTargetName)
 
