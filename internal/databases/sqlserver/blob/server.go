@@ -624,12 +624,15 @@ func (bs *Server) HandleBlobPut(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
+	bs.indexesMutex.Lock()
+	defer bs.indexesMutex.Unlock()
 	err = idx.Save()
 	if err != nil {
 		bs.returnError(w, req, err)
 		return
 	}
-	bs.deleteGarbage(folder, garbage)
+	bs.indexes[folder.GetPath()] = idx
+	go bs.deleteGarbage(folder, garbage)
 	w.WriteHeader(http.StatusCreated)
 }
 
