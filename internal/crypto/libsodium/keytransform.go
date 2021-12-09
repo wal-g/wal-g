@@ -69,7 +69,7 @@ func keyTransformHex(userInput string) ([]byte, error) {
 	return decoded, nil
 }
 
-// Mimics the behaviour of older versions of wal-g.
+// Mimics the behavior of older versions of wal-g.
 func keyTransformNone(userInput string) ([]byte, error) {
 	if len(userInput) < minimalKeyLength {
 		return nil, newErrShortKey(len(userInput))
