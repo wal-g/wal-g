@@ -7,15 +7,19 @@ import (
 	"strings"
 )
 
+const KeyTransformBase64 = "base64"
+const KeyTransformHex = "hex"
+const KeyTransformNone = "none"
+
 type keyTransformRegEntry struct {
 	typ string
 	fun func(userInput string) ([]byte, error)
 }
 
 var keyTransformReg = []keyTransformRegEntry{
-	{typ: "base64", fun: keyTransformBase64},
-	{typ: "hex", fun: keyTransformHex},
-	{typ: "none", fun: keyTransformNone},
+	{typ: KeyTransformBase64, fun: keyTransformBase64},
+	{typ: KeyTransformHex, fun: keyTransformHex},
+	{typ: KeyTransformNone, fun: keyTransformNone},
 }
 
 func keyTransform(userInput string, transformType string, expectedLen int) ([]byte, error) {
