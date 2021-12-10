@@ -41,7 +41,7 @@ func NewTarballStreamerRemap(from string, to string) (tsr *TarballStreamerRemap,
 // TarballStreamer is used to modify tar files which are received streaming.
 // Two modifications are:
 // * remap: change (some of) the paths for files in the tar file, and
-// * tee: copy some of the files to a second tar file
+// * tee: copy some files to a second tar file
 // In addition TarballStreamer maintains a list of files with their info
 type TarballStreamer struct {
 	// The tar stream we read from
@@ -91,17 +91,14 @@ func NewTarballStreamer(input io.Reader, maxTarSize int64, bundleFiles BundleFil
 	return streamer
 }
 
-//NextFile is what makes the TarballStreamer move to the next file.
+//NextInputFile is what makes the TarballStreamer move to the next file.
 func (streamer *TarballStreamer) NextInputFile() (err error) {
 	// First output tar, or switching to next
 	if streamer.outputTar == nil {
 		streamer.outputTar = tar.NewWriter(streamer.outputIo)
 		streamer.tarFileReadIndex = 0
 		if streamer.curHeader != nil {
-			err = streamer.outputTar.WriteHeader(streamer.curHeader)
-			if err != nil {
-				return err
-			}
+			return streamer.addFile()
 		}
 	}
 
@@ -109,6 +106,7 @@ func (streamer *TarballStreamer) NextInputFile() (err error) {
 		return errTarInputHeaderAlreadySet
 	}
 
+	tracelog.DebugLogger.Printf("Next file")
 	streamer.curHeader, err = streamer.inputTar.Next()
 	if err != nil {
 		return err
@@ -117,23 +115,27 @@ func (streamer *TarballStreamer) NextInputFile() (err error) {
 
 	streamer.remap()
 
-	if streamer.tarFileReadIndex == 0 && streamer.curHeader.Size >= streamer.maxTarSize {
-		tracelog.WarningLogger.Printf("This file %s is larger than max tar size. "+
-			"I will create a separate tar for just this file.", streamer.curHeader.Name)
-	} else if streamer.tarFileReadIndex+streamer.curHeader.Size >= streamer.maxTarSize {
-		// Seems outputfile is going to exceed maxTarSize. Next file.
-		return errTarStreamerOutputEOF
-	}
 	return streamer.addFile()
 }
 
 //addFile adds the new file to the stream
 func (streamer *TarballStreamer) addFile() (err error) {
+	if streamer.tarFileReadIndex+streamer.curHeader.Size > streamer.maxTarSize {
+		if streamer.tarFileReadIndex > 0 {
+			// Seems like output file is going to exceed maxTarSize. Next file.
+			tracelog.DebugLogger.Printf("Exceeding maxTarSize")
+			return errTarStreamerOutputEOF
+		}
+		tracelog.WarningLogger.Printf("This file %s is larger than max tar size. "+
+			"It will have its own tar file, which will be larger than the selected max tar size.", streamer.curHeader.Name)
+	}
+
 	tracelog.DebugLogger.Printf("Adding file %s", streamer.curHeader.Name)
 	err = streamer.outputTar.WriteHeader(streamer.curHeader)
 	if err != nil {
 		return err
 	}
+
 	streamer.teeing = false
 	for _, t := range streamer.Tee {
 		if t == streamer.curHeader.Name {
@@ -188,7 +190,7 @@ func (streamer *TarballStreamer) readFileData() (err error) {
 		return nil
 	}
 	if err == io.EOF && streamer.bufDataSize > 0 {
-		// stream reached end of file. Bytes where read, but . Lets ignore on this pass.
+		// stream reached end of file. Bytes where read, but . Let's ignore on this pass.
 		return nil
 	}
 	return err
