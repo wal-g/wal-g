@@ -190,7 +190,7 @@ func (streamer *TarballStreamer) readFileData() (err error) {
 		return nil
 	}
 	if err == io.EOF && streamer.bufDataSize > 0 {
-		// stream reached end of file. Bytes where read, but . Let's ignore on this pass.
+		// stream reached end of file. Bytes where read, but let's ignore on this pass.
 		return nil
 	}
 	return err
