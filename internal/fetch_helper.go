@@ -168,6 +168,14 @@ func putCachedDecompressorInFirstPlace(decompressors []compression.Decompressor)
 
 // TODO : unit tests
 func DownloadAndDecompressStorageFile(folder storage.Folder, fileName string) (io.ReadCloser, error) {
+	reader, exists, err := TryDownloadFile(folder, fileName)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return reader, nil
+	}
+	
 	for _, decompressor := range putCachedDecompressorInFirstPlace(compression.Decompressors) {
 		archiveReader, exists, err := TryDownloadFile(folder, fileName+"."+decompressor.FileExtension())
 		if err != nil {

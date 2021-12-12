@@ -68,7 +68,7 @@ func newHistoryRecordFromString(row string) (*TimelineHistoryRecord, error) {
 func createTimelineSwitchMap(startTimeline uint32,
 	walFolder storage.Folder) (map[WalSegmentNo]*TimelineHistoryRecord, error) {
 	timeLineHistoryMap := make(map[WalSegmentNo]*TimelineHistoryRecord)
-	historyRecords, err := getTimeLineHistoryRecords(startTimeline, walFolder)
+	historyRecords, err := GetTimeLineHistoryRecords(startTimeline, walFolder)
 	if _, ok := err.(HistoryFileNotFoundError); ok {
 		// return empty map if not found any history
 		return timeLineHistoryMap, nil
@@ -84,7 +84,7 @@ func createTimelineSwitchMap(startTimeline uint32,
 	return timeLineHistoryMap, nil
 }
 
-func getTimeLineHistoryRecords(startTimeline uint32, walFolder storage.Folder) ([]*TimelineHistoryRecord, error) {
+func GetTimeLineHistoryRecords(startTimeline uint32, walFolder storage.Folder) ([]*TimelineHistoryRecord, error) {
 	historyReadCloser, err := getHistoryFileFromStorage(startTimeline, walFolder)
 	if err != nil {
 		return nil, err
