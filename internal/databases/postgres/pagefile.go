@@ -132,6 +132,7 @@ func ReadIncrementalFile(filePath string,
 	pageReader := &IncrementalPageReader{fileReadSeekCloser, fileSize, lsn, nil, nil}
 	incrementSize, err := pageReader.initialize(deltaBitmap)
 	if err != nil {
+		utility.LoggedClose(file, "")
 		return nil, 0, err
 	}
 	return pageReader, incrementSize, nil
