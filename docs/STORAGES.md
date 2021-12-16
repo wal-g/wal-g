@@ -116,12 +116,12 @@ WAL-G sets default upload buffer size to 64 Megabytes and uses 3 buffers by defa
 * `WALG_AZURE_BUFFER_SIZE`
   (e.g. `33554432`)
 
-Overrides the default `upload buffer size` of 67108864 bytes (64 MB). Note that the size of the buffer must be specified in bytes. Therefore, to use 32 MB sized buffers, this variable should be set to 33554432 bytes.
+Overrides the default `upload buffer size` of 8388608 bytes (8 MB). Note that the size of the buffer must be specified in bytes. Therefore, to use 32 MB sized buffers, this variable should be set to 33554432 bytes.
 
 * `WALG_AZURE_MAX_BUFFERS`
   (e.g. `5`)
 
-Overrides the default `maximum number of upload buffers`. By default, at most 3 buffers are used concurrently.
+Overrides the default `maximum number of upload buffers`. By default, at most 4 buffers are used concurrently.
 
 Swift
 -----------
