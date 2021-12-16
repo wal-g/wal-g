@@ -43,9 +43,9 @@ func TestMockCrypterFromKeyPath_ShouldErrorIfTransformFails(t *testing.T) {
 		// valid hex, invalid length
 		{key: "2e4af6d03c7f73f4a80b0594dee2b4bcd11300bafb8a", transform: KeyTransformHex},
 		{key: "invalid hex", transform: KeyTransformHex},
-		{key: "invalid base64", tranfsorm: KeyTransformBase64},
+		{key: "invalid base64", transform: KeyTransformBase64},
 		// valid base64, invalid length
-		{key: "DBXYo+QaYKCLSNad+m27jl2UHtW4Htm9pStJv1ujjKPB2N5fmitOFw==", KeyTransformBase64},
+		{key: "DBXYo+QaYKCLSNad+m27jl2UHtW4Htm9pStJv1ujjKPB2N5fmitOFw==", transform: KeyTransformBase64},
 	}
 
 	for _, tc := range testcases {
