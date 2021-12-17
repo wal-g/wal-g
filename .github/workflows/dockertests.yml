@@ -33,10 +33,6 @@ jobs:
             ${{ env.CACHE_FILE_GOLANG }}
           key: ${{ env.IMAGES_CACHE_KEY }}
 
-      - name: Install deps
-        if: steps.cache-images.outputs.cache-hit != 'true'
-        run: sudo apt-get install liblzo2-dev
-
       - name: Set up Go 1.x
         if: steps.cache-images.outputs.cache-hit != 'true'
         uses: actions/setup-go@v2
@@ -129,9 +125,6 @@ jobs:
       # do not cancel all tests if one failed
       fail-fast: false
     steps:
-      - name: Install deps
-        run: sudo apt-get install liblzo2-dev
-
       - name: Set up Go 1.x
         uses: actions/setup-go@v2
         with:
@@ -172,3 +165,4 @@ jobs:
       USE_LIBSODIUM: 1
       USE_LZO: 1
       USE_BROTLI: 1
+      WALG_COMPRESSION_METHOD: lz4

@@ -58,10 +58,10 @@ type UnknownCompressionMethodError struct {
 	error
 }
 
-func newUnknownCompressionMethodError() UnknownCompressionMethodError {
+func newUnknownCompressionMethodError(compressionMethod string) UnknownCompressionMethodError {
 	return UnknownCompressionMethodError{
-		errors.Errorf("Unknown compression method, supported methods are: %v",
-			compression.CompressingAlgorithms)}
+		errors.Errorf("Unknown compression method %s, supported methods are: %v",
+			compressionMethod, compression.CompressingAlgorithms)}
 }
 
 func (err UnknownCompressionMethodError) Error() string {
@@ -198,7 +198,7 @@ func GetPgSlotName() (pgSlotName string) {
 func ConfigureCompressor() (compression.Compressor, error) {
 	compressionMethod := viper.GetString(CompressionMethodSetting)
 	if _, ok := compression.Compressors[compressionMethod]; !ok {
-		return nil, newUnknownCompressionMethodError()
+		return nil, newUnknownCompressionMethodError(compressionMethod)
 	}
 	return compression.Compressors[compressionMethod], nil
 }

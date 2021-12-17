@@ -41,5 +41,6 @@ jobs:
           USE_LIBSODIUM: 1
           USE_LZO: 1
           USE_BROTLI: 1
+          WALG_COMPRESSION_METHOD: lz4
           TEST_MODIFIER: -race
 
