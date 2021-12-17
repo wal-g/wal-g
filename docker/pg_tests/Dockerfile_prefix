@@ -21,7 +21,7 @@ COPY utility/ utility/
 RUN [ -z $use_brotli ] || sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
         vendor/github.com/google/brotli/go/cbrotli/cgo.go
 
-RUN [ -z $use_lzo ] ||  sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' \
+RUN [ -z $use_lzo ] || sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' \
         vendor/github.com/cyberdelia/lzo/lzo.go 
 
 RUN cd main/pg && \
