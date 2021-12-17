@@ -5,7 +5,7 @@ ENV TERM xterm-256color
 
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests \
-    cmake && \
+    cmake libsodium-dev && \
     rm -rf /var/lib/apt/lists/*
 
 COPY submodules/ tmp/
