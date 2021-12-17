@@ -17,7 +17,6 @@ COPY Makefile Makefile
 ARG build_tags
 ARG use_brotli
 ARG use_lzo
-
 ARG walg_compression_method
 ENV WALG_COMPRESSION_METHOD $walg_compression_method
 

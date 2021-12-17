@@ -33,6 +33,9 @@ echo "archive_command = '/usr/bin/wal-g --config=${TMP_CONFIG} wal-push %p --pg-
 
 sleep 10
 
+ls /var/lib/postgresql/10/main/log
+ls /var/lib/postgresql/10/main/*log*
+
 count=$(grep -c 'archived write-ahead log file' /var/lib/postgresql/10/main/log/postgresql.log)
 
 if [ "${count}" = '0' ]; then
