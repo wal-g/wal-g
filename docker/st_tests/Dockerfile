@@ -16,12 +16,16 @@ COPY cmd/ cmd/
 COPY main/ main/
 COPY utility/ utility/
 
-RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
-        vendor/github.com/google/brotli/go/cbrotli/cgo.go && \
-    sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' \
-        vendor/github.com/cyberdelia/lzo/lzo.go && \
-    cd main/pg && \
-    go build -mod vendor -race -o wal-g -tags "brotli lzo" -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
+ARG build_tags
+ARG use_brotli
+ARG use_lzo
+
+RUN [ -z $use_brotli ] || sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
+        vendor/github.com/google/brotli/go/cbrotli/cgo.go
+RUN [ -z $use_lzo ] || sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' \
+        vendor/github.com/cyberdelia/lzo/lzo.go
+RUN cd main/pg && \
+    go build -mod vendor -race -o wal-g -tags "$build_tags" -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 
 FROM wal-g/ubuntu:latest
 
