@@ -19,6 +19,7 @@ COPY utility/ utility/
 ARG build_tags
 ARG use_brotli
 ARG use_lzo
+ENV WALG_COMPRESSION_METHOD $walg_compression_method
 
 RUN [ -z $use_brotli ] || sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
         vendor/github.com/google/brotli/go/cbrotli/cgo.go

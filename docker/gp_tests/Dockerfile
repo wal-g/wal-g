@@ -16,13 +16,15 @@ COPY Makefile Makefile
 
 ARG build_tags
 ARG use_brotli
+ARG use_lzo
 
 ARG walg_compression_method
 ENV WALG_COMPRESSION_METHOD $walg_compression_method
 
 RUN [ -z $use_brotli ] || sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
         vendor/github.com/google/brotli/go/cbrotli/cgo.go
-
+RUN [ -z $use_lzo ] || sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' \
+        vendor/github.com/cyberdelia/lzo/lzo.go
 RUN cd main/gp && \
     go build -mod vendor -tags "$build_tags" -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 
