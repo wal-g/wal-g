@@ -29,6 +29,6 @@ var contentID int
 
 func init() {
 	segBackupPushCmd.PersistentFlags().IntVar(&contentID, "content-id", 0, "segment content ID")
-	_ = cmd.MarkFlagRequired("config")
+	_ = segBackupPushCmd.MarkFlagRequired("content-id")
 	cmd.AddCommand(segBackupPushCmd)
 }
