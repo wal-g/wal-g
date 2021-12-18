@@ -68,11 +68,16 @@ To configure the name of a file containing private key of Yandex Cloud Service A
 
 * `WALG_LIBSODIUM_KEY`
 
-To configure encryption and decryption with libsodium. WAL-G uses an [algorithm](https://download.libsodium.org/doc/secret-key_cryptography/secretstream#algorithm) that only requires a secret key.
+To configure encryption and decryption with libsodium. WAL-G uses an [algorithm](https://download.libsodium.org/doc/secret-key_cryptography/secretstream#algorithm) that only requires a secret key. libsodium keys are fixed-size keys of 32 bytes. For optimal cryptographic security, it is recommened to use a random 32 byte key. To generate a random key, you can something like `openssl rand -hex 32` (set `WALG_LIBSODIUM_KEY_TRANSFORM` to `hex`) or `openssl rand -base64 32` (set `WALG_LIBSODIUM_KEY_TRANSFORM` to `base64`).
 
 * `WALG_LIBSODIUM_KEY_PATH`
 
 Similar to `WALG_LIBSODIUM_KEY`, but value is the path to the key on file system. The file content will be trimmed from whitespace characters.
+
+* `WALG_LIBSODIUM_KEY_TRANSFORM`
+
+The transform that will be applied to the `WALG_LIBSODIUM_KEY` to get the required 32 byte key. Supported transformations are `base64`, `hex` or `none` (default).
+The option `none` exists for backwards compatbility, the user input will be converted to 32 byte either via truncation or by zero-padding.
 
 * `WALG_GPG_KEY_ID`  (alternative form `WALE_GPG_KEY_ID`) ⚠️ **DEPRECATED**
 

@@ -57,6 +57,7 @@ const (
 	CseKmsRegionSetting          = "WALG_CSE_KMS_REGION"
 	LibsodiumKeySetting          = "WALG_LIBSODIUM_KEY"
 	LibsodiumKeyPathSetting      = "WALG_LIBSODIUM_KEY_PATH"
+	LibsodiumKeyTransform        = "WALG_LIBSODIUM_KEY_TRANSFORM"
 	GpgKeyIDSetting              = "GPG_KEY_ID"
 	PgpKeySetting                = "WALG_PGP_KEY"
 	PgpKeyPathSetting            = "WALG_PGP_KEY_PATH"
@@ -159,6 +160,7 @@ var (
 		WithoutFilesMetadataSetting:  "false",
 		MaxDelayedSegmentsCount:      "0",
 		SerializerTypeSetting:        "json_default",
+		LibsodiumKeyTransform:        "none",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -217,6 +219,7 @@ var (
 		PgpKeyPassphraseSetting:      true,
 		LibsodiumKeySetting:          true,
 		LibsodiumKeyPathSetting:      true,
+		LibsodiumKeyTransform:        true,
 		TotalBgUploadedLimit:         true,
 		NameStreamCreateCmd:          true,
 		NameStreamRestoreCmd:         true,
