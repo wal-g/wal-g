@@ -38,14 +38,6 @@ type UnsupportedFileTypeError struct {
 	error
 }
 
-type DecompressionError struct {
-	error
-}
-
-func newDecompressionError(err error) DecompressionError {
-	return DecompressionError{err}
-}
-
 func newUnsupportedFileTypeError(path string, fileFormat string) UnsupportedFileTypeError {
 	return UnsupportedFileTypeError{errors.Errorf("WAL-G does not support the file format '%s' in '%s'", fileFormat, path)}
 }
@@ -58,19 +50,6 @@ func (err UnsupportedFileTypeError) Error() string {
 // for different file types.
 type TarInterpreter interface {
 	Interpret(reader io.Reader, header *tar.Header) error
-}
-
-// EmptyWriteIgnorer handles 0 byte write in LZ4 package
-// to stop pipe reader/writer from blocking.
-type EmptyWriteIgnorer struct {
-	io.WriteCloser
-}
-
-func (e EmptyWriteIgnorer) Write(p []byte) (int, error) {
-	if len(p) == 0 {
-		return 0, nil
-	}
-	return e.WriteCloser.Write(p)
 }
 
 type DevNullWriter struct {
@@ -119,52 +98,27 @@ func extractOne(tarInterpreter TarInterpreter, source io.Reader) error {
 // DecryptAndDecompressTar decrypts file and checks its extension.
 // If it's tar, a decompression is not needed.
 // Otherwise it uses corresponding decompressor. If none found an error will be returned.
-func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter crypto.Crypter) error {
-	readCloser, err := readerMaker.Reader()
-
-	if err != nil {
-		return errors.Wrap(err, "DecryptAndDecompressTar: failed to create new reader")
-	}
-	defer utility.LoggedClose(readCloser, "")
-	var reader io.Reader = readCloser
+func DecryptAndDecompressTar(reader io.Reader, filePath string, crypter crypto.Crypter) (io.ReadCloser, error) {
+	var err error
 
 	if crypter != nil {
 		reader, err = crypter.Decrypt(reader)
 		if err != nil {
-			return errors.Wrap(err, "DecryptAndDecompressTar: decrypt failed")
+			return nil, errors.Wrap(err, "DecryptAndDecompressTar: decrypt failed")
 		}
 	}
 
-	fileExtension := utility.GetFileExtension(readerMaker.Path())
+	fileExtension := utility.GetFileExtension(filePath)
 	if fileExtension == "tar" {
-		_, err = utility.FastCopy(writer, reader)
-		return errors.Wrap(err, "DecryptAndDecompressTar: tar extract failed")
+		return io.NopCloser(reader), nil
 	}
 
 	decompressor := compression.FindDecompressor(fileExtension)
 	if decompressor == nil {
-		return newUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
+		return nil, newUnsupportedFileTypeError(filePath, fileExtension)
 	}
 
-	decompressedReadCloser, err := decompressor.Decompress(reader)
-	if err != nil {
-		decompressionError := newDecompressionError(err)
-		return errors.Wrapf(decompressionError,
-			"DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?",
-			decompressor.FileExtension())
-	}
-	defer utility.LoggedClose(decompressedReadCloser, "")
-	reader = decompressedReadCloser
-
-	_, err = utility.FastCopy(writer, reader)
-	if err != nil {
-		decompressionError := newDecompressionError(err)
-		return errors.Wrapf(decompressionError,
-			"DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?",
-			decompressor.FileExtension())
-	}
-
-	return nil
+	return decompressor.Decompress(reader)
 }
 
 // ExtractAll Handles all files passed in. Supports `.lzo`, `.lz4`, `.lzma`, and `.tar`.
@@ -208,7 +162,6 @@ func tryExtractFiles(files []ReaderMaker,
 	downloadingConcurrency int) (failed []ReaderMaker) {
 	downloadingContext := context.TODO()
 	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
-	writingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
 	crypter := ConfigureCrypter()
 	isFailed := sync.Map{}
 
@@ -218,34 +171,30 @@ func tryExtractFiles(files []ReaderMaker,
 			tracelog.ErrorLogger.Println(err)
 			return files //Should never happen, but if we are asked to cancel - consider all files unfinished
 		}
-		err = writingSemaphore.Acquire(downloadingContext, 1)
-		if err != nil {
-			tracelog.ErrorLogger.Println(err)
-			return files //Should never happen, but if we are asked to cancel - consider all files unfinished
-		}
 		fileClosure := file
 
-		extractingReader, pipeWriter := io.Pipe()
-		decompressingWriter := &EmptyWriteIgnorer{pipeWriter}
 		go func() {
 			defer downloadingSemaphore.Release(1)
-			err := DecryptAndDecompressTar(decompressingWriter, fileClosure, crypter)
-			utility.LoggedClose(decompressingWriter, "")
-			tracelog.InfoLogger.Printf("Finished decompression of %s", fileClosure.Path())
-			if err != nil {
-				isFailed.Store(fileClosure, true)
-				tracelog.ErrorLogger.Println(fileClosure.Path(), err)
-			}
-		}()
-		go func() {
-			defer writingSemaphore.Release(1)
-			defer utility.LoggedClose(extractingReader, "")
-			err := extractOne(tarInterpreter, extractingReader)
+
+			readCloser, err := fileClosure.Reader()
 			if err == nil {
-				err = readTrailingZeros(extractingReader)
+				defer utility.LoggedClose(readCloser, "")
+
+				filePath := fileClosure.Path()
+				var extractingReader io.ReadCloser
+				extractingReader, err = DecryptAndDecompressTar(readCloser, filePath, crypter)
+				if err == nil {
+					defer extractingReader.Close()
+
+					err = extractOne(tarInterpreter, extractingReader)
+					if err == nil {
+						err = readTrailingZeros(extractingReader)
+					}
+					err = errors.Wrapf(err, "Extraction error in %s", filePath)
+					tracelog.InfoLogger.Printf("Finished extraction of %s", filePath)
+				}
 			}
-			err = errors.Wrapf(err, "Extraction error in %s", fileClosure.Path())
-			tracelog.InfoLogger.Printf("Finished extraction of %s", fileClosure.Path())
+
 			if err != nil {
 				isFailed.Store(fileClosure, true)
 				tracelog.ErrorLogger.Println(err)
@@ -257,11 +206,6 @@ func tryExtractFiles(files []ReaderMaker,
 	if err != nil {
 		tracelog.ErrorLogger.Println(err)
 		return files //Should never happen, but if we are asked to cancel - consider all files unfinished
-	}
-	err = writingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency))
-	if err != nil {
-		tracelog.ErrorLogger.Println(err)
-		return files
 	}
 
 	isFailed.Range(func(failedFile, _ interface{}) bool {
