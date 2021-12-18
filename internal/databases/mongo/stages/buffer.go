@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
 	mocks "github.com/wal-g/wal-g/internal/databases/mongo/stages/mocks"
@@ -32,7 +31,7 @@ type FileBuffer struct {
 
 // NewFileBuffer builds FileBuffer with given args.
 func NewFileBuffer(path string) (*FileBuffer, error) {
-	bufFile, err := ioutil.TempFile(path, "walg.oplog_push.tmp.")
+	bufFile, err := os.CreateTemp(path, "walg.oplog_push.tmp.")
 	if err != nil {
 		return nil, err
 	}

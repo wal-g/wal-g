@@ -3,7 +3,6 @@ package testtools
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 
 	"github.com/wal-g/wal-g/internal/fsutil"
 )
@@ -41,7 +40,7 @@ func (folder *MockDataFolder) IsEmpty() bool {
 func (folder *MockDataFolder) OpenReadonlyFile(filename string) (io.ReadCloser, error) {
 	_, ok := (*folder)[filename]
 	if ok {
-		return ioutil.NopCloser(bytes.NewReader((*folder)[filename].Bytes())), nil
+		return io.NopCloser(bytes.NewReader((*folder)[filename].Bytes())), nil
 	}
 	return nil, fsutil.NewNoSuchFileError(filename)
 }

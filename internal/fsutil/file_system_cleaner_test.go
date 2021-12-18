@@ -1,7 +1,6 @@
 package fsutil_test
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -103,14 +102,14 @@ func createTempFolder(t *testing.T, path string) string {
 	cwd, err := filepath.Abs(path)
 	check(t, err)
 
-	dir, err := ioutil.TempDir(cwd, "test")
+	dir, err := os.MkdirTemp(cwd, "test")
 	check(t, err)
 
 	return dir
 }
 
 func createTempFile(t *testing.T, directory string, name string) {
-	err := ioutil.WriteFile(filepath.Join(directory, name), []byte{}, 0700)
+	err := os.WriteFile(filepath.Join(directory, name), []byte{}, 0700)
 	check(t, err)
 }
 

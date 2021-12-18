@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"io"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"testing"
@@ -42,7 +41,7 @@ func generateRandomBytes() []byte {
 		R: sb,
 		N: int64(randomBytesAmount),
 	}
-	b, _ := ioutil.ReadAll(lr)
+	b, _ := io.ReadAll(lr)
 	return b
 }
 
@@ -181,7 +180,7 @@ func TestDecryptAndDecompressTar_encrypted(t *testing.T) {
 	compressor := GetLz4Compressor()
 	compressed := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
 
-	compressedBuffer, _ := ioutil.ReadAll(compressed)
+	compressedBuffer, _ := io.ReadAll(compressed)
 	brm := &BufferReaderMaker{bytes.NewBuffer(compressedBuffer), "/usr/local/test.tar.lz4"}
 
 	decompressed := &bytes.Buffer{}
@@ -206,7 +205,7 @@ func TestDecryptAndDecompressTar_noCrypter(t *testing.T) {
 	compressor := GetLz4Compressor()
 	compressed := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
 
-	compressedBuffer, _ := ioutil.ReadAll(compressed)
+	compressedBuffer, _ := io.ReadAll(compressed)
 	brm := &BufferReaderMaker{bytes.NewBuffer(compressedBuffer), "/usr/local/test.tar.lz4"}
 
 	decompressed := &bytes.Buffer{}
@@ -233,7 +232,7 @@ func TestDecryptAndDecompressTar_wrongCrypter(t *testing.T) {
 	compressor := GetLz4Compressor()
 	compressed := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
 
-	compressedBuffer, _ := ioutil.ReadAll(compressed)
+	compressedBuffer, _ := io.ReadAll(compressed)
 	brm := &BufferReaderMaker{bytes.NewBuffer(compressedBuffer), "/usr/local/test.tar.lzma"}
 
 	decompressed := &bytes.Buffer{}
@@ -290,7 +289,7 @@ type BufferReaderMaker struct {
 	Key string
 }
 
-func (b *BufferReaderMaker) Reader() (io.ReadCloser, error) { return ioutil.NopCloser(b.Buf), nil }
+func (b *BufferReaderMaker) Reader() (io.ReadCloser, error) { return io.NopCloser(b.Buf), nil }
 func (b *BufferReaderMaker) Path() string                   { return b.Key }
 
 type NOPSleeper struct{}

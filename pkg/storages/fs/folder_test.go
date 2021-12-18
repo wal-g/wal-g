@@ -1,7 +1,6 @@
 package fs
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -29,11 +28,11 @@ func setupTmpDir(t *testing.T) string {
 		t.Log(err)
 	}
 	// Create temp directory.
-	tmpDir, err := ioutil.TempDir(cwd, "data")
+	tmpDir, err := os.MkdirTemp(cwd, "data")
 	if err != nil {
 		t.Log(err)
 	}
-	err = os.MkdirAll(tmpDir, 0755)
+	err = os.Chmod(tmpDir, 0755)
 	if err != nil {
 		t.Log(err)
 	}

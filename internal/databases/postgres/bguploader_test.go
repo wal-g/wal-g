@@ -2,7 +2,6 @@ package postgres_test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -135,7 +134,7 @@ func setupArchiveStatus(t *testing.T, dir string) (string, string) {
 		}
 	} else {
 		// Create temp directory.
-		tmpDir, err := ioutil.TempDir(cwd, "data")
+		tmpDir, err := os.MkdirTemp(cwd, "data")
 		testDir = tmpDir
 		if err != nil {
 			t.Log(err)

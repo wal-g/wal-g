@@ -2,7 +2,7 @@ package utility_test
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"os"
 	"sort"
@@ -91,7 +91,7 @@ func TestCreateFileWith(t *testing.T) {
 	content := "content"
 	err := ioextensions.CreateFileWith(CreateFileWithPath, strings.NewReader(content))
 	assert.NoError(t, err)
-	actualContent, err := ioutil.ReadFile(CreateFileWithPath)
+	actualContent, err := os.ReadFile(CreateFileWithPath)
 	assert.NoError(t, err)
 	assert.Equal(t, []byte(content), actualContent)
 	os.Remove(CreateFileWithPath)
@@ -443,7 +443,7 @@ func TestLoggedCloseWithoutError(t *testing.T) {
 
 	utility.LoggedClose(&testtools.NopCloser{}, "")
 
-	loggedData, err := ioutil.ReadAll(&buf)
+	loggedData, err := io.ReadAll(&buf)
 	if err != nil {
 		t.Logf("failed read from pipe: %v", err)
 	}
@@ -464,7 +464,7 @@ func TestLoggedCloseWithErrorAndDefaultMessage(t *testing.T) {
 
 	utility.LoggedClose(&testtools.ErrorWriteCloser{}, "")
 
-	loggedData, err := ioutil.ReadAll(&buf)
+	loggedData, err := io.ReadAll(&buf)
 	if err != nil {
 		t.Logf("failed read from buffer: %v", err)
 	}
@@ -485,7 +485,7 @@ func TestLoggedCloseWithErrorAndCustomMessage(t *testing.T) {
 
 	utility.LoggedClose(&testtools.ErrorWriteCloser{}, "custom error message")
 
-	loggedData, err := ioutil.ReadAll(&buf)
+	loggedData, err := io.ReadAll(&buf)
 	if err != nil {
 		t.Logf("failed read from buffer: %v", err)
 	}

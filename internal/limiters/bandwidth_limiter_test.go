@@ -3,7 +3,6 @@ package limiters_test
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"testing"
 	"time"
 
@@ -38,7 +37,7 @@ func TestLimiter(t *testing.T) {
 	start := utility.TimeNowCrossPlatformLocal()
 
 	reader := limiters.NewDiskLimitReader(limiters.NewNetworkLimitReader(r))
-	_, err := ioutil.ReadAll(reader)
+	_, err := io.ReadAll(reader)
 	assert.NoError(t, err)
 	end := utility.TimeNowCrossPlatformLocal()
 

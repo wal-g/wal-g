@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -77,7 +76,7 @@ func DecompressDecryptBytes(archiveReader io.Reader, decompressor compression.De
 	}
 	if decompressor == nil {
 		tracelog.DebugLogger.Printf("No decompressor has been selected")
-		return ioutil.NopCloser(decryptReader), nil
+		return io.NopCloser(decryptReader), nil
 	}
 	return decompressor.Decompress(decryptReader)
 }
@@ -111,7 +110,7 @@ func GetLastDecompressor() (compression.Decompressor, error) {
 	usr, err := user.Current()
 	if err == nil {
 		cacheFilename = filepath.Join(usr.HomeDir, ".walg_decompressor_cache")
-		file, err := ioutil.ReadFile(cacheFilename)
+		file, err := os.ReadFile(cacheFilename)
 		if err == nil {
 			err = json.Unmarshal(file, &cache)
 			if err != nil {
@@ -138,7 +137,7 @@ func SetLastDecompressor(decompressor compression.Decompressor) error {
 
 	marshal, err := json.Marshal(&cache)
 	if err == nil {
-		return ioutil.WriteFile(cacheFilename, marshal, 0644)
+		return os.WriteFile(cacheFilename, marshal, 0644)
 	}
 
 	return err

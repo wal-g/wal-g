@@ -3,7 +3,6 @@ package yckms
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -77,7 +76,7 @@ func TestYcCrypterEncryptionCycle(t *testing.T) {
 	decrypt, err := crypter.Decrypt(buffer)
 	assert.NoErrorf(t, err, "YcCrypter decryption error: %v", err)
 
-	decryptedData, err := ioutil.ReadAll(decrypt)
+	decryptedData, err := io.ReadAll(decrypt)
 	assert.NoErrorf(t, err, "YcCryptor reading decrypted data error: %v", err)
 
 	assert.Equal(t, testSecretString, string(decryptedData), "Decrypted text not equal to plain text")

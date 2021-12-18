@@ -2,7 +2,7 @@ package internal
 
 import (
 	"archive/tar"
-	"io/ioutil"
+	"io"
 	"sync/atomic"
 
 	"github.com/wal-g/wal-g/internal/crypto"
@@ -40,7 +40,7 @@ func (tarBallMaker *NOPTarBallMaker) Make(inheritState bool) TarBall {
 	return &NOPTarBall{
 		number:    tarBallMaker.number,
 		partSize:  tarBallMaker.partSize,
-		tarWriter: tar.NewWriter(ioutil.Discard),
+		tarWriter: tar.NewWriter(io.Discard),
 	}
 }
 

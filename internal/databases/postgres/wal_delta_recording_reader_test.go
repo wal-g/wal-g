@@ -2,7 +2,7 @@ package postgres_test
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"os"
 	"path"
 	"testing"
@@ -54,7 +54,7 @@ func TestRecordBlockLocationsFromPage(t *testing.T) {
 }
 
 func TestRead_CorrectData(t *testing.T) {
-	data, err := ioutil.ReadFile(WalFilePath)
+	data, err := os.ReadFile(WalFilePath)
 	assert.NoError(t, err)
 	reader := postgres.WalDeltaRecordingReader{
 		PageReader: *walparser.NewWalPageReader(bytes.NewReader(data)),
@@ -76,7 +76,7 @@ func TestRead_CorrectRecording(t *testing.T) {
 	recordingReader, err := postgres.NewWalDeltaRecordingReader(walFile, WalFilename, manager)
 	assert.NoError(t, err)
 
-	_, err = ioutil.ReadAll(recordingReader)
+	_, err = io.ReadAll(recordingReader)
 	assert.NoError(t, err)
 	manager.FlushFiles(nil)
 
@@ -97,7 +97,7 @@ func TestRead_RecordingFail(t *testing.T) {
 	recordingReader, err := postgres.NewWalDeltaRecordingReader(bytes.NewReader(walData), WalFilename, manager)
 	assert.NoError(t, err)
 
-	actualData, err := ioutil.ReadAll(recordingReader)
+	actualData, err := io.ReadAll(recordingReader)
 	assert.NoError(t, err)
 	manager.FlushFiles(nil)
 

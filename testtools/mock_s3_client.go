@@ -1,7 +1,7 @@
 package testtools
 
 import (
-	"io/ioutil"
+	"io"
 	"strings"
 	"time"
 
@@ -48,7 +48,7 @@ func (client *MockS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOu
 	}
 
 	output := &s3.GetObjectOutput{
-		Body: ioutil.NopCloser(strings.NewReader("mock content")),
+		Body: io.NopCloser(strings.NewReader("mock content")),
 	}
 
 	return output, nil

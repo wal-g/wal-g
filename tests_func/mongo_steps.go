@@ -3,7 +3,7 @@ package functests
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 
 	"github.com/stretchr/testify/assert"
@@ -74,7 +74,7 @@ func (tctx *TestContext) loadMongodbOpsFromConfig(host string, loadId string) er
 	}
 	defer func() { _ = expectedFile.Close() }()
 
-	expectedData, err := ioutil.ReadAll(expectedFile)
+	expectedData, err := io.ReadAll(expectedFile)
 	if err != nil {
 		return err
 	}

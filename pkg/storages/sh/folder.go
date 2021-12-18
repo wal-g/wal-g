@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -57,7 +56,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 
 	authMethods := []ssh.AuthMethod{}
 	if pkeyPath != "" {
-		pkey, err := ioutil.ReadFile(pkeyPath)
+		pkey, err := os.ReadFile(pkeyPath)
 		if err != nil {
 			return nil, NewFolderError(err, "Unable to read private key: %v", err)
 		}

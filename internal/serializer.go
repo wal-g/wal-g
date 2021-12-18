@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/spf13/viper"
 	streamJSON "github.com/wal-g/json"
@@ -61,7 +60,7 @@ func (r RegularJSON) Marshal(dto interface{}) (io.Reader, error) {
 }
 
 func (r RegularJSON) Unmarshal(reader io.Reader, dto interface{}) error {
-	data, err := ioutil.ReadAll(reader)
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return err
 	}

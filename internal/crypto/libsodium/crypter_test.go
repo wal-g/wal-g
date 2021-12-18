@@ -5,7 +5,6 @@ package libsodium
 
 import (
 	"io"
-	"io/ioutil"
 	"strings"
 	"testing"
 
@@ -68,7 +67,7 @@ func EncryptionCycle(t *testing.T, crypter crypto.Crypter) {
 		encrypt.Close()
 	}()
 
-	decrypted, err := ioutil.ReadAll(decrypt)
+	decrypted, err := io.ReadAll(decrypt)
 	assert.NoErrorf(t, err, "decryption read error: %v", err)
 
 	assert.Equal(t, secret, string(decrypted), "decrypted text not equals to open text")
