@@ -123,7 +123,7 @@ func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 		// pass the config file location
 		fmt.Sprintf("--config=%s", internal.CfgFile),
 		// forward STDOUT& STDERR to log file
-		formatSegmentLogPath(contentID),
+		">>", formatSegmentLogPath(contentID), "2>&1 &",
 	}
 
 	cmdLine := strings.Join(cmd, " ")
@@ -502,5 +502,5 @@ func (bh *BackupHandler) fetchSingleMetadata(backupID string, segCfg *cluster.Se
 
 func formatSegmentLogPath(contentID int) string {
 	logsDir := viper.GetString(internal.GPLogsDirectory)
-	return fmt.Sprintf(">>%s/%s-seg%d 2>&1 &", logsDir, SegBackupLogPrefix, contentID)
+	return fmt.Sprintf("%s/%s-seg%d", logsDir, SegBackupLogPrefix, contentID)
 }

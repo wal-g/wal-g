@@ -185,7 +185,7 @@ var (
 	}
 
 	GPDefaultSettings = map[string]string{
-		GPLogsDirectory: "",
+		GPLogsDirectory: "/var/log",
 		PgWalSize:       "64",
 	}
 
