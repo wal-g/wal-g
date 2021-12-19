@@ -23,11 +23,9 @@ import (
 )
 
 const (
-	BackupNamePrefix      = "backup_"
-	BackupNameLength      = 23 // len(BackupNamePrefix) + len(utility.BackupTimeFormat)
-	SegBackupLogPrefix    = "wal-g-log"
-	segmentPollInterval   = 5 * time.Minute
-	segmentPollRetryCount = 5
+	BackupNamePrefix   = "backup_"
+	BackupNameLength   = 23 // len(BackupNamePrefix) + len(utility.BackupTimeFormat)
+	SegBackupLogPrefix = "wal-g-log"
 )
 
 // BackupArguments holds all arguments parsed from cmd to this handler class
@@ -36,6 +34,9 @@ type BackupArguments struct {
 	userData       interface{}
 	segmentFwdArgs []SegmentFwdArg
 	logsDir        string
+
+	segPollInterval time.Duration
+	segPollRetries  int
 }
 
 type SegmentUserData struct {
@@ -192,21 +193,21 @@ func (bh *BackupHandler) HandleBackupPush() {
 }
 
 func (bh *BackupHandler) waitSegmentBackups() error {
-	ticker := time.NewTicker(segmentPollInterval)
-	retryCount := segmentPollRetryCount
+	ticker := time.NewTicker(bh.arguments.segPollInterval)
+	retryCount := bh.arguments.segPollRetries
 	for {
 		<-ticker.C
 		states, err := bh.pollSegmentStates()
 		if err != nil {
 			if retryCount == 0 {
-				return fmt.Errorf("gave up polling the backup-push states (tried %d times): %v", segmentPollRetryCount, err)
+				return fmt.Errorf("gave up polling the backup-push states (tried %d times): %v", bh.arguments.segPollRetries, err)
 			}
 			retryCount--
 			tracelog.WarningLogger.Printf("failed to poll segment backup-push states, will try again %d more times", retryCount)
 			continue
 		}
 		// reset retries after the successful poll
-		retryCount = segmentPollRetryCount
+		retryCount = bh.arguments.segPollRetries
 
 		runningBackups, err := checkBackupStates(states)
 		if err != nil {
@@ -433,12 +434,15 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 }
 
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
-func NewBackupArguments(isPermanent bool, userData interface{}, fwdArgs []SegmentFwdArg, logsDir string) BackupArguments {
+func NewBackupArguments(isPermanent bool, userData interface{}, fwdArgs []SegmentFwdArg, logsDir string,
+	segPollInterval time.Duration, segPollRetries int) BackupArguments {
 	return BackupArguments{
-		isPermanent:    isPermanent,
-		userData:       userData,
-		segmentFwdArgs: fwdArgs,
-		logsDir:        logsDir,
+		isPermanent:     isPermanent,
+		userData:        userData,
+		segmentFwdArgs:  fwdArgs,
+		logsDir:         logsDir,
+		segPollInterval: segPollInterval,
+		segPollRetries:  segPollRetries,
 	}
 }
 

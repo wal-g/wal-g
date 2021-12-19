@@ -12,8 +12,6 @@ import (
 	"github.com/wal-g/wal-g/internal"
 )
 
-const statusUpdateIntervalSeconds = 10
-
 type SegBackupRunner struct {
 	// content ID of the segment backup
 	contentID int
@@ -21,13 +19,16 @@ type SegBackupRunner struct {
 	backupName string
 	// args for the backup-push command
 	backupArgs string
+	// controls the frequency of the backup state updates
+	stateUpdateInterval time.Duration
 }
 
-func NewSegBackupRunner(contentID int, backupName, backupArgs string) *SegBackupRunner {
+func NewSegBackupRunner(contentID int, backupName, backupArgs string, updInterval time.Duration) *SegBackupRunner {
 	return &SegBackupRunner{
-		contentID:  contentID,
-		backupName: backupName,
-		backupArgs: backupArgs,
+		contentID:           contentID,
+		backupName:          backupName,
+		backupArgs:          backupArgs,
+		stateUpdateInterval: updInterval,
 	}
 }
 
@@ -65,7 +66,7 @@ func (r *SegBackupRunner) Run() {
 }
 
 func (r *SegBackupRunner) waitBackup(doneCh chan error) error {
-	ticker := time.NewTicker(statusUpdateIntervalSeconds * time.Second)
+	ticker := time.NewTicker(r.stateUpdateInterval)
 
 	for {
 		status, err := checkBackupStatus(ticker, doneCh)

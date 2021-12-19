@@ -1,6 +1,8 @@
 package gp
 
 import (
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 
 	"github.com/spf13/cobra"
@@ -20,7 +22,9 @@ var (
 			backupName := args[0]
 			backupArgs := args[1]
 
-			greenplum.NewSegBackupRunner(contentID, backupName, backupArgs).Run()
+			stateUpdateInterval, err := internal.GetDurationSetting(internal.GPSegmentsUpdInterval)
+			tracelog.ErrorLogger.FatalOnError(err)
+			greenplum.NewSegBackupRunner(contentID, backupName, backupArgs, stateUpdateInterval).Run()
 		},
 	}
 )
