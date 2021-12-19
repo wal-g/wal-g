@@ -10,6 +10,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/client"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/defaults"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -82,12 +83,41 @@ func setupReqProxy(endpointSource, port string) *string {
 	return nil
 }
 
+func getFirstSettingOf(settings map[string]string, keys []string) string {
+	for _, key := range keys {
+		if value, ok := settings[key]; ok {
+			return value
+		}
+	}
+	return ""
+}
+
 func getDefaultConfig(settings map[string]string, maxRetries int) *aws.Config {
 	// DefaultRetryer implements basic retry logic using exponential backoff for
 	// most services. If you want to implement custom retry logic, you can implement the
 	// request.Retryer interface.
 	config := defaults.Get().Config.WithRegion(settings[RegionSetting])
 	config = request.WithRetryer(config, NewConnResetRetryer(client.DefaultRetryer{NumMaxRetries: maxRetries}))
+
+	accessKeyId := getFirstSettingOf(settings, []string{AccessKeyIdSetting, AccessKeySetting})
+	secretAccessKey := getFirstSettingOf(settings, []string{SecretAccessKeySetting, SecretKeySetting})
+	sessionToken := settings[SessionTokenSetting]
+	if accessKeyId != "" && secretAccessKey != "" {
+		provider := &credentials.StaticProvider{Value: credentials.Value{
+			AccessKeyID:     accessKeyId,
+			SecretAccessKey: secretAccessKey,
+			SessionToken:    sessionToken,
+		}}
+		providers := make([]credentials.Provider, 0)
+		providers = append(providers, provider)
+		providers = append(providers, defaults.CredProviders(config, defaults.Handlers())...)
+		newCredentials := credentials.NewCredentials(&credentials.ChainProvider{
+			VerboseErrors: aws.BoolValue(config.CredentialsChainVerboseErrors),
+			Providers:     providers,
+		})
+
+		config = config.WithCredentials(newCredentials)
+	}
 
 	if logLevel, ok := settings[LogLevel]; ok {
 		config = config.WithLogLevel(func(s string) aws.LogLevelType {
