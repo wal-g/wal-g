@@ -378,8 +378,11 @@ var (
 	}
 
 	GPAllowedSettings = map[string]bool{
-		GPLogsDirectory: true,
-		GPSegContentID:  true,
+		GPLogsDirectory:        true,
+		GPSegContentID:         true,
+		GPSegmentsPollRetries:  true,
+		GPSegmentsPollInterval: true,
+		GPSegmentsUpdInterval:  true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
