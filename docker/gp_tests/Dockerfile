@@ -37,6 +37,9 @@ COPY docker/pg_tests/scripts/scripts/ /tmp/pg_scripts
 
 RUN chmod 777 /tmp/configs/
 
+RUN mkdir -p /var/log/
+RUN chmod 777 /var/log/
+
 RUN /bin/bash -c 'sudo chmod +x -R /tmp/tests; chmod +x /tmp/run_integration_tests.sh'
 
 CMD su gpadmin bash -c '/tmp/run_integration_tests.sh'

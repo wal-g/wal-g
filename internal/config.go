@@ -107,8 +107,11 @@ const (
 
 	RedisPassword = "WALG_REDIS_PASSWORD"
 
-	GPLogsDirectory = "WALG_GP_LOGS_DIR"
-	GPSegContentID  = "WALG_GP_SEG_CONTENT_ID"
+	GPLogsDirectory        = "WALG_GP_LOGS_DIR"
+	GPSegContentID         = "WALG_GP_SEG_CONTENT_ID"
+	GPSegmentsPollInterval = "WALG_GP_SEG_POLL_INTERVAL"
+	GPSegmentsPollRetries  = "WALG_GP_SEG_POLL_RETRIES"
+	GPSegmentsUpdInterval  = "WALG_GP_SEG_UPD_INTERVAL"
 
 	GoMaxProcs = "GOMAXPROCS"
 
@@ -187,8 +190,11 @@ var (
 	}
 
 	GPDefaultSettings = map[string]string{
-		GPLogsDirectory: "",
-		PgWalSize:       "64",
+		GPLogsDirectory:        "/var/log",
+		PgWalSize:              "64",
+		GPSegmentsPollInterval: "5m",
+		GPSegmentsUpdInterval:  "10s",
+		GPSegmentsPollRetries:  "5",
 	}
 
 	AllowedSettings map[string]bool
@@ -375,8 +381,11 @@ var (
 	}
 
 	GPAllowedSettings = map[string]bool{
-		GPLogsDirectory: true,
-		GPSegContentID:  true,
+		GPLogsDirectory:        true,
+		GPSegContentID:         true,
+		GPSegmentsPollRetries:  true,
+		GPSegmentsPollInterval: true,
+		GPSegmentsUpdInterval:  true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
