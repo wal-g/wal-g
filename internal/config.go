@@ -666,8 +666,6 @@ func FolderFromConfig(configFile string) (storage.Folder, error) {
 	ReadConfigFromFile(config, configFile)
 	CheckAllowedSettings(config)
 
-	bindConfigToEnv(config)
-
 	var folder, err = ConfigureFolderForSpecificConfig(config)
 
 	if err != nil {
