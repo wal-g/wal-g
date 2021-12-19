@@ -1,7 +1,7 @@
 //go:build lzo
 // +build lzo
 
-package lzo
+package lzo_test
 
 import (
 	"bufio"
@@ -14,6 +14,7 @@ import (
 	"github.com/cyberdelia/lzo"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	walg_lzo "github.com/wal-g/wal-g/internal/compression/lzo"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -43,7 +44,7 @@ func testLzopRoundTrip(t *testing.T, stride, nBytes int) {
 	go func() {
 		defer utility.LoggedClose(lzow, "")
 		defer utility.LoggedClose(w, "")
-		bw := bufio.NewWriterSize(lzow, LzopBlockSize)
+		bw := bufio.NewWriterSize(lzow, walg_lzo.LzopBlockSize)
 		defer func() {
 			if err := bw.Flush(); err != nil {
 				panic(err)
@@ -73,7 +74,7 @@ func testLzopRoundTrip(t *testing.T, stride, nBytes int) {
 }
 
 func TestLzopUncompressableBytes(t *testing.T) {
-	testLzopRoundTrip(t, LzopBlockSize*2, LzopBlockSize*2)
+	testLzopRoundTrip(t, walg_lzo.LzopBlockSize*2, walg_lzo.LzopBlockSize*2)
 }
 func TestLzop1Byte(t *testing.T)   { testLzopRoundTrip(t, 7924, 1) }
 func TestLzop1MByte(t *testing.T)  { testLzopRoundTrip(t, 7924, 1024*1024) }
@@ -141,3 +142,9 @@ type BufferReaderMaker struct {
 
 func (b *BufferReaderMaker) Reader() (io.ReadCloser, error) { return ioutil.NopCloser(b.Buf), nil }
 func (b *BufferReaderMaker) Path() string                   { return b.Key }
+
+func init() {
+	internal.ConfigureSettings("")
+	internal.InitConfig()
+	internal.Configure()
+}
