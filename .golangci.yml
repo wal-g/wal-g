@@ -17,9 +17,12 @@ linters-settings:
       - experimental
       - opinionated
       - style
-    settings:
-      hugeParam:
-        sizeThreshold: 170 # temporary, default is 80
+    disabled-checks:
+      - hugeParam
+      - rangeValCopy
+    # settings:
+    #   hugeParam:
+    #     sizeThreshold: 170 # temporary, default is 80
   gocyclo:
     min-complexity: 15
   govet:
@@ -71,34 +74,20 @@ linters:
     - nakedret
     - revive
     - staticcheck
-    - structcheck
+    # - structcheck
     - typecheck
     - unconvert
     - unparam
     - unused
     - varcheck
     - lll
-  # - godox
     - deadcode
     - stylecheck
     - gosimple
     - whitespace
-  # don't enable:
-  # - gosec
-  # - gochecknoinits
-  # - asciicheck
-  # - gochecknoglobals
-  # - gocognit
-  # - godot
-  # - goerr113
-  # - maligned
-  # - nestif
-  # - prealloc
-  # - testpackage
-  # - wsl
-  # - depguard
 
 run:
+  go: 1.18
   timeout: 5m
   skip-dirs:
     - "cmd/redis"
