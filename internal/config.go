@@ -112,6 +112,7 @@ const (
 	GPSegmentsPollInterval = "WALG_GP_SEG_POLL_INTERVAL"
 	GPSegmentsPollRetries  = "WALG_GP_SEG_POLL_RETRIES"
 	GPSegmentsUpdInterval  = "WALG_GP_SEG_UPD_INTERVAL"
+	GPSegmentStatesDir     = "WALG_GP_SEG_STATES_DIR"
 
 	GoMaxProcs = "GOMAXPROCS"
 
@@ -195,6 +196,7 @@ var (
 		GPSegmentsPollInterval: "5m",
 		GPSegmentsUpdInterval:  "10s",
 		GPSegmentsPollRetries:  "5",
+		GPSegmentStatesDir:     "/tmp",
 	}
 
 	AllowedSettings map[string]bool
@@ -386,6 +388,7 @@ var (
 		GPSegmentsPollRetries:  true,
 		GPSegmentsPollInterval: true,
 		GPSegmentsUpdInterval:  true,
+		GPSegmentStatesDir:     true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
