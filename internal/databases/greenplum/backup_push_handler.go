@@ -331,6 +331,7 @@ func (bh *BackupHandler) handleBackupError() error {
 	return nil
 }
 
+// nolint:gocritic
 func (bh *BackupHandler) uploadSentinel(sentinelDto BackupSentinelDto) (err error) {
 	tracelog.InfoLogger.Println("Uploading sentinel file")
 	tracelog.InfoLogger.Println(sentinelDto.String())
