@@ -42,8 +42,9 @@ func (r *SegBackupRunner) Run() {
 		cmdArgs = append(cmdArgs, "--config", internal.CfgFile)
 	}
 
-	tracelog.ErrorLogger.FatalOnError(os.RemoveAll(stateFilesDirPath))
-	tracelog.ErrorLogger.FatalOnError(os.MkdirAll(stateFilesDirPath, os.ModePerm))
+	segBackupStatesPath := FormatSegmentStateFolderPath(r.contentID)
+	tracelog.ErrorLogger.FatalOnError(os.RemoveAll(segBackupStatesPath))
+	tracelog.ErrorLogger.FatalOnError(os.MkdirAll(segBackupStatesPath, os.ModePerm))
 
 	cmd := exec.Command(os.Args[0], cmdArgs...)
 	cmd.Env = os.Environ()
