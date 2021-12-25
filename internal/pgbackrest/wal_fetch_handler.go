@@ -2,12 +2,10 @@ package pgbackrest
 
 import (
 	"errors"
-	"fmt"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -33,8 +31,9 @@ func HandleWalFetch(folder storage.Folder, stanza string, walFileName string, lo
 	}
 
 	for _, file := range fileList {
-		if strings.HasPrefix(file.GetName(), walFileName) {
-			return internal.DownloadFileTo(walFolder, file.GetName(), location)
+		fileName := file.GetName()
+		if strings.HasPrefix(fileName, walFileName) {
+			return internal.DownloadFileTo(walFolder, strings.TrimSuffix(fileName, filepath.Ext(fileName)), location)
 		}
 	}
 

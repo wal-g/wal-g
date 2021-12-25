@@ -2,8 +2,6 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/pgbackrest"
 )
 
@@ -18,5 +16,5 @@ var pgbackrestWalFetchCmd = &cobra.Command{
 }
 
 func init() {
-	pgbackrestCmd.AddCommand(walFetchCmd)
+	pgbackrestCmd.AddCommand(pgbackrestWalFetchCmd)
 }
