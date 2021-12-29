@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/big"
 	"net/url"
 	"path"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -553,27 +553,34 @@ func RunOrReuseProxy(ctx context.Context, cancel context.CancelFunc, folder stor
 	return &LockWrapper{lock}, nil
 }
 
-func GetDBRestoreLSN(db *sql.DB, databaseName string) (uint64, error) {
+func GetDBRestoreLSN(db *sql.DB, databaseName string) (string, error) {
 	query := `SELECT MAX(redo_start_lsn) 
         FROM sys.master_files
         WHERE database_id=DB_ID(@dbname) `
-	var res uint64
+	var res string
 	if err := db.QueryRow(query, sql.Named("dbname", databaseName)).Scan(&res); err != nil {
-		return 0, err
+		return "0", err
 	}
 	return res, nil
 }
 
 func IsLogAlreadyApplied(db *sql.DB, databaseName string, logBackupFileProperties *BackupProperties) (bool, error) {
-	lastLSN, err := strconv.ParseUint(logBackupFileProperties.LastLSN, 10, 64)
-	if err != nil {
-		return false, err
-	}
 	dbRestoreLSN, err := GetDBRestoreLSN(db, databaseName)
 	if err != nil {
 		return false, err
 	}
-	if dbRestoreLSN < lastLSN {
+
+	dbRestoreLSN_int := new(big.Int)
+	dbRestoreLSN_int, ok := dbRestoreLSN_int.SetString(dbRestoreLSN, 10)
+	if !ok {
+		return false, xerrors.Errorf("dbRestoreLSN not recognized")
+	}
+	lastLSN_int := new(big.Int)
+	lastLSN_int, ok = lastLSN_int.SetString(logBackupFileProperties.LastLSN, 10)
+	if !ok {
+		return false, xerrors.Errorf("lastLSN not recognized")
+	}
+	if dbRestoreLSN_int.Cmp(lastLSN_int) == -1 {
 		return false, nil
 	}
 	return true, nil
