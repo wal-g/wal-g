@@ -569,18 +569,17 @@ func IsLogAlreadyApplied(db *sql.DB, databaseName string, logBackupFilePropertie
 	if err != nil {
 		return false, err
 	}
-
-	dbRestoreLSN_int := new(big.Int)
-	dbRestoreLSN_int, ok := dbRestoreLSN_int.SetString(dbRestoreLSN, 10)
+	dbRestoreLSNInt := new(big.Int)
+	dbRestoreLSNInt, ok := dbRestoreLSNInt.SetString(dbRestoreLSN, 10)
 	if !ok {
 		return false, xerrors.Errorf("dbRestoreLSN not recognized")
 	}
-	lastLSN_int := new(big.Int)
-	lastLSN_int, ok = lastLSN_int.SetString(logBackupFileProperties.LastLSN, 10)
+	lastLSNInt := new(big.Int)
+	lastLSNInt, ok = lastLSNInt.SetString(logBackupFileProperties.LastLSN, 10)
 	if !ok {
 		return false, xerrors.Errorf("lastLSN not recognized")
 	}
-	if dbRestoreLSN_int.Cmp(lastLSN_int) == -1 {
+	if dbRestoreLSNInt.Cmp(lastLSNInt) == -1 {
 		return false, nil
 	}
 	return true, nil
