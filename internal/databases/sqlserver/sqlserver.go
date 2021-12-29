@@ -553,11 +553,11 @@ func RunOrReuseProxy(ctx context.Context, cancel context.CancelFunc, folder stor
 	return &LockWrapper{lock}, nil
 }
 
-func GetDBRestoreLSN(db *sql.DB, databaseName string) (int64, error) {
+func GetDBRestoreLSN(db *sql.DB, databaseName string) (uint64, error) {
 	query := `SELECT MAX(redo_start_lsn) 
         FROM sys.master_files
         WHERE database_id=DB_ID(@dbname) `
-	var res int64
+	var res uint64
 	if err := db.QueryRow(query, sql.Named("dbname", databaseName)).Scan(&res); err != nil {
 		return 0, err
 	}
@@ -565,7 +565,7 @@ func GetDBRestoreLSN(db *sql.DB, databaseName string) (int64, error) {
 }
 
 func IsLogAlreadyApplied(db *sql.DB, databaseName string, logBackupFileProperties *BackupProperties) (bool, error) {
-	lastLSN, err := strconv.ParseInt(logBackupFileProperties.LastLSN, 10, 64)
+	lastLSN, err := strconv.ParseUint(logBackupFileProperties.LastLSN, 10, 64)
 	if err != nil {
 		return false, err
 	}
