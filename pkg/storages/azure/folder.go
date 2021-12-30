@@ -15,7 +15,6 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -59,7 +58,7 @@ func NewCredentialError(settingName string) storage.Error {
 func NewFolder(
 	uploadStreamToBlockBlobOptions azblob.UploadStreamToBlockBlobOptions,
 	containerClient azblob.ContainerClient,
-	credential azcore.Credential,
+	credential *azblob.SharedKeyCredential,
 	timeout time.Duration,
 	path string) *Folder {
 	return &Folder{
@@ -91,11 +90,9 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		environmentName = defaultEnvName
 	}
 
-	var credential azcore.Credential
+	var credential *azblob.SharedKeyCredential
 	var err error
-	if usingToken {
-		credential = azcore.NewAnonymousCredential()
-	} else {
+	if !usingToken {
 		credential, err = azblob.NewSharedKeyCredential(accountName, accountKey)
 		if err != nil {
 			return nil, NewFolderError(err, "Unable to create credentials")
@@ -111,6 +108,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 	} else {
 		tryTimeout = defaultTryTimeout
 	}
+	timeout := time.Duration(tryTimeout) * time.Minute
 
 	containerName, path, err := storage.GetPathFromPrefix(prefix)
 	if err != nil {
@@ -120,23 +118,28 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 	storageEndpointSuffix := getStorageEndpointSuffix(environmentName)
 
 	var containerUrlString string
+	var containerClient azblob.ContainerClient
 	if usingToken {
 		containerUrlString = fmt.Sprintf("https://%s.blob.%s/%s%s", accountName, storageEndpointSuffix, containerName, accountToken)
 		_, err = url.Parse(containerUrlString)
 		if err != nil {
 			return nil, NewFolderError(err, "Unable to parse service URL with SAS token")
 		}
+
+		containerClient, err = azblob.NewContainerClientWithNoCredential(containerUrlString, &azblob.ClientOptions{
+			Retry: policy.RetryOptions{TryTimeout: timeout},
+		})
 	} else {
 		containerUrlString = fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
 		_, err = url.Parse(containerUrlString)
 		if err != nil {
 			return nil, NewFolderError(err, "Unable to parse service URL")
 		}
+
+		containerClient, err = azblob.NewContainerClientWithSharedKey(containerUrlString, credential, &azblob.ClientOptions{
+			Retry: policy.RetryOptions{TryTimeout: timeout},
+		})
 	}
-	timeout := time.Duration(tryTimeout) * time.Minute
-	containerClient, err := azblob.NewContainerClient(containerUrlString, credential, &azblob.ClientOptions{
-		Retry: policy.RetryOptions{TryTimeout: timeout},
-	})
 	if err != nil {
 		return nil, NewFolderError(err, "Unable to create service client")
 	}
@@ -147,7 +150,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 type Folder struct {
 	uploadStreamToBlockBlobOptions azblob.UploadStreamToBlockBlobOptions
 	containerClient                azblob.ContainerClient
-	credential                     azcore.Credential
+	credential                     *azblob.SharedKeyCredential
 	timeout                        time.Duration
 	path                           string
 }
@@ -327,20 +330,20 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 		return nil, NewFolderError(err, "Unable to download blob %s.", path)
 	}
 
-	if cred, ok := folder.credential.(*azblob.SharedKeyCredential); ok {
+	if folder.credential != nil {
 		// Shared Key auth involves signing each request
 		if d := req.Header.Get("x-ms-data"); d == "" {
 			req.Header.Set("x-ms-date", time.Now().UTC().Format(http.TimeFormat))
 		}
-		stringToSign, stringErr := buildStringToSign(cred, req)
+		stringToSign, stringErr := buildStringToSign(folder.credential, req)
 		if stringErr != nil {
 			return nil, NewFolderError(stringErr, "Unable to sign request to sign blob %s.", path)
 		}
-		signature, sigErr := cred.ComputeHMACSHA256(stringToSign)
+		signature, sigErr := folder.credential.ComputeHMACSHA256(stringToSign)
 		if sigErr != nil {
 			return nil, NewFolderError(sigErr, "Unable to sign request to sign blob %s.", path)
 		}
-		req.Header.Set("Authorization", strings.Join([]string{"SharedKey ", cred.AccountName(), ":", signature}, ""))
+		req.Header.Set("Authorization", strings.Join([]string{"SharedKey ", folder.credential.AccountName(), ":", signature}, ""))
 	}
 
 	resp, err := httpClient.Do(req)
@@ -361,30 +364,12 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	return resp.Body, nil
 }
 
-// blobClient.UploadStreamToBlockBlob only requires an io.Reader
-// See https://github.com/Azure/azure-sdk-for-go/pull/15958
-type FakeIoReadSeekCloser struct {
-	reader io.Reader
-}
-
-func (ioReader FakeIoReadSeekCloser) Read(p []byte) (n int, err error) {
-	return ioReader.reader.Read(p)
-}
-
-func (ioReader FakeIoReadSeekCloser) Seek(offset int64, whence int) (int64, error) {
-	return 0, errors.New("FakeIoReadSeekCloser received Seek, only handles Read")
-}
-
-func (ioReader FakeIoReadSeekCloser) Close() error {
-	return errors.New("FakeIoReadSeekCloser received Close, only handles Read")
-}
-
 func (folder *Folder) PutObject(name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
 	//Upload content to a block blob using full path
 	path := storage.JoinPath(folder.path, name)
 	blobClient := folder.containerClient.NewBlockBlobClient(path)
-	_, err := blobClient.UploadStreamToBlockBlob(context.Background(), FakeIoReadSeekCloser{reader:content}, folder.uploadStreamToBlockBlobOptions)
+	_, err := blobClient.UploadStreamToBlockBlob(context.Background(), content, folder.uploadStreamToBlockBlobOptions)
 	if err != nil {
 		return NewFolderError(err, "Unable to upload blob %v", name)
 	}
