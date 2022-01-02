@@ -287,6 +287,8 @@ type BufferReaderMaker struct {
 
 func (b *BufferReaderMaker) Reader() (io.ReadCloser, error) { return io.NopCloser(b.Buf), nil }
 func (b *BufferReaderMaker) Path() string                   { return b.Key }
+func (b *BufferReaderMaker) FileType() internal.FileType    { return internal.TarFileType }
+func (b *BufferReaderMaker) Mode() int                      { return 0 }
 
 type NOPSleeper struct{}
 

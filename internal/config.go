@@ -136,6 +136,8 @@ const (
 
 	YcKmsKeyIDSetting  = "YC_CSE_KMS_KEY_ID"
 	YcSaKeyFileSetting = "YC_SERVICE_ACCOUNT_KEY_FILE"
+
+	PgBackRestStanza = "PGBACKREST_STANZA"
 )
 
 var (
@@ -187,7 +189,8 @@ var (
 	}
 
 	PGDefaultSettings = map[string]string{
-		PgWalSize: "16",
+		PgWalSize:        "16",
+		PgBackRestStanza: "main",
 	}
 
 	GPDefaultSettings = map[string]string{
@@ -334,6 +337,7 @@ var (
 		"PGPASSFILE":      true,
 		PrefetchDir:       true,
 		PgReadyRename:     true,
+		PgBackRestStanza:  true,
 	}
 
 	MongoAllowedSettings = map[string]bool{

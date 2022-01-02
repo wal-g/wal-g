@@ -95,6 +95,20 @@ func extractOne(tarInterpreter TarInterpreter, source io.Reader) error {
 	return nil
 }
 
+func extractNonTar(tarInterpreter TarInterpreter, source io.Reader, path string, fileType FileType, mode int) error {
+	var typeFlag byte
+	if fileType == RegularFileType {
+		typeFlag = tar.TypeReg
+	} else {
+		typeFlag = tar.TypeDir
+	}
+	return tarInterpreter.Interpret(source, &tar.Header{
+		Name:     path,
+		Mode:     int64(mode),
+		Typeflag: typeFlag,
+	})
+}
+
 // DecryptAndDecompressTar decrypts file and checks its extension.
 // If it's tar, a decompression is not needed.
 // Otherwise it uses corresponding decompressor. If none found an error will be returned.
@@ -156,6 +170,23 @@ func ExtractAllWithSleeper(tarInterpreter TarInterpreter, files []ReaderMaker, s
 	return nil
 }
 
+func extractFile(tarInterpreter TarInterpreter, extractingReader io.Reader, fileClosure ReaderMaker) error {
+	switch fileClosure.FileType() {
+	case TarFileType:
+		err := extractOne(tarInterpreter, extractingReader)
+		if err == nil {
+			err = readTrailingZeros(extractingReader)
+		}
+		return err
+	case RegularFileType:
+		filePath := utility.TrimFileExtension(fileClosure.Path())
+		return extractNonTar(tarInterpreter, extractingReader, filePath, fileClosure.FileType(), fileClosure.Mode())
+	default:
+		tracelog.InfoLogger.Print()
+		return errors.New("Unknown fileType " + string(fileClosure.FileType()))
+	}
+}
+
 // TODO : unit tests
 func tryExtractFiles(files []ReaderMaker,
 	tarInterpreter TarInterpreter,
@@ -185,11 +216,7 @@ func tryExtractFiles(files []ReaderMaker,
 				extractingReader, err = DecryptAndDecompressTar(readCloser, filePath, crypter)
 				if err == nil {
 					defer extractingReader.Close()
-
-					err = extractOne(tarInterpreter, extractingReader)
-					if err == nil {
-						err = readTrailingZeros(extractingReader)
-					}
+					err = extractFile(tarInterpreter, extractingReader, fileClosure)
 					err = errors.Wrapf(err, "Extraction error in %s", filePath)
 					tracelog.InfoLogger.Printf("Finished extraction of %s", filePath)
 				}
