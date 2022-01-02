@@ -559,6 +559,24 @@ services:
     links:
       - s3
 
+  pg_pgbackrest:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_pgbackrest
+      context: .
+    image: wal-g/docker_pgbackrest
+    container_name: wal-g_docker_pgbackrest
+
+  pg_pgbackrest_backup_fetch_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_pgbackrest_backup_fetch_test
+      context: .
+    image: wal-g/pgbackrest_backup_fetch_test
+    container_name: wal-g_pgbackrest_backup_fetch_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   mysql:
     build:
       dockerfile: docker/mysql/Dockerfile

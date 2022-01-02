@@ -59,6 +59,9 @@ pg_integration_test:
 	else\
 		docker load -i ${CACHE_FILE_DOCKER_PREFIX};\
 	fi
+	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
+		docker-compose build pg_pgbackrest;\
+	fi
 	docker-compose build $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
 
