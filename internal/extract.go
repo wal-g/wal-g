@@ -75,7 +75,7 @@ var _ io.Writer = &DevNullWriter{}
 
 // TODO : unit tests
 // Extract exactly one tar bundle.
-func extractOne(tarInterpreter TarInterpreter, source io.Reader) error {
+func extractOneTar(tarInterpreter TarInterpreter, source io.Reader) error {
 	tarReader := tar.NewReader(source)
 
 	for {
@@ -170,10 +170,13 @@ func ExtractAllWithSleeper(tarInterpreter TarInterpreter, files []ReaderMaker, s
 	return nil
 }
 
+// Extract single file from backup
+// If it is .tar file unpack it and store internal files (there will be .tar file if you work with wal-g backup)
+// Otherwise store this file (there will be regular file if you work with pgbackrest backup)
 func extractFile(tarInterpreter TarInterpreter, extractingReader io.Reader, fileClosure ReaderMaker) error {
 	switch fileClosure.FileType() {
 	case TarFileType:
-		err := extractOne(tarInterpreter, extractingReader)
+		err := extractOneTar(tarInterpreter, extractingReader)
 		if err == nil {
 			err = readTrailingZeros(extractingReader)
 		}
