@@ -18,6 +18,7 @@ func testInterpret(t *testing.T,
 
 	tarInterpreter := &postgres.FileTarInterpreter{
 		DBDataDirectory: dbDataDirectory,
+		UnwrapResult: postgres.NewUnwrapResult(),
 	}
 
 	err := create(name)

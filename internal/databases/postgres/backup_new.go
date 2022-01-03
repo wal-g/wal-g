@@ -27,7 +27,7 @@ type UnwrapResult struct {
 	writtenIncrementFilesMutex sync.Mutex
 }
 
-func newUnwrapResult() *UnwrapResult {
+func NewUnwrapResult() *UnwrapResult {
 	return &UnwrapResult{make([]string, 0), sync.Mutex{},
 		make(map[string]int64), sync.Mutex{},
 		make(map[string]int64), sync.Mutex{}}

@@ -31,7 +31,7 @@ func NewFileTarInterpreter(
 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
 ) *FileTarInterpreter {
 	return &FileTarInterpreter{dbDataDirectory, sentinel, filesMetadata,
-		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles}
+		filesToUnwrap, NewUnwrapResult(), createNewIncrementalFiles}
 }
 
 // Interpret extracts a tar file to disk and creates needed directories.
