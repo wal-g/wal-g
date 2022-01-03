@@ -11,9 +11,6 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
-// temporary flag is used in tar interpreter to determine if it should use new unwrap logic
-var useNewUnwrapImplementation = false
-
 // UnwrapResult stores information about
 // the result of single backup unwrap operation
 type UnwrapResult struct {
@@ -70,7 +67,6 @@ func checkDBDirectoryForUnwrapNew(dbDataDirectory string, sentinelDto BackupSent
 func (backup *Backup) unwrapNew(
 	dbDataDirectory string, sentinelDto BackupSentinelDto, filesMetaDto FilesMetadataDto, filesToUnwrap map[string]bool,
 	createIncrementalFiles, skipRedundantTars bool) (*UnwrapResult, error) {
-	useNewUnwrapImplementation = true
 	err := checkDBDirectoryForUnwrapNew(dbDataDirectory, sentinelDto, filesMetaDto)
 	if err != nil {
 		return nil, err
