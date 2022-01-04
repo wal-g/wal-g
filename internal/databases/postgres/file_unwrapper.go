@@ -84,12 +84,7 @@ func (u *BackupFileUnwrapper) clearLocalFile(file *os.File) error {
 func (u *BackupFileUnwrapper) writeLocalFile(fileReader io.Reader, header *tar.Header, localFile *os.File, fsync bool) error {
 	_, err := io.Copy(localFile, fileReader)
 	if err != nil {
-		err1 := localFile.Close()
-		if err1 != nil {
-			tracelog.ErrorLogger.Printf("Interpret: failed to close localFile '%s' because of error: %v",
-				localFile.Name(), err1)
-		}
-		err1 = os.Remove(localFile.Name())
+		err1 := os.Remove(localFile.Name())
 		if err1 != nil {
 			tracelog.ErrorLogger.Fatalf("Interpret: failed to remove localFile '%s' because of error: %v",
 				localFile.Name(), err1)
@@ -98,7 +93,7 @@ func (u *BackupFileUnwrapper) writeLocalFile(fileReader io.Reader, header *tar.H
 	}
 
 	mode := os.FileMode(header.Mode)
-	if err = os.Chmod(localFile.Name(), mode); err != nil {
+	if err = localFile.Chmod(mode); err != nil {
 		return errors.Wrap(err, "Interpret: chmod failed")
 	}
 
