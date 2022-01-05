@@ -13,6 +13,16 @@ type CatchupFileUnwrapper struct {
 	BackupFileUnwrapper
 }
 
+// truncate local file and set reader offset to zero
+func clearLocalFile(file *os.File) error {
+	err := file.Truncate(0)
+	if err != nil {
+		return err
+	}
+	_, err = file.Seek(0, 0)
+	return err
+}
+
 func (u *CatchupFileUnwrapper) UnwrapNewFile(reader io.Reader, header *tar.Header,
 	file *os.File, fsync bool) (*FileUnwrapResult, error) {
 	if u.options.isIncremented {
@@ -26,7 +36,7 @@ func (u *CatchupFileUnwrapper) UnwrapNewFile(reader io.Reader, header *tar.Heade
 		}
 		return NewCreatedFromIncrementResult(missingBlockCount), nil
 	}
-	err := u.writeLocalFile(reader, header, file, fsync)
+	err := WriteLocalFile(reader, header, file, fsync)
 	if err != nil {
 		return nil, err
 	}
@@ -48,11 +58,11 @@ func (u *CatchupFileUnwrapper) UnwrapExistingFile(reader io.Reader, header *tar.
 	}
 
 	// clear the local file because there is a newer version for it
-	err := u.clearLocalFile(file)
+	err := clearLocalFile(file)
 	if err != nil {
 		return nil, err
 	}
-	err = u.writeLocalFile(reader, header, file, fsync)
+	err = WriteLocalFile(reader, header, file, fsync)
 	if err != nil {
 		return nil, err
 	}

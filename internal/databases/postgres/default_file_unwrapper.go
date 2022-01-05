@@ -26,7 +26,7 @@ func (u *DefaultFileUnwrapper) UnwrapNewFile(reader io.Reader, header *tar.Heade
 		}
 		return NewCreatedFromIncrementResult(missingBlockCount), nil
 	}
-	err := u.writeLocalFile(reader, header, file, fsync)
+	err := WriteLocalFile(reader, header, file, fsync)
 	if err != nil {
 		return nil, err
 	}
