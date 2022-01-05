@@ -57,7 +57,7 @@ func DownloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 		}
 		defer utility.LoggedClose(decompressedReader, "")
 
-		_, err = utility.FastCopy(&EmptyWriteIgnorer{WriteCloser: writeCloser}, decompressedReader)
+		_, err = utility.FastCopy(&utility.EmptyWriteIgnorer{Writer: writeCloser}, decompressedReader)
 		if err != nil {
 			return fmt.Errorf("failed to decompress and decrypt file: %w", err)
 		}
@@ -83,7 +83,7 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 	}
 
 	errorsPerWorker := make([]chan error, 0)
-	writers := splitmerge.MergeWriter(EmptyWriteIgnorer{WriteCloser: writeCloser}, partitions, blockSize)
+	writers := splitmerge.MergeWriter(utility.EmptyWriteIgnorer{Writer: writeCloser}, partitions, blockSize)
 
 	for i := 0; i < partitions; i++ {
 		fileName := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), i)

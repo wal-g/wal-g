@@ -107,8 +107,12 @@ const (
 
 	RedisPassword = "WALG_REDIS_PASSWORD"
 
-	GPLogsDirectory = "WALG_GP_LOGS_DIR"
-	GPSegContentID  = "WALG_GP_SEG_CONTENT_ID"
+	GPLogsDirectory        = "WALG_GP_LOGS_DIR"
+	GPSegContentID         = "WALG_GP_SEG_CONTENT_ID"
+	GPSegmentsPollInterval = "WALG_GP_SEG_POLL_INTERVAL"
+	GPSegmentsPollRetries  = "WALG_GP_SEG_POLL_RETRIES"
+	GPSegmentsUpdInterval  = "WALG_GP_SEG_UPD_INTERVAL"
+	GPSegmentStatesDir     = "WALG_GP_SEG_STATES_DIR"
 
 	GoMaxProcs = "GOMAXPROCS"
 
@@ -187,8 +191,12 @@ var (
 	}
 
 	GPDefaultSettings = map[string]string{
-		GPLogsDirectory: "",
-		PgWalSize:       "64",
+		GPLogsDirectory:        "/var/log",
+		PgWalSize:              "64",
+		GPSegmentsPollInterval: "5m",
+		GPSegmentsUpdInterval:  "10s",
+		GPSegmentsPollRetries:  "5",
+		GPSegmentStatesDir:     "/tmp",
 	}
 
 	AllowedSettings map[string]bool
@@ -375,8 +383,12 @@ var (
 	}
 
 	GPAllowedSettings = map[string]bool{
-		GPLogsDirectory: true,
-		GPSegContentID:  true,
+		GPLogsDirectory:        true,
+		GPSegContentID:         true,
+		GPSegmentsPollRetries:  true,
+		GPSegmentsPollInterval: true,
+		GPSegmentsUpdInterval:  true,
+		GPSegmentStatesDir:     true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
@@ -668,8 +680,6 @@ func FolderFromConfig(configFile string) (storage.Folder, error) {
 	SetDefaultValues(config)
 	ReadConfigFromFile(config, configFile)
 	CheckAllowedSettings(config)
-
-	bindConfigToEnv(config)
 
 	var folder, err = ConfigureFolderForSpecificConfig(config)
 

@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
@@ -157,15 +156,18 @@ func TestDecryptAndDecompressTar_unencrypted(t *testing.T) {
 
 	compressedBuffer := &bytes.Buffer{}
 	_, _ = compressedBuffer.ReadFrom(compressed)
-	brm := &BufferReaderMaker{compressedBuffer, "/usr/local/test.tar.lz4"}
 
-	decompressed := &bytes.Buffer{}
-	err := internal.DecryptAndDecompressTar(decompressed, brm, nil)
-
+	reader, err := internal.DecryptAndDecompressTar(compressedBuffer, "/usr/local/test.tar.lz4", nil)
 	if err != nil {
 		t.Logf("%+v\n", err)
 	}
-	assert.Equalf(t, bCopy, decompressed.Bytes(), "decompressed tar does not match the input")
+
+	decompressed, readErr := io.ReadAll(reader)
+	if readErr != nil {
+		t.Logf("%+v\n", readErr)
+	}
+
+	assert.Equalf(t, bCopy, decompressed, "decompressed tar does not match the input")
 }
 
 func TestDecryptAndDecompressTar_encrypted(t *testing.T) {
@@ -180,17 +182,17 @@ func TestDecryptAndDecompressTar_encrypted(t *testing.T) {
 	compressor := GetLz4Compressor()
 	compressed := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
 
-	compressedBuffer, _ := io.ReadAll(compressed)
-	brm := &BufferReaderMaker{bytes.NewBuffer(compressedBuffer), "/usr/local/test.tar.lz4"}
-
-	decompressed := &bytes.Buffer{}
-	err := internal.DecryptAndDecompressTar(decompressed, brm, crypter)
-
+	reader, err := internal.DecryptAndDecompressTar(compressed, "/usr/local/test.tar.lz4", crypter)
 	if err != nil {
 		t.Logf("%+v\n", err)
 	}
 
-	assert.Equalf(t, bCopy, decompressed.Bytes(), "decompressed tar does not match the input")
+	decompressed, readErr := io.ReadAll(reader)
+	if readErr != nil {
+		t.Logf("%+v\n", readErr)
+	}
+
+	assert.Equalf(t, bCopy, decompressed, "decompressed tar does not match the input")
 }
 
 func TestDecryptAndDecompressTar_noCrypter(t *testing.T) {
@@ -205,19 +207,17 @@ func TestDecryptAndDecompressTar_noCrypter(t *testing.T) {
 	compressor := GetLz4Compressor()
 	compressed := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
 
-	compressedBuffer, _ := io.ReadAll(compressed)
-	brm := &BufferReaderMaker{bytes.NewBuffer(compressedBuffer), "/usr/local/test.tar.lz4"}
-
-	decompressed := &bytes.Buffer{}
-	err := internal.DecryptAndDecompressTar(decompressed, brm, nil)
-
+	reader, err := internal.DecryptAndDecompressTar(compressed, "/usr/local/test.tar.lz4", nil)
 	if err != nil {
 		t.Logf("%+v\n", err)
 	}
 
-	assert.Error(t, err)
-	originalError := errors.Cause(err)
-	assert.IsType(t, internal.DecompressionError{}, originalError)
+	_, readErr := io.ReadAll(reader)
+	if readErr != nil {
+		t.Logf("%+v\n", readErr)
+	}
+
+	assert.Error(t, readErr)
 }
 
 func TestDecryptAndDecompressTar_wrongCrypter(t *testing.T) {
@@ -232,15 +232,12 @@ func TestDecryptAndDecompressTar_wrongCrypter(t *testing.T) {
 	compressor := GetLz4Compressor()
 	compressed := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
 
-	compressedBuffer, _ := io.ReadAll(compressed)
-	brm := &BufferReaderMaker{bytes.NewBuffer(compressedBuffer), "/usr/local/test.tar.lzma"}
-
-	decompressed := &bytes.Buffer{}
-	err := internal.DecryptAndDecompressTar(decompressed, brm, crypter)
+	_, err := internal.DecryptAndDecompressTar(compressed, "/usr/local/test.tar.lzma", crypter)
+	if err != nil {
+		t.Logf("%+v\n", err)
+	}
 
 	assert.Error(t, err)
-	originalError := errors.Cause(err)
-	assert.IsType(t, internal.DecompressionError{}, originalError)
 }
 
 func TestDecryptAndDecompressTar_unknownFormat(t *testing.T) {
@@ -250,11 +247,7 @@ func TestDecryptAndDecompressTar_unknownFormat(t *testing.T) {
 	bCopy := make([]byte, len(b))
 	copy(bCopy, b)
 
-	brm := &BufferReaderMaker{bytes.NewBuffer(b), "/usr/local/test.some_unsupported_file_format"}
-
-	decompressed := &bytes.Buffer{}
-	err := internal.DecryptAndDecompressTar(decompressed, brm, nil)
-
+	_, err := internal.DecryptAndDecompressTar(bytes.NewBuffer(b), "/usr/local/test.some_unsupported_file_format", nil)
 	if err != nil {
 		t.Logf("%+v\n", err)
 	}
@@ -272,15 +265,18 @@ func TestDecryptAndDecompressTar_uncompressed(t *testing.T) {
 
 	compressedBuffer := &bytes.Buffer{}
 	_, _ = compressedBuffer.ReadFrom(compressed)
-	brm := &BufferReaderMaker{compressedBuffer, "/usr/local/test.tar"}
 
-	decompressed := &bytes.Buffer{}
-	err := internal.DecryptAndDecompressTar(decompressed, brm, nil)
-
+	reader, err := internal.DecryptAndDecompressTar(compressedBuffer, "/usr/local/test.tar", nil)
 	if err != nil {
 		t.Logf("%+v\n", err)
 	}
-	assert.Equalf(t, bCopy, decompressed.Bytes(), "decompressed tar does not match the input")
+
+	decompressed, readErr := io.ReadAll(reader)
+	if readErr != nil {
+		t.Logf("%+v\n", err)
+	}
+
+	assert.Equalf(t, bCopy, decompressed, "decompressed tar does not match the input")
 }
 
 // Used to mock files in memory.

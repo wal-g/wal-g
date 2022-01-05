@@ -53,7 +53,7 @@ func DownloadFile(folder storage.Folder, filename, ext string, writeCloser io.Wr
 	}
 	defer utility.LoggedClose(decompressedReader, "")
 
-	_, err = utility.FastCopy(&EmptyWriteIgnorer{WriteCloser: writeCloser}, decompressedReader)
+	_, err = utility.FastCopy(&utility.EmptyWriteIgnorer{Writer: writeCloser}, decompressedReader)
 	return err
 }
 

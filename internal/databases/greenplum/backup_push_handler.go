@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/viper"
+
 	"github.com/google/uuid"
 
 	"github.com/blang/semver"
@@ -21,8 +23,9 @@ import (
 )
 
 const (
-	BackupNamePrefix = "backup_"
-	BackupNameLength = 23 // len(BackupNamePrefix) + len(utility.BackupTimeFormat)
+	BackupNamePrefix   = "backup_"
+	BackupNameLength   = 23 // len(BackupNamePrefix) + len(utility.BackupTimeFormat)
+	SegBackupLogPrefix = "wal-g-log"
 )
 
 // BackupArguments holds all arguments parsed from cmd to this handler class
@@ -31,6 +34,9 @@ type BackupArguments struct {
 	userData       interface{}
 	segmentFwdArgs []SegmentFwdArg
 	logsDir        string
+
+	segPollInterval time.Duration
+	segPollRetries  int
 }
 
 type SegmentUserData struct {
@@ -94,17 +100,31 @@ func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 	segment := bh.globalCluster.ByContent[contentID][0]
 	segUserData := NewSegmentUserData()
 	bh.currBackupInfo.segmentBackups[segUserData.ID] = segment
-	cmd := []string{
-		fmt.Sprintf("PGPORT=%d", segment.Port),
-		"wal-g seg",
-		fmt.Sprintf("backup-push %s", segment.DataDir),
-		fmt.Sprintf("--content-id=%d", segment.ContentID),
-		fmt.Sprintf("--add-user-data=%s", segUserData.QuotedString()),
-		fmt.Sprintf("--config=%s", internal.CfgFile),
+
+	backupPushArgs := []string{
+		segment.DataDir,
+		fmt.Sprintf("--add-user-data=%s", segUserData.String()),
+		fmt.Sprintf("--pgport=%d", segment.Port),
 	}
 
 	for _, arg := range bh.arguments.segmentFwdArgs {
-		cmd = append(cmd, fmt.Sprintf("--%s=%s", arg.Name, arg.Value))
+		backupPushArgs = append(backupPushArgs, fmt.Sprintf("--%s=%s", arg.Name, arg.Value))
+	}
+
+	backupPushArgsLine := "'" + strings.Join(backupPushArgs, " ") + "'"
+
+	cmd := []string{
+		// nohup to avoid the SIGHUP on SSH session disconnect
+		"nohup", "wal-g seg-backup-push",
+		fmt.Sprintf("--content-id=%d", segment.ContentID),
+		// name of the current backup to format the state file name
+		bh.currBackupInfo.backupName,
+		// actual arguments to be passed to the backup-push command
+		backupPushArgsLine,
+		// pass the config file location
+		fmt.Sprintf("--config=%s", internal.CfgFile),
+		// forward STDOUT& STDERR to log file
+		">>", formatSegmentLogPath(contentID), "2>&1 &",
 	}
 
 	cmdLine := strings.Join(cmd, " ")
@@ -133,10 +153,16 @@ func (bh *BackupHandler) HandleBackupPush() {
 		return "Unable to run wal-g"
 	}, true)
 
+	// wait for segments to complete their backups
+	waitBackupsErr := bh.waitSegmentBackups()
+	if waitBackupsErr != nil {
+		tracelog.ErrorLogger.Printf("Segment backups wait error: %v", waitBackupsErr)
+	}
+
 	tracelog.ErrorLogger.FatalfOnError("Failed to connect to the greenplum master: %v",
 		bh.connect())
 
-	if remoteOutput.NumErrors > 0 {
+	if remoteOutput.NumErrors > 0 || waitBackupsErr != nil {
 		// handle the backup failure and exit
 		err := bh.handleBackupError()
 		if err != nil {
@@ -164,6 +190,96 @@ func (bh *BackupHandler) HandleBackupPush() {
 	}
 	tracelog.InfoLogger.Printf("Backup %s successfully created", bh.currBackupInfo.backupName)
 	bh.disconnect()
+}
+
+func (bh *BackupHandler) waitSegmentBackups() error {
+	ticker := time.NewTicker(bh.arguments.segPollInterval)
+	retryCount := bh.arguments.segPollRetries
+	for {
+		<-ticker.C
+		states, err := bh.pollSegmentStates()
+		if err != nil {
+			if retryCount == 0 {
+				return fmt.Errorf("gave up polling the backup-push states (tried %d times): %v", bh.arguments.segPollRetries, err)
+			}
+			retryCount--
+			tracelog.WarningLogger.Printf("failed to poll segment backup-push states, will try again %d more times", retryCount)
+			continue
+		}
+		// reset retries after the successful poll
+		retryCount = bh.arguments.segPollRetries
+
+		runningBackups, err := checkBackupStates(states)
+		if err != nil {
+			return err
+		}
+
+		if runningBackups == 0 {
+			tracelog.InfoLogger.Printf("No running backups left.")
+			return nil
+		}
+	}
+}
+
+func checkBackupStates(states map[int]SegBackupState) (int, error) {
+	runningBackupsCount := 0
+
+	tracelog.InfoLogger.Printf("backup-push states:")
+	for contentID, state := range states {
+		tracelog.InfoLogger.Printf("content ID: %d, status: %s, ts: %s", contentID, state.Status, state.TS)
+	}
+
+	for contentID, state := range states {
+		switch state.Status {
+		case RunningBackupStatus:
+			// give up if the heartbeat ts is too old
+			if state.TS.Add(15 * time.Minute).Before(time.Now()) {
+				return 0, fmt.Errorf("giving up waiting for segment %d: last seen on %s", contentID, state.TS)
+			}
+			runningBackupsCount++
+
+		case FailedBackupStatus:
+			return 0, fmt.Errorf("backup failed on segment %d at %s", contentID, state.TS)
+		}
+	}
+
+	return runningBackupsCount, nil
+}
+
+func (bh *BackupHandler) pollSegmentStates() (map[int]SegBackupState, error) {
+	segmentStates := make(map[int]SegBackupState)
+	remoteOutput := bh.globalCluster.GenerateAndExecuteCommand("Polling the segment backup-push statuses...",
+		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_MASTER,
+		func(contentID int) string {
+			cmd := fmt.Sprintf("cat %s", FormatBackupStatePath(contentID, bh.currBackupInfo.backupName))
+			tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
+			return cmd
+		})
+
+	bh.globalCluster.CheckClusterError(remoteOutput, "Unable to poll segment backup-push states", func(contentID int) string {
+		return fmt.Sprintf("Unable to poll backup-push state on segment %d", contentID)
+	}, true)
+
+	for _, command := range remoteOutput.Commands {
+		tracelog.InfoLogger.Printf("Poll segment backup-push state STDERR (segment %d):\n%s\n", command.Content, command.Stderr)
+		tracelog.InfoLogger.Printf("Poll segment backup-push state STDOUT (segment %d):\n%s\n", command.Content, command.Stdout)
+	}
+
+	if remoteOutput.NumErrors > 0 {
+		return nil, fmt.Errorf("encountered one or more errors during the polling. See %s for a complete list of errors",
+			gplog.GetLogFilePath())
+	}
+
+	for _, command := range remoteOutput.Commands {
+		backupState := SegBackupState{}
+		err := json.Unmarshal([]byte(command.Stdout), &backupState)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal state JSON file: %v", err)
+		}
+		segmentStates[command.Content] = backupState
+	}
+
+	return segmentStates, nil
 }
 
 func (bh *BackupHandler) checkPrerequisites() (err error) {
@@ -215,6 +331,7 @@ func (bh *BackupHandler) handleBackupError() error {
 	return nil
 }
 
+// nolint:gocritic
 func (bh *BackupHandler) uploadSentinel(sentinelDto BackupSentinelDto) (err error) {
 	tracelog.InfoLogger.Println("Uploading sentinel file")
 	tracelog.InfoLogger.Println(sentinelDto.String())
@@ -318,12 +435,15 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 }
 
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
-func NewBackupArguments(isPermanent bool, userData interface{}, fwdArgs []SegmentFwdArg, logsDir string) BackupArguments {
+func NewBackupArguments(isPermanent bool, userData interface{}, fwdArgs []SegmentFwdArg, logsDir string,
+	segPollInterval time.Duration, segPollRetries int) BackupArguments {
 	return BackupArguments{
-		isPermanent:    isPermanent,
-		userData:       userData,
-		segmentFwdArgs: fwdArgs,
-		logsDir:        logsDir,
+		isPermanent:     isPermanent,
+		userData:        userData,
+		segmentFwdArgs:  fwdArgs,
+		logsDir:         logsDir,
+		segPollInterval: segPollInterval,
+		segPollRetries:  segPollRetries,
 	}
 }
 
@@ -383,4 +503,9 @@ func (bh *BackupHandler) fetchSingleMetadata(backupID string, segCfg *cluster.Se
 	}
 
 	return &meta, nil
+}
+
+func formatSegmentLogPath(contentID int) string {
+	logsDir := viper.GetString(internal.GPLogsDirectory)
+	return fmt.Sprintf("%s/%s-seg%d", logsDir, SegBackupLogPrefix, contentID)
 }

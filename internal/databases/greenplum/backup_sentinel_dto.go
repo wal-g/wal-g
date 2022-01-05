@@ -15,6 +15,8 @@ import (
 
 type SegmentRole string
 
+const MetadataDatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
+
 const (
 	Primary SegmentRole = "p"
 	Mirror  SegmentRole = "m"
@@ -72,6 +74,7 @@ type BackupSentinelDto struct {
 
 	StartTime        time.Time `json:"start_time"`
 	FinishTime       time.Time `json:"finish_time"`
+	DatetimeFormat   string    `json:"date_fmt,omitempty"`
 	Hostname         string    `json:"hostname"`
 	GpVersion        string    `json:"gp_version"`
 	IsPermanent      bool      `json:"is_permanent"`
@@ -103,6 +106,7 @@ func NewBackupSentinelDto(currBackupInfo CurrBackupInfo, restoreLSNs map[int]str
 		UserData:         userData,
 		StartTime:        currBackupInfo.startTime,
 		FinishTime:       utility.TimeNowCrossPlatformUTC(),
+		DatetimeFormat:   MetadataDatetimeFormat,
 		Hostname:         hostname,
 		GpVersion:        currBackupInfo.gpVersion.String(),
 		IsPermanent:      isPermanent,

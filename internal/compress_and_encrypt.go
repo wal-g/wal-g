@@ -42,7 +42,7 @@ func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, cry
 
 	var compressedWriter io.WriteCloser
 	if compressor != nil {
-		writeIgnorer := &EmptyWriteIgnorer{writeCloser}
+		writeIgnorer := &utility.EmptyWriteIgnorer{Writer: writeCloser}
 		compressedWriter = compressor.NewWriter(writeIgnorer)
 	} else {
 		compressedWriter = writeCloser

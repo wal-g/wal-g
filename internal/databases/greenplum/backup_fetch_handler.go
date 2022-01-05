@@ -55,6 +55,7 @@ type FetchHandler struct {
 	fetchMode           BackupFetchMode
 }
 
+// nolint:gocritic
 func NewFetchHandler(
 	backup internal.Backup, sentinel BackupSentinelDto,
 	segCfgMaker SegConfigMaker, logsDir string,
