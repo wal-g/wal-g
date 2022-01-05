@@ -96,7 +96,12 @@ func HandleWALFetch(folder storage.Folder, walFileName string, location string, 
 	}
 
 	err := internal.DownloadFileTo(folder, walFileName, location)
-	tracelog.ErrorLogger.FatalOnError(err)
+	if _, isArchNonExistErr := err.(internal.ArchiveNonExistenceError); isArchNonExistErr {
+		tracelog.ErrorLogger.Print(err.Error())
+		os.Exit(74)
+	} else {
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
 }
 
 // TODO : unit tests
