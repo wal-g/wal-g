@@ -7,7 +7,7 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-const pgbackrestCommandDescription = "Work with pgbackrest backups"
+const pgbackrestCommandDescription = "Interact with pgbackrest backups"
 
 var pgbackrestCmd = &cobra.Command{
 	Use:   "pgbackrest",

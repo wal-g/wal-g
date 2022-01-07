@@ -510,6 +510,8 @@ Usage:
 wal-g wal-purge
 ```
 
+pgBackRest backups support
+-----------
 ### ``pgbackrest backup-list``
 
 List pgbackrest backups.
