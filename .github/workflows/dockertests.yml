@@ -124,6 +124,7 @@ jobs:
                    'make MYSQL_TEST=mysql_copy_tests mysql_integration_test',
                    'make gp_test',
                    'make st_test',
+                   'make TEST="pg_pgbackrest_backup_fetch_test" pg_integration_test'
       ]
       # do not cancel all tests if one failed
       fail-fast: false

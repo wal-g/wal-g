@@ -11,12 +11,15 @@ RUN apt-get update && \
     pinentry-qt \
     time \
     bc \
-    jq
+    jq \
+    s3cmd
 
 COPY docker/pg/PGP_KEY /tmp/PGP_KEY
 COPY docker/pg/SSH_KEY /tmp/SSH_KEY
 COPY docker/pg/gpg.conf /var/lib/postgresql/.gnupg/gpg.conf
 COPY docker/pg/gpg-agent.conf /var/lib/postgresql/.gnupg/gpg-agent.conf
+
+COPY docker/common/s3cfg /var/lib/postgresql/.s3cfg
 
 COPY docker/pg/walg.json /tmp/walg.json
 

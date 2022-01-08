@@ -1,0 +1,2 @@
+"WALG_S3_PREFIX": "s3://pgbackrest-backups",
+"PGBACKREST_STANZA": "main"

@@ -3,6 +3,8 @@ package testtools
 import (
 	"io"
 	"os"
+
+	"github.com/wal-g/wal-g/internal"
 )
 
 // FileReaderMaker decompresses lzop tarballs from
@@ -21,4 +23,12 @@ func (f *FileReaderMaker) Reader() (io.ReadCloser, error) {
 	}
 
 	return r, nil
+}
+
+func (f *FileReaderMaker) FileType() internal.FileType {
+	return internal.TarFileType
+}
+
+func (f *FileReaderMaker) Mode() int {
+	return 0
 }

@@ -509,3 +509,23 @@ Usage:
 ```bash
 wal-g wal-purge
 ```
+
+pgBackRest backups support
+-----------
+### ``pgbackrest backup-list``
+
+List pgbackrest backups.
+
+Usage:
+```bash
+wal-g pgbackrest backup-list [--pretty] [--json] [--detail]
+```
+
+### ``pgbackrest backup-fetch``
+
+Fetch pgbackrest backup. For now works only with full backups, incr and diff backups are not supported.
+
+Usage:
+```bash
+wal-g pgbackrest backup-fetch path/to/destination-directory backup-name
+```
