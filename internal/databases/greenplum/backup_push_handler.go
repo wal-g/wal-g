@@ -138,7 +138,6 @@ func (bh *BackupHandler) HandleBackupPush() {
 	bh.currBackupInfo.startTime = utility.TimeNowCrossPlatformUTC()
 	gplog.InitializeLogging("wal-g", bh.arguments.logsDir)
 
-	tracelog.ErrorLogger.FatalOnError(bh.connect())
 	err := bh.checkPrerequisites()
 	tracelog.ErrorLogger.FatalfOnError("Backup prerequisites check failed: %v\n", err)
 	bh.disconnect()
@@ -176,7 +175,7 @@ func (bh *BackupHandler) HandleBackupPush() {
 		tracelog.InfoLogger.Printf("WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
 	}
 
-	restoreLSNs, err := bh.createRestorePoint(bh.currBackupInfo.backupName)
+	restoreLSNs, err := createRestorePoint(bh.workers.Conn, bh.currBackupInfo.backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	bh.currBackupInfo.segmentsMetadata, err = bh.fetchSegmentBackupsMetadata()
@@ -344,10 +343,7 @@ func (bh *BackupHandler) uploadSentinel(sentinelDto BackupSentinelDto) (err erro
 func (bh *BackupHandler) connect() (err error) {
 	tracelog.InfoLogger.Println("Connecting to Greenplum master.")
 	bh.workers.Conn, err = postgres.Connect()
-	if err != nil {
-		return
-	}
-	return
+	return err
 }
 
 func (bh *BackupHandler) disconnect() {
@@ -358,27 +354,8 @@ func (bh *BackupHandler) disconnect() {
 	}
 }
 
-func (bh *BackupHandler) createRestorePoint(restorePointName string) (restoreLSNs map[int]string, err error) {
-	tracelog.InfoLogger.Printf("Creating restore point with name %s", restorePointName)
-	queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
-	if err != nil {
-		return
-	}
-	restoreLSNs, err = queryRunner.CreateGreenplumRestorePoint(restorePointName)
-	if err != nil {
-		return nil, err
-	}
-	return restoreLSNs, nil
-}
-
-func getGpClusterInfo() (globalCluster *cluster.Cluster, version semver.Version, systemIdentifier *uint64, err error) {
-	tracelog.InfoLogger.Println("Initializing tmp connection to read Greenplum info")
-	tmpConn, err := postgres.Connect()
-	if err != nil {
-		return globalCluster, semver.Version{}, nil, err
-	}
-
-	queryRunner, err := NewGpQueryRunner(tmpConn)
+func getGpClusterInfo(conn *pgx.Conn) (globalCluster *cluster.Cluster, version semver.Version, systemIdentifier *uint64, err error) {
+	queryRunner, err := NewGpQueryRunner(conn)
 	if err != nil {
 		return globalCluster, semver.Version{}, nil, err
 	}
@@ -411,18 +388,24 @@ func getGpClusterInfo() (globalCluster *cluster.Cluster, version semver.Version,
 func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) {
 	uploader, err := internal.ConfigureUploader()
 	if err != nil {
-		return bh, err
+		return nil, err
 	}
 
-	globalCluster, version, systemIdentifier, err := getGpClusterInfo()
+	conn, err := postgres.Connect()
 	if err != nil {
-		return bh, err
+		return nil, err
+	}
+
+	globalCluster, version, systemIdentifier, err := getGpClusterInfo(conn)
+	if err != nil {
+		return nil, err
 	}
 
 	bh = &BackupHandler{
 		arguments: arguments,
 		workers: BackupWorkers{
 			Uploader: uploader,
+			Conn:     conn,
 		},
 		globalCluster: globalCluster,
 		currBackupInfo: CurrBackupInfo{
@@ -431,7 +414,7 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 			systemIdentifier: systemIdentifier,
 		},
 	}
-	return bh, err
+	return bh, nil
 }
 
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
