@@ -92,15 +92,15 @@ func (backup *Backup) fetchStorageStream(path string) (io.ReadCloser, error) {
 }
 
 func (backup *Backup) UploadMetadata(metadataDto interface{}) error {
-	return backup.uploadDto(metadataDto, backup.getMetadataPath())
+	return UploadDto(backup.Folder, metadataDto, backup.getMetadataPath())
 }
 
 func (backup *Backup) UploadSentinel(sentinelDto interface{}) error {
-	return backup.uploadDto(sentinelDto, backup.getStopSentinelPath())
+	return UploadDto(backup.Folder, sentinelDto, backup.getStopSentinelPath())
 }
 
-// uploadDto serializes given object to JSON and puts it to path
-func (backup *Backup) uploadDto(dto interface{}, path string) error {
+// UploadDto serializes given object to JSON and puts it to path
+func UploadDto(folder storage.Folder, dto interface{}, path string) error {
 	marshaller, err := NewDtoSerializer()
 	if err != nil {
 		return err
@@ -109,7 +109,7 @@ func (backup *Backup) uploadDto(dto interface{}, path string) error {
 	if err != nil {
 		return err
 	}
-	return backup.Folder.PutObject(path, r)
+	return folder.PutObject(path, r)
 }
 
 func (backup *Backup) CheckExistence() (bool, error) {
@@ -159,17 +159,7 @@ func GetBackupByName(backupName, subfolder string, folder storage.Folder) (Backu
 // TODO : unit tests
 func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupName string) error {
 	sentinelName := SentinelNameFromBackup(backupName)
-
-	marshaller, err := NewDtoSerializer()
-	if err != nil {
-		return err
-	}
-	r, err := marshaller.Marshal(sentinelDto)
-	if err != nil {
-		return err
-	}
-
-	return uploader.Upload(sentinelName, r)
+	return UploadDto(uploader.Folder(), sentinelDto, sentinelName)
 }
 
 type ErrWaiter interface {

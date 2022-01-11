@@ -1,8 +1,6 @@
 package internal
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"io"
 
@@ -50,11 +48,5 @@ func GetBackupStreamFetcher(backup Backup) (StreamFetcher, error) {
 
 func UploadBackupStreamMetadata(uploader UploaderProvider, metadata interface{}, backupName string) error {
 	sentinelName := StreamMetadataNameFromBackup(backupName)
-
-	raw, err := json.Marshal(metadata)
-	if err != nil {
-		return err
-	}
-
-	return uploader.Upload(sentinelName, bytes.NewReader(raw))
+	return UploadDto(uploader.Folder(), metadata, sentinelName)
 }
