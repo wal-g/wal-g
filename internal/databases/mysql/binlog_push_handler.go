@@ -292,8 +292,19 @@ func (u *gtidFilter) test(binlog, nextBinlog string) bool {
 		return false
 	}
 
-	currentBinlogGTIDSet := nextPreviousGTIDs.Minus(u.lastGtidSeen)
-	u.gtidArchived.Add(currentBinlogGTIDSet)
+	if u.lastGtidSeen != nil {
+		currentBinlogGTIDSet := nextPreviousGTIDs.Clone().(*mysql.MysqlGTIDSet)
+		err = currentBinlogGTIDSet.Minus(*u.lastGtidSeen)
+		if err != nil {
+			tracelog.InfoLogger.Printf("Cannot subtract GTIDs: %v (%s check)\n", err, u.name())
+			return true // math is brokern. upload binlog
+		}
+		err = u.gtidArchived.Add(*currentBinlogGTIDSet)
+		if err != nil {
+			tracelog.InfoLogger.Printf("Cannot merge GTIDs: %v (%s check)\n", err, u.name())
+			return true // math is brokern. upload binlog
+		}
+	}
 	u.lastGtidSeen = nextPreviousGTIDs
 	return true
 }
