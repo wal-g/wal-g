@@ -15,19 +15,20 @@ ENV WALG_CONF_DIR /etc/wal-g/
 RUN echo "deb http://$MONGO_REPO/apt/ubuntu bionic/${MONGO_PACKAGE}/${MONGO_MAJOR} multiverse" | tee "/etc/apt/sources.list.d/mongodb_${MONGO_MAJOR}.list" && \
     wget -qO - https://www.mongodb.org/static/pgp/server-${MONGO_MAJOR}.asc | apt-key add -
 
-RUN echo "deb http://$MONGO_REPO/apt/ubuntu bionic/mongodb-org/4.4 multiverse" | tee "/etc/apt/sources.list.d/mongodb_4.4.list" && \
+RUN echo "deb http://$MONGO_REPO/apt/ubuntu bionic/${MONGO_PACKAGE}/4.4 multiverse" | tee "/etc/apt/sources.list.d/mongodb_4.4.list" && \
     wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | apt-key add -
 
 RUN apt-get update -qq && \
     apt-get install -y apt-transport-https tzdata && apt-get update -qq && \
-    apt-get download --allow-unauthenticated mongodb-org-server=$MONGO_VERSION && \
-    dpkg --unpack mongodb-org-server*.deb && \
-    sed -i 's/systemctl daemon-reload/echo "SKIPPED: systemctl daemon-reload"/' /var/lib/dpkg/info/mongodb-org-server.postinst && \
-    dpkg --configure mongodb-org-server && \
+    apt-get install snmp libsasl2-modules-gssapi-mit && \
+    apt-get download --allow-unauthenticated ${MONGO_PACKAGE}-server=$MONGO_VERSION && \
+    dpkg --unpack ${MONGO_PACKAGE}-server*.deb && \
+    sed -i 's/systemctl daemon-reload/echo "SKIPPED: systemctl daemon-reload"/' /var/lib/dpkg/info/${MONGO_PACKAGE}-server.postinst && \
+    dpkg --configure ${MONGO_PACKAGE}-server && \
     apt-get install -yf && \
     apt-get install --allow-unauthenticated -y \
         mongodb-database-tools=$MONGO_TOOLS_VERSION \
-        mongodb-org-shell=$MONGO_VERSION && \
+        ${MONGO_PACKAGE}-shell=$MONGO_VERSION && \
     rm -rf /var/lib/apt/lists/* /var/cache/debconf /var/lib/mongodb/* && \
     apt-get clean
 

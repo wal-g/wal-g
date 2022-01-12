@@ -25,6 +25,8 @@ services:
             args:
                 - MONGO_MAJOR=${MONGO_MAJOR}
                 - MONGO_VERSION=${MONGO_VERSION}
+                - MONGO_PACKAGE=${MONGO_PACKAGE}
+                - MONGO_REPO=${MONGO_REPO}
         container_name: mongodb01.test_net_${TEST_ID}
         domainname: test_net_${TEST_ID}
         external_links:
@@ -48,6 +50,8 @@ services:
             args:
                 - MONGO_MAJOR=${MONGO_MAJOR}
                 - MONGO_VERSION=${MONGO_VERSION}
+                - MONGO_PACKAGE=${MONGO_PACKAGE}
+                - MONGO_REPO=${MONGO_REPO}
         container_name: mongodb02.test_net_${TEST_ID}
         domainname: test_net_${TEST_ID}
         external_links:
