@@ -490,5 +490,5 @@ func (bh *BackupHandler) fetchSingleMetadata(backupID string, segCfg *cluster.Se
 
 func formatSegmentLogPath(contentID int) string {
 	logsDir := viper.GetString(internal.GPLogsDirectory)
-	return fmt.Sprintf("%s/%s-seg%d", logsDir, SegBackupLogPrefix, contentID)
+	return fmt.Sprintf("%s/%s-seg%d.log", logsDir, SegBackupLogPrefix, contentID)
 }
