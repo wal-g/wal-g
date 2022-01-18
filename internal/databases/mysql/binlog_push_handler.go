@@ -274,12 +274,12 @@ func (u *gtidFilter) test(binlog, nextBinlog string) bool {
 	// nextPreviousGTIDs is 'GTIDs_executed in the current binary log file'
 	nextPreviousGTIDs, err := peekPreviousMysqlGTIDs(path.Join(u.BinlogsFolder, nextBinlog), u.Flavor)
 	if err != nil {
-		tracelog.InfoLogger.Printf("cannot extract PREVIOUS_GTIDS event from binlog %s\n", binlog)
+		tracelog.InfoLogger.Printf("Cannot extract PREVIOUS_GTIDS event from binlog %s\n", binlog)
 		// continue uploading even when we cannot parse next binlog
 	}
 
 	if u.gtidArchived == nil {
-		tracelog.DebugLogger.Printf("cannot extract set of uploaded binlgs from cache\n")
+		tracelog.DebugLogger.Printf("Cannot extract set of uploaded binlogs from cache\n")
 		// continue uploading even when we cannot read uploadedGTIDs
 		u.gtidArchived = nextPreviousGTIDs
 		u.lastGtidSeen = nextPreviousGTIDs
@@ -292,19 +292,24 @@ func (u *gtidFilter) test(binlog, nextBinlog string) bool {
 		return false
 	}
 
-	if u.lastGtidSeen != nil {
-		currentBinlogGTIDSet := nextPreviousGTIDs.Clone().(*mysql.MysqlGTIDSet)
-		err = currentBinlogGTIDSet.Minus(*u.lastGtidSeen)
-		if err != nil {
-			tracelog.InfoLogger.Printf("Cannot subtract GTIDs: %v (%s check)\n", err, u.name())
-			return true // math is brokern. upload binlog
-		}
-		err = u.gtidArchived.Add(*currentBinlogGTIDSet)
-		if err != nil {
-			tracelog.InfoLogger.Printf("Cannot merge GTIDs: %v (%s check)\n", err, u.name())
-			return true // math is brokern. upload binlog
-		}
+	if u.lastGtidSeen == nil {
+		tracelog.DebugLogger.Printf("Binlog %s is the first binlog that we seen. Upload it. (%s check)\n", binlog, u.name())
+		u.lastGtidSeen = nextPreviousGTIDs
+		return false
 	}
+
+	currentBinlogGTIDSet := nextPreviousGTIDs.Clone().(*mysql.MysqlGTIDSet)
+	err = currentBinlogGTIDSet.Minus(*u.lastGtidSeen)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Cannot subtract GTIDs: %v (%s check)\n", err, u.name())
+		return true // math is broken. upload binlog
+	}
+	err = u.gtidArchived.Add(*currentBinlogGTIDSet)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Cannot merge GTIDs: %v (%s check)\n", err, u.name())
+		return true // math is broken. upload binlog
+	}
+	tracelog.DebugLogger.Printf("Should upload binlog %s with GTID set: %s (%s check)\n", binlog, currentBinlogGTIDSet.String(), u.name())
 	u.lastGtidSeen = nextPreviousGTIDs
 	return true
 }
