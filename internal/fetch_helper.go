@@ -175,7 +175,7 @@ func DownloadAndDecompressStorageFile(folder storage.Folder, fileName string) (i
 	if exists {
 		return reader, nil
 	}
-	
+
 	for _, decompressor := range putCachedDecompressorInFirstPlace(compression.Decompressors) {
 		archiveReader, exists, err := TryDownloadFile(folder, fileName+"."+decompressor.FileExtension())
 		if err != nil {

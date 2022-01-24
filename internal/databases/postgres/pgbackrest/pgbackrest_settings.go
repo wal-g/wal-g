@@ -20,7 +20,7 @@ const (
 )
 
 type ArchiveSettings struct {
-	DatabaseId      int64  `ini:"db-id"`
+	DatabaseID      int64  `ini:"db-id"`
 	DatabaseVersion string `ini:"db-version"`
 }
 
@@ -136,7 +136,7 @@ func GetArchiveName(folder storage.Folder, stanza string) (*string, error) {
 		return nil, err
 	}
 
-	archiveName := fmt.Sprintf("%s-%d", settings.DatabaseVersion, settings.DatabaseId)
+	archiveName := fmt.Sprintf("%s-%d", settings.DatabaseVersion, settings.DatabaseID)
 	return &archiveName, nil
 }
 

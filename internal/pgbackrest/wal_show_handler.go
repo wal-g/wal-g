@@ -27,7 +27,7 @@ func HandleWalShow(rootFolder storage.Folder, stanza string, outputWriter postgr
 		return err
 	}
 	walSequencesByTimelines := getWalSequencesByTimelines(walSegments)
-	
+
 	var timelineInfos []*postgres.TimelineInfo
 	for _, segmentsSequence := range walSequencesByTimelines {
 		historyRecords, err := postgres.GetTimeLineHistoryRecords(segmentsSequence.TimelineID, archiveFolder)
@@ -41,13 +41,12 @@ func HandleWalShow(rootFolder storage.Folder, stanza string, outputWriter postgr
 		tracelog.ErrorLogger.FatalfOnError("Error while creating TimeLineInfo %v\n", err)
 		timelineInfos = append(timelineInfos, info)
 	}
-	
+
 	sort.Slice(timelineInfos, func(i, j int) bool {
 		return timelineInfos[i].ID < timelineInfos[j].ID
 	})
 
 	return outputWriter.Write(timelineInfos)
-	
 }
 
 func getWalSequencesByTimelines(segments []postgres.WalSegmentDescription) map[uint32]*postgres.WalSegmentsSequence {
@@ -60,7 +59,6 @@ func getWalSequencesByTimelines(segments []postgres.WalSegmentDescription) map[u
 		segmentsByTimelines[segment.Timeline] = postgres.NewSegmentsSequence(segment.Timeline, segment.Number)
 	}
 	return segmentsByTimelines
-
 }
 
 func getWalSegments(filenames []string) ([]postgres.WalSegmentDescription, error) {
