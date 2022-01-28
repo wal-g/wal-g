@@ -53,6 +53,7 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 	cache := getCache()
 	if err == nil && binlogSentinelDto.GTIDArchived != "" {
 		cache.GTIDArchived = binlogSentinelDto.GTIDArchived
+		tracelog.InfoLogger.Printf("fetched binlog archived GTID SET: %s\n", cache.GTIDArchived)
 	}
 
 	var filters []statefulBinlogFilter
@@ -62,7 +63,9 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 		if flavor == "" || err != nil {
 			flavor = mysql.MySQLFlavor
 		}
-		filters = append(filters, &gtidFilter{BinlogsFolder: binlogsFolder, Flavor: flavor})
+		if flavor == mysql.MySQLFlavor {
+			filters = append(filters, &gtidFilter{BinlogsFolder: binlogsFolder, Flavor: flavor})
+		}
 	}
 	for _, filter := range filters {
 		filter.init(cache)
@@ -245,45 +248,81 @@ func (u *archivedBinlogFilter) test(binlog, _ string) bool {
 type gtidFilter struct {
 	BinlogsFolder string
 	Flavor        string
-	gtidArchived  string
-	lastGtidSeen  string
+	gtidArchived  *mysql.MysqlGTIDSet
+	lastGtidSeen  *mysql.MysqlGTIDSet
 }
 
 var _ statefulBinlogFilter = &gtidFilter{}
 
 func (u *gtidFilter) init(data LogsCache) {
-	u.lastGtidSeen = data.GTIDArchived
-	u.gtidArchived = data.GTIDArchived
+	gtid, _ := mysql.ParseMysqlGTIDSet(data.GTIDArchived)
+	u.gtidArchived, _ = gtid.(*mysql.MysqlGTIDSet)
+	u.lastGtidSeen = nil
 }
 func (u *gtidFilter) name() string {
 	return "gtid"
 }
 func (u *gtidFilter) onUpload(data *LogsCache) {
-	data.GTIDArchived = u.lastGtidSeen
+	data.GTIDArchived = u.gtidArchived.String()
 }
 func (u *gtidFilter) test(binlog, nextBinlog string) bool {
-	// nextPreviousGTIDs is 'GTIDs_executed in the current binary log file'
-	nextPreviousGTIDs, err := peekPreviousGTIDs(path.Join(u.BinlogsFolder, nextBinlog), u.Flavor)
-	if err != nil {
-		tracelog.InfoLogger.Printf("cannot extract PREVIOUS_GTIDS event from binlog %s\n", binlog)
-		// continue uploading even when we cannot parse next binlog
+	if u.Flavor != mysql.MySQLFlavor {
+		// MariaDB GTID Sets consists of: DomainID + ServerID + Sequence Number (64-bit unsigned integer)
+		// It is not clear how it handles gaps in SequenceNumbers, so for safety reasons skip this check
+		return true
 	}
-	uploadedGTIDs, err := mysql.ParseMysqlGTIDSet(u.gtidArchived)
+
+	// nextPreviousGTIDs is 'GTIDs_executed at the end of current binary log file'
+	nextPreviousGTIDs, err := peekPreviousMysqlGTIDs(path.Join(u.BinlogsFolder, nextBinlog), u.Flavor)
 	if err != nil {
-		tracelog.DebugLogger.Printf("cannot extract set of uploaded binlgos from cache\n")
+		tracelog.InfoLogger.Printf("Cannot extract PREVIOUS_GTIDS event from binlog %s. Upload it. (%s check)\n", binlog, u.name())
+		return true
+	}
+
+	if u.gtidArchived == nil {
+		tracelog.DebugLogger.Printf("Cannot extract set of uploaded binlogs from cache\n")
 		// continue uploading even when we cannot read uploadedGTIDs
-	} else {
-		// when we know that _next_ binlog's PreviousGTID already uploaded we can safely skip _current_ binlog
-		if uploadedGTIDs.String() != "" && uploadedGTIDs.Contain(nextPreviousGTIDs) {
-			tracelog.InfoLogger.Printf("Binlog %v already archived (%s check)\n", binlog, u.name())
-			return false
-		}
+		u.gtidArchived = nextPreviousGTIDs
+		u.lastGtidSeen = nextPreviousGTIDs
+		return true
 	}
-	u.lastGtidSeen = nextPreviousGTIDs.String()
+
+	if u.lastGtidSeen == nil {
+		gtidSetBeforeCurrentBinlog, err := peekPreviousMysqlGTIDs(path.Join(u.BinlogsFolder, binlog), u.Flavor)
+		if err != nil {
+			tracelog.InfoLogger.Printf("Cannot extract PREVIOUS_GTIDS event from current binlog %s. Upload it. (%s check)\n", binlog, u.name())
+			u.lastGtidSeen = nextPreviousGTIDs
+			return true
+		}
+		tracelog.DebugLogger.Printf("Binlog %s is the first binlog that we seen by GTID-checker in this run. (%s check)\n", binlog, u.name())
+		u.lastGtidSeen = gtidSetBeforeCurrentBinlog
+	}
+
+	currentBinlogGTIDSet := nextPreviousGTIDs.Clone().(*mysql.MysqlGTIDSet)
+	err = currentBinlogGTIDSet.Minus(*u.lastGtidSeen)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Cannot subtract GTIDs: %v (%s check)\n", err, u.name())
+		return true // math is broken. upload binlog
+	}
+
+	// when we know that _next_ binlog's PreviousGTID already uploaded we can safely skip _current_ binlog
+	if u.gtidArchived.Contain(currentBinlogGTIDSet) {
+		tracelog.InfoLogger.Printf("Binlog %v with GTID Set %s already archived (%s check)\n", binlog, currentBinlogGTIDSet.String(), u.name())
+		u.lastGtidSeen = nextPreviousGTIDs
+		return false
+	}
+
+	err = u.gtidArchived.Add(*currentBinlogGTIDSet)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Cannot merge GTIDs: %v (%s check)\n", err, u.name())
+		return true // math is broken. upload binlog
+	}
+	tracelog.InfoLogger.Printf("Should upload binlog %s with GTID set: %s (%s check)\n", binlog, currentBinlogGTIDSet.String(), u.name())
+	u.lastGtidSeen = nextPreviousGTIDs
 	return true
 }
 
-func peekPreviousGTIDs(filename string, flavor string) (mysql.GTIDSet, error) {
+func peekPreviousMysqlGTIDs(filename string, flavor string) (*mysql.MysqlGTIDSet, error) {
 	var found bool
 	previousGTID := &replication.PreviousGTIDsEvent{}
 
@@ -304,9 +343,16 @@ func peekPreviousGTIDs(filename string, flavor string) (mysql.GTIDSet, error) {
 	})
 
 	if err != nil && !found {
-		result, _ := mysql.ParseMysqlGTIDSet("")
-		return result, errors.Wrapf(err, "binlog-push: could not parse binlog file '%s'\n", filename)
+		return nil, errors.Wrapf(err, "binlog-push: could not parse binlog file '%s'\n", filename)
 	}
 
-	return mysql.ParseMysqlGTIDSet(previousGTID.GTIDSets)
+	res, err := mysql.ParseMysqlGTIDSet(previousGTID.GTIDSets)
+	if err != nil {
+		return nil, err
+	}
+	result, ok := res.(*mysql.MysqlGTIDSet)
+	if !ok {
+		tracelog.ErrorLogger.Fatalf("cannot cast nextPreviousGTIDs to MysqlGTIDSet. Should never be here. Actual type: %T\n", res)
+	}
+	return result, nil
 }
