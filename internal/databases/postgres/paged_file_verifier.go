@@ -191,7 +191,8 @@ func VerifyPagedFileIncrement(path string, fileInfo os.FileInfo, increment io.Re
 // VerifyPagedFileBase verifies pages of a standard paged file
 func VerifyPagedFileBase(path string, fileInfo os.FileInfo, pagedFile io.Reader) ([]uint32, error) {
 	size := fileInfo.Size()
-	filePageCount := uint32(size / DatabasePageSize)
+	// Round up filePageCount so last block will return io.ErrUnexpectedEOF if size isn't multiple of DatabasePageSize
+	filePageCount := uint32((size + DatabasePageSize - 1) / DatabasePageSize)
 	blockNumbers := make([]uint32, 0, filePageCount)
 	for i := uint32(0); i < filePageCount; i++ {
 		blockNumbers = append(blockNumbers, i)
@@ -202,20 +203,24 @@ func VerifyPagedFileBase(path string, fileInfo os.FileInfo, pagedFile io.Reader)
 // verifyPageBlocks verifies provided page blocks from the pagedBlocks reader
 func verifyPageBlocks(path string, fileInfo os.FileInfo, pageBlocks io.Reader,
 	blockNumbers []uint32) (corruptBlockNumbers []uint32, err error) {
-	if _, ignored := ignoredFileNames[fileInfo.Name()]; ignored || !isPagedFile(fileInfo, path) {
+	if _, ignored := ignoredFileNames[fileInfo.Name()]; ignored {
 		_, err = io.Copy(ioutil.Discard, pageBlocks)
 		return nil, err
 	}
 	for _, blockNo := range blockNumbers {
 		corrupted, err := verifySinglePage(path, blockNo, pageBlocks)
+		if corrupted {
+			corruptBlockNumbers = append(corruptBlockNumbers, blockNo)
+		}
 		if err == io.EOF {
+			break
+		}
+		if err == io.ErrUnexpectedEOF {
+			tracelog.WarningLogger.Printf("verifyPageBlocks: %s invalid file size %d\n", path, fileInfo.Size())
 			break
 		}
 		if err != nil {
 			return nil, err
-		}
-		if corrupted {
-			corruptBlockNumbers = append(corruptBlockNumbers, blockNo)
 		}
 	}
 	// check if some extra delta blocks left in increment
@@ -232,7 +237,7 @@ func verifySinglePage(path string, blockNo uint32, pageBlocks io.Reader) (bool, 
 	page := PgDatabasePage{}
 	_, err := io.ReadFull(pageBlocks, page[:])
 	if err != nil {
-		return false, err
+		return err == io.ErrUnexpectedEOF, err
 	}
 	return isPageCorrupted(path, blockNo, &page)
 }
