@@ -5,8 +5,6 @@ import (
 
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
@@ -70,7 +68,7 @@ func createTargetFetchBackupSelector(cmd *cobra.Command,
 		targetName = args[0]
 	}
 
-	backupSelector, err := internal.NewTargetBackupSelector(targetUserData, targetName, postgres.NewGenericMetaFetcher())
+	backupSelector, err := internal.NewTargetBackupSelector(targetUserData, targetName, greenplum.NewGenericMetaFetcher())
 	if err != nil {
 		fmt.Println(cmd.UsageString())
 		return nil, err
