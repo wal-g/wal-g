@@ -114,12 +114,22 @@ Sends (not yet archived) binlogs to storage. Typically run in CRON.
 wal-g binlog-push
 ```
 
-
 When `WALG_MYSQL_CHECK_GTIDS` is set wal-g will try to be upload only binlogs which GTID sets contains events that
 wasn't seen before. This is done by parsing binlogs and peeking first PREVIOUS_GTIDS_EVENT that holds GTID set of
 all executed transactions at the moment this particular binlog file created.
 This feature may be useful when you are uploading binlogs from different hosts (e.g. after master switchower)
 Note: Don't use `WALG_MYSQL_CHECK_GTIDS` when GTIDs are not used - it will slow down binlog upload.
+
+### ``binlog``
+
+This is toolbox that contains useful commands to manipulate archived binlogs.
+
+Available commands:
+
+- ``forget-gtids`` resets wal-g's knowledge about uploaded GITDs.
+  ```bash
+  wal-g binlog forget-gtid
+  ```
 
 ### ``binlog-fetch``
 
