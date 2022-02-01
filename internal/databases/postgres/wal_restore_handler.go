@@ -123,15 +123,13 @@ func FindLastCommonPoint(target, source []*TimelineHistoryRecord) (uint64, uint3
 
 // GetMissingWals collect the slice of WAL filenames by last LSN, last timeline,
 // current timeline, history records and folder
-func GetMissingWals(
-	lastSeg uint64, lastTl uint32, currentTl uint32,
+func GetMissingWals(lastSeg uint64, lastTl, currentTl uint32,
 	tlToSeg map[uint32]*TimelineWithSegmentNo,
 	walsByTimelines map[uint32]*WalSegmentsSequence,
 ) ([]string, error) {
 	result := make([]string, 0)
 	currentSeg := uint64(walsByTimelines[currentTl].maxSegmentNo)
 
-LOOP:
 	for ; currentTl >= lastTl; currentTl-- {
 		// Get wal segment sequence for current timeline
 		walSegSeq, ok := walsByTimelines[currentTl]
@@ -144,7 +142,7 @@ LOOP:
 			}
 
 			if currentSeg == lastSeg {
-				break LOOP
+				return result, nil
 			}
 		}
 	}
