@@ -1,17 +1,22 @@
 package sqlserver
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
+	"math/big"
 	"net/url"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"golang.org/x/xerrors"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -511,4 +516,71 @@ func GetBackupProperties(db *sql.DB,
 		res = append(res, &dbf)
 	}
 	return res, nil
+}
+
+type LockWrapper struct {
+	c io.Closer
+}
+
+func (lw LockWrapper) Close() {
+	if lw.c != nil {
+		tracelog.ErrorLogger.PrintOnError(lw.c.Close())
+	}
+}
+
+func RunOrReuseProxy(ctx context.Context, cancel context.CancelFunc, folder storage.Folder) (*LockWrapper, error) {
+	bs, err := blob.NewServer(folder)
+	if err != nil {
+		return nil, xerrors.Errorf("proxy create error: %v", err)
+	}
+	reuse, _, err := internal.GetBoolSetting(internal.SQLServerReuseProxy)
+	if err != nil {
+		return nil, err
+	}
+	if reuse {
+		return &LockWrapper{nil}, bs.WaitReady(ctx, blob.ProxyStartTimeout)
+	}
+	lock, err := bs.AcquireLock()
+	if err != nil {
+		return nil, err
+	}
+
+	err = bs.RunBackground(ctx, cancel)
+	if err != nil {
+		tracelog.ErrorLogger.PrintOnError(lock.Close())
+		return nil, xerrors.Errorf("proxy run error: %v", err)
+	}
+	return &LockWrapper{lock}, nil
+}
+
+func GetDBRestoreLSN(db *sql.DB, databaseName string) (string, error) {
+	query := `SELECT MAX(redo_start_lsn) 
+        FROM sys.master_files
+        WHERE database_id=DB_ID(@dbname) `
+	var res string
+	if err := db.QueryRow(query, sql.Named("dbname", databaseName)).Scan(&res); err != nil {
+		return "0", err
+	}
+	return res, nil
+}
+
+func IsLogAlreadyApplied(db *sql.DB, databaseName string, logBackupFileProperties *BackupProperties) (bool, error) {
+	dbRestoreLSN, err := GetDBRestoreLSN(db, databaseName)
+	if err != nil {
+		return false, err
+	}
+	dbRestoreLSNInt := new(big.Int)
+	dbRestoreLSNInt, ok := dbRestoreLSNInt.SetString(dbRestoreLSN, 10)
+	if !ok {
+		return false, xerrors.Errorf("dbRestoreLSN not recognized")
+	}
+	lastLSNInt := new(big.Int)
+	lastLSNInt, ok = lastLSNInt.SetString(logBackupFileProperties.LastLSN, 10)
+	if !ok {
+		return false, xerrors.Errorf("lastLSN not recognized")
+	}
+	if dbRestoreLSNInt.Cmp(lastLSNInt) == -1 {
+		return false, nil
+	}
+	return true, nil
 }

@@ -4,20 +4,22 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/wal-g/wal-g/pkg/storages/storage"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPermanent bool, userDataRaw string) {
-	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
-
+func HandleBackupPush(folder storage.Folder, uploader internal.UploaderProvider,
+	backupCmd *exec.Cmd, isPermanent bool, userDataRaw string) {
 	db, err := getMySQLConnection()
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(db, "")
 
-	binlogStart := getMySQLCurrentBinlogFile(db)
+	binlogStart, err := getLastUploadedBinlog(folder)
+	tracelog.ErrorLogger.FatalfOnError("failed to get last uploaded binlog: %v", err)
 	timeStart := utility.TimeNowCrossPlatformLocal()
 
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
@@ -32,7 +34,8 @@ func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, isPerman
 		tracelog.ErrorLogger.Fatalf("backup create command failed: %v", err)
 	}
 
-	binlogEnd := getMySQLCurrentBinlogFile(db)
+	binlogEnd, err := getLastUploadedBinlog(folder)
+	tracelog.ErrorLogger.FatalfOnError("failed to get last uploaded binlog (after): %v", err)
 	timeStop := utility.TimeNowCrossPlatformLocal()
 	hostname, err := os.Hostname()
 	if err != nil {

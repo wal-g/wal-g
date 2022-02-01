@@ -30,8 +30,6 @@ type ComposeFileInfo struct {
 	isIncremented bool
 }
 
-type TarFileSets map[string][]string
-
 func NewComposeFileInfo(path string, fileInfo os.FileInfo, wasInBase, isIncremented bool,
 	header *tar.Header) *ComposeFileInfo {
 	return &ComposeFileInfo{path: path, fileInfo: fileInfo,
@@ -51,12 +49,15 @@ type TarBallComposerMaker interface {
 	Make(bundle *Bundle) (TarBallComposer, error)
 }
 
-func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn,
-	folder storage.Folder, newBackupName string,
-	filePackOptions TarBallFilePackerOptions) (TarBallComposerMaker, error) {
+func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn, folder storage.Folder,
+	newBackupName string, filePackOptions TarBallFilePackerOptions,
+	withoutFilesMetadata bool) (TarBallComposerMaker, error) {
 	switch composerType {
 	case RegularComposer:
-		return NewRegularTarBallComposerMaker(filePackOptions), nil
+		if withoutFilesMetadata {
+			return NewRegularTarBallComposerMaker(filePackOptions, &NopBundleFiles{}, NewNopTarFileSets()), nil
+		}
+		return NewRegularTarBallComposerMaker(filePackOptions, &RegularBundleFiles{}, NewRegularTarFileSets()), nil
 	case RatingComposer:
 		relFileStats, err := newRelFileStatistics(conn)
 		if err != nil {
@@ -69,17 +70,17 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn,
 			tracelog.InfoLogger.Printf(
 				"Failed to init the CopyComposer, will use the RegularComposer instead:"+
 					" couldn't get the previous backup name: %v", err)
-			return NewRegularTarBallComposerMaker(filePackOptions), nil
+			return NewRegularTarBallComposerMaker(filePackOptions, &RegularBundleFiles{}, NewRegularTarFileSets()), nil
 		}
 		previousBackup := NewBackup(folder, previousBackupName)
-		prevBackupSentinelDto, err := previousBackup.GetSentinel()
+		prevBackupSentinelDto, _, err := previousBackup.GetSentinelAndFilesMetadata()
 		if err != nil {
 			return nil, err
 		}
 		if prevBackupSentinelDto.IncrementFullName != nil {
 			previousBackupName = *prevBackupSentinelDto.IncrementFullName
 			previousBackup = NewBackup(folder, previousBackupName)
-			_, err = previousBackup.GetSentinel()
+			_, _, err = previousBackup.GetSentinelAndFilesMetadata()
 			if err != nil {
 				return nil, err
 			}

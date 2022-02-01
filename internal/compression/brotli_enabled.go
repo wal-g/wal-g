@@ -1,5 +1,5 @@
-// +build brotli
-// +build !windows
+//go:build brotli && !windows
+// +build brotli,!windows
 
 package compression
 

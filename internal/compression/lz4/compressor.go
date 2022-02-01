@@ -3,7 +3,7 @@ package lz4
 import (
 	"io"
 
-	"github.com/pierrec/lz4"
+	"github.com/pierrec/lz4/v4"
 )
 
 const (

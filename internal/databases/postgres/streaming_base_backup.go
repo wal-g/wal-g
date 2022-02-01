@@ -23,8 +23,8 @@ import (
 )
 
 var (
-	errTbsOutOfRange     error = errors.New("requesting next tablespace after all tablespaces are streamed")
-	errTbsStillStreaming error = errors.New("cannot move to next table. Current tablespace is not yet fully streamed")
+	errTbsOutOfRange     = errors.New("requesting next tablespace after all tablespaces are streamed")
+	errTbsStillStreaming = errors.New("cannot move to next table. Current tablespace is not yet fully streamed")
 )
 
 // The StreamingBaseBackup object represents a Postgres BASE_BACKUP, connecting to Postgres, and streaming backup data.
@@ -105,7 +105,7 @@ func (bb *StreamingBaseBackup) nextTbs() (err error) {
 	remaps := TarballStreamerRemaps{}
 	if bb.tbsPointer == len(bb.tablespaces) {
 		tee = append(tee, "global/pg_control")
-		tracelog.InfoLogger.Printf("Adding datadirectory")
+		tracelog.InfoLogger.Printf("Adding data directory")
 	} else {
 		curTbs := bb.tablespaces[bb.tbsPointer]
 		tsr, err := NewTarballStreamerRemap("^", fmt.Sprintf("pg_tblspc/%d/", curTbs.OID))
@@ -124,10 +124,10 @@ func (bb *StreamingBaseBackup) nextTbs() (err error) {
 }
 
 // Upload will read all tar files from Postgres, and use the uploader to upload to the backup location
-func (bb *StreamingBaseBackup) Upload(uploader *WalUploader) (err error) {
+func (bb *StreamingBaseBackup) Upload(uploader *WalUploader, bundleFiles BundleFiles) (err error) {
 	// Upload the tar
 	bb.uploader = uploader
-	bb.streamer = NewTarballStreamer(bb, bb.maxTarSize)
+	bb.streamer = NewTarballStreamer(bb, bb.maxTarSize, bundleFiles)
 	for {
 		tbsTar := ioextensions.NewNamedReaderImpl(bb.streamer, bb.FileName())
 		compressedFile := internal.CompressAndEncrypt(tbsTar, bb.uploader.Compressor, internal.ConfigureCrypter())
@@ -144,9 +144,12 @@ func (bb *StreamingBaseBackup) Upload(uploader *WalUploader) (err error) {
 	}
 
 	// Update file info
-	for fileName, file := range bb.streamer.Files {
-		bb.Files[fileName] = file
-	}
+	bb.streamer.Files.GetUnderlyingMap().Range(func(k, v interface{}) bool {
+		fileName := k.(string)
+		description := v.(internal.BackupFileDescription)
+		bb.Files[fileName] = description
+		return true
+	})
 
 	// Upload the extra tar
 	if len(bb.streamer.Tee) > 0 {
@@ -163,15 +166,12 @@ func (bb *StreamingBaseBackup) Upload(uploader *WalUploader) (err error) {
 	return nil
 }
 
-// FolderName returns the name of the folder where the backup should be stored.
+// BackupName returns the name of the folder where the backup should be stored.
 func (bb *StreamingBaseBackup) BackupName() string {
-	// Example base_00000001000000000000006A
-	// For now this is hardcoded to wal segments of 16MB, which is probably fine in all cases for backup path
-	segID := uint64(bb.StartLSN) / WalSegmentSize
-	return fmt.Sprintf("base_%08X%016X", bb.TimeLine, segID)
+	return "base_" + formatWALFileName(bb.TimeLine, uint64(bb.StartLSN)/WalSegmentSize)
 }
 
-// Name returns the filename of a tablespace backup file.
+// FileName returns the filename of a tablespace backup file.
 // This is used by the WalUploader to set the name of the destination file during upload of the backup file.
 func (bb *StreamingBaseBackup) FileName() string {
 	// Example LSN -> Name:
@@ -179,15 +179,12 @@ func (bb *StreamingBaseBackup) FileName() string {
 	return fmt.Sprintf("part_%03d.tar", bb.fileNo+1)
 }
 
-// FolderName returns the name of the folder where the backup should be stored.
+// Path returns the name of the folder where the backup should be stored.
 func (bb *StreamingBaseBackup) Path() string {
-	// Example base_00000001000000000000006A
-	// For now this is hardcoded to wal segments of 16MB, which is probably fine in all cases for backup path
 	return storage.JoinPath(bb.BackupName(), internal.TarPartitionFolderName, bb.FileName())
 }
 
-// Name returns the filename of a tablespace backup file.
-// This is used by the WalUploader to set the name of the destination file during upload of the backup file.
+// GetTablespaceSpec returns the tablespace specifications.
 func (bb *StreamingBaseBackup) GetTablespaceSpec() *TablespaceSpec {
 	spec := NewTablespaceSpec(bb.dataDir)
 	for _, tbs := range bb.tablespaces {
@@ -249,7 +246,7 @@ func (bb *StreamingBaseBackup) Read(p []byte) (n int, err error) {
 	bb.UncompressedSize += int64(n)
 	bb.readIndex += n
 	if bb.readIndex == len(bb.buffer) {
-		//All of buffer returned. Empty buffer
+		//The entire buffer is returned. Empty buffer.
 		bb.buffer = []byte{}
 		bb.readIndex = 0
 	}

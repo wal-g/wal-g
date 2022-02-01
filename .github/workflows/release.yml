@@ -6,7 +6,7 @@ on:
       - 'v*' # Push events to matching v*, i.e. v0.2.19, v0.2.14a
 
 env:
-  GO_VERSION: 1.15
+  GO_VERSION: 1.17
   USE_LIBSODIUM: 1
 
 jobs:
@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         os: [ ubuntu-18.04, ubuntu-20.04 ]
-        db: [ pg, mysql, sqlserver, redis, mongo, fdb ]
+        db: [ pg, mysql, sqlserver, redis, mongo, fdb, gp ]
       fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:
@@ -54,12 +54,20 @@ jobs:
       - name: Compress WAL-G binary
         run: tar --owner=0 --group=0 -zcvf wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
 
+      - name: Calculate checksum
+        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64 > wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.sha256
+
+      - name: Calculate checksum for the compressed binary
+        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz > wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz.sha256
+
       - name: Upload WAL-G binary
         uses: softprops/action-gh-release@v1
         with:
           files: |
             wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
             wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz
+            wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.sha256
+            wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:

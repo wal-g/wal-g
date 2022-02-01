@@ -27,7 +27,11 @@ type Logging struct {
 
 func DefaultHandleBackupList(folder storage.Folder, pretty, json bool) {
 	getBackupsFunc := func() ([]BackupTime, error) {
-		return GetBackups(folder)
+		res, err := GetBackups(folder)
+		if _, ok := err.(NoBackupsFoundError); ok {
+			err = nil
+		}
+		return res, err
 	}
 	writeBackupListFunc := func(backups []BackupTime) {
 		SortBackupTimeSlices(backups)
@@ -55,11 +59,12 @@ func HandleBackupList(
 	logging Logging,
 ) {
 	backups, err := getBackupsFunc()
+	logging.ErrorLogger.FatalOnError(err)
+
 	if len(backups) == 0 {
 		logging.InfoLogger.Println("No backups found")
 		return
 	}
-	logging.ErrorLogger.FatalOnError(err)
 
 	writeBackupListFunc(backups)
 }

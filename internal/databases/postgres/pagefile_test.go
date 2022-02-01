@@ -84,7 +84,7 @@ func postgresApplyIncrementTest(testIncrement *TestIncrement, t *testing.T) {
 	tmpFile, _ := os.OpenFile(tmpFileName, os.O_RDWR, 0666)
 	tmpFile.WriteAt(make([]byte, 12345), 477421568-12345)
 	tmpFile.Close()
-	err := postgres.ApplyFileIncrement(tmpFileName, incrementReader, false)
+	err := postgres.ApplyFileIncrement(tmpFileName, incrementReader, false, true)
 	assert.NoError(t, err)
 	_, err = incrementReader.Read(make([]byte, 1))
 	assert.Equalf(t, io.EOF, err, "Not read to the end")

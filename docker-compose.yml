@@ -32,8 +32,10 @@ services:
       -c 'mkdir -p /export/fullbucket
       &&  mkdir -p /export/fullratingcomposerbucket
       &&  mkdir -p /export/fullcopycomposerbucket
+      &&  mkdir -p /export/fullwithoutfilesmetadatabucket
       &&  mkdir -p /export/fullscandeltabucket
       &&  mkdir -p /export/remotebucket
+      &&  mkdir -p /export/remotewithoutfilesmetadatabucket
       &&  mkdir -p /export/cryptobucket
       &&  mkdir -p /export/waldeltabucket
       &&  mkdir -p /export/ghostbucket
@@ -76,12 +78,14 @@ services:
       &&  mkdir -p /export/mysqldeletebinlogs
       &&  mkdir -p /export/archivereadyrename
       &&  mkdir -p /export/gpfullbucket
+      &&  mkdir -p /export/gpfullserializedbucket
       &&  mkdir -p /export/gpdeletewithoutconfirm
       &&  mkdir -p /export/gpdeleteretainbucket
       &&  mkdir -p /export/gpdeleteendtoendbucket
       &&  mkdir -p /export/gpdeletebeforepermanentbucket
       &&  mkdir -p /export/gpdeletebeforenamebucket
       &&  mkdir -p /export/gpdeletebeforetimebucket
+      &&  mkdir -p /export/createrestorepointbucket
       &&  mkdir -p /export/storagetoolsbucket
       &&  mkdir -p /export/walrestorebucket
       &&  /usr/bin/minio server /export'
@@ -254,12 +258,35 @@ services:
     links:
       - s3
 
+  pg_full_backup_streamed_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_streamed_test
+      context: .
+    build:
+    image: wal-g/full_backup_streamed_test
+    container_name: wal-g_pg_full_backup_streamed_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   pg_remote_backup_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_remote_backup_test
       context: .
     image: wal-g/remote_backup_test
     container_name: wal-g_pg_remote_backup_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_remote_backup_without_files_metadata_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_remote_backup_without_files_metadata_test
+      context: .
+    image: wal-g/remote_backup_without_files_metadata_test
+    container_name: wal-g_pg_remote_backup_without_files_metadata_test
     depends_on:
       - s3
     links:
@@ -288,7 +315,7 @@ services:
       - s3
 
   pg_full_backup_copy_composer_test:
-    build:  
+    build:
       dockerfile: docker/pg_tests/Dockerfile_full_backup_copy_composer_test
       context: .
     image: wal-g/full_backup_copy_composer_test
@@ -304,6 +331,17 @@ services:
       context: .
     image: wal-g/full_backup_rating_composer_test
     container_name: wal-g_pg_full_backup_rating_composer_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_full_backup_without_files_metadata_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_without_files_metadata_test
+      context: .
+    image: wal-g/full_backup_without_files_metadata_test
+    container_name: wal-g_pg_full_backup_without_files_metadata_test
     depends_on:
       - s3
     links:
@@ -524,12 +562,31 @@ services:
     links:
       - s3
 
+
   pg_wal_restore_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_wal_restore_test
       context: .
     image: wal-g/wal_restore_test
     container_name: wal-g_pg_wal_restore_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_pgbackrest:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_pgbackrest
+      context: .
+    image: wal-g/docker_pgbackrest
+    container_name: wal-g_docker_pgbackrest
+
+  pg_pgbackrest_backup_fetch_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_pgbackrest_backup_fetch_test
+      context: .
+    image: wal-g/pgbackrest_backup_fetch_test
+    container_name: wal-g_pgbackrest_backup_fetch_test
     depends_on:
       - s3
     links:

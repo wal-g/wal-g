@@ -66,7 +66,7 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 }
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
-	return NewFolder(path.Join(folder.path, subFolderRelativePath) + "/", folder.Storage)
+	return NewFolder(path.Join(folder.path, subFolderRelativePath)+"/", folder.Storage)
 }
 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {

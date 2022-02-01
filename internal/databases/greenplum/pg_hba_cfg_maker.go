@@ -3,6 +3,7 @@ package greenplum
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
@@ -46,22 +47,9 @@ func (m PgHbaMaker) Make() (string, error) {
 		pgHbaRows = append(pgHbaRows, row)
 	}
 
-	primarySegments := make([]*cluster.SegConfig, 0)
-	for _, configs := range m.segments {
-		for _, config := range configs {
-			if config.ContentID == -1 {
-				break // we are not interested in mdw/mdws segments
-			}
-
-			if SegmentRole(config.Role) == Primary {
-				primarySegments = append(primarySegments, config)
-			}
-		}
-	}
-
 	writtenHosts := make(map[string]bool)
 	// add entries for sdwN primary segments (w/o mdw/mdws hosts)
-	for _, primary := range primarySegments {
+	for _, primary := range m.primarySegments() {
 		if writtenHosts[primary.Hostname] {
 			continue // do not write duplicate entries
 		}
@@ -75,7 +63,7 @@ func (m PgHbaMaker) Make() (string, error) {
 
 	writtenHosts = make(map[string]bool)
 	// add replication entries for sdwN primary segments (w/o mdw/mdws hosts)
-	for _, primary := range primarySegments {
+	for _, primary := range m.primarySegments() {
 		if writtenHosts[primary.Hostname] {
 			continue // do not write duplicate entries
 		}
@@ -85,4 +73,23 @@ func (m PgHbaMaker) Make() (string, error) {
 	}
 
 	return strings.Join(pgHbaRows, "\n"), nil
+}
+
+// Return primary sdwN segments ordered by contentID
+func (m PgHbaMaker) primarySegments() []*cluster.SegConfig {
+	primarySegments := make([]*cluster.SegConfig, 0)
+	for _, configs := range m.segments {
+		for _, config := range configs {
+			if config.ContentID == -1 {
+				break // we are not interested in mdw/mdws segments
+			}
+
+			if SegmentRole(config.Role) == Primary {
+				primarySegments = append(primarySegments, config)
+			}
+		}
+	}
+
+	sort.Slice(primarySegments, func(i, j int) bool { return primarySegments[i].ContentID < primarySegments[j].ContentID })
+	return primarySegments
 }

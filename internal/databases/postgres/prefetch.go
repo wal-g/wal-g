@@ -248,6 +248,10 @@ func forkPrefetch(walFileName string, location string) {
 	if internal.CfgFile != "" {
 		prefetchArgs = append(prefetchArgs, "--config", internal.CfgFile)
 	}
+	storagePrefix := viper.GetString(internal.StoragePrefixSetting)
+	if storagePrefix != "" {
+		prefetchArgs = append(prefetchArgs, "--walg-storage-prefix", storagePrefix)
+	}
 	cmd := exec.Command(os.Args[0], prefetchArgs...)
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout

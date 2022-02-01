@@ -7,13 +7,14 @@ import (
 	"os"
 	"syscall"
 
+	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
+func HandleBackupPush(dbnames []string, updateLatest bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 	defer func() { _ = signalHandler.Close() }()
@@ -29,15 +30,9 @@ func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 
 	tracelog.ErrorLogger.FatalfOnError("failed to list databases to backup: %v", err)
 
-	bs, err := blob.NewServer(folder)
-	tracelog.ErrorLogger.FatalfOnError("proxy create error: %v", err)
-
-	lock, err := bs.AcquireLock()
+	lock, err := RunOrReuseProxy(ctx, cancel, folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	defer func() { tracelog.ErrorLogger.PrintOnError(lock.Unlock()) }()
-
-	err = bs.RunBackground(ctx, cancel)
-	tracelog.ErrorLogger.FatalfOnError("proxy run error: %v", err)
+	defer lock.Close()
 
 	server, _ := os.Hostname()
 	timeStart := utility.TimeNowCrossPlatformLocal()
@@ -59,8 +54,9 @@ func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 			StartLocalTime: timeStart,
 		}
 	}
+	builtinCompression := blob.UseBuiltinCompression()
 	err = runParallel(func(i int) error {
-		return backupSingleDatabase(ctx, db, backupName, dbnames[i], compression)
+		return backupSingleDatabase(ctx, db, backupName, dbnames[i], builtinCompression)
 	}, len(dbnames), getDBConcurrency())
 	tracelog.ErrorLogger.FatalfOnError("overall backup failed: %v", err)
 
@@ -73,7 +69,7 @@ func HandleBackupPush(dbnames []string, updateLatest bool, compression bool) {
 	tracelog.InfoLogger.Printf("backup finished")
 }
 
-func backupSingleDatabase(ctx context.Context, db *sql.DB, backupName string, dbname string, compression bool) error {
+func backupSingleDatabase(ctx context.Context, db *sql.DB, backupName string, dbname string, builtinCompression bool) error {
 	baseURL := getDatabaseBackupURL(backupName, dbname)
 	size, blobCount, err := estimateDBSize(db, dbname)
 	if err != nil {
@@ -83,7 +79,7 @@ func backupSingleDatabase(ctx context.Context, db *sql.DB, backupName string, db
 	urls := buildBackupUrls(baseURL, blobCount)
 	sql := fmt.Sprintf("BACKUP DATABASE %s TO %s", quoteName(dbname), urls)
 	sql += fmt.Sprintf(" WITH FORMAT, MAXTRANSFERSIZE=%d", MaxTransferSize)
-	if compression {
+	if builtinCompression {
 		sql += ", COMPRESSION"
 	}
 	tracelog.InfoLogger.Printf("starting backup database [%s] to %s", dbname, urls)

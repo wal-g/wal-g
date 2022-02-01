@@ -5,6 +5,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/wal-g/wal-g/internal/databases/postgres"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 
@@ -12,6 +14,8 @@ import (
 )
 
 type SegmentRole string
+
+const MetadataDatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 const (
 	Primary SegmentRole = "p"
@@ -27,6 +31,7 @@ type SegmentMetadata struct {
 	DataDir    string      `json:"data_dir"`
 
 	BackupID        string `json:"backup_id"`
+	BackupName      string `json:"backup_name"`
 	RestorePointLSN string `json:"restore_point_lsn"`
 }
 
@@ -41,7 +46,7 @@ func (c SegmentMetadata) ToSegConfig() cluster.SegConfig {
 	}
 }
 
-func NewSegmentMetadata(backupID string, segCfg cluster.SegConfig, restoreLSN string) SegmentMetadata {
+func NewSegmentMetadata(backupID string, segCfg cluster.SegConfig, restoreLSN, backupName string) SegmentMetadata {
 	return SegmentMetadata{
 		DatabaseID:      segCfg.DbID,
 		ContentID:       segCfg.ContentID,
@@ -51,7 +56,14 @@ func NewSegmentMetadata(backupID string, segCfg cluster.SegConfig, restoreLSN st
 		DataDir:         segCfg.DataDir,
 		BackupID:        backupID,
 		RestorePointLSN: restoreLSN,
+		BackupName:      backupName,
 	}
+}
+
+// PgSegmentMetaDto is used during the initial fetching of the segment backup metadata
+type PgSegmentMetaDto struct {
+	postgres.ExtendedMetadataDto
+	BackupName string
 }
 
 // BackupSentinelDto describes file structure of json sentinel
@@ -62,6 +74,7 @@ type BackupSentinelDto struct {
 
 	StartTime        time.Time `json:"start_time"`
 	FinishTime       time.Time `json:"finish_time"`
+	DatetimeFormat   string    `json:"date_fmt,omitempty"`
 	Hostname         string    `json:"hostname"`
 	GpVersion        string    `json:"gp_version"`
 	IsPermanent      bool      `json:"is_permanent"`
@@ -93,20 +106,22 @@ func NewBackupSentinelDto(currBackupInfo CurrBackupInfo, restoreLSNs map[int]str
 		UserData:         userData,
 		StartTime:        currBackupInfo.startTime,
 		FinishTime:       utility.TimeNowCrossPlatformUTC(),
+		DatetimeFormat:   MetadataDatetimeFormat,
 		Hostname:         hostname,
 		GpVersion:        currBackupInfo.gpVersion.String(),
 		IsPermanent:      isPermanent,
 		SystemIdentifier: currBackupInfo.systemIdentifier,
 	}
 
-	for idx := range currBackupInfo.segmentsMetadata {
-		sentinel.CompressedSize += currBackupInfo.segmentsMetadata[idx].CompressedSize
-		sentinel.UncompressedSize += currBackupInfo.segmentsMetadata[idx].UncompressedSize
+	for backupID := range currBackupInfo.segmentsMetadata {
+		sentinel.CompressedSize += currBackupInfo.segmentsMetadata[backupID].CompressedSize
+		sentinel.UncompressedSize += currBackupInfo.segmentsMetadata[backupID].UncompressedSize
 	}
 
 	for backupID, cfg := range currBackupInfo.segmentBackups {
 		restoreLSN := restoreLSNs[cfg.ContentID]
-		sentinel.Segments = append(sentinel.Segments, NewSegmentMetadata(backupID, *cfg, restoreLSN))
+		backupName := currBackupInfo.segmentsMetadata[backupID].BackupName
+		sentinel.Segments = append(sentinel.Segments, NewSegmentMetadata(backupID, *cfg, restoreLSN, backupName))
 	}
 	return sentinel
 }

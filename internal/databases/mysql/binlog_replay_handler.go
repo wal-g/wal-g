@@ -72,37 +72,42 @@ func (rh *replayHandler) handleBinlog(binlogPath string) error {
 	}
 }
 
-func HandleBinlogReplay(folder storage.Folder, backupName string, untilTS string) {
+func HandleBinlogReplay(folder storage.Folder, backupName string, untilTS string, untilBinlogLastModifiedTS string) {
 	dstDir, err := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	startTS, endTS, err := getTimestamps(folder, backupName, untilTS)
+	startTS, endTS, endBinlogTS, err := getTimestamps(folder, backupName, untilTS, untilBinlogLastModifiedTS)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	handler := newReplayHandler(endTS)
 
 	tracelog.InfoLogger.Printf("Fetching binlogs since %s until %s", startTS, endTS)
-	err = fetchLogs(folder, dstDir, startTS, endTS, handler)
+	err = fetchLogs(folder, dstDir, startTS, endTS, endBinlogTS, handler)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch binlogs: %v", err)
 
 	err = handler.wait()
 	tracelog.ErrorLogger.FatalfOnError("Failed to apply binlogs: %v", err)
 }
 
-func getTimestamps(folder storage.Folder, backupName, untilTS string) (time.Time, time.Time, error) {
+func getTimestamps(folder storage.Folder, backupName, untilTS, untilBinlogLastModifiedTS string) (time.Time, time.Time, time.Time, error) {
 	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	if err != nil {
-		return time.Time{}, time.Time{}, errors.Wrap(err, "Unable to get backup")
+		return time.Time{}, time.Time{}, time.Time{}, errors.Wrap(err, "Unable to get backup")
 	}
 
 	startTS, err := getBinlogSinceTS(folder, backup)
 	if err != nil {
-		return time.Time{}, time.Time{}, err
+		return time.Time{}, time.Time{}, time.Time{}, err
 	}
 
 	endTS, err := utility.ParseUntilTS(untilTS)
 	if err != nil {
-		return time.Time{}, time.Time{}, err
+		return time.Time{}, time.Time{}, time.Time{}, err
 	}
-	return startTS, endTS, nil
+
+	endBinlogTS, err := utility.ParseUntilTS(untilBinlogLastModifiedTS)
+	if err != nil {
+		return time.Time{}, time.Time{}, time.Time{}, err
+	}
+	return startTS, endTS, endBinlogTS, nil
 }

@@ -43,7 +43,7 @@ func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedu
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
 func deltaFetchRecursionNew(cfg *FetchConfig) error {
 	backup := NewBackup(cfg.folder.GetSubFolder(utility.BaseBackupPath), cfg.backupName)
-	sentinelDto, err := backup.GetSentinel()
+	sentinelDto, filesMetaDto, err := backup.GetSentinelAndFilesMetadata()
 	if err != nil {
 		return err
 	}
@@ -52,11 +52,11 @@ func deltaFetchRecursionNew(cfg *FetchConfig) error {
 
 	if sentinelDto.IsIncremental() {
 		tracelog.InfoLogger.Printf("Delta %v at LSN %x \n", cfg.backupName, *(sentinelDto.BackupStartLSN))
-		baseFilesToUnwrap, err := GetBaseFilesToUnwrap(sentinelDto.Files, cfg.filesToUnwrap)
+		baseFilesToUnwrap, err := GetBaseFilesToUnwrap(filesMetaDto.Files, cfg.filesToUnwrap)
 		if err != nil {
 			return err
 		}
-		unwrapResult, err := backup.unwrapNew(cfg.dbDataDirectory, sentinelDto, cfg.filesToUnwrap,
+		unwrapResult, err := backup.unwrapNew(cfg.dbDataDirectory, sentinelDto, filesMetaDto, cfg.filesToUnwrap,
 			false, cfg.skipRedundantTars)
 		if err != nil {
 			return err
@@ -79,7 +79,7 @@ func deltaFetchRecursionNew(cfg *FetchConfig) error {
 	}
 
 	tracelog.InfoLogger.Printf("%x reached. Applying base backup... \n", *(sentinelDto.BackupStartLSN))
-	_, err = backup.unwrapNew(cfg.dbDataDirectory, sentinelDto, cfg.filesToUnwrap,
+	_, err = backup.unwrapNew(cfg.dbDataDirectory, sentinelDto, filesMetaDto, cfg.filesToUnwrap,
 		false, cfg.skipRedundantTars)
 	return err
 }

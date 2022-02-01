@@ -104,6 +104,10 @@ To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not e
 
 To configure the size of one backup bundle (in bytes). Smaller size causes granularity and more optimal, faster recovering. It also increases the number of storage requests, so it can costs you much money. Default size is 1 GB (`1 << 30 - 1` bytes).
 
+* `WALG_TAR_DISABLE_FSYNC`
+
+Disable calling fsync after writing files when extracting tar files.
+
 * `WALG_PG_WAL_SIZE`
 
 To configure the wal segment size if different from the postgres default of 16 MB
@@ -245,6 +249,26 @@ To activate this feature, do one of the following:
 wal-g backup-push /path --copy-composer
 ```
 
+#### Backup without metadata
+
+By default, WAL-G tracks metadata of the files backed up. If millions of files are backed up (typically in case of hundreds of databases and thousands of tables in each database), tracking this metadata alone would require GBs of memory.
+
+If `--without-files-metadata` or `WALG_WITHOUT_FILES_METADATA` is enabled, WAL-G does not track metadata of the files backed up. This significantly reduces the memory usage on instances with `> 100k` files.
+
+Limitations
+
+* Cannot be used with `rating-composer`, `copy-composer`
+* Cannot be used with `delta-from-user-data`, `delta-from-name`, `add-user-data`
+
+To activate this feature, do one of the following:
+
+* set the `WALG_WITHOUT_FILES_METADATA`environment variable
+* add the `--without-files-metadata` flag
+
+```bash
+wal-g backup-push /path --without-files-metadata
+```
+
 #### Create delta from specific backup
 When creating delta backup (`WALG_DELTA_MAX_STEPS` > 0), WAL-G uses the latest backup as the base by default. This behaviour can be changed via following flags:
 
@@ -273,6 +297,26 @@ wal-g logs:
 INFO: Selecting the backup with name base_000000010000000100000046_D_000000010000000100000040 as the base for the current delta backup...
 INFO: Delta will be made from full backup.
 INFO: Delta backup from base_000000010000000100000040 with LSN 140000060.
+```
+
+#### Pages checksum verification
+To enable verification of the page checksums during the backup-push, use the `--verify` flag or set the `WALG_VERIFY_PAGE_CHECKSUMS` env variable. If found any, corrupted block numbers (currently no more than 10 of them) will be recorded to the backup sentinel json, for example:
+```json
+...
+"/base/13690/13535": {
+"IsSkipped": true,
+"MTime": "2020-08-20T21:02:56.690095409+05:00",
+"IsIncremented": false
+},
+"/base/16384/16397": {
+"CorruptBlocks": [
+1
+],
+"IsIncremented": false,
+"IsSkipped": false,
+"MTime": "2020-08-21T19:09:52.966149937+05:00"
+},
+...
 ```
 
 ### ``wal-fetch``
@@ -464,4 +508,24 @@ Purges outdated WAL archives from storage. Will remove all WAL archives before t
 Usage:
 ```bash
 wal-g wal-purge
+```
+
+pgBackRest backups support
+-----------
+### ``pgbackrest backup-list``
+
+List pgbackrest backups.
+
+Usage:
+```bash
+wal-g pgbackrest backup-list [--pretty] [--json] [--detail]
+```
+
+### ``pgbackrest backup-fetch``
+
+Fetch pgbackrest backup. For now works only with full backups, incr and diff backups are not supported.
+
+Usage:
+```bash
+wal-g pgbackrest backup-fetch path/to/destination-directory backup-name
 ```

@@ -68,11 +68,16 @@ To configure the name of a file containing private key of Yandex Cloud Service A
 
 * `WALG_LIBSODIUM_KEY`
 
-To configure encryption and decryption with libsodium. WAL-G uses an [algorithm](https://download.libsodium.org/doc/secret-key_cryptography/secretstream#algorithm) that only requires a secret key.
+To configure encryption and decryption with libsodium. WAL-G uses an [algorithm](https://download.libsodium.org/doc/secret-key_cryptography/secretstream#algorithm) that only requires a secret key. libsodium keys are fixed-size keys of 32 bytes. For optimal cryptographic security, it is recommened to use a random 32 byte key. To generate a random key, you can something like `openssl rand -hex 32` (set `WALG_LIBSODIUM_KEY_TRANSFORM` to `hex`) or `openssl rand -base64 32` (set `WALG_LIBSODIUM_KEY_TRANSFORM` to `base64`).
 
 * `WALG_LIBSODIUM_KEY_PATH`
 
 Similar to `WALG_LIBSODIUM_KEY`, but value is the path to the key on file system. The file content will be trimmed from whitespace characters.
+
+* `WALG_LIBSODIUM_KEY_TRANSFORM`
+
+The transform that will be applied to the `WALG_LIBSODIUM_KEY` to get the required 32 byte key. Supported transformations are `base64`, `hex` or `none` (default).
+The option `none` exists for backwards compatbility, the user input will be converted to 32 byte either via truncation or by zero-padding.
 
 * `WALG_GPG_KEY_ID`  (alternative form `WALE_GPG_KEY_ID`) ⚠️ **DEPRECATED**
 
@@ -160,46 +165,9 @@ If `FIND_FULL` is specified, WAL-G will calculate minimum backup needed to keep 
 
 **More commands are available for the chosen database engine. See it in [Databases](#databases)**
 
-## Storage tools (danger zone)
-`wal-g st` command series allows interacting with the configured storage. Be aware that these commands can do potentially harmful operations and make sure that you know what you're doing.
-
-### ``ls``
-Prints listing of the objects in the provided storage folder.
-
-``wal-g st ls`` get listing with all objects in the configured storage.
-
-``wal-g st ls some_folder/some_subfolder`` get listing with all objects in the provided storage path.
-
-### ``get``
-Download the specified storage object. By default, the command will try to apply the decompression and decryption (if configured).
-
-Flags:
-1. Add `--no-decompress` to download the remote object without decompression
-2. Add `--no-decrypt` to download the remote object without decryption
-
-Examples:
-
-``wal-g st get path/to/remote_file path/to/local_file`` download the file from storage.
-
-``wal-g st get path/to/remote_file path/to/local_file --no-decrypt`` download the file from storage without decryption.
-
-### ``rm``
-Remove the specified storage object.
-
-Example:
-
-``wal-g st rm path/to/remote_file`` remove the file from storage.
-
-### ``put``
-Upload the specified file to the storage. By default, the command will try to apply the compression and encryption (if configured).
-
-Flags:
-1. Add `--no-compress` to upload the object without compression
-2. Add `--no-encrypt` to upload the object without encryption
-
-Example:
-
-``wal-g st put path/to/local_file path/to/remote_file`` upload the local file to storage.
+## Storage tools
+`wal-g st` command series allows the direct interaction with the configured storage.
+[Storage tools documentation](StorageTools.md)
 
 Databases
 -----------
@@ -220,6 +188,9 @@ Databases
 
 ### Redis [Beta]
 [Information about installing, configuration and usage](Redis.md)
+
+### Greenplum [Work in progress]
+[Information about installing, configuration and usage](Greenplum.md)
 
 Development
 -----------

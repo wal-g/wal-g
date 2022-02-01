@@ -33,6 +33,7 @@ type BackupDetail struct {
 	UserData    interface{} `json:"user_data,omitempty"`
 }
 
+//nolint:gocritic,hugeParam
 func NewBackupDetail(backupTime internal.BackupTime, sentinel StreamSentinelDto) BackupDetail {
 	return BackupDetail{
 		BackupName:       backupTime.BackupName,

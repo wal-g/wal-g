@@ -25,7 +25,7 @@ sysbench --time=3 run
 mysql -e "FLUSH LOGS"
 wal-g binlog-push
 
-# last binlog waas not archived
+# last binlog was not archived
 current_binlog=$(mysql -e "SHOW BINARY LOGS" | tail -n 1 | awk '{print $1}')
 mysql -N -e 'show binary logs' | awk '{print $1}' | grep -v "$current_binlog" > /tmp/proper_order
 
@@ -47,3 +47,32 @@ while read -r binlog; do
         diff -u /tmp/proper.sql /tmp/fetched.sql
     fi
 done < /tmp/binlogs/binlogs_order
+
+
+echo "Get GTIDs, and write HUGE GTID to cache, so no binlogs should be uploaded anymore"
+sysbench --time=1 run && mysql -e "FLUSH LOGS"
+sysbench --time=1 run && mysql -e "FLUSH LOGS"
+sysbench --time=1 run && mysql -e "FLUSH LOGS"
+current_uuid=$(mysql -Nse "SELECT @@server_uuid" | awk '{print $1}')
+current_sentinel=$(s3cmd get "${WALE_S3_PREFIX}/binlog_sentinel_005.json" - )
+echo "{\"GtidArchived\":\"${current_uuid}:1-999999\"}" | s3cmd put - "${WALE_S3_PREFIX}/binlog_sentinel_005.json"
+binlogs_cnt1=$(s3cmd ls "${WALE_S3_PREFIX}/binlog_005/" | wc -l )
+export WALG_MYSQL_CHECK_GTIDS="true"
+wal-g binlog-push
+binlogs_cnt2=$(s3cmd ls "${WALE_S3_PREFIX}/binlog_005/" | wc -l )
+
+if [ "$binlogs_cnt1" -ne "$binlogs_cnt2" ]; then
+  echo "Some binlogs has been uploaded... however it shouldn't be: ${binlogs_cnt1} != ${binlogs_cnt2}"
+  exit 1
+fi
+
+echo "Revert GTIDs in cache, so all binlogs should be uploaded"
+echo "${current_sentinel}}" | s3cmd put - "${WALE_S3_PREFIX}/binlog_sentinel_005.json"
+export WALG_MYSQL_CHECK_GTIDS="true"
+wal-g binlog-push
+binlogs_cnt3=$(s3cmd ls "${WALE_S3_PREFIX}/binlog_005/" | wc -l )
+
+if [ "$binlogs_cnt2" -eq "$binlogs_cnt3" ]; then
+  echo "Some binlogs haven't been uploaded... however it should"
+  exit 1
+fi

@@ -7,8 +7,11 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+const SegmentsFolderPath = "segments_" + utility.VersionStr + "/"
+
 func FormatSegmentStoragePrefix(contentID int) string {
-	return fmt.Sprintf("seg%d", contentID)
+	segmentFolderName := fmt.Sprintf("seg%d", contentID)
+	return path.Join(SegmentsFolderPath, segmentFolderName)
 }
 
 func FormatSegmentBackupPath(contentID int) string {

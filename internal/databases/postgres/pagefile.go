@@ -132,6 +132,7 @@ func ReadIncrementalFile(filePath string,
 	pageReader := &IncrementalPageReader{fileReadSeekCloser, fileSize, lsn, nil, nil}
 	incrementSize, err := pageReader.initialize(deltaBitmap)
 	if err != nil {
+		utility.LoggedClose(file, "")
 		return nil, 0, err
 	}
 	return pageReader, incrementSize, nil
@@ -170,7 +171,7 @@ func convertBlocksToLocations(filePath string, blocks []uint32) ([]walparser.Blo
 }
 
 // ApplyFileIncrement changes pages according to supplied change map file
-func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrementalFiles bool) error {
+func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrementalFiles bool, fsync bool) error {
 	tracelog.DebugLogger.Printf("Incrementing %s\n", fileName)
 	err := ReadIncrementFileHeader(increment)
 	if err != nil {
@@ -207,7 +208,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrement
 		return errors.Wrap(err, "can't open file to increment")
 	}
 	defer utility.LoggedClose(file, "")
-	defer utility.LoggedSync(file, "")
+	defer utility.LoggedSync(file, "", fsync)
 
 	err = file.Truncate(int64(fileSize))
 	if err != nil {

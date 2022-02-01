@@ -17,6 +17,7 @@ import (
 type BundleFiles interface {
 	AddSkippedFile(tarHeader *tar.Header, fileInfo os.FileInfo)
 	AddFile(tarHeader *tar.Header, fileInfo os.FileInfo, isIncremented bool)
+	AddFileDescription(name string, backupFileDescription internal.BackupFileDescription)
 	AddFileWithCorruptBlocks(tarHeader *tar.Header, fileInfo os.FileInfo, isIncremented bool,
 		corruptedBlocks []uint32, storeAllBlocks bool)
 	GetUnderlyingMap() *sync.Map
@@ -27,20 +28,24 @@ type RegularBundleFiles struct {
 }
 
 func (files *RegularBundleFiles) AddSkippedFile(tarHeader *tar.Header, fileInfo os.FileInfo) {
-	files.Store(tarHeader.Name,
+	files.AddFileDescription(tarHeader.Name,
 		internal.BackupFileDescription{IsSkipped: true, IsIncremented: false, MTime: fileInfo.ModTime()})
 }
 
 func (files *RegularBundleFiles) AddFile(tarHeader *tar.Header, fileInfo os.FileInfo, isIncremented bool) {
-	files.Store(tarHeader.Name,
+	files.AddFileDescription(tarHeader.Name,
 		internal.BackupFileDescription{IsSkipped: false, IsIncremented: isIncremented, MTime: fileInfo.ModTime()})
+}
+
+func (files *RegularBundleFiles) AddFileDescription(name string, backupFileDescription internal.BackupFileDescription) {
+	files.Store(name, backupFileDescription)
 }
 
 func (files *RegularBundleFiles) AddFileWithCorruptBlocks(tarHeader *tar.Header, fileInfo os.FileInfo,
 	isIncremented bool, corruptedBlocks []uint32, storeAllBlocks bool) {
 	fileDescription := internal.BackupFileDescription{IsSkipped: false, IsIncremented: isIncremented, MTime: fileInfo.ModTime()}
 	fileDescription.SetCorruptBlocks(corruptedBlocks, storeAllBlocks)
-	files.Store(tarHeader.Name, fileDescription)
+	files.AddFileDescription(tarHeader.Name, fileDescription)
 }
 
 func (files *RegularBundleFiles) GetUnderlyingMap() *sync.Map {
@@ -67,25 +72,49 @@ func (files *StatBundleFiles) AddFileWithCorruptBlocks(tarHeader *tar.Header,
 	fileDescription := internal.BackupFileDescription{IsSkipped: false, IsIncremented: isIncremented, MTime: fileInfo.ModTime(),
 		UpdatesCount: updatesCount}
 	fileDescription.SetCorruptBlocks(corruptedBlocks, storeAllBlocks)
-	files.Store(tarHeader.Name, fileDescription)
+	files.AddFileDescription(tarHeader.Name, fileDescription)
 }
 
 func (files *StatBundleFiles) AddSkippedFile(tarHeader *tar.Header, fileInfo os.FileInfo) {
 	updatesCount := files.fileStats.getFileUpdateCount(tarHeader.Name)
-	files.Store(tarHeader.Name,
+	files.AddFileDescription(tarHeader.Name,
 		internal.BackupFileDescription{IsSkipped: true, IsIncremented: false,
 			MTime: fileInfo.ModTime(), UpdatesCount: updatesCount})
 }
 
 func (files *StatBundleFiles) AddFile(tarHeader *tar.Header, fileInfo os.FileInfo, isIncremented bool) {
 	updatesCount := files.fileStats.getFileUpdateCount(tarHeader.Name)
-	files.Store(tarHeader.Name,
+	files.AddFileDescription(tarHeader.Name,
 		internal.BackupFileDescription{IsSkipped: false, IsIncremented: isIncremented,
 			MTime: fileInfo.ModTime(), UpdatesCount: updatesCount})
 }
 
+func (files *StatBundleFiles) AddFileDescription(name string, backupFileDescription internal.BackupFileDescription) {
+	files.Store(name, backupFileDescription)
+}
+
 func (files *StatBundleFiles) GetUnderlyingMap() *sync.Map {
 	return &files.Map
+}
+
+type NopBundleFiles struct {
+}
+
+func (files *NopBundleFiles) AddSkippedFile(tarHeader *tar.Header, fileInfo os.FileInfo) {
+}
+
+func (files *NopBundleFiles) AddFile(tarHeader *tar.Header, fileInfo os.FileInfo, isIncremented bool) {
+}
+
+func (files *NopBundleFiles) AddFileDescription(name string, backupFileDescription internal.BackupFileDescription) {
+}
+
+func (files *NopBundleFiles) AddFileWithCorruptBlocks(tarHeader *tar.Header, fileInfo os.FileInfo,
+	isIncremented bool, corruptedBlocks []uint32, storeAllBlocks bool) {
+}
+
+func (files *NopBundleFiles) GetUnderlyingMap() *sync.Map {
+	return &sync.Map{}
 }
 
 type RelFileStatistics map[walparser.RelFileNode]PgRelationStat

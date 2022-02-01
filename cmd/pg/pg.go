@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wal-g/wal-g/cmd/st"
+	"github.com/wal-g/wal-g/cmd/common"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 
@@ -30,6 +30,7 @@ var (
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			err := internal.AssertRequiredSettingsSet()
 			tracelog.ErrorLogger.FatalOnError(err)
+
 			if viper.IsSet(internal.PgWalSize) {
 				postgres.SetWalSize(viper.GetUint64(internal.PgWalSize))
 			}
@@ -48,14 +49,6 @@ func Execute() {
 }
 
 func configureCommand() {
-	internal.ConfigureSettings(internal.PG)
-	cobra.OnInitialize(internal.InitConfig, internal.Configure)
-
-	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
+	common.Init(Cmd, internal.PG)
 	Cmd.PersistentFlags().BoolVarP(&internal.Turbo, "turbo", "", false, "Ignore all kinds of throttling defined in config")
-	Cmd.InitDefaultVersionFlag()
-	internal.AddConfigFlags(Cmd)
-
-	// Storage tools
-	Cmd.AddCommand(st.StorageToolsCmd)
 }

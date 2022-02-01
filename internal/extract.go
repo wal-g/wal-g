@@ -13,7 +13,6 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
-	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/semaphore"
 )
@@ -39,14 +38,6 @@ type UnsupportedFileTypeError struct {
 	error
 }
 
-type DecompressionError struct {
-	error
-}
-
-func newDecompressionError(err error) DecompressionError {
-	return DecompressionError{err}
-}
-
 func newUnsupportedFileTypeError(path string, fileFormat string) UnsupportedFileTypeError {
 	return UnsupportedFileTypeError{errors.Errorf("WAL-G does not support the file format '%s' in '%s'", fileFormat, path)}
 }
@@ -61,22 +52,30 @@ type TarInterpreter interface {
 	Interpret(reader io.Reader, header *tar.Header) error
 }
 
-// EmptyWriteIgnorer handles 0 byte write in LZ4 package
-// to stop pipe reader/writer from blocking.
-type EmptyWriteIgnorer struct {
+type DevNullWriter struct {
 	io.WriteCloser
+	statPrinter sync.Once
+	totalBytes  int64
 }
 
-func (e EmptyWriteIgnorer) Write(p []byte) (int, error) {
-	if len(p) == 0 {
-		return 0, nil
-	}
-	return e.WriteCloser.Write(p)
+func (e *DevNullWriter) Write(p []byte) (int, error) {
+	e.statPrinter.Do(func() {
+		go func() {
+			for {
+				time.Sleep(1 * time.Second)
+				tracelog.ErrorLogger.Printf("/dev/null size %d", e.totalBytes)
+			}
+		}()
+	})
+	e.totalBytes += int64(len(p))
+	return len(p), nil
 }
+
+var _ io.Writer = &DevNullWriter{}
 
 // TODO : unit tests
 // Extract exactly one tar bundle.
-func extractOne(tarInterpreter TarInterpreter, source io.Reader) error {
+func extractOneTar(tarInterpreter TarInterpreter, source io.Reader) error {
 	tarReader := tar.NewReader(source)
 
 	for {
@@ -96,50 +95,44 @@ func extractOne(tarInterpreter TarInterpreter, source io.Reader) error {
 	return nil
 }
 
+func extractNonTar(tarInterpreter TarInterpreter, source io.Reader, path string, fileType FileType, mode int) error {
+	var typeFlag byte
+	if fileType == RegularFileType {
+		typeFlag = tar.TypeReg
+	} else {
+		typeFlag = tar.TypeDir
+	}
+	return tarInterpreter.Interpret(source, &tar.Header{
+		Name:     path,
+		Mode:     int64(mode),
+		Typeflag: typeFlag,
+	})
+}
+
 // DecryptAndDecompressTar decrypts file and checks its extension.
 // If it's tar, a decompression is not needed.
 // Otherwise it uses corresponding decompressor. If none found an error will be returned.
-func DecryptAndDecompressTar(writer io.Writer, readerMaker ReaderMaker, crypter crypto.Crypter) error {
-	readCloser, err := readerMaker.Reader()
-
-	if err != nil {
-		return errors.Wrap(err, "DecryptAndDecompressTar: failed to create new reader")
-	}
-	defer utility.LoggedClose(readCloser, "")
+func DecryptAndDecompressTar(reader io.Reader, filePath string, crypter crypto.Crypter) (io.ReadCloser, error) {
+	var err error
 
 	if crypter != nil {
-		var reader io.Reader
-		reader, err = crypter.Decrypt(readCloser)
+		reader, err = crypter.Decrypt(reader)
 		if err != nil {
-			return errors.Wrap(err, "DecryptAndDecompressTar: decrypt failed")
-		}
-		readCloser = ioextensions.ReadCascadeCloser{
-			Reader: reader,
-			Closer: readCloser,
+			return nil, errors.Wrap(err, "DecryptAndDecompressTar: decrypt failed")
 		}
 	}
 
-	fileExtension := utility.GetFileExtension(readerMaker.Path())
+	fileExtension := utility.GetFileExtension(filePath)
 	if fileExtension == "tar" {
-		_, err = io.Copy(writer, readCloser)
-		return errors.Wrap(err, "DecryptAndDecompressTar: tar extract failed")
+		return io.NopCloser(reader), nil
 	}
 
-	for _, decompressor := range compression.Decompressors {
-		if fileExtension != decompressor.FileExtension() {
-			continue
-		}
-		err = decompressor.Decompress(writer, readCloser)
-		if err == nil {
-			return nil
-		}
-		decompressionError := newDecompressionError(err)
-		return errors.Wrapf(decompressionError,
-			"DecryptAndDecompressTar: %v decompress failed. Is archive encrypted?",
-			decompressor.FileExtension())
+	decompressor := compression.FindDecompressor(fileExtension)
+	if decompressor == nil {
+		return nil, newUnsupportedFileTypeError(filePath, fileExtension)
 	}
 
-	return newUnsupportedFileTypeError(readerMaker.Path(), fileExtension)
+	return decompressor.Decompress(reader)
 }
 
 // ExtractAll Handles all files passed in. Supports `.lzo`, `.lz4`, `.lzma`, and `.tar`.
@@ -177,13 +170,32 @@ func ExtractAllWithSleeper(tarInterpreter TarInterpreter, files []ReaderMaker, s
 	return nil
 }
 
+// Extract single file from backup
+// If it is .tar file unpack it and store internal files (there will be .tar file if you work with wal-g backup)
+// Otherwise store this file (there will be regular file if you work with pgbackrest backup)
+func extractFile(tarInterpreter TarInterpreter, extractingReader io.Reader, fileClosure ReaderMaker) error {
+	switch fileClosure.FileType() {
+	case TarFileType:
+		err := extractOneTar(tarInterpreter, extractingReader)
+		if err == nil {
+			err = readTrailingZeros(extractingReader)
+		}
+		return err
+	case RegularFileType:
+		filePath := utility.TrimFileExtension(fileClosure.Path())
+		return extractNonTar(tarInterpreter, extractingReader, filePath, fileClosure.FileType(), fileClosure.Mode())
+	default:
+		tracelog.InfoLogger.Print()
+		return errors.New("Unknown fileType " + string(fileClosure.FileType()))
+	}
+}
+
 // TODO : unit tests
 func tryExtractFiles(files []ReaderMaker,
 	tarInterpreter TarInterpreter,
 	downloadingConcurrency int) (failed []ReaderMaker) {
 	downloadingContext := context.TODO()
 	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
-	writingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
 	crypter := ConfigureCrypter()
 	isFailed := sync.Map{}
 
@@ -193,31 +205,26 @@ func tryExtractFiles(files []ReaderMaker,
 			tracelog.ErrorLogger.Println(err)
 			return files //Should never happen, but if we are asked to cancel - consider all files unfinished
 		}
-		err = writingSemaphore.Acquire(downloadingContext, 1)
-		if err != nil {
-			tracelog.ErrorLogger.Println(err)
-			return files //Should never happen, but if we are asked to cancel - consider all files unfinished
-		}
 		fileClosure := file
 
-		extractingReader, pipeWriter := io.Pipe()
-		decompressingWriter := &EmptyWriteIgnorer{pipeWriter}
 		go func() {
 			defer downloadingSemaphore.Release(1)
-			err := DecryptAndDecompressTar(decompressingWriter, fileClosure, crypter)
-			utility.LoggedClose(decompressingWriter, "")
-			tracelog.InfoLogger.Printf("Finished decompression of %s", fileClosure.Path())
-			if err != nil {
-				isFailed.Store(fileClosure, true)
-				tracelog.ErrorLogger.Println(fileClosure.Path(), err)
+
+			readCloser, err := fileClosure.Reader()
+			if err == nil {
+				defer utility.LoggedClose(readCloser, "")
+
+				filePath := fileClosure.Path()
+				var extractingReader io.ReadCloser
+				extractingReader, err = DecryptAndDecompressTar(readCloser, filePath, crypter)
+				if err == nil {
+					defer extractingReader.Close()
+					err = extractFile(tarInterpreter, extractingReader, fileClosure)
+					err = errors.Wrapf(err, "Extraction error in %s", filePath)
+					tracelog.InfoLogger.Printf("Finished extraction of %s", filePath)
+				}
 			}
-		}()
-		go func() {
-			defer writingSemaphore.Release(1)
-			err := extractOne(tarInterpreter, extractingReader)
-			err = errors.Wrapf(err, "Extraction error in %s", fileClosure.Path())
-			utility.LoggedClose(extractingReader, "")
-			tracelog.InfoLogger.Printf("Finished extraction of %s", fileClosure.Path())
+
 			if err != nil {
 				isFailed.Store(fileClosure, true)
 				tracelog.ErrorLogger.Println(err)
@@ -230,15 +237,34 @@ func tryExtractFiles(files []ReaderMaker,
 		tracelog.ErrorLogger.Println(err)
 		return files //Should never happen, but if we are asked to cancel - consider all files unfinished
 	}
-	err = writingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency))
-	if err != nil {
-		tracelog.ErrorLogger.Println(err)
-		return files
-	}
 
 	isFailed.Range(func(failedFile, _ interface{}) bool {
 		failed = append(failed, failedFile.(ReaderMaker))
 		return true
 	})
 	return failed
+}
+
+func readTrailingZeros(r io.Reader) error {
+	// on first iteration we read small chunk
+	// in most cases we will return fast without memory allocation
+	b := make([]byte, 1024)
+	for {
+		n, err := r.Read(b)
+		if n > 0 {
+			if !utility.AllZero(b[:n]) {
+				return io.ErrClosedPipe
+			}
+		}
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+		if len(b) < utility.CompressedBlockMaxSize {
+			// but if we found zeroes, allocate large buffer to speed up reading
+			b = make([]byte, utility.CompressedBlockMaxSize)
+		}
+	}
 }

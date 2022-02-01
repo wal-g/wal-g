@@ -10,7 +10,7 @@ type Compressor interface {
 }
 
 type Decompressor interface {
-	Decompress(dst io.Writer, src io.Reader) error
+	Decompress(src io.Reader) (io.ReadCloser, error)
 	FileExtension() string
 }
 

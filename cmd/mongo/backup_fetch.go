@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -32,8 +31,10 @@ var backupFetchCmd = &cobra.Command{
 		restoreCmd.Stdout = os.Stdout
 		restoreCmd.Stderr = os.Stderr
 
-		err = mongo.HandleBackupFetch(ctx, folder, args[0], restoreCmd)
+		backupSelector, err := internal.NewBackupNameSelector(args[0], true)
 		tracelog.ErrorLogger.FatalOnError(err)
+
+		internal.HandleBackupFetch(folder, backupSelector, internal.GetBackupToCommandFetcher(restoreCmd))
 	},
 }
 

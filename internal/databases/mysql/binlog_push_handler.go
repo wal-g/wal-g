@@ -1,14 +1,19 @@
 package mysql
 
 import (
+	"bufio"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/user"
 	"path"
 	"path/filepath"
 	"sort"
+
+	"github.com/go-mysql-org/go-mysql/mysql"
+	"github.com/go-mysql-org/go-mysql/replication"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -20,10 +25,13 @@ const BinlogCacheFileName = ".walg_mysql_binlogs_cache"
 
 type LogsCache struct {
 	LastArchivedBinlog string `json:"LastArchivedBinlog"`
+	GTIDArchived       string `json:"GtidArchived"`
 }
 
-func HandleBinlogPush(uploader *internal.Uploader, untilBinlog string) {
-	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(BinlogPath)
+//gocyclo:ignore
+func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, checkGTIDs bool) {
+	rootFolder := uploader.Folder()
+	uploader.ChangeDirectory(BinlogPath)
 
 	db, err := getMySQLConnection()
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -32,37 +40,88 @@ func HandleBinlogPush(uploader *internal.Uploader, untilBinlog string) {
 	binlogsFolder, err := getMySQLBinlogsFolder(db)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	binlogs, err := getMySQLSortedBinlogs(db, untilBinlog)
+	binlogs, err := getMySQLSortedBinlogs(db)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	for _, binLog := range binlogs {
-		err = tryArchiveBinLog(uploader, path.Join(binlogsFolder, binLog), binLog)
-		tracelog.ErrorLogger.FatalOnError(err)
-	}
-}
-
-func getMySQLSortedBinlogs(db *sql.DB, untilBinlog string) ([]string, error) {
-	var result []string
-
-	if untilBinlog == "" {
+	if untilBinlog == "" || untilBinlog > getMySQLCurrentBinlogFileLocal(db) {
 		untilBinlog = getMySQLCurrentBinlogFileLocal(db)
 	}
 
-	rows, err := db.Query("SHOW BINARY LOGS")
-	if err != nil {
-		return nil, err
+	var binlogSentinelDto BinlogSentinelDto
+	err = FetchBinlogSentinel(rootFolder, &binlogSentinelDto)
+	// copy MySQLBinlogSentinel to cache:
+	cache := getCache()
+	if err == nil && binlogSentinelDto.GTIDArchived != "" {
+		cache.GTIDArchived = binlogSentinelDto.GTIDArchived
+		tracelog.InfoLogger.Printf("fetched binlog archived GTID SET: %s\n", cache.GTIDArchived)
 	}
-	defer utility.LoggedClose(rows, "")
-	for rows.Next() {
-		var logFinName string
-		var size uint64
-		err = utility.ScanToMap(rows, map[string]interface{}{"Log_name": &logFinName, "File_size": &size})
-		if err != nil {
-			return nil, err
+
+	var filters []statefulBinlogFilter
+	filters = append(filters, &untilBinlogFilter{Until: untilBinlog}, &archivedBinlogFilter{})
+	if checkGTIDs {
+		flavor, err := getFlavor(db)
+		if flavor == "" || err != nil {
+			flavor = mysql.MySQLFlavor
 		}
-		if logFinName < untilBinlog {
-			result = append(result, logFinName)
+		if flavor == mysql.MySQLFlavor {
+			filters = append(filters, &gtidFilter{BinlogsFolder: binlogsFolder, Flavor: flavor})
 		}
+	}
+	for _, filter := range filters {
+		filter.init(cache)
+	}
+
+outer:
+	for i := 0; i < len(binlogs); i++ {
+		binLog := binlogs[i]
+
+		tracelog.DebugLogger.Printf("Testing... %v\n", binLog)
+		for _, filter := range filters {
+			nextBinLog := ""
+			if i < len(binlogs)-1 {
+				nextBinLog = binlogs[i+1]
+			}
+			if !filter.test(binLog, nextBinLog) {
+				tracelog.DebugLogger.Printf("Skip binlog %v (%s check)\n", binLog, filter.name())
+				continue outer
+			}
+		}
+
+		// Upload binlogs:
+		err = archiveBinLog(uploader, binlogsFolder, binLog)
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		for _, filter := range filters {
+			filter.onUpload(&cache)
+		}
+		putCache(cache)
+	}
+
+	// Write Binlog Sentinel
+	binlogSentinelDto.GTIDArchived = cache.GTIDArchived
+	tracelog.InfoLogger.Printf("Binlog sentinel: %s, cache: %+v", binlogSentinelDto.String(), cache)
+	err = UploadBinlogSentinel(rootFolder, &binlogSentinelDto)
+	tracelog.ErrorLogger.FatalOnError(err)
+}
+
+func getMySQLSortedBinlogs(db *sql.DB) ([]string, error) {
+	var result []string
+	// SHOW BINARY LOGS acquire binlog mutex and may hang while mysql is committing huge transactions
+	// so we read binlog index from the disk with no locking
+	row := db.QueryRow("SELECT @@log_bin_index")
+	var binlogIndex string
+	err := row.Scan(&binlogIndex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query mysql variable: %w", err)
+	}
+	fh, err := os.Open(binlogIndex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open binlog index: %w", err)
+	}
+	s := bufio.NewScanner(fh)
+	for s.Scan() {
+		binlog := path.Base(s.Text())
+		result = append(result, binlog)
 	}
 	sort.Strings(result)
 	return result, nil
@@ -78,13 +137,10 @@ func getMySQLBinlogsFolder(db *sql.DB) (string, error) {
 	return path.Dir(logBinBasename), nil
 }
 
-func tryArchiveBinLog(uploader *internal.Uploader, filename string, binLog string) error {
-	if binLog <= getLastArchivedBinlog() {
-		tracelog.DebugLogger.Printf("Binlog %v already archived\n", binLog)
-		return nil
-	}
+func archiveBinLog(uploader internal.UploaderProvider, dataDir string, binLog string) error {
 	tracelog.InfoLogger.Printf("Archiving %v\n", binLog)
 
+	filename := path.Join(dataDir, binLog)
 	walFile, err := os.Open(filename)
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not open '%s'\n", filename)
@@ -95,11 +151,10 @@ func tryArchiveBinLog(uploader *internal.Uploader, filename string, binLog strin
 		return errors.Wrapf(err, "upload: could not upload '%s'\n", filename)
 	}
 
-	setLastArchivedBinlog(binLog)
 	return nil
 }
 
-func getLastArchivedBinlog() string {
+func getCache() LogsCache {
 	var cache LogsCache
 	var cacheFilename string
 
@@ -111,7 +166,7 @@ func getLastArchivedBinlog() string {
 		if err == nil {
 			err = json.Unmarshal(file, &cache)
 			if err == nil {
-				return cache.LastArchivedBinlog
+				return cache
 			}
 		}
 	}
@@ -120,28 +175,19 @@ func getLastArchivedBinlog() string {
 	} else {
 		tracelog.ErrorLogger.Printf("%+v\n", err)
 	}
-	return ""
+	return LogsCache{}
 }
 
-func setLastArchivedBinlog(binlogFileName string) {
-	var cache LogsCache
+func putCache(cache LogsCache) {
 	var cacheFilename string
-
 	usr, err := user.Current()
-	if err == nil {
-		cacheFilename = filepath.Join(usr.HomeDir, BinlogCacheFileName)
-		var file []byte
-		file, err = ioutil.ReadFile(cacheFilename)
-		// here we ignore whatever error can occur
-		if err == nil {
-			_ = json.Unmarshal(file, &cache)
-		}
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to get current user homedir: %v\n", err)
 	}
+	cacheFilename = filepath.Join(usr.HomeDir, BinlogCacheFileName)
 	if err != nil && !os.IsNotExist(err) {
 		tracelog.ErrorLogger.Printf("Failed to read MySQL binlog cache file: %v\n", err)
 	}
-
-	cache.LastArchivedBinlog = binlogFileName
 
 	marshal, err := json.Marshal(&cache)
 	if err == nil && len(cacheFilename) > 0 {
@@ -150,4 +196,163 @@ func setLastArchivedBinlog(binlogFileName string) {
 			tracelog.ErrorLogger.Printf("Failed to write MySQL binlog cache file: %v\n", err)
 		}
 	}
+}
+
+type statefulBinlogFilter interface {
+	name() string
+	init(LogsCache)
+	onUpload(*LogsCache)
+	test(binlog, nextBinlog string) bool
+}
+
+type untilBinlogFilter struct {
+	Until string
+}
+
+var _ statefulBinlogFilter = &untilBinlogFilter{}
+
+func (u *untilBinlogFilter) init(LogsCache) {}
+func (u *untilBinlogFilter) name() string {
+	return "until"
+}
+func (u *untilBinlogFilter) onUpload(*LogsCache) {}
+func (u *untilBinlogFilter) test(binlog, _ string) bool {
+	return binlog < u.Until
+}
+
+type archivedBinlogFilter struct {
+	lastArchived string
+	lastTested   string
+}
+
+var _ statefulBinlogFilter = &archivedBinlogFilter{}
+
+func (u *archivedBinlogFilter) init(data LogsCache) {
+	u.lastTested = data.LastArchivedBinlog
+	u.lastArchived = data.LastArchivedBinlog
+}
+func (u *archivedBinlogFilter) name() string {
+	return "archived binlog"
+}
+func (u *archivedBinlogFilter) onUpload(data *LogsCache) {
+	data.LastArchivedBinlog = u.lastTested
+}
+func (u *archivedBinlogFilter) test(binlog, _ string) bool {
+	if binlog > u.lastArchived {
+		u.lastTested = binlog
+		return true
+	}
+	return false
+}
+
+type gtidFilter struct {
+	BinlogsFolder string
+	Flavor        string
+	gtidArchived  *mysql.MysqlGTIDSet
+	lastGtidSeen  *mysql.MysqlGTIDSet
+}
+
+var _ statefulBinlogFilter = &gtidFilter{}
+
+func (u *gtidFilter) init(data LogsCache) {
+	gtid, _ := mysql.ParseMysqlGTIDSet(data.GTIDArchived)
+	u.gtidArchived, _ = gtid.(*mysql.MysqlGTIDSet)
+	u.lastGtidSeen = nil
+}
+func (u *gtidFilter) name() string {
+	return "gtid"
+}
+func (u *gtidFilter) onUpload(data *LogsCache) {
+	data.GTIDArchived = u.gtidArchived.String()
+}
+func (u *gtidFilter) test(binlog, nextBinlog string) bool {
+	if u.Flavor != mysql.MySQLFlavor {
+		// MariaDB GTID Sets consists of: DomainID + ServerID + Sequence Number (64-bit unsigned integer)
+		// It is not clear how it handles gaps in SequenceNumbers, so for safety reasons skip this check
+		return true
+	}
+
+	// nextPreviousGTIDs is 'GTIDs_executed at the end of current binary log file'
+	nextPreviousGTIDs, err := peekPreviousMysqlGTIDs(path.Join(u.BinlogsFolder, nextBinlog), u.Flavor)
+	if err != nil {
+		tracelog.InfoLogger.Printf("Cannot extract PREVIOUS_GTIDS event from binlog %s. Upload it. (%s check)\n", binlog, u.name())
+		return true
+	}
+
+	if u.gtidArchived == nil {
+		tracelog.DebugLogger.Printf("Cannot extract set of uploaded binlogs from cache\n")
+		// continue uploading even when we cannot read uploadedGTIDs
+		u.gtidArchived = nextPreviousGTIDs
+		u.lastGtidSeen = nextPreviousGTIDs
+		return true
+	}
+
+	if u.lastGtidSeen == nil {
+		gtidSetBeforeCurrentBinlog, err := peekPreviousMysqlGTIDs(path.Join(u.BinlogsFolder, binlog), u.Flavor)
+		if err != nil {
+			tracelog.InfoLogger.Printf("Cannot extract PREVIOUS_GTIDS event from current binlog %s. Upload it. (%s check)\n", binlog, u.name())
+			u.lastGtidSeen = nextPreviousGTIDs
+			return true
+		}
+		tracelog.DebugLogger.Printf("Binlog %s is the first binlog that we seen by GTID-checker in this run. (%s check)\n", binlog, u.name())
+		u.lastGtidSeen = gtidSetBeforeCurrentBinlog
+	}
+
+	currentBinlogGTIDSet := nextPreviousGTIDs.Clone().(*mysql.MysqlGTIDSet)
+	err = currentBinlogGTIDSet.Minus(*u.lastGtidSeen)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Cannot subtract GTIDs: %v (%s check)\n", err, u.name())
+		return true // math is broken. upload binlog
+	}
+
+	// when we know that _next_ binlog's PreviousGTID already uploaded we can safely skip _current_ binlog
+	if u.gtidArchived.Contain(currentBinlogGTIDSet) {
+		tracelog.InfoLogger.Printf("Binlog %v with GTID Set %s already archived (%s check)\n", binlog, currentBinlogGTIDSet.String(), u.name())
+		u.lastGtidSeen = nextPreviousGTIDs
+		return false
+	}
+
+	err = u.gtidArchived.Add(*currentBinlogGTIDSet)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Cannot merge GTIDs: %v (%s check)\n", err, u.name())
+		return true // math is broken. upload binlog
+	}
+	tracelog.InfoLogger.Printf("Should upload binlog %s with GTID set: %s (%s check)\n", binlog, currentBinlogGTIDSet.String(), u.name())
+	u.lastGtidSeen = nextPreviousGTIDs
+	return true
+}
+
+func peekPreviousMysqlGTIDs(filename string, flavor string) (*mysql.MysqlGTIDSet, error) {
+	var found bool
+	previousGTID := &replication.PreviousGTIDsEvent{}
+
+	parser := replication.NewBinlogParser()
+	parser.SetFlavor(flavor)
+	parser.SetVerifyChecksum(false) // the faster, the better
+	parser.SetRawMode(true)         // choose events to parse manually
+	err := parser.ParseFile(filename, 0, func(event *replication.BinlogEvent) error {
+		if event.Header.EventType == replication.PREVIOUS_GTIDS_EVENT {
+			err := previousGTID.Decode(event.RawData[replication.EventHeaderSize:])
+			if err != nil {
+				return err
+			}
+			found = true
+			return fmt.Errorf("shallow file read finished")
+		}
+		return nil
+	})
+
+	if err != nil && !found {
+		return nil, errors.Wrapf(err, "binlog-push: could not parse binlog file '%s'\n", filename)
+	}
+
+	res, err := mysql.ParseMysqlGTIDSet(previousGTID.GTIDSets)
+	if err != nil {
+		return nil, err
+	}
+	result, ok := res.(*mysql.MysqlGTIDSet)
+	if !ok {
+		tracelog.ErrorLogger.Fatalf("cannot cast nextPreviousGTIDs to MysqlGTIDSet. Should never be here. Actual type: %T\n", res)
+	}
+	return result, nil
 }

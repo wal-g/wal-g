@@ -41,7 +41,15 @@ var (
 			userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
 			tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
-			arguments := greenplum.NewBackupArguments(permanent, userData, prepareSegmentFwdArgs())
+			logsDir := viper.GetString(internal.GPLogsDirectory)
+
+			segPollInterval, err := internal.GetDurationSetting(internal.GPSegmentsPollInterval)
+			tracelog.ErrorLogger.FatalOnError(err)
+
+			segPollRetries := viper.GetInt(internal.GPSegmentsPollRetries)
+
+			arguments := greenplum.NewBackupArguments(permanent, userData, prepareSegmentFwdArgs(), logsDir,
+				segPollInterval, segPollRetries)
 			backupHandler, err := greenplum.NewBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
 			backupHandler.HandleBackupPush()
