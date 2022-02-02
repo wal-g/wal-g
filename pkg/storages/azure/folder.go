@@ -175,9 +175,6 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	blobPager := folder.containerClient.ListBlobsHierarchy("/", &azblob.ContainerListBlobHierarchySegmentOptions{Prefix: &folder.path})
 	for blobPager.NextPage(context.Background()) {
 		blobs := blobPager.PageResponse()
-		if err != nil {
-			return nil, nil, NewFolderError(err, "Unable to iterate %v", folder.path)
-		}
 		//add blobs to the list of storage objects
 		for _, blob := range blobs.Segment.BlobItems {
 			objName := strings.TrimPrefix(*blob.Name, folder.path)
@@ -200,6 +197,10 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 				subFolderPath))
 		}
 
+	}
+	err = blobPager.Err()
+	if err != nil {
+		return nil, nil, NewFolderError(err, "Unable to iterate %v", folder.path)
 	}
 	return
 }
