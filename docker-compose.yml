@@ -87,6 +87,7 @@ services:
       &&  mkdir -p /export/gpdeletebeforetimebucket
       &&  mkdir -p /export/createrestorepointbucket
       &&  mkdir -p /export/storagetoolsbucket
+      &&  mkdir -p /export/walrestorebucket
       &&  /usr/bin/minio server /export'
 
   s3-another:
@@ -555,6 +556,18 @@ services:
       context: .
     image: wal-g/catchup_test
     container_name: wal-g_pg_catchup_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+
+  pg_wal_restore_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_wal_restore_test
+      context: .
+    image: wal-g/wal_restore_test
+    container_name: wal-g_pg_wal_restore_test
     depends_on:
       - s3
     links:

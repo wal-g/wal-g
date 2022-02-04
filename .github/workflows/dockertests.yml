@@ -121,6 +121,7 @@ jobs:
                    'make TEST="pg_wal_perftest" pg_integration_test',
                    'make TEST="pg_backup_perftest" pg_integration_test',
                    'make TEST="pg_catchup_test" pg_integration_test',
+                   'make TEST="pg_wal_restore_test" pg_integration_test',
                    'make MYSQL_TEST=mysql_base_tests mysql_integration_test',
                    'make MYSQL_TEST=mysql_delete_tests mysql_integration_test',
                    'make MYSQL_TEST=mysql_copy_tests mysql_integration_test',
