@@ -10,7 +10,7 @@ import (
 const (
 	WalRestoreUsage            = "wal-restore target-pgdata source-pgdata"
 	WalRestoreShortDescription = "Restores WAL segments from storage."
-	WalRestoreLongDescription  = "Restores the missing WAL segments that will be needed to perform pg_rewind with storage."
+	WalRestoreLongDescription  = "Restores the missing WAL segments that will be needed to perform pg_rewind from storage."
 )
 
 // walRestoreCmd represents the walRestore command

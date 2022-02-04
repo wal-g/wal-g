@@ -9,6 +9,8 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
+const pgControlSize = 8192
+
 // PgControlData represents data contained in pg_control file
 type PgControlData struct {
 	systemIdentifier uint64 // systemIdentifier represents system ID of PG cluster (f.e. [0-8] bytes in pg_control)
@@ -39,10 +41,10 @@ func ExtractPgControl(folder string) (*PgControlData, error) {
 }
 
 func extractPgControlData(pgControlReader io.Reader) (*PgControlData, error) {
-	bytes := make([]byte, 8192)
+	bytes := make([]byte, pgControlSize)
 
-	n, err := pgControlReader.Read(bytes)
-	if err != nil || n < 8192 {
+	_, err := io.ReadAtLeast(pgControlReader, bytes, pgControlSize)
+	if err != nil {
 		return nil, err
 	}
 

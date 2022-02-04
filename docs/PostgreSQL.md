@@ -510,6 +510,15 @@ Usage:
 wal-g wal-purge
 ```
 
+### ``wal-restore``
+
+Restores the missing WAL segments that will be needed to perform pg_rewind from storage. The current version supports only local clusters.
+
+Usage:
+```bash
+wal-g wal-restore path/to/target-pgdata path/to/source-pgdata
+```
+
 pgBackRest backups support
 -----------
 ### ``pgbackrest backup-list``
