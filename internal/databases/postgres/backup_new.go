@@ -12,7 +12,7 @@ import (
 )
 
 // temporary flag is used in tar interpreter to determine if it should use new unwrap logic
-var useNewUnwrapImplementation = false
+var useNewUnwrapImplementation = true
 
 // UnwrapResult stores information about
 // the result of single backup unwrap operation
