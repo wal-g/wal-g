@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sync/atomic"
 	"time"
@@ -593,10 +593,10 @@ func (bh *BackupHandler) uploadFilesMetadata(filesMetaDto FilesMetadataDto) (err
 }
 
 func (bh *BackupHandler) checkPgVersionAndPgControl() {
-	_, err := ioutil.ReadFile(filepath.Join(bh.pgInfo.pgDataDirectory, PgControlPath))
+	_, err := os.ReadFile(filepath.Join(bh.pgInfo.pgDataDirectory, PgControlPath))
 	tracelog.ErrorLogger.FatalfOnError(
 		"It looks like you are trying to backup not pg_data. PgControl file not found: %v\n", err)
-	_, err = ioutil.ReadFile(filepath.Join(bh.pgInfo.pgDataDirectory, "PG_VERSION"))
+	_, err = os.ReadFile(filepath.Join(bh.pgInfo.pgDataDirectory, "PG_VERSION"))
 	tracelog.ErrorLogger.FatalfOnError(
 		"It looks like you are trying to backup not pg_data. PG_VERSION file not found: %v\n", err)
 }

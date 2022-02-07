@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/user"
 	"path"
@@ -162,7 +161,7 @@ func getCache() LogsCache {
 	if err == nil {
 		cacheFilename = filepath.Join(usr.HomeDir, BinlogCacheFileName)
 		var file []byte
-		file, err = ioutil.ReadFile(cacheFilename)
+		file, err = os.ReadFile(cacheFilename)
 		if err == nil {
 			err = json.Unmarshal(file, &cache)
 			if err == nil {
@@ -191,7 +190,7 @@ func putCache(cache LogsCache) {
 
 	marshal, err := json.Marshal(&cache)
 	if err == nil && len(cacheFilename) > 0 {
-		err = ioutil.WriteFile(cacheFilename, marshal, 0644)
+		err = os.WriteFile(cacheFilename, marshal, 0644)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Failed to write MySQL binlog cache file: %v\n", err)
 		}

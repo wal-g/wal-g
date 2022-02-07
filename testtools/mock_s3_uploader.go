@@ -3,7 +3,6 @@ package testtools
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
@@ -58,7 +57,7 @@ func (uploader *MockS3Uploader) Upload(input *s3manager.UploadInput,
 	var err error
 	if uploader.storage == nil {
 		// Discard bytes to unblock pipe.
-		_, err = io.Copy(ioutil.Discard, input.Body)
+		_, err = io.Copy(io.Discard, input.Body)
 	} else {
 		var buf bytes.Buffer
 		_, err = io.Copy(&buf, input.Body)

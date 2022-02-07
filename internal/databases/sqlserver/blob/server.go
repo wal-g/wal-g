@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"runtime/debug"
@@ -440,7 +439,7 @@ func (bs *Server) HandleBlockListPut(w http.ResponseWriter, req *http.Request) {
 		bs.returnError(w, req, err)
 		return
 	}
-	data, err := ioutil.ReadAll(req.Body)
+	data, err := io.ReadAll(req.Body)
 	req.Body.Close()
 	if err != nil {
 		bs.returnError(w, req, err)

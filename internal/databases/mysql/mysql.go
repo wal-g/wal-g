@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
 	"sort"
 	"strings"
@@ -101,7 +101,7 @@ func getMySQLConnection() (*sql.DB, error) {
 func getMySQLConnectionFromDatasource(datasourceName string) (*sql.DB, error) {
 	if caFile, ok := internal.GetSetting(internal.MysqlSslCaSetting); ok {
 		rootCertPool := x509.NewCertPool()
-		pem, err := ioutil.ReadFile(caFile)
+		pem, err := os.ReadFile(caFile)
 		if err != nil {
 			return nil, err
 		}

@@ -2,7 +2,7 @@ package awskms
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -49,7 +49,7 @@ func TestEncryptionCycle(t *testing.T) {
 	decrypt, err := crypter.Decrypt(buf)
 	assert.NoErrorf(t, err, "Decryption error: %v", err)
 
-	decryptedBytes, err := ioutil.ReadAll(decrypt)
+	decryptedBytes, err := io.ReadAll(decrypt)
 	assert.NoErrorf(t, err, "Decryption read error: %v", err)
 
 	assert.Equal(t, someSecret, string(decryptedBytes), "Decrypted text not equals open text")

@@ -6,7 +6,6 @@ package internal_test
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -28,7 +27,7 @@ const (
 var waleGpgKey string
 
 func init() {
-	waleGpgKeyBytes, err := ioutil.ReadFile(waleGpgKeyFilePath)
+	waleGpgKeyBytes, err := os.ReadFile(waleGpgKeyFilePath)
 	if err != nil {
 		panic(err)
 	}
@@ -45,7 +44,7 @@ func TestDecryptWALElzo(t *testing.T) {
 	assert.NoError(t, err)
 	decrypt, err := crypter.Decrypt(f)
 	assert.NoError(t, err)
-	bytes1, err := ioutil.ReadAll(decrypt)
+	bytes1, err := io.ReadAll(decrypt)
 	assert.NoError(t, err)
 
 	installTestKeyToExternalGPG(t)
@@ -112,7 +111,7 @@ func TestOpenGPGandExternalGPGCompatibility(t *testing.T) {
 
 		assert.NoError(t, err)
 
-		decrypted, err := ioutil.ReadAll(reader)
+		decrypted, err := io.ReadAll(reader)
 
 		assert.NoError(t, err)
 

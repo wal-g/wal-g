@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -55,7 +54,7 @@ func NewSkipReader(r io.Reader, offset uint64) io.Reader {
 
 func (r *SkipReader) Read(s []byte) (int, error) {
 	if r.offset > 0 {
-		done, err := io.CopyN(ioutil.Discard, r.reader, int64(r.offset))
+		done, err := io.CopyN(io.Discard, r.reader, int64(r.offset))
 		if err != nil {
 			return 0, err
 		}

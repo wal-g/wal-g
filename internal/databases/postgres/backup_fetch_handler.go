@@ -3,7 +3,7 @@ package postgres
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -37,7 +37,7 @@ func (err PgControlNotFoundError) Error() string {
 }
 
 func readRestoreSpec(path string, spec *TablespaceSpec) (err error) {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("unable to read file: %v", err)
 	}

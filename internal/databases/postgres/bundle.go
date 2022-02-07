@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -219,13 +218,13 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 
 	// Resolve symlinks for tablespaces and save folder structure.
 	if filepath.Base(path) == TablespaceFolder {
-		tablespaceInfos, err := ioutil.ReadDir(path)
+		tablespaceEntries, err := os.ReadDir(path)
 		if err != nil {
 			return fmt.Errorf("could not read directory structure in %s: %v", TablespaceFolder, err)
 		}
-		for _, tablespaceInfo := range tablespaceInfos {
-			if (tablespaceInfo.Mode() & os.ModeSymlink) != 0 {
-				symlinkName := tablespaceInfo.Name()
+		for _, tablespaceEntry := range tablespaceEntries {
+			if (tablespaceEntry.Type() & os.ModeSymlink) != 0 {
+				symlinkName := tablespaceEntry.Name()
 				actualPath, err := os.Readlink(filepath.Join(path, symlinkName))
 				if err != nil {
 					return fmt.Errorf("could not read symlink for tablespace %v", err)

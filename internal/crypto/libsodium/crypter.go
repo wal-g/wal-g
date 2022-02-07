@@ -8,7 +8,7 @@ import "C"
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"strings"
 	"sync"
 
@@ -74,7 +74,7 @@ func (crypter *Crypter) setup() (err error) {
 	keyString := crypter.KeyInline
 	if keyString == "" {
 		// read from file
-		keyFileContents, err := ioutil.ReadFile(crypter.KeyPath)
+		keyFileContents, err := os.ReadFile(crypter.KeyPath)
 		if err != nil {
 			return fmt.Errorf("libsodium Crypter: unable to read key from file: %v", err)
 		}

@@ -3,7 +3,6 @@ package mysql
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -22,7 +21,7 @@ func TestReadWholeBinlog(t *testing.T) {
 		t.Errorf("failed to open data example: %v", err)
 	}
 	defer binlog.Close()
-	data1, err := ioutil.ReadAll(binlog)
+	data1, err := io.ReadAll(binlog)
 	if err != nil {
 		t.Errorf("failed to read data exapmple: %v", err)
 	}
@@ -31,7 +30,7 @@ func TestReadWholeBinlog(t *testing.T) {
 		t.Errorf("failed to seek data exapmple: %v", err)
 	}
 	br := NewBinlogReader(binlog, startTs, endTs)
-	data2, err := ioutil.ReadAll(br)
+	data2, err := io.ReadAll(br)
 	if err != nil {
 		t.Errorf("failed to read whole binlog through BinlogReader: %v", err)
 	}
@@ -52,7 +51,7 @@ func TestReadBinlogAfterInterval(t *testing.T) {
 	}
 	defer binlog.Close()
 	br := NewBinlogReader(binlog, startTs, endTs)
-	data, err := ioutil.ReadAll(br)
+	data, err := io.ReadAll(br)
 	if err != nil {
 		t.Errorf("failed to read binlog through BinlogReader: %v", err)
 	}
@@ -73,7 +72,7 @@ func TestReadBinlogBeforeInterval(t *testing.T) {
 	}
 	defer binlog.Close()
 	br := NewBinlogReader(binlog, startTs, endTs)
-	data, err := ioutil.ReadAll(br)
+	data, err := io.ReadAll(br)
 	if err != nil {
 		t.Errorf("failed to read binlog through BinlogReader: %v", err)
 	}
@@ -93,7 +92,7 @@ func TestReadPartOfBinlog(t *testing.T) {
 		t.Errorf("failed to open data example: %v", err)
 	}
 	defer binlog.Close()
-	data1, err := ioutil.ReadAll(binlog)
+	data1, err := io.ReadAll(binlog)
 	if err != nil {
 		t.Errorf("failed to read data exapmple: %v", err)
 	}
@@ -102,7 +101,7 @@ func TestReadPartOfBinlog(t *testing.T) {
 		t.Errorf("failed to seek data exapmple: %v", err)
 	}
 	br := NewBinlogReader(binlog, startTs, endTs)
-	data2, err := ioutil.ReadAll(br)
+	data2, err := io.ReadAll(br)
 	if err != nil {
 		t.Errorf("failed to read whole binlog through BinlogReader: %v", err)
 	}
@@ -136,7 +135,7 @@ func TestReadWholeBinlogWithDifferentChunks(t *testing.T) {
 		t.Errorf("failed to open data example: %v", err)
 	}
 	defer binlog.Close()
-	data1, err := ioutil.ReadAll(binlog)
+	data1, err := io.ReadAll(binlog)
 	if err != nil {
 		t.Errorf("failed to read data exapmple: %v", err)
 	}
@@ -151,7 +150,7 @@ func TestReadWholeBinlogWithDifferentChunks(t *testing.T) {
 			ur := &antiBufReader{binlog, underChunk}
 			br := NewBinlogReader(ur, startTs, endTs)
 			or := &antiBufReader{br, overChunk}
-			data2, err := ioutil.ReadAll(or)
+			data2, err := io.ReadAll(or)
 			if err != nil {
 				t.Errorf("failed to read whole binlog through BinlogReader: %v", err)
 			}

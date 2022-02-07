@@ -65,7 +65,7 @@ func generateData(t *testing.T) string {
 	}
 
 	// Create temp directory.
-	dir, err := ioutil.TempDir(cwd, "data")
+	dir, err := os.MkdirTemp(cwd, "data")
 	if err != nil {
 		t.Log(err)
 	}
@@ -148,7 +148,7 @@ func generateData(t *testing.T) string {
 
 // Extract files to temp directory 'extracted'.
 func extract(t *testing.T, dir string) string {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		t.Log(err)
 	}

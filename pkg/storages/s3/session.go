@@ -1,7 +1,7 @@
 package s3
 
 import (
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -75,7 +75,7 @@ func setupReqProxy(endpointSource, port string) *string {
 		return nil
 	}
 	defer resp.Body.Close()
-	bytes, err := ioutil.ReadAll(resp.Body)
+	bytes, err := io.ReadAll(resp.Body)
 	if err == nil {
 		return aws.String(net.JoinHostPort(string(bytes), port))
 	}

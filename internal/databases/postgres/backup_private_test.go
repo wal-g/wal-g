@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,7 +14,7 @@ func createTempDir(prefix string) (name string, err error) {
 		return "", err
 	}
 
-	dir, err := ioutil.TempDir(cwd, prefix)
+	dir, err := os.MkdirTemp(cwd, prefix)
 	if err != nil {
 		return "", err
 	}
@@ -38,7 +37,7 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenOneFileIsInDirectory(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.Remove(dir)
 
-	file, err := ioutil.TempFile(dir, "file")
+	file, err := os.CreateTemp(dir, "file")
 	assert.NoError(t, err)
 	defer os.Remove(file.Name())
 
@@ -53,7 +52,7 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenSeveralFilesAreInDirectory(t *testing
 	defer os.Remove(dir)
 
 	for i := 0; i < 3; i++ {
-		file, err := ioutil.TempFile(dir, "file")
+		file, err := os.CreateTemp(dir, "file")
 		assert.NoError(t, err)
 		defer os.Remove(file.Name())
 	}
@@ -68,7 +67,7 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenNestedDirectoryIsInDirectory(t *testi
 	assert.NoError(t, err)
 	defer os.Remove(dir)
 
-	nested, err := ioutil.TempDir(dir, "nested")
+	nested, err := os.MkdirTemp(dir, "nested")
 	assert.NoError(t, err)
 	defer os.Remove(nested)
 

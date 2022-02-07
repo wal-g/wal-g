@@ -3,7 +3,7 @@ package postgres
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -99,12 +99,12 @@ func checkWALOverwrite(uploader *WalUploader, walFilePath string) (overwriteAtte
 		return false, err
 	}
 
-	archived, err := ioutil.ReadAll(walFileReader)
+	archived, err := io.ReadAll(walFileReader)
 	if err != nil {
 		return false, err
 	}
 
-	localBytes, err := ioutil.ReadFile(walFilePath)
+	localBytes, err := os.ReadFile(walFilePath)
 	if err != nil {
 		return false, err
 	}

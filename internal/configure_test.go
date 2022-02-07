@@ -2,7 +2,6 @@ package internal_test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -159,7 +158,7 @@ func prepareDataFolder(t *testing.T, name string) string {
 		t.Log(err)
 	}
 	// Create temp directory.
-	dir, err := ioutil.TempDir(cwd, "test")
+	dir, err := os.MkdirTemp(cwd, "test")
 	if err != nil {
 		t.Log(err)
 	}
