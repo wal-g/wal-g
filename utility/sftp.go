@@ -43,7 +43,6 @@ func NewSftpClient(host, port, user, password, privateKeyPath string) (*sftp.Cli
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect via ssh by address %s: %s", address, err)
 	}
-	defer sshClient.Close()
 
 	sftpClient, err := sftp.NewClient(sshClient)
 	if err != nil {
