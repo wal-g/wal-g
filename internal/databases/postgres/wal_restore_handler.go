@@ -29,14 +29,21 @@ func NewTimelineWithSegmentNoBy(record *TimelineHistoryRecord) *TimelineWithSegm
 }
 
 // HandleWALRestore is invoked to perform wal-g wal-restore
-func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder) {
+func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder, isTargetRemote bool, requisites SshRequisites) {
 	cloudFolder = cloudFolder.GetSubFolder(utility.WalPath)
 
-	targetPgData, err := ExtractPgControl(targetPath)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get pg data on target cluster: %v\n", err)
+	var targetPgData *PgControlData
+	var err error
+	if isTargetRemote {
+		targetPgData, err = ExtractRemotePgControl(targetPath, requisites)
+		tracelog.ErrorLogger.FatalfOnError("Failed to get pg data on remote target cluster: %s\n", err)
+	} else {
+		targetPgData, err = ExtractPgControl(targetPath)
+		tracelog.ErrorLogger.FatalfOnError("Failed to get pg data on target cluster: %s\n", err)
+	}
 
 	sourcePgData, err := ExtractPgControl(sourcePath)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get pg data on source cluster: %v\n", err)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get pg data on source cluster: %s\n", err)
 
 	if targetPgData.GetSystemIdentifier() != sourcePgData.GetSystemIdentifier() {
 		tracelog.ErrorLogger.Fatal("System identifiers of target and source clusters are not equal\n")
@@ -46,30 +53,30 @@ func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder)
 	}
 
 	targetWalDir, err := getWalDirName(targetPath)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL directory name: %v\n", err)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL directory name: %s\n", err)
 	sourceWalDir, err := getWalDirName(sourcePath)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL directory name: %v\n", err)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL directory name: %s\n", err)
 
 	tgtHistoryRecords, err := getLocalTimelineHistoryRecords(targetPgData.GetCurrentTimeline(), targetWalDir)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on target cluster: %v\n", err)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on target cluster: %s\n", err)
 	srcHistoryRecords, err := getLocalTimelineHistoryRecords(sourcePgData.GetCurrentTimeline(), sourceWalDir)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on source cluster: %v\n", err)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on source cluster: %s\n", err)
 
 	lastCommonLsn, lastCommonTl, err := FindLastCommonPoint(tgtHistoryRecords, srcHistoryRecords)
-	tracelog.ErrorLogger.FatalfOnError("Failed to find last common point: %v\n", err)
+	tracelog.ErrorLogger.FatalfOnError("Failed to find last common point: %s\n", err)
 
 	srcTimelineWithSegNo := transformTimelineHistoryRecords(srcHistoryRecords)
 	mapOfSrcTimelineWithSegNo := timelineWithSegmentNoSliceToMap(srcTimelineWithSegNo)
 
 	folderFilenames, err := getDirectoryFilenames(sourceWalDir)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL filenames: %v\n", err)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL filenames: %s\n", err)
 
 	walsByTimelines := groupSegmentsByTimelines(getSegmentsFromFiles(folderFilenames))
 
 	filenamesToRestore, err := GetMissingWals(
 		getSegmentNoFromLsn(lastCommonLsn), lastCommonTl,
 		sourcePgData.GetCurrentTimeline(), mapOfSrcTimelineWithSegNo, walsByTimelines)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get missing source WALs: %v\n", err)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get missing source WALs: %s\n", err)
 
 	if len(filenamesToRestore) == 0 {
 		tracelog.InfoLogger.Println("No WAL files to restore")
@@ -79,9 +86,9 @@ func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder)
 	for _, walFilename := range filenamesToRestore {
 		location := utility.ResolveSymlink(path.Join(sourceWalDir, walFilename))
 		if err = internal.DownloadFileTo(cloudFolder, walFilename, location); err != nil {
-			tracelog.ErrorLogger.Printf("Failed to download WAL file %v: %v\n", walFilename, err)
+			tracelog.ErrorLogger.Printf("Failed to download WAL file %s: %s\n", walFilename, err)
 		} else {
-			tracelog.InfoLogger.Printf("Successfully download WAL file %v\n", walFilename)
+			tracelog.InfoLogger.Printf("Successfully download WAL file %s\n", walFilename)
 		}
 	}
 }

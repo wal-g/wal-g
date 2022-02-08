@@ -3,15 +3,13 @@ package sh
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/sftp"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
-	"golang.org/x/crypto/ssh"
+	"github.com/wal-g/wal-g/utility"
 )
 
 type Folder struct {
@@ -50,44 +48,9 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 	port := settings[Port]
 	pkeyPath := settings[PrivateKeyPath]
 
-	if port == "" {
-		port = "22"
-	}
-
-	authMethods := []ssh.AuthMethod{}
-	if pkeyPath != "" {
-		pkey, err := os.ReadFile(pkeyPath)
-		if err != nil {
-			return nil, NewFolderError(err, "Unable to read private key: %v", err)
-		}
-
-		signer, err := ssh.ParsePrivateKey(pkey)
-		if err != nil {
-			return nil, NewFolderError(err, "Unable to parse private key: %v", err)
-		}
-
-		authMethods = append(authMethods, ssh.PublicKeys(signer))
-	}
-
-	if pass != "" {
-		authMethods = append(authMethods, ssh.Password(pass))
-	}
-
-	config := &ssh.ClientConfig{
-		User:            user,
-		Auth:            authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	}
-
-	address := fmt.Sprint(host, ":", port)
-	sshClient, err := ssh.Dial("tcp", address, config)
+	sftpClient, err := utility.NewSftpClient(host, port, user, pass, pkeyPath)
 	if err != nil {
-		return nil, NewFolderError(err, "Fail connect via ssh. Address: %s", address)
-	}
-
-	sftpClient, err := sftp.NewClient(sshClient)
-	if err != nil {
-		return nil, NewFolderError(err, "Fail connect via sftp. Address: %s", address)
+		return nil, NewFolderError(err, "Failed to create sftp client")
 	}
 
 	path = storage.AddDelimiterToPath(path)
