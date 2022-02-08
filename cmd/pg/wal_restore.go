@@ -32,7 +32,7 @@ var (
 			folder, err := internal.ConfigureFolder()
 			tracelog.ErrorLogger.FatalfOnError("Error on configure external folder %s\n", err)
 
-			sshRequisites := postgres.SshRequisites{}
+			sshRequisites := postgres.SSHRequisites{}
 			if sshHost != "" {
 				sshRequisites.Host = sshHost
 			}

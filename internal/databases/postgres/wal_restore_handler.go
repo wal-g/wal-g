@@ -29,7 +29,7 @@ func NewTimelineWithSegmentNoBy(record *TimelineHistoryRecord) *TimelineWithSegm
 }
 
 // HandleWALRestore is invoked to perform wal-g wal-restore
-func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder, isTargetRemote bool, requisites SshRequisites) {
+func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder, isTargetRemote bool, requisites SSHRequisites) {
 	cloudFolder = cloudFolder.GetSubFolder(utility.WalPath)
 
 	var targetPgData *PgControlData

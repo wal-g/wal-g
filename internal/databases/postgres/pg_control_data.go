@@ -19,8 +19,8 @@ type PgControlData struct {
 	// Any data from pg_control
 }
 
-// SshRequisites using to decrease passed params TODO: When will use by other functions move to more suitable place
-type SshRequisites struct {
+// SSHRequisites using to decrease passed params TODO: When will use by other functions move to more suitable place
+type SSHRequisites struct {
 	Host string
 	Port string
 
@@ -46,8 +46,9 @@ func ExtractPgControl(folder string) (*PgControlData, error) {
 }
 
 // ExtractRemotePgControl extracts pg_control data of remote cluster. Requisites should be set in config
-func ExtractRemotePgControl(folder string, requisites SshRequisites) (*PgControlData, error) {
-	sftpClient, err := utility.NewSftpClient(requisites.Host, requisites.Port, requisites.Username, requisites.Password, requisites.PrivateKeyPath)
+func ExtractRemotePgControl(folder string, requisites SSHRequisites) (*PgControlData, error) {
+	sftpClient, err := utility.NewSftpClient(requisites.Host, requisites.Port,
+		requisites.Username, requisites.Password, requisites.PrivateKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sftp client: %s", err)
 	}
