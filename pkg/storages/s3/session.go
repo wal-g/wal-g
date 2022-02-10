@@ -111,8 +111,6 @@ func configWithSettings(config *aws.Config, bucket string, settings map[string]s
 	secretAccessKey := getFirstSettingOf(settings, []string{SecretAccessKeySetting, SecretKeySetting})
 	sessionToken := settings[SessionTokenSetting]
 	if accessKeyId != "" && secretAccessKey != "" {
-		tracelog.WarningLogger.Println("Using deprecated method of setting AWS credentials.")
-		tracelog.WarningLogger.Println("Consider not setting access key id, secret access key, and session token explicitly, but setting them in environment variables or relying on default credentials provider chain to infer them.")
 		provider := &credentials.StaticProvider{Value: credentials.Value{
 			AccessKeyID:     accessKeyId,
 			SecretAccessKey: secretAccessKey,

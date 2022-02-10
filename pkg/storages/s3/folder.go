@@ -22,11 +22,11 @@ const (
 	EndpointSetting          = "AWS_ENDPOINT"
 	RegionSetting            = "AWS_REGION"
 	ForcePathStyleSetting    = "AWS_S3_FORCE_PATH_STYLE"
-	AccessKeyIdSetting       = "AWS_ACCESS_KEY_ID"     // deprecated
-	AccessKeySetting         = "AWS_ACCESS_KEY"        // deprecated
-	SecretAccessKeySetting   = "AWS_SECRET_ACCESS_KEY" // deprecated
-	SecretKeySetting         = "AWS_SECRET_KEY"        // deprecated
-	SessionTokenSetting      = "AWS_SESSION_TOKEN"     // deprecated
+	AccessKeyIdSetting       = "AWS_ACCESS_KEY_ID"
+	AccessKeySetting         = "AWS_ACCESS_KEY"
+	SecretAccessKeySetting   = "AWS_SECRET_ACCESS_KEY"
+	SecretKeySetting         = "AWS_SECRET_KEY"
+	SessionTokenSetting      = "AWS_SESSION_TOKEN"
 	SseSetting               = "S3_SSE"
 	SseCSetting              = "S3_SSE_C"
 	SseKmsIdSetting          = "S3_SSE_KMS_ID"
