@@ -3,15 +3,19 @@ package splitmerge
 import (
 	"io"
 
+	"github.com/wal-g/wal-g/utility"
+
 	"github.com/wal-g/tracelog"
 )
 
 // MergeWriter returns list of WriteCloser-s
 // Then it reads data from each of n=`parts` WriteClosers in blocks of `blockSize` and writes data to `sink` writer.
-func MergeWriter(sink io.Writer, parts int, blockSize int) []io.WriteCloser {
+// MergeWriter gets ownership over sink and will close it.
+func MergeWriter(sink io.WriteCloser, parts int, blockSize int) []io.WriteCloser {
 	result := make([]io.WriteCloser, 0)
 	channels := make([]chan []byte, 0)
 	writeResults := make([]chan writeResult, 0)
+	sink = &utility.CloseOnce{WriteCloser: sink}
 
 	for i := 0; i < parts; i++ {
 		channels = append(channels, make(chan []byte))
@@ -46,12 +50,22 @@ func MergeWriter(sink io.Writer, parts int, blockSize int) []io.WriteCloser {
 				}
 				if err != nil {
 					tracelog.ErrorLogger.Printf("MergeWriter error: %v", err)
-					return
+					// It is unrecoverable error - close sink. All consequent writes will return error.
+					// This will ensure that all channels will be gracefully closed
+					err = sink.Close()
+					if err != nil {
+						tracelog.ErrorLogger.Printf("MergeWriter error on sink close: %v", err)
+					}
+					continue
 				}
 			}
 
 			if closed == len(channels) {
 				tracelog.DebugLogger.Printf("MergeWriter: finished")
+				err := sink.Close()
+				if err != nil {
+					tracelog.ErrorLogger.Printf("MergeWriter error on sink close: %v", err)
+				}
 				return
 			}
 		}
