@@ -571,6 +571,7 @@ func InitConfig() {
 	var globalViper = viper.GetViper()
 	globalViper.AutomaticEnv() // read in environment variables that match
 	SetDefaultValues(globalViper)
+	SetGoMaxProcs(globalViper)
 	ReadConfigFromFile(globalViper, CfgFile)
 	CheckAllowedSettings(globalViper)
 
@@ -608,12 +609,10 @@ func SetDefaultValues(config *viper.Viper) {
 	for setting, value := range defaultConfigValues {
 		config.SetDefault(setting, value)
 	}
-
-	setGoMaxProcs()
 }
 
-func setGoMaxProcs() {
-	gomaxprocs := viper.GetInt(GoMaxProcs)
+func SetGoMaxProcs(config *viper.Viper) {
+	gomaxprocs := config.GetInt(GoMaxProcs)
 	if !Turbo && gomaxprocs > 0 {
 		runtime.GOMAXPROCS(gomaxprocs)
 	}
