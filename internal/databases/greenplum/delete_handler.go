@@ -118,7 +118,7 @@ func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject, confirm
 		segFolder := h.Folder.GetSubFolder(FormatSegmentStoragePrefix(meta.ContentID))
 		permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(segFolder)
 
-		segDeleteHandler, err := postgres.NewDeleteHandler(segFolder, permanentBackups, permanentWals, true)
+		segDeleteHandler, err := postgres.NewDeleteHandler(segFolder, permanentBackups, permanentWals, false)
 		if err != nil {
 			return err
 		}
