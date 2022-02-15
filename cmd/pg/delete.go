@@ -12,7 +12,7 @@ const UseSentinelTimeDescription = "Use backup creation time from sentinel for b
 const DeleteGarbageExamples = `  garbage           Deletes outdated WAL archives and leftover backups files from storage
   garbage ARCHIVES  Deletes only outdated WAL archives from storage
   garbage BACKUPS   Deletes only leftover backups files from storage`
-const DeleteGarbageUse = "garbage [ARCHIVES|BACKUPS"
+const DeleteGarbageUse = "garbage [ARCHIVES|BACKUPS]"
 
 var confirmed = false
 var useSentinelTime = false
