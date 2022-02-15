@@ -501,13 +501,15 @@ Flags:
 - `-t, --to string` Storage config to where should copy backup
 - `-w, --without-history` Copy backup without history (wal files)
 
-### ``wal-purge``
+### ``delete garbage``
 
-Purges outdated WAL archives from storage. Will remove all WAL archives before the earliest non-permanent backup.
+Deletes outdated WAL archives and backups leftover files from storage, e.g. unsuccessfully backups or partially deleted ones. Will remove all non-permanent objects before the earliest non-permanent backup. This command is useful when backups are being deleted by the `delete target` command.
 
 Usage:
 ```bash
-wal-g wal-purge
+wal-g delete garbage           # Deletes outdated WAL archives and leftover backups files from storage
+wal-g delete garbage ARCHIVES      # Deletes only outdated WAL archives from storage
+wal-g delete garbage BACKUPS       # Deletes only leftover (partially deleted or unsuccessful) backups files from storage
 ```
 
 ### ``wal-restore``
