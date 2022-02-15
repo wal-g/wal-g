@@ -34,7 +34,7 @@ pgbench -i -s 3 postgres
 sleep 1
 
 # make two non-permanent backups
-for i in 1 2
+for _ in 1 2
 do
     pgbench -i -s 2 postgres
     sleep 1
@@ -43,8 +43,63 @@ done
 
 FIRST_NON_PERMANENT_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==3{print $1}')
 
+# backup the first non-permanent backup sentinel and remove it from the storage
+# to emulate some partially deleted backup
+# then try to delete the garbage (without the --confirm flag)
+
+wal-g st cat "basebackups_005/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" > "/tmp/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" --config=${TMP_CONFIG}
+wal-g st rm "basebackups_005/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" --config=${TMP_CONFIG}
+
+# check that ARCHIVES mode works
+wal-g delete garbage ARCHIVES --config=${TMP_CONFIG} > /tmp/delete_garbage_archives_output 2>&1
+if ! grep -q "wal_005" /tmp/delete_garbage_archives_output;
+then
+  echo "wal-g delete garbage ARCHIVES did not delete any of the wal_005/* files!"
+  cat /tmp/delete_garbage_archives_output
+  exit 1
+fi
+if grep -q "basebackups_005" /tmp/delete_garbage_archives_output;
+then
+  echo "wal-g delete garbage ARCHIVES deleted the basebackups_005/* files!"
+  cat /tmp/delete_garbage_archives_output
+  exit 1
+fi
+
+# check that BACKUPS mode works
+wal-g delete garbage BACKUPS --config=${TMP_CONFIG} > /tmp/delete_garbage_backups_output 2>&1
+if ! grep -q "basebackups_005" /tmp/delete_garbage_backups_output;
+then
+  echo "wal-g delete garbage BACKUPS did not delete any of the basebackups_005/* files!"
+  cat /tmp/delete_garbage_backups_output
+  exit 1
+fi
+if grep -q "wal_005" /tmp/delete_garbage_backups_output;
+then
+  echo "wal-g delete garbage BACKUPS deleted the wal_005/* files!"
+  cat /tmp/delete_garbage_backups_output
+  exit 1
+fi
+
+# check that default mode works
+wal-g delete garbage --config=${TMP_CONFIG} > /tmp/delete_garbage_default_output 2>&1
+if ! grep -q "basebackups_005" /tmp/delete_garbage_default_output;
+then
+  echo "wal-g delete garbage did not delete any of the basebackups_005/* files!"
+  cat /tmp/delete_garbage_default_output
+  exit 1
+fi
+if ! grep -q "wal_005" /tmp/delete_garbage_default_output;
+then
+  echo "wal-g delete garbage did not delete any of the wal_005/* files!"
+  cat /tmp/delete_garbage_default_output
+  exit 1
+fi
+
+# restore the backup sentinel
+wal-g st put "/tmp/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" "basebackups_005/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" --no-compress --no-encrypt --config=${TMP_CONFIG}
+
 # delete the first non-permanent backup
-wal-g --config=${TMP_CONFIG} delete target ${FIRST_NON_PERMANENT_BACKUP} --confirm
+wal-g --config=${TMP_CONFIG} delete target "${FIRST_NON_PERMANENT_BACKUP}" --confirm
 
 # should delete WALs in ranges (0, PERMANENT_BACKUP) and (PERMANENT_BACKUP, second non-permanent backup)
 wal-g --config=${TMP_CONFIG} delete garbage --confirm

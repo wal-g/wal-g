@@ -227,11 +227,14 @@ func (dh *DeleteHandler) HandleDeleteGarbage(args []string, folder storage.Folde
 // ExtractDeleteGarbagePredicate extracts delete modifier the "delete garbage" command
 func ExtractDeleteGarbagePredicate(args []string) func(storage.Object) bool {
 	switch {
-	case len(args) == 2 && args[1] == DeleteGarbageArchivesModifier:
+	case len(args) == 1 && args[0] == DeleteGarbageArchivesModifier:
+		tracelog.InfoLogger.Printf("Archive-only mode selected. Will remove only outdated WAL files.")
 		return storagePrefixFilter(utility.WalPath)
-	case len(args) == 2 && args[1] == DeleteGarbageBackupsModifier:
+	case len(args) == 1 && args[0] == DeleteGarbageBackupsModifier:
+		tracelog.InfoLogger.Printf("Backups-only mode selected. Will remove only leftover backup files.")
 		return storagePrefixFilter(utility.BaseBackupPath)
 	default:
+		tracelog.InfoLogger.Printf("Running in default mode. Will remove outdated WAL files and leftover backup files.")
 		return func(storage.Object) bool { return true }
 	}
 }
