@@ -1,15 +1,18 @@
 package pg
 
 import (
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 const UseSentinelTimeFlag = "use-sentinel-time"
 const UseSentinelTimeDescription = "Use backup creation time from sentinel for backups ordering."
+const DeleteGarbageExamples = `  garbage           Deletes outdated WAL archives and leftover backups files from storage
+  garbage ARCHIVES  Deletes only outdated WAL archives from storage
+  garbage BACKUPS   Deletes only leftover backups files from storage`
+const DeleteGarbageUse = "garbage [ARCHIVES|BACKUPS"
 
 var confirmed = false
 var useSentinelTime = false
@@ -48,6 +51,13 @@ var deleteTargetCmd = &cobra.Command{
 	Example: internal.DeleteTargetExamples,
 	Args:    internal.DeleteTargetArgsValidator,
 	Run:     runDeleteTarget,
+}
+
+var deleteGarbageCmd = &cobra.Command{
+	Use:     DeleteGarbageUse,
+	Example: DeleteGarbageExamples,
+	Args:    DeleteGarbageArgsValidator,
+	Run:     runDeleteGarbage,
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
@@ -107,13 +117,31 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 	deleteHandler.HandleDeleteTarget(targetBackupSelector, confirmed, findFullBackup)
 }
 
+func runDeleteGarbage(cmd *cobra.Command, args []string) {
+	folder, err := internal.ConfigureFolder()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
+
+	deleteHandler, err := postgres.NewDeleteHandler(folder, permanentBackups, permanentWals, false)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	err = deleteHandler.HandleDeleteGarbage(args, folder, confirmed)
+	tracelog.ErrorLogger.FatalOnError(err)
+}
+
+func DeleteGarbageArgsValidator(cmd *cobra.Command, args []string) error {
+	modifiers := []string{postgres.DeleteGarbageArchivesModifier, postgres.DeleteGarbageBackupsModifier}
+	return internal.DeleteArgsValidator(args, modifiers, 0, 1)
+}
+
 func init() {
 	Cmd.AddCommand(deleteCmd)
 
 	deleteTargetCmd.Flags().StringVar(
 		&deleteTargetUserData, internal.DeleteTargetUserDataFlag, "", internal.DeleteTargetUserDataDescription)
 
-	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd, deleteEverythingCmd, deleteTargetCmd)
+	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd, deleteEverythingCmd, deleteTargetCmd, deleteGarbageCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 	deleteCmd.PersistentFlags().BoolVar(&useSentinelTime, UseSentinelTimeFlag, false, UseSentinelTimeDescription)
 }

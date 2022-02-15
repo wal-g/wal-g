@@ -52,7 +52,7 @@ services:
       &&  mkdir -p /export/deletewithoutconfirm
       &&  mkdir -p /export/deleteendtoendbucket
       &&  mkdir -p /export/deletetargetbucket
-      &&  mkdir -p /export/walpurgebucket
+      &&  mkdir -p /export/deletegarbagebucket
       &&  mkdir -p /export/mysqlfullxtrabackupbucket
       &&  mkdir -p /export/mysqlfullxtrabackupwithrangesbucket
       &&  mkdir -p /export/mysqlfullmysqldumpbucket
@@ -368,12 +368,12 @@ services:
     links:
       - s3
 
-  pg_wal_purge_test:
+  pg_delete_garbage_test:
     build:
-      dockerfile: docker/pg_tests/Dockerfile_wal_purge_test
+      dockerfile: docker/pg_tests/Dockerfile_delete_garbage_test
       context: .
-    image: wal-g/wal_purge_test
-    container_name: wal-g_pg_wal_purge_test
+    image: wal-g/delete_garbage_test
+    container_name: wal-g_pg_delete_garbage_test
     depends_on:
       - s3
     links:

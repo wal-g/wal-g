@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e -x
 
-CONFIG_FILE="/tmp/configs/wal_purge_test_config.json"
+CONFIG_FILE="/tmp/configs/delete_garbage_test_config.json"
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
 cat ${CONFIG_FILE} > ${TMP_CONFIG}
@@ -47,13 +47,13 @@ FIRST_NON_PERMANENT_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR=
 wal-g --config=${TMP_CONFIG} delete target ${FIRST_NON_PERMANENT_BACKUP} --confirm
 
 # should delete WALs in ranges (0, PERMANENT_BACKUP) and (PERMANENT_BACKUP, second non-permanent backup)
-wal-g --config=${TMP_CONFIG} wal-purge --confirm
+wal-g --config=${TMP_CONFIG} delete garbage --confirm
 
 FIRST_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==2{print $1}')
 
 if [ "$PERMANENT_BACKUP" != "$FIRST_BACKUP" ];
 then
-    echo "oh no! wal-purge deleted the permanent backup!"
+    echo "oh no! delete garbage deleted the permanent backup!"
     exit 1
 fi
 

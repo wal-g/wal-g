@@ -10,9 +10,18 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+type DeleteHandler struct {
+	internal.DeleteHandler
+}
+
+const (
+	DeleteGarbageArchivesModifier = "ARCHIVES"
+	DeleteGarbageBackupsModifier  = "BACKUPS"
+)
+
 func NewDeleteHandler(folder storage.Folder, permanentBackups, permanentWals map[string]bool,
 	useSentinelTime bool,
-) (*internal.DeleteHandler, error) {
+) (*DeleteHandler, error) {
 	backups, err := internal.GetBackupSentinelObjects(folder)
 	if err != nil {
 		return nil, err
@@ -37,13 +46,15 @@ func NewDeleteHandler(folder storage.Folder, permanentBackups, permanentWals map
 		return nil, err
 	}
 
-	deleteHandler := internal.NewDeleteHandler(
-		folder,
-		postgresBackups,
-		lessFunc,
-		internal.IsPermanentFunc(
-			makePermanentFunc(permanentBackups, permanentWals)),
-	)
+	deleteHandler :=
+		&DeleteHandler{
+			*internal.NewDeleteHandler(
+				folder,
+				postgresBackups,
+				lessFunc,
+				internal.IsPermanentFunc(
+					makePermanentFunc(permanentBackups, permanentWals))),
+		}
 
 	return deleteHandler, nil
 }
@@ -191,4 +202,76 @@ func getIncrementInfo(folder storage.Folder, object storage.Object) (string, str
 	}
 
 	return *sentinel.IncrementFullName, *sentinel.IncrementFrom, false, nil
+}
+
+// HandleDeleteGarbage delete outdated WAL archives and leftover backup files
+func (dh *DeleteHandler) HandleDeleteGarbage(args []string, folder storage.Folder, confirm bool) error {
+	predicate := ExtractDeleteGarbagePredicate(args)
+	oldestBackup, err := findOldestNonPermanentBackup(folder.GetSubFolder(utility.BaseBackupPath))
+	if err != nil {
+		if _, ok := err.(internal.NoBackupsFoundError); ok {
+			tracelog.InfoLogger.Println("Couldn't find any non-permanent backups in storage. Not doing anything.")
+			return nil
+		}
+		return err
+	}
+
+	target, err := dh.FindTargetByName(oldestBackup.BackupName)
+	if err != nil {
+		return err
+	}
+
+	return dh.DeleteBeforeTargetWhere(target, confirm, predicate)
+}
+
+// ExtractDeleteGarbagePredicate extracts delete modifier the "delete garbage" command
+func ExtractDeleteGarbagePredicate(args []string) func(storage.Object) bool {
+	switch {
+	case len(args) == 2 && args[1] == DeleteGarbageArchivesModifier:
+		return storagePrefixFilter(utility.WalPath)
+	case len(args) == 2 && args[1] == DeleteGarbageBackupsModifier:
+		return storagePrefixFilter(utility.BaseBackupPath)
+	default:
+		return func(storage.Object) bool { return true }
+	}
+}
+
+func storagePrefixFilter(prefix string) func(storage.Object) bool {
+	return func(object storage.Object) bool {
+		objectName := object.GetName()
+		return len(objectName) >= len(prefix) && objectName[:len(prefix)] == prefix
+	}
+}
+
+// findOldestNonPermanentBackup finds oldest non-permanent backup available in storage.
+func findOldestNonPermanentBackup(
+	folder storage.Folder,
+) (*BackupDetail, error) {
+	backups, err := internal.GetBackups(folder)
+	if err != nil {
+		// this also includes the zero backups case
+		return nil, err
+	}
+
+	backupDetails, err := GetBackupsDetails(folder, backups)
+	if err != nil {
+		return nil, err
+	}
+
+	SortBackupDetails(backupDetails)
+
+	for i := range backupDetails {
+		currBackup := &backupDetails[i]
+
+		if currBackup.IsPermanent {
+			tracelog.InfoLogger.Printf(
+				"Backup %s is permanent, it is not eligible to be selected "+
+					"as the oldest backup for delete garbage.\n", currBackup.BackupName)
+			continue
+		}
+		tracelog.InfoLogger.Printf("Found earliest non-permanent backup: %s\n", currBackup.BackupName)
+		return currBackup, nil
+	}
+
+	return nil, internal.NewNoBackupsFoundError()
 }
