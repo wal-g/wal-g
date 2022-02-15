@@ -96,7 +96,7 @@ then
 fi
 
 # restore the backup sentinel
-wal-g st put "${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" "basebackups_005/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" --no-compress --no-encrypt --config=${TMP_CONFIG}
+wal-g st put "/tmp/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" "basebackups_005/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" --no-compress --no-encrypt --config=${TMP_CONFIG}
 
 # delete the first non-permanent backup
 wal-g --config=${TMP_CONFIG} delete target "${FIRST_NON_PERMANENT_BACKUP}" --confirm
