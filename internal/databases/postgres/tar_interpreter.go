@@ -24,6 +24,7 @@ type FileTarInterpreter struct {
 	UnwrapResult    *UnwrapResult
 
 	createNewIncrementalFiles bool
+	explicitFsync             *bool
 }
 
 func NewFileTarInterpreter(
@@ -31,7 +32,17 @@ func NewFileTarInterpreter(
 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
 ) *FileTarInterpreter {
 	return &FileTarInterpreter{dbDataDirectory, sentinel, filesMetadata,
-		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles}
+		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles, nil}
+}
+
+// Tzoop: Make use of GroupTarInterpreter (copy code from one method). Probably need to create SimpleGroupTarInterpreter which does looping
+// and then make use of something like 'FileGroupTarInterpreter' which does errGroup stuff...
+func NewFileTarInterpreterWithExplicitFsync(
+	dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
+	filesToUnwrap map[string]bool, createNewIncrementalFiles bool, explicitFsync bool,
+) *FileTarInterpreter {
+	return &FileTarInterpreter{dbDataDirectory, sentinel, filesMetadata,
+		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles, &explicitFsync}
 }
 
 // write file from reader to local file
@@ -98,6 +109,9 @@ func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileIn
 	tracelog.DebugLogger.Println("Interpreting: ", fileInfo.Name)
 	targetPath := path.Join(tarInterpreter.DBDataDirectory, fileInfo.Name)
 	fsync := !viper.GetBool(internal.TarDisableFsyncSetting)
+	if tarInterpreter.explicitFsync != nil {
+		fsync = *tarInterpreter.explicitFsync
+	}
 	switch fileInfo.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
 		// temporary switch to determine if new unwrap logic should be used
