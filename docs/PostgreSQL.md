@@ -329,6 +329,11 @@ WAL-G will also prefetch WAL files ahead of asked WAL file. These files will be 
 wal-g wal-fetch example-archive new-file-name
 ```
 
+Note: ``wal-fetch`` will exit with errorcode 74 (EX_IOERR: input/output error, see sysexits.h for more info) if the WAL-file is not available in the repository.
+All other errors end in exit code 1, and should stop PostgreSQL rather than ending PostgreSQL recovery.
+For PostgreSQL that should be any error code between 126 and 255, which can be achieved with a simple wrapper script.
+Please see https://github.com/wal-g/wal-g/pull/1195 for more information.
+
 ### ``wal-push``
 
 When uploading WAL archives to S3, the user should pass in the absolute path to where the archive is located.

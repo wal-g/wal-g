@@ -17,6 +17,9 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+// Looking at sysexits.h, EX_IOERR (74) is defined as a generic exit code for input/output errors
+const exIoError = 74
+
 type InvalidWalFileMagicError struct {
 	error
 }
@@ -98,7 +101,7 @@ func HandleWALFetch(folder storage.Folder, walFileName string, location string, 
 	err := internal.DownloadFileTo(folder, walFileName, location)
 	if _, isArchNonExistErr := err.(internal.ArchiveNonExistenceError); isArchNonExistErr {
 		tracelog.ErrorLogger.Print(err.Error())
-		os.Exit(74)
+		os.Exit(exIoError)
 	} else {
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
