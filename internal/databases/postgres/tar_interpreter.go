@@ -45,6 +45,16 @@ func NewFileTarInterpreterWithExplicitFsync(
 		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles, &explicitFsync}
 }
 
+// Tzoop: We could replace fsync handler with global fsync in internals.GlobalFileSyncHandler
+func NewGroupFileTarInterpreter(dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
+	filesToUnwrap map[string]bool, createNewIncrementalFiles bool) *internal.BaseGroupTarInterpreter {
+	fileInterpreter := NewFileTarInterpreterWithExplicitFsync(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles, false)
+	fsyncHandler := internal.FileSyncHandler{dbDataDirectory}
+	fileHandlers := [...]internal.FileInterpretFinishedHandler{fsyncHandler}
+	endHandlers := [...]internal.InterpretFinishedHandler{}
+	return &internal.BaseGroupTarInterpreter{fileInterpreter, fileHandlers[:], endHandlers[:]}
+}
+
 // write file from reader to local file
 func WriteLocalFile(fileReader io.Reader, header *tar.Header, localFile *os.File, fsync bool) error {
 	_, err := io.Copy(localFile, fileReader)
