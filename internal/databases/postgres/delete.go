@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -241,8 +242,7 @@ func ExtractDeleteGarbagePredicate(args []string) func(storage.Object) bool {
 
 func storagePrefixFilter(prefix string) func(storage.Object) bool {
 	return func(object storage.Object) bool {
-		objectName := object.GetName()
-		return len(objectName) >= len(prefix) && objectName[:len(prefix)] == prefix
+		return strings.HasPrefix(object.GetName(), prefix)
 	}
 }
 

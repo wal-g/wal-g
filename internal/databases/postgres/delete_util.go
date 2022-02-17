@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"strings"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -48,11 +50,11 @@ func GetPermanentBackupsAndWals(folder storage.Folder) (map[string]bool, map[str
 }
 
 func IsPermanent(objectName string, permanentBackups, permanentWals map[string]bool) bool {
-	if objectName[:len(utility.WalPath)] == utility.WalPath {
+	if strings.HasPrefix(objectName, utility.WalPath) {
 		wal := objectName[len(utility.WalPath) : len(utility.WalPath)+24]
 		return permanentWals[wal]
 	}
-	if objectName[:len(utility.BaseBackupPath)] == utility.BaseBackupPath {
+	if strings.HasPrefix(objectName, utility.BaseBackupPath) {
 		backup := utility.StripLeftmostBackupName(objectName[len(utility.BaseBackupPath):])
 		return permanentBackups[backup]
 	}
