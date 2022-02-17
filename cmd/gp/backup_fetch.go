@@ -72,7 +72,7 @@ func createTargetFetchBackupSelector(cmd *cobra.Command,
 
 	// if target restore point is provided without the backup name, then
 	// choose the latest backup up to the specified restore point name
-	if restorePoint != "" && targetUserData == "" && len(args) == 0 {
+	if restorePoint != "" && targetUserData == "" && targetName == "" {
 		tracelog.InfoLogger.Printf("Restore point %s is specified without the backup name or target user data, "+
 			"will search for a matching backup", restorePoint)
 		return greenplum.NewRestorePointBackupSelector(restorePoint), nil

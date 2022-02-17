@@ -59,11 +59,15 @@ setup_wal_archiving() {
   start_cluster
 }
 
-stop_and_delete_cluster_dir() {
-  stop_cluster
+delete_cluster_dirs() {
   #remove the database files
   for elem in "${SEGMENTS_DIRS[@]}"; do
     read -a arr <<< "$elem"
     rm -rf "${arr[1]}"
   done
+}
+
+stop_and_delete_cluster_dir() {
+  stop_cluster
+  delete_cluster_dirs
 }
