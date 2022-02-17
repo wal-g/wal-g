@@ -82,7 +82,6 @@ var _ io.Writer = &DevNullWriter{}
 func extractOneTar(tarInterpreter TarInterpreter, source io.Reader) error {
 	tarReader := tar.NewReader(source)
 
-	// Tzoop: We loop through files we need to extract here
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
@@ -92,7 +91,6 @@ func extractOneTar(tarInterpreter TarInterpreter, source io.Reader) error {
 			return errors.Wrap(err, "extractOne: tar extract failed")
 		}
 
-		// We could probably launch interpretation here. Is it okay to use TarInterpreter concurrently?
 		err = tarInterpreter.Interpret(tarReader, header)
 		if err != nil {
 			return errors.Wrap(err, "extractOne: Interpret failed")
@@ -226,8 +224,6 @@ func tryExtractFiles(files []ReaderMaker,
 				if err == nil {
 					defer extractingReader.Close()
 
-					// Tzoop: We iterate over files inside this function.
-					// Looks like it's best to fsync inside
 					err = extractFile(tarInterpreter, extractingReader, fileClosure)
 					err = errors.Wrapf(err, "Extraction error in %s", filePath)
 					tracelog.InfoLogger.Printf("Finished extraction of %s", filePath)
