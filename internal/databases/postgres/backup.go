@@ -133,7 +133,7 @@ func (backup *Backup) GetSentinelAndFilesMetadata() (BackupSentinelDto, FilesMet
 		return sentinel, filesMetadata, nil
 	}
 
-	err = backup.FetchDto(&filesMetadata, getFilesMetadataPath(backup.Name))
+	err = internal.FetchDto(backup.Folder, &filesMetadata, getFilesMetadataPath(backup.Name))
 	if err != nil {
 		// double-check that this is not V2 backup
 		sentinelV2, err2 := backup.getSentinelV2()

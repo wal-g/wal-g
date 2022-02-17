@@ -14,6 +14,7 @@ import (
 const (
 	backupFetchShortDescription  = "Fetches a backup from storage"
 	targetUserDataDescription    = "Fetch storage backup which has the specified user data"
+	restorePointDescription      = "Fetch storage backup w/ restore point specified by name"
 	restoreConfigPathDescription = "Path to the cluster restore configuration"
 	fetchContentIdsDescription   = "If set, WAL-G will fetch only the specified segments"
 	fetchModeDescription         = "Backup fetch mode. default: do the backup unpacking " +
@@ -22,13 +23,14 @@ const (
 )
 
 var fetchTargetUserData string
+var restorePoint string
 var restoreConfigPath string
 var fetchContentIds *[]int
 var fetchModeStr string
 var inPlaceRestore bool
 
 var backupFetchCmd = &cobra.Command{
-	Use:   "backup-fetch [backup_name | --target-user-data <data>]",
+	Use:   "backup-fetch [backup_name | --target-user-data <data> | --restore-point <name>]",
 	Short: backupFetchShortDescription, // TODO : improve description
 	Args:  cobra.RangeArgs(0, 1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -40,7 +42,7 @@ var backupFetchCmd = &cobra.Command{
 		if fetchTargetUserData == "" {
 			fetchTargetUserData = viper.GetString(internal.FetchTargetUserDataSetting)
 		}
-		targetBackupSelector, err := createTargetFetchBackupSelector(cmd, args, fetchTargetUserData)
+		targetBackupSelector, err := createTargetFetchBackupSelector(cmd, args, fetchTargetUserData, restorePoint)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		folder, err := internal.ConfigureFolder()
@@ -56,16 +58,24 @@ var backupFetchCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		internal.HandleBackupFetch(folder, targetBackupSelector,
-			greenplum.NewGreenplumBackupFetcher(restoreConfigPath, inPlaceRestore, logsDir, *fetchContentIds, fetchMode))
+			greenplum.NewGreenplumBackupFetcher(restoreConfigPath, inPlaceRestore, logsDir, *fetchContentIds, fetchMode, restorePoint))
 	},
 }
 
 // create the BackupSelector to select the backup to fetch
 func createTargetFetchBackupSelector(cmd *cobra.Command,
-	args []string, targetUserData string) (internal.BackupSelector, error) {
+	args []string, targetUserData, restorePoint string) (internal.BackupSelector, error) {
 	targetName := ""
 	if len(args) >= 1 {
 		targetName = args[0]
+	}
+
+	// if target restore point is provided without the backup name, then
+	// choose the latest backup up to the specified restore point name
+	if restorePoint != "" && targetUserData == "" && len(args) == 0 {
+		tracelog.InfoLogger.Printf("Restore point %s is specified without the backup name or target user data, "+
+			"will search for a matching backup", restorePoint)
+		return greenplum.NewRestorePointBackupSelector(restorePoint), nil
 	}
 
 	backupSelector, err := internal.NewTargetBackupSelector(targetUserData, targetName, greenplum.NewGenericMetaFetcher())
@@ -79,6 +89,7 @@ func createTargetFetchBackupSelector(cmd *cobra.Command,
 func init() {
 	backupFetchCmd.Flags().StringVar(&fetchTargetUserData, "target-user-data",
 		"", targetUserDataDescription)
+	backupFetchCmd.Flags().StringVar(&restorePoint, "restore-point", "", restorePointDescription)
 	backupFetchCmd.Flags().StringVar(&restoreConfigPath, "restore-config",
 		"", restoreConfigPathDescription)
 	backupFetchCmd.Flags().BoolVar(&inPlaceRestore, "in-place", false, inPlaceFlagDescription)
