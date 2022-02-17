@@ -36,7 +36,8 @@ func FindPermanentBackups(folder storage.Folder, metaFetcher GenericMetaFetcher)
 // IsPermanent is a generic function to determine if the storage object is permanent.
 // It does not support permanent WALs or binlogs.
 func IsPermanent(objectName string, permanentBackups map[string]bool, backupNameLength int) bool {
-	if strings.HasPrefix(objectName, utility.BaseBackupPath) {
+	if strings.HasPrefix(objectName, utility.BaseBackupPath) &&
+		len(objectName) >= len(utility.BaseBackupPath)+backupNameLength {
 		backup := objectName[len(utility.BaseBackupPath) : len(utility.BaseBackupPath)+backupNameLength]
 		return permanentBackups[backup]
 	}

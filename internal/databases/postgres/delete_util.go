@@ -50,7 +50,7 @@ func GetPermanentBackupsAndWals(folder storage.Folder) (map[string]bool, map[str
 }
 
 func IsPermanent(objectName string, permanentBackups, permanentWals map[string]bool) bool {
-	if strings.HasPrefix(objectName, utility.WalPath) {
+	if strings.HasPrefix(objectName, utility.WalPath) && len(objectName) >= len(utility.WalPath)+24 {
 		wal := objectName[len(utility.WalPath) : len(utility.WalPath)+24]
 		return permanentWals[wal]
 	}
