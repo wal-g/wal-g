@@ -62,6 +62,10 @@ func (groupTarInterpreter *BaseGroupTarInterpreter) InterpretGroup(tarReader *ta
 	return nil
 }
 
+func (groupTarInterpreter *BaseGroupTarInterpreter) InterpretOne(tarReader io.Reader, header *tar.Header) error {
+	return groupTarInterpreter.Interpreter.Interpret(tarReader, header)
+}
+
 type FileSyncHandler struct {
 	BasePath string
 }

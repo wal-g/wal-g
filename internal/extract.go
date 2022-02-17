@@ -53,6 +53,7 @@ type TarInterpreter interface {
 }
 
 type GroupTarInterpreter interface {
+	InterpretOne(reader io.Reader, header *tar.Header) error
 	InterpretGroup(tarReader *tar.Reader) error
 }
 
