@@ -2,7 +2,6 @@ package internal
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -65,30 +64,12 @@ func (backup *Backup) SentinelExists() (bool, error) {
 
 // TODO : unit tests
 func (backup *Backup) FetchSentinel(sentinelDto interface{}) error {
-	return backup.FetchDto(sentinelDto, backup.getStopSentinelPath())
+	return FetchDto(backup.Folder, sentinelDto, backup.getStopSentinelPath())
 }
 
 // TODO : unit tests
 func (backup *Backup) FetchMetadata(metadataDto interface{}) error {
-	return backup.FetchDto(metadataDto, backup.getMetadataPath())
-}
-
-// FetchDto gets data from path and de-serializes it to given object
-func (backup *Backup) FetchDto(dto interface{}, path string) error {
-	reader, err := backup.fetchStorageStream(path)
-	if err != nil {
-		return err
-	}
-	unmarshaller, err := NewDtoSerializer()
-	if err != nil {
-		return err
-	}
-	return errors.Wrap(unmarshaller.Unmarshal(reader, dto), fmt.Sprintf("failed to fetch dto from %s", path))
-}
-
-func (backup *Backup) fetchStorageStream(path string) (io.ReadCloser, error) {
-	backupReaderMaker := NewStorageReaderMaker(backup.Folder, path)
-	return backupReaderMaker.Reader()
+	return FetchDto(backup.Folder, metadataDto, backup.getMetadataPath())
 }
 
 func (backup *Backup) UploadMetadata(metadataDto interface{}) error {
@@ -97,6 +78,20 @@ func (backup *Backup) UploadMetadata(metadataDto interface{}) error {
 
 func (backup *Backup) UploadSentinel(sentinelDto interface{}) error {
 	return UploadDto(backup.Folder, sentinelDto, backup.getStopSentinelPath())
+}
+
+// FetchDto gets data from path and de-serializes it to given object
+func FetchDto(folder storage.Folder, dto interface{}, path string) error {
+	backupReaderMaker := NewStorageReaderMaker(folder, path)
+	reader, err := backupReaderMaker.Reader()
+	if err != nil {
+		return err
+	}
+	unmarshaller, err := NewDtoSerializer()
+	if err != nil {
+		return err
+	}
+	return errors.Wrap(unmarshaller.Unmarshal(reader, dto), fmt.Sprintf("failed to fetch dto from %s", path))
 }
 
 // UploadDto serializes given object to JSON and puts it to path

@@ -38,5 +38,31 @@ if [ "$EXIT_STATUS" -eq 0 ] ; then
     exit 1
 fi
 
+wal-g backup-push --config=${TMP_CONFIG}
+
+wal-g create-restore-point after_backup --config=${TMP_CONFIG}
+stop_and_delete_cluster_dir
+
+wal-g backup-fetch LATEST --restore-point rp1 --in-place --config=${TMP_CONFIG} && EXIT_STATUS=$? || EXIT_STATUS=$?
+if [ "$EXIT_STATUS" -eq 0 ] ; then
+    echo "Error: backup fetched with restore point in the past"
+    exit 1
+fi
+
+wal-g backup-fetch --restore-point rp1 --in-place --config=${TMP_CONFIG} && EXIT_STATUS=$? || EXIT_STATUS=$?
+if [ "$EXIT_STATUS" -eq 0 ] ; then
+    echo "Error: backup fetched with restore point in the past"
+    exit 1
+fi
+
+# should not fail
+wal-g backup-fetch LATEST --restore-point after_backup --in-place --config=${TMP_CONFIG}
+delete_cluster_dirs
+
+# should not fail
+wal-g backup-fetch --restore-point after_backup --in-place --config=${TMP_CONFIG}
+
+start_cluster
+
 cleanup
 rm ${TMP_CONFIG}
