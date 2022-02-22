@@ -18,7 +18,13 @@ func HandleBackupPush(folder storage.Folder, uploader internal.UploaderProvider,
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(db, "")
 
-	binlogStart, err := getLastUploadedBinlog(folder)
+	flavor, err := getMySQLFlavor(db)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	gtidStart, err := getMySQLGTIDExecuted(db, flavor)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	binlogStart, err := getLastUploadedBinlogBeforeGTID(folder, gtidStart, flavor)
 	tracelog.ErrorLogger.FatalfOnError("failed to get last uploaded binlog: %v", err)
 	timeStart := utility.TimeNowCrossPlatformLocal()
 

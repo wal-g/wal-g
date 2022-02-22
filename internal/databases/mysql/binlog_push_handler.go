@@ -12,8 +12,6 @@ import (
 	"sort"
 
 	"github.com/go-mysql-org/go-mysql/mysql"
-	"github.com/go-mysql-org/go-mysql/replication"
-
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -58,7 +56,7 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 	var filters []statefulBinlogFilter
 	filters = append(filters, &untilBinlogFilter{Until: untilBinlog}, &archivedBinlogFilter{})
 	if checkGTIDs {
-		flavor, err := getFlavor(db)
+		flavor, err := getMySQLFlavor(db)
 		if flavor == "" || err != nil {
 			flavor = mysql.MySQLFlavor
 		}
@@ -272,7 +270,7 @@ func (u *gtidFilter) test(binlog, nextBinlog string) bool {
 	}
 
 	// nextPreviousGTIDs is 'GTIDs_executed at the end of current binary log file'
-	nextPreviousGTIDs, err := peekPreviousMysqlGTIDs(path.Join(u.BinlogsFolder, nextBinlog), u.Flavor)
+	nextPreviousGTIDs, err := GetBinlogPreviousGTIDs(path.Join(u.BinlogsFolder, nextBinlog), u.Flavor)
 	if err != nil {
 		tracelog.InfoLogger.Printf("Cannot extract PREVIOUS_GTIDS event from binlog %s. Upload it. (%s check)\n", binlog, u.name())
 		return true
@@ -287,7 +285,7 @@ func (u *gtidFilter) test(binlog, nextBinlog string) bool {
 	}
 
 	if u.lastGtidSeen == nil {
-		gtidSetBeforeCurrentBinlog, err := peekPreviousMysqlGTIDs(path.Join(u.BinlogsFolder, binlog), u.Flavor)
+		gtidSetBeforeCurrentBinlog, err := GetBinlogPreviousGTIDs(path.Join(u.BinlogsFolder, binlog), u.Flavor)
 		if err != nil {
 			tracelog.InfoLogger.Printf("Cannot extract PREVIOUS_GTIDS event from current binlog %s. Upload it. (%s check)\n", binlog, u.name())
 			u.lastGtidSeen = nextPreviousGTIDs
@@ -319,39 +317,4 @@ func (u *gtidFilter) test(binlog, nextBinlog string) bool {
 	tracelog.InfoLogger.Printf("Should upload binlog %s with GTID set: %s (%s check)\n", binlog, currentBinlogGTIDSet.String(), u.name())
 	u.lastGtidSeen = nextPreviousGTIDs
 	return true
-}
-
-func peekPreviousMysqlGTIDs(filename string, flavor string) (*mysql.MysqlGTIDSet, error) {
-	var found bool
-	previousGTID := &replication.PreviousGTIDsEvent{}
-
-	parser := replication.NewBinlogParser()
-	parser.SetFlavor(flavor)
-	parser.SetVerifyChecksum(false) // the faster, the better
-	parser.SetRawMode(true)         // choose events to parse manually
-	err := parser.ParseFile(filename, 0, func(event *replication.BinlogEvent) error {
-		if event.Header.EventType == replication.PREVIOUS_GTIDS_EVENT {
-			err := previousGTID.Decode(event.RawData[replication.EventHeaderSize:])
-			if err != nil {
-				return err
-			}
-			found = true
-			return fmt.Errorf("shallow file read finished")
-		}
-		return nil
-	})
-
-	if err != nil && !found {
-		return nil, errors.Wrapf(err, "binlog-push: could not parse binlog file '%s'\n", filename)
-	}
-
-	res, err := mysql.ParseMysqlGTIDSet(previousGTID.GTIDSets)
-	if err != nil {
-		return nil, err
-	}
-	result, ok := res.(*mysql.MysqlGTIDSet)
-	if !ok {
-		tracelog.ErrorLogger.Fatalf("cannot cast nextPreviousGTIDs to MysqlGTIDSet. Should never be here. Actual type: %T\n", res)
-	}
-	return result, nil
 }
