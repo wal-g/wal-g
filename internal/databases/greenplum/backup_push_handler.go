@@ -260,8 +260,12 @@ func (bh *BackupHandler) pollSegmentStates() (map[int]SegBackupState, error) {
 	}, true)
 
 	for _, command := range remoteOutput.Commands {
-		tracelog.InfoLogger.Printf("Poll segment backup-push state STDERR (segment %d):\n%s\n", command.Content, command.Stderr)
-		tracelog.InfoLogger.Printf("Poll segment backup-push state STDOUT (segment %d):\n%s\n", command.Content, command.Stdout)
+		logger := tracelog.DebugLogger
+		if command.Stderr != "" {
+			logger = tracelog.WarningLogger
+		}
+		logger.Printf("Poll segment backup-push state STDERR (segment %d):\n%s\n", command.Content, command.Stderr)
+		logger.Printf("Poll segment backup-push state STDOUT (segment %d):\n%s\n", command.Content, command.Stdout)
 	}
 
 	if remoteOutput.NumErrors > 0 {
