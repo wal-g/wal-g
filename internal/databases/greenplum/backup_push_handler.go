@@ -136,7 +136,7 @@ func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 func (bh *BackupHandler) HandleBackupPush() {
 	bh.currBackupInfo.backupName = BackupNamePrefix + time.Now().Format(utility.BackupTimeFormat)
 	bh.currBackupInfo.startTime = utility.TimeNowCrossPlatformUTC()
-	gplog.InitializeLogging("wal-g", bh.arguments.logsDir)
+	initGpLog(bh.arguments.logsDir)
 
 	err := bh.checkPrerequisites()
 	tracelog.ErrorLogger.FatalfOnError("Backup prerequisites check failed: %v\n", err)

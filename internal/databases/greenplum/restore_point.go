@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/blang/semver"
-	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/jackc/pgx"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -122,7 +121,7 @@ func NewRestorePointCreator(pointName string) (rpc *RestorePointCreator, err err
 // Create creates cluster-wide consistent restore point
 func (rpc *RestorePointCreator) Create() {
 	rpc.startTime = utility.TimeNowCrossPlatformUTC()
-	gplog.InitializeLogging("wal-g", rpc.logsDir)
+	initGpLog(rpc.logsDir)
 
 	err := rpc.checkExists()
 	tracelog.ErrorLogger.FatalOnError(err)

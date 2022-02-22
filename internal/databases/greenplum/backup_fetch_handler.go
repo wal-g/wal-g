@@ -7,8 +7,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/greenplum-db/gp-common-go-libs/gplog"
-
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -65,7 +63,7 @@ func NewFetchHandler(
 ) *FetchHandler {
 	backupIDByContentID := make(map[int]string)
 	segmentConfigs := make([]cluster.SegConfig, 0)
-	gplog.InitializeLogging("wal-g", logsDir)
+	initGpLog(logsDir)
 
 	for _, segMeta := range sentinel.Segments {
 		// currently, WAL-G does not restore the mirrors
