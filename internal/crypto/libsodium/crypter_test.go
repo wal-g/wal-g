@@ -71,6 +71,12 @@ func EncryptionCycle(t *testing.T, crypter crypto.Crypter) {
 	assert.NoErrorf(t, err, "decryption read error: %v", err)
 
 	assert.Equal(t, secret, string(decrypted), "decrypted text not equals to open text")
+
+	// decrypter should keep returning EOF with no data
+	var buf [8]byte
+	n, err := decrypt.Read(buf[:])
+	assert.Equal(t, n, 0, "decryptor should not read any more data after ReadAll")
+	assert.Error(t, io.EOF, "decryptor should keep returning EOF error")
 }
 
 func TestEncryptionCycleFromKey(t *testing.T) {
