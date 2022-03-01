@@ -90,6 +90,7 @@ func (r *SegBackupRunner) waitBackup(doneCh chan error) error {
 	}
 }
 
+// TODO: unit tests
 func checkBackupStatus(ticker *time.Ticker, doneCh chan error) (SegBackupStatus, error) {
 	select {
 	case <-ticker.C:

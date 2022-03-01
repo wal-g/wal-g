@@ -94,6 +94,8 @@ func NewFetchHandler(
 	}
 }
 
+// TODO: Unit tests
+// prepareContentIDsToFetch returns a set containing the IDs of segments to be fetched
 func prepareContentIDsToFetch(fetchContentIds []int, segmentConfigs []cluster.SegConfig) map[int]bool {
 	contentIDsToFetch := make(map[int]bool)
 
@@ -222,6 +224,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 	return nil
 }
 
+// TODO: Unit tests
 // buildFetchCommand creates the WAL-G command to restore the segment with
 // the provided contentID
 func (fh *FetchHandler) buildFetchCommand(contentID int) string {
