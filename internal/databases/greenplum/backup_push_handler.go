@@ -96,6 +96,8 @@ type BackupHandler struct {
 	currBackupInfo CurrBackupInfo
 }
 
+// TODO: unit tests
+// buildBackupPushCommand builds a command to be executed on specific segment
 func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 	segment := bh.globalCluster.ByContent[contentID][0]
 	segUserData := NewSegmentUserData()
@@ -220,6 +222,7 @@ func (bh *BackupHandler) waitSegmentBackups() error {
 	}
 }
 
+// TODO: unit tests
 func checkBackupStates(states map[int]SegBackupState) (int, error) {
 	runningBackupsCount := 0
 
