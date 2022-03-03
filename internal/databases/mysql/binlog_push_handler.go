@@ -26,6 +26,7 @@ type LogsCache struct {
 }
 
 //gocyclo:ignore
+//nolint:funlen
 func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, checkGTIDs bool) {
 	rootFolder := uploader.Folder()
 	uploader.ChangeDirectory(BinlogPath)
@@ -68,11 +69,11 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 		filter.init(cache)
 	}
 
-outer:
 	for i := 0; i < len(binlogs); i++ {
 		binLog := binlogs[i]
 
 		tracelog.DebugLogger.Printf("Testing... %v\n", binLog)
+		upload := true
 		for _, filter := range filters {
 			nextBinLog := ""
 			if i < len(binlogs)-1 {
@@ -80,8 +81,16 @@ outer:
 			}
 			if !filter.test(binLog, nextBinLog) {
 				tracelog.DebugLogger.Printf("Skip binlog %v (%s check)\n", binLog, filter.name())
-				continue outer
+				upload = false
+				break
 			}
+		}
+
+		if !upload {
+			for _, filter := range filters {
+				filter.onSkip(&cache)
+			}
+			continue
 		}
 
 		// Upload binlogs:
@@ -91,8 +100,13 @@ outer:
 		for _, filter := range filters {
 			filter.onUpload(&cache)
 		}
-		putCache(cache)
+		if i%10 == 0 {
+			putCache(cache) // sync cache to disk from time to time
+		}
 	}
+
+	// Write Binlog Cache
+	putCache(cache)
 
 	// Write Binlog Sentinel
 	binlogSentinelDto.GTIDArchived = cache.GTIDArchived
@@ -199,6 +213,7 @@ type statefulBinlogFilter interface {
 	name() string
 	init(LogsCache)
 	onUpload(*LogsCache)
+	onSkip(cache *LogsCache)
 	test(binlog, nextBinlog string) bool
 }
 
@@ -213,6 +228,7 @@ func (u *untilBinlogFilter) name() string {
 	return "until"
 }
 func (u *untilBinlogFilter) onUpload(*LogsCache) {}
+func (u *untilBinlogFilter) onSkip(*LogsCache)   {}
 func (u *untilBinlogFilter) test(binlog, _ string) bool {
 	return binlog < u.Until
 }
@@ -232,6 +248,9 @@ func (u *archivedBinlogFilter) name() string {
 	return "archived binlog"
 }
 func (u *archivedBinlogFilter) onUpload(data *LogsCache) {
+	data.LastArchivedBinlog = u.lastTested
+}
+func (u *archivedBinlogFilter) onSkip(data *LogsCache) {
 	data.LastArchivedBinlog = u.lastTested
 }
 func (u *archivedBinlogFilter) test(binlog, _ string) bool {
@@ -262,6 +281,7 @@ func (u *gtidFilter) name() string {
 func (u *gtidFilter) onUpload(data *LogsCache) {
 	data.GTIDArchived = u.gtidArchived.String()
 }
+func (u *gtidFilter) onSkip(*LogsCache) {}
 func (u *gtidFilter) test(binlog, nextBinlog string) bool {
 	if u.Flavor != mysql.MySQLFlavor {
 		// MariaDB GTID Sets consists of: DomainID + ServerID + Sequence Number (64-bit unsigned integer)

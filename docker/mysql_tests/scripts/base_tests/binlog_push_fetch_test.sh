@@ -56,6 +56,7 @@ sysbench --time=1 run && mysql -e "FLUSH LOGS"
 current_uuid=$(mysql -Nse "SELECT @@server_uuid" | awk '{print $1}')
 current_sentinel=$(s3cmd get "${WALE_S3_PREFIX}/binlog_sentinel_005.json" - )
 echo "{\"GtidArchived\":\"${current_uuid}:1-999999\"}" | s3cmd put - "${WALE_S3_PREFIX}/binlog_sentinel_005.json"
+rm -f "$HOME/.walg_mysql_binlogs_cache"
 binlogs_cnt1=$(s3cmd ls "${WALE_S3_PREFIX}/binlog_005/" | wc -l )
 export WALG_MYSQL_CHECK_GTIDS="true"
 wal-g binlog-push
@@ -68,6 +69,7 @@ fi
 
 echo "Revert GTIDs in cache, so all binlogs should be uploaded"
 echo "${current_sentinel}}" | s3cmd put - "${WALE_S3_PREFIX}/binlog_sentinel_005.json"
+rm -f "$HOME/.walg_mysql_binlogs_cache"
 export WALG_MYSQL_CHECK_GTIDS="true"
 wal-g binlog-push
 binlogs_cnt3=$(s3cmd ls "${WALE_S3_PREFIX}/binlog_005/" | wc -l )
