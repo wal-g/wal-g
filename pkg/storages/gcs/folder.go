@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"path"
 	"strconv"
@@ -275,7 +274,7 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	if err == gcs.ErrObjectNotExist {
 		return nil, storage.NewObjectNotFoundError(path)
 	}
-	return ioutil.NopCloser(reader), err
+	return io.NopCloser(reader), err
 }
 
 func (folder *Folder) PutObject(name string, content io.Reader) error {

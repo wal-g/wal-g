@@ -3,6 +3,7 @@ package greenplum
 import (
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -36,7 +37,7 @@ func NewDeleteHandler(folder storage.Folder) (*DeleteHandler, error) {
 		// Remove only the basebackups folder objects, do not touch the segments folders.
 		// WAL-G deals with them separately.
 		objectName := obj.GetName()
-		return objectName[:len(utility.BaseBackupPath)] != utility.BaseBackupPath
+		return !strings.HasPrefix(objectName, utility.BaseBackupPath)
 	}
 
 	return &DeleteHandler{
@@ -118,7 +119,7 @@ func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject, confirm
 		segFolder := h.Folder.GetSubFolder(FormatSegmentStoragePrefix(meta.ContentID))
 		permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(segFolder)
 
-		segDeleteHandler, err := postgres.NewDeleteHandler(segFolder, permanentBackups, permanentWals, true)
+		segDeleteHandler, err := postgres.NewDeleteHandler(segFolder, permanentBackups, permanentWals, false)
 		if err != nil {
 			return err
 		}

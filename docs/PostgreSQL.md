@@ -329,6 +329,11 @@ WAL-G will also prefetch WAL files ahead of asked WAL file. These files will be 
 wal-g wal-fetch example-archive new-file-name
 ```
 
+Note: ``wal-fetch`` will exit with errorcode 74 (EX_IOERR: input/output error, see sysexits.h for more info) if the WAL-file is not available in the repository.
+All other errors end in exit code 1, and should stop PostgreSQL rather than ending PostgreSQL recovery.
+For PostgreSQL that should be any error code between 126 and 255, which can be achieved with a simple wrapper script.
+Please see https://github.com/wal-g/wal-g/pull/1195 for more information.
+
 ### ``wal-push``
 
 When uploading WAL archives to S3, the user should pass in the absolute path to where the archive is located.
@@ -501,13 +506,24 @@ Flags:
 - `-t, --to string` Storage config to where should copy backup
 - `-w, --without-history` Copy backup without history (wal files)
 
-### ``wal-purge``
+### ``delete garbage``
 
-Purges outdated WAL archives from storage. Will remove all WAL archives before the earliest non-permanent backup.
+Deletes outdated WAL archives and backups leftover files from storage, e.g. unsuccessfully backups or partially deleted ones. Will remove all non-permanent objects before the earliest non-permanent backup. This command is useful when backups are being deleted by the `delete target` command.
 
 Usage:
 ```bash
-wal-g wal-purge
+wal-g delete garbage           # Deletes outdated WAL archives and leftover backups files from storage
+wal-g delete garbage ARCHIVES      # Deletes only outdated WAL archives from storage
+wal-g delete garbage BACKUPS       # Deletes only leftover (partially deleted or unsuccessful) backups files from storage
+```
+
+### ``wal-restore``
+
+Restores the missing WAL segments that will be needed to perform pg_rewind from storage. The current version supports only local clusters.
+
+Usage:
+```bash
+wal-g wal-restore path/to/target-pgdata path/to/source-pgdata
 ```
 
 pgBackRest backups support

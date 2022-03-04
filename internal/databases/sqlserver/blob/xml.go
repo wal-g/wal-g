@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 
-	//"io/ioutil"
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"

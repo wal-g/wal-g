@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
-	"io/ioutil"
 	"os"
 	"unsafe"
 
@@ -203,7 +202,7 @@ func VerifyPagedFileBase(path string, fileInfo os.FileInfo, pagedFile io.Reader)
 func verifyPageBlocks(path string, fileInfo os.FileInfo, pageBlocks io.Reader,
 	blockNumbers []uint32) (corruptBlockNumbers []uint32, err error) {
 	if _, ignored := ignoredFileNames[fileInfo.Name()]; ignored || !isPagedFile(fileInfo, path) {
-		_, err = io.Copy(ioutil.Discard, pageBlocks)
+		_, err = io.Copy(io.Discard, pageBlocks)
 		return nil, err
 	}
 	for _, blockNo := range blockNumbers {

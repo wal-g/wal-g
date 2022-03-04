@@ -4,8 +4,8 @@ go 1.17
 
 require (
 	cloud.google.com/go/storage v1.8.0
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v0.19.0
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.1.0
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v0.21.1
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.3.0
 	github.com/Azure/go-autorest/autorest v0.11.21
 	github.com/DATA-DOG/godog v0.7.14-0.20190529133509-96731eaefa46
 	github.com/DataDog/zstd v1.4.4
@@ -16,7 +16,7 @@ require (
 	github.com/cyberdelia/lzo v0.0.0-20171006181345-d85071271a6f
 	github.com/denisenkom/go-mssqldb v0.10.0
 	github.com/docker/docker v1.13.1
-	github.com/go-mysql-org/go-mysql v1.3.0
+	github.com/go-mysql-org/go-mysql v1.4.1-0.20220126055159-3566d1e608ea
 	github.com/go-redis/redis v6.15.6+incompatible
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gofrs/flock v0.8.0
@@ -58,7 +58,7 @@ require (
 
 require (
 	cloud.google.com/go v0.57.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/internal v0.7.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/internal v0.8.3 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest/adal v0.9.14 // indirect
 	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect

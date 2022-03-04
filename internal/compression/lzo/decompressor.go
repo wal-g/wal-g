@@ -5,7 +5,6 @@ package lzo
 
 import (
 	"io"
-	"io/ioutil"
 
 	"github.com/cyberdelia/lzo"
 )
@@ -23,7 +22,7 @@ func (decompressor Decompressor) Decompress(src io.Reader) (io.ReadCloser, error
 	if err != nil {
 		return nil, err
 	}
-	return ioutil.NopCloser(lzor), nil
+	return io.NopCloser(lzor), nil
 }
 
 func (decompressor Decompressor) FileExtension() string {

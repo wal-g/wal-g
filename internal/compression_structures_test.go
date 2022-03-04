@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"testing"
 
@@ -161,7 +160,7 @@ func TestCompressAndEncryptError(t *testing.T) {
 	compressor := GetLz4Compressor()
 	compressed := internal.CompressAndEncrypt(&testtools.ErrorReader{}, compressor, nil)
 
-	_, err := ioutil.ReadAll(compressed)
+	_, err := io.ReadAll(compressed)
 	assert.Errorf(t, err, "compress: CompressingPipeWriter expected error but got `<nil>`")
 	if re, ok := err.(internal.CompressAndEncryptError); !ok {
 		t.Errorf("compress: CompressingPipeWriter expected CompressAndEncryptError but got %v", re)

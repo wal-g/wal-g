@@ -96,6 +96,8 @@ type BackupHandler struct {
 	currBackupInfo CurrBackupInfo
 }
 
+// TODO: unit tests
+// buildBackupPushCommand builds a command to be executed on specific segment
 func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 	segment := bh.globalCluster.ByContent[contentID][0]
 	segUserData := NewSegmentUserData()
@@ -136,7 +138,7 @@ func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 func (bh *BackupHandler) HandleBackupPush() {
 	bh.currBackupInfo.backupName = BackupNamePrefix + time.Now().Format(utility.BackupTimeFormat)
 	bh.currBackupInfo.startTime = utility.TimeNowCrossPlatformUTC()
-	gplog.InitializeLogging("wal-g", bh.arguments.logsDir)
+	initGpLog(bh.arguments.logsDir)
 
 	err := bh.checkPrerequisites()
 	tracelog.ErrorLogger.FatalfOnError("Backup prerequisites check failed: %v\n", err)
@@ -220,6 +222,7 @@ func (bh *BackupHandler) waitSegmentBackups() error {
 	}
 }
 
+// TODO: unit tests
 func checkBackupStates(states map[int]SegBackupState) (int, error) {
 	runningBackupsCount := 0
 
@@ -260,8 +263,12 @@ func (bh *BackupHandler) pollSegmentStates() (map[int]SegBackupState, error) {
 	}, true)
 
 	for _, command := range remoteOutput.Commands {
-		tracelog.InfoLogger.Printf("Poll segment backup-push state STDERR (segment %d):\n%s\n", command.Content, command.Stderr)
-		tracelog.InfoLogger.Printf("Poll segment backup-push state STDOUT (segment %d):\n%s\n", command.Content, command.Stdout)
+		logger := tracelog.DebugLogger
+		if command.Stderr != "" {
+			logger = tracelog.WarningLogger
+		}
+		logger.Printf("Poll segment backup-push state STDERR (segment %d):\n%s\n", command.Content, command.Stderr)
+		logger.Printf("Poll segment backup-push state STDOUT (segment %d):\n%s\n", command.Content, command.Stdout)
 	}
 
 	if remoteOutput.NumErrors > 0 {

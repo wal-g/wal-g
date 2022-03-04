@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"sort"
 	"sync"
 	"time"
@@ -76,7 +75,7 @@ func (idx *Index) Load() error {
 		return err
 	}
 	defer reader.Close()
-	data, err := ioutil.ReadAll(reader)
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return err
 	}
@@ -336,7 +335,7 @@ func (idx *Index) GetCachedReader(folder storage.Folder, s Section) (io.ReadClos
 		tracelog.DebugLogger.Printf("ADD_CACHE: %s %d", key, s.BlockSize)
 		idx.readCache.Add(key, buf)
 	}
-	return ioutil.NopCloser(bytes.NewReader(buf)), nil
+	return io.NopCloser(bytes.NewReader(buf)), nil
 }
 
 // nolint: unused

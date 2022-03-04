@@ -3,7 +3,6 @@ package postgres
 import (
 	"archive/tar"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -174,7 +173,7 @@ func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader
 				return errors.Wrapf(err, "packFileIntoTar: failed reading incremental file '%s'\n", path)
 			}
 
-			_, err := io.Copy(ioutil.Discard, fileReader)
+			_, err := io.Copy(io.Discard, fileReader)
 
 			if err != nil {
 				return errors.Wrap(err, "packFileIntoTar: operation failed")

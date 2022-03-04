@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"testing"
@@ -117,7 +116,7 @@ func postgresReadIncrementTest(localLSN uint64, t *testing.T) {
 	if err != nil {
 		fmt.Print(err.Error())
 	}
-	buf, _ := ioutil.ReadAll(reader)
+	buf, _ := io.ReadAll(reader)
 	assert.Falsef(t, localLSN != 0 && int64(len(buf)) >= fileInfo.Size(), "Increment is too big")
 
 	assert.Falsef(t, localLSN == 0 && int64(len(buf)) <= fileInfo.Size(), "Increment is expected to be bigger than file")
@@ -203,7 +202,7 @@ func TestWritingZeroBlocksIncrementToCompletedFile(t *testing.T) {
 }
 
 func postgresWriteIncrementTestCompletedFile(testIncrement *TestIncrement, t *testing.T) {
-	mockContent, _ := ioutil.ReadFile(pagedFileName)
+	mockContent, _ := os.ReadFile(pagedFileName)
 	mockFile := NewMockReadWriterAt(mockContent)
 
 	_, err := postgres.WritePagesFromIncrement(testIncrement.NewReader(), mockFile, false)
@@ -254,7 +253,7 @@ func TestWritingRegularIncrementToIncompleteFile(t *testing.T) {
 		blockNo := binary.LittleEndian.Uint32(regularTestIncrement.diffMap[i*sizeofInt32 : (i+1)*sizeofInt32])
 		deltaBlockNumbers[int64(blockNo)] = true
 	}
-	mockContent, _ := ioutil.ReadFile(pagedFileName)
+	mockContent, _ := os.ReadFile(pagedFileName)
 	// all blocks after the second will be zero (missing) blocks
 	zeroBlocksStart := int64(2)
 	for i := zeroBlocksStart * postgres.DatabasePageSize; i < int64(len(mockContent)); i++ {
@@ -293,7 +292,7 @@ func TestWritingAllBlocksIncrementToIncompleteFile(t *testing.T) {
 	incrementReader := allBlocksTestIncrement.NewReader()
 	sourceFile, _ := os.Open(pagedFileName)
 	defer utility.LoggedClose(sourceFile, "")
-	mockContent, _ := ioutil.ReadFile(pagedFileName)
+	mockContent, _ := os.ReadFile(pagedFileName)
 	for i := pagedFileSizeInBytes / 2; i < len(mockContent); i++ {
 		mockContent[i] = 0
 	}
@@ -315,7 +314,7 @@ func TestRestoringPagesToCompletedFile(t *testing.T) {
 	pagedFile, _ := os.Open(pagedFileName)
 	fileReader := io.Reader(pagedFile)
 	defer utility.LoggedClose(pagedFile, "")
-	mockContent, _ := ioutil.ReadFile(pagedFileName)
+	mockContent, _ := os.ReadFile(pagedFileName)
 	mockFile := NewMockReadWriterAt(mockContent)
 
 	err := postgres.RestoreMissingPages(fileReader, mockFile)
@@ -331,7 +330,7 @@ func TestRestoringPagesToIncompleteFile(t *testing.T) {
 	pagedFile, _ := os.Open(pagedFileName)
 	fileReader := io.Reader(pagedFile)
 	defer utility.LoggedClose(pagedFile, "")
-	mockContent, _ := ioutil.ReadFile(pagedFileName)
+	mockContent, _ := os.ReadFile(pagedFileName)
 	for i := pagedFileSizeInBytes / 2; i < len(mockContent); i++ {
 		mockContent[i] = 0
 	}
@@ -390,7 +389,7 @@ func checkAllWrittenBlocksCorrect(mockFile *MockReadWriterAt, sourceFile io.Read
 func readIncrementToBuffer(localLSN uint64) []byte {
 	fileInfo, _ := os.Stat(pagedFileName)
 	reader, _, _ := postgres.ReadIncrementalFile(pagedFileName, fileInfo.Size(), localLSN, nil)
-	buf, _ := ioutil.ReadAll(reader)
+	buf, _ := io.ReadAll(reader)
 	return buf
 }
 

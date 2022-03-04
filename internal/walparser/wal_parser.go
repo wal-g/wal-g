@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -115,7 +114,7 @@ func (parser *WalParser) parsePage(reader io.Reader) (*XLogPage, error) {
 	pageHeader, err := readXLogPageHeader(alignedReader)
 	if err != nil {
 		if _, ok := err.(ZeroPageHeaderError); ok {
-			pageData, err1 := ioutil.ReadAll(alignedReader)
+			pageData, err1 := io.ReadAll(alignedReader)
 			if err1 != nil {
 				return nil, errors.WithStack(err1)
 			}
@@ -177,7 +176,7 @@ func readXLogPage(alignedReader *AlignedReader, pageHeader *XLogPageHeader, rema
 
 func checkPartialPage(pageReader io.Reader, page *XLogPage, recordReadingErr error) (*XLogPage, error) {
 	if _, ok := recordReadingErr.(ZeroRecordHeaderError); ok {
-		pageData, err1 := ioutil.ReadAll(pageReader)
+		pageData, err1 := io.ReadAll(pageReader)
 		if err1 != nil {
 			return nil, errors.WithStack(err1)
 		}

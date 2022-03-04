@@ -67,7 +67,7 @@ func DownloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 }
 
 // TODO : unit tests
-// DownloadAndDecompressStream downloads, decompresses and writes stream to stdout
+// DownloadAndDecompressSplittedStream downloads, decompresses and writes stream to stdout
 func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension string, writeCloser io.WriteCloser) error {
 	defer utility.LoggedClose(writeCloser, "")
 
@@ -83,7 +83,7 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 	}
 
 	errorsPerWorker := make([]chan error, 0)
-	writers := splitmerge.MergeWriter(utility.EmptyWriteIgnorer{Writer: writeCloser}, partitions, blockSize)
+	writers := splitmerge.MergeWriter(utility.EmptyWriteCloserIgnorer{WriteCloser: writeCloser}, partitions, blockSize)
 
 	for i := 0; i < partitions; i++ {
 		fileName := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), i)
@@ -100,21 +100,20 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 			}
 			if !exists {
 				errCh <- writer.Close()
-				tracelog.InfoLogger.PrintOnError(writer.Close())
 				return
 			}
 			tracelog.DebugLogger.Printf("Found file: %s", fileName)
 			decompressedReader, err := DecompressDecryptBytes(archiveReader, decompressor)
 			if err != nil {
-				errCh <- fmt.Errorf("failed to decompress/decrypt file %v: %w", fileName, err)
 				tracelog.ErrorLogger.PrintOnError(writer.Close())
+				errCh <- fmt.Errorf("failed to decompress/decrypt file %v: %w", fileName, err)
 				return
 			}
 			defer utility.LoggedClose(decompressedReader, "")
 			_, err = utility.FastCopy(writer, decompressedReader)
 			if err != nil {
-				errCh <- fmt.Errorf("failed to decompress/decrypt file %v: %w", fileName, err)
 				tracelog.ErrorLogger.PrintOnError(writer.Close())
+				errCh <- fmt.Errorf("failed to decompress/decrypt/pipe file %v: %w", fileName, err)
 				return
 			}
 			errCh <- writer.Close()

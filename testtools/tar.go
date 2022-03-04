@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -19,7 +18,7 @@ type BufferTarInterpreter struct {
 // Interpret handles in memory tar formats. Used for testing purposes.
 func (tarInterpreter *BufferTarInterpreter) Interpret(reader io.Reader, header *tar.Header) error {
 	// Assumes only regular files
-	out, err := ioutil.ReadAll(reader)
+	out, err := io.ReadAll(reader)
 	if err != nil {
 		return errors.Wrap(err, "Interpret: ReadAll failed")
 	}
@@ -43,7 +42,7 @@ func NewConcurrentConcatBufferTarInterpreter() *ConcurrentConcatBufferTarInterpr
 // Interpret handles in memory tar formats. Used for testing purposes.
 func (tarInterpreter *ConcurrentConcatBufferTarInterpreter) Interpret(reader io.Reader, header *tar.Header) error {
 	// Assumes only regular files
-	out, err := ioutil.ReadAll(reader)
+	out, err := io.ReadAll(reader)
 	if err != nil {
 		return errors.Wrap(err, "Interpret: ReadAll failed")
 	}

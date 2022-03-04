@@ -7,8 +7,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/greenplum-db/gp-common-go-libs/gplog"
-
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -53,6 +51,7 @@ type FetchHandler struct {
 	backup              internal.Backup
 	contentIDsToFetch   map[int]bool
 	fetchMode           BackupFetchMode
+	restorePoint        string
 }
 
 // nolint:gocritic
@@ -60,10 +59,11 @@ func NewFetchHandler(
 	backup internal.Backup, sentinel BackupSentinelDto,
 	segCfgMaker SegConfigMaker, logsDir string,
 	fetchContentIds []int, mode BackupFetchMode,
+	restorePoint string,
 ) *FetchHandler {
 	backupIDByContentID := make(map[int]string)
 	segmentConfigs := make([]cluster.SegConfig, 0)
-	gplog.InitializeLogging("wal-g", logsDir)
+	initGpLog(logsDir)
 
 	for _, segMeta := range sentinel.Segments {
 		// currently, WAL-G does not restore the mirrors
@@ -90,9 +90,12 @@ func NewFetchHandler(
 		backup:              backup,
 		contentIDsToFetch:   prepareContentIDsToFetch(fetchContentIds, segmentConfigs),
 		fetchMode:           mode,
+		restorePoint:        restorePoint,
 	}
 }
 
+// TODO: Unit tests
+// prepareContentIDsToFetch returns a set containing the IDs of segments to be fetched
 func prepareContentIDsToFetch(fetchContentIds []int, segmentConfigs []cluster.SegConfig) map[int]bool {
 	contentIDsToFetch := make(map[int]bool)
 
@@ -189,7 +192,12 @@ func (fh *FetchHandler) createPgHbaOnSegments() error {
 // files to each segment instance (including master) so they can recover correctly
 // during the database startup
 func (fh *FetchHandler) createRecoveryConfigs() error {
-	restoreCfgMaker := NewRecoveryConfigMaker("/usr/bin/wal-g", internal.CfgFile, fh.backup.Name)
+	recoveryTarget := fh.backup.Name
+	if fh.restorePoint != "" {
+		recoveryTarget = fh.restorePoint
+	}
+	tracelog.InfoLogger.Printf("Recovery target is %s", recoveryTarget)
+	restoreCfgMaker := NewRecoveryConfigMaker("/usr/bin/wal-g", internal.CfgFile, recoveryTarget)
 
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Creating recovery.conf on segments and master",
 		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_MASTER,
@@ -216,6 +224,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 	return nil
 }
 
+// TODO: Unit tests
 // buildFetchCommand creates the WAL-G command to restore the segment with
 // the provided contentID
 func (fh *FetchHandler) buildFetchCommand(contentID int) string {
@@ -245,9 +254,14 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 	return cmdLine
 }
 
-func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsDir string, fetchContentIds []int, mode BackupFetchMode,
+func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsDir string,
+	fetchContentIds []int, mode BackupFetchMode, restorePoint string,
 ) func(folder storage.Folder, backup internal.Backup) {
 	return func(folder storage.Folder, backup internal.Backup) {
+		tracelog.InfoLogger.Printf("Starting backup-fetch for %s", backup.Name)
+		if restorePoint != "" {
+			tracelog.ErrorLogger.FatalOnError(ValidateMatch(folder, backup.Name, restorePoint))
+		}
 		var sentinel BackupSentinelDto
 		err := backup.FetchSentinel(&sentinel)
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -255,7 +269,7 @@ func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsD
 		segCfgMaker, err := NewSegConfigMaker(restoreCfgPath, inPlaceRestore)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIds, mode).Fetch()
+		err = NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIds, mode, restorePoint).Fetch()
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
 }

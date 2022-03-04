@@ -3,7 +3,6 @@ package swift
 import (
 	"errors"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -139,7 +138,7 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	} else {
 		//retrieved object from  the cloud
 	}
-	return ioutil.NopCloser(readContents), nil
+	return io.NopCloser(readContents), nil
 }
 
 func (folder *Folder) PutObject(name string, content io.Reader) error {

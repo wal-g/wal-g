@@ -3,7 +3,6 @@ package postgres_test
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -68,7 +67,7 @@ func TestTryDownloadWALFile_Exist(t *testing.T) {
 	archiveReader, exist, err := internal.TryDownloadFile(folder, WalFilename)
 	assert.NoError(t, err)
 	assert.True(t, exist)
-	actualData, err := ioutil.ReadAll(archiveReader)
+	actualData, err := io.ReadAll(archiveReader)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedData, actualData)
 }

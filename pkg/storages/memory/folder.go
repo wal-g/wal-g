@@ -3,7 +3,6 @@ package memory
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"path"
 	"path/filepath"
 	"strings"
@@ -75,11 +74,11 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	if !exists {
 		return nil, storage.NewObjectNotFoundError(objectAbsPath)
 	}
-	return ioutil.NopCloser(&object.Data), nil
+	return io.NopCloser(&object.Data), nil
 }
 
 func (folder *Folder) PutObject(name string, content io.Reader) error {
-	data, err := ioutil.ReadAll(content)
+	data, err := io.ReadAll(content)
 	objectPath := path.Join(folder.path, name)
 	if err != nil {
 		return errors.Wrapf(err, "failed to put '%s' in memory storage", objectPath)

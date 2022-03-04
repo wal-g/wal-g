@@ -534,7 +534,7 @@ func ExtractDeleteModifierFromArgs(args []string) (int, string) {
 }
 
 func DeleteBeforeArgsValidator(cmd *cobra.Command, args []string) error {
-	err := deleteArgsValidator(args, StringModifiers, 1, 2)
+	err := DeleteArgsValidator(args, StringModifiers, 1, 2)
 	if err != nil {
 		return err
 	}
@@ -570,7 +570,7 @@ func DeleteTargetArgsValidator(cmd *cobra.Command, args []string) error {
 }
 
 func DeleteEverythingArgsValidator(cmd *cobra.Command, args []string) error {
-	return deleteArgsValidator(args, StringModifiersDeleteEverything, 0, 1)
+	return DeleteArgsValidator(args, StringModifiersDeleteEverything, 0, 1)
 }
 
 func DeleteRetainArgsValidator(cmd *cobra.Command, args []string) error {
@@ -586,7 +586,7 @@ func DeleteRetainArgsValidator(cmd *cobra.Command, args []string) error {
 }
 
 func DeleteRetainAfterArgsValidator(cmd *cobra.Command, args []string) error {
-	err := deleteArgsValidator(args, StringModifiers, 2, 3)
+	err := DeleteArgsValidator(args, StringModifiers, 2, 3)
 	if err != nil {
 		return err
 	}
@@ -606,7 +606,7 @@ func DeleteRetainAfterArgsValidator(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func deleteArgsValidator(args, stringModifiers []string, minArgs int, maxArgs int) error {
+func DeleteArgsValidator(args, stringModifiers []string, minArgs int, maxArgs int) error {
 	if len(args) < minArgs || len(args) > maxArgs {
 		return fmt.Errorf("accepts between %d and %d arg(s), received %d", minArgs, maxArgs, len(args))
 	}

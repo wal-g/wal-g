@@ -3,7 +3,6 @@ package functests
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -193,7 +192,7 @@ func (tctx *TestContext) LoadEnv() {
 
 func scanFeatureDirs(dbName, featurePrefix string) (map[string]string, error) {
 	dir := path.Join(featuresDir, dbName)
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +204,7 @@ func scanFeatureDirs(dbName, featurePrefix string) (map[string]string, error) {
 		for _, f := range files {
 			filename := f.Name()
 			if filename == requestedFeature+featureExt {
-				files = []os.FileInfo{f}
+				files = []os.DirEntry{f}
 				found = true
 				break
 			}

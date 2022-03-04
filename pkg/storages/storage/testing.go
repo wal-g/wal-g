@@ -2,7 +2,7 @@ package storage
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"strings"
 	"testing"
@@ -21,7 +21,7 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 
 	readCloser, err := storageFolder.ReadObject("file0")
 	assert.NoError(t, err)
-	all, err := ioutil.ReadAll(readCloser)
+	all, err := io.ReadAll(readCloser)
 	assert.NoError(t, err)
 	assert.Equal(t, token, all)
 
@@ -50,7 +50,7 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 
 	data, err := sub1.ReadObject("file1")
 	assert.NoError(t, err)
-	data0Str, err := ioutil.ReadAll(data)
+	data0Str, err := io.ReadAll(data)
 	assert.NoError(t, err)
 	assert.Equal(t, "data1", string(data0Str))
 	err = data.Close()
@@ -74,7 +74,7 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 
 	data, err = sub2.ReadObject("file2")
 	assert.NoError(t, err)
-	data0Str, err = ioutil.ReadAll(data)
+	data0Str, err = io.ReadAll(data)
 	assert.NoError(t, err)
 	assert.Equal(t, "data1", string(data0Str))
 	err = data.Close()
