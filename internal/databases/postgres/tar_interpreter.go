@@ -35,8 +35,6 @@ func NewFileTarInterpreter(
 		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles, nil}
 }
 
-// Tzoop: Make use of GroupTarInterpreter (copy code from one method). Probably need to create SimpleGroupTarInterpreter which does looping
-// and then make use of something like 'FileGroupTarInterpreter' which does errGroup stuff...
 func NewFileTarInterpreterWithExplicitFsync(
 	dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool, explicitFsync bool,
@@ -45,14 +43,22 @@ func NewFileTarInterpreterWithExplicitFsync(
 		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles, &explicitFsync}
 }
 
-// Tzoop: We could replace fsync handler with global fsync in internals.GlobalFileSyncHandler
 func NewGroupFileTarInterpreter(dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool) *internal.BaseGroupTarInterpreter {
 	fileInterpreter := NewFileTarInterpreterWithExplicitFsync(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles, false)
-	fsyncHandler := internal.FileSyncHandler{dbDataDirectory}
+	fsyncHandler := internal.FileSyncHandler{BasePath: dbDataDirectory}
 	fileHandlers := [...]internal.FileInterpretFinishedHandler{fsyncHandler}
 	endHandlers := [...]internal.InterpretFinishedHandler{}
-	return &internal.BaseGroupTarInterpreter{fileInterpreter, fileHandlers[:], endHandlers[:]}
+	return &internal.BaseGroupTarInterpreter{Interpreter: fileInterpreter, FileInterpretFinishedHandlers: fileHandlers[:], InterpretFinishedHandlers: endHandlers[:]}
+}
+
+func NewGroupFileTarInterpreterWithGlobalFsync(dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
+	filesToUnwrap map[string]bool, createNewIncrementalFiles bool) *internal.BaseGroupTarInterpreter {
+	fileInterpreter := NewFileTarInterpreterWithExplicitFsync(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles, false)
+	globalFsyncHandler := internal.GlobalFileSyncHandler{}
+	fileHandlers := [...]internal.FileInterpretFinishedHandler{}
+	endHandlers := [...]internal.InterpretFinishedHandler{globalFsyncHandler}
+	return &internal.BaseGroupTarInterpreter{Interpreter: fileInterpreter, FileInterpretFinishedHandlers: fileHandlers[:], InterpretFinishedHandlers: endHandlers[:]}
 }
 
 // write file from reader to local file

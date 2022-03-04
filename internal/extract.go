@@ -53,7 +53,7 @@ type TarInterpreter interface {
 }
 
 type GroupTarInterpreter interface {
-	InterpretOne(reader io.Reader, header *tar.Header) error
+	TarInterpreter
 	InterpretGroup(tarReader *tar.Reader) error
 }
 
@@ -82,6 +82,10 @@ var _ io.Writer = &DevNullWriter{}
 // Extract exactly one tar bundle.
 func extractOneTar(tarInterpreter TarInterpreter, source io.Reader) error {
 	tarReader := tar.NewReader(source)
+
+	if groupInterpreter, ok := tarInterpreter.(GroupTarInterpreter); ok {
+		return groupInterpreter.InterpretGroup(tarReader)
+	}
 
 	for {
 		header, err := tarReader.Next()

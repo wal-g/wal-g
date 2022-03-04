@@ -33,12 +33,12 @@ func (groupTarInterpreter *BaseGroupTarInterpreter) InterpretGroup(tarReader *ta
 			break
 		}
 		if err != nil {
-			return errors.Wrap(err, "groupTarInterpreter: tar extract failed")
+			return errors.Wrap(err, "GroupTarInterpreter: tar extract failed")
 		}
 
 		err = groupTarInterpreter.Interpreter.Interpret(tarReader, header)
 		if err != nil {
-			return errors.Wrap(err, "groupTarInterpreter: Interpret failed")
+			return errors.Wrap(err, "GroupTarInterpreter: Interpret failed")
 		}
 
 		for _, handler := range groupTarInterpreter.FileInterpretFinishedHandlers {
@@ -62,7 +62,7 @@ func (groupTarInterpreter *BaseGroupTarInterpreter) InterpretGroup(tarReader *ta
 	return nil
 }
 
-func (groupTarInterpreter *BaseGroupTarInterpreter) InterpretOne(tarReader io.Reader, header *tar.Header) error {
+func (groupTarInterpreter *BaseGroupTarInterpreter) Interpret(tarReader io.Reader, header *tar.Header) error {
 	return groupTarInterpreter.Interpreter.Interpret(tarReader, header)
 }
 
