@@ -35,19 +35,19 @@ type FileTarInterpreter struct {
 // 		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles, nil}
 // }
 
-// func NewFileTarInterpreter(
-// 	dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
-// 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
-// ) *GroupFileTarInterpreter {
-// 	return NewGroupFileTarInterpreterWithGlobalFsync(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles)
-// }
-
 func NewFileTarInterpreter(
 	dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
 ) *GroupFileTarInterpreter {
-	return NewGroupFileTarInterpreter(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles)
+	return NewGroupFileTarInterpreterWithGlobalFsync(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles)
 }
+
+// func NewFileTarInterpreter(
+// 	dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
+// 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
+// ) *GroupFileTarInterpreter {
+// 	return NewGroupFileTarInterpreter(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles)
+// }
 
 func NewFileTarInterpreterWithExplicitFsync(
 	dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
