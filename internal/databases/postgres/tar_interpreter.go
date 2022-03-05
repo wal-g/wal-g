@@ -59,20 +59,28 @@ func NewFileTarInterpreterWithExplicitFsync(
 
 func NewGroupFileTarInterpreter(dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool) *GroupFileTarInterpreter {
-	fileInterpreter := *NewFileTarInterpreterWithExplicitFsync(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles, false)
+	fileInterpreter := *NewFileTarInterpreterWithExplicitFsync(dbDataDirectory,
+		sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles, false)
 	fsyncHandler := FileSyncHandler{BasePath: dbDataDirectory}
 	fileHandlers := [...]FileInterpretFinishedHandler{fsyncHandler}
 	endHandlers := [...]InterpretFinishedHandler{}
-	return &GroupFileTarInterpreter{FileTarInterpreter: fileInterpreter, FileInterpretFinishedHandlers: fileHandlers[:], InterpretFinishedHandlers: endHandlers[:]}
+	return &GroupFileTarInterpreter{
+		FileTarInterpreter:            fileInterpreter,
+		FileInterpretFinishedHandlers: fileHandlers[:],
+		InterpretFinishedHandlers:     endHandlers[:]}
 }
 
 func NewGroupFileTarInterpreterWithGlobalFsync(dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool) *GroupFileTarInterpreter {
-	fileInterpreter := *NewFileTarInterpreterWithExplicitFsync(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles, false)
+	fileInterpreter := *NewFileTarInterpreterWithExplicitFsync(dbDataDirectory,
+		sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles, false)
 	globalFsyncHandler := GlobalFileSyncHandler{}
 	fileHandlers := [...]FileInterpretFinishedHandler{}
 	endHandlers := [...]InterpretFinishedHandler{globalFsyncHandler}
-	return &GroupFileTarInterpreter{FileTarInterpreter: fileInterpreter, FileInterpretFinishedHandlers: fileHandlers[:], InterpretFinishedHandlers: endHandlers[:]}
+	return &GroupFileTarInterpreter{
+		FileTarInterpreter:            fileInterpreter,
+		FileInterpretFinishedHandlers: fileHandlers[:],
+		InterpretFinishedHandlers:     endHandlers[:]}
 }
 
 // write file from reader to local file
