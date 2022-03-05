@@ -1,4 +1,4 @@
-package internal
+package postgres
 
 import (
 	"archive/tar"
@@ -19,13 +19,13 @@ type InterpretFinishedHandler interface {
 	OnInterpretationFinished() error
 }
 
-type BaseGroupTarInterpreter struct {
-	Interpreter                   TarInterpreter
+type GroupFileTarInterpreter struct {
+	FileTarInterpreter
 	FileInterpretFinishedHandlers []FileInterpretFinishedHandler
 	InterpretFinishedHandlers     []InterpretFinishedHandler
 }
 
-func (groupTarInterpreter *BaseGroupTarInterpreter) InterpretGroup(tarReader *tar.Reader) error {
+func (groupTarInterpreter *GroupFileTarInterpreter) InterpretGroup(tarReader *tar.Reader) error {
 	group := new(errgroup.Group)
 	for {
 		header, err := tarReader.Next()
@@ -36,7 +36,7 @@ func (groupTarInterpreter *BaseGroupTarInterpreter) InterpretGroup(tarReader *ta
 			return errors.Wrap(err, "GroupTarInterpreter: tar extract failed")
 		}
 
-		err = groupTarInterpreter.Interpreter.Interpret(tarReader, header)
+		err = groupTarInterpreter.Interpret(tarReader, header)
 		if err != nil {
 			return errors.Wrap(err, "GroupTarInterpreter: Interpret failed")
 		}
@@ -60,10 +60,6 @@ func (groupTarInterpreter *BaseGroupTarInterpreter) InterpretGroup(tarReader *ta
 	}
 
 	return nil
-}
-
-func (groupTarInterpreter *BaseGroupTarInterpreter) Interpret(tarReader io.Reader, header *tar.Header) error {
-	return groupTarInterpreter.Interpreter.Interpret(tarReader, header)
 }
 
 type FileSyncHandler struct {

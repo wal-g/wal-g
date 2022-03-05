@@ -27,12 +27,26 @@ type FileTarInterpreter struct {
 	explicitFsync             *bool
 }
 
+// func NewFileTarInterpreter(
+// 	dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
+// 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
+// ) internal.TarInterpreter {
+// 	return &FileTarInterpreter{dbDataDirectory, sentinel, filesMetadata,
+// 		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles, nil}
+// }
+
+// func NewFileTarInterpreter(
+// 	dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
+// 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
+// ) *GroupFileTarInterpreter {
+// 	return NewGroupFileTarInterpreterWithGlobalFsync(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles)
+// }
+
 func NewFileTarInterpreter(
 	dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
-) *FileTarInterpreter {
-	return &FileTarInterpreter{dbDataDirectory, sentinel, filesMetadata,
-		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles, nil}
+) *GroupFileTarInterpreter {
+	return NewGroupFileTarInterpreter(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles)
 }
 
 func NewFileTarInterpreterWithExplicitFsync(
@@ -44,21 +58,21 @@ func NewFileTarInterpreterWithExplicitFsync(
 }
 
 func NewGroupFileTarInterpreter(dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
-	filesToUnwrap map[string]bool, createNewIncrementalFiles bool) *internal.BaseGroupTarInterpreter {
-	fileInterpreter := NewFileTarInterpreterWithExplicitFsync(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles, false)
-	fsyncHandler := internal.FileSyncHandler{BasePath: dbDataDirectory}
-	fileHandlers := [...]internal.FileInterpretFinishedHandler{fsyncHandler}
-	endHandlers := [...]internal.InterpretFinishedHandler{}
-	return &internal.BaseGroupTarInterpreter{Interpreter: fileInterpreter, FileInterpretFinishedHandlers: fileHandlers[:], InterpretFinishedHandlers: endHandlers[:]}
+	filesToUnwrap map[string]bool, createNewIncrementalFiles bool) *GroupFileTarInterpreter {
+	fileInterpreter := *NewFileTarInterpreterWithExplicitFsync(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles, false)
+	fsyncHandler := FileSyncHandler{BasePath: dbDataDirectory}
+	fileHandlers := [...]FileInterpretFinishedHandler{fsyncHandler}
+	endHandlers := [...]InterpretFinishedHandler{}
+	return &GroupFileTarInterpreter{FileTarInterpreter: fileInterpreter, FileInterpretFinishedHandlers: fileHandlers[:], InterpretFinishedHandlers: endHandlers[:]}
 }
 
 func NewGroupFileTarInterpreterWithGlobalFsync(dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
-	filesToUnwrap map[string]bool, createNewIncrementalFiles bool) *internal.BaseGroupTarInterpreter {
-	fileInterpreter := NewFileTarInterpreterWithExplicitFsync(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles, false)
-	globalFsyncHandler := internal.GlobalFileSyncHandler{}
-	fileHandlers := [...]internal.FileInterpretFinishedHandler{}
-	endHandlers := [...]internal.InterpretFinishedHandler{globalFsyncHandler}
-	return &internal.BaseGroupTarInterpreter{Interpreter: fileInterpreter, FileInterpretFinishedHandlers: fileHandlers[:], InterpretFinishedHandlers: endHandlers[:]}
+	filesToUnwrap map[string]bool, createNewIncrementalFiles bool) *GroupFileTarInterpreter {
+	fileInterpreter := *NewFileTarInterpreterWithExplicitFsync(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles, false)
+	globalFsyncHandler := GlobalFileSyncHandler{}
+	fileHandlers := [...]FileInterpretFinishedHandler{}
+	endHandlers := [...]InterpretFinishedHandler{globalFsyncHandler}
+	return &GroupFileTarInterpreter{FileTarInterpreter: fileInterpreter, FileInterpretFinishedHandlers: fileHandlers[:], InterpretFinishedHandlers: endHandlers[:]}
 }
 
 // write file from reader to local file
