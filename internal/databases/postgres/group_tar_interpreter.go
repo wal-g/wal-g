@@ -40,6 +40,11 @@ func (groupTarInterpreter *GroupFileTarInterpreter) InterpretGroup(tarReader *ta
 		if err != nil {
 			return errors.Wrap(err, "GroupTarInterpreter: Interpret failed")
 		}
+		if groupTarInterpreter.FilesToUnwrap != nil {
+			if _, ok := groupTarInterpreter.FilesToUnwrap[header.Name]; !ok {
+				continue
+			}
+		}
 
 		for _, handler := range groupTarInterpreter.FileInterpretFinishedHandlers {
 			closure := handler
