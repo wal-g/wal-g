@@ -46,7 +46,7 @@ jobs:
 
       - name: Check out code into the Go module directory
         if: steps.cache-images.outputs.cache-hit != 'true'
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Get dependencies
         if: steps.cache-images.outputs.cache-hit != 'true'
@@ -142,7 +142,7 @@ jobs:
         id: go
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Get dependencies
         run: |
