@@ -26,6 +26,7 @@ type LogsCache struct {
 }
 
 //gocyclo:ignore
+//nolint:funlen
 func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, checkGTIDs bool) {
 	rootFolder := uploader.Folder()
 	uploader.ChangeDirectory(BinlogPath)
@@ -56,10 +57,10 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 	var filter gtidFilter
 	if checkGTIDs {
 		flavor, err := getMySQLFlavor(db)
-		if flavor == "" || err != nil {
-			flavor = mysql.MySQLFlavor
-		}
-		if flavor == mysql.MySQLFlavor {
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		switch flavor {
+		case mysql.MySQLFlavor:
 			gtid, _ := mysql.ParseMysqlGTIDSet(cache.GTIDArchived)
 			gtidArchived, _ := gtid.(*mysql.MysqlGTIDSet)
 			filter = gtidFilter{
@@ -68,10 +69,11 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 				gtidArchived:  gtidArchived,
 				lastGtidSeen:  nil,
 			}
+		default:
+			tracelog.ErrorLogger.Fatalf("Unsupported flavor type: %s. Disable GTIDs check for current database flavor.", flavor)
 		}
 	}
 
-outer:
 	for i := 0; i < len(binlogs); i++ {
 		binlog := binlogs[i]
 
@@ -79,12 +81,12 @@ outer:
 
 		if binlog >= untilBinlog {
 			tracelog.DebugLogger.Printf("Skip binlog %v (until check)\n", binlog)
-			continue outer
+			continue
 		}
 
 		if binlog <= cache.LastArchivedBinlog {
 			tracelog.DebugLogger.Printf("Skip binlog %v (archived binlog check)\n", binlog)
-			continue outer
+			continue
 		}
 
 		if checkGTIDs && filter.isValid() {
