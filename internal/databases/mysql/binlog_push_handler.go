@@ -38,12 +38,13 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 	binlogsFolder, err := getMySQLBinlogsFolder(db)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	binlogs, err := getMySQLSortedBinlogs(db)
-	tracelog.ErrorLogger.FatalOnError(err)
-
 	if untilBinlog == "" || untilBinlog > getMySQLCurrentBinlogFileLocal(db) {
+		// select safe to upload binlog before acquiring list of binlogs [avoid race]
 		untilBinlog = getMySQLCurrentBinlogFileLocal(db)
 	}
+
+	binlogs, err := getMySQLSortedBinlogs(db)
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	var binlogSentinelDto BinlogSentinelDto
 	err = FetchBinlogSentinel(rootFolder, &binlogSentinelDto)
@@ -237,10 +238,17 @@ func (u *gtidFilter) isValid() bool {
 }
 
 func (u *gtidFilter) shouldUpload(binlog, nextBinlog string) bool {
+	if nextBinlog == "" {
+		// it is better to skip this binlog rather than have gap in binlog sentinel GTID-set
+		tracelog.DebugLogger.Printf("Cannot extract PREVIOUS_GTIDS event - no 'next' binlog found. Skip it for now. (gtid check)\n")
+		return false
+	}
 	// nextPreviousGTIDs is 'GTIDs_executed at the end of current binary log file'
 	nextPreviousGTIDs, err := GetBinlogPreviousGTIDs(path.Join(u.BinlogsFolder, nextBinlog), u.Flavor)
 	if err != nil {
-		tracelog.InfoLogger.Printf("Cannot extract PREVIOUS_GTIDS event from binlog %s. Upload it. (gtid check)\n", binlog)
+		tracelog.InfoLogger.Printf(
+			"Cannot extract PREVIOUS_GTIDS event from current binlog %s, next %s (caused by %v). Upload it. (gtid check)\n",
+			binlog, nextBinlog, err)
 		return true
 	}
 
@@ -255,7 +263,9 @@ func (u *gtidFilter) shouldUpload(binlog, nextBinlog string) bool {
 	if u.lastGtidSeen == nil {
 		gtidSetBeforeCurrentBinlog, err := GetBinlogPreviousGTIDs(path.Join(u.BinlogsFolder, binlog), u.Flavor)
 		if err != nil {
-			tracelog.InfoLogger.Printf("Cannot extract PREVIOUS_GTIDS event from current binlog %s. Upload it. (gtid check)\n", binlog)
+			tracelog.InfoLogger.Printf(
+				"Cannot extract PREVIOUS_GTIDS event from current binlog %s, next %s (caused by %v). Upload it. (gtid check)\n",
+				binlog, nextBinlog, err)
 			u.lastGtidSeen = nextPreviousGTIDs
 			return true
 		}
