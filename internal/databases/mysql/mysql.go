@@ -42,20 +42,6 @@ func getMySQLFlavor(db *sql.DB) (string, error) {
 	return gomysql.MySQLFlavor, nil
 }
 
-func getMySQLCurrentBinlogFileLocal(db *sql.DB) (fileName string) {
-	rows, err := db.Query("SHOW MASTER STATUS")
-	tracelog.ErrorLogger.FatalOnError(err)
-	defer utility.LoggedClose(rows, "")
-	var logFileName string
-	for rows.Next() {
-		err = utility.ScanToMap(rows, map[string]interface{}{"File": &logFileName})
-		tracelog.ErrorLogger.FatalOnError(err)
-		return logFileName
-	}
-	tracelog.ErrorLogger.Fatalf("Failed to obtain current binlog file")
-	return ""
-}
-
 func getMySQLGTIDExecuted(db *sql.DB, flavor string) (gtid string, err error) {
 	query := ""
 	switch flavor {

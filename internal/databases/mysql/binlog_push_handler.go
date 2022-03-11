@@ -38,13 +38,13 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 	binlogsFolder, err := getMySQLBinlogsFolder(db)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	if untilBinlog == "" || untilBinlog > getMySQLCurrentBinlogFileLocal(db) {
-		// select safe to upload binlog before acquiring list of binlogs [avoid race]
-		untilBinlog = getMySQLCurrentBinlogFileLocal(db)
-	}
-
 	binlogs, err := getMySQLSortedBinlogs(db)
 	tracelog.ErrorLogger.FatalOnError(err)
+
+	lastBinlog := lastOrDefault(binlogs, "")
+	if untilBinlog == "" || untilBinlog > lastBinlog {
+		untilBinlog = lastBinlog
+	}
 
 	var binlogSentinelDto BinlogSentinelDto
 	err = FetchBinlogSentinel(rootFolder, &binlogSentinelDto)
@@ -75,6 +75,7 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 		}
 	}
 
+	hadUploadsInThisRun := false
 	for i := 0; i < len(binlogs); i++ {
 		binlog := binlogs[i]
 
@@ -95,12 +96,21 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 			if i < len(binlogs)-1 {
 				nextBinlog = binlogs[i+1]
 			}
-			if !filter.shouldUpload(binlog, nextBinlog) {
+			shouldUpload := filter.shouldUpload(binlog, nextBinlog)
+			if !hadUploadsInThisRun && !shouldUpload {
 				tracelog.DebugLogger.Printf("Skip binlog %v (gtid check)\n", binlog)
 				// in fact this binlog had been uploaded before. Mark it as uploaded:
 				cache.LastArchivedBinlog = binlog
 				continue
 			}
+
+			// During PITR WAL-G will apply binlogs one-by-one from oldest to newest
+			// (based on upload timestamp) without checking GTID sets.
+			// It means that during upload phase it is not possible to fill the gaps
+			// in GTID sets (because it will break during PITR phase).
+			// So, for safety reasons
+			// we will upload all other binlogs after uploading single binlog.
+			hadUploadsInThisRun = true
 		}
 
 		// Upload binlogs:
@@ -295,4 +305,11 @@ func (u *gtidFilter) shouldUpload(binlog, nextBinlog string) bool {
 	tracelog.InfoLogger.Printf("Should upload binlog %s with GTID set: %s (gtid check)\n", binlog, currentBinlogGTIDSet.String())
 	u.lastGtidSeen = nextPreviousGTIDs
 	return true
+}
+
+func lastOrDefault(data []string, defaultValue string) string {
+	if len(data) > 0 {
+		return data[len(data)-1]
+	}
+	return defaultValue
 }
