@@ -529,7 +529,6 @@ func (bs *Server) HandleBlobGet(w http.ResponseWriter, req *http.Request) {
 	if idx.Compression != "" || idx.Encryption != "" {
 		err = bs.validateBlobCompressionEncryption(idx)
 		if err != nil {
-			tracelog.ErrorLogger.Printf("proxy: misconfiguration: %v", err)
 			bs.returnError(w, req, err)
 			return
 		}
@@ -563,22 +562,25 @@ func (bs *Server) HandleBlobGet(w http.ResponseWriter, req *http.Request) {
 		// TODO: enable cache
 		// r, err := idx.GetCachedReader(folder, s)
 		bs.downloadSem <- struct{}{}
-		r, err := folder.ReadObject(s.Path)
+		obj, err := folder.ReadObject(s.Path)
 		<-bs.downloadSem
 		if err != nil {
 			tracelog.ErrorLogger.Printf("proxy: failed to read object from storage: %v", err)
 			break
 		}
+		defer obj.Close()
+		var r io.Reader = obj
 		if idx.Compression != "" || idx.Encryption != "" {
-			r, err = internal.DecompressDecryptBytes(r, bs.decompressor)
+			dr, err := internal.DecompressDecryptBytes(r, bs.decompressor)
 			if err != nil {
 				tracelog.ErrorLogger.Printf("proxy: failed to decompress / decrypt bytes: %v", err)
 				break
 			}
+			defer dr.Close()
+			r = dr
 		}
 		r2 := io.LimitReader(NewSkipReader(r, s.Offset), int64(s.Limit))
 		_, err = io.Copy(w, r2)
-		r.Close()
 		if err != nil {
 			tracelog.ErrorLogger.Printf("proxy: failed to copy data from storage: %v", err)
 			break
@@ -668,7 +670,7 @@ func (bs *Server) returnError(w http.ResponseWriter, req *http.Request, err erro
 	case err == ErrBadRequest:
 		w.WriteHeader(http.StatusBadRequest)
 	default:
-		tracelog.ErrorLogger.Printf("proxy: failed to load blob index: %s %v", req.URL.Path, err)
+		tracelog.ErrorLogger.Printf("proxy: req: %s %s: error: %v", req.Method, req.URL.Path, err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
