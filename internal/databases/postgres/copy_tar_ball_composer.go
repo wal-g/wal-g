@@ -235,7 +235,7 @@ func (c *CopyTarBallComposer) PackTarballs() (TarFileSets, error) {
 	if err != nil {
 		return nil, err
 	}
-	var tarBall internal.TarBall = nil
+	var tarBall internal.TarBall
 	for fileName := range c.fileInfo {
 		file := c.fileInfo[fileName]
 		if file.status == doNotCopy || file.status == fromNew {

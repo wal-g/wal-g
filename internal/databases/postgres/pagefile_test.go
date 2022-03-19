@@ -431,7 +431,7 @@ func deepCompare(file1, file2 string) bool {
 }
 
 func deepCompareReaders(r1, r2 io.Reader) bool {
-	var chunkNumber = 0
+	var chunkNumber int
 	for {
 		b1 := make([]byte, chunkSize)
 		_, err1 := r1.Read(b1)
