@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/parallel"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -75,10 +76,10 @@ type TarballStreamer struct {
 	// list of remaps, remapping input file names to output file names
 	Remaps TarballStreamerRemaps
 	// list of processed files
-	Files BundleFiles
+	Files parallel.BundleFiles
 }
 
-func NewTarballStreamer(input io.Reader, maxTarSize int64, bundleFiles BundleFiles) (streamer *TarballStreamer) {
+func NewTarballStreamer(input io.Reader, maxTarSize int64, bundleFiles parallel.BundleFiles) (streamer *TarballStreamer) {
 	streamer = &TarballStreamer{
 		maxTarSize: maxTarSize,
 		inputTar:   tar.NewReader(input),

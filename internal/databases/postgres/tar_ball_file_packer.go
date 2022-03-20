@@ -14,6 +14,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/limiters"
+	"github.com/wal-g/wal-g/internal/parallel"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/errgroup"
 )
@@ -59,11 +60,11 @@ func NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks bool
 type TarBallFilePacker struct {
 	deltaMap         PagedFileDeltaMap
 	incrementFromLsn *uint64
-	files            BundleFiles
+	files            parallel.BundleFiles
 	options          TarBallFilePackerOptions
 }
 
-func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *uint64, files BundleFiles,
+func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *uint64, files parallel.BundleFiles,
 	options TarBallFilePackerOptions) *TarBallFilePacker {
 	return &TarBallFilePacker{
 		deltaMap:         deltaMap,

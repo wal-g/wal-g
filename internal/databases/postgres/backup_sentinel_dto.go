@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/parallel"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/wal-g/wal-g/internal"
@@ -123,7 +124,7 @@ type FilesMetadataDto struct {
 	TarFileSets map[string][]string     `json:"TarFileSets,omitempty"`
 }
 
-func NewFilesMetadataDto(files internal.BackupFileList, tarFileSets TarFileSets) FilesMetadataDto {
+func NewFilesMetadataDto(files internal.BackupFileList, tarFileSets parallel.TarFileSets) FilesMetadataDto {
 	return FilesMetadataDto{TarFileSets: tarFileSets.Get(), Files: files}
 }
 

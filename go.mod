@@ -21,7 +21,7 @@ require (
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gofrs/flock v0.8.0
 	github.com/golang/mock v1.4.3
-	github.com/google/brotli v1.0.9
+	github.com/google/brotli v1.0.9 // indirect
 	github.com/google/uuid v1.2.0
 	github.com/greenplum-db/gp-common-go-libs v1.0.4
 	github.com/hashicorp/golang-lru v0.5.1
@@ -55,6 +55,8 @@ require (
 	google.golang.org/api v0.28.0
 	gopkg.in/ini.v1 v1.51.0
 )
+
+require github.com/google/brotli/go/cbrotli v0.0.0-20220110100810-f4153a09f87c
 
 require (
 	cloud.google.com/go v0.57.0 // indirect

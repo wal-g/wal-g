@@ -16,6 +16,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/parallel"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -430,7 +431,7 @@ func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uin
 	return nil
 }
 
-func (bundle *Bundle) PackTarballs() (TarFileSets, error) {
+func (bundle *Bundle) PackTarballs() (parallel.TarFileSets, error) {
 	return bundle.TarBallComposer.PackTarballs()
 }
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/parallel"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -17,8 +18,8 @@ type TarBallComposer interface {
 	AddFile(info *ComposeFileInfo)
 	AddHeader(header *tar.Header, fileInfo os.FileInfo) error
 	SkipFile(tarHeader *tar.Header, fileInfo os.FileInfo)
-	PackTarballs() (TarFileSets, error)
-	GetFiles() BundleFiles
+	PackTarballs() (parallel.TarFileSets, error)
+	GetFiles() parallel.BundleFiles
 }
 
 // ComposeFileInfo holds data which is required to pack a file to some tarball
@@ -55,9 +56,9 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn, f
 	switch composerType {
 	case RegularComposer:
 		if withoutFilesMetadata {
-			return NewRegularTarBallComposerMaker(filePackOptions, &NopBundleFiles{}, NewNopTarFileSets()), nil
+			return NewRegularTarBallComposerMaker(filePackOptions, &parallel.NopBundleFiles{}, parallel.NewNopTarFileSets()), nil
 		}
-		return NewRegularTarBallComposerMaker(filePackOptions, &RegularBundleFiles{}, NewRegularTarFileSets()), nil
+		return NewRegularTarBallComposerMaker(filePackOptions, &parallel.RegularBundleFiles{}, parallel.NewRegularTarFileSets()), nil
 	case RatingComposer:
 		relFileStats, err := newRelFileStatistics(conn)
 		if err != nil {
@@ -70,7 +71,7 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn, f
 			tracelog.InfoLogger.Printf(
 				"Failed to init the CopyComposer, will use the RegularComposer instead:"+
 					" couldn't get the previous backup name: %v", err)
-			return NewRegularTarBallComposerMaker(filePackOptions, &RegularBundleFiles{}, NewRegularTarFileSets()), nil
+			return NewRegularTarBallComposerMaker(filePackOptions, &parallel.RegularBundleFiles{}, parallel.NewRegularTarFileSets()), nil
 		}
 		previousBackup := NewBackup(folder, previousBackupName)
 		prevBackupSentinelDto, _, err := previousBackup.GetSentinelAndFilesMetadata()

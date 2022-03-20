@@ -11,12 +11,13 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/parallel"
 	"golang.org/x/sync/errgroup"
 )
 
 type RatingTarBallComposerMaker struct {
 	fileStats         RelFileStatistics
-	bundleFiles       BundleFiles
+	bundleFiles       parallel.BundleFiles
 	filePackerOptions TarBallFilePackerOptions
 }
 
@@ -87,7 +88,7 @@ type RatingTarBallComposer struct {
 	addFileWaitGroup sync.WaitGroup
 
 	fileStats   RelFileStatistics
-	bundleFiles BundleFiles
+	bundleFiles parallel.BundleFiles
 
 	incrementBaseLsn *uint64
 	tarSizeThreshold uint64
@@ -102,7 +103,7 @@ type RatingTarBallComposer struct {
 func NewRatingTarBallComposer(
 	tarSizeThreshold uint64, updateRatingEvaluator internal.ComposeRatingEvaluator,
 	incrementBaseLsn *uint64, deltaMap PagedFileDeltaMap, tarBallQueue *internal.TarBallQueue,
-	crypter crypto.Crypter, fileStats RelFileStatistics, bundleFiles BundleFiles, packer *TarBallFilePacker,
+	crypter crypto.Crypter, fileStats RelFileStatistics, bundleFiles parallel.BundleFiles, packer *TarBallFilePacker,
 ) (*RatingTarBallComposer, error) {
 	errorGroup, _ := errgroup.WithContext(context.Background())
 	deltaMapComplete := true
@@ -155,7 +156,7 @@ func (c *RatingTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.File
 	c.bundleFiles.AddSkippedFile(tarHeader, fileInfo)
 }
 
-func (c *RatingTarBallComposer) PackTarballs() (TarFileSets, error) {
+func (c *RatingTarBallComposer) PackTarballs() (parallel.TarFileSets, error) {
 	close(c.addFileQueue)
 	err := c.errorGroup.Wait()
 	if err != nil {
@@ -170,7 +171,7 @@ func (c *RatingTarBallComposer) PackTarballs() (TarFileSets, error) {
 		return nil, err
 	}
 
-	tarFileSets := NewRegularTarFileSets()
+	tarFileSets := parallel.NewRegularTarFileSets()
 	tarFileSets.AddFiles(headersTarName, headersNames)
 
 	for _, tarFilesCollection := range tarFilesCollections {
@@ -198,7 +199,7 @@ func (c *RatingTarBallComposer) PackTarballs() (TarFileSets, error) {
 	return tarFileSets, nil
 }
 
-func (c *RatingTarBallComposer) GetFiles() BundleFiles {
+func (c *RatingTarBallComposer) GetFiles() parallel.BundleFiles {
 	return c.bundleFiles
 }
 
