@@ -27,7 +27,7 @@ const (
 
 type fileInfo struct {
 	status copyStatus
-	info   *ComposeFileInfo
+	info   *parallel.ComposeFileInfo
 }
 
 type headerInfo struct {
@@ -101,7 +101,7 @@ func NewCopyTarBallComposer(
 	}, nil
 }
 
-func (maker *CopyTarBallComposerMaker) Make(bundle *Bundle) (TarBallComposer, error) {
+func (maker *CopyTarBallComposerMaker) Make(bundle *Bundle) (parallel.TarBallComposer, error) {
 	prevFileTar := make(map[string]string)
 	prevTarFileSets := parallel.NewRegularTarFileSets()
 	tarUnchangedFilesCount := make(map[string]int)
@@ -124,11 +124,11 @@ func (maker *CopyTarBallComposerMaker) Make(bundle *Bundle) (TarBallComposer, er
 		prevFileTar, prevTarFileSets)
 }
 
-func (c *CopyTarBallComposer) AddFile(info *ComposeFileInfo) {
-	var fileName = info.header.Name
+func (c *CopyTarBallComposer) AddFile(info *parallel.ComposeFileInfo) {
+	var fileName = info.Header.Name
 	var currFile = fileInfo{}
 	if _, exists := c.prevFileTar[fileName]; exists {
-		if !c.prevBackup.FilesMetadataDto.Files[fileName].MTime.Equal(info.header.ModTime) {
+		if !c.prevBackup.FilesMetadataDto.Files[fileName].MTime.Equal(info.Header.ModTime) {
 			currFile.status = doNotCopy
 		} else {
 			c.tarUnchangedFilesCount[c.prevFileTar[fileName]]--
@@ -181,7 +181,7 @@ func (c *CopyTarBallComposer) copyTar(tarName string) error {
 		if file, exists := c.fileInfo[fileName]; exists {
 			file.status = processed
 			c.tarFileSets.AddFile(newTarName, fileName)
-			c.files.AddFile(file.info.header, file.info.fileInfo, file.info.isIncremented)
+			c.files.AddFile(file.info.Header, file.info.FileInfo, file.info.IsIncremented)
 		} else if header, exists := c.headerInfos[fileName]; exists {
 			header.status = processed
 			c.tarFileSets.AddFile(newTarName, fileName)

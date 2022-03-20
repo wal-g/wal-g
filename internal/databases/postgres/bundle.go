@@ -65,7 +65,7 @@ type Bundle struct {
 	Directory string
 	Sentinel  *internal.Sentinel
 
-	TarBallComposer TarBallComposer
+	TarBallComposer parallel.TarBallComposer
 	TarBallQueue    *internal.TarBallQueue
 
 	Crypter            crypto.Crypter
@@ -293,7 +293,7 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 		}
 		incrementBaseLsn := bundle.getIncrementBaseLsn()
 		isIncremented := incrementBaseLsn != nil && (wasInBase || bundle.forceIncremental) && isPagedFile(info, path)
-		bundle.TarBallComposer.AddFile(NewComposeFileInfo(path, info, wasInBase, isIncremented, fileInfoHeader))
+		bundle.TarBallComposer.AddFile(parallel.NewComposeFileInfo(path, info, wasInBase, isIncremented, fileInfoHeader))
 	} else {
 		err := bundle.TarBallComposer.AddHeader(fileInfoHeader, info)
 		if err != nil {

@@ -1,21 +1,78 @@
 package parallel
 
+import (
+	"path/filepath"
+	"sync/atomic"
+
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/utility"
+)
+
 type DirectoryUploader interface {
 	Upload(path string) error
-	Download(path string) error
 }
 
 type CommonDirectoryUploader struct {
+	crypter crypto.Crypter
+
+	tarBallFilePacker    TarBallFilePacker
+	tarBallComposerMaker TarBallComposerMaker
+	tarSizeThreshold     int64
+
+	excludedFiles map[string]utility.Empty
+	backupName    string
+	uploader      *internal.Uploader
 }
 
-func NewCommonDirectoryUploader() *CommonDirectoryUploader {
-	return &CommonDirectoryUploader{}
+func NewCommonDirectoryUploader(crypter crypto.Crypter, packer TarBallFilePacker, tarBallComposerMaker TarBallComposerMaker, tarSizeThreshold int64, excludedFiles map[string]utility.Empty, backupName string, uploader *internal.Uploader) *CommonDirectoryUploader {
+	return &CommonDirectoryUploader{
+		crypter:              crypter,
+		tarBallFilePacker:    packer,
+		tarBallComposerMaker: tarBallComposerMaker,
+		tarSizeThreshold:     tarSizeThreshold,
+		excludedFiles:        excludedFiles,
+		backupName:           backupName,
+		uploader:             uploader,
+	}
 }
 
-func (uploader *CommonDirectoryUploader) Upload(path string) error {
-	return nil
-}
+func (u *CommonDirectoryUploader) Upload(path string) TarFileSets {
+	bundle := NewBundle(path, u.crypter, u.tarBallFilePacker, u.tarSizeThreshold, u.excludedFiles)
 
-func (uploader *CommonDirectoryUploader) Download(path string) error {
-	return nil
+	// Start a new tar bundle, walk the pgDataDirectory and upload everything there.
+	tracelog.InfoLogger.Println("Starting a new tar bundle")
+	err := bundle.StartQueue(internal.NewStorageTarBallMaker(u.backupName, u.uploader))
+	tracelog.ErrorLogger.FatalOnError(err)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	err = bundle.SetupComposer(u.tarBallComposerMaker)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	tracelog.InfoLogger.Println("Walking ...")
+	err = filepath.Walk(path, bundle.AddToBundle)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	tracelog.InfoLogger.Println("Packing ...")
+	tarFileSets, err := bundle.PackTarballs()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	tracelog.DebugLogger.Println("Finishing queue ...")
+	err = bundle.FinishQueue()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	uncompressedSize := atomic.LoadInt64(bundle.TarBallQueue.AllTarballsSize)
+	compressedSize, err := u.uploader.UploadedDataSize()
+	tracelog.ErrorLogger.FatalOnError(err)
+	tracelog.DebugLogger.Printf("Uncompressed size: %d", uncompressedSize)
+	tracelog.DebugLogger.Printf("Compressed size: %d", compressedSize)
+
+	// Wait for all uploads to finish.
+	tracelog.DebugLogger.Println("Waiting for all uploads to finish")
+	u.uploader.Finish()
+	if u.uploader.Failed.Load().(bool) {
+		tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", path)
+	}
+	return tarFileSets
 }

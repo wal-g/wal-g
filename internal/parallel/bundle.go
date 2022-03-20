@@ -25,9 +25,8 @@ type Bundle struct {
 	Directory string
 	Sentinel  *internal.Sentinel
 
-	TarBallComposer   TarBallComposer
-	TarBallQueue      *internal.TarBallQueue
-	TarBallFilePacker TarBallFilePacker
+	TarBallComposer TarBallComposer
+	TarBallQueue    *internal.TarBallQueue
 
 	Crypter crypto.Crypter
 
@@ -44,7 +43,6 @@ func NewBundle(directory string, crypter crypto.Crypter, tarBallFilePacker TarBa
 		Crypter:           crypter,
 		TarSizeThreshold:  tarSizeThreshold,
 		ExcludedFilenames: excludedFilenames,
-		TarBallFilePacker: tarBallFilePacker,
 	}
 }
 
@@ -66,7 +64,15 @@ func (bundle *Bundle) FinishQueue() error {
 	return bundle.TarBallQueue.FinishQueue()
 }
 
-func (bundle *Bundle) AddToBundle(path string, info os.FileInfo) error {
+func (bundle *Bundle) AddToBundle(path string, info os.FileInfo, err error) error {
+	if err != nil {
+		if os.IsNotExist(err) {
+			tracelog.WarningLogger.Println(path, " deleted during filepath walk")
+			return nil
+		}
+		return errors.Wrap(err, "HandleWalkedFSObject: walk failed")
+	}
+
 	fileName := info.Name()
 	_, excluded := bundle.ExcludedFilenames[fileName]
 	isDir := info.IsDir()

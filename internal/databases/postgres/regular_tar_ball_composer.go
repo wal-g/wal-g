@@ -57,7 +57,7 @@ func NewRegularTarBallComposerMaker(
 	}
 }
 
-func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (TarBallComposer, error) {
+func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (parallel.TarBallComposer, error) {
 	bundleFiles := maker.files
 	tarFileSets := maker.tarFileSets
 	tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap,
@@ -65,13 +65,13 @@ func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (TarBallComposer,
 	return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, bundleFiles, tarFileSets, bundle.Crypter), nil
 }
 
-func (c *RegularTarBallComposer) AddFile(info *ComposeFileInfo) {
+func (c *RegularTarBallComposer) AddFile(info *parallel.ComposeFileInfo) {
 	tarBall, err := c.tarBallQueue.DequeCtx(c.ctx)
 	if err != nil {
 		return
 	}
 	tarBall.SetUp(c.crypter)
-	c.tarFileSets.AddFile(tarBall.Name(), info.header.Name)
+	c.tarFileSets.AddFile(tarBall.Name(), info.Header.Name)
 	c.errorGroup.Go(func() error {
 		err := c.tarFilePacker.PackFileIntoTar(info, tarBall)
 		if err != nil {
