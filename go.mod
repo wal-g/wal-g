@@ -21,7 +21,6 @@ require (
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gofrs/flock v0.8.0
 	github.com/golang/mock v1.4.4
-	github.com/google/brotli v1.0.9
 	github.com/google/uuid v1.2.0
 	github.com/greenplum-db/gp-common-go-libs v1.0.4
 	github.com/hashicorp/golang-lru v0.5.1
@@ -57,8 +56,10 @@ require (
 )
 
 require (
+	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/google/brotli/go/cbrotli v0.0.0-20220110100810-f4153a09f87c
 	github.com/prometheus/client_golang v1.12.1
+	github.com/prometheus/client_model v0.2.0
 )
 
 require (
@@ -69,11 +70,9 @@ require (
 	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
-	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/Microsoft/go-winio v0.4.14 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/cactus/go-statsd-client/v5 v5.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
@@ -117,7 +116,6 @@ require (
 	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/pingcap/errors v0.11.5-0.20201126102027-b0a155152ca3 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/satori/go.uuid v1.2.0 // indirect
@@ -149,5 +147,4 @@ require (
 	google.golang.org/protobuf v1.26.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
-	honnef.co/go/tools v0.0.1-2020.1.4 // indirect
 )
