@@ -81,6 +81,7 @@ const (
 	SerializerTypeSetting        = "WALG_SERIALIZER_TYPE"
 	StreamSplitterPartitions     = "WALG_STREAM_SPLITTER_PARTITIONS"
 	StreamSplitterBlockSize      = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
+	StatsdAddressSetting         = "WALG_STATSD_ADDRESS"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
@@ -246,6 +247,7 @@ var (
 		DeltaFromUserDataSetting:     true,
 		FetchTargetUserDataSetting:   true,
 		SerializerTypeSetting:        true,
+		StatsdAddressSetting:         true,
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,
