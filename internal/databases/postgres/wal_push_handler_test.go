@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/wal-g/wal-g/utility"
+
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 
 	"github.com/spf13/viper"
@@ -29,6 +31,7 @@ func generateAndUploadWalFile(t *testing.T, fileFormat string) (postgres.WalUplo
 	uploader := testtools.NewMockWalDirUploader(false, false)
 	fakeASM := asm.NewFakeASM()
 	uploader.ArchiveStatusManager = fakeASM
+	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
 	postgres.HandleWALPush(uploader, filepath.Join(dirName, testFileName))
 	return *uploader, fakeASM, dir, testFileName
 }
