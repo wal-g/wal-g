@@ -94,12 +94,18 @@ func writeMetricFamilyToStatsd(client statsd.Statter, in *dto.MetricFamily) erro
 			if metric.Counter == nil {
 				return fmt.Errorf("expected counter in metric %s %s", name, metric)
 			}
-			client.Inc(name, int64(metric.Counter.GetValue()), 1.0, tags...)
+			err := client.Inc(name, int64(metric.Counter.GetValue()), 1.0, tags...)
+			if err != nil {
+				return err
+			}
 		case dto.MetricType_GAUGE:
 			if metric.Gauge == nil {
 				return fmt.Errorf("expected gauge in metric %s %s", name, metric)
 			}
-			client.Gauge(name, int64(metric.Gauge.GetValue()), 1.0, tags...)
+			err := client.Gauge(name, int64(metric.Gauge.GetValue()), 1.0, tags...)
+			if err != nil {
+				return err
+			}
 		case dto.MetricType_UNTYPED:
 			return fmt.Errorf("expected untyped in metric %s %s", name, metric)
 		case dto.MetricType_SUMMARY:
