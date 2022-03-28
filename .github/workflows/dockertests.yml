@@ -25,7 +25,7 @@ jobs:
       #  use cache to pass docker images to the test jobs
       - name: Docker images caching
         id: cache-images
-        uses: actions/cache@v2.1.7
+        uses: actions/cache@v3
         with:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}
@@ -155,7 +155,7 @@ jobs:
       # load docker images
       - name: Load docker images
         id: cache-images
-        uses: actions/cache@v2.1.7
+        uses: actions/cache@v3
         with:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}
