@@ -59,7 +59,11 @@ func Init(cmd *cobra.Command, dbName string) {
 	cmd.AddCommand(st.StorageToolsCmd)
 
 	// set PostRun handler
-	cmd.PersistentPostRun = func(*cobra.Command, []string) {
+	var persistentPostRun func(*cobra.Command, []string)
+	cmd.PersistentPostRun = func(cmd *cobra.Command, args []string) {
+		if persistentPostRun != nil {
+			persistentPostRun(cmd, args)
+		}
 		internal.PushMetrics()
 	}
 }
