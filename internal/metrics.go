@@ -2,7 +2,6 @@ package internal
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/cactus/go-statsd-client/v5/statsd"
@@ -13,22 +12,29 @@ import (
 )
 
 var (
+	WalgMetricsPrefix = "walg_"
+
 	uploadedFilesTotal = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: "walg_uploader_uploaded_files_total",
+			Name: WalgMetricsPrefix + "uploader_uploaded_files_total",
 			Help: "Number of uploaded files.",
 		},
 	)
 
 	uploadedFilesFailedTotal = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: "walg_uploader_uploaded_files_failed_total",
+			Name: WalgMetricsPrefix + "uploader_uploaded_files_failed_total",
 			Help: "Number of file upload failures.",
 		},
 	)
 )
 
 func init() {
+	// unregister prometheus collectors
+	// https://github.com/prometheus/client_golang/blob/8dfa334295e85f9b1e48ce862fae5f337faa6d2f/prometheus/registry.go#L62-L63
+	prometheus.Unregister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
+	prometheus.Unregister(prometheus.NewGoCollector())
+
 	prometheus.MustRegister(uploadedFilesTotal)
 	prometheus.MustRegister(uploadedFilesFailedTotal)
 }
@@ -77,11 +83,6 @@ func pushMetrics(address string) error {
 func writeMetricFamilyToStatsd(client statsd.Statter, in *dto.MetricFamily) error {
 	name := in.GetName()
 	metricType := in.GetType()
-
-	// only export metrics native to wal-g
-	if !strings.HasPrefix(name, "walg_") {
-		return nil
-	}
 
 	for _, metric := range in.Metric {
 		var tags []statsd.Tag
