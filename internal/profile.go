@@ -1,13 +1,11 @@
 package internal
 
 import (
-	"fmt"
 	"math/rand"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/pkg/profile"
+	"github.com/spf13/viper"
 )
 
 type ProfileStopper interface {
@@ -15,15 +13,11 @@ type ProfileStopper interface {
 }
 
 func Profile() (ProfileStopper, error) {
-	envSamplingRatio := os.Getenv("PROFILE_SAMPLING_RATIO")
-	if envSamplingRatio == "" {
+	if !viper.IsSet(ProfileSamplingRatio) {
 		return nil, nil
 	}
 
-	samplingRatio, err := strconv.ParseFloat(envSamplingRatio, 64)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse PROFILE_SAMPLING_RATIO as float: %v", err)
-	}
+	samplingRatio := viper.GetFloat64(ProfileSamplingRatio)
 
 	// sample profiling invoked commands
 	rand.Seed(time.Now().UnixNano())
@@ -33,7 +27,7 @@ func Profile() (ProfileStopper, error) {
 
 	var opts []func(*profile.Profile)
 
-	profileMode := os.Getenv("PROFILE_MODE")
+	profileMode := viper.GetString(ProfileMode)
 	switch profileMode {
 	case "cpu":
 		opts = append(opts, profile.CPUProfile)
@@ -51,7 +45,7 @@ func Profile() (ProfileStopper, error) {
 		opts = append(opts, profile.GoroutineProfile)
 	}
 
-	profilePath := os.Getenv("PROFILE_PATH")
+	profilePath := viper.GetString(ProfilePath)
 	if profilePath != "" {
 		opts = append(opts, profile.ProfilePath(profilePath))
 	}

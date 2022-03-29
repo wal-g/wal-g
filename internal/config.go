@@ -82,6 +82,10 @@ const (
 	StreamSplitterPartitions     = "WALG_STREAM_SPLITTER_PARTITIONS"
 	StreamSplitterBlockSize      = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
 
+	ProfileSamplingRatio = "PROFILE_SAMPLING_RATIO"
+	ProfileMode          = "PROFILE_MODE"
+	ProfilePath          = "PROFILE_PATH"
+
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
 	OplogArchiveAfterSize           = "OPLOG_ARCHIVE_AFTER_SIZE"
@@ -246,6 +250,10 @@ var (
 		DeltaFromUserDataSetting:     true,
 		FetchTargetUserDataSetting:   true,
 		SerializerTypeSetting:        true,
+
+		ProfileSamplingRatio: true,
+		ProfileMode:          true,
+		ProfilePath:          true,
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,

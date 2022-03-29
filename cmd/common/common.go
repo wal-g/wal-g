@@ -60,9 +60,8 @@ func Init(cmd *cobra.Command, dbName string) {
 	cmd.AddCommand(st.StorageToolsCmd)
 
 	// profiler
-	var persistentPreRun, persistentPostRun func(*cobra.Command, []string)
-	persistentPreRun = cmd.PersistentPreRun
-	persistentPostRun = cmd.PersistentPostRun
+	persistentPreRun := cmd.PersistentPreRun
+	persistentPostRun := cmd.PersistentPostRun
 
 	var p internal.ProfileStopper
 	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
