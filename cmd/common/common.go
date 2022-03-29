@@ -55,6 +55,9 @@ func Init(cmd *cobra.Command, dbName string) {
 	// Add flags subcommand
 	cmd.AddCommand(FlagsCmd)
 
+	// Add completion subcommand
+	cmd.AddCommand(CompletionCmd)
+
 	// Add storage tools
 	cmd.AddCommand(st.StorageToolsCmd)
 }
