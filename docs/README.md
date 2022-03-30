@@ -98,7 +98,13 @@ Similar to `WALG_PGP_KEY`, but value is the path to the key on file system.
 
 If your *private key* is encrypted with a *passphrase*, you should set *passphrase* for decrypt.
 
-### Database-specific options 
+### Monitoring
+
+* `WALG_STATSD_ADDRESS`
+
+To enable metrics publishing to [statsd](https://github.com/statsd/statsd) or [statsd_exporter](https://github.com/prometheus/statsd_exporter). Metrics will be sent on a best-effort basis via UDP. The default port for statsd is `9125`.
+
+### Database-specific options
 **More options are available for the chosen database. See it in [Databases](#databases)**
 
 Usage
