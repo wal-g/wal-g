@@ -11,22 +11,29 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
+type metrics struct {
+	uploadedFilesTotal       prometheus.Counter
+	uploadedFilesFailedTotal prometheus.Counter
+}
+
 var (
 	WalgMetricsPrefix = "walg_"
 
-	uploadedFilesTotal = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: WalgMetricsPrefix + "uploader_uploaded_files_total",
-			Help: "Number of uploaded files.",
-		},
-	)
+	WalgMetrics = metrics{
+		uploadedFilesTotal: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: WalgMetricsPrefix + "uploader_uploaded_files_total",
+				Help: "Number of uploaded files.",
+			},
+		),
 
-	uploadedFilesFailedTotal = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: WalgMetricsPrefix + "uploader_uploaded_files_failed_total",
-			Help: "Number of file upload failures.",
-		},
-	)
+		uploadedFilesFailedTotal: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: WalgMetricsPrefix + "uploader_uploaded_files_failed_total",
+				Help: "Number of file upload failures.",
+			},
+		),
+	}
 )
 
 func init() {
@@ -35,8 +42,8 @@ func init() {
 	prometheus.Unregister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
 	prometheus.Unregister(prometheus.NewGoCollector())
 
-	prometheus.MustRegister(uploadedFilesTotal)
-	prometheus.MustRegister(uploadedFilesFailedTotal)
+	prometheus.MustRegister(WalgMetrics.uploadedFilesTotal)
+	prometheus.MustRegister(WalgMetrics.uploadedFilesFailedTotal)
 }
 
 func PushMetrics() {
