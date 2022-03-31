@@ -6,6 +6,7 @@ import (
 
 	"github.com/cactus/go-statsd-client/v5/statsd"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
@@ -39,8 +40,8 @@ var (
 func init() {
 	// unregister prometheus collectors
 	// https://github.com/prometheus/client_golang/blob/8dfa334295e85f9b1e48ce862fae5f337faa6d2f/prometheus/registry.go#L62-L63
-	prometheus.Unregister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
-	prometheus.Unregister(prometheus.NewGoCollector())
+	prometheus.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	prometheus.Unregister(collectors.NewGoCollector())
 
 	prometheus.MustRegister(WalgMetrics.uploadedFilesTotal)
 	prometheus.MustRegister(WalgMetrics.uploadedFilesFailedTotal)
