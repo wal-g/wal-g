@@ -62,9 +62,4 @@ func init() {
 		withoutHistoryShorthand,
 		false,
 		withoutHistoryDescription)
-
-	_ = backupCopyCmd.MarkFlagFilename(toConfigFile)
-	_ = backupCopyCmd.MarkFlagFilename(fromConfigFile)
-	_ = backupCopyCmd.MarkFlagRequired(toConfigFile)
-	_ = backupCopyCmd.MarkFlagRequired(fromConfigFile)
 }
