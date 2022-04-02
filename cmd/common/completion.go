@@ -19,9 +19,11 @@ However, the completion script depends on bash-completion, which means that you 
       echo 'source <(wal-g completion bash)' >>~/.bashrc
       source ~/.bashrc
   Zsh:
-    Write zsh completion code to .zshrc and then source it:
-      echo 'source <(wal-g completion zsh)' >>~/.zshrc
-      source ~/.zshrc`
+    If shell completion is not already enabled in your environment, you will need to enable it.
+    You can execute the following once:
+      echo "autoload -U compinit; compinit" >> ~/.zshrc
+    To load completions for each session, execute once:
+      wal-g completion zsh > ${fpath[1]}/_wal-g`
 )
 
 // completionCmd represents the completion command
@@ -35,7 +37,7 @@ var CompletionCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		switch args[0] {
 		case "bash":
-			cmd.Root().GenBashCompletion(os.Stdout)
+			cmd.Root().GenBashCompletionV2(os.Stdout, true)
 		case "zsh":
 			cmd.Root().GenZshCompletion(os.Stdout)
 		}

@@ -45,6 +45,8 @@ mv wal-g-pg-ubuntu-18.04-amd64 /usr/local/bin/wal-g
 
 For other systems, please consult the [Development](#development) section for more information.
 
+Bash and zsh completion is supported. Use `wal-g help completion` for more info
+
 Configuration
 -------------
 ### Storage
@@ -98,7 +100,7 @@ Similar to `WALG_PGP_KEY`, but value is the path to the key on file system.
 
 If your *private key* is encrypted with a *passphrase*, you should set *passphrase* for decrypt.
 
-### Database-specific options 
+### Database-specific options
 **More options are available for the chosen database. See it in [Databases](#databases)**
 
 Usage
