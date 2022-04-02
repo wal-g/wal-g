@@ -1,22 +1,48 @@
 package common
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
+)
+
+var (
+	completionShort = "Output shell completion code for the specified shell"
+
+	completionLong = `Output shell completion code for the specified shell. The shell code must be evaluated
+to provide interactive completion of wal-g commands. This can be done by sourcing it from the .bashrc.
+However, the completion script depends on bash-completion, which means that you have to install this software first`
+
+	completionExample = `  Bash:
+    If bash-completion is not installed on Linux, install the 'bash-completion' package
+    via your distribution's package manager. Write bash completion code to .bashrc and then source it:
+      echo 'source <(wal-g completion bash)' >>~/.bashrc
+      source ~/.bashrc
+  Zsh:
+    Write zsh completion code to .zshrc and then source it:
+      echo 'source <(wal-g completion zsh)' >>~/.zshrc
+      source ~/.zshrc`
 )
 
 // completionCmd represents the completion command
 var CompletionCmd = &cobra.Command{
-	Use:   "completion",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {},
+	Use:       "completion bash|zsh",
+	Short:     completionShort,
+	Long:      completionLong,
+	Example:   completionExample,
+	ValidArgs: []string{"bash", "zsh"},
+	Args:      cobra.ExactValidArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		switch args[0] {
+		case "bash":
+			cmd.Root().GenBashCompletion(os.Stdout)
+		case "zsh":
+			cmd.Root().GenZshCompletion(os.Stdout)
+		}
+	},
 }
 
 func init() {
-	// Here you will define your flags and configuration settings.
+	// fix to disable the required settings check for the completion subcommand
+	CompletionCmd.PersistentPreRun = func(*cobra.Command, []string) {}
 }
