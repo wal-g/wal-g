@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/wal-g/tracelog"
 )
 
 const (
@@ -26,7 +27,7 @@ configured properly for autocomplete to work`
       wal-g completion zsh > ${fpath[1]}/_wal-g`
 )
 
-// completionCmd represents the completion command
+// CompletionCmd represents the completion command
 var CompletionCmd = &cobra.Command{
 	Use:       "completion bash|zsh",
 	Short:     completionShort,
@@ -35,12 +36,15 @@ var CompletionCmd = &cobra.Command{
 	ValidArgs: []string{"bash", "zsh"},
 	Args:      cobra.ExactValidArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
 		switch args[0] {
 		case "bash":
-			cmd.Root().GenBashCompletionV2(os.Stdout, true)
+			err = cmd.Root().GenBashCompletionV2(os.Stdout, true)
 		case "zsh":
-			cmd.Root().GenZshCompletion(os.Stdout)
+			err = cmd.Root().GenZshCompletion(os.Stdout)
 		}
+
+		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
 
