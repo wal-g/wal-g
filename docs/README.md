@@ -98,7 +98,23 @@ Similar to `WALG_PGP_KEY`, but value is the path to the key on file system.
 
 If your *private key* is encrypted with a *passphrase*, you should set *passphrase* for decrypt.
 
-### Database-specific options 
+### Profiling
+
+Profiling is useful for identifying bottlenecks within WAL-G.
+
+* `PROFILE_SAMPLING_RATIO`
+
+A float value between 0 and 1, defines likelihood of the profiler getting enabled. When set to 1, it will always run. This allows probabilistic sampling of invocations. Since WAL-G processes may get created several times per second (e.g. wal-g wal-push), we do not want to profile all of them.
+
+* `PROFILE_MODE`
+
+The type of pprof profiler to use. Can be one of `cpu`, `mem`, `mutex`, `block`, `threadcreation`, `trace`, `goroutine`. See the [runtime/pprof docs](https://pkg.go.dev/runtime/pprof) for more information. Defaults to `cpu`.
+
+* `PROFILE_PATH`
+
+The directory to store profiles in. Defaults to `$TMPDIR`.
+
+### Database-specific options
 **More options are available for the chosen database. See it in [Databases](#databases)**
 
 Usage
