@@ -23,7 +23,11 @@ to provide interactive completion of wal-g commands.`
     You can execute the following once:
       echo "autoload -U compinit; compinit" >> ~/.zshrc
     To load completions for each session, execute once:
-      wal-g completion zsh > ${fpath[1]}/_wal-g`
+      Linux:
+        wal-g completion zsh > ${fpath[1]}/_wal-g
+      macOS:
+        wal-g completion zsh > /usr/local/share/zsh/site-functions/_wal-g
+    You will need to start a new shell for this setup to take effect.`
 )
 
 // CompletionCmd represents the completion command
