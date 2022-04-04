@@ -39,6 +39,8 @@ const MaxBlobSize = MaxTransferSize * MaxBlocksPerBlob
 
 const BlobNamePrefix = "blob_"
 
+const ExternalBackupFilenameSeparator = ","
+
 var SystemDbnames = []string{
 	"master",
 	"msdb",
@@ -203,29 +205,44 @@ func listDatabaseFiles(db *sql.DB, urls string) ([]DatabaseFile, error) {
 	return res, nil
 }
 
+func buildBackupUrlsList(baseURL string, blobCount int) []string {
+	var res []string
+	for i := 0; i < blobCount; i++ {
+		res = append(res, fmt.Sprintf("%s/%s%03d", baseURL, BlobNamePrefix, i))
+	}
+	return res
+}
+
 func buildBackupUrls(baseURL string, blobCount int) string {
 	res := ""
-	for i := 0; i < blobCount; i++ {
+	for i, url := range buildBackupUrlsList(baseURL, blobCount) {
 		if i > 0 {
 			res += ", "
 		}
-		blobName := fmt.Sprintf("%s%03d", BlobNamePrefix, i)
-		res += fmt.Sprintf("URL = '%s/%s'", baseURL, blobName)
+		res += fmt.Sprintf("URL = '%s'", url)
+	}
+	return res
+}
+
+func buildRestoreUrlsList(baseURL string, blobNames []string) []string {
+	if len(blobNames) == 0 {
+		// old-style single blob backup
+		return []string{baseURL}
+	}
+	var res []string
+	for _, blobName := range blobNames {
+		res = append(res, fmt.Sprintf("%s/%s", baseURL, blobName))
 	}
 	return res
 }
 
 func buildRestoreUrls(baseURL string, blobNames []string) string {
-	if len(blobNames) == 0 {
-		// old-style single blob backup
-		return fmt.Sprintf("URL = '%s'", baseURL)
-	}
 	res := ""
-	for i, blobName := range blobNames {
+	for i, url := range buildRestoreUrlsList(baseURL, blobNames) {
 		if i > 0 {
 			res += ", "
 		}
-		res += fmt.Sprintf("URL = '%s/%s'", baseURL, blobName)
+		res += fmt.Sprintf("URL = '%s'", url)
 	}
 	return res
 }

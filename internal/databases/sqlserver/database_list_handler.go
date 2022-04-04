@@ -22,7 +22,7 @@ func HandleDatabaseList(backupName string) {
 		tracelog.ErrorLogger.Fatalf("can't find backup %s: %v", backupName, err)
 	}
 	sentinel := new(SentinelDto)
-	err = backup.FetchSentinel(&sentinel)
+	err = backup.FetchSentinel(sentinel)
 	tracelog.ErrorLogger.FatalOnError(err)
 	for _, name := range sentinel.Databases {
 		fmt.Println(name)

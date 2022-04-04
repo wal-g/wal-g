@@ -1,6 +1,7 @@
 package blob
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -588,6 +589,34 @@ func (bs *Server) HandleBlobGet(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func (bs *Server) blobPut(r io.Reader, idx *Index) ([]string, error) {
+	const blockSize = 4 * 1024 * 1024
+	buf := make([]byte, blockSize)
+	xblocklist := &XBlockListIn{Blocks: []XBlockIn{}}
+	for i, last := 0, false; !last; i++ {
+		n, err := io.ReadFull(r, buf)
+		if err != nil {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				last = true
+			} else {
+				return nil, err
+			}
+		}
+		if n == 0 {
+			continue
+		}
+		id := fmt.Sprintf("data_%05d", i)
+		name := idx.PutBlock(id, uint64(n))
+		encryptedReader := internal.CompressAndEncrypt(bytes.NewReader(buf[:n]), bs.compressor, bs.crypter)
+		err = idx.folder.PutObject(name, encryptedReader)
+		if err != nil {
+			return nil, err
+		}
+		xblocklist.Blocks = append(xblocklist.Blocks, XBlockIn{ID: id, Mode: BlockLatest})
+	}
+	return idx.PutBlockList(xblocklist)
+}
+
 func (bs *Server) HandleBlobPut(w http.ResponseWriter, req *http.Request) {
 	folder := bs.getBlobFolder(req.URL.Path)
 	idx, err := bs.loadBlobIndex(folder)
@@ -599,41 +628,40 @@ func (bs *Server) HandleBlobPut(w http.ResponseWriter, req *http.Request) {
 		bs.returnError(w, req, err)
 		return
 	}
+	if idx.Compression != "" || idx.Encryption != "" {
+		err = bs.validateBlobCompressionEncryption(idx)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("proxy: misconfiguration: %v", err)
+			bs.returnError(w, req, err)
+			return
+		}
+	}
 	if err := bs.checkLease(req, folder); err != nil {
 		bs.returnError(w, req, err)
 		return
 	}
 	blobSizeStr := req.Header.Get("Content-Length")
-	blobSize, err := strconv.ParseUint(blobSizeStr, 10, 64)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	garbage := idx.Clear()
-	if blobSize > 0 {
-		name := idx.PutBlock("data", blobSize)
-		encryptedReader := internal.CompressAndEncrypt(req.Body, bs.compressor, bs.crypter)
-		err := folder.PutObject(name, encryptedReader)
-		req.Body.Close()
-		if err != nil {
-			bs.returnError(w, req, err)
-			return
-		}
-		_, err = idx.PutBlockList(&XBlockListIn{Blocks: []XBlockIn{{ID: "data", Mode: BlockLatest}}})
+	var garbage []string
+	if blobSizeStr == "0" {
+		garbage = idx.Clear()
+	} else {
+		defer req.Body.Close()
+		garbage, err = bs.blobPut(req.Body, idx)
 		if err != nil {
 			bs.returnError(w, req, err)
 			return
 		}
 	}
 	bs.indexesMutex.Lock()
-	defer bs.indexesMutex.Unlock()
 	err = idx.Save()
 	if err != nil {
+		bs.indexesMutex.Unlock()
 		bs.returnError(w, req, err)
 		return
 	}
 	bs.indexes[folder.GetPath()] = idx
-	go bs.deleteGarbage(folder, garbage)
+	bs.indexesMutex.Unlock()
+	bs.deleteGarbage(folder, garbage)
 	w.WriteHeader(http.StatusCreated)
 }
 
