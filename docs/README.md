@@ -45,7 +45,7 @@ mv wal-g-pg-ubuntu-18.04-amd64 /usr/local/bin/wal-g
 
 For other systems, please consult the [Development](#development) section for more information.
 
-Bash and zsh completion is supported. Use `wal-g help completion` for more info
+WAL-G supports bash and zsh autocompletion. Run `wal-g help completion` for more info.
 
 Configuration
 -------------
