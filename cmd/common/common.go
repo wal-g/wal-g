@@ -61,15 +61,6 @@ func Init(cmd *cobra.Command, dbName string) {
 	// Add completion subcommand
 	cmd.AddCommand(CompletionCmd)
 
-	// Don't run PersistentPreRun when shell autocompleting
-	preRun := cmd.PersistentPreRun
-	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		if strings.Index(cmd.Use, "__complete") == 0 {
-			return
-		}
-		preRun(cmd, args)
-	}
-
 	// Add storage tools
 	cmd.AddCommand(st.StorageToolsCmd)
 
@@ -95,5 +86,14 @@ func Init(cmd *cobra.Command, dbName string) {
 		if p != nil {
 			p.Stop()
 		}
+	}
+
+	// Don't run PersistentPreRun when shell autocompleting
+	preRun := cmd.PersistentPreRun
+	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		if strings.Index(cmd.Use, "__complete") == 0 {
+			return
+		}
+		preRun(cmd, args)
 	}
 }
