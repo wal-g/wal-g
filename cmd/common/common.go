@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/cmd/common/st"
 	"github.com/wal-g/wal-g/internal"
 )
@@ -71,4 +72,28 @@ func Init(cmd *cobra.Command, dbName string) {
 
 	// Add storage tools
 	cmd.AddCommand(st.StorageToolsCmd)
+
+	// profiler
+	persistentPreRun := cmd.PersistentPreRun
+	persistentPostRun := cmd.PersistentPostRun
+
+	var p internal.ProfileStopper
+	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		if persistentPreRun != nil {
+			persistentPreRun(cmd, args)
+		}
+
+		var err error
+		p, err = internal.Profile()
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
+	cmd.PersistentPostRun = func(cmd *cobra.Command, args []string) {
+		if persistentPostRun != nil {
+			persistentPostRun(cmd, args)
+		}
+
+		if p != nil {
+			p.Stop()
+		}
+	}
 }
