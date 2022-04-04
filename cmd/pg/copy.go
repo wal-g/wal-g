@@ -62,4 +62,7 @@ func init() {
 		withoutHistoryShorthand,
 		false,
 		withoutHistoryDescription)
+
+	_ = backupCopyCmd.MarkFlagRequired(toFlag)
+	_ = backupCopyCmd.MarkFlagRequired(fromFlag)
 }
