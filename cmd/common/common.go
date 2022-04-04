@@ -1,6 +1,8 @@
 package common
 
 import (
+	"strings"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/wal-g/cmd/common/st"
 	"github.com/wal-g/wal-g/internal"
@@ -57,6 +59,15 @@ func Init(cmd *cobra.Command, dbName string) {
 
 	// Add completion subcommand
 	cmd.AddCommand(CompletionCmd)
+
+	// Don't run PersistentPreRun when shell autocompleting
+	preRun := cmd.PersistentPreRun
+	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		if strings.Index(cmd.Use, "__complete") == 0 {
+			return
+		}
+		preRun(cmd, args)
+	}
 
 	// Add storage tools
 	cmd.AddCommand(st.StorageToolsCmd)

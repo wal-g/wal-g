@@ -11,8 +11,7 @@ const (
 	completionShort = "Output shell completion code for the specified shell"
 
 	completionLong = `Output shell completion code for the specified shell. The shell code must be evaluated
-to provide interactive completion of wal-g commands. Note that wal-g have to be
-configured properly for autocomplete to work`
+to provide interactive completion of wal-g commands.`
 
 	completionExample = `  Bash:
     If bash-completion is not installed on Linux, install the 'bash-completion' package
