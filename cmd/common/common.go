@@ -87,7 +87,7 @@ func Init(cmd *cobra.Command, dbName string) {
 	// Don't run PersistentPreRun when shell autocompleting
 	preRun := cmd.PersistentPreRun
 	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		if strings.Index(cmd.Use, "__complete") == 0 {
+		if strings.Index(cmd.Use, cobra.ShellCompRequestCmd) == 0 {
 			return
 		}
 		preRun(cmd, args)
