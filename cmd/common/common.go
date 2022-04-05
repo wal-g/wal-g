@@ -1,6 +1,8 @@
 package common
 
 import (
+	"strings"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/cmd/common/st"
@@ -56,6 +58,9 @@ func Init(cmd *cobra.Command, dbName string) {
 	// Add flags subcommand
 	cmd.AddCommand(FlagsCmd)
 
+	// Add completion subcommand
+	cmd.AddCommand(CompletionCmd)
+
 	// Add storage tools
 	cmd.AddCommand(st.StorageToolsCmd)
 
@@ -81,5 +86,14 @@ func Init(cmd *cobra.Command, dbName string) {
 		if p != nil {
 			p.Stop()
 		}
+	}
+
+	// Don't run PersistentPreRun when shell autocompleting
+	preRun := cmd.PersistentPreRun
+	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		if strings.Index(cmd.Use, "__complete") == 0 {
+			return
+		}
+		preRun(cmd, args)
 	}
 }
