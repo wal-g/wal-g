@@ -142,6 +142,8 @@ const (
 	YcSaKeyFileSetting = "YC_SERVICE_ACCOUNT_KEY_FILE"
 
 	PgBackRestStanza = "PGBACKREST_STANZA"
+
+	HiddenConfigFlagAnnotation = "HIDDEN_CONFIG_FLAG_ANNOTATION"
 )
 
 var (
@@ -569,8 +571,12 @@ func AddConfigFlags(Cmd *cobra.Command) {
 		cfgFlags.String(flagName, "", flagUsage)
 		_ = viper.BindPFlag(k, cfgFlags.Lookup(flagName))
 	}
-	cfgFlags.VisitAll(func(f *pflag.Flag) { f.Hidden = true })
-
+	cfgFlags.VisitAll(func(f *pflag.Flag) {
+		if f.Annotations == nil {
+			f.Annotations = map[string][]string{}
+		}
+		f.Annotations[HiddenConfigFlagAnnotation] = []string{"true"}
+	})
 	Cmd.PersistentFlags().AddFlagSet(cfgFlags)
 }
 

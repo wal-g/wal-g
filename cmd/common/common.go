@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/cmd/common/st"
 	"github.com/wal-g/wal-g/internal"
@@ -43,17 +44,12 @@ func Init(cmd *cobra.Command, dbName string) {
 	internal.ConfigureSettings(dbName)
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
-	cmd.SetUsageTemplate(usageTemplate)
 	cmd.InitDefaultVersionFlag()
 	internal.AddConfigFlags(cmd)
 
 	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 
-	// Init help subcommand
-	cmd.InitDefaultHelpCmd()
-	helpCmd, _, _ := cmd.Find([]string{"help"})
-	// fix to disable the required settings check for the help subcommand
-	helpCmd.PersistentPreRun = func(*cobra.Command, []string) {}
+	initHelp(cmd)
 
 	// Add flags subcommand
 	cmd.AddCommand(FlagsCmd)
@@ -96,4 +92,42 @@ func Init(cmd *cobra.Command, dbName string) {
 		}
 		preRun(cmd, args)
 	}
+}
+
+// setup init and usage functionality
+func initHelp(cmd *cobra.Command) {
+	cmd.SetUsageTemplate(usageTemplate)
+	defaultUsageFn := (&cobra.Command{}).UsageFunc()
+	defaultHelpFn := (&cobra.Command{}).HelpFunc()
+
+	// hide global config flags from usage output
+	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
+		if cmd != FlagsCmd {
+			cmd.Root().PersistentFlags().VisitAll(func(f *pflag.Flag) {
+				if _, ok := f.Annotations[internal.HiddenConfigFlagAnnotation]; ok {
+					f.Hidden = true
+				}
+			})
+		}
+
+		return defaultUsageFn(cmd)
+	})
+	// hide global config flags from help output
+	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		if cmd != FlagsCmd {
+			cmd.Root().PersistentFlags().VisitAll(func(f *pflag.Flag) {
+				if _, ok := f.Annotations[internal.HiddenConfigFlagAnnotation]; ok {
+					f.Hidden = true
+				}
+			})
+		}
+
+		defaultHelpFn(cmd, args)
+	})
+
+	// Init help subcommand
+	cmd.InitDefaultHelpCmd()
+	helpCmd, _, _ := cmd.Find([]string{"help"})
+	// fix to disable the required settings check for the help subcommand
+	helpCmd.PersistentPreRun = func(*cobra.Command, []string) {}
 }
