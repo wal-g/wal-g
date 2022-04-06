@@ -119,7 +119,7 @@ func GetBinlogPreviousGTIDsRemote(folder storage.Folder, filename string, flavor
 }
 
 func GetBinlogStartTimestamp(filename string, flavor string) (time.Time, error) {
-	var ts uint32 = 0
+	var ts uint32
 	parser := replication.NewBinlogParser()
 	parser.SetFlavor(flavor)
 	parser.SetVerifyChecksum(false) // the faster, the better

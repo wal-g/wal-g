@@ -19,7 +19,7 @@ const (
 	FilesMetadataName = "files_metadata.json"
 )
 
-var UnwrapAll map[string]bool = nil
+var UnwrapAll map[string]bool
 
 var UtilityFilePaths = map[string]bool{
 	PgControlPath:         true,

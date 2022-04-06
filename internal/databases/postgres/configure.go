@@ -40,7 +40,7 @@ func ConfigureWalUploaderWithoutCompressMethod() (uploader *WalUploader, err err
 		return nil, errors.Wrap(err, "failed to configure WAL Delta usage")
 	}
 
-	var deltaFileManager *DeltaFileManager = nil
+	var deltaFileManager *DeltaFileManager
 	if useWalDelta {
 		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
 	}
