@@ -38,7 +38,7 @@ func TestFetch(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 	marshaller, _ := internal.NewDtoSerializer()
 	file, _ := marshaller.Marshal(testObject)
-	folder.PutObject(internal.SentinelNameFromBackup(backupName), file)
+	_ = folder.PutObject(internal.SentinelNameFromBackup(backupName), file)
 	backup, err := greenplum.NewGenericMetaFetcher().Fetch(backupName, folder)
 	assert.NoError(t, err)
 	assert.Equal(t, backupName, backup.BackupName)
@@ -66,9 +66,9 @@ func TestSetIsPermanent(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 	marshaller, _ := internal.NewDtoSerializer()
 	file, _ := marshaller.Marshal(testObject)
-	folder.PutObject(internal.SentinelNameFromBackup(backupName), file)
+	_ = folder.PutObject(internal.SentinelNameFromBackup(backupName), file)
 
-	greenplum.NewGenericMetaSetter().SetIsPermanent(backupName, folder, true)
+	_ = greenplum.NewGenericMetaSetter().SetIsPermanent(backupName, folder, true)
 	backup, err := greenplum.NewGenericMetaFetcher().Fetch(backupName, folder)
 
 	assert.NoError(t, err)
@@ -97,9 +97,9 @@ func TestSetUserData(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 	marshaller, _ := internal.NewDtoSerializer()
 	file, _ := marshaller.Marshal(testObject)
-	folder.PutObject(internal.SentinelNameFromBackup(backupName), file)
+	_ = folder.PutObject(internal.SentinelNameFromBackup(backupName), file)
 
-	greenplum.NewGenericMetaSetter().SetUserData(backupName, folder, updatedData)
+	_ = greenplum.NewGenericMetaSetter().SetUserData(backupName, folder, updatedData)
 
 	backup, err := greenplum.NewGenericMetaFetcher().Fetch(backupName, folder)
 
