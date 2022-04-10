@@ -17,21 +17,32 @@ func init() {
 
 func TestFetch(t *testing.T) {
 	backupName := "test"
+	data := "Data"
 	hostName := "TestHost"
 	compressedSize := int64(100)
+	uncompressedSize := int64(10)
+	restorePoint := new(string)
+	*restorePoint = "restorePoint"
+	var segments []greenplum.SegmentMetadata
+	timeNow := time.Now()
+	format := greenplum.MetadataDatetimeFormat
+	version := "version"
+	isPermanent := false
+	systemIdentifier := new(uint64)
+	*systemIdentifier = 20
 
 	testObject := greenplum.BackupSentinelDto{
-		RestorePoint:     nil,
-		Segments:         nil,
-		UserData:         nil,
-		StartTime:        time.Now(),
-		FinishTime:       time.Now(),
-		DatetimeFormat:   greenplum.MetadataDatetimeFormat,
+		RestorePoint:     restorePoint,
+		Segments:         segments,
+		UserData:         data,
+		StartTime:        timeNow,
+		FinishTime:       timeNow,
+		DatetimeFormat:   format,
 		Hostname:         hostName,
-		GpVersion:        "",
-		IsPermanent:      false,
-		SystemIdentifier: nil,
-		UncompressedSize: 0,
+		GpVersion:        version,
+		IsPermanent:      isPermanent,
+		SystemIdentifier: systemIdentifier,
+		UncompressedSize: uncompressedSize,
 		CompressedSize:   compressedSize,
 	}
 
@@ -42,7 +53,10 @@ func TestFetch(t *testing.T) {
 	backup, err := greenplum.NewGenericMetaFetcher().Fetch(backupName, folder)
 	assert.NoError(t, err)
 	assert.Equal(t, backupName, backup.BackupName)
+	assert.Equal(t, data, backup.UserData)
 	assert.Equal(t, hostName, backup.Hostname)
+	assert.Equal(t, isPermanent, backup.IsPermanent)
+	assert.Equal(t, uncompressedSize, backup.UncompressedSize)
 	assert.Equal(t, compressedSize, backup.CompressedSize)
 }
 
