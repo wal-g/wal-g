@@ -21,18 +21,14 @@ func TestFetch(t *testing.T) {
 	hostName := "TestHost"
 	compressedSize := int64(100)
 	uncompressedSize := int64(10)
-	restorePoint := new(string)
-	*restorePoint = "restorePoint"
 	var segments []greenplum.SegmentMetadata
 	timeNow := time.Now()
 	format := greenplum.MetadataDatetimeFormat
 	version := "version"
 	isPermanent := false
-	systemIdentifier := new(uint64)
-	*systemIdentifier = 20
 
 	testObject := greenplum.BackupSentinelDto{
-		RestorePoint:     restorePoint,
+		RestorePoint:     nil,
 		Segments:         segments,
 		UserData:         data,
 		StartTime:        timeNow,
@@ -41,7 +37,7 @@ func TestFetch(t *testing.T) {
 		Hostname:         hostName,
 		GpVersion:        version,
 		IsPermanent:      isPermanent,
-		SystemIdentifier: systemIdentifier,
+		SystemIdentifier: nil,
 		UncompressedSize: uncompressedSize,
 		CompressedSize:   compressedSize,
 	}
