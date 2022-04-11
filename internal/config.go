@@ -81,6 +81,7 @@ const (
 	SerializerTypeSetting        = "WALG_SERIALIZER_TYPE"
 	StreamSplitterPartitions     = "WALG_STREAM_SPLITTER_PARTITIONS"
 	StreamSplitterBlockSize      = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
+	StatsdAddressSetting         = "WALG_STATSD_ADDRESS"
 
 	ProfileSamplingRatio = "PROFILE_SAMPLING_RATIO"
 	ProfileMode          = "PROFILE_MODE"
@@ -250,6 +251,7 @@ var (
 		DeltaFromUserDataSetting:     true,
 		FetchTargetUserDataSetting:   true,
 		SerializerTypeSetting:        true,
+		StatsdAddressSetting:         true,
 
 		ProfileSamplingRatio: true,
 		ProfileMode:          true,

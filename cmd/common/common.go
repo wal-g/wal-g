@@ -83,6 +83,9 @@ func Init(cmd *cobra.Command, dbName string) {
 			persistentPostRun(cmd, args)
 		}
 
+		// metrics hook
+		internal.PushMetrics()
+
 		if p != nil {
 			p.Stop()
 		}
