@@ -22,7 +22,6 @@ const BinlogCacheFileName = ".walg_mysql_binlogs_cache"
 
 type LogsCache struct {
 	LastArchivedBinlog string `json:"LastArchivedBinlog"`
-	GTIDArchived       string `json:"GtidArchived"`
 }
 
 //gocyclo:ignore
@@ -51,8 +50,7 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 	// copy MySQLBinlogSentinel to cache:
 	cache := getCache()
 	if err == nil && binlogSentinelDto.GTIDArchived != "" {
-		cache.GTIDArchived = binlogSentinelDto.GTIDArchived
-		tracelog.InfoLogger.Printf("fetched binlog archived GTID SET: %s\n", cache.GTIDArchived)
+		tracelog.InfoLogger.Printf("fetched binlog archived GTID SET: %s\n", binlogSentinelDto.GTIDArchived)
 	}
 
 	var filter gtidFilter
@@ -62,7 +60,7 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 
 		switch flavor {
 		case mysql.MySQLFlavor:
-			gtid, _ := mysql.ParseMysqlGTIDSet(cache.GTIDArchived)
+			gtid, _ := mysql.ParseMysqlGTIDSet(binlogSentinelDto.GTIDArchived)
 			gtidArchived, _ := gtid.(*mysql.MysqlGTIDSet)
 			filter = gtidFilter{
 				BinlogsFolder: binlogsFolder,
@@ -118,20 +116,19 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		cache.LastArchivedBinlog = binlog
+		putCache(cache)
+
+		// Write Binlog Sentinel
 		if checkGTIDs && filter.isValid() {
-			cache.GTIDArchived = filter.gtidArchived.String()
+			binlogSentinelDto.GTIDArchived = filter.gtidArchived.String()
+			tracelog.InfoLogger.Printf("Uploading binlog sentinel: %s", binlogSentinelDto)
+			err := UploadBinlogSentinel(rootFolder, &binlogSentinelDto)
+			tracelog.ErrorLogger.FatalOnError(err)
 		}
-		putCache(cache) // sync cache to disk from time to time
 	}
 
 	// Write Binlog Cache (even when no data uploaded, it will create file on first run)
 	putCache(cache)
-
-	// Write Binlog Sentinel
-	binlogSentinelDto.GTIDArchived = cache.GTIDArchived
-	tracelog.InfoLogger.Printf("Binlog sentinel: %s, cache: %+v", binlogSentinelDto.String(), cache)
-	err = UploadBinlogSentinel(rootFolder, &binlogSentinelDto)
-	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 func getMySQLSortedBinlogs(db *sql.DB) ([]string, error) {
@@ -262,7 +259,7 @@ func (u *gtidFilter) shouldUpload(binlog, nextBinlog string) bool {
 		return true
 	}
 
-	if u.gtidArchived == nil {
+	if u.gtidArchived == nil || u.gtidArchived.String() == "" {
 		tracelog.DebugLogger.Printf("Cannot extract set of uploaded binlogs from cache\n")
 		// continue uploading even when we cannot read uploadedGTIDs
 		u.gtidArchived = nextPreviousGTIDs
