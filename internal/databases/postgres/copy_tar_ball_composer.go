@@ -230,7 +230,7 @@ func (c *CopyTarBallComposer) copyUnchangedTars() error {
 	return nil
 }
 
-func (c *CopyTarBallComposer) PackTarballs() (TarFileSets, error) {
+func (c *CopyTarBallComposer) FinishComposing() (TarFileSets, error) {
 	err := c.copyUnchangedTars()
 	if err != nil {
 		return nil, err

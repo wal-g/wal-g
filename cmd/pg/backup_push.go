@@ -23,6 +23,7 @@ const (
 	storeAllCorruptBlocksFlag = "store-all-corrupt"
 	useRatingComposerFlag     = "rating-composer"
 	useCopyComposerFlag       = "copy-composer"
+	useGpComposerFlag         = "gp-composer"
 	deltaFromUserDataFlag     = "delta-from-user-data"
 	deltaFromNameFlag         = "delta-from-name"
 	addUserDataFlag           = "add-user-data"
@@ -51,17 +52,9 @@ var (
 
 			verifyPageChecksums = verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting)
 			storeAllCorruptBlocks = storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting)
-			tarBallComposerType := postgres.RegularComposer
 
-			useRatingComposer = useRatingComposer || viper.GetBool(internal.UseRatingComposerSetting)
-			if useRatingComposer {
-				tarBallComposerType = postgres.RatingComposer
-			}
-			useCopyComposer = useCopyComposer || viper.GetBool(internal.UseCopyComposerSetting)
-			if useCopyComposer {
-				fullBackup = true
-				tarBallComposerType = postgres.CopyComposer
-			}
+			tarBallComposerType := chooseTarBallComposer()
+
 			if deltaFromName == "" {
 				deltaFromName = viper.GetString(internal.DeltaFromNameSetting)
 			}
@@ -74,10 +67,10 @@ var (
 			withoutFilesMetadata = withoutFilesMetadata || viper.GetBool(internal.WithoutFilesMetadataSetting)
 			if withoutFilesMetadata {
 				// files metadata tracking is required for delta backups and copy/rating composers
-				if useRatingComposer || useCopyComposer {
+				if tarBallComposerType != postgres.RegularComposer {
 					tracelog.ErrorLogger.Fatalf(
-						"%s option cannot be used with %s, %s options",
-						withoutFilesMetadataFlag, useRatingComposerFlag, useCopyComposerFlag)
+						"%s option cannot be used with non-regular tar ball composer",
+						withoutFilesMetadataFlag)
 				}
 				if deltaFromName != "" || deltaFromUserData != "" || userDataRaw != "" {
 					tracelog.ErrorLogger.Fatalf(
@@ -110,11 +103,32 @@ var (
 	storeAllCorruptBlocks = false
 	useRatingComposer     = false
 	useCopyComposer       = false
+	useGpComposer         = false
 	deltaFromName         = ""
 	deltaFromUserData     = ""
 	userDataRaw           = ""
 	withoutFilesMetadata  = false
 )
+
+func chooseTarBallComposer() postgres.TarBallComposerType {
+	tarBallComposerType := postgres.RegularComposer
+
+	useRatingComposer = useRatingComposer || viper.GetBool(internal.UseRatingComposerSetting)
+	if useRatingComposer {
+		tarBallComposerType = postgres.RatingComposer
+	}
+	useCopyComposer = useCopyComposer || viper.GetBool(internal.UseCopyComposerSetting)
+	if useCopyComposer {
+		fullBackup = true
+		tarBallComposerType = postgres.CopyComposer
+	}
+	if useGpComposer {
+		fullBackup = true
+		tarBallComposerType = postgres.GreenplumComposer
+	}
+
+	return tarBallComposerType
+}
 
 // create the BackupSelector for delta backup base according to the provided flags
 func createDeltaBaseSelector(cmd *cobra.Command,
@@ -154,6 +168,8 @@ func init() {
 		false, "Use rating tar composer (beta)")
 	backupPushCmd.Flags().BoolVarP(&useCopyComposer, useCopyComposerFlag, useCopyComposerShorthand,
 		false, "Use copy tar composer (beta)")
+	backupPushCmd.Flags().BoolVar(&useGpComposer, useGpComposerFlag, false, "Use gp tar composer (beta)")
+	_ = backupPushCmd.Flags().MarkHidden(useGpComposerFlag)
 	backupPushCmd.Flags().StringVar(&deltaFromName, deltaFromNameFlag,
 		"", "Select the backup specified by name as the target for the delta backup")
 	backupPushCmd.Flags().StringVar(&deltaFromUserData, deltaFromUserDataFlag,

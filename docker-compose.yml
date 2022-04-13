@@ -85,6 +85,7 @@ services:
       &&  mkdir -p /export/gpdeletebeforepermanentbucket
       &&  mkdir -p /export/gpdeletebeforenamebucket
       &&  mkdir -p /export/gpdeletebeforetimebucket
+      &&  mkdir -p /export/gpaostoragetestbucket
       &&  mkdir -p /export/createrestorepointbucket
       &&  mkdir -p /export/storagetoolsbucket
       &&  mkdir -p /export/walrestorebucket

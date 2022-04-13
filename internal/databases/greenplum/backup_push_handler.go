@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/viper"
-
 	"github.com/google/uuid"
 
 	"github.com/blang/semver"
@@ -300,7 +298,7 @@ func (bh *BackupHandler) checkPrerequisites() (err error) {
 	tracelog.InfoLogger.Println("Checking for the existing running backup...")
 	queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
 	if err != nil {
-		return
+		return err
 	}
 	backupStatuses, err := queryRunner.IsInBackup()
 	if err != nil {
@@ -493,9 +491,4 @@ func (bh *BackupHandler) fetchSingleMetadata(backupID string, segCfg *cluster.Se
 	}
 
 	return &meta, nil
-}
-
-func formatSegmentLogPath(contentID int) string {
-	logsDir := viper.GetString(internal.GPLogsDirectory)
-	return fmt.Sprintf("%s/%s-seg%d.log", logsDir, SegBackupLogPrefix, contentID)
 }

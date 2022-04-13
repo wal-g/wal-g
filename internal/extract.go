@@ -95,7 +95,7 @@ func extractOneTar(tarInterpreter TarInterpreter, source io.Reader) error {
 	return nil
 }
 
-func extractNonTar(tarInterpreter TarInterpreter, source io.Reader, path string, fileType FileType, mode int) error {
+func extractNonTar(tarInterpreter TarInterpreter, source io.Reader, path string, fileType FileType, mode int64) error {
 	var typeFlag byte
 	if fileType == RegularFileType {
 		typeFlag = tar.TypeReg
@@ -104,7 +104,7 @@ func extractNonTar(tarInterpreter TarInterpreter, source io.Reader, path string,
 	}
 	return tarInterpreter.Interpret(source, &tar.Header{
 		Name:     path,
-		Mode:     int64(mode),
+		Mode:     mode,
 		Typeflag: typeFlag,
 	})
 }
@@ -123,7 +123,8 @@ func DecryptAndDecompressTar(reader io.Reader, filePath string, crypter crypto.C
 	}
 
 	fileExtension := utility.GetFileExtension(filePath)
-	if fileExtension == "tar" {
+
+	if fileExtension == "tar" || fileExtension == "" {
 		return io.NopCloser(reader), nil
 	}
 
@@ -182,8 +183,7 @@ func extractFile(tarInterpreter TarInterpreter, extractingReader io.Reader, file
 		}
 		return err
 	case RegularFileType:
-		filePath := utility.TrimFileExtension(fileClosure.Path())
-		return extractNonTar(tarInterpreter, extractingReader, filePath, fileClosure.FileType(), fileClosure.Mode())
+		return extractNonTar(tarInterpreter, extractingReader, fileClosure.LocalPath(), fileClosure.FileType(), fileClosure.Mode())
 	default:
 		tracelog.InfoLogger.Print()
 		return errors.New("Unknown fileType " + string(fileClosure.FileType()))
@@ -214,7 +214,7 @@ func tryExtractFiles(files []ReaderMaker,
 			if err == nil {
 				defer utility.LoggedClose(readCloser, "")
 
-				filePath := fileClosure.Path()
+				filePath := fileClosure.StoragePath()
 				var extractingReader io.ReadCloser
 				extractingReader, err = DecryptAndDecompressTar(readCloser, filePath, crypter)
 				if err == nil {

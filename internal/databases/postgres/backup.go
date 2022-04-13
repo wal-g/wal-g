@@ -3,6 +3,7 @@ package postgres
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 
@@ -36,6 +37,9 @@ type Backup struct {
 	internal.Backup
 	SentinelDto      *BackupSentinelDto // used for storage query caching
 	FilesMetadataDto *FilesMetadataDto
+
+	// Greenplum backups only
+	AoFilesMetadataDto *AOFilesMetadataDTO
 }
 
 func ToPgBackup(source internal.Backup) (output Backup) {
@@ -343,6 +347,23 @@ func (backup *Backup) getTarsToExtract(filesMeta FilesMetadataDto, filesToUnwrap
 		tarToExtract := internal.NewStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
 		tarsToExtract = append(tarsToExtract, tarToExtract)
 	}
+
+	aoMeta, err := backup.loadAoFilesMetadata()
+	if err != nil {
+		tracelog.InfoLogger.Printf("AO files metadata was not found. Skipping the AO segments unpacking.")
+	} else {
+		tracelog.InfoLogger.Printf("AO files metadata found. Will perform the AO segments unpacking.")
+		for extractPath, meta := range aoMeta.Files {
+			if !filesToUnwrap[extractPath] {
+				tracelog.InfoLogger.Printf("Don't need to unwrap the %s AO segment file, skipping it...", extractPath)
+				continue
+			}
+			objPath := path.Join(AoStoragePath, meta.StoragePath)
+			readerMaker := internal.NewRegularFileStorageReaderMarker(backup.Folder, objPath, extractPath, meta.FileMode)
+			tarsToExtract = append(tarsToExtract, readerMaker)
+		}
+	}
+
 	return tarsToExtract, pgControlKey, nil
 }
 
@@ -364,6 +385,21 @@ func (backup *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error)
 		filesToUnwrap[utilityFilePath] = true
 	}
 	return utility.SelectMatchingFiles(fileMask, filesToUnwrap)
+}
+
+func (backup *Backup) loadAoFilesMetadata() (*AOFilesMetadataDTO, error) {
+	if backup.AoFilesMetadataDto != nil {
+		return backup.AoFilesMetadataDto, nil
+	}
+
+	var meta AOFilesMetadataDTO
+	err := internal.FetchDto(backup.Folder, &meta, getAOFilesMetadataPath(backup.Name))
+	if err != nil {
+		return nil, err
+	}
+
+	backup.AoFilesMetadataDto = &meta
+	return backup.AoFilesMetadataDto, nil
 }
 
 func shouldUnwrapTar(tarName string, filesMeta FilesMetadataDto, filesToUnwrap map[string]bool) bool {

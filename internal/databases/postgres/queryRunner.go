@@ -399,3 +399,69 @@ func (queryRunner *PgQueryRunner) GetPhysicalSlotInfo(slotName string) (Physical
 func (queryRunner *PgQueryRunner) IsTablespaceMapExists() bool {
 	return queryRunner.Version >= 90600
 }
+
+// BuildRelStorageQuery formats a query that fetch list of relfilenodes along with the storage type
+func (queryRunner *PgQueryRunner) BuildAORelStorageQuery() (string, error) {
+	switch {
+	case queryRunner.Version >= 90000:
+		// combine AO and AOCS metadata
+		return "SELECT md5(c.relname), c.relfilenode, c.reltablespace, c.relstorage, aocs.physical_segno as segno, aocs.modcount, aocs.eof " +
+			"FROM pg_class c, gp_toolkit.__gp_aocsseg(c.oid) aocs " +
+			"WHERE relstorage='c' " +
+			"UNION " +
+			"SELECT md5(c.relname), c.relfilenode, c.reltablespace, c.relstorage, ao.segno, ao.modcount, ao.eof " +
+			"FROM pg_class c, gp_toolkit.__gp_aoseg(c.oid) ao " +
+			"WHERE relstorage='a';", nil
+	case queryRunner.Version == 0:
+		return "", newNoPostgresVersionError()
+	default:
+		return "", newUnsupportedPostgresVersionError(queryRunner.Version)
+	}
+}
+
+// fetchAOStorageMetadata queries the storage metadata for AO & AOCS tables (GreenplumDB)
+func (queryRunner *PgQueryRunner) fetchAOStorageMetadata(dbInfo PgDatabaseInfo) (AoRelFileStorageMap, error) {
+	tracelog.InfoLogger.Printf("fetchAOStorageMetadata: Querying pg_class for %s", dbInfo.name)
+	getStatQuery, err := queryRunner.BuildAORelStorageQuery()
+	conn := queryRunner.Connection
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner fetchRelStorages: failed to build the pg_class query")
+	}
+
+	rows, err := conn.Query(getStatQuery)
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner fetchRelStorages: pg_class query failed")
+	}
+
+	defer rows.Close()
+	relStorageMap := make(AoRelFileStorageMap)
+	for rows.Next() {
+		var relNameMd5 string
+		var relFileNodeID uint32
+		var spcNode uint32
+		var storage RelStorageType
+		var segNo uint32
+		var modCount uint32
+		var eof uint32
+		if err := rows.Scan(&relNameMd5, &relFileNodeID, &spcNode, &storage, &segNo, &modCount, &eof); err != nil {
+			tracelog.WarningLogger.Printf("fetchAOStorageMetadata: failed to parse query result: %v\n", err.Error())
+		}
+		relFileLoc := walparser.NewBlockLocation(walparser.Oid(spcNode), dbInfo.oid, walparser.Oid(relFileNodeID), segNo)
+		// if tablespace id is zero, use the default database tablespace id
+		if relFileLoc.RelationFileNode.SpcNode == walparser.Oid(0) {
+			relFileLoc.RelationFileNode.SpcNode = dbInfo.tblSpcOid
+		}
+		relStorageMap[*relFileLoc] = AoRelFileMetadata{
+			relNameMd5:  relNameMd5,
+			storageType: storage,
+			eof:         eof,
+			modCount:    modCount,
+		}
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	return relStorageMap, nil
+}

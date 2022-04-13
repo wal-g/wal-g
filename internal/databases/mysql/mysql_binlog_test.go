@@ -1,9 +1,10 @@
 package mysql
 
 import (
-	"github.com/go-mysql-org/go-mysql/mysql"
 	"testing"
 	"time"
+
+	"github.com/go-mysql-org/go-mysql/mysql"
 )
 
 const testFilenameSmall = "testdata/binlog_small_test"
