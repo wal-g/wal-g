@@ -22,7 +22,7 @@ func TestFetch(t *testing.T) {
 	compressedSize := int64(100)
 	uncompressedSize := int64(10)
 	var segments []greenplum.SegmentMetadata
-	timeNow := time.Now()
+	timeNow := time.Time{}
 	format := greenplum.MetadataDatetimeFormat
 	version := "version"
 	isPermanent := false
@@ -42,18 +42,26 @@ func TestFetch(t *testing.T) {
 		CompressedSize:   compressedSize,
 	}
 
+	expectedResult := internal.GenericMetadata{
+		BackupName:       backupName,
+		UncompressedSize: uncompressedSize,
+		CompressedSize:   compressedSize,
+		Hostname:         hostName,
+		StartTime:        timeNow,
+		FinishTime:       timeNow,
+		IsPermanent:      isPermanent,
+		IsIncremental:    false,
+		IncrementDetails: &internal.NopIncrementDetailsFetcher{},
+		UserData:         data,
+	}
+
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 	marshaller, _ := internal.NewDtoSerializer()
 	file, _ := marshaller.Marshal(testObject)
 	_ = folder.PutObject(internal.SentinelNameFromBackup(backupName), file)
 	backup, err := greenplum.NewGenericMetaFetcher().Fetch(backupName, folder)
 	assert.NoError(t, err)
-	assert.Equal(t, backupName, backup.BackupName)
-	assert.Equal(t, data, backup.UserData)
-	assert.Equal(t, hostName, backup.Hostname)
-	assert.Equal(t, isPermanent, backup.IsPermanent)
-	assert.Equal(t, uncompressedSize, backup.UncompressedSize)
-	assert.Equal(t, compressedSize, backup.CompressedSize)
+	assert.Equal(t, expectedResult, backup)
 }
 
 func TestSetIsPermanent(t *testing.T) {
