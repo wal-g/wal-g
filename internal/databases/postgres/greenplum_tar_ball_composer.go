@@ -239,7 +239,7 @@ func (c *GpTarBallComposer) addAOFile(cfi *ComposeFileInfo, aoMeta AoRelFileMeta
 
 	// do not compress AO/AOCS segment files since they are already compressed in most cases
 	// TODO: lookup the compression details for each relation and compress it when compression is turned off
-	var compressor compression.Compressor = nil
+	var compressor compression.Compressor
 
 	uploadContents := internal.CompressAndEncrypt(fileReadCloser, compressor, c.crypter)
 	uploadPath := path.Join(AoStoragePath, storageKey)
