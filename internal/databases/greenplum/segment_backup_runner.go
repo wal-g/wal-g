@@ -34,7 +34,7 @@ func NewSegBackupRunner(contentID int, backupName, backupArgs string, updInterva
 
 func (r *SegBackupRunner) Run() {
 	contentIDArg := fmt.Sprintf("--content-id=%d", r.contentID)
-	cmdArgs := []string{"seg", "backup-push", contentIDArg}
+	cmdArgs := []string{"seg", "backup-push", contentIDArg, "--gp-composer"}
 	backupArgs := strings.Fields(r.backupArgs)
 	cmdArgs = append(cmdArgs, backupArgs...)
 

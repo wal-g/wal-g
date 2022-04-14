@@ -247,6 +247,8 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 		fmt.Sprintf("--content-id=%d", segment.ContentID),
 		fmt.Sprintf("--target-user-data=%s", segUserData.QuotedString()),
 		fmt.Sprintf("--config=%s", internal.CfgFile),
+		// forward STDOUT& STDERR to log file
+		">>", formatSegmentLogPath(contentID), "2>&1",
 	}
 
 	cmdLine := strings.Join(cmd, " ")

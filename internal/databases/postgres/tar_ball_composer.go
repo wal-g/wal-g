@@ -9,7 +9,6 @@ import (
 
 	"github.com/jackc/pgx"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 // TarBallComposer is used to compose files into tarballs.
@@ -17,7 +16,7 @@ type TarBallComposer interface {
 	AddFile(info *ComposeFileInfo)
 	AddHeader(header *tar.Header, fileInfo os.FileInfo) error
 	SkipFile(tarHeader *tar.Header, fileInfo os.FileInfo)
-	PackTarballs() (TarFileSets, error)
+	FinishComposing() (TarFileSets, error)
 	GetFiles() BundleFiles
 }
 
@@ -42,6 +41,7 @@ const (
 	RegularComposer TarBallComposerType = iota + 1
 	RatingComposer
 	CopyComposer
+	GreenplumComposer
 )
 
 // TarBallComposerMaker is used to make an instance of TarBallComposer
@@ -49,9 +49,10 @@ type TarBallComposerMaker interface {
 	Make(bundle *Bundle) (TarBallComposer, error)
 }
 
-func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn, folder storage.Folder,
+func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn, uploader *internal.Uploader,
 	newBackupName string, filePackOptions TarBallFilePackerOptions,
 	withoutFilesMetadata bool) (TarBallComposerMaker, error) {
+	folder := uploader.UploadingFolder
 	switch composerType {
 	case RegularComposer:
 		if withoutFilesMetadata {
@@ -86,6 +87,13 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn, f
 			}
 		}
 		return NewCopyTarBallComposerMaker(previousBackup, newBackupName, filePackOptions), nil
+	case GreenplumComposer:
+		relStorageMap, err := newAoRelFileStorageMap(conn)
+		if err != nil {
+			return nil, err
+		}
+
+		return NewGpTarBallComposerMaker(relStorageMap, uploader, newBackupName)
 	default:
 		return nil, errors.New("NewTarBallComposerMaker: Unknown TarBallComposerType")
 	}

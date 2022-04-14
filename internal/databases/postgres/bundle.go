@@ -430,8 +430,8 @@ func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uin
 	return nil
 }
 
-func (bundle *Bundle) PackTarballs() (TarFileSets, error) {
-	return bundle.TarBallComposer.PackTarballs()
+func (bundle *Bundle) FinishTarComposer() (TarFileSets, error) {
+	return bundle.TarBallComposer.FinishComposing()
 }
 
 func (bundle *Bundle) GetFiles() *sync.Map {

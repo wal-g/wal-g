@@ -239,7 +239,7 @@ func (bh *BackupHandler) uploadBackup() TarFileSets {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tarBallComposerMaker, err := NewTarBallComposerMaker(bh.arguments.tarBallComposerType, bh.workers.conn,
-		bh.workers.uploader.UploadingFolder, bh.curBackupInfo.name,
+		bh.workers.uploader.Uploader, bh.curBackupInfo.name,
 		NewTarBallFilePackerOptions(bh.arguments.verifyPageChecksums, bh.arguments.storeAllCorruptBlocks),
 		bh.arguments.withoutFilesMetadata)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -252,7 +252,7 @@ func (bh *BackupHandler) uploadBackup() TarFileSets {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Packing ...")
-	tarFileSets, err := bundle.PackTarballs()
+	tarFileSets, err := bundle.FinishTarComposer()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.DebugLogger.Println("Finishing queue ...")
