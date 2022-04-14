@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"sync"
+	"sync/atomic"
 
 	"github.com/wal-g/wal-g/internal/walparser"
 
@@ -248,6 +249,8 @@ func (c *GpTarBallComposer) addAOFile(cfi *ComposeFileInfo, aoMeta AoRelFileMeta
 		return err
 	}
 
+	// looks ugly, but currently it is the only way to keep track of the AO files size
+	atomic.AddInt64(c.tarBallQueue.AllTarballsSize, cfi.fileInfo.Size())
 	c.addAoFileMetadata(cfi, storageKey, aoMeta, false)
 
 	// add reference for the current backup to the storage
