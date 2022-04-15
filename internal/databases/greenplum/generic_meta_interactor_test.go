@@ -22,7 +22,7 @@ func TestFetch(t *testing.T) {
 	compressedSize := int64(100)
 	uncompressedSize := int64(10)
 	var segments []greenplum.SegmentMetadata
-	timeNow := time.Time{}
+	date := time.Date(2022, 3, 21, 0, 0, 0, 0, time.UTC)
 	format := greenplum.MetadataDatetimeFormat
 	version := "version"
 	isPermanent := false
@@ -31,8 +31,8 @@ func TestFetch(t *testing.T) {
 		RestorePoint:     nil,
 		Segments:         segments,
 		UserData:         data,
-		StartTime:        timeNow,
-		FinishTime:       timeNow,
+		StartTime:        date,
+		FinishTime:       date,
 		DatetimeFormat:   format,
 		Hostname:         hostName,
 		GpVersion:        version,
@@ -47,8 +47,8 @@ func TestFetch(t *testing.T) {
 		UncompressedSize: uncompressedSize,
 		CompressedSize:   compressedSize,
 		Hostname:         hostName,
-		StartTime:        timeNow,
-		FinishTime:       timeNow,
+		StartTime:        date,
+		FinishTime:       date,
 		IsPermanent:      isPermanent,
 		IsIncremental:    false,
 		IncrementDetails: &internal.NopIncrementDetailsFetcher{},
@@ -59,9 +59,23 @@ func TestFetch(t *testing.T) {
 	marshaller, _ := internal.NewDtoSerializer()
 	file, _ := marshaller.Marshal(testObject)
 	_ = folder.PutObject(internal.SentinelNameFromBackup(backupName), file)
-	backup, err := greenplum.NewGenericMetaFetcher().Fetch(backupName, folder)
+	actualResult, err := greenplum.NewGenericMetaFetcher().Fetch(backupName, folder)
+
+	//check equality of time separately
+	isEqualTimeStart := expectedResult.StartTime.Equal(actualResult.StartTime)
+	assert.True(t, isEqualTimeStart)
+
+	isEqualTimeFinish := expectedResult.FinishTime.Equal(actualResult.FinishTime)
+	assert.True(t, isEqualTimeFinish)
+
+	expectedResult.StartTime = time.Time{}
+	actualResult.StartTime = time.Time{}
+
+	expectedResult.FinishTime = time.Time{}
+	actualResult.FinishTime = time.Time{}
+
 	assert.NoError(t, err)
-	assert.Equal(t, expectedResult, backup)
+	assert.Equal(t, expectedResult, actualResult)
 }
 
 func TestSetIsPermanent(t *testing.T) {
