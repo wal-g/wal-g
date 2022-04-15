@@ -68,11 +68,9 @@ func TestFetch(t *testing.T) {
 	isEqualTimeFinish := expectedResult.FinishTime.Equal(actualResult.FinishTime)
 	assert.True(t, isEqualTimeFinish)
 
-	expectedResult.StartTime = time.Time{}
-	actualResult.StartTime = time.Time{}
-
-	expectedResult.FinishTime = time.Time{}
-	actualResult.FinishTime = time.Time{}
+	// since assert.Equal doesn't compare time properly, just assign the actual to the expected time  
+	expectedResult.StartTime = actualResult.StartTime
+	expectedResult.FinishTime = actualResult.FinishTime
 
 	assert.NoError(t, err)
 	assert.Equal(t, expectedResult, actualResult)
