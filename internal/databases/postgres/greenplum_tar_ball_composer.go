@@ -4,10 +4,11 @@ import (
 	"archive/tar"
 	"context"
 	"fmt"
-	"github.com/wal-g/wal-g/internal/walparser"
 	"os"
 	"path"
 	"sync"
+
+	"github.com/wal-g/wal-g/internal/walparser"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -82,6 +83,8 @@ type GpTarBallComposer struct {
 	baseAoFiles   map[string]struct{}
 
 	uploader *internal.Uploader
+	// Separate uploader for AO/AOCS relfiles with disabled file size tracking
+	aoSegUploader *internal.Uploader
 
 	files            BundleFiles
 	tarFileSets      TarFileSets
@@ -99,6 +102,9 @@ func NewGpTarBallComposer(
 ) (*GpTarBallComposer, error) {
 	errorGroup, ctx := errgroup.WithContext(context.Background())
 
+	aoSegUploader := uploader.Clone()
+	aoSegUploader.DisableSizeTracking()
+
 	composer := &GpTarBallComposer{
 		backupName:    backupName,
 		tarBallQueue:  tarBallQueue,
@@ -109,6 +115,7 @@ func NewGpTarBallComposer(
 		aoFiles:       aoFiles,
 		baseAoFiles:   baseAoFiles,
 		uploader:      uploader.Clone(),
+		aoSegUploader: aoSegUploader,
 		tarFileSets:   tarFileSets,
 		errorGroup:    errorGroup,
 		ctx:           ctx,
@@ -242,7 +249,7 @@ func (c *GpTarBallComposer) addAOFile(cfi *ComposeFileInfo, aoMeta AoRelFileMeta
 
 	uploadContents := internal.CompressAndEncrypt(fileReadCloser, compressor, c.crypter)
 	uploadPath := path.Join(AoStoragePath, storageKey)
-	err = c.uploader.Upload(uploadPath, uploadContents)
+	err = c.aoSegUploader.Upload(uploadPath, uploadContents)
 	if err != nil {
 		return err
 	}
