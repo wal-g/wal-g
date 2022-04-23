@@ -52,7 +52,7 @@ func (writer *WalShowTableOutputWriter) Write(timelineInfos []*TimelineInfo) err
 	tableWriter.AppendHeader(header)
 
 	for _, tl := range timelineInfos {
-		row := table.Row{tl.ID, tl.ParentID, tl.SwitchPointLsn, tl.StartSegment,
+		row := table.Row{tl.ID, tl.ParentID, ConvertLSNtoPostgresFormat(tl.SwitchPointLsn), tl.StartSegment,
 			tl.EndSegment, tl.SegmentRangeSize, tl.SegmentsCount, tl.Status}
 		if writer.includeBackups {
 			row = append(row, len(tl.Backups))

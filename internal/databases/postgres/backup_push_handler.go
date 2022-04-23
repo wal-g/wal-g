@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -560,12 +561,32 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 			return err
 		}
 	}
-	tracelog.InfoLogger.Printf("Delta backup from %v with LSN %x.\n", previousBackupName,
-		*prevBackupSentinelDto.BackupStartLSN)
+	tracelog.InfoLogger.Printf("Delta backup from %v with LSN %s.\n", previousBackupName,
+		ConvertLSNtoPostgresFormat(*prevBackupSentinelDto.BackupStartLSN))
 	bh.prevBackupInfo.name = previousBackupName
 	bh.prevBackupInfo.sentinelDto = prevBackupSentinelDto
 	_, bh.prevBackupInfo.filesMetadataDto, err = previousBackup.GetSentinelAndFilesMetadata()
 	return err
+}
+
+func ConvertLSNtoPostgresFormat(intLSN uint64) string {
+	hexLSN := strconv.FormatUint(intLSN, 16)
+	rightPart := ""
+	for i := 0; i < 8; i++ {
+		lastLSNDigit := hexLSN[len(hexLSN)-1-i]
+		rightPart = string(lastLSNDigit) + rightPart
+	}
+	result := ""
+	wasNonZero := false
+	for i := range rightPart {
+		if !wasNonZero && rightPart[i] == '0' {
+			continue
+		}
+		wasNonZero = true
+		result += string(rightPart[i])
+	}
+	result = hexLSN[:len(hexLSN)-8] + "/" + result
+	return result
 }
 
 // TODO : unit tests
