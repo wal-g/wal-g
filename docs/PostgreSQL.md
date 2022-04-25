@@ -126,6 +126,16 @@ Sample metadata file (000000020000000300000071.json)
 ```
 If the parameter value is NOMETADATA or not specified, it will fallback to default setting (no wal metadata generation)
 
+* `WALG_ALIVE_CHECK_INTERVAL`
+
+To control how frequently WAL-G will check if Postgres is alive during the backup-push. If the check fails, backup-push terminates.
+
+Examples:
+- `0` - disable the alive checks (default value)
+- `10s` - check every 10 seconds
+- `10m` - check every 10 minutes
+
+
 Usage
 -----
 

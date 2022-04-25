@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/wal-g/wal-g/internal"
@@ -179,7 +181,7 @@ func (bh *BackupHandler) startBackup() (err error) {
 	bh.curBackupInfo.startLSN = backupStartLSN
 	bh.curBackupInfo.name = backupName
 	tracelog.DebugLogger.Printf("Backup name: %s\nBackup start LSN: %d", backupName, backupStartLSN)
-
+	bh.initBackupTerminator()
 	return
 }
 
@@ -599,4 +601,45 @@ func (bh *BackupHandler) checkPgVersionAndPgControl() {
 	_, err = os.ReadFile(filepath.Join(bh.pgInfo.pgDataDirectory, "PG_VERSION"))
 	tracelog.ErrorLogger.FatalfOnError(
 		"It looks like you are trying to backup not pg_data. PG_VERSION file not found: %v\n", err)
+}
+
+func (bh *BackupHandler) initBackupTerminator() {
+	errCh := make(chan error, 1)
+
+	addSignalListener(errCh)
+	addPgIsAliveChecker(errCh)
+
+	terminator := NewBackupTerminator(bh.workers.conn, bh.pgInfo.pgVersion, bh.pgInfo.pgDataDirectory)
+
+	go func() {
+		err := <-errCh
+		tracelog.ErrorLogger.Printf("Error: %v, gracefully stopping the running backup...", err)
+		terminator.TerminateBackup()
+		tracelog.ErrorLogger.Fatal("Finished backup termination, will now exit")
+	}()
+}
+
+func addSignalListener(errCh chan error) {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
+	go func() {
+		sig := <-sigCh
+		errCh <- fmt.Errorf("received interruption signal: %s", sig)
+	}()
+}
+
+func addPgIsAliveChecker(errCh chan error) {
+	if !viper.IsSet(internal.PgAliveCheckInterval) {
+		return
+	}
+	stateUpdateInterval, err := internal.GetDurationSetting(internal.PgAliveCheckInterval)
+	tracelog.ErrorLogger.FatalOnError(err)
+	tracelog.InfoLogger.Printf("Initializing the PG alive checker (interval=%s)...", stateUpdateInterval)
+	pgWatcher := NewPgWatcher(stateUpdateInterval)
+
+	go func() {
+		err := <-pgWatcher.Err
+		errCh <- fmt.Errorf("PG alive check failed: %v", err)
+	}()
 }

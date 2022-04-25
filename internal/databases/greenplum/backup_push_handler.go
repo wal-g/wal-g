@@ -78,12 +78,13 @@ type BackupWorkers struct {
 
 // CurrBackupInfo holds all information that is harvest during the backup process
 type CurrBackupInfo struct {
-	backupName       string
-	segmentBackups   map[string]*cluster.SegConfig
-	startTime        time.Time
-	systemIdentifier *uint64
-	gpVersion        semver.Version
-	segmentsMetadata map[string]PgSegmentMetaDto
+	backupName           string
+	segmentBackups       map[string]*cluster.SegConfig
+	startTime            time.Time
+	systemIdentifier     *uint64
+	gpVersion            semver.Version
+	segmentsMetadata     map[string]PgSegmentMetaDto
+	backupPidByContentID map[int]int
 }
 
 // BackupHandler is the main struct which is handling the backup process
@@ -123,8 +124,10 @@ func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 		backupPushArgsLine,
 		// pass the config file location
 		fmt.Sprintf("--config=%s", internal.CfgFile),
-		// forward STDOUT& STDERR to log file
-		">>", formatSegmentLogPath(contentID), "2>&1 &",
+		// forward stdout and stderr to the log file
+		"&>>", formatSegmentLogPath(contentID),
+		// run in the background and get the launched process PID
+		"& echo $!",
 	}
 
 	cmdLine := strings.Join(cmd, " ")
@@ -140,7 +143,6 @@ func (bh *BackupHandler) HandleBackupPush() {
 
 	err := bh.checkPrerequisites()
 	tracelog.ErrorLogger.FatalfOnError("Backup prerequisites check failed: %v\n", err)
-	bh.disconnect()
 
 	tracelog.InfoLogger.Println("Running wal-g on segments")
 	remoteOutput := bh.globalCluster.GenerateAndExecuteCommand("Running wal-g",
@@ -152,27 +154,31 @@ func (bh *BackupHandler) HandleBackupPush() {
 		return "Unable to run wal-g"
 	}, true)
 
+	for _, command := range remoteOutput.Commands {
+		if command.Stderr != "" {
+			tracelog.ErrorLogger.Printf("stderr (segment %d):\n%s\n", command.Content, command.Stderr)
+		}
+	}
+
+	bh.currBackupInfo.backupPidByContentID, err = extractBackupPids(remoteOutput)
+	// this is a non-critical error since backup PIDs are only useful if backup is aborted
+	tracelog.ErrorLogger.PrintOnError(err)
+	if remoteOutput.NumErrors > 0 {
+		bh.abortBackup()
+	}
+
+	// WAL-G will reconnect later
+	bh.disconnect()
+
 	// wait for segments to complete their backups
 	waitBackupsErr := bh.waitSegmentBackups()
 	if waitBackupsErr != nil {
 		tracelog.ErrorLogger.Printf("Segment backups wait error: %v", waitBackupsErr)
 	}
-
 	tracelog.ErrorLogger.FatalfOnError("Failed to connect to the greenplum master: %v",
 		bh.connect())
-
-	if remoteOutput.NumErrors > 0 || waitBackupsErr != nil {
-		// handle the backup failure and exit
-		err := bh.handleBackupError()
-		if err != nil {
-			tracelog.WarningLogger.Printf("Non-critical error during terminating of the failed backup: %v", err)
-		}
-		tracelog.InfoLogger.Fatalf("Encountered one or more errors during the backup-push. See %s for a complete list of errors.",
-			gplog.GetLogFilePath())
-	}
-
-	for _, command := range remoteOutput.Commands {
-		tracelog.InfoLogger.Printf("WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
+	if waitBackupsErr != nil {
+		bh.abortBackup()
 	}
 
 	restoreLSNs, err := createRestorePoint(bh.workers.Conn, bh.currBackupInfo.backupName)
@@ -238,12 +244,30 @@ func checkBackupStates(states map[int]SegBackupState) (int, error) {
 			}
 			runningBackupsCount++
 
-		case FailedBackupStatus:
-			return 0, fmt.Errorf("backup failed on segment %d at %s", contentID, state.TS)
+		case FailedBackupStatus, InterruptedBackupStatus:
+			return 0, fmt.Errorf("unexpected backup status: %s on segment %d at %s", state.Status, contentID, state.TS)
 		}
 	}
 
 	return runningBackupsCount, nil
+}
+
+func extractBackupPids(output *cluster.RemoteOutput) (map[int]int, error) {
+	backupPids := make(map[int]int)
+	var resErr error
+
+	for _, command := range output.Commands {
+		pid, err := strconv.Atoi(strings.TrimSpace(command.Stdout))
+		if err != nil {
+			resErr = fmt.Errorf("%w; failed to parse the backup PID: %v", resErr, err)
+			continue
+		}
+
+		backupPids[command.Content] = pid
+	}
+
+	tracelog.InfoLogger.Printf("WAL-G segment PIDs: %v", backupPids)
+	return backupPids, resErr
 }
 
 func (bh *BackupHandler) pollSegmentStates() (map[int]SegBackupState, error) {
@@ -317,21 +341,6 @@ func (bh *BackupHandler) checkPrerequisites() (err error) {
 	}
 	tracelog.InfoLogger.Printf("No running backups were found")
 	tracelog.InfoLogger.Printf("Checking backup prerequisites: OK")
-	return nil
-}
-
-func (bh *BackupHandler) handleBackupError() error {
-	// Abort the non-finished exclusive backups on the segments.
-	// WAL-G in GP7+ uses the non-exclusive backups, that are terminated on connection close, so this is unnecessary.
-	if bh.currBackupInfo.gpVersion.Major < 7 {
-		tracelog.InfoLogger.Println("Terminating the running exclusive backups...")
-		queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
-		if err != nil {
-			return err
-		}
-		return queryRunner.AbortBackup()
-	}
-
 	return nil
 }
 
@@ -491,4 +500,71 @@ func (bh *BackupHandler) fetchSingleMetadata(backupID string, segCfg *cluster.Se
 	}
 
 	return &meta, nil
+}
+
+func (bh *BackupHandler) abortBackup() {
+	err := bh.terminateRunningBackups()
+	if err != nil {
+		tracelog.WarningLogger.Printf("Failed to stop running backups: %v", err)
+	}
+
+	err = bh.terminateWalgProcesses()
+	if err != nil {
+		tracelog.WarningLogger.Printf("Failed to shutdown the running WAL-G processes: %v", err)
+	}
+
+	tracelog.InfoLogger.Fatalf("Encountered one or more errors during the backup-push. See %s for a complete list of errors.",
+		gplog.GetLogFilePath())
+}
+
+func (bh *BackupHandler) terminateRunningBackups() error {
+	// Abort the non-finished exclusive backups on the segments.
+	// WAL-G in GP7+ uses the non-exclusive backups, that are terminated on connection close, so this is unnecessary.
+	if bh.currBackupInfo.gpVersion.Major >= 7 {
+		return nil
+	}
+
+	tracelog.InfoLogger.Println("Terminating the running exclusive backups...")
+	queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
+	if err != nil {
+		return err
+	}
+	return queryRunner.AbortBackup()
+}
+
+func (bh *BackupHandler) terminateWalgProcesses() error {
+	knownPidsLen := len(bh.currBackupInfo.backupPidByContentID)
+	if knownPidsLen == 0 {
+		return fmt.Errorf("there are no known PIDs of WAL-G segment processess")
+	}
+
+	if knownPidsLen < len(bh.globalCluster.ContentIDs) {
+		tracelog.WarningLogger.Printf("Known PIDs count (%d) is less than the total segments number (%d)",
+			knownPidsLen, len(bh.globalCluster.ContentIDs))
+	}
+
+	remoteOutput := bh.globalCluster.GenerateAndExecuteCommand("Terminating the segment backup-push processes...",
+		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_MASTER,
+		func(contentID int) string {
+			backupPid, ok := bh.currBackupInfo.backupPidByContentID[contentID]
+			if !ok {
+				return ""
+			}
+
+			return fmt.Sprintf("kill %d", backupPid)
+		})
+
+	bh.globalCluster.CheckClusterError(remoteOutput, "Unable to terminate backup-push processes", func(contentID int) string {
+		return fmt.Sprintf("Unable to terminate backup-push process on segment %d", contentID)
+	}, true)
+
+	for _, command := range remoteOutput.Commands {
+		if command.Stderr == "" {
+			continue
+		}
+
+		tracelog.WarningLogger.Printf("Unable to terminate backup-push process (segment %d):\n%s\n", command.Content, command.Stderr)
+	}
+
+	return nil
 }
