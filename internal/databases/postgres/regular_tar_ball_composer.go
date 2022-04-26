@@ -14,7 +14,7 @@ import (
 
 type RegularTarBallComposer struct {
 	tarBallQueue  *internal.TarBallQueue
-	tarFilePacker *TarBallFilePacker
+	tarFilePacker *PostgresTarBallFilePacker
 	crypter       crypto.Crypter
 	files         parallel.BundleFiles
 	tarFileSets   parallel.TarFileSets
@@ -24,7 +24,7 @@ type RegularTarBallComposer struct {
 
 func NewRegularTarBallComposer(
 	tarBallQueue *internal.TarBallQueue,
-	tarBallFilePacker *TarBallFilePacker,
+	tarBallFilePacker *PostgresTarBallFilePacker,
 	files parallel.BundleFiles,
 	tarFileSets parallel.TarFileSets,
 	crypter crypto.Crypter,

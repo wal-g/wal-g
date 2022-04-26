@@ -1,7 +1,5 @@
 package parallel
 
-// DONE
-
 import (
 	"archive/tar"
 	"os"

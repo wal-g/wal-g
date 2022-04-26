@@ -46,14 +46,12 @@ func NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks bool
 }
 
 type RegularTarBallFilePacker struct {
-	files   BundleFiles
-	options TarBallFilePackerOptions
+	files BundleFiles
 }
 
 func NewRegularTarBallFilePacker(files BundleFiles, options TarBallFilePackerOptions) *RegularTarBallFilePacker {
 	return &RegularTarBallFilePacker{
-		files:   files,
-		options: options,
+		files: files,
 	}
 }
 
@@ -72,23 +70,7 @@ func (p *RegularTarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall
 	}
 	errorGroup, _ := errgroup.WithContext(context.Background())
 
-	if p.options.verifyPageChecksums {
-		var secondReadCloser io.ReadCloser
-		// newTeeReadCloser is used to provide the fileReadCloser to two consumers:
-		// fileReadCloser is needed for PackFileTo, secondReadCloser is for the page verification
-		fileReadCloser, secondReadCloser = newTeeReadCloser(fileReadCloser)
-		errorGroup.Go(func() (err error) {
-			corruptBlocks, err := verifyFile(cfi.Path, cfi.FileInfo, secondReadCloser, cfi.IsIncremented)
-			if err != nil {
-				return err
-			}
-			p.files.AddFileWithCorruptBlocks(cfi.Header, cfi.FileInfo, cfi.IsIncremented,
-				corruptBlocks, p.options.storeAllCorruptBlocks)
-			return nil
-		})
-	} else {
-		p.files.AddFile(cfi.Header, cfi.FileInfo, cfi.IsIncremented)
-	}
+	p.files.AddFile(cfi.Header, cfi.FileInfo, cfi.IsIncremented)
 
 	errorGroup.Go(func() error {
 		defer utility.LoggedClose(fileReadCloser, "")
@@ -123,21 +105,4 @@ func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string)
 		Closer: file,
 	}
 	return fileReader, nil
-}
-
-// Move to verifier?
-func verifyFile(path string, fileInfo os.FileInfo, fileReader io.Reader, isIncremented bool) ([]uint32, error) {
-	_, err := io.Copy(io.Discard, fileReader)
-	return nil, err
-}
-
-// TeeReadCloser creates two io.ReadClosers from one
-func newTeeReadCloser(readCloser io.ReadCloser) (io.ReadCloser, io.ReadCloser) {
-	pipeReader, pipeWriter := io.Pipe()
-
-	// teeReader is used to provide the readCloser to two consumers
-	teeReader := io.TeeReader(readCloser, pipeWriter)
-	// MultiCloser closes both pipeWriter and readCloser on Close() call
-	closer := ioextensions.NewMultiCloser([]io.Closer{readCloser, pipeWriter})
-	return &ioextensions.ReadCascadeCloser{Reader: teeReader, Closer: closer}, pipeReader
 }

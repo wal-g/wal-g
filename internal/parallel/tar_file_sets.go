@@ -1,7 +1,5 @@
 package parallel
 
-// DONE
-
 type TarFileSets interface {
 	AddFile(name string, file string)
 	AddFiles(name string, files []string)
