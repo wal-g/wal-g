@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
@@ -64,4 +66,17 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder fsutil.DataFold
 		err = nil
 	}
 	return
+}
+
+func getStopBackupTimeoutSetting() (time.Duration, error) {
+	if !viper.IsSet(internal.PgStopBackupTimeout) {
+		return 0, nil
+	}
+
+	timeout, err := internal.GetDurationSetting(internal.PgStopBackupTimeout)
+	if err != nil {
+		return 0, err
+	}
+
+	return timeout, nil
 }

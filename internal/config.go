@@ -82,6 +82,8 @@ const (
 	StreamSplitterPartitions     = "WALG_STREAM_SPLITTER_PARTITIONS"
 	StreamSplitterBlockSize      = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
 	StatsdAddressSetting         = "WALG_STATSD_ADDRESS"
+	PgAliveCheckInterval         = "WALG_ALIVE_CHECK_INTERVAL"
+	PgStopBackupTimeout          = "WALG_STOP_BACKUP_TIMEOUT"
 
 	ProfileSamplingRatio = "PROFILE_SAMPLING_RATIO"
 	ProfileMode          = "PROFILE_MODE"
@@ -335,19 +337,21 @@ var (
 
 	PGAllowedSettings = map[string]bool{
 		// Postgres
-		PgPortSetting:     true,
-		PgUserSetting:     true,
-		PgHostSetting:     true,
-		PgDataSetting:     true,
-		PgPasswordSetting: true,
-		PgDatabaseSetting: true,
-		PgSslModeSetting:  true,
-		PgSlotName:        true,
-		PgWalSize:         true,
-		"PGPASSFILE":      true,
-		PrefetchDir:       true,
-		PgReadyRename:     true,
-		PgBackRestStanza:  true,
+		PgPortSetting:        true,
+		PgUserSetting:        true,
+		PgHostSetting:        true,
+		PgDataSetting:        true,
+		PgPasswordSetting:    true,
+		PgDatabaseSetting:    true,
+		PgSslModeSetting:     true,
+		PgSlotName:           true,
+		PgWalSize:            true,
+		"PGPASSFILE":         true,
+		PrefetchDir:          true,
+		PgReadyRename:        true,
+		PgBackRestStanza:     true,
+		PgAliveCheckInterval: true,
+		PgStopBackupTimeout:  true,
 	}
 
 	MongoAllowedSettings = map[string]bool{

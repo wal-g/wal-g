@@ -3,6 +3,7 @@ package postgres
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
@@ -57,9 +58,10 @@ type PgRelationStat struct {
 
 // PgQueryRunner is implementation for controlling PostgreSQL 9.0+
 type PgQueryRunner struct {
-	Connection       *pgx.Conn
-	Version          int
-	SystemIdentifier *uint64
+	Connection        *pgx.Conn
+	Version           int
+	SystemIdentifier  *uint64
+	stopBackupTimeout time.Duration
 }
 
 // BuildGetVersion formats a query to retrieve PostgreSQL numeric version
@@ -125,8 +127,14 @@ func (queryRunner *PgQueryRunner) BuildStopBackup() (string, error) {
 
 // NewPgQueryRunner builds QueryRunner from available connection
 func NewPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
-	r := &PgQueryRunner{Connection: conn}
-	err := r.getVersion()
+	timeout, err := getStopBackupTimeoutSetting()
+	if err != nil {
+		return nil, err
+	}
+
+	r := &PgQueryRunner{Connection: conn, stopBackupTimeout: timeout}
+
+	err = r.getVersion()
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +222,7 @@ func (queryRunner *PgQueryRunner) stopBackup() (label string, offsetMap string, 
 		_ = tx.Rollback()
 	}()
 
-	_, err = tx.Exec("SET statement_timeout=0;")
+	_, err = tx.Exec(fmt.Sprintf("SET statement_timeout=%d;", queryRunner.stopBackupTimeout.Milliseconds()))
 	if err != nil {
 		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: failed setting statement timeout in transaction")
 	}

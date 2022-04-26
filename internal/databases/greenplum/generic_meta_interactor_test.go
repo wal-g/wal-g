@@ -1,12 +1,13 @@
 package greenplum_test
 
 import (
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/testtools"
-	"testing"
-	"time"
 )
 
 func init() {
@@ -68,7 +69,7 @@ func TestFetch(t *testing.T) {
 	isEqualTimeFinish := expectedResult.FinishTime.Equal(actualResult.FinishTime)
 	assert.True(t, isEqualTimeFinish)
 
-	// since assert.Equal doesn't compare time properly, just assign the actual to the expected time  
+	// since assert.Equal doesn't compare time properly, just assign the actual to the expected time
 	expectedResult.StartTime = actualResult.StartTime
 	expectedResult.FinishTime = actualResult.FinishTime
 

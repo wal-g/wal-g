@@ -29,9 +29,10 @@ func FormatSegmentStateFolderPath(contentID int) string {
 type SegBackupStatus string
 
 const (
-	RunningBackupStatus SegBackupStatus = "running"
-	FailedBackupStatus  SegBackupStatus = "failed"
-	SuccessBackupStatus SegBackupStatus = "success"
+	RunningBackupStatus     SegBackupStatus = "running"
+	FailedBackupStatus      SegBackupStatus = "failed"
+	SuccessBackupStatus     SegBackupStatus = "success"
+	InterruptedBackupStatus SegBackupStatus = "interrupted"
 )
 
 type SegBackupState struct {
