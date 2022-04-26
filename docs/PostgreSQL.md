@@ -136,6 +136,16 @@ Examples:
 - `10m` - check every 10 minutes
 
 
+* `WALG_STOP_BACKUP_TIMEOUT`
+
+Timeout for the pg_stop_backup() call. By default, there is no timeout.
+
+Examples:
+- `0` - disable the timeout (default value)
+- `10s` - 10 seconds timeout
+- `10m` - 10 minutes timeout
+
+
 Usage
 -----
 
