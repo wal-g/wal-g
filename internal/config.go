@@ -83,6 +83,7 @@ const (
 	StreamSplitterBlockSize      = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
 	StatsdAddressSetting         = "WALG_STATSD_ADDRESS"
 	PgAliveCheckInterval         = "WALG_ALIVE_CHECK_INTERVAL"
+	PgStopBackupTimeout          = "WALG_STOP_BACKUP_TIMEOUT"
 
 	ProfileSamplingRatio = "PROFILE_SAMPLING_RATIO"
 	ProfileMode          = "PROFILE_MODE"
@@ -350,6 +351,7 @@ var (
 		PgReadyRename:        true,
 		PgBackRestStanza:     true,
 		PgAliveCheckInterval: true,
+		PgStopBackupTimeout:  true,
 	}
 
 	MongoAllowedSettings = map[string]bool{

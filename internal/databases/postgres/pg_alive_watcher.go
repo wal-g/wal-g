@@ -1,17 +1,20 @@
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgx"
 
 	"github.com/wal-g/tracelog"
 )
 
-func NewPgWatcher(aliveCheckInterval time.Duration) *PgAliveWatcher {
+func NewPgWatcher(conn *pgx.Conn, aliveCheckInterval time.Duration) *PgAliveWatcher {
 	ticker := time.NewTicker(aliveCheckInterval)
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- watchPgStatus(ticker)
+		errCh <- watchPgStatus(conn, ticker)
 		close(errCh)
 	}()
 
@@ -22,18 +25,15 @@ type PgAliveWatcher struct {
 	Err <-chan error
 }
 
-func watchPgStatus(ticker *time.Ticker) error {
+func watchPgStatus(conn *pgx.Conn, ticker *time.Ticker) error {
 	for {
 		<-ticker.C
 		tracelog.DebugLogger.Printf("Checking if Postgres is still alive...")
-		conn, err := Connect()
-		if err != nil {
-			return fmt.Errorf("failed to connect to Postgres: %v", err)
-		}
 
-		err = conn.Close()
+		ctx := context.Background()
+		err := conn.Ping(ctx)
 		if err != nil {
-			tracelog.WarningLogger.Printf("watchPgStatus: failed to disconnect: %v", err)
+			return fmt.Errorf("failed to check if the Postgres connection is alive: %v", err)
 		}
 	}
 }

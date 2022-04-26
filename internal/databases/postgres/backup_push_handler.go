@@ -607,7 +607,7 @@ func (bh *BackupHandler) initBackupTerminator() {
 	errCh := make(chan error, 1)
 
 	addSignalListener(errCh)
-	addPgIsAliveChecker(errCh)
+	addPgIsAliveChecker(bh.workers.conn, errCh)
 
 	terminator := NewBackupTerminator(bh.workers.conn, bh.pgInfo.pgVersion, bh.pgInfo.pgDataDirectory)
 
@@ -629,14 +629,14 @@ func addSignalListener(errCh chan error) {
 	}()
 }
 
-func addPgIsAliveChecker(errCh chan error) {
+func addPgIsAliveChecker(conn *pgx.Conn, errCh chan error) {
 	if !viper.IsSet(internal.PgAliveCheckInterval) {
 		return
 	}
 	stateUpdateInterval, err := internal.GetDurationSetting(internal.PgAliveCheckInterval)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Initializing the PG alive checker (interval=%s)...", stateUpdateInterval)
-	pgWatcher := NewPgWatcher(stateUpdateInterval)
+	pgWatcher := NewPgWatcher(conn, stateUpdateInterval)
 
 	go func() {
 		err := <-pgWatcher.Err

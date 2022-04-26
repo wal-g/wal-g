@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"time"
 
 	"github.com/jackc/pgx"
 	"github.com/wal-g/tracelog"
@@ -12,7 +11,6 @@ import (
 
 const backupLabelFileName = "backup_label"
 const backupLabelDstFileName = "backup_label.old"
-const stopBackupTimeout = 1 * time.Minute
 
 type BackupTerminator struct {
 	conn              *pgx.Conn
@@ -28,25 +26,10 @@ func NewBackupTerminator(conn *pgx.Conn, pgVersion int, pgDataDir string) *Backu
 }
 
 func (t *BackupTerminator) TerminateBackup() {
-	stopBackupErrCh := make(chan error, 1)
-
-	go func() {
-		err := t.tryStopPgBackup()
-		stopBackupErrCh <- err
-	}()
-
-	var err error
-	select {
-	case stopErr := <-stopBackupErrCh:
-		if stopErr == nil {
-			tracelog.InfoLogger.Printf("Successfully stopped the running backup")
-			return
-		}
-
-		err = stopErr
-
-	case <-time.After(stopBackupTimeout):
-		err = fmt.Errorf("run out of time (%s)", stopBackupTimeout.String())
+	err := t.tryStopPgBackup()
+	if err == nil {
+		tracelog.InfoLogger.Printf("Successfully stopped the running backup")
+		return
 	}
 
 	tracelog.WarningLogger.Printf("Failed to stop backup: %v", err)
