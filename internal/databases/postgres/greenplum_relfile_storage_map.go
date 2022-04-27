@@ -49,8 +49,8 @@ func (storageMap *AoRelFileStorageMap) getAOStorageMetadata(filePath string) (bo
 	return true, storageInfo, location
 }
 
-func newAoRelFileStorageMap(conn *pgx.Conn) (AoRelFileStorageMap, error) {
-	databases, err := getDatabaseInfos(conn)
+func newAoRelFileStorageMap(queryRunner *PgQueryRunner) (AoRelFileStorageMap, error) {
+	databases, err := queryRunner.getDatabaseInfos()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get database names")
 	}
