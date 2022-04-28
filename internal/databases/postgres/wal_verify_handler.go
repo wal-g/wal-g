@@ -94,7 +94,7 @@ func QueryCurrentWalSegment() WalSegmentDescription {
 	currentSegmentNo, err := getCurrentWalSegmentNo(queryRunner)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get current WAL segment number %v", err)
 
-	currentTimeline, err := getCurrentTimeline(conn)
+	currentTimeline, err := queryRunner.readTimeline()
 	tracelog.ErrorLogger.FatalfOnError("Failed to get current timeline %v", err)
 
 	tracelog.InfoLogger.Printf("Current WAL segment: %s\n", currentSegmentNo.getFilename(currentTimeline))
@@ -172,13 +172,4 @@ func getCurrentWalSegmentNo(queryRunner *PgQueryRunner) (WalSegmentNo, error) {
 		return 0, err
 	}
 	return newWalSegmentNo(lsn - 1), nil
-}
-
-// get the current timeline of the cluster
-func getCurrentTimeline(conn *pgx.Conn) (uint32, error) {
-	timeline, err := readTimeline(conn)
-	if err != nil {
-		return 0, err
-	}
-	return timeline, nil
 }

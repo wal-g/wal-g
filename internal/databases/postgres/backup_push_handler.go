@@ -16,8 +16,6 @@ import (
 
 	"github.com/jackc/pgconn"
 
-	"github.com/jackc/pgx"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
@@ -84,9 +82,9 @@ type PrevBackupInfo struct {
 
 // BackupWorkers holds the external objects that the handler uses to get the backup data / write the backup data
 type BackupWorkers struct {
-	uploader *WalUploader
-	bundle   *Bundle
-	conn     *pgx.Conn
+	uploader    *WalUploader
+	bundle      *Bundle
+	queryRunner *PgQueryRunner
 }
 
 // BackupPgInfo holds the PostgreSQL info that the handler queries before running the backup
@@ -167,14 +165,18 @@ func (bh *BackupHandler) createAndPushBackup() {
 func (bh *BackupHandler) startBackup() (err error) {
 	// Connect to postgres and start/finish a nonexclusive backup.
 	tracelog.DebugLogger.Println("Connecting to Postgres.")
-	bh.workers.conn, err = Connect()
+	conn, err := Connect()
 	if err != nil {
 		return
+	}
+	bh.workers.queryRunner, err = NewPgQueryRunner(conn)
+	if err != nil {
+		return fmt.Errorf("failed to build query runner: %v", err)
 	}
 
 	tracelog.DebugLogger.Println("Running StartBackup.")
 	backupName, backupStartLSN, err := bh.workers.bundle.StartBackup(
-		bh.workers.conn, utility.CeilTimeUpToMicroseconds(time.Now()).String())
+		bh.workers.queryRunner, utility.CeilTimeUpToMicroseconds(time.Now()).String())
 	if err != nil {
 		return
 	}
@@ -240,7 +242,7 @@ func (bh *BackupHandler) uploadBackup() TarFileSets {
 	err := bundle.StartQueue(internal.NewStorageTarBallMaker(bh.curBackupInfo.name, bh.workers.uploader.Uploader))
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	tarBallComposerMaker, err := NewTarBallComposerMaker(bh.arguments.tarBallComposerType, bh.workers.conn,
+	tarBallComposerMaker, err := NewTarBallComposerMaker(bh.arguments.tarBallComposerType, bh.workers.queryRunner,
 		bh.workers.uploader.Uploader, bh.curBackupInfo.name,
 		NewTarBallFilePackerOptions(bh.arguments.verifyPageChecksums, bh.arguments.storeAllCorruptBlocks),
 		bh.arguments.withoutFilesMetadata)
@@ -267,14 +269,14 @@ func (bh *BackupHandler) uploadBackup() TarFileSets {
 
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
 	tracelog.DebugLogger.Println("Stop backup and upload backup_label and tablespace_map")
-	labelFilesTarBallName, labelFilesList, finishLsn, err := bundle.uploadLabelFiles(bh.workers.conn)
+	labelFilesTarBallName, labelFilesList, finishLsn, err := bundle.uploadLabelFiles(bh.workers.queryRunner)
 	tracelog.ErrorLogger.FatalOnError(err)
 	bh.curBackupInfo.endLSN = finishLsn
 	bh.curBackupInfo.uncompressedSize = atomic.LoadInt64(bundle.TarBallQueue.AllTarballsSize)
 	bh.curBackupInfo.compressedSize, err = bh.workers.uploader.UploadedDataSize()
 	tracelog.ErrorLogger.FatalOnError(err)
 	tarFileSets.AddFiles(labelFilesTarBallName, labelFilesList)
-	timelineChanged := bundle.checkTimelineChanged(bh.workers.conn)
+	timelineChanged := bundle.checkTimelineChanged(bh.workers.queryRunner)
 	tracelog.DebugLogger.Printf("Labelfiles tarball name: %s", labelFilesTarBallName)
 	tracelog.DebugLogger.Printf("Number of label files: %d", len(labelFilesList))
 	tracelog.DebugLogger.Printf("Finish LSN: %d", bh.curBackupInfo.endLSN)
@@ -607,9 +609,9 @@ func (bh *BackupHandler) initBackupTerminator() {
 	errCh := make(chan error, 1)
 
 	addSignalListener(errCh)
-	addPgIsAliveChecker(bh.workers.conn, errCh)
+	addPgIsAliveChecker(bh.workers.queryRunner, errCh)
 
-	terminator := NewBackupTerminator(bh.workers.conn, bh.pgInfo.pgVersion, bh.pgInfo.pgDataDirectory)
+	terminator := NewBackupTerminator(bh.workers.queryRunner, bh.pgInfo.pgVersion, bh.pgInfo.pgDataDirectory)
 
 	go func() {
 		err := <-errCh
@@ -629,14 +631,14 @@ func addSignalListener(errCh chan error) {
 	}()
 }
 
-func addPgIsAliveChecker(conn *pgx.Conn, errCh chan error) {
+func addPgIsAliveChecker(queryRunner *PgQueryRunner, errCh chan error) {
 	if !viper.IsSet(internal.PgAliveCheckInterval) {
 		return
 	}
 	stateUpdateInterval, err := internal.GetDurationSetting(internal.PgAliveCheckInterval)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Initializing the PG alive checker (interval=%s)...", stateUpdateInterval)
-	pgWatcher := NewPgWatcher(conn, stateUpdateInterval)
+	pgWatcher := NewPgWatcher(queryRunner, stateUpdateInterval)
 
 	go func() {
 		err := <-pgWatcher.Err
