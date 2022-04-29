@@ -3,6 +3,7 @@ package postgres
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/jackc/pgx"
 	"os"
 
 	"github.com/pkg/errors"
@@ -72,7 +73,8 @@ func deltaFetchRecursionOld(backup Backup, folder storage.Folder, dbDataDirector
 	sentinelDto.TablespaceSpec = tablespaceSpec
 
 	if sentinelDto.IsIncremental() {
-		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n", *(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN))
+		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n", *(sentinelDto.IncrementFrom),
+			pgx.FormatLSN(*(sentinelDto.IncrementFromLSN)))
 		baseFilesToUnwrap, err := GetBaseFilesToUnwrap(filesMetaDto.Files, filesToUnwrap)
 		if err != nil {
 			return err
@@ -83,7 +85,9 @@ func deltaFetchRecursionOld(backup Backup, folder storage.Folder, dbDataDirector
 			return err
 		}
 		tracelog.InfoLogger.Printf("%v fetched. Upgrading from LSN %x to LSN %x \n",
-			*(sentinelDto.IncrementFrom), *(sentinelDto.IncrementFromLSN), *(sentinelDto.BackupStartLSN))
+			*(sentinelDto.IncrementFrom),
+			pgx.FormatLSN(*(sentinelDto.IncrementFromLSN)),
+			pgx.FormatLSN(*(sentinelDto.BackupStartLSN)))
 	}
 
 	return backup.unwrapToEmptyDirectory(dbDataDirectory, sentinelDto, filesMetaDto, filesToUnwrap, false)

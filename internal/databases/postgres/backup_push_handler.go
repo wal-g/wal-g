@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -179,7 +178,7 @@ func (bh *BackupHandler) startBackup() (err error) {
 	}
 	bh.curBackupInfo.startLSN = backupStartLSN
 	bh.curBackupInfo.name = backupName
-	tracelog.DebugLogger.Printf("Backup name: %s\nBackup start LSN: %d", backupName, backupStartLSN)
+	tracelog.DebugLogger.Printf("Backup name: %s\nBackup start LSN: %d", backupName, pgx.FormatLSN(backupStartLSN))
 
 	return
 }
@@ -276,7 +275,7 @@ func (bh *BackupHandler) uploadBackup() TarFileSets {
 	timelineChanged := bundle.checkTimelineChanged(bh.workers.conn)
 	tracelog.DebugLogger.Printf("Labelfiles tarball name: %s", labelFilesTarBallName)
 	tracelog.DebugLogger.Printf("Number of label files: %d", len(labelFilesList))
-	tracelog.DebugLogger.Printf("Finish LSN: %d", bh.curBackupInfo.endLSN)
+	tracelog.DebugLogger.Printf("Finish LSN: %d", pgx.FormatLSN(bh.curBackupInfo.endLSN))
 	tracelog.DebugLogger.Printf("Uncompressed size: %d", bh.curBackupInfo.uncompressedSize)
 	tracelog.DebugLogger.Printf("Compressed size: %d", bh.curBackupInfo.compressedSize)
 
@@ -562,31 +561,11 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 		}
 	}
 	tracelog.InfoLogger.Printf("Delta backup from %v with LSN %s.\n", previousBackupName,
-		ConvertLSNtoPostgresFormat(*prevBackupSentinelDto.BackupStartLSN))
+		pgx.FormatLSN(*prevBackupSentinelDto.BackupStartLSN))
 	bh.prevBackupInfo.name = previousBackupName
 	bh.prevBackupInfo.sentinelDto = prevBackupSentinelDto
 	_, bh.prevBackupInfo.filesMetadataDto, err = previousBackup.GetSentinelAndFilesMetadata()
 	return err
-}
-
-func ConvertLSNtoPostgresFormat(intLSN uint64) string {
-	hexLSN := strconv.FormatUint(intLSN, 16)
-	rightPart := ""
-	for i := 0; i < 8; i++ {
-		lastLSNDigit := hexLSN[len(hexLSN)-1-i]
-		rightPart = string(lastLSNDigit) + rightPart
-	}
-	result := ""
-	wasNonZero := false
-	for i := range rightPart {
-		if !wasNonZero && rightPart[i] == '0' {
-			continue
-		}
-		wasNonZero = true
-		result += string(rightPart[i])
-	}
-	result = hexLSN[:len(hexLSN)-8] + "/" + result
-	return result
 }
 
 // TODO : unit tests

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"fmt"
+	"github.com/jackc/pgx"
 	"io"
 	"os"
 	"text/tabwriter"
@@ -51,7 +52,7 @@ func WriteBackupListDetails(backupDetails []BackupDetail, output io.Writer) erro
 	for i := 0; i < len(backupDetails); i++ {
 		b := backupDetails[i]
 		//nolint:lll
-		_, err = fmt.Fprintf(writer, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n", b.BackupName, internal.FormatTime(b.Time), b.WalFileName, internal.FormatTime(b.StartTime), internal.FormatTime(b.FinishTime), b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent)
+		_, err = fmt.Fprintf(writer, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n", b.BackupName, internal.FormatTime(b.Time), b.WalFileName, internal.FormatTime(b.StartTime), internal.FormatTime(b.FinishTime), b.Hostname, b.DataDir, b.PgVersion, pgx.FormatLSN(b.StartLsn), pgx.FormatLSN(b.FinishLsn), b.IsPermanent)
 		if err != nil {
 			return err
 		}
@@ -71,6 +72,6 @@ func WritePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer
 		writer.AppendRow(
 			table.Row{idx, b.BackupName, internal.PrettyFormatTime(b.Time), b.WalFileName,
 				internal.PrettyFormatTime(b.StartTime), internal.PrettyFormatTime(b.FinishTime),
-				b.Hostname, b.DataDir, b.PgVersion, b.StartLsn, b.FinishLsn, b.IsPermanent})
+				b.Hostname, b.DataDir, b.PgVersion, pgx.FormatLSN(b.StartLsn), pgx.FormatLSN(b.FinishLsn), b.IsPermanent})
 	}
 }

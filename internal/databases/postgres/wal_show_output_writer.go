@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"encoding/json"
+	"github.com/jackc/pgx"
 	"io"
 
 	"github.com/jedib0t/go-pretty/table"
@@ -52,7 +53,7 @@ func (writer *WalShowTableOutputWriter) Write(timelineInfos []*TimelineInfo) err
 	tableWriter.AppendHeader(header)
 
 	for _, tl := range timelineInfos {
-		row := table.Row{tl.ID, tl.ParentID, ConvertLSNtoPostgresFormat(tl.SwitchPointLsn), tl.StartSegment,
+		row := table.Row{tl.ID, tl.ParentID, pgx.FormatLSN(tl.SwitchPointLsn), tl.StartSegment,
 			tl.EndSegment, tl.SegmentRangeSize, tl.SegmentsCount, tl.Status}
 		if writer.includeBackups {
 			row = append(row, len(tl.Backups))

@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -11,7 +12,7 @@ func getDeltaMap(folder storage.Folder,
 	firstUsedLSN,
 	firstNotUsedLSN uint64) (PagedFileDeltaMap, error) {
 	tracelog.InfoLogger.Printf("Timeline: %d, FirstUsedLsn: %d, FirstNotUsedLsn: %d\n",
-		timeline, firstUsedLSN, firstNotUsedLSN)
+		timeline, pgx.FormatLSN(firstUsedLSN), pgx.FormatLSN(firstNotUsedLSN))
 	tracelog.InfoLogger.Printf("First WAL should participate in building delta map: %s",
 		newWalSegmentNo(firstUsedLSN).getFilename(timeline))
 	tracelog.InfoLogger.Printf("First WAL shouldn't participate in building delta map: %s",

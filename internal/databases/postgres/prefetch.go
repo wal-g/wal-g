@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"archive/tar"
+	"github.com/jackc/pgx"
 	"io"
 	"os"
 	"os/exec"
@@ -60,7 +61,7 @@ func HandleWALPrefetch(uploader *WalUploader, walFileName string, location strin
 func prefaultData(prefaultStartLsn uint64, timelineID uint32, waitGroup *sync.WaitGroup, uploader *WalUploader) {
 	defer func() {
 		if r := recover(); r != nil {
-			tracelog.ErrorLogger.Println("Prefault unsuccessful ", prefaultStartLsn)
+			tracelog.ErrorLogger.Println("Prefault unsuccessful ", pgx.FormatLSN(prefaultStartLsn))
 		}
 		waitGroup.Done()
 	}()

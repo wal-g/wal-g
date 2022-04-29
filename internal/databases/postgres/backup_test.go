@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"testing"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -170,25 +169,4 @@ func TestGetLastBackupNameWithGarbage(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, "base_000", latestBackup)
-}
-
-func TestBaseConverter(t *testing.T) {
-	lsn := "141700068128"
-	intLSN, _ := strconv.ParseInt(lsn, 16, 64)
-	result := postgres.ConvertLSNtoPostgresFormat(uint64(intLSN))
-	assert.Equal(t, "1417/68128", result)
-}
-
-func TestWithOutZerosConverter(t *testing.T) {
-	lsn := "1417abc68128"
-	intLSN, _ := strconv.ParseInt(lsn, 16, 64)
-	result := postgres.ConvertLSNtoPostgresFormat(uint64(intLSN))
-	assert.Equal(t, "1417/abc68128", result)
-}
-
-func TestWithLotOfZerosConverter(t *testing.T) {
-	lsn := "a00000008"
-	intLSN, _ := strconv.ParseInt(lsn, 16, 64)
-	result := postgres.ConvertLSNtoPostgresFormat(uint64(intLSN))
-	assert.Equal(t, "a/8", result)
 }
