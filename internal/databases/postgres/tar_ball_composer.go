@@ -7,7 +7,6 @@ import (
 
 	"github.com/wal-g/tracelog"
 
-	"github.com/jackc/pgx"
 	"github.com/wal-g/wal-g/internal"
 )
 
@@ -49,7 +48,7 @@ type TarBallComposerMaker interface {
 	Make(bundle *Bundle) (TarBallComposer, error)
 }
 
-func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn, uploader *internal.Uploader,
+func NewTarBallComposerMaker(composerType TarBallComposerType, queryRunner *PgQueryRunner, uploader *internal.Uploader,
 	newBackupName string, filePackOptions TarBallFilePackerOptions,
 	withoutFilesMetadata bool) (TarBallComposerMaker, error) {
 	folder := uploader.UploadingFolder
@@ -60,7 +59,7 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn, u
 		}
 		return NewRegularTarBallComposerMaker(filePackOptions, &RegularBundleFiles{}, NewRegularTarFileSets()), nil
 	case RatingComposer:
-		relFileStats, err := newRelFileStatistics(conn)
+		relFileStats, err := newRelFileStatistics(queryRunner)
 		if err != nil {
 			return nil, err
 		}
@@ -88,7 +87,7 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, conn *pgx.Conn, u
 		}
 		return NewCopyTarBallComposerMaker(previousBackup, newBackupName, filePackOptions), nil
 	case GreenplumComposer:
-		relStorageMap, err := newAoRelFileStorageMap(conn)
+		relStorageMap, err := newAoRelFileStorageMap(queryRunner)
 		if err != nil {
 			return nil, err
 		}

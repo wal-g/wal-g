@@ -5,6 +5,7 @@ set -e -x
 
 export WALE_S3_PREFIX=s3://mysqlbinlogpushfetchbucket
 export WALG_MYSQL_BINLOG_DST=/tmp/binlogs
+export WALG_MYSQL_CHECK_GTIDS=True
 
 mysqld --initialize --init-file=/etc/mysql/init.sql
 service mysql start
@@ -58,7 +59,6 @@ current_sentinel=$(s3cmd get "${WALE_S3_PREFIX}/binlog_sentinel_005.json" - )
 echo "{\"GtidArchived\":\"${current_uuid}:1-999999\"}" | s3cmd put - "${WALE_S3_PREFIX}/binlog_sentinel_005.json"
 rm -f "$HOME/.walg_mysql_binlogs_cache"
 binlogs_cnt1=$(s3cmd ls "${WALE_S3_PREFIX}/binlog_005/" | wc -l )
-export WALG_MYSQL_CHECK_GTIDS="true"
 wal-g binlog-push
 binlogs_cnt2=$(s3cmd ls "${WALE_S3_PREFIX}/binlog_005/" | wc -l )
 
@@ -70,7 +70,6 @@ fi
 echo "Revert GTIDs in cache, so all binlogs should be uploaded"
 echo "${current_sentinel}}" | s3cmd put - "${WALE_S3_PREFIX}/binlog_sentinel_005.json"
 rm -f "$HOME/.walg_mysql_binlogs_cache"
-export WALG_MYSQL_CHECK_GTIDS="true"
 wal-g binlog-push
 binlogs_cnt3=$(s3cmd ls "${WALE_S3_PREFIX}/binlog_005/" | wc -l )
 

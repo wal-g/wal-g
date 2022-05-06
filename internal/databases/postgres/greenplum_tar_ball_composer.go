@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"sync"
-	"sync/atomic"
 
 	"github.com/wal-g/wal-g/internal/walparser"
 
@@ -84,6 +83,8 @@ type GpTarBallComposer struct {
 	baseAoFiles   map[string]struct{}
 
 	uploader *internal.Uploader
+	// Separate uploader for AO/AOCS relfiles with disabled file size tracking
+	aoSegUploader *internal.Uploader
 
 	files            BundleFiles
 	tarFileSets      TarFileSets
@@ -101,6 +102,9 @@ func NewGpTarBallComposer(
 ) (*GpTarBallComposer, error) {
 	errorGroup, ctx := errgroup.WithContext(context.Background())
 
+	aoSegUploader := uploader.Clone()
+	aoSegUploader.DisableSizeTracking()
+
 	composer := &GpTarBallComposer{
 		backupName:    backupName,
 		tarBallQueue:  tarBallQueue,
@@ -111,6 +115,7 @@ func NewGpTarBallComposer(
 		aoFiles:       aoFiles,
 		baseAoFiles:   baseAoFiles,
 		uploader:      uploader.Clone(),
+		aoSegUploader: aoSegUploader,
 		tarFileSets:   tarFileSets,
 		errorGroup:    errorGroup,
 		ctx:           ctx,
@@ -244,13 +249,11 @@ func (c *GpTarBallComposer) addAOFile(cfi *ComposeFileInfo, aoMeta AoRelFileMeta
 
 	uploadContents := internal.CompressAndEncrypt(fileReadCloser, compressor, c.crypter)
 	uploadPath := path.Join(AoStoragePath, storageKey)
-	err = c.uploader.Upload(uploadPath, uploadContents)
+	err = c.aoSegUploader.Upload(uploadPath, uploadContents)
 	if err != nil {
 		return err
 	}
 
-	// looks ugly, but currently it is the only way to keep track of the AO files size
-	atomic.AddInt64(c.tarBallQueue.AllTarballsSize, cfi.fileInfo.Size())
 	c.addAoFileMetadata(cfi, storageKey, aoMeta, false)
 
 	// add reference for the current backup to the storage
