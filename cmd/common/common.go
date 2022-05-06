@@ -40,12 +40,14 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
 Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
 `
 
+const hiddenConfigFlagAnnotation = "walg_annotation_hidden_config_flag"
+
 func Init(cmd *cobra.Command, dbName string) {
 	internal.ConfigureSettings(dbName)
 	cobra.OnInitialize(internal.InitConfig, internal.Configure)
 
 	cmd.InitDefaultVersionFlag()
-	internal.AddConfigFlags(cmd)
+	internal.AddConfigFlags(cmd, hiddenConfigFlagAnnotation)
 
 	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 
@@ -102,26 +104,13 @@ func initHelp(cmd *cobra.Command) {
 
 	// hide global config flags from usage output
 	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
-		if cmd != FlagsCmd {
-			cmd.Root().PersistentFlags().VisitAll(func(f *pflag.Flag) {
-				if _, ok := f.Annotations[internal.HiddenConfigFlagAnnotation]; ok {
-					f.Hidden = true
-				}
-			})
-		}
-
+		hideGlobalConfigFlags(cmd)
 		return defaultUsageFn(cmd)
 	})
+
 	// hide global config flags from help output
 	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		if cmd != FlagsCmd {
-			cmd.Root().PersistentFlags().VisitAll(func(f *pflag.Flag) {
-				if _, ok := f.Annotations[internal.HiddenConfigFlagAnnotation]; ok {
-					f.Hidden = true
-				}
-			})
-		}
-
+		hideGlobalConfigFlags(cmd)
 		defaultHelpFn(cmd, args)
 	})
 
@@ -130,4 +119,15 @@ func initHelp(cmd *cobra.Command) {
 	helpCmd, _, _ := cmd.Find([]string{"help"})
 	// fix to disable the required settings check for the help subcommand
 	helpCmd.PersistentPreRun = func(*cobra.Command, []string) {}
+}
+
+// hide global config flags from all subcommands except the "flags" subcommand
+func hideGlobalConfigFlags(cmd *cobra.Command) {
+	if cmd != FlagsCmd {
+		cmd.Root().PersistentFlags().VisitAll(func(f *pflag.Flag) {
+			if _, ok := f.Annotations[hiddenConfigFlagAnnotation]; ok {
+				f.Hidden = true
+			}
+		})
+	}
 }

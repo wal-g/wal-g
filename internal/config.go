@@ -142,8 +142,6 @@ const (
 	YcSaKeyFileSetting = "YC_SERVICE_ACCOUNT_KEY_FILE"
 
 	PgBackRestStanza = "PGBACKREST_STANZA"
-
-	HiddenConfigFlagAnnotation = "HIDDEN_CONFIG_FLAG_ANNOTATION"
 )
 
 var (
@@ -558,7 +556,7 @@ func ConfigureAndRunDefaultWebServer() error {
 	return nil
 }
 
-func AddConfigFlags(Cmd *cobra.Command) {
+func AddConfigFlags(Cmd *cobra.Command, hiddenCfgFlagAnnotation string) {
 	cfgFlags := &pflag.FlagSet{}
 	for k := range AllowedSettings {
 		flagName := toFlagName(k)
@@ -575,7 +573,7 @@ func AddConfigFlags(Cmd *cobra.Command) {
 		if f.Annotations == nil {
 			f.Annotations = map[string][]string{}
 		}
-		f.Annotations[HiddenConfigFlagAnnotation] = []string{"true"}
+		f.Annotations[hiddenCfgFlagAnnotation] = []string{"true"}
 	})
 	Cmd.PersistentFlags().AddFlagSet(cfgFlags)
 }
