@@ -562,7 +562,7 @@ func ConfigureAndRunDefaultWebServer() error {
 	return nil
 }
 
-func AddConfigFlags(Cmd *cobra.Command) {
+func AddConfigFlags(Cmd *cobra.Command, hiddenCfgFlagAnnotation string) {
 	cfgFlags := &pflag.FlagSet{}
 	for k := range AllowedSettings {
 		flagName := toFlagName(k)
@@ -575,8 +575,12 @@ func AddConfigFlags(Cmd *cobra.Command) {
 		cfgFlags.String(flagName, "", flagUsage)
 		_ = viper.BindPFlag(k, cfgFlags.Lookup(flagName))
 	}
-	cfgFlags.VisitAll(func(f *pflag.Flag) { f.Hidden = true })
-
+	cfgFlags.VisitAll(func(f *pflag.Flag) {
+		if f.Annotations == nil {
+			f.Annotations = map[string][]string{}
+		}
+		f.Annotations[hiddenCfgFlagAnnotation] = []string{"true"}
+	})
 	Cmd.PersistentFlags().AddFlagSet(cfgFlags)
 }
 
