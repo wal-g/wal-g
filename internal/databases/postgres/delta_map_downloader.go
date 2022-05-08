@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -10,9 +9,9 @@ import (
 func getDeltaMap(folder storage.Folder,
 	timeline uint32,
 	firstUsedLSN,
-	firstNotUsedLSN uint64) (PagedFileDeltaMap, error) {
+	firstNotUsedLSN LSN) (PagedFileDeltaMap, error) {
 	tracelog.InfoLogger.Printf("Timeline: %d, FirstUsedLsn: %d, FirstNotUsedLsn: %d\n",
-		timeline, pgx.FormatLSN(firstUsedLSN), pgx.FormatLSN(firstNotUsedLSN))
+		timeline, firstUsedLSN, firstNotUsedLSN)
 	tracelog.InfoLogger.Printf("First WAL should participate in building delta map: %s",
 		newWalSegmentNo(firstUsedLSN).getFilename(timeline))
 	tracelog.InfoLogger.Printf("First WAL shouldn't participate in building delta map: %s",
@@ -42,13 +41,13 @@ func getDeltaMap(folder storage.Folder,
 	return deltaMap, nil
 }
 
-func getDeltaRange(firstUsedLsn, firstNotUsedLsn uint64) (DeltaNo, DeltaNo) {
+func getDeltaRange(firstUsedLsn, firstNotUsedLsn LSN) (DeltaNo, DeltaNo) {
 	firstUsedDeltaNo := newDeltaNoFromLsn(firstUsedLsn)
 	firstNotUsedDeltaNo := newDeltaNoFromLsn(firstNotUsedLsn)
 	return firstUsedDeltaNo, firstNotUsedDeltaNo
 }
 
-func getWalSegmentRange(firstNotUsedDeltaNo DeltaNo, firstNotUsedLsn uint64) (WalSegmentNo, WalSegmentNo) {
+func getWalSegmentRange(firstNotUsedDeltaNo DeltaNo, firstNotUsedLsn LSN) (WalSegmentNo, WalSegmentNo) {
 	firstUsedWalSegmentNo := firstNotUsedDeltaNo.firstWalSegmentNo()
 	lastUsedLsn := firstNotUsedLsn - 1
 	lastUsedWalSegmentNo := newWalSegmentNo(lastUsedLsn)

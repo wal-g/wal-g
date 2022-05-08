@@ -6,12 +6,12 @@ import (
 
 type WalSegmentNo uint64
 
-func newWalSegmentNo(lsn uint64) WalSegmentNo {
+func newWalSegmentNo(lsn LSN) WalSegmentNo {
 	return WalSegmentNo(getSegmentNoFromLsn(lsn))
 }
 
-func getSegmentNoFromLsn(lsn uint64) uint64 {
-	return lsn / WalSegmentSize
+func getSegmentNoFromLsn(lsn LSN) uint64 {
+	return uint64(lsn) / WalSegmentSize
 }
 
 func newWalSegmentNoFromFilename(filename string) (WalSegmentNo, error) {

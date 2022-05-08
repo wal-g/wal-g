@@ -58,12 +58,12 @@ func NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks bool
 // TarBallFilePacker is used to pack bundle file into tarball.
 type TarBallFilePacker struct {
 	deltaMap         PagedFileDeltaMap
-	incrementFromLsn *uint64
+	incrementFromLsn *LSN
 	files            BundleFiles
 	options          TarBallFilePackerOptions
 }
 
-func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *uint64, files BundleFiles,
+func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, files BundleFiles,
 	options TarBallFilePackerOptions) *TarBallFilePacker {
 	return &TarBallFilePacker{
 		deltaMap:         deltaMap,

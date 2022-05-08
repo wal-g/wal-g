@@ -11,7 +11,7 @@ func newDeltaNoFromWalSegmentNo(walSegmentNo WalSegmentNo) DeltaNo {
 	return DeltaNo(no)
 }
 
-func newDeltaNoFromLsn(lsn uint64) DeltaNo {
+func newDeltaNoFromLsn(lsn LSN) DeltaNo {
 	return newDeltaNoFromWalSegmentNo(newWalSegmentNo(lsn))
 }
 

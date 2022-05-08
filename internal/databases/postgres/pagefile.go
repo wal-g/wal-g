@@ -30,14 +30,14 @@ import (
 )
 
 const (
-	DatabasePageSize            = int64(walparser.BlockSize)
-	sizeofInt32                 = 4
-	sizeofInt64                 = 8
-	SignatureMagicNumber byte   = 0x55
-	invalidLsn           uint64 = 0
-	validFlags                  = 7
-	layoutVersion               = 4
-	headerSize                  = 24
+	DatabasePageSize          = int64(walparser.BlockSize)
+	sizeofInt32               = 4
+	sizeofInt64               = 8
+	SignatureMagicNumber byte = 0x55
+	invalidLsn           LSN  = 0
+	validFlags                = 7
+	layoutVersion             = 4
+	headerSize                = 24
 
 	DefaultTablespace    = "base"
 	GlobalTablespace     = "global"
@@ -116,7 +116,7 @@ func isPagedFile(info os.FileInfo, filePath string) bool {
 
 func ReadIncrementalFile(filePath string,
 	fileSize int64,
-	lsn uint64,
+	lsn LSN,
 	deltaBitmap *roaring.Bitmap) (fileReader io.ReadCloser, size int64, err error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -138,7 +138,7 @@ func ReadIncrementalFile(filePath string,
 	return pageReader, incrementSize, nil
 }
 
-func ReadIncrementLocations(filePath string, fileSize int64, lsn uint64) ([]walparser.BlockLocation, error) {
+func ReadIncrementLocations(filePath string, fileSize int64, lsn LSN) ([]walparser.BlockLocation, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
