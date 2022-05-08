@@ -10,7 +10,7 @@ func getDeltaMap(folder storage.Folder,
 	timeline uint32,
 	firstUsedLSN,
 	firstNotUsedLSN LSN) (PagedFileDeltaMap, error) {
-	tracelog.InfoLogger.Printf("Timeline: %d, FirstUsedLsn: %d, FirstNotUsedLsn: %d\n",
+	tracelog.InfoLogger.Printf("Timeline: %d, FirstUsedLsn: %s, FirstNotUsedLsn: %s\n",
 		timeline, firstUsedLSN, firstNotUsedLSN)
 	tracelog.InfoLogger.Printf("First WAL should participate in building delta map: %s",
 		newWalSegmentNo(firstUsedLSN).getFilename(timeline))

@@ -35,8 +35,8 @@ func (walSegmentNo WalSegmentNo) sub(n uint64) WalSegmentNo {
 	return WalSegmentNo(uint64(walSegmentNo) - n)
 }
 
-func (walSegmentNo WalSegmentNo) firstLsn() uint64 {
-	return uint64(walSegmentNo) * WalSegmentSize
+func (walSegmentNo WalSegmentNo) firstLsn() LSN {
+	return LSN(uint64(walSegmentNo) * WalSegmentSize)
 }
 
 func (walSegmentNo WalSegmentNo) getFilename(timeline uint32) string {

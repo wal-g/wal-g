@@ -42,7 +42,7 @@ func (deltaNo DeltaNo) firstWalSegmentNo() WalSegmentNo {
 	return WalSegmentNo(deltaNo)
 }
 
-func (deltaNo DeltaNo) firstLsn() uint64 {
+func (deltaNo DeltaNo) firstLsn() LSN {
 	return deltaNo.firstWalSegmentNo().firstLsn()
 }
 
