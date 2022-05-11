@@ -15,14 +15,14 @@ const MetadataDatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 // BackupSentinelDto describes file structure of json sentinel
 type BackupSentinelDto struct {
-	BackupStartLSN    *uint64 `json:"LSN"`
-	IncrementFromLSN  *uint64 `json:"DeltaLSN,omitempty"`
+	BackupStartLSN    *LSN    `json:"LSN"`
+	IncrementFromLSN  *LSN    `json:"DeltaLSN,omitempty"`
 	IncrementFrom     *string `json:"DeltaFrom,omitempty"`
 	IncrementFullName *string `json:"DeltaFullName,omitempty"`
 	IncrementCount    *int    `json:"DeltaCount,omitempty"`
 
 	PgVersion        int     `json:"PgVersion"`
-	BackupFinishLSN  *uint64 `json:"FinishLSN"`
+	BackupFinishLSN  *LSN    `json:"FinishLSN"`
 	SystemIdentifier *uint64 `json:"SystemIdentifier,omitempty"`
 
 	UncompressedSize int64           `json:"UncompressedSize"`
@@ -68,8 +68,8 @@ type ExtendedMetadataDto struct {
 	Hostname         string    `json:"hostname"`
 	DataDir          string    `json:"data_dir"`
 	PgVersion        int       `json:"pg_version"`
-	StartLsn         uint64    `json:"start_lsn"`
-	FinishLsn        uint64    `json:"finish_lsn"`
+	StartLsn         LSN       `json:"start_lsn"`
+	FinishLsn        LSN       `json:"finish_lsn"`
 	IsPermanent      bool      `json:"is_permanent"`
 	SystemIdentifier *uint64   `json:"system_identifier"`
 
@@ -167,5 +167,5 @@ func NewBackupSentinelDtoV2(sentinel BackupSentinelDto, meta ExtendedMetadataDto
 
 type DeprecatedSentinelFields struct {
 	FilesMetadataDto
-	DeltaFromLSN *uint64 `json:"DeltaFromLSN,omitempty"`
+	DeltaFromLSN *LSN `json:"DeltaFromLSN,omitempty"`
 }

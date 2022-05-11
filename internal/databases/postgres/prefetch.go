@@ -57,7 +57,7 @@ func HandleWALPrefetch(uploader *WalUploader, walFileName string, location strin
 }
 
 // TODO : unit tests
-func prefaultData(prefaultStartLsn uint64, timelineID uint32, waitGroup *sync.WaitGroup, uploader *WalUploader) {
+func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitGroup, uploader *WalUploader) {
 	defer func() {
 		if r := recover(); r != nil {
 			tracelog.ErrorLogger.Println("Prefault unsuccessful ", prefaultStartLsn)
@@ -75,7 +75,8 @@ func prefaultData(prefaultStartLsn uint64, timelineID uint32, waitGroup *sync.Wa
 	bundle := NewBundle(archiveDirectory, nil, &prefaultStartLsn, nil,
 		false, viper.GetInt64(internal.TarSizeThresholdSetting))
 	bundle.Timeline = timelineID
-	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(utility.WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
+	startLsn := prefaultStartLsn + LSN(WalSegmentSize*WalFileInDelta)
+	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(utility.WalPath), startLsn)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Error during loading delta map: '%+v'.", err)
 		return

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -167,7 +166,7 @@ func getCurrentWalSegmentNo(queryRunner *PgQueryRunner) (WalSegmentNo, error) {
 	if err != nil {
 		return 0, err
 	}
-	lsn, err := pgx.ParseLSN(lsnStr)
+	lsn, err := ParseLSN(lsnStr)
 	if err != nil {
 		return 0, err
 	}

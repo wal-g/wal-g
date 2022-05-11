@@ -91,7 +91,7 @@ type RatingTarBallComposer struct {
 	fileStats   RelFileStatistics
 	bundleFiles BundleFiles
 
-	incrementBaseLsn *uint64
+	incrementBaseLsn *LSN
 	tarSizeThreshold uint64
 
 	deltaMap         PagedFileDeltaMap
@@ -104,7 +104,7 @@ type RatingTarBallComposer struct {
 
 func NewRatingTarBallComposer(
 	tarSizeThreshold uint64, updateRatingEvaluator internal.ComposeRatingEvaluator,
-	incrementBaseLsn *uint64, deltaMap PagedFileDeltaMap, tarBallQueue *internal.TarBallQueue,
+	incrementBaseLsn *LSN, deltaMap PagedFileDeltaMap, tarBallQueue *internal.TarBallQueue,
 	crypter crypto.Crypter, fileStats RelFileStatistics, bundleFiles BundleFiles, packer *TarBallFilePacker,
 ) (*RatingTarBallComposer, error) {
 	errorGroup, ctx := errgroup.WithContext(context.Background())

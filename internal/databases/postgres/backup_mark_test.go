@@ -34,7 +34,7 @@ func TestGetBackupMetadataToUpload_markSeveralBackups(t *testing.T) {
 			},
 			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom:     func(s string) *string { return &s }("base_000000010000000000000002"),
-				IncrementFromLSN:  func(i uint64) *uint64 { return &i }(1),
+				IncrementFromLSN:  func(i postgres.LSN) *postgres.LSN { return &i }(1),
 				IncrementFullName: func(s string) *string { return &s }(""),
 				IncrementCount:    func(i int) *int { return &i }(1),
 			},
@@ -45,7 +45,7 @@ func TestGetBackupMetadataToUpload_markSeveralBackups(t *testing.T) {
 			},
 			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom:     func(s string) *string { return &s }("base_000000010000000000000004_D_000000010000000000000002"),
-				IncrementFromLSN:  func(i uint64) *uint64 { return &i }(1),
+				IncrementFromLSN:  func(i postgres.LSN) *postgres.LSN { return &i }(1),
 				IncrementFullName: func(s string) *string { return &s }(""),
 				IncrementCount:    func(i int) *int { return &i }(1),
 			},
@@ -78,7 +78,7 @@ func TestGetBackupMetadataToUpload_markOneBackup(t *testing.T) {
 			},
 			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom:     func(s string) *string { return &s }("base_000000010000000000000002"),
-				IncrementFromLSN:  func(i uint64) *uint64 { return &i }(1),
+				IncrementFromLSN:  func(i postgres.LSN) *postgres.LSN { return &i }(1),
 				IncrementFullName: func(s string) *string { return &s }(""),
 				IncrementCount:    func(i int) *int { return &i }(1),
 			},
@@ -89,7 +89,7 @@ func TestGetBackupMetadataToUpload_markOneBackup(t *testing.T) {
 			},
 			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom:     func(s string) *string { return &s }("base_000000010000000000000004_D_000000010000000000000002"),
-				IncrementFromLSN:  func(i uint64) *uint64 { return &i }(1),
+				IncrementFromLSN:  func(i postgres.LSN) *postgres.LSN { return &i }(1),
 				IncrementFullName: func(s string) *string { return &s }(""),
 				IncrementCount:    func(i int) *int { return &i }(1),
 			},
@@ -119,7 +119,7 @@ func TestGetBackupMetadataToUpload_unmarkOneBackupWithIncrementBackups(t *testin
 			},
 			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom:     func(s string) *string { return &s }("base_000000010000000000000002"),
-				IncrementFromLSN:  func(i uint64) *uint64 { return &i }(1),
+				IncrementFromLSN:  func(i postgres.LSN) *postgres.LSN { return &i }(1),
 				IncrementFullName: func(s string) *string { return &s }(""),
 				IncrementCount:    func(i int) *int { return &i }(1),
 			},
@@ -130,7 +130,7 @@ func TestGetBackupMetadataToUpload_unmarkOneBackupWithIncrementBackups(t *testin
 			},
 			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom:     func(s string) *string { return &s }("base_000000010000000000000004_D_000000010000000000000002"),
-				IncrementFromLSN:  func(i uint64) *uint64 { return &i }(1),
+				IncrementFromLSN:  func(i postgres.LSN) *postgres.LSN { return &i }(1),
 				IncrementFullName: func(s string) *string { return &s }(""),
 				IncrementCount:    func(i int) *int { return &i }(1),
 			},
@@ -161,7 +161,7 @@ func TestGetBackupMetadataToUpload_unmarkOneBackupWithoutIncrementBackups(t *tes
 			},
 			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom:     func(s string) *string { return &s }("base_000000010000000000000002"),
-				IncrementFromLSN:  func(i uint64) *uint64 { return &i }(1),
+				IncrementFromLSN:  func(i postgres.LSN) *postgres.LSN { return &i }(1),
 				IncrementFullName: func(s string) *string { return &s }(""),
 				IncrementCount:    func(i int) *int { return &i }(1),
 			},
@@ -228,7 +228,7 @@ func TestGetBackupMetadataToUpload_tryToUnmarkBackupWithMarkedIncrementBackups(t
 			},
 			sentinel: postgres.BackupSentinelDto{
 				IncrementFrom:     func(s string) *string { return &s }("base_000000010000000000000002"),
-				IncrementFromLSN:  func(i uint64) *uint64 { return &i }(1),
+				IncrementFromLSN:  func(i postgres.LSN) *postgres.LSN { return &i }(1),
 				IncrementFullName: func(s string) *string { return &s }(""),
 				IncrementCount:    func(i int) *int { return &i }(1),
 			},

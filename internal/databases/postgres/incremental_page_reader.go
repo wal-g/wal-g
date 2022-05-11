@@ -20,7 +20,7 @@ var IncrementFileHeader = []byte{'w', 'i', '1', SignatureMagicNumber}
 type IncrementalPageReader struct {
 	PagedFile ioextensions.ReadSeekCloser
 	FileSize  int64
-	Lsn       uint64
+	Lsn       LSN
 	Next      []byte
 	Blocks    []uint32
 }
