@@ -55,7 +55,7 @@ func (u *CommonDirectoryUploader) Upload(path string) TarFileSets {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Packing ...")
-	tarFileSets, err := bundle.PackTarballs()
+	tarFileSets, err := bundle.FinishComposing()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.DebugLogger.Println("Finishing queue ...")

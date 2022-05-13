@@ -97,7 +97,7 @@ func (c *RegularTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.Fil
 	c.files.AddSkippedFile(tarHeader, fileInfo)
 }
 
-func (c *RegularTarBallComposer) PackTarballs() (parallel.TarFileSets, error) {
+func (c *RegularTarBallComposer) FinishComposing() (parallel.TarFileSets, error) {
 	err := c.errorGroup.Wait()
 	if err != nil {
 		return nil, err

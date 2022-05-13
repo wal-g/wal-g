@@ -75,8 +75,8 @@ func (relStat *RelFileStatistics) getFileUpdateCount(filePath string) uint64 {
 	return fileStat.deletedTuplesCount + fileStat.updatedTuplesCount + fileStat.insertedTuplesCount
 }
 
-func newRelFileStatistics(conn *pgx.Conn) (RelFileStatistics, error) {
-	databases, err := getDatabaseInfos(conn)
+func newRelFileStatistics(queryRunner *PgQueryRunner) (RelFileStatistics, error) {
+	databases, err := queryRunner.getDatabaseInfos()
 	if err != nil {
 		return nil, errors.Wrap(err, "CollectStatistics: Failed to get db names.")
 	}
@@ -110,12 +110,4 @@ func newRelFileStatistics(conn *pgx.Conn) (RelFileStatistics, error) {
 		tracelog.WarningLogger.PrintOnError(err)
 	}
 	return result, nil
-}
-
-func getDatabaseInfos(conn *pgx.Conn) ([]PgDatabaseInfo, error) {
-	queryRunner, err := NewPgQueryRunner(conn)
-	if err != nil {
-		return nil, errors.Wrap(err, "getDatabaseInfos: Failed to build query runner.")
-	}
-	return queryRunner.getDatabaseInfos()
 }

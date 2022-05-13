@@ -7,8 +7,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/greenplum-db/gp-common-go-libs/gplog"
-
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -65,7 +63,7 @@ func NewFetchHandler(
 ) *FetchHandler {
 	backupIDByContentID := make(map[int]string)
 	segmentConfigs := make([]cluster.SegConfig, 0)
-	gplog.InitializeLogging("wal-g", logsDir)
+	initGpLog(logsDir)
 
 	for _, segMeta := range sentinel.Segments {
 		// currently, WAL-G does not restore the mirrors
@@ -96,6 +94,8 @@ func NewFetchHandler(
 	}
 }
 
+// TODO: Unit tests
+// prepareContentIDsToFetch returns a set containing the IDs of segments to be fetched
 func prepareContentIDsToFetch(fetchContentIds []int, segmentConfigs []cluster.SegConfig) map[int]bool {
 	contentIDsToFetch := make(map[int]bool)
 
@@ -224,6 +224,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 	return nil
 }
 
+// TODO: Unit tests
 // buildFetchCommand creates the WAL-G command to restore the segment with
 // the provided contentID
 func (fh *FetchHandler) buildFetchCommand(contentID int) string {
@@ -246,6 +247,8 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 		fmt.Sprintf("--content-id=%d", segment.ContentID),
 		fmt.Sprintf("--target-user-data=%s", segUserData.QuotedString()),
 		fmt.Sprintf("--config=%s", internal.CfgFile),
+		// forward STDOUT& STDERR to log file
+		">>", formatSegmentLogPath(contentID), "2>&1",
 	}
 
 	cmdLine := strings.Join(cmd, " ")

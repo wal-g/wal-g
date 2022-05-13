@@ -9,7 +9,7 @@ type TarBallComposer interface {
 	AddFile(info *ComposeFileInfo)
 	AddHeader(header *tar.Header, fileInfo os.FileInfo) error
 	SkipFile(tarHeader *tar.Header, fileInfo os.FileInfo)
-	PackTarballs() (TarFileSets, error)
+	FinishComposing() (TarFileSets, error)
 	GetFiles() BundleFiles
 }
 

@@ -7,6 +7,8 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 
 	"github.com/pkg/errors"
@@ -98,6 +100,7 @@ type RatingTarBallComposer struct {
 	deltaMapComplete bool
 
 	errorGroup *errgroup.Group
+	ctx        context.Context
 }
 
 func NewRatingTarBallComposer(
@@ -105,7 +108,7 @@ func NewRatingTarBallComposer(
 	incrementBaseLsn *uint64, deltaMap PagedFileDeltaMap, tarBallQueue *internal.TarBallQueue,
 	crypter crypto.Crypter, fileStats RelFileStatistics, bundleFiles parallel.BundleFiles, packer *PostgresTarBallFilePacker,
 ) (*RatingTarBallComposer, error) {
-	errorGroup, _ := errgroup.WithContext(context.Background())
+	errorGroup, ctx := errgroup.WithContext(context.Background())
 	deltaMapComplete := true
 	if deltaMap == nil {
 		deltaMapComplete = false
@@ -126,6 +129,7 @@ func NewRatingTarBallComposer(
 		bundleFiles:            bundleFiles,
 		tarFilePacker:          packer,
 		errorGroup:             errorGroup,
+		ctx:                    ctx,
 	}
 
 	maxUploadDiskConcurrency, err := internal.GetMaxUploadDiskConcurrency()
@@ -143,7 +147,13 @@ func NewRatingTarBallComposer(
 }
 
 func (c *RatingTarBallComposer) AddFile(info *parallel.ComposeFileInfo) {
-	c.addFileQueue <- info
+	select {
+	case c.addFileQueue <- info:
+		return
+	case <-c.ctx.Done():
+		tracelog.ErrorLogger.Printf("AddFile: not doing anything, err: %v", c.ctx.Err())
+		return
+	}
 }
 
 func (c *RatingTarBallComposer) AddHeader(fileInfoHeader *tar.Header, info os.FileInfo) error {
@@ -156,7 +166,7 @@ func (c *RatingTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.File
 	c.bundleFiles.AddSkippedFile(tarHeader, fileInfo)
 }
 
-func (c *RatingTarBallComposer) PackTarballs() (parallel.TarFileSets, error) {
+func (c *RatingTarBallComposer) FinishComposing() (parallel.TarFileSets, error) {
 	close(c.addFileQueue)
 	err := c.errorGroup.Wait()
 	if err != nil {

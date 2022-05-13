@@ -374,7 +374,7 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesM
 	if err != nil {
 		t.Log(err)
 	}
-	tarFileSets, err := bundle.PackTarballs()
+	tarFileSets, err := bundle.FinishTarComposer()
 	if err != nil {
 		t.Log(err)
 	}

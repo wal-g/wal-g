@@ -104,8 +104,8 @@ func (bundle *Bundle) AddToBundle(path string, info os.FileInfo, err error) erro
 	return nil
 }
 
-func (bundle *Bundle) PackTarballs() (TarFileSets, error) {
-	return bundle.TarBallComposer.PackTarballs()
+func (bundle *Bundle) FinishComposing() (TarFileSets, error) {
+	return bundle.TarBallComposer.FinishComposing()
 }
 
 func (bundle *Bundle) getFileRelPath(fileAbsPath string) string {

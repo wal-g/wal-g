@@ -81,6 +81,13 @@ const (
 	SerializerTypeSetting        = "WALG_SERIALIZER_TYPE"
 	StreamSplitterPartitions     = "WALG_STREAM_SPLITTER_PARTITIONS"
 	StreamSplitterBlockSize      = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
+	StatsdAddressSetting         = "WALG_STATSD_ADDRESS"
+	PgAliveCheckInterval         = "WALG_ALIVE_CHECK_INTERVAL"
+	PgStopBackupTimeout          = "WALG_STOP_BACKUP_TIMEOUT"
+
+	ProfileSamplingRatio = "PROFILE_SAMPLING_RATIO"
+	ProfileMode          = "PROFILE_MODE"
+	ProfilePath          = "PROFILE_PATH"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
@@ -246,6 +253,11 @@ var (
 		DeltaFromUserDataSetting:     true,
 		FetchTargetUserDataSetting:   true,
 		SerializerTypeSetting:        true,
+		StatsdAddressSetting:         true,
+
+		ProfileSamplingRatio: true,
+		ProfileMode:          true,
+		ProfilePath:          true,
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,
@@ -325,19 +337,21 @@ var (
 
 	PGAllowedSettings = map[string]bool{
 		// Postgres
-		PgPortSetting:     true,
-		PgUserSetting:     true,
-		PgHostSetting:     true,
-		PgDataSetting:     true,
-		PgPasswordSetting: true,
-		PgDatabaseSetting: true,
-		PgSslModeSetting:  true,
-		PgSlotName:        true,
-		PgWalSize:         true,
-		"PGPASSFILE":      true,
-		PrefetchDir:       true,
-		PgReadyRename:     true,
-		PgBackRestStanza:  true,
+		PgPortSetting:        true,
+		PgUserSetting:        true,
+		PgHostSetting:        true,
+		PgDataSetting:        true,
+		PgPasswordSetting:    true,
+		PgDatabaseSetting:    true,
+		PgSslModeSetting:     true,
+		PgSlotName:           true,
+		PgWalSize:            true,
+		"PGPASSFILE":         true,
+		PrefetchDir:          true,
+		PgReadyRename:        true,
+		PgBackRestStanza:     true,
+		PgAliveCheckInterval: true,
+		PgStopBackupTimeout:  true,
 	}
 
 	MongoAllowedSettings = map[string]bool{
@@ -548,7 +562,7 @@ func ConfigureAndRunDefaultWebServer() error {
 	return nil
 }
 
-func AddConfigFlags(Cmd *cobra.Command) {
+func AddConfigFlags(Cmd *cobra.Command, hiddenCfgFlagAnnotation string) {
 	cfgFlags := &pflag.FlagSet{}
 	for k := range AllowedSettings {
 		flagName := toFlagName(k)
@@ -561,8 +575,12 @@ func AddConfigFlags(Cmd *cobra.Command) {
 		cfgFlags.String(flagName, "", flagUsage)
 		_ = viper.BindPFlag(k, cfgFlags.Lookup(flagName))
 	}
-	cfgFlags.VisitAll(func(f *pflag.Flag) { f.Hidden = true })
-
+	cfgFlags.VisitAll(func(f *pflag.Flag) {
+		if f.Annotations == nil {
+			f.Annotations = map[string][]string{}
+		}
+		f.Annotations[hiddenCfgFlagAnnotation] = []string{"true"}
+	})
 	Cmd.PersistentFlags().AddFlagSet(cfgFlags)
 }
 
@@ -571,6 +589,7 @@ func InitConfig() {
 	var globalViper = viper.GetViper()
 	globalViper.AutomaticEnv() // read in environment variables that match
 	SetDefaultValues(globalViper)
+	SetGoMaxProcs(globalViper)
 	ReadConfigFromFile(globalViper, CfgFile)
 	CheckAllowedSettings(globalViper)
 
@@ -608,12 +627,10 @@ func SetDefaultValues(config *viper.Viper) {
 	for setting, value := range defaultConfigValues {
 		config.SetDefault(setting, value)
 	}
-
-	setGoMaxProcs()
 }
 
-func setGoMaxProcs() {
-	gomaxprocs := viper.GetInt(GoMaxProcs)
+func SetGoMaxProcs(config *viper.Viper) {
+	gomaxprocs := config.GetInt(GoMaxProcs)
 	if !Turbo && gomaxprocs > 0 {
 		runtime.GOMAXPROCS(gomaxprocs)
 	}

@@ -6,10 +6,11 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/wal-g/wal-g/utility"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
-	"github.com/wal-g/wal-g/utility"
 )
 
 func HandlePgbackrestBackupFetch(folder storage.Folder, stanza string, destinationDirectory string,
@@ -53,7 +54,7 @@ func fullBackupFetch(folder storage.Folder, stanza string, backupName string,
 func getFilesToUnwrap(files []internal.ReaderMaker) map[string]bool {
 	filesToUnwrap := make(map[string]bool)
 	for _, file := range files {
-		filesToUnwrap[utility.TrimFileExtension(file.Path())] = true
+		filesToUnwrap[file.LocalPath()] = true
 	}
 	return filesToUnwrap
 }
@@ -84,7 +85,7 @@ func getFilesRecursively(folder storage.Folder, backupFilesFolder storage.Folder
 			return nil, err
 		}
 		filePath := path.Join(relativePath, object.GetName())
-		file := internal.NewRegularFileStorageReaderMarker(backupFilesFolder, filePath, fileMode)
+		file := internal.NewRegularFileStorageReaderMarker(backupFilesFolder, filePath, utility.TrimFileExtension(filePath), int64(fileMode))
 		files = append(files, file)
 	}
 

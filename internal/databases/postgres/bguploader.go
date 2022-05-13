@@ -172,7 +172,7 @@ func (b *BgUploader) scanAndProcessFiles() {
 //
 // This function should only be invoked once (in scanFiles)
 func (b *BgUploader) processFiles(fileChan <-chan string) {
-	var numUploaded int32 = 0
+	var numUploaded int32
 	for {
 		name, ok := <-fileChan
 		if !ok {

@@ -27,6 +27,7 @@ const (
 	SecretAccessKeySetting   = "AWS_SECRET_ACCESS_KEY"
 	SecretKeySetting         = "AWS_SECRET_KEY"
 	SessionTokenSetting      = "AWS_SESSION_TOKEN"
+	S3UseYcSessionToken      = "S3_USE_YC_SESSION_TOKEN"
 	SseSetting               = "S3_SSE"
 	SseCSetting              = "S3_SSE_C"
 	SseKmsIdSetting          = "S3_SSE_KMS_ID"
@@ -64,6 +65,7 @@ var (
 		SecretAccessKeySetting,
 		SecretKeySetting,
 		SessionTokenSetting,
+		S3UseYcSessionToken,
 		SseSetting,
 		SseCSetting,
 		SseKmsIdSetting,

@@ -183,6 +183,22 @@ func createSession(bucket string, settings map[string]string) (*session.Session,
 		}
 	}
 
+	if settings[S3UseYcSessionToken] != "" {
+		useYcSessionToken, err := strconv.ParseBool(settings[S3UseYcSessionToken])
+		if err != nil {
+			return nil, NewFolderError(err, "Invalid %s setting", S3UseYcSessionToken)
+		}
+		if useYcSessionToken {
+			// yandex cloud mimic metadata service, so we can use default AWS credentials, but set token to another header
+			cred := credentials.NewCredentials(defaults.RemoteCredProvider(*defaults.Config(), defaults.Handlers()))
+			s.Config.WithCredentials(cred)
+			s.Handlers.Send.PushFront(func(r *request.Request) {
+				token := r.HTTPRequest.Header.Get("X-Amz-Security-Token")
+				r.HTTPRequest.Header.Add("X-YaCloud-SubjectToken", token)
+			})
+		}
+	}
+
 	if endpointSource, ok := settings[EndpointSourceSetting]; ok {
 		s.Handlers.Validate.PushBack(func(request *request.Request) {
 			src := setupReqProxy(endpointSource, getEndpointPort(settings))

@@ -2,6 +2,7 @@ package greenplum
 
 import (
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -136,7 +137,17 @@ func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject, confirm
 
 		tracelog.InfoLogger.Printf("Running delete before target %s on segment %d\n",
 			segTarget.GetBackupName(), meta.ContentID)
-		err = segDeleteHandler.DeleteBeforeTarget(segTarget, confirmed)
+
+		filterFunc := func(object storage.Object) bool {
+			return !strings.HasSuffix(object.GetName(), postgres.AoSegSuffix)
+		}
+
+		err = segDeleteHandler.DeleteBeforeTargetWhere(segTarget, confirmed, filterFunc)
+		if err != nil {
+			return err
+		}
+
+		err = cleanupAOSegments(segFolder, confirmed)
 		if err != nil {
 			return err
 		}
@@ -144,4 +155,51 @@ func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject, confirm
 	tracelog.InfoLogger.Printf("Finished deleting the segments backups")
 
 	return h.DeleteHandler.DeleteBeforeTarget(target, confirmed)
+}
+
+func cleanupAOSegments(segFolder storage.Folder, confirmed bool) error {
+	aoSegFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(postgres.AoStoragePath)
+	aoSegmentsToDelete, err := findAoSegmentsToDelete(aoSegFolder)
+	if err != nil {
+		return err
+	}
+
+	tracelog.InfoLogger.Printf("Cleaning up the AO segment objects")
+	return storage.DeleteObjectsWhere(aoSegFolder, confirmed, func(object storage.Object) bool {
+		if !strings.HasSuffix(object.GetName(), postgres.AoSegSuffix) {
+			return false
+		}
+
+		segName := path.Base(object.GetName())
+		_, shouldDelete := aoSegmentsToDelete[segName]
+		return shouldDelete
+	})
+}
+
+func findAoSegmentsToDelete(aoSegFolder storage.Folder) (map[string]struct{}, error) {
+	aoObjects, _, err := aoSegFolder.ListFolder()
+	if err != nil {
+		return nil, err
+	}
+
+	aoSegmentsToDelete := make(map[string]struct{})
+	// by default, we want to delete all segments
+	for _, obj := range aoObjects {
+		if strings.HasSuffix(obj.GetName(), postgres.AoSegSuffix) {
+			aoSegName := path.Base(obj.GetName())
+			aoSegmentsToDelete[aoSegName] = struct{}{}
+		}
+	}
+
+	// now exclude the still referenced ones
+	for _, obj := range aoObjects {
+		if strings.HasSuffix(obj.GetName(), postgres.BackupRefSuffix) {
+			// this should never fail, since slice len is always > 0
+			referencedSegName := strings.SplitAfter(obj.GetName(), postgres.AoSegSuffix)[0]
+			tracelog.InfoLogger.Printf(
+				"AO segment %s is still referenced by some backups, will not delete it\n", referencedSegName)
+			delete(aoSegmentsToDelete, referencedSegName)
+		}
+	}
+	return aoSegmentsToDelete, nil
 }

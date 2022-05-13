@@ -10,10 +10,13 @@ declare -a SEGMENTS_DIRS=(
 
 insert_data() {
   echo "Inserting sample data..."
-  psql -p 6000 -c "drop database if exists test"
-  psql -p 6000 -c "create database test"
-  psql -p 6000 -d test -c "create table test(id serial not null primary key, n float)"
-  psql -p 6000 -d test -c "insert into test(n) select random() from generate_series(1,10000)"
+  psql -p 6000 -c "DROP DATABASE IF EXISTS test"
+  psql -p 6000 -c "CREATE DATABASE test"
+	psql -p 6000 -d test -c "CREATE TABLE heap AS SELECT a FROM generate_series(1,10) AS a;"
+	psql -p 6000 -d test -c "CREATE TABLE ao(a int, b int) WITH (appendoptimized = true) DISTRIBUTED BY (a);"
+	psql -p 6000 -d test -c "CREATE TABLE co(a int, b int) WITH (appendoptimized = true, orientation = column) DISTRIBUTED BY (a);"
+	psql -p 6000 -d test -c "INSERT INTO ao select i, i FROM generate_series(1,10)i;"
+	psql -p 6000 -d test -c "INSERT INTO co select i, i FROM generate_series(1,10)i;"
 }
 
 enable_pitr_extension() {
@@ -70,4 +73,14 @@ delete_cluster_dirs() {
 stop_and_delete_cluster_dir() {
   stop_cluster
   delete_cluster_dirs
+}
+
+run_backup_logged() {
+  wal-g --config=$1 backup-push $2 && EXIT_STATUS=$? || EXIT_STATUS=$?
+  if [ "$EXIT_STATUS" -ne 0 ] ; then
+      echo "Error: Failed to create backup"
+      cat /var/log/wal-g-gplog.log
+      cat /var/log/wal-g-log-seg*
+      exit 1
+  fi
 }

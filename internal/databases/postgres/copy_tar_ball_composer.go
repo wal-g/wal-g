@@ -231,12 +231,12 @@ func (c *CopyTarBallComposer) copyUnchangedTars() error {
 	return nil
 }
 
-func (c *CopyTarBallComposer) PackTarballs() (parallel.TarFileSets, error) {
+func (c *CopyTarBallComposer) FinishComposing() (parallel.TarFileSets, error) {
 	err := c.copyUnchangedTars()
 	if err != nil {
 		return nil, err
 	}
-	var tarBall internal.TarBall = nil
+	var tarBall internal.TarBall
 	for fileName := range c.fileInfo {
 		file := c.fileInfo[fileName]
 		if file.status == doNotCopy || file.status == fromNew {

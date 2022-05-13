@@ -175,7 +175,7 @@ func readXLogRecordBlockHeader(lastRelFileNode *RelFileNode,
 }
 
 func readXLogRecordBlockHeaderPart(record *XLogRecord, reader io.Reader) error {
-	var lastRelFileNode *RelFileNode = nil
+	var lastRelFileNode *RelFileNode
 	maxReadBlockID := -1
 	headerReader := &ShrinkableReader{reader, int(record.Header.TotalRecordLength - XLogRecordHeaderSize)}
 	for headerReader.dataRemained > 0 {
