@@ -67,8 +67,8 @@ type BackupArguments struct {
 type CurBackupInfo struct {
 	name             string
 	startTime        time.Time
-	startLSN         uint64
-	endLSN           uint64
+	startLSN         LSN
+	endLSN           LSN
 	uncompressedSize int64
 	compressedSize   int64
 	incrementCount   int
@@ -183,7 +183,7 @@ func (bh *BackupHandler) startBackup() (err error) {
 	}
 	bh.curBackupInfo.startLSN = backupStartLSN
 	bh.curBackupInfo.name = backupName
-	tracelog.DebugLogger.Printf("Backup name: %s\nBackup start LSN: %d", backupName, backupStartLSN)
+	tracelog.DebugLogger.Printf("Backup name: %s\nBackup start LSN: %s", backupName, backupStartLSN)
 	bh.initBackupTerminator()
 	return
 }
@@ -280,7 +280,7 @@ func (bh *BackupHandler) uploadBackup() parallel.TarFileSets {
 	timelineChanged := bundle.checkTimelineChanged(bh.workers.queryRunner)
 	tracelog.DebugLogger.Printf("Labelfiles tarball name: %s", labelFilesTarBallName)
 	tracelog.DebugLogger.Printf("Number of label files: %d", len(labelFilesList))
-	tracelog.DebugLogger.Printf("Finish LSN: %d", bh.curBackupInfo.endLSN)
+	tracelog.DebugLogger.Printf("Finish LSN: %s", bh.curBackupInfo.endLSN)
 	tracelog.DebugLogger.Printf("Uncompressed size: %d", bh.curBackupInfo.uncompressedSize)
 	tracelog.DebugLogger.Printf("Compressed size: %d", bh.curBackupInfo.compressedSize)
 
@@ -353,8 +353,8 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 
 	baseBackup := bh.runRemoteBackup()
 	tracelog.InfoLogger.Println("Updating metadata")
-	bh.curBackupInfo.startLSN = uint64(baseBackup.StartLSN)
-	bh.curBackupInfo.endLSN = uint64(baseBackup.EndLSN)
+	bh.curBackupInfo.startLSN = LSN(baseBackup.StartLSN)
+	bh.curBackupInfo.endLSN = LSN(baseBackup.EndLSN)
 
 	bh.curBackupInfo.uncompressedSize = baseBackup.UncompressedSize
 	bh.curBackupInfo.compressedSize, err = bh.workers.uploader.UploadedDataSize()
@@ -565,7 +565,7 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 			return err
 		}
 	}
-	tracelog.InfoLogger.Printf("Delta backup from %v with LSN %x.\n", previousBackupName,
+	tracelog.InfoLogger.Printf("Delta backup from %v with LSN %s.\n", previousBackupName,
 		*prevBackupSentinelDto.BackupStartLSN)
 	bh.prevBackupInfo.name = previousBackupName
 	bh.prevBackupInfo.sentinelDto = prevBackupSentinelDto

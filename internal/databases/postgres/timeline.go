@@ -84,7 +84,7 @@ func SetWalSize(sizeMb uint64) {
 }
 
 // getWalFilename formats WAL file name using PostgreSQL connection. Essentially reads timeline of the server.
-func getWalFilename(lsn uint64, queryRunner *PgQueryRunner) (walFilename string, timeline uint32, err error) {
+func getWalFilename(lsn LSN, queryRunner *PgQueryRunner) (walFilename string, timeline uint32, err error) {
 	timeline, err = queryRunner.readTimeline()
 	if err != nil {
 		return "", 0, err
@@ -170,7 +170,7 @@ func GetNextWalFilename(name string) (string, error) {
 	return formatWALFileName(timelineID, logSegNo), nil
 }
 
-func shouldPrefault(name string) (lsn uint64, shouldPrefault bool, timelineID uint32, err error) {
+func shouldPrefault(name string) (lsn LSN, shouldPrefault bool, timelineID uint32, err error) {
 	timelineID, logSegNo, err := ParseWALFilename(name)
 	if err != nil {
 		return 0, false, 0, err
@@ -180,5 +180,5 @@ func shouldPrefault(name string) (lsn uint64, shouldPrefault bool, timelineID ui
 	}
 	logSegNo += WalFileInDelta
 
-	return logSegNo * WalSegmentSize, true, timelineID, nil
+	return LSN(logSegNo * WalSegmentSize), true, timelineID, nil
 }

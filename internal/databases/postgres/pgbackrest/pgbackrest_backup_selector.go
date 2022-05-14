@@ -8,7 +8,7 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-type LastestBackupSelector struct {
+type LatestBackupSelector struct {
 	Stanza string
 }
 
@@ -17,7 +17,7 @@ type NamedBackupSelector struct {
 	Stanza     string
 }
 
-func (selector LastestBackupSelector) Select(folder storage.Folder) (string, error) {
+func (selector LatestBackupSelector) Select(folder storage.Folder) (string, error) {
 	backupList, err := GetBackupList(folder, selector.Stanza)
 	if err != nil {
 		return "", err
@@ -45,7 +45,7 @@ func (selector NamedBackupSelector) Select(folder storage.Folder) (string, error
 func NewBackupSelector(backupName string, stanza string) internal.BackupSelector {
 	if backupName == internal.LatestString {
 		tracelog.InfoLogger.Printf("Selecting the latest backup...\n")
-		return LastestBackupSelector{Stanza: stanza}
+		return LatestBackupSelector{Stanza: stanza}
 	}
 
 	tracelog.InfoLogger.Printf("Selecting the backup with name %s...\n", backupName)

@@ -14,8 +14,8 @@ func TestGetDeltaRange(t *testing.T) {
 	walSegNo000000010000011100000015 := walSegNo000000010000011100000014.next()
 	walSegNo000000010000011100000009 := deltaNo000000010000011100000010.firstWalSegmentNo().previous()
 	type args struct {
-		firstUsedLsn    uint64
-		firstNotUsedLsn uint64
+		firstUsedLsn    LSN
+		firstNotUsedLsn LSN
 	}
 	tests := []struct {
 		name                string
@@ -89,7 +89,7 @@ func TestGetWalSegmentRange(t *testing.T) {
 	deltaNo000000010000011100000009, _ := newDeltaNoFromFilename("000000010000011100000009")
 	type args struct {
 		firstNotUsedDeltaNo DeltaNo
-		firstNotUsedLsn     uint64
+		firstNotUsedLsn     LSN
 	}
 	tests := []struct {
 		name  string

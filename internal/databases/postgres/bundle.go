@@ -12,7 +12,6 @@ import (
 	"github.com/wal-g/wal-g/internal"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
@@ -71,7 +70,7 @@ type Bundle struct {
 	Crypter            crypto.Crypter
 	Timeline           uint32
 	Replica            bool
-	IncrementFromLsn   *uint64
+	IncrementFromLsn   *LSN
 	IncrementFromFiles internal.BackupFileList
 	DeltaMap           PagedFileDeltaMap
 	TablespaceSpec     TablespaceSpec
@@ -83,7 +82,7 @@ type Bundle struct {
 // TODO: use DiskDataFolder
 func NewBundle(
 	directory string, crypter crypto.Crypter,
-	incrementFromLsn *uint64, incrementFromFiles internal.BackupFileList,
+	incrementFromLsn *LSN, incrementFromFiles internal.BackupFileList,
 	forceIncremental bool, tarSizeThreshold int64,
 ) *Bundle {
 	return &Bundle{
@@ -125,7 +124,7 @@ func (bundle *Bundle) NewTarBall(dedicatedUploader bool) internal.TarBall {
 }
 
 // GetIncrementBaseLsn returns LSN of previous backup
-func (bundle *Bundle) getIncrementBaseLsn() *uint64 { return bundle.IncrementFromLsn }
+func (bundle *Bundle) getIncrementBaseLsn() *LSN { return bundle.IncrementFromLsn }
 
 // GetIncrementBaseFiles returns list of Files from previous backup
 func (bundle *Bundle) getIncrementBaseFiles() internal.BackupFileList {
@@ -159,14 +158,14 @@ func (bundle *Bundle) checkTimelineChanged(queryRunner *PgQueryRunner) bool {
 // a file but returned instead. Returns empty string and an error if backup
 // fails.
 func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
-	backup string) (backupName string, lsn uint64, err error) {
+	backup string) (backupName string, lsn LSN, err error) {
 	var name, lsnStr string
 	name, lsnStr, bundle.Replica, err = queryRunner.startBackup(backup)
 
 	if err != nil {
 		return "", 0, err
 	}
-	lsn, err = pgx.ParseLSN(lsnStr)
+	lsn, err = ParseLSN(lsnStr)
 	if err != nil {
 		return "", 0, err
 	}
@@ -355,13 +354,13 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 // TODO : unit tests
 // UploadLabelFiles creates the `backup_label` and `tablespace_map` files by stopping the backup
 // and uploads them to S3.
-func (bundle *Bundle) uploadLabelFiles(queryRunner *PgQueryRunner) (string, []string, uint64, error) {
+func (bundle *Bundle) uploadLabelFiles(queryRunner *PgQueryRunner) (string, []string, LSN, error) {
 	label, offsetMap, lsnStr, err := queryRunner.stopBackup()
 	if err != nil {
 		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: failed to stop backup")
 	}
 
-	lsn, err := pgx.ParseLSN(lsnStr)
+	lsn, err := ParseLSN(lsnStr)
 	if err != nil {
 		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: failed to parse finish LSN")
 	}
@@ -414,7 +413,7 @@ func (bundle *Bundle) getDeltaBitmapFor(filePath string) (*roaring.Bitmap, error
 	return bundle.DeltaMap.GetDeltaBitmapFor(filePath)
 }
 
-func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uint64) error {
+func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN LSN) error {
 	deltaMap, err := getDeltaMap(folder, bundle.Timeline, *bundle.IncrementFromLsn, backupStartLSN)
 	if err != nil {
 		return err

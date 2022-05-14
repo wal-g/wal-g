@@ -59,12 +59,12 @@ func NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks bool
 // PostgresTarBallFilePacker is used to pack bundle file into tarball.
 type PostgresTarBallFilePacker struct {
 	deltaMap         PagedFileDeltaMap
-	incrementFromLsn *uint64
+	incrementFromLsn *LSN
 	files            parallel.BundleFiles
 	options          TarBallFilePackerOptions
 }
 
-func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *uint64, files parallel.BundleFiles,
+func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, files parallel.BundleFiles,
 	options TarBallFilePackerOptions) *PostgresTarBallFilePacker {
 	return &PostgresTarBallFilePacker{
 		deltaMap:         deltaMap,

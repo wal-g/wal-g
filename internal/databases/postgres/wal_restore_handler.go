@@ -88,8 +88,8 @@ func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder)
 
 // FindLastCommonPoint get the last common LSN and timeline between two slices of
 // history records. Nil input is not handle
-func FindLastCommonPoint(target, source []*TimelineHistoryRecord) (uint64, uint32, error) {
-	currentLsn := uint64(1)
+func FindLastCommonPoint(target, source []*TimelineHistoryRecord) (LSN, uint32, error) {
+	currentLsn := LSN(1)
 	currentTimeline := uint32(1)
 
 	if len(target) == len(source) {
@@ -113,7 +113,7 @@ func FindLastCommonPoint(target, source []*TimelineHistoryRecord) (uint64, uint3
 			currentLsn = tgtRecord.lsn
 			currentTimeline = tgtRecord.timeline
 		} else {
-			currentLsn = uint64Min(tgtRecord.lsn, source[i].lsn)
+			currentLsn = lsnMin(tgtRecord.lsn, source[i].lsn)
 			currentTimeline = tgtRecord.timeline
 			break
 		}
@@ -225,11 +225,4 @@ func getWalDirName(pgData string) (string, error) {
 		return dataFolderPath, nil
 	}
 	return "", errors.New("directory for WAL files doesn't exist in " + pgData)
-}
-
-func uint64Min(a, b uint64) uint64 {
-	if a < b {
-		return a
-	}
-	return b
 }

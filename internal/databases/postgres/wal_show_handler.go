@@ -18,7 +18,7 @@ const (
 type TimelineInfo struct {
 	ID               uint32          `json:"id"`
 	ParentID         uint32          `json:"parent_id"`
-	SwitchPointLsn   uint64          `json:"switch_point_lsn"`
+	SwitchPointLsn   LSN             `json:"switch_point_lsn"`
 	StartSegment     string          `json:"start_segment"`
 	EndSegment       string          `json:"end_segment"`
 	SegmentsCount    int             `json:"segments_count"`

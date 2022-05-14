@@ -72,7 +72,7 @@ func TestSelectNewValidPage_ValidPageLowLsn(t *testing.T) {
 func TestSelectNewValidPage_ValidPageHighLsn(t *testing.T) {
 	pageReader := postgres.IncrementalPageReader{
 		Blocks: make([]uint32, 0),
-		Lsn:    uint64(1) << 62,
+		Lsn:    postgres.LSN(1) << 62,
 	}
 	var blockNo uint32 = 10
 	pageFile, err := os.Open(pagedFileName)

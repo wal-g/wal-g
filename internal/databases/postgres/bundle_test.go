@@ -190,10 +190,10 @@ func setupFolderAndBundle() (folder storage.Folder, bundle *postgres.Bundle, err
 	if err != nil {
 		return nil, nil, err
 	}
-	logSegNo *= postgres.WalSegmentSize
+	incrementFromLsn := postgres.LSN(logSegNo * postgres.WalSegmentSize)
 	bundle = &postgres.Bundle{
 		Timeline:         timeLine,
-		IncrementFromLsn: &logSegNo,
+		IncrementFromLsn: &incrementFromLsn,
 	}
 	return
 }
@@ -205,7 +205,8 @@ func TestLoadDeltaMap_AllDeltas(t *testing.T) {
 	backupNextWalFilename := "000000010000000000000090"
 	_, curLogSegNo, _ := postgres.ParseWALFilename(backupNextWalFilename)
 
-	err = bundle.DownloadDeltaMap(folder, curLogSegNo*postgres.WalSegmentSize+1)
+	backupStartLsn := postgres.LSN(curLogSegNo*postgres.WalSegmentSize + 1)
+	err = bundle.DownloadDeltaMap(folder, backupStartLsn)
 	deltaMap := bundle.DeltaMap
 	assert.NoError(t, err)
 	assert.NotNil(t, deltaMap)
@@ -222,7 +223,7 @@ func TestLoadDeltaMap_MissingDelta(t *testing.T) {
 	backupNextWalFilename := "0000000100000000000000B0"
 	_, curLogSegNo, _ := postgres.ParseWALFilename(backupNextWalFilename)
 
-	err = bundle.DownloadDeltaMap(folder, curLogSegNo*postgres.WalSegmentSize)
+	err = bundle.DownloadDeltaMap(folder, postgres.LSN(curLogSegNo*postgres.WalSegmentSize))
 	assert.Error(t, err)
 	assert.Nil(t, bundle.DeltaMap)
 }
@@ -234,7 +235,7 @@ func TestLoadDeltaMap_WalTail(t *testing.T) {
 	backupNextWalFilename := "000000010000000000000091"
 	_, curLogSegNo, _ := postgres.ParseWALFilename(backupNextWalFilename)
 
-	err = bundle.DownloadDeltaMap(folder, curLogSegNo*postgres.WalSegmentSize)
+	err = bundle.DownloadDeltaMap(folder, postgres.LSN(curLogSegNo*postgres.WalSegmentSize))
 	assert.NoError(t, err)
 	assert.NotNil(t, bundle.DeltaMap)
 	assert.Equal(t, []uint32{4, 9}, bundle.DeltaMap[BundleTestLocations[0].RelationFileNode].ToArray())

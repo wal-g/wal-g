@@ -22,7 +22,7 @@ func TestFindLastCommonPoint_SameTimeline(t *testing.T) {
 }
 
 func TestFindLastCommonPoint_OneOnTheFirstTimeline(t *testing.T) {
-	wantLsn, wantTimeline := uint64(12), uint32(1)
+	wantLsn, wantTimeline := postgres.LSN(12), uint32(1)
 	target := []*postgres.TimelineHistoryRecord{
 		postgres.NewTimelineHistoryRecord(wantTimeline, wantLsn, ""),
 	}
@@ -34,7 +34,7 @@ func TestFindLastCommonPoint_OneOnTheFirstTimeline(t *testing.T) {
 }
 
 func TestFindLastCommonPoint_OneOnTheFirstTimelineMirror(t *testing.T) {
-	wantLsn, wantTimeline := uint64(12), uint32(1)
+	wantLsn, wantTimeline := postgres.LSN(12), uint32(1)
 	target := []*postgres.TimelineHistoryRecord{}
 	source := []*postgres.TimelineHistoryRecord{
 		postgres.NewTimelineHistoryRecord(wantTimeline, wantLsn, ""),
@@ -46,7 +46,7 @@ func TestFindLastCommonPoint_OneOnTheFirstTimelineMirror(t *testing.T) {
 }
 
 func TestFindLastCommonPoint_FirstRandomCase(t *testing.T) {
-	wantLsn, wantTimeline := uint64(12), uint32(2)
+	wantLsn, wantTimeline := postgres.LSN(12), uint32(2)
 	target := []*postgres.TimelineHistoryRecord{
 		postgres.NewTimelineHistoryRecord(1, 5, ""),
 		postgres.NewTimelineHistoryRecord(2, 16, ""),
@@ -63,7 +63,7 @@ func TestFindLastCommonPoint_FirstRandomCase(t *testing.T) {
 }
 
 func TestFindLastCommonPoint_SecondRandomCase(t *testing.T) {
-	wantLsn, wantTimeline := uint64(20), uint32(3)
+	wantLsn, wantTimeline := postgres.LSN(20), uint32(3)
 	target := []*postgres.TimelineHistoryRecord{
 		postgres.NewTimelineHistoryRecord(1, 5, ""),
 		postgres.NewTimelineHistoryRecord(2, 16, ""),
@@ -82,7 +82,7 @@ func TestFindLastCommonPoint_SecondRandomCase(t *testing.T) {
 }
 
 func TestFindLastCommonPoint_ThirdRandomCase(t *testing.T) {
-	wantLsn, wantTimeline := uint64(4), uint32(1)
+	wantLsn, wantTimeline := postgres.LSN(4), uint32(1)
 	target := []*postgres.TimelineHistoryRecord{
 		postgres.NewTimelineHistoryRecord(wantTimeline, wantLsn, ""),
 		postgres.NewTimelineHistoryRecord(2, 7, ""),
@@ -101,7 +101,7 @@ func TestFindLastCommonPoint_ThirdRandomCase(t *testing.T) {
 }
 
 func TestFindLastCommonPoint_FourthRandomCase(t *testing.T) {
-	wantLsn, wantTimeline := uint64(32), uint32(4)
+	wantLsn, wantTimeline := postgres.LSN(32), uint32(4)
 	target := []*postgres.TimelineHistoryRecord{
 		postgres.NewTimelineHistoryRecord(1, 5, ""),
 		postgres.NewTimelineHistoryRecord(2, 9, ""),
@@ -122,7 +122,7 @@ func TestFindLastCommonPoint_FourthRandomCase(t *testing.T) {
 }
 
 func TestFindLastCommonPoint_FifthRandomCase(t *testing.T) {
-	wantLsn, wantTimeline := uint64(32), uint32(4)
+	wantLsn, wantTimeline := postgres.LSN(32), uint32(4)
 	target := []*postgres.TimelineHistoryRecord{
 		postgres.NewTimelineHistoryRecord(1, 5, ""),
 		postgres.NewTimelineHistoryRecord(2, 9, ""),
