@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/parallel"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -31,8 +32,10 @@ func TestEmptyBundleQueue(t *testing.T) {
 	internal.Configure()
 
 	bundle := &postgres.Bundle{
-		Directory:        "",
-		TarSizeThreshold: 100,
+		Bundle: parallel.Bundle{
+			Directory:        "",
+			TarSizeThreshold: 100,
+		},
 	}
 
 	uploader := testtools.NewMockUploader(false, false)
@@ -61,8 +64,10 @@ func TestBundleQueueLowConcurrency(t *testing.T) {
 
 func queueTest(t *testing.T) {
 	bundle := &postgres.Bundle{
-		Directory:        "",
-		TarSizeThreshold: 100,
+		Bundle: parallel.Bundle{
+			Directory:        "",
+			TarSizeThreshold: 100,
+		},
 	}
 	uploader := testtools.NewMockUploader(false, false)
 	tarBallMaker := internal.NewStorageTarBallMaker("mockBackup", uploader)

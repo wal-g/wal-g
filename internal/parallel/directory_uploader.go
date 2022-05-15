@@ -26,7 +26,11 @@ type CommonDirectoryUploader struct {
 	uploader      *internal.Uploader
 }
 
-func NewCommonDirectoryUploader(crypter crypto.Crypter, packer TarBallFilePacker, tarBallComposerMaker TarBallComposerMaker, tarSizeThreshold int64, excludedFiles map[string]utility.Empty, backupName string, uploader *internal.Uploader) *CommonDirectoryUploader {
+func NewCommonDirectoryUploader(
+	crypter crypto.Crypter, packer TarBallFilePacker,
+	tarBallComposerMaker TarBallComposerMaker, tarSizeThreshold int64,
+	excludedFiles map[string]utility.Empty, backupName string,
+	uploader *internal.Uploader) *CommonDirectoryUploader {
 	return &CommonDirectoryUploader{
 		crypter:              crypter,
 		tarBallFilePacker:    packer,

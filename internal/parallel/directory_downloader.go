@@ -1,5 +1,5 @@
 package parallel
 
-type DirectoryLoader interface {
+type DirectoryDownloader interface {
 	DownloadDirectory(pathToRestore string) error
 }

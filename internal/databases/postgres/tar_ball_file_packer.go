@@ -56,8 +56,8 @@ func NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks bool
 	}
 }
 
-// PostgresTarBallFilePacker is used to pack bundle file into tarball.
-type PostgresTarBallFilePacker struct {
+// TarBallFilePackerImpl is used to pack bundle file into tarball.
+type TarBallFilePackerImpl struct {
 	deltaMap         PagedFileDeltaMap
 	incrementFromLsn *LSN
 	files            parallel.BundleFiles
@@ -65,8 +65,8 @@ type PostgresTarBallFilePacker struct {
 }
 
 func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, files parallel.BundleFiles,
-	options TarBallFilePackerOptions) *PostgresTarBallFilePacker {
-	return &PostgresTarBallFilePacker{
+	options TarBallFilePackerOptions) *TarBallFilePackerImpl {
+	return &TarBallFilePackerImpl{
 		deltaMap:         deltaMap,
 		incrementFromLsn: incrementFromLsn,
 		files:            files,
@@ -74,19 +74,19 @@ func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, fil
 	}
 }
 
-func (p *PostgresTarBallFilePacker) getDeltaBitmapFor(filePath string) (*roaring.Bitmap, error) {
+func (p *TarBallFilePackerImpl) getDeltaBitmapFor(filePath string) (*roaring.Bitmap, error) {
 	if p.deltaMap == nil {
 		return nil, nil
 	}
 	return p.deltaMap.GetDeltaBitmapFor(filePath)
 }
 
-func (p *PostgresTarBallFilePacker) UpdateDeltaMap(deltaMap PagedFileDeltaMap) {
+func (p *TarBallFilePackerImpl) UpdateDeltaMap(deltaMap PagedFileDeltaMap) {
 	p.deltaMap = deltaMap
 }
 
 // TODO : unit tests
-func (p *PostgresTarBallFilePacker) PackFileIntoTar(cfi *parallel.ComposeFileInfo, tarBall internal.TarBall) error {
+func (p *TarBallFilePackerImpl) PackFileIntoTar(cfi *parallel.ComposeFileInfo, tarBall internal.TarBall) error {
 	fileReadCloser, err := p.createFileReadCloser(cfi)
 	if err != nil {
 		switch err.(type) {
@@ -137,7 +137,7 @@ func (p *PostgresTarBallFilePacker) PackFileIntoTar(cfi *parallel.ComposeFileInf
 	return errorGroup.Wait()
 }
 
-func (p *PostgresTarBallFilePacker) createFileReadCloser(cfi *parallel.ComposeFileInfo) (io.ReadCloser, error) {
+func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *parallel.ComposeFileInfo) (io.ReadCloser, error) {
 	var fileReadCloser io.ReadCloser
 	if cfi.IsIncremented {
 		bitmap, err := p.getDeltaBitmapFor(cfi.Path)

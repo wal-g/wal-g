@@ -37,7 +37,10 @@ type Bundle struct {
 	FilesFilter FilesFilter
 }
 
-func NewBundle(directory string, crypter crypto.Crypter, tarBallFilePacker TarBallFilePacker, tarSizeThreshold int64, excludedFilenames map[string]utility.Empty) *Bundle {
+func NewBundle(
+	directory string, crypter crypto.Crypter,
+	tarBallFilePacker TarBallFilePacker, tarSizeThreshold int64,
+	excludedFilenames map[string]utility.Empty) *Bundle {
 	return &Bundle{
 		Directory:         directory,
 		Crypter:           crypter,

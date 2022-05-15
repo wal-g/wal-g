@@ -2,7 +2,6 @@ package parallel
 
 import (
 	"archive/tar"
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -13,7 +12,6 @@ import (
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/utility"
-	"golang.org/x/sync/errgroup"
 )
 
 type FileNotExistError struct {
@@ -68,23 +66,17 @@ func (p *RegularTarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall
 			return err
 		}
 	}
-	errorGroup, _ := errgroup.WithContext(context.Background())
-
 	p.files.AddFile(cfi.Header, cfi.FileInfo, cfi.IsIncremented)
 
-	errorGroup.Go(func() error {
-		defer utility.LoggedClose(fileReadCloser, "")
-		packedFileSize, err := internal.PackFileTo(tarBall, cfi.Header, fileReadCloser)
-		if err != nil {
-			return errors.Wrap(err, "PackFileIntoTar: operation failed")
-		}
-		if packedFileSize != cfi.Header.Size {
-			return newTarSizeError(packedFileSize, cfi.Header.Size)
-		}
-		return nil
-	})
-
-	return errorGroup.Wait()
+	defer utility.LoggedClose(fileReadCloser, "")
+	packedFileSize, err := internal.PackFileTo(tarBall, cfi.Header, fileReadCloser)
+	if err != nil {
+		return errors.Wrap(err, "PackFileIntoTar: operation failed")
+	}
+	if packedFileSize != cfi.Header.Size {
+		return newTarSizeError(packedFileSize, cfi.Header.Size)
+	}
+	return nil
 }
 
 func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string) (io.ReadCloser, error) {

@@ -38,7 +38,7 @@ type headerInfo struct {
 
 type CopyTarBallComposer struct {
 	tarBallQueue  *internal.TarBallQueue
-	tarFilePacker *PostgresTarBallFilePacker
+	tarFilePacker *TarBallFilePackerImpl
 	crypter       crypto.Crypter
 	files         *parallel.RegularBundleFiles
 	ctx           context.Context
@@ -68,7 +68,7 @@ func NewCopyTarBallComposerMaker(previousBackup Backup, newBackupName string,
 
 func NewCopyTarBallComposer(
 	tarBallQueue *internal.TarBallQueue,
-	tarBallFilePacker *PostgresTarBallFilePacker,
+	tarBallFilePacker *TarBallFilePackerImpl,
 	files *parallel.RegularBundleFiles,
 	crypter crypto.Crypter,
 	prevBackup Backup,

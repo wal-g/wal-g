@@ -72,7 +72,7 @@ func (maker *GpTarBallComposerMaker) Make(bundle *Bundle) (parallel.TarBallCompo
 type GpTarBallComposer struct {
 	backupName    string
 	tarBallQueue  *internal.TarBallQueue
-	tarFilePacker *PostgresTarBallFilePacker
+	tarFilePacker *TarBallFilePackerImpl
 	crypter       crypto.Crypter
 
 	addFileQueue     chan *parallel.ComposeFileInfo
@@ -97,7 +97,7 @@ type GpTarBallComposer struct {
 
 func NewGpTarBallComposer(
 	tarBallQueue *internal.TarBallQueue,
-	crypter crypto.Crypter, relStorageMap AoRelFileStorageMap, bundleFiles parallel.BundleFiles, packer *PostgresTarBallFilePacker,
+	crypter crypto.Crypter, relStorageMap AoRelFileStorageMap, bundleFiles parallel.BundleFiles, packer *TarBallFilePackerImpl,
 	aoFiles *AOFilesMetadataDTO, baseAoFiles map[string]struct{}, tarFileSets parallel.TarFileSets, uploader *internal.Uploader,
 	backupName string,
 ) (*GpTarBallComposer, error) {

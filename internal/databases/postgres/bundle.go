@@ -61,13 +61,7 @@ func init() {
 // uploaded backups; in this case, pg_control is used as
 // the sentinel.
 type Bundle struct {
-	Directory string
-	Sentinel  *internal.Sentinel
-
-	TarBallComposer parallel.TarBallComposer
-	TarBallQueue    *internal.TarBallQueue
-
-	Crypter            crypto.Crypter
+	parallel.Bundle
 	Timeline           uint32
 	Replica            bool
 	IncrementFromLsn   *LSN
@@ -76,7 +70,6 @@ type Bundle struct {
 	TablespaceSpec     TablespaceSpec
 
 	forceIncremental bool
-	TarSizeThreshold int64
 }
 
 // TODO: use DiskDataFolder
@@ -86,13 +79,16 @@ func NewBundle(
 	forceIncremental bool, tarSizeThreshold int64,
 ) *Bundle {
 	return &Bundle{
-		Directory:          directory,
-		Crypter:            crypter,
+		Bundle: parallel.Bundle{
+			Directory:         directory,
+			Crypter:           crypter,
+			TarSizeThreshold:  tarSizeThreshold,
+			ExcludedFilenames: ExcludedFilenames,
+		},
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
 		TablespaceSpec:     NewTablespaceSpec(directory),
 		forceIncremental:   forceIncremental,
-		TarSizeThreshold:   tarSizeThreshold,
 	}
 }
 
