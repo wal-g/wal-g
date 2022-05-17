@@ -47,7 +47,7 @@ type RegularTarBallFilePacker struct {
 	files BundleFiles
 }
 
-func NewRegularTarBallFilePacker(files BundleFiles, options TarBallFilePackerOptions) *RegularTarBallFilePacker {
+func NewRegularTarBallFilePacker(files BundleFiles) *RegularTarBallFilePacker {
 	return &RegularTarBallFilePacker{
 		files: files,
 	}

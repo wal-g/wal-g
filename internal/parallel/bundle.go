@@ -39,13 +39,13 @@ type Bundle struct {
 
 func NewBundle(
 	directory string, crypter crypto.Crypter,
-	tarBallFilePacker TarBallFilePacker, tarSizeThreshold int64,
-	excludedFilenames map[string]utility.Empty) *Bundle {
+	tarSizeThreshold int64, excludedFilenames map[string]utility.Empty) *Bundle {
 	return &Bundle{
 		Directory:         directory,
 		Crypter:           crypter,
 		TarSizeThreshold:  tarSizeThreshold,
 		ExcludedFilenames: excludedFilenames,
+		FilesFilter:       &CommonFilesFilter{},
 	}
 }
 
@@ -92,7 +92,7 @@ func (bundle *Bundle) AddToBundle(path string, info os.FileInfo, err error) erro
 	fileInfoHeader.Name = bundle.getFileRelPath(path)
 	tracelog.DebugLogger.Println(fileInfoHeader.Name)
 
-	if bundle.FilesFilter.ShouldUploadFile(path) {
+	if bundle.FilesFilter.ShouldUploadFile(path) && info.Mode().IsRegular() {
 		bundle.TarBallComposer.AddFile(NewComposeFileInfo(path, info, false, false, fileInfoHeader))
 	} else {
 		err := bundle.TarBallComposer.AddHeader(fileInfoHeader, info)
