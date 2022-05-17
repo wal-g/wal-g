@@ -20,11 +20,11 @@
 
 * @wal-g/committers
 
-/internal/databases/mysql/ @mialinx @ostinru
-/cmd/mysql/ @mialinx @ostinru
+/internal/databases/mysql/ @mialinx @ostinru @teem0n
+/cmd/mysql/ @mialinx @ostinru @teem0n
 
-/internal/databases/sqlserver/ @mialinx @ostinru
-/cmd/sqlserver/ @mialinx @ostinru
+/internal/databases/sqlserver/ @mialinx @ostinru @teem0n
+/cmd/sqlserver/ @mialinx @ostinru @teem0n
 
 /internal/databases/mongo/ @perekalov
 /cmd/mongo/ @perekalov
