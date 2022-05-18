@@ -83,13 +83,11 @@ func (bundle *Bundle) AddToBundle(path string, info os.FileInfo, err error) erro
 	if excluded && !isDir {
 		return nil
 	}
-
-	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
+	fileInfoHeader, err := bundle.createTarFileInfoHeader(path, info)
 	if err != nil {
-		return errors.Wrap(err, "addToBundle: could not grab header info")
+		return err
 	}
 
-	fileInfoHeader.Name = bundle.getFileRelPath(path)
 	tracelog.DebugLogger.Println(fileInfoHeader.Name)
 
 	if bundle.FilesFilter.ShouldUploadFile(path) && info.Mode().IsRegular() {
@@ -112,5 +110,23 @@ func (bundle *Bundle) FinishComposing() (TarFileSets, error) {
 }
 
 func (bundle *Bundle) getFileRelPath(fileAbsPath string) string {
-	return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.Directory)
+	return utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.Directory)
+}
+
+func (bundle *Bundle) createTarFileInfoHeader(path string, info os.FileInfo) (header *tar.Header, err error) {
+	var symLinkTarget string
+	if info.Mode()&os.ModeSymlink == os.ModeSymlink {
+		symLinkTarget, err = os.Readlink(path)
+		if err != nil {
+			return
+		}
+	}
+
+	header, err = tar.FileInfoHeader(info, symLinkTarget)
+	if err != nil {
+		return nil, errors.Wrap(err, "addToBundle: could not grab header info")
+	}
+
+	header.Name = bundle.getFileRelPath(path)
+	return
 }

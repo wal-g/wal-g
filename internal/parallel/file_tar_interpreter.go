@@ -41,7 +41,7 @@ func (tarInterpreter *FileTarInterpreter) Interpret(reader io.Reader, fileInfo *
 			return errors.Wrapf(err, "Interpret: failed to create hardlink %s", targetPath)
 		}
 	case tar.TypeSymlink:
-		if err := os.Symlink(fileInfo.Name, targetPath); err != nil {
+		if err := os.Symlink(fileInfo.Linkname, targetPath); err != nil {
 			return errors.Wrapf(err, "Interpret: failed to create symlink %s", targetPath)
 		}
 	}
