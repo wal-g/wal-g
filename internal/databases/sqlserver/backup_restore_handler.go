@@ -76,7 +76,11 @@ func restoreSingleDatabase(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	move, err := buildPhysicalFileMove(files, dbname)
+	datadir, logdir, err := GetDefaultDataLogDirs(db)
+	if err != nil {
+		return err
+	}
+	move, err := buildPhysicalFileMove(files, dbname, datadir, logdir)
 	if err != nil {
 		return err
 	}

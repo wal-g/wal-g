@@ -247,7 +247,7 @@ func buildRestoreUrls(baseURL string, blobNames []string) string {
 	return res
 }
 
-func buildPhysicalFileMove(files []DatabaseFile, dbname string) (string, error) {
+func buildPhysicalFileMove(files []DatabaseFile, dbname string, datadir string, logdir string) (string, error) {
 	sort.Slice(files, func(i, j int) bool {
 		return files[i].FileID < files[j].FileID
 	})
@@ -256,6 +256,7 @@ func buildPhysicalFileMove(files []DatabaseFile, dbname string) (string, error) 
 	logFileCnt := 0
 	for _, file := range files {
 		var newName string
+		var newPhysicalName string
 		switch file.Type {
 		case "D":
 			suffix := ""
@@ -268,6 +269,7 @@ func buildPhysicalFileMove(files []DatabaseFile, dbname string) (string, error) 
 				ext = ".ndf"
 			}
 			newName = dbname + suffix + ext
+			newPhysicalName = filepath.Join(datadir, newName)
 		case "L":
 			suffix := "_log"
 			if logFileCnt > 0 {
@@ -275,10 +277,10 @@ func buildPhysicalFileMove(files []DatabaseFile, dbname string) (string, error) 
 			}
 			logFileCnt++
 			newName = dbname + suffix + ".ldf"
+			newPhysicalName = filepath.Join(logdir, newName)
 		default:
 			return "", fmt.Errorf("unexpected backup file type: '%s'", file.Type)
 		}
-		newPhysicalName := filepath.Join(filepath.Dir(file.PhysicalName), newName)
 		if res != "" {
 			res += ", "
 		}
@@ -600,4 +602,11 @@ func IsLogAlreadyApplied(db *sql.DB, databaseName string, logBackupFilePropertie
 		return false, nil
 	}
 	return true, nil
+}
+
+func GetDefaultDataLogDirs(db *sql.DB) (string, string, error) {
+	var datadir, logdir string
+	query := `SELECT serverproperty('InstanceDefaultDataPath'), serverproperty('InstanceDefaultLogPath')`
+	err := db.QueryRow(query).Scan(&datadir, &logdir)
+	return strings.TrimSpace(datadir), strings.TrimSpace(logdir), err
 }
