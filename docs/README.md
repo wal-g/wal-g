@@ -45,6 +45,8 @@ mv wal-g-pg-ubuntu-18.04-amd64 /usr/local/bin/wal-g
 
 For other systems, please consult the [Development](#development) section for more information.
 
+WAL-G supports bash and zsh autocompletion. Run `wal-g help completion` for more info.
+
 Configuration
 -------------
 ### Storage
@@ -68,11 +70,16 @@ To configure the name of a file containing private key of Yandex Cloud Service A
 
 * `WALG_LIBSODIUM_KEY`
 
-To configure encryption and decryption with libsodium. WAL-G uses an [algorithm](https://download.libsodium.org/doc/secret-key_cryptography/secretstream#algorithm) that only requires a secret key.
+To configure encryption and decryption with libsodium. WAL-G uses an [algorithm](https://download.libsodium.org/doc/secret-key_cryptography/secretstream#algorithm) that only requires a secret key. libsodium keys are fixed-size keys of 32 bytes. For optimal cryptographic security, it is recommened to use a random 32 byte key. To generate a random key, you can something like `openssl rand -hex 32` (set `WALG_LIBSODIUM_KEY_TRANSFORM` to `hex`) or `openssl rand -base64 32` (set `WALG_LIBSODIUM_KEY_TRANSFORM` to `base64`).
 
 * `WALG_LIBSODIUM_KEY_PATH`
 
 Similar to `WALG_LIBSODIUM_KEY`, but value is the path to the key on file system. The file content will be trimmed from whitespace characters.
+
+* `WALG_LIBSODIUM_KEY_TRANSFORM`
+
+The transform that will be applied to the `WALG_LIBSODIUM_KEY` to get the required 32 byte key. Supported transformations are `base64`, `hex` or `none` (default).
+The option `none` exists for backwards compatbility, the user input will be converted to 32 byte either via truncation or by zero-padding.
 
 * `WALG_GPG_KEY_ID`  (alternative form `WALE_GPG_KEY_ID`) ⚠️ **DEPRECATED**
 
@@ -93,7 +100,29 @@ Similar to `WALG_PGP_KEY`, but value is the path to the key on file system.
 
 If your *private key* is encrypted with a *passphrase*, you should set *passphrase* for decrypt.
 
-### Database-specific options 
+### Monitoring
+
+* `WALG_STATSD_ADDRESS`
+
+To enable metrics publishing to [statsd](https://github.com/statsd/statsd) or [statsd_exporter](https://github.com/prometheus/statsd_exporter). Metrics will be sent on a best-effort basis via UDP. The default port for statsd is `9125`.
+
+### Profiling
+
+Profiling is useful for identifying bottlenecks within WAL-G.
+
+* `PROFILE_SAMPLING_RATIO`
+
+A float value between 0 and 1, defines likelihood of the profiler getting enabled. When set to 1, it will always run. This allows probabilistic sampling of invocations. Since WAL-G processes may get created several times per second (e.g. wal-g wal-push), we do not want to profile all of them.
+
+* `PROFILE_MODE`
+
+The type of pprof profiler to use. Can be one of `cpu`, `mem`, `mutex`, `block`, `threadcreation`, `trace`, `goroutine`. See the [runtime/pprof docs](https://pkg.go.dev/runtime/pprof) for more information. Defaults to `cpu`.
+
+* `PROFILE_PATH`
+
+The directory to store profiles in. Defaults to `$TMPDIR`.
+
+### Database-specific options
 **More options are available for the chosen database. See it in [Databases](#databases)**
 
 Usage
@@ -128,7 +157,7 @@ If `FIND_FULL` is specified, WAL-G will calculate minimum backup needed to keep 
 
 ``everything`` [FORCE]
 
-``target`` [FIND_FULL] %name% | --target-user-data %data% will delete the backup specified by name or user data.
+``target`` [FIND_FULL] %name% | --target-user-data %data% will delete the backup specified by name or user data. Unlike other delete commands, this command does not delete any archived WALs.
 
 (Only in Postgres) By default, if delta backup is provided as the target, WAL-G will also delete all the dependant delta backups. If `FIND_FULL` is specified, WAL-G will delete all backups with the same base backup as the target.
 
@@ -160,6 +189,10 @@ If `FIND_FULL` is specified, WAL-G will calculate minimum backup needed to keep 
 
 **More commands are available for the chosen database engine. See it in [Databases](#databases)**
 
+## Storage tools
+`wal-g st` command series allows the direct interaction with the configured storage.
+[Storage tools documentation](StorageTools.md)
+
 Databases
 -----------
 ### PostgreSQL
@@ -179,6 +212,9 @@ Databases
 
 ### Redis [Beta]
 [Information about installing, configuration and usage](Redis.md)
+
+### Greenplum [Work in progress]
+[Information about installing, configuration and usage](Greenplum.md)
 
 Development
 -----------

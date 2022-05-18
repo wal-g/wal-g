@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
@@ -43,7 +43,7 @@ func GetPubRingArmor(keyID string) ([]byte, error) {
 	usr, err := user.Current()
 	if err == nil {
 		cacheFilename = filepath.Join(usr.HomeDir, ".walg_key_cache")
-		file, err := ioutil.ReadFile(cacheFilename)
+		file, err := os.ReadFile(cacheFilename)
 		// here we ignore whatever error can occur
 		if err == nil {
 			err = json.Unmarshal(file, &cache)
@@ -69,7 +69,7 @@ func GetPubRingArmor(keyID string) ([]byte, error) {
 	cache.Body = out
 	marshal, err := json.Marshal(&cache)
 	if err == nil && len(cacheFilename) > 0 {
-		err = ioutil.WriteFile(cacheFilename, marshal, 0644)
+		err = os.WriteFile(cacheFilename, marshal, 0644)
 		tracelog.ErrorLogger.PrintOnError(err)
 	}
 

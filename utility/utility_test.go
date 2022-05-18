@@ -2,7 +2,7 @@ package utility_test
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"os"
 	"sort"
@@ -26,29 +26,29 @@ var times = []struct {
 	input internal.BackupTime
 }{
 	{internal.BackupTime{
-		BackupName:       "second",
-		Time: time.Date(2017, 2, 2, 30, 48, 39, 651387233, time.UTC),
-		WalFileName:      "",
+		BackupName:  "second",
+		Time:        time.Date(2017, 2, 2, 30, 48, 39, 651387233, time.UTC),
+		WalFileName: "",
 	}},
 	{internal.BackupTime{
-		BackupName:       "fourth",
-		Time: time.Date(2009, 2, 27, 20, 8, 33, 651387235, time.UTC),
-		WalFileName:      "",
+		BackupName:  "fourth",
+		Time:        time.Date(2009, 2, 27, 20, 8, 33, 651387235, time.UTC),
+		WalFileName: "",
 	}},
 	{internal.BackupTime{
-		BackupName:       "fifth",
-		Time: time.Date(2008, 11, 20, 16, 34, 58, 651387232, time.UTC),
-		WalFileName:      "",
+		BackupName:  "fifth",
+		Time:        time.Date(2008, 11, 20, 16, 34, 58, 651387232, time.UTC),
+		WalFileName: "",
 	}},
 	{internal.BackupTime{
-		BackupName:       "first",
-		Time: time.Date(2020, 11, 31, 20, 3, 58, 651387237, time.UTC),
-		WalFileName:      "",
+		BackupName:  "first",
+		Time:        time.Date(2020, 11, 31, 20, 3, 58, 651387237, time.UTC),
+		WalFileName: "",
 	}},
 	{internal.BackupTime{
-		BackupName:       "third",
-		Time: time.Date(2009, 3, 13, 4, 2, 42, 651387234, time.UTC),
-		WalFileName:      "",
+		BackupName:  "third",
+		Time:        time.Date(2009, 3, 13, 4, 2, 42, 651387234, time.UTC),
+		WalFileName: "",
 	}},
 }
 
@@ -91,7 +91,7 @@ func TestCreateFileWith(t *testing.T) {
 	content := "content"
 	err := ioextensions.CreateFileWith(CreateFileWithPath, strings.NewReader(content))
 	assert.NoError(t, err)
-	actualContent, err := ioutil.ReadFile(CreateFileWithPath)
+	actualContent, err := os.ReadFile(CreateFileWithPath)
 	assert.NoError(t, err)
 	assert.Equal(t, []byte(content), actualContent)
 	os.Remove(CreateFileWithPath)
@@ -443,7 +443,7 @@ func TestLoggedCloseWithoutError(t *testing.T) {
 
 	utility.LoggedClose(&testtools.NopCloser{}, "")
 
-	loggedData, err := ioutil.ReadAll(&buf)
+	loggedData, err := io.ReadAll(&buf)
 	if err != nil {
 		t.Logf("failed read from pipe: %v", err)
 	}
@@ -464,7 +464,7 @@ func TestLoggedCloseWithErrorAndDefaultMessage(t *testing.T) {
 
 	utility.LoggedClose(&testtools.ErrorWriteCloser{}, "")
 
-	loggedData, err := ioutil.ReadAll(&buf)
+	loggedData, err := io.ReadAll(&buf)
 	if err != nil {
 		t.Logf("failed read from buffer: %v", err)
 	}
@@ -485,7 +485,7 @@ func TestLoggedCloseWithErrorAndCustomMessage(t *testing.T) {
 
 	utility.LoggedClose(&testtools.ErrorWriteCloser{}, "custom error message")
 
-	loggedData, err := ioutil.ReadAll(&buf)
+	loggedData, err := io.ReadAll(&buf)
 	if err != nil {
 		t.Logf("failed read from buffer: %v", err)
 	}

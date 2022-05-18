@@ -2,15 +2,9 @@
 Feature: MongoDB backups check
 
   Background: Wait for working infrastructure
-    Given a working mongodb on mongodb01
-    And a working mongodb on mongodb02
+    Given mongodb initialized on mongodb01
+    And mongodb initialized on mongodb02
     And a configured s3 on minio01
-    And mongodb replset initialized on mongodb01
-    And mongodb replset initialized on mongodb02
-    And mongodb auth initialized on mongodb01
-    And mongodb auth initialized on mongodb02
-    And mongodb role is primary on mongodb01
-    And mongodb role is primary on mongodb02
 
   Scenario: Backups were done successfully
     When mongodb01 has test mongodb data test1
@@ -42,10 +36,16 @@ Feature: MongoDB backups check
     Then we got 3 backup entries of mongodb01
 
   Scenario: Last backup restored successfully
+    Given mongodb02 has no data
+    And mongodb initialized on mongodb02
     When we restore #2 backup to mongodb02
     Then we got same mongodb data at mongodb01 mongodb02
 
   Scenario: Pre-last backup restored successfully
+    Given mongodb01 has no data
+    And mongodb02 has no data
+    And mongodb initialized on mongodb02
+    And mongodb initialized on mongodb01
     When we restore #1 backup to mongodb01
     And we restore #1 backup to mongodb02
     Then we got same mongodb data at mongodb01 mongodb02

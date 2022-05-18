@@ -6,8 +6,12 @@ import (
 
 type WalSegmentNo uint64
 
-func newWalSegmentNo(lsn uint64) WalSegmentNo {
-	return WalSegmentNo(lsn / WalSegmentSize)
+func newWalSegmentNo(lsn LSN) WalSegmentNo {
+	return WalSegmentNo(getSegmentNoFromLsn(lsn))
+}
+
+func getSegmentNoFromLsn(lsn LSN) uint64 {
+	return uint64(lsn) / WalSegmentSize
 }
 
 func newWalSegmentNoFromFilename(filename string) (WalSegmentNo, error) {
@@ -31,8 +35,8 @@ func (walSegmentNo WalSegmentNo) sub(n uint64) WalSegmentNo {
 	return WalSegmentNo(uint64(walSegmentNo) - n)
 }
 
-func (walSegmentNo WalSegmentNo) firstLsn() uint64 {
-	return uint64(walSegmentNo) * WalSegmentSize
+func (walSegmentNo WalSegmentNo) firstLsn() LSN {
+	return LSN(uint64(walSegmentNo) * WalSegmentSize)
 }
 
 func (walSegmentNo WalSegmentNo) getFilename(timeline uint32) string {

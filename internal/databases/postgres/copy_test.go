@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/copy"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
 )
 
@@ -118,7 +118,7 @@ func TestBuildCopyingInfos_WhenComplexCondition(t *testing.T) {
 	objects, err := storage.ListFolderRecursively(from)
 	assert.NoError(t, err)
 	var condition = func(object storage.Object) bool { return strings.HasSuffix(object.GetName(), ".json") }
-	var expectedCount = 0
+	var expectedCount int
 	for _, object := range objects {
 		if condition(object) {
 			expectedCount += 1

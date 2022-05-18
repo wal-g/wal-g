@@ -3,7 +3,7 @@ package functests
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 
 	"github.com/stretchr/testify/assert"
@@ -74,7 +74,7 @@ func (tctx *TestContext) loadMongodbOpsFromConfig(host string, loadId string) er
 	}
 	defer func() { _ = expectedFile.Close() }()
 
-	expectedData, err := ioutil.ReadAll(expectedFile)
+	expectedData, err := io.ReadAll(expectedFile)
 	if err != nil {
 		return err
 	}
@@ -181,6 +181,23 @@ func (tctx *TestContext) isMongoPrimary(host string) error {
 		}
 		return nil
 	})
+}
+
+func (tctx *TestContext) mongoInit(host string) error {
+	if err := tctx.testMongoConnect(host); err != nil {
+		return err
+	}
+	if err := tctx.initiateReplSet(host); err != nil {
+		return err
+	}
+	if err := tctx.isMongoPrimary(host); err != nil {
+		return err
+	}
+	if err := tctx.mongoEnableAuth(host); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (tctx *TestContext) mongoEnableAuth(host string) error {

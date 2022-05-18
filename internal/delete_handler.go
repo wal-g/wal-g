@@ -10,8 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -75,6 +75,12 @@ func IsPermanentFunc(isPermanent func(storage.Object) bool) DeleteHandlerOption 
 	}
 }
 
+func IsIgnoredFunc(isIgnored func(storage.Object) bool) DeleteHandlerOption {
+	return func(h *DeleteHandler) {
+		h.isIgnored = isIgnored
+	}
+}
+
 func NewDeleteHandler(
 	folder storage.Folder,
 	backups []BackupObject,
@@ -90,6 +96,8 @@ func NewDeleteHandler(
 		},
 		// by default, all storage objects are impermanent
 		isPermanent: func(storage.Object) bool { return false },
+		// by default, all storage objects are not ignored
+		isIgnored: func(storage.Object) bool { return false },
 	}
 
 	for _, option := range options {
@@ -107,19 +115,13 @@ type DeleteHandler struct {
 	greater func(object1, object2 storage.Object) bool
 
 	isPermanent func(object storage.Object) bool
+	isIgnored   func(object storage.Object) bool
 }
 
 func (h *DeleteHandler) HandleDeleteBefore(args []string, confirmed bool) {
-	modifier, beforeStr := extractDeleteModifierFromArgs(args)
+	modifier, beforeStr := ExtractDeleteModifierFromArgs(args)
 
-	var target BackupObject
-	timeLine, err := time.Parse(time.RFC3339, beforeStr)
-	if err == nil {
-		target, err = h.FindTargetBeforeTime(timeLine, modifier)
-	} else {
-		target, err = h.FindTargetBeforeName(beforeStr, modifier)
-	}
-
+	target, err := h.FindTargetBefore(beforeStr, modifier)
 	tracelog.ErrorLogger.FatalOnError(err)
 	if target == nil {
 		tracelog.InfoLogger.Printf("No backup found for deletion")
@@ -131,7 +133,7 @@ func (h *DeleteHandler) HandleDeleteBefore(args []string, confirmed bool) {
 }
 
 func (h *DeleteHandler) HandleDeleteRetain(args []string, confirmed bool) {
-	modifier, retentionStr := extractDeleteModifierFromArgs(args)
+	modifier, retentionStr := ExtractDeleteModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionStr)
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -146,17 +148,11 @@ func (h *DeleteHandler) HandleDeleteRetain(args []string, confirmed bool) {
 }
 
 func (h *DeleteHandler) HandleDeleteRetainAfter(args []string, confirmed bool) {
-	modifier, retentionSir, afterStr := extractDeleteRetainModifierFromArgs(args)
+	modifier, retentionSir, afterStr := ExtractDeleteRetainAfterModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionSir)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	var target BackupObject
-	timeLine, err := time.Parse(time.RFC3339, afterStr)
-	if err == nil {
-		target, err = h.FindTargetRetainAfterTime(retentionCount, timeLine, modifier)
-	} else {
-		target, err = h.FindTargetRetainAfterName(retentionCount, afterStr, modifier)
-	}
+	target, err := h.FindTargetRetainAfter(retentionCount, afterStr, modifier)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if target == nil {
@@ -214,6 +210,15 @@ func (h *DeleteHandler) HandleDeleteEverything(args []string, permanentBackups m
 	h.DeleteEverything(confirmed)
 }
 
+func (h *DeleteHandler) FindTargetBefore(beforeStr string, modifier int) (BackupObject, error) {
+	timeLine, err := time.Parse(time.RFC3339, beforeStr)
+	if err == nil {
+		return h.FindTargetBeforeTime(timeLine, modifier)
+	}
+
+	return h.FindTargetBeforeName(beforeStr, modifier)
+}
+
 func (h *DeleteHandler) FindTargetBeforeName(name string, modifier int) (BackupObject, error) {
 	choiceFunc := getBeforeChoiceFunc(name, modifier)
 	if choiceFunc == nil {
@@ -242,13 +247,27 @@ func (h *DeleteHandler) FindTargetRetain(retentionCount, modifier int) (BackupOb
 	if choiceFunc == nil {
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete retain'")
 	}
-	return findTarget(h.backups, h.greater, choiceFunc)
+	target, err := findTarget(h.backups, h.greater, choiceFunc)
+	// it is OK to have no backups found outside of the specified retain window, skip this error
+	if err != nil && err != errNotFound {
+		return nil, err
+	}
+	return target, nil
 }
 
 func (h *DeleteHandler) FindTargetByName(bname string) (BackupObject, error) {
 	return findTarget(h.backups, h.greater, func(object BackupObject) bool {
 		return strings.HasPrefix(object.GetName(), bname)
 	})
+}
+
+func (h *DeleteHandler) FindTargetRetainAfter(retentionCount int, afterStr string, modifier int) (BackupObject, error) {
+	timeLine, err := time.Parse(time.RFC3339, afterStr)
+	if err == nil {
+		return h.FindTargetRetainAfterTime(retentionCount, timeLine, modifier)
+	}
+
+	return h.FindTargetRetainAfterName(retentionCount, afterStr, modifier)
 }
 
 func (h *DeleteHandler) FindTargetRetainAfterName(
@@ -329,6 +348,10 @@ func (h *DeleteHandler) DeleteEverything(confirmed bool) {
 }
 
 func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) error {
+	return h.DeleteBeforeTargetWhere(target, confirmed, func(storage.Object) bool { return true })
+}
+
+func (h *DeleteHandler) DeleteBeforeTargetWhere(target BackupObject, confirmed bool, selector func(object storage.Object) bool) error {
 	if !target.IsFullBackup() {
 		errorMessage := "%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
 		return utility.NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
@@ -336,7 +359,7 @@ func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) 
 	tracelog.InfoLogger.Println("Start delete")
 
 	return storage.DeleteObjectsWhere(h.Folder, confirmed, func(object storage.Object) bool {
-		return h.less(object, target) && !h.isPermanent(object)
+		return selector(object) && h.less(object, target) && !h.isPermanent(object) && !h.isIgnored(object)
 	})
 }
 
@@ -351,7 +374,7 @@ func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool) er
 
 	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath),
 		confirmed, func(object storage.Object) bool {
-			return backupNamesToDelete[utility.StripLeftmostBackupName(object.GetName())] && !h.isPermanent(object)
+			return backupNamesToDelete[utility.StripLeftmostBackupName(object.GetName())] && !h.isPermanent(object) && !h.isIgnored(object)
 		})
 }
 
@@ -473,7 +496,8 @@ func getRetainChoiceFunc(retentionCount, modifier int) func(object BackupObject)
 	return nil
 }
 
-func extractDeleteRetainModifierFromArgs(args []string) (int, string, string) {
+// ExtractDeleteRetainAfterModifierFromArgs extracts the args for the "delete retain --after" command
+func ExtractDeleteRetainAfterModifierFromArgs(args []string) (int, string, string) {
 	if len(args) == 2 {
 		return NoDeleteModifier, args[0], args[1]
 	} else if args[0] == StringModifiers[0] {
@@ -482,6 +506,7 @@ func extractDeleteRetainModifierFromArgs(args []string) (int, string, string) {
 	return FindFullDeleteModifier, args[1], args[2]
 }
 
+// ExtractDeleteEverythingModifierFromArgs extracts the args for the "delete everything" command
 func ExtractDeleteEverythingModifierFromArgs(args []string) int {
 	if len(args) == 0 {
 		return NoDeleteModifier
@@ -489,6 +514,7 @@ func ExtractDeleteEverythingModifierFromArgs(args []string) int {
 	return ForceDeleteModifier
 }
 
+// ExtractDeleteTargetModifierFromArgs extracts the args for the "delete target" command
 func ExtractDeleteTargetModifierFromArgs(args []string) int {
 	if len(args) >= 1 && args[0] == StringModifiers[1] {
 		return FindFullDeleteModifier
@@ -497,7 +523,8 @@ func ExtractDeleteTargetModifierFromArgs(args []string) int {
 	return NoDeleteModifier
 }
 
-func extractDeleteModifierFromArgs(args []string) (int, string) {
+// ExtractDeleteModifierFromArgs extracts the delete modifier the "delete retain"/"delete before" commands
+func ExtractDeleteModifierFromArgs(args []string) (int, string) {
 	if len(args) == 1 {
 		return NoDeleteModifier, args[0]
 	} else if args[0] == StringModifiers[0] {
@@ -507,11 +534,11 @@ func extractDeleteModifierFromArgs(args []string) (int, string) {
 }
 
 func DeleteBeforeArgsValidator(cmd *cobra.Command, args []string) error {
-	err := deleteArgsValidator(args, StringModifiers, 1, 2)
+	err := DeleteArgsValidator(args, StringModifiers, 1, 2)
 	if err != nil {
 		return err
 	}
-	modifier, beforeStr := extractDeleteModifierFromArgs(args)
+	modifier, beforeStr := ExtractDeleteModifierFromArgs(args)
 	if modifier == FullDeleteModifier {
 		return fmt.Errorf("unsupported moodifier for delete before command")
 	}
@@ -543,11 +570,11 @@ func DeleteTargetArgsValidator(cmd *cobra.Command, args []string) error {
 }
 
 func DeleteEverythingArgsValidator(cmd *cobra.Command, args []string) error {
-	return deleteArgsValidator(args, StringModifiersDeleteEverything, 0, 1)
+	return DeleteArgsValidator(args, StringModifiersDeleteEverything, 0, 1)
 }
 
 func DeleteRetainArgsValidator(cmd *cobra.Command, args []string) error {
-	_, retentionStr := extractDeleteModifierFromArgs(args)
+	_, retentionStr := ExtractDeleteModifierFromArgs(args)
 	retentionNumber, err := strconv.Atoi(retentionStr)
 	if err != nil {
 		return errors.Wrapf(err, "expected to get a number as retantion count, but got: '%s'", retentionStr)
@@ -559,11 +586,11 @@ func DeleteRetainArgsValidator(cmd *cobra.Command, args []string) error {
 }
 
 func DeleteRetainAfterArgsValidator(cmd *cobra.Command, args []string) error {
-	err := deleteArgsValidator(args, StringModifiers, 2, 3)
+	err := DeleteArgsValidator(args, StringModifiers, 2, 3)
 	if err != nil {
 		return err
 	}
-	_, retentionStr, afterStr := extractDeleteRetainModifierFromArgs(args)
+	_, retentionStr, afterStr := ExtractDeleteRetainAfterModifierFromArgs(args)
 	retentionNumber, err := strconv.Atoi(retentionStr)
 	if err != nil {
 		return errors.Wrapf(err, "expected to get a number as retantion count, but got: '%s'", retentionStr)
@@ -579,7 +606,7 @@ func DeleteRetainAfterArgsValidator(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func deleteArgsValidator(args, stringModifiers []string, minArgs int, maxArgs int) error {
+func DeleteArgsValidator(args, stringModifiers []string, minArgs int, maxArgs int) error {
 	if len(args) < minArgs || len(args) > maxArgs {
 		return fmt.Errorf("accepts between %d and %d arg(s), received %d", minArgs, maxArgs, len(args))
 	}

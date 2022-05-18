@@ -89,6 +89,8 @@ RUN mkdir -p /var/log/wal-g/ ${TMP_DIR} && \
     ln --force -s /config/gpg-key.armor ${WALG_CONF_DIR}/gpg-key.armor
 
 COPY staging/wal-g ${WALG_REPO}/
+COPY staging/wal-g/redis_cli.sh /usr/bin/redis_cli.sh
+
 WORKDIR ${WALG_REPO}
 
 RUN make link_external_deps

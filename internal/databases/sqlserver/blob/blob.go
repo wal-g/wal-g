@@ -5,34 +5,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"sort"
 	"sync"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
 	"github.com/wal-g/tracelog"
 
-	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const IndexFileName = "__blob_index.json"
-
-const CacheItemsPerBlob = 3
-
-const MaxCacheBlockSize = 16 * 1024 * 1024 // 16M
 
 const BgSaveInterval = 30 * time.Second
 
 type Index struct {
 	sync.Mutex
-	folder    storage.Folder
-	Size      uint64            `json:"size"`
-	Blocks    []*Block          `json:"blocks"`
-	icache    map[string]*Block // cache by id's
-	ocache    []*Block          // cache by offset, ordered, only committed
-	needSave  bool
-	readCache *lru.Cache
+	folder      storage.Folder
+	Size        uint64            `json:"size"`
+	Blocks      []*Block          `json:"blocks"`
+	Compression string            `json:"compression"`
+	Encryption  string            `json:"encryption"`
+	icache      map[string]*Block // cache by id's
+	ocache      []*Block          // cache by offset, ordered, only committed
+	needSave    bool
 }
 
 type Block struct {
@@ -52,14 +47,9 @@ type Section struct {
 }
 
 func NewIndex(f storage.Folder) *Index {
-	c, err := lru.New(CacheItemsPerBlob)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create lru cache: %v", err))
-	}
 	idx := &Index{
-		folder:    f,
-		icache:    make(map[string]*Block),
-		readCache: c,
+		folder: f,
+		icache: make(map[string]*Block),
 	}
 	go idx.saver()
 	return idx
@@ -74,7 +64,7 @@ func (idx *Index) Load() error {
 		return err
 	}
 	defer reader.Close()
-	data, err := ioutil.ReadAll(reader)
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return err
 	}
@@ -215,7 +205,6 @@ func (idx *Index) PutBlockList(xblocklist *XBlockListIn) ([]string, error) {
 		}
 	}
 
-	idx.readCache.Purge()
 	return garbage, nil
 }
 
@@ -307,34 +296,6 @@ func (idx *Index) GetSections(rangeMin, rangeMax uint64) []Section {
 		})
 	}
 	return sections
-}
-
-func (idx *Index) GetCachedReader(folder storage.Folder, s Section) (io.ReadCloser, error) {
-	key := folder.GetPath() + s.Path
-	if s.BlockSize > MaxCacheBlockSize {
-		tracelog.DebugLogger.Printf("READ_OBJ: %s %d", key, s.BlockSize)
-		return folder.ReadObject(s.Path)
-	}
-	var buf []byte
-	if b, ok := idx.readCache.Get(key); ok {
-		tracelog.DebugLogger.Printf("READ_CACHE: %s %d", key, s.BlockSize)
-		buf = b.([]byte)
-	} else {
-		tracelog.DebugLogger.Printf("READ_OBJ: %s %d", key, s.BlockSize)
-		rc, err := folder.ReadObject(s.Path)
-		if err != nil {
-			return nil, err
-		}
-		defer rc.Close()
-		buf = make([]byte, s.BlockSize)
-		_, err = io.ReadFull(rc, buf)
-		if err != nil {
-			return nil, err
-		}
-		tracelog.DebugLogger.Printf("ADD_CACHE: %s %d", key, s.BlockSize)
-		idx.readCache.Add(key, buf)
-	}
-	return ioutil.NopCloser(bytes.NewReader(buf)), nil
 }
 
 // nolint: unused

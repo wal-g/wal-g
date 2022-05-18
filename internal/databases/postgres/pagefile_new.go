@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/wal-g/tracelog"
@@ -116,7 +115,7 @@ func WritePagesFromIncrement(increment io.Reader, target ReadWriterAt, overwrite
 	for i := uint32(0); i < diffBlockCount; i++ {
 		blockNo := int64(binary.LittleEndian.Uint32(diffMap[i*sizeofInt32 : (i+1)*sizeofInt32]))
 		if blockNo >= targetPageCount {
-			_, err := io.CopyN(ioutil.Discard, increment, DatabasePageSize)
+			_, err := io.CopyN(io.Discard, increment, DatabasePageSize)
 			if err != nil {
 				return 0, err
 			}

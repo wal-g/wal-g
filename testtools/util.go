@@ -17,12 +17,12 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/storages/memory"
-	"github.com/wal-g/storages/s3"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/pkg/storages/memory"
+	"github.com/wal-g/wal-g/pkg/storages/s3"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/test/mocks"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -43,14 +43,14 @@ func MakeDefaultInMemoryStorageFolder() *memory.Folder {
 }
 
 func MakeDefaultUploader(uploaderAPI s3manageriface.UploaderAPI) *s3.Uploader {
-	return s3.NewUploader(uploaderAPI, "", "", "STANDARD")
+	return s3.NewUploader(uploaderAPI, "", "", "", "STANDARD")
 }
 
 func NewMockUploader(apiMultiErr, apiErr bool) *internal.Uploader {
 	s3Uploader := MakeDefaultUploader(NewMockS3Uploader(apiMultiErr, apiErr, nil))
 	return internal.NewUploader(
 		&MockCompressor{},
-		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), "bucket/", "server/", false),
+		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), map[string]string{}, "bucket/", "server/", false),
 	)
 }
 
@@ -65,7 +65,7 @@ func NewMockWalUploader(apiMultiErr, apiErr bool) *postgres.WalUploader {
 	s3Uploader := MakeDefaultUploader(NewMockS3Uploader(apiMultiErr, apiErr, nil))
 	return postgres.NewWalUploader(
 		&MockCompressor{},
-		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), "bucket/", "server/", false),
+		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), map[string]string{}, "bucket/", "server/", false),
 		nil,
 	)
 }

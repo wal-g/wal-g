@@ -37,7 +37,7 @@ var (
 )
 
 func init() {
-	cmd.AddCommand(backupListCmd)
+	Cmd.AddCommand(backupListCmd)
 
 	// TODO: Merge similar backup-list functionality
 	// to avoid code duplication in command handlers

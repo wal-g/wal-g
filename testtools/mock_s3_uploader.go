@@ -3,12 +3,11 @@ package testtools
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
-	"github.com/wal-g/storages/memory"
+	"github.com/wal-g/wal-g/pkg/storages/memory"
 )
 
 type mockMultiFailureError struct {
@@ -58,7 +57,7 @@ func (uploader *MockS3Uploader) Upload(input *s3manager.UploadInput,
 	var err error
 	if uploader.storage == nil {
 		// Discard bytes to unblock pipe.
-		_, err = io.Copy(ioutil.Discard, input.Body)
+		_, err = io.Copy(io.Discard, input.Body)
 	} else {
 		var buf bytes.Buffer
 		_, err = io.Copy(&buf, input.Body)

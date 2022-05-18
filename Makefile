@@ -4,7 +4,11 @@ MAIN_SQLSERVER_PATH := main/sqlserver
 MAIN_REDIS_PATH := main/redis
 MAIN_MONGO_PATH := main/mongo
 MAIN_FDB_PATH := main/fdb
+<<<<<<< HEAD
 MAIN_ROCKSDB_PATH := main/rocksdb
+=======
+MAIN_GP_PATH := main/gp
+>>>>>>> master
 DOCKER_COMMON := golang ubuntu s3
 CMD_FILES = $(wildcard cmd/**/*.go)
 PKG_FILES = $(wildcard internal/**/*.go internal/**/**/*.go internal/*.go)
@@ -17,6 +21,7 @@ MONGO_MAJOR ?= "4.2"
 MONGO_VERSION ?= "4.2.8"
 GOLANGCI_LINT_VERSION ?= "v1.37.0"
 REDIS_VERSION ?= "5.0.8"
+TOOLS_MOD_DIR := ./internal/tools
 
 BUILD_TAGS:=brotli
 
@@ -28,9 +33,9 @@ ifdef USE_LZO
 	BUILD_TAGS:=$(BUILD_TAGS) lzo
 endif
 
-.PHONY: unittest fmt lint clean
+.PHONY: unittest fmt lint clean install_tools
 
-test: deps unittest pg_build mysql_build redis_build mongo_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test
+test: deps unittest pg_build mysql_build redis_build mongo_build gp_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test gp_integration_test
 
 pg_test: deps pg_build unlink_brotli pg_integration_test
 
@@ -57,6 +62,9 @@ pg_integration_test:
 		make pg_build_image;\
 	else\
 		docker load -i ${CACHE_FILE_DOCKER_PREFIX};\
+	fi
+	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
+		docker-compose build pg_pgbackrest;\
 	fi
 	docker-compose build $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
@@ -167,42 +175,50 @@ clean_redis_features:
 	set -e
 	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1  -timeout 5m -tf.test=false -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=redis
 
+gp_build: $(CMD_FILES) $(PKG_FILES)
+	(cd $(MAIN_GP_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/gp.walgVersion=`git tag -l --points-at HEAD`")
+
+gp_clean:
+	(cd $(MAIN_GP_PATH) && go clean)
+	./cleanup.sh
+
+gp_install: gp_build
+	mv $(MAIN_GP_PATH)/wal-g $(GOBIN)/wal-g
+
+gp_test: deps gp_build unlink_brotli gp_integration_test
+
+gp_integration_test: load_docker_common
+	docker-compose build gp gp_tests
+	docker-compose up --exit-code-from gp_tests gp_tests
+
+st_test: deps pg_build unlink_brotli st_integration_test
+
+st_integration_test: load_docker_common
+	docker-compose build st_tests
+	docker-compose up --exit-code-from st_tests st_tests
 
 unittest:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet
-	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/
-	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/compression/
-	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/crypto/openpgp/
-	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/crypto/awskms/
-	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/abool
-	@if [ ! -z "${USE_LIBSODIUM}" ]; then\
-		go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/crypto/libsodium/;\
-	fi
-	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/databases/mysql
-	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/databases/mongo/...
-	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/databases/postgres
-	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/walparser/
-	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./utility
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/...
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./pkg/...
+	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./utility/...
 
 coverage:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go test -v $(TEST_MODIFIER) -coverprofile=$(COVERAGE_FILE) | grep -v 'no test files'
 	go tool cover -html=$(COVERAGE_FILE)
 
+install_tools:
+	cd $(TOOLS_MOD_DIR) && go install golang.org/x/tools/cmd/goimports
+	cd $(TOOLS_MOD_DIR) && go install github.com/golangci/golangci-lint/cmd/golangci-lint
+
 fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 	gofmt -s -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 
-goimports: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
+goimports: install_tools $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 	goimports -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 
-lint:
-	@#Github Actions
-	@if [ "$(shell command -v golangci-lint)" = "" ] && [ "$(GITHUB_WORKFLOW)" != "" ]; then curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sudo sh -s -- -b $(go env GOPATH)/bin $(GOLANGCI_LINT_VERSION); fi;
-	@#MacOS (brew)
-	@if [ "$(shell command -v golangci-lint)" = "" ] && [ "$(shell command -v brew)" != "" ]; then brew install golangci-lint; fi;
-	@#Linux (has sudo)
-	@if [ "$(shell command -v golangci-lint)" = "" ]; then curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s $(GOLANGCI_LINT_VERSION) && sudo cp ./bin/golangci-lint $(go env GOPATH)/bin/; fi;
-	@echo "running golangci-lint..."
-	@golangci-lint run
+lint: install_tools
+	golangci-lint run --allow-parallel-runners ./...
 
 docker_lint:
 	docker build -t wal-g/lint - < docker/lint/Dockerfile
@@ -226,7 +242,7 @@ link_external_deps: link_brotli link_libsodium
 unlink_external_deps: unlink_brotli unlink_libsodium
 
 install:
-	@echo "Nothing to be done. Use pg_install/mysql_install/mongo_install/fdb_install/... instead."
+	@echo "Nothing to be done. Use pg_install/mysql_install/mongo_install/fdb_install/gp_install... instead."
 
 link_brotli:
 	./link_brotli.sh

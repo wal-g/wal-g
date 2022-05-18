@@ -3,7 +3,6 @@ package functests
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -141,6 +140,7 @@ func (tctx *TestContext) setupSuites(s *godog.Suite) {
 	s.Step(`^mongodb replset initialized on ([^\s]*)$`, tctx.initiateReplSet)
 	s.Step(`^mongodb role is primary on ([^\s]*)$`, tctx.isMongoPrimary)
 	s.Step(`^mongodb auth initialized on ([^\s]*)$`, tctx.mongoEnableAuth)
+	s.Step(`^mongodb initialized on ([^\s]*)$`, tctx.mongoInit)
 	s.Step(`^([^\s]*) has no data$`, tctx.purgeMongoDataDir)
 
 	s.Step(`we save last oplog timestamp on ([^\s]*) to "([^"]*)"`, tctx.saveOplogTimestamp)
@@ -192,7 +192,7 @@ func (tctx *TestContext) LoadEnv() {
 
 func scanFeatureDirs(dbName, featurePrefix string) (map[string]string, error) {
 	dir := path.Join(featuresDir, dbName)
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +204,7 @@ func scanFeatureDirs(dbName, featurePrefix string) (map[string]string, error) {
 		for _, f := range files {
 			filename := f.Name()
 			if filename == requestedFeature+featureExt {
-				files = []os.FileInfo{f}
+				files = []os.DirEntry{f}
 				found = true
 				break
 			}

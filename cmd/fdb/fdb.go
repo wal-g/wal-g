@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/wal-g/wal-g/cmd/common"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -37,10 +39,5 @@ func Execute() {
 }
 
 func init() {
-	internal.ConfigureSettings(internal.FDB)
-	cobra.OnInitialize(internal.InitConfig, internal.Configure)
-
-	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
-	cmd.InitDefaultVersionFlag()
-	internal.AddConfigFlags(cmd)
+	common.Init(cmd, internal.FDB)
 }

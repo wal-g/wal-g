@@ -7,11 +7,11 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/asm"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -26,6 +26,8 @@ type UploaderProvider interface {
 	DisableSizeTracking()
 	UploadedDataSize() (int64, error)
 	RawDataSize() (int64, error)
+	ChangeDirectory(relativePath string)
+	Folder() storage.Folder
 }
 
 // Uploader contains fields associated with uploading tarballs.
@@ -41,12 +43,25 @@ type Uploader struct {
 	dataSize               *int64
 }
 
+var _ UploaderProvider = &Uploader{}
+
+// SplitStreamUploader - new UploaderProvider implementation that enable us to split upload streams into blocks
+//   of blockSize bytes, then puts it in at most `partitions` streams that are compressed and pushed to storage
+type SplitStreamUploader struct {
+	*Uploader
+	partitions int
+	blockSize  int
+}
+
+var _ UploaderProvider = &SplitStreamUploader{}
+
 // UploadObject
 type UploadObject struct {
 	Path    string
 	Content io.Reader
 }
 
+// FIXME: return UploaderProvider
 func NewUploader(
 	compressor compression.Compressor,
 	uploadingLocation storage.Folder,
@@ -57,6 +72,32 @@ func NewUploader(
 		waitGroup:       &sync.WaitGroup{},
 		tarSize:         new(int64),
 		dataSize:        new(int64),
+	}
+	uploader.Failed.Store(false)
+	return uploader
+}
+
+func NewSplitStreamUploader(
+	compressor compression.Compressor,
+	uploadingLocation storage.Folder,
+	partitions int,
+	blockSize int,
+) UploaderProvider {
+	if partitions <= 1 {
+		// Fallback to old implementation in order to skip unneeded steps:
+		return NewUploader(compressor, uploadingLocation)
+	}
+
+	uploader := &SplitStreamUploader{
+		Uploader: &Uploader{
+			UploadingFolder: uploadingLocation,
+			Compressor:      compressor,
+			waitGroup:       &sync.WaitGroup{},
+			tarSize:         new(int64),
+			dataSize:        new(int64),
+		},
+		partitions: partitions,
+		blockSize:  blockSize,
 	}
 	uploader.Failed.Store(false)
 	return uploader
@@ -130,16 +171,18 @@ func (uploader *Uploader) Compression() compression.Compressor {
 
 // TODO : unit tests
 func (uploader *Uploader) Upload(path string, content io.Reader) error {
+	WalgMetrics.uploadedFilesTotal.Inc()
 	if uploader.tarSize != nil {
 		content = NewWithSizeReader(content, uploader.tarSize)
 	}
 	err := uploader.UploadingFolder.PutObject(path, content)
-	if err == nil {
-		return nil
+	if err != nil {
+		WalgMetrics.uploadedFilesFailedTotal.Inc()
+		uploader.Failed.Store(true)
+		tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"\n", err)
+		return err
 	}
-	uploader.Failed.Store(true)
-	tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"\n", err)
-	return err
+	return nil
 }
 
 // UploadMultiple uploads multiple objects from the start of the slice,
@@ -154,4 +197,20 @@ func (uploader *Uploader) UploadMultiple(objects []UploadObject) error {
 		}
 	}
 	return nil
+}
+
+func (uploader *Uploader) ChangeDirectory(relativePath string) {
+	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(relativePath)
+}
+
+func (uploader *Uploader) Folder() storage.Folder {
+	return uploader.UploadingFolder
+}
+
+func (uploader *SplitStreamUploader) Clone() *SplitStreamUploader {
+	return &SplitStreamUploader{
+		Uploader:   uploader.Uploader.Clone(),
+		partitions: uploader.partitions,
+		blockSize:  uploader.blockSize,
+	}
 }

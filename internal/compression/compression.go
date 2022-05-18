@@ -10,7 +10,7 @@ type Compressor interface {
 }
 
 type Decompressor interface {
-	Decompress(dst io.Writer, src io.Reader) error
+	Decompress(src io.Reader) (io.ReadCloser, error)
 	FileExtension() string
 }
 
@@ -19,6 +19,11 @@ func GetDecompressorByCompressor(compressor Compressor) Decompressor {
 }
 
 func FindDecompressor(fileExtension string) Decompressor {
+	// cut the leading '.' (e.g. ".lz4" => "lz4")
+	if len(fileExtension) > 0 && fileExtension[0] == '.' {
+		fileExtension = fileExtension[1:]
+	}
+
 	for _, decompressor := range Decompressors {
 		if decompressor.FileExtension() == fileExtension {
 			return decompressor

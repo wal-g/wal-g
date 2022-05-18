@@ -1,7 +1,7 @@
 package testtools
 
 import (
-	"io/ioutil"
+	"io"
 	"strings"
 	"time"
 
@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	walgs3 "github.com/wal-g/storages/s3"
+	walgs3 "github.com/wal-g/wal-g/pkg/storages/s3"
 )
 
 // Mock out S3 client. Includes these methods:
@@ -48,7 +48,7 @@ func (client *MockS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOu
 	}
 
 	output := &s3.GetObjectOutput{
-		Body: ioutil.NopCloser(strings.NewReader("mock content")),
+		Body: io.NopCloser(strings.NewReader("mock content")),
 	}
 
 	return output, nil

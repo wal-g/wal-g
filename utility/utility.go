@@ -30,13 +30,15 @@ func LoggedClose(c io.Closer, errmsg string) {
 	}
 }
 
-func LoggedSync(file *os.File, errmsg string) {
-	err := file.Sync()
-	if errmsg == "" {
-		errmsg = "Problem with file sync"
-	}
-	if err != nil {
-		tracelog.ErrorLogger.Printf("%s: %v", errmsg, err)
+func LoggedSync(file *os.File, errmsg string, fsync bool) {
+	if fsync {
+		err := file.Sync()
+		if errmsg == "" {
+			errmsg = "Problem with file sync"
+		}
+		if err != nil {
+			tracelog.ErrorLogger.Printf("%s: %v", errmsg, err)
+		}
 	}
 }
 
@@ -53,6 +55,7 @@ const (
 	CompressedBlockMaxSize = 20 << 20
 	CopiedBlockMaxSize     = CompressedBlockMaxSize
 	MetadataFileName       = "metadata.json"
+	StreamMetadataFileName = "stream_metadata.json"
 	PathSeparator          = string(os.PathSeparator)
 	Mebibyte               = 1024 * 1024
 )
@@ -128,7 +131,7 @@ func ResolveSymlink(path string) string {
 	resolve, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		// TODO: Consider descriptive panic here and other checks
-		// Directory may be absent et c.
+		// Directory may be absent etc.
 		return path
 	}
 	return resolve

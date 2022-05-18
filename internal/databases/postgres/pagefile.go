@@ -30,14 +30,14 @@ import (
 )
 
 const (
-	DatabasePageSize            = int64(walparser.BlockSize)
-	sizeofInt32                 = 4
-	sizeofInt64                 = 8
-	SignatureMagicNumber byte   = 0x55
-	invalidLsn           uint64 = 0
-	validFlags                  = 7
-	layoutVersion               = 4
-	headerSize                  = 24
+	DatabasePageSize          = int64(walparser.BlockSize)
+	sizeofInt32               = 4
+	sizeofInt64               = 8
+	SignatureMagicNumber byte = 0x55
+	invalidLsn           LSN  = 0
+	validFlags                = 7
+	layoutVersion             = 4
+	headerSize                = 24
 
 	DefaultTablespace    = "base"
 	GlobalTablespace     = "global"
@@ -116,7 +116,7 @@ func isPagedFile(info os.FileInfo, filePath string) bool {
 
 func ReadIncrementalFile(filePath string,
 	fileSize int64,
-	lsn uint64,
+	lsn LSN,
 	deltaBitmap *roaring.Bitmap) (fileReader io.ReadCloser, size int64, err error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -132,12 +132,13 @@ func ReadIncrementalFile(filePath string,
 	pageReader := &IncrementalPageReader{fileReadSeekCloser, fileSize, lsn, nil, nil}
 	incrementSize, err := pageReader.initialize(deltaBitmap)
 	if err != nil {
+		utility.LoggedClose(file, "")
 		return nil, 0, err
 	}
 	return pageReader, incrementSize, nil
 }
 
-func ReadIncrementLocations(filePath string, fileSize int64, lsn uint64) ([]walparser.BlockLocation, error) {
+func ReadIncrementLocations(filePath string, fileSize int64, lsn LSN) ([]walparser.BlockLocation, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
@@ -170,7 +171,7 @@ func convertBlocksToLocations(filePath string, blocks []uint32) ([]walparser.Blo
 }
 
 // ApplyFileIncrement changes pages according to supplied change map file
-func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrementalFiles bool) error {
+func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrementalFiles bool, fsync bool) error {
 	tracelog.DebugLogger.Printf("Incrementing %s\n", fileName)
 	err := ReadIncrementFileHeader(increment)
 	if err != nil {
@@ -207,7 +208,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrement
 		return errors.Wrap(err, "can't open file to increment")
 	}
 	defer utility.LoggedClose(file, "")
-	defer utility.LoggedSync(file, "")
+	defer utility.LoggedSync(file, "", fsync)
 
 	err = file.Truncate(int64(fileSize))
 	if err != nil {

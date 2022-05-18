@@ -1,9 +1,11 @@
 package postgres
 
 import (
-	"github.com/wal-g/storages/storage"
+	"strings"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -40,15 +42,25 @@ func GetPermanentBackupsAndWals(folder storage.Folder) (map[string]bool, map[str
 			permanentBackups[backupTime.BackupName] = true
 		}
 	}
+	if len(permanentBackups) > 0 {
+		tracelog.InfoLogger.Printf("Found permanent objects: backups=%v, wals=%v\n",
+			permanentBackups, permanentWals)
+	}
 	return permanentBackups, permanentWals
 }
 
 func IsPermanent(objectName string, permanentBackups, permanentWals map[string]bool) bool {
-	if objectName[:len(utility.WalPath)] == utility.WalPath {
+	if strings.HasPrefix(objectName, utility.WalPath) && len(objectName) >= len(utility.WalPath)+24 {
 		wal := objectName[len(utility.WalPath) : len(utility.WalPath)+24]
 		return permanentWals[wal]
 	}
-	if objectName[:len(utility.BaseBackupPath)] == utility.BaseBackupPath {
+	if strings.HasPrefix(objectName, utility.BaseBackupPath) {
+		// Handle Greenplum AO segment backup reference
+		if strings.HasSuffix(objectName, BackupRefSuffix) {
+			backupRef := strings.SplitAfter(objectName, AoSegSuffix+"_")[1]
+			return permanentBackups[strings.TrimSuffix(backupRef, BackupRefSuffix)]
+		}
+
 		backup := utility.StripLeftmostBackupName(objectName[len(utility.BaseBackupPath):])
 		return permanentBackups[backup]
 	}

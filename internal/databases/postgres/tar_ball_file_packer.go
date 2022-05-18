@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/wal-g/wal-g/internal"
@@ -59,12 +58,12 @@ func NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks bool
 // TarBallFilePacker is used to pack bundle file into tarball.
 type TarBallFilePacker struct {
 	deltaMap         PagedFileDeltaMap
-	incrementFromLsn *uint64
+	incrementFromLsn *LSN
 	files            BundleFiles
 	options          TarBallFilePackerOptions
 }
 
-func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *uint64, files BundleFiles,
+func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, files BundleFiles,
 	options TarBallFilePackerOptions) *TarBallFilePacker {
 	return &TarBallFilePacker{
 		deltaMap:         deltaMap,
@@ -202,7 +201,7 @@ func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string)
 
 func verifyFile(path string, fileInfo os.FileInfo, fileReader io.Reader, isIncremented bool) ([]uint32, error) {
 	if !isPagedFile(fileInfo, path) {
-		_, err := io.Copy(ioutil.Discard, fileReader)
+		_, err := io.Copy(io.Discard, fileReader)
 		return nil, err
 	}
 

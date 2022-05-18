@@ -2,7 +2,7 @@ package postgres_test
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,18 +20,27 @@ func TestWallFetchCachesLastDecompressor(t *testing.T) {
 	type TestData struct {
 		filename     string
 		decompressor compression.Decompressor
+		compressor   compression.Compressor
 	}
 
-	testData := []TestData{{"00000001000000000000007C", lz4.Decompressor{}},
-		{"00000001000000000000007F", lzma.Decompressor{}}}
+	testData := []TestData{
+		{"00000001000000000000007C", lz4.Decompressor{}, lz4.Compressor{}},
+		{"00000001000000000000007F", lzma.Decompressor{}, lzma.Compressor{}},
+	}
 
 	for _, data := range testData {
-		walFilename, decompressor := data.filename, data.decompressor
+		walFilename, decompressor, compressor := data.filename, data.decompressor, data.compressor
 
-		assert.NoError(t, folder.PutObject(walFilename+"."+decompressor.FileExtension(),
-			bytes.NewReader([]byte("test data"))))
+		data := bytes.Buffer{}
+		cw := compressor.NewWriter(&data)
+		_, err := io.WriteString(cw, "dest data")
+		assert.NoError(t, err)
+		err = cw.Close()
+		assert.NoError(t, err)
 
-		_, err := internal.DownloadAndDecompressStorageFile(folder, walFilename)
+		assert.NoError(t, folder.PutObject(walFilename+"."+decompressor.FileExtension(), &data))
+
+		_, err = internal.DownloadAndDecompressStorageFile(folder, walFilename)
 		assert.NoError(t, err)
 
 		last, err := internal.GetLastDecompressor()
@@ -58,7 +67,7 @@ func TestTryDownloadWALFile_Exist(t *testing.T) {
 	archiveReader, exist, err := internal.TryDownloadFile(folder, WalFilename)
 	assert.NoError(t, err)
 	assert.True(t, exist)
-	actualData, err := ioutil.ReadAll(archiveReader)
+	actualData, err := io.ReadAll(archiveReader)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedData, actualData)
 }

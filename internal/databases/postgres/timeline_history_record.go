@@ -9,10 +9,9 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 
-	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 // regexp for .history file record. For more details, see
@@ -38,11 +37,11 @@ func (err HistoryFileNotFoundError) Error() string {
 // TimelineHistoryRecord represents entry in .history file
 type TimelineHistoryRecord struct {
 	timeline uint32
-	lsn      uint64
+	lsn      LSN
 	comment  string
 }
 
-func NewTimelineHistoryRecord(timeline uint32, lsn uint64, comment string) *TimelineHistoryRecord {
+func NewTimelineHistoryRecord(timeline uint32, lsn LSN, comment string) *TimelineHistoryRecord {
 	return &TimelineHistoryRecord{timeline: timeline, lsn: lsn, comment: comment}
 }
 
@@ -55,7 +54,7 @@ func newHistoryRecordFromString(row string) (*TimelineHistoryRecord, error) {
 	if err != nil {
 		return nil, err
 	}
-	lsn, err := pgx.ParseLSN(matchResult[2])
+	lsn, err := ParseLSN(matchResult[2])
 	if err != nil {
 		return nil, err
 	}

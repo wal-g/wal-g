@@ -28,6 +28,28 @@ linters-settings:
     locale: US
   lll:
     line-length: 140
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-naming
+      - name: exported
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: unreachable-code
+      - name: redefines-builtin-id
 
 linters:
   # please, do not use `enable-all`: it's deprecated and will be removed soon.
@@ -37,6 +59,7 @@ linters:
     - bodyclose
     - dupl
     - errcheck
+    - exportloopref
     - funlen
     - gocritic
     - gocyclo
@@ -44,10 +67,9 @@ linters:
     - goimports
     - govet
     - ineffassign
-    - interfacer
     - misspell
     - nakedret
-    - scopelint
+    - revive
     - staticcheck
     - structcheck
     - typecheck
@@ -55,7 +77,6 @@ linters:
     - unparam
     - unused
     - varcheck
-    - golint
     - lll
   # - godox
     - deadcode
@@ -86,6 +107,7 @@ run:
     - "tmp"
     - "submodules"
     - "testtools"
+    - "pkg/storages"
   skip-files:
     - ".*_test.go$"
 

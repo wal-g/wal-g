@@ -84,7 +84,7 @@ Overrides the default `number of WAL files to upload during one scan`. By defaul
 
 * `WALG_SENTINEL_USER_DATA`
 
-This setting allows backup automation tools to add extra information to JSON sentinel file during ```backup-push```. This setting can be used e.g. to give user-defined names to backups.
+This setting allows backup automation tools to add extra information to JSON sentinel file during ```backup-push```. This setting can be used e.g. to give user-defined names to backups. Note: UserData must be a valid JSON string.
 
 * `WALG_PREVENT_WAL_OVERWRITE`
 
@@ -104,6 +104,10 @@ To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not e
 
 To configure the size of one backup bundle (in bytes). Smaller size causes granularity and more optimal, faster recovering. It also increases the number of storage requests, so it can costs you much money. Default size is 1 GB (`1 << 30 - 1` bytes).
 
+* `WALG_TAR_DISABLE_FSYNC`
+
+Disable calling fsync after writing files when extracting tar files.
+
 * `WALG_PG_WAL_SIZE`
 
 To configure the wal segment size if different from the postgres default of 16 MB
@@ -121,6 +125,26 @@ Sample metadata file (000000020000000300000071.json)
 }
 ```
 If the parameter value is NOMETADATA or not specified, it will fallback to default setting (no wal metadata generation)
+
+* `WALG_ALIVE_CHECK_INTERVAL`
+
+To control how frequently WAL-G will check if Postgres is alive during the backup-push. If the check fails, backup-push terminates.
+
+Examples:
+- `0` - disable the alive checks (default value)
+- `10s` - check every 10 seconds
+- `10m` - check every 10 minutes
+
+
+* `WALG_STOP_BACKUP_TIMEOUT`
+
+Timeout for the pg_stop_backup() call. By default, there is no timeout.
+
+Examples:
+- `0` - disable the timeout (default value)
+- `10s` - 10 seconds timeout
+- `10m` - 10 minutes timeout
+
 
 Usage
 -----
@@ -232,6 +256,39 @@ To activate this feature, do one of the following:
 wal-g backup-push /path --rating-composer
 ```
 
+#### Copy composer mode
+
+In the copy composer mode, WAL-G does full backup and copies unchanged tar files from previous full backup. In case when there are no previous full backup, `regular` composer is used.
+
+To activate this feature, do one of the following:
+
+* set the `WALG_USE_COPY_COMPOSER`environment variable
+* add the --copy-composer flag
+
+```bash
+wal-g backup-push /path --copy-composer
+```
+
+#### Backup without metadata
+
+By default, WAL-G tracks metadata of the files backed up. If millions of files are backed up (typically in case of hundreds of databases and thousands of tables in each database), tracking this metadata alone would require GBs of memory.
+
+If `--without-files-metadata` or `WALG_WITHOUT_FILES_METADATA` is enabled, WAL-G does not track metadata of the files backed up. This significantly reduces the memory usage on instances with `> 100k` files.
+
+Limitations
+
+* Cannot be used with `rating-composer`, `copy-composer`
+* Cannot be used with `delta-from-user-data`, `delta-from-name`, `add-user-data`
+
+To activate this feature, do one of the following:
+
+* set the `WALG_WITHOUT_FILES_METADATA`environment variable
+* add the `--without-files-metadata` flag
+
+```bash
+wal-g backup-push /path --without-files-metadata
+```
+
 #### Create delta from specific backup
 When creating delta backup (`WALG_DELTA_MAX_STEPS` > 0), WAL-G uses the latest backup as the base by default. This behaviour can be changed via following flags:
 
@@ -262,6 +319,26 @@ INFO: Delta will be made from full backup.
 INFO: Delta backup from base_000000010000000100000040 with LSN 140000060.
 ```
 
+#### Pages checksum verification
+To enable verification of the page checksums during the backup-push, use the `--verify` flag or set the `WALG_VERIFY_PAGE_CHECKSUMS` env variable. If found any, corrupted block numbers (currently no more than 10 of them) will be recorded to the backup sentinel json, for example:
+```json
+...
+"/base/13690/13535": {
+"IsSkipped": true,
+"MTime": "2020-08-20T21:02:56.690095409+05:00",
+"IsIncremented": false
+},
+"/base/16384/16397": {
+"CorruptBlocks": [
+1
+],
+"IsIncremented": false,
+"IsSkipped": false,
+"MTime": "2020-08-21T19:09:52.966149937+05:00"
+},
+...
+```
+
 ### ``wal-fetch``
 
 When fetching WAL archives from S3, the user should pass in the archive name and the name of the file to download to. This file should not exist as WAL-G will create it for you.
@@ -271,6 +348,11 @@ WAL-G will also prefetch WAL files ahead of asked WAL file. These files will be 
 ```bash
 wal-g wal-fetch example-archive new-file-name
 ```
+
+Note: ``wal-fetch`` will exit with errorcode 74 (EX_IOERR: input/output error, see sysexits.h for more info) if the WAL-file is not available in the repository.
+All other errors end in exit code 1, and should stop PostgreSQL rather than ending PostgreSQL recovery.
+For PostgreSQL that should be any error code between 126 and 255, which can be achieved with a simple wrapper script.
+Please see https://github.com/wal-g/wal-g/pull/1195 for more information.
 
 ### ``wal-push``
 
@@ -443,3 +525,43 @@ Flags:
 - `-f, --from string` Storage config from where should copy backup
 - `-t, --to string` Storage config to where should copy backup
 - `-w, --without-history` Copy backup without history (wal files)
+
+### ``delete garbage``
+
+Deletes outdated WAL archives and backups leftover files from storage, e.g. unsuccessfully backups or partially deleted ones. Will remove all non-permanent objects before the earliest non-permanent backup. This command is useful when backups are being deleted by the `delete target` command.
+
+Usage:
+```bash
+wal-g delete garbage           # Deletes outdated WAL archives and leftover backups files from storage
+wal-g delete garbage ARCHIVES      # Deletes only outdated WAL archives from storage
+wal-g delete garbage BACKUPS       # Deletes only leftover (partially deleted or unsuccessful) backups files from storage
+```
+
+### ``wal-restore``
+
+Restores the missing WAL segments that will be needed to perform pg_rewind from storage. The current version supports only local clusters.
+
+Usage:
+```bash
+wal-g wal-restore path/to/target-pgdata path/to/source-pgdata
+```
+
+pgBackRest backups support
+-----------
+### ``pgbackrest backup-list``
+
+List pgbackrest backups.
+
+Usage:
+```bash
+wal-g pgbackrest backup-list [--pretty] [--json] [--detail]
+```
+
+### ``pgbackrest backup-fetch``
+
+Fetch pgbackrest backup. For now works only with full backups, incr and diff backups are not supported.
+
+Usage:
+```bash
+wal-g pgbackrest backup-fetch path/to/destination-directory backup-name
+```

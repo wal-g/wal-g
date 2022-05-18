@@ -4,16 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -31,11 +30,14 @@ func (err ArchiveNonExistenceError) Error() string {
 
 // DownloadFile downloads, decompresses and decrypts
 func DownloadFile(folder storage.Folder, filename, ext string, writeCloser io.WriteCloser) error {
+	utility.LoggedClose(writeCloser, "")
+
 	decompressor := compression.FindDecompressor(ext)
 	if decompressor == nil {
 		return fmt.Errorf("decompressor for extension '%s' was not found", ext)
 	}
 	tracelog.DebugLogger.Printf("Found decompressor for %s", decompressor.FileExtension())
+
 	archiveReader, exists, err := TryDownloadFile(folder, filename)
 	if err != nil {
 		return err
@@ -43,17 +45,20 @@ func DownloadFile(folder storage.Folder, filename, ext string, writeCloser io.Wr
 	if !exists {
 		return fmt.Errorf("file '%s' does not exist", filename)
 	}
+	defer utility.LoggedClose(archiveReader, "")
 
-	err = DecompressDecryptBytes(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
+	decompressedReader, err := DecompressDecryptBytes(archiveReader, decompressor)
 	if err != nil {
 		return err
 	}
-	utility.LoggedClose(writeCloser, "")
-	return nil
+	defer utility.LoggedClose(decompressedReader, "")
+
+	_, err = utility.FastCopy(&utility.EmptyWriteIgnorer{Writer: writeCloser}, decompressedReader)
+	return err
 }
 
-func TryDownloadFile(folder storage.Folder, path string) (walFileReader io.ReadCloser, exists bool, err error) {
-	walFileReader, err = folder.ReadObject(path)
+func TryDownloadFile(folder storage.Folder, path string) (fileReader io.ReadCloser, exists bool, err error) {
+	fileReader, err = folder.ReadObject(path)
 	if err == nil {
 		exists = true
 		return
@@ -64,29 +69,33 @@ func TryDownloadFile(folder storage.Folder, path string) (walFileReader io.ReadC
 	return
 }
 
-// TODO : unit tests
-func DecompressDecryptBytes(dst io.Writer, archiveReader io.ReadCloser, decompressor compression.Decompressor) error {
-	crypter := ConfigureCrypter()
-	if crypter != nil {
-		tracelog.DebugLogger.Printf("Selected crypter: %s", crypter.Name())
-
-		reader, err := crypter.Decrypt(archiveReader)
-		if err != nil {
-			return fmt.Errorf("failed to init decrypt reader: %w", err)
-		}
-		archiveReader = ioextensions.ReadCascadeCloser{
-			Reader: reader,
-			Closer: archiveReader,
-		}
-	} else {
-		tracelog.DebugLogger.Printf("No crypter has been selected")
-	}
-
-	err := decompressor.Decompress(dst, archiveReader)
+func DecompressDecryptBytes(archiveReader io.Reader, decompressor compression.Decompressor) (io.ReadCloser, error) {
+	decryptReader, err := DecryptBytes(archiveReader)
 	if err != nil {
-		return fmt.Errorf("failed to decompress archive reader: %w", err)
+		return nil, err
 	}
-	return nil
+	if decompressor == nil {
+		tracelog.DebugLogger.Printf("No decompressor has been selected")
+		return io.NopCloser(decryptReader), nil
+	}
+	return decompressor.Decompress(decryptReader)
+}
+
+func DecryptBytes(archiveReader io.Reader) (io.Reader, error) {
+	crypter := ConfigureCrypter()
+	if crypter == nil {
+		tracelog.DebugLogger.Printf("No crypter has been selected")
+		return archiveReader, nil
+	}
+
+	tracelog.DebugLogger.Printf("Selected crypter: %s", crypter.Name())
+
+	decryptReader, err := crypter.Decrypt(archiveReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init decrypt reader: %w", err)
+	}
+
+	return decryptReader, nil
 }
 
 // CachedDecompressor is the file extension describing decompressor
@@ -101,7 +110,7 @@ func GetLastDecompressor() (compression.Decompressor, error) {
 	usr, err := user.Current()
 	if err == nil {
 		cacheFilename = filepath.Join(usr.HomeDir, ".walg_decompressor_cache")
-		file, err := ioutil.ReadFile(cacheFilename)
+		file, err := os.ReadFile(cacheFilename)
 		if err == nil {
 			err = json.Unmarshal(file, &cache)
 			if err != nil {
@@ -128,7 +137,7 @@ func SetLastDecompressor(decompressor compression.Decompressor) error {
 
 	marshal, err := json.Marshal(&cache)
 	if err == nil {
-		return ioutil.WriteFile(cacheFilename, marshal, 0644)
+		return os.WriteFile(cacheFilename, marshal, 0644)
 	}
 
 	return err
@@ -168,12 +177,17 @@ func DownloadAndDecompressStorageFile(folder storage.Folder, fileName string) (i
 			continue
 		}
 		_ = SetLastDecompressor(decompressor)
-		reader, writer := io.Pipe()
-		go func() {
-			err = DecompressDecryptBytes(&EmptyWriteIgnorer{writer}, archiveReader, decompressor)
-			_ = writer.CloseWithError(err)
-		}()
-		return reader, nil
+
+		decompressedReaded, err := DecompressDecryptBytes(archiveReader, decompressor)
+		if err != nil {
+			utility.LoggedClose(archiveReader, "")
+			return nil, err
+		}
+
+		return ioextensions.ReadCascadeCloser{
+			Reader: decompressedReaded,
+			Closer: ioextensions.NewMultiCloser([]io.Closer{archiveReader, decompressedReaded}),
+		}, nil
 	}
 	return nil, newArchiveNonExistenceError(fileName)
 }
@@ -186,6 +200,7 @@ func DownloadFileTo(folder storage.Folder, fileName string, dstPath string) erro
 	if err != nil {
 		return err
 	}
+	defer utility.LoggedClose(file, "")
 
 	reader, err := DownloadAndDecompressStorageFile(folder, fileName)
 	if err != nil {

@@ -8,6 +8,7 @@ RUN apt-get update && \
 COPY go.mod go.mod
 COPY vendor/ vendor/
 COPY internal/ internal/
+COPY pkg/ pkg/
 COPY cmd/ cmd/
 COPY main/ main/
 COPY utility/ utility/

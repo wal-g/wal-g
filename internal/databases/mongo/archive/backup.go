@@ -8,10 +8,12 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/wal-g/storages/storage"
+	"github.com/pkg/errors"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -95,7 +97,6 @@ type MongoMetaConstructor struct {
 	client    client.MongoDriver
 	folder    storage.Folder
 	meta      models.BackupMeta
-	mongo     models.MongoMeta
 	permanent bool
 }
 
@@ -124,16 +125,22 @@ func (m *MongoMetaConstructor) Init() error {
 	if err != nil {
 		return fmt.Errorf("can not initialize backup mongo")
 	}
-	m.mongo.Before = models.NodeMeta{
-		LastTS:    lastTS,
-		LastMajTS: lastMajTS,
+
+	userData, err := internal.GetSentinelUserData()
+	if err != nil {
+		return errors.Wrap(err, "failed to unmarshal the provided UserData")
 	}
 
 	m.meta = models.BackupMeta{
 		StartTime: utility.TimeNowCrossPlatformLocal(),
-		Mongo:     m.mongo,
 		Permanent: m.permanent,
-		User:      internal.GetSentinelUserData(),
+		User:      userData,
+		Mongo: models.MongoMeta{
+			Before: models.NodeMeta{
+				LastTS:    lastTS,
+				LastMajTS: lastMajTS,
+			},
+		},
 	}
 	return nil
 }
@@ -148,7 +155,7 @@ func (m *MongoMetaConstructor) Finalize(backupName string) error {
 	if err != nil {
 		return fmt.Errorf("can not finalize backup mongo")
 	}
-	m.mongo.After = models.NodeMeta{
+	m.meta.Mongo.After = models.NodeMeta{
 		LastTS:    lastTS,
 		LastMajTS: lastMajTS,
 	}

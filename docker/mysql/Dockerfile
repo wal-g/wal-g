@@ -7,7 +7,8 @@ RUN apt-get update && \
     curl \
     mysql-server \
     mysql-client \
-    percona-xtrabackup
+    percona-xtrabackup \
+    s3cmd
 
 
 RUN curl -s https://packagecloud.io/install/repositories/akopytov/sysbench/script.deb.sh | bash && apt -y install sysbench
@@ -18,6 +19,7 @@ COPY docker/mysql/client.cnf /etc/mysql/debian.cnf
 COPY docker/mysql/init.sql /etc/mysql/init.sql
 COPY docker/mysql/export_common.sh /usr/local/export_common.sh
 COPY docker/mysql/export_test_funcs.sh /usr/local/export_test_funcs.sh
+COPY docker/common/s3cfg /root/.s3cfg
 
 # append
 COPY docker/mysql/my.cnf /tmp/my.cnf

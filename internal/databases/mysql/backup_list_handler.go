@@ -8,10 +8,9 @@ import (
 	"time"
 
 	"github.com/jedib0t/go-pretty/table"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/utility"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 type BackupDetail struct {
@@ -34,6 +33,7 @@ type BackupDetail struct {
 	UserData    interface{} `json:"user_data,omitempty"`
 }
 
+//nolint:gocritic,hugeParam
 func NewBackupDetail(backupTime internal.BackupTime, sentinel StreamSentinelDto) BackupDetail {
 	return BackupDetail{
 		BackupName:       backupTime.BackupName,
@@ -56,7 +56,7 @@ func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 
 	backupDetails := make([]BackupDetail, 0, len(backupTimes))
 	for _, backupTime := range backupTimes {
-		backup := internal.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), backupTime.BackupName)
+		backup := internal.NewBackup(folder, backupTime.BackupName)
 
 		var sentinel StreamSentinelDto
 		err = backup.FetchSentinel(&sentinel)

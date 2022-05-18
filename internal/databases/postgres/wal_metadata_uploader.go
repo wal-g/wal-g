@@ -3,7 +3,6 @@ package postgres
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -13,8 +12,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"github.com/wal-g/storages/fs"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/fs"
 )
 
 const (
@@ -96,7 +95,7 @@ func (u *WalMetadataUploader) uploadBulkMetadataFile(walFileName string, uploade
 	walMetadataArray := make(map[string]WalMetadataDescription)
 
 	for _, walMetadataFile := range walMetadataFiles {
-		file, err := ioutil.ReadFile(walMetadataFile)
+		file, err := os.ReadFile(walMetadataFile)
 		if err != nil {
 			return err
 		}

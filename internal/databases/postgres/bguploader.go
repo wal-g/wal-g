@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -117,7 +116,7 @@ func (b *BgUploader) Stop() error {
 // scanAndProcessFiles scans directory for WAL segments and attempts to upload them. It
 // makes best effort attempts to avoid duplicating work (re-uploading files).
 func (b *BgUploader) scanAndProcessFiles() {
-	fileChan := make(chan os.FileInfo)
+	fileChan := make(chan string)
 	defer close(fileChan)
 	go b.processFiles(fileChan)
 
@@ -136,12 +135,12 @@ func (b *BgUploader) scanAndProcessFiles() {
 		select {
 		case <-b.ctx.Done():
 			return
-		case fileChan <- stat:
+		case fileChan <- stat.Name():
 		}
 	}
 
 	for {
-		files, err := ioutil.ReadDir(filepath.Join(b.dir, archiveStatusDir))
+		files, err := os.ReadDir(filepath.Join(b.dir, archiveStatusDir))
 		if err != nil {
 			tracelog.ErrorLogger.Print("Error of parallel upload: ", err)
 			return
@@ -151,7 +150,7 @@ func (b *BgUploader) scanAndProcessFiles() {
 			select {
 			case <-b.ctx.Done():
 				return
-			case fileChan <- f:
+			case fileChan <- f.Name():
 			}
 		}
 
@@ -172,15 +171,13 @@ func (b *BgUploader) scanAndProcessFiles() {
 // BgUploader.
 //
 // This function should only be invoked once (in scanFiles)
-func (b *BgUploader) processFiles(fileChan <-chan os.FileInfo) {
-	var numUploaded int32 = 0
+func (b *BgUploader) processFiles(fileChan <-chan string) {
+	var numUploaded int32
 	for {
-		f, ok := <-fileChan
+		name, ok := <-fileChan
 		if !ok {
 			break
 		}
-
-		name := f.Name()
 
 		if b.shouldSkipFile(name) {
 			continue
@@ -220,7 +217,8 @@ func (b *BgUploader) upload(walStatusFilename string) bool {
 		return false
 	}
 
-	if err := b.uploader.ArchiveStatusManager.MarkWalUploaded(walFilename); err != nil {
+	err = b.uploader.ArchiveStatusManager.MarkWalUploaded(walFilename)
+	if err != nil {
 		tracelog.ErrorLogger.Printf("Error marking wal file %s as uploaded: %v", walFilename, err)
 	}
 

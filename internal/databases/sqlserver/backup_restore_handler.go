@@ -7,11 +7,10 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -27,7 +26,7 @@ func HandleBackupRestore(backupName string, dbnames []string, fromnames []string
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	sentinel := new(SentinelDto)
-	err = backup.FetchSentinel(&sentinel)
+	err = backup.FetchSentinel(sentinel)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	db, err := getSQLServerConnection()
@@ -36,15 +35,9 @@ func HandleBackupRestore(backupName string, dbnames []string, fromnames []string
 	dbnames, fromnames, err = getDatabasesToRestore(sentinel, dbnames, fromnames)
 	tracelog.ErrorLogger.FatalfOnError("failed to list databases to restore: %v", err)
 
-	bs, err := blob.NewServer(folder)
-	tracelog.ErrorLogger.FatalfOnError("proxy create error: %v", err)
-
-	lock, err := bs.AcquireLock()
+	lock, err := RunOrReuseProxy(ctx, cancel, folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	defer func() { tracelog.ErrorLogger.PrintOnError(lock.Unlock()) }()
-
-	err = bs.RunBackground(ctx, cancel)
-	tracelog.ErrorLogger.FatalfOnError("proxy run error: %v", err)
+	defer lock.Close()
 
 	backupName = backup.Name
 
@@ -59,7 +52,7 @@ func HandleBackupRestore(backupName string, dbnames []string, fromnames []string
 			return recoverSingleDatabase(ctx, db, dbname)
 		}
 		return nil
-	}, len(dbnames))
+	}, len(dbnames), getDBConcurrency())
 	tracelog.ErrorLogger.FatalfOnError("overall restore failed: %v", err)
 
 	tracelog.InfoLogger.Printf("restore finished")
@@ -79,17 +72,19 @@ func restoreSingleDatabase(ctx context.Context,
 	}
 	urls := buildRestoreUrls(baseURL, blobs)
 	sql := fmt.Sprintf("RESTORE DATABASE %s FROM %s WITH REPLACE, NORECOVERY", quoteName(dbname), urls)
-	if dbname != fromName {
-		files, err := listDatabaseFiles(db, urls)
-		if err != nil {
-			return err
-		}
-		move, err := buildPhysicalFileMove(files, dbname)
-		if err != nil {
-			return err
-		}
-		sql += ", " + move
+	files, err := listDatabaseFiles(db, urls)
+	if err != nil {
+		return err
 	}
+	datadir, logdir, err := GetDefaultDataLogDirs(db)
+	if err != nil {
+		return err
+	}
+	move, err := buildPhysicalFileMove(files, dbname, datadir, logdir)
+	if err != nil {
+		return err
+	}
+	sql += ", " + move
 	tracelog.InfoLogger.Printf("starting restore database [%s] from %s", dbname, urls)
 	tracelog.DebugLogger.Printf("SQL: %s", sql)
 	_, err = db.ExecContext(ctx, sql)

@@ -11,10 +11,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -66,7 +65,7 @@ func generateData(t *testing.T) string {
 	}
 
 	// Create temp directory.
-	dir, err := ioutil.TempDir(cwd, "data")
+	dir, err := os.MkdirTemp(cwd, "data")
 	if err != nil {
 		t.Log(err)
 	}
@@ -149,7 +148,7 @@ func generateData(t *testing.T) string {
 
 // Extract files to temp directory 'extracted'.
 func extract(t *testing.T, dir string) string {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		t.Log(err)
 	}
@@ -165,7 +164,7 @@ func extract(t *testing.T, dir string) string {
 
 	outDir := filepath.Join(filepath.Dir(dir), "extracted")
 
-	ft := postgres.NewFileTarInterpreter(outDir, postgres.BackupSentinelDto{}, map[string]bool{
+	ft := postgres.NewFileTarInterpreter(outDir, postgres.BackupSentinelDto{}, postgres.FilesMetadataDto{}, map[string]bool{
 		"/1":                 true,
 		"/2":                 true,
 		"/3":                 true,
@@ -327,14 +326,22 @@ func isEmpty(t *testing.T, path string) bool {
 }
 
 func TestWalk_RegularComposer(t *testing.T) {
-	testWalk(t, false)
+	testWalk(t, postgres.RegularComposer, false)
+}
+
+func TestWalk_RegularComposerWithoutFilesMetadata(t *testing.T) {
+	testWalk(t, postgres.RegularComposer, true)
 }
 
 func TestWalk_RatingComposer(t *testing.T) {
-	testWalk(t, true)
+	testWalk(t, postgres.RatingComposer, false)
 }
 
-func testWalk(t *testing.T, useRatingComposer bool) {
+func TestWalk_CopyComposer(t *testing.T) {
+	testWalk(t, postgres.CopyComposer, false)
+}
+
+func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesMetadata bool) {
 	// Generate random data and write to tmp dir `data...`.
 	data := generateData(t)
 	tarSizeThreshold := int64(10)
@@ -356,7 +363,7 @@ func testWalk(t *testing.T, useRatingComposer bool) {
 		t.Log(err)
 	}
 
-	err = bundle.SetupComposer(setupTestTarBallComposerMaker(useRatingComposer))
+	err = bundle.SetupComposer(setupTestTarBallComposerMaker(composer, withoutFilesMetadata))
 	if err != nil {
 		t.Log(err)
 	}
@@ -366,9 +373,25 @@ func testWalk(t *testing.T, useRatingComposer bool) {
 	if err != nil {
 		t.Log(err)
 	}
-	_, err = bundle.PackTarballs()
+	tarFileSets, err := bundle.FinishTarComposer()
 	if err != nil {
 		t.Log(err)
+	}
+
+	backupFileListEmpty := true
+	bundle.GetFiles().Range(func(key, value interface{}) bool {
+		backupFileListEmpty = false
+		return false
+	})
+
+	if withoutFilesMetadata {
+		// Test tarFileSets is not tracked
+		assert.True(t, len(tarFileSets.Get()) == 0)
+		// Test BackupFileList is not tracked
+		assert.True(t, backupFileListEmpty)
+	} else {
+		assert.True(t, len(tarFileSets.Get()) > 0)
+		assert.False(t, backupFileListEmpty)
 	}
 
 	err = bundle.FinishQueue()
@@ -412,12 +435,23 @@ func testWalk(t *testing.T, useRatingComposer bool) {
 	}
 }
 
-func setupTestTarBallComposerMaker(useRatingComposer bool) postgres.TarBallComposerMaker {
+func setupTestTarBallComposerMaker(composer postgres.TarBallComposerType, withoutFilesMetadata bool) postgres.TarBallComposerMaker {
 	filePackOptions := postgres.NewTarBallFilePackerOptions(false, false)
-	if !useRatingComposer {
-		return postgres.NewRegularTarBallComposerMaker(filePackOptions)
+	switch composer {
+	case postgres.RegularComposer:
+		if withoutFilesMetadata {
+			return postgres.NewRegularTarBallComposerMaker(filePackOptions, &postgres.NopBundleFiles{}, postgres.NewNopTarFileSets())
+		} else {
+			return postgres.NewRegularTarBallComposerMaker(filePackOptions, &postgres.RegularBundleFiles{}, postgres.NewRegularTarFileSets())
+		}
+	case postgres.RatingComposer:
+		relFileStats := make(postgres.RelFileStatistics)
+		composerMaker, _ := postgres.NewRatingTarBallComposerMaker(relFileStats, filePackOptions)
+		return composerMaker
+	case postgres.CopyComposer:
+		mockBackup := getMockBackupFromFiles(nil)
+		return postgres.NewCopyTarBallComposerMaker(mockBackup, "mockName", filePackOptions)
+	default:
+		return nil
 	}
-	relFileStats := make(postgres.RelFileStatistics)
-	composerMaker, _ := postgres.NewRatingTarBallComposerMaker(relFileStats, filePackOptions)
-	return composerMaker
 }

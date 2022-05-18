@@ -3,6 +3,7 @@ package postgres_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -15,9 +16,8 @@ import (
 
 func getMockBackupFromFiles(files internal.BackupFileList) postgres.Backup {
 	return postgres.Backup{
-		SentinelDto: &postgres.BackupSentinelDto{
-			Files: files,
-		},
+		SentinelDto:      &postgres.BackupSentinelDto{},
+		FilesMetadataDto: &postgres.FilesMetadataDto{Files: files},
 	}
 }
 
@@ -42,11 +42,11 @@ func TestGetFilesToUnwrap_SkippedFile(t *testing.T) {
 	assert.Contains(t, files, testtools.SkippedPath)
 }
 
-func TestGetFilesToUnwrap_UtilityFiles(t *testing.T) {
+func TestGetFilesToUnwrap_UnwrapAll(t *testing.T) {
 	backup := getMockBackupFromFiles(testtools.NewBackupFileListBuilder().Build())
 
 	files, _ := backup.GetFilesToUnwrap("")
-	assert.Equal(t, postgres.UtilityFilePaths, files)
+	assert.True(t, files == nil)
 }
 
 func TestGetFilesToUnwrap_NoMoreFiles(t *testing.T) {
@@ -130,8 +130,9 @@ func TestFetchSentinelReturnErrorWhenSentinelNotExist(t *testing.T) {
 
 func TestFetchSentinelReturnErrorWhenSentinelUnmarshallable(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
-	backup := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_000")
-	errorMessage := "failed to unmarshal sentinel"
+	backupName := "base_000"
+	backup := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), backupName)
+	errorMessage := fmt.Sprintf("failed to fetch dto from %s", backupName+utility.SentinelSuffix)
 
 	_, err := backup.GetSentinel()
 

@@ -10,8 +10,8 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -43,6 +43,7 @@ type IntegrityCheckRunner struct {
 	delayedSegmentRangeSize   int
 	walFolderFilenames        []string
 	timelineSwitchMap         map[WalSegmentNo]*TimelineHistoryRecord
+	noBackupsFound            bool
 }
 
 func NewIntegrityCheckRunner(
@@ -57,11 +58,13 @@ func NewIntegrityCheckRunner(
 		return IntegrityCheckRunner{}, errors.Wrap(err, "Failed to initialize timeline history map")
 	}
 
+	noBackupsFound := false
 	stopWalSegmentNo, err := getEarliestBackupStartSegmentNo(timelineSwitchMap, currentWalSegment.Timeline, rootFolder)
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to detect earliest backup WAL segment no: '%v',"+
 			"will scan until the 0000000X0000000000000001 segment.\n", err)
 		stopWalSegmentNo = 1
+		noBackupsFound = true
 	}
 
 	// uploadingSegmentRangeSize is needed to determine max amount of missing WAL segments
@@ -78,6 +81,7 @@ func NewIntegrityCheckRunner(
 		delayedSegmentRangeSize:   viper.GetInt(internal.MaxDelayedSegmentsCount),
 		walFolderFilenames:        walFolderFilenames,
 		timelineSwitchMap:         timelineSwitchMap,
+		noBackupsFound:            noBackupsFound,
 	}, nil
 }
 
@@ -96,7 +100,7 @@ func (check IntegrityCheckRunner) Run() (WalVerifyCheckResult, error) {
 
 	integrityScanSegmentSequences := collapseSegmentsByStatusAndTimeline(segmentScanner.ScannedSegments)
 
-	return newWalIntegrityCheckResult(integrityScanSegmentSequences), nil
+	return check.newWalIntegrityCheckResult(integrityScanSegmentSequences), nil
 }
 
 func (check IntegrityCheckRunner) Type() WalVerifyCheckType {
@@ -107,16 +111,26 @@ func (check IntegrityCheckRunner) Type() WalVerifyCheckType {
 // StatusOk if there are no missing segments in storage
 // StatusWarning if storage contains some ProbablyUploading or ProbablyDelayed segments
 // StatusFailure if storage contains Lost segments
-func newWalIntegrityCheckResult(segmentSequences []*IntegrityScanSegmentSequence) WalVerifyCheckResult {
+func (check IntegrityCheckRunner) newWalIntegrityCheckResult(segmentSequences []*IntegrityScanSegmentSequence) WalVerifyCheckResult {
 	result := WalVerifyCheckResult{
 		Status:  StatusOk,
 		Details: IntegrityCheckDetails(segmentSequences),
 	}
+
+	prevFound := false
 	for _, row := range segmentSequences {
 		switch row.Status {
+		case Found:
+			prevFound = true
 		case Lost:
-			result.Status = StatusFailure
-			return result
+			if check.noBackupsFound && !prevFound {
+				// If there are no backups in storage, WAL-G can't determine the first segment to start the scan from.
+				// So, skip the first not found segment sequences instead of failing.
+				result.Status = StatusWarning
+			} else {
+				result.Status = StatusFailure
+				return result
+			}
 		case ProbablyDelayed, ProbablyUploading:
 			result.Status = StatusWarning
 		}

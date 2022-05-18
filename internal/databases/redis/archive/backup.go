@@ -6,8 +6,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -77,9 +77,13 @@ type RedisMetaConstructor struct {
 
 // Init - required for internal.MetaConstructor
 func (m *RedisMetaConstructor) Init() error {
+	userData, err := internal.GetSentinelUserData()
+	if err != nil {
+		return err
+	}
 	m.meta = BackupMeta{
 		Permanent: m.permanent,
-		User:      internal.GetSentinelUserData(),
+		User:      userData,
 		StartTime: utility.TimeNowCrossPlatformLocal(),
 	}
 	return nil

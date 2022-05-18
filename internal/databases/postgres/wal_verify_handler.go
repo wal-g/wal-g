@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -88,13 +87,13 @@ func QueryCurrentWalSegment() WalSegmentDescription {
 	conn, err := Connect()
 	tracelog.ErrorLogger.FatalfOnError("Failed to establish a connection to Postgres cluster %v", err)
 
-	queryRunner, err := newPgQueryRunner(conn)
+	queryRunner, err := NewPgQueryRunner(conn)
 	tracelog.ErrorLogger.FatalfOnError("Failed to initialize PgQueryRunner %v", err)
 
 	currentSegmentNo, err := getCurrentWalSegmentNo(queryRunner)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get current WAL segment number %v", err)
 
-	currentTimeline, err := getCurrentTimeline(conn)
+	currentTimeline, err := queryRunner.readTimeline()
 	tracelog.ErrorLogger.FatalfOnError("Failed to get current timeline %v", err)
 
 	tracelog.InfoLogger.Printf("Current WAL segment: %s\n", currentSegmentNo.getFilename(currentTimeline))
@@ -167,18 +166,9 @@ func getCurrentWalSegmentNo(queryRunner *PgQueryRunner) (WalSegmentNo, error) {
 	if err != nil {
 		return 0, err
 	}
-	lsn, err := pgx.ParseLSN(lsnStr)
+	lsn, err := ParseLSN(lsnStr)
 	if err != nil {
 		return 0, err
 	}
 	return newWalSegmentNo(lsn - 1), nil
-}
-
-// get the current timeline of the cluster
-func getCurrentTimeline(conn *pgx.Conn) (uint32, error) {
-	timeline, err := readTimeline(conn)
-	if err != nil {
-		return 0, err
-	}
-	return timeline, nil
 }

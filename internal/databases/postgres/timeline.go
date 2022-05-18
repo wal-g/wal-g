@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
@@ -56,18 +55,6 @@ func (err IncorrectBackupNameError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-func readTimeline(conn *pgx.Conn) (timeline uint32, err error) {
-	var bytesPerWalSegment uint32
-
-	// TODO: Check if this logic can be moved to queryRunner or abstracted away somehow
-	err = conn.QueryRow("select timeline_id, bytes_per_wal_segment "+
-		"from pg_control_checkpoint(), pg_control_init()").Scan(&timeline, &bytesPerWalSegment)
-	if err == nil && uint64(bytesPerWalSegment) != WalSegmentSize {
-		return 0, newBytesPerWalSegmentError()
-	}
-	return
-}
-
 const (
 	sizeofInt32bits = sizeofInt32 * 8
 	hexadecimal     = 16
@@ -97,8 +84,8 @@ func SetWalSize(sizeMb uint64) {
 }
 
 // getWalFilename formats WAL file name using PostgreSQL connection. Essentially reads timeline of the server.
-func getWalFilename(lsn uint64, conn *pgx.Conn) (walFilename string, timeline uint32, err error) {
-	timeline, err = readTimeline(conn)
+func getWalFilename(lsn LSN, queryRunner *PgQueryRunner) (walFilename string, timeline uint32, err error) {
+	timeline, err = queryRunner.readTimeline()
 	if err != nil {
 		return "", 0, err
 	}
@@ -183,7 +170,7 @@ func GetNextWalFilename(name string) (string, error) {
 	return formatWALFileName(timelineID, logSegNo), nil
 }
 
-func shouldPrefault(name string) (lsn uint64, shouldPrefault bool, timelineID uint32, err error) {
+func shouldPrefault(name string) (lsn LSN, shouldPrefault bool, timelineID uint32, err error) {
 	timelineID, logSegNo, err := ParseWALFilename(name)
 	if err != nil {
 		return 0, false, 0, err
@@ -193,5 +180,5 @@ func shouldPrefault(name string) (lsn uint64, shouldPrefault bool, timelineID ui
 	}
 	logSegNo += WalFileInDelta
 
-	return logSegNo * WalSegmentSize, true, timelineID, nil
+	return LSN(logSegNo * WalSegmentSize), true, timelineID, nil
 }

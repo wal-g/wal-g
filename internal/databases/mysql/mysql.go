@@ -6,16 +6,19 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/wal-g/wal-g/internal/compression"
+
+	gomysql "github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-sql-driver/mysql"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -23,48 +26,83 @@ const BinlogPath = "binlog_" + utility.VersionStr + "/"
 
 const TimeMysqlFormat = "2006-01-02 15:04:05"
 
-func isMaster(db *sql.DB) bool {
-	rows, err := db.Query("SHOW SLAVE STATUS")
-	tracelog.ErrorLogger.FatalOnError(err)
-	defer utility.LoggedClose(rows, "")
-	return !rows.Next()
+func getMySQLFlavor(db *sql.DB) (string, error) {
+	row := db.QueryRow("SELECT @@version")
+	var versionComment string
+	err := row.Scan(&versionComment)
+	if err != nil {
+		return "", err
+	}
+	// example: '10.6.4-MariaDB-1:10.6.4+maria~focal'
+	if strings.Contains(versionComment, "MariaDB") {
+		return gomysql.MariaDBFlavor, nil
+	}
+	// It is possible to distinguish Percona & MySQL by checking 'version_comment',
+	// however usually we can expect that there is no difference between these distributions
+	return gomysql.MySQLFlavor, nil
 }
 
-func getMySQLCurrentBinlogFileLocal(db *sql.DB) (fileName string) {
-	rows, err := db.Query("SHOW MASTER STATUS")
-	tracelog.ErrorLogger.FatalOnError(err)
-	defer utility.LoggedClose(rows, "")
-	var logFileName string
-	for rows.Next() {
-		err = utility.ScanToMap(rows, map[string]interface{}{"File": &logFileName})
-		tracelog.ErrorLogger.FatalOnError(err)
-		return logFileName
+func getMySQLGTIDExecuted(db *sql.DB, flavor string) (gtid string, err error) {
+	query := ""
+	switch flavor {
+	case gomysql.MySQLFlavor:
+		query = "SELECT @@global.gtid_executed"
+	case gomysql.MariaDBFlavor:
+		query = "SELECT @@global.gtid_current_pos"
+	default:
+		return "", fmt.Errorf("unknown MySQL flavor: %s", flavor)
 	}
-	tracelog.ErrorLogger.Fatalf("Failed to obtain current binlog file")
-	return ""
+	row := db.QueryRow(query)
+	err = row.Scan(&gtid)
+	return gtid, err
 }
 
-func getMySQLCurrentBinlogFileFromMaster(db *sql.DB) (fileName string) {
-	rows, err := db.Query("SHOW SLAVE STATUS")
-	tracelog.ErrorLogger.FatalOnError(err)
-	defer utility.LoggedClose(rows, "")
-	var logFileName string
-	for rows.Next() {
-		err = utility.ScanToMap(rows, map[string]interface{}{"Relay_Master_Log_File": &logFileName})
-		tracelog.ErrorLogger.FatalOnError(err)
-		return logFileName
+func getLastUploadedBinlog(folder storage.Folder) (string, error) {
+	logFiles, _, err := folder.GetSubFolder(BinlogPath).ListFolder()
+	if err != nil {
+		return "", err
 	}
-	tracelog.ErrorLogger.Fatalf("Failed to obtain master's current binlog file")
-	return ""
+	sort.Slice(logFiles, func(i, j int) bool {
+		return logFiles[i].GetLastModified().Before(logFiles[j].GetLastModified())
+	})
+	if len(logFiles) == 0 {
+		return "", nil
+	}
+	name := logFiles[len(logFiles)-1].GetName()
+	if ext := path.Ext(name); compression.FindDecompressor(ext) != nil {
+		// remove archive extension (like .br)
+		name = strings.TrimSuffix(name, ext)
+	}
+	return name, nil
 }
 
-func getMySQLCurrentBinlogFile(db *sql.DB) (fileName string) {
-	takeFromMaster, err := internal.GetBoolSettingDefault(internal.MysqlTakeBinlogsFromMaster, false)
-	tracelog.ErrorLogger.FatalOnError(err)
-	if takeFromMaster && !isMaster(db) {
-		return getMySQLCurrentBinlogFileFromMaster(db)
+func getLastUploadedBinlogBeforeGTID(folder storage.Folder, gtid string, flavor string) (string, error) {
+	gtidParsed, err := gomysql.ParseMysqlGTIDSet(gtid)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse server gtid: %s: %v", gtid, err)
 	}
-	return getMySQLCurrentBinlogFileLocal(db)
+	folder = folder.GetSubFolder(BinlogPath)
+	logFiles, _, err := folder.ListFolder()
+	if err != nil {
+		return "", err
+	}
+	sort.Slice(logFiles, func(i, j int) bool {
+		return logFiles[i].GetLastModified().Before(logFiles[j].GetLastModified())
+	})
+	if len(logFiles) == 0 {
+		return "", nil
+	}
+	for i := len(logFiles) - 1; i > 0; i-- {
+		prevGtid, err := GetBinlogPreviousGTIDsRemote(folder, logFiles[i].GetName(), flavor)
+		if err != nil {
+			return "", err
+		}
+		if gtidParsed.Contain(prevGtid) {
+			return utility.TrimFileExtension(logFiles[i].GetName()), nil
+		}
+	}
+	tracelog.WarningLogger.Printf("failed to find uploaded binlog behind %s", gtid)
+	return "", nil
 }
 
 func getMySQLConnection() (*sql.DB, error) {
@@ -88,7 +126,7 @@ func getMySQLConnection() (*sql.DB, error) {
 func getMySQLConnectionFromDatasource(datasourceName string) (*sql.DB, error) {
 	if caFile, ok := internal.GetSetting(internal.MysqlSslCaSetting); ok {
 		rootCertPool := x509.NewCertPool()
-		pem, err := ioutil.ReadFile(caFile)
+		pem, err := os.ReadFile(caFile)
 		if err != nil {
 			return nil, err
 		}
@@ -136,7 +174,9 @@ func replaceHostInDatasourceName(datasourceName string, newHost string) string {
 }
 
 type StreamSentinelDto struct {
-	BinLogStart    string    `json:"BinLogStart,omitempty"`
+	BinLogStart string `json:"BinLogStart,omitempty"`
+	// BinLogEnd field is for debug purpose only.
+	// As we can not guarantee that transactions in BinLogEnd file happened before or after backup
 	BinLogEnd      string    `json:"BinLogEnd,omitempty"`
 	StartLocalTime time.Time `json:"StartLocalTime,omitempty"`
 	StopLocalTime  time.Time `json:"StopLocalTime,omitempty"`
@@ -147,6 +187,7 @@ type StreamSentinelDto struct {
 
 	IsPermanent bool        `json:"IsPermanent,omitempty"`
 	UserData    interface{} `json:"UserData,omitempty"`
+
 	//todo: add other fields from internal.GenericMetadata
 }
 
@@ -162,12 +203,12 @@ type binlogHandler interface {
 	handleBinlog(binlogPath string) error
 }
 
-func fetchLogs(folder storage.Folder, dstDir string, startTS time.Time, endTS time.Time, handler binlogHandler) error {
+func fetchLogs(folder storage.Folder, dstDir string, startTS, endTS, endBinlogTS time.Time, handler binlogHandler) error {
 	logFolder := folder.GetSubFolder(BinlogPath)
 	includeStart := true
 outer:
 	for {
-		logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, includeStart)
+		logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, includeStart, endBinlogTS)
 		includeStart = false
 		if err != nil {
 			return err
@@ -181,7 +222,7 @@ outer:
 				tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
 				return err
 			}
-			timestamp, err := GetBinlogStartTimestamp(binlogPath)
+			timestamp, err := GetBinlogStartTimestamp(binlogPath, gomysql.MySQLFlavor)
 			if err != nil {
 				return err
 			}
@@ -239,7 +280,7 @@ func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time,
 }
 
 // getLogsCoveringInterval lists the operation logs that cover the interval
-func getLogsCoveringInterval(folder storage.Folder, start time.Time, includeStart bool) ([]storage.Object, error) {
+func getLogsCoveringInterval(folder storage.Folder, start time.Time, includeStart bool, endBinlogTS time.Time) ([]storage.Object, error) {
 	logFiles, _, err := folder.ListFolder()
 	if err != nil {
 		return nil, err
@@ -249,6 +290,9 @@ func getLogsCoveringInterval(folder storage.Folder, start time.Time, includeStar
 	})
 	var logsToFetch []storage.Object
 	for _, logFile := range logFiles {
+		if logFile.GetLastModified().After(endBinlogTS) {
+			continue // don't fetch binlogs from future
+		}
 		if start.Before(logFile.GetLastModified()) || includeStart && start.Equal(logFile.GetLastModified()) {
 			logsToFetch = append(logsToFetch, logFile)
 		}

@@ -14,7 +14,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
@@ -22,6 +21,7 @@ import (
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/limiters"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"golang.org/x/time/rate"
 )
 
@@ -126,7 +126,20 @@ func configureLimiters() {
 
 // TODO : unit tests
 func ConfigureFolder() (storage.Folder, error) {
-	return ConfigureFolderForSpecificConfig(viper.GetViper())
+	folder, err := ConfigureFolderForSpecificConfig(viper.GetViper())
+	if err != nil {
+		return nil, err
+	}
+
+	return ConfigureStoragePrefix(folder), nil
+}
+
+func ConfigureStoragePrefix(folder storage.Folder) storage.Folder {
+	prefix := viper.GetString(StoragePrefixSetting)
+	if prefix != "" {
+		folder = folder.GetSubFolder(prefix)
+	}
+	return folder
 }
 
 // TODO: something with that
@@ -248,6 +261,24 @@ func ConfigureUploaderWithoutCompressMethod() (uploader *Uploader, err error) {
 	return uploader, err
 }
 
+func ConfigureSplitUploader() (uploader UploaderProvider, err error) {
+	folder, err := ConfigureFolder()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure folder")
+	}
+
+	compressor, err := ConfigureCompressor()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure compression")
+	}
+
+	var partitions = viper.GetInt(StreamSplitterPartitions)
+	var blockSize = viper.GetSizeInBytes(StreamSplitterBlockSize)
+
+	uploader = NewSplitStreamUploader(compressor, folder, partitions, int(blockSize))
+	return uploader, err
+}
+
 // ConfigureCrypter uses environment variables to create and configure a crypter.
 // In case no configuration in environment variables found, return `<nil>` value.
 func ConfigureCrypter() crypto.Crypter {
@@ -315,28 +346,25 @@ func GetMaxConcurrency(concurrencyType string) (int, error) {
 	return concurrency, nil
 }
 
-func GetSentinelUserData() interface{} {
+func GetSentinelUserData() (interface{}, error) {
 	dataStr, ok := GetSetting(SentinelUserDataSetting)
 	if !ok {
-		return nil
+		return nil, nil
 	}
 	return UnmarshalSentinelUserData(dataStr)
 }
 
-func UnmarshalSentinelUserData(userDataStr string) interface{} {
+func UnmarshalSentinelUserData(userDataStr string) (interface{}, error) {
 	if len(userDataStr) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	var out interface{}
 	err := json.Unmarshal([]byte(userDataStr), &out)
 	if err != nil {
-		tracelog.WarningLogger.Printf(
-			"Failed to read the user data as a JSON object, will read as a raw string instead: %s",
-			newUnmarshallingError(userDataStr, err))
-		return userDataStr
+		return nil, errors.Wrapf(newUnmarshallingError(userDataStr, err), "failed to read the user data as a JSON object")
 	}
-	return out
+	return out, nil
 }
 
 func GetCommandSettingContext(ctx context.Context, variableName string) (*exec.Cmd, error) {

@@ -138,7 +138,7 @@ func (seg *WalSegment) processMessage(message pgproto3.BackendMessage) (ProcessM
 				messageOffset = seg.StartLSN - xld.WALStart
 			}
 			tracelog.DebugLogger.Println("XLogData =>", "WALStart", xld.WALStart, "WALEnd", walEnd,
-				"LenWALData", len(string(xld.WALData)), "ServerWALEnd", xld.ServerWALEnd,
+				"LenWALData", len(xld.WALData), "ServerWALEnd", xld.ServerWALEnd,
 				"messageOffset", messageOffset) //, "ServerTime:", xld.ServerTime)
 			if seg.StartLSN+pglogrepl.LSN(seg.writeIndex) != (xld.WALStart + messageOffset) {
 				return ProcessMessageSegmentGap, segmentError{

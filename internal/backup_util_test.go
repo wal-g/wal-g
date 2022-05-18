@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/storages/memory"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/storages/memory"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -39,7 +39,7 @@ func TestGetBackupTimeSlices_List(t *testing.T) {
 
 	assert.Equalf(t, 1, len(result), "GetBackupTimeSlices returned wrong count of backup: something wrong")
 	assert.Equalf(t, testStreamBackup.BackupName, result[0].BackupName, "GetBackupTimeSlices returned strange name")
-	assert.True(t, testStreamBackup.Time.Before(result[0].Time), "GetBackupTimeSlices returned bad time: storage time less then mock time")
+	assert.True(t, testStreamBackup.Time.Before(result[0].Time), "GetBackupTimeSlices returned bad time: storage time less than mock time")
 }
 
 func TestGetBackupTimeSlices_OrderCheck(t *testing.T) {
@@ -56,6 +56,21 @@ func TestGetBackupTimeSlices_OrderCheck(t *testing.T) {
 	assert.Equalf(t, 2, len(result), "GetBackupTimeSlices returned wrong count of backup: something wrong")
 	assert.True(t, result[0].BackupName == testStreamBackup.BackupName+".1", "GetBackupTimeSlices returned bad time ordering: "+testStreamBackup.BackupName+".1 should be first, because second was added earlier")
 	assert.True(t, result[0].Time.Before(result[1].Time), "GetBackupTimeSlices returned bad time ordering: order should be Ascending")
+}
+
+func TestGetLastBackupName(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	b1 := testStreamBackup.BackupName + ".1" + utility.SentinelSuffix
+	b2 := testStreamBackup.BackupName + ".2" + utility.SentinelSuffix
+	_, _ = folder.PutObject(b1, &bytes.Buffer{}), folder.PutObject(b2, &bytes.Buffer{})
+	lastB, _ := internal.GetLatestBackupName(folder)
+	assert.Equalf(t, lastB+utility.SentinelSuffix, b2, "Last Backup is not b2")
+}
+
+func TestGetLatestBackupName_EmptyWhenNoBackups(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	lastB, _ := internal.GetLatestBackupName(folder)
+	assert.Equal(t, "", lastB)
 }
 
 func TestGetGarbageFromPrefix(t *testing.T) {

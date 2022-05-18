@@ -4,13 +4,13 @@ import (
 	"strings"
 
 	"github.com/spf13/viper"
-	"github.com/wal-g/storages/azure"
-	"github.com/wal-g/storages/fs"
-	"github.com/wal-g/storages/gcs"
-	"github.com/wal-g/storages/s3"
-	"github.com/wal-g/storages/sh"
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/storages/swift"
+	"github.com/wal-g/wal-g/pkg/storages/azure"
+	"github.com/wal-g/wal-g/pkg/storages/fs"
+	"github.com/wal-g/wal-g/pkg/storages/gcs"
+	"github.com/wal-g/wal-g/pkg/storages/s3"
+	"github.com/wal-g/wal-g/pkg/storages/sh"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/pkg/storages/swift"
 )
 
 type StorageAdapter struct {
@@ -25,7 +25,7 @@ func (adapter *StorageAdapter) loadSettings(config *viper.Viper) map[string]stri
 
 	for _, settingName := range adapter.settingNames {
 		settingValue := config.GetString(settingName)
-		if len(settingValue) > 0 {
+		if config.IsSet(settingName) {
 			settings[settingName] = settingValue
 			/* prefer config values */
 			continue

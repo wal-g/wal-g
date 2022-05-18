@@ -19,8 +19,9 @@ services:
     container_name: wal-g_ubuntu
 
   s3:
-    image: minio/minio
+    image: minio/minio:RELEASE.2021-06-07T21-40-51Z
     container_name: wal-g_s3
+    hostname: s3
     ports:
       - "9000:9000"
     environment:
@@ -30,8 +31,11 @@ services:
     command: >
       -c 'mkdir -p /export/fullbucket
       &&  mkdir -p /export/fullratingcomposerbucket
+      &&  mkdir -p /export/fullcopycomposerbucket
+      &&  mkdir -p /export/fullwithoutfilesmetadatabucket
       &&  mkdir -p /export/fullscandeltabucket
       &&  mkdir -p /export/remotebucket
+      &&  mkdir -p /export/remotewithoutfilesmetadatabucket
       &&  mkdir -p /export/cryptobucket
       &&  mkdir -p /export/waldeltabucket
       &&  mkdir -p /export/ghostbucket
@@ -48,7 +52,9 @@ services:
       &&  mkdir -p /export/deletewithoutconfirm
       &&  mkdir -p /export/deleteendtoendbucket
       &&  mkdir -p /export/deletetargetbucket
+      &&  mkdir -p /export/deletegarbagebucket
       &&  mkdir -p /export/mysqlfullxtrabackupbucket
+      &&  mkdir -p /export/mysqlfullxtrabackupwithrangesbucket
       &&  mkdir -p /export/mysqlfullmysqldumpbucket
       &&  mkdir -p /export/mysqlbinlogpushfetchbucket
       &&  mkdir -p /export/mysqldeleteendtoendbucket
@@ -71,10 +77,22 @@ services:
       &&  mkdir -p /export/mysqlconfonly
       &&  mkdir -p /export/mysqldeletebinlogs
       &&  mkdir -p /export/archivereadyrename
+      &&  mkdir -p /export/gpfullbucket
+      &&  mkdir -p /export/gpfullserializedbucket
+      &&  mkdir -p /export/gpdeletewithoutconfirm
+      &&  mkdir -p /export/gpdeleteretainbucket
+      &&  mkdir -p /export/gpdeleteendtoendbucket
+      &&  mkdir -p /export/gpdeletebeforepermanentbucket
+      &&  mkdir -p /export/gpdeletebeforenamebucket
+      &&  mkdir -p /export/gpdeletebeforetimebucket
+      &&  mkdir -p /export/gpaostoragetestbucket
+      &&  mkdir -p /export/createrestorepointbucket
+      &&  mkdir -p /export/storagetoolsbucket
+      &&  mkdir -p /export/walrestorebucket
       &&  /usr/bin/minio server /export'
 
   s3-another:
-    image: minio/minio
+    image: minio/minio:RELEASE.2021-06-07T21-40-51Z
     container_name: wal-g_s32
     ports:
       - "9001:9001"
@@ -241,12 +259,34 @@ services:
     links:
       - s3
 
+  pg_full_backup_streamed_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_streamed_test
+      context: .
+    image: wal-g/full_backup_streamed_test
+    container_name: wal-g_pg_full_backup_streamed_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   pg_remote_backup_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_remote_backup_test
       context: .
     image: wal-g/remote_backup_test
     container_name: wal-g_pg_remote_backup_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_remote_backup_without_files_metadata_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_remote_backup_without_files_metadata_test
+      context: .
+    image: wal-g/remote_backup_without_files_metadata_test
+    container_name: wal-g_pg_remote_backup_without_files_metadata_test
     depends_on:
       - s3
     links:
@@ -274,12 +314,34 @@ services:
     links:
       - s3
 
+  pg_full_backup_copy_composer_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_copy_composer_test
+      context: .
+    image: wal-g/full_backup_copy_composer_test
+    container_name: wal-g_pg_full_backup_copy_composer_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   pg_full_backup_rating_composer_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_full_backup_rating_composer_test
       context: .
     image: wal-g/full_backup_rating_composer_test
     container_name: wal-g_pg_full_backup_rating_composer_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_full_backup_without_files_metadata_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_without_files_metadata_test
+      context: .
+    image: wal-g/full_backup_without_files_metadata_test
+    container_name: wal-g_pg_full_backup_without_files_metadata_test
     depends_on:
       - s3
     links:
@@ -302,6 +364,17 @@ services:
       context: .
     image: wal-g/delete_without_confirm_test
     container_name: wal-g_pg_delete_without_confirm_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_delete_garbage_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_garbage_test
+      context: .
+    image: wal-g/delete_garbage_test
+    container_name: wal-g_pg_delete_garbage_test
     depends_on:
       - s3
     links:
@@ -489,6 +562,36 @@ services:
     links:
       - s3
 
+
+  pg_wal_restore_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_wal_restore_test
+      context: .
+    image: wal-g/wal_restore_test
+    container_name: wal-g_pg_wal_restore_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_pgbackrest:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_pgbackrest
+      context: .
+    image: wal-g/docker_pgbackrest
+    container_name: wal-g_docker_pgbackrest
+
+  pg_pgbackrest_backup_fetch_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_pgbackrest_backup_fetch_test
+      context: .
+    image: wal-g/pgbackrest_backup_fetch_test
+    container_name: wal-g_pgbackrest_backup_fetch_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   mysql:
     build:
       dockerfile: docker/mysql/Dockerfile
@@ -595,6 +698,38 @@ services:
       context: .
     image: wal-g/redis_tests
     container_name: wal-g_redis_tests
+    env_file:
+      - docker/common/common_walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  gp:
+    build:
+      dockerfile: docker/gp/Dockerfile
+      context: .
+    image: wal-g/gp
+    container_name: wal-g_gp
+
+  gp_tests:
+    build:
+      dockerfile: docker/gp_tests/Dockerfile
+      context: .
+    image: wal-g/gp_tests
+    container_name: wal-g_gp_tests
+    depends_on:
+      - gp
+      - s3
+    links:
+      - s3
+
+  st_tests:
+    build:
+      dockerfile: docker/st_tests/Dockerfile
+      context: .
+    image: wal-g/st_tests
+    container_name: wal-g_st_tests
     env_file:
       - docker/common/common_walg.env
     depends_on:

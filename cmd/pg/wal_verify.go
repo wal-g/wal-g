@@ -88,6 +88,6 @@ func checkArgs(cmd *cobra.Command, args []string) error {
 }
 
 func init() {
-	cmd.AddCommand(walVerifyCmd)
+	Cmd.AddCommand(walVerifyCmd)
 	walVerifyCmd.Flags().BoolVar(&useJSONOutput, useJSONOutputFlag, false, useJSONOutputDescription)
 }

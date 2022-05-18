@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -39,7 +39,6 @@ func (err NoBackupsFoundError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-// TODO : unit tests
 func GetLatestBackupName(folder storage.Folder) (string, error) {
 	backupTimes, err := GetBackups(folder)
 	SortBackupTimeSlices(backupTimes)
@@ -132,6 +131,14 @@ func GetGarbageFromPrefix(folders []storage.Folder, nonGarbage []BackupTime) []s
 
 func SentinelNameFromBackup(backupName string) string {
 	return backupName + utility.SentinelSuffix
+}
+
+func MetadataNameFromBackup(backupName string) string {
+	return backupName + "/" + utility.MetadataFileName
+}
+
+func StreamMetadataNameFromBackup(backupName string) string {
+	return backupName + "/" + utility.StreamMetadataFileName
 }
 
 // UnwrapLatestModifier checks if LATEST is provided instead of backupName

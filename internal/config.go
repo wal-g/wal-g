@@ -10,10 +10,11 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/webserver"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const (
@@ -24,6 +25,7 @@ const (
 	FDB       = "FDB"
 	MONGO     = "MONGO"
 	ROCKSDB   = "ROCKSDB"
+	GP        = "GP"
 
 	DownloadConcurrencySetting   = "WALG_DOWNLOAD_CONCURRENCY"
 	UploadConcurrencySetting     = "WALG_UPLOAD_CONCURRENCY"
@@ -35,6 +37,7 @@ const (
 	DeltaMaxStepsSetting         = "WALG_DELTA_MAX_STEPS"
 	DeltaOriginSetting           = "WALG_DELTA_ORIGIN"
 	CompressionMethodSetting     = "WALG_COMPRESSION_METHOD"
+	StoragePrefixSetting         = "WALG_STORAGE_PREFIX"
 	DiskRateLimitSetting         = "WALG_DISK_RATE_LIMIT"
 	NetworkRateLimitSetting      = "WALG_NETWORK_RATE_LIMIT"
 	UseWalDeltaSetting           = "WALG_USE_WAL_DELTA"
@@ -43,15 +46,19 @@ const (
 	VerifyPageChecksumsSetting   = "WALG_VERIFY_PAGE_CHECKSUMS"
 	StoreAllCorruptBlocksSetting = "WALG_STORE_ALL_CORRUPT_BLOCKS"
 	UseRatingComposerSetting     = "WALG_USE_RATING_COMPOSER"
+	UseCopyComposerSetting       = "WALG_USE_COPY_COMPOSER"
+	WithoutFilesMetadataSetting  = "WALG_WITHOUT_FILES_METADATA"
 	DeltaFromNameSetting         = "WALG_DELTA_FROM_NAME"
 	DeltaFromUserDataSetting     = "WALG_DELTA_FROM_USER_DATA"
 	FetchTargetUserDataSetting   = "WALG_FETCH_TARGET_USER_DATA"
 	LogLevelSetting              = "WALG_LOG_LEVEL"
 	TarSizeThresholdSetting      = "WALG_TAR_SIZE_THRESHOLD"
+	TarDisableFsyncSetting       = "WALG_TAR_DISABLE_FSYNC"
 	CseKmsIDSetting              = "WALG_CSE_KMS_ID"
 	CseKmsRegionSetting          = "WALG_CSE_KMS_REGION"
 	LibsodiumKeySetting          = "WALG_LIBSODIUM_KEY"
 	LibsodiumKeyPathSetting      = "WALG_LIBSODIUM_KEY_PATH"
+	LibsodiumKeyTransform        = "WALG_LIBSODIUM_KEY_TRANSFORM"
 	GpgKeyIDSetting              = "GPG_KEY_ID"
 	PgpKeySetting                = "WALG_PGP_KEY"
 	PgpKeyPathSetting            = "WALG_PGP_KEY_PATH"
@@ -72,6 +79,16 @@ const (
 	MaxDelayedSegmentsCount      = "WALG_INTEGRITY_MAX_DELAYED_WALS"
 	PrefetchDir                  = "WALG_PREFETCH_DIR"
 	PgReadyRename                = "PG_READY_RENAME"
+	SerializerTypeSetting        = "WALG_SERIALIZER_TYPE"
+	StreamSplitterPartitions     = "WALG_STREAM_SPLITTER_PARTITIONS"
+	StreamSplitterBlockSize      = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
+	StatsdAddressSetting         = "WALG_STATSD_ADDRESS"
+	PgAliveCheckInterval         = "WALG_ALIVE_CHECK_INTERVAL"
+	PgStopBackupTimeout          = "WALG_STOP_BACKUP_TIMEOUT"
+
+	ProfileSamplingRatio = "PROFILE_SAMPLING_RATIO"
+	ProfileMode          = "PROFILE_MODE"
+	ProfilePath          = "PROFILE_PATH"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
@@ -94,8 +111,16 @@ const (
 	MysqlBinlogDstSetting      = "WALG_MYSQL_BINLOG_DST"
 	MysqlBackupPrepareCmd      = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
 	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
+	MysqlCheckGTIDs            = "WALG_MYSQL_CHECK_GTIDS"
 
 	RedisPassword = "WALG_REDIS_PASSWORD"
+
+	GPLogsDirectory        = "WALG_GP_LOGS_DIR"
+	GPSegContentID         = "WALG_GP_SEG_CONTENT_ID"
+	GPSegmentsPollInterval = "WALG_GP_SEG_POLL_INTERVAL"
+	GPSegmentsPollRetries  = "WALG_GP_SEG_POLL_RETRIES"
+	GPSegmentsUpdInterval  = "WALG_GP_SEG_UPD_INTERVAL"
+	GPSegmentStatesDir     = "WALG_GP_SEG_STATES_DIR"
 
 	GoMaxProcs = "GOMAXPROCS"
 
@@ -110,6 +135,8 @@ const (
 	SQLServerBlobKeyFile      = "SQLSERVER_BLOB_KEY_FILE"
 	SQLServerBlobLockFile     = "SQLSERVER_BLOB_LOCK_FILE"
 	SQLServerConnectionString = "SQLSERVER_CONNECTION_STRING"
+	SQLServerDBConcurrency    = "SQLSERVER_DB_CONCURRENCY"
+	SQLServerReuseProxy       = "SQLSERVER_REUSE_PROXY"
 
 	EndpointSourceSetting = "S3_ENDPOINT_SOURCE"
 	EndpointPortSetting   = "S3_ENDPOINT_PORT"
@@ -119,6 +146,8 @@ const (
 
 	YcKmsKeyIDSetting  = "YC_CSE_KMS_KEY_ID"
 	YcSaKeyFileSetting = "YC_SERVICE_ACCOUNT_KEY_FILE"
+
+	PgBackRestStanza = "PGBACKREST_STANZA"
 )
 
 var (
@@ -136,13 +165,18 @@ var (
 		CompressionMethodSetting:     "lz4",
 		UseWalDeltaSetting:           "false",
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
+		TarDisableFsyncSetting:       "false",
 		TotalBgUploadedLimit:         "32",
 		UseReverseUnpackSetting:      "false",
 		SkipRedundantTarsSetting:     "false",
 		VerifyPageChecksumsSetting:   "false",
 		StoreAllCorruptBlocksSetting: "false",
 		UseRatingComposerSetting:     "false",
+		UseCopyComposerSetting:       "false",
+		WithoutFilesMetadataSetting:  "false",
 		MaxDelayedSegmentsCount:      "0",
+		SerializerTypeSetting:        "json_default",
+		LibsodiumKeyTransform:        "none",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -153,10 +187,29 @@ var (
 		OplogArchiveTimeoutInterval:    "60s",
 		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
 		MongoDBLastWriteUpdateInterval: "3s",
+		StreamSplitterBlockSize:        "1048576",
+	}
+
+	MysqlDefaultSettings = map[string]string{
+		StreamSplitterBlockSize: "1048576",
+	}
+
+	SQLServerDefaultSettings = map[string]string{
+		SQLServerDBConcurrency: "10",
 	}
 
 	PGDefaultSettings = map[string]string{
-		PgWalSize: "16",
+		PgWalSize:        "16",
+		PgBackRestStanza: "main",
+	}
+
+	GPDefaultSettings = map[string]string{
+		GPLogsDirectory:        "/var/log",
+		PgWalSize:              "64",
+		GPSegmentsPollInterval: "5m",
+		GPSegmentsUpdInterval:  "10s",
+		GPSegmentsPollRetries:  "5",
+		GPSegmentStatesDir:     "/tmp",
 	}
 
 	AllowedSettings map[string]bool
@@ -173,11 +226,13 @@ var (
 		DeltaMaxStepsSetting:         true,
 		DeltaOriginSetting:           true,
 		CompressionMethodSetting:     true,
+		StoragePrefixSetting:         true,
 		DiskRateLimitSetting:         true,
 		NetworkRateLimitSetting:      true,
 		UseWalDeltaSetting:           true,
 		LogLevelSetting:              true,
 		TarSizeThresholdSetting:      true,
+		TarDisableFsyncSetting:       true,
 		"WALG_" + GpgKeyIDSetting:    true,
 		"WALE_" + GpgKeyIDSetting:    true,
 		PgpKeySetting:                true,
@@ -185,6 +240,7 @@ var (
 		PgpKeyPassphraseSetting:      true,
 		LibsodiumKeySetting:          true,
 		LibsodiumKeyPathSetting:      true,
+		LibsodiumKeyTransform:        true,
 		TotalBgUploadedLimit:         true,
 		NameStreamCreateCmd:          true,
 		NameStreamRestoreCmd:         true,
@@ -193,10 +249,18 @@ var (
 		VerifyPageChecksumsSetting:   true,
 		StoreAllCorruptBlocksSetting: true,
 		UseRatingComposerSetting:     true,
+		UseCopyComposerSetting:       true,
+		WithoutFilesMetadataSetting:  true,
 		MaxDelayedSegmentsCount:      true,
 		DeltaFromNameSetting:         true,
 		DeltaFromUserDataSetting:     true,
 		FetchTargetUserDataSetting:   true,
+		SerializerTypeSetting:        true,
+		StatsdAddressSetting:         true,
+
+		ProfileSamplingRatio: true,
+		ProfileMode:          true,
+		ProfilePath:          true,
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,
@@ -225,6 +289,7 @@ var (
 		"WALG_S3_CA_CERT_FILE":        true,
 		"WALG_S3_STORAGE_CLASS":       true,
 		"WALG_S3_SSE":                 true,
+		"WALG_S3_SSE_C":               true,
 		"WALG_S3_SSE_KMS_ID":          true,
 		"WALG_CSE_KMS_ID":             true,
 		"WALG_CSE_KMS_REGION":         true,
@@ -232,15 +297,19 @@ var (
 		"S3_ENDPOINT_SOURCE":          true,
 		"S3_ENDPOINT_PORT":            true,
 		"S3_USE_LIST_OBJECTS_V1":      true,
+		"S3_LOG_LEVEL":                true,
+		"S3_RANGE_BATCH_ENABLED":      true,
+		"S3_RANGE_MAX_RETRIES":        true,
+		"S3_MAX_RETRIES":              true,
 
 		// Azure
-		"WALG_AZ_PREFIX":          true,
-		"AZURE_STORAGE_ACCOUNT":   true,
-		"AZURE_STORAGE_KEY":       true,
-		"AZURE_STORAGE_SAS_TOKEN": true,
-		"AZURE_ENVIRONMENT_NAME":  true,
-		"WALG_AZURE_BUFFER_SIZE":  true,
-		"WALG_AZURE_MAX_BUFFERS":  true,
+		"WALG_AZ_PREFIX":           true,
+		"AZURE_STORAGE_ACCOUNT":    true,
+		"AZURE_STORAGE_ACCESS_KEY": true,
+		"AZURE_STORAGE_SAS_TOKEN":  true,
+		"AZURE_ENVIRONMENT_NAME":   true,
+		"WALG_AZURE_BUFFER_SIZE":   true,
+		"WALG_AZURE_MAX_BUFFERS":   true,
 
 		// GS
 		"WALG_GS_PREFIX":                 true,
@@ -271,18 +340,21 @@ var (
 
 	PGAllowedSettings = map[string]bool{
 		// Postgres
-		PgPortSetting:     true,
-		PgUserSetting:     true,
-		PgHostSetting:     true,
-		PgDataSetting:     true,
-		PgPasswordSetting: true,
-		PgDatabaseSetting: true,
-		PgSslModeSetting:  true,
-		PgSlotName:        true,
-		PgWalSize:         true,
-		"PGPASSFILE":      true,
-		PrefetchDir:       true,
-		PgReadyRename:     true,
+		PgPortSetting:        true,
+		PgUserSetting:        true,
+		PgHostSetting:        true,
+		PgDataSetting:        true,
+		PgPasswordSetting:    true,
+		PgDatabaseSetting:    true,
+		PgSslModeSetting:     true,
+		PgSlotName:           true,
+		PgWalSize:            true,
+		"PGPASSFILE":         true,
+		PrefetchDir:          true,
+		PgReadyRename:        true,
+		PgBackRestStanza:     true,
+		PgAliveCheckInterval: true,
+		PgStopBackupTimeout:  true,
 	}
 
 	MongoAllowedSettings = map[string]bool{
@@ -298,6 +370,8 @@ var (
 		OplogPushWaitForBecomePrimary:  true,
 		OplogPushPrimaryCheckInterval:  true,
 		OplogPITRDiscoveryInterval:     true,
+		StreamSplitterBlockSize:        true,
+		StreamSplitterPartitions:       true,
 	}
 
 	SQLServerAllowedSettings = map[string]bool{
@@ -307,6 +381,8 @@ var (
 		SQLServerBlobKeyFile:      true,
 		SQLServerBlobLockFile:     true,
 		SQLServerConnectionString: true,
+		SQLServerDBConcurrency:    true,
+		SQLServerReuseProxy:       true,
 	}
 
 	MysqlAllowedSettings = map[string]bool{
@@ -317,11 +393,23 @@ var (
 		MysqlBinlogDstSetting:      true,
 		MysqlBackupPrepareCmd:      true,
 		MysqlTakeBinlogsFromMaster: true,
+		MysqlCheckGTIDs:            true,
+		StreamSplitterPartitions:   true,
+		StreamSplitterBlockSize:    true,
 	}
 
 	RedisAllowedSettings = map[string]bool{
 		// Redis
 		RedisPassword: true,
+	}
+
+	GPAllowedSettings = map[string]bool{
+		GPLogsDirectory:        true,
+		GPSegContentID:         true,
+		GPSegmentsPollRetries:  true,
+		GPSegmentsPollInterval: true,
+		GPSegmentsUpdInterval:  true,
+		GPSegmentStatesDir:     true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
@@ -333,6 +421,7 @@ var (
 	Turbo bool
 )
 
+// nolint: gocyclo
 func ConfigureSettings(currentType string) {
 	if len(defaultConfigValues) == 0 {
 		defaultConfigValues = commonDefaultConfigValues
@@ -342,6 +431,12 @@ func ConfigureSettings(currentType string) {
 			dbSpecificDefaultSettings = PGDefaultSettings
 		case MONGO:
 			dbSpecificDefaultSettings = MongoDefaultSettings
+		case MYSQL:
+			dbSpecificDefaultSettings = MysqlDefaultSettings
+		case SQLSERVER:
+			dbSpecificDefaultSettings = SQLServerDefaultSettings
+		case GP:
+			dbSpecificDefaultSettings = GPDefaultSettings
 		}
 
 		for k, v := range dbSpecificDefaultSettings {
@@ -355,6 +450,11 @@ func ConfigureSettings(currentType string) {
 		switch currentType {
 		case PG:
 			dbSpecificSettings = PGAllowedSettings
+		case GP:
+			for setting := range PGAllowedSettings {
+				GPAllowedSettings[setting] = true
+			}
+			dbSpecificSettings = GPAllowedSettings
 		case MONGO:
 			dbSpecificSettings = MongoAllowedSettings
 		case MYSQL:
@@ -465,7 +565,8 @@ func ConfigureAndRunDefaultWebServer() error {
 	return nil
 }
 
-func AddConfigFlags(Cmd *cobra.Command) {
+func AddConfigFlags(Cmd *cobra.Command, hiddenCfgFlagAnnotation string) {
+	cfgFlags := &pflag.FlagSet{}
 	for k := range AllowedSettings {
 		flagName := toFlagName(k)
 		isRequired, exist := RequiredSettings[k]
@@ -474,9 +575,16 @@ func AddConfigFlags(Cmd *cobra.Command) {
 			flagUsage = "Required, can be set though this flag or " + k + " variable"
 		}
 
-		Cmd.PersistentFlags().String(flagName, "", flagUsage)
-		_ = viper.BindPFlag(k, Cmd.PersistentFlags().Lookup(flagName))
+		cfgFlags.String(flagName, "", flagUsage)
+		_ = viper.BindPFlag(k, cfgFlags.Lookup(flagName))
 	}
+	cfgFlags.VisitAll(func(f *pflag.Flag) {
+		if f.Annotations == nil {
+			f.Annotations = map[string][]string{}
+		}
+		f.Annotations[hiddenCfgFlagAnnotation] = []string{"true"}
+	})
+	Cmd.PersistentFlags().AddFlagSet(cfgFlags)
 }
 
 // InitConfig reads config file and ENV variables if set.
@@ -484,18 +592,11 @@ func InitConfig() {
 	var globalViper = viper.GetViper()
 	globalViper.AutomaticEnv() // read in environment variables that match
 	SetDefaultValues(globalViper)
+	SetGoMaxProcs(globalViper)
 	ReadConfigFromFile(globalViper, CfgFile)
 	CheckAllowedSettings(globalViper)
 
-	// Set compiled config to ENV.
-	// Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
-	for k, v := range viper.AllSettings() {
-		val, ok := v.(string)
-		if ok {
-			err := bindToEnv(k, val)
-			tracelog.ErrorLogger.FatalOnError(err)
-		}
-	}
+	bindConfigToEnv(globalViper)
 }
 
 // ReadConfigFromFile read config to the viper instance
@@ -529,13 +630,11 @@ func SetDefaultValues(config *viper.Viper) {
 	for setting, value := range defaultConfigValues {
 		config.SetDefault(setting, value)
 	}
-
-	setGoMaxProcs()
 }
 
-func setGoMaxProcs() {
-	gomaxprocs := viper.GetInt(GoMaxProcs)
-	if gomaxprocs > 0 {
+func SetGoMaxProcs(config *viper.Viper) {
+	gomaxprocs := config.GetInt(GoMaxProcs)
+	if !Turbo && gomaxprocs > 0 {
 		runtime.GOMAXPROCS(gomaxprocs)
 	}
 }
@@ -599,6 +698,7 @@ func toFlagName(s string) string {
 	return strings.ReplaceAll(strings.ToLower(s), "_", "-")
 }
 
+// FolderFromConfig prefers the config parameters instead of the current environment variables
 func FolderFromConfig(configFile string) (storage.Folder, error) {
 	var config = viper.New()
 	SetDefaultValues(config)
@@ -612,4 +712,16 @@ func FolderFromConfig(configFile string) (storage.Folder, error) {
 		tracelog.ErrorLogger.FatalError(err)
 	}
 	return folder, err
+}
+
+// Set the compiled config to ENV.
+// Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
+func bindConfigToEnv(globalViper *viper.Viper) {
+	for k, v := range globalViper.AllSettings() {
+		val, ok := v.(string)
+		if ok {
+			err := bindToEnv(k, val)
+			tracelog.ErrorLogger.FatalOnError(err)
+		}
+	}
 }

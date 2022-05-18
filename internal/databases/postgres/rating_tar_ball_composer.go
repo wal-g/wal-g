@@ -7,6 +7,8 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 
 	"github.com/pkg/errors"
@@ -89,7 +91,7 @@ type RatingTarBallComposer struct {
 	fileStats   RelFileStatistics
 	bundleFiles BundleFiles
 
-	incrementBaseLsn *uint64
+	incrementBaseLsn *LSN
 	tarSizeThreshold uint64
 
 	deltaMap         PagedFileDeltaMap
@@ -97,14 +99,15 @@ type RatingTarBallComposer struct {
 	deltaMapComplete bool
 
 	errorGroup *errgroup.Group
+	ctx        context.Context
 }
 
 func NewRatingTarBallComposer(
 	tarSizeThreshold uint64, updateRatingEvaluator internal.ComposeRatingEvaluator,
-	incrementBaseLsn *uint64, deltaMap PagedFileDeltaMap, tarBallQueue *internal.TarBallQueue,
+	incrementBaseLsn *LSN, deltaMap PagedFileDeltaMap, tarBallQueue *internal.TarBallQueue,
 	crypter crypto.Crypter, fileStats RelFileStatistics, bundleFiles BundleFiles, packer *TarBallFilePacker,
 ) (*RatingTarBallComposer, error) {
-	errorGroup, _ := errgroup.WithContext(context.Background())
+	errorGroup, ctx := errgroup.WithContext(context.Background())
 	deltaMapComplete := true
 	if deltaMap == nil {
 		deltaMapComplete = false
@@ -125,6 +128,7 @@ func NewRatingTarBallComposer(
 		bundleFiles:            bundleFiles,
 		tarFilePacker:          packer,
 		errorGroup:             errorGroup,
+		ctx:                    ctx,
 	}
 
 	maxUploadDiskConcurrency, err := internal.GetMaxUploadDiskConcurrency()
@@ -142,7 +146,13 @@ func NewRatingTarBallComposer(
 }
 
 func (c *RatingTarBallComposer) AddFile(info *ComposeFileInfo) {
-	c.addFileQueue <- info
+	select {
+	case c.addFileQueue <- info:
+		return
+	case <-c.ctx.Done():
+		tracelog.ErrorLogger.Printf("AddFile: not doing anything, err: %v", c.ctx.Err())
+		return
+	}
 }
 
 func (c *RatingTarBallComposer) AddHeader(fileInfoHeader *tar.Header, info os.FileInfo) error {
@@ -155,7 +165,7 @@ func (c *RatingTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.File
 	c.bundleFiles.AddSkippedFile(tarHeader, fileInfo)
 }
 
-func (c *RatingTarBallComposer) PackTarballs() (TarFileSets, error) {
+func (c *RatingTarBallComposer) FinishComposing() (TarFileSets, error) {
 	close(c.addFileQueue)
 	err := c.errorGroup.Wait()
 	if err != nil {
@@ -170,14 +180,14 @@ func (c *RatingTarBallComposer) PackTarballs() (TarFileSets, error) {
 		return nil, err
 	}
 
-	tarFileSets := make(map[string][]string)
-	tarFileSets[headersTarName] = headersNames
+	tarFileSets := NewRegularTarFileSets()
+	tarFileSets.AddFiles(headersTarName, headersNames)
 
 	for _, tarFilesCollection := range tarFilesCollections {
 		tarBall := c.tarBallQueue.Deque()
 		tarBall.SetUp(c.crypter)
 		for _, composeFileInfo := range tarFilesCollection.files {
-			tarFileSets[tarBall.Name()] = append(tarFileSets[tarBall.Name()], composeFileInfo.header.Name)
+			tarFileSets.AddFile(tarBall.Name(), composeFileInfo.header.Name)
 		}
 		// tarFilesCollection closure
 		tarFilesCollectionLocal := tarFilesCollection

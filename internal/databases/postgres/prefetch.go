@@ -3,7 +3,6 @@ package postgres
 import (
 	"archive/tar"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -16,9 +15,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/fsutil"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -58,7 +57,7 @@ func HandleWALPrefetch(uploader *WalUploader, walFileName string, location strin
 }
 
 // TODO : unit tests
-func prefaultData(prefaultStartLsn uint64, timelineID uint32, waitGroup *sync.WaitGroup, uploader *WalUploader) {
+func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitGroup, uploader *WalUploader) {
 	defer func() {
 		if r := recover(); r != nil {
 			tracelog.ErrorLogger.Println("Prefault unsuccessful ", prefaultStartLsn)
@@ -76,7 +75,8 @@ func prefaultData(prefaultStartLsn uint64, timelineID uint32, waitGroup *sync.Wa
 	bundle := NewBundle(archiveDirectory, nil, &prefaultStartLsn, nil,
 		false, viper.GetInt64(internal.TarSizeThresholdSetting))
 	bundle.Timeline = timelineID
-	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(utility.WalPath), prefaultStartLsn+WalSegmentSize*WalFileInDelta)
+	startLsn := prefaultStartLsn + LSN(WalSegmentSize*WalFileInDelta)
+	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(utility.WalPath), startLsn)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Error during loading delta map: '%+v'.", err)
 		return
@@ -174,7 +174,7 @@ func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader
 				return errors.Wrapf(err, "packFileIntoTar: failed reading incremental file '%s'\n", path)
 			}
 
-			_, err := io.Copy(ioutil.Discard, fileReader)
+			_, err := io.Copy(io.Discard, fileReader)
 
 			if err != nil {
 				return errors.Wrap(err, "packFileIntoTar: operation failed")
@@ -247,6 +247,10 @@ func forkPrefetch(walFileName string, location string) {
 	prefetchArgs := []string{"wal-prefetch", walFileName, location}
 	if internal.CfgFile != "" {
 		prefetchArgs = append(prefetchArgs, "--config", internal.CfgFile)
+	}
+	storagePrefix := viper.GetString(internal.StoragePrefixSetting)
+	if storagePrefix != "" {
+		prefetchArgs = append(prefetchArgs, "--walg-storage-prefix", storagePrefix)
 	}
 	cmd := exec.Command(os.Args[0], prefetchArgs...)
 	cmd.Env = os.Environ()

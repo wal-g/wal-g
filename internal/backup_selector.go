@@ -5,10 +5,11 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/pkg/errors"
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
+
+	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const LatestString = "LATEST"
@@ -27,7 +28,11 @@ func NewLatestBackupSelector() LatestBackupSelector {
 }
 
 func (s LatestBackupSelector) Select(folder storage.Folder) (string, error) {
-	return GetLatestBackupName(folder.GetSubFolder(utility.BaseBackupPath))
+	backupName, err := GetLatestBackupName(folder.GetSubFolder(utility.BaseBackupPath))
+	if err == nil {
+		tracelog.InfoLogger.Printf("LATEST backup is: '%s'\n", backupName)
+	}
+	return backupName, err
 }
 
 // Select backup which has the provided user data
@@ -36,11 +41,15 @@ type UserDataBackupSelector struct {
 	metaFetcher GenericMetaFetcher
 }
 
-func NewUserDataBackupSelector(userDataRaw string, metaFetcher GenericMetaFetcher) UserDataBackupSelector {
-	return UserDataBackupSelector{
-		userData:    UnmarshalSentinelUserData(userDataRaw),
-		metaFetcher: metaFetcher,
+func NewUserDataBackupSelector(userDataRaw string, metaFetcher GenericMetaFetcher) (UserDataBackupSelector, error) {
+	userData, err := UnmarshalSentinelUserData(userDataRaw)
+	if err != nil {
+		return UserDataBackupSelector{}, err
 	}
+	return UserDataBackupSelector{
+		userData:    userData,
+		metaFetcher: metaFetcher,
+	}, nil
 }
 
 func (s UserDataBackupSelector) Select(folder storage.Folder) (string, error) {
@@ -105,14 +114,19 @@ func searchInMetadata(
 
 // Select backup by provided backup name
 type BackupNameSelector struct {
-	backupName string
+	backupName     string
+	checkExistence bool
 }
 
-func NewBackupNameSelector(backupName string) (BackupNameSelector, error) {
-	return BackupNameSelector{backupName: backupName}, nil
+func NewBackupNameSelector(backupName string, checkExistence bool) (BackupNameSelector, error) {
+	return BackupNameSelector{backupName: backupName, checkExistence: checkExistence}, nil
 }
 
 func (s BackupNameSelector) Select(folder storage.Folder) (string, error) {
+	if !s.checkExistence {
+		return s.backupName, nil
+	}
+
 	_, err := GetBackupByName(s.backupName, utility.BaseBackupPath, folder)
 	if err != nil {
 		return "", err
@@ -132,11 +146,11 @@ func NewTargetBackupSelector(targetUserData, targetName string, metaFetcher Gene
 
 	case targetName != "":
 		tracelog.InfoLogger.Printf("Selecting the backup with name %s...\n", targetName)
-		return NewBackupNameSelector(targetName)
+		return NewBackupNameSelector(targetName, true)
 
 	case targetUserData != "":
 		tracelog.InfoLogger.Println("Selecting the backup with the specified user data...")
-		return NewUserDataBackupSelector(targetUserData, metaFetcher), nil
+		return NewUserDataBackupSelector(targetUserData, metaFetcher)
 
 	default:
 		err = errors.New("insufficient arguments")

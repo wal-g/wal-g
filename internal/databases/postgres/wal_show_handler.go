@@ -3,9 +3,9 @@ package postgres
 import (
 	"sort"
 
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -18,7 +18,7 @@ const (
 type TimelineInfo struct {
 	ID               uint32          `json:"id"`
 	ParentID         uint32          `json:"parent_id"`
-	SwitchPointLsn   uint64          `json:"switch_point_lsn"`
+	SwitchPointLsn   LSN             `json:"switch_point_lsn"`
 	StartSegment     string          `json:"start_segment"`
 	EndSegment       string          `json:"end_segment"`
 	SegmentsCount    int             `json:"segments_count"`

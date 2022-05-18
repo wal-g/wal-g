@@ -1,3 +1,4 @@
+//go:build lzo
 // +build lzo
 
 package internal_test
@@ -5,7 +6,6 @@ package internal_test
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -27,7 +27,7 @@ const (
 var waleGpgKey string
 
 func init() {
-	waleGpgKeyBytes, err := ioutil.ReadFile(waleGpgKeyFilePath)
+	waleGpgKeyBytes, err := os.ReadFile(waleGpgKeyFilePath)
 	if err != nil {
 		panic(err)
 	}
@@ -44,7 +44,7 @@ func TestDecryptWALElzo(t *testing.T) {
 	assert.NoError(t, err)
 	decrypt, err := crypter.Decrypt(f)
 	assert.NoError(t, err)
-	bytes1, err := ioutil.ReadAll(decrypt)
+	bytes1, err := io.ReadAll(decrypt)
 	assert.NoError(t, err)
 
 	installTestKeyToExternalGPG(t)
@@ -58,9 +58,11 @@ func TestDecryptWALElzo(t *testing.T) {
 
 	assert.Equalf(t, bytes1, bytes2, "Decryption result differ")
 
-	buffer := bytes.Buffer{}
 	decompressor := lzo.Decompressor{}
-	err = decompressor.Decompress(&buffer, bytes.NewReader(bytes1))
+	dr, err := decompressor.Decompress(bytes.NewReader(bytes1))
+	assert.NoError(t, err)
+	defer dr.Close()
+	_, err = io.ReadAll(dr)
 	assert.NoError(t, err)
 
 	/* Unfortunately, we cannot quietly uninstall test keyring. This is why this test is not executed by default.
@@ -109,7 +111,7 @@ func TestOpenGPGandExternalGPGCompatibility(t *testing.T) {
 
 		assert.NoError(t, err)
 
-		decrypted, err := ioutil.ReadAll(reader)
+		decrypted, err := io.ReadAll(reader)
 
 		assert.NoError(t, err)
 

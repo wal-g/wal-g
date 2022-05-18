@@ -3,9 +3,10 @@ package postgres
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/wal-g/wal-g/internal"
 
@@ -48,7 +49,8 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	totalBgUploadedLimit := viper.GetInt32(internal.TotalBgUploadedLimit)
-	preventWalOverwrite := viper.GetBool(internal.PreventWalOverwriteSetting)
+	// .history files must not be overwritten, see https://github.com/wal-g/wal-g/issues/420
+	preventWalOverwrite := viper.GetBool(internal.PreventWalOverwriteSetting) || strings.HasSuffix(walFilePath, ".history")
 	readyRename := viper.GetBool(internal.PgReadyRename)
 
 	bgUploader := NewBgUploader(walFilePath, int32(concurrency-1), totalBgUploadedLimit-1, uploader, preventWalOverwrite, readyRename)
@@ -97,12 +99,12 @@ func checkWALOverwrite(uploader *WalUploader, walFilePath string) (overwriteAtte
 		return false, err
 	}
 
-	archived, err := ioutil.ReadAll(walFileReader)
+	archived, err := io.ReadAll(walFileReader)
 	if err != nil {
 		return false, err
 	}
 
-	localBytes, err := ioutil.ReadFile(walFilePath)
+	localBytes, err := os.ReadFile(walFilePath)
 	if err != nil {
 		return false, err
 	}

@@ -9,6 +9,8 @@ echo "," >> ${TMP_CONFIG}
 cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 /tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
 
+wal-g delete everything FORCE --confirm --config=${TMP_CONFIG}
+
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
 echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
@@ -31,9 +33,11 @@ echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${TMP_CONF
 
 sleep 10
 
+grep -i 'archived write-ahead log file' /var/lib/postgresql/10/main/log/postgresql.log
+
 count=$(grep -c 'archived write-ahead log file' /var/lib/postgresql/10/main/log/postgresql.log)
 
-if [[ $count != '1' ]]; then
+if [ "${count}" = '0' ]; then
     exit 1
 fi
 

@@ -9,8 +9,8 @@ import (
 const WalPrefetchShortDescription = `Used for prefetching process forking
 and should not be called by user.`
 
-// walPrefetchCmd represents the walPrefetch command
-var walPrefetchCmd = &cobra.Command{
+// WalPrefetchCmd represents the walPrefetch command
+var WalPrefetchCmd = &cobra.Command{
 	Use:    "wal-prefetch wal_name prefetch_location",
 	Short:  WalPrefetchShortDescription,
 	Args:   cobra.ExactArgs(2),
@@ -23,5 +23,5 @@ var walPrefetchCmd = &cobra.Command{
 }
 
 func init() {
-	cmd.AddCommand(walPrefetchCmd)
+	Cmd.AddCommand(WalPrefetchCmd)
 }
