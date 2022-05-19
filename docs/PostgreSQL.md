@@ -565,3 +565,17 @@ Usage:
 ```bash
 wal-g pgbackrest backup-fetch path/to/destination-directory backup-name
 ```
+
+### ``pgbackrest wal-fetch``
+
+Usage:
+```bash
+wal-g pgbackrest wal-fetch example-archive new-file-name
+```
+
+### ``pgbackrest wal-show``
+
+Usage:
+```bash
+wal-g pgbackrest wal-show
+```
