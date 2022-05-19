@@ -568,12 +568,16 @@ wal-g pgbackrest backup-fetch path/to/destination-directory backup-name
 
 ### ``pgbackrest wal-fetch``
 
+Fetch wal file from pgbackrest backup
+
 Usage:
 ```bash
 wal-g pgbackrest wal-fetch example-archive new-file-name
 ```
 
 ### ``pgbackrest wal-show``
+
+Show wal files from pgbackrest backup
 
 Usage:
 ```bash
