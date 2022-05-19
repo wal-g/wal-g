@@ -24,10 +24,13 @@ mkdir -m 770 /tmp/pgbackrest-backups
 pgbackrest --stanza=main --pg1-path=${PGDATA} --repo1-path=/tmp/pgbackrest-backups stanza-create
 
 pgbench -i -s 5 postgres
-pg_dumpall -f /tmp/dump1
 pgbench -c 2 -T 1000 &
+pgbench_pid=$!
+
 sleep 1
 pgbackrest --stanza=main --pg1-path=${PGDATA} --repo1-path=/tmp/pgbackrest-backups backup
+wait $pgbench_pid
+pg_dumpall -f /tmp/dump1
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w stop
 
