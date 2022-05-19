@@ -546,7 +546,7 @@ Usage:
 wal-g wal-restore path/to/target-pgdata path/to/source-pgdata
 ```
 
-pgBackRest backups support
+pgBackRest backups support (beta version)
 -----------
 ### ``pgbackrest backup-list``
 
