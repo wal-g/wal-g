@@ -25,7 +25,7 @@ pgbackrest --stanza=main --pg1-path=${PGDATA} --repo1-path=/tmp/pgbackrest-backu
 
 pgbench -i -s 5 postgres
 pg_dumpall -f /tmp/dump1
-pgbench -c 2 -T 100000000 -S &
+pgbench -c 2 -T 1000 &
 sleep 1
 pgbackrest --stanza=main --pg1-path=${PGDATA} --repo1-path=/tmp/pgbackrest-backups backup
 
