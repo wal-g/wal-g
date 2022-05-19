@@ -168,37 +168,46 @@ func putCachedDecompressorInFirstPlace(decompressors []compression.Decompressor)
 
 // TODO : unit tests
 func DownloadAndDecompressStorageFile(folder storage.Folder, fileName string) (io.ReadCloser, error) {
+	archiveReader, decompressor, err := findDecompressorAndDownload(folder, fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	decompressedReaded, err := DecompressDecryptBytes(archiveReader, decompressor)
+	if err != nil {
+		utility.LoggedClose(archiveReader, "")
+		return nil, err
+	}
+
+	return ioextensions.ReadCascadeCloser{
+		Reader: decompressedReaded,
+		Closer: ioextensions.NewMultiCloser([]io.Closer{archiveReader, decompressedReaded}),
+	}, nil
+}
+
+func findDecompressorAndDownload(folder storage.Folder, fileName string) (io.ReadCloser, compression.Decompressor, error) {
 	for _, decompressor := range putCachedDecompressorInFirstPlace(compression.Decompressors) {
 		archiveReader, exists, err := TryDownloadFile(folder, fileName+"."+decompressor.FileExtension())
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if !exists {
 			continue
 		}
 		_ = SetLastDecompressor(decompressor)
 
-		decompressedReaded, err := DecompressDecryptBytes(archiveReader, decompressor)
-		if err != nil {
-			utility.LoggedClose(archiveReader, "")
-			return nil, err
-		}
-
-		return ioextensions.ReadCascadeCloser{
-			Reader: decompressedReaded,
-			Closer: ioextensions.NewMultiCloser([]io.Closer{archiveReader, decompressedReaded}),
-		}, nil
+		return archiveReader, decompressor, nil
 	}
 
 	reader, exists, err := TryDownloadFile(folder, fileName)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if exists {
-		return reader, nil
+		return reader, nil, nil
 	}
 
-	return nil, newArchiveNonExistenceError(fileName)
+	return nil, nil, newArchiveNonExistenceError(fileName)
 }
 
 // TODO : unit tests
