@@ -15,7 +15,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
-	"github.com/wal-g/wal-g/internal/parallel"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -61,7 +60,7 @@ func init() {
 // uploaded backups; in this case, pg_control is used as
 // the sentinel.
 type Bundle struct {
-	parallel.Bundle
+	internal.Bundle
 	Timeline           uint32
 	Replica            bool
 	IncrementFromLsn   *LSN
@@ -79,7 +78,7 @@ func NewBundle(
 	forceIncremental bool, tarSizeThreshold int64,
 ) *Bundle {
 	return &Bundle{
-		Bundle: parallel.Bundle{
+		Bundle: internal.Bundle{
 			Directory:         directory,
 			Crypter:           crypter,
 			TarSizeThreshold:  tarSizeThreshold,
@@ -284,7 +283,7 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 		}
 		incrementBaseLsn := bundle.getIncrementBaseLsn()
 		isIncremented := incrementBaseLsn != nil && (wasInBase || bundle.forceIncremental) && isPagedFile(info, path)
-		bundle.TarBallComposer.AddFile(parallel.NewComposeFileInfo(path, info, wasInBase, isIncremented, fileInfoHeader))
+		bundle.TarBallComposer.AddFile(internal.NewComposeFileInfo(path, info, wasInBase, isIncremented, fileInfoHeader))
 	} else {
 		err := bundle.TarBallComposer.AddHeader(fileInfoHeader, info)
 		if err != nil {
@@ -418,7 +417,7 @@ func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN LSN
 	return nil
 }
 
-func (bundle *Bundle) FinishTarComposer() (parallel.TarFileSets, error) {
+func (bundle *Bundle) FinishTarComposer() (internal.TarFileSets, error) {
 	return bundle.TarBallComposer.FinishComposing()
 }
 

@@ -1,4 +1,4 @@
-package parallel
+package internal
 
 import (
 	"archive/tar"

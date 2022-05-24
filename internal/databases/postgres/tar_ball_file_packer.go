@@ -14,7 +14,6 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/limiters"
-	"github.com/wal-g/wal-g/internal/parallel"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/errgroup"
 )
@@ -60,11 +59,11 @@ func NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks bool
 type TarBallFilePackerImpl struct {
 	deltaMap         PagedFileDeltaMap
 	incrementFromLsn *LSN
-	files            parallel.BundleFiles
+	files            internal.BundleFiles
 	options          TarBallFilePackerOptions
 }
 
-func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, files parallel.BundleFiles,
+func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, files internal.BundleFiles,
 	options TarBallFilePackerOptions) *TarBallFilePackerImpl {
 	return &TarBallFilePackerImpl{
 		deltaMap:         deltaMap,
@@ -86,7 +85,7 @@ func (p *TarBallFilePackerImpl) UpdateDeltaMap(deltaMap PagedFileDeltaMap) {
 }
 
 // TODO : unit tests
-func (p *TarBallFilePackerImpl) PackFileIntoTar(cfi *parallel.ComposeFileInfo, tarBall internal.TarBall) error {
+func (p *TarBallFilePackerImpl) PackFileIntoTar(cfi *internal.ComposeFileInfo, tarBall internal.TarBall) error {
 	fileReadCloser, err := p.createFileReadCloser(cfi)
 	if err != nil {
 		switch err.(type) {
@@ -137,7 +136,7 @@ func (p *TarBallFilePackerImpl) PackFileIntoTar(cfi *parallel.ComposeFileInfo, t
 	return errorGroup.Wait()
 }
 
-func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *parallel.ComposeFileInfo) (io.ReadCloser, error) {
+func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileInfo) (io.ReadCloser, error) {
 	var fileReadCloser io.ReadCloser
 	if cfi.IsIncremented {
 		bitmap, err := p.getDeltaBitmapFor(cfi.Path)

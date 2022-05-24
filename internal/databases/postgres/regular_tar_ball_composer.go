@@ -8,7 +8,6 @@ import (
 	"github.com/wal-g/wal-g/internal"
 
 	"github.com/wal-g/wal-g/internal/crypto"
-	"github.com/wal-g/wal-g/internal/parallel"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -16,8 +15,8 @@ type RegularTarBallComposer struct {
 	tarBallQueue  *internal.TarBallQueue
 	tarFilePacker *TarBallFilePackerImpl
 	crypter       crypto.Crypter
-	files         parallel.BundleFiles
-	tarFileSets   parallel.TarFileSets
+	files         internal.BundleFiles
+	tarFileSets   internal.TarFileSets
 	errorGroup    *errgroup.Group
 	ctx           context.Context
 }
@@ -25,8 +24,8 @@ type RegularTarBallComposer struct {
 func NewRegularTarBallComposer(
 	tarBallQueue *internal.TarBallQueue,
 	tarBallFilePacker *TarBallFilePackerImpl,
-	files parallel.BundleFiles,
-	tarFileSets parallel.TarFileSets,
+	files internal.BundleFiles,
+	tarFileSets internal.TarFileSets,
 	crypter crypto.Crypter,
 ) *RegularTarBallComposer {
 	errorGroup, ctx := errgroup.WithContext(context.Background())
@@ -43,12 +42,12 @@ func NewRegularTarBallComposer(
 
 type RegularTarBallComposerMaker struct {
 	filePackerOptions TarBallFilePackerOptions
-	files             parallel.BundleFiles
-	tarFileSets       parallel.TarFileSets
+	files             internal.BundleFiles
+	tarFileSets       internal.TarFileSets
 }
 
 func NewRegularTarBallComposerMaker(
-	filePackerOptions TarBallFilePackerOptions, files parallel.BundleFiles, tarFileSets parallel.TarFileSets,
+	filePackerOptions TarBallFilePackerOptions, files internal.BundleFiles, tarFileSets internal.TarFileSets,
 ) *RegularTarBallComposerMaker {
 	return &RegularTarBallComposerMaker{
 		filePackerOptions: filePackerOptions,
@@ -57,7 +56,7 @@ func NewRegularTarBallComposerMaker(
 	}
 }
 
-func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (parallel.TarBallComposer, error) {
+func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBallComposer, error) {
 	bundleFiles := maker.files
 	tarFileSets := maker.tarFileSets
 	tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap,
@@ -65,7 +64,7 @@ func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (parallel.TarBall
 	return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, bundleFiles, tarFileSets, bundle.Crypter), nil
 }
 
-func (c *RegularTarBallComposer) AddFile(info *parallel.ComposeFileInfo) {
+func (c *RegularTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
 	tarBall, err := c.tarBallQueue.DequeCtx(c.ctx)
 	if err != nil {
 		return
@@ -97,7 +96,7 @@ func (c *RegularTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.Fil
 	c.files.AddSkippedFile(tarHeader, fileInfo)
 }
 
-func (c *RegularTarBallComposer) FinishComposing() (parallel.TarFileSets, error) {
+func (c *RegularTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 	err := c.errorGroup.Wait()
 	if err != nil {
 		return nil, err
@@ -105,6 +104,6 @@ func (c *RegularTarBallComposer) FinishComposing() (parallel.TarFileSets, error)
 	return c.tarFileSets, nil
 }
 
-func (c *RegularTarBallComposer) GetFiles() parallel.BundleFiles {
+func (c *RegularTarBallComposer) GetFiles() internal.BundleFiles {
 	return c.files
 }

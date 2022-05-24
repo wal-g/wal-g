@@ -8,7 +8,6 @@ import (
 	"path"
 	"sync"
 
-	"github.com/wal-g/wal-g/internal/parallel"
 	"github.com/wal-g/wal-g/internal/walparser"
 
 	"github.com/wal-g/tracelog"
@@ -21,8 +20,8 @@ import (
 
 type GpTarBallComposerMaker struct {
 	relStorageMap AoRelFileStorageMap
-	bundleFiles   parallel.BundleFiles
-	TarFileSets   parallel.TarFileSets
+	bundleFiles   internal.BundleFiles
+	TarFileSets   internal.TarFileSets
 	aoFiles       *AOFilesMetadataDTO
 	uploader      *internal.Uploader
 	baseFiles     map[string]struct{}
@@ -38,8 +37,8 @@ func NewGpTarBallComposerMaker(relStorageMap AoRelFileStorageMap, uploader *inte
 
 	return &GpTarBallComposerMaker{
 		relStorageMap: relStorageMap,
-		bundleFiles:   &parallel.RegularBundleFiles{},
-		TarFileSets:   parallel.NewRegularTarFileSets(),
+		bundleFiles:   &internal.RegularBundleFiles{},
+		TarFileSets:   internal.NewRegularTarFileSets(),
 		aoFiles:       NewAOFilesMetadataDTO(),
 		uploader:      uploader,
 		baseFiles:     baseFiles,
@@ -47,7 +46,7 @@ func NewGpTarBallComposerMaker(relStorageMap AoRelFileStorageMap, uploader *inte
 	}, nil
 }
 
-func (maker *GpTarBallComposerMaker) Make(bundle *Bundle) (parallel.TarBallComposer, error) {
+func (maker *GpTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBallComposer, error) {
 	// checksums verification is not supported in Greenplum (yet)
 	// TODO: Add support for checksum verification
 	filePackerOptions := TarBallFilePackerOptions{
@@ -75,7 +74,7 @@ type GpTarBallComposer struct {
 	tarFilePacker *TarBallFilePackerImpl
 	crypter       crypto.Crypter
 
-	addFileQueue     chan *parallel.ComposeFileInfo
+	addFileQueue     chan *internal.ComposeFileInfo
 	addFileWaitGroup sync.WaitGroup
 
 	relStorageMap AoRelFileStorageMap
@@ -87,8 +86,8 @@ type GpTarBallComposer struct {
 	// Separate uploader for AO/AOCS relfiles with disabled file size tracking
 	aoSegUploader *internal.Uploader
 
-	files            parallel.BundleFiles
-	tarFileSets      parallel.TarFileSets
+	files            internal.BundleFiles
+	tarFileSets      internal.TarFileSets
 	tarFileSetsMutex sync.Mutex
 
 	errorGroup *errgroup.Group
@@ -97,8 +96,8 @@ type GpTarBallComposer struct {
 
 func NewGpTarBallComposer(
 	tarBallQueue *internal.TarBallQueue,
-	crypter crypto.Crypter, relStorageMap AoRelFileStorageMap, bundleFiles parallel.BundleFiles, packer *TarBallFilePackerImpl,
-	aoFiles *AOFilesMetadataDTO, baseAoFiles map[string]struct{}, tarFileSets parallel.TarFileSets, uploader *internal.Uploader,
+	crypter crypto.Crypter, relStorageMap AoRelFileStorageMap, bundleFiles internal.BundleFiles, packer *TarBallFilePackerImpl,
+	aoFiles *AOFilesMetadataDTO, baseAoFiles map[string]struct{}, tarFileSets internal.TarFileSets, uploader *internal.Uploader,
 	backupName string,
 ) (*GpTarBallComposer, error) {
 	errorGroup, ctx := errgroup.WithContext(context.Background())
@@ -126,7 +125,7 @@ func NewGpTarBallComposer(
 	if err != nil {
 		return nil, err
 	}
-	composer.addFileQueue = make(chan *parallel.ComposeFileInfo, maxUploadDiskConcurrency)
+	composer.addFileQueue = make(chan *internal.ComposeFileInfo, maxUploadDiskConcurrency)
 	for i := 0; i < maxUploadDiskConcurrency; i++ {
 		composer.addFileWaitGroup.Add(1)
 		composer.errorGroup.Go(func() error {
@@ -136,7 +135,7 @@ func NewGpTarBallComposer(
 	return composer, nil
 }
 
-func (c *GpTarBallComposer) AddFile(info *parallel.ComposeFileInfo) {
+func (c *GpTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
 	select {
 	case c.addFileQueue <- info:
 		return
@@ -162,7 +161,7 @@ func (c *GpTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.FileInfo
 	c.files.AddSkippedFile(tarHeader, fileInfo)
 }
 
-func (c *GpTarBallComposer) FinishComposing() (parallel.TarFileSets, error) {
+func (c *GpTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 	close(c.addFileQueue)
 
 	err := c.errorGroup.Wait()
@@ -179,11 +178,11 @@ func (c *GpTarBallComposer) FinishComposing() (parallel.TarFileSets, error) {
 	return c.tarFileSets, nil
 }
 
-func (c *GpTarBallComposer) GetFiles() parallel.BundleFiles {
+func (c *GpTarBallComposer) GetFiles() internal.BundleFiles {
 	return c.files
 }
 
-func (c *GpTarBallComposer) addFileWorker(tasks <-chan *parallel.ComposeFileInfo) error {
+func (c *GpTarBallComposer) addFileWorker(tasks <-chan *internal.ComposeFileInfo) error {
 	for task := range tasks {
 		err := c.addFile(task)
 		if err != nil {
@@ -196,7 +195,7 @@ func (c *GpTarBallComposer) addFileWorker(tasks <-chan *parallel.ComposeFileInfo
 	return nil
 }
 
-func (c *GpTarBallComposer) addFile(cfi *parallel.ComposeFileInfo) error {
+func (c *GpTarBallComposer) addFile(cfi *internal.ComposeFileInfo) error {
 	// WAL-G uploads AO/AOCS relfiles to different location
 	if isAo, meta, location := c.relStorageMap.getAOStorageMetadata(cfi.Path); isAo {
 		return c.addAOFile(cfi, meta, location)
@@ -220,7 +219,7 @@ func (c *GpTarBallComposer) addFile(cfi *parallel.ComposeFileInfo) error {
 	return nil
 }
 
-func (c *GpTarBallComposer) addAOFile(cfi *parallel.ComposeFileInfo, aoMeta AoRelFileMetadata, location *walparser.BlockLocation) error {
+func (c *GpTarBallComposer) addAOFile(cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, location *walparser.BlockLocation) error {
 	storageKey := makeAoFileStorageKey(aoMeta.relNameMd5, aoMeta.modCount, location)
 	if _, exists := c.baseAoFiles[storageKey]; exists {
 		c.addAoFileMetadata(cfi, storageKey, aoMeta, true)
@@ -261,7 +260,7 @@ func (c *GpTarBallComposer) addAOFile(cfi *parallel.ComposeFileInfo, aoMeta AoRe
 	return storeBackupReference(c.uploader.UploadingFolder, storageKey, c.backupName)
 }
 
-func (c *GpTarBallComposer) addAoFileMetadata(cfi *parallel.ComposeFileInfo, storageKey string, aoMeta AoRelFileMetadata, isSkipped bool) {
+func (c *GpTarBallComposer) addAoFileMetadata(cfi *internal.ComposeFileInfo, storageKey string, aoMeta AoRelFileMetadata, isSkipped bool) {
 	c.aoFilesMutex.Lock()
 	c.aoFiles.addFile(cfi.Header.Name, storageKey, cfi.FileInfo.ModTime(), aoMeta, cfi.Header.Mode, isSkipped)
 	c.aoFilesMutex.Unlock()

@@ -12,7 +12,6 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto"
-	"github.com/wal-g/wal-g/internal/parallel"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -27,7 +26,7 @@ const (
 
 type fileInfo struct {
 	status copyStatus
-	info   *parallel.ComposeFileInfo
+	info   *internal.ComposeFileInfo
 }
 
 type headerInfo struct {
@@ -40,17 +39,17 @@ type CopyTarBallComposer struct {
 	tarBallQueue  *internal.TarBallQueue
 	tarFilePacker *TarBallFilePackerImpl
 	crypter       crypto.Crypter
-	files         *parallel.RegularBundleFiles
+	files         *internal.RegularBundleFiles
 	ctx           context.Context
 	errorGroup    *errgroup.Group
 
 	copyCount              int
 	prevBackup             Backup
 	newBackupName          string
-	tarFileSets            parallel.TarFileSets
+	tarFileSets            internal.TarFileSets
 	tarUnchangedFilesCount map[string]int
 	prevFileTar            map[string]string
-	prevTarFileSets        parallel.TarFileSets
+	prevTarFileSets        internal.TarFileSets
 	fileInfo               map[string]*fileInfo
 	headerInfos            map[string]*headerInfo
 }
@@ -69,13 +68,13 @@ func NewCopyTarBallComposerMaker(previousBackup Backup, newBackupName string,
 func NewCopyTarBallComposer(
 	tarBallQueue *internal.TarBallQueue,
 	tarBallFilePacker *TarBallFilePackerImpl,
-	files *parallel.RegularBundleFiles,
+	files *internal.RegularBundleFiles,
 	crypter crypto.Crypter,
 	prevBackup Backup,
 	newBackupName string,
 	tarUnchangedFilesCount map[string]int,
 	prevFileTar map[string]string,
-	prevTarFileSets parallel.TarFileSets,
+	prevTarFileSets internal.TarFileSets,
 ) (*CopyTarBallComposer, error) {
 	errorGroup, ctx := errgroup.WithContext(context.Background())
 	_, _, err := prevBackup.GetSentinelAndFilesMetadata()
@@ -92,7 +91,7 @@ func NewCopyTarBallComposer(
 		copyCount:              0,
 		prevBackup:             prevBackup,
 		newBackupName:          newBackupName,
-		tarFileSets:            parallel.NewRegularTarFileSets(),
+		tarFileSets:            internal.NewRegularTarFileSets(),
 		tarUnchangedFilesCount: tarUnchangedFilesCount,
 		prevFileTar:            prevFileTar,
 		prevTarFileSets:        prevTarFileSets,
@@ -101,9 +100,9 @@ func NewCopyTarBallComposer(
 	}, nil
 }
 
-func (maker *CopyTarBallComposerMaker) Make(bundle *Bundle) (parallel.TarBallComposer, error) {
+func (maker *CopyTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBallComposer, error) {
 	prevFileTar := make(map[string]string)
-	prevTarFileSets := parallel.NewRegularTarFileSets()
+	prevTarFileSets := internal.NewRegularTarFileSets()
 	tarUnchangedFilesCount := make(map[string]int)
 	if maker.previousBackup.SentinelDto != nil {
 		for tarName, fileSet := range maker.previousBackup.FilesMetadataDto.TarFileSets {
@@ -116,7 +115,7 @@ func (maker *CopyTarBallComposerMaker) Make(bundle *Bundle) (parallel.TarBallCom
 	} else {
 		return nil, errors.New("No SentinelDto in previous backup")
 	}
-	files := &parallel.RegularBundleFiles{}
+	files := &internal.RegularBundleFiles{}
 	tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap,
 		bundle.IncrementFromLsn, files, maker.filePackerOptions)
 	return NewCopyTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, files,
@@ -124,7 +123,7 @@ func (maker *CopyTarBallComposerMaker) Make(bundle *Bundle) (parallel.TarBallCom
 		prevFileTar, prevTarFileSets)
 }
 
-func (c *CopyTarBallComposer) AddFile(info *parallel.ComposeFileInfo) {
+func (c *CopyTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
 	var fileName = info.Header.Name
 	var currFile = fileInfo{}
 	if _, exists := c.prevFileTar[fileName]; exists {
@@ -231,7 +230,7 @@ func (c *CopyTarBallComposer) copyUnchangedTars() error {
 	return nil
 }
 
-func (c *CopyTarBallComposer) FinishComposing() (parallel.TarFileSets, error) {
+func (c *CopyTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 	err := c.copyUnchangedTars()
 	if err != nil {
 		return nil, err
@@ -274,6 +273,6 @@ func (c *CopyTarBallComposer) FinishComposing() (parallel.TarFileSets, error) {
 	return c.tarFileSets, nil
 }
 
-func (c *CopyTarBallComposer) GetFiles() parallel.BundleFiles {
+func (c *CopyTarBallComposer) GetFiles() internal.BundleFiles {
 	return c.files
 }

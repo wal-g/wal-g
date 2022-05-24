@@ -1,4 +1,4 @@
-package parallel
+package internal
 
 type FilesFilter interface {
 	ShouldUploadFile(path string) bool

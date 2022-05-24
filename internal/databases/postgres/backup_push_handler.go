@@ -12,10 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/parallel"
-
 	"github.com/jackc/pgconn"
+	"github.com/wal-g/wal-g/internal"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -216,7 +214,7 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
 	}
 }
 
-func (bh *BackupHandler) setupDTO(tarFileSets parallel.TarFileSets) (sentinelDto BackupSentinelDto, filesMeta FilesMetadataDto) {
+func (bh *BackupHandler) setupDTO(tarFileSets internal.TarFileSets) (sentinelDto BackupSentinelDto, filesMeta FilesMetadataDto) {
 	var tablespaceSpec *TablespaceSpec
 	if !bh.workers.bundle.TablespaceSpec.empty() {
 		tablespaceSpec = &bh.workers.bundle.TablespaceSpec
@@ -236,7 +234,7 @@ func (bh *BackupHandler) markBackups(folder storage.Folder, sentinelDto BackupSe
 	}
 }
 
-func (bh *BackupHandler) uploadBackup() parallel.TarFileSets {
+func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 	bundle := bh.workers.bundle
 	// Start a new tar bundle, walk the pgDataDirectory and upload everything there.
 	tracelog.InfoLogger.Println("Starting a new tar bundle")
@@ -344,11 +342,11 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	tracelog.DebugLogger.Printf("Uploading folder: %s", uploader.UploadingFolder)
 
-	var tarFileSets parallel.TarFileSets
+	var tarFileSets internal.TarFileSets
 	if bh.arguments.withoutFilesMetadata {
-		tarFileSets = parallel.NewNopTarFileSets()
+		tarFileSets = internal.NewNopTarFileSets()
 	} else {
-		tarFileSets = parallel.NewRegularTarFileSets()
+		tarFileSets = internal.NewRegularTarFileSets()
 	}
 
 	baseBackup := bh.runRemoteBackup()
@@ -435,11 +433,11 @@ func (bh *BackupHandler) runRemoteBackup() *StreamingBaseBackup {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	baseBackup := NewStreamingBaseBackup(bh.pgInfo.pgDataDirectory, viper.GetInt64(internal.TarSizeThresholdSetting), conn)
-	var bundleFiles parallel.BundleFiles
+	var bundleFiles internal.BundleFiles
 	if bh.arguments.withoutFilesMetadata {
-		bundleFiles = &parallel.NopBundleFiles{}
+		bundleFiles = &internal.NopBundleFiles{}
 	} else {
-		bundleFiles = &parallel.RegularBundleFiles{}
+		bundleFiles = &internal.RegularBundleFiles{}
 	}
 	tracelog.InfoLogger.Println("Starting remote backup")
 	err = baseBackup.Start(bh.arguments.verifyPageChecksums, diskLimit)
