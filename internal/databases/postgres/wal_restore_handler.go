@@ -128,7 +128,7 @@ func GetMissingWals(lastSeg uint64, lastTl, currentTl uint32,
 	walsByTimelines map[uint32]*WalSegmentsSequence,
 ) ([]string, error) {
 	result := make([]string, 0)
-	currentSeg := uint64(walsByTimelines[currentTl].maxSegmentNo)
+	currentSeg := uint64(walsByTimelines[currentTl].MaxSegmentNo)
 
 	for ; currentTl >= lastTl; currentTl-- {
 		// Get wal segment sequence for current timeline
@@ -137,7 +137,7 @@ func GetMissingWals(lastSeg uint64, lastTl, currentTl uint32,
 		// Iterate over wal segment sequence for current timeline
 		for ; currentSeg >= tlToSeg[currentTl].segmentNo; currentSeg-- {
 			// Making sure that this wal segment sequence is correct and check for existing segment
-			if !ok || !walSegSeq.walSegmentNumbers[WalSegmentNo(currentSeg)] {
+			if !ok || !walSegSeq.WalSegmentNumbers[WalSegmentNo(currentSeg)] {
 				result = append(result, WalSegmentNo(currentSeg).getFilename(currentTl))
 			}
 

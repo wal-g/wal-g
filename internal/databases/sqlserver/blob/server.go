@@ -13,12 +13,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wal-g/wal-g/utility"
+
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"golang.org/x/xerrors"
 
 	"github.com/gofrs/flock"
 	"github.com/google/uuid"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -29,6 +32,10 @@ const ProxyStartTimeout = 10 * time.Second
 const ReqIDHeader = "X-Ms-Request-Id"
 
 const DefaultConcurrency = 8
+
+const BlockReadCacheSize = 16
+
+const MaxCacheBlockSize = 16 * 1024 * 1024 // 16M
 
 type Server struct {
 	folder       storage.Folder
@@ -47,6 +54,7 @@ type Server struct {
 	decompressor compression.Decompressor
 	encryption   string
 	crypter      crypto.Crypter
+	readCache    *lru.Cache
 }
 
 func NewServer(folder storage.Folder) (*Server, error) {
@@ -94,6 +102,20 @@ func NewServer(folder storage.Folder) (*Server, error) {
 	if bs.crypter != nil {
 		bs.encryption = bs.crypter.Name()
 	}
+	c, err := lru.NewWithEvict(BlockReadCacheSize, func(k, _ interface{}) {
+		tracelog.DebugLogger.Printf("EVICT_CACHE: %s", k)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create lru cache: %v", err)
+	}
+	bs.readCache = c
+	go func() {
+		for {
+			// to release memory after restore
+			time.Sleep(time.Minute)
+			bs.readCache.RemoveOldest()
+		}
+	}()
 	return bs, nil
 }
 
@@ -560,25 +582,13 @@ func (bs *Server) HandleBlobGet(w http.ResponseWriter, req *http.Request) {
 
 	sections := idx.GetSections(rangeMin, rangeMax)
 	for _, s := range sections {
-		// TODO: enable cache
-		// r, err := idx.GetCachedReader(folder, s)
 		bs.downloadSem <- struct{}{}
-		obj, err := folder.ReadObject(s.Path)
+		r, err := bs.getCachedReader(idx, s)
+		defer utility.LoggedClose(r, "failed to close section reader")
 		<-bs.downloadSem
 		if err != nil {
 			tracelog.ErrorLogger.Printf("proxy: failed to read object from storage: %v", err)
 			break
-		}
-		defer obj.Close()
-		var r io.Reader = obj
-		if idx.Compression != "" || idx.Encryption != "" {
-			dr, err := internal.DecompressDecryptBytes(r, bs.decompressor)
-			if err != nil {
-				tracelog.ErrorLogger.Printf("proxy: failed to decompress / decrypt bytes: %v", err)
-				break
-			}
-			defer dr.Close()
-			r = dr
 		}
 		r2 := io.LimitReader(NewSkipReader(r, s.Offset), int64(s.Limit))
 		_, err = io.Copy(w, r2)
@@ -782,4 +792,53 @@ func (bs *Server) validateBlobCompressionEncryption(idx *Index) error {
 		return fmt.Errorf("blob compression (%s) does not match configured (%s)", idx.Compression, bs.compression)
 	}
 	return nil
+}
+
+func (bs *Server) getCachedReader(idx *Index, s Section) (io.ReadCloser, error) {
+	folder := idx.folder
+	key := folder.GetPath() + s.Path
+	if s.BlockSize > MaxCacheBlockSize {
+		tracelog.DebugLogger.Printf("READ_OBJ: %s %d", key, s.BlockSize)
+		r, err := folder.ReadObject(s.Path)
+		if err != nil {
+			return nil, err
+		}
+		return bs.decompressDecryptIfNeeded(idx, r)
+	}
+	var buf []byte
+	if b, ok := bs.readCache.Get(key); ok {
+		tracelog.DebugLogger.Printf("READ_CACHE: %s %d", key, s.BlockSize)
+		buf = b.([]byte)
+	} else {
+		tracelog.DebugLogger.Printf("READ_OBJ: %s %d", key, s.BlockSize)
+		r, err := folder.ReadObject(s.Path)
+		if err != nil {
+			return nil, err
+		}
+		dr, err := bs.decompressDecryptIfNeeded(idx, r)
+		if err != nil {
+			utility.LoggedClose(r, "failed to close block reader")
+			return nil, err
+		}
+		defer utility.LoggedClose(dr, "failed to close decompress reader")
+		buf = make([]byte, s.BlockSize)
+		_, err = io.ReadFull(dr, buf)
+		if err != nil {
+			return nil, err
+		}
+		tracelog.DebugLogger.Printf("ADD_CACHE: %s %d", key, s.BlockSize)
+		bs.readCache.Add(key, buf)
+	}
+	return io.NopCloser(bytes.NewReader(buf)), nil
+}
+
+func (bs *Server) decompressDecryptIfNeeded(idx *Index, r io.ReadCloser) (io.ReadCloser, error) {
+	if idx.Compression != "" || idx.Encryption != "" {
+		dr, err := internal.DecompressDecryptBytes(r, bs.decompressor)
+		if err != nil {
+			return nil, fmt.Errorf("proxy: failed to decompress / decrypt bytes: %v", err)
+		}
+		r = &utility.CascadeReadCloser{ReadCloser: dr, Underlying: r}
+	}
+	return r, nil
 }

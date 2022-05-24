@@ -546,7 +546,7 @@ Usage:
 wal-g wal-restore path/to/target-pgdata path/to/source-pgdata
 ```
 
-pgBackRest backups support
+pgBackRest backups support (beta version)
 -----------
 ### ``pgbackrest backup-list``
 
@@ -564,4 +564,22 @@ Fetch pgbackrest backup. For now works only with full backups, incr and diff bac
 Usage:
 ```bash
 wal-g pgbackrest backup-fetch path/to/destination-directory backup-name
+```
+
+### ``pgbackrest wal-fetch``
+
+Fetch wal file from pgbackrest backup
+
+Usage:
+```bash
+wal-g pgbackrest wal-fetch example-archive new-file-name
+```
+
+### ``pgbackrest wal-show``
+
+Show wal files from pgbackrest backup
+
+Usage:
+```bash
+wal-g pgbackrest wal-show
 ```
