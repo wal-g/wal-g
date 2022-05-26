@@ -60,13 +60,7 @@ func init() {
 // uploaded backups; in this case, pg_control is used as
 // the sentinel.
 type Bundle struct {
-	Directory string
-	Sentinel  *internal.Sentinel
-
-	TarBallComposer TarBallComposer
-	TarBallQueue    *internal.TarBallQueue
-
-	Crypter            crypto.Crypter
+	internal.Bundle
 	Timeline           uint32
 	Replica            bool
 	IncrementFromLsn   *LSN
@@ -75,7 +69,6 @@ type Bundle struct {
 	TablespaceSpec     TablespaceSpec
 
 	forceIncremental bool
-	TarSizeThreshold int64
 }
 
 // TODO: use DiskDataFolder
@@ -85,13 +78,16 @@ func NewBundle(
 	forceIncremental bool, tarSizeThreshold int64,
 ) *Bundle {
 	return &Bundle{
-		Directory:          directory,
-		Crypter:            crypter,
+		Bundle: internal.Bundle{
+			Directory:         directory,
+			Crypter:           crypter,
+			TarSizeThreshold:  tarSizeThreshold,
+			ExcludedFilenames: ExcludedFilenames,
+		},
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
 		TablespaceSpec:     NewTablespaceSpec(directory),
 		forceIncremental:   forceIncremental,
-		TarSizeThreshold:   tarSizeThreshold,
 	}
 }
 
@@ -287,7 +283,7 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 		}
 		incrementBaseLsn := bundle.getIncrementBaseLsn()
 		isIncremented := incrementBaseLsn != nil && (wasInBase || bundle.forceIncremental) && isPagedFile(info, path)
-		bundle.TarBallComposer.AddFile(NewComposeFileInfo(path, info, wasInBase, isIncremented, fileInfoHeader))
+		bundle.TarBallComposer.AddFile(internal.NewComposeFileInfo(path, info, wasInBase, isIncremented, fileInfoHeader))
 	} else {
 		err := bundle.TarBallComposer.AddHeader(fileInfoHeader, info)
 		if err != nil {
@@ -421,7 +417,7 @@ func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN LSN
 	return nil
 }
 
-func (bundle *Bundle) FinishTarComposer() (TarFileSets, error) {
+func (bundle *Bundle) FinishTarComposer() (internal.TarFileSets, error) {
 	return bundle.TarBallComposer.FinishComposing()
 }
 

@@ -1,31 +1,29 @@
-package postgres
+package internal
 
 import (
 	"archive/tar"
 	"context"
 	"os"
 
-	"github.com/wal-g/wal-g/internal"
-
 	"github.com/wal-g/wal-g/internal/crypto"
 	"golang.org/x/sync/errgroup"
 )
 
 type RegularTarBallComposer struct {
-	tarBallQueue  *internal.TarBallQueue
-	tarFilePacker *TarBallFilePackerImpl
+	tarBallQueue  *TarBallQueue
+	tarFilePacker TarBallFilePacker
 	crypter       crypto.Crypter
-	files         internal.BundleFiles
-	tarFileSets   internal.TarFileSets
+	files         BundleFiles
+	tarFileSets   TarFileSets
 	errorGroup    *errgroup.Group
 	ctx           context.Context
 }
 
 func NewRegularTarBallComposer(
-	tarBallQueue *internal.TarBallQueue,
-	tarBallFilePacker *TarBallFilePackerImpl,
-	files internal.BundleFiles,
-	tarFileSets internal.TarFileSets,
+	tarBallQueue *TarBallQueue,
+	tarBallFilePacker TarBallFilePacker,
+	files BundleFiles,
+	tarFileSets TarFileSets,
 	crypter crypto.Crypter,
 ) *RegularTarBallComposer {
 	errorGroup, ctx := errgroup.WithContext(context.Background())
@@ -42,12 +40,12 @@ func NewRegularTarBallComposer(
 
 type RegularTarBallComposerMaker struct {
 	filePackerOptions TarBallFilePackerOptions
-	files             internal.BundleFiles
-	tarFileSets       internal.TarFileSets
+	files             BundleFiles
+	tarFileSets       TarFileSets
 }
 
 func NewRegularTarBallComposerMaker(
-	filePackerOptions TarBallFilePackerOptions, files internal.BundleFiles, tarFileSets internal.TarFileSets,
+	filePackerOptions TarBallFilePackerOptions, files BundleFiles, tarFileSets TarFileSets,
 ) *RegularTarBallComposerMaker {
 	return &RegularTarBallComposerMaker{
 		filePackerOptions: filePackerOptions,
@@ -56,15 +54,14 @@ func NewRegularTarBallComposerMaker(
 	}
 }
 
-func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBallComposer, error) {
+func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (TarBallComposer, error) {
 	bundleFiles := maker.files
 	tarFileSets := maker.tarFileSets
-	tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap,
-		bundle.IncrementFromLsn, bundleFiles, maker.filePackerOptions)
-	return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, bundleFiles, tarFileSets, bundle.Crypter), nil
+	packer := NewRegularTarBallFilePacker(bundleFiles, maker.filePackerOptions)
+	return NewRegularTarBallComposer(bundle.TarBallQueue, packer, bundleFiles, tarFileSets, bundle.Crypter), nil
 }
 
-func (c *RegularTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
+func (c *RegularTarBallComposer) AddFile(info *ComposeFileInfo) {
 	tarBall, err := c.tarBallQueue.DequeCtx(c.ctx)
 	if err != nil {
 		return
@@ -80,23 +77,23 @@ func (c *RegularTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
 	})
 }
 
-func (c *RegularTarBallComposer) AddHeader(fileInfoHeader *tar.Header, info os.FileInfo) error {
+func (c *RegularTarBallComposer) AddHeader(header *tar.Header, fileInfo os.FileInfo) error {
 	tarBall, err := c.tarBallQueue.DequeCtx(c.ctx)
 	if err != nil {
 		return c.errorGroup.Wait()
 	}
 	tarBall.SetUp(c.crypter)
 	defer c.tarBallQueue.EnqueueBack(tarBall)
-	c.tarFileSets.AddFile(tarBall.Name(), fileInfoHeader.Name)
-	c.files.AddFile(fileInfoHeader, info, false)
-	return tarBall.TarWriter().WriteHeader(fileInfoHeader)
+	c.tarFileSets.AddFile(tarBall.Name(), header.Name)
+	c.files.AddFile(header, fileInfo, false)
+	return tarBall.TarWriter().WriteHeader(header)
 }
 
 func (c *RegularTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.FileInfo) {
 	c.files.AddSkippedFile(tarHeader, fileInfo)
 }
 
-func (c *RegularTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
+func (c *RegularTarBallComposer) FinishComposing() (TarFileSets, error) {
 	err := c.errorGroup.Wait()
 	if err != nil {
 		return nil, err
@@ -104,6 +101,6 @@ func (c *RegularTarBallComposer) FinishComposing() (internal.TarFileSets, error)
 	return c.tarFileSets, nil
 }
 
-func (c *RegularTarBallComposer) GetFiles() internal.BundleFiles {
+func (c *RegularTarBallComposer) GetFiles() BundleFiles {
 	return c.files
 }

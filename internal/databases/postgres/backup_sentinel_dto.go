@@ -123,7 +123,7 @@ type FilesMetadataDto struct {
 	TarFileSets map[string][]string     `json:"TarFileSets,omitempty"`
 }
 
-func NewFilesMetadataDto(files internal.BackupFileList, tarFileSets TarFileSets) FilesMetadataDto {
+func NewFilesMetadataDto(files internal.BackupFileList, tarFileSets internal.TarFileSets) FilesMetadataDto {
 	return FilesMetadataDto{TarFileSets: tarFileSets.Get(), Files: files}
 }
 

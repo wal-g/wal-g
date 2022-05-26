@@ -1,38 +1,12 @@
 package postgres
 
 import (
-	"archive/tar"
 	"errors"
-	"os"
 
 	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal"
 )
-
-// TarBallComposer is used to compose files into tarballs.
-type TarBallComposer interface {
-	AddFile(info *ComposeFileInfo)
-	AddHeader(header *tar.Header, fileInfo os.FileInfo) error
-	SkipFile(tarHeader *tar.Header, fileInfo os.FileInfo)
-	FinishComposing() (TarFileSets, error)
-	GetFiles() BundleFiles
-}
-
-// ComposeFileInfo holds data which is required to pack a file to some tarball
-type ComposeFileInfo struct {
-	path          string
-	fileInfo      os.FileInfo
-	wasInBase     bool
-	header        *tar.Header
-	isIncremented bool
-}
-
-func NewComposeFileInfo(path string, fileInfo os.FileInfo, wasInBase, isIncremented bool,
-	header *tar.Header) *ComposeFileInfo {
-	return &ComposeFileInfo{path: path, fileInfo: fileInfo,
-		wasInBase: wasInBase, header: header, isIncremented: isIncremented}
-}
 
 type TarBallComposerType int
 
@@ -45,7 +19,7 @@ const (
 
 // TarBallComposerMaker is used to make an instance of TarBallComposer
 type TarBallComposerMaker interface {
-	Make(bundle *Bundle) (TarBallComposer, error)
+	Make(bundle *Bundle) (internal.TarBallComposer, error)
 }
 
 func NewTarBallComposerMaker(composerType TarBallComposerType, queryRunner *PgQueryRunner, uploader *internal.Uploader,
@@ -55,9 +29,9 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, queryRunner *PgQu
 	switch composerType {
 	case RegularComposer:
 		if withoutFilesMetadata {
-			return NewRegularTarBallComposerMaker(filePackOptions, &NopBundleFiles{}, NewNopTarFileSets()), nil
+			return NewRegularTarBallComposerMaker(filePackOptions, &internal.NopBundleFiles{}, internal.NewNopTarFileSets()), nil
 		}
-		return NewRegularTarBallComposerMaker(filePackOptions, &RegularBundleFiles{}, NewRegularTarFileSets()), nil
+		return NewRegularTarBallComposerMaker(filePackOptions, &internal.RegularBundleFiles{}, internal.NewRegularTarFileSets()), nil
 	case RatingComposer:
 		relFileStats, err := newRelFileStatistics(queryRunner)
 		if err != nil {
@@ -70,7 +44,7 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, queryRunner *PgQu
 			tracelog.InfoLogger.Printf(
 				"Failed to init the CopyComposer, will use the RegularComposer instead:"+
 					" couldn't get the previous backup name: %v", err)
-			return NewRegularTarBallComposerMaker(filePackOptions, &RegularBundleFiles{}, NewRegularTarFileSets()), nil
+			return NewRegularTarBallComposerMaker(filePackOptions, &internal.RegularBundleFiles{}, internal.NewRegularTarFileSets()), nil
 		}
 		previousBackup := NewBackup(folder, previousBackupName)
 		prevBackupSentinelDto, _, err := previousBackup.GetSentinelAndFilesMetadata()

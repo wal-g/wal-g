@@ -20,8 +20,8 @@ import (
 
 type GpTarBallComposerMaker struct {
 	relStorageMap AoRelFileStorageMap
-	bundleFiles   BundleFiles
-	TarFileSets   TarFileSets
+	bundleFiles   internal.BundleFiles
+	TarFileSets   internal.TarFileSets
 	aoFiles       *AOFilesMetadataDTO
 	uploader      *internal.Uploader
 	baseFiles     map[string]struct{}
@@ -37,8 +37,8 @@ func NewGpTarBallComposerMaker(relStorageMap AoRelFileStorageMap, uploader *inte
 
 	return &GpTarBallComposerMaker{
 		relStorageMap: relStorageMap,
-		bundleFiles:   &RegularBundleFiles{},
-		TarFileSets:   NewRegularTarFileSets(),
+		bundleFiles:   &internal.RegularBundleFiles{},
+		TarFileSets:   internal.NewRegularTarFileSets(),
 		aoFiles:       NewAOFilesMetadataDTO(),
 		uploader:      uploader,
 		baseFiles:     baseFiles,
@@ -46,7 +46,7 @@ func NewGpTarBallComposerMaker(relStorageMap AoRelFileStorageMap, uploader *inte
 	}, nil
 }
 
-func (maker *GpTarBallComposerMaker) Make(bundle *Bundle) (TarBallComposer, error) {
+func (maker *GpTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBallComposer, error) {
 	// checksums verification is not supported in Greenplum (yet)
 	// TODO: Add support for checksum verification
 	filePackerOptions := TarBallFilePackerOptions{
@@ -71,10 +71,10 @@ func (maker *GpTarBallComposerMaker) Make(bundle *Bundle) (TarBallComposer, erro
 type GpTarBallComposer struct {
 	backupName    string
 	tarBallQueue  *internal.TarBallQueue
-	tarFilePacker *TarBallFilePacker
+	tarFilePacker *TarBallFilePackerImpl
 	crypter       crypto.Crypter
 
-	addFileQueue     chan *ComposeFileInfo
+	addFileQueue     chan *internal.ComposeFileInfo
 	addFileWaitGroup sync.WaitGroup
 
 	relStorageMap AoRelFileStorageMap
@@ -86,8 +86,8 @@ type GpTarBallComposer struct {
 	// Separate uploader for AO/AOCS relfiles with disabled file size tracking
 	aoSegUploader *internal.Uploader
 
-	files            BundleFiles
-	tarFileSets      TarFileSets
+	files            internal.BundleFiles
+	tarFileSets      internal.TarFileSets
 	tarFileSetsMutex sync.Mutex
 
 	errorGroup *errgroup.Group
@@ -96,8 +96,8 @@ type GpTarBallComposer struct {
 
 func NewGpTarBallComposer(
 	tarBallQueue *internal.TarBallQueue,
-	crypter crypto.Crypter, relStorageMap AoRelFileStorageMap, bundleFiles BundleFiles, packer *TarBallFilePacker,
-	aoFiles *AOFilesMetadataDTO, baseAoFiles map[string]struct{}, tarFileSets TarFileSets, uploader *internal.Uploader,
+	crypter crypto.Crypter, relStorageMap AoRelFileStorageMap, bundleFiles internal.BundleFiles, packer *TarBallFilePackerImpl,
+	aoFiles *AOFilesMetadataDTO, baseAoFiles map[string]struct{}, tarFileSets internal.TarFileSets, uploader *internal.Uploader,
 	backupName string,
 ) (*GpTarBallComposer, error) {
 	errorGroup, ctx := errgroup.WithContext(context.Background())
@@ -125,7 +125,7 @@ func NewGpTarBallComposer(
 	if err != nil {
 		return nil, err
 	}
-	composer.addFileQueue = make(chan *ComposeFileInfo, maxUploadDiskConcurrency)
+	composer.addFileQueue = make(chan *internal.ComposeFileInfo, maxUploadDiskConcurrency)
 	for i := 0; i < maxUploadDiskConcurrency; i++ {
 		composer.addFileWaitGroup.Add(1)
 		composer.errorGroup.Go(func() error {
@@ -135,7 +135,7 @@ func NewGpTarBallComposer(
 	return composer, nil
 }
 
-func (c *GpTarBallComposer) AddFile(info *ComposeFileInfo) {
+func (c *GpTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
 	select {
 	case c.addFileQueue <- info:
 		return
@@ -161,7 +161,7 @@ func (c *GpTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.FileInfo
 	c.files.AddSkippedFile(tarHeader, fileInfo)
 }
 
-func (c *GpTarBallComposer) FinishComposing() (TarFileSets, error) {
+func (c *GpTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 	close(c.addFileQueue)
 
 	err := c.errorGroup.Wait()
@@ -178,16 +178,16 @@ func (c *GpTarBallComposer) FinishComposing() (TarFileSets, error) {
 	return c.tarFileSets, nil
 }
 
-func (c *GpTarBallComposer) GetFiles() BundleFiles {
+func (c *GpTarBallComposer) GetFiles() internal.BundleFiles {
 	return c.files
 }
 
-func (c *GpTarBallComposer) addFileWorker(tasks <-chan *ComposeFileInfo) error {
+func (c *GpTarBallComposer) addFileWorker(tasks <-chan *internal.ComposeFileInfo) error {
 	for task := range tasks {
 		err := c.addFile(task)
 		if err != nil {
 			tracelog.ErrorLogger.Printf(
-				"Received an error while adding the file %s: %v", task.path, err)
+				"Received an error while adding the file %s: %v", task.Path, err)
 			return err
 		}
 	}
@@ -195,9 +195,9 @@ func (c *GpTarBallComposer) addFileWorker(tasks <-chan *ComposeFileInfo) error {
 	return nil
 }
 
-func (c *GpTarBallComposer) addFile(cfi *ComposeFileInfo) error {
+func (c *GpTarBallComposer) addFile(cfi *internal.ComposeFileInfo) error {
 	// WAL-G uploads AO/AOCS relfiles to different location
-	if isAo, meta, location := c.relStorageMap.getAOStorageMetadata(cfi.path); isAo {
+	if isAo, meta, location := c.relStorageMap.getAOStorageMetadata(cfi.Path); isAo {
 		return c.addAOFile(cfi, meta, location)
 	}
 
@@ -207,7 +207,7 @@ func (c *GpTarBallComposer) addFile(cfi *ComposeFileInfo) error {
 	}
 	tarBall.SetUp(c.crypter)
 	c.tarFileSetsMutex.Lock()
-	c.tarFileSets.AddFile(tarBall.Name(), cfi.header.Name)
+	c.tarFileSets.AddFile(tarBall.Name(), cfi.Header.Name)
 	c.tarFileSetsMutex.Unlock()
 	c.errorGroup.Go(func() error {
 		err := c.tarFilePacker.PackFileIntoTar(cfi, tarBall)
@@ -219,18 +219,18 @@ func (c *GpTarBallComposer) addFile(cfi *ComposeFileInfo) error {
 	return nil
 }
 
-func (c *GpTarBallComposer) addAOFile(cfi *ComposeFileInfo, aoMeta AoRelFileMetadata, location *walparser.BlockLocation) error {
+func (c *GpTarBallComposer) addAOFile(cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, location *walparser.BlockLocation) error {
 	storageKey := makeAoFileStorageKey(aoMeta.relNameMd5, aoMeta.modCount, location)
 	if _, exists := c.baseAoFiles[storageKey]; exists {
 		c.addAoFileMetadata(cfi, storageKey, aoMeta, true)
-		tracelog.DebugLogger.Printf("Skipping %s AO relfile (already exists in storage as %s)", cfi.path, storageKey)
+		tracelog.DebugLogger.Printf("Skipping %s AO relfile (already exists in storage as %s)", cfi.Path, storageKey)
 
 		// add reference for the current backup to the storage
 		return storeBackupReference(c.uploader.UploadingFolder, storageKey, c.backupName)
 	}
 
-	tracelog.DebugLogger.Printf("Uploading %s AO relfile to %s (does not exist in storage)", cfi.path, storageKey)
-	fileReadCloser, err := startReadingFile(cfi.header, cfi.fileInfo, cfi.path)
+	tracelog.DebugLogger.Printf("Uploading %s AO relfile to %s (does not exist in storage)", cfi.Path, storageKey)
+	fileReadCloser, err := startReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
 	if err != nil {
 		switch err.(type) {
 		case FileNotExistError:
@@ -260,9 +260,9 @@ func (c *GpTarBallComposer) addAOFile(cfi *ComposeFileInfo, aoMeta AoRelFileMeta
 	return storeBackupReference(c.uploader.UploadingFolder, storageKey, c.backupName)
 }
 
-func (c *GpTarBallComposer) addAoFileMetadata(cfi *ComposeFileInfo, storageKey string, aoMeta AoRelFileMetadata, isSkipped bool) {
+func (c *GpTarBallComposer) addAoFileMetadata(cfi *internal.ComposeFileInfo, storageKey string, aoMeta AoRelFileMetadata, isSkipped bool) {
 	c.aoFilesMutex.Lock()
-	c.aoFiles.addFile(cfi.header.Name, storageKey, cfi.fileInfo.ModTime(), aoMeta, cfi.header.Mode, isSkipped)
+	c.aoFiles.addFile(cfi.Header.Name, storageKey, cfi.FileInfo.ModTime(), aoMeta, cfi.Header.Mode, isSkipped)
 	c.aoFilesMutex.Unlock()
-	c.files.AddFile(cfi.header, cfi.fileInfo, false)
+	c.files.AddFile(cfi.Header, cfi.FileInfo, false)
 }
