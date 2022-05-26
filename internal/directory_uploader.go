@@ -1,11 +1,10 @@
-package parallel
+package internal
 
 import (
 	"path/filepath"
 	"sync/atomic"
 
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -23,14 +22,14 @@ type CommonDirectoryUploader struct {
 
 	excludedFiles map[string]utility.Empty
 	backupName    string
-	uploader      *internal.Uploader
+	uploader      *Uploader
 }
 
 func NewCommonDirectoryUploader(
 	crypter crypto.Crypter, packer TarBallFilePacker,
 	tarBallComposerMaker TarBallComposerMaker, tarSizeThreshold int64,
 	excludedFiles map[string]utility.Empty, backupName string,
-	uploader *internal.Uploader) *CommonDirectoryUploader {
+	uploader *Uploader) *CommonDirectoryUploader {
 	return &CommonDirectoryUploader{
 		crypter:              crypter,
 		tarBallFilePacker:    packer,
@@ -47,7 +46,7 @@ func (u *CommonDirectoryUploader) Upload(path string) TarFileSets {
 
 	// Start a new tar bundle, walk the pgDataDirectory and upload everything there.
 	tracelog.InfoLogger.Println("Starting a new tar bundle")
-	err := bundle.StartQueue(internal.NewStorageTarBallMaker(u.backupName, u.uploader))
+	err := bundle.StartQueue(NewStorageTarBallMaker(u.backupName, u.uploader))
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	err = bundle.SetupComposer(u.tarBallComposerMaker)

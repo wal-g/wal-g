@@ -13,13 +13,12 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/crypto"
-	"github.com/wal-g/wal-g/internal/parallel"
 	"golang.org/x/sync/errgroup"
 )
 
 type RatingTarBallComposerMaker struct {
 	fileStats         RelFileStatistics
-	bundleFiles       parallel.BundleFiles
+	bundleFiles       internal.BundleFiles
 	filePackerOptions TarBallFilePackerOptions
 }
 
@@ -33,7 +32,7 @@ func NewRatingTarBallComposerMaker(relFileStats RelFileStatistics,
 	}, nil
 }
 
-func (maker *RatingTarBallComposerMaker) Make(bundle *Bundle) (parallel.TarBallComposer, error) {
+func (maker *RatingTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBallComposer, error) {
 	composeRatingEvaluator := internal.NewDefaultComposeRatingEvaluator(bundle.IncrementFromFiles)
 	filePacker := newTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, maker.bundleFiles, maker.filePackerOptions)
 	return NewRatingTarBallComposer(uint64(bundle.TarSizeThreshold),
@@ -48,7 +47,7 @@ func (maker *RatingTarBallComposerMaker) Make(bundle *Bundle) (parallel.TarBallC
 }
 
 type RatedComposeFileInfo struct {
-	parallel.ComposeFileInfo
+	internal.ComposeFileInfo
 	updateRating uint64
 	updatesCount uint64
 	// for regular files this value should match their size on the disk
@@ -86,11 +85,11 @@ type RatingTarBallComposer struct {
 	tarFilePacker *TarBallFilePackerImpl
 	crypter       crypto.Crypter
 
-	addFileQueue     chan *parallel.ComposeFileInfo
+	addFileQueue     chan *internal.ComposeFileInfo
 	addFileWaitGroup sync.WaitGroup
 
 	fileStats   RelFileStatistics
-	bundleFiles parallel.BundleFiles
+	bundleFiles internal.BundleFiles
 
 	incrementBaseLsn *LSN
 	tarSizeThreshold uint64
@@ -106,7 +105,7 @@ type RatingTarBallComposer struct {
 func NewRatingTarBallComposer(
 	tarSizeThreshold uint64, updateRatingEvaluator internal.ComposeRatingEvaluator,
 	incrementBaseLsn *LSN, deltaMap PagedFileDeltaMap, tarBallQueue *internal.TarBallQueue,
-	crypter crypto.Crypter, fileStats RelFileStatistics, bundleFiles parallel.BundleFiles, packer *TarBallFilePackerImpl,
+	crypter crypto.Crypter, fileStats RelFileStatistics, bundleFiles internal.BundleFiles, packer *TarBallFilePackerImpl,
 ) (*RatingTarBallComposer, error) {
 	errorGroup, ctx := errgroup.WithContext(context.Background())
 	deltaMapComplete := true
@@ -136,7 +135,7 @@ func NewRatingTarBallComposer(
 	if err != nil {
 		return nil, err
 	}
-	composer.addFileQueue = make(chan *parallel.ComposeFileInfo, maxUploadDiskConcurrency)
+	composer.addFileQueue = make(chan *internal.ComposeFileInfo, maxUploadDiskConcurrency)
 	for i := 0; i < maxUploadDiskConcurrency; i++ {
 		composer.addFileWaitGroup.Add(1)
 		composer.errorGroup.Go(func() error {
@@ -146,7 +145,7 @@ func NewRatingTarBallComposer(
 	return composer, nil
 }
 
-func (c *RatingTarBallComposer) AddFile(info *parallel.ComposeFileInfo) {
+func (c *RatingTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
 	select {
 	case c.addFileQueue <- info:
 		return
@@ -166,7 +165,7 @@ func (c *RatingTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.File
 	c.bundleFiles.AddSkippedFile(tarHeader, fileInfo)
 }
 
-func (c *RatingTarBallComposer) FinishComposing() (parallel.TarFileSets, error) {
+func (c *RatingTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 	close(c.addFileQueue)
 	err := c.errorGroup.Wait()
 	if err != nil {
@@ -181,7 +180,7 @@ func (c *RatingTarBallComposer) FinishComposing() (parallel.TarFileSets, error) 
 		return nil, err
 	}
 
-	tarFileSets := parallel.NewRegularTarFileSets()
+	tarFileSets := internal.NewRegularTarFileSets()
 	tarFileSets.AddFiles(headersTarName, headersNames)
 
 	for _, tarFilesCollection := range tarFilesCollections {
@@ -209,11 +208,11 @@ func (c *RatingTarBallComposer) FinishComposing() (parallel.TarFileSets, error) 
 	return tarFileSets, nil
 }
 
-func (c *RatingTarBallComposer) GetFiles() parallel.BundleFiles {
+func (c *RatingTarBallComposer) GetFiles() internal.BundleFiles {
 	return c.bundleFiles
 }
 
-func (c *RatingTarBallComposer) addFileWorker(tasks <-chan *parallel.ComposeFileInfo) error {
+func (c *RatingTarBallComposer) addFileWorker(tasks <-chan *internal.ComposeFileInfo) error {
 	for task := range tasks {
 		err := c.addFile(task)
 		if err != nil {
@@ -224,7 +223,7 @@ func (c *RatingTarBallComposer) addFileWorker(tasks <-chan *parallel.ComposeFile
 	return nil
 }
 
-func (c *RatingTarBallComposer) addFile(cfi *parallel.ComposeFileInfo) error {
+func (c *RatingTarBallComposer) addFile(cfi *internal.ComposeFileInfo) error {
 	expectedFileSize, err := c.getExpectedFileSize(cfi)
 	if err != nil {
 		return err
@@ -267,7 +266,7 @@ func (c *RatingTarBallComposer) composeFiles() ([]*tar.Header, []*TarFilesCollec
 	return c.headersToCompose, tarFilesCollections
 }
 
-func (c *RatingTarBallComposer) getExpectedFileSize(cfi *parallel.ComposeFileInfo) (uint64, error) {
+func (c *RatingTarBallComposer) getExpectedFileSize(cfi *internal.ComposeFileInfo) (uint64, error) {
 	if !cfi.IsIncremented {
 		return uint64(cfi.FileInfo.Size()), nil
 	}

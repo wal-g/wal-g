@@ -1,4 +1,4 @@
-package parallel
+package internal
 
 import (
 	"archive/tar"
@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/utility"
@@ -28,7 +27,7 @@ func (err FileNotExistError) Error() string {
 }
 
 type TarBallFilePacker interface {
-	PackFileIntoTar(cfi *ComposeFileInfo, tarBall internal.TarBall) error
+	PackFileIntoTar(cfi *ComposeFileInfo, tarBall TarBall) error
 }
 
 type TarBallFilePackerOptions struct {
@@ -53,7 +52,7 @@ func NewRegularTarBallFilePacker(files BundleFiles) *RegularTarBallFilePacker {
 	}
 }
 
-func (p *RegularTarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall internal.TarBall) error {
+func (p *RegularTarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall TarBall) error {
 	fileReadCloser, err := startReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
 	if err != nil {
 		switch err.(type) {
@@ -69,7 +68,7 @@ func (p *RegularTarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall
 	p.files.AddFile(cfi.Header, cfi.FileInfo, cfi.IsIncremented)
 
 	defer utility.LoggedClose(fileReadCloser, "")
-	packedFileSize, err := internal.PackFileTo(tarBall, cfi.Header, fileReadCloser)
+	packedFileSize, err := PackFileTo(tarBall, cfi.Header, fileReadCloser)
 	if err != nil {
 		return errors.Wrap(err, "PackFileIntoTar: operation failed")
 	}

@@ -1,17 +1,16 @@
-package parallel
+package internal
 
 import (
 	"archive/tar"
 	"context"
 	"os"
 
-	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"golang.org/x/sync/errgroup"
 )
 
 type RegularTarBallComposer struct {
-	tarBallQueue  *internal.TarBallQueue
+	tarBallQueue  *TarBallQueue
 	tarFilePacker TarBallFilePacker
 	crypter       crypto.Crypter
 	files         BundleFiles
@@ -21,7 +20,7 @@ type RegularTarBallComposer struct {
 }
 
 func NewRegularTarBallComposer(
-	tarBallQueue *internal.TarBallQueue,
+	tarBallQueue *TarBallQueue,
 	tarBallFilePacker TarBallFilePacker,
 	files BundleFiles,
 	tarFileSets TarFileSets,

@@ -5,14 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-	"github.com/wal-g/wal-g/internal/parallel"
-
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/compression/lz4"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -32,7 +30,7 @@ func TestEmptyBundleQueue(t *testing.T) {
 	internal.Configure()
 
 	bundle := &postgres.Bundle{
-		Bundle: parallel.Bundle{
+		Bundle: internal.Bundle{
 			Directory:        "",
 			TarSizeThreshold: 100,
 		},
@@ -64,7 +62,7 @@ func TestBundleQueueLowConcurrency(t *testing.T) {
 
 func queueTest(t *testing.T) {
 	bundle := &postgres.Bundle{
-		Bundle: parallel.Bundle{
+		Bundle: internal.Bundle{
 			Directory:        "",
 			TarSizeThreshold: 100,
 		},

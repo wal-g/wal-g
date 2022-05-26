@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
-	"github.com/wal-g/wal-g/internal/parallel"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -441,9 +440,9 @@ func setupTestTarBallComposerMaker(composer postgres.TarBallComposerType, withou
 	switch composer {
 	case postgres.RegularComposer:
 		if withoutFilesMetadata {
-			return postgres.NewRegularTarBallComposerMaker(filePackOptions, &parallel.NopBundleFiles{}, parallel.NewNopTarFileSets())
+			return postgres.NewRegularTarBallComposerMaker(filePackOptions, &internal.NopBundleFiles{}, internal.NewNopTarFileSets())
 		} else {
-			return postgres.NewRegularTarBallComposerMaker(filePackOptions, &parallel.RegularBundleFiles{}, parallel.NewRegularTarFileSets())
+			return postgres.NewRegularTarBallComposerMaker(filePackOptions, &internal.RegularBundleFiles{}, internal.NewRegularTarFileSets())
 		}
 	case postgres.RatingComposer:
 		relFileStats := make(postgres.RelFileStatistics)

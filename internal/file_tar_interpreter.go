@@ -1,4 +1,4 @@
-package parallel
+package internal
 
 import (
 	"archive/tar"
@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -17,14 +16,14 @@ type FileTarInterpreter struct {
 	DirectoryToSave string
 }
 
-func NewFileTarInterpreter(directoryToSave string) internal.TarInterpreter {
+func NewFileTarInterpreter(directoryToSave string) TarInterpreter {
 	return &FileTarInterpreter{directoryToSave}
 }
 
 func (tarInterpreter *FileTarInterpreter) Interpret(reader io.Reader, fileInfo *tar.Header) error {
 	tracelog.DebugLogger.Println("Interpreting: ", fileInfo.Name)
 	targetPath := path.Join(tarInterpreter.DirectoryToSave, fileInfo.Name)
-	fsync := !viper.GetBool(internal.TarDisableFsyncSetting)
+	fsync := !viper.GetBool(TarDisableFsyncSetting)
 	switch fileInfo.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
 		return tarInterpreter.interpretRegularFile(fsync, targetPath, fileInfo, reader)

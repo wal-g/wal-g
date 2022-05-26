@@ -1,10 +1,9 @@
-package parallel
+package internal
 
 import (
 	"github.com/pkg/errors"
 
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -45,11 +44,11 @@ func (downloader *CommonDirectoryDownloader) DownloadDirectory(pathToRestore str
 		return NewDirectoryIsNotEmptyError(pathToRestore)
 	}
 
-	return internal.ExtractAll(NewFileTarInterpreter(pathToRestore), tarsToExtract)
+	return ExtractAll(NewFileTarInterpreter(pathToRestore), tarsToExtract)
 }
 
 func (downloader *CommonDirectoryDownloader) getTarPartitionFolder() storage.Folder {
-	return downloader.Folder.GetSubFolder(downloader.BackupName + internal.TarPartitionFolderName)
+	return downloader.Folder.GetSubFolder(downloader.BackupName + TarPartitionFolderName)
 }
 
 func (downloader *CommonDirectoryDownloader) getTarNames() (names []string, err error) {
@@ -67,16 +66,16 @@ func (downloader *CommonDirectoryDownloader) getTarNames() (names []string, err 
 	return result, nil
 }
 
-func (backup *CommonDirectoryDownloader) getTarsToExtract() (tarsToExtract []internal.ReaderMaker, err error) {
+func (backup *CommonDirectoryDownloader) getTarsToExtract() (tarsToExtract []ReaderMaker, err error) {
 	tarNames, err := backup.getTarNames()
 	if err != nil {
 		return nil, err
 	}
 	tracelog.DebugLogger.Printf("Tars to extract: '%+v'\n", tarNames)
-	tarsToExtract = make([]internal.ReaderMaker, 0, len(tarNames))
+	tarsToExtract = make([]ReaderMaker, 0, len(tarNames))
 
 	for _, tarName := range tarNames {
-		tarToExtract := internal.NewStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
+		tarToExtract := NewStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
 		tarsToExtract = append(tarsToExtract, tarToExtract)
 	}
 

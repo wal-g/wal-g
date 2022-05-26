@@ -1,4 +1,4 @@
-package parallel
+package internal
 
 import (
 	"archive/tar"
@@ -9,8 +9,6 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/utility"
-
-	"github.com/wal-g/wal-g/internal"
 )
 
 type TarSizeError struct {
@@ -23,10 +21,10 @@ func newTarSizeError(packedFileSize, expectedSize int64) TarSizeError {
 
 type Bundle struct {
 	Directory string
-	Sentinel  *internal.Sentinel
+	Sentinel  *Sentinel
 
 	TarBallComposer TarBallComposer
-	TarBallQueue    *internal.TarBallQueue
+	TarBallQueue    *TarBallQueue
 
 	Crypter crypto.Crypter
 
@@ -49,8 +47,8 @@ func NewBundle(
 	}
 }
 
-func (bundle *Bundle) StartQueue(tarBallMaker internal.TarBallMaker) error {
-	bundle.TarBallQueue = internal.NewTarBallQueue(bundle.TarSizeThreshold, tarBallMaker)
+func (bundle *Bundle) StartQueue(tarBallMaker TarBallMaker) error {
+	bundle.TarBallQueue = NewTarBallQueue(bundle.TarSizeThreshold, tarBallMaker)
 	return bundle.TarBallQueue.StartQueue()
 }
 

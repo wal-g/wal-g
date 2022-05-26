@@ -1,4 +1,4 @@
-package parallel
+package internal
 
 type TarFileSets interface {
 	AddFile(name string, file string)

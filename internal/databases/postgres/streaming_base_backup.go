@@ -19,7 +19,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
-	"github.com/wal-g/wal-g/internal/parallel"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -125,7 +124,7 @@ func (bb *StreamingBaseBackup) nextTbs() (err error) {
 }
 
 // Upload will read all tar files from Postgres, and use the uploader to upload to the backup location
-func (bb *StreamingBaseBackup) Upload(uploader *WalUploader, bundleFiles parallel.BundleFiles) (err error) {
+func (bb *StreamingBaseBackup) Upload(uploader *WalUploader, bundleFiles internal.BundleFiles) (err error) {
 	// Upload the tar
 	bb.uploader = uploader
 	bb.streamer = NewTarballStreamer(bb, bb.maxTarSize, bundleFiles)
