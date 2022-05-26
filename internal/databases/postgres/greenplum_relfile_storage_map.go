@@ -76,7 +76,8 @@ func newAoRelFileStorageMap(queryRunner *PgQueryRunner) (AoRelFileStorageMap, er
 		}
 		rows, err := queryRunner.fetchAOStorageMetadata(db)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to fetch storage types")
+			tracelog.WarningLogger.Printf("failed to fetch storage types: %s\n'%v'\n", db.name, err)
+			continue
 		}
 		for relFileLoc, metadata := range rows {
 			result[relFileLoc] = metadata
