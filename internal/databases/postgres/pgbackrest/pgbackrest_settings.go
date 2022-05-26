@@ -2,6 +2,7 @@ package pgbackrest
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"gopkg.in/ini.v1"
@@ -11,10 +12,17 @@ const (
 	BackupPath        = "backup"
 	BackupInfoIni     = "backup.info"
 	BackupManifestIni = "backup.manifest"
+	WalArchivePath    = "archive"
+	ArchiveInfo       = "archive.info"
 
 	BackupFolderName    = "backup"
 	BackupDataDirectory = "pg_data"
 )
+
+type ArchiveSettings struct {
+	DatabaseID      int64  `ini:"db-id"`
+	DatabaseVersion string `ini:"db-version"`
+}
 
 type BackupSettings struct {
 	Name                    string
@@ -104,6 +112,32 @@ type DefaultPathSection struct {
 	Group string `ini:"group"`
 	Mode  string `ini:"mode"`
 	User  string `ini:"user"`
+}
+
+func GetArchiveName(folder storage.Folder, stanza string) (*string, error) {
+	archiveFolder := folder.GetSubFolder(WalArchivePath).GetSubFolder(stanza)
+	ioReader, err := archiveFolder.ReadObject(ArchiveInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg, err := ini.Load(ioReader)
+	if err != nil {
+		return nil, err
+	}
+
+	dbSection, err := cfg.GetSection("db")
+	if err != nil {
+		return nil, err
+	}
+
+	var settings ArchiveSettings
+	if err := dbSection.MapTo(&settings); err != nil {
+		return nil, err
+	}
+
+	archiveName := fmt.Sprintf("%s-%d", settings.DatabaseVersion, settings.DatabaseID)
+	return &archiveName, nil
 }
 
 func LoadBackupsSettings(folder storage.Folder, stanza string) ([]BackupSettings, error) {
