@@ -15,6 +15,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -74,24 +75,23 @@ func NewFolder(
 
 func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
 	var accountName, accountKey, accountToken, storageEndpointSuffix string
-	var ok, usingToken bool
+	var ok, usingAccessKey, usingToken bool
 	if accountName, ok = settings[AccountSetting]; !ok {
 		return nil, NewCredentialError(AccountSetting)
 	}
-	if accountKey, ok = settings[AccessKeySetting]; !ok {
-		if accountToken, usingToken = settings[SasTokenSetting]; !usingToken {
-			return nil, NewCredentialError(AccessKeySetting)
-		}
 
-		// Tokens may or may not begin with ?, normalize these cases
-		if !strings.HasPrefix(accountToken, "?") {
-			accountToken = "?" + accountToken
+	if accountKey, usingAccessKey = settings[AccessKeySetting]; !usingAccessKey {
+		if accountToken, usingToken = settings[SasTokenSetting]; usingToken {
+			// Tokens may or may not begin with ?, normalize these cases
+			if !strings.HasPrefix(accountToken, "?") {
+				accountToken = "?" + accountToken
+			}
 		}
 	}
 
 	var credential *azblob.SharedKeyCredential
 	var err error
-	if !usingToken {
+	if !usingToken && usingAccessKey {
 		credential, err = azblob.NewSharedKeyCredential(accountName, accountKey)
 		if err != nil {
 			return nil, NewFolderError(err, "Unable to create credentials")
@@ -124,7 +124,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 
 	var containerUrlString string
 	var containerClient azblob.ContainerClient
-	if usingToken {
+	if usingToken && !usingAccessKey {
 		containerUrlString = fmt.Sprintf("https://%s.blob.%s/%s%s", accountName, storageEndpointSuffix, containerName, accountToken)
 		_, err = url.Parse(containerUrlString)
 		if err != nil {
@@ -134,7 +134,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		containerClient, err = azblob.NewContainerClientWithNoCredential(containerUrlString, &azblob.ClientOptions{
 			Retry: policy.RetryOptions{TryTimeout: timeout},
 		})
-	} else {
+	} else if !usingToken && usingAccessKey {
 		containerUrlString = fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
 		_, err = url.Parse(containerUrlString)
 		if err != nil {
@@ -142,6 +142,22 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		}
 
 		containerClient, err = azblob.NewContainerClientWithSharedKey(containerUrlString, credential, &azblob.ClientOptions{
+			Retry: policy.RetryOptions{TryTimeout: timeout},
+		})
+	} else {
+		// No explicitly configured auth method, try the default credential chain
+		defaultCredential, err := azidentity.NewDefaultAzureCredential(nil)
+		if err != nil {
+			return nil, NewFolderError(err, "Unable to construct default Azure credential chain")
+		}
+
+		containerUrlString = fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
+		_, err = url.Parse(containerUrlString)
+		if err != nil {
+			return nil, NewFolderError(err, "Unable to parse service URL")
+		}
+
+		containerClient, err = azblob.NewContainerClient(containerUrlString, defaultCredential, &azblob.ClientOptions{
 			Retry: policy.RetryOptions{TryTimeout: timeout},
 		})
 	}
