@@ -39,6 +39,13 @@ const (
 	defaultEnvName    = "AzurePublicCloud"
 )
 
+type AzureAuthType string
+
+const (
+	AzureAccessKeyAuth AzureAuthType = "AzureAccessKeyAuth"
+	AzureSASTokenAuth AzureAuthType = "AzureSASTokenAuth"
+)
+
 var SettingList = []string{
 	AccountSetting,
 	AccessKeySetting,
@@ -75,23 +82,25 @@ func NewFolder(
 
 func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
 	var accountName, accountKey, accountToken, storageEndpointSuffix string
-	var ok, usingAccessKey, usingToken bool
+	var ok bool
+	var authType AzureAuthType
 	if accountName, ok = settings[AccountSetting]; !ok {
 		return nil, NewCredentialError(AccountSetting)
 	}
 
-	if accountKey, usingAccessKey = settings[AccessKeySetting]; !usingAccessKey {
-		if accountToken, usingToken = settings[SasTokenSetting]; usingToken {
-			// Tokens may or may not begin with ?, normalize these cases
-			if !strings.HasPrefix(accountToken, "?") {
-				accountToken = "?" + accountToken
-			}
+	if accountKey, ok = settings[AccessKeySetting]; ok {
+		authType = AzureAccessKeyAuth
+	} else if accountToken, ok = settings[SasTokenSetting]; ok {
+		authType = AzureSASTokenAuth
+		// Tokens may or may not begin with ?, normalize these cases
+		if !strings.HasPrefix(accountToken, "?") {
+			accountToken = "?" + accountToken
 		}
 	}
 
 	var credential *azblob.SharedKeyCredential
 	var err error
-	if !usingToken && usingAccessKey {
+	if authType == AzureAccessKeyAuth {
 		credential, err = azblob.NewSharedKeyCredential(accountName, accountKey)
 		if err != nil {
 			return nil, NewFolderError(err, "Unable to create credentials")
@@ -124,7 +133,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 
 	var containerUrlString string
 	var containerClient azblob.ContainerClient
-	if usingToken && !usingAccessKey {
+	if authType == AzureSASTokenAuth {
 		containerUrlString = fmt.Sprintf("https://%s.blob.%s/%s%s", accountName, storageEndpointSuffix, containerName, accountToken)
 		_, err = url.Parse(containerUrlString)
 		if err != nil {
@@ -134,7 +143,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		containerClient, err = azblob.NewContainerClientWithNoCredential(containerUrlString, &azblob.ClientOptions{
 			Retry: policy.RetryOptions{TryTimeout: timeout},
 		})
-	} else if !usingToken && usingAccessKey {
+	} else if authType == AzureAccessKeyAuth {
 		containerUrlString = fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
 		_, err = url.Parse(containerUrlString)
 		if err != nil {
