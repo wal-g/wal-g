@@ -140,7 +140,7 @@ func getContainerClient(
 
 func configureAuthType(settings map[string]string) (AzureAuthType, string, string) {
 	var ok bool
-	var accountToken, accessKey  string
+	var accountToken, accessKey string
 	var authType AzureAuthType
 
 	if accessKey, ok = settings[AccessKeySetting]; ok {
