@@ -13,7 +13,7 @@ var checkCmd = &cobra.Command{
 }
 
 var checkReadCmd = &cobra.Command{
-	Use:   "read",
+	Use:   "read [filename1 filename2 ...]",
 	Short: "check read access to the storage",
 	Args:  cobra.MinimumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
