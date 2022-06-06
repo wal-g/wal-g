@@ -56,5 +56,5 @@ func HandleCheckWrite(folder storage.Folder) {
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("failed to write to the storage: %v", err)
 	}
-	fmt.Printf("OK")
+	tracelog.InfoLogger.Println("Write check OK")
 }
