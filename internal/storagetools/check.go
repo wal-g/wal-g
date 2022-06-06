@@ -27,7 +27,7 @@ func HandleCheckRead(folder storage.Folder, filenames []string) {
 	if len(missing) > 0 {
 		tracelog.ErrorLogger.Fatalf("files are missing: %s", strings.Join(missing, ", "))
 	}
-	fmt.Printf("OK")
+	tracelog.InfoLogger.Println("Read check OK")
 }
 
 func randomName(length int) string {
