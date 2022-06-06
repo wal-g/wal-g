@@ -15,8 +15,8 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/pkg/errors"
@@ -43,7 +43,7 @@ type AzureAuthType string
 
 const (
 	AzureAccessKeyAuth AzureAuthType = "AzureAccessKeyAuth"
-	AzureSASTokenAuth AzureAuthType = "AzureSASTokenAuth"
+	AzureSASTokenAuth  AzureAuthType = "AzureSASTokenAuth"
 )
 
 var SettingList = []string{
@@ -80,15 +80,70 @@ func NewFolder(
 	}
 }
 
-func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
-	var accountName, accountKey, accountToken, storageEndpointSuffix string
-	var ok bool
-	var authType AzureAuthType
-	if accountName, ok = settings[AccountSetting]; !ok {
-		return nil, NewCredentialError(AccountSetting)
+func getContainerClientWithSASToken(
+	accountName string,
+	storageEndpointSuffix string,
+	containerName string,
+	timeout time.Duration,
+	accountToken string) (*azblob.ContainerClient, error) {
+	containerUrlString := fmt.Sprintf("https://%s.blob.%s/%s%s", accountName, storageEndpointSuffix, containerName, accountToken)
+	_, err := url.Parse(containerUrlString)
+	if err != nil {
+		return nil, NewFolderError(err, "Unable to parse service URL with SAS token")
 	}
 
-	if accountKey, ok = settings[AccessKeySetting]; ok {
+	containerClient, err := azblob.NewContainerClientWithNoCredential(containerUrlString, &azblob.ClientOptions{
+		Retry: policy.RetryOptions{TryTimeout: timeout},
+	})
+	return &containerClient, err
+}
+
+func getContainerClientWithAccessKey(
+	accountName string,
+	storageEndpointSuffix string,
+	containerName string,
+	timeout time.Duration,
+	credential *azblob.SharedKeyCredential) (*azblob.ContainerClient, error) {
+	containerUrlString := fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
+	_, err := url.Parse(containerUrlString)
+	if err != nil {
+		return nil, NewFolderError(err, "Unable to parse service URL")
+	}
+
+	containerClient, err := azblob.NewContainerClientWithSharedKey(containerUrlString, credential, &azblob.ClientOptions{
+		Retry: policy.RetryOptions{TryTimeout: timeout},
+	})
+	return &containerClient, err
+}
+
+func getContainerClient(
+	accountName string,
+	storageEndpointSuffix string,
+	containerName string,
+	timeout time.Duration) (*azblob.ContainerClient, error) {
+	defaultCredential, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		return nil, NewFolderError(err, "Unable to construct default Azure credential chain")
+	}
+
+	containerUrlString := fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
+	_, err = url.Parse(containerUrlString)
+	if err != nil {
+		return nil, NewFolderError(err, "Unable to parse service URL")
+	}
+
+	containerClient, err := azblob.NewContainerClient(containerUrlString, defaultCredential, &azblob.ClientOptions{
+		Retry: policy.RetryOptions{TryTimeout: timeout},
+	})
+	return &containerClient, err
+}
+
+func configureAuthType(settings map[string]string) (AzureAuthType, string, string) {
+	var ok bool
+	var accountToken, accessKey  string
+	var authType AzureAuthType
+
+	if accessKey, ok = settings[AccessKeySetting]; ok {
 		authType = AzureAccessKeyAuth
 	} else if accountToken, ok = settings[SasTokenSetting]; ok {
 		authType = AzureSASTokenAuth
@@ -97,6 +152,19 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 			accountToken = "?" + accountToken
 		}
 	}
+
+	return authType, accountToken, accessKey
+}
+
+func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
+	var accountName, accountKey, accountToken, storageEndpointSuffix string
+	var ok bool
+	var authType AzureAuthType
+	if accountName, ok = settings[AccountSetting]; !ok {
+		return nil, NewCredentialError(AccountSetting)
+	}
+
+	authType, accountToken, accountKey = configureAuthType(settings)
 
 	var credential *azblob.SharedKeyCredential
 	var err error
@@ -131,50 +199,20 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		storageEndpointSuffix = getStorageEndpointSuffix(environmentName)
 	}
 
-	var containerUrlString string
-	var containerClient azblob.ContainerClient
+	var containerClient *azblob.ContainerClient
 	if authType == AzureSASTokenAuth {
-		containerUrlString = fmt.Sprintf("https://%s.blob.%s/%s%s", accountName, storageEndpointSuffix, containerName, accountToken)
-		_, err = url.Parse(containerUrlString)
-		if err != nil {
-			return nil, NewFolderError(err, "Unable to parse service URL with SAS token")
-		}
-
-		containerClient, err = azblob.NewContainerClientWithNoCredential(containerUrlString, &azblob.ClientOptions{
-			Retry: policy.RetryOptions{TryTimeout: timeout},
-		})
+		containerClient, err = getContainerClientWithSASToken(accountName, storageEndpointSuffix, containerName, timeout, accountToken)
 	} else if authType == AzureAccessKeyAuth {
-		containerUrlString = fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
-		_, err = url.Parse(containerUrlString)
-		if err != nil {
-			return nil, NewFolderError(err, "Unable to parse service URL")
-		}
-
-		containerClient, err = azblob.NewContainerClientWithSharedKey(containerUrlString, credential, &azblob.ClientOptions{
-			Retry: policy.RetryOptions{TryTimeout: timeout},
-		})
+		containerClient, err = getContainerClientWithAccessKey(accountName, storageEndpointSuffix, containerName, timeout, credential)
 	} else {
 		// No explicitly configured auth method, try the default credential chain
-		defaultCredential, err := azidentity.NewDefaultAzureCredential(nil)
-		if err != nil {
-			return nil, NewFolderError(err, "Unable to construct default Azure credential chain")
-		}
-
-		containerUrlString = fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
-		_, err = url.Parse(containerUrlString)
-		if err != nil {
-			return nil, NewFolderError(err, "Unable to parse service URL")
-		}
-
-		containerClient, err = azblob.NewContainerClient(containerUrlString, defaultCredential, &azblob.ClientOptions{
-			Retry: policy.RetryOptions{TryTimeout: timeout},
-		})
+		containerClient, err = getContainerClient(accountName, storageEndpointSuffix, containerName, timeout)
 	}
 	if err != nil {
 		return nil, NewFolderError(err, "Unable to create service client")
 	}
 	path = storage.AddDelimiterToPath(path)
-	return NewFolder(getUploadStreamToBlockBlobOptions(settings), containerClient, credential, timeout, path), nil
+	return NewFolder(getUploadStreamToBlockBlobOptions(settings), *containerClient, credential, timeout, path), nil
 }
 
 type Folder struct {
@@ -194,7 +232,7 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 	ctx := context.Background()
 	blobClient := folder.containerClient.NewBlockBlobClient(path)
 	_, err := blobClient.GetProperties(ctx, &azblob.GetBlobPropertiesOptions{})
-	var stgErr *azblob.StorageError;
+	var stgErr *azblob.StorageError
 	if err != nil && errors.As(err, &stgErr) && stgErr.ErrorCode == azblob.StorageErrorCodeBlobNotFound {
 		return false, nil
 	}
@@ -348,12 +386,13 @@ func buildCanonicalizedResource(c *azblob.SharedKeyCredential, u *url.URL) (stri
 	}
 	return cr.String(), nil
 }
+
 // End from https://github.com/Azure/azure-sdk-for-go/blob/main/sdk/storage/azblob/zc_shared_policy_shared_key_credential.go
 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	path := storage.JoinPath(folder.path, objectRelativePath)
 	blobClient := folder.containerClient.NewBlobClient(path)
-	httpClient := &http.Client{ Timeout: folder.timeout }
+	httpClient := &http.Client{Timeout: folder.timeout}
 
 	req, err := http.NewRequest("GET", blobClient.URL(), nil)
 	if err != nil {
@@ -429,7 +468,7 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 		blobClient := folder.containerClient.NewBlockBlobClient(path)
 		tracelog.DebugLogger.Printf("Delete %v\n", path)
 		_, err := blobClient.Delete(context.Background(), &azblob.DeleteBlobOptions{DeleteSnapshots: azblob.DeleteSnapshotsOptionTypeInclude.ToPtr()})
-		var stgErr *azblob.StorageError;
+		var stgErr *azblob.StorageError
 		if err != nil && errors.As(err, &stgErr) && stgErr.ErrorCode == azblob.StorageErrorCodeBlobNotFound {
 			continue
 		}
