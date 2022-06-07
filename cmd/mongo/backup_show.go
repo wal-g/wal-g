@@ -2,15 +2,13 @@ package mongo
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
-	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
-	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -26,17 +24,12 @@ var backupShowCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		// set up storage downloader client
-		downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
+		backupName := args[0]
+
+		backupFolder, err := common.GetBackupFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = mongo.HandleBackupShow(
-			downloader,
-			args[0],
-			func(b models.Backup) (bytes []byte, err error) {
-				return json.Marshal(b)
-			},
-			os.Stdout)
+		err = mongo.HandleBackupShow(backupFolder, backupName, os.Stdout, true)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

@@ -13,15 +13,15 @@ type Backup struct {
 	DataSize        int64       `json:"DataSize,omitempty"`
 }
 
-func (b Backup) Name() string {
+func (b *Backup) Name() string {
 	return b.BackupName
 }
 
-func (b Backup) StartTime() time.Time {
+func (b *Backup) StartTime() time.Time {
 	return b.StartLocalTime
 }
 
-func (b Backup) IsPermanent() bool {
+func (b *Backup) IsPermanent() bool {
 	return b.Permanent
 }
 
@@ -49,15 +49,13 @@ type BackupMeta struct {
 
 // FirstOverlappingBackupForArch checks if archive overlaps any backup from given list.
 // TODO: build btree to fix ugly complexity here
-func FirstOverlappingBackupForArch(arch Archive, backups []Backup) Backup {
-	var backup Backup
-	for j := range backups {
-		backup = backups[j]
-		if ArchInBackup(arch, &backup) {
+func FirstOverlappingBackupForArch(arch Archive, backups []*Backup) *Backup {
+	for _, backup := range backups {
+		if ArchInBackup(arch, backup) {
 			return backup
 		}
 	}
-	return Backup{}
+	return nil
 }
 
 // ArchInBackup checks if archive and given backup overlaps each over.
