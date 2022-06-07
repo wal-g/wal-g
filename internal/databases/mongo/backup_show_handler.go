@@ -1,29 +1,28 @@
 package mongo
 
 import (
-	"fmt"
 	"io"
+	"strings"
 
-	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
+	"github.com/wal-g/wal-g/internal/databases/mongo/logical"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-// HandleBackupPush prints sentinel contents.
-func HandleBackupShow(downloader archive.Downloader,
-	backup string,
-	marshaller archive.BackupInfoMarshalFunc,
-	output io.Writer) error {
-	sentinel, err := downloader.BackupMeta(backup)
+// HandleBackupShow prints sentinel contents.
+func HandleBackupShow(backupFolder storage.Folder, backupName string, output io.Writer, pretty bool) (err error) {
+	sentinel, err := DownloadSentinel(backupFolder, backupName)
 	if err != nil {
 		return err
 	}
 
-	report, err := marshaller(sentinel)
-	if err != nil {
-		return fmt.Errorf("can not marshal sentinel: %w", err)
-	}
+	return internal.WriteAsJSON(sentinel, output, pretty)
+}
 
-	if _, err := fmt.Fprintf(output, "%s\n", report); err != nil {
-		return err
+func DownloadSentinel(folder storage.Folder, backupName string) (interface{}, error) {
+	if strings.HasPrefix(backupName, "binary") {
+		return binary.DownloadSentinel(folder, backupName)
 	}
-	return nil
+	return logical.DownloadSentinel(folder, backupName)
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/databases/mongo/logical"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -31,16 +32,16 @@ type Uploader interface {
 
 // Downloader defines interface to fetch mongodb oplog archives
 type Downloader interface {
-	BackupMeta(name string) (models.Backup, error)
+	BackupMeta(name string) (*models.Backup, error)
 	DownloadOplogArchive(arch models.Archive, writeCloser io.WriteCloser) error
 	ListOplogArchives() ([]models.Archive, error)
-	LoadBackups(names []string) ([]models.Backup, error)
+	LoadBackups(names []string) ([]*models.Backup, error)
 	ListBackups() ([]internal.BackupTime, []string, error)
 	LastKnownArchiveTS() (models.Timestamp, error)
 }
 
 type Purger interface {
-	DeleteBackups(backups []models.Backup) error
+	DeleteBackups(backups []*models.Backup) error
 	DeleteGarbage(garbage []string) error
 	DeleteOplogArchives(archives []models.Archive) error
 }
@@ -79,22 +80,13 @@ func NewStorageDownloader(opts StorageSettings) (*StorageDownloader, error) {
 }
 
 // BackupMeta downloads sentinel contents.
-func (sd *StorageDownloader) BackupMeta(name string) (models.Backup, error) {
-	backup := internal.NewBackup(sd.backupsFolder, name)
-	var sentinel models.Backup
-	err := backup.FetchSentinel(&sentinel)
-	if err != nil {
-		return models.Backup{}, fmt.Errorf("can not fetch stream sentinel: %w", err)
-	}
-	if sentinel.BackupName == "" {
-		sentinel.BackupName = name
-	}
-	return sentinel, nil
+func (sd *StorageDownloader) BackupMeta(name string) (*models.Backup, error) {
+	return logical.DownloadSentinel(sd.backupsFolder, name)
 }
 
 // LoadBackups downloads backups metadata
-func (sd *StorageDownloader) LoadBackups(names []string) ([]models.Backup, error) {
-	backups := make([]models.Backup, 0, len(names))
+func (sd *StorageDownloader) LoadBackups(names []string) ([]*models.Backup, error) {
+	backups := make([]*models.Backup, 0, len(names))
 	for _, name := range names {
 		backup, err := sd.BackupMeta(name)
 		if err != nil {
@@ -284,7 +276,7 @@ func NewStoragePurger(opts StorageSettings) (*StoragePurger, error) {
 
 // DeleteBackups purges given backups files
 // TODO: extract BackupLayout abstraction and provide DataPath(), SentinelPath(), Exists() methods
-func (sp *StoragePurger) DeleteBackups(backups []models.Backup) error {
+func (sp *StoragePurger) DeleteBackups(backups []*models.Backup) error {
 	backupNames := BackupNamesFromBackups(backups)
 	return internal.DeleteBackups(sp.backupsFolder, backupNames)
 }
