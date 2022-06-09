@@ -200,13 +200,14 @@ wal-g backup-fetch /path LATEST --reverse-unpack --skip-redundant-tars
 
 ### ``backup-push``
 
-When uploading backups to S3, the user should pass in the path containing the backup started by Postgres as in:
+When uploading backups to storage, the user should pass directory of running Postgres as an argument.
 
 ```bash
 wal-g backup-push /backup/directory/path
 ```
+ If the PGDATA section is setted, WAL-G will check that command argument, environment variable PGDATA and config setting PGDATA are the same.
 
-If backup is pushed from replication slave, WAL-G will control timeline of the server. In case of promotion to master or timeline switch, backup will be uploaded but not finalized, WAL-G will exit with an error. In this case logs will contain information necessary to finalize the backup. You can use backuped data if you clearly understand entangled risks.
+If backup is pushed from replication standby, WAL-G will control timeline of the server. In case of promotion to master or timeline switch, backup will be uploaded but not finalized, WAL-G will exit with an error. In this case logs will contain information necessary to finalize the backup. You can use backuped data if you clearly understand entangled risks.
 
 ``backup-push`` can also be run with the ``--permanent`` flag, which will mark the backup as permanent and prevent it from being removed when running ``delete``.
 
