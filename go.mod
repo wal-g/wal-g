@@ -1,6 +1,6 @@
 module github.com/wal-g/wal-g
 
-go 1.17
+go 1.18
 
 require (
 	cloud.google.com/go/storage v1.10.0
@@ -11,7 +11,7 @@ require (
 	github.com/DATA-DOG/godog v0.7.14-0.20190529133509-96731eaefa46
 	github.com/DataDog/zstd v1.4.4
 	github.com/RoaringBitmap/roaring v0.4.21
-	github.com/aws/aws-sdk-go v1.34.28
+	github.com/aws/aws-sdk-go v1.44.7
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/cyberdelia/lzo v0.0.0-20171006181345-d85071271a6f

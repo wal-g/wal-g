@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-mysql-org/go-mysql/mysql"
@@ -132,4 +134,29 @@ func GetBinlogStartTimestamp(filename string, flavor string) (time.Time, error) 
 		return time.Time{}, fmt.Errorf("failed to parse binlog %s: %w", filename, err)
 	}
 	return time.Unix(int64(ts), 0), nil
+}
+
+/*
+Mysql binlog file names looks like foobar.000001, foobar.000002 (with leading zeroes)
+And it looks like they can be compared lexicographically, but..
+The next name after foobar.999999 is foobar.1000000 (7 digits) and it cannot be compared so.
+*/
+func BinlogNum(filename string) int {
+	p := strings.LastIndexAny(filename, ".")
+	if p < 0 {
+		tracelog.ErrorLogger.Panicf("unexpected binlog name: %v", filename)
+	}
+	num, err := strconv.Atoi(filename[p+1:])
+	if err != nil {
+		tracelog.ErrorLogger.Panicf("unexpected binlog name: %v", filename)
+	}
+	return num
+}
+
+func BinlogPrefix(filename string) string {
+	p := strings.LastIndexAny(filename, ".")
+	if p < 0 {
+		tracelog.ErrorLogger.Panicf("unexpected binlog name: %v", filename)
+	}
+	return filename[:p]
 }

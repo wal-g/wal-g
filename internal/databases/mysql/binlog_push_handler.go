@@ -9,7 +9,6 @@ import (
 	"os/user"
 	"path"
 	"path/filepath"
-	"sort"
 
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/pkg/errors"
@@ -37,20 +36,27 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 	binlogsFolder, err := getMySQLBinlogsFolder(db)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	binlogs, err := getMySQLSortedBinlogs(db)
+	binlogs, err := getMySQLBinlogs(db)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	lastBinlog := lastOrDefault(binlogs, "")
-	if untilBinlog == "" || untilBinlog > lastBinlog {
+	if untilBinlog == "" || BinlogNum(untilBinlog) > BinlogNum(lastBinlog) {
 		untilBinlog = lastBinlog
 	}
 
 	var binlogSentinelDto BinlogSentinelDto
 	err = FetchBinlogSentinel(rootFolder, &binlogSentinelDto)
-	// copy MySQLBinlogSentinel to cache:
-	cache := getCache()
 	if err == nil && binlogSentinelDto.GTIDArchived != "" {
 		tracelog.InfoLogger.Printf("fetched binlog archived GTID SET: %s\n", binlogSentinelDto.GTIDArchived)
+	}
+	cache := getCache()
+	if len(binlogs) > 0 && cache.LastArchivedBinlog != "" {
+		if BinlogPrefix(binlogs[0]) != BinlogPrefix(cache.LastArchivedBinlog) ||
+			BinlogNum(binlogs[len(binlogs)-1]) < BinlogNum(cache.LastArchivedBinlog) {
+			tracelog.WarningLogger.Printf("binlog was reset or naming (%s => %s), clearing cache",
+				cache.LastArchivedBinlog, binlogs[0])
+			cache = LogsCache{}
+		}
 	}
 
 	var filter gtidFilter
@@ -79,12 +85,12 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 
 		tracelog.DebugLogger.Printf("Testing... %v\n", binlog)
 
-		if binlog >= untilBinlog {
+		if untilBinlog != "" && BinlogNum(binlog) >= BinlogNum(untilBinlog) {
 			tracelog.DebugLogger.Printf("Skip binlog %v (until check)\n", binlog)
 			continue
 		}
 
-		if binlog <= cache.LastArchivedBinlog {
+		if cache.LastArchivedBinlog != "" && BinlogNum(binlog) <= BinlogNum(cache.LastArchivedBinlog) {
 			tracelog.DebugLogger.Printf("Skip binlog %v (archived binlog check)\n", binlog)
 			continue
 		}
@@ -131,7 +137,7 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 	putCache(cache)
 }
 
-func getMySQLSortedBinlogs(db *sql.DB) ([]string, error) {
+func getMySQLBinlogs(db *sql.DB) ([]string, error) {
 	var result []string
 	// SHOW BINARY LOGS acquire binlog mutex and may hang while mysql is committing huge transactions
 	// so we read binlog index from the disk with no locking
@@ -150,7 +156,7 @@ func getMySQLSortedBinlogs(db *sql.DB) ([]string, error) {
 		binlog := path.Base(s.Text())
 		result = append(result, binlog)
 	}
-	sort.Strings(result)
+	// binlogs in index files are already sorted actually, so we don't need to sort them again
 	return result, nil
 }
 
