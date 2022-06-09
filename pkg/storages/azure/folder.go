@@ -27,12 +27,12 @@ const (
 	EnvironmentName   = "AZURE_ENVIRONMENT_NAME"
 	BufferSizeSetting = "AZURE_BUFFER_SIZE"
 	MaxBuffersSetting = "AZURE_MAX_BUFFERS"
-	// TryTimeoutSetting = "AZURE_TRY_TIMEOUT"
+	TryTimeoutSetting = "AZURE_TRY_TIMEOUT"
 	minBufferSize     = 1024
 	defaultBufferSize = 8 * 1024 * 1024
 	minBuffers        = 1
 	defaultBuffers    = 4
-	// defaultTryTimeout = 5
+	defaultTryTimeout = 5
 	defaultEnvName    = "AzurePublicCloud"
 )
 
@@ -63,13 +63,13 @@ func NewCredentialError(settingName string) storage.Error {
 }
 
 func NewFolder(
-	uploadStreamToBlockBlobOptions azblob.UploadStreamToBlockBlobOptions,
+	uploadStreamOptions azblob.UploadStreamOptions,
 	containerClient azblob.ContainerClient,
 	credential *azblob.SharedKeyCredential,
 	timeout time.Duration,
 	path string) *Folder {
 	return &Folder{
-		uploadStreamToBlockBlobOptions,
+		uploadStreamOptions,
 		containerClient,
 		credential,
 		timeout,
@@ -92,7 +92,7 @@ func getContainerClientWithSASToken(
 	containerClient, err := azblob.NewContainerClientWithNoCredential(containerUrlString, &azblob.ClientOptions{
 		Retry: policy.RetryOptions{TryTimeout: timeout},
 	})
-	return &containerClient, err
+	return containerClient, err
 }
 
 func getContainerClientWithAccessKey(
@@ -110,7 +110,7 @@ func getContainerClientWithAccessKey(
 	containerClient, err := azblob.NewContainerClientWithSharedKey(containerUrlString, credential, &azblob.ClientOptions{
 		Retry: policy.RetryOptions{TryTimeout: timeout},
 	})
-	return &containerClient, err
+	return containerClient, err
 }
 
 func getContainerClient(
@@ -132,7 +132,7 @@ func getContainerClient(
 	containerClient, err := azblob.NewContainerClient(containerUrlString, defaultCredential, &azblob.ClientOptions{
 		Retry: policy.RetryOptions{TryTimeout: timeout},
 	})
-	return &containerClient, err
+	return containerClient, err
 }
 
 func configureAuthType(settings map[string]string) (AzureAuthType, string, string) {
@@ -172,9 +172,16 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		}
 	}
 
-	// TODO - make the timeout configurable. Requires this bugfix in azcore 1.0.0
-	// https://github.com/Azure/azure-sdk-for-go/issues/17780
-	timeout := time.Duration(0) * time.Minute
+	var tryTimeout int
+	if strTryTimeout, ok := settings[TryTimeoutSetting]; ok {
+		tryTimeout, err = strconv.Atoi(strTryTimeout)
+		if err != nil {
+			return nil, NewFolderError(err, "Invalid azure try timeout setting")
+		}
+	} else {
+		tryTimeout = defaultTryTimeout
+	}
+	timeout := time.Duration(tryTimeout) * time.Minute
 
 	containerName, path, err := storage.GetPathFromPrefix(prefix)
 	if err != nil {
@@ -202,11 +209,11 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		return nil, NewFolderError(err, "Unable to create service client")
 	}
 	path = storage.AddDelimiterToPath(path)
-	return NewFolder(getUploadStreamToBlockBlobOptions(settings), *containerClient, credential, timeout, path), nil
+	return NewFolder(getUploadStreamOptions(settings), *containerClient, credential, timeout, path), nil
 }
 
 type Folder struct {
-	uploadStreamToBlockBlobOptions azblob.UploadStreamToBlockBlobOptions
+	uploadStreamOptions azblob.UploadStreamOptions
 	containerClient                azblob.ContainerClient
 	credential                     *azblob.SharedKeyCredential
 	timeout                        time.Duration
@@ -220,8 +227,11 @@ func (folder *Folder) GetPath() string {
 func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 	path := storage.JoinPath(folder.path, objectRelativePath)
 	ctx := context.Background()
-	blobClient := folder.containerClient.NewBlockBlobClient(path)
-	_, err := blobClient.GetProperties(ctx, &azblob.GetBlobPropertiesOptions{})
+	blobClient, err := folder.containerClient.NewBlockBlobClient(path)
+	if err != nil {
+		return false, NewFolderError(err, "Unable to init Azure Blob client")
+	}
+	_, err = blobClient.GetProperties(ctx, nil)
 	var stgErr *azblob.StorageError
 	if err != nil && errors.As(err, &stgErr) && stgErr.ErrorCode == azblob.StorageErrorCodeBlobNotFound {
 		return false, nil
@@ -233,7 +243,7 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 }
 
 func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
-	blobPager := folder.containerClient.ListBlobsHierarchy("/", &azblob.ContainerListBlobHierarchySegmentOptions{Prefix: &folder.path})
+	blobPager := folder.containerClient.ListBlobsHierarchy("/", &azblob.ContainerListBlobsHierarchyOptions{Prefix: &folder.path})
 	for blobPager.NextPage(context.Background()) {
 		blobs := blobPager.PageResponse()
 		//add blobs to the list of storage objects
@@ -251,7 +261,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 			subFolderPath := *blobPrefix.Name
 
 			subFolders = append(subFolders, NewFolder(
-				folder.uploadStreamToBlockBlobOptions,
+				folder.uploadStreamOptions,
 				folder.containerClient,
 				folder.credential,
 				folder.timeout,
@@ -268,7 +278,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 	return NewFolder(
-		folder.uploadStreamToBlockBlobOptions,
+		folder.uploadStreamOptions,
 		folder.containerClient,
 		folder.credential,
 		folder.timeout,
@@ -277,7 +287,10 @@ func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder 
 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	path := storage.JoinPath(folder.path, objectRelativePath)
-	blobClient := folder.containerClient.NewBlobClient(path)
+	blobClient, err := folder.containerClient.NewBlockBlobClient(path)
+	if err != nil {
+		return nil, NewFolderError(err, "Unable to init Azure Blob client")
+	}
 
 	get, err := blobClient.Download(context.Background(), nil)
 	if err != nil {
@@ -291,8 +304,12 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
 	//Upload content to a block blob using full path
 	path := storage.JoinPath(folder.path, name)
-	blobClient := folder.containerClient.NewBlockBlobClient(path)
-	_, err := blobClient.UploadStreamToBlockBlob(context.Background(), content, folder.uploadStreamToBlockBlobOptions)
+	blobClient, err := folder.containerClient.NewBlockBlobClient(path)
+	if err != nil {
+		return NewFolderError(err, "Unable to init Azure Blob client")
+	}
+
+	_, err = blobClient.UploadStream(context.Background(), content, folder.uploadStreamOptions)
 	if err != nil {
 		return NewFolderError(err, "Unable to upload blob %v", name)
 	}
@@ -302,16 +319,25 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 }
 
 func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
-	if exists, err := folder.Exists(srcPath); !exists {
+	var exists bool
+	var err error
+	if exists, err = folder.Exists(srcPath); !exists {
 		if err == nil {
 			return errors.New("object do not exists")
 		} else {
 			return err
 		}
 	}
-	srcClient := folder.containerClient.NewBlockBlobClient(srcPath)
-	dstClient := folder.containerClient.NewBlockBlobClient(dstPath)
-	_, err := dstClient.StartCopyFromURL(context.Background(), srcClient.URL(), &azblob.StartCopyBlobOptions{Tier: azblob.AccessTierHot.ToPtr()})
+	var srcClient, dstClient *azblob.BlockBlobClient
+	srcClient, err = folder.containerClient.NewBlockBlobClient(srcPath)
+	if err != nil {
+		return NewFolderError(err, "Unable to init Azure Blob client for copy source %v", srcPath)
+	}
+	dstClient, err = folder.containerClient.NewBlockBlobClient(dstPath)
+	if err != nil {
+		return NewFolderError(err, "Unable to init Azure Blob client for copy source %v", srcPath)
+	}
+	_, err = dstClient.StartCopyFromURL(context.Background(), srcClient.URL(), &azblob.BlobStartCopyOptions{Tier: azblob.AccessTierHot.ToPtr()})
 	return err
 }
 
@@ -319,9 +345,12 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	for _, objectRelativePath := range objectRelativePaths {
 		//Delete blob using blobClient obtained from full path to blob
 		path := storage.JoinPath(folder.path, objectRelativePath)
-		blobClient := folder.containerClient.NewBlockBlobClient(path)
+		blobClient, err := folder.containerClient.NewBlockBlobClient(path)
+		if err != nil {
+			return NewFolderError(err, "Unable to init Azure Blob client")
+		}
 		tracelog.DebugLogger.Printf("Delete %v\n", path)
-		_, err := blobClient.Delete(context.Background(), &azblob.DeleteBlobOptions{DeleteSnapshots: azblob.DeleteSnapshotsOptionTypeInclude.ToPtr()})
+		_, err = blobClient.Delete(context.Background(), &azblob.BlobDeleteOptions{DeleteSnapshots: azblob.DeleteSnapshotsOptionTypeInclude.ToPtr()})
 		var stgErr *azblob.StorageError
 		if err != nil && errors.As(err, &stgErr) && stgErr.ErrorCode == azblob.StorageErrorCodeBlobNotFound {
 			continue
@@ -335,7 +364,7 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	return nil
 }
 
-func getUploadStreamToBlockBlobOptions(settings map[string]string) azblob.UploadStreamToBlockBlobOptions {
+func getUploadStreamOptions(settings map[string]string) azblob.UploadStreamOptions {
 	// Configure the size of the rotating buffers
 	bufSizeS := settings[BufferSizeSetting]
 	bufferSize, err := strconv.Atoi(bufSizeS)
@@ -348,7 +377,7 @@ func getUploadStreamToBlockBlobOptions(settings map[string]string) azblob.Upload
 	if err != nil || maxBuffers < minBuffers {
 		maxBuffers = defaultBuffers
 	}
-	return azblob.UploadStreamToBlockBlobOptions{MaxBuffers: maxBuffers, BufferSize: bufferSize}
+	return azblob.UploadStreamOptions{MaxBuffers: maxBuffers, BufferSize: bufferSize}
 }
 
 // Function will get environment's name and return string with the environment's Azure storage account endpoint suffix.

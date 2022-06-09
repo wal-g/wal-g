@@ -4,9 +4,9 @@ go 1.18
 
 require (
 	cloud.google.com/go/storage v1.10.0
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v0.21.1
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v0.13.2
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.3.0
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.1.0
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.1.0
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.4.1
 	github.com/Azure/go-autorest/autorest v0.11.21
 	github.com/DATA-DOG/godog v0.7.14-0.20190529133509-96731eaefa46
 	github.com/DataDog/zstd v1.4.4
@@ -41,7 +41,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.1
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.1
 	github.com/ulikunitz/xz v0.5.8
 	github.com/wal-g/json v0.3.1
 	github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30
@@ -66,13 +66,13 @@ require (
 
 require (
 	cloud.google.com/go v0.65.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/internal v0.9.1 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/internal v1.0.0 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest/adal v0.9.14 // indirect
 	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
-	github.com/AzureAD/microsoft-authentication-library-for-go v0.4.0 // indirect
+	github.com/AzureAD/microsoft-authentication-library-for-go v0.5.1 // indirect
 	github.com/Microsoft/go-winio v0.4.14 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
