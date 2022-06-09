@@ -335,7 +335,7 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	}
 	dstClient, err = folder.containerClient.NewBlockBlobClient(dstPath)
 	if err != nil {
-		return NewFolderError(err, "Unable to init Azure Blob client for copy source %v", srcPath)
+		return NewFolderError(err, "Unable to init Azure Blob client for copy destination %v", dstPath)
 	}
 	_, err = dstClient.StartCopyFromURL(context.Background(), srcClient.URL(), &azblob.BlobStartCopyOptions{Tier: azblob.AccessTierHot.ToPtr()})
 	return err
