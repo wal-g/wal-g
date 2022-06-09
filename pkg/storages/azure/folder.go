@@ -154,14 +154,13 @@ func configureAuthType(settings map[string]string) (AzureAuthType, string, strin
 }
 
 func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
-	var accountName, accountKey, accountToken, storageEndpointSuffix string
+	var accountName, storageEndpointSuffix string
 	var ok bool
-	var authType AzureAuthType
 	if accountName, ok = settings[AccountSetting]; !ok {
 		return nil, NewCredentialError(AccountSetting)
 	}
 
-	authType, accountToken, accountKey = configureAuthType(settings)
+	authType, accountToken, accountKey := configureAuthType(settings)
 
 	var credential *azblob.SharedKeyCredential
 	var err error
@@ -294,6 +293,11 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 
 	get, err := blobClient.Download(context.Background(), nil)
 	if err != nil {
+		var storageError *azblob.StorageError
+		errors.As(err, &storageError)
+		if storageError.ErrorCode == azblob.StorageErrorCodeBlobNotFound {
+			return nil, storage.NewObjectNotFoundError(path)
+		}
 		return nil, NewFolderError(err, "Unable to download blob %s.", path)
 	}
 	reader := get.Body(nil)
@@ -331,11 +335,11 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	var srcClient, dstClient *azblob.BlockBlobClient
 	srcClient, err = folder.containerClient.NewBlockBlobClient(srcPath)
 	if err != nil {
-		return NewFolderError(err, "Unable to init Azure Blob client for copy source %v", srcPath)
+		return NewFolderError(err, "Unable to init Azure Blob client for copy source %s", srcPath)
 	}
 	dstClient, err = folder.containerClient.NewBlockBlobClient(dstPath)
 	if err != nil {
-		return NewFolderError(err, "Unable to init Azure Blob client for copy destination %v", dstPath)
+		return NewFolderError(err, "Unable to init Azure Blob client for copy destination %s", dstPath)
 	}
 	_, err = dstClient.StartCopyFromURL(context.Background(), srcClient.URL(), &azblob.BlobStartCopyOptions{Tier: azblob.AccessTierHot.ToPtr()})
 	return err
