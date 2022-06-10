@@ -100,14 +100,17 @@ Overrides the default upload and download retry limit while interacting with GCS
 
 Azure
 -----------
-To store backups in Azure Storage, WAL-G requires that this variable be set:
+To store backups in Azure Storage, WAL-G requires that these variables be set:
 
 * `WALG_AZ_PREFIX`
 to specify where to store backups in Azure storage (e.g. `azure://test-container/walg-folder`)
 
-WAL-G determines Azure Storage credentials using [azure default credentials](https://docs.microsoft.com/en-us/azure/storage/common/storage-azure-cli#azure-cli-sample-script). You can set `AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_ACCESS_KEY` to provide azure storage credentials.
+* `AZURE_STORAGE_ACCOUNT`
+to specify the storage account of your backups
 
-You may set `AZURE_STORAGE_SAS_TOKEN` in lieu of `AZURE_STORAGE_ACCESS_KEY` to make use of [SAS tokens](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview).
+WAL-G determines Azure Storage credentials using the [azure default credential chain](https://docs.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication). You can set the standard `AZURE_CLIENT_ID`/`AZURE_TENANT_ID`/`AZURE_CLIENT_SECRET` environment variables to authenticate, or exclude them all if you are using a Managed Identity.
+
+Alternatively, you can set `AZURE_STORAGE_ACCESS_KEY` to authenticate using the storage account's [access keys](https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage), or set `AZURE_STORAGE_SAS_TOKEN` to make use of [SAS tokens](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview).
 
 For deployments where Azure Storage is not under AzurePuplicCloud environment, WAL-G need to use different Azure Storage endpoint. You can use optional setting `AZURE_STORAGE_SAS_TOKEN` to select the correct Azure Storage endpoint. Available setting values:  `"AzurePublicCloud"`, `"AzureUSGovernmentCloud"`, `"AzureChinaCloud"`, `"AzureGermanCloud"`. If setting is omitted or has a value different to the ones defined here, WAL-G will default to the Azure Storage endpoint for AzurePublicCloud.
 
