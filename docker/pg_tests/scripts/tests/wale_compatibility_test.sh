@@ -42,7 +42,7 @@ PGSSLMODE=allow \
 PGDATABASE=postgres \
 PGHOST=/var/run/postgresql \
 WALE_FILE_PREFIX=file://localhost/tmp \
-(wal-e backup-push ${PGDATA} && wal-e backup-push ${PGDATA})
+wal-e backup-push ${PGDATA} && wal-e backup-push ${PGDATA}
 
 pkill -9 postgres
 
