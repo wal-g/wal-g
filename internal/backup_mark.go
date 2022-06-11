@@ -198,8 +198,7 @@ func GetPermanentBackups(folder storage.Folder, metaFetcher GenericMetaFetcher) 
 	for _, backupTime := range backupTimes {
 		meta, err := metaFetcher.Fetch(backupTime.BackupName, folder)
 		if err != nil {
-			tracelog.ErrorLogger.Printf("failed to fetch backup meta for backup %s with error %s, ignoring...",
-				backupTime.BackupName, err.Error())
+			PrintMetadataNotFoundError(backupTime, err)
 			continue
 		}
 		if meta.IsPermanent {

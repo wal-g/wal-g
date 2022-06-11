@@ -22,8 +22,7 @@ func FindPermanentBackups(folder storage.Folder, metaFetcher GenericMetaFetcher)
 		meta, err := metaFetcher.Fetch(
 			backupTime.BackupName, folder.GetSubFolder(utility.BaseBackupPath))
 		if err != nil {
-			tracelog.ErrorLogger.Printf("failed to fetch backup meta for backup %s with error %s, ignoring...",
-				backupTime.BackupName, err.Error())
+			PrintMetadataNotFoundError(backupTime, err)
 			continue
 		}
 		if meta.IsPermanent {
@@ -31,6 +30,16 @@ func FindPermanentBackups(folder storage.Folder, metaFetcher GenericMetaFetcher)
 		}
 	}
 	return permanentBackups
+}
+
+func PrintMetadataNotFoundError(backupTime BackupTime, err error) {
+	if _, ok := err.(storage.ObjectNotFoundError); ok {
+		tracelog.InfoLogger.Printf("Backup %s lacks metadata to check if it's permanent, ignoring...",
+			backupTime.BackupName)
+	} else {
+		tracelog.ErrorLogger.Printf("failed to fetch backup meta for backup %s with error %s, ignoring...",
+			backupTime.BackupName, err.Error())
+	}
 }
 
 // IsPermanent is a generic function to determine if the storage object is permanent.

@@ -43,6 +43,7 @@ PGDATABASE=postgres \
 PGHOST=/var/run/postgresql \
 WALE_FILE_PREFIX=file://localhost/tmp \
 wal-e backup-push ${PGDATA}
+wal-e backup-push ${PGDATA}
 
 pkill -9 postgres
 
@@ -97,5 +98,7 @@ pg_dumpall -f /tmp/dump2
 diff /tmp/dump1 /tmp/dump2
 rm -rf /tmp/conf_files
 /tmp/scripts/drop_pg.sh
+
+wal-g delete RETAIN 1 --confirm
 
 echo "WAL-E compatible backup-fetch success!!!!!!"
