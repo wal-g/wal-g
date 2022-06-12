@@ -115,9 +115,11 @@ pg_dumpall -f /tmp/dump2
 
 diff /tmp/dump1 /tmp/dump2
 rm -rf /tmp/conf_files
-/tmp/scripts/drop_pg.sh
+
 
 WALE_FILE_PREFIX=file://localhost/tmp \
 wal-g delete retain 1 --confirm
+
+/tmp/scripts/drop_pg.sh
 
 echo "WAL-E compatible backup-fetch success!!!!!!"
