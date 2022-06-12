@@ -118,6 +118,6 @@ rm -rf /tmp/conf_files
 /tmp/scripts/drop_pg.sh
 
 WALE_FILE_PREFIX=file://localhost/tmp \
-wal-g delete RETAIN 1 --confirm
+wal-g delete retain 1 --confirm
 
 echo "WAL-E compatible backup-fetch success!!!!!!"
