@@ -22,7 +22,7 @@ func GetPermanentBackupsAndWals(folder storage.Folder) (map[string]bool, map[str
 		backup := NewBackup(folder.GetSubFolder(utility.BaseBackupPath), backupTime.BackupName)
 		meta, err := backup.FetchMeta()
 		if err != nil {
-			internal.PrintMetadataNotFoundError(backupTime, err)
+			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
 			continue
 		}
 		if meta.IsPermanent {

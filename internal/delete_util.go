@@ -10,7 +10,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func PrintMetadataNotFoundError(backupTime BackupTime, err error) {
+func FatalOnUnrecoverableMetadataError(backupTime BackupTime, err error) {
 	if _, ok := err.(storage.ObjectNotFoundError); ok {
 		tracelog.InfoLogger.Printf("Backup %s lacks metadata to check if it's permanent, ignoring...",
 			backupTime.BackupName)
