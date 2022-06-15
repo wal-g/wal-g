@@ -29,7 +29,8 @@ func NewDeleteHandler(folder storage.Folder) (*DeleteHandler, error) {
 		return obj1.GetLastModified().Before(obj2.GetLastModified())
 	}
 
-	permanentBackups := internal.FindPermanentBackups(folder, NewGenericMetaFetcher())
+	permanentBackups := internal.GetPermanentBackups(folder.GetSubFolder(utility.BaseBackupPath),
+		NewGenericMetaFetcher())
 	isPermanentFunc := func(obj storage.Object) bool {
 		return internal.IsPermanent(obj.GetName(), permanentBackups, BackupNameLength)
 	}

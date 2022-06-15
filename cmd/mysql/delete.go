@@ -115,7 +115,8 @@ func NewMySQLDeleteHandler() (*DeleteHandler, error) {
 	backupObjects, err := internal.FindBackupObjects(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	permanentBackups := internal.FindPermanentBackups(folder, mysql.NewGenericMetaFetcher())
+	permanentBackups := internal.GetPermanentBackups(folder.GetSubFolder(utility.BaseBackupPath),
+		mysql.NewGenericMetaFetcher())
 
 	return &DeleteHandler{
 		DeleteHandler: internal.NewDeleteHandler(folder, backupObjects, makeLessFunc(folder),
