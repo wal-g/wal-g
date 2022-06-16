@@ -4,15 +4,44 @@ You can use wal-g as a tool for making encrypted, compressed PostgreSQL backups(
 
 Development
 -----------
-### Installing
 
-Prepare on Ubuntu:
-```plaintext
-sudo apt-get install liblzo2-dev
+Optional:
+
+- To build with libsodium, set the `USE_LIBSODIUM` environment variable.
+- To build with lzo decompressor, set the `USE_LZO` environment variable.
+
+### Ubuntu
+
+```sh
+# Install latest Go compiler
+sudo add-apt-repository ppa:longsleep/golang-backports 
+sudo apt update
+sudo apt install golang-go
+
+# Install lib dependencies
+sudo apt install libbrotli-dev liblzo2-dev libsodium-dev
+
+# Fetch project and build
+go get github.com/wal-g/wal-g
+cd ~/go/src/github.com/wal-g/wal-g
+make deps
+make pg_build
+main/pg/wal-g --version
 ```
 
-Prepare on Mac OS:
-``` plaintext
+Users can also install WAL-G by using `make pg_install`. Specifying the `GOBIN` environment variable before installing allows the user to specify the installation location. By default, `make pg_install` puts the compiled binary in the root directory (`/`).
+
+```sh
+export USE_LIBSODIUM=1
+export USE_LZO=1
+make pg_clean
+make deps
+GOBIN=/usr/local/bin make pg_install
+```
+
+### macOS
+
+```sh
 # brew command is Homebrew for Mac OS
 brew install cmake
 export USE_LIBSODIUM="true" # since we're linking libsodium later
@@ -20,31 +49,8 @@ export USE_LIBSODIUM="true" # since we're linking libsodium later
 ./link_libsodium.sh
 make install_and_build_pg
 ```
-> The compiled binary to run is in `main/pg/wal-g`
 
-To compile and build the binary for Postgres:
-
-Optional:
-
-- To build with libsodium, just set `USE_LIBSODIUM` environment variable.
-- To build with lzo decompressor, just set `USE_LZO` environment variable.
-```plaintext
-go get github.com/wal-g/wal-g
-cd $GOPATH/src/github.com/wal-g/wal-g
-make install
-make deps
-make pg_build
-```
-
-Users can also install WAL-G by using `make install`. Specifying the GOBIN environment variable before installing allows the user to specify the installation location. On default, `make install` puts the compiled binary in `go/bin`.
-
-```plaintext
-export GOBIN=/usr/local/bin
-cd $GOPATH/src/github.com/wal-g/wal-g
-make install
-make deps
-make pg_install
-```
+The compiled binary to run is `main/pg/wal-g`
 
 Configuration
 -------------
