@@ -66,8 +66,8 @@ func (downloader *CommonDirectoryDownloader) getTarNames() (names []string, err 
 	return result, nil
 }
 
-func (backup *CommonDirectoryDownloader) getTarsToExtract() (tarsToExtract []ReaderMaker, err error) {
-	tarNames, err := backup.getTarNames()
+func (downloader *CommonDirectoryDownloader) getTarsToExtract() (tarsToExtract []ReaderMaker, err error) {
+	tarNames, err := downloader.getTarNames()
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func (backup *CommonDirectoryDownloader) getTarsToExtract() (tarsToExtract []Rea
 	tarsToExtract = make([]ReaderMaker, 0, len(tarNames))
 
 	for _, tarName := range tarNames {
-		tarToExtract := NewStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
+		tarToExtract := NewStorageReaderMaker(downloader.getTarPartitionFolder(), tarName)
 		tarsToExtract = append(tarsToExtract, tarToExtract)
 	}
 
