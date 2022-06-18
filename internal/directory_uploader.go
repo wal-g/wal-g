@@ -10,7 +10,7 @@ import (
 )
 
 type DirectoryUploader interface {
-	Upload(path string) error
+	Upload(path string) TarFileSets
 }
 
 type CommonDirectoryUploader struct {
