@@ -28,7 +28,7 @@ var UtilityFilePaths = map[string]bool{
 	TablespaceMapFilename: true,
 }
 
-var patternPgBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?", PatternTimelineAndLogSegNo)
+var patternPgBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?(_%[2]s)?", PatternTimelineAndLogSegNo, PatternLSN)
 var regexpPgBackupName = regexp.MustCompile(patternPgBackupName)
 
 // Backup contains information about a valid Postgres backup
@@ -176,7 +176,7 @@ func (backup *Backup) FetchMeta() (ExtendedMetadataDto, error) {
 	extendedMetadataDto := ExtendedMetadataDto{}
 	err := backup.FetchMetadata(&extendedMetadataDto)
 	if err != nil {
-		return ExtendedMetadataDto{}, errors.Wrap(err, "failed to unmarshal metadata")
+		return ExtendedMetadataDto{}, err
 	}
 
 	return extendedMetadataDto, nil
@@ -421,6 +421,6 @@ func GetLastWalFilename(backup Backup) (string, error) {
 	return endWalSegmentNo.getFilename(timelineID), nil
 }
 
-func FetchPgBackupName(object storage.Object) string {
+func DeduceBackupName(object storage.Object) string {
 	return regexpPgBackupName.FindString(object.GetName())
 }

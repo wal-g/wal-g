@@ -16,7 +16,7 @@ const (
 	AoSegSuffix     = "_aoseg"
 )
 
-func makeAoFileStorageKey(relNameMd5 string, modCount uint32, location *walparser.BlockLocation) string {
+func makeAoFileStorageKey(relNameMd5 string, modCount int64, location *walparser.BlockLocation) string {
 	return fmt.Sprintf("%d_%d_%s_%d_%d_%d%s",
 		location.RelationFileNode.SpcNode, location.RelationFileNode.DBNode,
 		relNameMd5,

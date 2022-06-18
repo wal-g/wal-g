@@ -152,7 +152,9 @@ func (c *GpTarBallComposer) AddHeader(fileInfoHeader *tar.Header, info os.FileIn
 	}
 	tarBall.SetUp(c.crypter)
 	defer c.tarBallQueue.EnqueueBack(tarBall)
+	c.tarFileSetsMutex.Lock()
 	c.tarFileSets.AddFile(tarBall.Name(), fileInfoHeader.Name)
+	c.tarFileSetsMutex.Unlock()
 	c.files.AddFile(fileInfoHeader, info, false)
 	return tarBall.TarWriter().WriteHeader(fileInfoHeader)
 }
