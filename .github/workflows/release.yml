@@ -10,65 +10,112 @@ env:
   USE_LIBSODIUM: 1
 
 jobs:
-  release-ubuntu:
+#  release-ubuntu:
+#    strategy:
+#      matrix:
+#        os: [ ubuntu-18.04, ubuntu-20.04 ]
+#        db: [ pg, mysql, sqlserver, redis, mongo, fdb, gp ]
+#      fail-fast: false
+#    runs-on: ${{ matrix.os }}
+#    steps:
+#      - name: Set up Go 1.x
+#        uses: actions/setup-go@v3
+#        with:
+#          go-version: ${{ env.GO_VERSION }}
+#        id: go
+#
+#      - name: Install deps
+#        run: sudo apt-get install liblzo2-dev brotli libsodium-dev
+#
+#      - name: Checkout code
+#        uses: actions/checkout@v3
+#
+#      - name: Get dependencies
+#        run: |
+#          go get -v -t -d ./...
+#          if [ -f Gopkg.toml ]; then
+#           curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+#           dep ensure
+#          fi
+#
+#      - name: Make deps
+#        run: make deps
+#
+#      - name: Fix LZO (ubuntu-18.04)
+#        if: matrix.os == 'ubuntu-18.04'
+#        run: echo "CGO_LDFLAGS=-no-pie" >> $GITHUB_ENV
+#
+#      - name: Build WAL-G
+#        run: make ${{ matrix.db }}_build
+#
+#      - name: Rename WAL-G binary
+#        run: mv main/${{ matrix.db }}/wal-g wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
+#
+#      - name: Compress WAL-G binary
+#        run: tar --owner=0 --group=0 -zcvf wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
+#
+#      - name: Calculate checksum
+#        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64 > wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.sha256
+#
+#      - name: Calculate checksum for the compressed binary
+#        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz > wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz.sha256
+#
+#      - name: Upload WAL-G binary
+#        uses: softprops/action-gh-release@v1
+#        with:
+#          files: |
+#            wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
+#            wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz
+#            wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.sha256
+#            wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz.sha256
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#    env:
+#      USE_LZO: 1
+
+  release-debian:
     strategy:
       matrix:
-        os: [ ubuntu-18.04, ubuntu-20.04 ]
+        arch: [ aarch64 ]
+        os: [ ubuntu-20.04 ]
         db: [ pg, mysql, sqlserver, redis, mongo, fdb, gp ]
       fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-        id: go
-
-      - name: Install deps
-        run: sudo apt-get install liblzo2-dev brotli libsodium-dev
-
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Get dependencies
-        run: |
-          go get -v -t -d ./...
-          if [ -f Gopkg.toml ]; then
-           curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-           dep ensure
-          fi
-
-      - name: Make deps
-        run: make deps
-
-      - name: Fix LZO (ubuntu-18.04)
-        if: matrix.os == 'ubuntu-18.04'
-        run: echo "CGO_LDFLAGS=-no-pie" >> $GITHUB_ENV
-
-      - name: Build WAL-G
-        run: make ${{ matrix.db }}_build
-
-      - name: Rename WAL-G binary
-        run: mv main/${{ matrix.db }}/wal-g wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
-
-      - name: Compress WAL-G binary
-        run: tar --owner=0 --group=0 -zcvf wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
-
-      - name: Calculate checksum
-        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64 > wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.sha256
-
-      - name: Calculate checksum for the compressed binary
-        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz > wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz.sha256
-
-      - name: Upload WAL-G binary
-        uses: softprops/action-gh-release@v1
+      - uses: uraimo/run-on-arch-action@v2
         with:
-          files: |
-            wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
-            wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz
-            wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.sha256
-            wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz.sha256
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    env:
-      USE_LZO: 1
+          arch: ${{ matrix.arch }}
+          distro: ${{ matrix.os }}
+          env: | # YAML, but pipe character is necessary
+            USE_LIBSODIUM: ${{ env.USE_LIBSODIUM }}
+            USE_LZO: ${{ env.USE_LZO }}
+          shell: /bin/bash
+          run: |
+            apt-get install -y liblzo2-dev brotli libsodium-dev golang-1.18
+            
+            export PATH="/usr/lib/go-1.18/bin:$PATH"
+            
+            go get -v -t -d ./...
+            make deps
+
+        - name: Build WAL-G
+          run: make ${{ matrix.db }}_build
+
+        - run: mv main/${{ matrix.db }}/wal-g wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}
+        - run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }} > wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}.sha256
+
+        - run: tar --owner=0 --group=0 -zcvf wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}
+        - run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz > wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
+
+        - uses: softprops/action-gh-release@v1
+            with:
+              files: |
+                wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}
+                wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+                wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}.sha256
+                wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
+            env:
+              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
