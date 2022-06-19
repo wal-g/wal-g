@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         arch: [ aarch64 ]
-        os: [ ubuntu-20.04 ]
+        os: [ ubuntu20.04 ]
         db: [ pg, mysql, sqlserver, redis, mongo, fdb, gp ]
       fail-fast: false
     runs-on: ${{ matrix.os }}
@@ -22,7 +22,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - uses: uraimo/run-on-arch-action@v2
+      - name: Build on arch
+        uses: uraimo/run-on-arch-action@v2
         with:
           arch: ${{ matrix.arch }}
           distro: ${{ matrix.os }}
@@ -41,13 +42,20 @@ jobs:
       - name: Build WAL-G
         run: make ${{ matrix.db }}_build
 
-      - run: mv main/${{ matrix.db }}/wal-g wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}
-      - run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }} > wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}.sha256
+      - name: Rename WAL-G binary
+        run: mv main/${{ matrix.db }}/wal-g wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}
 
-      - run: tar --owner=0 --group=0 -zcvf wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}
-      - run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz > wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
+      - name: Compress WAL-G binary
+        run: tar --owner=0 --group=0 -zcvf wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}
 
-      - uses: softprops/action-gh-release@v1
+      - name: Calculate checksum
+        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }} > wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}.sha256
+
+      - name: Calculate checksum for the compressed binary
+        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz > wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
+
+      - name: Upload WAL-G binary
+        uses: softprops/action-gh-release@v1
         with:
           files: |
             wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ matrix.arch }}
