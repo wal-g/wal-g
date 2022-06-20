@@ -8,6 +8,7 @@ on:
 env:
   GO_VERSION: 1.18
   USE_LIBSODIUM: 1
+  USE_LZO: 1
 
 jobs:
   release-ubuntu:
@@ -69,6 +70,7 @@ jobs:
             wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   release-debian:
     runs-on: ubuntu-20.04
     strategy:
