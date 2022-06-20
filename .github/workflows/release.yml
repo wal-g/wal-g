@@ -73,13 +73,17 @@ jobs:
       USE_LZO: 1
 
   release-debian:
+
+    runs-on: ubuntu-20.04
+
     strategy:
       matrix:
-        arch: [ aarch64 ]
-        os: [ ubuntu18.04 ]
-        db: [ pg, mysql, sqlserver, redis, mongo, fdb, gp ]
+        include:
+          - arch: aarch64
+            distro: ubuntu18.04
+            db: [ pg, mysql, sqlserver, redis, mongo, fdb, gp ]
       fail-fast: false
-    runs-on: ${{ matrix.os }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -88,7 +92,7 @@ jobs:
         uses: uraimo/run-on-arch-action@v2
         with:
           arch: ${{ matrix.arch }}
-          distro: ${{ matrix.os }}
+          distro: ${{ matrix.distro }}
           env: | # YAML, but pipe character is necessary
             USE_LIBSODIUM: ${{ env.USE_LIBSODIUM }}
             USE_LZO: ${{ env.USE_LZO }}
