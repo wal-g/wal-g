@@ -69,19 +69,14 @@ jobs:
             wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    env:
-      USE_LZO: 1
-
   release-debian:
-
     runs-on: ubuntu-20.04
-
     strategy:
       matrix:
+        db: [ pg, mysql, sqlserver, redis, mongo, fdb, gp ]
         include:
           - arch: aarch64
-            distro: ubuntu18.04
-            db: [ pg, mysql, sqlserver, redis, mongo, fdb, gp ]
+            distro: ubuntu20.04
       fail-fast: false
 
     steps:
