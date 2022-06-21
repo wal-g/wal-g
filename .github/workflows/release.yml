@@ -96,8 +96,9 @@ jobs:
           shell: /bin/bash
           run: |
             apt-get update
-            apt-get install -y liblzo2-dev brotli libsodium-dev golang-1.18
-            
+            apt-get upgrade
+            apt-get install -y liblzo2-dev brotli libsodium-dev
+            apt-get install golang-1.18-go
             export PATH="/usr/lib/go-1.18/bin:$PATH"
             
             go get -v -t -d ./...
