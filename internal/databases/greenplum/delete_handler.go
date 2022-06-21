@@ -3,11 +3,12 @@ package greenplum
 import (
 	"context"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -126,7 +127,8 @@ func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject, confirm
 	deleteSem := make(chan struct{}, deleteConcurrency)
 
 	// clean the segments
-	for _, meta := range sentinel.Segments {
+	for i := range sentinel.Segments {
+		meta := sentinel.Segments[i]
 		errorGroup.Go(func() error {
 			deleteSem <- struct{}{}
 			deleteErr := h.runDeleteOnSegment(backup, meta, confirmed)
