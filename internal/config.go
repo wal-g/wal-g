@@ -120,6 +120,7 @@ const (
 	GPSegmentsPollRetries  = "WALG_GP_SEG_POLL_RETRIES"
 	GPSegmentsUpdInterval  = "WALG_GP_SEG_UPD_INTERVAL"
 	GPSegmentStatesDir     = "WALG_GP_SEG_STATES_DIR"
+	GPDeleteConcurrency    = "WALG_GP_DELETE_CONCURRENCY"
 
 	GoMaxProcs = "GOMAXPROCS"
 
@@ -207,6 +208,7 @@ var (
 		GPSegmentsUpdInterval:  "10s",
 		GPSegmentsPollRetries:  "5",
 		GPSegmentStatesDir:     "/tmp",
+		GPDeleteConcurrency:    "1",
 	}
 
 	AllowedSettings map[string]bool
@@ -407,6 +409,7 @@ var (
 		GPSegmentsPollInterval: true,
 		GPSegmentsUpdInterval:  true,
 		GPSegmentStatesDir:     true,
+		GPDeleteConcurrency:    true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
