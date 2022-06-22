@@ -31,6 +31,9 @@ linters-settings:
     locale: US
   lll:
     line-length: 140
+  staticcheck:
+    # SA1019 is disabled until WAL-G has migrated from the deprecated package golang.org/x/crypto/openpgp
+    checks: [ "all", "-SA1019" ]
   revive:
     rules:
       - name: blank-imports
