@@ -284,9 +284,6 @@ func (h *DeleteHandler) FindTargetRetainAfterName(
 		}
 		return meetName && object.IsFullBackup()
 	}
-	if choiceFuncAfterName == nil {
-		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete before'")
-	}
 
 	target1, err := findTarget(h.backups, h.greater, choiceFuncRetain)
 	if err != nil && err != errNotFound {
