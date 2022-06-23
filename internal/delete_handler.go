@@ -38,7 +38,7 @@ const (
 	DeleteTargetExamples = `  target base_0000000100000000000000C4	delete base backup by name
   target --target-user-data "{ \"x\": [3], \"y\": 4 }"	delete backup specified by user data
   target base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all dependant delta backups 
-  target FIND_FULL base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all delta backups with the same base backup`  //nolint:lll
+  target FIND_FULL base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all delta backups with the same base backup` //nolint:lll
 
 	DeleteEverythingUsageExample = "everything [FORCE]"
 	DeleteRetainUsageExample     = "retain [FULL|FIND_FULL] backup_count"
@@ -346,19 +346,22 @@ func (h *DeleteHandler) DeleteEverything(confirmed bool) {
 }
 
 func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) error {
-	return h.DeleteBeforeTargetWhere(target, confirmed, func(storage.Object) bool { return true })
+	objFilter := func(storage.Object) bool { return true }
+	folderFilter := func(string) bool { return true }
+
+	return h.DeleteBeforeTargetWhere(target, confirmed, objFilter, folderFilter)
 }
 
-func (h *DeleteHandler) DeleteBeforeTargetWhere(target BackupObject, confirmed bool, selector func(object storage.Object) bool) error {
+func (h *DeleteHandler) DeleteBeforeTargetWhere(target BackupObject, confirmed bool,
+	objSelector func(object storage.Object) bool, folderFilter func(name string) bool) error {
 	if !target.IsFullBackup() {
 		errorMessage := "%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
 		return utility.NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
 	}
 	tracelog.InfoLogger.Println("Start delete")
 
-	folderFilter := func(path string) bool { return true }
 	return storage.DeleteObjectsWhere(h.Folder, confirmed, func(object storage.Object) bool {
-		return selector(object) && h.less(object, target) && !h.isPermanent(object) && !h.isIgnored(object)
+		return objSelector(object) && h.less(object, target) && !h.isPermanent(object) && !h.isIgnored(object)
 	}, folderFilter)
 }
 

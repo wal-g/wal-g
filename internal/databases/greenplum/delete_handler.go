@@ -144,7 +144,9 @@ func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject, confirm
 
 	tracelog.InfoLogger.Printf("Finished deleting the segments backups")
 
-	return h.DeleteHandler.DeleteBeforeTarget(target, confirmed)
+	objFilter := func(object storage.Object) bool { return true }
+	folderFilter := func(name string) bool { return strings.HasPrefix(name, utility.BaseBackupPath) }
+	return h.DeleteHandler.DeleteBeforeTargetWhere(target, confirmed, objFilter, folderFilter)
 }
 
 func (h *DeleteHandler) runDeleteOnSegment(backup Backup, meta SegmentMetadata, confirmed bool) error {
@@ -174,8 +176,8 @@ func (h *DeleteHandler) runDeleteOnSegment(backup Backup, meta SegmentMetadata, 
 	filterFunc := func(object storage.Object) bool {
 		return !strings.HasSuffix(object.GetName(), postgres.AoSegSuffix)
 	}
-
-	err = segDeleteHandler.DeleteBeforeTargetWhere(segTarget, confirmed, filterFunc)
+	folderFilter := func(string) bool { return true }
+	err = segDeleteHandler.DeleteBeforeTargetWhere(segTarget, confirmed, filterFunc, folderFilter)
 	if err != nil {
 		return err
 	}
