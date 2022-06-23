@@ -49,6 +49,7 @@ func CreateMockStorageFolder() storage.Folder {
 	subFolder.PutObject("base_456/tar_partitions/1", &bytes.Buffer{})
 	subFolder.PutObject("base_456/tar_partitions/2", &bytes.Buffer{})
 	subFolder.PutObject("base_456/tar_partitions/3", &bytes.Buffer{})
+	subFolder.PutObject("base_456/some_folder/3", &bytes.Buffer{})
 	return folder
 }
 
@@ -58,7 +59,28 @@ func TestDeleteOldObjects(t *testing.T) {
 	filter := func(object storage.Object) bool {
 		return object.GetName() != expectedOnlyOneSavedObjectName
 	}
-	err := storage.DeleteObjectsWhere(folder, true, filter)
+
+	folderFilter := func(path string) bool { return true }
+	err := storage.DeleteObjectsWhere(folder, true, filter, folderFilter)
+	assert.NoError(t, err)
+	savedObjects, err := storage.ListFolderRecursively(folder)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(savedObjects))
+	assert.Equal(t, expectedOnlyOneSavedObjectName, savedObjects[0].GetName())
+}
+
+func TestDeleteOldObjectsWithFilter(t *testing.T) {
+	folder := CreateMockStorageFolder()
+	expectedOnlyOneSavedObjectName := "basebackups_005/base_456/some_folder/3"
+	filter := func(object storage.Object) bool {
+		return true
+	}
+
+	folderFilter := func(name string) bool {
+		return !strings.HasPrefix(name, "basebackups_005/base_456/some_folder")
+	}
+
+	err := storage.DeleteObjectsWhere(folder, true, filter, folderFilter)
 	assert.NoError(t, err)
 	savedObjects, err := storage.ListFolderRecursively(folder)
 	assert.NoError(t, err)

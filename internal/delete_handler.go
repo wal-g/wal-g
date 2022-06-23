@@ -340,7 +340,8 @@ func (h *DeleteHandler) FindTargetRetainAfterTime(retentionCount int, timeLine t
 
 func (h *DeleteHandler) DeleteEverything(confirmed bool) {
 	filter := func(object storage.Object) bool { return true }
-	err := storage.DeleteObjectsWhere(h.Folder, confirmed, filter)
+	folderFilter := func(path string) bool { return true }
+	err := storage.DeleteObjectsWhere(h.Folder, confirmed, filter, folderFilter)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
@@ -355,9 +356,10 @@ func (h *DeleteHandler) DeleteBeforeTargetWhere(target BackupObject, confirmed b
 	}
 	tracelog.InfoLogger.Println("Start delete")
 
+	folderFilter := func(path string) bool { return true }
 	return storage.DeleteObjectsWhere(h.Folder, confirmed, func(object storage.Object) bool {
 		return selector(object) && h.less(object, target) && !h.isPermanent(object) && !h.isIgnored(object)
-	})
+	}, folderFilter)
 }
 
 func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool) error {
@@ -369,10 +371,11 @@ func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool) er
 		backupNamesToDelete[target.GetBackupName()] = true
 	}
 
+	folderFilter := func(path string) bool { return true }
 	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath),
 		confirmed, func(object storage.Object) bool {
 			return backupNamesToDelete[utility.StripLeftmostBackupName(object.GetName())] && !h.isPermanent(object) && !h.isIgnored(object)
-		})
+		}, folderFilter)
 }
 
 // Find all backups related to the target.

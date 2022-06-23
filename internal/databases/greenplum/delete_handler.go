@@ -191,7 +191,8 @@ func cleanupAOSegments(segFolder storage.Folder, confirmed bool) error {
 	}
 
 	tracelog.InfoLogger.Printf("Cleaning up the AO segment objects")
-	return storage.DeleteObjectsWhere(aoSegFolder, confirmed, func(object storage.Object) bool {
+
+	objFilter := func(object storage.Object) bool {
 		if !strings.HasSuffix(object.GetName(), postgres.AoSegSuffix) {
 			return false
 		}
@@ -199,7 +200,10 @@ func cleanupAOSegments(segFolder storage.Folder, confirmed bool) error {
 		segName := path.Base(object.GetName())
 		_, shouldDelete := aoSegmentsToDelete[segName]
 		return shouldDelete
-	})
+	}
+
+	folderFilter := func(path string) bool { return true }
+	return storage.DeleteObjectsWhere(aoSegFolder, confirmed, objFilter, folderFilter)
 }
 
 func findAoSegmentsToDelete(aoSegFolder storage.Folder) (map[string]struct{}, error) {

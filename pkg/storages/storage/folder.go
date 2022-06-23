@@ -31,15 +31,15 @@ type Folder interface {
 	CopyObject(srcPath string, dstPath string) error
 }
 
-func DeleteObjectsWhere(folder Folder, confirm bool, filter func(object1 Object) bool) error {
-	relativePathObjects, err := ListFolderRecursively(folder)
+func DeleteObjectsWhere(folder Folder, confirm bool, objFilter func(object1 Object) bool, folderFilter func(name string) bool) error {
+	relativePathObjects, err := ListFolderRecursivelyWithFilter(folder, folderFilter)
 	if err != nil {
 		return err
 	}
 	filteredRelativePaths := make([]string, 0)
 	tracelog.InfoLogger.Println("Objects in folder:")
 	for _, object := range relativePathObjects {
-		if filter(object) {
+		if objFilter(object) {
 			tracelog.InfoLogger.Println("\twill be deleted: " + object.GetName())
 			filteredRelativePaths = append(filteredRelativePaths, object.GetName())
 		} else {
