@@ -58,6 +58,10 @@ func DeleteObjectsWhere(folder Folder, confirm bool, filter func(object1 Object)
 }
 
 func ListFolderRecursively(folder Folder) (relativePathObjects []Object, err error) {
+	return ListFolderRecursivelyWithFilter(folder, func(string) bool { return true })
+}
+
+func ListFolderRecursivelyWithFilter(folder Folder, selector func(path string) bool) (relativePathObjects []Object, err error) {
 	queue := make([]Folder, 0)
 	queue = append(queue, folder)
 	for len(queue) > 0 {
@@ -69,7 +73,8 @@ func ListFolderRecursively(folder Folder) (relativePathObjects []Object, err err
 		if err != nil {
 			return nil, err
 		}
-		queue = append(queue, subFolders...)
+
+		queue = append(queue, filterSubfolders(folder.GetPath(), subFolders, selector)...)
 	}
 	return relativePathObjects, nil
 }
@@ -81,4 +86,16 @@ func addPrefixToNames(objects []Object, folderPrefix string) []Object {
 		relativePathObjects[i] = NewLocalObject(relativePath, object.GetLastModified(), object.GetSize())
 	}
 	return relativePathObjects
+}
+
+// filterSubfolders returns subfolders matching the provided path selector
+func filterSubfolders(rootFolderPath string, folders []Folder, selector func(path string) bool) []Folder {
+	result := make([]Folder, 0)
+	for i := range folders {
+		folderPath := strings.TrimPrefix(folders[i].GetPath(), rootFolderPath)
+		if selector(folderPath) {
+			result = append(result, folders[i])
+		}
+	}
+	return result
 }
