@@ -99,7 +99,7 @@ jobs:
             apt-get install -y build-essential curl git cmake liblzo2-dev brotli libsodium-dev
             
             curl -LO https://go.dev/dl/go1.18.3.linux-arm64.tar.gz
-            sudo tar -C /usr/local -xzf go1.18.3.linux-arm64.tar.gz
+            tar -C /usr/local -xzf go1.18.3.linux-arm64.tar.gz
             export GOROOT=/usr/local/go
             export GOPATH=$HOME/go          
             export PATH="/usr/lib/go/bin:$PATH"
