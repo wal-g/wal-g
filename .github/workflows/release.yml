@@ -78,7 +78,7 @@ jobs:
         db: [ pg, mysql, sqlserver, redis, mongo, fdb, gp ]
         include:
           - arch: aarch64
-            distro: ubuntu_latest
+            distro: ubuntu20.04
       fail-fast: false
 
     steps:
