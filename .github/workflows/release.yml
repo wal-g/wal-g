@@ -114,7 +114,6 @@ jobs:
             
             git config --global --add safe.directory /home/runner/work/wal-g/wal-g
             git config --global --add safe.directory /home/runner/work/wal-g/wal-g/submodules/brotli
-            git config --global --add safe.directory /home/runner/work/wal-g/wal-g/*
             
             make deps
             
