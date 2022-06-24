@@ -108,6 +108,8 @@ jobs:
               dep ensure
             fi
             
+            git config --global --add safe.directory /home/runner/work/wal-g/wal-g
+            
             make deps
             
             make ${{ matrix.db }}_build
