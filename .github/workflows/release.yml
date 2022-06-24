@@ -103,7 +103,7 @@ jobs:
             export GOROOT=/usr/local/go
             export GOPATH=$HOME/go          
             export PATH="/usr/local/go/bin:$PATH"
-            source .bashrc
+            source ~/.bashrc
             
             go version
             
