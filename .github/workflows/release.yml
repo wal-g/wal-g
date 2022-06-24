@@ -100,6 +100,7 @@ jobs:
             
             curl -LO https://go.dev/dl/go1.18.3.linux-arm64.tar.gz
             tar -C /usr/local -xzf go1.18.3.linux-arm64.tar.gz
+            source ~/.profile
             export GOROOT=/usr/local/go
             export GOPATH=$HOME/go          
             export PATH="/usr/lib/go/bin:$PATH"
