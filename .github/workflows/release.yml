@@ -102,7 +102,7 @@ jobs:
             tar -C /usr/local -xzf go1.18.3.linux-arm64.tar.gz
             export GOROOT=/usr/local/go
             export GOPATH=$HOME/go          
-            export PATH="/usr/local/go/bin:$PATH"
+            export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
             source ~/.bashrc
             
             go version
