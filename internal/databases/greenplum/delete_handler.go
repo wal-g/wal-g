@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 
@@ -187,51 +186,49 @@ func (h *DeleteHandler) runDeleteOnSegment(backup Backup, meta SegmentMetadata, 
 
 func cleanupAOSegments(segFolder storage.Folder, confirmed bool) error {
 	aoSegFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(postgres.AoStoragePath)
+	tracelog.InfoLogger.Printf("Cleaning up the AO segment objects")
 	aoSegmentsToDelete, err := findAoSegmentsToDelete(aoSegFolder)
 	if err != nil {
 		return err
 	}
 
-	tracelog.InfoLogger.Printf("Cleaning up the AO segment objects")
-
-	objFilter := func(object storage.Object) bool {
-		if !strings.HasSuffix(object.GetName(), postgres.AoSegSuffix) {
-			return false
-		}
-
-		segName := path.Base(object.GetName())
-		_, shouldDelete := aoSegmentsToDelete[segName]
-		return shouldDelete
-	}
-
-	folderFilter := func(path string) bool { return true }
-	return storage.DeleteObjectsWhere(aoSegFolder, confirmed, objFilter, folderFilter)
+	return aoSegFolder.DeleteObjects(aoSegmentsToDelete)
 }
 
-func findAoSegmentsToDelete(aoSegFolder storage.Folder) (map[string]struct{}, error) {
+func findAoSegmentsToDelete(aoSegFolder storage.Folder) ([]string, error) {
 	aoObjects, _, err := aoSegFolder.ListFolder()
 	if err != nil {
 		return nil, err
 	}
 
-	aoSegmentsToDelete := make(map[string]struct{})
-	// by default, we want to delete all segments
-	for _, obj := range aoObjects {
-		if strings.HasSuffix(obj.GetName(), postgres.AoSegSuffix) {
-			aoSegName := path.Base(obj.GetName())
-			aoSegmentsToDelete[aoSegName] = struct{}{}
-		}
-	}
-
-	// now exclude the still referenced ones
+	// we want to retain AO segments that are still referenced by some backups
+	aoSegmentsToRetain := make(map[string]struct{})
 	for _, obj := range aoObjects {
 		if strings.HasSuffix(obj.GetName(), postgres.BackupRefSuffix) {
 			// this should never fail, since slice len is always > 0
 			referencedSegName := strings.SplitAfter(obj.GetName(), postgres.AoSegSuffix)[0]
-			tracelog.InfoLogger.Printf(
-				"AO segment %s is still referenced by some backups, will not delete it\n", referencedSegName)
-			delete(aoSegmentsToDelete, referencedSegName)
+			aoSegmentsToRetain[referencedSegName] = struct{}{}
 		}
 	}
+
+	aoSegmentsToDelete := make([]string, 0)
+	for _, obj := range aoObjects {
+		if !strings.HasSuffix(obj.GetName(), postgres.AoSegSuffix) {
+			// this is not an AO segment file, skip it
+			tracelog.InfoLogger.Println("\tis not an AO segment file, will not delete: " + obj.GetName())
+			continue
+		}
+
+		if _, ok := aoSegmentsToRetain[obj.GetName()]; ok {
+			// this AO segment file is still referenced by some backup, skip it
+			tracelog.InfoLogger.Println("\tis still referenced by some backups, will not delete: " + obj.GetName())
+			continue
+		}
+
+		tracelog.InfoLogger.Println("\twill be deleted: " + obj.GetName())
+
+		aoSegmentsToDelete = append(aoSegmentsToDelete, obj.GetName())
+	}
+
 	return aoSegmentsToDelete, nil
 }
