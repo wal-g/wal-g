@@ -90,7 +90,7 @@ jobs:
         with:
           arch: ${{ matrix.arch }}
           distro: ${{ matrix.distro }}
-          env:
+          env: |
             USE_LIBSODIUM: ${{ env.USE_LIBSODIUM }}
             USE_LZO: ${{ env.USE_LZO }}
           shell: /bin/bash
