@@ -78,7 +78,7 @@ jobs:
         db: [ pg, mysql, sqlserver, redis, mongo, fdb, gp ]
         include:
           - arch: aarch64
-            distro: ubuntu20.04
+            distro: ubuntu_latest
       fail-fast: false
 
     steps:
@@ -90,13 +90,13 @@ jobs:
         with:
           arch: ${{ matrix.arch }}
           distro: ${{ matrix.distro }}
-          env: | # YAML, but pipe character is necessary
+          env:
             USE_LIBSODIUM: ${{ env.USE_LIBSODIUM }}
             USE_LZO: ${{ env.USE_LZO }}
           shell: /bin/bash
           run: |
             apt-get update
-            apt-get install -y liblzo2-dev brotli libsodium-dev golang-1.18-go
+            apt-get install -y build-essential curl git cmake golang-1.18 liblzo2-dev brotli libsodium-dev
 
             export PATH="/usr/lib/go-1.18/bin:$PATH"
             
