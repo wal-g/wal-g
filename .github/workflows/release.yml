@@ -70,7 +70,7 @@ jobs:
             wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+          
   release-ubuntu-arm:
     runs-on: ubuntu-20.04
     strategy:
