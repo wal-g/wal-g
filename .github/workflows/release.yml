@@ -107,8 +107,12 @@ jobs:
            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
            dep ensure
           fi
+
       - name: Make deps
         run: make deps
+
+      - name: Check golang version
+        run: go version
 
       - name: Build WAL-G
         run: make ${{ matrix.db }}_build
