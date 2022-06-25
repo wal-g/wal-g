@@ -95,6 +95,9 @@ jobs:
             USE_LZO: ${{ env.USE_LZO }}
           shell: /bin/bash
           run: |
+            echo USE_LZO: $USE_LZO
+            echo USE_LIBSODIUM: $USE_LIBSODIUM
+            
             apt-get update
             apt-get install -y build-essential curl git cmake liblzo2-dev brotli libsodium-dev
             
@@ -104,7 +107,6 @@ jobs:
             export GOPATH=$HOME/go          
             export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
             
-            go version
             
             go get -v -t -d ./...
             if [ -f Gopkg.toml ]; then
