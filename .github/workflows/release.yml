@@ -94,10 +94,7 @@ jobs:
             USE_LIBSODIUM: ${{ env.USE_LIBSODIUM }}
             USE_LZO: ${{ env.USE_LZO }}
           shell: /bin/bash
-          run: |
-            echo USE_LZO: $USE_LZO
-            echo USE_LIBSODIUM: $USE_LIBSODIUM
-            
+          run: |            
             apt-get update
             apt-get install -y build-essential curl git cmake liblzo2-dev brotli libsodium-dev
             
