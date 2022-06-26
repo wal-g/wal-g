@@ -35,7 +35,7 @@ func GetLocalFileInfo(targetPath string) (fileInfo os.FileInfo, err error) {
 
 // create new local file on disk
 func CreateLocalFile(targetPath, name string) (*os.File, error) {
-	err := PrepareDirs(name, targetPath)
+	err := CreateParentDirs(name, targetPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create all directories")
 	}
