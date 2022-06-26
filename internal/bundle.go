@@ -112,15 +112,7 @@ func (bundle *Bundle) getFileRelPath(fileAbsPath string) string {
 }
 
 func (bundle *Bundle) createTarFileInfoHeader(path string, info os.FileInfo) (header *tar.Header, err error) {
-	var symLinkTarget string
-	if info.Mode()&os.ModeSymlink == os.ModeSymlink {
-		symLinkTarget, err = os.Readlink(path)
-		if err != nil {
-			return
-		}
-	}
-
-	header, err = tar.FileInfoHeader(info, symLinkTarget)
+	header, err = tar.FileInfoHeader(info, path)
 	if err != nil {
 		return nil, errors.Wrap(err, "addToBundle: could not grab header info")
 	}

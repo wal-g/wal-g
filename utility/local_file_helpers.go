@@ -11,7 +11,6 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
-// Вынести в utility
 func GetLocalFile(targetPath string, header *tar.Header) (localFile *os.File, isNewFile bool, err error) {
 	if localFileInfo, _ := GetLocalFileInfo(targetPath); localFileInfo != nil {
 		localFile, err = os.OpenFile(targetPath, os.O_RDWR, 0666)
@@ -38,7 +37,7 @@ func GetLocalFileInfo(targetPath string) (fileInfo os.FileInfo, err error) {
 func CreateLocalFile(targetPath, name string) (*os.File, error) {
 	err := PrepareDirs(name, targetPath)
 	if err != nil {
-		return nil, errors.Wrap(err, "Interpret: failed to create all directories")
+		return nil, errors.Wrap(err, "failed to create all directories")
 	}
 	file, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
@@ -47,7 +46,8 @@ func CreateLocalFile(targetPath, name string) (*os.File, error) {
 	return file, nil
 }
 
-func PrepareDirs(fileName string, targetPath string) error {
+// creates parent dirs of the file
+func CreateParentDirs(fileName string, targetPath string) error {
 	if fileName == targetPath {
 		return nil // because it runs in the local directory
 	}
@@ -62,20 +62,20 @@ func WriteLocalFile(fileReader io.Reader, header *tar.Header, localFile *os.File
 	if err != nil {
 		err1 := os.Remove(localFile.Name())
 		if err1 != nil {
-			tracelog.ErrorLogger.Fatalf("Interpret: failed to remove localFile '%s' because of error: %v",
+			tracelog.ErrorLogger.Fatalf("failed to remove localFile '%s' because of error: %v",
 				localFile.Name(), err1)
 		}
-		return errors.Wrap(err, "Interpret: copy failed")
+		return errors.Wrap(err, "copy failed")
 	}
 
 	mode := os.FileMode(header.Mode)
 	if err = localFile.Chmod(mode); err != nil {
-		return errors.Wrap(err, "Interpret: chmod failed")
+		return errors.Wrap(err, "chmod failed")
 	}
 
 	if fsync {
 		err = localFile.Sync()
-		return errors.Wrap(err, "Interpret: fsync failed")
+		return errors.Wrap(err, "fsync failed")
 	}
 
 	return nil
