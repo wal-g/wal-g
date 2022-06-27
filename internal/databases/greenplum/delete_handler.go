@@ -215,13 +215,13 @@ func findAoSegmentsToDelete(aoSegFolder storage.Folder) ([]string, error) {
 	for _, obj := range aoObjects {
 		if !strings.HasSuffix(obj.GetName(), postgres.AoSegSuffix) {
 			// this is not an AO segment file, skip it
-			tracelog.InfoLogger.Println("\tis not an AO segment file, will not delete: " + obj.GetName())
+			tracelog.DebugLogger.Println("\tis not an AO segment file, will not delete: " + obj.GetName())
 			continue
 		}
 
 		if _, ok := aoSegmentsToRetain[obj.GetName()]; ok {
 			// this AO segment file is still referenced by some backup, skip it
-			tracelog.InfoLogger.Println("\tis still referenced by some backups, will not delete: " + obj.GetName())
+			tracelog.DebugLogger.Println("\tis still referenced by some backups, will not delete: " + obj.GetName())
 			continue
 		}
 
