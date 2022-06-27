@@ -222,7 +222,8 @@ func (dh *DeleteHandler) HandleDeleteGarbage(args []string, folder storage.Folde
 		return err
 	}
 
-	return dh.DeleteBeforeTargetWhere(target, confirm, predicate)
+	folderFilter := func(string) bool { return true }
+	return dh.DeleteBeforeTargetWhere(target, confirm, predicate, folderFilter)
 }
 
 // ExtractDeleteGarbagePredicate extracts delete modifier the "delete garbage" command

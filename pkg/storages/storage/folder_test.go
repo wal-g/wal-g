@@ -2,6 +2,7 @@ package storage_test
 
 import (
 	"bytes"
+	"sort"
 	"strings"
 	"testing"
 
@@ -48,6 +49,7 @@ func CreateMockStorageFolder() storage.Folder {
 	subFolder.PutObject("base_456/tar_partitions/1", &bytes.Buffer{})
 	subFolder.PutObject("base_456/tar_partitions/2", &bytes.Buffer{})
 	subFolder.PutObject("base_456/tar_partitions/3", &bytes.Buffer{})
+	subFolder.PutObject("base_456/some_folder/3", &bytes.Buffer{})
 	return folder
 }
 
@@ -57,10 +59,76 @@ func TestDeleteOldObjects(t *testing.T) {
 	filter := func(object storage.Object) bool {
 		return object.GetName() != expectedOnlyOneSavedObjectName
 	}
-	err := storage.DeleteObjectsWhere(folder, true, filter)
+
+	folderFilter := func(path string) bool { return true }
+	err := storage.DeleteObjectsWhere(folder, true, filter, folderFilter)
 	assert.NoError(t, err)
 	savedObjects, err := storage.ListFolderRecursively(folder)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(savedObjects))
 	assert.Equal(t, expectedOnlyOneSavedObjectName, savedObjects[0].GetName())
+}
+
+func TestDeleteOldObjectsWithFilter(t *testing.T) {
+	folder := CreateMockStorageFolder()
+	expectedOnlyOneSavedObjectName := "basebackups_005/base_456/some_folder/3"
+	filter := func(object storage.Object) bool {
+		return true
+	}
+
+	folderFilter := func(name string) bool {
+		return !strings.HasPrefix(name, "basebackups_005/base_456/some_folder")
+	}
+
+	err := storage.DeleteObjectsWhere(folder, true, filter, folderFilter)
+	assert.NoError(t, err)
+	savedObjects, err := storage.ListFolderRecursively(folder)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(savedObjects))
+	assert.Equal(t, expectedOnlyOneSavedObjectName, savedObjects[0].GetName())
+}
+
+func TestListFolderRecursivelyWithFilter(t *testing.T) {
+	var folder = memory.NewFolder("in_memory/", memory.NewStorage())
+	subFolder := folder.GetSubFolder("basebackups_005/")
+	includedObjNames := []string{
+		"base_123_backup_stop_sentinel.json",
+		"base_456_backup_stop_sentinel.json",
+		"base_123312",
+		"base_321/nop",
+		"folder123/nop",
+		"base_456/some_folder/2",
+	}
+
+	for _, name := range includedObjNames {
+		subFolder.PutObject(name, &bytes.Buffer{})
+	}
+
+	excludedObjNames := []string{
+		"base_456/tar_partitions/1",
+		"base_456/tar_partitions/2",
+		"base_456/tar_partitions/3",
+	}
+
+	for _, name := range excludedObjNames {
+		subFolder.PutObject(name, &bytes.Buffer{})
+	}
+
+	filterFunc := func(path string) bool {
+		return !strings.HasPrefix(path, "base_456/tar_partitions")
+	}
+
+	filtered, err := storage.ListFolderRecursivelyWithFilter(subFolder, filterFunc)
+
+	filteredNames := make([]string, 0)
+
+	for i := range filtered {
+		filteredNames = append(filteredNames, filtered[i].GetName())
+	}
+
+	sort.Strings(filteredNames)
+	sort.Strings(includedObjNames)
+
+	assert.NoError(t, err)
+	assert.Equal(t, filteredNames, includedObjNames)
 }
