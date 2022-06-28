@@ -226,9 +226,7 @@ func (c *GpTarBallComposer) addAOFile(cfi *internal.ComposeFileInfo, aoMeta AoRe
 	if _, exists := c.baseAoFiles[storageKey]; exists {
 		c.addAoFileMetadata(cfi, storageKey, aoMeta, true)
 		tracelog.DebugLogger.Printf("Skipping %s AO relfile (already exists in storage as %s)", cfi.Path, storageKey)
-
-		// add reference for the current backup to the storage
-		return storeBackupReference(c.uploader.UploadingFolder, storageKey, c.backupName)
+		return nil
 	}
 
 	tracelog.DebugLogger.Printf("Uploading %s AO relfile to %s (does not exist in storage)", cfi.Path, storageKey)
@@ -257,9 +255,7 @@ func (c *GpTarBallComposer) addAOFile(cfi *internal.ComposeFileInfo, aoMeta AoRe
 	}
 
 	c.addAoFileMetadata(cfi, storageKey, aoMeta, false)
-
-	// add reference for the current backup to the storage
-	return storeBackupReference(c.uploader.UploadingFolder, storageKey, c.backupName)
+	return nil
 }
 
 func (c *GpTarBallComposer) addAoFileMetadata(cfi *internal.ComposeFileInfo, storageKey string, aoMeta AoRelFileMetadata, isSkipped bool) {

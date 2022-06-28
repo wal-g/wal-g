@@ -1,9 +1,7 @@
 package postgres
 
 import (
-	"bytes"
 	"fmt"
-	"path"
 
 	"github.com/wal-g/wal-g/internal/walparser"
 
@@ -11,9 +9,8 @@ import (
 )
 
 const (
-	AoStoragePath   = "aosegments"
-	BackupRefSuffix = "_ref"
-	AoSegSuffix     = "_aoseg"
+	AoStoragePath = "aosegments"
+	AoSegSuffix   = "_aoseg"
 )
 
 func makeAoFileStorageKey(relNameMd5 string, modCount int64, location *walparser.BlockLocation) string {
@@ -22,11 +19,6 @@ func makeAoFileStorageKey(relNameMd5 string, modCount int64, location *walparser
 		relNameMd5,
 		location.RelationFileNode.RelNode, location.BlockNo,
 		modCount, AoSegSuffix)
-}
-
-func storeBackupReference(baseBackupsFolder storage.Folder, aoFilename string, backupName string) error {
-	refName := aoFilename + "_" + backupName + BackupRefSuffix
-	return baseBackupsFolder.PutObject(path.Join(AoStoragePath, refName), &bytes.Buffer{})
 }
 
 func LoadStorageAoFiles(baseBackupsFolder storage.Folder) (map[string]struct{}, error) {
