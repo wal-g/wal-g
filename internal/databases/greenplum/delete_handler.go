@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -172,50 +173,50 @@ func (h *DeleteHandler) runDeleteOnSegment(backup Backup, meta SegmentMetadata, 
 	tracelog.InfoLogger.Printf("Running delete before target %s on segment %d\n",
 		segTarget.GetBackupName(), meta.ContentID)
 
-	filterFunc := func(object storage.Object) bool {
-		return !strings.HasSuffix(object.GetName(), postgres.AoSegSuffix)
+	filterFunc := func(object storage.Object) bool { return true }
+	folderFilter := func(folderPath string) bool {
+		aoSegFolderPrefix := path.Join(utility.BaseBackupPath, postgres.AoStoragePath)
+		return !strings.HasPrefix(folderPath, aoSegFolderPrefix)
 	}
-	folderFilter := func(string) bool { return true }
 	err = segDeleteHandler.DeleteBeforeTargetWhere(segTarget, confirmed, filterFunc, folderFilter)
 	if err != nil {
 		return err
 	}
 
-	return cleanupAOSegments(segFolder, confirmed)
+	return cleanupAOSegments(segTarget, segFolder, confirmed)
 }
 
-func cleanupAOSegments(segFolder storage.Folder, confirmed bool) error {
+func cleanupAOSegments(target internal.BackupObject, segFolder storage.Folder, confirmed bool) error {
 	aoSegFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(postgres.AoStoragePath)
-	tracelog.InfoLogger.Printf("Cleaning up the AO segment objects")
-	aoSegmentsToDelete, err := findAoSegmentsToDelete(aoSegFolder)
+	aoSegmentsToRetain, err := getAoSegmentsToRetain(segFolder)
 	if err != nil {
 		return err
+	}
+	tracelog.InfoLogger.Printf("Cleaning up the AO segment objects")
+	aoSegmentsToDelete, err := findAoSegmentsToDelete(target, aoSegmentsToRetain, aoSegFolder)
+	if err != nil {
+		return err
+	}
+
+	if !confirmed {
+		return nil
 	}
 
 	return aoSegFolder.DeleteObjects(aoSegmentsToDelete)
 }
 
-func findAoSegmentsToDelete(aoSegFolder storage.Folder) ([]string, error) {
+func findAoSegmentsToDelete(target internal.BackupObject,
+	aoSegmentsToRetain map[string]struct{}, aoSegFolder storage.Folder) ([]string, error) {
 	aoObjects, _, err := aoSegFolder.ListFolder()
 	if err != nil {
 		return nil, err
 	}
 
-	// we want to retain AO segments that are still referenced by some backups
-	aoSegmentsToRetain := make(map[string]struct{})
-	for _, obj := range aoObjects {
-		if strings.HasSuffix(obj.GetName(), postgres.BackupRefSuffix) {
-			// this should never fail, since slice len is always > 0
-			referencedSegName := strings.SplitAfter(obj.GetName(), postgres.AoSegSuffix)[0]
-			aoSegmentsToRetain[referencedSegName] = struct{}{}
-		}
-	}
-
 	aoSegmentsToDelete := make([]string, 0)
 	for _, obj := range aoObjects {
-		if !strings.HasSuffix(obj.GetName(), postgres.AoSegSuffix) {
-			// this is not an AO segment file, skip it
-			tracelog.DebugLogger.Println("\tis not an AO segment file, will not delete: " + obj.GetName())
+		if !strings.HasSuffix(obj.GetName(), postgres.AoSegSuffix) && obj.GetLastModified().After(target.GetLastModified()) {
+			tracelog.DebugLogger.Println(
+				"\tis not an AO segment file, will not delete (modify time is too recent): " + obj.GetName())
 			continue
 		}
 
@@ -231,4 +232,39 @@ func findAoSegmentsToDelete(aoSegFolder storage.Folder) ([]string, error) {
 	}
 
 	return aoSegmentsToDelete, nil
+}
+
+func getAoSegmentsToRetain(folder storage.Folder) (map[string]struct{}, error) {
+	baseBackupsFolder := folder.GetSubFolder(utility.BaseBackupPath)
+	backupObjects, _, err := baseBackupsFolder.ListFolder()
+	if err != nil {
+		return nil, err
+	}
+
+	backupTimes := internal.GetBackupTimeSlices(backupObjects)
+	if err != nil {
+		return nil, err
+	}
+
+	aoSegmentsToRetain := make(map[string]struct{}, 0)
+	for _, b := range backupTimes {
+		backup := postgres.NewBackup(baseBackupsFolder, b.BackupName)
+		aoMeta, err := backup.LoadAoFilesMetadata()
+		if err != nil {
+			if _, ok := err.(storage.ObjectNotFoundError); ok {
+				tracelog.WarningLogger.Printf("No AO files metadata found for backup %s in folder %s, skipping",
+					backup.Name, baseBackupsFolder.GetPath())
+				continue
+			}
+
+			return nil, err
+		}
+
+		for _, fileDesc := range aoMeta.Files {
+			tracelog.DebugLogger.Printf("%s is still used by %s, retaining...\n", fileDesc.StoragePath, backup.Name)
+			aoSegmentsToRetain[fileDesc.StoragePath] = struct{}{}
+		}
+	}
+
+	return aoSegmentsToRetain, nil
 }

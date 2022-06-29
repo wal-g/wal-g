@@ -348,9 +348,9 @@ func (backup *Backup) getTarsToExtract(filesMeta FilesMetadataDto, filesToUnwrap
 		tarsToExtract = append(tarsToExtract, tarToExtract)
 	}
 
-	aoMeta, err := backup.loadAoFilesMetadata()
+	aoMeta, err := backup.LoadAoFilesMetadata()
 	if err != nil {
-		tracelog.InfoLogger.Printf("AO files metadata was not found. Skipping the AO segments unpacking.")
+		tracelog.DebugLogger.Printf("AO files metadata was not found. Skipping the AO segments unpacking.")
 	} else {
 		tracelog.InfoLogger.Printf("AO files metadata found. Will perform the AO segments unpacking.")
 		for extractPath, meta := range aoMeta.Files {
@@ -387,7 +387,7 @@ func (backup *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error)
 	return utility.SelectMatchingFiles(fileMask, filesToUnwrap)
 }
 
-func (backup *Backup) loadAoFilesMetadata() (*AOFilesMetadataDTO, error) {
+func (backup *Backup) LoadAoFilesMetadata() (*AOFilesMetadataDTO, error) {
 	if backup.AoFilesMetadataDto != nil {
 		return backup.AoFilesMetadataDto, nil
 	}

@@ -54,12 +54,6 @@ func IsPermanent(objectName string, permanentBackups, permanentWals map[string]b
 		return permanentWals[wal]
 	}
 	if strings.HasPrefix(objectName, utility.BaseBackupPath) {
-		// Handle Greenplum AO segment backup reference
-		if strings.HasSuffix(objectName, BackupRefSuffix) {
-			backupRef := strings.SplitAfter(objectName, AoSegSuffix+"_")[1]
-			return permanentBackups[strings.TrimSuffix(backupRef, BackupRefSuffix)]
-		}
-
 		backup := utility.StripLeftmostBackupName(objectName[len(utility.BaseBackupPath):])
 		return permanentBackups[backup]
 	}
