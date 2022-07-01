@@ -151,6 +151,7 @@ To store backups via ssh, WAL-G requires that these variables be set:
 * `SSH_PORT` ssh connection port
 * `SSH_USERNAME` connect with username
 * `SSH_PASSWORD` connect with password
+* `SSH_PRIVATE_KEY_PATH` or connect with a SSH KEY by specifying its full path
 
 Examples
 -----------
