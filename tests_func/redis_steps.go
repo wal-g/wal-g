@@ -4,11 +4,21 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cucumber/godog"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/helpers"
 	"github.com/wal-g/wal-g/tests_func/utils"
 )
+
+func setupRedisSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
+	ctx.Step(`^a working redis on ([^\s]*)$`, tctx.isWorkingRedis)
+	ctx.Step(`^([^\s]*) has test redis data test(\d+)$`, tctx.redisHasTestRedisDataTest)
+	ctx.Step(`^we create ([^\s]*) redis-backup$`, tctx.createRedisBackup)
+	ctx.Step(`^we delete redis backups retain (\d+) via ([^\s]*)$`, tctx.weDeleteRedisBackupsRetainViaRedis)
+	ctx.Step(`^we restart redis-server at ([^\s]*)$`, tctx.weRestartRedisServerAt)
+	ctx.Step(`^we got same redis data at ([^\s]*) ([^\s]*)$`, tctx.testEqualRedisDataAtHosts)
+}
 
 func (tctx *TestContext) isWorkingRedis(hostName string) error {
 	redisCtl, err := GetRedisCtlFromTestContext(tctx, hostName)

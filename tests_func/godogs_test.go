@@ -1,15 +1,14 @@
 package functests
 
 import (
-	"flag"
 	"os"
-	"path"
-	"strings"
 	"testing"
 
-	"github.com/DATA-DOG/godog"
-	"github.com/DATA-DOG/godog/colors"
+	"github.com/cucumber/godog"
+	"github.com/cucumber/godog/colors"
+	"github.com/spf13/pflag"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/tests_func/utils"
 )
 
 type TestOpts struct {
@@ -20,13 +19,6 @@ type TestOpts struct {
 	featurePrefix string
 	database      string
 }
-
-const (
-	testOptsPrefix = "tf."
-
-	stagingDir = "staging"
-	envFile    = "env.file"
-)
 
 var (
 	godogOpts = godog.Options{
@@ -45,78 +37,58 @@ var (
 )
 
 func init() {
-	flag.BoolVar(&testOpts.test, testOptsPrefix+"test", true, "run tests")
-	flag.BoolVar(&testOpts.stop, testOptsPrefix+"stop", true, "shutdown test environment")
-	flag.BoolVar(&testOpts.clean, testOptsPrefix+"clean", true, "delete test environment")
-	flag.BoolVar(&testOpts.debug, testOptsPrefix+"debug", false, "enable debug logging")
-	flag.StringVar(&testOpts.featurePrefix, testOptsPrefix+"featurePrefix", "", "features prefix")
-	flag.StringVar(&testOpts.database, testOptsPrefix+"database", "", "database name [mongodb|redis]")
-	godog.BindFlags("godog.", flag.CommandLine, &godogOpts)
+	pflag.BoolVar(&testOpts.test, "tf.test", true, "run tests")
+	pflag.BoolVar(&testOpts.stop, "tf.stop", true, "shutdown test environment")
+	pflag.BoolVar(&testOpts.clean, "tf.clean", true, "delete test environment")
+	pflag.BoolVar(&testOpts.debug, "tf.debug", false, "enable debug logging")
+	pflag.StringVar(&testOpts.featurePrefix, "tf.featurePrefix", "", "features prefix")
+	pflag.StringVar(&testOpts.database, "tf.database", "", "database name [mongodb|redis]")
+
+	godog.BindCommandLineFlags("godog.", &godogOpts)
+}
+
+func parseArgs() {
+	pflag.Parse()
+
+	if _, ok := databases[testOpts.database]; !ok {
+		tracelog.ErrorLogger.Fatalf("Database '%s' is not valid, please provide test database -tf.database=dbname\n",
+			testOpts.database)
+	}
 }
 
 func TestMain(m *testing.M) {
-	flag.Parse()
+	parseArgs()
 
-	status := 0
 	if testOpts.debug {
 		err := tracelog.UpdateLogLevel(tracelog.DevelLogLevel)
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
 
-	database := testOpts.database
-
-	if _, ok := databases[database]; !ok {
-		tracelog.ErrorLogger.Fatalf("Database '%s' is not valid, please provide test database -tf.database=dbname\n", database)
-	}
-
-	stagingPath := stagingDir
-	envFilePath := path.Join(stagingDir, envFile)
-
-	Env["ENV_FILE"] = envFilePath // set ENV_FILE for docker-compose
-	Env["DOCKER_FILE"] = "Dockerfile." + database
-	Env["COMPOSE_FILE"] = database + Env["COMPOSE_FILE_SUFFIX"]
-	Env["WALG_S3_PREFIX"] = strings.Replace(Env["WALG_S3_PREFIX"], "DBNAME", database, -1)
-	tracelog.DebugLogger.Printf("Database name %s\nEnv: %s\n", database, Env)
-
-	newEnv := !EnvExists(envFilePath)
-
-	var env map[string]string
-	var err error
-
-	if newEnv {
-		env, err = SetupEnv(Env, envFilePath, stagingPath)
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		err := SetupStaging(env["IMAGES_DIR"], stagingPath)
-		tracelog.ErrorLogger.FatalOnError(err)
-	}
-
-	foundFeatures, err := scanFeatureDirs(database, testOpts.featurePrefix)
+	tctx, err := CreateTestContex(testOpts.database)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	if len(foundFeatures) == 0 {
-		tracelog.ErrorLogger.Fatalln("No features found")
-	}
-
-	tctx, err := NewTestContext(envFilePath, database, env, foundFeatures)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	// if newEnv == false, database empty, so we should load from database file
-	tctx.LoadEnv()
+	status := 0
 
 	if testOpts.test {
-		godogOpts.Paths = tctx.Features
+		godogOpts.Paths, err = utils.FindFeaturePaths(testOpts.database, testOpts.featurePrefix)
+		tracelog.ErrorLogger.FatalOnError(err)
 
 		tracelog.InfoLogger.Printf("Starting testing environment: mongodb %s with features: %v",
 			tctx.Version.Full, godogOpts.Paths)
 
-		status = godog.RunWithOptions("godogs", func(s *godog.Suite) {
-			tctx.setupSuites(s)
-		}, godogOpts)
-
-		if st := m.Run(); st > status {
-			status = st
+		suite := godog.TestSuite{
+			Name: "godogs",
+			TestSuiteInitializer: func(ctx *godog.TestSuiteContext) {
+				ctx.BeforeSuite(tctx.LoadEnv)
+			},
+			ScenarioInitializer: func(ctx *godog.ScenarioContext) {
+				setupCommonSteps(ctx, tctx)
+				setupMongodbSteps(ctx, tctx)
+				setupRedisSteps(ctx, tctx)
+			},
+			Options: &godogOpts,
 		}
+		status = suite.Run()
 	}
 
 	if testOpts.stop {

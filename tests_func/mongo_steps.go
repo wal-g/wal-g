@@ -6,12 +6,43 @@ import (
 	"io"
 	"os"
 
+	"github.com/cucumber/godog"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/helpers"
 	"github.com/wal-g/wal-g/tests_func/mongodb/mongoload"
 	"github.com/wal-g/wal-g/tests_func/mongodb/mongoload/models"
 )
+
+func setupMongodbSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
+	ctx.Step(`^a working mongodb on ([^\s]*)$`, tctx.testMongoConnect)
+	ctx.Step(`^mongodb replset initialized on ([^\s]*)$`, tctx.initiateReplSet)
+	ctx.Step(`^mongodb role is primary on ([^\s]*)$`, tctx.isMongoPrimary)
+	ctx.Step(`^mongodb auth initialized on ([^\s]*)$`, tctx.mongoEnableAuth)
+	ctx.Step(`^mongodb initialized on ([^\s]*)$`, tctx.mongoInit)
+	ctx.Step(`^([^\s]*) has no data$`, tctx.purgeMongoDataDir)
+
+	ctx.Step(`we save last oplog timestamp on ([^\s]*) to "([^"]*)"`, tctx.saveOplogTimestamp)
+	ctx.Step(`^([^\s]*) has test mongodb data test(\d+)$`, tctx.fillMongodbWithTestData)
+	ctx.Step(`^([^\s]*) has been loaded with "([^"]*)"$`, tctx.loadMongodbOpsFromConfig)
+	ctx.Step(`^we got same mongodb data at ([^\s]*) ([^\s]*)$`, tctx.testEqualMongodbDataAtHosts)
+	ctx.Step(`^we have same data in "([^"]*)" and "([^"]*)"$`, tctx.sameDataCheck)
+	ctx.Step(`^we save ([^\s]*) data "([^"]*)"$`, tctx.saveMongoSnapshot)
+
+	ctx.Step(`^we create ([^\s]*) mongo-backup$`, tctx.createMongoBackup)
+	ctx.Step(`^we delete mongo backups retain (\d+) via ([^\s]*)$`, tctx.purgeBackupRetain)
+	ctx.Step(`^at least one oplog archive exists in storage$`, tctx.oplogArchiveIsNotEmpty)
+	ctx.Step(`^we purge oplog archives via ([^\s]*)$`, tctx.purgeOplogArchives)
+	ctx.Step(`^we restore #(\d+) backup to ([^\s]*)$`, tctx.restoreBackupToMongodb)
+	ctx.Step(`^oplog archiving is enabled on ([^\s]*)$`, tctx.enableOplogPush)
+	ctx.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*)$`, tctx.replayOplog)
+
+	ctx.Step(`^we got (\d+) backup entries of ([^\s]*)$`, tctx.checkBackupsCount)
+	ctx.Step(`^we delete mongo backup #(\d+) via ([^\s]*)$`, tctx.deleteMongoBackup)
+	ctx.Step(`^we ensure ([^\s]*) #(\d+) backup metadata contains$`, tctx.backupMetadataContains)
+	ctx.Step(`^we put empty backup via ([^\s]*) to ([^\s]*)$`, tctx.putEmptyBackupViaMinio)
+	ctx.Step(`^we check if empty backups were purged via ([^\s]*)$`, tctx.testEmptyBackupsViaMinio)
+}
 
 func (tctx *TestContext) oplogArchiveIsNotEmpty() error {
 	s3 := S3StorageFromTestContext(tctx, tctx.S3Host())
