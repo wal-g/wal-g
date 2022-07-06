@@ -179,7 +179,7 @@ func generateOp(writer io.Writer, config opConfig, lastComma bool) error {
 		var res []string
 		for _, cmd := range config.Cmds {
 			fstr := strings.Map(func(r rune) rune {
-				if strings.Contains(" \n\t\r", string(r)) {
+				if strings.Contains(" \n\t\r", string(r)) { //nolint: gocritic
 					return -1
 				}
 				return r
@@ -204,9 +204,9 @@ func generateOp(writer io.Writer, config opConfig, lastComma bool) error {
 			return fmt.Errorf("cannot generate op %s: %v", config.Op, err)
 		}
 		if i != config.Cnt-1 || lastComma {
-			cmdLine = cmdLine + ","
+			cmdLine += ","
 		}
-		cmdLine = cmdLine + "\n"
+		cmdLine += "\n"
 		_, err = writer.Write([]byte(cmdLine))
 		if err != nil {
 			return fmt.Errorf("cannot generate op %s: %v", config.Op, err)

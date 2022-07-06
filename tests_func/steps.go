@@ -8,11 +8,18 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/DATA-DOG/godog/gherkin"
+	"github.com/cucumber/godog"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/helpers"
 )
+
+func setupCommonSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
+	ctx.Step(`^prepared infrastructure$`, tctx.prepareInfrastructure)
+	ctx.Step(`^a configured s3 on ([^\s]*)$`, tctx.configureS3)
+
+	ctx.Step(`we sleep ([^\s]*)$`, tctx.sleep)
+}
 
 type TestingfWrap func(format string, args ...interface{})
 
@@ -37,6 +44,16 @@ func (tctx *TestContext) sameDataCheck(dataId1, dataId2 string) error {
 		return fmt.Errorf("no snapshot is saved for with id %s", dataId2)
 	}
 	return fmt.Errorf("no snapshot is saved for with id %s", dataId1)
+}
+
+func (tctx *TestContext) prepareInfrastructure() error {
+	tctx.AuxData.CreatedBackupNames = []string{}
+	tctx.AuxData.NometaBackupNames = []string{}
+	tctx.AuxData.OplogPushEnabled = false
+	tctx.AuxData.Timestamps = make(map[string]helpers.OpTimestamp)
+	tctx.AuxData.Snapshots = make(map[string][]helpers.NsSnapshot)
+	tctx.PreviousBackupTime = time.Unix(0, 0)
+	return tctx.Infra.RecreateContainers()
 }
 
 func (tctx *TestContext) createMongoBackup(container string) error {
@@ -97,7 +114,7 @@ func (tctx *TestContext) deleteMongoBackup(backupNum int, container string) erro
 	return walg.DeleteBackup(backups[backupNum])
 }
 
-func (tctx *TestContext) backupMetadataContains(container string, backupId int, expectedMeta *gherkin.DocString) error {
+func (tctx *TestContext) backupMetadataContains(container string, backupId int, expectedMeta *godog.DocString) error {
 	s3client, err := S3StorageFromTestContext(tctx, tctx.S3Host()).Client()
 	if err != nil {
 		return err
@@ -113,8 +130,8 @@ func (tctx *TestContext) backupMetadataContains(container string, backupId int, 
 	}
 
 	backup := backups[backupId]
-	path := fmt.Sprintf("%s/basebackups_005/%s_backup_stop_sentinel.json", tctx.Env["WALG_S3_PREFIX"], backup)
-	contents, err := s3client.FileContents(path)
+	sentinelPath := fmt.Sprintf("%s/basebackups_005/%s_backup_stop_sentinel.json", tctx.Env["WALG_S3_PREFIX"], backup)
+	contents, err := s3client.FileContents(sentinelPath)
 	if err != nil {
 		return err
 	}

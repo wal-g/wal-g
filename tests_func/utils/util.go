@@ -174,14 +174,6 @@ func CopySymLink(source, dest string) error {
 	return os.Symlink(link, dest)
 }
 
-func GetMapValues(m map[string]string) []string {
-	values := make([]string, 0, len(m))
-	for _, v := range m {
-		values = append(values, v)
-	}
-	return values
-}
-
 func IsArraysEqual(arr1, arr2 []string) bool {
 	sort.Strings(arr1)
 	sort.Strings(arr2)
