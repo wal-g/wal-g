@@ -64,8 +64,8 @@ github.com/DATA-DOG/go-sqlmock v1.3.3 h1:CWUqKXe0s8A2z6qCgkP4Kru7wC11YoAnoupUKFD
 github.com/DATA-DOG/go-sqlmock v1.3.3/go.mod h1:f/Ixk793poVmq4qj/V1dPUg2JEAKC73Q5eFN3EC/SaM=
 github.com/DATA-DOG/godog v0.7.14-0.20190529133509-96731eaefa46 h1:Y4moA9AVGfQbZ4f+LzrTnfk9mHXj/HseIFu1E4wvZPo=
 github.com/DATA-DOG/godog v0.7.14-0.20190529133509-96731eaefa46/go.mod h1:GQyRe8MROPiE5oQeEdXWTlfOmQRyMSXFkNYIORsW4xk=
-github.com/DataDog/zstd v1.4.4 h1:+IawcoXhCBylN7ccwdwf8LOH2jKq7NavGpEPanrlTzE=
-github.com/DataDog/zstd v1.4.4/go.mod h1:1jcaCB/ufaK+sKp1NBhlGmpz41jOoPQ35bpF36t7BBo=
+github.com/DataDog/zstd v1.5.3-0.20220606203749-fd035e54e312 h1:MB4OhDISHzUx+9VIhkCinijzgGAsyrFqko4PjPjJmbw=
+github.com/DataDog/zstd v1.5.3-0.20220606203749-fd035e54e312/go.mod h1:g4AWEaM3yOg3HYfnJ3YIawPnVdXJh9QME85blwSAmyw=
 github.com/Microsoft/go-winio v0.4.14 h1:+hMXMk01us9KgxGb7ftKQt2Xpf5hH/yky+TDA+qxleU=
 github.com/Microsoft/go-winio v0.4.14/go.mod h1:qXqCSQ3Xa7+6tgxaGTIe4Kpcdsi+P8jBhyzoq1bpyYA=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
