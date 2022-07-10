@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/sftp"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
-	"github.com/wal-g/wal-g/utility"
 )
 
 type Folder struct {
@@ -43,12 +43,15 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		return nil, err
 	}
 
-	user := settings[Username]
-	pass := settings[Password]
-	port := settings[Port]
-	pkeyPath := settings[PrivateKeyPath]
+	requisites := sftp.SSHRequisites{
+		Host:           host,
+		Port:           settings[Port],
+		Username:       settings[Username],
+		Password:       settings[Password],
+		PrivateKeyPath: settings[PrivateKeyPath],
+	}
 
-	sftpClient, err := utility.NewSftpClient(host, port, user, pass, pkeyPath)
+	sftpClient, err := sftp.NewSftpClient(requisites)
 	if err != nil {
 		return nil, NewFolderError(err, "Failed to create sftp client")
 	}

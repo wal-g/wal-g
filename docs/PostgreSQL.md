@@ -512,11 +512,19 @@ wal-g wal-purge
 
 ### ``wal-restore``
 
-Restores the missing WAL segments that will be needed to perform pg_rewind from storage. The current version supports only local clusters.
+Restores the missing WAL segments that will be needed to perform pg_rewind from storage.
+If you mark the target cluster as remote (`--remote`) you should specify requisites to connect by flags.
 
-Usage:
+Local target usage:
 ```bash
 wal-g wal-restore path/to/target-pgdata path/to/source-pgdata
+```
+
+Remote target usage:
+```bash
+wal-g wal-restore path/to/target-pgdata path/to/source-pgdata \
+ --remote --host-ssh=localhost --port-ssh=22 --username-ssh=user --password-ssh=12346 \
+ --private-key-path-ssh=path/to/ssh/private/key
 ```
 
 pgBackRest backups support

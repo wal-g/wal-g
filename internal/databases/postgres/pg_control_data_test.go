@@ -14,6 +14,9 @@ func TestParsePgControlData_IncorrectPgControlSize(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// In pg_control versions 1099 and below timeline was located
+// on different place, compared to the new versions:
+// https://github.com/postgres/postgres/blob/REL_10_21/src/include/catalog/pg_control.h
 func TestParsePgControlData_OldVersion(t *testing.T) {
 	bytesContainsSystemId := make([]byte, 8)
 	binary.LittleEndian.PutUint64(bytesContainsSystemId, 9876)
@@ -34,6 +37,9 @@ func TestParsePgControlData_OldVersion(t *testing.T) {
 	assert.Equal(t, uint32(7), pgControlData.GetCurrentTimeline())
 }
 
+// In pg_control versions 1100 and higher timeline was located
+// on different place, compared to the old versions:
+// https://github.com/postgres/postgres/blob/REL_11_0/src/include/catalog/pg_control.h
 func TestParsePgControlData_NewVersion(t *testing.T) {
 	bytesContainsSystemId := make([]byte, 8)
 	binary.LittleEndian.PutUint64(bytesContainsSystemId, 9876)

@@ -5,14 +5,15 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/pkg/sftp"
 )
 
 const (
 	WalRestoreUsage            = "wal-restore target-pgdata source-pgdata"
 	WalRestoreShortDescription = "Restores WAL segments from storage to the source to perform pg_rewind with the target."
-	WalRestoreLongDescription  = "Restores the missing WAL segments that will be needed in source cluster to perform pg_rewind " +
-		"with target cluster from storage. If you mark the target cluster as remote you should specify requisites to connect by" +
-		" flags."
+	WalRestoreLongDescription  = "Restores the missing WAL segments that will be needed in source cluster to perform" +
+		" pg_rewind with target cluster from storage. To run in remote mode, should be run from the source cluster. " +
+		"If you mark the target cluster as remote you should specify requisites to connect by flags."
 	RemoteFlag            = "remote"
 	sshHostFlag           = "host-ssh"
 	sshPortFlag           = "port-ssh"
@@ -32,21 +33,12 @@ var (
 			folder, err := internal.ConfigureFolder()
 			tracelog.ErrorLogger.FatalfOnError("Error on configure external folder %s\n", err)
 
-			sshRequisites := postgres.SSHRequisites{}
-			if sshHost != "" {
-				sshRequisites.Host = sshHost
-			}
-			if sshPort != "" {
-				sshRequisites.Port = sshPort
-			}
-			if sshUsername != "" {
-				sshRequisites.Username = sshUsername
-			}
-			if sshPassword != "" {
-				sshRequisites.Password = sshPassword
-			}
-			if sshPrivateKeyPath != "" {
-				sshRequisites.PrivateKeyPath = sshPrivateKeyPath
+			sshRequisites := sftp.SSHRequisites{
+				Host:           sshHost,
+				Port:           sshPort,
+				Username:       sshUsername,
+				Password:       sshPassword,
+				PrivateKeyPath: sshPrivateKeyPath,
 			}
 
 			postgres.HandleWALRestore(args[0], args[1], folder, remote, sshRequisites)
@@ -65,7 +57,7 @@ func init() {
 
 	walRestoreCmd.Flags().BoolVar(&remote, RemoteFlag, false, "Is target cluster remote")
 	walRestoreCmd.Flags().StringVar(&sshHost, sshHostFlag, "", "Host of remote target cluster to connect by SSH")
-	walRestoreCmd.Flags().StringVar(&sshPort, sshPortFlag, "", "Port of remote target cluster to connect by SSH (default 22)")
+	walRestoreCmd.Flags().StringVar(&sshPort, sshPortFlag, "22", "Port of remote target cluster to connect by SSH")
 	walRestoreCmd.Flags().StringVar(&sshUsername, sshUsernameFlag, "", "Username for connect to remote cluster by SSH")
 	walRestoreCmd.Flags().StringVar(&sshPassword, sshPasswordFlag, "", "Password for connect to remote cluster by SSH")
 	walRestoreCmd.Flags().StringVar(&sshPrivateKeyPath, sshPrivateKeyPathFlag, "", "Path to private key for connect to remote cluster by SSH")

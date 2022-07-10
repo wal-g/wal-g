@@ -7,7 +7,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/wal-g/wal-g/utility"
+	"github.com/wal-g/wal-g/pkg/sftp"
 )
 
 const pgControlSize = 8192
@@ -17,16 +17,6 @@ type PgControlData struct {
 	systemIdentifier uint64 // systemIdentifier represents system ID of PG cluster (e.g. [0-8] bytes in pg_control)
 	currentTimeline  uint32 // currentTimeline represents current timeline of PG cluster (e.g. [48-52] bytes in pg_control v. 1100+)
 	// Any data from pg_control
-}
-
-// SSHRequisites using to decrease passed params TODO: When will use by other functions move to more suitable place
-type SSHRequisites struct {
-	Host string
-	Port string
-
-	Username       string
-	Password       string
-	PrivateKeyPath string
 }
 
 // ExtractPgControl extracts pg_control data of cluster
@@ -46,9 +36,8 @@ func ExtractPgControl(folder string) (*PgControlData, error) {
 }
 
 // ExtractRemotePgControl extracts pg_control data of remote cluster. Requisites should be set in config
-func ExtractRemotePgControl(folder string, requisites SSHRequisites) (*PgControlData, error) {
-	sftpClient, err := utility.NewSftpClient(requisites.Host, requisites.Port,
-		requisites.Username, requisites.Password, requisites.PrivateKeyPath)
+func ExtractRemotePgControl(folder string, requisites sftp.SSHRequisites) (*PgControlData, error) {
+	sftpClient, err := sftp.NewSftpClient(requisites)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sftp client: %s", err)
 	}
@@ -80,6 +69,7 @@ func parsePgControlData(pgControlReader io.Reader) (*PgControlData, error) {
 	pgControlVersion := binary.LittleEndian.Uint32(bytes[8:12])
 	currentTimeline := uint32(0)
 
+	// Check tests TestParsePgControlData_(Old/New)Version for more info
 	if pgControlVersion < 1100 {
 		currentTimeline = binary.LittleEndian.Uint32(bytes[56:60])
 	} else {

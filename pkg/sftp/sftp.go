@@ -1,4 +1,4 @@
-package utility
+package sftp
 
 import (
 	"fmt"
@@ -8,14 +8,24 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func NewSftpClient(host, port, user, password, privateKeyPath string) (*sftp.Client, error) {
-	if port == "" {
-		port = "22"
+// SSHRequisites using to decrease passed params
+type SSHRequisites struct {
+	Host string
+	Port string
+
+	Username       string
+	Password       string
+	PrivateKeyPath string
+}
+
+func NewSftpClient(requisites SSHRequisites) (*sftp.Client, error) {
+	if requisites.Port == "" {
+		requisites.Port = "22"
 	}
 
 	authMethods := make([]ssh.AuthMethod, 0)
-	if privateKeyPath != "" {
-		pkey, err := os.ReadFile(privateKeyPath)
+	if requisites.PrivateKeyPath != "" {
+		pkey, err := os.ReadFile(requisites.PrivateKeyPath)
 		if err != nil {
 			return nil, fmt.Errorf("unable to read private key: %s", err)
 		}
@@ -28,17 +38,17 @@ func NewSftpClient(host, port, user, password, privateKeyPath string) (*sftp.Cli
 		authMethods = append(authMethods, ssh.PublicKeys(signer))
 	}
 
-	if password != "" {
-		authMethods = append(authMethods, ssh.Password(password))
+	if requisites.Password != "" {
+		authMethods = append(authMethods, ssh.Password(requisites.Password))
 	}
 
 	config := &ssh.ClientConfig{
-		User:            user,
+		User:            requisites.Username,
 		Auth:            authMethods,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	address := fmt.Sprint(host, ":", port)
+	address := fmt.Sprint(requisites.Host, ":", requisites.Port)
 	sshClient, err := ssh.Dial("tcp", address, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect via ssh by address %s: %s", address, err)
