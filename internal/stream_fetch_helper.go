@@ -83,7 +83,7 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 	}
 
 	errorsPerWorker := make([]chan error, 0)
-	writers := splitmerge.MergeWriter(utility.EmptyWriteIgnorer{Writer: writeCloser}, partitions, blockSize)
+	writers := splitmerge.MergeWriter(utility.EmptyWriteCloserIgnorer{WriteCloser: writeCloser}, partitions, blockSize)
 
 	for i := 0; i < partitions; i++ {
 		fileName := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), i)

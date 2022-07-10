@@ -17,8 +17,8 @@ type PageHeader struct {
 	pdPageSizeVersion uint16
 }
 
-func (header *PageHeader) lsn() uint64 {
-	return ((uint64(header.pdLsnH)) << 32) + uint64(header.pdLsnL)
+func (header *PageHeader) lsn() LSN {
+	return LSN(((uint64(header.pdLsnH)) << 32) + uint64(header.pdLsnL))
 }
 
 func (header *PageHeader) isValid() bool {

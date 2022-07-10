@@ -18,7 +18,7 @@ const (
 type TimelineInfo struct {
 	ID               uint32          `json:"id"`
 	ParentID         uint32          `json:"parent_id"`
-	SwitchPointLsn   uint64          `json:"switch_point_lsn"`
+	SwitchPointLsn   LSN             `json:"switch_point_lsn"`
 	StartSegment     string          `json:"start_segment"`
 	EndSegment       string          `json:"end_segment"`
 	SegmentsCount    int             `json:"segments_count"`
@@ -30,11 +30,11 @@ type TimelineInfo struct {
 
 func NewTimelineInfo(walSegments *WalSegmentsSequence, historyRecords []*TimelineHistoryRecord) (*TimelineInfo, error) {
 	timelineInfo := &TimelineInfo{
-		ID:               walSegments.timelineID,
-		StartSegment:     walSegments.minSegmentNo.getFilename(walSegments.timelineID),
-		EndSegment:       walSegments.maxSegmentNo.getFilename(walSegments.timelineID),
-		SegmentsCount:    len(walSegments.walSegmentNumbers),
-		SegmentRangeSize: uint64(walSegments.maxSegmentNo-walSegments.minSegmentNo) + 1,
+		ID:               walSegments.TimelineID,
+		StartSegment:     walSegments.MinSegmentNo.getFilename(walSegments.TimelineID),
+		EndSegment:       walSegments.MaxSegmentNo.getFilename(walSegments.TimelineID),
+		SegmentsCount:    len(walSegments.WalSegmentNumbers),
+		SegmentRangeSize: uint64(walSegments.MaxSegmentNo-walSegments.MinSegmentNo) + 1,
 		Status:           TimelineOkStatus,
 	}
 
@@ -62,10 +62,10 @@ func NewTimelineInfo(walSegments *WalSegmentsSequence, historyRecords []*Timelin
 
 // WalSegmentsSequence represents some collection of wal segments with the same timeline
 type WalSegmentsSequence struct {
-	timelineID        uint32
-	walSegmentNumbers map[WalSegmentNo]bool
-	minSegmentNo      WalSegmentNo
-	maxSegmentNo      WalSegmentNo
+	TimelineID        uint32
+	WalSegmentNumbers map[WalSegmentNo]bool
+	MinSegmentNo      WalSegmentNo
+	MaxSegmentNo      WalSegmentNo
 }
 
 func NewSegmentsSequence(id uint32, segmentNo WalSegmentNo) *WalSegmentsSequence {
@@ -73,36 +73,36 @@ func NewSegmentsSequence(id uint32, segmentNo WalSegmentNo) *WalSegmentsSequence
 	walSegmentNumbers[segmentNo] = true
 
 	return &WalSegmentsSequence{
-		timelineID:        id,
-		walSegmentNumbers: walSegmentNumbers,
-		minSegmentNo:      segmentNo,
-		maxSegmentNo:      segmentNo,
+		TimelineID:        id,
+		WalSegmentNumbers: walSegmentNumbers,
+		MinSegmentNo:      segmentNo,
+		MaxSegmentNo:      segmentNo,
 	}
 }
 
 // AddWalSegmentNo adds the provided segment number to collection
 func (seq *WalSegmentsSequence) AddWalSegmentNo(number WalSegmentNo) {
-	seq.walSegmentNumbers[number] = true
-	if seq.minSegmentNo > number {
-		seq.minSegmentNo = number
+	seq.WalSegmentNumbers[number] = true
+	if seq.MinSegmentNo > number {
+		seq.MinSegmentNo = number
 	}
-	if seq.maxSegmentNo < number {
-		seq.maxSegmentNo = number
+	if seq.MaxSegmentNo < number {
+		seq.MaxSegmentNo = number
 	}
 }
 
 // FindMissingSegments finds missing segments in range [minSegmentNo, maxSegmentNo]
 func (seq *WalSegmentsSequence) FindMissingSegments() ([]WalSegmentDescription, error) {
-	startWalSegment := WalSegmentDescription{Number: seq.maxSegmentNo, Timeline: seq.timelineID}
+	startWalSegment := WalSegmentDescription{Number: seq.MaxSegmentNo, Timeline: seq.TimelineID}
 
-	walSegments := make(map[WalSegmentDescription]bool, len(seq.walSegmentNumbers))
-	for number := range seq.walSegmentNumbers {
-		segment := WalSegmentDescription{Number: number, Timeline: seq.timelineID}
+	walSegments := make(map[WalSegmentDescription]bool, len(seq.WalSegmentNumbers))
+	for number := range seq.WalSegmentNumbers {
+		segment := WalSegmentDescription{Number: number, Timeline: seq.TimelineID}
 		walSegments[segment] = true
 	}
 
 	// create WAL segment runner to run on single timeline
-	walSegmentRunner := NewWalSegmentRunner(startWalSegment, walSegments, seq.minSegmentNo, nil)
+	walSegmentRunner := NewWalSegmentRunner(startWalSegment, walSegments, seq.MinSegmentNo, nil)
 	walSegmentScanner := NewWalSegmentScanner(walSegmentRunner)
 	err := walSegmentScanner.Scan(SegmentScanConfig{
 		UnlimitedScan:        true,
@@ -126,7 +126,7 @@ func HandleWalShow(rootFolder storage.Folder, showBackups bool, outputWriter Wal
 
 	timelineInfos := make([]*TimelineInfo, 0, len(segmentsByTimelines))
 	for _, segmentsSequence := range segmentsByTimelines {
-		historyRecords, err := getTimeLineHistoryRecords(segmentsSequence.timelineID, walFolder)
+		historyRecords, err := GetTimeLineHistoryRecords(segmentsSequence.TimelineID, walFolder)
 		if err != nil {
 			if _, ok := err.(HistoryFileNotFoundError); !ok {
 				tracelog.ErrorLogger.Fatalf("Error while loading .history file %v\n", err)

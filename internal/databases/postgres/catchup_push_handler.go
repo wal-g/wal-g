@@ -13,7 +13,7 @@ func extendExcludedFiles() {
 }
 
 // HandleCatchupPush is invoked to perform a wal-g catchup-push
-func HandleCatchupPush(pgDataDirectory string, fromLSN uint64) {
+func HandleCatchupPush(pgDataDirectory string, fromLSN LSN) {
 	pgDataDirectory = utility.ResolveSymlink(pgDataDirectory)
 
 	fakePreviousBackupSentinelDto := BackupSentinelDto{

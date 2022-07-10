@@ -151,11 +151,11 @@ type IntegrityScanSegmentSequence struct {
 func newIntegrityScanSegmentSequence(sequence *WalSegmentsSequence,
 	status ScannedSegmentStatus) *IntegrityScanSegmentSequence {
 	return &IntegrityScanSegmentSequence{
-		TimelineID:    sequence.timelineID,
-		StartSegment:  sequence.minSegmentNo.getFilename(sequence.timelineID),
-		EndSegment:    sequence.maxSegmentNo.getFilename(sequence.timelineID),
+		TimelineID:    sequence.TimelineID,
+		StartSegment:  sequence.MinSegmentNo.getFilename(sequence.TimelineID),
+		EndSegment:    sequence.MaxSegmentNo.getFilename(sequence.TimelineID),
 		Status:        status,
-		SegmentsCount: len(sequence.walSegmentNumbers),
+		SegmentsCount: len(sequence.WalSegmentNumbers),
 	}
 }
 
@@ -215,7 +215,7 @@ func collapseSegmentsByStatusAndTimeline(scannedSegments []ScannedSegmentDescrip
 		segment := scannedSegments[i]
 
 		// switch to the new sequence on segment Status change or timeline id change
-		if segment.status != currentStatus || currentSequence.timelineID != segment.Timeline {
+		if segment.status != currentStatus || currentSequence.TimelineID != segment.Timeline {
 			segmentSequences = append(segmentSequences, newIntegrityScanSegmentSequence(currentSequence, currentStatus))
 			currentSequence = NewSegmentsSequence(segment.Timeline, segment.Number)
 			currentStatus = segment.status

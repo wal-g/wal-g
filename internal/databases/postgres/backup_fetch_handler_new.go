@@ -51,7 +51,9 @@ func deltaFetchRecursionNew(cfg *FetchConfig) error {
 	sentinelDto.TablespaceSpec = cfg.tablespaceSpec
 
 	if sentinelDto.IsIncremental() {
-		tracelog.InfoLogger.Printf("Delta %v at LSN %x \n", cfg.backupName, *(sentinelDto.BackupStartLSN))
+		tracelog.InfoLogger.Printf("Delta %v at LSN %s \n",
+			cfg.backupName,
+			*(sentinelDto.BackupStartLSN))
 		baseFilesToUnwrap, err := GetBaseFilesToUnwrap(filesMetaDto.Files, cfg.filesToUnwrap)
 		if err != nil {
 			return err
@@ -68,8 +70,10 @@ func deltaFetchRecursionNew(cfg *FetchConfig) error {
 			// no longer need any additional information (completed ones)
 			cfg.SkipRedundantFiles(unwrapResult)
 		}
-		tracelog.InfoLogger.Printf("%v fetched. Downgrading from LSN %x to LSN %x \n",
-			cfg.backupName, *(sentinelDto.BackupStartLSN), *(sentinelDto.IncrementFromLSN))
+		tracelog.InfoLogger.Printf("%v fetched. Downgrading from LSN %s to LSN %s \n",
+			cfg.backupName,
+			*(sentinelDto.BackupStartLSN),
+			*(sentinelDto.IncrementFromLSN))
 		err = deltaFetchRecursionNew(cfg)
 		if err != nil {
 			return err
@@ -78,7 +82,8 @@ func deltaFetchRecursionNew(cfg *FetchConfig) error {
 		return nil
 	}
 
-	tracelog.InfoLogger.Printf("%x reached. Applying base backup... \n", *(sentinelDto.BackupStartLSN))
+	tracelog.InfoLogger.Printf("%s reached. Applying base backup... \n",
+		*(sentinelDto.BackupStartLSN))
 	_, err = backup.unwrapNew(cfg.dbDataDirectory, sentinelDto, filesMetaDto, cfg.filesToUnwrap,
 		false, cfg.skipRedundantTars)
 	return err

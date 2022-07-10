@@ -75,8 +75,8 @@ func TestWritePrettyBackupList_LongColumnsValues(t *testing.T) {
 	expectedRes := "+---+-----------+----------+-----------------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n" +
 		"| # | NAME      | MODIFIED | WAL SEGMENT BACKUP START          | START TIME | FINISH TIME | HOSTNAME | DATADIR | PG VERSION | START LSN | FINISH LSN | PERMANENT |\n" +
 		"+---+-----------+----------+-----------------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n" +
-		"| 0 | backup000 | -        | veryVeryVeryVeryVeryLongWallName0 | -          | -           |          |         |          0 |         0 |          0 | false     |\n" +
-		"| 1 | backup001 | -        | veryVeryVeryVeryVeryLongWallName1 | -          | -           |          |         |          0 |         0 |          0 | false     |\n" +
+		"| 0 | backup000 | -        | veryVeryVeryVeryVeryLongWallName0 | -          | -           |          |         |          0 |       0/0 |        0/0 | false     |\n" +
+		"| 1 | backup001 | -        | veryVeryVeryVeryVeryLongWallName1 | -          | -           |          |         |          0 |       0/0 |        0/0 | false     |\n" +
 		"+---+-----------+----------+-----------------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n"
 	b := bytes.Buffer{}
 	postgres.WritePrettyBackupListDetails(longBackups, &b)
@@ -88,8 +88,8 @@ func TestWritePrettyBackupList_ShortColumnsValues(t *testing.T) {
 	expectedRes := "+---+------+----------+--------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n" +
 		"| # | NAME | MODIFIED | WAL SEGMENT BACKUP START | START TIME | FINISH TIME | HOSTNAME | DATADIR | PG VERSION | START LSN | FINISH LSN | PERMANENT |\n" +
 		"+---+------+----------+--------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n" +
-		"| 0 | b0   | -        | shortWallName0           | -          | -           |          |         |          0 |         0 |          0 | false     |\n" +
-		"| 1 | b1   | -        | shortWallName1           | -          | -           |          |         |          0 |         0 |          0 | false     |\n" +
+		"| 0 | b0   | -        | shortWallName0           | -          | -           |          |         |          0 |       0/0 |        0/0 | false     |\n" +
+		"| 1 | b1   | -        | shortWallName1           | -          | -           |          |         |          0 |       0/0 |        0/0 | false     |\n" +
 		"+---+------+----------+--------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n"
 	b := bytes.Buffer{}
 	postgres.WritePrettyBackupListDetails(shortBackups, &b)
@@ -114,9 +114,9 @@ func TestWritePrettyBackupList_EmptyColumnsValues(t *testing.T) {
 	expectedRes := "+---+------+----------+--------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n" +
 		"| # | NAME | MODIFIED | WAL SEGMENT BACKUP START | START TIME | FINISH TIME | HOSTNAME | DATADIR | PG VERSION | START LSN | FINISH LSN | PERMANENT |\n" +
 		"+---+------+----------+--------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n" +
-		"| 0 |      | -        | shortWallName0           | -          | -           |          |         |          0 |         0 |          0 | false     |\n" +
-		"| 1 | b1   | -        |                          | -          | -           |          |         |          0 |         0 |          0 | false     |\n" +
-		"| 2 |      | -        |                          | -          | -           |          |         |          0 |         0 |          0 | false     |\n" +
+		"| 0 |      | -        | shortWallName0           | -          | -           |          |         |          0 |       0/0 |        0/0 | false     |\n" +
+		"| 1 | b1   | -        |                          | -          | -           |          |         |          0 |       0/0 |        0/0 | false     |\n" +
+		"| 2 |      | -        |                          | -          | -           |          |         |          0 |       0/0 |        0/0 | false     |\n" +
 		"+---+------+----------+--------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n"
 	b := bytes.Buffer{}
 	postgres.WritePrettyBackupListDetails(emptyColonsBackups, &b)
@@ -136,9 +136,9 @@ func TestWriteBackupList_NoBackups(t *testing.T) {
 
 func TestWriteBackupList_EmptyColumnsValues(t *testing.T) {
 	expectedRes := "name modified wal_segment_backup_start start_time finish_time hostname data_dir pg_version start_lsn finish_lsn is_permanent\n" +
-		"     -        shortWallName0           -          -                             0          0         0          false\n" +
-		"b1   -                                 -          -                             0          0         0          false\n" +
-		"     -                                 -          -                             0          0         0          false\n"
+		"     -        shortWallName0           -          -                             0          0/0       0/0        false\n" +
+		"b1   -                                 -          -                             0          0/0       0/0        false\n" +
+		"     -                                 -          -                             0          0/0       0/0        false\n"
 	b := bytes.Buffer{}
 	postgres.WriteBackupListDetails(emptyColonsBackups, &b)
 
@@ -147,8 +147,8 @@ func TestWriteBackupList_EmptyColumnsValues(t *testing.T) {
 
 func TestWriteBackupList_ShortColumnsValues(t *testing.T) {
 	expectedRes := "name modified wal_segment_backup_start start_time finish_time hostname data_dir pg_version start_lsn finish_lsn is_permanent\n" +
-		"b0   -        shortWallName0           -          -                             0          0         0          false\n" +
-		"b1   -        shortWallName1           -          -                             0          0         0          false\n"
+		"b0   -        shortWallName0           -          -                             0          0/0       0/0        false\n" +
+		"b1   -        shortWallName1           -          -                             0          0/0       0/0        false\n"
 
 	b := bytes.Buffer{}
 	postgres.WriteBackupListDetails(shortBackups, &b)
@@ -158,8 +158,8 @@ func TestWriteBackupList_ShortColumnsValues(t *testing.T) {
 
 func TestWriteBackupList_LongColumnsValues(t *testing.T) {
 	expectedRes := "name      modified wal_segment_backup_start          start_time finish_time hostname data_dir pg_version start_lsn finish_lsn is_permanent\n" +
-		"backup000 -        veryVeryVeryVeryVeryLongWallName0 -          -                             0          0         0          false\n" +
-		"backup001 -        veryVeryVeryVeryVeryLongWallName1 -          -                             0          0         0          false\n"
+		"backup000 -        veryVeryVeryVeryVeryLongWallName0 -          -                             0          0/0       0/0        false\n" +
+		"backup001 -        veryVeryVeryVeryVeryLongWallName1 -          -                             0          0/0       0/0        false\n"
 
 	b := bytes.Buffer{}
 	postgres.WriteBackupListDetails(longBackups, &b)

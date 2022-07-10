@@ -124,7 +124,7 @@ func (bb *StreamingBaseBackup) nextTbs() (err error) {
 }
 
 // Upload will read all tar files from Postgres, and use the uploader to upload to the backup location
-func (bb *StreamingBaseBackup) Upload(uploader *WalUploader, bundleFiles BundleFiles) (err error) {
+func (bb *StreamingBaseBackup) Upload(uploader *WalUploader, bundleFiles internal.BundleFiles) (err error) {
 	// Upload the tar
 	bb.uploader = uploader
 	bb.streamer = NewTarballStreamer(bb, bb.maxTarSize, bundleFiles)

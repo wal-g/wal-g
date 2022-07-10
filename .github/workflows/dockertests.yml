@@ -15,7 +15,7 @@ env:
   IMAGE_UBUNTU: wal-g/ubuntu
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
-  GO_VERSION: 1.17
+  GO_VERSION: 1.18
 
 jobs:
   buildimages:
@@ -25,7 +25,7 @@ jobs:
       #  use cache to pass docker images to the test jobs
       - name: Docker images caching
         id: cache-images
-        uses: actions/cache@v2.1.7
+        uses: actions/cache@v3
         with:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}
@@ -39,14 +39,14 @@ jobs:
 
       - name: Set up Go 1.x
         if: steps.cache-images.outputs.cache-hit != 'true'
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
         id: go
 
       - name: Check out code into the Go module directory
         if: steps.cache-images.outputs.cache-hit != 'true'
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Get dependencies
         if: steps.cache-images.outputs.cache-hit != 'true'
@@ -100,7 +100,7 @@ jobs:
                    'make TEST="pg_delete_target_delta_test" pg_integration_test',
                    'make TEST="pg_delete_target_delta_find_full_test" pg_integration_test',
                    'make TEST="pg_backup_mark_permanent_no_error_test" pg_integration_test',
-                   'make TEST="pg_wal_purge_test" pg_integration_test',
+                   'make TEST="pg_delete_garbage_test" pg_integration_test',
                    'make mongo_test',
                    'make MONGO_VERSION="5.0.1" MONGO_MAJOR="5.0" MONGO_REPO="repo.mongodb.org" MONGO_PACKAGE="mongodb-org" mongo_features',
                    'make MONGO_VERSION="5.0.1" MONGO_MAJOR="5.0" MONGO_REPO="repo.mongodb.com" MONGO_PACKAGE="mongodb-enterprise" mongo_features',
@@ -136,13 +136,13 @@ jobs:
         run: sudo apt-get install liblzo2-dev
 
       - name: Set up Go 1.x
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
         id: go
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Get dependencies
         run: |
@@ -155,7 +155,7 @@ jobs:
       # load docker images
       - name: Load docker images
         id: cache-images
-        uses: actions/cache@v2.1.7
+        uses: actions/cache@v3
         with:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}

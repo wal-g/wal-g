@@ -6,10 +6,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/wal-g/wal-g/pkg/storages/storage"
+
 	"github.com/spf13/viper"
 
 	"github.com/blang/semver"
-	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/jackc/pgx"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -39,6 +40,40 @@ func (s *RestorePointMetadata) String() string {
 
 func RestorePointMetadataFileName(pointName string) string {
 	return pointName + RestorePointSuffix
+}
+
+func FetchRestorePointMetadata(folder storage.Folder, pointName string) (RestorePointMetadata, error) {
+	var restorePoint RestorePointMetadata
+	err := internal.FetchDto(folder.GetSubFolder(utility.BaseBackupPath),
+		&restorePoint, RestorePointMetadataFileName(pointName))
+	if err != nil {
+		return RestorePointMetadata{}, fmt.Errorf("failed to fetch metadata for restore point %s: %w", pointName, err)
+	}
+
+	return restorePoint, nil
+}
+
+// ValidateMatch checks that restore point is reachable from the provided backup
+func ValidateMatch(folder storage.Folder, backupName string, restorePoint string) error {
+	backup := NewBackup(folder, backupName)
+	bSentinel, err := backup.GetSentinel()
+	if err != nil {
+		return fmt.Errorf("failed to fetch %s sentinel: %w", backupName, err)
+	}
+
+	rpMeta, err := FetchRestorePointMetadata(folder, restorePoint)
+	if err != nil {
+		tracelog.WarningLogger.Printf(
+			"failed to fetch restore point %s metadata, will skip the validation check: %v", restorePoint, err)
+		return nil
+	}
+
+	if bSentinel.FinishTime.After(rpMeta.FinishTime) {
+		return fmt.Errorf("%s backup finish time (%s) is after the %s provided restore point finish time (%s)",
+			backupName, bSentinel.FinishTime, restorePoint, rpMeta.FinishTime)
+	}
+
+	return nil
 }
 
 type RestorePointCreator struct {
@@ -86,7 +121,7 @@ func NewRestorePointCreator(pointName string) (rpc *RestorePointCreator, err err
 // Create creates cluster-wide consistent restore point
 func (rpc *RestorePointCreator) Create() {
 	rpc.startTime = utility.TimeNowCrossPlatformUTC()
-	gplog.InitializeLogging("wal-g", rpc.logsDir)
+	initGpLog(rpc.logsDir)
 
 	err := rpc.checkExists()
 	tracelog.ErrorLogger.FatalOnError(err)

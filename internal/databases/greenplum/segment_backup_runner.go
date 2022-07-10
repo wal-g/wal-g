@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/wal-g/tracelog"
@@ -34,7 +36,7 @@ func NewSegBackupRunner(contentID int, backupName, backupArgs string, updInterva
 
 func (r *SegBackupRunner) Run() {
 	contentIDArg := fmt.Sprintf("--content-id=%d", r.contentID)
-	cmdArgs := []string{"seg", "backup-push", contentIDArg}
+	cmdArgs := []string{"seg", "backup-push", contentIDArg, "--gp-composer"}
 	backupArgs := strings.Fields(r.backupArgs)
 	cmdArgs = append(cmdArgs, backupArgs...)
 
@@ -62,15 +64,17 @@ func (r *SegBackupRunner) Run() {
 		done <- cmd.Wait()
 	}()
 
-	err = r.waitBackup(done)
+	err = r.waitBackup(cmd, done)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func (r *SegBackupRunner) waitBackup(doneCh chan error) error {
+func (r *SegBackupRunner) waitBackup(cmd *exec.Cmd, doneCh chan error) error {
 	ticker := time.NewTicker(r.stateUpdateInterval)
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	for {
-		status, err := checkBackupStatus(ticker, doneCh)
+		status, err := checkBackupStatus(ticker, doneCh, sigCh)
 		saveErr := writeBackupState(SegBackupState{Status: status, TS: time.Now()}, r.contentID, r.backupName)
 		if saveErr != nil {
 			tracelog.WarningLogger.Printf("Failed to update the backup status file: %v", saveErr)
@@ -86,11 +90,18 @@ func (r *SegBackupRunner) waitBackup(doneCh chan error) error {
 			return nil
 		case FailedBackupStatus:
 			return fmt.Errorf("backup-push failed: %v", err)
+		case InterruptedBackupStatus:
+			// on receiving a SIGTERM, also broadcast it to the backup process
+			if termErr := cmd.Process.Signal(syscall.SIGTERM); termErr != nil {
+				tracelog.ErrorLogger.Printf("failed to send SIGTERM to the backup process: %v", termErr)
+			}
+			return fmt.Errorf("backup-push terminated")
 		}
 	}
 }
 
-func checkBackupStatus(ticker *time.Ticker, doneCh chan error) (SegBackupStatus, error) {
+// TODO: unit tests
+func checkBackupStatus(ticker *time.Ticker, doneCh chan error, sigCh chan os.Signal) (SegBackupStatus, error) {
 	select {
 	case <-ticker.C:
 		tracelog.DebugLogger.Printf("Tick")
@@ -102,6 +113,10 @@ func checkBackupStatus(ticker *time.Ticker, doneCh chan error) (SegBackupStatus,
 		}
 
 		return SuccessBackupStatus, nil
+
+	case sig := <-sigCh:
+		tracelog.ErrorLogger.Printf("Received signal: %s, terminating the running backup...", sig)
+		return InterruptedBackupStatus, nil
 	}
 }
 

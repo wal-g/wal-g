@@ -1,6 +1,7 @@
 package blob
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -12,12 +13,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wal-g/wal-g/utility"
+
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"golang.org/x/xerrors"
 
 	"github.com/gofrs/flock"
 	"github.com/google/uuid"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -28,6 +32,10 @@ const ProxyStartTimeout = 10 * time.Second
 const ReqIDHeader = "X-Ms-Request-Id"
 
 const DefaultConcurrency = 8
+
+const BlockReadCacheSize = 16
+
+const MaxCacheBlockSize = 16 * 1024 * 1024 // 16M
 
 type Server struct {
 	folder       storage.Folder
@@ -46,6 +54,7 @@ type Server struct {
 	decompressor compression.Decompressor
 	encryption   string
 	crypter      crypto.Crypter
+	readCache    *lru.Cache
 }
 
 func NewServer(folder storage.Folder) (*Server, error) {
@@ -93,6 +102,20 @@ func NewServer(folder storage.Folder) (*Server, error) {
 	if bs.crypter != nil {
 		bs.encryption = bs.crypter.Name()
 	}
+	c, err := lru.NewWithEvict(BlockReadCacheSize, func(k, _ interface{}) {
+		tracelog.DebugLogger.Printf("EVICT_CACHE: %s", k)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create lru cache: %v", err)
+	}
+	bs.readCache = c
+	go func() {
+		for {
+			// to release memory after restore
+			time.Sleep(time.Minute)
+			bs.readCache.RemoveOldest()
+		}
+	}()
 	return bs, nil
 }
 
@@ -529,7 +552,6 @@ func (bs *Server) HandleBlobGet(w http.ResponseWriter, req *http.Request) {
 	if idx.Compression != "" || idx.Encryption != "" {
 		err = bs.validateBlobCompressionEncryption(idx)
 		if err != nil {
-			tracelog.ErrorLogger.Printf("proxy: misconfiguration: %v", err)
 			bs.returnError(w, req, err)
 			return
 		}
@@ -560,30 +582,49 @@ func (bs *Server) HandleBlobGet(w http.ResponseWriter, req *http.Request) {
 
 	sections := idx.GetSections(rangeMin, rangeMax)
 	for _, s := range sections {
-		// TODO: enable cache
-		// r, err := idx.GetCachedReader(folder, s)
 		bs.downloadSem <- struct{}{}
-		r, err := folder.ReadObject(s.Path)
+		r, err := bs.getCachedReader(idx, s)
+		defer utility.LoggedClose(r, "failed to close section reader")
 		<-bs.downloadSem
 		if err != nil {
 			tracelog.ErrorLogger.Printf("proxy: failed to read object from storage: %v", err)
 			break
 		}
-		if idx.Compression != "" || idx.Encryption != "" {
-			r, err = internal.DecompressDecryptBytes(r, bs.decompressor)
-			if err != nil {
-				tracelog.ErrorLogger.Printf("proxy: failed to decompress / decrypt bytes: %v", err)
-				break
-			}
-		}
 		r2 := io.LimitReader(NewSkipReader(r, s.Offset), int64(s.Limit))
 		_, err = io.Copy(w, r2)
-		r.Close()
 		if err != nil {
 			tracelog.ErrorLogger.Printf("proxy: failed to copy data from storage: %v", err)
 			break
 		}
 	}
+}
+
+func (bs *Server) blobPut(r io.Reader, idx *Index) ([]string, error) {
+	const blockSize = 4 * 1024 * 1024
+	buf := make([]byte, blockSize)
+	xblocklist := &XBlockListIn{Blocks: []XBlockIn{}}
+	for i, last := 0, false; !last; i++ {
+		n, err := io.ReadFull(r, buf)
+		if err != nil {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				last = true
+			} else {
+				return nil, err
+			}
+		}
+		if n == 0 {
+			continue
+		}
+		id := fmt.Sprintf("data_%05d", i)
+		name := idx.PutBlock(id, uint64(n))
+		encryptedReader := internal.CompressAndEncrypt(bytes.NewReader(buf[:n]), bs.compressor, bs.crypter)
+		err = idx.folder.PutObject(name, encryptedReader)
+		if err != nil {
+			return nil, err
+		}
+		xblocklist.Blocks = append(xblocklist.Blocks, XBlockIn{ID: id, Mode: BlockLatest})
+	}
+	return idx.PutBlockList(xblocklist)
 }
 
 func (bs *Server) HandleBlobPut(w http.ResponseWriter, req *http.Request) {
@@ -597,41 +638,40 @@ func (bs *Server) HandleBlobPut(w http.ResponseWriter, req *http.Request) {
 		bs.returnError(w, req, err)
 		return
 	}
+	if idx.Compression != "" || idx.Encryption != "" {
+		err = bs.validateBlobCompressionEncryption(idx)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("proxy: misconfiguration: %v", err)
+			bs.returnError(w, req, err)
+			return
+		}
+	}
 	if err := bs.checkLease(req, folder); err != nil {
 		bs.returnError(w, req, err)
 		return
 	}
 	blobSizeStr := req.Header.Get("Content-Length")
-	blobSize, err := strconv.ParseUint(blobSizeStr, 10, 64)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	garbage := idx.Clear()
-	if blobSize > 0 {
-		name := idx.PutBlock("data", blobSize)
-		encryptedReader := internal.CompressAndEncrypt(req.Body, bs.compressor, bs.crypter)
-		err := folder.PutObject(name, encryptedReader)
-		req.Body.Close()
-		if err != nil {
-			bs.returnError(w, req, err)
-			return
-		}
-		_, err = idx.PutBlockList(&XBlockListIn{Blocks: []XBlockIn{{ID: "data", Mode: BlockLatest}}})
+	var garbage []string
+	if blobSizeStr == "0" {
+		garbage = idx.Clear()
+	} else {
+		defer req.Body.Close()
+		garbage, err = bs.blobPut(req.Body, idx)
 		if err != nil {
 			bs.returnError(w, req, err)
 			return
 		}
 	}
 	bs.indexesMutex.Lock()
-	defer bs.indexesMutex.Unlock()
 	err = idx.Save()
 	if err != nil {
+		bs.indexesMutex.Unlock()
 		bs.returnError(w, req, err)
 		return
 	}
 	bs.indexes[folder.GetPath()] = idx
-	go bs.deleteGarbage(folder, garbage)
+	bs.indexesMutex.Unlock()
+	bs.deleteGarbage(folder, garbage)
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -668,7 +708,7 @@ func (bs *Server) returnError(w http.ResponseWriter, req *http.Request, err erro
 	case err == ErrBadRequest:
 		w.WriteHeader(http.StatusBadRequest)
 	default:
-		tracelog.ErrorLogger.Printf("proxy: failed to load blob index: %s %v", req.URL.Path, err)
+		tracelog.ErrorLogger.Printf("proxy: req: %s %s: error: %v", req.Method, req.URL.Path, err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
@@ -752,4 +792,53 @@ func (bs *Server) validateBlobCompressionEncryption(idx *Index) error {
 		return fmt.Errorf("blob compression (%s) does not match configured (%s)", idx.Compression, bs.compression)
 	}
 	return nil
+}
+
+func (bs *Server) getCachedReader(idx *Index, s Section) (io.ReadCloser, error) {
+	folder := idx.folder
+	key := folder.GetPath() + s.Path
+	if s.BlockSize > MaxCacheBlockSize {
+		tracelog.DebugLogger.Printf("READ_OBJ: %s %d", key, s.BlockSize)
+		r, err := folder.ReadObject(s.Path)
+		if err != nil {
+			return nil, err
+		}
+		return bs.decompressDecryptIfNeeded(idx, r)
+	}
+	var buf []byte
+	if b, ok := bs.readCache.Get(key); ok {
+		tracelog.DebugLogger.Printf("READ_CACHE: %s %d", key, s.BlockSize)
+		buf = b.([]byte)
+	} else {
+		tracelog.DebugLogger.Printf("READ_OBJ: %s %d", key, s.BlockSize)
+		r, err := folder.ReadObject(s.Path)
+		if err != nil {
+			return nil, err
+		}
+		dr, err := bs.decompressDecryptIfNeeded(idx, r)
+		if err != nil {
+			utility.LoggedClose(r, "failed to close block reader")
+			return nil, err
+		}
+		defer utility.LoggedClose(dr, "failed to close decompress reader")
+		buf = make([]byte, s.BlockSize)
+		_, err = io.ReadFull(dr, buf)
+		if err != nil {
+			return nil, err
+		}
+		tracelog.DebugLogger.Printf("ADD_CACHE: %s %d", key, s.BlockSize)
+		bs.readCache.Add(key, buf)
+	}
+	return io.NopCloser(bytes.NewReader(buf)), nil
+}
+
+func (bs *Server) decompressDecryptIfNeeded(idx *Index, r io.ReadCloser) (io.ReadCloser, error) {
+	if idx.Compression != "" || idx.Encryption != "" {
+		dr, err := internal.DecompressDecryptBytes(r, bs.decompressor)
+		if err != nil {
+			return nil, fmt.Errorf("proxy: failed to decompress / decrypt bytes: %v", err)
+		}
+		r = &utility.CascadeReadCloser{ReadCloser: dr, Underlying: r}
+	}
+	return r, nil
 }

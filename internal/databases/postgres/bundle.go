@@ -12,7 +12,6 @@ import (
 	"github.com/wal-g/wal-g/internal"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
@@ -61,38 +60,34 @@ func init() {
 // uploaded backups; in this case, pg_control is used as
 // the sentinel.
 type Bundle struct {
-	Directory string
-	Sentinel  *internal.Sentinel
-
-	TarBallComposer TarBallComposer
-	TarBallQueue    *internal.TarBallQueue
-
-	Crypter            crypto.Crypter
+	internal.Bundle
 	Timeline           uint32
 	Replica            bool
-	IncrementFromLsn   *uint64
+	IncrementFromLsn   *LSN
 	IncrementFromFiles internal.BackupFileList
 	DeltaMap           PagedFileDeltaMap
 	TablespaceSpec     TablespaceSpec
 
 	forceIncremental bool
-	TarSizeThreshold int64
 }
 
 // TODO: use DiskDataFolder
 func NewBundle(
 	directory string, crypter crypto.Crypter,
-	incrementFromLsn *uint64, incrementFromFiles internal.BackupFileList,
+	incrementFromLsn *LSN, incrementFromFiles internal.BackupFileList,
 	forceIncremental bool, tarSizeThreshold int64,
 ) *Bundle {
 	return &Bundle{
-		Directory:          directory,
-		Crypter:            crypter,
+		Bundle: internal.Bundle{
+			Directory:         directory,
+			Crypter:           crypter,
+			TarSizeThreshold:  tarSizeThreshold,
+			ExcludedFilenames: ExcludedFilenames,
+		},
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
 		TablespaceSpec:     NewTablespaceSpec(directory),
 		forceIncremental:   forceIncremental,
-		TarSizeThreshold:   tarSizeThreshold,
 	}
 }
 
@@ -124,7 +119,7 @@ func (bundle *Bundle) NewTarBall(dedicatedUploader bool) internal.TarBall {
 }
 
 // GetIncrementBaseLsn returns LSN of previous backup
-func (bundle *Bundle) getIncrementBaseLsn() *uint64 { return bundle.IncrementFromLsn }
+func (bundle *Bundle) getIncrementBaseLsn() *LSN { return bundle.IncrementFromLsn }
 
 // GetIncrementBaseFiles returns list of Files from previous backup
 func (bundle *Bundle) getIncrementBaseFiles() internal.BackupFileList {
@@ -133,9 +128,9 @@ func (bundle *Bundle) getIncrementBaseFiles() internal.BackupFileList {
 
 // TODO : unit tests
 // checkTimelineChanged compares timelines of pg_backup_start() and pg_backup_stop()
-func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
+func (bundle *Bundle) checkTimelineChanged(queryRunner *PgQueryRunner) bool {
 	if bundle.Replica {
-		timeline, err := readTimeline(conn)
+		timeline, err := queryRunner.readTimeline()
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Unable to check timeline change. Sentinel for the backup will not be uploaded.")
 			return true
@@ -157,30 +152,26 @@ func (bundle *Bundle) checkTimelineChanged(conn *pgx.Conn) bool {
 // `backup_label` and `tablespace_map` contents are not immediately written to
 // a file but returned instead. Returns empty string and an error if backup
 // fails.
-func (bundle *Bundle) StartBackup(conn *pgx.Conn,
-	backup string) (backupName string, lsn uint64, err error) {
+func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
+	backup string) (backupName string, lsn LSN, err error) {
 	var name, lsnStr string
-	queryRunner, err := NewPgQueryRunner(conn)
-	if err != nil {
-		return "", 0, errors.Wrap(err, "StartBackup: Failed to build query runner.")
-	}
 	name, lsnStr, bundle.Replica, err = queryRunner.startBackup(backup)
 
 	if err != nil {
 		return "", 0, err
 	}
-	lsn, err = pgx.ParseLSN(lsnStr)
+	lsn, err = ParseLSN(lsnStr)
 	if err != nil {
 		return "", 0, err
 	}
 
 	if bundle.Replica {
-		name, bundle.Timeline, err = getWalFilename(lsn, conn)
+		name, bundle.Timeline, err = getWalFilename(lsn, queryRunner)
 		if err != nil {
 			return "", 0, err
 		}
 	} else {
-		bundle.Timeline, err = readTimeline(conn)
+		bundle.Timeline, err = queryRunner.readTimeline()
 		if err != nil {
 			tracelog.WarningLogger.Printf("Couldn't get current timeline because of error: '%v'\n", err)
 		}
@@ -292,7 +283,7 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 		}
 		incrementBaseLsn := bundle.getIncrementBaseLsn()
 		isIncremented := incrementBaseLsn != nil && (wasInBase || bundle.forceIncremental) && isPagedFile(info, path)
-		bundle.TarBallComposer.AddFile(NewComposeFileInfo(path, info, wasInBase, isIncremented, fileInfoHeader))
+		bundle.TarBallComposer.AddFile(internal.NewComposeFileInfo(path, info, wasInBase, isIncremented, fileInfoHeader))
 	} else {
 		err := bundle.TarBallComposer.AddHeader(fileInfoHeader, info)
 		if err != nil {
@@ -358,17 +349,13 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 // TODO : unit tests
 // UploadLabelFiles creates the `backup_label` and `tablespace_map` files by stopping the backup
 // and uploads them to S3.
-func (bundle *Bundle) uploadLabelFiles(conn *pgx.Conn) (string, []string, uint64, error) {
-	queryRunner, err := NewPgQueryRunner(conn)
-	if err != nil {
-		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: Failed to build query runner.")
-	}
+func (bundle *Bundle) uploadLabelFiles(queryRunner *PgQueryRunner) (string, []string, LSN, error) {
 	label, offsetMap, lsnStr, err := queryRunner.stopBackup()
 	if err != nil {
 		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: failed to stop backup")
 	}
 
-	lsn, err := pgx.ParseLSN(lsnStr)
+	lsn, err := ParseLSN(lsnStr)
 	if err != nil {
 		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: failed to parse finish LSN")
 	}
@@ -421,7 +408,7 @@ func (bundle *Bundle) getDeltaBitmapFor(filePath string) (*roaring.Bitmap, error
 	return bundle.DeltaMap.GetDeltaBitmapFor(filePath)
 }
 
-func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uint64) error {
+func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN LSN) error {
 	deltaMap, err := getDeltaMap(folder, bundle.Timeline, *bundle.IncrementFromLsn, backupStartLSN)
 	if err != nil {
 		return err
@@ -430,8 +417,8 @@ func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN uin
 	return nil
 }
 
-func (bundle *Bundle) PackTarballs() (TarFileSets, error) {
-	return bundle.TarBallComposer.PackTarballs()
+func (bundle *Bundle) FinishTarComposer() (internal.TarFileSets, error) {
+	return bundle.TarBallComposer.FinishComposing()
 }
 
 func (bundle *Bundle) GetFiles() *sync.Map {

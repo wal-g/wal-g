@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/cmd/common"
 
 	"github.com/spf13/cobra"
@@ -22,6 +23,14 @@ var cmd = &cobra.Command{
 	Use:     "sqlserver",
 	Short:   ShortDescription,
 	Version: strings.Join([]string{walgVersion, gitRevision, buildDate, "SQLServer"}, "\t"),
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		err := internal.AssertRequiredSettingsSet()
+		if err != nil {
+			tracelog.WarningLogger.PrintError(err)
+		}
+		err = internal.ConfigureAndRunDefaultWebServer()
+		tracelog.ErrorLogger.FatalOnError(err)
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

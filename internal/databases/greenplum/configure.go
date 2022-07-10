@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/greenplum-db/gp-common-go-libs/gplog"
+
 	"github.com/spf13/viper"
 	"github.com/wal-g/wal-g/internal"
 )
@@ -28,4 +30,12 @@ func ConfigureSegContentID(contentIDFlag string) (int, error) {
 	}
 
 	return contentID, nil
+}
+
+//initGpLog is required for gp-common-go library to function properly
+func initGpLog(logsDir string) {
+	gplog.SetLogFileNameFunc(func(program, logdir string) string {
+		return fmt.Sprintf("%s/%s-gplog.log", logdir, program)
+	})
+	gplog.InitializeLogging("wal-g", logsDir)
 }

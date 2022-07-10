@@ -39,6 +39,8 @@ const MaxBlobSize = MaxTransferSize * MaxBlocksPerBlob
 
 const BlobNamePrefix = "blob_"
 
+const ExternalBackupFilenameSeparator = ","
+
 var SystemDbnames = []string{
 	"master",
 	"msdb",
@@ -203,34 +205,49 @@ func listDatabaseFiles(db *sql.DB, urls string) ([]DatabaseFile, error) {
 	return res, nil
 }
 
+func buildBackupUrlsList(baseURL string, blobCount int) []string {
+	var res []string
+	for i := 0; i < blobCount; i++ {
+		res = append(res, fmt.Sprintf("%s/%s%03d", baseURL, BlobNamePrefix, i))
+	}
+	return res
+}
+
 func buildBackupUrls(baseURL string, blobCount int) string {
 	res := ""
-	for i := 0; i < blobCount; i++ {
+	for i, url := range buildBackupUrlsList(baseURL, blobCount) {
 		if i > 0 {
 			res += ", "
 		}
-		blobName := fmt.Sprintf("%s%03d", BlobNamePrefix, i)
-		res += fmt.Sprintf("URL = '%s/%s'", baseURL, blobName)
+		res += fmt.Sprintf("URL = '%s'", url)
+	}
+	return res
+}
+
+func buildRestoreUrlsList(baseURL string, blobNames []string) []string {
+	if len(blobNames) == 0 {
+		// old-style single blob backup
+		return []string{baseURL}
+	}
+	var res []string
+	for _, blobName := range blobNames {
+		res = append(res, fmt.Sprintf("%s/%s", baseURL, blobName))
 	}
 	return res
 }
 
 func buildRestoreUrls(baseURL string, blobNames []string) string {
-	if len(blobNames) == 0 {
-		// old-style single blob backup
-		return fmt.Sprintf("URL = '%s'", baseURL)
-	}
 	res := ""
-	for i, blobName := range blobNames {
+	for i, url := range buildRestoreUrlsList(baseURL, blobNames) {
 		if i > 0 {
 			res += ", "
 		}
-		res += fmt.Sprintf("URL = '%s/%s'", baseURL, blobName)
+		res += fmt.Sprintf("URL = '%s'", url)
 	}
 	return res
 }
 
-func buildPhysicalFileMove(files []DatabaseFile, dbname string) (string, error) {
+func buildPhysicalFileMove(files []DatabaseFile, dbname string, datadir string, logdir string) (string, error) {
 	sort.Slice(files, func(i, j int) bool {
 		return files[i].FileID < files[j].FileID
 	})
@@ -239,6 +256,7 @@ func buildPhysicalFileMove(files []DatabaseFile, dbname string) (string, error) 
 	logFileCnt := 0
 	for _, file := range files {
 		var newName string
+		var newPhysicalName string
 		switch file.Type {
 		case "D":
 			suffix := ""
@@ -251,6 +269,7 @@ func buildPhysicalFileMove(files []DatabaseFile, dbname string) (string, error) 
 				ext = ".ndf"
 			}
 			newName = dbname + suffix + ext
+			newPhysicalName = filepath.Join(datadir, newName)
 		case "L":
 			suffix := "_log"
 			if logFileCnt > 0 {
@@ -258,10 +277,10 @@ func buildPhysicalFileMove(files []DatabaseFile, dbname string) (string, error) 
 			}
 			logFileCnt++
 			newName = dbname + suffix + ".ldf"
+			newPhysicalName = filepath.Join(logdir, newName)
 		default:
 			return "", fmt.Errorf("unexpected backup file type: '%s'", file.Type)
 		}
-		newPhysicalName := filepath.Join(filepath.Dir(file.PhysicalName), newName)
 		if res != "" {
 			res += ", "
 		}
@@ -583,4 +602,11 @@ func IsLogAlreadyApplied(db *sql.DB, databaseName string, logBackupFilePropertie
 		return false, nil
 	}
 	return true, nil
+}
+
+func GetDefaultDataLogDirs(db *sql.DB) (string, string, error) {
+	var datadir, logdir string
+	query := `SELECT serverproperty('InstanceDefaultDataPath'), serverproperty('InstanceDefaultLogPath')`
+	err := db.QueryRow(query).Scan(&datadir, &logdir)
+	return strings.TrimSpace(datadir), strings.TrimSpace(logdir), err
 }

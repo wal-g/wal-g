@@ -1,6 +1,6 @@
 module github.com/jaegertracing/jaeger-clickhouse/internal/tools
 
-go 1.17
+go 1.18
 
 require (
 	4d63.com/gochecknoglobals v0.0.0-20201008074935-acfc0b28355a // indirect

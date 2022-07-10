@@ -171,11 +171,13 @@ func (uploader *Uploader) Compression() compression.Compressor {
 
 // TODO : unit tests
 func (uploader *Uploader) Upload(path string, content io.Reader) error {
+	WalgMetrics.uploadedFilesTotal.Inc()
 	if uploader.tarSize != nil {
 		content = NewWithSizeReader(content, uploader.tarSize)
 	}
 	err := uploader.UploadingFolder.PutObject(path, content)
 	if err != nil {
+		WalgMetrics.uploadedFilesFailedTotal.Inc()
 		uploader.Failed.Store(true)
 		tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"\n", err)
 		return err

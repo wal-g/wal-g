@@ -40,6 +40,10 @@ var (
 		Long:  backupCopyLongDescription,
 		Args:  cobra.ExactArgs(0),
 		Run:   runBackupCopy,
+		PersistentPreRun: func(*cobra.Command, []string) {
+			// do not check for any configured settings because wal-g copy uses the different
+			// settings init process
+		},
 	}
 )
 
@@ -59,8 +63,6 @@ func init() {
 		false,
 		withoutHistoryDescription)
 
-	_ = backupCopyCmd.MarkFlagFilename(toConfigFile)
-	_ = backupCopyCmd.MarkFlagFilename(fromConfigFile)
-	_ = backupCopyCmd.MarkFlagRequired(toConfigFile)
-	_ = backupCopyCmd.MarkFlagRequired(fromConfigFile)
+	_ = backupCopyCmd.MarkFlagRequired(toFlag)
+	_ = backupCopyCmd.MarkFlagRequired(fromFlag)
 }
