@@ -29,6 +29,12 @@ ifdef USE_LZO
 	BUILD_TAGS:=$(BUILD_TAGS) lzo
 endif
 
+ifdef USE_STATIC_BUILD
+	# build using alpine golang image with musl to allow static linking
+	BUILD_CMD := docker run --rm -it -e GOCACHE=/tmp/gocache -v $(PWD)/tmp/gocache:/tmp/gocache -v $(PWD):/app wal-g/golang
+	BUILD_LDFLAGS := -linkmode external -extldflags \"-static\"
+endif
+
 .PHONY: unittest fmt lint clean install_tools
 
 test: deps unittest pg_build mysql_build redis_build mongo_build gp_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test gp_integration_test
@@ -36,7 +42,8 @@ test: deps unittest pg_build mysql_build redis_build mongo_build gp_build unlink
 pg_test: deps pg_build unlink_brotli pg_integration_test
 
 pg_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_PG_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/pg.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/pg.walgVersion=`git tag -l --points-at HEAD`")
+	$(BUILD_CMD) go build -mod vendor -tags "$(BUILD_TAGS)" -o $(MAIN_PG_PATH)/wal-g -ldflags "-s -w $(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/pg.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/pg.walgVersion=`git tag -l --points-at HEAD`" ./$(MAIN_PG_PATH)
+	$(BUILD_CMD) upx $(MAIN_PG_PATH)/wal-g
 
 install_and_build_pg: deps pg_build
 
@@ -82,10 +89,12 @@ mysql_base: deps mysql_build unlink_brotli
 mysql_test: deps mysql_build unlink_brotli mysql_integration_test
 
 mysql_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_MYSQL_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mysql.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mysql.walgVersion=`git tag -l --points-at HEAD`")
+	$(BUILD_CMD) go build -mod vendor -tags "$(BUILD_TAGS)" -o $(MAIN_MYSQL_PATH)/wal-g -ldflags "-s -w $(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/mysql.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mysql.walgVersion=`git tag -l --points-at HEAD`" ./$(MAIN_MYSQL_PATH)
+	$(BUILD_CMD) upx $(MAIN_MYSQL_PATH)/wal-g
 
 sqlserver_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_SQLSERVER_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=`git tag -l --points-at HEAD`")
+	$(BUILD_CMD) go build -mod vendor -tags "$(BUILD_TAGS)" -o $(MAIN_SQLSERVER_PATH)/wal-g -ldflags "-s -w $(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=`git tag -l --points-at HEAD`" ./$(MAIN_SQLSERVER_PATH)
+	$(BUILD_CMD) upx $(MAIN_SQLSERVER_PATH)
 
 load_docker_common:
 	@if [ "x" = "${CACHE_FILE_UBUNTU}x" ]; then\
@@ -97,7 +106,7 @@ load_docker_common:
 	fi
 
 mysql_integration_test: deps mysql_build unlink_brotli load_docker_common
-	./link_brotli.sh
+	$(BUILD_CMD) ./link_brotli.sh
 	docker-compose build mysql $(MYSQL_TEST)
 	docker-compose up --force-recreate --exit-code-from $(MYSQL_TEST) $(MYSQL_TEST)
 
@@ -117,7 +126,8 @@ mariadb_integration_test: load_docker_common
 mongo_test: deps mongo_build unlink_brotli
 
 mongo_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_MONGO_PATH) && go build $(BUILD_ARGS) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mongo.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mongo.walgVersion=`git tag -l --points-at HEAD`")
+	$(BUILD_CMD) go build $(BUILD_ARGS) -mod vendor -tags "$(BUILD_TAGS)" -o $(MAIN_MONGO_PATH)/wal-g -ldflags "-s -w -linkmode external -extldflags \"-static\" -X github.com/wal-g/wal-g/cmd/mongo.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mongo.walgVersion=`git tag -l --points-at HEAD`") ./$(MAIN_MONGO_PATH)
+	$(BUILD_CMD) upx $(MAIN_MONGO_PATH)/wal-g
 
 mongo_install: mongo_build
 	mv $(MAIN_MONGO_PATH)/wal-g $(GOBIN)/wal-g
@@ -132,7 +142,7 @@ clean_mongo_features:
 	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -v -count=1  -timeout 5m -tf.test=false -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=mongodb
 
 fdb_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_FDB_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w")
+	(cd $(MAIN_FDB_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -linkmode external -extldflags \"-static\"")
 
 fdb_install: fdb_build
 	mv $(MAIN_FDB_PATH)/wal-g $(GOBIN)/wal-g
@@ -145,7 +155,8 @@ fdb_integration_test: load_docker_common
 redis_test: deps redis_build unlink_brotli redis_integration_test
 
 redis_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_REDIS_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/redis.walgVersion=`git tag -l --points-at HEAD`")
+	$(BUILD_CMD) go build -mod vendor -tags "$(BUILD_TAGS)" -o $(MAIN_REDIS_PATH)/wal-g -ldflags "-s -w $(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/redis.walgVersion=`git tag -l --points-at HEAD`"
+	$(BUILD_CMD) upx $(MAIN_REDIS_PATH)/wal-g
 
 redis_integration_test: load_docker_common
 	docker-compose build redis redis_tests
@@ -168,7 +179,8 @@ clean_redis_features:
 	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1  -timeout 5m -tf.test=false -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=redis
 
 gp_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_GP_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/gp.walgVersion=`git tag -l --points-at HEAD`")
+	$(BUILD_CMD) go build -mod vendor -tags "$(BUILD_TAGS)" -o $(MAIN_GP_PATH)/wal-g -ldflags "-s -w $(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/gp.walgVersion=`git tag -l --points-at HEAD`")
+	$(BUILD_CMD) upx $(MAIN_GP_PATH)/wal-g
 
 gp_clean:
 	(cd $(MAIN_GP_PATH) && go clean)
@@ -191,9 +203,9 @@ st_integration_test: load_docker_common
 
 unittest:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet
-	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/...
-	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./pkg/...
-	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./utility/...
+	$(BUILD_CMD) go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/...
+	$(BUILD_CMD) go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./pkg/...
+	$(BUILD_CMD) go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./utility/...
 
 coverage:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go test -v $(TEST_MODIFIER) -coverprofile=$(COVERAGE_FILE) | grep -v 'no test files'
@@ -224,6 +236,9 @@ go_deps:
 ifdef USE_LZO
 	sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' vendor/github.com/cyberdelia/lzo/lzo.go
 endif
+ifdef USE_STATIC_BUILD
+	mkdir -p tmp/gocache
+endif
 
 link_external_deps: link_brotli link_libsodium
 
@@ -233,11 +248,11 @@ install:
 	@echo "Nothing to be done. Use pg_install/mysql_install/mongo_install/fdb_install/gp_install... instead."
 
 link_brotli:
-	./link_brotli.sh
+	$(BUILD_CMD) ./link_brotli.sh
 
 link_libsodium:
 	@if [ ! -z "${USE_LIBSODIUM}" ]; then\
-		./link_libsodium.sh;\
+		$(BUILD_CMD) ./link_libsodium.sh;\
 	fi
 
 unlink_brotli:
@@ -247,3 +262,4 @@ unlink_brotli:
 
 unlink_libsodium:
 	rm -rf tmp/libsodium
+
