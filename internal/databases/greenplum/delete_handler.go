@@ -188,10 +188,15 @@ func (h *DeleteHandler) runDeleteOnSegment(backup Backup, meta SegmentMetadata, 
 
 func cleanupAOSegments(target internal.BackupObject, segFolder storage.Folder, confirmed bool) error {
 	aoSegFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(postgres.AoStoragePath)
-	aoSegmentsToRetain, err := getAoSegmentsToRetain(segFolder)
+	aoSegmentsToRetain, err := postgres.LoadStorageAoFiles(segFolder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return err
 	}
+
+	for segPath := range aoSegmentsToRetain {
+		tracelog.DebugLogger.Printf("%s is still used, retaining...\n", segPath)
+	}
+
 	tracelog.InfoLogger.Printf("Cleaning up the AO segment objects")
 	aoSegmentsToDelete, err := findAoSegmentsToDelete(target, aoSegmentsToRetain, aoSegFolder)
 	if err != nil {
@@ -232,39 +237,4 @@ func findAoSegmentsToDelete(target internal.BackupObject,
 	}
 
 	return aoSegmentsToDelete, nil
-}
-
-func getAoSegmentsToRetain(folder storage.Folder) (map[string]struct{}, error) {
-	baseBackupsFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	backupObjects, _, err := baseBackupsFolder.ListFolder()
-	if err != nil {
-		return nil, err
-	}
-
-	backupTimes := internal.GetBackupTimeSlices(backupObjects)
-	if err != nil {
-		return nil, err
-	}
-
-	aoSegmentsToRetain := make(map[string]struct{}, 0)
-	for _, b := range backupTimes {
-		backup := postgres.NewBackup(baseBackupsFolder, b.BackupName)
-		aoMeta, err := backup.LoadAoFilesMetadata()
-		if err != nil {
-			if _, ok := err.(storage.ObjectNotFoundError); ok {
-				tracelog.WarningLogger.Printf("No AO files metadata found for backup %s in folder %s, skipping",
-					backup.Name, baseBackupsFolder.GetPath())
-				continue
-			}
-
-			return nil, err
-		}
-
-		for _, fileDesc := range aoMeta.Files {
-			tracelog.DebugLogger.Printf("%s is still used by %s, retaining...\n", fileDesc.StoragePath, backup.Name)
-			aoSegmentsToRetain[fileDesc.StoragePath] = struct{}{}
-		}
-	}
-
-	return aoSegmentsToRetain, nil
 }
