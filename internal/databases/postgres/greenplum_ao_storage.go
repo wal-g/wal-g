@@ -3,6 +3,8 @@ package postgres
 import (
 	"fmt"
 
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/walparser"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -21,15 +23,36 @@ func makeAoFileStorageKey(relNameMd5 string, modCount int64, location *walparser
 		modCount, AoSegSuffix)
 }
 
+//LoadStorageAoFiles loads the list of the AO/AOCS segment files that are referenced from previous backups
 func LoadStorageAoFiles(baseBackupsFolder storage.Folder) (map[string]struct{}, error) {
-	aoObjects, _, err := baseBackupsFolder.GetSubFolder(AoStoragePath).ListFolder()
+	backupObjects, _, err := baseBackupsFolder.ListFolder()
 	if err != nil {
 		return nil, err
 	}
-	result := make(map[string]struct{})
-	for _, obj := range aoObjects {
-		result[obj.GetName()] = struct{}{}
+
+	backupTimes := internal.GetBackupTimeSlices(backupObjects)
+	if err != nil {
+		return nil, err
 	}
 
-	return result, nil
+	aoSegments := make(map[string]struct{}, 0)
+	for _, b := range backupTimes {
+		backup := NewBackup(baseBackupsFolder, b.BackupName)
+		aoMeta, err := backup.LoadAoFilesMetadata()
+		if err != nil {
+			if _, ok := err.(storage.ObjectNotFoundError); ok {
+				tracelog.WarningLogger.Printf("No AO files metadata found for backup %s in folder %s, skipping",
+					backup.Name, baseBackupsFolder.GetPath())
+				continue
+			}
+
+			return nil, err
+		}
+
+		for _, fileDesc := range aoMeta.Files {
+			aoSegments[fileDesc.StoragePath] = struct{}{}
+		}
+	}
+
+	return aoSegments, nil
 }
