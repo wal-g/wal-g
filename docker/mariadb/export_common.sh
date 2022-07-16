@@ -9,9 +9,17 @@ export WALG_MYSQL_BACKUP_PREPARE_COMMAND="mariabackup --prepare --target-dir=${M
 
 # test tools
 mariadb_kill_and_clean_data() {
-    service mysql stop || true
+    # MariaDB service is weired - it returns error on service stop. Repeat it until success
+    while ! service mysql stop
+    do
+      echo "Stopping MariaDB... Try again"
+      sleep 1
+    done
+
     kill -9 `pidof mysqld` || true
+
     rm -rf "${MYSQLDATA}"/*
+    rm -rf "${MYSQLDATA}"/.tmp
     rm -rf /root/.walg_mysql_binlogs_cache
 }
 
