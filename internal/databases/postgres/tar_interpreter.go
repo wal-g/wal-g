@@ -24,63 +24,14 @@ type FileTarInterpreter struct {
 	UnwrapResult    *UnwrapResult
 
 	createNewIncrementalFiles bool
-	explicitFsync             *bool
 }
-
-// func NewFileTarInterpreter(
-// 	dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
-// 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
-// ) internal.TarInterpreter {
-// 	return &FileTarInterpreter{dbDataDirectory, sentinel, filesMetadata,
-// 		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles, nil}
-// }
-
-// func NewFileTarInterpreter(
-// 	dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
-// 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
-// ) *GroupFileTarInterpreter {
-// 	return NewGroupFileTarInterpreterWithGlobalFsync(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles)
-// }
 
 func NewFileTarInterpreter(
 	dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
-) *GroupFileTarInterpreter {
-	return NewGroupFileTarInterpreter(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles)
-}
-
-func NewFileTarInterpreterWithExplicitFsync(
-	dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
-	filesToUnwrap map[string]bool, createNewIncrementalFiles bool, explicitFsync bool,
-) *FileTarInterpreter {
+) internal.TarInterpreter {
 	return &FileTarInterpreter{dbDataDirectory, sentinel, filesMetadata,
-		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles, &explicitFsync}
-}
-
-func NewGroupFileTarInterpreter(dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
-	filesToUnwrap map[string]bool, createNewIncrementalFiles bool) *GroupFileTarInterpreter {
-	fileInterpreter := *NewFileTarInterpreterWithExplicitFsync(dbDataDirectory,
-		sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles, false)
-	fsyncHandler := FileSyncHandler{BasePath: dbDataDirectory}
-	fileHandlers := [...]FileInterpretFinishedHandler{fsyncHandler}
-	endHandlers := [...]InterpretFinishedHandler{}
-	return &GroupFileTarInterpreter{
-		FileTarInterpreter:            fileInterpreter,
-		FileInterpretFinishedHandlers: fileHandlers[:],
-		InterpretFinishedHandlers:     endHandlers[:]}
-}
-
-func NewGroupFileTarInterpreterWithGlobalFsync(dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
-	filesToUnwrap map[string]bool, createNewIncrementalFiles bool) *GroupFileTarInterpreter {
-	fileInterpreter := *NewFileTarInterpreterWithExplicitFsync(dbDataDirectory,
-		sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles, false)
-	globalFsyncHandler := GlobalFileSyncHandler{}
-	fileHandlers := [...]FileInterpretFinishedHandler{}
-	endHandlers := [...]InterpretFinishedHandler{globalFsyncHandler}
-	return &GroupFileTarInterpreter{
-		FileTarInterpreter:            fileInterpreter,
-		FileInterpretFinishedHandlers: fileHandlers[:],
-		InterpretFinishedHandlers:     endHandlers[:]}
+		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles}
 }
 
 // write file from reader to local file
@@ -146,10 +97,10 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFileOld(fileReader io.Rea
 func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileInfo *tar.Header) error {
 	tracelog.DebugLogger.Println("Interpreting: ", fileInfo.Name)
 	targetPath := path.Join(tarInterpreter.DBDataDirectory, fileInfo.Name)
-	fsync := !viper.GetBool(internal.TarDisableFsyncSetting)
-	if tarInterpreter.explicitFsync != nil {
-		fsync = *tarInterpreter.explicitFsync
-	}
+
+	// note(HolyPrapor, 17.07.2022): Do not use single file fsync even if specified in config if global fsync is enabled
+	// so that old users could seamlessly upgrade wal-g without changing their configuration
+	fsync := !viper.GetBool(internal.TarDisableFsyncSetting) && viper.GetBool(internal.TarDisableGlobalFsyncSetting)
 	switch fileInfo.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
 		// temporary switch to determine if new unwrap logic should be used
@@ -172,6 +123,17 @@ func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileIn
 	case tar.TypeSymlink:
 		if err := os.Symlink(fileInfo.Name, targetPath); err != nil {
 			return errors.Wrapf(err, "Interpret: failed to create symlink %s", targetPath)
+		}
+	}
+	return nil
+}
+
+func (tarInterpreter *FileTarInterpreter) OnInterpretFinish() error {
+	globalFsync := !viper.GetBool(internal.TarDisableGlobalFsyncSetting)
+	if globalFsync {
+		_, _, err := unix.Syscall(unix.SYS_SYNC, 0, 0, 0)
+		if err != 0 {
+			return errors.Errorf("FileTarInterpreter: global fsync failed with error code %d", err)
 		}
 	}
 	return nil

@@ -50,11 +50,7 @@ func (err UnsupportedFileTypeError) Error() string {
 // for different file types.
 type TarInterpreter interface {
 	Interpret(reader io.Reader, header *tar.Header) error
-}
-
-type GroupTarInterpreter interface {
-	TarInterpreter
-	InterpretGroup(tarReader *tar.Reader) error
+	OnInterpretFinish() error
 }
 
 type DevNullWriter struct {
@@ -83,10 +79,6 @@ var _ io.Writer = &DevNullWriter{}
 func extractOneTar(tarInterpreter TarInterpreter, source io.Reader) error {
 	tarReader := tar.NewReader(source)
 
-	if groupInterpreter, ok := tarInterpreter.(GroupTarInterpreter); ok {
-		return groupInterpreter.InterpretGroup(tarReader)
-	}
-
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
@@ -101,7 +93,8 @@ func extractOneTar(tarInterpreter TarInterpreter, source io.Reader) error {
 			return errors.Wrap(err, "extractOne: Interpret failed")
 		}
 	}
-	return nil
+
+	return tarInterpreter.OnInterpretFinish()
 }
 
 func extractNonTar(tarInterpreter TarInterpreter, source io.Reader, path string, fileType FileType, mode int) error {
