@@ -29,7 +29,7 @@ type FileTarInterpreter struct {
 func NewFileTarInterpreter(
 	dbDataDirectory string, sentinel BackupSentinelDto, filesMetadata FilesMetadataDto,
 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool,
-) internal.TarInterpreter {
+) *FileTarInterpreter {
 	return &FileTarInterpreter{dbDataDirectory, sentinel, filesMetadata,
 		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles}
 }
