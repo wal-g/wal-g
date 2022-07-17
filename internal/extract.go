@@ -93,7 +93,6 @@ func extractOneTar(tarInterpreter TarInterpreter, source io.Reader) error {
 			return errors.Wrap(err, "extractOne: Interpret failed")
 		}
 	}
-
 	return tarInterpreter.OnInterpretFinish()
 }
 
@@ -211,7 +210,6 @@ func tryExtractFiles(files []ReaderMaker,
 
 		go func() {
 			defer downloadingSemaphore.Release(1)
-
 			readCloser, err := fileClosure.Reader()
 			if err == nil {
 				defer utility.LoggedClose(readCloser, "")

@@ -13,6 +13,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
+	"golang.org/x/sys/unix"
 )
 
 // FileTarInterpreter extracts input to disk.
