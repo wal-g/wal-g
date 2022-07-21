@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
-	"github.com/wal-g/wal-g/internal/databases/mongo/logical"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -24,5 +24,5 @@ func DownloadSentinel(folder storage.Folder, backupName string) (interface{}, er
 	if strings.HasPrefix(backupName, "binary") {
 		return binary.DownloadSentinel(folder, backupName)
 	}
-	return logical.DownloadSentinel(folder, backupName)
+	return archive.DownloadSentinel(folder, backupName)
 }

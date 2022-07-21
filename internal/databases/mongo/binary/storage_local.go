@@ -1,14 +1,17 @@
 package binary
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/user"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -187,6 +190,21 @@ func (localStorage *LocalStorage) ApplyFileOwnerAndPermissions(backupFileMeta *B
 	userName := "mongodb"  // todo: get from sentinel!!!
 	groupName := "mongodb" // todo: get from sentinel!!!
 	return chown(absolutePath, userName, groupName)
+}
+
+func (localStorage *LocalStorage) FixFileOwnerOfMongodData() error {
+	userName := "mongodb"  // todo: get from sentinel!!!
+	groupName := "mongodb" // todo: get from sentinel!!!
+	// todo: check if some files own non mongodb user
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	command := exec.CommandContext(ctx, "chown", "-R", userName+"."+groupName, localStorage.MongodDBPath)
+	err := command.Start()
+	if err != nil {
+		return err
+	}
+	return command.Wait()
 }
 
 func chown(path, userName, groupName string) error {

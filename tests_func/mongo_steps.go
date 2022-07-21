@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/cucumber/godog"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +15,7 @@ import (
 	"github.com/wal-g/wal-g/tests_func/mongodb/mongoload/models"
 )
 
-func setupMongodbSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
+func SetupMongodbSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^a working mongodb on ([^\s]*)$`, tctx.testMongoConnect)
 	ctx.Step(`^mongodb replset initialized on ([^\s]*)$`, tctx.initiateReplSet)
 	ctx.Step(`^mongodb role is primary on ([^\s]*)$`, tctx.isMongoPrimary)
@@ -22,26 +23,62 @@ func setupMongodbSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^mongodb initialized on ([^\s]*)$`, tctx.mongoInit)
 	ctx.Step(`^([^\s]*) has no data$`, tctx.purgeMongoDataDir)
 
-	ctx.Step(`we save last oplog timestamp on ([^\s]*) to "([^"]*)"`, tctx.saveOplogTimestamp)
 	ctx.Step(`^([^\s]*) has test mongodb data test(\d+)$`, tctx.fillMongodbWithTestData)
 	ctx.Step(`^([^\s]*) has been loaded with "([^"]*)"$`, tctx.loadMongodbOpsFromConfig)
 	ctx.Step(`^we got same mongodb data at ([^\s]*) ([^\s]*)$`, tctx.testEqualMongodbDataAtHosts)
 	ctx.Step(`^we have same data in "([^"]*)" and "([^"]*)"$`, tctx.sameDataCheck)
 	ctx.Step(`^we save ([^\s]*) data "([^"]*)"$`, tctx.saveMongoSnapshot)
 
-	ctx.Step(`^we create ([^\s]*) mongo-backup$`, tctx.createMongoBackup)
 	ctx.Step(`^we delete mongo backups retain (\d+) via ([^\s]*)$`, tctx.purgeBackupRetain)
-	ctx.Step(`^at least one oplog archive exists in storage$`, tctx.oplogArchiveIsNotEmpty)
-	ctx.Step(`^we purge oplog archives via ([^\s]*)$`, tctx.purgeOplogArchives)
-	ctx.Step(`^we restore #(\d+) backup to ([^\s]*)$`, tctx.restoreBackupToMongodb)
-	ctx.Step(`^oplog archiving is enabled on ([^\s]*)$`, tctx.enableOplogPush)
-	ctx.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*)$`, tctx.replayOplog)
 
 	ctx.Step(`^we got (\d+) backup entries of ([^\s]*)$`, tctx.checkBackupsCount)
 	ctx.Step(`^we delete mongo backup #(\d+) via ([^\s]*)$`, tctx.deleteMongoBackup)
 	ctx.Step(`^we ensure ([^\s]*) #(\d+) backup metadata contains$`, tctx.backupMetadataContains)
 	ctx.Step(`^we put empty backup via ([^\s]*) to ([^\s]*)$`, tctx.putEmptyBackupViaMinio)
 	ctx.Step(`^we check if empty backups were purged via ([^\s]*)$`, tctx.testEmptyBackupsViaMinio)
+
+	SetupMongodbLogicalSteps(ctx, tctx)
+}
+
+func SetupMongodbLogicalSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
+	ctx.Step(`^we create ([^\s]*) mongo-backup$`, tctx.createMongoBackup)
+	ctx.Step(`^we restore #(\d+) backup to ([^\s]*)$`, tctx.restoreBackupToMongodb)
+
+	// oplog
+	ctx.Step(`we save last oplog timestamp on ([^\s]*) to "([^"]*)"`, tctx.saveOplogTimestamp)
+	ctx.Step(`^at least one oplog archive exists in storage$`, tctx.oplogArchiveIsNotEmpty)
+	ctx.Step(`^we purge oplog archives via ([^\s]*)$`, tctx.purgeOplogArchives)
+	ctx.Step(`^oplog archiving is enabled on ([^\s]*)$`, tctx.enableOplogPush)
+	ctx.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*)$`, tctx.replayOplog)
+}
+
+func (tctx *TestContext) createMongoBackup(container string) error {
+	host := tctx.ContainerFQDN(container)
+	beforeBackupTime, err := helpers.TimeInContainer(tctx.Context, host)
+	if err != nil {
+		return err
+	}
+
+	passed := beforeBackupTime.Sub(tctx.PreviousBackupTime)
+	if passed < time.Second {
+		time.Sleep(time.Second)
+	}
+
+	walg := WalgUtilFromTestContext(tctx, container)
+	backupID, err := walg.PushBackup()
+	if err != nil {
+		return err
+	}
+	tracelog.DebugLogger.Println("Backup created: ", backupID)
+
+	afterBackupTime, err := helpers.TimeInContainer(tctx.Context, host)
+	if err != nil {
+		return err
+	}
+
+	tctx.PreviousBackupTime = afterBackupTime
+	tctx.AuxData.CreatedBackupNames = append(tctx.AuxData.CreatedBackupNames, backupID)
+	return nil
 }
 
 func (tctx *TestContext) oplogArchiveIsNotEmpty() error {
@@ -64,7 +101,7 @@ func (tctx *TestContext) testEqualMongodbDataAtHosts(host1, host2 string) error 
 	if err != nil {
 		return err
 	}
-	mc2, err := MongoCtlFromTestContext(tctx, host1)
+	mc2, err := MongoCtlFromTestContext(tctx, host2)
 	if err != nil {
 		return err
 	}
@@ -306,7 +343,7 @@ func (tctx *TestContext) replayOplog(backupId int, timestampId string, container
 	if err != nil {
 		return fmt.Errorf("can not retrieve backup #%d metadata: %v", backupId, err)
 	}
-	from := backupMeta.MongoMeta.Before.LastMajTS
+	from := backupMeta.MongoMeta.GetBackupLastTS()
 	until := tctx.AuxData.Timestamps[timestampId]
 	tracelog.DebugLogger.Printf("Saved timestamps:\nbackup #%d majTs: %v\n%s: %v\n", backupId, from, timestampId, until)
 	until.Inc++

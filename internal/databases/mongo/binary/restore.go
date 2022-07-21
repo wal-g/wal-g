@@ -13,18 +13,17 @@ type RestoreService struct {
 	Context       context.Context
 	LocalStorage  *LocalStorage
 	BackupStorage *BackupStorage
+
+	MongodFileConfig *MongodFileConfig
 }
 
-// nolint: whitespace
-func CreateRestoreService(
-	ctx context.Context,
-	localStorage *LocalStorage,
-	backupStorage *BackupStorage) (*RestoreService, error) {
-
+func CreateRestoreService(ctx context.Context, localStorage *LocalStorage, backupStorage *BackupStorage,
+	mongodFileConfig *MongodFileConfig) (*RestoreService, error) {
 	return &RestoreService{
-		Context:       ctx,
-		LocalStorage:  localStorage,
-		BackupStorage: backupStorage,
+		Context:          ctx,
+		LocalStorage:     localStorage,
+		BackupStorage:    backupStorage,
+		MongodFileConfig: mongodFileConfig,
 	}, nil
 }
 
@@ -50,10 +49,69 @@ func (restoreService *RestoreService) DoRestore(restoreMongodVersion string) err
 	}
 
 	tracelog.InfoLogger.Println("Download backup files to dbPath")
-	return restoreService.DownloadFilesFromBackup(mongodBackupMeta)
+	err = restoreService.downloadFilesFromBackup(mongodBackupMeta)
+	if err != nil {
+		return err
+	}
+
+	err = restoreService.fixSystemData(mongodBackupMeta)
+	if err != nil {
+		return err
+	}
+
+	err = restoreService.recoverFromOplogAsStandalone()
+	if err != nil {
+		return err
+	}
+
+	return restoreService.LocalStorage.FixFileOwnerOfMongodData()
 }
 
-func (restoreService *RestoreService) DownloadFilesFromBackup(backupMeta *MongodBackupMeta) error {
+func (restoreService *RestoreService) fixSystemData(mongodBackupMeta *MongodBackupMeta) error {
+	mongodProcess, err := StartMongodWithDisableLogicalSessionCacheRefresh(restoreService.MongodFileConfig)
+	if err != nil {
+		return errors.Wrap(err, "unable to start mongod in special mode")
+	}
+
+	mongodService, err := CreateMongodService(restoreService.Context, "wal-g restore", mongodProcess.GetURI())
+	if err != nil {
+		return errors.Wrap(err, "unable to create mongod service")
+	}
+
+	lastWriteTS := mongodBackupMeta.MongodMeta.EndTS
+	err = mongodService.FixSystemDataAfterRestore(lastWriteTS)
+	if err != nil {
+		return err
+	}
+
+	err = mongodService.Shutdown()
+	if err != nil {
+		return err
+	}
+
+	return mongodProcess.Wait()
+}
+
+func (restoreService *RestoreService) recoverFromOplogAsStandalone() error {
+	mongodProcess, err := StartMongodWithRecoverFromOplogAsStandalone(restoreService.MongodFileConfig)
+	if err != nil {
+		return errors.Wrap(err, "unable to start mongod in special mode")
+	}
+
+	mongodService, err := CreateMongodService(restoreService.Context, "wal-g restore", mongodProcess.GetURI())
+	if err != nil {
+		return errors.Wrap(err, "unable to create mongod service")
+	}
+
+	err = mongodService.Shutdown()
+	if err != nil {
+		return err
+	}
+
+	return mongodProcess.Wait()
+}
+
+func (restoreService *RestoreService) downloadFilesFromBackup(backupMeta *MongodBackupMeta) error {
 	err := restoreService.LocalStorage.EnsureEmptyDBPath()
 	if err != nil {
 		return err

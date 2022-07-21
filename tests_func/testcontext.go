@@ -124,8 +124,7 @@ func CreateTestContex(database string) (tctx *TestContext, err error) {
 		},
 		Env: env,
 	}
-	tctx.LoadEnv()
-	return tctx, nil
+	return tctx, tctx.LoadEnv()
 }
 
 func (tctx *TestContext) StopEnv() error {
@@ -136,20 +135,18 @@ func (tctx *TestContext) CleanEnv() error {
 	return os.RemoveAll(path.Dir(tctx.EnvFilePath))
 }
 
-func (tctx *TestContext) LoadEnv() {
-	env := tctx.Env
-	var err error
-	if env == nil {
-		env, err = ReadEnv(tctx.EnvFilePath)
-		tracelog.ErrorLogger.FatalOnError(err)
+func (tctx *TestContext) LoadEnv() (err error) {
+	if tctx.Env == nil {
+		tctx.Env, err = ReadEnv(tctx.EnvFilePath)
+		if err != nil {
+			return err
+		}
 	}
 
 	// mix os.environ to our database params
-	tctx.Env = utils.MergeEnvs(utils.ParseEnvLines(os.Environ()), env)
-
+	tctx.Env = utils.MergeEnvs(tctx.Env, utils.ParseEnvLines(os.Environ()))
 	tctx.Infra = InfraFromTestContext(tctx)
-	err = tctx.Infra.Setup()
-	tracelog.ErrorLogger.FatalOnError(err)
+	return tctx.Infra.Setup()
 }
 
 func GetRedisCtlFromTestContext(tctx *TestContext, hostName string) (*helpers.RedisCtl, error) {

@@ -156,7 +156,7 @@ func TestSequenceBetweenTS(t *testing.T) {
 				until: models.Timestamp{TS: 1579005001, Inc: 1},
 			},
 			want: nil,
-			err:  fmt.Errorf("can not find archive with until timestamp '1579005001.1'"),
+			err:  fmt.Errorf("can not find archive with since timestamp '1579000000.1'"),
 		},
 		{
 			name: "error: since ts is out of bounds",
@@ -165,7 +165,7 @@ func TestSequenceBetweenTS(t *testing.T) {
 				until: models.Timestamp{TS: 1579003001, Inc: 2},
 			},
 			want: nil,
-			err:  fmt.Errorf("previous archive in sequence with last ts '1579000001.1' does not exist"),
+			err:  fmt.Errorf("can not find archive with since timestamp '1579000000.1'"),
 		},
 		{
 			name: "error: until ts is out of bounds",
@@ -183,7 +183,7 @@ func TestSequenceBetweenTS(t *testing.T) {
 				until: models.Timestamp{TS: 1579004001, Inc: 2},
 			},
 			want: nil,
-			err:  fmt.Errorf("previous archive in sequence with last ts '1579000001.1' does not exist"),
+			err:  fmt.Errorf("can not find archive with since timestamp '1579000001.1'"),
 		},
 		{
 			name: "error: since ts is in last archive, until is out of bounds",

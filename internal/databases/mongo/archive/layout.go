@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
@@ -27,6 +28,7 @@ func SequenceBetweenTS(archives []models.Archive, since, until models.Timestamp)
 		return nil, fmt.Errorf("until ts must be greater or equal to since ts")
 	}
 
+	var seqStart *models.Archive
 	var seqEnd *models.Archive
 	lastTSArch := make(map[models.Timestamp]*models.Archive)
 
@@ -35,10 +37,19 @@ func SequenceBetweenTS(archives []models.Archive, since, until models.Timestamp)
 		if arch.Type != models.ArchiveTypeOplog {
 			continue
 		}
-		lastTSArch[arch.End] = &arch // TODO: we can have few archives with same endTS
+		if _, ok := lastTSArch[arch.End]; ok {
+			return nil, errors.Errorf("duplicate archives with the same end %+v (archives: %+v)", arch.End, archives)
+		}
+		lastTSArch[arch.End] = &arch
+		if seqStart == nil && arch.In(since) {
+			seqStart = &arch
+		}
 		if seqEnd == nil && arch.In(until) {
 			seqEnd = &arch
 		}
+	}
+	if seqStart == nil {
+		return nil, fmt.Errorf("can not find archive with since timestamp '%s'", since)
 	}
 	if seqEnd == nil {
 		return nil, fmt.Errorf("can not find archive with until timestamp '%s'", until)
@@ -46,9 +57,8 @@ func SequenceBetweenTS(archives []models.Archive, since, until models.Timestamp)
 
 	archPath := Sequence{}
 	ok := true
-	i := 0
 	ts := models.Timestamp{}
-	for ok && i <= len(archives) {
+	for i := 0; ok && i <= len(archives); i++ {
 		archPath = append(archPath, *seqEnd)
 		if seqEnd.In(since) {
 			archPath.Reverse()
@@ -56,7 +66,6 @@ func SequenceBetweenTS(archives []models.Archive, since, until models.Timestamp)
 		}
 		ts = seqEnd.Start
 		seqEnd, ok = lastTSArch[ts]
-		i++
 	}
 	if !ok {
 		return nil, fmt.Errorf("previous archive in sequence with last ts '%s' does not exist", ts)

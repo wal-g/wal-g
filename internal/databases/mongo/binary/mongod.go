@@ -2,8 +2,13 @@ package binary
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
 
-	"github.com/wal-g/wal-g/internal"
+	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -17,14 +22,10 @@ type MongodService struct {
 	MongoClient *mongo.Client
 }
 
-func CreateMongodService(ctx context.Context, appName string) (*MongodService, error) {
-	mongodbURI, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
-	if err != nil {
-		return nil, err
-	}
-
+func CreateMongodService(ctx context.Context, appName, mongodbURI string) (*MongodService, error) {
 	mongoClient, err := mongo.Connect(ctx,
 		options.Client().ApplyURI(mongodbURI).
+			SetSocketTimeout(time.Minute).
 			SetAppName(appName).
 			SetDirect(true).
 			SetRetryReads(false))
@@ -106,6 +107,88 @@ func (mongodService *MongodService) GetBackupCursorExtended(backupID *primitive.
 			},
 		}},
 	})
+}
+
+func (mongodService *MongodService) FixSystemDataAfterRestore(LastWriteTS primitive.Timestamp) error {
+	localDatabase := mongodService.MongoClient.Database("local")
+
+	err := replaceData(mongodService.Context, localDatabase.Collection("replset.election"), true, nil)
+	if err != nil {
+		return err
+	}
+
+	err = replaceData(mongodService.Context, localDatabase.Collection("replset.minvalid"), true, bson.M{
+		"_id": primitive.NewObjectID(),
+		"t":   -1,
+		"ts":  primitive.Timestamp{T: 0, I: 1},
+	})
+	if err != nil {
+		return err
+	}
+
+	tracelog.DebugLogger.Printf("oplogTruncateAfterPoint: %v", LastWriteTS)
+	err = replaceData(mongodService.Context, localDatabase.Collection("replset.oplogTruncateAfterPoint"), true,
+		bson.M{
+			"_id":                     "oplogTruncateAfterPoint",
+			"oplogTruncateAfterPoint": LastWriteTS,
+		})
+	if err != nil {
+		return err
+	}
+
+	err = replaceData(mongodService.Context, localDatabase.Collection("system.replset"), false, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func replaceData(ctx context.Context, collection *mongo.Collection, drop bool, insertData bson.M) error {
+	findCursor, err := collection.Find(ctx, bson.D{})
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("unable to find all from %v", collection.Name()))
+	}
+	data := bson.D{}
+	for findCursor.Next(ctx) {
+		err := findCursor.Decode(&data)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("unable to decode item from %v", collection.Name()))
+		}
+		bytes, err := json.Marshal(data)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("unable to marchal data from %v", collection.Name()))
+		}
+		tracelog.InfoLogger.Printf("[%v] %v", collection.Name(), string(bytes))
+	}
+
+	if drop {
+		err = collection.Drop(ctx)
+	} else {
+		_, err = collection.DeleteMany(ctx, bson.D{})
+	}
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("unable to drop data from %v", collection.Name()))
+	}
+
+	if insertData != nil {
+		_, err = collection.InsertOne(ctx, insertData)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("unable to insert data to %v", collection.Name()))
+		}
+	}
+
+	return nil
+}
+
+func (mongodService *MongodService) Shutdown() error {
+	err := mongodService.MongoClient.Database(adminDB).RunCommand(context.Background(),
+		bson.D{{Key: "shutdown", Value: 1}},
+	).Err()
+	if err != nil && !strings.Contains(err.Error(), "socket was unexpectedly closed") {
+		return errors.Wrap(err, "unable to shutdown mongod")
+	}
+	return nil
 }
 
 type BackupCursorOplogTS struct {

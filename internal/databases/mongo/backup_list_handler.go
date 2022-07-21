@@ -15,15 +15,15 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// nolint: stylecheck
 type BackupDetail struct {
 	BackupName string    `json:"backup_name"`
 	ModifyTime time.Time `json:"modify_time"`
 
-	StartTS models.Timestamp `json:"ts_start"`
-	EndTS   models.Timestamp `json:"ts_end"`
+	StartTS primitive.Timestamp `json:"ts_start"`
+	EndTS   primitive.Timestamp `json:"ts_end"`
 
 	StartLocalTime  time.Time `json:"start_local_time"`
 	FinishLocalTime time.Time `json:"stop_local_time"`
@@ -56,8 +56,8 @@ func NewLogicalBackupDetail(backupTime internal.BackupTime, sentinel *models.Bac
 	return &BackupDetail{
 		BackupName:      backupTime.BackupName,
 		ModifyTime:      backupTime.Time,
-		StartTS:         sentinel.MongoMeta.Before.LastMajTS,
-		EndTS:           sentinel.MongoMeta.After.LastMajTS,
+		StartTS:         sentinel.MongoMeta.Before.LastMajTS.ToBsonTS(),
+		EndTS:           sentinel.MongoMeta.After.LastMajTS.ToBsonTS(),
 		StartLocalTime:  sentinel.StartLocalTime,
 		FinishLocalTime: sentinel.FinishLocalTime,
 		//UncompressedSize: sentinel.UncompressedDataSize,

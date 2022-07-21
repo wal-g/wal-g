@@ -12,7 +12,6 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/checksum"
-	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -36,10 +35,8 @@ func GenerateNewBackupName() string {
 	return backupType + "_" + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 }
 
-// nolint: whitespace
 func CreateBackupService(ctx context.Context, mongodService *MongodService, localStorage *LocalStorage,
 	backupStorage *BackupStorage) (*BackupService, error) {
-
 	return &BackupService{
 		Context:       ctx,
 		MongodService: mongodService,
@@ -72,7 +69,7 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 
 	backupID, err := backupService.processBackupCursor(backupCursor, backupCursorCloseChannel)
 
-	upto := primitive.Timestamp{T: uint32(time.Now().UTC().Unix()), I: 0}
+	upto := backupService.MongodBackupMeta.MongodMeta.EndTS
 	extendedBackupCursor, err := backupService.MongodService.GetBackupCursorExtended(backupID, upto)
 	if err != nil {
 		return err
@@ -165,14 +162,9 @@ func (backupService *BackupService) processBackupMetadata(backupCursorMeta *Back
 	}
 
 	var mongodMeta = &backupService.MongodBackupMeta.MongodMeta
-	mongodMeta.StartTS = models.Timestamp{
-		TS:  backupCursorMeta.OplogStart.TS.T,
-		Inc: backupCursorMeta.OplogStart.TS.I,
-	}
-	mongodMeta.EndTS = models.Timestamp{
-		TS:  backupCursorMeta.OplogEnd.TS.T,
-		Inc: backupCursorMeta.OplogEnd.TS.I,
-	}
+	mongodMeta.StartTS = backupCursorMeta.OplogStart.TS
+	mongodMeta.EndTS = backupCursorMeta.OplogEnd.TS
+	mongodMeta.BackupLastTS = mongodMeta.EndTS
 
 	return nil
 }
