@@ -142,7 +142,8 @@ clean_mongo_features:
 	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -v -count=1  -timeout 5m -tf.test=false -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=mongodb
 
 fdb_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_FDB_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -linkmode external -extldflags \"-static\"")
+	$(BUILD_CMD) go build -mod vendor -tags "$(BUILD_TAGS)" -o $(MAIN_FDB_PATH)/wal-g -ldflags "-s -w $(BUILD_LDFLAGS)")
+	$(BUILD_CMD) upx $(MAIN_FDB_PATH)/wal-g
 
 fdb_install: fdb_build
 	mv $(MAIN_FDB_PATH)/wal-g $(GOBIN)/wal-g
