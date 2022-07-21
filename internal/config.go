@@ -17,6 +17,14 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
+type WalFsyncMode string
+
+const (
+	DEFAULT  WalFsyncMode = "DEFAULT"
+	DISABLED WalFsyncMode = "DISABLED"
+	GLOBAL   WalFsyncMode = "GLOBAL"
+)
+
 const (
 	PG        = "PG"
 	SQLSERVER = "SQLSERVER"
@@ -52,36 +60,39 @@ const (
 	FetchTargetUserDataSetting   = "WALG_FETCH_TARGET_USER_DATA"
 	LogLevelSetting              = "WALG_LOG_LEVEL"
 	TarSizeThresholdSetting      = "WALG_TAR_SIZE_THRESHOLD"
-	TarDisableFsyncSetting       = "WALG_TAR_DISABLE_FSYNC"
-	TarDisableGlobalFsyncSetting = "WALG_TAR_DISABLE_GLOBAL_FSYNC"
-	CseKmsIDSetting              = "WALG_CSE_KMS_ID"
-	CseKmsRegionSetting          = "WALG_CSE_KMS_REGION"
-	LibsodiumKeySetting          = "WALG_LIBSODIUM_KEY"
-	LibsodiumKeyPathSetting      = "WALG_LIBSODIUM_KEY_PATH"
-	LibsodiumKeyTransform        = "WALG_LIBSODIUM_KEY_TRANSFORM"
-	GpgKeyIDSetting              = "GPG_KEY_ID"
-	PgpKeySetting                = "WALG_PGP_KEY"
-	PgpKeyPathSetting            = "WALG_PGP_KEY_PATH"
-	PgpKeyPassphraseSetting      = "WALG_PGP_KEY_PASSPHRASE"
-	PgDataSetting                = "PGDATA"
-	UserSetting                  = "USER" // TODO : do something with it
-	PgPortSetting                = "PGPORT"
-	PgUserSetting                = "PGUSER"
-	PgHostSetting                = "PGHOST"
-	PgPasswordSetting            = "PGPASSWORD"
-	PgDatabaseSetting            = "PGDATABASE"
-	PgSslModeSetting             = "PGSSLMODE"
-	PgSlotName                   = "WALG_SLOTNAME"
-	PgWalSize                    = "WALG_PG_WAL_SIZE"
-	TotalBgUploadedLimit         = "TOTAL_BG_UPLOADED_LIMIT"
-	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
-	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
-	MaxDelayedSegmentsCount      = "WALG_INTEGRITY_MAX_DELAYED_WALS"
-	PrefetchDir                  = "WALG_PREFETCH_DIR"
-	PgReadyRename                = "PG_READY_RENAME"
-	SerializerTypeSetting        = "WALG_SERIALIZER_TYPE"
-	StreamSplitterPartitions     = "WALG_STREAM_SPLITTER_PARTITIONS"
-	StreamSplitterBlockSize      = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
+
+	// Deprecated: this setting was responsible for 'fsync for every file' logic.
+	TarDisableFsyncSetting = "WALG_TAR_DISABLE_FSYNC"
+	TarFsyncMode           = "WALG_TAR_FSYNC_MODE"
+
+	CseKmsIDSetting          = "WALG_CSE_KMS_ID"
+	CseKmsRegionSetting      = "WALG_CSE_KMS_REGION"
+	LibsodiumKeySetting      = "WALG_LIBSODIUM_KEY"
+	LibsodiumKeyPathSetting  = "WALG_LIBSODIUM_KEY_PATH"
+	LibsodiumKeyTransform    = "WALG_LIBSODIUM_KEY_TRANSFORM"
+	GpgKeyIDSetting          = "GPG_KEY_ID"
+	PgpKeySetting            = "WALG_PGP_KEY"
+	PgpKeyPathSetting        = "WALG_PGP_KEY_PATH"
+	PgpKeyPassphraseSetting  = "WALG_PGP_KEY_PASSPHRASE"
+	PgDataSetting            = "PGDATA"
+	UserSetting              = "USER" // TODO : do something with it
+	PgPortSetting            = "PGPORT"
+	PgUserSetting            = "PGUSER"
+	PgHostSetting            = "PGHOST"
+	PgPasswordSetting        = "PGPASSWORD"
+	PgDatabaseSetting        = "PGDATABASE"
+	PgSslModeSetting         = "PGSSLMODE"
+	PgSlotName               = "WALG_SLOTNAME"
+	PgWalSize                = "WALG_PG_WAL_SIZE"
+	TotalBgUploadedLimit     = "TOTAL_BG_UPLOADED_LIMIT"
+	NameStreamCreateCmd      = "WALG_STREAM_CREATE_COMMAND"
+	NameStreamRestoreCmd     = "WALG_STREAM_RESTORE_COMMAND"
+	MaxDelayedSegmentsCount  = "WALG_INTEGRITY_MAX_DELAYED_WALS"
+	PrefetchDir              = "WALG_PREFETCH_DIR"
+	PgReadyRename            = "PG_READY_RENAME"
+	SerializerTypeSetting    = "WALG_SERIALIZER_TYPE"
+	StreamSplitterPartitions = "WALG_STREAM_SPLITTER_PARTITIONS"
+	StreamSplitterBlockSize  = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
@@ -225,7 +236,7 @@ var (
 		LogLevelSetting:              true,
 		TarSizeThresholdSetting:      true,
 		TarDisableFsyncSetting:       true,
-		TarDisableGlobalFsyncSetting: true,
+		TarFsyncMode:                 DEFAULT,
 		"WALG_" + GpgKeyIDSetting:    true,
 		"WALE_" + GpgKeyIDSetting:    true,
 		PgpKeySetting:                true,
