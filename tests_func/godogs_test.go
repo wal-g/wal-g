@@ -47,31 +47,38 @@ func init() {
 	godog.BindCommandLineFlags("godog.", &godogOpts)
 }
 
-func parseArgs() {
+func TestMain(m *testing.M) {
 	pflag.Parse()
 
 	if _, ok := databases[testOpts.database]; !ok {
 		tracelog.ErrorLogger.Fatalf("Database '%s' is not valid, please provide test database -tf.database=dbname\n",
 			testOpts.database)
 	}
+
+	status, err := RunTestFeatures()
+
+	tracelog.ErrorLogger.FatalOnError(err)
+	os.Exit(status)
 }
 
-func TestMain(m *testing.M) {
-	parseArgs()
-
+func RunTestFeatures() (status int, err error) {
 	if testOpts.debug {
 		err := tracelog.UpdateLogLevel(tracelog.DevelLogLevel)
-		tracelog.ErrorLogger.FatalOnError(err)
+		if err != nil {
+			return -1, err
+		}
 	}
 
 	tctx, err := CreateTestContex(testOpts.database)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	status := 0
+	if err != nil {
+		return -1, err
+	}
 
 	if testOpts.test {
 		godogOpts.Paths, err = utils.FindFeaturePaths(testOpts.database, testOpts.featurePrefix)
-		tracelog.ErrorLogger.FatalOnError(err)
+		if err != nil {
+			return -1, err
+		}
 
 		tracelog.InfoLogger.Printf("Starting testing environment: mongodb %s with features: %v",
 			tctx.Version.Full, godogOpts.Paths)
@@ -79,12 +86,16 @@ func TestMain(m *testing.M) {
 		suite := godog.TestSuite{
 			Name: "godogs",
 			TestSuiteInitializer: func(ctx *godog.TestSuiteContext) {
-				ctx.BeforeSuite(tctx.LoadEnv)
+				ctx.BeforeSuite(func() {
+					err := tctx.LoadEnv()
+					tracelog.ErrorLogger.FatalOnError(err)
+				})
 			},
 			ScenarioInitializer: func(ctx *godog.ScenarioContext) {
-				setupCommonSteps(ctx, tctx)
-				setupMongodbSteps(ctx, tctx)
-				setupRedisSteps(ctx, tctx)
+				SetupCommonSteps(ctx, tctx)
+				SetupMongodbSteps(ctx, tctx)
+				SetupMongodbBinaryBackupSteps(ctx, tctx)
+				SetupRedisSteps(ctx, tctx)
 			},
 			Options: &godogOpts,
 		}
@@ -93,13 +104,17 @@ func TestMain(m *testing.M) {
 
 	if testOpts.stop {
 		err = tctx.StopEnv()
-		tracelog.ErrorLogger.FatalOnError(err)
+		if err != nil {
+			return -1, err
+		}
 	}
 
 	if testOpts.clean {
 		err = tctx.CleanEnv()
-		tracelog.ErrorLogger.FatalOnError(err)
+		if err != nil {
+			return -1, err
+		}
 	}
 
-	os.Exit(status)
+	return status, nil
 }

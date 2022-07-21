@@ -11,7 +11,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
-	"github.com/wal-g/wal-g/internal/databases/mongo/logical"
+	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -81,7 +81,19 @@ func NewStorageDownloader(opts StorageSettings) (*StorageDownloader, error) {
 
 // BackupMeta downloads sentinel contents.
 func (sd *StorageDownloader) BackupMeta(name string) (*models.Backup, error) {
-	return logical.DownloadSentinel(sd.backupsFolder, name)
+	return DownloadSentinel(sd.backupsFolder, name)
+}
+
+func DownloadSentinel(folder storage.Folder, backupName string) (*models.Backup, error) {
+	var sentinel models.Backup
+	err := common.DownloadSentinel(folder, backupName, &sentinel)
+	if err != nil {
+		return nil, err
+	}
+	if sentinel.BackupName == "" {
+		sentinel.BackupName = backupName
+	}
+	return &sentinel, nil
 }
 
 // LoadBackups downloads backups metadata

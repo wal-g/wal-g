@@ -3,13 +3,18 @@ package mongo
 import (
 	"context"
 
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
 )
 
 func HandleBinaryBackupPush(ctx context.Context, permanent bool, appName string) error {
 	backupName := binary.GenerateNewBackupName()
 
-	mongodService, err := binary.CreateMongodService(ctx, appName)
+	mongodbURI, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
+	if err != nil {
+		return err
+	}
+	mongodService, err := binary.CreateMongodService(ctx, appName, mongodbURI)
 	if err != nil {
 		return err
 	}

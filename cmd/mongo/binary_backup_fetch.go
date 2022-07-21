@@ -23,11 +23,11 @@ var binaryBackupFetchCmd = &cobra.Command{
 		defer func() { _ = signalHandler.Close() }()
 
 		backupName := args[0] // todo: use backup selector
-		replSetName := args[1]
-		dbPath := args[2]
+		backupReplSetName := args[1]
+		mongodbConfigPath := args[2]
 		mongodVersion := args[3]
 
-		err := mongo.HandleBinaryFetchPush(ctx, dbPath, backupName, replSetName, mongodVersion)
+		err := mongo.HandleBinaryFetchPush(ctx, mongodbConfigPath, backupName, backupReplSetName, mongodVersion)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

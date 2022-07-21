@@ -22,6 +22,13 @@ type Timestamp struct {
 	Inc uint32 `json:"Inc"`
 }
 
+func (ots Timestamp) ToBsonTS() primitive.Timestamp {
+	return primitive.Timestamp{
+		T: ots.TS,
+		I: ots.Inc,
+	}
+}
+
 // String returns text representation of Timestamp struct
 func (ots Timestamp) String() string {
 	return fmt.Sprintf("%d%s%d", ots.TS, timestampDelimiter, ots.Inc)

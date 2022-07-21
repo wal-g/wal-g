@@ -4,15 +4,17 @@ import (
 	"os"
 	"time"
 
-	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type MongodMeta struct {
 	Version     string `json:"Version"`
 	ReplSetName string `json:"ReplSetName"`
 
-	StartTS models.Timestamp `json:"TsStart"`
-	EndTS   models.Timestamp `json:"TsEnd"`
+	StartTS primitive.Timestamp `json:"TsStart"`
+	EndTS   primitive.Timestamp `json:"TsEnd"`
+
+	BackupLastTS primitive.Timestamp `json:"BackupLastTS"`
 }
 
 type BackupDirectoryMeta struct {

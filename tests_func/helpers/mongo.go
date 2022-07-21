@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/utils"
 	"go.mongodb.org/mongo-driver/bson"
@@ -383,12 +384,47 @@ func (mc *MongoCtl) InitReplSet() error {
 	if im.SetName != "" {
 		return nil
 	}
-	_, err = mc.runCmd([]string{"mongo",
-		"--host", "localhost", "--quiet", "--norc",
-		"--port", "27018", "--eval", "rs.initiate()"})
+	cli := []string{"mongo", "--host", "localhost", "--port", "27018", "--norc"}
+	authedCli := append(cli, "--username", mc.adminCreds.Username, "--password", mc.adminCreds.Password)
+	if _, err := mc.runCmd(append(authedCli, "--eval", "quit()", AdminDB)...); err == nil {
+		cli = authedCli
+	}
+	_, err = mc.runCmd(append(cli, "--eval", "rs.initiate()")...)
 	time.Sleep(3 * time.Second) // TODO: wait until rs initiated
 
 	return err
+}
+
+func (mc *MongoCtl) GetVersion() (string, error) {
+	result, err := mc.runCmd("mongo", "--host", "localhost", "--quiet", "--port", "27018", "--eval", "db.version()")
+	version := strings.TrimSpace(result.Stdout())
+
+	if len(version) == 0 {
+		return "", errors.New("version is empty")
+	}
+
+	return version, err
+}
+
+func (mc *MongoCtl) GetConfigPath() (string, error) {
+	getCmdLineOpts := struct {
+		Parsed struct {
+			Config string `bson:"config"`
+		} `bson:"parsed"`
+	}{}
+	adminConnect, err := mc.AdminConnect()
+	if err != nil {
+		return "", err
+	}
+	err = adminConnect.Database("admin").RunCommand(mc.ctx, bson.M{"getCmdLineOpts": 1}).Decode(&getCmdLineOpts)
+	if err != nil {
+		return "", err
+	}
+	if len(getCmdLineOpts.Parsed.Config) == 0 {
+		return "", errors.New("config path is empty")
+	}
+
+	return getCmdLineOpts.Parsed.Config, nil
 }
 
 func (mc *MongoCtl) EnableAuth() error {
@@ -444,30 +480,35 @@ func (mc *MongoCtl) EnableAuth() error {
 	return nil
 }
 
-func (mc *MongoCtl) runCmd(run []string) (ExecResult, error) {
-	exc, err := RunCommandStrict(mc.ctx, mc.host, run)
+func (mc *MongoCtl) runCmd(cli ...string) (ExecResult, error) {
+	exc, err := RunCommandStrict(mc.ctx, mc.host, cli)
 
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", strings.Join(run, " "), exc.String())
+		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", strings.Join(cli, " "), exc.String())
 		return exc, err
 	}
 	return exc, err
 }
 
+func (mc *MongoCtl) StopMongod() error {
+	_, err := mc.runCmd("supervisorctl", "stop", "mongodb")
+	return err
+}
+
+func (mc *MongoCtl) StartMongod() error {
+	_, err := mc.runCmd("supervisorctl", "start", "mongodb")
+	return err
+}
+
 func (mc *MongoCtl) PurgeDatadir() error {
-	_, err := mc.runCmd([]string{"supervisorctl", "stop", "mongodb"})
+	err := mc.StopMongod()
 	if err != nil {
 		return err
 	}
-	_, err = mc.runCmd([]string{"bash", "-c", "rm -rf /var/lib/mongodb/*"})
-	if err != nil {
-		return err
-	}
-
-	_, err = mc.runCmd([]string{"supervisorctl", "start", "mongodb"})
+	_, err = mc.runCmd("bash", "-c", "rm -rf /var/lib/mongodb/*")
 	if err != nil {
 		return err
 	}
 
-	return nil
+	return mc.StartMongod()
 }

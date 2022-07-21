@@ -29,6 +29,8 @@ var backupDeleteCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
+		backupName := args[0]
+
 		// set up storage downloader client
 		downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -37,7 +39,7 @@ var backupDeleteCmd = &cobra.Command{
 		purger, err := archive.NewStoragePurger(archive.NewDefaultStorageSettings())
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = mongo.HandleBackupDelete(args[0], downloader, purger, !confirmedBackupDelete)
+		err = mongo.HandleBackupDelete(backupName, downloader, purger, !confirmedBackupDelete)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

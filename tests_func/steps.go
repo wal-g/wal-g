@@ -14,7 +14,7 @@ import (
 	"github.com/wal-g/wal-g/tests_func/helpers"
 )
 
-func setupCommonSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
+func SetupCommonSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^prepared infrastructure$`, tctx.prepareInfrastructure)
 	ctx.Step(`^a configured s3 on ([^\s]*)$`, tctx.configureS3)
 
@@ -54,38 +54,6 @@ func (tctx *TestContext) prepareInfrastructure() error {
 	tctx.AuxData.Snapshots = make(map[string][]helpers.NsSnapshot)
 	tctx.PreviousBackupTime = time.Unix(0, 0)
 	return tctx.Infra.RecreateContainers()
-}
-
-func (tctx *TestContext) createMongoBackup(container string) error {
-	host := tctx.ContainerFQDN(container)
-	beforeBackupTime, err := helpers.TimeInContainer(tctx.Context, host)
-	if err != nil {
-		return err
-	}
-
-	passed := beforeBackupTime.Sub(tctx.PreviousBackupTime)
-	if passed < time.Second {
-		cmd := []string{"sleep", "1"}
-		if _, err := helpers.RunCommandStrict(tctx.Context, host, cmd); err != nil {
-			return err
-		}
-	}
-
-	walg := WalgUtilFromTestContext(tctx, container)
-	backupId, err := walg.PushBackup()
-	if err != nil {
-		return err
-	}
-	tracelog.DebugLogger.Println("Backup created: ", backupId)
-
-	afterBackupTime, err := helpers.TimeInContainer(tctx.Context, host)
-	if err != nil {
-		return err
-	}
-
-	tctx.PreviousBackupTime = afterBackupTime
-	tctx.AuxData.CreatedBackupNames = append(tctx.AuxData.CreatedBackupNames, backupId)
-	return nil
 }
 
 func (tctx *TestContext) checkBackupsCount(backupCount int, container string) error {

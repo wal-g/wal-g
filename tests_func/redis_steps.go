@@ -11,7 +11,7 @@ import (
 	"github.com/wal-g/wal-g/tests_func/utils"
 )
 
-func setupRedisSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
+func SetupRedisSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^a working redis on ([^\s]*)$`, tctx.isWorkingRedis)
 	ctx.Step(`^([^\s]*) has test redis data test(\d+)$`, tctx.redisHasTestRedisDataTest)
 	ctx.Step(`^we create ([^\s]*) redis-backup$`, tctx.createRedisBackup)
