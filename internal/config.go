@@ -165,7 +165,7 @@ var (
 		UseWalDeltaSetting:           "false",
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
 		TarDisableFsyncSetting:       "true",
-		TarFsyncMode:                 DISABLED,
+		TarFsyncMode:                 DEFAULT,
 		TotalBgUploadedLimit:         "32",
 		UseReverseUnpackSetting:      "false",
 		SkipRedundantTarsSetting:     "false",
