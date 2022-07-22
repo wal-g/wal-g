@@ -48,6 +48,11 @@ Configuration
   (created by `WALG_STREAM_CREATE_COMMAND`) to STDIN and unpack it to MySQL datadir.
 Required.
 
+* `WALG_STREAM_SPLITTER_PARTITIONS` and `WALG_STREAM_SPLITTER_BLOCK_SIZE` - Splits the
+  backup stream into `WALG_STREAM_SPLITTER_PARTITIONS` different output streams in blocks
+  of `WALG_STREAM_SPLITTER_BLOCK_SIZE` bytes. Each stream is uploaded separately. Using
+  multiple backup streams significantly improve restore performance. Optional. 
+
 * `WALG_MYSQL_BACKUP_PREPARE_COMMAND` - Command to prepare MySQL backup after restoring.
   Needed for xtrabackup. Optional.
 
@@ -70,11 +75,6 @@ Required.
 are taken from the same host, this variable should be left False (default).
 
 > **Operations with binlogs**: If you'd like to do binlog operations with wal-g don't forget to [activate the binary log](https://mariadb.com/kb/en/activating-the-binary-log/) by starting mysql/mariadb with [--log-bin](https://mariadb.com/kb/en/replication-and-binary-log-server-system-variables/#log_bin) and [--log-basename](https://mariadb.com/kb/en/mysqld-options/#-log-basename)=\[name\].
-
-* `WALG_STREAM_SPLITTER_PARTITIONS` and `WALG_STREAM_SPLITTER_BLOCK_SIZE` - Splits the
-  backup stream into `WALG_STREAM_SPLITTER_PARTITIONS` different output streams in blocks
-  of `WALG_STREAM_SPLITTER_BLOCK_SIZE` bytes. Each stream is uploaded separately. Using
-  multiple backup streams significantly improve restore performance. Optional. 
 
 Usage
 -----
