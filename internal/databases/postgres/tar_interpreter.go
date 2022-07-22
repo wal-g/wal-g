@@ -23,7 +23,7 @@ Please use file sync mode using environment variable %s instead of using %s.
 `, internal.TarFsyncMode, internal.TarDisableFsyncSetting)
 var fallingBackFileSyncMessage = fmt.Sprintf(
 	`Falling back to %s file sync mode.`,
-	internal.DISABLED
+	internal.DISABLED_FSYNC
 )
 
 // FileTarInterpreter extracts input to disk.
@@ -138,7 +138,7 @@ func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileIn
 
 func (tarInterpreter *FileTarInterpreter) OnInterpretFinish() error {
 	fileSyncMode := getFileSyncMode()
-	if fileSyncMode == internal.GLOBAL || fileSyncMode == internal.DEFAULT {
+	if fileSyncMode == internal.GLOBAL_FSYNC || fileSyncMode == internal.DEFAULT_FSYNC {
 		_, _, err := unix.Syscall(unix.SYS_SYNC, 0, 0, 0)
 		if err != 0 {
 			return errors.Errorf("FileTarInterpreter: global fsync failed with error code %d", err)
@@ -158,14 +158,14 @@ func PrepareDirs(fileName string, targetPath string) error {
 	return err
 }
 
-func getFileSyncMode() internal.TarFsyncMode {
-	var fsyncMode internal.WalFsyncMode = viper.GetString(internal.TarFsyncMode)
+func getFileSyncMode() string {
+	fsyncMode := viper.GetString(internal.TarFsyncMode)
 
 	if viper.IsSet(internal.TarDisableFsyncSetting) {
 		tracelog.WarningLogger.Printf(deprecatedFileSyncMessage)
-		if fsyncMode == internal.DEFAULT && viper.GetBool(internal.TarDisableFsyncSetting) {
+		if fsyncMode == internal.DEFAULT_FSYNC && viper.GetBool(internal.TarDisableFsyncSetting) {
 			tracelog.WarningLogger.Printf(fallingBackFileSyncMessage)
-			fsyncMode = internal.DISABLED
+			fsyncMode = internal.DISABLED_FSYNC
 		}
 	}
 

@@ -17,15 +17,11 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-type WalFsyncMode string
-
 const (
-	DEFAULT  WalFsyncMode = "DEFAULT"
-	DISABLED WalFsyncMode = "DISABLED"
-	GLOBAL   WalFsyncMode = "GLOBAL"
-)
+	DEFAULT_FSYNC  = "DEFAULT"
+	DISABLED_FSYNC = "DISABLED"
+	GLOBAL_FSYNC   = "GLOBAL"
 
-const (
 	PG        = "PG"
 	SQLSERVER = "SQLSERVER"
 	MYSQL     = "MYSQL"
@@ -165,7 +161,7 @@ var (
 		UseWalDeltaSetting:           "false",
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
 		TarDisableFsyncSetting:       "true",
-		TarFsyncMode:                 DEFAULT,
+		TarFsyncMode:                 DEFAULT_FSYNC,
 		TotalBgUploadedLimit:         "32",
 		UseReverseUnpackSetting:      "false",
 		SkipRedundantTarsSetting:     "false",
@@ -233,7 +229,7 @@ var (
 		LogLevelSetting:              true,
 		TarSizeThresholdSetting:      true,
 		TarDisableFsyncSetting:       true,
-		TarFsyncMode:                 DISABLED,
+		TarFsyncMode:                 true,
 		"WALG_" + GpgKeyIDSetting:    true,
 		"WALE_" + GpgKeyIDSetting:    true,
 		PgpKeySetting:                true,
