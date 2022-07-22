@@ -18,9 +18,9 @@ import (
 )
 
 const (
-	DEFAULT_FSYNC  = "DEFAULT"
-	DISABLED_FSYNC = "DISABLED"
-	GLOBAL_FSYNC   = "GLOBAL"
+	DEFAULT  = "DEFAULT"
+	DISABLED = "DISABLED"
+	GLOBAL   = "GLOBAL"
 
 	PG        = "PG"
 	SQLSERVER = "SQLSERVER"
@@ -161,7 +161,7 @@ var (
 		UseWalDeltaSetting:           "false",
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
 		TarDisableFsyncSetting:       "true",
-		TarFsyncMode:                 DEFAULT_FSYNC,
+		TarFsyncMode:                 DEFAULT,
 		TotalBgUploadedLimit:         "32",
 		UseReverseUnpackSetting:      "false",
 		SkipRedundantTarsSetting:     "false",
