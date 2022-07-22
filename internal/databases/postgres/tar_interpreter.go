@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"archive/tar"
+	"fmt"
 	"io"
 	"os"
 	"path"
