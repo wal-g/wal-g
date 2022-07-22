@@ -168,7 +168,7 @@ var (
 		UseWalDeltaSetting:           "false",
 		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
 		TarDisableFsyncSetting:       "true",
-		TarDisableGlobalFsyncSetting: "false",
+		TarFsyncMode: 				  DISABLED
 		TotalBgUploadedLimit:         "32",
 		UseReverseUnpackSetting:      "false",
 		SkipRedundantTarsSetting:     "false",
@@ -236,7 +236,7 @@ var (
 		LogLevelSetting:              true,
 		TarSizeThresholdSetting:      true,
 		TarDisableFsyncSetting:       true,
-		TarFsyncMode:                 DEFAULT,
+		TarFsyncMode:                 DISABLED,
 		"WALG_" + GpgKeyIDSetting:    true,
 		"WALE_" + GpgKeyIDSetting:    true,
 		PgpKeySetting:                true,
