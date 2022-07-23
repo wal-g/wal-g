@@ -3,11 +3,10 @@ set -e -x
 
 . /usr/local/export_common.sh
 
-export WALE_S3_PREFIX=s3://mysqlbinlogpushfetchbucket
+export WALE_S3_PREFIX=s3://mariadb_binlog_push_fetch
 export WALG_MYSQL_BINLOG_DST=/tmp/binlogs
-export WALG_MYSQL_CHECK_GTIDS=True
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
+mysql_install_db > /dev/null
 service mysql start
 
 # drop all before-dump binlogs, so SHOW BINARY LOGS will show all binlogs we need to fetch
@@ -48,32 +47,3 @@ while read -r binlog; do
         diff -u /tmp/proper.sql /tmp/fetched.sql
     fi
 done < /tmp/binlogs/binlogs_order
-
-
-echo "Get GTIDs, and write HUGE GTID to cache, so no binlogs should be uploaded anymore"
-sysbench --time=1 run && mysql -e "FLUSH LOGS"
-sysbench --time=1 run && mysql -e "FLUSH LOGS"
-sysbench --time=1 run && mysql -e "FLUSH LOGS"
-current_uuid=$(mysql -Nse "SELECT @@server_uuid" | awk '{print $1}')
-current_sentinel=$(s3cmd get "${WALE_S3_PREFIX}/binlog_sentinel_005.json" - )
-echo "{\"GtidArchived\":\"${current_uuid}:1-999999\"}" | s3cmd put - "${WALE_S3_PREFIX}/binlog_sentinel_005.json"
-rm -f "$HOME/.walg_mysql_binlogs_cache"
-binlogs_cnt1=$(s3cmd ls "${WALE_S3_PREFIX}/binlog_005/" | wc -l )
-wal-g binlog-push
-binlogs_cnt2=$(s3cmd ls "${WALE_S3_PREFIX}/binlog_005/" | wc -l )
-
-if [ "$binlogs_cnt1" -ne "$binlogs_cnt2" ]; then
-  echo "Some binlogs has been uploaded... however it shouldn't be: ${binlogs_cnt1} != ${binlogs_cnt2}"
-  exit 1
-fi
-
-echo "Revert GTIDs in cache, so all binlogs should be uploaded"
-echo "${current_sentinel}}" | s3cmd put - "${WALE_S3_PREFIX}/binlog_sentinel_005.json"
-rm -f "$HOME/.walg_mysql_binlogs_cache"
-wal-g binlog-push
-binlogs_cnt3=$(s3cmd ls "${WALE_S3_PREFIX}/binlog_005/" | wc -l )
-
-if [ "$binlogs_cnt2" -eq "$binlogs_cnt3" ]; then
-  echo "Some binlogs haven't been uploaded... however it should"
-  exit 1
-fi
