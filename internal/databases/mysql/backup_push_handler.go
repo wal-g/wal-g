@@ -4,8 +4,6 @@ import (
 	"os"
 	"os/exec"
 
-	gomysql "github.com/go-mysql-org/go-mysql/mysql"
-
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/wal-g/tracelog"
@@ -23,16 +21,10 @@ func HandleBackupPush(folder storage.Folder, uploader internal.UploaderProvider,
 	flavor, err := getMySQLFlavor(db)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	var binlogStart string
-	if flavor == gomysql.MySQLFlavor {
-		var gtidStart string
-		gtidStart, err = getMySQLGTIDExecuted(db, flavor)
-		tracelog.ErrorLogger.FatalOnError(err)
+	gtidStart, err := getMySQLGTIDExecuted(db, flavor)
+	tracelog.ErrorLogger.FatalOnError(err)
 
-		binlogStart, err = getLastUploadedBinlogBeforeGTID(folder, gtidStart, flavor)
-	} else {
-		binlogStart, err = getLastUploadedBinlog(folder)
-	}
+	binlogStart, err := getLastUploadedBinlogBeforeGTID(folder, gtidStart, flavor)
 	tracelog.ErrorLogger.FatalfOnError("failed to get last uploaded binlog: %v", err)
 	timeStart := utility.TimeNowCrossPlatformLocal()
 
