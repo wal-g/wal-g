@@ -90,7 +90,8 @@ func GetBinlogPreviousGTIDs(filename string, flavor string) (mysql.GTIDSet, erro
 			if err != nil {
 				return err
 			}
-			var _result = &mysql.MariadbGTIDSet{}
+			var _result = new(mysql.MariadbGTIDSet)
+			_result.Sets = make(map[uint32]*mysql.MariadbGTID) // there is no good constructor for MariadbGTIDSet
 			for _, gtid := range listEvent.GTIDs {
 				err = _result.AddSet(&gtid)
 				if err != nil {
