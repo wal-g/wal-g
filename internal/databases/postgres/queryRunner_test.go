@@ -29,6 +29,10 @@ func TestBuildStartBackup(t *testing.T) {
 	queryBuilder.Version = 100000
 	queryString, err = queryBuilder.BuildStartBackup()
 	assert.Equal(t, "SELECT case when pg_is_in_recovery() then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn", queryString)
+
+	queryBuilder.Version = 150000
+	queryString, err = queryBuilder.BuildStartBackup()
+	assert.Equal(t, "SELECT case when pg_is_in_recovery() then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_backup_start($1, true) lsn", queryString)
 }
 
 // Tests building stop backup query
@@ -52,4 +56,8 @@ func TestBuildStopBackup(t *testing.T) {
 	queryBuilder.Version = 100000
 	queryString, err = queryBuilder.BuildStopBackup()
 	assert.Equal(t, "SELECT labelfile, spcmapfile, lsn FROM pg_stop_backup(false)", queryString)
+
+	queryBuilder.Version = 150000
+	queryString, err = queryBuilder.BuildStopBackup()
+	assert.Equal(t, "SELECT labelfile, spcmapfile, lsn FROM pg_backup_stop(false)", queryString)
 }

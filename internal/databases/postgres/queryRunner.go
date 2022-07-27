@@ -102,6 +102,10 @@ func (queryRunner *PgQueryRunner) BuildStartBackup() (string, error) {
 	// TODO: rewrite queries for older versions to remove pg_is_in_recovery()
 	// where pg_start_backup() will fail on standby anyway
 	switch {
+	case queryRunner.Version >= 150000:
+		return "SELECT case when pg_is_in_recovery()" +
+			" then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery()" +
+			" FROM pg_backup_start($1, true) lsn", nil
 	case queryRunner.Version >= 100000:
 		return "SELECT case when pg_is_in_recovery()" +
 			" then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery()" +
@@ -124,6 +128,8 @@ func (queryRunner *PgQueryRunner) BuildStartBackup() (string, error) {
 // BuildStopBackup formats a query that stops backup according to server features and version
 func (queryRunner *PgQueryRunner) BuildStopBackup() (string, error) {
 	switch {
+	case queryRunner.Version >= 150000:
+		return "SELECT labelfile, spcmapfile, lsn FROM pg_backup_stop(false)", nil
 	case queryRunner.Version >= 90600:
 		return "SELECT labelfile, spcmapfile, lsn FROM pg_stop_backup(false)", nil
 	case queryRunner.Version >= 90000:
