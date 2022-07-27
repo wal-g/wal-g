@@ -7,7 +7,7 @@ for i in /tmp/tests/*; do
   echo
   echo "===== RUNNING $i ====="
   set -x
-  "$i"
+  timeout 3m "$i"
   set +x
   echo "===== SUCCESS $i ====="
   echo
