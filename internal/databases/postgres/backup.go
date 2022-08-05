@@ -235,7 +235,14 @@ func setTablespacePaths(spec TablespaceSpec) error {
 	for _, location := range spec.tablespaceLocations() {
 		err := fs.NewFolder(location.Location, "").EnsureExists()
 		if err != nil {
-			return fmt.Errorf("error creating folder for tablespace %v", err)
+			// Don't show error when correct symlink already exist
+			linkpath, _ := os.Readlink(filepath.Join(basePrefix, location.Symlink))
+			if linkpath != location.Location {
+				return fmt.Errorf("error creating tablespace symlink %v", err)
+			} else {
+				tracelog.WarningLogger.Printf(
+					"Symlink %v already exists", filepath.Join(basePrefix, location.Symlink))
+			}
 		}
 		err = os.Symlink(location.Location, filepath.Join(basePrefix, location.Symlink))
 		if err != nil {
