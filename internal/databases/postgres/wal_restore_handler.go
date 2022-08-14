@@ -285,12 +285,3 @@ func getRemoteWalDirName(pgData string, requisites sftp.SSHRequisites) (string, 
 	}
 	return "", errors.New("directory for WAL files doesn't exist in " + pgData)
 }
-
-// uint64Min returns the smallest of the two uint64 numbers
-func uint64Min(a, b uint64) uint64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
