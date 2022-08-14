@@ -16,13 +16,13 @@ import (
 )
 
 const (
-	pagedFileName               = "../../../test/testdata/base_paged_file.bin"
-	pagedFileSizeInBytes        = 65536
-	pagedFileBlockCount         = pagedFileSizeInBytes / postgres.DatabasePageSize
-	sampleLSN            uint64 = 0xc6bd4600
-	smallLSN             uint64 = 0
-	bigLSN                      = sampleLSN * 2
-	sizeofInt32                 = 4
+	pagedFileName                     = "../../../test/testdata/base_paged_file.bin"
+	pagedFileSizeInBytes              = 65536
+	pagedFileBlockCount               = pagedFileSizeInBytes / postgres.DatabasePageSize
+	sampleLSN            postgres.LSN = 0xc6bd4600
+	smallLSN             postgres.LSN = 0
+	bigLSN                            = sampleLSN * 2
+	sizeofInt32                       = 4
 )
 
 // TestIncrement holds information about some increment for easy testing
@@ -37,7 +37,7 @@ func (ti *TestIncrement) NewReader() io.Reader {
 	return bytes.NewReader(ti.incrementBytes)
 }
 
-func newTestIncrement(lsn uint64) *TestIncrement {
+func newTestIncrement(lsn postgres.LSN) *TestIncrement {
 	incrementBytes := readIncrementToBuffer(lsn)
 	fileSize, diffBlockCount, diffMap, _ := postgres.GetIncrementHeaderFields(bytes.NewReader(incrementBytes))
 	return &TestIncrement{incrementBytes: incrementBytes, fileSize: fileSize, diffBlockCount: diffBlockCount,
@@ -107,7 +107,7 @@ func TestReadingIncrementSmallLSN(t *testing.T) {
 }
 
 // This test checks that increment is being read correctly
-func postgresReadIncrementTest(localLSN uint64, t *testing.T) {
+func postgresReadIncrementTest(localLSN postgres.LSN, t *testing.T) {
 	fileInfo, err := os.Stat(pagedFileName)
 	if err != nil {
 		fmt.Print(err.Error())
@@ -386,7 +386,7 @@ func checkAllWrittenBlocksCorrect(mockFile *MockReadWriterAt, sourceFile io.Read
 	assert.Equal(t, diffBlockCount, dataBlockCount, "Result file is incorrect")
 }
 
-func readIncrementToBuffer(localLSN uint64) []byte {
+func readIncrementToBuffer(localLSN postgres.LSN) []byte {
 	fileInfo, _ := os.Stat(pagedFileName)
 	reader, _, _ := postgres.ReadIncrementalFile(pagedFileName, fileInfo.Size(), localLSN, nil)
 	buf, _ := io.ReadAll(reader)
@@ -431,7 +431,7 @@ func deepCompare(file1, file2 string) bool {
 }
 
 func deepCompareReaders(r1, r2 io.Reader) bool {
-	var chunkNumber = 0
+	var chunkNumber int
 	for {
 		b1 := make([]byte, chunkSize)
 		_, err1 := r1.Read(b1)

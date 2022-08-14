@@ -1,4 +1,4 @@
-package postgres
+package internal
 
 type TarFileSets interface {
 	AddFile(name string, file string)

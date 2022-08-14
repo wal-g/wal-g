@@ -284,9 +284,6 @@ func (h *DeleteHandler) FindTargetRetainAfterName(
 		}
 		return meetName && object.IsFullBackup()
 	}
-	if choiceFuncAfterName == nil {
-		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete before'")
-	}
 
 	target1, err := findTarget(h.backups, h.greater, choiceFuncRetain)
 	if err != nil && err != errNotFound {
@@ -343,15 +340,20 @@ func (h *DeleteHandler) FindTargetRetainAfterTime(retentionCount int, timeLine t
 
 func (h *DeleteHandler) DeleteEverything(confirmed bool) {
 	filter := func(object storage.Object) bool { return true }
-	err := storage.DeleteObjectsWhere(h.Folder, confirmed, filter)
+	folderFilter := func(path string) bool { return true }
+	err := storage.DeleteObjectsWhere(h.Folder, confirmed, filter, folderFilter)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) error {
-	return h.DeleteBeforeTargetWhere(target, confirmed, func(storage.Object) bool { return true })
+	objFilter := func(storage.Object) bool { return true }
+	folderFilter := func(string) bool { return true }
+
+	return h.DeleteBeforeTargetWhere(target, confirmed, objFilter, folderFilter)
 }
 
-func (h *DeleteHandler) DeleteBeforeTargetWhere(target BackupObject, confirmed bool, selector func(object storage.Object) bool) error {
+func (h *DeleteHandler) DeleteBeforeTargetWhere(target BackupObject, confirmed bool,
+	objSelector func(object storage.Object) bool, folderFilter func(name string) bool) error {
 	if !target.IsFullBackup() {
 		errorMessage := "%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
 		return utility.NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
@@ -359,8 +361,8 @@ func (h *DeleteHandler) DeleteBeforeTargetWhere(target BackupObject, confirmed b
 	tracelog.InfoLogger.Println("Start delete")
 
 	return storage.DeleteObjectsWhere(h.Folder, confirmed, func(object storage.Object) bool {
-		return selector(object) && h.less(object, target) && !h.isPermanent(object) && !h.isIgnored(object)
-	})
+		return objSelector(object) && h.less(object, target) && !h.isPermanent(object) && !h.isIgnored(object)
+	}, folderFilter)
 }
 
 func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool) error {
@@ -372,10 +374,11 @@ func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool) er
 		backupNamesToDelete[target.GetBackupName()] = true
 	}
 
+	folderFilter := func(path string) bool { return true }
 	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath),
 		confirmed, func(object storage.Object) bool {
 			return backupNamesToDelete[utility.StripLeftmostBackupName(object.GetName())] && !h.isPermanent(object) && !h.isIgnored(object)
-		})
+		}, folderFilter)
 }
 
 // Find all backups related to the target.
@@ -534,7 +537,7 @@ func ExtractDeleteModifierFromArgs(args []string) (int, string) {
 }
 
 func DeleteBeforeArgsValidator(cmd *cobra.Command, args []string) error {
-	err := deleteArgsValidator(args, StringModifiers, 1, 2)
+	err := DeleteArgsValidator(args, StringModifiers, 1, 2)
 	if err != nil {
 		return err
 	}
@@ -570,7 +573,7 @@ func DeleteTargetArgsValidator(cmd *cobra.Command, args []string) error {
 }
 
 func DeleteEverythingArgsValidator(cmd *cobra.Command, args []string) error {
-	return deleteArgsValidator(args, StringModifiersDeleteEverything, 0, 1)
+	return DeleteArgsValidator(args, StringModifiersDeleteEverything, 0, 1)
 }
 
 func DeleteRetainArgsValidator(cmd *cobra.Command, args []string) error {
@@ -586,7 +589,7 @@ func DeleteRetainArgsValidator(cmd *cobra.Command, args []string) error {
 }
 
 func DeleteRetainAfterArgsValidator(cmd *cobra.Command, args []string) error {
-	err := deleteArgsValidator(args, StringModifiers, 2, 3)
+	err := DeleteArgsValidator(args, StringModifiers, 2, 3)
 	if err != nil {
 		return err
 	}
@@ -606,7 +609,7 @@ func DeleteRetainAfterArgsValidator(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func deleteArgsValidator(args, stringModifiers []string, minArgs int, maxArgs int) error {
+func DeleteArgsValidator(args, stringModifiers []string, minArgs int, maxArgs int) error {
 	if len(args) < minArgs || len(args) > maxArgs {
 		return fmt.Errorf("accepts between %d and %d arg(s), received %d", minArgs, maxArgs, len(args))
 	}

@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
@@ -9,33 +10,21 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func FindPermanentBackups(folder storage.Folder, metaFetcher GenericMetaFetcher) map[string]bool {
-	tracelog.InfoLogger.Println("retrieving permanent objects")
-	backupTimes, err := GetBackups(folder.GetSubFolder(utility.BaseBackupPath))
-	if err != nil {
-		return map[string]bool{}
+func FatalOnUnrecoverableMetadataError(backupTime BackupTime, err error) {
+	if _, ok := err.(storage.ObjectNotFoundError); ok {
+		tracelog.InfoLogger.Printf("Backup %s lacks metadata to check if it's permanent, ignoring...",
+			backupTime.BackupName)
+	} else {
+		tracelog.ErrorLogger.Fatalf("failed to fetch backup meta for backup %s with error %s",
+			backupTime.BackupName, err.Error())
 	}
-
-	permanentBackups := map[string]bool{}
-	for _, backupTime := range backupTimes {
-		meta, err := metaFetcher.Fetch(
-			backupTime.BackupName, folder.GetSubFolder(utility.BaseBackupPath))
-		if err != nil {
-			tracelog.ErrorLogger.Printf("failed to fetch backup meta for backup %s with error %s, ignoring...",
-				backupTime.BackupName, err.Error())
-			continue
-		}
-		if meta.IsPermanent {
-			permanentBackups[backupTime.BackupName] = true
-		}
-	}
-	return permanentBackups
 }
 
 // IsPermanent is a generic function to determine if the storage object is permanent.
 // It does not support permanent WALs or binlogs.
 func IsPermanent(objectName string, permanentBackups map[string]bool, backupNameLength int) bool {
-	if objectName[:len(utility.BaseBackupPath)] == utility.BaseBackupPath {
+	if strings.HasPrefix(objectName, utility.BaseBackupPath) &&
+		len(objectName) >= len(utility.BaseBackupPath)+backupNameLength {
 		backup := objectName[len(utility.BaseBackupPath) : len(utility.BaseBackupPath)+backupNameLength]
 		return permanentBackups[backup]
 	}

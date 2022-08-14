@@ -34,7 +34,7 @@ type TestTimelineSetup struct {
 	missingSegments     []string
 	id                  uint32
 	parentId            uint32
-	switchPointLsn      uint64
+	switchPointLsn      postgres.LSN
 	historyFileContents string
 }
 

@@ -1,15 +1,19 @@
 package mysql
 
 import (
-	"bufio"
 	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"os"
+	"strconv"
+	"strings"
 	"time"
+
+	"github.com/go-mysql-org/go-mysql/mysql"
+	"github.com/go-mysql-org/go-mysql/replication"
+	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -17,180 +21,10 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-var BinlogMagic = [...]byte{0xfe, 0x62, 0x69, 0x6e}
-
-const BinlogMagicLength = 4
-
-const BinlogEventHeaderSize = 13
-
-func time2uint32(t time.Time) uint32 {
-	ts := t.Unix()
-	if ts > math.MaxUint32 {
-		return math.MaxUint32
-	}
-	return uint32(ts)
-}
-
-func minInt(i, j int) int {
-	if i < j {
-		return i
-	}
-	return j
-}
-
-// https://dev.mysql.com/doc/internals/en/event-structure.html
-// First 4 fields are the same in all versions
-type BinlogEventHeader struct {
-	Timestamp   uint32
-	TypeCode    uint8
-	ServerID    uint32
-	EventLength uint32
-}
-
-func ParseEventHeader(buf []byte) (header BinlogEventHeader) {
-	if len(buf) < BinlogEventHeaderSize {
-		panic("failed to parse binlog event header: buffer is too short")
-	}
-	le := binary.LittleEndian
-	header.Timestamp = le.Uint32(buf[0:])
-	header.TypeCode = buf[4]
-	header.ServerID = le.Uint32(buf[5:])
-	header.EventLength = le.Uint32(buf[9:])
-	return header
-}
-
-type BinlogReader struct {
-	reader          *bufio.Reader
-	startTS         uint32
-	endTS           uint32
-	headerBuf       []byte
-	headerSaved     bool
-	intervalEntered bool
-	intervalLeft    bool
-	tail            int
-}
-
-func NewBinlogReader(reader io.Reader, startTS time.Time, endTS time.Time) *BinlogReader {
-	return &BinlogReader{
-		reader:  bufio.NewReaderSize(reader, 10*utility.Mebibyte),
-		startTS: time2uint32(startTS),
-		endTS:   time2uint32(endTS),
-	}
-}
-
-func (bl *BinlogReader) saveMagicAndHeaderEvent() error {
-	var magic [4]byte
-	_, err := io.ReadFull(bl.reader, magic[:])
-	if err != nil {
-		return err
-	}
-	if magic != BinlogMagic {
-		return fmt.Errorf("incorrect binlog magic: %v", magic)
-	}
-	hbuf, err := bl.reader.Peek(BinlogEventHeaderSize)
-	if err != nil {
-		return err
-	}
-	header := ParseEventHeader(hbuf)
-	bl.headerBuf = make([]byte, 4+header.EventLength)
-	copy(bl.headerBuf[:4], magic[:])
-	_, err = io.ReadFull(bl.reader, bl.headerBuf[4:])
-	return err
-}
-
-func (bl *BinlogReader) readMagicAndHeaderEvent(buf []byte) int {
-	limit := minInt(len(bl.headerBuf), len(buf))
-	copy(buf, bl.headerBuf[:limit])
-	bl.headerBuf = bl.headerBuf[limit:]
-	return limit
-}
-
-func (bl *BinlogReader) readEvent(buf []byte) (int, error) {
-	limit := minInt(bl.tail, len(buf))
-	read, err := bl.reader.Read(buf[:limit])
-	bl.tail -= read
-	return read, err
-}
-
-func (bl *BinlogReader) Read(buf []byte) (int, error) {
-	blen := len(buf)
-	// save magic and first event (aka header) into the temporary buffer
-	// and keep them until first appropriate event
-	if !bl.headerSaved {
-		err := bl.saveMagicAndHeaderEvent()
-		if err != nil {
-			return 0, err
-		}
-		bl.headerSaved = true
-	}
-	// read events, checking timestamps
-	offset := 0
-	for offset < blen {
-		// pass magic and header event to client with first appropriate event
-		if bl.intervalEntered && len(bl.headerBuf) > 0 {
-			read := bl.readMagicAndHeaderEvent(buf[offset:])
-			offset += read
-			if len(bl.headerBuf) > 0 {
-				return offset, nil
-			}
-		}
-		// pass next event to client
-		if bl.tail > 0 {
-			read, err := bl.readEvent(buf[offset:])
-			offset += read
-			if err != nil || bl.tail > 0 {
-				return offset, err
-			}
-		}
-		// parse next event
-		hbuf, err := bl.reader.Peek(BinlogEventHeaderSize)
-		if err != nil {
-			// may return EOF here
-			return offset, err
-		}
-		header := ParseEventHeader(hbuf)
-		evlen := int(header.EventLength)
-		if header.Timestamp < bl.startTS {
-			_, err := bl.reader.Discard(evlen)
-			if err != nil {
-				return offset, err
-			}
-			continue
-		}
-		bl.intervalEntered = true
-		if header.Timestamp >= bl.endTS {
-			bl.intervalLeft = true
-			return offset, io.EOF
-		}
-		// set event to be read
-		bl.tail = evlen
-	}
-	return offset, nil
-}
-
-func (bl *BinlogReader) NeedAbort() bool {
-	return bl.intervalLeft
-}
-
-func GetBinlogStartTimestamp(path string) (time.Time, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return time.Time{}, err
-	}
-	defer file.Close()
-	buf := make([]byte, BinlogMagicLength+BinlogEventHeaderSize)
-	_, err = io.ReadFull(file, buf)
-	if err != nil {
-		return time.Time{}, err
-	}
-	if !bytes.Equal(BinlogMagic[:], buf[:BinlogMagicLength]) {
-		return time.Time{}, fmt.Errorf("incorrect binlog magic: %v", buf[:BinlogMagicLength])
-	}
-	header := ParseEventHeader(buf[BinlogMagicLength:])
-	return time.Unix(int64(header.Timestamp), 0), nil
-}
-
 const BinlogSentinelPath = "binlog_sentinel_" + utility.VersionStr + ".json"
+
+// 128k should be enough to parse prev_gtids event
+const BinlogReadHeaderSize = 128 * 1024
 
 type BinlogSentinelDto struct {
 	GTIDArchived string `json:"GtidArchived"`
@@ -226,4 +60,103 @@ func UploadBinlogSentinel(folder storage.Folder, sentinelDto interface{}) error 
 	}
 
 	return folder.PutObject(sentinelName, bytes.NewReader(dtoBody))
+}
+
+func GetBinlogPreviousGTIDs(filename string, flavor string) (*mysql.MysqlGTIDSet, error) {
+	var found bool
+	previousGTID := &replication.PreviousGTIDsEvent{}
+
+	parser := replication.NewBinlogParser()
+	parser.SetFlavor(flavor)
+	parser.SetVerifyChecksum(false) // the faster, the better
+	parser.SetRawMode(true)         // choose events to parse manually
+	err := parser.ParseFile(filename, 0, func(event *replication.BinlogEvent) error {
+		if event.Header.EventType == replication.PREVIOUS_GTIDS_EVENT {
+			err := previousGTID.Decode(event.RawData[replication.EventHeaderSize:])
+			if err != nil {
+				return err
+			}
+			found = true
+			return fmt.Errorf("shallow file read finished")
+		}
+		return nil
+	})
+
+	if err != nil && !found {
+		return nil, errors.Wrapf(err, "binlog-push: could not parse binlog file '%s'\n", filename)
+	}
+
+	res, err := mysql.ParseMysqlGTIDSet(previousGTID.GTIDSets)
+	if err != nil {
+		return nil, err
+	}
+	result, ok := res.(*mysql.MysqlGTIDSet)
+	if !ok {
+		tracelog.ErrorLogger.Fatalf("cannot cast nextPreviousGTIDs to MysqlGTIDSet. Should never be here. Actual type: %T\n", res)
+	}
+	return result, nil
+}
+
+func GetBinlogPreviousGTIDsRemote(folder storage.Folder, filename string, flavor string) (*mysql.MysqlGTIDSet, error) {
+	binlogName := utility.TrimFileExtension(filename)
+	fh, err := internal.DownloadAndDecompressStorageFile(folder, binlogName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read binlog %s: %w", binlogName, err)
+	}
+	defer utility.LoggedClose(fh, "failed to close binlog")
+	tmp, err := os.CreateTemp("", binlogName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer utility.LoggedClose(tmp, "failed to close temp file")
+	_, err = io.CopyN(tmp, fh, BinlogReadHeaderSize)
+	if err != nil && err != io.EOF {
+		return nil, fmt.Errorf("failed to read binlog beginning")
+	}
+	prevGtid, err := GetBinlogPreviousGTIDs(tmp.Name(), flavor)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse binlog %s: %w", binlogName, err)
+	}
+	return prevGtid, nil
+}
+
+func GetBinlogStartTimestamp(filename string, flavor string) (time.Time, error) {
+	var ts uint32
+	parser := replication.NewBinlogParser()
+	parser.SetFlavor(flavor)
+	parser.SetVerifyChecksum(false) // the faster, the better
+	parser.SetRawMode(true)         // choose events to parse manually
+	err := parser.ParseFile(filename, 0, func(event *replication.BinlogEvent) error {
+		ts = event.Header.Timestamp
+		return fmt.Errorf("shallow file read finished")
+	})
+	if err != nil && ts == 0 {
+		return time.Time{}, fmt.Errorf("failed to parse binlog %s: %w", filename, err)
+	}
+	return time.Unix(int64(ts), 0), nil
+}
+
+/*
+Mysql binlog file names looks like foobar.000001, foobar.000002 (with leading zeroes)
+And it looks like they can be compared lexicographically, but..
+The next name after foobar.999999 is foobar.1000000 (7 digits) and it cannot be compared so.
+*/
+func BinlogNum(filename string) int {
+	p := strings.LastIndexAny(filename, ".")
+	if p < 0 {
+		tracelog.ErrorLogger.Panicf("unexpected binlog name: %v", filename)
+	}
+	num, err := strconv.Atoi(filename[p+1:])
+	if err != nil {
+		tracelog.ErrorLogger.Panicf("unexpected binlog name: %v", filename)
+	}
+	return num
+}
+
+func BinlogPrefix(filename string) string {
+	p := strings.LastIndexAny(filename, ".")
+	if p < 0 {
+		tracelog.ErrorLogger.Panicf("unexpected binlog name: %v", filename)
+	}
+	return filename[:p]
 }

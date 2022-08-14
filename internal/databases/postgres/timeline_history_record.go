@@ -9,7 +9,6 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 
-	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -38,11 +37,11 @@ func (err HistoryFileNotFoundError) Error() string {
 // TimelineHistoryRecord represents entry in .history file
 type TimelineHistoryRecord struct {
 	timeline uint32
-	lsn      uint64
+	lsn      LSN
 	comment  string
 }
 
-func NewTimelineHistoryRecord(timeline uint32, lsn uint64, comment string) *TimelineHistoryRecord {
+func NewTimelineHistoryRecord(timeline uint32, lsn LSN, comment string) *TimelineHistoryRecord {
 	return &TimelineHistoryRecord{timeline: timeline, lsn: lsn, comment: comment}
 }
 
@@ -55,7 +54,7 @@ func newHistoryRecordFromString(row string) (*TimelineHistoryRecord, error) {
 	if err != nil {
 		return nil, err
 	}
-	lsn, err := pgx.ParseLSN(matchResult[2])
+	lsn, err := ParseLSN(matchResult[2])
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +68,7 @@ func newHistoryRecordFromString(row string) (*TimelineHistoryRecord, error) {
 func createTimelineSwitchMap(startTimeline uint32,
 	walFolder storage.Folder) (map[WalSegmentNo]*TimelineHistoryRecord, error) {
 	timeLineHistoryMap := make(map[WalSegmentNo]*TimelineHistoryRecord)
-	historyRecords, err := getTimeLineHistoryRecords(startTimeline, walFolder)
+	historyRecords, err := GetTimeLineHistoryRecords(startTimeline, walFolder)
 	if _, ok := err.(HistoryFileNotFoundError); ok {
 		// return empty map if not found any history
 		return timeLineHistoryMap, nil
@@ -85,7 +84,7 @@ func createTimelineSwitchMap(startTimeline uint32,
 	return timeLineHistoryMap, nil
 }
 
-func getTimeLineHistoryRecords(startTimeline uint32, walFolder storage.Folder) ([]*TimelineHistoryRecord, error) {
+func GetTimeLineHistoryRecords(startTimeline uint32, walFolder storage.Folder) ([]*TimelineHistoryRecord, error) {
 	historyReadCloser, err := getHistoryFileFromStorage(startTimeline, walFolder)
 	if err != nil {
 		return nil, err

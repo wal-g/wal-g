@@ -16,7 +16,7 @@ var (
 		Short: catchupPushShortDescription,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			postgres.HandleCatchupPush(args[0], fromLSN)
+			postgres.HandleCatchupPush(args[0], postgres.LSN(fromLSN))
 		},
 	}
 	fromLSN uint64

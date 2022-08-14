@@ -58,7 +58,7 @@ func TestGetBlockLocationConsumer_CreateNew(t *testing.T) {
 	assert.NoError(t, err)
 	expectedConsumer, exists := manager.DeltaFileWriters.LoadExisting(DeltaFilename)
 	assert.True(t, exists)
-	assert.Equal(t, expectedConsumer.(*postgres.DeltaFileChanWriter).BlockLocationConsumer, consumer)
+	assert.Equal(t, expectedConsumer.BlockLocationConsumer, consumer)
 }
 
 func TestGetBlockLocationConsumer_Load(t *testing.T) {
@@ -81,8 +81,8 @@ func TestGetBlockLocationConsumer_Load(t *testing.T) {
 	assert.NoError(t, err)
 	expectedConsumer, exists := manager.DeltaFileWriters.LoadExisting(DeltaFilename)
 	assert.True(t, exists)
-	assert.Equal(t, deltaFile, expectedConsumer.(*postgres.DeltaFileChanWriter).DeltaFile)
-	assert.Equal(t, expectedConsumer.(*postgres.DeltaFileChanWriter).BlockLocationConsumer, consumer)
+	assert.Equal(t, deltaFile, expectedConsumer.DeltaFile)
+	assert.Equal(t, expectedConsumer.BlockLocationConsumer, consumer)
 }
 
 func TestGetPartFile_Exists(t *testing.T) {
@@ -107,7 +107,7 @@ func TestGetPartFile_CreateNew(t *testing.T) {
 	assert.NoError(t, err)
 	expectedPartFile, exists := manager.PartFiles.LoadExisting(postgres.ToPartFilename(DeltaFilename))
 	assert.True(t, exists)
-	assert.Equal(t, expectedPartFile.(*postgres.WalPartFile), actualPartFile)
+	assert.Equal(t, expectedPartFile, actualPartFile)
 }
 
 func TestGetPartFile_Load(t *testing.T) {

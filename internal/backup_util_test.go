@@ -58,6 +58,21 @@ func TestGetBackupTimeSlices_OrderCheck(t *testing.T) {
 	assert.True(t, result[0].Time.Before(result[1].Time), "GetBackupTimeSlices returned bad time ordering: order should be Ascending")
 }
 
+func TestGetLastBackupName(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	b1 := testStreamBackup.BackupName + ".1" + utility.SentinelSuffix
+	b2 := testStreamBackup.BackupName + ".2" + utility.SentinelSuffix
+	_, _ = folder.PutObject(b1, &bytes.Buffer{}), folder.PutObject(b2, &bytes.Buffer{})
+	lastB, _ := internal.GetLatestBackupName(folder)
+	assert.Equalf(t, lastB+utility.SentinelSuffix, b2, "Last Backup is not b2")
+}
+
+func TestGetLatestBackupName_EmptyWhenNoBackups(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	lastB, _ := internal.GetLatestBackupName(folder)
+	assert.Equal(t, "", lastB)
+}
+
 func TestGetGarbageFromPrefix(t *testing.T) {
 	backupNames := []string{"backup", "garbage", "garbage_0"}
 	folders := make([]storage.Folder, 0)

@@ -3,7 +3,7 @@ package pg
 import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal/pgbackrest"
+	"github.com/wal-g/wal-g/internal/databases/postgres/pgbackrest"
 )
 
 var pgbackrestBackupListCmd = &cobra.Command{

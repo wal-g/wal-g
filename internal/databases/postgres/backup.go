@@ -3,6 +3,7 @@ package postgres
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 
@@ -19,7 +20,7 @@ const (
 	FilesMetadataName = "files_metadata.json"
 )
 
-var UnwrapAll map[string]bool = nil
+var UnwrapAll map[string]bool
 
 var UtilityFilePaths = map[string]bool{
 	PgControlPath:         true,
@@ -27,7 +28,7 @@ var UtilityFilePaths = map[string]bool{
 	TablespaceMapFilename: true,
 }
 
-var patternPgBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?", PatternTimelineAndLogSegNo)
+var patternPgBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?(_%[2]s)?", PatternTimelineAndLogSegNo, PatternLSN)
 var regexpPgBackupName = regexp.MustCompile(patternPgBackupName)
 
 // Backup contains information about a valid Postgres backup
@@ -36,6 +37,9 @@ type Backup struct {
 	internal.Backup
 	SentinelDto      *BackupSentinelDto // used for storage query caching
 	FilesMetadataDto *FilesMetadataDto
+
+	// Greenplum backups only
+	AoFilesMetadataDto *AOFilesMetadataDTO
 }
 
 func ToPgBackup(source internal.Backup) (output Backup) {
@@ -133,7 +137,7 @@ func (backup *Backup) GetSentinelAndFilesMetadata() (BackupSentinelDto, FilesMet
 		return sentinel, filesMetadata, nil
 	}
 
-	err = backup.FetchDto(&filesMetadata, getFilesMetadataPath(backup.Name))
+	err = internal.FetchDto(backup.Folder, &filesMetadata, getFilesMetadataPath(backup.Name))
 	if err != nil {
 		// double-check that this is not V2 backup
 		sentinelV2, err2 := backup.getSentinelV2()
@@ -172,7 +176,7 @@ func (backup *Backup) FetchMeta() (ExtendedMetadataDto, error) {
 	extendedMetadataDto := ExtendedMetadataDto{}
 	err := backup.FetchMetadata(&extendedMetadataDto)
 	if err != nil {
-		return ExtendedMetadataDto{}, errors.Wrap(err, "failed to unmarshal metadata")
+		return ExtendedMetadataDto{}, err
 	}
 
 	return extendedMetadataDto, nil
@@ -343,6 +347,23 @@ func (backup *Backup) getTarsToExtract(filesMeta FilesMetadataDto, filesToUnwrap
 		tarToExtract := internal.NewStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
 		tarsToExtract = append(tarsToExtract, tarToExtract)
 	}
+
+	aoMeta, err := backup.LoadAoFilesMetadata()
+	if err != nil {
+		tracelog.DebugLogger.Printf("AO files metadata was not found. Skipping the AO segments unpacking.")
+	} else {
+		tracelog.InfoLogger.Printf("AO files metadata found. Will perform the AO segments unpacking.")
+		for extractPath, meta := range aoMeta.Files {
+			if !filesToUnwrap[extractPath] {
+				tracelog.InfoLogger.Printf("Don't need to unwrap the %s AO segment file, skipping it...", extractPath)
+				continue
+			}
+			objPath := path.Join(AoStoragePath, meta.StoragePath)
+			readerMaker := internal.NewRegularFileStorageReaderMarker(backup.Folder, objPath, extractPath, meta.FileMode)
+			tarsToExtract = append(tarsToExtract, readerMaker)
+		}
+	}
+
 	return tarsToExtract, pgControlKey, nil
 }
 
@@ -364,6 +385,21 @@ func (backup *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error)
 		filesToUnwrap[utilityFilePath] = true
 	}
 	return utility.SelectMatchingFiles(fileMask, filesToUnwrap)
+}
+
+func (backup *Backup) LoadAoFilesMetadata() (*AOFilesMetadataDTO, error) {
+	if backup.AoFilesMetadataDto != nil {
+		return backup.AoFilesMetadataDto, nil
+	}
+
+	var meta AOFilesMetadataDTO
+	err := internal.FetchDto(backup.Folder, &meta, getAOFilesMetadataPath(backup.Name))
+	if err != nil {
+		return nil, err
+	}
+
+	backup.AoFilesMetadataDto = &meta
+	return backup.AoFilesMetadataDto, nil
 }
 
 func shouldUnwrapTar(tarName string, filesMeta FilesMetadataDto, filesToUnwrap map[string]bool) bool {
@@ -399,6 +435,6 @@ func GetLastWalFilename(backup Backup) (string, error) {
 	return endWalSegmentNo.getFilename(timelineID), nil
 }
 
-func FetchPgBackupName(object storage.Object) string {
+func DeduceBackupName(object storage.Object) string {
 	return regexpPgBackupName.FindString(object.GetName())
 }

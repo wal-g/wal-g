@@ -1,8 +1,11 @@
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/jackc/pgx"
 	"github.com/pkg/errors"
@@ -57,9 +60,20 @@ type PgRelationStat struct {
 
 // PgQueryRunner is implementation for controlling PostgreSQL 9.0+
 type PgQueryRunner struct {
-	Connection       *pgx.Conn
-	Version          int
-	SystemIdentifier *uint64
+	Connection        *pgx.Conn
+	Version           int
+	SystemIdentifier  *uint64
+	stopBackupTimeout time.Duration
+	mu                sync.Mutex
+}
+
+type aoRelPgClassInfo struct {
+	oid           uint32
+	relNameMd5    string
+	relFileNodeID uint32
+	relNAtts      int16
+	spcNode       uint32
+	storage       RelStorageType
 }
 
 // BuildGetVersion formats a query to retrieve PostgreSQL numeric version
@@ -125,8 +139,14 @@ func (queryRunner *PgQueryRunner) BuildStopBackup() (string, error) {
 
 // NewPgQueryRunner builds QueryRunner from available connection
 func NewPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
-	r := &PgQueryRunner{Connection: conn}
-	err := r.getVersion()
+	timeout, err := getStopBackupTimeoutSetting()
+	if err != nil {
+		return nil, err
+	}
+
+	r := &PgQueryRunner{Connection: conn, stopBackupTimeout: timeout}
+
+	err = r.getVersion()
 	if err != nil {
 		return nil, err
 	}
@@ -158,6 +178,9 @@ func (queryRunner *PgQueryRunner) buildGetPhysicalSlotInfo() string {
 
 // Retrieve PostgreSQL numeric version
 func (queryRunner *PgQueryRunner) getVersion() (err error) {
+	queryRunner.mu.Lock()
+	defer queryRunner.mu.Unlock()
+
 	conn := queryRunner.Connection
 	err = conn.QueryRow(queryRunner.buildGetVersion()).Scan(&queryRunner.Version)
 	return errors.Wrap(err, "GetVersion: getting Postgres version failed")
@@ -165,6 +188,9 @@ func (queryRunner *PgQueryRunner) getVersion() (err error) {
 
 // Get current LSN of cluster
 func (queryRunner *PgQueryRunner) getCurrentLsn() (lsn string, err error) {
+	queryRunner.mu.Lock()
+	defer queryRunner.mu.Unlock()
+
 	conn := queryRunner.Connection
 	err = conn.QueryRow(queryRunner.buildGetCurrentLsn()).Scan(&lsn)
 	if err != nil {
@@ -174,6 +200,9 @@ func (queryRunner *PgQueryRunner) getCurrentLsn() (lsn string, err error) {
 }
 
 func (queryRunner *PgQueryRunner) getSystemIdentifier() (err error) {
+	queryRunner.mu.Lock()
+	defer queryRunner.mu.Unlock()
+
 	if queryRunner.Version < 90600 {
 		tracelog.WarningLogger.Println("GetSystemIdentifier: Unable to get system identifier")
 		return nil
@@ -186,6 +215,9 @@ func (queryRunner *PgQueryRunner) getSystemIdentifier() (err error) {
 // StartBackup informs the database that we are starting copy of cluster contents
 func (queryRunner *PgQueryRunner) startBackup(backup string) (backupName string,
 	lsnString string, inRecovery bool, err error) {
+	queryRunner.mu.Lock()
+	defer queryRunner.mu.Unlock()
+
 	tracelog.InfoLogger.Println("Calling pg_start_backup()")
 	startBackupQuery, err := queryRunner.BuildStartBackup()
 	conn := queryRunner.Connection
@@ -202,6 +234,9 @@ func (queryRunner *PgQueryRunner) startBackup(backup string) (backupName string,
 
 // StopBackup informs the database that copy is over
 func (queryRunner *PgQueryRunner) stopBackup() (label string, offsetMap string, lsnStr string, err error) {
+	queryRunner.mu.Lock()
+	defer queryRunner.mu.Unlock()
+
 	tracelog.InfoLogger.Println("Calling pg_stop_backup()")
 	conn := queryRunner.Connection
 
@@ -214,7 +249,7 @@ func (queryRunner *PgQueryRunner) stopBackup() (label string, offsetMap string, 
 		_ = tx.Rollback()
 	}()
 
-	_, err = tx.Exec("SET statement_timeout=0;")
+	_, err = tx.Exec(fmt.Sprintf("SET statement_timeout=%d;", queryRunner.stopBackupTimeout.Milliseconds()))
 	if err != nil {
 		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: failed setting statement timeout in transaction")
 	}
@@ -257,6 +292,9 @@ func (queryRunner *PgQueryRunner) BuildStatisticsQuery() (string, error) {
 // getStatistics queries the relations statistics from database
 func (queryRunner *PgQueryRunner) getStatistics(
 	dbInfo PgDatabaseInfo) (map[walparser.RelFileNode]PgRelationStat, error) {
+	queryRunner.mu.Lock()
+	defer queryRunner.mu.Unlock()
+
 	tracelog.InfoLogger.Println("Querying pg_stat_all_tables")
 	getStatQuery, err := queryRunner.BuildStatisticsQuery()
 	conn := queryRunner.Connection
@@ -309,6 +347,9 @@ func (queryRunner *PgQueryRunner) BuildGetDatabasesQuery() (string, error) {
 
 // getDatabaseInfos fetches a list of all databases in cluster which are allowed to connect
 func (queryRunner *PgQueryRunner) getDatabaseInfos() ([]PgDatabaseInfo, error) {
+	queryRunner.mu.Lock()
+	defer queryRunner.mu.Unlock()
+
 	tracelog.InfoLogger.Println("Querying pg_database")
 	getDBInfoQuery, err := queryRunner.BuildGetDatabasesQuery()
 	conn := queryRunner.Connection
@@ -345,6 +386,9 @@ func (queryRunner *PgQueryRunner) getDatabaseInfos() ([]PgDatabaseInfo, error) {
 // GetParameter reads a Postgres setting
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) GetParameter(parameterName string) (string, error) {
+	queryRunner.mu.Lock()
+	defer queryRunner.mu.Unlock()
+
 	var value string
 	conn := queryRunner.Connection
 	err := conn.QueryRow(queryRunner.buildGetParameter(), parameterName).Scan(&value)
@@ -372,6 +416,9 @@ func (queryRunner *PgQueryRunner) GetWalSegmentBytes() (segBlocks uint64, err er
 // GetDataDir reads the wals segment size (in bytes) and converts it to uint64
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) GetDataDir() (dataDir string, err error) {
+	queryRunner.mu.Lock()
+	defer queryRunner.mu.Unlock()
+
 	conn := queryRunner.Connection
 	err = conn.QueryRow("show data_directory").Scan(&dataDir)
 	return dataDir, err
@@ -380,6 +427,9 @@ func (queryRunner *PgQueryRunner) GetDataDir() (dataDir string, err error) {
 // GetPhysicalSlotInfo reads information on a physical replication slot
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) GetPhysicalSlotInfo(slotName string) (PhysicalSlot, error) {
+	queryRunner.mu.Lock()
+	defer queryRunner.mu.Unlock()
+
 	var active bool
 	var restartLSN string
 
@@ -398,4 +448,196 @@ func (queryRunner *PgQueryRunner) GetPhysicalSlotInfo(slotName string) (Physical
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) IsTablespaceMapExists() bool {
 	return queryRunner.Version >= 90600
+}
+
+// fetchAOStorageMetadata queries the storage metadata for AO & AOCS tables (GreenplumDB)
+func (queryRunner *PgQueryRunner) fetchAOStorageMetadata(dbInfo PgDatabaseInfo) (AoRelFileStorageMap, error) {
+	queryRunner.mu.Lock()
+	defer queryRunner.mu.Unlock()
+
+	tracelog.InfoLogger.Printf("Querying pg_class for %s", dbInfo.name)
+	getStatQuery, err := queryRunner.buildAORelPgClassQuery()
+	conn := queryRunner.Connection
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to build the pg_class query")
+	}
+
+	rows, err := conn.Query(getStatQuery)
+	if err != nil {
+		return nil, errors.Wrap(err, "pg_class query failed")
+	}
+
+	defer rows.Close()
+	relPgClassInfo := make(map[string]aoRelPgClassInfo)
+	for rows.Next() {
+		var oid uint32
+		var relNameMd5 string
+		var aoSegTableFqn string
+		var relFileNodeID uint32
+		var spcNode uint32
+		var storage RelStorageType
+		var relNAtts int16
+		if err := rows.Scan(&oid, &relNameMd5, &aoSegTableFqn, &relFileNodeID, &spcNode, &storage, &relNAtts); err != nil {
+			return nil, errors.Wrapf(err, "failed to parse query result")
+		}
+		row := aoRelPgClassInfo{
+			oid:           oid,
+			relNameMd5:    relNameMd5,
+			relFileNodeID: relFileNodeID,
+			relNAtts:      relNAtts,
+			spcNode:       spcNode,
+			storage:       storage,
+		}
+		relPgClassInfo[aoSegTableFqn] = row
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	relStorageMap := make(AoRelFileStorageMap)
+
+	for aoSegTableFqn, row := range relPgClassInfo {
+		var queryFunc func() (*pgx.Rows, error)
+		switch row.storage {
+		case AppendOptimized:
+			queryFunc = func() (*pgx.Rows, error) {
+				query, err := queryRunner.buildAOMetadataQuery(aoSegTableFqn)
+				if err != nil {
+					return nil, err
+				}
+
+				return conn.Query(query)
+			}
+		case ColumnOriented:
+			queryFunc = func() (*pgx.Rows, error) {
+				query, err := queryRunner.buildAOCSMetadataQuery()
+				if err != nil {
+					return nil, err
+				}
+
+				return conn.Query(query, row.oid)
+			}
+		default:
+			tracelog.WarningLogger.Printf("Unexpected relation storage type %c for relfilenode %d in database %s",
+				row.storage, row.relFileNodeID, dbInfo.name)
+			continue
+		}
+
+		err = loadStorageMetadata(relStorageMap, dbInfo, queryFunc, aoSegTableFqn, relPgClassInfo)
+		if err != nil {
+			tracelog.WarningLogger.Printf("failed to fetch the AOCS storage metadata: %v\n", err)
+		}
+	}
+
+	return relStorageMap, nil
+}
+
+func loadStorageMetadata(relStorageMap AoRelFileStorageMap, dbInfo PgDatabaseInfo,
+	queryFn func() (*pgx.Rows, error), aoSegTableFqn string, relPgClassInfo map[string]aoRelPgClassInfo) error {
+	rows, err := queryFn()
+	if err != nil {
+		return errors.Wrap(err, "storage metadata query failed")
+	}
+
+	defer rows.Close()
+	for rows.Next() {
+		var segNo int
+		var modCount int64
+		var eof int64
+
+		if err := rows.Scan(&segNo, &modCount, &eof); err != nil {
+			tracelog.WarningLogger.Printf("failed to parse query result: %v\n", err.Error())
+		}
+
+		cInfo := relPgClassInfo[aoSegTableFqn]
+		relFileLoc := walparser.NewBlockLocation(walparser.Oid(cInfo.spcNode), dbInfo.oid, walparser.Oid(cInfo.relFileNodeID), uint32(segNo))
+		// if tablespace id is zero, use the default database tablespace id
+		if relFileLoc.RelationFileNode.SpcNode == walparser.Oid(0) {
+			relFileLoc.RelationFileNode.SpcNode = dbInfo.tblSpcOid
+		}
+		relStorageMap[*relFileLoc] = AoRelFileMetadata{
+			relNameMd5:  cInfo.relNameMd5,
+			storageType: cInfo.storage,
+			eof:         eof,
+			modCount:    modCount,
+		}
+	}
+	if rows.Err() != nil {
+		return rows.Err()
+	}
+	return nil
+}
+
+func (queryRunner *PgQueryRunner) readTimeline() (timeline uint32, err error) {
+	queryRunner.mu.Lock()
+	defer queryRunner.mu.Unlock()
+
+	conn := queryRunner.Connection
+	var bytesPerWalSegment uint32
+
+	err = conn.QueryRow("select timeline_id, bytes_per_wal_segment "+
+		"from pg_control_checkpoint(), pg_control_init()").Scan(&timeline, &bytesPerWalSegment)
+	if err == nil && uint64(bytesPerWalSegment) != WalSegmentSize {
+		return 0, newBytesPerWalSegmentError()
+	}
+	return
+}
+
+func (queryRunner *PgQueryRunner) Ping() error {
+	queryRunner.mu.Lock()
+	defer queryRunner.mu.Unlock()
+
+	ctx := context.Background()
+	return queryRunner.Connection.Ping(ctx)
+}
+
+func (queryRunner *PgQueryRunner) buildAORelPgClassQuery() (string, error) {
+	switch {
+	case queryRunner.Version >= 90000:
+		return `
+SELECT seg.aooid, md5(seg.aotablefqn), 'pg_aoseg.' || quote_ident(aoseg_c.relname) AS aosegtablefqn,
+	seg.relfilenode, seg.reltablespace, seg.relstorage, seg.relnatts 
+FROM pg_class aoseg_c
+JOIN (
+	SELECT pg_ao.relid AS aooid, pg_ao.segrelid, 
+			aotables.aotablefqn, aotables.relstorage, 
+			aotables.relnatts, aotables.relfilenode, aotables.reltablespace
+	FROM pg_appendonly pg_ao
+	JOIN (
+		SELECT c.oid, quote_ident(n.nspname)|| '.' || quote_ident(c.relname) AS aotablefqn, 
+				c.relstorage, c.relnatts, c.relfilenode, c.reltablespace 
+		FROM pg_class c
+		JOIN pg_namespace n ON c.relnamespace = n.oid
+		WHERE relstorage IN ( 'ao', 'co' ) AND relpersistence='p'
+		) aotables ON pg_ao.relid = aotables.oid
+	) seg ON aoseg_c.oid = seg.segrelid;
+`, nil
+	case queryRunner.Version == 0:
+		return "", newNoPostgresVersionError()
+	default:
+		return "", newUnsupportedPostgresVersionError(queryRunner.Version)
+	}
+}
+
+func (queryRunner *PgQueryRunner) buildAOCSMetadataQuery() (string, error) {
+	switch {
+	case queryRunner.Version >= 90000:
+		return `SELECT aocs.physical_segno as segno, aocs.modcount, aocs.eof " +
+			"FROM gp_toolkit.__gp_aocsseg($1::oid) aocs;`, nil
+	case queryRunner.Version == 0:
+		return "", newNoPostgresVersionError()
+	default:
+		return "", newUnsupportedPostgresVersionError(queryRunner.Version)
+	}
+}
+
+func (queryRunner *PgQueryRunner) buildAOMetadataQuery(aoSegTableFqn string) (string, error) {
+	switch {
+	case queryRunner.Version >= 90000:
+		return fmt.Sprintf(`SELECT segno, modcount, eof FROM %s;`, aoSegTableFqn), nil
+	case queryRunner.Version == 0:
+		return "", newNoPostgresVersionError()
+	default:
+		return "", newUnsupportedPostgresVersionError(queryRunner.Version)
+	}
 }

@@ -92,12 +92,20 @@ func getFirstSettingOf(settings map[string]string, keys []string) string {
 	return ""
 }
 
-func getDefaultConfig(settings map[string]string, maxRetries int) *aws.Config {
+func configWithSettings(config *aws.Config, bucket string, settings map[string]string) (*aws.Config, error) {
 	// DefaultRetryer implements basic retry logic using exponential backoff for
 	// most services. If you want to implement custom retry logic, you can implement the
 	// request.Retryer interface.
-	config := defaults.Get().Config.WithRegion(settings[RegionSetting])
-	config = request.WithRetryer(config, NewConnResetRetryer(client.DefaultRetryer{NumMaxRetries: maxRetries}))
+	maxRetriesCount := MaxRetriesDefault
+	if maxRetriesRaw, ok := settings[MaxRetriesSetting]; ok {
+		maxRetriesInt, err := strconv.Atoi(maxRetriesRaw)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to parse %s", MaxRetriesSetting)
+		}
+
+		maxRetriesCount = maxRetriesInt
+	}
+	config = request.WithRetryer(config, NewConnResetRetryer(client.DefaultRetryer{NumMaxRetries: maxRetriesCount}))
 
 	accessKeyId := getFirstSettingOf(settings, []string{AccessKeyIdSetting, AccessKeySetting})
 	secretAccessKey := getFirstSettingOf(settings, []string{SecretAccessKeySetting, SecretKeySetting})
@@ -133,25 +141,6 @@ func getDefaultConfig(settings map[string]string, maxRetries int) *aws.Config {
 	if endpoint, ok := settings[EndpointSetting]; ok {
 		config = config.WithEndpoint(endpoint)
 	}
-	return config
-}
-
-// TODO : unit tests
-func createSession(bucket string, settings map[string]string) (*session.Session, error) {
-	maxRetriesCount := MaxRetriesDefault
-	if maxRetriesRaw, ok := settings[MaxRetriesSetting]; ok {
-		maxRetriesInt, err := strconv.Atoi(maxRetriesRaw)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse %s", MaxRetriesSetting)
-		}
-
-		maxRetriesCount = maxRetriesInt
-	}
-	config := getDefaultConfig(settings, maxRetriesCount)
-	config.MaxRetries = aws.Int(maxRetriesCount)
-	if _, err := config.Credentials.Get(); err != nil {
-		return nil, errors.Wrapf(err, "failed to get AWS credentials; please specify %s and %s", AccessKeyIdSetting, SecretAccessKeySetting)
-	}
 
 	if s3ForcePathStyleStr, ok := settings[ForcePathStyleSetting]; ok {
 		s3ForcePathStyle, err := strconv.ParseBool(s3ForcePathStyleStr)
@@ -167,34 +156,61 @@ func createSession(bucket string, settings map[string]string) (*session.Session,
 	}
 	config = config.WithRegion(region)
 
+	return config, nil
+}
+
+// TODO : unit tests
+func createSession(bucket string, settings map[string]string) (*session.Session, error) {
+	s, err := session.NewSession()
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := configWithSettings(s.Config, bucket, settings)
+	if err != nil {
+		return nil, err
+	}
+	s.Config = c
+
 	filePath := settings[s3CertFile]
 	if filePath != "" {
 		if file, err := os.Open(filePath); err == nil {
 			defer file.Close()
-			s, err := session.NewSessionWithOptions(session.Options{Config: *config, CustomCABundle: file})
+			s, err := session.NewSessionWithOptions(session.Options{Config: *s.Config, CustomCABundle: file})
 			return s, err
 		} else {
 			return nil, err
 		}
 	}
 
-	s, err := session.NewSession(config)
-
-	if err != nil {
-		return nil, err
+	if settings[S3UseYcSessionToken] != "" {
+		useYcSessionToken, err := strconv.ParseBool(settings[S3UseYcSessionToken])
+		if err != nil {
+			return nil, NewFolderError(err, "Invalid %s setting", S3UseYcSessionToken)
+		}
+		if useYcSessionToken {
+			// yandex cloud mimic metadata service, so we can use default AWS credentials, but set token to another header
+			cred := credentials.NewCredentials(defaults.RemoteCredProvider(*defaults.Config(), defaults.Handlers()))
+			s.Config.WithCredentials(cred)
+			s.Handlers.Send.PushFront(func(r *request.Request) {
+				token := r.HTTPRequest.Header.Get("X-Amz-Security-Token")
+				r.HTTPRequest.Header.Add("X-YaCloud-SubjectToken", token)
+			})
+		}
 	}
+
 	if endpointSource, ok := settings[EndpointSourceSetting]; ok {
 		s.Handlers.Validate.PushBack(func(request *request.Request) {
 			src := setupReqProxy(endpointSource, getEndpointPort(settings))
 			if src != nil {
 				tracelog.DebugLogger.Printf("using endpoint %s", *src)
-				host := strings.TrimPrefix(*config.Endpoint, "https://")
+				host := strings.TrimPrefix(*s.Config.Endpoint, "https://")
 				request.HTTPRequest.Host = host
 				request.HTTPRequest.Header.Add("Host", host)
 				request.HTTPRequest.URL.Host = *src
 				request.HTTPRequest.URL.Scheme = HTTP
 			} else {
-				tracelog.DebugLogger.Printf("using endpoint %s", *config.Endpoint)
+				tracelog.DebugLogger.Printf("using endpoint %s", *s.Config.Endpoint)
 			}
 		})
 	}

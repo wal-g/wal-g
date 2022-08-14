@@ -29,8 +29,8 @@ func (err DeltaFileWriterNotFoundError) Error() string {
 
 type DeltaFileManager struct {
 	dataFolder            fsutil.DataFolder
-	PartFiles             *internal.LazyCache
-	DeltaFileWriters      *internal.LazyCache
+	PartFiles             *internal.LazyCache[string, *WalPartFile]
+	DeltaFileWriters      *internal.LazyCache[string, *DeltaFileChanWriter]
 	deltaFileWriterWaiter sync.WaitGroup
 	canceledWalRecordings chan string
 	CanceledDeltaFiles    map[string]bool
@@ -43,19 +43,12 @@ func NewDeltaFileManager(dataFolder fsutil.DataFolder) *DeltaFileManager {
 		canceledWalRecordings: make(chan string),
 		CanceledDeltaFiles:    make(map[string]bool),
 	}
-	manager.PartFiles = internal.NewLazyCache(func(partFilenameInterface interface{}) (partFile interface{}, err error) {
-		partFilename, ok := partFilenameInterface.(string)
-		if !ok {
-			return nil, internal.NewWrongTypeError("string")
-		}
-		return manager.loadPartFile(partFilename)
-	})
+	manager.PartFiles = internal.NewLazyCache(
+		func(partFilename string) (partFile *WalPartFile, err error) {
+			return manager.loadPartFile(partFilename)
+		})
 	manager.DeltaFileWriters = internal.NewLazyCache(
-		func(deltaFilenameInterface interface{}) (deltaFileWriter interface{}, err error) {
-			deltaFilename, ok := deltaFilenameInterface.(string)
-			if !ok {
-				return nil, internal.NewWrongTypeError("string")
-			}
+		func(deltaFilename string) (deltaFileWriter *DeltaFileChanWriter, err error) {
 			return manager.loadDeltaFileWriter(deltaFilename)
 		})
 	manager.canceledWaiter.Add(1)
@@ -68,7 +61,7 @@ func (manager *DeltaFileManager) GetBlockLocationConsumer(deltaFilename string) 
 	if err != nil {
 		return nil, err
 	}
-	return deltaFileWriter.(*DeltaFileChanWriter).BlockLocationConsumer, nil
+	return deltaFileWriter.BlockLocationConsumer, nil
 }
 
 // TODO : unit tests
@@ -103,7 +96,7 @@ func (manager *DeltaFileManager) GetPartFile(deltaFilename string) (*WalPartFile
 	if err != nil {
 		return nil, err
 	}
-	return partFile.(*WalPartFile), nil
+	return partFile, nil
 }
 
 // TODO : unit tests
@@ -129,9 +122,7 @@ func (manager *DeltaFileManager) FlushPartFiles() (completedPartFiles map[string
 	close(manager.canceledWalRecordings)
 	manager.canceledWaiter.Wait()
 	completedPartFiles = make(map[string]bool)
-	manager.PartFiles.Range(func(key, value interface{}) bool {
-		partFilename := key.(string)
-		partFile := value.(*WalPartFile)
+	manager.PartFiles.Range(func(partFilename string, partFile *WalPartFile) bool {
 		deltaFilename := partFilenameToDelta(partFilename)
 		if _, ok := manager.CanceledDeltaFiles[deltaFilename]; ok {
 			return true
@@ -158,15 +149,12 @@ func (manager *DeltaFileManager) FlushPartFiles() (completedPartFiles map[string
 }
 
 func (manager *DeltaFileManager) FlushDeltaFiles(uploader *internal.Uploader, completedPartFiles map[string]bool) {
-	manager.DeltaFileWriters.Range(func(key, value interface{}) bool {
-		deltaFileWriter := value.(*DeltaFileChanWriter)
+	manager.DeltaFileWriters.Range(func(key string, deltaFileWriter *DeltaFileChanWriter) bool {
 		deltaFileWriter.close()
 		return true
 	})
 	manager.deltaFileWriterWaiter.Wait()
-	manager.DeltaFileWriters.Range(func(key, value interface{}) bool {
-		deltaFilename := key.(string)
-		deltaFileWriter := value.(*DeltaFileChanWriter)
+	manager.DeltaFileWriters.Range(func(deltaFilename string, deltaFileWriter *DeltaFileChanWriter) bool {
 		if _, ok := manager.CanceledDeltaFiles[deltaFilename]; ok {
 			return true
 		}
@@ -225,11 +213,10 @@ func (manager *DeltaFileManager) collectCanceledDeltaFiles() {
 }
 
 func (manager *DeltaFileManager) CombinePartFile(deltaFilename string, partFile *WalPartFile) error {
-	deltaFileWriterInterface, exists := manager.DeltaFileWriters.LoadExisting(deltaFilename)
+	deltaFileWriter, exists := manager.DeltaFileWriters.LoadExisting(deltaFilename)
 	if !exists {
 		return newDeltaFileWriterNotFoundError(deltaFilename)
 	}
-	deltaFileWriter := deltaFileWriterInterface.(*DeltaFileChanWriter)
 	deltaFileWriter.DeltaFile.WalParser = walparser.LoadWalParserFromCurrentRecordHead(partFile.WalHeads[WalFileInDelta-1])
 	records, err := partFile.CombineRecords()
 	if err != nil {

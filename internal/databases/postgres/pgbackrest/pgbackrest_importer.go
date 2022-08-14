@@ -4,7 +4,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jackc/pgx"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -17,8 +18,8 @@ type BackupDetails struct {
 	StartTime            time.Time
 	FinishTime           time.Time
 	PgVersion            string
-	StartLsn             uint64
-	FinishLsn            uint64
+	StartLsn             postgres.LSN
+	FinishLsn            postgres.LSN
 	SystemIdentifier     uint64
 	DirectoryPaths       []string
 	DefaultFileMode      int
@@ -54,12 +55,12 @@ func GetBackupDetails(backupsFolder storage.Folder, stanza string, backupName st
 		WalFileName: manifest.BackupSection.BackupArchiveStart,
 	}
 
-	startLsn, err := pgx.ParseLSN(manifest.BackupSection.BackupLsnStart)
+	startLsn, err := postgres.ParseLSN(manifest.BackupSection.BackupLsnStart)
 	if err != nil {
 		return nil, err
 	}
 
-	finishLsn, err := pgx.ParseLSN(manifest.BackupSection.BackupLsnStop)
+	finishLsn, err := postgres.ParseLSN(manifest.BackupSection.BackupLsnStop)
 	if err != nil {
 		return nil, err
 	}

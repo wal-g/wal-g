@@ -17,9 +17,12 @@ linters-settings:
       - experimental
       - opinionated
       - style
-    settings:
-      hugeParam:
-        sizeThreshold: 170 # temporary, default is 80
+    disabled-checks:
+      - hugeParam
+      - rangeValCopy
+    # settings:
+    #   hugeParam:
+    #     sizeThreshold: 170 # temporary, default is 80
   gocyclo:
     min-complexity: 15
   govet:
@@ -28,6 +31,31 @@ linters-settings:
     locale: US
   lll:
     line-length: 140
+  staticcheck:
+    # SA1019 is disabled until WAL-G has migrated from the deprecated package golang.org/x/crypto/openpgp
+    checks: [ "all", "-SA1019" ]
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-naming
+      - name: exported
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: unreachable-code
+      - name: redefines-builtin-id
 
 linters:
   # please, do not use `enable-all`: it's deprecated and will be removed soon.
@@ -37,6 +65,7 @@ linters:
     - bodyclose
     - dupl
     - errcheck
+    - exportloopref
     - funlen
     - gocritic
     - gocyclo
@@ -44,40 +73,24 @@ linters:
     - goimports
     - govet
     - ineffassign
-    - interfacer
     - misspell
     - nakedret
-    - scopelint
+    - revive
     - staticcheck
-    - structcheck
+    # - structcheck
     - typecheck
     - unconvert
     - unparam
     - unused
     - varcheck
-    - golint
     - lll
-  # - godox
     - deadcode
     - stylecheck
     - gosimple
     - whitespace
-  # don't enable:
-  # - gosec
-  # - gochecknoinits
-  # - asciicheck
-  # - gochecknoglobals
-  # - gocognit
-  # - godot
-  # - goerr113
-  # - maligned
-  # - nestif
-  # - prealloc
-  # - testpackage
-  # - wsl
-  # - depguard
 
 run:
+  go: 1.18
   timeout: 5m
   skip-dirs:
     - "cmd/redis"
