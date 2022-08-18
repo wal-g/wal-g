@@ -41,5 +41,5 @@ func HandleBinaryBackupPush(ctx context.Context, permanent bool, appName string)
 		return err
 	}
 
-	return backupService.DoBackup(backupName, permanent)
+	return backupService.DoBackup(backupName, replSetName, permanent)
 }

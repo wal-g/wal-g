@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
@@ -13,6 +14,8 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
+
+const FilesMetadataSuffix = "_backup_files.json"
 
 type BackupStorage struct {
 	UploaderProvider internal.UploaderProvider
@@ -37,16 +40,35 @@ func CreateBackupStorage(backupName, replSetName string) (*BackupStorage, error)
 	}, nil
 }
 
-func (backupStorage *BackupStorage) UploadMongodBackupMeta(mongodBackupMeta *MongodBackupMeta) error {
-	return internal.UploadSentinel(backupStorage.UploaderProvider, mongodBackupMeta, backupStorage.BackupName)
+func (backupStorage *BackupStorage) UploadMongodBackupSentinel(sentinel *MongodBackupSentinel) error {
+	return internal.UploadSentinel(backupStorage.UploaderProvider, sentinel, backupStorage.BackupName)
 }
 
-func (backupStorage *BackupStorage) DownloadMongodBackupMeta() (*MongodBackupMeta, error) {
+func (backupStorage *BackupStorage) FilesMetadataNameFromBackup() string {
+	return backupStorage.GetBackupDataAbsolutePath(backupStorage.BackupName + FilesMetadataSuffix)
+}
+
+func (backupStorage *BackupStorage) UploadMongodBackupFilesMetadata(filesMetadata *MongodBackupFilesMetadata) error {
+	filesMetadataPath := backupStorage.FilesMetadataNameFromBackup()
+	return internal.UploadDto(backupStorage.UploaderProvider.Folder(), filesMetadata, filesMetadataPath)
+}
+
+func (backupStorage *BackupStorage) DownloadMongodBackupSentinel() (*MongodBackupSentinel, error) {
 	return DownloadSentinel(backupStorage.UploaderProvider.Folder(), backupStorage.BackupName)
 }
 
-func DownloadSentinel(folder storage.Folder, backupName string) (*MongodBackupMeta, error) {
-	var sentinel MongodBackupMeta
+func (backupStorage *BackupStorage) DownloadMongodBackupFilesMetadata() (*MongodBackupFilesMetadata, error) {
+	var filesMetadata MongodBackupFilesMetadata
+	filesMetadataPath := backupStorage.FilesMetadataNameFromBackup()
+	err := internal.FetchDto(backupStorage.UploaderProvider.Folder(), filesMetadata, filesMetadataPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "can not fetch files metadata")
+	}
+	return &filesMetadata, nil
+}
+
+func DownloadSentinel(folder storage.Folder, backupName string) (*MongodBackupSentinel, error) {
+	var sentinel MongodBackupSentinel
 	err := common.DownloadSentinel(folder, backupName, &sentinel)
 	if err != nil {
 		return nil, err
@@ -54,9 +76,12 @@ func DownloadSentinel(folder storage.Folder, backupName string) (*MongodBackupMe
 	return &sentinel, nil
 }
 
+func (backupStorage *BackupStorage) GetBackupDataAbsolutePath(fileName string) string {
+	return filepath.Join(backupStorage.BackupName, backupStorage.ReplSetName, fileName)
+}
+
 func (backupStorage *BackupStorage) MakeBackupFilePath(backupFileMeta *BackupFileMeta) string {
-	return filepath.Join(backupStorage.BackupName, backupStorage.ReplSetName,
-		backupFileMeta.Path+"."+backupFileMeta.Compression)
+	return backupStorage.GetBackupDataAbsolutePath(backupFileMeta.Path + "." + backupFileMeta.Compression)
 }
 
 func (backupStorage *BackupStorage) CreateReader(backupFileMeta *BackupFileMeta) (io.ReadCloser, error) {
