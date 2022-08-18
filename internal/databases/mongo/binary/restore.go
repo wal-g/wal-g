@@ -28,12 +28,17 @@ func CreateRestoreService(ctx context.Context, localStorage *LocalStorage, backu
 }
 
 func (restoreService *RestoreService) DoRestore(restoreMongodVersion string) error {
-	mongodBackupMeta, err := restoreService.BackupStorage.DownloadMongodBackupMeta()
+	mongodBackupSentinel, err := restoreService.BackupStorage.DownloadMongodBackupSentinel()
 	if err != nil {
 		return err
 	}
 
-	err = EnsureCompatibilityToRestoreMongodVersions(restoreMongodVersion, mongodBackupMeta.MongodMeta.Version)
+	mongodBackupFilesMetadata, err := restoreService.BackupStorage.DownloadMongodBackupFilesMetadata()
+	if err != nil {
+		return err
+	}
+
+	err = EnsureCompatibilityToRestoreMongodVersions(restoreMongodVersion, mongodBackupSentinel.MongodMeta.Version)
 	if err != nil {
 		return err
 	}
@@ -49,12 +54,12 @@ func (restoreService *RestoreService) DoRestore(restoreMongodVersion string) err
 	}
 
 	tracelog.InfoLogger.Println("Download backup files to dbPath")
-	err = restoreService.downloadFilesFromBackup(mongodBackupMeta)
+	err = restoreService.downloadFilesFromBackup(mongodBackupFilesMetadata)
 	if err != nil {
 		return err
 	}
 
-	err = restoreService.fixSystemData(mongodBackupMeta)
+	err = restoreService.fixSystemData(mongodBackupSentinel)
 	if err != nil {
 		return err
 	}
@@ -67,7 +72,7 @@ func (restoreService *RestoreService) DoRestore(restoreMongodVersion string) err
 	return restoreService.LocalStorage.FixFileOwnerOfMongodData()
 }
 
-func (restoreService *RestoreService) fixSystemData(mongodBackupMeta *MongodBackupMeta) error {
+func (restoreService *RestoreService) fixSystemData(mongodBackupSentinel *MongodBackupSentinel) error {
 	mongodProcess, err := StartMongodWithDisableLogicalSessionCacheRefresh(restoreService.MongodFileConfig)
 	if err != nil {
 		return errors.Wrap(err, "unable to start mongod in special mode")
@@ -78,7 +83,7 @@ func (restoreService *RestoreService) fixSystemData(mongodBackupMeta *MongodBack
 		return errors.Wrap(err, "unable to create mongod service")
 	}
 
-	lastWriteTS := mongodBackupMeta.MongodMeta.EndTS
+	lastWriteTS := mongodBackupSentinel.MongodMeta.EndTS
 	err = mongodService.FixSystemDataAfterRestore(lastWriteTS)
 	if err != nil {
 		return err
@@ -111,17 +116,17 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone() error {
 	return mongodProcess.Wait()
 }
 
-func (restoreService *RestoreService) downloadFilesFromBackup(backupMeta *MongodBackupMeta) error {
+func (restoreService *RestoreService) downloadFilesFromBackup(backupFilesMetadata *MongodBackupFilesMetadata) error {
 	err := restoreService.LocalStorage.EnsureEmptyDBPath()
 	if err != nil {
 		return err
 	}
-	err = restoreService.LocalStorage.CreateDirectories(backupMeta.BackupDirectories)
+	err = restoreService.LocalStorage.CreateDirectories(backupFilesMetadata.BackupDirectories)
 	if err != nil {
 		return err
 	}
 
-	for _, backupFileMeta := range backupMeta.BackupFiles {
+	for _, backupFileMeta := range backupFilesMetadata.BackupFiles {
 		err = restoreService.DownloadFileFromBackup(backupFileMeta)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("bad backup file %v", backupFileMeta.Path))

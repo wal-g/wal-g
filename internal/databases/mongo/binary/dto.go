@@ -8,8 +8,8 @@ import (
 )
 
 type MongodMeta struct {
-	Version     string `json:"Version"`
-	ReplSetName string `json:"ReplSetName"`
+	Version      string   `json:"Version"`
+	ReplSetNames []string `json:"ReplSetNames"`
 
 	StartTS primitive.Timestamp `json:"TsStart"`
 	EndTS   primitive.Timestamp `json:"TsEnd"`
@@ -36,7 +36,7 @@ type BackupFileMeta struct {
 	Checksum         Checksum    `json:"Checksum"`
 }
 
-type MongodBackupMeta struct {
+type MongodBackupSentinel struct {
 	//todo: use `internal.GenericMetadata` as base
 	BackupName string `json:"BackupName,omitempty"`
 	BackupType string `json:"BackupType,omitempty"`
@@ -51,8 +51,10 @@ type MongodBackupMeta struct {
 	CompressedDataSize   int64 `json:"CompressedDataSize,omitempty"`
 	Permanent            bool  `json:"Permanent"`
 
+	UserData interface{} `json:"UserData,omitempty"`
+}
+
+type MongodBackupFilesMetadata struct {
 	BackupDirectories []*BackupDirectoryMeta `json:"BackupDirectories,omitempty"`
 	BackupFiles       []*BackupFileMeta      `json:"BackupFiles,omitempty"`
-
-	UserData interface{} `json:"UserData,omitempty"`
 }

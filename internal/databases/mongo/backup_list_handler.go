@@ -36,7 +36,7 @@ type BackupDetail struct {
 	UserData    interface{} `json:"user_data,omitempty"`
 }
 
-func NewBinaryBackupDetail(backupTime internal.BackupTime, sentinel *binary.MongodBackupMeta) *BackupDetail {
+func NewBinaryBackupDetail(backupTime internal.BackupTime, sentinel *binary.MongodBackupSentinel) *BackupDetail {
 	return &BackupDetail{
 		BackupName:       backupTime.BackupName,
 		ModifyTime:       backupTime.Time,
@@ -81,7 +81,7 @@ func HandleDetailedBackupList(folder storage.Folder, output io.Writer, pretty, j
 		backup := internal.NewBackup(folder, backupTime.BackupName)
 
 		if strings.HasPrefix(backup.Name, "binary") {
-			var sentinel binary.MongodBackupMeta
+			var sentinel binary.MongodBackupSentinel
 			err = backup.FetchSentinel(&sentinel)
 			tracelog.ErrorLogger.FatalfOnError("Failed to load sentinel for backup %s", err)
 
