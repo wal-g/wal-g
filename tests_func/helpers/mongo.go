@@ -7,10 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wal-g/wal-g/tests_func/utils"
-
 	"github.com/mongodb/mongo-tools-common/db"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/tests_func/utils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -169,7 +168,9 @@ func (mc *MongoCtl) connect(creds *AuthCreds) (*mongo.Client, error) {
 		auth = fmt.Sprintf("%s:%s@", creds.Username, creds.Password)
 		dbase = creds.Database
 	}
-	uri := fmt.Sprintf("mongodb://%s%s:%d/%s?connect=direct&w=majority&socketTimeoutMS=3000&connectTimeoutMS=3000", auth, mc.expHost, mc.expPort, dbase)
+	uri := fmt.Sprintf("mongodb://%s%s:%d/%s"+
+		"?connect=direct&w=majority&socketTimeoutMS=3000&connectTimeoutMS=3000",
+		auth, mc.expHost, mc.expPort, dbase)
 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
 	if err != nil {
 		return nil, fmt.Errorf("can not create mongo client: %v", err)
@@ -181,18 +182,19 @@ func (mc *MongoCtl) connect(creds *AuthCreds) (*mongo.Client, error) {
 	return client, nil
 }
 
-func (mc *MongoCtl) WriteTestData(mark string) error {
+func (mc *MongoCtl) WriteTestData(mark string, dbCount, tablesCount, docsCount int) error {
 	conn, err := mc.AdminConnect()
 	if err != nil {
 		return err
 	}
-	docsCount := 3
-	for _, dbName := range []string{"test_db_01", "test_db_02"} {
-		for _, tableName := range []string{"test_table_01", "test_table_02"} {
+	for dbId := 1; dbId <= dbCount; dbId++ {
+		for tableId := 1; tableId <= tablesCount; tableId++ {
 			var rows []interface{}
 			for k := 1; k <= docsCount; k++ {
 				rows = append(rows, generateRecord(k, 5, mark))
 			}
+			dbName := fmt.Sprintf("test_db_%02d", dbId)
+			tableName := fmt.Sprintf("test_table_%02d", tableId)
 			if _, err := conn.Database(dbName).Collection(tableName).InsertMany(mc.ctx, rows); err != nil {
 				return err
 			}
@@ -381,7 +383,9 @@ func (mc *MongoCtl) InitReplSet() error {
 	if im.SetName != "" {
 		return nil
 	}
-	_, err = mc.runCmd([]string{"mongo", "--host", "localhost", "--quiet", "--norc", "--port", "27018", "--eval", "rs.initiate()"})
+	_, err = mc.runCmd([]string{"mongo",
+		"--host", "localhost", "--quiet", "--norc",
+		"--port", "27018", "--eval", "rs.initiate()"})
 	time.Sleep(3 * time.Second) // TODO: wait until rs initiated
 
 	return err

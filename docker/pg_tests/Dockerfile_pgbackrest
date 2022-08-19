@@ -1,0 +1,26 @@
+FROM ubuntu:18.04 as build
+
+RUN apt-get update && apt-get install -y wget
+
+RUN mkdir -p /build
+
+RUN wget -q -O - https://github.com/pgbackrest/pgbackrest/archive/release/2.36.tar.gz | tar zx -C /build
+RUN apt-get install -y make gcc libpq-dev libssl-dev libxml2-dev pkg-config liblz4-dev libzstd-dev libbz2-dev libz-dev libyaml-dev
+
+RUN cd /build/pgbackrest-release-2.36/src && ./configure && make
+
+FROM wal-g/docker_prefix:latest
+
+COPY --from=build /build/pgbackrest-release-2.36/src/pgbackrest /usr/bin
+
+
+RUN chmod 755 /usr/bin/pgbackrest && \
+    mkdir -p -m 770 /var/log/pgbackrest && \
+    chown postgres:postgres /var/log/pgbackrest && \
+    mkdir -p /etc/pgbackrest && \
+    mkdir -p /etc/pgbackrest && \
+    mkdir -p /etc/pgbackrest/conf.d && \
+    touch /etc/pgbackrest/pgbackrest.conf && \
+    chmod 640 /etc/pgbackrest/pgbackrest.conf && \
+    chown postgres:postgres /etc/pgbackrest/pgbackrest.conf
+

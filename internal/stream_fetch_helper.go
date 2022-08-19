@@ -1,14 +1,14 @@
 package internal
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
+	"path"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/splitmerge"
 
-	"github.com/wal-g/storages/storage"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -37,54 +37,130 @@ func GetLogsDstSettings(operationLogsDstEnvVariable string) (dstFolder string, e
 
 // TODO : unit tests
 // downloadAndDecompressStream downloads, decompresses and writes stream to stdout
-func downloadAndDecompressStream(backup *Backup, writeCloser io.WriteCloser) error {
+func DownloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) error {
+	defer utility.LoggedClose(writeCloser, "")
+
 	for _, decompressor := range compression.Decompressors {
-		archiveReader, exists, err := TryDownloadFile(backup.BaseBackupFolder, getStreamName(backup.Name, decompressor.FileExtension()))
+		archiveReader, exists, err := TryDownloadFile(backup.Folder, GetStreamName(backup.Name, decompressor.FileExtension()))
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to dowload file: %w", err)
 		}
 		if !exists {
 			continue
 		}
+		tracelog.DebugLogger.Printf("Found file: %s.%s", backup.Name, decompressor.FileExtension())
+		defer utility.LoggedClose(archiveReader, "")
 
-		err = DecompressDecryptBytes(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
+		decompressedReader, err := DecompressDecryptBytes(archiveReader, decompressor)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to decompress and decrypt file: %w", err)
 		}
-		utility.LoggedClose(writeCloser, "")
+		defer utility.LoggedClose(decompressedReader, "")
+
+		_, err = utility.FastCopy(&utility.EmptyWriteIgnorer{Writer: writeCloser}, decompressedReader)
+		if err != nil {
+			return fmt.Errorf("failed to decompress and decrypt file: %w", err)
+		}
 		return nil
 	}
 	return newArchiveNonExistenceError(fmt.Sprintf("Archive '%s' does not exist.\n", backup.Name))
 }
 
 // TODO : unit tests
-func FetchStreamSentinel(backup *Backup, sentinelDto interface{}) error {
-	sentinelDtoData, err := backup.fetchSentinelData()
-	if err != nil {
-		return errors.Wrap(err, "failed to fetch sentinel")
+// DownloadAndDecompressSplittedStream downloads, decompresses and writes stream to stdout
+func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension string, writeCloser io.WriteCloser) error {
+	defer utility.LoggedClose(writeCloser, "")
+
+	decompressor := compression.FindDecompressor(extension)
+	if decompressor == nil {
+		return fmt.Errorf("decompressor for file type '%s' not found", extension)
 	}
-	err = json.Unmarshal(sentinelDtoData, sentinelDto)
-	return errors.Wrap(err, "failed to unmarshal sentinel")
+
+	// detect number of partitions. For tiny backups it may not be equal to WALG_STREAM_SPLITTER_PARTITIONS
+	partitions, err := detectPartitionsCount(backup, decompressor)
+	if err != nil {
+		return err
+	}
+
+	errorsPerWorker := make([]chan error, 0)
+	writers := splitmerge.MergeWriter(utility.EmptyWriteCloserIgnorer{WriteCloser: writeCloser}, partitions, blockSize)
+
+	for i := 0; i < partitions; i++ {
+		fileName := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), i)
+		errCh := make(chan error)
+		errorsPerWorker = append(errorsPerWorker, errCh)
+
+		go func(fileName string, errCh chan error, writer io.WriteCloser) {
+			defer close(errCh)
+			archiveReader, exists, err := TryDownloadFile(backup.Folder, fileName)
+			if err != nil {
+				tracelog.ErrorLogger.PrintOnError(writer.Close())
+				errCh <- fmt.Errorf("failed to dowload file %v: %w", fileName, err)
+				return
+			}
+			if !exists {
+				errCh <- writer.Close()
+				return
+			}
+			tracelog.DebugLogger.Printf("Found file: %s", fileName)
+			decompressedReader, err := DecompressDecryptBytes(archiveReader, decompressor)
+			if err != nil {
+				tracelog.ErrorLogger.PrintOnError(writer.Close())
+				errCh <- fmt.Errorf("failed to decompress/decrypt file %v: %w", fileName, err)
+				return
+			}
+			defer utility.LoggedClose(decompressedReader, "")
+			_, err = utility.FastCopy(writer, decompressedReader)
+			if err != nil {
+				tracelog.ErrorLogger.PrintOnError(writer.Close())
+				errCh <- fmt.Errorf("failed to decompress/decrypt/pipe file %v: %w", fileName, err)
+				return
+			}
+			errCh <- writer.Close()
+		}(fileName, errCh, writers[i])
+	}
+
+	var lastErr error
+	for _, ch := range errorsPerWorker {
+		err := <-ch
+		tracelog.ErrorLogger.PrintOnError(err)
+		if (lastErr == nil && err != nil) || (lastErr == io.ErrShortWrite && err != io.ErrShortWrite) {
+			lastErr = err
+		}
+	}
+
+	return lastErr
 }
 
-// DownloadFile downloads, decompresses and decrypts
-func DownloadFile(folder storage.Folder, filename, ext string, writeCloser io.WriteCloser) error {
-	decompressor := compression.FindDecompressor(ext)
-	if decompressor == nil {
-		return fmt.Errorf("decompressor for extension '%s' was not found", ext)
-	}
-	archiveReader, exists, err := TryDownloadFile(folder, filename)
+func detectPartitionsCount(backup Backup, decompressor compression.Decompressor) (int, error) {
+	// list all files in backup folder:
+	files, _, err := backup.Folder.GetSubFolder(backup.Name).ListFolder()
 	if err != nil {
-		return err
-	}
-	if !exists {
-		return fmt.Errorf("File '%s' does not exist.\n", filename)
+		return -1, fmt.Errorf("cannot list files in backup folder '%s' due to: %w", backup.Folder.GetPath(), err)
 	}
 
-	err = DecompressDecryptBytes(&EmptyWriteIgnorer{WriteCloser: writeCloser}, archiveReader, decompressor)
-	if err != nil {
-		return err
+	// prepare lookup table:
+	fileNames := make(map[string]bool)
+	for _, file := range files {
+		filePath := path.Join(backup.Name, file.GetName())
+		fileNames[filePath] = true
 	}
-	utility.LoggedClose(writeCloser, "")
-	return nil
+
+	// find all backups:
+	partitions := 0
+	for {
+		nextPartition := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), partitions)
+		if fileNames[nextPartition] {
+			partitions++
+			tracelog.DebugLogger.Printf("partition %s found in backup folder", nextPartition)
+		} else {
+			break
+		}
+	}
+
+	if partitions == 0 {
+		return -1, fmt.Errorf("no backup partitions found in backup folder '%s'", backup.Folder.GetPath())
+	}
+
+	return partitions, nil
 }

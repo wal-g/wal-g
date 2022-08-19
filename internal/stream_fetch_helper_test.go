@@ -1,10 +1,11 @@
 package internal
 
 import (
-	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
 )
 
 const (

@@ -1,324 +1,171 @@
 package internal
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"regexp"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/storages/fs"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
-const (
-	TarPartitionFolderName = "/tar_partitions/"
-	PgControlPath          = "/global/pg_control"
-)
-
-var UnwrapAll map[string]bool = nil
-
-var UtilityFilePaths = map[string]bool{
-	PgControlPath:         true,
-	BackupLabelFilename:   true,
-	TablespaceMapFilename: true,
-}
-
-type NoBackupsFoundError struct {
+//region errors
+type SentinelMarshallingError struct {
 	error
 }
 
-func NewNoBackupsFoundError() NoBackupsFoundError {
-	return NoBackupsFoundError{errors.New("No backups found")}
+func NewSentinelMarshallingError(sentinelName string, err error) SentinelMarshallingError {
+	return SentinelMarshallingError{errors.Wrapf(err, "Failed to marshall sentinel file: '%s'", sentinelName)}
 }
 
-func (err NoBackupsFoundError) Error() string {
+func (err SentinelMarshallingError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-// Backup contains information about a valid backup
-// generated and uploaded by WAL-G.
+//endregion
+
+// Backup provides basic functionality
+// to fetch backup-related information from storage
+//
+// WAL-G stores information about single backup in the following files:
+//
+// Sentinel file - contains useful information, such as backup start time, backup size, etc.
+// see FetchSentinel, UploadSentinel
+//
+// Metadata file (only in Postgres) - Postgres sentinel files can be quite large (> 1GB),
+// so the metadata file is useful for the quick fetch of backup-related information.
+// see FetchMetadata, UploadMetadata
 type Backup struct {
-	BaseBackupFolder storage.Folder
-	Name             string
-	SentinelDto      *BackupSentinelDto // used for storage query caching
+	Name string
+	// base backup folder or catchup backup folder
+	Folder storage.Folder
 }
 
-func NewBackup(baseBackupFolder storage.Folder, name string) *Backup {
-	return &Backup{baseBackupFolder, name, nil}
+func NewBackup(folder storage.Folder, name string) Backup {
+	return Backup{
+		Name:   name,
+		Folder: folder,
+	}
 }
 
+// getStopSentinelPath returns sentinel path.
 func (backup *Backup) getStopSentinelPath() string {
-	return backup.Name + utility.SentinelSuffix
+	return SentinelNameFromBackup(backup.Name)
 }
 
 func (backup *Backup) getMetadataPath() string {
 	return backup.Name + "/" + utility.MetadataFileName
 }
 
-func (backup *Backup) getTarPartitionFolder() storage.Folder {
-	return backup.BaseBackupFolder.GetSubFolder(backup.Name + TarPartitionFolderName)
+// SentinelExists checks that the sentinel file of the specified backup exists.
+func (backup *Backup) SentinelExists() (bool, error) {
+	return backup.Folder.Exists(backup.getStopSentinelPath())
 }
 
-// CheckExistence checks that the specified backup exists.
+// TODO : unit tests
+func (backup *Backup) FetchSentinel(sentinelDto interface{}) error {
+	return FetchDto(backup.Folder, sentinelDto, backup.getStopSentinelPath())
+}
+
+// TODO : unit tests
+func (backup *Backup) FetchMetadata(metadataDto interface{}) error {
+	return FetchDto(backup.Folder, metadataDto, backup.getMetadataPath())
+}
+
+func (backup *Backup) UploadMetadata(metadataDto interface{}) error {
+	return UploadDto(backup.Folder, metadataDto, backup.getMetadataPath())
+}
+
+func (backup *Backup) UploadSentinel(sentinelDto interface{}) error {
+	return UploadDto(backup.Folder, sentinelDto, backup.getStopSentinelPath())
+}
+
+// FetchDto gets data from path and de-serializes it to given object
+func FetchDto(folder storage.Folder, dto interface{}, path string) error {
+	backupReaderMaker := NewStorageReaderMaker(folder, path)
+	reader, err := backupReaderMaker.Reader()
+	if err != nil {
+		return err
+	}
+	unmarshaller, err := NewDtoSerializer()
+	if err != nil {
+		return err
+	}
+	return errors.Wrap(unmarshaller.Unmarshal(reader, dto), fmt.Sprintf("failed to fetch dto from %s", path))
+}
+
+// UploadDto serializes given object to JSON and puts it to path
+func UploadDto(folder storage.Folder, dto interface{}, path string) error {
+	marshaller, err := NewDtoSerializer()
+	if err != nil {
+		return err
+	}
+	r, err := marshaller.Marshal(dto)
+	if err != nil {
+		return err
+	}
+	return folder.PutObject(path, r)
+}
+
 func (backup *Backup) CheckExistence() (bool, error) {
-	return backup.BaseBackupFolder.Exists(backup.getStopSentinelPath())
+	exists, err := backup.SentinelExists()
+	if err != nil {
+		return false, errors.Wrap(err, "failed to check if backup sentinel exists")
+	}
+	return exists, nil
 }
 
-func (backup *Backup) GetTarNames() ([]string, error) {
-	tarPartitionFolder := backup.getTarPartitionFolder()
-	objects, _, err := tarPartitionFolder.ListFolder()
+// AssureExists is similar to CheckExistence, but returns
+// an error in two cases:
+// 1. Backup does not exist
+// 2. Failed to check if backup exist
+func (backup *Backup) AssureExists() error {
+	exists, err := backup.CheckExistence()
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to list backup '%s' for deletion", backup.Name)
+		return err
 	}
-	result := make([]string, len(objects))
-	for id, object := range objects {
-		result[id] = object.GetName()
+	if !exists {
+		return NewBackupNonExistenceError(backup.Name)
 	}
-	return result, nil
+	return nil
 }
 
-func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
-	if backup.SentinelDto != nil {
-		return *backup.SentinelDto, nil
-	}
-	sentinelDto := BackupSentinelDto{}
-	sentinelDtoData, err := backup.fetchSentinelData()
-	if err != nil {
-		return sentinelDto, err
-	}
+func GetBackupByName(backupName, subfolder string, folder storage.Folder) (Backup, error) {
+	baseBackupFolder := folder.GetSubFolder(subfolder)
 
-	err = json.Unmarshal(sentinelDtoData, &sentinelDto)
-	if err != nil {
-		return sentinelDto, errors.Wrap(err, "failed to unmarshal sentinel")
-	}
-	backup.SentinelDto = &sentinelDto
-	return sentinelDto, nil
-}
-
-// TODO : unit tests
-func (backup *Backup) fetchSentinelData() ([]byte, error) {
-	backupReaderMaker := newStorageReaderMaker(backup.BaseBackupFolder, backup.getStopSentinelPath())
-	backupReader, err := backupReaderMaker.Reader()
-	if err != nil {
-		return make([]byte, 0), err
-	}
-	sentinelDtoData, err := ioutil.ReadAll(backupReader)
-	if err != nil {
-		return sentinelDtoData, errors.Wrap(err, "failed to fetch sentinel")
-	}
-	return sentinelDtoData, nil
-}
-
-func (backup *Backup) fetchMeta() (ExtendedMetadataDto, error) {
-	extendedMetadataDto := ExtendedMetadataDto{}
-	backupReaderMaker := newStorageReaderMaker(backup.BaseBackupFolder, backup.getMetadataPath())
-	backupReader, err := backupReaderMaker.Reader()
-	if err != nil {
-		return extendedMetadataDto, err
-	}
-	extendedMetadataDtoData, err := ioutil.ReadAll(backupReader)
-	if err != nil {
-		return extendedMetadataDto, errors.Wrap(err, "failed to fetch metadata")
-	}
-
-	err = json.Unmarshal(extendedMetadataDtoData, &extendedMetadataDto)
-	return extendedMetadataDto, errors.Wrap(err, "failed to unmarshal metadata")
-}
-
-func checkDbDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentinelDto) error {
-	if !sentinelDto.IsIncremental() {
-		isEmpty, err := isDirectoryEmpty(dbDataDirectory)
+	var backup Backup
+	if backupName == LatestString {
+		latest, err := GetLatestBackupName(baseBackupFolder)
 		if err != nil {
-			return err
+			return Backup{}, err
 		}
-		if !isEmpty {
-			return newNonEmptyDbDataDirectoryError(dbDataDirectory)
-		}
+		tracelog.InfoLogger.Printf("LATEST backup is: '%s'\n", latest)
+
+		backup = NewBackup(baseBackupFolder, latest)
 	} else {
-		tracelog.DebugLogger.Println("DB data directory before increment:")
-		_ = filepath.Walk(dbDataDirectory,
-			func(path string, info os.FileInfo, err error) error {
-				if !info.IsDir() {
-					tracelog.DebugLogger.Println(path)
-				}
-				return nil
-			})
-
-		for fileName, fileDescription := range sentinelDto.Files {
-			if fileDescription.IsSkipped {
-				tracelog.DebugLogger.Printf("Skipped file %v\n", fileName)
-			}
+		backup = NewBackup(baseBackupFolder, backupName)
+		if err := backup.AssureExists(); err != nil {
+			return Backup{}, err
 		}
 	}
-
-	if sentinelDto.TablespaceSpec != nil && !sentinelDto.TablespaceSpec.empty() {
-		err := setTablespacePaths(*sentinelDto.TablespaceSpec)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func setTablespacePaths(spec TablespaceSpec) error {
-	basePrefix, ok := spec.BasePrefix()
-	if !ok {
-		return fmt.Errorf("Tablespace specification base path is not set\n")
-	}
-	err := fs.NewFolder(basePrefix, TablespaceFolder).EnsureExists()
-	if err != nil {
-		return fmt.Errorf("Error creating pg_tblspc folder %v\n", err)
-	}
-	for _, location := range spec.tablespaceLocations() {
-		err := fs.NewFolder(location.Location, "").EnsureExists()
-		if err != nil {
-			return fmt.Errorf("Error creating folder for tablespace %v\n", err)
-		}
-		err = os.Symlink(location.Location, filepath.Join(basePrefix, location.Symlink))
-		if err != nil {
-			return fmt.Errorf("Error creating tablespace symkink %v\n", err)
-		}
-	}
-	return nil
-}
-
-// check that directory is empty before unwrap
-func (backup *Backup) unwrapToEmptyDirectory(
-	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
-) error {
-	err := checkDbDirectoryForUnwrap(dbDataDirectory, sentinelDto)
-	if err != nil {
-		return err
-	}
-
-	return backup.unwrap(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
+	return backup, nil
 }
 
 // TODO : unit tests
-// Do the job of unpacking Backup object
-func (backup *Backup) unwrap(
-	dbDataDirectory string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
-) error {
-	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesToUnwrap, createIncrementalFiles)
-	tarsToExtract, pgControlKey, err := backup.getTarsToExtract(sentinelDto, filesToUnwrap)
-	if err != nil {
-		return err
-	}
-
-	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of backup.
-	needPgControl := IsPgControlRequired(backup, sentinelDto)
-
-	if pgControlKey == "" && needPgControl {
-		return newPgControlNotFoundError()
-	}
-
-	err = ExtractAll(tarInterpreter, tarsToExtract)
-	if err != nil {
-		return err
-	}
-
-	if needPgControl {
-		err = ExtractAll(tarInterpreter, []ReaderMaker{newStorageReaderMaker(backup.getTarPartitionFolder(), pgControlKey)})
-		if err != nil {
-			return errors.Wrap(err, "failed to extract pg_control")
-		}
-	}
-
-	tracelog.InfoLogger.Print("\nBackup extraction complete.\n")
-	return nil
+func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupName string) error {
+	sentinelName := SentinelNameFromBackup(backupName)
+	return UploadDto(uploader.Folder(), sentinelDto, sentinelName)
 }
 
-func IsPgControlRequired(backup *Backup, sentinelDto BackupSentinelDto) bool {
-	re := regexp.MustCompile(`^([^_]+._{1}[^_]+._{1})`)
-	walgBasebackupName := re.FindString(backup.Name) == ""
-	needPgControl := walgBasebackupName || sentinelDto.IsIncremental()
-	return needPgControl
+type ErrWaiter interface {
+	Wait() error
 }
 
-func isDirectoryEmpty(directoryPath string) (bool, error) {
-	var isEmpty = true
-
-	searchLambda := func(path string, info os.FileInfo, err error) error {
-		if path != directoryPath {
-			isEmpty = false
-			tracelog.InfoLogger.Printf("found file '%s' in directory: '%s'\n", path, directoryPath)
-		}
-		return nil
-	}
-	err := filepath.Walk(directoryPath, searchLambda)
-	return isEmpty, errors.Wrapf(err, "can't check, that directory: '%s' is empty", directoryPath)
-}
-
-// TODO : init tests
-func (backup *Backup) getTarsToExtract(sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool) (tarsToExtract []ReaderMaker, pgControlKey string, err error) {
-	tarNames, err := backup.GetTarNames()
-	if err != nil {
-		return nil, "", err
-	}
-	tracelog.DebugLogger.Printf("Tars to extract: '%+v'\n", tarNames)
-	tarsToExtract = make([]ReaderMaker, 0, len(tarNames))
-
-	pgControlRe := regexp.MustCompile(`^.*?pg_control\.tar(\..+$|$)`)
-	for _, tarName := range tarNames {
-		// Separate the pg_control tarName from the others to
-		// extract it at the end, as to prevent server startup
-		// with incomplete backup restoration.  But only if it
-		// exists: it won't in the case of WAL-E backup
-		// backwards compatibility.
-		if pgControlRe.MatchString(tarName) {
-			if pgControlKey != "" {
-				panic("expect only one pg_control tar name match")
-			}
-			pgControlKey = tarName
-			continue
-		}
-
-		if !shouldUnwrapTar(tarName, sentinelDto, filesToUnwrap) {
-			continue
-		}
-
-		tarToExtract := newStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
-		tarsToExtract = append(tarsToExtract, tarToExtract)
-	}
-	return
-}
-
-func (backup *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error) {
-	sentinelDto, err := backup.GetSentinel()
-	if err != nil {
-		return nil, err
-	}
-	if sentinelDto.Files == nil { // in case of WAL-E of old WAL-G backup
-		return UnwrapAll, nil
-	}
-	filesToUnwrap := make(map[string]bool)
-	for file := range sentinelDto.Files {
-		filesToUnwrap[file] = true
-	}
-	for utilityFilePath := range UtilityFilePaths {
-		filesToUnwrap[utilityFilePath] = true
-	}
-	return utility.SelectMatchingFiles(fileMask, filesToUnwrap)
-}
-
-func shouldUnwrapTar(tarName string, sentinelDto BackupSentinelDto, filesToUnwrap map[string]bool) bool {
-	if len(sentinelDto.TarFileSets) == 0 {
-		return true
-	}
-
-	tarFiles := sentinelDto.TarFileSets[tarName]
-
-	for _, file := range tarFiles {
-		if filesToUnwrap[file] {
-			return true
-		}
-	}
-
-	return false
+// MetaConstructor - interface that helps with building meta-info about backup and generate MetaInfo
+// see MongoMetaConstructor
+// see RedisMetaConstructor
+type MetaConstructor interface {
+	Init() error
+	Finalize(backupName string) error
+	MetaInfo() interface{}
 }

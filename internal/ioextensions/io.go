@@ -1,6 +1,7 @@
 package ioextensions
 
 import (
+	"fmt"
 	"io"
 	"os"
 
@@ -62,5 +63,29 @@ func CreateFileWith(filePath string, content io.Reader) error {
 		return err
 	}
 	_, err = utility.FastCopy(file, content)
+	return err
+}
+
+type MultiCloser struct {
+	closers []io.Closer
+}
+
+func NewMultiCloser(closers []io.Closer) *MultiCloser {
+	return &MultiCloser{
+		closers: closers,
+	}
+}
+func (m *MultiCloser) Close() error {
+	var err error
+	for _, c := range m.closers {
+		// still call Close on each, even if one returns an error
+		if e := c.Close(); e != nil {
+			if err != nil {
+				err = fmt.Errorf("%w; %v", err, e)
+			} else {
+				err = e
+			}
+		}
+	}
 	return err
 }

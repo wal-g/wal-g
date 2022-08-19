@@ -3,25 +3,35 @@ package internal
 import (
 	"strings"
 
-	"github.com/wal-g/storages/azure"
-	"github.com/wal-g/storages/fs"
-	"github.com/wal-g/storages/gcs"
-	"github.com/wal-g/storages/s3"
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/storages/swift"
+	"github.com/spf13/viper"
+	"github.com/wal-g/wal-g/pkg/storages/azure"
+	"github.com/wal-g/wal-g/pkg/storages/fs"
+	"github.com/wal-g/wal-g/pkg/storages/gcs"
+	"github.com/wal-g/wal-g/pkg/storages/s3"
+	"github.com/wal-g/wal-g/pkg/storages/sh"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/pkg/storages/swift"
 )
 
 type StorageAdapter struct {
-	prefixName         string
+	prefixName         string // actually this is an env key suffix, but all names contains '_PREFIX' word at the end, see StorageAdapters
 	settingNames       []string
 	configureFolder    func(string, map[string]string) (storage.Folder, error)
 	prefixPreprocessor func(string) string
 }
 
-func (adapter *StorageAdapter) loadSettings() (map[string]string, error) {
+func (adapter *StorageAdapter) loadSettings(config *viper.Viper) map[string]string {
 	settings := make(map[string]string)
+
 	for _, settingName := range adapter.settingNames {
-		settingValue, ok := getWaleCompatibleSetting(settingName)
+		settingValue := config.GetString(settingName)
+		if config.IsSet(settingName) {
+			settings[settingName] = settingValue
+			/* prefer config values */
+			continue
+		}
+
+		settingValue, ok := getWaleCompatibleSettingFrom(settingName, config)
 		if !ok {
 			settingValue, ok = GetSetting(settingName)
 		}
@@ -29,7 +39,7 @@ func (adapter *StorageAdapter) loadSettings() (map[string]string, error) {
 			settings[settingName] = settingValue
 		}
 	}
-	return settings, nil
+	return settings
 }
 
 func preprocessFilePrefix(prefix string) string {
@@ -42,4 +52,5 @@ var StorageAdapters = []StorageAdapter{
 	{"GS_PREFIX", gcs.SettingList, gcs.ConfigureFolder, nil},
 	{"AZ_PREFIX", azure.SettingList, azure.ConfigureFolder, nil},
 	{"SWIFT_PREFIX", swift.SettingList, swift.ConfigureFolder, nil},
+	{"SSH_PREFIX", sh.SettingsList, sh.ConfigureFolder, nil},
 }

@@ -1,0 +1,11 @@
+[client]
+user = sbtest
+host = localhost
+port = 3306
+protocol = tcp
+
+[mysqldump]
+user = sbtest
+host = localhost
+port = 3306
+comments = OFF

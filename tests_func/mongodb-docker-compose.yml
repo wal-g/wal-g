@@ -1,0 +1,71 @@
+networks:
+    test_net:
+        external:
+            name: test_net_${TEST_ID}
+services:
+    minio01:
+        build: staging/images/minio
+        container_name: minio01.test_net_${TEST_ID}
+        domainname: test_net_${TEST_ID}
+        hostname: minio01
+        image: minio:test_net_${TEST_ID}
+        networks:
+            - test_net
+        ports:
+            - ${S3_PORT}
+        tmpfs: /var/run
+        volumes:
+            - ./images/minio/config:/config:rw
+        env_file:
+            - ${ENV_FILE}
+    mongodb01:
+        build:
+            dockerfile: ${DOCKER_FILE}
+            context: .
+            args:
+                - MONGO_MAJOR=${MONGO_MAJOR}
+                - MONGO_VERSION=${MONGO_VERSION}
+                - MONGO_PACKAGE=${MONGO_PACKAGE}
+                - MONGO_REPO=${MONGO_REPO}
+        container_name: mongodb01.test_net_${TEST_ID}
+        domainname: test_net_${TEST_ID}
+        external_links:
+            - minio01.test_net_${TEST_ID}:minio
+        hostname: mongodb01
+        image: mongodb:test_net_${TEST_ID}
+        networks:
+            - test_net
+        ports:
+            - ${MONGO_EXPOSE_MONGOD}
+            - ${EXPOSE_SSH_PORT}
+        tmpfs: /var/run
+        volumes:
+            - ./images/mongodb/config:/config:ro
+        env_file:
+            - ${ENV_FILE}
+    mongodb02:
+        build:
+            dockerfile: ${DOCKER_FILE}
+            context: .
+            args:
+                - MONGO_MAJOR=${MONGO_MAJOR}
+                - MONGO_VERSION=${MONGO_VERSION}
+                - MONGO_PACKAGE=${MONGO_PACKAGE}
+                - MONGO_REPO=${MONGO_REPO}
+        container_name: mongodb02.test_net_${TEST_ID}
+        domainname: test_net_${TEST_ID}
+        external_links:
+            - minio01.test_net_${TEST_ID}:minio
+        hostname: mongodb02
+        image: mongodb:test_net_${TEST_ID}
+        networks:
+            - test_net
+        ports:
+            - ${MONGO_EXPOSE_MONGOD}
+            - ${EXPOSE_SSH_PORT}
+        tmpfs: /var/run
+        volumes:
+            - ./images/mongodb/config:/config:ro
+        env_file:
+            - ${ENV_FILE}
+version: '2'

@@ -18,7 +18,6 @@ PGSSLMODE=allow \
 PGDATABASE=postgres \
 PGHOST=/var/run/postgresql \
 WALE_FILE_PREFIX=file://localhost/tmp \
-WALE_LOG_DESTINATION=stderr \
 /usr/bin/timeout 600 wal-e wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
 echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
@@ -26,7 +25,7 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 /tmp/scripts/wait_while_pg_not_ready.sh
 
-pgbench -i -s 20 postgres
+pgbench -i -s 10 postgres
 pg_dumpall -f /tmp/dump1
 pgbench -c 2 -T 100000000 -S &
 sleep 1
@@ -43,7 +42,25 @@ PGSSLMODE=allow \
 PGDATABASE=postgres \
 PGHOST=/var/run/postgresql \
 WALE_FILE_PREFIX=file://localhost/tmp \
-WALE_LOG_DESTINATION=stderr \
+wal-e backup-push ${PGDATA}
+
+pgbench -i -s 10 postgres
+pg_dumpall -f /tmp/dump1
+pgbench -c 2 -T 100000000 -S &
+sleep 1
+AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE \
+AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY \
+AWS_ENDPOINT=http://s3:9000 \
+AWS_S3_FORCE_PATH_STYLE=true \
+WALG_COMPRESSION_METHOD=brotli \
+WALG_DELTA_MAX_STEPS=6 \
+WALG_UPLOAD_CONCURRENCY=10 \
+WALG_DISK_RATE_LIMIT=41943040 \
+WALG_NETWORK_RATE_LIMIT=10485760 \
+PGSSLMODE=allow \
+PGDATABASE=postgres \
+PGHOST=/var/run/postgresql \
+WALE_FILE_PREFIX=file://localhost/tmp \
 wal-e backup-push ${PGDATA}
 
 pkill -9 postgres
@@ -70,7 +87,6 @@ PGSSLMODE=allow \
 PGDATABASE=postgres \
 PGHOST=/var/run/postgresql \
 WALE_FILE_PREFIX=file://localhost/tmp \
-WALE_LOG_DESTINATION=stderr \
 wal-g backup-fetch ${PGDATA} LATEST
 
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&&\
@@ -87,7 +103,6 @@ PGSSLMODE=allow \
 PGDATABASE=postgres \
 PGHOST=/var/run/postgresql \
 WALE_FILE_PREFIX=file://localhost/tmp \
-WALE_LOG_DESTINATION=stderr \
 /usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
 
 cp /tmp/conf_files/postgresql.conf ${PGDATA}
@@ -100,6 +115,11 @@ pg_dumpall -f /tmp/dump2
 
 diff /tmp/dump1 /tmp/dump2
 rm -rf /tmp/conf_files
+
+
+WALE_FILE_PREFIX=file://localhost/tmp \
+wal-g delete retain 1 --confirm
+
 /tmp/scripts/drop_pg.sh
 
 echo "WAL-E compatible backup-fetch success!!!!!!"

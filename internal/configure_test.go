@@ -2,10 +2,11 @@ package internal_test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/wal-g/wal-g/testtools"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -25,6 +26,7 @@ func TestGetMaxConcurrency_ValidKey(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, 100, actual)
+	resetToDefaults()
 }
 
 func TestGetMaxConcurrency_ValidKeyAndNegativeValue(t *testing.T) {
@@ -32,6 +34,7 @@ func TestGetMaxConcurrency_ValidKeyAndNegativeValue(t *testing.T) {
 	_, err := internal.GetMaxConcurrency(internal.UploadConcurrencySetting)
 
 	assert.Error(t, err)
+	resetToDefaults()
 }
 
 func TestGetMaxConcurrency_ValidKeyAndInvalidValue(t *testing.T) {
@@ -39,27 +42,38 @@ func TestGetMaxConcurrency_ValidKeyAndInvalidValue(t *testing.T) {
 	_, err := internal.GetMaxConcurrency(internal.UploadConcurrencySetting)
 
 	assert.Error(t, err)
+	resetToDefaults()
 }
 
 func TestGetSentinelUserData(t *testing.T) {
-
 	viper.Set(internal.SentinelUserDataSetting, "1.0")
 
-	data := internal.GetSentinelUserData()
+	data, err := internal.GetSentinelUserData()
+	assert.NoError(t, err)
 	t.Log(data)
 	assert.Equalf(t, 1.0, data.(float64), "Unable to parse WALG_SENTINEL_USER_DATA")
 
 	viper.Set(internal.SentinelUserDataSetting, "\"1\"")
 
-	data = internal.GetSentinelUserData()
+	data, err = internal.GetSentinelUserData()
+	assert.NoError(t, err)
 	t.Log(data)
 	assert.Equalf(t, "1", data.(string), "Unable to parse WALG_SENTINEL_USER_DATA")
 
 	viper.Set(internal.SentinelUserDataSetting, `{"x":123,"y":["asdasd",123]}`)
 
-	data = internal.GetSentinelUserData()
+	data, err = internal.GetSentinelUserData()
+	assert.NoError(t, err)
 	t.Log(data)
 	assert.NotNilf(t, data, "Unable to parse WALG_SENTINEL_USER_DATA")
+
+	viper.Set(internal.SentinelUserDataSetting, `"x",1`)
+
+	data, err = internal.GetSentinelUserData()
+	assert.Error(t, err, "Should fail on the invalid user data")
+	t.Log(err)
+	assert.Nil(t, data)
+	resetToDefaults()
 }
 
 func TestGetDataFolderPath_Default(t *testing.T) {
@@ -68,42 +82,49 @@ func TestGetDataFolderPath_Default(t *testing.T) {
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(internal.DefaultDataFolderPath, "walg_data"), actual)
+	resetToDefaults()
 }
 
 func TestGetDataFolderPath_FolderNotExist(t *testing.T) {
 	parentDir := prepareDataFolder(t, "someOtherFolder")
+	defer testtools.Cleanup(t, parentDir)
+
 	viper.Set(internal.PgDataSetting, parentDir)
 
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(internal.DefaultDataFolderPath, "walg_data"), actual)
-	cleanup(t, parentDir)
+	resetToDefaults()
 }
 
 func TestGetDataFolderPath_Wal(t *testing.T) {
 	parentDir := prepareDataFolder(t, "pg_wal")
+	defer testtools.Cleanup(t, parentDir)
 
 	viper.Set(internal.PgDataSetting, parentDir)
 
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(parentDir, "pg_wal", "walg_data"), actual)
-	cleanup(t, parentDir)
+	resetToDefaults()
 }
 
 func TestGetDataFolderPath_Xlog(t *testing.T) {
 	parentDir := prepareDataFolder(t, "pg_xlog")
+	defer testtools.Cleanup(t, parentDir)
 
 	viper.Set(internal.PgDataSetting, parentDir)
 
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(parentDir, "pg_xlog", "walg_data"), actual)
-	cleanup(t, parentDir)
+	resetToDefaults()
 }
 
 func TestGetDataFolderPath_WalIgnoreXlog(t *testing.T) {
 	parentDir := prepareDataFolder(t, "pg_xlog")
+	defer testtools.Cleanup(t, parentDir)
+
 	err := os.Mkdir(filepath.Join(parentDir, "pg_wal"), 0700)
 	if err != nil {
 		t.Log(err)
@@ -113,7 +134,7 @@ func TestGetDataFolderPath_WalIgnoreXlog(t *testing.T) {
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(parentDir, "pg_wal", "walg_data"), actual)
-	cleanup(t, parentDir)
+	resetToDefaults()
 }
 
 func TestConfigureLogging_WhenLogLevelSettingIsNotSet(t *testing.T) {
@@ -122,10 +143,13 @@ func TestConfigureLogging_WhenLogLevelSettingIsNotSet(t *testing.T) {
 
 func TestConfigureLogging_WhenLogLevelSettingIsSet(t *testing.T) {
 	parentDir := prepareDataFolder(t, "someOtherFolder")
+	defer testtools.Cleanup(t, parentDir)
+
 	viper.Set(internal.LogLevelSetting, parentDir)
 	err := internal.ConfigureLogging()
 
 	assert.Error(t, tracelog.UpdateLogLevel(viper.GetString(internal.LogLevelSetting)), err)
+	resetToDefaults()
 }
 
 func prepareDataFolder(t *testing.T, name string) string {
@@ -134,7 +158,7 @@ func prepareDataFolder(t *testing.T, name string) string {
 		t.Log(err)
 	}
 	// Create temp directory.
-	dir, err := ioutil.TempDir(cwd, "test")
+	dir, err := os.MkdirTemp(cwd, "test")
 	if err != nil {
 		t.Log(err)
 	}
@@ -144,4 +168,11 @@ func prepareDataFolder(t *testing.T, name string) string {
 	}
 	fmt.Println(dir)
 	return dir
+}
+
+func resetToDefaults() {
+	viper.Reset()
+	internal.ConfigureSettings(internal.PG)
+	internal.InitConfig()
+	internal.Configure()
 }

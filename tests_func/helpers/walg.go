@@ -125,6 +125,7 @@ func (w *WalgUtil) FetchBackupByNum(backupNum int) error {
 		return fmt.Errorf("only %d backups exists, backup #%d is not found", len(backups), backupNum)
 	}
 	_, err = w.runCmd([]string{"backup-fetch", backups[backupNum]})
+	//time.Sleep(5 * time.Minute)
 	return err
 }
 
@@ -156,36 +157,18 @@ func (w *WalgUtil) Backups() ([]string, error) {
 	return BackupNamesFromListing(exec.Combined()), nil
 }
 
-func (w *WalgUtil) PurgeAll() error {
-	_, err := w.runCmd([]string{"delete", "everything", "--confirm"})
-	return err
-}
-
 func (w *WalgUtil) PurgeRetain(keepNumber int) error {
-	_, err := w.runCmd([]string{"delete", "retain", strconv.Itoa(keepNumber), "--confirm"})
-	return err
-}
-
-func (w *WalgUtil) PurgeAfterNum(keepNumber int, afterBackupNum int) error {
-	backups, err := w.Backups()
-	if err != nil {
-		return err
-	}
-
-	if afterBackupNum >= len(backups) {
-		return fmt.Errorf("only %d backups exists, backup #%d is not found", len(backups), afterBackupNum)
-	}
-
-	_, err = w.runCmd([]string{
-		"delete", "retain", strconv.Itoa(keepNumber), "--after", backups[len(backups)-afterBackupNum-1], "--confirm"})
-
-	return err
-}
-
-func (w *WalgUtil) PurgeAfterTime(keepNumber int, timeLine time.Time) error {
 	_, err := w.runCmd([]string{
-		"delete", "retain", strconv.Itoa(keepNumber), "--after", timeLine.Format(time.RFC3339), "--confirm",
-	})
+		"delete",
+		"--retain-count", strconv.Itoa(keepNumber),
+		"--retain-after", time.Now().Format("2006-01-02T15:04:05Z"),
+		"--purge-oplog",
+		"--confirm"})
+	return err
+}
+
+func (w *WalgUtil) DeleteBackup(backupName string) error {
+	_, err := w.runCmd([]string{"backup-delete", backupName, "--confirm"})
 	return err
 }
 
@@ -206,5 +189,10 @@ func (w *WalgUtil) OplogPush() error {
 
 func (w *WalgUtil) OplogReplay(from, until OpTimestamp) error {
 	_, err := w.runCmd([]string{"oplog-replay", from.String(), until.String()})
+	return err
+}
+
+func (w *WalgUtil) OplogPurge() error {
+	_, err := w.runCmd([]string{"oplog-purge", "--confirm"})
 	return err
 }

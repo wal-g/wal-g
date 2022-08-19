@@ -6,12 +6,12 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/wal-g/wal-g/internal/databases/mongo"
-	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
-	"github.com/wal-g/wal-g/utility"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/mongo"
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const BackupShowShortDescription = "Prints information about backup"
@@ -27,14 +27,14 @@ var backupShowCmd = &cobra.Command{
 		defer func() { _ = signalHandler.Close() }()
 
 		// set up storage downloader client
-		downloader, err := archive.NewStorageDownloader("")
+		downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		err = mongo.HandleBackupShow(
 			downloader,
 			args[0],
-			func(dto archive.StreamSentinelDto) (bytes []byte, err error) {
-				return json.Marshal(dto)
+			func(b models.Backup) (bytes []byte, err error) {
+				return json.Marshal(b)
 			},
 			os.Stdout)
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -42,5 +42,5 @@ var backupShowCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(backupShowCmd)
+	cmd.AddCommand(backupShowCmd)
 }

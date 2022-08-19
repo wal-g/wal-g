@@ -1,0 +1,4 @@
+"WALE_S3_PREFIX": "s3://compressionreversebucket",
+"WALG_DELTA_MAX_STEPS": "6",
+"WALG_USE_WAL_DELTA": "true",
+"WALG_LOG_LEVEL": "DEVEL"

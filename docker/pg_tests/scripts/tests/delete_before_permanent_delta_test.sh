@@ -242,7 +242,7 @@ WALE_S3_PREFIX=s3://deletebeforepermanentdeltabucket \
 WALG_USE_WAL_DELTA=true \
 wal-g backup-list --detail
 
-# delete all backups after previous tests
+# delete all backups after previous base_tests
 AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE \
 AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY \
 AWS_ENDPOINT=http://s3:9000 \
@@ -423,5 +423,3 @@ diff /tmp/dump1 /tmp/dump2
 
 /tmp/scripts/drop_pg.sh
 
-
-echo "Delete before permanent delta success!!!!!!"

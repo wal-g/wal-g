@@ -3,6 +3,7 @@ package utility
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -13,21 +14,31 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 )
 
-// TODO : unit tests
 func LoggedClose(c io.Closer, errmsg string) {
 	err := c.Close()
 	if errmsg == "" {
-		errmsg = "Problem with closing object: %v"
+		errmsg = "Problem with closing object"
 	}
 	if err != nil {
-		tracelog.ErrorLogger.Printf(errmsg+": %v", err)
+		tracelog.ErrorLogger.Printf("%s: %v", errmsg, err)
+	}
+}
+
+func LoggedSync(file *os.File, errmsg string, fsync bool) {
+	if fsync {
+		err := file.Sync()
+		if errmsg == "" {
+			errmsg = "Problem with file sync"
+		}
+		if err != nil {
+			tracelog.ErrorLogger.Printf("%s: %v", errmsg, err)
+		}
 	}
 }
 
@@ -37,15 +48,30 @@ const (
 	CatchupPath      = "catchup_" + VersionStr + "/"
 	WalPath          = "wal_" + VersionStr + "/"
 	BackupNamePrefix = "base_"
+	BackupTimeFormat = "20060102T150405Z" // timestamps in that format should be lexicographically sorted
 
 	// utility.SentinelSuffix is a suffix of backup finish sentinel file
 	SentinelSuffix         = "_backup_stop_sentinel.json"
 	CompressedBlockMaxSize = 20 << 20
 	CopiedBlockMaxSize     = CompressedBlockMaxSize
 	MetadataFileName       = "metadata.json"
+	StreamMetadataFileName = "stream_metadata.json"
 	PathSeparator          = string(os.PathSeparator)
 	Mebibyte               = 1024 * 1024
 )
+
+// MaxTime not really the maximal value, but high enough.
+var MaxTime time.Time
+
+func init() {
+	var err error
+	MaxTime, err = time.Parse(BackupTimeFormat, "99991231T235959Z")
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse MaxTime: %v", err))
+	}
+}
+
+var MinTime = time.Unix(0, 0)
 
 // Empty is used for channel signaling.
 type Empty struct{}
@@ -92,7 +118,8 @@ func IsInDirectory(path, directoryPath string) bool {
 	if err != nil {
 		return false
 	}
-	return relativePath == "." || NormalizePath(NormalizePath(directoryPath)+PathSeparator+relativePath) == NormalizePath(path)
+	return relativePath == "." ||
+		NormalizePath(NormalizePath(directoryPath)+PathSeparator+relativePath) == NormalizePath(path)
 }
 
 func PathsEqual(path1, path2 string) bool {
@@ -104,7 +131,7 @@ func ResolveSymlink(path string) string {
 	resolve, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		// TODO: Consider descriptive panic here and other checks
-		// Directory may be absent et c.
+		// Directory may be absent etc.
 		return path
 	}
 	return resolve
@@ -126,27 +153,63 @@ func GetSubdirectoryRelativePath(subdirectoryPath string, directoryPath string) 
 	return NormalizePath(SanitizePath(strings.TrimPrefix(subdirectoryPath, directoryPath)))
 }
 
-//FastCopy copies data from src to dst in blocks of CopiedBlockMaxSize bytes
-func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
-	n := int64(0)
-	buf := make([]byte, CopiedBlockMaxSize)
-	for {
-		m, readingErr := src.Read(buf)
-		if readingErr != nil && readingErr != io.EOF {
-			return n, readingErr
-		}
-		m, writingErr := dst.Write(buf[:m])
-		n += int64(m)
-		if writingErr != nil || readingErr == io.EOF {
-			return n, writingErr
-		}
+// BytesPool holds []byte.
+type BytesPool struct {
+	pool chan []byte
+}
+
+// NewBytesPool creates new BytesPool.
+func NewBytesPool(max int) *BytesPool {
+	return &BytesPool{
+		pool: make(chan []byte, max),
 	}
 }
 
-func StripBackupName(path string) string {
+const CopyBytesPoolSize = 2
+
+var copyBytesPool = NewBytesPool(CopyBytesPoolSize)
+
+// Get borrows []byte from the pool.
+func (p *BytesPool) Get() []byte {
+	var buf []byte
+	select {
+	case buf = <-p.pool:
+	default:
+		buf = make([]byte, CopiedBlockMaxSize)
+	}
+	return buf
+}
+
+// Put returns []byte to the pool.
+func (p *BytesPool) Put(b []byte) {
+	select {
+	case p.pool <- b:
+	default:
+	}
+}
+
+// FastCopy copies data from src to dst in blocks of CopiedBlockMaxSize bytes
+func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
+	buf := copyBytesPool.Get()
+	defer copyBytesPool.Put(buf)
+
+	return io.CopyBuffer(dst, src, buf)
+}
+
+func StripRightmostBackupName(path string) string {
+	path = strings.Trim(path, "/")
 	all := strings.SplitAfter(path, "/")
-	name := strings.Split(all[len(all)-1], "_backup")[0]
-	return name
+	return stripBackupSuffix(all[len(all)-1])
+}
+
+func StripLeftmostBackupName(path string) string {
+	path = strings.Trim(path, "/")
+	all := strings.Split(path, "/")
+	return stripBackupSuffix(all[0])
+}
+
+func stripBackupSuffix(pathValue string) string {
+	return strings.Split(pathValue, "_backup")[0]
 }
 
 func StripPrefixName(path string) string {
@@ -276,39 +339,6 @@ func (sh *SignalHandler) Close() error {
 	return nil
 }
 
-// WaitFirstError returns first error from given channels or nil
-func WaitFirstError(errs ...<-chan error) error {
-	errc := MergeErrors(errs...)
-	for err := range errc {
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// MergeErrors merges multiple channels of errors.
-func MergeErrors(cs ...<-chan error) <-chan error {
-	var wg sync.WaitGroup
-	out := make(chan error, len(cs))
-	output := func(c <-chan error) {
-		for n := range c {
-			out <- n
-		}
-		wg.Done()
-	}
-	wg.Add(len(cs))
-	for _, c := range cs {
-		go output(c)
-	}
-
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-	return out
-}
-
 func StartCommandWithStdoutStderr(cmd *exec.Cmd) (io.ReadCloser, *bytes.Buffer, error) {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -321,4 +351,52 @@ func StartCommandWithStdoutStderr(cmd *exec.Cmd) (io.ReadCloser, *bytes.Buffer, 
 		return nil, nil, err
 	}
 	return stdout, stderr, err
+}
+
+func StartCommandWithStdoutPipe(cmd *exec.Cmd) (io.ReadCloser, error) {
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	err = cmd.Start()
+	if err != nil {
+		return nil, err
+	}
+	return stdout, err
+}
+
+func ParseUntilTS(untilTS string) (time.Time, error) {
+	if untilTS != "" {
+		dt, err := time.Parse(time.RFC3339, untilTS)
+		if err != nil {
+			return time.Time{}, err
+		}
+		return dt, nil
+	}
+	// far future
+	return MaxTime, nil
+}
+
+// MarshalEnumToString is used to write the string enum representation
+// instead of int enum value to JSON
+func MarshalEnumToString(enum fmt.Stringer) ([]byte, error) {
+	buffer := bytes.NewBufferString(enum.String())
+	return buffer.Bytes(), nil
+}
+
+func ScanToMap(rows *sql.Rows, dst map[string]interface{}) error {
+	columns, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+	args := make([]interface{}, len(columns))
+	var garbage interface{}
+	for i, field := range columns {
+		if v, ok := dst[field]; ok {
+			args[i] = v
+		} else {
+			args[i] = &garbage
+		}
+	}
+	return rows.Scan(args...)
 }

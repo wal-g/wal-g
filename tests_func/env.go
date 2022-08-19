@@ -7,8 +7,12 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/wal-g/wal-g/tests_func/config"
 	"github.com/wal-g/wal-g/tests_func/utils"
+)
+
+const (
+	EnvDirPerm  os.FileMode = 0755
+	EnvFilePerv os.FileMode = 0644
 )
 
 func EnvExists(path string) bool {
@@ -16,28 +20,33 @@ func EnvExists(path string) bool {
 	return err == nil
 }
 
-func SetupEnv(envFilePath, stagingDir string) error {
-	if err := os.Mkdir(stagingDir, 0755); err != nil {
-		return fmt.Errorf("can not create staging dir: %v", err)
+func SetupEnv(fromEnv map[string]string, envFilePath, stagingDir string) (map[string]string, error) {
+	if _, err := os.Stat(stagingDir); err == nil {
+		err = os.Chmod(stagingDir, EnvDirPerm)
+		if err != nil {
+			return nil, fmt.Errorf("can not chmod staging dir: %v", err)
+		}
+	} else if err := os.Mkdir(stagingDir, EnvDirPerm); err != nil {
+		return nil, fmt.Errorf("can not create staging dir: %v", err)
 	}
-	env := utils.MergeEnvs(config.Env, DynConf(config.Env))
-	file, err := os.OpenFile(envFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	env := utils.MergeEnvs(fromEnv, DynConf(fromEnv))
+	file, err := os.OpenFile(envFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, EnvFilePerv)
 	if err != nil {
-		return fmt.Errorf("can not open env file for writing: %v", err)
+		return nil, fmt.Errorf("can not open database file for writing: %v", err)
 	}
 	defer func() { _ = file.Close() }()
 
 	if err := utils.WriteEnv(env, file); err != nil {
-		return fmt.Errorf("can not write to env file: %v", err)
+		return nil, fmt.Errorf("can not write to database file: %v", err)
 	}
 
-	return nil
+	return env, nil
 }
 
 func ReadEnv(path string) (map[string]string, error) {
-	file, err := os.OpenFile(path, os.O_RDONLY, 0644)
+	file, err := os.OpenFile(path, os.O_RDONLY, EnvFilePerv)
 	if err != nil {
-		return nil, fmt.Errorf("can not open env file: %v", err)
+		return nil, fmt.Errorf("can not open database file: %v", err)
 	}
 	defer func() { _ = file.Close() }()
 	envLines, err := utils.ReadLines(file)

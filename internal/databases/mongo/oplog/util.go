@@ -33,8 +33,8 @@ func newFilteredApplyOps(cmd bson.D) (bson.D, error) {
 	}
 
 	filtered := make([]db.Oplog, len(ops))
-	for i, v := range ops {
-		filtered[i], err = filterUUIDs(v)
+	for i := range ops {
+		filtered[i], err = filterUUIDs(filtered[i])
 		if err != nil {
 			return nil, err
 		}

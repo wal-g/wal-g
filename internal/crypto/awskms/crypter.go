@@ -15,6 +15,10 @@ type Crypter struct {
 	SymmetricKey crypto.SymmetricKey
 }
 
+func (crypter *Crypter) Name() string {
+	return "AWK_KMS/Crypter"
+}
+
 // Encrypt creates encryption writer from ordinary writer
 func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	if len(crypter.SymmetricKey.GetKey()) == 0 {
@@ -49,7 +53,8 @@ func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
 	_, err := reader.Read(encryptedSymmetricKey)
 	tracelog.ErrorLogger.FatalfOnError("Can't read encryption key from archive file header: %v", err)
 
-	crypter.SymmetricKey.SetEncryptedKey(encryptedSymmetricKey)
+	err = crypter.SymmetricKey.SetEncryptedKey(encryptedSymmetricKey)
+	tracelog.ErrorLogger.FatalfOnError("Can't set encrypted key: %v", err)
 
 	err = crypter.SymmetricKey.Decrypt()
 	tracelog.ErrorLogger.FatalfOnError("Can't decrypt symmetric key: %v", err)

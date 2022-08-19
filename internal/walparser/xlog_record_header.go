@@ -23,7 +23,10 @@ type InconsistentXLogRecordTotalLengthError struct {
 }
 
 func NewInconsistentXLogRecordTotalLengthError(totalRecordLength uint32) InconsistentXLogRecordTotalLengthError {
-	return InconsistentXLogRecordTotalLengthError{errors.Errorf("total record length is too small: %v, expected at least: %v", totalRecordLength, XLogRecordHeaderSize)}
+	return InconsistentXLogRecordTotalLengthError{
+		errors.Errorf("total record length is too small: %v, expected at least: %v",
+			totalRecordLength, XLogRecordHeaderSize),
+	}
 }
 
 func (err InconsistentXLogRecordTotalLengthError) Error() string {
@@ -35,7 +38,10 @@ type InvalidXLogRecordResourceManagerIDError struct {
 }
 
 func NewInvalidXLogRecordResourceManagerIDError(resourceManagerID uint8) InvalidXLogRecordResourceManagerIDError {
-	return InvalidXLogRecordResourceManagerIDError{errors.Errorf("resource manager id is invalid: %v, while it should be less then: %v", resourceManagerID, RmNextFreeID)}
+	return InvalidXLogRecordResourceManagerIDError{
+		errors.Errorf("resource manager id is invalid: %v, while it should be less than: %v",
+			resourceManagerID, RmNextFreeID),
+	}
 }
 
 func (err InvalidXLogRecordResourceManagerIDError) Error() string {
@@ -47,7 +53,10 @@ type ZeroRecordHeaderError struct {
 }
 
 func NewZeroRecordHeaderError() ZeroRecordHeaderError {
-	return ZeroRecordHeaderError{errors.New("whole record header is zero, maybe it's parsed from .partial file or after WAL-Switch operation")}
+	return ZeroRecordHeaderError{
+		errors.New(
+			"whole record header is zero, maybe it's parsed from .partial file or after WAL-Switch operation"),
+	}
 }
 
 func (err ZeroRecordHeaderError) Error() string {

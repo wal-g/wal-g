@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"golang.org/x/crypto/openpgp"
@@ -34,6 +33,10 @@ type Crypter struct {
 	loadPassphrase func() (string, bool)
 
 	mutex sync.RWMutex
+}
+
+func (crypter *Crypter) Name() string {
+	return "Opengpg/Crypter"
 }
 
 // CrypterFromKey creates Crypter from armored key.
@@ -65,7 +68,8 @@ func (crypter *Crypter) setupPubKey() error {
 		return nil
 	}
 
-	if crypter.IsUseArmoredKey {
+	switch {
+	case crypter.IsUseArmoredKey:
 		evaluatedKey := strings.Replace(crypter.ArmoredKey, `\n`, "\n", -1)
 		entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(evaluatedKey))
 
@@ -74,7 +78,8 @@ func (crypter *Crypter) setupPubKey() error {
 		}
 
 		crypter.PubKey = entityList
-	} else if crypter.IsUseArmoredKeyPath {
+
+	case crypter.IsUseArmoredKeyPath:
 		entityList, err := readPGPKey(crypter.ArmoredKeyPath)
 
 		if err != nil {
@@ -82,7 +87,8 @@ func (crypter *Crypter) setupPubKey() error {
 		}
 
 		crypter.PubKey = entityList
-	} else {
+
+	default:
 		// TODO: legacy gpg external use, need to remove in next major version
 		armor, err := crypto.GetPubRingArmor(crypter.KeyRingID)
 

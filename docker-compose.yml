@@ -1,5 +1,8 @@
 version: '3'
 
+volumes:
+  fdb_volume:
+
 services:
   golang:
     build:
@@ -16,8 +19,9 @@ services:
     container_name: wal-g_ubuntu
 
   s3:
-    image: minio/minio
+    image: minio/minio:RELEASE.2021-06-07T21-40-51Z
     container_name: wal-g_s3
+    hostname: s3
     ports:
       - "9000:9000"
     environment:
@@ -26,11 +30,19 @@ services:
     entrypoint: sh
     command: >
       -c 'mkdir -p /export/fullbucket
+      &&  mkdir -p /export/fullratingcomposerbucket
+      &&  mkdir -p /export/fullcopycomposerbucket
+      &&  mkdir -p /export/fullwithoutfilesmetadatabucket
       &&  mkdir -p /export/fullscandeltabucket
+      &&  mkdir -p /export/remotebucket
+      &&  mkdir -p /export/remotewithoutfilesmetadatabucket
       &&  mkdir -p /export/cryptobucket
       &&  mkdir -p /export/waldeltabucket
       &&  mkdir -p /export/ghostbucket
       &&  mkdir -p /export/compressionbucket
+      &&  mkdir -p /export/copyallbucket
+      &&  mkdir -p /export/copybackupbucket
+      &&  mkdir -p /export/compressionreversebucket
       &&  mkdir -p /export/deleteretainfullbucket
       &&  mkdir -p /export/deleteretainfindfullbucket
       &&  mkdir -p /export/deletebeforenamefindfullbucket
@@ -39,19 +51,69 @@ services:
       &&  mkdir -p /export/deletebeforepermanentdeltabucket
       &&  mkdir -p /export/deletewithoutconfirm
       &&  mkdir -p /export/deleteendtoendbucket
+      &&  mkdir -p /export/deletetargetbucket
+      &&  mkdir -p /export/deletegarbagebucket
       &&  mkdir -p /export/mysqlfullxtrabackupbucket
+      &&  mkdir -p /export/mysqlfullxtrabackupwithrangesbucket
       &&  mkdir -p /export/mysqlfullmysqldumpbucket
       &&  mkdir -p /export/mysqlbinlogpushfetchbucket
       &&  mkdir -p /export/mysqldeleteendtoendbucket
+      &&  mkdir -p /export/mysqldeleteeverythingpermanent
+      &&  mkdir -p /export/mysqlmarkbucket
       &&  mkdir -p /export/mysqlbinlogreplaybucket
       &&  mkdir -p /export/mysqlpitrxtrabackupbucket
       &&  mkdir -p /export/mysqlpitrmysqldumpbucket
+      &&  mkdir -p /export/mysqllivereplay
+      &&  mkdir -p /export/mysqlpermanentbackupbucket
+      &&  mkdir -p /export/mariadb_binlog_push_fetch
+      &&  mkdir -p /export/mariadb_binlog_push_with_gtids_check
+      &&  mkdir -p /export/mariadb_full_mysqldump
+      &&  mkdir -p /export/mariadb_full_maria_backup
+      &&  mkdir -p /export/mariadb_pitr_xtrabackup
       &&  mkdir -p /export/mongostreampushbucket
       &&  mkdir -p /export/mongooplogpushbucket
       &&  mkdir -p /export/mongodeletebeforebucket
       &&  mkdir -p /export/mongodeleteretainbucket
       &&  mkdir -p /export/redisbucket
+      &&  mkdir -p /export/mysqlcopybackupfrom
+      &&  mkdir -p /export/mysqlcopybackupto
+      &&  mkdir -p /export/mysqlconfonly
+      &&  mkdir -p /export/mysqldeletebinlogs
+      &&  mkdir -p /export/archivereadyrename
+      &&  mkdir -p /export/gpfullbucket
+      &&  mkdir -p /export/gpfullserializedbucket
+      &&  mkdir -p /export/gpdeletewithoutconfirm
+      &&  mkdir -p /export/gpdeleteretainbucket
+      &&  mkdir -p /export/gpdeleteendtoendbucket
+      &&  mkdir -p /export/gpdeletebeforepermanentbucket
+      &&  mkdir -p /export/gpdeletebeforenamebucket
+      &&  mkdir -p /export/gpdeletebeforetimebucket
+      &&  mkdir -p /export/gpaostoragetestbucket
+      &&  mkdir -p /export/createrestorepointbucket
+      &&  mkdir -p /export/storagetoolsbucket
+      &&  mkdir -p /export/walrestorebucket
       &&  /usr/bin/minio server /export'
+
+  s3-another:
+    image: minio/minio:RELEASE.2021-06-07T21-40-51Z
+    container_name: wal-g_s32
+    ports:
+      - "9001:9001"
+    environment:
+      - "MINIO_ACCESS_KEY=AKIAIOSFODNN7EXAMPLEBUTANOHER"
+      - "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEYBUTANOTHERTOO"
+    entrypoint: sh
+    command: >
+      -c 'mkdir -p /export/mysqlcopybackupto
+      &&  /usr/bin/minio server /export'
+
+  ssh:
+    build:
+      dockerfile: docker/ssh/Dockerfile
+      context: .
+    container_name: wal-g_ssh
+    ports:
+      - "6942:6942"
 
   pg:
     build:
@@ -78,6 +140,17 @@ services:
     links:
       - s3
 
+  pg_ready_rename_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_archiving_ready_rename_test
+      context: .
+    image: wal-g/archiving_ready_rename_test
+    container_name: archiving_ready_rename_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   pg_delete_before_permanent_full_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_delete_before_permanent_full_test
@@ -95,6 +168,17 @@ services:
       context: .
     image: wal-g/backup_mark_permanent_test
     container_name: wal-g_pg_backup_mark_permanent_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_backup_mark_permanent_no_error_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_backup_mark_permanent_no_error_test
+      context: .
+    image: wal-g/backup_mark_permanent_no_error_test
+    container_name: wal-g_pg_backup_mark_permanent_no_error_test
     depends_on:
       - s3
     links:
@@ -178,6 +262,94 @@ services:
     links:
       - s3
 
+  pg_full_backup_streamed_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_streamed_test
+      context: .
+    image: wal-g/full_backup_streamed_test
+    container_name: wal-g_pg_full_backup_streamed_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_remote_backup_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_remote_backup_test
+      context: .
+    image: wal-g/remote_backup_test
+    container_name: wal-g_pg_remote_backup_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_remote_backup_without_files_metadata_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_remote_backup_without_files_metadata_test
+      context: .
+    image: wal-g/remote_backup_without_files_metadata_test
+    container_name: wal-g_pg_remote_backup_without_files_metadata_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_ssh_backup_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_ssh_backup_test
+      context: .
+    image: wal-g/ssh_backup_test
+    container_name: wal-g_pg_ssh_backup_test
+    depends_on:
+      - ssh
+    links:
+      - ssh
+
+  pg_receive_wal_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_receive_wal_test
+      context: .
+    image: wal-g/receive_wal_test
+    container_name: wal-g_pg_receive_wal_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_full_backup_copy_composer_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_copy_composer_test
+      context: .
+    image: wal-g/full_backup_copy_composer_test
+    container_name: wal-g_pg_full_backup_copy_composer_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_full_backup_rating_composer_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_rating_composer_test
+      context: .
+    image: wal-g/full_backup_rating_composer_test
+    container_name: wal-g_pg_full_backup_rating_composer_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_full_backup_without_files_metadata_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_without_files_metadata_test
+      context: .
+    image: wal-g/full_backup_without_files_metadata_test
+    container_name: wal-g_pg_full_backup_without_files_metadata_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   pg_delete_before_time_find_full_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_delete_before_time_find_full_test
@@ -195,6 +367,50 @@ services:
       context: .
     image: wal-g/delete_without_confirm_test
     container_name: wal-g_pg_delete_without_confirm_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_delete_garbage_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_garbage_test
+      context: .
+    image: wal-g/delete_garbage_test
+    container_name: wal-g_pg_delete_garbage_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_delete_target_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_target_test
+      context: .
+    image: wal-g/delete_target_test
+    container_name: wal-g_pg_delete_target_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_delete_target_delta_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_target_delta_test
+      context: .
+    image: wal-g/delete_target_delta_test
+    container_name: wal-g_pg_delete_target_delta_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_delete_target_delta_find_full_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_delete_target_delta_find_full_test
+      context: .
+    image: wal-g/delete_target_delta_find_full_test
+    container_name: wal-g_pg_delete_target_delta_find_full_test
     depends_on:
       - s3
     links:
@@ -250,6 +466,17 @@ services:
       context: .
     image: wal-g/several_delta_backups_test
     container_name: wal-g_pg_several_delta_backups_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_several_delta_backups_reverse_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_several_delta_backups_reverse_test
+      context: .
+    image: wal-g/several_delta_backups_reverse_test
+    container_name: wal-g_pg_several_delta_backups_reverse_test
     depends_on:
       - s3
     links:
@@ -338,6 +565,36 @@ services:
     links:
       - s3
 
+
+  pg_wal_restore_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_wal_restore_test
+      context: .
+    image: wal-g/wal_restore_test
+    container_name: wal-g_pg_wal_restore_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_pgbackrest:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_pgbackrest
+      context: .
+    image: wal-g/docker_pgbackrest
+    container_name: wal-g_docker_pgbackrest
+
+  pg_pgbackrest_backup_fetch_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_pgbackrest_backup_fetch_test
+      context: .
+    image: wal-g/pgbackrest_backup_fetch_test
+    container_name: wal-g_pgbackrest_backup_fetch_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   mysql:
     build:
       dockerfile: docker/mysql/Dockerfile
@@ -345,20 +602,91 @@ services:
     image: wal-g/mysql
     container_name: wal-g_mysql
 
-  mysql_tests:
+  mysql_base_tests:
     build:
-      dockerfile: docker/mysql_tests/Dockerfile
+      dockerfile: docker/mysql_tests/Dockerfile_base
       context: .
     security_opt:
       - seccomp:unconfined
     image: wal-g/mysql_tests
-    container_name: wal-g_mysql_tests
+    container_name: wal-g_mysql_base_tests
     env_file:
       - docker/common/common_walg.env
     depends_on:
       - s3
     links:
       - s3
+  
+  mysql_delete_tests:
+    build:
+      dockerfile: docker/mysql_tests/Dockerfile_delete
+      context: .
+    security_opt:
+      - seccomp:unconfined
+    image: wal-g/mysql_tests
+    container_name: wal-g_mysql_delete_tests
+    env_file:
+      - docker/common/common_walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  mysql_copy_tests:
+    build:
+      dockerfile: docker/mysql_tests/Dockerfile_copy
+      context: .
+    security_opt:
+      - seccomp:unconfined
+    image: wal-g/mysql_tests
+    container_name: wal-g_mysql_copy_tests
+    env_file:
+      - docker/common/common_walg.env
+    depends_on:
+      - s3
+      - s3-another
+    links:
+      - s3
+      - s3-another
+
+  mariadb:
+    build:
+      dockerfile: docker/mariadb/Dockerfile
+      context: .
+    image: wal-g/mariadb
+    container_name: wal-g_mariadb
+
+  mariadb_tests:
+    build:
+      dockerfile: docker/mariadb_tests/Dockerfile
+      context: .
+    security_opt:
+      - seccomp:unconfined
+    image: wal-g/mariadb_tests
+    container_name: wal-g_mariadb_tests
+    env_file:
+      - docker/common/common_walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  fdb:
+    image: foundationdb/foundationdb
+    container_name: wal-g_fdb
+    volumes:
+      - fdb_volume:/var/fdb
+
+  fdb_tests:
+    build:
+      dockerfile: docker/fdb_tests/Dockerfile
+      context: .
+    image: wal-g/fdb_tests
+    container_name: wal-g_fdb_tests
+    volumes:
+      - fdb_volume:/var/fdb
+    depends_on:
+      - fdb
 
   redis:
     build:
@@ -373,6 +701,38 @@ services:
       context: .
     image: wal-g/redis_tests
     container_name: wal-g_redis_tests
+    env_file:
+      - docker/common/common_walg.env
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  gp:
+    build:
+      dockerfile: docker/gp/Dockerfile
+      context: .
+    image: wal-g/gp
+    container_name: wal-g_gp
+
+  gp_tests:
+    build:
+      dockerfile: docker/gp_tests/Dockerfile
+      context: .
+    image: wal-g/gp_tests
+    container_name: wal-g_gp_tests
+    depends_on:
+      - gp
+      - s3
+    links:
+      - s3
+
+  st_tests:
+    build:
+      dockerfile: docker/st_tests/Dockerfile
+      context: .
+    image: wal-g/st_tests
+    container_name: wal-g_st_tests
     env_file:
       - docker/common/common_walg.env
     depends_on:

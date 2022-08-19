@@ -16,13 +16,13 @@ func (tarBallMaker *StorageTarBallMaker) Make(dedicatedUploader bool) TarBall {
 	tarBallMaker.partCount++
 	uploader := tarBallMaker.uploader
 	if dedicatedUploader {
-		uploader = uploader.clone()
+		uploader = uploader.Clone()
 	}
 	size := int64(0)
 	return &StorageTarBall{
-		partNumber:      tarBallMaker.partCount,
-		backupName:      tarBallMaker.backupName,
-		uploader:        uploader,
-		allTarballsSize: &size,
+		partNumber: tarBallMaker.partCount,
+		backupName: tarBallMaker.backupName,
+		uploader:   uploader,
+		partSize:   &size,
 	}
 }

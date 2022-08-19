@@ -1,23 +1,26 @@
 package mongo
 
 import (
+	"fmt"
 	"os/exec"
 
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/utility"
-
-	"github.com/wal-g/tracelog"
 )
 
 // HandleBackupPush starts backup procedure.
-func HandleBackupPush(uploader archive.Uploader, metaProvider archive.BackupMetaProvider, backupCmd *exec.Cmd) {
-	err := metaProvider.Init()
-	tracelog.ErrorLogger.FatalOnError(err)
-	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
-	tracelog.ErrorLogger.FatalOnError(err)
-	err = uploader.UploadBackup(stdout, backupCmd, metaProvider)
-	if err != nil {
-		tracelog.ErrorLogger.Print("Backup command output:\n" + stderr.String())
-		tracelog.ErrorLogger.Fatal(err)
+func HandleBackupPush(uploader archive.Uploader,
+	metaConstructor internal.MetaConstructor,
+	backupCmd *exec.Cmd) error {
+	if err := metaConstructor.Init(); err != nil {
+		return fmt.Errorf("can not initiate meta provider: %+v", err)
 	}
+
+	stdout, err := utility.StartCommandWithStdoutPipe(backupCmd)
+	if err != nil {
+		return fmt.Errorf("can not start backup command: %+v", err)
+	}
+
+	return uploader.UploadBackup(stdout, backupCmd, metaConstructor)
 }

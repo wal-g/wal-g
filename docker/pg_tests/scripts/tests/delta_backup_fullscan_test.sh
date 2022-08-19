@@ -20,10 +20,10 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
-pgbench -i -s 10 postgres
+pgbench -i -s 4 postgres
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
-pgbench -i -s 20 postgres
+pgbench -i -s 8 postgres
 pg_dumpall -f /tmp/dump1
 pgbench -c 2 -T 100000000 -S &
 sleep 1
@@ -46,7 +46,7 @@ psql -f /tmp/scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 /tmp/scripts/drop_pg.sh
 
-# check that we cant make delta from other database then previous backup
+# check that we can't make delta from other database than previous backup
 
 # create db
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
@@ -80,5 +80,3 @@ diff /tmp/1 /tmp/2
 
 rm ${TMP_CONFIG}
 /tmp/scripts/drop_pg.sh
-
-echo "Fullscan delta backup success!!!!!!"

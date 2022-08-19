@@ -1,0 +1,30 @@
+# Overview
+
+# The CODEOWNERS file is a GitHub's feature which allows you to create an overview of the code ownership structure in your repository.
+# Specify the default owners of your repository and code owners of particular repository parts to define who is automatically requested for a review each time a contributor creates a pull request to the main branch.
+# Modify the default settings of the repository and select the "Require review from Code Owners" option on the protected main branch to require one approval from the owners of every part of the repository included in the pull request. For more details, read the following article on GitHub: https://help.github.com/articles/enabling-required-reviews-for-pull-requests/.
+
+# Details
+
+# The CODEOWNERS file is located at the root of your repository and includes a specification of the code ownership structure of the repository.
+# It is up to you to decide who is responsible for the review of particular parts and types of files in your repository.
+
+# When defining the file, keep in mind the following rules:
+
+# Lines starting with a hash (#) are comments.
+# Each line of the file is a file pattern followed by one or more owners.
+# You can use individual GitHub usernames, e-mail addresses, or team names to define owners. To define the owners with a team name, first add the team to your repository as collaborators with write access permissions. For more details, read the following article on GitHub: https://help.github.com/articles/adding-outside-collaborators-to-repositories-in-your-organization/.
+# Define the default owners of the repository. They are automatically requested for a review of any content at the root of the repository and any content for which no owners are specified in this file.
+# Provide granular ownership specification for folders and subfolders. You can also define the owners of specific file types in your repository.
+# The order is important. The last matching pattern in the file has the most precedence.
+
+* @wal-g/committers
+
+/internal/databases/mysql/ @mialinx @ostinru @teem0n
+/cmd/mysql/ @mialinx @ostinru @teem0n
+
+/internal/databases/sqlserver/ @mialinx @ostinru @teem0n
+/cmd/sqlserver/ @mialinx @ostinru @teem0n
+
+/internal/databases/mongo/ @perekalov
+/cmd/mongo/ @perekalov

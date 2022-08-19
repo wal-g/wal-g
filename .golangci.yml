@@ -1,0 +1,112 @@
+# This file contains all available configuration options
+# with their default values.
+
+# all available settings of specific linters
+linters-settings:
+  modules-download-mode: vendor
+  dupl:
+    threshold: 400
+  funlen:
+    lines: 100
+    statements: 50
+  gocritic:
+    enabled-tags:
+      - performance
+    disabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - style
+    disabled-checks:
+      - hugeParam
+      - rangeValCopy
+    # settings:
+    #   hugeParam:
+    #     sizeThreshold: 170 # temporary, default is 80
+  gocyclo:
+    min-complexity: 15
+  govet:
+    check-shadowing: false
+  misspell:
+    locale: US
+  lll:
+    line-length: 140
+  staticcheck:
+    # SA1019 is disabled until WAL-G has migrated from the deprecated package golang.org/x/crypto/openpgp
+    checks: [ "all", "-SA1019" ]
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-naming
+      - name: exported
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: unreachable-code
+      - name: redefines-builtin-id
+
+linters:
+  # please, do not use `enable-all`: it's deprecated and will be removed soon.
+  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
+  disable-all: true
+  enable:
+    - bodyclose
+    - dupl
+    - errcheck
+    - exportloopref
+    - funlen
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - govet
+    - ineffassign
+    - misspell
+    - nakedret
+    - revive
+    - staticcheck
+    # - structcheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - lll
+    - deadcode
+    - stylecheck
+    - gosimple
+    - whitespace
+
+run:
+  go: 1.18
+  timeout: 5m
+  skip-dirs:
+    - "cmd/redis"
+    - "internal/databases/redis"
+    - "tests_func"
+    - "tmp"
+    - "submodules"
+    - "testtools"
+    - "pkg/storages"
+  skip-files:
+    - ".*_test.go$"
+
+severity:
+  default-severity: error
+  rules:
+    - linters:
+      - godox
+      - deadcode
+      severity: info

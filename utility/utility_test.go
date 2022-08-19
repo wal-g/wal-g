@@ -2,7 +2,7 @@ package utility_test
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"os"
 	"sort"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/testtools"
@@ -90,7 +91,7 @@ func TestCreateFileWith(t *testing.T) {
 	content := "content"
 	err := ioextensions.CreateFileWith(CreateFileWithPath, strings.NewReader(content))
 	assert.NoError(t, err)
-	actualContent, err := ioutil.ReadFile(CreateFileWithPath)
+	actualContent, err := os.ReadFile(CreateFileWithPath)
 	assert.NoError(t, err)
 	assert.Equal(t, []byte(content), actualContent)
 	os.Remove(CreateFileWithPath)
@@ -105,7 +106,7 @@ func TestCreateFileWith_ExistenceError(t *testing.T) {
 	os.Remove(CreateFileWithPath)
 }
 
-func TestStripBackupName(t *testing.T) {
+func TestStripRightmostBackupName(t *testing.T) {
 	var testCases = []struct {
 		input    string
 		expected string
@@ -119,7 +120,7 @@ func TestStripBackupName(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		actual := utility.StripBackupName(testCase.input)
+		actual := utility.StripRightmostBackupName(testCase.input)
 		assert.Equal(t, testCase.expected, actual)
 	}
 }
@@ -140,6 +141,29 @@ func TestStripPrefixName(t *testing.T) {
 
 	for _, testCase := range testCases {
 		actual := utility.StripPrefixName(testCase.input)
+		assert.Equal(t, testCase.expected, actual)
+	}
+}
+
+func TestStripLeftmostBackupName(t *testing.T) {
+	var testCases = []struct {
+		input    string
+		expected string
+	}{
+		{"stream_20210329T125616Z/metadata.json", "stream_20210329T125616Z"},
+		{"/stream_20210329T125616Z/metadata.json", "stream_20210329T125616Z"},
+		{"stream_20210329T125616Z_backup_stop_sentinel.json", "stream_20210329T125616Z"},
+		{"/stream_20210329T125616Z_backup_stop_sentinel.json", "stream_20210329T125616Z"},
+		{"/stream_20210329T125616Z/random_folder/random_subfolder/random_file", "stream_20210329T125616Z"},
+		{"/stream_20210329T125616Z/random_folder/random_subfolder/random_file", "stream_20210329T125616Z"},
+		{"base_0000000100000000000000C4/tar_partitions/part_001.tar.lz4", "base_0000000100000000000000C4"},
+		{"base_0000000100000000000000C4_backup_stop_sentinel.json", "base_0000000100000000000000C4"},
+		{"base_0000000100000000000000C9_D_0000000100000000000000C4", "base_0000000100000000000000C9_D_0000000100000000000000C4"},
+		{"/stream_20210329T125616Z/random_folder/random_backup/random_file", "stream_20210329T125616Z"},
+	}
+
+	for _, testCase := range testCases {
+		actual := utility.StripLeftmostBackupName(testCase.input)
 		assert.Equal(t, testCase.expected, actual)
 	}
 }
@@ -409,4 +433,62 @@ func RandomLsn() string {
 		b[i] = letter[rand.Intn(len(letter))]
 	}
 	return string(b)
+}
+
+func TestLoggedCloseWithoutError(t *testing.T) {
+	defer tracelog.ErrorLogger.SetOutput(tracelog.ErrorLogger.Writer())
+
+	var buf bytes.Buffer
+	tracelog.ErrorLogger.SetOutput(&buf)
+
+	utility.LoggedClose(&testtools.NopCloser{}, "")
+
+	loggedData, err := io.ReadAll(&buf)
+	if err != nil {
+		t.Logf("failed read from pipe: %v", err)
+	}
+
+	assert.Equal(t, "", string(loggedData))
+}
+
+func TestLoggedCloseWithErrorAndDefaultMessage(t *testing.T) {
+	defer tracelog.ErrorLogger.SetOutput(tracelog.ErrorLogger.Writer())
+	defer tracelog.ErrorLogger.SetPrefix(tracelog.ErrorLogger.Prefix())
+	defer tracelog.ErrorLogger.SetFlags(tracelog.ErrorLogger.Flags())
+
+	var buf bytes.Buffer
+
+	tracelog.ErrorLogger.SetPrefix("")
+	tracelog.ErrorLogger.SetOutput(&buf)
+	tracelog.ErrorLogger.SetFlags(0)
+
+	utility.LoggedClose(&testtools.ErrorWriteCloser{}, "")
+
+	loggedData, err := io.ReadAll(&buf)
+	if err != nil {
+		t.Logf("failed read from buffer: %v", err)
+	}
+
+	assert.Equal(t, "Problem with closing object: mock close: close error\n", string(loggedData))
+}
+
+func TestLoggedCloseWithErrorAndCustomMessage(t *testing.T) {
+	defer tracelog.ErrorLogger.SetOutput(tracelog.ErrorLogger.Writer())
+	defer tracelog.ErrorLogger.SetPrefix(tracelog.ErrorLogger.Prefix())
+	defer tracelog.ErrorLogger.SetFlags(tracelog.ErrorLogger.Flags())
+
+	var buf bytes.Buffer
+
+	tracelog.ErrorLogger.SetPrefix("")
+	tracelog.ErrorLogger.SetOutput(&buf)
+	tracelog.ErrorLogger.SetFlags(0)
+
+	utility.LoggedClose(&testtools.ErrorWriteCloser{}, "custom error message")
+
+	loggedData, err := io.ReadAll(&buf)
+	if err != nil {
+		t.Logf("failed read from buffer: %v", err)
+	}
+
+	assert.Equal(t, "custom error message: mock close: close error\n", string(loggedData))
 }

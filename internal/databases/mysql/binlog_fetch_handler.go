@@ -1,13 +1,13 @@
 package mysql
 
 import (
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/utility"
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 type indexHandler struct {
@@ -41,23 +41,17 @@ func (ih *indexHandler) createIndexFile() error {
 	return nil
 }
 
-func HandleBinlogFetch(folder storage.Folder, backupName string, untilDT string) {
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
-	tracelog.ErrorLogger.FatalfOnError("Unable to get backup %v", err)
-
-	startTs, err := getBinlogStartTs(folder, backup)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	endTs, err := configureEndTs(untilDT)
-	tracelog.ErrorLogger.FatalOnError(err)
-
+func HandleBinlogFetch(folder storage.Folder, backupName string, untilTS string, untilBinlogLastModifiedTS string) {
 	dstDir, err := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	startTS, endTS, endBinlogTS, err := getTimestamps(folder, backupName, untilTS, untilBinlogLastModifiedTS)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	handler := newIndexHandler(dstDir)
 
-	tracelog.InfoLogger.Printf("Fetching binlogs since %s until %s", startTs, endTs)
-	err = fetchLogs(folder, dstDir, startTs, endTs, handler)
+	tracelog.InfoLogger.Printf("Fetching binlogs since %s until %s", startTS, endTS)
+	err = fetchLogs(folder, dstDir, startTS, endTS, endBinlogTS, handler)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch binlogs: %v", err)
 
 	err = handler.createIndexFile()

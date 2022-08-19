@@ -1,4 +1,5 @@
-// +build lzo
+//go:build lzo && !windows
+// +build lzo,!windows
 
 package compression
 

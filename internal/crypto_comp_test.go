@@ -1,3 +1,4 @@
+//go:build lzo
 // +build lzo
 
 package internal_test
@@ -5,17 +6,15 @@ package internal_test
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"os/exec"
 	"strings"
 	"testing"
 
-	"github.com/wal-g/wal-g/internal/crypto"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal/compression/lzo"
+	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 )
 
@@ -28,15 +27,11 @@ const (
 var waleGpgKey string
 
 func init() {
-	waleGpgKeyBytes, err := ioutil.ReadFile(waleGpgKeyFilePath)
+	waleGpgKeyBytes, err := os.ReadFile(waleGpgKeyFilePath)
 	if err != nil {
 		panic(err)
 	}
 	waleGpgKey = string(waleGpgKeyBytes)
-}
-
-func noPassphrase() (string, bool) {
-	return "", false
 }
 
 // This test extracts WAL-E-encrypted WAL, decrypts it by external
@@ -44,14 +39,12 @@ func noPassphrase() (string, bool) {
 // decompression to check integrity. Test will leave gpg key
 // "walg-server-test" installed.
 func TestDecryptWALElzo(t *testing.T) {
-	t.Skip("This test has gpg side effects and was skipped. If you want to run it - comment skip line in crypto_compt_test.go")
-
 	crypter := openpgp.CrypterFromKey(waleGpgKey, noPassphrase)
 	f, err := os.Open(waleWALfilename)
 	assert.NoError(t, err)
 	decrypt, err := crypter.Decrypt(f)
 	assert.NoError(t, err)
-	bytes1, err := ioutil.ReadAll(decrypt)
+	bytes1, err := io.ReadAll(decrypt)
 	assert.NoError(t, err)
 
 	installTestKeyToExternalGPG(t)
@@ -65,9 +58,11 @@ func TestDecryptWALElzo(t *testing.T) {
 
 	assert.Equalf(t, bytes1, bytes2, "Decryption result differ")
 
-	buffer := bytes.Buffer{}
 	decompressor := lzo.Decompressor{}
-	err = decompressor.Decompress(&buffer, bytes.NewReader(bytes1))
+	dr, err := decompressor.Decompress(bytes.NewReader(bytes1))
+	assert.NoError(t, err)
+	defer dr.Close()
+	_, err = io.ReadAll(dr)
 	assert.NoError(t, err)
 
 	/* Unfortunately, we cannot quietly uninstall test keyring. This is why this test is not executed by default.
@@ -96,7 +91,6 @@ func installTestKeyToExternalGPG(t *testing.T) *exec.Cmd {
 
 // Test will leave gpg key "walg-server-test" installed.
 func TestOpenGPGandExternalGPGCompatibility(t *testing.T) {
-	t.Skip("This test has gpg side effects and was skipped. If you want to run it - comment skip line in crypto_compt_test.go")
 
 	installTestKeyToExternalGPG(t)
 
@@ -117,7 +111,7 @@ func TestOpenGPGandExternalGPGCompatibility(t *testing.T) {
 
 		assert.NoError(t, err)
 
-		decrypted, err := ioutil.ReadAll(reader)
+		decrypted, err := io.ReadAll(reader)
 
 		assert.NoError(t, err)
 
@@ -129,8 +123,7 @@ type ExternalGPGCrypter struct {
 }
 
 func (c *ExternalGPGCrypter) Encrypt(reader io.Reader) ([]byte, error) {
-	cmd := exec.Command("gpg", "-e", "-z", "0", "-r", gpgKeyID)
-
+	cmd := exec.Command("gpg", "-e", "-z", "0", "-r", gpgKeyID, "--trust-model", "always")
 	cmd.Stdin = reader
 
 	return cmd.Output()

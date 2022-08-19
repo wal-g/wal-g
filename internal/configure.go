@@ -10,19 +10,24 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/wal-g/wal-g/internal/crypto/yckms"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/awskms"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
+	"github.com/wal-g/wal-g/internal/fsutil"
+	"github.com/wal-g/wal-g/internal/limiters"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"golang.org/x/time/rate"
 )
 
 const (
-	DefaultDataBurstRateLimit = 8 * int64(DatabasePageSize)
+	pgDefaultDatabasePageSize = 8192
+	DefaultDataBurstRateLimit = 8 * pgDefaultDatabasePageSize
 	DefaultDataFolderPath     = "/tmp"
 	WaleFileHost              = "file://localhost"
 )
@@ -40,7 +45,9 @@ type UnconfiguredStorageError struct {
 }
 
 func newUnconfiguredStorageError(storagePrefixVariants []string) UnconfiguredStorageError {
-	return UnconfiguredStorageError{errors.Errorf("No storage is configured now, please set one of following settings: %v", storagePrefixVariants)}
+	return UnconfiguredStorageError{
+		errors.Errorf("No storage is configured now, please set one of following settings: %v",
+			storagePrefixVariants)}
 }
 
 func (err UnconfiguredStorageError) Error() string {
@@ -52,7 +59,9 @@ type UnknownCompressionMethodError struct {
 }
 
 func newUnknownCompressionMethodError() UnknownCompressionMethodError {
-	return UnknownCompressionMethodError{errors.Errorf("Unknown compression method, supported methods are: %v", compression.CompressingAlgorithms)}
+	return UnknownCompressionMethodError{
+		errors.Errorf("Unknown compression method, supported methods are: %v",
+			compression.CompressingAlgorithms)}
 }
 
 func (err UnknownCompressionMethodError) Error() string {
@@ -76,7 +85,9 @@ type InvalidConcurrencyValueError struct {
 }
 
 func newInvalidConcurrencyValueError(concurrencyType string, value int) InvalidConcurrencyValueError {
-	return InvalidConcurrencyValueError{errors.Errorf("%v value is expected to be positive but is: %v", concurrencyType, value)}
+	return InvalidConcurrencyValueError{
+		errors.Errorf("%v value is expected to be positive but is: %v",
+			concurrencyType, value)}
 }
 
 func (err InvalidConcurrencyValueError) Error() string {
@@ -97,22 +108,48 @@ func (err UnmarshallingError) Error() string {
 
 // TODO : unit tests
 func configureLimiters() {
+	if Turbo {
+		return
+	}
 	if viper.IsSet(DiskRateLimitSetting) {
 		diskLimit := viper.GetInt64(DiskRateLimitSetting)
-		DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit), int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
+		limiters.DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit),
+			int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 
 	if viper.IsSet(NetworkRateLimitSetting) {
 		netLimit := viper.GetInt64(NetworkRateLimitSetting)
-		NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit), int(netLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
+		limiters.NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit),
+			int(netLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 }
 
 // TODO : unit tests
 func ConfigureFolder() (storage.Folder, error) {
+	folder, err := ConfigureFolderForSpecificConfig(viper.GetViper())
+	if err != nil {
+		return nil, err
+	}
+
+	return ConfigureStoragePrefix(folder), nil
+}
+
+func ConfigureStoragePrefix(folder storage.Folder) storage.Folder {
+	prefix := viper.GetString(StoragePrefixSetting)
+	if prefix != "" {
+		folder = folder.GetSubFolder(prefix)
+	}
+	return folder
+}
+
+// TODO: something with that
+// when provided multiple 'keys' in the config,
+// this function will always return only one concrete 'folder'.
+// Chosen folder depends only on 'StorageAdapters' order
+func ConfigureFolderForSpecificConfig(config *viper.Viper) (storage.Folder, error) {
 	skippedPrefixes := make([]string, 0)
 	for _, adapter := range StorageAdapters {
-		prefix, ok := getWaleCompatibleSetting(adapter.prefixName)
+		prefix, ok := getWaleCompatibleSettingFrom(adapter.prefixName, config)
 		if !ok {
 			skippedPrefixes = append(skippedPrefixes, "WALG_"+adapter.prefixName)
 			continue
@@ -121,10 +158,7 @@ func ConfigureFolder() (storage.Folder, error) {
 			prefix = adapter.prefixPreprocessor(prefix)
 		}
 
-		settings, err := adapter.loadSettings()
-		if err != nil {
-			return nil, err
-		}
+		settings := adapter.loadSettings(config)
 		return adapter.configureFolder(prefix, settings)
 	}
 	return nil, newUnconfiguredStorageError(skippedPrefixes)
@@ -134,17 +168,16 @@ func getWalFolderPath() string {
 	if !viper.IsSet(PgDataSetting) {
 		return DefaultDataFolderPath
 	}
-	pgdata := viper.GetString(PgDataSetting)
-	dataFolderPath := filepath.Join(pgdata, "pg_wal")
-	if _, err := os.Stat(dataFolderPath); err == nil {
-		return dataFolderPath
-	}
+	return getRelativeWalFolderPath(viper.GetString(PgDataSetting))
+}
 
-	dataFolderPath = filepath.Join(pgdata, "pg_xlog")
-	if _, err := os.Stat(dataFolderPath); err == nil {
-		return dataFolderPath
+func getRelativeWalFolderPath(pgdata string) string {
+	for _, walDir := range []string{"pg_wal", "pg_xlog"} {
+		dataFolderPath := filepath.Join(pgdata, walDir)
+		if _, err := os.Stat(dataFolderPath); err == nil {
+			return dataFolderPath
+		}
 	}
-
 	return DefaultDataFolderPath
 }
 
@@ -152,25 +185,17 @@ func GetDataFolderPath() string {
 	return filepath.Join(getWalFolderPath(), "walg_data")
 }
 
-// TODO : unit tests
-func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder DataFolder, err error) {
-	useWalDelta = viper.GetBool(UseWalDeltaSetting)
-	if !useWalDelta {
-		return
-	}
-	dataFolderPath := GetDataFolderPath()
-	deltaDataFolder, err = newDiskDataFolder(dataFolderPath)
-	if err != nil {
-		useWalDelta = false
-		tracelog.WarningLogger.Printf("can't use wal delta feature because can't open delta data folder '%s'"+
-			" due to error: '%v'\n", dataFolderPath, err)
-		err = nil
+// GetPgSlotName reads the slot name from the environment
+func GetPgSlotName() (pgSlotName string) {
+	pgSlotName = viper.GetString(PgSlotName)
+	if pgSlotName == "" {
+		pgSlotName = "walg"
 	}
 	return
 }
 
 // TODO : unit tests
-func configureCompressor() (compression.Compressor, error) {
+func ConfigureCompressor() (compression.Compressor, error) {
 	compressionMethod := viper.GetString(CompressionMethodSetting)
 	if _, ok := compression.Compressors[compressionMethod]; !ok {
 		return nil, newUnknownCompressionMethodError()
@@ -185,13 +210,25 @@ func ConfigureLogging() error {
 	return nil
 }
 
+func getPGArchiveStatusFolderPath() string {
+	return filepath.Join(getWalFolderPath(), "archive_status")
+}
+
 func getArchiveDataFolderPath() string {
 	return filepath.Join(GetDataFolderPath(), "walg_archive_status")
 }
 
+func GetRelativeArchiveDataFolderPath() string {
+	return filepath.Join(getRelativeWalFolderPath(""), "walg_data", "walg_archive_status")
+}
+
 // TODO : unit tests
-func ConfigureArchiveStatusManager() (DataFolder, error) {
-	return newDiskDataFolder(getArchiveDataFolderPath())
+func ConfigureArchiveStatusManager() (fsutil.DataFolder, error) {
+	return fsutil.NewDiskDataFolder(getArchiveDataFolderPath())
+}
+
+func ConfigurePGArchiveStatusManager() (fsutil.DataFolder, error) {
+	return fsutil.ExistingDiskDataFolder(getPGArchiveStatusFolderPath())
 }
 
 // ConfigureUploader connects to storage and creates an uploader. It makes sure
@@ -205,33 +242,12 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 
 	folder := uploader.UploadingFolder
 
-	compressor, err := configureCompressor()
+	compressor, err := ConfigureCompressor()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure compression")
 	}
 
 	uploader = NewUploader(compressor, folder)
-	return uploader, err
-}
-
-// ConfigureWalUploader connects to storage and creates an uploader. It makes sure
-// that a valid session has started; if invalid, returns AWS error
-// and `<nil>` values.
-func ConfigureWalUploader() (uploader *WalUploader, err error) {
-	uploader, err = ConfigureWalUploaderWithoutCompressMethod()
-	if err != nil {
-		return nil, err
-	}
-
-	folder := uploader.UploadingFolder
-	deltaFileManager := uploader.DeltaFileManager
-
-	compressor, err := configureCompressor()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure compression")
-	}
-
-	uploader = NewWalUploader(compressor, folder, deltaFileManager)
 	return uploader, err
 }
 
@@ -245,23 +261,21 @@ func ConfigureUploaderWithoutCompressMethod() (uploader *Uploader, err error) {
 	return uploader, err
 }
 
-func ConfigureWalUploaderWithoutCompressMethod() (uploader *WalUploader, err error) {
+func ConfigureSplitUploader() (uploader UploaderProvider, err error) {
 	folder, err := ConfigureFolder()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure folder")
 	}
 
-	useWalDelta, deltaDataFolder, err := configureWalDeltaUsage()
+	compressor, err := ConfigureCompressor()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure WAL Delta usage")
+		return nil, errors.Wrap(err, "failed to configure compression")
 	}
 
-	var deltaFileManager *DeltaFileManager = nil
-	if useWalDelta {
-		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
-	}
+	var partitions = viper.GetInt(StreamSplitterPartitions)
+	var blockSize = viper.GetSizeInBytes(StreamSplitterBlockSize)
 
-	uploader = NewWalUploader(nil, folder, deltaFileManager)
+	uploader = NewSplitStreamUploader(compressor, folder, partitions, int(blockSize))
 	return uploader, err
 }
 
@@ -291,6 +305,10 @@ func ConfigureCrypter() crypto.Crypter {
 		return awskms.CrypterFromKeyID(viper.GetString(CseKmsIDSetting), viper.GetString(CseKmsRegionSetting))
 	}
 
+	if viper.IsSet(YcKmsKeyIDSetting) {
+		return yckms.YcCrypterFromKeyIDAndCredential(viper.GetString(YcKmsKeyIDSetting), viper.GetString(YcSaKeyFileSetting))
+	}
+
 	if crypter := configureLibsodiumCrypter(); crypter != nil {
 		return crypter
 	}
@@ -298,11 +316,11 @@ func ConfigureCrypter() crypto.Crypter {
 	return nil
 }
 
-func getMaxDownloadConcurrency() (int, error) {
+func GetMaxDownloadConcurrency() (int, error) {
 	return GetMaxConcurrency(DownloadConcurrencySetting)
 }
 
-func getMaxUploadConcurrency() (int, error) {
+func GetMaxUploadConcurrency() (int, error) {
 	return GetMaxConcurrency(UploadConcurrencySetting)
 }
 
@@ -312,7 +330,10 @@ func getMaxUploadQueue() (int, error) {
 	return GetMaxConcurrency(UploadQueueSetting)
 }
 
-func getMaxUploadDiskConcurrency() (int, error) {
+func GetMaxUploadDiskConcurrency() (int, error) {
+	if Turbo {
+		return 4, nil
+	}
 	return GetMaxConcurrency(UploadDiskConcurrencySetting)
 }
 
@@ -325,18 +346,25 @@ func GetMaxConcurrency(concurrencyType string) (int, error) {
 	return concurrency, nil
 }
 
-func GetSentinelUserData() interface{} {
+func GetSentinelUserData() (interface{}, error) {
 	dataStr, ok := GetSetting(SentinelUserDataSetting)
-	if !ok || len(dataStr) == 0 {
-		return nil
+	if !ok {
+		return nil, nil
 	}
+	return UnmarshalSentinelUserData(dataStr)
+}
+
+func UnmarshalSentinelUserData(userDataStr string) (interface{}, error) {
+	if len(userDataStr) == 0 {
+		return nil, nil
+	}
+
 	var out interface{}
-	err := json.Unmarshal([]byte(dataStr), &out)
+	err := json.Unmarshal([]byte(userDataStr), &out)
 	if err != nil {
-		tracelog.WarningLogger.PrintError(newUnmarshallingError(SentinelUserDataSetting, err))
-		return dataStr
+		return nil, errors.Wrapf(newUnmarshallingError(userDataStr, err), "failed to read the user data as a JSON object")
 	}
-	return out
+	return out, nil
 }
 
 func GetCommandSettingContext(ctx context.Context, variableName string) (*exec.Cmd, error) {
@@ -363,31 +391,39 @@ func GetCommandSetting(variableName string) (*exec.Cmd, error) {
 	return GetCommandSettingContext(context.Background(), variableName)
 }
 
-func GetOplogArchiveTimeout() (time.Duration, error) {
-	oplogArchiveTimeoutStr, _ := GetSetting(OplogArchiveTimeoutSetting)
-	oplogArchiveTimeout, err := strconv.Atoi(oplogArchiveTimeoutStr)
-	if err != nil {
-		return 0, fmt.Errorf("integer expected for %s setting but given '%s': %w", OplogArchiveTimeoutSetting, oplogArchiveTimeoutStr, err)
-	}
-	return time.Duration(oplogArchiveTimeout) * time.Second, nil
-}
-
 func GetOplogArchiveAfterSize() (int, error) {
 	oplogArchiveAfterSizeStr, _ := GetSetting(OplogArchiveAfterSize)
 	oplogArchiveAfterSize, err := strconv.Atoi(oplogArchiveAfterSizeStr)
 	if err != nil {
-		return 0, fmt.Errorf("integer expected for %s setting but given '%s': %w", OplogArchiveAfterSize, oplogArchiveAfterSizeStr, err)
+		return 0,
+			fmt.Errorf("integer expected for %s setting but given '%s': %w",
+				OplogArchiveAfterSize, oplogArchiveAfterSizeStr, err)
 	}
 	return oplogArchiveAfterSize, nil
 }
 
-func GetLastWriteUpdateInterval() (time.Duration, error) {
-	intervalStr, _ := GetSetting(MongoDBLastWriteUpdateSeconds)
-	interval, err := strconv.Atoi(intervalStr)
-	if err != nil {
-		return 0, fmt.Errorf("integer(seconds) expected for %s setting but given '%s': %w", MongoDBLastWriteUpdateSeconds, intervalStr, err)
+func GetDurationSetting(setting string) (time.Duration, error) {
+	intervalStr, ok := GetSetting(setting)
+	if !ok {
+		return 0, NewUnsetRequiredSettingError(setting)
 	}
-	return time.Duration(interval) * time.Second, nil
+	interval, err := time.ParseDuration(intervalStr)
+	if err != nil {
+		return 0, fmt.Errorf("duration expected for %s setting but given '%s': %w", setting, intervalStr, err)
+	}
+	return interval, nil
+}
+
+func GetOplogPITRDiscoveryIntervalSetting() (*time.Duration, error) {
+	durStr, ok := GetSetting(OplogPITRDiscoveryInterval)
+	if !ok {
+		return nil, nil
+	}
+	dur, err := time.ParseDuration(durStr)
+	if err != nil {
+		return nil, fmt.Errorf("duration expected for %s setting but given '%s': %w", OplogPITRDiscoveryInterval, durStr, err)
+	}
+	return &dur, nil
 }
 
 func GetRequiredSetting(setting string) (string, error) {
@@ -396,4 +432,21 @@ func GetRequiredSetting(setting string) (string, error) {
 		return "", NewUnsetRequiredSettingError(setting)
 	}
 	return val, nil
+}
+
+func GetBoolSettingDefault(setting string, def bool) (bool, error) {
+	val, ok := GetSetting(setting)
+	if !ok {
+		return def, nil
+	}
+	return strconv.ParseBool(val)
+}
+
+func GetBoolSetting(setting string) (val bool, ok bool, err error) {
+	valstr, ok := GetSetting(setting)
+	if !ok {
+		return false, false, nil
+	}
+	val, err = strconv.ParseBool(valstr)
+	return val, true, err
 }

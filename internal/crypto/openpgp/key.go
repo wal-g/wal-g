@@ -3,13 +3,13 @@ package openpgp
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
+	"os"
 
 	"golang.org/x/crypto/openpgp"
 )
 
 func readKey(path string) (io.Reader, error) {
-	byteData, err := ioutil.ReadFile(path)
+	byteData, err := os.ReadFile(path)
 
 	if err != nil {
 		return nil, err

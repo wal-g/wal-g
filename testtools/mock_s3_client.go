@@ -1,7 +1,7 @@
 package testtools
 
 import (
-	"io/ioutil"
+	"io"
 	"strings"
 	"time"
 
@@ -9,24 +9,25 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	walgs3 "github.com/wal-g/storages/s3"
+	walgs3 "github.com/wal-g/wal-g/pkg/storages/s3"
 )
 
 // Mock out S3 client. Includes these methods:
 // ListObjects(*ListObjectsV2Input)
 // GetObject(*GetObjectInput)
 // HeadObject(*HeadObjectInput)
-type mockS3Client struct {
+type MockS3Client struct {
 	s3iface.S3API
 	err      bool
 	notFound bool
 }
 
-func NewMockS3Client(err, notFound bool) *mockS3Client {
-	return &mockS3Client{err: err, notFound: notFound}
+func NewMockS3Client(err, notFound bool) *MockS3Client {
+	return &MockS3Client{err: err, notFound: notFound}
 }
 
-func (client *mockS3Client) ListObjectsV2Pages(input *s3.ListObjectsV2Input, callback func(*s3.ListObjectsV2Output, bool) bool) error {
+func (client *MockS3Client) ListObjectsV2Pages(input *s3.ListObjectsV2Input,
+	callback func(*s3.ListObjectsV2Output, bool) bool) error {
 	if client.err {
 		return awserr.New("MockListObjects", "mock ListObjects errors", nil)
 	}
@@ -41,19 +42,19 @@ func (client *mockS3Client) ListObjectsV2Pages(input *s3.ListObjectsV2Input, cal
 	return nil
 }
 
-func (client *mockS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error) {
+func (client *MockS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error) {
 	if client.err {
 		return nil, awserr.New("MockGetObject", "mock GetObject error", nil)
 	}
 
 	output := &s3.GetObjectOutput{
-		Body: ioutil.NopCloser(strings.NewReader("mock content")),
+		Body: io.NopCloser(strings.NewReader("mock content")),
 	}
 
 	return output, nil
 }
 
-func (client *mockS3Client) HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjectOutput, error) {
+func (client *MockS3Client) HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjectOutput, error) {
 	if client.err {
 		return nil, awserr.New("MockHeadObject", "mock HeadObject error", nil)
 	} else if client.notFound {

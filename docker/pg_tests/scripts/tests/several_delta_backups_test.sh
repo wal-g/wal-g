@@ -20,7 +20,7 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
-pgbench -i -s 10 postgres
+pgbench -i -s 5 postgres
 pgbench -T 100000000 postgres &
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
@@ -56,4 +56,3 @@ psql -f scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
 diff /tmp/dump1 /tmp/dump2
 /tmp/scripts/drop_pg.sh
 rm ${TMP_CONFIG}
-echo "Several delta backup success!!!!!!"
