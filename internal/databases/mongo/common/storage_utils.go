@@ -1,20 +1,28 @@
 package common
 
 import (
-	"fmt"
-
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
-func DownloadSentinel(folder storage.Folder, backupName string, sentinel interface{}) error {
-	internalNewBackup := internal.NewBackup(folder, backupName)
-	err := internalNewBackup.FetchSentinel(sentinel)
-	if err != nil {
-		return fmt.Errorf("can not fetch stream sentinel: %w", err)
+const LogicalBackupType = "logical"
+const BinaryBackupType = "binary"
+
+func DownloadSentinel(folder storage.Folder, backupName string) (*models.Backup, error) {
+	var sentinel models.Backup
+	backup := internal.NewBackup(folder, backupName)
+	if err := backup.FetchSentinel(&sentinel); err != nil {
+		return nil, err
 	}
-	return nil
+	if sentinel.BackupName == "" {
+		sentinel.BackupName = backupName
+	}
+	if sentinel.BackupType == "" {
+		sentinel.BackupType = LogicalBackupType
+	}
+	return &sentinel, nil
 }
 
 func GetBackupFolder() (backupFolder storage.Folder, err error) {

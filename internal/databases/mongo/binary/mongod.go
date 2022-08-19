@@ -110,14 +110,15 @@ func (mongodService *MongodService) GetBackupCursorExtended(backupID *primitive.
 }
 
 func (mongodService *MongodService) FixSystemDataAfterRestore(LastWriteTS primitive.Timestamp) error {
+	ctx := mongodService.Context
 	localDatabase := mongodService.MongoClient.Database("local")
 
-	err := replaceData(mongodService.Context, localDatabase.Collection("replset.election"), true, nil)
+	err := replaceData(ctx, localDatabase.Collection("replset.election"), true, nil)
 	if err != nil {
 		return err
 	}
 
-	err = replaceData(mongodService.Context, localDatabase.Collection("replset.minvalid"), true, bson.M{
+	err = replaceData(ctx, localDatabase.Collection("replset.minvalid"), true, bson.M{
 		"_id": primitive.NewObjectID(),
 		"t":   -1,
 		"ts":  primitive.Timestamp{T: 0, I: 1},
@@ -127,7 +128,7 @@ func (mongodService *MongodService) FixSystemDataAfterRestore(LastWriteTS primit
 	}
 
 	tracelog.DebugLogger.Printf("oplogTruncateAfterPoint: %v", LastWriteTS)
-	err = replaceData(mongodService.Context, localDatabase.Collection("replset.oplogTruncateAfterPoint"), true,
+	err = replaceData(ctx, localDatabase.Collection("replset.oplogTruncateAfterPoint"), true,
 		bson.M{
 			"_id":                     "oplogTruncateAfterPoint",
 			"oplogTruncateAfterPoint": LastWriteTS,
@@ -136,7 +137,7 @@ func (mongodService *MongodService) FixSystemDataAfterRestore(LastWriteTS primit
 		return err
 	}
 
-	err = replaceData(mongodService.Context, localDatabase.Collection("system.replset"), false, nil)
+	err = replaceData(ctx, localDatabase.Collection("system.replset"), false, nil)
 	if err != nil {
 		return err
 	}

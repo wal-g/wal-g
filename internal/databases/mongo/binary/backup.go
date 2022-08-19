@@ -12,12 +12,12 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/checksum"
+	"github.com/wal-g/wal-g/internal/databases/mongo/common"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
-
-const backupType = "binary"
 
 type BackupService struct {
 	Context       context.Context
@@ -25,7 +25,7 @@ type BackupService struct {
 	LocalStorage  *LocalStorage
 	BackupStorage *BackupStorage
 
-	MongodBackupSentinel      MongodBackupSentinel
+	Sentinel                  models.Backup
 	MongodBackupFilesMetadata MongodBackupFilesMetadata
 
 	BackupDirectoriesMap map[string]*BackupDirectoryMeta
@@ -33,7 +33,7 @@ type BackupService struct {
 }
 
 func GenerateNewBackupName() string {
-	return backupType + "_" + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
+	return common.BinaryBackupType + "_" + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 }
 
 func CreateBackupService(ctx context.Context, mongodService *MongodService, localStorage *LocalStorage,
@@ -49,8 +49,8 @@ func CreateBackupService(ctx context.Context, mongodService *MongodService, loca
 	}, nil
 }
 
-func (backupService *BackupService) DoBackup(backupName, replSetName string, permanent bool) (err error) {
-	err = backupService.InitializeMongodBackupMeta(backupName, replSetName, permanent)
+func (backupService *BackupService) DoBackup(backupName string, permanent bool) (err error) {
+	err = backupService.InitializeMongodBackupMeta(backupName, permanent)
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func (backupService *BackupService) DoBackup(backupName, replSetName string, per
 		return errors.Wrapf(err, "unable to process backup cursor")
 	}
 
-	upto := backupService.MongodBackupSentinel.MongodMeta.EndTS
+	upto := backupService.Sentinel.MongoMeta.BackupLastTS
 	extendedBackupCursor, err := backupService.MongodService.GetBackupCursorExtended(backupID, upto)
 	if err != nil {
 		return errors.Wrapf(err, "unable to take extended backup cursor with '%+v' and '%+v'", backupID, upto)
@@ -166,15 +166,12 @@ func (backupService *BackupService) processBackupMetadata(backupCursorMeta *Back
 			backupService.LocalStorage.MongodDBPath, backupCursorMeta.DBPath)
 	}
 
-	var mongodMeta = &backupService.MongodBackupSentinel.MongodMeta
-	mongodMeta.StartTS = backupCursorMeta.OplogStart.TS
-	mongodMeta.EndTS = backupCursorMeta.OplogEnd.TS
-	mongodMeta.BackupLastTS = mongodMeta.EndTS
+	backupService.Sentinel.MongoMeta.BackupLastTS = backupCursorMeta.OplogEnd.TS
 
 	return nil
 }
 
-func (backupService *BackupService) InitializeMongodBackupMeta(backupName, replSetName string, permanent bool) error {
+func (backupService *BackupService) InitializeMongodBackupMeta(backupName string, permanent bool) error {
 	mongodVersion, err := backupService.MongodService.MongodVersion()
 	if err != nil {
 		return err
@@ -185,13 +182,18 @@ func (backupService *BackupService) InitializeMongodBackupMeta(backupName, replS
 		return err
 	}
 
-	backupService.MongodBackupSentinel.BackupName = backupName
-	backupService.MongodBackupSentinel.BackupType = backupType
-	backupService.MongodBackupSentinel.MongodMeta.Version = mongodVersion
-	backupService.MongodBackupSentinel.MongodMeta.ReplSetNames = []string{replSetName}
-	backupService.MongodBackupSentinel.StartLocalTime = utility.TimeNowCrossPlatformLocal()
-	backupService.MongodBackupSentinel.Permanent = permanent
-	backupService.MongodBackupSentinel.UserData = userData
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+
+	backupService.Sentinel.BackupName = backupName
+	backupService.Sentinel.BackupType = common.BinaryBackupType
+	backupService.Sentinel.Hostname = hostname
+	backupService.Sentinel.MongoMeta.Version = mongodVersion
+	backupService.Sentinel.StartLocalTime = utility.TimeNowCrossPlatformLocal()
+	backupService.Sentinel.Permanent = permanent
+	backupService.Sentinel.UserData = userData
 
 	return nil
 }
@@ -241,7 +243,7 @@ func (backupService *BackupService) AppendBackupFile(backupFile BackupCursorFile
 		UncompressedSize: backupFileStat.Size(), // backupFile.FileSize contains 0 for extended backup cursor
 	}
 	metadata.BackupFiles = append(metadata.BackupFiles, &backupFileMeta)
-	backupService.MongodBackupSentinel.UncompressedDataSize += backupFile.FileSize
+	backupService.Sentinel.UncompressedSize += backupFile.FileSize
 	backupService.BackupFilesMap[backupFilePath] = &backupFileMeta
 
 	return nil
@@ -268,15 +270,22 @@ func (backupService *BackupService) FinalizeAndStoreMongodBackupMetadata() error
 		return errors.Wrap(err, "can not upload files metadata")
 	}
 
-	sentinel := &backupService.MongodBackupSentinel
-	sentinel.FinishLocalTime = utility.TimeNowCrossPlatformLocal()
-	sentinel.CompressedDataSize, err =
-		backupService.BackupStorage.CalculateCompressedFiles(backupService.BackupFilesMap)
+	compressedDataSize, err := backupService.BackupStorage.CalculateCompressedFiles(backupService.BackupFilesMap)
 	if err != nil {
 		return errors.Wrap(err, "unable to calculate compressed files in backup storage")
 	}
 
-	return backupService.BackupStorage.UploadMongodBackupSentinel(sentinel)
+	sentinel := &backupService.Sentinel
+	sentinel.FinishLocalTime = utility.TimeNowCrossPlatformLocal()
+	sentinel.CompressedSize = compressedDataSize
+
+	backupLastTS := models.TimestampFromBson(sentinel.MongoMeta.BackupLastTS)
+	sentinel.MongoMeta.Before.LastMajTS = backupLastTS
+	sentinel.MongoMeta.Before.LastTS = backupLastTS
+	sentinel.MongoMeta.After.LastMajTS = backupLastTS
+	sentinel.MongoMeta.After.LastTS = backupLastTS
+
+	return backupService.BackupStorage.UploadSentinel(sentinel)
 }
 
 func (backupService *BackupService) UploadBackupFiles() error {

@@ -6,8 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
 )
 
-func HandleBinaryFetchPush(ctx context.Context, mongodConfigPath, backupName, backupReplSetName,
-	clusterMongodVersion string) error {
+func HandleBinaryFetchPush(ctx context.Context, mongodConfigPath, backupName, clusterMongodVersion string) error {
 	config, err := binary.CreateMongodConfig(mongodConfigPath)
 	if err != nil {
 		return err
@@ -15,7 +14,7 @@ func HandleBinaryFetchPush(ctx context.Context, mongodConfigPath, backupName, ba
 
 	localStorage := binary.CreateLocalStorage(config.GetDBPath())
 
-	backupStorage, err := binary.CreateBackupStorage(backupName, backupReplSetName)
+	backupStorage, err := binary.CreateBackupStorage(backupName)
 	if err != nil {
 		return err
 	}

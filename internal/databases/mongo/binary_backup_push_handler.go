@@ -24,14 +24,9 @@ func HandleBinaryBackupPush(ctx context.Context, permanent bool, appName string)
 		return err
 	}
 
-	replSetName, err := mongodService.GetReplSetName()
-	if err != nil {
-		return err
-	}
-
 	localStorage := binary.CreateLocalStorage(mongodConfig.Storage.DBPath)
 
-	backupStorage, err := binary.CreateBackupStorage(backupName, replSetName)
+	backupStorage, err := binary.CreateBackupStorage(backupName)
 	if err != nil {
 		return err
 	}
@@ -41,5 +36,5 @@ func HandleBinaryBackupPush(ctx context.Context, permanent bool, appName string)
 		return err
 	}
 
-	return backupService.DoBackup(backupName, replSetName, permanent)
+	return backupService.DoBackup(backupName, permanent)
 }

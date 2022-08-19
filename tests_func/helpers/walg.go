@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -93,7 +92,7 @@ func TimestampFromStr(s string) (OpTimestamp, error) {
 }
 
 func BackupNamesFromListing(output string) []string {
-	re := regexp.MustCompile("(stream|binary)_[0-9]{8}T[0-9]{6}Z")
+	re := regexp.MustCompile(`(stream|binary)_\d{8}T\d{6}Z`)
 	return re.FindAllString(output, -1)
 }
 
@@ -165,31 +164,8 @@ func (w *WalgUtil) FetchBackupByNum(backupNum int) error {
 }
 
 func (w *WalgUtil) FetchBinaryBackup(backup, mongodConfigPath, mongodbVersion string) error {
-	backupReplSetName, err := w.GetReplSetName(backup)
-	if err != nil {
-		return err
-	}
-	_, err = w.runCmd("binary-backup-fetch", backup, backupReplSetName, mongodConfigPath, mongodbVersion)
+	_, err := w.runCmd("binary-backup-fetch", backup, mongodConfigPath, mongodbVersion)
 	return err
-}
-
-func (w *WalgUtil) GetReplSetName(backup string) (string, error) {
-	execResult, err := w.runCmd("backup-show", backup)
-	if err != nil {
-		return "", errors.Wrap(err, fmt.Sprintf("backup show '%v' failed", backup))
-	}
-	backupShowOutput := execResult.Stdout()
-
-	replSetNameHolder := struct {
-		MongoMeta struct {
-			ReplSetName string
-		}
-	}{}
-	err = json.Unmarshal([]byte(backupShowOutput), &replSetNameHolder)
-	if err != nil {
-		return "", err
-	}
-	return replSetNameHolder.MongoMeta.ReplSetName, nil
 }
 
 func (w *WalgUtil) BackupMeta(backupNum int) (Sentinel, error) {

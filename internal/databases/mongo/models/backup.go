@@ -1,16 +1,24 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 // Backup represents backup sentinel data
+// todo: use `internal.GenericMetadata` as base
 type Backup struct {
-	BackupName      string      `json:"BackupName,omitempty"`
-	StartLocalTime  time.Time   `json:"StartLocalTime,omitempty"`
-	FinishLocalTime time.Time   `json:"FinishLocalTime,omitempty"`
-	UserData        interface{} `json:"UserData,omitempty"`
-	MongoMeta       MongoMeta   `json:"MongoMeta,omitempty"`
-	Permanent       bool        `json:"Permanent"`
-	DataSize        int64       `json:"DataSize,omitempty"`
+	BackupName       string      `json:"BackupName,omitempty"`
+	BackupType       string      `json:"BackupType,omitempty"`
+	Hostname         string      `json:"Hostname,omitempty"`
+	StartLocalTime   time.Time   `json:"StartLocalTime,omitempty"`
+	FinishLocalTime  time.Time   `json:"FinishLocalTime,omitempty"`
+	UserData         interface{} `json:"UserData,omitempty"`
+	MongoMeta        MongoMeta   `json:"MongoMeta,omitempty"`
+	Permanent        bool        `json:"Permanent"`
+	UncompressedSize int64       `json:"UncompressedSize,omitempty"`
+	CompressedSize   int64       `json:"DataSize,omitempty"`
 }
 
 func (b *Backup) Name() string {
@@ -35,16 +43,22 @@ type NodeMeta struct {
 type MongoMeta struct {
 	Before NodeMeta `json:"Before,omitempty"`
 	After  NodeMeta `json:"After,omitempty"`
+
+	Version string `json:"Version,omitempty"`
+
+	BackupLastTS primitive.Timestamp `json:"BackupLastTS,omitempty"`
 }
 
 // BackupMeta includes mongodb and storage metadata
 type BackupMeta struct {
-	Mongo      MongoMeta
-	DataSize   int64
-	Permanent  bool
-	User       interface{}
-	StartTime  time.Time
-	FinishTime time.Time
+	BackupName     string
+	Hostname       string
+	Mongo          MongoMeta
+	CompressedSize int64
+	Permanent      bool
+	User           interface{}
+	StartTime      time.Time
+	FinishTime     time.Time
 }
 
 // FirstOverlappingBackupForArch checks if archive overlaps any backup from given list.

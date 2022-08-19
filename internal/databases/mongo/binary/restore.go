@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -28,7 +29,7 @@ func CreateRestoreService(ctx context.Context, localStorage *LocalStorage, backu
 }
 
 func (restoreService *RestoreService) DoRestore(restoreMongodVersion string) error {
-	mongodBackupSentinel, err := restoreService.BackupStorage.DownloadMongodBackupSentinel()
+	sentinel, err := restoreService.BackupStorage.DownloadSentinel()
 	if err != nil {
 		return err
 	}
@@ -38,7 +39,7 @@ func (restoreService *RestoreService) DoRestore(restoreMongodVersion string) err
 		return err
 	}
 
-	err = EnsureCompatibilityToRestoreMongodVersions(restoreMongodVersion, mongodBackupSentinel.MongodMeta.Version)
+	err = EnsureCompatibilityToRestoreMongodVersions(restoreMongodVersion, sentinel.MongoMeta.Version)
 	if err != nil {
 		return err
 	}
@@ -59,7 +60,7 @@ func (restoreService *RestoreService) DoRestore(restoreMongodVersion string) err
 		return err
 	}
 
-	err = restoreService.fixSystemData(mongodBackupSentinel)
+	err = restoreService.fixSystemData(sentinel)
 	if err != nil {
 		return err
 	}
@@ -72,7 +73,7 @@ func (restoreService *RestoreService) DoRestore(restoreMongodVersion string) err
 	return restoreService.LocalStorage.FixFileOwnerOfMongodData()
 }
 
-func (restoreService *RestoreService) fixSystemData(mongodBackupSentinel *MongodBackupSentinel) error {
+func (restoreService *RestoreService) fixSystemData(sentinel *models.Backup) error {
 	mongodProcess, err := StartMongodWithDisableLogicalSessionCacheRefresh(restoreService.MongodFileConfig)
 	if err != nil {
 		return errors.Wrap(err, "unable to start mongod in special mode")
@@ -83,7 +84,7 @@ func (restoreService *RestoreService) fixSystemData(mongodBackupSentinel *Mongod
 		return errors.Wrap(err, "unable to create mongod service")
 	}
 
-	lastWriteTS := mongodBackupSentinel.MongodMeta.EndTS
+	lastWriteTS := sentinel.MongoMeta.BackupLastTS
 	err = mongodService.FixSystemDataAfterRestore(lastWriteTS)
 	if err != nil {
 		return err
