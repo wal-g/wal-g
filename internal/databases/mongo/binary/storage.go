@@ -11,20 +11,19 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
-const FilesMetadataSuffix = "_backup_files.json"
+const FilesMetadataFileName = "_backup_files.json"
 
 type BackupStorage struct {
 	UploaderProvider internal.UploaderProvider
-
-	BackupName  string
-	ReplSetName string
+	BackupName       string
 }
 
-func CreateBackupStorage(backupName, replSetName string) (*BackupStorage, error) {
+func CreateBackupStorage(backupName string) (*BackupStorage, error) {
 	uploaderProvider, err := internal.ConfigureSplitUploader()
 	if err != nil {
 		return nil, err
@@ -36,16 +35,11 @@ func CreateBackupStorage(backupName, replSetName string) (*BackupStorage, error)
 	return &BackupStorage{
 		UploaderProvider: uploaderProvider,
 		BackupName:       backupName,
-		ReplSetName:      replSetName,
 	}, nil
 }
 
-func (backupStorage *BackupStorage) UploadMongodBackupSentinel(sentinel *MongodBackupSentinel) error {
+func (backupStorage *BackupStorage) UploadSentinel(sentinel *models.Backup) error {
 	return internal.UploadSentinel(backupStorage.UploaderProvider, sentinel, backupStorage.BackupName)
-}
-
-func (backupStorage *BackupStorage) FilesMetadataNameFromBackup() string {
-	return backupStorage.GetBackupDataAbsolutePath(backupStorage.BackupName + FilesMetadataSuffix)
 }
 
 func (backupStorage *BackupStorage) UploadMongodBackupFilesMetadata(filesMetadata *MongodBackupFilesMetadata) error {
@@ -53,35 +47,26 @@ func (backupStorage *BackupStorage) UploadMongodBackupFilesMetadata(filesMetadat
 	return internal.UploadDto(backupStorage.UploaderProvider.Folder(), filesMetadata, filesMetadataPath)
 }
 
-func (backupStorage *BackupStorage) DownloadMongodBackupSentinel() (*MongodBackupSentinel, error) {
-	return DownloadSentinel(backupStorage.UploaderProvider.Folder(), backupStorage.BackupName)
+func (backupStorage *BackupStorage) DownloadSentinel() (*models.Backup, error) {
+	return common.DownloadSentinel(backupStorage.UploaderProvider.Folder(), backupStorage.BackupName)
 }
 
 func (backupStorage *BackupStorage) DownloadMongodBackupFilesMetadata() (*MongodBackupFilesMetadata, error) {
 	var filesMetadata MongodBackupFilesMetadata
 	filesMetadataPath := backupStorage.FilesMetadataNameFromBackup()
-	err := internal.FetchDto(backupStorage.UploaderProvider.Folder(), filesMetadata, filesMetadataPath)
+	err := internal.FetchDto(backupStorage.UploaderProvider.Folder(), &filesMetadata, filesMetadataPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "can not fetch files metadata")
 	}
 	return &filesMetadata, nil
 }
 
-func DownloadSentinel(folder storage.Folder, backupName string) (*MongodBackupSentinel, error) {
-	var sentinel MongodBackupSentinel
-	err := common.DownloadSentinel(folder, backupName, &sentinel)
-	if err != nil {
-		return nil, err
-	}
-	return &sentinel, nil
-}
-
-func (backupStorage *BackupStorage) GetBackupDataAbsolutePath(fileName string) string {
-	return filepath.Join(backupStorage.BackupName, backupStorage.ReplSetName, fileName)
+func (backupStorage *BackupStorage) FilesMetadataNameFromBackup() string {
+	return filepath.Join(backupStorage.BackupName, FilesMetadataFileName)
 }
 
 func (backupStorage *BackupStorage) MakeBackupFilePath(backupFileMeta *BackupFileMeta) string {
-	return backupStorage.GetBackupDataAbsolutePath(backupFileMeta.Path + "." + backupFileMeta.Compression)
+	return filepath.Join(backupStorage.BackupName, backupFileMeta.Path+"."+backupFileMeta.Compression)
 }
 
 func (backupStorage *BackupStorage) CreateReader(backupFileMeta *BackupFileMeta) (io.ReadCloser, error) {
@@ -109,9 +94,7 @@ func (backupStorage *BackupStorage) UploadFile(reader io.Reader, backupFileMeta 
 }
 
 func (backupStorage *BackupStorage) CalculateCompressedFiles(backupFiles map[string]*BackupFileMeta) (int64, error) {
-	folder := backupStorage.UploaderProvider.Folder().
-		GetSubFolder(backupStorage.BackupName).
-		GetSubFolder(backupStorage.ReplSetName)
+	folder := backupStorage.UploaderProvider.Folder().GetSubFolder(backupStorage.BackupName)
 	return backupStorage.calculateCompressedFiles("", folder, backupFiles)
 }
 
@@ -126,6 +109,9 @@ func (backupStorage *BackupStorage) calculateCompressedFiles(relativePath string
 
 	for _, object := range objects {
 		objectPath := makeObjectPath(object.GetName(), relativePath)
+		if objectPath == FilesMetadataFileName {
+			continue
+		}
 		backupFilePath, compressExtension := splitOnFilePathAndCompressExtension(objectPath)
 		backupFileMeta, ok := backupFiles[backupFilePath]
 		if !ok {

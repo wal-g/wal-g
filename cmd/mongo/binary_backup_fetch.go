@@ -14,20 +14,19 @@ import (
 const binaryBackupFetchCommandName = "binary-backup-fetch"
 
 var binaryBackupFetchCmd = &cobra.Command{
-	Use:   binaryBackupFetchCommandName + " <backup name> <replSetName> <mongod dbpath> <mongod version>",
+	Use:   binaryBackupFetchCommandName + " <backup name> <mongod dbpath> <mongod version>",
 	Short: "Fetches a mongodb binary backup from storage and restores it in mongodb storage dbPath",
-	Args:  cobra.ExactArgs(4),
+	Args:  cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		backupName := args[0] // todo: use backup selector
-		backupReplSetName := args[1]
-		mongodbConfigPath := args[2]
-		mongodVersion := args[3]
+		backupName := args[0]
+		mongodbConfigPath := args[1]
+		mongodVersion := args[2]
 
-		err := mongo.HandleBinaryFetchPush(ctx, mongodbConfigPath, backupName, backupReplSetName, mongodVersion)
+		err := mongo.HandleBinaryFetchPush(ctx, mongodbConfigPath, backupName, mongodVersion)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

@@ -3,10 +3,12 @@ package archive
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
+	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -23,11 +25,13 @@ type MongoMetaConstructor struct {
 func (m *MongoMetaConstructor) MetaInfo() interface{} {
 	meta := m.Meta()
 	backupSentinel := &models.Backup{
+		BackupName:      meta.BackupName,
+		BackupType:      common.LogicalBackupType,
 		StartLocalTime:  meta.StartTime,
 		FinishLocalTime: meta.FinishTime,
 		UserData:        meta.User,
 		MongoMeta:       meta.Mongo,
-		DataSize:        meta.DataSize,
+		CompressedSize:  meta.CompressedSize,
 		Permanent:       meta.Permanent,
 	}
 	return backupSentinel
@@ -51,7 +55,13 @@ func (m *MongoMetaConstructor) Init() error {
 		return errors.Wrap(err, "failed to unmarshal the provided UserData")
 	}
 
+	hostname, err := os.Hostname()
+	if err != nil {
+		return errors.Wrap(err, "failed to get hostname")
+	}
+
 	m.meta = models.BackupMeta{
+		Hostname:  hostname,
 		StartTime: utility.TimeNowCrossPlatformLocal(),
 		Permanent: m.permanent,
 		User:      userData,
@@ -79,8 +89,9 @@ func (m *MongoMetaConstructor) Finalize(backupName string) error {
 		LastTS:    lastTS,
 		LastMajTS: lastMajTS,
 	}
+	m.meta.BackupName = backupName
 	m.meta.FinishTime = utility.TimeNowCrossPlatformLocal()
-	m.meta.DataSize = dataSize
+	m.meta.CompressedSize = dataSize
 	return nil
 }
 

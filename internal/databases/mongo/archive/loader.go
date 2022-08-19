@@ -81,19 +81,7 @@ func NewStorageDownloader(opts StorageSettings) (*StorageDownloader, error) {
 
 // BackupMeta downloads sentinel contents.
 func (sd *StorageDownloader) BackupMeta(name string) (*models.Backup, error) {
-	return DownloadSentinel(sd.backupsFolder, name)
-}
-
-func DownloadSentinel(folder storage.Folder, backupName string) (*models.Backup, error) {
-	var sentinel models.Backup
-	err := common.DownloadSentinel(folder, backupName, &sentinel)
-	if err != nil {
-		return nil, err
-	}
-	if sentinel.BackupName == "" {
-		sentinel.BackupName = backupName
-	}
-	return &sentinel, nil
+	return common.DownloadSentinel(sd.backupsFolder, name)
 }
 
 // LoadBackups downloads backups metadata
