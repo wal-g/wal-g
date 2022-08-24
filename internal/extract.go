@@ -164,6 +164,8 @@ func ExtractAllWithSleeper(tarInterpreter TarInterpreter, files []ReaderMaker, s
 		}
 		currentRun = failed
 		if len(failed) > 0 {
+			tracelog.WarningLogger.Printf("%d files failed to download: %s. Going to sleep and retry downloading them.\n",
+						   len(failed), readerMakersToFilePaths(failed)) 
 			sleeper.Sleep()
 		}
 	}
