@@ -287,7 +287,7 @@ If `--without-files-metadata` or `WALG_WITHOUT_FILES_METADATA` is enabled, WAL-G
 Limitations
 
 * Cannot be used with `rating-composer`, `copy-composer`
-* Cannot be used with `delta-from-user-data`, `delta-from-name`, `add-user-data`
+* Cannot be used with `WALG_DELTA_MAX_STEPS` setting or `delta-from-user-data`, `delta-from-name` flags.
 
 To activate this feature, do one of the following:
 
