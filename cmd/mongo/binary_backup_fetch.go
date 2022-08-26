@@ -14,7 +14,7 @@ import (
 const binaryBackupFetchCommandName = "binary-backup-fetch"
 
 var binaryBackupFetchCmd = &cobra.Command{
-	Use:   binaryBackupFetchCommandName + " <backup name> <mongod dbpath> <mongod version>",
+	Use:   binaryBackupFetchCommandName + " <backup name> <mongod config path> <mongod version>",
 	Short: "Fetches a mongodb binary backup from storage and restores it in mongodb storage dbPath",
 	Args:  cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
