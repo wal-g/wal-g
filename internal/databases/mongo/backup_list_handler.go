@@ -122,7 +122,7 @@ func printBackupDetailsWithTabFormatter(backupDetails []*BackupDetail, output io
 func marshalUserData(userData interface{}) string {
 	rawUserData, err := json.Marshal(userData)
 	if err != nil {
-		rawUserData = []byte("<marshall_error>")
+		rawUserData = []byte(fmt.Sprintf("{\"error\": \"unable to marshal %+v\"}", userData))
 	}
 	return string(rawUserData)
 }

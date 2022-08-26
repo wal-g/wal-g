@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
 	"os/exec"
 	"strconv"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -70,7 +68,7 @@ func (mongodProcess *MongodProcess) start() error {
 	}
 	mongodProcess.port = unusedPort
 
-	configFilePath, err := mongodProcess.config.SaveConfigToTempFile("storage")
+	configFilePath, err := mongodProcess.config.SaveConfigToTempFile("storage", "systemLog")
 	if err != nil {
 		return err
 	}
@@ -78,11 +76,6 @@ func (mongodProcess *MongodProcess) start() error {
 	cliArgs := []string{"--port", strconv.Itoa(unusedPort), "--config", configFilePath}
 	for _, parameter := range mongodProcess.parameters {
 		cliArgs = append(cliArgs, "--setParameter", parameter)
-	}
-
-	if _, err := os.Stat("/var/log/mongodb"); err == nil {
-		logPath := fmt.Sprintf("/var/log/mongodb/mongod-recovery-%d.log", unusedPort)
-		cliArgs = append(cliArgs, "--logpath", logPath)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -106,12 +99,6 @@ func randomUnusedPort() (int, error) {
 	}
 	defer utility.LoggedClose(listen, "unable to close listen")
 
-	address := listen.Addr().String()
-	lastColonIndex := strings.LastIndex(address, ":")
-	portString := address[lastColonIndex+1:]
-	port, err := strconv.Atoi(portString)
-	if err != nil {
-		return 0, errors.Wrap(err, fmt.Sprintf("unable extract port '%v' from address '%v'", portString, address))
-	}
+	port := listen.Addr().(*net.TCPAddr).Port
 	return port, nil
 }

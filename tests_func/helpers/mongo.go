@@ -15,6 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/mod/semver"
 )
 
 const (
@@ -69,7 +70,7 @@ type CmdResponse struct {
 	CodeName string `bson:"codeName, omitempty"`
 }
 
-// Optime ...
+// OpTime ...
 type OpTime struct {
 	TS   primitive.Timestamp `bson:"ts" json:"ts"`
 	Term int64               `bson:"t" json:"t"`
@@ -118,12 +119,6 @@ type MongoCtlOpt func(*MongoCtl)
 func AdminCreds(creds AuthCreds) MongoCtlOpt {
 	return func(mc *MongoCtl) {
 		mc.adminCreds = creds
-	}
-}
-
-func Port(port int) MongoCtlOpt {
-	return func(mc *MongoCtl) {
-		mc.port = port
 	}
 }
 
@@ -395,15 +390,22 @@ func (mc *MongoCtl) InitReplSet() error {
 	return err
 }
 
-func (mc *MongoCtl) GetVersion() (string, error) {
-	result, err := mc.runCmd("mongo", "--host", "localhost", "--quiet", "--port", "27018", "--eval", "db.version()")
-	version := strings.TrimSpace(result.Stdout())
+func (mc *MongoCtl) GetVersion() (version string, err error) {
+	for attempt := 0; attempt < 5; attempt++ {
+		var result ExecResult
+		result, err = mc.runCmd("mongo", "--host", "localhost", "--quiet", "--port", "27018", "--eval", "db.version()")
+		if err != nil {
+			continue
+		}
+		version := strings.TrimSpace(result.Stdout())
+		if !semver.IsValid(fmt.Sprintf("v%s", version)) {
+			err = fmt.Errorf("invalid version: %v", version)
+			continue
+		}
 
-	if len(version) == 0 {
-		return "", errors.New("version is empty")
+		return version, err
 	}
-
-	return version, err
+	return "", errors.Wrap(err, "Unable to get version of mongodb")
 }
 
 func (mc *MongoCtl) GetConfigPath() (string, error) {

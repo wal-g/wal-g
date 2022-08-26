@@ -2,7 +2,7 @@ package binary
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -16,7 +16,7 @@ type MongodFileConfig struct {
 }
 
 func CreateMongodConfig(path string) (*MongodFileConfig, error) {
-	fileData, err := ioutil.ReadFile(path)
+	fileData, err := os.ReadFile(path)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to read data from "+path)
 	}
@@ -33,10 +33,6 @@ func CreateMongodConfig(path string) (*MongodFileConfig, error) {
 
 func (mongodFileConfig *MongodFileConfig) GetDBPath() string {
 	return mongodFileConfig.Get("storage.dbPath").(string)
-}
-
-func (mongodFileConfig *MongodFileConfig) GetPort() int {
-	return mongodFileConfig.Get("net.port").(int)
 }
 
 func (mongodFileConfig *MongodFileConfig) Get(key string) any {
@@ -64,7 +60,7 @@ func (mongodFileConfig *MongodFileConfig) SaveConfigToTempFile(keys ...string) (
 		return "", errors.Wrap(err, "unable to marshal json")
 	}
 
-	tempFile, err := ioutil.TempFile("", "mongod-*.conf")
+	tempFile, err := os.CreateTemp("", "mongod-*.conf")
 	if err != nil {
 		return "", errors.Wrap(err, "unable to create temp file")
 	}
