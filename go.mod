@@ -9,7 +9,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.4.1
 	github.com/Azure/go-autorest/autorest v0.11.21
 	github.com/DATA-DOG/godog v0.7.14-0.20190529133509-96731eaefa46
-	github.com/DataDog/zstd v1.4.4
+	github.com/DataDog/zstd v1.5.3-0.20220606203749-fd035e54e312
 	github.com/RoaringBitmap/roaring v0.4.21
 	github.com/aws/aws-sdk-go v1.44.7
 	github.com/blang/semver v3.5.1+incompatible
