@@ -95,11 +95,6 @@ func (bundle *Bundle) getFileRelPath(fileAbsPath string) string {
 	return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.Directory)
 }
 
-func (bundle *Bundle) StartQueue(tarBallMaker internal.TarBallMaker) error {
-	bundle.TarBallQueue = internal.NewTarBallQueue(bundle.TarSizeThreshold, tarBallMaker)
-	return bundle.TarBallQueue.StartQueue()
-}
-
 func (bundle *Bundle) SetupComposer(composerMaker TarBallComposerMaker) (err error) {
 	tarBallComposer, err := composerMaker.Make(bundle)
 	if err != nil {
@@ -107,10 +102,6 @@ func (bundle *Bundle) SetupComposer(composerMaker TarBallComposerMaker) (err err
 	}
 	bundle.TarBallComposer = tarBallComposer
 	return nil
-}
-
-func (bundle *Bundle) FinishQueue() error {
-	return bundle.TarBallQueue.FinishQueue()
 }
 
 // NewTarBall starts writing new tarball

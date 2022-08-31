@@ -108,7 +108,7 @@ func (bundle *Bundle) FinishComposing() (TarFileSets, error) {
 }
 
 func (bundle *Bundle) getFileRelPath(fileAbsPath string) string {
-	return utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.Directory)
+	return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.Directory)
 }
 
 func (bundle *Bundle) createTarFileInfoHeader(path string, info os.FileInfo) (header *tar.Header, err error) {
