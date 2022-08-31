@@ -131,7 +131,7 @@ func (bundle *Bundle) prefaultHandleTar(path string, info os.FileInfo) error {
 		return errors.Wrap(err, "addToBundle: could not grab header info")
 	}
 
-	fileInfoHeader.Name = bundle.getFileRelPath(path)
+	fileInfoHeader.Name = bundle.GetFileRelPath(path)
 
 	if !excluded && info.Mode().IsRegular() {
 		tarBall := bundle.TarBallQueue.Deque()
