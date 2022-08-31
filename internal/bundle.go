@@ -107,7 +107,7 @@ func (bundle *Bundle) FinishComposing() (TarFileSets, error) {
 	return bundle.TarBallComposer.FinishComposing()
 }
 
-func (bundle *Bundle) getFileRelPath(fileAbsPath string) string {
+func (bundle *Bundle) GetFileRelPath(fileAbsPath string) string {
 	return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.Directory)
 }
 
@@ -117,6 +117,6 @@ func (bundle *Bundle) createTarFileInfoHeader(path string, info os.FileInfo) (he
 		return nil, errors.Wrap(err, "addToBundle: could not grab header info")
 	}
 
-	header.Name = bundle.getFileRelPath(path)
+	header.Name = bundle.GetFileRelPath(path)
 	return
 }
