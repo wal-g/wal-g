@@ -8,7 +8,7 @@
 
 WAL-G is an archival restoration tool for PostgreSQL, MySQL/MariaDB, and MS SQL Server (beta for MongoDB and Redis).
 
-WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4, LZMA, or Brotli compression, multiple processors, and non-exclusive base backups for Postgres. More information on the original design and implementation of WAL-G can be found on the Citus Data blog post ["Introducing WAL-G by Citus: Faster Disaster Recovery for Postgres"](https://www.citusdata.com/blog/2017/08/18/introducing-wal-g-faster-restores-for-postgres/).
+WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4, LZMA, ZSTD, or Brotli compression, multiple processors, and non-exclusive base backups for Postgres. More information on the original design and implementation of WAL-G can be found on the Citus Data blog post ["Introducing WAL-G by Citus: Faster Disaster Recovery for Postgres"](https://www.citusdata.com/blog/2017/08/18/introducing-wal-g-faster-restores-for-postgres/).
 
 **Table of Contents**
 - [Installation](#installation)
@@ -55,8 +55,8 @@ To configure where WAL-G stores backups, please consult the [Storages](STORAGES.
 ### Compression
 * `WALG_COMPRESSION_METHOD`
 
-To configure the compression method used for backups. Possible options are: `lz4`, `lzma`, `brotli`. The default method is `lz4`. LZ4 is the fastest method, but the compression ratio is bad.
-LZMA is way much slower. However, it compresses backups about 6 times better than LZ4. Brotli is a good trade-off between speed and compression ratio, which is about 3 times better than LZ4.
+To configure the compression method used for backups. Possible options are: `lz4`, `lzma`, `zstd`, `brotli`. The default method is `lz4`. LZ4 is the fastest method, but the compression ratio is bad.
+LZMA is way much slower. However, it compresses backups about 6 times better than LZ4. Brotli and zstd are a good trade-off between speed and compression ratio, which is about 3 times better than LZ4.
 
 ### Encryption
 

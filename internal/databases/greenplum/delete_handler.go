@@ -1,10 +1,14 @@
 package greenplum
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -29,7 +33,8 @@ func NewDeleteHandler(folder storage.Folder) (*DeleteHandler, error) {
 		return obj1.GetLastModified().Before(obj2.GetLastModified())
 	}
 
-	permanentBackups := internal.FindPermanentBackups(folder, NewGenericMetaFetcher())
+	permanentBackups := internal.GetPermanentBackups(folder.GetSubFolder(utility.BaseBackupPath),
+		NewGenericMetaFetcher())
 	isPermanentFunc := func(obj storage.Object) bool {
 		return internal.IsPermanent(obj.GetName(), permanentBackups, BackupNameLength)
 	}
@@ -112,94 +117,124 @@ func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject, confirm
 	}
 
 	tracelog.InfoLogger.Println("Deleting the segments backups...")
+	errorGroup, _ := errgroup.WithContext(context.Background())
+
+	deleteConcurrency, err := internal.GetMaxConcurrency(internal.GPDeleteConcurrency)
+	if err != nil {
+		tracelog.WarningLogger.Printf("config error: %v", err)
+	}
+
+	deleteSem := make(chan struct{}, deleteConcurrency)
+
 	// clean the segments
 	for i := range sentinel.Segments {
-		meta := &sentinel.Segments[i]
-		tracelog.InfoLogger.Printf("Processing segment %d (backupId=%s)\n", meta.ContentID, meta.BackupID)
-
-		segFolder := h.Folder.GetSubFolder(FormatSegmentStoragePrefix(meta.ContentID))
-		permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(segFolder)
-
-		segDeleteHandler, err := postgres.NewDeleteHandler(segFolder, permanentBackups, permanentWals, false)
-		if err != nil {
-			return err
-		}
-
-		pgBackup, err := backup.GetSegmentBackup(meta.BackupID, meta.ContentID)
-		if err != nil {
-			return err
-		}
-
-		segTarget, err := segDeleteHandler.FindTargetByName(pgBackup.Name)
-		if err != nil {
-			return err
-		}
-
-		tracelog.InfoLogger.Printf("Running delete before target %s on segment %d\n",
-			segTarget.GetBackupName(), meta.ContentID)
-
-		filterFunc := func(object storage.Object) bool {
-			return !strings.HasSuffix(object.GetName(), postgres.AoSegSuffix)
-		}
-
-		err = segDeleteHandler.DeleteBeforeTargetWhere(segTarget, confirmed, filterFunc)
-		if err != nil {
-			return err
-		}
-
-		err = cleanupAOSegments(segFolder, confirmed)
-		if err != nil {
-			return err
-		}
+		meta := sentinel.Segments[i]
+		errorGroup.Go(func() error {
+			deleteSem <- struct{}{}
+			deleteErr := h.runDeleteOnSegment(backup, meta, confirmed)
+			<-deleteSem
+			return deleteErr
+		})
 	}
+
+	err = errorGroup.Wait()
+	if err != nil {
+		return fmt.Errorf("failed to delete the segments backups: %w", err)
+	}
+
 	tracelog.InfoLogger.Printf("Finished deleting the segments backups")
 
-	return h.DeleteHandler.DeleteBeforeTarget(target, confirmed)
+	objFilter := func(object storage.Object) bool { return true }
+	folderFilter := func(name string) bool { return strings.HasPrefix(name, utility.BaseBackupPath) }
+	return h.DeleteHandler.DeleteBeforeTargetWhere(target, confirmed, objFilter, folderFilter)
 }
 
-func cleanupAOSegments(segFolder storage.Folder, confirmed bool) error {
-	aoSegFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(postgres.AoStoragePath)
-	aoSegmentsToDelete, err := findAoSegmentsToDelete(aoSegFolder)
+func (h *DeleteHandler) runDeleteOnSegment(backup Backup, meta SegmentMetadata, confirmed bool) error {
+	tracelog.InfoLogger.Printf("Processing segment %d (backupId=%s)\n", meta.ContentID, meta.BackupID)
+
+	segFolder := h.Folder.GetSubFolder(FormatSegmentStoragePrefix(meta.ContentID))
+	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(segFolder)
+
+	segDeleteHandler, err := postgres.NewDeleteHandler(segFolder, permanentBackups, permanentWals, false)
 	if err != nil {
 		return err
 	}
 
-	tracelog.InfoLogger.Printf("Cleaning up the AO segment objects")
-	return storage.DeleteObjectsWhere(aoSegFolder, confirmed, func(object storage.Object) bool {
-		if !strings.HasSuffix(object.GetName(), postgres.AoSegSuffix) {
-			return false
-		}
+	pgBackup, err := backup.GetSegmentBackup(meta.BackupID, meta.ContentID)
+	if err != nil {
+		return err
+	}
 
-		segName := path.Base(object.GetName())
-		_, shouldDelete := aoSegmentsToDelete[segName]
-		return shouldDelete
-	})
+	segTarget, err := segDeleteHandler.FindTargetByName(pgBackup.Name)
+	if err != nil {
+		return err
+	}
+
+	tracelog.InfoLogger.Printf("Running delete before target %s on segment %d\n",
+		segTarget.GetBackupName(), meta.ContentID)
+
+	filterFunc := func(object storage.Object) bool { return true }
+	folderFilter := func(folderPath string) bool {
+		aoSegFolderPrefix := path.Join(utility.BaseBackupPath, postgres.AoStoragePath)
+		return !strings.HasPrefix(folderPath, aoSegFolderPrefix)
+	}
+	err = segDeleteHandler.DeleteBeforeTargetWhere(segTarget, confirmed, filterFunc, folderFilter)
+	if err != nil {
+		return err
+	}
+
+	return cleanupAOSegments(segTarget, segFolder, confirmed)
 }
 
-func findAoSegmentsToDelete(aoSegFolder storage.Folder) (map[string]struct{}, error) {
+func cleanupAOSegments(target internal.BackupObject, segFolder storage.Folder, confirmed bool) error {
+	aoSegFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(postgres.AoStoragePath)
+	aoSegmentsToRetain, err := postgres.LoadStorageAoFiles(segFolder.GetSubFolder(utility.BaseBackupPath))
+	if err != nil {
+		return err
+	}
+
+	for segPath := range aoSegmentsToRetain {
+		tracelog.DebugLogger.Printf("%s is still used, retaining...\n", segPath)
+	}
+
+	tracelog.InfoLogger.Printf("Cleaning up the AO segment objects")
+	aoSegmentsToDelete, err := findAoSegmentsToDelete(target, aoSegmentsToRetain, aoSegFolder)
+	if err != nil {
+		return err
+	}
+
+	if !confirmed {
+		return nil
+	}
+
+	return aoSegFolder.DeleteObjects(aoSegmentsToDelete)
+}
+
+func findAoSegmentsToDelete(target internal.BackupObject,
+	aoSegmentsToRetain map[string]struct{}, aoSegFolder storage.Folder) ([]string, error) {
 	aoObjects, _, err := aoSegFolder.ListFolder()
 	if err != nil {
 		return nil, err
 	}
 
-	aoSegmentsToDelete := make(map[string]struct{})
-	// by default, we want to delete all segments
+	aoSegmentsToDelete := make([]string, 0)
 	for _, obj := range aoObjects {
-		if strings.HasSuffix(obj.GetName(), postgres.AoSegSuffix) {
-			aoSegName := path.Base(obj.GetName())
-			aoSegmentsToDelete[aoSegName] = struct{}{}
+		if !strings.HasSuffix(obj.GetName(), postgres.AoSegSuffix) && obj.GetLastModified().After(target.GetLastModified()) {
+			tracelog.DebugLogger.Println(
+				"\tis not an AO segment file, will not delete (modify time is too recent): " + obj.GetName())
+			continue
 		}
+
+		if _, ok := aoSegmentsToRetain[obj.GetName()]; ok {
+			// this AO segment file is still referenced by some backup, skip it
+			tracelog.DebugLogger.Println("\tis still referenced by some backups, will not delete: " + obj.GetName())
+			continue
+		}
+
+		tracelog.InfoLogger.Println("\twill be deleted: " + obj.GetName())
+
+		aoSegmentsToDelete = append(aoSegmentsToDelete, obj.GetName())
 	}
 
-	// now exclude the still referenced ones
-	for _, obj := range aoObjects {
-		if strings.HasSuffix(obj.GetName(), postgres.BackupRefSuffix) {
-			// this should never fail, since slice len is always > 0
-			referencedSegName := strings.SplitAfter(obj.GetName(), postgres.AoSegSuffix)[0]
-			tracelog.InfoLogger.Printf(
-				"AO segment %s is still referenced by some backups, will not delete it\n", referencedSegName)
-			delete(aoSegmentsToDelete, referencedSegName)
-		}
-	}
 	return aoSegmentsToDelete, nil
 }

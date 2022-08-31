@@ -6,8 +6,9 @@ on:
       - 'v*' # Push events to matching v*, i.e. v0.2.19, v0.2.14a
 
 env:
-  GO_VERSION: 1.17
+  GO_VERSION: 1.18
   USE_LIBSODIUM: 1
+  USE_LZO: 1
 
 jobs:
   release-ubuntu:
@@ -37,7 +38,6 @@ jobs:
            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
            dep ensure
           fi
-
       - name: Make deps
         run: make deps
 
@@ -70,5 +70,73 @@ jobs:
             wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    env:
-      USE_LZO: 1
+
+  release-ubuntu-arm:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        db: [ pg, mysql, sqlserver, redis, mongo, fdb, gp ]
+        include:
+          - arch: aarch64
+            distro: ubuntu20.04
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Build on arch
+        uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: ${{ matrix.arch }}
+          distro: ${{ matrix.distro }}
+          env: |
+            USE_LIBSODIUM: ${{ env.USE_LIBSODIUM }}
+            USE_LZO: ${{ env.USE_LZO }}
+          shell: /bin/bash
+          run: |            
+            apt-get update
+            apt-get install -y build-essential curl git cmake liblzo2-dev brotli libsodium-dev
+            
+            curl -LO https://go.dev/dl/go1.18.3.linux-arm64.tar.gz
+            tar -C /usr/local -xzf go1.18.3.linux-arm64.tar.gz
+            export GOROOT=/usr/local/go
+            export GOPATH=$HOME/go          
+            export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
+            
+            
+            go get -v -t -d ./...
+            if [ -f Gopkg.toml ]; then
+              curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+              dep ensure
+            fi
+            
+            git config --global --add safe.directory /home/runner/work/wal-g/wal-g
+            git config --global --add safe.directory /home/runner/work/wal-g/wal-g/submodules/brotli
+            
+            make deps
+            
+            make ${{ matrix.db }}_build
+
+      - name: Rename WAL-G binary
+        run: mv main/${{ matrix.db }}/wal-g wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}
+
+      - name: Compress WAL-G binary
+        run: tar --owner=0 --group=0 -zcvf wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}.tar.gz wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}
+
+      - name: Calculate checksum
+        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }} > wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}.sha256
+
+      - name: Calculate checksum for the compressed binary
+        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}.tar.gz > wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}.tar.gz.sha256
+
+      - name: Upload WAL-G binary
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}
+            wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}.tar.gz
+            wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}.sha256
+            wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}.tar.gz.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

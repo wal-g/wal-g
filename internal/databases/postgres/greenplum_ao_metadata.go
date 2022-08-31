@@ -16,7 +16,7 @@ type BackupAOFileDesc struct {
 	IsSkipped   bool           `json:"IsSkipped"`
 	MTime       time.Time      `json:"MTime"`
 	StorageType RelStorageType `json:"StorageType"`
-	EOF         uint32         `json:"EOF"`
+	EOF         int64          `json:"EOF"`
 	Compressor  string         `json:"Compressor,omitempty"`
 	FileMode    int64          `json:"FileMode"`
 }

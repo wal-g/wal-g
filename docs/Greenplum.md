@@ -125,3 +125,6 @@ WAL-G can also do in-place backup restoration without the restore config. It mig
 ```bash
 wal-g backup-fetch LATEST --in-place --config=/path/to/config.yaml
 ```
+
+#### Delete concurrency
+During the delete execution, WAL-G can process segments in parallel mode. To control, how many segments will be processed simultaneously, use the `WALG_GP_DELETE_CONCURRENCY` setting. The default value is `1`. 

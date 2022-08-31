@@ -15,7 +15,7 @@ env:
   IMAGE_UBUNTU: wal-g/ubuntu
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
-  GO_VERSION: 1.17
+  GO_VERSION: 1.18
 
 jobs:
   buildimages:
@@ -125,6 +125,7 @@ jobs:
                    'make MYSQL_TEST=mysql_base_tests mysql_integration_test',
                    'make MYSQL_TEST=mysql_delete_tests mysql_integration_test',
                    'make MYSQL_TEST=mysql_copy_tests mysql_integration_test',
+                   'make mariadb_test',
                    'make gp_test',
                    'make st_test',
                    'make TEST="pg_pgbackrest_backup_fetch_test" pg_integration_test'

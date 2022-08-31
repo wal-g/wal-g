@@ -28,7 +28,7 @@ var UtilityFilePaths = map[string]bool{
 	TablespaceMapFilename: true,
 }
 
-var patternPgBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?", PatternTimelineAndLogSegNo)
+var patternPgBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?(_%[2]s)?", PatternTimelineAndLogSegNo, PatternLSN)
 var regexpPgBackupName = regexp.MustCompile(patternPgBackupName)
 
 // Backup contains information about a valid Postgres backup
@@ -176,7 +176,7 @@ func (backup *Backup) FetchMeta() (ExtendedMetadataDto, error) {
 	extendedMetadataDto := ExtendedMetadataDto{}
 	err := backup.FetchMetadata(&extendedMetadataDto)
 	if err != nil {
-		return ExtendedMetadataDto{}, errors.Wrap(err, "failed to unmarshal metadata")
+		return ExtendedMetadataDto{}, err
 	}
 
 	return extendedMetadataDto, nil
@@ -189,7 +189,7 @@ func getFilesMetadataPath(backupName string) string {
 
 func checkDBDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentinelDto, filesMeta FilesMetadataDto) error {
 	if !sentinelDto.IsIncremental() {
-		isEmpty, err := isDirectoryEmpty(dbDataDirectory)
+		isEmpty, err := utility.IsDirectoryEmpty(dbDataDirectory)
 		if err != nil {
 			return err
 		}
@@ -301,20 +301,6 @@ func IsPgControlRequired(backup Backup, sentinelDto BackupSentinelDto) bool {
 	return needPgControl
 }
 
-func isDirectoryEmpty(directoryPath string) (bool, error) {
-	var isEmpty = true
-
-	searchLambda := func(path string, info os.FileInfo, err error) error {
-		if path != directoryPath {
-			isEmpty = false
-			tracelog.InfoLogger.Printf("found file '%s' in directory: '%s'\n", path, directoryPath)
-		}
-		return nil
-	}
-	err := filepath.Walk(directoryPath, searchLambda)
-	return isEmpty, errors.Wrapf(err, "can't check, that directory: '%s' is empty", directoryPath)
-}
-
 // TODO : init tests
 func (backup *Backup) getTarsToExtract(filesMeta FilesMetadataDto, filesToUnwrap map[string]bool,
 	skipRedundantTars bool) (tarsToExtract []internal.ReaderMaker, pgControlKey string, err error) {
@@ -348,9 +334,9 @@ func (backup *Backup) getTarsToExtract(filesMeta FilesMetadataDto, filesToUnwrap
 		tarsToExtract = append(tarsToExtract, tarToExtract)
 	}
 
-	aoMeta, err := backup.loadAoFilesMetadata()
+	aoMeta, err := backup.LoadAoFilesMetadata()
 	if err != nil {
-		tracelog.InfoLogger.Printf("AO files metadata was not found. Skipping the AO segments unpacking.")
+		tracelog.DebugLogger.Printf("AO files metadata was not found. Skipping the AO segments unpacking.")
 	} else {
 		tracelog.InfoLogger.Printf("AO files metadata found. Will perform the AO segments unpacking.")
 		for extractPath, meta := range aoMeta.Files {
@@ -387,7 +373,7 @@ func (backup *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error)
 	return utility.SelectMatchingFiles(fileMask, filesToUnwrap)
 }
 
-func (backup *Backup) loadAoFilesMetadata() (*AOFilesMetadataDTO, error) {
+func (backup *Backup) LoadAoFilesMetadata() (*AOFilesMetadataDTO, error) {
 	if backup.AoFilesMetadataDto != nil {
 		return backup.AoFilesMetadataDto, nil
 	}
@@ -435,6 +421,6 @@ func GetLastWalFilename(backup Backup) (string, error) {
 	return endWalSegmentNo.getFilename(timelineID), nil
 }
 
-func FetchPgBackupName(object storage.Object) string {
+func DeduceBackupName(object storage.Object) string {
 	return regexpPgBackupName.FindString(object.GetName())
 }

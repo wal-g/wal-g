@@ -9,7 +9,6 @@ import (
 	"os/user"
 	"path"
 	"path/filepath"
-	"sort"
 
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/pkg/errors"
@@ -37,20 +36,27 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 	binlogsFolder, err := getMySQLBinlogsFolder(db)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	binlogs, err := getMySQLSortedBinlogs(db)
+	binlogs, err := getMySQLBinlogs(db)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	lastBinlog := lastOrDefault(binlogs, "")
-	if untilBinlog == "" || untilBinlog > lastBinlog {
+	if untilBinlog == "" || BinlogNum(untilBinlog) > BinlogNum(lastBinlog) {
 		untilBinlog = lastBinlog
 	}
 
 	var binlogSentinelDto BinlogSentinelDto
 	err = FetchBinlogSentinel(rootFolder, &binlogSentinelDto)
-	// copy MySQLBinlogSentinel to cache:
-	cache := getCache()
 	if err == nil && binlogSentinelDto.GTIDArchived != "" {
 		tracelog.InfoLogger.Printf("fetched binlog archived GTID SET: %s\n", binlogSentinelDto.GTIDArchived)
+	}
+	cache := getCache()
+	if len(binlogs) > 0 && cache.LastArchivedBinlog != "" {
+		if BinlogPrefix(binlogs[0]) != BinlogPrefix(cache.LastArchivedBinlog) ||
+			BinlogNum(binlogs[len(binlogs)-1]) < BinlogNum(cache.LastArchivedBinlog) {
+			tracelog.WarningLogger.Printf("binlog was reset or naming (%s => %s), clearing cache",
+				cache.LastArchivedBinlog, binlogs[0])
+			cache = LogsCache{}
+		}
 	}
 
 	var filter gtidFilter
@@ -69,7 +75,7 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 				lastGtidSeen:  nil,
 			}
 		default:
-			tracelog.ErrorLogger.Fatalf("Unsupported flavor type: %s. Disable GTIDs check for current database flavor.", flavor)
+			tracelog.ErrorLogger.Fatalf("Unsupported flavor type: %s. Disable WALG_MYSQL_CHECK_GTIDS for current database.", flavor)
 		}
 	}
 
@@ -79,12 +85,12 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 
 		tracelog.DebugLogger.Printf("Testing... %v\n", binlog)
 
-		if binlog >= untilBinlog {
+		if untilBinlog != "" && BinlogNum(binlog) >= BinlogNum(untilBinlog) {
 			tracelog.DebugLogger.Printf("Skip binlog %v (until check)\n", binlog)
 			continue
 		}
 
-		if binlog <= cache.LastArchivedBinlog {
+		if cache.LastArchivedBinlog != "" && BinlogNum(binlog) <= BinlogNum(cache.LastArchivedBinlog) {
 			tracelog.DebugLogger.Printf("Skip binlog %v (archived binlog check)\n", binlog)
 			continue
 		}
@@ -131,7 +137,7 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 	putCache(cache)
 }
 
-func getMySQLSortedBinlogs(db *sql.DB) ([]string, error) {
+func getMySQLBinlogs(db *sql.DB) ([]string, error) {
 	var result []string
 	// SHOW BINARY LOGS acquire binlog mutex and may hang while mysql is committing huge transactions
 	// so we read binlog index from the disk with no locking
@@ -150,7 +156,7 @@ func getMySQLSortedBinlogs(db *sql.DB) ([]string, error) {
 		binlog := path.Base(s.Text())
 		result = append(result, binlog)
 	}
-	sort.Strings(result)
+	// binlogs in index files are already sorted actually, so we don't need to sort them again
 	return result, nil
 }
 
@@ -251,13 +257,14 @@ func (u *gtidFilter) shouldUpload(binlog, nextBinlog string) bool {
 		return false
 	}
 	// nextPreviousGTIDs is 'GTIDs_executed at the end of current binary log file'
-	nextPreviousGTIDs, err := GetBinlogPreviousGTIDs(path.Join(u.BinlogsFolder, nextBinlog), u.Flavor)
+	_nextPreviousGTIDs, err := GetBinlogPreviousGTIDs(path.Join(u.BinlogsFolder, nextBinlog), u.Flavor)
 	if err != nil {
 		tracelog.InfoLogger.Printf(
 			"Cannot extract PREVIOUS_GTIDS event from current binlog %s, next %s (caused by %v). Upload it. (gtid check)\n",
 			binlog, nextBinlog, err)
 		return true
 	}
+	nextPreviousGTIDs := _nextPreviousGTIDs.(*mysql.MysqlGTIDSet)
 
 	if u.gtidArchived == nil || u.gtidArchived.String() == "" {
 		tracelog.DebugLogger.Printf("Cannot extract set of uploaded binlogs from cache\n")
@@ -277,7 +284,7 @@ func (u *gtidFilter) shouldUpload(binlog, nextBinlog string) bool {
 			return true
 		}
 		tracelog.DebugLogger.Printf("Binlog %s is the first binlog that we seen by GTID-checker in this run. (gtid check)\n", binlog)
-		u.lastGtidSeen = gtidSetBeforeCurrentBinlog
+		u.lastGtidSeen = gtidSetBeforeCurrentBinlog.(*mysql.MysqlGTIDSet)
 	}
 
 	currentBinlogGTIDSet := nextPreviousGTIDs.Clone().(*mysql.MysqlGTIDSet)

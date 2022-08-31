@@ -60,13 +60,7 @@ func init() {
 // uploaded backups; in this case, pg_control is used as
 // the sentinel.
 type Bundle struct {
-	Directory string
-	Sentinel  *internal.Sentinel
-
-	TarBallComposer TarBallComposer
-	TarBallQueue    *internal.TarBallQueue
-
-	Crypter            crypto.Crypter
+	internal.Bundle
 	Timeline           uint32
 	Replica            bool
 	IncrementFromLsn   *LSN
@@ -75,7 +69,6 @@ type Bundle struct {
 	TablespaceSpec     TablespaceSpec
 
 	forceIncremental bool
-	TarSizeThreshold int64
 }
 
 // TODO: use DiskDataFolder
@@ -85,23 +78,17 @@ func NewBundle(
 	forceIncremental bool, tarSizeThreshold int64,
 ) *Bundle {
 	return &Bundle{
-		Directory:          directory,
-		Crypter:            crypter,
+		Bundle: internal.Bundle{
+			Directory:         directory,
+			Crypter:           crypter,
+			TarSizeThreshold:  tarSizeThreshold,
+			ExcludedFilenames: ExcludedFilenames,
+		},
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
 		TablespaceSpec:     NewTablespaceSpec(directory),
 		forceIncremental:   forceIncremental,
-		TarSizeThreshold:   tarSizeThreshold,
 	}
-}
-
-func (bundle *Bundle) getFileRelPath(fileAbsPath string) string {
-	return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.Directory)
-}
-
-func (bundle *Bundle) StartQueue(tarBallMaker internal.TarBallMaker) error {
-	bundle.TarBallQueue = internal.NewTarBallQueue(bundle.TarSizeThreshold, tarBallMaker)
-	return bundle.TarBallQueue.StartQueue()
 }
 
 func (bundle *Bundle) SetupComposer(composerMaker TarBallComposerMaker) (err error) {
@@ -111,10 +98,6 @@ func (bundle *Bundle) SetupComposer(composerMaker TarBallComposerMaker) (err err
 	}
 	bundle.TarBallComposer = tarBallComposer
 	return nil
-}
-
-func (bundle *Bundle) FinishQueue() error {
-	return bundle.TarBallQueue.FinishQueue()
 }
 
 // NewTarBall starts writing new tarball
@@ -266,7 +249,7 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 		return errors.Wrap(err, "addToBundle: could not grab header info")
 	}
 
-	fileInfoHeader.Name = bundle.getFileRelPath(path)
+	fileInfoHeader.Name = bundle.GetFileRelPath(path)
 	tracelog.DebugLogger.Println(fileInfoHeader.Name)
 
 	if !excluded && info.Mode().IsRegular() {
@@ -287,7 +270,7 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 		}
 		incrementBaseLsn := bundle.getIncrementBaseLsn()
 		isIncremented := incrementBaseLsn != nil && (wasInBase || bundle.forceIncremental) && isPagedFile(info, path)
-		bundle.TarBallComposer.AddFile(NewComposeFileInfo(path, info, wasInBase, isIncremented, fileInfoHeader))
+		bundle.TarBallComposer.AddFile(internal.NewComposeFileInfo(path, info, wasInBase, isIncremented, fileInfoHeader))
 	} else {
 		err := bundle.TarBallComposer.AddHeader(fileInfoHeader, info)
 		if err != nil {
@@ -318,7 +301,7 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 		return errors.Wrap(err, "UploadPgControl: failed to grab header info")
 	}
 
-	fileInfoHeader.Name = bundle.getFileRelPath(path)
+	fileInfoHeader.Name = bundle.GetFileRelPath(path)
 	tracelog.InfoLogger.Println(fileInfoHeader.Name)
 
 	err = tarWriter.WriteHeader(fileInfoHeader) // TODO : what happens in case of irregular pg_control?
@@ -421,7 +404,7 @@ func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN LSN
 	return nil
 }
 
-func (bundle *Bundle) FinishTarComposer() (TarFileSets, error) {
+func (bundle *Bundle) FinishTarComposer() (internal.TarFileSets, error) {
 	return bundle.TarBallComposer.FinishComposing()
 }
 

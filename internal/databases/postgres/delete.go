@@ -68,7 +68,7 @@ func newBackupObject(incrementBase, incrementFrom string,
 		baseBackupName:    incrementBase,
 		incrementFromName: incrementFrom,
 		creationTime:      creationTime,
-		BackupName:        FetchPgBackupName(object),
+		BackupName:        DeduceBackupName(object),
 	}
 }
 
@@ -129,13 +129,13 @@ func makePermanentFunc(permanentBackups, permanentWals map[string]bool) func(obj
 
 func makeLessFunc(startTimeByBackupName map[string]time.Time) func(storage.Object, storage.Object) bool {
 	return func(object1 storage.Object, object2 storage.Object) bool {
-		backupName1 := FetchPgBackupName(object1)
+		backupName1 := DeduceBackupName(object1)
 		if backupName1 == "" {
 			// we can't compare non-backup storage objects (probably WAL segments) by start time,
 			// so use the segment number comparator instead
 			return segmentNoLess(object1, object2)
 		}
-		backupName2 := FetchPgBackupName(object2)
+		backupName2 := DeduceBackupName(object2)
 		if backupName2 == "" {
 			return segmentNoLess(object1, object2)
 		}
@@ -193,7 +193,7 @@ func timelineAndSegmentNoLess(object1 storage.Object, object2 storage.Object) bo
 }
 
 func getIncrementInfo(folder storage.Folder, object storage.Object) (string, string, bool, error) {
-	backup := NewBackup(folder.GetSubFolder(utility.BaseBackupPath), FetchPgBackupName(object))
+	backup := NewBackup(folder.GetSubFolder(utility.BaseBackupPath), DeduceBackupName(object))
 	sentinel, err := backup.GetSentinel()
 	if err != nil {
 		return "", "", true, err
@@ -222,7 +222,8 @@ func (dh *DeleteHandler) HandleDeleteGarbage(args []string, folder storage.Folde
 		return err
 	}
 
-	return dh.DeleteBeforeTargetWhere(target, confirm, predicate)
+	folderFilter := func(string) bool { return true }
+	return dh.DeleteBeforeTargetWhere(target, confirm, predicate, folderFilter)
 }
 
 // ExtractDeleteGarbagePredicate extracts delete modifier the "delete garbage" command

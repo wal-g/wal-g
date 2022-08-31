@@ -2,17 +2,48 @@
 
 You can use wal-g as a tool for making encrypted, compressed PostgreSQL backups(full and incremental) and push/fetch them to/from storage without saving it on your filesystem.
 
+If you prefer use Docker Image, you can directly test wal-g with this [playground](https://github.com/stephane-klein/playground-postgresql-walg).
+
 Development
 -----------
-### Installing
 
-Prepare on Ubuntu:
-```plaintext
-sudo apt-get install liblzo2-dev
+Optional:
+
+- To build with libsodium, set the `USE_LIBSODIUM` environment variable.
+- To build with lzo decompressor, set the `USE_LZO` environment variable.
+
+### Ubuntu
+
+```sh
+# Install latest Go compiler
+sudo add-apt-repository ppa:longsleep/golang-backports 
+sudo apt update
+sudo apt install golang-go
+
+# Install lib dependencies
+sudo apt install libbrotli-dev liblzo2-dev libsodium-dev
+
+# Fetch project and build
+go get github.com/wal-g/wal-g
+cd ~/go/src/github.com/wal-g/wal-g
+make deps
+make pg_build
+main/pg/wal-g --version
 ```
 
-Prepare on Mac OS:
-``` plaintext
+Users can also install WAL-G by using `make pg_install`. Specifying the `GOBIN` environment variable before installing allows the user to specify the installation location. By default, `make pg_install` puts the compiled binary in the root directory (`/`).
+
+```sh
+export USE_LIBSODIUM=1
+export USE_LZO=1
+make pg_clean
+make deps
+GOBIN=/usr/local/bin make pg_install
+```
+
+### macOS
+
+```sh
 # brew command is Homebrew for Mac OS
 brew install cmake
 export USE_LIBSODIUM="true" # since we're linking libsodium later
@@ -20,31 +51,8 @@ export USE_LIBSODIUM="true" # since we're linking libsodium later
 ./link_libsodium.sh
 make install_and_build_pg
 ```
-> The compiled binary to run is in `main/pg/wal-g`
 
-To compile and build the binary for Postgres:
-
-Optional:
-
-- To build with libsodium, just set `USE_LIBSODIUM` environment variable.
-- To build with lzo decompressor, just set `USE_LZO` environment variable.
-```plaintext
-go get github.com/wal-g/wal-g
-cd $GOPATH/src/github.com/wal-g/wal-g
-make install
-make deps
-make pg_build
-```
-
-Users can also install WAL-G by using `make install`. Specifying the GOBIN environment variable before installing allows the user to specify the installation location. On default, `make install` puts the compiled binary in `go/bin`.
-
-```plaintext
-export GOBIN=/usr/local/bin
-cd $GOPATH/src/github.com/wal-g/wal-g
-make install
-make deps
-make pg_install
-```
+The compiled binary to run is `main/pg/wal-g`
 
 Configuration
 -------------
@@ -200,13 +208,14 @@ wal-g backup-fetch /path LATEST --reverse-unpack --skip-redundant-tars
 
 ### ``backup-push``
 
-When uploading backups to S3, the user should pass in the path containing the backup started by Postgres as in:
+When uploading backups to storage, the user should pass the Postgres data directory as an argument.
 
 ```bash
-wal-g backup-push /backup/directory/path
+wal-g backup-push $PGDATA
 ```
+WAL-G will check that command argument, environment variable PGDATA and config setting PGDATA are the same, if set.
 
-If backup is pushed from replication slave, WAL-G will control timeline of the server. In case of promotion to master or timeline switch, backup will be uploaded but not finalized, WAL-G will exit with an error. In this case logs will contain information necessary to finalize the backup. You can use backuped data if you clearly understand entangled risks.
+If a backup is started from a standby sever, WAL-G will monitor the timeline of the server. If a promotion or timeline change occurs during the backup, the data will be uploaded but not finalized, and WAL-G will exit with an error. The logs will contain the necessary information to finalize the backup, which can then be used if you clearly understand the risks.
 
 ``backup-push`` can also be run with the ``--permanent`` flag, which will mark the backup as permanent and prevent it from being removed when running ``delete``.
 
@@ -278,7 +287,7 @@ If `--without-files-metadata` or `WALG_WITHOUT_FILES_METADATA` is enabled, WAL-G
 Limitations
 
 * Cannot be used with `rating-composer`, `copy-composer`
-* Cannot be used with `delta-from-user-data`, `delta-from-name`, `add-user-data`
+* Cannot be used with `WALG_DELTA_MAX_STEPS` setting or `delta-from-user-data`, `delta-from-name` flags.
 
 To activate this feature, do one of the following:
 
@@ -546,7 +555,7 @@ Usage:
 wal-g wal-restore path/to/target-pgdata path/to/source-pgdata
 ```
 
-pgBackRest backups support
+pgBackRest backups support (beta version)
 -----------
 ### ``pgbackrest backup-list``
 
@@ -564,4 +573,22 @@ Fetch pgbackrest backup. For now works only with full backups, incr and diff bac
 Usage:
 ```bash
 wal-g pgbackrest backup-fetch path/to/destination-directory backup-name
+```
+
+### ``pgbackrest wal-fetch``
+
+Fetch wal file from pgbackrest backup
+
+Usage:
+```bash
+wal-g pgbackrest wal-fetch example-archive new-file-name
+```
+
+### ``pgbackrest wal-show``
+
+Show wal files from pgbackrest backup
+
+Usage:
+```bash
+wal-g pgbackrest wal-show
 ```

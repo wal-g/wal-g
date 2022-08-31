@@ -242,12 +242,19 @@ For the restore procedure you have to do similar things to [what the offical doc
 * clean a datadir (typically `/var/lib/mysql`)
 * fetch and prepare desired backup using `wal-g backup-fetch "backup_name"`
 * after the previous step you might have to fix file permissions: `chown -R mysql:mysql /var/lib/mysql`
-* in case of restoring for a replication slave you can follow the [official docs](https://mariadb.com/kb/en/setting-up-a-replication-slave-with-mariabackup/#gtids)
-* for PITR, replay binlogs with
-```bash
-wal-g binlog-replay --since "backup_name" --until "2006-01-02T15:04:05Z07:00"
-```
 * start mariadb
+* WAL-G doesn't support automatic PITR for MariaDB. There are 2 possible workarounds:
+  * You can configure restored database to replicate from your master, so it will be able to catch up (follow the [official docs](https://mariadb.com/kb/en/setting-up-a-replication-slave-with-mariabackup/#gtids))
+  * You can manually replay events with binlog and position:
+```bash
+wal-g binlog-fetch --since [backup name | LATEST]
+# Get binlog-name, position and GTIDs:
+tail -n 1 < /var/lib/mysql/xtrabackup_binlog_info
+# eg 'mysql-bin.000005	385	0-1-5763'
+# then replay it manually:
+mysql -e "STOP ALL SLAVES; SET GLOBAL gtid_slave_pos='$gtids';"
+mysqlbinlog --stop-datetime="some point in time" --start-position [position above] [all binlogs starting from thouse we seen above] | mysql --user XXX --host YYY [other options]
+```
 
 ### MariaDB - using with `mysqldump`
 

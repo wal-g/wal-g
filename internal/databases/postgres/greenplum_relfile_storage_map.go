@@ -17,8 +17,8 @@ const (
 type AoRelFileMetadata struct {
 	relNameMd5  string
 	storageType RelStorageType
-	eof         uint32
-	modCount    uint32
+	eof         int64
+	modCount    int64
 }
 
 // AoRelFileStorageMap indicates the storage type for the relfile
@@ -76,8 +76,10 @@ func newAoRelFileStorageMap(queryRunner *PgQueryRunner) (AoRelFileStorageMap, er
 		}
 		rows, err := queryRunner.fetchAOStorageMetadata(db)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to fetch storage types")
+			tracelog.WarningLogger.Printf("failed to fetch storage types: %s\n'%v'\n", db.name, err)
+			continue
 		}
+		tracelog.InfoLogger.Printf("Successfully loaded AO/AOCS metadata about %d relations in database %s\n", len(rows), db.name)
 		for relFileLoc, metadata := range rows {
 			result[relFileLoc] = metadata
 		}

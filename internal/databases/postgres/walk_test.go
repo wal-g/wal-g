@@ -440,9 +440,9 @@ func setupTestTarBallComposerMaker(composer postgres.TarBallComposerType, withou
 	switch composer {
 	case postgres.RegularComposer:
 		if withoutFilesMetadata {
-			return postgres.NewRegularTarBallComposerMaker(filePackOptions, &postgres.NopBundleFiles{}, postgres.NewNopTarFileSets())
+			return postgres.NewRegularTarBallComposerMaker(filePackOptions, &internal.NopBundleFiles{}, internal.NewNopTarFileSets())
 		} else {
-			return postgres.NewRegularTarBallComposerMaker(filePackOptions, &postgres.RegularBundleFiles{}, postgres.NewRegularTarFileSets())
+			return postgres.NewRegularTarBallComposerMaker(filePackOptions, &internal.RegularBundleFiles{}, internal.NewRegularTarFileSets())
 		}
 	case postgres.RatingComposer:
 		relFileStats := make(postgres.RelFileStatistics)

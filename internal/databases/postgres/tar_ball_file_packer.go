@@ -55,17 +55,17 @@ func NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks bool
 	}
 }
 
-// TarBallFilePacker is used to pack bundle file into tarball.
-type TarBallFilePacker struct {
+// TarBallFilePackerImpl is used to pack bundle file into tarball.
+type TarBallFilePackerImpl struct {
 	deltaMap         PagedFileDeltaMap
 	incrementFromLsn *LSN
-	files            BundleFiles
+	files            internal.BundleFiles
 	options          TarBallFilePackerOptions
 }
 
-func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, files BundleFiles,
-	options TarBallFilePackerOptions) *TarBallFilePacker {
-	return &TarBallFilePacker{
+func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, files internal.BundleFiles,
+	options TarBallFilePackerOptions) *TarBallFilePackerImpl {
+	return &TarBallFilePackerImpl{
 		deltaMap:         deltaMap,
 		incrementFromLsn: incrementFromLsn,
 		files:            files,
@@ -73,24 +73,24 @@ func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, fil
 	}
 }
 
-func (p *TarBallFilePacker) getDeltaBitmapFor(filePath string) (*roaring.Bitmap, error) {
+func (p *TarBallFilePackerImpl) getDeltaBitmapFor(filePath string) (*roaring.Bitmap, error) {
 	if p.deltaMap == nil {
 		return nil, nil
 	}
 	return p.deltaMap.GetDeltaBitmapFor(filePath)
 }
 
-func (p *TarBallFilePacker) UpdateDeltaMap(deltaMap PagedFileDeltaMap) {
+func (p *TarBallFilePackerImpl) UpdateDeltaMap(deltaMap PagedFileDeltaMap) {
 	p.deltaMap = deltaMap
 }
 
 // TODO : unit tests
-func (p *TarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall internal.TarBall) error {
+func (p *TarBallFilePackerImpl) PackFileIntoTar(cfi *internal.ComposeFileInfo, tarBall internal.TarBall) error {
 	fileReadCloser, err := p.createFileReadCloser(cfi)
 	if err != nil {
 		switch err.(type) {
 		case SkippedFileError:
-			p.files.AddSkippedFile(cfi.header, cfi.fileInfo)
+			p.files.AddSkippedFile(cfi.Header, cfi.FileInfo)
 			return nil
 		case FileNotExistError:
 			// File was deleted before opening.
@@ -109,26 +109,26 @@ func (p *TarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall intern
 		// fileReadCloser is needed for PackFileTo, secondReadCloser is for the page verification
 		fileReadCloser, secondReadCloser = newTeeReadCloser(fileReadCloser)
 		errorGroup.Go(func() (err error) {
-			corruptBlocks, err := verifyFile(cfi.path, cfi.fileInfo, secondReadCloser, cfi.isIncremented)
+			corruptBlocks, err := verifyFile(cfi.Path, cfi.FileInfo, secondReadCloser, cfi.IsIncremented)
 			if err != nil {
 				return err
 			}
-			p.files.AddFileWithCorruptBlocks(cfi.header, cfi.fileInfo, cfi.isIncremented,
+			p.files.AddFileWithCorruptBlocks(cfi.Header, cfi.FileInfo, cfi.IsIncremented,
 				corruptBlocks, p.options.storeAllCorruptBlocks)
 			return nil
 		})
 	} else {
-		p.files.AddFile(cfi.header, cfi.fileInfo, cfi.isIncremented)
+		p.files.AddFile(cfi.Header, cfi.FileInfo, cfi.IsIncremented)
 	}
 
 	errorGroup.Go(func() error {
 		defer utility.LoggedClose(fileReadCloser, "")
-		packedFileSize, err := internal.PackFileTo(tarBall, cfi.header, fileReadCloser)
+		packedFileSize, err := internal.PackFileTo(tarBall, cfi.Header, fileReadCloser)
 		if err != nil {
 			return errors.Wrap(err, "PackFileIntoTar: operation failed")
 		}
-		if packedFileSize != cfi.header.Size {
-			return newTarSizeError(packedFileSize, cfi.header.Size)
+		if packedFileSize != cfi.Header.Size {
+			return newTarSizeError(packedFileSize, cfi.Header.Size)
 		}
 		return nil
 	})
@@ -136,41 +136,41 @@ func (p *TarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall intern
 	return errorGroup.Wait()
 }
 
-func (p *TarBallFilePacker) createFileReadCloser(cfi *ComposeFileInfo) (io.ReadCloser, error) {
+func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileInfo) (io.ReadCloser, error) {
 	var fileReadCloser io.ReadCloser
-	if cfi.isIncremented {
-		bitmap, err := p.getDeltaBitmapFor(cfi.path)
+	if cfi.IsIncremented {
+		bitmap, err := p.getDeltaBitmapFor(cfi.Path)
 		if _, ok := err.(NoBitmapFoundError); ok { // this file has changed after the start of backup, so just skip it
-			return nil, newSkippedFileError(cfi.path)
+			return nil, newSkippedFileError(cfi.Path)
 		} else if err != nil {
-			return nil, errors.Wrapf(err, "PackFileIntoTar: failed to find corresponding bitmap '%s'\n", cfi.path)
+			return nil, errors.Wrapf(err, "PackFileIntoTar: failed to find corresponding bitmap '%s'\n", cfi.Path)
 		}
-		fileReadCloser, cfi.header.Size, err = ReadIncrementalFile(cfi.path, cfi.fileInfo.Size(), *p.incrementFromLsn, bitmap)
+		fileReadCloser, cfi.Header.Size, err = ReadIncrementalFile(cfi.Path, cfi.FileInfo.Size(), *p.incrementFromLsn, bitmap)
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, newFileNotExistError(cfi.path)
+			return nil, newFileNotExistError(cfi.Path)
 		}
 		switch err.(type) {
 		case nil:
 			fileReadCloser = &ioextensions.ReadCascadeCloser{
 				Reader: &io.LimitedReader{
 					R: io.MultiReader(fileReadCloser, &ioextensions.ZeroReader{}),
-					N: cfi.header.Size,
+					N: cfi.Header.Size,
 				},
 				Closer: fileReadCloser,
 			}
 		case InvalidBlockError: // fallback to full file backup
-			tracelog.WarningLogger.Printf("failed to read file '%s' as incremented\n", cfi.header.Name)
-			cfi.isIncremented = false
-			fileReadCloser, err = startReadingFile(cfi.header, cfi.fileInfo, cfi.path)
+			tracelog.WarningLogger.Printf("failed to read file '%s' as incremented\n", cfi.Header.Name)
+			cfi.IsIncremented = false
+			fileReadCloser, err = startReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
 			if err != nil {
 				return nil, err
 			}
 		default:
-			return nil, errors.Wrapf(err, "PackFileIntoTar: failed reading incremental file '%s'\n", cfi.path)
+			return nil, errors.Wrapf(err, "PackFileIntoTar: failed reading incremental file '%s'\n", cfi.Path)
 		}
 	} else {
 		var err error
-		fileReadCloser, err = startReadingFile(cfi.header, cfi.fileInfo, cfi.path)
+		fileReadCloser, err = startReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
 		if err != nil {
 			return nil, err
 		}
