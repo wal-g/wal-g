@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func createTempDir(prefix string) (name string, err error) {
@@ -27,7 +28,7 @@ func TestIsDirectoryEmpty_ReturnsTrue_WhenDirectoryIsEmpty(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.Remove(dir)
 
-	actual, _ := isDirectoryEmpty(dir)
+	actual, _ := utility.IsDirectoryEmpty(dir)
 
 	assert.True(t, actual)
 }
@@ -41,7 +42,7 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenOneFileIsInDirectory(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.Remove(file.Name())
 
-	actual, _ := isDirectoryEmpty(dir)
+	actual, _ := utility.IsDirectoryEmpty(dir)
 
 	assert.False(t, actual)
 }
@@ -57,7 +58,7 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenSeveralFilesAreInDirectory(t *testing
 		defer os.Remove(file.Name())
 	}
 
-	actual, _ := isDirectoryEmpty(dir)
+	actual, _ := utility.IsDirectoryEmpty(dir)
 
 	assert.False(t, actual)
 }
@@ -71,7 +72,7 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenNestedDirectoryIsInDirectory(t *testi
 	assert.NoError(t, err)
 	defer os.Remove(nested)
 
-	actual, _ := isDirectoryEmpty(dir)
+	actual, _ := utility.IsDirectoryEmpty(dir)
 
 	assert.False(t, actual)
 }
@@ -83,7 +84,7 @@ func TestIsDirectoryEmpty_ReturnsTrue_WhenDirectoryDoesntExist(t *testing.T) {
 	err = os.Remove(dir)
 	assert.NoError(t, err)
 
-	actual, _ := isDirectoryEmpty(dir)
+	actual, _ := utility.IsDirectoryEmpty(dir)
 
 	assert.True(t, actual)
 }
