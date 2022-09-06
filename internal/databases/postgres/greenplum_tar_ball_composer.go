@@ -8,6 +8,8 @@ import (
 	"path"
 	"sync"
 
+	"github.com/spf13/viper"
+
 	"github.com/wal-g/wal-g/internal/walparser"
 
 	"github.com/wal-g/tracelog"
@@ -84,7 +86,8 @@ type GpTarBallComposer struct {
 
 	uploader *internal.Uploader
 	// Separate uploader for AO/AOCS relfiles with disabled file size tracking
-	aoSegUploader *internal.Uploader
+	aoSegUploader      *internal.Uploader
+	aoSegSizeThreshold int64
 
 	files            internal.BundleFiles
 	tarFileSets      internal.TarFileSets
@@ -106,19 +109,20 @@ func NewGpTarBallComposer(
 	aoSegUploader.DisableSizeTracking()
 
 	composer := &GpTarBallComposer{
-		backupName:    backupName,
-		tarBallQueue:  tarBallQueue,
-		tarFilePacker: packer,
-		crypter:       crypter,
-		relStorageMap: relStorageMap,
-		files:         bundleFiles,
-		aoFiles:       aoFiles,
-		baseAoFiles:   baseAoFiles,
-		uploader:      uploader.Clone(),
-		aoSegUploader: aoSegUploader,
-		tarFileSets:   tarFileSets,
-		errorGroup:    errorGroup,
-		ctx:           ctx,
+		backupName:         backupName,
+		tarBallQueue:       tarBallQueue,
+		tarFilePacker:      packer,
+		crypter:            crypter,
+		relStorageMap:      relStorageMap,
+		files:              bundleFiles,
+		aoFiles:            aoFiles,
+		baseAoFiles:        baseAoFiles,
+		uploader:           uploader.Clone(),
+		aoSegUploader:      aoSegUploader,
+		aoSegSizeThreshold: viper.GetInt64(internal.GPAoSegSizeThreshold),
+		tarFileSets:        tarFileSets,
+		errorGroup:         errorGroup,
+		ctx:                ctx,
 	}
 
 	maxUploadDiskConcurrency, err := internal.GetMaxUploadDiskConcurrency()
@@ -199,7 +203,8 @@ func (c *GpTarBallComposer) addFileWorker(tasks <-chan *internal.ComposeFileInfo
 
 func (c *GpTarBallComposer) addFile(cfi *internal.ComposeFileInfo) error {
 	// WAL-G uploads AO/AOCS relfiles to different location
-	if isAo, meta, location := c.relStorageMap.getAOStorageMetadata(cfi.Path); isAo {
+	isAo, meta, location := c.relStorageMap.getAOStorageMetadata(cfi.Path)
+	if isAo && cfi.FileInfo.Size() >= c.aoSegSizeThreshold {
 		return c.addAOFile(cfi, meta, location)
 	}
 

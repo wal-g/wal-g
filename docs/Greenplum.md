@@ -128,3 +128,7 @@ wal-g backup-fetch LATEST --in-place --config=/path/to/config.yaml
 
 #### Delete concurrency
 During the delete execution, WAL-G can process segments in parallel mode. To control, how many segments will be processed simultaneously, use the `WALG_GP_DELETE_CONCURRENCY` setting. The default value is `1`. 
+
+
+#### AO/AOCS size threshold
+To control the minimal size of the AO/AOCS segment file to be uploaded into the shared storage, use the `WALG_GP_AOSEG_SIZE_THRESHOLD`. The higher this value, the bigger the size of a single backup and the smaller the size of the shared AO/AOCS storage folder. Default value is `1048576 (1MB)`.
