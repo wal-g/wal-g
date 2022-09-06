@@ -121,6 +121,7 @@ const (
 	GPSegmentsUpdInterval  = "WALG_GP_SEG_UPD_INTERVAL"
 	GPSegmentStatesDir     = "WALG_GP_SEG_STATES_DIR"
 	GPDeleteConcurrency    = "WALG_GP_DELETE_CONCURRENCY"
+	GPAoSegSizeThreshold   = "WALG_GP_AOSEG_SIZE_THRESHOLD"
 
 	GoMaxProcs = "GOMAXPROCS"
 
@@ -209,6 +210,7 @@ var (
 		GPSegmentsPollRetries:  "5",
 		GPSegmentStatesDir:     "/tmp",
 		GPDeleteConcurrency:    "1",
+		GPAoSegSizeThreshold:   "1048576", // (1 << 20)
 	}
 
 	AllowedSettings map[string]bool
@@ -410,6 +412,7 @@ var (
 		GPSegmentsUpdInterval:  true,
 		GPSegmentStatesDir:     true,
 		GPDeleteConcurrency:    true,
+		GPAoSegSizeThreshold:   true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
