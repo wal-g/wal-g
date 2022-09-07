@@ -64,10 +64,6 @@ WAL-G uses [the usual PostgreSQL environment variables](https://www.postgresql.o
 
 To configure disk read rate limit during ```backup-push``` in bytes per second.
 
-* `WALG_NETWORK_RATE_LIMIT`
-To configure the network upload rate limit during ```backup-push``` in bytes per second.
-
-
 Concurrency values can be configured using:
 
 * `WALG_DOWNLOAD_CONCURRENCY`

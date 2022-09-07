@@ -122,6 +122,12 @@ The type of pprof profiler to use. Can be one of `cpu`, `mem`, `mutex`, `block`,
 
 The directory to store profiles in. Defaults to `$TMPDIR`.
 
+### Rate limiting
+* `WALG_NETWORK_RATE_LIMIT`
+
+Network traffic rate limit during the ```backup-push```/```backup-fetch``` operations in bytes per second.
+
+
 ### Database-specific options
 **More options are available for the chosen database. See it in [Databases](#databases)**
 
