@@ -532,8 +532,6 @@ func Configure() {
 	for _, pair := range env {
 		tracelog.DebugLogger.Println(pair)
 	}
-
-	configureLimiters()
 }
 
 // ConfigureAndRunDefaultWebServer configures and runs web server

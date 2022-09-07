@@ -107,7 +107,7 @@ func (err UnmarshallingError) Error() string {
 }
 
 // TODO : unit tests
-func configureLimiters() {
+func ConfigureLimiters() {
 	if Turbo {
 		return
 	}

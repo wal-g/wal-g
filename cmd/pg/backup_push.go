@@ -44,6 +44,8 @@ var (
 		Short: backupPushShortDescription, // TODO : improve description
 		Args:  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			internal.ConfigureLimiters()
+
 			var dataDirectory string
 
 			if len(args) > 0 {

@@ -34,6 +34,8 @@ var backupFetchCmd = &cobra.Command{
 	Short: backupFetchShortDescription, // TODO : improve description
 	Args:  cobra.RangeArgs(0, 1),
 	Run: func(cmd *cobra.Command, args []string) {
+		internal.ConfigureLimiters()
+
 		if !inPlaceRestore && restoreConfigPath == "" {
 			tracelog.ErrorLogger.Fatalf(
 				"No restore config was specified. Either specify one via the --restore-config flag or add the --in-place flag to restore in-place.")
