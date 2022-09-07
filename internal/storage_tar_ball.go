@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
-	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -87,7 +86,7 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) 
 	go func() {
 		defer uploader.waitGroup.Done()
 
-		err := uploader.Upload(path, limiters.NewNetworkLimitReader(pipeReader))
+		err := uploader.Upload(path, pipeReader)
 		if compressingError, ok := err.(CompressAndEncryptError); ok {
 			tracelog.ErrorLogger.Printf("could not upload '%s' due to compression error\n%+v\n", path, compressingError)
 		}

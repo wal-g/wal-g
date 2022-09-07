@@ -131,6 +131,10 @@ func ConfigureFolder() (storage.Folder, error) {
 		return nil, err
 	}
 
+	if limiters.NetworkLimiter != nil {
+		folder = NewLimitedFolder(folder, limiters.NetworkLimiter)
+	}
+
 	return ConfigureStoragePrefix(folder), nil
 }
 
