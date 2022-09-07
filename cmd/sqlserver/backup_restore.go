@@ -2,6 +2,7 @@ package sqlserver
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/sqlserver"
 )
 
@@ -16,6 +17,7 @@ var backupRestoreCmd = &cobra.Command{
 	Short: backupRestoreShortDescription,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		internal.ConfigureLimiters()
 		sqlserver.HandleBackupRestore(args[0], restoreDatabases, restoreFrom, restoreNoRecovery)
 	},
 }

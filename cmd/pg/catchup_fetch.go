@@ -20,6 +20,8 @@ var catchupFetchCmd = &cobra.Command{
 	Short: CatchupFetchShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
+		internal.ConfigureLimiters()
+
 		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
 		postgres.HandleCatchupFetch(folder, args[0], args[1], useNewUnwrap)

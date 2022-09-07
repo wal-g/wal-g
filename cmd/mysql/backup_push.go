@@ -28,6 +28,8 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
+			internal.ConfigureLimiters()
+
 			uploader, err := internal.ConfigureSplitUploader()
 			tracelog.ErrorLogger.FatalOnError(err)
 			folder := uploader.Folder()

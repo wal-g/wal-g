@@ -35,6 +35,8 @@ var (
 		Short: backupPushShortDescription, // TODO : improve description
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
+			internal.ConfigureLimiters()
+
 			if userDataRaw == "" {
 				userDataRaw = viper.GetString(internal.SentinelUserDataSetting)
 			}

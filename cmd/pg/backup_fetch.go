@@ -34,6 +34,8 @@ var backupFetchCmd = &cobra.Command{
 	Short: backupFetchShortDescription, // TODO : improve description
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
+		internal.ConfigureLimiters()
+
 		if fetchTargetUserData == "" {
 			fetchTargetUserData = viper.GetString(internal.FetchTargetUserDataSetting)
 		}
