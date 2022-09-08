@@ -67,6 +67,9 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 	}()
 
 	backupCursorCloseChannel := make(chan string)
+	defer func() {
+		backupCursorCloseChannel <- "Game Over"
+	}()
 
 	backupID, err := backupService.processBackupCursor(backupCursor, backupCursorCloseChannel)
 	if err != nil {
@@ -96,8 +99,6 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 	if err != nil {
 		return err
 	}
-
-	backupCursorCloseChannel <- "Game Over"
 
 	return backupService.FinalizeAndStoreMongodBackupMetadata()
 }
