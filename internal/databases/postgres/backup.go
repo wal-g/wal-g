@@ -237,21 +237,9 @@ func setTablespacePaths(spec TablespaceSpec) error {
 		if err != nil {
 			return fmt.Errorf("error creating %v folder %v", location.Location, err)
 		}
-		// Don't show error when correct symlink already exist
-		linkpath := filepath.Join(basePrefix, location.Symlink)
-		linktarget, err := os.Readlink(linkpath)
+		err = spec.EnsureSymlinkExist(location)
 		if err != nil {
-			// create symlink if not exist
-			err = os.Symlink(location.Location, linkpath)
-			if err != nil {
-				return fmt.Errorf("error creating tablespace symlink %v", err)
-			}
-		} else {
-			// check symlink if exists
-			if linktarget != location.Location {
-				return fmt.Errorf("symlink %v have incorrect tagret %v", linkpath, err)
-			}
-			tracelog.WarningLogger.Printf("Symlink %v already exists", linkpath)
+			return fmt.Errorf("error creating correct tablespace symlink %v", err)
 		}
 	}
 	return nil

@@ -3,8 +3,11 @@ package postgres
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 
+	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -172,4 +175,27 @@ func (spec *TablespaceSpec) MarshalJSON() ([]byte, error) {
 		toMarshal[symlinkName] = location
 	}
 	return json.Marshal(toMarshal)
+}
+
+func (spec *TablespaceSpec) EnsureSymlinkExist(location TablespaceLocation) error {
+	basePrefix, ok := spec.BasePrefix()
+	if !ok {
+		return ErrorBasePrefixMissing
+	}
+	linkpath := filepath.Join(basePrefix, location.Symlink)
+	linktarget, err := os.Readlink(linkpath)
+	if err != nil {
+		// create symlink if not exist
+		err = os.Symlink(location.Location, linkpath)
+		if err != nil {
+			return err
+		}
+	} else {
+		// check symlink exists
+		if linktarget != location.Location {
+			return errors.Errorf("symlink %v having incorrect target", linkpath)
+		}
+		tracelog.WarningLogger.Printf("Symlink %v already exists", linkpath)
+	}
+	return nil
 }
