@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/utility"
 )
 
 // DefaultFileUnwrapper is used for default (backup-push) backups
@@ -26,7 +27,7 @@ func (u *DefaultFileUnwrapper) UnwrapNewFile(reader io.Reader, header *tar.Heade
 		}
 		return NewCreatedFromIncrementResult(missingBlockCount), nil
 	}
-	err := WriteLocalFile(reader, header, file, fsync)
+	err := utility.WriteLocalFile(reader, header, file, fsync)
 	if err != nil {
 		return nil, err
 	}

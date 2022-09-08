@@ -2,6 +2,8 @@
 
 You can use wal-g as a tool for making encrypted, compressed PostgreSQL backups(full and incremental) and push/fetch them to/from storage without saving it on your filesystem.
 
+If you prefer use Docker Image, you can directly test wal-g with this [playground](https://github.com/stephane-klein/playground-postgresql-walg).
+
 Development
 -----------
 
@@ -61,10 +63,6 @@ WAL-G uses [the usual PostgreSQL environment variables](https://www.postgresql.o
 * `WALG_DISK_RATE_LIMIT`
 
 To configure disk read rate limit during ```backup-push``` in bytes per second.
-
-* `WALG_NETWORK_RATE_LIMIT`
-To configure the network upload rate limit during ```backup-push``` in bytes per second.
-
 
 Concurrency values can be configured using:
 
@@ -285,7 +283,7 @@ If `--without-files-metadata` or `WALG_WITHOUT_FILES_METADATA` is enabled, WAL-G
 Limitations
 
 * Cannot be used with `rating-composer`, `copy-composer`
-* Cannot be used with `delta-from-user-data`, `delta-from-name`, `add-user-data`
+* Cannot be used with `WALG_DELTA_MAX_STEPS` setting or `delta-from-user-data`, `delta-from-name` flags.
 
 To activate this feature, do one of the following:
 

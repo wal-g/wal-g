@@ -107,7 +107,7 @@ func (err UnmarshallingError) Error() string {
 }
 
 // TODO : unit tests
-func configureLimiters() {
+func ConfigureLimiters() {
 	if Turbo {
 		return
 	}
@@ -129,6 +129,10 @@ func ConfigureFolder() (storage.Folder, error) {
 	folder, err := ConfigureFolderForSpecificConfig(viper.GetViper())
 	if err != nil {
 		return nil, err
+	}
+
+	if limiters.NetworkLimiter != nil {
+		folder = NewLimitedFolder(folder, limiters.NetworkLimiter)
 	}
 
 	return ConfigureStoragePrefix(folder), nil

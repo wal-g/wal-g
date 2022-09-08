@@ -44,6 +44,8 @@ var (
 		Short: backupPushShortDescription, // TODO : improve description
 		Args:  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			internal.ConfigureLimiters()
+
 			var dataDirectory string
 
 			if len(args) > 0 {
@@ -72,10 +74,10 @@ var (
 						"%s option cannot be used with non-regular tar ball composer",
 						withoutFilesMetadataFlag)
 				}
-				if deltaFromName != "" || deltaFromUserData != "" || userDataRaw != "" {
+				if deltaFromName != "" || deltaFromUserData != "" {
 					tracelog.ErrorLogger.Fatalf(
-						"%s option cannot be used with %s, %s, %s options",
-						withoutFilesMetadataFlag, deltaFromNameFlag, deltaFromUserDataFlag, addUserDataFlag)
+						"%s option cannot be used with %s, %s options",
+						withoutFilesMetadataFlag, deltaFromNameFlag, deltaFromUserDataFlag)
 				}
 				tracelog.InfoLogger.Print("Files metadata tracking is disabled")
 				fullBackup = true

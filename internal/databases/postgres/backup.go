@@ -189,7 +189,7 @@ func getFilesMetadataPath(backupName string) string {
 
 func checkDBDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentinelDto, filesMeta FilesMetadataDto) error {
 	if !sentinelDto.IsIncremental() {
-		isEmpty, err := isDirectoryEmpty(dbDataDirectory)
+		isEmpty, err := utility.IsDirectoryEmpty(dbDataDirectory)
 		if err != nil {
 			return err
 		}
@@ -311,20 +311,6 @@ func IsPgControlRequired(backup Backup, sentinelDto BackupSentinelDto) bool {
 	walgBasebackupName := re.FindString(backup.Name) == ""
 	needPgControl := walgBasebackupName || sentinelDto.IsIncremental()
 	return needPgControl
-}
-
-func isDirectoryEmpty(directoryPath string) (bool, error) {
-	var isEmpty = true
-
-	searchLambda := func(path string, info os.FileInfo, err error) error {
-		if path != directoryPath {
-			isEmpty = false
-			tracelog.InfoLogger.Printf("found file '%s' in directory: '%s'\n", path, directoryPath)
-		}
-		return nil
-	}
-	err := filepath.Walk(directoryPath, searchLambda)
-	return isEmpty, errors.Wrapf(err, "can't check, that directory: '%s' is empty", directoryPath)
 }
 
 // TODO : init tests

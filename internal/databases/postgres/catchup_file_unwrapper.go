@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/utility"
 )
 
 // CatchupFileUnwrapper is used for catchup (catchup-push) backups
@@ -36,7 +37,7 @@ func (u *CatchupFileUnwrapper) UnwrapNewFile(reader io.Reader, header *tar.Heade
 		}
 		return NewCreatedFromIncrementResult(missingBlockCount), nil
 	}
-	err := WriteLocalFile(reader, header, file, fsync)
+	err := utility.WriteLocalFile(reader, header, file, fsync)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +63,7 @@ func (u *CatchupFileUnwrapper) UnwrapExistingFile(reader io.Reader, header *tar.
 	if err != nil {
 		return nil, err
 	}
-	err = WriteLocalFile(reader, header, file, fsync)
+	err = utility.WriteLocalFile(reader, header, file, fsync)
 	if err != nil {
 		return nil, err
 	}

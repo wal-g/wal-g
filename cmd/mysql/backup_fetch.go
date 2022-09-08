@@ -25,6 +25,7 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
+			internal.ConfigureLimiters()
 			folder, err := internal.ConfigureFolder()
 			tracelog.ErrorLogger.FatalOnError(err)
 			restoreCmd, err := internal.GetCommandSetting(internal.NameStreamRestoreCmd)

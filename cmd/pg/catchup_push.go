@@ -2,6 +2,7 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
@@ -16,6 +17,8 @@ var (
 		Short: catchupPushShortDescription,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			internal.ConfigureLimiters()
+
 			postgres.HandleCatchupPush(args[0], postgres.LSN(fromLSN))
 		},
 	}

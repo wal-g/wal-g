@@ -25,7 +25,7 @@ func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedu
 		}
 
 		// directory must be empty before starting a deltaFetch
-		isEmpty, err := isDirectoryEmpty(dbDataDirectory)
+		isEmpty, err := utility.IsDirectoryEmpty(dbDataDirectory)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 
 		if !isEmpty {

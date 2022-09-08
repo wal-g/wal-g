@@ -91,15 +91,6 @@ func NewBundle(
 	}
 }
 
-func (bundle *Bundle) getFileRelPath(fileAbsPath string) string {
-	return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.Directory)
-}
-
-func (bundle *Bundle) StartQueue(tarBallMaker internal.TarBallMaker) error {
-	bundle.TarBallQueue = internal.NewTarBallQueue(bundle.TarSizeThreshold, tarBallMaker)
-	return bundle.TarBallQueue.StartQueue()
-}
-
 func (bundle *Bundle) SetupComposer(composerMaker TarBallComposerMaker) (err error) {
 	tarBallComposer, err := composerMaker.Make(bundle)
 	if err != nil {
@@ -107,10 +98,6 @@ func (bundle *Bundle) SetupComposer(composerMaker TarBallComposerMaker) (err err
 	}
 	bundle.TarBallComposer = tarBallComposer
 	return nil
-}
-
-func (bundle *Bundle) FinishQueue() error {
-	return bundle.TarBallQueue.FinishQueue()
 }
 
 // NewTarBall starts writing new tarball
@@ -262,7 +249,7 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 		return errors.Wrap(err, "addToBundle: could not grab header info")
 	}
 
-	fileInfoHeader.Name = bundle.getFileRelPath(path)
+	fileInfoHeader.Name = bundle.GetFileRelPath(path)
 	tracelog.DebugLogger.Println(fileInfoHeader.Name)
 
 	if !excluded && info.Mode().IsRegular() {
@@ -314,7 +301,7 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 		return errors.Wrap(err, "UploadPgControl: failed to grab header info")
 	}
 
-	fileInfoHeader.Name = bundle.getFileRelPath(path)
+	fileInfoHeader.Name = bundle.GetFileRelPath(path)
 	tracelog.InfoLogger.Println(fileInfoHeader.Name)
 
 	err = tarWriter.WriteHeader(fileInfoHeader) // TODO : what happens in case of irregular pg_control?
