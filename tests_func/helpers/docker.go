@@ -3,7 +3,6 @@ package helpers
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -53,12 +52,6 @@ type RunOptions struct {
 
 type RunOption func(*RunOptions)
 
-func User(user string) RunOption {
-	return func(args *RunOptions) {
-		args.user = user
-	}
-}
-
 func TimeInContainer(ctx context.Context, container string) (time.Time, error) {
 	exc, err := RunCommandStrict(ctx, container, []string{"date", "+%s"})
 	if err != nil {
@@ -72,27 +65,21 @@ func TimeInContainer(ctx context.Context, container string) (time.Time, error) {
 }
 
 func RunCommandStrict(ctx context.Context, container string, command []string) (ExecResult, error) {
-	cmdLine := strings.Join(command, " ")
-
 	exc, err := RunCommand(ctx, container, command)
 	if err != nil {
 		return exc, err
 	}
 	if exc.ExitCode != 0 {
+		cmdLine := strings.Join(command, " ")
 		tracelog.ErrorLogger.Printf("'%s' failed with %d\nstdout:\n%s\nstderr:\n%s\n",
 			cmdLine, exc.ExitCode, exc.Stdout(), exc.Stderr())
 		return exc, fmt.Errorf("%s exit code: %d", cmdLine, exc.ExitCode)
 	}
 	return exc, nil
-
 }
 
-func RunCommand(ctx context.Context,
-	container string, cmd []string, setters ...RunOption) (ExecResult, error) {
+func RunCommand(ctx context.Context, container string, cmd []string) (ExecResult, error) {
 	args := &RunOptions{}
-	for _, setter := range setters {
-		setter(args)
-	}
 
 	execConfig := types.ExecConfig{
 		AttachStdout: true,
@@ -149,7 +136,7 @@ func ContainerWithPrefix(containers []types.Container, name string) (*types.Cont
 			return &container, nil
 		}
 	}
-	return nil, errors.New(fmt.Sprintf("cannot find container with name %s", name))
+	return nil, fmt.Errorf("cannot find container with name %s", name)
 }
 
 func DockerContainer(ctx context.Context, prefix string) (*types.Container, error) {
@@ -210,6 +197,7 @@ func CreateNet(ctx context.Context, netName string) error {
 		return fmt.Errorf("error in creating network: %v", err)
 	}
 	if len(networkList) != 0 {
+		tracelog.DebugLogger.Printf("Found networks: %+v", networkList)
 		return nil
 	}
 	ipam := &network.IPAM{
@@ -228,19 +216,7 @@ func CreateNet(ctx context.Context, netName string) error {
 	if err != nil {
 		return fmt.Errorf("error in creating network: %v", err)
 	}
-	return nil
-}
-
-func RemoveNet(ctx context.Context, netName string) error {
-	nets, err := ListNets(ctx, netName)
-	if err != nil {
-		return fmt.Errorf("error im removing network %s: %v", netName, err)
-	}
-	for _, net := range nets {
-		if err := Docker.NetworkRemove(ctx, net.ID); err != nil {
-			panic(err)
-		}
-	}
+	tracelog.DebugLogger.Printf("Network %v has been created", netName)
 	return nil
 }
 
@@ -256,9 +232,12 @@ func BuildImage(ctx context.Context, tag string, path string) error {
 	cmd := exec.CommandContext(ctx, "docker", "build", "-t", tag, path)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
+	tracelog.DebugLogger.Printf("Building image %v with tag %v by command %v", path, tag, cmd)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("error in building base: %v", err)
 	}
+	tracelog.DebugLogger.Printf("Image %v with tag %v was build successfully", path, tag)
 	return nil
 }
 
@@ -334,11 +313,11 @@ func (inf *Infra) callCompose(actions []string) error {
 	}
 	tracelog.DebugLogger.Printf("Running command %s: with args %v", fullPath, baseArgs)
 	cmd := exec.CommandContext(inf.ctx, fullPath, baseArgs...)
-	for _, line := range utils.EnvToList(inf.env) {
-		cmd.Env = append(cmd.Env, line)
-	}
+	cmd.Env = append(cmd.Env, utils.EnvToList(inf.env)...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
+	tracelog.DebugLogger.Printf("Running command: %+v", cmd)
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("can not start command: %v", err)
@@ -347,6 +326,8 @@ func (inf *Infra) callCompose(actions []string) error {
 	if err := cmd.Wait(); err != nil {
 		return fmt.Errorf("error when calling compose: %v", err)
 	}
+
+	tracelog.DebugLogger.Printf("Command '%v' has been completed successfully!", cmd)
 
 	return nil
 }

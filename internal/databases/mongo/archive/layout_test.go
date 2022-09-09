@@ -156,7 +156,7 @@ func TestSequenceBetweenTS(t *testing.T) {
 				until: models.Timestamp{TS: 1579005001, Inc: 1},
 			},
 			want: nil,
-			err:  fmt.Errorf("can not find archive with until timestamp '1579005001.1'"),
+			err:  fmt.Errorf("can not find archive with since timestamp '1579000000.1'"),
 		},
 		{
 			name: "error: since ts is out of bounds",
@@ -165,7 +165,7 @@ func TestSequenceBetweenTS(t *testing.T) {
 				until: models.Timestamp{TS: 1579003001, Inc: 2},
 			},
 			want: nil,
-			err:  fmt.Errorf("previous archive in sequence with last ts '1579000001.1' does not exist"),
+			err:  fmt.Errorf("can not find archive with since timestamp '1579000000.1'"),
 		},
 		{
 			name: "error: until ts is out of bounds",
@@ -183,7 +183,7 @@ func TestSequenceBetweenTS(t *testing.T) {
 				until: models.Timestamp{TS: 1579004001, Inc: 2},
 			},
 			want: nil,
-			err:  fmt.Errorf("previous archive in sequence with last ts '1579000001.1' does not exist"),
+			err:  fmt.Errorf("can not find archive with since timestamp '1579000001.1'"),
 		},
 		{
 			name: "error: since ts is in last archive, until is out of bounds",
@@ -334,7 +334,7 @@ func TestSequence_Reverse(t *testing.T) {
 }
 
 var (
-	LastTSBackups = []models.Backup{
+	LastTSBackups = []*models.Backup{
 		{MongoMeta: models.MongoMeta{Before: models.NodeMeta{LastMajTS: models.Timestamp{TS: 1579000001, Inc: 2}}, After: models.NodeMeta{LastMajTS: models.Timestamp{TS: 1579000001, Inc: 9}}}},
 		{MongoMeta: models.MongoMeta{Before: models.NodeMeta{LastMajTS: models.Timestamp{TS: 1579000010, Inc: 1}}, After: models.NodeMeta{LastMajTS: models.Timestamp{TS: 1579000011, Inc: 9}}}},
 		{MongoMeta: models.MongoMeta{Before: models.NodeMeta{LastMajTS: models.Timestamp{TS: 1579000019, Inc: 11}}, After: models.NodeMeta{LastMajTS: models.Timestamp{TS: 1579000031, Inc: 12}}}},
@@ -343,7 +343,7 @@ var (
 
 func TestLastKnownInBackupTS(t *testing.T) {
 	type args struct {
-		backups []models.Backup
+		backups []*models.Backup
 	}
 	tests := []struct {
 		name string
@@ -354,7 +354,7 @@ func TestLastKnownInBackupTS(t *testing.T) {
 		{
 			name: "empty backups error",
 			args: args{
-				backups: []models.Backup{},
+				backups: []*models.Backup{},
 			},
 			want: models.Timestamp{},
 			err:  fmt.Errorf("empty backups list given"),
@@ -383,18 +383,18 @@ func TestLastKnownInBackupTS(t *testing.T) {
 }
 
 var (
-	MockBackup1 = models.Backup{BackupName: "back1", StartLocalTime: time.Unix(1579000500, 0), FinishLocalTime: time.Unix(1579000550, 0)}
-	MockBackup2 = models.Backup{BackupName: "back2", StartLocalTime: time.Unix(1579000300, 0), FinishLocalTime: time.Unix(1579000400, 0)}
-	MockBackup3 = models.Backup{BackupName: "back3", StartLocalTime: time.Unix(1579000300, 0), FinishLocalTime: time.Unix(1579000400, 0)}
-	MockBackup4 = models.Backup{BackupName: "back4", StartLocalTime: time.Unix(1579000200, 0), FinishLocalTime: time.Unix(1579000250, 0)}
-	MockBackup5 = models.Backup{BackupName: "back5", StartLocalTime: time.Unix(1579000100, 0), FinishLocalTime: time.Unix(1579000101, 0)}
-	MockBackup6 = models.Backup{BackupName: "back6", StartLocalTime: time.Unix(1579000001, 0), FinishLocalTime: time.Unix(1579000001, 0)}
-	MockBackup7 = models.Backup{BackupName: "back7", StartLocalTime: time.Unix(1579000001, 0), FinishLocalTime: time.Unix(1579000001, 0)}
+	MockBackup1 = &models.Backup{BackupName: "back1", StartLocalTime: time.Unix(1579000500, 0), FinishLocalTime: time.Unix(1579000550, 0)}
+	MockBackup2 = &models.Backup{BackupName: "back2", StartLocalTime: time.Unix(1579000300, 0), FinishLocalTime: time.Unix(1579000400, 0)}
+	MockBackup3 = &models.Backup{BackupName: "back3", StartLocalTime: time.Unix(1579000300, 0), FinishLocalTime: time.Unix(1579000400, 0)}
+	MockBackup4 = &models.Backup{BackupName: "back4", StartLocalTime: time.Unix(1579000200, 0), FinishLocalTime: time.Unix(1579000250, 0)}
+	MockBackup5 = &models.Backup{BackupName: "back5", StartLocalTime: time.Unix(1579000100, 0), FinishLocalTime: time.Unix(1579000101, 0)}
+	MockBackup6 = &models.Backup{BackupName: "back6", StartLocalTime: time.Unix(1579000001, 0), FinishLocalTime: time.Unix(1579000001, 0)}
+	MockBackup7 = &models.Backup{BackupName: "back7", StartLocalTime: time.Unix(1579000001, 0), FinishLocalTime: time.Unix(1579000001, 0)}
 
-	MockBackup5Perm = models.Backup{BackupName: "perm5", StartLocalTime: time.Unix(1579000100, 0), FinishLocalTime: time.Unix(1579000101, 0), Permanent: true}
-	MockBackup8Perm = models.Backup{BackupName: "perm8", StartLocalTime: time.Unix(1579000000, 0), FinishLocalTime: time.Unix(1579000001, 0), Permanent: true}
+	MockBackup5Perm = &models.Backup{BackupName: "perm5", StartLocalTime: time.Unix(1579000100, 0), FinishLocalTime: time.Unix(1579000101, 0), Permanent: true}
+	MockBackup8Perm = &models.Backup{BackupName: "perm8", StartLocalTime: time.Unix(1579000000, 0), FinishLocalTime: time.Unix(1579000001, 0), Permanent: true}
 
-	SplitBackups = []models.Backup{
+	SplitBackups = []*models.Backup{
 		MockBackup1,
 		MockBackup2,
 		MockBackup3,
@@ -402,7 +402,7 @@ var (
 		MockBackup5,
 		MockBackup6,
 	}
-	SplitBackupsPermanent = []models.Backup{
+	SplitBackupsPermanent = []*models.Backup{
 		MockBackup1,
 		MockBackup2,
 		MockBackup3,
@@ -428,15 +428,15 @@ func TimestampPtr(ts models.Timestamp) *models.Timestamp {
 
 func TestSplitPurgingBackups(t *testing.T) {
 	type args struct {
-		backups     []models.Backup
+		backups     []*models.Backup
 		retainCount *int
 		retainAfter *time.Time
 	}
 	tests := []struct {
 		name       string
 		args       args
-		wantPurge  []models.Backup
-		wantRetain []models.Backup
+		wantPurge  []*models.Backup
+		wantRetain []*models.Backup
 		err        error
 	}{
 		{
@@ -589,12 +589,12 @@ func TestSplitPurgingBackups(t *testing.T) {
 				retainCount: IntPtr(2),
 				retainAfter: TimePtr(SplitBackups[3].StartLocalTime.Add(time.Second)),
 			},
-			wantPurge: []models.Backup{
+			wantPurge: []*models.Backup{
 				MockBackup4,
 				MockBackup6,
 				MockBackup7,
 			},
-			wantRetain: []models.Backup{
+			wantRetain: []*models.Backup{
 				MockBackup1,
 				MockBackup2,
 				MockBackup3,
@@ -700,13 +700,13 @@ func TestSplitPurgingOplogArchivesByTS(t *testing.T) {
 
 func TestOldestBackupAfterTime(t *testing.T) {
 	type args struct {
-		backups     []models.Backup
+		backups     []*models.Backup
 		retainAfter time.Time
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    models.Backup
+		want    *models.Backup
 		wantErr error
 	}{
 		{
@@ -731,8 +731,8 @@ func TestOldestBackupAfterTime(t *testing.T) {
 		},
 		{
 			name: "backups_wrong_sorting",
-			want: models.Backup{},
-			args: args{[]models.Backup{
+			want: nil,
+			args: args{[]*models.Backup{
 				{BackupName: "wrong1", StartLocalTime: time.Unix(1579000200, 0), FinishLocalTime: time.Unix(1579000300, 0)},
 				MockBackup2,
 				MockBackup1,
@@ -755,7 +755,7 @@ func TestOldestBackupAfterTime(t *testing.T) {
 }
 
 var (
-	Backups = []models.Backup{
+	Backups = []*models.Backup{
 		{MongoMeta: models.MongoMeta{Before: models.NodeMeta{LastMajTS: models.Timestamp{TS: 800}}, After: models.NodeMeta{LastMajTS: models.Timestamp{TS: 900}}}},
 		{MongoMeta: models.MongoMeta{Before: models.NodeMeta{LastMajTS: models.Timestamp{TS: 600}}, After: models.NodeMeta{LastMajTS: models.Timestamp{TS: 700}}}},
 		{MongoMeta: models.MongoMeta{Before: models.NodeMeta{LastMajTS: models.Timestamp{TS: 350}}, After: models.NodeMeta{LastMajTS: models.Timestamp{TS: 500}}}},
@@ -781,7 +781,7 @@ var (
 func TestSelectPurgingOplogArchives(t *testing.T) {
 	type args struct {
 		archives      []models.Archive
-		backups       []models.Backup
+		backups       []*models.Backup
 		retainAfterTS *models.Timestamp
 	}
 	tests := []struct {
@@ -858,7 +858,7 @@ func TestSelectPurgingOplogArchives(t *testing.T) {
 			name: "retain_after_in_the_middle,_empty_backups",
 			args: args{
 				archives:      Archives,
-				backups:       []models.Backup{},
+				backups:       []*models.Backup{},
 				retainAfterTS: TimestampPtr(models.Timestamp{TS: 600}),
 			},
 			want: Archives[:6],

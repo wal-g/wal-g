@@ -234,7 +234,7 @@ func TestArchInBackup(t *testing.T) {
 }
 
 var (
-	Backups = []Backup{
+	Backups = []*Backup{
 		{MongoMeta: MongoMeta{Before: NodeMeta{LastMajTS: Timestamp{TS: 800}}, After: NodeMeta{LastMajTS: Timestamp{TS: 900}}}},
 		{MongoMeta: MongoMeta{Before: NodeMeta{LastMajTS: Timestamp{TS: 600}}, After: NodeMeta{LastMajTS: Timestamp{TS: 700}}}},
 		{MongoMeta: MongoMeta{Before: NodeMeta{LastMajTS: Timestamp{TS: 350}}, After: NodeMeta{LastMajTS: Timestamp{TS: 500}}}},
@@ -245,12 +245,12 @@ var (
 func TestFirstOverlappingBackupForArch(t *testing.T) {
 	type args struct {
 		arch    Archive
-		backups []Backup
+		backups []*Backup
 	}
 	tests := []struct {
 		name string
 		args args
-		want Backup
+		want *Backup
 	}{
 		{
 			name: "to_the_left",
@@ -258,7 +258,7 @@ func TestFirstOverlappingBackupForArch(t *testing.T) {
 				arch:    Archive{Start: Timestamp{TS: 100}, End: Timestamp{TS: 200}},
 				backups: Backups,
 			},
-			want: Backup{},
+			want: nil,
 		},
 		{
 			name: "to_the_right",
@@ -266,7 +266,7 @@ func TestFirstOverlappingBackupForArch(t *testing.T) {
 				arch:    Archive{Start: Timestamp{TS: 950}, End: Timestamp{TS: 1000}},
 				backups: Backups,
 			},
-			want: Backup{},
+			want: nil,
 		},
 		{
 			name: "between_backups",
@@ -274,7 +274,7 @@ func TestFirstOverlappingBackupForArch(t *testing.T) {
 				arch:    Archive{Start: Timestamp{TS: 550}, End: Timestamp{TS: 590}},
 				backups: Backups,
 			},
-			want: Backup{},
+			want: nil,
 		},
 		{
 			name: "in_newest_backup",

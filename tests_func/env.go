@@ -20,7 +20,7 @@ func EnvExists(path string) bool {
 	return err == nil
 }
 
-func SetupEnv(fromEnv map[string]string, envFilePath, stagingDir string) (map[string]string, error) {
+func SetupNewEnv(fromEnv map[string]string, envFilePath, stagingDir string) (map[string]string, error) {
 	if _, err := os.Stat(stagingDir); err == nil {
 		err = os.Chmod(stagingDir, EnvDirPerm)
 		if err != nil {

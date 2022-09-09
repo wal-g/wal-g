@@ -1,27 +1,35 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 // Backup represents backup sentinel data
+// todo: use `internal.GenericMetadata` as base
 type Backup struct {
-	BackupName      string      `json:"BackupName,omitempty"`
-	StartLocalTime  time.Time   `json:"StartLocalTime,omitempty"`
-	FinishLocalTime time.Time   `json:"FinishLocalTime,omitempty"`
-	UserData        interface{} `json:"UserData,omitempty"`
-	MongoMeta       MongoMeta   `json:"MongoMeta,omitempty"`
-	Permanent       bool        `json:"Permanent"`
-	DataSize        int64       `json:"DataSize,omitempty"`
+	BackupName       string      `json:"BackupName,omitempty"`
+	BackupType       string      `json:"BackupType,omitempty"`
+	Hostname         string      `json:"Hostname,omitempty"`
+	StartLocalTime   time.Time   `json:"StartLocalTime,omitempty"`
+	FinishLocalTime  time.Time   `json:"FinishLocalTime,omitempty"`
+	UserData         interface{} `json:"UserData,omitempty"`
+	MongoMeta        MongoMeta   `json:"MongoMeta,omitempty"`
+	Permanent        bool        `json:"Permanent"`
+	UncompressedSize int64       `json:"UncompressedSize,omitempty"`
+	CompressedSize   int64       `json:"DataSize,omitempty"`
 }
 
-func (b Backup) Name() string {
+func (b *Backup) Name() string {
 	return b.BackupName
 }
 
-func (b Backup) StartTime() time.Time {
+func (b *Backup) StartTime() time.Time {
 	return b.StartLocalTime
 }
 
-func (b Backup) IsPermanent() bool {
+func (b *Backup) IsPermanent() bool {
 	return b.Permanent
 }
 
@@ -35,29 +43,33 @@ type NodeMeta struct {
 type MongoMeta struct {
 	Before NodeMeta `json:"Before,omitempty"`
 	After  NodeMeta `json:"After,omitempty"`
+
+	Version string `json:"Version,omitempty"`
+
+	BackupLastTS primitive.Timestamp `json:"BackupLastTS,omitempty"`
 }
 
 // BackupMeta includes mongodb and storage metadata
 type BackupMeta struct {
-	Mongo      MongoMeta
-	DataSize   int64
-	Permanent  bool
-	User       interface{}
-	StartTime  time.Time
-	FinishTime time.Time
+	BackupName     string
+	Hostname       string
+	Mongo          MongoMeta
+	CompressedSize int64
+	Permanent      bool
+	User           interface{}
+	StartTime      time.Time
+	FinishTime     time.Time
 }
 
 // FirstOverlappingBackupForArch checks if archive overlaps any backup from given list.
 // TODO: build btree to fix ugly complexity here
-func FirstOverlappingBackupForArch(arch Archive, backups []Backup) Backup {
-	var backup Backup
-	for j := range backups {
-		backup = backups[j]
-		if ArchInBackup(arch, &backup) {
+func FirstOverlappingBackupForArch(arch Archive, backups []*Backup) *Backup {
+	for _, backup := range backups {
+		if ArchInBackup(arch, backup) {
 			return backup
 		}
 	}
-	return Backup{}
+	return nil
 }
 
 // ArchInBackup checks if archive and given backup overlaps each over.

@@ -8,12 +8,14 @@ import (
 	"time"
 
 	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/utils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/mod/semver"
 )
 
 const (
@@ -68,7 +70,7 @@ type CmdResponse struct {
 	CodeName string `bson:"codeName, omitempty"`
 }
 
-// Optime ...
+// OpTime ...
 type OpTime struct {
 	TS   primitive.Timestamp `bson:"ts" json:"ts"`
 	Term int64               `bson:"t" json:"t"`
@@ -117,12 +119,6 @@ type MongoCtlOpt func(*MongoCtl)
 func AdminCreds(creds AuthCreds) MongoCtlOpt {
 	return func(mc *MongoCtl) {
 		mc.adminCreds = creds
-	}
-}
-
-func Port(port int) MongoCtlOpt {
-	return func(mc *MongoCtl) {
-		mc.port = port
 	}
 }
 
@@ -383,12 +379,54 @@ func (mc *MongoCtl) InitReplSet() error {
 	if im.SetName != "" {
 		return nil
 	}
-	_, err = mc.runCmd([]string{"mongo",
-		"--host", "localhost", "--quiet", "--norc",
-		"--port", "27018", "--eval", "rs.initiate()"})
+	cli := []string{"mongo", "--host", "localhost", "--port", "27018", "--norc"}
+	authedCli := append(cli, "--username", mc.adminCreds.Username, "--password", mc.adminCreds.Password)
+	if _, err := mc.runCmd(append(authedCli, "--eval", "quit()", AdminDB)...); err == nil {
+		cli = authedCli
+	}
+	_, err = mc.runCmd(append(cli, "--eval", "rs.initiate()")...)
 	time.Sleep(3 * time.Second) // TODO: wait until rs initiated
 
 	return err
+}
+
+func (mc *MongoCtl) GetVersion() (version string, err error) {
+	for attempt := 0; attempt < 5; attempt++ {
+		var result ExecResult
+		result, err = mc.runCmd("mongo", "--host", "localhost", "--quiet", "--port", "27018", "--eval", "db.version()")
+		if err != nil {
+			continue
+		}
+		version := strings.TrimSpace(result.Stdout())
+		if !semver.IsValid(fmt.Sprintf("v%s", version)) {
+			err = fmt.Errorf("invalid version: %v", version)
+			continue
+		}
+
+		return version, err
+	}
+	return "", errors.Wrap(err, "Unable to get version of mongodb")
+}
+
+func (mc *MongoCtl) GetConfigPath() (string, error) {
+	getCmdLineOpts := struct {
+		Parsed struct {
+			Config string `bson:"config"`
+		} `bson:"parsed"`
+	}{}
+	adminConnect, err := mc.AdminConnect()
+	if err != nil {
+		return "", err
+	}
+	err = adminConnect.Database("admin").RunCommand(mc.ctx, bson.M{"getCmdLineOpts": 1}).Decode(&getCmdLineOpts)
+	if err != nil {
+		return "", err
+	}
+	if len(getCmdLineOpts.Parsed.Config) == 0 {
+		return "", errors.New("config path is empty")
+	}
+
+	return getCmdLineOpts.Parsed.Config, nil
 }
 
 func (mc *MongoCtl) EnableAuth() error {
@@ -444,30 +482,35 @@ func (mc *MongoCtl) EnableAuth() error {
 	return nil
 }
 
-func (mc *MongoCtl) runCmd(run []string) (ExecResult, error) {
-	exc, err := RunCommandStrict(mc.ctx, mc.host, run)
+func (mc *MongoCtl) runCmd(cli ...string) (ExecResult, error) {
+	exc, err := RunCommandStrict(mc.ctx, mc.host, cli)
 
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", strings.Join(run, " "), exc.String())
+		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", strings.Join(cli, " "), exc.String())
 		return exc, err
 	}
 	return exc, err
 }
 
+func (mc *MongoCtl) StopMongod() error {
+	_, err := mc.runCmd("supervisorctl", "stop", "mongodb")
+	return err
+}
+
+func (mc *MongoCtl) StartMongod() error {
+	_, err := mc.runCmd("supervisorctl", "start", "mongodb")
+	return err
+}
+
 func (mc *MongoCtl) PurgeDatadir() error {
-	_, err := mc.runCmd([]string{"supervisorctl", "stop", "mongodb"})
+	err := mc.StopMongod()
 	if err != nil {
 		return err
 	}
-	_, err = mc.runCmd([]string{"bash", "-c", "rm -rf /var/lib/mongodb/*"})
-	if err != nil {
-		return err
-	}
-
-	_, err = mc.runCmd([]string{"supervisorctl", "start", "mongodb"})
+	_, err = mc.runCmd("bash", "-c", "rm -rf /var/lib/mongodb/*")
 	if err != nil {
 		return err
 	}
 
-	return nil
+	return mc.StartMongod()
 }

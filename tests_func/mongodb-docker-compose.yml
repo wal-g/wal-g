@@ -13,9 +13,6 @@ services:
             - test_net
         ports:
             - ${S3_PORT}
-        tmpfs: /var/run
-        volumes:
-            - ./images/minio/config:/config:rw
         env_file:
             - ${ENV_FILE}
     mongodb01:
@@ -38,9 +35,6 @@ services:
         ports:
             - ${MONGO_EXPOSE_MONGOD}
             - ${EXPOSE_SSH_PORT}
-        tmpfs: /var/run
-        volumes:
-            - ./images/mongodb/config:/config:ro
         env_file:
             - ${ENV_FILE}
     mongodb02:
@@ -63,9 +57,5 @@ services:
         ports:
             - ${MONGO_EXPOSE_MONGOD}
             - ${EXPOSE_SSH_PORT}
-        tmpfs: /var/run
-        volumes:
-            - ./images/mongodb/config:/config:ro
         env_file:
             - ${ENV_FILE}
-version: '2'
