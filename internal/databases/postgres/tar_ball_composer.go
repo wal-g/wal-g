@@ -14,7 +14,6 @@ const (
 	RegularComposer TarBallComposerType = iota + 1
 	RatingComposer
 	CopyComposer
-	GreenplumComposer
 )
 
 // TarBallComposerMaker is used to make an instance of TarBallComposer
@@ -26,11 +25,16 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, queryRunner *PgQu
 	newBackupName string, filePackOptions TarBallFilePackerOptions,
 	withoutFilesMetadata bool) (TarBallComposerMaker, error) {
 	folder := uploader.UploadingFolder
+
+	if withoutFilesMetadata {
+		if composerType != RegularComposer {
+			tracelog.InfoLogger.Printf("No files metadata mode is enabled. Choosing the regular tar ball composer.")
+		}
+		return NewRegularTarBallComposerMaker(filePackOptions, &internal.NopBundleFiles{}, internal.NewNopTarFileSets()), nil
+	}
+
 	switch composerType {
 	case RegularComposer:
-		if withoutFilesMetadata {
-			return NewRegularTarBallComposerMaker(filePackOptions, &internal.NopBundleFiles{}, internal.NewNopTarFileSets()), nil
-		}
 		return NewRegularTarBallComposerMaker(filePackOptions, &internal.RegularBundleFiles{}, internal.NewRegularTarFileSets()), nil
 	case RatingComposer:
 		relFileStats, err := newRelFileStatistics(queryRunner)
@@ -60,13 +64,6 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, queryRunner *PgQu
 			}
 		}
 		return NewCopyTarBallComposerMaker(previousBackup, newBackupName, filePackOptions), nil
-	case GreenplumComposer:
-		relStorageMap, err := newAoRelFileStorageMap(queryRunner)
-		if err != nil {
-			return nil, err
-		}
-
-		return NewGpTarBallComposerMaker(relStorageMap, uploader, newBackupName)
 	default:
 		return nil, errors.New("NewTarBallComposerMaker: Unknown TarBallComposerType")
 	}

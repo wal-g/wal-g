@@ -6,7 +6,7 @@ import (
 )
 
 func NewFetchConfig(backupName, dbDataDirectory string, folder storage.Folder, spec *TablespaceSpec,
-	filesToUnwrap map[string]bool, skipRedundantTars bool) *FetchConfig {
+	filesToUnwrap map[string]bool, skipRedundantTars bool, manager ExtractProvider) *FetchConfig {
 	fetchConfig := &FetchConfig{
 		filesToUnwrap:     filesToUnwrap,
 		missingBlocks:     make(map[string]int64),
@@ -15,6 +15,7 @@ func NewFetchConfig(backupName, dbDataDirectory string, folder storage.Folder, s
 		folder:            folder,
 		dbDataDirectory:   dbDataDirectory,
 		skipRedundantTars: skipRedundantTars,
+		extractProv:       manager,
 	}
 	return fetchConfig
 }
@@ -28,6 +29,7 @@ type FetchConfig struct {
 	folder            storage.Folder
 	dbDataDirectory   string
 	skipRedundantTars bool
+	extractProv       ExtractProvider
 }
 
 func (fc *FetchConfig) SkipRedundantFiles(unwrapResult *UnwrapResult) {

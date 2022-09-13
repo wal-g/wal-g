@@ -51,25 +51,33 @@ type BackupArguments struct {
 	isPermanent           bool
 	verifyPageChecksums   bool
 	storeAllCorruptBlocks bool
-	tarBallComposerType   TarBallComposerType
 	userData              interface{}
 	forceIncremental      bool
 	backupsFolder         string
 	pgDataDirectory       string
 	isFullBackup          bool
-	deltaBaseSelector     internal.BackupSelector
+	deltaConfigurator     DeltaBackupConfigurator
 	withoutFilesMetadata  bool
+	composerInitFunc      func(handler *BackupHandler) error
 }
 
 // CurBackupInfo holds all information that is harvest during the backup process
 type CurBackupInfo struct {
-	name             string
-	startTime        time.Time
+	Name             string
+	StartTime        time.Time
 	startLSN         LSN
 	endLSN           LSN
 	uncompressedSize int64
 	compressedSize   int64
 	incrementCount   int
+}
+
+func NewPrevBackupInfo(name string, sentinel BackupSentinelDto, filesMeta FilesMetadataDto) PrevBackupInfo {
+	return PrevBackupInfo{
+		name:             name,
+		sentinelDto:      sentinel,
+		filesMetadataDto: filesMeta,
+	}
 }
 
 // PrevBackupInfo holds all information that is harvest during the backup process
@@ -81,31 +89,31 @@ type PrevBackupInfo struct {
 
 // BackupWorkers holds the external objects that the handler uses to get the backup data / write the backup data
 type BackupWorkers struct {
-	uploader    *WalUploader
-	bundle      *Bundle
-	queryRunner *PgQueryRunner
+	Uploader    *WalUploader
+	Bundle      *Bundle
+	QueryRunner *PgQueryRunner
 }
 
 // BackupPgInfo holds the PostgreSQL info that the handler queries before running the backup
 type BackupPgInfo struct {
 	pgVersion        int
-	pgDataDirectory  string
+	PgDataDirectory  string
 	systemIdentifier *uint64
 }
 
 // BackupHandler is the main struct which is handling the backup process
 type BackupHandler struct {
-	curBackupInfo  CurBackupInfo
+	CurBackupInfo  CurBackupInfo
 	prevBackupInfo PrevBackupInfo
-	arguments      BackupArguments
-	workers        BackupWorkers
-	pgInfo         BackupPgInfo
+	Arguments      BackupArguments
+	Workers        BackupWorkers
+	PgInfo         BackupPgInfo
 }
 
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
 func NewBackupArguments(pgDataDirectory string, backupsFolder string, isPermanent bool, verifyPageChecksums bool,
 	isFullBackup bool, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
-	deltaBaseSelector internal.BackupSelector, userData interface{}, withoutFilesMetadata bool) BackupArguments {
+	deltaConfigurator DeltaBackupConfigurator, userData interface{}, withoutFilesMetadata bool) BackupArguments {
 	return BackupArguments{
 		pgDataDirectory:       pgDataDirectory,
 		backupsFolder:         backupsFolder,
@@ -113,40 +121,27 @@ func NewBackupArguments(pgDataDirectory string, backupsFolder string, isPermanen
 		verifyPageChecksums:   verifyPageChecksums,
 		isFullBackup:          isFullBackup,
 		storeAllCorruptBlocks: storeAllCorruptBlocks,
-		tarBallComposerType:   tarBallComposerType,
-		deltaBaseSelector:     deltaBaseSelector,
+		deltaConfigurator:     deltaConfigurator,
 		userData:              userData,
 		withoutFilesMetadata:  withoutFilesMetadata,
+		composerInitFunc: func(handler *BackupHandler) error {
+			return configureTarBallComposer(handler, tarBallComposerType)
+		},
 	}
-}
-
-// TODO : unit tests
-func getDeltaConfig() (maxDeltas int, fromFull bool) {
-	maxDeltas = viper.GetInt(internal.DeltaMaxStepsSetting)
-	if origin, hasOrigin := internal.GetSetting(internal.DeltaOriginSetting); hasOrigin {
-		switch origin {
-		case internal.LatestString:
-		case "LATEST_FULL":
-			fromFull = true
-		default:
-			tracelog.ErrorLogger.Fatalf("Unknown %s: %s\n", internal.DeltaOriginSetting, origin)
-		}
-	}
-	return
 }
 
 func (bh *BackupHandler) createAndPushBackup() {
 	var err error
-	folder := bh.workers.uploader.UploadingFolder
+	folder := bh.Workers.Uploader.UploadingFolder
 	// TODO: AB: this subfolder switch look ugly.
 	// I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
-	bh.workers.uploader.UploadingFolder = folder.GetSubFolder(bh.arguments.backupsFolder)
-	tracelog.DebugLogger.Printf("Uploading folder: %s", bh.workers.uploader.UploadingFolder)
+	bh.Workers.Uploader.UploadingFolder = folder.GetSubFolder(bh.Arguments.backupsFolder)
+	tracelog.DebugLogger.Printf("Uploading folder: %s", bh.Workers.Uploader.UploadingFolder)
 
-	arguments := bh.arguments
+	arguments := bh.Arguments
 	crypter := internal.ConfigureCrypter()
-	bh.workers.bundle = NewBundle(bh.pgInfo.pgDataDirectory, crypter, bh.prevBackupInfo.sentinelDto.BackupStartLSN,
-		bh.prevBackupInfo.filesMetadataDto.Files, arguments.forceIncremental,
+	bh.Workers.Bundle = NewBundle(bh.PgInfo.PgDataDirectory, crypter, bh.prevBackupInfo.name,
+		bh.prevBackupInfo.sentinelDto.BackupStartLSN, bh.prevBackupInfo.filesMetadataDto.Files, arguments.forceIncremental,
 		viper.GetInt64(internal.TarSizeThresholdSetting))
 
 	err = bh.startBackup()
@@ -157,8 +152,8 @@ func (bh *BackupHandler) createAndPushBackup() {
 	bh.markBackups(folder, sentinelDto)
 	bh.uploadMetadata(sentinelDto, filesMetaDto)
 
-	// logging backup set name
-	tracelog.InfoLogger.Printf("Wrote backup with name %s", bh.curBackupInfo.name)
+	// logging backup set Name
+	tracelog.InfoLogger.Printf("Wrote backup with name %s", bh.CurBackupInfo.Name)
 }
 
 func (bh *BackupHandler) startBackup() (err error) {
@@ -168,19 +163,19 @@ func (bh *BackupHandler) startBackup() (err error) {
 	if err != nil {
 		return
 	}
-	bh.workers.queryRunner, err = NewPgQueryRunner(conn)
+	bh.Workers.QueryRunner, err = NewPgQueryRunner(conn)
 	if err != nil {
 		return fmt.Errorf("failed to build query runner: %v", err)
 	}
 
 	tracelog.DebugLogger.Println("Running StartBackup.")
-	backupName, backupStartLSN, err := bh.workers.bundle.StartBackup(
-		bh.workers.queryRunner, utility.CeilTimeUpToMicroseconds(time.Now()).String())
+	backupName, backupStartLSN, err := bh.Workers.Bundle.StartBackup(
+		bh.Workers.QueryRunner, utility.CeilTimeUpToMicroseconds(time.Now()).String())
 	if err != nil {
 		return
 	}
-	bh.curBackupInfo.startLSN = backupStartLSN
-	bh.curBackupInfo.name = backupName
+	bh.CurBackupInfo.startLSN = backupStartLSN
+	bh.CurBackupInfo.Name = backupName
 	tracelog.DebugLogger.Printf("Backup name: %s\nBackup start LSN: %s", backupName, backupStartLSN)
 	bh.initBackupTerminator()
 	return
@@ -191,16 +186,16 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
 		tracelog.InfoLogger.Println("Delta backup enabled")
 		tracelog.DebugLogger.Printf("Previous backup: %s\nBackup start LSN: %d", bh.prevBackupInfo.name,
 			bh.prevBackupInfo.sentinelDto.BackupStartLSN)
-		if *bh.prevBackupInfo.sentinelDto.BackupFinishLSN > bh.curBackupInfo.startLSN {
+		if *bh.prevBackupInfo.sentinelDto.BackupFinishLSN > bh.CurBackupInfo.startLSN {
 			tracelog.ErrorLogger.FatalOnError(newBackupFromFuture(bh.prevBackupInfo.name))
 		}
 		if bh.prevBackupInfo.sentinelDto.SystemIdentifier != nil &&
-			bh.pgInfo.systemIdentifier != nil &&
-			*bh.pgInfo.systemIdentifier != *bh.prevBackupInfo.sentinelDto.SystemIdentifier {
+			bh.PgInfo.systemIdentifier != nil &&
+			*bh.PgInfo.systemIdentifier != *bh.prevBackupInfo.sentinelDto.SystemIdentifier {
 			tracelog.ErrorLogger.FatalOnError(newBackupFromOtherBD())
 		}
-		if bh.workers.uploader.getUseWalDelta() {
-			err := bh.workers.bundle.DownloadDeltaMap(folder.GetSubFolder(utility.WalPath), bh.curBackupInfo.startLSN)
+		if bh.Workers.Uploader.getUseWalDelta() {
+			err := bh.Workers.Bundle.DownloadDeltaMap(folder.GetSubFolder(utility.WalPath), bh.CurBackupInfo.startLSN)
 			if err == nil {
 				tracelog.InfoLogger.Println("Successfully loaded delta map, delta backup will be made with provided " +
 					"delta map")
@@ -209,18 +204,18 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
 					"Fallback to full scan delta backup\n", err)
 			}
 		}
-		bh.curBackupInfo.name = bh.curBackupInfo.name + "_D_" + utility.StripWalFileName(bh.prevBackupInfo.name)
-		tracelog.DebugLogger.Printf("Suffixing Backup name with Delta info: %s", bh.curBackupInfo.name)
+		bh.CurBackupInfo.Name = bh.CurBackupInfo.Name + "_D_" + utility.StripWalFileName(bh.prevBackupInfo.name)
+		tracelog.DebugLogger.Printf("Suffixing Backup name with Delta info: %s", bh.CurBackupInfo.Name)
 	}
 }
 
 func (bh *BackupHandler) setupDTO(tarFileSets internal.TarFileSets) (sentinelDto BackupSentinelDto, filesMeta FilesMetadataDto) {
 	var tablespaceSpec *TablespaceSpec
-	if !bh.workers.bundle.TablespaceSpec.empty() {
-		tablespaceSpec = &bh.workers.bundle.TablespaceSpec
+	if !bh.Workers.Bundle.TablespaceSpec.empty() {
+		tablespaceSpec = &bh.Workers.Bundle.TablespaceSpec
 	}
 	sentinelDto = NewBackupSentinelDto(bh, tablespaceSpec)
-	filesMeta.setFiles(bh.workers.bundle.GetFiles())
+	filesMeta.setFiles(bh.Workers.Bundle.GetFiles())
 	filesMeta.TarFileSets = tarFileSets.Get()
 	return sentinelDto, filesMeta
 }
@@ -228,30 +223,40 @@ func (bh *BackupHandler) setupDTO(tarFileSets internal.TarFileSets) (sentinelDto
 func (bh *BackupHandler) markBackups(folder storage.Folder, sentinelDto BackupSentinelDto) {
 	// If pushing permanent delta backup, mark all previous backups permanent
 	// Do this before uploading current meta to ensure that backups are marked in increasing order
-	if bh.arguments.isPermanent && sentinelDto.IsIncremental() {
+	if bh.Arguments.isPermanent && sentinelDto.IsIncremental() {
 		markBackupHandler := internal.NewBackupMarkHandler(NewGenericMetaInteractor(), folder)
 		markBackupHandler.MarkBackup(bh.prevBackupInfo.name, true)
 	}
 }
 
+func (bh *BackupHandler) SetComposerInitFunc(initFunc func(handler *BackupHandler) error) {
+	bh.Arguments.composerInitFunc = initFunc
+}
+
+func configureTarBallComposer(bh *BackupHandler, tarBallComposerType TarBallComposerType) error {
+	maker, err := NewTarBallComposerMaker(tarBallComposerType, bh.Workers.QueryRunner,
+		bh.Workers.Uploader.Uploader, bh.CurBackupInfo.Name,
+		NewTarBallFilePackerOptions(bh.Arguments.verifyPageChecksums, bh.Arguments.storeAllCorruptBlocks),
+		bh.Arguments.withoutFilesMetadata)
+	if err != nil {
+		return err
+	}
+
+	return bh.Workers.Bundle.SetupComposer(maker)
+}
+
 func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
-	bundle := bh.workers.bundle
+	bundle := bh.Workers.Bundle
 	// Start a new tar bundle, walk the pgDataDirectory and upload everything there.
 	tracelog.InfoLogger.Println("Starting a new tar bundle")
-	err := bundle.StartQueue(internal.NewStorageTarBallMaker(bh.curBackupInfo.name, bh.workers.uploader.Uploader))
+	err := bundle.StartQueue(internal.NewStorageTarBallMaker(bh.CurBackupInfo.Name, bh.Workers.Uploader.Uploader))
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	tarBallComposerMaker, err := NewTarBallComposerMaker(bh.arguments.tarBallComposerType, bh.workers.queryRunner,
-		bh.workers.uploader.Uploader, bh.curBackupInfo.name,
-		NewTarBallFilePackerOptions(bh.arguments.verifyPageChecksums, bh.arguments.storeAllCorruptBlocks),
-		bh.arguments.withoutFilesMetadata)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	err = bundle.SetupComposer(tarBallComposerMaker)
+	err = bh.Arguments.composerInitFunc(bh)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Walking ...")
-	err = filepath.Walk(bh.pgInfo.pgDataDirectory, bundle.HandleWalkedFSObject)
+	err = filepath.Walk(bh.PgInfo.PgDataDirectory, bundle.HandleWalkedFSObject)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Packing ...")
@@ -263,30 +268,30 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.DebugLogger.Println("Uploading pg_control ...")
-	err = bundle.UploadPgControl(bh.workers.uploader.Compressor.FileExtension())
+	err = bundle.UploadPgControl(bh.Workers.Uploader.Compressor.FileExtension())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
 	tracelog.DebugLogger.Println("Stop backup and upload backup_label and tablespace_map")
-	labelFilesTarBallName, labelFilesList, finishLsn, err := bundle.uploadLabelFiles(bh.workers.queryRunner)
+	labelFilesTarBallName, labelFilesList, finishLsn, err := bundle.uploadLabelFiles(bh.Workers.QueryRunner)
 	tracelog.ErrorLogger.FatalOnError(err)
-	bh.curBackupInfo.endLSN = finishLsn
-	bh.curBackupInfo.uncompressedSize = atomic.LoadInt64(bundle.TarBallQueue.AllTarballsSize)
-	bh.curBackupInfo.compressedSize, err = bh.workers.uploader.UploadedDataSize()
+	bh.CurBackupInfo.endLSN = finishLsn
+	bh.CurBackupInfo.uncompressedSize = atomic.LoadInt64(bundle.TarBallQueue.AllTarballsSize)
+	bh.CurBackupInfo.compressedSize, err = bh.Workers.Uploader.UploadedDataSize()
 	tracelog.ErrorLogger.FatalOnError(err)
 	tarFileSets.AddFiles(labelFilesTarBallName, labelFilesList)
-	timelineChanged := bundle.checkTimelineChanged(bh.workers.queryRunner)
+	timelineChanged := bundle.checkTimelineChanged(bh.Workers.QueryRunner)
 	tracelog.DebugLogger.Printf("Labelfiles tarball name: %s", labelFilesTarBallName)
 	tracelog.DebugLogger.Printf("Number of label files: %d", len(labelFilesList))
-	tracelog.DebugLogger.Printf("Finish LSN: %s", bh.curBackupInfo.endLSN)
-	tracelog.DebugLogger.Printf("Uncompressed size: %d", bh.curBackupInfo.uncompressedSize)
-	tracelog.DebugLogger.Printf("Compressed size: %d", bh.curBackupInfo.compressedSize)
+	tracelog.DebugLogger.Printf("Finish LSN: %s", bh.CurBackupInfo.endLSN)
+	tracelog.DebugLogger.Printf("Uncompressed size: %d", bh.CurBackupInfo.uncompressedSize)
+	tracelog.DebugLogger.Printf("Compressed size: %d", bh.CurBackupInfo.compressedSize)
 
 	// Wait for all uploads to finish.
 	tracelog.DebugLogger.Println("Waiting for all uploads to finish")
-	bh.workers.uploader.Finish()
-	if bh.workers.uploader.Failed.Load().(bool) {
-		tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", bh.curBackupInfo.name)
+	bh.Workers.Uploader.Finish()
+	if bh.Workers.Uploader.Failed.Load().(bool) {
+		tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", bh.CurBackupInfo.Name)
 	}
 	if timelineChanged {
 		tracelog.ErrorLogger.Fatalf("Cannot finish backup because of changed timeline.")
@@ -297,14 +302,14 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 // HandleBackupPush handles the backup being read from Postgres or filesystem and being pushed to the repository
 // TODO : unit tests
 func (bh *BackupHandler) HandleBackupPush() {
-	folder := bh.workers.uploader.UploadingFolder
-	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
+	folder := bh.Workers.Uploader.UploadingFolder
+	baseBackupFolder := folder.GetSubFolder(bh.Arguments.backupsFolder)
 	tracelog.DebugLogger.Printf("Base backup folder: %s", baseBackupFolder)
 
-	bh.curBackupInfo.startTime = utility.TimeNowCrossPlatformUTC()
+	bh.CurBackupInfo.StartTime = utility.TimeNowCrossPlatformUTC()
 
-	if bh.arguments.pgDataDirectory == "" {
-		if bh.arguments.forceIncremental {
+	if bh.Arguments.pgDataDirectory == "" {
+		if bh.Arguments.forceIncremental {
 			tracelog.ErrorLogger.Println("Delta backup not available for remote backup.")
 			tracelog.ErrorLogger.Fatal("To run delta backup, supply [db_directory].")
 		}
@@ -312,24 +317,26 @@ func (bh *BackupHandler) HandleBackupPush() {
 		tracelog.InfoLogger.Println("Running remote backup through Postgres connection.")
 		tracelog.InfoLogger.Println("Features like delta backup are disabled, there might be a performance impact.")
 		tracelog.InfoLogger.Println("To run with local backup functionalities, supply [db_directory].")
-		if bh.pgInfo.pgVersion < 110000 && !bh.arguments.verifyPageChecksums {
+		if bh.PgInfo.pgVersion < 110000 && !bh.Arguments.verifyPageChecksums {
 			tracelog.InfoLogger.Println("VerifyPageChecksums=false is only supported for streaming backup since PG11")
-			bh.arguments.verifyPageChecksums = true
+			bh.Arguments.verifyPageChecksums = true
 		}
 		bh.createAndPushRemoteBackup()
 		return
 	}
 
-	if utility.ResolveSymlink(bh.arguments.pgDataDirectory) != bh.pgInfo.pgDataDirectory {
+	if utility.ResolveSymlink(bh.Arguments.pgDataDirectory) != bh.PgInfo.PgDataDirectory {
 		tracelog.ErrorLogger.Panicf("Data directory read from Postgres (%s) is different than as parsed (%s).",
-			bh.arguments.pgDataDirectory, bh.pgInfo.pgDataDirectory)
+			bh.Arguments.pgDataDirectory, bh.PgInfo.PgDataDirectory)
 	}
 	bh.checkPgVersionAndPgControl()
 
-	if bh.arguments.isFullBackup {
+	if bh.Arguments.isFullBackup {
 		tracelog.InfoLogger.Println("Doing full backup.")
 	} else {
-		err := bh.configureDeltaBackup()
+		var err error
+		bh.prevBackupInfo, bh.CurBackupInfo.incrementCount, err = bh.Arguments.deltaConfigurator.Configure(
+			folder, bh.Arguments.isPermanent)
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
 
@@ -338,12 +345,12 @@ func (bh *BackupHandler) HandleBackupPush() {
 
 func (bh *BackupHandler) createAndPushRemoteBackup() {
 	var err error
-	uploader := *bh.workers.uploader
+	uploader := *bh.Workers.Uploader
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	tracelog.DebugLogger.Printf("Uploading folder: %s", uploader.UploadingFolder)
 
 	var tarFileSets internal.TarFileSets
-	if bh.arguments.withoutFilesMetadata {
+	if bh.Arguments.withoutFilesMetadata {
 		tarFileSets = internal.NewNopTarFileSets()
 	} else {
 		tarFileSets = internal.NewRegularTarFileSets()
@@ -351,25 +358,25 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 
 	baseBackup := bh.runRemoteBackup()
 	tracelog.InfoLogger.Println("Updating metadata")
-	bh.curBackupInfo.startLSN = LSN(baseBackup.StartLSN)
-	bh.curBackupInfo.endLSN = LSN(baseBackup.EndLSN)
+	bh.CurBackupInfo.startLSN = LSN(baseBackup.StartLSN)
+	bh.CurBackupInfo.endLSN = LSN(baseBackup.EndLSN)
 
-	bh.curBackupInfo.uncompressedSize = baseBackup.UncompressedSize
-	bh.curBackupInfo.compressedSize, err = bh.workers.uploader.UploadedDataSize()
+	bh.CurBackupInfo.uncompressedSize = baseBackup.UncompressedSize
+	bh.CurBackupInfo.compressedSize, err = bh.Workers.Uploader.UploadedDataSize()
 	tracelog.ErrorLogger.FatalOnError(err)
 	sentinelDto := NewBackupSentinelDto(bh, baseBackup.GetTablespaceSpec())
 	filesMetadataDto := NewFilesMetadataDto(baseBackup.Files, tarFileSets)
-	bh.curBackupInfo.name = baseBackup.BackupName()
+	bh.CurBackupInfo.Name = baseBackup.BackupName()
 	tracelog.InfoLogger.Println("Uploading metadata")
 	bh.uploadMetadata(sentinelDto, filesMetadataDto)
-	// logging backup set name
-	tracelog.InfoLogger.Printf("Wrote backup with name %s", bh.curBackupInfo.name)
+	// logging backup set Name
+	tracelog.InfoLogger.Printf("Wrote backup with name %s", bh.CurBackupInfo.Name)
 }
 
 func (bh *BackupHandler) uploadMetadata(sentinelDto BackupSentinelDto, filesMetaDto FilesMetadataDto) {
-	curBackupName := bh.curBackupInfo.name
-	meta := NewExtendedMetadataDto(bh.arguments.isPermanent, bh.pgInfo.pgDataDirectory,
-		bh.curBackupInfo.startTime, sentinelDto)
+	curBackupName := bh.CurBackupInfo.Name
+	meta := NewExtendedMetadataDto(bh.Arguments.isPermanent, bh.PgInfo.PgDataDirectory,
+		bh.CurBackupInfo.StartTime, sentinelDto)
 
 	err := bh.uploadExtendedMetadata(meta)
 	if err != nil {
@@ -379,7 +386,7 @@ func (bh *BackupHandler) uploadMetadata(sentinelDto BackupSentinelDto, filesMeta
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to upload files metadata for backup %s: %v", curBackupName, err)
 	}
-	err = internal.UploadSentinel(bh.workers.uploader, NewBackupSentinelDtoV2(sentinelDto, meta), bh.curBackupInfo.name)
+	err = internal.UploadSentinel(bh.Workers.Uploader, NewBackupSentinelDtoV2(sentinelDto, meta), bh.CurBackupInfo.Name)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to upload sentinel file for backup %s: %v", curBackupName, err)
 	}
@@ -400,18 +407,18 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 		return bh, err
 	}
 
-	if arguments.pgDataDirectory != "" && arguments.pgDataDirectory != pgInfo.pgDataDirectory {
+	if arguments.pgDataDirectory != "" && arguments.pgDataDirectory != pgInfo.PgDataDirectory {
 		warning := fmt.Sprintf("Data directory for postgres '%s' is not equal to backup-push argument '%s'",
-			arguments.pgDataDirectory, pgInfo.pgDataDirectory)
+			arguments.pgDataDirectory, pgInfo.PgDataDirectory)
 		tracelog.WarningLogger.Println(warning)
 	}
 
 	bh = &BackupHandler{
-		arguments: arguments,
-		workers: BackupWorkers{
-			uploader: uploader,
+		Arguments: arguments,
+		Workers: BackupWorkers{
+			Uploader: uploader,
 		},
-		pgInfo: pgInfo,
+		PgInfo: pgInfo,
 	}
 
 	return bh, err
@@ -432,19 +439,19 @@ func (bh *BackupHandler) runRemoteBackup() *StreamingBaseBackup {
 	conn, err := pgconn.Connect(context.Background(), "replication=yes")
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	baseBackup := NewStreamingBaseBackup(bh.pgInfo.pgDataDirectory, viper.GetInt64(internal.TarSizeThresholdSetting), conn)
+	baseBackup := NewStreamingBaseBackup(bh.PgInfo.PgDataDirectory, viper.GetInt64(internal.TarSizeThresholdSetting), conn)
 	var bundleFiles internal.BundleFiles
-	if bh.arguments.withoutFilesMetadata {
+	if bh.Arguments.withoutFilesMetadata {
 		bundleFiles = &internal.NopBundleFiles{}
 	} else {
 		bundleFiles = &internal.RegularBundleFiles{}
 	}
 	tracelog.InfoLogger.Println("Starting remote backup")
-	err = baseBackup.Start(bh.arguments.verifyPageChecksums, diskLimit)
+	err = baseBackup.Start(bh.Arguments.verifyPageChecksums, diskLimit)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Streaming remote backup")
-	err = baseBackup.Upload(bh.workers.uploader, bundleFiles)
+	err = baseBackup.Upload(bh.Workers.Uploader, bundleFiles)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Finishing backup")
@@ -471,12 +478,12 @@ func getPgServerInfo() (pgInfo BackupPgInfo, err error) {
 		return pgInfo, err
 	}
 
-	pgInfo.pgDataDirectory, err = queryRunner.GetDataDir()
+	pgInfo.PgDataDirectory, err = queryRunner.GetDataDir()
 	if err != nil {
 		return pgInfo, err
 	}
-	pgInfo.pgDataDirectory = utility.ResolveSymlink(pgInfo.pgDataDirectory)
-	tracelog.DebugLogger.Printf("Datadir: %s", pgInfo.pgDataDirectory)
+	pgInfo.PgDataDirectory = utility.ResolveSymlink(pgInfo.PgDataDirectory)
+	tracelog.DebugLogger.Printf("Datadir: %s", pgInfo.PgDataDirectory)
 
 	err = queryRunner.getVersion()
 	if err != nil {
@@ -500,90 +507,19 @@ func getPgServerInfo() (pgInfo BackupPgInfo, err error) {
 	return pgInfo, err
 }
 
-func (bh *BackupHandler) configureDeltaBackup() (err error) {
-	maxDeltas, fromFull := getDeltaConfig()
-	if maxDeltas == 0 {
-		return nil
-	}
-
-	folder := bh.workers.uploader.UploadingFolder
-	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	previousBackupName, err := bh.arguments.deltaBaseSelector.Select(folder)
-	if err != nil {
-		if _, ok := err.(internal.NoBackupsFoundError); ok {
-			tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
-			return nil
-		}
-		return err
-	}
-
-	previousBackup := NewBackup(baseBackupFolder, previousBackupName)
-	prevBackupSentinelDto, err := previousBackup.GetSentinel()
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	if prevBackupSentinelDto.IncrementCount != nil {
-		bh.curBackupInfo.incrementCount = *prevBackupSentinelDto.IncrementCount + 1
-	} else {
-		bh.curBackupInfo.incrementCount = 1
-	}
-
-	if bh.curBackupInfo.incrementCount > maxDeltas {
-		tracelog.InfoLogger.Println("Reached max delta steps. Doing full backup.")
-		return nil
-	}
-
-	if prevBackupSentinelDto.BackupStartLSN == nil {
-		tracelog.InfoLogger.Println("LATEST backup was made without support for delta feature. " +
-			"Fallback to full backup with LSN marker for future deltas.")
-		return nil
-	}
-
-	previousBackupMeta, err := previousBackup.FetchMeta()
-	if err != nil {
-		tracelog.InfoLogger.Printf(
-			"Failed to get previous backup metadata: %s. Doing full backup.\n", err.Error())
-		return nil
-	}
-
-	if !bh.arguments.isPermanent && !fromFull && previousBackupMeta.IsPermanent {
-		tracelog.InfoLogger.Println("Can't do a delta backup from permanent backup. Doing full backup.")
-		return nil
-	}
-
-	if fromFull {
-		tracelog.InfoLogger.Println("Delta will be made from full backup.")
-
-		if prevBackupSentinelDto.IncrementFullName != nil {
-			previousBackupName = *prevBackupSentinelDto.IncrementFullName
-		}
-
-		previousBackup := NewBackup(baseBackupFolder, previousBackupName)
-		prevBackupSentinelDto, err = previousBackup.GetSentinel()
-		if err != nil {
-			return err
-		}
-	}
-	tracelog.InfoLogger.Printf("Delta backup from %v with LSN %s.\n", previousBackupName,
-		*prevBackupSentinelDto.BackupStartLSN)
-	bh.prevBackupInfo.name = previousBackupName
-	bh.prevBackupInfo.sentinelDto = prevBackupSentinelDto
-	_, bh.prevBackupInfo.filesMetadataDto, err = previousBackup.GetSentinelAndFilesMetadata()
-	return err
-}
-
 // TODO : unit tests
 func (bh *BackupHandler) uploadExtendedMetadata(meta ExtendedMetadataDto) (err error) {
-	metaFile := storage.JoinPath(bh.curBackupInfo.name, utility.MetadataFileName)
+	metaFile := storage.JoinPath(bh.CurBackupInfo.Name, utility.MetadataFileName)
 	dtoBody, err := json.Marshal(meta)
 	if err != nil {
 		return internal.NewSentinelMarshallingError(metaFile, err)
 	}
 	tracelog.DebugLogger.Printf("Uploading metadata file (%s):\n%s", metaFile, dtoBody)
-	return bh.workers.uploader.Upload(metaFile, bytes.NewReader(dtoBody))
+	return bh.Workers.Uploader.Upload(metaFile, bytes.NewReader(dtoBody))
 }
 
 func (bh *BackupHandler) uploadFilesMetadata(filesMetaDto FilesMetadataDto) (err error) {
-	if bh.arguments.withoutFilesMetadata {
+	if bh.Arguments.withoutFilesMetadata {
 		tracelog.InfoLogger.Printf("Files metadata tracking is disabled, will not upload the %s", FilesMetadataName)
 		return nil
 	}
@@ -592,14 +528,14 @@ func (bh *BackupHandler) uploadFilesMetadata(filesMetaDto FilesMetadataDto) (err
 	if err != nil {
 		return err
 	}
-	return bh.workers.uploader.Upload(getFilesMetadataPath(bh.curBackupInfo.name), bytes.NewReader(dtoBody))
+	return bh.Workers.Uploader.Upload(getFilesMetadataPath(bh.CurBackupInfo.Name), bytes.NewReader(dtoBody))
 }
 
 func (bh *BackupHandler) checkPgVersionAndPgControl() {
-	_, err := os.ReadFile(filepath.Join(bh.pgInfo.pgDataDirectory, PgControlPath))
+	_, err := os.ReadFile(filepath.Join(bh.PgInfo.PgDataDirectory, PgControlPath))
 	tracelog.ErrorLogger.FatalfOnError(
 		"It looks like you are trying to backup not pg_data. PgControl file not found: %v\n", err)
-	_, err = os.ReadFile(filepath.Join(bh.pgInfo.pgDataDirectory, "PG_VERSION"))
+	_, err = os.ReadFile(filepath.Join(bh.PgInfo.PgDataDirectory, "PG_VERSION"))
 	tracelog.ErrorLogger.FatalfOnError(
 		"It looks like you are trying to backup not pg_data. PG_VERSION file not found: %v\n", err)
 }
@@ -608,9 +544,9 @@ func (bh *BackupHandler) initBackupTerminator() {
 	errCh := make(chan error, 1)
 
 	addSignalListener(errCh)
-	addPgIsAliveChecker(bh.workers.queryRunner, errCh)
+	addPgIsAliveChecker(bh.Workers.QueryRunner, errCh)
 
-	terminator := NewBackupTerminator(bh.workers.queryRunner, bh.pgInfo.pgVersion, bh.pgInfo.pgDataDirectory)
+	terminator := NewBackupTerminator(bh.Workers.QueryRunner, bh.PgInfo.pgVersion, bh.PgInfo.PgDataDirectory)
 
 	go func() {
 		err := <-errCh

@@ -334,6 +334,21 @@ func getMaxUploadQueue() (int, error) {
 	return GetMaxConcurrency(UploadQueueSetting)
 }
 
+// TODO : unit tests
+func GetDeltaConfig() (maxDeltas int, fromFull bool) {
+	maxDeltas = viper.GetInt(DeltaMaxStepsSetting)
+	if origin, hasOrigin := GetSetting(DeltaOriginSetting); hasOrigin {
+		switch origin {
+		case LatestString:
+		case "LATEST_FULL":
+			fromFull = true
+		default:
+			tracelog.ErrorLogger.Fatalf("Unknown %s: %s\n", DeltaOriginSetting, origin)
+		}
+	}
+	return
+}
+
 func GetMaxUploadDiskConcurrency() (int, error) {
 	if Turbo {
 		return 4, nil

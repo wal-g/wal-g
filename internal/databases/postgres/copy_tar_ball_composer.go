@@ -116,7 +116,7 @@ func (maker *CopyTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBallCom
 		return nil, errors.New("No SentinelDto in previous backup")
 	}
 	files := &internal.RegularBundleFiles{}
-	tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap,
+	tarBallFilePacker := NewTarBallFilePacker(bundle.DeltaMap,
 		bundle.IncrementFromLsn, files, maker.filePackerOptions)
 	return NewCopyTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, files,
 		bundle.Crypter, maker.previousBackup, maker.newBackupName, tarUnchangedFilesCount,

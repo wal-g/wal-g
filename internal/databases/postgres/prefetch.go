@@ -72,7 +72,7 @@ func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitG
 	archiveDirectory := uploader.DeltaFileManager.dataFolder.(*fsutil.DiskDataFolder).Path
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	archiveDirectory = filepath.Dir(archiveDirectory)
-	bundle := NewBundle(archiveDirectory, nil, &prefaultStartLsn, nil,
+	bundle := NewBundle(archiveDirectory, nil, "", &prefaultStartLsn, nil,
 		false, viper.GetInt64(internal.TarSizeThresholdSetting))
 	bundle.Timeline = timelineID
 	startLsn := prefaultStartLsn + LSN(WalSegmentSize*WalFileInDelta)

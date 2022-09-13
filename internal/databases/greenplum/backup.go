@@ -17,12 +17,6 @@ type Backup struct {
 	rootFolder  storage.Folder
 }
 
-func ToGpBackup(source internal.Backup) (output Backup) {
-	return Backup{
-		Backup: source,
-	}
-}
-
 func NewBackup(rootFolder storage.Folder, name string) Backup {
 	return Backup{
 		Backup:     internal.NewBackup(rootFolder.GetSubFolder(utility.BaseBackupPath), name),
