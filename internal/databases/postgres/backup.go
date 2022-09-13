@@ -3,7 +3,6 @@ package postgres
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 
@@ -37,9 +36,6 @@ type Backup struct {
 	internal.Backup
 	SentinelDto      *BackupSentinelDto // used for storage query caching
 	FilesMetadataDto *FilesMetadataDto
-
-	// Greenplum backups only
-	AoFilesMetadataDto *AOFilesMetadataDTO
 }
 
 func ToPgBackup(source internal.Backup) (output Backup) {
@@ -77,7 +73,7 @@ func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
 	}
 
 	// this utility struct is used for compatibility reasons, since
-	// previous WAL-G versions used to store the FilesMetadataDto in the s json
+	// previous WAL-G versions used to store the FilesMetadataDto in the sentinel json
 	s := struct {
 		BackupSentinelDto
 		DeprecatedSentinelFields
@@ -247,31 +243,31 @@ func setTablespacePaths(spec TablespaceSpec) error {
 
 // check that directory is empty before unwrap
 func (backup *Backup) unwrapToEmptyDirectory(
-	dbDataDirectory string, sentinelDto BackupSentinelDto,
-	filesMeta FilesMetadataDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
+	dbDataDirectory string, filesToUnwrap map[string]bool, createIncrementalFiles bool,
+	extractProv ExtractProvider,
 ) error {
-	err := checkDBDirectoryForUnwrap(dbDataDirectory, sentinelDto, filesMeta)
+	err := checkDBDirectoryForUnwrap(dbDataDirectory, *backup.SentinelDto, *backup.FilesMetadataDto)
 	if err != nil {
 		return err
 	}
 
-	return backup.unwrapOld(dbDataDirectory, sentinelDto, filesMeta, filesToUnwrap, createIncrementalFiles)
+	return backup.unwrapOld(dbDataDirectory, filesToUnwrap, createIncrementalFiles, extractProv)
 }
 
 // TODO : unit tests
 // Do the job of unpacking Backup object
 func (backup *Backup) unwrapOld(
-	dbDataDirectory string, sentinelDto BackupSentinelDto,
-	filesMeta FilesMetadataDto, filesToUnwrap map[string]bool, createIncrementalFiles bool,
+	dbDataDirectory string, filesToUnwrap map[string]bool, createIncrementalFiles bool,
+	extractProv ExtractProvider,
 ) error {
-	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesMeta, filesToUnwrap, createIncrementalFiles)
-	tarsToExtract, pgControlKey, err := backup.getTarsToExtract(filesMeta, filesToUnwrap, false)
+	tarInterpreter, tarsToExtract, pgControlKey, err := extractProv.Get(
+		*backup, filesToUnwrap, false, dbDataDirectory, createIncrementalFiles)
 	if err != nil {
 		return err
 	}
 
 	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of backup.
-	needPgControl := IsPgControlRequired(*backup, sentinelDto)
+	needPgControl := IsPgControlRequired(*backup)
 
 	if pgControlKey == "" && needPgControl {
 		return newPgControlNotFoundError()
@@ -294,63 +290,11 @@ func (backup *Backup) unwrapOld(
 	return nil
 }
 
-func IsPgControlRequired(backup Backup, sentinelDto BackupSentinelDto) bool {
+func IsPgControlRequired(backup Backup) bool {
 	re := regexp.MustCompile(`^([^_]+._{1}[^_]+._{1})`)
 	walgBasebackupName := re.FindString(backup.Name) == ""
-	needPgControl := walgBasebackupName || sentinelDto.IsIncremental()
+	needPgControl := walgBasebackupName || backup.SentinelDto.IsIncremental()
 	return needPgControl
-}
-
-// TODO : init tests
-func (backup *Backup) getTarsToExtract(filesMeta FilesMetadataDto, filesToUnwrap map[string]bool,
-	skipRedundantTars bool) (tarsToExtract []internal.ReaderMaker, pgControlKey string, err error) {
-	tarNames, err := backup.GetTarNames()
-	if err != nil {
-		return nil, "", err
-	}
-	tracelog.DebugLogger.Printf("Tars to extract: '%+v'\n", tarNames)
-	tarsToExtract = make([]internal.ReaderMaker, 0, len(tarNames))
-
-	pgControlRe := regexp.MustCompile(`^.*?pg_control\.tar(\..+$|$)`)
-	for _, tarName := range tarNames {
-		// Separate the pg_control tarName from the others to
-		// extract it at the end, as to prevent server startup
-		// with incomplete backup restoration.  But only if it
-		// exists: it won't in the case of WAL-E backup
-		// backwards compatibility.
-		if pgControlRe.MatchString(tarName) {
-			if pgControlKey != "" {
-				panic("expect only one pg_control tar name match")
-			}
-			pgControlKey = tarName
-			continue
-		}
-
-		if skipRedundantTars && !shouldUnwrapTar(tarName, filesMeta, filesToUnwrap) {
-			continue
-		}
-
-		tarToExtract := internal.NewStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
-		tarsToExtract = append(tarsToExtract, tarToExtract)
-	}
-
-	aoMeta, err := backup.LoadAoFilesMetadata()
-	if err != nil {
-		tracelog.DebugLogger.Printf("AO files metadata was not found. Skipping the AO segments unpacking.")
-	} else {
-		tracelog.InfoLogger.Printf("AO files metadata found. Will perform the AO segments unpacking.")
-		for extractPath, meta := range aoMeta.Files {
-			if !filesToUnwrap[extractPath] {
-				tracelog.InfoLogger.Printf("Don't need to unwrap the %s AO segment file, skipping it...", extractPath)
-				continue
-			}
-			objPath := path.Join(AoStoragePath, meta.StoragePath)
-			readerMaker := internal.NewRegularFileStorageReaderMarker(backup.Folder, objPath, extractPath, meta.FileMode)
-			tarsToExtract = append(tarsToExtract, readerMaker)
-		}
-	}
-
-	return tarsToExtract, pgControlKey, nil
 }
 
 func (backup *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error) {
@@ -371,21 +315,6 @@ func (backup *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error)
 		filesToUnwrap[utilityFilePath] = true
 	}
 	return utility.SelectMatchingFiles(fileMask, filesToUnwrap)
-}
-
-func (backup *Backup) LoadAoFilesMetadata() (*AOFilesMetadataDTO, error) {
-	if backup.AoFilesMetadataDto != nil {
-		return backup.AoFilesMetadataDto, nil
-	}
-
-	var meta AOFilesMetadataDTO
-	err := internal.FetchDto(backup.Folder, &meta, getAOFilesMetadataPath(backup.Name))
-	if err != nil {
-		return nil, err
-	}
-
-	backup.AoFilesMetadataDto = &meta
-	return backup.AoFilesMetadataDto, nil
 }
 
 func shouldUnwrapTar(tarName string, filesMeta FilesMetadataDto, filesToUnwrap map[string]bool) bool {

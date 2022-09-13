@@ -15,6 +15,11 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+type IncrementalTarInterpreter interface {
+	internal.TarInterpreter
+	GetUnwrapResult() *UnwrapResult
+}
+
 // FileTarInterpreter extracts input to disk.
 type FileTarInterpreter struct {
 	DBDataDirectory string
@@ -32,6 +37,10 @@ func NewFileTarInterpreter(
 ) *FileTarInterpreter {
 	return &FileTarInterpreter{dbDataDirectory, sentinel, filesMetadata,
 		filesToUnwrap, newUnwrapResult(), createNewIncrementalFiles}
+}
+
+func (tarInterpreter *FileTarInterpreter) GetUnwrapResult() *UnwrapResult {
+	return tarInterpreter.UnwrapResult
 }
 
 // TODO : unit tests

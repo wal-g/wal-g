@@ -95,15 +95,16 @@ func TestGetTarNames(t *testing.T) {
 func TestIsPgControlRequired(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
 	backup := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_456")
-	dto, err := backup.GetSentinel()
+	_, err := backup.GetSentinel()
 	assert.NoError(t, err)
-	assert.True(t, postgres.IsPgControlRequired(backup, dto))
+	assert.True(t, postgres.IsPgControlRequired(backup))
 }
 
 func TestIsPgControlNotRequiredForWALEBackups(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
 	backup := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_000000010000DD170000000C_00743784")
-	assert.False(t, postgres.IsPgControlRequired(backup, postgres.BackupSentinelDto{}))
+	backup.SentinelDto = &postgres.BackupSentinelDto{}
+	assert.False(t, postgres.IsPgControlRequired(backup))
 }
 
 func TestFetchSentinel(t *testing.T) {

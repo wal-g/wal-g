@@ -23,7 +23,12 @@ type DeleteHandler struct {
 }
 
 func NewDeleteHandler(folder storage.Folder) (*DeleteHandler, error) {
-	backupObjects, err := internal.FindBackupObjects(folder)
+	backupSentinelObjects, err := internal.GetBackupSentinelObjects(folder)
+	if err != nil {
+		return nil, err
+	}
+
+	backupObjects, err := makeBackupObjects(folder, backupSentinelObjects)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +180,7 @@ func (h *DeleteHandler) runDeleteOnSegment(backup Backup, meta SegmentMetadata, 
 
 	filterFunc := func(object storage.Object) bool { return true }
 	folderFilter := func(folderPath string) bool {
-		aoSegFolderPrefix := path.Join(utility.BaseBackupPath, postgres.AoStoragePath)
+		aoSegFolderPrefix := path.Join(utility.BaseBackupPath, AoStoragePath)
 		return !strings.HasPrefix(folderPath, aoSegFolderPrefix)
 	}
 	err = segDeleteHandler.DeleteBeforeTargetWhere(segTarget, confirmed, filterFunc, folderFilter)
@@ -187,8 +192,8 @@ func (h *DeleteHandler) runDeleteOnSegment(backup Backup, meta SegmentMetadata, 
 }
 
 func cleanupAOSegments(target internal.BackupObject, segFolder storage.Folder, confirmed bool) error {
-	aoSegFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(postgres.AoStoragePath)
-	aoSegmentsToRetain, err := postgres.LoadStorageAoFiles(segFolder.GetSubFolder(utility.BaseBackupPath))
+	aoSegFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(AoStoragePath)
+	aoSegmentsToRetain, err := LoadStorageAoFiles(segFolder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return err
 	}
@@ -219,7 +224,7 @@ func findAoSegmentsToDelete(target internal.BackupObject,
 
 	aoSegmentsToDelete := make([]string, 0)
 	for _, obj := range aoObjects {
-		if !strings.HasSuffix(obj.GetName(), postgres.AoSegSuffix) && obj.GetLastModified().After(target.GetLastModified()) {
+		if !strings.HasSuffix(obj.GetName(), AoSegSuffix) && obj.GetLastModified().After(target.GetLastModified()) {
 			tracelog.DebugLogger.Println(
 				"\tis not an AO segment file, will not delete (modify time is too recent): " + obj.GetName())
 			continue

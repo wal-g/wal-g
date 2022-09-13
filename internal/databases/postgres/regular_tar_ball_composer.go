@@ -59,7 +59,7 @@ func NewRegularTarBallComposerMaker(
 func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBallComposer, error) {
 	bundleFiles := maker.files
 	tarFileSets := maker.tarFileSets
-	tarBallFilePacker := newTarBallFilePacker(bundle.DeltaMap,
+	tarBallFilePacker := NewTarBallFilePacker(bundle.DeltaMap,
 		bundle.IncrementFromLsn, bundleFiles, maker.filePackerOptions)
 	return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, bundleFiles, tarFileSets, bundle.Crypter), nil
 }

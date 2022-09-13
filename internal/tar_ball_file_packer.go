@@ -30,18 +30,6 @@ type TarBallFilePacker interface {
 	PackFileIntoTar(cfi *ComposeFileInfo, tarBall TarBall) error
 }
 
-type TarBallFilePackerOptions struct {
-	verifyPageChecksums   bool
-	storeAllCorruptBlocks bool
-}
-
-func NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks bool) TarBallFilePackerOptions {
-	return TarBallFilePackerOptions{
-		verifyPageChecksums:   verifyPageChecksums,
-		storeAllCorruptBlocks: storeAllCorruptBlocks,
-	}
-}
-
 type RegularTarBallFilePacker struct {
 	files BundleFiles
 }
@@ -53,7 +41,7 @@ func NewRegularTarBallFilePacker(files BundleFiles) *RegularTarBallFilePacker {
 }
 
 func (p *RegularTarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall TarBall) error {
-	fileReadCloser, err := startReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
+	fileReadCloser, err := StartReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
 	if err != nil {
 		switch err.(type) {
 		case FileNotExistError:
@@ -78,7 +66,8 @@ func (p *RegularTarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall
 	return nil
 }
 
-func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string) (io.ReadCloser, error) {
+// TODO : unit tests
+func StartReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string) (io.ReadSeekCloser, error) {
 	fileInfoHeader.Size = info.Size()
 	file, err := os.Open(path)
 	if err != nil {
@@ -88,12 +77,13 @@ func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string)
 		return nil, errors.Wrapf(err, "startReadingFile: failed to open file '%s'\n", path)
 	}
 	diskLimitedFileReader := limiters.NewDiskLimitReader(file)
-	fileReader := &ioextensions.ReadCascadeCloser{
+	fileReader := &ioextensions.ReadSeekCloserImpl{
 		Reader: &io.LimitedReader{
 			R: io.MultiReader(diskLimitedFileReader, &ioextensions.ZeroReader{}),
 			N: fileInfoHeader.Size,
 		},
 		Closer: file,
+		Seeker: file,
 	}
 	return fileReader, nil
 }

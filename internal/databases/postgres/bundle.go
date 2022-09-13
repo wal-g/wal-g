@@ -65,6 +65,7 @@ type Bundle struct {
 	Replica            bool
 	IncrementFromLsn   *LSN
 	IncrementFromFiles internal.BackupFileList
+	IncrementFromName  string
 	DeltaMap           PagedFileDeltaMap
 	TablespaceSpec     TablespaceSpec
 
@@ -74,7 +75,7 @@ type Bundle struct {
 // TODO: use DiskDataFolder
 func NewBundle(
 	directory string, crypter crypto.Crypter,
-	incrementFromLsn *LSN, incrementFromFiles internal.BackupFileList,
+	incrementFromName string, incrementFromLsn *LSN, incrementFromFiles internal.BackupFileList,
 	forceIncremental bool, tarSizeThreshold int64,
 ) *Bundle {
 	return &Bundle{
@@ -86,6 +87,7 @@ func NewBundle(
 		},
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
+		IncrementFromName:  incrementFromName,
 		TablespaceSpec:     NewTablespaceSpec(directory),
 		forceIncremental:   forceIncremental,
 	}

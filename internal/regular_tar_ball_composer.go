@@ -43,9 +43,7 @@ type RegularTarBallComposerMaker struct {
 	tarFileSets TarFileSets
 }
 
-func NewRegularTarBallComposerMaker(
-	files BundleFiles, tarFileSets TarFileSets,
-) *RegularTarBallComposerMaker {
+func NewRegularTarBallComposerMaker(files BundleFiles, tarFileSets TarFileSets) *RegularTarBallComposerMaker {
 	return &RegularTarBallComposerMaker{
 		files:       files,
 		tarFileSets: tarFileSets,

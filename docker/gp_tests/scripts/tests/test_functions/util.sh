@@ -76,7 +76,7 @@ stop_and_delete_cluster_dir() {
 }
 
 run_backup_logged() {
-  wal-g --config=$1 backup-push $2 && EXIT_STATUS=$? || EXIT_STATUS=$?
+  wal-g --config=$1 backup-push $2 $3 && EXIT_STATUS=$? || EXIT_STATUS=$?
   if [ "$EXIT_STATUS" -ne 0 ] ; then
       echo "Error: Failed to create backup"
       cat /var/log/wal-g-gplog.log

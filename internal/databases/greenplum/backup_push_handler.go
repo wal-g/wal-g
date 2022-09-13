@@ -21,20 +21,24 @@ import (
 )
 
 const (
-	BackupNamePrefix   = "backup_"
-	BackupNameLength   = 23 // len(BackupNamePrefix) + len(utility.BackupTimeFormat)
-	SegBackupLogPrefix = "wal-g-log"
+	BackupNamePrefix     = "backup_"
+	BackupNameLength     = len(BackupNamePrefix) + len(utility.BackupTimeFormat)
+	SegBackupLogPrefix   = "wal-g-log"
+	SegBackupPushCmdName = "seg-backup-push"
 )
 
 // BackupArguments holds all arguments parsed from cmd to this handler class
 type BackupArguments struct {
 	isPermanent    bool
+	isFull         bool
 	userData       interface{}
 	segmentFwdArgs []SegmentFwdArg
 	logsDir        string
 
 	segPollInterval time.Duration
 	segPollRetries  int
+
+	deltaBaseSelector internal.BackupSelector
 }
 
 type SegmentUserData struct {
@@ -85,6 +89,13 @@ type CurrBackupInfo struct {
 	gpVersion            semver.Version
 	segmentsMetadata     map[string]PgSegmentMetaDto
 	backupPidByContentID map[int]int
+	incrementCount       int
+}
+
+type PrevBackupInfo struct {
+	name               string
+	sentinelDto        BackupSentinelDto
+	deltaBaseBackupIds map[int]string
 }
 
 // BackupHandler is the main struct which is handling the backup process
@@ -93,6 +104,7 @@ type BackupHandler struct {
 	workers        BackupWorkers
 	globalCluster  *cluster.Cluster
 	currBackupInfo CurrBackupInfo
+	prevBackupInfo PrevBackupInfo
 }
 
 // TODO: unit tests
@@ -108,6 +120,8 @@ func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 		fmt.Sprintf("--pgport=%d", segment.Port),
 	}
 
+	backupPushArgs = bh.addSegmentDeltaBaseArg(contentID, backupPushArgs)
+
 	for _, arg := range bh.arguments.segmentFwdArgs {
 		backupPushArgs = append(backupPushArgs, fmt.Sprintf("--%s=%s", arg.Name, arg.Value))
 	}
@@ -116,10 +130,9 @@ func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 
 	cmd := []string{
 		// nohup to avoid the SIGHUP on SSH session disconnect
-		"nohup", "wal-g seg-backup-push",
+		"nohup", "wal-g seg-cmd-run",
+		SegBackupPushCmdName,
 		fmt.Sprintf("--content-id=%d", segment.ContentID),
-		// name of the current backup to format the state file name
-		bh.currBackupInfo.backupName,
 		// actual arguments to be passed to the backup-push command
 		backupPushArgsLine,
 		// pass the config file location
@@ -135,6 +148,25 @@ func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 	return cmdLine
 }
 
+func (bh *BackupHandler) addSegmentDeltaBaseArg(contentID int, args []string) []string {
+	if bh.prevBackupInfo.name == "" {
+		return args
+	}
+
+	backupID, ok := bh.prevBackupInfo.deltaBaseBackupIds[contentID]
+	if !ok {
+		tracelog.WarningLogger.Printf(
+			"unable to find the requested contentID %d in metadata of the base backup %s, "+
+				"will do a full backup for this segment", contentID, bh.prevBackupInfo.name)
+		return args
+	}
+
+	userData := NewSegmentUserDataFromID(backupID)
+	args = append(args, fmt.Sprintf("--delta-from-user-data=%s", userData.String()))
+
+	return args
+}
+
 // HandleBackupPush handles the backup being read from filesystem and being pushed to the repository
 func (bh *BackupHandler) HandleBackupPush() {
 	bh.currBackupInfo.backupName = BackupNamePrefix + time.Now().Format(utility.BackupTimeFormat)
@@ -143,6 +175,9 @@ func (bh *BackupHandler) HandleBackupPush() {
 
 	err := bh.checkPrerequisites()
 	tracelog.ErrorLogger.FatalfOnError("Backup prerequisites check failed: %v\n", err)
+
+	err = bh.configureDeltaBackup()
+	tracelog.ErrorLogger.FatalfOnError("Failed to configure delta backup: %v\n", err)
 
 	tracelog.InfoLogger.Println("Running wal-g on segments")
 	remoteOutput := bh.globalCluster.GenerateAndExecuteCommand("Running wal-g",
@@ -187,7 +222,8 @@ func (bh *BackupHandler) HandleBackupPush() {
 	bh.currBackupInfo.segmentsMetadata, err = bh.fetchSegmentBackupsMetadata()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	sentinelDto := NewBackupSentinelDto(bh.currBackupInfo, restoreLSNs, bh.arguments.userData, bh.arguments.isPermanent)
+	sentinelDto := NewBackupSentinelDto(bh.currBackupInfo, bh.prevBackupInfo,
+		restoreLSNs, bh.arguments.userData, bh.arguments.isPermanent)
 	err = bh.uploadSentinel(sentinelDto)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", bh.currBackupInfo.backupName)
@@ -227,7 +263,7 @@ func (bh *BackupHandler) waitSegmentBackups() error {
 }
 
 // TODO: unit tests
-func checkBackupStates(states map[int]SegBackupState) (int, error) {
+func checkBackupStates(states map[int]SegCmdState) (int, error) {
 	runningBackupsCount := 0
 
 	tracelog.InfoLogger.Printf("backup-push states:")
@@ -237,14 +273,14 @@ func checkBackupStates(states map[int]SegBackupState) (int, error) {
 
 	for contentID, state := range states {
 		switch state.Status {
-		case RunningBackupStatus:
+		case RunningCmdStatus:
 			// give up if the heartbeat ts is too old
 			if state.TS.Add(15 * time.Minute).Before(time.Now()) {
 				return 0, fmt.Errorf("giving up waiting for segment %d: last seen on %s", contentID, state.TS)
 			}
 			runningBackupsCount++
 
-		case FailedBackupStatus, InterruptedBackupStatus:
+		case FailedCmdStatus, InterruptedCmdStatus:
 			return 0, fmt.Errorf("unexpected backup status: %s on segment %d at %s", state.Status, contentID, state.TS)
 		}
 	}
@@ -270,12 +306,12 @@ func extractBackupPids(output *cluster.RemoteOutput) (map[int]int, error) {
 	return backupPids, resErr
 }
 
-func (bh *BackupHandler) pollSegmentStates() (map[int]SegBackupState, error) {
-	segmentStates := make(map[int]SegBackupState)
+func (bh *BackupHandler) pollSegmentStates() (map[int]SegCmdState, error) {
+	segmentStates := make(map[int]SegCmdState)
 	remoteOutput := bh.globalCluster.GenerateAndExecuteCommand("Polling the segment backup-push statuses...",
 		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_MASTER,
 		func(contentID int) string {
-			cmd := fmt.Sprintf("cat %s", FormatBackupStatePath(contentID, bh.currBackupInfo.backupName))
+			cmd := fmt.Sprintf("cat %s", FormatCmdStatePath(contentID, SegBackupPushCmdName))
 			tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
 			return cmd
 		})
@@ -299,7 +335,7 @@ func (bh *BackupHandler) pollSegmentStates() (map[int]SegBackupState, error) {
 	}
 
 	for _, command := range remoteOutput.Commands {
-		backupState := SegBackupState{}
+		backupState := SegCmdState{}
 		err := json.Unmarshal([]byte(command.Stdout), &backupState)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal state JSON file: %v", err)
@@ -395,7 +431,7 @@ func getGpClusterInfo(conn *pgx.Conn) (globalCluster *cluster.Cluster, version s
 	}
 	globalCluster = cluster.NewCluster(segConfigs)
 
-	return globalCluster, semVer, queryRunner.pgQueryRunner.SystemIdentifier, nil
+	return globalCluster, semVer, queryRunner.SystemIdentifier, nil
 }
 
 // NewBackupHandler returns a backup handler object, which can handle the backup
@@ -432,15 +468,17 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 }
 
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
-func NewBackupArguments(isPermanent bool, userData interface{}, fwdArgs []SegmentFwdArg, logsDir string,
-	segPollInterval time.Duration, segPollRetries int) BackupArguments {
+func NewBackupArguments(isPermanent, isFull bool, userData interface{}, fwdArgs []SegmentFwdArg, logsDir string,
+	segPollInterval time.Duration, segPollRetries int, deltaBaseSelector internal.BackupSelector) BackupArguments {
 	return BackupArguments{
-		isPermanent:     isPermanent,
-		userData:        userData,
-		segmentFwdArgs:  fwdArgs,
-		logsDir:         logsDir,
-		segPollInterval: segPollInterval,
-		segPollRetries:  segPollRetries,
+		isPermanent:       isPermanent,
+		isFull:            isFull,
+		userData:          userData,
+		segmentFwdArgs:    fwdArgs,
+		logsDir:           logsDir,
+		segPollInterval:   segPollInterval,
+		segPollRetries:    segPollRetries,
+		deltaBaseSelector: deltaBaseSelector,
 	}
 }
 
@@ -566,5 +604,96 @@ func (bh *BackupHandler) terminateWalgProcesses() error {
 		tracelog.WarningLogger.Printf("Unable to terminate backup-push process (segment %d):\n%s\n", command.Content, command.Stderr)
 	}
 
+	return nil
+}
+
+func (bh *BackupHandler) configureDeltaBackup() (err error) {
+	if bh.arguments.isFull {
+		tracelog.InfoLogger.Println("Full backup flag is set to true. Doing full backup.")
+		return nil
+	}
+
+	maxDeltas, fromFull := internal.GetDeltaConfig()
+	if maxDeltas == 0 {
+		return nil
+	}
+
+	folder := bh.workers.Uploader.UploadingFolder
+	previousBackupName, err := bh.arguments.deltaBaseSelector.Select(folder)
+	if err != nil {
+		if _, ok := err.(internal.NoBackupsFoundError); ok {
+			tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
+			return nil
+		}
+		return err
+	}
+
+	previousBackup := NewBackup(folder, previousBackupName)
+	prevBackupSentinelDto, err := previousBackup.GetSentinel()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	bh.currBackupInfo.incrementCount = 1
+	if prevBackupSentinelDto.IncrementCount != nil {
+		bh.currBackupInfo.incrementCount += *prevBackupSentinelDto.IncrementCount
+	}
+
+	if bh.currBackupInfo.incrementCount > maxDeltas {
+		tracelog.InfoLogger.Println("Reached max delta steps. Doing full backup.")
+		return nil
+	}
+
+	if !bh.arguments.isPermanent && !fromFull && prevBackupSentinelDto.IsPermanent {
+		tracelog.InfoLogger.Println("Can't do a delta backup from permanent backup. Doing full backup.")
+		return nil
+	}
+
+	if fromFull {
+		tracelog.InfoLogger.Println("Delta will be made from full backup.")
+
+		if prevBackupSentinelDto.IncrementFullName != nil {
+			previousBackupName = *prevBackupSentinelDto.IncrementFullName
+		}
+
+		previousBackup := NewBackup(folder, previousBackupName)
+		prevBackupSentinelDto, err = previousBackup.GetSentinel()
+		if err != nil {
+			return err
+		}
+	}
+
+	tracelog.InfoLogger.Printf("Delta backup from %v.\n", previousBackupName)
+	bh.prevBackupInfo.name = previousBackupName
+	bh.prevBackupInfo.sentinelDto, err = previousBackup.GetSentinel()
+	if err != nil {
+		return err
+	}
+
+	if err = bh.configureDeltaBackupName(); err != nil {
+		return err
+	}
+
+	bh.loadDeltaBaseBackupIds()
+
+	return nil
+}
+
+func (bh *BackupHandler) loadDeltaBaseBackupIds() {
+	bh.prevBackupInfo.deltaBaseBackupIds = make(map[int]string)
+
+	for i := range bh.prevBackupInfo.sentinelDto.Segments {
+		backupID := bh.prevBackupInfo.sentinelDto.Segments[i].BackupID
+		contentID := bh.prevBackupInfo.sentinelDto.Segments[i].ContentID
+		bh.prevBackupInfo.deltaBaseBackupIds[contentID] = backupID
+	}
+}
+
+// TODO: unit tests
+func (bh *BackupHandler) configureDeltaBackupName() error {
+	if len(bh.prevBackupInfo.name) < BackupNameLength {
+		return fmt.Errorf("incorrect backup name: %s", bh.prevBackupInfo.name)
+	}
+
+	baseName := bh.prevBackupInfo.name[len(BackupNamePrefix):BackupNameLength]
+	bh.currBackupInfo.backupName += "_D_" + baseName
 	return nil
 }

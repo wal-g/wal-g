@@ -1,1 +1,2 @@
-"WALE_S3_PREFIX": "s3://gpdeletebeforepermanentbucket"
+"WALE_S3_PREFIX": "s3://gpdeletebeforepermanentbucket",
+"WALG_DELTA_MAX_STEPS": "0"

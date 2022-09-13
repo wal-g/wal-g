@@ -157,3 +157,25 @@ func NewTargetBackupSelector(targetUserData, targetName string, metaFetcher Gene
 	}
 	return nil, err
 }
+
+// NewDeltaBaseSelector returns the BackupSelector for delta backup base according to the provided flags
+func NewDeltaBaseSelector(
+	targetBackupName, targetUserData string, metaFetcher GenericMetaFetcher) (BackupSelector, error) {
+	switch {
+	case targetUserData != "" && targetBackupName != "":
+		return nil, errors.New("only one delta target should be specified")
+
+	case targetBackupName != "":
+		tracelog.InfoLogger.Printf("Selecting the backup with name %s as the base for the current delta backup...\n",
+			targetBackupName)
+		return NewBackupNameSelector(targetBackupName, true)
+
+	case targetUserData != "":
+		tracelog.InfoLogger.Println(
+			"Selecting the backup with specified user data as the base for the current delta backup...")
+		return NewUserDataBackupSelector(targetUserData, metaFetcher)
+
+	default:
+		return NewLatestBackupSelector(), nil
+	}
+}

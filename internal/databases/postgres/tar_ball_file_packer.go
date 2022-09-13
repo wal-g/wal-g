@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"archive/tar"
 	"context"
 	"fmt"
 	"io"
@@ -13,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
-	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/errgroup"
 )
@@ -27,19 +25,6 @@ func newSkippedFileError(path string) SkippedFileError {
 }
 
 func (err SkippedFileError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
-type FileNotExistError struct {
-	error
-}
-
-func newFileNotExistError(path string) FileNotExistError {
-	return FileNotExistError{errors.Errorf(
-		"%s does not exist, probably deleted during the backup creation\n", path)}
-}
-
-func (err FileNotExistError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
@@ -63,7 +48,7 @@ type TarBallFilePackerImpl struct {
 	options          TarBallFilePackerOptions
 }
 
-func newTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, files internal.BundleFiles,
+func NewTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, files internal.BundleFiles,
 	options TarBallFilePackerOptions) *TarBallFilePackerImpl {
 	return &TarBallFilePackerImpl{
 		deltaMap:         deltaMap,
@@ -92,7 +77,7 @@ func (p *TarBallFilePackerImpl) PackFileIntoTar(cfi *internal.ComposeFileInfo, t
 		case SkippedFileError:
 			p.files.AddSkippedFile(cfi.Header, cfi.FileInfo)
 			return nil
-		case FileNotExistError:
+		case internal.FileNotExistError:
 			// File was deleted before opening.
 			// We should ignore file here as if it did not exist.
 			tracelog.WarningLogger.Println(err)
@@ -147,7 +132,7 @@ func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileIn
 		}
 		fileReadCloser, cfi.Header.Size, err = ReadIncrementalFile(cfi.Path, cfi.FileInfo.Size(), *p.incrementFromLsn, bitmap)
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, newFileNotExistError(cfi.Path)
+			return nil, internal.NewFileNotExistError(cfi.Path)
 		}
 		switch err.(type) {
 		case nil:
@@ -161,7 +146,7 @@ func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileIn
 		case InvalidBlockError: // fallback to full file backup
 			tracelog.WarningLogger.Printf("failed to read file '%s' as incremented\n", cfi.Header.Name)
 			cfi.IsIncremented = false
-			fileReadCloser, err = startReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
+			fileReadCloser, err = internal.StartReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
 			if err != nil {
 				return nil, err
 			}
@@ -170,33 +155,12 @@ func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileIn
 		}
 	} else {
 		var err error
-		fileReadCloser, err = startReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
+		fileReadCloser, err = internal.StartReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
 		if err != nil {
 			return nil, err
 		}
 	}
 	return fileReadCloser, nil
-}
-
-// TODO : unit tests
-func startReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string) (io.ReadCloser, error) {
-	fileInfoHeader.Size = info.Size()
-	file, err := os.Open(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, newFileNotExistError(path)
-		}
-		return nil, errors.Wrapf(err, "startReadingFile: failed to open file '%s'\n", path)
-	}
-	diskLimitedFileReader := limiters.NewDiskLimitReader(file)
-	fileReader := &ioextensions.ReadCascadeCloser{
-		Reader: &io.LimitedReader{
-			R: io.MultiReader(diskLimitedFileReader, &ioextensions.ZeroReader{}),
-			N: fileInfoHeader.Size,
-		},
-		Closer: file,
-	}
-	return fileReader, nil
 }
 
 func verifyFile(path string, fileInfo os.FileInfo, fileReader io.Reader, isIncremented bool) ([]uint32, error) {

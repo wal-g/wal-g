@@ -36,9 +36,9 @@ type BackupSentinelDto struct {
 
 func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec) BackupSentinelDto {
 	sentinel := BackupSentinelDto{
-		BackupStartLSN:   &bh.curBackupInfo.startLSN,
+		BackupStartLSN:   &bh.CurBackupInfo.startLSN,
 		IncrementFromLSN: bh.prevBackupInfo.sentinelDto.BackupStartLSN,
-		PgVersion:        bh.pgInfo.pgVersion,
+		PgVersion:        bh.PgInfo.pgVersion,
 		TablespaceSpec:   tbsSpec,
 	}
 	if bh.prevBackupInfo.sentinelDto.BackupStartLSN != nil {
@@ -48,15 +48,15 @@ func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec) BackupSent
 		} else {
 			sentinel.IncrementFullName = &bh.prevBackupInfo.name
 		}
-		sentinel.IncrementCount = &bh.curBackupInfo.incrementCount
+		sentinel.IncrementCount = &bh.CurBackupInfo.incrementCount
 	}
 
-	sentinel.BackupFinishLSN = &bh.curBackupInfo.endLSN
-	sentinel.UserData = bh.arguments.userData
-	sentinel.SystemIdentifier = bh.pgInfo.systemIdentifier
-	sentinel.UncompressedSize = bh.curBackupInfo.uncompressedSize
-	sentinel.CompressedSize = bh.curBackupInfo.compressedSize
-	sentinel.FilesMetadataDisabled = bh.arguments.withoutFilesMetadata
+	sentinel.BackupFinishLSN = &bh.CurBackupInfo.endLSN
+	sentinel.UserData = bh.Arguments.userData
+	sentinel.SystemIdentifier = bh.PgInfo.systemIdentifier
+	sentinel.UncompressedSize = bh.CurBackupInfo.uncompressedSize
+	sentinel.CompressedSize = bh.CurBackupInfo.compressedSize
+	sentinel.FilesMetadataDisabled = bh.Arguments.withoutFilesMetadata
 	return sentinel
 }
 
