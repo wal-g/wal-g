@@ -26,5 +26,5 @@
 /internal/databases/sqlserver/ @mialinx @ostinru @teem0n
 /cmd/sqlserver/ @mialinx @ostinru @teem0n
 
-/internal/databases/mongo/ @perekalov
-/cmd/mongo/ @perekalov
+/internal/databases/mongo/ @perekalov @VGoshev @KhurtinDN
+/cmd/mongo/ @perekalov @VGoshev @KhurtinDN
