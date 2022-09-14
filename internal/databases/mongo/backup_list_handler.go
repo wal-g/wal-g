@@ -45,7 +45,7 @@ func HandleDetailedBackupList(folder storage.Folder, output io.Writer, pretty, j
 	}
 
 	sort.Slice(backupDetails, func(i, j int) bool {
-		return backupDetails[i].FinishLocalTime.After(backupDetails[j].FinishLocalTime)
+		return backupDetails[i].FinishLocalTime.Before(backupDetails[j].FinishLocalTime)
 	})
 
 	switch {

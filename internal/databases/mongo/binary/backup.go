@@ -62,7 +62,9 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 	defer func() {
 		if err != nil {
 			closeErr := backupCursor.Close(backupService.Context)
-			tracelog.ErrorLogger.Printf("Unable to close backup cursor: %+v", closeErr)
+			if closeErr != nil {
+				tracelog.ErrorLogger.Printf("Unable to close backup cursor: %+v", closeErr)
+			}
 		}
 	}()
 
