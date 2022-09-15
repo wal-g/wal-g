@@ -133,7 +133,10 @@ func ApplyFileIncrement(fileName string, increment io.Reader, fsync bool) error 
 	return nil
 }
 
-func newIncrementalPageReader(file io.ReadSeekCloser, eof, offset int64) (io.ReadCloser, error) {
+func NewIncrementalPageReader(file io.ReadSeekCloser, eof, offset int64) (io.ReadCloser, error) {
+	if eof <= offset {
+		return nil, fmt.Errorf("file eof %d is less or equal than offset %d", eof, offset)
+	}
 	var headerBuffer bytes.Buffer
 	headerBuffer.Write(IncrementFileHeader)
 	headerBuffer.Write(utility.ToBytes(uint64(eof)))

@@ -15,6 +15,15 @@ const (
 	ColumnOriented  RelStorageType = 'c'
 )
 
+func NewAoRelFileMetadata(relNameMd5 string, storageType RelStorageType, eof, modCount int64) AoRelFileMetadata {
+	return AoRelFileMetadata{
+		relNameMd5:  relNameMd5,
+		storageType: storageType,
+		eof:         eof,
+		modCount:    modCount,
+	}
+}
+
 type AoRelFileMetadata struct {
 	relNameMd5  string
 	storageType RelStorageType
