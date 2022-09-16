@@ -29,7 +29,7 @@ func (t FilesToExtractProviderImpl) Get(backup SegBackup, filesToUnwrap map[stri
 			return nil, "",
 				fmt.Errorf("failed to fetch AO files metadata for backup %s: %w", backup.Name, err)
 		}
-		tracelog.DebugLogger.Printf("AO files metadata was not found. Skipping the AO segments unpacking.")
+		tracelog.WarningLogger.Printf("AO files metadata was not found. Skipping the AO segments unpacking.")
 	} else {
 		tracelog.InfoLogger.Printf("AO files metadata found. Will perform the AO segments unpacking.")
 		for extractPath, meta := range aoMeta.Files {
