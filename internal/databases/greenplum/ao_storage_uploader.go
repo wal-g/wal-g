@@ -104,7 +104,7 @@ func (u *AoStorageUploader) GetFiles() *AOFilesMetadataDTO {
 
 func (u *AoStorageUploader) skipAoUpload(cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, storageKey string) error {
 	u.addAoFileMetadata(cfi, storageKey, aoMeta, true, false)
-	u.bundleFiles.AddFile(cfi.Header, cfi.FileInfo, false)
+	u.bundleFiles.AddSkippedFile(cfi.Header, cfi.FileInfo)
 	tracelog.DebugLogger.Printf("Skipping %s AO relfile (already exists in storage as %s)", cfi.Path, storageKey)
 	return nil
 }
@@ -147,7 +147,7 @@ func (u *AoStorageUploader) incrementalAoUpload(
 		return err
 	}
 
-	incrementalReader, err := newIncrementalPageReader(file, aoMeta.eof, baseFileEOF)
+	incrementalReader, err := NewIncrementalPageReader(file, aoMeta.eof, baseFileEOF)
 	if err != nil {
 		return err
 	}
