@@ -3,6 +3,12 @@ package greenplum_test
 import (
 	"archive/tar"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
@@ -11,11 +17,6 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
-	"io"
-	"os"
-	"path/filepath"
-	"testing"
-	"time"
 )
 
 type TestFileInfo struct {

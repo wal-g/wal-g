@@ -3,12 +3,13 @@ package greenplum_test
 import (
 	"bytes"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal/databases/greenplum"
-	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 )
 
 const aoSegmentFileName = "../../../test/testdata/gp_ao_file.bin"
