@@ -87,7 +87,7 @@ type CurrBackupInfo struct {
 	startTime            time.Time
 	systemIdentifier     *uint64
 	gpVersion            semver.Version
-	segmentsMetadata     map[string]PgSegmentMetaDto
+	segmentsMetadata     map[string]PgSegmentSentinelDto
 	backupPidByContentID map[int]int
 	incrementCount       int
 }
@@ -488,8 +488,8 @@ func NewBackupArguments(isPermanent, isFull bool, userData interface{}, fwdArgs 
 	}
 }
 
-func (bh *BackupHandler) fetchSegmentBackupsMetadata() (map[string]PgSegmentMetaDto, error) {
-	metadata := make(map[string]PgSegmentMetaDto)
+func (bh *BackupHandler) fetchSegmentBackupsMetadata() (map[string]PgSegmentSentinelDto, error) {
+	metadata := make(map[string]PgSegmentSentinelDto)
 
 	backupIDs := make([]string, 0)
 	for backupID := range bh.currBackupInfo.segmentBackups {
@@ -525,7 +525,7 @@ func (bh *BackupHandler) fetchSegmentBackupsMetadata() (map[string]PgSegmentMeta
 	return metadata, nil
 }
 
-func (bh *BackupHandler) fetchSingleMetadata(backupID string, segCfg *cluster.SegConfig) (*PgSegmentMetaDto, error) {
+func (bh *BackupHandler) fetchSingleMetadata(backupID string, segCfg *cluster.SegConfig) (*PgSegmentSentinelDto, error) {
 	// Actually, this is not a real completed backup. It is only used to fetch the segment metadata
 	currentBackup := NewBackup(bh.workers.Uploader.UploadingFolder, bh.currBackupInfo.backupName)
 
@@ -534,11 +534,11 @@ func (bh *BackupHandler) fetchSingleMetadata(backupID string, segCfg *cluster.Se
 		return nil, err
 	}
 
-	meta := PgSegmentMetaDto{
+	meta := PgSegmentSentinelDto{
 		BackupName: pgBackup.Name,
 	}
 
-	meta.ExtendedMetadataDto, err = pgBackup.FetchMeta()
+	meta.BackupSentinelDto, err = pgBackup.GetSentinel()
 	if err != nil {
 		return nil, err
 	}
