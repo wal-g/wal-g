@@ -424,6 +424,11 @@ var (
 	Turbo bool
 )
 
+func AddTurboFlag(cmd *cobra.Command) {
+	cmd.PersistentFlags().BoolVarP(&Turbo, "turbo", "", false,
+		"Ignore all kinds of throttling defined in config")
+}
+
 // nolint: gocyclo
 func ConfigureSettings(currentType string) {
 	if len(defaultConfigValues) == 0 {
