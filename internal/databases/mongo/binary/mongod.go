@@ -17,6 +17,8 @@ import (
 
 const adminDB = "admin"
 
+const cursorCreateRetries = 10
+
 type MongodService struct {
 	Context     context.Context
 	MongoClient *mongo.Client
@@ -89,16 +91,29 @@ func (mongodService *MongodService) GetReplSetName() (string, error) {
 	return replSetNameHolder.ReplSetName, err
 }
 
-func (mongodService *MongodService) GetBackupCursor() (*mongo.Cursor, error) {
-	return mongodService.MongoClient.Database(adminDB).Aggregate(mongodService.Context, mongo.Pipeline{
-		{{Key: "$backupCursor", Value: bson.D{}}},
-	})
+func (mongodService *MongodService) GetBackupCursor() (cursor *mongo.Cursor, err error) {
+	for i := 0; i < cursorCreateRetries; i++ {
+		cursor, err = mongodService.MongoClient.Database(adminDB).Aggregate(mongodService.Context, mongo.Pipeline{
+			{{Key: "$backupCursor", Value: bson.D{}}},
+		})
+		if err == nil || !backupCursorErrorIsRetried(err) {
+			break
+		}
+		if i < cursorCreateRetries {
+			minutes := time.Duration(i + 1)
+			tracelog.WarningLogger.Printf("%v. Sleep %d minutes and retry", err.Error(), minutes)
+			time.Sleep(time.Minute * minutes)
+		}
+	}
+	return cursor, err
 }
 
-//nolint: whitespace
+func backupCursorErrorIsRetried(err error) bool {
+	return strings.Contains(err.Error(), "(Location50915)") // mongodb take checkpoint
+}
+
 func (mongodService *MongodService) GetBackupCursorExtended(backupID *primitive.Binary,
 	lastTS primitive.Timestamp) (*mongo.Cursor, error) {
-
 	return mongodService.MongoClient.Database(adminDB).Aggregate(mongodService.Context, mongo.Pipeline{
 		{{
 			Key: "$backupCursorExtend", Value: bson.D{
