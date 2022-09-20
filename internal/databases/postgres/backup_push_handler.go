@@ -69,6 +69,7 @@ type CurBackupInfo struct {
 	endLSN           LSN
 	uncompressedSize int64
 	compressedSize   int64
+	dataCatalogSize  int64
 	incrementCount   int
 }
 
@@ -278,6 +279,7 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 	bh.CurBackupInfo.endLSN = finishLsn
 	bh.CurBackupInfo.uncompressedSize = atomic.LoadInt64(bundle.TarBallQueue.AllTarballsSize)
 	bh.CurBackupInfo.compressedSize, err = bh.Workers.Uploader.UploadedDataSize()
+	bh.CurBackupInfo.dataCatalogSize = atomic.LoadInt64(bundle.DataCatalogSize)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tarFileSets.AddFiles(labelFilesTarBallName, labelFilesList)
 	timelineChanged := bundle.checkTimelineChanged(bh.Workers.QueryRunner)
