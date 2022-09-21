@@ -12,6 +12,7 @@ import (
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -75,11 +76,12 @@ func (backupStorage *BackupStorage) CreateReader(backupFileMeta *BackupFileMeta)
 	if err != nil {
 		return objectReader, err
 	}
+	reader := limiters.NewNetworkLimitReader(objectReader)
 	decompressor := compression.FindDecompressor(backupFileMeta.Compression)
 	if decompressor == nil {
 		return nil, fmt.Errorf("decompressor for %v not found", backupFileMeta.Compression)
 	}
-	return internal.DecompressDecryptBytes(objectReader, decompressor)
+	return internal.DecompressDecryptBytes(reader, decompressor)
 }
 
 func (backupStorage *BackupStorage) GetCompression() string {
@@ -98,10 +100,8 @@ func (backupStorage *BackupStorage) CalculateCompressedFiles(backupFiles map[str
 	return backupStorage.calculateCompressedFiles("", folder, backupFiles)
 }
 
-//nolint: whitespace
 func (backupStorage *BackupStorage) calculateCompressedFiles(relativePath string, folder storage.Folder,
 	backupFiles map[string]*BackupFileMeta) (backupSize int64, err error) {
-
 	objects, subFolders, err := folder.ListFolder()
 	if err != nil {
 		return 0, err
