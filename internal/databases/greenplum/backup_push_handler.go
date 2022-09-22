@@ -250,7 +250,7 @@ func (bh *BackupHandler) waitSegmentBackups() error {
 		// reset retries after the successful poll
 		retryCount = bh.arguments.segPollRetries
 
-		runningBackups, err := checkBackupStates(states)
+		runningBackups, err := bh.checkBackupStates(states)
 		if err != nil {
 			return err
 		}
@@ -263,12 +263,18 @@ func (bh *BackupHandler) waitSegmentBackups() error {
 }
 
 // TODO: unit tests
-func checkBackupStates(states map[int]SegCmdState) (int, error) {
+func (bh *BackupHandler) checkBackupStates(states map[int]SegCmdState) (int, error) {
 	runningBackupsCount := 0
 
 	tracelog.InfoLogger.Printf("backup-push states:")
 	for contentID, state := range states {
-		tracelog.InfoLogger.Printf("content ID: %d, status: %s, ts: %s", contentID, state.Status, state.TS)
+		segments, ok := bh.globalCluster.ByContent[contentID]
+		if !ok || len(segments) != 1 {
+			return 0, fmt.Errorf("failed to lookup the segment details for content ID %d", contentID)
+		}
+		host := segments[0].Hostname
+		tracelog.InfoLogger.Printf("host: %s, content ID: %d, status: %s, ts: %s",
+			host, contentID, state.Status, state.TS)
 	}
 
 	for contentID, state := range states {
