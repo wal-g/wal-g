@@ -60,9 +60,9 @@ func NewSegmentMetadata(backupID string, segCfg cluster.SegConfig, restoreLSN, b
 	}
 }
 
-// PgSegmentMetaDto is used during the initial fetching of the segment backup metadata
-type PgSegmentMetaDto struct {
-	postgres.ExtendedMetadataDto
+// PgSegmentSentinelDto is used during the initial fetching of the segment backup metadata
+type PgSegmentSentinelDto struct {
+	postgres.BackupSentinelDto
 	BackupName string
 }
 
@@ -82,6 +82,7 @@ type BackupSentinelDto struct {
 
 	UncompressedSize int64 `json:"uncompressed_size"`
 	CompressedSize   int64 `json:"compressed_size"`
+	DataCatalogSize  int64 `json:"data_catalog_size"`
 
 	IncrementFrom     *string `json:"increment_from,omitempty"`
 	IncrementFullName *string `json:"increment_full_name,omitempty"`
@@ -130,6 +131,7 @@ func NewBackupSentinelDto(currBackupInfo CurrBackupInfo, prevBackupInfo PrevBack
 	for backupID := range currBackupInfo.segmentsMetadata {
 		sentinel.CompressedSize += currBackupInfo.segmentsMetadata[backupID].CompressedSize
 		sentinel.UncompressedSize += currBackupInfo.segmentsMetadata[backupID].UncompressedSize
+		sentinel.DataCatalogSize += currBackupInfo.segmentsMetadata[backupID].DataCatalogSize
 	}
 
 	for backupID, cfg := range currBackupInfo.segmentBackups {

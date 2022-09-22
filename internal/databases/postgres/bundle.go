@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/wal-g/wal-g/internal"
 
@@ -68,6 +69,7 @@ type Bundle struct {
 	IncrementFromName  string
 	DeltaMap           PagedFileDeltaMap
 	TablespaceSpec     TablespaceSpec
+	DataCatalogSize    *int64
 
 	forceIncremental bool
 }
@@ -90,6 +92,7 @@ func NewBundle(
 		IncrementFromName:  incrementFromName,
 		TablespaceSpec:     NewTablespaceSpec(directory),
 		forceIncremental:   forceIncremental,
+		DataCatalogSize:    new(int64),
 	}
 }
 
@@ -183,6 +186,8 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 		}
 		return errors.Wrap(err, "HandleWalkedFSObject: walk failed")
 	}
+
+	atomic.AddInt64(bundle.DataCatalogSize, info.Size())
 
 	path, err = bundle.TablespaceSpec.makeTablespaceSymlinkPath(path)
 	if err != nil {

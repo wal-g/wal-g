@@ -27,6 +27,7 @@ type BackupSentinelDto struct {
 
 	UncompressedSize int64           `json:"UncompressedSize"`
 	CompressedSize   int64           `json:"CompressedSize"`
+	DataCatalogSize  int64           `json:"DataCatalogSize,omitempty"`
 	TablespaceSpec   *TablespaceSpec `json:"Spec"`
 
 	UserData interface{} `json:"UserData,omitempty"`
@@ -56,6 +57,7 @@ func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec) BackupSent
 	sentinel.SystemIdentifier = bh.PgInfo.systemIdentifier
 	sentinel.UncompressedSize = bh.CurBackupInfo.uncompressedSize
 	sentinel.CompressedSize = bh.CurBackupInfo.compressedSize
+	sentinel.DataCatalogSize = bh.CurBackupInfo.dataCatalogSize
 	sentinel.FilesMetadataDisabled = bh.Arguments.withoutFilesMetadata
 	return sentinel
 }
