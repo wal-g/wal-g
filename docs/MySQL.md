@@ -1,18 +1,18 @@
 # WAL-G for MySQL
 
-**Interface of MySQL and MariaDB now is unstable**
-
 You can use wal-g as a tool for encrypting, compressing MySQL backups and push/fetch them to/from storage without saving it on your filesystem.
 
 Development
 -----------
 ### Installing
+
 To compile and build the binary for MySQL:
 
 Optional:
 
-- To build with libsodium, just set `USE_LIBSODIUM` environment variable.
-- To build with lzo decompressor, just set `USE_LZO` environment variable.
+* To build with libsodium, just set `USE_LIBSODIUM` environment variable.
+* To build with lzo decompressor, just set `USE_LZO` environment variable.
+
 ```plaintext
 go get github.com/wal-g/wal-g
 cd $GOPATH/src/github.com/wal-g/wal-g
@@ -20,7 +20,9 @@ make install
 make deps
 make mysql_build
 ```
+
 Users can also install WAL-G by using `make install`. Specifying the GOBIN environment variable before installing allows the user to specify the installation location. On default, `make install` puts the compiled binary in `go/bin`.
+
 ```plaintext
 export GOBIN=/usr/local/bin
 cd $GOPATH/src/github.com/wal-g/wal-g
@@ -32,42 +34,47 @@ make mysql_install
 Configuration
 -------------
 
-* `WALG_MYSQL_DATASOURCE_NAME`
+* `WALG_MYSQL_DATASOURCE_NAME` - Configure the connection string for MySQL. Required.
+  Format `user:password@host/dbname` (use
+  `user:password@unix(/path/to/socket.sock)/dbname` to connect via UNIX socket).
 
-To configure the connection string for MySQL. Required. Format ```user:password@host/dbname```
+* `WALG_MYSQL_SSL_CA` - If connecting to MySQL using SSL, this variable should be set to a
+  path to file with CA certificates.
 
-* `WALG_MYSQL_SSL_CA`
+* `WALG_STREAM_CREATE_COMMAND` - Command to create MySQL backup, should return backup as
+  single stream to STDOUT. Requried.
 
-To use SSL, a path to file with certificates should be set to this variable.
+* `WALG_STREAM_RESTORE_COMMAND` - Command to unpack MySQL backup, should take backup
+  (created by `WALG_STREAM_CREATE_COMMAND`) to STDIN and unpack it to MySQL datadir.
+Required.
 
-*  `WALG_STREAM_CREATE_COMMAND`
+* `WALG_STREAM_SPLITTER_PARTITIONS` and `WALG_STREAM_SPLITTER_BLOCK_SIZE` - Splits the
+  backup stream into `WALG_STREAM_SPLITTER_PARTITIONS` different output streams in blocks
+  of `WALG_STREAM_SPLITTER_BLOCK_SIZE` bytes. Each stream is uploaded separately. Using
+  multiple backup streams significantly improve restore performance. Optional. 
 
-Command to create MySQL backup, should return backup as single stream to STDOUT. Requried.
+* `WALG_MYSQL_BACKUP_PREPARE_COMMAND` - Command to prepare MySQL backup after restoring.
+  Needed for xtrabackup. Optional.
 
-*  `WALG_STREAM_RESTORE_COMMAND`
+* `WALG_MYSQL_BINLOG_REPLAY_COMMAND` - Command to replay binlog on runing MySQL. Required
+  for binlog-fetch command.
 
-Command to unpack MySQL backup, should take backup (created by `WALG_STREAM_CREATE_COMMAND`) 
-to STDIN and unpack it to MySQL datadir. Required.
+* `WALG_MYSQL_BINLOG_DST` - Which directory should be used to store binlogs during
+  binlog-fetch or binlog-replay.
 
-* `WALG_MYSQL_BACKUP_PREPARE_COMMAND`
+* `WALG_MYSQL_BINLOG_READ_FROM_REMOTE_SERVER` - When this is enabled, wal-g will connect
+  to the server at `WALG_MYSQL_DATASOURCE_NAME` and read binary logs directly from MySQL
+  as if wal-g was a replica server. This option is equivalent to backing up binary logs
+  using `mysqlbinlog --raw --read-from-remote-server`.  Set this to true if you have are
+  using binary log encryption-at-rest (and also make sure you have configured [WAL-G's
+  encryption](https://github.com/wal-g/wal-g#encryption)), otherwise leave false (default).
+  Optional.
 
-Command to prepare MySQL backup after restoring. Optional. Needed for xtrabackup case.
-
-* `WALG_MYSQL_BINLOG_REPLAY_COMMAND`
-
-Command to replay binlog on runing MySQL. Required for binlog-fetch command.
-
-* `WALG_MYSQL_BINLOG_DST`
-
-To place binlogs in the specified directory during binlog-fetch or binlog-replay
-
-* `WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER`
-
-Set this variable to True if you are planning to take base backup from replica and binlog backup from master.
-If base and binlogs backups are taken from the same host, this variable should be left False (default).
+* `WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER` - Set this variable to True if you are planning to
+  take base backup from replica and binlog backup from master. If base and binlogs backups
+are taken from the same host, this variable should be left False (default).
 
 > **Operations with binlogs**: If you'd like to do binlog operations with wal-g don't forget to [activate the binary log](https://mariadb.com/kb/en/activating-the-binary-log/) by starting mysql/mariadb with [--log-bin](https://mariadb.com/kb/en/replication-and-binary-log-server-system-variables/#log_bin) and [--log-basename](https://mariadb.com/kb/en/mysqld-options/#-log-basename)=\[name\].
-
 
 Usage
 -----
@@ -103,7 +110,7 @@ wal-g backup-fetch example_backup
 WAL-G can also fetch the latest backup using:
 
 ```bash
-wal-g backup-fetch  LATEST
+wal-g backup-fetch LATEST
 ```
 
 ### ``binlog-push``
@@ -114,12 +121,12 @@ Sends (not yet archived) binlogs to storage. Typically run in CRON.
 wal-g binlog-push
 ```
 
-
-When `WALG_MYSQL_CHECK_GTIDS` is set wal-g will try to be upload only binlogs which GTID sets contains events that
-wasn't seen before. This is done by parsing binlogs and peeking first PREVIOUS_GTIDS_EVENT that holds GTID set of
-all executed transactions at the moment this particular binlog file created.
-This feature may be useful when you are uploading binlogs from different hosts (e.g. after master switchower)
-Note: Don't use `WALG_MYSQL_CHECK_GTIDS` when GTIDs are not used - it will slow down binlog upload.
+When `WALG_MYSQL_CHECK_GTIDS` is set wal-g will try to be upload only binlogs which GTID
+sets contains events that wasn't seen before. This is done by parsing binlogs and peeking
+first PREVIOUS_GTIDS_EVENT that holds GTID set of all executed transactions at the moment
+this particular binlog file created. This feature may be useful when you are uploading
+binlogs from different hosts (e.g. after master switchower). Note: Don't use
+`WALG_MYSQL_CHECK_GTIDS` when GTIDs are not used - it will slow down binlog upload.
 
 ### ``binlog-fetch``
 
@@ -183,20 +190,21 @@ Typical configurations
 
 It's recommended to use wal-g with xtrabackup tool in case of MySQL for creating lock-less backups.
 Here's typical wal-g configuration for that case:
+
 ```bash
- WALG_MYSQL_DATASOURCE_NAME=user:pass@tcp(localhost:3306)/mysql                                                                                                                                      
- WALG_STREAM_CREATE_COMMAND="xtrabackup --backup --stream=xbstream --datadir=/var/lib/mysql"                                                                                                                               
- WALG_STREAM_RESTORE_COMMAND="xbstream -x -C /var/lib/mysql"                                                                                                                       
- WALG_MYSQL_BACKUP_PREPARE_COMMAND="xtrabackup --prepare --target-dir=/var/lib/mysql"                                                                                              
- WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
+WALG_MYSQL_DATASOURCE_NAME=user:pass@tcp(localhost:3306)/mysql
+WALG_STREAM_CREATE_COMMAND="xtrabackup --backup --stream=xbstream --datadir=/var/lib/mysql"
+WALG_STREAM_RESTORE_COMMAND="xbstream -x -C /var/lib/mysql"
+WALG_MYSQL_BACKUP_PREPARE_COMMAND="xtrabackup --prepare --target-dir=/var/lib/mysql"
+WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
 ```
 
 Restore procedure is a bit tricky:
 * stop mysql
-* clean a datadir (typically `/var/lib/mysql`)
+* remove all files in the MySQL datadir (typically `/var/lib/mysql`)
 * fetch and prepare desired backup using `wal-g backup-fetch "backup_name"`
 * start mysql
-* in case of you have replication and GTID enabled: set mysql GTID_PURGED variable to value from `/var/lib/mysql/xtrabackup_binlog_info`, using
+* in case you have replication and GTID enabled: set mysql GTID_PURGED variable to value from `/var/lib/mysql/xtrabackup_binlog_info`, using
 ```bash
 gtids=$(tr -d '\n' < /var/lib/mysql/xtrabackup_binlog_info | awk '{print $3}')
 mysql -e "RESET MASTER; SET @@GLOBAL.GTID_PURGED='$gtids';"
@@ -206,35 +214,91 @@ mysql -e "RESET MASTER; SET @@GLOBAL.GTID_PURGED='$gtids';"
 wal-g binlog-replay --since "backup_name" --until "2006-01-02T15:04:05Z07:00"
 ```
 
-### MySQL - using with `mysqldump`
+### MySQL - using `xtrabackup` with InnoDB encryption-at-rest and binary log encryption
 
+Percona Server 5.7+ and MySQL 8.0 support encryption-at-rest of both MySQL tablespaces as
+well as binary logs. WAL-G is capable of backing up and restoring this encrypted data using
+transition keys.
 
-It's possible to use wal-g with standard mysqldump/mysql tools.
-In that case MySQL mysql backup is a plain SQL script.
-Here's typical wal-g configuration for that case:
+To understand how restores work, it is important to understand how MySQL encrypts tables:
+
+* Each tablespace (typically corresponding to one table) is stored as a single file on disk.
+* Each tablespace file has a header containing the encryption key for the rest of the
+  data.
+* This header is encrypted using a master encryption key stored in a keyring.
+
+When we backup an encrypted table using a transition key, `xtrabackup` re-encrypts the
+tablespace headers with the transition key (instead of the master encryption key),
+making the backup no longer depend on the presence of the keyring for a successful
+restore. When restoring an encrypted backup, `xtrabackup` generates a new encryption key
+during the `--move-back`/`--copy-back` step. This allows MySQL to perform backups and
+restores without spending hours re-encrypting all of the data (only the master
+encryption key is changed, the actual encryption keys used to encrypt your MySQL data are
+not rotated).
+
+If you are using MySQL binary log encryption, these are encrypted in a similar manner:
+each binary log file has its own encryption key encrypted by the server's master key.
+Unfortunately, `mysqlbinlog` is incapable of using MySQL's keyring plugins and cannot
+decrypt binlogs making point-in-time-restores using encrypted binlogs impossible. As a
+workaround, you can set `WALG_MYSQL_BINLOG_READ_FROM_REMOTE_SERVER=true` to have wal-g
+archive unencrypted binary logs instead (the "unencrypted" binary logs are still encrypted
+by WAL-G before remote storage using the same encryption settings as normal WAL-G backups).
+When `WALG_MYSQL_BINLOG_READ_FROM_REMOTE_SERVER` is set, WAL-G connects to MySQL as if it
+was a replica server and encrypts+streams the binary log directly to cloud storage without
+the unencrypted binary log being stored to disk.
+
+Taken together, this procedure allows you to perform point-in-time-recovery of encrypted
+MySQL databases even if the master keyring has been lost or corrupted (keep your
+transition key safe, however!). For more reading, see 
+https://docs.percona.com/percona-xtrabackup/2.4/advanced/encrypted_innodb_tablespace_backups.html#restoring-backup-when-keyring-is-not-available
+
+This is an example config for backups and restores of encrypted tables and binary logs,
+using the `keyring_file` plugin as an example (please don't use `hunter2` as your
+transition key): 
 
 ```bash
- WALG_MYSQL_DATASOURCE_NAME=user:pass@localhost/mysql                                                                                                               
- WALG_STREAM_CREATE_COMMAND="mysqldump --all-databases --single-transaction --set-gtid-purged=ON"                                                                                                                               
- WALG_STREAM_RESTORE_COMMAND="mysql"
- WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
+# make sure you are encrypting backups using libsodium/pgp/etc.
+WALG_LIBSODIUM_KEY_PATH=/path/to/your/libsodium/key
+# make sure you connect over tls in the datasource config if using a tcp connection
+WALG_MYSQL_DATASOURCE_NAME=user:pass@unix(/path/to/socket.sock)/mysql
+WALG_STREAM_CREATE_COMMAND="xtrabackup --backup --stream=xbstream --datadir=/var/lib/mysql --transition-key=hunter2"
+WALG_STREAM_RESTORE_COMMAND="xbstream -x -C /var/lib/mysql-restore"
+WALG_MYSQL_BACKUP_PREPARE_COMMAND="xtrabackup --prepare --target-dir=/var/lib/mysql-restore --transition-key=hunter2 && xtrabackup --move-back --target-dir=/var/lib/mysql-restore --datadir=/var/lib/mysql --transition-key=hunter2 --generate-new-master-key --keyring-file-data=/path/to/mysql/keyring"
+WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
+WALG_MYSQL_BINLOG_READ_FROM_REMOTE_SERVER=true
+```
+
+With this configuration, backup and restores are otherwise identical to the normal
+`xtrabackup` instructions above (the `/var/lib/mysql-restore/` directory must exist
+beforehand however).
+
+### MySQL - using `mysqldump`
+
+It's possible to use wal-g with standard mysqldump/mysql tools. In that case the MySQL
+mysql backup is a plain SQL script. Here's a typical wal-g configuration for that use case:
+
+```bash
+WALG_MYSQL_DATASOURCE_NAME=user:pass@localhost/mysql
+WALG_STREAM_CREATE_COMMAND="mysqldump --all-databases --single-transaction --set-gtid-purged=ON"
+WALG_STREAM_RESTORE_COMMAND="mysql"
+WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
 ```
 
 Restore procedure is straightforward:
 * start mysql (it's recommended to create new mysql instance)
 * fetch and apply desired backup using `wal-g backup-fetch "backup_name"`
 
-
-### MariaDB - using with `mariabackup`
+### MariaDB - using `mariabackup`
 
 It's recommended to use wal-g with `mariabackup` tool in case of MariaDB for creating lock-less backups.
-Here's typical wal-g configuration for that case:
+Here's a typical wal-g configuration for that use case:
+
 ```bash
- WALG_MYSQL_DATASOURCE_NAME=user:pass@tcp(localhost:3305)/mysql                                                                                                                                      
- WALG_STREAM_CREATE_COMMAND="mariabackup --backup --stream=xbstream --datadir=/var/lib/mysql"                                                                                                                               
- WALG_STREAM_RESTORE_COMMAND="mbstream -x -C /var/lib/mysql"                                                                                                                       
- WALG_MYSQL_BACKUP_PREPARE_COMMAND="mariabackup --prepare --target-dir=/var/lib/mysql"                                                                                              
- WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
+WALG_MYSQL_DATASOURCE_NAME=user:pass@tcp(localhost:3305)/mysql
+WALG_STREAM_CREATE_COMMAND="mariabackup --backup --stream=xbstream --datadir=/var/lib/mysql"
+WALG_STREAM_RESTORE_COMMAND="mbstream -x -C /var/lib/mysql"
+WALG_MYSQL_BACKUP_PREPARE_COMMAND="mariabackup --prepare --target-dir=/var/lib/mysql"
+WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
 ```
 
 For the restore procedure you have to do similar things to [what the offical docs says about full backup and restore](https://mariadb.com/kb/en/full-backup-and-restore-with-mariabackup/):
@@ -259,3 +323,4 @@ mysqlbinlog --stop-datetime="some point in time" --start-position [position abov
 ### MariaDB - using with `mysqldump`
 
 The procedure is same as in case of [MySQL. You can follow the instructions from the previous section.](#mysql---using-with-mysqldump)
+

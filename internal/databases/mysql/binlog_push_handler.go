@@ -12,8 +12,10 @@ import (
 
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/pkg/errors"
+	"github.com/siddontang/go-log/log"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -25,7 +27,8 @@ type LogsCache struct {
 
 //gocyclo:ignore
 //nolint:funlen
-func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, checkGTIDs bool) {
+func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string,
+	checkGTIDs bool, readFromRemoteServer bool) {
 	rootFolder := uploader.Folder()
 	uploader.ChangeDirectory(BinlogPath)
 
@@ -118,7 +121,11 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 		}
 
 		// Upload binlogs:
-		err = archiveBinLog(uploader, binlogsFolder, binlog)
+		if readFromRemoteServer {
+			err = archiveBinLogStream(uploader, db, binlog)
+		} else {
+			err = archiveBinLog(uploader, binlogsFolder, binlog)
+		}
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		cache.LastArchivedBinlog = binlog
@@ -170,6 +177,7 @@ func getMySQLBinlogsFolder(db *sql.DB) (string, error) {
 	return path.Dir(logBinBasename), nil
 }
 
+// archiveBinLog archives a binary log file directly from disk
 func archiveBinLog(uploader internal.UploaderProvider, dataDir string, binlog string) error {
 	tracelog.InfoLogger.Printf("Archiving %v\n", binlog)
 
@@ -185,6 +193,37 @@ func archiveBinLog(uploader internal.UploaderProvider, dataDir string, binlog st
 	}
 
 	return nil
+}
+
+// archiveBinLogStream archives a binary log directly from the server as a stream
+func archiveBinLogStream(uploader internal.UploaderProvider, db *sql.DB, binlog string) error {
+	tracelog.InfoLogger.Printf("Archiving %v\n", binlog)
+
+	stream, err := NewBinlogStream(db, binlog)
+	tracelog.ErrorLogger.FatalfOnError("failed to create binlog stream: %v", err)
+
+	err = uploader.PushStreamToDestination(
+		limiters.NewDiskLimitReader(stream),
+		fmt.Sprintf("%s.%s", binlog, uploader.Compression().FileExtension()),
+	)
+
+	// Depending on which system you run it on, replication.BinlogSyncer sometimes, but not always,
+	// closes the MySQL replication command automatically once done. In practice, this results in
+	// the MySQL server potentially slowly filling up with extra replication connections and running
+	// out of free connections. To be on the safe side, we explicitly close the connection ourselves.
+	//
+	// If the connection is closed twice, replication.BinlogSyncer throws the extremely cryptic,
+	// yet harmless warning: "close sync with err: sync is been closing..."
+	// https://github.com/github/gh-ost/pull/389
+	//
+	// We mute any potential "double close" error message here by briefly setting the go-mysql loglevel
+	// to fatal - no actual error has occurred and the binlog was archived successfully.
+	log.SetLevel(log.LevelFatal)
+	stream.Close()
+	log.SetLevel(log.LevelError)
+
+	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
+	return err
 }
 
 func getCache() LogsCache {

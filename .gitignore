@@ -23,6 +23,8 @@ tmp/
 *.xml
 *.iml
 *.so
+*.pprof
+*.pdf
 .session_conf.sav
 __pycache__/
 venv/
