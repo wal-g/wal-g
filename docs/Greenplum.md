@@ -2,12 +2,6 @@
 
 You can use WAL-G as a tool for making encrypted, compressed physical Greenplum backups and push/fetch them to/from the remote storage without saving it on your filesystem.
 
-Development
------------
-### Installing
-
-Installing process is the same as for [WAL-G for Postgres](PostgreSQL.md#installing). To build or install binary for Greenplum, use the `make gp_build` and `make gp_install` commands respectively.
-
 Configuration
 -------------
 WAL-G for Greenplum understands the basic configuration options that are [supported by the WAL-G for Postgres](PostgreSQL.md#Configuration), except the advanced features such as delta backups, remote backups, catchup backup, etc.
