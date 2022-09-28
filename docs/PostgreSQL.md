@@ -21,8 +21,7 @@ sudo apt update
 sudo apt install golang-go
 
 # Install lib dependencies
-sudo apt install libbrotli-dev liblzo2-dev libsodium-dev
-sudo apt-get install cmake
+sudo apt install libbrotli-dev liblzo2-dev libsodium-dev cmake
 
 # Fetch project and build
 go get github.com/wal-g/wal-g
