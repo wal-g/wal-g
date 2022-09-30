@@ -38,18 +38,18 @@ func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
 	return sentinelDto, nil
 }
 
-func (backup *Backup) GetSegmentBackup(backupID string, contentID int) (*postgres.Backup, error) {
+func (backup *Backup) GetSegmentBackup(backupID string, contentID int) (SegBackup, error) {
 	selector, err := internal.NewUserDataBackupSelector(NewSegmentUserDataFromID(backupID).String(), postgres.NewGenericMetaFetcher())
 	if err != nil {
-		return nil, err
+		return SegBackup{}, err
 	}
 	segBackupsFolder := backup.rootFolder.GetSubFolder(FormatSegmentStoragePrefix(contentID))
 
 	backupName, err := selector.Select(segBackupsFolder)
 	if err != nil {
-		return nil, fmt.Errorf("failed to select matching backup for id %s from subfolder %s: %w", backupID, segBackupsFolder.GetPath(), err)
+		return SegBackup{}, fmt.Errorf("failed to select matching backup for id %s from subfolder %s: %w", backupID, segBackupsFolder.GetPath(), err)
 	}
 
-	segmentBackup := postgres.NewBackup(segBackupsFolder.GetSubFolder(utility.BaseBackupPath), backupName)
-	return &segmentBackup, nil
+	pgBackup := postgres.NewBackup(segBackupsFolder.GetSubFolder(utility.BaseBackupPath), backupName)
+	return ToGpSegBackup(pgBackup), nil
 }

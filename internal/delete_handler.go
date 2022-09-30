@@ -164,7 +164,7 @@ func (h *DeleteHandler) HandleDeleteRetainAfter(args []string, confirmed bool) {
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func (h *DeleteHandler) HandleDeleteTarget(targetSelector BackupSelector, confirmed, findFull bool) {
+func (h *DeleteHandler) FindTargetBySelector(targetSelector BackupSelector) BackupObject {
 	targetName, err := targetSelector.Select(h.Folder)
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -181,6 +181,15 @@ func (h *DeleteHandler) HandleDeleteTarget(targetSelector BackupSelector, confir
 		os.Exit(0)
 	}
 
+	return target
+}
+
+func (h *DeleteHandler) HandleDeleteTarget(target BackupObject, confirmed, findFull bool) {
+	folderFilter := func(string) bool { return true }
+	h.HandleDeleteTargetWithFilter(target, confirmed, findFull, folderFilter)
+}
+
+func (h *DeleteHandler) HandleDeleteTargetWithFilter(target BackupObject, confirmed, findFull bool, folderFilter func(string) bool) {
 	var backupsToDelete []BackupObject
 	if findFull {
 		// delete all backups with the same base backup as the target
@@ -190,7 +199,7 @@ func (h *DeleteHandler) HandleDeleteTarget(targetSelector BackupSelector, confir
 		backupsToDelete = h.findDependantBackups(target)
 	}
 
-	err = h.DeleteTargets(backupsToDelete, confirmed)
+	err := h.DeleteTargets(backupsToDelete, confirmed, folderFilter)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
@@ -365,7 +374,7 @@ func (h *DeleteHandler) DeleteBeforeTargetWhere(target BackupObject, confirmed b
 	}, folderFilter)
 }
 
-func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool) error {
+func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool, folderFilter func(string) bool) error {
 	backupNamesToDelete := make(map[string]bool)
 	for _, target := range targets {
 		if h.isPermanent(target) {
@@ -374,7 +383,6 @@ func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool) er
 		backupNamesToDelete[target.GetBackupName()] = true
 	}
 
-	folderFilter := func(path string) bool { return true }
 	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath),
 		confirmed, func(object storage.Object) bool {
 			return backupNamesToDelete[utility.StripLeftmostBackupName(object.GetName())] && !h.isPermanent(object) && !h.isIgnored(object)
