@@ -48,20 +48,12 @@ func NewDeleteHandler(folder storage.Folder, args DeleteArgs) (*DeleteHandler, e
 		return internal.IsPermanent(obj.GetName(), permanentBackups, BackupNameLength)
 	}
 
-	isIgnoredFunc := func(obj storage.Object) bool {
-		// Remove only the basebackups folder objects, do not touch the segments folders.
-		// WAL-G deals with them separately.
-		objectName := obj.GetName()
-		return !strings.HasPrefix(objectName, utility.BaseBackupPath)
-	}
-
 	return &DeleteHandler{
 		DeleteHandler: *internal.NewDeleteHandler(
 			folder,
 			backupObjects,
 			gpLessFunc,
 			internal.IsPermanentFunc(isPermanentFunc),
-			internal.IsIgnoredFunc(isIgnoredFunc),
 		),
 		permanentBackups: permanentBackups,
 		args:             args,

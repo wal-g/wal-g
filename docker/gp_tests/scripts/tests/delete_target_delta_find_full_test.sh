@@ -26,6 +26,7 @@ done
 
 # remember the backup-list output
 # later in the test we create new backups which should be deleted so lists should be identical
+wal-g --config=${TMP_CONFIG} backup-list
 lines_before_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
 wal-g --config=${TMP_CONFIG} backup-list | tail -n 2 > /tmp/list_before_delete
 
@@ -38,7 +39,7 @@ do
        modifier=''
     fi
     insert_data
-    wal-g --config=${TMP_CONFIG} backup-push
+    wal-g --config=${TMP_CONFIG} backup-push ${modifier}
 done
 
 # get the name of the second incremental backup
@@ -53,6 +54,8 @@ wal-g --config=${TMP_CONFIG} backup-push
 
 # delete the SECOND_INCREMENT with FIND_FULL, should leave only the first full backup w/ first increment
 wal-g --config=${TMP_CONFIG} delete target FIND_FULL ${SECOND_INCREMENT} --confirm
+
+wal-g --config=${TMP_CONFIG} backup-list
 
 lines_after_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
 wal-g --config=${TMP_CONFIG} backup-list | tail -n 2 > /tmp/list_after_delete

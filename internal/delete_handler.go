@@ -75,12 +75,6 @@ func IsPermanentFunc(isPermanent func(storage.Object) bool) DeleteHandlerOption 
 	}
 }
 
-func IsIgnoredFunc(isIgnored func(storage.Object) bool) DeleteHandlerOption {
-	return func(h *DeleteHandler) {
-		h.isIgnored = isIgnored
-	}
-}
-
 func NewDeleteHandler(
 	folder storage.Folder,
 	backups []BackupObject,
@@ -96,8 +90,6 @@ func NewDeleteHandler(
 		},
 		// by default, all storage objects are impermanent
 		isPermanent: func(storage.Object) bool { return false },
-		// by default, all storage objects are not ignored
-		isIgnored: func(storage.Object) bool { return false },
 	}
 
 	for _, option := range options {
@@ -115,7 +107,6 @@ type DeleteHandler struct {
 	greater func(object1, object2 storage.Object) bool
 
 	isPermanent func(object storage.Object) bool
-	isIgnored   func(object storage.Object) bool
 }
 
 func (h *DeleteHandler) HandleDeleteBefore(args []string, confirmed bool) {
@@ -199,6 +190,7 @@ func (h *DeleteHandler) HandleDeleteTargetWithFilter(
 		// delete all dependant backups
 		backupsToDelete = h.findDependantBackups(target)
 	}
+	tracelog.DebugLogger.Printf("backupsToDelete: %v", backupsToDelete)
 
 	err := h.DeleteTargets(backupsToDelete, confirmed, folderFilter)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -371,7 +363,7 @@ func (h *DeleteHandler) DeleteBeforeTargetWhere(target BackupObject, confirmed b
 	tracelog.InfoLogger.Println("Start delete")
 
 	return storage.DeleteObjectsWhere(h.Folder, confirmed, func(object storage.Object) bool {
-		return objSelector(object) && h.less(object, target) && !h.isPermanent(object) && !h.isIgnored(object)
+		return objSelector(object) && h.less(object, target) && !h.isPermanent(object)
 	}, folderFilter)
 }
 
@@ -386,7 +378,7 @@ func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool, fo
 
 	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath),
 		confirmed, func(object storage.Object) bool {
-			return backupNamesToDelete[utility.StripLeftmostBackupName(object.GetName())] && !h.isPermanent(object) && !h.isIgnored(object)
+			return backupNamesToDelete[utility.StripLeftmostBackupName(object.GetName())] && !h.isPermanent(object)
 		}, folderFilter)
 }
 
