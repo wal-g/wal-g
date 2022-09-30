@@ -189,7 +189,8 @@ func (h *DeleteHandler) HandleDeleteTarget(target BackupObject, confirmed, findF
 	h.HandleDeleteTargetWithFilter(target, confirmed, findFull, folderFilter)
 }
 
-func (h *DeleteHandler) HandleDeleteTargetWithFilter(target BackupObject, confirmed, findFull bool, folderFilter func(string) bool) {
+func (h *DeleteHandler) HandleDeleteTargetWithFilter(
+	target BackupObject, confirmed, findFull bool, folderFilter func(string) bool) {
 	var backupsToDelete []BackupObject
 	if findFull {
 		// delete all backups with the same base backup as the target

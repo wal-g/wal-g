@@ -1,23 +1,24 @@
 package greenplum
 
 import (
+	"path"
+	"strings"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
-	"path"
-	"strings"
 )
 
 type SegDeleteHandler struct {
 	*postgres.DeleteHandler
-	contentId int
+	contentID int
 	args      DeleteArgs
 }
 
-func NewSegDeleteHandler(rootFolder storage.Folder, contentId int, args DeleteArgs) (SegDeleteHandler, error) {
-	segFolder := rootFolder.GetSubFolder(FormatSegmentStoragePrefix(contentId))
+func NewSegDeleteHandler(rootFolder storage.Folder, contentID int, args DeleteArgs) (SegDeleteHandler, error) {
+	segFolder := rootFolder.GetSubFolder(FormatSegmentStoragePrefix(contentID))
 	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(segFolder)
 
 	segDeleteHandler, err := postgres.NewDeleteHandler(segFolder, permanentBackups, permanentWals, false)
@@ -27,7 +28,7 @@ func NewSegDeleteHandler(rootFolder storage.Folder, contentId int, args DeleteAr
 
 	return SegDeleteHandler{
 		DeleteHandler: segDeleteHandler,
-		contentId:     contentId,
+		contentID:     contentID,
 		args:          args,
 	}, nil
 }
@@ -39,7 +40,7 @@ func runSegmentDeleteTarget(h SegDeleteHandler, segBackup SegBackup) error {
 	}
 
 	tracelog.InfoLogger.Printf("Running delete target %s on segment %d\n",
-		segTarget.GetBackupName(), h.contentId)
+		segTarget.GetBackupName(), h.contentID)
 
 	folderFilter := func(folderPath string) bool {
 		aoSegFolderPrefix := path.Join(utility.BaseBackupPath, AoStoragePath)
@@ -60,7 +61,7 @@ func runSegmentDeleteBefore(h SegDeleteHandler, segBackup SegBackup) error {
 	}
 
 	tracelog.InfoLogger.Printf("Running delete before target %s on segment %d\n",
-		segTarget.GetBackupName(), h.contentId)
+		segTarget.GetBackupName(), h.contentID)
 
 	filterFunc := func(object storage.Object) bool { return true }
 	folderFilter := func(folderPath string) bool {

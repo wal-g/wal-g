@@ -47,7 +47,9 @@ func (backup *Backup) GetSegmentBackup(backupID string, contentID int) (SegBacku
 
 	backupName, err := selector.Select(segBackupsFolder)
 	if err != nil {
-		return SegBackup{}, fmt.Errorf("failed to select matching backup for id %s from subfolder %s: %w", backupID, segBackupsFolder.GetPath(), err)
+		return SegBackup{}, fmt.Errorf(
+			"failed to select matching backup for id %s from subfolder %s: %w",
+			backupID, segBackupsFolder.GetPath(), err)
 	}
 
 	pgBackup := postgres.NewBackup(segBackupsFolder.GetSubFolder(utility.BaseBackupPath), backupName)

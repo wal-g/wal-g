@@ -64,6 +64,7 @@ func NewDeleteHandler(folder storage.Folder, args DeleteArgs) (*DeleteHandler, e
 			internal.IsIgnoredFunc(isIgnoredFunc),
 		),
 		permanentBackups: permanentBackups,
+		args:             args,
 	}, nil
 }
 
@@ -135,7 +136,7 @@ func (h *DeleteHandler) DeleteTarget(target internal.BackupObject) {
 	tracelog.InfoLogger.Println("Deleting the segments backups...")
 	err := h.dispatchDeleteCmd(target, runSegmentDeleteTarget)
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Failed to delete the segments backups: %w", err)
+		tracelog.ErrorLogger.Fatalf("Failed to delete the segments backups: %v", err)
 	}
 	tracelog.InfoLogger.Printf("Finished deleting the segments backups")
 
