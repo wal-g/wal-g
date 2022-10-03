@@ -71,7 +71,8 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 	backupSelector, err := internal.NewBackupNameSelector(bname, true) //todo: add selection by userdata
 	tracelog.ErrorLogger.PrintOnError(err)
 
-	deleteHandler.HandleDeleteTarget(backupSelector, confirmed, false)
+	target := deleteHandler.FindTargetBySelector(backupSelector)
+	deleteHandler.HandleDeleteTarget(target, confirmed, false)
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {

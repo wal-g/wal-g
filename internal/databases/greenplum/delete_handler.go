@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 
@@ -12,17 +11,22 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
+type DeleteArgs struct {
+	Confirmed bool
+	FindFull  bool
+}
+
 type DeleteHandler struct {
 	internal.DeleteHandler
 	permanentBackups map[string]bool
+	args             DeleteArgs
 }
 
-func NewDeleteHandler(folder storage.Folder) (*DeleteHandler, error) {
+func NewDeleteHandler(folder storage.Folder, args DeleteArgs) (*DeleteHandler, error) {
 	backupSentinelObjects, err := internal.GetBackupSentinelObjects(folder)
 	if err != nil {
 		return nil, err
@@ -44,26 +48,19 @@ func NewDeleteHandler(folder storage.Folder) (*DeleteHandler, error) {
 		return internal.IsPermanent(obj.GetName(), permanentBackups, BackupNameLength)
 	}
 
-	isIgnoredFunc := func(obj storage.Object) bool {
-		// Remove only the basebackups folder objects, do not touch the segments folders.
-		// WAL-G deals with them separately.
-		objectName := obj.GetName()
-		return !strings.HasPrefix(objectName, utility.BaseBackupPath)
-	}
-
 	return &DeleteHandler{
 		DeleteHandler: *internal.NewDeleteHandler(
 			folder,
 			backupObjects,
 			gpLessFunc,
 			internal.IsPermanentFunc(isPermanentFunc),
-			internal.IsIgnoredFunc(isIgnoredFunc),
 		),
 		permanentBackups: permanentBackups,
+		args:             args,
 	}, nil
 }
 
-func (h *DeleteHandler) HandleDeleteBefore(args []string, confirmed bool) {
+func (h *DeleteHandler) HandleDeleteBefore(args []string) {
 	modifier, beforeStr := internal.ExtractDeleteModifierFromArgs(args)
 
 	target, err := h.FindTargetBefore(beforeStr, modifier)
@@ -73,11 +70,11 @@ func (h *DeleteHandler) HandleDeleteBefore(args []string, confirmed bool) {
 		os.Exit(0)
 	}
 
-	err = h.DeleteBeforeTarget(target, confirmed)
+	err = h.DeleteBeforeTarget(target)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func (h *DeleteHandler) HandleDeleteRetain(args []string, confirmed bool) {
+func (h *DeleteHandler) HandleDeleteRetain(args []string) {
 	modifier, retentionStr := internal.ExtractDeleteModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionStr)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -89,11 +86,11 @@ func (h *DeleteHandler) HandleDeleteRetain(args []string, confirmed bool) {
 		os.Exit(0)
 	}
 
-	err = h.DeleteBeforeTarget(target, confirmed)
+	err = h.DeleteBeforeTarget(target)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func (h *DeleteHandler) HandleDeleteRetainAfter(args []string, confirmed bool) {
+func (h *DeleteHandler) HandleDeleteRetainAfter(args []string) {
 	modifier, retentionSir, afterStr := internal.ExtractDeleteRetainAfterModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionSir)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -106,22 +103,45 @@ func (h *DeleteHandler) HandleDeleteRetainAfter(args []string, confirmed bool) {
 		os.Exit(0)
 	}
 
-	err = h.DeleteBeforeTarget(target, confirmed)
+	err = h.DeleteBeforeTarget(target)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func (h *DeleteHandler) HandleDeleteEverything(args []string, confirmed bool) {
-	h.DeleteHandler.HandleDeleteEverything(args, h.permanentBackups, confirmed)
+func (h *DeleteHandler) HandleDeleteEverything(args []string) {
+	h.DeleteHandler.HandleDeleteEverything(args, h.permanentBackups, h.args.Confirmed)
 }
 
-func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject, confirmed bool) error {
+func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject) error {
+	tracelog.InfoLogger.Println("Deleting the segments backups...")
+	err := h.dispatchDeleteCmd(target, SegDeleteBefore)
+	if err != nil {
+		return fmt.Errorf("failed to delete the segments backups: %w", err)
+	}
+	tracelog.InfoLogger.Printf("Finished deleting the segments backups")
+
+	objFilter := func(object storage.Object) bool { return true }
+	folderFilter := func(name string) bool { return strings.HasPrefix(name, utility.BaseBackupPath) }
+	return h.DeleteHandler.DeleteBeforeTargetWhere(target, h.args.Confirmed, objFilter, folderFilter)
+}
+
+func (h *DeleteHandler) DeleteTarget(target internal.BackupObject) {
+	tracelog.InfoLogger.Println("Deleting the segments backups...")
+	err := h.dispatchDeleteCmd(target, SegDeleteTarget)
+	if err != nil {
+		tracelog.ErrorLogger.Fatalf("Failed to delete the segments backups: %v", err)
+	}
+	tracelog.InfoLogger.Printf("Finished deleting the segments backups")
+
+	h.DeleteHandler.HandleDeleteTarget(target, h.args.Confirmed, h.args.FindFull)
+}
+
+func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType SegDeleteType) error {
 	backup := NewBackup(h.Folder, target.GetBackupName())
 	sentinel, err := backup.GetSentinel()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load backup %s sentinel: %v", backup.Name, err)
 	}
 
-	tracelog.InfoLogger.Println("Deleting the segments backups...")
 	errorGroup, _ := errgroup.WithContext(context.Background())
 
 	deleteConcurrency, err := internal.GetMaxConcurrency(internal.GPDeleteConcurrency)
@@ -134,112 +154,25 @@ func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject, confirm
 	// clean the segments
 	for i := range sentinel.Segments {
 		meta := sentinel.Segments[i]
+		tracelog.InfoLogger.Printf("Processing segment %d (backupId=%s)\n", meta.ContentID, meta.BackupID)
+
+		segHandler, err := NewSegDeleteHandler(h.Folder, meta.ContentID, h.args, delType)
+		if err != nil {
+			return err
+		}
+
+		segBackup, err := backup.GetSegmentBackup(meta.BackupID, meta.ContentID)
+		if err != nil {
+			return err
+		}
+
 		errorGroup.Go(func() error {
 			deleteSem <- struct{}{}
-			deleteErr := h.runDeleteOnSegment(backup, meta, confirmed)
+			deleteErr := segHandler.Delete(segBackup)
 			<-deleteSem
 			return deleteErr
 		})
 	}
 
-	err = errorGroup.Wait()
-	if err != nil {
-		return fmt.Errorf("failed to delete the segments backups: %w", err)
-	}
-
-	tracelog.InfoLogger.Printf("Finished deleting the segments backups")
-
-	objFilter := func(object storage.Object) bool { return true }
-	folderFilter := func(name string) bool { return strings.HasPrefix(name, utility.BaseBackupPath) }
-	return h.DeleteHandler.DeleteBeforeTargetWhere(target, confirmed, objFilter, folderFilter)
-}
-
-func (h *DeleteHandler) runDeleteOnSegment(backup Backup, meta SegmentMetadata, confirmed bool) error {
-	tracelog.InfoLogger.Printf("Processing segment %d (backupId=%s)\n", meta.ContentID, meta.BackupID)
-
-	segFolder := h.Folder.GetSubFolder(FormatSegmentStoragePrefix(meta.ContentID))
-	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(segFolder)
-
-	segDeleteHandler, err := postgres.NewDeleteHandler(segFolder, permanentBackups, permanentWals, false)
-	if err != nil {
-		return err
-	}
-
-	pgBackup, err := backup.GetSegmentBackup(meta.BackupID, meta.ContentID)
-	if err != nil {
-		return err
-	}
-
-	segTarget, err := segDeleteHandler.FindTargetByName(pgBackup.Name)
-	if err != nil {
-		return err
-	}
-
-	tracelog.InfoLogger.Printf("Running delete before target %s on segment %d\n",
-		segTarget.GetBackupName(), meta.ContentID)
-
-	filterFunc := func(object storage.Object) bool { return true }
-	folderFilter := func(folderPath string) bool {
-		aoSegFolderPrefix := path.Join(utility.BaseBackupPath, AoStoragePath)
-		return !strings.HasPrefix(folderPath, aoSegFolderPrefix)
-	}
-	err = segDeleteHandler.DeleteBeforeTargetWhere(segTarget, confirmed, filterFunc, folderFilter)
-	if err != nil {
-		return err
-	}
-
-	return cleanupAOSegments(segTarget, segFolder, confirmed)
-}
-
-func cleanupAOSegments(target internal.BackupObject, segFolder storage.Folder, confirmed bool) error {
-	aoSegFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(AoStoragePath)
-	aoSegmentsToRetain, err := LoadStorageAoFiles(segFolder.GetSubFolder(utility.BaseBackupPath))
-	if err != nil {
-		return err
-	}
-
-	for segPath := range aoSegmentsToRetain {
-		tracelog.DebugLogger.Printf("%s is still used, retaining...\n", segPath)
-	}
-
-	tracelog.InfoLogger.Printf("Cleaning up the AO segment objects")
-	aoSegmentsToDelete, err := findAoSegmentsToDelete(target, aoSegmentsToRetain, aoSegFolder)
-	if err != nil {
-		return err
-	}
-
-	if !confirmed {
-		return nil
-	}
-
-	return aoSegFolder.DeleteObjects(aoSegmentsToDelete)
-}
-
-func findAoSegmentsToDelete(target internal.BackupObject,
-	aoSegmentsToRetain map[string]struct{}, aoSegFolder storage.Folder) ([]string, error) {
-	aoObjects, _, err := aoSegFolder.ListFolder()
-	if err != nil {
-		return nil, err
-	}
-
-	aoSegmentsToDelete := make([]string, 0)
-	for _, obj := range aoObjects {
-		if !strings.HasSuffix(obj.GetName(), AoSegSuffix) && obj.GetLastModified().After(target.GetLastModified()) {
-			tracelog.DebugLogger.Println(
-				"\tis not an AO segment file, will not delete (modify time is too recent): " + obj.GetName())
-			continue
-		}
-
-		if _, ok := aoSegmentsToRetain[obj.GetName()]; ok {
-			// this AO segment file is still referenced by some backup, skip it
-			tracelog.DebugLogger.Println("\tis still referenced by some backups, will not delete: " + obj.GetName())
-			continue
-		}
-
-		tracelog.InfoLogger.Println("\twill be deleted: " + obj.GetName())
-
-		aoSegmentsToDelete = append(aoSegmentsToDelete, obj.GetName())
-	}
-
-	return aoSegmentsToDelete, nil
+	return errorGroup.Wait()
 }

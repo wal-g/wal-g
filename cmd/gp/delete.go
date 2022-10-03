@@ -49,34 +49,57 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := greenplum.NewDeleteHandler(folder)
+	delArgs := greenplum.DeleteArgs{Confirmed: confirmed}
+	deleteHandler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteBefore(args, confirmed)
+	deleteHandler.HandleDeleteBefore(args)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := greenplum.NewDeleteHandler(folder)
+	delArgs := greenplum.DeleteArgs{Confirmed: confirmed}
+	deleteHandler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteRetain(args, confirmed)
+	deleteHandler.HandleDeleteRetain(args)
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := greenplum.NewDeleteHandler(folder)
+	delArgs := greenplum.DeleteArgs{Confirmed: confirmed}
+	deleteHandler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteEverything(args, confirmed)
+	deleteHandler.HandleDeleteEverything(args)
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
-	tracelog.ErrorLogger.Fatalf("wal-g delete target is not supported for greenplum (yet)")
+	folder, err := internal.ConfigureFolder()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	findFullBackup := false
+	modifier := internal.ExtractDeleteTargetModifierFromArgs(args)
+	if modifier == internal.FindFullDeleteModifier {
+		findFullBackup = true
+		// remove the extracted modifier from args
+		args = args[1:]
+	}
+
+	delArgs := greenplum.DeleteArgs{Confirmed: confirmed, FindFull: findFullBackup}
+	deleteHandler, err := greenplum.NewDeleteHandler(folder, delArgs)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	targetBackupSelector, err := internal.CreateTargetDeleteBackupSelector(
+		cmd, args, deleteTargetUserData, greenplum.NewGenericMetaFetcher())
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	target := deleteHandler.FindTargetBySelector(targetBackupSelector)
+	deleteHandler.DeleteTarget(target)
 }
 
 func init() {
