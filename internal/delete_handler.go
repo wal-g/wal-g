@@ -155,44 +155,18 @@ func (h *DeleteHandler) HandleDeleteRetainAfter(args []string, confirmed bool) {
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func (h *DeleteHandler) FindTargetBySelector(targetSelector BackupSelector) BackupObject {
-	targetName, err := targetSelector.Select(h.Folder)
+func (h *DeleteHandler) HandleDeleteTarget(targetSelector BackupSelector, confirmed, findFull bool) {
+	target, err := h.FindTargetBySelector(targetSelector)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	var target BackupObject
-	for idx := range h.backups {
-		if h.backups[idx].GetBackupName() == targetName {
-			target = h.backups[idx]
-			break
-		}
-	}
-
 	if target == nil {
-		tracelog.InfoLogger.Printf("No backup found for deletion")
-		os.Exit(0)
+		// since we want to delete the target backup, we should fail if
+		// we didn't find the requested backup for deletion
+		tracelog.ErrorLogger.Fatal("Requested backup was not found")
 	}
 
-	return target
-}
-
-func (h *DeleteHandler) HandleDeleteTarget(target BackupObject, confirmed, findFull bool) {
-	folderFilter := func(string) bool { return true }
-	h.HandleDeleteTargetWithFilter(target, confirmed, findFull, folderFilter)
-}
-
-func (h *DeleteHandler) HandleDeleteTargetWithFilter(
-	target BackupObject, confirmed, findFull bool, folderFilter func(string) bool) {
-	var backupsToDelete []BackupObject
-	if findFull {
-		// delete all backups with the same base backup as the target
-		backupsToDelete = h.findRelatedBackups(target)
-	} else {
-		// delete all dependant backups
-		backupsToDelete = h.findDependantBackups(target)
-	}
-	tracelog.DebugLogger.Printf("backupsToDelete: %v", backupsToDelete)
-
-	err := h.DeleteTargets(backupsToDelete, confirmed, folderFilter)
+	folderFilter := func(name string) bool { return true }
+	err = h.DeleteTarget(target, confirmed, findFull, folderFilter)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
@@ -212,6 +186,7 @@ func (h *DeleteHandler) HandleDeleteEverything(args []string, permanentBackups m
 	h.DeleteEverything(confirmed)
 }
 
+// TODO: unit tests
 func (h *DeleteHandler) FindTargetBefore(beforeStr string, modifier int) (BackupObject, error) {
 	timeLine, err := time.Parse(time.RFC3339, beforeStr)
 	if err == nil {
@@ -229,6 +204,7 @@ func (h *DeleteHandler) FindTargetBeforeName(name string, modifier int) (BackupO
 	return findTarget(h.backups, h.greater, choiceFunc)
 }
 
+// TODO: unit tests
 func (h *DeleteHandler) FindTargetBeforeTime(timeLine time.Time, modifier int) (BackupObject, error) {
 	potentialTarget, err := findTarget(h.backups, h.less, func(object BackupObject) bool {
 		backupTime := object.GetBackupTime()
@@ -257,12 +233,37 @@ func (h *DeleteHandler) FindTargetRetain(retentionCount, modifier int) (BackupOb
 	return target, nil
 }
 
+// TODO: unit tests
 func (h *DeleteHandler) FindTargetByName(bname string) (BackupObject, error) {
 	return findTarget(h.backups, h.greater, func(object BackupObject) bool {
 		return strings.HasPrefix(object.GetName(), bname)
 	})
 }
 
+// TODO: unit tests
+func (h *DeleteHandler) FindTargetBySelector(targetSelector BackupSelector) (BackupObject, error) {
+	targetName, err := targetSelector.Select(h.Folder)
+	if err != nil {
+		if _, ok := err.(NoBackupsFoundError); ok {
+			// it is OK to have no backups found for the provided selector,
+			// just return no target found
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var target BackupObject
+	for idx := range h.backups {
+		if h.backups[idx].GetBackupName() == targetName {
+			target = h.backups[idx]
+			break
+		}
+	}
+
+	return target, nil
+}
+
+// TODO: unit tests
 func (h *DeleteHandler) FindTargetRetainAfter(retentionCount int, afterStr string, modifier int) (BackupObject, error) {
 	timeLine, err := time.Parse(time.RFC3339, afterStr)
 	if err == nil {
@@ -272,6 +273,7 @@ func (h *DeleteHandler) FindTargetRetainAfter(retentionCount int, afterStr strin
 	return h.FindTargetRetainAfterName(retentionCount, afterStr, modifier)
 }
 
+// TODO: unit tests
 func (h *DeleteHandler) FindTargetRetainAfterName(
 	retentionCount int, name string, modifier int) (BackupObject, error) {
 	choiceFuncRetain := getRetainChoiceFunc(retentionCount, modifier)
@@ -302,6 +304,7 @@ func (h *DeleteHandler) FindTargetRetainAfterName(
 	return target2, nil
 }
 
+// TODO: unit tests
 func (h *DeleteHandler) FindTargetRetainAfterTime(retentionCount int, timeLine time.Time, modifier int,
 ) (BackupObject, error) {
 	choiceFuncRetain := getRetainChoiceFunc(retentionCount, modifier)
@@ -367,13 +370,24 @@ func (h *DeleteHandler) DeleteBeforeTargetWhere(target BackupObject, confirmed b
 	}, folderFilter)
 }
 
-func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool, folderFilter func(string) bool) error {
+func (h *DeleteHandler) DeleteTarget(target BackupObject, confirmed, findFull bool,
+	folderFilter func(name string) bool) error {
+	var backupsToDelete []BackupObject
+	if findFull {
+		// delete all backups with the same base backup as the target
+		backupsToDelete = h.findRelatedBackups(target)
+	} else {
+		// delete all dependant backups
+		backupsToDelete = h.findDependantBackups(target)
+	}
+	tracelog.DebugLogger.Printf("backupsToDelete: %v", backupsToDelete)
+
 	backupNamesToDelete := make(map[string]bool)
-	for _, target := range targets {
-		if h.isPermanent(target) {
-			tracelog.ErrorLogger.Fatalf("Unable to delete permanent backup %s\n", target.GetName())
+	for _, bTarget := range backupsToDelete {
+		if h.isPermanent(bTarget) {
+			tracelog.ErrorLogger.Fatalf("Unable to delete permanent backup %s\n", bTarget.GetName())
 		}
-		backupNamesToDelete[target.GetBackupName()] = true
+		backupNamesToDelete[bTarget.GetBackupName()] = true
 	}
 
 	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath),
@@ -382,6 +396,7 @@ func (h *DeleteHandler) DeleteTargets(targets []BackupObject, confirmed bool, fo
 		}, folderFilter)
 }
 
+// TODO: unit tests
 // Find all backups related to the target.
 // All delta backups with the same base backup are considered as related.
 func (h *DeleteHandler) findRelatedBackups(target BackupObject) []BackupObject {
@@ -414,6 +429,7 @@ func (h *DeleteHandler) findRelatedBackups(target BackupObject) []BackupObject {
 	return relatedBackups
 }
 
+// TODO: unit tests
 // Find all backups dependant on the target.
 // All delta backups which have the target as the ancestor in increment chain
 // are considered as dependant.

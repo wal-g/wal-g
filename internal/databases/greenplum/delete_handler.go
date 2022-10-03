@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/wal-g/wal-g/internal/databases/postgres"
+
 	"golang.org/x/sync/errgroup"
 
 	"github.com/wal-g/tracelog"
@@ -124,15 +126,26 @@ func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject) error {
 	return h.DeleteHandler.DeleteBeforeTargetWhere(target, h.args.Confirmed, objFilter, folderFilter)
 }
 
-func (h *DeleteHandler) DeleteTarget(target internal.BackupObject) {
+func (h *DeleteHandler) HandleDeleteTarget(targetSelector internal.BackupSelector) {
+	target, err := h.FindTargetBySelector(targetSelector)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	if target == nil {
+		// since we want to delete the target backup, we should fail if
+		// we didn't find the requested backup for deletion
+		tracelog.ErrorLogger.Fatal("Requested backup was not found")
+	}
+
 	tracelog.InfoLogger.Println("Deleting the segments backups...")
-	err := h.dispatchDeleteCmd(target, SegDeleteTarget)
+	err = h.dispatchDeleteCmd(target, SegDeleteTarget)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to delete the segments backups: %v", err)
 	}
 	tracelog.InfoLogger.Printf("Finished deleting the segments backups")
 
-	h.DeleteHandler.HandleDeleteTarget(target, h.args.Confirmed, h.args.FindFull)
+	folderFilter := func(name string) bool { return true }
+	err = h.DeleteHandler.DeleteTarget(target, h.args.Confirmed, h.args.FindFull, folderFilter)
+	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType SegDeleteType) error {
@@ -175,4 +188,33 @@ func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType 
 	}
 
 	return errorGroup.Wait()
+}
+
+// HandleDeleteGarbage delete outdated WAL archives and leftover backup files
+func (h *DeleteHandler) HandleDeleteGarbage(args []string, confirm bool) error {
+	predicate := postgres.ExtractDeleteGarbagePredicate(args)
+	backupSelector := internal.NewOldestNonPermanentSelector(NewGenericMetaFetcher())
+	oldestBackup, err := backupSelector.Select(h.Folder)
+	if err != nil {
+		if _, ok := err.(internal.NoBackupsFoundError); ok {
+			tracelog.InfoLogger.Println("Couldn't find any non-permanent backups in storage. Not doing anything.")
+			return nil
+		}
+		return err
+	}
+
+	target, err := h.FindTargetByName(oldestBackup)
+	if err != nil {
+		return err
+	}
+
+	tracelog.InfoLogger.Println("Processing the segments...")
+	err = h.dispatchDeleteCmd(target, SegDeleteBefore)
+	if err != nil {
+		return fmt.Errorf("failed to delete: %w", err)
+	}
+	tracelog.InfoLogger.Printf("Finished processing the segments backups")
+
+	folderFilter := func(name string) bool { return strings.HasPrefix(name, utility.BaseBackupPath) }
+	return h.DeleteBeforeTargetWhere(target, confirm, predicate, folderFilter)
 }
