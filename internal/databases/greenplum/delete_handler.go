@@ -113,7 +113,7 @@ func (h *DeleteHandler) HandleDeleteEverything(args []string) {
 
 func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject) error {
 	tracelog.InfoLogger.Println("Deleting the segments backups...")
-	err := h.dispatchDeleteCmd(target, runSegmentDeleteBefore)
+	err := h.dispatchDeleteCmd(target, SegDeleteBefore)
 	if err != nil {
 		return fmt.Errorf("failed to delete the segments backups: %w", err)
 	}
@@ -126,7 +126,7 @@ func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject) error {
 
 func (h *DeleteHandler) DeleteTarget(target internal.BackupObject) {
 	tracelog.InfoLogger.Println("Deleting the segments backups...")
-	err := h.dispatchDeleteCmd(target, runSegmentDeleteTarget)
+	err := h.dispatchDeleteCmd(target, SegDeleteTarget)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to delete the segments backups: %v", err)
 	}
@@ -135,8 +135,7 @@ func (h *DeleteHandler) DeleteTarget(target internal.BackupObject) {
 	h.DeleteHandler.HandleDeleteTarget(target, h.args.Confirmed, h.args.FindFull)
 }
 
-func (h *DeleteHandler) dispatchDeleteCmd(
-	target internal.BackupObject, delCmd func(SegDeleteHandler, SegBackup) error) error {
+func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType SegDeleteType) error {
 	backup := NewBackup(h.Folder, target.GetBackupName())
 	sentinel, err := backup.GetSentinel()
 	if err != nil {
@@ -157,7 +156,7 @@ func (h *DeleteHandler) dispatchDeleteCmd(
 		meta := sentinel.Segments[i]
 		tracelog.InfoLogger.Printf("Processing segment %d (backupId=%s)\n", meta.ContentID, meta.BackupID)
 
-		segHandler, err := NewSegDeleteHandler(h.Folder, meta.ContentID, h.args)
+		segHandler, err := NewSegDeleteHandler(h.Folder, meta.ContentID, h.args, delType)
 		if err != nil {
 			return err
 		}
@@ -169,7 +168,7 @@ func (h *DeleteHandler) dispatchDeleteCmd(
 
 		errorGroup.Go(func() error {
 			deleteSem <- struct{}{}
-			deleteErr := delCmd(segHandler, segBackup)
+			deleteErr := segHandler.Delete(segBackup)
 			<-deleteSem
 			return deleteErr
 		})

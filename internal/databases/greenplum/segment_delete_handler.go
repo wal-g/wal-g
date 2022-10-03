@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"fmt"
 	"path"
 	"strings"
 
@@ -11,50 +12,54 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-type SegDeleteHandler struct {
+type SegDeleteType int
+
+const (
+	SegDeleteBefore SegDeleteType = iota
+	SegDeleteTarget
+)
+
+type SegDeleteHandler interface {
+	Delete(backup SegBackup) error
+}
+
+type SegDeleteBeforeHandler struct {
 	*postgres.DeleteHandler
 	contentID int
 	args      DeleteArgs
 }
 
-func NewSegDeleteHandler(rootFolder storage.Folder, contentID int, args DeleteArgs) (SegDeleteHandler, error) {
+func NewSegDeleteHandler(rootFolder storage.Folder, contentID int, args DeleteArgs, delType SegDeleteType,
+) (SegDeleteHandler, error) {
 	segFolder := rootFolder.GetSubFolder(FormatSegmentStoragePrefix(contentID))
 	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(segFolder)
 
 	segDeleteHandler, err := postgres.NewDeleteHandler(segFolder, permanentBackups, permanentWals, false)
 	if err != nil {
-		return SegDeleteHandler{}, err
+		return nil, err
 	}
 
-	return SegDeleteHandler{
-		DeleteHandler: segDeleteHandler,
-		contentID:     contentID,
-		args:          args,
-	}, nil
+	switch delType {
+	case SegDeleteBefore:
+		return &SegDeleteBeforeHandler{
+			DeleteHandler: segDeleteHandler,
+			contentID:     contentID,
+			args:          args,
+		}, nil
+
+	case SegDeleteTarget:
+		return &SegDeleteTargetHandler{
+			DeleteHandler: segDeleteHandler,
+			contentID:     contentID,
+			args:          args,
+		}, nil
+
+	default:
+		return nil, fmt.Errorf("unknown segment delete handler type")
+	}
 }
 
-func runSegmentDeleteTarget(h SegDeleteHandler, segBackup SegBackup) error {
-	segTarget, err := h.FindTargetByName(segBackup.Name)
-	if err != nil {
-		return err
-	}
-
-	tracelog.InfoLogger.Printf("Running delete target %s on segment %d\n",
-		segTarget.GetBackupName(), h.contentID)
-
-	folderFilter := func(folderPath string) bool {
-		aoSegFolderPrefix := path.Join(utility.BaseBackupPath, AoStoragePath)
-		return !strings.HasPrefix(folderPath, aoSegFolderPrefix)
-	}
-	h.HandleDeleteTargetWithFilter(segTarget, h.args.Confirmed, h.args.FindFull, folderFilter)
-	if err != nil {
-		return err
-	}
-
-	return cleanupAOSegments(segTarget, h.Folder, h.args.Confirmed)
-}
-
-func runSegmentDeleteBefore(h SegDeleteHandler, segBackup SegBackup) error {
+func (h SegDeleteBeforeHandler) Delete(segBackup SegBackup) error {
 	segTarget, err := h.FindTargetByName(segBackup.Name)
 	if err != nil {
 		return err
@@ -76,6 +81,34 @@ func runSegmentDeleteBefore(h SegDeleteHandler, segBackup SegBackup) error {
 	return cleanupAOSegments(segTarget, h.Folder, h.args.Confirmed)
 }
 
+type SegDeleteTargetHandler struct {
+	*postgres.DeleteHandler
+	contentID int
+	args      DeleteArgs
+}
+
+func (h SegDeleteTargetHandler) Delete(segBackup SegBackup) error {
+	segTarget, err := h.FindTargetByName(segBackup.Name)
+	if err != nil {
+		return err
+	}
+
+	tracelog.InfoLogger.Printf("Running delete target %s on segment %d\n",
+		segTarget.GetBackupName(), h.contentID)
+
+	folderFilter := func(folderPath string) bool {
+		aoSegFolderPrefix := path.Join(utility.BaseBackupPath, AoStoragePath)
+		return !strings.HasPrefix(folderPath, aoSegFolderPrefix)
+	}
+	h.HandleDeleteTargetWithFilter(segTarget, h.args.Confirmed, h.args.FindFull, folderFilter)
+	if err != nil {
+		return err
+	}
+
+	return cleanupAOSegments(segTarget, h.Folder, h.args.Confirmed)
+}
+
+// TODO: unit tests
 func cleanupAOSegments(target internal.BackupObject, segFolder storage.Folder, confirmed bool) error {
 	aoSegFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(AoStoragePath)
 	aoSegmentsToRetain, err := LoadStorageAoFiles(segFolder.GetSubFolder(utility.BaseBackupPath))
@@ -100,6 +133,7 @@ func cleanupAOSegments(target internal.BackupObject, segFolder storage.Folder, c
 	return aoSegFolder.DeleteObjects(aoSegmentsToDelete)
 }
 
+// TODO: unit tests
 func findAoSegmentsToDelete(target internal.BackupObject,
 	aoSegmentsToRetain map[string]struct{}, aoSegFolder storage.Folder) ([]string, error) {
 	aoObjects, _, err := aoSegFolder.ListFolder()
