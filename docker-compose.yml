@@ -54,6 +54,7 @@ services:
       &&  mkdir -p /export/deletetargetbucket
       &&  mkdir -p /export/gpdeletetargetbucket
       &&  mkdir -p /export/deletegarbagebucket
+      &&  mkdir -p /export/gpdeletegarbagebucket
       &&  mkdir -p /export/mysqlfullxtrabackupbucket
       &&  mkdir -p /export/mysqlfullxtrabackupwithrangesbucket
       &&  mkdir -p /export/mysqlfullmysqldumpbucket
