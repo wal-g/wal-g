@@ -191,7 +191,7 @@ func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType 
 }
 
 // HandleDeleteGarbage delete outdated WAL archives and leftover backup files
-func (h *DeleteHandler) HandleDeleteGarbage(args []string, confirm bool) error {
+func (h *DeleteHandler) HandleDeleteGarbage(args []string) error {
 	predicate := postgres.ExtractDeleteGarbagePredicate(args)
 	backupSelector := internal.NewOldestNonPermanentSelector(NewGenericMetaFetcher())
 	oldestBackup, err := backupSelector.Select(h.Folder)
@@ -216,5 +216,5 @@ func (h *DeleteHandler) HandleDeleteGarbage(args []string, confirm bool) error {
 	tracelog.InfoLogger.Printf("Finished processing the segments backups")
 
 	folderFilter := func(name string) bool { return strings.HasPrefix(name, utility.BaseBackupPath) }
-	return h.DeleteBeforeTargetWhere(target, confirm, predicate, folderFilter)
+	return h.DeleteBeforeTargetWhere(target, h.args.Confirmed, predicate, folderFilter)
 }

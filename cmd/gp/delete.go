@@ -119,7 +119,7 @@ func runDeleteGarbage(cmd *cobra.Command, args []string) {
 	deleteHandler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	err = deleteHandler.HandleDeleteGarbage(args, confirmed)
+	err = deleteHandler.HandleDeleteGarbage(args)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
