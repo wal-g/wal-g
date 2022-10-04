@@ -206,9 +206,10 @@ func getIncrementInfo(folder storage.Folder, object storage.Object) (string, str
 }
 
 // HandleDeleteGarbage delete outdated WAL archives and leftover backup files
-func (dh *DeleteHandler) HandleDeleteGarbage(args []string, folder storage.Folder, confirm bool) error {
+func (dh *DeleteHandler) HandleDeleteGarbage(args []string, confirm bool) error {
 	predicate := ExtractDeleteGarbagePredicate(args)
-	oldestBackup, err := findOldestNonPermanentBackup(folder.GetSubFolder(utility.BaseBackupPath))
+	backupSelector := internal.NewOldestNonPermanentSelector(NewGenericMetaFetcher())
+	oldestBackup, err := backupSelector.Select(dh.Folder)
 	if err != nil {
 		if _, ok := err.(internal.NoBackupsFoundError); ok {
 			tracelog.InfoLogger.Println("Couldn't find any non-permanent backups in storage. Not doing anything.")
@@ -217,7 +218,7 @@ func (dh *DeleteHandler) HandleDeleteGarbage(args []string, folder storage.Folde
 		return err
 	}
 
-	target, err := dh.FindTargetByName(oldestBackup.BackupName)
+	target, err := dh.FindTargetByName(oldestBackup)
 	if err != nil {
 		return err
 	}
@@ -245,37 +246,4 @@ func storagePrefixFilter(prefix string) func(storage.Object) bool {
 	return func(object storage.Object) bool {
 		return strings.HasPrefix(object.GetName(), prefix)
 	}
-}
-
-// findOldestNonPermanentBackup finds oldest non-permanent backup available in storage.
-func findOldestNonPermanentBackup(
-	folder storage.Folder,
-) (*BackupDetail, error) {
-	backups, err := internal.GetBackups(folder)
-	if err != nil {
-		// this also includes the zero backups case
-		return nil, err
-	}
-
-	backupDetails, err := GetBackupsDetails(folder, backups)
-	if err != nil {
-		return nil, err
-	}
-
-	SortBackupDetails(backupDetails)
-
-	for i := range backupDetails {
-		currBackup := &backupDetails[i]
-
-		if currBackup.IsPermanent {
-			tracelog.InfoLogger.Printf(
-				"Backup %s is permanent, it is not eligible to be selected "+
-					"as the oldest backup for delete garbage.\n", currBackup.BackupName)
-			continue
-		}
-		tracelog.InfoLogger.Printf("Found earliest non-permanent backup: %s\n", currBackup.BackupName)
-		return currBackup, nil
-	}
-
-	return nil, internal.NewNoBackupsFoundError()
 }

@@ -97,10 +97,9 @@ func (h SegDeleteTargetHandler) Delete(segBackup SegBackup) error {
 		segTarget.GetBackupName(), h.contentID)
 
 	folderFilter := func(folderPath string) bool {
-		aoSegFolderPrefix := path.Join(utility.BaseBackupPath, AoStoragePath)
-		return !strings.HasPrefix(folderPath, aoSegFolderPrefix)
+		return !strings.HasPrefix(folderPath, AoStoragePath)
 	}
-	h.HandleDeleteTargetWithFilter(segTarget, h.args.Confirmed, h.args.FindFull, folderFilter)
+	err = h.DeleteTarget(segTarget, h.args.Confirmed, h.args.FindFull, folderFilter)
 	if err != nil {
 		return err
 	}

@@ -14,7 +14,8 @@ import (
 
 const LatestString = "LATEST"
 
-// Select the name of storage backup chosen according to the internal rules
+// BackupSelector returns the name of storage backup chosen according to the internal rules.
+// Returns NoBackupsFoundError in case there are no backups matching the criteria.
 type BackupSelector interface {
 	Select(folder storage.Folder) (string, error)
 }
@@ -27,6 +28,7 @@ func NewLatestBackupSelector() LatestBackupSelector {
 	return LatestBackupSelector{}
 }
 
+// TODO: unit tests
 func (s LatestBackupSelector) Select(folder storage.Folder) (string, error) {
 	backupName, err := GetLatestBackupName(folder.GetSubFolder(utility.BaseBackupPath))
 	if err == nil {
@@ -52,6 +54,7 @@ func NewUserDataBackupSelector(userDataRaw string, metaFetcher GenericMetaFetche
 	}, nil
 }
 
+// TODO: unit tests
 func (s UserDataBackupSelector) Select(folder storage.Folder) (string, error) {
 	backupName, err := s.findBackupByUserData(s.userData, folder)
 	if err != nil {
@@ -71,7 +74,7 @@ func (s UserDataBackupSelector) findBackupByUserData(userData interface{}, folde
 	}
 
 	if len(foundBackups) == 0 {
-		return "", errors.New("no backups found with specified user data")
+		return "", NewNoBackupsFoundError()
 	}
 
 	if len(foundBackups) > 1 {
@@ -122,6 +125,7 @@ func NewBackupNameSelector(backupName string, checkExistence bool) (BackupNameSe
 	return BackupNameSelector{backupName: backupName, checkExistence: checkExistence}, nil
 }
 
+// TODO: unit tests
 func (s BackupNameSelector) Select(folder storage.Folder) (string, error) {
 	if !s.checkExistence {
 		return s.backupName, nil
@@ -178,4 +182,45 @@ func NewDeltaBaseSelector(
 	default:
 		return NewLatestBackupSelector(), nil
 	}
+}
+
+// OldestNonPermanentSelector finds oldest non-permanent backup available in storage.
+type OldestNonPermanentSelector struct {
+	metaFetcher GenericMetaFetcher
+}
+
+func NewOldestNonPermanentSelector(metaFetcher GenericMetaFetcher) *OldestNonPermanentSelector {
+	return &OldestNonPermanentSelector{metaFetcher: metaFetcher}
+}
+
+// TODO: unit tests
+func (s *OldestNonPermanentSelector) Select(folder storage.Folder) (string, error) {
+	searchFn := func(d GenericMetadata) bool {
+		if !d.IsPermanent {
+			return true
+		}
+
+		tracelog.InfoLogger.Printf(
+			"Backup %s is permanent, it is not eligible to be selected "+
+				"as the oldest backup\n", d.BackupName)
+		return false
+	}
+
+	foundBackups, err := searchInMetadata(searchFn, folder, s.metaFetcher)
+	if err != nil {
+		return "", errors.Wrapf(err, "backups lookup failed")
+	}
+
+	if len(foundBackups) == 0 {
+		return "", NewNoBackupsFoundError()
+	}
+
+	oldest := foundBackups[0]
+	for i := range foundBackups {
+		if foundBackups[i].StartTime.Before(oldest.StartTime) {
+			oldest = foundBackups[i]
+		}
+	}
+
+	return oldest.BackupName, nil
 }
