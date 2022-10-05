@@ -85,11 +85,6 @@ var daemonCmd = &cobra.Command{
 
 		uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
 
-		if !daemonMode {
-			tracelog.ErrorLogger.FatalOnError(postgres.HandleWALPush(uploader, args[0]))
-			return
-		}
-
 		_ = os.Remove(DaemonSocketName)
 		l, err := net.Listen("unix", DaemonSocketName)
 		if err != nil {
@@ -110,9 +105,6 @@ var daemonCmd = &cobra.Command{
 	},
 }
 
-var daemonMode = false
-
 func init() {
 	Cmd.AddCommand(daemonCmd)
-	daemonCmd.Flags().BoolVar(&daemonMode, "daemon", false, "Run in daemon mode")
 }
