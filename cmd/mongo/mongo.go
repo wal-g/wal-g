@@ -42,6 +42,6 @@ func Execute() {
 
 func init() {
 	common.Init(cmd, internal.MONGO)
-
+	internal.AddTurboFlag(cmd)
 	internal.RequiredSettings[internal.MongoDBUriSetting] = true
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/wal-g/wal-g/internal/checksum"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/utility"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -310,7 +311,7 @@ func (backupService *BackupService) UploadBackupFile(backupFileMeta *BackupFileM
 	}
 	defer utility.LoggedClose(fileReader, fmt.Sprintf("close backup file reader %v", backupFileMeta.Path))
 
-	var reader io.Reader = fileReader
+	var reader = limiters.NewDiskLimitReader(fileReader)
 
 	if backupFileMeta.UncompressedSize >= 0 {
 		// backupFileMeta.UncompressedSize contains size from backupCursor

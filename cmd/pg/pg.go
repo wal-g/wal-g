@@ -50,5 +50,5 @@ func Execute() {
 
 func configureCommand() {
 	common.Init(Cmd, internal.PG)
-	Cmd.PersistentFlags().BoolVarP(&internal.Turbo, "turbo", "", false, "Ignore all kinds of throttling defined in config")
+	internal.AddTurboFlag(Cmd)
 }
