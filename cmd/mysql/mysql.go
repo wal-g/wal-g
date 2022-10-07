@@ -44,5 +44,5 @@ func Execute() {
 
 func init() {
 	common.Init(cmd, internal.MYSQL)
-	cmd.PersistentFlags().BoolVarP(&internal.Turbo, "turbo", "", false, "Ignore all kinds of throttling defined in config")
+	internal.AddTurboFlag(cmd)
 }

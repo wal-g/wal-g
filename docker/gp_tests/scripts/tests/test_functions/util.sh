@@ -19,6 +19,16 @@ insert_data() {
 	psql -p 6000 -d test -c "INSERT INTO co select i, i FROM generate_series(1,10)i;"
 }
 
+insert_a_lot_of_data() {
+  psql -p 6000 -c "DROP DATABASE IF EXISTS test"
+  psql -p 6000 -c "CREATE DATABASE test"
+	psql -p 6000 -d test -c "CREATE TABLE heap AS SELECT a FROM generate_series(1,100000) AS a;"
+	psql -p 6000 -d test -c "CREATE TABLE ao(a int, b int) WITH (appendoptimized = true) DISTRIBUTED BY (a);"
+	psql -p 6000 -d test -c "CREATE TABLE co(a int, b int) WITH (appendoptimized = true, orientation = column) DISTRIBUTED BY (a);"
+	psql -p 6000 -d test -c "INSERT INTO ao select i, i FROM generate_series(1,100000)i;"
+	psql -p 6000 -d test -c "INSERT INTO co select i, i FROM generate_series(1,100000)i;"
+}
+
 enable_pitr_extension() {
   echo "Enabling gp_pitr extension..."
   psql -p 6000 -d postgres -c "create extension gp_pitr"
