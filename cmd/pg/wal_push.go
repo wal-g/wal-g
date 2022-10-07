@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/asm"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const WalPushShortDescription = "Uploads a WAL file to storage"
@@ -35,7 +36,11 @@ var walPushCmd = &cobra.Command{
 			uploader.PGArchiveStatusManager = asm.NewNopASM()
 		}
 
-		postgres.HandleWALPush(uploader, args[0])
+		uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
+		err = postgres.HandleWALPush(uploader, args[0])
+		if err != nil {
+			tracelog.ErrorLogger.FatalOnError(err)
+		}
 	},
 }
 
