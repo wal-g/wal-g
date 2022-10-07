@@ -89,7 +89,7 @@ jobs:
         uses: uraimo/run-on-arch-action@v2
         with:
           arch: ${{ matrix.arch }}
-          distro: ${{ matrix.distro }}
+          distro: ubuntu20.04
           env: |
             USE_LIBSODIUM: ${{ env.USE_LIBSODIUM }}
             USE_LZO: ${{ env.USE_LZO }}
