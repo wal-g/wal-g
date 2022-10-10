@@ -1,11 +1,9 @@
 package pg
 
 import (
-	"net"
+	"github.com/wal-g/wal-g/utility"
 	"os"
 	"path"
-
-	"github.com/wal-g/wal-g/utility"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
@@ -15,11 +13,10 @@ import (
 )
 
 const DaemonShortDescription = "Uploads a WAL file to storage"
-const DaemonSocketName = "/tmp/wal-push.sock"
 
-// daemonCmd represents the daemon command
+// daemonCmd represents the daemon archive command
 var daemonCmd = &cobra.Command{
-	Use:   "daemon wal_filepath",
+	Use:   "daemon daemon_socket_path",
 	Short: DaemonShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -43,25 +40,13 @@ var daemonCmd = &cobra.Command{
 		}
 
 		uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
-
-		_ = os.Remove(DaemonSocketName)
-		l, err := net.Listen("unix", DaemonSocketName)
-		if err != nil {
-			tracelog.ErrorLogger.Fatal("listen error:", err)
+		pathToData, exist := os.LookupEnv("PGDATA")
+		if !exist {
+			tracelog.ErrorLogger.Fatal("'PGDATA' variable is not defined or does not exist")
 		}
-		for {
-			fd, err := l.Accept()
-			if err != nil {
-				tracelog.ErrorLogger.Println("accept error:", err)
-			}
+		pathToWal := path.Join(pathToData, "pg_wal")
 
-			go postgres.HandleDaemon(fd, func(walFileName string) error {
-				fullPath := path.Join(args[0], walFileName)
-				tracelog.InfoLogger.Printf("starting wal-push for %s\n", fullPath)
-				uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
-				return postgres.HandleWALPush(uploader, fullPath)
-			})
-		}
+		postgres.HandleDaemon(uploader, args[0], pathToWal)
 	},
 }
 

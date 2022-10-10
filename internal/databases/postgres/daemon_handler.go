@@ -2,12 +2,37 @@ package postgres
 
 import (
 	"net"
+	"os"
+	"path"
 
 	"github.com/wal-g/tracelog"
 )
 
 // HandleDaemon is invoked to perform daemon mode
-func HandleDaemon(c net.Conn, f func(string) error) {
+func HandleDaemon(uploader *WalUploader, pathToSocket string, pathToWal string) {
+
+	_ = os.Remove(pathToSocket)
+	l, err := net.Listen("unix", pathToSocket)
+	if err != nil {
+		tracelog.ErrorLogger.Fatal("Error on listening socket:", err)
+	}
+	for {
+		fd, err := l.Accept()
+		if err != nil {
+			tracelog.ErrorLogger.Println("Failed to accept, err:", err)
+		}
+
+		go CheckDaemon(fd, func(walFileName string) error {
+			fullPath := path.Join(pathToWal, walFileName)
+			tracelog.InfoLogger.Printf("starting wal-push for %s\n", fullPath)
+			return HandleWALPush(uploader, fullPath)
+		})
+	}
+
+}
+
+// CheckDaemon is invoked to check all needs of archiving
+func CheckDaemon(c net.Conn, f func(string) error) {
 	defer func(c net.Conn) {
 		err := c.Close()
 		if err != nil {
