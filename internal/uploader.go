@@ -46,7 +46,8 @@ type Uploader struct {
 var _ UploaderProvider = &Uploader{}
 
 // SplitStreamUploader - new UploaderProvider implementation that enable us to split upload streams into blocks
-//   of blockSize bytes, then puts it in at most `partitions` streams that are compressed and pushed to storage
+//
+//	of blockSize bytes, then puts it in at most `partitions` streams that are compressed and pushed to storage
 type SplitStreamUploader struct {
 	*Uploader
 	partitions int
@@ -78,29 +79,20 @@ func NewUploader(
 }
 
 func NewSplitStreamUploader(
-	compressor compression.Compressor,
-	uploadingLocation storage.Folder,
+	uploader *Uploader,
 	partitions int,
 	blockSize int,
 ) UploaderProvider {
 	if partitions <= 1 {
 		// Fallback to old implementation in order to skip unneeded steps:
-		return NewUploader(compressor, uploadingLocation)
+		return uploader
 	}
 
-	uploader := &SplitStreamUploader{
-		Uploader: &Uploader{
-			UploadingFolder: uploadingLocation,
-			Compressor:      compressor,
-			waitGroup:       &sync.WaitGroup{},
-			tarSize:         new(int64),
-			dataSize:        new(int64),
-		},
+	return &SplitStreamUploader{
+		Uploader:   uploader,
 		partitions: partitions,
 		blockSize:  blockSize,
 	}
-	uploader.Failed.Store(false)
-	return uploader
 }
 
 // UploadedDataSize returns 0 and error when SizeTracking disabled (see DisableSizeTracking)

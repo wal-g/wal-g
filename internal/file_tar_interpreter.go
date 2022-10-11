@@ -14,19 +14,22 @@ import (
 
 type FileTarInterpreter struct {
 	DirectoryToSave string
+	fsync           bool
 }
 
 func NewFileTarInterpreter(directoryToSave string) TarInterpreter {
-	return &FileTarInterpreter{directoryToSave}
+	return &FileTarInterpreter{
+		DirectoryToSave: directoryToSave,
+		fsync:           !viper.GetBool(TarDisableFsyncSetting),
+	}
 }
 
 func (tarInterpreter *FileTarInterpreter) Interpret(reader io.Reader, fileInfo *tar.Header) error {
 	tracelog.DebugLogger.Println("Interpreting: ", fileInfo.Name)
 	targetPath := path.Join(tarInterpreter.DirectoryToSave, fileInfo.Name)
-	fsync := !viper.GetBool(TarDisableFsyncSetting)
 	switch fileInfo.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
-		return tarInterpreter.interpretRegularFile(fsync, targetPath, fileInfo, reader)
+		return tarInterpreter.interpretRegularFile(targetPath, fileInfo, reader)
 	case tar.TypeDir:
 		err := os.MkdirAll(targetPath, 0755)
 		if err != nil {
@@ -47,13 +50,13 @@ func (tarInterpreter *FileTarInterpreter) Interpret(reader io.Reader, fileInfo *
 	return nil
 }
 
-func (tarInterpreter *FileTarInterpreter) interpretRegularFile(fsync bool, targetPath string, header *tar.Header, reader io.Reader) error {
+func (tarInterpreter *FileTarInterpreter) interpretRegularFile(targetPath string, header *tar.Header, reader io.Reader) error {
 	localFile, _, err := utility.GetLocalFile(targetPath, header)
 	if err != nil {
 		return err
 	}
 	defer utility.LoggedClose(localFile, "")
-	defer utility.LoggedSync(localFile, "", fsync)
+	defer utility.LoggedSync(localFile, "", tarInterpreter.fsync)
 
-	return utility.WriteLocalFile(reader, header, localFile, fsync)
+	return utility.WriteLocalFile(reader, header, localFile, tarInterpreter.fsync)
 }

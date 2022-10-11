@@ -3,17 +3,14 @@ package binary
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/checksum"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/utility"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -27,8 +24,7 @@ type BackupService struct {
 	Sentinel                  models.Backup
 	MongodBackupFilesMetadata MongodBackupFilesMetadata
 
-	BackupDirectoriesMap map[string]*BackupDirectoryMeta
-	BackupFilesMap       map[string]*BackupFileMeta
+	Visited map[string]*BackupFileMeta
 }
 
 func GenerateNewBackupName() string {
@@ -43,8 +39,7 @@ func CreateBackupService(ctx context.Context, mongodService *MongodService, loca
 		LocalStorage:  localStorage,
 		BackupStorage: backupStorage,
 
-		BackupDirectoriesMap: map[string]*BackupDirectoryMeta{},
-		BackupFilesMap:       map[string]*BackupFileMeta{},
+		Visited: map[string]*BackupFileMeta{},
 	}, nil
 }
 
@@ -85,12 +80,12 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 		}
 	}
 
-	err = backupService.UploadBackupFiles()
+	uncompressedSize, compressedSize, err := backupService.UploadBackupFiles()
 	if err != nil {
 		return err
 	}
 
-	return backupService.FinalizeAndStoreMongodBackupMetadata()
+	return backupService.FinalizeAndStoreMongodBackupMetadata(uncompressedSize, compressedSize)
 }
 
 func (backupService *BackupService) processBackupCursor(backupCursor *BackupCursor) (*primitive.Binary, error) {
@@ -171,12 +166,13 @@ func (backupService *BackupService) InitializeMongodBackupMeta(backupName string
 }
 
 func (backupService *BackupService) AppendBackupFile(backupFile BackupCursorFile) error {
-	backupFilePath, err := backupService.LocalStorage.GetRelativeMongodPath(backupFile.FileName)
+	absoluteBackupFilePath := backupFile.FileName
+	backupFilePath, err := backupService.LocalStorage.GetRelativeMongodPath(absoluteBackupFilePath)
 	if err != nil {
 		return err
 	}
 
-	if previousBackupFileMeta, ok := backupService.BackupFilesMap[backupFilePath]; ok {
+	if previousBackupFileMeta, ok := backupService.Visited[backupFilePath]; ok {
 		return processDoubleEncounterTheSameBackupFile(previousBackupFileMeta, backupFile)
 	}
 
@@ -184,7 +180,7 @@ func (backupService *BackupService) AppendBackupFile(backupFile BackupCursorFile
 	directoryPath := filepath.Dir(backupFilePath)
 
 	for len(directoryPath) > 0 && directoryPath != "." {
-		if _, ok := backupService.BackupDirectoriesMap[directoryPath]; ok {
+		if _, ok := backupService.Visited[directoryPath]; ok {
 			break
 		}
 
@@ -193,63 +189,60 @@ func (backupService *BackupService) AppendBackupFile(backupFile BackupCursorFile
 			return err
 		}
 
-		backupDirectoryMeta := BackupDirectoryMeta{
+		backupFileMeta := &BackupFileMeta{
 			Path:     directoryPath,
 			FileMode: directoryStat.Mode(),
 		}
-		metadata.BackupDirectories = append(metadata.BackupDirectories, &backupDirectoryMeta)
-		backupService.BackupDirectoriesMap[directoryPath] = &backupDirectoryMeta
+		metadata.BackupFiles = append(metadata.BackupFiles, backupFileMeta)
+		backupService.Visited[directoryPath] = backupFileMeta
 
 		directoryPath = filepath.Dir(directoryPath)
 	}
 
-	backupFileStat, err := os.Stat(backupFile.FileName)
+	backupFileInfo, err := os.Stat(absoluteBackupFilePath)
 	if err != nil {
 		return err
 	}
 
-	backupFileMeta := BackupFileMeta{
-		Path:             backupFilePath,
-		FileMode:         backupFileStat.Mode(),
-		Compression:      backupService.BackupStorage.GetCompression(),
-		UncompressedSize: backupFileStat.Size(), // backupFile.FileSize contains 0 for extended backup cursor
+	backupFileMeta := &BackupFileMeta{
+		Path:     backupFilePath,
+		FileMode: backupFileInfo.Mode(),
+		FileSize: backupFile.FileSize,
 	}
-	metadata.BackupFiles = append(metadata.BackupFiles, &backupFileMeta)
-	backupService.Sentinel.UncompressedSize += backupFile.FileSize
-	backupService.BackupFilesMap[backupFilePath] = &backupFileMeta
+	if backupFileMeta.FileSize <= 0 { // backupFile.FileSize contains 0 for extended backup cursor
+		backupFileMeta.FileSize = backupFileInfo.Size()
+	}
+	metadata.BackupFiles = append(metadata.BackupFiles, backupFileMeta)
+	backupService.Visited[backupFilePath] = backupFileMeta
 
 	return nil
 }
 
 func processDoubleEncounterTheSameBackupFile(backupFileMeta *BackupFileMeta, backupFile BackupCursorFile) error {
-	if backupFileMeta.UncompressedSize > backupFile.FileSize {
+	if backupFileMeta.FileSize > backupFile.FileSize {
 		return fmt.Errorf("previous backup file <%v> was bigger (was truncate?)", backupFile.FileName)
 	}
-	if backupFileMeta.UncompressedSize == backupFile.FileSize {
-		return fmt.Errorf("previous backup file <%v> has the same file size (bag with uniqueness?)",
+	if backupFileMeta.FileSize == backupFile.FileSize {
+		return fmt.Errorf("previous backup file <%v> has the same file size (bug with uniqueness?)",
 			backupFile.FileName)
 	}
 
 	tracelog.WarningLogger.Printf("backup file <%v> was processed already with size %v, but new file has size %v",
-		backupFileMeta.Path, backupFileMeta.UncompressedSize, backupFile.FileSize)
-	backupFileMeta.UncompressedSize = backupFile.FileSize
+		backupFileMeta.Path, backupFileMeta.FileSize, backupFile.FileSize)
+	backupFileMeta.FileSize = backupFile.FileSize
 	return nil
 }
 
-func (backupService *BackupService) FinalizeAndStoreMongodBackupMetadata() error {
+func (backupService *BackupService) FinalizeAndStoreMongodBackupMetadata(uncompressedSize, compressedSize int64) error {
 	err := backupService.BackupStorage.UploadMongodBackupFilesMetadata(&backupService.MongodBackupFilesMetadata)
 	if err != nil {
 		return errors.Wrap(err, "can not upload files metadata")
 	}
 
-	compressedDataSize, err := backupService.BackupStorage.CalculateCompressedFiles(backupService.BackupFilesMap)
-	if err != nil {
-		return errors.Wrap(err, "unable to calculate compressed files in backup storage")
-	}
-
 	sentinel := &backupService.Sentinel
 	sentinel.FinishLocalTime = utility.TimeNowCrossPlatformLocal()
-	sentinel.CompressedSize = compressedDataSize
+	sentinel.UncompressedSize = uncompressedSize
+	sentinel.CompressedSize = compressedSize
 
 	backupLastTS := models.TimestampFromBson(sentinel.MongoMeta.BackupLastTS)
 	sentinel.MongoMeta.Before.LastMajTS = backupLastTS
@@ -260,44 +253,24 @@ func (backupService *BackupService) FinalizeAndStoreMongodBackupMetadata() error
 	return backupService.BackupStorage.UploadSentinel(sentinel)
 }
 
-func (backupService *BackupService) UploadBackupFiles() error {
-	// todo: parallel
-	for i := 0; i < len(backupService.MongodBackupFilesMetadata.BackupFiles); i++ {
-		backupFileMeta := backupService.MongodBackupFilesMetadata.BackupFiles[i]
-		err := backupService.UploadBackupFile(backupFileMeta)
+func (backupService *BackupService) UploadBackupFiles() (int64, int64, error) {
+	uploader := backupService.BackupStorage.Uploader
+	backupName := backupService.BackupStorage.BackupName
+	mongodDBPath := backupService.LocalStorage.MongodDBPath
+
+	concurrentUploader, err := CreateConcurrentUploader(uploader, backupName, mongodDBPath)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	for _, backupFileMeta := range backupService.MongodBackupFilesMetadata.BackupFiles {
+		backupFilePath := backupService.LocalStorage.GetAbsolutePath(backupFileMeta.Path)
+
+		err = concurrentUploader.Upload(backupFilePath, backupFileMeta)
 		if err != nil {
-			return err
+			return 0, 0, err
 		}
 	}
-	return nil
-}
 
-func (backupService *BackupService) UploadBackupFile(backupFileMeta *BackupFileMeta) error {
-	fileReader, err := backupService.LocalStorage.CreateReader(backupFileMeta)
-	if err != nil {
-		return err
-	}
-	defer utility.LoggedClose(fileReader, fmt.Sprintf("close backup file reader %v", backupFileMeta.Path))
-
-	var reader = limiters.NewDiskLimitReader(fileReader)
-
-	if backupFileMeta.UncompressedSize >= 0 {
-		// backupFileMeta.UncompressedSize contains size from backupCursor
-		reader = io.LimitReader(reader, backupFileMeta.UncompressedSize)
-	}
-
-	checksumCalculator := checksum.CreateCalculator()
-	readerWithChecksum := checksum.CreateReaderWithChecksum(reader, checksumCalculator)
-
-	err = backupService.BackupStorage.UploadFile(readerWithChecksum, backupFileMeta)
-	if err != nil {
-		return err
-	}
-
-	backupFileMeta.Checksum = Checksum{
-		Algorithm: checksumCalculator.Algorithm(),
-		Data:      checksumCalculator.Checksum(),
-	}
-
-	return nil
+	return concurrentUploader.Finalize()
 }

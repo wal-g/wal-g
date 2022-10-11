@@ -15,7 +15,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal/checksum"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -102,8 +101,7 @@ func (localStorage *LocalStorage) EnsureEmptyDirectory(directoryPath string) err
 	return fmt.Errorf("directory '%v' is not empty", directoryPath)
 }
 
-func (localStorage *LocalStorage) CreateDirectories(directoryMetas []*BackupDirectoryMeta) error {
-	// todo: sort directories to avoid check on existence
+func (localStorage *LocalStorage) CreateDirectories(directoryMetas []*BackupFileMeta) error {
 	for _, directoryMeta := range directoryMetas {
 		directoryPath := filepath.Join(localStorage.MongodDBPath, directoryMeta.Path)
 		_, err := os.Stat(directoryPath)
@@ -120,8 +118,8 @@ func (localStorage *LocalStorage) CreateDirectories(directoryMetas []*BackupDire
 		if err != nil {
 			return err
 		}
-		userName := "mongodb"  // todo: get from sentinel!!!
-		groupName := "mongodb" // todo: get from sentinel!!!
+		userName := "mongodb"
+		groupName := "mongodb"
 		err = chown(directoryPath, userName, groupName)
 		if err != nil {
 			return err
@@ -160,21 +158,9 @@ func (localStorage *LocalStorage) SaveStreamToMongodFile(inputStream io.Reader, 
 	}
 	defer utility.LoggedClose(fileWriter, fmt.Sprintf("close backup file writer %v", absolutePath))
 
-	checksumCalculator := checksum.CreateCalculator() // todo: find checksum calculator by name
-	if checksumCalculator.Algorithm() != backupFileMeta.Checksum.Algorithm {
-		return fmt.Errorf("different checksum algorithms file: %v != backup: %v", checksumCalculator.Algorithm(),
-			backupFileMeta.Checksum.Algorithm)
-	}
-	writerWithChecksum := checksum.CreateWriterWithChecksum(fileWriter, checksumCalculator)
-
-	_, err = utility.FastCopy(&utility.EmptyWriteIgnorer{Writer: writerWithChecksum}, inputStream)
+	_, err = utility.FastCopy(&utility.EmptyWriteIgnorer{Writer: fileWriter}, inputStream)
 	if err != nil {
 		return fmt.Errorf("failed to decompress and decrypt file <%v>: %w", absolutePath, err)
-	}
-
-	checksumData := checksumCalculator.Checksum()
-	if checksumData != backupFileMeta.Checksum.Data {
-		return fmt.Errorf("different checksum data file %v != backup %v", checksumData, backupFileMeta.Checksum.Data)
 	}
 
 	return localStorage.ApplyFileOwnerAndPermissions(backupFileMeta)

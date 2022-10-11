@@ -135,12 +135,12 @@ func (w *WalgUtil) PushBackup() (string, error) {
 	return BackupNameFromCreate(exec.Combined()), nil
 }
 
-func (w *WalgUtil) PushBinaryBackup() (string, error) {
-	exec, err := w.runCmd("binary-backup-push")
+func (w *WalgUtil) PushBinaryBackup() error {
+	_, err := w.runCmd("binary-backup-push")
 	if err != nil {
-		return "", err
+		return err
 	}
-	return BackupNameFromCreate(exec.Combined()), nil
+	return nil
 }
 
 func (w *WalgUtil) GetBackupByNumber(backupNumber int) (string, error) {

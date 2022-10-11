@@ -118,6 +118,22 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone() error {
 }
 
 func (restoreService *RestoreService) downloadFilesFromBackup(backupFilesMetadata *MongodBackupFilesMetadata) error {
+	if IsTarBackupFormat(restoreService.BackupStorage.Uploader, restoreService.BackupStorage.BackupName) {
+		return restoreService.concurrentDownloadFromTarArchives()
+	}
+	return restoreService.oldFormatDownload(backupFilesMetadata)
+}
+
+func (restoreService *RestoreService) concurrentDownloadFromTarArchives() error {
+	uploader := restoreService.BackupStorage.Uploader
+	backupName := restoreService.BackupStorage.BackupName
+	mongodDBPath := restoreService.LocalStorage.MongodDBPath
+
+	downloader := CreateConcurrentDownloader(uploader)
+	return downloader.Download(backupName, mongodDBPath)
+}
+
+func (restoreService *RestoreService) oldFormatDownload(backupFilesMetadata *MongodBackupFilesMetadata) error {
 	err := restoreService.LocalStorage.EnsureEmptyDBPath()
 	if err != nil {
 		return err
