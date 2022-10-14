@@ -1,7 +1,6 @@
 package pg
 
 import (
-	"github.com/wal-g/wal-g/utility"
 	"os"
 	"path"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/asm"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const DaemonShortDescription = "Uploads a WAL file to storage"
