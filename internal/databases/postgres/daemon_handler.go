@@ -22,8 +22,7 @@ func HandleDaemon(uploader *WalUploader, pathToSocket string, pathToWal string) 
 		if err != nil {
 			tracelog.ErrorLogger.Println("Failed to accept, err:", err)
 		}
-
-		go CheckDaemon(fd, func(walFileName string) error {
+		go DaemonProcess(fd, func(walFileName string) error {
 			fullPath := path.Join(pathToWal, walFileName)
 			tracelog.InfoLogger.Printf("starting wal-push for %s\n", fullPath)
 			return HandleWALPush(uploader, fullPath)
@@ -31,8 +30,7 @@ func HandleDaemon(uploader *WalUploader, pathToSocket string, pathToWal string) 
 	}
 }
 
-// CheckDaemon is invoked to check all needs of archiving
-func CheckDaemon(c net.Conn, f func(string) error) {
+func DaemonProcess(c net.Conn, f func(string) error) {
 	defer func(c net.Conn) {
 		err := c.Close()
 		if err != nil {
@@ -47,60 +45,56 @@ func CheckDaemon(c net.Conn, f func(string) error) {
 			_, _ = c.Write([]byte("READ_FAILED"))
 			return
 		}
-
-		requestType, requestLength, requestBody := BufferParser(buf)
-		response := ValidateMessage(requestType, requestLength, requestBody, f)
+		requestType, requestLength, requestBody := MessageParser(buf)
+		response := HandleMessage(requestType, requestLength, requestBody, f)
 		_, _ = c.Write([]byte(response))
 		if response == "OK" {
 			return
 		}
 		if int(requestLength) < nr {
-			requestType, requestLength, requestBody = BufferParser(buf[requestLength:])
-			response = ValidateMessage(requestType, requestLength, requestBody, f)
+			tracelog.InfoLogger.Println("Read remaining buffer...")
+			requestType, requestLength, requestBody = MessageParser(buf[requestLength:])
+			response = HandleMessage(requestType, requestLength, requestBody, f)
 			_, _ = c.Write([]byte(response))
 			return
 		}
 	}
 }
 
-// BufferParser is invoked to read bytes from buffer
-func BufferParser(buf []byte) (string, uint16, string) {
+// MessageParser is invoked to read bytes from buffer
+func MessageParser(buf []byte) (string, uint16, string) {
 	messageType := string(buf[0])
-	tracelog.InfoLogger.Printf("request type is : %s", messageType)
-
 	var messageLength uint16
 	l := bytes.NewReader(buf[1:3])
 	err := binary.Read(l, binary.BigEndian, &messageLength)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to read message length, err: %v", err)
 	}
-	tracelog.InfoLogger.Printf("request len is : %d", messageLength)
 	messageBody := string(buf[3 : messageLength-1])
-	tracelog.InfoLogger.Printf("request body is : %s", messageBody)
 	return messageType, messageLength, messageBody
 }
 
-// ValidateMessage is invoked to validate request and to give a correct response
-func ValidateMessage(requestType string, requestLength uint16, requestBody string, f func(string) error) string {
-	if requestType == "C" {
-		if requestBody == "CHECK" {
+// HandleMessage is invoked to validate message and to return a correct response
+func HandleMessage(messageType string, messageLength uint16, messageBody string, f func(string) error) string {
+	if messageType == "C" {
+		if messageBody[0:5] == "CHECK" {
 			tracelog.InfoLogger.Println("Successful configuration check")
 			return "CHECKED"
 		}
-		tracelog.ErrorLogger.Printf("Incorrect message body: '%s', expected: '%s'", requestBody, "CHECK")
+		tracelog.ErrorLogger.Printf("Incorrect message body: '%s', expected: '%s'", messageBody, "CHECK")
 		return "BAD_MSG"
 	}
-	if requestType == "F" {
-		if requestLength < 28 {
-			if requestLength > 0 {
-				tracelog.ErrorLogger.Printf("Received incorrect message %s", requestBody)
+	if messageType == "F" {
+		if messageLength < 28 {
+			if messageLength > 0 {
+				tracelog.ErrorLogger.Printf("Received incorrect message %s", messageBody)
 			} else {
 				tracelog.ErrorLogger.Println("Received empty message")
 			}
 			return "BAD_MSG"
 		}
-		tracelog.InfoLogger.Printf("wal file name: %s\n", requestBody)
-		err := f(requestBody)
+		tracelog.InfoLogger.Printf("wal file name: %s\n", messageBody)
+		err := f(messageBody)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("wal-push failed: %v\n", err)
 			return "FAIL"
