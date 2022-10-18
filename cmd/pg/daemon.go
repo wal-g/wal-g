@@ -1,9 +1,6 @@
 package pg
 
 import (
-	"os"
-	"path"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -38,15 +35,8 @@ var daemonCmd = &cobra.Command{
 			tracelog.ErrorLogger.PrintError(err)
 			uploader.PGArchiveStatusManager = asm.NewNopASM()
 		}
-
 		uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
-		pathToData, exist := os.LookupEnv("PGDATA")
-		if !exist {
-			tracelog.ErrorLogger.Fatal("'PGDATA' variable is not defined or does not exist")
-		}
-		pathToWal := path.Join(pathToData, "pg_wal")
-
-		postgres.HandleDaemon(uploader, args[0], pathToWal)
+		postgres.HandleDaemon(uploader, args[0])
 	},
 }
 
