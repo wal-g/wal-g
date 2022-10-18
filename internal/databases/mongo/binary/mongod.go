@@ -91,13 +91,18 @@ func (mongodService *MongodService) GetReplSetName() (string, error) {
 	return replSetNameHolder.ReplSetName, err
 }
 
-func (mongodService *MongodService) GetBackupCursor() (cursor *mongo.Cursor, err error) {
+func (mongodService *MongodService) GetBackupCursor() (*BackupCursor, error) {
+	var cursor *mongo.Cursor
+	var err error
 	for i := 0; i < cursorCreateRetries; i++ {
 		cursor, err = mongodService.MongoClient.Database(adminDB).Aggregate(mongodService.Context, mongo.Pipeline{
 			{{Key: "$backupCursor", Value: bson.D{}}},
 		})
-		if err == nil || !backupCursorErrorIsRetried(err) {
-			break
+		if err == nil {
+			break // success!
+		}
+		if !backupCursorErrorIsRetried(err) {
+			return nil, errors.Wrap(err, "Unable to open backup cursor")
 		}
 		if i < cursorCreateRetries {
 			minutes := time.Duration(i + 1)
@@ -105,7 +110,12 @@ func (mongodService *MongodService) GetBackupCursor() (cursor *mongo.Cursor, err
 			time.Sleep(time.Minute * minutes)
 		}
 	}
-	return cursor, err
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("Unable to open backup cursor after %d attempts", cursorCreateRetries))
+	}
+
+	backupCursor := CreateBackupCursor(mongodService.Context, cursor)
+	return backupCursor, nil
 }
 
 func backupCursorErrorIsRetried(err error) bool {
