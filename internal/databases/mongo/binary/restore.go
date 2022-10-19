@@ -15,16 +15,16 @@ type RestoreService struct {
 	LocalStorage  *LocalStorage
 	BackupStorage *BackupStorage
 
-	MongodFileConfig *MongodFileConfig
+	minimalConfigPath string
 }
 
 func CreateRestoreService(ctx context.Context, localStorage *LocalStorage, backupStorage *BackupStorage,
-	mongodFileConfig *MongodFileConfig) (*RestoreService, error) {
+	minimalConfigPath string) (*RestoreService, error) {
 	return &RestoreService{
-		Context:          ctx,
-		LocalStorage:     localStorage,
-		BackupStorage:    backupStorage,
-		MongodFileConfig: mongodFileConfig,
+		Context:           ctx,
+		LocalStorage:      localStorage,
+		BackupStorage:     backupStorage,
+		minimalConfigPath: minimalConfigPath,
 	}, nil
 }
 
@@ -74,7 +74,7 @@ func (restoreService *RestoreService) DoRestore(restoreMongodVersion string) err
 }
 
 func (restoreService *RestoreService) fixSystemData(sentinel *models.Backup) error {
-	mongodProcess, err := StartMongodWithDisableLogicalSessionCacheRefresh(restoreService.MongodFileConfig)
+	mongodProcess, err := StartMongodWithDisableLogicalSessionCacheRefresh(restoreService.minimalConfigPath)
 	if err != nil {
 		return errors.Wrap(err, "unable to start mongod in special mode")
 	}
@@ -99,7 +99,7 @@ func (restoreService *RestoreService) fixSystemData(sentinel *models.Backup) err
 }
 
 func (restoreService *RestoreService) recoverFromOplogAsStandalone() error {
-	mongodProcess, err := StartMongodWithRecoverFromOplogAsStandalone(restoreService.MongodFileConfig)
+	mongodProcess, err := StartMongodWithRecoverFromOplogAsStandalone(restoreService.minimalConfigPath)
 	if err != nil {
 		return errors.Wrap(err, "unable to start mongod in special mode")
 	}

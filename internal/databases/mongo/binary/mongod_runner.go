@@ -13,25 +13,26 @@ import (
 )
 
 type MongodProcess struct {
-	config     *MongodFileConfig
-	parameters []string
-	port       int
-	cancel     context.CancelFunc
-	cmd        *exec.Cmd
+	minimalConfigPath string
+	parameters        []string
+	port              int
+	cancel            context.CancelFunc
+	cmd               *exec.Cmd
 }
 
-func StartMongodWithDisableLogicalSessionCacheRefresh(config *MongodFileConfig) (*MongodProcess, error) {
-	return StartMongo(config, "disableLogicalSessionCacheRefresh=true")
+func StartMongodWithDisableLogicalSessionCacheRefresh(minimalConfigPath string) (*MongodProcess, error) {
+	return StartMongo(minimalConfigPath, "disableLogicalSessionCacheRefresh=true")
 }
 
-func StartMongodWithRecoverFromOplogAsStandalone(config *MongodFileConfig) (*MongodProcess, error) {
-	return StartMongo(config, "recoverFromOplogAsStandalone=true", "takeUnstableCheckpointOnShutdown=true")
+func StartMongodWithRecoverFromOplogAsStandalone(minimalConfigPath string) (*MongodProcess, error) {
+	return StartMongo(minimalConfigPath,
+		"recoverFromOplogAsStandalone=true", "takeUnstableCheckpointOnShutdown=true")
 }
 
-func StartMongo(config *MongodFileConfig, parameters ...string) (*MongodProcess, error) {
+func StartMongo(minimalConfigPath string, parameters ...string) (*MongodProcess, error) {
 	mongodProcess := &MongodProcess{
-		config:     config,
-		parameters: parameters,
+		minimalConfigPath: minimalConfigPath,
+		parameters:        parameters,
 	}
 
 	err := mongodProcess.start()
@@ -61,19 +62,13 @@ func (mongodProcess *MongodProcess) Wait() error {
 	return err
 }
 
-func (mongodProcess *MongodProcess) start() error {
-	unusedPort, err := randomUnusedPort()
-	if err != nil {
-		return err
-	}
-	mongodProcess.port = unusedPort
-
-	configFilePath, err := mongodProcess.config.SaveConfigToTempFile("storage", "systemLog")
+func (mongodProcess *MongodProcess) start() (err error) {
+	mongodProcess.port, err = randomUnusedPort()
 	if err != nil {
 		return err
 	}
 
-	cliArgs := []string{"--port", strconv.Itoa(unusedPort), "--config", configFilePath}
+	cliArgs := []string{"--port", strconv.Itoa(mongodProcess.port), "--config", mongodProcess.minimalConfigPath}
 	for _, parameter := range mongodProcess.parameters {
 		cliArgs = append(cliArgs, "--setParameter", parameter)
 	}
