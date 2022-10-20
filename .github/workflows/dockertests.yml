@@ -101,6 +101,7 @@ jobs:
                    'make TEST="pg_delete_target_delta_find_full_test" pg_integration_test',
                    'make TEST="pg_backup_mark_permanent_no_error_test" pg_integration_test',
                    'make TEST="pg_delete_garbage_test" pg_integration_test',
+                   'make TEST="pg_daemon_test" pg_integration_test',
                    'make mongo_test',
                    'make MONGO_VERSION="5.0.10" MONGO_MAJOR="5.0" MONGO_REPO="repo.mongodb.org" MONGO_PACKAGE="mongodb-org" mongo_features',
                    'make MONGO_VERSION="5.0.10" MONGO_MAJOR="5.0" MONGO_REPO="repo.mongodb.com" MONGO_PACKAGE="mongodb-enterprise" mongo_features',

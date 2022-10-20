@@ -1,7 +1,7 @@
-#!/bin/sh
+#!/bin/bash
 set -e -x
 
-CONFIG_FILE="/tmp/configs/wal_perftest_config.json"
+CONFIG_FILE="/tmp/configs/daemon_test_config.json"
 
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
@@ -12,17 +12,15 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 /tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
 
 WAL=$(ls -l ${PGDATA}/pg_wal | head -n2 | tail -n1 | egrep -o "[0-9A-F]{24}")
+SOCKET="/tmp/wal-daemon.sock"
 
-wal-g --config=${TMP_CONFIG} daemon "${PGDATA}"/pg_wal
+wal-g --config=${TMP_CONFIG} daemon ${SOCKET}
 
-# shellcheck disable=SC2039
-nc -U /tmp/wal-push.sock <<< 'CHECK'
-sleep 1
+if (echo -en "C\x0\x8"; echo -n "CHECK"; echo -en "F\x0\x1B"; echo -n "${WAL}") | nc -U ${SOCKET} | grep -q "OO"; then
+  echo "WAL-G response is correct"
+else
+  echo "Error in WAL-G response"
+  exit 1
+fi
 
-# shellcheck disable=SC2039
-nc -U /tmp/wal-push.sock <<< "${WAL}"
-sleep 1
-
-wal-g st ls WALG_S3_PREFIX/wal_005/"${WAL}".br
-
-
+wal-g st ls ${WALE_S3_PREFIX}/wal_005/${WAL}.br

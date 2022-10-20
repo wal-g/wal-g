@@ -3,7 +3,6 @@ package postgres
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -33,7 +32,7 @@ type ArchiveMessageHandler struct {
 }
 
 func (h *CheckMessageHandler) Handle(messageBody []byte) error {
-	_, err := h.fd.Write([]byte{'O', 0, 3})
+	_, err := h.fd.Write([]byte{'O'})
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Error on writing in socket: %v \n", err)
 		return err
@@ -67,7 +66,7 @@ func (h *ArchiveMessageHandler) Handle(messageBody []byte) error {
 		tracelog.ErrorLogger.Printf("Failed to archive file: %s, err: %v \n", string(messageBody), err)
 		return err
 	}
-	_, err = h.fd.Write([]byte{'O', 0, 3})
+	_, err = h.fd.Write([]byte{'O'})
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to write in socket: %v\n", err)
 		return err
@@ -78,15 +77,15 @@ func (h *ArchiveMessageHandler) Handle(messageBody []byte) error {
 func messageValidation(messageBody []byte) error {
 	if len(messageBody) < 24 {
 		if len(messageBody) > 0 {
-			tracelog.ErrorLogger.Println("Received empty message")
-			return errors.New(fmt.Sprintf("Incorrect message accepted: %s", string(messageBody)))
+			tracelog.ErrorLogger.Println("incorrect message accepted")
+			return fmt.Errorf("incorrect message accepted: %s", string(messageBody))
 		}
-		return errors.New(fmt.Sprintf("Empty message accepted"))
+		return fmt.Errorf("empty message accepted")
 	}
 	return nil
 }
 
-func MessageTypeConstruct(messageType byte, c net.Conn, uploader *WalUploader) SocketMessageHandler {
+func GetMessageType(messageType byte, c net.Conn, uploader *WalUploader) SocketMessageHandler {
 	switch messageType {
 	case 'C':
 		return &CheckMessageHandler{CheckType, c, uploader}
@@ -101,7 +100,7 @@ type SocketMessageReader struct {
 	c net.Conn
 }
 
-func MessageReaderConstruct(c net.Conn) *SocketMessageReader {
+func GetMessageReader(c net.Conn) *SocketMessageReader {
 	return &SocketMessageReader{c}
 }
 
@@ -145,9 +144,10 @@ func HandleDaemon(uploader *WalUploader, pathToSocket string) {
 	}
 }
 
+// DaemonProcess reads data from connection and processes it
 func DaemonProcess(c net.Conn, uploader *WalUploader) {
 	defer utility.LoggedClose(c, fmt.Sprintf("Failed to close connection with %s \n", c.RemoteAddr()))
-	messageReader := MessageReaderConstruct(c)
+	messageReader := GetMessageReader(c)
 	for {
 		messageType, messageBody, err := messageReader.Next()
 		if err != nil {
@@ -155,7 +155,7 @@ func DaemonProcess(c net.Conn, uploader *WalUploader) {
 			_, _ = c.Write([]byte{'E', 0, 3})
 			return
 		}
-		messageHandler := MessageTypeConstruct(messageType, c, uploader)
+		messageHandler := GetMessageType(messageType, c, uploader)
 		err = messageHandler.Handle(messageBody)
 		if err != nil {
 			tracelog.ErrorLogger.Println("Failed to handle message, err:", err)
