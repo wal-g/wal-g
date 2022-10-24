@@ -1,11 +1,13 @@
 package s3
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
 	"io"
 	"strconv"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -38,10 +40,11 @@ type Uploader struct {
 	SSECustomerKey       string
 	SSEKMSKeyId          string
 	StorageClass         string
+	uploadTimeout        int
 }
 
-func NewUploader(uploaderAPI s3manageriface.UploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyId, storageClass string) *Uploader {
-	return &Uploader{uploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyId, storageClass}
+func NewUploader(uploaderAPI s3manageriface.UploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyId, storageClass string, uploadTimeout int) *Uploader {
+	return &Uploader{uploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyId, storageClass, uploadTimeout}
 }
 
 // TODO : unit tests
@@ -74,8 +77,16 @@ func (uploader *Uploader) createUploadInput(bucket, path string, content io.Read
 }
 
 func (uploader *Uploader) upload(bucket, path string, content io.Reader) error {
+	var err error
+	uploadTimeout := uploader.uploadTimeout
 	input := uploader.createUploadInput(bucket, path, content)
-	_, err := uploader.uploaderAPI.Upload(input)
+	if uploadTimeout != 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(uploadTimeout * int(time.Second)))
+		defer cancel()
+		_, err = uploader.uploaderAPI.UploadWithContext(ctx, input)
+	} else {
+		_, err = uploader.uploaderAPI.Upload(input)
+	}
 	return errors.Wrapf(err, "failed to upload '%s' to bucket '%s'", path, bucket)
 }
 
@@ -139,6 +150,24 @@ func configureUploader(s3Client *s3.S3, settings map[string]string) (*Uploader, 
 		maxPartSize = DefaultMaxPartSize
 	}
 
+	uploadWithTimeout := false
+	if strUploadWithTimeout, ok := settings[UploadWithTimeout]; ok {
+		uploadWithTimeout, err = strconv.ParseBool(strUploadWithTimeout)
+		if err != nil {
+			return nil, NewFolderError(err, "Invalid s3 upload with timeout setting")
+		}
+	}
+
+	uploadTimeout := 0
+	if uploadWithTimeout {
+		if strUploadTimeout, ok := settings[UploadTimeout]; ok {
+			uploadTimeout, err = strconv.Atoi(strUploadTimeout)
+			if err != nil {
+				return nil, NewFolderError(err, "Invalid s3 upload timeout setting")
+			}
+		}
+	}
+
 	uploaderApi := CreateUploaderAPI(s3Client, maxPartSize, concurrency)
 
 	serverSideEncryption, sseCustomerKey, sseKmsKeyId, err := configureServerSideEncryption(settings)
@@ -151,5 +180,5 @@ func configureUploader(s3Client *s3.S3, settings map[string]string) (*Uploader, 
 	if storageClass, ok = settings[StorageClassSetting]; !ok {
 		storageClass = "STANDARD"
 	}
-	return NewUploader(uploaderApi, serverSideEncryption, sseCustomerKey, sseKmsKeyId, storageClass), nil
+	return NewUploader(uploaderApi, serverSideEncryption, sseCustomerKey, sseKmsKeyId, storageClass, uploadTimeout), nil
 }

@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"context"
 	"io"
 	"path"
 	"strconv"
@@ -41,6 +42,8 @@ const (
 	UseListObjectsV1         = "S3_USE_LIST_OBJECTS_V1"
 	RangeBatchEnabled        = "S3_RANGE_BATCH_ENABLED"
 	RangeQueriesMaxRetries   = "S3_RANGE_MAX_RETRIES"
+	UploadWithTimeout        = "S3_UPLOAD_WITH_TIMEOUT"
+	UploadTimeout            = "S3_UPLOAD_TIMEOUT"
 	// MaxRetriesSetting limits retries during interaction with S3
 	MaxRetriesSetting = "S3_MAX_RETRIES"
 
@@ -78,6 +81,8 @@ var (
 		RangeBatchEnabled,
 		RangeQueriesMaxRetries,
 		MaxRetriesSetting,
+		UploadWithTimeout,
+		UploadTimeout,
 	}
 )
 
@@ -278,10 +283,20 @@ func (folder *Folder) listObjectsPagesV1(prefix *string, delimiter *string,
 		Prefix:    prefix,
 		Delimiter: delimiter,
 	}
-	return folder.S3API.ListObjectsPages(s3Objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
-		listFunc(files.CommonPrefixes, files.Contents)
-		return true
-	})
+	uploadTimeout := folder.getUploadTimeout()
+	if uploadTimeout != 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(uploadTimeout * int(time.Second)))
+		defer cancel()
+		return folder.S3API.ListObjectsPagesWithContext(ctx, s3Objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
+			listFunc(files.CommonPrefixes, files.Contents)
+			return true
+		})
+	} else {
+		return folder.S3API.ListObjectsPages(s3Objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
+			listFunc(files.CommonPrefixes, files.Contents)
+			return true
+		})
+	}
 }
 
 func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string,
@@ -291,10 +306,20 @@ func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string,
 		Prefix:    prefix,
 		Delimiter: delimiter,
 	}
-	return folder.S3API.ListObjectsV2Pages(s3Objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
-		listFunc(files.CommonPrefixes, files.Contents)
-		return true
-	})
+	uploadTimeout := folder.getUploadTimeout()
+	if uploadTimeout != 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(uploadTimeout * int(time.Second)))
+		defer cancel()
+		return folder.S3API.ListObjectsV2PagesWithContext(ctx, s3Objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
+			listFunc(files.CommonPrefixes, files.Contents)
+			return true
+		})
+	} else {
+		return folder.S3API.ListObjectsV2Pages(s3Objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
+			listFunc(files.CommonPrefixes, files.Contents)
+			return true
+		})
+	}
 }
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
@@ -317,6 +342,28 @@ func (folder *Folder) partitionToObjects(keys []string) []*s3.ObjectIdentifier {
 		objects[id] = &s3.ObjectIdentifier{Key: aws.String(folder.Path + key)}
 	}
 	return objects
+}
+
+func (folder *Folder) getUploadTimeout() int {
+	var err error
+	uploadWithTimeout := false
+	if strUploadWithTimeout, ok := folder.settings[UploadWithTimeout]; ok {
+		uploadWithTimeout, err = strconv.ParseBool(strUploadWithTimeout)
+		if err != nil {
+			return 0
+		}
+	}
+
+	uploadTimeout := 0
+	if uploadWithTimeout {
+		if strUploadTimeout, ok := folder.settings[UploadTimeout]; ok {
+			uploadTimeout, err = strconv.Atoi(strUploadTimeout)
+			if err != nil {
+				return 0
+			}
+		}
+	}
+	return uploadTimeout
 }
 
 func isAwsNotExist(err error) bool {
