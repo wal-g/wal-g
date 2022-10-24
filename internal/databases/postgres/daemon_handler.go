@@ -37,7 +37,7 @@ func (h *CheckMessageHandler) Handle(messageBody []byte) error {
 		tracelog.ErrorLogger.Printf("Error on writing in socket: %v \n", err)
 		return err
 	}
-	tracelog.ErrorLogger.Println("Successful configuration check")
+	tracelog.InfoLogger.Println("Successful configuration check")
 	return nil
 }
 
@@ -56,7 +56,8 @@ func (h *ArchiveMessageHandler) Handle(messageBody []byte) error {
 	tracelog.InfoLogger.Printf("wal file name: %s\n", string(messageBody))
 	PgDataSettingString, ok := internal.GetSetting(internal.PgDataSetting)
 	if !ok {
-		tracelog.InfoLogger.Print("\nPGDATA is not set in the conf.\n")
+		tracelog.ErrorLogger.Print("\nPGDATA is not set in the conf.\n")
+		return fmt.Errorf("PGDATA is not set in the conf")
 	}
 	pathToWal := path.Join(PgDataSettingString, "pg_wal")
 	fullPath := path.Join(pathToWal, string(messageBody))
