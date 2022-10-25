@@ -86,7 +86,7 @@ func messageValidation(messageBody []byte) error {
 	return nil
 }
 
-func GetMessageType(messageType byte, c net.Conn, uploader *WalUploader) SocketMessageHandler {
+func GetMessageHandler(messageType byte, c net.Conn, uploader *WalUploader) SocketMessageHandler {
 	switch messageType {
 	case 'C':
 		return &CheckMessageHandler{CheckType, c, uploader}
@@ -105,12 +105,13 @@ func GetMessageReader(c net.Conn) *SocketMessageReader {
 	return &SocketMessageReader{c}
 }
 
+// Next method reads messages sequentially from the Reader
 func (r SocketMessageReader) Next() (messageType byte, messageBody []byte, err error) {
 	messageParameters := make([]byte, 3)
 	_, err = io.ReadFull(r.c, messageParameters)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to read from socket, err: %v \n", err)
-		return 'E', []byte{}, err
+		return 'E', nil, err
 	}
 	messageType = messageParameters[0]
 	var messageLength uint16
@@ -118,13 +119,13 @@ func (r SocketMessageReader) Next() (messageType byte, messageBody []byte, err e
 	err = binary.Read(l, binary.BigEndian, &messageLength)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to read message length, err: %v \n", err)
-		return 'E', []byte{}, err
+		return 'E', nil, err
 	}
 	messageBody = make([]byte, messageLength-3)
 	_, err = io.ReadFull(r.c, messageBody)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to read from socket, err: %v \n", err)
-		return 'E', []byte{}, err
+		return 'E', nil, err
 	}
 	return messageType, messageBody, err
 }
@@ -153,14 +154,19 @@ func DaemonProcess(c net.Conn, uploader *WalUploader) {
 		messageType, messageBody, err := messageReader.Next()
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Failed to read  message from client %s, err: %v\n", c.RemoteAddr(), err)
-			_, _ = c.Write([]byte{'E', 0, 3})
+			_, _ = c.Write([]byte{'E'})
 			return
 		}
-		messageHandler := GetMessageType(messageType, c, uploader)
+		messageHandler := GetMessageHandler(messageType, c, uploader)
+		if messageHandler == nil {
+			tracelog.ErrorLogger.Printf("Unexpected message type: %s", string(messageType))
+			_, _ = c.Write([]byte{'E'})
+			return
+		}
 		err = messageHandler.Handle(messageBody)
 		if err != nil {
 			tracelog.ErrorLogger.Println("Failed to handle message, err:", err)
-			_, _ = c.Write([]byte{'E', 0, 3})
+			_, _ = c.Write([]byte{'E'})
 			return
 		}
 		if messageType == 'F' {
