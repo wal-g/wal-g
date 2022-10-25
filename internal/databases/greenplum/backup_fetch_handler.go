@@ -40,6 +40,16 @@ type SegmentRestoreConfig struct {
 	DataDir  string `json:"data_dir"`
 }
 
+func (cfg SegmentRestoreConfig) ToSegConfig(contentID int) cluster.SegConfig {
+	return cluster.SegConfig{
+		ContentID: contentID,
+		Role:      string(Primary),
+		Port:      cfg.Port,
+		Hostname:  cfg.Hostname,
+		DataDir:   cfg.DataDir,
+	}
+}
+
 // ClusterRestoreConfig is used to describe the restored cluster
 type ClusterRestoreConfig struct {
 	Segments map[int]SegmentRestoreConfig `json:"segments"`
@@ -197,7 +207,8 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 		recoveryTarget = fh.restorePoint
 	}
 	tracelog.InfoLogger.Printf("Recovery target is %s", recoveryTarget)
-	restoreCfgMaker := NewRecoveryConfigMaker("/usr/bin/wal-g", internal.CfgFile, recoveryTarget)
+	restoreCfgMaker := NewRecoveryConfigMaker("/usr/bin/wal-g", internal.CfgFile, recoveryTarget,
+		false)
 
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Creating recovery.conf on segments and master",
 		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_MASTER,
