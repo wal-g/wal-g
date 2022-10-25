@@ -57,9 +57,3 @@ func (downloader *ConcurrentDownloader) getTarsToExtract(tarsFolder storage.Fold
 
 	return tarsToExtract, nil
 }
-
-func IsTarBackupFormat(uploader *internal.Uploader, backupName string) bool {
-	tarsFolder := uploader.Folder().GetSubFolder(strings.Trim(backupName+internal.TarPartitionFolderName, "/"))
-	tarObjects, _, err := tarsFolder.ListFolder()
-	return err == nil && len(tarObjects) > 0
-}

@@ -1,8 +1,6 @@
 package binary
 
 import (
-	"os"
-
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -12,6 +10,9 @@ import (
 type ConcurrentUploader struct {
 	uploader *internal.Uploader
 	bundle   *internal.Bundle
+
+	UncompressedSize int64
+	CompressedSize   int64
 }
 
 func CreateConcurrentUploader(uploader *internal.Uploader, backupName, directory string) (*ConcurrentUploader, error) {
@@ -38,28 +39,35 @@ func CreateConcurrentUploader(uploader *internal.Uploader, backupName, directory
 	}, nil
 }
 
-func (concurrentUploader *ConcurrentUploader) Upload(path string, fileInfo os.FileInfo) error {
-	return concurrentUploader.bundle.AddToBundle(path, fileInfo, nil)
+func (concurrentUploader *ConcurrentUploader) UploadBackupFiles(backupFiles []*BackupFileMeta) error {
+	for _, backupFileMeta := range backupFiles {
+		err := concurrentUploader.Upload(backupFileMeta)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (concurrentUploader *ConcurrentUploader) Finalize() (int64, int64, error) {
+func (concurrentUploader *ConcurrentUploader) Upload(backupFile *BackupFileMeta) error {
+	return concurrentUploader.bundle.AddToBundle(backupFile.Path, backupFile, nil)
+}
+
+func (concurrentUploader *ConcurrentUploader) Finalize() error {
 	tracelog.InfoLogger.Println("Packing ...")
 	_, err := concurrentUploader.bundle.FinishComposing()
 	if err != nil {
-		return 0, 0, err
+		return err
 	}
 
 	tracelog.DebugLogger.Println("Finishing queue ...")
 	err = concurrentUploader.bundle.FinishQueue()
 	if err != nil {
-		return 0, 0, err
+		return err
 	}
 
-	uncompressedSize := *concurrentUploader.bundle.TarBallQueue.AllTarballsSize
-	compressedSize, err := concurrentUploader.uploader.UploadedDataSize()
-	if err != nil {
-		return 0, 0, err
-	}
-
-	return uncompressedSize, compressedSize, err
+	concurrentUploader.UncompressedSize = *concurrentUploader.bundle.TarBallQueue.AllTarballsSize
+	concurrentUploader.CompressedSize, err = concurrentUploader.uploader.UploadedDataSize()
+	return err
 }

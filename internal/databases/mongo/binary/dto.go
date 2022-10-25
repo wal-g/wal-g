@@ -6,16 +6,10 @@ import (
 	"time"
 )
 
-type MongodBackupFilesMetadata struct {
-	BackupDirectories []*BackupFileMeta `json:"BackupDirectories,omitempty"` // used only for restoring old backups
-	BackupFiles       []*BackupFileMeta `json:"BackupFiles,omitempty"`
-}
-
 type BackupFileMeta struct {
-	Path        string      `json:"Path"`
-	FileMode    os.FileMode `json:"FileMode"`
-	Compression string      `json:"Compression"` // used only for restoring old backups
-	FileSize    int64       `json:"-"`
+	Path     string
+	FileMode os.FileMode
+	FileSize int64
 }
 
 func (backupFileMeta *BackupFileMeta) Name() string {

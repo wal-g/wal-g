@@ -514,3 +514,8 @@ func (mc *MongoCtl) PurgeDatadir() error {
 
 	return mc.StartMongod()
 }
+
+func (mc *MongoCtl) ChownDBPath() error {
+	_, err := mc.runCmd("bash", "-c", "chown -R mongodb.mongodb /var/lib/mongodb/*")
+	return err
+}
