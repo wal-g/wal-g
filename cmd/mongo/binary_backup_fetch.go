@@ -12,7 +12,15 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-const binaryBackupFetchCommandName = "binary-backup-fetch"
+const (
+	binaryBackupFetchCommandName = "binary-backup-fetch"
+	MinimalConfigPathFlag        = "minimal-mongod-config-path"
+	MinimalConfigPathDescription = "Path to mongod config with minimal working configuration"
+)
+
+var (
+	minimalConfigPath = ""
+)
 
 var binaryBackupFetchCmd = &cobra.Command{
 	Use:   binaryBackupFetchCommandName + " <backup name> <mongod config path> <mongod version>",
@@ -29,11 +37,12 @@ var binaryBackupFetchCmd = &cobra.Command{
 		mongodbConfigPath := args[1]
 		mongodVersion := args[2]
 
-		err := mongo.HandleBinaryFetchPush(ctx, mongodbConfigPath, backupName, mongodVersion)
+		err := mongo.HandleBinaryFetchPush(ctx, mongodbConfigPath, minimalConfigPath, backupName, mongodVersion)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
 
 func init() {
+	binaryBackupFetchCmd.Flags().StringVar(&minimalConfigPath, MinimalConfigPathFlag, "", MinimalConfigPathDescription)
 	cmd.AddCommand(binaryBackupFetchCmd)
 }
