@@ -302,7 +302,6 @@ var (
 		"S3_RANGE_BATCH_ENABLED":      true,
 		"S3_RANGE_MAX_RETRIES":        true,
 		"S3_MAX_RETRIES":              true,
-		"S3_UPLOAD_WITH_TIMEOUT":      true,
 
 		// Azure
 		"WALG_AZ_PREFIX":           true,
