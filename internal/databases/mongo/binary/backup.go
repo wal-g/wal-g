@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -17,7 +16,6 @@ import (
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/utility"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type BackupService struct {
@@ -60,24 +58,13 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err != nil {
-			closeErr := backupCursor.Close(backupService.Context)
-			if closeErr != nil {
-				tracelog.ErrorLogger.Printf("Unable to close backup cursor: %+v", closeErr)
-			}
-		}
-	}()
+	defer backupCursor.Close()
 
-	backupCursorCloseChannel := make(chan string)
-	defer func() {
-		backupCursorCloseChannel <- "Game Over"
-	}()
-
-	backupID, err := backupService.processBackupCursor(backupCursor, backupCursorCloseChannel)
+	backupID, err := backupService.processBackupCursor(backupCursor)
 	if err != nil {
 		return errors.Wrapf(err, "unable to process backup cursor")
 	}
+	backupCursor.StartKeepAlive()
 
 	upto := backupService.Sentinel.MongoMeta.BackupLastTS
 	extendedBackupCursor, err := backupService.MongodService.GetBackupCursorExtended(backupID, upto)
@@ -106,19 +93,16 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 	return backupService.FinalizeAndStoreMongodBackupMetadata()
 }
 
-// nolint: whitespace
-func (backupService *BackupService) processBackupCursor(backupCursor *mongo.Cursor,
-	closeChannel chan string) (*primitive.Binary, error) {
-
+func (backupService *BackupService) processBackupCursor(backupCursor *BackupCursor) (*primitive.Binary, error) {
 	var backupCursorMeta *BackupCursorMeta
 
-	for backupCursor.TryNext(backupService.Context) {
+	for backupCursor.cursor.TryNext(backupService.Context) {
 		// metadata is the first record in backup cursor
 		if backupCursorMeta == nil {
 			metadataHolder := struct {
 				Metadata BackupCursorMeta `bson:"metadata"`
 			}{}
-			err := backupCursor.Decode(&metadataHolder)
+			err := backupCursor.cursor.Decode(&metadataHolder)
 			if err != nil {
 				return nil, errors.Wrap(err, "unable to decode metadata")
 			}
@@ -132,7 +116,7 @@ func (backupService *BackupService) processBackupCursor(backupCursor *mongo.Curs
 			}
 		} else {
 			var backupFile BackupCursorFile
-			err := backupCursor.Decode(&backupFile)
+			err := backupCursor.cursor.Decode(&backupFile)
 			if err != nil {
 				return nil, err
 			}
@@ -143,22 +127,6 @@ func (backupService *BackupService) processBackupCursor(backupCursor *mongo.Curs
 			}
 		}
 	}
-
-	go func() {
-		ticker := time.NewTicker(time.Minute * 1)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-closeChannel:
-				closeErr := backupCursor.Close(context.Background())
-				cursorErr := backupCursor.Err()
-				fmt.Printf("stop cursor polling: %v, cursor err: %v\n", closeErr, cursorErr)
-				return
-			case <-ticker.C:
-				backupCursor.TryNext(backupService.Context)
-			}
-		}
-	}()
 
 	return &backupCursorMeta.ID, nil
 }
