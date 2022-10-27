@@ -134,7 +134,7 @@ func (mongodService *MongodService) GetBackupCursorExtended(backupID *primitive.
 	})
 }
 
-func (mongodService *MongodService) FixSystemDataAfterRestore(LastWriteTS primitive.Timestamp) error {
+func (mongodService *MongodService) FixSystemDataAfterRestore(LastWriteTS primitive.Timestamp, fixOplog bool) error {
 	ctx := mongodService.Context
 	localDatabase := mongodService.MongoClient.Database("local")
 
@@ -152,14 +152,18 @@ func (mongodService *MongodService) FixSystemDataAfterRestore(LastWriteTS primit
 		return err
 	}
 
-	tracelog.DebugLogger.Printf("oplogTruncateAfterPoint: %v", LastWriteTS)
-	err = replaceData(ctx, localDatabase.Collection("replset.oplogTruncateAfterPoint"), true,
-		bson.M{
-			"_id":                     "oplogTruncateAfterPoint",
-			"oplogTruncateAfterPoint": LastWriteTS,
-		})
-	if err != nil {
-		return err
+	if fixOplog {
+		tracelog.DebugLogger.Printf("oplogTruncateAfterPoint: %v", LastWriteTS)
+		err = replaceData(ctx, localDatabase.Collection("replset.oplogTruncateAfterPoint"), true,
+			bson.M{
+				"_id":                     "oplogTruncateAfterPoint",
+				"oplogTruncateAfterPoint": LastWriteTS,
+			})
+		if err != nil {
+			return err
+		}
+	} else {
+		tracelog.InfoLogger.Printf("We are skipping fix replset.oplogTruncateAfterPoint because it is disabled")
 	}
 
 	err = replaceData(ctx, localDatabase.Collection("system.replset"), false, nil)
