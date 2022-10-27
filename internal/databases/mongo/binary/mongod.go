@@ -91,9 +91,7 @@ func (mongodService *MongodService) GetReplSetName() (string, error) {
 	return replSetNameHolder.ReplSetName, err
 }
 
-func (mongodService *MongodService) GetBackupCursor() (*BackupCursor, error) {
-	var cursor *mongo.Cursor
-	var err error
+func (mongodService *MongodService) GetBackupCursor() (cursor *mongo.Cursor, err error) {
 	for i := 0; i < cursorCreateRetries; i++ {
 		cursor, err = mongodService.MongoClient.Database(adminDB).Aggregate(mongodService.Context, mongo.Pipeline{
 			{{Key: "$backupCursor", Value: bson.D{}}},
@@ -102,7 +100,7 @@ func (mongodService *MongodService) GetBackupCursor() (*BackupCursor, error) {
 			break // success!
 		}
 		if !backupCursorErrorIsRetried(err) {
-			return nil, errors.Wrap(err, "Unable to open backup cursor")
+			return nil, err
 		}
 		if i < cursorCreateRetries {
 			minutes := time.Duration(i + 1)
@@ -110,25 +108,20 @@ func (mongodService *MongodService) GetBackupCursor() (*BackupCursor, error) {
 			time.Sleep(time.Minute * minutes)
 		}
 	}
-	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Unable to open backup cursor after %d attempts", cursorCreateRetries))
-	}
 
-	backupCursor := CreateBackupCursor(mongodService.Context, cursor)
-	return backupCursor, nil
+	return cursor, err
 }
 
 func backupCursorErrorIsRetried(err error) bool {
 	return strings.Contains(err.Error(), "(Location50915)") // mongodb take checkpoint
 }
 
-func (mongodService *MongodService) GetBackupCursorExtended(backupID *primitive.Binary,
-	lastTS primitive.Timestamp) (*mongo.Cursor, error) {
+func (mongodService *MongodService) GetBackupCursorExtended(backupCursorMeta *BackupCursorMeta) (*mongo.Cursor, error) {
 	return mongodService.MongoClient.Database(adminDB).Aggregate(mongodService.Context, mongo.Pipeline{
 		{{
 			Key: "$backupCursorExtend", Value: bson.D{
-				{Key: "backupId", Value: backupID},
-				{Key: "timestamp", Value: lastTS},
+				{Key: "backupId", Value: backupCursorMeta.ID},
+				{Key: "timestamp", Value: backupCursorMeta.OplogEnd.TS},
 			},
 		}},
 	})

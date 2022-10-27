@@ -3,7 +3,9 @@ package mongo
 import (
 	"context"
 
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func HandleBinaryFetchPush(ctx context.Context, mongodConfigPath, minimalConfigPath, backupName,
@@ -16,10 +18,11 @@ func HandleBinaryFetchPush(ctx context.Context, mongodConfigPath, minimalConfigP
 
 	localStorage := binary.CreateLocalStorage(config.GetDBPath())
 
-	backupStorage, err := binary.CreateBackupStorage(backupName)
+	uploader, err := internal.ConfigureUploader()
 	if err != nil {
 		return err
 	}
+	uploader.ChangeDirectory(utility.BaseBackupPath + "/")
 
 	if minimalConfigPath == "" {
 		minimalConfigPath, err = config.SaveConfigToTempFile("storage", "systemLog")
@@ -28,10 +31,10 @@ func HandleBinaryFetchPush(ctx context.Context, mongodConfigPath, minimalConfigP
 		}
 	}
 
-	restoreService, err := binary.CreateRestoreService(ctx, localStorage, backupStorage, minimalConfigPath)
+	restoreService, err := binary.CreateRestoreService(ctx, localStorage, uploader, minimalConfigPath)
 	if err != nil {
 		return err
 	}
 
-	return restoreService.DoRestore(restoreMongodVersion)
+	return restoreService.DoRestore(backupName, restoreMongodVersion)
 }

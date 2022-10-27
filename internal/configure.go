@@ -239,12 +239,10 @@ func ConfigurePGArchiveStatusManager() (fsutil.DataFolder, error) {
 // that a valid session has started; if invalid, returns AWS error
 // and `<nil>` values.
 func ConfigureUploader() (uploader *Uploader, err error) {
-	uploader, err = ConfigureUploaderWithoutCompressMethod()
+	folder, err := ConfigureFolder()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to configure folder")
 	}
-
-	folder := uploader.UploadingFolder
 
 	compressor, err := ConfigureCompressor()
 	if err != nil {
@@ -255,32 +253,17 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 	return uploader, err
 }
 
-func ConfigureUploaderWithoutCompressMethod() (uploader *Uploader, err error) {
-	folder, err := ConfigureFolder()
+func ConfigureSplitUploader() (UploaderProvider, error) {
+	uploader, err := ConfigureUploader()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure folder")
-	}
-
-	uploader = NewUploader(nil, folder)
-	return uploader, err
-}
-
-func ConfigureSplitUploader() (uploader UploaderProvider, err error) {
-	folder, err := ConfigureFolder()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure folder")
-	}
-
-	compressor, err := ConfigureCompressor()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure compression")
+		return nil, err
 	}
 
 	var partitions = viper.GetInt(StreamSplitterPartitions)
 	var blockSize = viper.GetSizeInBytes(StreamSplitterBlockSize)
 
-	uploader = NewSplitStreamUploader(compressor, folder, partitions, int(blockSize))
-	return uploader, err
+	splitStreamUploader := NewSplitStreamUploader(uploader, partitions, int(blockSize))
+	return splitStreamUploader, nil
 }
 
 // ConfigureCrypter uses environment variables to create and configure a crypter.

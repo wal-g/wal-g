@@ -5,6 +5,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func HandleBinaryBackupPush(ctx context.Context, permanent bool, appName string) error {
@@ -19,19 +20,13 @@ func HandleBinaryBackupPush(ctx context.Context, permanent bool, appName string)
 		return err
 	}
 
-	mongodConfig, err := mongodService.MongodConfig()
+	uploader, err := internal.ConfigureUploader()
 	if err != nil {
 		return err
 	}
+	uploader.ChangeDirectory(utility.BaseBackupPath + "/")
 
-	localStorage := binary.CreateLocalStorage(mongodConfig.Storage.DBPath)
-
-	backupStorage, err := binary.CreateBackupStorage(backupName)
-	if err != nil {
-		return err
-	}
-
-	backupService, err := binary.CreateBackupService(ctx, mongodService, localStorage, backupStorage)
+	backupService, err := binary.CreateBackupService(ctx, mongodService, uploader)
 	if err != nil {
 		return err
 	}

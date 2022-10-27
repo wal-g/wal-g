@@ -15,18 +15,17 @@ func (tctx *TestContext) createMongoBinaryBackup(container string) error {
 	host := tctx.ContainerFQDN(container)
 
 	walg := WalgUtilFromTestContext(tctx, container)
-	backupID, err := walg.PushBinaryBackup()
+	err := walg.PushBinaryBackup()
 	if err != nil {
 		return err
 	}
-	tracelog.DebugLogger.Println("Backup created: ", backupID)
+	tracelog.DebugLogger.Println("Backup created")
 
 	tctx.PreviousBackupTime, err = helpers.TimeInContainer(tctx.Context, host)
 	if err != nil {
 		return err
 	}
 
-	tctx.AuxData.CreatedBackupNames = append(tctx.AuxData.CreatedBackupNames, backupID)
 	return nil
 }
 
@@ -60,6 +59,10 @@ func (tctx *TestContext) restoreMongoBinaryBackup(backupNumber int, container st
 
 	err = walg.FetchBinaryBackup(backup, configPath, mongodbVersion)
 	if err != nil {
+		return err
+	}
+
+	if err := mc.ChownDBPath(); err != nil {
 		return err
 	}
 
