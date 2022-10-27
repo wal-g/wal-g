@@ -6,6 +6,8 @@ import (
 	"golang.org/x/mod/semver"
 )
 
+const minOplogRecoverSupportedVersion = "4.2"
+
 // MajorMinorVersion return version in format '<MajorVersion>.<MinorVersion>' (without patch, prerelease, build, ...)
 func MajorMinorVersion(version string) string {
 	if len(version) == 0 {
@@ -28,4 +30,8 @@ func EnsureCompatibilityToRestoreMongodVersions(backupMongodVersion, restoreMong
 			backupMongodVersion, restoreMongodVersion)
 	}
 	return nil
+}
+
+func NeedFixOplog(mongodVersion string) bool {
+	return semver.Compare(MajorMinorVersion(mongodVersion), MajorMinorVersion(minOplogRecoverSupportedVersion)) > 0
 }

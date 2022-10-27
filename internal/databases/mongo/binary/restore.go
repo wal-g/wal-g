@@ -55,12 +55,21 @@ func (restoreService *RestoreService) DoRestore(backupName, restoreMongodVersion
 		return err
 	}
 
-	err = restoreService.fixSystemData(sentinel)
-	if err != nil {
+	needFixOplog := NeedFixOplog(restoreMongodVersion)
+
+	if err = restoreService.fixSystemData(sentinel, needFixOplog); err != nil {
 		return err
 	}
 
-	return restoreService.recoverFromOplogAsStandalone()
+	if needFixOplog {
+		if err = restoreService.recoverFromOplogAsStandalone(); err != nil {
+			return err
+		}
+	} else {
+		tracelog.InfoLogger.Printf("We are skipping recoverFromOplogAsStandalone because it is disabled")
+	}
+
+	return nil
 }
 
 func (restoreService *RestoreService) downloadFromTarArchives(backupName string) error {
@@ -68,7 +77,7 @@ func (restoreService *RestoreService) downloadFromTarArchives(backupName string)
 	return downloader.Download(backupName, restoreService.LocalStorage.MongodDBPath)
 }
 
-func (restoreService *RestoreService) fixSystemData(sentinel *models.Backup) error {
+func (restoreService *RestoreService) fixSystemData(sentinel *models.Backup, needFixOplog bool) error {
 	mongodProcess, err := StartMongodWithDisableLogicalSessionCacheRefresh(restoreService.minimalConfigPath)
 	if err != nil {
 		return errors.Wrap(err, "unable to start mongod in special mode")
@@ -80,7 +89,7 @@ func (restoreService *RestoreService) fixSystemData(sentinel *models.Backup) err
 	}
 
 	lastWriteTS := sentinel.MongoMeta.BackupLastTS
-	err = mongodService.FixSystemDataAfterRestore(lastWriteTS)
+	err = mongodService.FixSystemDataAfterRestore(lastWriteTS, needFixOplog)
 	if err != nil {
 		return err
 	}
