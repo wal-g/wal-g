@@ -504,7 +504,7 @@ wal-g wal-restore path/to/target-pgdata path/to/source-pgdata
 
 ### ``daemon``
 
-Archives all WAL segments in the background.
+Archives all WAL segments in the background. Works with the PostgreSQL archive library `walg_archive`.
 
 Usage:
 ```bash

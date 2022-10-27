@@ -19,26 +19,16 @@ type SocketMessageType byte
 const (
 	CheckType    SocketMessageType = 'C'
 	FileNameType SocketMessageType = 'F'
+	OkType       SocketMessageType = 'O'
+	ErrorType    SocketMessageType = 'E'
 )
+
+func (msg SocketMessageType) ToBytes() []byte {
+	return []byte{byte(msg)}
+}
 
 type SocketMessageHandler interface {
 	Handle(messageBody []byte) error
-}
-
-type ArchiveMessageHandler struct {
-	messageType SocketMessageType
-	fd          net.Conn
-	uploader    *WalUploader
-}
-
-func (h *CheckMessageHandler) Handle(messageBody []byte) error {
-	_, err := h.fd.Write([]byte{'O'})
-	if err != nil {
-		tracelog.ErrorLogger.Printf("Error on writing in socket: %v \n", err)
-		return err
-	}
-	tracelog.InfoLogger.Println("Successful configuration check")
-	return nil
 }
 
 type CheckMessageHandler struct {
@@ -47,50 +37,46 @@ type CheckMessageHandler struct {
 	uploader    *WalUploader
 }
 
-func (h *ArchiveMessageHandler) Handle(messageBody []byte) error {
-	err := messageValidation(messageBody)
+func (h *CheckMessageHandler) Handle(messageBody []byte) error {
+	_, err := h.fd.Write(OkType.ToBytes())
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Incorrect message: %v\n", err)
-		return err
+		return fmt.Errorf("failed to write in socket: %w", err)
 	}
+	tracelog.InfoLogger.Println("Successful configuration check")
+	return nil
+}
+
+type ArchiveMessageHandler struct {
+	messageType SocketMessageType
+	fd          net.Conn
+	uploader    *WalUploader
+}
+
+func (h *ArchiveMessageHandler) Handle(messageBody []byte) error {
 	tracelog.InfoLogger.Printf("wal file name: %s\n", string(messageBody))
 	PgDataSettingString, ok := internal.GetSetting(internal.PgDataSetting)
 	if !ok {
-		tracelog.ErrorLogger.Print("\nPGDATA is not set in the conf.\n")
 		return fmt.Errorf("PGDATA is not set in the conf")
 	}
 	pathToWal := path.Join(PgDataSettingString, "pg_wal")
 	fullPath := path.Join(pathToWal, string(messageBody))
 	tracelog.InfoLogger.Printf("starting wal-push for %s\n", fullPath)
-	err = HandleWALPush(h.uploader, fullPath)
+	err := HandleWALPush(h.uploader, fullPath)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Failed to archive file: %s, err: %v \n", string(messageBody), err)
-		return err
+		return fmt.Errorf("file archiving failed: %w", err)
 	}
-	_, err = h.fd.Write([]byte{'O'})
+	_, err = h.fd.Write(OkType.ToBytes())
 	if err != nil {
-		tracelog.ErrorLogger.Printf("failed to write in socket: %v\n", err)
-		return err
+		return fmt.Errorf("socket write failed: %w", err)
 	}
 	return nil
 }
 
-func messageValidation(messageBody []byte) error {
-	if len(messageBody) < 24 {
-		if len(messageBody) > 0 {
-			tracelog.ErrorLogger.Println("incorrect message accepted")
-			return fmt.Errorf("incorrect message accepted: %s", string(messageBody))
-		}
-		return fmt.Errorf("empty message accepted")
-	}
-	return nil
-}
-
-func GetMessageHandler(messageType byte, c net.Conn, uploader *WalUploader) SocketMessageHandler {
+func NewMessageHandler(messageType SocketMessageType, c net.Conn, uploader *WalUploader) SocketMessageHandler {
 	switch messageType {
-	case 'C':
+	case CheckType:
 		return &CheckMessageHandler{CheckType, c, uploader}
-	case 'F':
+	case FileNameType:
 		return &ArchiveMessageHandler{FileNameType, c, uploader}
 	default:
 		return nil
@@ -101,38 +87,40 @@ type SocketMessageReader struct {
 	c net.Conn
 }
 
-func GetMessageReader(c net.Conn) *SocketMessageReader {
+func NewMessageReader(c net.Conn) *SocketMessageReader {
 	return &SocketMessageReader{c}
 }
 
 // Next method reads messages sequentially from the Reader
-func (r SocketMessageReader) Next() (messageType byte, messageBody []byte, err error) {
+func (r SocketMessageReader) Next() (messageType SocketMessageType, messageBody []byte, err error) {
 	messageParameters := make([]byte, 3)
 	_, err = io.ReadFull(r.c, messageParameters)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Failed to read from socket, err: %v \n", err)
-		return 'E', nil, err
+		return ErrorType, nil, fmt.Errorf("failed to read params: %w", err)
 	}
-	messageType = messageParameters[0]
+	messageType = SocketMessageType(messageParameters[0])
 	var messageLength uint16
 	l := bytes.NewReader(messageParameters[1:3])
 	err = binary.Read(l, binary.BigEndian, &messageLength)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Failed to read message length, err: %v \n", err)
-		return 'E', nil, err
+		return ErrorType, nil, fmt.Errorf("fail to read message len: %w", err)
 	}
 	messageBody = make([]byte, messageLength-3)
 	_, err = io.ReadFull(r.c, messageBody)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Failed to read from socket, err: %v \n", err)
-		return 'E', nil, err
+		return ErrorType, nil, fmt.Errorf("failed to read msg body: %w", err)
 	}
 	return messageType, messageBody, err
 }
 
 // HandleDaemon is invoked to perform daemon mode
 func HandleDaemon(uploader *WalUploader, pathToSocket string) {
-	_ = os.Remove(pathToSocket)
+	if _, err := os.Stat(pathToSocket); err == nil {
+		err = os.Remove(pathToSocket)
+		if err != nil {
+			tracelog.ErrorLogger.Fatal("Failed to remove socket file:", err)
+		}
+	}
 	l, err := net.Listen("unix", pathToSocket)
 	if err != nil {
 		tracelog.ErrorLogger.Fatal("Error on listening socket:", err)
@@ -140,36 +128,40 @@ func HandleDaemon(uploader *WalUploader, pathToSocket string) {
 	for {
 		fd, err := l.Accept()
 		if err != nil {
-			tracelog.ErrorLogger.Println("Failed to accept, err:", err)
+			tracelog.ErrorLogger.Fatal("Failed to accept, err:", err)
 		}
-		go DaemonProcess(fd, uploader)
+		go Listen(fd, uploader)
 	}
 }
 
-// DaemonProcess reads data from connection and processes it
-func DaemonProcess(c net.Conn, uploader *WalUploader) {
+// Listen is used for listening connection and processing messages
+func Listen(c net.Conn, uploader *WalUploader) {
 	defer utility.LoggedClose(c, fmt.Sprintf("Failed to close connection with %s \n", c.RemoteAddr()))
-	messageReader := GetMessageReader(c)
+	messageReader := NewMessageReader(c)
 	for {
 		messageType, messageBody, err := messageReader.Next()
 		if err != nil {
-			tracelog.ErrorLogger.Printf("Failed to read  message from client %s, err: %v\n", c.RemoteAddr(), err)
-			_, _ = c.Write([]byte{'E'})
+			tracelog.ErrorLogger.Printf("Failed to read message from %s, err: %v\n", c.RemoteAddr(), err)
+			_, err = c.Write(ErrorType.ToBytes())
+			tracelog.ErrorLogger.PrintOnError(err)
 			return
 		}
-		messageHandler := GetMessageHandler(messageType, c, uploader)
+		messageHandler := NewMessageHandler(messageType, c, uploader)
 		if messageHandler == nil {
 			tracelog.ErrorLogger.Printf("Unexpected message type: %s", string(messageType))
-			_, _ = c.Write([]byte{'E'})
+			_, err = c.Write(ErrorType.ToBytes())
+			tracelog.ErrorLogger.PrintOnError(err)
 			return
 		}
 		err = messageHandler.Handle(messageBody)
 		if err != nil {
-			tracelog.ErrorLogger.Println("Failed to handle message, err:", err)
-			_, _ = c.Write([]byte{'E'})
+			tracelog.ErrorLogger.Println("Failed to handle message:", err)
+			_, err = c.Write(ErrorType.ToBytes())
+			tracelog.ErrorLogger.PrintOnError(err)
 			return
 		}
-		if messageType == 'F' {
+		if messageType == FileNameType {
+			tracelog.InfoLogger.Printf("Successful archiving for %s\n", string(messageBody))
 			return
 		}
 	}

@@ -29,7 +29,7 @@ wal-g --config=${TMP_CONFIG} daemon ${SOCKET} &
 
 until [ -S ${SOCKET} ]
 do
-  sleep 2
+  sleep 1
 done
 echo "walg-daemon is working"
 
@@ -40,6 +40,7 @@ if {
   echo -n "${WAL}"
 } | nc -U ${SOCKET} | grep -q "OO"; then
   echo "WAL-G response is correct"
+  wal-g --config=${TMP_CONFIG} st ls wal_005/${WAL}.br
 else
   echo "Error in WAL-G response"
   exit 1

@@ -38,9 +38,7 @@ var walPushCmd = &cobra.Command{
 
 		uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
 		err = postgres.HandleWALPush(uploader, args[0])
-		if err != nil {
-			tracelog.ErrorLogger.FatalOnError(err)
-		}
+		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
 
