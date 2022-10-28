@@ -95,6 +95,7 @@ services:
       &&  mkdir -p /export/createrestorepointbucket
       &&  mkdir -p /export/storagetoolsbucket
       &&  mkdir -p /export/walrestorebucket
+      && mkdir -p /export/daemonbucket
       &&  /usr/bin/minio server /export'
 
   s3-another:
@@ -575,6 +576,17 @@ services:
       context: .
     image: wal-g/wal_restore_test
     container_name: wal-g_pg_wal_restore_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_daemon_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_daemon_test
+      context: .
+    image: wal-g/daemon_test
+    container_name: wal-g_pg_daemon_test
     depends_on:
       - s3
     links:

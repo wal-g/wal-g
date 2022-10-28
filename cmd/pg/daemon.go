@@ -9,12 +9,12 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-const WalPushShortDescription = "Uploads a WAL file to storage"
+const DaemonShortDescription = "Uploads a WAL file to storage"
 
-// walPushCmd represents the walPush command
-var walPushCmd = &cobra.Command{
-	Use:   "wal-push wal_filepath",
-	Short: WalPushShortDescription, // TODO : improve description
+// daemonCmd represents the daemon archive command
+var daemonCmd = &cobra.Command{
+	Use:   "daemon daemon_socket_path",
+	Short: DaemonShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := postgres.ConfigureWalUploader()
@@ -35,13 +35,11 @@ var walPushCmd = &cobra.Command{
 			tracelog.ErrorLogger.PrintError(err)
 			uploader.PGArchiveStatusManager = asm.NewNopASM()
 		}
-
 		uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
-		err = postgres.HandleWALPush(uploader, args[0])
-		tracelog.ErrorLogger.FatalOnError(err)
+		postgres.HandleDaemon(uploader, args[0])
 	},
 }
 
 func init() {
-	Cmd.AddCommand(walPushCmd)
+	Cmd.AddCommand(daemonCmd)
 }
