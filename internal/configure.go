@@ -261,8 +261,9 @@ func ConfigureSplitUploader() (UploaderProvider, error) {
 
 	var partitions = viper.GetInt(StreamSplitterPartitions)
 	var blockSize = viper.GetSizeInBytes(StreamSplitterBlockSize)
+	var maxFileSize = viper.GetInt(StreamMaxFileSize)
 
-	splitStreamUploader := NewSplitStreamUploader(uploader, partitions, int(blockSize))
+	splitStreamUploader := NewSplitStreamUploader(uploader, partitions, int(blockSize), maxFileSize)
 	return splitStreamUploader, nil
 }
 
