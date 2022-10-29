@@ -231,11 +231,11 @@ func setTablespacePaths(spec TablespaceSpec) error {
 	for _, location := range spec.tablespaceLocations() {
 		err := fs.NewFolder(location.Location, "").EnsureExists()
 		if err != nil {
-			return fmt.Errorf("error creating folder for tablespace %v", err)
+			return fmt.Errorf("error creating %v folder %v", location.Location, err)
 		}
-		err = os.Symlink(location.Location, filepath.Join(basePrefix, location.Symlink))
+		err = spec.EnsureSymlinkExist(location)
 		if err != nil {
-			return fmt.Errorf("error creating tablespace symkink %v", err)
+			return fmt.Errorf("error creating correct tablespace symlink %v", err)
 		}
 	}
 	return nil
